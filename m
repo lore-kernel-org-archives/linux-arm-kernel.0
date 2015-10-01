@@ -1,111 +1,58 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 1 Oct 2015 22:38:37 +0200
-Subject: [PULL] clk: at91: sama5d2 materials
-In-Reply-To: <20151001194747.GK19319@codeaurora.org>
-References: <20150818102401.17de779b@bbrezillon>
- <20150825191033.31346.67237@quantum>
- <20151001194747.GK19319@codeaurora.org>
-Message-ID: <20151001223837.583b8b2d@bbrezillon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 1 Oct 2015 22:12:15 +0200
+Subject: [PATCH v2 1/4] dt-bindings: add sunxi SPDIF transceiver bindings
+In-Reply-To: <1443635458-8873-2-git-send-email-codekipper@gmail.com>
+References: <1443635458-8873-1-git-send-email-codekipper@gmail.com>
+ <1443635458-8873-2-git-send-email-codekipper@gmail.com>
+Message-ID: <20151001201215.GN7104@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Thu, 1 Oct 2015 12:47:48 -0700
-Stephen Boyd <sboyd@codeaurora.org> wrote:
-
-> On 08/25, Michael Turquette wrote:
-> > Quoting Boris Brezillon (2015-08-18 01:24:01)
-> > > Stephen, Mike,
-> > > 
-> > > Here is a PR for the sama5d2 materials.
-> > > I know we're already late in the release cycle and I'm not sure you can
-> > > take this PR into account for 4.3, so if you can't could you please
-> > > queue it for 4.4?
-> > 
-> > Queued for 4.4.
-> > 
-> > Thanks,
-> > Mike
-> > 
-> > > 
-> > > Thanks,
-> > > 
-> > > Boris
-> > > 
-> > > The following changes since commit c42743f11f58646a50bc4b96da363429dca0c5e6:
-> > > 
+On Wed, Sep 30, 2015 at 07:50:55PM +0200, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 > 
-> This commit was in clk-next and then got rebased. clk-next isn't
-> stable, please don't base pull requests on it. If you have some
-> dependency on the patches in there then we need to know so that
-> we can provide some branch.
-
-Yes, sorry about that, I'll base my future PR on linus' master branch.
-
+> Add devicetree bindings for the SPDIF transceiver found on
+> found on Allwinners A10, A20 and A31 SoCs.
 > 
-> I cherry-picked the 4 patches to clk-next. I had to squash in this fix
-> to get it to compile. Please check.
-
-Thanks, looks good to me.
-Nicolas, can you test it on a real platform?
-
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>  .../devicetree/bindings/sound/sunxi,spdif.txt      | 49 ++++++++++++++++++++++
+>  1 file changed, 49 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/sunxi,spdif.txt
 > 
-> ---8<----
-> diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-> index 631123ca6f85..abc80949e1dd 100644
-> --- a/drivers/clk/at91/clk-generated.c
-> +++ b/drivers/clk/at91/clk-generated.c
-> @@ -99,22 +99,22 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
->  					struct clk_rate_request *req)
->  {
->  	struct clk_generated *gck = to_clk_generated(hw);
-> -	struct clk *parent = NULL;
-> +	struct clk_hw *parent = NULL;
->  	long best_rate = -EINVAL;
->  	unsigned long tmp_rate, min_rate;
->  	int best_diff = -1;
->  	int tmp_diff;
->  	int i;
->  
-> -	for (i = 0; i < __clk_get_num_parents(hw->clk); i++) {
-> +	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
->  		u32 div;
->  		unsigned long parent_rate;
->  
-> -		parent = clk_get_parent_by_index(hw->clk, i);
-> +		parent = clk_hw_get_parent_by_index(hw, i);
->  		if (!parent)
->  			continue;
->  
-> -		parent_rate = __clk_get_rate(parent);
-> +		parent_rate = clk_hw_get_rate(parent);
->  		min_rate = DIV_ROUND_CLOSEST(parent_rate, GENERATED_MAX_DIV + 1);
->  		if (!parent_rate ||
->  		    (gck->range.max && min_rate > gck->range.max))
-> @@ -128,7 +128,7 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
->  				best_rate = tmp_rate;
->  				best_diff = tmp_diff;
->  				req->best_parent_rate = parent_rate;
-> -				req->best_parent_hw = __clk_get_hw(parent);
-> +				req->best_parent_hw = parent;
->  			}
->  
->  			if (!best_diff || tmp_rate < req->rate)
-> @@ -156,7 +156,7 @@ static int clk_generated_set_parent(struct clk_hw *hw, u8 index)
->  {
->  	struct clk_generated *gck = to_clk_generated(hw);
->  
-> -	if (index >= __clk_get_num_parents(hw->clk))
-> +	if (index >= clk_hw_get_num_parents(hw))
->  		return -EINVAL;
->  
->  	gck->parent_id = index;
-> 
+> diff --git a/Documentation/devicetree/bindings/sound/sunxi,spdif.txt b/Documentation/devicetree/bindings/sound/sunxi,spdif.txt
+> new file mode 100644
+> index 0000000..1868722
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/sunxi,spdif.txt
+> @@ -0,0 +1,49 @@
+> +Allwinner Sony/Philips Digital Interface Format (S/PDIF) Controller
+> +
+> +The Allwinner S/PDIF audio block is a transceiver that allows the
+> +processor to receive and transmit digital audio via an coaxial cable or
+> +a fibre cable.
+> +
+> +Required properties:
+> +
+> +  - compatible		: should be one of the following:
+> +    - "allwinner,sun4i-a10-spdif": for the Allwinner A10 SoC
+> +    - "allwinner,sun7i-a20-spdif": for the Allwinner A20 SoC
+> +    - "allwinner,sun6i-a31-spdif": for the Allwinner A31 SoC
 
+Are all these compatibles really work? Is there any significant
+difference between the controller on all these SoCs?
 
+Thanks,
+Maxime
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151001/30054a00/attachment.sig>
