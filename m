@@ -1,32 +1,110 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 1 Oct 2015 18:02:04 +0100
-Subject: [PATCH] arm64: Fix THP protection change logic
-In-Reply-To: <CAPvkgC0oEcfb5pnR_hZDXJc0VxA6edgrCheB5BfYHueuYWtOAA@mail.gmail.com>
-References: <1443701167-10816-1-git-send-email-steve.capper@linaro.org>
- <20151001140755.GF6963@e104818-lin.cambridge.arm.com>
- <CAFpQJXVssNN46+fQmqYiiA0hQ0uCMtVHFQKPUeK39dmM1Pxcvw@mail.gmail.com>
- <CAPvkgC0oEcfb5pnR_hZDXJc0VxA6edgrCheB5BfYHueuYWtOAA@mail.gmail.com>
-Message-ID: <20151001170203.GJ6963@e104818-lin.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  1 Oct 2015 19:04:14 +0200
+Subject: [PATCH 0/9] UEFI boot and runtime services support for 32-bit ARM
+Message-ID: <1443719063-6832-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 01, 2015 at 05:21:02PM +0100, Steve Capper wrote:
-> On 1 October 2015 at 17:09, Ganapatrao Kulkarni <gpkulkarni@gmail.com> wrote:
-> > Thanks Steve.
-> > this patch fixes the issue i was facing when running applications
-> > (which forms thp) with auto numa enabled.
-> >
-> > Tested-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> >
-> 
-> Brilliant, thank you Ganapat.
-> 
-> Catalin, thanks for the review, would you like me to resend with these
-> two tags added, or are you happy to apply them before merging?
+This series adds support for booting the 32-bit ARM kernel directly from
+UEFI firmware using a builtin UEFI stub. It mostly reuses refactored arm64
+code, and the differences (primarily the PE/COFF header and entry point and
+the efi_create_mapping() implementation) are split out into arm64 and ARM
+versions.
 
-No need to resend, I'll add the tags and send a pull request tomorrow.
+Patch #1 splits off most of arch/arm64/kernel/efi.c into arch agnostic files
+arm-init.c and arm-runtime.c under drivers/firmware/efi.
 
-Thanks.
+Patch #2 refactors the code split off in patch #1 to isolate the arm64 specific
+pieces, and change a couple of arm64-isms that ARM handles slightly differently.
+
+Patch #3 enables the generic early_ioremap and early_memremap implementations
+for ARM. It reuses the kmap fixmap region, which is not used that early anyway.
+
+Patch #4 adds support to ARM for the MEMBLOCK_NOMAP region flag.
+
+Patch #5 splits off the core functionality of create_mapping() into a new
+function __create_mapping() that we can reuse for mapping UEFI runtime regions.
+
+Patch #6 factors out the early_alloc() routine so we can invoke __create_mapping
+using another (late) allocator.
+
+Patch #7 implements create_mapping_late() that uses a late allocator.
+
+Patch #8 implements the UEFI support in the kernel proper to probe the UEFI
+memory map and map the runtime services.
+
+Patch #9 ties together all of the above, by implementing the UEFI stub, and
+introducing the Kconfig symbols that allow all of this to be built.
+
+There are a number of prerequisites for this series that have all been sent to
+the linux-arm-kernel mailing list at some point (and mostly ignored).
+
+Matt Fleming's efi-next branch:
+https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/log/?h=next
+
+arm64: EFI stub isolation:
+http://thread.gmane.org/gmane.linux.kernel.efi/6414
+
+arm64: remove UEFI reserved regions from linear mapping (aka MEMBLOCK_NOMAP)
+http://thread.gmane.org/gmane.linux.kernel.mm/138474
+
+arm64 UEFI early FDT handling
+http://thread.gmane.org/gmane.linux.kernel.efi/6334
+
+arm64/efi: adapt to UEFI 2.5 properties table changes
+http://thread.gmane.org/gmane.linux.kernel.efi/5847
+
+The complete series (including all prerequisites) can be found here:
+https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm32-uefi-support
+
+Instructions how to build and run the 32-bit ARM UEFI firmware can be found here:
+https://wiki.linaro.org/LEG/UEFIforQEMU
+
+Ard Biesheuvel (8):
+  arm64/efi: split off EFI init and runtime code for reuse by 32-bit ARM
+  arm64/efi: refactor EFI init and runtime code for reuse by 32-bit ARM
+  ARM: add support for generic early_ioremap/early_memremap
+  ARM: only consider memblocks with NOMAP cleared for linear mapping
+  ARM: split off core mapping logic from create_mapping
+  ARM: factor out allocation routine from __create_mapping()
+  ARM: implement create_mapping_late() for EFI use
+  ARM: wire up UEFI init and runtime support
+
+Roy Franz (1):
+  ARM: add UEFI stub support
+
+ arch/arm/Kconfig                        |  20 +
+ arch/arm/boot/compressed/Makefile       |   5 +-
+ arch/arm/boot/compressed/efi-header.S   | 130 +++++++
+ arch/arm/boot/compressed/efi-stub.c     |  89 +++++
+ arch/arm/boot/compressed/head.S         |  54 ++-
+ arch/arm/boot/compressed/vmlinux.lds.S  |   7 +
+ arch/arm/include/asm/Kbuild             |   1 +
+ arch/arm/include/asm/efi.h              |  92 +++++
+ arch/arm/include/asm/fixmap.h           |  28 +-
+ arch/arm/include/asm/mach/map.h         |   1 +
+ arch/arm/kernel/Makefile                |   1 +
+ arch/arm/kernel/devtree.c               |   4 +
+ arch/arm/kernel/efi.c                   |  71 ++++
+ arch/arm/kernel/setup.c                 |  10 +-
+ arch/arm/mm/init.c                      |  16 +-
+ arch/arm/mm/ioremap.c                   |   9 +
+ arch/arm/mm/mmu.c                       | 110 ++++--
+ arch/arm64/include/asm/efi.h            |  16 +
+ arch/arm64/kernel/efi.c                 | 392 ++------------------
+ drivers/firmware/efi/Makefile           |   4 +-
+ drivers/firmware/efi/arm-init.c         | 215 +++++++++++
+ drivers/firmware/efi/arm-runtime.c      | 148 ++++++++
+ drivers/firmware/efi/efi.c              |   4 +-
+ drivers/firmware/efi/libstub/Makefile   |  12 +
+ drivers/firmware/efi/libstub/arm-stub.c |   4 +-
+ 25 files changed, 1046 insertions(+), 397 deletions(-)
+ create mode 100644 arch/arm/boot/compressed/efi-header.S
+ create mode 100644 arch/arm/boot/compressed/efi-stub.c
+ create mode 100644 arch/arm/include/asm/efi.h
+ create mode 100644 arch/arm/kernel/efi.c
+ create mode 100644 drivers/firmware/efi/arm-init.c
+ create mode 100644 drivers/firmware/efi/arm-runtime.c
 
 -- 
-Catalin
+1.9.1
