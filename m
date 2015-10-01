@@ -1,66 +1,49 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Thu, 1 Oct 2015 05:32:49 +0000
-Subject: Need information on Microblaze/ARM PCIe
-In-Reply-To: <1564493.rNY8FKFBZT@wuerfel>
-References: <loom.20150930T152450-636@post.gmane.org>
- <1564493.rNY8FKFBZT@wuerfel>
-Message-ID: <8520D5D51A55D047800579B094147198016900FD@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 1 Oct 2015 08:57:40 +0300
+Subject: [PATCH 01/11 RESEND] ARM: OMAP: DRA7: hwmod: Add data for McASP3
+In-Reply-To: <560BDCF8.20909@ti.com>
+References: <1442326206-30192-1-git-send-email-peter.ujfalusi@ti.com>
+ <alpine.DEB.2.02.1509270631440.7947@utopia.booyaka.com>
+ <560BB434.6080308@ti.com> <560BDCF8.20909@ti.com>
+Message-ID: <560CCB54.60306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the input, so you mean to say we need modify pci-common.c  to
-provide similar functionality that ARM64 provides.
+On 09/30/2015 04:00 PM, Tero Kristo wrote:
+>>>> +/* l4_per2 -> mcasp3 */
+>>>> +static struct omap_hwmod_ocp_if dra7xx_l4_per2__mcasp3 = {
+>>>> +    .master        = &dra7xx_l4_per2_hwmod,
+>>>> +    .slave        = &dra7xx_mcasp3_hwmod,
+>>>
+>>> So this is the low-speed control/register access port, where the MPU
+>>> writes to the McASP3 config registers...
+>>>
+>>>> +    .clk        = "l3_iclk_div",
+>>>
+>>> ... and thus this interface clock doesn't look right for this port, since
+>>> it's most likely generated from the L4PER2, where this port is connected.
+>>> So it should probably be "l4_iclk_div".
+>>
+>> There is no "l4_iclk_div" for dra7xx. Looking around the file all other script
+>> generated data uses "l3_iclk_div" for IPs under dra7xx_l4_per2_hwmod.
+>>
+>> Tero: do you know the reason for this?
+> 
+> This comes from the autogen generated data. Looking at the hwdb data for dra7,
+> it seems l3 clock is defined as the OCP input clock for most of the modules.
+> 
+> Looking at TRM, we also have L3 ICK defined as the interface clock for GPIO
+> modules for example, and also mcasp modules.
+> 
+> I think this is just a documentation issue and we are missing a divide by 2
+> from all interface clocks, the interface clocks are coming from l4
+> interconnects and the interconnect chapter still clearly states that the l4
+> clock is l3 clock / 2.
 
->From the sentence (or putting it under and Kconfig symbol initially) you
-mean to say (putting it under arm Kconfig symbol).
+It seams that we have the clock node for the l4_iclk_div, but it is called as
+l4_root_clk_div.
 
-Bharat
+I will use this in the mcasp3 hwmod patch.
 
------Original Message-----
-From: Arnd Bergmann [mailto:arnd at arndb.de]
-Sent: Wednesday, September 30, 2015 7:25 PM
-To: linux-arm-kernel at lists.infradead.org
-Cc: Bharat Kumar Gogada
-Subject: Re: Need information on Microblaze/ARM PCIe
-
-On Wednesday 30 September 2015 13:26:15 bharat kumar gogada wrote:
-> We are trying to write a generic PCIE root port driver which works
-> both on zynq (ARM 32 architecture) and Microblaze architecture, since
-> both use same PCIE Hardware IP. So we started exploring microblaze pci
-> architecture. Zynq driver is already present at
-> drivers/pci/host/pcie-xilinx.c
->
-> Microblaze pci mainly relies on arch/microblaze/pci/pci-common.c this file.
-> In this file "static int __init pcibios_init(void)" is the main
-> function which does most of the work, before that we need to allocate
-> struct pci_controller and fill in the required device node and resource details.
->
-> Problem is if we use platform_driver for registration, the
-> "pcibios_init" of microblaze will get invoked before this driver probe
-> is called since it is exported as " subsys_initcall(pcibios_init) "
-> and by that time it doesn't have information of struct pci_controller.
-> (We are using some #ifdef according to archticture)
->
-> So, in order to avoid above problem and remove dependency on
-> "pcibios_init", we tried directly invoking the following functions,
-> without registering to hw_pci in probe:
-> of_pci_get_host_bridge_resources, pci_create_root_bus,
-> pci_scan_child_bus, pci_assign_unassigned_bus_resources, pci_bus_add_devices.
->
-> But then also its not successful since pci subsystem itself is
-> invoking some methods from this file(pci-common.c), and some methods
-> take information from struct pci_controller.
->
-> So I need some inputs what are other possible ways I could try to make
-> generic driver.
-
-You are looking at different ways of structuring the PCI code. PowerPC had a rather elaborate method for their servers, and this is what got copied into microblaze. ARM had a completely different way of doing this that had a bit less complexity but had it in different places. For ARM64, we managed to do away with most of the architecture specific code and instead generalized the common drivers/pci layer to do more of that. Drivers can now be shared between ARM32 and ARM64 with very few differences.
-
-What I'd recommend doing here is to try ripping out most of the PCI code from microblaze (or putting it under and Kconfig symbol initially) and using the same code that ARM64 uses. Start with a copy of drivers/pci/host/pci-host-generic.c for your PCI hardware and add all hardware specific code that you need to get it to work with that.
-
-For the start, ignore all I/O space setup, that should simplify things a lot and can be added in the second step.
-
-        Arnd
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+-- 
+P?ter
