@@ -1,129 +1,126 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  1 Oct 2015 19:04:19 +0200
-Subject: [PATCH 5/9] ARM: split off core mapping logic from create_mapping
+Date: Thu,  1 Oct 2015 19:04:20 +0200
+Subject: [PATCH 6/9] ARM: factor out allocation routine from __create_mapping()
 In-Reply-To: <1443719063-6832-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1443719063-6832-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1443719063-6832-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1443719063-6832-7-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to reuse the core mapping logic of create_mapping
-for mapping the UEFI Runtime Services into a private set of page tables,
-split it off from create_mapping() into a separate function
-__create_mapping which we will wire up in a subsequent patch.
+To allow __create_mapping() to be used for populating UEFI Runtime
+Services page tables, factor out the allocation routine 'early_alloc'
+and pass it down as a function pointer into alloc_init_[pud|pmd|pte].
+This way, new users of __create_mapping() can supply another allocation
+function.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/mm/mmu.c | 56 +++++++++++---------
- 1 file changed, 31 insertions(+), 25 deletions(-)
+ arch/arm/mm/mmu.c | 34 +++++++++++++-------
+ 1 file changed, 23 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 008f28ef6d68..3930bad44a61 100644
+index 3930bad44a61..dd0967ee23b7 100644
 --- a/arch/arm/mm/mmu.c
 +++ b/arch/arm/mm/mmu.c
-@@ -817,7 +817,8 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+@@ -723,21 +723,30 @@ static void __init *early_alloc(unsigned long sz)
+ 	return early_alloc_aligned(sz, sz);
  }
  
- #ifndef CONFIG_ARM_LPAE
--static void __init create_36bit_mapping(struct map_desc *md,
-+static void __init create_36bit_mapping(struct mm_struct *mm,
-+					struct map_desc *md,
- 					const struct mem_type *type)
+-static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr, unsigned long prot)
++static pte_t * __init pte_alloc(pmd_t *pmd, unsigned long addr,
++				unsigned long prot,
++				void *(*alloc)(unsigned long sz))
  {
- 	unsigned long addr, length, end;
-@@ -858,7 +859,7 @@ static void __init create_36bit_mapping(struct map_desc *md,
- 	 */
- 	phys |= (((md->pfn >> (32 - PAGE_SHIFT)) & 0xF) << 20);
+ 	if (pmd_none(*pmd)) {
+-		pte_t *pte = early_alloc(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE);
++		pte_t *pte = alloc(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE);
+ 		__pmd_populate(pmd, __pa(pte), prot);
+ 	}
+ 	BUG_ON(pmd_bad(*pmd));
+ 	return pte_offset_kernel(pmd, addr);
+ }
  
--	pgd = pgd_offset_k(addr);
-+	pgd = pgd_offset(mm, addr);
- 	end = addr + length;
++static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr,
++				      unsigned long prot)
++{
++	return pte_alloc(pmd, addr, prot, early_alloc);
++}
++
+ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 				  unsigned long end, unsigned long pfn,
+-				  const struct mem_type *type)
++				  const struct mem_type *type,
++				  void *(*alloc)(unsigned long sz))
+ {
+-	pte_t *pte = early_pte_alloc(pmd, addr, type->prot_l1);
++	pte_t *pte = pte_alloc(pmd, addr, type->prot_l1, alloc);
  	do {
- 		pud_t *pud = pud_offset(pgd, addr);
-@@ -875,33 +876,13 @@ static void __init create_36bit_mapping(struct map_desc *md,
+ 		set_pte_ext(pte, pfn_pte(pfn, __pgprot(type->prot_pte)), 0);
+ 		pfn++;
+@@ -773,7 +782,8 @@ static void __init __map_init_section(pmd_t *pmd, unsigned long addr,
+ 
+ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 				      unsigned long end, phys_addr_t phys,
+-				      const struct mem_type *type)
++				      const struct mem_type *type,
++				      void *(*alloc)(unsigned long sz))
+ {
+ 	pmd_t *pmd = pmd_offset(pud, addr);
+ 	unsigned long next;
+@@ -794,7 +804,7 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 			__map_init_section(pmd, addr, next, phys, type);
+ 		} else {
+ 			alloc_init_pte(pmd, addr, next,
+-						__phys_to_pfn(phys), type);
++				       __phys_to_pfn(phys), type, alloc);
+ 		}
+ 
+ 		phys += next - addr;
+@@ -804,14 +814,15 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 
+ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+ 				  unsigned long end, phys_addr_t phys,
+-				  const struct mem_type *type)
++				  const struct mem_type *type,
++				  void *(*alloc)(unsigned long sz))
+ {
+ 	pud_t *pud = pud_offset(pgd, addr);
+ 	unsigned long next;
+ 
+ 	do {
+ 		next = pud_addr_end(addr, end);
+-		alloc_init_pmd(pud, addr, next, phys, type);
++		alloc_init_pmd(pud, addr, next, phys, type, alloc);
+ 		phys += next - addr;
+ 	} while (pud++, addr = next, addr != end);
+ }
+@@ -876,7 +887,8 @@ static void __init create_36bit_mapping(struct mm_struct *mm,
  }
  #endif	/* !CONFIG_ARM_LPAE */
  
--/*
-- * Create the page directory entries and any necessary
-- * page tables for the mapping specified by `md'.  We
-- * are able to cope here with varying sizes and address
-- * offsets, and we take full advantage of sections and
-- * supersections.
-- */
--static void __init create_mapping(struct map_desc *md)
-+static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md)
+-static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md)
++static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md,
++				    void *(*alloc)(unsigned long sz))
  {
  	unsigned long addr, length, end;
  	phys_addr_t phys;
- 	const struct mem_type *type;
- 	pgd_t *pgd;
- 
--	if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
--		pr_warn("BUG: not creating mapping for 0x%08llx@0x%08lx in user region\n",
--			(long long)__pfn_to_phys((u64)md->pfn), md->virtual);
--		return;
--	}
--
--	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
--	    md->virtual >= PAGE_OFFSET && md->virtual < FIXADDR_START &&
--	    (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
--		pr_warn("BUG: mapping for 0x%08llx at 0x%08lx out of vmalloc space\n",
--			(long long)__pfn_to_phys((u64)md->pfn), md->virtual);
--	}
--
- 	type = &mem_types[md->type];
- 
- #ifndef CONFIG_ARM_LPAE
-@@ -909,7 +890,7 @@ static void __init create_mapping(struct map_desc *md)
- 	 * Catch 36-bit addresses
- 	 */
- 	if (md->pfn >= 0x100000) {
--		create_36bit_mapping(md, type);
-+		create_36bit_mapping(mm, md, type);
- 		return;
- 	}
- #endif
-@@ -924,7 +905,7 @@ static void __init create_mapping(struct map_desc *md)
- 		return;
- 	}
- 
--	pgd = pgd_offset_k(addr);
-+	pgd = pgd_offset(mm, addr);
- 	end = addr + length;
+@@ -910,7 +922,7 @@ static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md)
  	do {
  		unsigned long next = pgd_addr_end(addr, end);
-@@ -937,6 +918,31 @@ static void __init create_mapping(struct map_desc *md)
+ 
+-		alloc_init_pud(pgd, addr, next, phys, type);
++		alloc_init_pud(pgd, addr, next, phys, type, alloc);
+ 
+ 		phys += next - addr;
+ 		addr = next;
+@@ -939,7 +951,7 @@ static void __init create_mapping(struct map_desc *md)
+ 			(long long)__pfn_to_phys((u64)md->pfn), md->virtual);
+ 	}
+ 
+-	__create_mapping(&init_mm, md);
++	__create_mapping(&init_mm, md, early_alloc);
  }
  
  /*
-+ * Create the page directory entries and any necessary
-+ * page tables for the mapping specified by `md'.  We
-+ * are able to cope here with varying sizes and address
-+ * offsets, and we take full advantage of sections and
-+ * supersections.
-+ */
-+static void __init create_mapping(struct map_desc *md)
-+{
-+	if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
-+		pr_warn("BUG: not creating mapping for 0x%08llx@0x%08lx in user region\n",
-+			(long long)__pfn_to_phys((u64)md->pfn), md->virtual);
-+		return;
-+	}
-+
-+	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
-+	    md->virtual >= PAGE_OFFSET && md->virtual < FIXADDR_START &&
-+	    (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
-+		pr_warn("BUG: mapping for 0x%08llx at 0x%08lx out of vmalloc space\n",
-+			(long long)__pfn_to_phys((u64)md->pfn), md->virtual);
-+	}
-+
-+	__create_mapping(&init_mm, md);
-+}
-+
-+/*
-  * Create the architecture specific mappings
-  */
- void __init iotable_init(struct map_desc *io_desc, int nr)
 -- 
 1.9.1
