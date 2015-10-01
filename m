@@ -1,151 +1,107 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 01 Oct 2015 18:14:51 +0900
-Subject: [RFC PATCH v8 0/10] Add external dma support for Synopsys MSHC
-In-Reply-To: <1442385625-26775-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1442385625-26775-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <560CF98B.7010609@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 01 Oct 2015 10:24:44 +0100
+Subject: [PATCH v3 3/4] PCI/MSI: Add helper function
+ pci_msi_domain_get_msi_rid().
+In-Reply-To: <1443653222-24924-4-git-send-email-ddaney.cavm@gmail.com>
+References: <1443653222-24924-1-git-send-email-ddaney.cavm@gmail.com>
+ <1443653222-24924-4-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <560CFBDC.4020901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear, All.
+Hi David,
 
-I will apply patch 01-03 at my repository on today.
-But i don't know better how i do about other patches relevant to config file.
+On 30/09/15 23:47, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> Add pci_msi_domain_get_msi_rid() to return the MSI requester id (RID).
+> Initially needed by gic-v3 based systems. It will be used by follow on
+> patch to drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> 
+> Initially supports mapping the RID via OF device tree.  In the future,
+> this could be extended to use ACPI _IORT tables as well.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  drivers/pci/msi.c   | 31 +++++++++++++++++++++++++++++++
+>  include/linux/msi.h |  1 +
+>  2 files changed, 32 insertions(+)
+> 
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index d449714..92b6dc9 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/io.h>
+>  #include <linux/slab.h>
+>  #include <linux/irqdomain.h>
+> +#include <linux/of_irq.h>
+>  
+>  #include "pci.h"
+>  
+> @@ -1327,4 +1328,34 @@ struct irq_domain *pci_msi_create_default_irq_domain(struct device_node *node,
+>  
+>  	return domain;
+>  }
+> +
+> +struct get_mis_id_data {
+> +	u32	alias;
+> +};
+> +
+> +static int get_msi_id_cb(struct pci_dev *pdev, u16 alias, void *data)
+> +{
+> +	struct get_mis_id_data *s = data;
+> +
+> +	s->alias = alias;
+> +	return 0;
+> +}
 
-Best Regards,
-Jaehoon Chung
+Why not use a naked u32, since you only have a single field in this
+structure? Or is it that you are anticipating other fields there?
 
-On 09/16/2015 03:40 PM, Shawn Lin wrote:
-> Synopsys DesignWare mobile storage host controller supports three
-> types of transfer mode: pio, internal dma and external dma. However,
-> dw_mmc can only supports pio and internal dma now. Thus some platforms
-> using dw-mshc integrated with generic dma can't work in dma mode. So we
-> submit this patch to achieve it.
+> +/**
+> + * pci_msi_domain_get_msi_rid - Get the MSI requester id (RID)
+> + * @domain:	The interrupt domain
+> + * @pdev:	The PCI device.
+> + *
+> + * The RID for a device is formed from the alias, with a firmware
+> + * supplied mapping applied
+> + *
+> + * Returns: The RID.
+> + */
+> +u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
+> +{
+> +	struct get_mis_id_data d;
+> +
+> +	d.alias = 0;
+> +	pci_for_each_dma_alias(pdev, get_msi_id_cb, &d);
+> +	return of_msi_map_rid(&pdev->dev, domain->of_node, d.alias);
+
+Should you check whether domain->of_node is NULL first? I don't think
+of_msi_map_rid would have any problem with that, but a domain that is
+not backed by an of_node makes me feel a bit uneasy and would tend to
+indicate that we're not using DT.
+
+> +}
+>  #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+> diff --git a/include/linux/msi.h b/include/linux/msi.h
+> index ad939d0..56e3b76 100644
+> --- a/include/linux/msi.h
+> +++ b/include/linux/msi.h
+> @@ -293,6 +293,7 @@ irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
+>  					  struct msi_desc *desc);
+>  int pci_msi_domain_check_cap(struct irq_domain *domain,
+>  			     struct msi_domain_info *info, struct device *dev);
+> +u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev);
+>  #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+>  
+>  #endif /* LINUX_MSI_H */
 > 
-> And the config option, CONFIG_MMC_DW_IDMAC, was added by Will Newton
-> (commit:f95f3850) for the first version of dw_mmc and never be touched since
-> then. At that time dt-bindings hadn't been introduced into dw_mmc yet means
-> we should select CONFIG_MMC_DW_IDMAC to enable internal dma mode at compile
-> time. Nowadays, device-tree helps us to support a variety of boards with one
-> kernel. That's why we need to remove it and decide the transfer mode by reading
-> dw_mmc's HCON reg at runtime.
-> 
-> This RFC patch needs lots of ACKs. I know it's hard, but it does need someone
-> to make the running.
-> 
-> Patch does the following things:
-> - remove CONFIG_MMC_DW_IDMAC config option
-> - add bindings for edmac used by synopsys-dw-mshc
->   at runtime
-> - add edmac support for synopsys-dw-mshc
-> 
-> Patch is based on next of git://git.linaro.org/people/ulf.hansson/mmc
-> 
-> Test emmc throughput on my platform with edmac support and without edmac support(pio only)
-> iozone -L64 -S32 -azecwI -+n -r4k -r64k -r128k -s1g -i0 -i1 -i2 -f datafile -Rb out.xls > /mnt/result.txt
-> (light cpu loading, Direct IO, fixed line size, all pattern recycle, 1GB data in total)
->  ___________________________________________________________
-> |                   external dma mode                       |
-> |-----------------------------------------------------------|
-> |blksz | Random Read | Random Write | Seq Read   | Seq Write|
-> |-----------------------------------------------------------|
-> |4kB   |  13953kB/s  |    8602kB/s  | 13672kB/s  |  9785kB/s|
-> |-----------------------------------------------------------|
-> |64kB  |  46058kB/s  |   24794kB/s  | 48058kB/s  | 25418kB/s|
-> |-----------------------------------------------------------|
-> |128kB |  57026kB/s  |   35117kB/s  | 57375kB/s  | 35183kB/s|
-> |-----------------------------------------------------------|
->                            VS
->  ___________________________________________________________
-> |                          pio mode                         |
-> |-----------------------------------------------------------|
-> |blksz | Random Read  | Random Write | Seq Read  | Seq Write|
-> |-----------------------------------------------------------|
-> |4kB   |  11720kB/s   |    8644kB/s  | 11549kB/s |  9624kB/s|
-> |-----------------------------------------------------------|
-> |64kB  |  21869kB/s   |   24414kB/s  | 22031kB/s | 27986kB/s|
-> |-----------------------------------------------------------|
-> |128kB |  23718kB/s   |   34495kB/s  | 24698kB/s | 34637kB/s|
-> |-----------------------------------------------------------|
-> 
-> 
-> Changes in v8:
-> - remove trans_mode variable
-> - remove unnecessary dma_ops check
-> - remove unnecessary comment
-> - fix coding style based on latest ulf's next
-> - add Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
->   for HCON's changes
-> 
-> Changes in v7:
-> - rebased on Ulf's next
-> - combine condition state
-> - elaborate more about DMA_INTERFACE
-> - define some macro for DMA_INERFACE value
-> - spilt HCON ops' changes into another patch
-> 
-> Changes in v6:
-> - add trans_mode condition for IDMAC initialization
->   suggested by Heiko
-> - re-test my patch on rk3188 platform and update commit msg
-> - update performance of pio vs edmac in cover letter
-> 
-> Changes in v5:
-> - add the title of cover letter
-> - fix typo of comment
-> - add macro for reading HCON register
-> - add "Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>" for exynos_defconfig patch
-> - add "Acked-by: Vineet Gupta <vgupta@synopsys.com>" for axs10x_defconfig patch
-> - add "Acked-by: Govindraj Raja <govindraj.raja@imgtec.com>" and
->   "Acked-by: Ralf Baechle <ralf@linux-mips.org>" for pistachio_defconfig patch
-> - add "Acked-by: Joachim Eastwood <manabian@gmail.com>" for lpc18xx_defconfig patch
-> - add "Acked-by: Wei Xu <xuwei5@hisilicon.com>" for hisi_defconfig patch
-> - rebase on "https://github.com/jh80chung/dw-mmc.git tags/dw-mmc-for-ulf-v4.2" for merging easily
-> 
-> Changes in v4:
-> - remove "host->trans_mode" and use "host->use_dma" to indicate
->   transfer mode.
-> - remove all bt-bindings' changes since we don't need new properities.
-> - check transfer mode at runtime by reading HCON reg
-> - spilt defconfig changes for each sub-architecture
-> - fix the title of cover letter
-> - reuse some code for reducing code size
-> 
-> Changes in v3:
-> - choose transfer mode at runtime
-> - remove all CONFIG_MMC_DW_IDMAC config option
-> - add supports-idmac property for some platforms
-> 
-> Changes in v2:
-> - Fix typo of dev_info msg
-> - remove unused dmach from declaration of dw_mci_dma_slave
-> 
-> Shawn Lin (10):
->   mmc: dw_mmc: Add external dma interface support
->   mmc: dw_mmc: use macro for HCON register operations
->   Documentation: synopsys-dw-mshc: add bindings for idmac and edmac
->   mips: pistachio_defconfig: remove CONFIG_MMC_DW_IDMAC
->   arc: axs10x_defconfig: remove CONFIG_MMC_DW_IDMAC
->   arm: exynos_defconfig: remove CONFIG_MMC_DW_IDMAC
->   arm: hisi_defconfig: remove CONFIG_MMC_DW_IDMAC
->   arm: lpc18xx_defconfig: remove CONFIG_MMC_DW_IDMAC
->   arm: multi_v7_defconfig: remove CONFIG_MMC_DW_IDMAC
->   arm: zx_defconfig: remove CONFIG_MMC_DW_IDMAC
-> 
->  .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |  25 ++
->  arch/arc/configs/axs101_defconfig                  |   1 -
->  arch/arc/configs/axs103_defconfig                  |   1 -
->  arch/arc/configs/axs103_smp_defconfig              |   1 -
->  arch/arm/configs/exynos_defconfig                  |   1 -
->  arch/arm/configs/hisi_defconfig                    |   1 -
->  arch/arm/configs/lpc18xx_defconfig                 |   1 -
->  arch/arm/configs/multi_v7_defconfig                |   1 -
->  arch/arm/configs/zx_defconfig                      |   1 -
->  arch/mips/configs/pistachio_defconfig              |   1 -
->  drivers/mmc/host/Kconfig                           |  11 +-
->  drivers/mmc/host/dw_mmc-pltfm.c                    |   2 +
->  drivers/mmc/host/dw_mmc.c                          | 272 +++++++++++++++++----
->  drivers/mmc/host/dw_mmc.h                          |   9 +
->  include/linux/mmc/dw_mmc.h                         |  23 +-
->  15 files changed, 276 insertions(+), 75 deletions(-)
-> 
+
+Otherwise looks good to me.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
