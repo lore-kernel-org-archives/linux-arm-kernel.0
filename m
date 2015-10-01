@@ -1,70 +1,121 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Thu, 1 Oct 2015 21:39:02 +0530
-Subject: [PATCH] arm64: Fix THP protection change logic
-In-Reply-To: <20151001140755.GF6963@e104818-lin.cambridge.arm.com>
-References: <1443701167-10816-1-git-send-email-steve.capper@linaro.org>
- <20151001140755.GF6963@e104818-lin.cambridge.arm.com>
-Message-ID: <CAFpQJXVssNN46+fQmqYiiA0hQ0uCMtVHFQKPUeK39dmM1Pxcvw@mail.gmail.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Thu, 1 Oct 2015 09:13:12 -0700
+Subject: [PATCH v3 3/4] PCI/MSI: Add helper function
+ pci_msi_domain_get_msi_rid().
+In-Reply-To: <560CFBDC.4020901@arm.com>
+References: <1443653222-24924-1-git-send-email-ddaney.cavm@gmail.com>
+ <1443653222-24924-4-git-send-email-ddaney.cavm@gmail.com>
+ <560CFBDC.4020901@arm.com>
+Message-ID: <560D5B98.5050400@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Steve.
-this patch fixes the issue i was facing when running applications
-(which forms thp) with auto numa enabled.
-
-Tested-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-
-On Thu, Oct 1, 2015 at 7:37 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Oct 01, 2015 at 01:06:07PM +0100, Steve Capper wrote:
->> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
->> index 56283f8..cf73194 100644
->> --- a/arch/arm64/include/asm/pgtable.h
->> +++ b/arch/arm64/include/asm/pgtable.h
->> @@ -80,7 +80,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
->>  #define PAGE_S2                      __pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
->>  #define PAGE_S2_DEVICE               __pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
+On 10/01/2015 02:24 AM, Marc Zyngier wrote:
+> Hi David,
+>
+> On 30/09/15 23:47, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
 >>
->> -#define PAGE_NONE            __pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
->> +#define PAGE_NONE            __pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
->>  #define PAGE_SHARED          __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
->>  #define PAGE_SHARED_EXEC     __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
->>  #define PAGE_COPY            __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
->> @@ -460,7 +460,7 @@ static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
->>  static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
->>  {
->>       const pteval_t mask = PTE_USER | PTE_PXN | PTE_UXN | PTE_RDONLY |
->> -                           PTE_PROT_NONE | PTE_WRITE | PTE_TYPE_MASK;
->> +                           PTE_PROT_NONE | PTE_VALID | PTE_WRITE;
->>       pte_val(pte) = (pte_val(pte) & ~mask) | (pgprot_val(newprot) & mask);
->>       return pte;
->>  }
+>> Add pci_msi_domain_get_msi_rid() to return the MSI requester id (RID).
+>> Initially needed by gic-v3 based systems. It will be used by follow on
+>> patch to drivers/irqchip/irq-gic-v3-its-pci-msi.c
+>>
+>> Initially supports mapping the RID via OF device tree.  In the future,
+>> this could be extended to use ACPI _IORT tables as well.
+>>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> ---
+>>   drivers/pci/msi.c   | 31 +++++++++++++++++++++++++++++++
+>>   include/linux/msi.h |  1 +
+>>   2 files changed, 32 insertions(+)
+>>
+>> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+>> index d449714..92b6dc9 100644
+>> --- a/drivers/pci/msi.c
+>> +++ b/drivers/pci/msi.c
+>> @@ -20,6 +20,7 @@
+>>   #include <linux/io.h>
+>>   #include <linux/slab.h>
+>>   #include <linux/irqdomain.h>
+>> +#include <linux/of_irq.h>
+>>
+>>   #include "pci.h"
+>>
+>> @@ -1327,4 +1328,34 @@ struct irq_domain *pci_msi_create_default_irq_domain(struct device_node *node,
+>>
+>>   	return domain;
+>>   }
+>> +
+>> +struct get_mis_id_data {
+>> +	u32	alias;
+>> +};
+>> +
+>> +static int get_msi_id_cb(struct pci_dev *pdev, u16 alias, void *data)
+>> +{
+>> +	struct get_mis_id_data *s = data;
+>> +
+>> +	s->alias = alias;
+>> +	return 0;
+>> +}
 >
-> Thanks for looking into this. So for ptes, we need the type bits to be:
->
-> 0b?0: unmapped/PAGE_NONE
-> 0b11: mapped
->
-> With pmd block (huge page), we want:
->
-> 0b?0: unmapped/PAGE_NONE
-> 0b01: mapped
->
-> With your fix, bit 1 is no longer touched by pte_modify(). It looks fine
-> to me. Another option would have been a separate pmd_modify() function
-> with its own mask but I think it's cleaner this way.
->
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->
-> Let's see if it fixes the issue for Ganapatrao and Will or I will send
-> it upstream.
->
-> --
-> Catalin
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Why not use a naked u32, since you only have a single field in this
+> structure? Or is it that you are anticipating other fields there?
 
-thanks
-Ganapat
+In this case, I think using a pointer to u32 is a good idea.  It would 
+simplify the source code somewhat.  Although, I think the generated 
+binary would likely be the same.  I don't foresee adding things to this 
+structure.  If it becomes necessary in the future, we can just go back 
+to using a pointer to a structure.
+
+>
+>> +/**
+>> + * pci_msi_domain_get_msi_rid - Get the MSI requester id (RID)
+>> + * @domain:	The interrupt domain
+>> + * @pdev:	The PCI device.
+>> + *
+>> + * The RID for a device is formed from the alias, with a firmware
+>> + * supplied mapping applied
+>> + *
+>> + * Returns: The RID.
+>> + */
+>> +u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
+>> +{
+>> +	struct get_mis_id_data d;
+>> +
+>> +	d.alias = 0;
+>> +	pci_for_each_dma_alias(pdev, get_msi_id_cb, &d);
+>> +	return of_msi_map_rid(&pdev->dev, domain->of_node, d.alias);
+>
+> Should you check whether domain->of_node is NULL first? I don't think
+> of_msi_map_rid would have any problem with that, but a domain that is
+> not backed by an of_node makes me feel a bit uneasy and would tend to
+> indicate that we're not using DT.
+
+Yes, that makes sense.  As you observe, I think it probably works as is, 
+but it would be good to make it more clear.  This is especially true 
+when we add ACPI support.  We will want to be clear on which of 
+device-tree or ACPI we are using.
+
+
+>
+>> +}
+>>   #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+>> diff --git a/include/linux/msi.h b/include/linux/msi.h
+>> index ad939d0..56e3b76 100644
+>> --- a/include/linux/msi.h
+>> +++ b/include/linux/msi.h
+>> @@ -293,6 +293,7 @@ irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
+>>   					  struct msi_desc *desc);
+>>   int pci_msi_domain_check_cap(struct irq_domain *domain,
+>>   			     struct msi_domain_info *info, struct device *dev);
+>> +u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev);
+>>   #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+>>
+>>   #endif /* LINUX_MSI_H */
+>>
+>
+> Otherwise looks good to me.
+
+I will send what I hope is the final revision of the patches later today.
+
+David Daney
