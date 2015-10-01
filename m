@@ -1,87 +1,64 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 1 Oct 2015 12:44:41 +0100
-Subject: [PATCH v9 4/5] xhci: mediatek: support MTK xHCI host controller
-In-Reply-To: <1443495698-32233-5-git-send-email-chunfeng.yun@mediatek.com>
-References: <1443495698-32233-1-git-send-email-chunfeng.yun@mediatek.com>
- <1443495698-32233-5-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <560D1CA9.1050009@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 1 Oct 2015 12:55:46 +0100
+Subject: [PATCH linux-next v11 1/3] mfd: atmel-flexcom: create include
+ file with macros used by DT bindings
+In-Reply-To: <97f3621def8ca996e6e5ca48870e29d452e252d9.1443431309.git.cyrille.pitchen@atmel.com>
+References: <cover.1443431309.git.cyrille.pitchen@atmel.com>
+ <97f3621def8ca996e6e5ca48870e29d452e252d9.1443431309.git.cyrille.pitchen@atmel.com>
+Message-ID: <20151001115546.GS3214@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/09/15 04:01, Chunfeng Yun wrote:
-> There some vendor quirks for MTK xhci host controller:
-> 1. It defines some extra SW scheduling parameters for HW
->    to minimize the scheduling effort for synchronous and
->    interrupt endpoints. The parameters are put into reseved
->    DWs of slot context and endpoint context.
-> 2. Its IMODI unit for Interrupter Moderation register is
->    8 times as much as that defined in xHCI spec.
-> 3. Its TDS in  Normal TRB defines a number of packets that
->    remains to be transferred for a TD after processing all
->    Max packets in all previous TRBs.
->
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+On Mon, 28 Sep 2015, Cyrille Pitchen wrote:
 
-I've done some basic soak tests, both with a directly attached USB3 HDD 
-and, given the extra code to manage isochronous xfer, also with a hub, 
-disc and two audio interfaces.
+> This patch defines some macros to be used as value for the
+> "atmel,flexcom-mode" DT property. This value is then written into
+> the Operating Mode (OPMODE) bit field of the Flexcom Mode Register.
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  include/dt-bindings/mfd/atmel-flexcom.h | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 include/dt-bindings/mfd/atmel-flexcom.h
 
-Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
+Applied, thanks.
 
-
-> diff --git a/drivers/usb/host/xhci-ring.c b/drivers/usb/host/xhci-ring.c
-> index 57f40a1..243f696 100644
-> --- a/drivers/usb/host/xhci-ring.c
-> +++ b/drivers/usb/host/xhci-ring.c
-> @@ -68,6 +68,7 @@
->   #include <linux/slab.h>
->   #include "xhci.h"
->   #include "xhci-trace.h"
-> +#include "xhci-mtk.h"
->
->   /*
->    * Returns zero if the TRB isn't in this segment, otherwise it returns the DMA
-> @@ -3044,18 +3045,27 @@ static u32 xhci_td_remainder(struct xhci_hcd *xhci, int transferred,
->   			      struct urb *urb, unsigned int num_trbs_left)
->   {
->   	u32 maxp, total_packet_count;
-> +	u32 skip_current_trb = 0;
-
-A bit of a nitpick but why do we need skip_current_trb? Testing 
-(xhci->quirks & XHCI_MTK_HOST) twice would make what the code does, and 
-why, more obvious.
-
-Anyhow with that looked at, and the caveat that I'm not much of USB 
-expert, you're welcome to add my Reviewed-by: to v10.
-
->
-> -	if (xhci->hci_version < 0x100)
-> -		return ((td_total_len - transferred) >> 10);
-> -
-> -	maxp = GET_MAX_PACKET(usb_endpoint_maxp(&urb->ep->desc));
-> -	total_packet_count = DIV_ROUND_UP(td_total_len, maxp);
-> +	if (xhci->hci_version < 0x100) {
-> +		/* for MTK xHCI, TD size doesn't include this TRB */
-> +		if (xhci->quirks & XHCI_MTK_HOST)
-> +			skip_current_trb = 1;
-> +		else
-> +			return ((td_total_len - transferred) >> 10);
-> +	}
->
->   	/* One TRB with a zero-length data packet. */
->   	if (num_trbs_left == 0 || (transferred == 0 && trb_buff_len == 0) ||
->   	    trb_buff_len == td_total_len)
->   		return 0;
->
-> +	if (skip_current_trb)
-> +		trb_buff_len = 0;
+> diff --git a/include/dt-bindings/mfd/atmel-flexcom.h b/include/dt-bindings/mfd/atmel-flexcom.h
+> new file mode 100644
+> index 000000000000..a266fe4ee945
+> --- /dev/null
+> +++ b/include/dt-bindings/mfd/atmel-flexcom.h
+> @@ -0,0 +1,26 @@
+> +/*
+> + * This header provides macros for Atmel Flexcom DT bindings.
+> + *
+> + * Copyright (C) 2015 Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but
+> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
 > +
-> +	maxp = GET_MAX_PACKET(usb_endpoint_maxp(&urb->ep->desc));
-> +	total_packet_count = DIV_ROUND_UP(td_total_len, maxp);
+> +#ifndef __DT_BINDINGS_ATMEL_FLEXCOM_H__
+> +#define __DT_BINDINGS_ATMEL_FLEXCOM_H__
 > +
->   	/* Queueing functions don't count the current TRB into transferred */
->   	return (total_packet_count - ((transferred + trb_buff_len) / maxp));
->   }
+> +#define ATMEL_FLEXCOM_MODE_USART	1
+> +#define ATMEL_FLEXCOM_MODE_SPI		2
+> +#define ATMEL_FLEXCOM_MODE_TWI		3
+> +
+> +#endif /* __DT_BINDINGS_ATMEL_FLEXCOM_H__ */
 
-
-Daniel.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
