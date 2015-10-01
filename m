@@ -1,46 +1,63 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 1 Oct 2015 10:24:38 +0200
-Subject: [PATCH 08/16] clk: at91: only enable available IRQs
-In-Reply-To: <1443629469-15086-9-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1443629469-15086-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1443629469-15086-9-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20151001082438.GJ31199@odux.rfo.atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 1 Oct 2015 10:32:42 +0200
+Subject: [linux-sunxi] Re: [PATCH 2/6] ARM: dts: sun7i: Enable USB DRC on
+ Bananapi
+In-Reply-To: <560A4B3D.4040007@redhat.com>
+References: <1442928966-6418-1-git-send-email-hdegoede@redhat.com>
+ <1442928966-6418-2-git-send-email-hdegoede@redhat.com>
+ <20150929080453.GN7104@lukather> <560A4B3D.4040007@redhat.com>
+Message-ID: <20151001083242.GB7104@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 06:11:01PM +0200, Alexandre Belloni wrote:
-> From: Boris Brezillon <boris.brezillon@free-electrons.com>
-> 
-> Only enable available IRQs in case writing to a reserved bit has an armful
-> effect.
+Hi,
 
-You probably mean disable instead of enable and s/armful/harmful.
+On Tue, Sep 29, 2015 at 10:26:37AM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 29-09-15 10:04, Maxime Ripard wrote:
+> >On Tue, Sep 22, 2015 at 03:36:01PM +0200, Hans de Goede wrote:
+> >>Enable the otg/drc usb controller on the Bananapi.
+> >>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >
+> >Applied all the other patches but this one.
+> 
+> Thanks, seems you did not push this to your git.kernel.org repo though ?
 
+I think I did, but maybe not at the time you sent the mail.
+
+> >Since we dropped the patch adding the regulators support on the
+> >Bananapi until we figure out why the board crash, it doesn't compile
+> >anymore.
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  drivers/clk/at91/pmc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> How about me doing a v2 of the regulators patch which removes the
 > 
-> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-> index 6c1f08a73373..45dd32bf2531 100644
-> --- a/drivers/clk/at91/pmc.c
-> +++ b/drivers/clk/at91/pmc.c
-> @@ -287,7 +287,7 @@ static int __init atmel_pmc_probe(struct platform_device *pdev)
->  	if (!pmc->irqdomain)
->  		return 0;
->  
-> -	regmap_write(pmc->regmap, AT91_PMC_IDR, 0xffffffff);
-> +	regmap_write(pmc->regmap, AT91_PMC_IDR, pmc->caps->available_irqs);
->  	ret = request_irq(pmc->virq, pmc_irq_handler,
->  			  IRQF_SHARED | IRQF_COND_SUSPEND, "pmc", pmc);
->  	if (ret)
-> -- 
-> 2.1.4
+> &cpu0 {
+>         cpu-supply = <&reg_dcdc2>;
+> };
 > 
+> So that we do not get cpu voltage scaling, then the regulator
+> changes should be a NOP, everything should just keep the u-boot
+> set voltages, and we can enable oth support.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> And then when we've figured out a safe way to enable cpu voltage
+> scaling we can do so with a follow up patch ?
+> 
+> Is that a plan ? If so say yes and I'll do a v2 of these patches :)
+
+Yep, it sounds like a good plan :)
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151001/f0ed65c4/attachment-0001.sig>
