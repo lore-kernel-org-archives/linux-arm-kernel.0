@@ -1,8 +1,8 @@
 From: xerofoify@gmail.com (Nicholas Krause)
-Date: Wed, 30 Sep 2015 22:28:51 -0400
+Date: Wed, 30 Sep 2015 22:35:46 -0400
 Subject: [PATCH] mach:-s3c64xx:Output trace information with WARN_ON if calls
  for setting up gpio board configuration fail in s3c64xx_i2s_cfg_gpio
-Message-ID: <1443666531-2377-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <1443666946-16400-1-git-send-email-xerofoify@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
