@@ -1,40 +1,47 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 1 Oct 2015 08:18:37 -0500
-Subject: [PATCH 2/4] of: documentation: add bindings documentation for
- Meson8b
-In-Reply-To: <1443699514-11590-3-git-send-email-carlo@caione.org>
-References: <1443699514-11590-1-git-send-email-carlo@caione.org>
- <1443699514-11590-3-git-send-email-carlo@caione.org>
-Message-ID: <CAL_JsqK4wjfbwvYmB459OhyqJpWgm6GtR3PtsDqiH2QE+FJ_ag@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 1 Oct 2015 22:18:57 +0900
+Subject: [PATCH] thermal: exynos: fix register read in TMU
+In-Reply-To: <1443699599-9693-1-git-send-email-sudipm.mukherjee@gmail.com>
+References: <1443699599-9693-1-git-send-email-sudipm.mukherjee@gmail.com>
+Message-ID: <CAJKOXPfyC8etcPe373q6Pc1qWb2zVnHE96V+Rh5mPmpzAxFjiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 1, 2015 at 6:38 AM, Carlo Caione <carlo@caione.org> wrote:
-> From: Carlo Caione <carlo@endlessm.com>
+2015-10-01 20:39 GMT+09:00 Sudip Mukherjee <sudipm.mukherjee@gmail.com>:
+> The value of emul_con was getting overwritten if the selected soc is
+> SOC_ARCH_EXYNOS5260. And so as a result we were reading from the wrong
+> register in the case of SOC_ARCH_EXYNOS5260.
+
+How the value is overwritten if the soc is Exynos5260? I can't see it
+(although the "else if" is still more obvious than "if" but how does
+the description match the code?).
+
+Best regards,
+Krzysztof
+
 >
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> Signed-off-by: Sudip Mukherjee <sudip@vectorindia.org>
 > ---
->  Documentation/devicetree/bindings/arm/amlogic.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  drivers/thermal/samsung/exynos_tmu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-> index 973884a..b1a6444 100644
-> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
-> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-> @@ -9,6 +9,12 @@ Boards with the Amlogic Meson8 SoC shall have the following properties:
->    Required root node property:
->      compatible: "amlogic,meson8";
+> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+> index 0bae8cc..ca920b0 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.c
+> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> @@ -932,7 +932,7 @@ static void exynos4412_tmu_set_emulation(struct exynos_tmu_data *data,
 >
-> +Boards with the Amlogic Meson8b SoC shall have the following properties:
-> +  Required root node property:
-> +    compatible: "amlogic,meson8b";
-> +
->  Board compatible values:
->    - "geniatech,atv1200"
->    - "minix,neo-x8"
-> +  - "tronfy,mxq"
-> +  - "hardkernel,odroid-c1"
-
-It would be good to separate which board compatibles apply to which SOC.
-
-Rob
+>         if (data->soc == SOC_ARCH_EXYNOS5260)
+>                 emul_con = EXYNOS5260_EMUL_CON;
+> -       if (data->soc == SOC_ARCH_EXYNOS5433)
+> +       else if (data->soc == SOC_ARCH_EXYNOS5433)
+>                 emul_con = EXYNOS5433_TMU_EMUL_CON;
+>         else if (data->soc == SOC_ARCH_EXYNOS7)
+>                 emul_con = EXYNOS7_TMU_REG_EMUL_CON;
+> --
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
