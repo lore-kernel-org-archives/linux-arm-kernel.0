@@ -1,90 +1,70 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 01 Oct 2015 19:04:51 +0300
-Subject: [PATCH v2 4/6] pinctrl: sh-pfc: Stop calling
- gpiochip_add_pin_range() on DT platforms
-In-Reply-To: <1438696519-13727-5-git-send-email-geert+renesas@glider.be>
-References: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
- <1438696519-13727-5-git-send-email-geert+renesas@glider.be>
-Message-ID: <1907000.EBhLlX2sDO@avalon>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Thu, 1 Oct 2015 21:39:02 +0530
+Subject: [PATCH] arm64: Fix THP protection change logic
+In-Reply-To: <20151001140755.GF6963@e104818-lin.cambridge.arm.com>
+References: <1443701167-10816-1-git-send-email-steve.capper@linaro.org>
+ <20151001140755.GF6963@e104818-lin.cambridge.arm.com>
+Message-ID: <CAFpQJXVssNN46+fQmqYiiA0hQ0uCMtVHFQKPUeK39dmM1Pxcvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Thanks Steve.
+this patch fixes the issue i was facing when running applications
+(which forms thp) with auto numa enabled.
 
-Thank you for the patch.
+Tested-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
 
-On Tuesday 04 August 2015 15:55:17 Geert Uytterhoeven wrote:
-> On platforms where the PFC/GPIO controller is instantiated from DT, the
-> mapping between GPIOs and pins is set up using the "gpio-ranges"
-> property in DT.
-> 
-> Hence stop setting up the mapping from C code on DT platforms.
-> This code is still used for SH or ARM-legacy platforms.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Oct 1, 2015 at 7:37 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Thu, Oct 01, 2015 at 01:06:07PM +0100, Steve Capper wrote:
+>> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+>> index 56283f8..cf73194 100644
+>> --- a/arch/arm64/include/asm/pgtable.h
+>> +++ b/arch/arm64/include/asm/pgtable.h
+>> @@ -80,7 +80,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
+>>  #define PAGE_S2                      __pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
+>>  #define PAGE_S2_DEVICE               __pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
+>>
+>> -#define PAGE_NONE            __pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
+>> +#define PAGE_NONE            __pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
+>>  #define PAGE_SHARED          __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
+>>  #define PAGE_SHARED_EXEC     __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
+>>  #define PAGE_COPY            __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+>> @@ -460,7 +460,7 @@ static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
+>>  static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+>>  {
+>>       const pteval_t mask = PTE_USER | PTE_PXN | PTE_UXN | PTE_RDONLY |
+>> -                           PTE_PROT_NONE | PTE_WRITE | PTE_TYPE_MASK;
+>> +                           PTE_PROT_NONE | PTE_VALID | PTE_WRITE;
+>>       pte_val(pte) = (pte_val(pte) & ~mask) | (pgprot_val(newprot) & mask);
+>>       return pte;
+>>  }
+>
+> Thanks for looking into this. So for ptes, we need the type bits to be:
+>
+> 0b?0: unmapped/PAGE_NONE
+> 0b11: mapped
+>
+> With pmd block (huge page), we want:
+>
+> 0b?0: unmapped/PAGE_NONE
+> 0b01: mapped
+>
+> With your fix, bit 1 is no longer touched by pte_modify(). It looks fine
+> to me. Another option would have been a separate pmd_modify() function
+> with its own mask but I think it's cleaner this way.
+>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+>
+> Let's see if it fixes the issue for Ganapatrao and Will or I will send
+> it upstream.
+>
+> --
+> Catalin
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
-> v2:
->   - Add Acked-by,
->   - Add check for CONFIG_OF and pfc->dev->of_node.
-> ---
->  drivers/pinctrl/sh-pfc/gpio.c | 37 ++++++++++++++++++++++---------------
->  1 file changed, 22 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
-> index ba353735ecf2be9a..b380e3f17b121bbb 100644
-> --- a/drivers/pinctrl/sh-pfc/gpio.c
-> +++ b/drivers/pinctrl/sh-pfc/gpio.c
-> @@ -379,22 +379,29 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
-> 
->  	pfc->gpio = chip;
-> 
-> -	/* Register the GPIO to pin mappings. As pins with GPIO ports must come
-> -	 * first in the ranges, skip the pins without GPIO ports by stopping at
-> -	 * the first range that contains such a pin.
-> -	 */
-> -	for (i = 0; i < pfc->nr_ranges; ++i) {
-> -		const struct sh_pfc_pin_range *range = &pfc->ranges[i];
-> -
-> -		if (range->start >= pfc->nr_gpio_pins)
-> -			break;
-> +	if (IS_ENABLED(CONFIG_OF) && pfc->dev->of_node)
-> +		return 0;
-> 
-> -		ret = gpiochip_add_pin_range(&chip->gpio_chip,
-> -					     dev_name(pfc->dev),
-> -					     range->start, range->start,
-> -					     range->end - range->start + 1);
-> -		if (ret < 0)
-> -			return ret;
-> +	if (IS_ENABLED(CONFIG_SUPERH) ||
-> +	    IS_ENABLED(CONFIG_ARCH_SHMOBILE_LEGACY)) {
-> +		/*
-> +		 * Register the GPIO to pin mappings. As pins with GPIO ports
-> +		 * must come first in the ranges, skip the pins without GPIO
-> +		 * ports by stopping at the first range that contains such a
-> +		 * pin.
-> +		 */
-> +		for (i = 0; i < pfc->nr_ranges; ++i) {
-> +			const struct sh_pfc_pin_range *range = &pfc->ranges[i];
-> +
-> +			if (range->start >= pfc->nr_gpio_pins)
-> +				break;
-> +
-> +			ret = gpiochip_add_pin_range(&chip->gpio_chip,
-> +				dev_name(pfc->dev), range->start, range->start,
-> +				range->end - range->start + 1);
-> +			if (ret < 0)
-> +				return ret;
-> +		}
->  	}
-> 
->  	/* Register the function GPIOs chip. */
-
--- 
-Regards,
-
-Laurent Pinchart
+thanks
+Ganapat
