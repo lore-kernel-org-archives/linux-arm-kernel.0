@@ -1,37 +1,59 @@
-From: lee@kernel.org (Lee Jones)
-Date: Thu, 1 Oct 2015 15:43:09 +0100
-Subject: [PATCH 1/4] clk: bcm2835: Move under bcm/ with other Broadcom
- SoC clk drivers.
-In-Reply-To: <20150908192257.GQ15099@codeaurora.org>
-References: <1441562263-19888-1-git-send-email-eric@anholt.net>
- <1441562263-19888-2-git-send-email-eric@anholt.net>
- <20150907064838.GE4796@x1> <20150908192257.GQ15099@codeaurora.org>
-Message-ID: <20151001144309.GZ3214@x1>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 1 Oct 2015 15:47:06 +0100
+Subject: [tip:irq/core] genirq: Introduce generic irq migration for cpu
+ hotunplug
+In-Reply-To: <alpine.DEB.2.11.1510011619390.4500@nanos>
+References: <1443087135-17044-2-git-send-email-yangyingliang@huawei.com>
+ <tip-f1e0bb0ad473a32d1b7e6d285ae9f7e47710bb5e@git.kernel.org>
+ <alpine.DEB.2.11.1510011619390.4500@nanos>
+Message-ID: <20151001144706.GG6963@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 08 Sep 2015, Stephen Boyd wrote:
-
-> On 09/07, Lee Jones wrote:
-> > On Sun, 06 Sep 2015, Eric Anholt wrote:
-> > 
-> > > clk-bcm2835.c predates the drivers under bcm/, but all the new BCM
-> > > drivers are going in there so let's follow them.
-> > > 
-> > > Signed-off-by: Eric Anholt <eric@anholt.net>
-> > > ---
-> > >  drivers/clk/Makefile          |  1 -
-> > >  drivers/clk/bcm/Makefile      |  1 +
-> > >  drivers/clk/bcm/clk-bcm2835.c | 60 +++++++++++++++++++++++++++++++++++++++++++
-> > >  drivers/clk/clk-bcm2835.c     | 60 -------------------------------------------
-> > 
-> > You need to resubmit this with `git format-patch -M`.
+On Thu, Oct 01, 2015 at 04:24:24PM +0200, Thomas Gleixner wrote:
+> On Thu, 1 Oct 2015, tip-bot for Yang Yingliang wrote:
 > 
-> You don't have to. It would have been nice if it was formatted
-> with -M so that review is easier, but we can always apply the
-> patch and then check the result to make sure things look the
-> same.
+> > Commit-ID:  f1e0bb0ad473a32d1b7e6d285ae9f7e47710bb5e
+> > Gitweb:     http://git.kernel.org/tip/f1e0bb0ad473a32d1b7e6d285ae9f7e47710bb5e
+> > Author:     Yang Yingliang <yangyingliang@huawei.com>
+> > AuthorDate: Thu, 24 Sep 2015 17:32:13 +0800
+> > Committer:  Thomas Gleixner <tglx@linutronix.de>
+> > CommitDate: Thu, 1 Oct 2015 14:51:15 +0200
+> > 
+> > genirq: Introduce generic irq migration for cpu hotunplug
+> > 
+> > ARM and ARM64 have almost identical code for migrating interrupts on
+> > cpu hotunplug. Provide a generic version which can be used by both.
+> > 
+> > The new code addresses a shortcoming in the ARM[64] variants which
+> > fails to update the affinity change in some cases. The solution for
+> > this is to use the core function irq_do_set_affinity() instead of open
+> > coding it.
+> > 
+> > [ tglx: Added copyright notice and license boilerplate. Rewrote
+> >   	subject and changelog. ]
+> > 
+> > Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+> > Acked-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> > Cc: Jiang Liu <jiang.liu@linux.intel.com>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> > Cc: <linux-arm-kernel@lists.infradead.org>
+> > Link: http://lkml.kernel.org/r/1443087135-17044-2-git-send-email-yangyingliang at huawei.com
+> > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> 
+> Russell, Will,
+> 
+> I applied that to a seperate branch
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git irq/for-arm
+> 
+> You can pull that into arm[64] so you can apply the architecture
+> specific part.
 
-I vehemently avoid having to apply patches to my local repo in order
-to review them.  Submitters should always be encouraged to use -M,
-especially in cases where there have been changes.
+Thanks. I'll queue the corresponding arm64 patch for 4.4.
+
+-- 
+Catalin
