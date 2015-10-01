@@ -1,34 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 1 Oct 2015 16:07:35 +0100
-Subject: [PATCH] arm64: replace read_lock to rcu lock in call_break_hook
-In-Reply-To: <1443653944-21885-1-git-send-email-yang.shi@linaro.org>
-References: <1443653944-21885-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <20151001150735.GH6963@e104818-lin.cambridge.arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 1 Oct 2015 17:07:43 +0200
+Subject: [PATCH] mtd: nand: pass page number to ecc->write_xxx() methods
+In-Reply-To: <1440436219-31625-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1440436219-31625-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20151001170743.3aa0d6fa@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 03:59:04PM -0700, Yang Shi wrote:
-> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-> index cebf786..eb520d0 100644
-> --- a/arch/arm64/kernel/debug-monitors.c
-> +++ b/arch/arm64/kernel/debug-monitors.c
-> @@ -292,11 +292,11 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
->  	struct break_hook *hook;
->  	int (*fn)(struct pt_regs *regs, unsigned int esr) = NULL;
->  
-> -	read_lock(&break_hook_lock);
-> +	rcu_read_lock();
->  	list_for_each_entry(hook, &break_hook, node)
->  		if ((esr & hook->esr_mask) == hook->esr_val)
->  			fn = hook->fn;
-> -	read_unlock(&break_hook_lock);
-> +	rcu_read_unlock();
->  
->  	return fn ? fn(regs, esr) : DBG_HOOK_ERROR;
->  }
+Hi Brian,
 
-That's not enough, you also need list_(add|del)_rcu where the list is
-modified, together with list_for_each_entry_rcu() here.
+On Mon, 24 Aug 2015 19:10:19 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+
+> The ->read_xxx() methods are all passed the page number the NAND controller
+> is supposed to read, but ->write_xxx() do not have such a parameter.
+> 
+> This is a problem if we want to properly implement data
+> scrambling/randomization in order to mitigate MLC sensibility to repeated
+> pattern: to prevent bitflips in adjacent pages in the same block we need
+> to avoid repeating the same pattern at the same offset in those pages,
+> hence the randomizer/scrambler engine need to be passed the page value
+> in order to adapt its seed accordingly.
+> 
+> Moreover, adding the page parameter the ->write_xxx() methods add some
+> consistency to the current model.
+
+Apparently nobody complained (or nobody cares :-)) about that patch,
+and I'll really need the page information if I want to support
+randomization/scrambling in the sunxi driver.
+
+Do you have any objections to this patch (I can rebase it on mainline
+and check if new drivers have been added since the submission)?
+I remember you pointed a trick you've used in the brcmnand driver to
+get this page information (storing it during the ->cmdfunc() or
+->ctrl_cmd() call), but it would be way easier to have it directly in
+the ecc->write_xxx() parameters...
+
+Best Regards,
+
+Boris
 
 -- 
-Catalin
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
