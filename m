@@ -1,134 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 01 Oct 2015 17:33:44 +0100
-Subject: [PATCH v3 3/4] PCI/MSI: Add helper function
- pci_msi_domain_get_msi_rid().
-In-Reply-To: <560D5B98.5050400@caviumnetworks.com>
-References: <1443653222-24924-1-git-send-email-ddaney.cavm@gmail.com>
- <1443653222-24924-4-git-send-email-ddaney.cavm@gmail.com>
- <560CFBDC.4020901@arm.com> <560D5B98.5050400@caviumnetworks.com>
-Message-ID: <560D6068.6030801@arm.com>
+From: andrey.konovalov@linaro.org (Andrey Konovalov)
+Date: Thu, 1 Oct 2015 19:42:04 +0300
+Subject: [PATCH v5 00/23] ILP32 for ARM64
+In-Reply-To: <20151001113642.GI12635@sirena.org.uk>
+References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
+ <20150930101918.GA9753@e104818-lin.cambridge.arm.com>
+ <20150930164103.GC15635@sirena.org.uk>
+ <20151001111931.GD6963@e104818-lin.cambridge.arm.com>
+ <20151001113642.GI12635@sirena.org.uk>
+Message-ID: <560D625C.2010100@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/15 17:13, David Daney wrote:
-> On 10/01/2015 02:24 AM, Marc Zyngier wrote:
->> Hi David,
->>
->> On 30/09/15 23:47, David Daney wrote:
->>> From: David Daney <david.daney@cavium.com>
->>>
->>> Add pci_msi_domain_get_msi_rid() to return the MSI requester id (RID).
->>> Initially needed by gic-v3 based systems. It will be used by follow on
->>> patch to drivers/irqchip/irq-gic-v3-its-pci-msi.c
->>>
->>> Initially supports mapping the RID via OF device tree.  In the future,
->>> this could be extended to use ACPI _IORT tables as well.
->>>
->>> Signed-off-by: David Daney <david.daney@cavium.com>
->>> ---
->>>   drivers/pci/msi.c   | 31 +++++++++++++++++++++++++++++++
->>>   include/linux/msi.h |  1 +
->>>   2 files changed, 32 insertions(+)
->>>
->>> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
->>> index d449714..92b6dc9 100644
->>> --- a/drivers/pci/msi.c
->>> +++ b/drivers/pci/msi.c
->>> @@ -20,6 +20,7 @@
->>>   #include <linux/io.h>
->>>   #include <linux/slab.h>
->>>   #include <linux/irqdomain.h>
->>> +#include <linux/of_irq.h>
->>>
->>>   #include "pci.h"
->>>
->>> @@ -1327,4 +1328,34 @@ struct irq_domain *pci_msi_create_default_irq_domain(struct device_node *node,
->>>
->>>   	return domain;
->>>   }
->>> +
->>> +struct get_mis_id_data {
->>> +	u32	alias;
->>> +};
->>> +
->>> +static int get_msi_id_cb(struct pci_dev *pdev, u16 alias, void *data)
->>> +{
->>> +	struct get_mis_id_data *s = data;
->>> +
->>> +	s->alias = alias;
->>> +	return 0;
->>> +}
->>
->> Why not use a naked u32, since you only have a single field in this
->> structure? Or is it that you are anticipating other fields there?
-> 
-> In this case, I think using a pointer to u32 is a good idea.  It would 
-> simplify the source code somewhat.  Although, I think the generated 
-> binary would likely be the same.  I don't foresee adding things to this 
-> structure.  If it becomes necessary in the future, we can just go back 
-> to using a pointer to a structure.
-> 
->>
->>> +/**
->>> + * pci_msi_domain_get_msi_rid - Get the MSI requester id (RID)
->>> + * @domain:	The interrupt domain
->>> + * @pdev:	The PCI device.
->>> + *
->>> + * The RID for a device is formed from the alias, with a firmware
->>> + * supplied mapping applied
->>> + *
->>> + * Returns: The RID.
->>> + */
->>> +u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
->>> +{
->>> +	struct get_mis_id_data d;
->>> +
->>> +	d.alias = 0;
->>> +	pci_for_each_dma_alias(pdev, get_msi_id_cb, &d);
->>> +	return of_msi_map_rid(&pdev->dev, domain->of_node, d.alias);
->>
->> Should you check whether domain->of_node is NULL first? I don't think
->> of_msi_map_rid would have any problem with that, but a domain that is
->> not backed by an of_node makes me feel a bit uneasy and would tend to
->> indicate that we're not using DT.
-> 
-> Yes, that makes sense.  As you observe, I think it probably works as is, 
-> but it would be good to make it more clear.  This is especially true 
-> when we add ACPI support.  We will want to be clear on which of 
-> device-tree or ACPI we are using.
-> 
-> 
->>
->>> +}
->>>   #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
->>> diff --git a/include/linux/msi.h b/include/linux/msi.h
->>> index ad939d0..56e3b76 100644
->>> --- a/include/linux/msi.h
->>> +++ b/include/linux/msi.h
->>> @@ -293,6 +293,7 @@ irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
->>>   					  struct msi_desc *desc);
->>>   int pci_msi_domain_check_cap(struct irq_domain *domain,
->>>   			     struct msi_domain_info *info, struct device *dev);
->>> +u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev);
->>>   #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
->>>
->>>   #endif /* LINUX_MSI_H */
->>>
->>
->> Otherwise looks good to me.
-> 
-> I will send what I hope is the final revision of the patches later today.
+On 10/01/2015 02:36 PM, Mark Brown wrote:
+> On Thu, Oct 01, 2015 at 12:19:31PM +0100, Catalin Marinas wrote:
+>> On Wed, Sep 30, 2015 at 05:41:03PM +0100, Mark Brown wrote:
+>
+>>> Indeed.  On that subject there was some discussion at Linaro Connect
+>>> last week about work (being done outside Linaro, not sure how public it
+>>> is at this point) to pull together the current state of the art into a
+>>> Docker container image which people can use for benchmarking and as a
+>>> reference for how to pull things together.  That should help with the
+>>> analysis, it'll at least make it easier for other people to reproduce
+>>> any benchmarking results.
 
-Excellent. In related news, I've rebased my msi-parent stuff on top of
-this series, and extended it to also deal with msi-map for matching MSI
-domains.
+Using Docker image sounds like a great idea.
 
-With the two series, we should now have something vaguely coherent that
-deals with both the old version of msi-parent, its new definition, and
-msi-map in its whole glory. Fun times!
+>> That's fine and I would welcome it. However, I'm definitely against
+>> using non-agreed ABI and further spreading such toolchains (or kernel
+>
+> You might want to speak to some of your colleagues about that...  in any
+> case I'll reply off list later today with information on the third party
+> working on this so you can get in touch, like I say I'm not sure how
+> public that work is at this point.
+>
+>> patches; Linaro's tracking kernel has kept these patches for a long
+>> time, even though the ABI has been NAK'ed).
+>
+> I know, I'm not thrilled about that either.  :/
+
+Same for me.
+As you have noticed, ILP32 was removed from Linaro's tracking kernel recently.
+The thing is that we (builds&baselines team in Linaro) have been requested
+to have a CI loop for ILP32. So I'll continue running it, but will use a
+separate git branch for ILP32. The linux-linaro branch will not have ILP32
+any more (or at least until ILP32 ABI is agreed on).
 
 Thanks,
+Andrey
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
