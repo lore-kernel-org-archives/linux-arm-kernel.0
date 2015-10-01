@@ -1,94 +1,44 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 01 Oct 2015 12:21:19 +0200
-Subject: [PATCH v2 3/8] mmc: core: Add mmc_regulator_set_vqmmc()
-In-Reply-To: <CAPDyKFpis8XnvrppHq7q_7DQeN2UiEpykNTJ=1iJJ9AGOHTW6Q@mail.gmail.com>
-References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
- <17200614.QxCe8zAb7I@diego>
- <CAPDyKFpis8XnvrppHq7q_7DQeN2UiEpykNTJ=1iJJ9AGOHTW6Q@mail.gmail.com>
-Message-ID: <2695161.Z1IhqPE0bd@diego>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 1 Oct 2015 11:21:36 +0100
+Subject: [PATCH] arm64: dts: add all hi6220 uart nodes
+In-Reply-To: <20151001031552.GC15675@leoy-linaro>
+References: <1443558552-5734-1-git-send-email-tyler.baker@linaro.org>
+ <1459065.BtzC7pyUYF@wuerfel> <20150930173145.GG15635@sirena.org.uk>
+ <CANMBJr7yY1PJChnFSRknqfOLORuWZSEONV+e=M=9heX3i-ADKA@mail.gmail.com>
+ <20150930191818.GZ15635@sirena.org.uk>
+ <CANMBJr6aU4wPO5HqP-Oh-ND7_DZXSH30ykNHyvDtUp3nQFG6sA@mail.gmail.com>
+ <20151001031552.GC15675@leoy-linaro>
+Message-ID: <20151001102136.GC12635@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 1. Oktober 2015, 11:54:24 schrieb Ulf Hansson:
-> On 30 September 2015 at 16:55, Heiko St?bner <heiko@sntech.de> wrote:
-> > Am Mittwoch, 30. September 2015, 16:42:05 schrieb Ulf Hansson:
-> >> On 30 September 2015 at 16:07, Heiko Stuebner <heiko@sntech.de> wrote:
-> >> > From: Douglas Anderson <dianders@chromium.org>
-> >> > 
-> >> > This adds logic to the MMC core to set VQMMC.  This is expected to be
-> >> > called by MMC drivers like dw_mmc as part of (or instead of) their
-> >> > start_signal_voltage_switch() callback.
-> >> > 
-> >> > A few notes:
-> >> > 
-> >> > * When setting the signal voltage to 3.3V we do our best to make VQMMC
-> >> > 
-> >> >   and VMMC match.  It's been reported that this makes some old cards
-> >> >   happy since they were tested back in the day before UHS when VQMMC
-> >> >   and VMMC were provided by the same regulator.  A nice side effect of
-> >> >   this is that we don't end up on the hairy edge of VQMMC (2.7V),
-> >> >   which some EEs claim is a little too close to the minimum for
-> >> >   comfort.
-> >> >   This is done in two steps. At first we try to find a VQMMC within
-> >> >   a 0.3V tolerance of VMMC and if this is not supported by the
-> >> >   supplying regulator we try to find a suitable voltage within the
-> >> >   whole 2.7V-3.6V area of the spec.
-> >> > 
-> >> > * The two step approach is currently necessary, as the used
-> >> > 
-> >> >   regulator_set_voltage_triplet(min, target, max) uses a simple
-> >> >   
-> >> >   implementation that just tries two basic steps:
-> >> >         regulator_set_voltage(target, max);
-> >> >         regulator_set_voltage(min, target);
-> >> >   
-> >> >   So with only one step with 2.7-3.6V borders, if a suitable voltage
-> >> >   is a bit below VMMC, we would directly get the lowest 2.7V
-> >> >   which some boards (like Rockchips) don't like at all.
-> >> > 
-> >> > * When setting the signal voltage to 1.8V or 1.2V we aim for that
-> >> > 
-> >> >   specific voltage instead of picking the lowest one in the range.
-> >> > 
-> >> > * We very purposely don't print errors in mmc_regulator_set_vqmmc().
-> >> > 
-> >> >   There are cases where the MMC core will try several different
-> >> >   voltages and we don't want to pollute the logs.
-> >> > 
-> >> > Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> >> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> >> 
-> >> This looks good to me!
-> > 
-> > very cool :-)
-> > 
-> >> Once all are happy with the patches, can we take the mmc patches via
-> >> my mmc tree or does it all have to go together?
-> > 
-> > The clock changes of course only touch internals of the phase-clocks, so
-> > should have no problem going through another tree.
-> 
-> What happens if I take mmc and dt changes, wouldn't I need the clock
-> patches as well?
+On Thu, Oct 01, 2015 at 11:15:52AM +0800, Leo Yan wrote:
+> On Wed, Sep 30, 2015 at 04:54:51PM -0700, Tyler Baker wrote:
+> > On 30 September 2015 at 12:18, Mark Brown <broonie@kernel.org> wrote:
 
-The API stays of course the same, only the degree to settings translation gets 
-optimized, so I guess in the worst case you would get no good phase and thus 
-fall back to non-highspeed modes - but the system would stay running.
+> > > My understanding is that it applies to both with slightly different
+> > > driver sets, the slides aren't online yet (!) but if you look at 10:52
+> > > or so in the video we should have SD/eMMC on HiKey in v4.1 with thermal
+> > > and CPUfreq added in v4.2.  It also looks like there's just some DT
+> > > additions needed to enable reset, cpuidle and CPU hotplug using generic
+> > > code (mainly the constants for PSCI I expect).
 
-But of course, if the clock maintainers could Ack the two clock patches and 
-everything would stay together that would work even better :-)
+> > I just skimmed the video and I see your point. I'll need to
+> > investigate a bit but I'm up for sending some follow up patches to get
+> > these drivers functioning. First lets get the UART working :)
 
+> If you think it's necessary, i could send out patches to enable cpuidle
+> firstly (actually now PSCI has been enabled yet); for cpufreq and
+> thermal features, need wait until mailbox driver has been merged.
 
-Heiko
-
-> 
-> > For the devicetree part I'm unsure. If the boards enable the
-> > tuning-related
-> > settings without the new voltage handling, 2.7V gets set on all Rockchip
-> > boards which doesn't work on those at all.
-> > 
-> > So either the dts patches would need to go into your tree, I would need a
-> > stable branch or we could simply postpone dts changes for the next cycle.
-> 
-> Kind regards
-> Uffe
+It seems sensible to get the DT bits for functionality that is already
+supported on the driver side upstream, that way we get the maximum
+functionality available as soon as possible and even if other bits get
+problems in review users can take advantage of things that are OK.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151001/e47c3524/attachment.sig>
