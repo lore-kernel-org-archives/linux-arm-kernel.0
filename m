@@ -1,39 +1,90 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Thu, 01 Oct 2015 09:03:05 -0700
-Subject: [PATCH] arm64: replace read_lock to rcu lock in call_break_hook
-In-Reply-To: <20151001150735.GH6963@e104818-lin.cambridge.arm.com>
-References: <1443653944-21885-1-git-send-email-yang.shi@linaro.org>
- <20151001150735.GH6963@e104818-lin.cambridge.arm.com>
-Message-ID: <560D5939.7080107@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 01 Oct 2015 19:04:51 +0300
+Subject: [PATCH v2 4/6] pinctrl: sh-pfc: Stop calling
+ gpiochip_add_pin_range() on DT platforms
+In-Reply-To: <1438696519-13727-5-git-send-email-geert+renesas@glider.be>
+References: <1438696519-13727-1-git-send-email-geert+renesas@glider.be>
+ <1438696519-13727-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <1907000.EBhLlX2sDO@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/1/2015 8:07 AM, Catalin Marinas wrote:
-> On Wed, Sep 30, 2015 at 03:59:04PM -0700, Yang Shi wrote:
->> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
->> index cebf786..eb520d0 100644
->> --- a/arch/arm64/kernel/debug-monitors.c
->> +++ b/arch/arm64/kernel/debug-monitors.c
->> @@ -292,11 +292,11 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
->>   	struct break_hook *hook;
->>   	int (*fn)(struct pt_regs *regs, unsigned int esr) = NULL;
->>
->> -	read_lock(&break_hook_lock);
->> +	rcu_read_lock();
->>   	list_for_each_entry(hook, &break_hook, node)
->>   		if ((esr & hook->esr_mask) == hook->esr_val)
->>   			fn = hook->fn;
->> -	read_unlock(&break_hook_lock);
->> +	rcu_read_unlock();
->>
->>   	return fn ? fn(regs, esr) : DBG_HOOK_ERROR;
->>   }
->
-> That's not enough, you also need list_(add|del)_rcu where the list is
-> modified, together with list_for_each_entry_rcu() here.
+Hi Geert,
 
-Thanks for pointing it out. I'm going to prepare v2 with list_(add|del)_rcu.
+Thank you for the patch.
 
-Yang
+On Tuesday 04 August 2015 15:55:17 Geert Uytterhoeven wrote:
+> On platforms where the PFC/GPIO controller is instantiated from DT, the
+> mapping between GPIOs and pins is set up using the "gpio-ranges"
+> property in DT.
+> 
+> Hence stop setting up the mapping from C code on DT platforms.
+> This code is still used for SH or ARM-legacy platforms.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
->
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+> v2:
+>   - Add Acked-by,
+>   - Add check for CONFIG_OF and pfc->dev->of_node.
+> ---
+>  drivers/pinctrl/sh-pfc/gpio.c | 37 ++++++++++++++++++++++---------------
+>  1 file changed, 22 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
+> index ba353735ecf2be9a..b380e3f17b121bbb 100644
+> --- a/drivers/pinctrl/sh-pfc/gpio.c
+> +++ b/drivers/pinctrl/sh-pfc/gpio.c
+> @@ -379,22 +379,29 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
+> 
+>  	pfc->gpio = chip;
+> 
+> -	/* Register the GPIO to pin mappings. As pins with GPIO ports must come
+> -	 * first in the ranges, skip the pins without GPIO ports by stopping at
+> -	 * the first range that contains such a pin.
+> -	 */
+> -	for (i = 0; i < pfc->nr_ranges; ++i) {
+> -		const struct sh_pfc_pin_range *range = &pfc->ranges[i];
+> -
+> -		if (range->start >= pfc->nr_gpio_pins)
+> -			break;
+> +	if (IS_ENABLED(CONFIG_OF) && pfc->dev->of_node)
+> +		return 0;
+> 
+> -		ret = gpiochip_add_pin_range(&chip->gpio_chip,
+> -					     dev_name(pfc->dev),
+> -					     range->start, range->start,
+> -					     range->end - range->start + 1);
+> -		if (ret < 0)
+> -			return ret;
+> +	if (IS_ENABLED(CONFIG_SUPERH) ||
+> +	    IS_ENABLED(CONFIG_ARCH_SHMOBILE_LEGACY)) {
+> +		/*
+> +		 * Register the GPIO to pin mappings. As pins with GPIO ports
+> +		 * must come first in the ranges, skip the pins without GPIO
+> +		 * ports by stopping at the first range that contains such a
+> +		 * pin.
+> +		 */
+> +		for (i = 0; i < pfc->nr_ranges; ++i) {
+> +			const struct sh_pfc_pin_range *range = &pfc->ranges[i];
+> +
+> +			if (range->start >= pfc->nr_gpio_pins)
+> +				break;
+> +
+> +			ret = gpiochip_add_pin_range(&chip->gpio_chip,
+> +				dev_name(pfc->dev), range->start, range->start,
+> +				range->end - range->start + 1);
+> +			if (ret < 0)
+> +				return ret;
+> +		}
+>  	}
+> 
+>  	/* Register the function GPIOs chip. */
+
+-- 
+Regards,
+
+Laurent Pinchart
