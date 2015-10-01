@@ -1,78 +1,71 @@
-From: lars.persson@axis.com (Lars Persson)
-Date: Thu,  1 Oct 2015 14:04:07 +0200
-Subject: [RFC] arm: Add generic smc wrapper
-Message-ID: <1443701047-10101-1-git-send-email-larper@axis.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu,  1 Oct 2015 19:57:49 +0800
+Subject: [PATCH v5 3/5] ARM: dts: sun8i: Add Reduced Serial Bus controller
+ device node to A23/A33 dtsi
+In-Reply-To: <1443700673-24312-1-git-send-email-wens@csie.org>
+References: <1443700673-24312-1-git-send-email-wens@csie.org>
+Message-ID: <1443700673-24312-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds an smc wrapper according to the ARM standard for secure
-monitor calling conventions (ARM DEN 0028A).
+This patch adds a device node for the Reduced Serial Bus (RSB)
+controller and the defacto pinmux setting to the A23/A33 dtsi.
 
-Signed-off-by: Lars Persson <larper@axis.com>
+Since there is only one possible pinmux setting for RSB, just
+set it in the dtsi.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/include/asm/smc-call.h | 12 ++++++++++++
- arch/arm/kernel/Makefile        |  2 ++
- arch/arm/kernel/smc-call.S      | 22 ++++++++++++++++++++++
- 3 files changed, 36 insertions(+)
- create mode 100644 arch/arm/include/asm/smc-call.h
- create mode 100644 arch/arm/kernel/smc-call.S
 
-diff --git a/arch/arm/include/asm/smc-call.h b/arch/arm/include/asm/smc-call.h
-new file mode 100644
-index 0000000..88a83d4
---- /dev/null
-+++ b/arch/arm/include/asm/smc-call.h
-@@ -0,0 +1,12 @@
-+/*
-+ * Wrapper for secure monitor calls using the ARM SMC calling
-+ * convention.
-+ */
-+#ifndef __ASM_SMC_CALL_H
-+#define __ASM_SMC_CALL_H
-+
-+#include <linux/types.h>
-+
-+extern int invoke_smc(u32 function_id, u32 arg0, u32 arg1, u32 arg2);
-+
-+#endif
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index af9e59b..f09d2d6 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -92,4 +92,6 @@ obj-y				+= psci-call.o
- obj-$(CONFIG_SMP)		+= psci_smp.o
- endif
+Changes since v4:
+
+  None
+
+Changes since v3:
+
+  - Changed #address-cells to 1
+
+---
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index 04bccad977ee..828aaf52c342 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -651,6 +651,13 @@
+ 			#size-cells = <0>;
+ 			#gpio-cells = <3>;
  
-+obj-y		+= smc-call.o
++			r_rsb_pins: r_rsb {
++				allwinner,pins = "PL0", "PL1";
++				allwinner,function = "s_rsb";
++				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++			};
 +
- extra-y := $(head-y) vmlinux.lds
-diff --git a/arch/arm/kernel/smc-call.S b/arch/arm/kernel/smc-call.S
-new file mode 100644
-index 0000000..a07ebf9
---- /dev/null
-+++ b/arch/arm/kernel/smc-call.S
-@@ -0,0 +1,22 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Copied from: psci-call.S.
-+ */
+ 			r_uart_pins_a: r_uart at 0 {
+ 				allwinner,pins = "PL2", "PL3";
+ 				allwinner,function = "s_uart";
+@@ -658,5 +665,19 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 		};
 +
-+#include <linux/linkage.h>
-+
-+#include <asm/opcodes-sec.h>
-+
-+/* int invoke_smc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
-+ENTRY(invoke_smc)
-+	__SMC(0)
-+	bx	lr
-+ENDPROC(invoke_smc)
++		r_rsb: rsb at 01f03400 {
++			compatible = "allwinner,sun8i-a23-rsb";
++			reg = <0x01f03400 0x400>;
++			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&apb0_gates 3>;
++			clock-frequency = <3000000>;
++			resets = <&apb0_rst 3>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&r_rsb_pins>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
+ 	};
+ };
 -- 
-2.1.4
+2.5.3
