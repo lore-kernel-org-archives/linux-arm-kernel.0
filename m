@@ -1,47 +1,57 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 1 Oct 2015 09:24:15 +0200
-Subject: [PATCH 30/31] ARM: shmobile: r8a7791: add USB-DMAC device nodes
-In-Reply-To: <SG2PR06MB0919932925BB68EC82538044D84D0@SG2PR06MB0919.apcprd06.prod.outlook.com>
-References: <cover.1431565427.git.horms+renesas@verge.net.au>
- <e3e25edc1116ebf44b1813aff03b02b7737d41ca.1431565427.git.horms+renesas@verge.net.au>
- <560B11FF.3010305@cogentembedded.com>
- <SG2PR06MB0919932925BB68EC82538044D84D0@SG2PR06MB0919.apcprd06.prod.outlook.com>
-Message-ID: <CAMuHMdVfmOifVdW2a4Ai2-T4WZPFd5d+OtNHhVhD9g+CF1zgxA@mail.gmail.com>
+From: jangra.pankaj9@gmail.com (Pankaj Jangra)
+Date: Thu, 1 Oct 2015 13:02:46 +0530
+Subject: Undefined instruction error on Cortex A57 (aarch64) in init process
+Message-ID: <CADTbHxpXCJZdK=iQc+FUxW27-vv1_kHXCeespDXR2fJ8UkfCCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shimoda-san,
+In android system, after system is running for long time say 10 hour,
+some time i am hitting below
+traces:
 
-On Wed, Sep 30, 2015 at 11:06 AM, Yoshihiro Shimoda
-<yoshihiro.shimoda.uh@renesas.com> wrote:
->> Sent: Wednesday, September 30, 2015 7:35 AM
->>     When the USB-DMAC driver is enabled, this causes kernel oops on at least
->> the R8A7791 Henninger/Porter boards (haven't checked the others yet) with
->> renesas-devel-20150928-v4.3-rc3 and even earlier tag. The oops can only be
->> seen with the earlyprintk=serial kernel parameter, otherwise the kernel just
->> hangs with a blank console.
->>
->> Unable to handle kernel NULL pointer dereference at virtual address 00000014
+ init[1]: undefined instruction: pc=0000000000401624
+Code: 1a9f00c2 aa1703e0 2a1603e1 9400e1bf (6b1f001f)
+Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000004
 
->> [<c027f0cc>] (usb_dmac_chan_halt) from [<c027f1c8>] (usb_dmac_runtime_suspend+0)
->>   r5:eebdaf50 r4:00000001
->> [<c027f19c>] (usb_dmac_runtime_suspend) from [<c02d60e0>] (pm_generic_runtime_s)
->>   r6:00000000 r5:c02ddfc4 r4:ee93d810 r3:c027f19c
+CPU: 0 PID: 1 Comm: init Tainted: G           O 3.10.67-g978f332 #15
+Call trace:
+[<ffffffc000089ccc>] dump_backtrace+0x0/0xf4
+[<ffffffc00008a05c>] show_stack+0x10/0x1c
+[<ffffffc0003738c0>] dump_stack+0x1c/0x28
+[<ffffffc0000aa84c>] panic+0xf8/0x118
+[<ffffffc0000af790>] find_new_reaper+0x98/0x154
+[<ffffffc0000b0490>] forget_original_parent+0x40/0x1cc
+[<ffffffc0000b0630>] exit_notify+0x14/0x16c
+[<ffffffc0000b0a4c>] do_exit+0x2c4/0x3ec
+[<ffffffc0000b1814>] do_group_exit+0xe8/0xec
+[<ffffffc0000c1b8c>] get_signal_to_deliver+0x310/0x3a8
+[<ffffffc000089648>] do_signal+0x160/0x180
 
-> I'm not sure but I am guessing this issue related runtime PM? (suspend)
-> I checked the usb-dmac driver roughly, and if the usb_dmac_runtime_suspend()
-> is called before usb_dmac_chan_probe() runs, it might happen because dmac->iomem is NULL.
+The objdump of binary around this address is :
+ 401610:       eb1f011f        cmp     x8, xzr
+ 401614:       1a9f00c2        csel    w2, w6, wzr, eq
+               bootchart_count = 0;
+           }
+       }
+endif
 
-That's exactly what's happening. Reproduced with CONFIG_PREEMPT=y (thanks
-Sergei), and patch sent.
+       nr = poll(ufds, fd_count, timeout);
+ 401618:       aa1703e0        mov     x0, x23
+ 40161c:       2a1603e1        mov     w1, w22
+ 401620:       9400e1df        bl      439d9c <poll>
+       if (nr <= 0)
+ 401624:       6b1f001f        cmp     w0, wzr
+ 401628:       54fffccd        b.le    4015c0 <main+0x558>
+           continue;
 
-Gr{oetje,eeting}s,
+       for (i = 0; i < fd_count; i++) {
+ 40162c:       34fffcb6        cbz     w22, 4015c0 <main+0x558>
+ 401630:       510006c9        sub     w9, w22, #0x1
+ 401634:       aa1703f3        mov     x19, x23
+ 401638:       9100052a        add     x10, x9, #0x1
+ 40163c:       8b0a0ef4        add     x20, x23, x10, lsl #3
 
-                        Geert
+Could any one please point me to what could be the problem here ? Or
+how further i can approach to debug this further.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-Pankaj Kumar
