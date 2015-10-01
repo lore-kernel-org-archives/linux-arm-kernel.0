@@ -1,47 +1,42 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 1 Oct 2015 22:18:57 +0900
-Subject: [PATCH] thermal: exynos: fix register read in TMU
-In-Reply-To: <1443699599-9693-1-git-send-email-sudipm.mukherjee@gmail.com>
-References: <1443699599-9693-1-git-send-email-sudipm.mukherjee@gmail.com>
-Message-ID: <CAJKOXPfyC8etcPe373q6Pc1qWb2zVnHE96V+Rh5mPmpzAxFjiA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 1 Oct 2015 08:26:02 -0500
+Subject: [RESEND][PATCH v3 5/9] of: Add Boundary Devices Inc. vendor prefix
+In-Reply-To: <1443620806-14792-6-git-send-email-gary.bisson@boundarydevices.com>
+References: <1441645069-27263-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1443620806-14792-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1443620806-14792-6-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <CAL_JsqLTvh8MKqhyZ1KdPttkj7gFGaHt1-1ULEYKc0jCy+YB6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-01 20:39 GMT+09:00 Sudip Mukherjee <sudipm.mukherjee@gmail.com>:
-> The value of emul_con was getting overwritten if the selected soc is
-> SOC_ARCH_EXYNOS5260. And so as a result we were reading from the wrong
-> register in the case of SOC_ARCH_EXYNOS5260.
-
-How the value is overwritten if the soc is Exynos5260? I can't see it
-(although the "else if" is still more obvious than "if" but how does
-the description match the code?).
-
-Best regards,
-Krzysztof
-
+On Wed, Sep 30, 2015 at 8:46 AM, Gary Bisson
+<gary.bisson@boundarydevices.com> wrote:
+> This patch adds the vendor prefix for Boundary Devices Inc. which is a
+> supplier of ARM-based single board computers and System-on-Modules for
+> the general embedded market.
 >
-> Signed-off-by: Sudip Mukherjee <sudip@vectorindia.org>
+> Website: http://boundarydevices.com/
+>
+> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+
+Acked-by: Rob Herring <robh@kernel.org>
+
 > ---
->  drivers/thermal/samsung/exynos_tmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 >
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-> index 0bae8cc..ca920b0 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.c
-> +++ b/drivers/thermal/samsung/exynos_tmu.c
-> @@ -932,7 +932,7 @@ static void exynos4412_tmu_set_emulation(struct exynos_tmu_data *data,
->
->         if (data->soc == SOC_ARCH_EXYNOS5260)
->                 emul_con = EXYNOS5260_EMUL_CON;
-> -       if (data->soc == SOC_ARCH_EXYNOS5433)
-> +       else if (data->soc == SOC_ARCH_EXYNOS5433)
->                 emul_con = EXYNOS5433_TMU_EMUL_CON;
->         else if (data->soc == SOC_ARCH_EXYNOS7)
->                 emul_con = EXYNOS7_TMU_REG_EMUL_CON;
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 82d2ac9..eca468d 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -34,6 +34,7 @@ avago Avago Technologies
+>  avic   Shanghai AVIC Optoelectronics Co., Ltd.
+>  axis   Axis Communications AB
+>  bosch  Bosch Sensortec GmbH
+> +boundary       Boundary Devices Inc.
+>  brcm   Broadcom Corporation
+>  buffalo        Buffalo, Inc.
+>  calxeda        Calxeda
 > --
-> 1.9.1
+> 2.5.3
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
