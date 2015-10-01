@@ -1,45 +1,43 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 1 Oct 2015 16:07:09 -0600
-Subject: [RFC PATCH 00/20] Coresight integration with perf
-In-Reply-To: <87zj04jnlw.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
- <87zj04jnlw.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CANLsYkxitWS0hUXL_=T-V8qSXKvtyUc8F7NknDu16Xy0nN_o0A@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 2 Oct 2015 00:12:21 +0200
+Subject: [RFC/PATCH 00/11] arm: omap: counter32k rework
+In-Reply-To: <6944324.e1oo8C9xbx@wuerfel>
+References: <1443559446-26969-1-git-send-email-balbi@ti.com>
+ <20150930141338.GC31865@saruman.tx.rr.com> <3705422.OMk7ysE7Jn@wuerfel>
+ <6944324.e1oo8C9xbx@wuerfel>
+Message-ID: <560DAFC5.50003@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 September 2015 at 02:52, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+On 09/30/2015 04:49 PM, Arnd Bergmann wrote:
+> On Wednesday 30 September 2015 16:42:21 Arnd Bergmann wrote:
+>>
+>> TEGRA folks: the tegra_read_persistent_clock() implementation apparently
+>> predates the Tegra RTC driver and I wonder if they actually do the
+>> right thing in combination. Could it be that the wall time forwards
+>> twice as fast as it should during resume when the RTC driver is loaded?
+>> Could it be that we can simply remove  tegra_read_persistent_clock()
+>> and the register_persistent_clock() infrastructure?
+>>
 >
->> This patchset aims to integrate configuration and control of
->> the Coresight tracers with the perf sub-system.
->>
->> The goal is to use PMUs to represent tracers and the auxiliary
->> buffer enhancement to collect processor traces.  As such a lot
->> of work is done to move the current Coresight sysFS oriented
->> configuration and control commands to perf's AUX API.
->>
->> For the time being the work concentrates on ETMv3 and ETB1.0
->> sink buffers.  Work on ETMv4 and other type of sink buffers
->> will follow once a foundation has been established.
->>
->> Enhancement to the perf command line tool can be found here [1].
->> It is based on v4.2 but a rebase to v4.3-rcX will be available
->> shortly.
->>
->> Best regards,
->> Mathieu
->>
->> [1]. https://git.linaro.org/people/mathieu.poirier/coresight.git/shortlog/refs/heads/perf-v4.2
+> I found the 'sleeptime_injected' variable now, which takes care of
+> forwarding the clock by the correct amount.
 >
-> I had a peek there -- didn't see an actual decoder for the ETM/PTM
-> binary stream or did I miss it somehow?
+> I also found the CLOCK_SOURCE_SUSPEND_NONSTOP flag next to it, which
+> should let us use the counter32k driver to provide the correct
+> time during suspend without the omap_read_persistent_clock() function.
+> We should be able to just delete that code.
+>
+> If we decide to also delete the tegra_read_persistent_clock()
+> function, we can remove the registration too.
 
-A stream decoder is not included in this patch set but a couple of
-people are currently working on it.
 
->
-> Thanks,
-> --
-> Alex
++1
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
