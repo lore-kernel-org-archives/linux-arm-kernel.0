@@ -1,133 +1,64 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 1 Oct 2015 12:25:04 +0200
-Subject: [PATCH v4 07/11] KVM: arm/arm64: vgic: Allow HW interrupts to be
- queued to a guest
-In-Reply-To: <560BEC68.4010400@arm.com>
-References: <1438962347-17541-1-git-send-email-marc.zyngier@arm.com>
- <1438962347-17541-8-git-send-email-marc.zyngier@arm.com>
- <5602E778.3080004@arm.com> <20150929134445.GF9002@cbox>
- <560BEC68.4010400@arm.com>
-Message-ID: <20151001102504.GA32011@cbox>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 1 Oct 2015 18:51:19 +0800
+Subject: [RESEND PATCH v2 2/2] ARM: imx6: change default burst size for USB
+In-Reply-To: <1443688950.8574.7.camel@pengutronix.de>
+References: <1443579437-845-1-git-send-email-peter.chen@freescale.com>
+ <1443579437-845-2-git-send-email-peter.chen@freescale.com>
+ <1443603159.3185.5.camel@pengutronix.de>
+ <CAL411-p-V=p8g9ckxewNzZ7kG+ChbgewSn8V8n1kmw7DqU0hZw@mail.gmail.com>
+ <1443688950.8574.7.camel@pengutronix.de>
+Message-ID: <CAL411-qf7H=4OkgrUXUVkvFc3QSuSLJ2ioGCeVJ0bqF9jLa3qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 03:06:32PM +0100, Andre Przywara wrote:
-> Hi Christoffer,
-> 
-> On 29/09/15 14:44, Christoffer Dall wrote:
-> > On Wed, Sep 23, 2015 at 06:55:04PM +0100, Andre Przywara wrote:
-> >> Salut Marc,
-> >>
-> >> I know that this patch is already merged, but ....
-> >>
-> >> On 07/08/15 16:45, Marc Zyngier wrote:
-> >>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> >>> index 51c9900..9d009d2 100644
-> >> ...
-> >>> @@ -1364,6 +1397,39 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
-> >>>  	return level_pending;
-> >>>  }
-> >>>  
-> >>> +/*
-> >>> + * Save the physical active state, and reset it to inactive.
-> >>> + *
-> >>> + * Return 1 if HW interrupt went from active to inactive, and 0 otherwise.
-> >>> + */
-> >>> +static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
-> >>> +{
-> >>> +	struct irq_phys_map *map;
-> >>> +	int ret;
-> >>> +
-> >>> +	if (!(vlr.state & LR_HW))
-> >>> +		return 0;
-> >>> +
-> >>> +	map = vgic_irq_map_search(vcpu, vlr.irq);
-> >>> +	BUG_ON(!map || !map->active);
-> >>> +
-> >>> +	ret = irq_get_irqchip_state(map->irq,
-> >>> +				    IRQCHIP_STATE_ACTIVE,
-> >>> +				    &map->active);
-> >>> +
-> >>> +	WARN_ON(ret);
-> >>> +
-> >>> +	if (map->active) {
-> >>> +		ret = irq_set_irqchip_state(map->irq,
-> >>> +					    IRQCHIP_STATE_ACTIVE,
-> >>> +					    false);
-> >>> +		WARN_ON(ret);
-> >>> +		return 0;
-> >>> +	}
-> >>> +
-> >>> +	return 1;
-> >>> +}
-> >>> +
-> >>>  /* Sync back the VGIC state after a guest run */
-> >>>  static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
-> >>>  {
-> >>> @@ -1378,14 +1444,31 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
-> >>>  	elrsr = vgic_get_elrsr(vcpu);
-> >>>  	elrsr_ptr = u64_to_bitmask(&elrsr);
-> >>>  
-> >>> -	/* Clear mappings for empty LRs */
-> >>> -	for_each_set_bit(lr, elrsr_ptr, vgic->nr_lr) {
-> >>> +	/* Deal with HW interrupts, and clear mappings for empty LRs */
-> >>> +	for (lr = 0; lr < vgic->nr_lr; lr++) {
-> >>>  		struct vgic_lr vlr;
-> >>>  
-> >>> -		if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
-> >>> +		if (!test_bit(lr, vgic_cpu->lr_used))
-> >>>  			continue;
-> >>>  
-> >>>  		vlr = vgic_get_lr(vcpu, lr);
-> >>> +		if (vgic_sync_hwirq(vcpu, vlr)) {
-> >>> +			/*
-> >>> +			 * So this is a HW interrupt that the guest
-> >>> +			 * EOI-ed. Clean the LR state and allow the
-> >>> +			 * interrupt to be sampled again.
-> >>> +			 */
-> >>> +			vlr.state = 0;
-> >>> +			vlr.hwirq = 0;
-> >>> +			vgic_set_lr(vcpu, lr, vlr);
-> >>> +			vgic_irq_clear_queued(vcpu, vlr.irq);
-> >>
-> >> Isn't this line altering common VGIC state without holding the lock?
-> >> Eric removed the coarse dist->lock around the whole
-> >> __kvm_vgic_sync_hwstate() function, we take it now in
-> >> vgic_process_maintenance(), but don't hold it here AFAICT.
-> >> As long as we are only dealing with private timer IRQs this is probably
-> >> not a problem, but the IRQ number could be a SPI as well, right?
-> >>
-> > I don't see a problematic race with this though, as all we're doing is
-> > to clear a bit in a bitmap, which is always checked atomically, so
-> > adding a lock around this really doesn't change anything as far as I can
-> > tell.
-> 
-> Indeed I found a similar comment in some older revisions of the code.
-> 
-> But isn't it that other code holding the lock (thinking about
-> kvm_vgic_flush_hwstate() in particular) assumes that no-one else tinkers
-> with the VGIC state while it holds the lock?
-> So couldn't we (potentially) run into inconsistent state because we
-> cleared the queued bit while the flushing code runs over all interrupts?
-> Maybe not in this particular case, but in general?
+On Thu, Oct 1, 2015 at 4:42 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Am Donnerstag, den 01.10.2015, 16:13 +0800 schrieb Peter Chen:
+>> On Wed, Sep 30, 2015 at 4:52 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+>> > Am Mittwoch, den 30.09.2015, 10:17 +0800 schrieb Peter Chen:
+>> >> It can improve the USB performance when choosing larger
+>> >> burst size at some systems (bus size is larger), there is
+>> >> no side effect if this burst size is larger than bus size.
+>> >>
+>> > Just for the record, as it seems too late to stop the train now:
+>> >
+>> > I am _NOT_ happy that the extended binding has been accepted into the
+>> > USB tree despite outstanding review comments from me not being addressed
+>> > or even answered.
+>> >
+>>
+>> I sent patch for review at Aug 7th, queued this patches at Aug 13th
+>> [1], and sent pull
+>> request at Aug 14th, I am curious why you did not give comments
+>> between this period utill
+>> I complained one ethernet patch breaks i.mx ethernet function for v4.2
+>> tree [2] at Aug 14th.
+>>
+> What do the USB changes have to do with any ethernet changes?
+>
+> The comments I'm referring to are from Aug 14th
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/364396.html
+>
+> So you are telling me that giving reviewers not even a week before
+> sending the pull request is appropriate? And that sending the pull
+> despite there being open review comments is ok? Think again.
+>
 
-In general, yes, you should lock operations accessing the distributor.
+Comments are welcome at anytime, but why you are __NOT__ happy it
+was accepted and your comments were delayed. If you think this binding
+description is not ok, patch is welcome.
 
-It just feels silly to do 
+>> I will consider your comments, and send patch for improving it if possible.
+>>
+> As I said it may be too late now. By sending the pull request including
+> the binding change you forced everyone to now either accept the (in my
+> opinion not really perfect) binding, or hurry to change it in the
+> current RC phase, something which I'm not comfortable with. The damage
+> has been done.
+>
 
-spin_lock();
-vgic_irq_clear_queued(...);
-spin_unlock();
+Again, I waited one week, and your comments were late. I do not want
+to dispute more at our holidays. Let's stop here.
 
-because vgic_irq_clear_queued just clears a bit and I don't see the
-race.
-
-> 
-> Haven't looked at your new series yet, but will do this ASAP.
-> 
-Thanks, much appreciated.  Based on your comment on the previous
-version, the whole thing is now wrapped in a spinlock so this point is
-moot.  Unless there's a clear race to be fixed here, I would prefer if
-we focus our energy on getting the other series merged.
-
--Christoffer
+-- 
+BR,
+Peter Chen
