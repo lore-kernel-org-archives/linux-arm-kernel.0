@@ -1,76 +1,72 @@
-From: leoli@freescale.com (Li Yang)
-Date: Thu, 1 Oct 2015 17:41:56 -0500
-Subject: [PATCH v2 07/10] dts/ls2085a: Update DTSI to add support of
- various peripherals
-In-Reply-To: <1443736737.5336.158.camel@freescale.com>
-References: <1441350322-4671-1-git-send-email-bhupesh.sharma@freescale.com>
- <CAL_Jsq+9izV8vkrF1tK96M-VRGTMJ+GN5o=RsnCBDcnh-at5kA@mail.gmail.com>
- <CALRxmdC9ZzGiw6CVnVTqhH1xvA-P9s8cpYbk8DoVq7CodFS0VA@mail.gmail.com>
- <CY1PR0301MB0748A8F37E3FBE1922AF9D3F874C0@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <CADRPPNRz-yM_48HvHYv3r31u_b_tHkAjg5H5r+V2mE2=oJTGDA@mail.gmail.com>
- <1443736737.5336.158.camel@freescale.com>
-Message-ID: <CADRPPNT_DCruM-+nfwQnGwkuLgqMtwRJdcBuRJ06Onr93nSe=w@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 1 Oct 2015 16:42:35 -0600
+Subject: [RFC PATCH 06/20] coresight: etm3x: unlocking tracer in default
+ arch init
+In-Reply-To: <87eghgjg4v.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
+ <1442593594-10665-7-git-send-email-mathieu.poirier@linaro.org>
+ <87eghgjg4v.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CANLsYkwO64CRfcZ+z+=+ucbtOVeOcOoCy+d0GO5sEuTf+Qe0WQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 1, 2015 at 4:58 PM, Scott Wood <scottwood@freescale.com> wrote:
-> On Thu, 2015-10-01 at 16:42 -0500, Li Yang wrote:
->> On Thu, Oct 1, 2015 at 3:05 PM, Stuart Yoder <stuart.yoder@freescale.com>
->> wrote:
->> > Hi Rob,
->> >
->> > Had a question about your comments on the patch below.
->> >
->> > You singled out 3 nodes (gic,uart,clockgen) and said "This should be
->> > under a bus node."
->> >
->> > What is special about those 3 nodes types?  There are a bunch of other
->> > memory
->> > mapped SoC devices as well in the DTS.
->> >
->> > I skimmed the dts files under arch/arm64 and it looks like most have a
->> > simple-bus
->> > SoC node like this where SoC devices are under:
->> >
->> >         soc {
->> >                 #address-cells = <2>;
->> >                 #size-cells = <2>;
->> >                 compatible = "simple-bus";
->> >                 ranges;
->> >
->> > Is that what you are looking for-- for all SoC devices?
->>
->> I think the key is to have the soc node and have all the on-chip
->> devices defined underneath it.
->>
->> I read the following from the booting-without-of.txt document:
->>
->>   f) the /soc<SOCname> node
->>
->>   This node is used to represent a system-on-a-chip (SoC) and must be
->>   present if the processor is a SoC. The top-level soc node contains
->>   information that is global to all devices on the SoC. The node name
->>   should contain a unit address for the SoC, which is the base address
->>   of the memory-mapped register set for the SoC. The name of an SoC
->>   node should start with "soc", and the remainder of the name should
->>   represent the part number for the soc.  For example, the MPC8540's
->>   soc node would be called "soc8540".
->>
->> A lot of device trees didn't follow the soc<SOCname> naming scheme and
->> just used "soc" as the node name.  I am not sure if we want to enforce
->> the naming in the future or update the document to make it more relax.
+On 30 September 2015 at 05:33, Alexander Shishkin
+<alexander.shishkin@linux.intel.com> wrote:
+> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 >
-> Update the document.  Having the SoC name in the node name was a pain, which
-> is why we don't do it anymore.  Ideally, this text should be moved into a
-> binding for Freescale PPC/LS SoCs.  It really doesn't have the broad
-> applicability that this historical document suggests, and even on our SoCs it
-> doesn't represent the entire SoC.  It represents CCSR/IMMR.
+>> Calling function 'smp_call_function_single()' to unlock the
+>> tracer and calling it right after to perform the default
+>> initialisation doesn't make sense.
+>>
+>> Moving 'etm_os_unlock()' just before making the default
+>> initialisation results in the same outcome while saving
+>> one call to 'smp_call_function_single()'.
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>>  drivers/hwtracing/coresight/coresight-etm3x.c | 8 +++++---
+>>  1 file changed, 5 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+>> index c6880c1ade55..a4c158df0fef 100644
+>> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
+>> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+>> @@ -1867,6 +1867,11 @@ static void etm_init_arch_data(void *info)
+>>        * certain registers might be ignored.
+>>        */
+>>       etm_clr_pwrdwn(drvdata);
+>> +
+>> +     /* Make sure all registers are accessible */
+>> +     etm_os_unlock(drvdata);
+>
+> In case of co-processor register access, this will end up unlocking the
+> local ETM instead of the one on target cpu, by the looks of it.
 
-Having the soc node to represent the CCSR space is a Freescale
-specific thing.  But using the soc node to be the parent for all the
-on-chip devices seems to be a good practice for all device trees.  I
-do think we should maintain a standard for the top level nodes of a
-device tree.
+"etm_init_arch_data()" is also called from "smp_function_calls()" and
+as such, will end up executing the correct CPU.
 
-Regards,
-Leo
+> That's
+> why smp_function_call() was needed there. Or you might want a
+> etm_read_on_cpu() variant if it's really worth it.
+>
+>> +     drvdata->os_unlock = true;
+>> +
+>>       /*
+>>        * Set prog bit. It will be set from reset but this is included to
+>>        * ensure it is set
+>> @@ -1961,9 +1966,6 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+>>       get_online_cpus();
+>>       etmdrvdata[drvdata->cpu] = drvdata;
+>>
+>> -     if (!smp_call_function_single(drvdata->cpu, etm_os_unlock, drvdata, 1))
+>> -             drvdata->os_unlock = true;
+>> -
+>>       if (smp_call_function_single(drvdata->cpu,
+>>                                    etm_init_arch_data,  drvdata, 1))
+>>               dev_err(dev, "ETM arch init failed\n");
+>> --
+>> 1.9.1
+>
+> Regards,
+> --
+> Alex
