@@ -1,98 +1,63 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 1 Oct 2015 13:08:19 -0400
-Subject: [v2 PATCH] arm64: replace read_lock to rcu lock in call_break_hook
-In-Reply-To: <1443717457-31461-1-git-send-email-yang.shi@linaro.org>
-References: <1443717457-31461-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <20151001130819.5080bc24@gandalf.local.home>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 1 Oct 2015 10:17:50 -0700
+Subject: [PATCH] mtd: nand: pass page number to ecc->write_xxx() methods
+In-Reply-To: <1440436219-31625-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1440436219-31625-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20151001171750.GR143959@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  1 Oct 2015 09:37:37 -0700
-Yang Shi <yang.shi@linaro.org> wrote:
-
-> BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
-> in_atomic(): 0, irqs_disabled(): 128, pid: 342, name: perf
-> 1 lock held by perf/342:
->  #0:  (break_hook_lock){+.+...}, at: [<ffffffc0000851ac>] call_break_hook+0x34/0xd0
-> irq event stamp: 62224
-> hardirqs last  enabled at (62223): [<ffffffc00010b7bc>] __call_rcu.constprop.59+0x104/0x270
-> hardirqs last disabled at (62224): [<ffffffc0000fbe20>] vprintk_emit+0x68/0x640
-> softirqs last  enabled at (0): [<ffffffc000097928>] copy_process.part.8+0x428/0x17f8
-> softirqs last disabled at (0): [<          (null)>]           (null)
-> CPU: 0 PID: 342 Comm: perf Not tainted 4.1.6-rt5 #4
-> Hardware name: linux,dummy-virt (DT)
-> Call trace:
-> [<ffffffc000089968>] dump_backtrace+0x0/0x128
-> [<ffffffc000089ab0>] show_stack+0x20/0x30
-> [<ffffffc0007030d0>] dump_stack+0x7c/0xa0
-> [<ffffffc0000c878c>] ___might_sleep+0x174/0x260
-> [<ffffffc000708ac8>] __rt_spin_lock+0x28/0x40
-> [<ffffffc000708db0>] rt_read_lock+0x60/0x80
-> [<ffffffc0000851a8>] call_break_hook+0x30/0xd0
-> [<ffffffc000085a70>] brk_handler+0x30/0x98
-> [<ffffffc000082248>] do_debug_exception+0x50/0xb8
-> Exception stack(0xffffffc00514fe30 to 0xffffffc00514ff50)
-> fe20:                                     00000000 00000000 c1594680 0000007f
-> fe40: ffffffff ffffffff 92063940 0000007f 0550dcd8 ffffffc0 00000000 00000000
-> fe60: 0514fe70 ffffffc0 000be1f8 ffffffc0 0514feb0 ffffffc0 0008948c ffffffc0
-> fe80: 00000004 00000000 0514fed0 ffffffc0 ffffffff ffffffff 9282a948 0000007f
-> fea0: 00000000 00000000 9282b708 0000007f c1592820 0000007f 00083914 ffffffc0
-> fec0: 00000000 00000000 00000010 00000000 00000064 00000000 00000001 00000000
-> fee0: 005101e0 00000000 c1594680 0000007f c1594740 0000007f ffffffd8 ffffff80
-> ff00: 00000000 00000000 00000000 00000000 c1594770 0000007f c1594770 0000007f
-> ff20: 00665e10 00000000 7f7f7f7f 7f7f7f7f 01010101 01010101 00000000 00000000
-> ff40: 928e4cc0 0000007f 91ff11e8 0000007f
+On Mon, Aug 24, 2015 at 07:10:19PM +0200, Boris Brezillon wrote:
+> The ->read_xxx() methods are all passed the page number the NAND controller
+> is supposed to read, but ->write_xxx() do not have such a parameter.
 > 
-> call_break_hook is called in atomic context (hard irq disabled), so replace
-> the sleepable lock to rcu lock and replace relevant list operations to rcu
-> version.
+> This is a problem if we want to properly implement data
+> scrambling/randomization in order to mitigate MLC sensibility to repeated
+> pattern: to prevent bitflips in adjacent pages in the same block we need
+> to avoid repeating the same pattern at the same offset in those pages,
+> hence the randomizer/scrambler engine need to be passed the page value
+> in order to adapt its seed accordingly.
 > 
-> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> Moreover, adding the page parameter the ->write_xxx() methods add some
+> consistency to the current model.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> CC: Josh Wu <josh.wu@atmel.com>
+> CC: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> CC: Maxime Ripard <maxime.ripard@free-electrons.com>
+> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> CC: Huang Shijie <shijie.huang@intel.com>
+> CC: Bryan Wu <bryan.wu@analog.com>
+> CC: devel at driverdev.osuosl.org
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: linux-kernel at vger.kernel.org
+> 
 > ---
-> v1-> v2
-> Replace list operations to rcu version.
-> 
->  arch/arm64/kernel/debug-monitors.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-> index cebf786..cf0e4fc 100644
-> --- a/arch/arm64/kernel/debug-monitors.c
-> +++ b/arch/arm64/kernel/debug-monitors.c
-> @@ -276,14 +276,14 @@ static DEFINE_RWLOCK(break_hook_lock);
->  void register_break_hook(struct break_hook *hook)
->  {
->  	write_lock(&break_hook_lock);
-> -	list_add(&hook->node, &break_hook);
-> +	list_add_rcu(&hook->node, &break_hook);
->  	write_unlock(&break_hook_lock);
->  }
->  
->  void unregister_break_hook(struct break_hook *hook)
->  {
->  	write_lock(&break_hook_lock);
-> -	list_del(&hook->node);
-> +	list_del_rcu(&hook->node);
->  	write_unlock(&break_hook_lock);
->  }
+>  drivers/mtd/nand/atmel_nand.c                 |  6 ++++--
+>  drivers/mtd/nand/bf5xx_nand.c                 |  3 ++-
+>  drivers/mtd/nand/brcmnand/brcmnand.c          |  4 ++--
+>  drivers/mtd/nand/cafe_nand.c                  |  3 ++-
+>  drivers/mtd/nand/denali.c                     |  5 +++--
+>  drivers/mtd/nand/docg4.c                      |  4 ++--
+>  drivers/mtd/nand/fsl_elbc_nand.c              |  4 ++--
+>  drivers/mtd/nand/fsl_ifc_nand.c               |  2 +-
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c        |  6 +++---
+>  drivers/mtd/nand/hisi504_nand.c               |  3 ++-
+>  drivers/mtd/nand/lpc32xx_mlc.c                |  3 ++-
+>  drivers/mtd/nand/lpc32xx_slc.c                |  5 +++--
+>  drivers/mtd/nand/nand_base.c                  | 31 ++++++++++++++++++---------
+>  drivers/mtd/nand/omap2.c                      |  3 ++-
+>  drivers/mtd/nand/pxa3xx_nand.c                |  3 ++-
+>  drivers/mtd/nand/sh_flctl.c                   |  3 ++-
+>  drivers/mtd/nand/sunxi_nand.c                 |  5 +++--
+>  drivers/staging/mt29f_spinand/mt29f_spinand.c |  3 ++-
+>  include/linux/mtd/nand.h                      |  6 +++---
+>  19 files changed, 63 insertions(+), 39 deletions(-)
 
-Shouldn't there be a synchronize_rcu() somewhere?
+Tip for rebasing -- I noticed one build failure for docg4:
 
--- Steve
+  drivers/mtd/nand/docg4.c: In function ?docg4_block_markbad?:
+  drivers/mtd/nand/docg4.c:1116:2: error: too few arguments to function ?docg4_write_page?
+  drivers/mtd/nand/docg4.c:985:12: note: declared here
 
->  
-> @@ -292,11 +292,11 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
->  	struct break_hook *hook;
->  	int (*fn)(struct pt_regs *regs, unsigned int esr) = NULL;
->  
-> -	read_lock(&break_hook_lock);
-> -	list_for_each_entry(hook, &break_hook, node)
-> +	rcu_read_lock();
-> +	list_for_each_entry_rcu(hook, &break_hook, node)
->  		if ((esr & hook->esr_mask) == hook->esr_val)
->  			fn = hook->fn;
-> -	read_unlock(&break_hook_lock);
-> +	rcu_read_unlock();
->  
->  	return fn ? fn(regs, esr) : DBG_HOOK_ERROR;
->  }
+Brian
