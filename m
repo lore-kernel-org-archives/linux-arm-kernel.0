@@ -1,43 +1,43 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Thu, 1 Oct 2015 14:58:52 +0800
-Subject: [PATCH] soc: mediatek: Fix random hang up issue while kernel init
-In-Reply-To: <CAGS+omCXMRf4bxWancSJSq2a1pc38TYYY46Os9ASWWCRp95_ig@mail.gmail.com>
-References: <1443162717-64831-1-git-send-email-jamesjj.liao@mediatek.com>
- <1443169573.3135.9.camel@pengutronix.de> <5607D224.4050801@gmail.com>
- <CAGS+omCXMRf4bxWancSJSq2a1pc38TYYY46Os9ASWWCRp95_ig@mail.gmail.com>
-Message-ID: <1443682732.1714.11.camel@mtksdaap41>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 1 Oct 2015 08:58:59 +0200
+Subject: [PATCH 1/5] ARM: sunxi: Add R8 support
+In-Reply-To: <20150930223829.GG18556@codeaurora.org>
+References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1442566130-3497-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20150930223829.GG18556@codeaurora.org>
+Message-ID: <20151001065859.GA7104@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-Thanks for your help to explain the patch.
-
-On Tue, 2015-09-29 at 18:25 +0800, Daniel Kurtz wrote:
-> On Sun, Sep 27, 2015 at 7:25 PM, Matthias Brugger
-> <matthias.bgg@gmail.com> wrote:
-> >> But then we at least need a corresponding change to the binding documentation.
-
-I'll send a new patch with changing binding document.
-
-> If the existing bindings are not used anywhere yet (*), it seems like
-> unnecessary overhead to enforce backwards compatibility at this stage.
+On Wed, Sep 30, 2015 at 03:38:29PM -0700, Stephen Boyd wrote:
+> On 09/18, Maxime Ripard wrote:
+> > The R8 is a new Allwinner SoC based on the A13. While both are very
+> > similar, there's still a few differences. Introduce a new compatible to
+> > deal with them.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
 > 
-> (*) I don't actually know if this is true, perhaps only Mediatek can
-> answer this.
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> BTW, why is the entire series sent To: Mike and I? Are these
+> patches intended to go through clk tree?
 
-What does the meaning of existing bindings are used anywhere? Do you
-mean this binding is used by other SoCs ?
+I wanted to have the Ack from one of you on this patch. I usually
+prefer to have the whole serie instead of a single out of context
+patch, just let me know if you feel otherwise :)
 
-Currently scpsys driver can't be shared between different Mediatek SoCs
-because the power domains are different from each other. So I think it
-should no need to maintain backward compatibility on scpsys's binding.
+Thanks!
+Maxime
 
-> > Apart from that, please send the dtsi part as a seperate patch.
-
-OK.
-
-
-Best regards,
-
-James
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151001/a57c81af/attachment.sig>
