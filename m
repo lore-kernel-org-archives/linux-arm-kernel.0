@@ -1,30 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 01 Oct 2015 10:39:56 +0200
-Subject: Need information on Microblaze/ARM PCIe
-In-Reply-To: <8520D5D51A55D047800579B094147198016900FD@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <loom.20150930T152450-636@post.gmane.org>
- <1564493.rNY8FKFBZT@wuerfel>
- <8520D5D51A55D047800579B094147198016900FD@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <2823526.BaGmYtbVG2@wuerfel>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 01 Oct 2015 10:42:30 +0200
+Subject: [RESEND PATCH v2 2/2] ARM: imx6: change default burst size for USB
+In-Reply-To: <CAL411-p-V=p8g9ckxewNzZ7kG+ChbgewSn8V8n1kmw7DqU0hZw@mail.gmail.com>
+References: <1443579437-845-1-git-send-email-peter.chen@freescale.com>
+ <1443579437-845-2-git-send-email-peter.chen@freescale.com>
+ <1443603159.3185.5.camel@pengutronix.de>
+ <CAL411-p-V=p8g9ckxewNzZ7kG+ChbgewSn8V8n1kmw7DqU0hZw@mail.gmail.com>
+Message-ID: <1443688950.8574.7.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 October 2015 05:32:49 Bharat Kumar Gogada wrote:
-> Thanks for the input, so you mean to say we need modify pci-common.c  to
-> provide similar functionality that ARM64 provides.
+Am Donnerstag, den 01.10.2015, 16:13 +0800 schrieb Peter Chen:
+> On Wed, Sep 30, 2015 at 4:52 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> > Am Mittwoch, den 30.09.2015, 10:17 +0800 schrieb Peter Chen:
+> >> It can improve the USB performance when choosing larger
+> >> burst size at some systems (bus size is larger), there is
+> >> no side effect if this burst size is larger than bus size.
+> >>
+> > Just for the record, as it seems too late to stop the train now:
+> >
+> > I am _NOT_ happy that the extended binding has been accepted into the
+> > USB tree despite outstanding review comments from me not being addressed
+> > or even answered.
+> >
+> 
+> I sent patch for review at Aug 7th, queued this patches at Aug 13th
+> [1], and sent pull
+> request at Aug 14th, I am curious why you did not give comments
+> between this period utill
+> I complained one ethernet patch breaks i.mx ethernet function for v4.2
+> tree [2] at Aug 14th.
+> 
+What do the USB changes have to do with any ethernet changes?
 
-Yes, but that essentially means replacing it with a file that only
-provides trivial implementations for
-pcibios_fixup_bus(), pcibios_align_resource(), and pcibios_add_device().
-I don't think you need any others.
+The comments I'm referring to are from Aug 14th
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/364396.html
 
-> From the sentence (or putting it under and Kconfig symbol initially) you
-> mean to say (putting it under arm Kconfig symbol).
+So you are telling me that giving reviewers not even a week before
+sending the pull request is appropriate? And that sending the pull
+despite there being open review comments is ok? Think again.
 
-Sorry for being unclear. I meant putting the current implementation
-under a new microblaze specific Kconfig symbol so you can use it with
-the original host driver implementation as an alternative to the new
-new implementation. Once you have migrated to the new code it can be
-deleted.
+> I will consider your comments, and send patch for improving it if possible.
+> 
+As I said it may be too late now. By sending the pull request including
+the binding change you forced everyone to now either accept the (in my
+opinion not really perfect) binding, or hurry to change it in the
+current RC phase, something which I'm not comfortable with. The damage
+has been done.
 
-	Arnd
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/364352.html
+> [2] http://marc.info/?l=linux-netdev&m=143954500409636&w=2
+> 
+
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
