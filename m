@@ -1,30 +1,77 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 1 Oct 2015 16:15:14 +0100
-Subject: [Xen-devel] [PATCH v5 00/22] xen/arm64: Add support for 64KB
- page in Linux
-In-Reply-To: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
-References: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <560D4E02.60700@citrix.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 1 Oct 2015 16:27:39 +0100
+Subject: [PATCH] arm64: ftrace: fix function_graph tracer panic
+In-Reply-To: <560CCE91.3020407@linaro.org>
+References: <1443581395-30088-1-git-send-email-huawei.libin@huawei.com>
+ <560CCE91.3020407@linaro.org>
+Message-ID: <20151001152739.GI6963@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/15 11:45, Julien Grall wrote:
-> Hi all,
+On Thu, Oct 01, 2015 at 03:11:29PM +0900, AKASHI Takahiro wrote:
+> On 09/30/2015 11:49 AM, Li Bin wrote:
+> >When function graph tracer is enabled, the following operation
+> >will trigger panic:
+> >
+> >mount -t debugfs nodev /sys/kernel
+> >echo next_tgid > /sys/kernel/tracing/set_ftrace_filter
+> >echo function_graph > /sys/kernel/tracing/current_tracer
+> >ls /proc/
+> >
+> >------------[ cut here ]------------
+> >[  198.501417] Unable to handle kernel paging request at virtual address cb88537fdc8ba316
+> >[  198.506126] pgd = ffffffc008f79000
+> >[  198.509363] [cb88537fdc8ba316] *pgd=00000000488c6003, *pud=00000000488c6003, *pmd=0000000000000000
+> >[  198.517726] Internal error: Oops: 94000005 [#1] SMP
+> >[  198.518798] Modules linked in:
+> >[  198.520582] CPU: 1 PID: 1388 Comm: ls Tainted: G
+> >[  198.521800] Hardware name: linux,dummy-virt (DT)
+> >[  198.522852] task: ffffffc0fa9e8000 ti: ffffffc0f9ab0000 task.ti: ffffffc0f9ab0000
+> >[  198.524306] PC is at next_tgid+0x30/0x100
+> >[  198.525205] LR is at return_to_handler+0x0/0x20
+> >[  198.526090] pc : [<ffffffc0002a1070>] lr : [<ffffffc0000907c0>] pstate: 60000145
+> >[  198.527392] sp : ffffffc0f9ab3d40
+> >[  198.528084] x29: ffffffc0f9ab3d40 x28: ffffffc0f9ab0000
+> >[  198.529406] x27: ffffffc000d6a000 x26: ffffffc000b786e8
+> >[  198.530659] x25: ffffffc0002a1900 x24: ffffffc0faf16c00
+> >[  198.531942] x23: ffffffc0f9ab3ea0 x22: 0000000000000002
+> >[  198.533202] x21: ffffffc000d85050 x20: 0000000000000002
+> >[  198.534446] x19: 0000000000000002 x18: 0000000000000000
+> >[  198.535719] x17: 000000000049fa08 x16: ffffffc000242efc
+> >[  198.537030] x15: 0000007fa472b54c x14: ffffffffff000000
+> >[  198.538347] x13: ffffffc0fada84a0 x12: 0000000000000001
+> >[  198.539634] x11: ffffffc0f9ab3d70 x10: ffffffc0f9ab3d70
+> >[  198.540915] x9 : ffffffc0000907c0 x8 : ffffffc0f9ab3d40
+> >[  198.542215] x7 : 0000002e330f08f0 x6 : 0000000000000015
+> >[  198.543508] x5 : 0000000000000f08 x4 : ffffffc0f9835ec0
+> >[  198.544792] x3 : cb88537fdc8ba316 x2 : cb88537fdc8ba306
+> >[  198.546108] x1 : 0000000000000002 x0 : ffffffc000d85050
+> >[  198.547432]
+> >[  198.547920] Process ls (pid: 1388, stack limit = 0xffffffc0f9ab0020)
+> >[  198.549170] Stack: (0xffffffc0f9ab3d40 to 0xffffffc0f9ab4000)
+> >[  198.582568] Call trace:
+> >[  198.583313] [<ffffffc0002a1070>] next_tgid+0x30/0x100
+> >[  198.584359] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
+> >[  198.585503] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
+> >[  198.586574] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
+> >[  198.587660] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
+> >[  198.588896] Code: aa0003f5 2a0103f4 b4000102 91004043 (885f7c60)
+> >[  198.591092] ---[ end trace 6a346f8f20949ac8 ]---
+> >
+> >This is because when using function graph tracer, if the traced
+> >function return value is in multi regs ([0x-07]), return_to_handler
+> >may corrupt them. So in return_to_handler, the parameter regs should
+> >be protected properly.
 > 
-> ARM64 Linux is supporting both 4KB and 64KB page granularity. Although, Xen
-> hypercall interface and PV protocol are always based on 4KB page granularity.
-> 
-> Any attempt to boot a Linux guest with 64KB pages enabled will result to a
-> guest crash.
-> 
-> This series is a first attempt to allow those Linux running with the current
-> hypercall interface and PV protocol.
-> 
-> This solution has been chosen because we want to run Linux 64KB in released
-> Xen ARM version or/and platform using an old version of Linux DOM0.
+> You're right. we should preserve x0-x7 around a call to ftrace_return_to_handler()
+> just in case they might be used as a "composite type" (ie. struct) of return value.
 
-Applied to for-linus-4.4, thanks.
+Do I take this as an ack?
 
-Boris, can you kick off a set of tests for this branch, please?
+I applied the patch locally and I'm going to send a pull request
+tomorrow.
 
-David
+Thanks.
+
+-- 
+Catalin
