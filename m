@@ -1,61 +1,117 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 1 Oct 2015 22:45:06 +0200
-Subject: "clk: sunxi: Add a simple gates driver" breaks kernel with older
- DTB
-In-Reply-To: <1443689231.16718.225.camel@citrix.com>
-References: <1443689231.16718.225.camel@citrix.com>
-Message-ID: <20151001204506.GR7104@lukather>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Thu, 01 Oct 2015 13:53:51 -0700
+Subject: [v2 PATCH] arm64: replace read_lock to rcu lock in call_break_hook
+In-Reply-To: <20151001130819.5080bc24@gandalf.local.home>
+References: <1443717457-31461-1-git-send-email-yang.shi@linaro.org>
+ <20151001130819.5080bc24@gandalf.local.home>
+Message-ID: <560D9D5F.70403@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian,
+On 10/1/2015 10:08 AM, Steven Rostedt wrote:
+> On Thu,  1 Oct 2015 09:37:37 -0700
+> Yang Shi <yang.shi@linaro.org> wrote:
+>
+>> BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
+>> in_atomic(): 0, irqs_disabled(): 128, pid: 342, name: perf
+>> 1 lock held by perf/342:
+>>   #0:  (break_hook_lock){+.+...}, at: [<ffffffc0000851ac>] call_break_hook+0x34/0xd0
+>> irq event stamp: 62224
+>> hardirqs last  enabled at (62223): [<ffffffc00010b7bc>] __call_rcu.constprop.59+0x104/0x270
+>> hardirqs last disabled at (62224): [<ffffffc0000fbe20>] vprintk_emit+0x68/0x640
+>> softirqs last  enabled at (0): [<ffffffc000097928>] copy_process.part.8+0x428/0x17f8
+>> softirqs last disabled at (0): [<          (null)>]           (null)
+>> CPU: 0 PID: 342 Comm: perf Not tainted 4.1.6-rt5 #4
+>> Hardware name: linux,dummy-virt (DT)
+>> Call trace:
+>> [<ffffffc000089968>] dump_backtrace+0x0/0x128
+>> [<ffffffc000089ab0>] show_stack+0x20/0x30
+>> [<ffffffc0007030d0>] dump_stack+0x7c/0xa0
+>> [<ffffffc0000c878c>] ___might_sleep+0x174/0x260
+>> [<ffffffc000708ac8>] __rt_spin_lock+0x28/0x40
+>> [<ffffffc000708db0>] rt_read_lock+0x60/0x80
+>> [<ffffffc0000851a8>] call_break_hook+0x30/0xd0
+>> [<ffffffc000085a70>] brk_handler+0x30/0x98
+>> [<ffffffc000082248>] do_debug_exception+0x50/0xb8
+>> Exception stack(0xffffffc00514fe30 to 0xffffffc00514ff50)
+>> fe20:                                     00000000 00000000 c1594680 0000007f
+>> fe40: ffffffff ffffffff 92063940 0000007f 0550dcd8 ffffffc0 00000000 00000000
+>> fe60: 0514fe70 ffffffc0 000be1f8 ffffffc0 0514feb0 ffffffc0 0008948c ffffffc0
+>> fe80: 00000004 00000000 0514fed0 ffffffc0 ffffffff ffffffff 9282a948 0000007f
+>> fea0: 00000000 00000000 9282b708 0000007f c1592820 0000007f 00083914 ffffffc0
+>> fec0: 00000000 00000000 00000010 00000000 00000064 00000000 00000001 00000000
+>> fee0: 005101e0 00000000 c1594680 0000007f c1594740 0000007f ffffffd8 ffffff80
+>> ff00: 00000000 00000000 00000000 00000000 c1594770 0000007f c1594770 0000007f
+>> ff20: 00665e10 00000000 7f7f7f7f 7f7f7f7f 01010101 01010101 00000000 00000000
+>> ff40: 928e4cc0 0000007f 91ff11e8 0000007f
+>>
+>> call_break_hook is called in atomic context (hard irq disabled), so replace
+>> the sleepable lock to rcu lock and replace relevant list operations to rcu
+>> version.
+>>
+>> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+>> ---
+>> v1-> v2
+>> Replace list operations to rcu version.
+>>
+>>   arch/arm64/kernel/debug-monitors.c | 10 +++++-----
+>>   1 file changed, 5 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+>> index cebf786..cf0e4fc 100644
+>> --- a/arch/arm64/kernel/debug-monitors.c
+>> +++ b/arch/arm64/kernel/debug-monitors.c
+>> @@ -276,14 +276,14 @@ static DEFINE_RWLOCK(break_hook_lock);
+>>   void register_break_hook(struct break_hook *hook)
+>>   {
+>>   	write_lock(&break_hook_lock);
+>> -	list_add(&hook->node, &break_hook);
+>> +	list_add_rcu(&hook->node, &break_hook);
+>>   	write_unlock(&break_hook_lock);
+>>   }
+>>
+>>   void unregister_break_hook(struct break_hook *hook)
+>>   {
+>>   	write_lock(&break_hook_lock);
+>> -	list_del(&hook->node);
+>> +	list_del_rcu(&hook->node);
+>>   	write_unlock(&break_hook_lock);
+>>   }
+>
+> Shouldn't there be a synchronize_rcu() somewhere?
 
-On Thu, Oct 01, 2015 at 09:47:11AM +0100, Ian Campbell wrote:
-> Booting a recent kernel with the DTB supplied with Debian Jessie (3.16
-> based) breaks on Cubietruck because that DTB lacks the clock-indices nodes
-> which the new driver from the commit below adds (replacing the hardcoding
-> which used to be in clk-sunxi.c).
-> 
-> It is panicing in drivers/clocksource/timer-sun5i.c with:
-> 
-> [    0.015413] clocksource: timer: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 79635851949 ns
-> [    0.025049] Kernel panic - not syncing: Can't get timer clock
-> [    0.030794] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.3.0-rc2-arm-native+ #6
-> [    0.038002] Hardware name: Allwinner sun7i (A20) Family
-> [    0.043253] [<c0219794>] (unwind_backtrace) from [<c0214e44>] (show_stack+0x10/0x14)
-> [    0.050992] [<c0214e44>] (show_stack) from [<c048159c>] (dump_stack+0x88/0x98)
-> [    0.058213] [<c048159c>] (dump_stack) from [<c02caa98>] (panic+0xa4/0x22c)
-> [    0.065090] [<c02caa98>] (panic) from [<c0d7c518>] (sun5i_timer_init+0x80/0x384)
-> [    0.072482] [<c0d7c518>] (sun5i_timer_init) from [<c0d7aad0>] (clocksource_of_init+0x4c/0x8c)
-> [    0.081001] [<c0d7aad0>] (clocksource_of_init) from [<c0d39b48>] (start_kernel+0x28c/0x3c4)
-> [    0.089343] [<c0d39b48>] (start_kernel) from [<4020807c>] (0x4020807c)
-> [    0.095866] ---[ end Kernel panic - not syncing: Can't get timer clock
-> 
-> Reverting ee38b2698ae2 fixes this specific issue for me (it boots further,
-> but there seems to be other problems later when earlycon hands over to
-> proper console, which I've not yet looked into).
-> 
-> Is this considered acceptable linkage between the kernel and the dtbs?
-> 
-> I suspect that even if anyone does care this is going to be an uphill
-> struggle for that minority so I'm going to adjust our test infrastructure
-> to pickup the dtbs from the kernel it is trying to test rather then reusing
-> the one from the OS install.
+So far kgdb is the only user of unregister_break_hook in mainline kernel.
 
-It's never been something we supported (or even claim to support), so
-it's actually surprising that it's the only commit that need to be
-reverted, but yeah, you should keep your DTB in sync.
+Just read Documentation/RCU/checklist.txt, it says:
 
-Maxime
+Note that synchronize_rcu() -only- guarantees to wait until
+all currently executing rcu_read_lock()-protected RCU read-side critical 
+sections complete.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151001/5240a60d/attachment.sig>
+For kgdb, the unregister is just called in kgdb_arch_exit by 
+kgdb_unregister_io_module, which is called when rmmod kgdb module.
+
+The break point handler is done synchronously. So, it sounds should be 
+not a problem without calling synchronize_rcu().
+
+Yang
+
+> -- Steve
+>
+>>
+>> @@ -292,11 +292,11 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
+>>   	struct break_hook *hook;
+>>   	int (*fn)(struct pt_regs *regs, unsigned int esr) = NULL;
+>>
+>> -	read_lock(&break_hook_lock);
+>> -	list_for_each_entry(hook, &break_hook, node)
+>> +	rcu_read_lock();
+>> +	list_for_each_entry_rcu(hook, &break_hook, node)
+>>   		if ((esr & hook->esr_mask) == hook->esr_val)
+>>   			fn = hook->fn;
+>> -	read_unlock(&break_hook_lock);
+>> +	rcu_read_unlock();
+>>
+>>   	return fn ? fn(regs, esr) : DBG_HOOK_ERROR;
+>>   }
+>
