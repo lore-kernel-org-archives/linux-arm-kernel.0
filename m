@@ -1,94 +1,162 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 1 Oct 2015 12:47:48 -0700
-Subject: [PULL] clk: at91: sama5d2 materials
-In-Reply-To: <20150825191033.31346.67237@quantum>
-References: <20150818102401.17de779b@bbrezillon>
- <20150825191033.31346.67237@quantum>
-Message-ID: <20151001194747.GK19319@codeaurora.org>
+From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
+Date: Thu, 1 Oct 2015 21:54:59 +0200
+Subject: [PATCH v5 17/23] arm64:ilp32: add vdso-ilp32 and use for signal
+ return
+In-Reply-To: <20151001194405.GB31021@yury-N73SV>
+References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
+ <1443564860-31208-18-git-send-email-ynorov@caviumnetworks.com>
+ <560B5FB5.6080605@mentor.com> <20151001194405.GB31021@yury-N73SV>
+Message-ID: <A9C485E4-CB07-41B9-B578-C130085A82BA@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25, Michael Turquette wrote:
-> Quoting Boris Brezillon (2015-08-18 01:24:01)
-> > Stephen, Mike,
-> > 
-> > Here is a PR for the sama5d2 materials.
-> > I know we're already late in the release cycle and I'm not sure you can
-> > take this PR into account for 4.3, so if you can't could you please
-> > queue it for 4.4?
+Yury,
+
+this patch has been based on an earlier version of vdso and mainly adjusted to match
+the requirements of commit 601255ae3c98fdeeee3a8bb4696425e4f868b4f1.
+
+As these are mainly style-changes, please feel free to revise and adjust as needed.
+
+Regards,
+Philipp.
+
+> On 01 Oct 2015, at 21:44, Yury Norov <ynorov@caviumnetworks.com> wrote:
 > 
-> Queued for 4.4.
+> On Tue, Sep 29, 2015 at 11:06:13PM -0500, Nathan Lynch wrote:
+>> On 09/29/2015 05:14 PM, Yury Norov wrote:
+>>> From: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+>>> 
+>>> Adjusted to move the move data page before code pages in sync with
+>>> commit 601255ae3c98fdeeee3a8bb4696425e4f868b4f1
+>> 
+>> This commit message needs more information about how the ilp32 VDSO uses
+>> the existing arm64 code.  I had to really hunt through the Makefile to
+>> figure out what's going on.
+>> 
+>> The commit message should also identify the APIs that are supported.
+>> The subject line mentions signal return, but gettimeofday, clock_gettime
+>> and clock_getres are being added here too, and it is not obvious.
+>> 
+>> 
+>>> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+>>> Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+>>> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+>>> 
+>>> create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
+>>> create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
+>>> copy arch/arm64/{include/asm/vdso.h => kernel/vdso-ilp32/vdso-ilp32.S} (56%)
+>>> create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+>> 
+>> How are you invoking git-format-patch?  The copy detection in this case
+>> is not conducive to review.
+>> 
+>> It looks like the existing arm64 vdso Makefile has been copied to
+>> vdso-ilp32/ and adjusted for paths and naming.  While the gettimeofday
+>> assembly implementation is reused, the build logic is duplicated.  x86
+>> produces VDSOs for multiple ABIs with a single Makefile; is a similar
+>> approach not appropriate for arm64?
+>> 
+>> 
+>>> diff --git a/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+>>> new file mode 100644
+>>> index 0000000..ac8029b
+>>> --- /dev/null
+>>> +++ b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+>>> @@ -0,0 +1,98 @@
+>> 
+>> [...]
+>> 
+>>> +#include <linux/const.h>
+>>> +#include <asm/page.h>
+>>> +#include <asm/vdso.h>
+>>> +
+>>> +/*OUTPUT_FORMAT("elf32-littleaarch64", "elf32-bigaarch64", "elf32-littleaarch64")
+>>> +OUTPUT_ARCH(aarch64)
+>>> +*/
+>> 
+>> If these lines aren't needed then omit them.
+>> 
+>> [...]
+>> 
+>> 
+>>> +/*
+>>> + * This controls what symbols we export from the DSO.
+>>> + */
+>>> +VERSION
+>>> +{
+>>> +	LINUX_2.6.39 {
+>>> +	global:
+>>> +		__kernel_rt_sigreturn;
+>>> +		__kernel_gettimeofday;
+>>> +		__kernel_clock_gettime;
+>>> +		__kernel_clock_getres;
+>>> +	local: *;
+>>> +	};
+>>> +}
+>> 
+>> Something that came up during review of arch/arm's VDSO code: consider
+>> using version and names that match x86, i.e. LINUX_2.6, __vdso_gettimeofday.
+>> 
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/267940.html
+>> 
+>> Using LINUX_2.6.39 for this code is nonsensical.
+>> 
+>> 
+>>> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+>>> index b239b9b..bed6cf1 100644
+>>> --- a/arch/arm64/kernel/vdso.c
+>>> +++ b/arch/arm64/kernel/vdso.c
+>>> @@ -40,6 +40,12 @@ extern char vdso_start, vdso_end;
+>>> static unsigned long vdso_pages;
+>>> static struct page **vdso_pagelist;
+>>> 
+>>> +#ifdef CONFIG_ARM64_ILP32
+>>> +extern char vdso_ilp32_start, vdso_ilp32_end;
+>>> +static unsigned long vdso_ilp32_pages;
+>>> +static struct page **vdso_ilp32_pagelist;
+>>> +#endif
+>>> +
+>>> /*
+>>>  * The vDSO data page.
+>>>  */
+>>> @@ -117,24 +123,29 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
+>>> }
+>>> #endif /* CONFIG_AARCH32_EL0 */
+>>> 
+>>> -static struct vm_special_mapping vdso_spec[2];
+>>> -
+>>> -static int __init vdso_init(void)
+>>> +static inline int __init vdso_init_common(char *vdso_start, char *vdso_end,
+>> 
+>> No inline please.
+>> 
+>> 
+>>> +					  unsigned long *vdso_pagesp,
+>>> +					  struct page ***vdso_pagelistp,
+>>> +					  struct vm_special_mapping* vdso_spec)
+>>> {
+>> 
+>> [...]
+>> 
+>>> int arch_setup_additional_pages(struct linux_binprm *bprm,
+>>> 				int uses_interp)
+>>> {
+>>> 	struct mm_struct *mm = current->mm;
+>>> 	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
+>>> -	void *ret;
+>>> +	void* ret;
+>> 
+>> Gratuitous (and incorrect) style change.
+>> 
+>> 
+>>> +	unsigned long pages = vdso_pages;
+>>> +	struct vm_special_mapping* spec = vdso_spec;
+>> 
+>> Incorrect style:                  *spec
 > 
-> Thanks,
-> Mike
+> Hi Nathan,
 > 
-> > 
-> > Thanks,
-> > 
-> > Boris
-> > 
-> > The following changes since commit c42743f11f58646a50bc4b96da363429dca0c5e6:
-> > 
-
-This commit was in clk-next and then got rebased. clk-next isn't
-stable, please don't base pull requests on it. If you have some
-dependency on the patches in there then we need to know so that
-we can provide some branch.
-
-I cherry-picked the 4 patches to clk-next. I had to squash in this fix
-to get it to compile. Please check.
-
----8<----
-diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-index 631123ca6f85..abc80949e1dd 100644
---- a/drivers/clk/at91/clk-generated.c
-+++ b/drivers/clk/at91/clk-generated.c
-@@ -99,22 +99,22 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
- 					struct clk_rate_request *req)
- {
- 	struct clk_generated *gck = to_clk_generated(hw);
--	struct clk *parent = NULL;
-+	struct clk_hw *parent = NULL;
- 	long best_rate = -EINVAL;
- 	unsigned long tmp_rate, min_rate;
- 	int best_diff = -1;
- 	int tmp_diff;
- 	int i;
- 
--	for (i = 0; i < __clk_get_num_parents(hw->clk); i++) {
-+	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
- 		u32 div;
- 		unsigned long parent_rate;
- 
--		parent = clk_get_parent_by_index(hw->clk, i);
-+		parent = clk_hw_get_parent_by_index(hw, i);
- 		if (!parent)
- 			continue;
- 
--		parent_rate = __clk_get_rate(parent);
-+		parent_rate = clk_hw_get_rate(parent);
- 		min_rate = DIV_ROUND_CLOSEST(parent_rate, GENERATED_MAX_DIV + 1);
- 		if (!parent_rate ||
- 		    (gck->range.max && min_rate > gck->range.max))
-@@ -128,7 +128,7 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
- 				best_rate = tmp_rate;
- 				best_diff = tmp_diff;
- 				req->best_parent_rate = parent_rate;
--				req->best_parent_hw = __clk_get_hw(parent);
-+				req->best_parent_hw = parent;
- 			}
- 
- 			if (!best_diff || tmp_rate < req->rate)
-@@ -156,7 +156,7 @@ static int clk_generated_set_parent(struct clk_hw *hw, u8 index)
- {
- 	struct clk_generated *gck = to_clk_generated(hw);
- 
--	if (index >= __clk_get_num_parents(hw->clk))
-+	if (index >= clk_hw_get_num_parents(hw))
- 		return -EINVAL;
- 
- 	gck->parent_id = index;
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> If Philipp Philipp Tomsich will not answer soon, I'll fix all this.
+> 
+> BR,
+> Yury.
