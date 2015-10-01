@@ -1,51 +1,78 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 1 Oct 2015 12:11:56 +0200
-Subject: [PATCH RESEND] ARM: dts: Fix Makefile target for
- sun4i-a10-itead-iteaduino-plus
-In-Reply-To: <CA+5PVA5ceg94PrUdUpb5X7ZsbEuK4_u1V-ZDesR7h_MZ8rGUtg@mail.gmail.com>
-References: <20150904124934.GD464@hansolo.redhat.com>
- <20150906112046.GK31584@lukather>
- <CA+5PVA5ceg94PrUdUpb5X7ZsbEuK4_u1V-ZDesR7h_MZ8rGUtg@mail.gmail.com>
-Message-ID: <20151001101156.GE7104@lukather>
+From: lars.persson@axis.com (Lars Persson)
+Date: Thu,  1 Oct 2015 14:04:07 +0200
+Subject: [RFC] arm: Add generic smc wrapper
+Message-ID: <1443701047-10101-1-git-send-email-larper@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This adds an smc wrapper according to the ARM standard for secure
+monitor calling conventions (ARM DEN 0028A).
 
-On Tue, Sep 29, 2015 at 10:32:59AM -0400, Josh Boyer wrote:
-> On Sun, Sep 6, 2015 at 7:20 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Fri, Sep 04, 2015 at 08:49:34AM -0400, Josh Boyer wrote:
-> >> Commit 79ae3e66f8d (ARM: dts: sun4i: Add Iteaduino Plus A10) added a new
-> >> make target for the sun4i-a10-itead-iteaduino-plus dts file, but mistakenly
-> >> used .dts instead of the correct .dtb suffix.  This resulted in a build error
-> >> like:
-> >>
-> >>         scripts/Makefile.dtbinst:42: target 'sun4i-a10-itead-iteaduino-plus.dts' doesn't match the target pattern
-> >>
-> >> when doing a make dtbs_install.
-> >>
-> >> Fix it to use the proper file name.
-> >>
-> >> Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
-> >
-> > Queued, thanks!
-> 
-> Are you going to push this to Olof or Linus for the 4.3 release?  I
-> don't see it in Linus' tree and this is still broken there.
+Signed-off-by: Lars Persson <larper@axis.com>
+---
+ arch/arm/include/asm/smc-call.h | 12 ++++++++++++
+ arch/arm/kernel/Makefile        |  2 ++
+ arch/arm/kernel/smc-call.S      | 22 ++++++++++++++++++++++
+ 3 files changed, 36 insertions(+)
+ create mode 100644 arch/arm/include/asm/smc-call.h
+ create mode 100644 arch/arm/kernel/smc-call.S
 
-I was planning on sending the pull request for 4.3 sometime this week.
-
-Maxime
-
+diff --git a/arch/arm/include/asm/smc-call.h b/arch/arm/include/asm/smc-call.h
+new file mode 100644
+index 0000000..88a83d4
+--- /dev/null
++++ b/arch/arm/include/asm/smc-call.h
+@@ -0,0 +1,12 @@
++/*
++ * Wrapper for secure monitor calls using the ARM SMC calling
++ * convention.
++ */
++#ifndef __ASM_SMC_CALL_H
++#define __ASM_SMC_CALL_H
++
++#include <linux/types.h>
++
++extern int invoke_smc(u32 function_id, u32 arg0, u32 arg1, u32 arg2);
++
++#endif
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index af9e59b..f09d2d6 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -92,4 +92,6 @@ obj-y				+= psci-call.o
+ obj-$(CONFIG_SMP)		+= psci_smp.o
+ endif
+ 
++obj-y		+= smc-call.o
++
+ extra-y := $(head-y) vmlinux.lds
+diff --git a/arch/arm/kernel/smc-call.S b/arch/arm/kernel/smc-call.S
+new file mode 100644
+index 0000000..a07ebf9
+--- /dev/null
++++ b/arch/arm/kernel/smc-call.S
+@@ -0,0 +1,22 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Copied from: psci-call.S.
++ */
++
++#include <linux/linkage.h>
++
++#include <asm/opcodes-sec.h>
++
++/* int invoke_smc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
++ENTRY(invoke_smc)
++	__SMC(0)
++	bx	lr
++ENDPROC(invoke_smc)
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151001/a4f517e4/attachment.sig>
+2.1.4
