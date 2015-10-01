@@ -1,74 +1,98 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Thu, 1 Oct 2015 12:07:44 -0500
-Subject: [PATCH v3 1/2] fsl: Add binding for RCPM
-In-Reply-To: <CY1PR0301MB0748AB1CE2D93FFD79FE6009874C0@CY1PR0301MB0748.namprd03.prod.outlook.com>
-References: <1443083354-37369-1-git-send-email-dongsheng.wang@freescale.com>
- <CALRxmdDwGgxCG5SfSOaEXK8_fJcG4UUw_9D2=NA7nQhikDyb+A@mail.gmail.com>
- <CY1PR0301MB0748AB1CE2D93FFD79FE6009874C0@CY1PR0301MB0748.namprd03.prod.outlook.com>
-Message-ID: <1443719264.5336.133.camel@freescale.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 1 Oct 2015 13:08:19 -0400
+Subject: [v2 PATCH] arm64: replace read_lock to rcu lock in call_break_hook
+In-Reply-To: <1443717457-31461-1-git-send-email-yang.shi@linaro.org>
+References: <1443717457-31461-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <20151001130819.5080bc24@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-10-01 at 12:05 -0500, Yoder Stuart-B08248 wrote:
-> > +++ b/Documentation/devicetree/bindings/soc/fsl/rcpm.txt
-> > @@ -0,0 +1,63 @@
-> > +* Run Control and Power Management
-> > +-------------------------------------------
-> > +The RCPM performs all device-level tasks associated with device run 
-> > control
-> > +and power management.
-> > +
-> > +Required properites:
-> > +  - reg : Offset and length of the register set of RCPM block.
-> 
-> s/RCPM block/the RCPM block/
-> 
-> > +  - fsl,#rcpm-wakeup-cells : The number of cells in rcpm-wakeup property.
-> 
-> s/rcpm-wakeup-property/the rcpm-wakeup-property/
-> 
-> > +  - compatible : Sould contain a chip-specific RCPM block compatible 
-> > string
-> 
-> s/Sould/Should
-> 
-> "Should" means it is recommended, but does not mean "must".  Is it really 
-> optional?
-> 
-> > +       and (if applicable) may contain a chassis-version RCPM compatible
-> > +       string. Chip-specific strings are of the form "fsl,<chip>-rcpm",
-> > +       such as:
-> > +       * "fsl,p2041-rcpm"
-> > +       * "fsl,p3041-rcpm"
-> > +       * "fsl,p4080-rcpm"
-> > +       * "fsl,p5020-rcpm"
-> > +       * "fsl,p5040-rcpm"
-> > +       * "fsl,t4240-rcpm"
-> > +       * "fsl,b4420-rcpm"
-> > +       * "fsl,b4860-rcpm"
-> 
-> 2 or 3 examples is enough.
-> 
-> > +       Chassis-version strings are of the form "fsl,qoriq-rcpm-
-> > <version>",
-> > +       such as:
-> > +       * "fsl,qoriq-rcpm-1.0": for chassis 1.0 rcpm
-> > +       * "fsl,qoriq-rcpm-2.0": for chassis 2.0 rcpm
-> > +       * "fsl,qoriq-rcpm-2.1": for chassis 2.1 rcpm
-> > +
-> > +All references to "1.0" and "2.0" refer to the QorIQ chassis version to
-> > +which the chip complies.
-> > +Chassis Version                Example Chips
-> > +---------------                -------------------------------
-> > +1.0                            p4080, p5020, p5040, p2041, p3041
-> > +2.0                            t4240, b4860, b4420
-> > +2.1                            t1040, ls1021
-> 
-> Not sure this binding is the place to maintain a table of chassis
-> versions to SoCs.
+On Thu,  1 Oct 2015 09:37:37 -0700
+Yang Shi <yang.shi@linaro.org> wrote:
 
-This is something I've been encouraging, given that the block versions are 
-not publicly documented.  It lets people find a manual that describes the 
-advertised programming interface.
+> BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
+> in_atomic(): 0, irqs_disabled(): 128, pid: 342, name: perf
+> 1 lock held by perf/342:
+>  #0:  (break_hook_lock){+.+...}, at: [<ffffffc0000851ac>] call_break_hook+0x34/0xd0
+> irq event stamp: 62224
+> hardirqs last  enabled at (62223): [<ffffffc00010b7bc>] __call_rcu.constprop.59+0x104/0x270
+> hardirqs last disabled at (62224): [<ffffffc0000fbe20>] vprintk_emit+0x68/0x640
+> softirqs last  enabled at (0): [<ffffffc000097928>] copy_process.part.8+0x428/0x17f8
+> softirqs last disabled at (0): [<          (null)>]           (null)
+> CPU: 0 PID: 342 Comm: perf Not tainted 4.1.6-rt5 #4
+> Hardware name: linux,dummy-virt (DT)
+> Call trace:
+> [<ffffffc000089968>] dump_backtrace+0x0/0x128
+> [<ffffffc000089ab0>] show_stack+0x20/0x30
+> [<ffffffc0007030d0>] dump_stack+0x7c/0xa0
+> [<ffffffc0000c878c>] ___might_sleep+0x174/0x260
+> [<ffffffc000708ac8>] __rt_spin_lock+0x28/0x40
+> [<ffffffc000708db0>] rt_read_lock+0x60/0x80
+> [<ffffffc0000851a8>] call_break_hook+0x30/0xd0
+> [<ffffffc000085a70>] brk_handler+0x30/0x98
+> [<ffffffc000082248>] do_debug_exception+0x50/0xb8
+> Exception stack(0xffffffc00514fe30 to 0xffffffc00514ff50)
+> fe20:                                     00000000 00000000 c1594680 0000007f
+> fe40: ffffffff ffffffff 92063940 0000007f 0550dcd8 ffffffc0 00000000 00000000
+> fe60: 0514fe70 ffffffc0 000be1f8 ffffffc0 0514feb0 ffffffc0 0008948c ffffffc0
+> fe80: 00000004 00000000 0514fed0 ffffffc0 ffffffff ffffffff 9282a948 0000007f
+> fea0: 00000000 00000000 9282b708 0000007f c1592820 0000007f 00083914 ffffffc0
+> fec0: 00000000 00000000 00000010 00000000 00000064 00000000 00000001 00000000
+> fee0: 005101e0 00000000 c1594680 0000007f c1594740 0000007f ffffffd8 ffffff80
+> ff00: 00000000 00000000 00000000 00000000 c1594770 0000007f c1594770 0000007f
+> ff20: 00665e10 00000000 7f7f7f7f 7f7f7f7f 01010101 01010101 00000000 00000000
+> ff40: 928e4cc0 0000007f 91ff11e8 0000007f
+> 
+> call_break_hook is called in atomic context (hard irq disabled), so replace
+> the sleepable lock to rcu lock and replace relevant list operations to rcu
+> version.
+> 
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> ---
+> v1-> v2
+> Replace list operations to rcu version.
+> 
+>  arch/arm64/kernel/debug-monitors.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+> index cebf786..cf0e4fc 100644
+> --- a/arch/arm64/kernel/debug-monitors.c
+> +++ b/arch/arm64/kernel/debug-monitors.c
+> @@ -276,14 +276,14 @@ static DEFINE_RWLOCK(break_hook_lock);
+>  void register_break_hook(struct break_hook *hook)
+>  {
+>  	write_lock(&break_hook_lock);
+> -	list_add(&hook->node, &break_hook);
+> +	list_add_rcu(&hook->node, &break_hook);
+>  	write_unlock(&break_hook_lock);
+>  }
+>  
+>  void unregister_break_hook(struct break_hook *hook)
+>  {
+>  	write_lock(&break_hook_lock);
+> -	list_del(&hook->node);
+> +	list_del_rcu(&hook->node);
+>  	write_unlock(&break_hook_lock);
+>  }
 
--Scott
+Shouldn't there be a synchronize_rcu() somewhere?
+
+-- Steve
+
+>  
+> @@ -292,11 +292,11 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
+>  	struct break_hook *hook;
+>  	int (*fn)(struct pt_regs *regs, unsigned int esr) = NULL;
+>  
+> -	read_lock(&break_hook_lock);
+> -	list_for_each_entry(hook, &break_hook, node)
+> +	rcu_read_lock();
+> +	list_for_each_entry_rcu(hook, &break_hook, node)
+>  		if ((esr & hook->esr_mask) == hook->esr_val)
+>  			fn = hook->fn;
+> -	read_unlock(&break_hook_lock);
+> +	rcu_read_unlock();
+>  
+>  	return fn ? fn(regs, esr) : DBG_HOOK_ERROR;
+>  }
