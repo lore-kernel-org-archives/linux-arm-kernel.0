@@ -1,193 +1,73 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 1 Oct 2015 22:11:22 +0200
-Subject: [PATCH v2 4/4] ASOC: sunxi: Add support for the spdif block
-In-Reply-To: <1443635458-8873-5-git-send-email-codekipper@gmail.com>
-References: <1443635458-8873-1-git-send-email-codekipper@gmail.com>
- <1443635458-8873-5-git-send-email-codekipper@gmail.com>
-Message-ID: <20151001201122.GM7104@lukather>
+Date: Thu, 1 Oct 2015 22:14:28 +0200
+Subject: [PATCH 1/2] irqchip: sunxi-nmi: Use driver name instead of DT
+ node name for identification
+In-Reply-To: <1443713629-17415-2-git-send-email-wens@csie.org>
+References: <1443713629-17415-1-git-send-email-wens@csie.org>
+ <1443713629-17415-2-git-send-email-wens@csie.org>
+Message-ID: <20151001201428.GO7104@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 07:50:58PM +0200, codekipper at gmail.com wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
+Hi,
+
+On Thu, Oct 01, 2015 at 11:33:48PM +0800, Chen-Yu Tsai wrote:
+> The device tree node name is typically "interrupt-controller", which is
+> rather useless when used in printk messages and irq chip names for
+> identification purposes. Use the driver name "sunxi-nmi" instead.
 > 
-> The sun4i, sun6i and sun7i SoC families have an SPDIF
-> block which is capable of playback and capture.
-> 
-> This patch enables the playback of this block for
-> the sun4i and sun7i families.
-> 
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  sound/soc/sunxi/Kconfig       |  12 +
->  sound/soc/sunxi/Makefile      |   4 +
->  sound/soc/sunxi/sun4i-spdif.c | 612 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 628 insertions(+)
->  create mode 100644 sound/soc/sunxi/sun4i-spdif.c
+>  drivers/irqchip/irq-sunxi-nmi.c | 11 ++++++-----
+>  1 file changed, 6 insertions(+), 5 deletions(-)
 > 
-> diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
-> index 84c72ec..2ebf43d 100644
-> --- a/sound/soc/sunxi/Kconfig
-> +++ b/sound/soc/sunxi/Kconfig
-> @@ -8,4 +8,16 @@ config SND_SUN4I_CODEC
->  	  Select Y or M to add support for the Codec embedded in the Allwinner
->  	  A10 and affiliated SoCs.
+> diff --git a/drivers/irqchip/irq-sunxi-nmi.c b/drivers/irqchip/irq-sunxi-nmi.c
+> index c143dd58410c..57e009917d2d 100644
+> --- a/drivers/irqchip/irq-sunxi-nmi.c
+> +++ b/drivers/irqchip/irq-sunxi-nmi.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/irqchip/chained_irq.h>
 >  
-> +config SND_SOC_SUNXI_DAI_SPDIF
-> +        tristate
-> +	depends on OF
-> +        select SND_SOC_GENERIC_DMAENGINE_PCM
-> +        select REGMAP_MMIO
-> +
-> +config SND_SOC_SUNXI_MACHINE_SPDIF
-> +        tristate "APB on-chip sun4i/sun5i/sun7i SPDIF"
-> +	depends on OF
-> +        select SND_SOC_SUNXI_DAI_SPDIF
-> +        help
-> +          Say Y if you want to add support for SoC S/PDIF audio as simple audio card.
+>  #define SUNXI_NMI_SRC_TYPE_MASK	0x00000003
+> +#define DRV_NAME "sunxi-nmi"
+>  
+>  enum {
+>  	SUNXI_SRC_TYPE_LEVEL_LOW = 0,
+> @@ -130,22 +131,22 @@ static int __init sunxi_sc_nmi_irq_init(struct device_node *node,
+>  
+>  	domain = irq_domain_add_linear(node, 1, &irq_generic_chip_ops, NULL);
+>  	if (!domain) {
+> -		pr_err("%s: Could not register interrupt domain.\n", node->name);
+> +		pr_err("%s: Could not register interrupt domain.\n", DRV_NAME);
+>  		return -ENOMEM;
+>  	}
+>  
+> -	ret = irq_alloc_domain_generic_chips(domain, 1, 2, node->name,
+> +	ret = irq_alloc_domain_generic_chips(domain, 1, 2, DRV_NAME,
+>  					     handle_fasteoi_irq, clr, 0,
+>  					     IRQ_GC_INIT_MASK_CACHE);
+>  	if (ret) {
+>  		 pr_err("%s: Could not allocate generic interrupt chip.\n",
+> -			 node->name);
+> +			 DRV_NAME);
+>  		 goto fail_irqd_remove;
+>  	}
+>  
+>  	irq = irq_of_parse_and_map(node, 0);
+>  	if (irq <= 0) {
+> -		pr_err("%s: unable to parse irq\n", node->name);
+> +		pr_err("%s: unable to parse irq\n", DRV_NAME);
+>  		ret = -EINVAL;
+>  		goto fail_irqd_remove;
+>  	}
+> @@ -153,7 +154,7 @@ static int __init sunxi_sc_nmi_irq_init(struct device_node *node,
+>  	gc = irq_get_domain_generic_chip(domain, 0);
+>  	gc->reg_base = of_iomap(node, 0);
+>  	if (!gc->reg_base) {
+> -		pr_err("%s: unable to map resource\n", node->name);
+> +		pr_err("%s: unable to map resource\n", DRV_NAME);
 
-You still haven't said why you can't use simple-card...
-
-> +static void sun4i_spdif_configure(struct sun4i_spdif_dev *host)
-> +{
-> +	u32 reg_val;
-> +
-> +	/* soft reset SPDIF */
-> +	regmap_write(host->regmap, SUN4I_SPDIF_CTL, SUN4I_SPDIF_CTL_RESET);
-> +
-> +	/* MCLK OUTPUT enable */
-> +	regmap_update_bits(host->regmap, SUN4I_SPDIF_CTL,
-> +			SUN4I_SPDIF_CTL_MCLKOUTEN, SUN4I_SPDIF_CTL_MCLKOUTEN);
-
-The alignment is still not right....
-
-> +	/* flush TX FIFO */
-> +	regmap_update_bits(host->regmap, SUN4I_SPDIF_FCTL,
-> +			SUN4I_SPDIF_FCTL_FTX, SUN4I_SPDIF_FCTL_FTX);
-> +
-> +	/* clear interrupt status */
-> +	regmap_read(host->regmap, SUN4I_SPDIF_ISTA, &reg_val);
-> +	regmap_write(host->regmap, SUN4I_SPDIF_ISTA, reg_val);
-
-You're not using any interrupts. Why is this needed?
-
-> +static int sun4i_spdif_startup(struct snd_pcm_substream *substream,
-> +				struct snd_soc_dai *cpu_dai)
-> +{
-> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-> +	struct sun4i_spdif_dev *host = snd_soc_dai_get_drvdata(rtd->cpu_dai);
-> +
-> +	if (substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
-> +		return -EINVAL;
-> +
-> +	sun4i_spdif_configure(host);
-> +
-> +	return clk_prepare_enable(host->clk);
-
-You're still not using pm_runtime...
-
-> +}
-> +
-> +static void sun4i_spdif_shutdown(struct snd_pcm_substream *substream,
-> +				struct snd_soc_dai *dai)
-> +{
-> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-> +	struct sun4i_spdif_dev *host = snd_soc_dai_get_drvdata(rtd->cpu_dai);
-> +
-> +	if (substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
-> +		return;
-> +
-> +	clk_disable_unprepare(host->clk);
-> +}
-> +
-> +static int sun4i_spdif_hw_params(struct snd_pcm_substream *substream,
-> +				struct snd_pcm_hw_params *params,
-> +				struct snd_soc_dai *cpu_dai)
-> +{
-> +	int ret = 0;
-> +	int fmt;
-> +	unsigned long rate = params_rate(params);
-> +	u32 mclk_div = 0;
-> +	unsigned int mclk = 0;
-> +	u32 reg_val;
-> +	struct sun4i_spdif_dev *host = snd_soc_dai_get_drvdata(cpu_dai);
-> +	struct platform_device *pdev = host->pdev;
-> +
-> +	/* Add the PCM and raw data select interface */
-> +	switch (params_channels(params)) {
-> +	case 1: /* PCM mode */
-> +	case 2:
-> +		fmt = 0;
-> +		break;
-> +	case 4: /* raw data mode */
-> +		fmt = SUN4I_SPDIF_TXCFG_NONAUDIO;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	switch (params_format(params)) {
-> +	case SNDRV_PCM_FORMAT_S16_LE:
-> +		fmt |= SUN4I_SPDIF_TXCFG_FMT16BIT;
-> +		break;
-> +	case SNDRV_PCM_FORMAT_S20_3LE:
-> +		fmt |= SUN4I_SPDIF_TXCFG_FMT20BIT;
-> +		break;
-> +	case SNDRV_PCM_FORMAT_S24_LE:
-> +		fmt |= SUN4I_SPDIF_TXCFG_FMT24BIT;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	switch (rate) {
-> +	case 22050:
-> +	case 44100:
-> +	case 88200:
-> +	case 176400:
-> +		mclk = 22579200;
-> +		break;
-> +	case 24000:
-> +	case 32000:
-> +	case 48000:
-> +	case 96000:
-> +	case 192000:
-> +		mclk = 24576000;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	ret = clk_set_rate(host->audio_clk, mclk);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev,
-> +			"Setting pll2 clock rate for %d Hz failed!\n", mclk);
-> +		return ret;
-> +	}
-
-You're still using the PLL2...
-
-> +
-> +	ret = clk_set_rate(host->clk, mclk);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev,
-> +			"Setting SPDIF clock rate for %d Hz failed!\n", mclk);
-> +		return ret;
-> +	}
-> +
-> +	reg_val = 0;
-> +	reg_val &= ~SUN4I_SPDIF_FCTL_FIFOSRC;
-> +	reg_val |= SUN4I_SPDIF_FCTL_TXTL_MASK;
-> +	reg_val |= SUN4I_SPDIF_FCTL_RXTL_MASK;
-> +	reg_val |= SUN4I_SPDIF_FCTL_TXIM;
-> +	reg_val |= SUN4I_SPDIF_FCTL_RXOM_MASK;
-> +	regmap_write(host->regmap, SUN4I_SPDIF_FCTL, reg_val);
-
-You're still not using regmap_update_bits...
-
-IF you're really going to ignore all the comments we did, please tell
-us upfront. That way, we will not waste our time doing a review of
-your patches.
+All the pr_err changes can even be replaced by defining pr_fmt.
 
 Maxime
 
@@ -201,4 +81,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151001/a9646fd9/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151001/1d0115dc/attachment-0001.sig>
