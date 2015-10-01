@@ -1,122 +1,42 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu,  1 Oct 2015 22:54:53 +0200
-Subject: [PATCH 16/16] ARM: dts: lpc4350-hitex-eval: add joystick,
- buttons and leds
-In-Reply-To: <1443732893-17145-1-git-send-email-manabian@gmail.com>
-References: <1443732893-17145-1-git-send-email-manabian@gmail.com>
-Message-ID: <1443732893-17145-17-git-send-email-manabian@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 1 Oct 2015 23:05:12 +0200
+Subject: [PATCH v2 3/8] mmc: core: Add mmc_regulator_set_vqmmc()
+In-Reply-To: <20151001173554.GB19319@codeaurora.org>
+References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
+ <17200614.QxCe8zAb7I@diego>
+ <CAPDyKFpis8XnvrppHq7q_7DQeN2UiEpykNTJ=1iJJ9AGOHTW6Q@mail.gmail.com>
+ <2695161.Z1IhqPE0bd@diego> <20151001173554.GB19319@codeaurora.org>
+Message-ID: <CAPDyKFqrkYXsbBJ61yYo0G8za1szARvA=as-5nLTiwGH5pCrEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the joystick, buttons and LEDs connected to the I2C I/O expander.
+On 1 October 2015 at 19:35, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 10/01, Heiko St?bner wrote:
+>> Am Donnerstag, 1. Oktober 2015, 11:54:24 schrieb Ulf Hansson:
+>> > On 30 September 2015 at 16:55, Heiko St?bner <heiko@sntech.de> wrote:
+>> > > Am Mittwoch, 30. September 2015, 16:42:05 schrieb Ulf Hansson:
+>> > >> On 30 September 2015 at 16:07, Heiko Stuebner <heiko@sntech.de> wrote:
+>> > > The clock changes of course only touch internals of the phase-clocks, so
+>> > > should have no problem going through another tree.
+>> >
+>> > What happens if I take mmc and dt changes, wouldn't I need the clock
+>> > patches as well?
+>>
+>> The API stays of course the same, only the degree to settings translation gets
+>> optimized, so I guess in the worst case you would get no good phase and thus
+>> fall back to non-highspeed modes - but the system would stay running.
+>>
+>> But of course, if the clock maintainers could Ack the two clock patches and
+>> everything would stay together that would work even better :-)
+>>
+>
+> If Ulf doesn't want to take them we can apply them to clk tree.
+> Otherwise, you can have my acked-by on the clk patches.
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- arch/arm/boot/dts/lpc4350-hitex-eval.dts | 85 ++++++++++++++++++++++++++++++++
- 1 file changed, 85 insertions(+)
+I don't mind picking up the clock patches. So I consider this as an
+ack for both patch 1 and patch2, thanks.
 
-diff --git a/arch/arm/boot/dts/lpc4350-hitex-eval.dts b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
-index 5c529f45947b..022d495432c1 100644
---- a/arch/arm/boot/dts/lpc4350-hitex-eval.dts
-+++ b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
-@@ -15,6 +15,9 @@
- #include "lpc18xx.dtsi"
- #include "lpc4350.dtsi"
- 
-+#include "dt-bindings/input/input.h"
-+#include "dt-bindings/gpio/gpio.h"
-+
- / {
- 	model = "Hitex LPC4350 Evaluation Board";
- 	compatible = "hitex,lpc4350-eval-board", "nxp,lpc4350";
-@@ -34,6 +37,88 @@
- 		device_type = "memory";
- 		reg = <0x28000000 0x800000>; /* 8 MB */
- 	};
-+
-+	pca_buttons {
-+		compatible = "gpio-keys-polled";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		poll-interval = <100>;
-+		autorepeat;
-+
-+		button at 0 {
-+			label = "joy:right";
-+			linux,code = <KEY_RIGHT>;
-+			gpios = <&pca_gpio 8 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		button at 1 {
-+			label = "joy:up";
-+			linux,code = <KEY_UP>;
-+			gpios = <&pca_gpio 9 GPIO_ACTIVE_LOW>;
-+		};
-+
-+
-+		button at 2 {
-+			label = "joy:enter";
-+			linux,code = <KEY_ENTER>;
-+			gpios = <&pca_gpio 10 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		button at 3 {
-+			label = "joy:left";
-+			linux,code = <KEY_LEFT>;
-+			gpios = <&pca_gpio 11 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		button at 4 {
-+			label = "joy:down";
-+			linux,code = <KEY_DOWN>;
-+			gpios = <&pca_gpio 12 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		button at 5 {
-+			label = "user:sw3";
-+			linux,code = <KEY_F1>;
-+			gpios = <&pca_gpio 13 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		button at 6 {
-+			label = "user:sw4";
-+			linux,code = <KEY_F2>;
-+			gpios = <&pca_gpio 14 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		button at 7 {
-+			label = "user:sw5";
-+			linux,code = <KEY_F3>;
-+			gpios = <&pca_gpio 15 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	pca_leds {
-+		compatible = "gpio-leds";
-+
-+		led0 {
-+			label = "ext:led0";
-+			gpios = <&pca_gpio 0 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		led1 {
-+			label = "ext:led1";
-+			gpios = <&pca_gpio 1 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		led2 {
-+			label = "ext:led2";
-+			gpios = <&pca_gpio 2 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		led3 {
-+			label = "ext:led3";
-+			gpios = <&pca_gpio 3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
- };
- 
- &pinctrl {
--- 
-1.8.0
+Now, let's give Jaehoon some time to review the dw_mmc parts.
+
+Kind regards
+Uffe
