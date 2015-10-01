@@ -1,63 +1,70 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 1 Oct 2015 10:32:42 +0200
-Subject: [linux-sunxi] Re: [PATCH 2/6] ARM: dts: sun7i: Enable USB DRC on
- Bananapi
-In-Reply-To: <560A4B3D.4040007@redhat.com>
-References: <1442928966-6418-1-git-send-email-hdegoede@redhat.com>
- <1442928966-6418-2-git-send-email-hdegoede@redhat.com>
- <20150929080453.GN7104@lukather> <560A4B3D.4040007@redhat.com>
-Message-ID: <20151001083242.GB7104@lukather>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 1 Oct 2015 10:34:12 +0200
+Subject: [PATCH 06/16] clk: at91: clk-main: factorize irq handling
+In-Reply-To: <1443629469-15086-7-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1443629469-15086-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1443629469-15086-7-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20151001103412.1ac2231d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Alexandre,
 
-On Tue, Sep 29, 2015 at 10:26:37AM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 29-09-15 10:04, Maxime Ripard wrote:
-> >On Tue, Sep 22, 2015 at 03:36:01PM +0200, Hans de Goede wrote:
-> >>Enable the otg/drc usb controller on the Bananapi.
-> >>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >
-> >Applied all the other patches but this one.
-> 
-> Thanks, seems you did not push this to your git.kernel.org repo though ?
+On Wed, 30 Sep 2015 18:10:59 +0200
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-I think I did, but maybe not at the time you sent the mail.
+> The three different irq handlers are doing the same thing, factorize their
+> code in a generic irq handler.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  drivers/clk/at91/clk-main.c | 43 ++++++++++++++++---------------------------
+>  1 file changed, 16 insertions(+), 27 deletions(-)
+> 
+> diff --git a/drivers/clk/at91/clk-main.c b/drivers/clk/at91/clk-main.c
+> index c1f119748bdc..79a380cd1f4e 100644
+> --- a/drivers/clk/at91/clk-main.c
+> +++ b/drivers/clk/at91/clk-main.c
+> @@ -71,12 +71,21 @@ struct clk_sam9x5_main {
+>  
+>  #define to_clk_sam9x5_main(hw) container_of(hw, struct clk_sam9x5_main, hw)
+>  
+> -static irqreturn_t clk_main_osc_irq_handler(int irq, void *dev_id)
+> +/* Generic structure */
+> +struct clk_main {
+> +	struct clk_hw hw;
+> +	struct at91_pmc *pmc;
+> +	unsigned int irq;
+> +	wait_queue_head_t wait;
+> +};
+> +#define to_clk_main(hw) container_of(hw, struct clk_main, hw)
 
-> >Since we dropped the patch adding the regulators support on the
-> >Bananapi until we figure out why the board crash, it doesn't compile
-> >anymore.
-> 
-> How about me doing a v2 of the regulators patch which removes the
-> 
-> &cpu0 {
->         cpu-supply = <&reg_dcdc2>;
-> };
-> 
-> So that we do not get cpu voltage scaling, then the regulator
-> changes should be a NOP, everything should just keep the u-boot
-> set voltages, and we can enable oth support.
-> 
-> And then when we've figured out a safe way to enable cpu voltage
-> scaling we can do so with a follow up patch ?
-> 
-> Is that a plan ? If so say yes and I'll do a v2 of these patches :)
+It wasn't clear to me at first glance that this structure was actually
+a base struct for the clk_main_rc_osc and clk_sam9x5_main struct.
+Maybe you should rename it into struct clk_main_base and then replace
+the hw, pmc, irq and fields in the child structures by a base field.
 
-Yep, it sounds like a good plan :)
+Something like:
 
-Maxime
+struct clk_sam9x5_main {
+	struct clk_main_base base;
+	u8 parent;
+};
+
+struct clk_main_rc_osc {
+	struct clk_main_base base;
+	unsigned long frequency;
+	unsigned long accuracy;
+};
+
+Also, it would avoid any problem if someone decides to change the field
+oder in one of those structures.
+
+Best Regards,
+
+Boris
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151001/f0ed65c4/attachment-0001.sig>
