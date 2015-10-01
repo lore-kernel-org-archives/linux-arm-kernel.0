@@ -1,54 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 1 Oct 2015 15:07:56 +0100
-Subject: [PATCH] arm64: Fix THP protection change logic
-In-Reply-To: <1443701167-10816-1-git-send-email-steve.capper@linaro.org>
-References: <1443701167-10816-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20151001140755.GF6963@e104818-lin.cambridge.arm.com>
+From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
+Date: Thu, 1 Oct 2015 19:42:43 +0530
+Subject: [PATCH] thermal: exynos: fix register read in TMU
+In-Reply-To: <CAJKOXPfyC8etcPe373q6Pc1qWb2zVnHE96V+Rh5mPmpzAxFjiA@mail.gmail.com>
+References: <1443699599-9693-1-git-send-email-sudipm.mukherjee@gmail.com>
+ <CAJKOXPfyC8etcPe373q6Pc1qWb2zVnHE96V+Rh5mPmpzAxFjiA@mail.gmail.com>
+Message-ID: <20151001141243.GA5061@sudip-pc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 01, 2015 at 01:06:07PM +0100, Steve Capper wrote:
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 56283f8..cf73194 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -80,7 +80,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
->  #define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
->  #define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
->  
-> -#define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
-> +#define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
->  #define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
->  #define PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
->  #define PAGE_COPY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
-> @@ -460,7 +460,7 @@ static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
->  static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
->  {
->  	const pteval_t mask = PTE_USER | PTE_PXN | PTE_UXN | PTE_RDONLY |
-> -			      PTE_PROT_NONE | PTE_WRITE | PTE_TYPE_MASK;
-> +			      PTE_PROT_NONE | PTE_VALID | PTE_WRITE;
->  	pte_val(pte) = (pte_val(pte) & ~mask) | (pgprot_val(newprot) & mask);
->  	return pte;
->  }
+On Thu, Oct 01, 2015 at 10:18:57PM +0900, Krzysztof Kozlowski wrote:
+> 2015-10-01 20:39 GMT+09:00 Sudip Mukherjee <sudipm.mukherjee@gmail.com>:
+> > The value of emul_con was getting overwritten if the selected soc is
+> > SOC_ARCH_EXYNOS5260. And so as a result we were reading from the wrong
+> > register in the case of SOC_ARCH_EXYNOS5260.
+> 
+> How the value is overwritten if the soc is Exynos5260? I can't see it
+> (although the "else if" is still more obvious than "if" but how does
+> the description match the code?).
+The code here is:
+if (data->soc == SOC_ARCH_EXYNOS5260)
+	emul_con = EXYNOS5260_EMUL_CON;
+if (data->soc == SOC_ARCH_EXYNOS5433)
+	emul_con = EXYNOS5433_TMU_EMUL_CON;
+else if (data->soc == SOC_ARCH_EXYNOS7)
+	emul_con = EXYNOS7_TMU_REG_EMUL_CON;
+else
+	emul_con = EXYNOS_EMUL_CON;
 
-Thanks for looking into this. So for ptes, we need the type bits to be:
+So if data->soc is SOC_ARCH_EXYNOS5260 , then emul_con becomes
+EXYNOS5260_EMUL_CON. But again for the else part it will become
+EXYNOS_EMUL_CON.
 
-0b?0: unmapped/PAGE_NONE
-0b11: mapped
-
-With pmd block (huge page), we want:
-
-0b?0: unmapped/PAGE_NONE
-0b01: mapped
-
-With your fix, bit 1 is no longer touched by pte_modify(). It looks fine
-to me. Another option would have been a separate pmd_modify() function
-with its own mask but I think it's cleaner this way.
-
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Let's see if it fixes the issue for Ganapatrao and Will or I will send
-it upstream.
-
--- 
-Catalin
+regards
+sudip
