@@ -1,56 +1,90 @@
-From: andrey.konovalov@linaro.org (Andrey Konovalov)
-Date: Thu, 1 Oct 2015 19:42:04 +0300
-Subject: [PATCH v5 00/23] ILP32 for ARM64
-In-Reply-To: <20151001113642.GI12635@sirena.org.uk>
-References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
- <20150930101918.GA9753@e104818-lin.cambridge.arm.com>
- <20150930164103.GC15635@sirena.org.uk>
- <20151001111931.GD6963@e104818-lin.cambridge.arm.com>
- <20151001113642.GI12635@sirena.org.uk>
-Message-ID: <560D625C.2010100@linaro.org>
+From: yang.shi@linaro.org (Yang Shi)
+Date: Thu,  1 Oct 2015 09:37:37 -0700
+Subject: [v2 PATCH] arm64: replace read_lock to rcu lock in call_break_hook
+Message-ID: <1443717457-31461-1-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2015 02:36 PM, Mark Brown wrote:
-> On Thu, Oct 01, 2015 at 12:19:31PM +0100, Catalin Marinas wrote:
->> On Wed, Sep 30, 2015 at 05:41:03PM +0100, Mark Brown wrote:
->
->>> Indeed.  On that subject there was some discussion at Linaro Connect
->>> last week about work (being done outside Linaro, not sure how public it
->>> is at this point) to pull together the current state of the art into a
->>> Docker container image which people can use for benchmarking and as a
->>> reference for how to pull things together.  That should help with the
->>> analysis, it'll at least make it easier for other people to reproduce
->>> any benchmarking results.
+BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
+in_atomic(): 0, irqs_disabled(): 128, pid: 342, name: perf
+1 lock held by perf/342:
+ #0:  (break_hook_lock){+.+...}, at: [<ffffffc0000851ac>] call_break_hook+0x34/0xd0
+irq event stamp: 62224
+hardirqs last  enabled at (62223): [<ffffffc00010b7bc>] __call_rcu.constprop.59+0x104/0x270
+hardirqs last disabled at (62224): [<ffffffc0000fbe20>] vprintk_emit+0x68/0x640
+softirqs last  enabled at (0): [<ffffffc000097928>] copy_process.part.8+0x428/0x17f8
+softirqs last disabled at (0): [<          (null)>]           (null)
+CPU: 0 PID: 342 Comm: perf Not tainted 4.1.6-rt5 #4
+Hardware name: linux,dummy-virt (DT)
+Call trace:
+[<ffffffc000089968>] dump_backtrace+0x0/0x128
+[<ffffffc000089ab0>] show_stack+0x20/0x30
+[<ffffffc0007030d0>] dump_stack+0x7c/0xa0
+[<ffffffc0000c878c>] ___might_sleep+0x174/0x260
+[<ffffffc000708ac8>] __rt_spin_lock+0x28/0x40
+[<ffffffc000708db0>] rt_read_lock+0x60/0x80
+[<ffffffc0000851a8>] call_break_hook+0x30/0xd0
+[<ffffffc000085a70>] brk_handler+0x30/0x98
+[<ffffffc000082248>] do_debug_exception+0x50/0xb8
+Exception stack(0xffffffc00514fe30 to 0xffffffc00514ff50)
+fe20:                                     00000000 00000000 c1594680 0000007f
+fe40: ffffffff ffffffff 92063940 0000007f 0550dcd8 ffffffc0 00000000 00000000
+fe60: 0514fe70 ffffffc0 000be1f8 ffffffc0 0514feb0 ffffffc0 0008948c ffffffc0
+fe80: 00000004 00000000 0514fed0 ffffffc0 ffffffff ffffffff 9282a948 0000007f
+fea0: 00000000 00000000 9282b708 0000007f c1592820 0000007f 00083914 ffffffc0
+fec0: 00000000 00000000 00000010 00000000 00000064 00000000 00000001 00000000
+fee0: 005101e0 00000000 c1594680 0000007f c1594740 0000007f ffffffd8 ffffff80
+ff00: 00000000 00000000 00000000 00000000 c1594770 0000007f c1594770 0000007f
+ff20: 00665e10 00000000 7f7f7f7f 7f7f7f7f 01010101 01010101 00000000 00000000
+ff40: 928e4cc0 0000007f 91ff11e8 0000007f
 
-Using Docker image sounds like a great idea.
+call_break_hook is called in atomic context (hard irq disabled), so replace
+the sleepable lock to rcu lock and replace relevant list operations to rcu
+version.
 
->> That's fine and I would welcome it. However, I'm definitely against
->> using non-agreed ABI and further spreading such toolchains (or kernel
->
-> You might want to speak to some of your colleagues about that...  in any
-> case I'll reply off list later today with information on the third party
-> working on this so you can get in touch, like I say I'm not sure how
-> public that work is at this point.
->
->> patches; Linaro's tracking kernel has kept these patches for a long
->> time, even though the ABI has been NAK'ed).
->
-> I know, I'm not thrilled about that either.  :/
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
+---
+v1-> v2
+Replace list operations to rcu version.
 
-Same for me.
-As you have noticed, ILP32 was removed from Linaro's tracking kernel recently.
-The thing is that we (builds&baselines team in Linaro) have been requested
-to have a CI loop for ILP32. So I'll continue running it, but will use a
-separate git branch for ILP32. The linux-linaro branch will not have ILP32
-any more (or at least until ILP32 ABI is agreed on).
+ arch/arm64/kernel/debug-monitors.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Thanks,
-Andrey
-
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index cebf786..cf0e4fc 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -276,14 +276,14 @@ static DEFINE_RWLOCK(break_hook_lock);
+ void register_break_hook(struct break_hook *hook)
+ {
+ 	write_lock(&break_hook_lock);
+-	list_add(&hook->node, &break_hook);
++	list_add_rcu(&hook->node, &break_hook);
+ 	write_unlock(&break_hook_lock);
+ }
+ 
+ void unregister_break_hook(struct break_hook *hook)
+ {
+ 	write_lock(&break_hook_lock);
+-	list_del(&hook->node);
++	list_del_rcu(&hook->node);
+ 	write_unlock(&break_hook_lock);
+ }
+ 
+@@ -292,11 +292,11 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
+ 	struct break_hook *hook;
+ 	int (*fn)(struct pt_regs *regs, unsigned int esr) = NULL;
+ 
+-	read_lock(&break_hook_lock);
+-	list_for_each_entry(hook, &break_hook, node)
++	rcu_read_lock();
++	list_for_each_entry_rcu(hook, &break_hook, node)
+ 		if ((esr & hook->esr_mask) == hook->esr_val)
+ 			fn = hook->fn;
+-	read_unlock(&break_hook_lock);
++	rcu_read_unlock();
+ 
+ 	return fn ? fn(regs, esr) : DBG_HOOK_ERROR;
+ }
+-- 
+2.0.2
