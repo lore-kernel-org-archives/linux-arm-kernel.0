@@ -1,165 +1,232 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Thu, 1 Oct 2015 18:08:31 +0800
-Subject: [PATCH] soc: mediatek: Fix random hang up issue while kernel init
-In-Reply-To: <1443691590.1714.73.camel@mtksdaap41>
-References: <1443162717-64831-1-git-send-email-jamesjj.liao@mediatek.com>
- <1443169573.3135.9.camel@pengutronix.de> <5607D224.4050801@gmail.com>
- <CAGS+omCXMRf4bxWancSJSq2a1pc38TYYY46Os9ASWWCRp95_ig@mail.gmail.com>
- <1443604022.3185.17.camel@pengutronix.de>
- <1443683750.1714.25.camel@mtksdaap41>
- <CAGS+omCpWqtKPKoyjFb=q4BxmfUGGsfvQGEZas8g8VLZKPtKbQ@mail.gmail.com>
- <1443691590.1714.73.camel@mtksdaap41>
-Message-ID: <CAGS+omCm2pKczooGkMf75HjQL=oF7Ufo6DsRCvvikt0QA1jx-g@mail.gmail.com>
+From: ralf@ramses-pyramidenbau.de (Ralf Ramsauer)
+Date: Thu, 1 Oct 2015 12:18:05 +0200
+Subject: [PATCH] ARM, ARM64: Un-inlined and exported symbols of
+ is_hyp_mode_available() and related functions
+In-Reply-To: <560CF6D9.1080403@arm.com>
+References: <1443649252-10702-1-git-send-email-ralf@ramses-pyramidenbau.de>
+ <560CF6D9.1080403@arm.com>
+Message-ID: <560D085D.3020704@ramses-pyramidenbau.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+linux-clk +linux-pm and the genpd and clock gurus
+Hello Marc,
 
-Hi James,
-
-On Thu, Oct 1, 2015 at 5:26 PM, James Liao <jamesjj.liao@mediatek.com> wrote:
-> Hi Daniel,
->
-> On Thu, 2015-10-01 at 16:07 +0800, Daniel Kurtz wrote:
->> Hmm... below is my current understanding.
+On 10/01/2015 11:03 AM, Marc Zyngier wrote:
+> On 30/09/15 22:40, Ralf Ramsauer wrote:
+>> Hypervisors may be available as modules, but need to check if
+>> HYP mode is enabled. Functions are provided for these means, but
+>> are not exported to modules; in particular since __boot_cpu_mode
+>> is not accessible.
 >>
->> In the current software architecture, we have split the "venc"
->> subsystem register space into two parts (two dt nodes), with each node
->> handled instantiated as its own  platform device, and handled by a
->> different platform driver:
+>> Instead of exporting symbol __boot_cpu_mode, un-inline
+>> is_hyp_mode_available() and related functions. This has no negative
+>> impact since they are never called in hot paths.
 >>
->> vencsys: clock-controller at 18000000 {
->>   compatible = "mediatek,mt8173-vencsys", "syscon";
->>   reg = <0 0x18000000 0 0x1000>;
->>   #clock-cells = <1>;
->> };
+>> Though all modified files are licensed under GPLv2, for ARM we use
+>> EXPORT_SYMBOL instead of EXPORT_SYMBOL_GPL to be consistent with the
+>> rest of the exports in arch/arm/kernel/setup.c.
+> I think that's for the authors of the original code to decide.
+>
+>> Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
+>> Signed-off-by: Wolfgang Mauerer <wolfgang.mauerer@oth-regensburg.de>
+>> ---
+>>  arch/arm/include/asm/virt.h   | 21 +++------------------
+>>  arch/arm/kernel/setup.c       | 29 +++++++++++++++++++++++++++++
+>>  arch/arm64/include/asm/virt.h | 11 ++---------
+>>  arch/arm64/kernel/setup.c     | 14 ++++++++++++++
+>>  4 files changed, 48 insertions(+), 27 deletions(-)
 >>
->> /* TBD - a venc driver has not been posted to the list so I don't
->> really know yet what it will look like */
->>  venc: encoder@~18000000 {
->>    compatible = "mediatek,mt8173-venc?";
->>    reg = <0 ~0x18000000 0 ?>;
->>    clocks = <& <&vencsys CLK_VENC_CKE1>, <&vencsys CLK_VENC_CKE0>, ...;
->>    clock-names = "apb", "smi", ...;
->>    ...
->>  };
+>> diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
+>> index 4371f45..37d970d 100644
+>> --- a/arch/arm/include/asm/virt.h
+>> +++ b/arch/arm/include/asm/virt.h
+>> @@ -42,15 +42,7 @@
+>>   */
+>>  extern int __boot_cpu_mode;
+>>  
+>> -static inline void sync_boot_mode(void)
+>> -{
+>> -	/*
+>> -	 * As secondaries write to __boot_cpu_mode with caches disabled, we
+>> -	 * must flush the corresponding cache entries to ensure the visibility
+>> -	 * of their writes.
+>> -	 */
+>> -	sync_cache_r(&__boot_cpu_mode);
+>> -}
+>> +void sync_boot_mode(void);
+>>  
+>>  void __hyp_set_vectors(unsigned long phys_vector_base);
+>>  unsigned long __hyp_get_vectors(void);
+>> @@ -63,17 +55,10 @@ unsigned long __hyp_get_vectors(void);
+>>  void hyp_mode_check(void);
+>>  
+>>  /* Reports the availability of HYP mode */
+>> -static inline bool is_hyp_mode_available(void)
+>> -{
+>> -	return ((__boot_cpu_mode & MODE_MASK) == HYP_MODE &&
+>> -		!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH));
+>> -}
+>> +bool is_hyp_mode_available(void);
+>>  
+>>  /* Check if the bootloader has booted CPUs in different modes */
+>> -static inline bool is_hyp_mode_mismatched(void)
+>> -{
+>> -	return !!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH);
+>> -}
+>> +bool is_hyp_mode_mismatched(void);
+>>  #endif
+>>  
+>>  #endif /* __ASSEMBLY__ */
+>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>> index 20edd34..c2c39f1 100644
+>> --- a/arch/arm/kernel/setup.c
+>> +++ b/arch/arm/kernel/setup.c
+>> @@ -915,6 +915,35 @@ static void __init reserve_crashkernel(void)
+>>  static inline void reserve_crashkernel(void) {}
+>>  #endif /* CONFIG_KEXEC */
+>>  
+>> +#ifdef CONFIG_ARM_VIRT_EXT
+>> +void sync_boot_mode(void)
+> Why is this function global? As far as I can see, it is only called from
+> that very same file.
+I un-inlined all inlined static functions as they are visible but not
+callable from modules. sync_boot_mode() is defined in a global visible
+header and callable from any part of the kernel that includes
+<asm/virt.h>. As it is only used in setup.c (and in fact it only makes
+sense to use it there), wouldn't it be better to move its definition to
+setup.c?
+>
+>> +{
+>> +	/*
+>> +	* As secondaries write to __boot_cpu_mode with caches disabled, we
+>> +	* must flush the corresponding cache entries to ensure the visibility
+>> +	* of their writes.
+>> +	*/
+>> +	sync_cache_r(&__boot_cpu_mode);
+>> +}
+>> +#endif
+>> +
+>> +#ifndef ZIMAGE
+> What is the point of this #ifndef? setup.c is not part of the decompressor.
+Ok, I see, this #ifndef is not necessary inside setup.c.
+>
+>> +/* Reports the availability of HYP mode */
+>> +bool is_hyp_mode_available(void)
+>> +{
+>> +	return ((__boot_cpu_mode & MODE_MASK) == HYP_MODE &&
+>> +		!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH));
+>> +}
+>> +EXPORT_SYMBOL(is_hyp_mode_available);
+>> +
+>> +/* Check if the bootloader has booted CPUs in different modes */
+>> +bool is_hyp_mode_mismatched(void)
+>> +{
+>> +	return !!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH);
+>> +}
+>> +EXPORT_SYMBOL(is_hyp_mode_mismatched);
+>> +#endif
+>> +
+>>  void __init hyp_mode_check(void)
+>>  {
+>>  #ifdef CONFIG_ARM_VIRT_EXT
+>> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+>> index 7a5df52..48c6170 100644
+>> --- a/arch/arm64/include/asm/virt.h
+>> +++ b/arch/arm64/include/asm/virt.h
+>> @@ -38,17 +38,10 @@ void __hyp_set_vectors(phys_addr_t phys_vector_base);
+>>  phys_addr_t __hyp_get_vectors(void);
+>>  
+>>  /* Reports the availability of HYP mode */
+>> -static inline bool is_hyp_mode_available(void)
+>> -{
+>> -	return (__boot_cpu_mode[0] == BOOT_CPU_MODE_EL2 &&
+>> -		__boot_cpu_mode[1] == BOOT_CPU_MODE_EL2);
+>> -}
+>> +bool is_hyp_mode_available(void);
+>>  
+>>  /* Check if the bootloader has booted CPUs in different modes */
+>> -static inline bool is_hyp_mode_mismatched(void)
+>> -{
+>> -	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
+>> -}
+>> +bool is_hyp_mode_mismatched(void);
+>>  
+>>  /* The section containing the hypervisor text */
+>>  extern char __hyp_text_start[];
+>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+>> index 6bab21f..6442d70 100644
+>> --- a/arch/arm64/kernel/setup.c
+>> +++ b/arch/arm64/kernel/setup.c
+>> @@ -62,6 +62,7 @@
+>>  #include <asm/traps.h>
+>>  #include <asm/memblock.h>
+>>  #include <asm/efi.h>
+>> +#include <asm/virt.h>
+>>  #include <asm/xen/hypervisor.h>
+>>  
+>>  unsigned long elf_hwcap __read_mostly;
+>> @@ -195,6 +196,19 @@ static void __init smp_build_mpidr_hash(void)
+>>  	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
+>>  }
+>>  
+>> +bool is_hyp_mode_available(void)
+>> +{
+>> +	return (__boot_cpu_mode[0] == BOOT_CPU_MODE_EL2 &&
+>> +		__boot_cpu_mode[1] == BOOT_CPU_MODE_EL2);
+>> +}
+>> +EXPORT_SYMBOL_GPL(is_hyp_mode_available);
+>> +
+>> +bool is_hyp_mode_mismatched(void)
+>> +{
+>> +	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
+>> +}
+>> +EXPORT_SYMBOL_GPL(is_hyp_mode_mismatched);
+>> +
+>>  static void __init setup_processor(void)
+>>  {
+>>  	u64 features;
 >>
->> Each independent driver must take appropriate independent action to
->> ensure that any clock required to access its associated registers is
->> enabled when accessing said registers.
->> In other words,
->>  * the venc *clock-controller* driver that must enable any clocks
->> required to access the *clock control* registers
->>  * the venc *encoder* driver must enable clocks any clocks required to
->> access the *encoder* registers
+> My main question is "Why?". As it stands, this patch is pretty useless.
+> What good does is_hyp_mode_mismatched bring to you? All you need to know
+> for sure that HYP is available.
+Yes, in fact I only need to know if HYP mode is available. But for the
+completeness sake, I exported related functions as well.
+Again, so why is is_hyp_mode_mismatched defined in the header at all?
 >
->> Actually, the situation is a little worse that this, since we also
->> have a 'larb' node in the same register space, whose driver must also
->> ensure that VENC_SEL is enabled before accessing its registers:
->>
->> larb3: larb at 18001000 {
->>   compatible = "mediatek,mt8173-smi-larb";
->>   reg = <0 0x18001000 0 0x1000>;
->>   mediatek,smi = <&smi_common>;
->>   power-domains = <&scpsys MT8173_POWER_DOMAIN_VENC>;
->>   clocks = <&vencsys CLK_VENC_CKE1>, <&vencsys CLK_VENC_CKE0>;
->>   clock-names = "apb", "smi";
->> };
->>
->> Personally, I am not opposed to using the power-domain enable/disable
->> as a proxy for also enabling/disabling the "subsystem register bank"
->> clock as is done in this patch and by the scpsys driver in general.
->> However, it feels a bit like an abuse of the power domain api.
->>
->> > I preferred to keep venc_sel on during VENC power on because I'm not
->> > sure there is any other framework may control VENC's registers during
->> > kernel init.
->>
->> The misunderstanding here is the interpretation of "VENC's registers".
->> In this case, the registers in question are those owned by the
->> "vencsys: clock-controller at 18000000" node, and the driver accessing
->> them is drivers/clk/mediatek/clk-gate.c.
+> And even then. You can issue an HVC and enter the HYP stubs, but this is
+> a private kernel API, and we're not exporting the actually useful stuff
+> (__hyp_{g,s}et_vectors).
 >
-> The situation is more complex than you mentioned above. VENC (0x18000000
-> ~ 0x1800ffff) for example, if we want to avoid hanging up while
-> accessing registers, we need to:
->
->  - Prevent venc_sel off while VENC is powered on.
->  - Prevent mm_sel off while MM is powered on.
->
-> First, it's not worth to control power domains in clock control path
-> because it's too expensive. So we want to keep clock on before accessing
-> registers or during the domain is powered on.
->
-> Besides, modeling a clock controller as a consumer of power domain may
-> not a good idea, because there are power domains be consumers of clocks,
-> such as:
->
->         [MT8173_POWER_DOMAIN_MM] = {
->                 .name = "mm",
->                 [...]
->                 .clk_id = MT8173_CLK_MM,
->                 [...]
->         },
+> So as it stands, this looks pretty pointless. Maybe you should explain
+> what you have in mind, and then we can discuss what would actually be
+> useful.
+We are developing a hypervisor which is loaded as a module. At the
+moment, we are not able to perform a sanity check if HYP mode is
+actually available using the kernel API, as __boot_cpu_mode is not
+exported to modules. This is the reason for this patch.
 
-I see two cases where "a power domain is a consumer of a clock":
-  (a) the clock is needed to access the power domain control
-registers.  The clock must actually be in another power domain, since
-otherwise you could never turn *on* the power domain in question.
-  (b) the clock is needed to talk to the power domain that is about to
-turn off, or that was just turned on - these clocks are usually used
-to control some kind of bus arbitration, etc.  In this case, the
-clocks are only accessed when the power domain is on.
+The reason why I exported is_hyp_mode_mismatched() is just completeness.
+In my opinion, it looks inconsistent if is_hyp_mode_available() is
+exported and is_hyp_mode_mismatched() remains unexported but belong to
+the same 'logical unit'. I feel happy if at least
+is_hyp_mode_available() would be exported.
 
-I would argue that in both cases, the clock should in theory should
-only be enabled/disabled by the power on/off routine for the duration
-of time that is needed, and that it should not be "left enabled" by
-the power domain on/off function...  I can see how this might be a
-useful optimization - but it also seems like a way to burn extra power
-by leaving on a clock that is not necessarily being used.
+So I have two suggestions:
+ - _only_ un-inline and export is_hyp_mode_available() and leave the
+rest as it is (so that anyone would be able to call this function)
+ - additionally also move definitions of is_hyp_mode_mismatched() and
+sync_boot_mode() to setup.c (as no one outside setup.c needs to see them)
 
-But - perhaps I am over thinking this, and it is standard practice to
-bundle power domains with the clocks that service components in the
-power domain.
+Would that be okay for you?
 
-> Second, if we want to avoid hanging up by enabling related top clocks in
-> clock controllers, we need to clock on venc_sel and mm_sel before *each
-> clock operations*, and then clock off them after clock operations. That
-> means:
+Thank you
+  Ralf
 >
-> - To check venc_cke0's state:
->  = clk_prepare mm_sel and venc_sel (where to prepare?)
->   - It may turn on related PLLs, and it can't be invoked in an atomic
-> context.
->  = clk_enable mm_sel and venc_sel.
->  = Read VENC's clock register.
->  = clk_disable mm_sel and venc_sel.
->  = clk_unprepare mm_sel and venc_sel (where to unprepare?)
->   - It may turn off PLLs, and it can't be invoked in an atomic context.
->  = Return venc_cke0's state.
+> Thanks,
 >
-> Overhead is a reason. The clock framework's API flow (prepare - enable -
-> disable - unprepare) is another reason to reject the solution in clock
-> controllers, because prepare/unprepare is a non-atomic operation but
-> operations to access registers may be a atomic context.
+> 	M.
 
-Or, alternatively, just prepare venc_sel once during init, for each
-clock controller that needs it, when configuring the clock controller
-node (for example, in mtk_vencsys_init()). This is similar to how we
-set up 'critical clocks'.
-By just preparing the clock, you tell the common clock core:
- "my clock controller will need this clock later; please make sure
-that it can be enabled/disabled later during atomic context."
 
-Thanks!
--Dan
-
->
->
->
-> Best regards,
->
-> James
->
->
->
+-- 
+Ralf Ramsauer
+GPG: 0x8F10049B
