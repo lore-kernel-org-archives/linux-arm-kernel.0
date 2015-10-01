@@ -1,45 +1,30 @@
 From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 1 Oct 2015 17:56:22 +0200
-Subject: [PATCH 4/4] ARM: dts: Enable Ethernet on STi's B2199 board
-In-Reply-To: <1443714982-16251-1-git-send-email-maxime.coquelin@st.com>
-References: <1443714982-16251-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <1443714982-16251-5-git-send-email-maxime.coquelin@st.com>
+Date: Thu, 1 Oct 2015 17:56:18 +0200
+Subject: [PATCH 0/4] Enable Ethernet on StiH407 family boards
+Message-ID: <1443714982-16251-1-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The B2199 board is mounted with Realtek RTL8367 switch.
-We consider the bootloader will have intiliazed the switch before jumping into
-the kernel, so we declare it as a fixed link.
+This series enables Ethernet support on STiH407 family reference design
+boards.
 
-Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
----
- arch/arm/boot/dts/stih418-b2199.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+These boards use the RTL8367 Switch as PHY.
+As it is previously configured by the bootloader, we declare it as a fixed
+link.
 
-diff --git a/arch/arm/boot/dts/stih418-b2199.dts b/arch/arm/boot/dts/stih418-b2199.dts
-index 82eee39..772d2bb 100644
---- a/arch/arm/boot/dts/stih418-b2199.dts
-+++ b/arch/arm/boot/dts/stih418-b2199.dts
-@@ -24,6 +24,7 @@
- 
- 	aliases {
- 		ttyAS0 = &sbc_serial0;
-+		ethernet0 = &ethernet0;
- 	};
- 
- 	soc {
-@@ -101,5 +102,12 @@
- 		st_dwc3: dwc3 at 8f94000 {
- 			status = "okay";
- 		};
-+
-+		ethernet0: dwmac at 9630000 {
-+			st,tx-retime-src = "clkgen";
-+			status = "okay";
-+			phy-mode = "rgmii";
-+			fixed-link = <0 1 1000 0 0>;
-+		};
- 	};
- };
+Maxime Coquelin (4):
+  ARM: dts: Fix RGMII pinctrl timings
+  ARM: dts: Add Ethernet node to STiH407 family
+  ARM: dts: Enable Ethernet on STi's B2120 boards
+  ARM: dts: Enable Ethernet on STi's B2199 board
+
+ arch/arm/boot/dts/stih407-b2120.dts    |  1 +
+ arch/arm/boot/dts/stih407-family.dtsi  | 27 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/stih407-pinctrl.dtsi |  4 ++--
+ arch/arm/boot/dts/stih410-b2120.dts    |  1 +
+ arch/arm/boot/dts/stih418-b2199.dts    |  8 ++++++++
+ arch/arm/boot/dts/stihxxx-b2120.dtsi   |  6 ++++++
+ 6 files changed, 45 insertions(+), 2 deletions(-)
+
 -- 
 1.9.1
