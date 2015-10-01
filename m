@@ -1,38 +1,55 @@
-From: zhengxing@rock-chips.com (zhengxing)
-Date: Thu, 1 Oct 2015 16:46:21 +0800
-Subject: [PATCH v3 5/8] clk: rockchip: add new clock type and controller
- for rk3036
-In-Reply-To: <17410513.afcQr96dHz@diego>
-References: <1443492833-15630-1-git-send-email-zhengxing@rock-chips.com>
- <1443492833-15630-6-git-send-email-zhengxing@rock-chips.com>
- <17410513.afcQr96dHz@diego>
-Message-ID: <39D164F7-3461-42FE-8D5D-B30756C86DD8@rock-chips.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu,  1 Oct 2015 09:58:51 +0100
+Subject: [PATCH 0/2] Enabling PSCI based idle on ARM 32-bit platforms
+Message-ID: <1443689933-28882-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+PSCI firmware provides a kernel API that, through a standard interface,
+allows to manage power states transitions in a seamless manner for
+ARM and ARM64 systems.
 
-Hi Heiko,
+Current PSCI code that initializes CPUidle states on PSCI based
+systems lives in arch/arm64 directory but it is not ARM64 specific
+and can be shared with ARM 32-bit systems so that the generic
+ARM CPUidle driver can leverage the common PSCI interface.
 
-???? iPad
-> ? 2015?10?1??16:12?Heiko St?bner <heiko@sntech.de> ???
-> 
-> Am Dienstag, 29. September 2015, 10:13:50 schrieb Xing Zheng:
->> The rk3036's pll and clock are different with base on the rk3066(rk3188,
->> rk3288, rk3368 use it), there are different adjust foctors and control
->> registers, so these should be independent and separate from the series
->> of rk3066s.
-> 
-> subject should probably be like
-> clk: rockchip: add new pll-type for rk3036 and similar socs
-OK.
-> 
-> And the general handling should probably be implemented similar to the example 
-> I posted in the v2 thread yesterday. [of course folded in and not as a 
-> separate patch ;-) ]
-> 
-> Heiko
-> 
-OK, because I just received and saw this patch, and I will test and update it into next version patchset.
+This patch series moves PSCI CPUidle management code to
+drivers/firmware directory so that ARM and ARM64 architecture
+can actually share the code.
 
+It is made up of two patches:
 
-Thank you. :)
+Patch 1 refactors ARM 32-bit generic idle implementation to make it
+compliant with ARM64 CPUidle operations, and patches the existing
+CPUidle implementation based on the generic CPUidle driver.
+
+Patch 2 moves ARM64 PSCI CPUidle functions implementation to
+drivers/firmware so that it can be shared with ARM 32-bit platforms
+code. This patch also adds a PSCI entry section on ARM 32-bit systems
+so that the PSCI CPUidle back-end can be enabled when the enable-method
+corresponds to PSCI.
+
+Patches apply on top of current patch stack to enable PSCI 1.0:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/351470.html
+
+Tested on Juno board (ARM64), compile tested only on ARM 32-bit systems.
+
+Lorenzo Pieralisi (2):
+  ARM: cpuidle: make cpuidle_ops interfaces ARM64 compliant
+  ARM64: kernel: PSCI: move PSCI idle management code to
+    drivers/firmware
+
+ arch/arm/include/asm/cpuidle.h |   4 +-
+ arch/arm/kernel/cpuidle.c      |   4 +-
+ arch/arm64/kernel/psci.c       |  99 +--------------------------------
+ drivers/firmware/Makefile      |   2 +-
+ drivers/firmware/psci_cpuops.c | 121 +++++++++++++++++++++++++++++++++++++++++
+ drivers/soc/qcom/spm.c         |   9 ++-
+ include/linux/psci.h           |   3 +
+ 7 files changed, 138 insertions(+), 104 deletions(-)
+ create mode 100644 drivers/firmware/psci_cpuops.c
+
+-- 
+2.5.1
