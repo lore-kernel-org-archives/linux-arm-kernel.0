@@ -1,57 +1,51 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 2 Oct 2015 02:17:05 +0800
-Subject: [PATCH v2] mtd: nand: pass page number to ecc->write_xxx() methods
-In-Reply-To: <1443722657-13051-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <201510020244.DQEH8IPg%fengguang.wu@intel.com>
+From: oliver+list@schinagl.nl (Olliver Schinagl)
+Date: Thu, 01 Oct 2015 20:51:59 +0200
+Subject: [linux-sunxi] [PATCH] i2c: mv64xxx: The n clockdiv factor is
+ 0 based on sunxi SoCs
+In-Reply-To: <20150929120943.GP7104@lukather>
+References: <1443365828-8956-1-git-send-email-hdegoede@redhat.com>
+ <560813CF.4000807@schinagl.nl> <20150929120943.GP7104@lukather>
+Message-ID: <560D80CF.6050500@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Hey Maxime,
 
-[auto build test results on next-20151001 -- if it's inappropriate base, please ignore]
+On 29-09-15 14:09, Maxime Ripard wrote:
+> On Sun, Sep 27, 2015 at 06:05:35PM +0200, Olliver Schinagl wrote:
+>> Hey Hans,
+>>
+>> On 27-09-15 16:57, Hans de Goede wrote:
+>>> According to the datasheets to n factor for dividing the tclk is
+>>> 2 to the power n on Allwinner SoCs, not 2 to the power n + 1 as it is
+>>> on other mv64xxx implementations.
+>> Ah!
+>>> I've contacted Allwinner about this and they have confirmed that the
+>>> datasheet is correct.
+>>>
+>>> This commit fixes the clk-divider calculations for Allwinner SoCs
+>>> accordingly.
+>> So this explains why all my i2c frequenties are double of what I setup.
+>> Thanks for taking the time of figuring it out! I'll give it a test hopefully
+>> soon.
+> It would have been great to let us know...
+If your talking about past tence, I actually did ;) [0][1] and I 
+actually had a tree made ready just 3 weeks ago with 3.15 to start my 
+bisection with. It seemed logical to see if it worked there as that was 
+the first iteration (based on the sunxi/allwinner based tree before the 
+mv migration.
 
-config: i386-randconfig-s1-201539 (attached as .config)
-reproduce:
-        git checkout 425b29816a0dba028eef09be5cb531a187e256a1
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Anyway, I even built tried to build the kernel! but my gcc failed to 
+build it so i put it on the back-burner for a while.
 
-All error/warnings (new ones prefixed by >>):
+WIth Hans having figured it out and fixing it, I'll absolutly will take 
+a nother look and check with a scope if it all works out now.
 
-   drivers/mtd/nand/docg4.c: In function 'docg4_block_markbad':
->> drivers/mtd/nand/docg4.c:1116:2: error: too few arguments to function 'docg4_write_page'
-     docg4_write_page(mtd, nand, buf, 1);
-     ^
-   drivers/mtd/nand/docg4.c:985:12: note: declared here
-    static int docg4_write_page(struct mtd_info *mtd, struct nand_chip *nand,
-               ^
+Olliver
 
-vim +/docg4_write_page +1116 drivers/mtd/nand/docg4.c
+[0] http://irclog.whitequark.org/linux-sunxi/2015-01-16#11522114;
+[1] http://s24.postimg.org/yiykh6kkl/DS1_Z_Quick_Print2.png
 
-570469f3 Mike Dunn    2012-01-03  1110  	memset(nand->oob_poi, 0xff, mtd->oobsize);
-570469f3 Mike Dunn    2012-01-03  1111  	for (i = 0; i < bbtd->len; i++)
-570469f3 Mike Dunn    2012-01-03  1112  		nand->oob_poi[bbtd->offs + i] = ~bbtd->pattern[i];
-570469f3 Mike Dunn    2012-01-03  1113  
-570469f3 Mike Dunn    2012-01-03  1114  	/* write first page of block */
-570469f3 Mike Dunn    2012-01-03  1115  	write_page_prologue(mtd, g4_addr);
-1fbb938d Brian Norris 2012-05-02 @1116  	docg4_write_page(mtd, nand, buf, 1);
-570469f3 Mike Dunn    2012-01-03  1117  	ret = pageprog(mtd);
-570469f3 Mike Dunn    2012-01-03  1118  
-570469f3 Mike Dunn    2012-01-03  1119  	kfree(buf);
 
-:::::: The code at line 1116 was first introduced by commit
-:::::: 1fbb938dff5b6bb4514a4e7600276b03c7f08e25 mtd: nand: add 'oob_required' argument to NAND {read,write}_page interfaces
-
-:::::: TO: Brian Norris <computersforpeace@gmail.com>
-:::::: CC: David Woodhouse <David.Woodhouse@intel.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 21000 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151002/8e7c1958/attachment-0001.obj>
+> Maxime
+>
