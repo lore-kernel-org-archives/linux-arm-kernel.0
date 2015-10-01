@@ -1,50 +1,40 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 1 Oct 2015 16:43:35 -0600
-Subject: [RFC PATCH 03/20] coresight: etm3x: implementing 'cpu_id()' API
-In-Reply-To: <87h9mcjgx1.fsf@ashishki-desk.ger.corp.intel.com>
+Date: Thu, 1 Oct 2015 16:49:11 -0600
+Subject: [RFC PATCH 15/20] coresight: etm-perf: implementing 'setup_aux()'
+ API
+In-Reply-To: <87bnckjfce.fsf@ashishki-desk.ger.corp.intel.com>
 References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
- <1442593594-10665-4-git-send-email-mathieu.poirier@linaro.org>
- <87h9mcjgx1.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CANLsYkwbLMJ3VBX3SoymcJjayGHJRji4K7zutwq6_=yU3LoeNg@mail.gmail.com>
+ <1442593594-10665-16-git-send-email-mathieu.poirier@linaro.org>
+ <87bnckjfce.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CANLsYkyjHZOzZqx8X7StegkxE7kuBma4Wz_pZ8OBDs-V3E3irw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 September 2015 at 05:16, Alexander Shishkin
+On 30 September 2015 at 05:50, Alexander Shishkin
 <alexander.shishkin@linux.intel.com> wrote:
 > Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 >
->> Adding an interface to lookup the CPU a tracer has been affined
->> to along with a source operation allowing external customers to
->> access it.
->>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> ---
->>  drivers/hwtracing/coresight/coresight-etm3x.c | 14 ++++++++++++++
->>  include/linux/coresight.h                     |  3 +++
->>  2 files changed, 17 insertions(+)
->>
->> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
->> index a44bc3532585..4ce9cfc06e93 100644
->> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
->> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
->> @@ -441,6 +441,19 @@ static void etm_config_enable(void *info)
->>       spin_unlock(&drvdata->spinlock);
->>  }
->>
->> +static int etm_cpu_id(struct coresight_device *csdev)
+>> +static void *etm_setup_aux(int cpu, void **pages,
+>> +                           int nr_pages, bool overwrite)
 >> +{
->> +     int cpu;
->> +     unsigned long flags;
->> +     struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>> +     struct coresight_device *csdev;
 >> +
->> +     spin_lock_irqsave(&drvdata->spinlock, flags);
->> +     cpu = drvdata->cpu;
->> +     spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>> +     if (cpu == -1)
+>> +             cpu = smp_processor_id();
+>> +
+>> +     csdev = per_cpu(csdev_sink, cpu);
+>> +     if (!csdev)
+>> +             return NULL;
+>> +
+>> +     return sink_ops(csdev)->setup_aux(csdev, cpu, pages,
+>> +                                       nr_pages, overwrite);
 >
-> Why do you need a spinlock here? Afaict, it never changes and if it
-> would, things would go really bad really fast.
+> Is it guaranteed that this sink would always have .setup_aux()?
 
-You are correct.
+A setup_aux() is vital to the design, both on Intel and ARM.  I really
+don't see how one could go without it.  I can return NULL if it hasn't
+been provided - that way the setup will fail without triggering a core
+dump.
 
 >
 > Regards,
