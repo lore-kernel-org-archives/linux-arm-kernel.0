@@ -1,71 +1,93 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu,  1 Oct 2015 13:47:16 +0100
-Subject: [PATCH v3 3/6] arm64: GICv3: Specialize readq and writeq accesses
+Date: Thu,  1 Oct 2015 13:47:19 +0100
+Subject: [PATCH v3 6/6] arm/arm64: KVM: only allow 64bit hosts to build VGICv3
 In-Reply-To: <1443703639-3730-1-git-send-email-jean-philippe.brucker@arm.com>
 References: <1443703639-3730-1-git-send-email-jean-philippe.brucker@arm.com>
-Message-ID: <1443703639-3730-4-git-send-email-jean-philippe.brucker@arm.com>
+Message-ID: <1443703639-3730-7-git-send-email-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 32bit platforms, we cannot assure that an I/O ldrd or strd will be
-done atomically. Besides, an hypervisor would be unable to emulate such
-accesses.
-In order to allow the AArch32 version of the driver to split them into
-two 32bit accesses while keeping the requirement for atomic writes, this
-patch specializes the IROUTER and TYPER accesses.
-Since the latter is an ID register, it won't need to be read atomically,
-but we still avoid future confusion by using gic_read_typer instead of a
-generic gic_readq.
+Hardware virtualisation of GICv3 is only supported by 64bit hosts for
+the moment. Some VGICv3 bits are missing from the 32bit side, and this
+patch allows to still be able to build 32bit hosts when CONFIG_ARM_GIC_V3
+is selected.
+
+To this end, we introduce a new option, CONFIG_KVM_ARM_VGIC_V3, that is
+only enabled on the 64bit side. The selection is done unconditionally
+because CONFIG_ARM_GIC_V3 is always enabled on arm64.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- arch/arm64/include/asm/arch_gicv3.h |    3 +++
- drivers/irqchip/irq-gic-v3.c        |    6 +++---
- 2 files changed, 6 insertions(+), 3 deletions(-)
+ arch/arm64/kvm/Kconfig |    4 ++++
+ include/kvm/arm_vgic.h |    4 ++--
+ virt/kvm/arm/vgic.c    |    4 ++--
+ 3 files changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index bd8f005..8e602e1 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -141,5 +141,8 @@ static inline void gic_write_sre(u32 val)
- 	isb();
- }
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 5c7e920..ff5292c 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -16,6 +16,9 @@ menuconfig VIRTUALIZATION
  
-+#define gic_read_typer(c)		readq_relaxed(c)
-+#define gic_write_irouter(v, c)		writeq_relaxed(v, c)
+ if VIRTUALIZATION
+ 
++config KVM_ARM_VGIC_V3
++	bool
 +
- #endif /* __ASSEMBLY__ */
- #endif /* __ASM_ARCH_GICV3_H */
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 0fb8d6d..30ecaf5 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -400,7 +400,7 @@ static void __init gic_dist_init(void)
- 	 */
- 	affinity = gic_mpidr_to_affinity(cpu_logical_map(smp_processor_id()));
- 	for (i = 32; i < gic_data.irq_nr; i++)
--		writeq_relaxed(affinity, base + GICD_IROUTER + i * 8);
-+		gic_write_irouter(affinity, base + GICD_IROUTER + i * 8);
- }
+ config KVM
+ 	bool "Kernel-based Virtual Machine (KVM) support"
+ 	depends on OF
+@@ -31,6 +34,7 @@ config KVM
+ 	select KVM_VFIO
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
++	select KVM_ARM_VGIC_V3
+ 	---help---
+ 	  Support hosting virtualized guest machines.
  
- static int gic_populate_rdist(void)
-@@ -431,7 +431,7 @@ static int gic_populate_rdist(void)
- 		}
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 4e14dac..6a3538e 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -282,7 +282,7 @@ struct vgic_v2_cpu_if {
+ };
  
- 		do {
--			typer = readq_relaxed(ptr + GICR_TYPER);
-+			typer = gic_read_typer(ptr + GICR_TYPER);
- 			if ((typer >> 32) == aff) {
- 				u64 offset = ptr - gic_data.redist_regions[i].redist_base;
- 				gic_data_rdist_rd_base() = ptr;
-@@ -624,7 +624,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 	reg = gic_dist_base(d) + GICD_IROUTER + (gic_irq(d) * 8);
- 	val = gic_mpidr_to_affinity(cpu_logical_map(cpu));
- 
--	writeq_relaxed(val, reg);
-+	gic_write_irouter(val, reg);
- 
- 	/*
- 	 * If the interrupt was enabled, enabled it again. Otherwise,
+ struct vgic_v3_cpu_if {
+-#ifdef CONFIG_ARM_GIC_V3
++#ifdef CONFIG_KVM_ARM_VGIC_V3
+ 	u32		vgic_hcr;
+ 	u32		vgic_vmcr;
+ 	u32		vgic_sre;	/* Restored only, change ignored */
+@@ -364,7 +364,7 @@ void kvm_vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
+ int vgic_v2_probe(struct device_node *vgic_node,
+ 		  const struct vgic_ops **ops,
+ 		  const struct vgic_params **params);
+-#ifdef CONFIG_ARM_GIC_V3
++#ifdef CONFIG_KVM_ARM_VGIC_V3
+ int vgic_v3_probe(struct device_node *vgic_node,
+ 		  const struct vgic_ops **ops,
+ 		  const struct vgic_params **params);
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 6bd1c9b..77b0176 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -2122,7 +2122,7 @@ static int init_vgic_model(struct kvm *kvm, int type)
+ 	case KVM_DEV_TYPE_ARM_VGIC_V2:
+ 		vgic_v2_init_emulation(kvm);
+ 		break;
+-#ifdef CONFIG_ARM_GIC_V3
++#ifdef CONFIG_KVM_ARM_VGIC_V3
+ 	case KVM_DEV_TYPE_ARM_VGIC_V3:
+ 		vgic_v3_init_emulation(kvm);
+ 		break;
+@@ -2284,7 +2284,7 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+ 		block_size = KVM_VGIC_V2_CPU_SIZE;
+ 		alignment = SZ_4K;
+ 		break;
+-#ifdef CONFIG_ARM_GIC_V3
++#ifdef CONFIG_KVM_ARM_VGIC_V3
+ 	case KVM_VGIC_V3_ADDR_TYPE_DIST:
+ 		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+ 		addr_ptr = &vgic->vgic_dist_base;
 -- 
 1.7.9.5
