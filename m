@@ -1,96 +1,45 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 1 Oct 2015 14:32:40 -0500
-Subject: [PATCH 4/4] ARM: DRA7: hwmod: Add data for GPTimer 12
-In-Reply-To: <1443727960-32232-1-git-send-email-s-anna@ti.com>
-References: <1443727960-32232-1-git-send-email-s-anna@ti.com>
-Message-ID: <1443727960-32232-5-git-send-email-s-anna@ti.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 1 Oct 2015 22:33:59 +0300
+Subject: [PATCH v5 00/23] ILP32 for ARM64
+In-Reply-To: <20150930164103.GC15635@sirena.org.uk>
+References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
+ <20150930101918.GA9753@e104818-lin.cambridge.arm.com>
+ <20150930164103.GC15635@sirena.org.uk>
+Message-ID: <20151001193359.GA31021@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the hwmod data for GPTimer 12. GPTimer 12 is present in
-WKUPAON power domain and is clocked from a secure 32K clock.
-GPTimer 12 serves as a secure timer on HS devices, but is
-available for kernel on regular GP devices.
+On Wed, Sep 30, 2015 at 05:41:03PM +0100, Mark Brown wrote:
+> On Wed, Sep 30, 2015 at 11:19:19AM +0100, Catalin Marinas wrote:
+> > On Wed, Sep 30, 2015 at 01:13:57AM +0300, Yury Norov wrote:
+> 
+> > >  - What for ILP32 on ARM64?
+> > > 	See https://lkml.org/lkml/2015/4/13/814
+> > > 	and http://permalink.gmane.org/gmane.comp.lib.uclibc.buildroot/121100
+> > > 	Briefly,
+> > > 	 - for compatibility;
+> > > 	 - for performance;
+> > > 	 - for memory saving.
+> 
+> > Does anyone actually need this ABI? And by "need" I don't mean a
+> > tick-box on product fliers but actually someone going to use it on real
+> > systems in the field. Because I'm not keen on maintaining an ABI in the
+> > kernel just as a PR exercise. I have yet to see conclusive benchmarks
+> > that ILP32 is a real win vs LP64 but happy to be proven wrong.
+> 
+> Indeed.  On that subject there was some discussion at Linaro Connect
+> last week about work (being done outside Linaro, not sure how public it
+> is at this point) to pull together the current state of the art into a
+> Docker container image which people can use for benchmarking and as a
+> reference for how to pull things together.  That should help with the
+> analysis, it'll at least make it easier for other people to reproduce
+> any benchmarking results.
 
-The hwmod link is registered only on GP devices. The hwmod data
-also reused the existing timer class instead of reintroducing
-the identical dra7xx_timer_secure_sysc class which was dropped
-in commit edec17863362 ("ARM: DRA7: hwmod: Fix the hwmod class
-for GPTimer4").
+Hi, Mark,
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 36 +++++++++++++++++++++++++++++--
- 1 file changed, 34 insertions(+), 2 deletions(-)
+>From you, I got more on what happens with ILP32 than from my company.
+Thank you. I know people participated Linaro Connect, and will ask
+them for details. And, if possible, will share it here.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 562247bced49..37a10f87fbcd 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1929,6 +1929,20 @@ static struct omap_hwmod dra7xx_timer11_hwmod = {
- 	},
- };
- 
-+/* timer12 */
-+static struct omap_hwmod dra7xx_timer12_hwmod = {
-+	.name		= "timer12",
-+	.class		= &dra7xx_timer_hwmod_class,
-+	.clkdm_name	= "wkupaon_clkdm",
-+	.main_clk	= "secure_32k_clk_src_ck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_WKUPAON_TIMER12_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_WKUPAON_TIMER12_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
- /* timer13 */
- static struct omap_hwmod dra7xx_timer13_hwmod = {
- 	.name		= "timer13",
-@@ -3135,6 +3149,14 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per1__timer11 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* l4_wkup -> timer12 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_wkup__timer12 = {
-+	.master		= &dra7xx_l4_wkup_hwmod,
-+	.slave		= &dra7xx_timer12_hwmod,
-+	.clk		= "wkupaon_iclk_mux",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* l4_per3 -> timer13 */
- static struct omap_hwmod_ocp_if dra7xx_l4_per3__timer13 = {
- 	.master		= &dra7xx_l4_per3_hwmod,
-@@ -3429,6 +3451,13 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	NULL,
- };
- 
-+/* GP-only hwmod links */
-+static struct omap_hwmod_ocp_if *dra7xx_gp_hwmod_ocp_ifs[] __initdata = {
-+	&dra7xx_l4_wkup__timer12,
-+	NULL,
-+};
-+
-+/* SoC variant specific hwmod links */
- static struct omap_hwmod_ocp_if *dra74x_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l4_per3__usb_otg_ss4,
- 	NULL,
-@@ -3446,9 +3475,12 @@ int __init dra7xx_hwmod_init(void)
- 	ret = omap_hwmod_register_links(dra7xx_hwmod_ocp_ifs);
- 
- 	if (!ret && soc_is_dra74x())
--		return omap_hwmod_register_links(dra74x_hwmod_ocp_ifs);
-+		ret = omap_hwmod_register_links(dra74x_hwmod_ocp_ifs);
- 	else if (!ret && soc_is_dra72x())
--		return omap_hwmod_register_links(dra72x_hwmod_ocp_ifs);
-+		ret = omap_hwmod_register_links(dra72x_hwmod_ocp_ifs);
-+
-+	if (!ret && omap_type() == OMAP2_DEVICE_TYPE_GP)
-+		ret = omap_hwmod_register_links(dra7xx_gp_hwmod_ocp_ifs);
- 
- 	return ret;
- }
--- 
-2.6.0
+BR,
+Yury.
