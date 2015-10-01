@@ -1,74 +1,149 @@
-From: Andrew.Pinski@caviumnetworks.com (Pinski, Andrew)
-Date: Thu, 1 Oct 2015 21:49:46 +0000
-Subject: [PATCH v5 00/23] ILP32 for ARM64
-In-Reply-To: <1708349.DFbfvHcnCR@wuerfel>
-References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
- <20150930101918.GA9753@e104818-lin.cambridge.arm.com>
- <20151001191520.GA25295@yury-N73SV>,<1708349.DFbfvHcnCR@wuerfel>
-Message-ID: <F6B719D8-1FC0-4B26-A926-40FB6953AAE3@caviumnetworks.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Thu, 1 Oct 2015 14:58:57 -0700
+Subject: [RFC/PATCH 09/11] clocksource: add TI 32.768 Hz counter driver
+In-Reply-To: <1443559446-26969-10-git-send-email-balbi@ti.com>
+References: <1443559446-26969-1-git-send-email-balbi@ti.com>
+ <1443559446-26969-10-git-send-email-balbi@ti.com>
+Message-ID: <CALAqxLU1TiKVfPXmxAONZsHYCTvkcMbR4BXRz9vmUjTitUL4Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 29, 2015 at 1:44 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Introduce a new clocksource driver for Texas
+> Instruments 32.768 Hz device which is available
+> on most OMAP-like devices.
+>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/clocksource/Kconfig        |   8 +++
+>  drivers/clocksource/Makefile       |   1 +
+>  drivers/clocksource/timer-ti-32k.c | 121 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 130 insertions(+)
+>  create mode 100644 drivers/clocksource/timer-ti-32k.c
+>
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index a7726db13abb..0ccfd12a00a3 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -115,6 +115,14 @@ config CLKSRC_PISTACHIO
+>         bool
+>         select CLKSRC_OF
+>
+> +config CLKSRC_TI_32K
+> +       bool "Texas Instruments 32.768 Hz Clocksource"
+> +       depends on OF && ARCH_OMAP2PLUS
+> +       select CLKSRC_OF
+> +       help
+> +         This option enables support for Texas Instruments 32.768 Hz clocksource
+> +         available on many OMAP-like platforms.
+> +
+>  config CLKSRC_STM32
+>         bool "Clocksource for STM32 SoCs" if !ARCH_STM32
+>         depends on OF && ARM && (ARCH_STM32 || COMPILE_TEST)
+> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> index 5c00863c3e33..749abc3665b3 100644
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+> @@ -45,6 +45,7 @@ obj-$(CONFIG_VF_PIT_TIMER)    += vf_pit_timer.o
+>  obj-$(CONFIG_CLKSRC_QCOM)      += qcom-timer.o
+>  obj-$(CONFIG_MTK_TIMER)                += mtk_timer.o
+>  obj-$(CONFIG_CLKSRC_PISTACHIO) += time-pistachio.o
+> +obj-$(CONFIG_CLKSRC_TI_32K)    += timer-ti-32k.o
+>
+>  obj-$(CONFIG_ARM_ARCH_TIMER)           += arm_arch_timer.o
+>  obj-$(CONFIG_ARM_GLOBAL_TIMER)         += arm_global_timer.o
+> diff --git a/drivers/clocksource/timer-ti-32k.c b/drivers/clocksource/timer-ti-32k.c
+> new file mode 100644
+> index 000000000000..10ccce2eb645
+> --- /dev/null
+> +++ b/drivers/clocksource/timer-ti-32k.c
+> @@ -0,0 +1,121 @@
+> +/**
+> + * timer-ti-32k.c - OMAP2 32k Timer Support
+> + *
+> + * Copyright (C) 2015 Texas Instruments Incorporated - http://www.ti.com
+> + *
+> + * This program is free software: you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2  of
+> + * the License as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/time.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/err.h>
+> +#include <linux/irq.h>
+> +#include <linux/sched_clock.h>
+> +#include <linux/clocksource.h>
+> +#include <linux/slab.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +
+> +#include <asm/mach/time.h>
+> +
+> +/* OMAP2_32KSYNCNT_CR_OFF: offset of 32ksync counter register */
+> +#define OMAP2_32KSYNCNT_REV_OFF                0x0
+> +#define OMAP2_32KSYNCNT_REV_SCHEME     (0x3 << 30)
+> +#define OMAP2_32KSYNCNT_CR_OFF_LOW     0x10
+> +#define OMAP2_32KSYNCNT_CR_OFF_HIGH    0x30
+> +
+> +/*
+> + * 32KHz clocksource ... always available, on pretty most chips except
+> + * OMAP 730 and 1510.  Other timers could be used as clocksources, with
+> + * higher resolution in free-running counter modes (e.g. 12 MHz xtal),
+> + * but systems won't necessarily want to spend resources that way.
+> + */
+> +static void __iomem *sync32k_cnt_reg;
+> +
+> +/**
+> + * omap_read_persistent_clock64 -  Return time from a persistent clock.
+> + *
+> + * Reads the time from a source which isn't disabled during PM, the
+> + * 32k sync timer.  Convert the cycles elapsed since last read into
+> + * nsecs and adds to a monotonically increasing timespec64.
+> + */
+> +static struct timespec64 persistent_ts;
+> +static cycles_t cycles;
+> +static unsigned int persistent_mult, persistent_shift;
+> +
+> +static u64 notrace omap_32k_read_sched_clock(void)
+> +{
+> +       return readl_relaxed(sync32k_cnt_reg);
+> +}
+> +
+> +static void omap_read_persistent_clock64(struct timespec64 *ts)
+> +{
+> +       unsigned long long nsecs;
+> +       cycles_t last_cycles;
+> +
+> +       last_cycles = cycles;
+> +       cycles = sync32k_cnt_reg ? readl_relaxed(sync32k_cnt_reg) : 0;
+> +
+> +       nsecs = clocksource_cyc2ns(cycles - last_cycles,
+> +                                       persistent_mult, persistent_shift);
+> +
+> +       timespec64_add_ns(&persistent_ts, nsecs);
+> +
+> +       *ts = persistent_ts;
+> +}
 
-> On Oct 1, 2015, at 2:29 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
->> On Thursday 01 October 2015 22:15:20 Yury Norov wrote:
->> 
->> Regarding time_t, it, of course, doesn't takes much time to make it
->> 32-bit, but I think 64 bit is better because of Y2038. X32 and mips
->> n32 has time_t 64-bit (and ppc, not sure), and that's OK for them.
-> 
-> I'm pretty sure that n32 has 32-bit time_t, and we know that it still
-> causes real-world problems on x32: socket timestamps, v4l, alsa and
-> other subsystems all have bugs in this area that are hard to fix.
-> 
->> That's OK for BSD as well. The objection may come from users of ABI,
->> complaining portability problems, but I found no such complains in
->> public discussions.
->> 
->> Nevertheless, as I told, I do not see any problem to rework time_t.
->> But some arguments supporting this decision are appreciated.
->> 
->> The downside of 32 bit time_t is that we still face Y2038 problem,
->> but that's the other story fixing it.
-> 
-> The main reason for 32-bit time_t is compatibility with existing
-> ioctls (also getsockopts and some others), and having a sane way
-> for fixing them. We cannot change compat_time_t to be 64-bit
-> without breaking arm32 compat mode, and we can't use the native
-> 64-bit ioctl implementation on ARM64/ILP32 because that breaks
-> all interfaces that pass 'long' or a pointer.
-> 
-> This means drivers that currently pass a time_t (or timeval, timespec
-> etc) need to not only have a compat_ioctl handler to convert it,
-> they also need to check whether which of the two compat modes they
-> are talking to. This is a mess to add (I know, because I'm working
-> on this for y2038 compliance for normal 32-bit mode), and making
-> the two behave differently makes it even harder to get right for
-> all cases.
-> 
->> __kernel_long_t is the same. Now it's 64 bits length. Compatibility
->> may suffer, but, again, there're no complains, and in long run it
->> looks better.
-> 
-> __kernel_long_t isn't actually used that much, and rarely used in
-> places where it matters. The idea was to be able to reuse the
-> native syscalls rather than the compat syscall calls, but that
-> comes with the downside of defining the ABI in a way that is
-> incompatible with all other 32-bit user space.
-> 
-> Having a 64-bit __kernel_off_t is similar to the 64-bit time_t:
-> a good idea in principle, but it breaks device drivers that
-> expect user space to pass 32-bit arguments. For any interface
-> that really needs 64-bit data, we have to fix it for all
-> 32-bit architectures, and we're better off avoiding special
-> cases.
+So this doesn't look to really be a persistent clock (like an RTC),
+and is more just a clock that doesn't halt in suspend, right?
+(I know some devices used this trick to provide suspend timing w/o an RTC).
 
-Ok, we will rewrite these patches using 32bit time_t and 32bit off_t and redo the toolchain support for them.  Note this is going back to the abi I had originally done when I submitted my original version when it was asked to change time_t to be 64bit. 
+That said, we do now support CLOCK_SOURCE_SUSPEND_NONSTOP, which
+allows us to do suspend timing from the clocksource itself, so you
+should be able to add that flag to the clocksource flags and drop all
+the persistent clock bit here.
 
-Thanks,
-Andrew
-
-
-> 
->    Arnd
+thanks
+-john
