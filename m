@@ -1,23 +1,20 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 1 Oct 2015 07:31:30 +0530
-Subject: [PATCH 0/4] at_xdmac: improvment and fixes for the interleaved
- mode
-In-Reply-To: <1442323770-20266-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1442323770-20266-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20151001020130.GB11757@localhost>
+Date: Thu, 1 Oct 2015 07:45:21 +0530
+Subject: [PATCH v2 1/2] dma: pxa_dma: fix the no-requestor case
+In-Reply-To: <1443634935-28989-1-git-send-email-robert.jarzmik@free.fr>
+References: <1443634935-28989-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20151001021521.GF11757@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 03:29:26PM +0200, Ludovic Desroches wrote:
-> Hi Vinod,
-> 
-> This set of patches introduces the support of 'numf > 1' case for the
-> interleaved mode and several fixes: 'change block increment addressing mode'
-> and 'clean used descriptor' can be backported to 4.2.
+On Wed, Sep 30, 2015 at 07:42:14PM +0200, Robert Jarzmik wrote:
+> A very small number of devices don't use the flow control offered by
+> requestor lines. In these specific cases, the pxa dma driver should be
+> aware of that and not try to use a requestor line.
 
-Applied all,
+Applied both now
 
-Thanks
+Btw what happened to subsytem name here!!
 
 -- 
 ~Vinod
