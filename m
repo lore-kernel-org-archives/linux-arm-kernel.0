@@ -1,90 +1,51 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Thu,  1 Oct 2015 09:37:37 -0700
-Subject: [v2 PATCH] arm64: replace read_lock to rcu lock in call_break_hook
-Message-ID: <1443717457-31461-1-git-send-email-yang.shi@linaro.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 1 Oct 2015 09:58:41 -0700
+Subject: [PATCH] mtd: nand: pass page number to ecc->write_xxx() methods
+In-Reply-To: <20151001170743.3aa0d6fa@bbrezillon>
+References: <1440436219-31625-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20151001170743.3aa0d6fa@bbrezillon>
+Message-ID: <20151001165841.GQ143959@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
-in_atomic(): 0, irqs_disabled(): 128, pid: 342, name: perf
-1 lock held by perf/342:
- #0:  (break_hook_lock){+.+...}, at: [<ffffffc0000851ac>] call_break_hook+0x34/0xd0
-irq event stamp: 62224
-hardirqs last  enabled at (62223): [<ffffffc00010b7bc>] __call_rcu.constprop.59+0x104/0x270
-hardirqs last disabled at (62224): [<ffffffc0000fbe20>] vprintk_emit+0x68/0x640
-softirqs last  enabled at (0): [<ffffffc000097928>] copy_process.part.8+0x428/0x17f8
-softirqs last disabled at (0): [<          (null)>]           (null)
-CPU: 0 PID: 342 Comm: perf Not tainted 4.1.6-rt5 #4
-Hardware name: linux,dummy-virt (DT)
-Call trace:
-[<ffffffc000089968>] dump_backtrace+0x0/0x128
-[<ffffffc000089ab0>] show_stack+0x20/0x30
-[<ffffffc0007030d0>] dump_stack+0x7c/0xa0
-[<ffffffc0000c878c>] ___might_sleep+0x174/0x260
-[<ffffffc000708ac8>] __rt_spin_lock+0x28/0x40
-[<ffffffc000708db0>] rt_read_lock+0x60/0x80
-[<ffffffc0000851a8>] call_break_hook+0x30/0xd0
-[<ffffffc000085a70>] brk_handler+0x30/0x98
-[<ffffffc000082248>] do_debug_exception+0x50/0xb8
-Exception stack(0xffffffc00514fe30 to 0xffffffc00514ff50)
-fe20:                                     00000000 00000000 c1594680 0000007f
-fe40: ffffffff ffffffff 92063940 0000007f 0550dcd8 ffffffc0 00000000 00000000
-fe60: 0514fe70 ffffffc0 000be1f8 ffffffc0 0514feb0 ffffffc0 0008948c ffffffc0
-fe80: 00000004 00000000 0514fed0 ffffffc0 ffffffff ffffffff 9282a948 0000007f
-fea0: 00000000 00000000 9282b708 0000007f c1592820 0000007f 00083914 ffffffc0
-fec0: 00000000 00000000 00000010 00000000 00000064 00000000 00000001 00000000
-fee0: 005101e0 00000000 c1594680 0000007f c1594740 0000007f ffffffd8 ffffff80
-ff00: 00000000 00000000 00000000 00000000 c1594770 0000007f c1594770 0000007f
-ff20: 00665e10 00000000 7f7f7f7f 7f7f7f7f 01010101 01010101 00000000 00000000
-ff40: 928e4cc0 0000007f 91ff11e8 0000007f
+On Thu, Oct 01, 2015 at 05:07:43PM +0200, Boris Brezillon wrote:
+> On Mon, 24 Aug 2015 19:10:19 +0200
+> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> 
+> > The ->read_xxx() methods are all passed the page number the NAND controller
+> > is supposed to read, but ->write_xxx() do not have such a parameter.
+> > 
+> > This is a problem if we want to properly implement data
+> > scrambling/randomization in order to mitigate MLC sensibility to repeated
+> > pattern: to prevent bitflips in adjacent pages in the same block we need
+> > to avoid repeating the same pattern at the same offset in those pages,
+> > hence the randomizer/scrambler engine need to be passed the page value
+> > in order to adapt its seed accordingly.
+> > 
+> > Moreover, adding the page parameter the ->write_xxx() methods add some
+> > consistency to the current model.
+> 
+> Apparently nobody complained (or nobody cares :-)) about that patch,
+> and I'll really need the page information if I want to support
+> randomization/scrambling in the sunxi driver.
+> 
+> Do you have any objections to this patch
 
-call_break_hook is called in atomic context (hard irq disabled), so replace
-the sleepable lock to rcu lock and replace relevant list operations to rcu
-version.
+No, I guess not.
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
-v1-> v2
-Replace list operations to rcu version.
+> (I can rebase it on mainline
+> and check if new drivers have been added since the submission)?
 
- arch/arm64/kernel/debug-monitors.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+I recently compile tested it against the tip of tree (don't know why I
+didn't merge it then), but I think we added one driver since then. I
+suppose a rebase is in order.
 
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index cebf786..cf0e4fc 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -276,14 +276,14 @@ static DEFINE_RWLOCK(break_hook_lock);
- void register_break_hook(struct break_hook *hook)
- {
- 	write_lock(&break_hook_lock);
--	list_add(&hook->node, &break_hook);
-+	list_add_rcu(&hook->node, &break_hook);
- 	write_unlock(&break_hook_lock);
- }
- 
- void unregister_break_hook(struct break_hook *hook)
- {
- 	write_lock(&break_hook_lock);
--	list_del(&hook->node);
-+	list_del_rcu(&hook->node);
- 	write_unlock(&break_hook_lock);
- }
- 
-@@ -292,11 +292,11 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
- 	struct break_hook *hook;
- 	int (*fn)(struct pt_regs *regs, unsigned int esr) = NULL;
- 
--	read_lock(&break_hook_lock);
--	list_for_each_entry(hook, &break_hook, node)
-+	rcu_read_lock();
-+	list_for_each_entry_rcu(hook, &break_hook, node)
- 		if ((esr & hook->esr_mask) == hook->esr_val)
- 			fn = hook->fn;
--	read_unlock(&break_hook_lock);
-+	rcu_read_unlock();
- 
- 	return fn ? fn(regs, esr) : DBG_HOOK_ERROR;
- }
--- 
-2.0.2
+> I remember you pointed a trick you've used in the brcmnand driver to
+> get this page information (storing it during the ->cmdfunc() or
+> ->ctrl_cmd() call), but it would be way easier to have it directly in
+> the ecc->write_xxx() parameters...
+
+Right, that's not a pattern I'd really like people to copy...
+
+Regards,
+Brian
