@@ -1,27 +1,189 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 01 Oct 2015 10:12:34 +0200
-Subject: [PATCH v3 5/8] clk: rockchip: add new clock type and controller
- for rk3036
-In-Reply-To: <1443492833-15630-6-git-send-email-zhengxing@rock-chips.com>
-References: <1443492833-15630-1-git-send-email-zhengxing@rock-chips.com>
- <1443492833-15630-6-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <17410513.afcQr96dHz@diego>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 1 Oct 2015 16:13:06 +0800
+Subject: [RESEND PATCH v2 2/2] ARM: imx6: change default burst size for USB
+In-Reply-To: <1443603159.3185.5.camel@pengutronix.de>
+References: <1443579437-845-1-git-send-email-peter.chen@freescale.com>
+ <1443579437-845-2-git-send-email-peter.chen@freescale.com>
+ <1443603159.3185.5.camel@pengutronix.de>
+Message-ID: <CAL411-p-V=p8g9ckxewNzZ7kG+ChbgewSn8V8n1kmw7DqU0hZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 29. September 2015, 10:13:50 schrieb Xing Zheng:
-> The rk3036's pll and clock are different with base on the rk3066(rk3188,
-> rk3288, rk3368 use it), there are different adjust foctors and control
-> registers, so these should be independent and separate from the series
-> of rk3066s.
+On Wed, Sep 30, 2015 at 4:52 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Am Mittwoch, den 30.09.2015, 10:17 +0800 schrieb Peter Chen:
+>> It can improve the USB performance when choosing larger
+>> burst size at some systems (bus size is larger), there is
+>> no side effect if this burst size is larger than bus size.
+>>
+> Just for the record, as it seems too late to stop the train now:
+>
+> I am _NOT_ happy that the extended binding has been accepted into the
+> USB tree despite outstanding review comments from me not being addressed
+> or even answered.
+>
 
-subject should probably be like
-clk: rockchip: add new pll-type for rk3036 and similar socs
+I sent patch for review at Aug 7th, queued this patches at Aug 13th
+[1], and sent pull
+request at Aug 14th, I am curious why you did not give comments
+between this period utill
+I complained one ethernet patch breaks i.mx ethernet function for v4.2
+tree [2] at Aug 14th.
+
+I will consider your comments, and send patch for improving it if possible.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/364352.html
+[2] http://marc.info/?l=linux-netdev&m=143954500409636&w=2
 
 
-And the general handling should probably be implemented similar to the example 
-I posted in the v2 thread yesterday. [of course folded in and not as a 
-separate patch ;-) ]
+>> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+>> ---
+>>
+>> Changes for v2:
+>> - Applies changes for imx6ul
+>>
+>>  arch/arm/boot/dts/imx6qdl.dtsi | 8 ++++++++
+>>  arch/arm/boot/dts/imx6sl.dtsi  | 6 ++++++
+>>  arch/arm/boot/dts/imx6sx.dtsi  | 6 ++++++
+>>  arch/arm/boot/dts/imx6ul.dtsi  | 4 ++++
+>>  4 files changed, 24 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+>> index 3d04a17..92c5cc0 100644
+>> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+>> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+>> @@ -907,6 +907,8 @@
+>>                               fsl,usbphy = <&usbphy1>;
+>>                               fsl,usbmisc = <&usbmisc 0>;
+>>                               ahb-burst-config = <0x0>;
+>> +                             tx-burst-size-dword = <0x10>;
+>> +                             rx-burst-size-dword = <0x10>;
+>>                               status = "disabled";
+>>                       };
+>>
+>> @@ -919,6 +921,8 @@
+>>                               fsl,usbmisc = <&usbmisc 1>;
+>>                               dr_mode = "host";
+>>                               ahb-burst-config = <0x0>;
+>> +                             tx-burst-size-dword = <0x10>;
+>> +                             rx-burst-size-dword = <0x10>;
+>>                               status = "disabled";
+>>                       };
+>>
+>> @@ -930,6 +934,8 @@
+>>                               fsl,usbmisc = <&usbmisc 2>;
+>>                               dr_mode = "host";
+>>                               ahb-burst-config = <0x0>;
+>> +                             tx-burst-size-dword = <0x10>;
+>> +                             rx-burst-size-dword = <0x10>;
+>>                               status = "disabled";
+>>                       };
+>>
+>> @@ -941,6 +947,8 @@
+>>                               fsl,usbmisc = <&usbmisc 3>;
+>>                               dr_mode = "host";
+>>                               ahb-burst-config = <0x0>;
+>> +                             tx-burst-size-dword = <0x10>;
+>> +                             rx-burst-size-dword = <0x10>;
+>>                               status = "disabled";
+>>                       };
+>>
+>> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+>> index 057b1d4..2c0faeb 100644
+>> --- a/arch/arm/boot/dts/imx6sl.dtsi
+>> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+>> @@ -690,6 +690,8 @@
+>>                               fsl,usbphy = <&usbphy1>;
+>>                               fsl,usbmisc = <&usbmisc 0>;
+>>                               ahb-burst-config = <0x0>;
+>> +                             tx-burst-size-dword = <0x10>;
+>> +                             rx-burst-size-dword = <0x10>;
+>>                               status = "disabled";
+>>                       };
+>>
+>> @@ -701,6 +703,8 @@
+>>                               fsl,usbphy = <&usbphy2>;
+>>                               fsl,usbmisc = <&usbmisc 1>;
+>>                               ahb-burst-config = <0x0>;
+>> +                             tx-burst-size-dword = <0x10>;
+>> +                             rx-burst-size-dword = <0x10>;
+>>                               status = "disabled";
+>>                       };
+>>
+>> @@ -712,6 +716,8 @@
+>>                               fsl,usbmisc = <&usbmisc 2>;
+>>                               dr_mode = "host";
+>>                               ahb-burst-config = <0x0>;
+>> +                             tx-burst-size-dword = <0x10>;
+>> +                             rx-burst-size-dword = <0x10>;
+>>                               status = "disabled";
+>>                       };
+>>
+>> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+>> index 70a7c4f..01191c0 100644
+>> --- a/arch/arm/boot/dts/imx6sx.dtsi
+>> +++ b/arch/arm/boot/dts/imx6sx.dtsi
+>> @@ -784,6 +784,8 @@
+>>                               fsl,usbmisc = <&usbmisc 0>;
+>>                               fsl,anatop = <&anatop>;
+>>                               ahb-burst-config = <0x0>;
+>> +                             tx-burst-size-dword = <0x10>;
+>> +                             rx-burst-size-dword = <0x10>;
+>>                               status = "disabled";
+>>                       };
+>>
+>> @@ -795,6 +797,8 @@
+>>                               fsl,usbphy = <&usbphy2>;
+>>                               fsl,usbmisc = <&usbmisc 1>;
+>>                               ahb-burst-config = <0x0>;
+>> +                             tx-burst-size-dword = <0x10>;
+>> +                             rx-burst-size-dword = <0x10>;
+>>                               status = "disabled";
+>>                       };
+>>
+>> @@ -808,6 +812,8 @@
+>>                               fsl,anatop = <&anatop>;
+>>                               dr_mode = "host";
+>>                               ahb-burst-config = <0x0>;
+>> +                             tx-burst-size-dword = <0x10>;
+>> +                             rx-burst-size-dword = <0x10>;
+>>                               status = "disabled";
+>>                       };
+>>
+>> diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+>> index 654009f..28dcd68 100644
+>> --- a/arch/arm/boot/dts/imx6ul.dtsi
+>> +++ b/arch/arm/boot/dts/imx6ul.dtsi
+>> @@ -536,6 +536,8 @@
+>>                               fsl,usbmisc = <&usbmisc 0>;
+>>                               fsl,anatop = <&anatop>;
+>>                               ahb-burst-config = <0x0>;
+>> +                             tx-burst-size-dword = <0x10>;
+>> +                             rx-burst-size-dword = <0x10>;
+>>                               status = "disabled";
+>>                       };
+>>
+>> @@ -547,6 +549,8 @@
+>>                               fsl,usbphy = <&usbphy2>;
+>>                               fsl,usbmisc = <&usbmisc 1>;
+>>                               ahb-burst-config = <0x0>;
+>> +                             tx-burst-size-dword = <0x10>;
+>> +                             rx-burst-size-dword = <0x10>;
+>>                               status = "disabled";
+>>                       };
+>>
+>
+> --
+> Pengutronix e.K.             | Lucas Stach                 |
+> Industrial Linux Solutions   | http://www.pengutronix.de/  |
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 
-Heiko
+
+-- 
+BR,
+Peter Chen
