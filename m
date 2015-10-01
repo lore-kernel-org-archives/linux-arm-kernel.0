@@ -1,71 +1,95 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  1 Oct 2015 19:57:49 +0800
-Subject: [PATCH v5 3/5] ARM: dts: sun8i: Add Reduced Serial Bus controller
- device node to A23/A33 dtsi
+Date: Thu,  1 Oct 2015 19:57:47 +0800
+Subject: [PATCH v5 1/5] soc: sunxi: Add Allwinner Reduced Serial Bus (RSB)
+ controller bindings
 In-Reply-To: <1443700673-24312-1-git-send-email-wens@csie.org>
 References: <1443700673-24312-1-git-send-email-wens@csie.org>
-Message-ID: <1443700673-24312-4-git-send-email-wens@csie.org>
+Message-ID: <1443700673-24312-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a device node for the Reduced Serial Bus (RSB)
-controller and the defacto pinmux setting to the A23/A33 dtsi.
+Reduced Serial Bus is a proprietary 2-line push-pull serial bus supporting
+multiple slave devices. It was developed by Allwinner, Inc. and used by
+Allwinner and X-Powers, Inc. for their line of PMICs and other peripheral
+ICs.
 
-Since there is only one possible pinmux setting for RSB, just
-set it in the dtsi.
+Recent Allwinner SoCs, starting with the A23, have an RSB controller. This
+is used to talk to the PMIC, and later with the A80 and A83 platform, the
+audio codec IC.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
 
 Changes since v4:
 
-  None
+  - Added ack by Maxime
 
 Changes since v3:
 
-  - Changed #address-cells to 1
+  - Merged common RSB bindings and Allwinner RSB controller bindings
+  - Moved to soc/sunxi/rsb.txt
+  - Removed runtime address from bindings
+  - #address-cells changed to 1
+  - Default to 3 MHz if bus clock speed is not specified
 
 ---
- arch/arm/boot/dts/sun8i-a23-a33.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ .../devicetree/bindings/soc/sunxi/rsb.txt          | 47 ++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/sunxi/rsb.txt
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 04bccad977ee..828aaf52c342 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -651,6 +651,13 @@
- 			#size-cells = <0>;
- 			#gpio-cells = <3>;
- 
-+			r_rsb_pins: r_rsb {
-+				allwinner,pins = "PL0", "PL1";
-+				allwinner,function = "s_rsb";
-+				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+			};
+diff --git a/Documentation/devicetree/bindings/soc/sunxi/rsb.txt b/Documentation/devicetree/bindings/soc/sunxi/rsb.txt
+new file mode 100644
+index 000000000000..3dd28343b6ce
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/sunxi/rsb.txt
+@@ -0,0 +1,47 @@
++Allwinner Reduced Serial Bus (RSB) controller
 +
- 			r_uart_pins_a: r_uart at 0 {
- 				allwinner,pins = "PL2", "PL3";
- 				allwinner,function = "s_uart";
-@@ -658,5 +665,19 @@
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
++The RSB controller found on later Allwinner SoCs is an SMBus like 2 wire
++serial bus with 1 master and up to 15 slaves. It is represented by a node
++for the controller itself, and child nodes representing the slave devices.
 +
-+		r_rsb: rsb at 01f03400 {
-+			compatible = "allwinner,sun8i-a23-rsb";
-+			reg = <0x01f03400 0x400>;
-+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&apb0_gates 3>;
-+			clock-frequency = <3000000>;
-+			resets = <&apb0_rst 3>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&r_rsb_pins>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++Required properties :
++
++ - reg             : Offset and length of the register set for the controller.
++ - compatible      : Shall be "allwinner,sun8i-a23-rsb".
++ - interrupts      : The interrupt line associated to the RSB controller.
++ - clocks          : The gate clk associated to the RSB controller.
++ - resets          : The reset line associated to the RSB controller.
++ - #address-cells  : shall be 1
++ - #size-cells     : shall be 0
++
++Optional properties :
++
++ - clock-frequency : Desired RSB bus clock frequency in Hz. Maximum is 20MHz.
++		     If not set this defaults to 3MHz.
++
++Child nodes:
++
++An RSB controller node can contain zero or more child nodes representing
++slave devices on the bus.  Child 'reg' properties should contain the slave
++device's hardware address. The hardware address is hardwired in the device,
++which can normally be found in the datasheet.
++
++Example:
++
++	rsb at 01f03400 {
++		compatible = "allwinner,sun8i-a23-rsb";
++		reg = <0x01f03400 0x400>;
++		interrupts = <0 39 4>;
++		clocks = <&apb0_gates 3>;
++		clock-frequency = <3000000>;
++		resets = <&apb0_rst 3>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		pmic at 3e3 {
++			compatible = "...";
++			reg = <0x3e3>;
++
++			/* ... */
 +		};
- 	};
- };
++	};
 -- 
 2.5.3
