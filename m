@@ -1,74 +1,57 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 1 Oct 2015 20:13:22 +0200
-Subject: [PATCH] mtd: nand: pass page number to ecc->write_xxx() methods
-In-Reply-To: <20151001171750.GR143959@google.com>
-References: <1440436219-31625-1-git-send-email-boris.brezillon@free-electrons.com>
- <20151001171750.GR143959@google.com>
-Message-ID: <20151001201322.5bc2cfe1@bbrezillon>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 2 Oct 2015 02:17:05 +0800
+Subject: [PATCH v2] mtd: nand: pass page number to ecc->write_xxx() methods
+In-Reply-To: <1443722657-13051-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <201510020244.DQEH8IPg%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Oct 2015 10:17:50 -0700
-Brian Norris <computersforpeace@gmail.com> wrote:
+Hi Boris,
 
-> On Mon, Aug 24, 2015 at 07:10:19PM +0200, Boris Brezillon wrote:
-> > The ->read_xxx() methods are all passed the page number the NAND controller
-> > is supposed to read, but ->write_xxx() do not have such a parameter.
-> > 
-> > This is a problem if we want to properly implement data
-> > scrambling/randomization in order to mitigate MLC sensibility to repeated
-> > pattern: to prevent bitflips in adjacent pages in the same block we need
-> > to avoid repeating the same pattern at the same offset in those pages,
-> > hence the randomizer/scrambler engine need to be passed the page value
-> > in order to adapt its seed accordingly.
-> > 
-> > Moreover, adding the page parameter the ->write_xxx() methods add some
-> > consistency to the current model.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > CC: Josh Wu <josh.wu@atmel.com>
-> > CC: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > CC: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > CC: Huang Shijie <shijie.huang@intel.com>
-> > CC: Bryan Wu <bryan.wu@analog.com>
-> > CC: devel at driverdev.osuosl.org
-> > CC: linux-arm-kernel at lists.infradead.org
-> > CC: linux-kernel at vger.kernel.org
-> > 
-> > ---
-> >  drivers/mtd/nand/atmel_nand.c                 |  6 ++++--
-> >  drivers/mtd/nand/bf5xx_nand.c                 |  3 ++-
-> >  drivers/mtd/nand/brcmnand/brcmnand.c          |  4 ++--
-> >  drivers/mtd/nand/cafe_nand.c                  |  3 ++-
-> >  drivers/mtd/nand/denali.c                     |  5 +++--
-> >  drivers/mtd/nand/docg4.c                      |  4 ++--
-> >  drivers/mtd/nand/fsl_elbc_nand.c              |  4 ++--
-> >  drivers/mtd/nand/fsl_ifc_nand.c               |  2 +-
-> >  drivers/mtd/nand/gpmi-nand/gpmi-nand.c        |  6 +++---
-> >  drivers/mtd/nand/hisi504_nand.c               |  3 ++-
-> >  drivers/mtd/nand/lpc32xx_mlc.c                |  3 ++-
-> >  drivers/mtd/nand/lpc32xx_slc.c                |  5 +++--
-> >  drivers/mtd/nand/nand_base.c                  | 31 ++++++++++++++++++---------
-> >  drivers/mtd/nand/omap2.c                      |  3 ++-
-> >  drivers/mtd/nand/pxa3xx_nand.c                |  3 ++-
-> >  drivers/mtd/nand/sh_flctl.c                   |  3 ++-
-> >  drivers/mtd/nand/sunxi_nand.c                 |  5 +++--
-> >  drivers/staging/mt29f_spinand/mt29f_spinand.c |  3 ++-
-> >  include/linux/mtd/nand.h                      |  6 +++---
-> >  19 files changed, 63 insertions(+), 39 deletions(-)
-> 
-> Tip for rebasing -- I noticed one build failure for docg4:
-> 
->   drivers/mtd/nand/docg4.c: In function ?docg4_block_markbad?:
->   drivers/mtd/nand/docg4.c:1116:2: error: too few arguments to function ?docg4_write_page?
->   drivers/mtd/nand/docg4.c:985:12: note: declared here
+[auto build test results on next-20151001 -- if it's inappropriate base, please ignore]
 
-Fixed in v2, thanks for the pointer.
+config: i386-randconfig-s1-201539 (attached as .config)
+reproduce:
+        git checkout 425b29816a0dba028eef09be5cb531a187e256a1
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
+All error/warnings (new ones prefixed by >>):
 
+   drivers/mtd/nand/docg4.c: In function 'docg4_block_markbad':
+>> drivers/mtd/nand/docg4.c:1116:2: error: too few arguments to function 'docg4_write_page'
+     docg4_write_page(mtd, nand, buf, 1);
+     ^
+   drivers/mtd/nand/docg4.c:985:12: note: declared here
+    static int docg4_write_page(struct mtd_info *mtd, struct nand_chip *nand,
+               ^
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+vim +/docg4_write_page +1116 drivers/mtd/nand/docg4.c
+
+570469f3 Mike Dunn    2012-01-03  1110  	memset(nand->oob_poi, 0xff, mtd->oobsize);
+570469f3 Mike Dunn    2012-01-03  1111  	for (i = 0; i < bbtd->len; i++)
+570469f3 Mike Dunn    2012-01-03  1112  		nand->oob_poi[bbtd->offs + i] = ~bbtd->pattern[i];
+570469f3 Mike Dunn    2012-01-03  1113  
+570469f3 Mike Dunn    2012-01-03  1114  	/* write first page of block */
+570469f3 Mike Dunn    2012-01-03  1115  	write_page_prologue(mtd, g4_addr);
+1fbb938d Brian Norris 2012-05-02 @1116  	docg4_write_page(mtd, nand, buf, 1);
+570469f3 Mike Dunn    2012-01-03  1117  	ret = pageprog(mtd);
+570469f3 Mike Dunn    2012-01-03  1118  
+570469f3 Mike Dunn    2012-01-03  1119  	kfree(buf);
+
+:::::: The code at line 1116 was first introduced by commit
+:::::: 1fbb938dff5b6bb4514a4e7600276b03c7f08e25 mtd: nand: add 'oob_required' argument to NAND {read,write}_page interfaces
+
+:::::: TO: Brian Norris <computersforpeace@gmail.com>
+:::::: CC: David Woodhouse <David.Woodhouse@intel.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 21000 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151002/8e7c1958/attachment-0001.obj>
