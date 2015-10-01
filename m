@@ -1,42 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 1 Oct 2015 15:09:32 +0200
-Subject: [linux-sunxi][PATCH v5] ARM: sun7i: dt: Add new Olimex A20 EVB
- device
-In-Reply-To: <CAEKpxB=ytV17o5uO6srDbJSrvNe66EeRERF-Ow=HuzE4=z1qag@mail.gmail.com>
-References: <1443634479-18111-1-git-send-email-codekipper@gmail.com>
- <20151001120630.GH7104@lukather>
- <CAEKpxB=ytV17o5uO6srDbJSrvNe66EeRERF-Ow=HuzE4=z1qag@mail.gmail.com>
-Message-ID: <20151001130932.GJ7104@lukather>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Thu,  1 Oct 2015 16:13:05 +0300
+Subject: [PATCH 1/1] ARM: davinci: re-use %*ph specifier
+Message-ID: <1443705185-85280-1-git-send-email-andriy.shevchenko@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 01, 2015 at 02:54:07PM +0200, Code Kipper wrote:
-> >> +&reg_dcdc2 {
-> >> +     regulator-always-on;
-> >> +     regulator-min-microvolt = <1000000>;
-> >> +     regulator-max-microvolt = <1425000>;
-> >
-> > You also changed that since v4, for an unknown reason, and without
-> > mentionning it in the changelog...
->
-> AAARRRGGGGHHHHHHHHHHH....could you kindly fix this for me?....pllllleeeasseee.
+%*ph specifier allows to dump data in hex format using the poiter to a buffer.
+This is suitable to use here.
 
-If that's the only change you made, sure...
+Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+---
+ arch/arm/mach-davinci/board-dm644x-evm.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-But you should pay more attention and / or polish your git
-workflow. Having part of codes from several versions ago poping back
-is definitely not good.
-
-Maxime
-
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index 1a0898c..bbdd2d6 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -546,9 +546,7 @@ static int dm6444evm_msp430_get_pins(void)
+ 	if (status < 0)
+ 		return status;
+ 
+-	dev_dbg(&dm6446evm_msp->dev,
+-		"PINS: %02x %02x %02x %02x\n",
+-		buf[0], buf[1], buf[2], buf[3]);
++	dev_dbg(&dm6446evm_msp->dev, "PINS: %4ph\n", buf);
+ 
+ 	return (buf[3] << 8) | buf[2];
+ }
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151001/33dbb9bf/attachment.sig>
+2.5.1
