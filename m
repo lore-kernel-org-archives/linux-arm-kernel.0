@@ -1,134 +1,142 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 1 Oct 2015 23:11:56 +0200
-Subject: [PATCH v2 2/7] PM / Domains: Support IRQ safe PM domains
-In-Reply-To: <1441310314-8857-3-git-send-email-lina.iyer@linaro.org>
-References: <1441310314-8857-1-git-send-email-lina.iyer@linaro.org>
- <1441310314-8857-3-git-send-email-lina.iyer@linaro.org>
-Message-ID: <CAMuHMdVYsD7frMacrF0Y1+a+dCWZgZYpNGRn8ij4on4ir0BTuw@mail.gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 1 Oct 2015 14:27:02 -0700
+Subject: [v2 PATCH] arm64: replace read_lock to rcu lock in call_break_hook
+In-Reply-To: <560D9D5F.70403@linaro.org>
+References: <1443717457-31461-1-git-send-email-yang.shi@linaro.org>
+ <20151001130819.5080bc24@gandalf.local.home>
+ <560D9D5F.70403@linaro.org>
+Message-ID: <20151001212702.GM4043@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lina,
+On Thu, Oct 01, 2015 at 01:53:51PM -0700, Shi, Yang wrote:
+> On 10/1/2015 10:08 AM, Steven Rostedt wrote:
+> >On Thu,  1 Oct 2015 09:37:37 -0700
+> >Yang Shi <yang.shi@linaro.org> wrote:
+> >
+> >>BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
+> >>in_atomic(): 0, irqs_disabled(): 128, pid: 342, name: perf
+> >>1 lock held by perf/342:
+> >>  #0:  (break_hook_lock){+.+...}, at: [<ffffffc0000851ac>] call_break_hook+0x34/0xd0
+> >>irq event stamp: 62224
+> >>hardirqs last  enabled at (62223): [<ffffffc00010b7bc>] __call_rcu.constprop.59+0x104/0x270
+> >>hardirqs last disabled at (62224): [<ffffffc0000fbe20>] vprintk_emit+0x68/0x640
+> >>softirqs last  enabled at (0): [<ffffffc000097928>] copy_process.part.8+0x428/0x17f8
+> >>softirqs last disabled at (0): [<          (null)>]           (null)
+> >>CPU: 0 PID: 342 Comm: perf Not tainted 4.1.6-rt5 #4
+> >>Hardware name: linux,dummy-virt (DT)
+> >>Call trace:
+> >>[<ffffffc000089968>] dump_backtrace+0x0/0x128
+> >>[<ffffffc000089ab0>] show_stack+0x20/0x30
+> >>[<ffffffc0007030d0>] dump_stack+0x7c/0xa0
+> >>[<ffffffc0000c878c>] ___might_sleep+0x174/0x260
+> >>[<ffffffc000708ac8>] __rt_spin_lock+0x28/0x40
+> >>[<ffffffc000708db0>] rt_read_lock+0x60/0x80
+> >>[<ffffffc0000851a8>] call_break_hook+0x30/0xd0
+> >>[<ffffffc000085a70>] brk_handler+0x30/0x98
+> >>[<ffffffc000082248>] do_debug_exception+0x50/0xb8
+> >>Exception stack(0xffffffc00514fe30 to 0xffffffc00514ff50)
+> >>fe20:                                     00000000 00000000 c1594680 0000007f
+> >>fe40: ffffffff ffffffff 92063940 0000007f 0550dcd8 ffffffc0 00000000 00000000
+> >>fe60: 0514fe70 ffffffc0 000be1f8 ffffffc0 0514feb0 ffffffc0 0008948c ffffffc0
+> >>fe80: 00000004 00000000 0514fed0 ffffffc0 ffffffff ffffffff 9282a948 0000007f
+> >>fea0: 00000000 00000000 9282b708 0000007f c1592820 0000007f 00083914 ffffffc0
+> >>fec0: 00000000 00000000 00000010 00000000 00000064 00000000 00000001 00000000
+> >>fee0: 005101e0 00000000 c1594680 0000007f c1594740 0000007f ffffffd8 ffffff80
+> >>ff00: 00000000 00000000 00000000 00000000 c1594770 0000007f c1594770 0000007f
+> >>ff20: 00665e10 00000000 7f7f7f7f 7f7f7f7f 01010101 01010101 00000000 00000000
+> >>ff40: 928e4cc0 0000007f 91ff11e8 0000007f
+> >>
+> >>call_break_hook is called in atomic context (hard irq disabled), so replace
+> >>the sleepable lock to rcu lock and replace relevant list operations to rcu
+> >>version.
+> >>
+> >>Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> >>---
+> >>v1-> v2
+> >>Replace list operations to rcu version.
+> >>
+> >>  arch/arm64/kernel/debug-monitors.c | 10 +++++-----
+> >>  1 file changed, 5 insertions(+), 5 deletions(-)
+> >>
+> >>diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+> >>index cebf786..cf0e4fc 100644
+> >>--- a/arch/arm64/kernel/debug-monitors.c
+> >>+++ b/arch/arm64/kernel/debug-monitors.c
+> >>@@ -276,14 +276,14 @@ static DEFINE_RWLOCK(break_hook_lock);
+> >>  void register_break_hook(struct break_hook *hook)
+> >>  {
+> >>  	write_lock(&break_hook_lock);
+> >>-	list_add(&hook->node, &break_hook);
+> >>+	list_add_rcu(&hook->node, &break_hook);
+> >>  	write_unlock(&break_hook_lock);
+> >>  }
+> >>
+> >>  void unregister_break_hook(struct break_hook *hook)
+> >>  {
+> >>  	write_lock(&break_hook_lock);
+> >>-	list_del(&hook->node);
+> >>+	list_del_rcu(&hook->node);
+> >>  	write_unlock(&break_hook_lock);
+> >>  }
+> >
+> >Shouldn't there be a synchronize_rcu() somewhere?
+> 
+> So far kgdb is the only user of unregister_break_hook in mainline kernel.
+> 
+> Just read Documentation/RCU/checklist.txt, it says:
+> 
+> Note that synchronize_rcu() -only- guarantees to wait until
+> all currently executing rcu_read_lock()-protected RCU read-side
+> critical sections complete.
+> 
+> For kgdb, the unregister is just called in kgdb_arch_exit by
+> kgdb_unregister_io_module, which is called when rmmod kgdb module.
+> 
+> The break point handler is done synchronously. So, it sounds should
+> be not a problem without calling synchronize_rcu().
 
-On Thu, Sep 3, 2015 at 9:58 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
-> Generic Power Domains currently support turning on/off only in process
-> context. This prevents the usage of PM domains for domains that could be
-> powered on/off in a context where IRQs are disabled. Many such domains
-> exist today and do not get powered off, when the IRQ safe devices in
-> that domain are powered off, because of this limitation.
->
-> However, not all domains can operate in IRQ safe contexts. Genpd
-> therefore, has to support both cases where the domain may or may not
-> operate in IRQ safe contexts. Configuring genpd to use an appropriate
-> lock for that domain, would allow domains that have IRQ safe devices to
-> runtime suspend and resume, in atomic context.
->
-> To achieve domain specific locking, set the domain's ->flag to
-> GENPD_FLAG_IRQ_SAFE while defining the domain. This indicates that genpd
-> should use a spinlock instead of a mutex for locking the domain. Locking
-> is abstracted through genpd_lock() and genpd_unlock() functions that use
-> the flag to determine the appropriate lock to be used for that domain.
-> Domains that have lower latency to suspend and resume and can operate
-> with IRQs disabled may now be able to save power, when the component
-> devices and sub-domains are idle at runtime.
->
-> The restriction this imposes on the domain hierarchy is that sub-domains
-> and all devices in the IRQ safe domain's hierarchy also have to be IRQ
-> safe, so that we dont try to lock a mutex, while holding a spinlock.
-> Non-IRQ safe domains may continue to have devices and sub-domains that
-> may or may not be IRQ safe.
->
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-> Cc: Krzysztof Koz?owski <k.kozlowski@samsung.com>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+OK, I will bite...  What does "synchronously" mean here?  Unless you
+have somehow guaranteed that all current readers in call_break_hook()
+are done between the time you call unregister_break_hook() to remove a
+given break_hook structure and the time you call register_break_hook()
+to add that same structure back in, you have a problem.
 
-> @@ -394,8 +468,17 @@ static int pm_genpd_poweroff(struct generic_pm_domain *genpd)
->                 if (stat > PM_QOS_FLAGS_NONE)
->                         return -EBUSY;
->
-> -               if (!pm_runtime_suspended(pdd->dev) || pdd->dev->power.irq_safe)
-> +               /*
-> +                * We do not want to power off the domain if the device is
-> +                * not suspended or an IRQ safe device is part of this
-> +                * non-IRQ safe domain.
-> +                */
-> +               if (!pm_runtime_suspended(pdd->dev) ||
-> +                       irq_safe_dev_in_no_sleep_domain(pdd->dev, genpd))
->                         not_suspended++;
-> +               WARN_ONCE(irq_safe_dev_in_no_sleep_domain(pdd->dev, genpd),
-> +                               "PM domain %s will not be powered off\n",
+What you have now only protects against invoking register_break_hook()
+on newly allocated and initialized break_hook structure.  But the only
+calls to register_break_hook() that I see in v4.2 use compile-time
+initialized structures.  So the only failure from using non-RCU list
+primitives would be due to the list_head's ->next pointer initialization.
+This could momentarily make the list appear to have only the new element,
+but not the old element.
 
-Does this warrant a WARN_ON(), i.e. is this really something that should not
-happen?
+Unless you do a series of register_break_hook() and unregister_break_hook()
+calls, in which case a previously deleted structure could momentarily
+appear to already (or still) be in the list.
 
-This prints "PM domain %s" ...
+Are those the sorts of failures you are seeing?
 
-> +                               genpd->name);
+							Thanx, Paul
 
-Please also print dev_name(pdd->dev), to make debugging easier.
-
-> @@ -500,17 +583,21 @@ static int pm_genpd_runtime_suspend(struct device *dev)
->         }
->
->         /*
-> -        * If power.irq_safe is set, this routine will be run with interrupts
-> -        * off, so it can't use mutexes.
-> +        * If power.irq_safe is set, this routine may be run with
-> +        * IRQ disabled, so suspend only if the power domain is
-> +        * irq_safe.
->          */
-> -       if (dev->power.irq_safe)
-> +       WARN_ONCE(irq_safe_dev_in_no_sleep_domain(dev, genpd),
-> +                       "genpd %s will not be powered off\n", genpd->name);
-
-Does this warrant a WARN_ON(), i.e. is this really something that should not
-happen?
-
-... while this prints "genpd %s".
-
-Please also print dev_name(pdd->dev), to make debugging easier.
-
-> +       if (irq_safe_dev_in_no_sleep_domain(dev, genpd))
->                 return 0;
-
-> @@ -1280,11 +1370,18 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
->         if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(dev))
->                 return -EINVAL;
->
-> +       if (genpd->irq_safe && !dev->power.irq_safe) {
-> +               dev_err(dev,
-> +                       "PM Domain %s is IRQ safe; device has to IRQ safe.\n",
-
-... has to be IRQ safe
-
-> +                       genpd->name);
-
-The reason I'm asking about the WARN_ON()s is that both are triggered on the
-two systems I tried your series on:
-  - r8a7740/armadillo has real hardware power domains and a clock domain,
-    using the renesas,sysc-rmobile PM Domain driver,
-  - r8a7791/koelsch has a clock domain, using the renesas,cpg-mstp-clocks
-    CPG/MSTP clock domain driver.
-
-Both have renesas,cmt and/or renesas,tmu timers, which are one of the few
-existing IRQ safe devices, causing the warnings.
-
-Apart from the warnings, the system seems to work fine.
-
-Making the PM resp. Clock Domain irqsafe by setting GENPD_FLAG_IRQ_SAFE makes
-matters worse, as you cannot attach non-irq safe devices to an irq safe genpd,
-which causes the system to fail to boot.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> Yang
+> 
+> >-- Steve
+> >
+> >>
+> >>@@ -292,11 +292,11 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
+> >>  	struct break_hook *hook;
+> >>  	int (*fn)(struct pt_regs *regs, unsigned int esr) = NULL;
+> >>
+> >>-	read_lock(&break_hook_lock);
+> >>-	list_for_each_entry(hook, &break_hook, node)
+> >>+	rcu_read_lock();
+> >>+	list_for_each_entry_rcu(hook, &break_hook, node)
+> >>  		if ((esr & hook->esr_mask) == hook->esr_val)
+> >>  			fn = hook->fn;
+> >>-	read_unlock(&break_hook_lock);
+> >>+	rcu_read_unlock();
+> >>
+> >>  	return fn ? fn(regs, esr) : DBG_HOOK_ERROR;
+> >>  }
+> >
+> 
