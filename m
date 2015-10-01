@@ -1,200 +1,151 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 01 Oct 2015 10:03:21 +0100
-Subject: [PATCH] ARM,
- ARM64: Un-inlined and exported symbols of is_hyp_mode_available()
- and related functions
-In-Reply-To: <1443649252-10702-1-git-send-email-ralf@ramses-pyramidenbau.de>
-References: <1443649252-10702-1-git-send-email-ralf@ramses-pyramidenbau.de>
-Message-ID: <560CF6D9.1080403@arm.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 01 Oct 2015 18:14:51 +0900
+Subject: [RFC PATCH v8 0/10] Add external dma support for Synopsys MSHC
+In-Reply-To: <1442385625-26775-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1442385625-26775-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <560CF98B.7010609@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/15 22:40, Ralf Ramsauer wrote:
-> Hypervisors may be available as modules, but need to check if
-> HYP mode is enabled. Functions are provided for these means, but
-> are not exported to modules; in particular since __boot_cpu_mode
-> is not accessible.
+Dear, All.
+
+I will apply patch 01-03 at my repository on today.
+But i don't know better how i do about other patches relevant to config file.
+
+Best Regards,
+Jaehoon Chung
+
+On 09/16/2015 03:40 PM, Shawn Lin wrote:
+> Synopsys DesignWare mobile storage host controller supports three
+> types of transfer mode: pio, internal dma and external dma. However,
+> dw_mmc can only supports pio and internal dma now. Thus some platforms
+> using dw-mshc integrated with generic dma can't work in dma mode. So we
+> submit this patch to achieve it.
 > 
-> Instead of exporting symbol __boot_cpu_mode, un-inline
-> is_hyp_mode_available() and related functions. This has no negative
-> impact since they are never called in hot paths.
+> And the config option, CONFIG_MMC_DW_IDMAC, was added by Will Newton
+> (commit:f95f3850) for the first version of dw_mmc and never be touched since
+> then. At that time dt-bindings hadn't been introduced into dw_mmc yet means
+> we should select CONFIG_MMC_DW_IDMAC to enable internal dma mode at compile
+> time. Nowadays, device-tree helps us to support a variety of boards with one
+> kernel. That's why we need to remove it and decide the transfer mode by reading
+> dw_mmc's HCON reg at runtime.
 > 
-> Though all modified files are licensed under GPLv2, for ARM we use
-> EXPORT_SYMBOL instead of EXPORT_SYMBOL_GPL to be consistent with the
-> rest of the exports in arch/arm/kernel/setup.c.
-
-I think that's for the authors of the original code to decide.
-
+> This RFC patch needs lots of ACKs. I know it's hard, but it does need someone
+> to make the running.
 > 
-> Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
-> Signed-off-by: Wolfgang Mauerer <wolfgang.mauerer@oth-regensburg.de>
-> ---
->  arch/arm/include/asm/virt.h   | 21 +++------------------
->  arch/arm/kernel/setup.c       | 29 +++++++++++++++++++++++++++++
->  arch/arm64/include/asm/virt.h | 11 ++---------
->  arch/arm64/kernel/setup.c     | 14 ++++++++++++++
->  4 files changed, 48 insertions(+), 27 deletions(-)
+> Patch does the following things:
+> - remove CONFIG_MMC_DW_IDMAC config option
+> - add bindings for edmac used by synopsys-dw-mshc
+>   at runtime
+> - add edmac support for synopsys-dw-mshc
 > 
-> diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-> index 4371f45..37d970d 100644
-> --- a/arch/arm/include/asm/virt.h
-> +++ b/arch/arm/include/asm/virt.h
-> @@ -42,15 +42,7 @@
->   */
->  extern int __boot_cpu_mode;
->  
-> -static inline void sync_boot_mode(void)
-> -{
-> -	/*
-> -	 * As secondaries write to __boot_cpu_mode with caches disabled, we
-> -	 * must flush the corresponding cache entries to ensure the visibility
-> -	 * of their writes.
-> -	 */
-> -	sync_cache_r(&__boot_cpu_mode);
-> -}
-> +void sync_boot_mode(void);
->  
->  void __hyp_set_vectors(unsigned long phys_vector_base);
->  unsigned long __hyp_get_vectors(void);
-> @@ -63,17 +55,10 @@ unsigned long __hyp_get_vectors(void);
->  void hyp_mode_check(void);
->  
->  /* Reports the availability of HYP mode */
-> -static inline bool is_hyp_mode_available(void)
-> -{
-> -	return ((__boot_cpu_mode & MODE_MASK) == HYP_MODE &&
-> -		!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH));
-> -}
-> +bool is_hyp_mode_available(void);
->  
->  /* Check if the bootloader has booted CPUs in different modes */
-> -static inline bool is_hyp_mode_mismatched(void)
-> -{
-> -	return !!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH);
-> -}
-> +bool is_hyp_mode_mismatched(void);
->  #endif
->  
->  #endif /* __ASSEMBLY__ */
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 20edd34..c2c39f1 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -915,6 +915,35 @@ static void __init reserve_crashkernel(void)
->  static inline void reserve_crashkernel(void) {}
->  #endif /* CONFIG_KEXEC */
->  
-> +#ifdef CONFIG_ARM_VIRT_EXT
-> +void sync_boot_mode(void)
-
-Why is this function global? As far as I can see, it is only called from
-that very same file.
-
-> +{
-> +	/*
-> +	* As secondaries write to __boot_cpu_mode with caches disabled, we
-> +	* must flush the corresponding cache entries to ensure the visibility
-> +	* of their writes.
-> +	*/
-> +	sync_cache_r(&__boot_cpu_mode);
-> +}
-> +#endif
-> +
-> +#ifndef ZIMAGE
-
-What is the point of this #ifndef? setup.c is not part of the decompressor.
-
-> +/* Reports the availability of HYP mode */
-> +bool is_hyp_mode_available(void)
-> +{
-> +	return ((__boot_cpu_mode & MODE_MASK) == HYP_MODE &&
-> +		!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH));
-> +}
-> +EXPORT_SYMBOL(is_hyp_mode_available);
-> +
-> +/* Check if the bootloader has booted CPUs in different modes */
-> +bool is_hyp_mode_mismatched(void)
-> +{
-> +	return !!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH);
-> +}
-> +EXPORT_SYMBOL(is_hyp_mode_mismatched);
-> +#endif
-> +
->  void __init hyp_mode_check(void)
->  {
->  #ifdef CONFIG_ARM_VIRT_EXT
-> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-> index 7a5df52..48c6170 100644
-> --- a/arch/arm64/include/asm/virt.h
-> +++ b/arch/arm64/include/asm/virt.h
-> @@ -38,17 +38,10 @@ void __hyp_set_vectors(phys_addr_t phys_vector_base);
->  phys_addr_t __hyp_get_vectors(void);
->  
->  /* Reports the availability of HYP mode */
-> -static inline bool is_hyp_mode_available(void)
-> -{
-> -	return (__boot_cpu_mode[0] == BOOT_CPU_MODE_EL2 &&
-> -		__boot_cpu_mode[1] == BOOT_CPU_MODE_EL2);
-> -}
-> +bool is_hyp_mode_available(void);
->  
->  /* Check if the bootloader has booted CPUs in different modes */
-> -static inline bool is_hyp_mode_mismatched(void)
-> -{
-> -	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
-> -}
-> +bool is_hyp_mode_mismatched(void);
->  
->  /* The section containing the hypervisor text */
->  extern char __hyp_text_start[];
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 6bab21f..6442d70 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -62,6 +62,7 @@
->  #include <asm/traps.h>
->  #include <asm/memblock.h>
->  #include <asm/efi.h>
-> +#include <asm/virt.h>
->  #include <asm/xen/hypervisor.h>
->  
->  unsigned long elf_hwcap __read_mostly;
-> @@ -195,6 +196,19 @@ static void __init smp_build_mpidr_hash(void)
->  	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
->  }
->  
-> +bool is_hyp_mode_available(void)
-> +{
-> +	return (__boot_cpu_mode[0] == BOOT_CPU_MODE_EL2 &&
-> +		__boot_cpu_mode[1] == BOOT_CPU_MODE_EL2);
-> +}
-> +EXPORT_SYMBOL_GPL(is_hyp_mode_available);
-> +
-> +bool is_hyp_mode_mismatched(void)
-> +{
-> +	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
-> +}
-> +EXPORT_SYMBOL_GPL(is_hyp_mode_mismatched);
-> +
->  static void __init setup_processor(void)
->  {
->  	u64 features;
+> Patch is based on next of git://git.linaro.org/people/ulf.hansson/mmc
 > 
-
-My main question is "Why?". As it stands, this patch is pretty useless.
-What good does is_hyp_mode_mismatched bring to you? All you need to know
-for sure that HYP is available.
-
-And even then. You can issue an HVC and enter the HYP stubs, but this is
-a private kernel API, and we're not exporting the actually useful stuff
-(__hyp_{g,s}et_vectors).
-
-So as it stands, this looks pretty pointless. Maybe you should explain
-what you have in mind, and then we can discuss what would actually be
-useful.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Test emmc throughput on my platform with edmac support and without edmac support(pio only)
+> iozone -L64 -S32 -azecwI -+n -r4k -r64k -r128k -s1g -i0 -i1 -i2 -f datafile -Rb out.xls > /mnt/result.txt
+> (light cpu loading, Direct IO, fixed line size, all pattern recycle, 1GB data in total)
+>  ___________________________________________________________
+> |                   external dma mode                       |
+> |-----------------------------------------------------------|
+> |blksz | Random Read | Random Write | Seq Read   | Seq Write|
+> |-----------------------------------------------------------|
+> |4kB   |  13953kB/s  |    8602kB/s  | 13672kB/s  |  9785kB/s|
+> |-----------------------------------------------------------|
+> |64kB  |  46058kB/s  |   24794kB/s  | 48058kB/s  | 25418kB/s|
+> |-----------------------------------------------------------|
+> |128kB |  57026kB/s  |   35117kB/s  | 57375kB/s  | 35183kB/s|
+> |-----------------------------------------------------------|
+>                            VS
+>  ___________________________________________________________
+> |                          pio mode                         |
+> |-----------------------------------------------------------|
+> |blksz | Random Read  | Random Write | Seq Read  | Seq Write|
+> |-----------------------------------------------------------|
+> |4kB   |  11720kB/s   |    8644kB/s  | 11549kB/s |  9624kB/s|
+> |-----------------------------------------------------------|
+> |64kB  |  21869kB/s   |   24414kB/s  | 22031kB/s | 27986kB/s|
+> |-----------------------------------------------------------|
+> |128kB |  23718kB/s   |   34495kB/s  | 24698kB/s | 34637kB/s|
+> |-----------------------------------------------------------|
+> 
+> 
+> Changes in v8:
+> - remove trans_mode variable
+> - remove unnecessary dma_ops check
+> - remove unnecessary comment
+> - fix coding style based on latest ulf's next
+> - add Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+>   for HCON's changes
+> 
+> Changes in v7:
+> - rebased on Ulf's next
+> - combine condition state
+> - elaborate more about DMA_INTERFACE
+> - define some macro for DMA_INERFACE value
+> - spilt HCON ops' changes into another patch
+> 
+> Changes in v6:
+> - add trans_mode condition for IDMAC initialization
+>   suggested by Heiko
+> - re-test my patch on rk3188 platform and update commit msg
+> - update performance of pio vs edmac in cover letter
+> 
+> Changes in v5:
+> - add the title of cover letter
+> - fix typo of comment
+> - add macro for reading HCON register
+> - add "Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>" for exynos_defconfig patch
+> - add "Acked-by: Vineet Gupta <vgupta@synopsys.com>" for axs10x_defconfig patch
+> - add "Acked-by: Govindraj Raja <govindraj.raja@imgtec.com>" and
+>   "Acked-by: Ralf Baechle <ralf@linux-mips.org>" for pistachio_defconfig patch
+> - add "Acked-by: Joachim Eastwood <manabian@gmail.com>" for lpc18xx_defconfig patch
+> - add "Acked-by: Wei Xu <xuwei5@hisilicon.com>" for hisi_defconfig patch
+> - rebase on "https://github.com/jh80chung/dw-mmc.git tags/dw-mmc-for-ulf-v4.2" for merging easily
+> 
+> Changes in v4:
+> - remove "host->trans_mode" and use "host->use_dma" to indicate
+>   transfer mode.
+> - remove all bt-bindings' changes since we don't need new properities.
+> - check transfer mode at runtime by reading HCON reg
+> - spilt defconfig changes for each sub-architecture
+> - fix the title of cover letter
+> - reuse some code for reducing code size
+> 
+> Changes in v3:
+> - choose transfer mode at runtime
+> - remove all CONFIG_MMC_DW_IDMAC config option
+> - add supports-idmac property for some platforms
+> 
+> Changes in v2:
+> - Fix typo of dev_info msg
+> - remove unused dmach from declaration of dw_mci_dma_slave
+> 
+> Shawn Lin (10):
+>   mmc: dw_mmc: Add external dma interface support
+>   mmc: dw_mmc: use macro for HCON register operations
+>   Documentation: synopsys-dw-mshc: add bindings for idmac and edmac
+>   mips: pistachio_defconfig: remove CONFIG_MMC_DW_IDMAC
+>   arc: axs10x_defconfig: remove CONFIG_MMC_DW_IDMAC
+>   arm: exynos_defconfig: remove CONFIG_MMC_DW_IDMAC
+>   arm: hisi_defconfig: remove CONFIG_MMC_DW_IDMAC
+>   arm: lpc18xx_defconfig: remove CONFIG_MMC_DW_IDMAC
+>   arm: multi_v7_defconfig: remove CONFIG_MMC_DW_IDMAC
+>   arm: zx_defconfig: remove CONFIG_MMC_DW_IDMAC
+> 
+>  .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |  25 ++
+>  arch/arc/configs/axs101_defconfig                  |   1 -
+>  arch/arc/configs/axs103_defconfig                  |   1 -
+>  arch/arc/configs/axs103_smp_defconfig              |   1 -
+>  arch/arm/configs/exynos_defconfig                  |   1 -
+>  arch/arm/configs/hisi_defconfig                    |   1 -
+>  arch/arm/configs/lpc18xx_defconfig                 |   1 -
+>  arch/arm/configs/multi_v7_defconfig                |   1 -
+>  arch/arm/configs/zx_defconfig                      |   1 -
+>  arch/mips/configs/pistachio_defconfig              |   1 -
+>  drivers/mmc/host/Kconfig                           |  11 +-
+>  drivers/mmc/host/dw_mmc-pltfm.c                    |   2 +
+>  drivers/mmc/host/dw_mmc.c                          | 272 +++++++++++++++++----
+>  drivers/mmc/host/dw_mmc.h                          |   9 +
+>  include/linux/mmc/dw_mmc.h                         |  23 +-
+>  15 files changed, 276 insertions(+), 75 deletions(-)
+> 
