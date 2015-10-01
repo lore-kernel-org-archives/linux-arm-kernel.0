@@ -1,77 +1,134 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Thu, 1 Oct 2015 11:31:11 -0500
-Subject: [PATCH v8 2/2] ARM: imx: support suspend states on imx7D
-In-Reply-To: <20150919011247.GD3770@tiger>
-References: <1438378439-11569-1-git-send-email-shenwei.wang@freescale.com>
- <1438378439-11569-3-git-send-email-shenwei.wang@freescale.com>
- <20150907151106.GA30723@tiger>
- <CY1PR0301MB084344B059A4178B09E949DF83530@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <20150918141524.GC3770@tiger>
- <CY1PR0301MB0843D4E46210525521F9453483590@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <20150919011247.GD3770@tiger>
-Message-ID: <CAHrpEqQjp+iEYR3QhXhm2ak+CcZ4gyfK1JekCsVR78FE-0CfMw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 01 Oct 2015 17:33:44 +0100
+Subject: [PATCH v3 3/4] PCI/MSI: Add helper function
+ pci_msi_domain_get_msi_rid().
+In-Reply-To: <560D5B98.5050400@caviumnetworks.com>
+References: <1443653222-24924-1-git-send-email-ddaney.cavm@gmail.com>
+ <1443653222-24924-4-git-send-email-ddaney.cavm@gmail.com>
+ <560CFBDC.4020901@arm.com> <560D5B98.5050400@caviumnetworks.com>
+Message-ID: <560D6068.6030801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 8:12 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Fri, Sep 18, 2015 at 02:38:39PM +0000, Shenwei Wang wrote:
+On 01/10/15 17:13, David Daney wrote:
+> On 10/01/2015 02:24 AM, Marc Zyngier wrote:
+>> Hi David,
 >>
+>> On 30/09/15 23:47, David Daney wrote:
+>>> From: David Daney <david.daney@cavium.com>
+>>>
+>>> Add pci_msi_domain_get_msi_rid() to return the MSI requester id (RID).
+>>> Initially needed by gic-v3 based systems. It will be used by follow on
+>>> patch to drivers/irqchip/irq-gic-v3-its-pci-msi.c
+>>>
+>>> Initially supports mapping the RID via OF device tree.  In the future,
+>>> this could be extended to use ACPI _IORT tables as well.
+>>>
+>>> Signed-off-by: David Daney <david.daney@cavium.com>
+>>> ---
+>>>   drivers/pci/msi.c   | 31 +++++++++++++++++++++++++++++++
+>>>   include/linux/msi.h |  1 +
+>>>   2 files changed, 32 insertions(+)
+>>>
+>>> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+>>> index d449714..92b6dc9 100644
+>>> --- a/drivers/pci/msi.c
+>>> +++ b/drivers/pci/msi.c
+>>> @@ -20,6 +20,7 @@
+>>>   #include <linux/io.h>
+>>>   #include <linux/slab.h>
+>>>   #include <linux/irqdomain.h>
+>>> +#include <linux/of_irq.h>
+>>>
+>>>   #include "pci.h"
+>>>
+>>> @@ -1327,4 +1328,34 @@ struct irq_domain *pci_msi_create_default_irq_domain(struct device_node *node,
+>>>
+>>>   	return domain;
+>>>   }
+>>> +
+>>> +struct get_mis_id_data {
+>>> +	u32	alias;
+>>> +};
+>>> +
+>>> +static int get_msi_id_cb(struct pci_dev *pdev, u16 alias, void *data)
+>>> +{
+>>> +	struct get_mis_id_data *s = data;
+>>> +
+>>> +	s->alias = alias;
+>>> +	return 0;
+>>> +}
 >>
->> > -----Original Message-----
->> > From: Shawn Guo [mailto:shawnguo at kernel.org]
->> > Sent: 2015?9?18? 9:15
->> > To: Wang Shenwei-B38339
->> > Cc: jason at lakedaemon.net; Huang Yongcai-B20788;
->> > linux-kernel at vger.kernel.org; kernel at pengutronix.de; Sudeep Holla;
->> > tglx at linutronix.de; shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org
->> > Subject: Re: [PATCH v8 2/2] ARM: imx: support suspend states on imx7D
->> >
->> > On Tue, Sep 08, 2015 at 03:01:07PM +0000, Shenwei Wang wrote:
->> > > > >  arch/arm/mach-imx/Kconfig        |   1 +
->> > > > >  arch/arm/mach-imx/Makefile       |   2 +
->> > > > >  arch/arm/mach-imx/common.h       |   4 +
->> > > > >  arch/arm/mach-imx/pm-imx7.c      | 917
->> > > > +++++++++++++++++++++++++++++++++++++++
->> > > > >  arch/arm/mach-imx/suspend-imx7.S | 529 ++++++++++++++++++++++
->> > > > >  5 files changed, 1453 insertions(+)
->> > > >
->> > > > 1453 lines addition to kernel only for i.MX7D suspend support.  Yes,
->> > > > this is the way we support suspend on i.MX6, but that's enough, and
->> > > > we have to stop this somewhere.  I would ask you to take Sudeep's
->> > > > comment and adopt PSCI for i.MX7D power management.
->> > >
->> > > According to PSCI spec, a supervisory software must be implemented
->> > > under either
->> > > HVC(EL2) or SMC(EL3) privilege level. I agree that, with this idea, we
->> > > could finally move these 1453 lines of codes from kernel into a
->> > > platform specific firmware. The problem is we don't have the firmware
->> > > so far, and we haven't even had a plan to enable the hypervisor or
->> > > secure software on this platform. Because low power consumption is the
->> > > key feature of this i.MX7D platform, please continue to consider the current
->> > implementation and get this feature supported first.
->> >
->> > Can't U-Boot be considered as a firmware to implement PSCI?  I have seen an
->> > initial ARMv7 PSCI core support for U-Boot added by Marc Zyngier.
+>> Why not use a naked u32, since you only have a single field in this
+>> structure? Or is it that you are anticipating other fields there?
+> 
+> In this case, I think using a pointer to u32 is a good idea.  It would 
+> simplify the source code somewhat.  Although, I think the generated 
+> binary would likely be the same.  I don't foresee adding things to this 
+> structure.  If it becomes necessary in the future, we can just go back 
+> to using a pointer to a structure.
+> 
 >>
->> The current PSCI support in uboot is not complete. It can now support cpuidle, shutdown,
->> and reset. But to support system suspend, there would be a lot more tasks. For example,
->> even the current wakeup source management codes will have to move into the firmware
->> too. It is not a short time task. Please continue to consider this platform dependent implementation
->> first, meanwhile, we will start to migrate the solution to PSCI. However it will take some time.
->
-> I have zero interest to maintain this pile of code in the mainline
-> kernel.  Take it as a motivation to move to PSCI soon, or you maintain
-> it on your own as a out-of-tree patch for whatever long time you like.
->
+>>> +/**
+>>> + * pci_msi_domain_get_msi_rid - Get the MSI requester id (RID)
+>>> + * @domain:	The interrupt domain
+>>> + * @pdev:	The PCI device.
+>>> + *
+>>> + * The RID for a device is formed from the alias, with a firmware
+>>> + * supplied mapping applied
+>>> + *
+>>> + * Returns: The RID.
+>>> + */
+>>> +u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
+>>> +{
+>>> +	struct get_mis_id_data d;
+>>> +
+>>> +	d.alias = 0;
+>>> +	pci_for_each_dma_alias(pdev, get_msi_id_cb, &d);
+>>> +	return of_msi_map_rid(&pdev->dev, domain->of_node, d.alias);
+>>
+>> Should you check whether domain->of_node is NULL first? I don't think
+>> of_msi_map_rid would have any problem with that, but a domain that is
+>> not backed by an of_node makes me feel a bit uneasy and would tend to
+>> indicate that we're not using DT.
+> 
+> Yes, that makes sense.  As you observe, I think it probably works as is, 
+> but it would be good to make it more clear.  This is especially true 
+> when we add ACPI support.  We will want to be clear on which of 
+> device-tree or ACPI we are using.
+> 
+> 
+>>
+>>> +}
+>>>   #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+>>> diff --git a/include/linux/msi.h b/include/linux/msi.h
+>>> index ad939d0..56e3b76 100644
+>>> --- a/include/linux/msi.h
+>>> +++ b/include/linux/msi.h
+>>> @@ -293,6 +293,7 @@ irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
+>>>   					  struct msi_desc *desc);
+>>>   int pci_msi_domain_check_cap(struct irq_domain *domain,
+>>>   			     struct msi_domain_info *info, struct device *dev);
+>>> +u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev);
+>>>   #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+>>>
+>>>   #endif /* LINUX_MSI_H */
+>>>
+>>
+>> Otherwise looks good to me.
+> 
+> I will send what I hope is the final revision of the patches later today.
 
-Does it means that SMP support also need go through PSCI?
+Excellent. In related news, I've rebased my msi-parent stuff on top of
+this series, and extended it to also deal with msi-map for matching MSI
+domains.
 
-best regards
-Frank Li
+With the two series, we should now have something vaguely coherent that
+deals with both the old version of msi-parent, its new definition, and
+msi-map in its whole glory. Fun times!
 
-> Shawn
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
