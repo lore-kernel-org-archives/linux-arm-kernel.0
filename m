@@ -1,93 +1,225 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu,  1 Oct 2015 13:47:19 +0100
-Subject: [PATCH v3 6/6] arm/arm64: KVM: only allow 64bit hosts to build VGICv3
+Date: Thu,  1 Oct 2015 13:47:15 +0100
+Subject: [PATCH v3 2/6] arm64: GICv3: change unsigned types for AArch32
+ compatibility
 In-Reply-To: <1443703639-3730-1-git-send-email-jean-philippe.brucker@arm.com>
 References: <1443703639-3730-1-git-send-email-jean-philippe.brucker@arm.com>
-Message-ID: <1443703639-3730-7-git-send-email-jean-philippe.brucker@arm.com>
+Message-ID: <1443703639-3730-3-git-send-email-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hardware virtualisation of GICv3 is only supported by 64bit hosts for
-the moment. Some VGICv3 bits are missing from the 32bit side, and this
-patch allows to still be able to build 32bit hosts when CONFIG_ARM_GIC_V3
-is selected.
+This patch does a few simple compatibility-related changes:
+- change the system register access prototypes to their actual size,
+- homogenise mpidr accesses with unsigned long,
+- force the 64bit register values to unsigned long long.
 
-To this end, we introduce a new option, CONFIG_KVM_ARM_VGIC_V3, that is
-only enabled on the 64bit side. The selection is done unconditionally
-because CONFIG_ARM_GIC_V3 is always enabled on arm64.
+Note: the list registers are 64bit on GICv3, but the AArch32 vGIC driver
+will need to split their values into two 32bit registers: LRn and LRCn.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- arch/arm64/kvm/Kconfig |    4 ++++
- include/kvm/arm_vgic.h |    4 ++--
- virt/kvm/arm/vgic.c    |    4 ++--
- 3 files changed, 8 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/arch_gicv3.h |   35 ++++++++++++++++++++---------------
+ drivers/irqchip/irq-gic-v3.c        |   25 ++++++++++++-------------
+ include/linux/irqchip/arm-gic-v3.h  |   18 +++++++++---------
+ 3 files changed, 41 insertions(+), 37 deletions(-)
 
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index 5c7e920..ff5292c 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -16,6 +16,9 @@ menuconfig VIRTUALIZATION
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index e6b68a8..bd8f005 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -78,21 +78,26 @@
  
- if VIRTUALIZATION
+ #include <linux/stringify.h>
  
-+config KVM_ARM_VGIC_V3
-+	bool
-+
- config KVM
- 	bool "Kernel-based Virtual Machine (KVM) support"
- 	depends on OF
-@@ -31,6 +34,7 @@ config KVM
- 	select KVM_VFIO
- 	select HAVE_KVM_EVENTFD
- 	select HAVE_KVM_IRQFD
-+	select KVM_ARM_VGIC_V3
- 	---help---
- 	  Support hosting virtualized guest machines.
+-/* Low level accessors */
++/*
++ * Low-level accessors
++ *
++ * These system registers are 32 bits, but we make sure that the compiler
++ * sets the GP register's most significant bits to 0 with an explicit cast.
++ */
  
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 4e14dac..6a3538e 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -282,7 +282,7 @@ struct vgic_v2_cpu_if {
+-static inline void gic_write_eoir(u64 irq)
++static inline void gic_write_eoir(u32 irq)
+ {
+-	asm volatile("msr_s " __stringify(ICC_EOIR1_EL1) ", %0" : : "r" (irq));
++	asm volatile("msr_s " __stringify(ICC_EOIR1_EL1) ", %0" : : "r" ((u64)irq));
+ 	isb();
+ }
+ 
+-static inline void gic_write_dir(u64 irq)
++static inline void gic_write_dir(u32 irq)
+ {
+-	asm volatile("msr_s " __stringify(ICC_DIR_EL1) ", %0" : : "r" (irq));
++	asm volatile("msr_s " __stringify(ICC_DIR_EL1) ", %0" : : "r" ((u64)irq));
+ 	isb();
+ }
+ 
+-static inline u64 gic_read_iar(void)
++static inline u32 gic_read_iar(void)
+ {
+ 	u64 irqstat;
+ 
+@@ -100,20 +105,20 @@ static inline u64 gic_read_iar(void)
+ 	return irqstat;
+ }
+ 
+-static inline void gic_write_pmr(u64 val)
++static inline void gic_write_pmr(u32 val)
+ {
+-	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
++	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" ((u64)val));
+ }
+ 
+-static inline void gic_write_ctlr(u64 val)
++static inline void gic_write_ctlr(u32 val)
+ {
+-	asm volatile("msr_s " __stringify(ICC_CTLR_EL1) ", %0" : : "r" (val));
++	asm volatile("msr_s " __stringify(ICC_CTLR_EL1) ", %0" : : "r" ((u64)val));
+ 	isb();
+ }
+ 
+-static inline void gic_write_grpen1(u64 val)
++static inline void gic_write_grpen1(u32 val)
+ {
+-	asm volatile("msr_s " __stringify(ICC_GRPEN1_EL1) ", %0" : : "r" (val));
++	asm volatile("msr_s " __stringify(ICC_GRPEN1_EL1) ", %0" : : "r" ((u64)val));
+ 	isb();
+ }
+ 
+@@ -122,7 +127,7 @@ static inline void gic_write_sgi1r(u64 val)
+ 	asm volatile("msr_s " __stringify(ICC_SGI1R_EL1) ", %0" : : "r" (val));
+ }
+ 
+-static inline u64 gic_read_sre(void)
++static inline u32 gic_read_sre(void)
+ {
+ 	u64 val;
+ 
+@@ -130,9 +135,9 @@ static inline u64 gic_read_sre(void)
+ 	return val;
+ }
+ 
+-static inline void gic_write_sre(u64 val)
++static inline void gic_write_sre(u32 val)
+ {
+-	asm volatile("msr_s " __stringify(ICC_SRE_EL1) ", %0" : : "r" (val));
++	asm volatile("msr_s " __stringify(ICC_SRE_EL1) ", %0" : : "r" ((u64)val));
+ 	isb();
+ }
+ 
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index a08eda8..0fb8d6d 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -327,11 +327,11 @@ static int gic_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu)
+ 	return 0;
+ }
+ 
+-static u64 gic_mpidr_to_affinity(u64 mpidr)
++static u64 gic_mpidr_to_affinity(unsigned long mpidr)
+ {
+ 	u64 aff;
+ 
+-	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 32 |
++	aff = ((u64)MPIDR_AFFINITY_LEVEL(mpidr, 3) << 32 |
+ 	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
+ 	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8  |
+ 	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
+@@ -341,7 +341,7 @@ static u64 gic_mpidr_to_affinity(u64 mpidr)
+ 
+ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+ {
+-	u64 irqnr;
++	u32 irqnr;
+ 
+ 	do {
+ 		irqnr = gic_read_iar();
+@@ -405,7 +405,7 @@ static void __init gic_dist_init(void)
+ 
+ static int gic_populate_rdist(void)
+ {
+-	u64 mpidr = cpu_logical_map(smp_processor_id());
++	unsigned long mpidr = cpu_logical_map(smp_processor_id());
+ 	u64 typer;
+ 	u32 aff;
+ 	int i;
+@@ -436,10 +436,9 @@ static int gic_populate_rdist(void)
+ 				u64 offset = ptr - gic_data.redist_regions[i].redist_base;
+ 				gic_data_rdist_rd_base() = ptr;
+ 				gic_data_rdist()->phys_base = gic_data.redist_regions[i].phys_base + offset;
+-				pr_info("CPU%d: found redistributor %llx region %d:%pa\n",
+-					smp_processor_id(),
+-					(unsigned long long)mpidr,
+-					i, &gic_data_rdist()->phys_base);
++				pr_info("CPU%d: found redistributor %lx region %d:%pa\n",
++					smp_processor_id(), mpidr, i,
++					&gic_data_rdist()->phys_base);
+ 				return 0;
+ 			}
+ 
+@@ -454,8 +453,8 @@ static int gic_populate_rdist(void)
+ 	}
+ 
+ 	/* We couldn't even deal with ourselves... */
+-	WARN(true, "CPU%d: mpidr %llx has no re-distributor!\n",
+-	     smp_processor_id(), (unsigned long long)mpidr);
++	WARN(true, "CPU%d: mpidr %lx has no re-distributor!\n",
++	     smp_processor_id(), mpidr);
+ 	return -ENODEV;
+ }
+ 
+@@ -525,10 +524,10 @@ static struct notifier_block gic_cpu_notifier = {
  };
  
- struct vgic_v3_cpu_if {
--#ifdef CONFIG_ARM_GIC_V3
-+#ifdef CONFIG_KVM_ARM_VGIC_V3
- 	u32		vgic_hcr;
- 	u32		vgic_vmcr;
- 	u32		vgic_sre;	/* Restored only, change ignored */
-@@ -364,7 +364,7 @@ void kvm_vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
- int vgic_v2_probe(struct device_node *vgic_node,
- 		  const struct vgic_ops **ops,
- 		  const struct vgic_params **params);
--#ifdef CONFIG_ARM_GIC_V3
-+#ifdef CONFIG_KVM_ARM_VGIC_V3
- int vgic_v3_probe(struct device_node *vgic_node,
- 		  const struct vgic_ops **ops,
- 		  const struct vgic_params **params);
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 6bd1c9b..77b0176 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -2122,7 +2122,7 @@ static int init_vgic_model(struct kvm *kvm, int type)
- 	case KVM_DEV_TYPE_ARM_VGIC_V2:
- 		vgic_v2_init_emulation(kvm);
- 		break;
--#ifdef CONFIG_ARM_GIC_V3
-+#ifdef CONFIG_KVM_ARM_VGIC_V3
- 	case KVM_DEV_TYPE_ARM_VGIC_V3:
- 		vgic_v3_init_emulation(kvm);
- 		break;
-@@ -2284,7 +2284,7 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
- 		block_size = KVM_VGIC_V2_CPU_SIZE;
- 		alignment = SZ_4K;
- 		break;
--#ifdef CONFIG_ARM_GIC_V3
-+#ifdef CONFIG_KVM_ARM_VGIC_V3
- 	case KVM_VGIC_V3_ADDR_TYPE_DIST:
- 		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
- 		addr_ptr = &vgic->vgic_dist_base;
+ static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
+-				   u64 cluster_id)
++				   unsigned long cluster_id)
+ {
+ 	int cpu = *base_cpu;
+-	u64 mpidr = cpu_logical_map(cpu);
++	unsigned long mpidr = cpu_logical_map(cpu);
+ 	u16 tlist = 0;
+ 
+ 	while (cpu < nr_cpu_ids) {
+@@ -589,7 +588,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 	smp_wmb();
+ 
+ 	for_each_cpu(cpu, mask) {
+-		u64 cluster_id = cpu_logical_map(cpu) & ~0xffUL;
++		unsigned long cluster_id = cpu_logical_map(cpu) & ~0xffUL;
+ 		u16 tlist;
+ 
+ 		tlist = gic_compute_target_list(&cpu, mask, cluster_id);
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 5ab6e37..47663c6 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -264,16 +264,16 @@
+ /*
+  * Hypervisor interface registers (SRE only)
+  */
+-#define ICH_LR_VIRTUAL_ID_MASK		((1UL << 32) - 1)
+-
+-#define ICH_LR_EOI			(1UL << 41)
+-#define ICH_LR_GROUP			(1UL << 60)
+-#define ICH_LR_HW			(1UL << 61)
+-#define ICH_LR_STATE			(3UL << 62)
+-#define ICH_LR_PENDING_BIT		(1UL << 62)
+-#define ICH_LR_ACTIVE_BIT		(1UL << 63)
++#define ICH_LR_VIRTUAL_ID_MASK		((1ULL << 32) - 1)
++
++#define ICH_LR_EOI			(1ULL << 41)
++#define ICH_LR_GROUP			(1ULL << 60)
++#define ICH_LR_HW			(1ULL << 61)
++#define ICH_LR_STATE			(3ULL << 62)
++#define ICH_LR_PENDING_BIT		(1ULL << 62)
++#define ICH_LR_ACTIVE_BIT		(1ULL << 63)
+ #define ICH_LR_PHYS_ID_SHIFT		32
+-#define ICH_LR_PHYS_ID_MASK		(0x3ffUL << ICH_LR_PHYS_ID_SHIFT)
++#define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
+ 
+ #define ICH_MISR_EOI			(1 << 0)
+ #define ICH_MISR_U			(1 << 1)
 -- 
 1.7.9.5
