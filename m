@@ -1,29 +1,47 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 01 Oct 2015 17:17:07 +1000
-Subject: [PATCH v5 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <CAFpQJXXKcwks0iZN+3B=U0-9uYKFpAXcZE90GCHN9WyM45Hdpw@mail.gmail.com>
-References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
- <20150828123228.GE31748@leverpostej>
- <CAFpQJXWzM644KsFWP9ei-k6gWgNVpBVT+UbY7NYdyfmyL=zMkw@mail.gmail.com>
- <CAFpQJXWFx2dQ_vv0POqkOiLe3eh9Ee=Sf+2Xx_08Vp=E4g6gLQ@mail.gmail.com>
- <20150930105331.GA10066@leverpostej>
- <CAFpQJXVegqortRLK+g7_9p82KMYwq0hg8n3_9bJqjGHsJvngaA@mail.gmail.com>
- <1443661547.2828.40.camel@kernel.crashing.org>
- <CAFpQJXXKcwks0iZN+3B=U0-9uYKFpAXcZE90GCHN9WyM45Hdpw@mail.gmail.com>
-Message-ID: <1443683827.2828.46.camel@kernel.crashing.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 1 Oct 2015 09:24:15 +0200
+Subject: [PATCH 30/31] ARM: shmobile: r8a7791: add USB-DMAC device nodes
+In-Reply-To: <SG2PR06MB0919932925BB68EC82538044D84D0@SG2PR06MB0919.apcprd06.prod.outlook.com>
+References: <cover.1431565427.git.horms+renesas@verge.net.au>
+ <e3e25edc1116ebf44b1813aff03b02b7737d41ca.1431565427.git.horms+renesas@verge.net.au>
+ <560B11FF.3010305@cogentembedded.com>
+ <SG2PR06MB0919932925BB68EC82538044D84D0@SG2PR06MB0919.apcprd06.prod.outlook.com>
+Message-ID: <CAMuHMdVfmOifVdW2a4Ai2-T4WZPFd5d+OtNHhVhD9g+CF1zgxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-10-01 at 10:41 +0530, Ganapatrao Kulkarni wrote:
-> i still could not represent the ring/mesh numa topology using
-> associativity, which will be present in other upcoming arm64
-> platforms.
+Hi Shimoda-san,
 
-Right. It should be possible to represent it using the multiple list as
-a multi-path problem, but it's a bit awkward.
+On Wed, Sep 30, 2015 at 11:06 AM, Yoshihiro Shimoda
+<yoshihiro.shimoda.uh@renesas.com> wrote:
+>> Sent: Wednesday, September 30, 2015 7:35 AM
+>>     When the USB-DMAC driver is enabled, this causes kernel oops on at least
+>> the R8A7791 Henninger/Porter boards (haven't checked the others yet) with
+>> renesas-devel-20150928-v4.3-rc3 and even earlier tag. The oops can only be
+>> seen with the earlyprintk=serial kernel parameter, otherwise the kernel just
+>> hangs with a blank console.
+>>
+>> Unable to handle kernel NULL pointer dereference at virtual address 00000014
 
-It does look like the representation might not work well for that case
+>> [<c027f0cc>] (usb_dmac_chan_halt) from [<c027f1c8>] (usb_dmac_runtime_suspend+0)
+>>   r5:eebdaf50 r4:00000001
+>> [<c027f19c>] (usb_dmac_runtime_suspend) from [<c02d60e0>] (pm_generic_runtime_s)
+>>   r6:00000000 r5:c02ddfc4 r4:ee93d810 r3:c027f19c
 
-Cheers,
-Ben.
+> I'm not sure but I am guessing this issue related runtime PM? (suspend)
+> I checked the usb-dmac driver roughly, and if the usb_dmac_runtime_suspend()
+> is called before usb_dmac_chan_probe() runs, it might happen because dmac->iomem is NULL.
+
+That's exactly what's happening. Reproduced with CONFIG_PREEMPT=y (thanks
+Sergei), and patch sent.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
