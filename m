@@ -1,166 +1,179 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  1 Oct 2015 14:18:20 +0200
-Subject: [PATCH v2 1/2] arm64: use ENDPIPROC() to annotate position
- independent assembler routines
-In-Reply-To: <1443701901-17625-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1443701901-17625-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1443701901-17625-2-git-send-email-ard.biesheuvel@linaro.org>
+From: lee@kernel.org (Lee Jones)
+Date: Thu, 1 Oct 2015 13:25:55 +0100
+Subject: [PATCH v3 4/4] ARM: bcm2835: Switch to using the new clock
+ driver support.
+In-Reply-To: <1443475325-22270-4-git-send-email-eric@anholt.net>
+References: <1443475325-22270-1-git-send-email-eric@anholt.net>
+ <1443475325-22270-4-git-send-email-eric@anholt.net>
+Message-ID: <20151001122555.GV3214@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For more control over which functions are called with the MMU off or
-with the UEFI 1:1 mapping active, annotate some assembler routines as
-position independent. This is done by introducing ENDPIPROC(), which
-replaces the ENDPROC() declaration of those routines.
+On Mon, 28 Sep 2015, Eric Anholt wrote:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/assembler.h | 11 +++++++++++
- arch/arm64/lib/memchr.S            |  2 +-
- arch/arm64/lib/memcmp.S            |  2 +-
- arch/arm64/lib/memcpy.S            |  2 +-
- arch/arm64/lib/memmove.S           |  2 +-
- arch/arm64/lib/memset.S            |  2 +-
- arch/arm64/lib/strlen.S            |  2 +-
- arch/arm64/lib/strncmp.S           |  2 +-
- arch/arm64/mm/cache.S              | 10 +++++-----
- 9 files changed, 23 insertions(+), 12 deletions(-)
+> This will give us the ability to set the pixel and HDMI state machine
+> clocks for the VC4 KMS driver, change the CPU frequency, and
+> potentially gate clocks in the future (once we also write a power
+> domain driver).  It also gives the uart an explicit clock reference,
+> so that we don't need to change the physical addresses of the old
+> fixed clk_bcm2835.c clocks for Raspberry Pi 2 port.
+> 
+> Two clocks get their frequencies updated as a result of this.  One is
+> uart's apb_pclk, which was previously accidentally grabbing the fixed
+> uart0_pclk due to the apb_pclk not having clk_register_clkdev()
+> called.  The uart doesn't seem to do anything with apb_pclk other than
+> make sure it's on, so that appears safe (also, as far as I can see,
+> the apb clock is actually the same as the VPU clock).  The other is
+> EMMC, which according to the docs was supposed to be in the 50-100Mhz
+> range, but it turns out the firmware needed to change to running it at
+> the 250Mhz core clock speed to avoid a bug in clock domain crossing.
+> 
+> Additionally, anything using BCM2835_CLOCK_VPU will now have a correct
+> clock rate if the user configures the boot-time core clock speed using
+> config.txt.
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> ---
+>  arch/arm/boot/dts/bcm2835.dtsi | 52 +++++++++++++++++++++++-------------------
+>  1 file changed, 28 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index b51f2cc22ca9..12eff928ef8b 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -193,4 +193,15 @@ lr	.req	x30		// link register
- 	str	\src, [\tmp, :lo12:\sym]
- 	.endm
- 
-+/*
-+ * Annotate a function as position independent, i.e., safe to be called before
-+ * the kernel virtual mapping is activated.
-+ */
-+#define ENDPIPROC(x)			\
-+	.globl	__pi_##x;		\
-+	.type 	__pi_##x, %function;	\
-+	.set	__pi_##x, x;		\
-+	.size	__pi_##x, . - x;	\
-+	ENDPROC(x)
-+
- #endif	/* __ASM_ASSEMBLER_H */
-diff --git a/arch/arm64/lib/memchr.S b/arch/arm64/lib/memchr.S
-index 8636b7549163..4444c1d25f4b 100644
---- a/arch/arm64/lib/memchr.S
-+++ b/arch/arm64/lib/memchr.S
-@@ -41,4 +41,4 @@ ENTRY(memchr)
- 	ret
- 2:	mov	x0, #0
- 	ret
--ENDPROC(memchr)
-+ENDPIPROC(memchr)
-diff --git a/arch/arm64/lib/memcmp.S b/arch/arm64/lib/memcmp.S
-index 6ea0776ba6de..ffbdec00327d 100644
---- a/arch/arm64/lib/memcmp.S
-+++ b/arch/arm64/lib/memcmp.S
-@@ -255,4 +255,4 @@ CPU_LE( rev	data2, data2 )
- .Lret0:
- 	mov	result, #0
- 	ret
--ENDPROC(memcmp)
-+ENDPIPROC(memcmp)
-diff --git a/arch/arm64/lib/memcpy.S b/arch/arm64/lib/memcpy.S
-index 8a9a96d3ddae..5d6ddb74454d 100644
---- a/arch/arm64/lib/memcpy.S
-+++ b/arch/arm64/lib/memcpy.S
-@@ -198,4 +198,4 @@ ENTRY(memcpy)
- 	tst	count, #0x3f
- 	b.ne	.Ltail63
- 	ret
--ENDPROC(memcpy)
-+ENDPIPROC(memcpy)
-diff --git a/arch/arm64/lib/memmove.S b/arch/arm64/lib/memmove.S
-index 57b19ea2dad4..68e2f2035e23 100644
---- a/arch/arm64/lib/memmove.S
-+++ b/arch/arm64/lib/memmove.S
-@@ -194,4 +194,4 @@ ENTRY(memmove)
- 	tst	count, #0x3f
- 	b.ne	.Ltail63
- 	ret
--ENDPROC(memmove)
-+ENDPIPROC(memmove)
-diff --git a/arch/arm64/lib/memset.S b/arch/arm64/lib/memset.S
-index 7c72dfd36b63..29f405f08792 100644
---- a/arch/arm64/lib/memset.S
-+++ b/arch/arm64/lib/memset.S
-@@ -213,4 +213,4 @@ ENTRY(memset)
- 	ands	count, count, zva_bits_x
- 	b.ne	.Ltail_maybe_long
- 	ret
--ENDPROC(memset)
-+ENDPIPROC(memset)
-diff --git a/arch/arm64/lib/strlen.S b/arch/arm64/lib/strlen.S
-index 987b68b9ce44..55ccc8e24c08 100644
---- a/arch/arm64/lib/strlen.S
-+++ b/arch/arm64/lib/strlen.S
-@@ -123,4 +123,4 @@ CPU_LE( lsr	tmp2, tmp2, tmp1 )	/* Shift (tmp1 & 63).  */
- 	csinv	data1, data1, xzr, le
- 	csel	data2, data2, data2a, le
- 	b	.Lrealigned
--ENDPROC(strlen)
-+ENDPIPROC(strlen)
-diff --git a/arch/arm64/lib/strncmp.S b/arch/arm64/lib/strncmp.S
-index 0224cf5a5533..e267044761c6 100644
---- a/arch/arm64/lib/strncmp.S
-+++ b/arch/arm64/lib/strncmp.S
-@@ -307,4 +307,4 @@ CPU_BE( orr	syndrome, diff, has_nul )
- .Lret0:
- 	mov	result, #0
- 	ret
--ENDPROC(strncmp)
-+ENDPIPROC(strncmp)
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index eb48d5df4a0f..cfa44a6adc0a 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -98,7 +98,7 @@ ENTRY(__flush_dcache_area)
- 	b.lo	1b
- 	dsb	sy
- 	ret
--ENDPROC(__flush_dcache_area)
-+ENDPIPROC(__flush_dcache_area)
- 
- /*
-  *	__inval_cache_range(start, end)
-@@ -131,7 +131,7 @@ __dma_inv_range:
- 	b.lo	2b
- 	dsb	sy
- 	ret
--ENDPROC(__inval_cache_range)
-+ENDPIPROC(__inval_cache_range)
- ENDPROC(__dma_inv_range)
- 
- /*
-@@ -171,7 +171,7 @@ ENTRY(__dma_flush_range)
- 	b.lo	1b
- 	dsb	sy
- 	ret
--ENDPROC(__dma_flush_range)
-+ENDPIPROC(__dma_flush_range)
- 
- /*
-  *	__dma_map_area(start, size, dir)
-@@ -184,7 +184,7 @@ ENTRY(__dma_map_area)
- 	cmp	w2, #DMA_FROM_DEVICE
- 	b.eq	__dma_inv_range
- 	b	__dma_clean_range
--ENDPROC(__dma_map_area)
-+ENDPIPROC(__dma_map_area)
- 
- /*
-  *	__dma_unmap_area(start, size, dir)
-@@ -197,4 +197,4 @@ ENTRY(__dma_unmap_area)
- 	cmp	w2, #DMA_TO_DEVICE
- 	b.ne	__dma_inv_range
- 	ret
--ENDPROC(__dma_unmap_area)
-+ENDPIPROC(__dma_unmap_area)
--- 
-1.9.1
+Couple of small nits.
+
+> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+> index 301c73f..a6a55b7 100644
+> --- a/arch/arm/boot/dts/bcm2835.dtsi
+> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+> @@ -1,4 +1,5 @@
+>  #include <dt-bindings/pinctrl/bcm2835.h>
+> +#include <dt-bindings/clock/bcm2835.h>
+>  #include "skeleton.dtsi"
+>  
+>  / {
+> @@ -21,6 +22,10 @@
+>  			compatible = "brcm,bcm2835-system-timer";
+>  			reg = <0x7e003000 0x1000>;
+>  			interrupts = <1 0>, <1 1>, <1 2>, <1 3>;
+> +			/* This could be a reference to BCM2835_CLOCK_TIMER,
+> +			 * but we don't have the driver using the common clock
+> +			 * support yet.
+> +			 */
+
+Nit: Please use correct multi-line comment formatting.
+
+>From Documentation/CodingStyle:
+
+/*
+ * This is the preferred style for multi-line
+ * comments in the Linux kernel source code.
+ * Please use it consistently.
+ *
+ * Description:  A column of asterisks on the left side,
+ * with beginning and ending almost-blank lines.
+ */
+
+>  			clock-frequency = <1000000>;
+>  		};
+>  
+> @@ -57,6 +62,17 @@
+>  			reg = <0x7e100000 0x28>;
+>  		};
+>  
+> +		clocks: cprman at 7e101000 {
+> +			compatible = "brcm,bcm2835-cprman";
+> +			#clock-cells = <1>;
+> +			reg = <0x7e101000 0x2000>;
+> +
+> +			/* CPRMAN derives everything from the platform's
+> +			 * oscillator.
+> +			 */
+
+As above.
+
+> +			clocks = <&clk_osc>;
+> +		};
+> +
+>  		rng at 7e104000 {
+>  			compatible = "brcm,bcm2835-rng";
+>  			reg = <0x7e104000 0x10>;
+> @@ -96,7 +112,9 @@
+>  			compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
+>  			reg = <0x7e201000 0x1000>;
+>  			interrupts = <2 25>;
+> -			clock-frequency = <3000000>;
+> +			clocks = <&clocks BCM2835_CLOCK_UART>,
+> +				 <&clocks BCM2835_CLOCK_VPU>;
+> +			clock-names = "uartclk", "apb_pclk";
+>  			arm,primecell-periphid = <0x00241011>;
+>  		};
+>  
+> @@ -115,7 +133,7 @@
+>  			compatible = "brcm,bcm2835-spi";
+>  			reg = <0x7e204000 0x1000>;
+>  			interrupts = <2 22>;
+> -			clocks = <&clk_spi>;
+> +			clocks = <&clocks BCM2835_CLOCK_VPU>;
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  			status = "disabled";
+> @@ -125,7 +143,7 @@
+>  			compatible = "brcm,bcm2835-i2c";
+>  			reg = <0x7e205000 0x1000>;
+>  			interrupts = <2 21>;
+> -			clocks = <&clk_i2c>;
+> +			clocks = <&clocks BCM2835_CLOCK_VPU>;
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  			status = "disabled";
+> @@ -135,7 +153,7 @@
+>  			compatible = "brcm,bcm2835-sdhci";
+>  			reg = <0x7e300000 0x100>;
+>  			interrupts = <2 30>;
+> -			clocks = <&clk_mmc>;
+> +			clocks = <&clocks BCM2835_CLOCK_EMMC>;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -143,7 +161,7 @@
+>  			compatible = "brcm,bcm2835-i2c";
+>  			reg = <0x7e804000 0x1000>;
+>  			interrupts = <2 21>;
+> -			clocks = <&clk_i2c>;
+> +			clocks = <&clocks BCM2835_CLOCK_VPU>;
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  			status = "disabled";
+> @@ -165,28 +183,14 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  
+> -		clk_mmc: clock at 0 {
+> -			compatible = "fixed-clock";
+> -			reg = <0>;
+> -			#clock-cells = <0>;
+> -			clock-output-names = "mmc";
+> -			clock-frequency = <100000000>;
+> -		};
+> -
+> -		clk_i2c: clock at 1 {
+> +		/* The oscillator is the root of the clock tree. */
+> +		clk_osc: clock at 3 {
+>  			compatible = "fixed-clock";
+> -			reg = <1>;
+> +			reg = <3>;
+>  			#clock-cells = <0>;
+> -			clock-output-names = "i2c";
+> -			clock-frequency = <250000000>;
+> +			clock-output-names = "osc";
+> +			clock-frequency = <19200000>;
+>  		};
+>  
+> -		clk_spi: clock at 2 {
+> -			compatible = "fixed-clock";
+> -			reg = <2>;
+> -			#clock-cells = <0>;
+> -			clock-output-names = "spi";
+> -			clock-frequency = <250000000>;
+> -		};
+>  	};
+>  };
