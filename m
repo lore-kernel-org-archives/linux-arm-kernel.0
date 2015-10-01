@@ -1,49 +1,83 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 30 Sep 2015 16:58:43 -0700
-Subject: [PATCH] ARM: dts: Add Exynos5250 Snow Rev5+ support
-In-Reply-To: <560C73EC.40608@samsung.com>
-References: <1443527855-434-1-git-send-email-javier@osg.samsung.com>
- <560B2D29.5060707@samsung.com>
- <CAD=FV=VfGeWdynFd+5YqnRGn+jsC0G_2VhTm1FKsR5o2WpcH1A@mail.gmail.com>
- <560C73EC.40608@samsung.com>
-Message-ID: <CAD=FV=WmqDSbnA8OWL00WS-qc9A4wCpkgxHhLBW3qEE=SkzupA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 30 Sep 2015 17:51:56 -0700
+Subject: [PATCH v2 4/9] clk: rockchip: add new clock type and controller
+ for rk3036
+In-Reply-To: <4123121.bNYOPIrL2s@diego>
+References: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
+ <2850967.rjRj3AZerS@diego> <20150922231900.GL23081@codeaurora.org>
+ <4123121.bNYOPIrL2s@diego>
+Message-ID: <20151001005156.GA19319@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/01, Heiko St?bner wrote:
+> Hi Stephen,
+> 
+> Am Dienstag, 22. September 2015, 16:19:00 schrieb Stephen Boyd:
+> > On 09/23, Heiko St?bner wrote:
+> > > Am Dienstag, 22. September 2015, 15:41:25 schrieb Stephen Boyd:
+> > > > On 09/17, Xing Zheng wrote:
+> > > > > +{
+> > > > > +	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
+> > > > > +	const struct rockchip_pll_rate_table *rate;
+> > > > > +	unsigned int fbdiv, postdiv1, refdiv, postdiv2, dsmpd, frac;
+> > > > > +	unsigned long drate;
+> > > > > +	u32 pllcon;
+> > > > > +
+> > > > > +	if (!(pll->flags & ROCKCHIP_PLL_SYNC_RATE))
+> > > > > +		return;
+> > > > 
+> > > > I don't understand what this one does though. This check isn't in
+> > > > the set rate ops.
+> > > 
+> > > And it shouldn't be :-)
+> > > 
+> > > The issue this whole thing is trying to solve is aligning the pll settings
+> > > which what we have in the rate table, not what the bootloader set.
+> > > 
+> > > For example the bootloader could set up a pll at 594MHz with one set of
+> > > parameters and after some time - when you don't want to exchange
+> > > bootloaders on shipping devices anymore - it comes to light that a
+> > > different set of parameters for the same frequency produces for example a
+> > > more stable hdmi signal [I think that was the main reason for the initial
+> > > change].
+> > > 
+> > > So we're not changing the frequency x -> y, which could be easily done
+> > > [and is done already] via assigned-rates, but instead
+> > > 
+> > > 	x {params a,b,c} -> x {params d,e,f}
+> > > 
+> > > so the rate itself stays the same, only the frequency generation is
+> > > adapted.
+> > Ok. It would be nice if this sort of information was made into a
+> > comment and put in the code. Or at least the commit text for the
+> > change.
+> > 
+> > And is there any reason that we need to get the parent clock and
+> > parent rate to align the PLL settings?
+> > It would be nice if we
+> > avoided using clk_* APIs in here, by extracting the pll set rate
+> > code into another function that we can call from init to make the
+> > values the same without all the fallback to old rates, etc.
+> 
+> I guess you want Xing Zheng to change his pll code somewhat like the
+> following, right? While starting off as proof-of-concept, that change
+> below actually does work quite nicely on rk3288 boards.
+> 
+> ---------------- 8< --------------------
+> From: Heiko Stuebner <heiko@sntech.de>
+> Subject: [PATCH] clk: rockchip: don't use clk_ APIs in the pll init-callback
+> 
+> Separate the update of pll registers from the actual set_rate function
+> so that the init callback does not need to access clk-API functions.
+> 
+> As we now have separated the getting and setting of the pll parameters
+> we can also directly use these new functions in other places too.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-On Wed, Sep 30, 2015 at 4:44 PM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
->> Switching the default meaning of "google,snow" to Rev5 is probably not
->> something we'd ever want to do, since it could confuse "rev3" boards
->> (which should be serviced by the rev4 dts).  From comments in the
->> Chrome OS tree:
->>
->> In the "rev4" DTS:
->>          * - Any real rev 0-3 boards in the field will match "google,snow",
->>          *   since older U-Boots don't look for a revision specific device tree.
->>          * - Any real rev 4 boards in the field will match "google,snow-rev4"
->>          *   first.  If that's not present they will pick the first
->>          *   "google,snow" device tree that they find (ignoring the kernel
->>          *   ordering).
->>
->> In the "rev5" DTS:
->>          * - Purposely don't add "google,snow" so old firmware (which didn't
->>          *   include a -revN suffix) won't pick this one.
->
-> These are requirements written somewhere in the downstream tree... not
-> in upstream. Have in mind that someone may not be using Chrome OS on
-> Chromebook but custom U-Boot and different distro.
->
-> You cannot expect that everyone will new some requirements of some
-> downstream OS. If you need such requirements, write them in bindings
-> documentation *in the upstream*.
+Yep, it looks much better this way.
 
-Agreed, which is why I bring it up here.  I think Javier wasn't aware
-of these when he sent up his patch.  I believe when he adds the
-bindings docs he'll put this information.
-
-Previously rev5 wasn't supported upstream and I believe rev5 didn't
-even exist when the upstream stuff was submitted.
-
--Doug
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
