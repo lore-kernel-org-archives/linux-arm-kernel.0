@@ -1,45 +1,31 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Thu,  1 Oct 2015 13:38:34 +0200
-Subject: [PATCH 4/4] ARM: meson: Enable Meson8b SoCs
-In-Reply-To: <1443699514-11590-1-git-send-email-carlo@caione.org>
-References: <1443699514-11590-1-git-send-email-carlo@caione.org>
-Message-ID: <1443699514-11590-5-git-send-email-carlo@caione.org>
+From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
+Date: Thu,  1 Oct 2015 17:09:59 +0530
+Subject: [PATCH] thermal: exynos: fix register read in TMU
+Message-ID: <1443699599-9693-1-git-send-email-sudipm.mukherjee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+The value of emul_con was getting overwritten if the selected soc is
+SOC_ARCH_EXYNOS5260. And so as a result we were reading from the wrong
+register in the case of SOC_ARCH_EXYNOS5260.
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
+Signed-off-by: Sudip Mukherjee <sudip@vectorindia.org>
 ---
- arch/arm/mach-meson/Kconfig | 5 +++++
- arch/arm/mach-meson/meson.c | 1 +
- 2 files changed, 6 insertions(+)
+ drivers/thermal/samsung/exynos_tmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-meson/Kconfig b/arch/arm/mach-meson/Kconfig
-index 0743e20..5d56f86 100644
---- a/arch/arm/mach-meson/Kconfig
-+++ b/arch/arm/mach-meson/Kconfig
-@@ -19,4 +19,9 @@ config MACH_MESON8
- 	default ARCH_MESON
- 	select MESON6_TIMER
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index 0bae8cc..ca920b0 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -932,7 +932,7 @@ static void exynos4412_tmu_set_emulation(struct exynos_tmu_data *data,
  
-+config MACH_MESON8B
-+	bool "Amlogic Meson8b SoCs support"
-+	default ARCH_MESON
-+	select MESON6_TIMER
-+
- endif
-diff --git a/arch/arm/mach-meson/meson.c b/arch/arm/mach-meson/meson.c
-index 5d6affe..4e23571 100644
---- a/arch/arm/mach-meson/meson.c
-+++ b/arch/arm/mach-meson/meson.c
-@@ -19,6 +19,7 @@
- static const char * const meson_common_board_compat[] = {
- 	"amlogic,meson6",
- 	"amlogic,meson8",
-+	"amlogic,meson8b",
- 	NULL,
- };
- 
+ 	if (data->soc == SOC_ARCH_EXYNOS5260)
+ 		emul_con = EXYNOS5260_EMUL_CON;
+-	if (data->soc == SOC_ARCH_EXYNOS5433)
++	else if (data->soc == SOC_ARCH_EXYNOS5433)
+ 		emul_con = EXYNOS5433_TMU_EMUL_CON;
+ 	else if (data->soc == SOC_ARCH_EXYNOS7)
+ 		emul_con = EXYNOS7_TMU_REG_EMUL_CON;
 -- 
 1.9.1
