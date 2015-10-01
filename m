@@ -1,128 +1,153 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 01 Oct 2015 15:00:16 +0200
-Subject: [patch 1/1] iop32x: increase irq numbers by 1
-References: <20151001130015.092991764@rtp-net.org>
-Message-ID: <20151001130025.814797537@rtp-net.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 1 Oct 2015 08:08:35 -0500
+Subject: [PATCH v3 2/4] of/irq: Add new function of_msi_map_rid()
+In-Reply-To: <1443653222-24924-3-git-send-email-ddaney.cavm@gmail.com>
+References: <1443653222-24924-1-git-send-email-ddaney.cavm@gmail.com>
+ <1443653222-24924-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <CAL_JsqJA6UskrxU2Gpo3vtAyfPzT=d-9Z+CSpT__mR+7FRmhrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On recent kernels, IRQ0 is not valid. Given that irqs on iop32x are
-starting at 0, as soon as irq0 (iop-adma) is used, the board will
-hang.
-As a simple solution, I'm just increasing the numbers by 1
+On Wed, Sep 30, 2015 at 5:47 PM, David Daney <ddaney.cavm@gmail.com> wrote:
+> From: David Daney <david.daney@cavium.com>
+>
+> The device tree property "msi-map" specifies how to create the PCI
+> requester id used in some MSI controllers.  Add a new function
+> of_msi_map_rid() that finds the msi-map property and applies its
+> translation to a given requester id.
+>
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: David Daney <david.daney@cavium.com>
 
-[ Tested on a ss4000e/em7210 platform with a 4.1 ]
+Acked-by: Rob Herring <robh@kernel.org>
 
-Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-Index: linux-next/arch/arm/mach-iop32x/include/mach/irqs.h
-===================================================================
---- linux-next.orig/arch/arm/mach-iop32x/include/mach/irqs.h	2015-10-01 14:38:50.190495924 +0200
-+++ linux-next/arch/arm/mach-iop32x/include/mach/irqs.h	2015-10-01 14:38:50.182495760 +0200
-@@ -15,36 +15,36 @@
- /*
-  * IOP80321 chipset interrupts
-  */
--#define IRQ_IOP32X_DMA0_EOT	0
--#define IRQ_IOP32X_DMA0_EOC	1
--#define IRQ_IOP32X_DMA1_EOT	2
--#define IRQ_IOP32X_DMA1_EOC	3
--#define IRQ_IOP32X_AA_EOT	6
--#define IRQ_IOP32X_AA_EOC	7
--#define IRQ_IOP32X_CORE_PMON	8
--#define IRQ_IOP32X_TIMER0	9
--#define IRQ_IOP32X_TIMER1	10
--#define IRQ_IOP32X_I2C_0	11
--#define IRQ_IOP32X_I2C_1	12
--#define IRQ_IOP32X_MESSAGING	13
--#define IRQ_IOP32X_ATU_BIST	14
--#define IRQ_IOP32X_PERFMON	15
--#define IRQ_IOP32X_CORE_PMU	16
--#define IRQ_IOP32X_BIU_ERR	17
--#define IRQ_IOP32X_ATU_ERR	18
--#define IRQ_IOP32X_MCU_ERR	19
--#define IRQ_IOP32X_DMA0_ERR	20
--#define IRQ_IOP32X_DMA1_ERR	21
--#define IRQ_IOP32X_AA_ERR	23
--#define IRQ_IOP32X_MSG_ERR	24
--#define IRQ_IOP32X_SSP		25
--#define IRQ_IOP32X_XINT0	27
--#define IRQ_IOP32X_XINT1	28
--#define IRQ_IOP32X_XINT2	29
--#define IRQ_IOP32X_XINT3	30
--#define IRQ_IOP32X_HPI		31
-+#define IRQ_IOP32X_DMA0_EOT	(1+0)
-+#define IRQ_IOP32X_DMA0_EOC	(1+1)
-+#define IRQ_IOP32X_DMA1_EOT	(1+2)
-+#define IRQ_IOP32X_DMA1_EOC	(1+3)
-+#define IRQ_IOP32X_AA_EOT	(1+6)
-+#define IRQ_IOP32X_AA_EOC	(1+7)
-+#define IRQ_IOP32X_CORE_PMON	(1+8)
-+#define IRQ_IOP32X_TIMER0	(1+9)
-+#define IRQ_IOP32X_TIMER1	(1+10)
-+#define IRQ_IOP32X_I2C_0	(1+11)
-+#define IRQ_IOP32X_I2C_1	(1+12)
-+#define IRQ_IOP32X_MESSAGING	(1+13)
-+#define IRQ_IOP32X_ATU_BIST	(1+14)
-+#define IRQ_IOP32X_PERFMON	(1+15)
-+#define IRQ_IOP32X_CORE_PMU	(1+16)
-+#define IRQ_IOP32X_BIU_ERR	(1+17)
-+#define IRQ_IOP32X_ATU_ERR	(1+18)
-+#define IRQ_IOP32X_MCU_ERR	(1+19)
-+#define IRQ_IOP32X_DMA0_ERR	(1+20)
-+#define IRQ_IOP32X_DMA1_ERR	(1+21)
-+#define IRQ_IOP32X_AA_ERR	(1+23)
-+#define IRQ_IOP32X_MSG_ERR	(1+24)
-+#define IRQ_IOP32X_SSP		(1+25)
-+#define IRQ_IOP32X_XINT0	(1+27)
-+#define IRQ_IOP32X_XINT1	(1+28)
-+#define IRQ_IOP32X_XINT2	(1+29)
-+#define IRQ_IOP32X_XINT3	(1+30)
-+#define IRQ_IOP32X_HPI		(1+31)
- 
--#define NR_IRQS			32
-+#define NR_IRQS			(1+32)
- 
- 
- #endif
-Index: linux-next/arch/arm/mach-iop32x/irq.c
-===================================================================
---- linux-next.orig/arch/arm/mach-iop32x/irq.c	2015-10-01 14:38:50.190495924 +0200
-+++ linux-next/arch/arm/mach-iop32x/irq.c	2015-10-01 14:38:50.182495760 +0200
-@@ -34,14 +34,14 @@ static void intstr_write(u32 val)
- static void
- iop32x_irq_mask(struct irq_data *d)
- {
--	iop32x_mask &= ~(1 << d->irq);
-+	iop32x_mask &= ~(1 << (d->irq-1));
- 	intctl_write(iop32x_mask);
- }
- 
- static void
- iop32x_irq_unmask(struct irq_data *d)
- {
--	iop32x_mask |= 1 << d->irq;
-+	iop32x_mask |= 1 << (d->irq-1);
- 	intctl_write(iop32x_mask);
- }
- 
-@@ -67,7 +67,7 @@ void __init iop32x_init_irq(void)
- 	    machine_is_em7210())
- 		*IOP3XX_PCIIRSR = 0x0f;
- 
--	for (i = 0; i < NR_IRQS; i++) {
-+	for (i = IRQ_IOP32X_DMA0_EOT; i < NR_IRQS; i++) {
- 		irq_set_chip_and_handler(i, &ext_chip, handle_level_irq);
- 		irq_clear_status_flags(i, IRQ_NOREQUEST | IRQ_NOPROBE);
- 	}
-Index: linux-next/arch/arm/mach-iop32x/include/mach/entry-macro.S
-===================================================================
---- linux-next.orig/arch/arm/mach-iop32x/include/mach/entry-macro.S	2015-10-01 14:38:50.190495924 +0200
-+++ linux-next/arch/arm/mach-iop32x/include/mach/entry-macro.S	2015-10-01 14:38:50.182495760 +0200
-@@ -23,6 +23,7 @@
- 	cmp     \irqstat, #0
- 	clzne   \irqnr, \irqstat
- 	rsbne   \irqnr, \irqnr, #31
-+	add     \irqnr, \irqnr, #1
- 	.endm
- 
- 	.macro arch_ret_to_user, tmp1, tmp2
+I'm assuming this will go thru irqchip or PCI trees? It helps if To is
+who you want to merge this.
+
+Rob
+
+> ---
+>  drivers/of/irq.c       | 84 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_irq.h |  7 +++++
+>  2 files changed, 91 insertions(+)
+>
+> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> index 55317fa..c90bd4e 100644
+> --- a/drivers/of/irq.c
+> +++ b/drivers/of/irq.c
+> @@ -598,3 +598,87 @@ void of_msi_configure(struct device *dev, struct device_node *np)
+>                 d = irq_find_host(msi_np);
+>         dev_set_msi_domain(dev, d);
+>  }
+> +
+> +/**
+> + * of_msi_map_rid - Map a MSI requester ID for a device.
+> + * @dev: device for which the mapping is to be done.
+> + * @msi_np: device node of the expected msi controller.
+> + * @rid_in: unmapped MSI requester ID for the device.
+> + *
+> + * Walk up the device hierarchy looking for devices with a "msi-map"
+> + * property.  If found, apply the mapping to @rid_in.
+> + *
+> + * Returns the mapped MSI requester ID.
+> + */
+> +u32 of_msi_map_rid(struct device *dev, struct device_node *msi_np, u32 rid_in)
+> +{
+> +       struct device *parent_dev;
+> +       struct device_node *msi_controller_node;
+> +       u32 map_mask, masked_rid, rid_base, msi_base, rid_len, phandle;
+> +       int msi_map_len;
+> +       bool matched;
+> +       u32 rid_out = rid_in;
+> +       const __be32 *msi_map = NULL;
+> +
+> +       /*
+> +        * Walk up the device parent links looking for one with a
+> +        * "msi-map" property.
+> +        */
+> +       for (parent_dev = dev; parent_dev; parent_dev = parent_dev->parent) {
+> +               if (!parent_dev->of_node)
+> +                       continue;
+> +
+> +               msi_map = of_get_property(parent_dev->of_node,
+> +                                         "msi-map", &msi_map_len);
+> +               if (!msi_map)
+> +                       continue;
+> +
+> +               if (msi_map_len % (4 * sizeof(__be32))) {
+> +                       dev_err(parent_dev, "Error: Bad msi-map length: %d\n",
+> +                               msi_map_len);
+> +                       return rid_out;
+> +               }
+> +               /* We have a good parent_dev and msi_map, let's use them. */
+> +               break;
+> +       }
+> +       if (!msi_map)
+> +               return rid_out;
+> +
+> +       /* The default is to select all bits. */
+> +       map_mask = 0xffffffff;
+> +
+> +       /*
+> +        * Can be overridden by "msi-map-mask" property.  If
+> +        * of_property_read_u32() fails, the default is used.
+> +        */
+> +       of_property_read_u32(parent_dev->of_node, "msi-map-mask", &map_mask);
+> +
+> +       masked_rid = map_mask & rid_in;
+> +       matched = false;
+> +       while (!matched && msi_map_len >= 4 * sizeof(__be32)) {
+> +               rid_base = be32_to_cpup(msi_map + 0);
+> +               phandle = be32_to_cpup(msi_map + 1);
+> +               msi_base = be32_to_cpup(msi_map + 2);
+> +               rid_len = be32_to_cpup(msi_map + 3);
+> +
+> +               msi_controller_node = of_find_node_by_phandle(phandle);
+> +
+> +               matched = masked_rid >= rid_base &&
+> +                       masked_rid < rid_base + rid_len &&
+> +                       msi_np == msi_controller_node;
+> +
+> +               of_node_put(msi_controller_node);
+> +               msi_map_len -= 4 * sizeof(__be32);
+> +               msi_map += 4;
+> +       }
+> +       if (!matched)
+> +               return rid_out;
+> +
+> +       rid_out = masked_rid + msi_base;
+> +       dev_dbg(dev,
+> +               "msi-map at: %s, using mask %08x, rid-base: %08x, msi-base: %08x, length: %08x, rid: %08x -> %08x\n",
+> +               dev_name(parent_dev), map_mask, rid_base, msi_base,
+> +               rid_len, rid_in, rid_out);
+> +
+> +       return rid_out;
+> +}
+> diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
+> index 4bcbd58..8cd9334 100644
+> --- a/include/linux/of_irq.h
+> +++ b/include/linux/of_irq.h
+> @@ -75,6 +75,7 @@ static inline int of_irq_to_resource_table(struct device_node *dev,
+>  extern unsigned int irq_of_parse_and_map(struct device_node *node, int index);
+>  extern struct device_node *of_irq_find_parent(struct device_node *child);
+>  extern void of_msi_configure(struct device *dev, struct device_node *np);
+> +u32 of_msi_map_rid(struct device *dev, struct device_node *msi_np, u32 rid_in);
+>
+>  #else /* !CONFIG_OF */
+>  static inline unsigned int irq_of_parse_and_map(struct device_node *dev,
+> @@ -87,6 +88,12 @@ static inline void *of_irq_find_parent(struct device_node *child)
+>  {
+>         return NULL;
+>  }
+> +
+> +static inline u32 of_msi_map_rid(struct device *dev,
+> +                                struct device_node *msi_np, u32 rid_in)
+> +{
+> +       return rid_in;
+> +}
+>  #endif /* !CONFIG_OF */
+>
+>  #endif /* __OF_IRQ_H */
+> --
+> 1.9.1
+>
