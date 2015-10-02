@@ -1,109 +1,105 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 2 Oct 2015 20:50:35 +0200
-Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
-In-Reply-To: <20151002180255.GK12338@codeaurora.org>
-References: <560E53E3.7070207@free.fr> <560E8584.8000207@free.fr>
- <20151002180255.GK12338@codeaurora.org>
-Message-ID: <560ED1FB.9010000@free.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 2 Oct 2015 19:53:37 +0100
+Subject: [PATCH] arm-soc: Add Sigma Designs Tango4 port
+In-Reply-To: <560EC863.8030600@free.fr>
+References: <560EAA7C.3070302@free.fr> <yw1xoaghl099.fsf@unicorn.mansr.com>
+ <560EB1EC.3020403@free.fr>
+ <20151002171334.GB21513@n2100.arm.linux.org.uk>
+ <560EC863.8030600@free.fr>
+Message-ID: <20151002185337.GC21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2015 20:02, Stephen Boyd wrote:
-> On 10/02, Mason wrote:
->> [ Adding original reporter ]
->>
->> On 02/10/2015 11:52, Mason wrote:
->>
->>> [ take 1 was sent on 2015-03-26 ]
->>>
->>> Hello everyone,
->>>
->>> In http://thread.gmane.org/gmane.linux.ports.arm.kernel/389931/focus=392348
->>> Stephen Boyd wrote:
->>>
->>>> I don't see any problem with the TWD dropping the dependency on SMP.
->>>> The code should work the same on a UP configuration [...]
->>>
->>> And Arnd recently said:
->>>
->>>> I think this has come up before and should be fixed. Could you
->>>> send a patch that allows using TWD in uniprocessor configurations?
->>>
->>> Basically, this means reverting Shawn Guo's 904464b91eca patch.
->>> and removing "depends on SMP" for HAVE_ARM_TWD.
->>>
->>> However, Shawn's patch fixed an issue, therefore it seems likely
->>> that simply reverting is not the proper solution?
->>>
->>> What should I do?
->>
->> For reference, the warning used to be:
->>
->>     ------------[ cut here ]------------
->>     WARNING: at arch/arm/kernel/smp_twd.c:345
->>     twd_local_timer_of_register+0x7c/0x90()
->>     twd_local_timer_of_register failed (-6)
->>     Modules linked in:
->>     Backtrace:
->>     [<80011f14>] (dump_backtrace+0x0/0x10c) from [<8044dd30>]
->>     (dump_stack+0x18/0x1c)
->>      r7:805e9f58 r6:805ba84c r5:80539331 r4:00000159
->>     [<8044dd18>] (dump_stack+0x0/0x1c) from [<80020fbc>]
->>     (warn_slowpath_common+0x54/0x6c)
->>     [<80020f68>] (warn_slowpath_common+0x0/0x6c) from [<80021078>]
->>     (warn_slowpath_fmt+0x38/0x40)
->>      r9:412fc09a r8:8fffffff r7:ffffffff r6:00000001 r5:80633b8c
->>     r4:80b32da8
->>     [<80021040>] (warn_slowpath_fmt+0x0/0x40) from [<805ba84]
->>     (twd_local_timer_of_register+0x7c/0x90)
->>      r3:fffffffa r2:8053934b
->>     [<805ba7d0>] (twd_local_timer_of_register+0x0/0x90) from [<805c0bec>]
->>     (imx6q_timer_init+0x18/0x4c)
->>      r5:80633800 r4:8053b701
->>     [<805c0bd4>] (imx6q_timer_init+0x0/0x4c) from [<805ba4e8>]
->>     (time_init+0x28/0x38)
->>      r5:80633800 r4:805dc0f4
->>     [<805ba4c0>] (time_init+0x0/0x38) from [<805b6854>]
->>     (start_kernel+0x1a0/0x310)
->>     [<805b66b4>] (start_kernel+0x0/0x310) from [<10008044>] (0x10008044)
->>      r8:1000406a r7:805f3f8c r6:805dc0c4 r5:805f0518 r4:10c5387d
->>     ---[ end trace 1b75b31a2719ed1c ]---
->>
->>
->> I cannot reproduce on v4.2 + my platform...
+On Fri, Oct 02, 2015 at 08:09:39PM +0200, Mason wrote:
+> On 02/10/2015 19:13, Russell King - ARM Linux wrote:
+> > On Fri, Oct 02, 2015 at 06:33:48PM +0200, Mason wrote:
+> >> On 02/10/2015 18:10, M?ns Rullg?rd wrote:
+> >>
+> >>> Mason writes:
+> >>>
+> >>>> +		intc: intc at e000 {
+> >>>> +			compatible = "sigma,tango-intc";
+> >>>
+> >>> Why do you insist on using other names than the ones I've been using for
+> >>> months?  Just want to leave your own mark on the code?
+> >>
+> >> You're using "sigma,smp8640-intc".
+> >> The SMP8640 is a Tango3 (MIPS-based) platform.
+> > 
+> > If it's the same device, then there's nothing wrong with re-using the
+> > compatible.  The compatible property actually accepts multiple values,
+> > so you can do:
+> > 
+> > 			compatible = "sigma,tango4-intc", "sigma,smp8640-intc";
 > 
-> The warning has been removed in commit 5028090d1da1 (ARM: 8434/1:
-> Revert "7655/1: smp_twd: make twd_local_timer_of_register() no-op
-> for nosmp", 2015-09-14) sitting in linux-next.
+> I have access to resources unavailable to Mans. Since I know the
+> interrupt controller is the same on Tango2, Tango3 and Tango4,
+> doesn't it make sense to use the string "sigma,tango-intc"
+> given that the driver is not even upstream yet?
 
-Does that mean it will automatically make it into v4.3?
+You could do:
+			compatible = "sigma,tango4-intc",
+				     "sigma,tango-intc",
+				     "sigma,smp8640-intc";
 
-> Oddly, that commit doesn't remove the depends on SMP for the Kconfig.
+The advantage of using the most specific first is that if you then find
+the hardware contains bugs, you can _just_ modify the device driver to
+match on the specific ID, and implement workarounds based on that.  Older
+device trees will then pick up those same workarounds without needing to
+be modified.
 
-Perhaps because the commit is just a revert, and the depends
-statement has been here since the beginning (f32f4ce257452)
+Remember, device trees are supposed to describe the hardware.
 
-> So it seems that we can apply this patch and everyone is happy?
-> We could also drop the "if SMP" part of most of the platform
-> selects if anyone actually cares.
+> (If worse comes to worst, I suppose I can always write my own
+> driver from scratch; I just find it silly to duplicate work.)
 
-My port requires the TWD to function. So I'm using
-select HAVE_ARM_TWD (no "if SMP") to have it work
-even on MULTIPLATFORM UP configs.
+It's not about writing a separate driver.  What the above says is that
+this device is first and foremost a "sigma,tango4-intc" device, but if
+we don't have such a driver, it can be driven by a driver for
+"sigma,tango-intc", but if we don't have one of those, then it can
+be driven by a "sigma,smp8640-intc" driver.
 
-> ---8<----
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 369791fb619c..be64d9d604c3 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1389,7 +1389,6 @@ config HAVE_ARM_ARCH_TIMER
->  
->  config HAVE_ARM_TWD
->  	bool
-> -	depends on SMP
->  	select CLKSRC_OF if OF
->  	help
->  	  This options enables support for the ARM timer and watchdog unit
+Please read the quoted bit of the spec on this to get a proper
+understanding of how these compatible strings are supposed to work:
 
+> > See the ePAPR spec - I'll include the relevant bit:
+> > 
+> > Property: compatible
+> > Value type: <stringlist>
+> > Description: The compatible property value consists of one or more strings
+> >  that define the specific programming model for the device. This list of
+> >  strings should be used by a client program for device driver selection.
+> >  The property value consists of a concatenated list of null terminated
+> >  strings, from most specific to most general. They allow a device to
+> >  express its compatibility with a family of similar devices, potentially
+> >  allowing a single device driver to match against several devices. ...
+> > Example: compatible = "fsl,mpc8641-uart", "ns16550";
+> >  In this example, an operating system would first try to locate a device
+> >  driver that supported fsl,mpc8641-uart. If a driver was not found, it
+> >  would then try to locate a driver that supported the more general
+> >  ns16550 device type.
+> > 
+> > Note also that vendor prefixes should be listed in
+> > Documentation/devicetree/bindings/vendor-prefixes.txt.  If it's not there,
+> > you need to propose a separate patch (to the devicetree mailing list) to
+> > add it, which must be done with their agreement.  Right now, the use of
+> > "sigma" as a prefix is entirely non-standard and not acceptable in DT
+> > files until this is done.
+> 
+> As far as the upstreaming process is concerned, I speak for Sigma.
 
-Regards.
+It doesn't matter who you speak for.  Your first patch should be to
+_only_ add the vendor ID to that file above, and to get it acked by
+the device tree maintainers.  That makes it "official" in the eyes of
+the developers responsible for maintaining the sanity of device tree.
+
+However, that has an impact on the above: you should therefore have
+access to the folk who know the origins of the interrupt controller,
+and whether it is a derivative of "sigma,smp8640-intc" or something
+else.  If "sigma,smp8640-intc" and "sigma,tango-intc" are jointly
+derived from a common ancestor, then you should not mention
+"sigma,smp8640-intc" at all.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
