@@ -1,9 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri,  2 Oct 2015 15:20:58 -0700
-Subject: [GIT PULL] Broadcom soc changes for v4.4
+Date: Fri,  2 Oct 2015 15:20:56 -0700
+Subject: [GIT PULL] Broadcom devicetree changes for v4.4
 In-Reply-To: <1443824458-20799-1-git-send-email-f.fainelli@gmail.com>
 References: <1443824458-20799-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1443824458-20799-4-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1443824458-20799-2-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,66 +14,84 @@ The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
 are available in the git repository at:
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.4/soc
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.4/devicetree
 
-for you to fetch changes up to 7333ecdcd71fbbed1e2cab675fd129ab99f4db41:
+for you to fetch changes up to eef228e3191de0b62ef5913be216f25ba6b23a4c:
 
-  ARM: brcmstb: Setup BIU control registers during boot (2015-09-18 12:21:17 -0700)
+  ARM: dts: move aliases back to .dts in Cygnus (2015-09-24 18:30:10 -0700)
 
 ----------------------------------------------------------------
-This pull request contains the following Broadcom SoC platform and driver changes:
+This pull requests contains the following Broadcom SoCs Device Tree changes:
 
-- Brian Norris create a drivers/soc/brcmstb/ stub and then adds support for S2/S3/S5
-  suspend/resume modes for the Broadcom BCM7xxx Set Top Box SoCs
+- Brian Norris documents the BCM7445 SoCs Power Management controllers and
+  hardware and updates the reference BCM7445 Device Tree with these nodes
 
-- Florian Fainelli adds support for configuring the BCM7xxx SoCs Bus Interface Unit
-  with their specific write-pairing setting, which must be saved and restored during
-  system-wide suspend/resume, and consequently updates the brcmstb machine code to
-  initialize the BIU
+- Florian Fainelli documents the BCM7xxx write-pairing feature in the top-level
+  BCM7xxx binding document
 
-- Jon Mason adds support for the Northstar Plus SoCs by introducing a custom machine
-  descriptor matching their compatible string and setting up the PL310 L2 cache and
-  enabling the relevant ARM errata for their Cortex-A9
+- Hauke Merthens enables the NAND controller for the Asus RT-AC87U and adds the
+  GPIO pin controlling the USB power supply on Netgear R6250
+
+- Jon Mason adds support for the NorthStar Plus SoC by providing a top-level
+  binding document and the minimalist device tree skeleton for these SoCs
+
+- Rafal Milecki adds support for the Netgear R7000 (BCM5301x SoC)
+
+- Ray Jui provides a set of Cygnus DT changes that make the Device Tree clearer
+  and more correct with respect to how the hardware is designed. He also enables
+  the NAND controller on the bcm911360_entphn design, enables a bunch of
+  peripherals on the bcm958305k evaluation board, and adds a skeleton .dtsi file
+  for the touchscreen extansion board(s)
 
 ----------------------------------------------------------------
 Brian Norris (2):
-      soc: add stubs for brcmstb SoC's
-      soc: brcmstb: add PM suspend/resume support (S2/S3/S5)
+      Documentation: dt: brcmstb: add system PM bindings
+      ARM: dts: brcmstb: add BCM7445 system PM DT nodes
 
-Florian Fainelli (2):
-      soc: brcmstb: Add Bus Interface Unit control setup
-      ARM: brcmstb: Setup BIU control registers during boot
+Florian Fainelli (1):
+      Documentation: bindings: brcmstb: Document write-pairing
 
-Jon Mason (1):
-      ARM: NSP: Add basic support for Broadcom Northstar Plus SoC
+Hauke Mehrtens (2):
+      ARM: BCM5301X: add NAND flash chip description for Asus RT-AC87U
+      ARM: BCM5301X: Netgear R6250 add USB GPIO
 
- arch/arm/mach-bcm/Kconfig           |  15 ++
- arch/arm/mach-bcm/Makefile          |   5 +-
- arch/arm/mach-bcm/bcm_nsp.c         |  25 ++
- arch/arm/mach-bcm/brcmstb.c         |   9 +
- drivers/soc/Kconfig                 |   1 +
- drivers/soc/Makefile                |   1 +
- drivers/soc/brcmstb/Kconfig         |  19 ++
- drivers/soc/brcmstb/Makefile        |   3 +
- drivers/soc/brcmstb/biuctrl.c       | 116 ++++++++
- drivers/soc/brcmstb/common.c        |  33 +++
- drivers/soc/brcmstb/pm/Makefile     |   2 +
- drivers/soc/brcmstb/pm/aon_defs.h   |  85 ++++++
- drivers/soc/brcmstb/pm/pm.c         | 512 ++++++++++++++++++++++++++++++++++++
- drivers/soc/brcmstb/pm/pm.h         |  40 +++
- drivers/soc/brcmstb/pm/s2.S         |  73 +++++
- include/linux/soc/brcmstb/brcmstb.h |  10 +
- include/soc/brcmstb/common.h        |  15 ++
- 17 files changed, 963 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-bcm/bcm_nsp.c
- create mode 100644 drivers/soc/brcmstb/Kconfig
- create mode 100644 drivers/soc/brcmstb/Makefile
- create mode 100644 drivers/soc/brcmstb/biuctrl.c
- create mode 100644 drivers/soc/brcmstb/common.c
- create mode 100644 drivers/soc/brcmstb/pm/Makefile
- create mode 100644 drivers/soc/brcmstb/pm/aon_defs.h
- create mode 100644 drivers/soc/brcmstb/pm/pm.c
- create mode 100644 drivers/soc/brcmstb/pm/pm.h
- create mode 100644 drivers/soc/brcmstb/pm/s2.S
- create mode 100644 include/linux/soc/brcmstb/brcmstb.h
- create mode 100644 include/soc/brcmstb/common.h
+Jon Mason (2):
+      dt-bindings: Create Documentation for NSP DT bindings
+      ARM: NSP: add minimal Northstar Plus device tree
+
+Rafa? Mi?ecki (1):
+      ARM: BCM5301X: Add DT for Netgear R7000
+
+Ray Jui (10):
+      ARM: dts: consolidate aliases for Cygnus dt files
+      ARM: dts: Use label for device nodes in Cygnus dts
+      ARM: dts: Put Cygnus core components under core bus
+      ARM: dts: Move all Cygnus peripherals into axi bus
+      ARM: dts: Reorder Cygnus peripherals
+      ARM: dts: Enable various peripherals on bcm958305k
+      ARM: dts: Enable NAND support on bcm911360_entphn
+      ARM: dts: enable touchscreen support on Cygnus
+      ARM: dts: fix Cygnus nand device node
+      ARM: dts: move aliases back to .dts in Cygnus
+
+ .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   | 162 +++++++++-
+ .../devicetree/bindings/arm/bcm/brcm,nsp.txt       |  34 +++
+ arch/arm/boot/dts/Makefile                         |   3 +
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  | 334 +++++++++++----------
+ arch/arm/boot/dts/bcm-nsp.dtsi                     | 119 ++++++++
+ arch/arm/boot/dts/bcm4708-netgear-r6250.dts        |  11 +
+ arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts        |   1 +
+ arch/arm/boot/dts/bcm4709-netgear-r7000.dts        | 106 +++++++
+ arch/arm/boot/dts/bcm7445.dtsi                     |  84 ++++++
+ arch/arm/boot/dts/bcm911360_entphn.dts             |  28 +-
+ arch/arm/boot/dts/bcm911360k.dts                   |   9 +-
+ arch/arm/boot/dts/bcm958300k.dts                   |  44 +--
+ arch/arm/boot/dts/bcm958305k.dts                   |  40 ++-
+ arch/arm/boot/dts/bcm958625k.dts                   |  57 ++++
+ arch/arm/boot/dts/bcm9hmidc.dtsi                   |  42 +++
+ 15 files changed, 874 insertions(+), 200 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp.txt
+ create mode 100644 arch/arm/boot/dts/bcm-nsp.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+ create mode 100644 arch/arm/boot/dts/bcm958625k.dts
+ create mode 100644 arch/arm/boot/dts/bcm9hmidc.dtsi
