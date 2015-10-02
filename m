@@ -1,42 +1,39 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 2 Oct 2015 23:05:16 +0800
-Subject: [PATCH v4 0/3] add GPT timer support for mt8173
-Message-ID: <1443798319-45744-1-git-send-email-yingjoe.chen@mediatek.com>
+Date: Fri, 2 Oct 2015 23:05:17 +0800
+Subject: [PATCH v4 1/3] dt-bindings: add more MediaTek SoC to mtk-timer binding
+In-Reply-To: <1443798319-45744-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1443798319-45744-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1443798319-45744-2-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is based on v4.3-rc1 + clockevents-4.4[1] and James's mediatek-clk
-tree[2].
+Add compatible string for mt8127, mt8135 and mt8173 and sort
+the list.
 
-Changes compare to previous version[3]:
-- Add more MediaTek SoC to mtk-timer binding
-- Update commit message to better describe the purpose.
-
-Changes compare to v2[4]:
-- the first two mtk_timer related changes are removed because they are
-replaced/accepted in clockevents tree.
-- Remove 'add 13mhz clock for MT8173' because it is accepted in
-mediatek-clk tree.
-- Kconfig.platforms path change.
-
-[1]
-https://git.linaro.org/people/daniel.lezcano/linux.git clockevents/4.4
-[2]
-http://lists.infradead.org/pipermail/linux-mediatek/2015-August/002069.html
-[3]
-http://lists.infradead.org/pipermail/linux-mediatek/2015-September/002301.html
-[4]
-http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001544.html
-
-
-Daniel Kurtz (1):
-  arm64: dts: mt8173: add timer node
-
-Yingjoe Chen (2):
-  dt-bindings: add more MediaTek SoC to mtk-timer binding
-  arm64: mediatek: enable MTK_TIMER
-
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+---
  Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt | 8 +++++---
- arch/arm64/Kconfig.platforms                                   | 1 +
- arch/arm64/boot/dts/mediatek/mt8173.dtsi                       | 9 +++++++++
- 3 files changed, 15 insertions(+), 3 deletions(-)
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+index 53a3029..64083bc 100644
+--- a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
++++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+@@ -3,10 +3,12 @@ Mediatek MT6577, MT6572 and MT6589 Timers
+ 
+ Required properties:
+ - compatible should contain:
+-	* "mediatek,mt6589-timer" for MT6589 compatible timers
+ 	* "mediatek,mt6580-timer" for MT6580 compatible timers
+-	* "mediatek,mt6577-timer" for all compatible timers (MT6589, MT6580,
+-		MT6577)
++	* "mediatek,mt6589-timer" for MT6589 compatible timers
++	* "mediatek,mt8127-timer" for MT8127 compatible timers
++	* "mediatek,mt8135-timer" for MT8135 compatible timers
++	* "mediatek,mt8173-timer" for MT8173 compatible timers
++	* "mediatek,mt6577-timer" for MT6577 and all above compatible timers
+ - reg: Should contain location and length for timers register.
+ - clocks: Clocks driving the timer hardware. This list should include two
+ 	clocks. The order is system clock and as second clock the RTC clock.
+-- 
+1.9.1
