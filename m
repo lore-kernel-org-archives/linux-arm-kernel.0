@@ -1,39 +1,35 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 2 Oct 2015 12:45:28 -0700
-Subject: [PATCH v4 0/8] i.MX early debug UART clock fixes
-In-Reply-To: <1443108993.8476.10.camel@pengutronix.de>
-References: <1442854444-4460-1-git-send-email-l.stach@pengutronix.de>
- <20150924152016.GV3529@tiger>
- <1443108993.8476.10.camel@pengutronix.de>
-Message-ID: <20151002194528.GX12338@codeaurora.org>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 02 Oct 2015 12:53:03 -0700
+Subject: [PATCH v3 3/4] clk: bcm2835: Add support for programming the
+ audio domain clocks.
+In-Reply-To: <20151002000741.GA1213@codeaurora.org>
+References: <1443475325-22270-1-git-send-email-eric@anholt.net>
+ <1443475325-22270-3-git-send-email-eric@anholt.net>
+ <20151002000741.GA1213@codeaurora.org>
+Message-ID: <87lhblt5cw.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24, Lucas Stach wrote:
-> Am Donnerstag, den 24.09.2015, 08:20 -0700 schrieb Shawn Guo:
-> > On Mon, Sep 21, 2015 at 06:53:56PM +0200, Lucas Stach wrote:
-> > > This series fixes a long standing interaction issue between the
-> > > kernels early debug facilities and the i.MX clock drivers.
-> > 
-> > This is fixing some issue but not regression.  As the change basically
-> > has influence on all i.MX platforms, my take is that we should get them
-> > into linux-next for extensive testing and queue for 4.4.  Agree?
-> > 
-> Absolutely, this fixes a bug which should mostly hit developers running
-> with earlyprintk or earlycon, so it's definitely not fixes material.
-> 
-> Please queue it up for 4.4.
+Stephen Boyd <sboyd@codeaurora.org> writes:
 
-Patches look mostly ok to me, but this certainly feels like some
-generic problem that we should handle in the core. Perhaps it
-would make sense to move this over to using the handoff mechanism
-Mike is working on, where we keep the clock on until a consumer
-grabs a reference to the clock?
+> On 09/28, Eric Anholt wrote:
+>> +
+>> +static const char *bcm2835_clock_per_parents[] = {
+>> +static const char *bcm2835_clock_vpu_parents[] = {
+>> +static const char *bcm2835_clock_osc_parents[] = {
+>
+> Can these parent arrays be const char * const ?
 
-So I'm not opposed to merging this for 4.4, but I'd like to see
-it become a generic solution sometime soon, instead of staying as
-a one-off fix for imx platforms.
+They couldn't because I was editing them in place to do the
+s/"xosc"/of_clk_get_parent_name()/ edit.  I've moved the edit to being
+in a stack allocation at probe time.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I think I've done all of your suggested changes in the new version (and
+explained the extra ana2 read/write).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151002/41bf9f7e/attachment.sig>
