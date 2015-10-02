@@ -1,31 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 03 Oct 2015 00:22:38 +0200
-Subject: [PATCH] serial: Enable Freescale 16550 workaround on arm
-In-Reply-To: <20151002001616.GA3885@home.buserror.net>
-References: <20151002001616.GA3885@home.buserror.net>
-Message-ID: <5286230.7Dic6OMiYf@wuerfel>
+From: jonmason@broadcom.com (Jon Mason)
+Date: Fri, 2 Oct 2015 18:22:44 -0400
+Subject: [PATCH 2/2] dt-bindings: Add new boards to bcm4708 DT bindings
+In-Reply-To: <1443824564-17291-1-git-send-email-jonmason@broadcom.com>
+References: <1443824564-17291-1-git-send-email-jonmason@broadcom.com>
+Message-ID: <1443824564-17291-2-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 October 2015 19:16:16 Scott Wood wrote:
-> 
-> +#ifdef CONFIG_SERIAL_8250_FSL
-> +       if (of_device_is_compatible(np, "fsl,ns16550") ||
-> +           of_device_is_compatible(np, "fsl,16550-FIFO64"))
-> +               port->handle_irq = fsl8250_handle_irq;
-> +#endif
-> +
-> 
+Add the 4708, 4709, and 953012k SVKs to the the documentation for the
+Broadcom Northstar device tree bindings.
 
-Can you change this to use
+Signed-off-by: Jon Mason <jonmason@broadcom.com>
+---
+ Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-	if (IS_ENABLED(CONFIG_SERIAL_8250_FSL)) && ...
-
-The resulting code will be the same, it just get a little easier
-on the eye.
-
-Other than that, I wonder if we should do this completely differently
-and have the respective entries in of_platform_serial_table[] with
-an appropriate PORT_* constant to handle the freescale case.
-
-	Arnd
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
+index 6b0f49f..bdf4c06 100644
+--- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
+@@ -5,4 +5,11 @@ Boards with the BCM4708 SoC shall have the following properties:
+ 
+ Required root node property:
+ 
++bcm94709
+ compatible = "brcm,bcm4708";
++
++bcm94709
++compatible = "brcm,bcm4709", "brcm,bcm4708";
++
++bcm953012k
++compatible = "brcm,bcm5301k", "brcm,bcm4708";
+-- 
+1.9.1
