@@ -1,34 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 2 Oct 2015 17:48:36 +0100
-Subject: [PATCH] arm64: dts: add all hi6220 uart nodes
-In-Reply-To: <20151002142809.GA13483@leoy-linaro>
-References: <1443558552-5734-1-git-send-email-tyler.baker@linaro.org>
- <1459065.BtzC7pyUYF@wuerfel> <20150930173145.GG15635@sirena.org.uk>
- <CANMBJr7yY1PJChnFSRknqfOLORuWZSEONV+e=M=9heX3i-ADKA@mail.gmail.com>
- <20150930191818.GZ15635@sirena.org.uk>
- <CANMBJr6aU4wPO5HqP-Oh-ND7_DZXSH30ykNHyvDtUp3nQFG6sA@mail.gmail.com>
- <20151001031552.GC15675@leoy-linaro>
- <20151001102136.GC12635@sirena.org.uk>
- <20151002142809.GA13483@leoy-linaro>
-Message-ID: <20151002164836.GS12635@sirena.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 02 Oct 2015 17:50:38 +0100
+Subject: [PATCH 09/15] arm64: Add page size to the kernel image header
+In-Reply-To: <20151002163131.GO6963@e104818-lin.cambridge.arm.com>
+References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
+ <1442331684-28818-10-git-send-email-suzuki.poulose@arm.com>
+ <20151002154900.GN6963@e104818-lin.cambridge.arm.com>
+ <20151002163131.GO6963@e104818-lin.cambridge.arm.com>
+Message-ID: <560EB5DE.7080007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 02, 2015 at 10:28:09PM +0800, Leo Yan wrote:
-> On Thu, Oct 01, 2015 at 11:21:36AM +0100, Mark Brown wrote:
+On 02/10/15 17:31, Catalin Marinas wrote:
+> On Fri, Oct 02, 2015 at 04:49:01PM +0100, Catalin Marinas wrote:
+>> On Tue, Sep 15, 2015 at 04:41:18PM +0100, Suzuki K. Poulose wrote:
+>>> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>
+>>> This patch adds the page size to the arm64 kernel image header
+>>> so that one can infer the PAGESIZE used by the kernel. This will
+>>> be helpful to diagnose failures to boot the kernel with page size
+>>> not supported by the CPU.
+>>>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>
+>> This patch needs you signed-off-by as well since you are posting it. And
+>> IIRC I acked it as well, I'll check.
+>>
+>> If you are fine with adding your signed-of-by, I can add it to the patch
+>> when applying (unless I see other issues with the series).
+> 
+> Actually, I just realised that the kvm patches don't have any acks, so
+> I'm not taking this series yet. You may want to repost once you have all
+> the acks in place.
+> 
 
-> > It seems sensible to get the DT bits for functionality that is already
-> > supported on the driver side upstream, that way we get the maximum
-> > functionality available as soon as possible and even if other bits get
-> > problems in review users can take advantage of things that are OK.
+I'm in the middle of it. I should be done next week (I may have said the
+same thing two weeks ago...).
 
-> Okay, i will prepare patches for enabling CPUIdle ASAP.
-
-Excellent, thanks!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151002/c96700e4/attachment.sig>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
