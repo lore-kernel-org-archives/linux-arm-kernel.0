@@ -1,112 +1,116 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 2 Oct 2015 15:48:43 +0300
-Subject: [PATCH 01/11 RESEND] ARM: OMAP: DRA7: hwmod: Add data for McASP3
-In-Reply-To: <560E7094.408@ti.com>
-References: <1442326206-30192-1-git-send-email-peter.ujfalusi@ti.com>
- <alpine.DEB.2.02.1509270631440.7947@utopia.booyaka.com>
- <560BB434.6080308@ti.com>
- <alpine.DEB.2.02.1510020854390.11596@utopia.booyaka.com>
- <560E6912.4030902@ti.com> <560E7094.408@ti.com>
-Message-ID: <560E7D2B.1090100@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 2 Oct 2015 14:58:23 +0200
+Subject: [PULL] clk: at91: sama5d2 materials
+In-Reply-To: <20151001223837.583b8b2d@bbrezillon>
+References: <20150818102401.17de779b@bbrezillon>
+ <20150825191033.31346.67237@quantum> <20151001194747.GK19319@codeaurora.org>
+ <20151001223837.583b8b2d@bbrezillon>
+Message-ID: <560E7F6F.5040302@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2015 02:55 PM, Peter Ujfalusi wrote:
-> On 10/02/2015 02:22 PM, Peter Ujfalusi wrote:
->> Paul,
->>
->> On 10/02/2015 12:07 PM, Paul Walmsley wrote:
->>> Hello P?ter,
->>>
->>> On Wed, 30 Sep 2015, Peter Ujfalusi wrote:
->>>
->>>> On 09/27/2015 10:02 AM, Paul Walmsley wrote:
->>>>>>  /*
->>>>>> + * 'mcasp' class
->>>>>> + *
->>>>>> + */
->>>>>> +static struct omap_hwmod_class_sysconfig dra7xx_mcasp_sysc = {
->>>>>> +	.sysc_offs	= 0x0004,
->>>>>> +	.sysc_flags	= SYSC_HAS_SIDLEMODE,
->>>>>> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
->>>>>> +	.sysc_fields	= &omap_hwmod_sysc_type3,
->>>>>> +};
->>>>>> +
->>>>>> +static struct omap_hwmod_class dra7xx_mcasp_hwmod_class = {
->>>>>> +	.name	= "mcasp",
->>>>>> +	.sysc	= &dra7xx_mcasp_sysc,
->>>>>> +};
->>>>>> +
->>>>>> +/* mcasp3 */
->>>>>> +static struct omap_hwmod dra7xx_mcasp3_hwmod = {
->>>>>> +	.name		= "mcasp3",
->>>>>> +	.class		= &dra7xx_mcasp_hwmod_class,
->>>>>> +	.clkdm_name	= "l4per2_clkdm",
->>>>>> +	.main_clk	= "mcasp3_ahclkx_mux",
->>>>>
->>>>> I'd expect this clock to be something derived from mcasp3_aux_gfclk, 
->>>>> according to Table 24-408 "Clocks and Resets" of SPRUHZ6.  Could you 
->>>>> please doublecheck this?
+Le 01/10/2015 22:38, Boris Brezillon a ?crit :
+> Hi Stephen,
+> 
+> On Thu, 1 Oct 2015 12:47:48 -0700
+> Stephen Boyd <sboyd@codeaurora.org> wrote:
+> 
+>> On 08/25, Michael Turquette wrote:
+>>> Quoting Boris Brezillon (2015-08-18 01:24:01)
+>>>> Stephen, Mike,
 >>>>
->>>> I can not explain this. If I change the main_clk to "mcasp3_aux_gfclk_mux"
->>>> then I can not access to McASP3 register at all.
->>>> I don't see anything popping out in the clock data, nor in other places.
+>>>> Here is a PR for the sama5d2 materials.
+>>>> I know we're already late in the release cycle and I'm not sure you can
+>>>> take this PR into account for 4.3, so if you can't could you please
+>>>> queue it for 4.4?
 >>>
->>> OK thank you for testing that.  Maybe just add a brief comment along those 
->>> lines in the hwmod data, above the structure record declaration?
+>>> Queued for 4.4.
+>>>
+>>> Thanks,
+>>> Mike
+>>>
+>>>>
+>>>> Thanks,
+>>>>
+>>>> Boris
+>>>>
+>>>> The following changes since commit c42743f11f58646a50bc4b96da363429dca0c5e6:
+>>>>
 >>
->> Now I more or less figured out the root of the issue. According to the
->> documentations the McASP in dra7xx family has following clocks:
->> ICLK - interface clock
->> GFCLK - functional clock
->> AHCLKX - Transmit high-frequency master clock
->> AHCLKR - Receive high-frequency master clock (on selected instances)
->>
->> In order to access registers all of these clock lines must have valid clock
->> signal. No other SoC with McASP has this setup.
->> As for why things seams to work when mcasp3_ahclkx_mux is set as main_clk and
->> mcasp3_aux_gfclk_mux is not handled at all?
->> The mcasp3_aux_gfclk_mux by default is from PER_ABE_X1GFCLK we never change
->> this. On dra7/72 evm the AHCLKX is reparented to ATL2 clock.
->> When with pm_runtime we enable the device, the mcasp3_ahclkx_mux will be
->> enabled by the SW (and ATL as well) _and_ the mcasp3_aux_gfclk_mux path will
->> be enabled by HW w/o SW.
->> The reason why I have had crash when I switched the main_clk to
->> mcasp3_aux_gfclk_mux is that even the path for the mcasp3_ahclkx_mux is
->> enabled by the HW, the ATL itself was not enabled, so it was not generating
->> the needed clocks. Same goes backwards for the gfclk: if I reparent it to
->> let's say HDMI clock - which is not present, and handle the ahclkx clock I
->> have similar crash.
->> All in all: the McASP3 needs ICLK and both FCLK and AHCLKX to be running in
->> order to be able to access registers.
->>
->> This current setup works fine, the only issue I see is that the refcounts for
->> the mcasp3_aux_gfclk_mux path is not reflecting the reality.
->>
->> With Tero we looked at different angles of this and how to solve it w/o
->> considering it as a hack.
->> Either we go with the hwmod data with main_clk set to mcasp3_ahclkx_mux and
->> document it in a comment, or:
->> Add new flag HWMOD_OPT_CLKS_NEEDED to hwmods to use to tell that the optional
->> clocks are not really optional as they are needed to be enabled in order to
->> access to the IP. In omap_hwmod.c's _enable_clocks() and _disable_clocks() we
->> call _enable_optional_clocks()/_disable_optional_clocks() if the flag is set
->> for the hwmod and add the ahclkx_mux as optional clock for McASP3.
+>> This commit was in clk-next and then got rebased. clk-next isn't
+>> stable, please don't base pull requests on it. If you have some
+>> dependency on the patches in there then we need to know so that
+>> we can provide some branch.
 > 
-> This might be awkward to say that the optional clocks are not optional,
-> probably would be better to add:
-> struct omap_hwmod {
-> 	...
-> 	struct omap_hwmod_opt_clk	*needed_clks;
-> 	...
-> 	u8				needed_clks_cnt;
-> 	...
-> };
+> Yes, sorry about that, I'll base my future PR on linus' master branch.
 > 
-> and use the needed_clks in _init_main_clk()/_enable_clocks()/_disable_clocks() ?
+>>
+>> I cherry-picked the 4 patches to clk-next. I had to squash in this fix
+>> to get it to compile. Please check.
+> 
+> Thanks, looks good to me.
+> Nicolas, can you test it on a real platform?
 
-Arrgh, but how to deal with this via DT bindings? It will be better to mark
-the optional clocks as needed.
+Yep, tested and works okay. So for your changes (and for the record
+actually):
+Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+
+>> ---8<----
+>> diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
+>> index 631123ca6f85..abc80949e1dd 100644
+>> --- a/drivers/clk/at91/clk-generated.c
+>> +++ b/drivers/clk/at91/clk-generated.c
+>> @@ -99,22 +99,22 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
+>>  					struct clk_rate_request *req)
+>>  {
+>>  	struct clk_generated *gck = to_clk_generated(hw);
+>> -	struct clk *parent = NULL;
+>> +	struct clk_hw *parent = NULL;
+>>  	long best_rate = -EINVAL;
+>>  	unsigned long tmp_rate, min_rate;
+>>  	int best_diff = -1;
+>>  	int tmp_diff;
+>>  	int i;
+>>  
+>> -	for (i = 0; i < __clk_get_num_parents(hw->clk); i++) {
+>> +	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
+>>  		u32 div;
+>>  		unsigned long parent_rate;
+>>  
+>> -		parent = clk_get_parent_by_index(hw->clk, i);
+>> +		parent = clk_hw_get_parent_by_index(hw, i);
+>>  		if (!parent)
+>>  			continue;
+>>  
+>> -		parent_rate = __clk_get_rate(parent);
+>> +		parent_rate = clk_hw_get_rate(parent);
+>>  		min_rate = DIV_ROUND_CLOSEST(parent_rate, GENERATED_MAX_DIV + 1);
+>>  		if (!parent_rate ||
+>>  		    (gck->range.max && min_rate > gck->range.max))
+>> @@ -128,7 +128,7 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
+>>  				best_rate = tmp_rate;
+>>  				best_diff = tmp_diff;
+>>  				req->best_parent_rate = parent_rate;
+>> -				req->best_parent_hw = __clk_get_hw(parent);
+>> +				req->best_parent_hw = parent;
+>>  			}
+>>  
+>>  			if (!best_diff || tmp_rate < req->rate)
+>> @@ -156,7 +156,7 @@ static int clk_generated_set_parent(struct clk_hw *hw, u8 index)
+>>  {
+>>  	struct clk_generated *gck = to_clk_generated(hw);
+>>  
+>> -	if (index >= __clk_get_num_parents(hw->clk))
+>> +	if (index >= clk_hw_get_num_parents(hw))
+>>  		return -EINVAL;
+>>  
+>>  	gck->parent_id = index;
+>>
+> 
+> 
+> 
+
 
 -- 
-P?ter
+Nicolas Ferre
