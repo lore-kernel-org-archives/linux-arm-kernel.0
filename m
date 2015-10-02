@@ -1,72 +1,184 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 02 Oct 2015 17:48:18 +0900
-Subject: [PATCH v2 3/8] mmc: core: Add mmc_regulator_set_vqmmc()
-In-Reply-To: <CAPDyKFro3Uk3+Jzz3Y0WBKZvTs5LjahT7KgRbh_nWWVBG7V3=w@mail.gmail.com>
-References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
- <CAPDyKFqrkYXsbBJ61yYo0G8za1szARvA=as-5nLTiwGH5pCrEQ@mail.gmail.com>
- <560DF150.3000906@samsung.com> <3312969.jJ2hfB2JkV@diego>
- <560E3800.1060603@samsung.com>
- <CAPDyKFro3Uk3+Jzz3Y0WBKZvTs5LjahT7KgRbh_nWWVBG7V3=w@mail.gmail.com>
-Message-ID: <560E44D2.9060101@samsung.com>
+From: dv@vollmann.ch (Detlef Vollmann)
+Date: Fri, 2 Oct 2015 10:54:18 +0200
+Subject: [PATCH 1/1] ARM: orion5x: use mac_pton() helper
+In-Reply-To: <877fn6og2h.fsf@free-electrons.com>
+References: <1443705223-85421-1-git-send-email-andriy.shevchenko@linux.intel.com>
+ <877fn6og2h.fsf@free-electrons.com>
+Message-ID: <560E463A.6040704@vollmann.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2015 05:43 PM, Ulf Hansson wrote:
-> On 2 October 2015 at 09:53, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->> On 10/02/2015 04:06 PM, Heiko St?bner wrote:
->>> Am Freitag, 2. Oktober 2015, 11:52:00 schrieb Jaehoon Chung:
->>>> On 10/02/2015 06:05 AM, Ulf Hansson wrote:
->>>>> On 1 October 2015 at 19:35, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>>>>> On 10/01, Heiko St?bner wrote:
->>>>>>> Am Donnerstag, 1. Oktober 2015, 11:54:24 schrieb Ulf Hansson:
->>>>>>>> On 30 September 2015 at 16:55, Heiko St?bner <heiko@sntech.de> wrote:
->>>>>>>>> Am Mittwoch, 30. September 2015, 16:42:05 schrieb Ulf Hansson:
->>>>>>>>>> On 30 September 2015 at 16:07, Heiko Stuebner <heiko@sntech.de>
->>> wrote:
->>>>>>>>> The clock changes of course only touch internals of the phase-clocks,
->>>>>>>>> so
->>>>>>>>> should have no problem going through another tree.
->>>>>>>>
->>>>>>>> What happens if I take mmc and dt changes, wouldn't I need the clock
->>>>>>>> patches as well?
->>>>>>>
->>>>>>> The API stays of course the same, only the degree to settings
->>>>>>> translation gets optimized, so I guess in the worst case you would get
->>>>>>> no good phase and thus fall back to non-highspeed modes - but the
->>>>>>> system would stay running.
->>>>>>>
->>>>>>> But of course, if the clock maintainers could Ack the two clock patches
->>>>>>> and
->>>>>>> everything would stay together that would work even better :-)
->>>>>>
->>>>>> If Ulf doesn't want to take them we can apply them to clk tree.
->>>>>> Otherwise, you can have my acked-by on the clk patches.
->>>>>
->>>>> I don't mind picking up the clock patches. So I consider this as an
->>>>> ack for both patch 1 and patch2, thanks.
->>>>>
->>>>> Now, let's give Jaehoon some time to review the dw_mmc parts.
->>>>
->>>> I will check other patches on today, if it's ok, i will apply at my
->>>> repository. Thanks for giving time! :)
->>>
->>> I think Ulf wanted to apply the whole series via the mmc tree directly, but I
->>> guess that is between you two to decide ;-)
+On 10/01/15 15:48, Gregory CLEMENT wrote:
+> Hi Andy,
+>
+>   On jeu., oct. 01 2015, Andy Shevchenko <andriy.shevchenko@linux.intel.com> wrote:
+>
+>> Instead of custom approach let's use generic helper function.
+>
+> This patch looks good, however did you tested it on one of these board?
+I can probably test it over the weekend on a DNS-323.
+
+   Detlef
+
+>
+> Thanks,
+> gregory
+>
 >>
->> If it will get Stephen's acked-by, i will pick up all after checked the dwmmc patches. how about?
-> 
-> Stephen already acked the clock patches from this thread.
-> 
-> Perhaps this time, it's easier if you ack the dw_mmc patches and I can
-> pick up the hole series? Does that work for you?
-
-I doesn't review dwmmc patches (Sorry), could you give me more time?
-If you're ok, i will notice to you...then you can pick up all. :)
-
-Best Regards,
-Jaehoon Chung
-
-> 
-> Kind regards
-> Uffe
-> 
+>> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+>> Cc: Detlef Vollmann <dv@vollmann.ch>
+>> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>   arch/arm/mach-orion5x/dns323-setup.c | 53 ++----------------------------------
+>>   arch/arm/mach-orion5x/tsx09-common.c | 49 +++------------------------------
+>>   2 files changed, 7 insertions(+), 95 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
+>> index f267e58..bc279a8 100644
+>> --- a/arch/arm/mach-orion5x/dns323-setup.c
+>> +++ b/arch/arm/mach-orion5x/dns323-setup.c
+>> @@ -173,42 +173,10 @@ static struct mv643xx_eth_platform_data dns323_eth_data = {
+>>   	.phy_addr = MV643XX_ETH_PHY_ADDR(8),
+>>   };
+>>
+>> -/* dns323_parse_hex_*() taken from tsx09-common.c; should a common copy of these
+>> - * functions be kept somewhere?
+>> - */
+>> -static int __init dns323_parse_hex_nibble(char n)
+>> -{
+>> -	if (n >= '0' && n <= '9')
+>> -		return n - '0';
+>> -
+>> -	if (n >= 'A' && n <= 'F')
+>> -		return n - 'A' + 10;
+>> -
+>> -	if (n >= 'a' && n <= 'f')
+>> -		return n - 'a' + 10;
+>> -
+>> -	return -1;
+>> -}
+>> -
+>> -static int __init dns323_parse_hex_byte(const char *b)
+>> -{
+>> -	int hi;
+>> -	int lo;
+>> -
+>> -	hi = dns323_parse_hex_nibble(b[0]);
+>> -	lo = dns323_parse_hex_nibble(b[1]);
+>> -
+>> -	if (hi < 0 || lo < 0)
+>> -		return -1;
+>> -
+>> -	return (hi << 4) | lo;
+>> -}
+>> -
+>>   static int __init dns323_read_mac_addr(void)
+>>   {
+>>   	u_int8_t addr[6];
+>> -	int i;
+>> -	char *mac_page;
+>> +	void __iomem *mac_page;
+>>
+>>   	/* MAC address is stored as a regular ol' string in /dev/mtdblock4
+>>   	 * (0x007d0000-0x00800000) starting at offset 196480 (0x2ff80).
+>> @@ -217,23 +185,8 @@ static int __init dns323_read_mac_addr(void)
+>>   	if (!mac_page)
+>>   		return -ENOMEM;
+>>
+>> -	/* Sanity check the string we're looking at */
+>> -	for (i = 0; i < 5; i++) {
+>> -		if (*(mac_page + (i * 3) + 2) != ':') {
+>> -			goto error_fail;
+>> -		}
+>> -	}
+>> -
+>> -	for (i = 0; i < 6; i++)	{
+>> -		int byte;
+>> -
+>> -		byte = dns323_parse_hex_byte(mac_page + (i * 3));
+>> -		if (byte < 0) {
+>> -			goto error_fail;
+>> -		}
+>> -
+>> -		addr[i] = byte;
+>> -	}
+>> +	if (!mac_pton((__force const char *) mac_page, addr))
+>> +		goto error_fail;
+>>
+>>   	iounmap(mac_page);
+>>   	printk("DNS-323: Found ethernet MAC address: %pM\n", addr);
+>> diff --git a/arch/arm/mach-orion5x/tsx09-common.c b/arch/arm/mach-orion5x/tsx09-common.c
+>> index 24b2959..d42e006 100644
+>> --- a/arch/arm/mach-orion5x/tsx09-common.c
+>> +++ b/arch/arm/mach-orion5x/tsx09-common.c
+>> @@ -53,53 +53,12 @@ struct mv643xx_eth_platform_data qnap_tsx09_eth_data = {
+>>   	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+>>   };
+>>
+>> -static int __init qnap_tsx09_parse_hex_nibble(char n)
+>> -{
+>> -	if (n >= '0' && n <= '9')
+>> -		return n - '0';
+>> -
+>> -	if (n >= 'A' && n <= 'F')
+>> -		return n - 'A' + 10;
+>> -
+>> -	if (n >= 'a' && n <= 'f')
+>> -		return n - 'a' + 10;
+>> -
+>> -	return -1;
+>> -}
+>> -
+>> -static int __init qnap_tsx09_parse_hex_byte(const char *b)
+>> -{
+>> -	int hi;
+>> -	int lo;
+>> -
+>> -	hi = qnap_tsx09_parse_hex_nibble(b[0]);
+>> -	lo = qnap_tsx09_parse_hex_nibble(b[1]);
+>> -
+>> -	if (hi < 0 || lo < 0)
+>> -		return -1;
+>> -
+>> -	return (hi << 4) | lo;
+>> -}
+>> -
+>>   static int __init qnap_tsx09_check_mac_addr(const char *addr_str)
+>>   {
+>>   	u_int8_t addr[6];
+>> -	int i;
+>>
+>> -	for (i = 0; i < 6; i++) {
+>> -		int byte;
+>> -
+>> -		/*
+>> -		 * Enforce "xx:xx:xx:xx:xx:xx\n" format.
+>> -		 */
+>> -		if (addr_str[(i * 3) + 2] != ((i < 5) ? ':' : '\n'))
+>> -			return -1;
+>> -
+>> -		byte = qnap_tsx09_parse_hex_byte(addr_str + (i * 3));
+>> -		if (byte < 0)
+>> -			return -1;
+>> -		addr[i] = byte;
+>> -	}
+>> +	if (!mac_pton(addr_str, addr))
+>> +		return -1;
+>>
+>>   	printk(KERN_INFO "tsx09: found ethernet mac address %pM\n", addr);
+>>
+>> @@ -118,12 +77,12 @@ void __init qnap_tsx09_find_mac_addr(u32 mem_base, u32 size)
+>>   	unsigned long addr;
+>>
+>>   	for (addr = mem_base; addr < (mem_base + size); addr += 1024) {
+>> -		char *nor_page;
+>> +		void __iomem *nor_page;
+>>   		int ret = 0;
+>>
+>>   		nor_page = ioremap(addr, 1024);
+>>   		if (nor_page != NULL) {
+>> -			ret = qnap_tsx09_check_mac_addr(nor_page);
+>> +			ret = qnap_tsx09_check_mac_addr((__force const char *)nor_page);
+>>   			iounmap(nor_page);
+>>   		}
+>
