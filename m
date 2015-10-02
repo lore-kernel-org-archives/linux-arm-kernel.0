@@ -1,38 +1,70 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 2 Oct 2015 23:26:45 +0530
-Subject: [PATCH 4/5] Documentation: dt-bindings: Add info about brcm,
- nand-iproc-reset DT flag
+Date: Fri, 2 Oct 2015 23:26:46 +0530
+Subject: [PATCH 5/5] arm64: dts: Add BRCM IPROC NAND DT node for NS2
 In-Reply-To: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
 References: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1443808606-21203-5-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1443808606-21203-6-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the BRCM NAND controller DT bindings documentation
-to add info about newly added optional flag "brcm,nand-iproc-reset".
+The NAND controller on NS2 SoC is compatible with existing
+BRCM IPROC NAND driver so let's enable it in NS2 DT and
+NS2 SVK DT.
 
 Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Pramod KUMAR <pramodku@broadcom.com>
 Reviewed-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- Documentation/devicetree/bindings/mtd/brcm,brcmnand.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts | 12 ++++++++++++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi    | 15 +++++++++++++++
+ 2 files changed, 27 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mtd/brcm,brcmnand.txt b/Documentation/devicetree/bindings/mtd/brcm,brcmnand.txt
-index 4ff7128..19b7a3c 100644
---- a/Documentation/devicetree/bindings/mtd/brcm,brcmnand.txt
-+++ b/Documentation/devicetree/bindings/mtd/brcm,brcmnand.txt
-@@ -78,6 +78,10 @@ we define additional 'compatible' properties and associated register resources w
-        for interrupt status/ack.
-      - reg-names: (required) a list of the names corresponding to the previous
-        register ranges. Should contain "iproc-idm" and "iproc-ext".
-+     - brcm,nand-iproc-reset: (optional) Some of the Broadcom IPROC SoCs
-+       require NAND controller to be resetted for cleanup of previously
-+       configured NAND controller state. This optional flag resets the
-+       NAND controller once before any NAND commands are issued.
- 
- 
- * NAND chip-select
+diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+index e5950d5..a754160 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
++++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+@@ -63,5 +63,17 @@
+ 		uart3: serial at 66130000 {
+ 			status = "ok";
+ 		};
++
++		nand: nand at 66460000 {
++			nandcs at 0 {
++				compatible = "brcm,nandcs";
++				reg = <0>;
++				nand-ecc-mode = "hw";
++				nand-ecc-strength = <8>;
++				nand-ecc-step-size = <512>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++			};
++		};
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+index f603277..55c3c5a 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
++++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+@@ -212,5 +212,20 @@
+ 			compatible = "brcm,iproc-rng200";
+ 			reg = <0x66220000 0x28>;
+ 		};
++
++		nand: nand at 66460000 {
++			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
++			reg = <0x66460000 0x600>,
++			      <0x67015408 0x600>,
++			      <0x66460f00 0x20>;
++			reg-names = "nand", "iproc-idm", "iproc-ext";
++			interrupts = <GIC_SPI 420 IRQ_TYPE_LEVEL_HIGH>;
++
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			brcm,nand-iproc-reset;
++			brcm,nand-has-wp;
++		};
+ 	};
+ };
 -- 
 1.9.1
