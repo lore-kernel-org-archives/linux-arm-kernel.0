@@ -1,35 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Oct 2015 14:46:18 -0700
-Subject: [PATCH v8 7/7] pinctrl: freescale: imx: imx7d iomuxc-lpsr
- devicetree bindings
-In-Reply-To: <1443629469-12294-7-git-send-email-aalonso@freescale.com>
-References: <1443629469-12294-1-git-send-email-aalonso@freescale.com>
- <1443629469-12294-7-git-send-email-aalonso@freescale.com>
-Message-ID: <CACRpkdaht884ZBBaUoibGVRx8aGwHdimt2r9cz48=MZTpo2qaQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 03 Oct 2015 00:53:38 +0300
+Subject: [PATCH] ARM: shmobile: fix SILK board name
+In-Reply-To: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+Message-ID: <6818713.ulHphNVRsJ@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 9:11 AM, Adrian Alonso <aalonso@freescale.com> wrote:
+Unfortunately, the SILK board bindings were not quite correct, as the  board
+name should be all caps.  Fix that,  adding the board model #  in parens and
+removing stray semicolon.
 
-> Add iomuxc-lpsr devicetree bindings documentation
-> Provide documentation context as well an example on
-> pheriperals that could use pad from either iomuxc controller
-> supported by iMX7D SoC
->
-> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
-> ---
-> Changes for V2: New patch on imx7d iomuxc-lpsr patch series
-> Changes for V3: Add shared input select register notes
-> Changes for V4: Resend
-> Changes for V5:
-> - Fix spell error
-> - Remove references of SHARE_INPUT_SELECT_REG flag
-> Changes for V6: Resend
-> Changes for V7: Resend
-> Changes for V8: Correct SDA pad example
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Patch applied. Assuming Shawn's old ACK is valid so attached it,
-else beat me up Shawn.
+---
+ Documentation/devicetree/bindings/arm/shmobile.txt |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Yours,
-Linus Walleij
+Index: renesas/Documentation/devicetree/bindings/arm/shmobile.txt
+===================================================================
+--- renesas.orig/Documentation/devicetree/bindings/arm/shmobile.txt
++++ renesas/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -57,5 +57,5 @@ Boards:
+     compatible = "renesas,marzen", "renesas,r8a7779"
+   - Porter (M2-LCDP)
+     compatible = "renesas,porter", "renesas,r8a7791"
+-  - Silk
+-    compatible = "renesas,silk", "renesas,r8a7794";
++  - SILK (RTP0RC7794LCB00011S)
++    compatible = "renesas,silk", "renesas,r8a7794"
