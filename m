@@ -1,52 +1,56 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 2 Oct 2015 22:05:13 +0800
-Subject: [arm-platforms:irq/msi-map-pci 11/13] include/linux/of_irq.h:80:1:
- error: expected identifier or '(' before '{' token
-Message-ID: <201510022211.cUzT45bT%fengguang.wu@intel.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 02 Oct 2015 16:08:02 +0200
+Subject: [PATCH] PM / AVS: rockchip-io: Fix module autoload for OF
+ platform driver
+In-Reply-To: <20150918165258.GA27398@goodgumbo.baconseed.org>
+References: <20150918165258.GA27398@goodgumbo.baconseed.org>
+Message-ID: <1959860.KNdhvIZiRr@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/msi-map-pci
-head:   1ab5975873b783abe6d2f748f54ca5bef44b183f
-commit: 5af05cd5fe6352aa1838099ccdce2c597092524c [11/13] of/irq: Use the msi-map property to provide device-specific MSI domain
-config: i386-randconfig-s1-201539 (attached as .config)
-reproduce:
-        git checkout 5af05cd5fe6352aa1838099ccdce2c597092524c
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Am Freitag, 18. September 2015, 18:52:58 schrieb Luis de Bethencourt:
+> This platform driver has a OF device ID table but the OF module
+> alias information is not created so module autoloading won't work.
+> 
+> Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
 
-All error/warnings (new ones prefixed by >>):
+looks obviously correct.
 
-   In file included from drivers/base/platform.c:16:0:
->> include/linux/of_irq.h:80:1: error: expected identifier or '(' before '{' token
-    {
-    ^
->> include/linux/of_irq.h:78:34: warning: 'of_msi_map_get_device_domain' declared 'static' but never defined [-Wunused-function]
-    static inline struct irq_domain *of_msi_map_get_device_domain(struct device *dev,
-                                     ^
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-vim +80 include/linux/of_irq.h
 
-    72	static inline struct irq_domain *of_msi_get_domain(struct device *dev,
-    73							   struct device_node *np,
-    74							   enum irq_domain_bus_token token)
-    75	{
-    76		return NULL;
-    77	}
-  > 78	static inline struct irq_domain *of_msi_map_get_device_domain(struct device *dev,
-    79								      u32 rid);
-  > 80	{
-    81		return NULL;
-    82	}
-    83	#endif
+depending on how Kevin wants to handle that single patch, you might want to 
+resent it with Rafael Wysocki in the to-list though
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 20836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151002/157a0825/attachment-0001.obj>
+
+Heiko
+
+> ---
+> 
+> Hello,
+> 
+> This patch adds the missing MODULE_DEVICE_TABLE() for OF to export
+> that information so modules have the correct aliases built-in and
+> autoloading works correctly.
+> 
+> A longer explanation by Javier Canillas can be found here:
+> https://lkml.org/lkml/2015/7/30/519
+> 
+> Thanks,
+> Luis
+> 
+>  drivers/power/avs/rockchip-io-domain.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/power/avs/rockchip-io-domain.c
+> b/drivers/power/avs/rockchip-io-domain.c index 2e30002..8099456 100644
+> --- a/drivers/power/avs/rockchip-io-domain.c
+> +++ b/drivers/power/avs/rockchip-io-domain.c
+> @@ -271,6 +271,7 @@ static const struct of_device_id
+> rockchip_iodomain_match[] = { },
+>  	{ /* sentinel */ },
+>  };
+> +MODULE_DEVICE_TABLE(of, rockchip_iodomain_match);
+> 
+>  static int rockchip_iodomain_probe(struct platform_device *pdev)
+>  {
