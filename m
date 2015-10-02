@@ -1,62 +1,76 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 2 Oct 2015 23:24:18 +0530
-Subject: [PATCH 1/6] arm64: dts: Add L2-cache DT node for NS2
+Date: Fri, 2 Oct 2015 23:24:19 +0530
+Subject: [PATCH 2/6] arm64: dts: Add SMMU DT node for NS2
 In-Reply-To: <1443808463-21120-1-git-send-email-anup.patel@broadcom.com>
 References: <1443808463-21120-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1443808463-21120-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1443808463-21120-3-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent kernels requires cache hierrachy to be defined via DT hence
-this patch updates NS2 DT accordingly.
+The SMMU-500 driver is already available in Linux kernel. Let's
+enable it for NS2 in DT.
+
+This patch keeps mmu-masters attribute empty so that driver patches
+can later extend this attribute when adding device DT nodes.
 
 Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Sandeep Tripathy <tripathy@broadcom.com>
 Reviewed-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- arch/arm64/boot/dts/broadcom/ns2.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/boot/dts/broadcom/ns2.dtsi | 41 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index 3c92d92..f759175 100644
+index f759175..c5d90e4 100644
 --- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
 +++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -50,6 +50,7 @@
- 			reg = <0 0>;
- 			enable-method = "spin-table";
- 			cpu-release-addr = <0 0x84b00000>;
-+			next-level-cache = <&CLUSTER0_L2>;
- 		};
+@@ -103,6 +103,47 @@
+ 		#size-cells = <1>;
+ 		ranges = <0 0 0 0xffffffff>;
  
- 		cpu at 1 {
-@@ -58,6 +59,7 @@
- 			reg = <0 1>;
- 			enable-method = "spin-table";
- 			cpu-release-addr = <0 0x84b00000>;
-+			next-level-cache = <&CLUSTER0_L2>;
- 		};
- 
- 		cpu at 2 {
-@@ -66,6 +68,7 @@
- 			reg = <0 2>;
- 			enable-method = "spin-table";
- 			cpu-release-addr = <0 0x84b00000>;
-+			next-level-cache = <&CLUSTER0_L2>;
- 		};
- 
- 		cpu at 3 {
-@@ -74,6 +77,11 @@
- 			reg = <0 3>;
- 			enable-method = "spin-table";
- 			cpu-release-addr = <0 0x84b00000>;
-+			next-level-cache = <&CLUSTER0_L2>;
++		smmu: mmu at 64000000 {
++			compatible = "arm,mmu-500";
++			reg = <0x64000000 0x40000>;
++			#global-interrupts = <2>;
++			interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 230 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 232 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 233 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 234 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 235 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 236 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 237 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 238 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 239 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 240 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 241 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 242 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 243 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 244 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 245 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 247 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 248 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 249 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 250 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 251 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 252 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 253 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 254 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 255 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 257 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 258 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 259 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 260 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 261 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 262 IRQ_TYPE_LEVEL_HIGH>;
++			mmu-masters;
 +		};
 +
-+		CLUSTER0_L2: l2-cache at 000 {
-+			compatible = "cache";
- 		};
- 	};
- 
+ 		gic: interrupt-controller at 65210000 {
+ 			compatible = "arm,gic-400";
+ 			#interrupt-cells = <3>;
 -- 
 1.9.1
