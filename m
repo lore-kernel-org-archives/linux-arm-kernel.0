@@ -1,46 +1,56 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 2 Oct 2015 22:49:38 +0200
-Subject: [PATCH 0/9] UEFI boot and runtime services support for 32-bit ARM
-In-Reply-To: <20151002203831.GE21513@n2100.arm.linux.org.uk>
-References: <1443719063-6832-1-git-send-email-ard.biesheuvel@linaro.org>
- <20151002203831.GE21513@n2100.arm.linux.org.uk>
-Message-ID: <CAKv+Gu8Fin7h9LniFS+Q99UFd4+X_NbXD41432zU8xSz=UShjQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 2 Oct 2015 22:52:34 +0200
+Subject: [PATCH v3 4/8] arm/arm64: KVM: Implement GICD_ICFGR as RO for PPIs
+In-Reply-To: <560E9A06.3040404@arm.com>
+References: <1443538145-11990-1-git-send-email-christoffer.dall@linaro.org>
+ <1443538145-11990-5-git-send-email-christoffer.dall@linaro.org>
+ <560E9A06.3040404@arm.com>
+Message-ID: <20151002205234.GF32011@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 October 2015 at 22:38, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Oct 01, 2015 at 07:04:14PM +0200, Ard Biesheuvel wrote:
->> There are a number of prerequisites for this series that have all been
->> sent to the linux-arm-kernel mailing list at some point (and mostly
->> ignored).
->
-> They've been ignored because they're UEFI and no one's said that it's
-> something that 32-bit ARM should get... until this series has come
-> along.  It might help if Linaro was more engaging with developers who
-> aren't part of Linaro.
->
+On Fri, Oct 02, 2015 at 03:51:50PM +0100, Andre Przywara wrote:
+> Hi Christoffer,
+> 
+> On 29/09/15 15:49, Christoffer Dall wrote:
+> > The GICD_ICFGR allows the bits for the SGIs and PPIs to be read only.
+> > We currently simulate this behavior by writing a hardcoded value to the
+> > register for the SGIs and PPIs on every write of these bits to the
+> > register (ignoring what the guest actually wrote), and by writing the
+> > same value as the reset value to the register.
+> > 
+> > This is a bit counter-intuitive, as the register is RO for these bits,
+> > and we can just implement it that way, allowing us to control the value
+> > of the bits purely in the reset code.
+> > 
+> > Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  virt/kvm/arm/vgic.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> > index fe0e5db..e606f78 100644
+> > --- a/virt/kvm/arm/vgic.c
+> > +++ b/virt/kvm/arm/vgic.c
+> > @@ -655,7 +655,7 @@ bool vgic_handle_cfg_reg(u32 *reg, struct kvm_exit_mmio *mmio,
+> >  			ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
+> >  	if (mmio->is_write) {
+> >  		if (offset < 8) {
+> > -			*reg = ~0U; /* Force PPIs/SGIs to 1 */
+> > +			/* Ignore writes to read-only SGI and PPI bits */
+> >  			return false;
+> >  		}
+> 
+> Nit: Isn't this now violating kernel coding style because of a single
+> statement not needing braces? Maybe move the comment in front of the
+> if-statement to make this more obvious?
+> 
+sure
 
-Actually, the first iteration of this series was sent out by Roy more
-than two years ago.
-But I am fully aware that these patches and the prerequisite series
-(plural) still need thorough review, I am just throwing this series
-out there early since it ties all of that together, so it puts the
-other stuff into context.
-
-> Now, I'm not going to suddenly drop what I'm working on to start trying
-> to gain an understanding of UEFI, and what its implications are for
-> 32-bit ARM so that I can reasonably review these patches - let me put
-> that another way: don't expect me to review this stuff quickly and
-> come out with review comments on something I have very ltitle clue
-> about.  I have precisely zero UEFI knowledge.
->
-
-I think the UEFI peculiarities are mostly covered by the common code
-shared with x86 and arm64. What I would appreciate your input on is
-the ARM specific thinks like early .data in the decompressor (even
-before the GOT fixups), the early_ioremap addition and the changes to
-create_mapping(). But no rush at all.
-
+> Other than that:
+> 
+> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+> 
 Thanks,
-Ard.
+-Christoffer
