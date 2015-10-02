@@ -1,152 +1,66 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  2 Oct 2015 10:55:04 +0100
-Subject: [PATCHv4 2/6] arm64: perf: add Cortex-A53 support
-In-Reply-To: <1443779708-26789-1-git-send-email-mark.rutland@arm.com>
-References: <1443779708-26789-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1443779708-26789-3-git-send-email-mark.rutland@arm.com>
+Date: Fri,  2 Oct 2015 10:55:02 +0100
+Subject: [PATCHv4 0/6] arm64: perf: heterogeneous PMU support
+Message-ID: <1443779708-26789-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortex-A53 PMU supports a few events outside of the required PMUv3
-set that are rather useful.
+This patch series moves the arm64 code over to the librified perf code now used
+by 32-bit arm, in the process gaining support for heterogeneous PMUs. Tailored
+support is then added for Cortex-A53 and Cortex-A57 as used in Juno systems.
 
-This patch adds the event map data for said events.
+With this series applied, perf can be used to monitor 64-bit systems with
+heterogeneous PMUs in an identical fashion to 32-bit systems, e.g.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- Documentation/devicetree/bindings/arm/pmu.txt |  1 +
- arch/arm64/kernel/perf_event.c                | 64 ++++++++++++++++++++++++++-
- 2 files changed, 63 insertions(+), 2 deletions(-)
+$ perf stat -e armv8_cortex_a53/config=0x11/ -e armv8_cortex_a57/config=0x11/ ./a.out 
 
-diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-index 435251f..2e6737b 100644
---- a/Documentation/devicetree/bindings/arm/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/pmu.txt
-@@ -8,6 +8,7 @@ Required properties:
- 
- - compatible : should be one of
- 	"arm,armv8-pmuv3"
-+	"arm.cortex-a53-pmu"
- 	"arm,cortex-a17-pmu"
- 	"arm,cortex-a15-pmu"
- 	"arm,cortex-a12-pmu"
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 5984c0c..cc13395 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -69,6 +69,11 @@ enum armv8_pmuv3_perf_types {
- 	ARMV8_PMUV3_PERFCTR_BUS_CYCLES				= 0x1D,
- };
- 
-+/* ARMv8 Cortex-A53 specific event types. */
-+enum armv8_a53_pmu_perf_types {
-+	ARMV8_A53_PERFCTR_PREFETCH_LINEFILL			= 0xC2,
-+};
-+
- /* PMUv3 HW events mapping. */
- static const unsigned armv8_pmuv3_perf_map[PERF_COUNT_HW_MAX] = {
- 	PERF_MAP_ALL_UNSUPPORTED,
-@@ -79,6 +84,18 @@ static const unsigned armv8_pmuv3_perf_map[PERF_COUNT_HW_MAX] = {
- 	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
- };
- 
-+/* ARM Cortex-A53 HW events mapping. */
-+static const unsigned armv8_a53_perf_map[PERF_COUNT_HW_MAX] = {
-+	PERF_MAP_ALL_UNSUPPORTED,
-+	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV8_PMUV3_PERFCTR_CLOCK_CYCLES,
-+	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV8_PMUV3_PERFCTR_INSTR_EXECUTED,
-+	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
-+	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
-+	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV8_PMUV3_PERFCTR_PC_WRITE,
-+	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
-+	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV8_PMUV3_PERFCTR_BUS_CYCLES,
-+};
-+
- static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 						[PERF_COUNT_HW_CACHE_OP_MAX]
- 						[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
-@@ -95,6 +112,28 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
- };
- 
-+static const unsigned armv8_a53_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
-+					      [PERF_COUNT_HW_CACHE_OP_MAX]
-+					      [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
-+	PERF_CACHE_MAP_ALL_UNSUPPORTED,
-+
-+	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
-+	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
-+	[C(L1D)][C(OP_PREFETCH)][C(RESULT_MISS)] = ARMV8_A53_PERFCTR_PREFETCH_LINEFILL,
-+
-+	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_ICACHE_ACCESS,
-+	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_ICACHE_REFILL,
-+
-+	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_ITLB_REFILL,
-+
-+	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
-+};
-+
- /*
-  * Perf Events' indices
-  */
-@@ -502,6 +541,13 @@ static int armv8_pmuv3_map_event(struct perf_event *event)
- 				ARMV8_EVTYPE_EVENT);
- }
- 
-+static int armv8_a53_map_event(struct perf_event *event)
-+{
-+	return armpmu_map_event(event, &armv8_a53_perf_map,
-+				&armv8_a53_perf_cache_map,
-+				ARMV8_EVTYPE_EVENT);
-+}
-+
- static void armv8pmu_read_num_pmnc_events(void *info)
- {
- 	int *nb_cnt = info;
-@@ -520,7 +566,7 @@ static int armv8pmu_probe_num_events(struct arm_pmu *arm_pmu)
- 				    &arm_pmu->num_events, 1);
- }
- 
--static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
-+static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	cpu_pmu->handle_irq		= armv8pmu_handle_irq,
- 	cpu_pmu->enable			= armv8pmu_enable_event,
-@@ -532,14 +578,28 @@ static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->stop			= armv8pmu_stop,
- 	cpu_pmu->reset			= armv8pmu_reset,
- 	cpu_pmu->max_period		= (1LLU << 32) - 1,
-+	cpu_pmu->set_event_filter	= armv8pmu_set_event_filter;
-+}
-+
-+static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
-+{
-+	armv8_pmu_init(cpu_pmu);
- 	cpu_pmu->name			= "armv8_pmuv3";
- 	cpu_pmu->map_event		= armv8_pmuv3_map_event;
--	cpu_pmu->set_event_filter	= armv8pmu_set_event_filter;
-+	return armv8pmu_probe_num_events(cpu_pmu);
-+}
-+
-+static int armv8_a53_pmu_init(struct arm_pmu *cpu_pmu)
-+{
-+	armv8_pmu_init(cpu_pmu);
-+	cpu_pmu->name			= "armv8_cortex_a53";
-+	cpu_pmu->map_event		= armv8_a53_map_event;
- 	return armv8pmu_probe_num_events(cpu_pmu);
- }
- 
- static const struct of_device_id armv8_pmu_of_device_ids[] = {
- 	{.compatible = "arm,armv8-pmuv3",	.data = armv8_pmuv3_init},
-+	{.compatible = "arm,cortex-a53-pmu",	.data = armv8_a53_pmu_init},
- 	{},
- };
- 
+ Performance counter stats for './a.out':
+
+         185250238 armv8_cortex_a53/config=0x11/                                    [55.34%]
+         225006550 armv8_cortex_a57/config=0x11/                                    [43.96%]
+
+       0.213953840 seconds time elapsed
+
+$ perf stat -e cycles ./a.out 
+
+ Performance counter stats for './a.out':
+
+         830917902 cycles                    [64.60%]
+
+       1.023141420 seconds time elapsed
+
+Since v2 [1]:
+* Rebase to v4.2-rc1
+* Split MAINTAINERS changes
+* Add arm64 perf code to MAINTAINERS entry
+Since v3 [2]
+* Drop patches which made it for v4.3-rc1
+* Don't bother with pmuv3 renaming
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/350109.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354287.html
+
+Mark Rutland (6):
+  arm64: perf: move to shared arm_pmu framework
+  arm64: perf: add Cortex-A53 support
+  arm64: perf: add Cortex-A57 support
+  arm64: dts: juno: describe PMUs separately
+  MAINTAINERS: update ARM PMU profiling and debugging for arm64
+  MAINTAINERS: add myself as arm perf reviewer
+
+ Documentation/devicetree/bindings/arm/pmu.txt |    2 +
+ MAINTAINERS                                   |    9 +-
+ arch/arm64/Kconfig                            |    8 +-
+ arch/arm64/boot/dts/arm/juno-r1.dts           |   18 +-
+ arch/arm64/boot/dts/arm/juno.dts              |   18 +-
+ arch/arm64/include/asm/pmu.h                  |   83 --
+ arch/arm64/kernel/perf_event.c                | 1068 +++++--------------------
+ drivers/perf/Kconfig                          |    2 +-
+ 8 files changed, 241 insertions(+), 967 deletions(-)
+ delete mode 100644 arch/arm64/include/asm/pmu.h
+
 -- 
 1.9.1
