@@ -1,23 +1,21 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 2 Oct 2015 10:25:41 +0900
-Subject: [PATCH v2 0/2] Add USB PHY device tree support for R8A7794/SILK
- board
-In-Reply-To: <4938706.NQELE8A71r@wasted.cogentembedded.com>
-References: <4938706.NQELE8A71r@wasted.cogentembedded.com>
-Message-ID: <20151002012541.GE22640@verge.net.au>
+Date: Fri, 2 Oct 2015 10:57:13 +0900
+Subject: [PATCH 13/38] ARM: shmobile: apmu: correct type of CPU id
+In-Reply-To: <1442842450-29769-14-git-send-email-a.hajda@samsung.com>
+References: <1442842450-29769-1-git-send-email-a.hajda@samsung.com>
+ <1442842450-29769-14-git-send-email-a.hajda@samsung.com>
+Message-ID: <20151002015713.GA7043@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-On Fri, Oct 02, 2015 at 01:03:41AM +0300, Sergei Shtylyov wrote:
-> Hello.
+On Mon, Sep 21, 2015 at 03:33:45PM +0200, Andrzej Hajda wrote:
+> CPU id can be negative, so it cannot be assigned to unsigned variable.
 > 
->    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
-> 'renesas-devel-20151001-v4.3-rc3' tag. Here we add the USB PHY device tree
-> support on the R8A7794/SILK low cost board.
+> The problem has been detected using proposed semantic patch
+> scripts/coccinelle/tests/unsigned_lesser_than_zero.cocci [1].
 > 
-> [1/2] ARM: shmobile: r8a7794: add USB PHY DT support
-> [2/2] ARM: shmobile: silk: enable USB PHY
+> [1]: http://permalink.gmane.org/gmane.linux.kernel/2038576
+> 
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 
-Thanks, I have queued these up for v4.4.
+Thanks, I have queued this up as a cleanup for v4.4.
