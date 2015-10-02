@@ -1,75 +1,331 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Fri, 2 Oct 2015 18:57:43 -0400
-Subject: [PATCH 08/10] clk: iproc: define Broadcom NS2 iProc clock binding
+Date: Fri, 2 Oct 2015 18:57:42 -0400
+Subject: [PATCH 07/10] clk: iproc: Separate status and control variables
 In-Reply-To: <1443826665-17570-1-git-send-email-jonmason@broadcom.com>
 References: <1443826665-17570-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1443826665-17570-9-git-send-email-jonmason@broadcom.com>
+Message-ID: <1443826665-17570-8-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device tree bindings for Broadcom Northstar 2 architecture
-based clock controller
+Some PLLs have separate registers for Status and Control.  The means the
+pll_base needs to be split into 2 new variables, so that those PLLs can
+specify device tree registers for those independently.  Also, add a new
+driver flag to identify this presence of the split, and let the driver
+know that additional registers need to be used.
 
 Signed-off-by: Jon Mason <jonmason@broadcom.com>
 ---
- .../bindings/clock/brcm,iproc-clocks.txt           | 48 ++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ drivers/clk/bcm/clk-iproc-pll.c | 96 ++++++++++++++++++++++++-----------------
+ drivers/clk/bcm/clk-iproc.h     |  6 +++
+ 2 files changed, 62 insertions(+), 40 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-index b3c3e9d..ede65a5 100644
---- a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-+++ b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-@@ -160,3 +160,51 @@ Northstar Plus.  These clock IDs are defined in:
-     pcie_phy	lcpll0		1	BCM_NSP_LCPLL0_PCIE_PHY_REF_CLK
-     sdio	lcpll0		2	BCM_NSP_LCPLL0_SDIO_CLK
-     ddr_phy	lcpll0		3	BCM_NSP_LCPLL0_DDR_PHY_CLK
+diff --git a/drivers/clk/bcm/clk-iproc-pll.c b/drivers/clk/bcm/clk-iproc-pll.c
+index 882aced..c8c993d 100644
+--- a/drivers/clk/bcm/clk-iproc-pll.c
++++ b/drivers/clk/bcm/clk-iproc-pll.c
+@@ -74,7 +74,8 @@ struct iproc_clk {
+ };
+ 
+ struct iproc_pll {
+-	void __iomem *pll_base;
++	void __iomem *status_base;
++	void __iomem *control_base;
+ 	void __iomem *pwr_base;
+ 	void __iomem *asiu_base;
+ 
+@@ -127,7 +128,7 @@ static int pll_wait_for_lock(struct iproc_pll *pll)
+ 	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
+ 
+ 	for (i = 0; i < LOCK_DELAY; i++) {
+-		u32 val = readl(pll->pll_base + ctrl->status.offset);
++		u32 val = readl(pll->status_base + ctrl->status.offset);
+ 
+ 		if (val & (1 << ctrl->status.shift))
+ 			return 0;
+@@ -145,7 +146,7 @@ static void iproc_pll_write(struct iproc_pll *pll, void __iomem *base,
+ 	writel(val, base + offset);
+ 
+ 	if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK &&
+-		     base == pll->pll_base))
++		     (base == pll->status_base || base == pll->control_base)))
+ 		val = readl(base + offset);
+ }
+ 
+@@ -161,9 +162,9 @@ static void __pll_disable(struct iproc_pll *pll)
+ 	}
+ 
+ 	if (ctrl->flags & IPROC_CLK_EMBED_PWRCTRL) {
+-		val = readl(pll->pll_base + ctrl->aon.offset);
++		val = readl(pll->control_base + ctrl->aon.offset);
+ 		val |= (bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
+-		iproc_pll_write(pll, pll->pll_base, ctrl->aon.offset, val);
++		iproc_pll_write(pll, pll->control_base, ctrl->aon.offset, val);
+ 	}
+ 
+ 	if (pll->pwr_base) {
+@@ -184,9 +185,9 @@ static int __pll_enable(struct iproc_pll *pll)
+ 	u32 val;
+ 
+ 	if (ctrl->flags & IPROC_CLK_EMBED_PWRCTRL) {
+-		val = readl(pll->pll_base + ctrl->aon.offset);
++		val = readl(pll->control_base + ctrl->aon.offset);
+ 		val &= ~(bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
+-		iproc_pll_write(pll, pll->pll_base, ctrl->aon.offset, val);
++		iproc_pll_write(pll, pll->control_base, ctrl->aon.offset, val);
+ 	}
+ 
+ 	if (pll->pwr_base) {
+@@ -213,9 +214,9 @@ static void __pll_put_in_reset(struct iproc_pll *pll)
+ 	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
+ 	const struct iproc_pll_reset_ctrl *reset = &ctrl->reset;
+ 
+-	val = readl(pll->pll_base + reset->offset);
++	val = readl(pll->control_base + reset->offset);
+ 	val &= ~(1 << reset->reset_shift | 1 << reset->p_reset_shift);
+-	iproc_pll_write(pll, pll->pll_base, reset->offset, val);
++	iproc_pll_write(pll, pll->control_base, reset->offset, val);
+ }
+ 
+ static void __pll_bring_out_reset(struct iproc_pll *pll, unsigned int kp,
+@@ -226,17 +227,17 @@ static void __pll_bring_out_reset(struct iproc_pll *pll, unsigned int kp,
+ 	const struct iproc_pll_reset_ctrl *reset = &ctrl->reset;
+ 	const struct iproc_pll_dig_filter_ctrl *dig_filter = &ctrl->dig_filter;
+ 
+-	val = readl(pll->pll_base + dig_filter->offset);
++	val = readl(pll->control_base + dig_filter->offset);
+ 	val &= ~(bit_mask(dig_filter->ki_width) << dig_filter->ki_shift |
+ 		bit_mask(dig_filter->kp_width) << dig_filter->kp_shift |
+ 		bit_mask(dig_filter->ka_width) << dig_filter->ka_shift);
+ 	val |= ki << dig_filter->ki_shift | kp << dig_filter->kp_shift |
+ 	       ka << dig_filter->ka_shift;
+-	iproc_pll_write(pll, pll->pll_base, dig_filter->offset, val);
++	iproc_pll_write(pll, pll->control_base, dig_filter->offset, val);
+ 
+-	val = readl(pll->pll_base + reset->offset);
++	val = readl(pll->control_base + reset->offset);
+ 	val |= 1 << reset->reset_shift | 1 << reset->p_reset_shift;
+-	iproc_pll_write(pll, pll->pll_base, reset->offset, val);
++	iproc_pll_write(pll, pll->control_base, reset->offset, val);
+ }
+ 
+ static int pll_set_rate(struct iproc_clk *clk, unsigned int rate_index,
+@@ -291,9 +292,9 @@ static int pll_set_rate(struct iproc_clk *clk, unsigned int rate_index,
+ 	/* put PLL in reset */
+ 	__pll_put_in_reset(pll);
+ 
+-	iproc_pll_write(pll, pll->pll_base, ctrl->vco_ctrl.u_offset, 0);
++	iproc_pll_write(pll, pll->control_base, ctrl->vco_ctrl.u_offset, 0);
+ 
+-	val = readl(pll->pll_base + ctrl->vco_ctrl.l_offset);
++	val = readl(pll->control_base + ctrl->vco_ctrl.l_offset);
+ 
+ 	if (rate >= VCO_LOW && rate < VCO_MID)
+ 		val |= (1 << PLL_VCO_LOW_SHIFT);
+@@ -303,29 +304,29 @@ static int pll_set_rate(struct iproc_clk *clk, unsigned int rate_index,
+ 	else
+ 		val |= (1 << PLL_VCO_HIGH_SHIFT);
+ 
+-	iproc_pll_write(pll, pll->pll_base, ctrl->vco_ctrl.l_offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->vco_ctrl.l_offset, val);
+ 
+ 	/* program integer part of NDIV */
+-	val = readl(pll->pll_base + ctrl->ndiv_int.offset);
++	val = readl(pll->control_base + ctrl->ndiv_int.offset);
+ 	val &= ~(bit_mask(ctrl->ndiv_int.width) << ctrl->ndiv_int.shift);
+ 	val |= vco->ndiv_int << ctrl->ndiv_int.shift;
+-	iproc_pll_write(pll, pll->pll_base, ctrl->ndiv_int.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->ndiv_int.offset, val);
+ 
+ 	/* program fractional part of NDIV */
+ 	if (ctrl->flags & IPROC_CLK_PLL_HAS_NDIV_FRAC) {
+-		val = readl(pll->pll_base + ctrl->ndiv_frac.offset);
++		val = readl(pll->control_base + ctrl->ndiv_frac.offset);
+ 		val &= ~(bit_mask(ctrl->ndiv_frac.width) <<
+ 			 ctrl->ndiv_frac.shift);
+ 		val |= vco->ndiv_frac << ctrl->ndiv_frac.shift;
+-		iproc_pll_write(pll, pll->pll_base, ctrl->ndiv_frac.offset,
++		iproc_pll_write(pll, pll->control_base, ctrl->ndiv_frac.offset,
+ 				val);
+ 	}
+ 
+ 	/* program PDIV */
+-	val = readl(pll->pll_base + ctrl->pdiv.offset);
++	val = readl(pll->control_base + ctrl->pdiv.offset);
+ 	val &= ~(bit_mask(ctrl->pdiv.width) << ctrl->pdiv.shift);
+ 	val |= vco->pdiv << ctrl->pdiv.shift;
+-	iproc_pll_write(pll, pll->pll_base, ctrl->pdiv.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->pdiv.offset, val);
+ 
+ 	__pll_bring_out_reset(pll, kp, ka, ki);
+ 
+@@ -372,7 +373,7 @@ static unsigned long iproc_pll_recalc_rate(struct clk_hw *hw,
+ 		return 0;
+ 
+ 	/* PLL needs to be locked */
+-	val = readl(pll->pll_base + ctrl->status.offset);
++	val = readl(pll->status_base + ctrl->status.offset);
+ 	if ((val & (1 << ctrl->status.shift)) == 0) {
+ 		clk->rate = 0;
+ 		return 0;
+@@ -383,13 +384,13 @@ static unsigned long iproc_pll_recalc_rate(struct clk_hw *hw,
+ 	 *
+ 	 * ((ndiv_int + ndiv_frac / 2^20) * (parent clock rate / pdiv)
+ 	 */
+-	val = readl(pll->pll_base + ctrl->ndiv_int.offset);
++	val = readl(pll->control_base + ctrl->ndiv_int.offset);
+ 	ndiv_int = (val >> ctrl->ndiv_int.shift) &
+ 		bit_mask(ctrl->ndiv_int.width);
+ 	ndiv = (u64)ndiv_int << ctrl->ndiv_int.shift;
+ 
+ 	if (ctrl->flags & IPROC_CLK_PLL_HAS_NDIV_FRAC) {
+-		val = readl(pll->pll_base + ctrl->ndiv_frac.offset);
++		val = readl(pll->control_base + ctrl->ndiv_frac.offset);
+ 		ndiv_frac = (val >> ctrl->ndiv_frac.shift) &
+ 			bit_mask(ctrl->ndiv_frac.width);
+ 
+@@ -398,7 +399,7 @@ static unsigned long iproc_pll_recalc_rate(struct clk_hw *hw,
+ 				ndiv_frac;
+ 	}
+ 
+-	val = readl(pll->pll_base + ctrl->pdiv.offset);
++	val = readl(pll->control_base + ctrl->pdiv.offset);
+ 	pdiv = (val >> ctrl->pdiv.shift) & bit_mask(ctrl->pdiv.width);
+ 
+ 	clk->rate = (ndiv * parent_rate) >> ctrl->ndiv_int.shift;
+@@ -463,14 +464,14 @@ static int iproc_clk_enable(struct clk_hw *hw)
+ 	u32 val;
+ 
+ 	/* channel enable is active low */
+-	val = readl(pll->pll_base + ctrl->enable.offset);
++	val = readl(pll->control_base + ctrl->enable.offset);
+ 	val &= ~(1 << ctrl->enable.enable_shift);
+-	iproc_pll_write(pll, pll->pll_base, ctrl->enable.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->enable.offset, val);
+ 
+ 	/* also make sure channel is not held */
+-	val = readl(pll->pll_base + ctrl->enable.offset);
++	val = readl(pll->control_base + ctrl->enable.offset);
+ 	val &= ~(1 << ctrl->enable.hold_shift);
+-	iproc_pll_write(pll, pll->pll_base, ctrl->enable.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->enable.offset, val);
+ 
+ 	return 0;
+ }
+@@ -485,9 +486,9 @@ static void iproc_clk_disable(struct clk_hw *hw)
+ 	if (ctrl->flags & IPROC_CLK_AON)
+ 		return;
+ 
+-	val = readl(pll->pll_base + ctrl->enable.offset);
++	val = readl(pll->control_base + ctrl->enable.offset);
+ 	val |= 1 << ctrl->enable.enable_shift;
+-	iproc_pll_write(pll, pll->pll_base, ctrl->enable.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->enable.offset, val);
+ }
+ 
+ static unsigned long iproc_clk_recalc_rate(struct clk_hw *hw,
+@@ -502,7 +503,7 @@ static unsigned long iproc_clk_recalc_rate(struct clk_hw *hw,
+ 	if (parent_rate == 0)
+ 		return 0;
+ 
+-	val = readl(pll->pll_base + ctrl->mdiv.offset);
++	val = readl(pll->control_base + ctrl->mdiv.offset);
+ 	mdiv = (val >> ctrl->mdiv.shift) & bit_mask(ctrl->mdiv.width);
+ 	if (mdiv == 0)
+ 		mdiv = 256;
+@@ -549,14 +550,14 @@ static int iproc_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (div > 256)
+ 		return -EINVAL;
+ 
+-	val = readl(pll->pll_base + ctrl->mdiv.offset);
++	val = readl(pll->control_base + ctrl->mdiv.offset);
+ 	if (div == 256) {
+ 		val &= ~(bit_mask(ctrl->mdiv.width) << ctrl->mdiv.shift);
+ 	} else {
+ 		val &= ~(bit_mask(ctrl->mdiv.width) << ctrl->mdiv.shift);
+ 		val |= div << ctrl->mdiv.shift;
+ 	}
+-	iproc_pll_write(pll, pll->pll_base, ctrl->mdiv.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->mdiv.offset, val);
+ 	clk->rate = parent_rate / div;
+ 
+ 	return 0;
+@@ -581,9 +582,10 @@ static void iproc_pll_sw_cfg(struct iproc_pll *pll)
+ 	if (ctrl->flags & IPROC_CLK_PLL_NEEDS_SW_CFG) {
+ 		u32 val;
+ 
+-		val = readl(pll->pll_base + ctrl->sw_ctrl.offset);
++		val = readl(pll->control_base + ctrl->sw_ctrl.offset);
+ 		val |= BIT(ctrl->sw_ctrl.shift);
+-		iproc_pll_write(pll, pll->pll_base, ctrl->sw_ctrl.offset, val);
++		iproc_pll_write(pll, pll->control_base, ctrl->sw_ctrl.offset,
++				val);
+ 	}
+ }
+ 
+@@ -618,8 +620,8 @@ void __init iproc_pll_clk_setup(struct device_node *node,
+ 	if (WARN_ON(!pll->clks))
+ 		goto err_clks;
+ 
+-	pll->pll_base = of_iomap(node, 0);
+-	if (WARN_ON(!pll->pll_base))
++	pll->control_base = of_iomap(node, 0);
++	if (WARN_ON(!pll->control_base))
+ 		goto err_pll_iomap;
+ 
+ 	/* Some SoCs do not require the pwr_base, thus failing is not fatal */
+@@ -632,6 +634,16 @@ void __init iproc_pll_clk_setup(struct device_node *node,
+ 			goto err_asiu_iomap;
+ 	}
+ 
++	if (pll_ctrl->flags & IPROC_CLK_PLL_SPLIT_STAT_CTRL) {
++		/* Some SoCs have a split status/control.  If this does not
++		 * exist, assume they are unified.
++		 */
++		pll->status_base = of_iomap(node, 2);
++		if (!pll->status_base)
++			goto err_status_iomap;
++	} else
++		pll->status_base = pll->control_base;
 +
-+Northstar 2
-+-----------
-+PLL and leaf clock compatible strings for Northstar 2 are:
-+    "brcm,ns2-genpll-scr"
-+    "brcm,ns2-genpll-sw"
-+    "brcm,ns2-lcpll-ddr"
-+    "brcm,ns2-lcpll-ports"
+ 	/* initialize and register the PLL itself */
+ 	pll->ctrl = pll_ctrl;
+ 
+@@ -702,6 +714,10 @@ err_clk_register:
+ 		clk_unregister(pll->clk_data.clks[i]);
+ 
+ err_pll_register:
++	if (pll->status_base != pll->control_base)
++		iounmap(pll->status_base);
 +
-+The following table defines the set of PLL/clock index and ID for Northstar 2.
-+These clock IDs are defined in:
-+    "include/dt-bindings/clock/bcm-ns2.h"
++err_status_iomap:
+ 	if (pll->asiu_base)
+ 		iounmap(pll->asiu_base);
+ 
+@@ -709,7 +725,7 @@ err_asiu_iomap:
+ 	if (pll->pwr_base)
+ 		iounmap(pll->pwr_base);
+ 
+-	iounmap(pll->pll_base);
++	iounmap(pll->control_base);
+ 
+ err_pll_iomap:
+ 	kfree(pll->clks);
+diff --git a/drivers/clk/bcm/clk-iproc.h b/drivers/clk/bcm/clk-iproc.h
+index b71c197..8988de7 100644
+--- a/drivers/clk/bcm/clk-iproc.h
++++ b/drivers/clk/bcm/clk-iproc.h
+@@ -55,6 +55,12 @@
+ #define IPROC_CLK_EMBED_PWRCTRL BIT(5)
+ 
+ /*
++ * Some PLLs have separate registers for Status and Control.  Identify this to
++ * let the driver know if additional registers need to be used
++ */
++#define IPROC_CLK_PLL_SPLIT_STAT_CTRL BIT(6)
 +
-+    Clock	Source		Index	ID
-+    ---		-----		-----	---------
-+    crystal	N/A		N/A	N/A
-+
-+    genpll_scr	crystal		0	BCM_NS2_GENPLL_SCR
-+    scr		genpll_scr	1	BCM_NS2_GENPLL_SCR_SCR_CLK
-+    fs		genpll_scr	2	BCM_NS2_GENPLL_SCR_FS_CLK
-+    audio_ref	genpll_scr	3	BCM_NS2_GENPLL_SCR_AUDIO_CLK
-+    ch3_unused	genpll_scr	4	BCM_NS2_GENPLL_SCR_CH3_UNUSED
-+    ch4_unused	genpll_scr	5	BCM_NS2_GENPLL_SCR_CH4_UNUSED
-+    ch5_unused	genpll_scr	6	BCM_NS2_GENPLL_SCR_CH5_UNUSED
-+
-+    genpll_sw	crystal		0	BCM_NS2_GENPLL_SW
-+    rpe		genpll_sw	1	BCM_NS2_GENPLL_SW_RPE_CLK
-+    250		genpll_sw	2	BCM_NS2_GENPLL_SW_250_CLK
-+    nic		genpll_sw	3	BCM_NS2_GENPLL_SW_NIC_CLK
-+    chimp	genpll_sw	4	BCM_NS2_GENPLL_SW_CHIMP_CLK
-+    port	genpll_sw	5	BCM_NS2_GENPLL_SW_PORT_CLK
-+    sdio	genpll_sw	6	BCM_NS2_GENPLL_SW_SDIO_CLK
-+
-+    lcpll_ddr	crystal		0	BCM_NS2_LCPLL_DDR
-+    pcie_sata_usb lcpll_ddr	1	BCM_NS2_LCPLL_DDR_PCIE_SATA_USB_CLK
-+    ddr		lcpll_ddr	2	BCM_NS2_LCPLL_DDR_DDR_CLK
-+    ch2_unused	lcpll_ddr	3	BCM_NS2_LCPLL_DDR_CH2_UNUSED
-+    ch3_unused	lcpll_ddr	4	BCM_NS2_LCPLL_DDR_CH3_UNUSED
-+    ch4_unused	lcpll_ddr	5	BCM_NS2_LCPLL_DDR_CH4_UNUSED
-+    ch5_unused	lcpll_ddr	6	BCM_NS2_LCPLL_DDR_CH5_UNUSED
-+
-+    lcpll_ports	crystal		0	BCM_NS2_LCPLL_PORTS
-+    wan		lcpll_ports	1	BCM_NS2_LCPLL_PORTS_WAN_CLK
-+    rgmii	lcpll_ports	2	BCM_NS2_LCPLL_PORTS_RGMII_CLK
-+    ch2_unused	lcpll_ports	3	BCM_NS2_LCPLL_PORTS_CH2_UNUSED
-+    ch3_unused	lcpll_ports	4	BCM_NS2_LCPLL_PORTS_CH3_UNUSED
-+    ch4_unused	lcpll_ports	5	BCM_NS2_LCPLL_PORTS_CH4_UNUSED
-+    ch5_unused	lcpll_ports	6	BCM_NS2_LCPLL_PORTS_CH5_UNUSED
++/*
+  * Parameters for VCO frequency configuration
+  *
+  * VCO frequency =
 -- 
 1.9.1
