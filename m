@@ -1,10 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Oct 2015 03:19:55 -0700
-Subject: [PATCH 4/6] pinctrl: sunxi: Remove unneeded semicolon
-In-Reply-To: <1442392111-8448-5-git-send-email-javier@osg.samsung.com>
+Date: Fri, 2 Oct 2015 03:21:48 -0700
+Subject: [PATCH 5/6] pinctrl: mediatek: Remove unneded semicolon
+In-Reply-To: <1442392111-8448-6-git-send-email-javier@osg.samsung.com>
 References: <1442392111-8448-1-git-send-email-javier@osg.samsung.com>
- <1442392111-8448-5-git-send-email-javier@osg.samsung.com>
-Message-ID: <CACRpkdahdhQ2r-vjLGni=VSbmVS6BfDm0TqTtQqrm69xf9Uorw@mail.gmail.com>
+ <1442392111-8448-6-git-send-email-javier@osg.samsung.com>
+Message-ID: <CACRpkdZetHu82FqPNL_gqssYW_NoWRKgZsjLSzkkGO__CwKcvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,7 +15,7 @@ On Wed, Sep 16, 2015 at 1:28 AM, Javier Martinez Canillas
 >
 > Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Patch applied with Maxime's ACK.
+Patch applied with Hongzhou's ACK.
 
 Yours,
 Linus Walleij
