@@ -1,93 +1,44 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 2 Oct 2015 09:54:11 +0200
-Subject: [PATCH RFC] apei: xgene: Add ACPI APEI support for X-Gene
-In-Reply-To: <1443747112-24814-1-git-send-email-lho@apm.com>
-References: <1443747112-24814-1-git-send-email-lho@apm.com>
-Message-ID: <20151002075411.GB16538@pd.tnic>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Fri, 2 Oct 2015 15:56:16 +0800
+Subject: [PATCH v7 5/6] Documentation: dt-bindings: pci: altera pcie
+ device tree binding
+In-Reply-To: <1803658.W77SUJGE4K@wuerfel>
+References: <1442801587-3812-1-git-send-email-lftan@altera.com>
+ <CAFiDJ59PuhRj3F288A_451pLiKnqPUKin9C2t5uuH2iNPnJfAg@mail.gmail.com>
+ <CAL_JsqL9eoTRa2-eeNJgVoO=0LyuaaJ87E4_BS0KocRKBXGdGA@mail.gmail.com>
+ <1803658.W77SUJGE4K@wuerfel>
+Message-ID: <CAFiDJ5-yMBw6Ff1++F5DTg6u_rAgoivGJeNj1tr9fwo-hdKDkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 01, 2015 at 06:51:52PM -0600, Loc Ho wrote:
-> Add ACPI APEI support for X-Gene platform. This patch requires [1] to 
-> configiure and build.
-> 
-> [1] http://marc.info/?l=linux-kernel&m=143955588312730&w=2 
-> 
-> Signed-off-by: Tuan Phan <tphan@apm.com>
-> Signed-off-by: Loc Ho <lho@apm.com>
-> ---
->  drivers/edac/Kconfig      |    7 +++
->  drivers/edac/Makefile     |    2 +
->  drivers/edac/xgene_apei.c |  120 +++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 129 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/edac/xgene_apei.c
-> 
-> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
-> index ef25000..f489852 100644
-> --- a/drivers/edac/Kconfig
-> +++ b/drivers/edac/Kconfig
-> @@ -390,4 +390,11 @@ config EDAC_XGENE
->  	  Support for error detection and correction on the
->  	  APM X-Gene family of SOCs.
->  
-> +config EDAC_XGENE_APEI
-> +	tristate "APM X-Gene SoC APEI"
-> +	depends on ACPI_APEI && (ARM64 || COMPILE_TEST)
-> +	help
-> +	  APEI interface support for error detection and correction on the
-> +	  APM X-Gene family of SOCs.
-> +
->  endif # EDAC
-> diff --git a/drivers/edac/Makefile b/drivers/edac/Makefile
-> index dbf53e0..27dbae1 100644
-> --- a/drivers/edac/Makefile
-> +++ b/drivers/edac/Makefile
-> @@ -70,3 +70,5 @@ obj-$(CONFIG_EDAC_OCTEON_PCI)		+= octeon_edac-pci.o
->  obj-$(CONFIG_EDAC_ALTERA_MC)		+= altera_edac.o
->  obj-$(CONFIG_EDAC_SYNOPSYS)		+= synopsys_edac.o
->  obj-$(CONFIG_EDAC_XGENE)		+= xgene_edac.o
-> +obj-$(CONFIG_EDAC_XGENE_APEI)		+= xgene_apei.o
-> +
-> diff --git a/drivers/edac/xgene_apei.c b/drivers/edac/xgene_apei.c
-> new file mode 100644
-> index 0000000..6ec416f
-> --- /dev/null
-> +++ b/drivers/edac/xgene_apei.c
-> @@ -0,0 +1,120 @@
-> +/*
-> + * AppliedMicro X-Gene APEI Driver
-> + *
-> + * Copyright (c) 2015, Applied Micro Circuits Corporation
-> + * Author: Tuan Phan <tphan@apm.com>
-> + *
-> + * This program is free software; you can redistribute  it and/or modify it
-> + * under  the terms of  the GNU General  Public License as published by the
-> + * Free Software Foundation;  either version 2 of the  License, or (at your
-> + * option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + *
-> + * This driver provides the interrupt hook up with the UEFI FW for the X-Gene
-> + * SoC processor under the following conditions:
-> + *
-> + * 1. No interrupt GPIO available or don't want to use one and no EL3 support
-> + * 2. With EL3 support, but no mean to interrupt the Linux OS that an event
-> + *    has occurred.
+On Tue, Sep 29, 2015 at 3:38 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 28 September 2015 12:31:36 Rob Herring wrote:
+>> >> > +
+>> >> > +Required properties:
+>> >> > +- compatible :       should contain "altr,pcie-root-port-1.0"
+>> >> > +- reg:               a list of physical base address and length for TXS and CRA.
+>> >> > +- reg-names: must include the following entries:
+>> >> > +             "Txs" or "txs": TX slave port region
+>> >> > +             "Cra" or "cra": Control register access region
+>> >>
+>> >> Why both cases? Can we please just have one (or none is better IMO).
+>> > The PCIe IP on different device families use different register names.
+>> > And our device tree generator will auto generate the register names
+>> > based on the hardware description name. Too bad we can't change the
+>> > hardware description names now.
+>>
+>> Okay, your problem to maintain. Hopefully the driver just goes by index then.
+>>
+>> Strictly speaking, if you have undocumented bindings downstream that
+>> is your problem and we don't have to accept them as-is upstream. I'm
+>> not going to worry about that here.
+>
+> Are they always in the same order? If you don't mandate any names for the
+> registers in the binding but just use them by index, we can keep that
+> bit of ugliness out of the binding and the driver and still be compatible
+> with all the devices.
+Too bad the order might change in future devices. We will fix the
+tool, so only have one reg-name case.
 
-Why is this an x-gene-specific driver and not a generic, APEI one, like
-ghes_edac? I'd like to see a single ARM64 APEI/GHES/whatever driver
-which is programmed against the spec - no vendor-specific stuff. And I
-don't see anything vendor-specific below except xgene_apei_acpi_match
-which can be part of the generic driver.
-
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
+Regards
+Ley Foon
