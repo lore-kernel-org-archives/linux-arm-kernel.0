@@ -1,79 +1,98 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 2 Oct 2015 19:00:58 +0100
-Subject: [PATCH] arm64: dts: add all hi6220 uart nodes
-In-Reply-To: <CANMBJr7yY1PJChnFSRknqfOLORuWZSEONV+e=M=9heX3i-ADKA@mail.gmail.com>
-References: <1443558552-5734-1-git-send-email-tyler.baker@linaro.org>
- <1459065.BtzC7pyUYF@wuerfel> <20150930173145.GG15635@sirena.org.uk>
- <CANMBJr7yY1PJChnFSRknqfOLORuWZSEONV+e=M=9heX3i-ADKA@mail.gmail.com>
-Message-ID: <20151002180058.GA4220@griffinp-ThinkPad-X1-Carbon-2nd>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 2 Oct 2015 11:02:55 -0700
+Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
+In-Reply-To: <560E8584.8000207@free.fr>
+References: <560E53E3.7070207@free.fr>
+ <560E8584.8000207@free.fr>
+Message-ID: <20151002180255.GK12338@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
-
-On Wed, 30 Sep 2015, Tyler Baker wrote:
-
-> On 30 September 2015 at 10:31, Mark Brown <broonie@kernel.org> wrote:
-> > On Wed, Sep 30, 2015 at 10:24:56AM +0200, Arnd Bergmann wrote:
-> >> On Tuesday 29 September 2015 13:29:12 Tyler Baker wrote:
-> >
-> >> >         aliases {
-> >> >                 serial0 = &uart0;
-> >> > +               serial1 = &uart1;
-> >> > +               serial2 = &uart2;
-> >> > +               serial3 = &uart3;
-> >> > +               serial4 = &uart4;
-> >> >         };
-> >
-> >> In the changelog you mention "both uarts", but here you have five of them.
-> >> Are they all accessible on the connector? If not, only provide aliases
-> >> for the ones that are, using numbering that makes most sense for given
-> >> how one would use the board.
+On 10/02, Mason wrote:
+> [ Adding original reporter ]
 > 
-> Thanks for the comment Arnd. Mark's comment below is correct, there
-> are only two UARTs accessible on the LS connection in addition to the
-> one on the board (solder pad).
+> On 02/10/2015 11:52, Mason wrote:
 > 
-> Is the following definition any clearer?
+> > [ take 1 was sent on 2015-03-26 ]
+> > 
+> > Hello everyone,
+> > 
+> > In http://thread.gmane.org/gmane.linux.ports.arm.kernel/389931/focus=392348
+> > Stephen Boyd wrote:
+> > 
+> >> I don't see any problem with the TWD dropping the dependency on SMP.
+> >> The code should work the same on a UP configuration [...]
+> > 
+> > And Arnd recently said:
+> > 
+> >> I think this has come up before and should be fixed. Could you
+> >> send a patch that allows using TWD in uniprocessor configurations?
+> > 
+> > Basically, this means reverting Shawn Guo's 904464b91eca patch.
+> > and removing "depends on SMP" for HAVE_ARM_TWD.
+> > 
+> > However, Shawn's patch fixed an issue, therefore it seems likely
+> > that simply reverting is not the proper solution?
+> > 
+> > What should I do?
 > 
-> serial0 = &uart0; // Onboard UART0
-> serial1 = &uart2; // LS expansion UART0
-> serial2 = &uart3; // LS expansion UART1
+> For reference, the warning used to be:
 > 
-> If so, I'll respin this patch.
+>     ------------[ cut here ]------------
+>     WARNING: at arch/arm/kernel/smp_twd.c:345
+>     twd_local_timer_of_register+0x7c/0x90()
+>     twd_local_timer_of_register failed (-6)
+>     Modules linked in:
+>     Backtrace:
+>     [<80011f14>] (dump_backtrace+0x0/0x10c) from [<8044dd30>]
+>     (dump_stack+0x18/0x1c)
+>      r7:805e9f58 r6:805ba84c r5:80539331 r4:00000159
+>     [<8044dd18>] (dump_stack+0x0/0x1c) from [<80020fbc>]
+>     (warn_slowpath_common+0x54/0x6c)
+>     [<80020f68>] (warn_slowpath_common+0x0/0x6c) from [<80021078>]
+>     (warn_slowpath_fmt+0x38/0x40)
+>      r9:412fc09a r8:8fffffff r7:ffffffff r6:00000001 r5:80633b8c
+>     r4:80b32da8
+>     [<80021040>] (warn_slowpath_fmt+0x0/0x40) from [<805ba84]
+>     (twd_local_timer_of_register+0x7c/0x90)
+>      r3:fffffffa r2:8053934b
+>     [<805ba7d0>] (twd_local_timer_of_register+0x0/0x90) from [<805c0bec>]
+>     (imx6q_timer_init+0x18/0x4c)
+>      r5:80633800 r4:8053b701
+>     [<805c0bd4>] (imx6q_timer_init+0x0/0x4c) from [<805ba4e8>]
+>     (time_init+0x28/0x38)
+>      r5:80633800 r4:805dc0f4
+>     [<805ba4c0>] (time_init+0x0/0x38) from [<805b6854>]
+>     (start_kernel+0x1a0/0x310)
+>     [<805b66b4>] (start_kernel+0x0/0x310) from [<10008044>] (0x10008044)
+>      r8:1000406a r7:805f3f8c r6:805dc0c4 r5:805f0518 r4:10c5387d
+>     ---[ end trace 1b75b31a2719ed1c ]---
 > 
-> > Unless I'm missing something there's only two UARTs brought out on the
-> > low speed expansion connector (in addition to the one on the solder pads
-> > which is currently supported).  We should also adjust the console
-> > default to match whatever one of the low speed expansion connector UARTs
-> > is being used by the bootloader.
 > 
-> Your not missing anything, I should not have added the additional
-> aliases, it is confusing, will remove. The UART boards by default come
-> configured to use UART1 on the LS connector.
-> 
-> + Peter as he has been submitting u-boot patches recently for the HiKey.
+> I cannot reproduce on v4.2 + my platform...
 
-Thanks :)
+The warning has been removed in commit 5028090d1da1 (ARM: 8434/1:
+Revert "7655/1: smp_twd: make twd_local_timer_of_register() no-op
+for nosmp", 2015-09-14) sitting in linux-next. Oddly, that commit
+doesn't remove the depends on SMP for the Kconfig. So it seems
+that we can apply this patch and everyone is happy? We could also
+drop the "if SMP" part of most of the platform selects if anyone
+actually cares.
 
-> 
-> Obviously, both UEFI and u-boot can be configured to use either UART,
-> and at the moment u-boot defaults to using the on board UART. Whereas
-> UEFI is using UART1 on the LS connector. I'm fine with switching the
-> console default to use the UART1 on the LS connector as long as there
-> is agreement to do so.
+---8<----
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 369791fb619c..be64d9d604c3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1389,7 +1389,6 @@ config HAVE_ARM_ARCH_TIMER
+ 
+ config HAVE_ARM_TWD
+ 	bool
+-	depends on SMP
+ 	select CLKSRC_OF if OF
+ 	help
+ 	  This options enables support for the ARM timer and watchdog unit
 
-Eek... "serial2 = uart3 //UART1"
-
-I sent the following patch
-http://lists.denx.de/pipermail/u-boot/2015-September/227465.html
-
-which has been accepted which switches from using UART0 (onboard) to
-UART3 (LS connector). This matched up with the change made in ATF i.e. both ATF
-and u-boot were then both outputting on the same UART.
-
-So u-boot has already been migrated over.
-
-regards,
-
-Peter.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
