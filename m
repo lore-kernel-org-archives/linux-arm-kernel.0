@@ -1,33 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 2 Oct 2015 13:42:41 +0100
-Subject: [PATCH] arm64: ftrace: fix function_graph tracer panic
-In-Reply-To: <560E38C0.7080409@linaro.org>
-References: <1443581395-30088-1-git-send-email-huawei.libin@huawei.com>
- <560CCE91.3020407@linaro.org>
- <20151001152739.GI6963@e104818-lin.cambridge.arm.com>
- <560E38C0.7080409@linaro.org>
-Message-ID: <20151002124240.GK6963@e104818-lin.cambridge.arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 2 Oct 2015 13:49:17 +0100
+Subject: [PATCH v2 01/15] KVM: arm/arm64: VGIC: don't track used LRs in
+ the distributor
+In-Reply-To: <00f301d0fd0f$6b21ac10$41650430$@samsung.com>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-2-git-send-email-andre.przywara@arm.com>
+ <00cb01d0fcf8$6a906000$3fb12000$@samsung.com> <560E5D2F.1000401@arm.com>
+ <00f301d0fd0f$6b21ac10$41650430$@samsung.com>
+Message-ID: <560E7D4D.1090009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 02, 2015 at 04:56:48PM +0900, AKASHI Takahiro wrote:
-> >>On 09/30/2015 11:49 AM, Li Bin wrote:
-> >>>This is because when using function graph tracer, if the traced
-> >>>function return value is in multi regs ([0x-07]), return_to_handler
+Hi Pavel,
+
+On 02/10/15 13:39, Pavel Fedin wrote:
+>  Hello!
 > 
-> typo: 0x-07 => x0-x7
+>> Can't you use the ELRSR bitmap instead? The idea of lr_used sounds like
+>> a moot optimization to me.
+> 
+>  This perfectly works on 4.2, but will break HW interrupt forwarding on 4.3. If you look at 4.3
+> __kvm_vgic_sync_hwstate(), you'll notice that for HW interrupts lr_used and elrsr_ptr will diverge
+> at this point, and this function actually brings them into sync. And it relies on lr_used for the
+> loop to operate correctly (no idea why we use "for" loop here with extra check instead of
+> "for_each_set_bit(lr, vgic_cpu->lr_used, vgic->nr_lr)", looks stupid to me).
 
-I fixed this up.
+I know, because I have reworked my patch lately to work on top of 4.3-rc
+and Christoffer's timer rework series. I have something which "works
+now"(TM), but wanted to wait for Christoffer's respin to send out.
+I will send you this new version this as a sneak preview in private,
+maybe that helps.
 
-> and pre/post-indexed addressing stp&ldp may save add&sub instructions, but
-> it's a matter of preference.
-
-Doing it this way is more efficient in general as it avoids updating the
-sp and writing in reverse order. That's the reason we recently changed
-the kernel_entry/exit macros (see commit 63648dd20fa0 "arm64: entry:
-use ldp/stp instead of push/pop when saving/restoring regs").
-
-Thanks.
-
--- 
-Catalin
+Cheers,
+Andre.
