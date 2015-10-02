@@ -1,47 +1,45 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 2 Oct 2015 10:41:16 +0530
-Subject: [PATCH v3 2/5] mailbox: Add support for ST's Mailbox IP
-In-Reply-To: <1439994175-13360-3-git-send-email-lee.jones@linaro.org>
-References: <1439994175-13360-1-git-send-email-lee.jones@linaro.org>
- <1439994175-13360-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <CABb+yY2wJKBvL3eceVxkq3ZdS6V+-yqQp98YCaS_oR+3CobQ0g@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 2 Oct 2015 13:13:24 +0800
+Subject: [RFC] arm: Add generic smc wrapper
+In-Reply-To: <1443701047-10101-1-git-send-email-larper@axis.com>
+Message-ID: <201510021338.iKkCgj7c%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 19, 2015 at 7:52 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Hi Lars,
 
-....
+[auto build test results on v4.3-rc3 -- if it's inappropriate base, please ignore]
 
-> +
-> +#define MBOX_BASE(mdev, inst)   ((mdev)->base + (inst * 4))
->
-It should be    (inst) * 4
+config: arm-rpc_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-> +/**
-> + * STi Mailbox device data
-> + *
-> + * An IP Mailbox is currently composed of 4 instances
-> + * Each instance is currently composed of 32 channels
-> + * This means that we have 128 channels per Mailbox
-> + * A channel an be used for TX or RX
-> + *
-> + * @dev:       Device to which it is attached
-> + * @mbox:      Representation of a communication channel controller
-> + * @base:      Base address of the register mapping region
-> + * @name:      Name of the mailbox
-> + * @enabled:   Local copy of enabled channels
-> + * @lock:      Mutex protecting enabled status
-> + */
-> +struct sti_mbox_device {
-> +       struct device           *dev;
-> +       struct mbox_controller  *mbox;
-> +       void __iomem            *base;
-> +       const char              *name;
-> +       u32                     enabled[STI_MBOX_INST_MAX];
-> +       spinlock_t              lock;
-> +       bool                    txonly;
->
-txonly is never used after being initialized from DT :)   which is a
-good sign. So maybe just drop it and the optional property 'tx-only'.
+All error/warnings (new ones prefixed by >>):
 
-Cheers!
+   arch/arm/kernel/smc-call.S: Assembler messages:
+>> arch/arm/kernel/smc-call.S:21: Error: selected processor does not support ARM mode `bx lr'
+
+vim +21 arch/arm/kernel/smc-call.S
+
+    15	
+    16	#include <asm/opcodes-sec.h>
+    17	
+    18	/* int invoke_smc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
+    19	ENTRY(invoke_smc)
+    20		__SMC(0)
+  > 21		bx	lr
+    22	ENDPROC(invoke_smc)
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 12414 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151002/a8a9624f/attachment-0001.obj>
