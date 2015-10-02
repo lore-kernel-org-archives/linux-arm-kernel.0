@@ -1,43 +1,57 @@
-From: sposelenov@emcraft.com (Sergei Poselenov)
-Date: Fri, 2 Oct 2015 20:07:26 +0300
-Subject: nommu Linux: not enough memory to start an application?
-Message-ID: <20151002200726.18428ee4@skywanderer.emcraft.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 2 Oct 2015 18:13:34 +0100
+Subject: [PATCH] arm-soc: Add Sigma Designs Tango4 port
+In-Reply-To: <560EB1EC.3020403@free.fr>
+References: <560EAA7C.3070302@free.fr> <yw1xoaghl099.fsf@unicorn.mansr.com>
+ <560EB1EC.3020403@free.fr>
+Message-ID: <20151002171334.GB21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Oct 02, 2015 at 06:33:48PM +0200, Mason wrote:
+> On 02/10/2015 18:10, M?ns Rullg?rd wrote:
+> 
+> > Mason writes:
+> > 
+> >> +		intc: intc at e000 {
+> >> +			compatible = "sigma,tango-intc";
+> > 
+> > Why do you insist on using other names than the ones I've been using for
+> > months?  Just want to leave your own mark on the code?
+> 
+> You're using "sigma,smp8640-intc".
+> The SMP8640 is a Tango3 (MIPS-based) platform.
 
-I'm trying to start a big BFLT application on ARM/noMMU Linux 4.2.0 and
-getting the following output:
-...
-nommu: Allocation of length 5226496 from process 21 (qt) failed
-active_anon:0 inactive_anon:0 isolated_anon:0
- active_file:0 inactive_file:13 isolated_file:0
- unevictable:1900 dirty:0 writeback:0 unstable:0
- slab_reclaimable:27 slab_unreclaimable:112
- mapped:0 shmem:0 pagetables:0 bounce:0
- free:5535 free_pcp:0 free_cma:0
-Normal free:22140kB min:620kB low:772kB high:928kB active_anon:0kB inactive_anon:0kB active_file:0kB inactive_file:52kB unevictable:7600kB isolated(anon):0kB isolated(file):0kB present:32768kB managed:31568kB mlocked:0kB dirty:0kB writeback:0kB mapped:0kB shmem:0kB slab_reclaimable:108kB slab_unreclaimable:448kB kernel_stack:112kB pagetables:0kB unstable:0kB bounce:0kB free_pcp:0kB local_pcp:0kB free_cma:0kB writeback_tmp:0kB pages_scanned:1836 all_unreclaimable? yes
-lowmem_reserve[]: 0 0
-Normal: 3*4kB (UM) 2*8kB (M) 0*16kB 1*32kB (M) 3*64kB (UM) 3*128kB (UM) 4*256kB (UM) 2*512kB (M) 5*1024kB (UM) 5*2048kB (UM) 1*4096kB (M) 0*8192kB = 22140kB
-1913 total pagecache pages
-Unable to allocate RAM for process text/data, errno 12
-SEGV
+If it's the same device, then there's nothing wrong with re-using the
+compatible.  The compatible property actually accepts multiple values,
+so you can do:
 
-Kernel configuration includes a pretty big INITRD image, about 7MB. Total number of memory
-on the board is 32MB.
+			compatible = "sigma,tango4-intc", "sigma,smp8640-intc";
 
-I already increased CONFIG_FORCE_MAX_ZONEORDER from the default 11 to 12
-and turned off everything (networking, usb etc) but this doesn't help,
-as you see the number of 8192kB chunks is zero.
-I can't believe that the system has >20 MB of free memory and still
-unable to run 5MB application. That's completely unlike of the old 2.6.33
-kernel with the same INITRD which works fine even in "normal" configuration,
-with networking and drivers enabled.
+See the ePAPR spec - I'll include the relevent bit:
 
-Any ideas?
+Property: compatible
+Value type: <stringlist>
+Description: The compatible property value consists of one or more strings
+ that define the specific programming model for the device. This list of
+ strings should be used by a client program for device driver selection.
+ The property value consists of a concatenated list of null terminated
+ strings, from most specific to most general. They allow a device to
+ express its compatibility with a family of similar devices, potentially
+ allowing a single device driver to match against several devices. ...
+Example: compatible = "fsl,mpc8641-uart", "ns16550";
+ In this example, an operating system would first try to locate a device
+ driver that supported fsl,mpc8641-uart. If a driver was not found, it
+ would then try to locate a driver that supported the more general
+ ns16550 device type.
 
-Thanks is advance.
+Note also that vendor prefixes should be listed in
+Documentation/devicetree/bindings/vendor-prefixes.txt.  If it's not there,
+you need to propose a separate patch (to the devicetree mailing list) to
+add it, which must be done with their agreement.  Right now, the use of
+"sigma" as a prefix is entirely non-standard and not acceptable in DT
+files until this is done.
 
-Regards,
-Sergei
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
