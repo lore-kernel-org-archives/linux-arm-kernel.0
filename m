@@ -1,54 +1,61 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 2 Oct 2015 17:32:10 +0300
-Subject: [PATCH] ARM: debug: add support for alternate 8250 register layout
-In-Reply-To: <yw1x1tddmjng.fsf@unicorn.mansr.com>
-References: <1443787929-19173-1-git-send-email-mans@mansr.com>
- <560E9268.60900@cogentembedded.com> <yw1x1tddmjng.fsf@unicorn.mansr.com>
-Message-ID: <560E956A.6070700@cogentembedded.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 2 Oct 2015 15:31:45 +0100
+Subject: [PATCH v5 12/22] xen/balloon: Don't rely on the page granularity
+ is the same for Xen and Linux
+In-Reply-To: <560E9004.8030604@citrix.com>
+References: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
+ <1443609937-25278-13-git-send-email-julien.grall@citrix.com>
+ <560E9004.8030604@citrix.com>
+Message-ID: <560E9551.6020105@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/2/2015 5:26 PM, M?ns Rullg?rd wrote:
+Hi David,
 
->>> Some SoCs have a UART with a non-standard register layout. This
->>> allows the debug console to work with these.
+On 02/10/15 15:09, David Vrabel wrote:
+> On 30/09/15 11:45, Julien Grall wrote:
+>> For ARM64 guests, Linux is able to support either 64K or 4K page
+>> granularity. Although, the hypercall interface is always based on 4K
+>> page granularity.
 >>
->>> Signed-off-by: Mans Rullgard <mans@mansr.com>
->>> ---
->>> I would have preferred a more accurate description of the UART, but I've
->>> not managed to figure out who the vendor is.
+>> With 64K page granularity, a single page will be spread over multiple
+>> Xen frame.
 >>
->>     You haven't seem the Alchemy datasheets? I can send you some if so.
->
-> I have.  They don't say where Alchemy bought the UART block.
-
-    In fact, seeing at least Au1550 databook googling for "alchemy databook".
-The UART registers are described there. Perhaps, it's not accurate enought for 
-your needs, though...
-
->>> ---
->>>    arch/arm/Kconfig.debug        |  4 ++++
->>>    arch/arm/include/debug/8250.S | 12 ++++++++++++
->>>    2 files changed, 16 insertions(+)
->>>
->>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->>> index 0cfd7f9..8d5c837 100644
->>> --- a/arch/arm/Kconfig.debug
->>> +++ b/arch/arm/Kconfig.debug
->>> @@ -1597,6 +1597,10 @@ config DEBUG_UART_8250_WORD
->>>    		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
->>>    		DEBUG_BRCMSTB_UART
->>>
->>> +config DEBUG_UART_8250_AU
->>> +       bool "8250 UART has Alchemy register layout"
->>> +       depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
->>> +
+>> To avoid splitting the page into 4K frame, take advantage of the
+>> extent_order field to directly allocate/free chunk of the Linux page
+>> size.
 >>
->>     So Alchemy UART got reused on ARM?
->
-> The UART is actually a Palmchip IP core used by several SoC companies.
+>> Note that PVMMU is only used for PV guest (which is x86) and the page
+>> granularity is always 4KB. Some BUILD_BUG_ON has been added to ensure
+>> that because the code has not been modified.
+> 
+> This causes a BUG() in x86 PV guests when decreasing the reservation.
+> 
+> Xen says:
+> 
+> (XEN) d0v2 Error pfn 0: rd=0 od=32753 caf=8000000000000001
+> taf=7400000000000001
+> (XEN) memory.c:250:d0v2 Bad page free for domain 0
+> 
+> And Linux BUGs with:
+> 
+> [   82.032654] kernel BUG at
+> /anfs/drall/scratch/davidvr/x86/linux/drivers/xen/balloon.c:540!
+> 
+> Which is a non-zero return value from the decrease_reservation hypercall.
+> 
+> The frame_list[] has been incorrectly populated.  The below patch fixes
+> it for me.  Please test as well.
 
-    Hm, how have you figured out that;s Palmchip if the Alchemy databooks are 
-silent about that? :-)
+Sorry for the breakage, I think I haven't spot the bug on my board
+because most the PV drivers are allocating one balloon page at the time
+by default.
 
-MBR, Sergei
+This patch looks valid to me. i was resetting and incremented for each
+loop on an early version. Although I dropped it by mistake when I use a
+different way to decrease the reservation.
+
+Regards,
+
+-- 
+Julien Grall
