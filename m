@@ -1,47 +1,49 @@
 From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 02 Oct 2015 07:50:25 +0300
-Subject: [RFC PATCH 15/20] coresight: etm-perf: implementing 'setup_aux()'
- API
-In-Reply-To: <CANLsYkyjHZOzZqx8X7StegkxE7kuBma4Wz_pZ8OBDs-V3E3irw@mail.gmail.com>
+Date: Fri, 02 Oct 2015 07:53:09 +0300
+Subject: [RFC PATCH 00/20] Coresight integration with perf
+In-Reply-To: <CANLsYkxitWS0hUXL_=T-V8qSXKvtyUc8F7NknDu16Xy0nN_o0A@mail.gmail.com>
 References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
- <1442593594-10665-16-git-send-email-mathieu.poirier@linaro.org>
- <87bnckjfce.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYkyjHZOzZqx8X7StegkxE7kuBma4Wz_pZ8OBDs-V3E3irw@mail.gmail.com>
-Message-ID: <87si5t3mcu.fsf@ashishki-desk.ger.corp.intel.com>
+ <87zj04jnlw.fsf@ashishki-desk.ger.corp.intel.com>
+ <CANLsYkxitWS0hUXL_=T-V8qSXKvtyUc8F7NknDu16Xy0nN_o0A@mail.gmail.com>
+Message-ID: <87pp0x3m8a.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 
-> On 30 September 2015 at 05:50, Alexander Shishkin
+> On 30 September 2015 at 02:52, Alexander Shishkin
 > <alexander.shishkin@linux.intel.com> wrote:
 >> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 >>
->>> +static void *etm_setup_aux(int cpu, void **pages,
->>> +                           int nr_pages, bool overwrite)
->>> +{
->>> +     struct coresight_device *csdev;
->>> +
->>> +     if (cpu == -1)
->>> +             cpu = smp_processor_id();
->>> +
->>> +     csdev = per_cpu(csdev_sink, cpu);
->>> +     if (!csdev)
->>> +             return NULL;
->>> +
->>> +     return sink_ops(csdev)->setup_aux(csdev, cpu, pages,
->>> +                                       nr_pages, overwrite);
+>>> This patchset aims to integrate configuration and control of
+>>> the Coresight tracers with the perf sub-system.
+>>>
+>>> The goal is to use PMUs to represent tracers and the auxiliary
+>>> buffer enhancement to collect processor traces.  As such a lot
+>>> of work is done to move the current Coresight sysFS oriented
+>>> configuration and control commands to perf's AUX API.
+>>>
+>>> For the time being the work concentrates on ETMv3 and ETB1.0
+>>> sink buffers.  Work on ETMv4 and other type of sink buffers
+>>> will follow once a foundation has been established.
+>>>
+>>> Enhancement to the perf command line tool can be found here [1].
+>>> It is based on v4.2 but a rebase to v4.3-rcX will be available
+>>> shortly.
+>>>
+>>> Best regards,
+>>> Mathieu
+>>>
+>>> [1]. https://git.linaro.org/people/mathieu.poirier/coresight.git/shortlog/refs/heads/perf-v4.2
 >>
->> Is it guaranteed that this sink would always have .setup_aux()?
+>> I had a peek there -- didn't see an actual decoder for the ETM/PTM
+>> binary stream or did I miss it somehow?
 >
-> A setup_aux() is vital to the design, both on Intel and ARM.  I really
-> don't see how one could go without it.  I can return NULL if it hasn't
-> been provided - that way the setup will fail without triggering a core
-> dump.
+> A stream decoder is not included in this patch set but a couple of
+> people are currently working on it.
 
-It wasn't clear to me that the sink that ends up in csdev_sink will
-always be the one that does have .setup_aux(). And if it indeed doesn't,
-it's better to refuse to setup a buffer than crash.
+Ok, thanks. Can you provide instructions in the next version on how one
+can use this code to get a trace and decode it?
 
 Regards,
 --
