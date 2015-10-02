@@ -1,49 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  2 Oct 2015 11:29:28 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.3
-Message-ID: <cover.1443752733.git.horms+renesas@verge.net.au>
+Date: Fri,  2 Oct 2015 11:29:37 +0900
+Subject: [PATCH 1/2] ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain
+ for sound
+In-Reply-To: <cover.1443752733.git.horms+renesas@verge.net.au>
+References: <cover.1443752733.git.horms+renesas@verge.net.au>
+Message-ID: <6507c4efd2ca4a3dccedbc5b4724f9faabf97fca.1443752733.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC fixes for v4.3.
+484adb005886 ("ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain")
+added CPG/MSTP clock-cells domain support, but it was missing sound
+support. This patch adds it.
 
-These changes are required to restore working sound for the r8a779[01] SoCs
-in v4.3.
-
-My understanding is that with the inclusion of
-"drivers: sh: Disable PM runtime for multi-platform ARM with genpd"
-in v4.3-rc3 sound stopped working for the SoCs in question.
-
-These patches were previously posted as part of
-"Renesas ARM Based SoC DT Updates for v4.4".
-I have withdrawn that pull request.
-
-
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
-
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.3
-
-for you to fetch changes up to 56e86dd4bbeb66a7ad67e20fa045c6f51b4da571:
-
-  ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain for sound (2015-09-29 09:44:13 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Fixes for v4.3
-
-* Add Add CPG/MSTP Clock Domain for sound on r8a779[01] SoCs.
-  This allows sound to work once again.
-
-----------------------------------------------------------------
-Geert Uytterhoeven (2):
-      ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain for sound
-      ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain for sound
-
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+[horms: Updated commit id referred to in changelog]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/boot/dts/r8a7790.dtsi | 1 +
- arch/arm/boot/dts/r8a7791.dtsi | 1 +
- 2 files changed, 2 insertions(+)
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index a0b2a79cbfbd..4624d0f2a754 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1627,6 +1627,7 @@
+ 				"mix.0", "mix.1",
+ 				"dvc.0", "dvc.1",
+ 				"clk_a", "clk_b", "clk_c", "clk_i";
++		power-domains = <&cpg_clocks>;
+ 
+ 		status = "disabled";
+ 
+-- 
+2.1.4
