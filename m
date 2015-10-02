@@ -1,98 +1,149 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 2 Oct 2015 11:02:55 -0700
-Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
-In-Reply-To: <560E8584.8000207@free.fr>
-References: <560E53E3.7070207@free.fr>
- <560E8584.8000207@free.fr>
-Message-ID: <20151002180255.GK12338@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 2 Oct 2015 20:03:57 +0200
+Subject: [PATCH 9/9] ARM: add UEFI stub support
+In-Reply-To: <CAD0U-h+zPhDe6Fqpg_vhF46FLjvvsbeSrQ_Fnj86o5cRc+A2QQ@mail.gmail.com>
+References: <1443719063-6832-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1443719063-6832-10-git-send-email-ard.biesheuvel@linaro.org>
+ <CAD0U-h+zPhDe6Fqpg_vhF46FLjvvsbeSrQ_Fnj86o5cRc+A2QQ@mail.gmail.com>
+Message-ID: <CAKv+Gu8y-ooMHPCHftb+_aYgb-FpbfeR==R9v+hY-_oetkPisw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02, Mason wrote:
-> [ Adding original reporter ]
-> 
-> On 02/10/2015 11:52, Mason wrote:
-> 
-> > [ take 1 was sent on 2015-03-26 ]
-> > 
-> > Hello everyone,
-> > 
-> > In http://thread.gmane.org/gmane.linux.ports.arm.kernel/389931/focus=392348
-> > Stephen Boyd wrote:
-> > 
-> >> I don't see any problem with the TWD dropping the dependency on SMP.
-> >> The code should work the same on a UP configuration [...]
-> > 
-> > And Arnd recently said:
-> > 
-> >> I think this has come up before and should be fixed. Could you
-> >> send a patch that allows using TWD in uniprocessor configurations?
-> > 
-> > Basically, this means reverting Shawn Guo's 904464b91eca patch.
-> > and removing "depends on SMP" for HAVE_ARM_TWD.
-> > 
-> > However, Shawn's patch fixed an issue, therefore it seems likely
-> > that simply reverting is not the proper solution?
-> > 
-> > What should I do?
-> 
-> For reference, the warning used to be:
-> 
->     ------------[ cut here ]------------
->     WARNING: at arch/arm/kernel/smp_twd.c:345
->     twd_local_timer_of_register+0x7c/0x90()
->     twd_local_timer_of_register failed (-6)
->     Modules linked in:
->     Backtrace:
->     [<80011f14>] (dump_backtrace+0x0/0x10c) from [<8044dd30>]
->     (dump_stack+0x18/0x1c)
->      r7:805e9f58 r6:805ba84c r5:80539331 r4:00000159
->     [<8044dd18>] (dump_stack+0x0/0x1c) from [<80020fbc>]
->     (warn_slowpath_common+0x54/0x6c)
->     [<80020f68>] (warn_slowpath_common+0x0/0x6c) from [<80021078>]
->     (warn_slowpath_fmt+0x38/0x40)
->      r9:412fc09a r8:8fffffff r7:ffffffff r6:00000001 r5:80633b8c
->     r4:80b32da8
->     [<80021040>] (warn_slowpath_fmt+0x0/0x40) from [<805ba84]
->     (twd_local_timer_of_register+0x7c/0x90)
->      r3:fffffffa r2:8053934b
->     [<805ba7d0>] (twd_local_timer_of_register+0x0/0x90) from [<805c0bec>]
->     (imx6q_timer_init+0x18/0x4c)
->      r5:80633800 r4:8053b701
->     [<805c0bd4>] (imx6q_timer_init+0x0/0x4c) from [<805ba4e8>]
->     (time_init+0x28/0x38)
->      r5:80633800 r4:805dc0f4
->     [<805ba4c0>] (time_init+0x0/0x38) from [<805b6854>]
->     (start_kernel+0x1a0/0x310)
->     [<805b66b4>] (start_kernel+0x0/0x310) from [<10008044>] (0x10008044)
->      r8:1000406a r7:805f3f8c r6:805dc0c4 r5:805f0518 r4:10c5387d
->     ---[ end trace 1b75b31a2719ed1c ]---
-> 
-> 
-> I cannot reproduce on v4.2 + my platform...
+On 2 October 2015 at 18:29, Ryan Harkin <ryan.harkin@linaro.org> wrote:
+> Hi Ard/Roy,
+>
+> On 1 October 2015 at 18:04, Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> wrote:
+>>
+>> From: Roy Franz <roy.franz@linaro.org>
+>>
+>> This patch adds EFI stub support for the ARM Linux kernel.
+>>
+>> The EFI stub operates similarly to the x86 and arm64 stubs: it is a
+>> shim between the EFI firmware and the normal zImage entry point, and
+>> sets up the environment that the zImage is expecting. This includes
+>> optionally loading the initrd and device tree from the system partition
+>> based on the kernel command line.
+>>
+>> Signed-off-by: Roy Franz <roy.franz@linaro.org>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm/Kconfig                       |  19 +++
+>>  arch/arm/boot/compressed/Makefile      |   5 +-
+>>  arch/arm/boot/compressed/efi-header.S  | 130 ++++++++++++++++++++
+>>  arch/arm/boot/compressed/efi-stub.c    |  89 ++++++++++++++
+>>  arch/arm/boot/compressed/head.S        |  54 +++++++-
+>>  arch/arm/boot/compressed/vmlinux.lds.S |   7 ++
+>>  arch/arm/include/asm/efi.h             |  23 ++++
+>>  drivers/firmware/efi/libstub/Makefile  |  12 ++
+>>  8 files changed, 336 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index e4b7d6cfd8eb..6d7fd83c2ee4 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -2061,6 +2061,25 @@ config AUTO_ZRELADDR
+>>           0xf8000000. This assumes the zImage being placed in the first
+>> 128MB
+>>           from start of memory.
+>>
+>> +config EFI_STUB
+>> +       bool
+>> +
+>> +config EFI
+>> +       bool "UEFI runtime support"
+>> +       depends on OF && !CPU_BIG_ENDIAN && MMU && AUTO_ZRELADDR &&
+>> !XIP_KERNEL
+>> +       select UCS2_STRING
+>> +       select EFI_PARAMS_FROM_FDT
+>> +       select EFI_STUB
+>> +       select EFI_ARMSTUB
+>> +       select EFI_RUNTIME_WRAPPERS
+>
+>
+> Should we make this "default y" like ARM64?  I think so.
+>
+>
 
-The warning has been removed in commit 5028090d1da1 (ARM: 8434/1:
-Revert "7655/1: smp_twd: make twd_local_timer_of_register() no-op
-for nosmp", 2015-09-14) sitting in linux-next. Oddly, that commit
-doesn't remove the depends on SMP for the Kconfig. So it seems
-that we can apply this patch and everyone is happy? We could also
-drop the "if SMP" part of most of the platform selects if anyone
-actually cares.
+It is not necessarily something that should be enabled by default,
+imo. The distro kernels will probably enabled it, which is good enough
+for me.
 
----8<----
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 369791fb619c..be64d9d604c3 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1389,7 +1389,6 @@ config HAVE_ARM_ARCH_TIMER
- 
- config HAVE_ARM_TWD
- 	bool
--	depends on SMP
- 	select CLKSRC_OF if OF
- 	help
- 	  This options enables support for the ARM timer and watchdog unit
+>> +       ---help---
+>> +         This option provides support for runtime services provided
+>> +         by UEFI firmware (such as non-volatile variables, realtime
+>> +         clock, and platform reset). A UEFI stub is also provided to
+>> +         allow the kernel to be booted as an EFI application. This
+>> +         is only useful for kernels that may run on systems that have
+>> +         UEFI firmware.
+>> +
+>>  endmenu
+>>
+>>  menu "CPU Power Management"
+>> diff --git a/arch/arm/boot/compressed/Makefile
+>> b/arch/arm/boot/compressed/Makefile
+>> index 3f9a9ebc77c3..0e5624d6215d 100644
+>> --- a/arch/arm/boot/compressed/Makefile
+>> +++ b/arch/arm/boot/compressed/Makefile
+>> @@ -167,9 +167,12 @@ if [ $(words $(ZRELADDR)) -gt 1 -a
+>> "$(CONFIG_AUTO_ZRELADDR)" = "" ]; then \
+>>         false; \
+>>  fi
+>>
+>> +efi-obj-$(CONFIG_EFI_STUB) := $(obj)/efi-stub.o $(obj)/efi-banner.o \
+>
+>
+> When I try to compile the kernel from your branch, I get:
+>
+> make[2]: *** No rule to make target 'arch/arm/boot/compressed/efi-banner.o',
+> needed by 'arch/arm/boot/compressed/vmlinux'. Stop.
+>
+> Did I miss something or is this a problem?
+>
+
+It was I who missed something: I have been reshuffling some bits, and
+this fell through the cracks. I didn't spot it since I apparently did
+not try to rebuild it cleanly.
+
+I would like to get rid of the linux_banner reference in the stub
+completely, and I posted a patch here
+
+In the mean time, could you try with this folded in?
+
+-------------------8<--------------------
+diff --git a/arch/arm/boot/compressed/Makefile
+b/arch/arm/boot/compressed/Makefile
+index 0e5624d6215d..a6aa7f9123a2 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -170,6 +170,10 @@ fi
+ efi-obj-$(CONFIG_EFI_STUB) := $(obj)/efi-stub.o $(obj)/efi-banner.o \
+                              $(objtree)/drivers/firmware/efi/libstub/lib.a
+
++$(obj)/efi-banner.o: OBJCOPYFLAGS=-j .rodata
++$(obj)/efi-banner.o: $(objtree)/init/version.o FORCE
++       $(call if_changed,objcopy)
++
+ $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
+                $(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) \
+                $(bswapsdi2) $(efi-obj-y) FORCE
+diff --git a/drivers/firmware/efi/libstub/fdt.c
+b/drivers/firmware/efi/libstub/fdt.c
+index a7e87cd582f2..f45a6f715e73 100644
+--- a/drivers/firmware/efi/libstub/fdt.c
++++ b/drivers/firmware/efi/libstub/fdt.c
+@@ -16,6 +16,8 @@
+
+ #include "efistub.h"
+
++extern __attribute__((__visibility__("hidden"))) const char linux_banner[];
++
+ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+                        unsigned long orig_fdt_size,
+                        void *fdt, int new_fdt_size, char *cmdline_ptr,
+-------------------8<--------------------
+
+Thanks for testing!
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Ard.
