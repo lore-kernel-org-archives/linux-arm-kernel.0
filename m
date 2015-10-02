@@ -1,34 +1,67 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 2 Oct 2015 17:31:32 +0100
-Subject: [PATCH 09/15] arm64: Add page size to the kernel image header
-In-Reply-To: <20151002154900.GN6963@e104818-lin.cambridge.arm.com>
-References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
- <1442331684-28818-10-git-send-email-suzuki.poulose@arm.com>
- <20151002154900.GN6963@e104818-lin.cambridge.arm.com>
-Message-ID: <20151002163131.GO6963@e104818-lin.cambridge.arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 2 Oct 2015 18:33:48 +0200
+Subject: [PATCH] arm-soc: Add Sigma Designs Tango4 port
+In-Reply-To: <yw1xoaghl099.fsf@unicorn.mansr.com>
+References: <560EAA7C.3070302@free.fr> <yw1xoaghl099.fsf@unicorn.mansr.com>
+Message-ID: <560EB1EC.3020403@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 02, 2015 at 04:49:01PM +0100, Catalin Marinas wrote:
-> On Tue, Sep 15, 2015 at 04:41:18PM +0100, Suzuki K. Poulose wrote:
-> > From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > 
-> > This patch adds the page size to the arm64 kernel image header
-> > so that one can infer the PAGESIZE used by the kernel. This will
-> > be helpful to diagnose failures to boot the kernel with page size
-> > not supported by the CPU.
-> > 
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> 
-> This patch needs you signed-off-by as well since you are posting it. And
-> IIRC I acked it as well, I'll check.
-> 
-> If you are fine with adding your signed-of-by, I can add it to the patch
-> when applying (unless I see other issues with the series).
+On 02/10/2015 18:10, M?ns Rullg?rd wrote:
 
-Actually, I just realised that the kvm patches don't have any acks, so
-I'm not taking this series yet. You may want to repost once you have all
-the acks in place.
+> Mason writes:
+> 
+>> diff --git a/arch/arm/boot/dts/tango4.dtsi b/arch/arm/boot/dts/tango4.dtsi
+>> new file mode 100644
+>> index 000000000000..7336fcc3ac1d
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/tango4.dtsi
+>
+> Once more with feeling, why don't you want to use the fine clock driver
+> I wrote?
 
--- 
-Catalin
+I'll send you my clock tree driver next week. Then we can discuss.
+
+>> +		uart0 {
+>> +			compatible = "ralink,rt2880-uart";
+>> +			reg = <0x10700 0x100>;
+>> +			clock-frequency = <7372800>;
+>> +			reg-shift = <2>;
+>> +/*			fifo-size = <16>; BROKEN */
+> 
+> Either fix whatever is broken or drop that line.
+
+I can't leave TODO reminders in the platform Kconfig?
+Even as comments?
+
+>> +		};
+>> +
+>> +		eth0: eth0 {
+>> +			compatible = "sigma,smp8640-emac";
+>> +			reg = <0x26000 0x800>;
+>> +			interrupts = <38 4>;
+>> +			interrupt-parent = <&irq0>;
+>> +			mac-address = [ 00 16 e8 02 08 42 ];
+> 
+> mac-address should not be hardcoded here or anywhere else.
+
+Sorry. I missed that in my clean up.
+
+>> +			clocks = <&sysclk>;
+>> +		};
+>> +
+>> +		intc: intc at e000 {
+>> +			compatible = "sigma,tango-intc";
+> 
+> Why do you insist on using other names than the ones I've been using for
+> months?  Just want to leave your own mark on the code?
+
+You're using "sigma,smp8640-intc".
+The SMP8640 is a Tango3 (MIPS-based) platform.
+It makes no sense to have references to Tango3 in tango4.dtsi
+Aside from the CPU difference, Tango3 and Tango4 have a lot in common though.
+
+Which reminds me that I forgot to change "sigma,smp8640-emac"
+I'll send an updated patch.
+
+Regards.
