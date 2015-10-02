@@ -1,60 +1,65 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 02 Oct 2015 16:53:36 +0900
-Subject: [PATCH v2 3/8] mmc: core: Add mmc_regulator_set_vqmmc()
-In-Reply-To: <3312969.jJ2hfB2JkV@diego>
-References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
- <CAPDyKFqrkYXsbBJ61yYo0G8za1szARvA=as-5nLTiwGH5pCrEQ@mail.gmail.com>
- <560DF150.3000906@samsung.com> <3312969.jJ2hfB2JkV@diego>
-Message-ID: <560E3800.1060603@samsung.com>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Fri, 2 Oct 2015 15:53:44 +0800
+Subject: [PATCH v7 5/6] Documentation: dt-bindings: pci: altera pcie
+ device tree binding
+In-Reply-To: <CAL_JsqL9eoTRa2-eeNJgVoO=0LyuaaJ87E4_BS0KocRKBXGdGA@mail.gmail.com>
+References: <1442801587-3812-1-git-send-email-lftan@altera.com>
+ <1442801587-3812-6-git-send-email-lftan@altera.com>
+ <5606171A.5000609@kernel.org>
+ <CAFiDJ59PuhRj3F288A_451pLiKnqPUKin9C2t5uuH2iNPnJfAg@mail.gmail.com>
+ <CAL_JsqL9eoTRa2-eeNJgVoO=0LyuaaJ87E4_BS0KocRKBXGdGA@mail.gmail.com>
+Message-ID: <CAFiDJ5_MYC=V_L1LyRNq00z=DerzKAF=RF5av9vHnUPP+9a1nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2015 04:06 PM, Heiko St?bner wrote:
-> Am Freitag, 2. Oktober 2015, 11:52:00 schrieb Jaehoon Chung:
->> On 10/02/2015 06:05 AM, Ulf Hansson wrote:
->>> On 1 October 2015 at 19:35, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>>> On 10/01, Heiko St?bner wrote:
->>>>> Am Donnerstag, 1. Oktober 2015, 11:54:24 schrieb Ulf Hansson:
->>>>>> On 30 September 2015 at 16:55, Heiko St?bner <heiko@sntech.de> wrote:
->>>>>>> Am Mittwoch, 30. September 2015, 16:42:05 schrieb Ulf Hansson:
->>>>>>>> On 30 September 2015 at 16:07, Heiko Stuebner <heiko@sntech.de> 
-> wrote:
->>>>>>> The clock changes of course only touch internals of the phase-clocks,
->>>>>>> so
->>>>>>> should have no problem going through another tree.
->>>>>>
->>>>>> What happens if I take mmc and dt changes, wouldn't I need the clock
->>>>>> patches as well?
->>>>>
->>>>> The API stays of course the same, only the degree to settings
->>>>> translation gets optimized, so I guess in the worst case you would get
->>>>> no good phase and thus fall back to non-highspeed modes - but the
->>>>> system would stay running.
->>>>>
->>>>> But of course, if the clock maintainers could Ack the two clock patches
->>>>> and
->>>>> everything would stay together that would work even better :-)
->>>>
->>>> If Ulf doesn't want to take them we can apply them to clk tree.
->>>> Otherwise, you can have my acked-by on the clk patches.
+On Tue, Sep 29, 2015 at 1:31 AM, Rob Herring <robh@kernel.org> wrote:
+> On Mon, Sep 28, 2015 at 12:38 AM, Ley Foon Tan <lftan@altera.com> wrote:
+>> On Sat, Sep 26, 2015 at 11:55 AM, Rob Herring <robh@kernel.org> wrote:
 >>>
->>> I don't mind picking up the clock patches. So I consider this as an
->>> ack for both patch 1 and patch2, thanks.
+>>> On 09/20/2015 09:13 PM, Ley Foon Tan wrote:
+>>> > This patch adds the bindings for Altera PCIe host controller driver and
+>>> > Altera PCIe MSI driver.
+>
+> [...]
+>
+>>> > +     num-vectors = <32>;
+>>> > +};
+>>> > diff --git a/Documentation/devicetree/bindings/pci/altera-pcie.txt b/Documentation/devicetree/bindings/pci/altera-pcie.txt
+>>> > new file mode 100644
+>>> > index 0000000..4440db1
+>>> > --- /dev/null
+>>> > +++ b/Documentation/devicetree/bindings/pci/altera-pcie.txt
+>>> > @@ -0,0 +1,49 @@
+>>> > +* Altera PCIe controller
+>>> > +
+>>> > +Required properties:
+>>> > +- compatible :       should contain "altr,pcie-root-port-1.0"
+>>> > +- reg:               a list of physical base address and length for TXS and CRA.
+>>> > +- reg-names: must include the following entries:
+>>> > +             "Txs" or "txs": TX slave port region
+>>> > +             "Cra" or "cra": Control register access region
 >>>
->>> Now, let's give Jaehoon some time to review the dw_mmc parts.
->>
->> I will check other patches on today, if it's ok, i will apply at my
->> repository. Thanks for giving time! :)
-> 
-> I think Ulf wanted to apply the whole series via the mmc tree directly, but I 
-> guess that is between you two to decide ;-)
+>>> Why both cases? Can we please just have one (or none is better IMO).
+>> The PCIe IP on different device families use different register names.
+>> And our device tree generator will auto generate the register names
+>> based on the hardware description name. Too bad we can't change the
+>> hardware description names now.
+>
+> Okay, your problem to maintain. Hopefully the driver just goes by index then.
+Okay, we will fix our generator tool to standardize one reg-name case
+and driver  just use one reg-name case as well.
+>
+> Strictly speaking, if you have undocumented bindings downstream that
+> is your problem and we don't have to accept them as-is upstream. I'm
+> not going to worry about that here.
+>
+>>> txs contains the config space?
+>> It is not the config space, but a memory slave port.
+>
+> Then where is the config space? It should not be part of "ranges" is
+> all I care about.
+The config space is not part of "ranges". Our IP uses TLP packet to
+access config space.
 
-If it will get Stephen's acked-by, i will pick up all after checked the dwmmc patches. how about?
-
-Best Regards,
-Jaehoon Chung
-
-> 
-> 
-> Heiko
-> 
+Regards
+Ley Foon
