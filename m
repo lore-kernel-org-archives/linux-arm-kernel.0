@@ -1,62 +1,79 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Fri, 2 Oct 2015 15:09:08 +0100
-Subject: [PATCH v5 12/22] xen/balloon: Don't rely on the page granularity
- is the same for Xen and Linux
-In-Reply-To: <1443609937-25278-13-git-send-email-julien.grall@citrix.com>
-References: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
- <1443609937-25278-13-git-send-email-julien.grall@citrix.com>
-Message-ID: <560E9004.8030604@citrix.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 02 Oct 2015 16:12:13 +0200
+Subject: [PATCH 1/3] clk: add flag for clocks that need to be enabled on
+ rate changes
+In-Reply-To: <1929669.AsgMSusdJb@phil>
+References: <1929669.AsgMSusdJb@phil>
+Message-ID: <3137165.kmu68gRS44@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/15 11:45, Julien Grall wrote:
-> For ARM64 guests, Linux is able to support either 64K or 4K page
-> granularity. Although, the hypercall interface is always based on 4K
-> page granularity.
+Hi,
+
+any comment on these 3 patches?
+
+Thanks
+Heiko
+
+Am Freitag, 21. August 2015, 19:46:31 schrieb Heiko Stuebner:
+> Some clocks need to be enabled to accept rate changes. This patch adds a
+> new flag CLK_SET_RATE_UNGATE that lets clk_change_rate enable the clock
+> before trying to change the rate and disable it again afterwards.
+> This of course doesn't effect clocks that are already running at that
+> point, as their refcount will only temporarily increase.
 > 
-> With 64K page granularity, a single page will be spread over multiple
-> Xen frame.
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/clk/clk.c            | 18 ++++++++++++++++++
+>  include/linux/clk-provider.h |  1 +
+>  2 files changed, 19 insertions(+)
 > 
-> To avoid splitting the page into 4K frame, take advantage of the
-> extent_order field to directly allocate/free chunk of the Linux page
-> size.
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 28cd923..564f11e 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1438,6 +1438,15 @@ static void clk_change_rate(struct clk_core *core)
+>  	else if (core->parent)
+>  		best_parent_rate = core->parent->rate;
 > 
-> Note that PVMMU is only used for PV guest (which is x86) and the page
-> granularity is always 4KB. Some BUILD_BUG_ON has been added to ensure
-> that because the code has not been modified.
-
-This causes a BUG() in x86 PV guests when decreasing the reservation.
-
-Xen says:
-
-(XEN) d0v2 Error pfn 0: rd=0 od=32753 caf=8000000000000001
-taf=7400000000000001
-(XEN) memory.c:250:d0v2 Bad page free for domain 0
-
-And Linux BUGs with:
-
-[   82.032654] kernel BUG at
-/anfs/drall/scratch/davidvr/x86/linux/drivers/xen/balloon.c:540!
-
-Which is a non-zero return value from the decrease_reservation hypercall.
-
-The frame_list[] has been incorrectly populated.  The below patch fixes
-it for me.  Please test as well.
-
---- a/drivers/xen/balloon.c
-+++ b/drivers/xen/balloon.c
-@@ -504,9 +504,10 @@ static enum bp_state decrease_reservation(unsigned
-long nr_pages, gfp_t gfp)
- 	 * Setup the frame, update direct mapping, invalidate P2M,
- 	 * and add to balloon.
- 	 */
-+	i = 0;
- 	list_for_each_entry_safe(page, tmp, &pages, lru) {
- 		/* XENMEM_decrease_reservation requires a GFN */
--		frame_list[i] = xen_page_to_gfn(page);
-+		frame_list[i++] = xen_page_to_gfn(page);
-
- #ifdef CONFIG_XEN_HAVE_PVMMU
- 		/*
-
-David
+> +	if (core->flags & CLK_SET_RATE_UNGATE) {
+> +		unsigned long flags;
+> +
+> +		clk_core_prepare(core);
+> +		flags = clk_enable_lock();
+> +		clk_core_enable(core);
+> +		clk_enable_unlock(flags);
+> +	}
+> +
+>  	if (core->new_parent && core->new_parent != core->parent) {
+>  		old_parent = __clk_set_parent_before(core, core->new_parent);
+>  		trace_clk_set_parent(core, core->new_parent);
+> @@ -1464,6 +1473,15 @@ static void clk_change_rate(struct clk_core *core)
+> 
+>  	core->rate = clk_recalc(core, best_parent_rate);
+> 
+> +	if (core->flags & CLK_SET_RATE_UNGATE) {
+> +		unsigned long flags;
+> +
+> +		flags = clk_enable_lock();
+> +		clk_core_disable(core);
+> +		clk_enable_unlock(flags);
+> +		clk_core_unprepare(core);
+> +	}
+> +
+>  	if (core->notifier_count && old_rate != core->rate)
+>  		__clk_notify(core, POST_RATE_CHANGE, old_rate, core->rate);
+> 
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 3ecc07d..21e0025 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -31,6 +31,7 @@
+>  #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change
+> */ #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk
+> accuracy */ #define CLK_RECALC_NEW_RATES	BIT(9) /* recalc rates after
+> notifications */ +#define CLK_SET_RATE_UNGATE	BIT(10) /* clock needs to run
+> to set rate */
+> 
+>  struct clk;
+>  struct clk_hw;
