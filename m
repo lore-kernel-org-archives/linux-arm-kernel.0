@@ -1,40 +1,53 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 2 Oct 2015 13:45:55 -0700
-Subject: [PATCH v3 5/5] clk: sunxi: mod1 clock support
-In-Reply-To: <1443512353-28073-6-git-send-email-maxime.ripard@free-electrons.com>
-References: <1443512353-28073-1-git-send-email-maxime.ripard@free-electrons.com>
- <1443512353-28073-6-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20151002204555.GA12338@codeaurora.org>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri,  2 Oct 2015 15:47:40 -0500
+Subject: [PATCH 2/7] arm64: PTE/PMD contiguous bit definition
+In-Reply-To: <1443818865-19846-1-git-send-email-jeremy.linton@arm.com>
+References: <1443818865-19846-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1443818865-19846-3-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29, Maxime Ripard wrote:
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/clkdev.h>
+Define the bit positions in the PTE and PMD for the
+contiguous bit.
 
-Is this include used?
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ arch/arm64/include/asm/pgtable-hwdef.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-> +	if (!gate)
-> +		goto err_free_mux;
-> +
-> +	of_property_read_string(node, "clock-output-names", &clk_name);
-> +
-> +	while (i < SUN4I_MOD1_MAX_PARENTS &&
-> +	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
-
-Can we use of_clk_parent_fill() here?
-
-> +		i++;
-> +
-
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index 24154b0..361352d 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -55,6 +55,13 @@
+ #define SECTION_MASK		(~(SECTION_SIZE-1))
+ 
+ /*
++ * Contiguous page definitions.
++ */
++#define CONT_RANGE		(_AC(1, UL) << CONT_SHIFT)
++#define CONT_RANGE_MASK		((CONT_RANGE-1) << PAGE_SHIFT)
++#define CONT_RANGE_OFFSET(addr) (((addr)>>PAGE_SHIFT)&(CONT_RANGE-1))
++
++/*
+  * Hardware page table definitions.
+  *
+  * Level 1 descriptor (PUD).
+@@ -83,6 +90,7 @@
+ #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
+ #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
+ #define PMD_SECT_NG		(_AT(pmdval_t, 1) << 11)
++#define PMD_SECT_CONT		(_AT(pmdval_t, 1) << 52)
+ #define PMD_SECT_PXN		(_AT(pmdval_t, 1) << 53)
+ #define PMD_SECT_UXN		(_AT(pmdval_t, 1) << 54)
+ 
+@@ -105,6 +113,7 @@
+ #define PTE_AF			(_AT(pteval_t, 1) << 10)	/* Access Flag */
+ #define PTE_NG			(_AT(pteval_t, 1) << 11)	/* nG */
+ #define PTE_DBM			(_AT(pteval_t, 1) << 51)	/* Dirty Bit Management */
++#define PTE_CONT		(_AT(pteval_t, 1) << 52)	/* Contiguous range */
+ #define PTE_PXN			(_AT(pteval_t, 1) << 53)	/* Privileged XN */
+ #define PTE_UXN			(_AT(pteval_t, 1) << 54)	/* User XN */
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.4.3
