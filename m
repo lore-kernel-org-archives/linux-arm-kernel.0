@@ -1,46 +1,27 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 02 Oct 2015 17:55:13 +0100
-Subject: [PATCH] arm-soc: Add Sigma Designs Tango4 port
-In-Reply-To: <560EB1EC.3020403@free.fr> (Mason's message of "Fri, 2 Oct 2015
- 18:33:48 +0200")
-References: <560EAA7C.3070302@free.fr> <yw1xoaghl099.fsf@unicorn.mansr.com>
- <560EB1EC.3020403@free.fr>
-Message-ID: <yw1xfv1tky6m.fsf@unicorn.mansr.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 2 Oct 2015 17:55:48 +0100
+Subject: [PATCH v2 0/2] Add support to make output voltage determined by
+ VSET2[] bits
+In-Reply-To: <1443597950-27849-1-git-send-email-wenyou.yang@atmel.com>
+References: <1443597950-27849-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20151002165548.GT12635@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+On Wed, Sep 30, 2015 at 03:25:48PM +0800, Wenyou Yang wrote:
+> The patch is to add support to make the output voltage of ACT8865
+> DC/DC regulator determined by VSET2[] bits. The DT property
+> "active-semi,vsel-high" is used to specify the VSEL pin at high
+> on the board. When the VSEL pin is high, output voltage is programmed
+> by VSET2[] bits.
 
->>> +		uart0 {
->>> +			compatible = "ralink,rt2880-uart";
->>> +			reg = <0x10700 0x100>;
->>> +			clock-frequency = <7372800>;
->>> +			reg-shift = <2>;
->>> +/*			fifo-size = <16>; BROKEN */
->> 
->> Either fix whatever is broken or drop that line.
->
-> I can't leave TODO reminders in the platform Kconfig?
-> Even as comments?
-
-Never mind, I've sent a patch fixing the problem.
-
->>> +		intc: intc at e000 {
->>> +			compatible = "sigma,tango-intc";
->> 
->> Why do you insist on using other names than the ones I've been using for
->> months?  Just want to leave your own mark on the code?
->
-> You're using "sigma,smp8640-intc".
-> The SMP8640 is a Tango3 (MIPS-based) platform.
-> It makes no sense to have references to Tango3 in tango4.dtsi
-> Aside from the CPU difference, Tango3 and Tango4 have a lot in common though.
-
-It's commonplace to refer to peripherals by the earliest (supported)
-chip using them.  This avoids naming conflicts if a future chip uses a
-different component.  Some bits are incompatible even between different
-devices in the tango3 family.
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
+I'll apply these but they'll probably need some rework when someone
+needs to support a board where the pin is connected to a GPIO and
+controllable for fast voltage switching.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151002/76a41052/attachment-0001.sig>
