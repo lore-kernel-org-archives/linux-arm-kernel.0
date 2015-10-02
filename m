@@ -1,62 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 2 Oct 2015 10:32:01 +0100
-Subject: [PATCH v3 2/5] mailbox: Add support for ST's Mailbox IP
-In-Reply-To: <CABb+yY2wJKBvL3eceVxkq3ZdS6V+-yqQp98YCaS_oR+3CobQ0g@mail.gmail.com>
-References: <1439994175-13360-1-git-send-email-lee.jones@linaro.org>
- <1439994175-13360-3-git-send-email-lee.jones@linaro.org>
- <CABb+yY2wJKBvL3eceVxkq3ZdS6V+-yqQp98YCaS_oR+3CobQ0g@mail.gmail.com>
-Message-ID: <20151002093201.GA23213@x1>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 2 Oct 2015 10:37:12 +0100
+Subject: [PATCH v5 00/23] ILP32 for ARM64
+In-Reply-To: <F6B719D8-1FC0-4B26-A926-40FB6953AAE3@caviumnetworks.com>
+References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
+ <20150930101918.GA9753@e104818-lin.cambridge.arm.com>
+ <20151001191520.GA25295@yury-N73SV> <1708349.DFbfvHcnCR@wuerfel>
+ <F6B719D8-1FC0-4B26-A926-40FB6953AAE3@caviumnetworks.com>
+Message-ID: <20151002093711.GA15803@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 02 Oct 2015, Jassi Brar wrote:
+On Thu, Oct 01, 2015 at 09:49:46PM +0000, Pinski, Andrew wrote:
+> Ok, we will rewrite these patches using 32bit time_t and 32bit off_t
+> and redo the toolchain support for them.  Note this is going back to
+> the abi I had originally done when I submitted my original version
+> when it was asked to change time_t to be 64bit. 
 
-> On Wed, Aug 19, 2015 at 7:52 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> ....
-> 
-> > +
-> > +#define MBOX_BASE(mdev, inst)   ((mdev)->base + (inst * 4))
-> >
-> It should be    (inst) * 4
+One of the key aspects of kernel development is the ability to adapt
+quickly to new requests/insights. This implies releasing early and often
+rather than a new version roughly twice a year (IIRC, v1 was posted
+September 2013). Moreover, the success of the kernel is partly based on
+not getting stuck on old decisions (well, unless it breaks accepted user
+ABI).
 
-I'm guessing you mean:
+So, at the time, following x32 discussions, we thought of using the
+native ABI as much as possible. However, two important things happened
+since:
 
-  ((mdev)->base + ((inst) * 4))
+1. libc community didn't like breaking the POSIX compliance
+2. No-one seems desperate for ILP32 on AArch64
 
-?
+(1) is a fair point and I would rather be careful as we don't know the
+extent of the code affected. In the meantime, we've also had ongoing
+work for addressing the 2038 issue on 32-bit architectures.
 
-> > +/**
-> > + * STi Mailbox device data
-> > + *
-> > + * An IP Mailbox is currently composed of 4 instances
-> > + * Each instance is currently composed of 32 channels
-> > + * This means that we have 128 channels per Mailbox
-> > + * A channel an be used for TX or RX
-> > + *
-> > + * @dev:       Device to which it is attached
-> > + * @mbox:      Representation of a communication channel controller
-> > + * @base:      Base address of the register mapping region
-> > + * @name:      Name of the mailbox
-> > + * @enabled:   Local copy of enabled channels
-> > + * @lock:      Mutex protecting enabled status
-> > + */
-> > +struct sti_mbox_device {
-> > +       struct device           *dev;
-> > +       struct mbox_controller  *mbox;
-> > +       void __iomem            *base;
-> > +       const char              *name;
-> > +       u32                     enabled[STI_MBOX_INST_MAX];
-> > +       spinlock_t              lock;
-> > +       bool                    txonly;
-> >
-> txonly is never used after being initialized from DT :)   which is a
-> good sign. So maybe just drop it and the optional property 'tx-only'.
+The second point is equally important. The benchmarks I've seen didn't
+show a significant improvement and the messages I got on various
+channels pretty much labeled ILP32 as a transitional stage to full LP64.
+In this case, we need to balance the benefits of a close to native ABI
+(future proof, slightly higher performance) vs. the cost of maintaining
+such ABI in the kernel on the long term, especially if it's not widely
+used/tested.
 
-Okay.
+We've seen the kernel patches and, following discussions on the lists,
+decided to change the original recommendation. IIRC, the main ideas (but
+you need to read various threads as I can't remember the details from
+6-7 months ago):
+
+a) separate syscall table for ILP32
+b) close to compat ABI with 32-bit time_t, off_t
+c) asm-generic/unistd.h rather than asm/unistd32.h (that's where it
+   would differ from compat, together with places where pointers are
+   passed)
+
+As I said previously, I'm not going to pay any attention to the patches
+in this series, it's nothing more than a rebase of a version I already
+reviewed.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Catalin
