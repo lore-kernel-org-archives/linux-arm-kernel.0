@@ -1,63 +1,59 @@
-From: mans@mansr.com (Mans Rullgard)
-Date: Fri,  2 Oct 2015 16:19:13 +0100
-Subject: [PATCH v2] ARM: debug: add support for Palmchip 16550-like UART
-Message-ID: <1443799154-26768-1-git-send-email-mans@mansr.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Fri, 2 Oct 2015 16:19:31 +0100
+Subject: [Xen-devel] [PATCH v5 12/22] xen/balloon: Don't rely on the page
+ granularity is the same for Xen and Linux
+In-Reply-To: <560E9A19.2010301@citrix.com>
+References: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
+ <1443609937-25278-13-git-send-email-julien.grall@citrix.com>
+ <560E9004.8030604@citrix.com> <560E9551.6020105@citrix.com>
+ <560E9A19.2010301@citrix.com>
+Message-ID: <560EA083.2020102@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SoCs have a Palmchip UART with a non-standard register layout.
-This allows the debug console to work with these.
+On 02/10/15 15:52, Julien Grall wrote:
+> On 02/10/15 15:31, Julien Grall wrote:
+>> Hi David,
+>>
+>> On 02/10/15 15:09, David Vrabel wrote:
+>>> On 30/09/15 11:45, Julien Grall wrote:
+>>>> For ARM64 guests, Linux is able to support either 64K or 4K page
+>>>> granularity. Although, the hypercall interface is always based on 4K
+>>>> page granularity.
+>>>>
+>>>> With 64K page granularity, a single page will be spread over multiple
+>>>> Xen frame.
+>>>>
+>>>> To avoid splitting the page into 4K frame, take advantage of the
+>>>> extent_order field to directly allocate/free chunk of the Linux page
+>>>> size.
+>>>>
+>>>> Note that PVMMU is only used for PV guest (which is x86) and the page
+>>>> granularity is always 4KB. Some BUILD_BUG_ON has been added to ensure
+>>>> that because the code has not been modified.
+>>>
+>>> This causes a BUG() in x86 PV guests when decreasing the reservation.
+>>>
+>>> Xen says:
+>>>
+>>> (XEN) d0v2 Error pfn 0: rd=0 od=32753 caf=8000000000000001
+>>> taf=7400000000000001
+>>> (XEN) memory.c:250:d0v2 Bad page free for domain 0
+>>>
+>>> And Linux BUGs with:
+>>>
+>>> [   82.032654] kernel BUG at
+>>> /anfs/drall/scratch/davidvr/x86/linux/drivers/xen/balloon.c:540!
+>>>
+>>> Which is a non-zero return value from the decrease_reservation hypercall.
+>>>
+>>> The frame_list[] has been incorrectly populated.  The below patch fixes
+>>> it for me.  Please test as well.
+> 
+> FIY, I've just tested with the patch on ARM64 and I haven't see any issue.
 
-Signed-off-by: Mans Rullgard <mans@mansr.com>
----
-Changed in v2:
-- Updated to reflect actual vendor of this UART
----
- arch/arm/Kconfig.debug        |  8 ++++++++
- arch/arm/include/debug/8250.S | 12 ++++++++++++
- 2 files changed, 20 insertions(+)
+Thanks, I've folded it in.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 0cfd7f9..9039fff 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1597,6 +1597,14 @@ config DEBUG_UART_8250_WORD
- 		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
- 		DEBUG_BRCMSTB_UART
- 
-+config DEBUG_UART_8250_PALMCHIP
-+	bool "8250 UART is Palmchip variant"
-+	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
-+	help
-+	  Palmchip provides a UART implementation compatible with 16550
-+	  except for having a different register layout.  Say Y here if
-+	  the debug UART is of this type.
-+
- config DEBUG_UART_8250_FLOW_CONTROL
- 	bool "Enable flow control for 8250 UART"
- 	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
-diff --git a/arch/arm/include/debug/8250.S b/arch/arm/include/debug/8250.S
-index 7f7446f..2332f40 100644
---- a/arch/arm/include/debug/8250.S
-+++ b/arch/arm/include/debug/8250.S
-@@ -9,6 +9,18 @@
-  */
- #include <linux/serial_reg.h>
- 
-+#ifdef CONFIG_DEBUG_UART_8250_PALMCHIP
-+
-+#undef UART_TX
-+#undef UART_LSR
-+#undef UART_MSR
-+
-+#define UART_TX 1
-+#define UART_LSR 7
-+#define UART_MSR 8
-+
-+#endif
-+
- 		.macro	addruart, rp, rv, tmp
- 		ldr	\rp, =CONFIG_DEBUG_UART_PHYS
- 		ldr	\rv, =CONFIG_DEBUG_UART_VIRT
--- 
-2.5.3
+Boris, can we get another test run on the for-linus-4.4 branch, please?
+
+David
