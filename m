@@ -1,39 +1,31 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 2 Oct 2015 23:05:17 +0800
-Subject: [PATCH v4 1/3] dt-bindings: add more MediaTek SoC to mtk-timer binding
+Date: Fri, 2 Oct 2015 23:05:18 +0800
+Subject: [PATCH v4 2/3] arm64: mediatek: enable MTK_TIMER
 In-Reply-To: <1443798319-45744-1-git-send-email-yingjoe.chen@mediatek.com>
 References: <1443798319-45744-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1443798319-45744-2-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1443798319-45744-3-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add compatible string for mt8127, mt8135 and mt8173 and sort
-the list.
+Enable MTK_TIMER for MediaTek plaform, which will be used as
+tick broadcast device and schedule clock.
 
 Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 ---
- Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ arch/arm64/Kconfig.platforms | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-index 53a3029..64083bc 100644
---- a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-@@ -3,10 +3,12 @@ Mediatek MT6577, MT6572 and MT6589 Timers
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 23800a1..8176455 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -42,6 +42,7 @@ config ARCH_MEDIATEK
+ 	bool "Mediatek MT65xx & MT81xx ARMv8 SoC"
+ 	select ARM_GIC
+ 	select PINCTRL
++	select MTK_TIMER
+ 	help
+ 	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
  
- Required properties:
- - compatible should contain:
--	* "mediatek,mt6589-timer" for MT6589 compatible timers
- 	* "mediatek,mt6580-timer" for MT6580 compatible timers
--	* "mediatek,mt6577-timer" for all compatible timers (MT6589, MT6580,
--		MT6577)
-+	* "mediatek,mt6589-timer" for MT6589 compatible timers
-+	* "mediatek,mt8127-timer" for MT8127 compatible timers
-+	* "mediatek,mt8135-timer" for MT8135 compatible timers
-+	* "mediatek,mt8173-timer" for MT8173 compatible timers
-+	* "mediatek,mt6577-timer" for MT6577 and all above compatible timers
- - reg: Should contain location and length for timers register.
- - clocks: Clocks driving the timer hardware. This list should include two
- 	clocks. The order is system clock and as second clock the RTC clock.
 -- 
 1.9.1
