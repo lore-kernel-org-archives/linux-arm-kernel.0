@@ -1,79 +1,200 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 02 Oct 2015 16:12:13 +0200
-Subject: [PATCH 1/3] clk: add flag for clocks that need to be enabled on
- rate changes
-In-Reply-To: <1929669.AsgMSusdJb@phil>
-References: <1929669.AsgMSusdJb@phil>
-Message-ID: <3137165.kmu68gRS44@diego>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri,  2 Oct 2015 17:12:33 +0300
+Subject: [PATCH v2 1/1] ARM: orion5x: use mac_pton() helper
+Message-ID: <1443795153-40836-1-git-send-email-andriy.shevchenko@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Instead of custom approach let's use generic helper function.
 
-any comment on these 3 patches?
+Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Cc: Detlef Vollmann <dv@vollmann.ch>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+Changelog v2:
+- select GENERIC_NET_UTILS when appropriate
+- compile test only
+ arch/arm/mach-orion5x/Kconfig        |  3 ++
+ arch/arm/mach-orion5x/dns323-setup.c | 53 ++----------------------------------
+ arch/arm/mach-orion5x/tsx09-common.c | 49 +++------------------------------
+ 3 files changed, 10 insertions(+), 95 deletions(-)
 
-Thanks
-Heiko
-
-Am Freitag, 21. August 2015, 19:46:31 schrieb Heiko Stuebner:
-> Some clocks need to be enabled to accept rate changes. This patch adds a
-> new flag CLK_SET_RATE_UNGATE that lets clk_change_rate enable the clock
-> before trying to change the rate and disable it again afterwards.
-> This of course doesn't effect clocks that are already running at that
-> point, as their refcount will only temporarily increase.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/clk/clk.c            | 18 ++++++++++++++++++
->  include/linux/clk-provider.h |  1 +
->  2 files changed, 19 insertions(+)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 28cd923..564f11e 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1438,6 +1438,15 @@ static void clk_change_rate(struct clk_core *core)
->  	else if (core->parent)
->  		best_parent_rate = core->parent->rate;
-> 
-> +	if (core->flags & CLK_SET_RATE_UNGATE) {
-> +		unsigned long flags;
-> +
-> +		clk_core_prepare(core);
-> +		flags = clk_enable_lock();
-> +		clk_core_enable(core);
-> +		clk_enable_unlock(flags);
-> +	}
-> +
->  	if (core->new_parent && core->new_parent != core->parent) {
->  		old_parent = __clk_set_parent_before(core, core->new_parent);
->  		trace_clk_set_parent(core, core->new_parent);
-> @@ -1464,6 +1473,15 @@ static void clk_change_rate(struct clk_core *core)
-> 
->  	core->rate = clk_recalc(core, best_parent_rate);
-> 
-> +	if (core->flags & CLK_SET_RATE_UNGATE) {
-> +		unsigned long flags;
-> +
-> +		flags = clk_enable_lock();
-> +		clk_core_disable(core);
-> +		clk_enable_unlock(flags);
-> +		clk_core_unprepare(core);
-> +	}
-> +
->  	if (core->notifier_count && old_rate != core->rate)
->  		__clk_notify(core, POST_RATE_CHANGE, old_rate, core->rate);
-> 
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 3ecc07d..21e0025 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -31,6 +31,7 @@
->  #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change
-> */ #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk
-> accuracy */ #define CLK_RECALC_NEW_RATES	BIT(9) /* recalc rates after
-> notifications */ +#define CLK_SET_RATE_UNGATE	BIT(10) /* clock needs to run
-> to set rate */
-> 
->  struct clk;
->  struct clk_hw;
+diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
+index 08d2be2..66f1c95 100644
+--- a/arch/arm/mach-orion5x/Kconfig
++++ b/arch/arm/mach-orion5x/Kconfig
+@@ -45,6 +45,7 @@ config MACH_KUROBOX_PRO
+ 
+ config MACH_DNS323
+ 	bool "D-Link DNS-323"
++	select GENERIC_NET_UTILS
+ 	select I2C_BOARDINFO
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+@@ -52,6 +53,7 @@ config MACH_DNS323
+ 
+ config MACH_TS209
+ 	bool "QNAP TS-109/TS-209"
++	select GENERIC_NET_UTILS
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  QNAP TS-109/TS-209 platform.
+@@ -93,6 +95,7 @@ config MACH_LINKSTATION_LS_HGL
+ 
+ config MACH_TS409
+ 	bool "QNAP TS-409"
++	select GENERIC_NET_UTILS
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  QNAP TS-409 platform.
+diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
+index f267e58..bc279a8 100644
+--- a/arch/arm/mach-orion5x/dns323-setup.c
++++ b/arch/arm/mach-orion5x/dns323-setup.c
+@@ -173,42 +173,10 @@ static struct mv643xx_eth_platform_data dns323_eth_data = {
+ 	.phy_addr = MV643XX_ETH_PHY_ADDR(8),
+ };
+ 
+-/* dns323_parse_hex_*() taken from tsx09-common.c; should a common copy of these
+- * functions be kept somewhere?
+- */
+-static int __init dns323_parse_hex_nibble(char n)
+-{
+-	if (n >= '0' && n <= '9')
+-		return n - '0';
+-
+-	if (n >= 'A' && n <= 'F')
+-		return n - 'A' + 10;
+-
+-	if (n >= 'a' && n <= 'f')
+-		return n - 'a' + 10;
+-
+-	return -1;
+-}
+-
+-static int __init dns323_parse_hex_byte(const char *b)
+-{
+-	int hi;
+-	int lo;
+-
+-	hi = dns323_parse_hex_nibble(b[0]);
+-	lo = dns323_parse_hex_nibble(b[1]);
+-
+-	if (hi < 0 || lo < 0)
+-		return -1;
+-
+-	return (hi << 4) | lo;
+-}
+-
+ static int __init dns323_read_mac_addr(void)
+ {
+ 	u_int8_t addr[6];
+-	int i;
+-	char *mac_page;
++	void __iomem *mac_page;
+ 
+ 	/* MAC address is stored as a regular ol' string in /dev/mtdblock4
+ 	 * (0x007d0000-0x00800000) starting at offset 196480 (0x2ff80).
+@@ -217,23 +185,8 @@ static int __init dns323_read_mac_addr(void)
+ 	if (!mac_page)
+ 		return -ENOMEM;
+ 
+-	/* Sanity check the string we're looking@*/
+-	for (i = 0; i < 5; i++) {
+-		if (*(mac_page + (i * 3) + 2) != ':') {
+-			goto error_fail;
+-		}
+-	}
+-
+-	for (i = 0; i < 6; i++)	{
+-		int byte;
+-
+-		byte = dns323_parse_hex_byte(mac_page + (i * 3));
+-		if (byte < 0) {
+-			goto error_fail;
+-		}
+-
+-		addr[i] = byte;
+-	}
++	if (!mac_pton((__force const char *) mac_page, addr))
++		goto error_fail;
+ 
+ 	iounmap(mac_page);
+ 	printk("DNS-323: Found ethernet MAC address: %pM\n", addr);
+diff --git a/arch/arm/mach-orion5x/tsx09-common.c b/arch/arm/mach-orion5x/tsx09-common.c
+index 24b2959..d42e006 100644
+--- a/arch/arm/mach-orion5x/tsx09-common.c
++++ b/arch/arm/mach-orion5x/tsx09-common.c
+@@ -53,53 +53,12 @@ struct mv643xx_eth_platform_data qnap_tsx09_eth_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+ };
+ 
+-static int __init qnap_tsx09_parse_hex_nibble(char n)
+-{
+-	if (n >= '0' && n <= '9')
+-		return n - '0';
+-
+-	if (n >= 'A' && n <= 'F')
+-		return n - 'A' + 10;
+-
+-	if (n >= 'a' && n <= 'f')
+-		return n - 'a' + 10;
+-
+-	return -1;
+-}
+-
+-static int __init qnap_tsx09_parse_hex_byte(const char *b)
+-{
+-	int hi;
+-	int lo;
+-
+-	hi = qnap_tsx09_parse_hex_nibble(b[0]);
+-	lo = qnap_tsx09_parse_hex_nibble(b[1]);
+-
+-	if (hi < 0 || lo < 0)
+-		return -1;
+-
+-	return (hi << 4) | lo;
+-}
+-
+ static int __init qnap_tsx09_check_mac_addr(const char *addr_str)
+ {
+ 	u_int8_t addr[6];
+-	int i;
+ 
+-	for (i = 0; i < 6; i++) {
+-		int byte;
+-
+-		/*
+-		 * Enforce "xx:xx:xx:xx:xx:xx\n" format.
+-		 */
+-		if (addr_str[(i * 3) + 2] != ((i < 5) ? ':' : '\n'))
+-			return -1;
+-
+-		byte = qnap_tsx09_parse_hex_byte(addr_str + (i * 3));
+-		if (byte < 0)
+-			return -1;
+-		addr[i] = byte;
+-	}
++	if (!mac_pton(addr_str, addr))
++		return -1;
+ 
+ 	printk(KERN_INFO "tsx09: found ethernet mac address %pM\n", addr);
+ 
+@@ -118,12 +77,12 @@ void __init qnap_tsx09_find_mac_addr(u32 mem_base, u32 size)
+ 	unsigned long addr;
+ 
+ 	for (addr = mem_base; addr < (mem_base + size); addr += 1024) {
+-		char *nor_page;
++		void __iomem *nor_page;
+ 		int ret = 0;
+ 
+ 		nor_page = ioremap(addr, 1024);
+ 		if (nor_page != NULL) {
+-			ret = qnap_tsx09_check_mac_addr(nor_page);
++			ret = qnap_tsx09_check_mac_addr((__force const char *)nor_page);
+ 			iounmap(nor_page);
+ 		}
+ 
+-- 
+2.5.1
