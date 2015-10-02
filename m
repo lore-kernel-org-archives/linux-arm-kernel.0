@@ -1,38 +1,40 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  2 Oct 2015 17:37:50 +0100
-Subject: [PATCH 1/5] arm64: el2_setup: Make sure ICC_SRE_EL2.SRE sticks before
- using GICv3 sysregs
-In-Reply-To: <1443803874-9566-1-git-send-email-marc.zyngier@arm.com>
-References: <1443803874-9566-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1443803874-9566-2-git-send-email-marc.zyngier@arm.com>
+Date: Fri,  2 Oct 2015 17:37:49 +0100
+Subject: [PATCH 0/5] arm64: Allow booting with GICv3 in GICv2 mode
+Message-ID: <1443803874-9566-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Contrary to what was originally expected, EL3 firmware can (for whatever
-reason) disable GICv3 system register access. In this case, the kernel
-explodes very early.
+Recent evolutions of the ARM Trusted Firmware have outlined issues
+when the system is equipped with a GICv3 interrupt controller, but the
+firmware has decided to restrict it to GICv2 compatibility mode.
 
-Work around this by testing if the SRE bit sticks or not. If it doesn't,
-abort the GICv3 setup, and pray that the firmware has passed a DT that
-doesn't contain a GICv3 node.
+In this mode, system registers cannot be enabled, and the firmware is
+expected to pass a GICv2 description (DT or ACPI tables).
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kernel/head.S | 2 ++
- 1 file changed, 2 insertions(+)
+This series makes sure that system register access is checked at EL2
+setup time and when the feature detection is performed. Additionally,
+the GICv2 driver checks that system registers are disabled, and warns
+if they are enabled.
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 90d09ed..351a4de 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -498,6 +498,8 @@ CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
- 	orr	x0, x0, #ICC_SRE_EL2_ENABLE	// Set ICC_SRE_EL2.Enable==1
- 	msr_s	ICC_SRE_EL2, x0
- 	isb					// Make sure SRE is now set
-+	mrs_s	x0, ICC_SRE_EL2			// Read SRE back,
-+	tbz	x0, #0, 3f			// and check that it sticks
- 	msr_s	ICH_HCR_EL2, xzr		// Reset ICC_HCR_EL2 to defaults
- 
- 3:
+The booting requirements are also updated to make the above explicit.
+
+Marc Zyngier (5):
+  arm64: el2_setup: Make sure ICC_SRE_EL2.SRE sticks before using GICv3
+    sysregs
+  irqchip/gic-v3: Make gic_enable_sre an inline function
+  arm64: cpufeatures: Check ICC_EL1_SRE.SRE before enabling
+    ARM64_HAS_SYSREG_GIC_CPUIF
+  irqchip/gic: Warn if GICv3 system registers are enabled
+  arm64: Update booting requirements for GICv3 in GICv2 mode
+
+ Documentation/arm64/booting.txt    | 11 ++++++++++-
+ arch/arm64/kernel/cpufeature.c     | 19 ++++++++++++++++++-
+ arch/arm64/kernel/head.S           |  2 ++
+ drivers/irqchip/irq-gic-v3.c       | 32 +++++++++-----------------------
+ drivers/irqchip/irq-gic.c          | 15 +++++++++++++++
+ include/linux/irqchip/arm-gic-v3.h | 16 ++++++++++++++++
+ 6 files changed, 70 insertions(+), 25 deletions(-)
+
 -- 
 2.1.4
