@@ -1,20 +1,43 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Fri, 2 Oct 2015 02:23:45 -0300
-Subject: Queueing b0a688ddcc50 "usb: musb: cppi41: allow it to work again" for
- -stable
-Message-ID: <CAAEAJfC7z=dvw_5vgXDBWVQdKA5jDpfECYv4Jy67YaT7219uJA@mail.gmail.com>
+From: codekipper@gmail.com (Code Kipper)
+Date: Fri, 2 Oct 2015 07:24:20 +0200
+Subject: [PATCH v2 1/4] dt-bindings: add sunxi SPDIF transceiver bindings
+In-Reply-To: <20151001201215.GN7104@lukather>
+References: <1443635458-8873-1-git-send-email-codekipper@gmail.com>
+ <1443635458-8873-2-git-send-email-codekipper@gmail.com>
+ <20151001201215.GN7104@lukather>
+Message-ID: <CAEKpxB=kdmrbeiq8M=dXmpccxOhd7UZTaMkLZGo9TdRB1kMz3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+>> +
+>> +  - compatible               : should be one of the following:
+>> +    - "allwinner,sun4i-a10-spdif": for the Allwinner A10 SoC
+>> +    - "allwinner,sun7i-a20-spdif": for the Allwinner A20 SoC
+>> +    - "allwinner,sun6i-a31-spdif": for the Allwinner A31 SoC
+>
+> Are all these compatibles really work? Is there any significant
+> difference between the controller on all these SoCs?
+Let us assume that there isn't any difference. Remember SPDIF details
+for all of these devices is sketchy. In the A10 User Manual, it's not
+even mentioned although devices such as the Mele A2000 which I use
+come with the physical connector. It's only when the A20 Manual was
+released that we see the pin details and related components. We didn't
+see a SPDIF block spec until the H3 User Manual was released.
 
-Commit b0a688ddcc50 "usb: musb: cppi41: allow it to work again" seems
-to fix a regression. It applies cleanly on v4.1 and removes the
-"musb-hdrc musb-hdrc.1.auto: Need DT for the DMA engine." error.
+Looking at the SDK code I've only seen fifo level settings to be
+different for the sun6i family. It was this release that also showed
+Rx rotines. The fact of the matter is we won't know until these SoCs
+have been tested and with that in mind I'm happy to remove all
+capabilities for now until then.
 
-Any chance you can queue it for -stable?
+BR,
+CK
 
-Thanks!
--- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+>
+> Thanks,
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
