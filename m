@@ -1,48 +1,35 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 2 Oct 2015 13:30:57 +0900
-Subject: [PATCH v4 0/3] ARM: uniphier: add outer cache support and rework
- SMP operations
-In-Reply-To: <1443610906-8608-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1443610906-8608-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNASLjEFSogG9Ab-Zsrgbr09sxSDaN6Gr0dzQ82VpPUNcmQ@mail.gmail.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Fri, 02 Oct 2015 07:40:39 +0300
+Subject: [RFC PATCH 01/20] coresight: etm3x: splitting 'etm_enable_hw()'
+ operations
+In-Reply-To: <CANLsYkyOvHT1caPMNP0J90c1h9PAUsod7C8+kJg83taw4Ls6HQ@mail.gmail.com>
+References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
+ <1442593594-10665-2-git-send-email-mathieu.poirier@linaro.org>
+ <87r3lgjkjw.fsf@ashishki-desk.ger.corp.intel.com>
+ <CANLsYkyOvHT1caPMNP0J90c1h9PAUsod7C8+kJg83taw4Ls6HQ@mail.gmail.com>
+Message-ID: <87y4fl3mt4.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-09-30 20:01 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Hi Olof,
->
-> Now Linux 4.3-rc1 is out, so I am back to this.
->
-> 1/3: add outer cache support
-> 2/3: rework SMP operations
-> 3/3: add device tree nodes
->
-> Because 2/3 highly depends on 1/3, I hope whole of this series
-> is applied through ARM-SOC tree.
->
->
-> Changes in v4:
->   - Add more detailed comments to explain why no spin lock is needed
->   - Add two examples to the binding document
->
-> Changes in v3:
->   - Drop bogus includes
->
-> Changes in v2:
->   - Use pr_fmt() to have pr_<level> are automatically prefixed
->   - Re-design to initialize the outer cache earlier in init_IRQ()
->   - Require DT properties such as "cacne-unified", "cache-size",
->     "cache-sets", "cache-size", "cache-line-size".
->   - Follow "next-level-cache" property to search further outer caches
->
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 
+> On 30 September 2015 at 03:58, Alexander Shishkin
+> <alexander.shishkin@linux.intel.com> wrote:
+>> Most of these things can also be bypassed, as at least initially perf
+>> events won't be using trigger/sequencer configurations, so we could
+>> simply clear all these things out when a first perf event is created
+>> (which would also disallow any sysfs poking around the etm/etb) and not
+>> worry about them in the pmu callbacks.
+>
+> I don't want to restrain configuration options to what is available
+> through Perf's cmd line.  The sysFS interface is there to complement
+> what is currently not available.
 
-I found something to be fixed.
+In practice this means that part of your trace configuration will be
+global and part -- per event, which can indeed work if you only have one
+event at a time, but again, makes using perf infrastructure redundant
+for this driver. For multiple events this doesn't make much sense.
 
-I will send v5.
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Regards,
+--
+Alex
