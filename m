@@ -1,85 +1,97 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri,  2 Oct 2015 11:44:02 -0700
-Subject: [PATCH v4 4/5] PCI: generic: Correct, and avoid overflow,
- in bus_max calculation.
-In-Reply-To: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1443811443-18878-5-git-send-email-ddaney.cavm@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 2 Oct 2015 13:48:27 -0500
+Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
+In-Reply-To: <20151002180255.GK12338@codeaurora.org>
+References: <560E53E3.7070207@free.fr> <560E8584.8000207@free.fr>
+ <20151002180255.GK12338@codeaurora.org>
+Message-ID: <20151002184827.GB5552@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
+Hi,
 
-There are two problems with the bus_max calculation:
+On Fri, Oct 02, 2015 at 11:02:55AM -0700, Stephen Boyd wrote:
+> On 10/02, Mason wrote:
+> > [ Adding original reporter ]
+> > 
+> > On 02/10/2015 11:52, Mason wrote:
+> > 
+> > > [ take 1 was sent on 2015-03-26 ]
+> > > 
+> > > Hello everyone,
+> > > 
+> > > In http://thread.gmane.org/gmane.linux.ports.arm.kernel/389931/focus=392348
+> > > Stephen Boyd wrote:
+> > > 
+> > >> I don't see any problem with the TWD dropping the dependency on SMP.
+> > >> The code should work the same on a UP configuration [...]
+> > > 
+> > > And Arnd recently said:
+> > > 
+> > >> I think this has come up before and should be fixed. Could you
+> > >> send a patch that allows using TWD in uniprocessor configurations?
+> > > 
+> > > Basically, this means reverting Shawn Guo's 904464b91eca patch.
+> > > and removing "depends on SMP" for HAVE_ARM_TWD.
+> > > 
+> > > However, Shawn's patch fixed an issue, therefore it seems likely
+> > > that simply reverting is not the proper solution?
+> > > 
+> > > What should I do?
+> > 
+> > For reference, the warning used to be:
+> > 
+> >     ------------[ cut here ]------------
+> >     WARNING: at arch/arm/kernel/smp_twd.c:345
+> >     twd_local_timer_of_register+0x7c/0x90()
+> >     twd_local_timer_of_register failed (-6)
+> >     Modules linked in:
+> >     Backtrace:
+> >     [<80011f14>] (dump_backtrace+0x0/0x10c) from [<8044dd30>]
+> >     (dump_stack+0x18/0x1c)
+> >      r7:805e9f58 r6:805ba84c r5:80539331 r4:00000159
+> >     [<8044dd18>] (dump_stack+0x0/0x1c) from [<80020fbc>]
+> >     (warn_slowpath_common+0x54/0x6c)
+> >     [<80020f68>] (warn_slowpath_common+0x0/0x6c) from [<80021078>]
+> >     (warn_slowpath_fmt+0x38/0x40)
+> >      r9:412fc09a r8:8fffffff r7:ffffffff r6:00000001 r5:80633b8c
+> >     r4:80b32da8
+> >     [<80021040>] (warn_slowpath_fmt+0x0/0x40) from [<805ba84]
+> >     (twd_local_timer_of_register+0x7c/0x90)
+> >      r3:fffffffa r2:8053934b
+> >     [<805ba7d0>] (twd_local_timer_of_register+0x0/0x90) from [<805c0bec>]
+> >     (imx6q_timer_init+0x18/0x4c)
+> >      r5:80633800 r4:8053b701
+> >     [<805c0bd4>] (imx6q_timer_init+0x0/0x4c) from [<805ba4e8>]
+> >     (time_init+0x28/0x38)
+> >      r5:80633800 r4:805dc0f4
+> >     [<805ba4c0>] (time_init+0x0/0x38) from [<805b6854>]
+> >     (start_kernel+0x1a0/0x310)
+> >     [<805b66b4>] (start_kernel+0x0/0x310) from [<10008044>] (0x10008044)
+> >      r8:1000406a r7:805f3f8c r6:805dc0c4 r5:805f0518 r4:10c5387d
+> >     ---[ end trace 1b75b31a2719ed1c ]---
+> > 
+> > 
+> > I cannot reproduce on v4.2 + my platform...
+> 
+> The warning has been removed in commit 5028090d1da1 (ARM: 8434/1:
+> Revert "7655/1: smp_twd: make twd_local_timer_of_register() no-op
+> for nosmp", 2015-09-14) sitting in linux-next. Oddly, that commit
+> doesn't remove the depends on SMP for the Kconfig. So it seems
+> that we can apply this patch and everyone is happy? We could also
+> drop the "if SMP" part of most of the platform selects if anyone
+> actually cares.
 
-1) The u8 data type can overflow for large config space windows.
+heh, sorry about that. I forgot omap2plus_defconfig enables everything. I could
+refresh that patch if Russell is still okay taking a newer version of
+it. Russell ?
 
-2) The calculation is incorrect for a bus range that doesn't start at
-   zero.
-
-Since the configuration space is relative to bus zero, make bus_max
-just be the size of the config window scaled by bus_shift.  Then clamp
-it to a maximum of 255, per PCI.  Use a data type of int to avoid
-overflow problems.
-
-Update host-generic-pci.txt to clarify the semantics of the "reg"
-property with respect to non-zero starting bus numbers.
-
-Signed-off-by: David Daney <david.daney@cavium.com>
----
-Change from V3: Add to explanation of "reg" property in
-host-generic-pci.txt.  Add error message if "reg" property is too big.
-
- Documentation/devicetree/bindings/pci/host-generic-pci.txt |  6 +++++-
- drivers/pci/host/pci-host-generic.c                        | 12 +++++++++---
- 2 files changed, 14 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-index cf3e205..42303bb 100644
---- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-@@ -34,7 +34,11 @@ Properties of the host controller node:
- - #size-cells    : Must be 2.
- 
- - reg            : The Configuration Space base address and size, as accessed
--                   from the parent bus.
-+                   from the parent bus.  The base address corresponds to
-+                   bus zero, even though the "bus-range" property may specify
-+                   a different starting bus number.  The driver must only map
-+                   or access the portion of the Configuration Space that
-+                   corresponds to the "bus-range"
- 
- 
- Properties of the /chosen node:
-diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-index 216ded5..5cce837 100644
---- a/drivers/pci/host/pci-host-generic.c
-+++ b/drivers/pci/host/pci-host-generic.c
-@@ -164,7 +164,7 @@ out_release_res:
- static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
- {
- 	int err;
--	u8 bus_max;
-+	int bus_max;
- 	resource_size_t busn;
- 	struct resource *bus_range;
- 	struct device *dev = pci->host.dev.parent;
-@@ -177,8 +177,14 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
- 	}
- 
- 	/* Limit the bus-range to fit within reg */
--	bus_max = pci->cfg.bus_range->start +
--		  (resource_size(&pci->cfg.res) >> pci->cfg.ops->bus_shift) - 1;
-+	bus_max = (resource_size(&pci->cfg.res) >> pci->cfg.ops->bus_shift) - 1;
-+	if (bus_max > 255) {
-+		dev_err(dev,
-+			"\"reg\" size corresponds to bus %d, truncating to 255\n",
-+			bus_max);
-+		bus_max = 255;
-+	}
-+
- 	pci->cfg.bus_range->end = min_t(resource_size_t,
- 					pci->cfg.bus_range->end, bus_max);
- 
 -- 
-1.9.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151002/5962cbea/attachment.sig>
