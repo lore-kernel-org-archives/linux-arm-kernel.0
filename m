@@ -1,57 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Oct 2015 18:13:34 +0100
-Subject: [PATCH] arm-soc: Add Sigma Designs Tango4 port
-In-Reply-To: <560EB1EC.3020403@free.fr>
-References: <560EAA7C.3070302@free.fr> <yw1xoaghl099.fsf@unicorn.mansr.com>
- <560EB1EC.3020403@free.fr>
-Message-ID: <20151002171334.GB21513@n2100.arm.linux.org.uk>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Fri, 2 Oct 2015 14:16:50 -0300
+Subject: Queueing b0a688ddcc50 "usb: musb: cppi41: allow it to work again"
+ for -stable
+In-Reply-To: <20151002160902.GF5552@saruman.tx.rr.com>
+References: <CAAEAJfC7z=dvw_5vgXDBWVQdKA5jDpfECYv4Jy67YaT7219uJA@mail.gmail.com>
+ <20151002160902.GF5552@saruman.tx.rr.com>
+Message-ID: <CAAEAJfALjV2BCJwzd20TQA3CWa1VZRM5vPv6CydrBuMJc=vVAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 02, 2015 at 06:33:48PM +0200, Mason wrote:
-> On 02/10/2015 18:10, M?ns Rullg?rd wrote:
-> 
-> > Mason writes:
-> > 
-> >> +		intc: intc at e000 {
-> >> +			compatible = "sigma,tango-intc";
-> > 
-> > Why do you insist on using other names than the ones I've been using for
-> > months?  Just want to leave your own mark on the code?
-> 
-> You're using "sigma,smp8640-intc".
-> The SMP8640 is a Tango3 (MIPS-based) platform.
+On 2 October 2015 at 13:09, Felipe Balbi <balbi@ti.com> wrote:
+> On Fri, Oct 02, 2015 at 02:23:45AM -0300, Ezequiel Garcia wrote:
+>> Hello,
+>>
+>> Commit b0a688ddcc50 "usb: musb: cppi41: allow it to work again" seems
+>> to fix a regression. It applies cleanly on v4.1 and removes the
+>> "musb-hdrc musb-hdrc.1.auto: Need DT for the DMA engine." error.
+>>
+>> Any chance you can queue it for -stable?
+>
+> Have a look at Documentation/stable_kernel_rules.txt, you can do a proper
+> request for Greg and he will make sure it gets there.
+>
 
-If it's the same device, then there's nothing wrong with re-using the
-compatible.  The compatible property actually accepts multiple values,
-so you can do:
+Sure, I will.
 
-			compatible = "sigma,tango4-intc", "sigma,smp8640-intc";
+Maybe next time you could add a Cc: stable to these kinds of fixes, along with
+a proper Fixes tag, so the -stable folks can pick them automatically.
 
-See the ePAPR spec - I'll include the relevent bit:
-
-Property: compatible
-Value type: <stringlist>
-Description: The compatible property value consists of one or more strings
- that define the specific programming model for the device. This list of
- strings should be used by a client program for device driver selection.
- The property value consists of a concatenated list of null terminated
- strings, from most specific to most general. They allow a device to
- express its compatibility with a family of similar devices, potentially
- allowing a single device driver to match against several devices. ...
-Example: compatible = "fsl,mpc8641-uart", "ns16550";
- In this example, an operating system would first try to locate a device
- driver that supported fsl,mpc8641-uart. If a driver was not found, it
- would then try to locate a driver that supported the more general
- ns16550 device type.
-
-Note also that vendor prefixes should be listed in
-Documentation/devicetree/bindings/vendor-prefixes.txt.  If it's not there,
-you need to propose a separate patch (to the devicetree mailing list) to
-add it, which must be done with their agreement.  Right now, the use of
-"sigma" as a prefix is entirely non-standard and not acceptable in DT
-files until this is done.
-
+Thanks!
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
