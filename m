@@ -1,34 +1,79 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 2 Oct 2015 23:26:41 +0530
-Subject: [PATCH 0/5] NAND support for Broadcom NS2 SoC
-Message-ID: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
+Date: Fri, 2 Oct 2015 23:26:44 +0530
+Subject: [PATCH 3/5] mtd: brcmnand: Optional DT flag to reset IPROC NAND
+ controller
+In-Reply-To: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
+References: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1443808606-21203-4-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We enable NAND support for Broadcom NS2 SoC by reusing existing
-BRCMNAND driver.
+The BRCM NAND controller on NS2 SoC requires a reset to
+cleanup previously configured NAND controller state.
 
-This patchset applies on-top of "arm64: Simple additions to
-NS2 DT" patchset and is available in ns2_nand_v1 branch of 
-https://github.com/Broadcom/arm64-linux.git.
+This patch adds optional boolean device tree flag named
+"brcm,nand-iproc-reset". If this flag is present in NAND
+controller DT node then BRCM IPROC NAND driver will reset
+the NAND controller before any commands are issued.
 
-The patchset is tested on NS2 SVK.
+Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+Reviewed-by: Pramod KUMAR <pramodku@broadcom.com>
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
+---
+ drivers/mtd/nand/brcmnand/iproc_nand.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-Anup Patel (5):
-  mtd: brcmnand: Fix pointer type-cast in brcmnand_write()
-  mtd: nand: Allow MTD_NAND_BRCMNAND to be selected for ARM64
-  mtd: brcmnand: Optional DT flag to reset IPROC NAND controller
-  Documentation: dt-bindings: Add info about brcm,nand-iproc-reset DT
-    flag
-  arm64: dts: Add BRCM IPROC NAND DT node for NS2
-
- .../devicetree/bindings/mtd/brcm,brcmnand.txt         |  4 ++++
- arch/arm64/boot/dts/broadcom/ns2-svk.dts              | 12 ++++++++++++
- arch/arm64/boot/dts/broadcom/ns2.dtsi                 | 15 +++++++++++++++
- drivers/mtd/nand/Kconfig                              |  2 +-
- drivers/mtd/nand/brcmnand/brcmnand.c                  |  4 ++--
- drivers/mtd/nand/brcmnand/iproc_nand.c                | 19 +++++++++++++++++++
- 6 files changed, 53 insertions(+), 3 deletions(-)
-
+diff --git a/drivers/mtd/nand/brcmnand/iproc_nand.c b/drivers/mtd/nand/brcmnand/iproc_nand.c
+index 683495c..d837207 100644
+--- a/drivers/mtd/nand/brcmnand/iproc_nand.c
++++ b/drivers/mtd/nand/brcmnand/iproc_nand.c
+@@ -11,6 +11,7 @@
+  * GNU General Public License for more details.
+  */
+ 
++#include <linux/delay.h>
+ #include <linux/device.h>
+ #include <linux/io.h>
+ #include <linux/ioport.h>
+@@ -35,6 +36,10 @@ struct iproc_nand_soc_priv {
+ #define IPROC_NAND_APB_LE_MODE             BIT(24)
+ #define IPROC_NAND_INT_CTRL_READ_ENABLE    BIT(6)
+ 
++#define IPROC_NAND_RESET_OFFSET            0x3f8
++#define IPROC_NAND_RESET_BIT_SHIFT         0
++#define IPROC_NAND_RESET_BIT               BIT(IPROC_NAND_RESET_BIT_SHIFT)
++
+ static bool iproc_nand_intc_ack(struct brcmnand_soc *soc)
+ {
+ 	struct iproc_nand_soc_priv *priv = soc->priv;
+@@ -93,6 +98,7 @@ static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
+ 
+ static int iproc_nand_probe(struct platform_device *pdev)
+ {
++	u32 reset;
+ 	struct device *dev = &pdev->dev;
+ 	struct iproc_nand_soc_priv *priv;
+ 	struct brcmnand_soc *soc;
+@@ -124,6 +130,19 @@ static int iproc_nand_probe(struct platform_device *pdev)
+ 	soc->ctlrdy_set_enabled = iproc_nand_intc_set;
+ 	soc->prepare_data_bus = iproc_nand_apb_access;
+ 
++	if (of_property_read_bool(dev->of_node, "brcm,nand-iproc-reset")) {
++		/* Put controller in reset and wait 10 usecs */
++		reset = readl(priv->idm_base + IPROC_NAND_RESET_OFFSET);
++		reset |= IPROC_NAND_RESET_BIT;
++		writel(reset, priv->idm_base + IPROC_NAND_RESET_OFFSET);
++		udelay(10);
++		/* Bring controller out of reset and wait 10 usecs */
++		reset = readl(priv->idm_base + IPROC_NAND_RESET_OFFSET);
++		reset &= ~IPROC_NAND_RESET_BIT;
++		writel(reset, priv->idm_base + IPROC_NAND_RESET_OFFSET);
++		udelay(10);
++	}
++
+ 	return brcmnand_probe(pdev, soc);
+ }
+ 
 -- 
 1.9.1
