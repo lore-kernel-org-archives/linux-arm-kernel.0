@@ -1,44 +1,29 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 2 Oct 2015 13:12:14 +0200
-Subject: [PATCH] ARM: ux500: modify initial levelshifter status
-In-Reply-To: <1442483427-10500-1-git-send-email-linus.walleij@linaro.org>
-References: <1442483427-10500-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAPDyKFodbEDKTpqCrDShXAz3-KT2WO59cv4vuY59usb6zcdD4A@mail.gmail.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 2 Oct 2015 12:15:52 +0100
+Subject: "clk: sunxi: Add a simple gates driver" breaks kernel with older
+ DTB
+In-Reply-To: <20151002105333.GA2696@lukather>
+References: <1443689231.16718.225.camel@citrix.com>
+ <20151001204506.GR7104@lukather> <560E5767.2040502@citrix.com>
+ <20151002105333.GA2696@lukather>
+Message-ID: <560E6768.6040705@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 September 2015 at 11:50, Linus Walleij <linus.walleij@linaro.org> wrote:
-> commit 1d8aca9df612f5751892fb2642d72536f2f48fd0
-> "ARM: ux500: fix MMC/SD card regression"
-> fixed broken the level shifter: it should be default ON
-> but became default OFF.
->
-> Fixes: 1d8aca9df612 "ARM: ux500: fix MMC/SD card regression"
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On 02/10/15 11:53, Maxime Ripard wrote:
+>> If no, that's very unfortunate because it means that you can't
+>> re-use the same DT across multiple OS and the DT provided by the
+>> firmware (if it's built-in).
+> 
+> Is there such OS yet (and by that, I mean one that actually shares our
+> DT, instead of rewriting its own) ?
 
-Reported-and-tested-by: Ulf Hansson <ulf.hansson@linaro.org>
+Yes, FreeBSD started to support the DT provided by vendors which are
+based on Linux bindings. The ARM64 port is only using DTB provided by
+the hardware. For ARM32, there is still some platform using a specific
+DT for FreeBSD but they are trying to get a ride.
 
-Kind regards
-Uffe
+Regards,
 
-> ---
->  arch/arm/boot/dts/ste-hrefv60plus.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/ste-hrefv60plus.dtsi b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-> index 810cda743b6d..9c2387b34d0c 100644
-> --- a/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-> +++ b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-> @@ -56,7 +56,7 @@
->                                         /* VMMCI level-shifter enable */
->                                         default_hrefv60_cfg2 {
->                                                 pins = "GPIO169_D22";
-> -                                               ste,config = <&gpio_out_lo>;
-> +                                               ste,config = <&gpio_out_hi>;
->                                         };
->                                         /* VMMCI level-shifter voltage select */
->                                         default_hrefv60_cfg3 {
-> --
-> 2.4.3
->
+-- 
+Julien Grall
