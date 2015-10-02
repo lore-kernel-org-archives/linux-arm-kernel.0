@@ -1,38 +1,45 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 2 Oct 2015 11:00:23 +0900
-Subject: [PATCH] ARM: shmobile: r8a7794: link PCI USB devices to USB PHY
-In-Reply-To: <560A8997.8090301@cogentembedded.com>
-References: <10927620.1TFu7PRvi4@wasted.cogentembedded.com>
- <20150929003751.GB20067@verge.net.au>
- <560A8997.8090301@cogentembedded.com>
-Message-ID: <20151002020021.GF22640@verge.net.au>
+Date: Fri, 2 Oct 2015 11:20:23 +0900
+Subject: [PATCH] ARM: shmobile: dt: Rename incorrect interrupt related
+ binding
+In-Reply-To: <1443516188-3308-1-git-send-email-lee.jones@linaro.org>
+References: <1443516188-3308-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20151002022023.GA13404@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+[CCed linux-sh, Magnus]
 
-On Tue, Sep 29, 2015 at 03:52:39PM +0300, Sergei Shtylyov wrote:
-> Hello.
+On Tue, Sep 29, 2015 at 09:43:08AM +0100, Lee Jones wrote:
+> interrupts-names => interrupt-names
 > 
-> On 9/29/2015 3:37 AM, Simon Horman wrote:
+> Other line changes are re-aligning.
 > 
-> >>Describe the PCI USB devices that are behind the PCI bridges, adding necessary
-> >>links to the USB PHY device.
-> >>
-> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >>
-> >>---
-> >>This patch is against 'renesas-devel-20150911v2-v4.2' tag of Simon Horman's
-> >>'renesas.git' repo plus the R8A7794/SILK PCI USB and USB PHY support patches
-> >>just posted.
-> 
-> >Does this series have any dependencies (e.g. bindings) other
-> 
->    This patch, you mean?
-> 
-> >than the aforementioned R8A7794/SILK PCI USB and USB PHY support patches?
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Thanks, I have queued this up for v4.4.
+Thanks, I have queued this up as a cleanup for v4.4.
 
-I think I have got everything now but please let me know if you have any
-shmobile DT patches outstanding which are ready to be queued-up.
+> ---
+>  .../bindings/memory-controllers/renesas-memory-controllers.txt      | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/memory-controllers/renesas-memory-controllers.txt b/Documentation/devicetree/bindings/memory-controllers/renesas-memory-controllers.txt
+> index c64b792..9f78e6c 100644
+> --- a/Documentation/devicetree/bindings/memory-controllers/renesas-memory-controllers.txt
+> +++ b/Documentation/devicetree/bindings/memory-controllers/renesas-memory-controllers.txt
+> @@ -24,9 +24,9 @@ Required properties:
+>  Optional properties:
+>    - interrupts: Must contain a list of interrupt specifiers for memory
+>  		controller interrupts, if available.
+> -  - interrupts-names: Must contain a list of interrupt names corresponding to
+> -		      the interrupts in the interrupts property, if available.
+> -		      Valid interrupt names are:
+> +  - interrupt-names: Must contain a list of interrupt names corresponding to
+> +		     the interrupts in the interrupts property, if available.
+> +		     Valid interrupt names are:
+>  			- "sec" (secure interrupt)
+>  			- "temp" (normal (temperature) interrupt)
+>    - power-domains: Must contain a reference to the PM domain that the memory
+> -- 
+> 1.9.1
+> 
