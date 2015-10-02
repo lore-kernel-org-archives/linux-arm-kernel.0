@@ -1,31 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Oct 2015 03:00:10 -0700
-Subject: [RFC 2/3] mmc: sdhci: add host_ops->voltage_switch callback for
- all other voltages
-In-Reply-To: <55E6B129.1030002@linaro.org>
-References: <1441135938-8056-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1441135938-8056-3-git-send-email-vaibhav.hiremath@linaro.org>
- <20150902150442.118d3305@xhacker> <55E6B129.1030002@linaro.org>
-Message-ID: <CACRpkdbQX1xfMEiHwUe7FRUvtsQGbNhO6VK2=8FAgrYE9GzsoA@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 2 Oct 2015 11:52:35 +0200
+Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
+Message-ID: <560E53E3.7070207@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 2, 2015 at 1:19 AM, Vaibhav Hiremath
-<vaibhav.hiremath@linaro.org> wrote:
+[ take 1 was sent on 2015-03-26 ]
 
-> Not quite sure whether regulator would be right fit for this.
->
-> Initially I was thinking of making use of pinconf framework, using
-> PIN_CONFIG_POWER_SOURCE, but that too I am not sure is the right way of
-> doing it.
->
-> Probably, question for pinctrl maintainer. Looping Linus Walleji.
+Hello everyone,
 
-We have another pinctrl driver exposing the occasional fixed regulator
-for exactly this purpose, see:
-sh-pfc/pfc-sh73a0.c
+In http://thread.gmane.org/gmane.linux.ports.arm.kernel/389931/focus=392348
+Stephen Boyd wrote:
 
-So use the same mechanism for this driver.
+> I don't see any problem with the TWD dropping the dependency on SMP.
+> The code should work the same on a UP configuration [...]
 
-Yours,
-Linus Walleij
+And Arnd recently said:
+
+> I think this has come up before and should be fixed. Could you
+> send a patch that allows using TWD in uniprocessor configurations?
+
+Basically, this means reverting Shawn Guo's 904464b91eca patch.
+and removing "depends on SMP" for HAVE_ARM_TWD.
+
+However, Shawn's patch fixed an issue, therefore it seems likely
+that simply reverting is not the proper solution?
+
+What should I do?
+
+Regards.
