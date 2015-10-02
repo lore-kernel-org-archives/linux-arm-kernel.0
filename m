@@ -1,44 +1,54 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 2 Oct 2015 22:28:09 +0800
-Subject: [PATCH] arm64: dts: add all hi6220 uart nodes
-In-Reply-To: <20151001102136.GC12635@sirena.org.uk>
-References: <1443558552-5734-1-git-send-email-tyler.baker@linaro.org>
- <1459065.BtzC7pyUYF@wuerfel> <20150930173145.GG15635@sirena.org.uk>
- <CANMBJr7yY1PJChnFSRknqfOLORuWZSEONV+e=M=9heX3i-ADKA@mail.gmail.com>
- <20150930191818.GZ15635@sirena.org.uk>
- <CANMBJr6aU4wPO5HqP-Oh-ND7_DZXSH30ykNHyvDtUp3nQFG6sA@mail.gmail.com>
- <20151001031552.GC15675@leoy-linaro>
- <20151001102136.GC12635@sirena.org.uk>
-Message-ID: <20151002142809.GA13483@leoy-linaro>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 2 Oct 2015 17:32:10 +0300
+Subject: [PATCH] ARM: debug: add support for alternate 8250 register layout
+In-Reply-To: <yw1x1tddmjng.fsf@unicorn.mansr.com>
+References: <1443787929-19173-1-git-send-email-mans@mansr.com>
+ <560E9268.60900@cogentembedded.com> <yw1x1tddmjng.fsf@unicorn.mansr.com>
+Message-ID: <560E956A.6070700@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 01, 2015 at 11:21:36AM +0100, Mark Brown wrote:
-> On Thu, Oct 01, 2015 at 11:15:52AM +0800, Leo Yan wrote:
-> > On Wed, Sep 30, 2015 at 04:54:51PM -0700, Tyler Baker wrote:
-> > > On 30 September 2015 at 12:18, Mark Brown <broonie@kernel.org> wrote:
-> 
-> > > > My understanding is that it applies to both with slightly different
-> > > > driver sets, the slides aren't online yet (!) but if you look at 10:52
-> > > > or so in the video we should have SD/eMMC on HiKey in v4.1 with thermal
-> > > > and CPUfreq added in v4.2.  It also looks like there's just some DT
-> > > > additions needed to enable reset, cpuidle and CPU hotplug using generic
-> > > > code (mainly the constants for PSCI I expect).
-> 
-> > > I just skimmed the video and I see your point. I'll need to
-> > > investigate a bit but I'm up for sending some follow up patches to get
-> > > these drivers functioning. First lets get the UART working :)
-> 
-> > If you think it's necessary, i could send out patches to enable cpuidle
-> > firstly (actually now PSCI has been enabled yet); for cpufreq and
-> > thermal features, need wait until mailbox driver has been merged.
-> 
-> It seems sensible to get the DT bits for functionality that is already
-> supported on the driver side upstream, that way we get the maximum
-> functionality available as soon as possible and even if other bits get
-> problems in review users can take advantage of things that are OK.
+On 10/2/2015 5:26 PM, M?ns Rullg?rd wrote:
 
-Okay, i will prepare patches for enabling CPUIdle ASAP.
+>>> Some SoCs have a UART with a non-standard register layout. This
+>>> allows the debug console to work with these.
+>>
+>>> Signed-off-by: Mans Rullgard <mans@mansr.com>
+>>> ---
+>>> I would have preferred a more accurate description of the UART, but I've
+>>> not managed to figure out who the vendor is.
+>>
+>>     You haven't seem the Alchemy datasheets? I can send you some if so.
+>
+> I have.  They don't say where Alchemy bought the UART block.
 
-Thanks,
-Leo Yan
+    In fact, seeing at least Au1550 databook googling for "alchemy databook".
+The UART registers are described there. Perhaps, it's not accurate enought for 
+your needs, though...
+
+>>> ---
+>>>    arch/arm/Kconfig.debug        |  4 ++++
+>>>    arch/arm/include/debug/8250.S | 12 ++++++++++++
+>>>    2 files changed, 16 insertions(+)
+>>>
+>>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>>> index 0cfd7f9..8d5c837 100644
+>>> --- a/arch/arm/Kconfig.debug
+>>> +++ b/arch/arm/Kconfig.debug
+>>> @@ -1597,6 +1597,10 @@ config DEBUG_UART_8250_WORD
+>>>    		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
+>>>    		DEBUG_BRCMSTB_UART
+>>>
+>>> +config DEBUG_UART_8250_AU
+>>> +       bool "8250 UART has Alchemy register layout"
+>>> +       depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
+>>> +
+>>
+>>     So Alchemy UART got reused on ARM?
+>
+> The UART is actually a Palmchip IP core used by several SoC companies.
+
+    Hm, how have you figured out that;s Palmchip if the Alchemy databooks are 
+silent about that? :-)
+
+MBR, Sergei
