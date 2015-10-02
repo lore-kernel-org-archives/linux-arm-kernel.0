@@ -1,24 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Oct 2015 05:19:41 -0700
-Subject: [PATCH v5 1/7] pinctrl: freescale: imx: fix system crash if
- enable two pinctl instances
-In-Reply-To: <1443128043-21063-1-git-send-email-aalonso@freescale.com>
-References: <1443128043-21063-1-git-send-email-aalonso@freescale.com>
-Message-ID: <CACRpkdauecXzxmveqEYRE=-iKf8JoJCj7q8kG+k0AGcDQqYGEA@mail.gmail.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Fri, 02 Oct 2015 15:39:44 +0300
+Subject: [PATCH v2 01/15] KVM: arm/arm64: VGIC: don't track used LRs in the
+ distributor
+In-Reply-To: <560E5D2F.1000401@arm.com>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-2-git-send-email-andre.przywara@arm.com>
+ <00cb01d0fcf8$6a906000$3fb12000$@samsung.com> <560E5D2F.1000401@arm.com>
+Message-ID: <00f301d0fd0f$6b21ac10$41650430$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2015 at 1:53 PM, Adrian Alonso <aalonso@freescale.com> wrote:
+ Hello!
 
-> From: Robin Gong <b38343@freescale.com>
->
-> Fix system chrash caused by groups whose number is smaller than the number
-> of groups of the last pinctl instance which is not initialized.
->
-> iMX7D supports two iomux controllers (iomuxc-lpsr and iomuxc) on probing
-> the second instance (iomuxc) the chrash below occurs.
+> Can't you use the ELRSR bitmap instead? The idea of lr_used sounds like
+> a moot optimization to me.
 
-This 1/7 patch applied for next with Shawn's ACK.
+ This perfectly works on 4.2, but will break HW interrupt forwarding on 4.3. If you look at 4.3
+__kvm_vgic_sync_hwstate(), you'll notice that for HW interrupts lr_used and elrsr_ptr will diverge
+at this point, and this function actually brings them into sync. And it relies on lr_used for the
+loop to operate correctly (no idea why we use "for" loop here with extra check instead of
+"for_each_set_bit(lr, vgic_cpu->lr_used, vgic->nr_lr)", looks stupid to me).
 
-Yours,
-Linus Walleij
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
