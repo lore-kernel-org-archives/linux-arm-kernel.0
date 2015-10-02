@@ -1,222 +1,28 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Fri, 2 Oct 2015 18:22:43 -0400
-Subject: [PATCH 1/2] ARM: dts: bcm5301x: Add BCM SVK DT files
-Message-ID: <1443824564-17291-1-git-send-email-jonmason@broadcom.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 03 Oct 2015 00:25:57 +0200
+Subject: [PATCH 5/7] [media] mipi-csis: make sparse happy
+In-Reply-To: <de2ce8fd84f965a270bad28d284932bf20c349be.1443737683.git.mchehab@osg.samsung.com>
+References: <cover.1443737682.git.mchehab@osg.samsung.com>
+ <de2ce8fd84f965a270bad28d284932bf20c349be.1443737683.git.mchehab@osg.samsung.com>
+Message-ID: <4962836.RxBJeKxGZM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree files for Broadcom Northstar based SVKs.  Since the
-bcm5301x.dtsi already exists, all that is necessary is the dts files to
-enable the UARTs (and specify the RAM size for the 4708/9).  With these
-files, the SVKs are able to boot to shell.
+On Thursday 01 October 2015 19:17:27 Mauro Carvalho Chehab wrote:
+> diff --git a/drivers/media/platform/exynos4-is/mipi-csis.c b/drivers/media/platform/exynos4-is/mipi-csis.c
+> index d74e1bec3d86..4b85105dc159 100644
+> --- a/drivers/media/platform/exynos4-is/mipi-csis.c
+> +++ b/drivers/media/platform/exynos4-is/mipi-csis.c
+> @@ -706,7 +706,8 @@ static irqreturn_t s5pcsis_irq_handler(int irq, void *dev_id)
+>                 else
+>                         offset = S5PCSIS_PKTDATA_ODD;
+>  
+> -               memcpy(pktbuf->data, state->regs + offset, pktbuf->len);
+> +               memcpy(pktbuf->data, (u8 __force *)state->regs + offset,
+> +                      pktbuf->len);
+>                 pktbuf->data = NULL;
+> 
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
----
- arch/arm/boot/dts/Makefile       |  5 +++-
- arch/arm/boot/dts/bcm94708.dts   | 52 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/bcm94709.dts   | 52 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/bcm953012k.dts | 59 ++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 167 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/bcm94708.dts
- create mode 100644 arch/arm/boot/dts/bcm94709.dts
- create mode 100644 arch/arm/boot/dts/bcm953012k.dts
+I think this is what memcpy_toio() is meant for.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 233159d..96a1b58 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -72,7 +72,10 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm47081-buffalo-wzr-900dhp.dtb \
- 	bcm4709-asus-rt-ac87u.dtb \
- 	bcm4709-buffalo-wxr-1900dhp.dtb \
--	bcm4709-netgear-r8000.dtb
-+	bcm4709-netgear-r8000.dtb \
-+	bcm94708.dtb \
-+	bcm94709.dtb \
-+	bcm953012k.dtb
- dtb-$(CONFIG_ARCH_BCM_63XX) += \
- 	bcm963138dvt.dtb
- dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
-diff --git a/arch/arm/boot/dts/bcm94708.dts b/arch/arm/boot/dts/bcm94708.dts
-new file mode 100644
-index 0000000..57a74c6
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm94708.dts
-@@ -0,0 +1,52 @@
-+/*
-+ *  BSD LICENSE
-+ *
-+ *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
-+ *
-+ *  Redistribution and use in source and binary forms, with or without
-+ *  modification, are permitted provided that the following conditions
-+ *  are met:
-+ *
-+ *    * Redistributions of source code must retain the above copyright
-+ *      notice, this list of conditions and the following disclaimer.
-+ *    * Redistributions in binary form must reproduce the above copyright
-+ *      notice, this list of conditions and the following disclaimer in
-+ *      the documentation and/or other materials provided with the
-+ *      distribution.
-+ *    * Neither the name of Broadcom Corporation nor the names of its
-+ *      contributors may be used to endorse or promote products derived
-+ *      from this software without specific prior written permission.
-+ *
-+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm5301x.dtsi"
-+
-+/ {
-+	model = "NorthStar SVK (BCM94708)";
-+	compatible = "brcm,bcm4708";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 mem=128M";
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm94709.dts b/arch/arm/boot/dts/bcm94709.dts
-new file mode 100644
-index 0000000..bf4b6e1
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm94709.dts
-@@ -0,0 +1,52 @@
-+/*
-+ *  BSD LICENSE
-+ *
-+ *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
-+ *
-+ *  Redistribution and use in source and binary forms, with or without
-+ *  modification, are permitted provided that the following conditions
-+ *  are met:
-+ *
-+ *    * Redistributions of source code must retain the above copyright
-+ *      notice, this list of conditions and the following disclaimer.
-+ *    * Redistributions in binary form must reproduce the above copyright
-+ *      notice, this list of conditions and the following disclaimer in
-+ *      the documentation and/or other materials provided with the
-+ *      distribution.
-+ *    * Neither the name of Broadcom Corporation nor the names of its
-+ *      contributors may be used to endorse or promote products derived
-+ *      from this software without specific prior written permission.
-+ *
-+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm5301x.dtsi"
-+
-+/ {
-+	model = "NorthStar SVK (BCM94709)";
-+	compatible = "brcm,bcm4709", "brcm,bcm4708";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 mem=128M";
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm953012k.dts b/arch/arm/boot/dts/bcm953012k.dts
-new file mode 100644
-index 0000000..1726ba0
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm953012k.dts
-@@ -0,0 +1,59 @@
-+/*
-+ *  BSD LICENSE
-+ *
-+ *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
-+ *
-+ *  Redistribution and use in source and binary forms, with or without
-+ *  modification, are permitted provided that the following conditions
-+ *  are met:
-+ *
-+ *    * Redistributions of source code must retain the above copyright
-+ *      notice, this list of conditions and the following disclaimer.
-+ *    * Redistributions in binary form must reproduce the above copyright
-+ *      notice, this list of conditions and the following disclaimer in
-+ *      the documentation and/or other materials provided with the
-+ *      distribution.
-+ *    * Neither the name of Broadcom Corporation nor the names of its
-+ *      contributors may be used to endorse or promote products derived
-+ *      from this software without specific prior written permission.
-+ *
-+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm5301x.dtsi"
-+
-+/ {
-+	model = "NorthStar SVK (BCM953012K)";
-+	compatible = "brcm,bcm5301k", "brcm,bcm4708";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+};
-+
-+&uart0 {
-+	clock-frequency = <62499840>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	clock-frequency = <62499840>;
-+	status = "okay";
-+};
--- 
-1.9.1
+	Arnd
