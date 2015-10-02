@@ -1,152 +1,57 @@
 From: ingi2.kim@samsung.com (Ingi Kim)
-Date: Fri, 02 Oct 2015 17:59:26 +0900
-Subject: [PATCH] drm/exynos: fix spelling errors
-Message-ID: <1443776366-13046-1-git-send-email-ingi2.kim@samsung.com>
+Date: Fri, 02 Oct 2015 18:00:17 +0900
+Subject: [PATCH 1/2] s5p-mfc: fix spelling errors
+Message-ID: <1443776417-13083-1-git-send-email-ingi2.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes spelling errors in drm fimc/gsc
+This patch fixes spelling errors in mfc encoder.
 inavild -> invaild
 
 Signed-off-by: Ingi Kim <ingi2.kim@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_drm_fimc.c | 16 ++++++++--------
- drivers/gpu/drm/exynos/exynos_drm_gsc.c  | 12 ++++++------
- 2 files changed, 14 insertions(+), 14 deletions(-)
+ drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimc.c b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-index 2a65235..5d00f86 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-@@ -466,7 +466,7 @@ static int fimc_src_set_fmt_order(struct fimc_context *ctx, u32 fmt)
- 			EXYNOS_MSCTRL_C_INT_IN_2PLANE);
- 		break;
- 	default:
--		dev_err(ippdrv->dev, "inavlid source yuv order 0x%x.\n", fmt);
-+		dev_err(ippdrv->dev, "invalid source yuv order 0x%x.\n", fmt);
- 		return -EINVAL;
- 	}
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+index 2e57e9f..3a84021 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+@@ -1821,7 +1821,7 @@ static int s5p_mfc_queue_setup(struct vb2_queue *vq,
  
-@@ -513,7 +513,7 @@ static int fimc_src_set_fmt(struct device *dev, u32 fmt)
- 		cfg |= EXYNOS_MSCTRL_INFORMAT_YCBCR420;
- 		break;
- 	default:
--		dev_err(ippdrv->dev, "inavlid source format 0x%x.\n", fmt);
-+		dev_err(ippdrv->dev, "invalid source format 0x%x.\n", fmt);
- 		return -EINVAL;
- 	}
- 
-@@ -578,7 +578,7 @@ static int fimc_src_set_transf(struct device *dev,
- 			cfg1 &= ~EXYNOS_MSCTRL_FLIP_Y_MIRROR;
- 		break;
- 	default:
--		dev_err(ippdrv->dev, "inavlid degree value %d.\n", degree);
-+		dev_err(ippdrv->dev, "invalid degree value %d.\n", degree);
- 		return -EINVAL;
- 	}
- 
-@@ -701,7 +701,7 @@ static int fimc_src_set_addr(struct device *dev,
- 		property->prop_id, buf_id, buf_type);
- 
- 	if (buf_id > FIMC_MAX_SRC) {
--		dev_info(ippdrv->dev, "inavlid buf_id %d.\n", buf_id);
-+		dev_info(ippdrv->dev, "invalid buf_id %d.\n", buf_id);
- 		return -ENOMEM;
- 	}
- 
-@@ -812,7 +812,7 @@ static int fimc_dst_set_fmt_order(struct fimc_context *ctx, u32 fmt)
- 		cfg |= EXYNOS_CIOCTRL_YCBCR_2PLANE;
- 		break;
- 	default:
--		dev_err(ippdrv->dev, "inavlid target yuv order 0x%x.\n", fmt);
-+		dev_err(ippdrv->dev, "invalid target yuv order 0x%x.\n", fmt);
- 		return -EINVAL;
- 	}
- 
-@@ -865,7 +865,7 @@ static int fimc_dst_set_fmt(struct device *dev, u32 fmt)
- 			cfg |= EXYNOS_CITRGFMT_OUTFORMAT_YCBCR420;
- 			break;
- 		default:
--			dev_err(ippdrv->dev, "inavlid target format 0x%x.\n",
-+			dev_err(ippdrv->dev, "invalid target format 0x%x.\n",
- 				fmt);
+ 	if (vq->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+ 		if (ctx->state != MFCINST_GOT_INST) {
+-			mfc_err("inavlid state: %d\n", ctx->state);
++			mfc_err("invalid state: %d\n", ctx->state);
  			return -EINVAL;
  		}
-@@ -929,7 +929,7 @@ static int fimc_dst_set_transf(struct device *dev,
- 			cfg &= ~EXYNOS_CITRGFMT_FLIP_Y_MIRROR;
- 		break;
- 	default:
--		dev_err(ippdrv->dev, "inavlid degree value %d.\n", degree);
-+		dev_err(ippdrv->dev, "invalid degree value %d.\n", degree);
+ 
+@@ -1861,7 +1861,7 @@ static int s5p_mfc_queue_setup(struct vb2_queue *vq,
+ 				ctx->dev->alloc_ctx[MFC_BANK2_ALLOC_CTX];
+ 		}
+ 	} else {
+-		mfc_err("inavlid queue type: %d\n", vq->type);
++		mfc_err("invalid queue type: %d\n", vq->type);
  		return -EINVAL;
  	}
- 
-@@ -1160,7 +1160,7 @@ static int fimc_dst_set_addr(struct device *dev,
- 		property->prop_id, buf_id, buf_type);
- 
- 	if (buf_id > FIMC_MAX_DST) {
--		dev_info(ippdrv->dev, "inavlid buf_id %d.\n", buf_id);
-+		dev_info(ippdrv->dev, "invalid buf_id %d.\n", buf_id);
- 		return -ENOMEM;
- 	}
- 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_gsc.c b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-index 808a0a0..11b87d2 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-@@ -543,7 +543,7 @@ static int gsc_src_set_fmt(struct device *dev, u32 fmt)
- 			GSC_IN_YUV420_2P);
- 		break;
- 	default:
--		dev_err(ippdrv->dev, "inavlid target yuv order 0x%x.\n", fmt);
-+		dev_err(ippdrv->dev, "invalid target yuv order 0x%x.\n", fmt);
+ 	return 0;
+@@ -1895,7 +1895,7 @@ static int s5p_mfc_buf_init(struct vb2_buffer *vb)
+ 					vb2_dma_contig_plane_dma_addr(vb, 1);
+ 		ctx->src_bufs_cnt++;
+ 	} else {
+-		mfc_err("inavlid queue type: %d\n", vq->type);
++		mfc_err("invalid queue type: %d\n", vq->type);
  		return -EINVAL;
  	}
- 
-@@ -595,7 +595,7 @@ static int gsc_src_set_transf(struct device *dev,
- 			cfg &= ~GSC_IN_ROT_YFLIP;
- 		break;
- 	default:
--		dev_err(ippdrv->dev, "inavlid degree value %d.\n", degree);
-+		dev_err(ippdrv->dev, "invalid degree value %d.\n", degree);
+ 	return 0;
+@@ -1931,7 +1931,7 @@ static int s5p_mfc_buf_prepare(struct vb2_buffer *vb)
+ 			return -EINVAL;
+ 		}
+ 	} else {
+-		mfc_err("inavlid queue type: %d\n", vq->type);
++		mfc_err("invalid queue type: %d\n", vq->type);
  		return -EINVAL;
  	}
- 
-@@ -721,7 +721,7 @@ static int gsc_src_set_addr(struct device *dev,
- 		property->prop_id, buf_id, buf_type);
- 
- 	if (buf_id > GSC_MAX_SRC) {
--		dev_info(ippdrv->dev, "inavlid buf_id %d.\n", buf_id);
-+		dev_info(ippdrv->dev, "invalid buf_id %d.\n", buf_id);
- 		return -EINVAL;
- 	}
- 
-@@ -814,7 +814,7 @@ static int gsc_dst_set_fmt(struct device *dev, u32 fmt)
- 			GSC_OUT_YUV420_2P);
- 		break;
- 	default:
--		dev_err(ippdrv->dev, "inavlid target yuv order 0x%x.\n", fmt);
-+		dev_err(ippdrv->dev, "invalid target yuv order 0x%x.\n", fmt);
- 		return -EINVAL;
- 	}
- 
-@@ -866,7 +866,7 @@ static int gsc_dst_set_transf(struct device *dev,
- 			cfg &= ~GSC_IN_ROT_YFLIP;
- 		break;
- 	default:
--		dev_err(ippdrv->dev, "inavlid degree value %d.\n", degree);
-+		dev_err(ippdrv->dev, "invalid degree value %d.\n", degree);
- 		return -EINVAL;
- 	}
- 
-@@ -1176,7 +1176,7 @@ static int gsc_dst_set_addr(struct device *dev,
- 		property->prop_id, buf_id, buf_type);
- 
- 	if (buf_id > GSC_MAX_DST) {
--		dev_info(ippdrv->dev, "inavlid buf_id %d.\n", buf_id);
-+		dev_info(ippdrv->dev, "invalid buf_id %d.\n", buf_id);
- 		return -EINVAL;
- 	}
- 
+ 	return 0;
 -- 
 2.0.5
