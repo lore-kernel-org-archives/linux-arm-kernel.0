@@ -1,61 +1,124 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 2 Oct 2015 10:37:12 +0100
-Subject: [PATCH v5 00/23] ILP32 for ARM64
-In-Reply-To: <F6B719D8-1FC0-4B26-A926-40FB6953AAE3@caviumnetworks.com>
-References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
- <20150930101918.GA9753@e104818-lin.cambridge.arm.com>
- <20151001191520.GA25295@yury-N73SV> <1708349.DFbfvHcnCR@wuerfel>
- <F6B719D8-1FC0-4B26-A926-40FB6953AAE3@caviumnetworks.com>
-Message-ID: <20151002093711.GA15803@localhost>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 2 Oct 2015 11:37:58 +0200
+Subject: [PATCH 1/2] ARM: cpuidle: make cpuidle_ops interfaces ARM64
+ compliant
+In-Reply-To: <1443689933-28882-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1443689933-28882-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1443689933-28882-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <560E5076.7020906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 01, 2015 at 09:49:46PM +0000, Pinski, Andrew wrote:
-> Ok, we will rewrite these patches using 32bit time_t and 32bit off_t
-> and redo the toolchain support for them.  Note this is going back to
-> the abi I had originally done when I submitted my original version
-> when it was asked to change time_t to be 64bit. 
 
-One of the key aspects of kernel development is the ability to adapt
-quickly to new requests/insights. This implies releasing early and often
-rather than a new version roughly twice a year (IIRC, v1 was posted
-September 2013). Moreover, the success of the kernel is partly based on
-not getting stuck on old decisions (well, unless it breaks accepted user
-ABI).
+Hi Lorenzo,
 
-So, at the time, following x32 discussions, we thought of using the
-native ABI as much as possible. However, two important things happened
-since:
 
-1. libc community didn't like breaking the POSIX compliance
-2. No-one seems desperate for ILP32 on AArch64
+On 10/01/2015 10:58 AM, Lorenzo Pieralisi wrote:
+> In preparation for sharing PSCI idle operations on ARM and ARM64,
+> this patch refines the ARM cpuidle_ops interfaces so that the
+> two arches can use the same interfaces seamlessly.
+>
+> Based-on-patch-by: Jisheng Zhang <jszhang@marvell.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Lina Iyer <lina.iyer@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>   arch/arm/include/asm/cpuidle.h | 4 ++--
+>   arch/arm/kernel/cpuidle.c      | 4 ++--
+>   drivers/soc/qcom/spm.c         | 9 +++++++--
+>   3 files changed, 11 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
+> index 0f84249..ee36dd4 100644
+> --- a/arch/arm/include/asm/cpuidle.h
+> +++ b/arch/arm/include/asm/cpuidle.h
+> @@ -30,8 +30,8 @@ static inline int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+>   struct device_node;
+>
+>   struct cpuidle_ops {
+> -	int (*suspend)(int cpu, unsigned long arg);
+> -	int (*init)(struct device_node *, int cpu);
 
-(1) is a fair point and I would rather be careful as we don't know the
-extent of the code affected. In the meantime, we've also had ongoing
-work for addressing the 2038 issue on 32-bit architectures.
+I don't know the reason why the 'cpu_psci_cpu_init_idle' signature was 
+changed. It has before the same signature as this ops.
 
-The second point is equally important. The benchmarks I've seen didn't
-show a significant improvement and the messages I got on various
-channels pretty much labeled ILP32 as a transitional stage to full LP64.
-In this case, we need to balance the benefits of a close to native ABI
-(future proof, slightly higher performance) vs. the cost of maintaining
-such ABI in the kernel on the long term, especially if it's not widely
-used/tested.
+As in ARM, we can have more than one driver using the cpuidle_ops 
+infrastructure, removing the struct device_node * parameter will force 
+to add a call to of_get_cpu_node(cpu, NULL) in each driver with a call 
+to of_node_put (btw it is missing below in qcom_cpuidle_init), the 
+rollback labels and this will lead to duplicated code.
 
-We've seen the kernel patches and, following discussions on the lists,
-decided to change the original recommendation. IIRC, the main ideas (but
-you need to read various threads as I can't remember the details from
-6-7 months ago):
+So why not change ARM64 signature instead ?
 
-a) separate syscall table for ILP32
-b) close to compat ABI with 32-bit time_t, off_t
-c) asm-generic/unistd.h rather than asm/unistd32.h (that's where it
-   would differ from compat, together with places where pointers are
-   passed)
+> +	int (*suspend)(unsigned long arg);
+> +	int (*init)(unsigned int cpu);
+>   };
+>
+>   struct of_cpuidle_method {
+> diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+> index 318da33..a75b7ae 100644
+> --- a/arch/arm/kernel/cpuidle.c
+> +++ b/arch/arm/kernel/cpuidle.c
+> @@ -56,7 +56,7 @@ int arm_cpuidle_suspend(int index)
+>   	int cpu = smp_processor_id();
+>
+>   	if (cpuidle_ops[cpu].suspend)
+> -		ret = cpuidle_ops[cpu].suspend(cpu, index);
+> +		ret = cpuidle_ops[cpu].suspend(index);
+>
+>   	return ret;
+>   }
+> @@ -144,7 +144,7 @@ int __init arm_cpuidle_init(int cpu)
+>
+>   	ret = arm_cpuidle_read_ops(cpu_node, cpu);
+>   	if (!ret && cpuidle_ops[cpu].init)
+> -		ret = cpuidle_ops[cpu].init(cpu_node, cpu);
+> +		ret = cpuidle_ops[cpu].init(cpu);
+>
+>   	of_node_put(cpu_node);
+>
+> diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
+> index b04b05a..8deaea0 100644
+> --- a/drivers/soc/qcom/spm.c
+> +++ b/drivers/soc/qcom/spm.c
+> @@ -197,8 +197,9 @@ static int qcom_cpu_spc(int cpu)
+>   	return ret;
+>   }
+>
+> -static int qcom_idle_enter(int cpu, unsigned long index)
+> +static int qcom_idle_enter(unsigned long index)
+>   {
+> +	int cpu = smp_processor_id();
+>   	return per_cpu(qcom_idle_ops, cpu)[index](cpu);
+>   }
+>
+> @@ -207,7 +208,7 @@ static const struct of_device_id qcom_idle_state_match[] __initconst = {
+>   	{ },
+>   };
+>
+> -static int __init qcom_cpuidle_init(struct device_node *cpu_node, int cpu)
+> +static int __init qcom_cpuidle_init(unsigned int cpu)
+>   {
+>   	const struct of_device_id *match_id;
+>   	struct device_node *state_node;
+> @@ -217,6 +218,10 @@ static int __init qcom_cpuidle_init(struct device_node *cpu_node, int cpu)
+>   	idle_fn *fns;
+>   	cpumask_t mask;
+>   	bool use_scm_power_down = false;
+> +	struct device_node *cpu_node = of_get_cpu_node(cpu, NULL);
+> +
+> +	if (!cpu_node)
+> +		return -ENODEV;
+>
+>   	for (i = 0; ; i++) {
+>   		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
+>
 
-As I said previously, I'm not going to pay any attention to the patches
-in this series, it's nothing more than a rebase of a version I already
-reviewed.
 
 -- 
-Catalin
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
