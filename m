@@ -1,28 +1,72 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 03 Oct 2015 00:27:34 +0200
-Subject: [PATCH 6/7] [media] c8sectpfe: fix namespace on memcpy/memset
-In-Reply-To: <5347f97c651906887446a8811946e54b5a972fe4.1443737683.git.mchehab@osg.samsung.com>
-References: <cover.1443737682.git.mchehab@osg.samsung.com>
- <5347f97c651906887446a8811946e54b5a972fe4.1443737683.git.mchehab@osg.samsung.com>
-Message-ID: <5577273.mIdflaHak0@wuerfel>
+Date: Sat, 03 Oct 2015 00:36:53 +0200
+Subject: [PATCH v2] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <560DD374.4000708@broadcom.com>
+References: <1443689961-23909-1-git-send-email-bharatku@xilinx.com>
+ <2677327.lnRZhqx5GI@wuerfel> <560DD374.4000708@broadcom.com>
+Message-ID: <5225360.GkBHX0QnIA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 October 2015 19:17:28 Mauro Carvalho Chehab wrote:
-> @@ -1084,10 +1084,10 @@ static void load_dmem_segment(struct c8sectpfei *fei, Elf32_Phdr *phdr,
->                 seg_num, phdr->p_paddr, phdr->p_filesz,
->                 dst, phdr->p_memsz);
->  
-> -       memcpy((void __iomem *)dst, (void *)fw->data + phdr->p_offset,
-> +       memcpy((void __force *)dst, (void *)fw->data + phdr->p_offset,
->                 phdr->p_filesz);
->  
-> -       memset((void __iomem *)dst + phdr->p_filesz, 0,
-> +       memset((void __force *)dst + phdr->p_filesz, 0,
->                 phdr->p_memsz - phdr->p_filesz);
->  }
+On Thursday 01 October 2015 17:44:36 Ray Jui wrote:
 > 
-Same here: this should really use memcpy_toio() for the first one, though it
-seems we don't have a corresponding memset_io().
+> Sorry for stealing this discussion, :)
+> 
+> I have some questions here, since this affects how I should implement
+> the MSI support for iProc based PCIe controller. I understand it makes
+> more sense to use separate device node for MSI and have "msi-parent"
+> from the pci node points to the MSI node, and that MSI node can be
+> gicv2m or gicv3 based on more advanced ARMv8 platforms.
+> 
+> Then I would assume the MSI controller would deserve its own driver?
+> Which is a lot of people do nowadays. In that case, how I should handle
+> the case when the iProc MSI support is handled through some event queue
+> mechanism with their registers embedded in the PCIe controller register
+> space?
+> 
+> Does the following logic make sense to you?
+> 
+> 1. parse phandle of "msi-parent"
+> 2. Call of_pci_find_msi_chip_by_node to hook it up to msi chip already
+> registered (in the gicv2m and gicv3 case)
+> 3. If failed, fall back to use the iProc's own event queue logic by
+> calling iproc_pcie_msi_init.
+> 
+> The iProc MSI still has its own node that looks like this:
+> 141 msi0: msi at 20020000 {
+> 142                         msi-controller;
+> 143                         interrupt-parent = <&gic>;
+> 144                         interrupts = <GIC_SPI 277 IRQ_TYPE_NONE>,
+> 145                                      <GIC_SPI 278 IRQ_TYPE_NONE>,
+> 146                                      <GIC_SPI 279 IRQ_TYPE_NONE>,
+> 147                                      <GIC_SPI 280 IRQ_TYPE_NONE>,
+> 148                                      <GIC_SPI 281 IRQ_TYPE_NONE>,
+> 149                                      <GIC_SPI 282 IRQ_TYPE_NONE>;
+> 150                         brcm,num-eq-region = <1>;
+> 151                         brcm,num-msi-msg-region = <1>;
+> 152                 };
+> 
+> But it does not have its own "reg" since they are embedded in the PCI
+> controller's registers and it relies on one calling iproc_pcie_msi_init
+> to pass in base register value and some other information.
+
+I don't think I have a perfect answer to this. One way would be to
+separate the actual PCI root device node from the IP block that
+contains both the PCI root and the MSI catcher, but I guess that
+would require an incompatible change to your binding and it's not
+worth the pain.
+
+It's probably also ok to make the PCI host node itself be the msi-controller
+node and have an msi-parent phandle that points to the node itself. Not
+sure if that violates any rules that we may want or need to follow though.
+
+Having a device node without registers is also a bit problematic,
+especially the 'msi at 20020000' name doesn't make sense if 0x20020000
+is not the first number in the reg property. Maybe it's best to 
+put that node directly under the PCI host controller and not assign
+any registers. This is still a bit ugly because we'd expect devices
+under the host bridge to be PCI devices rather than random other things,
+but it may be the least of the evils.
 
 	Arnd
