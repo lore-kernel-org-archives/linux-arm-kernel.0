@@ -1,89 +1,62 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 2 Oct 2015 16:56:48 +0900
-Subject: [PATCH] arm64: ftrace: fix function_graph tracer panic
-In-Reply-To: <20151001152739.GI6963@e104818-lin.cambridge.arm.com>
-References: <1443581395-30088-1-git-send-email-huawei.libin@huawei.com>
- <560CCE91.3020407@linaro.org>
- <20151001152739.GI6963@e104818-lin.cambridge.arm.com>
-Message-ID: <560E38C0.7080409@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 2 Oct 2015 10:43:55 +0200
+Subject: [PATCH v2 3/8] mmc: core: Add mmc_regulator_set_vqmmc()
+In-Reply-To: <560E3800.1060603@samsung.com>
+References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
+ <CAPDyKFqrkYXsbBJ61yYo0G8za1szARvA=as-5nLTiwGH5pCrEQ@mail.gmail.com>
+ <560DF150.3000906@samsung.com> <3312969.jJ2hfB2JkV@diego>
+ <560E3800.1060603@samsung.com>
+Message-ID: <CAPDyKFro3Uk3+Jzz3Y0WBKZvTs5LjahT7KgRbh_nWWVBG7V3=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- > Do I take this as an ack?
-
-Yes, but
-
-On 10/02/2015 12:27 AM, Catalin Marinas wrote:
-> On Thu, Oct 01, 2015 at 03:11:29PM +0900, AKASHI Takahiro wrote:
->> On 09/30/2015 11:49 AM, Li Bin wrote:
->>> When function graph tracer is enabled, the following operation
->>> will trigger panic:
+On 2 October 2015 at 09:53, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> On 10/02/2015 04:06 PM, Heiko St?bner wrote:
+>> Am Freitag, 2. Oktober 2015, 11:52:00 schrieb Jaehoon Chung:
+>>> On 10/02/2015 06:05 AM, Ulf Hansson wrote:
+>>>> On 1 October 2015 at 19:35, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>>>> On 10/01, Heiko St?bner wrote:
+>>>>>> Am Donnerstag, 1. Oktober 2015, 11:54:24 schrieb Ulf Hansson:
+>>>>>>> On 30 September 2015 at 16:55, Heiko St?bner <heiko@sntech.de> wrote:
+>>>>>>>> Am Mittwoch, 30. September 2015, 16:42:05 schrieb Ulf Hansson:
+>>>>>>>>> On 30 September 2015 at 16:07, Heiko Stuebner <heiko@sntech.de>
+>> wrote:
+>>>>>>>> The clock changes of course only touch internals of the phase-clocks,
+>>>>>>>> so
+>>>>>>>> should have no problem going through another tree.
+>>>>>>>
+>>>>>>> What happens if I take mmc and dt changes, wouldn't I need the clock
+>>>>>>> patches as well?
+>>>>>>
+>>>>>> The API stays of course the same, only the degree to settings
+>>>>>> translation gets optimized, so I guess in the worst case you would get
+>>>>>> no good phase and thus fall back to non-highspeed modes - but the
+>>>>>> system would stay running.
+>>>>>>
+>>>>>> But of course, if the clock maintainers could Ack the two clock patches
+>>>>>> and
+>>>>>> everything would stay together that would work even better :-)
+>>>>>
+>>>>> If Ulf doesn't want to take them we can apply them to clk tree.
+>>>>> Otherwise, you can have my acked-by on the clk patches.
+>>>>
+>>>> I don't mind picking up the clock patches. So I consider this as an
+>>>> ack for both patch 1 and patch2, thanks.
+>>>>
+>>>> Now, let's give Jaehoon some time to review the dw_mmc parts.
 >>>
->>> mount -t debugfs nodev /sys/kernel
->>> echo next_tgid > /sys/kernel/tracing/set_ftrace_filter
->>> echo function_graph > /sys/kernel/tracing/current_tracer
->>> ls /proc/
->>>
->>> ------------[ cut here ]------------
->>> [  198.501417] Unable to handle kernel paging request at virtual address cb88537fdc8ba316
->>> [  198.506126] pgd = ffffffc008f79000
->>> [  198.509363] [cb88537fdc8ba316] *pgd=00000000488c6003, *pud=00000000488c6003, *pmd=0000000000000000
->>> [  198.517726] Internal error: Oops: 94000005 [#1] SMP
->>> [  198.518798] Modules linked in:
->>> [  198.520582] CPU: 1 PID: 1388 Comm: ls Tainted: G
->>> [  198.521800] Hardware name: linux,dummy-virt (DT)
->>> [  198.522852] task: ffffffc0fa9e8000 ti: ffffffc0f9ab0000 task.ti: ffffffc0f9ab0000
->>> [  198.524306] PC is at next_tgid+0x30/0x100
->>> [  198.525205] LR is at return_to_handler+0x0/0x20
->>> [  198.526090] pc : [<ffffffc0002a1070>] lr : [<ffffffc0000907c0>] pstate: 60000145
->>> [  198.527392] sp : ffffffc0f9ab3d40
->>> [  198.528084] x29: ffffffc0f9ab3d40 x28: ffffffc0f9ab0000
->>> [  198.529406] x27: ffffffc000d6a000 x26: ffffffc000b786e8
->>> [  198.530659] x25: ffffffc0002a1900 x24: ffffffc0faf16c00
->>> [  198.531942] x23: ffffffc0f9ab3ea0 x22: 0000000000000002
->>> [  198.533202] x21: ffffffc000d85050 x20: 0000000000000002
->>> [  198.534446] x19: 0000000000000002 x18: 0000000000000000
->>> [  198.535719] x17: 000000000049fa08 x16: ffffffc000242efc
->>> [  198.537030] x15: 0000007fa472b54c x14: ffffffffff000000
->>> [  198.538347] x13: ffffffc0fada84a0 x12: 0000000000000001
->>> [  198.539634] x11: ffffffc0f9ab3d70 x10: ffffffc0f9ab3d70
->>> [  198.540915] x9 : ffffffc0000907c0 x8 : ffffffc0f9ab3d40
->>> [  198.542215] x7 : 0000002e330f08f0 x6 : 0000000000000015
->>> [  198.543508] x5 : 0000000000000f08 x4 : ffffffc0f9835ec0
->>> [  198.544792] x3 : cb88537fdc8ba316 x2 : cb88537fdc8ba306
->>> [  198.546108] x1 : 0000000000000002 x0 : ffffffc000d85050
->>> [  198.547432]
->>> [  198.547920] Process ls (pid: 1388, stack limit = 0xffffffc0f9ab0020)
->>> [  198.549170] Stack: (0xffffffc0f9ab3d40 to 0xffffffc0f9ab4000)
->>> [  198.582568] Call trace:
->>> [  198.583313] [<ffffffc0002a1070>] next_tgid+0x30/0x100
->>> [  198.584359] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
->>> [  198.585503] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
->>> [  198.586574] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
->>> [  198.587660] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
->>> [  198.588896] Code: aa0003f5 2a0103f4 b4000102 91004043 (885f7c60)
->>> [  198.591092] ---[ end trace 6a346f8f20949ac8 ]---
->>>
->>> This is because when using function graph tracer, if the traced
->>> function return value is in multi regs ([0x-07]), return_to_handler
-
-typo: 0x-07 => x0-x7
-
-and pre/post-indexed addressing stp&ldp may save add&sub instructions, but
-it's a matter of preference.
-
--Takahiro AKASHI
-
->>> may corrupt them. So in return_to_handler, the parameter regs should
->>> be protected properly.
+>>> I will check other patches on today, if it's ok, i will apply at my
+>>> repository. Thanks for giving time! :)
 >>
->> You're right. we should preserve x0-x7 around a call to ftrace_return_to_handler()
->> just in case they might be used as a "composite type" (ie. struct) of return value.
+>> I think Ulf wanted to apply the whole series via the mmc tree directly, but I
+>> guess that is between you two to decide ;-)
 >
-> Do I take this as an ack?
->
-> I applied the patch locally and I'm going to send a pull request
-> tomorrow.
->
-> Thanks.
->
+> If it will get Stephen's acked-by, i will pick up all after checked the dwmmc patches. how about?
+
+Stephen already acked the clock patches from this thread.
+
+Perhaps this time, it's easier if you ack the dw_mmc patches and I can
+pick up the hole series? Does that work for you?
+
+Kind regards
+Uffe
