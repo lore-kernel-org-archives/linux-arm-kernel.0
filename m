@@ -1,79 +1,79 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 2 Oct 2015 20:00:03 +0200
-Subject: [PATCH] arm-soc: Add Sigma Designs Tango4 port
-In-Reply-To: <yw1xfv1tky6m.fsf@unicorn.mansr.com>
-References: <560EAA7C.3070302@free.fr> <yw1xoaghl099.fsf@unicorn.mansr.com>
- <560EB1EC.3020403@free.fr> <yw1xfv1tky6m.fsf@unicorn.mansr.com>
-Message-ID: <560EC623.4030300@free.fr>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 2 Oct 2015 19:00:58 +0100
+Subject: [PATCH] arm64: dts: add all hi6220 uart nodes
+In-Reply-To: <CANMBJr7yY1PJChnFSRknqfOLORuWZSEONV+e=M=9heX3i-ADKA@mail.gmail.com>
+References: <1443558552-5734-1-git-send-email-tyler.baker@linaro.org>
+ <1459065.BtzC7pyUYF@wuerfel> <20150930173145.GG15635@sirena.org.uk>
+ <CANMBJr7yY1PJChnFSRknqfOLORuWZSEONV+e=M=9heX3i-ADKA@mail.gmail.com>
+Message-ID: <20151002180058.GA4220@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2015 18:55, M?ns Rullg?rd wrote:
+Hi Tyler,
 
-> Mason writes:
+On Wed, 30 Sep 2015, Tyler Baker wrote:
+
+> On 30 September 2015 at 10:31, Mark Brown <broonie@kernel.org> wrote:
+> > On Wed, Sep 30, 2015 at 10:24:56AM +0200, Arnd Bergmann wrote:
+> >> On Tuesday 29 September 2015 13:29:12 Tyler Baker wrote:
+> >
+> >> >         aliases {
+> >> >                 serial0 = &uart0;
+> >> > +               serial1 = &uart1;
+> >> > +               serial2 = &uart2;
+> >> > +               serial3 = &uart3;
+> >> > +               serial4 = &uart4;
+> >> >         };
+> >
+> >> In the changelog you mention "both uarts", but here you have five of them.
+> >> Are they all accessible on the connector? If not, only provide aliases
+> >> for the ones that are, using numbering that makes most sense for given
+> >> how one would use the board.
 > 
->>>> +		uart0 {
->>>> +			compatible = "ralink,rt2880-uart";
->>>> +			reg = <0x10700 0x100>;
->>>> +			clock-frequency = <7372800>;
->>>> +			reg-shift = <2>;
->>>> +/*			fifo-size = <16>; BROKEN */
->>>
->>> Either fix whatever is broken or drop that line.
->>
->> I can't leave TODO reminders in the platform Kconfig [and DT files]?
+> Thanks for the comment Arnd. Mark's comment below is correct, there
+> are only two UARTs accessible on the LS connection in addition to the
+> one on the board (solder pad).
 > 
-> Never mind, I've sent a patch fixing the problem.
-
-That's great news. Although back-porting to 3.14 is looking
-more and more time-consuming. (But that's my problem.)
-
-The question of comments in Kconfig and DT files still stands.
-(No need to state your position again.)
-
->>>> +		intc: intc at e000 {
->>>> +			compatible = "sigma,tango-intc";
->>>
->>> Why do you insist on using other names than the ones I've been using for
->>> months?  Just want to leave your own mark on the code?
->>
->> You're using "sigma,smp8640-intc".
->> The SMP8640 is a Tango3 (MIPS-based) platform.
->> It makes no sense to have references to Tango3 in tango4.dtsi
->> Aside from the CPU difference, Tango3 and Tango4 have a lot in common though.
+> Is the following definition any clearer?
 > 
-> It's commonplace to refer to peripherals by the earliest (supported)
-> chip using them.  This avoids naming conflicts if a future chip uses a
-> different component.  Some bits are incompatible even between different
-> devices in the tango3 family.
+> serial0 = &uart0; // Onboard UART0
+> serial1 = &uart2; // LS expansion UART0
+> serial2 = &uart3; // LS expansion UART1
+> 
+> If so, I'll respin this patch.
+> 
+> > Unless I'm missing something there's only two UARTs brought out on the
+> > low speed expansion connector (in addition to the one on the solder pads
+> > which is currently supported).  We should also adjust the console
+> > default to match whatever one of the low speed expansion connector UARTs
+> > is being used by the bootloader.
+> 
+> Your not missing anything, I should not have added the additional
+> aliases, it is confusing, will remove. The UART boards by default come
+> configured to use UART1 on the LS connector.
+> 
+> + Peter as he has been submitting u-boot patches recently for the HiKey.
 
-I'm confused. I like the way ARM did it in smp-twd.c
+Thanks :)
 
-CLOCKSOURCE_OF_DECLARE(arm_twd_a9, "arm,cortex-a9-twd-timer", twd_local_timer_of_register);
-CLOCKSOURCE_OF_DECLARE(arm_twd_a5, "arm,cortex-a5-twd-timer", twd_local_timer_of_register);
-CLOCKSOURCE_OF_DECLARE(arm_twd_11mp, "arm,arm11mp-twd-timer", twd_local_timer_of_register);
+> 
+> Obviously, both UEFI and u-boot can be configured to use either UART,
+> and at the moment u-boot defaults to using the on board UART. Whereas
+> UEFI is using UART1 on the LS connector. I'm fine with switching the
+> console default to use the UART1 on the LS connector as long as there
+> is agreement to do so.
 
-They have several definitions for the different supported platforms.
+Eek... "serial2 = uart3 //UART1"
 
-They have several versions of the GIC:
+I sent the following patch
+http://lists.denx.de/pipermail/u-boot/2015-September/227465.html
 
-IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
-IRQCHIP_DECLARE(arm11mp_gic, "arm,arm11mp-gic", gic_of_init);
-IRQCHIP_DECLARE(arm1176jzf_dc_gic, "arm,arm1176jzf-devchip-gic", gic_of_init);
-IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
-IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
-IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", gic_of_init);
-IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
-IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
-IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
+which has been accepted which switches from using UART0 (onboard) to
+UART3 (LS connector). This matched up with the change made in ATF i.e. both ATF
+and u-boot were then both outputting on the same UART.
 
-For example, I know the interrupt controller was changed for Tango5.
+So u-boot has already been migrated over.
 
-So I was planning on using:
+regards,
 
-"sigma,tango-intc" for Tango3/Tango4
-"sigma,tango-intc-v2" for Tango5
-
-Would you change your code to accommodate this nomenclature? 
-
-Regards.
+Peter.
