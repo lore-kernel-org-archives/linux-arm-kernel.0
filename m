@@ -1,196 +1,65 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 2 Oct 2015 15:52:42 +0100
-Subject: [PATCH v3 3/8] arm/arm64: KVM: vgic: Factor out level irq
- processing on guest exit
-In-Reply-To: <1443538145-11990-4-git-send-email-christoffer.dall@linaro.org>
-References: <1443538145-11990-1-git-send-email-christoffer.dall@linaro.org>
- <1443538145-11990-4-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <560E9A3A.6020209@arm.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 2 Oct 2015 15:52:09 +0100
+Subject: [PATCH v5 12/22] xen/balloon: Don't rely on the page granularity
+ is the same for Xen and Linux
+In-Reply-To: <560E9551.6020105@citrix.com>
+References: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
+ <1443609937-25278-13-git-send-email-julien.grall@citrix.com>
+ <560E9004.8030604@citrix.com> <560E9551.6020105@citrix.com>
+Message-ID: <560E9A19.2010301@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On 29/09/15 15:49, Christoffer Dall wrote:
-> Currently vgic_process_maintenance() processes dealing with a completed
-> level-triggered interrupt directly, but we are soon going to reuse this
-> logic for level-triggered mapped interrupts with the HW bit set, so
-> move this logic into a separate static function.
+On 02/10/15 15:31, Julien Grall wrote:
+> Hi David,
 > 
-> Probably the most scary part of this commit is convincing yourself that
-> the current flow is safe compared to the old one.  In the following I
-> try to list the changes and why they are harmless:
+> On 02/10/15 15:09, David Vrabel wrote:
+>> On 30/09/15 11:45, Julien Grall wrote:
+>>> For ARM64 guests, Linux is able to support either 64K or 4K page
+>>> granularity. Although, the hypercall interface is always based on 4K
+>>> page granularity.
+>>>
+>>> With 64K page granularity, a single page will be spread over multiple
+>>> Xen frame.
+>>>
+>>> To avoid splitting the page into 4K frame, take advantage of the
+>>> extent_order field to directly allocate/free chunk of the Linux page
+>>> size.
+>>>
+>>> Note that PVMMU is only used for PV guest (which is x86) and the page
+>>> granularity is always 4KB. Some BUILD_BUG_ON has been added to ensure
+>>> that because the code has not been modified.
+>>
+>> This causes a BUG() in x86 PV guests when decreasing the reservation.
+>>
+>> Xen says:
+>>
+>> (XEN) d0v2 Error pfn 0: rd=0 od=32753 caf=8000000000000001
+>> taf=7400000000000001
+>> (XEN) memory.c:250:d0v2 Bad page free for domain 0
+>>
+>> And Linux BUGs with:
+>>
+>> [   82.032654] kernel BUG at
+>> /anfs/drall/scratch/davidvr/x86/linux/drivers/xen/balloon.c:540!
+>>
+>> Which is a non-zero return value from the decrease_reservation hypercall.
+>>
+>> The frame_list[] has been incorrectly populated.  The below patch fixes
+>> it for me.  Please test as well.
+
+FIY, I've just tested with the patch on ARM64 and I haven't see any issue.
+
+> Sorry for the breakage, I think I haven't spot the bug on my board
+> because most the PV drivers are allocating one balloon page at the time
+> by default.
 > 
->   Move vgic_irq_clear_queued after kvm_notify_acked_irq:
->     Harmless because the only potential effect of clearing the queued
->     flag wrt.  kvm_set_irq is that vgic_update_irq_pending does not set
->     the pending bit on the emulated CPU interface or in the
->     pending_on_cpu bitmask if the function is called with level=1.
->     However, the point of kvm_notify_acked_irq is to call kvm_set_irq
->     with level=0, and we set the queued flag again in
->     __kvm_vgic_sync_hwstate later on if the level is stil high.
-> 
->   Move vgic_set_lr before kvm_notify_acked_irq:
->     Also, harmless because the LR are cpu-local operations and
->     kvm_notify_acked only affects the dist
-> 
->   Move vgic_dist_irq_clear_soft_pend after kvm_notify_acked_irq:
->     Also harmless because it's just a bit which is cleared and altering
->     the line state does not affect this bit.
+> This patch looks valid to me. i was resetting and incremented for each
+> loop on an early version. Although I dropped it by mistake when I use a
+> different way to decrease the reservation.
 
-Mmmh, kvm_set_irq(level=0) will eventually execute (in
-vgic_update_irq_pending()):
 
-	vgic_dist_irq_clear_level(vcpu, irq_num);
-	if (!vgic_dist_irq_soft_pend(vcpu, irq_num))
-		vgic_dist_irq_clear_pending(vcpu, irq_num);
 
-So with the former code we would clear the (dist) pending bit if
-soft_pend was set before, while with the newer code we wouldn't.
-Is this just still working because Linux guests will never set the
-soft_pend bit? Or is this safe because will always clear the pending bit
-anyway later on? (my brain is too much jellyfish by now to still work
-this dependency out)
-Or what do I miss here?
 
-> 
-> Reviewed-by: Eric Auger <eric.auger@linaro.org>
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/vgic.c | 88 ++++++++++++++++++++++++++++++-----------------------
->  1 file changed, 50 insertions(+), 38 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 6bd1c9b..fe0e5db 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1322,12 +1322,56 @@ epilog:
->  	}
->  }
->  
-> +static int process_level_irq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
-> +{
-> +	int level_pending = 0;
-
-Why is this an int and not a bool? Also see below ...
-
-> +
-> +	vlr.state = 0;
-> +	vlr.hwirq = 0;
-> +	vgic_set_lr(vcpu, lr, vlr);
-> +
-> +	/*
-> +	 * If the IRQ was EOIed (called from vgic_process_maintenance) or it
-> +	 * went from active to non-active (called from vgic_sync_hwirq) it was
-> +	 * also ACKed and we we therefore assume we can clear the soft pending
-> +	 * state (should it had been set) for this interrupt.
-> +	 *
-> +	 * Note: if the IRQ soft pending state was set after the IRQ was
-> +	 * acked, it actually shouldn't be cleared, but we have no way of
-> +	 * knowing that unless we start trapping ACKs when the soft-pending
-> +	 * state is set.
-> +	 */
-> +	vgic_dist_irq_clear_soft_pend(vcpu, vlr.irq);
-> +
-> +	/*
-> +	 * Tell the gic to start sampling the line of this interrupt again.
-> +	 */
-> +	vgic_irq_clear_queued(vcpu, vlr.irq);
-> +
-> +	/* Any additional pending interrupt? */
-> +	if (vgic_dist_irq_get_level(vcpu, vlr.irq)) {
-> +		vgic_cpu_irq_set(vcpu, vlr.irq);
-> +		level_pending = 1;
-> +	} else {
-> +		vgic_dist_irq_clear_pending(vcpu, vlr.irq);
-> +		vgic_cpu_irq_clear(vcpu, vlr.irq);
-> +	}
-> +
-> +	/*
-> +	 * Despite being EOIed, the LR may not have
-> +	 * been marked as empty.
-> +	 */
-> +	vgic_sync_lr_elrsr(vcpu, lr, vlr);
-> +
-> +	return level_pending;
-> +}
-> +
->  static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->  {
->  	u32 status = vgic_get_interrupt_status(vcpu);
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> -	bool level_pending = false;
->  	struct kvm *kvm = vcpu->kvm;
-> +	int level_pending = 0;
-
-Why this change here? Even after 8/8 I don't see any use of values
-outside of true/false.
-
-Cheers,
-Andre.
-
->  
->  	kvm_debug("STATUS = %08x\n", status);
->  
-> @@ -1342,54 +1386,22 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->  
->  		for_each_set_bit(lr, eisr_ptr, vgic->nr_lr) {
->  			struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
-> -			WARN_ON(vgic_irq_is_edge(vcpu, vlr.irq));
->  
-> -			spin_lock(&dist->lock);
-> -			vgic_irq_clear_queued(vcpu, vlr.irq);
-> +			WARN_ON(vgic_irq_is_edge(vcpu, vlr.irq));
->  			WARN_ON(vlr.state & LR_STATE_MASK);
-> -			vlr.state = 0;
-> -			vgic_set_lr(vcpu, lr, vlr);
->  
-> -			/*
-> -			 * If the IRQ was EOIed it was also ACKed and we we
-> -			 * therefore assume we can clear the soft pending
-> -			 * state (should it had been set) for this interrupt.
-> -			 *
-> -			 * Note: if the IRQ soft pending state was set after
-> -			 * the IRQ was acked, it actually shouldn't be
-> -			 * cleared, but we have no way of knowing that unless
-> -			 * we start trapping ACKs when the soft-pending state
-> -			 * is set.
-> -			 */
-> -			vgic_dist_irq_clear_soft_pend(vcpu, vlr.irq);
->  
->  			/*
->  			 * kvm_notify_acked_irq calls kvm_set_irq()
-> -			 * to reset the IRQ level. Need to release the
-> -			 * lock for kvm_set_irq to grab it.
-> +			 * to reset the IRQ level, which grabs the dist->lock
-> +			 * so we call this before taking the dist->lock.
->  			 */
-> -			spin_unlock(&dist->lock);
-> -
->  			kvm_notify_acked_irq(kvm, 0,
->  					     vlr.irq - VGIC_NR_PRIVATE_IRQS);
-> -			spin_lock(&dist->lock);
-> -
-> -			/* Any additional pending interrupt? */
-> -			if (vgic_dist_irq_get_level(vcpu, vlr.irq)) {
-> -				vgic_cpu_irq_set(vcpu, vlr.irq);
-> -				level_pending = true;
-> -			} else {
-> -				vgic_dist_irq_clear_pending(vcpu, vlr.irq);
-> -				vgic_cpu_irq_clear(vcpu, vlr.irq);
-> -			}
->  
-> +			spin_lock(&dist->lock);
-> +			level_pending |= process_level_irq(vcpu, lr, vlr);
->  			spin_unlock(&dist->lock);
-> -
-> -			/*
-> -			 * Despite being EOIed, the LR may not have
-> -			 * been marked as empty.
-> -			 */
-> -			vgic_sync_lr_elrsr(vcpu, lr, vlr);
->  		}
->  	}
->  
-> 
+-- 
+Julien Grall
