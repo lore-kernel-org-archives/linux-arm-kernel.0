@@ -1,59 +1,75 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Fri, 2 Oct 2015 16:19:31 +0100
-Subject: [Xen-devel] [PATCH v5 12/22] xen/balloon: Don't rely on the page
- granularity is the same for Xen and Linux
-In-Reply-To: <560E9A19.2010301@citrix.com>
-References: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
- <1443609937-25278-13-git-send-email-julien.grall@citrix.com>
- <560E9004.8030604@citrix.com> <560E9551.6020105@citrix.com>
- <560E9A19.2010301@citrix.com>
-Message-ID: <560EA083.2020102@citrix.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 2 Oct 2015 23:19:36 +0800
+Subject: [PATCH v5 0/5] Add SMP bringup support for mt65xx socs
+Message-ID: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/15 15:52, Julien Grall wrote:
-> On 02/10/15 15:31, Julien Grall wrote:
->> Hi David,
->>
->> On 02/10/15 15:09, David Vrabel wrote:
->>> On 30/09/15 11:45, Julien Grall wrote:
->>>> For ARM64 guests, Linux is able to support either 64K or 4K page
->>>> granularity. Although, the hypercall interface is always based on 4K
->>>> page granularity.
->>>>
->>>> With 64K page granularity, a single page will be spread over multiple
->>>> Xen frame.
->>>>
->>>> To avoid splitting the page into 4K frame, take advantage of the
->>>> extent_order field to directly allocate/free chunk of the Linux page
->>>> size.
->>>>
->>>> Note that PVMMU is only used for PV guest (which is x86) and the page
->>>> granularity is always 4KB. Some BUILD_BUG_ON has been added to ensure
->>>> that because the code has not been modified.
->>>
->>> This causes a BUG() in x86 PV guests when decreasing the reservation.
->>>
->>> Xen says:
->>>
->>> (XEN) d0v2 Error pfn 0: rd=0 od=32753 caf=8000000000000001
->>> taf=7400000000000001
->>> (XEN) memory.c:250:d0v2 Bad page free for domain 0
->>>
->>> And Linux BUGs with:
->>>
->>> [   82.032654] kernel BUG at
->>> /anfs/drall/scratch/davidvr/x86/linux/drivers/xen/balloon.c:540!
->>>
->>> Which is a non-zero return value from the decrease_reservation hypercall.
->>>
->>> The frame_list[] has been incorrectly populated.  The below patch fixes
->>> it for me.  Please test as well.
-> 
-> FIY, I've just tested with the patch on ARM64 and I haven't see any issue.
+This series add SMP brinup support for MediaTek SoCs. This is v5 and
+is based on v4.3-rc1.
 
-Thanks, I've folded it in.
+There are similar but different SMP bringup up methods on MediaTek
+mt65xx and mt81xx. On MT8135 & MT8127, system boots with a trustzone
+firmware. Others, like MT6589, doesn't have trustzone, and run kernel
+directly in secure world.
 
-Boris, can we get another test run on the for-linus-4.4 branch, please?
+Patch 1 enable arch timer support.
+Patch 2,3 add support for cpu enable-method "mediatek,mt6589-smp" and
+"mediatek,mt81xx-tz-smp", which support Mediatek SMP bringup for non-TZ
+and TZ platform.
+Patch 4,5 finally enable SMP bringup for mt8135 and mt8127.
 
-David
+Changes in v5:
+- Fix dts error
+- Add Rob's Ack tag.
+
+Changes in v4[3]:
+- rebase to v4.3-rc1
+- Reserve trustzone bootinfo memory area in device tree.
+
+Changes in v3:
+- v3 in [1]
+- The first 2 patches in v2 are merged in v4.2-rc1.
+- Patch 3~4 in v2 are moved to another series [2]
+- platsmp.c changes based on Stephen's suggestion
+- Change cpu enable-method name to "mediatek,mt6589-smp"
+
+Changes in v2:
+- Fix boot issue for THUMB2 kernel.
+- Not enable GPT_CLK_EVT when setup to fix GPT spurious interrupt issue
+- Change platsmp.c according to Matthias' suggestion
+http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000714.html
+
+v1:
+http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000528.html
+
+[1]
+http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001570.html
+
+[2]
+http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001544.html
+
+[3]
+http://lists.infradead.org/pipermail/linux-mediatek/2015-September/002377.html
+
+
+Matthias Brugger (1):
+  ARM: mediatek: enable gpt6 on boot up to make arch timer working
+
+Yingjoe Chen (4):
+  devicetree: bindings: add new SMP enable method Mediatek SoC
+  ARM: mediatek: add smp bringup code
+  ARM: dts: mt8135: enable basic SMP bringup for mt8135
+  ARM: dts: mt8127: enable basic SMP bringup for mt8127
+
+ Documentation/devicetree/bindings/arm/cpus.txt |   2 +
+ arch/arm/boot/dts/mt8127.dtsi                  |  27 +++++
+ arch/arm/boot/dts/mt8135.dtsi                  |  27 +++++
+ arch/arm/mach-mediatek/Makefile                |   3 +
+ arch/arm/mach-mediatek/mediatek.c              |  27 +++++
+ arch/arm/mach-mediatek/platsmp.c               | 141 +++++++++++++++++++++++++
+ 6 files changed, 227 insertions(+)
+ create mode 100644 arch/arm/mach-mediatek/platsmp.c
+
+-- 
+1.9.1
