@@ -1,66 +1,44 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 2 Oct 2015 11:17:15 -0600
-Subject: [RFC PATCH 06/20] coresight: etm3x: unlocking tracer in default
- arch init
-In-Reply-To: <87vbap3mgz.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
- <1442593594-10665-7-git-send-email-mathieu.poirier@linaro.org>
- <87eghgjg4v.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYkwO64CRfcZ+z+=+ucbtOVeOcOoCy+d0GO5sEuTf+Qe0WQ@mail.gmail.com>
- <87vbap3mgz.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CANLsYkxNO5U83zgVHysGMLxKq0q1rZFPLLAYOT1W3n9HOaxQ4g@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 2 Oct 2015 12:24:08 -0500
+Subject: Queueing b0a688ddcc50 "usb: musb: cppi41: allow it to work
+ again" for -stable
+In-Reply-To: <CAAEAJfALjV2BCJwzd20TQA3CWa1VZRM5vPv6CydrBuMJc=vVAw@mail.gmail.com>
+References: <CAAEAJfC7z=dvw_5vgXDBWVQdKA5jDpfECYv4Jy67YaT7219uJA@mail.gmail.com>
+ <20151002160902.GF5552@saruman.tx.rr.com>
+ <CAAEAJfALjV2BCJwzd20TQA3CWa1VZRM5vPv6CydrBuMJc=vVAw@mail.gmail.com>
+Message-ID: <20151002172408.GJ5552@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 October 2015 at 22:47, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
->
->> On 30 September 2015 at 05:33, Alexander Shishkin
->> <alexander.shishkin@linux.intel.com> wrote:
->>> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
->>>
->>>> Calling function 'smp_call_function_single()' to unlock the
->>>> tracer and calling it right after to perform the default
->>>> initialisation doesn't make sense.
->>>>
->>>> Moving 'etm_os_unlock()' just before making the default
->>>> initialisation results in the same outcome while saving
->>>> one call to 'smp_call_function_single()'.
->>>>
->>>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->>>> ---
->>>>  drivers/hwtracing/coresight/coresight-etm3x.c | 8 +++++---
->>>>  1 file changed, 5 insertions(+), 3 deletions(-)
->>>>
->>>> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
->>>> index c6880c1ade55..a4c158df0fef 100644
->>>> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
->>>> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
->>>> @@ -1867,6 +1867,11 @@ static void etm_init_arch_data(void *info)
->>>>        * certain registers might be ignored.
->>>>        */
->>>>       etm_clr_pwrdwn(drvdata);
->>>> +
->>>> +     /* Make sure all registers are accessible */
->>>> +     etm_os_unlock(drvdata);
->>>
->>> In case of co-processor register access, this will end up unlocking the
->>> local ETM instead of the one on target cpu, by the looks of it.
->>
->> "etm_init_arch_data()" is also called from "smp_function_calls()" and
->> as such, will end up executing the correct CPU.
->
-> Yes, but it doesn't unlock the OSLAR register, which also needs to be
-> done on target cpu.
+On Fri, Oct 02, 2015 at 02:16:50PM -0300, Ezequiel Garcia wrote:
+> On 2 October 2015 at 13:09, Felipe Balbi <balbi@ti.com> wrote:
+> > On Fri, Oct 02, 2015 at 02:23:45AM -0300, Ezequiel Garcia wrote:
+> >> Hello,
+> >>
+> >> Commit b0a688ddcc50 "usb: musb: cppi41: allow it to work again" seems
+> >> to fix a regression. It applies cleanly on v4.1 and removes the
+> >> "musb-hdrc musb-hdrc.1.auto: Need DT for the DMA engine." error.
+> >>
+> >> Any chance you can queue it for -stable?
+> >
+> > Have a look at Documentation/stable_kernel_rules.txt, you can do a proper
+> > request for Greg and he will make sure it gets there.
+> >
+> 
+> Sure, I will.
+> 
+> Maybe next time you could add a Cc: stable to these kinds of fixes, along with
+> a proper Fixes tag, so the -stable folks can pick them automatically.
 
-Function "etm_os_unlock()" deals with ETMOSLAR and "CS_UNLOCK()" with
-ETMLAR.  Both are called from "etm_init_arch_data()", which runs on
-the target CPU.  One thing that I will do here is move
-"etm_os_unlock()" to the beginning of "etm_init_arch_data()".  Other
-than that I may be missing your point.
+I usually do, in this case, nobody had complained about this board in any stable
+kernel so I just didn't.
 
->
-> Regards,
-> --
-> Alex
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151002/4bb1683c/attachment.sig>
