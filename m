@@ -1,104 +1,220 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 2 Oct 2015 23:08:21 +0200
-Subject: [PATCH v3 8/8] arm/arm64: KVM: Support edge-triggered forwarded
- interrupts
-In-Reply-To: <560EBC4B.3050706@arm.com>
-References: <1443538145-11990-1-git-send-email-christoffer.dall@linaro.org>
- <1443538145-11990-9-git-send-email-christoffer.dall@linaro.org>
- <560EBC4B.3050706@arm.com>
-Message-ID: <20151002210821.GG32011@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 Oct 2015 23:11:29 +0200
+Subject: [PATCH] arm-soc: Add Sigma Designs Tango4 port
+In-Reply-To: <560EEEB7.909@free.fr>
+References: <560EAA7C.3070302@free.fr> <1563018.pqIIbZENJL@wuerfel>
+ <560EEEB7.909@free.fr>
+Message-ID: <5124277.UR9sg1IOHT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 02, 2015 at 06:18:03PM +0100, Andre Przywara wrote:
-> On 29/09/15 15:49, Christoffer Dall wrote:
-> > We mark edge-triggered interrupts with the HW bit set as queued to
-> > prevent the VGIC code from injecting LRs with both the Active and
-> > Pending bits set at the same time while also setting the HW bit,
-> > because the hardware does not support this.
+On Friday 02 October 2015 22:53:11 Mason wrote:
+> On 02/10/2015 21:56, Arnd Bergmann wrote:
+> > On Friday 02 October 2015 18:02:04 Mason wrote:
+> >> Add support for Tango4-based SoCs (SMP8756, SMP8758)
+> >>
+> >> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 > > 
-> > However, this means that we must also clear the queued flag when we sync
-> > back a LR where the state on the physical distributor went from active
-> > to inactive because the guest deactivated the interrupt.  At this point
-> > we must also check if the interrupt is pending on the distributor, and
-> > tell the VGIC to queue it again if it is.
+> > Please write a proper changelog text here that tells us more about
+> > the patch than the subject line.
+> 
+> Sorry, I'm quite unimaginative. What kind of information do you
+> consider required?
+
+The line you have there is not needed, but it would be nice to have
+a link to the data sheet (if available) and some information about
+what SoCs they are.
+
+For most patches, you describe what the original code does wrong
+first, followed by how your patch addresses the situation, but for
+a new platform that is a bit different.
+
+> >> --- a/arch/arm/boot/dts/Makefile
+> >> +++ b/arch/arm/boot/dts/Makefile
+> >> @@ -605,6 +605,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+> >>  dtb-$(CONFIG_MACH_SUN9I) += \
+> >>  	sun9i-a80-optimus.dtb \
+> >>  	sun9i-a80-cubieboard4.dtb
+> >> +dtb-$(CONFIG_ARCH_TANGOX) += \
+> >> +	vantage-1172.dtb
 > > 
-> > Since these actions on the sync path are extremely close to those for
-> > level-triggered interrupts, rename process_level_irq to
-> > process_queued_irq, allowing it to cater for both cases.
+> > This file name should start with the name of the chip,
+> > e.g. 'tango4-vantage-1172.dtb', to make it easier to find.
+> 
+> OK.
+> 
+> (Why doesn't arm do it like mips, with per-manufacturer folders?)
+
+Historic mistake on our side, and it's become too hard to fix now
+without breaking hundreds of patches that people are trying to
+get merged.
+
+> >> diff --git a/arch/arm/boot/dts/tango4.dtsi b/arch/arm/boot/dts/tango4.dtsi
+> >> new file mode 100644
+> >> index 000000000000..7336fcc3ac1d
+> >> --- /dev/null
+> >> +++ b/arch/arm/boot/dts/tango4.dtsi
+> >> @@ -0,0 +1,117 @@
+> >> +#include <dt-bindings/interrupt-controller/irq.h>
+> >> +
+> >> +/ {
+> >> +	compatible = "sigma,tango4-soc";
 > > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > Move the root compatible strings into the board specific file,
+> > and add the name of the machine as a more specific one.
 > 
-> 
-> > ---
-> >  virt/kvm/arm/vgic.c | 40 ++++++++++++++++++++++------------------
-> >  1 file changed, 22 insertions(+), 18 deletions(-)
+> I don't understand this.
+
+The compatible list should list both generic and specific names
+if applicable. For an SoC based platform, that almost always
+translates into board name, soc name and sometimes soc family name.
+
+> >> +	soc {
+> >> +		compatible = "simple-bus";
+> >> +		#address-cells = <1>;
+> >> +		#size-cells = <1>;
+> >> +		ranges;
+> >> +
+> >> +		xtal_in_cnt {
+> >> +			compatible = "sigma,xtal_in_cnt";
+> >> +			reg = <0x10048 0x4>;
+> >> +			clocks = <&xtal>;
+> >> +		};
+> >> +
+> >> +		uart0 {
+> >> +			compatible = "ralink,rt2880-uart";
+> >> +			reg = <0x10700 0x100>;
+> >> +			clock-frequency = <7372800>;
+> >> +			reg-shift = <2>;
+> >> +/*			fifo-size = <16>; BROKEN */
+> >> +		};
 > > 
-> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> > index 53548f1..f3e76e5 100644
-> > --- a/virt/kvm/arm/vgic.c
-> > +++ b/virt/kvm/arm/vgic.c
-> > @@ -1322,13 +1322,10 @@ epilog:
-> >  	}
-> >  }
-> >  
-> > -static int process_level_irq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
-> > +static int process_queued_irq(struct kvm_vcpu *vcpu,
-> > +				   int lr, struct vgic_lr vlr)
-> >  {
-> > -	int level_pending = 0;
-> > -
-> > -	vlr.state = 0;
-> > -	vlr.hwirq = 0;
-> > -	vgic_set_lr(vcpu, lr, vlr);
-> > +	int pending = 0;
+> > Please use standard node names here, the uart should be
+> > named 'serial at 10700', the other names should be
+> > 'ethernet at 26000', 'interrupt-controller at 6e000' etc.
 > 
-> As I mentioned in my reply to 3/8 already: shouldn't this be "bool"?
-> 
-> >  
-> >  	/*
-> >  	 * If the IRQ was EOIed (called from vgic_process_maintenance) or it
-> > @@ -1344,26 +1341,35 @@ static int process_level_irq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
-> >  	vgic_dist_irq_clear_soft_pend(vcpu, vlr.irq);
-> >  
-> >  	/*
-> > -	 * Tell the gic to start sampling the line of this interrupt again.
-> > +	 * Tell the gic to start sampling this interrupt again.
-> >  	 */
-> >  	vgic_irq_clear_queued(vcpu, vlr.irq);
-> >  
-> >  	/* Any additional pending interrupt? */
-> > -	if (vgic_dist_irq_get_level(vcpu, vlr.irq)) {
-> > -		vgic_cpu_irq_set(vcpu, vlr.irq);
-> > -		level_pending = 1;
-> > +	if (vgic_irq_is_edge(vcpu, vlr.irq)) {
-> > +		BUG_ON(!(vlr.state & LR_HW));
-> 
-> Is that really needed here?
+> Where are the standard node names documented?
 
-Are BUG_ON statements every 'really needed' ?
+ePAPR has a list, for others look at the existing dts files.
 
-> I don't see how this function would fail if
-> called on a non-mapped IRQ. Also the two current callers would always
-> fulfil this requirement:
-> - vgic_process_maintenance() already has a WARN_ON(vgic_irq_is_edge)
-> - vgic_sync_irq() returns early if it's not a mapped IRQ
+> Can I still name labels freely?
 
-yes, that's why it's a BUG_ON, don't ever do this;)
+Labels can be freely assigned, they are only used as syntactic
+sugar to let you write phandle references in a more compact
+way, but names are what ends up in the dts and they should
+follow convention as much as possible.
 
+> Or is there a naming convention for labels?
 > 
-> Removing this would also allow to pass "int irq" instead of "struct
-> vgic_lr vlr".
-> 
-> Just an idea, though and not a show-stopper.
+> Why is the base address duplicated? Can't the DTC figure
+> out the address from the reg property?
 
-I don't see a problem with having it there and I put it there because I
-wanted to protect us (developers) against accidentally writing a patch
-that reuses this function for a non-forwarded edge-triggered interrupt,
-which is not supposed to ever happen.
+I don't know what exactly has led to this, I believe it was
+like this in original open firmware, but not always enforced,
+but we probably needed to represent nodes from real firmware
+in dtb files.
 
+> >> +		eth0: eth0 {
+> >> +			compatible = "sigma,smp8640-emac";
+> >> +			reg = <0x26000 0x800>;
+> >> +			interrupts = <38 4>;
+> >> +			interrupt-parent = <&irq0>;
+> >> +			mac-address = [ 00 16 e8 02 08 42 ];
+> >> +			clocks = <&sysclk>;
+> >> +		};
+> >> +
+> >> +		intc: intc at e000 {
+> >> +			compatible = "sigma,tango-intc";
+> >> +			reg = <0x6e000 0x1000>;
+> >> +			interrupt-parent = <&gic>;
+> >> +			interrupt-controller;
+> >> +			#address-cells = <1>;
+> >> +			#size-cells = <1>;
+> >> +
+> >> +			irq0: irq0 at 000 {
+> >> +				reg = <0x000 0x100>;
+> >> +				interrupt-controller;
+> >> +				#interrupt-cells = <2>;
+> >> +				interrupts = <0 2 4>;
+> >> +			};
+> > 
+> > You are missing a ranges property that describes what address
+> > space these addresses are in.
 > 
-> Other than that it looks good to me.
+> ranges; is not hierarchically inherited?
+
+'ranges;' would be wrong here, as the interrupt controller is
+not a bus. If you have no ranges property, the bus is interpreted
+as having its own address space with no relation to the parent bus
+(e.g. an I2C bus uses addresses that are not memory mapped).
+
+Just list the addresses that are actually decoded by child
+devices here.
+
+> >> diff --git a/arch/arm/boot/dts/vantage-1172.dts b/arch/arm/boot/dts/vantage-1172.dts
+> >> new file mode 100644
+> >> index 000000000000..56f6babe7093
+> >> --- /dev/null
+> >> +++ b/arch/arm/boot/dts/vantage-1172.dts
+> >> @@ -0,0 +1,8 @@
+> >> +/dts-v1/;
+> >> +
+> >> +#include "tango4.dtsi"
+> >> +
+> >> +&eth0 {
+> >> +	phy-connection-type = "rgmii";
+> >> +	max-speed = <1000>;
+> >> +};
+> > 
+> > You should normally have /chosen and /aliases nodes here as well.
 > 
-Thanks,
--Christoffer
+> Sigh. I don't know what they are for.
+> http://devicetree.org/Device_Tree_Usage#Special_Nodes
+> 
+> So with aliases, I don't need to define labels in the .dtsi?
+
+labels are always optional, you can write the aliases node using
+either labels or open-coded paths, like
+
+/aliases {
+	serial0 = &uart_3;
+	serial1 = "/soc/serial at 10700";
+};
+ 
+> "Typically the chosen node is left empty in .dts source files and populated at boot time."
+> Should I put my current bootargs there?
+
+I would put only the stdout-path property in there, as long as you can
+boot with any bootargs.
+
+> >> diff --git a/arch/arm/mach-tangox/Kconfig b/arch/arm/mach-tangox/Kconfig
+> >> new file mode 100644
+> >> index 000000000000..152cdd487056
+> >> --- /dev/null
+> >> +++ b/arch/arm/mach-tangox/Kconfig
+> >> @@ -0,0 +1,12 @@
+> >> +# Tango3 was based on MIPS 74kf. Tango4 is based on ARM Cortex A9 MPCore.
+> >> +
+> >> +config ARCH_TANGOX
+> >> +	bool "Sigma Designs Tango4 (SMP87xx)" if ARCH_MULTI_V7
+> >> +	select ARCH_HAS_HOLES_MEMORYMODEL
+> >> +	select ARM_ERRATA_754322
+> >> +	select ARM_ERRATA_764369 if SMP
+> >> +	select ARM_GIC
+> >> +	select GENERIC_IRQ_CHIP
+> >> +	select HAVE_ARM_SCU
+> >> +	select HAVE_ARM_TWD
+> >> +	select SERIAL_8250_RT288X if SERIAL_8250
+> > 
+> > Do not 'select' the uart driver, that can just be part of the defconfig
+> > file.
+> 
+> Do you mean I should provide a defconfig with my patch?
+> 
+> Picking SERIAL_8250 but not SERIAL_8250_RT288X makes the kernel
+> panic. Doesn't that qualify for selecting it? (I don't understand
+> the rationale behind most conventions in kernel dev.)
+
+Add it to multi_v7_defconfig
+
+	Arnd
