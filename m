@@ -1,38 +1,34 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 2 Oct 2015 23:24:22 +0530
-Subject: [PATCH 5/6] arm64: dts: Add IPROC RNG200 DT node for NS2
-In-Reply-To: <1443808463-21120-1-git-send-email-anup.patel@broadcom.com>
-References: <1443808463-21120-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1443808463-21120-6-git-send-email-anup.patel@broadcom.com>
+Date: Fri, 2 Oct 2015 23:26:41 +0530
+Subject: [PATCH 0/5] NAND support for Broadcom NS2 SoC
+Message-ID: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have IPROC RNG200 hardware random number generation in
-NS2 SoC, lets enable it for NS2 in NS2 DT.
+We enable NAND support for Broadcom NS2 SoC by reusing existing
+BRCMNAND driver.
 
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Pramod KUMAR <pramodku@broadcom.com>
-Reviewed-by: Vikram Prakash <vikramp@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- arch/arm64/boot/dts/broadcom/ns2.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+This patchset applies on-top of "arm64: Simple additions to
+NS2 DT" patchset and is available in ns2_nand_v1 branch of 
+https://github.com/Broadcom/arm64-linux.git.
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index bc31c0e..92ecf1c 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -187,5 +187,10 @@
- 			clock-frequency = <23961600>;
- 			status = "disabled";
- 		};
-+
-+		hwrng: hwrng at 66220000 {
-+			compatible = "brcm,iproc-rng200";
-+			reg = <0x66220000 0x28>;
-+		};
- 	};
- };
+The patchset is tested on NS2 SVK.
+
+Anup Patel (5):
+  mtd: brcmnand: Fix pointer type-cast in brcmnand_write()
+  mtd: nand: Allow MTD_NAND_BRCMNAND to be selected for ARM64
+  mtd: brcmnand: Optional DT flag to reset IPROC NAND controller
+  Documentation: dt-bindings: Add info about brcm,nand-iproc-reset DT
+    flag
+  arm64: dts: Add BRCM IPROC NAND DT node for NS2
+
+ .../devicetree/bindings/mtd/brcm,brcmnand.txt         |  4 ++++
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts              | 12 ++++++++++++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi                 | 15 +++++++++++++++
+ drivers/mtd/nand/Kconfig                              |  2 +-
+ drivers/mtd/nand/brcmnand/brcmnand.c                  |  4 ++--
+ drivers/mtd/nand/brcmnand/iproc_nand.c                | 19 +++++++++++++++++++
+ 6 files changed, 53 insertions(+), 3 deletions(-)
+
 -- 
 1.9.1
