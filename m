@@ -1,42 +1,38 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 2 Oct 2015 23:26:42 +0530
-Subject: [PATCH 1/5] mtd: brcmnand: Fix pointer type-cast in brcmnand_write()
+Date: Fri, 2 Oct 2015 23:26:43 +0530
+Subject: [PATCH 2/5] mtd: nand: Allow MTD_NAND_BRCMNAND to be selected for
+ ARM64
 In-Reply-To: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
 References: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1443808606-21203-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1443808606-21203-3-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should always type-cast pointer to "long" or "unsigned long"
-because size of pointer is same as machine word size. This will
-avoid pointer type-cast issues on both 32bit and 64bit systems.
-
-This patch fixes pointer type-cast issue in brcmnand_write()
-as-per above info.
+The BRCM NAND driver can be re-used for Broadcom ARM64 SoCs hence
+this patch updates Kconfig to allow selection of MTD_NAND_BRCMNAND
+for ARM64.
 
 Signed-off-by: Anup Patel <anup.patel@broadcom.com>
 Reviewed-by: Vikram Prakash <vikramp@broadcom.com>
 Reviewed-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Pramod KUMAR <pramodku@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- drivers/mtd/nand/brcmnand/brcmnand.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/mtd/nand/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
-index fddb795..4cba03d 100644
---- a/drivers/mtd/nand/brcmnand/brcmnand.c
-+++ b/drivers/mtd/nand/brcmnand/brcmnand.c
-@@ -1544,9 +1544,9 @@ static int brcmnand_write(struct mtd_info *mtd, struct nand_chip *chip,
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 3324281..a1b5819 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -393,7 +393,7 @@ config MTD_NAND_GPMI_NAND
  
- 	dev_dbg(ctrl->dev, "write %llx <- %p\n", (unsigned long long)addr, buf);
- 
--	if (unlikely((u32)buf & 0x03)) {
-+	if (unlikely((unsigned long)buf & 0x03)) {
- 		dev_warn(ctrl->dev, "unaligned buffer: %p\n", buf);
--		buf = (u32 *)((u32)buf & ~0x03);
-+		buf = (u32 *)((unsigned long)buf & ~0x03);
- 	}
- 
- 	brcmnand_wp(mtd, 0);
+ config MTD_NAND_BRCMNAND
+ 	tristate "Broadcom STB NAND controller"
+-	depends on ARM || MIPS
++	depends on ARM || ARM64 || MIPS
+ 	help
+ 	  Enables the Broadcom NAND controller driver. The controller was
+ 	  originally designed for Set-Top Box but is used on various BCM7xxx,
 -- 
 1.9.1
