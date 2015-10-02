@@ -1,55 +1,46 @@
-From: peda@lysator.liu.se (Peter Rosin)
-Date: Sat, 3 Oct 2015 01:05:21 +0200
-Subject: Regression: at24 eeprom writing
-Message-ID: <560F0DB1.2020101@lysator.liu.se>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 2 Oct 2015 18:23:22 -0500
+Subject: [REPOST PATCH 1/4] ARM: dts: DRA7: Add dsp1_system syscon node
+In-Reply-To: <1443828205-18706-1-git-send-email-s-anna@ti.com>
+References: <1443828205-18706-1-git-send-email-s-anna@ti.com>
+Message-ID: <1443828205-18706-2-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The DSP_SYSTEM sub-module is a dedicated system control logic
+module present within a DRA7 DSP processor sub-system. This
+module is responsible for power management, clock generation
+and connection to the device PRCM module.
 
-I recently upgraded from the atmel linux-3.18-at91 kernel to vanilla 4.2
-and everything seemed fine. Until I tried to write to the little eeprom
-chip. I then tried the linux-4.1-at91 kernel and that suffers too.
+Add a syscon node for this module for the DSP1 processor
+sub-system. This is added as a syscon node as it is a common
+configuration module that can be used by the different IOMMU
+instances and the corresponding remoteproc device.
 
-The symptoms are that it seems like writes get interrupted, and restarted
-again without properly initializing everything again. Inspecting the i2c
-bus during these fails gets me something like this (int hex) when I
+The node is added to the common dra7.dtsi file, as the DSP1
+processor sub-system is mostly common across all the variants
+of the DRA7 SoC family.
 
-echo abcdefghijklmnopqr > /sys/bus/i2c/devices/0-0050/eeprom
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ arch/arm/boot/dts/dra7.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-S a0 00 61 62 63 64 65 66 67 68 69 6a 6b 6c 6d 6e 6f 70 P
-S a0 10 (clk and data low for a "long" time) 10 71 72 0a P
-
-Notice how the address byte in the second chunk (10) is repeated after
-the strange event on the i2c bus.
-
-I looked around and found that if I revert a839ce663b3183209fdf7b1fc4796bfe2a4679c3
-"eeprom: at24: extend driver to allow writing via i2c_smbus_write_byte_data"
-eeprom writing starts working again.
-
-AFAICT, the i2c-at91 bus driver makes the eeprom driver use the
-i2c_transfer code path both with that patch and with it reverted,
-so I sadly don't see why the patch makes a difference.
-
-I'm on a board that is based on the sama5d31 evaluation kit, with a
-NXP SE97BTP,547 chip and this in the devicetree:
-
-			i2c0: i2c at f0014000 {
-				status = "okay";
-
-				jc42 at 18 {
-					compatible = "jc42";
-					reg = <0x18>;
-				};
-
-				eeprom at 50 {
-					compatible = "24c02";
-					reg = <0x50>;
-					pagesize = <16>;
-				};
-			};
-
-Any ideas?
-
-Cheers,
-Peter
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index e289c706d27d..62055094e8d5 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -292,6 +292,11 @@
+ 				#thermal-sensor-cells = <1>;
+ 		};
+ 
++		dsp1_system: dsp_system at 40d00000 {
++			compatible = "syscon";
++			reg = <0x40d00000 0x100>;
++		};
++
+ 		sdma: dma-controller at 4a056000 {
+ 			compatible = "ti,omap4430-sdma";
+ 			reg = <0x4a056000 0x1000>;
+-- 
+2.6.0
