@@ -1,56 +1,62 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 02 Oct 2015 16:08:02 +0200
-Subject: [PATCH] PM / AVS: rockchip-io: Fix module autoload for OF
- platform driver
-In-Reply-To: <20150918165258.GA27398@goodgumbo.baconseed.org>
-References: <20150918165258.GA27398@goodgumbo.baconseed.org>
-Message-ID: <1959860.KNdhvIZiRr@diego>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Fri, 2 Oct 2015 15:09:08 +0100
+Subject: [PATCH v5 12/22] xen/balloon: Don't rely on the page granularity
+ is the same for Xen and Linux
+In-Reply-To: <1443609937-25278-13-git-send-email-julien.grall@citrix.com>
+References: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
+ <1443609937-25278-13-git-send-email-julien.grall@citrix.com>
+Message-ID: <560E9004.8030604@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 18. September 2015, 18:52:58 schrieb Luis de Bethencourt:
-> This platform driver has a OF device ID table but the OF module
-> alias information is not created so module autoloading won't work.
+On 30/09/15 11:45, Julien Grall wrote:
+> For ARM64 guests, Linux is able to support either 64K or 4K page
+> granularity. Although, the hypercall interface is always based on 4K
+> page granularity.
 > 
-> Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
+> With 64K page granularity, a single page will be spread over multiple
+> Xen frame.
+> 
+> To avoid splitting the page into 4K frame, take advantage of the
+> extent_order field to directly allocate/free chunk of the Linux page
+> size.
+> 
+> Note that PVMMU is only used for PV guest (which is x86) and the page
+> granularity is always 4KB. Some BUILD_BUG_ON has been added to ensure
+> that because the code has not been modified.
 
-looks obviously correct.
+This causes a BUG() in x86 PV guests when decreasing the reservation.
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Xen says:
 
+(XEN) d0v2 Error pfn 0: rd=0 od=32753 caf=8000000000000001
+taf=7400000000000001
+(XEN) memory.c:250:d0v2 Bad page free for domain 0
 
-depending on how Kevin wants to handle that single patch, you might want to 
-resent it with Rafael Wysocki in the to-list though
+And Linux BUGs with:
 
+[   82.032654] kernel BUG at
+/anfs/drall/scratch/davidvr/x86/linux/drivers/xen/balloon.c:540!
 
-Heiko
+Which is a non-zero return value from the decrease_reservation hypercall.
 
-> ---
-> 
-> Hello,
-> 
-> This patch adds the missing MODULE_DEVICE_TABLE() for OF to export
-> that information so modules have the correct aliases built-in and
-> autoloading works correctly.
-> 
-> A longer explanation by Javier Canillas can be found here:
-> https://lkml.org/lkml/2015/7/30/519
-> 
-> Thanks,
-> Luis
-> 
->  drivers/power/avs/rockchip-io-domain.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/power/avs/rockchip-io-domain.c
-> b/drivers/power/avs/rockchip-io-domain.c index 2e30002..8099456 100644
-> --- a/drivers/power/avs/rockchip-io-domain.c
-> +++ b/drivers/power/avs/rockchip-io-domain.c
-> @@ -271,6 +271,7 @@ static const struct of_device_id
-> rockchip_iodomain_match[] = { },
->  	{ /* sentinel */ },
->  };
-> +MODULE_DEVICE_TABLE(of, rockchip_iodomain_match);
-> 
->  static int rockchip_iodomain_probe(struct platform_device *pdev)
->  {
+The frame_list[] has been incorrectly populated.  The below patch fixes
+it for me.  Please test as well.
+
+--- a/drivers/xen/balloon.c
++++ b/drivers/xen/balloon.c
+@@ -504,9 +504,10 @@ static enum bp_state decrease_reservation(unsigned
+long nr_pages, gfp_t gfp)
+ 	 * Setup the frame, update direct mapping, invalidate P2M,
+ 	 * and add to balloon.
+ 	 */
++	i = 0;
+ 	list_for_each_entry_safe(page, tmp, &pages, lru) {
+ 		/* XENMEM_decrease_reservation requires a GFN */
+-		frame_list[i] = xen_page_to_gfn(page);
++		frame_list[i++] = xen_page_to_gfn(page);
+
+ #ifdef CONFIG_XEN_HAVE_PVMMU
+ 		/*
+
+David
