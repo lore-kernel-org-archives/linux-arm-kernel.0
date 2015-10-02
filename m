@@ -1,64 +1,33 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Fri, 2 Oct 2015 11:24:34 -0700
-Subject: [GIT PULL] ARM64: APM X-Gene 1 and X-Gene 2 DTS updates for 4.4
-In-Reply-To: <CADaLNDmeBz69eoU4PO6cAf2cKCQwVCORcXMUf5xdODJVUfb+Hw@mail.gmail.com>
-References: <CADaLNDmeBz69eoU4PO6cAf2cKCQwVCORcXMUf5xdODJVUfb+Hw@mail.gmail.com>
-Message-ID: <CADaLND=5yV-GGiEfu+=KPmCyzVRb8-j6uYcLZsChuUbUJ+OzpA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 2 Oct 2015 11:28:11 -0700
+Subject: [GIT PULL] clock: ti: fixes for 4.3-rc
+In-Reply-To: <560E26EC.1030801@ti.com>
+References: <560E26EC.1030801@ti.com>
+Message-ID: <20151002182811.GP12338@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 4:38 PM, Duc Dang <dhdang@apm.com> wrote:
-> Hi Olof,
->
-> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
->
->   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
->
+On 10/02, Tero Kristo wrote:
+> Hi Stephen, Mike,
+> 
+> A few TI clock driver fixes to pull against 4.3-rc.
+> 
+> -Tero
+> 
+> ================
+> 
+> The following changes since commit 9ffecb10283508260936b96022d4ee43a7798b4c:
+> 
+>   Linux 4.3-rc3 (2015-09-27 07:50:08 -0400)
+> 
 > are available in the git repository at:
->
->   https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.4-1
->
-> for you to fetch changes up to 1d8d53b62d80dc3a6ae1483891e7d840cd7a51bd:
->
->   arm64: dts: Add poweroff device nodes for APM X-Gene 2 platform
-> (2015-09-16 12:04:25 -0700)
->
-> ----------------------------------------------------------------
-> X-Gene DTS changes queued for v4.4
->
-> ----------------------------------------------------------------
-> Duc Dang (4):
->       MAINTAINERS: Add Applied Micro (APM) X-Gene Device Tree maintainer
->       arm64: dts: Add X-Gene v2 reboot driver dts node
->       arm64: dts: Add APM X-Gene 2 standby GPIO controller DTS entries
->       arm64: dts: Add poweroff device nodes for APM X-Gene 2 platform
->
-> Feng Kan (5):
->       Documentation: arm64: add SCU dts binding documentation to linux kernel
->       arm64: dts: Add X-Gene reboot driver dts node
->       arm64: dts: add APM Merlin Board device tree
->       Documentation: arm: pmu: Add Potenza PMU binding
->       arm64: dts: Add PMU node for APM X-Gene Storm SOC
->
-> Tai Nguyen (1):
->       power: reset: Add syscon poweroff device node for APM X-Gene platform
->
->  Documentation/devicetree/bindings/arm/apm/scu.txt |  17 ++
->  Documentation/devicetree/bindings/arm/pmu.txt     |   1 +
->  MAINTAINERS                                       |   5 +
->  arch/arm64/boot/dts/apm/Makefile                  |   1 +
->  arch/arm64/boot/dts/apm/apm-merlin.dts            |  72 ++++++
->  arch/arm64/boot/dts/apm/apm-mustang.dts           |  12 +
->  arch/arm64/boot/dts/apm/apm-shadowcat.dtsi        | 271 ++++++++++++++++++++++
->  arch/arm64/boot/dts/apm/apm-storm.dtsi            |  17 ++
->  8 files changed, 396 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/apm/scu.txt
->  create mode 100644 arch/arm64/boot/dts/apm/apm-merlin.dts
->  create mode 100644 arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
-Hi Olof,
+> 
+>   https://github.com/t-kristo/linux-pm.git for-4.3-rc/ti-clk-fixes
+> 
 
-Please let me know if there is anything I need to change in this pull
-request? I rebased these changes over 4.3-rc1.
+Thanks, pulled. I guess we'll wait until Monday next week to send
+off to Linus so this can go through a couple -next cycles.
 
-Regards,
-Duc Dang.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
