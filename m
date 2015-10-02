@@ -1,95 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  2 Oct 2015 17:24:17 +0100
-Subject: [PATCH] ARM: Remove open-coded version of IRQCHIP_DECLARE
-Message-ID: <1443803057-9007-1-git-send-email-marc.zyngier@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 02 Oct 2015 17:23:59 +0100
+Subject: [PATCH v3] arm64: Introduce IRQ stack
+In-Reply-To: <1442923918-11289-1-git-send-email-jungseoklee85@gmail.com>
+References: <1442923918-11289-1-git-send-email-jungseoklee85@gmail.com>
+Message-ID: <560EAF9F.6090604@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the IRQCHIP_DECLARE macro has been moved to linux/irqchip.h,
-it becomes possible to cleanup the open-coded versions of the same
-macro that have been added to some private irqchips implementations.
+Hi,
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mach-exynos/suspend.c       | 3 ++-
- arch/arm/mach-imx/gpc.c              | 8 ++------
- arch/arm/mach-omap2/omap-wakeupgen.c | 8 ++------
- 3 files changed, 6 insertions(+), 13 deletions(-)
+On 22/09/15 13:11, Jungseok Lee wrote:
+> Currently, kernel context and interrupts are handled using a single
+> kernel stack navigated by sp_el1. This forces a system to use 16KB
+> stack, not 8KB one. This restriction makes low memory platforms suffer
+> from memory pressure accompanied by performance degradation.
+> 
+> This patch addresses the issue as introducing a separate percpu IRQ
+> stack to handle both hard and soft interrupts with two ground rules:
+> 
+>   - Utilize sp_el0 in EL1 context, which is not used currently
+>   - Do not complicate current_thread_info calculation
+> 
+> It is a core concept to directly retrieve struct thread_info from
+> sp_el0. This approach helps to prevent text section size from being
+> increased largely as removing masking operation using THREAD_SIZE
+> in tons of places.
 
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index e00eb39..dfb1fcf 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -19,6 +19,7 @@
- #include <linux/cpu_pm.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-+#include <linux/irqchip.h>
- #include <linux/irqdomain.h>
- #include <linux/of_address.h>
- #include <linux/err.h>
-@@ -262,7 +263,7 @@ static int __init exynos_pmu_irq_init(struct device_node *node,
- 	return 0;
- }
- 
--#define EXYNOS_PMU_IRQ(symbol, name)	OF_DECLARE_2(irqchip, symbol, name, exynos_pmu_irq_init)
-+#define EXYNOS_PMU_IRQ(symbol, name)	IRQCHIP_DECLARE(symbol, name, exynos_pmu_irq_init)
- 
- EXYNOS_PMU_IRQ(exynos3250_pmu_irq, "samsung,exynos3250-pmu");
- EXYNOS_PMU_IRQ(exynos4210_pmu_irq, "samsung,exynos4210-pmu");
-diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-index 8c4467f..f2783b0 100644
---- a/arch/arm/mach-imx/gpc.c
-+++ b/arch/arm/mach-imx/gpc.c
-@@ -14,6 +14,7 @@
- #include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-+#include <linux/irqchip.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-@@ -268,12 +269,7 @@ static int __init imx_gpc_init(struct device_node *node,
- 
- 	return 0;
- }
--
--/*
-- * We cannot use the IRQCHIP_DECLARE macro that lives in
-- * drivers/irqchip, so we're forced to roll our own. Not very nice.
-- */
--OF_DECLARE_2(irqchip, imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
-+IRQCHIP_DECLARE(imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
- 
- void __init imx_gpc_check_dt(void)
- {
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index e1d2e99..0f8c1d1 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -20,6 +20,7 @@
- #include <linux/init.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-+#include <linux/irqchip.h>
- #include <linux/irqdomain.h>
- #include <linux/of_address.h>
- #include <linux/platform_device.h>
-@@ -537,9 +538,4 @@ static int __init wakeupgen_init(struct device_node *node,
- 
- 	return 0;
- }
--
--/*
-- * We cannot use the IRQCHIP_DECLARE macro that lives in
-- * drivers/irqchip, so we're forced to roll our own. Not very nice.
-- */
--OF_DECLARE_2(irqchip, ti_wakeupgen, "ti,omap4-wugen-mpu", wakeupgen_init);
-+IRQCHIP_DECLARE(ti_wakeupgen, "ti,omap4-wugen-mpu", wakeupgen_init);
--- 
-2.1.4
+One observed change in behaviour:
+Any stack-unwinding now stops at el1_irq(), which is the bottom of the irq
+stack. This shows up with perf (using incantation [0]), and with any calls
+to dump_stack() (which actually stops the frame before el1_irq()).
+
+I don't know if this will break something, (perf still seems to work) - but
+it makes the panic() output less useful, as all the 'other' cpus print:
+
+> CPU3: stopping
+> CPU: 3 PID: 0 Comm: swapper/3 Not tainted 4.3.0-rc3+ #223
+> Hardware name: ARM Juno development board (r1) (DT)
+> Call trace:
+> [<ffff800000089878>] dump_backtrace+0x0/0x164
+> [<ffff8000000899f8>] show_stack+0x1c/0x28
+> [<ffff8000003134d0>] dump_stack+0x88/0xc8
+> [<ffff80000008edcc>] handle_IPI+0x258/0x268
+> [<ffff8000000824b8>] gic_handle_irq+0x88/0xa4
+> Exception stack(0xffff8009769e3fc0 to 0xffff8009769e40e0)
+> <...values from stack ...>
+> CPU4: stopping
+> CPU: 4 PID: 0 Comm: swapper/4 Not tainted 4.3.0-rc3+ #223
+> Hardware name: ARM Juno development board (r1) (DT)
+> Call trace:
+
+So we don't get to see what they were doing, as the IPI-irq and subsequent
+switch to the irq_stack hide the state.
+
+I was trying to fix this with the other version, (see the changes to
+kernel/stacktrace.c), but as Akashi Takahiro pointed out, I wasn't quite
+right...
+
+I will try to produce a fragment to tidy this up next week.
+
+
+Thanks,
+
+James
+
+[0] perf record -e mem:<address of __do_softirq()>:x -ag -- sleep 10;
+    perf report --call-graph --stdio
