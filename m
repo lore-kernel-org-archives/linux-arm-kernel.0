@@ -1,224 +1,104 @@
-From: wei@redhat.com (Wei Huang)
-Date: Fri, 2 Oct 2015 16:06:05 -0500
-Subject: [PATCH v3 1/7] acpi: Add early device probing infrastructure
-In-Reply-To: <1443451758-22717-2-git-send-email-marc.zyngier@arm.com>
-References: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
- <1443451758-22717-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <560EF1BD.1020004@redhat.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 2 Oct 2015 23:08:21 +0200
+Subject: [PATCH v3 8/8] arm/arm64: KVM: Support edge-triggered forwarded
+ interrupts
+In-Reply-To: <560EBC4B.3050706@arm.com>
+References: <1443538145-11990-1-git-send-email-christoffer.dall@linaro.org>
+ <1443538145-11990-9-git-send-email-christoffer.dall@linaro.org>
+ <560EBC4B.3050706@arm.com>
+Message-ID: <20151002210821.GG32011@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 09/28/2015 09:49 AM, Marc Zyngier wrote:
-> IRQ controllers and timers are the two types of device the kernel
-> requires before being able to use the device driver model.
+On Fri, Oct 02, 2015 at 06:18:03PM +0100, Andre Przywara wrote:
+> On 29/09/15 15:49, Christoffer Dall wrote:
+> > We mark edge-triggered interrupts with the HW bit set as queued to
+> > prevent the VGIC code from injecting LRs with both the Active and
+> > Pending bits set at the same time while also setting the HW bit,
+> > because the hardware does not support this.
+> > 
+> > However, this means that we must also clear the queued flag when we sync
+> > back a LR where the state on the physical distributor went from active
+> > to inactive because the guest deactivated the interrupt.  At this point
+> > we must also check if the interrupt is pending on the distributor, and
+> > tell the VGIC to queue it again if it is.
+> > 
+> > Since these actions on the sync path are extremely close to those for
+> > level-triggered interrupts, rename process_level_irq to
+> > process_queued_irq, allowing it to cater for both cases.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> ACPI so far lacks a proper probing infrastructure similar to the one
-> we have with DT, where we're able to declare IRQ chips and
-> clocksources inside the driver code, and let the core code pick it up
-> and call us back on a match. This leads to all kind of really ugly
-> hacks all over the arm64 code and even in the ACPI layer.
 > 
-> In order to allow some basic probing based on the ACPI tables,
-> introduce "struct acpi_probe_entry" which contains just enough
-> data and callbacks to match a table, an optional subtable, and
-> call a probe function. A driver can, at build time, register itself
-> and expect being called if the right entry exists in the ACPI
-> table.
+> > ---
+> >  virt/kvm/arm/vgic.c | 40 ++++++++++++++++++++++------------------
+> >  1 file changed, 22 insertions(+), 18 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> > index 53548f1..f3e76e5 100644
+> > --- a/virt/kvm/arm/vgic.c
+> > +++ b/virt/kvm/arm/vgic.c
+> > @@ -1322,13 +1322,10 @@ epilog:
+> >  	}
+> >  }
+> >  
+> > -static int process_level_irq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
+> > +static int process_queued_irq(struct kvm_vcpu *vcpu,
+> > +				   int lr, struct vgic_lr vlr)
+> >  {
+> > -	int level_pending = 0;
+> > -
+> > -	vlr.state = 0;
+> > -	vlr.hwirq = 0;
+> > -	vgic_set_lr(vcpu, lr, vlr);
+> > +	int pending = 0;
 > 
-> A acpi_probe_device_table() is provided, taking an identifier for
-> a set of acpi_prove_entries, and iterating over the registered
-> entries.
+> As I mentioned in my reply to 3/8 already: shouldn't this be "bool"?
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/acpi/scan.c               | 39 +++++++++++++++++++++++
->  include/asm-generic/vmlinux.lds.h | 10 ++++++
->  include/linux/acpi.h              | 66 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 115 insertions(+)
+> >  
+> >  	/*
+> >  	 * If the IRQ was EOIed (called from vgic_process_maintenance) or it
+> > @@ -1344,26 +1341,35 @@ static int process_level_irq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
+> >  	vgic_dist_irq_clear_soft_pend(vcpu, vlr.irq);
+> >  
+> >  	/*
+> > -	 * Tell the gic to start sampling the line of this interrupt again.
+> > +	 * Tell the gic to start sampling this interrupt again.
+> >  	 */
+> >  	vgic_irq_clear_queued(vcpu, vlr.irq);
+> >  
+> >  	/* Any additional pending interrupt? */
+> > -	if (vgic_dist_irq_get_level(vcpu, vlr.irq)) {
+> > -		vgic_cpu_irq_set(vcpu, vlr.irq);
+> > -		level_pending = 1;
+> > +	if (vgic_irq_is_edge(vcpu, vlr.irq)) {
+> > +		BUG_ON(!(vlr.state & LR_HW));
 > 
-> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-> index f834b8c..daf9fc8 100644
-> --- a/drivers/acpi/scan.c
-> +++ b/drivers/acpi/scan.c
-> @@ -1913,3 +1913,42 @@ int __init acpi_scan_init(void)
->  	mutex_unlock(&acpi_scan_lock);
->  	return result;
->  }
-> +
-> +static struct acpi_probe_entry *ape;
-> +static int acpi_probe_count;
-> +static DEFINE_SPINLOCK(acpi_probe_lock);
-> +
-> +static int __init acpi_match_madt(struct acpi_subtable_header *header,
-> +				  const unsigned long end)
-> +{
-> +	if (!ape->subtable_valid || ape->subtable_valid(header, ape))
-> +		if (!ape->probe_subtbl(header, end))
-> +			acpi_probe_count++;
-> +
-> +	return 0;
-> +}
-> +
-> +int __init __acpi_probe_device_table(struct acpi_probe_entry *ap_head, int nr)
-> +{
-> +	int count = 0;
-> +
-> +	if (acpi_disabled)
-> +		return 0;
-> +
-> +	spin_lock(&acpi_probe_lock);
-> +	for (ape = ap_head; nr; ape++, nr--) {
-> +		if (ACPI_COMPARE_NAME(ACPI_SIG_MADT, ape->id)) {
-> +			acpi_probe_count = 0;
-> +			acpi_table_parse_madt(ape->type, acpi_match_madt, 0);
-> +			count += acpi_probe_count;
-> +		} else {
-> +			int res;
-> +			res = acpi_table_parse(ape->id, ape->probe_table);
-> +			if (!res)
-> +				count++;
-> +		}
-> +	}
-> +	spin_unlock(&acpi_probe_lock);
-> +
-> +	return count;
-> +}
-> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-> index 1781e54..efd7ed1 100644
-> --- a/include/asm-generic/vmlinux.lds.h
-> +++ b/include/asm-generic/vmlinux.lds.h
-> @@ -181,6 +181,16 @@
->  #define CPUIDLE_METHOD_OF_TABLES() OF_TABLE(CONFIG_CPU_IDLE, cpuidle_method)
->  #define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
->  
-> +#ifdef CONFIG_ACPI
-> +#define ACPI_PROBE_TABLE(name)						\
-> +	. = ALIGN(8);							\
-> +	VMLINUX_SYMBOL(__##name##_acpi_probe_table) = .;		\
-> +	*(__##name##_acpi_probe_table)					\
-> +	VMLINUX_SYMBOL(__##name##_acpi_probe_table_end) = .;
-> +#else
-> +#define ACPI_PROBE_TABLE(name)
-> +#endif
-> +
->  #define KERNEL_DTB()							\
->  	STRUCT_ALIGN();							\
->  	VMLINUX_SYMBOL(__dtb_start) = .;				\
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index 84e7055..51a96a8 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -787,6 +787,61 @@ int acpi_dev_prop_read(struct acpi_device *adev, const char *propname,
->  
->  struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
->  					    struct fwnode_handle *subnode);
-> +
-> +struct acpi_probe_entry;
-> +typedef bool (*acpi_probe_entry_validate_subtbl)(struct acpi_subtable_header *,
-> +						 struct acpi_probe_entry *);
-> +
-> +#define ACPI_TABLE_ID_LEN	5
-> +
-> +/**
-> + * struct acpi_probe_entry - boot-time probing entry
-> + * @id:			ACPI table name
-> + * @type:		Optional subtable type to match
-> + *			(if @id contains subtables)
-> + * @subtable_valid:	Optional callback to check the validity of
-> + *			the subtable
-> + * @probe_table:	Callback to the driver being probed when table
-> + *			match is successful
-> + * @probe_subtbl:	Callback to the driver being probed when table and
-> + *			subtable match (and optional callback is successful)
-> + * @driver_data:	Sideband data provided back to the driver
-> + */
+> Is that really needed here?
 
-A suggestion: could you add more details to the description above? I couldn't figure how to use it without reading __acpi_probe_device_table(). Something like "if @id matches the one defined in __acpi_probe_device_table(), then probe_subtbl() will be invoked; otherwise probe_table() will be invoked" would be helpful for programmers use this struct. 
+Are BUG_ON statements every 'really needed' ?
 
-> +struct acpi_probe_entry {
-> +	__u8 id[ACPI_TABLE_ID_LEN];
-> +	__u8 type;
-> +	acpi_probe_entry_validate_subtbl subtable_valid;
-> +	union {
-> +		acpi_tbl_table_handler probe_table;
-> +		acpi_tbl_entry_handler probe_subtbl;
-> +	};
+> I don't see how this function would fail if
+> called on a non-mapped IRQ. Also the two current callers would always
+> fulfil this requirement:
+> - vgic_process_maintenance() already has a WARN_ON(vgic_irq_is_edge)
+> - vgic_sync_irq() returns early if it's not a mapped IRQ
 
-Could we avoid using union for probe_table & probe_subtbl? The benefit is that we don't need to do function casting below and compiler can automatically check the correctness.
+yes, that's why it's a BUG_ON, don't ever do this;)
 
-> +	kernel_ulong_t driver_data;
-> +};
-> +
-> +#define ACPI_DECLARE_PROBE_ENTRY(table, name, table_id, subtable, valid, data, fn)	\
-> +	static const struct acpi_probe_entry __acpi_probe_##name	\
-> +		__used __section(__##table##_acpi_probe_table)		\
-> +		 = {							\
-> +			.id = table_id,					\
-> +			.type = subtable,				\
-> +			.subtable_valid = valid,			\
-> +			.probe_table = (acpi_tbl_table_handler)fn,	\
-> +			.driver_data = data, 				\
-> +		   }
-> +
-
-Something like: 
-
-#define ACPI_DECLARE_PROBE_ENTRY(table, name, table_id, subtable, valid, data, fn, subfn)	\
-	static const struct acpi_probe_entry __acpi_probe_##name	\
-		__used __section(__##table##_acpi_probe_table)		\
-		 = {							\
-			.id = table_id,					\
-			.type = subtable,				\
-			.subtable_valid = valid,			\
-			.probe_table = fn,				\
-			.probe_subtbl = subfn,				\
-			.driver_data = data, 				\
-		   }
-
-Then in patch 3, you can define new entries as:
-
-IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
-		     gic_validate_dist, ACPI_MADT_GIC_VERSION_V2,
-		     NULL, gic_v2_acpi_init);
-IRQCHIP_ACPI_DECLARE(gic_v2_maybe, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
-		     gic_validate_dist, ACPI_MADT_GIC_VERSION_NONE,
-		     NULL, gic_v2_acpi_init);
-
-
-> +#define ACPI_PROBE_TABLE(name)		__##name##_acpi_probe_table
-> +#define ACPI_PROBE_TABLE_END(name)	__##name##_acpi_probe_table_end
-> +
-> +int __acpi_probe_device_table(struct acpi_probe_entry *start, int nr);
-> +
-> +#define acpi_probe_device_table(t)					\
-> +	({ 								\
-> +		extern struct acpi_probe_entry ACPI_PROBE_TABLE(t),	\
-> +			                       ACPI_PROBE_TABLE_END(t);	\
-> +		__acpi_probe_device_table(&ACPI_PROBE_TABLE(t),		\
-> +					  (&ACPI_PROBE_TABLE_END(t) -	\
-> +					   &ACPI_PROBE_TABLE(t)));	\
-> +	})
->  #else
->  static inline int acpi_dev_get_property(struct acpi_device *adev,
->  					const char *name, acpi_object_type type,
-> @@ -845,6 +900,17 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
->  {
->  	return NULL;
->  }
-> +
-> +#define ACPI_DECLARE_PROBE_ENTRY(table, name, table_id, subtable, validate, data, fn) \
-> +	static const void * __acpi_table_##name[]			\
-> +		__attribute__((unused))					\
-> +		 = { (void *) table_id,					\
-> +		     (void *) subtable,					\
-> +		     (void *) valid,					\
-> +		     (void *) fn,					\
-> +		     (void *) data }
-> +
-> +#define acpi_probe_device_table(t)	({ int __r = 0; __r;})
->  #endif
->  
->  #endif	/*_LINUX_ACPI_H*/
 > 
+> Removing this would also allow to pass "int irq" instead of "struct
+> vgic_lr vlr".
+> 
+> Just an idea, though and not a show-stopper.
+
+I don't see a problem with having it there and I put it there because I
+wanted to protect us (developers) against accidentally writing a patch
+that reuses this function for a non-forwarded edge-triggered interrupt,
+which is not supposed to ever happen.
+
+> 
+> Other than that it looks good to me.
+> 
+Thanks,
+-Christoffer
