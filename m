@@ -1,29 +1,58 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri,  2 Oct 2015 18:31:15 +0000
-Subject: [PATCH] ARM: bcm2835: add label for uart0
-Message-ID: <1443810675-25558-1-git-send-email-stefan.wahren@i2se.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Fri,  2 Oct 2015 11:43:58 -0700
+Subject: [PATCH v4 0/5] PCI: generic: Misc. bug fixes/enhancements
+Message-ID: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a label for uart0 to allow changing of uart0 pins.
+From: David Daney <david.daney@cavium.com>
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/boot/dts/bcm2835.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+While using the pci-host-generic driver to add PCI support for the
+Cavium ThunderX processors, several bugs were discovered.  This patch
+set fixes the bugs, a follow-on set will add the ThunderX support.
 
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 301c73f..2029394 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -92,7 +92,7 @@
- 			#interrupt-cells = <2>;
- 		};
- 
--		uart at 7e201000 {
-+		uart0: uart at 7e201000 {
- 			compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
- 			reg = <0x7e201000 0x1000>;
- 			interrupts = <2 25>;
+Changes from v3:
+
+  - Drop "PCI: generic: Claim device resources if PCI_PROBE_ONLY"
+
+  - Add some Acked-by:
+
+  - Add to explanation of "reg" property in host-generic-pci.txt.
+
+  - Add error message if "reg" property is too big.
+
+  - Use pointer to ops rather than make a copy.
+
+Changes from v2:
+
+  - Added " PCI: generic: Claim device resources if PCI_PROBE_ONLY"
+
+Changes from v1:
+
+  - "PCI: generic: Allow bus default MSI controller to be specified."
+    patch was dropped as it is no longer necessary.
+
+  - "PCI: Make global and export pdev_fixup_irq()." and "PCI: generic:
+    Only fixup irqs for bus we are creating." were rewritten to move
+    the support into a somewhat more generic form in setup-irq.c.
+
+  - Add some clarifying text to host-generic-pci.txt
+
+  - Add some Acked-by:
+
+
+David Daney (5):
+  PCI: Add pci_bus_fixup_irqs().
+  PCI: generic: Only fixup irqs for bus we are creating.
+  PCI: generic: Quit clobbering our pci_ops.
+  PCI: generic: Correct, and avoid overflow, in bus_max calculation.
+  PCI: generic: Pass proper starting bus number to pci_scan_root_bus().
+
+ .../devicetree/bindings/pci/host-generic-pci.txt   |  6 +++-
+ drivers/pci/host/pci-host-generic.c                | 42 +++++++++++++---------
+ drivers/pci/setup-irq.c                            | 30 ++++++++++++++++
+ include/linux/pci.h                                |  4 +++
+ 4 files changed, 65 insertions(+), 17 deletions(-)
+
 -- 
-1.7.9.5
+1.9.1
