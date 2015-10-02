@@ -1,139 +1,52 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Fri, 2 Oct 2015 08:44:03 +0200
-Subject: [PATCH v2 4/4] ASOC: sunxi: Add support for the spdif block
-In-Reply-To: <20151001201122.GM7104@lukather>
-References: <1443635458-8873-1-git-send-email-codekipper@gmail.com>
- <1443635458-8873-5-git-send-email-codekipper@gmail.com>
- <20151001201122.GM7104@lukather>
-Message-ID: <CAEKpxB=_coi06gaixgqpLm=AFbw2mPVLPim7HCk-T-Lnsgt6mw@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 02 Oct 2015 09:06:48 +0200
+Subject: [PATCH v2 3/8] mmc: core: Add mmc_regulator_set_vqmmc()
+In-Reply-To: <560DF150.3000906@samsung.com>
+References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
+ <CAPDyKFqrkYXsbBJ61yYo0G8za1szARvA=as-5nLTiwGH5pCrEQ@mail.gmail.com>
+ <560DF150.3000906@samsung.com>
+Message-ID: <3312969.jJ2hfB2JkV@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +config SND_SOC_SUNXI_DAI_SPDIF
->> +        tristate
->> +     depends on OF
->> +        select SND_SOC_GENERIC_DMAENGINE_PCM
->> +        select REGMAP_MMIO
->> +
->> +config SND_SOC_SUNXI_MACHINE_SPDIF
->> +        tristate "APB on-chip sun4i/sun5i/sun7i SPDIF"
->> +     depends on OF
->> +        select SND_SOC_SUNXI_DAI_SPDIF
->> +        help
->> +          Say Y if you want to add support for SoC S/PDIF audio as simple audio card.
->
-> You still haven't said why you can't use simple-card...
+Am Freitag, 2. Oktober 2015, 11:52:00 schrieb Jaehoon Chung:
+> On 10/02/2015 06:05 AM, Ulf Hansson wrote:
+> > On 1 October 2015 at 19:35, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >> On 10/01, Heiko St?bner wrote:
+> >>> Am Donnerstag, 1. Oktober 2015, 11:54:24 schrieb Ulf Hansson:
+> >>>> On 30 September 2015 at 16:55, Heiko St?bner <heiko@sntech.de> wrote:
+> >>>>> Am Mittwoch, 30. September 2015, 16:42:05 schrieb Ulf Hansson:
+> >>>>>> On 30 September 2015 at 16:07, Heiko Stuebner <heiko@sntech.de> 
+wrote:
+> >>>>> The clock changes of course only touch internals of the phase-clocks,
+> >>>>> so
+> >>>>> should have no problem going through another tree.
+> >>>> 
+> >>>> What happens if I take mmc and dt changes, wouldn't I need the clock
+> >>>> patches as well?
+> >>> 
+> >>> The API stays of course the same, only the degree to settings
+> >>> translation gets optimized, so I guess in the worst case you would get
+> >>> no good phase and thus fall back to non-highspeed modes - but the
+> >>> system would stay running.
+> >>> 
+> >>> But of course, if the clock maintainers could Ack the two clock patches
+> >>> and
+> >>> everything would stay together that would work even better :-)
+> >> 
+> >> If Ulf doesn't want to take them we can apply them to clk tree.
+> >> Otherwise, you can have my acked-by on the clk patches.
+> > 
+> > I don't mind picking up the clock patches. So I consider this as an
+> > ack for both patch 1 and patch2, thanks.
+> > 
+> > Now, let's give Jaehoon some time to review the dw_mmc parts.
+> 
+> I will check other patches on today, if it's ok, i will apply at my
+> repository. Thanks for giving time! :)
 
-I mentioned in the covering letter that I thought that simple-card was
-overkill. There is also a thread concerning issues with the ordering
-of module bringup here
-http://mailman.alsa-project.org/pipermail/alsa-devel/2013-December/070534.html.
-I was initially trying to use the dummy spdif transmitter but couldn't
-get it working, this set up works for me. I haven't got an audio guy
-sitting next to me to ping and have reached out for some guidance. I
-can do this using simple-card, it just with all the driver refactoring
-it was the main place where I thought things would break.
+I think Ulf wanted to apply the whole series via the mmc tree directly, but I 
+guess that is between you two to decide ;-)
 
->
->> +static void sun4i_spdif_configure(struct sun4i_spdif_dev *host)
->> +{
->> +     u32 reg_val;
->> +
->> +     /* soft reset SPDIF */
->> +     regmap_write(host->regmap, SUN4I_SPDIF_CTL, SUN4I_SPDIF_CTL_RESET);
->> +
->> +     /* MCLK OUTPUT enable */
->> +     regmap_update_bits(host->regmap, SUN4I_SPDIF_CTL,
->> +                     SUN4I_SPDIF_CTL_MCLKOUTEN, SUN4I_SPDIF_CTL_MCLKOUTEN);
->
-> The alignment is still not right....
 
-I'm not even sure if we need mclk output enabled. Let me see what
-happens when I remove this.
-
->
->> +     /* flush TX FIFO */
->> +     regmap_update_bits(host->regmap, SUN4I_SPDIF_FCTL,
->> +                     SUN4I_SPDIF_FCTL_FTX, SUN4I_SPDIF_FCTL_FTX);
->> +
->> +     /* clear interrupt status */
->> +     regmap_read(host->regmap, SUN4I_SPDIF_ISTA, &reg_val);
->> +     regmap_write(host->regmap, SUN4I_SPDIF_ISTA, reg_val);
->
-> You're not using any interrupts. Why is this needed?
-
-ditto. This wasn't brought up in the previous reviews.
-
->
->> +static int sun4i_spdif_startup(struct snd_pcm_substream *substream,
->> +                             struct snd_soc_dai *cpu_dai)
->> +{
->> +     struct snd_soc_pcm_runtime *rtd = substream->private_data;
->> +     struct sun4i_spdif_dev *host = snd_soc_dai_get_drvdata(rtd->cpu_dai);
->> +
->> +     if (substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
->> +             return -EINVAL;
->> +
->> +     sun4i_spdif_configure(host);
->> +
->> +     return clk_prepare_enable(host->clk);
->
-> You're still not using pm_runtime...
-
-I've removed the pm stuff and this is the same as you have it in sun4i-codec.
-
->
->> +
->> +     ret = clk_set_rate(host->audio_clk, mclk);
->> +     if (ret < 0) {
->> +             dev_err(&pdev->dev,
->> +                     "Setting pll2 clock rate for %d Hz failed!\n", mclk);
->> +             return ret;
->> +     }
->
-> You're still using the PLL2...
-
-I commented this out and it stopped working...let me check again.
-
->
->> +
->> +     ret = clk_set_rate(host->clk, mclk);
->> +     if (ret < 0) {
->> +             dev_err(&pdev->dev,
->> +                     "Setting SPDIF clock rate for %d Hz failed!\n", mclk);
->> +             return ret;
->> +     }
->> +
->> +     reg_val = 0;
->> +     reg_val &= ~SUN4I_SPDIF_FCTL_FIFOSRC;
->> +     reg_val |= SUN4I_SPDIF_FCTL_TXTL_MASK;
->> +     reg_val |= SUN4I_SPDIF_FCTL_RXTL_MASK;
->> +     reg_val |= SUN4I_SPDIF_FCTL_TXIM;
->> +     reg_val |= SUN4I_SPDIF_FCTL_RXOM_MASK;
->> +     regmap_write(host->regmap, SUN4I_SPDIF_FCTL, reg_val);
->
-> You're still not using regmap_update_bits...
-
-Why would I need to?, this is the first write to the register before
-playback and I'm not interested in keeping any of the previous fifo
-settings. Will remove"reg_val &= ~SUN4I_SPDIF_FCTL_FIFOSRC;" as that's
-not doing anything.
-
->
-> IF you're really going to ignore all the comments we did, please tell
-> us upfront. That way, we will not waste our time doing a review of
-> your patches.
-
-All is a strong word....did you even read my covering letter?....there
-was a major refactoring of the code and I think I covered a majority
-of the comments. Apologies if you feel that you'd wasted a lot of time
-of this....it can't be any more that the EVB dts.
-Thanks anyway,
-CK
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+Heiko
