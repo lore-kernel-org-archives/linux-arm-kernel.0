@@ -1,35 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Oct 2015 14:42:52 -0700
-Subject: [PATCH v8 5/7] pinctrl: freescale: imx: add shared input select
- reg support
-In-Reply-To: <1443629469-12294-5-git-send-email-aalonso@freescale.com>
-References: <1443629469-12294-1-git-send-email-aalonso@freescale.com>
- <1443629469-12294-5-git-send-email-aalonso@freescale.com>
-Message-ID: <CACRpkdaVww1nUYUJNC0ZDum3Pd_erdDN9gPfXHM_hm-UH5ozzA@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 3 Oct 2015 00:43:08 +0300
+Subject: [PATCH] ARM: shmobile: r8a7794: link PCI USB devices to USB PHY
+In-Reply-To: <20151002020021.GF22640@verge.net.au>
+References: <10927620.1TFu7PRvi4@wasted.cogentembedded.com>
+ <20150929003751.GB20067@verge.net.au> <560A8997.8090301@cogentembedded.com>
+ <20151002020021.GF22640@verge.net.au>
+Message-ID: <560EFA6C.4090404@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 9:11 AM, Adrian Alonso <aalonso@freescale.com> wrote:
+Hello.
 
-> - Add shared input select register support
-> - imx7d has two iomux controllers iomuxc and iomuxc-lpsr
->   which share select_input register for daisy chain settings
->
-> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
-> ---
-> Changes for V2: Resend
-> Changes for V3:
-> - Use of_parse_phandle instead of of_get_child_by_name to get input select
->   base register address
-> Changes for V4: Resend
-> Changes for V5:
-> - Remove SHARE_INPUT_SELECT_REG flag
-> - Use fsl,input-sel to check if shared input select register support is used
-> Changes for V6: Resend
-> Changes for V7: Resend
-> Changes for V8: Resend
+On 10/02/2015 05:00 AM, Simon Horman wrote:
 
-Also seem identical to what I applied for v6 so keeping that one.
+>>>> Describe the PCI USB devices that are behind the PCI bridges, adding necessary
+>>>> links to the USB PHY device.
+>>>>
+>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>>>
+>>>> ---
+>>>> This patch is against 'renesas-devel-20150911v2-v4.2' tag of Simon Horman's
+>>>> 'renesas.git' repo plus the R8A7794/SILK PCI USB and USB PHY support patches
+>>>> just posted.
+>>
+>>> Does this series have any dependencies (e.g. bindings) other
+>>
+>>     This patch, you mean?
+>>
+>>> than the aforementioned R8A7794/SILK PCI USB and USB PHY support patches?
 
-Yours,
-Linus Walleij
+> Thanks, I have queued this up for v4.4.
+
+    Thank you!
+
+> I think I have got everything now but please let me know if you have any
+> shmobile DT patches outstanding which are ready to be queued-up.
+
+    Yes, the R8A7794 HS-USB patch.
+
+MBR, Sergei
