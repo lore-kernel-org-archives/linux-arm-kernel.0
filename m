@@ -1,64 +1,51 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 2 Oct 2015 22:00:44 +0800
-Subject: [PATCH 2/2] arm64: dts: mt8173: add timer node
-In-Reply-To: <560D5227.8050600@arm.com>
-References: <1442369095-1094-1-git-send-email-yingjoe.chen@mediatek.com>
- <1442369095-1094-2-git-send-email-yingjoe.chen@mediatek.com>
- <55FAC570.8040307@arm.com> <1442501816.4784.3.camel@mtksdaap41>
- <55FAE69C.2000906@arm.com> <1443710016.22188.10.camel@mtksdaap41>
- <560D5227.8050600@arm.com>
-Message-ID: <1443794444.10908.9.camel@mtksdaap41>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 2 Oct 2015 22:01:34 +0800
+Subject: [arm-platforms:irq/msi-map-pci 12/13] drivers/pci/probe.c:1646:6:
+ error: implicit declaration of function 'pci_msi_get_device_domain'
+Message-ID: <201510022232.mLdqVPIt%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-10-01 at 16:32 +0100, Sudeep Holla wrote:
-> 
-> On 01/10/15 15:33, Yingjoe Chen wrote:
-> > On Thu, 2015-09-17 at 17:13 +0100, Sudeep Holla wrote:
-> >>
-> 
-> [...]
-> 
-> >>
-> >> I think your are confusing the system counter with arch timers. System
-> >> counter is always-on, but the arch timers(logic implementing timers
-> >> comparators) might not be off when the processor is powered down.
-> >>
-> >> I think you need this timer and are using it for low power idle states
-> >> in which case you will use this as a clock event and not clock source.
-> >> It will be used as a hardware broadcast event source.
-> >>
-> >> There's no call to sched_clock_register in mtk_timer.c, so it can't be
-> >> the sched clock, so you need to fix the commit log.
-> >
-> > Hi Sudeep,
-> >
-> > Sorry for late reply.
-> >
-> > For sched_clock_register, please see
-> > http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001547.html
-> > which was accepted in
-> > https://git.linaro.org/people/daniel.lezcano/linux.git/shortlog/refs/heads/clockevents/4.4
-> >
-> 
-> The commit message makes no sense to me. The counters should continue to
-> work as long as they are in always-on domain. Only timers are lost
-> when you enter deeper idle states. So I agree with using MTK timer as
-> broadcast timer/eventsource. You still didn't answer what's the need
-> to use MTK timer as sched clocksource ?
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/msi-map-pci
+head:   1ab5975873b783abe6d2f748f54ca5bef44b183f
+commit: 927ae5900fd916fe63de4cba2f1c6c3f61d10806 [12/13] PCI/MSI: Allow the MSI domain to be device-specific
+config: i386-randconfig-a0-201539 (attached as .config)
+reproduce:
+        git checkout 927ae5900fd916fe63de4cba2f1c6c3f61d10806
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
+All error/warnings (new ones prefixed by >>):
 
-Hi, Sudeep,
+   drivers/pci/probe.c: In function 'pci_dev_msi_domain':
+>> drivers/pci/probe.c:1646:6: error: implicit declaration of function 'pci_msi_get_device_domain' [-Werror=implicit-function-declaration]
+     d = pci_msi_get_device_domain(dev);
+         ^
+   drivers/pci/probe.c:1646:4: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+     d = pci_msi_get_device_domain(dev);
+       ^
+   cc1: some warnings being treated as errors
 
-ARM ARM said the counter should be in always-on domain, but
-unfortunately that not true for mt8173. The last CPU enter idle can
-choose to enter deep idle mode and the counter value would be lost. Our
-firmware backup/recover the counter so it looks like it is stopped.
-That's why I thought we need to use it as sched clocksource.
+vim +/pci_msi_get_device_domain +1646 drivers/pci/probe.c
 
-On mt8173, we will fix the firmware to add missing counts, so it will
-looks like the counter keep counting. But other mediatek platform have
-similar issue, and the 2 counter have same resolution, so I still want
-to keep using GPT as sched clocksource.
+  1640			return d;
+  1641	
+  1642		/*
+  1643		 * Let's see if we have a firmware interface able to provide
+  1644		 * the domain.
+  1645		 */
+> 1646		d = pci_msi_get_device_domain(dev);
+  1647		if (d)
+  1648			return d;
+  1649	
 
-Joe.C
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 20807 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151002/2d8ae80c/attachment-0001.obj>
