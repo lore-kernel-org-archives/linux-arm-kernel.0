@@ -1,48 +1,44 @@
-From: luisbg@osg.samsung.com (Luis de Bethencourt)
-Date: Fri,  2 Oct 2015 15:27:57 +0100
-Subject: [PATCH v2] PM / AVS: rockchip-io: Fix module autoload for OF platform
- driver
-Message-ID: <1443796077-24722-1-git-send-email-luisbg@osg.samsung.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 2 Oct 2015 22:28:09 +0800
+Subject: [PATCH] arm64: dts: add all hi6220 uart nodes
+In-Reply-To: <20151001102136.GC12635@sirena.org.uk>
+References: <1443558552-5734-1-git-send-email-tyler.baker@linaro.org>
+ <1459065.BtzC7pyUYF@wuerfel> <20150930173145.GG15635@sirena.org.uk>
+ <CANMBJr7yY1PJChnFSRknqfOLORuWZSEONV+e=M=9heX3i-ADKA@mail.gmail.com>
+ <20150930191818.GZ15635@sirena.org.uk>
+ <CANMBJr6aU4wPO5HqP-Oh-ND7_DZXSH30ykNHyvDtUp3nQFG6sA@mail.gmail.com>
+ <20151001031552.GC15675@leoy-linaro>
+ <20151001102136.GC12635@sirena.org.uk>
+Message-ID: <20151002142809.GA13483@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This platform driver has a OF device ID table but the OF module
-alias information is not created so module autoloading won't work.
+On Thu, Oct 01, 2015 at 11:21:36AM +0100, Mark Brown wrote:
+> On Thu, Oct 01, 2015 at 11:15:52AM +0800, Leo Yan wrote:
+> > On Wed, Sep 30, 2015 at 04:54:51PM -0700, Tyler Baker wrote:
+> > > On 30 September 2015 at 12:18, Mark Brown <broonie@kernel.org> wrote:
+> 
+> > > > My understanding is that it applies to both with slightly different
+> > > > driver sets, the slides aren't online yet (!) but if you look at 10:52
+> > > > or so in the video we should have SD/eMMC on HiKey in v4.1 with thermal
+> > > > and CPUfreq added in v4.2.  It also looks like there's just some DT
+> > > > additions needed to enable reset, cpuidle and CPU hotplug using generic
+> > > > code (mainly the constants for PSCI I expect).
+> 
+> > > I just skimmed the video and I see your point. I'll need to
+> > > investigate a bit but I'm up for sending some follow up patches to get
+> > > these drivers functioning. First lets get the UART working :)
+> 
+> > If you think it's necessary, i could send out patches to enable cpuidle
+> > firstly (actually now PSCI has been enabled yet); for cpufreq and
+> > thermal features, need wait until mailbox driver has been merged.
+> 
+> It seems sensible to get the DT bits for functionality that is already
+> supported on the driver side upstream, that way we get the maximum
+> functionality available as soon as possible and even if other bits get
+> problems in review users can take advantage of things that are OK.
 
-Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
----
-
-Hello,
-
-Sending a second version to add Rafael Wysocki in the to-list as
-suggested by Heiko St?bner.
-https://lkml.org/lkml/2015/10/2/431
-
-This patch adds the missing MODULE_DEVICE_TABLE() for OF to export
-that information so modules have the correct aliases built-in and
-autoloading works correctly.
-
-A longer explanation by Javier Canillas can be found here:
-https://lkml.org/lkml/2015/7/30/519
+Okay, i will prepare patches for enabling CPUIdle ASAP.
 
 Thanks,
-Luis
-
- drivers/power/avs/rockchip-io-domain.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
-index 2e30002..8099456 100644
---- a/drivers/power/avs/rockchip-io-domain.c
-+++ b/drivers/power/avs/rockchip-io-domain.c
-@@ -271,6 +271,7 @@ static const struct of_device_id rockchip_iodomain_match[] = {
- 	},
- 	{ /* sentinel */ },
- };
-+MODULE_DEVICE_TABLE(of, rockchip_iodomain_match);
- 
- static int rockchip_iodomain_probe(struct platform_device *pdev)
- {
--- 
-2.5.1
+Leo Yan
