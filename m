@@ -1,38 +1,38 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 2 Oct 2015 12:41:50 -0700
-Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
-In-Reply-To: <560ED1FB.9010000@free.fr>
-References: <560E53E3.7070207@free.fr> <560E8584.8000207@free.fr>
- <20151002180255.GK12338@codeaurora.org> <560ED1FB.9010000@free.fr>
-Message-ID: <20151002194150.GA6526@codeaurora.org>
+Date: Fri, 2 Oct 2015 12:45:28 -0700
+Subject: [PATCH v4 0/8] i.MX early debug UART clock fixes
+In-Reply-To: <1443108993.8476.10.camel@pengutronix.de>
+References: <1442854444-4460-1-git-send-email-l.stach@pengutronix.de>
+ <20150924152016.GV3529@tiger>
+ <1443108993.8476.10.camel@pengutronix.de>
+Message-ID: <20151002194528.GX12338@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02, Mason wrote:
-> On 02/10/2015 20:02, Stephen Boyd wrote:
-> > On 10/02, Mason wrote:
-> >>
-> >>
-> >> I cannot reproduce on v4.2 + my platform...
+On 09/24, Lucas Stach wrote:
+> Am Donnerstag, den 24.09.2015, 08:20 -0700 schrieb Shawn Guo:
+> > On Mon, Sep 21, 2015 at 06:53:56PM +0200, Lucas Stach wrote:
+> > > This series fixes a long standing interaction issue between the
+> > > kernels early debug facilities and the i.MX clock drivers.
 > > 
-> > The warning has been removed in commit 5028090d1da1 (ARM: 8434/1:
-> > Revert "7655/1: smp_twd: make twd_local_timer_of_register() no-op
-> > for nosmp", 2015-09-14) sitting in linux-next.
+> > This is fixing some issue but not regression.  As the change basically
+> > has influence on all i.MX platforms, my take is that we should get them
+> > into linux-next for extensive testing and queue for 4.4.  Agree?
+> > 
+> Absolutely, this fixes a bug which should mostly hit developers running
+> with earlyprintk or earlycon, so it's definitely not fixes material.
 > 
-> Does that mean it will automatically make it into v4.3?
+> Please queue it up for 4.4.
 
-No. It will most likely be in v4.4
+Patches look mostly ok to me, but this certainly feels like some
+generic problem that we should handle in the core. Perhaps it
+would make sense to move this over to using the handoff mechanism
+Mike is working on, where we keep the clock on until a consumer
+grabs a reference to the clock?
 
-> > So it seems that we can apply this patch and everyone is happy?
-> > We could also drop the "if SMP" part of most of the platform
-> > selects if anyone actually cares.
-> 
-> My port requires the TWD to function. So I'm using
-> select HAVE_ARM_TWD (no "if SMP") to have it work
-> even on MULTIPLATFORM UP configs.
-
-So you probably get some Kconfig warning about unmet
-dependencies.
+So I'm not opposed to merging this for 4.4, but I'd like to see
+it become a generic solution sometime soon, instead of staying as
+a one-off fix for imx platforms.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
