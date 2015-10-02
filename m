@@ -1,38 +1,52 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  2 Oct 2015 11:29:38 +0900
-Subject: [PATCH 2/2] ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain
- for sound
-In-Reply-To: <cover.1443752733.git.horms+renesas@verge.net.au>
-References: <cover.1443752733.git.horms+renesas@verge.net.au>
-Message-ID: <56e86dd4bbeb66a7ad67e20fa045c6f51b4da571.1443752733.git.horms+renesas@verge.net.au>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 02 Oct 2015 11:52:00 +0900
+Subject: [PATCH v2 3/8] mmc: core: Add mmc_regulator_set_vqmmc()
+In-Reply-To: <CAPDyKFqrkYXsbBJ61yYo0G8za1szARvA=as-5nLTiwGH5pCrEQ@mail.gmail.com>
+References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
+ <17200614.QxCe8zAb7I@diego>
+ <CAPDyKFpis8XnvrppHq7q_7DQeN2UiEpykNTJ=1iJJ9AGOHTW6Q@mail.gmail.com>
+ <2695161.Z1IhqPE0bd@diego> <20151001173554.GB19319@codeaurora.org>
+ <CAPDyKFqrkYXsbBJ61yYo0G8za1szARvA=as-5nLTiwGH5pCrEQ@mail.gmail.com>
+Message-ID: <560DF150.3000906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On 10/02/2015 06:05 AM, Ulf Hansson wrote:
+> On 1 October 2015 at 19:35, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> On 10/01, Heiko St?bner wrote:
+>>> Am Donnerstag, 1. Oktober 2015, 11:54:24 schrieb Ulf Hansson:
+>>>> On 30 September 2015 at 16:55, Heiko St?bner <heiko@sntech.de> wrote:
+>>>>> Am Mittwoch, 30. September 2015, 16:42:05 schrieb Ulf Hansson:
+>>>>>> On 30 September 2015 at 16:07, Heiko Stuebner <heiko@sntech.de> wrote:
+>>>>> The clock changes of course only touch internals of the phase-clocks, so
+>>>>> should have no problem going through another tree.
+>>>>
+>>>> What happens if I take mmc and dt changes, wouldn't I need the clock
+>>>> patches as well?
+>>>
+>>> The API stays of course the same, only the degree to settings translation gets
+>>> optimized, so I guess in the worst case you would get no good phase and thus
+>>> fall back to non-highspeed modes - but the system would stay running.
+>>>
+>>> But of course, if the clock maintainers could Ack the two clock patches and
+>>> everything would stay together that would work even better :-)
+>>>
+>>
+>> If Ulf doesn't want to take them we can apply them to clk tree.
+>> Otherwise, you can have my acked-by on the clk patches.
+> 
+> I don't mind picking up the clock patches. So I consider this as an
+> ack for both patch 1 and patch2, thanks.
+> 
+> Now, let's give Jaehoon some time to review the dw_mmc parts.
 
-797a0626e08c ("ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain")
-added CPG/MSTP clock-cells domain support, but it was missing sound
-support. This patch adds it.
+I will check other patches on today, if it's ok, i will apply at my repository.
+Thanks for giving time! :)
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-[horms: updated commit id referred to in changelog]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+Best Regards,
+Jaehoon Chung
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 831525dd39a6..1666c8a6b143 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1677,6 +1677,7 @@
- 				"mix.0", "mix.1",
- 				"dvc.0", "dvc.1",
- 				"clk_a", "clk_b", "clk_c", "clk_i";
-+		power-domains = <&cpg_clocks>;
- 
- 		status = "disabled";
- 
--- 
-2.1.4
+> 
+> Kind regards
+> Uffe
+> 
