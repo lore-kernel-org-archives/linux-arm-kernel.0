@@ -1,50 +1,52 @@
-From: yvo@apm.com (Y Vo)
-Date: Fri, 2 Oct 2015 21:03:47 +0700
-Subject: [PATCH 1/2] gpio: xgene: add support to configure GPIO line as
- input, output or external IRQ pin
-In-Reply-To: <CACRpkdbos6r_S06r9gR9Mn7qu-ri61UJcQM332JK6S4gFwSN-A@mail.gmail.com>
-References: <1441963332-13329-1-git-send-email-yvo@apm.com>
- <1441963332-13329-2-git-send-email-yvo@apm.com>
- <CACRpkdbos6r_S06r9gR9Mn7qu-ri61UJcQM332JK6S4gFwSN-A@mail.gmail.com>
-Message-ID: <CAL4ahLfYO5nGvUbi6L5SUfhrj6o-O4-uvhFdrppojvH8Hwumjg@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 2 Oct 2015 22:05:13 +0800
+Subject: [arm-platforms:irq/msi-map-pci 11/13] include/linux/of_irq.h:80:1:
+ error: expected identifier or '(' before '{' token
+Message-ID: <201510022211.cUzT45bT%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 2, 2015 at 4:51 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Sep 11, 2015 at 2:22 AM, Y Vo <yvo@apm.com> wrote:
->
->> Add support to configure GPIO line as input, output or external IRQ pin.
->>
->> Signed-off-by: Y Vo <yvo@apm.com>
->
-> Mostly OK but...
->
->>  #define XGENE_MAX_GPIO_DS              22
->>  #define XGENE_MAX_GPIO_DS_IRQ          6
->> +#define XGENE_GPIO8_HWIRQ              0x48
->> +#define XGENE_GPIO8_IDX                        8
-> (...)
->> +static int xgene_irq_to_line(u32 irq)
->> +{
->> +       u32 offset = irq_get_irq_data(irq)->hwirq - XGENE_GPIO8_HWIRQ;
->> +
->> +       return (offset < XGENE_MAX_GPIO_DS_IRQ) ?
->> +                       (offset + XGENE_GPIO8_IDX) : -EINVAL;
->> +}
->
-> What is this hardcoded IRQ 0x48 business?
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/msi-map-pci
+head:   1ab5975873b783abe6d2f748f54ca5bef44b183f
+commit: 5af05cd5fe6352aa1838099ccdce2c597092524c [11/13] of/irq: Use the msi-map property to provide device-specific MSI domain
+config: i386-randconfig-s1-201539 (attached as .config)
+reproduce:
+        git checkout 5af05cd5fe6352aa1838099ccdce2c597092524c
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-This is hardware irq number ~ GPIO_DS8. So we use it to get the gpio
-number from hwirq. But we are preparing another version which is
-better to configure the GPIO lines as interrupt or direction(in/out).
+All error/warnings (new ones prefixed by >>):
 
->
-> This patch needs kerneldoc for this xgene_irq_to_line() to explain
-> what exactly is going on, or noone will understand it enough to
-> debug or refactor the code.
->
-> I hope this 0x48 is not some way of compensating for Linux internal
-> IRQ offsets, that is what irqdomain is for.
->
-> Yours,
-> Linus Walleij
+   In file included from drivers/base/platform.c:16:0:
+>> include/linux/of_irq.h:80:1: error: expected identifier or '(' before '{' token
+    {
+    ^
+>> include/linux/of_irq.h:78:34: warning: 'of_msi_map_get_device_domain' declared 'static' but never defined [-Wunused-function]
+    static inline struct irq_domain *of_msi_map_get_device_domain(struct device *dev,
+                                     ^
+
+vim +80 include/linux/of_irq.h
+
+    72	static inline struct irq_domain *of_msi_get_domain(struct device *dev,
+    73							   struct device_node *np,
+    74							   enum irq_domain_bus_token token)
+    75	{
+    76		return NULL;
+    77	}
+  > 78	static inline struct irq_domain *of_msi_map_get_device_domain(struct device *dev,
+    79								      u32 rid);
+  > 80	{
+    81		return NULL;
+    82	}
+    83	#endif
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 20836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151002/157a0825/attachment-0001.obj>
