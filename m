@@ -1,65 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 02 Oct 2015 16:19:53 +0100
-Subject: [PATCH v4 4/4] irqchip/gic-v3-its: Add handling of PCI requester
- id.
-In-Reply-To: <1443747025-9918-5-git-send-email-ddaney.cavm@gmail.com>
-References: <1443747025-9918-1-git-send-email-ddaney.cavm@gmail.com>
- <1443747025-9918-5-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <560EA099.2060907@arm.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 2 Oct 2015 23:19:37 +0800
+Subject: [PATCH v5 1/5] ARM: mediatek: enable gpt6 on boot up to make arch
+ timer working
+In-Reply-To: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1443799181-50409-2-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/15 01:50, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> Replace open coded generation PCI/MSI requester id with call to the
-> new function pci_msi_domain_get_msi_rid() which applies the "msi-map"
-> to the id value.
-> 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its-pci-msi.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> index cf351c6..7bbf64a 100644
-> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> @@ -42,7 +42,6 @@ static struct irq_chip its_msi_irq_chip = {
->  
->  struct its_pci_alias {
->  	struct pci_dev	*pdev;
-> -	u32		dev_id;
->  	u32		count;
->  };
->  
-> @@ -60,7 +59,6 @@ static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
->  {
->  	struct its_pci_alias *dev_alias = data;
->  
-> -	dev_alias->dev_id = alias;
->  	if (pdev != dev_alias->pdev)
->  		dev_alias->count += its_pci_msi_vec_count(dev_alias->pdev);
+From: Matthias Brugger <matthias.bgg@gmail.com>
 
-Damn it. You've just shown me a bug. Unrelated to what you're doing, but
-still. I'll post a patch shortly.
+We enable GTP6 which ungates the arch timer clock.
+In the future this should be done in the bootloader.
 
->  
-> @@ -86,7 +84,7 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
->  	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
->  
->  	/* ITS specific DeviceID, as the core ITS ignores dev. */
-> -	info->scratchpad[0].ul = dev_alias.dev_id;
-> +	info->scratchpad[0].ul = pci_msi_domain_get_msi_rid(domain, pdev);
->  
->  	return msi_info->ops->msi_prepare(domain->parent,
->  					  dev, dev_alias.count, info);
-> 
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+---
+ arch/arm/mach-mediatek/mediatek.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-Looks good to me.
-
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
+diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+index a954900..19dc738 100644
+--- a/arch/arm/mach-mediatek/mediatek.c
++++ b/arch/arm/mach-mediatek/mediatek.c
+@@ -16,6 +16,32 @@
+  */
+ #include <linux/init.h>
+ #include <asm/mach/arch.h>
++#include <linux/of.h>
++#include <linux/clk-provider.h>
++#include <linux/clocksource.h>
++
++
++#define GPT6_CON_MT65xx 0x10008060
++#define GPT_ENABLE      0x31
++
++static void __init mediatek_timer_init(void)
++{
++	void __iomem *gpt_base;
++
++	if (of_machine_is_compatible("mediatek,mt6589") ||
++	    of_machine_is_compatible("mediatek,mt8135") ||
++	    of_machine_is_compatible("mediatek,mt8127")) {
++		/* turn on GPT6 which ungates arch timer clocks */
++		gpt_base = ioremap(GPT6_CON_MT65xx, 0x04);
++
++		/* enable clock and set to free-run */
++		writel(GPT_ENABLE, gpt_base);
++		iounmap(gpt_base);
++	}
++
++	of_clk_init(NULL);
++	clocksource_of_init();
++};
+ 
+ static const char * const mediatek_board_dt_compat[] = {
+ 	"mediatek,mt6589",
+@@ -27,4 +53,5 @@ static const char * const mediatek_board_dt_compat[] = {
+ 
+ DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
+ 	.dt_compat	= mediatek_board_dt_compat,
++	.init_time	= mediatek_timer_init,
+ MACHINE_END
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
