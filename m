@@ -1,35 +1,266 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 02 Oct 2015 07:40:39 +0300
-Subject: [RFC PATCH 01/20] coresight: etm3x: splitting 'etm_enable_hw()'
- operations
-In-Reply-To: <CANLsYkyOvHT1caPMNP0J90c1h9PAUsod7C8+kJg83taw4Ls6HQ@mail.gmail.com>
-References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
- <1442593594-10665-2-git-send-email-mathieu.poirier@linaro.org>
- <87r3lgjkjw.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYkyOvHT1caPMNP0J90c1h9PAUsod7C8+kJg83taw4Ls6HQ@mail.gmail.com>
-Message-ID: <87y4fl3mt4.fsf@ashishki-desk.ger.corp.intel.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri,  2 Oct 2015 13:42:21 +0900
+Subject: [PATCH v5 3/3] ARM: dts: uniphier: add outer cache controller nodes
+In-Reply-To: <1443760941-24307-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1443760941-24307-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1443760941-24307-4-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+Add L2 cache controller nodes for all the UniPhier SoC DTSI.
+Also, add an L3 cache controller node for PH1-Pro5 DTSI.
 
-> On 30 September 2015 at 03:58, Alexander Shishkin
-> <alexander.shishkin@linux.intel.com> wrote:
->> Most of these things can also be bypassed, as at least initially perf
->> events won't be using trigger/sequencer configurations, so we could
->> simply clear all these things out when a first perf event is created
->> (which would also disallow any sysfs poking around the etm/etb) and not
->> worry about them in the pmu callbacks.
->
-> I don't want to restrain configuration options to what is available
-> through Perf's cmd line.  The sysFS interface is there to complement
-> what is currently not available.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-In practice this means that part of your trace configuration will be
-global and part -- per event, which can indeed work if you only have one
-event at a time, but again, makes using perf infrastructure redundant
-for this driver. For multiple events this doesn't make much sense.
+ arch/arm/boot/dts/uniphier-ph1-ld4.dtsi     | 13 +++++++++++++
+ arch/arm/boot/dts/uniphier-ph1-pro4.dtsi    | 14 ++++++++++++++
+ arch/arm/boot/dts/uniphier-ph1-pro5.dtsi    | 27 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/uniphier-ph1-sld3.dtsi    | 14 ++++++++++++++
+ arch/arm/boot/dts/uniphier-ph1-sld8.dtsi    | 13 +++++++++++++
+ arch/arm/boot/dts/uniphier-proxstream2.dtsi | 16 ++++++++++++++++
+ 6 files changed, 97 insertions(+)
 
-Regards,
---
-Alex
+diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
+index a6a185f..ae13469 100644
+--- a/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
++++ b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
+@@ -55,6 +55,7 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0>;
++			next-level-cache = <&l2>;
+ 		};
+ 	};
+ 
+@@ -91,6 +92,18 @@
+ 			#size-cells = <1>;
+ 		};
+ 
++		l2: l2-cache at 500c0000 {
++			compatible = "socionext,uniphier-system-cache";
++			reg = <0x500c0000 0x2000>, <0x503c0100 0x4>,
++			      <0x506c0000 0x400>;
++			interrupts = <0 174 4>, <0 175 4>;
++			cache-unified;
++			cache-size = <(512 * 1024)>;
++			cache-sets = <256>;
++			cache-line-size = <128>;
++			cache-level = <2>;
++		};
++
+ 		serial0: serial at 54006800 {
+ 			compatible = "socionext,uniphier-uart";
+ 			status = "disabled";
+diff --git a/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi b/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
+index e8bbc45..85377b2 100644
+--- a/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
++++ b/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
+@@ -56,12 +56,14 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0>;
++			next-level-cache = <&l2>;
+ 		};
+ 
+ 		cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <1>;
++			next-level-cache = <&l2>;
+ 		};
+ 	};
+ 
+@@ -98,6 +100,18 @@
+ 			#size-cells = <1>;
+ 		};
+ 
++		l2: l2-cache at 500c0000 {
++			compatible = "socionext,uniphier-system-cache";
++			reg = <0x500c0000 0x2000>, <0x503c0100 0x4>,
++			      <0x506c0000 0x400>;
++			interrupts = <0 174 4>, <0 175 4>;
++			cache-unified;
++			cache-size = <(768 * 1024)>;
++			cache-sets = <256>;
++			cache-line-size = <128>;
++			cache-level = <2>;
++		};
++
+ 		serial0: serial at 54006800 {
+ 			compatible = "socionext,uniphier-uart";
+ 			status = "disabled";
+diff --git a/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi b/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi
+index 59c2b12..96da01e 100644
+--- a/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi
++++ b/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi
+@@ -56,12 +56,14 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0>;
++			next-level-cache = <&l2>;
+ 		};
+ 
+ 		cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <1>;
++			next-level-cache = <&l2>;
+ 		};
+ 	};
+ 
+@@ -98,6 +100,31 @@
+ 			#size-cells = <1>;
+ 		};
+ 
++		l2: l2-cache at 500c0000 {
++			compatible = "socionext,uniphier-system-cache";
++			reg = <0x500c0000 0x2000>, <0x503c0100 0x8>,
++			      <0x506c0000 0x400>;
++			interrupts = <0 190 4>, <0 191 4>;
++			cache-unified;
++			cache-size = <(2 * 1024 * 1024)>;
++			cache-sets = <512>;
++			cache-line-size = <128>;
++			cache-level = <2>;
++			next-level-cache = <&l3>;
++		};
++
++		l3: l3-cache at 500c8000 {
++			compatible = "socionext,uniphier-system-cache";
++			reg = <0x500c8000 0x2000>, <0x503c8100 0x8>,
++			      <0x506c8000 0x400>;
++			interrupts = <0 174 4>, <0 175 4>;
++			cache-unified;
++			cache-size = <(2 * 1024 * 1024)>;
++			cache-sets = <512>;
++			cache-line-size = <256>;
++			cache-level = <3>;
++		};
++
+ 		serial0: serial at 54006800 {
+ 			compatible = "socionext,uniphier-uart";
+ 			status = "disabled";
+diff --git a/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi b/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
+index 3cc90cd..945b37f 100644
+--- a/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
++++ b/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
+@@ -56,12 +56,14 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0>;
++			next-level-cache = <&l2>;
+ 		};
+ 
+ 		cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <1>;
++			next-level-cache = <&l2>;
+ 		};
+ 	};
+ 
+@@ -120,6 +122,18 @@
+ 			      <0x20000100 0x100>;
+ 		};
+ 
++		l2: l2-cache at 500c0000 {
++			compatible = "socionext,uniphier-system-cache";
++			reg = <0x500c0000 0x2000>, <0x503c0100 0x4>,
++			      <0x506c0000 0x400>;
++			interrupts = <0 174 4>, <0 175 4>;
++			cache-unified;
++			cache-size = <(512 * 1024)>;
++			cache-sets = <256>;
++			cache-line-size = <128>;
++			cache-level = <2>;
++		};
++
+ 		serial0: serial at 54006800 {
+ 			compatible = "socionext,uniphier-uart";
+ 			status = "disabled";
+diff --git a/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi b/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
+index 58067df..c98428c 100644
+--- a/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
++++ b/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
+@@ -55,6 +55,7 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0>;
++			next-level-cache = <&l2>;
+ 		};
+ 	};
+ 
+@@ -91,6 +92,18 @@
+ 			#size-cells = <1>;
+ 		};
+ 
++		l2: l2-cache at 500c0000 {
++			compatible = "socionext,uniphier-system-cache";
++			reg = <0x500c0000 0x2000>, <0x503c0100 0x4>,
++			      <0x506c0000 0x400>;
++			interrupts = <0 174 4>, <0 175 4>;
++			cache-unified;
++			cache-size = <(256 * 1024)>;
++			cache-sets = <256>;
++			cache-line-size = <128>;
++			cache-level = <2>;
++		};
++
+ 		serial0: serial at 54006800 {
+ 			compatible = "socionext,uniphier-uart";
+ 			status = "disabled";
+diff --git a/arch/arm/boot/dts/uniphier-proxstream2.dtsi b/arch/arm/boot/dts/uniphier-proxstream2.dtsi
+index 4c7b246..ad5fb39 100644
+--- a/arch/arm/boot/dts/uniphier-proxstream2.dtsi
++++ b/arch/arm/boot/dts/uniphier-proxstream2.dtsi
+@@ -56,24 +56,28 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0>;
++			next-level-cache = <&l2>;
+ 		};
+ 
+ 		cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <1>;
++			next-level-cache = <&l2>;
+ 		};
+ 
+ 		cpu at 2 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <2>;
++			next-level-cache = <&l2>;
+ 		};
+ 
+ 		cpu at 3 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <3>;
++			next-level-cache = <&l2>;
+ 		};
+ 	};
+ 
+@@ -110,6 +114,18 @@
+ 			#size-cells = <1>;
+ 		};
+ 
++		l2: l2-cache at 500c0000 {
++			compatible = "socionext,uniphier-system-cache";
++			reg = <0x500c0000 0x2000>, <0x503c0100 0x4>,
++			      <0x506c0000 0x400>;
++			interrupts = <0 174 4>, <0 175 4>, <0 190 4>, <0 191 4>;
++			cache-unified;
++			cache-size = <(1280 * 1024)>;
++			cache-sets = <512>;
++			cache-line-size = <128>;
++			cache-level = <2>;
++		};
++
+ 		serial0: serial at 54006800 {
+ 			compatible = "socionext,uniphier-uart";
+ 			status = "disabled";
+-- 
+1.9.1
