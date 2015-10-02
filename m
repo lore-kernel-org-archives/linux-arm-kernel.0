@@ -1,34 +1,46 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Fri, 02 Oct 2015 13:39:26 +0300
-Subject: [PATCH v2 01/15] KVM: arm/arm64: VGIC: don't track used LRs in the
- distributor
-In-Reply-To: <560E5D2F.1000401@arm.com>
-References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
- <1436538111-4294-2-git-send-email-andre.przywara@arm.com>
- <00cb01d0fcf8$6a906000$3fb12000$@samsung.com> <560E5D2F.1000401@arm.com>
-Message-ID: <00d701d0fcfe$9cba1d40$d62e57c0$@samsung.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 2 Oct 2015 11:52:17 +0100
+Subject: [PATCH 1/2] ARM: cpuidle: make cpuidle_ops interfaces ARM64
+ compliant
+In-Reply-To: <560E5076.7020906@linaro.org>
+References: <1443689933-28882-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1443689933-28882-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <560E5076.7020906@linaro.org>
+Message-ID: <20151002105217.GA1533@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+On Fri, Oct 02, 2015 at 10:37:58AM +0100, Daniel Lezcano wrote:
 
-> For instance how did you come up with that 16384? LPIs could actually be
-> much bigger (in fact the emulation currently support up to 64k).
+[...]
 
- Well, read "at least 16384". I actually don't remember the exact value you've put in.
-
-> >  Since the map itself is actually used only for piggy-back optimization, it is possible to
-> easily
-> > get rid of it using for_each_set_bit(lr, vgic_cpu->lr_used, vgic->nr_lr) iteration instead.
+> > diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
+> > index 0f84249..ee36dd4 100644
+> > --- a/arch/arm/include/asm/cpuidle.h
+> > +++ b/arch/arm/include/asm/cpuidle.h
+> > @@ -30,8 +30,8 @@ static inline int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+> >   struct device_node;
+> >
+> >   struct cpuidle_ops {
+> > -	int (*suspend)(int cpu, unsigned long arg);
+> > -	int (*init)(struct device_node *, int cpu);
 > 
-> Can't you use the ELRSR bitmap instead? The idea of lr_used sounds like
-> a moot optimization to me.
+> I don't know the reason why the 'cpu_psci_cpu_init_idle' signature was 
+> changed. It has before the same signature as this ops.
 
- I'll take a look. You seem to be right, lr_used became a direct (well, inverted) copy of elrsr
-after full elrsr synchronization was introduced long time ago. It's just current code relying on
-lr_used everywhere.
+Short answer, ACPI (ie device_node is useless on ACPI systems, so
+there is no point in passing it).
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+> As in ARM, we can have more than one driver using the cpuidle_ops 
+> infrastructure, removing the struct device_node * parameter will force 
+> to add a call to of_get_cpu_node(cpu, NULL) in each driver with a call 
+> to of_node_put (btw it is missing below in qcom_cpuidle_init), the 
+> rollback labels and this will lead to duplicated code.
+> 
+> So why not change ARM64 signature instead ?
+
+See above, I will see what I can do and I understand your concern,
+it makes sense.
+
+Thanks,
+Lorenzo
