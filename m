@@ -1,50 +1,47 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 02 Oct 2015 07:53:09 +0300
-Subject: [RFC PATCH 00/20] Coresight integration with perf
-In-Reply-To: <CANLsYkxitWS0hUXL_=T-V8qSXKvtyUc8F7NknDu16Xy0nN_o0A@mail.gmail.com>
-References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
- <87zj04jnlw.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYkxitWS0hUXL_=T-V8qSXKvtyUc8F7NknDu16Xy0nN_o0A@mail.gmail.com>
-Message-ID: <87pp0x3m8a.fsf@ashishki-desk.ger.corp.intel.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 2 Oct 2015 10:41:16 +0530
+Subject: [PATCH v3 2/5] mailbox: Add support for ST's Mailbox IP
+In-Reply-To: <1439994175-13360-3-git-send-email-lee.jones@linaro.org>
+References: <1439994175-13360-1-git-send-email-lee.jones@linaro.org>
+ <1439994175-13360-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <CABb+yY2wJKBvL3eceVxkq3ZdS6V+-yqQp98YCaS_oR+3CobQ0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+On Wed, Aug 19, 2015 at 7:52 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> On 30 September 2015 at 02:52, Alexander Shishkin
-> <alexander.shishkin@linux.intel.com> wrote:
->> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
->>
->>> This patchset aims to integrate configuration and control of
->>> the Coresight tracers with the perf sub-system.
->>>
->>> The goal is to use PMUs to represent tracers and the auxiliary
->>> buffer enhancement to collect processor traces.  As such a lot
->>> of work is done to move the current Coresight sysFS oriented
->>> configuration and control commands to perf's AUX API.
->>>
->>> For the time being the work concentrates on ETMv3 and ETB1.0
->>> sink buffers.  Work on ETMv4 and other type of sink buffers
->>> will follow once a foundation has been established.
->>>
->>> Enhancement to the perf command line tool can be found here [1].
->>> It is based on v4.2 but a rebase to v4.3-rcX will be available
->>> shortly.
->>>
->>> Best regards,
->>> Mathieu
->>>
->>> [1]. https://git.linaro.org/people/mathieu.poirier/coresight.git/shortlog/refs/heads/perf-v4.2
->>
->> I had a peek there -- didn't see an actual decoder for the ETM/PTM
->> binary stream or did I miss it somehow?
+....
+
+> +
+> +#define MBOX_BASE(mdev, inst)   ((mdev)->base + (inst * 4))
 >
-> A stream decoder is not included in this patch set but a couple of
-> people are currently working on it.
+It should be    (inst) * 4
 
-Ok, thanks. Can you provide instructions in the next version on how one
-can use this code to get a trace and decode it?
+> +/**
+> + * STi Mailbox device data
+> + *
+> + * An IP Mailbox is currently composed of 4 instances
+> + * Each instance is currently composed of 32 channels
+> + * This means that we have 128 channels per Mailbox
+> + * A channel an be used for TX or RX
+> + *
+> + * @dev:       Device to which it is attached
+> + * @mbox:      Representation of a communication channel controller
+> + * @base:      Base address of the register mapping region
+> + * @name:      Name of the mailbox
+> + * @enabled:   Local copy of enabled channels
+> + * @lock:      Mutex protecting enabled status
+> + */
+> +struct sti_mbox_device {
+> +       struct device           *dev;
+> +       struct mbox_controller  *mbox;
+> +       void __iomem            *base;
+> +       const char              *name;
+> +       u32                     enabled[STI_MBOX_INST_MAX];
+> +       spinlock_t              lock;
+> +       bool                    txonly;
+>
+txonly is never used after being initialized from DT :)   which is a
+good sign. So maybe just drop it and the optional property 'tx-only'.
 
-Regards,
---
-Alex
+Cheers!
