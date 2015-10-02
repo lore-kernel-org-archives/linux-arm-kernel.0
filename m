@@ -1,74 +1,81 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 2 Oct 2015 23:24:23 +0530
-Subject: [PATCH 6/6] arm64: dts: Add I2C nodes for NS2
+Date: Fri, 2 Oct 2015 23:24:21 +0530
+Subject: [PATCH 4/6] arm64: dts: Add ARM PMUv3 DT node in NS2 DT
 In-Reply-To: <1443808463-21120-1-git-send-email-anup.patel@broadcom.com>
 References: <1443808463-21120-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1443808463-21120-7-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1443808463-21120-5-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ray Jui <rjui@broadcom.com>
+The NS2 SoC has Cortex-A57 CPUs which support ARM PMUv3 so,
+lets enable ARM PMUv3 in NS2 DT.
 
-This patch adds iProc I2C DT nodes for NS2 and enable them for the NS2
-SVK board
-
-Signed-off-by: Ray Jui <rjui@broadcom.com>
+Signed-off-by: Anup Patel <anup.patel@broadcom.com>
 Reviewed-by: Vikram Prakash <vikramp@broadcom.com>
+Reviewed-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- arch/arm64/boot/dts/broadcom/ns2-svk.dts |  8 ++++++++
- arch/arm64/boot/dts/broadcom/ns2.dtsi    | 20 ++++++++++++++++++++
- 2 files changed, 28 insertions(+)
+ arch/arm64/boot/dts/broadcom/ns2.dtsi | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-index 244baf8..e5950d5 100644
---- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-+++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-@@ -52,6 +52,14 @@
- 	};
- 
- 	soc: soc {
-+		i2c0: i2c at 66080000 {
-+			status = "ok";
-+		};
-+
-+		i2c1: i2c at 660b0000 {
-+			status = "ok";
-+		};
-+
- 		uart3: serial at 66130000 {
- 			status = "ok";
- 		};
 diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index 92ecf1c..f603277 100644
+index 5d2ac6b..bc31c0e 100644
 --- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
 +++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -178,6 +178,26 @@
- 			      <0x65260000 0x1000>;
+@@ -44,7 +44,7 @@
+ 		#address-cells = <2>;
+ 		#size-cells = <0>;
+ 
+-		cpu at 0 {
++		A57_0: cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			reg = <0 0>;
+@@ -53,7 +53,7 @@
+ 			next-level-cache = <&CLUSTER0_L2>;
  		};
  
-+		i2c0: i2c at 66080000 {
-+			compatible = "brcm,iproc-i2c";
-+			reg = <0x66080000 0x100>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <GIC_SPI 394 IRQ_TYPE_NONE>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
+-		cpu at 1 {
++		A57_1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			reg = <0 1>;
+@@ -62,7 +62,7 @@
+ 			next-level-cache = <&CLUSTER0_L2>;
+ 		};
+ 
+-		cpu at 2 {
++		A57_2: cpu at 2 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			reg = <0 2>;
+@@ -71,7 +71,7 @@
+ 			next-level-cache = <&CLUSTER0_L2>;
+ 		};
+ 
+-		cpu at 3 {
++		A57_3: cpu at 3 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			reg = <0 3>;
+@@ -97,6 +97,18 @@
+ 			      IRQ_TYPE_EDGE_RISING)>;
+ 	};
+ 
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&A57_0>,
++				     <&A57_1>,
++				     <&A57_2>,
++				     <&A57_3>;
++	};
 +
-+		i2c1: i2c at 660b0000 {
-+			compatible = "brcm,iproc-i2c";
-+			reg = <0x660b0000 0x100>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <GIC_SPI 395 IRQ_TYPE_NONE>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
-+
- 		uart3: serial at 66130000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x66130000 0x100>;
+ 	soc: soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
 -- 
 1.9.1
