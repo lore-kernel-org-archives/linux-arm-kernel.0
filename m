@@ -1,32 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Oct 2015 15:49:39 +0100
-Subject: [PATCH net-next] ARM: net: support BPF_ALU | BPF_MOD
- instructions in the BPF JIT.
-In-Reply-To: <1443796671-12598-1-git-send-email-nschichan@freebox.fr>
-References: <1443796671-12598-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <20151002144939.GZ21513@n2100.arm.linux.org.uk>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 2 Oct 2015 15:51:50 +0100
+Subject: [PATCH v3 4/8] arm/arm64: KVM: Implement GICD_ICFGR as RO for PPIs
+In-Reply-To: <1443538145-11990-5-git-send-email-christoffer.dall@linaro.org>
+References: <1443538145-11990-1-git-send-email-christoffer.dall@linaro.org>
+ <1443538145-11990-5-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <560E9A06.3040404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 02, 2015 at 04:37:51PM +0200, Nicolas Schichan wrote:
-> @@ -125,7 +125,7 @@ static u64 jit_get_skb_w(struct sk_buff *skb, int offset)
->  }
->  
->  /*
-> - * Wrapper that handles both OABI and EABI and assures Thumb2 interworking
-> + * Wrappers that handles both OABI and EABI and assures Thumb2 interworking
+Hi Christoffer,
 
-That doesn't read right with "wrapper" becoming plural.
+On 29/09/15 15:49, Christoffer Dall wrote:
+> The GICD_ICFGR allows the bits for the SGIs and PPIs to be read only.
+> We currently simulate this behavior by writing a hardcoded value to the
+> register for the SGIs and PPIs on every write of these bits to the
+> register (ignoring what the guest actually wrote), and by writing the
+> same value as the reset value to the register.
+> 
+> This is a bit counter-intuitive, as the register is RO for these bits,
+> and we can just implement it that way, allowing us to control the value
+> of the bits purely in the reset code.
+> 
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  virt/kvm/arm/vgic.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index fe0e5db..e606f78 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -655,7 +655,7 @@ bool vgic_handle_cfg_reg(u32 *reg, struct kvm_exit_mmio *mmio,
+>  			ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
+>  	if (mmio->is_write) {
+>  		if (offset < 8) {
+> -			*reg = ~0U; /* Force PPIs/SGIs to 1 */
+> +			/* Ignore writes to read-only SGI and PPI bits */
+>  			return false;
+>  		}
 
-"Wrapper that handles ..."
+Nit: Isn't this now violating kernel coding style because of a single
+statement not needing braces? Maybe move the comment in front of the
+if-statement to make this more obvious?
 
-or
+Other than that:
 
-"Wrappers which handle ..."
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 
-As normal, I'll let David pick the patch up, but please adjust the above
-comment first, thanks.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Cheers,
+Andre.
