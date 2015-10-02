@@ -1,53 +1,46 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 2 Oct 2015 18:23:25 -0500
-Subject: [REPOST PATCH 4/4] ARM: dts: DRA74x: Add IOMMU nodes for DSP2
+Date: Fri, 2 Oct 2015 18:23:23 -0500
+Subject: [REPOST PATCH 2/4] ARM: dts: DRA74x: Add dsp2_system syscon node
 In-Reply-To: <1443828205-18706-1-git-send-email-s-anna@ti.com>
 References: <1443828205-18706-1-git-send-email-s-anna@ti.com>
-Message-ID: <1443828205-18706-5-git-send-email-s-anna@ti.com>
+Message-ID: <1443828205-18706-3-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DRA74x family of SoCs have a second DSP, that also has
-two MMUs just like the DSP1 subsystem. Add the IOMMU nodes
-for this DSP2 subsystem in disabled state to the DRA74x
-specific DTS file, the nodes would need to be enabled
-appropriately in the respective board DTS files.
+The DSP_SYSTEM sub-module is a dedicated system control logic
+module present within a DRA7 DSP processor sub-system. This
+module is responsible for power management, clock generation
+and connection to the device PRCM module.
+
+Add a syscon node for this module for the DSP2 processor
+sub-system. This is added as a syscon node as it is a common
+configuration module that can be used by the different IOMMU
+instances and the corresponding remoteproc device.
+
+The node is added to the dra74x.dtsi file, as the DSP2 processor
+subsystem is usually present only on the DRA74x variants of the
+DRA7 SoC family.
 
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/boot/dts/dra74x.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/dra74x.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
-index dfa29b7ba86a..2f7d313e91a0 100644
+index feea98e0a4b5..dfa29b7ba86a 100644
 --- a/arch/arm/boot/dts/dra74x.dtsi
 +++ b/arch/arm/boot/dts/dra74x.dtsi
-@@ -81,6 +81,26 @@
- 				dr_mode = "otg";
- 			};
- 		};
-+
-+		mmu0_dsp2: mmu at 41501000 {
-+			compatible = "ti,dra7-dsp-iommu";
-+			reg = <0x41501000 0x100>;
-+			interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
-+			ti,hwmods = "mmu0_dsp2";
-+			#iommu-cells = <0>;
-+			ti,syscon-mmuconfig = <&dsp2_system 0x0>;
-+			status = "disabled";
-+		};
-+
-+		mmu1_dsp2: mmu at 41502000 {
-+			compatible = "ti,dra7-dsp-iommu";
-+			reg = <0x41502000 0x100>;
-+			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-+			ti,hwmods = "mmu1_dsp2";
-+			#iommu-cells = <0>;
-+			ti,syscon-mmuconfig = <&dsp2_system 0x1>;
-+			status = "disabled";
-+		};
+@@ -52,6 +52,11 @@
  	};
- };
  
+ 	ocp {
++		dsp2_system: dsp_system at 41500000 {
++			compatible = "syscon";
++			reg = <0x41500000 0x100>;
++		};
++
+ 		omap_dwc3_4: omap_dwc3_4 at 48940000 {
+ 			compatible = "ti,dwc3";
+ 			ti,hwmods = "usb_otg_ss4";
 -- 
 2.6.0
