@@ -1,66 +1,64 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 2 Oct 2015 20:09:39 +0200
-Subject: [PATCH] arm-soc: Add Sigma Designs Tango4 port
-In-Reply-To: <20151002171334.GB21513@n2100.arm.linux.org.uk>
-References: <560EAA7C.3070302@free.fr> <yw1xoaghl099.fsf@unicorn.mansr.com>
- <560EB1EC.3020403@free.fr> <20151002171334.GB21513@n2100.arm.linux.org.uk>
-Message-ID: <560EC863.8030600@free.fr>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 2 Oct 2015 11:24:34 -0700
+Subject: [GIT PULL] ARM64: APM X-Gene 1 and X-Gene 2 DTS updates for 4.4
+In-Reply-To: <CADaLNDmeBz69eoU4PO6cAf2cKCQwVCORcXMUf5xdODJVUfb+Hw@mail.gmail.com>
+References: <CADaLNDmeBz69eoU4PO6cAf2cKCQwVCORcXMUf5xdODJVUfb+Hw@mail.gmail.com>
+Message-ID: <CADaLND=5yV-GGiEfu+=KPmCyzVRb8-j6uYcLZsChuUbUJ+OzpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2015 19:13, Russell King - ARM Linux wrote:
-> On Fri, Oct 02, 2015 at 06:33:48PM +0200, Mason wrote:
->> On 02/10/2015 18:10, M?ns Rullg?rd wrote:
->>
->>> Mason writes:
->>>
->>>> +		intc: intc at e000 {
->>>> +			compatible = "sigma,tango-intc";
->>>
->>> Why do you insist on using other names than the ones I've been using for
->>> months?  Just want to leave your own mark on the code?
->>
->> You're using "sigma,smp8640-intc".
->> The SMP8640 is a Tango3 (MIPS-based) platform.
-> 
-> If it's the same device, then there's nothing wrong with re-using the
-> compatible.  The compatible property actually accepts multiple values,
-> so you can do:
-> 
-> 			compatible = "sigma,tango4-intc", "sigma,smp8640-intc";
+On Thu, Sep 17, 2015 at 4:38 PM, Duc Dang <dhdang@apm.com> wrote:
+> Hi Olof,
+>
+> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+>
+>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+>
+> are available in the git repository at:
+>
+>   https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.4-1
+>
+> for you to fetch changes up to 1d8d53b62d80dc3a6ae1483891e7d840cd7a51bd:
+>
+>   arm64: dts: Add poweroff device nodes for APM X-Gene 2 platform
+> (2015-09-16 12:04:25 -0700)
+>
+> ----------------------------------------------------------------
+> X-Gene DTS changes queued for v4.4
+>
+> ----------------------------------------------------------------
+> Duc Dang (4):
+>       MAINTAINERS: Add Applied Micro (APM) X-Gene Device Tree maintainer
+>       arm64: dts: Add X-Gene v2 reboot driver dts node
+>       arm64: dts: Add APM X-Gene 2 standby GPIO controller DTS entries
+>       arm64: dts: Add poweroff device nodes for APM X-Gene 2 platform
+>
+> Feng Kan (5):
+>       Documentation: arm64: add SCU dts binding documentation to linux kernel
+>       arm64: dts: Add X-Gene reboot driver dts node
+>       arm64: dts: add APM Merlin Board device tree
+>       Documentation: arm: pmu: Add Potenza PMU binding
+>       arm64: dts: Add PMU node for APM X-Gene Storm SOC
+>
+> Tai Nguyen (1):
+>       power: reset: Add syscon poweroff device node for APM X-Gene platform
+>
+>  Documentation/devicetree/bindings/arm/apm/scu.txt |  17 ++
+>  Documentation/devicetree/bindings/arm/pmu.txt     |   1 +
+>  MAINTAINERS                                       |   5 +
+>  arch/arm64/boot/dts/apm/Makefile                  |   1 +
+>  arch/arm64/boot/dts/apm/apm-merlin.dts            |  72 ++++++
+>  arch/arm64/boot/dts/apm/apm-mustang.dts           |  12 +
+>  arch/arm64/boot/dts/apm/apm-shadowcat.dtsi        | 271 ++++++++++++++++++++++
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi            |  17 ++
+>  8 files changed, 396 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/apm/scu.txt
+>  create mode 100644 arch/arm64/boot/dts/apm/apm-merlin.dts
+>  create mode 100644 arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+Hi Olof,
 
-I have access to resources unavailable to Mans. Since I know the
-interrupt controller is the same on Tango2, Tango3 and Tango4,
-doesn't it make sense to use the string "sigma,tango-intc"
-given that the driver is not even upstream yet?
+Please let me know if there is anything I need to change in this pull
+request? I rebased these changes over 4.3-rc1.
 
-(If worse comes to worst, I suppose I can always write my own
-driver from scratch; I just find it silly to duplicate work.)
-
-> See the ePAPR spec - I'll include the relevant bit:
-> 
-> Property: compatible
-> Value type: <stringlist>
-> Description: The compatible property value consists of one or more strings
->  that define the specific programming model for the device. This list of
->  strings should be used by a client program for device driver selection.
->  The property value consists of a concatenated list of null terminated
->  strings, from most specific to most general. They allow a device to
->  express its compatibility with a family of similar devices, potentially
->  allowing a single device driver to match against several devices. ...
-> Example: compatible = "fsl,mpc8641-uart", "ns16550";
->  In this example, an operating system would first try to locate a device
->  driver that supported fsl,mpc8641-uart. If a driver was not found, it
->  would then try to locate a driver that supported the more general
->  ns16550 device type.
-> 
-> Note also that vendor prefixes should be listed in
-> Documentation/devicetree/bindings/vendor-prefixes.txt.  If it's not there,
-> you need to propose a separate patch (to the devicetree mailing list) to
-> add it, which must be done with their agreement.  Right now, the use of
-> "sigma" as a prefix is entirely non-standard and not acceptable in DT
-> files until this is done.
-
-As far as the upstreaming process is concerned, I speak for Sigma.
-
-Regards.
+Regards,
+Duc Dang.
