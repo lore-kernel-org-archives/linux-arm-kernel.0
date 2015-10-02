@@ -1,65 +1,139 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 02 Oct 2015 15:37:17 +0100
-Subject: [PATCH] ARM: debug: add support for alternate 8250 register layout
-In-Reply-To: <560E956A.6070700@cogentembedded.com> (Sergei Shtylyov's message
- of "Fri, 2 Oct 2015 17:32:10 +0300")
-References: <1443787929-19173-1-git-send-email-mans@mansr.com>
- <560E9268.60900@cogentembedded.com>
- <yw1x1tddmjng.fsf@unicorn.mansr.com>
- <560E956A.6070700@cogentembedded.com>
-Message-ID: <yw1xwpv5l4ki.fsf@unicorn.mansr.com>
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Fri,  2 Oct 2015 16:37:51 +0200
+Subject: [PATCH net-next] ARM: net: support BPF_ALU | BPF_MOD instructions in
+ the BPF JIT.
+Message-ID: <1443796671-12598-1-git-send-email-nschichan@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> writes:
+For ARMv7 with UDIV instruction support, generate an UDIV instruction
+followed by an MLS instruction.
 
-> On 10/2/2015 5:26 PM, M?ns Rullg?rd wrote:
->
->>>> Some SoCs have a UART with a non-standard register layout. This
->>>> allows the debug console to work with these.
->>>
->>>> Signed-off-by: Mans Rullgard <mans@mansr.com>
->>>> ---
->>>> I would have preferred a more accurate description of the UART, but I've
->>>> not managed to figure out who the vendor is.
->>>
->>>     You haven't seem the Alchemy datasheets? I can send you some if so.
->>
->> I have.  They don't say where Alchemy bought the UART block.
->
->    In fact, seeing at least Au1550 databook googling for "alchemy databook".
-> The UART registers are described there. Perhaps, it's not accurate
-> enought for your needs, though...
+For other ARM variants, generate code calling a C wrapper similar to
+the jit_udiv() function used for BPF_ALU | BPF_DIV instructions.
 
-I have all the information I need about how it works.
+Some performance numbers reported by the test_bpf module (the duration
+per filter run is reported in nanoseconds, between "jitted:<x>" and
+"PASS":
 
->>>> ---
->>>>    arch/arm/Kconfig.debug        |  4 ++++
->>>>    arch/arm/include/debug/8250.S | 12 ++++++++++++
->>>>    2 files changed, 16 insertions(+)
->>>>
->>>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->>>> index 0cfd7f9..8d5c837 100644
->>>> --- a/arch/arm/Kconfig.debug
->>>> +++ b/arch/arm/Kconfig.debug
->>>> @@ -1597,6 +1597,10 @@ config DEBUG_UART_8250_WORD
->>>>    		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
->>>>    		DEBUG_BRCMSTB_UART
->>>>
->>>> +config DEBUG_UART_8250_AU
->>>> +       bool "8250 UART has Alchemy register layout"
->>>> +       depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
->>>> +
->>>
->>>     So Alchemy UART got reused on ARM?
->>
->> The UART is actually a Palmchip IP core used by several SoC companies.
->
->    Hm, how have you figured out that;s Palmchip if the Alchemy
-> databooks are silent about that? :-)
+ARMv7 QEMU nojit:	test_bpf: #3 DIV_MOD_KX jited:0 2196 PASS
+ARMv7 QEMU jit:		test_bpf: #3 DIV_MOD_KX jited:1 104 PASS
+ARMv5 QEMU nojit:	test_bpf: #3 DIV_MOD_KX jited:0 2176 PASS
+ARMv5 QEMU jit:		test_bpf: #3 DIV_MOD_KX jited:1 1104 PASS
+ARMv5 kirkwood nojit:	test_bpf: #3 DIV_MOD_KX jited:0 1103 PASS
+ARMv5 kirkwood jit:	test_bpf: #3 DIV_MOD_KX jited:1 311 PASS
 
-Someone with access to hardware design files told me.
+Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+---
+ arch/arm/net/bpf_jit_32.c | 38 ++++++++++++++++++++++++++++++++------
+ arch/arm/net/bpf_jit_32.h |  5 +++++
+ 2 files changed, 37 insertions(+), 6 deletions(-)
 
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index 876060b..17214d9 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -125,7 +125,7 @@ static u64 jit_get_skb_w(struct sk_buff *skb, int offset)
+ }
+ 
+ /*
+- * Wrapper that handles both OABI and EABI and assures Thumb2 interworking
++ * Wrappers that handles both OABI and EABI and assures Thumb2 interworking
+  * (where the assembly routines like __aeabi_uidiv could cause problems).
+  */
+ static u32 jit_udiv(u32 dividend, u32 divisor)
+@@ -133,6 +133,11 @@ static u32 jit_udiv(u32 dividend, u32 divisor)
+ 	return dividend / divisor;
+ }
+ 
++static u32 jit_mod(u32 dividend, u32 divisor)
++{
++	return dividend % divisor;
++}
++
+ static inline void _emit(int cond, u32 inst, struct jit_ctx *ctx)
+ {
+ 	inst |= (cond << 28);
+@@ -471,11 +476,17 @@ static inline void emit_blx_r(u8 tgt_reg, struct jit_ctx *ctx)
+ #endif
+ }
+ 
+-static inline void emit_udiv(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx)
++static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx,
++				int bpf_op)
+ {
+ #if __LINUX_ARM_ARCH__ == 7
+ 	if (elf_hwcap & HWCAP_IDIVA) {
+-		emit(ARM_UDIV(rd, rm, rn), ctx);
++		if (bpf_op == BPF_DIV)
++			emit(ARM_UDIV(rd, rm, rn), ctx);
++		else {
++			emit(ARM_UDIV(ARM_R3, rm, rn), ctx);
++			emit(ARM_MLS(rd, rn, ARM_R3, rm), ctx);
++		}
+ 		return;
+ 	}
+ #endif
+@@ -496,7 +507,8 @@ static inline void emit_udiv(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx)
+ 		emit(ARM_MOV_R(ARM_R0, rm), ctx);
+ 
+ 	ctx->seen |= SEEN_CALL;
+-	emit_mov_i(ARM_R3, (u32)jit_udiv, ctx);
++	emit_mov_i(ARM_R3, bpf_op == BPF_DIV ? (u32)jit_udiv : (u32)jit_mod,
++		   ctx);
+ 	emit_blx_r(ARM_R3, ctx);
+ 
+ 	if (rd != ARM_R0)
+@@ -697,13 +709,27 @@ load_ind:
+ 			if (k == 1)
+ 				break;
+ 			emit_mov_i(r_scratch, k, ctx);
+-			emit_udiv(r_A, r_A, r_scratch, ctx);
++			emit_udivmod(r_A, r_A, r_scratch, ctx, BPF_DIV);
+ 			break;
+ 		case BPF_ALU | BPF_DIV | BPF_X:
+ 			update_on_xread(ctx);
+ 			emit(ARM_CMP_I(r_X, 0), ctx);
+ 			emit_err_ret(ARM_COND_EQ, ctx);
+-			emit_udiv(r_A, r_A, r_X, ctx);
++			emit_udivmod(r_A, r_A, r_X, ctx, BPF_DIV);
++			break;
++		case BPF_ALU | BPF_MOD | BPF_K:
++			if (k == 1) {
++				emit_mov_i(r_A, 0, ctx);
++				break;
++			}
++			emit_mov_i(r_scratch, k, ctx);
++			emit_udivmod(r_A, r_A, r_scratch, ctx, BPF_MOD);
++			break;
++		case BPF_ALU | BPF_MOD | BPF_X:
++			update_on_xread(ctx);
++			emit(ARM_CMP_I(r_X, 0), ctx);
++			emit_err_ret(ARM_COND_EQ, ctx);
++			emit_udivmod(r_A, r_A, r_X, ctx, BPF_MOD);
+ 			break;
+ 		case BPF_ALU | BPF_OR | BPF_K:
+ 			/* A |= K */
+diff --git a/arch/arm/net/bpf_jit_32.h b/arch/arm/net/bpf_jit_32.h
+index 4b17d5ab..c46fca2 100644
+--- a/arch/arm/net/bpf_jit_32.h
++++ b/arch/arm/net/bpf_jit_32.h
+@@ -115,6 +115,8 @@
+ 
+ #define ARM_INST_UMULL		0x00800090
+ 
++#define ARM_INST_MLS		0x00600090
++
+ /*
+  * Use a suitable undefined instruction to use for ARM/Thumb2 faulting.
+  * We need to be careful not to conflict with those used by other modules
+@@ -210,4 +212,7 @@
+ #define ARM_UMULL(rd_lo, rd_hi, rn, rm)	(ARM_INST_UMULL | (rd_hi) << 16 \
+ 					 | (rd_lo) << 12 | (rm) << 8 | rn)
+ 
++#define ARM_MLS(rd, rn, rm, ra)	(ARM_INST_MLS | (rd) << 16 | (rn) | (rm) << 8 \
++				 | (ra) << 12)
++
+ #endif /* PFILTER_OPCODES_ARM_H */
 -- 
-M?ns Rullg?rd
-mans at mansr.com
+1.9.1
