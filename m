@@ -1,47 +1,62 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 2 Oct 2015 10:51:27 -0700
-Subject: [PATCH v2 19/25] pxa2xx-flash: switch from ioremap_cache to
- memremap
-In-Reply-To: <20150725023945.8664.34842.stgit@dwillia2-desk3.amr.corp.intel.com>
-References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150725023945.8664.34842.stgit@dwillia2-desk3.amr.corp.intel.com>
-Message-ID: <20151002175127.GH107187@google.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Fri, 2 Oct 2015 23:24:18 +0530
+Subject: [PATCH 1/6] arm64: dts: Add L2-cache DT node for NS2
+In-Reply-To: <1443808463-21120-1-git-send-email-anup.patel@broadcom.com>
+References: <1443808463-21120-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1443808463-21120-2-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ linux-mtd
+Recent kernels requires cache hierrachy to be defined via DT hence
+this patch updates NS2 DT accordingly.
 
-On Fri, Jul 24, 2015 at 10:39:45PM -0400, Dan Williams wrote:
-> In preparation for deprecating ioremap_cache() convert its usage in
-> pxa2xx-flash to memremap.
-> 
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Brian Norris <computersforpeace@gmail.com>
-> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
-> ---
->  drivers/mtd/maps/pxa2xx-flash.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
-> index 12fa75df5008..758a8a7f86d9 100644
-> --- a/drivers/mtd/maps/pxa2xx-flash.c
-> +++ b/drivers/mtd/maps/pxa2xx-flash.c
-> @@ -71,8 +71,8 @@ static int pxa2xx_flash_probe(struct platform_device *pdev)
->  		       info->map.name);
->  		return -ENOMEM;
->  	}
-> -	info->map.cached =
-> -		ioremap_cache(info->map.phys, info->map.size);
-> +	info->map.cached = memremap(info->map.phys, info->map.size,
-> +			MEMREMAP_CACHE);
+Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+Reviewed-by: Sandeep Tripathy <tripathy@broadcom.com>
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
+---
+ arch/arm64/boot/dts/broadcom/ns2.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Should the corresponding iounmap() be changed too? Looks like a pretty
-thin wrapper right now, but it seems like the API would suggest we do
-this anyway.
-
->  	if (!info->map.cached)
->  		printk(KERN_WARNING "Failed to ioremap cached %s\n",
->  		       info->map.name);
-> 
-
-Brian
+diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+index 3c92d92..f759175 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
++++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+@@ -50,6 +50,7 @@
+ 			reg = <0 0>;
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0 0x84b00000>;
++			next-level-cache = <&CLUSTER0_L2>;
+ 		};
+ 
+ 		cpu at 1 {
+@@ -58,6 +59,7 @@
+ 			reg = <0 1>;
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0 0x84b00000>;
++			next-level-cache = <&CLUSTER0_L2>;
+ 		};
+ 
+ 		cpu at 2 {
+@@ -66,6 +68,7 @@
+ 			reg = <0 2>;
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0 0x84b00000>;
++			next-level-cache = <&CLUSTER0_L2>;
+ 		};
+ 
+ 		cpu at 3 {
+@@ -74,6 +77,11 @@
+ 			reg = <0 3>;
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0 0x84b00000>;
++			next-level-cache = <&CLUSTER0_L2>;
++		};
++
++		CLUSTER0_L2: l2-cache at 000 {
++			compatible = "cache";
+ 		};
+ 	};
+ 
+-- 
+1.9.1
