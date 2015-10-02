@@ -1,13 +1,15 @@
 From: scottwood@freescale.com (Scott Wood)
-Date: Thu, 1 Oct 2015 19:23:54 -0500
+Date: Thu, 1 Oct 2015 19:26:29 -0500
 Subject: [RFC PATCH 0/8] clk: qoriq: Move chip-specific knowledge into
  driver
 In-Reply-To: <20150811182535.31346.52965@quantum>
 References: <1434682158-7243-1-git-send-email-scottwood@freescale.com>
  <20150811182535.31346.52965@quantum>
-Message-ID: <1443745434.5336.184.camel@freescale.com>
+Message-ID: <1443745589.5336.185.camel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+[Resending to updated e-mail address]
 
 On Tue, 2015-08-11 at 11:25 -0700, Michael Turquette wrote:
 > Hi Scott,
