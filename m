@@ -1,149 +1,66 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 2 Oct 2015 18:18:03 +0100
-Subject: [PATCH v3 8/8] arm/arm64: KVM: Support edge-triggered forwarded
- interrupts
-In-Reply-To: <1443538145-11990-9-git-send-email-christoffer.dall@linaro.org>
-References: <1443538145-11990-1-git-send-email-christoffer.dall@linaro.org>
- <1443538145-11990-9-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <560EBC4B.3050706@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 2 Oct 2015 11:17:15 -0600
+Subject: [RFC PATCH 06/20] coresight: etm3x: unlocking tracer in default
+ arch init
+In-Reply-To: <87vbap3mgz.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
+ <1442593594-10665-7-git-send-email-mathieu.poirier@linaro.org>
+ <87eghgjg4v.fsf@ashishki-desk.ger.corp.intel.com>
+ <CANLsYkwO64CRfcZ+z+=+ucbtOVeOcOoCy+d0GO5sEuTf+Qe0WQ@mail.gmail.com>
+ <87vbap3mgz.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CANLsYkxNO5U83zgVHysGMLxKq0q1rZFPLLAYOT1W3n9HOaxQ4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/09/15 15:49, Christoffer Dall wrote:
-> We mark edge-triggered interrupts with the HW bit set as queued to
-> prevent the VGIC code from injecting LRs with both the Active and
-> Pending bits set at the same time while also setting the HW bit,
-> because the hardware does not support this.
-> 
-> However, this means that we must also clear the queued flag when we sync
-> back a LR where the state on the physical distributor went from active
-> to inactive because the guest deactivated the interrupt.  At this point
-> we must also check if the interrupt is pending on the distributor, and
-> tell the VGIC to queue it again if it is.
-> 
-> Since these actions on the sync path are extremely close to those for
-> level-triggered interrupts, rename process_level_irq to
-> process_queued_irq, allowing it to cater for both cases.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+On 1 October 2015 at 22:47, Alexander Shishkin
+<alexander.shishkin@linux.intel.com> wrote:
+> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+>
+>> On 30 September 2015 at 05:33, Alexander Shishkin
+>> <alexander.shishkin@linux.intel.com> wrote:
+>>> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+>>>
+>>>> Calling function 'smp_call_function_single()' to unlock the
+>>>> tracer and calling it right after to perform the default
+>>>> initialisation doesn't make sense.
+>>>>
+>>>> Moving 'etm_os_unlock()' just before making the default
+>>>> initialisation results in the same outcome while saving
+>>>> one call to 'smp_call_function_single()'.
+>>>>
+>>>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>>> ---
+>>>>  drivers/hwtracing/coresight/coresight-etm3x.c | 8 +++++---
+>>>>  1 file changed, 5 insertions(+), 3 deletions(-)
+>>>>
+>>>> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+>>>> index c6880c1ade55..a4c158df0fef 100644
+>>>> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
+>>>> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+>>>> @@ -1867,6 +1867,11 @@ static void etm_init_arch_data(void *info)
+>>>>        * certain registers might be ignored.
+>>>>        */
+>>>>       etm_clr_pwrdwn(drvdata);
+>>>> +
+>>>> +     /* Make sure all registers are accessible */
+>>>> +     etm_os_unlock(drvdata);
+>>>
+>>> In case of co-processor register access, this will end up unlocking the
+>>> local ETM instead of the one on target cpu, by the looks of it.
+>>
+>> "etm_init_arch_data()" is also called from "smp_function_calls()" and
+>> as such, will end up executing the correct CPU.
+>
+> Yes, but it doesn't unlock the OSLAR register, which also needs to be
+> done on target cpu.
 
+Function "etm_os_unlock()" deals with ETMOSLAR and "CS_UNLOCK()" with
+ETMLAR.  Both are called from "etm_init_arch_data()", which runs on
+the target CPU.  One thing that I will do here is move
+"etm_os_unlock()" to the beginning of "etm_init_arch_data()".  Other
+than that I may be missing your point.
 
-> ---
->  virt/kvm/arm/vgic.c | 40 ++++++++++++++++++++++------------------
->  1 file changed, 22 insertions(+), 18 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 53548f1..f3e76e5 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1322,13 +1322,10 @@ epilog:
->  	}
->  }
->  
-> -static int process_level_irq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
-> +static int process_queued_irq(struct kvm_vcpu *vcpu,
-> +				   int lr, struct vgic_lr vlr)
->  {
-> -	int level_pending = 0;
-> -
-> -	vlr.state = 0;
-> -	vlr.hwirq = 0;
-> -	vgic_set_lr(vcpu, lr, vlr);
-> +	int pending = 0;
-
-As I mentioned in my reply to 3/8 already: shouldn't this be "bool"?
-
->  
->  	/*
->  	 * If the IRQ was EOIed (called from vgic_process_maintenance) or it
-> @@ -1344,26 +1341,35 @@ static int process_level_irq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
->  	vgic_dist_irq_clear_soft_pend(vcpu, vlr.irq);
->  
->  	/*
-> -	 * Tell the gic to start sampling the line of this interrupt again.
-> +	 * Tell the gic to start sampling this interrupt again.
->  	 */
->  	vgic_irq_clear_queued(vcpu, vlr.irq);
->  
->  	/* Any additional pending interrupt? */
-> -	if (vgic_dist_irq_get_level(vcpu, vlr.irq)) {
-> -		vgic_cpu_irq_set(vcpu, vlr.irq);
-> -		level_pending = 1;
-> +	if (vgic_irq_is_edge(vcpu, vlr.irq)) {
-> +		BUG_ON(!(vlr.state & LR_HW));
-
-Is that really needed here? I don't see how this function would fail if
-called on a non-mapped IRQ. Also the two current callers would always
-fulfil this requirement:
-- vgic_process_maintenance() already has a WARN_ON(vgic_irq_is_edge)
-- vgic_sync_irq() returns early if it's not a mapped IRQ
-
-Removing this would also allow to pass "int irq" instead of "struct
-vgic_lr vlr".
-
-Just an idea, though and not a show-stopper.
-
-Other than that it looks good to me.
-
-Cheers,
-Andre.
-
-> +		pending = vgic_dist_irq_is_pending(vcpu, vlr.irq);
->  	} else {
-> -		vgic_dist_irq_clear_pending(vcpu, vlr.irq);
-> -		vgic_cpu_irq_clear(vcpu, vlr.irq);
-> +		if (vgic_dist_irq_get_level(vcpu, vlr.irq)) {
-> +			vgic_cpu_irq_set(vcpu, vlr.irq);
-> +			pending = 1;
-> +		} else {
-> +			vgic_dist_irq_clear_pending(vcpu, vlr.irq);
-> +			vgic_cpu_irq_clear(vcpu, vlr.irq);
-> +		}
->  	}
->  
->  	/*
->  	 * Despite being EOIed, the LR may not have
->  	 * been marked as empty.
->  	 */
-> +	vlr.state = 0;
-> +	vlr.hwirq = 0;
-> +	vgic_set_lr(vcpu, lr, vlr);
-> +
->  	vgic_sync_lr_elrsr(vcpu, lr, vlr);
->  
-> -	return level_pending;
-> +	return pending;
->  }
->  
->  static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
-> @@ -1400,7 +1406,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->  					     vlr.irq - VGIC_NR_PRIVATE_IRQS);
->  
->  			spin_lock(&dist->lock);
-> -			level_pending |= process_level_irq(vcpu, lr, vlr);
-> +			level_pending |= process_queued_irq(vcpu, lr, vlr);
->  			spin_unlock(&dist->lock);
->  		}
->  	}
-> @@ -1422,7 +1428,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->  /*
->   * Save the physical active state, and reset it to inactive.
->   *
-> - * Return true if there's a pending level triggered interrupt line to queue.
-> + * Return true if there's a pending forwarded interrupt to queue.
->   */
->  static bool vgic_sync_hwirq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
->  {
-> @@ -1458,10 +1464,8 @@ static bool vgic_sync_hwirq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
->  		return false;
->  	}
->  
-> -	/* Mapped edge-triggered interrupts not yet supported. */
-> -	WARN_ON(vgic_irq_is_edge(vcpu, vlr.irq));
->  	spin_lock(&dist->lock);
-> -	level_pending = process_level_irq(vcpu, lr, vlr);
-> +	level_pending = process_queued_irq(vcpu, lr, vlr);
->  	spin_unlock(&dist->lock);
->  	return level_pending;
->  }
-> 
+>
+> Regards,
+> --
+> Alex
