@@ -1,31 +1,46 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 2 Oct 2015 11:52:35 +0200
-Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
-Message-ID: <560E53E3.7070207@free.fr>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 2 Oct 2015 03:04:00 -0700
+Subject: [PATCH] ARM: Remove __ref on hotplug cpu die path
+In-Reply-To: <1442276597-14325-1-git-send-email-sboyd@codeaurora.org>
+References: <1442276597-14325-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CACRpkdbgM30DTB_pZedMUnyzQ9nR9hn=JN8SUA6JWK0zPktuZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ take 1 was sent on 2015-03-26 ]
+On Mon, Sep 14, 2015 at 5:23 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-Hello everyone,
+> Now that __cpuinit has been removed, the __ref markings on these
+> functions are useless. Remove them. This also reduces the size of
+> the multi_v7_defconfig image:
+>
+> $ size before after
+>    text    data     bss     dec     hex filename
+>    12683578        1470996  348904 14503478         dd4e36 before
+>    12683274        1470996  348904 14503174         dd4d06 after
+>
+> presumably because now we don't have to jump to code in the
+> .ref.text section and/or the noinline marking is removed.
+>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Barry Song <baohua@kernel.org>
+> Cc: Andy Gross <agross@codeaurora.org>
+> Cc: Viresh Kumar <vireshk@kernel.org>
+> Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: <linux-omap@vger.kernel.org>
+> Cc: <linux-arm-msm@vger.kernel.org>
+> Cc: <spear-devel@list.st.com>
+> Cc: <linux-tegra@vger.kernel.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-In http://thread.gmane.org/gmane.linux.ports.arm.kernel/389931/focus=392348
-Stephen Boyd wrote:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-> I don't see any problem with the TWD dropping the dependency on SMP.
-> The code should work the same on a UP configuration [...]
-
-And Arnd recently said:
-
-> I think this has come up before and should be fixed. Could you
-> send a patch that allows using TWD in uniprocessor configurations?
-
-Basically, this means reverting Shawn Guo's 904464b91eca patch.
-and removing "depends on SMP" for HAVE_ARM_TWD.
-
-However, Shawn's patch fixed an issue, therefore it seems likely
-that simply reverting is not the proper solution?
-
-What should I do?
-
-Regards.
+Yours,
+Linus Walleij
