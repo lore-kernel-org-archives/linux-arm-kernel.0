@@ -1,52 +1,66 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 02 Oct 2015 11:52:00 +0900
-Subject: [PATCH v2 3/8] mmc: core: Add mmc_regulator_set_vqmmc()
-In-Reply-To: <CAPDyKFqrkYXsbBJ61yYo0G8za1szARvA=as-5nLTiwGH5pCrEQ@mail.gmail.com>
-References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
- <17200614.QxCe8zAb7I@diego>
- <CAPDyKFpis8XnvrppHq7q_7DQeN2UiEpykNTJ=1iJJ9AGOHTW6Q@mail.gmail.com>
- <2695161.Z1IhqPE0bd@diego> <20151001173554.GB19319@codeaurora.org>
- <CAPDyKFqrkYXsbBJ61yYo0G8za1szARvA=as-5nLTiwGH5pCrEQ@mail.gmail.com>
-Message-ID: <560DF150.3000906@samsung.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Fri, 2 Oct 2015 11:00:38 +0800
+Subject: [PATCH] soc: mediatek: Fix random hang up issue while kernel init
+In-Reply-To: <CAGS+omCm2pKczooGkMf75HjQL=oF7Ufo6DsRCvvikt0QA1jx-g@mail.gmail.com>
+References: <1443162717-64831-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1443169573.3135.9.camel@pengutronix.de> <5607D224.4050801@gmail.com>
+ <CAGS+omCXMRf4bxWancSJSq2a1pc38TYYY46Os9ASWWCRp95_ig@mail.gmail.com>
+ <1443604022.3185.17.camel@pengutronix.de>
+ <1443683750.1714.25.camel@mtksdaap41>
+ <CAGS+omCpWqtKPKoyjFb=q4BxmfUGGsfvQGEZas8g8VLZKPtKbQ@mail.gmail.com>
+ <1443691590.1714.73.camel@mtksdaap41>
+ <CAGS+omCm2pKczooGkMf75HjQL=oF7Ufo6DsRCvvikt0QA1jx-g@mail.gmail.com>
+Message-ID: <1443754838.1714.94.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2015 06:05 AM, Ulf Hansson wrote:
-> On 1 October 2015 at 19:35, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> On 10/01, Heiko St?bner wrote:
->>> Am Donnerstag, 1. Oktober 2015, 11:54:24 schrieb Ulf Hansson:
->>>> On 30 September 2015 at 16:55, Heiko St?bner <heiko@sntech.de> wrote:
->>>>> Am Mittwoch, 30. September 2015, 16:42:05 schrieb Ulf Hansson:
->>>>>> On 30 September 2015 at 16:07, Heiko Stuebner <heiko@sntech.de> wrote:
->>>>> The clock changes of course only touch internals of the phase-clocks, so
->>>>> should have no problem going through another tree.
->>>>
->>>> What happens if I take mmc and dt changes, wouldn't I need the clock
->>>> patches as well?
->>>
->>> The API stays of course the same, only the degree to settings translation gets
->>> optimized, so I guess in the worst case you would get no good phase and thus
->>> fall back to non-highspeed modes - but the system would stay running.
->>>
->>> But of course, if the clock maintainers could Ack the two clock patches and
->>> everything would stay together that would work even better :-)
->>>
->>
->> If Ulf doesn't want to take them we can apply them to clk tree.
->> Otherwise, you can have my acked-by on the clk patches.
-> 
-> I don't mind picking up the clock patches. So I consider this as an
-> ack for both patch 1 and patch2, thanks.
-> 
-> Now, let's give Jaehoon some time to review the dw_mmc parts.
+Hi Daniel,
 
-I will check other patches on today, if it's ok, i will apply at my repository.
-Thanks for giving time! :)
-
-Best Regards,
-Jaehoon Chung
-
+On Thu, 2015-10-01 at 18:08 +0800, Daniel Kurtz wrote:
+> I see two cases where "a power domain is a consumer of a clock":
+>   (a) the clock is needed to access the power domain control
+> registers.  The clock must actually be in another power domain, since
+> otherwise you could never turn *on* the power domain in question.
+>   (b) the clock is needed to talk to the power domain that is about to
+> turn off, or that was just turned on - these clocks are usually used
+> to control some kind of bus arbitration, etc.  In this case, the
+> clocks are only accessed when the power domain is on.
 > 
-> Kind regards
-> Uffe
+> I would argue that in both cases, the clock should in theory should
+> only be enabled/disabled by the power on/off routine for the duration
+> of time that is needed, and that it should not be "left enabled" by
+> the power domain on/off function...  I can see how this might be a
+> useful optimization - but it also seems like a way to burn extra power
+> by leaving on a clock that is not necessarily being used.
 > 
+> But - perhaps I am over thinking this, and it is standard practice to
+> bundle power domains with the clocks that service components in the
+> power domain.
+
+Yes, you are right. Power domain on/off operations need clocks to get
+status of the subsystem. Keeping clocks on during power domain on is an
+optimization.
+
+But to model a clock controller as a power domain consumer, or say we
+need to control power domain before clock on/off, is not a good practice
+because we always consider clock operations should be light weight.
+Power domains should be controlled explicitly by subsystem drivers,
+instead of hiding behind clock controls.
+
+> Or, alternatively, just prepare venc_sel once during init, for each
+> clock controller that needs it, when configuring the clock controller
+> node (for example, in mtk_vencsys_init()). This is similar to how we
+> set up 'critical clocks'.
+> By just preparing the clock, you tell the common clock core:
+>  "my clock controller will need this clock later; please make sure
+> that it can be enabled/disabled later during atomic context."
+
+In current implementation, PLLs will be turned on in clk_prepare(). So
+if a clock is always prepared, its parent PLL will be kept on even if
+the clock is not enabled. It consumes extra power, so we don't prefer
+this kind of solution.
+
+
+Best regards,
+
+James
