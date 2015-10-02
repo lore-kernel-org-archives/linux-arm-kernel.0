@@ -1,155 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 2 Oct 2015 20:07:09 +0200
-Subject: [PATCH 9/9] ARM: add UEFI stub support
-In-Reply-To: <CAKv+Gu8y-ooMHPCHftb+_aYgb-FpbfeR==R9v+hY-_oetkPisw@mail.gmail.com>
-References: <1443719063-6832-1-git-send-email-ard.biesheuvel@linaro.org>
- <1443719063-6832-10-git-send-email-ard.biesheuvel@linaro.org>
- <CAD0U-h+zPhDe6Fqpg_vhF46FLjvvsbeSrQ_Fnj86o5cRc+A2QQ@mail.gmail.com>
- <CAKv+Gu8y-ooMHPCHftb+_aYgb-FpbfeR==R9v+hY-_oetkPisw@mail.gmail.com>
-Message-ID: <CAKv+Gu8Dby7u_aM+=1hxf0fdXVVbH3FYzDfgB=3z3GzO_VYpKw@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 2 Oct 2015 20:09:39 +0200
+Subject: [PATCH] arm-soc: Add Sigma Designs Tango4 port
+In-Reply-To: <20151002171334.GB21513@n2100.arm.linux.org.uk>
+References: <560EAA7C.3070302@free.fr> <yw1xoaghl099.fsf@unicorn.mansr.com>
+ <560EB1EC.3020403@free.fr> <20151002171334.GB21513@n2100.arm.linux.org.uk>
+Message-ID: <560EC863.8030600@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 October 2015 at 20:03, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 2 October 2015 at 18:29, Ryan Harkin <ryan.harkin@linaro.org> wrote:
->> Hi Ard/Roy,
+On 02/10/2015 19:13, Russell King - ARM Linux wrote:
+> On Fri, Oct 02, 2015 at 06:33:48PM +0200, Mason wrote:
+>> On 02/10/2015 18:10, M?ns Rullg?rd wrote:
 >>
->> On 1 October 2015 at 18:04, Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> wrote:
+>>> Mason writes:
 >>>
->>> From: Roy Franz <roy.franz@linaro.org>
+>>>> +		intc: intc at e000 {
+>>>> +			compatible = "sigma,tango-intc";
 >>>
->>> This patch adds EFI stub support for the ARM Linux kernel.
->>>
->>> The EFI stub operates similarly to the x86 and arm64 stubs: it is a
->>> shim between the EFI firmware and the normal zImage entry point, and
->>> sets up the environment that the zImage is expecting. This includes
->>> optionally loading the initrd and device tree from the system partition
->>> based on the kernel command line.
->>>
->>> Signed-off-by: Roy Franz <roy.franz@linaro.org>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>  arch/arm/Kconfig                       |  19 +++
->>>  arch/arm/boot/compressed/Makefile      |   5 +-
->>>  arch/arm/boot/compressed/efi-header.S  | 130 ++++++++++++++++++++
->>>  arch/arm/boot/compressed/efi-stub.c    |  89 ++++++++++++++
->>>  arch/arm/boot/compressed/head.S        |  54 +++++++-
->>>  arch/arm/boot/compressed/vmlinux.lds.S |   7 ++
->>>  arch/arm/include/asm/efi.h             |  23 ++++
->>>  drivers/firmware/efi/libstub/Makefile  |  12 ++
->>>  8 files changed, 336 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->>> index e4b7d6cfd8eb..6d7fd83c2ee4 100644
->>> --- a/arch/arm/Kconfig
->>> +++ b/arch/arm/Kconfig
->>> @@ -2061,6 +2061,25 @@ config AUTO_ZRELADDR
->>>           0xf8000000. This assumes the zImage being placed in the first
->>> 128MB
->>>           from start of memory.
->>>
->>> +config EFI_STUB
->>> +       bool
->>> +
->>> +config EFI
->>> +       bool "UEFI runtime support"
->>> +       depends on OF && !CPU_BIG_ENDIAN && MMU && AUTO_ZRELADDR &&
->>> !XIP_KERNEL
->>> +       select UCS2_STRING
->>> +       select EFI_PARAMS_FROM_FDT
->>> +       select EFI_STUB
->>> +       select EFI_ARMSTUB
->>> +       select EFI_RUNTIME_WRAPPERS
+>>> Why do you insist on using other names than the ones I've been using for
+>>> months?  Just want to leave your own mark on the code?
 >>
->>
->> Should we make this "default y" like ARM64?  I think so.
->>
->>
->
-> It is not necessarily something that should be enabled by default,
-> imo. The distro kernels will probably enabled it, which is good enough
-> for me.
->
->>> +       ---help---
->>> +         This option provides support for runtime services provided
->>> +         by UEFI firmware (such as non-volatile variables, realtime
->>> +         clock, and platform reset). A UEFI stub is also provided to
->>> +         allow the kernel to be booted as an EFI application. This
->>> +         is only useful for kernels that may run on systems that have
->>> +         UEFI firmware.
->>> +
->>>  endmenu
->>>
->>>  menu "CPU Power Management"
->>> diff --git a/arch/arm/boot/compressed/Makefile
->>> b/arch/arm/boot/compressed/Makefile
->>> index 3f9a9ebc77c3..0e5624d6215d 100644
->>> --- a/arch/arm/boot/compressed/Makefile
->>> +++ b/arch/arm/boot/compressed/Makefile
->>> @@ -167,9 +167,12 @@ if [ $(words $(ZRELADDR)) -gt 1 -a
->>> "$(CONFIG_AUTO_ZRELADDR)" = "" ]; then \
->>>         false; \
->>>  fi
->>>
->>> +efi-obj-$(CONFIG_EFI_STUB) := $(obj)/efi-stub.o $(obj)/efi-banner.o \
->>
->>
->> When I try to compile the kernel from your branch, I get:
->>
->> make[2]: *** No rule to make target 'arch/arm/boot/compressed/efi-banner.o',
->> needed by 'arch/arm/boot/compressed/vmlinux'. Stop.
->>
->> Did I miss something or is this a problem?
->>
->
-> It was I who missed something: I have been reshuffling some bits, and
-> this fell through the cracks. I didn't spot it since I apparently did
-> not try to rebuild it cleanly.
->
-> I would like to get rid of the linux_banner reference in the stub
-> completely, and I posted a patch here
->
+>> You're using "sigma,smp8640-intc".
+>> The SMP8640 is a Tango3 (MIPS-based) platform.
+> 
+> If it's the same device, then there's nothing wrong with re-using the
+> compatible.  The compatible property actually accepts multiple values,
+> so you can do:
+> 
+> 			compatible = "sigma,tango4-intc", "sigma,smp8640-intc";
 
-Where? Here:
-http://marc.info/?l=linux-arm-kernel&m=144313135923256
+I have access to resources unavailable to Mans. Since I know the
+interrupt controller is the same on Tango2, Tango3 and Tango4,
+doesn't it make sense to use the string "sigma,tango-intc"
+given that the driver is not even upstream yet?
 
-> In the mean time, could you try with this folded in?
->
-> -------------------8<--------------------
-> diff --git a/arch/arm/boot/compressed/Makefile
-> b/arch/arm/boot/compressed/Makefile
-> index 0e5624d6215d..a6aa7f9123a2 100644
-> --- a/arch/arm/boot/compressed/Makefile
-> +++ b/arch/arm/boot/compressed/Makefile
-> @@ -170,6 +170,10 @@ fi
->  efi-obj-$(CONFIG_EFI_STUB) := $(obj)/efi-stub.o $(obj)/efi-banner.o \
->                               $(objtree)/drivers/firmware/efi/libstub/lib.a
->
-> +$(obj)/efi-banner.o: OBJCOPYFLAGS=-j .rodata
-> +$(obj)/efi-banner.o: $(objtree)/init/version.o FORCE
-> +       $(call if_changed,objcopy)
-> +
->  $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
->                 $(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) \
->                 $(bswapsdi2) $(efi-obj-y) FORCE
-> diff --git a/drivers/firmware/efi/libstub/fdt.c
-> b/drivers/firmware/efi/libstub/fdt.c
-> index a7e87cd582f2..f45a6f715e73 100644
-> --- a/drivers/firmware/efi/libstub/fdt.c
-> +++ b/drivers/firmware/efi/libstub/fdt.c
-> @@ -16,6 +16,8 @@
->
->  #include "efistub.h"
->
-> +extern __attribute__((__visibility__("hidden"))) const char linux_banner[];
-> +
->  efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->                         unsigned long orig_fdt_size,
->                         void *fdt, int new_fdt_size, char *cmdline_ptr,
-> -------------------8<--------------------
->
-> Thanks for testing!
->
-> --
-> Ard.
+(If worse comes to worst, I suppose I can always write my own
+driver from scratch; I just find it silly to duplicate work.)
+
+> See the ePAPR spec - I'll include the relevant bit:
+> 
+> Property: compatible
+> Value type: <stringlist>
+> Description: The compatible property value consists of one or more strings
+>  that define the specific programming model for the device. This list of
+>  strings should be used by a client program for device driver selection.
+>  The property value consists of a concatenated list of null terminated
+>  strings, from most specific to most general. They allow a device to
+>  express its compatibility with a family of similar devices, potentially
+>  allowing a single device driver to match against several devices. ...
+> Example: compatible = "fsl,mpc8641-uart", "ns16550";
+>  In this example, an operating system would first try to locate a device
+>  driver that supported fsl,mpc8641-uart. If a driver was not found, it
+>  would then try to locate a driver that supported the more general
+>  ns16550 device type.
+> 
+> Note also that vendor prefixes should be listed in
+> Documentation/devicetree/bindings/vendor-prefixes.txt.  If it's not there,
+> you need to propose a separate patch (to the devicetree mailing list) to
+> add it, which must be done with their agreement.  Right now, the use of
+> "sigma" as a prefix is entirely non-standard and not acceptable in DT
+> files until this is done.
+
+As far as the upstreaming process is concerned, I speak for Sigma.
+
+Regards.
