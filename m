@@ -1,60 +1,49 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 2 Oct 2015 11:28:39 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.4
-In-Reply-To: <20150924050843.GA3822@verge.net.au>
-References: <cover.1442536920.git.horms+renesas@verge.net.au>
- <CAMuHMdX41ggvKAKrp3s++UMYidhXuASoMP3xzdtnxjoL=0jpSA@mail.gmail.com>
- <1484890.bItsbzvneZ@wuerfel>
- <CAMuHMdX_kgj4c4J4rZUySfJmcV0t2xUBizhp102Xx-k1yn2jQQ@mail.gmail.com>
- <20150918081935.GA20840@verge.net.au>
- <20150924050843.GA3822@verge.net.au>
-Message-ID: <20151002022838.GA15481@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  2 Oct 2015 11:29:28 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.3
+Message-ID: <cover.1443752733.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Olof, Hi Kevin, Hi Arnd,
 
-On Thu, Sep 24, 2015 at 02:08:46PM +0900, Simon Horman wrote:
-> Hi Arnd,
-> 
-> On Fri, Sep 18, 2015 at 05:19:36PM +0900, Simon Horman wrote:
-> > On Fri, Sep 18, 2015 at 09:29:58AM +0200, Geert Uytterhoeven wrote:
-> > > Hi Arnd,
-> > > 
-> > > On Fri, Sep 18, 2015 at 9:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > > On Friday 18 September 2015 09:16:31 Geert Uytterhoeven wrote:
-> > > >> On Fri, Sep 18, 2015 at 2:47 AM, Simon Horman
-> > > >> <horms+renesas@verge.net.au> wrote:
-> > > >> > Renesas ARM Based SoC DT Updates for v4.4
-> > > >> >
-> > > >> > * Add missing CPG/MSTP Clock Domain for sound on r8a779[01] SoCs
-> > > >>
-> > > >> >       ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain for sound
-> > > >> >       ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain for sound
-> > > >>
-> > > >> These two should actually go in in v4.3, as they're bugfixes for commits that
-> > > >> are in v4.3-rc1. That can be done in parallel, though.
-> > > >>
-> > > >> Sound will stop working in mainline as soon as commit cbc41d0a761bffb3
-> > > >> ("drivers: sh: Disable PM runtime for multi-platform ARM with genpd") in
-> > > >> sh-drivers-for-v4.3 enters mainline.
-> > > >
-> > > > The commits are on the top of the branch, so we could just remove them
-> > > > here and apply them to the fixes branch if you like.
-> > > 
-> > > That sounds fine to me, thanks!
-> > > 
-> > > Simon, is that OK for you?
-> > 
-> > Yes, perfectly fine.
-> 
-> I am wondering if you need anything from me at this point.
+Please consider these Renesas ARM based SoC fixes for v4.3.
 
-In the interest of moving things forwards I am:
+These changes are required to restore working sound for the r8a779[01] SoCs
+in v4.3.
 
-* Withdrawing this pull request
-* Preparing a pull request with only the fixes
+My understanding is that with the inclusion of
+"drivers: sh: Disable PM runtime for multi-platform ARM with genpd"
+in v4.3-rc3 sound stopped working for the SoCs in question.
 
-I will also prepare an updated, v2, version of this pull request
-without the fixes and with some new patches I have queued-up in
-the mean time.
+These patches were previously posted as part of
+"Renesas ARM Based SoC DT Updates for v4.4".
+I have withdrawn that pull request.
+
+
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.3
+
+for you to fetch changes up to 56e86dd4bbeb66a7ad67e20fa045c6f51b4da571:
+
+  ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain for sound (2015-09-29 09:44:13 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Fixes for v4.3
+
+* Add Add CPG/MSTP Clock Domain for sound on r8a779[01] SoCs.
+  This allows sound to work once again.
+
+----------------------------------------------------------------
+Geert Uytterhoeven (2):
+      ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain for sound
+      ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain for sound
+
+ arch/arm/boot/dts/r8a7790.dtsi | 1 +
+ arch/arm/boot/dts/r8a7791.dtsi | 1 +
+ 2 files changed, 2 insertions(+)
