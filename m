@@ -1,132 +1,95 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 02 Oct 2015 17:10:26 +0100
-Subject: [PATCH] arm-soc: Add Sigma Designs Tango4 port
-In-Reply-To: <560EAA7C.3070302@free.fr> (Mason's message of "Fri, 2 Oct 2015
- 18:02:04 +0200")
-References: <560EAA7C.3070302@free.fr>
-Message-ID: <yw1xoaghl099.fsf@unicorn.mansr.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  2 Oct 2015 17:24:17 +0100
+Subject: [PATCH] ARM: Remove open-coded version of IRQCHIP_DECLARE
+Message-ID: <1443803057-9007-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+Now that the IRQCHIP_DECLARE macro has been moved to linux/irqchip.h,
+it becomes possible to cleanup the open-coded versions of the same
+macro that have been added to some private irqchips implementations.
 
-> diff --git a/arch/arm/boot/dts/tango4.dtsi b/arch/arm/boot/dts/tango4.dtsi
-> new file mode 100644
-> index 000000000000..7336fcc3ac1d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/tango4.dtsi
-> @@ -0,0 +1,117 @@
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +
-> +/ {
-> +	compatible = "sigma,tango4-soc";
-> +
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	clocks {
-> +		ranges;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
-> +		xtal: xtal {
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <27000000>;
-> +			#clock-cells = <0>;
-> +		};
-> +
-> +		sysclk: sysclk {
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <396000000>;
-> +			#clock-cells = <0>;
-> +		};
-> +
-> +		cpuclk: cpuclk {
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <999000000>;
-> +			#clock-cells = <0>;
-> +		};
-> +
-> +		periphclk: periphclk {
-> +			compatible = "fixed-factor-clock";
-> +			clocks = <&cpuclk>;
-> +			clock-mult = <1>;
-> +			clock-div  = <2>;
-> +			#clock-cells = <0>;
-> +		};
-> +	};
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-exynos/suspend.c       | 3 ++-
+ arch/arm/mach-imx/gpc.c              | 8 ++------
+ arch/arm/mach-omap2/omap-wakeupgen.c | 8 ++------
+ 3 files changed, 6 insertions(+), 13 deletions(-)
 
-Once more with feeling, why don't you want to use the fine clock driver
-I wrote?
-
-> +	gic: gic at 20001000 {
-> +		compatible = "arm,cortex-a9-gic";
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		reg = <0x20001000 0x1000>,
-> +		      <0x20000100 0x0100>;
-> +	};
-> +
-> +	twd-timer at 20000600 {
-> +		compatible = "arm,cortex-a9-twd-timer";
-> +		reg = <0x20000600 0x10>;
-> +		interrupts = <1 13 0xf01>;
-> +		interrupt-parent = <&gic>;
-> +		clocks = <&periphclk>;
-> +		twd_never_stops;
-> +	};
-> +
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		xtal_in_cnt {
-> +			compatible = "sigma,xtal_in_cnt";
-> +			reg = <0x10048 0x4>;
-> +			clocks = <&xtal>;
-> +		};
-> +
-> +		uart0 {
-> +			compatible = "ralink,rt2880-uart";
-> +			reg = <0x10700 0x100>;
-> +			clock-frequency = <7372800>;
-> +			reg-shift = <2>;
-> +/*			fifo-size = <16>; BROKEN */
-
-Either fix whatever is broken or drop that line.
-
-> +		};
-> +
-> +		eth0: eth0 {
-> +			compatible = "sigma,smp8640-emac";
-> +			reg = <0x26000 0x800>;
-> +			interrupts = <38 4>;
-> +			interrupt-parent = <&irq0>;
-> +			mac-address = [ 00 16 e8 02 08 42 ];
-
-mac-address should not be hardcoded here or anywhere else.
-
-> +			clocks = <&sysclk>;
-> +		};
-> +
-> +		intc: intc at e000 {
-> +			compatible = "sigma,tango-intc";
-
-Why do you insist on using other names than the ones I've been using for
-months?  Just want to leave your own mark on the code?
-
-> diff --git a/arch/arm/mach-tangox/Kconfig b/arch/arm/mach-tangox/Kconfig
-> new file mode 100644
-> index 000000000000..152cdd487056
-> --- /dev/null
-> +++ b/arch/arm/mach-tangox/Kconfig
-> @@ -0,0 +1,12 @@
-> +# Tango3 was based on MIPS 74kf. Tango4 is based on ARM Cortex A9 MPCore.
-
-This comment isn't relevant to the contents of the file.
-
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index e00eb39..dfb1fcf 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -19,6 +19,7 @@
+ #include <linux/cpu_pm.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
++#include <linux/irqchip.h>
+ #include <linux/irqdomain.h>
+ #include <linux/of_address.h>
+ #include <linux/err.h>
+@@ -262,7 +263,7 @@ static int __init exynos_pmu_irq_init(struct device_node *node,
+ 	return 0;
+ }
+ 
+-#define EXYNOS_PMU_IRQ(symbol, name)	OF_DECLARE_2(irqchip, symbol, name, exynos_pmu_irq_init)
++#define EXYNOS_PMU_IRQ(symbol, name)	IRQCHIP_DECLARE(symbol, name, exynos_pmu_irq_init)
+ 
+ EXYNOS_PMU_IRQ(exynos3250_pmu_irq, "samsung,exynos3250-pmu");
+ EXYNOS_PMU_IRQ(exynos4210_pmu_irq, "samsung,exynos4210-pmu");
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index 8c4467f..f2783b0 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -14,6 +14,7 @@
+ #include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
++#include <linux/irqchip.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+@@ -268,12 +269,7 @@ static int __init imx_gpc_init(struct device_node *node,
+ 
+ 	return 0;
+ }
+-
+-/*
+- * We cannot use the IRQCHIP_DECLARE macro that lives in
+- * drivers/irqchip, so we're forced to roll our own. Not very nice.
+- */
+-OF_DECLARE_2(irqchip, imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
++IRQCHIP_DECLARE(imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
+ 
+ void __init imx_gpc_check_dt(void)
+ {
+diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
+index e1d2e99..0f8c1d1 100644
+--- a/arch/arm/mach-omap2/omap-wakeupgen.c
++++ b/arch/arm/mach-omap2/omap-wakeupgen.c
+@@ -20,6 +20,7 @@
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
++#include <linux/irqchip.h>
+ #include <linux/irqdomain.h>
+ #include <linux/of_address.h>
+ #include <linux/platform_device.h>
+@@ -537,9 +538,4 @@ static int __init wakeupgen_init(struct device_node *node,
+ 
+ 	return 0;
+ }
+-
+-/*
+- * We cannot use the IRQCHIP_DECLARE macro that lives in
+- * drivers/irqchip, so we're forced to roll our own. Not very nice.
+- */
+-OF_DECLARE_2(irqchip, ti_wakeupgen, "ti,omap4-wugen-mpu", wakeupgen_init);
++IRQCHIP_DECLARE(ti_wakeupgen, "ti,omap4-wugen-mpu", wakeupgen_init);
 -- 
-M?ns Rullg?rd
-mans at mansr.com
+2.1.4
