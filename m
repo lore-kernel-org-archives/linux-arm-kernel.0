@@ -1,54 +1,85 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Thu, 1 Oct 2015 19:16:16 -0500
-Subject: [PATCH] serial: Enable Freescale 16550 workaround on arm
-Message-ID: <20151002001616.GA3885@home.buserror.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 1 Oct 2015 17:19:05 -0700
+Subject: [PATCH 2/3] clk: bcm2835: Add a driver for the auxiliary
+ peripheral clock gates.
+In-Reply-To: <1441923750-19404-3-git-send-email-eric@anholt.net>
+References: <1441923750-19404-1-git-send-email-eric@anholt.net>
+ <1441923750-19404-3-git-send-email-eric@anholt.net>
+Message-ID: <20151002001905.GB12338@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The same serial hardware is present on LS2080A which is arm64, and
-LS1021A which is arm32, so don't limit the workaround to PPC.
+On 09/10, Eric Anholt wrote:
+> diff --git a/drivers/clk/bcm/clk-bcm2835-aux.c b/drivers/clk/bcm/clk-bcm2835-aux.c
+> new file mode 100644
+> index 0000000..1efa6fb
+> --- /dev/null
+> +++ b/drivers/clk/bcm/clk-bcm2835-aux.c
+> @@ -0,0 +1,80 @@
+> +/*
+> + * Copyright (C) 2015 Broadcom
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/clkdev.h>
 
-Unlike PPC which uses arch/powerpc/kernel/legacy_serial.c, the ARM
-targets use drivers/tty/serial/of_serial.c, so add the handle_irq
-override check there as well.
+Is this include used?
 
-Signed-off-by: Scott Wood <scottwood@freescale.com>
----
- drivers/tty/serial/8250/Kconfig | 4 ++--
- drivers/tty/serial/of_serial.c  | 6 ++++++
- 2 files changed, 8 insertions(+), 2 deletions(-)
+> +#include <linux/clk/bcm2835.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <dt-bindings/clock/bcm2835-aux.h>
+> +
+> +static int bcm2835_aux_clk_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct clk_onecell_data *onecell;
+> +	const char *parent;
+> +	struct clk *parent_clk;
+> +	void __iomem *reg;
+> +
+> +	parent_clk = of_clk_get(dev->of_node, 0);
+> +	if (IS_ERR(parent_clk))
+> +		return PTR_ERR(parent_clk);
 
-diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
-index e1de118..5a2ae57 100644
---- a/drivers/tty/serial/8250/Kconfig
-+++ b/drivers/tty/serial/8250/Kconfig
-@@ -274,8 +274,8 @@ config SERIAL_8250_ACORN
- 
- config SERIAL_8250_FSL
- 	bool
--	depends on SERIAL_8250_CONSOLE && PPC_UDBG_16550
--	default PPC
-+	depends on SERIAL_8250_CONSOLE
-+	default PPC || ARM || ARM64
- 
- config SERIAL_8250_DW
- 	tristate "Support for Synopsys DesignWare 8250 quirks"
-diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
-index 6823df9..9cd0061 100644
---- a/drivers/tty/serial/of_serial.c
-+++ b/drivers/tty/serial/of_serial.c
-@@ -150,6 +150,12 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
- 		break;
- 	}
- 
-+#ifdef CONFIG_SERIAL_8250_FSL
-+	if (of_device_is_compatible(np, "fsl,ns16550") ||
-+	    of_device_is_compatible(np, "fsl,16550-FIFO64"))
-+		port->handle_irq = fsl8250_handle_irq;
-+#endif
-+
- 	return 0;
- out:
- 	if (info->clk)
+We have a device, any reason we can't use clk_get() directly?
+
+> +	parent = __clk_get_name(parent_clk);
+> +
+> +	reg = of_iomap(dev->of_node, 0);
+
+We have a platform device here, why aren't we using platform
+device APIs like platform_get_resource() and
+devm_ioremap_resource()?
+
+> +	if (!reg)
+> +		return -ENODEV;
+> +
+> +	onecell = kmalloc(sizeof(*onecell), GFP_KERNEL);
+> +	if (!onecell)
+> +		return -ENOMEM;
+> +	onecell->clk_num = BCM2835_AUX_CLOCK_COUNT;
+> +	onecell->clks = kzalloc(sizeof(*onecell->clks) *
+
+kcalloc?
+
+> +				BCM2835_AUX_CLOCK_COUNT, GFP_KERNEL);
+> +	if (!onecell->clks)
+> +		return -ENOMEM;
+> +
+
 -- 
-2.1.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
