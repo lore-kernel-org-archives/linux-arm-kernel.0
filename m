@@ -1,41 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  2 Oct 2015 16:44:06 +0100
-Subject: [PATCH 2/2] irqchip/gic-v3-its: Count additional LPIs for the aliased
- devices
-In-Reply-To: <1443800646-8074-1-git-send-email-marc.zyngier@arm.com>
-References: <1443800646-8074-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1443800646-8074-3-git-send-email-marc.zyngier@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 2 Oct 2015 16:49:01 +0100
+Subject: [PATCH 09/15] arm64: Add page size to the kernel image header
+In-Reply-To: <1442331684-28818-10-git-send-email-suzuki.poulose@arm.com>
+References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
+ <1442331684-28818-10-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151002154900.GN6963@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When configuring the interrupt mapping for a new device, we
-iterate over all the possible aliases to account for their
-maximum MSI allocation. This was introduced by e8137f4f5088
-("irqchip: gicv3-its: Iterate over PCI aliases to generate ITS configuration").
+On Tue, Sep 15, 2015 at 04:41:18PM +0100, Suzuki K. Poulose wrote:
+> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> 
+> This patch adds the page size to the arm64 kernel image header
+> so that one can infer the PAGESIZE used by the kernel. This will
+> be helpful to diagnose failures to boot the kernel with page size
+> not supported by the CPU.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Turns out that the code doing that is a bit braindead, and repeatedly
-accounts for the same device over and over.
+This patch needs you signed-off-by as well since you are posting it. And
+IIRC I acked it as well, I'll check.
 
-Fix this by counting the actual alias that is passed to us by the
-core code.
+If you are fine with adding your signed-of-by, I can add it to the patch
+when applying (unless I see other issues with the series).
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3-its-pci-msi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-index cf351c6..a7c8c9f 100644
---- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-@@ -62,7 +62,7 @@ static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
- 
- 	dev_alias->dev_id = alias;
- 	if (pdev != dev_alias->pdev)
--		dev_alias->count += its_pci_msi_vec_count(dev_alias->pdev);
-+		dev_alias->count += its_pci_msi_vec_count(pdev);
- 
- 	return 0;
- }
 -- 
-2.1.4
+Catalin
