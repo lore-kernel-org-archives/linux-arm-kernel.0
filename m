@@ -1,130 +1,75 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Fri, 2 Oct 2015 18:57:36 -0400
-Subject: [PATCH 01/10] clk: iproc: Add PWRCTRL support
+Date: Fri, 2 Oct 2015 18:57:43 -0400
+Subject: [PATCH 08/10] clk: iproc: define Broadcom NS2 iProc clock binding
 In-Reply-To: <1443826665-17570-1-git-send-email-jonmason@broadcom.com>
 References: <1443826665-17570-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1443826665-17570-2-git-send-email-jonmason@broadcom.com>
+Message-ID: <1443826665-17570-9-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some iProc SoC clocks use a different way to control clock power, via
-the PWRDWN bit in the PLL control register.  Since the PLL control
-register is used to access the PWRDWN bit, there is no need for the
-pwr_base when this is being used.  A new flag, IPROC_CLK_EMBED_PWRCTRL,
-has been added to identify this usage.  We can use the AON interface to
-write the values to enable/disable PWRDOWN.
+Document the device tree bindings for Broadcom Northstar 2 architecture
+based clock controller
 
 Signed-off-by: Jon Mason <jonmason@broadcom.com>
 ---
- drivers/clk/bcm/clk-iproc-pll.c | 55 ++++++++++++++++++++++++++++-------------
- drivers/clk/bcm/clk-iproc.h     |  6 +++++
- 2 files changed, 44 insertions(+), 17 deletions(-)
+ .../bindings/clock/brcm,iproc-clocks.txt           | 48 ++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-diff --git a/drivers/clk/bcm/clk-iproc-pll.c b/drivers/clk/bcm/clk-iproc-pll.c
-index 2dda4e8..e029ab3 100644
---- a/drivers/clk/bcm/clk-iproc-pll.c
-+++ b/drivers/clk/bcm/clk-iproc-pll.c
-@@ -148,14 +148,25 @@ static void __pll_disable(struct iproc_pll *pll)
- 		writel(val, pll->asiu_base + ctrl->asiu.offset);
- 	}
- 
--	/* latch input value so core power can be shut down */
--	val = readl(pll->pwr_base + ctrl->aon.offset);
--	val |= (1 << ctrl->aon.iso_shift);
--	writel(val, pll->pwr_base + ctrl->aon.offset);
--
--	/* power down the core */
--	val &= ~(bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
--	writel(val, pll->pwr_base + ctrl->aon.offset);
-+	if (ctrl->flags & IPROC_CLK_EMBED_PWRCTRL) {
-+		val = readl(pll->pll_base + ctrl->aon.offset);
-+		val |= (bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
-+		writel(val, pll->pll_base + ctrl->aon.offset);
+diff --git a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+index b3c3e9d..ede65a5 100644
+--- a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
++++ b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+@@ -160,3 +160,51 @@ Northstar Plus.  These clock IDs are defined in:
+     pcie_phy	lcpll0		1	BCM_NSP_LCPLL0_PCIE_PHY_REF_CLK
+     sdio	lcpll0		2	BCM_NSP_LCPLL0_SDIO_CLK
+     ddr_phy	lcpll0		3	BCM_NSP_LCPLL0_DDR_PHY_CLK
 +
-+		if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
-+			readl(pll->pll_base + ctrl->aon.offset);
-+	}
++Northstar 2
++-----------
++PLL and leaf clock compatible strings for Northstar 2 are:
++    "brcm,ns2-genpll-scr"
++    "brcm,ns2-genpll-sw"
++    "brcm,ns2-lcpll-ddr"
++    "brcm,ns2-lcpll-ports"
 +
-+	if (pll->pwr_base) {
-+		/* latch input value so core power can be shut down */
-+		val = readl(pll->pwr_base + ctrl->aon.offset);
-+		val |= (1 << ctrl->aon.iso_shift);
-+		writel(val, pll->pwr_base + ctrl->aon.offset);
++The following table defines the set of PLL/clock index and ID for Northstar 2.
++These clock IDs are defined in:
++    "include/dt-bindings/clock/bcm-ns2.h"
 +
-+		/* power down the core */
-+		val &= ~(bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
-+		writel(val, pll->pwr_base + ctrl->aon.offset);
-+	}
- }
- 
- static int __pll_enable(struct iproc_pll *pll)
-@@ -163,11 +174,22 @@ static int __pll_enable(struct iproc_pll *pll)
- 	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
- 	u32 val;
- 
--	/* power up the PLL and make sure it's not latched */
--	val = readl(pll->pwr_base + ctrl->aon.offset);
--	val |= bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift;
--	val &= ~(1 << ctrl->aon.iso_shift);
--	writel(val, pll->pwr_base + ctrl->aon.offset);
-+	if (ctrl->flags & IPROC_CLK_EMBED_PWRCTRL) {
-+		val = readl(pll->pll_base + ctrl->aon.offset);
-+		val &= ~(bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
-+		writel(val, pll->pll_base + ctrl->aon.offset);
++    Clock	Source		Index	ID
++    ---		-----		-----	---------
++    crystal	N/A		N/A	N/A
 +
-+		if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
-+			readl(pll->pll_base + ctrl->aon.offset);
-+	}
++    genpll_scr	crystal		0	BCM_NS2_GENPLL_SCR
++    scr		genpll_scr	1	BCM_NS2_GENPLL_SCR_SCR_CLK
++    fs		genpll_scr	2	BCM_NS2_GENPLL_SCR_FS_CLK
++    audio_ref	genpll_scr	3	BCM_NS2_GENPLL_SCR_AUDIO_CLK
++    ch3_unused	genpll_scr	4	BCM_NS2_GENPLL_SCR_CH3_UNUSED
++    ch4_unused	genpll_scr	5	BCM_NS2_GENPLL_SCR_CH4_UNUSED
++    ch5_unused	genpll_scr	6	BCM_NS2_GENPLL_SCR_CH5_UNUSED
 +
-+	if (pll->pwr_base) {
-+		/* power up the PLL and make sure it's not latched */
-+		val = readl(pll->pwr_base + ctrl->aon.offset);
-+		val |= bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift;
-+		val &= ~(1 << ctrl->aon.iso_shift);
-+		writel(val, pll->pwr_base + ctrl->aon.offset);
-+	}
- 
- 	/* certain PLLs also need to be ungated from the ASIU top level */
- 	if (ctrl->flags & IPROC_CLK_PLL_ASIU) {
-@@ -610,9 +632,8 @@ void __init iproc_pll_clk_setup(struct device_node *node,
- 	if (WARN_ON(!pll->pll_base))
- 		goto err_pll_iomap;
- 
-+	/* Some SoCs do not require the pwr_base, thus failing is not fatal */
- 	pll->pwr_base = of_iomap(node, 1);
--	if (WARN_ON(!pll->pwr_base))
--		goto err_pwr_iomap;
- 
- 	/* some PLLs require gating control at the top ASIU level */
- 	if (pll_ctrl->flags & IPROC_CLK_PLL_ASIU) {
-@@ -695,9 +716,9 @@ err_pll_register:
- 		iounmap(pll->asiu_base);
- 
- err_asiu_iomap:
--	iounmap(pll->pwr_base);
-+	if (pll->pwr_base)
-+		iounmap(pll->pwr_base);
- 
--err_pwr_iomap:
- 	iounmap(pll->pll_base);
- 
- err_pll_iomap:
-diff --git a/drivers/clk/bcm/clk-iproc.h b/drivers/clk/bcm/clk-iproc.h
-index d834b7a..ff7bfad 100644
---- a/drivers/clk/bcm/clk-iproc.h
-+++ b/drivers/clk/bcm/clk-iproc.h
-@@ -49,6 +49,12 @@
- #define IPROC_CLK_PLL_NEEDS_SW_CFG BIT(4)
- 
- /*
-+ * Some PLLs use a different way to control clock power, via the PWRDWN bit in
-+ * the PLL control register
-+ */
-+#define IPROC_CLK_EMBED_PWRCTRL BIT(5)
++    genpll_sw	crystal		0	BCM_NS2_GENPLL_SW
++    rpe		genpll_sw	1	BCM_NS2_GENPLL_SW_RPE_CLK
++    250		genpll_sw	2	BCM_NS2_GENPLL_SW_250_CLK
++    nic		genpll_sw	3	BCM_NS2_GENPLL_SW_NIC_CLK
++    chimp	genpll_sw	4	BCM_NS2_GENPLL_SW_CHIMP_CLK
++    port	genpll_sw	5	BCM_NS2_GENPLL_SW_PORT_CLK
++    sdio	genpll_sw	6	BCM_NS2_GENPLL_SW_SDIO_CLK
 +
-+/*
-  * Parameters for VCO frequency configuration
-  *
-  * VCO frequency =
++    lcpll_ddr	crystal		0	BCM_NS2_LCPLL_DDR
++    pcie_sata_usb lcpll_ddr	1	BCM_NS2_LCPLL_DDR_PCIE_SATA_USB_CLK
++    ddr		lcpll_ddr	2	BCM_NS2_LCPLL_DDR_DDR_CLK
++    ch2_unused	lcpll_ddr	3	BCM_NS2_LCPLL_DDR_CH2_UNUSED
++    ch3_unused	lcpll_ddr	4	BCM_NS2_LCPLL_DDR_CH3_UNUSED
++    ch4_unused	lcpll_ddr	5	BCM_NS2_LCPLL_DDR_CH4_UNUSED
++    ch5_unused	lcpll_ddr	6	BCM_NS2_LCPLL_DDR_CH5_UNUSED
++
++    lcpll_ports	crystal		0	BCM_NS2_LCPLL_PORTS
++    wan		lcpll_ports	1	BCM_NS2_LCPLL_PORTS_WAN_CLK
++    rgmii	lcpll_ports	2	BCM_NS2_LCPLL_PORTS_RGMII_CLK
++    ch2_unused	lcpll_ports	3	BCM_NS2_LCPLL_PORTS_CH2_UNUSED
++    ch3_unused	lcpll_ports	4	BCM_NS2_LCPLL_PORTS_CH3_UNUSED
++    ch4_unused	lcpll_ports	5	BCM_NS2_LCPLL_PORTS_CH4_UNUSED
++    ch5_unused	lcpll_ports	6	BCM_NS2_LCPLL_PORTS_CH5_UNUSED
 -- 
 1.9.1
