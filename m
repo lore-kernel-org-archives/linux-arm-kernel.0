@@ -1,43 +1,40 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 2 Oct 2015 08:43:52 +0900
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 02 Oct 2015 09:03:32 +0900
 Subject: [PATCH] thermal: exynos: fix register read in TMU
-In-Reply-To: <20151001141243.GA5061@sudip-pc>
+In-Reply-To: <1443699599-9693-1-git-send-email-sudipm.mukherjee@gmail.com>
 References: <1443699599-9693-1-git-send-email-sudipm.mukherjee@gmail.com>
- <CAJKOXPfyC8etcPe373q6Pc1qWb2zVnHE96V+Rh5mPmpzAxFjiA@mail.gmail.com>
- <20151001141243.GA5061@sudip-pc>
-Message-ID: <CAJKOXPdVs9i9sVP84wa2wU0qVH1-o4unvaDC+O7c1za6bJUSLw@mail.gmail.com>
+Message-ID: <560DC9D4.2000301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-01 23:12 GMT+09:00 Sudip Mukherjee <sudipm.mukherjee@gmail.com>:
-> On Thu, Oct 01, 2015 at 10:18:57PM +0900, Krzysztof Kozlowski wrote:
->> 2015-10-01 20:39 GMT+09:00 Sudip Mukherjee <sudipm.mukherjee@gmail.com>:
->> > The value of emul_con was getting overwritten if the selected soc is
->> > SOC_ARCH_EXYNOS5260. And so as a result we were reading from the wrong
->> > register in the case of SOC_ARCH_EXYNOS5260.
->>
->> How the value is overwritten if the soc is Exynos5260? I can't see it
->> (although the "else if" is still more obvious than "if" but how does
->> the description match the code?).
-> The code here is:
-> if (data->soc == SOC_ARCH_EXYNOS5260)
->         emul_con = EXYNOS5260_EMUL_CON;
-> if (data->soc == SOC_ARCH_EXYNOS5433)
->         emul_con = EXYNOS5433_TMU_EMUL_CON;
-> else if (data->soc == SOC_ARCH_EXYNOS7)
->         emul_con = EXYNOS7_TMU_REG_EMUL_CON;
-> else
->         emul_con = EXYNOS_EMUL_CON;
->
-> So if data->soc is SOC_ARCH_EXYNOS5260 , then emul_con becomes
-> EXYNOS5260_EMUL_CON. But again for the else part it will become
-> EXYNOS_EMUL_CON.
+On 2015? 10? 01? 20:39, Sudip Mukherjee wrote:
+> The value of emul_con was getting overwritten if the selected soc is
+> SOC_ARCH_EXYNOS5260. And so as a result we were reading from the wrong
+> register in the case of SOC_ARCH_EXYNOS5260.
+> 
+> Signed-off-by: Sudip Mukherjee <sudip@vectorindia.org>
+> ---
+>  drivers/thermal/samsung/exynos_tmu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+> index 0bae8cc..ca920b0 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.c
+> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> @@ -932,7 +932,7 @@ static void exynos4412_tmu_set_emulation(struct exynos_tmu_data *data,
+>  
+>  	if (data->soc == SOC_ARCH_EXYNOS5260)
+>  		emul_con = EXYNOS5260_EMUL_CON;
+> -	if (data->soc == SOC_ARCH_EXYNOS5433)
+> +	else if (data->soc == SOC_ARCH_EXYNOS5433)
+>  		emul_con = EXYNOS5433_TMU_EMUL_CON;
+>  	else if (data->soc == SOC_ARCH_EXYNOS7)
+>  		emul_con = EXYNOS7_TMU_REG_EMUL_CON;
+> 
 
-Indeed!
+Thanks for your point out. Looks good to me. 
 
-Fixes: 488c7455d74c ("thermal: exynos: Add the support for Exynos5433 TMU")
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
+Thanks,
+Chanwoo Choi
