@@ -1,34 +1,112 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Thu, 1 Oct 2015 19:26:29 -0500
-Subject: [RFC PATCH 0/8] clk: qoriq: Move chip-specific knowledge into
- driver
-In-Reply-To: <20150811182535.31346.52965@quantum>
-References: <1434682158-7243-1-git-send-email-scottwood@freescale.com>
- <20150811182535.31346.52965@quantum>
-Message-ID: <1443745589.5336.185.camel@freescale.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Thu, 1 Oct 2015 17:44:36 -0700
+Subject: [PATCH v2] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <2677327.lnRZhqx5GI@wuerfel>
+References: <1443689961-23909-1-git-send-email-bharatku@xilinx.com>
+ <2677327.lnRZhqx5GI@wuerfel>
+Message-ID: <560DD374.4000708@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Resending to updated e-mail address]
+Hi Arnd,
 
-On Tue, 2015-08-11 at 11:25 -0700, Michael Turquette wrote:
-> Hi Scott,
+On 10/1/2015 2:52 AM, Arnd Bergmann wrote:
+> On Thursday 01 October 2015 14:29:21 Bharat Kumar Gogada wrote:
+>> Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
+>>
+>> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+>> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+>> ---
+>> Removed unneccessary comments
+>> Modified setup_sspl implementation
+>> Added more details in binding Documentation
+>> ---
+>>  .../devicetree/bindings/pci/xilinx-nwl-pcie.txt    |   49 +
+>>  drivers/pci/host/Kconfig                           |    9 +
+>>  drivers/pci/host/Makefile                          |    1 +
+>>  drivers/pci/host/pcie-xilinx-nwl.c                 | 1029 ++++++++++++++++++++
+>>  4 files changed, 1088 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/pci/xilinx-nwl-pcie.txt
+>>  create mode 100644 drivers/pci/host/pcie-xilinx-nwl.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/pci/xilinx-nwl-pcie.txt b/Documentation/devicetree/bindings/pci/xilinx-nwl-pcie.txt
+>> new file mode 100644
+>> index 0000000..ed87184
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pci/xilinx-nwl-pcie.txt
+>> @@ -0,0 +1,49 @@
+>> +* Xilinx NWL PCIe Root Port Bridge DT description
+>> +
+>> +Required properties:
+>> +- compatible: Should contain "xlnx,nwl-pcie-2.11"
+>> +- #address-cells: Address representation for root ports, set to <3>
+>> +- #size-cells: Size representation for root ports, set to <2>
+>> +- #interrupt-cells: specifies the number of cells needed to encode an
+>> +	interrupt source. The value must be 1.
+>> +- reg: Should contain Bridge, PCIe Controller registers location,
+>> +	configuration sapce, and length
+>> +- reg-names: Must include the following entries:
+>> +	"breg": bridge registers
+>> +	"pcireg": PCIe controller registers
+>> +	"cfg": configuration space region
+>> +- device_type: must be "pci"
+>> +- interrupts: Should contain NWL PCIe interrupt
+>> +- interrupt-names: Must include the following entries:
+>> +	"misc": interrupt asserted when miscellaneous is recieved
+>> +	"intx": interrupt that is asserted when an legacy interrupt is received
+>> +	"msi_1, msi_0": interrupt asserted when msi is recieved
 > 
-> Quoting Scott Wood (2015-06-18 19:49:10)
-> > The existing device tree bindings are error-prone and inflexible. 
-> > Correct the mistake by moving the knowledge into the driver, which
-> > has more flexibility in describing the quirks of each chip.  This leaves
-> > the device tree to its proper role of identifying a programming interface
-> > rather than describing its individual registers.
+> The msi and intx interrupts don't really belong here: For intx, please
+> use an interrupt-map property as the other host drivers do.
 > 
-> Sorry for not responding to this one sooner. Fell through the cracks.
+> For MSI, the usual answer is that there should be a separate device node
+> for the MSI controller, and an msi-parent property in the PCI host.
 > 
-> All of the changes to drives/clk/clk-qoriq.c look great to me. I assume
-> you need to keep all of these patches together and want to the take
-> through the freescale tree? If so feel free to add,
+> This lets you use the same code for hosts that have a GICv2m or GICv3
+> that comes with its own MSI controller.
 > 
-> Acked-by: Michael Turquette <mturquette@baylibre.com>
 
-Is the ack still valid for the v3 patchset?
+Sorry for stealing this discussion, :)
 
--Scott
+I have some questions here, since this affects how I should implement
+the MSI support for iProc based PCIe controller. I understand it makes
+more sense to use separate device node for MSI and have "msi-parent"
+from the pci node points to the MSI node, and that MSI node can be
+gicv2m or gicv3 based on more advanced ARMv8 platforms.
+
+Then I would assume the MSI controller would deserve its own driver?
+Which is a lot of people do nowadays. In that case, how I should handle
+the case when the iProc MSI support is handled through some event queue
+mechanism with their registers embedded in the PCIe controller register
+space?
+
+Does the following logic make sense to you?
+
+1. parse phandle of "msi-parent"
+2. Call of_pci_find_msi_chip_by_node to hook it up to msi chip already
+registered (in the gicv2m and gicv3 case)
+3. If failed, fall back to use the iProc's own event queue logic by
+calling iproc_pcie_msi_init.
+
+The iProc MSI still has its own node that looks like this:
+141 msi0: msi at 20020000 {
+142                         msi-controller;
+143                         interrupt-parent = <&gic>;
+144                         interrupts = <GIC_SPI 277 IRQ_TYPE_NONE>,
+145                                      <GIC_SPI 278 IRQ_TYPE_NONE>,
+146                                      <GIC_SPI 279 IRQ_TYPE_NONE>,
+147                                      <GIC_SPI 280 IRQ_TYPE_NONE>,
+148                                      <GIC_SPI 281 IRQ_TYPE_NONE>,
+149                                      <GIC_SPI 282 IRQ_TYPE_NONE>;
+150                         brcm,num-eq-region = <1>;
+151                         brcm,num-msi-msg-region = <1>;
+152                 };
+
+But it does not have its own "reg" since they are embedded in the PCI
+controller's registers and it relies on one calling iproc_pcie_msi_init
+to pass in base register value and some other information.
+
+Thanks,
+
+Ray
