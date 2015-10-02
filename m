@@ -1,44 +1,89 @@
-From: lftan@altera.com (Ley Foon Tan)
-Date: Fri, 2 Oct 2015 15:56:16 +0800
-Subject: [PATCH v7 5/6] Documentation: dt-bindings: pci: altera pcie
- device tree binding
-In-Reply-To: <1803658.W77SUJGE4K@wuerfel>
-References: <1442801587-3812-1-git-send-email-lftan@altera.com>
- <CAFiDJ59PuhRj3F288A_451pLiKnqPUKin9C2t5uuH2iNPnJfAg@mail.gmail.com>
- <CAL_JsqL9eoTRa2-eeNJgVoO=0LyuaaJ87E4_BS0KocRKBXGdGA@mail.gmail.com>
- <1803658.W77SUJGE4K@wuerfel>
-Message-ID: <CAFiDJ5-yMBw6Ff1++F5DTg6u_rAgoivGJeNj1tr9fwo-hdKDkg@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 2 Oct 2015 16:56:48 +0900
+Subject: [PATCH] arm64: ftrace: fix function_graph tracer panic
+In-Reply-To: <20151001152739.GI6963@e104818-lin.cambridge.arm.com>
+References: <1443581395-30088-1-git-send-email-huawei.libin@huawei.com>
+ <560CCE91.3020407@linaro.org>
+ <20151001152739.GI6963@e104818-lin.cambridge.arm.com>
+Message-ID: <560E38C0.7080409@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 29, 2015 at 3:38 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 28 September 2015 12:31:36 Rob Herring wrote:
->> >> > +
->> >> > +Required properties:
->> >> > +- compatible :       should contain "altr,pcie-root-port-1.0"
->> >> > +- reg:               a list of physical base address and length for TXS and CRA.
->> >> > +- reg-names: must include the following entries:
->> >> > +             "Txs" or "txs": TX slave port region
->> >> > +             "Cra" or "cra": Control register access region
->> >>
->> >> Why both cases? Can we please just have one (or none is better IMO).
->> > The PCIe IP on different device families use different register names.
->> > And our device tree generator will auto generate the register names
->> > based on the hardware description name. Too bad we can't change the
->> > hardware description names now.
->>
->> Okay, your problem to maintain. Hopefully the driver just goes by index then.
->>
->> Strictly speaking, if you have undocumented bindings downstream that
->> is your problem and we don't have to accept them as-is upstream. I'm
->> not going to worry about that here.
->
-> Are they always in the same order? If you don't mandate any names for the
-> registers in the binding but just use them by index, we can keep that
-> bit of ugliness out of the binding and the driver and still be compatible
-> with all the devices.
-Too bad the order might change in future devices. We will fix the
-tool, so only have one reg-name case.
+ > Do I take this as an ack?
 
-Regards
-Ley Foon
+Yes, but
+
+On 10/02/2015 12:27 AM, Catalin Marinas wrote:
+> On Thu, Oct 01, 2015 at 03:11:29PM +0900, AKASHI Takahiro wrote:
+>> On 09/30/2015 11:49 AM, Li Bin wrote:
+>>> When function graph tracer is enabled, the following operation
+>>> will trigger panic:
+>>>
+>>> mount -t debugfs nodev /sys/kernel
+>>> echo next_tgid > /sys/kernel/tracing/set_ftrace_filter
+>>> echo function_graph > /sys/kernel/tracing/current_tracer
+>>> ls /proc/
+>>>
+>>> ------------[ cut here ]------------
+>>> [  198.501417] Unable to handle kernel paging request at virtual address cb88537fdc8ba316
+>>> [  198.506126] pgd = ffffffc008f79000
+>>> [  198.509363] [cb88537fdc8ba316] *pgd=00000000488c6003, *pud=00000000488c6003, *pmd=0000000000000000
+>>> [  198.517726] Internal error: Oops: 94000005 [#1] SMP
+>>> [  198.518798] Modules linked in:
+>>> [  198.520582] CPU: 1 PID: 1388 Comm: ls Tainted: G
+>>> [  198.521800] Hardware name: linux,dummy-virt (DT)
+>>> [  198.522852] task: ffffffc0fa9e8000 ti: ffffffc0f9ab0000 task.ti: ffffffc0f9ab0000
+>>> [  198.524306] PC is at next_tgid+0x30/0x100
+>>> [  198.525205] LR is at return_to_handler+0x0/0x20
+>>> [  198.526090] pc : [<ffffffc0002a1070>] lr : [<ffffffc0000907c0>] pstate: 60000145
+>>> [  198.527392] sp : ffffffc0f9ab3d40
+>>> [  198.528084] x29: ffffffc0f9ab3d40 x28: ffffffc0f9ab0000
+>>> [  198.529406] x27: ffffffc000d6a000 x26: ffffffc000b786e8
+>>> [  198.530659] x25: ffffffc0002a1900 x24: ffffffc0faf16c00
+>>> [  198.531942] x23: ffffffc0f9ab3ea0 x22: 0000000000000002
+>>> [  198.533202] x21: ffffffc000d85050 x20: 0000000000000002
+>>> [  198.534446] x19: 0000000000000002 x18: 0000000000000000
+>>> [  198.535719] x17: 000000000049fa08 x16: ffffffc000242efc
+>>> [  198.537030] x15: 0000007fa472b54c x14: ffffffffff000000
+>>> [  198.538347] x13: ffffffc0fada84a0 x12: 0000000000000001
+>>> [  198.539634] x11: ffffffc0f9ab3d70 x10: ffffffc0f9ab3d70
+>>> [  198.540915] x9 : ffffffc0000907c0 x8 : ffffffc0f9ab3d40
+>>> [  198.542215] x7 : 0000002e330f08f0 x6 : 0000000000000015
+>>> [  198.543508] x5 : 0000000000000f08 x4 : ffffffc0f9835ec0
+>>> [  198.544792] x3 : cb88537fdc8ba316 x2 : cb88537fdc8ba306
+>>> [  198.546108] x1 : 0000000000000002 x0 : ffffffc000d85050
+>>> [  198.547432]
+>>> [  198.547920] Process ls (pid: 1388, stack limit = 0xffffffc0f9ab0020)
+>>> [  198.549170] Stack: (0xffffffc0f9ab3d40 to 0xffffffc0f9ab4000)
+>>> [  198.582568] Call trace:
+>>> [  198.583313] [<ffffffc0002a1070>] next_tgid+0x30/0x100
+>>> [  198.584359] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
+>>> [  198.585503] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
+>>> [  198.586574] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
+>>> [  198.587660] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
+>>> [  198.588896] Code: aa0003f5 2a0103f4 b4000102 91004043 (885f7c60)
+>>> [  198.591092] ---[ end trace 6a346f8f20949ac8 ]---
+>>>
+>>> This is because when using function graph tracer, if the traced
+>>> function return value is in multi regs ([0x-07]), return_to_handler
+
+typo: 0x-07 => x0-x7
+
+and pre/post-indexed addressing stp&ldp may save add&sub instructions, but
+it's a matter of preference.
+
+-Takahiro AKASHI
+
+>>> may corrupt them. So in return_to_handler, the parameter regs should
+>>> be protected properly.
+>>
+>> You're right. we should preserve x0-x7 around a call to ftrace_return_to_handler()
+>> just in case they might be used as a "composite type" (ie. struct) of return value.
+>
+> Do I take this as an ack?
+>
+> I applied the patch locally and I'm going to send a pull request
+> tomorrow.
+>
+> Thanks.
+>
