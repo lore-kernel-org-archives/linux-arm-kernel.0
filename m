@@ -1,42 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 2 Oct 2015 18:38:48 +0100
-Subject: [GIT PULL] arm64 fixes for 4.3
-Message-ID: <20151002173844.GA24678@e104818-lin.cambridge.arm.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 2 Oct 2015 10:51:27 -0700
+Subject: [PATCH v2 19/25] pxa2xx-flash: switch from ioremap_cache to
+ memremap
+In-Reply-To: <20150725023945.8664.34842.stgit@dwillia2-desk3.amr.corp.intel.com>
+References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150725023945.8664.34842.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <20151002175127.GH107187@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
++ linux-mtd
 
-Please pull the arm64 fixes below. Thanks.
+On Fri, Jul 24, 2015 at 10:39:45PM -0400, Dan Williams wrote:
+> In preparation for deprecating ioremap_cache() convert its usage in
+> pxa2xx-flash to memremap.
+> 
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: Brian Norris <computersforpeace@gmail.com>
+> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+> ---
+>  drivers/mtd/maps/pxa2xx-flash.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
+> index 12fa75df5008..758a8a7f86d9 100644
+> --- a/drivers/mtd/maps/pxa2xx-flash.c
+> +++ b/drivers/mtd/maps/pxa2xx-flash.c
+> @@ -71,8 +71,8 @@ static int pxa2xx_flash_probe(struct platform_device *pdev)
+>  		       info->map.name);
+>  		return -ENOMEM;
+>  	}
+> -	info->map.cached =
+> -		ioremap_cache(info->map.phys, info->map.size);
+> +	info->map.cached = memremap(info->map.phys, info->map.size,
+> +			MEMREMAP_CACHE);
 
-The following changes since commit 9ffecb10283508260936b96022d4ee43a7798b4c:
+Should the corresponding iounmap() be changed too? Looks like a pretty
+thin wrapper right now, but it seems like the API would suggest we do
+this anyway.
 
-  Linux 4.3-rc3 (2015-09-27 07:50:08 -0400)
+>  	if (!info->map.cached)
+>  		printk(KERN_WARNING "Failed to ioremap cached %s\n",
+>  		       info->map.name);
+> 
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to ee556d00cf20012e889344a0adbbf809ab5015a3:
-
-  arm64: ftrace: fix function_graph tracer panic (2015-10-02 11:12:56 +0100)
-
-----------------------------------------------------------------
-- Fix for transparent huge page change_protection() logic which was
-  inadvertently changing a huge pmd page into a pmd table entry.
-- Function graph tracer panic fix caused by the return_to_handler code
-  corrupting the multi-regs function return value (composite types).
-
-----------------------------------------------------------------
-Li Bin (1):
-      arm64: ftrace: fix function_graph tracer panic
-
-Steve Capper (1):
-      arm64: Fix THP protection change logic
-
- arch/arm64/include/asm/pgtable.h |  4 ++--
- arch/arm64/kernel/entry-ftrace.S | 22 ++++++++++++++++++++--
- 2 files changed, 22 insertions(+), 4 deletions(-)
-
--- 
-Catalin
+Brian
