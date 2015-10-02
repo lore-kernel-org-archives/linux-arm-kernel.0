@@ -1,175 +1,78 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 2 Oct 2015 15:04:56 +0200
-Subject: [PATCH v2 1/6] pinctrl: berlin: regmap as an extra argument of
- berlin_pinctrl_probe()
-In-Reply-To: <1442829860-4647-2-git-send-email-jszhang@marvell.com>
-References: <1442829860-4647-1-git-send-email-jszhang@marvell.com>
- <1442829860-4647-2-git-send-email-jszhang@marvell.com>
-Message-ID: <20151002130456.GC3162@kwain>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Fri, 2 Oct 2015 15:10:41 +0200
+Subject: [PATCH] ARM: fix vdsomunge not to depend on glibc specific byteswap.h
+In-Reply-To: <cover.1443791320.git.hns@goldelico.com>
+References: <A323E65A-1631-4ADF-865D-04A5C38C6969@goldelico.com>
+ <cover.1443791320.git.hns@goldelico.com>
+Message-ID: <0B599C1F-3788-4DA0-9187-04DF6BF54800@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
+If the host toolchain is not glibc based then the arm kernel build
+fails with
 
-Thanks for providing this!
+ HOSTCC  arch/arm/vdso/vdsomunge
+ arch/arm/vdso/vdsomunge.c:48:22: fatal error: byteswap.h: No such file or directory
 
-On Mon, Sep 21, 2015 at 06:04:15PM +0800, Jisheng Zhang wrote:
-> Let berlin_pinctrl_probe() accepts an extra argument: regmap, this is to
-> prepare for the next berlin4ct support, where we won't use simple-mfd
-> any more.
+Observed: with omap2plus_defconfig and compile on Mac OS X with arm ELF
+cross-compiler.
 
-Just a question here: why don't we have instead one
-berlin_pinctrl_probe() and one berlin_pinctrl_probe_regmap(), both
-calling a static probe function in berlin.c, to avoid duplicating code?
+Reason: byteswap.h is a glibc only header.
 
-Antoine
+Solution: replace by private byte-swapping macros (taken from
+arch/mips/boot/elf2ecoff.c)
 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  drivers/pinctrl/berlin/berlin-bg2.c   | 10 +++++++++-
->  drivers/pinctrl/berlin/berlin-bg2cd.c | 10 +++++++++-
->  drivers/pinctrl/berlin/berlin-bg2q.c  | 10 +++++++++-
->  drivers/pinctrl/berlin/berlin.c       |  9 +--------
->  drivers/pinctrl/berlin/berlin.h       |  1 +
->  5 files changed, 29 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/berlin/berlin-bg2.c b/drivers/pinctrl/berlin/berlin-bg2.c
-> index 274c553..4aede2e 100644
-> --- a/drivers/pinctrl/berlin/berlin-bg2.c
-> +++ b/drivers/pinctrl/berlin/berlin-bg2.c
-> @@ -10,6 +10,7 @@
->   * warranty of any kind, whether express or implied.
->   */
->  
-> +#include <linux/mfd/syscon.h>
->  #include <linux/module.h>
->  #include <linux/of_device.h>
->  #include <linux/platform_device.h>
-> @@ -233,8 +234,15 @@ static int berlin2_pinctrl_probe(struct platform_device *pdev)
->  {
->  	const struct of_device_id *match =
->  		of_match_device(berlin2_pinctrl_match, &pdev->dev);
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *parent_np = of_get_parent(dev->of_node);
-> +	struct regmap *regmap = syscon_node_to_regmap(parent_np);
->  
-> -	return berlin_pinctrl_probe(pdev, match->data);
-> +	of_node_put(parent_np);
-> +	if (IS_ERR(regmap))
-> +		return PTR_ERR(regmap);
-> +
-> +	return berlin_pinctrl_probe(pdev, regmap, match->data);
->  }
->  
->  static struct platform_driver berlin2_pinctrl_driver = {
-> diff --git a/drivers/pinctrl/berlin/berlin-bg2cd.c b/drivers/pinctrl/berlin/berlin-bg2cd.c
-> index 0cb793a..6378dd8 100644
-> --- a/drivers/pinctrl/berlin/berlin-bg2cd.c
-> +++ b/drivers/pinctrl/berlin/berlin-bg2cd.c
-> @@ -10,6 +10,7 @@
->   * warranty of any kind, whether express or implied.
->   */
->  
-> +#include <linux/mfd/syscon.h>
->  #include <linux/module.h>
->  #include <linux/of_device.h>
->  #include <linux/platform_device.h>
-> @@ -176,8 +177,15 @@ static int berlin2cd_pinctrl_probe(struct platform_device *pdev)
->  {
->  	const struct of_device_id *match =
->  		of_match_device(berlin2cd_pinctrl_match, &pdev->dev);
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *parent_np = of_get_parent(dev->of_node);
-> +	struct regmap *regmap = syscon_node_to_regmap(parent_np);
->  
-> -	return berlin_pinctrl_probe(pdev, match->data);
-> +	of_node_put(parent_np);
-> +	if (IS_ERR(regmap))
-> +		return PTR_ERR(regmap);
-> +
-> +	return berlin_pinctrl_probe(pdev, regmap, match->data);
->  }
->  
->  static struct platform_driver berlin2cd_pinctrl_driver = {
-> diff --git a/drivers/pinctrl/berlin/berlin-bg2q.c b/drivers/pinctrl/berlin/berlin-bg2q.c
-> index a466054..907bdf0 100644
-> --- a/drivers/pinctrl/berlin/berlin-bg2q.c
-> +++ b/drivers/pinctrl/berlin/berlin-bg2q.c
-> @@ -10,6 +10,7 @@
->   * warranty of any kind, whether express or implied.
->   */
->  
-> +#include <linux/mfd/syscon.h>
->  #include <linux/module.h>
->  #include <linux/of_device.h>
->  #include <linux/platform_device.h>
-> @@ -395,8 +396,15 @@ static int berlin2q_pinctrl_probe(struct platform_device *pdev)
->  {
->  	const struct of_device_id *match =
->  		of_match_device(berlin2q_pinctrl_match, &pdev->dev);
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *parent_np = of_get_parent(dev->of_node);
-> +	struct regmap *regmap = syscon_node_to_regmap(parent_np);
->  
-> -	return berlin_pinctrl_probe(pdev, match->data);
-> +	of_node_put(parent_np);
-> +	if (IS_ERR(regmap))
-> +		return PTR_ERR(regmap);
-> +
-> +	return berlin_pinctrl_probe(pdev, regmap, match->data);
->  }
->  
->  static struct platform_driver berlin2q_pinctrl_driver = {
-> diff --git a/drivers/pinctrl/berlin/berlin.c b/drivers/pinctrl/berlin/berlin.c
-> index f495806..0557bbe 100644
-> --- a/drivers/pinctrl/berlin/berlin.c
-> +++ b/drivers/pinctrl/berlin/berlin.c
-> @@ -11,7 +11,6 @@
->   */
->  
->  #include <linux/io.h>
-> -#include <linux/mfd/syscon.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
-> @@ -293,19 +292,13 @@ static struct pinctrl_desc berlin_pctrl_desc = {
->  };
->  
->  int berlin_pinctrl_probe(struct platform_device *pdev,
-> +			 struct regmap *regmap,
->  			 const struct berlin_pinctrl_desc *desc)
->  {
->  	struct device *dev = &pdev->dev;
-> -	struct device_node *parent_np = of_get_parent(dev->of_node);
->  	struct berlin_pinctrl *pctrl;
-> -	struct regmap *regmap;
->  	int ret;
->  
-> -	regmap = syscon_node_to_regmap(parent_np);
-> -	of_node_put(parent_np);
-> -	if (IS_ERR(regmap))
-> -		return PTR_ERR(regmap);
-> -
->  	pctrl = devm_kzalloc(dev, sizeof(*pctrl), GFP_KERNEL);
->  	if (!pctrl)
->  		return -ENOMEM;
-> diff --git a/drivers/pinctrl/berlin/berlin.h b/drivers/pinctrl/berlin/berlin.h
-> index e1aa841..bf5781a 100644
-> --- a/drivers/pinctrl/berlin/berlin.h
-> +++ b/drivers/pinctrl/berlin/berlin.h
-> @@ -56,6 +56,7 @@ struct berlin_pinctrl_function {
->  #define BERLIN_PINCTRL_FUNCTION_UNKNOWN		{}
->  
->  int berlin_pinctrl_probe(struct platform_device *pdev,
-> +			 struct regmap *regmap,
->  			 const struct berlin_pinctrl_desc *desc);
->  
->  #endif /* __PINCTRL_BERLIN_H */
-> -- 
-> 2.5.3
-> 
+Tested to compile on Mac OS X 10.9.5 host.
 
+Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+---
+arch/arm/vdso/vdsomunge.c | 19 +++++++++++++++----
+1 file changed, 15 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/vdso/vdsomunge.c b/arch/arm/vdso/vdsomunge.c
+index aedec81..27a9a0b 100644
+--- a/arch/arm/vdso/vdsomunge.c
++++ b/arch/arm/vdso/vdsomunge.c
+@@ -45,7 +45,18 @@
+ * it does.
+ */
+
+-#include <byteswap.h>
++#define swab16(x) \
++	((unsigned short)( \
++		(((unsigned short)(x) & (unsigned short)0x00ffU) << 8) | \
++		(((unsigned short)(x) & (unsigned short)0xff00U) >> 8) ))
++
++#define swab32(x) \
++	((unsigned int)( \
++		(((unsigned int)(x) & (unsigned int)0x000000ffUL) << 24) | \
++		(((unsigned int)(x) & (unsigned int)0x0000ff00UL) <<  8) | \
++		(((unsigned int)(x) & (unsigned int)0x00ff0000UL) >>  8) | \
++		(((unsigned int)(x) & (unsigned int)0xff000000UL) >> 24) ))
++
+#include <elf.h>
+#include <errno.h>
+#include <fcntl.h>
+@@ -104,17 +115,17 @@ static void cleanup(void)
+
+static Elf32_Word read_elf_word(Elf32_Word word, bool swap)
+{
+-	return swap ? bswap_32(word) : word;
++	return swap ? swab32(word) : word;
+}
+
+static Elf32_Half read_elf_half(Elf32_Half half, bool swap)
+{
+-	return swap ? bswap_16(half) : half;
++	return swap ? swab16(half) : half;
+}
+
+static void write_elf_word(Elf32_Word val, Elf32_Word *dst, bool swap)
+{
+-	*dst = swap ? bswap_32(val) : val;
++	*dst = swap ? swab32(val) : val;
+}
+
+int main(int argc, char **argv)
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.5.1
