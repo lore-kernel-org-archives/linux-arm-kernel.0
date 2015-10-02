@@ -1,75 +1,65 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 2 Oct 2015 23:19:36 +0800
-Subject: [PATCH v5 0/5] Add SMP bringup support for mt65xx socs
-Message-ID: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 02 Oct 2015 16:19:53 +0100
+Subject: [PATCH v4 4/4] irqchip/gic-v3-its: Add handling of PCI requester
+ id.
+In-Reply-To: <1443747025-9918-5-git-send-email-ddaney.cavm@gmail.com>
+References: <1443747025-9918-1-git-send-email-ddaney.cavm@gmail.com>
+ <1443747025-9918-5-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <560EA099.2060907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series add SMP brinup support for MediaTek SoCs. This is v5 and
-is based on v4.3-rc1.
+On 02/10/15 01:50, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> Replace open coded generation PCI/MSI requester id with call to the
+> new function pci_msi_domain_get_msi_rid() which applies the "msi-map"
+> to the id value.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its-pci-msi.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> index cf351c6..7bbf64a 100644
+> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> @@ -42,7 +42,6 @@ static struct irq_chip its_msi_irq_chip = {
+>  
+>  struct its_pci_alias {
+>  	struct pci_dev	*pdev;
+> -	u32		dev_id;
+>  	u32		count;
+>  };
+>  
+> @@ -60,7 +59,6 @@ static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
+>  {
+>  	struct its_pci_alias *dev_alias = data;
+>  
+> -	dev_alias->dev_id = alias;
+>  	if (pdev != dev_alias->pdev)
+>  		dev_alias->count += its_pci_msi_vec_count(dev_alias->pdev);
 
-There are similar but different SMP bringup up methods on MediaTek
-mt65xx and mt81xx. On MT8135 & MT8127, system boots with a trustzone
-firmware. Others, like MT6589, doesn't have trustzone, and run kernel
-directly in secure world.
+Damn it. You've just shown me a bug. Unrelated to what you're doing, but
+still. I'll post a patch shortly.
 
-Patch 1 enable arch timer support.
-Patch 2,3 add support for cpu enable-method "mediatek,mt6589-smp" and
-"mediatek,mt81xx-tz-smp", which support Mediatek SMP bringup for non-TZ
-and TZ platform.
-Patch 4,5 finally enable SMP bringup for mt8135 and mt8127.
+>  
+> @@ -86,7 +84,7 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
+>  	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
+>  
+>  	/* ITS specific DeviceID, as the core ITS ignores dev. */
+> -	info->scratchpad[0].ul = dev_alias.dev_id;
+> +	info->scratchpad[0].ul = pci_msi_domain_get_msi_rid(domain, pdev);
+>  
+>  	return msi_info->ops->msi_prepare(domain->parent,
+>  					  dev, dev_alias.count, info);
+> 
 
-Changes in v5:
-- Fix dts error
-- Add Rob's Ack tag.
+Looks good to me.
 
-Changes in v4[3]:
-- rebase to v4.3-rc1
-- Reserve trustzone bootinfo memory area in device tree.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Changes in v3:
-- v3 in [1]
-- The first 2 patches in v2 are merged in v4.2-rc1.
-- Patch 3~4 in v2 are moved to another series [2]
-- platsmp.c changes based on Stephen's suggestion
-- Change cpu enable-method name to "mediatek,mt6589-smp"
-
-Changes in v2:
-- Fix boot issue for THUMB2 kernel.
-- Not enable GPT_CLK_EVT when setup to fix GPT spurious interrupt issue
-- Change platsmp.c according to Matthias' suggestion
-http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000714.html
-
-v1:
-http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000528.html
-
-[1]
-http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001570.html
-
-[2]
-http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001544.html
-
-[3]
-http://lists.infradead.org/pipermail/linux-mediatek/2015-September/002377.html
-
-
-Matthias Brugger (1):
-  ARM: mediatek: enable gpt6 on boot up to make arch timer working
-
-Yingjoe Chen (4):
-  devicetree: bindings: add new SMP enable method Mediatek SoC
-  ARM: mediatek: add smp bringup code
-  ARM: dts: mt8135: enable basic SMP bringup for mt8135
-  ARM: dts: mt8127: enable basic SMP bringup for mt8127
-
- Documentation/devicetree/bindings/arm/cpus.txt |   2 +
- arch/arm/boot/dts/mt8127.dtsi                  |  27 +++++
- arch/arm/boot/dts/mt8135.dtsi                  |  27 +++++
- arch/arm/mach-mediatek/Makefile                |   3 +
- arch/arm/mach-mediatek/mediatek.c              |  27 +++++
- arch/arm/mach-mediatek/platsmp.c               | 141 +++++++++++++++++++++++++
- 6 files changed, 227 insertions(+)
- create mode 100644 arch/arm/mach-mediatek/platsmp.c
-
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
