@@ -1,62 +1,232 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 03 Oct 2015 19:13:38 +0100
-Subject: [PATCH 9/9] pci: mvebu: remove code restricting accesses to slot 0
+Date: Sat, 03 Oct 2015 19:13:33 +0100
+Subject: [PATCH 8/9] pci: mvebu: add PCI Express root complex capability block
 In-Reply-To: <20151003181228.GI21513@n2100.arm.linux.org.uk>
 References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
-Message-ID: <E1ZiRJS-0004JN-6A@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZiRJN-0004JH-1h@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we advertise a PCIe capability, the Linux PCI layer will not
-scan the bus for devices other than in slot 0.  This makes the
-work-around to trap accesses to devices other than slot 0 unnecessary.
+Add a PCI Express root complex capability block so the PCI layer
+identifies the bridge as a PCI Express device.
+
+We expose this as a version 1 PCIe capability block, with slot support.
+We disable the clock power management capability as this depends on
+boards wiring the CLKREQ# signal.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/pci/host/pci-mvebu.c | 24 ------------------------
- 1 file changed, 24 deletions(-)
+ drivers/pci/host/pci-mvebu.c | 137 +++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 133 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 6310f2a84cfd..53b79c5f0559 100644
+index 97208233d901..6310f2a84cfd 100644
 --- a/drivers/pci/host/pci-mvebu.c
 +++ b/drivers/pci/host/pci-mvebu.c
-@@ -794,17 +794,6 @@ static int mvebu_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
- 	if (!mvebu_pcie_link_up(port))
- 		return PCIBIOS_DEVICE_NOT_FOUND;
+@@ -30,6 +30,7 @@
+ #define PCIE_DEV_REV_OFF	0x0008
+ #define PCIE_BAR_LO_OFF(n)	(0x0010 + ((n) << 3))
+ #define PCIE_BAR_HI_OFF(n)	(0x0014 + ((n) << 3))
++#define PCIE_CAP_PCIEXP		0x0060
+ #define PCIE_HEADER_LOG_4_OFF	0x0128
+ #define PCIE_BAR_CTRL_OFF(n)	(0x1804 + (((n) - 1) * 4))
+ #define PCIE_WIN04_CTRL_OFF(n)	(0x1820 + ((n) << 4))
+@@ -57,14 +58,35 @@
+ #define  PCIE_STAT_BUS                  0xff00
+ #define  PCIE_STAT_DEV                  0x1f0000
+ #define  PCIE_STAT_LINK_DOWN		BIT(0)
++#define PCIE_RC_RTSTA		0x1a14
+ #define PCIE_DEBUG_CTRL         0x1a60
+ #define  PCIE_DEBUG_SOFT_RESET		BIT(20)
  
--	/*
--	 * On the secondary bus, we don't want to expose any other
--	 * device than the device physically connected in the PCIe
--	 * slot, visible in slot 0. In slot 1, there's a special
--	 * Marvell device that only makes sense when the Armada is
--	 * used as a PCIe endpoint.
--	 */
--	if (bus->number == port->bridge.secondary_bus &&
--	    PCI_SLOT(devfn) != 0)
--		return PCIBIOS_DEVICE_NOT_FOUND;
--
- 	/* Access the real PCIe interface */
- 	ret = mvebu_pcie_hw_wr_conf(port, bus, devfn,
- 				    where, size, val);
-@@ -835,19 +824,6 @@ static int mvebu_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
- 		return PCIBIOS_DEVICE_NOT_FOUND;
++enum {
++	PCISWCAP = PCI_BRIDGE_CONTROL + 2,
++	PCISWCAP_EXP_LIST_ID	= PCISWCAP + PCI_CAP_LIST_ID,
++	PCISWCAP_EXP_DEVCAP	= PCISWCAP + PCI_EXP_DEVCAP,
++	PCISWCAP_EXP_DEVCTL	= PCISWCAP + PCI_EXP_DEVCTL,
++	PCISWCAP_EXP_LNKCAP	= PCISWCAP + PCI_EXP_LNKCAP,
++	PCISWCAP_EXP_LNKCTL	= PCISWCAP + PCI_EXP_LNKCTL,
++	PCISWCAP_EXP_SLTCAP	= PCISWCAP + PCI_EXP_SLTCAP,
++	PCISWCAP_EXP_SLTCTL	= PCISWCAP + PCI_EXP_SLTCTL,
++	PCISWCAP_EXP_RTCTL	= PCISWCAP + PCI_EXP_RTCTL,
++	PCISWCAP_EXP_RTSTA	= PCISWCAP + PCI_EXP_RTSTA,
++	PCISWCAP_EXP_DEVCAP2	= PCISWCAP + PCI_EXP_DEVCAP2,
++	PCISWCAP_EXP_DEVCTL2	= PCISWCAP + PCI_EXP_DEVCTL2,
++	PCISWCAP_EXP_LNKCAP2	= PCISWCAP + PCI_EXP_LNKCAP2,
++	PCISWCAP_EXP_LNKCTL2	= PCISWCAP + PCI_EXP_LNKCTL2,
++	PCISWCAP_EXP_SLTCAP2	= PCISWCAP + PCI_EXP_SLTCAP2,
++	PCISWCAP_EXP_SLTCTL2	= PCISWCAP + PCI_EXP_SLTCTL2,
++};
++
+ /* PCI configuration space of a PCI-to-PCI bridge */
+ struct mvebu_sw_pci_bridge {
+ 	u16 vendor;
+ 	u16 device;
+ 	u16 command;
++	u16 status;
+ 	u16 class;
+ 	u8 interface;
+ 	u8 revision;
+@@ -84,13 +106,15 @@ struct mvebu_sw_pci_bridge {
+ 	u16 memlimit;
+ 	u16 iobaseupper;
+ 	u16 iolimitupper;
+-	u8 cappointer;
+-	u8 reserved1;
+-	u16 reserved2;
+ 	u32 romaddr;
+ 	u8 intline;
+ 	u8 intpin;
+ 	u16 bridgectrl;
++
++	/* PCI express capability */
++	u32 pcie_sltcap;
++	u16 pcie_devctl;
++	u16 pcie_rtctl;
+ };
+ 
+ struct mvebu_pcie_port;
+@@ -451,6 +475,9 @@ static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
+ 	/* We support 32 bits I/O addressing */
+ 	bridge->iobase = PCI_IO_RANGE_TYPE_32;
+ 	bridge->iolimit = PCI_IO_RANGE_TYPE_32;
++
++	/* Add capabilities */
++	bridge->status = PCI_STATUS_CAP_LIST;
+ }
+ 
+ /*
+@@ -468,7 +495,7 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
+ 		break;
+ 
+ 	case PCI_COMMAND:
+-		*value = bridge->command;
++		*value = bridge->command | bridge->status << 16;
+ 		break;
+ 
+ 	case PCI_CLASS_REVISION:
+@@ -513,6 +540,10 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
+ 		*value = (bridge->iolimitupper << 16 | bridge->iobaseupper);
+ 		break;
+ 
++	case PCI_CAPABILITY_LIST:
++		*value = PCISWCAP;
++		break;
++
+ 	case PCI_ROM_ADDRESS1:
+ 		*value = 0;
+ 		break;
+@@ -522,6 +553,59 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
+ 		*value = 0;
+ 		break;
+ 
++	case PCISWCAP_EXP_LIST_ID:
++		/* Set PCIe v2, root port, slot support */
++		*value = (PCI_EXP_TYPE_ROOT_PORT << 4 | 2 |
++			  PCI_EXP_FLAGS_SLOT) << 16 | PCI_CAP_ID_EXP;
++		break;
++
++	case PCISWCAP_EXP_DEVCAP:
++		*value = mvebu_readl(port, PCIE_CAP_PCIEXP + PCI_EXP_DEVCAP);
++		break;
++
++	case PCISWCAP_EXP_DEVCTL:
++		*value = mvebu_readl(port, PCIE_CAP_PCIEXP + PCI_EXP_DEVCTL) &
++				 ~(PCI_EXP_DEVCTL_URRE | PCI_EXP_DEVCTL_FERE |
++				   PCI_EXP_DEVCTL_NFERE | PCI_EXP_DEVCTL_CERE);
++		*value |= bridge->pcie_devctl;
++		break;
++
++	case PCISWCAP_EXP_LNKCAP:
++		/*
++		 * PCIe requires the clock power management capability to be
++		 * hard-wired to zero for downstream ports
++		 */
++		*value = mvebu_readl(port, PCIE_CAP_PCIEXP + PCI_EXP_LNKCAP) &
++			 ~PCI_EXP_LNKCAP_CLKPM;
++		break;
++
++	case PCISWCAP_EXP_LNKCTL:
++		*value = mvebu_readl(port, PCIE_CAP_PCIEXP + PCI_EXP_LNKCTL);
++		break;
++
++	case PCISWCAP_EXP_SLTCAP:
++		*value = bridge->pcie_sltcap;
++		break;
++
++	case PCISWCAP_EXP_SLTCTL:
++		*value = PCI_EXP_SLTSTA_PDS << 16;
++		break;
++
++	case PCISWCAP_EXP_RTCTL:
++		*value = bridge->pcie_rtctl;
++		break;
++
++	case PCISWCAP_EXP_RTSTA:
++		*value = mvebu_readl(port, PCIE_RC_RTSTA);
++		break;
++
++	/* PCIe requires the v2 fields to be hard-wired to zero */
++	case PCISWCAP_EXP_DEVCAP2:
++	case PCISWCAP_EXP_DEVCTL2:
++	case PCISWCAP_EXP_LNKCAP2:
++	case PCISWCAP_EXP_LNKCTL2:
++	case PCISWCAP_EXP_SLTCAP2:
++	case PCISWCAP_EXP_SLTCTL2:
+ 	default:
+ 		/*
+ 		 * PCI defines configuration read accesses to reserved or
+@@ -614,6 +698,51 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+ 		mvebu_pcie_set_local_bus_nr(port, bridge->secondary_bus);
+ 		break;
+ 
++	case PCISWCAP_EXP_DEVCTL:
++		/*
++		 * Armada370 data says these bits must always
++		 * be zero when in root complex mode.
++		 */
++		value &= ~(PCI_EXP_DEVCTL_URRE | PCI_EXP_DEVCTL_FERE |
++			   PCI_EXP_DEVCTL_NFERE | PCI_EXP_DEVCTL_CERE);
++
++		/*
++		 * If the mask is 0xffff0000, then we only want to write
++		 * the device control register, rather than clearing the
++		 * RW1C bits in the device status register.  Mask out the
++		 * status register bits.
++		 */
++		if (mask == 0xffff0000)
++			value &= 0xffff;
++
++		mvebu_writel(port, value, PCIE_CAP_PCIEXP + PCI_EXP_DEVCTL);
++		break;
++
++	case PCISWCAP_EXP_LNKCTL:
++		/*
++		 * If we don't support CLKREQ, we must ensure that the
++		 * CLKREQ enable bit always reads zero.  Since we haven't
++		 * had this capability, and it's dependent on board wiring,
++		 * disable it for the time being.
++		 */
++		value &= ~PCI_EXP_LNKCTL_CLKREQ_EN;
++
++		/*
++		 * If the mask is 0xffff0000, then we only want to write
++		 * the link control register, rather than clearing the
++		 * RW1C bits in the link status register.  Mask out the
++		 * status register bits.
++		 */
++		if (mask == 0xffff0000)
++			value &= 0xffff;
++
++		mvebu_writel(port, value, PCIE_CAP_PCIEXP + PCI_EXP_LNKCTL);
++		break;
++
++	case PCISWCAP_EXP_RTSTA:
++		mvebu_writel(port, value, PCIE_RC_RTSTA);
++		break;
++
+ 	default:
+ 		break;
  	}
- 
--	/*
--	 * On the secondary bus, we don't want to expose any other
--	 * device than the device physically connected in the PCIe
--	 * slot, visible in slot 0. In slot 1, there's a special
--	 * Marvell device that only makes sense when the Armada is
--	 * used as a PCIe endpoint.
--	 */
--	if (bus->number == port->bridge.secondary_bus &&
--	    PCI_SLOT(devfn) != 0) {
--		*val = 0xffffffff;
--		return PCIBIOS_DEVICE_NOT_FOUND;
--	}
--
- 	/* Access the real PCIe interface */
- 	ret = mvebu_pcie_hw_rd_conf(port, bus, devfn,
- 				    where, size, val);
 -- 
 2.1.0
