@@ -1,232 +1,52 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 03 Oct 2015 19:13:33 +0100
-Subject: [PATCH 8/9] pci: mvebu: add PCI Express root complex capability block
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 3 Oct 2015 20:00:26 +0100
+Subject: [PATCH 0/9] Further mvebu PCIe patches
 In-Reply-To: <20151003181228.GI21513@n2100.arm.linux.org.uk>
 References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
-Message-ID: <E1ZiRJN-0004JH-1h@rmk-PC.arm.linux.org.uk>
+Message-ID: <20151003200026.6eea945d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a PCI Express root complex capability block so the PCI layer
-identifies the bridge as a PCI Express device.
+Hello Russell,
 
-We expose this as a version 1 PCIe capability block, with slot support.
-We disable the clock power management capability as this depends on
-boards wiring the CLKREQ# signal.
+On Sat, 3 Oct 2015 19:12:28 +0100, Russell King - ARM Linux wrote:
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/pci/host/pci-mvebu.c | 137 +++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 133 insertions(+), 4 deletions(-)
+> Here are further PCIe patches which follow on from the previous set of
+> six I sent earlier in September.  This set:
+> 
+> * Separates the DT parsing from the use of this parsed data.
+> * Fixes memory leaks from kasprintf() and refcount leaks of the DT
+>   node where we break out from the loop early.
+> * Uses gpio_set_value_cansleep() so that GPIOs on I2C expanders can
+>   be used for the PCIe reset functionality.
+> * Switch to using devm_kcalloc() instead of devm_kzalloc(), which
+>   eliminates the multiplication, moving it into core code.
+> * Switch to using a gpio descriptor for the reset gpio, which can
+>   contain the active level information from DT.  (It would be nice
+>   if gpiolib automated some of the resource claiming there.)
+> * Make PERST# vs clock timing to match PCIe specifications.  PCIe
+>   specs require the clock to be running for 100us prior to releasing
+>   reset.
+> * Add the standard PCIe capability block in root port form to the
+>   emulated PCIe configuration block.  This allows the PCI layer to
+>   identify the "host bridge" as a PCIe device, and allows us to
+>   take advantage of the code in drivers/pci/pcie, particularly
+>   aspm for link power management.
+> * As a result of identifying ourselves as a PCIe root port, this
+>   eliminates the need to special case accesses to non-slot 0 in
+>   the driver; the lack of other "slots" is something which the
+>   generic PCI code knows about for PCIe root ports.
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 97208233d901..6310f2a84cfd 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -30,6 +30,7 @@
- #define PCIE_DEV_REV_OFF	0x0008
- #define PCIE_BAR_LO_OFF(n)	(0x0010 + ((n) << 3))
- #define PCIE_BAR_HI_OFF(n)	(0x0014 + ((n) << 3))
-+#define PCIE_CAP_PCIEXP		0x0060
- #define PCIE_HEADER_LOG_4_OFF	0x0128
- #define PCIE_BAR_CTRL_OFF(n)	(0x1804 + (((n) - 1) * 4))
- #define PCIE_WIN04_CTRL_OFF(n)	(0x1820 + ((n) << 4))
-@@ -57,14 +58,35 @@
- #define  PCIE_STAT_BUS                  0xff00
- #define  PCIE_STAT_DEV                  0x1f0000
- #define  PCIE_STAT_LINK_DOWN		BIT(0)
-+#define PCIE_RC_RTSTA		0x1a14
- #define PCIE_DEBUG_CTRL         0x1a60
- #define  PCIE_DEBUG_SOFT_RESET		BIT(20)
- 
-+enum {
-+	PCISWCAP = PCI_BRIDGE_CONTROL + 2,
-+	PCISWCAP_EXP_LIST_ID	= PCISWCAP + PCI_CAP_LIST_ID,
-+	PCISWCAP_EXP_DEVCAP	= PCISWCAP + PCI_EXP_DEVCAP,
-+	PCISWCAP_EXP_DEVCTL	= PCISWCAP + PCI_EXP_DEVCTL,
-+	PCISWCAP_EXP_LNKCAP	= PCISWCAP + PCI_EXP_LNKCAP,
-+	PCISWCAP_EXP_LNKCTL	= PCISWCAP + PCI_EXP_LNKCTL,
-+	PCISWCAP_EXP_SLTCAP	= PCISWCAP + PCI_EXP_SLTCAP,
-+	PCISWCAP_EXP_SLTCTL	= PCISWCAP + PCI_EXP_SLTCTL,
-+	PCISWCAP_EXP_RTCTL	= PCISWCAP + PCI_EXP_RTCTL,
-+	PCISWCAP_EXP_RTSTA	= PCISWCAP + PCI_EXP_RTSTA,
-+	PCISWCAP_EXP_DEVCAP2	= PCISWCAP + PCI_EXP_DEVCAP2,
-+	PCISWCAP_EXP_DEVCTL2	= PCISWCAP + PCI_EXP_DEVCTL2,
-+	PCISWCAP_EXP_LNKCAP2	= PCISWCAP + PCI_EXP_LNKCAP2,
-+	PCISWCAP_EXP_LNKCTL2	= PCISWCAP + PCI_EXP_LNKCTL2,
-+	PCISWCAP_EXP_SLTCAP2	= PCISWCAP + PCI_EXP_SLTCAP2,
-+	PCISWCAP_EXP_SLTCTL2	= PCISWCAP + PCI_EXP_SLTCTL2,
-+};
-+
- /* PCI configuration space of a PCI-to-PCI bridge */
- struct mvebu_sw_pci_bridge {
- 	u16 vendor;
- 	u16 device;
- 	u16 command;
-+	u16 status;
- 	u16 class;
- 	u8 interface;
- 	u8 revision;
-@@ -84,13 +106,15 @@ struct mvebu_sw_pci_bridge {
- 	u16 memlimit;
- 	u16 iobaseupper;
- 	u16 iolimitupper;
--	u8 cappointer;
--	u8 reserved1;
--	u16 reserved2;
- 	u32 romaddr;
- 	u8 intline;
- 	u8 intpin;
- 	u16 bridgectrl;
-+
-+	/* PCI express capability */
-+	u32 pcie_sltcap;
-+	u16 pcie_devctl;
-+	u16 pcie_rtctl;
- };
- 
- struct mvebu_pcie_port;
-@@ -451,6 +475,9 @@ static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
- 	/* We support 32 bits I/O addressing */
- 	bridge->iobase = PCI_IO_RANGE_TYPE_32;
- 	bridge->iolimit = PCI_IO_RANGE_TYPE_32;
-+
-+	/* Add capabilities */
-+	bridge->status = PCI_STATUS_CAP_LIST;
- }
- 
- /*
-@@ -468,7 +495,7 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
- 		break;
- 
- 	case PCI_COMMAND:
--		*value = bridge->command;
-+		*value = bridge->command | bridge->status << 16;
- 		break;
- 
- 	case PCI_CLASS_REVISION:
-@@ -513,6 +540,10 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
- 		*value = (bridge->iolimitupper << 16 | bridge->iobaseupper);
- 		break;
- 
-+	case PCI_CAPABILITY_LIST:
-+		*value = PCISWCAP;
-+		break;
-+
- 	case PCI_ROM_ADDRESS1:
- 		*value = 0;
- 		break;
-@@ -522,6 +553,59 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
- 		*value = 0;
- 		break;
- 
-+	case PCISWCAP_EXP_LIST_ID:
-+		/* Set PCIe v2, root port, slot support */
-+		*value = (PCI_EXP_TYPE_ROOT_PORT << 4 | 2 |
-+			  PCI_EXP_FLAGS_SLOT) << 16 | PCI_CAP_ID_EXP;
-+		break;
-+
-+	case PCISWCAP_EXP_DEVCAP:
-+		*value = mvebu_readl(port, PCIE_CAP_PCIEXP + PCI_EXP_DEVCAP);
-+		break;
-+
-+	case PCISWCAP_EXP_DEVCTL:
-+		*value = mvebu_readl(port, PCIE_CAP_PCIEXP + PCI_EXP_DEVCTL) &
-+				 ~(PCI_EXP_DEVCTL_URRE | PCI_EXP_DEVCTL_FERE |
-+				   PCI_EXP_DEVCTL_NFERE | PCI_EXP_DEVCTL_CERE);
-+		*value |= bridge->pcie_devctl;
-+		break;
-+
-+	case PCISWCAP_EXP_LNKCAP:
-+		/*
-+		 * PCIe requires the clock power management capability to be
-+		 * hard-wired to zero for downstream ports
-+		 */
-+		*value = mvebu_readl(port, PCIE_CAP_PCIEXP + PCI_EXP_LNKCAP) &
-+			 ~PCI_EXP_LNKCAP_CLKPM;
-+		break;
-+
-+	case PCISWCAP_EXP_LNKCTL:
-+		*value = mvebu_readl(port, PCIE_CAP_PCIEXP + PCI_EXP_LNKCTL);
-+		break;
-+
-+	case PCISWCAP_EXP_SLTCAP:
-+		*value = bridge->pcie_sltcap;
-+		break;
-+
-+	case PCISWCAP_EXP_SLTCTL:
-+		*value = PCI_EXP_SLTSTA_PDS << 16;
-+		break;
-+
-+	case PCISWCAP_EXP_RTCTL:
-+		*value = bridge->pcie_rtctl;
-+		break;
-+
-+	case PCISWCAP_EXP_RTSTA:
-+		*value = mvebu_readl(port, PCIE_RC_RTSTA);
-+		break;
-+
-+	/* PCIe requires the v2 fields to be hard-wired to zero */
-+	case PCISWCAP_EXP_DEVCAP2:
-+	case PCISWCAP_EXP_DEVCTL2:
-+	case PCISWCAP_EXP_LNKCAP2:
-+	case PCISWCAP_EXP_LNKCTL2:
-+	case PCISWCAP_EXP_SLTCAP2:
-+	case PCISWCAP_EXP_SLTCTL2:
- 	default:
- 		/*
- 		 * PCI defines configuration read accesses to reserved or
-@@ -614,6 +698,51 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
- 		mvebu_pcie_set_local_bus_nr(port, bridge->secondary_bus);
- 		break;
- 
-+	case PCISWCAP_EXP_DEVCTL:
-+		/*
-+		 * Armada370 data says these bits must always
-+		 * be zero when in root complex mode.
-+		 */
-+		value &= ~(PCI_EXP_DEVCTL_URRE | PCI_EXP_DEVCTL_FERE |
-+			   PCI_EXP_DEVCTL_NFERE | PCI_EXP_DEVCTL_CERE);
-+
-+		/*
-+		 * If the mask is 0xffff0000, then we only want to write
-+		 * the device control register, rather than clearing the
-+		 * RW1C bits in the device status register.  Mask out the
-+		 * status register bits.
-+		 */
-+		if (mask == 0xffff0000)
-+			value &= 0xffff;
-+
-+		mvebu_writel(port, value, PCIE_CAP_PCIEXP + PCI_EXP_DEVCTL);
-+		break;
-+
-+	case PCISWCAP_EXP_LNKCTL:
-+		/*
-+		 * If we don't support CLKREQ, we must ensure that the
-+		 * CLKREQ enable bit always reads zero.  Since we haven't
-+		 * had this capability, and it's dependent on board wiring,
-+		 * disable it for the time being.
-+		 */
-+		value &= ~PCI_EXP_LNKCTL_CLKREQ_EN;
-+
-+		/*
-+		 * If the mask is 0xffff0000, then we only want to write
-+		 * the link control register, rather than clearing the
-+		 * RW1C bits in the link status register.  Mask out the
-+		 * status register bits.
-+		 */
-+		if (mask == 0xffff0000)
-+			value &= 0xffff;
-+
-+		mvebu_writel(port, value, PCIE_CAP_PCIEXP + PCI_EXP_LNKCTL);
-+		break;
-+
-+	case PCISWCAP_EXP_RTSTA:
-+		mvebu_writel(port, value, PCIE_RC_RTSTA);
-+		break;
-+
- 	default:
- 		break;
- 	}
+Thanks for these patches! They look good. However, I'm away for the
+Embedded Linux Conference Europe in Dublin right now, and therefore
+don't have access to my boards to test that it works OK on platforms
+other than Armada 38x (which you tested). I will try to do this testing
+next week, hopefully on Friday.
+
+Thanks!
+
+Thomas
 -- 
-2.1.0
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
