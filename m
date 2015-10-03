@@ -1,20 +1,87 @@
-From: yitian.bu@tangramtek.com (yitian)
-Date: Sat, 3 Oct 2015 08:39:13 +0800
-Subject: [alsa-devel] [RESEND PATCH v2 1/1] ASoC: dwc: fix dma
- stop	transferring issue
-In-Reply-To: <20151002170544.GX12635@sirena.org.uk>
-References: <006401d0fac5$2e4bb840$8ae328c0$@tangramtek.com>
- <20151002170544.GX12635@sirena.org.uk>
-Message-ID: <00a801d0fd73$ee047400$ca0d5c00$@tangramtek.com>
+From: Prasun.Kapoor@caviumnetworks.com (Kapoor, Prasun)
+Date: Sat, 3 Oct 2015 02:18:57 +0000
+Subject: [PATCH v5 00/23] ILP32 for ARM64
+In-Reply-To: <20151002093711.GA15803@localhost>
+References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
+ <20150930101918.GA9753@e104818-lin.cambridge.arm.com>
+ <20151001191520.GA25295@yury-N73SV> <1708349.DFbfvHcnCR@wuerfel>
+ <F6B719D8-1FC0-4B26-A926-40FB6953AAE3@caviumnetworks.com>
+ <20151002093711.GA15803@localhost>
+Message-ID: <D23487FC.908DE%pkapoor@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark:
-> This doesn't apply because it's been corrupted by line wrapping - git am
-> can't understand it.  Since it's just that one line I fixed it up by
-> hand but please look at your mail setup to make sure this works (this
-> might've been what happened with your other patch yesterday).
 
-After you said it corrupted git am, I used git send-email to send the
-"correct irq clear method" patch and hopefully that was correct.
-I will be careful next time, thanks a lot for your patient help.
+
+On 10/2/15, 2:37 AM, "Catalin Marinas" <catalin.marinas@arm.com> wrote:
+
+>On Thu, Oct 01, 2015 at 09:49:46PM +0000, Pinski, Andrew wrote:
+>> Ok, we will rewrite these patches using 32bit time_t and 32bit off_t
+>> and redo the toolchain support for them.  Note this is going back to
+>> the abi I had originally done when I submitted my original version
+>> when it was asked to change time_t to be 64bit.
+>
+>One of the key aspects of kernel development is the ability to adapt
+>quickly to new requests/insights. This implies releasing early and often
+>rather than a new version roughly twice a year (IIRC, v1 was posted
+>September 2013). Moreover, the success of the kernel is partly based on
+>not getting stuck on old decisions (well, unless it breaks accepted user
+>ABI).
+>
+>So, at the time, following x32 discussions, we thought of using the
+>native ABI as much as possible. However, two important things happened
+>since:
+>
+>1. libc community didn't like breaking the POSIX compliance
+>2. No-one seems desperate for ILP32 on AArch64
+>
+>(1) is a fair point and I would rather be careful as we don't know the
+>extent of the code affected. In the meantime, we've also had ongoing
+>work for addressing the 2038 issue on 32-bit architectures.
+>
+>The second point is equally important. The benchmarks I've seen didn't
+>show a significant improvement and the messages I got on various
+>channels pretty much labeled ILP32 as a transitional stage to full LP64.
+>In this case, we need to balance the benefits of a close to native ABI
+>(future proof, slightly higher performance) vs. the cost of maintaining
+>such ABI in the kernel on the long term, especially if it's not widely
+>used/tested.
+
+
+For us ILP32  is not about putting this into our product flier at all, it
+is about supporting real applications. We have an existing product line of
+MIPS based SoCs where a large number of N32 (an exact equivalent of ILP32)
+applications are currently in production. Our customers are looking to
+bring those applications (mostly in Networking and Telecom space) over to
+ARMv8. 
+
+We think its an extremely risky strategy to say either future processors
+should incur the additional cost (power and complexity) of implementing
+Aarch32 instruction set or have no way of  supporting 32 bit applications
+at all.
+
+Apart from there being an installed base of 32 bit networking and telecom
+applications, we have also seen non-trivial performance gains with ILP32
+(for example, our SPECINT score goes up by 7% with ILP32 compared to
+LP64).  
+
+
+
+>
+>We've seen the kernel patches and, following discussions on the lists,
+>decided to change the original recommendation. IIRC, the main ideas (but
+>you need to read various threads as I can't remember the details from
+>6-7 months ago):
+>
+>a) separate syscall table for ILP32
+>b) close to compat ABI with 32-bit time_t, off_t
+>c) asm-generic/unistd.h rather than asm/unistd32.h (that's where it
+>   would differ from compat, together with places where pointers are
+>   passed)
+>
+>As I said previously, I'm not going to pay any attention to the patches
+>in this series, it's nothing more than a rebase of a version I already
+>reviewed.
+>
+>-- 
+>Catalin
