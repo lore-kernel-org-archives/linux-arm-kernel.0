@@ -1,102 +1,62 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 03 Oct 2015 19:13:27 +0100
-Subject: [PATCH 7/9] pci: mvebu: better implementation of clock/reset handling
+Date: Sat, 03 Oct 2015 19:13:38 +0100
+Subject: [PATCH 9/9] pci: mvebu: remove code restricting accesses to slot 0
 In-Reply-To: <20151003181228.GI21513@n2100.arm.linux.org.uk>
 References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
-Message-ID: <E1ZiRJH-0004JA-UC@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZiRJS-0004JN-6A@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an implementation to handle clock and reset handling that is
-compliant with the PCIe specification.  The clock should be running
-and stable for 100us prior to reset being released, and we should
-re-assert reset prior to stopping the clock.
+Now that we advertise a PCIe capability, the Linux PCI layer will not
+scan the bus for devices other than in slot 0.  This makes the
+work-around to trap accesses to devices other than slot 0 unnecessary.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/pci/host/pci-mvebu.c | 56 ++++++++++++++++++++++++++++++++++----------
- 1 file changed, 43 insertions(+), 13 deletions(-)
+ drivers/pci/host/pci-mvebu.c | 24 ------------------------
+ 1 file changed, 24 deletions(-)
 
 diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index ab619ee0ef49..97208233d901 100644
+index 6310f2a84cfd..53b79c5f0559 100644
 --- a/drivers/pci/host/pci-mvebu.c
 +++ b/drivers/pci/host/pci-mvebu.c
-@@ -1042,6 +1042,46 @@ static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
- 	return ret;
- }
+@@ -794,17 +794,6 @@ static int mvebu_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+ 	if (!mvebu_pcie_link_up(port))
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
  
-+/*
-+ * Power up a PCIe port.  PCIe requires the refclk to be stable for 100?s
-+ * prior to releasing PERST.  See table 2-4 in section 2.6.2 AC Specifications
-+ * of the PCI Express Card Electromechanical Specification, 1.1.
-+ */
-+static int mvebu_pcie_powerup(struct mvebu_pcie_port *port)
-+{
-+	int ret;
-+
-+	ret = clk_prepare_enable(port->clk);
-+	if (ret < 0)
-+		return ret;
-+
-+	if (port->reset_gpio) {
-+		u32 reset_udelay = 20000;
-+
-+		of_property_read_u32(port->dn, "reset-delay-us",
-+				     &reset_udelay);
-+
-+		udelay(100);
-+
-+		gpiod_set_value_cansleep(port->reset_gpio, 0);
-+		msleep(reset_udelay / 1000);
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-+ * Power down a PCIe port.  Strictly, PCIe requires us to place the card
-+ * in D3hot state before asserting PERST#.
-+ */
-+static void mvebu_pcie_powerdown(struct mvebu_pcie_port *port)
-+{
-+	if (port->reset_gpio)
-+		gpiod_set_value_cansleep(port->reset_gpio, 1);
-+
-+	clk_disable_unprepare(port->clk);
-+}
-+
- static int mvebu_pcie_probe(struct platform_device *pdev)
- {
- 	struct mvebu_pcie *pcie;
-@@ -1114,18 +1154,8 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 		if (!child)
- 			continue;
- 
--		if (port->reset_gpio) {
--			u32 reset_udelay = 20000;
+-	/*
+-	 * On the secondary bus, we don't want to expose any other
+-	 * device than the device physically connected in the PCIe
+-	 * slot, visible in slot 0. In slot 1, there's a special
+-	 * Marvell device that only makes sense when the Armada is
+-	 * used as a PCIe endpoint.
+-	 */
+-	if (bus->number == port->bridge.secondary_bus &&
+-	    PCI_SLOT(devfn) != 0)
+-		return PCIBIOS_DEVICE_NOT_FOUND;
 -
--			of_property_read_u32(child, "reset-delay-us",
--					     &reset_udelay);
--
--			gpiod_set_value_cansleep(port->reset_gpio, 0);
--			msleep(reset_udelay / 1000);
--		}
--
--		ret = clk_prepare_enable(port->clk);
--		if (ret)
-+		ret = mvebu_pcie_powerup(port);
-+		if (ret < 0)
- 			continue;
+ 	/* Access the real PCIe interface */
+ 	ret = mvebu_pcie_hw_wr_conf(port, bus, devfn,
+ 				    where, size, val);
+@@ -835,19 +824,6 @@ static int mvebu_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 	}
  
- 		port->base = mvebu_pcie_map_registers(pdev, child, port);
-@@ -1133,7 +1163,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 			dev_err(&pdev->dev, "%s: cannot map registers\n",
- 				port->name);
- 			port->base = NULL;
--			clk_disable_unprepare(port->clk);
-+			mvebu_pcie_powerdown(port);
- 			continue;
- 		}
- 
+-	/*
+-	 * On the secondary bus, we don't want to expose any other
+-	 * device than the device physically connected in the PCIe
+-	 * slot, visible in slot 0. In slot 1, there's a special
+-	 * Marvell device that only makes sense when the Armada is
+-	 * used as a PCIe endpoint.
+-	 */
+-	if (bus->number == port->bridge.secondary_bus &&
+-	    PCI_SLOT(devfn) != 0) {
+-		*val = 0xffffffff;
+-		return PCIBIOS_DEVICE_NOT_FOUND;
+-	}
+-
+ 	/* Access the real PCIe interface */
+ 	ret = mvebu_pcie_hw_rd_conf(port, bus, devfn,
+ 				    where, size, val);
 -- 
 2.1.0
