@@ -1,74 +1,38 @@
 From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Sat, 03 Oct 2015 14:19:24 +0200
-Subject: [PATCH v4 02/26] ARM: pxa: magician: Change comments to be more
- informative
-In-Reply-To: <5609ACBA.6080503@tul.cz>
-References: <cover.1443472089.git.petr.cvek@tul.cz> <5609ACBA.6080503@tul.cz>
-Message-ID: <1443874764.4186.8.camel@gmail.com>
+Date: Sat, 03 Oct 2015 14:19:49 +0200
+Subject: [PATCH v4 03/26] ARM: pxa: magician: Print more specific error
+ message for global GPIOs
+In-Reply-To: <5609ACD3.6030600@tul.cz>
+References: <cover.1443472089.git.petr.cvek@tul.cz> <5609ACD3.6030600@tul.cz>
+Message-ID: <1443874789.4186.9.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Am Montag, den 28.09.2015, 23:10 +0200 schrieb Petr Cvek:
-> This patch changes the comments in the HTC Magician machine source
-> code
-> to better describe used devices and interfaces.
+> Print more specific error message for global GPIOs.
 > 
 > Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
 
-This is mostly fine, some comments below.
+Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
 
-[...]
->  static struct resource egpio_resources[] = {
-> @@ -197,7 +199,10 @@ static struct htc_egpio_chip egpio_chips[] = {
->  		.gpio_base	= MAGICIAN_EGPIO(0, 0),
->  		.num_gpios	= 24,
->  		.direction	= HTC_EGPIO_OUTPUT,
-> -		.initial_values	= 0x40, /*
-> EGPIO_MAGICIAN_GSM_RESET */
-> +		/*
-> +		 * Depends on modules configuration
-> +		 */
-> +		.initial_values	= 0x40,
->  	},
->  	[1] = {
->  		.reg_start	= 4,
-
-Why drop the info that this is the GSM reset while improving comments
-in every other place with more information?
-
-[...]
-> +/*
-> + * LCD PWM backlight (main)
-> + *
-> + * MP1521 frequency should be:
-> + *	100-400 Hz = 2?.5*10^6 - 10?*10^6 ns
-
-What is MP1521?
-
-[...]
-> @@ -459,7 +475,7 @@ static struct pasic3_leds_machinfo
-> pasic3_leds_info = {
->  };
+> ---
+>  arch/arm/mach-pxa/magician.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach
+> -pxa/magician.c
+> index c8fa379..29d8146 100644
+> --- a/arch/arm/mach-pxa/magician.c
+> +++ b/arch/arm/mach-pxa/magician.c
+> @@ -752,7 +752,7 @@ static void __init magician_init(void)
+>  	pxa2xx_mfp_config(ARRAY_AND_SIZE(magician_pin_config));
+>  	err =
+> gpio_request_array(ARRAY_AND_SIZE(magician_global_gpios));
+>  	if (err)
+> -		pr_err("magician: Failed to request GPIOs: %d\n",
+> err);
+> +		pr_err("magician: Failed to request global GPIOs:
+> %d\n", err);
 >  
->  /*
-> - * PASIC3 with DS1WM
-> + * PASIC3 DS1WM
->   */
-
-This is indeed an mfd chip that contains a DS1WM IP core. I think the
-older comment is better.
-
-> @@ -492,7 +508,7 @@ static struct platform_device pasic3 = {
->  };
->  
->  /*
-> - * USB "Transceiver"
-> + * PXA UDC
->   */
->  
->  static struct resource gpio_vbus_resource = {
-
-You fix this in a later commit, but here the change is incorrect.
-
-regards
-Philipp
+>  	pxa_set_ffuart_info(NULL);
+>  	pxa_set_btuart_info(NULL);
