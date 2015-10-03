@@ -1,50 +1,52 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 3 Oct 2015 19:02:20 +0200
-Subject: [PATCH v3 1/2] ARM: at91/dt: shdwc binding: add new shutdown
- controller documentation
-In-Reply-To: <1443630121-13912-2-git-send-email-nicolas.ferre@atmel.com>
-References: <1443630121-13912-1-git-send-email-nicolas.ferre@atmel.com>
- <1443630121-13912-2-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20151003170220.GG2694@piout.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 4 Oct 2015 01:29:26 +0800
+Subject: [PATCH 1/4] ARM: OMAP: dmtimer: check for fixed timers during
+ config
+In-Reply-To: <1443727960-32232-2-git-send-email-s-anna@ti.com>
+Message-ID: <201510040126.SfMisWv2%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/2015 at 18:22:00 +0200, Nicolas Ferre wrote :
-> +SHDWC Shutdown Controller (Alternative)
-> +
-> +1) shdwc node
-> +
-> +required properties:
-> +- compatible: should be "atmel,sama5d2-shdwc".
-> +- reg: should contain registers location and length
-> +- clocks: phandle to input clock.
-> +- #address-cells: should be one. The cell is the wake-up input index.
-> +- #size-cells: should be zero.
-> +
-> +optional properties:
-> +
-> +- atmel,wakeup-debouncer: minimum wake-up inputs debouncer period in
+Hi Suman,
 
-Shouldn't that property be called atmel,wakeup-debouncer-ms ?
+[auto build test results on v4.3-rc3 -- if it's inappropriate base, please ignore]
 
-> +
-> +2) input nodes
-> +
-> +Wake-up input nodes are usually described in the "board" part of the Device
-> +Tree. Note also that input 0 is linked to the wake-up pin and is frequently
-> +used.
-> +
-> +Required properties:
-> +- reg: should contain the wake-up input index [0 - 15].
-> +
-> +Optional properties:
-> +- atmel,wakeup-type: string, operation mode of the input described by the child
-> +  node. Supported values are: "high" or "low".
-> +
+config: arm-omap1_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Maybe we could avoid parsing string and use an integer with a few defines
+All error/warnings (new ones prefixed by >>):
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+   arch/arm/plat-omap/dmtimer.c: In function 'omap_dm_timer_set_source':
+>> arch/arm/plat-omap/dmtimer.c:509:2: error: implicit declaration of function 'clk_hw_get_num_parents' [-Werror=implicit-function-declaration]
+     if (!clk_hw_get_num_parents(__clk_get_hw(timer->fclk)))
+     ^
+>> arch/arm/plat-omap/dmtimer.c:509:2: error: implicit declaration of function '__clk_get_hw' [-Werror=implicit-function-declaration]
+   cc1: some warnings being treated as errors
+
+vim +/clk_hw_get_num_parents +509 arch/arm/plat-omap/dmtimer.c
+
+   503			return pdata->set_timer_src(timer->pdev, source);
+   504	
+   505		if (IS_ERR(timer->fclk))
+   506			return -EINVAL;
+   507	
+   508		/* Check if the clock has parents if not no point checking */
+ > 509		if (!clk_hw_get_num_parents(__clk_get_hw(timer->fclk)))
+   510			return 0;
+   511	
+   512		switch (source) {
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 18413 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151004/25ce697a/attachment-0001.obj>
