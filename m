@@ -1,123 +1,44 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Sat, 3 Oct 2015 18:38:50 -0500
-Subject: [PATCH V2 3/3] ARM: dts: keystone: Update SoC specific compatible
- flags
-In-Reply-To: <1443915530-15035-1-git-send-email-nm@ti.com>
+Date: Sat, 3 Oct 2015 18:38:47 -0500
+Subject: [PATCH V2 0/3] ARM: dts/keystone: Introduce SoC specific compatible
+ matches
+In-Reply-To: <1442938118-4718-1-git-send-email-nm@ti.com>
 References: <1442938118-4718-1-git-send-email-nm@ti.com>
- <1443915530-15035-1-git-send-email-nm@ti.com>
-Message-ID: <1443915530-15035-4-git-send-email-nm@ti.com>
+Message-ID: <1443915530-15035-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the compatible flags to allow specific SoC identification.
+Hi,
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-V2: No change
+Round 2 of the series with updated patch #1. This series introduces
+SoC specific dt compatible property to allow for future SoCs to be
+handled and for userspace applications that can introduce features
+based on SoC they are functioning on.
 
-V1: https://patchwork.kernel.org/patch/7240911/
+V1 of the series: http://marc.info/?l=devicetree&m=144309031109988&w=2
+V2 of the series has the following changes:
+	- updated commit message in patch #1
+	- picked up acked-by for patch #1
 
- arch/arm/boot/dts/k2e-evm.dts   | 2 +-
- arch/arm/boot/dts/k2e.dtsi      | 3 +++
- arch/arm/boot/dts/k2hk-evm.dts  | 2 +-
- arch/arm/boot/dts/k2hk.dtsi     | 3 +++
- arch/arm/boot/dts/k2l-evm.dts   | 2 +-
- arch/arm/boot/dts/k2l.dtsi      | 3 +++
- arch/arm/boot/dts/keystone.dtsi | 1 +
- 7 files changed, 13 insertions(+), 3 deletions(-)
+Series based on v4.3-rc1
 
-diff --git a/arch/arm/boot/dts/k2e-evm.dts b/arch/arm/boot/dts/k2e-evm.dts
-index 50c83c21d911..b7e99807f5c2 100644
---- a/arch/arm/boot/dts/k2e-evm.dts
-+++ b/arch/arm/boot/dts/k2e-evm.dts
-@@ -13,7 +13,7 @@
- #include "k2e.dtsi"
- 
- / {
--	compatible =  "ti,k2e-evm","ti,keystone";
-+	compatible = "ti,k2e-evm", "ti,k2e", "ti,keystone";
- 	model = "Texas Instruments Keystone 2 Edison EVM";
- 
- 	soc {
-diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
-index 675fb8e492c6..1097dada56d2 100644
---- a/arch/arm/boot/dts/k2e.dtsi
-+++ b/arch/arm/boot/dts/k2e.dtsi
-@@ -9,6 +9,9 @@
-  */
- 
- / {
-+	compatible = "ti,k2e", "ti,keystone";
-+	model = "Texas Instruments Keystone 2 Edison SoC";
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
-index 660ebf58d547..8161bf53271b 100644
---- a/arch/arm/boot/dts/k2hk-evm.dts
-+++ b/arch/arm/boot/dts/k2hk-evm.dts
-@@ -13,7 +13,7 @@
- #include "k2hk.dtsi"
- 
- / {
--	compatible =  "ti,k2hk-evm","ti,keystone";
-+	compatible =  "ti,k2hk-evm", "ti,k2hk", "ti,keystone";
- 	model = "Texas Instruments Keystone 2 Kepler/Hawking EVM";
- 
- 	soc {
-diff --git a/arch/arm/boot/dts/k2hk.dtsi b/arch/arm/boot/dts/k2hk.dtsi
-index d0810a5f2968..ada4c7ac96e7 100644
---- a/arch/arm/boot/dts/k2hk.dtsi
-+++ b/arch/arm/boot/dts/k2hk.dtsi
-@@ -9,6 +9,9 @@
-  */
- 
- / {
-+	compatible = "ti,k2hk", "ti,keystone";
-+	model = "Texas Instruments Keystone 2 Kepler/Hawking SoC";
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/k2l-evm.dts b/arch/arm/boot/dts/k2l-evm.dts
-index 9a69a6b55374..00861244d788 100644
---- a/arch/arm/boot/dts/k2l-evm.dts
-+++ b/arch/arm/boot/dts/k2l-evm.dts
-@@ -13,7 +13,7 @@
- #include "k2l.dtsi"
- 
- / {
--	compatible =  "ti,k2l-evm","ti,keystone";
-+	compatible = "ti,k2l-evm", "ti,k2l", "ti,keystone";
- 	model = "Texas Instruments Keystone 2 Lamarr EVM";
- 
- 	soc {
-diff --git a/arch/arm/boot/dts/k2l.dtsi b/arch/arm/boot/dts/k2l.dtsi
-index 49fd414f680c..4446da72b0ae 100644
---- a/arch/arm/boot/dts/k2l.dtsi
-+++ b/arch/arm/boot/dts/k2l.dtsi
-@@ -9,6 +9,9 @@
-  */
- 
- / {
-+	compatible = "ti,k2l", "ti,keystone";
-+	model = "Texas Instruments Keystone 2 Lamarr SoC";
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index 72816d65f7ec..ff91f703d371 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -12,6 +12,7 @@
- #include "skeleton.dtsi"
- 
- / {
-+	compatible = "ti,keystone";
- 	model = "Texas Instruments Keystone 2 SoC";
- 	#address-cells = <2>;
- 	#size-cells = <2>;
+Tested on v4.3-rc3: http://pastebin.ubuntu.com/12659000/
+
+Nishanth Menon (3):
+  Documentation: dt: keystone: provide SoC specific compatible flags
+  ARM: keystone: Update compatible to have SoC specific matches
+  ARM: dts: keystone: Update SoC specific compatible flags
+
+ .../devicetree/bindings/arm/keystone/keystone.txt    | 20 +++++++++++++++++---
+ arch/arm/boot/dts/k2e-evm.dts                        |  2 +-
+ arch/arm/boot/dts/k2e.dtsi                           |  3 +++
+ arch/arm/boot/dts/k2hk-evm.dts                       |  2 +-
+ arch/arm/boot/dts/k2hk.dtsi                          |  3 +++
+ arch/arm/boot/dts/k2l-evm.dts                        |  2 +-
+ arch/arm/boot/dts/k2l.dtsi                           |  3 +++
+ arch/arm/boot/dts/keystone.dtsi                      |  1 +
+ arch/arm/mach-keystone/keystone.c                    |  3 +++
+ 9 files changed, 33 insertions(+), 6 deletions(-)
+
 -- 
 2.1.4
