@@ -1,132 +1,56 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 03 Oct 2015 19:13:02 +0100
-Subject: [PATCH 2/9] pci: mvebu: fix memory leaks and refcount leaks
+Date: Sat, 03 Oct 2015 19:13:07 +0100
+Subject: [PATCH 3/9] pci: mvebu: split port parsing and resource claiming from
+ port setup
 In-Reply-To: <20151003181228.GI21513@n2100.arm.linux.org.uk>
 References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
-Message-ID: <E1ZiRIs-0004Id-AN@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZiRIx-0004Ik-Da@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvebu PCI port parsing is weak due to:
-
-1) allocations via kasprintf() were not cleaned up when we encounter an
-   error or decide to skip the port.
-2) kasprintf() wasn't checked for failure.
-3) of_get_named_gpio_flags() returns EPROBE_DEFER if the GPIO is not
-   present, not devm_gpio_request_one().
-4) the of_node was not being put when terminating the loop.
-
-Fix these oversights.
+Split the PCIe port DT parsing and resource claiming from setting up
+the actual ports.  This allows us to gather all the resources first,
+before touching the hardware.  This is important as some of these
+resources (such as the GPIO for the PCIe reset) may defer probing.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/pci/host/pci-mvebu.c | 50 +++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 43 insertions(+), 7 deletions(-)
+ drivers/pci/host/pci-mvebu.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 13ab0350f7fb..e8c51bb58e99 100644
+index e8c51bb58e99..92c777e1aa3c 100644
 --- a/drivers/pci/host/pci-mvebu.c
 +++ b/drivers/pci/host/pci-mvebu.c
-@@ -928,6 +928,13 @@ static int mvebu_pcie_resume(struct device *dev)
- 	return 0;
- }
- 
-+static void mvebu_pcie_port_clk_put(void *data)
-+{
-+	struct mvebu_pcie_port *port = data;
-+
-+	clk_put(port->clk);
-+}
-+
- static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
- 	struct mvebu_pcie_port *port, struct device_node *child)
- {
-@@ -946,7 +953,12 @@ static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
- 	if (of_property_read_u32(child, "marvell,pcie-lane", &port->lane))
- 		port->lane = 0;
- 
--	port->name = kasprintf(GFP_KERNEL, "pcie%d.%d", port->port, port->lane);
-+	port->name = devm_kasprintf(dev, GFP_KERNEL, "pcie%d.%d", port->port,
-+				    port->lane);
-+	if (!port->name) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
- 
- 	port->devfn = of_pci_get_devfn(child);
- 	if (port->devfn < 0)
-@@ -960,20 +972,29 @@ static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
- 		goto skip;
- 	}
- 
--	if (resource_size(&pcie->io) != 0)
-+	if (resource_size(&pcie->io) != 0) {
- 		mvebu_get_tgt_attr(dev->of_node, port->devfn, IORESOURCE_IO,
- 				   &port->io_target, &port->io_attr);
--	else {
-+	} else {
- 		port->io_target = -1;
- 		port->io_attr = -1;
- 	}
- 
- 	port->reset_gpio = of_get_named_gpio_flags(child, "reset-gpios", 0,
- 						   &flags);
-+	if (port->reset_gpio == -EPROBE_DEFER) {
-+		ret = port->reset_gpio;
-+		goto err;
-+	}
-+
- 	if (gpio_is_valid(port->reset_gpio)) {
- 		port->reset_active_low = flags & OF_GPIO_ACTIVE_LOW;
--		port->reset_name = kasprintf(GFP_KERNEL, "%s-reset",
--					     port->name);
-+		port->reset_name = devm_kasprintf(dev, GFP_KERNEL, "%s-reset",
-+						  port->name);
-+		if (!port->reset_name) {
-+			ret = -ENOMEM;
-+			goto err;
-+		}
- 
- 		ret = devm_gpio_request_one(dev, port->reset_gpio,
- 					    GPIOF_DIR_OUT, port->reset_name);
-@@ -990,10 +1011,23 @@ static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
- 		goto skip;
- 	}
- 
-+	ret = devm_add_action(dev, mvebu_pcie_port_clk_put, port);
-+	if (ret < 0) {
-+		clk_put(port->clk);
-+		goto err;
-+	}
-+
- 	return 1;
- 
- skip:
- 	ret = 0;
-+
-+	/* In the case of skipping, we need to free these */
-+	devm_kfree(dev, port->reset_name);
-+	port->reset_name = NULL;
-+	devm_kfree(dev, port->name);
-+	port->name = NULL;
-+
- err:
- 	return ret;
- }
-@@ -1052,10 +1086,12 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 		struct mvebu_pcie_port *port = &pcie->ports[i];
- 
- 		ret = mvebu_pcie_parse_port(pcie, port, child);
--		if (ret < 0)
-+		if (ret < 0) {
-+			of_node_put(child);
- 			return ret;
--		else if (ret == 0)
-+		} else if (ret == 0) {
+@@ -1093,6 +1093,18 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
  			continue;
-+		}
+ 		}
  
++		port->dn = child;
++		i++;
++	}
++	pcie->nports = i;
++
++	for (i = 0; i < pcie->nports; i++) {
++		struct mvebu_pcie_port *port = &pcie->ports[i];
++
++		child = port->dn;
++		if (!child)
++			continue;
++
  		if (gpio_is_valid(port->reset_gpio)) {
  			u32 reset_udelay = 20000;
+ 
+@@ -1118,10 +1130,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+ 		}
+ 
+ 		mvebu_pcie_set_local_dev_nr(port, 1);
+-
+-		port->dn = child;
+ 		mvebu_sw_pci_bridge_init(port);
+-		i++;
+ 	}
+ 
+ 	pcie->nports = i;
 -- 
 2.1.0
