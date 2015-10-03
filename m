@@ -1,78 +1,37 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Sat, 3 Oct 2015 10:20:04 +0200
-Subject: [PATCH] ARM: fix vdsomunge not to depend on glibc specific byteswap.h
-In-Reply-To: <cover.1443791320.git.hns@goldelico.com>
-References: <A323E65A-1631-4ADF-865D-04A5C38C6969@goldelico.com>
- <cover.1443791320.git.hns@goldelico.com>
-Message-ID: <58DAB2B9-4068-4A11-8623-5A54195950E1@goldelico.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 3 Oct 2015 10:32:19 +0100
+Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
+In-Reply-To: <yw1xbncgluad.fsf@unicorn.mansr.com>
+References: <560E53E3.7070207@free.fr> <560E8584.8000207@free.fr>
+ <20151002180255.GK12338@codeaurora.org> <560ED1FB.9010000@free.fr>
+ <yw1xbncgluad.fsf@unicorn.mansr.com>
+Message-ID: <20151003103219.1e10bdeb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the host toolchain is not glibc based then the arm kernel build
-fails with
+On Sat, 3 Oct 2015 00:34:02 +0100
+M?ns Rullg?rd <mans@mansr.com> wrote:
 
-HOSTCC  arch/arm/vdso/vdsomunge
-arch/arm/vdso/vdsomunge.c:48:22: fatal error: byteswap.h: No such file or directory
+> Mason <slash.tmp@free.fr> writes:
+> 
+> > My port requires the TWD to function. So I'm using
+> > select HAVE_ARM_TWD (no "if SMP") to have it work
+> > even on MULTIPLATFORM UP configs.
+> 
+> You could just let it use another timer in the non-smp case if you
+> didn't have that weird aversion towards using my code.
 
-Observed: with omap2plus_defconfig and compile on Mac OS X with arm ELF
-cross-compiler.
+I have no idea what your code does, but using the timer that is
+integrated into the core (just like on any other A9 implementation)
+feels like the right thing to do, unless the HW is too broken to use
+TWD.
 
-Reason: byteswap.h is a glibc only header.
+Another timer is a nice thing to have (it probably comes in handy for
+suspend/resume, and it may have a much better resolution), but this
+seems like icing on the cake at this point. Let's see the cake first.
 
-Solution: replace by private byte-swapping macros (taken from
-arch/mips/boot/elf2ecoff.c)
+Thanks,
 
-Tested to compile on Mac OS X 10.9.5 host.
-
-Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
----
-arch/arm/vdso/vdsomunge.c | 19 +++++++++++++++----
-1 file changed, 15 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/vdso/vdsomunge.c b/arch/arm/vdso/vdsomunge.c
-index aedec81..27a9a0b 100644
---- a/arch/arm/vdso/vdsomunge.c
-+++ b/arch/arm/vdso/vdsomunge.c
-@@ -45,7 +45,18 @@
-* it does.
-*/
-
--#include <byteswap.h>
-+#define swab16(x) \
-+	((unsigned short)( \
-+		(((unsigned short)(x) & (unsigned short)0x00ffU) << 8) | \
-+		(((unsigned short)(x) & (unsigned short)0xff00U) >> 8) ))
-+
-+#define swab32(x) \
-+	((unsigned int)( \
-+		(((unsigned int)(x) & (unsigned int)0x000000ffUL) << 24) | \
-+		(((unsigned int)(x) & (unsigned int)0x0000ff00UL) <<  8) | \
-+		(((unsigned int)(x) & (unsigned int)0x00ff0000UL) >>  8) | \
-+		(((unsigned int)(x) & (unsigned int)0xff000000UL) >> 24) ))
-+
-#include <elf.h>
-#include <errno.h>
-#include <fcntl.h>
-@@ -104,17 +115,17 @@ static void cleanup(void)
-
-static Elf32_Word read_elf_word(Elf32_Word word, bool swap)
-{
--	return swap ? bswap_32(word) : word;
-+	return swap ? swab32(word) : word;
-}
-
-static Elf32_Half read_elf_half(Elf32_Half half, bool swap)
-{
--	return swap ? bswap_16(half) : half;
-+	return swap ? swab16(half) : half;
-}
-
-static void write_elf_word(Elf32_Word val, Elf32_Word *dst, bool swap)
-{
--	*dst = swap ? bswap_32(val) : val;
-+	*dst = swap ? swab32(val) : val;
-}
-
-int main(int argc, char **argv)
+	M.
 -- 
-2.5.1
+Jazz is not dead. It just smells funny.
