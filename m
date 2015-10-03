@@ -1,52 +1,41 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 4 Oct 2015 01:29:26 +0800
-Subject: [PATCH 1/4] ARM: OMAP: dmtimer: check for fixed timers during
- config
-In-Reply-To: <1443727960-32232-2-git-send-email-s-anna@ti.com>
-Message-ID: <201510040126.SfMisWv2%fengguang.wu@intel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 3 Oct 2015 19:12:28 +0100
+Subject: [PATCH 0/9] Further mvebu PCIe patches
+Message-ID: <20151003181228.GI21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+Jason, Thomas,
 
-[auto build test results on v4.3-rc3 -- if it's inappropriate base, please ignore]
+Here are further PCIe patches which follow on from the previous set of
+six I sent earlier in September.  This set:
 
-config: arm-omap1_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+* Separates the DT parsing from the use of this parsed data.
+* Fixes memory leaks from kasprintf() and refcount leaks of the DT
+  node where we break out from the loop early.
+* Uses gpio_set_value_cansleep() so that GPIOs on I2C expanders can
+  be used for the PCIe reset functionality.
+* Switch to using devm_kcalloc() instead of devm_kzalloc(), which
+  eliminates the multiplication, moving it into core code.
+* Switch to using a gpio descriptor for the reset gpio, which can
+  contain the active level information from DT.  (It would be nice
+  if gpiolib automated some of the resource claiming there.)
+* Make PERST# vs clock timing to match PCIe specifications.  PCIe
+  specs require the clock to be running for 100us prior to releasing
+  reset.
+* Add the standard PCIe capability block in root port form to the
+  emulated PCIe configuration block.  This allows the PCI layer to
+  identify the "host bridge" as a PCIe device, and allows us to
+  take advantage of the code in drivers/pci/pcie, particularly
+  aspm for link power management.
+* As a result of identifying ourselves as a PCIe root port, this
+  eliminates the need to special case accesses to non-slot 0 in
+  the driver; the lack of other "slots" is something which the
+  generic PCI code knows about for PCIe root ports.
 
-All error/warnings (new ones prefixed by >>):
+ drivers/pci/host/pci-mvebu.c | 404 ++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 305 insertions(+), 99 deletions(-)
 
-   arch/arm/plat-omap/dmtimer.c: In function 'omap_dm_timer_set_source':
->> arch/arm/plat-omap/dmtimer.c:509:2: error: implicit declaration of function 'clk_hw_get_num_parents' [-Werror=implicit-function-declaration]
-     if (!clk_hw_get_num_parents(__clk_get_hw(timer->fclk)))
-     ^
->> arch/arm/plat-omap/dmtimer.c:509:2: error: implicit declaration of function '__clk_get_hw' [-Werror=implicit-function-declaration]
-   cc1: some warnings being treated as errors
-
-vim +/clk_hw_get_num_parents +509 arch/arm/plat-omap/dmtimer.c
-
-   503			return pdata->set_timer_src(timer->pdev, source);
-   504	
-   505		if (IS_ERR(timer->fclk))
-   506			return -EINVAL;
-   507	
-   508		/* Check if the clock has parents if not no point checking */
- > 509		if (!clk_hw_get_num_parents(__clk_get_hw(timer->fclk)))
-   510			return 0;
-   511	
-   512		switch (source) {
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 18413 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151004/25ce697a/attachment-0001.obj>
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
