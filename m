@@ -1,87 +1,78 @@
-From: Prasun.Kapoor@caviumnetworks.com (Kapoor, Prasun)
-Date: Sat, 3 Oct 2015 02:18:57 +0000
-Subject: [PATCH v5 00/23] ILP32 for ARM64
-In-Reply-To: <20151002093711.GA15803@localhost>
-References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
- <20150930101918.GA9753@e104818-lin.cambridge.arm.com>
- <20151001191520.GA25295@yury-N73SV> <1708349.DFbfvHcnCR@wuerfel>
- <F6B719D8-1FC0-4B26-A926-40FB6953AAE3@caviumnetworks.com>
- <20151002093711.GA15803@localhost>
-Message-ID: <D23487FC.908DE%pkapoor@caviumnetworks.com>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Sat, 3 Oct 2015 10:20:04 +0200
+Subject: [PATCH] ARM: fix vdsomunge not to depend on glibc specific byteswap.h
+In-Reply-To: <cover.1443791320.git.hns@goldelico.com>
+References: <A323E65A-1631-4ADF-865D-04A5C38C6969@goldelico.com>
+ <cover.1443791320.git.hns@goldelico.com>
+Message-ID: <58DAB2B9-4068-4A11-8623-5A54195950E1@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+If the host toolchain is not glibc based then the arm kernel build
+fails with
 
+HOSTCC  arch/arm/vdso/vdsomunge
+arch/arm/vdso/vdsomunge.c:48:22: fatal error: byteswap.h: No such file or directory
 
-On 10/2/15, 2:37 AM, "Catalin Marinas" <catalin.marinas@arm.com> wrote:
+Observed: with omap2plus_defconfig and compile on Mac OS X with arm ELF
+cross-compiler.
 
->On Thu, Oct 01, 2015 at 09:49:46PM +0000, Pinski, Andrew wrote:
->> Ok, we will rewrite these patches using 32bit time_t and 32bit off_t
->> and redo the toolchain support for them.  Note this is going back to
->> the abi I had originally done when I submitted my original version
->> when it was asked to change time_t to be 64bit.
->
->One of the key aspects of kernel development is the ability to adapt
->quickly to new requests/insights. This implies releasing early and often
->rather than a new version roughly twice a year (IIRC, v1 was posted
->September 2013). Moreover, the success of the kernel is partly based on
->not getting stuck on old decisions (well, unless it breaks accepted user
->ABI).
->
->So, at the time, following x32 discussions, we thought of using the
->native ABI as much as possible. However, two important things happened
->since:
->
->1. libc community didn't like breaking the POSIX compliance
->2. No-one seems desperate for ILP32 on AArch64
->
->(1) is a fair point and I would rather be careful as we don't know the
->extent of the code affected. In the meantime, we've also had ongoing
->work for addressing the 2038 issue on 32-bit architectures.
->
->The second point is equally important. The benchmarks I've seen didn't
->show a significant improvement and the messages I got on various
->channels pretty much labeled ILP32 as a transitional stage to full LP64.
->In this case, we need to balance the benefits of a close to native ABI
->(future proof, slightly higher performance) vs. the cost of maintaining
->such ABI in the kernel on the long term, especially if it's not widely
->used/tested.
+Reason: byteswap.h is a glibc only header.
 
+Solution: replace by private byte-swapping macros (taken from
+arch/mips/boot/elf2ecoff.c)
 
-For us ILP32  is not about putting this into our product flier at all, it
-is about supporting real applications. We have an existing product line of
-MIPS based SoCs where a large number of N32 (an exact equivalent of ILP32)
-applications are currently in production. Our customers are looking to
-bring those applications (mostly in Networking and Telecom space) over to
-ARMv8. 
+Tested to compile on Mac OS X 10.9.5 host.
 
-We think its an extremely risky strategy to say either future processors
-should incur the additional cost (power and complexity) of implementing
-Aarch32 instruction set or have no way of  supporting 32 bit applications
-at all.
+Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+---
+arch/arm/vdso/vdsomunge.c | 19 +++++++++++++++----
+1 file changed, 15 insertions(+), 4 deletions(-)
 
-Apart from there being an installed base of 32 bit networking and telecom
-applications, we have also seen non-trivial performance gains with ILP32
-(for example, our SPECINT score goes up by 7% with ILP32 compared to
-LP64).  
+diff --git a/arch/arm/vdso/vdsomunge.c b/arch/arm/vdso/vdsomunge.c
+index aedec81..27a9a0b 100644
+--- a/arch/arm/vdso/vdsomunge.c
++++ b/arch/arm/vdso/vdsomunge.c
+@@ -45,7 +45,18 @@
+* it does.
+*/
 
+-#include <byteswap.h>
++#define swab16(x) \
++	((unsigned short)( \
++		(((unsigned short)(x) & (unsigned short)0x00ffU) << 8) | \
++		(((unsigned short)(x) & (unsigned short)0xff00U) >> 8) ))
++
++#define swab32(x) \
++	((unsigned int)( \
++		(((unsigned int)(x) & (unsigned int)0x000000ffUL) << 24) | \
++		(((unsigned int)(x) & (unsigned int)0x0000ff00UL) <<  8) | \
++		(((unsigned int)(x) & (unsigned int)0x00ff0000UL) >>  8) | \
++		(((unsigned int)(x) & (unsigned int)0xff000000UL) >> 24) ))
++
+#include <elf.h>
+#include <errno.h>
+#include <fcntl.h>
+@@ -104,17 +115,17 @@ static void cleanup(void)
 
+static Elf32_Word read_elf_word(Elf32_Word word, bool swap)
+{
+-	return swap ? bswap_32(word) : word;
++	return swap ? swab32(word) : word;
+}
 
->
->We've seen the kernel patches and, following discussions on the lists,
->decided to change the original recommendation. IIRC, the main ideas (but
->you need to read various threads as I can't remember the details from
->6-7 months ago):
->
->a) separate syscall table for ILP32
->b) close to compat ABI with 32-bit time_t, off_t
->c) asm-generic/unistd.h rather than asm/unistd32.h (that's where it
->   would differ from compat, together with places where pointers are
->   passed)
->
->As I said previously, I'm not going to pay any attention to the patches
->in this series, it's nothing more than a rebase of a version I already
->reviewed.
->
->-- 
->Catalin
+static Elf32_Half read_elf_half(Elf32_Half half, bool swap)
+{
+-	return swap ? bswap_16(half) : half;
++	return swap ? swab16(half) : half;
+}
+
+static void write_elf_word(Elf32_Word val, Elf32_Word *dst, bool swap)
+{
+-	*dst = swap ? bswap_32(val) : val;
++	*dst = swap ? swab32(val) : val;
+}
+
+int main(int argc, char **argv)
+-- 
+2.5.1
