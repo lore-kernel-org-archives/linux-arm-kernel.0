@@ -1,112 +1,102 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 03 Oct 2015 19:13:22 +0100
-Subject: [PATCH 6/9] pci: mvebu: use gpio_desc to carry around gpio
+Date: Sat, 03 Oct 2015 19:13:27 +0100
+Subject: [PATCH 7/9] pci: mvebu: better implementation of clock/reset handling
 In-Reply-To: <20151003181228.GI21513@n2100.arm.linux.org.uk>
 References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
-Message-ID: <E1ZiRJC-0004J4-PY@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZiRJH-0004JA-UC@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a gpio_desc to carry around the gpio, so we can then make use of the
-GPIOF_ACTIVE_LOW property rather than carrying that around as well.
-This also avoids needing to use gpio_is_valid() to check whether we have
-a GPIO; checking for a non-NULL descriptor is simpler.
+Add an implementation to handle clock and reset handling that is
+compliant with the PCIe specification.  The clock should be running
+and stable for 100us prior to reset being released, and we should
+re-assert reset prior to stopping the clock.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/pci/host/pci-mvebu.c | 39 ++++++++++++++++++++++++---------------
- 1 file changed, 24 insertions(+), 15 deletions(-)
+ drivers/pci/host/pci-mvebu.c | 56 ++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 43 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 7282bb06c7a8..ab619ee0ef49 100644
+index ab619ee0ef49..97208233d901 100644
 --- a/drivers/pci/host/pci-mvebu.c
 +++ b/drivers/pci/host/pci-mvebu.c
-@@ -119,8 +119,7 @@ struct mvebu_pcie_port {
- 	unsigned int io_target;
- 	unsigned int io_attr;
- 	struct clk *clk;
--	int reset_gpio;
--	int reset_active_low;
-+	struct gpio_desc *reset_gpio;
- 	char *reset_name;
- 	struct mvebu_sw_pci_bridge bridge;
- 	struct device_node *dn;
-@@ -940,7 +939,7 @@ static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
+@@ -1042,6 +1042,46 @@ static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
+ 	return ret;
+ }
+ 
++/*
++ * Power up a PCIe port.  PCIe requires the refclk to be stable for 100?s
++ * prior to releasing PERST.  See table 2-4 in section 2.6.2 AC Specifications
++ * of the PCI Express Card Electromechanical Specification, 1.1.
++ */
++static int mvebu_pcie_powerup(struct mvebu_pcie_port *port)
++{
++	int ret;
++
++	ret = clk_prepare_enable(port->clk);
++	if (ret < 0)
++		return ret;
++
++	if (port->reset_gpio) {
++		u32 reset_udelay = 20000;
++
++		of_property_read_u32(port->dn, "reset-delay-us",
++				     &reset_udelay);
++
++		udelay(100);
++
++		gpiod_set_value_cansleep(port->reset_gpio, 0);
++		msleep(reset_udelay / 1000);
++	}
++
++	return 0;
++}
++
++/*
++ * Power down a PCIe port.  Strictly, PCIe requires us to place the card
++ * in D3hot state before asserting PERST#.
++ */
++static void mvebu_pcie_powerdown(struct mvebu_pcie_port *port)
++{
++	if (port->reset_gpio)
++		gpiod_set_value_cansleep(port->reset_gpio, 1);
++
++	clk_disable_unprepare(port->clk);
++}
++
+ static int mvebu_pcie_probe(struct platform_device *pdev)
  {
- 	struct device *dev = &pcie->pdev->dev;
- 	enum of_gpio_flags flags;
--	int ret;
-+	int reset_gpio, ret;
- 
- 	port->pcie = pcie;
- 
-@@ -980,15 +979,15 @@ static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
- 		port->io_attr = -1;
- 	}
- 
--	port->reset_gpio = of_get_named_gpio_flags(child, "reset-gpios", 0,
--						   &flags);
--	if (port->reset_gpio == -EPROBE_DEFER) {
--		ret = port->reset_gpio;
-+	reset_gpio = of_get_named_gpio_flags(child, "reset-gpios", 0, &flags);
-+	if (reset_gpio == -EPROBE_DEFER) {
-+		ret = reset_gpio;
- 		goto err;
- 	}
- 
--	if (gpio_is_valid(port->reset_gpio)) {
--		port->reset_active_low = flags & OF_GPIO_ACTIVE_LOW;
-+	if (gpio_is_valid(reset_gpio)) {
-+		unsigned long gpio_flags;
-+
- 		port->reset_name = devm_kasprintf(dev, GFP_KERNEL, "%s-reset",
- 						  port->name);
- 		if (!port->reset_name) {
-@@ -996,13 +995,24 @@ static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
- 			goto err;
- 		}
- 
--		ret = devm_gpio_request_one(dev, port->reset_gpio,
--					    GPIOF_DIR_OUT, port->reset_name);
-+		if (flags & OF_GPIO_ACTIVE_LOW) {
-+			dev_info(dev, "%s: reset gpio is active low\n",
-+				 of_node_full_name(child));
-+			gpio_flags = GPIOF_ACTIVE_LOW |
-+				     GPIOF_OUT_INIT_LOW;
-+		} else {
-+			gpio_flags = GPIOF_OUT_INIT_HIGH;
-+		}
-+
-+		ret = devm_gpio_request_one(dev, reset_gpio, gpio_flags,
-+					    port->reset_name);
- 		if (ret) {
- 			if (ret == -EPROBE_DEFER)
- 				goto err;
- 			goto skip;
- 		}
-+
-+		port->reset_gpio = gpio_to_desc(reset_gpio);
- 	}
- 
- 	port->clk = of_clk_get_by_name(child, NULL);
-@@ -1104,15 +1114,14 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+ 	struct mvebu_pcie *pcie;
+@@ -1114,18 +1154,8 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
  		if (!child)
  			continue;
  
--		if (gpio_is_valid(port->reset_gpio)) {
-+		if (port->reset_gpio) {
- 			u32 reset_udelay = 20000;
+-		if (port->reset_gpio) {
+-			u32 reset_udelay = 20000;
+-
+-			of_property_read_u32(child, "reset-delay-us",
+-					     &reset_udelay);
+-
+-			gpiod_set_value_cansleep(port->reset_gpio, 0);
+-			msleep(reset_udelay / 1000);
+-		}
+-
+-		ret = clk_prepare_enable(port->clk);
+-		if (ret)
++		ret = mvebu_pcie_powerup(port);
++		if (ret < 0)
+ 			continue;
  
- 			of_property_read_u32(child, "reset-delay-us",
- 					     &reset_udelay);
- 
--			gpio_set_value_cansleep(port->reset_gpio,
--						!!port->reset_active_low);
--			msleep(reset_udelay/1000);
-+			gpiod_set_value_cansleep(port->reset_gpio, 0);
-+			msleep(reset_udelay / 1000);
+ 		port->base = mvebu_pcie_map_registers(pdev, child, port);
+@@ -1133,7 +1163,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+ 			dev_err(&pdev->dev, "%s: cannot map registers\n",
+ 				port->name);
+ 			port->base = NULL;
+-			clk_disable_unprepare(port->clk);
++			mvebu_pcie_powerdown(port);
+ 			continue;
  		}
  
- 		ret = clk_prepare_enable(port->clk);
 -- 
 2.1.0
