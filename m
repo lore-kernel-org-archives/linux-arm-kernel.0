@@ -1,54 +1,44 @@
 From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Sat, 03 Oct 2015 14:41:39 +0200
-Subject: [PATCH v4 14/26] ARM: pxa: magician: Fix platform data for both
- PXA27x I2C controllers
-In-Reply-To: <5609B243.9020306@tul.cz>
-References: <cover.1443472089.git.petr.cvek@tul.cz> <5609B243.9020306@tul.cz>
-Message-ID: <1443876099.4186.28.camel@gmail.com>
+Date: Sat, 03 Oct 2015 14:45:27 +0200
+Subject: [PATCH v4 17/26] ARM: pxa: magician: Fix wrongly enabled USB
+ host ports
+In-Reply-To: <5609B33B.6070301@tul.cz>
+References: <cover.1443472089.git.petr.cvek@tul.cz> <5609B33B.6070301@tul.cz>
+Message-ID: <1443876327.4186.32.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 28.09.2015, 23:33 +0200 schrieb Petr Cvek:
-> This patch changes fast_mode settings for the normal and power I2C
-> controller on the HTC Magician machine.
-> 
-> Connected device on the Power I2C:
-> - MAX1587A: working in the fast mode
-> 
-> Connected devices on the Normal I2C:
-> - UDA1380: working in the fast mode
-> - OV9640: bus became stuck in the fast mode
-> 
-> The OV9640 is not using a standard I2C protocol, but an SCCB variant.
-> Maybe
-> it is not fully compatible in the fast mode. Therefore fast mode for
-> normal
-> I2C is disabled. If you not using the OV9640 then you can enable the
-> fast
-> mode for the UDA1380.
+Am Montag, den 28.09.2015, 23:38 +0200 schrieb Petr Cvek:
+> USB host ports on the HTC Magician are wrongly enabled. Port 1 is for
+> bluetooth and port 2 is for OTG (mux in the charger connector).
 > 
 > Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
 > ---
->  arch/arm/mach-pxa/magician.c | 13 +++++++++++--
->  1 file changed, 11 insertions(+), 2 deletions(-)
+>  arch/arm/mach-pxa/magician.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 > 
 > diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach
 > -pxa/magician.c
-> index 906df6d..86d395d 100644
+> index 8e8b122..af8133a 100644
 > --- a/arch/arm/mach-pxa/magician.c
 > +++ b/arch/arm/mach-pxa/magician.c
-> @@ -818,7 +818,16 @@ static struct platform_device strataflash = {
->   */
+> @@ -780,8 +780,10 @@ static struct pxamci_platform_data
+> magician_mci_info = {
 >  
->  static struct i2c_pxa_platform_data i2c_info = {
-> -	.fast_mode = 1,
-> +	/* FIXME both I2C devices should support fast mode */
+>  static struct pxaohci_platform_data magician_ohci_info = {
+>  	.port_mode	= PMM_PERPORT_MODE,
+> -	.flags		= ENABLE_PORT1 | ENABLE_PORT3 |
+> POWER_CONTROL_LOW,
+> +	/* port1: CSR Bluetooth, port2: OTG with UDC */
+> +	.flags		= ENABLE_PORT1 | ENABLE_PORT2 |
+> POWER_CONTROL_LOW,
+>  	.power_budget	= 0,
+> +	.power_on_delay = 100,
+>  };
 
-Maybe add the info from the commit description here (it's OV9640 that
-doesn't support fast mode).
-
-Otherwise,
-Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
+I have only ever tested the CSR bluetooth chip, so this could be
+correct, or again something that is different between the magician
+variants. I don't know.
 
 regards
 Philipp
