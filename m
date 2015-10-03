@@ -1,20 +1,23 @@
 From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Sat, 03 Oct 2015 14:33:50 +0200
-Subject: [PATCH v4 10/26] ARM: pxa: magician: Optimize Samsung LCD
- refresh to 50Hz
-In-Reply-To: <5609B1DC.2040703@tul.cz>
-References: <cover.1443472089.git.petr.cvek@tul.cz> <5609B1DC.2040703@tul.cz>
-Message-ID: <1443875630.4186.23.camel@gmail.com>
+Date: Sat, 03 Oct 2015 14:35:05 +0200
+Subject: [PATCH v4 11/26] ARM: pxa: magician: Optimize EGPIO initial values
+In-Reply-To: <5609B1E9.4020508@tul.cz>
+References: <cover.1443472089.git.petr.cvek@tul.cz> <5609B1E9.4020508@tul.cz>
+Message-ID: <1443875705.4186.24.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Am Montag, den 28.09.2015, 23:32 +0200 schrieb Petr Cvek:
-> Change the default Samsung LCD refresh from an unrealistic 117Hz to
-> 50Hz
-> as no video applications on the HTC Magician can work that fast.
+> This patch optimizes initial values of the EGPIO chip driver.
 > 
-> The optimalization lowers the RAM latency at least by 3%.
-> 
-> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+> GSM and sound should be powered off during boot. A weak accumulator
+> and
+> a powered GSM sometimes cause a system reboot. A charging current
+> should be
+> as high as possible during boot.
 
-Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
+Wouldn't that violate USB spec if we boot the magician while plugged
+into an unpowered USB host?
+
+regards
+Philipp
