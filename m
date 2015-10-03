@@ -1,182 +1,132 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 03 Oct 2015 19:12:57 +0100
-Subject: [PATCH 1/9] pci: mvebu: move port parsing and resource claiming to
- separate function
+Date: Sat, 03 Oct 2015 19:13:02 +0100
+Subject: [PATCH 2/9] pci: mvebu: fix memory leaks and refcount leaks
 In-Reply-To: <20151003181228.GI21513@n2100.arm.linux.org.uk>
 References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
-Message-ID: <E1ZiRIn-0004IT-6Q@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZiRIs-0004Id-AN@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the PCIe port parsing and resource claiming to a separate function
-in preparation to add proper cleanup of claimed resources.
+The mvebu PCI port parsing is weak due to:
+
+1) allocations via kasprintf() were not cleaned up when we encounter an
+   error or decide to skip the port.
+2) kasprintf() wasn't checked for failure.
+3) of_get_named_gpio_flags() returns EPROBE_DEFER if the GPIO is not
+   present, not devm_gpio_request_one().
+4) the of_node was not being put when terminating the loop.
+
+Fix these oversights.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/pci/host/pci-mvebu.c | 130 ++++++++++++++++++++++++-------------------
- 1 file changed, 74 insertions(+), 56 deletions(-)
+ drivers/pci/host/pci-mvebu.c | 50 +++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 43 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 19144ed7bdad..13ab0350f7fb 100644
+index 13ab0350f7fb..e8c51bb58e99 100644
 --- a/drivers/pci/host/pci-mvebu.c
 +++ b/drivers/pci/host/pci-mvebu.c
-@@ -928,6 +928,76 @@ static int mvebu_pcie_resume(struct device *dev)
+@@ -928,6 +928,13 @@ static int mvebu_pcie_resume(struct device *dev)
  	return 0;
  }
  
-+static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
-+	struct mvebu_pcie_port *port, struct device_node *child)
++static void mvebu_pcie_port_clk_put(void *data)
 +{
-+	struct device *dev = &pcie->pdev->dev;
-+	enum of_gpio_flags flags;
-+	int ret;
++	struct mvebu_pcie_port *port = data;
 +
-+	port->pcie = pcie;
-+
-+	if (of_property_read_u32(child, "marvell,pcie-port", &port->port)) {
-+		dev_warn(dev, "ignoring %s, missing pcie-port property\n",
-+			 of_node_full_name(child));
-+		goto skip;
-+	}
-+
-+	if (of_property_read_u32(child, "marvell,pcie-lane", &port->lane))
-+		port->lane = 0;
-+
-+	port->name = kasprintf(GFP_KERNEL, "pcie%d.%d", port->port, port->lane);
-+
-+	port->devfn = of_pci_get_devfn(child);
-+	if (port->devfn < 0)
-+		goto skip;
-+
-+	ret = mvebu_get_tgt_attr(dev->of_node, port->devfn, IORESOURCE_MEM,
-+				 &port->mem_target, &port->mem_attr);
-+	if (ret < 0) {
-+		dev_err(dev, "%s: cannot get tgt/attr for mem window\n",
-+			port->name);
-+		goto skip;
-+	}
-+
-+	if (resource_size(&pcie->io) != 0)
-+		mvebu_get_tgt_attr(dev->of_node, port->devfn, IORESOURCE_IO,
-+				   &port->io_target, &port->io_attr);
-+	else {
-+		port->io_target = -1;
-+		port->io_attr = -1;
-+	}
-+
-+	port->reset_gpio = of_get_named_gpio_flags(child, "reset-gpios", 0,
-+						   &flags);
-+	if (gpio_is_valid(port->reset_gpio)) {
-+		port->reset_active_low = flags & OF_GPIO_ACTIVE_LOW;
-+		port->reset_name = kasprintf(GFP_KERNEL, "%s-reset",
-+					     port->name);
-+
-+		ret = devm_gpio_request_one(dev, port->reset_gpio,
-+					    GPIOF_DIR_OUT, port->reset_name);
-+		if (ret) {
-+			if (ret == -EPROBE_DEFER)
-+				goto err;
-+			goto skip;
-+		}
-+	}
-+
-+	port->clk = of_clk_get_by_name(child, NULL);
-+	if (IS_ERR(port->clk)) {
-+		dev_err(dev, "%s: cannot get clock\n", port->name);
-+		goto skip;
-+	}
-+
-+	return 1;
-+
-+skip:
-+	ret = 0;
-+err:
-+	return ret;
++	clk_put(port->clk);
 +}
 +
- static int mvebu_pcie_probe(struct platform_device *pdev)
+ static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
+ 	struct mvebu_pcie_port *port, struct device_node *child)
  {
- 	struct mvebu_pcie *pcie;
-@@ -980,76 +1050,24 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 	i = 0;
- 	for_each_available_child_of_node(pdev->dev.of_node, child) {
+@@ -946,7 +953,12 @@ static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
+ 	if (of_property_read_u32(child, "marvell,pcie-lane", &port->lane))
+ 		port->lane = 0;
+ 
+-	port->name = kasprintf(GFP_KERNEL, "pcie%d.%d", port->port, port->lane);
++	port->name = devm_kasprintf(dev, GFP_KERNEL, "pcie%d.%d", port->port,
++				    port->lane);
++	if (!port->name) {
++		ret = -ENOMEM;
++		goto err;
++	}
+ 
+ 	port->devfn = of_pci_get_devfn(child);
+ 	if (port->devfn < 0)
+@@ -960,20 +972,29 @@ static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
+ 		goto skip;
+ 	}
+ 
+-	if (resource_size(&pcie->io) != 0)
++	if (resource_size(&pcie->io) != 0) {
+ 		mvebu_get_tgt_attr(dev->of_node, port->devfn, IORESOURCE_IO,
+ 				   &port->io_target, &port->io_attr);
+-	else {
++	} else {
+ 		port->io_target = -1;
+ 		port->io_attr = -1;
+ 	}
+ 
+ 	port->reset_gpio = of_get_named_gpio_flags(child, "reset-gpios", 0,
+ 						   &flags);
++	if (port->reset_gpio == -EPROBE_DEFER) {
++		ret = port->reset_gpio;
++		goto err;
++	}
++
+ 	if (gpio_is_valid(port->reset_gpio)) {
+ 		port->reset_active_low = flags & OF_GPIO_ACTIVE_LOW;
+-		port->reset_name = kasprintf(GFP_KERNEL, "%s-reset",
+-					     port->name);
++		port->reset_name = devm_kasprintf(dev, GFP_KERNEL, "%s-reset",
++						  port->name);
++		if (!port->reset_name) {
++			ret = -ENOMEM;
++			goto err;
++		}
+ 
+ 		ret = devm_gpio_request_one(dev, port->reset_gpio,
+ 					    GPIOF_DIR_OUT, port->reset_name);
+@@ -990,10 +1011,23 @@ static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
+ 		goto skip;
+ 	}
+ 
++	ret = devm_add_action(dev, mvebu_pcie_port_clk_put, port);
++	if (ret < 0) {
++		clk_put(port->clk);
++		goto err;
++	}
++
+ 	return 1;
+ 
+ skip:
+ 	ret = 0;
++
++	/* In the case of skipping, we need to free these */
++	devm_kfree(dev, port->reset_name);
++	port->reset_name = NULL;
++	devm_kfree(dev, port->name);
++	port->name = NULL;
++
+ err:
+ 	return ret;
+ }
+@@ -1052,10 +1086,12 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
  		struct mvebu_pcie_port *port = &pcie->ports[i];
--		enum of_gpio_flags flags;
--
--		port->pcie = pcie;
  
--		if (of_property_read_u32(child, "marvell,pcie-port",
--					 &port->port)) {
--			dev_warn(&pdev->dev,
--				 "ignoring %s, missing pcie-port property\n",
--				 of_node_full_name(child));
-+		ret = mvebu_pcie_parse_port(pcie, port, child);
-+		if (ret < 0)
-+			return ret;
-+		else if (ret == 0)
+ 		ret = mvebu_pcie_parse_port(pcie, port, child);
+-		if (ret < 0)
++		if (ret < 0) {
++			of_node_put(child);
+ 			return ret;
+-		else if (ret == 0)
++		} else if (ret == 0) {
  			continue;
--		}
++		}
  
--		if (of_property_read_u32(child, "marvell,pcie-lane",
--					 &port->lane))
--			port->lane = 0;
--
--		port->name = kasprintf(GFP_KERNEL, "pcie%d.%d",
--				       port->port, port->lane);
--
--		port->devfn = of_pci_get_devfn(child);
--		if (port->devfn < 0)
--			continue;
--
--		ret = mvebu_get_tgt_attr(np, port->devfn, IORESOURCE_MEM,
--					 &port->mem_target, &port->mem_attr);
--		if (ret < 0) {
--			dev_err(&pdev->dev, "%s: cannot get tgt/attr for mem window\n",
--				port->name);
--			continue;
--		}
--
--		if (resource_size(&pcie->io) != 0)
--			mvebu_get_tgt_attr(np, port->devfn, IORESOURCE_IO,
--					   &port->io_target, &port->io_attr);
--		else {
--			port->io_target = -1;
--			port->io_attr = -1;
--		}
--
--		port->reset_gpio = of_get_named_gpio_flags(child,
--						   "reset-gpios", 0, &flags);
  		if (gpio_is_valid(port->reset_gpio)) {
  			u32 reset_udelay = 20000;
- 
--			port->reset_active_low = flags & OF_GPIO_ACTIVE_LOW;
--			port->reset_name = kasprintf(GFP_KERNEL, "%s-reset",
--						     port->name);
- 			of_property_read_u32(child, "reset-delay-us",
- 					     &reset_udelay);
- 
--			ret = devm_gpio_request_one(&pdev->dev,
--			    port->reset_gpio, GPIOF_DIR_OUT, port->reset_name);
--			if (ret) {
--				if (ret == -EPROBE_DEFER)
--					return ret;
--				continue;
--			}
--
- 			gpio_set_value(port->reset_gpio,
- 				       (port->reset_active_low) ? 1 : 0);
- 			msleep(reset_udelay/1000);
- 		}
- 
--		port->clk = of_clk_get_by_name(child, NULL);
--		if (IS_ERR(port->clk)) {
--			dev_err(&pdev->dev, "%s: cannot get clock\n",
--				port->name);
--			continue;
--		}
--
- 		ret = clk_prepare_enable(port->clk);
- 		if (ret)
- 			continue;
 -- 
 2.1.0
