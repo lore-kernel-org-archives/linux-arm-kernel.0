@@ -1,37 +1,78 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Sat,  3 Oct 2015 21:35:19 +0100
-Subject: [PATCH 3/3] ARM: dts: stm32f429: Adopt STM32 RNG driver
-In-Reply-To: <1443904519-24012-1-git-send-email-daniel.thompson@linaro.org>
-References: <1443904519-24012-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1443904519-24012-4-git-send-email-daniel.thompson@linaro.org>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Sat, 3 Oct 2015 22:46:44 +0200
+Subject: [PATCH v2] ARM: fix vdsomunge not to depend on glibc specific
+ byteswap.h
+In-Reply-To: <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
+References: <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
+Message-ID: <B69CCAC6-FB47-4B2B-95F9-15F1BA4AD381@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-New bindings and driver have been created for STM32 series parts. This
-patch integrates this changes.
+If the host toolchain is not glibc based then the arm kernel build
+fails with
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+ HOSTCC  arch/arm/vdso/vdsomunge
+ arch/arm/vdso/vdsomunge.c:48:22: fatal error: byteswap.h: No such file or directory
+
+Observed: with omap2plus_defconfig and compile on Mac OS X with arm ELF
+cross-compiler.
+
+Reason: byteswap.h is a glibc only header.
+
+Solution: replace by private byte-swapping macros (taken from
+arch/mips/boot/elf2ecoff.c)
+
+Tested to compile on Mac OS X 10.9.5 host.
+
+Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
 ---
- arch/arm/boot/dts/stm32f429.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+arch/arm/vdso/vdsomunge.c | 19 +++++++++++++++----
+1 file changed, 15 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index cb0613090243..90081fc22c6c 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -175,6 +175,13 @@
- 			reg = <0x40023800 0x400>;
- 			clocks = <&clk_hse>;
- 		};
+diff --git a/arch/arm/vdso/vdsomunge.c b/arch/arm/vdso/vdsomunge.c
+index aedec81..27a9a0b 100644
+--- a/arch/arm/vdso/vdsomunge.c
++++ b/arch/arm/vdso/vdsomunge.c
+@@ -45,7 +45,18 @@
+ * it does.
+ */
+
+-#include <byteswap.h>
++#define swab16(x) \
++	((unsigned short)( \
++		(((unsigned short)(x) & (unsigned short)0x00ffU) << 8) | \
++		(((unsigned short)(x) & (unsigned short)0xff00U) >> 8) ))
 +
-+		rng: rng at 50060800 {
-+			compatible = "st,stm32-rng";
-+			reg = <0x50060800 0x400>;
-+			interrupts = <80>;
-+			clocks = <&rcc 0 38>;
-+		};
- 	};
- };
- 
++#define swab32(x) \
++	((unsigned int)( \
++		(((unsigned int)(x) & (unsigned int)0x000000ffUL) << 24) | \
++		(((unsigned int)(x) & (unsigned int)0x0000ff00UL) <<  8) | \
++		(((unsigned int)(x) & (unsigned int)0x00ff0000UL) >>  8) | \
++		(((unsigned int)(x) & (unsigned int)0xff000000UL) >> 24) ))
++
+#include <elf.h>
+#include <errno.h>
+#include <fcntl.h>
+@@ -104,17 +115,17 @@ static void cleanup(void)
+
+static Elf32_Word read_elf_word(Elf32_Word word, bool swap)
+{
+-	return swap ? bswap_32(word) : word;
++	return swap ? swab32(word) : word;
+}
+
+static Elf32_Half read_elf_half(Elf32_Half half, bool swap)
+{
+-	return swap ? bswap_16(half) : half;
++	return swap ? swab16(half) : half;
+}
+
+static void write_elf_word(Elf32_Word val, Elf32_Word *dst, bool swap)
+{
+-	*dst = swap ? bswap_32(val) : val;
++	*dst = swap ? swab32(val) : val;
+}
+
+int main(int argc, char **argv)
 -- 
-2.4.3
+2.5.1
