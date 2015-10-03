@@ -1,54 +1,84 @@
-From: slash.tmp@free.fr (Mason)
-Date: Sat, 3 Oct 2015 11:49:41 +0200
-Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
-In-Reply-To: <20151003103219.1e10bdeb@arm.com>
-References: <560E53E3.7070207@free.fr> <560E8584.8000207@free.fr>
- <20151002180255.GK12338@codeaurora.org> <560ED1FB.9010000@free.fr>
- <yw1xbncgluad.fsf@unicorn.mansr.com> <20151003103219.1e10bdeb@arm.com>
-Message-ID: <560FA4B5.1040709@free.fr>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 3 Oct 2015 11:04:02 +0100
+Subject: [PATCH v3 1/7] acpi: Add early device probing infrastructure
+In-Reply-To: <560EF1BD.1020004@redhat.com>
+References: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
+ <1443451758-22717-2-git-send-email-marc.zyngier@arm.com>
+ <560EF1BD.1020004@redhat.com>
+Message-ID: <20151003110402.6aa3022b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2015 11:32, Marc Zyngier wrote:
-> On Sat, 3 Oct 2015 00:34:02 +0100
-> M?ns Rullg?rd wrote:
->> Mason writes:
->>
->>> My port requires the TWD to function. So I'm using
->>> select HAVE_ARM_TWD (no "if SMP") to have it work
->>> even on MULTIPLATFORM UP configs.
->>
->> You could just let it use another timer in the non-smp case if you
->> didn't have that weird aversion towards using my code.
+On Fri, 2 Oct 2015 16:06:05 -0500
+Wei Huang <wei@redhat.com> wrote:
+
+Hi Wei,
+
+> Hi Marc,
+
+[...]
+
+> > +struct acpi_probe_entry {
+> > +	__u8 id[ACPI_TABLE_ID_LEN];
+> > +	__u8 type;
+> > +	acpi_probe_entry_validate_subtbl subtable_valid;
+> > +	union {
+> > +		acpi_tbl_table_handler probe_table;
+> > +		acpi_tbl_entry_handler probe_subtbl;
+> > +	};
 > 
-> I have no idea what your code does, but using the timer that is
-> integrated into the core (just like on any other A9 implementation)
-> feels like the right thing to do, unless the HW is too broken to use
-> TWD.
+> Could we avoid using union for probe_table & probe_subtbl? The benefit is that we don't need to do function casting below and compiler can automatically check the correctness.
 > 
-> Another timer is a nice thing to have (it probably comes in handy for
-> suspend/resume, and it may have a much better resolution), but this
-> seems like icing on the cake at this point. Let's see the cake first.
+> > +	kernel_ulong_t driver_data;
+> > +};
+> > +
+> > +#define ACPI_DECLARE_PROBE_ENTRY(table, name, table_id, subtable, valid, data, fn)	\
+> > +	static const struct acpi_probe_entry __acpi_probe_##name	\
+> > +		__used __section(__##table##_acpi_probe_table)		\
+> > +		 = {							\
+> > +			.id = table_id,					\
+> > +			.type = subtable,				\
+> > +			.subtable_valid = valid,			\
+> > +			.probe_table = (acpi_tbl_table_handler)fn,	\
+> > +			.driver_data = data, 				\
+> > +		   }
+> > +
+> 
+> Something like: 
+> 
+> #define ACPI_DECLARE_PROBE_ENTRY(table, name, table_id, subtable, valid, data, fn, subfn)	\
+> 	static const struct acpi_probe_entry __acpi_probe_##name	\
+> 		__used __section(__##table##_acpi_probe_table)		\
+> 		 = {							\
+> 			.id = table_id,					\
+> 			.type = subtable,				\
+> 			.subtable_valid = valid,			\
+> 			.probe_table = fn,				\
+> 			.probe_subtbl = subfn,				\
+> 			.driver_data = data, 				\
+> 		   }
+> 
+> Then in patch 3, you can define new entries as:
+> 
+> IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
+> 		     gic_validate_dist, ACPI_MADT_GIC_VERSION_V2,
+> 		     NULL, gic_v2_acpi_init);
+> IRQCHIP_ACPI_DECLARE(gic_v2_maybe, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
+> 		     gic_validate_dist, ACPI_MADT_GIC_VERSION_NONE,
+> 		     NULL, gic_v2_acpi_init);
+> 
 
-Marc,
+That's exactly what I was trying to avoid. If you want to do that, do
+it in the IRQCHIP_ACPI_DECLARE macro, as there is strictly no need for
+this this NULL to appear here (MADT always matches by subtable).
 
-I have a quick question for you :-)
+Or even better, have two ACPI_DECLARE* that populate the probe entry in
+a mutually exclusive way (either probe_table is set and both
+valid/subtbl are NULL, or probe_table is NULL and the two other fields
+are set).
 
-As I stated several months ago, my goal is to produce the simplest
-port possible, which is why I chose the TWD instead of platform
-timers. At one point, I was also considering the global timer.
-(I have a Cortex A9 MPCore.) But as far as I could tell, the
-code for the global timer does not handle CPU frequency changes
-(while smp_twd.c does), is that correct?
+Thanks,
 
-AFAIU, TWD timers and global timer "tick" at the frequency of
-PERIPHCLK (which is CPUCLK/2 in my implementation). Therefore,
-code needs to be specifically written to handle cpufreq events.
-Is that a correct understanding?
-
-As for you comment about resolution, nominal PERIPHCLK is 600 MHz.
-Hard to beat that kind of resolution, I think.
-
-Have a nice week end.
-
-Regards.
+	M.
+-- 
+Jazz is not dead. It just smells funny.
