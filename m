@@ -1,41 +1,182 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 3 Oct 2015 19:12:28 +0100
-Subject: [PATCH 0/9] Further mvebu PCIe patches
-Message-ID: <20151003181228.GI21513@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Sat, 03 Oct 2015 19:12:57 +0100
+Subject: [PATCH 1/9] pci: mvebu: move port parsing and resource claiming to
+ separate function
+In-Reply-To: <20151003181228.GI21513@n2100.arm.linux.org.uk>
+References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
+Message-ID: <E1ZiRIn-0004IT-6Q@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Thomas,
+Move the PCIe port parsing and resource claiming to a separate function
+in preparation to add proper cleanup of claimed resources.
 
-Here are further PCIe patches which follow on from the previous set of
-six I sent earlier in September.  This set:
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/pci/host/pci-mvebu.c | 130 ++++++++++++++++++++++++-------------------
+ 1 file changed, 74 insertions(+), 56 deletions(-)
 
-* Separates the DT parsing from the use of this parsed data.
-* Fixes memory leaks from kasprintf() and refcount leaks of the DT
-  node where we break out from the loop early.
-* Uses gpio_set_value_cansleep() so that GPIOs on I2C expanders can
-  be used for the PCIe reset functionality.
-* Switch to using devm_kcalloc() instead of devm_kzalloc(), which
-  eliminates the multiplication, moving it into core code.
-* Switch to using a gpio descriptor for the reset gpio, which can
-  contain the active level information from DT.  (It would be nice
-  if gpiolib automated some of the resource claiming there.)
-* Make PERST# vs clock timing to match PCIe specifications.  PCIe
-  specs require the clock to be running for 100us prior to releasing
-  reset.
-* Add the standard PCIe capability block in root port form to the
-  emulated PCIe configuration block.  This allows the PCI layer to
-  identify the "host bridge" as a PCIe device, and allows us to
-  take advantage of the code in drivers/pci/pcie, particularly
-  aspm for link power management.
-* As a result of identifying ourselves as a PCIe root port, this
-  eliminates the need to special case accesses to non-slot 0 in
-  the driver; the lack of other "slots" is something which the
-  generic PCI code knows about for PCIe root ports.
-
- drivers/pci/host/pci-mvebu.c | 404 ++++++++++++++++++++++++++++++++-----------
- 1 file changed, 305 insertions(+), 99 deletions(-)
-
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 19144ed7bdad..13ab0350f7fb 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -928,6 +928,76 @@ static int mvebu_pcie_resume(struct device *dev)
+ 	return 0;
+ }
+ 
++static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
++	struct mvebu_pcie_port *port, struct device_node *child)
++{
++	struct device *dev = &pcie->pdev->dev;
++	enum of_gpio_flags flags;
++	int ret;
++
++	port->pcie = pcie;
++
++	if (of_property_read_u32(child, "marvell,pcie-port", &port->port)) {
++		dev_warn(dev, "ignoring %s, missing pcie-port property\n",
++			 of_node_full_name(child));
++		goto skip;
++	}
++
++	if (of_property_read_u32(child, "marvell,pcie-lane", &port->lane))
++		port->lane = 0;
++
++	port->name = kasprintf(GFP_KERNEL, "pcie%d.%d", port->port, port->lane);
++
++	port->devfn = of_pci_get_devfn(child);
++	if (port->devfn < 0)
++		goto skip;
++
++	ret = mvebu_get_tgt_attr(dev->of_node, port->devfn, IORESOURCE_MEM,
++				 &port->mem_target, &port->mem_attr);
++	if (ret < 0) {
++		dev_err(dev, "%s: cannot get tgt/attr for mem window\n",
++			port->name);
++		goto skip;
++	}
++
++	if (resource_size(&pcie->io) != 0)
++		mvebu_get_tgt_attr(dev->of_node, port->devfn, IORESOURCE_IO,
++				   &port->io_target, &port->io_attr);
++	else {
++		port->io_target = -1;
++		port->io_attr = -1;
++	}
++
++	port->reset_gpio = of_get_named_gpio_flags(child, "reset-gpios", 0,
++						   &flags);
++	if (gpio_is_valid(port->reset_gpio)) {
++		port->reset_active_low = flags & OF_GPIO_ACTIVE_LOW;
++		port->reset_name = kasprintf(GFP_KERNEL, "%s-reset",
++					     port->name);
++
++		ret = devm_gpio_request_one(dev, port->reset_gpio,
++					    GPIOF_DIR_OUT, port->reset_name);
++		if (ret) {
++			if (ret == -EPROBE_DEFER)
++				goto err;
++			goto skip;
++		}
++	}
++
++	port->clk = of_clk_get_by_name(child, NULL);
++	if (IS_ERR(port->clk)) {
++		dev_err(dev, "%s: cannot get clock\n", port->name);
++		goto skip;
++	}
++
++	return 1;
++
++skip:
++	ret = 0;
++err:
++	return ret;
++}
++
+ static int mvebu_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct mvebu_pcie *pcie;
+@@ -980,76 +1050,24 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+ 	i = 0;
+ 	for_each_available_child_of_node(pdev->dev.of_node, child) {
+ 		struct mvebu_pcie_port *port = &pcie->ports[i];
+-		enum of_gpio_flags flags;
+-
+-		port->pcie = pcie;
+ 
+-		if (of_property_read_u32(child, "marvell,pcie-port",
+-					 &port->port)) {
+-			dev_warn(&pdev->dev,
+-				 "ignoring %s, missing pcie-port property\n",
+-				 of_node_full_name(child));
++		ret = mvebu_pcie_parse_port(pcie, port, child);
++		if (ret < 0)
++			return ret;
++		else if (ret == 0)
+ 			continue;
+-		}
+ 
+-		if (of_property_read_u32(child, "marvell,pcie-lane",
+-					 &port->lane))
+-			port->lane = 0;
+-
+-		port->name = kasprintf(GFP_KERNEL, "pcie%d.%d",
+-				       port->port, port->lane);
+-
+-		port->devfn = of_pci_get_devfn(child);
+-		if (port->devfn < 0)
+-			continue;
+-
+-		ret = mvebu_get_tgt_attr(np, port->devfn, IORESOURCE_MEM,
+-					 &port->mem_target, &port->mem_attr);
+-		if (ret < 0) {
+-			dev_err(&pdev->dev, "%s: cannot get tgt/attr for mem window\n",
+-				port->name);
+-			continue;
+-		}
+-
+-		if (resource_size(&pcie->io) != 0)
+-			mvebu_get_tgt_attr(np, port->devfn, IORESOURCE_IO,
+-					   &port->io_target, &port->io_attr);
+-		else {
+-			port->io_target = -1;
+-			port->io_attr = -1;
+-		}
+-
+-		port->reset_gpio = of_get_named_gpio_flags(child,
+-						   "reset-gpios", 0, &flags);
+ 		if (gpio_is_valid(port->reset_gpio)) {
+ 			u32 reset_udelay = 20000;
+ 
+-			port->reset_active_low = flags & OF_GPIO_ACTIVE_LOW;
+-			port->reset_name = kasprintf(GFP_KERNEL, "%s-reset",
+-						     port->name);
+ 			of_property_read_u32(child, "reset-delay-us",
+ 					     &reset_udelay);
+ 
+-			ret = devm_gpio_request_one(&pdev->dev,
+-			    port->reset_gpio, GPIOF_DIR_OUT, port->reset_name);
+-			if (ret) {
+-				if (ret == -EPROBE_DEFER)
+-					return ret;
+-				continue;
+-			}
+-
+ 			gpio_set_value(port->reset_gpio,
+ 				       (port->reset_active_low) ? 1 : 0);
+ 			msleep(reset_udelay/1000);
+ 		}
+ 
+-		port->clk = of_clk_get_by_name(child, NULL);
+-		if (IS_ERR(port->clk)) {
+-			dev_err(&pdev->dev, "%s: cannot get clock\n",
+-				port->name);
+-			continue;
+-		}
+-
+ 		ret = clk_prepare_enable(port->clk);
+ 		if (ret)
+ 			continue;
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
