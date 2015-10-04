@@ -1,117 +1,150 @@
 From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Sun, 4 Oct 2015 19:02:08 +0200 (CEST)
-Subject: [PATCH 5/5] media: atmel-isi: support RGB565 output when sensor
- output YUV formats
-In-Reply-To: <1442898875-7147-6-git-send-email-josh.wu@atmel.com>
+Date: Sun, 4 Oct 2015 19:04:28 +0200 (CEST)
+Subject: [PATCH 1/5] media: atmel-isi: correct yuv swap according to
+ different sensor outputs
+In-Reply-To: <Pine.LNX.4.64.1510041751480.26834@axis700.grange>
 References: <1442898875-7147-1-git-send-email-josh.wu@atmel.com>
- <1442898875-7147-6-git-send-email-josh.wu@atmel.com>
-Message-ID: <Pine.LNX.4.64.1510041852470.26834@axis700.grange>
+ <1442898875-7147-2-git-send-email-josh.wu@atmel.com>
+ <Pine.LNX.4.64.1510041751480.26834@axis700.grange>
+Message-ID: <Pine.LNX.4.64.1510041903460.26834@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Sep 2015, Josh Wu wrote:
+Even simpler:
 
-> This patch enable Atmel ISI preview path to convert the YUV to RGB format.
+On Sun, 4 Oct 2015, Guennadi Liakhovetski wrote:
+
+> Hi Josh,
 > 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
+> On Tue, 22 Sep 2015, Josh Wu wrote:
 > 
->  drivers/media/platform/soc_camera/atmel-isi.c | 38 ++++++++++++++++++++-------
->  1 file changed, 29 insertions(+), 9 deletions(-)
+> > we need to configure the YCC_SWAP bits in ISI_CFG2 according to current
+> > sensor output and Atmel ISI output format.
+> > 
+> > Current there are two cases Atmel ISI supported:
+> >   1. Atmel ISI outputs YUYV format.
+> >      This case we need to setup YCC_SWAP according to sensor output
+> >      format.
+> >   2. Atmel ISI output a pass-through formats, which means no swap.
+> >      Just setup YCC_SWAP as default with no swap.
+> > 
+> > Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> > ---
+> > 
+> >  drivers/media/platform/soc_camera/atmel-isi.c | 43 ++++++++++++++++++++-------
+> >  1 file changed, 33 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+> > index 45e304a..df64294 100644
+> > --- a/drivers/media/platform/soc_camera/atmel-isi.c
+> > +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+> > @@ -103,13 +103,41 @@ static u32 isi_readl(struct atmel_isi *isi, u32 reg)
+> >  	return readl(isi->regs + reg);
+> >  }
+> >  
+> > +static u32 setup_cfg2_yuv_swap(struct atmel_isi *isi,
+> > +		const struct soc_camera_format_xlate *xlate)
+> > +{
 > 
-> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-> index e87d354..e33a16a 100644
-> --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> @@ -201,13 +201,20 @@ static bool is_supported(struct soc_camera_device *icd,
->  	case V4L2_PIX_FMT_UYVY:
->  	case V4L2_PIX_FMT_YVYU:
->  	case V4L2_PIX_FMT_VYUY:
-> +	/* RGB */
-> +	case V4L2_PIX_FMT_RGB565:
->  		return true;
-> -	/* RGB, TODO */
->  	default:
->  		return false;
->  	}
->  }
->  
-> +static bool is_output_rgb(const struct soc_mbus_pixelfmt *host_fmt)
-> +{
-> +	return host_fmt->fourcc == V4L2_PIX_FMT_RGB565 ||
-> +			host_fmt->fourcc == V4L2_PIX_FMT_RGB32;
-> +}
-> +
+> This function will be called only for the four media codes from the 
+> switch-case statement below, namely for
+> 
+> MEDIA_BUS_FMT_VYUY8_2X8
+> MEDIA_BUS_FMT_UYVY8_2X8
+> MEDIA_BUS_FMT_YVYU8_2X8
+> MEDIA_BUS_FMT_YUYV8_2X8
+> 
+> > +	/* By default, no swap for the codec path of Atmel ISI. So codec
+> > +	* output is same as sensor's output.
+> > +	* For instance, if sensor's output is YUYV, then codec outputs YUYV.
+> > +	* And if sensor's output is UYVY, then codec outputs UYVY.
+> > +	*/
+> > +	u32 cfg2_yuv_swap = ISI_CFG2_YCC_SWAP_DEFAULT;
+> 
+> Then this ISI_CFG2_YCC_SWAP_DEFAULT will only hold for 
+> MEDIA_BUS_FMT_YUYV8_2X8? Why don't you just add one more case below? Don't 
+> think this initialisation is really justified.
+> 
+> > +
+> > +	if (xlate->host_fmt->fourcc == V4L2_PIX_FMT_YUYV) {
+> > +		/* all convert to YUYV */
+> > +		switch (xlate->code) {
+> > +		case MEDIA_BUS_FMT_VYUY8_2X8:
+> > +			cfg2_yuv_swap = ISI_CFG2_YCC_SWAP_MODE_3;
+> > +			break;
 
-Why not just pass fourcc to this function? Or maybe just embed it in 
-start_streaming - it won't clutter it a lot.
+Why don't you just return the result value here directly? Then you don't 
+need the variable at all
 
->  static irqreturn_t atmel_isi_handle_streaming(struct atmel_isi *isi)
->  {
->  	if (isi->active) {
-> @@ -467,6 +474,8 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
->  	struct atmel_isi *isi = ici->priv;
->  	int ret;
->  
-> +	isi->enable_preview_path = is_output_rgb(icd->current_fmt->host_fmt);
-> +
->  	pm_runtime_get_sync(ici->v4l2_dev.dev);
->  
->  	/* Reset ISI */
-> @@ -688,6 +697,14 @@ static const struct soc_mbus_pixelfmt isi_camera_formats[] = {
->  		.order			= SOC_MBUS_ORDER_LE,
->  		.layout			= SOC_MBUS_LAYOUT_PACKED,
->  	},
-> +	{
-> +		.fourcc			= V4L2_PIX_FMT_RGB565,
-> +		.name			= "RGB565",
-> +		.bits_per_sample	= 8,
-> +		.packing		= SOC_MBUS_PACKING_2X8_PADHI,
-> +		.order			= SOC_MBUS_ORDER_LE,
-> +		.layout			= SOC_MBUS_LAYOUT_PACKED,
-> +	},
->  };
->  
->  /* This will be corrected as we get more formats */
-> @@ -744,7 +761,7 @@ static int isi_camera_get_formats(struct soc_camera_device *icd,
->  				  struct soc_camera_format_xlate *xlate)
->  {
->  	struct v4l2_subdev *sd = soc_camera_to_subdev(icd);
-> -	int formats = 0, ret;
-> +	int formats = 0, ret, i, n;
->  	/* sensor format */
->  	struct v4l2_subdev_mbus_code_enum code = {
->  		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
-> @@ -778,13 +795,16 @@ static int isi_camera_get_formats(struct soc_camera_device *icd,
->  	case MEDIA_BUS_FMT_VYUY8_2X8:
->  	case MEDIA_BUS_FMT_YUYV8_2X8:
->  	case MEDIA_BUS_FMT_YVYU8_2X8:
-> -		formats++;
-> -		if (xlate) {
-> -			xlate->host_fmt	= &isi_camera_formats[0];
-> -			xlate->code	= code.code;
-> -			xlate++;
-> -			dev_dbg(icd->parent, "Providing format %s using code %d\n",
-> -				isi_camera_formats[0].name, code.code);
-> +		n = ARRAY_SIZE(isi_camera_formats);
-> +		formats += n;
-> +		for (i = 0; i < n; i++) {
-> +			if (xlate) {
-
-I'd put if outside of the loop, or just do
-
-+		for (i = 0; xlate && i < n; i++) {
-
-
-> +				xlate->host_fmt	= &isi_camera_formats[i];
-> +				xlate->code	= code.code;
-> +				dev_dbg(icd->parent, "Providing format %s using code %d\n",
-> +					isi_camera_formats[0].name, code.code);
-> +				xlate++;
-> +			}
->  		}
->  		break;
->  	default:
-> -- 
-> 1.9.1
+> > +		case MEDIA_BUS_FMT_UYVY8_2X8:
+> > +			cfg2_yuv_swap = ISI_CFG2_YCC_SWAP_MODE_2;
+> > +			break;
+> > +		case MEDIA_BUS_FMT_YVYU8_2X8:
+> > +			cfg2_yuv_swap = ISI_CFG2_YCC_SWAP_MODE_1;
+> > +			break;
+> > +		}
+> > +	}
+> > +
+> > +	return cfg2_yuv_swap;
+> > +}
+> > +
+> >  static void configure_geometry(struct atmel_isi *isi, u32 width,
+> > -			u32 height, u32 code)
+> > +		u32 height, const struct soc_camera_format_xlate *xlate)
+> >  {
+> >  	u32 cfg2;
+> >  
+> >  	/* According to sensor's output format to set cfg2 */
+> > -	switch (code) {
+> > +	switch (xlate->code) {
+> >  	default:
+> >  	/* Grey */
+> >  	case MEDIA_BUS_FMT_Y8_1X8:
+> > @@ -117,16 +145,11 @@ static void configure_geometry(struct atmel_isi *isi, u32 width,
+> >  		break;
+> >  	/* YUV */
+> >  	case MEDIA_BUS_FMT_VYUY8_2X8:
+> > -		cfg2 = ISI_CFG2_YCC_SWAP_MODE_3 | ISI_CFG2_COL_SPACE_YCbCr;
+> > -		break;
+> >  	case MEDIA_BUS_FMT_UYVY8_2X8:
+> > -		cfg2 = ISI_CFG2_YCC_SWAP_MODE_2 | ISI_CFG2_COL_SPACE_YCbCr;
+> > -		break;
+> >  	case MEDIA_BUS_FMT_YVYU8_2X8:
+> > -		cfg2 = ISI_CFG2_YCC_SWAP_MODE_1 | ISI_CFG2_COL_SPACE_YCbCr;
+> > -		break;
+> >  	case MEDIA_BUS_FMT_YUYV8_2X8:
+> > -		cfg2 = ISI_CFG2_YCC_SWAP_DEFAULT | ISI_CFG2_COL_SPACE_YCbCr;
+> > +		cfg2 = ISI_CFG2_COL_SPACE_YCbCr |
+> > +				setup_cfg2_yuv_swap(isi, xlate);
+> >  		break;
+> >  	/* RGB, TODO */
+> >  	}
+> 
+> I would move this switch-case completely inside setup_cfg2_yuv_swap(). 
+> Just do
+> 
+> 	cfg2 = setup_cfg2_yuv_swap(isi, xlate);
+> 
+> and handle the
+> 
+>  	case MEDIA_BUS_FMT_Y8_1X8:
+> 
+> in the function too. These two switch-case statements really look 
+> redundant.
+> 
+> > @@ -407,7 +430,7 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
+> >  	isi_writel(isi, ISI_INTDIS, (u32)~0UL);
+> >  
+> >  	configure_geometry(isi, icd->user_width, icd->user_height,
+> > -				icd->current_fmt->code);
+> > +				icd->current_fmt);
+> >  
+> >  	spin_lock_irq(&isi->lock);
+> >  	/* Clear any pending interrupt */
+> > -- 
+> > 1.9.1
+> > 
+> 
+> Thanks
+> Guennadi
 > 
