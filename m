@@ -1,121 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 4 Oct 2015 12:32:15 +0200
-Subject: [PATCH 2/3] hwrng: stm32 - add support for STM32 HW RNG
-In-Reply-To: <1443904519-24012-3-git-send-email-daniel.thompson@linaro.org>
-References: <1443904519-24012-1-git-send-email-daniel.thompson@linaro.org>
- <1443904519-24012-3-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <CACRpkdaCBUnFMYMSdjF4bHwQH3zxu2ou7b54E4FzgH9UbNQEHw@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Sun, 4 Oct 2015 12:04:21 +0100
+Subject: [PATCH 4/4] nvmem: sunxi: Check for memory allocation failure
+In-Reply-To: <1443616591-17867-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1443616298-17389-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1443616591-17867-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20151004110421.GB7110@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 3, 2015 at 10:35 PM, Daniel Thompson
-<daniel.thompson@linaro.org> wrote:
+On Wed, Sep 30, 2015 at 01:36:31PM +0100, Srinivas Kandagatla wrote:
+> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> The sunxi_sid driver doesn't check for kmalloc return status before
+> derefencing the returned pointer, which could lead to a NULL pointer
+> dereference if kmalloc failed. Check for its return code to make sure it
+> deosn't happen.
+> 
+> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/nvmem/sunxi_sid.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
 
-> Add support for STMicroelectronics STM32 random number generator.
->
-> The config value defaults to N, reflecting the fact that STM32 is a
-> very low resource microcontroller platform and unlikely to be targeted
-> by any "grown up" defconfigs.
->
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+No signed-off-by: from you on this patch?
 
-Incidentally both you and Lee Jones submitted similar RNG drivers from
-the same company (ST) recent weeks:
-
-Lee's ST thing:
-http://marc.info/?l=linux-crypto-vger&m=144249760524971&w=2
-
-Daniel's ST thing:
-http://marc.info/?l=linux-crypto-vger&m=144390463810134&w=2
-
-And we also have from old ST:
-drivers/char/hw_random/nomadik-rng.c
-
-1. Are these similar IPs that could be unified in a driver, just different
-offsets in memory?
-
-2. Could you at least cross-review each others drivers because both
-tight loops to read bytes seem to contain similar semantics.
-
-3. I took out the datasheet for Nomadik STn8820 and it seems that
-the hardware is very similar to what this driver is trying to drive.
-CR, SR and DR are in the same place, can you check if you also even
-have the PrimeCell magic in the words at offset 0xfe0 thru 0xffc?
-
-In any case it seems likely that this driver should supercede and replace
-drivers/char/hw_random/nomadik-rng.c
-still using the PrimeCell bus, and if it doesn't have the PrimeCell
-IDs in hardware, this can be specified in the device tree using
-arm,primecell-periphid = <0x000805e1>; in the node if need be.
-The in-tree driver is dangerously simple and assume too much IMO.
-
-Now the rest:
-
-> +       /* enable random number generation */
-> +       clk_enable(priv->clk);
-> +       cr = readl(priv->base + RNG_CR);
-> +       writel(cr | RNG_CR_RNGEN, priv->base + RNG_CR);
-
-The Nomadik datasheet says this works the inverse way: setting
-bit 2 to 1 *disables* the RNG. Can you double-check this?
-
-The Nomadik version also has a TSTCLK bit 3, that should
-always be set and loop-back checked in SR bit 1 to see that the block
-is properly clocked. (Read data will hang on an AHB stall if it's
-unclocked) Is this missing from STM32?
-
-> + sr = readl(priv->base + RNG_SR);
-
-I strongly recommend that you use readl_relaxed() for this and
-all other reads on the hotpath, the Nomadik uses __raw_readl()
-but that is just for the same reasons that readl_relaxed() should
-be used: we just wanna read, not clean buffers etc.
-
-> + /* Has h/ware error dection been triggered? */
-> + if (WARN_ON(sr & (RNG_SR_SEIS | RNG_SR_CEIS)))
-> +     break;
-> +
-> + /* No data ready... */
-> + if (!sr)
-> +     break;
-
-This assumes that only bits 6,5 and 0 are ever used in this hardware.
-Are you sure? On Nomadik DRDY bit 0 is the same, bit 1
-is the clock test bit mentioned above, bit 2 is FAULT set if an invalid
-bit sequence is detected and should definately be checked if
-the HW supports it. Please mask explicitly for DRDY at least.
-
-The bit layout gives at hand that this is indeed a derived IP block,
-I wonder what bits 3 & 4 may be used for in some or all
-revisions?
-
-Then this construct:
-
-> +static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
-> +{
-(...)
-> + /* enable random number generation */
-> + clk_enable(priv->clk);
-> + cr = readl(priv->base + RNG_CR);
-> + writel(cr | RNG_CR_RNGEN, priv->base + RNG_CR);
-(...)
-> + /* disable the generator */
-> + writel(cr, priv->base + RNG_CR);
-> + clk_disable(priv->clk);
-
-This is in the hotpath where megabytes of data may be read out
-by consecutive reads. I think it's wise to move the clock enable/disable
-and also the write to cr to enable/disable the block to runtime PM
-hooks, so that you can e.g. set some hysteresis around the disablement
-with pm_runtime_set_autosuspend_delay(&dev->dev, 50);
-pm_runtime_use_autosuspend(&dev->dev);pm_runtime_put_autosuspend().
-For a primecell check the usage in drivers/mmc/host/mmci.c
-for a complex usecase or e.g. drivers/hwtracing/coresight/coresight-tpiu.c
-for a simpler usecase.
-
-For the performance hints I guess you can even test whether
-what I'm saying makes sense or not by reading some megabytes
-of random and timing it.
-
-Yours,
-Linus Walleij
+:(
