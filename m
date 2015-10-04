@@ -1,62 +1,53 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Sun, 4 Oct 2015 18:50:15 +0200 (CEST)
-Subject: [PATCH 4/5] media: atmel-isi: setup YCC_SWAP correctly when
- using preview path
-In-Reply-To: <1442898875-7147-5-git-send-email-josh.wu@atmel.com>
-References: <1442898875-7147-1-git-send-email-josh.wu@atmel.com>
- <1442898875-7147-5-git-send-email-josh.wu@atmel.com>
-Message-ID: <Pine.LNX.4.64.1510041849370.26834@axis700.grange>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 5 Oct 2015 00:54:03 +0800
+Subject: [PATCH v3 1/8] ARM: dts: rockchip: add core rk3036 dts
+In-Reply-To: <1443492833-15630-2-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <201510050056.ZXVRbABB%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Sep 2015, Josh Wu wrote:
+Hi Xing,
 
-> The preview path only can convert UYVY format to RGB data.
-> 
-> To make preview path work correctly, we need to set up YCC_SWAP
-> according to sensor output and convert them to UYVY.
-> 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
-> 
->  drivers/media/platform/soc_camera/atmel-isi.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-> index bbf6449..e87d354 100644
-> --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> @@ -127,6 +127,22 @@ static u32 setup_cfg2_yuv_swap(struct atmel_isi *isi,
->  			cfg2_yuv_swap = ISI_CFG2_YCC_SWAP_MODE_1;
->  			break;
->  		}
-> +	} else if (xlate->host_fmt->fourcc == V4L2_PIX_FMT_RGB565) {
-> +		/* Preview path is enabled, it will convert UYVY to RGB format.
-> +		 * But if sensor output format is not UYVY, we need to set
-> +		 * YCC_SWAP_MODE to convert it as UYVY.
-> +		 */
+[auto build test results on v4.3-rc3 -- if it's inappropriate base, please ignore]
 
-Please, fix multiline comment style:
+config: arm-arm67 (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-		/*
-		 * ...
-		 * ...
-		 */
+Note: the linux-review/Xing-Zheng/Build-and-support-rk3036-SoC-platform HEAD fa7deba821e05956d8a4937e14541d315682f39a builds fine.
+      It only hurts bisectibility.
 
-> +		switch (xlate->code) {
-> +		case MEDIA_BUS_FMT_VYUY8_2X8:
-> +			cfg2_yuv_swap = ISI_CFG2_YCC_SWAP_MODE_1;
-> +			break;
-> +		case MEDIA_BUS_FMT_YUYV8_2X8:
-> +			cfg2_yuv_swap = ISI_CFG2_YCC_SWAP_MODE_2;
-> +			break;
-> +		case MEDIA_BUS_FMT_YVYU8_2X8:
-> +			cfg2_yuv_swap = ISI_CFG2_YCC_SWAP_MODE_3;
-> +			break;
-> +		}
->  	}
->  
->  	return cfg2_yuv_swap;
-> -- 
-> 1.9.1
-> 
+All error/warnings (new ones prefixed by >>):
+
+   In file included from arch/arm/boot/dts/rk3036-evb.dts:43:0:
+>> arch/arm/boot/dts/rk3036.dtsi:45:42: fatal error: dt-bindings/clock/rk3036-cru.h: No such file or directory
+    #include <dt-bindings/clock/rk3036-cru.h>
+                                             ^
+   compilation terminated.
+
+vim +45 arch/arm/boot/dts/rk3036.dtsi
+
+    39	 */
+    40	
+    41	#include <dt-bindings/gpio/gpio.h>
+    42	#include <dt-bindings/interrupt-controller/irq.h>
+    43	#include <dt-bindings/interrupt-controller/arm-gic.h>
+    44	#include <dt-bindings/pinctrl/rockchip.h>
+  > 45	#include <dt-bindings/clock/rk3036-cru.h>
+    46	#include "skeleton.dtsi"
+    47	
+    48	/ {
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 28527 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151005/5246274b/attachment-0001.obj>
