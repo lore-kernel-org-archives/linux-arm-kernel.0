@@ -1,67 +1,84 @@
 From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Sun,  4 Oct 2015 21:58:46 +0300
-Subject: [PATCH 1/3] ARM: dts: sun4i: Allow to use the PH6 pin for GPIO on
- pcDuino1/2
+Date: Sun,  4 Oct 2015 21:58:48 +0300
+Subject: [PATCH 3/3] ARM: dts: sun4i: Add AXP209 PMU regulators for pcDuino1/2
 In-Reply-To: <1443985128-23137-1-git-send-email-siarhei.siamashka@gmail.com>
 References: <1443985128-23137-1-git-send-email-siarhei.siamashka@gmail.com>
-Message-ID: <1443985128-23137-2-git-send-email-siarhei.siamashka@gmail.com>
+Message-ID: <1443985128-23137-4-git-send-email-siarhei.siamashka@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pcDuino1 board does not use any power switches at all for its
-two USB host ports and the VBUS pins are always connected to 5V.
-
-The pcDuino2 board uses the RT9701GB power switch for its single
-USB host port, but the USB_EN pin (PD2) is pulled up with a 10K
-resistor. So that the USB power is still enabled by default even
-if nobody bothers to configure the PD2 pin or runs the pcDuino1
-firmware.
-
-The current dts file unnecessarily meddles with the PH3 and PH6
-pins. But the PH6 pin is available on the J11 expansion header
-and may have a better use for other purposes. This patch fixes
-the problem and now the PH6 pin can be used with the GPIO sysfs
-interface. Tested on a pcDuino2 board and confirmed the voltage
-on the PH6 pin with a multimeter:
-
-    echo 230 > /sys/class/gpio/export
-    echo "out" > /sys/class/gpio/gpio230/direction
-    echo 0 > /sys/class/gpio/gpio230/value
-    echo 1 > /sys/class/gpio/gpio230/value
-
-USB still works as expected too.
+This allows voltage-scaling with cpufreq-dt. The reliability of
+voltage-scaling has been checked by reducing the voltage of all
+operating points by 0.025V (for extra safety headroom) and running
+libjpeg-turbo decoding tests on 5 pcDuino2 boards. It means that
+the standard sun4i voltages should be perfectly fine too.
 
 Signed-off-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
 ---
- arch/arm/boot/dts/sun4i-a10-pcduino.dts | 10 ----------
- 1 file changed, 10 deletions(-)
+ arch/arm/boot/dts/sun4i-a10-pcduino.dts | 35 +++++++++++++++++++++++++++++----
+ 1 file changed, 31 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/boot/dts/sun4i-a10-pcduino.dts b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
-index 4e3e1b9..fdc074c 100644
+index c9b9330..55714d0 100644
 --- a/arch/arm/boot/dts/sun4i-a10-pcduino.dts
 +++ b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
-@@ -180,14 +180,6 @@
+@@ -104,6 +104,10 @@
  	};
  };
  
--&reg_usb1_vbus {
--	status = "okay";
--};
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -129,12 +133,8 @@
+ 	status = "okay";
+ 
+ 	axp209: pmic at 34 {
+-		compatible = "x-powers,axp209";
+ 		reg = <0x34>;
+ 		interrupts = <0>;
 -
--&reg_usb2_vbus {
--	status = "okay";
--};
--
+-		interrupt-controller;
+-		#interrupt-cells = <1>;
+ 	};
+ };
+ 
+@@ -191,6 +191,33 @@
+ 	};
+ };
+ 
++#include "axp209.dtsi"
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-dll";
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
  &uart0 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&uart0_pins_a>;
-@@ -195,7 +187,5 @@
- };
- 
- &usbphy {
--	usb1_vbus-supply = <&reg_usb1_vbus>;
--	usb2_vbus-supply = <&reg_usb2_vbus>;
- 	status = "okay";
- };
 -- 
 2.4.9
