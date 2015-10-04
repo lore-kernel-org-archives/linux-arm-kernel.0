@@ -1,31 +1,39 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Sun, 4 Oct 2015 23:31:06 +0200
-Subject: [PATCH 1/2] pinctrl: at91-pio4: Use irq_set_handler_locked()
-In-Reply-To: <560E8D4C.1000400@atmel.com>
-References: <abf74f93ec58e3b321dce23af3fa5af1ffa2e070.1443793711.git.nicolas.ferre@atmel.com>
- <560E8D4C.1000400@atmel.com>
-Message-ID: <56119A9A.3070507@atmel.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Sun, 4 Oct 2015 22:32:25 +0100
+Subject: [PATCH v2 0/7] mtd: nand: sunxi: cleanup and improvements
+In-Reply-To: <1443649529-9852-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1443649529-9852-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20151004213225.GA14735@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/10/2015 15:57, Nicolas Ferre a ?crit :
-> Hi all,
+On Wed, Sep 30, 2015 at 11:45:22PM +0200, Boris Brezillon wrote:
+> Hello,
 > 
-> Well it seems my cover letter is missing. So, here it is:
+> This patch series aims at cleaning up the sunxi_nand driver by factorizing
+> the duplicated code found in hw_ecc and hw_syndrome_ecc implementations.
 > 
-> ---8<----
-> pinctrl: at91-pio4: fixes for current linux-next (irq)
+> It also adds support for OOB bytes protection (only on a limited amount of
+> OOB bytes), and add code to correctly handle the 'bitflips in erased pages'
+> case.
 > 
-> While testing the sama5d2 on today's linux-next I discovered that some
-> adaptations were missing. So, I don't know if you were aware but here
-> are my fixes in case you don't have them already.
+> Best Regards,
 > 
-> +Cc: Thomas and Stephen in case these errors happen while building
-> linux-next...
+> Boris
+> 
+> Changes since v1:
+> - drop the first patch (already applied)
+> - split the second patch to ease the review
+> - add the 'fix bitflips in erased pages' patch
+> 
+> Boris Brezillon (7):
+>   mtd: nand: sunxi: create sunxi_nfc_hw_ecc_enable()/disable() functions
+>   mtd: nand: sunxi: introduce sunxi_nfc_hw_ecc_read/write_chunk()
+>   mtd: nand: sunxi: make use of sunxi_nfc_hw_ecc_read/write_chunk()
+>   mtd: nand: sunxi: factorize extra OOB bytes handling
+>   mtd: nand: sunxi: retrieve corrected OOB bytes
+>   mtd: nand: sunxi: replace the NFC_BUF_TO_USER_DATA() macro by an
+>     inline function
+>   mtd: nand: sunxi: fix bitflips in erased pages
 
-After seeing that Linus applied 2 patches by Ludovic, I realized that as
-I had foreseen correctly: it was known and corrected.
-
-Sorry for the noise. Bye,
--- 
-Nicolas Ferre
+All look good to me. Pushed to l2-mtd.git. Thanks.
