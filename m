@@ -1,93 +1,151 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Sun, 4 Oct 2015 22:49:43 +0100
-Subject: [PATCH 3/5] mtd: brcmnand: Optional DT flag to reset IPROC NAND
- controller
-In-Reply-To: <1443808606-21203-4-git-send-email-anup.patel@broadcom.com>
-References: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
- <1443808606-21203-4-git-send-email-anup.patel@broadcom.com>
-Message-ID: <20151004214943.GA28904@localhost>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 4 Oct 2015 22:05:16 +0000 (UTC)
+Subject: OMAP baseline test results for v4.3-rc4
+Message-ID: <alpine.DEB.2.02.1510042152430.27103@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Rafal (to extend this mighty CC list)
 
-On Fri, Oct 02, 2015 at 11:26:44PM +0530, Anup Patel wrote:
-> The BRCM NAND controller on NS2 SoC requires a reset to
-> cleanup previously configured NAND controller state.
-> 
-> This patch adds optional boolean device tree flag named
-> "brcm,nand-iproc-reset". If this flag is present in NAND
-> controller DT node then BRCM IPROC NAND driver will reset
-> the NAND controller before any commands are issued.
+Here are some basic OMAP test results for Linux v4.3-rc4.
+Logs and other details at:
 
-Is there a reason not to do this reset unconditionally? I recall this
-came up in discussion previously, when the OpenWRT folks were trying to
-integrate with BCMA, where this reset was one of the few differences
-between the platform-device-based driver (i.e., this one) and the BCMA
-based driver. Might it help simplify things a bit if we just did the
-same thing everywhere?
+    http://www.pwsan.com/omap/testlogs/test_v4.3-rc4/20151004132242/
 
-Brian
 
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> Reviewed-by: Pramod KUMAR <pramodku@broadcom.com>
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> ---
->  drivers/mtd/nand/brcmnand/iproc_nand.c | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/drivers/mtd/nand/brcmnand/iproc_nand.c b/drivers/mtd/nand/brcmnand/iproc_nand.c
-> index 683495c..d837207 100644
-> --- a/drivers/mtd/nand/brcmnand/iproc_nand.c
-> +++ b/drivers/mtd/nand/brcmnand/iproc_nand.c
-> @@ -11,6 +11,7 @@
->   * GNU General Public License for more details.
->   */
->  
-> +#include <linux/delay.h>
->  #include <linux/device.h>
->  #include <linux/io.h>
->  #include <linux/ioport.h>
-> @@ -35,6 +36,10 @@ struct iproc_nand_soc_priv {
->  #define IPROC_NAND_APB_LE_MODE             BIT(24)
->  #define IPROC_NAND_INT_CTRL_READ_ENABLE    BIT(6)
->  
-> +#define IPROC_NAND_RESET_OFFSET            0x3f8
-> +#define IPROC_NAND_RESET_BIT_SHIFT         0
-> +#define IPROC_NAND_RESET_BIT               BIT(IPROC_NAND_RESET_BIT_SHIFT)
-> +
->  static bool iproc_nand_intc_ack(struct brcmnand_soc *soc)
->  {
->  	struct iproc_nand_soc_priv *priv = soc->priv;
-> @@ -93,6 +98,7 @@ static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
->  
->  static int iproc_nand_probe(struct platform_device *pdev)
->  {
-> +	u32 reset;
->  	struct device *dev = &pdev->dev;
->  	struct iproc_nand_soc_priv *priv;
->  	struct brcmnand_soc *soc;
-> @@ -124,6 +130,19 @@ static int iproc_nand_probe(struct platform_device *pdev)
->  	soc->ctlrdy_set_enabled = iproc_nand_intc_set;
->  	soc->prepare_data_bus = iproc_nand_apb_access;
->  
-> +	if (of_property_read_bool(dev->of_node, "brcm,nand-iproc-reset")) {
-> +		/* Put controller in reset and wait 10 usecs */
-> +		reset = readl(priv->idm_base + IPROC_NAND_RESET_OFFSET);
-> +		reset |= IPROC_NAND_RESET_BIT;
-> +		writel(reset, priv->idm_base + IPROC_NAND_RESET_OFFSET);
-> +		udelay(10);
-> +		/* Bring controller out of reset and wait 10 usecs */
-> +		reset = readl(priv->idm_base + IPROC_NAND_RESET_OFFSET);
-> +		reset &= ~IPROC_NAND_RESET_BIT;
-> +		writel(reset, priv->idm_base + IPROC_NAND_RESET_OFFSET);
-> +		udelay(10);
-> +	}
-> +
->  	return brcmnand_probe(pdev, soc);
->  }
->  
-> -- 
-> 1.9.1
-> 
+Test summary
+------------
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-stk-om44,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
+
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Build warnings from toolchain: uImage:
+    (none)
+
+Build warnings from toolchain: uImage+dtb:
+    (none)
+
+Build warnings from toolchain: zImage:
+    FAIL (10/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only
+
+Boot to userspace:
+    FAIL ( 1/17): 2430sdp
+    skip ( 3/17): 5912osk, 3517evm, 5430es2sbct54
+    Pass (13/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
+		  2420n800
+
+Kernel warnings during boot to userspace:
+    FAIL ( 3/17): 4430es2panda, 4460varsomom, cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
+		  2430sdp, 5430es2uevm
+    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
+		  2430sdp, 5430es2uevm
+    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 1/ 4): 37xxevm
+    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    FAIL ( 1/ 4): 37xxevm
+    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
+
+Kernel warnings during PM test:
+    FAIL ( 2/17): 4430es2panda, 4460varsomom
+
+Obsolete Kconfig symbols:
+    FAIL ( 2/20): omap2plus_defconfig, multi_v7_defconfig
+
+
+vmlinux object size
+(delta in bytes from test_v4.3-rc3 (9ffecb10283508260936b96022d4ee43a7798b4c)):
+   text     data      bss    total  kernel
+   +731      +32        0     +763  omap1_defconfig
+   +731      +32        0     +763  omap1_defconfig_1510innovator_only
+   +731      +32        0     +763  omap1_defconfig_5912osk_only
+  +1305        0        0    +1305  multi_v7_defconfig
+  +6563     +328      -64    +6827  omap2plus_defconfig
+  +6275     +360        0    +6635  omap2plus_defconfig_2430sdp_only
+  +6559     +384        0    +6943  omap2plus_defconfig_am33xx_only
+  +6559     +320        0    +6879  omap2plus_defconfig_am43xx_only
+  +6563     +320      -64    +6819  omap2plus_defconfig_cpupm
+  +6559     +328      -64    +6823  omap2plus_defconfig_dra7xx_only
+  +6227     +328        0    +6555  omap2plus_defconfig_n800_multi_omap2xxx
+  +6475     +320      +32    +6827  omap2plus_defconfig_n800_only_a
+  +6559     +320        0    +6879  omap2plus_defconfig_no_pm
+  +6559     +320      -64    +6815  omap2plus_defconfig_omap2_4_only
+  +6563     +264      -64    +6763  omap2plus_defconfig_omap3_4_only
+  +6495     +328        0    +6823  omap2plus_defconfig_omap5_only
+   +608        0      -56     +552  rmk_omap3430_ldp_allnoconfig
+   +735      +64        0     +799  rmk_omap3430_ldp_oldconfig
+   +664        0      -64     +600  rmk_omap4430_sdp_allnoconfig
+   +711      +64        0     +775  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v4.3-rc3 (9ffecb10283508260936b96022d4ee43a7798b4c))
+  avail  rsrvd   high  freed  board          kconfig
+      .      .      .    -4k  2420n800       omap2plus_defconfig_n800_only_a
+     4k    -4k      .      .  2430sdp        omap2plus_defconfig
+      .      .      .    -4k  3530es31beagle omap2plus_defconfig
+      .      .      .    -4k  3530es3beagle  omap2plus_defconfig
+      .      .      .    -4k  3730beaglexm   omap2plus_defconfig
+      .      .      .    -4k  3730es12beaglexmomap2plus_defconfig
+      .      .      .    -4k  37xxevm        omap2plus_defconfig
+      .      .      .    -4k  4430es2panda   omap2plus_defconfig
+      .      .      .    -4k  4460pandaes    omap2plus_defconfig
+      .      .      .    -4k  4460varsomom   omap2plus_defconfig
+      .      .      .    -4k  5430es2uevm    omap2plus_defconfig
+    -8k     8k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
