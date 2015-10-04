@@ -1,28 +1,30 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Sun, 4 Oct 2015 11:09:56 +0200
-Subject: [PATCH 3/3] ARM: dts: stm32f429: Adopt STM32 RNG driver
-In-Reply-To: <1443904519-24012-4-git-send-email-daniel.thompson@linaro.org>
-References: <1443904519-24012-1-git-send-email-daniel.thompson@linaro.org>
- <1443904519-24012-4-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <5610ECE4.5070108@gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Sun, 4 Oct 2015 10:10:59 +0100
+Subject: [PATCH v8 0/3] usb: xhci-platform: Configure 64-bit DMA mask if
+ the platform is capable
+In-Reply-To: <CADaLNDkQEZ-TA3PS-RdEWTGi3rxgqxHTDgvNO8De+VXeMKeJnw@mail.gmail.com>
+References: <CADaLNDno0cLXH3_4NG75fk6T31Pe5BCrbcUpA0cGriCwSh6OyQ@mail.gmail.com>
+ <cover.1442513540.git.dhdang@apm.com>
+ <CADaLNDkQEZ-TA3PS-RdEWTGi3rxgqxHTDgvNO8De+VXeMKeJnw@mail.gmail.com>
+Message-ID: <20151004091059.GA32394@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Wed, Sep 30, 2015 at 02:24:30PM -0700, Duc Dang wrote:
+> On Thu, Sep 17, 2015 at 11:19 AM, Duc Dang <dhdang@apm.com> wrote:
+> > The xhci platform driver does not work with system that only supports
+> > 64-bit DMA as it requests 32-bit DMA mask during driver initialization.
+> > This patch set addresses this issue and also adds XHCI-compliant USB
+> > Controller ACPI identification into xhci-platform driver.
+> 
+> Hi Greg, Mathias,
+> 
+> Arnd already ack-ed the first patch, please let me know if you have
+> more comment on this set?
 
-On 10/03/2015 10:35 PM, Daniel Thompson wrote:
-> New bindings and driver have been created for STM32 series parts. This
-> patch integrates this changes.
->
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> ---
->   arch/arm/boot/dts/stm32f429.dtsi | 7 +++++++
->   1 file changed, 7 insertions(+)
->
+I'm waiting for Mathias to forward this on to me as he's the xhci
+maintainer.
 
-Acked-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+thanks,
 
-I will queue it to STM32 tree as soon as the DT bindings are accepted.
-
-Thanks,
-Maxime
+greg k-h
