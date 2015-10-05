@@ -1,61 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 5 Oct 2015 15:21:11 +0100
-Subject: [PATCH] ASoC: sun4i-codec: Rework and fix headphone routing
-In-Reply-To: <20151005102550.GI2696@lukather>
-References: <1443965896-6205-1-git-send-email-maxime.ripard@free-electrons.com>
- <20151005094435.GI12635@sirena.org.uk>
- <20151005102550.GI2696@lukather>
-Message-ID: <20151005142111.GR12635@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 5 Oct 2015 15:24:03 +0100
+Subject: [PATCH] iommu/arm-smmu: Only return IRQ_NONE if FSR is not set
+In-Reply-To: <1443226325-28456-1-git-send-email-mitchelh@codeaurora.org>
+References: <1443226325-28456-1-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <20151005142402.GF8818@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 05, 2015 at 12:25:50PM +0200, Maxime Ripard wrote:
-> On Mon, Oct 05, 2015 at 10:44:35AM +0100, Mark Brown wrote:
-> > On Sun, Oct 04, 2015 at 03:38:16PM +0200, Maxime Ripard wrote:
+Hi Mitch,
 
-> > > Most of the boards have their headphone jack directly connected to the
-> > > matching pins of the SoCs. Since most of the time we will have the same
-> > > routing path, it makes sense to put that in the driver, and only have a
-> > > property describing whether that route is enabled or not.
+On Sat, Sep 26, 2015 at 01:12:05AM +0100, Mitchel Humpherys wrote:
+> Currently we return IRQ_NONE from the context fault handler if the FSR
+> doesn't actually have the fault bit set (some sort of miswired
+> interrupt?) or if the client doesn't register an IOMMU fault handler.
+> However, registering a client fault handler is optional, so telling the
+> interrupt framework that the interrupt wasn't for this device if the
+> client doesn't register a handler isn't exactly accurate.  Fix this by
+> returning IRQ_HANDLED even if the client doesn't register a handler.
+> 
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> ---
+>  drivers/iommu/arm-smmu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 48a39dfa9777..95560d447a54 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -653,7 +653,7 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
+>  		dev_err_ratelimited(smmu->dev,
+>  		    "Unhandled context fault: iova=0x%08lx, fsynr=0x%x, cb=%d\n",
+>  		    iova, fsynr, cfg->cbndx);
+> -		ret = IRQ_NONE;
+> +		ret = IRQ_HANDLED;
+>  		resume = RESUME_TERMINATE;
 
-> > What is the value in having just a dumb jack with no detection
-> > configured?  It doesn't actually do anything...
+Hmm, but if we haven't actually done anything to rectify the cause of the
+fault, what means that we won't take it again immediately? I guess I'm not
+understanding the use-case that triggered you to write this patch...
 
-> Well, it's how it's wired on most boards. The jack is directly
-> connected to the SoC, without any detection mechanism, not even a
-> GPIO, so we can only assume it's always there if we want it to work
-> properly.
-
-Sure, but what is the point of representing this in the driver?
-
-> > > It also fixes the following warning messages that were seen so far:
-> > > sun4i-codec 1c22c00.codec: ASoC: no sink widget found for Headphone Jack
-> > > sun4i-codec 1c22c00.codec: ASoC: Failed to add route HP Left -> direct -> Headphone Jack
-> > > sun4i-codec 1c22c00.codec: ASoC: no sink widget found for Headphone Jack
-> > > sun4i-codec 1c22c00.codec: ASoC: Failed to add route HP Right -> direct -> Headphone Jack
-
-> > Why are these routes being added separately to adding the jack?  Just
-> > remove the broken routes.
-
-> I'm not sure I understand here. The former DT bindings example was
-> adding this route, which was broken because of the missing output
-> widget for the headphone jack.
-
-If those warnings are being seen whatever added the routes is buggy
-as-is.
-
-> My patch here adds both if the DT says that the headphone jack is
-> actually used on that board, so it should fix both issues: no broken
-> route, and no missing widgets. right?
-
-It's not really a scalable binding - it's a boolean for this one
-configuration, even adding a GPIO for detection isn't going to fit in
-terribly neatly.  I'm trying to figure out if we even need a binding
-here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151005/bd3c255e/attachment.sig>
+Will
