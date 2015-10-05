@@ -1,49 +1,39 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 5 Oct 2015 11:42:54 -0500
-Subject: [PATCH 1/4] ARM: OMAP: dmtimer: check for fixed timers during
- config
-In-Reply-To: <201510040126.SfMisWv2%fengguang.wu@intel.com>
-References: <201510040126.SfMisWv2%fengguang.wu@intel.com>
-Message-ID: <5612A88E.1040809@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 5 Oct 2015 17:49:24 +0100
+Subject: [PATCH 7/7] Document the use of the arm64 contpte/nonconpte flags.
+In-Reply-To: <1443818865-19846-8-git-send-email-jeremy.linton@arm.com>
+References: <1443818865-19846-1-git-send-email-jeremy.linton@arm.com>
+ <1443818865-19846-8-git-send-email-jeremy.linton@arm.com>
+Message-ID: <20151005164924.GB5557@MBP.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+On Fri, Oct 02, 2015 at 03:47:45PM -0500, Jeremy Linton wrote:
+> These flags allow the user to enable/disable the contiguous PTE
+> detection and marking on the kernel command line for
+> debugging purposes.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  Documentation/kernel-parameters.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+> index 22a4b68..2766290 100644
+> --- a/Documentation/kernel-parameters.txt
+> +++ b/Documentation/kernel-parameters.txt
+> @@ -744,6 +744,10 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>  			seconds. Defaults to 10*60 = 10mins. A value of 0
+>  			disables the blank timer.
+>  
+> +	contpte		[ARM64] Enable contiguous PTE marking for the kernel
+> +			linear range. This may be disabled with nocontpte.
+> +			Default: Enabled
 
-On 10/03/2015 12:29 PM, kbuild test robot wrote:
-> Hi Suman,
-> 
-> [auto build test results on v4.3-rc3 -- if it's inappropriate base, please ignore]
-> 
-> config: arm-omap1_defconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm 
-> 
-> All error/warnings (new ones prefixed by >>):
-> 
->    arch/arm/plat-omap/dmtimer.c: In function 'omap_dm_timer_set_source':
->>> arch/arm/plat-omap/dmtimer.c:509:2: error: implicit declaration of function 'clk_hw_get_num_parents' [-Werror=implicit-function-declaration]
->      if (!clk_hw_get_num_parents(__clk_get_hw(timer->fclk)))
->      ^
->>> arch/arm/plat-omap/dmtimer.c:509:2: error: implicit declaration of function '__clk_get_hw' [-Werror=implicit-function-declaration]
->    cc1: some warnings being treated as errors
-> 
-> vim +/clk_hw_get_num_parents +509 arch/arm/plat-omap/dmtimer.c
-> 
->    503			return pdata->set_timer_src(timer->pdev, source);
->    504	
->    505		if (IS_ERR(timer->fclk))
->    506			return -EINVAL;
->    507	
->    508		/* Check if the clock has parents if not no point checking */
->  > 509		if (!clk_hw_get_num_parents(__clk_get_hw(timer->fclk)))
->    510			return 0;
+I recall you asked the question but I didn't have the time to reply. I
+don't think we need a command line option for this. In the "unlikely"
+event that something is broken in hardware (or software) and we want to
+disable the contiguous bit, I would rather have a Kconfig option.
 
-CONFIG_COMMON_CLK is not defined for OMAP1. So, are you ok if I enclose
-this within #ifdef CONFIG_COMMON_CLK?
-
-regards
-Suman
+-- 
+Catalin
