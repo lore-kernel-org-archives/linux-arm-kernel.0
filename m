@@ -1,61 +1,54 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  5 Oct 2015 10:49:57 +0200
-Subject: [PATCH 17/17] ARM: pxa: zylonite: Use PWM lookup table
-In-Reply-To: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
-References: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1444034997-9805-18-git-send-email-thierry.reding@gmail.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Mon, 5 Oct 2015 10:58:56 +0200
+Subject: [PATCH] twd: Don't set CLOCK_EVT_FEAT_C3STOP unconditionally
+Message-ID: <56123BD0.8010005@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a PWM lookup table to provide the PWM to the pwm-backlight device.
-The driver has a legacy code path that is required only because boards
-still use the legacy method of requesting PWMs by global ID. Replacing
-these usages allows that legacy fallback to be removed.
+In 5388a6b266 ("ARM: SMP: Always enable clock event broadcast support")
+Russell noted that "the TWD local timers are unable to wake up the CPU
+when it is placed into a low power mode".
 
-Cc: Daniel Mack <daniel@zonque.org>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Robert Jarzmik <robert.jarzmik@free.fr>
-Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
+However, some platforms do not stop the TWD block in low-power mode,
+and can thus use it without setting up a broadcast device.
+
+Make the driver check for the "twd_never_stops" property, and set the
+CLOCK_EVT_FEAT_C3STOP flag accordingly.
+
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 ---
- arch/arm/mach-pxa/zylonite.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/kernel/smp_twd.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-pxa/zylonite.c b/arch/arm/mach-pxa/zylonite.c
-index 77daea478e88..e20359a7433c 100644
---- a/arch/arm/mach-pxa/zylonite.c
-+++ b/arch/arm/mach-pxa/zylonite.c
-@@ -19,6 +19,7 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
-+#include <linux/pwm.h>
- #include <linux/pwm_backlight.h>
- #include <linux/smc91x.h>
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index e8f6d241881f..0ca825e24d9c 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -33,6 +33,7 @@ static unsigned long twd_timer_rate;
+ static DEFINE_PER_CPU(bool, percpu_setup_called);
  
-@@ -120,11 +121,14 @@ static inline void zylonite_init_leds(void) {}
- #endif
+ static struct clock_event_device __percpu *twd_evt;
++static int feat_c3stop;
+ static int twd_ppi;
  
- #if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
-+static struct pwm_lookup zylonite_pwm_lookup[] = {
-+	PWM_LOOKUP("pxa27x-pwm.1", 1, "pwm-backlight.0", NULL, 10000,
-+		   PWM_POLARITY_NORMAL),
-+};
-+
- static struct platform_pwm_backlight_data zylonite_backlight_data = {
--	.pwm_id		= 3,
- 	.max_brightness	= 100,
- 	.dft_brightness	= 100,
--	.pwm_period_ns	= 10000,
- 	.enable_gpio	= -1,
- };
+ static void twd_set_mode(enum clock_event_mode mode,
+@@ -293,7 +294,7 @@ static void twd_timer_setup(void)
  
-@@ -206,6 +210,7 @@ static struct pxafb_mach_info zylonite_sharp_lcd_info = {
+ 	clk->name = "local_timer";
+ 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+-			CLOCK_EVT_FEAT_C3STOP;
++			feat_c3stop;
+ 	clk->rating = 350;
+ 	clk->set_mode = twd_set_mode;
+ 	clk->set_next_event = twd_set_next_event;
+@@ -345,6 +346,8 @@ static int __init twd_local_timer_common_register(struct device_node *np)
+ 		goto out_irq;
  
- static void __init zylonite_init_lcd(void)
- {
-+	pwm_add_table(zylonite_pwm_lookup, ARRAY_SIZE(zylonite_pwm_lookup));
- 	platform_device_register(&zylonite_backlight_device);
+ 	twd_get_clock(np);
++	if (!of_property_read_bool(np, "twd_never_stops"))
++		feat_c3stop = CLOCK_EVT_FEAT_C3STOP;
  
- 	if (lcd_id & 0x20) {
+ 	/*
+ 	 * Immediately configure the timer on the boot CPU, unless we need
 -- 
-2.5.0
+2.4.5
