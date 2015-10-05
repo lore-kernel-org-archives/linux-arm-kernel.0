@@ -1,97 +1,108 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 5 Oct 2015 23:36:17 +0200
-Subject: [PATCH v9 0/4] Allow USB devices to remain runtime-suspended when
- sleeping
-In-Reply-To: <1444056332-30246-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1444056332-30246-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <CAPDyKFrU5mBz+xrj9dHkNfGa_QFBBWVsarFm4UG0oOTXyQfiHQ@mail.gmail.com>
+From: yang.shi@linaro.org (Yang Shi)
+Date: Mon,  5 Oct 2015 14:32:51 -0700
+Subject: [v3 PATCH] arm64: replace read_lock to rcu lock in call_break_hook
+Message-ID: <1444080771-22468-1-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 October 2015 at 16:45, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
-> Hi,
->
-> this is v9 of an attempt to make it easier for devices to remain in
-> runtime PM when the system goes to sleep, mainly to reduce the time
-> spent resuming devices.
->
-> For this, we interpret the absence of all PM callback implementations as
-> it being safe to do direct_complete, so their ancestors aren't prevented
-> from remaining runtime-suspended.
->
-> Additionally, the prepare() callback of USB devices will return 1 if
-> runtime PM is enabled and the current wakeup settings are correct.
->
-> With these changes, a uvcvideo device (for example) stays in runtime
-> suspend when the system goes to sleep and is left in that state when the
-> system resumes, not delaying it unnecessarily.
->
-> Thanks,
->
-> Tomeu
->
-> Changes in v9:
-> - Add docs noting the need for the device lock to be held before calling
->   device_is_bound()
-> - Add docs noting the need for the device lock to be held before calling
->   dev_pm_domain_set()
-> - Move to CONFIG_PM_SLEEP as suggested by Rafael and Ulf.
-> - Rename from device_check_pm_callbacks to device_pm_check_callbacks to
->   follow with the naming convention of existing API.
-> - Re-add calling to device_pm_check_callbacks from device registration
->   and when updating the PM domain of a device.
->
-> Changes in v8:
-> - Add device_is_bound()
-> - Add dev_pm_domain_set() and update code to use it
-> - Move no_pm_callbacks field into CONFIG_PM_SLEEP
-> - Call device_check_pm_callbacks only after a device is bound or unbound
->
-> Changes in v7:
-> - Reduce indentation by adding a label in device_prepare()
->
-> Changes in v6:
-> - Add stub for !CONFIG_PM.
-> - Move implementation of device_check_pm_callbacks to power/main.c as it
->   doesn't belong to CONFIG_PM_SLEEP.
-> - Take dev->power.lock before modifying flag.
->
-> Changes in v5:
-> - Check for all dev_pm_ops instances associated to a device, updating a
->   no_pm_callbacks flag at the times when that could change.
->
-> Tomeu Vizoso (4):
->   device core: add device_is_bound()
->   PM / Domains: add setter for dev.pm_domain
->   PM / sleep: Go direct_complete if driver has no callbacks
->   USB / PM: Allow USB devices to remain runtime-suspended when sleeping
->
->  arch/arm/mach-omap2/omap_device.c |  7 ++++---
->  drivers/acpi/acpi_lpss.c          |  5 +++--
->  drivers/acpi/device_pm.c          |  5 +++--
->  drivers/base/dd.c                 | 21 +++++++++++++++++++--
->  drivers/base/power/clock_ops.c    |  5 +++--
->  drivers/base/power/common.c       | 24 ++++++++++++++++++++++++
->  drivers/base/power/domain.c       |  6 ++++--
->  drivers/base/power/main.c         | 35 +++++++++++++++++++++++++++++++++++
->  drivers/base/power/power.h        |  3 +++
->  drivers/gpu/vga/vga_switcheroo.c  | 10 +++++-----
->  drivers/misc/mei/pci-me.c         |  5 +++--
->  drivers/misc/mei/pci-txe.c        |  5 +++--
->  drivers/usb/core/port.c           |  6 ++++++
->  drivers/usb/core/usb.c            | 11 ++++++++++-
->  include/linux/device.h            |  2 ++
->  include/linux/pm.h                |  1 +
->  include/linux/pm_domain.h         |  3 +++
->  17 files changed, 131 insertions(+), 23 deletions(-)
->
-> --
-> 2.4.3
->
+BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
+in_atomic(): 0, irqs_disabled(): 128, pid: 342, name: perf
+1 lock held by perf/342:
+ #0:  (break_hook_lock){+.+...}, at: [<ffffffc0000851ac>] call_break_hook+0x34/0xd0
+irq event stamp: 62224
+hardirqs last  enabled at (62223): [<ffffffc00010b7bc>] __call_rcu.constprop.59+0x104/0x270
+hardirqs last disabled at (62224): [<ffffffc0000fbe20>] vprintk_emit+0x68/0x640
+softirqs last  enabled at (0): [<ffffffc000097928>] copy_process.part.8+0x428/0x17f8
+softirqs last disabled at (0): [<          (null)>]           (null)
+CPU: 0 PID: 342 Comm: perf Not tainted 4.1.6-rt5 #4
+Hardware name: linux,dummy-virt (DT)
+Call trace:
+[<ffffffc000089968>] dump_backtrace+0x0/0x128
+[<ffffffc000089ab0>] show_stack+0x20/0x30
+[<ffffffc0007030d0>] dump_stack+0x7c/0xa0
+[<ffffffc0000c878c>] ___might_sleep+0x174/0x260
+[<ffffffc000708ac8>] __rt_spin_lock+0x28/0x40
+[<ffffffc000708db0>] rt_read_lock+0x60/0x80
+[<ffffffc0000851a8>] call_break_hook+0x30/0xd0
+[<ffffffc000085a70>] brk_handler+0x30/0x98
+[<ffffffc000082248>] do_debug_exception+0x50/0xb8
+Exception stack(0xffffffc00514fe30 to 0xffffffc00514ff50)
+fe20:                                     00000000 00000000 c1594680 0000007f
+fe40: ffffffff ffffffff 92063940 0000007f 0550dcd8 ffffffc0 00000000 00000000
+fe60: 0514fe70 ffffffc0 000be1f8 ffffffc0 0514feb0 ffffffc0 0008948c ffffffc0
+fe80: 00000004 00000000 0514fed0 ffffffc0 ffffffff ffffffff 9282a948 0000007f
+fea0: 00000000 00000000 9282b708 0000007f c1592820 0000007f 00083914 ffffffc0
+fec0: 00000000 00000000 00000010 00000000 00000064 00000000 00000001 00000000
+fee0: 005101e0 00000000 c1594680 0000007f c1594740 0000007f ffffffd8 ffffff80
+ff00: 00000000 00000000 00000000 00000000 c1594770 0000007f c1594770 0000007f
+ff20: 00665e10 00000000 7f7f7f7f 7f7f7f7f 01010101 01010101 00000000 00000000
+ff40: 928e4cc0 0000007f 91ff11e8 0000007f
 
-This looks good to me, for the series you may add:
+call_break_hook is called in atomic context (hard irq disabled), so replace
+the sleepable lock to rcu lock, replace relevant list operations to rcu
+version and call synchronize_rcu() in unregister_break_hook().
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+And, replace write lock to spinlock in {un}register_break_hook.
 
-Kind regards
-Uffe
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
+---
+v2 -> v3
+Add synchronize_rcu() in ungister_break_hook()
+Replace write lock to spinlock
+
+v1 -> v2
+Replace list operations to rcu version.
+
+ arch/arm64/kernel/debug-monitors.c | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index cebf786..13ca9cd 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -271,20 +271,21 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+  * Use reader/writer locks instead of plain spinlock.
+  */
+ static LIST_HEAD(break_hook);
+-static DEFINE_RWLOCK(break_hook_lock);
++static DEFINE_SPINLOCK(break_hook_lock);
+ 
+ void register_break_hook(struct break_hook *hook)
+ {
+-	write_lock(&break_hook_lock);
+-	list_add(&hook->node, &break_hook);
+-	write_unlock(&break_hook_lock);
++	spin_lock(&break_hook_lock);
++	list_add_rcu(&hook->node, &break_hook);
++	spin_unlock(&break_hook_lock);
+ }
+ 
+ void unregister_break_hook(struct break_hook *hook)
+ {
+-	write_lock(&break_hook_lock);
+-	list_del(&hook->node);
+-	write_unlock(&break_hook_lock);
++	spin_lock(&break_hook_lock);
++	list_del_rcu(&hook->node);
++	spin_unlock(&break_hook_lock);
++	synchronize_rcu();
+ }
+ 
+ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
+@@ -292,11 +293,11 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
+ 	struct break_hook *hook;
+ 	int (*fn)(struct pt_regs *regs, unsigned int esr) = NULL;
+ 
+-	read_lock(&break_hook_lock);
+-	list_for_each_entry(hook, &break_hook, node)
++	rcu_read_lock();
++	list_for_each_entry_rcu(hook, &break_hook, node)
+ 		if ((esr & hook->esr_mask) == hook->esr_val)
+ 			fn = hook->fn;
+-	read_unlock(&break_hook_lock);
++	rcu_read_unlock();
+ 
+ 	return fn ? fn(regs, esr) : DBG_HOOK_ERROR;
+ }
+-- 
+2.0.2
