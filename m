@@ -1,87 +1,66 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Sun, 4 Oct 2015 22:46:52 -0700
-Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
-In-Reply-To: <20151003111231.544ae8e2@arm.com>
-References: <560E53E3.7070207@free.fr> <560E8584.8000207@free.fr>
- <20151002180255.GK12338@codeaurora.org> <560ED1FB.9010000@free.fr>
- <yw1xbncgluad.fsf@unicorn.mansr.com>
- <20151003103219.1e10bdeb@arm.com> <560FA4B5.1040709@free.fr>
- <20151003111231.544ae8e2@arm.com>
-Message-ID: <20151005054652.GI26391@xsjsorenbubuntu>
+From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
+Date: Mon, 5 Oct 2015 08:58:53 +0300
+Subject: [linux-sunxi] [PATCH 1/3] ARM: dts: sun4i: Allow to use the PH6
+ pin for GPIO on pcDuino1/2
+In-Reply-To: <20151005083940.78d04f63@i7>
+References: <1443985128-23137-1-git-send-email-siarhei.siamashka@gmail.com>
+ <1443985128-23137-2-git-send-email-siarhei.siamashka@gmail.com>
+ <CAGb2v65n6ymon+sEASa726sam0KLOvMPbxTxCqvV4j0ust2PCA@mail.gmail.com>
+ <20151005083940.78d04f63@i7>
+Message-ID: <20151005085853.2dd2373b@i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2015-10-03 at 11:12AM +0100, Marc Zyngier wrote:
-> On Sat, 3 Oct 2015 11:49:41 +0200
-> Mason <slash.tmp@free.fr> wrote:
+On Mon, 5 Oct 2015 08:39:40 +0300
+Siarhei Siamashka <siarhei.siamashka@gmail.com> wrote:
+
+> On Mon, 5 Oct 2015 09:55:28 +0800
+> Chen-Yu Tsai <wens@csie.org> wrote:
 > 
-> > On 03/10/2015 11:32, Marc Zyngier wrote:
-> > > On Sat, 3 Oct 2015 00:34:02 +0100
-> > > M?ns Rullg?rd wrote:
-> > >> Mason writes:
-> > >>
-> > >>> My port requires the TWD to function. So I'm using
-> > >>> select HAVE_ARM_TWD (no "if SMP") to have it work
-> > >>> even on MULTIPLATFORM UP configs.
-> > >>
-> > >> You could just let it use another timer in the non-smp case if you
-> > >> didn't have that weird aversion towards using my code.
-> > > 
-> > > I have no idea what your code does, but using the timer that is
-> > > integrated into the core (just like on any other A9 implementation)
-> > > feels like the right thing to do, unless the HW is too broken to use
-> > > TWD.
-> > > 
-> > > Another timer is a nice thing to have (it probably comes in handy for
-> > > suspend/resume, and it may have a much better resolution), but this
-> > > seems like icing on the cake at this point. Let's see the cake first.
+> > On Mon, Oct 5, 2015 at 2:58 AM, Siarhei Siamashka
+> > <siarhei.siamashka@gmail.com> wrote:
+> > > The pcDuino1 board does not use any power switches at all for its
+> > > two USB host ports and the VBUS pins are always connected to 5V.
+> > >
+> > > The pcDuino2 board uses the RT9701GB power switch for its single
+> > > USB host port, but the USB_EN pin (PD2) is pulled up with a 10K
+> > > resistor. So that the USB power is still enabled by default even
+> > > if nobody bothers to configure the PD2 pin or runs the pcDuino1
+> > > firmware.
 > > 
-> > Marc,
-> > 
-> > I have a quick question for you :-)
-> > 
-> > As I stated several months ago, my goal is to produce the simplest
-> > port possible, which is why I chose the TWD instead of platform
-> > timers. At one point, I was also considering the global timer.
-> > (I have a Cortex A9 MPCore.) But as far as I could tell, the
-> > code for the global timer does not handle CPU frequency changes
-> > (while smp_twd.c does), is that correct?
+> > Seems like it would be better if you had a regulator controlled
+> > by PD2. At least can shut down VBUS power when it wants to?
 > 
-> Indeed, I cannot see any code that does that in the GT driver. But if
-> you have an A9 MP, you probably want to stick to TWD, which gives you a
-> per-cpu timer instead of a global timer that will require IPIs to other
-> CPUs.
-
-I think the TWD only provides a clock_event device. Clocksource and
-schedclock would have to be provided by something else.
-
+> That's a good question.
 > 
-> > AFAIU, TWD timers and global timer "tick" at the frequency of
-> > PERIPHCLK (which is CPUCLK/2 in my implementation). Therefore,
-> > code needs to be specifically written to handle cpufreq events.
-> > Is that a correct understanding?
+> Describing the regulator controlled by PD2 in the dts file is surely
+> the right solution for pcDuino2 boards. But in the case of using this
+> dts for pcDuino1, the kernel would think that it can shut down VBUS
+> power, while in fact this is not true.
 > 
-> I don't have the A9 TRM handy (nor the desire to read it on a
-> sunny Saturday morning), so I can't really tell. But yes, this is
-> likely to require some clock change handling.
+> The RT9701GB switch also provides the current limiting feature in
+> addition to the ability to enable/disable the VBUS power. Probably
+> this was a real reason why it was added to the board.
+> 
+> Everything boils down to the question whether we want to have a
+> common dts file for pcDuino1 and pcDuino2 or decide to split them.
+> Based on the schematics comparison, there do not seem to be any
+> substantial differences between these boards if we ignore the PD2
+> pin altogether. LinkSprite says that "Ubuntu images are same for
+> both pcDuino1 and pcDuino2" at their website:
+>     http://www.linksprite.com/?page_id=809
+> 
+> And I actually like their decision to have the PD2 pin pulled-up.
 
-I looked at that once. IIRC, the problems are schedclock and clocksource.
-Other than a clockevent device which can be adjusted for frequency
-changes, there is (at least was) no such mechanism for clocksources and
-schedclock. Those are required to run at a stable frequency at all times
-(https://www.kernel.org/doc/Documentation/timers/timekeeping.txt).
+I'm not sure if everyone would like this, but the following trick
+works. If we configure the PD2 pin as input with pull-down on the SoC
+side and read it, then it still reads as 1 on pcDuino2. Which means
+that the pull-up is apparently stronger (by how much and whether this
+is really reliable is another question). It should read as 0 on
+pcDuino1 and we might use this to detect the board type at runtime.
 
-On Zynq I had the same problem and created a construct of notifiers for
-our clocksource to deal with this problem
-(https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/clocksource/cadence_ttc_timer.c)
-I never really liked that "solution" much, though.
+Still it is probably an overkill for just this really minor thing :-)
 
-That approach would probably not work with the GT because, last time I
-checked, it runs at the maximum frequency possible, i.e. dividers at the
-minimum (as a timer should), which means, if cpufreq throttles your CPU
-speed down, you'd have to decrease the clock dividers which isn't
-possible anymore (I could do that on the TTC because we have to run it
-a at very low speeds with high dividers to avoid constantly overflowing
-the 16-bit counter).
-
-	S?ren
+-- 
+Best regards,
+Siarhei Siamashka
