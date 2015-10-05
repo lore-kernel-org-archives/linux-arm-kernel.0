@@ -1,33 +1,29 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon,  5 Oct 2015 09:00:28 +0000
-Subject: [PATCHv2 1/2] ARM: exynos_defconfig: Enable rtl8152 ethernet driver
- for Odroid-XU4
-Message-ID: <1444035629-1173-1-git-send-email-linux.amoon@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 5 Oct 2015 11:03:16 +0200
+Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
+In-Reply-To: <56122906.9010102@free.fr>
+References: <560E53E3.7070207@free.fr> <560E8584.8000207@free.fr>
+ <20151002180255.GK12338@codeaurora.org> <560ED1FB.9010000@free.fr>
+ <yw1xbncgluad.fsf@unicorn.mansr.com>
+ <20151003103219.1e10bdeb@arm.com> <560FA4B5.1040709@free.fr>
+ <20151003111231.544ae8e2@arm.com>
+ <20151005054652.GI26391@xsjsorenbubuntu> <56122906.9010102@free.fr>
+Message-ID: <CACRpkdb31n84UwRxzds7nitOO3QXsoaKFhJWSOVZQ+8dU7XKQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Odroid XU4 supports RTL8152/RTL8153 Based USB 3.0 Ethernet Adapters.
-Support speed upto 10/100/1000 Mbit Ethernet LAN.
+On Mon, Oct 5, 2015 at 9:38 AM, Mason <slash.tmp@free.fr> wrote:
 
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> 2) I was told that some platforms "turn off" the TWD block in
+> low-power modes (like during WFI), and therefore must be marked
+> as unreliable in "C3" (FEAT_C3STOP).
+>
+> I have a patch to selectively not mark the TWD as unreliable.
+> (I will make a formal submission today.)
 
----
-Changes: Fixed the commit log.
----
- arch/arm/configs/exynos_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+This sounds like something that should be done with a device
+tree bool. Don't forget to patch
+Documentation/devicetree/bindings/arm/twd.txt
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 1ff2bfa..5d1937b 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -61,6 +61,7 @@ CONFIG_BLK_DEV_DM=y
- CONFIG_DM_CRYPT=m
- CONFIG_NETDEVICES=y
- CONFIG_SMSC911X=y
-+CONFIG_USB_RTL8152=y
- CONFIG_USB_USBNET=y
- CONFIG_USB_NET_SMSC75XX=y
- CONFIG_USB_NET_SMSC95XX=y
--- 
-2.1.4
+Yours,
+Linus Walleij
