@@ -1,56 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Oct 2015 09:58:06 -0700
-Subject: [PATCH 1/4] ARM: OMAP: dmtimer: check for fixed timers during
- config
-In-Reply-To: <5612A88E.1040809@ti.com>
-References: <201510040126.SfMisWv2%fengguang.wu@intel.com>
- <5612A88E.1040809@ti.com>
-Message-ID: <20151005165806.GE23801@atomide.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 5 Oct 2015 18:58:16 +0200
+Subject: [PATCH v4 4/4] misc: atmel_tclib: get and use slow clock
+In-Reply-To: <20151005152706.GC17612@ulmo>
+References: <1439717026-30634-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1439717026-30634-5-git-send-email-alexandre.belloni@free-electrons.com>
+ <20151005152706.GC17612@ulmo>
+Message-ID: <20151005165816.GI2694@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [151005 09:47]:
-> Tony,
+On 05/10/2015 at 17:27:06 +0200, Thierry Reding wrote :
+> On Sun, Aug 16, 2015 at 11:23:46AM +0200, Alexandre Belloni wrote:
+> > From: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > 
+> > Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
+> > hang") added a workaround for the slow clock as it is not properly handled
+> > by its users.
+> > 
+> > Get and use the slow clock as it is necessary for the timer counters.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > ---
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Cc: Thierry Reding <thierry.reding@gmail.com>
+> > Cc: linux-pwm at vger.kernel.org
+> >  drivers/clocksource/tcb_clksrc.c | 10 +++++++++-
+> >  drivers/misc/atmel_tclib.c       |  4 ++++
+> >  drivers/pwm/pwm-atmel-tcb.c      | 26 +++++++++++++++++++-------
+> >  include/linux/atmel_tc.h         |  1 +
+> >  4 files changed, 33 insertions(+), 8 deletions(-)
 > 
-> On 10/03/2015 12:29 PM, kbuild test robot wrote:
-> > Hi Suman,
-> > 
-> > [auto build test results on v4.3-rc3 -- if it's inappropriate base, please ignore]
-> > 
-> > config: arm-omap1_defconfig (attached as .config)
-> > reproduce:
-> >         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-> >         chmod +x ~/bin/make.cross
-> >         # save the attached .config to linux build tree
-> >         make.cross ARCH=arm 
-> > 
-> > All error/warnings (new ones prefixed by >>):
-> > 
-> >    arch/arm/plat-omap/dmtimer.c: In function 'omap_dm_timer_set_source':
-> >>> arch/arm/plat-omap/dmtimer.c:509:2: error: implicit declaration of function 'clk_hw_get_num_parents' [-Werror=implicit-function-declaration]
-> >      if (!clk_hw_get_num_parents(__clk_get_hw(timer->fclk)))
-> >      ^
-> >>> arch/arm/plat-omap/dmtimer.c:509:2: error: implicit declaration of function '__clk_get_hw' [-Werror=implicit-function-declaration]
-> >    cc1: some warnings being treated as errors
-> > 
-> > vim +/clk_hw_get_num_parents +509 arch/arm/plat-omap/dmtimer.c
-> > 
-> >    503			return pdata->set_timer_src(timer->pdev, source);
-> >    504	
-> >    505		if (IS_ERR(timer->fclk))
-> >    506			return -EINVAL;
-> >    507	
-> >    508		/* Check if the clock has parents if not no point checking */
-> >  > 509		if (!clk_hw_get_num_parents(__clk_get_hw(timer->fclk)))
-> >    510			return 0;
+> This doesn't seem to apply anymore. Does it need to be rebased? Or do I
+> need some other patch as a dependency?
 > 
-> CONFIG_COMMON_CLK is not defined for OMAP1. So, are you ok if I enclose
-> this within #ifdef CONFIG_COMMON_CLK?
 
-Yes, or maybe you can just clk_get_rate() on the 32k oscillator?
+It will apply cleanly after [PATCH v4 3/4] clocksource: tcb_clksrc: fix
+setup_clkevents error path
 
-Boards with no 32k oscillator should set the rate for that 0 zero.
+It already has Daniel's ack so you can also take it if you want. Else,
+we can take it through at91.
 
-Regards,
-
-Tony
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
