@@ -1,37 +1,88 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  5 Oct 2015 18:00:52 +0100
-Subject: [PATCH] serial: atmel: fix compiler warning on address cast
-Message-ID: <1444064452-12285-1-git-send-email-andre.przywara@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Mon,  5 Oct 2015 18:01:51 +0100
+Subject: [PATCH v2 02/22] arm64: Delay ELF HWCAP initialisation until all CPUs
+ are up
+In-Reply-To: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1444064531-25607-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Turning on KVM and LPAE support on top of a multi_v7_defconfig will
-produce a compiler warning in the Atmel serial driver:
-drivers/tty/serial/atmel_serial.c: In function 'atmel_verify_port':
-drivers/tty/serial/atmel_serial.c:2299:6: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-  if ((void *)port->mapbase != ser->iomem_base)
-      ^
+Delay the ELF HWCAP initialisation untill all the (enabled) CPUs are
+up, i.e, smp_cpus_done(). This is in preparation for detecting the
+common features across the CPUS and creating a consistent ELF HWCAP
+for the system.
 
-Fix that by using the cast on the right hand side instead, as similar
-code already does in other drivers.
-
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- drivers/tty/serial/atmel_serial.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/include/asm/cpufeature.h |    1 +
+ arch/arm64/kernel/setup.c           |   16 ++++++++--------
+ arch/arm64/kernel/smp.c             |    1 +
+ 3 files changed, 10 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index cd30a45..28039ce 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -2296,7 +2296,7 @@ static int atmel_verify_port(struct uart_port *port, struct serial_struct *ser)
- 		ret = -EINVAL;
- 	if (port->uartclk / 16 != ser->baud_base)
- 		ret = -EINVAL;
--	if ((void *)port->mapbase != ser->iomem_base)
-+	if (port->mapbase != (unsigned long)ser->iomem_base)
- 		ret = -EINVAL;
- 	if (port->iobase != ser->port)
- 		ret = -EINVAL;
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 1715707..b7769f6 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -81,6 +81,7 @@ static inline int __attribute_const__ cpuid_feature_extract_field(u64 features,
+ 	return (s64)(features << (64 - 4 - field)) >> (64 - 4);
+ }
+ 
++void __init setup_cpu_features(void);
+ 
+ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 			    const char *info);
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 60fc9a9..d149c18 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -195,20 +195,13 @@ static void __init smp_build_mpidr_hash(void)
+ 	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
+ }
+ 
+-static void __init setup_processor(void)
++void __init setup_cpu_features(void)
+ {
+ 	u64 features;
+ 	s64 block;
+ 	u32 cwg;
+ 	int cls;
+ 
+-	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
+-
+-	sprintf(init_utsname()->machine, ELF_PLATFORM);
+-	elf_hwcap = 0;
+-
+-	cpuinfo_store_boot_cpu();
+-
+ 	/*
+ 	 * Check for sane CTR_EL0.CWG value.
+ 	 */
+@@ -292,6 +285,13 @@ static void __init setup_processor(void)
+ #endif
+ }
+ 
++static void __init setup_processor(void)
++{
++	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
++	sprintf(init_utsname()->machine, ELF_PLATFORM);
++	cpuinfo_store_boot_cpu();
++}
++
+ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ {
+ 	void *dt_virt = fixmap_remap_fdt(dt_phys);
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 641f529..cb3e0d8 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -326,6 +326,7 @@ static void __init hyp_mode_check(void)
+ void __init smp_cpus_done(unsigned int max_cpus)
+ {
+ 	pr_info("SMP: Total of %d processors activated.\n", num_online_cpus());
++	setup_cpu_features();
+ 	hyp_mode_check();
+ 	apply_alternatives_all();
+ }
 -- 
-2.5.1
+1.7.9.5
