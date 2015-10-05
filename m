@@ -1,24 +1,31 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 05 Oct 2015 15:37:50 +0200
-Subject: [PATCH v3 0/7] Early ACPI probing infrastructure
-In-Reply-To: <alpine.DEB.2.11.1509301244080.4500@nanos>
-References: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
- <3881043.sWK6Pcr0HP@vostro.rjw.lan>
- <alpine.DEB.2.11.1509301244080.4500@nanos>
-Message-ID: <1814571.vT9zgBevD0@vostro.rjw.lan>
+Date: Mon, 05 Oct 2015 15:39:23 +0200
+Subject: [PATCH v5 0/5] Provide better MADT subtable sanity checks
+In-Reply-To: <560C0968.6020904@redhat.com>
+References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
+ <560BA4C9.7090607@huawei.com> <560C0968.6020904@redhat.com>
+Message-ID: <2808057.teMg2oCLf6@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 30, 2015 12:44:29 PM Thomas Gleixner wrote:
-> On Tue, 29 Sep 2015, Rafael J. Wysocki wrote:
-> > If you want me to apply this series, ACKs are needed for patches [3-7/7].
-> > 
-> > They are fine by me, but I'd also like to hear from the other maintainers.
+On Wednesday, September 30, 2015 10:10:16 AM Al Stone wrote:
+> On 09/30/2015 03:00 AM, Hanjun Guo wrote:
+> > On 2015/9/30 7:45, Al Stone wrote:
+> >> NB: this patch set is for use against the linux-pm bleeding edge branch.
+> >>
 > 
-> Acked-by: Thomas Gleixner <tglx@linutronix.de>
+> [snip...]
+> 
+> > 
+> > For this patch set,
+> > 
+> > Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > 
+> > Thanks
+> > Hanjun
+> 
+> Thanks, Hanjun!
 
-Thanks Thomas!
-
-Series applied.
+Series applied, thanks!
 
 Rafael
