@@ -1,101 +1,93 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Oct 2015 07:35:32 -0700
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20151005112304.GZ23801@atomide.com>
-References: <20150924090048.GA21626@n2100.arm.linux.org.uk>
- <20150924233756.GN23801@atomide.com>
- <20151001093325.GU21513@n2100.arm.linux.org.uk>
- <CAPDyKFpnqJBrtiBekikrNHAf-agZm12KnF9n+=+72HH=jti-KA@mail.gmail.com>
- <20151001100326.GV21513@n2100.arm.linux.org.uk>
- <20151005112304.GZ23801@atomide.com>
-Message-ID: <20151005143532.GA23801@atomide.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 5 Oct 2015 15:37:14 +0100
+Subject: [PATCH 1/2] dma: Add Freescale qDMA engine driver support
+In-Reply-To: <1441950833-27684-1-git-send-email-yao.yuan@freescale.com>
+References: <1441950833-27684-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <20151005143713.GC13501@vkoul-mobl.iind.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [151005 04:28]:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [151001 03:07]:
-> > On Thu, Oct 01, 2015 at 11:50:00AM +0200, Ulf Hansson wrote:
-> > > On 1 October 2015 at 11:33, Russell King - ARM Linux
-> > > <linux@arm.linux.org.uk> wrote:
-> > > > On Thu, Sep 24, 2015 at 04:37:56PM -0700, Tony Lindgren wrote:
-> > > >> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150924 02:04]:
-> > > >> > Nightly testing has revealed that both the OMAP3430 LDP and the OMAP4430
-> > > >> > SDP fail to boot due to lack of working MMC.  Both platforms fail to
-> > > >> > find their rootfs, which is on a SD card.
-> > > >> >
-> > > >> > The breakage occurred somewhere between trees of September 9th (commit
-> > > >> > 4e4adb2f4628) and September 12th (commit b0a1ea51bda4), so during the
-> > > >> > merge window.
-> > > >>
-> > > >> Yes sorry things got messed up in multiple ways :( I've summarized
-> > > >> the mess here earlier:
-> > > >>
-> > > >> http://article.gmane.org/gmane.linux.kernel.mmc/33911
-> > > >>
-> > > >> And today commit b9c93646fd5c ("regulator: pbias: program pbias register
-> > > >> offset in pbias driver") hit mainline so I'll send a pull request for
-> > > >> the related dts change.
-> > > >
-> > > > It's still broken and untestable.  We're 8 days off it being a full
-> > > > month worth of failed testing for OMAP3 and OMAP4 platforms.
-> > > >
-> > > > I think OMAP and MMC people need to do a post-mortem and work out why
-> > > > this happened, and how to stop it happening again in the future.
-> > > 
-> > > You are probably right!
-> > > 
-> > > I think I should have been more persistent when asking on how to deal
-> > > with these patches. Typically they should all have gone together via
-> > > one tree, or we needed a slower way forward keeping changes more
-> > > standalone.
-> > > 
-> > > Anyway, according to kernelci.org, which builds and boot my next
-> > > branch omap3/4 seems to boot now...
-> > > http://kernelci.org/boot/all/job/ulfh/kernel/v4.3-rc3-27-gf7734d097520/
-> > 
-> > It continues to fail here.
-> > 
-> > Okay, sod it, I'm at the point of just not giving a damn about whether
-> > OMAP3 and OMAP4 boot anymore.
-> > 
-> > I'm taking all OMAP platforms out of my boot farm.  I'm totally fed up
-> > with this kind of regression happening.  It's probably some config option
-> > that someone's recently introduced which defaults to being off, thereby
-> > breaking the ability for people to move forward without constantly having
-> > to re-configure.  This is not acceptable.
-> > 
-> > STOP BREAKING THE KERNEL.
-> 
-> I totally agree, this is unacceptable. And I'm fed up chasing driver
-> breakage and trying to test everything myself.
-> 
-> If Kihon is not starting to respond to these issues, we better start
-> reverting some of the MMC patches. And I'd say in the future non-trivial
-> patches really have to sit in linux next for two weeks before merging.
-> 
-> We have still the omap3 legacy booting issue remaining, and warnings
-> at least on omap4 overo.
+On Fri, Sep 11, 2015 at 01:53:52PM +0800, Yuan Yao wrote:
 
-Sorry i mean Kishon instead of Kihon above.
+> +Examples:
+> +
+> +	qdma: qdma at 8390000 {
+> +		compatible = "fsl,ls-qdma";
+> +		reg = <0x0 0x8380000 0x0 0x20000>;
+> +		interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-names = "qdma-tx", "qdma-err";
+> +		big-endian;
+> +		channels = <1>;
+> +	};
 
-Based on some tests it seems that the duovero unpaired regulator usage
-is fixed by reverting:
+Binding should be a separate patch
 
-c55d7a055364 ("mmc: host: omap_hsmmc: use regulator_is_enabled to
-find pbias status")
+> +FREESCALE qDMA DRIVER
+> +M:     Yuan Yao <yao.yuan@freescale.com>
+> +L:     linux-arm-kernel at lists.infradead.org
 
-And it seems that omap3 legacy MMC is broken earlier in the
-series with:
+not dmaengine ML ?
 
-7d607f917008 ("mmc: host: omap_hsmmc: use
-devm_regulator_get_optional() for vmmc")
 
-This one does not cleanly revert so have not yet tried reverting
-it.
+> +config FSL_QDMA
+> +	tristate "Freescale qDMA engine support"
+> +	select DMA_ENGINE
+> +	select DMA_VIRTUAL_CHANNELS
 
-I'm at ELCE so there may be delays for me debugging stuff. Anybody
-see obvious places to fix with those two patches above?
+No depends on arch, can it work on x86?
 
-Regards,
+> +static int fsl_qdma_alloc_chan_resources(struct dma_chan *chan)
+> +{
+> +	struct fsl_qdma_chan *fsl_chan = to_fsl_qdma_chan(chan);
+> +
+> +	fsl_chan->desc = NULL;
+> +	return 0;
+> +}
 
-Tony
+why do you need this it seems to do nothing
+
+> +static struct fsl_qdma_desc *fsl_qdma_alloc_desc(struct fsl_qdma_chan *fsl_chan)
+> +{
+> +	struct fsl_qdma_desc *fsl_desc;
+> +
+> +	fsl_desc = kzalloc(sizeof(*fsl_desc), GFP_NOWAIT);
+> +
+
+empty line here is not required
+
+> +	if (!fsl_desc)
+> +		return NULL;
+> +
+> +	fsl_desc->qchan = fsl_chan;
+> +
+> +	return fsl_desc;
+
+why not return fsl_desc->qchan ;
+
+
+> +	dma_cap_set(DMA_PRIVATE, fsl_qdma->dma_dev.cap_mask);
+> +	dma_cap_set(DMA_SLAVE, fsl_qdma->dma_dev.cap_mask);
+> +	dma_cap_set(DMA_MEMCPY, fsl_qdma->dma_dev.cap_mask);
+> +
+> +	fsl_qdma->dma_dev.dev = &pdev->dev;
+> +	fsl_qdma->dma_dev.device_alloc_chan_resources
+> +		= fsl_qdma_alloc_chan_resources;
+> +	fsl_qdma->dma_dev.device_free_chan_resources
+> +		= fsl_qdma_free_chan_resources;
+> +	fsl_qdma->dma_dev.device_tx_status = fsl_qdma_tx_status;
+> +	fsl_qdma->dma_dev.device_prep_dma_memcpy = fsl_qdma_prep_memcpy;
+> +	fsl_qdma->dma_dev.device_issue_pending = fsl_qdma_issue_pending;
+
+You claim DMA_SLAVE but no prep_ for that?
+
+> +
+> +static int __init fsl_qdma_init(void)
+> +{
+> +	return platform_driver_register(&fsl_qdma_driver);
+> +}
+> +subsys_initcall(fsl_qdma_init);
+why subsys_init?
+
+-- 
+~Vinod
