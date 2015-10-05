@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  5 Oct 2015 10:49:53 +0200
-Subject: [PATCH 13/17] ARM: pxa: raumfeld: Use PWM lookup table
+Date: Mon,  5 Oct 2015 10:49:54 +0200
+Subject: [PATCH 14/17] ARM: pxa: tavorevb: Use PWM lookup table
 In-Reply-To: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
 References: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1444034997-9805-14-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1444034997-9805-15-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,48 +17,57 @@ Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
 Cc: Robert Jarzmik <robert.jarzmik@free.fr>
 Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
 ---
- arch/arm/mach-pxa/raumfeld.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ arch/arm/mach-pxa/tavorevb.c | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-index 88f70c37ad0d..adb96d8d5b7a 100644
---- a/arch/arm/mach-pxa/raumfeld.c
-+++ b/arch/arm/mach-pxa/raumfeld.c
-@@ -29,6 +29,7 @@
- #include <linux/leds.h>
- #include <linux/w1-gpio.h>
- #include <linux/sched.h>
+diff --git a/arch/arm/mach-pxa/tavorevb.c b/arch/arm/mach-pxa/tavorevb.c
+index a71da84e784b..349a13a76215 100644
+--- a/arch/arm/mach-pxa/tavorevb.c
++++ b/arch/arm/mach-pxa/tavorevb.c
+@@ -18,6 +18,7 @@
+ #include <linux/clk.h>
+ #include <linux/gpio.h>
+ #include <linux/smc91x.h>
 +#include <linux/pwm.h>
  #include <linux/pwm_backlight.h>
- #include <linux/i2c.h>
- #include <linux/i2c/pxa-i2c.h>
-@@ -531,13 +532,15 @@ static void __init raumfeld_w1_init(void)
-  * Framebuffer device
-  */
  
-+static struct pwm_lookup raumfeld_pwm_lookup[] = {
-+	PWM_LOOKUP("pxa27x-pwm.0", 0, "pwm-backlight", NULL, 10000,
+ #include <asm/mach-types.h>
+@@ -168,21 +169,24 @@ static inline void tavorevb_init_keypad(void) {}
+ #endif /* CONFIG_KEYBOARD_PXA27x || CONFIG_KEYBOARD_PXA27x_MODULE */
+ 
+ #if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
++static struct pwm_lookup tavorevb_pwm_lookup[] = {
++	PWM_LOOKUP("pxa27x-pwm.0", 1, "pwm-backlight.0", NULL, 100000,
++		   PWM_POLARITY_NORMAL),
++	PWM_LOOKUP("pxa27x-pwm.0", 0, "pwm-backlight.1", NULL, 100000,
 +		   PWM_POLARITY_NORMAL),
 +};
 +
- /* PWM controlled backlight */
- static struct platform_pwm_backlight_data raumfeld_pwm_backlight_data = {
--	.pwm_id		= 0,
- 	.max_brightness	= 100,
- 	.dft_brightness	= 100,
--	/* 10000 ns = 10 ms ^= 100 kHz */
--	.pwm_period_ns	= 10000,
- 	.enable_gpio	= -1,
+ static struct platform_pwm_backlight_data tavorevb_backlight_data[] = {
+ 	[0] = {
+ 		/* primary backlight */
+-		.pwm_id		= 2,
+ 		.max_brightness	= 100,
+ 		.dft_brightness	= 100,
+-		.pwm_period_ns	= 100000,
+ 		.enable_gpio	= -1,
+ 	},
+ 	[1] = {
+ 		/* secondary backlight */
+-		.pwm_id		= 0,
+ 		.max_brightness	= 100,
+ 		.dft_brightness	= 100,
+-		.pwm_period_ns	= 100000,
+ 		.enable_gpio	= -1,
+ 	},
  };
+@@ -470,6 +474,7 @@ static struct pxafb_mach_info tavorevb_lcd_info = {
  
-@@ -618,6 +621,8 @@ static void __init raumfeld_lcd_init(void)
- 	} else {
- 		mfp_cfg_t raumfeld_pwm_pin_config = GPIO17_PWM0_OUT;
- 		pxa3xx_mfp_config(&raumfeld_pwm_pin_config, 1);
-+		pwm_add_table(raumfeld_pwm_lookup,
-+			      ARRAY_SIZE(raumfeld_pwm_lookup));
- 		platform_device_register(&raumfeld_pwm_backlight_device);
- 	}
- 
+ static void __init tavorevb_init_lcd(void)
+ {
++	pwm_add_table(tavorevb_pwm_lookup, ARRAY_SIZE(tavorevb_pwm_lookup));
+ 	platform_device_register(&tavorevb_backlight_devices[0]);
+ 	platform_device_register(&tavorevb_backlight_devices[1]);
+ 	pxa_set_fb_info(NULL, &tavorevb_lcd_info);
 -- 
 2.5.0
