@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  5 Oct 2015 14:47:16 +0200
-Subject: [PATCH 5/6] ARM: s3c64xx: hmt: Use PWM lookup table
+Date: Mon,  5 Oct 2015 14:47:17 +0200
+Subject: [PATCH 6/6] ARM: s3c64xx: smartq: Use PWM lookup table
 In-Reply-To: <1444049237-29878-1-git-send-email-thierry.reding@gmail.com>
 References: <1444049237-29878-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1444049237-29878-6-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1444049237-29878-7-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,51 +16,50 @@ Cc: Kukjin Kim <kgene@kernel.org>
 Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
 ---
- arch/arm/mach-s3c64xx/mach-hmt.c | 9 +++++++--
+ arch/arm/mach-s3c64xx/mach-smartq.c | 9 +++++++--
  1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
-index e4b087c58ee6..816b39d1e6d1 100644
---- a/arch/arm/mach-s3c64xx/mach-hmt.c
-+++ b/arch/arm/mach-s3c64xx/mach-hmt.c
-@@ -19,6 +19,7 @@
+diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
+index b3d13537a7f0..7b8a3699795c 100644
+--- a/arch/arm/mach-s3c64xx/mach-smartq.c
++++ b/arch/arm/mach-s3c64xx/mach-smartq.c
+@@ -14,6 +14,7 @@
  #include <linux/gpio.h>
- #include <linux/delay.h>
- #include <linux/leds.h>
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
 +#include <linux/pwm.h>
  #include <linux/pwm_backlight.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
-@@ -73,6 +74,11 @@ static struct s3c2410_uartcfg hmt_uartcfgs[] __initdata = {
- 	},
+ #include <linux/serial_core.h>
+ #include <linux/serial_s3c.h>
+@@ -139,6 +140,11 @@ static struct platform_device smartq_usb_otg_vbus_dev = {
+ 	.dev.platform_data	= &smartq_usb_otg_vbus_pdata,
  };
  
-+static struct pwm_lookup hmt_pwm_lookup[] = {
++static struct pwm_lookup smartq_pwm_lookup[] = {
 +	PWM_LOOKUP("samsung-pwm", 1, "pwm-backlight.0", NULL,
-+		   1000000000 / (100 * 256 * 20), PWM_POLARITY_NORMAL),
++		   1000000000 / (1000 * 20), PWM_POLARITY_NORMAL),
 +};
 +
- static int hmt_bl_init(struct device *dev)
+ static int smartq_bl_init(struct device *dev)
  {
- 	int ret;
-@@ -110,10 +116,8 @@ static void hmt_bl_exit(struct device *dev)
+     s3c_gpio_cfgpin(S3C64XX_GPF(15), S3C_GPIO_SFN(2));
+@@ -147,10 +153,8 @@ static int smartq_bl_init(struct device *dev)
  }
  
- static struct platform_pwm_backlight_data hmt_backlight_data = {
+ static struct platform_pwm_backlight_data smartq_backlight_data = {
 -	.pwm_id		= 1,
- 	.max_brightness	= 100 * 256,
- 	.dft_brightness	= 40 * 256,
--	.pwm_period_ns	= 1000000000 / (100 * 256 * 20),
+ 	.max_brightness	= 1000,
+ 	.dft_brightness	= 600,
+-	.pwm_period_ns	= 1000000000 / (1000 * 20),
  	.enable_gpio	= -1,
- 	.init		= hmt_bl_init,
- 	.notify		= hmt_bl_notify,
-@@ -268,6 +272,7 @@ static void __init hmt_machine_init(void)
- 	gpio_request(S3C64XX_GPF(13), "usb power");
- 	gpio_direction_output(S3C64XX_GPF(13), 1);
+ 	.init		= smartq_bl_init,
+ };
+@@ -396,5 +400,6 @@ void __init smartq_machine_init(void)
+ 	WARN_ON(smartq_usb_host_init());
+ 	WARN_ON(smartq_wifi_init());
  
-+	pwm_add_table(hmt_pwm_lookup, ARRAY_SIZE(hmt_pwm_lookup));
- 	platform_add_devices(hmt_devices, ARRAY_SIZE(hmt_devices));
++	pwm_add_table(smartq_pwm_lookup, ARRAY_SIZE(smartq_pwm_lookup));
+ 	platform_add_devices(smartq_devices, ARRAY_SIZE(smartq_devices));
  }
- 
 -- 
 2.5.0
