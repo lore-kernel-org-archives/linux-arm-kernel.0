@@ -1,44 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 5 Oct 2015 14:29:52 +0200
-Subject: "clk: sunxi: Add a simple gates driver" breaks kernel with older
- DTB
-In-Reply-To: <560E6768.6040705@citrix.com>
-References: <1443689231.16718.225.camel@citrix.com>
- <20151001204506.GR7104@lukather> <560E5767.2040502@citrix.com>
- <20151002105333.GA2696@lukather> <560E6768.6040705@citrix.com>
-Message-ID: <20151005122952.GJ2696@lukather>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 5 Oct 2015 13:32:42 +0100
+Subject: [PATCH] arm: perf: Fix userspace call stack walking
+In-Reply-To: <20151001172643.GA23147@dreric01-gentoo.localdomain>
+References: <20151001172643.GA23147@dreric01-gentoo.localdomain>
+Message-ID: <20151005123242.GB8818@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1;3803;0c
-On Fri, Oct 02, 2015 at 12:15:52PM +0100, Julien Grall wrote:
-> On 02/10/15 11:53, Maxime Ripard wrote:
-> >> If no, that's very unfortunate because it means that you can't
-> >> re-use the same DT across multiple OS and the DT provided by the
-> >> firmware (if it's built-in).
-> > 
-> > Is there such OS yet (and by that, I mean one that actually shares our
-> > DT, instead of rewriting its own) ?
+Hi Drew,
+
+On Thu, Oct 01, 2015 at 06:26:47PM +0100, Drew Richardson wrote:
+> I got some undeliverable responses the first time, sorry if you get this twice
 > 
-> Yes, FreeBSD started to support the DT provided by vendors which are
-> based on Linux bindings. The ARM64 port is only using DTB provided by
-> the hardware. For ARM32, there is still some platform using a specific
-> DT for FreeBSD but they are trying to get a ride.
+> ---
+> 
+> The layout of stack frames has changed over time. Testing using a
+> arm-linux-gnueabi gcc-4.2 from 2007 the original code didn't work but
+> this new code does. It also works with clang as well as newer versions
+> of gcc.
+> 
+> gcc has this layout for it's stackframes
+> 
+> caller_fp
+> caller_lr <- fp
+> 
+> However clang has this layout
+> 
+> caller_fp <- fp
+> caller_lr
 
-Well, it would have been good if they contacted us in the first place
-then, because this has never been considered seriously afaik, and we
-never stated that it actually was an ABI.
+Do you have any buy-in from the toolchain people that this won't continue
+to change over time? Adding more and more heuristics to walk the stack of
+binaries compiled using GCC x.y doesn't really scale...
 
-Maxime
+> Since the layouts are not compatible use a heuristic to determine for
+> each stack frame which layout is used.
+> 
+> Signed-off-by: Drew Richardson <drew.richardson@arm.com>
+> ---
+>  arch/arm/kernel/perf_callchain.c | 86 +++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 76 insertions(+), 10 deletions(-)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151005/ec250fa7/attachment.sig>
+Please can you update the compat stack walker in
+arch/arm64/kernel/perf_callchain.c too?
+
+Will
