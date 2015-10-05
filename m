@@ -1,59 +1,44 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 5 Oct 2015 15:55:57 +0100
-Subject: [GIT PULL] PSCI 1.0 implementation for v4.4
-Message-ID: <20151005145557.GA2705@red-moon>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 5 Oct 2015 16:00:32 +0100
+Subject: Regression: at24 eeprom writing
+In-Reply-To: <561238A9.1060406@lysator.liu.se>
+References: <560F0DB1.2020101@lysator.liu.se> <561238A9.1060406@lysator.liu.se>
+Message-ID: <20151005150032.GA12137@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+Hi Peter
 
-please consider pulling the following commits for v4.4.
+On Mon, Oct 05, 2015 at 10:45:29AM +0200, Peter Rosin wrote:
+> On 2015-10-03 01:05, Peter Rosin wrote:
 
-The commits update the PSCI kernel interface implementation
-so that it becomes compliant with the PSCI v1.0 specification and
-also provide code that enables PSCI based suspend-to-RAM
-based on the newly introduced PSCI v1.0 System Suspend call.
+[...]
 
-Thanks,
-Lorenzo
+> Ok, I found the culprit, and I double and triple checked it this time...
+> 
+> If I move to the very latest on the linux-3.18-at91 branch, the bug is
+> there too. Which made it vastly more palatable to bisect the bug.
+> 
+> The offender (in the 4.2 kernel) is 93563a6a71bb69dd324fc7354c60fb05f84aae6b
+> "i2c: at91: fix a race condition when using the DMA controller"
+> which is far more understandable. Ao, adding Cyrille Pitchen to the Cc list.
+> 
 
-The following changes since commit 9ffecb10283508260936b96022d4ee43a7798b4c:
+Thanks for the bisecting effort. I am currently at ELCE where I have
+met someone with the same kind of issue. Is it easily reproducible? It
+doesn't seem to be the case for him.
 
-  Linux 4.3-rc3 (2015-09-27 07:50:08 -0400)
+I'll have a look once back.
 
-are available in the git repository at:
+> If I add that patch on top of my previously working tree, it behaves just
+> as newer kernels, i.e. equally bad. The patch doesn't revert cleanly, but
+> reverting the patch and quick-n-dirty-fixing the conflict on vanilla 4.2
+> makes the problem go away.
+> 
+> I have attached what I actually reverted.
+> 
+> Cheers,
+> Peter
+> 
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/firmware/psci-1.0
-
-for you to fetch changes up to faf7ec4a92c0231d1079177095077c162eb9b466:
-
-  drivers: firmware: psci: add system suspend support (2015-10-02 14:35:17 +0100)
-
-----------------------------------------------------------------
-This pull request contains patches that enable PSCI 1.0 firmware
-features for arm/arm64 platforms:
-
-- Lorenzo Pieralisi adds support for the PSCI_FEATURES call, manages
-  various 1.0 specifications updates (power state id and functions return
-  values) and provides PSCI v1.0 DT bindings
-- Sudeep Holla implements PSCI v1.0 system suspend support to enable PSCI
-  based suspend-to-RAM
-
-----------------------------------------------------------------
-Lorenzo Pieralisi (5):
-      drivers: firmware: psci: add INVALID_ADDRESS return value
-      drivers: firmware: psci: move power_state handling to generic code
-      drivers: firmware: psci: add PSCI_FEATURES call
-      drivers: firmware: psci: add extended stateid power_state support
-      drivers: firmware: psci: add PSCI v1.0 DT bindings
-
-Sudeep Holla (2):
-      drivers: firmware: psci: define more generic PSCI_FN_NATIVE macro
-      drivers: firmware: psci: add system suspend support
-
- Documentation/devicetree/bindings/arm/psci.txt |   6 ++
- arch/arm64/kernel/psci.c                       |  14 ----
- drivers/firmware/psci.c                        | 107 ++++++++++++++++++++++---
- include/linux/psci.h                           |   2 +
- include/uapi/linux/psci.h                      |  18 +++++
- 5 files changed, 123 insertions(+), 24 deletions(-)
+Ludovic
