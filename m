@@ -1,82 +1,71 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon,  5 Oct 2015 10:12:22 +0100
-Subject: [PATCH v2] ARM: multi_v7_defconfig: Add missing QCOM APQ8064 configs
-Message-ID: <1444036342-7900-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Mon, 5 Oct 2015 11:17:41 +0200
+Subject: [PATCH v2] twd: Don't set CLOCK_EVT_FEAT_C3STOP unconditionally
+In-Reply-To: <56123BD0.8010005@sigmadesigns.com>
+References: <56123BD0.8010005@sigmadesigns.com>
+Message-ID: <56124035.6080107@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds few missing essential configs in the multi_v7_defconf,
-absense of some configs like PINCTRL_APQ8064 would prevent the board from
-getting access to serial.
+In 5388a6b266 ("ARM: SMP: Always enable clock event broadcast support")
+Russell noted that "the TWD local timers are unable to wake up the CPU
+when it is placed into a low power mode".
 
-cc: Kevin Hilman <khilman@kernel.org>
-cc: Tyler Baker <tyler.baker@linaro.org>
-Tested-by: Andy Gross <agross@codeaurora.org>
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+However, some platforms do not stop the TWD block in low-power mode,
+and can thus use it without setting up a broadcast device.
+
+Make the driver check for the "twd_never_stops" property, and set the
+CLOCK_EVT_FEAT_C3STOP flag accordingly.
+
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ Documentation/devicetree/bindings/arm/twd.txt | 3 +++
+ arch/arm/kernel/smp_twd.c                     | 5 ++++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 03deb7f..a242760 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -332,6 +332,7 @@ CONFIG_SPI_XILINX=y
- CONFIG_SPI_SPIDEV=y
- CONFIG_PINCTRL_AS3722=y
- CONFIG_PINCTRL_PALMAS=y
-+CONFIG_PINCTRL_APQ8064=y
- CONFIG_PINCTRL_APQ8084=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_GENERIC_PLATFORM=y
-@@ -391,6 +392,8 @@ CONFIG_MFD_MAX14577=y
- CONFIG_MFD_MAX77686=y
- CONFIG_MFD_MAX77693=y
- CONFIG_MFD_MAX8907=y
-+CONFIG_MFD_PM8921_CORE=y
-+CONFIG_MFD_QCOM_RPM=y
- CONFIG_MFD_SEC_CORE=y
- CONFIG_MFD_STMPE=y
- CONFIG_MFD_PALMAS=y
-@@ -415,6 +418,7 @@ CONFIG_REGULATOR_MAX77802=m
- CONFIG_REGULATOR_PALMAS=y
- CONFIG_REGULATOR_PBIAS=y
- CONFIG_REGULATOR_PWM=m
-+CONFIG_REGULATOR_QCOM_RPM=y
- CONFIG_REGULATOR_S2MPS11=y
- CONFIG_REGULATOR_S5M8767=y
- CONFIG_REGULATOR_TPS51632=y
-@@ -494,6 +498,7 @@ CONFIG_USB=y
- CONFIG_USB_XHCI_HCD=y
- CONFIG_USB_XHCI_MVEBU=y
- CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_MSM=m
- CONFIG_USB_EHCI_EXYNOS=y
- CONFIG_USB_EHCI_TEGRA=y
- CONFIG_USB_EHCI_HCD_STI=y
-@@ -514,6 +519,7 @@ CONFIG_KEYSTONE_USB_PHY=y
- CONFIG_OMAP_USB3=y
- CONFIG_USB_GPIO_VBUS=y
- CONFIG_USB_ISP1301=y
-+CONFIG_USB_MSM_OTG=m
- CONFIG_USB_MXS_PHY=y
- CONFIG_USB_RCAR_PHY=m
- CONFIG_USB_GADGET=y
-@@ -605,6 +611,7 @@ CONFIG_IMX_SDMA=y
- CONFIG_IMX_DMA=y
- CONFIG_MXS_DMA=y
- CONFIG_DMA_OMAP=y
-+CONFIG_QCOM_BAM_DMA=y
- CONFIG_XILINX_VDMA=y
- CONFIG_DMA_SUN6I=y
- CONFIG_STAGING=y
-@@ -651,6 +658,7 @@ CONFIG_PHY_HIX5HD2_SATA=y
- CONFIG_PWM_STI=m
- CONFIG_OMAP_USB2=y
- CONFIG_TI_PIPE3=y
-+CONFIG_PHY_QCOM_APQ8064_SATA=m
- CONFIG_PHY_MIPHY28LP=y
- CONFIG_PHY_MIPHY365X=y
- CONFIG_PHY_RCAR_GEN2=m
+diff --git a/Documentation/devicetree/bindings/arm/twd.txt b/Documentation/devicetree/bindings/arm/twd.txt
+index 75b8610939fa..7724665a437d 100644
+--- a/Documentation/devicetree/bindings/arm/twd.txt
++++ b/Documentation/devicetree/bindings/arm/twd.txt
+@@ -19,6 +19,9 @@ interrupts.
+ - reg : Specify the base address and the size of the TWD timer
+ 	register window.
+ 
++Optional
++- twd_never_stops : Don't set the CLOCK_EVT_FEAT_C3STOP flag.
++
+ Example:
+ 
+ 	twd-timer at 2c000600 {
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index e8f6d241881f..0ca825e24d9c 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -33,6 +33,7 @@ static unsigned long twd_timer_rate;
+ static DEFINE_PER_CPU(bool, percpu_setup_called);
+ 
+ static struct clock_event_device __percpu *twd_evt;
++static int feat_c3stop;
+ static int twd_ppi;
+ 
+ static void twd_set_mode(enum clock_event_mode mode,
+@@ -293,7 +294,7 @@ static void twd_timer_setup(void)
+ 
+ 	clk->name = "local_timer";
+ 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+-			CLOCK_EVT_FEAT_C3STOP;
++			feat_c3stop;
+ 	clk->rating = 350;
+ 	clk->set_mode = twd_set_mode;
+ 	clk->set_next_event = twd_set_next_event;
+@@ -345,6 +346,8 @@ static int __init twd_local_timer_common_register(struct device_node *np)
+ 		goto out_irq;
+ 
+ 	twd_get_clock(np);
++	if (!of_property_read_bool(np, "twd_never_stops"))
++		feat_c3stop = CLOCK_EVT_FEAT_C3STOP;
+ 
+ 	/*
+ 	 * Immediately configure the timer on the boot CPU, unless we need
 -- 
-1.9.1
+2.4.5
