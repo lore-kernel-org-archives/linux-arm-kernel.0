@@ -1,340 +1,108 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon,  5 Oct 2015 16:45:30 +0200
-Subject: [PATCH v9 2/4] PM / Domains: add setter for dev.pm_domain
-In-Reply-To: <1444056332-30246-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1444056332-30246-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1444056332-30246-3-git-send-email-tomeu.vizoso@collabora.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Oct 2015 07:51:27 -0700
+Subject: All OMAP platforms: MMC is broken
+In-Reply-To: <20151005143532.GA23801@atomide.com>
+References: <20150924090048.GA21626@n2100.arm.linux.org.uk>
+ <20150924233756.GN23801@atomide.com>
+ <20151001093325.GU21513@n2100.arm.linux.org.uk>
+ <CAPDyKFpnqJBrtiBekikrNHAf-agZm12KnF9n+=+72HH=jti-KA@mail.gmail.com>
+ <20151001100326.GV21513@n2100.arm.linux.org.uk>
+ <20151005112304.GZ23801@atomide.com>
+ <20151005143532.GA23801@atomide.com>
+Message-ID: <20151005145127.GB23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a function that sets the pointer to dev_pm_domain in struct device
-and that warns if the device has already finished probing. The reason
-why we want to enforce that is because in the general case that can
-cause problems and also that we can simplify code quite a bit if we can
-always assume that.
+* Tony Lindgren <tony@atomide.com> [151005 07:44]:
+> * Tony Lindgren <tony@atomide.com> [151005 04:28]:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [151001 03:07]:
+> > > On Thu, Oct 01, 2015 at 11:50:00AM +0200, Ulf Hansson wrote:
+> > > > On 1 October 2015 at 11:33, Russell King - ARM Linux
+> > > > <linux@arm.linux.org.uk> wrote:
+> > > > > On Thu, Sep 24, 2015 at 04:37:56PM -0700, Tony Lindgren wrote:
+> > > > >> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150924 02:04]:
+> > > > >> > Nightly testing has revealed that both the OMAP3430 LDP and the OMAP4430
+> > > > >> > SDP fail to boot due to lack of working MMC.  Both platforms fail to
+> > > > >> > find their rootfs, which is on a SD card.
+> > > > >> >
+> > > > >> > The breakage occurred somewhere between trees of September 9th (commit
+> > > > >> > 4e4adb2f4628) and September 12th (commit b0a1ea51bda4), so during the
+> > > > >> > merge window.
+> > > > >>
+> > > > >> Yes sorry things got messed up in multiple ways :( I've summarized
+> > > > >> the mess here earlier:
+> > > > >>
+> > > > >> http://article.gmane.org/gmane.linux.kernel.mmc/33911
+> > > > >>
+> > > > >> And today commit b9c93646fd5c ("regulator: pbias: program pbias register
+> > > > >> offset in pbias driver") hit mainline so I'll send a pull request for
+> > > > >> the related dts change.
+> > > > >
+> > > > > It's still broken and untestable.  We're 8 days off it being a full
+> > > > > month worth of failed testing for OMAP3 and OMAP4 platforms.
+> > > > >
+> > > > > I think OMAP and MMC people need to do a post-mortem and work out why
+> > > > > this happened, and how to stop it happening again in the future.
+> > > > 
+> > > > You are probably right!
+> > > > 
+> > > > I think I should have been more persistent when asking on how to deal
+> > > > with these patches. Typically they should all have gone together via
+> > > > one tree, or we needed a slower way forward keeping changes more
+> > > > standalone.
+> > > > 
+> > > > Anyway, according to kernelci.org, which builds and boot my next
+> > > > branch omap3/4 seems to boot now...
+> > > > http://kernelci.org/boot/all/job/ulfh/kernel/v4.3-rc3-27-gf7734d097520/
+> > > 
+> > > It continues to fail here.
+> > > 
+> > > Okay, sod it, I'm at the point of just not giving a damn about whether
+> > > OMAP3 and OMAP4 boot anymore.
+> > > 
+> > > I'm taking all OMAP platforms out of my boot farm.  I'm totally fed up
+> > > with this kind of regression happening.  It's probably some config option
+> > > that someone's recently introduced which defaults to being off, thereby
+> > > breaking the ability for people to move forward without constantly having
+> > > to re-configure.  This is not acceptable.
+> > > 
+> > > STOP BREAKING THE KERNEL.
+> > 
+> > I totally agree, this is unacceptable. And I'm fed up chasing driver
+> > breakage and trying to test everything myself.
+> > 
+> > If Kihon is not starting to respond to these issues, we better start
+> > reverting some of the MMC patches. And I'd say in the future non-trivial
+> > patches really have to sit in linux next for two weeks before merging.
+> > 
+> > We have still the omap3 legacy booting issue remaining, and warnings
+> > at least on omap4 overo.
+> 
+> Sorry i mean Kishon instead of Kihon above.
+> 
+> Based on some tests it seems that the duovero unpaired regulator usage
+> is fixed by reverting:
+> 
+> c55d7a055364 ("mmc: host: omap_hsmmc: use regulator_is_enabled to
+> find pbias status")
 
-This patch also changes all current code that directly sets the
-dev.pm_domain pointer.
+With commit c55d7a055364 my guess is that the PBIAS regulator is
+already on from an earlier MMC probe and getting re-enabled when
+a deferred probe happens?
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
+> And it seems that omap3 legacy MMC is broken earlier in the
+> series with:
+> 
+> 7d607f917008 ("mmc: host: omap_hsmmc: use
+> devm_regulator_get_optional() for vmmc")
+> 
+> This one does not cleanly revert so have not yet tried reverting
+> it.
 
-Changes in v9:
-- Add docs noting the need for the device lock to be held before calling
-  dev_pm_domain_set()
+And with commit 7d607f917008 I'm guessing we can't return an
+error if the PBIAS regulator does not exist as that's not there
+for the legacy booting.
 
-Changes in v8:
-- Add dev_pm_domain_set() and update code to use it
+Regards,
 
- arch/arm/mach-omap2/omap_device.c |  7 ++++---
- drivers/acpi/acpi_lpss.c          |  5 +++--
- drivers/acpi/device_pm.c          |  5 +++--
- drivers/base/power/clock_ops.c    |  5 +++--
- drivers/base/power/common.c       | 21 +++++++++++++++++++++
- drivers/base/power/domain.c       |  4 ++--
- drivers/gpu/vga/vga_switcheroo.c  | 10 +++++-----
- drivers/misc/mei/pci-me.c         |  5 +++--
- drivers/misc/mei/pci-txe.c        |  5 +++--
- include/linux/pm_domain.h         |  3 +++
- 10 files changed, 50 insertions(+), 20 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index 4cb8fd9f741f..204101d11632 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -32,6 +32,7 @@
- #include <linux/io.h>
- #include <linux/clk.h>
- #include <linux/clkdev.h>
-+#include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- #include <linux/of.h>
- #include <linux/notifier.h>
-@@ -168,7 +169,7 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
- 			r->name = dev_name(&pdev->dev);
- 	}
- 
--	pdev->dev.pm_domain = &omap_device_pm_domain;
-+	dev_pm_domain_set(&pdev->dev, &omap_device_pm_domain);
- 
- 	if (device_active) {
- 		omap_device_enable(pdev);
-@@ -180,7 +181,7 @@ odbfd_exit1:
- odbfd_exit:
- 	/* if data/we are at fault.. load up a fail handler */
- 	if (ret)
--		pdev->dev.pm_domain = &omap_device_fail_pm_domain;
-+		dev_pm_domain_set(&pdev->dev, &omap_device_fail_pm_domain);
- 
- 	return ret;
- }
-@@ -701,7 +702,7 @@ int omap_device_register(struct platform_device *pdev)
- {
- 	pr_debug("omap_device: %s: registering\n", pdev->name);
- 
--	pdev->dev.pm_domain = &omap_device_pm_domain;
-+	dev_pm_domain_set(&pdev->dev, &omap_device_pm_domain);
- 	return platform_device_add(pdev);
- }
- 
-diff --git a/drivers/acpi/acpi_lpss.c b/drivers/acpi/acpi_lpss.c
-index f51bd0d0bc17..cc6e1abc69b3 100644
---- a/drivers/acpi/acpi_lpss.c
-+++ b/drivers/acpi/acpi_lpss.c
-@@ -17,6 +17,7 @@
- #include <linux/io.h>
- #include <linux/platform_device.h>
- #include <linux/platform_data/clk-lpss.h>
-+#include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- #include <linux/delay.h>
- 
-@@ -706,7 +707,7 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
- 
- 	switch (action) {
- 	case BUS_NOTIFY_ADD_DEVICE:
--		pdev->dev.pm_domain = &acpi_lpss_pm_domain;
-+		dev_pm_domain_set(&pdev->dev, &acpi_lpss_pm_domain);
- 		if (pdata->dev_desc->flags & LPSS_LTR)
- 			return sysfs_create_group(&pdev->dev.kobj,
- 						  &lpss_attr_group);
-@@ -714,7 +715,7 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
- 	case BUS_NOTIFY_DEL_DEVICE:
- 		if (pdata->dev_desc->flags & LPSS_LTR)
- 			sysfs_remove_group(&pdev->dev.kobj, &lpss_attr_group);
--		pdev->dev.pm_domain = NULL;
-+		dev_pm_domain_set(&pdev->dev, NULL);
- 		break;
- 	default:
- 		break;
-diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
-index 4806b7f856c4..8c5955bf9bbf 100644
---- a/drivers/acpi/device_pm.c
-+++ b/drivers/acpi/device_pm.c
-@@ -22,6 +22,7 @@
- #include <linux/export.h>
- #include <linux/mutex.h>
- #include <linux/pm_qos.h>
-+#include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- 
- #include "internal.h"
-@@ -1076,7 +1077,7 @@ static void acpi_dev_pm_detach(struct device *dev, bool power_off)
- 	struct acpi_device *adev = ACPI_COMPANION(dev);
- 
- 	if (adev && dev->pm_domain == &acpi_general_pm_domain) {
--		dev->pm_domain = NULL;
-+		dev_pm_domain_set(dev, NULL);
- 		acpi_remove_pm_notifier(adev);
- 		if (power_off) {
- 			/*
-@@ -1128,7 +1129,7 @@ int acpi_dev_pm_attach(struct device *dev, bool power_on)
- 		return -EBUSY;
- 
- 	acpi_add_pm_notifier(adev, dev, acpi_pm_notify_work_func);
--	dev->pm_domain = &acpi_general_pm_domain;
-+	dev_pm_domain_set(dev, &acpi_general_pm_domain);
- 	if (power_on) {
- 		acpi_dev_pm_full_power(adev);
- 		acpi_device_wakeup(adev, ACPI_STATE_S0, false);
-diff --git a/drivers/base/power/clock_ops.c b/drivers/base/power/clock_ops.c
-index 652b5a367c1f..e80fda6c03a9 100644
---- a/drivers/base/power/clock_ops.c
-+++ b/drivers/base/power/clock_ops.c
-@@ -15,6 +15,7 @@
- #include <linux/clkdev.h>
- #include <linux/slab.h>
- #include <linux/err.h>
-+#include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- 
- #ifdef CONFIG_PM
-@@ -346,7 +347,7 @@ static int pm_clk_notify(struct notifier_block *nb,
- 		if (error)
- 			break;
- 
--		dev->pm_domain = clknb->pm_domain;
-+		dev_pm_domain_set(dev, clknb->pm_domain);
- 		if (clknb->con_ids[0]) {
- 			for (con_id = clknb->con_ids; *con_id; con_id++)
- 				pm_clk_add(dev, *con_id);
-@@ -359,7 +360,7 @@ static int pm_clk_notify(struct notifier_block *nb,
- 		if (dev->pm_domain != clknb->pm_domain)
- 			break;
- 
--		dev->pm_domain = NULL;
-+		dev_pm_domain_set(dev, NULL);
- 		pm_clk_destroy(dev);
- 		break;
- 	}
-diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
-index f32b802b98f4..a70f8a5cdfd7 100644
---- a/drivers/base/power/common.c
-+++ b/drivers/base/power/common.c
-@@ -128,3 +128,24 @@ void dev_pm_domain_detach(struct device *dev, bool power_off)
- 		dev->pm_domain->detach(dev, power_off);
- }
- EXPORT_SYMBOL_GPL(dev_pm_domain_detach);
-+
-+/**
-+ * dev_pm_domain_set - Set PM domain of a device.
-+ * @dev: Device whose PM domain is to be set.
-+ * @pd: PM domain to be set, or NULL.
-+ *
-+ * Sets the PM domain the device belongs to. The PM domain of a device needs
-+ * to be set before its probe finishes (it's bound to a driver).
-+ *
-+ * This function must be called with the device lock held.
-+ */
-+void dev_pm_domain_set(struct device *dev, struct dev_pm_domain *pd)
-+{
-+	if (dev->pm_domain == pd)
-+		return;
-+
-+	WARN(device_is_bound(dev),
-+	     "PM domains can only be changed for unbound devices\n");
-+	dev->pm_domain = pd;
-+}
-+EXPORT_SYMBOL_GPL(dev_pm_domain_set);
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 16550c63d611..b75d02aa8d93 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1240,7 +1240,7 @@ static struct generic_pm_domain_data *genpd_alloc_dev_data(struct device *dev,
- 	}
- 
- 	dev->power.subsys_data->domain_data = &gpd_data->base;
--	dev->pm_domain = &genpd->domain;
-+	dev_pm_domain_set(dev, &genpd->domain);
- 
- 	spin_unlock_irq(&dev->power.lock);
- 
-@@ -1259,7 +1259,7 @@ static void genpd_free_dev_data(struct device *dev,
- {
- 	spin_lock_irq(&dev->power.lock);
- 
--	dev->pm_domain = NULL;
-+	dev_pm_domain_set(dev, NULL);
- 	dev->power.subsys_data->domain_data = NULL;
- 
- 	spin_unlock_irq(&dev->power.lock);
-diff --git a/drivers/gpu/vga/vga_switcheroo.c b/drivers/gpu/vga/vga_switcheroo.c
-index 21060668fd25..2c3208ea6de4 100644
---- a/drivers/gpu/vga/vga_switcheroo.c
-+++ b/drivers/gpu/vga/vga_switcheroo.c
-@@ -665,17 +665,17 @@ int vga_switcheroo_init_domain_pm_ops(struct device *dev,
- 		domain->ops.runtime_suspend = vga_switcheroo_runtime_suspend;
- 		domain->ops.runtime_resume = vga_switcheroo_runtime_resume;
- 
--		dev->pm_domain = domain;
-+		dev_pm_domain_set(dev, domain);
- 		return 0;
- 	}
--	dev->pm_domain = NULL;
-+	dev_pm_domain_set(dev, NULL);
- 	return -EINVAL;
- }
- EXPORT_SYMBOL(vga_switcheroo_init_domain_pm_ops);
- 
- void vga_switcheroo_fini_domain_pm_ops(struct device *dev)
- {
--	dev->pm_domain = NULL;
-+	dev_pm_domain_set(dev, NULL);
- }
- EXPORT_SYMBOL(vga_switcheroo_fini_domain_pm_ops);
- 
-@@ -719,10 +719,10 @@ vga_switcheroo_init_domain_pm_optimus_hdmi_audio(struct device *dev,
- 		domain->ops.runtime_resume =
- 			vga_switcheroo_runtime_resume_hdmi_audio;
- 
--		dev->pm_domain = domain;
-+		dev_pm_domain_set(dev, domain);
- 		return 0;
- 	}
--	dev->pm_domain = NULL;
-+	dev_pm_domain_set(dev, NULL);
- 	return -EINVAL;
- }
- EXPORT_SYMBOL(vga_switcheroo_init_domain_pm_optimus_hdmi_audio);
-diff --git a/drivers/misc/mei/pci-me.c b/drivers/misc/mei/pci-me.c
-index 27678d8154e0..75fc9c688df8 100644
---- a/drivers/misc/mei/pci-me.c
-+++ b/drivers/misc/mei/pci-me.c
-@@ -31,6 +31,7 @@
- #include <linux/jiffies.h>
- #include <linux/interrupt.h>
- 
-+#include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- 
- #include <linux/mei.h>
-@@ -436,7 +437,7 @@ static inline void mei_me_set_pm_domain(struct mei_device *dev)
- 		dev->pg_domain.ops.runtime_resume = mei_me_pm_runtime_resume;
- 		dev->pg_domain.ops.runtime_idle = mei_me_pm_runtime_idle;
- 
--		pdev->dev.pm_domain = &dev->pg_domain;
-+		dev_pm_domain_set(&pdev->dev, &dev->pg_domain);
- 	}
- }
- 
-@@ -448,7 +449,7 @@ static inline void mei_me_set_pm_domain(struct mei_device *dev)
- static inline void mei_me_unset_pm_domain(struct mei_device *dev)
- {
- 	/* stop using pm callbacks if any */
--	dev->dev->pm_domain = NULL;
-+	dev_pm_domain_set(dev->dev, NULL);
- }
- 
- static const struct dev_pm_ops mei_me_pm_ops = {
-diff --git a/drivers/misc/mei/pci-txe.c b/drivers/misc/mei/pci-txe.c
-index 0882c0201907..71f8a7475717 100644
---- a/drivers/misc/mei/pci-txe.c
-+++ b/drivers/misc/mei/pci-txe.c
-@@ -27,6 +27,7 @@
- #include <linux/jiffies.h>
- #include <linux/interrupt.h>
- #include <linux/workqueue.h>
-+#include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- 
- #include <linux/mei.h>
-@@ -388,7 +389,7 @@ static inline void mei_txe_set_pm_domain(struct mei_device *dev)
- 		dev->pg_domain.ops.runtime_resume = mei_txe_pm_runtime_resume;
- 		dev->pg_domain.ops.runtime_idle = mei_txe_pm_runtime_idle;
- 
--		pdev->dev.pm_domain = &dev->pg_domain;
-+		dev_pm_domain_set(&pdev->dev, &dev->pg_domain);
- 	}
- }
- 
-@@ -400,7 +401,7 @@ static inline void mei_txe_set_pm_domain(struct mei_device *dev)
- static inline void mei_txe_unset_pm_domain(struct mei_device *dev)
- {
- 	/* stop using pm callbacks if any */
--	dev->dev->pm_domain = NULL;
-+	dev_pm_domain_set(dev->dev, NULL);
- }
- 
- static const struct dev_pm_ops mei_txe_pm_ops = {
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index b1cf7e797892..4ae4b14fb7b4 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -306,12 +306,15 @@ static inline int of_genpd_add_provider_onecell(struct device_node *np,
- #ifdef CONFIG_PM
- extern int dev_pm_domain_attach(struct device *dev, bool power_on);
- extern void dev_pm_domain_detach(struct device *dev, bool power_off);
-+extern void dev_pm_domain_set(struct device *dev, struct dev_pm_domain *pd);
- #else
- static inline int dev_pm_domain_attach(struct device *dev, bool power_on)
- {
- 	return -ENODEV;
- }
- static inline void dev_pm_domain_detach(struct device *dev, bool power_off) {}
-+static inline void dev_pm_domain_set(struct device *dev,
-+				     struct dev_pm_domain *pd) {}
- #endif
- 
- #endif /* _LINUX_PM_DOMAIN_H */
--- 
-2.4.3
+Tony
