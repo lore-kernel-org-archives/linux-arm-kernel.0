@@ -1,59 +1,46 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 06 Oct 2015 07:57:33 +0900
-Subject: [GIT PULL] Samsung fixes for v4.3
-Message-ID: <5613005D.70709@kernel.org>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 5 Oct 2015 18:28:23 -0500
+Subject: [PATCH v2 3/4] ARM: dts: DRA7: Add timer12 node
+In-Reply-To: <1444087704-1429-1-git-send-email-s-anna@ti.com>
+References: <1444087704-1429-1-git-send-email-s-anna@ti.com>
+Message-ID: <1444087704-1429-4-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+Add the DT node for Timer12 present on DRA7 family of
+SoCs. Timer12 is present in PD_WKUPAON power domain, and
+has the same capabilities as the other timers, except for
+the fact that it serves as a secure timer on HS devices
+and is clocked only from the secure 32K clock.
 
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+The node is marked disabled for now, and the kernel should
+refrain from using this secure timer on HS devices.
 
-are available in the git repository at:
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ arch/arm/boot/dts/dra7.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-fixes
-
-for you to fetch changes up to 4776dbb3583d10969f991cc89da781884c15979d:
-
-  Merge tag 'samsung-fixes-4.3' of http://github.com/krzk/linux into
-v4.3-samsung-fixes (2015-09-30 15:42:39 +0900)
-
-----------------------------------------------------------------
-
-Samsung fixes for v4.3
-
-- fix invalid clock used for FIMD IOMMU
-- fix thermal boot issue smdk5250-smdk5250
-- fix S2R on exynos4412 trats2 boards
-- fix LEDs on exynos5422-odroidxu3-common
-- fix booting of all 8 cores on exynos542x
-
-----------------------------------------------------------------
-Bartlomiej Zolnierkiewicz (1):
-      ARM: dts: add suspend opp to exynos4412
-
-Chanho Park (1):
-      ARM: EXYNOS: reset Little cores when cpu is up
-
-Joonyoung Shim (1):
-      ARM: dts: Fix wrong clock binding for sysmmu_fimd1_1 on exynos5420
-
-Krzysztof Kozlowski (1):
-      ARM: dts: Fix LEDs on exynos5422-odroidxu3
-
-Kukjin Kim (1):
-      Merge tag 'samsung-fixes-4.3' of http://github.com/krzk/linux into
-v4.3-samsung-fixes
-
-Yadwinder Singh Brar (1):
-      ARM: dts: Fix bootup thermal issue on smdk5250
-
- arch/arm/boot/dts/exynos4412.dtsi                  |  1 +
- arch/arm/boot/dts/exynos5250-smdk5250.dts          |  1 +
- arch/arm/boot/dts/exynos5420.dtsi                  |  2 +-
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 -
- arch/arm/mach-exynos/mcpm-exynos.c                 | 27
-+++++++++++++++++++++-
- arch/arm/mach-exynos/regs-pmu.h                    |  6 +++++
- 6 files changed, 35 insertions(+), 3 deletions(-)
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index e289c706d27d..37d632dad576 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -762,6 +762,16 @@
+ 			ti,hwmods = "timer11";
+ 		};
+ 
++		timer12: timer at 4ae20000 {
++			compatible = "ti,omap5430-timer";
++			reg = <0x4ae20000 0x80>;
++			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
++			ti,hwmods = "timer12";
++			ti,timer-alwon;
++			ti,timer-secure;
++			status = "disabled";
++		};
++
+ 		timer13: timer at 48828000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48828000 0x80>;
+-- 
+2.6.0
