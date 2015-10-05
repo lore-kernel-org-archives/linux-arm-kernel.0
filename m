@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  5 Oct 2015 10:49:50 +0200
-Subject: [PATCH 10/17] ARM: pxa: palmtc: Use PWM lookup table
+Date: Mon,  5 Oct 2015 10:49:51 +0200
+Subject: [PATCH 11/17] ARM: pxa: palmte2: Use PWM lookup table
 In-Reply-To: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
 References: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1444034997-9805-11-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1444034997-9805-12-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,45 +17,51 @@ Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
 Cc: Robert Jarzmik <robert.jarzmik@free.fr>
 Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
 ---
- arch/arm/mach-pxa/palmtc.c | 9 +++++++--
+ arch/arm/mach-pxa/palmte2.c | 9 +++++++--
  1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
-index 7691c974ca4b..aebf6de62468 100644
---- a/arch/arm/mach-pxa/palmtc.c
-+++ b/arch/arm/mach-pxa/palmtc.c
-@@ -18,6 +18,7 @@
- #include <linux/delay.h>
- #include <linux/irq.h>
+diff --git a/arch/arm/mach-pxa/palmte2.c b/arch/arm/mach-pxa/palmte2.c
+index 956fd24ee6fd..e64bb4326e69 100644
+--- a/arch/arm/mach-pxa/palmte2.c
++++ b/arch/arm/mach-pxa/palmte2.c
+@@ -21,6 +21,7 @@
+ #include <linux/gpio_keys.h>
  #include <linux/input.h>
+ #include <linux/pda_power.h>
 +#include <linux/pwm.h>
  #include <linux/pwm_backlight.h>
  #include <linux/gpio.h>
- #include <linux/input/matrix_keypad.h>
-@@ -166,11 +167,14 @@ static inline void palmtc_keys_init(void) {}
+ #include <linux/wm97xx.h>
+@@ -138,6 +139,11 @@ static struct platform_device palmte2_pxa_keys = {
+ /******************************************************************************
   * Backlight
   ******************************************************************************/
- #if defined(CONFIG_BACKLIGHT_PWM) || defined(CONFIG_BACKLIGHT_PWM_MODULE)
-+static struct pwm_lookup palmtc_pwm_lookup[] = {
-+	PWM_LOOKUP("pxa25x-pwm.1", 0, "pwm-backlight.0", NULL, PALMTC_PERIOD_NS,
-+		   PWM_PERIOD_NORMAL),
++static struct pwm_lookup palmte2_pwm_lookup[] = {
++	PWM_LOOKUP("pxa25x-pwm.0", 0, "pwm-backlight.0", NULL,
++		   PALMTE2_PERIOD_NS, PWM_POLARITY_NORMAL),
 +};
 +
- static struct platform_pwm_backlight_data palmtc_backlight_data = {
--	.pwm_id		= 1,
- 	.max_brightness	= PALMTC_MAX_INTENSITY,
- 	.dft_brightness	= PALMTC_MAX_INTENSITY,
--	.pwm_period_ns	= PALMTC_PERIOD_NS,
- 	.enable_gpio	= GPIO_NR_PALMTC_BL_POWER,
- };
- 
-@@ -184,6 +188,7 @@ static struct platform_device palmtc_backlight = {
- 
- static void __init palmtc_pwm_init(void)
- {
-+	pwm_add_table(palmtc_pwm_lookup, ARRAY_SIZE(palmtc_pwm_lookup));
- 	platform_device_register(&palmtc_backlight);
+ static struct gpio palmte_bl_gpios[] = {
+ 	{ GPIO_NR_PALMTE2_BL_POWER, GPIOF_INIT_LOW, "Backlight power" },
+ 	{ GPIO_NR_PALMTE2_LCD_POWER, GPIOF_INIT_LOW, "LCD power" },
+@@ -161,10 +167,8 @@ static void palmte2_backlight_exit(struct device *dev)
  }
- #else
+ 
+ static struct platform_pwm_backlight_data palmte2_backlight_data = {
+-	.pwm_id		= 0,
+ 	.max_brightness	= PALMTE2_MAX_INTENSITY,
+ 	.dft_brightness	= PALMTE2_MAX_INTENSITY,
+-	.pwm_period_ns	= PALMTE2_PERIOD_NS,
+ 	.enable_gpio	= -1,
+ 	.init		= palmte2_backlight_init,
+ 	.notify		= palmte2_backlight_notify,
+@@ -355,6 +359,7 @@ static void __init palmte2_init(void)
+ 	pxa_set_ac97_info(&palmte2_ac97_pdata);
+ 	pxa_set_ficp_info(&palmte2_ficp_platform_data);
+ 
++	pwm_add_table(palmte2_pwm_lookup, ARRAY_SIZE(palmte2_pwm_lookup));
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ }
+ 
 -- 
 2.5.0
