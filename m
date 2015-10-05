@@ -1,55 +1,92 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Mon, 5 Oct 2015 13:50:07 +0000
-Subject: [PATCH v6 2/2] dmaengine: Add Xilinx AXI Central Direct Memory
- Access Engine driver support
-In-Reply-To: <20151005133907.GA13501@vkoul-mobl.iind.intel.com>
-References: <1441629198-17663-1-git-send-email-appanad@xilinx.com>
- <20151005133907.GA13501@vkoul-mobl.iind.intel.com>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A4EC176@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 5 Oct 2015 15:53:30 +0200
+Subject: [PATCH 1/3] ARM: OMAP2+: N900: always enable IBE bit
+In-Reply-To: <1437612483-30160-2-git-send-email-sre@kernel.org>
+References: <1437612483-30160-1-git-send-email-sre@kernel.org>
+ <1437612483-30160-2-git-send-email-sre@kernel.org>
+Message-ID: <20151005135330.GA12068@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Hi!
 
-	
-> -----Original Message-----
-> From: Vinod Koul [mailto:vinod.koul at intel.com]
-> Sent: Monday, October 05, 2015 7:09 PM
-> To: Appana Durga Kedareswara Rao
-> Cc: dan.j.williams at intel.com; Anirudha Sarangi; Michal Simek; Soren Brinkmann;
-> Appana Durga Kedareswara Rao; dmaengine at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH v6 2/2] dmaengine: Add Xilinx AXI Central Direct Memory
-> Access Engine driver support
+> The kernel's workaround for Errata 430973 consists of a BTAC/BTB
+> flush at context switch. This requires the IBE bit being set, which
+> should normally be done by the bootloader.
 > 
-> On Mon, Sep 07, 2015 at 06:03:18PM +0530, Kedareswara rao Appana wrote:
-> > This is the driver for the AXI Central Direct Memory Access (AXI
-> > CDMA) core, which is a soft Xilinx IP core that provides
-> > high-bandwidth Direct Memory Access (DMA) between a memory-mapped
-> > source address and a memory-mapped destination address.
+> Since the Nokia N900's bootloader is not easily replaceable,
+> a pdata quirk enables the IBE bit for the Nokia N900. Until
+> e748994f5cc5, the flush at context switch required
+> CONFIG_ARM_ERRATA_430973, so the same check has been used
+> for setting the IBE bit.
 > 
-> Where is the 1/2 here ? I have only this one in my mails..
+> Since all sold N900s are assumed to be affected, the guard
+> can be removed now, so that the IBE bit is always set.
 
-You are there in the 1/2 not the dmaengine at vger.kernel.org.
+Is the qemu affected?
 
-./scripts/get_maintainer.pl -f Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
-Rob Herring <robh+dt@kernel.org> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
-Pawel Moll <pawel.moll@arm.com> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
-Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
-Ian Campbell <ijc+devicetree@hellion.org.uk> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
-Kumar Gala <galak@codeaurora.org> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
-Michal Simek <michal.simek@xilinx.com> (supporter:ARM/ZYNQ ARCHITECTURE)
-"S?ren Brinkmann" <soren.brinkmann@xilinx.com> (reviewer)
-Kedareswara rao Appana <appanad@xilinx.com> (commit_signer:1/1=100%,authored:1/1=100%,added_lines:54/54=100%)
-devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
-linux-arm-kernel at lists.infradead.org (moderated list:ARM/ZYNQ ARCHITECTURE)
-linux-kernel at vger.kernel.org (open list)
+Does qemu have enough secure support not to fail on this?
 
-If you want me to resend the patch will resend
+Best regards,
 
-Regards,
-Kedar.
-
+							Pavel
 > 
-> --
-> ~Vinod
+> Signed-off-by: Sebastian Reichel <sre@kernel.org>
+> ---
+>  arch/arm/mach-omap2/board-rx51.c   |  2 --
+>  arch/arm/mach-omap2/pdata-quirks.c | 11 ++---------
+>  2 files changed, 2 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
+> index 2d1e5a6..3df01cc 100644
+> --- a/arch/arm/mach-omap2/board-rx51.c
+> +++ b/arch/arm/mach-omap2/board-rx51.c
+> @@ -108,11 +108,9 @@ static void __init rx51_init(void)
+>  	rx51_peripherals_init();
+>  
+>  	if (omap_type() == OMAP2_DEVICE_TYPE_SEC) {
+> -#ifdef CONFIG_ARM_ERRATA_430973
+>  		pr_info("RX-51: Enabling ARM errata 430973 workaround\n");
+>  		/* set IBE to 1 */
+>  		rx51_secure_update_aux_cr(BIT(6), 0);
+> -#endif
+>  	}
+>  
+>  	/* Ensure SDRC pins are mux'd for self-refresh */
+> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+> index 821171c..0aa438d 100644
+> --- a/arch/arm/mach-omap2/pdata-quirks.c
+> +++ b/arch/arm/mach-omap2/pdata-quirks.c
+> @@ -249,18 +249,11 @@ static void __init nokia_n900_legacy_init(void)
+>  	hsmmc2_internal_input_clk();
+>  
+>  	if (omap_type() == OMAP2_DEVICE_TYPE_SEC) {
+> -		if (IS_ENABLED(CONFIG_ARM_ERRATA_430973)) {
+> -			pr_info("RX-51: Enabling ARM errata 430973 workaround\n");
+> -			/* set IBE to 1 */
+> -			rx51_secure_update_aux_cr(BIT(6), 0);
+> -		} else {
+> -			pr_warn("RX-51: Not enabling ARM errata 430973 workaround\n");
+> -			pr_warn("Thumb binaries may crash randomly without this workaround\n");
+> -		}
+> +		pr_info("RX-51: Enabling ARM errata 430973 workaround\n");
+> +		rx51_secure_update_aux_cr(BIT(6), 0); /* set IBE to 1 */
+>  
+>  		pr_info("RX-51: Registring OMAP3 HWRNG device\n");
+>  		platform_device_register(&omap3_rom_rng_device);
+> -
+>  	}
+>  }
+>  
+> -- 
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
