@@ -1,48 +1,37 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 5 Oct 2015 18:58:16 +0200
-Subject: [PATCH v4 4/4] misc: atmel_tclib: get and use slow clock
-In-Reply-To: <20151005152706.GC17612@ulmo>
-References: <1439717026-30634-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1439717026-30634-5-git-send-email-alexandre.belloni@free-electrons.com>
- <20151005152706.GC17612@ulmo>
-Message-ID: <20151005165816.GI2694@piout.net>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon,  5 Oct 2015 18:00:52 +0100
+Subject: [PATCH] serial: atmel: fix compiler warning on address cast
+Message-ID: <1444064452-12285-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2015 at 17:27:06 +0200, Thierry Reding wrote :
-> On Sun, Aug 16, 2015 at 11:23:46AM +0200, Alexandre Belloni wrote:
-> > From: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > 
-> > Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
-> > hang") added a workaround for the slow clock as it is not properly handled
-> > by its users.
-> > 
-> > Get and use the slow clock as it is necessary for the timer counters.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > ---
-> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > Cc: Thierry Reding <thierry.reding@gmail.com>
-> > Cc: linux-pwm at vger.kernel.org
-> >  drivers/clocksource/tcb_clksrc.c | 10 +++++++++-
-> >  drivers/misc/atmel_tclib.c       |  4 ++++
-> >  drivers/pwm/pwm-atmel-tcb.c      | 26 +++++++++++++++++++-------
-> >  include/linux/atmel_tc.h         |  1 +
-> >  4 files changed, 33 insertions(+), 8 deletions(-)
-> 
-> This doesn't seem to apply anymore. Does it need to be rebased? Or do I
-> need some other patch as a dependency?
-> 
+Turning on KVM and LPAE support on top of a multi_v7_defconfig will
+produce a compiler warning in the Atmel serial driver:
+drivers/tty/serial/atmel_serial.c: In function 'atmel_verify_port':
+drivers/tty/serial/atmel_serial.c:2299:6: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+  if ((void *)port->mapbase != ser->iomem_base)
+      ^
 
-It will apply cleanly after [PATCH v4 3/4] clocksource: tcb_clksrc: fix
-setup_clkevents error path
+Fix that by using the cast on the right hand side instead, as similar
+code already does in other drivers.
 
-It already has Daniel's ack so you can also take it if you want. Else,
-we can take it through at91.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ drivers/tty/serial/atmel_serial.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index cd30a45..28039ce 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -2296,7 +2296,7 @@ static int atmel_verify_port(struct uart_port *port, struct serial_struct *ser)
+ 		ret = -EINVAL;
+ 	if (port->uartclk / 16 != ser->baud_base)
+ 		ret = -EINVAL;
+-	if ((void *)port->mapbase != ser->iomem_base)
++	if (port->mapbase != (unsigned long)ser->iomem_base)
+ 		ret = -EINVAL;
+ 	if (port->iobase != ser->port)
+ 		ret = -EINVAL;
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.5.1
