@@ -1,54 +1,34 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Mon, 5 Oct 2015 10:58:56 +0200
-Subject: [PATCH] twd: Don't set CLOCK_EVT_FEAT_C3STOP unconditionally
-Message-ID: <56123BD0.8010005@sigmadesigns.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 05 Oct 2015 09:59:02 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: Add missing QCOM APQ8064 configs
+In-Reply-To: <7133797.1AP9OuVQ6T@wuerfel>
+References: <1443704258-3180-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <7133797.1AP9OuVQ6T@wuerfel>
+Message-ID: <56123BD6.7060403@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In 5388a6b266 ("ARM: SMP: Always enable clock event broadcast support")
-Russell noted that "the TWD local timers are unable to wake up the CPU
-when it is placed into a low power mode".
 
-However, some platforms do not stop the TWD block in low-power mode,
-and can thus use it without setting up a broadcast device.
 
-Make the driver check for the "twd_never_stops" property, and set the
-CLOCK_EVT_FEAT_C3STOP flag accordingly.
+On 05/10/15 09:14, Arnd Bergmann wrote:
+> On Thursday 01 October 2015 13:57:38 Srinivas Kandagatla wrote:
+>> This patch adds few missing essential configs in the multi_v7_defconf,
+>> absense of some configs like PINCTRL_APQ8064 would prevent the board from
+>> getting access to serial.
+>>
+>> cc: Kevin Hilman <khilman@kernel.org>
+>> cc: Tyler Baker <tyler.baker@linaro.org>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>
+> Can you make some of these '=m' instead of '=y'? We try to have most things
+> that are not essential for booting as loadable modules, so the kernel
+> doesn't get too big.
+Yes, I can make the USB and SATA as modules and other options are very 
+essential to get the board booting with console.
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
----
- arch/arm/kernel/smp_twd.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Will send a new version.
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index e8f6d241881f..0ca825e24d9c 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -33,6 +33,7 @@ static unsigned long twd_timer_rate;
- static DEFINE_PER_CPU(bool, percpu_setup_called);
- 
- static struct clock_event_device __percpu *twd_evt;
-+static int feat_c3stop;
- static int twd_ppi;
- 
- static void twd_set_mode(enum clock_event_mode mode,
-@@ -293,7 +294,7 @@ static void twd_timer_setup(void)
- 
- 	clk->name = "local_timer";
- 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
--			CLOCK_EVT_FEAT_C3STOP;
-+			feat_c3stop;
- 	clk->rating = 350;
- 	clk->set_mode = twd_set_mode;
- 	clk->set_next_event = twd_set_next_event;
-@@ -345,6 +346,8 @@ static int __init twd_local_timer_common_register(struct device_node *np)
- 		goto out_irq;
- 
- 	twd_get_clock(np);
-+	if (!of_property_read_bool(np, "twd_never_stops"))
-+		feat_c3stop = CLOCK_EVT_FEAT_C3STOP;
- 
- 	/*
- 	 * Immediately configure the timer on the boot CPU, unless we need
--- 
-2.4.5
+--srini
+>
+> 	Arnd
+>
