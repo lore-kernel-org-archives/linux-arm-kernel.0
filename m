@@ -1,70 +1,97 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Mon, 5 Oct 2015 23:05:24 +0200
-Subject: [PATCH 0/9] Further mvebu PCIe patches
-In-Reply-To: <20151003200026.6eea945d@free-electrons.com>
-References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
- <20151003200026.6eea945d@free-electrons.com>
-Message-ID: <20151005210524.GA2292@1wt.eu>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 5 Oct 2015 23:36:17 +0200
+Subject: [PATCH v9 0/4] Allow USB devices to remain runtime-suspended when
+ sleeping
+In-Reply-To: <1444056332-30246-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1444056332-30246-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <CAPDyKFrU5mBz+xrj9dHkNfGa_QFBBWVsarFm4UG0oOTXyQfiHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 5 October 2015 at 16:45, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+> Hi,
+>
+> this is v9 of an attempt to make it easier for devices to remain in
+> runtime PM when the system goes to sleep, mainly to reduce the time
+> spent resuming devices.
+>
+> For this, we interpret the absence of all PM callback implementations as
+> it being safe to do direct_complete, so their ancestors aren't prevented
+> from remaining runtime-suspended.
+>
+> Additionally, the prepare() callback of USB devices will return 1 if
+> runtime PM is enabled and the current wakeup settings are correct.
+>
+> With these changes, a uvcvideo device (for example) stays in runtime
+> suspend when the system goes to sleep and is left in that state when the
+> system resumes, not delaying it unnecessarily.
+>
+> Thanks,
+>
+> Tomeu
+>
+> Changes in v9:
+> - Add docs noting the need for the device lock to be held before calling
+>   device_is_bound()
+> - Add docs noting the need for the device lock to be held before calling
+>   dev_pm_domain_set()
+> - Move to CONFIG_PM_SLEEP as suggested by Rafael and Ulf.
+> - Rename from device_check_pm_callbacks to device_pm_check_callbacks to
+>   follow with the naming convention of existing API.
+> - Re-add calling to device_pm_check_callbacks from device registration
+>   and when updating the PM domain of a device.
+>
+> Changes in v8:
+> - Add device_is_bound()
+> - Add dev_pm_domain_set() and update code to use it
+> - Move no_pm_callbacks field into CONFIG_PM_SLEEP
+> - Call device_check_pm_callbacks only after a device is bound or unbound
+>
+> Changes in v7:
+> - Reduce indentation by adding a label in device_prepare()
+>
+> Changes in v6:
+> - Add stub for !CONFIG_PM.
+> - Move implementation of device_check_pm_callbacks to power/main.c as it
+>   doesn't belong to CONFIG_PM_SLEEP.
+> - Take dev->power.lock before modifying flag.
+>
+> Changes in v5:
+> - Check for all dev_pm_ops instances associated to a device, updating a
+>   no_pm_callbacks flag at the times when that could change.
+>
+> Tomeu Vizoso (4):
+>   device core: add device_is_bound()
+>   PM / Domains: add setter for dev.pm_domain
+>   PM / sleep: Go direct_complete if driver has no callbacks
+>   USB / PM: Allow USB devices to remain runtime-suspended when sleeping
+>
+>  arch/arm/mach-omap2/omap_device.c |  7 ++++---
+>  drivers/acpi/acpi_lpss.c          |  5 +++--
+>  drivers/acpi/device_pm.c          |  5 +++--
+>  drivers/base/dd.c                 | 21 +++++++++++++++++++--
+>  drivers/base/power/clock_ops.c    |  5 +++--
+>  drivers/base/power/common.c       | 24 ++++++++++++++++++++++++
+>  drivers/base/power/domain.c       |  6 ++++--
+>  drivers/base/power/main.c         | 35 +++++++++++++++++++++++++++++++++++
+>  drivers/base/power/power.h        |  3 +++
+>  drivers/gpu/vga/vga_switcheroo.c  | 10 +++++-----
+>  drivers/misc/mei/pci-me.c         |  5 +++--
+>  drivers/misc/mei/pci-txe.c        |  5 +++--
+>  drivers/usb/core/port.c           |  6 ++++++
+>  drivers/usb/core/usb.c            | 11 ++++++++++-
+>  include/linux/device.h            |  2 ++
+>  include/linux/pm.h                |  1 +
+>  include/linux/pm_domain.h         |  3 +++
+>  17 files changed, 131 insertions(+), 23 deletions(-)
+>
+> --
+> 2.4.3
+>
 
-On Sat, Oct 03, 2015 at 08:00:26PM +0100, Thomas Petazzoni wrote:
-> Hello Russell,
-> 
-> On Sat, 3 Oct 2015 19:12:28 +0100, Russell King - ARM Linux wrote:
-> 
-> > Here are further PCIe patches which follow on from the previous set of
-> > six I sent earlier in September.  This set:
-> > 
-> > * Separates the DT parsing from the use of this parsed data.
-> > * Fixes memory leaks from kasprintf() and refcount leaks of the DT
-> >   node where we break out from the loop early.
-> > * Uses gpio_set_value_cansleep() so that GPIOs on I2C expanders can
-> >   be used for the PCIe reset functionality.
-> > * Switch to using devm_kcalloc() instead of devm_kzalloc(), which
-> >   eliminates the multiplication, moving it into core code.
-> > * Switch to using a gpio descriptor for the reset gpio, which can
-> >   contain the active level information from DT.  (It would be nice
-> >   if gpiolib automated some of the resource claiming there.)
-> > * Make PERST# vs clock timing to match PCIe specifications.  PCIe
-> >   specs require the clock to be running for 100us prior to releasing
-> >   reset.
-> > * Add the standard PCIe capability block in root port form to the
-> >   emulated PCIe configuration block.  This allows the PCI layer to
-> >   identify the "host bridge" as a PCIe device, and allows us to
-> >   take advantage of the code in drivers/pci/pcie, particularly
-> >   aspm for link power management.
-> > * As a result of identifying ourselves as a PCIe root port, this
-> >   eliminates the need to special case accesses to non-slot 0 in
-> >   the driver; the lack of other "slots" is something which the
-> >   generic PCI code knows about for PCIe root ports.
-> 
-> Thanks for these patches! They look good. However, I'm away for the
-> Embedded Linux Conference Europe in Dublin right now, and therefore
-> don't have access to my boards to test that it works OK on platforms
-> other than Armada 38x (which you tested). I will try to do this testing
-> next week, hopefully on Friday.
+This looks good to me, for the series you may add:
 
-Just FWIW, I could run this series on top of the previous one on top
-of 4.3-rc4. It ran fine (ie no regressions observed) on :
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-  - Iomega iconnect (kirkwood) with an RT3090 WiFi card (I could verify
-    that the card was detected in lspci, module loaded without error
-    and the interface appeared)
-
-  - mirabox (armada370) with a dual-igb NIC (i350), Marvell 88E8053 (sky2),
-    realtek 8168, and bcm5721. For the first one, I only verified that the
-    driver loaded properly and that I could set the links up on the two
-    NICs. For the last 3, I could even check that the NIC could receive
-    traffic.
-
-I could not test on the XPGP board, it didn't boot regardless of the
-patches, I'll have to redo a clean config. This happens once in a while
-during "make oldconfig" over a too large version jump.
-
-So far so good!
-
-Cheers,
-Willy
+Kind regards
+Uffe
