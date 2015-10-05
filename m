@@ -1,81 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Oct 2015 04:23:04 -0700
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20151001100326.GV21513@n2100.arm.linux.org.uk>
-References: <20150924090048.GA21626@n2100.arm.linux.org.uk>
- <20150924233756.GN23801@atomide.com>
- <20151001093325.GU21513@n2100.arm.linux.org.uk>
- <CAPDyKFpnqJBrtiBekikrNHAf-agZm12KnF9n+=+72HH=jti-KA@mail.gmail.com>
- <20151001100326.GV21513@n2100.arm.linux.org.uk>
-Message-ID: <20151005112304.GZ23801@atomide.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Mon, 05 Oct 2015 14:36:32 +0300
+Subject: [PATCH v2 0/7] Add support for Exynos SROM Controller driver
+In-Reply-To: <1440403348-8974-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1440403348-8974-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <018501d0ff62$1650b410$42f21c30$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [151001 03:07]:
-> On Thu, Oct 01, 2015 at 11:50:00AM +0200, Ulf Hansson wrote:
-> > On 1 October 2015 at 11:33, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > > On Thu, Sep 24, 2015 at 04:37:56PM -0700, Tony Lindgren wrote:
-> > >> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150924 02:04]:
-> > >> > Nightly testing has revealed that both the OMAP3430 LDP and the OMAP4430
-> > >> > SDP fail to boot due to lack of working MMC.  Both platforms fail to
-> > >> > find their rootfs, which is on a SD card.
-> > >> >
-> > >> > The breakage occurred somewhere between trees of September 9th (commit
-> > >> > 4e4adb2f4628) and September 12th (commit b0a1ea51bda4), so during the
-> > >> > merge window.
-> > >>
-> > >> Yes sorry things got messed up in multiple ways :( I've summarized
-> > >> the mess here earlier:
-> > >>
-> > >> http://article.gmane.org/gmane.linux.kernel.mmc/33911
-> > >>
-> > >> And today commit b9c93646fd5c ("regulator: pbias: program pbias register
-> > >> offset in pbias driver") hit mainline so I'll send a pull request for
-> > >> the related dts change.
-> > >
-> > > It's still broken and untestable.  We're 8 days off it being a full
-> > > month worth of failed testing for OMAP3 and OMAP4 platforms.
-> > >
-> > > I think OMAP and MMC people need to do a post-mortem and work out why
-> > > this happened, and how to stop it happening again in the future.
-> > 
-> > You are probably right!
-> > 
-> > I think I should have been more persistent when asking on how to deal
-> > with these patches. Typically they should all have gone together via
-> > one tree, or we needed a slower way forward keeping changes more
-> > standalone.
-> > 
-> > Anyway, according to kernelci.org, which builds and boot my next
-> > branch omap3/4 seems to boot now...
-> > http://kernelci.org/boot/all/job/ulfh/kernel/v4.3-rc3-27-gf7734d097520/
-> 
-> It continues to fail here.
-> 
-> Okay, sod it, I'm at the point of just not giving a damn about whether
-> OMAP3 and OMAP4 boot anymore.
-> 
-> I'm taking all OMAP platforms out of my boot farm.  I'm totally fed up
-> with this kind of regression happening.  It's probably some config option
-> that someone's recently introduced which defaults to being off, thereby
-> breaking the ability for people to move forward without constantly having
-> to re-configure.  This is not acceptable.
-> 
-> STOP BREAKING THE KERNEL.
+ Hello!
 
-I totally agree, this is unacceptable. And I'm fed up chasing driver
-breakage and trying to test everything myself.
+> This patch set adds support for Exynos SROM controller DT based driver.
+> Currently SROM register sets are used only during S2R, so driver
+> basically added for taking care of S2R. It will help us in removing
+> static mapping from exynos.c and other extra code handline during S2R.
 
-If Kihon is not starting to respond to these issues, we better start
-reverting some of the MMC patches. And I'd say in the future non-trivial
-patches really have to sit in linux next for two weeks before merging.
+ Very good news, but, your driver seems not to do anything except suspend/resume. But how do i add
+some device plugged into it? In order to be operational, its outputs have to be configured. But how
+do i do it with your driver? For example, on SMDK boards SROM controller is used to connect SMSC9111
+etherner chip.
+ Currently i use hardcoded initialization based on of_machine_is_compatible(), but i believe this
+would be considered a hack and such a thing cannot be pushed upstream. I guess i have to put all
+needed configuration into device tree somehow. But how? Are there any recommentations?
 
-We have still the omap3 legacy booting issue remaining, and warnings
-at least on omap4 overo.
-
-Regards,
-
-Regards,
-
-Tony
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
