@@ -1,107 +1,174 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 5 Oct 2015 14:52:42 +0100
-Subject: [PATCH v2 2/2] ASoC: atmel-i2s: add driver for the new Atmel I2S
- controller
-In-Reply-To: <f8dada26149491a584b83a59e8fcbec378ff6964.1443535188.git.cyrille.pitchen@atmel.com>
-References: <cover.1443535188.git.cyrille.pitchen@atmel.com>
- <f8dada26149491a584b83a59e8fcbec378ff6964.1443535188.git.cyrille.pitchen@atmel.com>
-Message-ID: <20151005135242.GP12635@sirena.org.uk>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Mon, 5 Oct 2015 14:08:52 +0000
+Subject: [PATCH v2] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <2677327.lnRZhqx5GI@wuerfel>
+References: <1443689961-23909-1-git-send-email-bharatku@xilinx.com>
+ <2677327.lnRZhqx5GI@wuerfel>
+Message-ID: <8520D5D51A55D047800579B0941471980169054D@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 29, 2015 at 04:09:20PM +0200, Cyrille Pitchen wrote:
-
-> +	if (pending & ATMEL_I2SC_INT_RXOR) {
-> +		mask = ATMEL_I2SC_SR_RXOR;
+On Thursday 01 October 2015 14:29:21 Bharat Kumar Gogada wrote:
+> Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
+> 
+> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+> ---
+> Removed unneccessary comments
+> Modified setup_sspl implementation
+> Added more details in binding Documentation
+> ---
+>  .../devicetree/bindings/pci/xilinx-nwl-pcie.txt    |   49 +
+>  drivers/pci/host/Kconfig                           |    9 +
+>  drivers/pci/host/Makefile                          |    1 +
+>  drivers/pci/host/pcie-xilinx-nwl.c                 | 1029 ++++++++++++++++++++
+>  4 files changed, 1088 insertions(+)
+>  create mode 100644 
+> Documentation/devicetree/bindings/pci/xilinx-nwl-pcie.txt
+>  create mode 100644 drivers/pci/host/pcie-xilinx-nwl.c
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/xilinx-nwl-pcie.txt 
+> b/Documentation/devicetree/bindings/pci/xilinx-nwl-pcie.txt
+> new file mode 100644
+> index 0000000..ed87184
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/xilinx-nwl-pcie.txt
+> @@ -0,0 +1,49 @@
+> +* Xilinx NWL PCIe Root Port Bridge DT description
 > +
-> +		for (ch = 0; ch < ATMEL_I2SC_MAX_TDM_CHANNELS; ++ch)
-> +			if (sr & ATMEL_I2SC_SR_RXORCH(ch)) {
-> +				mask |= ATMEL_I2SC_SR_RXORCH(ch);
-> +				dev_err(dev->dev,
-> +					"RX overrun on channel %d\n", ch);
-> +			}
-> +		regmap_write(dev->regmap, ATMEL_I2SC_SCR, mask);
-> +	}
+> +Required properties:
+> +- compatible: Should contain "xlnx,nwl-pcie-2.11"
+> +- #address-cells: Address representation for root ports, set to <3>
+> +- #size-cells: Size representation for root ports, set to <2>
+> +- #interrupt-cells: specifies the number of cells needed to encode an
+> +	interrupt source. The value must be 1.
+> +- reg: Should contain Bridge, PCIe Controller registers location,
+> +	configuration sapce, and length
+> +- reg-names: Must include the following entries:
+> +	"breg": bridge registers
+> +	"pcireg": PCIe controller registers
+> +	"cfg": configuration space region
+> +- device_type: must be "pci"
+> +- interrupts: Should contain NWL PCIe interrupt
+> +- interrupt-names: Must include the following entries:
+> +	"misc": interrupt asserted when miscellaneous is recieved
+> +	"intx": interrupt that is asserted when an legacy interrupt is received
+> +	"msi_1, msi_0": interrupt asserted when msi is recieved
 
-Coding style - the for loop needs { } for legibility.
+The msi and intx interrupts don't really belong here: For intx, please use an interrupt-map property as the other host drivers do.
 
-> +	if (pending & ATMEL_I2SC_INT_TXUR) {
-> +		mask = ATMEL_I2SC_SR_TXUR;
+For MSI, the usual answer is that there should be a separate device node for the MSI controller, and an msi-parent property in the PCI host.
+Our current GIC version does not have separate msi controller, so is it necessary to have separate msi node ?
+
+This lets you use the same code for hosts that have a GICv2m or GICv3 that comes with its own MSI controller.
+
+> +/**
+> + * struct nwl_pcie - PCIe port information
+> + *
+> + * @dev: Device pointer
+> + * @breg_base: IO Mapped Bridge Register Base
+> + * @pcireg_base: IO Mapped PCIe controller attributes
+> + * @ecam_base: IO Mapped configuration space
+> + * @phys_breg_base: Physical Bridge Register Base
+> + * @phys_pcie_reg_base: Physical PCIe Controller Attributes
+> + * @phys_ecam_base: Physical Configuration Base
+> + * @breg_size: Bridge Register space
+> + * @pcie_reg_size: PCIe controller attributes space
+> + * @ecam_size: PCIe Configuration space
+> + * @irq_intx: Legacy interrupt number
+> + * @irq_misc: Misc interrupt number
+> + * @ecam_value: ECAM value
+> + * @last_busno: Last Bus number configured
+> + * @link_up: Link status flag
+> + * @enable_msi_fifo: Enable MSI FIFO mode
+> + * @bus: PCI bus
+> + * @msi: MSI interrupt info
+> + */
+> +struct nwl_pcie {
+> +	struct device *dev;
+> +	void __iomem *breg_base;
+> +	void __iomem *pcireg_base;
+> +	void __iomem *ecam_base;
+> +	u32 phys_breg_base;
+> +	u32 phys_pcie_reg_base;
+> +	u32 phys_ecam_base;
+
+These should probably be phys_addr_t.
+
+> + * nwl_setup_sspl - Set Slot Power limit
+> + *
+> + * @pcie: PCIe port information
+> + */
+> +static int nwl_setup_sspl(struct nwl_pcie *pcie) {
+> +	unsigned int status;
+> +	int retval = 0;
 > +
-> +		for (ch = 0; ch < ATMEL_I2SC_MAX_TDM_CHANNELS; ++ch)
-> +			if (sr & ATMEL_I2SC_SR_TXURCH(ch)) {
-> +				mask |= ATMEL_I2SC_SR_TXURCH(ch);
-> +				dev_err(dev->dev,
-> +					"TX underrun on channel %d\n", ch);
-> +			}
-> +		regmap_write(dev->regmap, ATMEL_I2SC_SCR, mask);
+> +	do {
+> +		status = nwl_bridge_readl(pcie, TX_PCIE_MSG) & MSG_BUSY_BIT;
+> +		if (!status) {
+> +			/*
+> +			 * Generate the TLP message for a single EP
+> +			 * [TODO] Add a multi-endpoint code
+> +			 */
+> +			nwl_bridge_writel(pcie, 0x0,
+> +					  TX_PCIE_MSG + TX_PCIE_MSG_CNTL);
+> +			nwl_bridge_writel(pcie, 0x0,
+> +					  TX_PCIE_MSG + TX_PCIE_MSG_SPEC_LO);
+> +			nwl_bridge_writel(pcie, 0x0,
+> +					  TX_PCIE_MSG + TX_PCIE_MSG_SPEC_HI);
+> +			nwl_bridge_writel(pcie, 0x0,
+> +					  TX_PCIE_MSG + TX_PCIE_MSG_DATA);
+> +			/* Pattern to generate SSLP TLP */
+> +			nwl_bridge_writel(pcie, PATTRN_SSLP_TLP,
+> +					  TX_PCIE_MSG + TX_PCIE_MSG_CNTL);
+> +			nwl_bridge_writel(pcie, RANDOM_DIGIT,
+> +					  TX_PCIE_MSG + TX_PCIE_MSG_DATA);
+> +			nwl_bridge_writel(pcie, nwl_bridge_readl(pcie,
+> +					  TX_PCIE_MSG) | 0x1, TX_PCIE_MSG);
+> +			status = 0;
+> +			mdelay(2);
+
+That is a really long delay. Can you use msleep(2) instead here?
+
 > +
-> +	}
+> +/* PCIe operations */
+> +static struct pci_ops nwl_pcie_ops = {
+> +	.read  = nwl_nwl_readl_config,
+> +	.write = nwl_nwl_writel_config,
+> +};
+	
+If the config space access is using ECAM, you should be able to use the generic implementation for that. I don't know how far we got in splitting that out, but it would be nice to not duplicate that here.
+We need configuration base address for checking condition for nwl_setup_sspl function so we are not using the generic implementation.  
+
+> +
+> +static irqreturn_t nwl_pcie_leg_handler(int irq, void *data) {
+> +	struct nwl_pcie *pcie = (struct nwl_pcie *)data;
+> +	u32 leg_stat;
+> +
+> +	/* Checking for legacy interrupts */
+> +	leg_stat = nwl_bridge_readl(pcie, MSGF_LEG_STATUS) &
+> +				MSGF_LEG_SR_MASKALL;
+> +	if (!leg_stat)
+> +		return IRQ_NONE;
+> +
+> +	if (leg_stat & MSGF_LEG_SR_INTA)
+> +		dev_dbg(pcie->dev, "legacy interruptA\n");
+> +
+> +	if (leg_stat & MSGF_LEG_SR_INTB)
+> +		dev_dbg(pcie->dev, "legacy interruptB\n");
+> +
+> +	if (leg_stat & MSGF_LEG_SR_INTC)
+> +		dev_dbg(pcie->dev, "legacy interruptC\n");
+> +
+> +	if (leg_stat & MSGF_LEG_SR_INTD)
+> +		dev_dbg(pcie->dev, "legacy interruptD\n");
 > +
 > +	return IRQ_HANDLED;
+> +}
 
-This IRQ_HANDLED should be generated only if one of the interrupts we
-know about got handled - there was a check to see if any of the unmasked
-bits is set earlier on in the function but that's not quite the same
-check.
+This does not appear to be an appropriate implementation. I suspect what you need to do here is to model this as an irq_chip_generic, which should be able to handle the status/mask/pending registers and provide the irq domain that you will need for your DT irq-map property.
 
-> +
-> +static int atmel_i2s_prepare(struct snd_pcm_substream *substream,
-> +			     struct snd_soc_dai *dai)
-> +{
-> +	struct atmel_i2s_dev *dev = snd_soc_dai_get_drvdata(dai);
-> +	bool is_playback = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK);
-> +	unsigned int rhr, sr = 0;
-> +
-> +	if (is_playback) {
-> +		regmap_read(dev->regmap, ATMEL_I2SC_SR, &sr);
-> +		if (sr & ATMEL_I2SC_SR_RXRDY) {
-> +			dev_dbg(dev->dev, "RXRDY is set\n");
-> +			regmap_read(dev->regmap, ATMEL_I2SC_RHR, &rhr);
-> +		}
-> +	}
+	Arnd
 
-What's this doing?  It just seems to do two reads and issue a debug
-message...
-
-> +static int atmel_i2s_sama5d2_mck_init(struct atmel_i2s_dev *dev,
-> +				      struct device_node *np)
-> +{
-> +	#define SFR_I2SCLKSEL 0x90U
-> +	struct regmap *sfr;
-> +	int id;
-> +
-> +	id = of_alias_get_id(np, "i2s");
-> +	if (id < 0) {
-> +		dev_err(dev->dev, "failed to get alias ID\n");
-> +		return id;
-> +	}
-> +	if (id > 1) {
-> +		dev_err(dev->dev, "invalid I2S controller ID: %d\n", id);
-> +		return -EINVAL;
-> +	}
-
-This didn't appear in the DT binding and looks pretty funky - what's
-going on here?
-
-> +	sfr = syscon_regmap_lookup_by_compatible("atmel,sama5d2-sfr");
-> +	if (IS_ERR(sfr)) {
-> +		dev_err(dev->dev, "failed to get SFR syscon\n");
-> +		return PTR_ERR(sfr);
-> +	}
-
-This didn't appear in the binding either.
-
-> +	/* Get hardware capabilities. */
-> +	match = of_match_node(atmel_i2s_dt_ids, np);
-> +	dev->caps = match ? match->data : NULL;
-
-Please don't abuse the ternery operator like this, just write a normal
-if statement :/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151005/bb5e951a/attachment-0001.sig>
+Bharat
