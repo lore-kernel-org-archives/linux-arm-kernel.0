@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  5 Oct 2015 10:49:47 +0200
-Subject: [PATCH 07/17] ARM: pxa: mainstone: Use PWM lookup table
+Date: Mon,  5 Oct 2015 10:49:52 +0200
+Subject: [PATCH 12/17] ARM: pxa: pcm990: Use PWM lookup table
 In-Reply-To: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
 References: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1444034997-9805-8-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1444034997-9805-13-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,31 +17,31 @@ Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
 Cc: Robert Jarzmik <robert.jarzmik@free.fr>
 Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
 ---
- arch/arm/mach-pxa/mainstone.c | 18 ++++++++++++++----
- 1 file changed, 14 insertions(+), 4 deletions(-)
+ arch/arm/mach-pxa/pcm990-baseboard.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/mainstone.c b/arch/arm/mach-pxa/mainstone.c
-index 2c0658cf6be2..4ee9f59d45f5 100644
---- a/arch/arm/mach-pxa/mainstone.c
-+++ b/arch/arm/mach-pxa/mainstone.c
-@@ -26,6 +26,7 @@
- #include <linux/mtd/partitions.h>
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
+diff --git a/arch/arm/mach-pxa/pcm990-baseboard.c b/arch/arm/mach-pxa/pcm990-baseboard.c
+index 9a0c8affdadb..1453fd95ced5 100644
+--- a/arch/arm/mach-pxa/pcm990-baseboard.c
++++ b/arch/arm/mach-pxa/pcm990-baseboard.c
+@@ -24,6 +24,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c/pxa-i2c.h>
 +#include <linux/pwm.h>
  #include <linux/pwm_backlight.h>
- #include <linux/smc91x.h>
- #include <linux/i2c/pxa-i2c.h>
-@@ -248,11 +249,14 @@ static struct platform_device mst_flash_device[2] = {
- };
  
- #if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
-+static struct pwm_lookup mainstone_pwm_lookup[] = {
+ #include <media/mt9v022.h>
+@@ -148,11 +149,14 @@ static struct pxafb_mach_info pcm990_fbinfo __initdata = {
+ };
+ #endif
+ 
++static struct pwm_lookup pcm990_pwm_lookup[] = {
 +	PWM_LOOKUP("pxa27x-pwm.0", 0, "pwm-backlight.0", NULL, 78770,
 +		   PWM_POLARITY_NORMAL),
 +};
 +
- static struct platform_pwm_backlight_data mainstone_backlight_data = {
+ static struct platform_pwm_backlight_data pcm990_backlight_data = {
 -	.pwm_id		= 0,
  	.max_brightness	= 1023,
  	.dft_brightness	= 1023,
@@ -49,23 +49,13 @@ index 2c0658cf6be2..4ee9f59d45f5 100644
  	.enable_gpio	= -1,
  };
  
-@@ -266,9 +270,15 @@ static struct platform_device mainstone_backlight_device = {
+@@ -542,6 +546,7 @@ void __init pcm990_baseboard_init(void)
+ #ifndef CONFIG_PCM990_DISPLAY_NONE
+ 	pxa_set_fb_info(NULL, &pcm990_fbinfo);
+ #endif
++	pwm_add_table(pcm990_pwm_lookup, ARRAY_SIZE(pcm990_pwm_lookup));
+ 	platform_device_register(&pcm990_backlight_device);
  
- static void __init mainstone_backlight_register(void)
- {
--	int ret = platform_device_register(&mainstone_backlight_device);
--	if (ret)
-+	int ret;
-+
-+	pwm_add_table(mainstone_pwm_lookup, ARRAY_SIZE(mainstone_pwm_lookup));
-+
-+	ret = platform_device_register(&mainstone_backlight_device);
-+	if (ret) {
- 		printk(KERN_ERR "mainstone: failed to register backlight device: %d\n", ret);
-+		pwm_remove_table(mainstone_pwm_lookup, ARRAY_SIZE(mainstone_pwm_lookup));
-+	}
- }
- #else
- #define mainstone_backlight_register()	do { } while (0)
+ 	/* MMC */
 -- 
 2.5.0
