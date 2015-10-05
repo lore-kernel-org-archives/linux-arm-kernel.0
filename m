@@ -1,20 +1,25 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 5 Oct 2015 14:39:09 +0100
-Subject: [PATCH v6 2/2] dmaengine: Add Xilinx AXI Central Direct Memory
- Access Engine driver support
-In-Reply-To: <1441629198-17663-1-git-send-email-appanad@xilinx.com>
-References: <1441629198-17663-1-git-send-email-appanad@xilinx.com>
-Message-ID: <20151005133907.GA13501@vkoul-mobl.iind.intel.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 05 Oct 2015 07:01:55 -0700 (PDT)
+Subject: [PATCH net] ARM: net: make BPF_LD | BPF_IND instruction
+ trigger r_X initialisation to 0.
+In-Reply-To: <1443793152-8661-1-git-send-email-nschichan@freebox.fr>
+References: <1443793152-8661-1-git-send-email-nschichan@freebox.fr>
+Message-ID: <20151005.070155.1958954047126197017.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 07, 2015 at 06:03:18PM +0530, Kedareswara rao Appana wrote:
-> This is the driver for the AXI Central Direct Memory Access (AXI
-> CDMA) core, which is a soft Xilinx IP core that provides high-bandwidth
-> Direct Memory Access (DMA) between a memory-mapped source address and a
-> memory-mapped destination address.
+From: Nicolas Schichan <nschichan@freebox.fr>
+Date: Fri,  2 Oct 2015 15:39:12 +0200
 
-Where is the 1/2 here ? I have only this one in my mails..
+> Without this patch, if the only instructions using r_X are of the
+> BPF_LD | BPF_IND type, r_X would not be reset to 0, using whatever
+> value was there when entering the jited code. With this patch, r_X
+> will be correctly marked as used so it will be reset to 0 in the
+> prologue code.
+> 
+> This fix also makes the test "LD_IND byte default X" pass in the
+> test_bpf module when the ARM JIT is enabled.
+> 
+> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
 
--- 
-~Vinod
+Applied.
