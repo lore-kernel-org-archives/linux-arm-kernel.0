@@ -1,89 +1,308 @@
 From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Mon, 05 Oct 2015 21:09:13 +0200
-Subject: [PATCH 1/3] clk: add flag for clocks that need to be enabled on
- rate changes
-In-Reply-To: <1929669.AsgMSusdJb@phil>
-References: <1929669.AsgMSusdJb@phil>
-Message-ID: <1444072153.9895.25.camel@collabora.co.uk>
+Date: Mon, 05 Oct 2015 21:09:51 +0200
+Subject: [PATCH 2/3] clk: rockchip: handle mux dependency of fractional
+ dividers
+In-Reply-To: <1990916.Xur8Q3rQIb@phil>
+References: <1929669.AsgMSusdJb@phil> <1990916.Xur8Q3rQIb@phil>
+Message-ID: <1444072191.9895.27.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-08-21 at 19:46 +0200, Heiko Stuebner wrote:
-> Some clocks need to be enabled to accept rate changes. This patch
-> adds a
-> new flag CLK_SET_RATE_UNGATE that lets clk_change_rate enable the
-> clock
-> before trying to change the rate and disable it again afterwards.
-> This of course doesn't effect clocks that are already running at that
-> point, as their refcount will only temporarily increase.
+On Fri, 2015-08-21 at 19:47 +0200, Heiko Stuebner wrote:
+> The fractional dividers of Rockchip SoCs contain an "auto-gating
+> -feature"
+> that requires the downstream mux to actually point to the fractional
+> divider and the fractional divider gate to be enabled, for it to
+> really
+> accept changes to the divider ratio.
+> 
+> The downstream muxes themselfs are not generic enough to include them
+> directly into the fractional divider, as they have varying sources of
+> parent clocks including not only clocks related to the fractional
+> dividers but other clocks as well.
+> 
+> To solve this, allow our clock branches to specify direct child clock
+> -
+> branches in the new child property, let the fractional divider
+> register
+> its downstream mux through this and add a clock notifier that
+> temporarily
+> switches the mux setting when it notices rate changes to the
+> fractional
+> divider.
 > 
 > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
 Tested-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 Reviewed-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-> ---
->  drivers/clk/clk.c            | 18 ++++++++++++++++++
->  include/linux/clk-provider.h |  1 +
->  2 files changed, 19 insertions(+)
+
+>  drivers/clk/rockchip/clk.c | 137
+> ++++++++++++++++++++++++++++++++++++++++-----
+>  drivers/clk/rockchip/clk.h |  19 +++++++
+>  2 files changed, 142 insertions(+), 14 deletions(-)
 > 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 28cd923..564f11e 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1438,6 +1438,15 @@ static void clk_change_rate(struct clk_core
-> *core)
->  	else if (core->parent)
->  		best_parent_rate = core->parent->rate;
+> diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
+> index 2493881..8c7fd2b 100644
+> --- a/drivers/clk/rockchip/clk.c
+> +++ b/drivers/clk/rockchip/clk.c
+> @@ -102,22 +102,82 @@ static struct clk
+> *rockchip_clk_register_branch(const char *name,
+>  	return clk;
+>  }
 >  
-> +	if (core->flags & CLK_SET_RATE_UNGATE) {
-> +		unsigned long flags;
+> +struct rockchip_clk_frac {
+> +	struct notifier_block			clk_nb;
+> +	struct clk_fractional_divider		div;
+> +	struct clk_gate				gate;
 > +
-> +		clk_core_prepare(core);
-> +		flags = clk_enable_lock();
-> +		clk_core_enable(core);
-> +		clk_enable_unlock(flags);
+> +	struct clk_mux				mux;
+> +	const struct clk_ops			*mux_ops;
+> +	int					mux_frac_idx;
+> +
+> +	bool					rate_change_remu
+> xed;
+> +	int					rate_change_idx;
+> +};
+> +
+> +#define to_rockchip_clk_frac_nb(nb) \
+> +			container_of(nb, struct rockchip_clk_frac,
+> clk_nb)
+> +
+> +static int rockchip_clk_frac_notifier_cb(struct notifier_block *nb,
+> +					 unsigned long event, void
+> *data)
+> +{
+> +	struct clk_notifier_data *ndata = data;
+> +	struct rockchip_clk_frac *frac =
+> to_rockchip_clk_frac_nb(nb);
+> +	struct clk_mux *frac_mux = &frac->mux;
+> +	int ret = 0;
+> +
+> +	pr_debug("%s: event %lu, old_rate %lu, new_rate: %lu\n",
+> +		 __func__, event, ndata->old_rate, ndata->new_rate);
+> +	if (event == PRE_RATE_CHANGE) {
+> +		frac->rate_change_idx = frac->mux_ops
+> ->get_parent(&frac_mux->hw);
+> +		if (frac->rate_change_idx != frac->mux_frac_idx) {
+> +			frac->mux_ops->set_parent(&frac_mux->hw,
+> frac->mux_frac_idx);
+> +			frac->rate_change_remuxed = 1;
+> +		}
+> +	} else if (event == POST_RATE_CHANGE) {
+> +		/*
+> +		 * The POST_RATE_CHANGE notifier runs directly after
+> the
+> +		 * divider clock is set in clk_change_rate, so we'll
+> have
+> +		 * remuxed back to the original parent before
+> clk_change_rate
+> +		 * reaches the mux itself.
+> +		 */
+> +		if (frac->rate_change_remuxed) {
+> +			frac->mux_ops->set_parent(&frac_mux->hw,
+> frac->rate_change_idx);
+> +			frac->rate_change_remuxed = 0;
+> +		}
 > +	}
 > +
->  	if (core->new_parent && core->new_parent != core->parent) {
->  		old_parent = __clk_set_parent_before(core, core
-> ->new_parent);
->  		trace_clk_set_parent(core, core->new_parent);
-> @@ -1464,6 +1473,15 @@ static void clk_change_rate(struct clk_core
-> *core)
->  
->  	core->rate = clk_recalc(core, best_parent_rate);
->  
-> +	if (core->flags & CLK_SET_RATE_UNGATE) {
-> +		unsigned long flags;
+> +	return notifier_from_errno(ret);
+> +}
 > +
-> +		flags = clk_enable_lock();
-> +		clk_core_disable(core);
-> +		clk_enable_unlock(flags);
-> +		clk_core_unprepare(core);
+>  static struct clk *rockchip_clk_register_frac_branch(const char
+> *name,
+>  		const char *const *parent_names, u8 num_parents,
+>  		void __iomem *base, int muxdiv_offset, u8 div_flags,
+>  		int gate_offset, u8 gate_shift, u8 gate_flags,
+> -		unsigned long flags, spinlock_t *lock)
+> +		unsigned long flags, struct rockchip_clk_branch
+> *child,
+> +		spinlock_t *lock)
+>  {
+> +	struct rockchip_clk_frac *frac;
+>  	struct clk *clk;
+>  	struct clk_gate *gate = NULL;
+>  	struct clk_fractional_divider *div = NULL;
+>  	const struct clk_ops *div_ops = NULL, *gate_ops = NULL;
+>  
+> -	if (gate_offset >= 0) {
+> -		gate = kzalloc(sizeof(*gate), GFP_KERNEL);
+> -		if (!gate)
+> -			return ERR_PTR(-ENOMEM);
+> +	if (muxdiv_offset < 0)
+> +		return ERR_PTR(-EINVAL);
+>  
+> +	if (child && child->branch_type != branch_mux) {
+> +		pr_err("%s: fractional child clock for %s can only
+> be a mux\n",
+> +		       __func__, name);
+> +		return ERR_PTR(-EINVAL);
 > +	}
 > +
->  	if (core->notifier_count && old_rate != core->rate)
->  		__clk_notify(core, POST_RATE_CHANGE, old_rate, core
-> ->rate);
+> +	frac = kzalloc(sizeof(*frac), GFP_KERNEL);
+> +	if (!frac)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	if (gate_offset >= 0) {
+> +		gate = &frac->gate;
+>  		gate->flags = gate_flags;
+>  		gate->reg = base + gate_offset;
+>  		gate->bit_idx = gate_shift;
+> @@ -125,13 +185,7 @@ static struct clk
+> *rockchip_clk_register_frac_branch(const char *name,
+>  		gate_ops = &clk_gate_ops;
+>  	}
 >  
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk
-> -provider.h
-> index 3ecc07d..21e0025 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -31,6 +31,7 @@
->  #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate
-> change */
->  #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk
-> accuracy */
->  #define CLK_RECALC_NEW_RATES	BIT(9) /* recalc rates after
-> notifications */
-> +#define CLK_SET_RATE_UNGATE	BIT(10) /* clock needs to run to
-> set rate */
+> -	if (muxdiv_offset < 0)
+> -		return ERR_PTR(-EINVAL);
+> -
+> -	div = kzalloc(sizeof(*div), GFP_KERNEL);
+> -	if (!div)
+> -		return ERR_PTR(-ENOMEM);
+> -
+> +	div = &frac->div;
+>  	div->flags = div_flags;
+>  	div->reg = base + muxdiv_offset;
+>  	div->mshift = 16;
+> @@ -145,7 +199,61 @@ static struct clk
+> *rockchip_clk_register_frac_branch(const char *name,
+>  				     NULL, NULL,
+>  				     &div->hw, div_ops,
+>  				     gate ? &gate->hw : NULL,
+> gate_ops,
+> -				     flags);
+> +				     flags | CLK_SET_RATE_UNGATE);
+> +	if (IS_ERR(clk)) {
+> +		kfree(frac);
+> +		return clk;
+> +	}
+> +
+> +	if (child) {
+> +		struct clk_mux *frac_mux = &frac->mux;
+> +		struct clk_init_data init;
+> +		struct clk *mux_clk;
+> +		int i, ret;
+> +
+> +		frac->mux_frac_idx = -1;
+> +		for (i = 0; i < child->num_parents; i++) {
+> +			if (!strcmp(name, child->parent_names[i])) {
+> +				pr_debug("%s: found fractional
+> parent in mux at pos %d\n",
+> +					 __func__, i);
+> +				frac->mux_frac_idx = i;
+> +				break;
+> +			}
+> +		}
+> +
+> +		frac->mux_ops = &clk_mux_ops;
+> +		frac->clk_nb.notifier_call =
+> rockchip_clk_frac_notifier_cb;
+> +
+> +		frac_mux->reg = base + child->muxdiv_offset;
+> +		frac_mux->shift = child->mux_shift;
+> +		frac_mux->mask = BIT(child->mux_width) - 1;
+> +		frac_mux->flags = child->mux_flags;
+> +		frac_mux->lock = lock;
+> +		frac_mux->hw.init = &init;
+> +
+> +		init.name = child->name;
+> +		init.flags = child->flags | CLK_SET_RATE_PARENT;
+> +		init.ops = frac->mux_ops;
+> +		init.parent_names = child->parent_names;
+> +		init.num_parents = child->num_parents;
+> +
+> +		mux_clk = clk_register(NULL, &frac_mux->hw);
+> +		if (IS_ERR(mux_clk))
+> +			return clk;
+> +
+> +		rockchip_clk_add_lookup(mux_clk, child->id);
+> +
+> +		/* notifier on the fraction divider to catch rate
+> changes */
+> +		if (frac->mux_frac_idx >= 0) {
+> +			ret = clk_notifier_register(clk, &frac
+> ->clk_nb);
+> +			if (ret)
+> +				pr_err("%s: failed to register clock
+> notifier for %s\n",
+> +						__func__, name);
+> +		} else {
+> +			pr_warn("%s: could not find %s as parent of
+> %s, rate changes may not work\n",
+> +				__func__, name, child->name);
+> +		}
+> +	}
 >  
->  struct clk;
->  struct clk_hw;
+>  	return clk;
+>  }
+> @@ -249,7 +357,8 @@ void __init rockchip_clk_register_branches(
+>  				list->parent_names, list
+> ->num_parents,
+>  				reg_base, list->muxdiv_offset, list
+> ->div_flags,
+>  				list->gate_offset, list->gate_shift,
+> -				list->gate_flags, flags, &clk_lock);
+> +				list->gate_flags, flags, list
+> ->child,
+> +				&clk_lock);
+>  			break;
+>  		case branch_gate:
+>  			flags |= CLK_SET_RATE_PARENT;
+> diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
+> index dc8ecb2..147db79 100644
+> --- a/drivers/clk/rockchip/clk.h
+> +++ b/drivers/clk/rockchip/clk.h
+> @@ -235,6 +235,7 @@ struct rockchip_clk_branch {
+>  	int				gate_offset;
+>  	u8				gate_shift;
+>  	u8				gate_flags;
+> +	struct rockchip_clk_branch	*child;
+>  };
+>  
+>  #define COMPOSITE(_id, cname, pnames, f, mo, ms, mw, mf, ds, dw,\
+> @@ -369,6 +370,24 @@ struct rockchip_clk_branch {
+>  		.gate_flags	= gf,				
+> \
+>  	}
+>  
+> +#define COMPOSITE_FRACMUX(_id, cname, pname, f, mo, df, go, gs, gf,
+> ch) \
+> +	{							\
+> +		.id		= _id,				
+> \
+> +		.branch_type	= branch_fraction_divider,	
+> \
+> +		.name		= cname,			
+> \
+> +		.parent_names	= (const char *[]){ pname },	
+> \
+> +		.num_parents	= 1,				
+> \
+> +		.flags		= f,				
+> \
+> +		.muxdiv_offset	= mo,				
+> \
+> +		.div_shift	= 16,				
+> \
+> +		.div_width	= 16,				
+> \
+> +		.div_flags	= df,				
+> \
+> +		.gate_offset	= go,				
+> \
+> +		.gate_shift	= gs,				
+> \
+> +		.gate_flags	= gf,				
+> \
+> +		.child		= &(struct
+> rockchip_clk_branch)ch, \
+> +	}
+> +
+>  #define MUX(_id, cname, pnames, f, o, s, w, mf)			
+> \
+>  	{							\
+>  		.id		= _id,				
+> \
 
 -- 
 Sjoerd Simons
