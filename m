@@ -1,40 +1,33 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 05 Oct 2015 20:48:30 +0200
-Subject: [PATCH 00/17] ARM: pxa: Use PWM lookup tables
-In-Reply-To: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
- (Thierry Reding's message of "Mon, 5 Oct 2015 10:49:40 +0200")
-References: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <87r3l9b18h.fsf@belgarion.home>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Mon,  5 Oct 2015 21:03:39 +0200
+Subject: [PATCH] ASoC: rockchip: namespace rockchip i2s module name
+Message-ID: <1444071819-11521-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry Reding <thierry.reding@gmail.com> writes:
+Change the rockchip i2s object name (and thus module name) from the
+rather generic snd-soc-i2s to the more specific snd-soc-rockchip-i2s
 
-> Back when the PWM framework was introduced the concept of PWM lookup
-> tables was added to allow board code to register a table of PWM devices
-> and their association with consumers. The goal is to allow drivers to
-> use a unified method to request PWM devices. At the same time, since no
-> boards were exposing these tables, fallback code was kept in drivers to
-> allow old code to remain functional. Unfortunately I got the numbering
-> of PWM devices wrong, so all these boards should now be without working
-> backlight control, though only a few cases have been fixed since, so I
-> guess most of this hardware is largely unused.
->
-> This series aims at finally fixing this up. It converts all PXA boards
-> that hook up a pwm-backlight device to use the new PWM lookup tables.
-> All patches have been compile-tested, but I don't have access to any of
-> these boards, so I couldn't verify that they really work.
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-Hi Thierry,
+---
 
-Thanks for this serie. I'll test it in the next days. It looks good to me, at
-least the 5 patches I had a look into, so if it works on the 5 boards I have,
-I'll queue it up in pxa/for-next.
+ sound/soc/rockchip/Makefile | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Cheers.
-
+diff --git a/sound/soc/rockchip/Makefile b/sound/soc/rockchip/Makefile
+index 1bc1dc3..e9ba558 100644
+--- a/sound/soc/rockchip/Makefile
++++ b/sound/soc/rockchip/Makefile
+@@ -1,7 +1,7 @@
+ # ROCKCHIP Platform Support
+-snd-soc-i2s-objs := rockchip_i2s.o
++snd-soc-rockchip-i2s-objs := rockchip_i2s.o
+ 
+-obj-$(CONFIG_SND_SOC_ROCKCHIP_I2S) += snd-soc-i2s.o
++obj-$(CONFIG_SND_SOC_ROCKCHIP_I2S) += snd-soc-rockchip-i2s.o
+ 
+ snd-soc-rockchip-max98090-objs := rockchip_max98090.o
+ snd-soc-rockchip-rt5645-objs := rockchip_rt5645.o
 -- 
-Robert
-
-PS: removed all the addresses at openezx.org, don't see to work, or at least
-make my MTA very angry.
+2.6.0
