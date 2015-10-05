@@ -1,63 +1,114 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 5 Oct 2015 13:33:12 -0500
-Subject: [PATCH 1/4] ARM: OMAP: dmtimer: check for fixed timers during
- config
-In-Reply-To: <20151005165806.GE23801@atomide.com>
-References: <201510040126.SfMisWv2%fengguang.wu@intel.com>
- <5612A88E.1040809@ti.com> <20151005165806.GE23801@atomide.com>
-Message-ID: <5612C268.7000502@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Oct 2015 19:38:13 +0100
+Subject: All OMAP platforms: MMC is broken
+In-Reply-To: <20151005171155.GF23801@atomide.com>
+References: <20150924090048.GA21626@n2100.arm.linux.org.uk>
+ <20150924233756.GN23801@atomide.com>
+ <20151001093325.GU21513@n2100.arm.linux.org.uk>
+ <CAPDyKFpnqJBrtiBekikrNHAf-agZm12KnF9n+=+72HH=jti-KA@mail.gmail.com>
+ <20151001100326.GV21513@n2100.arm.linux.org.uk>
+ <20151005112304.GZ23801@atomide.com>
+ <20151005143532.GA23801@atomide.com>
+ <20151005145127.GB23801@atomide.com>
+ <20151005171155.GF23801@atomide.com>
+Message-ID: <20151005183813.GD21626@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/2015 11:58 AM, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [151005 09:47]:
->> Tony,
->>
->> On 10/03/2015 12:29 PM, kbuild test robot wrote:
->>> Hi Suman,
->>>
->>> [auto build test results on v4.3-rc3 -- if it's inappropriate base, please ignore]
->>>
->>> config: arm-omap1_defconfig (attached as .config)
->>> reproduce:
->>>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->>>         chmod +x ~/bin/make.cross
->>>         # save the attached .config to linux build tree
->>>         make.cross ARCH=arm 
->>>
->>> All error/warnings (new ones prefixed by >>):
->>>
->>>    arch/arm/plat-omap/dmtimer.c: In function 'omap_dm_timer_set_source':
->>>>> arch/arm/plat-omap/dmtimer.c:509:2: error: implicit declaration of function 'clk_hw_get_num_parents' [-Werror=implicit-function-declaration]
->>>      if (!clk_hw_get_num_parents(__clk_get_hw(timer->fclk)))
->>>      ^
->>>>> arch/arm/plat-omap/dmtimer.c:509:2: error: implicit declaration of function '__clk_get_hw' [-Werror=implicit-function-declaration]
->>>    cc1: some warnings being treated as errors
->>>
->>> vim +/clk_hw_get_num_parents +509 arch/arm/plat-omap/dmtimer.c
->>>
->>>    503			return pdata->set_timer_src(timer->pdev, source);
->>>    504	
->>>    505		if (IS_ERR(timer->fclk))
->>>    506			return -EINVAL;
->>>    507	
->>>    508		/* Check if the clock has parents if not no point checking */
->>>  > 509		if (!clk_hw_get_num_parents(__clk_get_hw(timer->fclk)))
->>>    510			return 0;
->>
->> CONFIG_COMMON_CLK is not defined for OMAP1. So, are you ok if I enclose
->> this within #ifdef CONFIG_COMMON_CLK?
+On Mon, Oct 05, 2015 at 10:11:56AM -0700, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [151005 07:57]:
+> > * Tony Lindgren <tony@atomide.com> [151005 07:44]:
+> > > * Tony Lindgren <tony@atomide.com> [151005 04:28]:
+> > > 
+> > > Based on some tests it seems that the duovero unpaired regulator usage
+> > > is fixed by reverting:
+> > > 
+> > > c55d7a055364 ("mmc: host: omap_hsmmc: use regulator_is_enabled to
+> > > find pbias status")
+> > 
+> > With commit c55d7a055364 my guess is that the PBIAS regulator is
+> > already on from an earlier MMC probe and getting re-enabled when
+> > a deferred probe happens?
 > 
-> Yes, or maybe you can just clk_get_rate() on the 32k oscillator?
+> Unless somebody has a better fix in mind for the above, I suggest
+> we revert it for the -rc kernel.
+
+Let me try reverting that in my build tree, and...
+
+> > > And it seems that omap3 legacy MMC is broken earlier in the
+> > > series with:
+> > > 
+> > > 7d607f917008 ("mmc: host: omap_hsmmc: use
+> > > devm_regulator_get_optional() for vmmc")
+> > > 
+> > > This one does not cleanly revert so have not yet tried reverting
+> > > it.
+> > 
+> > And with commit 7d607f917008 I'm guessing we can't return an
+> > error if the PBIAS regulator does not exist as that's not there
+> > for the legacy booting.
 > 
-> Boards with no 32k oscillator should set the rate for that 0 zero.
+> For omap3 legacy booting, we keep getting -EPROBE_DEFER for
+> all the optional regulators.
+> 
+> Something like the following might be the minimal fix for the -rc
+> cycle?
 
-Well, this API is about setting the timer clk's mux source, and not
-really dealing with the clk rate or just setting it to the 32k
-oscillator. A 32k is usually one of the mux parents (if the timer has
-them). If there is a way to find if the clk is a mux clock, then that
-check would be ideal. But since no such thing exists, so I will go ahead
-and fix this by adding the #ifdef check.
+applying this patch.  If that gets things going again, then we
+_definitely_ should get both of these to Linus ASAP.  The breakage
+has been around far too long already.
 
-regards
-Suman
+> 8< ----------------
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Mon, 5 Oct 2015 09:37:36 -0700
+> Subject: [PATCH] mmc: host: omap_hsmmc: Fix MMC for omap3 legacy booting
+> 
+> Starting with commit 7d607f917008 ("mmc: host: omap_hsmmc: use
+> devm_regulator_get_optional() for vmmc") MMC on omap3 stopped working
+> for legacy booting.
+> 
+> This is because legacy booting sets up some of the resource in the
+> platform init code, and for optional regulators always seem to
+> return -EPROBE_DEFER for the legacy booting.
+> 
+> Let's fix the issue by checking for device tree based booting for
+> now. Then when omap3 boots in device tree only mode, this patch
+> can be just reverted.
+> 
+> Fixes: 7d607f917008 ("mmc: host: omap_hsmmc: use
+> devm_regulator_get_optional() for vmmc")
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -478,7 +478,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+>  	mmc->supply.vmmc = devm_regulator_get_optional(host->dev, "vmmc");
+>  	if (IS_ERR(mmc->supply.vmmc)) {
+>  		ret = PTR_ERR(mmc->supply.vmmc);
+> -		if (ret != -ENODEV)
+> +		if ((ret != -ENODEV) && host->dev->of_node)
+>  			return ret;
+>  		dev_dbg(host->dev, "unable to get vmmc regulator %ld\n",
+>  			PTR_ERR(mmc->supply.vmmc));
+> @@ -493,7 +493,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+>  	mmc->supply.vqmmc = devm_regulator_get_optional(host->dev, "vmmc_aux");
+>  	if (IS_ERR(mmc->supply.vqmmc)) {
+>  		ret = PTR_ERR(mmc->supply.vqmmc);
+> -		if (ret != -ENODEV)
+> +		if ((ret != -ENODEV) && host->dev->of_node)
+>  			return ret;
+>  		dev_dbg(host->dev, "unable to get vmmc_aux regulator %ld\n",
+>  			PTR_ERR(mmc->supply.vqmmc));
+> @@ -503,7 +503,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+>  	host->pbias = devm_regulator_get_optional(host->dev, "pbias");
+>  	if (IS_ERR(host->pbias)) {
+>  		ret = PTR_ERR(host->pbias);
+> -		if (ret != -ENODEV)
+> +		if ((ret != -ENODEV) && host->dev->of_node)
+>  			return ret;
+>  		dev_dbg(host->dev, "unable to get pbias regulator %ld\n",
+>  			PTR_ERR(host->pbias));
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
