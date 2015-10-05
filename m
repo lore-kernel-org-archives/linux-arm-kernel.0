@@ -1,128 +1,189 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 5 Oct 2015 10:54:05 +0100
-Subject: [PATCH] sparc(64)/iommu: fixup iommu_tbl_range_alloc() types
-In-Reply-To: <1442855829-11245-1-git-send-email-andre.przywara@arm.com>
-References: <55FC49B8.3020100@arm.com>
- <1442855829-11245-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <561248BD.8080809@arm.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon, 5 Oct 2015 17:56:00 +0800
+Subject: [RFC PATCH v8 0/10] Add external dma support for Synopsys MSHC
+In-Reply-To: <5611D420.5080708@samsung.com>
+References: <1442385625-26775-1-git-send-email-shawn.lin@rock-chips.com>
+ <560CF98B.7010609@samsung.com> <560E5320.6050003@rock-chips.com>
+ <5611D420.5080708@samsung.com>
+Message-ID: <56124930.7020604@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On 2015/10/5 9:36, Jaehoon Chung wrote:
+> Hi, Shawn.
+>
+> On 10/02/2015 06:49 PM, Shawn Lin wrote:
+>> On 2015/10/1 17:14, Jaehoon Chung wrote:
+>>> Dear, All.
+>>>
+>>> I will apply patch 01-03 at my repository on today.
+>>> But i don't know better how i do about other patches relevant to config file.
+>>>
+>>
+>> Thanks, Jaehoon. :)
+>>
+>> I guess it would be acceptable to pick the config changes, already they were acked by the soc maintainers, via dw_mmc tree when ulf merge dw_mmc tree into his mmc-tree.
+>
+> Some patches didn't get the maintainer's acked-by.
+> I will wait for that..until this week. How about?
+>
 
-On 21/09/15 18:17, Andre Przywara wrote:
-> With DMA_ERROR_CODE now being dma_addr_t in most architectures, it
-> turned out that iommu_tbl_range_alloc (defined in lib/iommu-common.c)
-> is actually using a wrong return type.
-> This was easily fixed in a previous patch, but now the types in the
-> callers do not match anymore.
-> This patch fixes the obvious mismatches to allow sane comparisons with
-> the error return value.
-> Compile-tested on sparc, sparc64, x86, ARM, arm64.
+No problem, take your time. ??
 
-Is there any news on that issue? Are you willing to take either of my
-patches to fix the compile warnings I see on ARM with LPAE enabled?
+> Best Regards,
+> Jaehoon Chung
+>
+>>
+>>
+>>> Best Regards,
+>>> Jaehoon Chung
+>>>
+>>> On 09/16/2015 03:40 PM, Shawn Lin wrote:
+>>>> Synopsys DesignWare mobile storage host controller supports three
+>>>> types of transfer mode: pio, internal dma and external dma. However,
+>>>> dw_mmc can only supports pio and internal dma now. Thus some platforms
+>>>> using dw-mshc integrated with generic dma can't work in dma mode. So we
+>>>> submit this patch to achieve it.
+>>>>
+>>>> And the config option, CONFIG_MMC_DW_IDMAC, was added by Will Newton
+>>>> (commit:f95f3850) for the first version of dw_mmc and never be touched since
+>>>> then. At that time dt-bindings hadn't been introduced into dw_mmc yet means
+>>>> we should select CONFIG_MMC_DW_IDMAC to enable internal dma mode at compile
+>>>> time. Nowadays, device-tree helps us to support a variety of boards with one
+>>>> kernel. That's why we need to remove it and decide the transfer mode by reading
+>>>> dw_mmc's HCON reg at runtime.
+>>>>
+>>>> This RFC patch needs lots of ACKs. I know it's hard, but it does need someone
+>>>> to make the running.
+>>>>
+>>>> Patch does the following things:
+>>>> - remove CONFIG_MMC_DW_IDMAC config option
+>>>> - add bindings for edmac used by synopsys-dw-mshc
+>>>>     at runtime
+>>>> - add edmac support for synopsys-dw-mshc
+>>>>
+>>>> Patch is based on next of git://git.linaro.org/people/ulf.hansson/mmc
+>>>>
+>>>> Test emmc throughput on my platform with edmac support and without edmac support(pio only)
+>>>> iozone -L64 -S32 -azecwI -+n -r4k -r64k -r128k -s1g -i0 -i1 -i2 -f datafile -Rb out.xls > /mnt/result.txt
+>>>> (light cpu loading, Direct IO, fixed line size, all pattern recycle, 1GB data in total)
+>>>>    ___________________________________________________________
+>>>> |                   external dma mode                       |
+>>>> |-----------------------------------------------------------|
+>>>> |blksz | Random Read | Random Write | Seq Read   | Seq Write|
+>>>> |-----------------------------------------------------------|
+>>>> |4kB   |  13953kB/s  |    8602kB/s  | 13672kB/s  |  9785kB/s|
+>>>> |-----------------------------------------------------------|
+>>>> |64kB  |  46058kB/s  |   24794kB/s  | 48058kB/s  | 25418kB/s|
+>>>> |-----------------------------------------------------------|
+>>>> |128kB |  57026kB/s  |   35117kB/s  | 57375kB/s  | 35183kB/s|
+>>>> |-----------------------------------------------------------|
+>>>>                              VS
+>>>>    ___________________________________________________________
+>>>> |                          pio mode                         |
+>>>> |-----------------------------------------------------------|
+>>>> |blksz | Random Read  | Random Write | Seq Read  | Seq Write|
+>>>> |-----------------------------------------------------------|
+>>>> |4kB   |  11720kB/s   |    8644kB/s  | 11549kB/s |  9624kB/s|
+>>>> |-----------------------------------------------------------|
+>>>> |64kB  |  21869kB/s   |   24414kB/s  | 22031kB/s | 27986kB/s|
+>>>> |-----------------------------------------------------------|
+>>>> |128kB |  23718kB/s   |   34495kB/s  | 24698kB/s | 34637kB/s|
+>>>> |-----------------------------------------------------------|
+>>>>
+>>>>
+>>>> Changes in v8:
+>>>> - remove trans_mode variable
+>>>> - remove unnecessary dma_ops check
+>>>> - remove unnecessary comment
+>>>> - fix coding style based on latest ulf's next
+>>>> - add Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+>>>>     for HCON's changes
+>>>>
+>>>> Changes in v7:
+>>>> - rebased on Ulf's next
+>>>> - combine condition state
+>>>> - elaborate more about DMA_INTERFACE
+>>>> - define some macro for DMA_INERFACE value
+>>>> - spilt HCON ops' changes into another patch
+>>>>
+>>>> Changes in v6:
+>>>> - add trans_mode condition for IDMAC initialization
+>>>>     suggested by Heiko
+>>>> - re-test my patch on rk3188 platform and update commit msg
+>>>> - update performance of pio vs edmac in cover letter
+>>>>
+>>>> Changes in v5:
+>>>> - add the title of cover letter
+>>>> - fix typo of comment
+>>>> - add macro for reading HCON register
+>>>> - add "Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>" for exynos_defconfig patch
+>>>> - add "Acked-by: Vineet Gupta <vgupta@synopsys.com>" for axs10x_defconfig patch
+>>>> - add "Acked-by: Govindraj Raja <govindraj.raja@imgtec.com>" and
+>>>>     "Acked-by: Ralf Baechle <ralf@linux-mips.org>" for pistachio_defconfig patch
+>>>> - add "Acked-by: Joachim Eastwood <manabian@gmail.com>" for lpc18xx_defconfig patch
+>>>> - add "Acked-by: Wei Xu <xuwei5@hisilicon.com>" for hisi_defconfig patch
+>>>> - rebase on "https://github.com/jh80chung/dw-mmc.git tags/dw-mmc-for-ulf-v4.2" for merging easily
+>>>>
+>>>> Changes in v4:
+>>>> - remove "host->trans_mode" and use "host->use_dma" to indicate
+>>>>     transfer mode.
+>>>> - remove all bt-bindings' changes since we don't need new properities.
+>>>> - check transfer mode at runtime by reading HCON reg
+>>>> - spilt defconfig changes for each sub-architecture
+>>>> - fix the title of cover letter
+>>>> - reuse some code for reducing code size
+>>>>
+>>>> Changes in v3:
+>>>> - choose transfer mode at runtime
+>>>> - remove all CONFIG_MMC_DW_IDMAC config option
+>>>> - add supports-idmac property for some platforms
+>>>>
+>>>> Changes in v2:
+>>>> - Fix typo of dev_info msg
+>>>> - remove unused dmach from declaration of dw_mci_dma_slave
+>>>>
+>>>> Shawn Lin (10):
+>>>>     mmc: dw_mmc: Add external dma interface support
+>>>>     mmc: dw_mmc: use macro for HCON register operations
+>>>>     Documentation: synopsys-dw-mshc: add bindings for idmac and edmac
+>>>>     mips: pistachio_defconfig: remove CONFIG_MMC_DW_IDMAC
+>>>>     arc: axs10x_defconfig: remove CONFIG_MMC_DW_IDMAC
+>>>>     arm: exynos_defconfig: remove CONFIG_MMC_DW_IDMAC
+>>>>     arm: hisi_defconfig: remove CONFIG_MMC_DW_IDMAC
+>>>>     arm: lpc18xx_defconfig: remove CONFIG_MMC_DW_IDMAC
+>>>>     arm: multi_v7_defconfig: remove CONFIG_MMC_DW_IDMAC
+>>>>     arm: zx_defconfig: remove CONFIG_MMC_DW_IDMAC
+>>>>
+>>>>    .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |  25 ++
+>>>>    arch/arc/configs/axs101_defconfig                  |   1 -
+>>>>    arch/arc/configs/axs103_defconfig                  |   1 -
+>>>>    arch/arc/configs/axs103_smp_defconfig              |   1 -
+>>>>    arch/arm/configs/exynos_defconfig                  |   1 -
+>>>>    arch/arm/configs/hisi_defconfig                    |   1 -
+>>>>    arch/arm/configs/lpc18xx_defconfig                 |   1 -
+>>>>    arch/arm/configs/multi_v7_defconfig                |   1 -
+>>>>    arch/arm/configs/zx_defconfig                      |   1 -
+>>>>    arch/mips/configs/pistachio_defconfig              |   1 -
+>>>>    drivers/mmc/host/Kconfig                           |  11 +-
+>>>>    drivers/mmc/host/dw_mmc-pltfm.c                    |   2 +
+>>>>    drivers/mmc/host/dw_mmc.c                          | 272 +++++++++++++++++----
+>>>>    drivers/mmc/host/dw_mmc.h                          |   9 +
+>>>>    include/linux/mmc/dw_mmc.h                         |  23 +-
+>>>>    15 files changed, 276 insertions(+), 75 deletions(-)
+>>>>
+>>>
+>>>
+>>>
+>>>
+>>
+>>
+>
+>
+>
+>
 
-Cheers,
-Andre.
 
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Hi David,
-> 
-> as promised my first naive try on fixing the callers of
-> iommu_tbl_range_alloc() as well. This goes on top of the return type
-> fix I sent on Friday.
-> Please let me know if that makes sense or whether I am looking in the
-> totally wrong direction.
-> 
-> Cheers,
-> Andre.
->  arch/sparc/kernel/iommu.c     | 5 +++--
->  arch/sparc/kernel/ldc.c       | 5 +++--
->  arch/sparc/kernel/pci_sun4v.c | 7 ++++---
->  3 files changed, 10 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/sparc/kernel/iommu.c b/arch/sparc/kernel/iommu.c
-> index 5320689..7d04a87 100644
-> --- a/arch/sparc/kernel/iommu.c
-> +++ b/arch/sparc/kernel/iommu.c
-> @@ -157,7 +157,7 @@ static inline iopte_t *alloc_npages(struct device *dev,
->  				    struct iommu *iommu,
->  				    unsigned long npages)
->  {
-> -	unsigned long entry;
-> +	dma_addr_t entry;
->  
->  	entry = iommu_tbl_range_alloc(dev, &iommu->tbl, npages, NULL,
->  				      (unsigned long)(-1), 0);
-> @@ -476,7 +476,8 @@ static int dma_4u_map_sg(struct device *dev, struct scatterlist *sglist,
->  				  IO_PAGE_SIZE) >> IO_PAGE_SHIFT;
->  	base_shift = iommu->tbl.table_map_base >> IO_PAGE_SHIFT;
->  	for_each_sg(sglist, s, nelems, i) {
-> -		unsigned long paddr, npages, entry, out_entry = 0, slen;
-> +		unsigned long paddr, npages, slen;
-> +		dma_addr_t entry, out_entry = 0;
->  		iopte_t *base;
->  
->  		slen = s->length;
-> diff --git a/arch/sparc/kernel/ldc.c b/arch/sparc/kernel/ldc.c
-> index 1ae5eb1..41e79cb 100644
-> --- a/arch/sparc/kernel/ldc.c
-> +++ b/arch/sparc/kernel/ldc.c
-> @@ -10,6 +10,7 @@
->  #include <linux/delay.h>
->  #include <linux/errno.h>
->  #include <linux/string.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/scatterlist.h>
->  #include <linux/interrupt.h>
->  #include <linux/list.h>
-> @@ -1949,11 +1950,11 @@ static u64 make_cookie(u64 index, u64 pgsz_code, u64 page_offset)
->  static struct ldc_mtable_entry *alloc_npages(struct ldc_iommu *iommu,
->  					     unsigned long npages)
->  {
-> -	long entry;
-> +	dma_addr_t entry;
->  
->  	entry = iommu_tbl_range_alloc(NULL, &iommu->iommu_map_table,
->  				      npages, NULL, (unsigned long)-1, 0);
-> -	if (unlikely(entry < 0))
-> +	if (unlikely(entry == DMA_ERROR_CODE))
->  		return NULL;
->  
->  	return iommu->page_table + entry;
-> diff --git a/arch/sparc/kernel/pci_sun4v.c b/arch/sparc/kernel/pci_sun4v.c
-> index d2fe57d..f86902f 100644
-> --- a/arch/sparc/kernel/pci_sun4v.c
-> +++ b/arch/sparc/kernel/pci_sun4v.c
-> @@ -136,7 +136,7 @@ static void *dma_4v_alloc_coherent(struct device *dev, size_t size,
->  	struct iommu *iommu;
->  	struct page *page;
->  	void *ret;
-> -	long entry;
-> +	dma_addr_t entry;
->  	int nid;
->  
->  	size = IO_PAGE_ALIGN(size);
-> @@ -242,7 +242,7 @@ static dma_addr_t dma_4v_map_page(struct device *dev, struct page *page,
->  	unsigned long i, base_paddr;
->  	u32 bus_addr, ret;
->  	unsigned long prot;
-> -	long entry;
-> +	dma_addr_t entry;
->  
->  	iommu = dev->archdata.iommu;
->  
-> @@ -361,7 +361,8 @@ static int dma_4v_map_sg(struct device *dev, struct scatterlist *sglist,
->  				  IO_PAGE_SIZE) >> IO_PAGE_SHIFT;
->  	base_shift = iommu->tbl.table_map_base >> IO_PAGE_SHIFT;
->  	for_each_sg(sglist, s, nelems, i) {
-> -		unsigned long paddr, npages, entry, out_entry = 0, slen;
-> +		unsigned long paddr, npages, slen;
-> +		dma_addr_t entry, out_entry = 0;
->  
->  		slen = s->length;
->  		/* Sanity check */
-> 
+-- 
+Best Regards
+Shawn Lin
