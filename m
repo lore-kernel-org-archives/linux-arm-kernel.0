@@ -1,65 +1,30 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  5 Oct 2015 14:47:17 +0200
-Subject: [PATCH 6/6] ARM: s3c64xx: smartq: Use PWM lookup table
-In-Reply-To: <1444049237-29878-1-git-send-email-thierry.reding@gmail.com>
-References: <1444049237-29878-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1444049237-29878-7-git-send-email-thierry.reding@gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 05 Oct 2015 13:48:12 +0100
+Subject: [PATCH v4 2/5] firmware: arm_scpi: Extend to support sensors
+In-Reply-To: <560EB273.7000804@arm.com> (Sudeep Holla's message of "Fri, 2 Oct
+ 2015 17:36:03 +0100")
+References: <1442335861-7282-1-git-send-email-punit.agrawal@arm.com>
+ <1442335861-7282-3-git-send-email-punit.agrawal@arm.com>
+ <560EB273.7000804@arm.com>
+Message-ID: <9hhlhbhiir7.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a PWM lookup table to provide the PWM to the pwm-backlight device.
-The driver has a legacy code path that is required only because boards
-still use the legacy method of requesting PWMs by global ID. Replacing
-these usages allows that legacy fallback to be removed.
+Sudeep Holla <sudeep.holla@arm.com> writes:
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
----
- arch/arm/mach-s3c64xx/mach-smartq.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+> On 15/09/15 17:50, Punit Agrawal wrote:
+>> ARM System Control Processor (SCP) provides an API to query and use
+>> the sensors available in the system. Extend the SCPI driver to support
+>>   sensor messages.
+>>
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>
+>
+> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
-index b3d13537a7f0..7b8a3699795c 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq.c
-@@ -14,6 +14,7 @@
- #include <linux/gpio.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
-+#include <linux/pwm.h>
- #include <linux/pwm_backlight.h>
- #include <linux/serial_core.h>
- #include <linux/serial_s3c.h>
-@@ -139,6 +140,11 @@ static struct platform_device smartq_usb_otg_vbus_dev = {
- 	.dev.platform_data	= &smartq_usb_otg_vbus_pdata,
- };
- 
-+static struct pwm_lookup smartq_pwm_lookup[] = {
-+	PWM_LOOKUP("samsung-pwm", 1, "pwm-backlight.0", NULL,
-+		   1000000000 / (1000 * 20), PWM_POLARITY_NORMAL),
-+};
-+
- static int smartq_bl_init(struct device *dev)
- {
-     s3c_gpio_cfgpin(S3C64XX_GPF(15), S3C_GPIO_SFN(2));
-@@ -147,10 +153,8 @@ static int smartq_bl_init(struct device *dev)
- }
- 
- static struct platform_pwm_backlight_data smartq_backlight_data = {
--	.pwm_id		= 1,
- 	.max_brightness	= 1000,
- 	.dft_brightness	= 600,
--	.pwm_period_ns	= 1000000000 / (1000 * 20),
- 	.enable_gpio	= -1,
- 	.init		= smartq_bl_init,
- };
-@@ -396,5 +400,6 @@ void __init smartq_machine_init(void)
- 	WARN_ON(smartq_usb_host_init());
- 	WARN_ON(smartq_wifi_init());
- 
-+	pwm_add_table(smartq_pwm_lookup, ARRAY_SIZE(smartq_pwm_lookup));
- 	platform_add_devices(smartq_devices, ARRAY_SIZE(smartq_devices));
- }
--- 
-2.5.0
+Thanks, Sudeep!
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
