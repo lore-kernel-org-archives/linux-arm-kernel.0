@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  5 Oct 2015 10:49:45 +0200
-Subject: [PATCH 05/17] ARM: pxa: lpd270: Use PWM lookup table
+Date: Mon,  5 Oct 2015 10:49:43 +0200
+Subject: [PATCH 03/17] ARM: pxa: ezx: Use PWM lookup table
 In-Reply-To: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
 References: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1444034997-9805-6-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1444034997-9805-4-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,45 +17,45 @@ Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
 Cc: Robert Jarzmik <robert.jarzmik@free.fr>
 Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
 ---
- arch/arm/mach-pxa/lpd270.c | 9 +++++++--
+ arch/arm/mach-pxa/ezx.c | 9 +++++++--
  1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/lpd270.c b/arch/arm/mach-pxa/lpd270.c
-index b070167deef2..ab4e84f4ee0c 100644
---- a/arch/arm/mach-pxa/lpd270.c
-+++ b/arch/arm/mach-pxa/lpd270.c
-@@ -23,6 +23,7 @@
- #include <linux/ioport.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
+diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
+index ab93441e596e..9a9c15bfcd34 100644
+--- a/arch/arm/mach-pxa/ezx.c
++++ b/arch/arm/mach-pxa/ezx.c
+@@ -15,6 +15,7 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
 +#include <linux/pwm.h>
  #include <linux/pwm_backlight.h>
- #include <linux/smc91x.h>
+ #include <linux/input.h>
+ #include <linux/gpio.h>
+@@ -49,11 +50,14 @@
+ #define GPIO19_GEN1_CAM_RST		19
+ #define GPIO28_GEN2_CAM_RST		28
  
-@@ -271,11 +272,14 @@ static struct platform_device lpd270_flash_device[2] = {
- 	},
- };
- 
-+static struct pwm_lookup lpd270_pwm_lookup[] = {
-+	PWM_LOOKUP("pxa27x-pwm.0", 0, "pwm-backlight.0", NULL, 78770,
++static struct pwm_lookup ezx_pwm_lookup[] = {
++	PWM_LOOKUP("pxa27x-pwm.0", 0, "pwm-backlight.0", NULL, 78700,
 +		   PWM_POLARITY_NORMAL),
 +};
 +
- static struct platform_pwm_backlight_data lpd270_backlight_data = {
+ static struct platform_pwm_backlight_data ezx_backlight_data = {
 -	.pwm_id		= 0,
- 	.max_brightness	= 1,
- 	.dft_brightness	= 1,
+ 	.max_brightness	= 1023,
+ 	.dft_brightness	= 1023,
 -	.pwm_period_ns	= 78770,
  	.enable_gpio	= -1,
  };
  
-@@ -474,6 +478,7 @@ static void __init lpd270_init(void)
- 	 */
- 	ARB_CNTRL = ARB_CORE_PARK | 0x234;
+@@ -817,6 +821,7 @@ static void __init a780_init(void)
+ 		platform_device_register(&a780_camera);
+ 	}
  
-+	pwm_add_table(lpd270_pwm_lookup, ARRAY_SIZE(lpd270_pwm_lookup));
- 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
- 
- 	pxa_set_ac97_info(NULL);
++	pwm_add_table(ezx_pwm_lookup, ARRAY_SIZE(ezx_pwm_lookup));
+ 	platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
+ 	platform_add_devices(ARRAY_AND_SIZE(a780_devices));
+ }
 -- 
 2.5.0
