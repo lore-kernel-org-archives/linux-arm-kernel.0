@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  5 Oct 2015 14:47:15 +0200
-Subject: [PATCH 4/6] ARM: s3c64xx: crag6410: Use PWM lookup table
+Date: Mon,  5 Oct 2015 14:47:16 +0200
+Subject: [PATCH 5/6] ARM: s3c64xx: hmt: Use PWM lookup table
 In-Reply-To: <1444049237-29878-1-git-send-email-thierry.reding@gmail.com>
 References: <1444049237-29878-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1444049237-29878-5-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1444049237-29878-6-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,45 +16,51 @@ Cc: Kukjin Kim <kgene@kernel.org>
 Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
 ---
- arch/arm/mach-s3c64xx/mach-crag6410.c | 9 +++++++--
+ arch/arm/mach-s3c64xx/mach-hmt.c | 9 +++++++--
  1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index 65c426bc45f7..d13aa3f9bac4 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -25,6 +25,7 @@
- #include <linux/mmc/host.h>
- #include <linux/regulator/machine.h>
- #include <linux/regulator/fixed.h>
+diff --git a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
+index e4b087c58ee6..816b39d1e6d1 100644
+--- a/arch/arm/mach-s3c64xx/mach-hmt.c
++++ b/arch/arm/mach-s3c64xx/mach-hmt.c
+@@ -19,6 +19,7 @@
+ #include <linux/gpio.h>
+ #include <linux/delay.h>
+ #include <linux/leds.h>
 +#include <linux/pwm.h>
  #include <linux/pwm_backlight.h>
- #include <linux/dm9000.h>
- #include <linux/gpio_keys.h>
-@@ -108,11 +109,14 @@ static struct s3c2410_uartcfg crag6410_uartcfgs[] __initdata = {
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+@@ -73,6 +74,11 @@ static struct s3c2410_uartcfg hmt_uartcfgs[] __initdata = {
  	},
  };
  
-+static struct pwm_lookup crag6410_pwm_lookup[] = {
-+	PWM_LOOKUP("samsung-pwm", 0, "pwm-backlight", NULL, 100000,
-+		   PWM_POLARITY_NORMAL),
++static struct pwm_lookup hmt_pwm_lookup[] = {
++	PWM_LOOKUP("samsung-pwm", 1, "pwm-backlight.0", NULL,
++		   1000000000 / (100 * 256 * 20), PWM_POLARITY_NORMAL),
 +};
 +
- static struct platform_pwm_backlight_data crag6410_backlight_data = {
--	.pwm_id		= 0,
- 	.max_brightness	= 1000,
- 	.dft_brightness	= 600,
--	.pwm_period_ns	= 100000,	/* about 1kHz */
+ static int hmt_bl_init(struct device *dev)
+ {
+ 	int ret;
+@@ -110,10 +116,8 @@ static void hmt_bl_exit(struct device *dev)
+ }
+ 
+ static struct platform_pwm_backlight_data hmt_backlight_data = {
+-	.pwm_id		= 1,
+ 	.max_brightness	= 100 * 256,
+ 	.dft_brightness	= 40 * 256,
+-	.pwm_period_ns	= 1000000000 / (100 * 256 * 20),
  	.enable_gpio	= -1,
- };
+ 	.init		= hmt_bl_init,
+ 	.notify		= hmt_bl_notify,
+@@ -268,6 +272,7 @@ static void __init hmt_machine_init(void)
+ 	gpio_request(S3C64XX_GPF(13), "usb power");
+ 	gpio_direction_output(S3C64XX_GPF(13), 1);
  
-@@ -843,6 +847,7 @@ static void __init crag6410_machine_init(void)
- 	samsung_keypad_set_platdata(&crag6410_keypad_data);
- 	s3c64xx_spi0_set_platdata(NULL, 0, 2);
++	pwm_add_table(hmt_pwm_lookup, ARRAY_SIZE(hmt_pwm_lookup));
+ 	platform_add_devices(hmt_devices, ARRAY_SIZE(hmt_devices));
+ }
  
-+	pwm_add_table(crag6410_pwm_lookup, ARRAY_SIZE(crag6410_pwm_lookup));
- 	platform_add_devices(crag6410_devices, ARRAY_SIZE(crag6410_devices));
- 
- 	gpio_led_register_device(-1, &gpio_leds_pdata);
 -- 
 2.5.0
