@@ -1,98 +1,74 @@
-From: lho@apm.com (Loc Ho)
-Date: Mon, 5 Oct 2015 13:41:58 -0700
-Subject: [PATCH RFC] apei: xgene: Add ACPI APEI support for X-Gene
-In-Reply-To: <20151002075411.GB16538@pd.tnic>
-References: <1443747112-24814-1-git-send-email-lho@apm.com>
- <20151002075411.GB16538@pd.tnic>
-Message-ID: <CAPw-ZTn5stnEobMH018oLPn3nDO1uweVeVs=Otg3-6cXBWLz6g@mail.gmail.com>
+From: Andrew.Pinski@caviumnetworks.com (Pinski, Andrew)
+Date: Mon, 5 Oct 2015 21:00:33 +0000
+Subject: [PATCH v5 00/23] ILP32 for ARM64
+In-Reply-To: <20151005155857.GA5557@MBP.local>
+References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
+ <20150930101918.GA9753@e104818-lin.cambridge.arm.com>
+ <20151001191520.GA25295@yury-N73SV> <1708349.DFbfvHcnCR@wuerfel>
+ <F6B719D8-1FC0-4B26-A926-40FB6953AAE3@caviumnetworks.com>
+ <20151002093711.GA15803@localhost>
+ <D23487FC.908DE%pkapoor@caviumnetworks.com>, <20151005155857.GA5557@MBP.local>
+Message-ID: <8D6F4343-89AD-46A3-B7E7-15B8591CB020@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Borislav,
 
->> Add ACPI APEI support for X-Gene platform. This patch requires [1] to
->> configiure and build.
->>
->> [1] http://marc.info/?l=linux-kernel&m=143955588312730&w=2
->>
->> Signed-off-by: Tuan Phan <tphan@apm.com>
->> Signed-off-by: Loc Ho <lho@apm.com>
->> ---
->>  drivers/edac/Kconfig      |    7 +++
->>  drivers/edac/Makefile     |    2 +
->>  drivers/edac/xgene_apei.c |  120 +++++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 129 insertions(+), 0 deletions(-)
->>  create mode 100644 drivers/edac/xgene_apei.c
->>
->> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
->> index ef25000..f489852 100644
->> --- a/drivers/edac/Kconfig
->> +++ b/drivers/edac/Kconfig
->> @@ -390,4 +390,11 @@ config EDAC_XGENE
->>         Support for error detection and correction on the
->>         APM X-Gene family of SOCs.
->>
->> +config EDAC_XGENE_APEI
->> +     tristate "APM X-Gene SoC APEI"
->> +     depends on ACPI_APEI && (ARM64 || COMPILE_TEST)
->> +     help
->> +       APEI interface support for error detection and correction on the
->> +       APM X-Gene family of SOCs.
->> +
->>  endif # EDAC
->> diff --git a/drivers/edac/Makefile b/drivers/edac/Makefile
->> index dbf53e0..27dbae1 100644
->> --- a/drivers/edac/Makefile
->> +++ b/drivers/edac/Makefile
->> @@ -70,3 +70,5 @@ obj-$(CONFIG_EDAC_OCTEON_PCI)               += octeon_edac-pci.o
->>  obj-$(CONFIG_EDAC_ALTERA_MC)         += altera_edac.o
->>  obj-$(CONFIG_EDAC_SYNOPSYS)          += synopsys_edac.o
->>  obj-$(CONFIG_EDAC_XGENE)             += xgene_edac.o
->> +obj-$(CONFIG_EDAC_XGENE_APEI)                += xgene_apei.o
->> +
->> diff --git a/drivers/edac/xgene_apei.c b/drivers/edac/xgene_apei.c
->> new file mode 100644
->> index 0000000..6ec416f
->> --- /dev/null
->> +++ b/drivers/edac/xgene_apei.c
->> @@ -0,0 +1,120 @@
->> +/*
->> + * AppliedMicro X-Gene APEI Driver
->> + *
->> + * Copyright (c) 2015, Applied Micro Circuits Corporation
->> + * Author: Tuan Phan <tphan@apm.com>
->> + *
->> + * This program is free software; you can redistribute  it and/or modify it
->> + * under  the terms of  the GNU General  Public License as published by the
->> + * Free Software Foundation;  either version 2 of the  License, or (at your
->> + * option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + *
->> + * This driver provides the interrupt hook up with the UEFI FW for the X-Gene
->> + * SoC processor under the following conditions:
->> + *
->> + * 1. No interrupt GPIO available or don't want to use one and no EL3 support
->> + * 2. With EL3 support, but no mean to interrupt the Linux OS that an event
->> + *    has occurred.
->
-> Why is this an x-gene-specific driver and not a generic, APEI one, like
-> ghes_edac? I'd like to see a single ARM64 APEI/GHES/whatever driver
-> which is programmed against the spec - no vendor-specific stuff. And I
-> don't see anything vendor-specific below except xgene_apei_acpi_match
-> which can be part of the generic driver.
->
 
-Yes... We can make this generic. The only non-generic is the way the
-interrupt is cleared. As of right now, the method of clearing the
-interrupt is by writing back the same value as read. This would be
-fine for most. But to ensure 100% coverage, would an AML method be
-better or needed?
+> On Oct 5, 2015, at 8:59 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> 
+>> On Sat, Oct 03, 2015 at 02:18:57AM +0000, Kapoor, Prasun wrote:
+>>> On 10/2/15, 2:37 AM, "Catalin Marinas" <catalin.marinas@arm.com> wrote:
+>>> So, at the time, following x32 discussions, we thought of using the
+>>> native ABI as much as possible. However, two important things happened
+>>> since:
+>>> 
+>>> 1. libc community didn't like breaking the POSIX compliance
+>>> 2. No-one seems desperate for ILP32 on AArch64
+>>> 
+>>> (1) is a fair point and I would rather be careful as we don't know the
+>>> extent of the code affected. In the meantime, we've also had ongoing
+>>> work for addressing the 2038 issue on 32-bit architectures.
+>>> 
+>>> The second point is equally important. The benchmarks I've seen didn't
+>>> show a significant improvement and the messages I got on various
+>>> channels pretty much labeled ILP32 as a transitional stage to full LP64.
+>>> In this case, we need to balance the benefits of a close to native ABI
+>>> (future proof, slightly higher performance) vs. the cost of maintaining
+>>> such ABI in the kernel on the long term, especially if it's not widely
+>>> used/tested.
+>> 
+>> For us ILP32  is not about putting this into our product flier at all, it
+>> is about supporting real applications. We have an existing product line of
+>> MIPS based SoCs where a large number of N32 (an exact equivalent of ILP32)
+>> applications are currently in production. Our customers are looking to
+>> bring those applications (mostly in Networking and Telecom space) over to
+>> ARMv8. 
+>> 
+>> We think its an extremely risky strategy to say either future processors
+>> should incur the additional cost (power and complexity) of implementing
+>> Aarch32 instruction set or have no way of  supporting 32 bit applications
+>> at all.
+> 
+> Well, given that Cavium posted only 3 versions of this series since
+> September 2013, it doesn't seem critical at all.
 
--Loc
+We are going to post another version as soon as we finish the changes that you requested this time around. I am working on the glibc and yury (with my help) will doing the kernel side. 
+
+
+> 
+>> Apart from there being an installed base of 32 bit networking and telecom
+>> applications, we have also seen non-trivial performance gains with ILP32
+>> (for example, our SPECINT score goes up by 7% with ILP32 compared to
+>> LP64).
+> 
+> It would be good to re-run the benchmarks with the latest gcc since
+> LP64/AArch64 support has evolved in the meantime.
+
+We are also rerunning the numbers with the latest released gcc (5.2) and will report results when we submit the next version of the patch set.  
+
+Thanks,
+Andrew
+
+> 
+> -- 
+> Catalin
