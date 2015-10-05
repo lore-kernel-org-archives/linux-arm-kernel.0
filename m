@@ -1,35 +1,28 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 5 Oct 2015 10:24:54 -0500
-Subject: [RFC/PATCH 03/11] arm: omap2: timer: remove __omap_gptimer_init()
-In-Reply-To: <20151005110144.GW23801@atomide.com>
-References: <1443559446-26969-1-git-send-email-balbi@ti.com>
- <1443559446-26969-4-git-send-email-balbi@ti.com>
- <20151005110144.GW23801@atomide.com>
-Message-ID: <20151005152454.GC18784@saruman.tx.rr.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 5 Oct 2015 16:26:30 +0100
+Subject: [PATCH v9] dmaengine: Add Xilinx AXI Direct Memory Access Engine
+ driver support
+In-Reply-To: <1440432666-10310-1-git-send-email-appanad@xilinx.com>
+References: <1440432666-10310-1-git-send-email-appanad@xilinx.com>
+Message-ID: <20151005152628.GE13501@vkoul-mobl.iind.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 05, 2015 at 04:01:45AM -0700, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [150929 13:48]:
-> > since now we can reuse __omap_sync32k_timer_init()
-> > for OMAP3-like devices, we can safely remove
-> > __omap_gptimer_init().
-> 
-> There are tons of boards out there that need to use the
-> high frequency ocillator source with gptimer because of the
-> beagleboard B4 and earlier issue #7. So we need to provide
-> both options for the boards. Using the high frequency
-> oscillator source blocks deeper idle states in hardware
-> so those devices are usable.
+On Mon, Aug 24, 2015 at 09:41:06PM +0530, Kedareswara rao Appana wrote:
+> This is the driver for the AXI Direct Memory Access (AXI DMA)
+> core, which is a soft Xilinx IP core that provides high-
+> bandwidth direct memory access between memory and AXI4-Stream
+> type target peripherals.
 
-have a closer look, that hasn't changed
+Okay reviewing this after the other Xilinx driver with very similar name, I
+am very concerned about code duplication. Both codes seems to be pretty much
+copy paste and some modifications for IP. In Linux kernel we reuse!
+
+Please create common lib for Xilinx drivers to use and
+have HW diff is two drivers, or manage those with different driver ops
+
+Pls justify why we should have two drivers. Looking at code makes me think
+otherwise
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151005/ba86f409/attachment.sig>
+~Vinod
