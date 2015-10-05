@@ -1,35 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 5 Oct 2015 14:56:30 +0200
-Subject: [PATCH 3/3] ARM: dts: sun4i: Add AXP209 PMU regulators for
- pcDuino1/2
-In-Reply-To: <1443985128-23137-4-git-send-email-siarhei.siamashka@gmail.com>
-References: <1443985128-23137-1-git-send-email-siarhei.siamashka@gmail.com>
- <1443985128-23137-4-git-send-email-siarhei.siamashka@gmail.com>
-Message-ID: <20151005125630.GN2696@lukather>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Mon, 5 Oct 2015 13:01:15 +0000
+Subject: [PATCH v9] dmaengine: Add Xilinx AXI Direct Memory Access
+ Engine driver support
+In-Reply-To: <CAAtXAHc_wfuzW=ERRqvjcd_Ow5e2RrEcDkiYRuotzCRhq+oUYQ@mail.gmail.com>
+References: <1440432666-10310-1-git-send-email-appanad@xilinx.com>
+ <CAAtXAHccn5UjCg9Qr1Li1c9LfsBXrgF=gpMqJ6stGOaWL0u_-g@mail.gmail.com>
+ <55E00050.2020709@xilinx.com>
+ <CAAtXAHc_wfuzW=ERRqvjcd_Ow5e2RrEcDkiYRuotzCRhq+oUYQ@mail.gmail.com>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A4EC0F2@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 04, 2015 at 09:58:48PM +0300, Siarhei Siamashka wrote:
-> This allows voltage-scaling with cpufreq-dt. The reliability of
-> voltage-scaling has been checked by reducing the voltage of all
-> operating points by 0.025V (for extra safety headroom) and running
-> libjpeg-turbo decoding tests on 5 pcDuino2 boards. It means that
-> the standard sun4i voltages should be perfectly fine too.
+Hi Vinod,
+
+	I didn't get any comments on this patch since last few weeks.
+Apart from the Moritz clock framework related comments and it is addressed by Michal.
+If you are ok with this patch could you please apply it?
+
+Regards,
+Kedar.
+
+> -----Original Message-----
+> From: Moritz Fischer [mailto:moritz.fischer at ettus.com]
+> Sent: Monday, September 21, 2015 10:47 PM
+> To: Michal Simek
+> Cc: Appana Durga Kedareswara Rao; Vinod Koul; Dan Williams; Soren
+> Brinkmann; Appana Durga Kedareswara Rao; anirudha at xilinx.com;
+> dmaengine at vger.kernel.org; linux-arm-kernel; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH v9] dmaengine: Add Xilinx AXI Direct Memory Access Engine
+> driver support
 > 
-> Signed-off-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
-
-Applied, thanks!
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151005/76e13837/attachment.sig>
+> Hi Kedar,
+> 
+> I finally got around to test your stuff on hardware. Sorry it took me so long.
+> 
+> [    5.486709] dma1chan0-dma1c: terminating after 5 tests, 0 failures (status 0)
+> 
+> So it looks like it's working. You can already add a
+> 
+> Tested-by: Moritz Fischer <moritz.fischer@ettus.com>
+> 
+> for the driver.
+> 
+> I'll take a closer look at the code this week now that I have a known good bit
+> file.
+> 
+> Thanks,
+> 
+> Moritz
