@@ -1,34 +1,60 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 5 Oct 2015 17:59:10 +0200
-Subject: [PATCH v7 2/3] pwm: add MediaTek display PWM driver support
-In-Reply-To: <1439882875-19596-3-git-send-email-yh.huang@mediatek.com>
-References: <1439882875-19596-1-git-send-email-yh.huang@mediatek.com>
- <1439882875-19596-3-git-send-email-yh.huang@mediatek.com>
-Message-ID: <20151005155910.GE17612@ulmo>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 5 Oct 2015 17:00:18 +0100
+Subject: [PATCH v2] arm: Adding support for atomic half word exchange
+In-Reply-To: <1912649938.590071444050653292.JavaMail.weblogic@epmlwas01c>
+References: <1912649938.590071444050653292.JavaMail.weblogic@epmlwas01c>
+Message-ID: <20151005160017.GA3211@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 18, 2015 at 03:27:54PM +0800, YH Huang wrote:
-> Add display PWM driver support to modify backlight for MT8173 and MT6595.
-> The PWM has one channel to control the brightness of the display.
-> When the (high_width / period) is closer to 1, the screen is brighter;
-> otherwise, it is darker.
+On Mon, Oct 05, 2015 at 01:10:53PM +0000, Sarbojit Ganguly wrote:
+> My sincere apologies for the format issue. This was due to the e-mail editor
+> which reformats the text.
+> I am reposting the patch, please let me know if it is ok this time.
 > 
-> Signed-off-by: YH Huang <yh.huang@mediatek.com>
+> 
+> v1-->v2 : Extended the guard code to cover the byte exchange case as 
+> well following opinion of Will Deacon.
+> Checkpatch has been run and issues were taken care of.
+> 
+> Since support for half-word atomic exchange was not there and Qspinlock
+> on ARM requires it, modified __xchg() to add support for that as well.
+> ARMv6 and lower does not support ldrex{b,h} so, added a guard code
+> to prevent build breaks.
+> 
+> Signed-off-by: Sarbojit Ganguly <ganguly.s@samsung.com>
 > ---
->  drivers/pwm/Kconfig        |   11 +++
->  drivers/pwm/Makefile       |    1 +
->  drivers/pwm/pwm-mtk-disp.c |  232 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 244 insertions(+)
->  create mode 100644 drivers/pwm/pwm-mtk-disp.c
+>  arch/arm/include/asm/cmpxchg.h | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
+> index 916a274..a53cbeb 100644
+> --- a/arch/arm/include/asm/cmpxchg.h
+> +++ b/arch/arm/include/asm/cmpxchg.h
+> @@ -39,6 +39,7 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+>  
+>  	switch (size) {
+>  #if __LINUX_ARM_ARCH__ >= 6
+> +#if !defined(CONFIG_CPU_V6)
 
-Applied, thanks.
+#ifndef ? (to match the __cmpxchg code).
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151005/c61d9679/attachment.sig>
+>  	case 1:
+>  		asm volatile("@	__xchg1\n"
+>  		"1:	ldrexb	%0, [%3]\n"
+> @@ -49,6 +50,22 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+>  			: "r" (x), "r" (ptr)
+>  			: "memory", "cc");
+>  		break;
+> +
+> +		/*
+> +		 * Half-word atomic exchange, required
+> +		 * for Qspinlock support on ARM.
+> +		 */
+
+I think I said it before, but I don't think this comment is of any real
+value.
+
+Other than those, this looks ok to me.
+
+Will
