@@ -1,40 +1,75 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 6 Oct 2015 00:03:26 +0200
-Subject: [PATCH v2 1/2] irqchip: sunxi-nmi: Use driver name instead of DT
- node name for identification
-In-Reply-To: <1444063334-19832-2-git-send-email-wens@csie.org>
-References: <1444063334-19832-1-git-send-email-wens@csie.org>
- <1444063334-19832-2-git-send-email-wens@csie.org>
-Message-ID: <20151005220326.GP2696@lukather>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 06 Oct 2015 01:51:01 +0300
+Subject: [PATCH] ARM: shmobile: porter: add Ether DT support
+In-Reply-To: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+Message-ID: <1507520.6rxyDiKYNB@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 12:42:13AM +0800, Chen-Yu Tsai wrote:
-> The device tree node name is typically "interrupt-controller", which is
-> rather useless when used in printk messages and irq chip names for
-> identification purposes. Use the driver name "sunxi-nmi" instead.
-> 
-> While at it move the identifier from pr_err() calls to the pr_fmt macro.
-> 
-> Also remove the "__func__" identifier from the error message in the
-> interrupt type setting callback, sunxi_sc_nmi_set_type(). The driver
-> name in the pr_fmt macro should be enough.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Define  the Porter board dependent part of  the Ether device node.
+Enable DHCP and NFS root for the kernel booting.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+This  patch  is analogous to the commit 26b0d2cf73cb (ARM: shmobile: henninger:
+add Ether DT support)  as there  are no differences between those boards in this
+respect.
 
-Thanks!
-Maxime
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/8c271434/attachment.sig>
+---
+This patch is against the 'renesas-devel-20151005-v4.3-rc4' tag of Simon
+Horman's 'renesas.git' repo.
+
+ arch/arm/boot/dts/r8a7791-porter.dts |   28 +++++++++++++++++++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
+
+Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791-porter.dts
++++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -20,7 +20,7 @@
+ 	};
+ 
+ 	chosen {
+-		bootargs = "ignore_loglevel";
++		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+ 		stdout-path = &scif0;
+ 	};
+ 
+@@ -44,6 +44,16 @@
+ 		renesas,groups = "scif0_data_d";
+ 		renesas,function = "scif0";
+ 	};
++
++	ether_pins: ether {
++		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
++		renesas,function = "eth";
++	};
++
++	phy1_pins: phy1 {
++		renesas,groups = "intc_irq0";
++		renesas,function = "intc";
++	};
+ };
+ 
+ &scif0 {
+@@ -52,3 +62,19 @@
+ 
+ 	status = "okay";
+ };
++
++&ether {
++	pinctrl-0 = <&ether_pins &phy1_pins>;
++	pinctrl-names = "default";
++
++	phy-handle = <&phy1>;
++	renesas,ether-link-active-low;
++	status = "ok";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++		interrupt-parent = <&irqc0>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		micrel,led-mode = <1>;
++	};
++};
