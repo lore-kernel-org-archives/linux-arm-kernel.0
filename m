@@ -1,28 +1,42 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Mon, 05 Oct 2015 14:36:32 +0300
-Subject: [PATCH v2 0/7] Add support for Exynos SROM Controller driver
-In-Reply-To: <1440403348-8974-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1440403348-8974-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <018501d0ff62$1650b410$42f21c30$@samsung.com>
+From: mkarthi3@visteon.com (Mutharaju, Prasanna (P.))
+Date: Mon, 5 Oct 2015 11:45:08 +0000
+Subject: [PATCH] soc: Fix for clean up pmic driver - trivial
+Message-ID: <20151005114444.GA11494@jci-VirtualBox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+From: Prasanna Karthik <mkarthi3@visteon.com>
 
-> This patch set adds support for Exynos SROM controller DT based driver.
-> Currently SROM register sets are used only during S2R, so driver
-> basically added for taking care of S2R. It will help us in removing
-> static mapping from exynos.c and other extra code handline during S2R.
+Prefer using the BIT macro reported by checkpatch
 
- Very good news, but, your driver seems not to do anything except suspend/resume. But how do i add
-some device plugged into it? In order to be operational, its outputs have to be configured. But how
-do i do it with your driver? For example, on SMDK boards SROM controller is used to connect SMSC9111
-etherner chip.
- Currently i use hardcoded initialization based on of_machine_is_compatible(), but i believe this
-would be considered a hack and such a thing cannot be pushed upstream. I guess i have to put all
-needed configuration into device tree somehow. But how? Are there any recommentations?
+Signed-off-by: Prasanna Karthik <mkarthi3@visteon.com>
+---
+ drivers/soc/mediatek/mtk-pmic-wrap.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+index f432291..628a919 100644
+--- a/drivers/soc/mediatek/mtk-pmic-wrap.c
++++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+@@ -35,8 +35,8 @@
+ #define PWRAP_GET_WACS_RDATA(x)		(((x) >> 0) & 0x0000ffff)
+ #define PWRAP_GET_WACS_FSM(x)		(((x) >> 16) & 0x00000007)
+ #define PWRAP_GET_WACS_REQ(x)		(((x) >> 19) & 0x00000001)
+-#define PWRAP_STATE_SYNC_IDLE0		(1 << 20)
+-#define PWRAP_STATE_INIT_DONE0		(1 << 21)
++#define PWRAP_STATE_SYNC_IDLE0		BIT(20)
++#define PWRAP_STATE_INIT_DONE0		BIT(21)
+ 
+ /* macro for WACS FSM */
+ #define PWRAP_WACS_FSM_IDLE		0x00
+@@ -52,7 +52,7 @@
+ #define PWRAP_DEW_WRITE_TEST_VAL	0xa55a
+ 
+ /* macro for manual command */
+-#define PWRAP_MAN_CMD_SPI_WRITE		(1 << 13)
++#define PWRAP_MAN_CMD_SPI_WRITE		BIT(13)
+ #define PWRAP_MAN_CMD_OP_CSH		(0x0 << 8)
+ #define PWRAP_MAN_CMD_OP_CSL		(0x1 << 8)
+ #define PWRAP_MAN_CMD_OP_CK		(0x2 << 8)
+-- 
+1.9.1
