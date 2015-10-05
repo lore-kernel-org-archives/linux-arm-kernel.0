@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  5 Oct 2015 10:49:54 +0200
-Subject: [PATCH 14/17] ARM: pxa: tavorevb: Use PWM lookup table
+Date: Mon,  5 Oct 2015 10:49:55 +0200
+Subject: [PATCH 15/17] ARM: pxa: viper: Use PWM lookup table
 In-Reply-To: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
 References: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1444034997-9805-15-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1444034997-9805-16-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,57 +17,51 @@ Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
 Cc: Robert Jarzmik <robert.jarzmik@free.fr>
 Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
 ---
- arch/arm/mach-pxa/tavorevb.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+ arch/arm/mach-pxa/viper.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/tavorevb.c b/arch/arm/mach-pxa/tavorevb.c
-index a71da84e784b..349a13a76215 100644
---- a/arch/arm/mach-pxa/tavorevb.c
-+++ b/arch/arm/mach-pxa/tavorevb.c
-@@ -18,6 +18,7 @@
- #include <linux/clk.h>
- #include <linux/gpio.h>
+diff --git a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
+index 4841d6cefe76..b09e8cadd41f 100644
+--- a/arch/arm/mach-pxa/viper.c
++++ b/arch/arm/mach-pxa/viper.c
+@@ -39,6 +39,7 @@
+ #include <linux/i2c/pxa-i2c.h>
+ #include <linux/serial_8250.h>
  #include <linux/smc91x.h>
 +#include <linux/pwm.h>
  #include <linux/pwm_backlight.h>
+ #include <linux/usb/isp116x.h>
+ #include <linux/mtd/mtd.h>
+@@ -350,6 +351,11 @@ static struct pxafb_mach_info fb_info = {
+ 	.lcd_conn		= LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
+ };
  
- #include <asm/mach-types.h>
-@@ -168,21 +169,24 @@ static inline void tavorevb_init_keypad(void) {}
- #endif /* CONFIG_KEYBOARD_PXA27x || CONFIG_KEYBOARD_PXA27x_MODULE */
- 
- #if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
-+static struct pwm_lookup tavorevb_pwm_lookup[] = {
-+	PWM_LOOKUP("pxa27x-pwm.0", 1, "pwm-backlight.0", NULL, 100000,
-+		   PWM_POLARITY_NORMAL),
-+	PWM_LOOKUP("pxa27x-pwm.0", 0, "pwm-backlight.1", NULL, 100000,
++static struct pwm_lookup viper_pwm_lookup[] = {
++	PWM_LOOKUP("pxa25x-pwm.0", 0, "pwm-backlight.0", NULL, 1000000,
 +		   PWM_POLARITY_NORMAL),
 +};
 +
- static struct platform_pwm_backlight_data tavorevb_backlight_data[] = {
- 	[0] = {
- 		/* primary backlight */
--		.pwm_id		= 2,
- 		.max_brightness	= 100,
- 		.dft_brightness	= 100,
--		.pwm_period_ns	= 100000,
- 		.enable_gpio	= -1,
- 	},
- 	[1] = {
- 		/* secondary backlight */
--		.pwm_id		= 0,
- 		.max_brightness	= 100,
- 		.dft_brightness	= 100,
--		.pwm_period_ns	= 100000,
- 		.enable_gpio	= -1,
- 	},
- };
-@@ -470,6 +474,7 @@ static struct pxafb_mach_info tavorevb_lcd_info = {
- 
- static void __init tavorevb_init_lcd(void)
+ static int viper_backlight_init(struct device *dev)
  {
-+	pwm_add_table(tavorevb_pwm_lookup, ARRAY_SIZE(tavorevb_pwm_lookup));
- 	platform_device_register(&tavorevb_backlight_devices[0]);
- 	platform_device_register(&tavorevb_backlight_devices[1]);
- 	pxa_set_fb_info(NULL, &tavorevb_lcd_info);
+ 	int ret;
+@@ -398,10 +404,8 @@ static void viper_backlight_exit(struct device *dev)
+ }
+ 
+ static struct platform_pwm_backlight_data viper_backlight_data = {
+-	.pwm_id		= 0,
+ 	.max_brightness	= 100,
+ 	.dft_brightness	= 100,
+-	.pwm_period_ns	= 1000000,
+ 	.enable_gpio	= -1,
+ 	.init		= viper_backlight_init,
+ 	.notify		= viper_backlight_notify,
+@@ -939,6 +943,7 @@ static void __init viper_init(void)
+ 		smc91x_device.num_resources--;
+ 
+ 	pxa_set_i2c_info(NULL);
++	pwm_add_table(viper_pwm_lookup, ARRAY_SIZE(viper_pwm_lookup));
+ 	platform_add_devices(viper_devs, ARRAY_SIZE(viper_devs));
+ 
+ 	viper_init_vcore_gpios();
 -- 
 2.5.0
