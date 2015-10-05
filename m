@@ -1,59 +1,44 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 05 Oct 2015 14:23:46 +0200
-Subject: [PATCH 5/7] [media] mipi-csis: make sparse happy
-In-Reply-To: <30256208.KbAtSBWnKO@wuerfel>
-References: <cover.1443737682.git.mchehab@osg.samsung.com>
- <4962836.RxBJeKxGZM@wuerfel> <56124FE8.8070400@samsung.com>
- <30256208.KbAtSBWnKO@wuerfel>
-Message-ID: <56126BD2.3060004@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 5 Oct 2015 14:29:52 +0200
+Subject: "clk: sunxi: Add a simple gates driver" breaks kernel with older
+ DTB
+In-Reply-To: <560E6768.6040705@citrix.com>
+References: <1443689231.16718.225.camel@citrix.com>
+ <20151001204506.GR7104@lukather> <560E5767.2040502@citrix.com>
+ <20151002105333.GA2696@lukather> <560E6768.6040705@citrix.com>
+Message-ID: <20151005122952.GJ2696@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/15 13:07, Arnd Bergmann wrote:
-> On Monday 05 October 2015 12:24:40 Sylwester Nawrocki wrote:
->> > On 03/10/15 00:25, Arnd Bergmann wrote:
->>> > > On Thursday 01 October 2015 19:17:27 Mauro Carvalho Chehab wrote:
->>>>> > >> > diff --git a/drivers/media/platform/exynos4-is/mipi-csis.c b/drivers/media/platform/exynos4-is/mipi-csis.c
->>>>> > >> > index d74e1bec3d86..4b85105dc159 100644
->>>>> > >> > --- a/drivers/media/platform/exynos4-is/mipi-csis.c
->>>>> > >> > +++ b/drivers/media/platform/exynos4-is/mipi-csis.c
->>>>> > >> > @@ -706,7 +706,8 @@ static irqreturn_t s5pcsis_irq_handler(int irq, void *dev_id)
->>>>> > >> >                 else
->>>>> > >> >                         offset = S5PCSIS_PKTDATA_ODD;
->>>>> > >> >  
->>>>> > >> > -               memcpy(pktbuf->data, state->regs + offset, pktbuf->len);
->>>>> > >> > +               memcpy(pktbuf->data, (u8 __force *)state->regs + offset,
->>>>> > >> > +                      pktbuf->len);
->>>>> > >> >                 pktbuf->data = NULL;
->>>>> > >> > 
->>> > >
->>> > > I think this is what memcpy_toio() is meant for.
->> > 
->> > Exactly memcpy_fromio().  But it's implementation is inefficient on
->> > ARCH=arm, memcpy_fromio() will be translated to a loop of readb(),
->> > only if an arm sub-architecture provides a processor instruction
->> > to access memory by byte.  Each readb() also involves a memory barrier.
->> > That's all what we wanted to avoid. AFAIR using memcpy_fromio() was
->> > causing increase of the copy operation several times comparing to
->> > memcpy(). On arm64 it looks better, but this driver is currently
->> > used only on arm32.
->> > 
->> > I would prefer to add (void __force *) instead:
->> > 
->> > memcpy(pktbuf->data, (void __force *)state->regs + offset, pktbuf->len);
->> > 
->> > Alternatively, the memset could just be replaced by a loop of
->> > u32 reads - __raw_readl();
->
-> You are right for old kernels, but this was fixed in 7ddfe625cb ("ARM:
-> optimize memset_io()/memcpy_fromio()/memcpy_toio()") at least for
-> little-endian kernels and should be fine now on ARM just like
-> everywhere else.
+1;3803;0c
+On Fri, Oct 02, 2015 at 12:15:52PM +0100, Julien Grall wrote:
+> On 02/10/15 11:53, Maxime Ripard wrote:
+> >> If no, that's very unfortunate because it means that you can't
+> >> re-use the same DT across multiple OS and the DT provided by the
+> >> firmware (if it's built-in).
+> > 
+> > Is there such OS yet (and by that, I mean one that actually shares our
+> > DT, instead of rewriting its own) ?
+> 
+> Yes, FreeBSD started to support the DT provided by vendors which are
+> based on Linux bindings. The ARM64 port is only using DTB provided by
+> the hardware. For ARM32, there is still some platform using a specific
+> DT for FreeBSD but they are trying to get a ride.
 
-Indeed, I had just previously checked it in 4.0 kernel and missed those
-recent further optimizations. It should be fine to replace memcpy()
-with memcpy_fromio() then.
+Well, it would have been good if they contacted us in the first place
+then, because this has never been considered seriously afaik, and we
+never stated that it actually was an ABI.
 
---
-Thanks,
-Sylwester
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151005/ec250fa7/attachment.sig>
