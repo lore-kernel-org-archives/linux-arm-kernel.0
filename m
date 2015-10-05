@@ -1,62 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 05 Oct 2015 14:19:35 +0200
-Subject: [RFC/PATCH 00/11] arm: omap: counter32k rework
-In-Reply-To: <20151005111341.GY23801@atomide.com>
-References: <1443559446-26969-1-git-send-email-balbi@ti.com>
- <9068678.D8T0aRhgnK@wuerfel> <20151005111341.GY23801@atomide.com>
-Message-ID: <5000312.QFy0tdfCNA@wuerfel>
+Date: Mon, 05 Oct 2015 14:21:33 +0200
+Subject: [PATCH] soc: Fix for clean up pmic driver - trivial
+In-Reply-To: <20151005114444.GA11494@jci-VirtualBox>
+References: <20151005114444.GA11494@jci-VirtualBox>
+Message-ID: <19210837.P9sIqrRUPt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 October 2015 04:13:41 Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [151005 04:08]:
-> > On Monday 05 October 2015 03:55:55 Tony Lindgren wrote:
-> > > * Daniel Lezcano <daniel.lezcano@linaro.org> [151001 15:16]:
-> > > > On 09/30/2015 04:49 PM, Arnd Bergmann wrote:
-> > > > >On Wednesday 30 September 2015 16:42:21 Arnd Bergmann wrote:
-> > > > >>
-> > > > >>TEGRA folks: the tegra_read_persistent_clock() implementation apparently
-> > > > >>predates the Tegra RTC driver and I wonder if they actually do the
-> > > > >>right thing in combination. Could it be that the wall time forwards
-> > > > >>twice as fast as it should during resume when the RTC driver is loaded?
-> > > > >>Could it be that we can simply remove  tegra_read_persistent_clock()
-> > > > >>and the register_persistent_clock() infrastructure?
-> > > > >>
-> > > > >
-> > > > >I found the 'sleeptime_injected' variable now, which takes care of
-> > > > >forwarding the clock by the correct amount.
-> > > > >
-> > > > >I also found the CLOCK_SOURCE_SUSPEND_NONSTOP flag next to it, which
-> > > > >should let us use the counter32k driver to provide the correct
-> > > > >time during suspend without the omap_read_persistent_clock() function.
-> > > > >We should be able to just delete that code.
-> > > > >
-> > > > >If we decide to also delete the tegra_read_persistent_clock()
-> > > > >function, we can remove the registration too.
-> > > > 
-> > > > 
-> > > > +1
-> > > 
-> > > We could maybe have read_persistent_clock() just check for the
-> > > CLOCK_SOURCE_SUSPEND_NONSTOP flag?
-> > 
-> > timekeeping_resume() already ignores the persistent clock values if
-> > the clocksource has this set. Do you mean we should additionally
-> > not call the read_persistent_clock() function at all to safe a
-> > few cycles reading that value?
+On Monday 05 October 2015 11:45:08 Mutharaju, Prasanna wrote:
 > 
-> Hmm no I mean if we have CLOCK_SOURCE_SUSPEND_NONSTOP we can
-> automatically make read_persistent_clock() use that if nothing
-> else got registered.
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index f432291..628a919 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -35,8 +35,8 @@
+>  #define PWRAP_GET_WACS_RDATA(x)                (((x) >> 0) & 0x0000ffff)
+>  #define PWRAP_GET_WACS_FSM(x)          (((x) >> 16) & 0x00000007)
+>  #define PWRAP_GET_WACS_REQ(x)          (((x) >> 19) & 0x00000001)
+> -#define PWRAP_STATE_SYNC_IDLE0         (1 << 20)
+> -#define PWRAP_STATE_INIT_DONE0         (1 << 21)
+> +#define PWRAP_STATE_SYNC_IDLE0         BIT(20)
+> +#define PWRAP_STATE_INIT_DONE0         BIT(21)
+>  
+>  /* macro for WACS FSM */
+>  #define PWRAP_WACS_FSM_IDLE            0x00
+> @@ -52,7 +52,7 @@
+>  #define PWRAP_DEW_WRITE_TEST_VAL       0xa55a
+>  
+>  /* macro for manual command */
+> -#define PWRAP_MAN_CMD_SPI_WRITE                (1 << 13)
+> +#define PWRAP_MAN_CMD_SPI_WRITE                BIT(13)
+>  #define PWRAP_MAN_CMD_OP_CSH           (0x0 << 8)
+>  #define PWRAP_MAN_CMD_OP_CSL           (0x1 << 8)
+>  #define PWRAP_MAN_CMD_OP_CK            (0x2 << 8)
 
-Ok, so we don't need to change anything here then.
-
-> > How expensive is the function?
-> 
-> Usually the persistent clock is on some interconnect, so it is
-> way slower compared to a local timer. It doubt it makes a
-> difference in timekeeping_resume() though 
-
-Right.
+I'd say the original version is clearer because of the context that
+does not use (and should not) use BIT().
 
 	Arnd
