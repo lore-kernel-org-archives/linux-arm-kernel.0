@@ -1,45 +1,44 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 5 Oct 2015 16:37:47 +0100
-Subject: [PATCH v5 06/10] dmaengine: add API for getting dma controller's
- quirk
-In-Reply-To: <1442188139-6017-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1442187923-5736-1-git-send-email-shawn.lin@rock-chips.com>
- <1442188139-6017-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <20151005153746.GG13501@vkoul-mobl.iind.intel.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 5 Oct 2015 17:43:30 +0200
+Subject: [PATCH 09/15] arm64: Add page size to the kernel image header
+In-Reply-To: <560EB5DE.7080007@arm.com>
+References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
+ <1442331684-28818-10-git-send-email-suzuki.poulose@arm.com>
+ <20151002154900.GN6963@e104818-lin.cambridge.arm.com>
+ <20151002163131.GO6963@e104818-lin.cambridge.arm.com>
+ <560EB5DE.7080007@arm.com>
+Message-ID: <20151005154330.GI9011@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 07:48:59AM +0800, Shawn Lin wrote:
-> Add dmaengine_get_quirks API for peripheral devices to query
-> quirks if they need it to make special workaround due to broken
-> dma controller design.
+On Fri, Oct 02, 2015 at 05:50:38PM +0100, Marc Zyngier wrote:
+> On 02/10/15 17:31, Catalin Marinas wrote:
+> > On Fri, Oct 02, 2015 at 04:49:01PM +0100, Catalin Marinas wrote:
+> >> On Tue, Sep 15, 2015 at 04:41:18PM +0100, Suzuki K. Poulose wrote:
+> >>> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >>>
+> >>> This patch adds the page size to the arm64 kernel image header
+> >>> so that one can infer the PAGESIZE used by the kernel. This will
+> >>> be helpful to diagnose failures to boot the kernel with page size
+> >>> not supported by the CPU.
+> >>>
+> >>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >>
+> >> This patch needs you signed-off-by as well since you are posting it. And
+> >> IIRC I acked it as well, I'll check.
+> >>
+> >> If you are fine with adding your signed-of-by, I can add it to the patch
+> >> when applying (unless I see other issues with the series).
+> > 
+> > Actually, I just realised that the kvm patches don't have any acks, so
+> > I'm not taking this series yet. You may want to repost once you have all
+> > the acks in place.
+> > 
 > 
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> ---
+> I'm in the middle of it. I should be done next week (I may have said the
+> same thing two weeks ago...).
 > 
-> Changes in v5: None
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
-> Changes in v1: None
-> 
->  include/linux/dmaengine.h | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index e2f5eb4..5174ca4 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -704,6 +704,7 @@ struct dma_device {
->  
->  	int (*device_config)(struct dma_chan *chan,
->  			     struct dma_slave_config *config);
-> +	int (*device_get_quirks)(struct dma_chan *chan);
+Very near the top of my to-review list as well, will try to get it done
+this week.
 
-And why do we want to expose this to users? THis doesnt seem right!
-
-A quirk may exists but should be handled inside the controller driver and do
-appropriate action. You don't tell users or expect them to handle these
-
--- 
-~Vinod
+-Christoffer
