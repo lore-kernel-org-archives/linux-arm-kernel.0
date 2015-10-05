@@ -1,93 +1,106 @@
-From: wei@redhat.com (Wei Huang)
-Date: Mon, 5 Oct 2015 12:07:42 -0500
-Subject: [PATCH v3 1/7] acpi: Add early device probing infrastructure
-In-Reply-To: <20151003110402.6aa3022b@arm.com>
-References: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
- <1443451758-22717-2-git-send-email-marc.zyngier@arm.com>
- <560EF1BD.1020004@redhat.com> <20151003110402.6aa3022b@arm.com>
-Message-ID: <5612AE5E.8080504@redhat.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Oct 2015 10:11:56 -0700
+Subject: All OMAP platforms: MMC is broken
+In-Reply-To: <20151005145127.GB23801@atomide.com>
+References: <20150924090048.GA21626@n2100.arm.linux.org.uk>
+ <20150924233756.GN23801@atomide.com>
+ <20151001093325.GU21513@n2100.arm.linux.org.uk>
+ <CAPDyKFpnqJBrtiBekikrNHAf-agZm12KnF9n+=+72HH=jti-KA@mail.gmail.com>
+ <20151001100326.GV21513@n2100.arm.linux.org.uk>
+ <20151005112304.GZ23801@atomide.com>
+ <20151005143532.GA23801@atomide.com>
+ <20151005145127.GB23801@atomide.com>
+Message-ID: <20151005171155.GF23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Tony Lindgren <tony@atomide.com> [151005 07:57]:
+> * Tony Lindgren <tony@atomide.com> [151005 07:44]:
+> > * Tony Lindgren <tony@atomide.com> [151005 04:28]:
+> > 
+> > Based on some tests it seems that the duovero unpaired regulator usage
+> > is fixed by reverting:
+> > 
+> > c55d7a055364 ("mmc: host: omap_hsmmc: use regulator_is_enabled to
+> > find pbias status")
+> 
+> With commit c55d7a055364 my guess is that the PBIAS regulator is
+> already on from an earlier MMC probe and getting re-enabled when
+> a deferred probe happens?
 
+Unless somebody has a better fix in mind for the above, I suggest
+we revert it for the -rc kernel.
 
-On 10/03/2015 05:04 AM, Marc Zyngier wrote:
-> On Fri, 2 Oct 2015 16:06:05 -0500
-> Wei Huang <wei@redhat.com> wrote:
+> > And it seems that omap3 legacy MMC is broken earlier in the
+> > series with:
+> > 
+> > 7d607f917008 ("mmc: host: omap_hsmmc: use
+> > devm_regulator_get_optional() for vmmc")
+> > 
+> > This one does not cleanly revert so have not yet tried reverting
+> > it.
 > 
-> Hi Wei,
-> 
->> Hi Marc,
-> 
-> [...]
-> 
->>> +struct acpi_probe_entry {
->>> +	__u8 id[ACPI_TABLE_ID_LEN];
->>> +	__u8 type;
->>> +	acpi_probe_entry_validate_subtbl subtable_valid;
->>> +	union {
->>> +		acpi_tbl_table_handler probe_table;
->>> +		acpi_tbl_entry_handler probe_subtbl;
->>> +	};
->>
->> Could we avoid using union for probe_table & probe_subtbl? The benefit is that we don't need to do function casting below and compiler can automatically check the correctness.
->>
->>> +	kernel_ulong_t driver_data;
->>> +};
->>> +
->>> +#define ACPI_DECLARE_PROBE_ENTRY(table, name, table_id, subtable, valid, data, fn)	\
->>> +	static const struct acpi_probe_entry __acpi_probe_##name	\
->>> +		__used __section(__##table##_acpi_probe_table)		\
->>> +		 = {							\
->>> +			.id = table_id,					\
->>> +			.type = subtable,				\
->>> +			.subtable_valid = valid,			\
->>> +			.probe_table = (acpi_tbl_table_handler)fn,	\
->>> +			.driver_data = data, 				\
->>> +		   }
->>> +
->>
->> Something like: 
->>
->> #define ACPI_DECLARE_PROBE_ENTRY(table, name, table_id, subtable, valid, data, fn, subfn)	\
->> 	static const struct acpi_probe_entry __acpi_probe_##name	\
->> 		__used __section(__##table##_acpi_probe_table)		\
->> 		 = {							\
->> 			.id = table_id,					\
->> 			.type = subtable,				\
->> 			.subtable_valid = valid,			\
->> 			.probe_table = fn,				\
->> 			.probe_subtbl = subfn,				\
->> 			.driver_data = data, 				\
->> 		   }
->>
->> Then in patch 3, you can define new entries as:
->>
->> IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
->> 		     gic_validate_dist, ACPI_MADT_GIC_VERSION_V2,
->> 		     NULL, gic_v2_acpi_init);
->> IRQCHIP_ACPI_DECLARE(gic_v2_maybe, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
->> 		     gic_validate_dist, ACPI_MADT_GIC_VERSION_NONE,
->> 		     NULL, gic_v2_acpi_init);
->>
-> 
-> That's exactly what I was trying to avoid. If you want to do that, do
-> it in the IRQCHIP_ACPI_DECLARE macro, as there is strictly no need for
-> this this NULL to appear here (MADT always matches by subtable).
-> 
-> Or even better, have two ACPI_DECLARE* that populate the probe entry in
-> a mutually exclusive way (either probe_table is set and both
-> valid/subtbl are NULL, or probe_table is NULL and the two other fields
-> are set).
+> And with commit 7d607f917008 I'm guessing we can't return an
+> error if the PBIAS regulator does not exist as that's not there
+> for the legacy booting.
 
-Yes, this approach would be sufficient. So users can clearly tell them
-apart in terms of usage cases.
+For omap3 legacy booting, we keep getting -EPROBE_DEFER for
+all the optional regulators.
 
-Thanks,
--Wei
+Something like the following might be the minimal fix for the -rc
+cycle?
 
-> 
-> Thanks,
-> 
-> 	M.
-> 
+Regards,
+
+Tony
+
+8< ----------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Mon, 5 Oct 2015 09:37:36 -0700
+Subject: [PATCH] mmc: host: omap_hsmmc: Fix MMC for omap3 legacy booting
+
+Starting with commit 7d607f917008 ("mmc: host: omap_hsmmc: use
+devm_regulator_get_optional() for vmmc") MMC on omap3 stopped working
+for legacy booting.
+
+This is because legacy booting sets up some of the resource in the
+platform init code, and for optional regulators always seem to
+return -EPROBE_DEFER for the legacy booting.
+
+Let's fix the issue by checking for device tree based booting for
+now. Then when omap3 boots in device tree only mode, this patch
+can be just reverted.
+
+Fixes: 7d607f917008 ("mmc: host: omap_hsmmc: use
+devm_regulator_get_optional() for vmmc")
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -478,7 +478,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+ 	mmc->supply.vmmc = devm_regulator_get_optional(host->dev, "vmmc");
+ 	if (IS_ERR(mmc->supply.vmmc)) {
+ 		ret = PTR_ERR(mmc->supply.vmmc);
+-		if (ret != -ENODEV)
++		if ((ret != -ENODEV) && host->dev->of_node)
+ 			return ret;
+ 		dev_dbg(host->dev, "unable to get vmmc regulator %ld\n",
+ 			PTR_ERR(mmc->supply.vmmc));
+@@ -493,7 +493,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+ 	mmc->supply.vqmmc = devm_regulator_get_optional(host->dev, "vmmc_aux");
+ 	if (IS_ERR(mmc->supply.vqmmc)) {
+ 		ret = PTR_ERR(mmc->supply.vqmmc);
+-		if (ret != -ENODEV)
++		if ((ret != -ENODEV) && host->dev->of_node)
+ 			return ret;
+ 		dev_dbg(host->dev, "unable to get vmmc_aux regulator %ld\n",
+ 			PTR_ERR(mmc->supply.vqmmc));
+@@ -503,7 +503,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+ 	host->pbias = devm_regulator_get_optional(host->dev, "pbias");
+ 	if (IS_ERR(host->pbias)) {
+ 		ret = PTR_ERR(host->pbias);
+-		if (ret != -ENODEV)
++		if ((ret != -ENODEV) && host->dev->of_node)
+ 			return ret;
+ 		dev_dbg(host->dev, "unable to get pbias regulator %ld\n",
+ 			PTR_ERR(host->pbias));
