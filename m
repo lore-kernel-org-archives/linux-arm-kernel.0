@@ -1,48 +1,49 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 5 Oct 2015 11:08:54 -0500
-Subject: [RFC/PATCH 03/11] arm: omap2: timer: remove __omap_gptimer_init()
-In-Reply-To: <20151005160224.GC23801@atomide.com>
-References: <1443559446-26969-1-git-send-email-balbi@ti.com>
- <1443559446-26969-4-git-send-email-balbi@ti.com>
- <20151005110144.GW23801@atomide.com>
- <20151005152454.GC18784@saruman.tx.rr.com>
- <20151005160224.GC23801@atomide.com>
-Message-ID: <20151005160854.GE18784@saruman.tx.rr.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 05 Oct 2015 09:14:57 -0700
+Subject: [RFT - PATCH v2 0/2] KVM/arm64: add fp/simd lazy switch support
+In-Reply-To: <20151005154540.GJ9011@cbox>
+References: <1442964843-11953-1-git-send-email-m.smarduch@samsung.com>
+ <20151005154540.GJ9011@cbox>
+Message-ID: <5612A201.6030500@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 05, 2015 at 09:02:25AM -0700, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [151005 08:29]:
-> > On Mon, Oct 05, 2015 at 04:01:45AM -0700, Tony Lindgren wrote:
-> > > * Felipe Balbi <balbi@ti.com> [150929 13:48]:
-> > > > since now we can reuse __omap_sync32k_timer_init()
-> > > > for OMAP3-like devices, we can safely remove
-> > > > __omap_gptimer_init().
-> > > 
-> > > There are tons of boards out there that need to use the
-> > > high frequency ocillator source with gptimer because of the
-> > > beagleboard B4 and earlier issue #7. So we need to provide
-> > > both options for the boards. Using the high frequency
-> > > oscillator source blocks deeper idle states in hardware
-> > > so those devices are usable.
-> > 
-> > have a closer look, that hasn't changed
-> 
-> Oh right, you added the argument in the previous patch.
-> Maybe update the description a bit to make that clear?
-> I understood that we can only use the sync32k source now..
-> 
-> The __omap_sync32k_timer_init should not be called
-> "sync32k" as that's TRM name for the always-on counter :)
+Hi Christoffer,
+   I just managed to boot qemu arm32 up on arm64 (last Fri - thanks for the tip
+- there were few other issue to clean up), so let me retest it again. Also I
+noticed some refactoring would help both 32 and 64 bit patches.
 
-that's renamed on a follow-up patch, too ;-)
+Yes I could provide a the user space tests as well.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151005/6bcb53c6/attachment.sig>
+Thanks-
+- Mario
+
+On 10/5/2015 8:45 AM, Christoffer Dall wrote:
+> On Tue, Sep 22, 2015 at 04:34:01PM -0700, Mario Smarduch wrote:
+>> This is a 2nd itteration for arm64, v1 patches were posted by mistake from an 
+>> older branch which included several bugs. Hopefully didn't waste too much of 
+>> anyones time.
+>>
+>> This patch series is a followup to the armv7 fp/simd lazy switch
+>> implementation, uses similar approach and depends on the series - see
+>> https://lists.cs.columbia.edu/pipermail/kvmarm/2015-September/016516.html
+>>
+>> It's based on earlier arm64 fp/simd optimization work - see
+>> https://lists.cs.columbia.edu/pipermail/kvmarm/2015-July/015748.html
+>>
+>> And subsequent fixes by Marc and Christoffer at KVM Forum hackathon to handle
+>> 32-bit guest on 64 bit host (and may require more here) - see
+>> https://lists.cs.columbia.edu/pipermail/kvmarm/2015-August/016128.html
+>>
+>> This series has be tested with arm64 on arm64 with several FP applications 
+>> running on host and guest, with substantial decrease on number of 
+>> fp/simd context switches. From about 30% down to 2% with one guest running.
+>>
+>> At this time I don't have arm32/arm64 working and hoping Christoffer and/or
+>> Marc (or anyone) can test 32-bit guest/64-bit host.
+>>
+> Did you already have some test infrastructure/applications that I can
+> reuse for this purpose or do I have to write userspace software?
+> 
+> -Christoffer
+> 
