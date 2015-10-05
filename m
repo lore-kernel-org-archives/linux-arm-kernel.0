@@ -1,141 +1,62 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Oct 2015 17:31:00 +0100
-Subject: [PATCH 04/10] arm64: mm: rewrite ASID allocator and MM
- context-switching code
-In-Reply-To: <20150929084614.GY13823@e104818-lin.cambridge.arm.com>
+Date: Mon, 5 Oct 2015 17:33:13 +0100
+Subject: [PATCH 06/10] arm64: tlbflush: avoid flushing when fullmm == 1
+In-Reply-To: <20150929092957.GA30504@e104818-lin.cambridge.arm.com>
 References: <1442494219-6133-1-git-send-email-will.deacon@arm.com>
- <1442494219-6133-5-git-send-email-will.deacon@arm.com>
- <20150929084614.GY13823@e104818-lin.cambridge.arm.com>
-Message-ID: <20151005163100.GB3211@arm.com>
+ <1442494219-6133-7-git-send-email-will.deacon@arm.com>
+ <20150929092957.GA30504@e104818-lin.cambridge.arm.com>
+Message-ID: <20151005163313.GC3211@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On Tue, Sep 29, 2015 at 09:46:15AM +0100, Catalin Marinas wrote:
-> On Thu, Sep 17, 2015 at 01:50:13PM +0100, Will Deacon wrote:
-> > diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-> > index 030208767185..6af677c4f118 100644
-> > --- a/arch/arm64/include/asm/mmu.h
-> > +++ b/arch/arm64/include/asm/mmu.h
-> > @@ -17,15 +17,11 @@
-> >  #define __ASM_MMU_H
+On Tue, Sep 29, 2015 at 10:29:58AM +0100, Catalin Marinas wrote:
+> On Thu, Sep 17, 2015 at 01:50:15PM +0100, Will Deacon wrote:
+> > The TLB gather code sets fullmm=1 when tearing down the entire address
+> > space for an mm_struct on exit or execve. Given that the ASID allocator
+> > will never re-allocate a dirty ASID, this flushing is not needed and can
+> > simply be avoided in the flushing code.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/include/asm/tlb.h | 26 +++++++++++++++-----------
+> >  1 file changed, 15 insertions(+), 11 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+> > index d6e6b6660380..ffdaea7954bb 100644
+> > --- a/arch/arm64/include/asm/tlb.h
+> > +++ b/arch/arm64/include/asm/tlb.h
+> > @@ -37,17 +37,21 @@ static inline void __tlb_remove_table(void *_table)
 > >  
-> >  typedef struct {
-> > -	unsigned int id;
-> > -	raw_spinlock_t id_lock;
-> > -	void *vdso;
-> > +	atomic64_t	id;
-> > +	void		*vdso;
-> >  } mm_context_t;
-> >  
-> > -#define INIT_MM_CONTEXT(name) \
-> > -	.context.id_lock = __RAW_SPIN_LOCK_UNLOCKED(name.context.id_lock),
-> > -
-> > -#define ASID(mm)	((mm)->context.id & 0xffff)
-> > +#define ASID(mm)	((mm)->context.id.counter & 0xffff)
-> 
-> If you changed the id to atomic64_t, can you not use atomic64_read()
-> here?
-
-I could, but it forces the access to be volatile which I don't think is
-necessary for any of the users of this macro (i.e. the tlbflushing code).
-
-> > -#define asid_bits(reg) \
-> > -	(((read_cpuid(ID_AA64MMFR0_EL1) & 0xf0) >> 2) + 8)
-> > +static u32 asid_bits;
-> > +static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
-> >  
-> > -#define ASID_FIRST_VERSION	(1 << MAX_ASID_BITS)
-> > +static atomic64_t asid_generation;
-> > +static unsigned long *asid_map;
-> >  
-> > -static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
-> > -unsigned int cpu_last_asid = ASID_FIRST_VERSION;
-> > +static DEFINE_PER_CPU(atomic64_t, active_asids);
-> > +static DEFINE_PER_CPU(u64, reserved_asids);
-> > +static cpumask_t tlb_flush_pending;
-> >  
-> > -/*
-> > - * We fork()ed a process, and we need a new context for the child to run in.
-> > - */
-> > -void __init_new_context(struct task_struct *tsk, struct mm_struct *mm)
-> > +#define ASID_MASK		(~GENMASK(asid_bits - 1, 0))
-> > +#define ASID_FIRST_VERSION	(1UL << asid_bits)
-> > +#define NUM_USER_ASIDS		ASID_FIRST_VERSION
-> 
-> Apart from NUM_USER_ASIDS, I think we can live with constants for
-> ASID_MASK and ASID_FIRST_VERSION (as per 16-bit ASIDs, together with
-> some shifts converted to a constant), marginally more optimal code
-> generation which avoids reading asid_bits all the time. We should be ok
-> with 48-bit generation field.
-
-The main reason for writing it like this is that it's easy to test the
-code with different asid sizes -- you just change asid_bits and all of
-the masks change accordingly. If we hardcode ASID_MASK then we'll break
-flush_context (which uses it to generate a bitmap index) and, given that
-ASID_MASK and ASID_FIRST_VERSION are only used on the slow-path, I'd
-favour the current code over a micro-optimisation.
-
-> > +void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
+> >  static inline void tlb_flush(struct mmu_gather *tlb)
 > >  {
-> > -	unsigned int asid;
-> > -	unsigned int cpu = smp_processor_id();
-> > -	struct mm_struct *mm = current->active_mm;
-> > +	unsigned long flags;
-> > +	u64 asid;
+> > -	if (tlb->fullmm) {
+> > -		flush_tlb_mm(tlb->mm);
+> > -	} else {
+> > -		struct vm_area_struct vma = { .vm_mm = tlb->mm, };
+> > -		/*
+> > -		 * The intermediate page table levels are already handled by
+> > -		 * the __(pte|pmd|pud)_free_tlb() functions, so last level
+> > -		 * TLBI is sufficient here.
+> > -		 */
+> > -		__flush_tlb_range(&vma, tlb->start, tlb->end, true);
+> > -	}
+> > +	struct vm_area_struct vma = { .vm_mm = tlb->mm, };
 > > +
-> > +	asid = atomic64_read(&mm->context.id);
-> >  
-> >  	/*
-> > -	 * current->active_mm could be init_mm for the idle thread immediately
-> > -	 * after secondary CPU boot or hotplug. TTBR0_EL1 is already set to
-> > -	 * the reserved value, so no need to reset any context.
-> > +	 * The memory ordering here is subtle. We rely on the control
-> > +	 * dependency between the generation read and the update of
-> > +	 * active_asids to ensure that we are synchronised with a
-> > +	 * parallel rollover (i.e. this pairs with the smp_wmb() in
-> > +	 * flush_context).
-> >  	 */
-> > -	if (mm == &init_mm)
-> > -		return;
-> > +	if (!((asid ^ atomic64_read(&asid_generation)) >> asid_bits)
-> > +	    && atomic64_xchg_relaxed(&per_cpu(active_asids, cpu), asid))
-> > +		goto switch_mm_fastpath;
+> > +	/*
+> > +	 * The ASID allocator will either invalidate the ASID or mark
+> > +	 * it as used.
+> > +	 */
+> > +	if (tlb->fullmm)
+> > +		return;
 > 
-> Just trying to make sense of this ;). At a parallel roll-over, we have
-> two cases for the asid check above: it either (1) sees the new
-> generation or (2) the old one.
-> 
-> (1) is simple since it falls back on the slow path.
-> 
-> (2) means that it goes on and performs an atomic64_xchg. This may happen
-> before or after the active_asids xchg in flush_context(). We now have
-> two sub-cases:
-> 
-> a) if the code above sees the updated (in flush_context()) active_asids,
-> it falls back on the slow path since xchg returns 0. Here we are
-> guaranteed that another read of asid_generation returns the new value
-> (by the smp_wmb() in flush_context).
-> 
-> b) the code above sees the old active_asids, goes to the fast path just
-> like a roll-over hasn't happened (on this CPU). On the CPU doing the
-> roll-over, we want the active_asids xchg to see the new asid. That's
-> guaranteed by the atomicity of the xchg implementation (otherwise it
-> would be case (a) above).
-> 
-> So what the control dependency actually buys us is that a store
-> (exclusive) is not architecturally visible if the generation check
-> fails. I guess this only works (with respect to the load) because of the
-> exclusiveness of the memory accesses.
+> BTW, do we actually need this flush_tlb_mm() with the current ASID
+> allocator? It doesn't reuse old ASIDs either before a full TLBI (just
+> trying to remember if we had any logic; or maybe it was needed before
+> non-lazy __pte_free_tlb).
 
-This is also the case for non-exclusive stores (i.e. a control dependency
-from a load to a store creates order) since we don't permit speculative
-writes. So here, the control dependency is between the atomic64_read of
-the generation and the store-exclusive part of the xchg. The
-exclusiveness then guarantees that we replay the load-exclusive part of
-the xchg in the face of contention (due to a parallel rollover).
+I'm afraid I don't follow you here. This diff is removing the flush_tlb_mm
+because, as you point out, it's no longer needed.
 
-You seem to have the gist of it, though.
+What am I missing?
 
 Will
