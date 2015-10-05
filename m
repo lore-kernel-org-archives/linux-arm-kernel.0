@@ -1,38 +1,29 @@
-From: lftan@altera.com (Ley Foon Tan)
-Date: Mon, 5 Oct 2015 11:14:05 +0800
-Subject: [PATCH v7 5/6] Documentation: dt-bindings: pci: altera pcie
- device tree binding
-In-Reply-To: <6497772.rqSurELzER@wuerfel>
-References: <1442801587-3812-1-git-send-email-lftan@altera.com>
- <CAL_JsqL9eoTRa2-eeNJgVoO=0LyuaaJ87E4_BS0KocRKBXGdGA@mail.gmail.com>
- <CAFiDJ5_MYC=V_L1LyRNq00z=DerzKAF=RF5av9vHnUPP+9a1nw@mail.gmail.com>
- <6497772.rqSurELzER@wuerfel>
-Message-ID: <CAFiDJ590c0zG=bBBdERz9sh0Yvrrrv306Pd0simDmMWKw81z9w@mail.gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Sun, 4 Oct 2015 23:18:03 -0500
+Subject: [PATCH] ARM: multi_v7_defconfig: Add missing QCOM APQ8064 configs
+In-Reply-To: <1443704258-3180-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1443704258-3180-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20151005041803.GB28066@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 3, 2015 at 5:56 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 02 October 2015 15:53:44 Ley Foon Tan wrote:
->> > Strictly speaking, if you have undocumented bindings downstream that
->> > is your problem and we don't have to accept them as-is upstream. I'm
->> > not going to worry about that here.
->> >
->> >>> txs contains the config space?
->> >> It is not the config space, but a memory slave port.
->> >
->> > Then where is the config space? It should not be part of "ranges" is
->> > all I care about.
->> The config space is not part of "ranges". Our IP uses TLP packet to
->> access config space.
->>
->
-> It took me a bit to figure out what you mean here. To save others
-> from reading the source, here is what I found:
->
-> * The config space is accessed indirectly through registers from the
->   "cra" register range, which is the right approach according to the
->   point that Rob made.
-You are right.
+On Thu, Oct 01, 2015 at 01:57:38PM +0100, Srinivas Kandagatla wrote:
+> This patch adds few missing essential configs in the multi_v7_defconf,
+> absense of some configs like PINCTRL_APQ8064 would prevent the board from
+> getting access to serial.
+> 
+> cc: Kevin Hilman <khilman@kernel.org>
+> cc: Tyler Baker <tyler.baker@linaro.org>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 
-> * hardware-wise this basically looks like bit-banged PCIe, which is
->   both awesome and scary ;-)
+Works like a charm.
+
+Tested-by: Andy Gross <agross@codeaurora.org>
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
