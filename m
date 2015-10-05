@@ -1,93 +1,86 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 5 Oct 2015 15:37:14 +0100
-Subject: [PATCH 1/2] dma: Add Freescale qDMA engine driver support
-In-Reply-To: <1441950833-27684-1-git-send-email-yao.yuan@freescale.com>
-References: <1441950833-27684-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <20151005143713.GC13501@vkoul-mobl.iind.intel.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Mon,  5 Oct 2015 16:45:28 +0200
+Subject: [PATCH v9 0/4] Allow USB devices to remain runtime-suspended when
+ sleeping
+Message-ID: <1444056332-30246-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 01:53:52PM +0800, Yuan Yao wrote:
+Hi,
 
-> +Examples:
-> +
-> +	qdma: qdma at 8390000 {
-> +		compatible = "fsl,ls-qdma";
-> +		reg = <0x0 0x8380000 0x0 0x20000>;
-> +		interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-names = "qdma-tx", "qdma-err";
-> +		big-endian;
-> +		channels = <1>;
-> +	};
+this is v9 of an attempt to make it easier for devices to remain in
+runtime PM when the system goes to sleep, mainly to reduce the time
+spent resuming devices.
 
-Binding should be a separate patch
+For this, we interpret the absence of all PM callback implementations as
+it being safe to do direct_complete, so their ancestors aren't prevented
+from remaining runtime-suspended.
 
-> +FREESCALE qDMA DRIVER
-> +M:     Yuan Yao <yao.yuan@freescale.com>
-> +L:     linux-arm-kernel at lists.infradead.org
+Additionally, the prepare() callback of USB devices will return 1 if
+runtime PM is enabled and the current wakeup settings are correct.
 
-not dmaengine ML ?
+With these changes, a uvcvideo device (for example) stays in runtime
+suspend when the system goes to sleep and is left in that state when the
+system resumes, not delaying it unnecessarily.
 
+Thanks,
 
-> +config FSL_QDMA
-> +	tristate "Freescale qDMA engine support"
-> +	select DMA_ENGINE
-> +	select DMA_VIRTUAL_CHANNELS
+Tomeu
 
-No depends on arch, can it work on x86?
+Changes in v9:
+- Add docs noting the need for the device lock to be held before calling
+  device_is_bound()
+- Add docs noting the need for the device lock to be held before calling
+  dev_pm_domain_set()
+- Move to CONFIG_PM_SLEEP as suggested by Rafael and Ulf.
+- Rename from device_check_pm_callbacks to device_pm_check_callbacks to
+  follow with the naming convention of existing API.
+- Re-add calling to device_pm_check_callbacks from device registration
+  and when updating the PM domain of a device.
 
-> +static int fsl_qdma_alloc_chan_resources(struct dma_chan *chan)
-> +{
-> +	struct fsl_qdma_chan *fsl_chan = to_fsl_qdma_chan(chan);
-> +
-> +	fsl_chan->desc = NULL;
-> +	return 0;
-> +}
+Changes in v8:
+- Add device_is_bound()
+- Add dev_pm_domain_set() and update code to use it
+- Move no_pm_callbacks field into CONFIG_PM_SLEEP
+- Call device_check_pm_callbacks only after a device is bound or unbound
 
-why do you need this it seems to do nothing
+Changes in v7:
+- Reduce indentation by adding a label in device_prepare()
 
-> +static struct fsl_qdma_desc *fsl_qdma_alloc_desc(struct fsl_qdma_chan *fsl_chan)
-> +{
-> +	struct fsl_qdma_desc *fsl_desc;
-> +
-> +	fsl_desc = kzalloc(sizeof(*fsl_desc), GFP_NOWAIT);
-> +
+Changes in v6:
+- Add stub for !CONFIG_PM.
+- Move implementation of device_check_pm_callbacks to power/main.c as it
+  doesn't belong to CONFIG_PM_SLEEP.
+- Take dev->power.lock before modifying flag.
 
-empty line here is not required
+Changes in v5:
+- Check for all dev_pm_ops instances associated to a device, updating a
+  no_pm_callbacks flag at the times when that could change.
 
-> +	if (!fsl_desc)
-> +		return NULL;
-> +
-> +	fsl_desc->qchan = fsl_chan;
-> +
-> +	return fsl_desc;
+Tomeu Vizoso (4):
+  device core: add device_is_bound()
+  PM / Domains: add setter for dev.pm_domain
+  PM / sleep: Go direct_complete if driver has no callbacks
+  USB / PM: Allow USB devices to remain runtime-suspended when sleeping
 
-why not return fsl_desc->qchan ;
-
-
-> +	dma_cap_set(DMA_PRIVATE, fsl_qdma->dma_dev.cap_mask);
-> +	dma_cap_set(DMA_SLAVE, fsl_qdma->dma_dev.cap_mask);
-> +	dma_cap_set(DMA_MEMCPY, fsl_qdma->dma_dev.cap_mask);
-> +
-> +	fsl_qdma->dma_dev.dev = &pdev->dev;
-> +	fsl_qdma->dma_dev.device_alloc_chan_resources
-> +		= fsl_qdma_alloc_chan_resources;
-> +	fsl_qdma->dma_dev.device_free_chan_resources
-> +		= fsl_qdma_free_chan_resources;
-> +	fsl_qdma->dma_dev.device_tx_status = fsl_qdma_tx_status;
-> +	fsl_qdma->dma_dev.device_prep_dma_memcpy = fsl_qdma_prep_memcpy;
-> +	fsl_qdma->dma_dev.device_issue_pending = fsl_qdma_issue_pending;
-
-You claim DMA_SLAVE but no prep_ for that?
-
-> +
-> +static int __init fsl_qdma_init(void)
-> +{
-> +	return platform_driver_register(&fsl_qdma_driver);
-> +}
-> +subsys_initcall(fsl_qdma_init);
-why subsys_init?
+ arch/arm/mach-omap2/omap_device.c |  7 ++++---
+ drivers/acpi/acpi_lpss.c          |  5 +++--
+ drivers/acpi/device_pm.c          |  5 +++--
+ drivers/base/dd.c                 | 21 +++++++++++++++++++--
+ drivers/base/power/clock_ops.c    |  5 +++--
+ drivers/base/power/common.c       | 24 ++++++++++++++++++++++++
+ drivers/base/power/domain.c       |  6 ++++--
+ drivers/base/power/main.c         | 35 +++++++++++++++++++++++++++++++++++
+ drivers/base/power/power.h        |  3 +++
+ drivers/gpu/vga/vga_switcheroo.c  | 10 +++++-----
+ drivers/misc/mei/pci-me.c         |  5 +++--
+ drivers/misc/mei/pci-txe.c        |  5 +++--
+ drivers/usb/core/port.c           |  6 ++++++
+ drivers/usb/core/usb.c            | 11 ++++++++++-
+ include/linux/device.h            |  2 ++
+ include/linux/pm.h                |  1 +
+ include/linux/pm_domain.h         |  3 +++
+ 17 files changed, 131 insertions(+), 23 deletions(-)
 
 -- 
-~Vinod
+2.4.3
