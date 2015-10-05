@@ -1,37 +1,45 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Mon, 5 Oct 2015 18:37:04 +0200
-Subject: [PATCH v4] twd: Don't set CLOCK_EVT_FEAT_C3STOP unconditionally
-In-Reply-To: <5612649C.5020401@sigmadesigns.com>
-References: <56123BD0.8010005@sigmadesigns.com>
- <56124035.6080107@sigmadesigns.com>
- <CACRpkdbWRU3UH6aJnqdcuzdh_-sE7ryhs0vBTUbbRDcJ7PWXLw@mail.gmail.com>
- <561247DF.1000308@sigmadesigns.com> <20151005103539.GC19064@leverpostej>
- <5612649C.5020401@sigmadesigns.com>
-Message-ID: <5612A730.5030400@sigmadesigns.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue,  6 Oct 2015 00:42:12 +0800
+Subject: [PATCH v2 0/2] irqchip: sunxi-nmi: misc. / aesthetic improvements
+Message-ID: <1444063334-19832-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2015 13:53, Marc Gonzalez wrote:
-> In 5388a6b266 ("ARM: SMP: Always enable clock event broadcast support")
-> Russell noted that "the TWD local timers are unable to wake up the CPU
-> when it is placed into a low power mode".
-> 
-> However, some platforms do not stop the TWD block in low-power mode,
-> and can thus use the TWD timer in one-shot mode, without setting up
-> a broadcast device.
-> 
-> Make the driver check for the "twd-never-stops" boolean property,
-> and set the CLOCK_EVT_FEAT_C3STOP flag accordingly.
-> 
-> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-> ---
->  Documentation/devicetree/bindings/arm/twd.txt | 4 ++++
->  arch/arm/kernel/smp_twd.c                     | 5 ++++-
->  2 files changed, 8 insertions(+), 1 deletion(-)
+Hi everyone,
 
-Sorry, I don't fully understand the submission process.
+This is v2 of my sunxi-nmi aesthetic improvement series.
 
-Should I now submit my patch to the patch queue?
-http://www.arm.linux.org.uk/developer/patches/
+sunxi-nmi uses its DT node name, which is normally "interrupt-controller",
+as its irqchip name. This only serves to confuse the user when one sees
+"interrupt-controller" in /sys/kernel/debug/irq_domain_mapping or
+/proc/interrupts. We want it to show something more specific, like
+"sunxi-nmi". Also do this for the printk calls.
 
-Regards.
+While at it, also switch to the new of_io_request_and_map() call, so the
+IO resource is properly held, and also shows up in /proc/iomem.
+
+
+Changes since v1:
+
+  - Use the "pr_fmt" macro in patch 1, and also remove __func__ from the
+    error message in the interrupt type setter, sunxi_sc_nmi_set_type().
+
+  - Update the commit message of patch 1 to reflect the change above.
+
+  - Add a proper commit message for patch 2.
+
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (2):
+  irqchip: sunxi-nmi: Use driver name instead of DT node name for
+    identification
+  irqchip: sunxi-nmi: switch to of_io_request_and_map() from of_iomap()
+
+ drivers/irqchip/irq-sunxi-nmi.c | 20 +++++++++++---------
+ 1 file changed, 11 insertions(+), 9 deletions(-)
+
+-- 
+2.5.3
