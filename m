@@ -1,59 +1,80 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Oct 2015 04:13:41 -0700
-Subject: [RFC/PATCH 00/11] arm: omap: counter32k rework
-In-Reply-To: <9068678.D8T0aRhgnK@wuerfel>
-References: <1443559446-26969-1-git-send-email-balbi@ti.com>
- <560DAFC5.50003@linaro.org> <20151005105554.GV23801@atomide.com>
- <9068678.D8T0aRhgnK@wuerfel>
-Message-ID: <20151005111341.GY23801@atomide.com>
+Date: Mon, 5 Oct 2015 04:23:04 -0700
+Subject: All OMAP platforms: MMC is broken
+In-Reply-To: <20151001100326.GV21513@n2100.arm.linux.org.uk>
+References: <20150924090048.GA21626@n2100.arm.linux.org.uk>
+ <20150924233756.GN23801@atomide.com>
+ <20151001093325.GU21513@n2100.arm.linux.org.uk>
+ <CAPDyKFpnqJBrtiBekikrNHAf-agZm12KnF9n+=+72HH=jti-KA@mail.gmail.com>
+ <20151001100326.GV21513@n2100.arm.linux.org.uk>
+Message-ID: <20151005112304.GZ23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [151005 04:08]:
-> On Monday 05 October 2015 03:55:55 Tony Lindgren wrote:
-> > * Daniel Lezcano <daniel.lezcano@linaro.org> [151001 15:16]:
-> > > On 09/30/2015 04:49 PM, Arnd Bergmann wrote:
-> > > >On Wednesday 30 September 2015 16:42:21 Arnd Bergmann wrote:
-> > > >>
-> > > >>TEGRA folks: the tegra_read_persistent_clock() implementation apparently
-> > > >>predates the Tegra RTC driver and I wonder if they actually do the
-> > > >>right thing in combination. Could it be that the wall time forwards
-> > > >>twice as fast as it should during resume when the RTC driver is loaded?
-> > > >>Could it be that we can simply remove  tegra_read_persistent_clock()
-> > > >>and the register_persistent_clock() infrastructure?
-> > > >>
-> > > >
-> > > >I found the 'sleeptime_injected' variable now, which takes care of
-> > > >forwarding the clock by the correct amount.
-> > > >
-> > > >I also found the CLOCK_SOURCE_SUSPEND_NONSTOP flag next to it, which
-> > > >should let us use the counter32k driver to provide the correct
-> > > >time during suspend without the omap_read_persistent_clock() function.
-> > > >We should be able to just delete that code.
-> > > >
-> > > >If we decide to also delete the tegra_read_persistent_clock()
-> > > >function, we can remove the registration too.
-> > > 
-> > > 
-> > > +1
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [151001 03:07]:
+> On Thu, Oct 01, 2015 at 11:50:00AM +0200, Ulf Hansson wrote:
+> > On 1 October 2015 at 11:33, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > > On Thu, Sep 24, 2015 at 04:37:56PM -0700, Tony Lindgren wrote:
+> > >> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150924 02:04]:
+> > >> > Nightly testing has revealed that both the OMAP3430 LDP and the OMAP4430
+> > >> > SDP fail to boot due to lack of working MMC.  Both platforms fail to
+> > >> > find their rootfs, which is on a SD card.
+> > >> >
+> > >> > The breakage occurred somewhere between trees of September 9th (commit
+> > >> > 4e4adb2f4628) and September 12th (commit b0a1ea51bda4), so during the
+> > >> > merge window.
+> > >>
+> > >> Yes sorry things got messed up in multiple ways :( I've summarized
+> > >> the mess here earlier:
+> > >>
+> > >> http://article.gmane.org/gmane.linux.kernel.mmc/33911
+> > >>
+> > >> And today commit b9c93646fd5c ("regulator: pbias: program pbias register
+> > >> offset in pbias driver") hit mainline so I'll send a pull request for
+> > >> the related dts change.
+> > >
+> > > It's still broken and untestable.  We're 8 days off it being a full
+> > > month worth of failed testing for OMAP3 and OMAP4 platforms.
+> > >
+> > > I think OMAP and MMC people need to do a post-mortem and work out why
+> > > this happened, and how to stop it happening again in the future.
 > > 
-> > We could maybe have read_persistent_clock() just check for the
-> > CLOCK_SOURCE_SUSPEND_NONSTOP flag?
+> > You are probably right!
+> > 
+> > I think I should have been more persistent when asking on how to deal
+> > with these patches. Typically they should all have gone together via
+> > one tree, or we needed a slower way forward keeping changes more
+> > standalone.
+> > 
+> > Anyway, according to kernelci.org, which builds and boot my next
+> > branch omap3/4 seems to boot now...
+> > http://kernelci.org/boot/all/job/ulfh/kernel/v4.3-rc3-27-gf7734d097520/
 > 
-> timekeeping_resume() already ignores the persistent clock values if
-> the clocksource has this set. Do you mean we should additionally
-> not call the read_persistent_clock() function at all to safe a
-> few cycles reading that value?
+> It continues to fail here.
+> 
+> Okay, sod it, I'm at the point of just not giving a damn about whether
+> OMAP3 and OMAP4 boot anymore.
+> 
+> I'm taking all OMAP platforms out of my boot farm.  I'm totally fed up
+> with this kind of regression happening.  It's probably some config option
+> that someone's recently introduced which defaults to being off, thereby
+> breaking the ability for people to move forward without constantly having
+> to re-configure.  This is not acceptable.
+> 
+> STOP BREAKING THE KERNEL.
 
-Hmm no I mean if we have CLOCK_SOURCE_SUSPEND_NONSTOP we can
-automatically make read_persistent_clock() use that if nothing
-else got registered.
+I totally agree, this is unacceptable. And I'm fed up chasing driver
+breakage and trying to test everything myself.
 
-> How expensive is the function?
+If Kihon is not starting to respond to these issues, we better start
+reverting some of the MMC patches. And I'd say in the future non-trivial
+patches really have to sit in linux next for two weeks before merging.
 
-Usually the persistent clock is on some interconnect, so it is
-way slower compared to a local timer. It doubt it makes a
-difference in timekeeping_resume() though :)
+We have still the omap3 legacy booting issue remaining, and warnings
+at least on omap4 overo.
+
+Regards,
 
 Regards,
 
