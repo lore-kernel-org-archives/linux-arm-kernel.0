@@ -1,210 +1,136 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Mon, 05 Oct 2015 13:08:01 -0700
-Subject: [v2 PATCH] arm64: replace read_lock to rcu lock in call_break_hook
-In-Reply-To: <560DB067.3060908@linaro.org>
-References: <1443717457-31461-1-git-send-email-yang.shi@linaro.org>
- <20151001130819.5080bc24@gandalf.local.home> <560D9D5F.70403@linaro.org>
- <20151001212702.GM4043@linux.vnet.ibm.com> <560DB067.3060908@linaro.org>
-Message-ID: <5612D8A1.6060505@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Oct 2015 21:27:18 +0100
+Subject: IMX6 serial fuckage
+Message-ID: <20151005202718.GL21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/1/2015 3:15 PM, Shi, Yang wrote:
-> On 10/1/2015 2:27 PM, Paul E. McKenney wrote:
->> On Thu, Oct 01, 2015 at 01:53:51PM -0700, Shi, Yang wrote:
->>> On 10/1/2015 10:08 AM, Steven Rostedt wrote:
->>>> On Thu,  1 Oct 2015 09:37:37 -0700
->>>> Yang Shi <yang.shi@linaro.org> wrote:
->>>>
->>>>> BUG: sleeping function called from invalid context at
->>>>> kernel/locking/rtmutex.c:917
->>>>> in_atomic(): 0, irqs_disabled(): 128, pid: 342, name: perf
->>>>> 1 lock held by perf/342:
->>>>>   #0:  (break_hook_lock){+.+...}, at: [<ffffffc0000851ac>]
->>>>> call_break_hook+0x34/0xd0
->>>>> irq event stamp: 62224
->>>>> hardirqs last  enabled at (62223): [<ffffffc00010b7bc>]
->>>>> __call_rcu.constprop.59+0x104/0x270
->>>>> hardirqs last disabled at (62224): [<ffffffc0000fbe20>]
->>>>> vprintk_emit+0x68/0x640
->>>>> softirqs last  enabled at (0): [<ffffffc000097928>]
->>>>> copy_process.part.8+0x428/0x17f8
->>>>> softirqs last disabled at (0): [<          (null)>]           (null)
->>>>> CPU: 0 PID: 342 Comm: perf Not tainted 4.1.6-rt5 #4
->>>>> Hardware name: linux,dummy-virt (DT)
->>>>> Call trace:
->>>>> [<ffffffc000089968>] dump_backtrace+0x0/0x128
->>>>> [<ffffffc000089ab0>] show_stack+0x20/0x30
->>>>> [<ffffffc0007030d0>] dump_stack+0x7c/0xa0
->>>>> [<ffffffc0000c878c>] ___might_sleep+0x174/0x260
->>>>> [<ffffffc000708ac8>] __rt_spin_lock+0x28/0x40
->>>>> [<ffffffc000708db0>] rt_read_lock+0x60/0x80
->>>>> [<ffffffc0000851a8>] call_break_hook+0x30/0xd0
->>>>> [<ffffffc000085a70>] brk_handler+0x30/0x98
->>>>> [<ffffffc000082248>] do_debug_exception+0x50/0xb8
->>>>> Exception stack(0xffffffc00514fe30 to 0xffffffc00514ff50)
->>>>> fe20:                                     00000000 00000000
->>>>> c1594680 0000007f
->>>>> fe40: ffffffff ffffffff 92063940 0000007f 0550dcd8 ffffffc0
->>>>> 00000000 00000000
->>>>> fe60: 0514fe70 ffffffc0 000be1f8 ffffffc0 0514feb0 ffffffc0
->>>>> 0008948c ffffffc0
->>>>> fe80: 00000004 00000000 0514fed0 ffffffc0 ffffffff ffffffff
->>>>> 9282a948 0000007f
->>>>> fea0: 00000000 00000000 9282b708 0000007f c1592820 0000007f
->>>>> 00083914 ffffffc0
->>>>> fec0: 00000000 00000000 00000010 00000000 00000064 00000000
->>>>> 00000001 00000000
->>>>> fee0: 005101e0 00000000 c1594680 0000007f c1594740 0000007f
->>>>> ffffffd8 ffffff80
->>>>> ff00: 00000000 00000000 00000000 00000000 c1594770 0000007f
->>>>> c1594770 0000007f
->>>>> ff20: 00665e10 00000000 7f7f7f7f 7f7f7f7f 01010101 01010101
->>>>> 00000000 00000000
->>>>> ff40: 928e4cc0 0000007f 91ff11e8 0000007f
->>>>>
->>>>> call_break_hook is called in atomic context (hard irq disabled), so
->>>>> replace
->>>>> the sleepable lock to rcu lock and replace relevant list operations
->>>>> to rcu
->>>>> version.
->>>>>
->>>>> Signed-off-by: Yang Shi <yang.shi@linaro.org>
->>>>> ---
->>>>> v1-> v2
->>>>> Replace list operations to rcu version.
->>>>>
->>>>>   arch/arm64/kernel/debug-monitors.c | 10 +++++-----
->>>>>   1 file changed, 5 insertions(+), 5 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm64/kernel/debug-monitors.c
->>>>> b/arch/arm64/kernel/debug-monitors.c
->>>>> index cebf786..cf0e4fc 100644
->>>>> --- a/arch/arm64/kernel/debug-monitors.c
->>>>> +++ b/arch/arm64/kernel/debug-monitors.c
->>>>> @@ -276,14 +276,14 @@ static DEFINE_RWLOCK(break_hook_lock);
->>>>>   void register_break_hook(struct break_hook *hook)
->>>>>   {
->>>>>       write_lock(&break_hook_lock);
->>>>> -    list_add(&hook->node, &break_hook);
->>>>> +    list_add_rcu(&hook->node, &break_hook);
->>>>>       write_unlock(&break_hook_lock);
->>>>>   }
->>>>>
->>>>>   void unregister_break_hook(struct break_hook *hook)
->>>>>   {
->>>>>       write_lock(&break_hook_lock);
->>>>> -    list_del(&hook->node);
->>>>> +    list_del_rcu(&hook->node);
->>>>>       write_unlock(&break_hook_lock);
->>>>>   }
->>>>
->>>> Shouldn't there be a synchronize_rcu() somewhere?
->>>
->>> So far kgdb is the only user of unregister_break_hook in mainline
->>> kernel.
->>>
->>> Just read Documentation/RCU/checklist.txt, it says:
->>>
->>> Note that synchronize_rcu() -only- guarantees to wait until
->>> all currently executing rcu_read_lock()-protected RCU read-side
->>> critical sections complete.
->>>
->>> For kgdb, the unregister is just called in kgdb_arch_exit by
->>> kgdb_unregister_io_module, which is called when rmmod kgdb module.
->>>
->>> The break point handler is done synchronously. So, it sounds should
->>> be not a problem without calling synchronize_rcu().
->>
->> OK, I will bite...  What does "synchronously" mean here?  Unless you
->> have somehow guaranteed that all current readers in call_break_hook()
->> are done between the time you call unregister_break_hook() to remove a
->> given break_hook structure and the time you call register_break_hook()
->> to add that same structure back in, you have a problem.
->
-> For kgdb usecase, this might be guaranteed.
->
-> Generally, kgdb module is loaded then register_break_hook() is called.
-> Then connect kgdb from host or via kdb, set breakpoint, wait for the
-> break point is hit, run some commands to debug. Then finish debug, rmmod
-> kgdb which will call unregister_break_hook().
->
-> It sounds the current readers in call_break_hook() could be done during
-> the time otherwise I won't be able to continue my debug when break point
-> is hit.
->
->>
->> What you have now only protects against invoking register_break_hook()
->> on newly allocated and initialized break_hook structure.  But the only
->> calls to register_break_hook() that I see in v4.2 use compile-time
->> initialized structures.  So the only failure from using non-RCU list
->> primitives would be due to the list_head's ->next pointer initialization.
->> This could momentarily make the list appear to have only the new element,
->> but not the old element.
->>
->> Unless you do a series of register_break_hook() and
->> unregister_break_hook()
->> calls, in which case a previously deleted structure could momentarily
->> appear to already (or still) be in the list.
+Greg,
 
-This might be a problem. Just thought of the below senario.
+Please revert this commit:
 
-1. load kgdb module
-2. do some debugging
-3. unload kgdb module <-- the hook pointer may be still in the list
-4. load kgdb module again <-- there may be two hook pointers
-5. do some debugging <-- it may call them twice
+commit 9e7b399d6528eac33a6fbfceb2b92af209c3454d
+Author: Eduardo Valentin <edubezval@gmail.com>
+Date:   Tue Aug 11 10:21:20 2015 -0700
 
-Although my test didn't catch this problem, it still sounds like a 
-potential issue.
+@@ -1630,12 +1630,12 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
+        int locked = 1;
+        int retval;
+ 
+-       retval = clk_enable(sport->clk_per);
++       retval = clk_prepare_enable(sport->clk_per);
+        if (retval)
+                return;
+-       retval = clk_enable(sport->clk_ipg);
++       retval = clk_prepare_enable(sport->clk_ipg);
+        if (retval) {
+-               clk_disable(sport->clk_per);
++               clk_disable_unprepare(sport->clk_per);
+                return;
+        }
+ 
+@@ -1674,8 +1674,8 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
+        if (locked)
+                spin_unlock_irqrestore(&sport->port.lock, flags);
+ 
+-       clk_disable(sport->clk_ipg);
+-       clk_disable(sport->clk_per);
++       clk_disable_unprepare(sport->clk_ipg);
++       clk_disable_unprepare(sport->clk_per);
+ }
+ 
+ /*
 
-Preparing for v3 with synchronize_rcu() added.
+Which, *shock horror* and no surprise what so ever, produces this at
+boot time:
 
-Thanks,
-Yang
+WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:868 mutex_trylock+0x200/0x21c()
+DEBUG_LOCKS_WARN_ON(in_interrupt())
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.3.0-rc4+ #1826
+Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+Backtrace: 
+[<c0013914>] (dump_backtrace) from [<c0013ab0>] (show_stack+0x18/0x1c)
+ r6:c07654d4 r5:00000364 r4:00000000 r3:00000000
+[<c0013a98>] (show_stack) from [<c0308b84>] (dump_stack+0x7c/0x98)
+[<c0308b08>] (dump_stack) from [<c002a348>] (warn_slowpath_common+0x80/0xbc)
+ r4:c0a73ab0 r3:c0a78bb8
+[<c002a2c8>] (warn_slowpath_common) from [<c002a428>] (warn_slowpath_fmt+0x38/0x40)
+ r8:00000000 r7:c14b097c r6:c053be1c r5:c14b297c r4:c0adf5b4
+[<c002a3f4>] (warn_slowpath_fmt) from [<c07654d4>] (mutex_trylock+0x200/0x21c)
+ r3:c09111c8 r2:c090e21c
+[<c07652d4>] (mutex_trylock) from [<c053be1c>] (clk_prepare_lock+0x14/0xf4)
+ r7:c14b097c r6:ee071000 r5:00000037 r4:ee071000
+[<c053be08>] (clk_prepare_lock) from [<c053e2d0>] (clk_prepare+0x18/0x30)
+ r5:00000037 r4:ee071000
+[<c053e2b8>] (clk_prepare) from [<c037e718>] (imx_console_write+0x30/0x228)
+ r4:c12b0530 r3:00000000
+[<c037e6e8>] (imx_console_write) from [<c0082688>] (call_console_drivers.constprop.13+0x124/0x184)
+ r10:c076c004 r9:00000000 r8:00000000 r7:c14b097c r6:00000037 r5:c12b0030
+ r4:c0abdbac
+[<c0082564>] (call_console_drivers.constprop.13) from [<c008427c>] (console_unlock+0x4e8/0x5b8)
+ r10:00000037 r9:00000000 r8:00000001 r7:00000000 r6:000000e9 r5:c14b1828
+ r4:c12b51bc
+[<c0083d94>] (console_unlock) from [<c0084d30>] (vprintk_emit+0x244/0x5b4)
+ r10:c12b0030 r9:600f0193 r8:00000000 r7:00000006 r6:00000027 r5:c0a80d4c
+ r4:0000000f
+[<c0084aec>] (vprintk_emit) from [<c00850cc>] (vprintk_default+0x2c/0x34)
+ r10:600f0193 r9:00000081 r8:c0abdf60 r7:000000ce r6:00000001 r5:c0abdf60
+ r4:c0abdef4
+[<c00850a0>] (vprintk_default) from [<c00f093c>] (printk+0x34/0x40)
+[<c00f090c>] (printk) from [<c0384494>] (credit_entropy_bits+0x1e4/0x3a0)
+ r3:c0a78bb8 r2:c0abdda4 r1:c094fef4 r0:c094fd44
+[<c03842b0>] (credit_entropy_bits) from [<c0386bac>] (add_interrupt_randomness+0x160/0x1ec)
+ r10:0000011d r9:c0afe8dc r8:c0a73e00 r7:c0abdf28 r6:fffee471 r5:c0abdef4
+ r4:eef89750
+[<c0386a4c>] (add_interrupt_randomness) from [<c0086084>] (handle_irq_event_percpu+0xc8/0x228)
+ r10:c0afe8c8 r8:00000001 r7:0000011d r6:ee1d03c0 r5:00000001 r4:00000000
+[<c0085fbc>] (handle_irq_event_percpu) from [<c008622c>] (handle_irq_event+0x48/0x6c)
+ r10:f4001100 r9:c076c004 r8:ee824000 r7:00000096 r6:ee1d03c0 r5:eea13660
+ r4:eea13600
+[<c00861e4>] (handle_irq_event) from [<c008920c>] (handle_fasteoi_irq+0xbc/0x194)
+ r6:c0ab4814 r5:eea13660 r4:eea13600 r3:00000000
+[<c0089150>] (handle_fasteoi_irq) from [<c00858a0>] (generic_handle_irq+0x20/0x30)
+ r7:00000096 r6:00000000 r5:c0a73f08 r4:c0a6e6e4
+[<c0085880>] (generic_handle_irq) from [<c00859d4>] (__handle_domain_irq+0x5c/0xb8)
+[<c0085978>] (__handle_domain_irq) from [<c00094b4>] (gic_handle_irq+0x48/0x94)
+ r8:c0a73e00 r7:c0ab47f0 r6:c0a75b18 r5:f400010c r4:f4000100 r3:c0a73e00
+[<c000946c>] (gic_handle_irq) from [<c00146f8>] (__irq_svc+0x58/0x78)
+Exception stack(0xc0a73e00 to 0xc0a73e48)
+3e00: 00000001 00000000 00000000 00000000 c002f028 00000000 00000202 c0afe88c
+3e20: ee824000 c076c004 f4001100 c0a73e9c c0a73e20 c0a73e50 c0073fd0 c002ea10
+3e40: 600f0113 ffffffff
+ r10:f4001100 r8:ee824000 r7:c0a73e34 r6:ffffffff r5:600f0113 r4:c002ea10
+[<c002e940>] (__do_softirq) from [<c002f028>] (irq_exit+0xe0/0x14c)
+ r10:f4001100 r9:c076c004 r8:ee824000 r7:0000001d r6:00000000 r5:00000000
+ r4:c0a6e6e4
+[<c002ef48>] (irq_exit) from [<c00859d8>] (__handle_domain_irq+0x60/0xb8)
+ r4:c0a6e6e4 r3:c0089810
+[<c0085978>] (__handle_domain_irq) from [<c00094b4>] (gic_handle_irq+0x48/0x94)
+ r8:c0a73f08 r7:c0ab47f0 r6:c0a75b18 r5:f400010c r4:f4000100 r3:c0a73f08
+[<c000946c>] (gic_handle_irq) from [<c00146f8>] (__irq_svc+0x58/0x78)
+Exception stack(0xc0a73f08 to 0xc0a73f50)
+3f00:                   00000001 00000001 00000000 c0021c60 c0a755a0 c0a75554
+3f20: c0afee90 c0b02840 c0a6c414 c076c004 efffc940 c0a73f64 c0a73f28 c0a73f58
+3f40: c0074020 c001078c 200f0013 ffffffff
+ r10:efffc940 r8:c0a6c414 r7:c0a73f3c r6:ffffffff r5:200f0013 r4:c001078c
+[<c0010764>] (arch_cpu_idle) from [<c006c268>] (default_idle_call+0x28/0x38)
+[<c006c240>] (default_idle_call) from [<c006c3e0>] (cpu_startup_entry+0x168/0x284)
+[<c006c278>] (cpu_startup_entry) from [<c0761fe4>] (rest_init+0x130/0x168)
+ r7:c0b02840 r3:00000000
+[<c0761eb4>] (rest_init) from [<c09f9cec>] (start_kernel+0x380/0x3e8)
+ r5:00000001 r4:c0b02890
+[<c09f996c>] (start_kernel) from [<1000807c>] (0x1000807c)
+---[ end trace 3999d1b9ea157b43 ]---
 
->
-> They are called in series:
->
-> In kgdb_arch_init
->      register_break_hook(&kgdb_brkpt_hook);
->          register_break_hook(&kgdb_compiled_brkpt_hook);
->
-> In kgdb_arch_exit
->      unregister_break_hook(&kgdb_brkpt_hook);
->          unregister_break_hook(&kgdb_compiled_brkpt_hook);
->
-> Yang
->
->
->
->>
->> Are those the sorts of failures you are seeing?
->>
->>                             Thanx, Paul
->>
->>> Yang
->>>
->>>> -- Steve
->>>>
->>>>>
->>>>> @@ -292,11 +292,11 @@ static int call_break_hook(struct pt_regs
->>>>> *regs, unsigned int esr)
->>>>>       struct break_hook *hook;
->>>>>       int (*fn)(struct pt_regs *regs, unsigned int esr) = NULL;
->>>>>
->>>>> -    read_lock(&break_hook_lock);
->>>>> -    list_for_each_entry(hook, &break_hook, node)
->>>>> +    rcu_read_lock();
->>>>> +    list_for_each_entry_rcu(hook, &break_hook, node)
->>>>>           if ((esr & hook->esr_mask) == hook->esr_val)
->>>>>               fn = hook->fn;
->>>>> -    read_unlock(&break_hook_lock);
->>>>> +    rcu_read_unlock();
->>>>>
->>>>>       return fn ? fn(regs, esr) : DBG_HOOK_ERROR;
->>>>>   }
->>>>
->>>
->>
->
+clk_prepare() and clk_prepare_enable() must only ever be used from process
+context - they _always_ take a mutex.  No exception.  It's a simple rule,
+but one which must always be obeyed!  Therefore, it must never appear in
+_any_ console_write() implementation.
+
+Greg, please revert this fundamentally broken and improperly tested
+commit.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
