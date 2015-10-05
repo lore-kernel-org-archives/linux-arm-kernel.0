@@ -1,81 +1,62 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 5 Oct 2015 12:52:30 -0500
-Subject: [RFC/PATCH 11/11] arm: boot: dts: omap: add missing default
- status for 32k counter
-In-Reply-To: <22213826.1MtkNIZ6W3@wuerfel>
-References: <1443559446-26969-1-git-send-email-balbi@ti.com>
- <4815825.NCBBBMgLGf@wuerfel>
- <20150930141209.GB31865@saruman.tx.rr.com>
- <22213826.1MtkNIZ6W3@wuerfel>
-Message-ID: <20151005175230.GG18784@saruman.tx.rr.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 5 Oct 2015 11:09:29 -0700
+Subject: [PATCH v3 1/5] clk: Add a basic multiplier clock
+In-Reply-To: <20151005101932.GH2696@lukather>
+References: <1443512353-28073-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1443512353-28073-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20151002204308.GY12338@codeaurora.org>
+ <20151005101932.GH2696@lukather>
+Message-ID: <20151005180929.GB12338@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 11:58:16PM +0200, Arnd Bergmann wrote:
-> On Wednesday 30 September 2015 09:12:09 Felipe Balbi wrote:
-> > On Wed, Sep 30, 2015 at 10:15:25AM +0200, Arnd Bergmann wrote:
-> > > On Tuesday 29 September 2015 15:44:06 Felipe Balbi wrote:
-> > > > All devices should have a default status. Ignoring
-> > > > the arguments if it should be 'okay' or 'disabled'
-> > > > by default, let's set them all the 'disabled' and
-> > > > have boards enable 32k counter.
-> > > > 
-> > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > > 
-> > > 
-> > > The patch looks good, but the description is slightly incorrect:
-> > > There is no reason to list "status='okay'" other than overriding
-> > > the 'disabled' status.
-> > > 
-> > > I'd phrase it something like:
-> > > 
-> > > "We want the use of the 32k counter to be a per-board setting,
-> > > so let's disable it by default in each dtsi file and override the
-> > > setting in the boards. Any board that does not wire up the counter
-> > > should leave it disabled".
-> > > 
-> > > However, if you really want all boards to provide the counter all
-> > > the time, I'd argue that we're better off dropping this patch. We
-> > > use the status="disabled" trick for anything that may or may not
-> > > be working based on the board design, but things that are present
-> > > everywhere don't need this.
-> > 
-> > okay, so here's the thing. While fiddling with the 32k counter, I noticed
-> > that even though there was no status listed, the thing still initializes
-> > fine. However, when moving 32k to drivers/clocksource and using
-> > CLOCKSOURCE_OF_DECLARE(), 32k would *NOT* probe unless I had an explicit
-> > status = "okay" in DT.
+On 10/05, Maxime Ripard wrote:
+> Hi,
 > 
-> Very strange, that sounds like a bug in the clocksource probe code.
-> Can you check how this happens?
+> On Fri, Oct 02, 2015 at 01:43:08PM -0700, Stephen Boyd wrote:
+> > On 09/29, Maxime Ripard wrote:
+> > > +
+> > > +	if (!val && mult->flags & CLK_MULTIPLIER_ZERO_BYPASS)
+> > > +		val = 1;
+> > > +	
+> > > +	return parent_rate * val;
+> > > +}
+> > > +
+> > > +static bool __is_best_rate(unsigned long rate, unsigned long new,
+> > > +			   unsigned long best, unsigned long flags)
+> > > +{
+> > > +	if (flags & CLK_MULTIPLIER_ROUND_CLOSEST)
+> > 
+> > Is the only difference in this function vs the divider one that
+> > flag? Maybe we should make this function generic to the framework
+> > and pass a flag indicating closest or not.
+> 
+> Actually, the logic is also reversed.
+> 
+> The divider driver will always try to find some rate that is higher
+> than the one we already have, without going above than the one
+> requested.
+> 
+> Here, we're tring to be lower than the best rate, without going below
+> the requested rate.
 
-seems like something overwrites counter's status field, here's a snippet of boot
-log:
+So then a tri-state flag that indicates, closest, less than,
+greater than?
 
-[    0.000000] ===> counter is available ??
-[    0.000000] ===> no status -> TRUE!!
-[    0.000000] ===> searching for timer
-[    0.000000] ===> timer is available ??
-[    0.000000] ===> no status -> TRUE!!
-[    0.000005] sched_clock: 64 bits at 1000MHz, resolution 1ns, wraps every 4398046511103ns
-[    0.000014] clocksource: arm_global_timer: mask: 0xffffffffffffffff max_cycles: 0x1cd42e4dffb, max_idle_ns: 881590591483 ns
-[    0.000047] ===> searching for timer
-[    0.000051] ===> timer is available ??
-[    0.000054] ===> no status -> TRUE!!
-[    0.000307] ===> searching for counter
-[    0.000311] ===> counter is available ??
-[    0.000315] ===> counter status disabled
-[    0.000318] ====> counter NOT available
+> 
+> > 
+> > > +	unsigned long val;
+> > > +
+> > > +	if (mult->lock)
+> > > +		spin_lock_irqsave(mult->lock, flags);
+> > 
+> > This needs the same "trick" that we did in the generic clock
+> > types to avoid sparse warnings.
+> 
+> The __acquire call ?
 
-note that first time around counter had no status and later it got a status
-disabled from somewhere.
+Yes.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151005/48e904f0/attachment.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
