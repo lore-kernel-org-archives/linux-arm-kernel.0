@@ -1,58 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 5 Oct 2015 10:34:38 -0500
-Subject: [PATCH 1/3] dt-bindings: Document the STM32 HW RNG bindings
-In-Reply-To: <1443904519-24012-2-git-send-email-daniel.thompson@linaro.org>
-References: <1443904519-24012-1-git-send-email-daniel.thompson@linaro.org>
- <1443904519-24012-2-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <CAL_JsqLt2=Cb8SDAQG7XiMNC7NV59MimYETyt87-QYHt31cnsQ@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 5 Oct 2015 16:37:47 +0100
+Subject: [PATCH v5 06/10] dmaengine: add API for getting dma controller's
+ quirk
+In-Reply-To: <1442188139-6017-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1442187923-5736-1-git-send-email-shawn.lin@rock-chips.com>
+ <1442188139-6017-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <20151005153746.GG13501@vkoul-mobl.iind.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 3, 2015 at 3:35 PM, Daniel Thompson
-<daniel.thompson@linaro.org> wrote:
-> This adds documenttaion of device tree binds for the STM32 hardware
-> random number generator.
->
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+On Mon, Sep 14, 2015 at 07:48:59AM +0800, Shawn Lin wrote:
+> Add dmaengine_get_quirks API for peripheral devices to query
+> quirks if they need it to make special workaround due to broken
+> dma controller design.
+> 
+> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 > ---
->  .../devicetree/bindings/hwrng/stm32-rng.txt         | 21 +++++++++++++++++++++
+> 
+> Changes in v5: None
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+> Changes in v1: None
+> 
+>  include/linux/dmaengine.h | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index e2f5eb4..5174ca4 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -704,6 +704,7 @@ struct dma_device {
+>  
+>  	int (*device_config)(struct dma_chan *chan,
+>  			     struct dma_slave_config *config);
+> +	int (*device_get_quirks)(struct dma_chan *chan);
 
-Please use bindings/rng/... as I'm consolidating bindings there.
+And why do we want to expose this to users? THis doesnt seem right!
 
-Otherwise,
+A quirk may exists but should be handled inside the controller driver and do
+appropriate action. You don't tell users or expect them to handle these
 
-Acked-by: Rob Herring <robh@kernel.org>
-
->  1 file changed, 21 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/hwrng/stm32-rng.txt
->
-> diff --git a/Documentation/devicetree/bindings/hwrng/stm32-rng.txt b/Documentation/devicetree/bindings/hwrng/stm32-rng.txt
-> new file mode 100644
-> index 000000000000..47f04176f93b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/hwrng/stm32-rng.txt
-> @@ -0,0 +1,21 @@
-> +STMicroelectronics STM32 HW RNG
-> +===============================
-> +
-> +The STM32 hardware random number generator is a simple fixed purpose IP and
-> +is fully separated from other crypto functions.
-> +
-> +Required properties:
-> +
-> +- compatible : Should be "st,stm32-rng"
-> +- reg : Should be register base and length as documented in the datasheet
-> +- interrupts : The designated IRQ line for the RNG
-> +- clocks : The clock needed to enable the RNG
-> +
-> +Example:
-> +
-> +       rng: rng at 50060800 {
-> +               compatible = "st,stm32-rng";
-> +               reg = <0x50060800 0x400>;
-> +               interrupts = <80>;
-> +               clocks = <&rcc 0 38>;
-> +       };
-> --
-> 2.4.3
->
+-- 
+~Vinod
