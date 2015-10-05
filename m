@@ -1,31 +1,35 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Oct 2015 03:45:57 -0700
-Subject: [RFC/PATCH 11/11] arm: boot: dts: omap: add missing default
- status for 32k counter
-In-Reply-To: <1443559446-26969-12-git-send-email-balbi@ti.com>
+Date: Mon, 5 Oct 2015 03:50:34 -0700
+Subject: [RFC/PATCH 09/11] clocksource: add TI 32.768 Hz counter driver
+In-Reply-To: <560DACD8.8000301@linaro.org>
 References: <1443559446-26969-1-git-send-email-balbi@ti.com>
- <1443559446-26969-12-git-send-email-balbi@ti.com>
-Message-ID: <20151005104556.GT23801@atomide.com>
+ <1443559446-26969-10-git-send-email-balbi@ti.com>
+ <560DACD8.8000301@linaro.org>
+Message-ID: <20151005105034.GU23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [150929 13:48]:
-> All devices should have a default status. Ignoring
-> the arguments if it should be 'okay' or 'disabled'
-> by default, let's set them all the 'disabled' and
-> have boards enable 32k counter.
+* Daniel Lezcano <daniel.lezcano@linaro.org> [151001 15:04]:
+> >+	clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
+> >+			32768, NSEC_PER_SEC, 120000);
+> >+
+> >+	ret = clocksource_mmio_init(sync32k_cnt_reg, "32k_counter", 32768,
+> >+				250, 32, clocksource_mmio_readl_up);
+> >+	if (ret) {
+> >+		pr_err("32k_counter: can't register clocksource\n");
+> >+		return;
+> >+	}
+> >+
+> >+	sched_clock_register(omap_32k_read_sched_clock, 32, 32768);
+> >+	register_persistent_clock(NULL, omap_read_persistent_clock64);
+> 
+> I will let John Stultz to have a look at this part because I have doubt
+> regarding the usage of the persistent clock.
 
-We should not use "disabled" really at all. That means
-no struct device is ever created while that hardawre is
-there for the internal devices for sure.
-
-Also, we should use the 32k counter as the default one
-as that's always on for deeper idle states.
-
-For cases where the 32k ocillator is not available,
-it's better to just set the source clock rate to 0
-in the board specific dts file and have the driver
-bail out early if source clock rate is 0.
+The persistent clock we want to keep for deeper idle states..
+Especially when we start changing clocksource for the duration of
+deeper idle states. I'll post some updated patches on that when I
+get a chance.
 
 Regards,
 
