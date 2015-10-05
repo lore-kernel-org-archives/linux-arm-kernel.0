@@ -1,23 +1,92 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 05 Oct 2015 21:50:32 +0200
-Subject: [PATCH] ARM: pxa: z2: Fix section mismatch
-In-Reply-To: <1444034228-9249-1-git-send-email-thierry.reding@gmail.com>
- (Thierry Reding's message of "Mon, 5 Oct 2015 10:37:08 +0200")
-References: <1444034228-9249-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <87mvvxayd3.fsf@belgarion.home>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 05 Oct 2015 22:26:48 +0200
+Subject: [PATCH v9 0/4] Allow USB devices to remain runtime-suspended when
+ sleeping
+In-Reply-To: <1444056332-30246-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1444056332-30246-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <8710988.MO9zH1zeoz@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry Reding <thierry.reding@gmail.com> writes:
+On Monday, October 05, 2015 04:45:28 PM Tomeu Vizoso wrote:
+> Hi,
+> 
+> this is v9 of an attempt to make it easier for devices to remain in
+> runtime PM when the system goes to sleep, mainly to reduce the time
+> spent resuming devices.
+> 
+> For this, we interpret the absence of all PM callback implementations as
+> it being safe to do direct_complete, so their ancestors aren't prevented
+> from remaining runtime-suspended.
+> 
+> Additionally, the prepare() callback of USB devices will return 1 if
+> runtime PM is enabled and the current wakeup settings are correct.
+> 
+> With these changes, a uvcvideo device (for example) stays in runtime
+> suspend when the system goes to sleep and is left in that state when the
+> system resumes, not delaying it unnecessarily.
+> 
+> Thanks,
+> 
+> Tomeu
+> 
+> Changes in v9:
+> - Add docs noting the need for the device lock to be held before calling
+>   device_is_bound()
+> - Add docs noting the need for the device lock to be held before calling
+>   dev_pm_domain_set()
+> - Move to CONFIG_PM_SLEEP as suggested by Rafael and Ulf.
+> - Rename from device_check_pm_callbacks to device_pm_check_callbacks to
+>   follow with the naming convention of existing API.
+> - Re-add calling to device_pm_check_callbacks from device registration
+>   and when updating the PM domain of a device.
+> 
+> Changes in v8:
+> - Add device_is_bound()
+> - Add dev_pm_domain_set() and update code to use it
+> - Move no_pm_callbacks field into CONFIG_PM_SLEEP
+> - Call device_check_pm_callbacks only after a device is bound or unbound
+> 
+> Changes in v7:
+> - Reduce indentation by adding a label in device_prepare()
+> 
+> Changes in v6:
+> - Add stub for !CONFIG_PM.
+> - Move implementation of device_check_pm_callbacks to power/main.c as it
+>   doesn't belong to CONFIG_PM_SLEEP.
+> - Take dev->power.lock before modifying flag.
+> 
+> Changes in v5:
+> - Check for all dev_pm_ops instances associated to a device, updating a
+>   no_pm_callbacks flag at the times when that could change.
+> 
+> Tomeu Vizoso (4):
+>   device core: add device_is_bound()
+>   PM / Domains: add setter for dev.pm_domain
+>   PM / sleep: Go direct_complete if driver has no callbacks
+>   USB / PM: Allow USB devices to remain runtime-suspended when sleeping
+> 
+>  arch/arm/mach-omap2/omap_device.c |  7 ++++---
+>  drivers/acpi/acpi_lpss.c          |  5 +++--
+>  drivers/acpi/device_pm.c          |  5 +++--
+>  drivers/base/dd.c                 | 21 +++++++++++++++++++--
+>  drivers/base/power/clock_ops.c    |  5 +++--
+>  drivers/base/power/common.c       | 24 ++++++++++++++++++++++++
+>  drivers/base/power/domain.c       |  6 ++++--
+>  drivers/base/power/main.c         | 35 +++++++++++++++++++++++++++++++++++
+>  drivers/base/power/power.h        |  3 +++
+>  drivers/gpu/vga/vga_switcheroo.c  | 10 +++++-----
+>  drivers/misc/mei/pci-me.c         |  5 +++--
+>  drivers/misc/mei/pci-txe.c        |  5 +++--
+>  drivers/usb/core/port.c           |  6 ++++++
+>  drivers/usb/core/usb.c            | 11 ++++++++++-
+>  include/linux/device.h            |  2 ++
+>  include/linux/pm.h                |  1 +
+>  include/linux/pm_domain.h         |  3 +++
+>  17 files changed, 131 insertions(+), 23 deletions(-)
 
-> The z2_power_off() function calls pxa27x_set_pwrmode(), which is marked
-> __init. z2_power_off() is set up as the power off handler, so will need
-> to stick around after __init data is discarded. Fix this by doing what
-> everyone else does and set the power mode from the board initialization
-> code instead.
-Applied to pxa/fixes, thanks.
+The series looks good to me now, but patch [4/4] needs an ACK from the USB
+maintainers and patch [1/4] needs an ACK from Greg.
 
-Cheers.
-
---
-Robert
+Thanks,
+Rafael
