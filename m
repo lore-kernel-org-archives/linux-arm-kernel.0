@@ -1,67 +1,75 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  5 Oct 2015 14:02:15 +0100
-Subject: [PATCH v4 0/5] Mailbox: Provide support STi based platforms
-Message-ID: <1444050140-24733-1-git-send-email-lee.jones@linaro.org>
+Date: Mon,  5 Oct 2015 14:02:16 +0100
+Subject: [PATCH v4 1/5] mailbox: dt: Supply bindings for ST's Mailbox IP
+In-Reply-To: <1444050140-24733-1-git-send-email-lee.jones@linaro.org>
+References: <1444050140-24733-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1444050140-24733-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
-
-This should be it.  Exciting times!
-
-ST's platforms currently support a maximum of 5 Mailboxes, one for
-each of the supported co-processors situated on the platform.  Each
-Mailbox is divided up into 4 instances which consist of 32 channels.
-Messages are passed between the application and co-processors using
-shared memory areas.
-
-Also included in the set is an example Client which should be generic
-enough to use as a testing environment for all Mailbox IPs which use
-shared memory or the API to pass messages.  With small changes, it
-should also be able to test more extravagant implementations.
-
-v3 -> v4:
- - More protection in MBOX_BASE() MACRO
- - Remove unused tx-only marker
-
-v2 => v3:
- - Controller
-   - Shared (DT <=> Device Driver) defines removed
-   - Return actual error codes instead of NULL in xlate()
-   - Not passing 'direction' configuration via DT anymore
-     - Removed all accompanying configuration checking code
- - Test F/W
-   - Allow Rx-only and Tx-only controllers to be tested
-   - Cater for controllers requiring pre-Tx 'signal' to be sent
-   - Supply 'wr-' message debugfs file
-     - When written to, will Tx message through Mailbox Framework
-     - When read from, will print out a hexdump of Rx'ed message
-
-v1 => v2:
- - New MACRO() to obtain base address for a given instance
- - Move locking into the structure it protects
- - Stop checking for 'ready' state when sending data
- - Don't clear channel data (that belongs to the API)
- - #define register offsets instead of providing via pdata
- - Register driver with module_platform_driver()
-
-Lee Jones (5):
-  mailbox: dt: Supply bindings for ST's Mailbox IP
-  mailbox: Add support for ST's Mailbox IP
-  ARM: STi: stih407-family: Add nodes for Mailbox
-  mailbox: Add generic mechanism for testing Mailbox Controllers
-  ARM: STi: DT: STiH407: Enable Mailbox testing facility
-
- .../devicetree/bindings/mailbox/sti-mailbox.txt    |  52 +++
- arch/arm/boot/dts/stih407-family.dtsi              |  42 ++
- drivers/mailbox/Kconfig                            |  14 +
- drivers/mailbox/Makefile                           |   4 +
- drivers/mailbox/mailbox-sti.c                      | 516 +++++++++++++++++++++
- drivers/mailbox/mailbox-test.c                     | 361 ++++++++++++++
- 6 files changed, 989 insertions(+)
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ .../devicetree/bindings/mailbox/sti-mailbox.txt    | 52 ++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
- create mode 100644 drivers/mailbox/mailbox-sti.c
- create mode 100644 drivers/mailbox/mailbox-test.c
 
+diff --git a/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+new file mode 100644
+index 0000000..9fb4400
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+@@ -0,0 +1,52 @@
++ST Microelectronics Mailbox Driver
++
++Each ST Mailbox IP currently consists of 4 instances of 32 channels.  Messages
++are passed between Application and Remote processors using shared memory.
++
++Controller
++----------
++
++Required properties:
++- compatible		: Should be "st,stih407-mailbox"
++- reg			: Offset and length of the device's register set
++- mbox-name		: Name of the mailbox
++- #mbox-cells:		: Must be 2
++			  <&phandle instance channel direction>
++			    phandle   : Label name of controller
++			    instance  : Instance number
++			    channel   : Channel number
++
++Optional properties
++- interrupts		: Contains the IRQ line for a Rx mailbox
++- tx-only		: Denotes Mailbox cannot receive messages
++
++Example:
++
++mailbox0: mailbox at 0  {
++	compatible	= "st,stih407-mailbox";
++	reg		= <0x08f00000 0x1000>;
++	interrupts	= <GIC_SPI 1 IRQ_TYPE_NONE>;
++	#mbox-cells	= <2>;
++	mbox-name	= "a9";
++};
++
++Client
++------
++
++Required properties:
++- compatible		: Many (See the client docs)
++- reg			: Shared (between Application and Remote) memory address
++- mboxes		: Standard property to specify a Mailbox (See ./mailbox.txt)
++			  Cells must match 'mbox-cells' (See Controller docs above)
++
++Optional properties
++- mbox-names		: Name given to channels seen in the 'mboxes' property.
++
++Example:
++
++mailbox_test {
++	compatible	= "mailbox_test";
++	reg		= <0x[shared_memory_address], [shared_memory_size]>;
++	mboxes		= <&mailbox2 0 1>, <&mailbox0 2 1>;
++	mbox-names	= "tx",	"rx";
++};
 -- 
 1.9.1
