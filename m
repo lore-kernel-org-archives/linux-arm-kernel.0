@@ -1,89 +1,49 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  6 Oct 2015 00:42:13 +0800
-Subject: [PATCH v2 1/2] irqchip: sunxi-nmi: Use driver name instead of DT node
- name for identification
-In-Reply-To: <1444063334-19832-1-git-send-email-wens@csie.org>
-References: <1444063334-19832-1-git-send-email-wens@csie.org>
-Message-ID: <1444063334-19832-2-git-send-email-wens@csie.org>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 5 Oct 2015 11:42:54 -0500
+Subject: [PATCH 1/4] ARM: OMAP: dmtimer: check for fixed timers during
+ config
+In-Reply-To: <201510040126.SfMisWv2%fengguang.wu@intel.com>
+References: <201510040126.SfMisWv2%fengguang.wu@intel.com>
+Message-ID: <5612A88E.1040809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device tree node name is typically "interrupt-controller", which is
-rather useless when used in printk messages and irq chip names for
-identification purposes. Use the driver name "sunxi-nmi" instead.
+Tony,
 
-While at it move the identifier from pr_err() calls to the pr_fmt macro.
+On 10/03/2015 12:29 PM, kbuild test robot wrote:
+> Hi Suman,
+> 
+> [auto build test results on v4.3-rc3 -- if it's inappropriate base, please ignore]
+> 
+> config: arm-omap1_defconfig (attached as .config)
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm 
+> 
+> All error/warnings (new ones prefixed by >>):
+> 
+>    arch/arm/plat-omap/dmtimer.c: In function 'omap_dm_timer_set_source':
+>>> arch/arm/plat-omap/dmtimer.c:509:2: error: implicit declaration of function 'clk_hw_get_num_parents' [-Werror=implicit-function-declaration]
+>      if (!clk_hw_get_num_parents(__clk_get_hw(timer->fclk)))
+>      ^
+>>> arch/arm/plat-omap/dmtimer.c:509:2: error: implicit declaration of function '__clk_get_hw' [-Werror=implicit-function-declaration]
+>    cc1: some warnings being treated as errors
+> 
+> vim +/clk_hw_get_num_parents +509 arch/arm/plat-omap/dmtimer.c
+> 
+>    503			return pdata->set_timer_src(timer->pdev, source);
+>    504	
+>    505		if (IS_ERR(timer->fclk))
+>    506			return -EINVAL;
+>    507	
+>    508		/* Check if the clock has parents if not no point checking */
+>  > 509		if (!clk_hw_get_num_parents(__clk_get_hw(timer->fclk)))
+>    510			return 0;
 
-Also remove the "__func__" identifier from the error message in the
-interrupt type setting callback, sunxi_sc_nmi_set_type(). The driver
-name in the pr_fmt macro should be enough.
+CONFIG_COMMON_CLK is not defined for OMAP1. So, are you ok if I enclose
+this within #ifdef CONFIG_COMMON_CLK?
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/irqchip/irq-sunxi-nmi.c | 20 +++++++++++---------
- 1 file changed, 11 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/irqchip/irq-sunxi-nmi.c b/drivers/irqchip/irq-sunxi-nmi.c
-index c143dd58410c..c4f719664c63 100644
---- a/drivers/irqchip/irq-sunxi-nmi.c
-+++ b/drivers/irqchip/irq-sunxi-nmi.c
-@@ -8,6 +8,9 @@
-  * warranty of any kind, whether express or implied.
-  */
- 
-+#define DRV_NAME	"sunxi-nmi"
-+#define pr_fmt(fmt)	DRV_NAME ": " fmt
-+
- #include <linux/bitops.h>
- #include <linux/device.h>
- #include <linux/io.h>
-@@ -96,8 +99,8 @@ static int sunxi_sc_nmi_set_type(struct irq_data *data, unsigned int flow_type)
- 		break;
- 	default:
- 		irq_gc_unlock(gc);
--		pr_err("%s: Cannot assign multiple trigger modes to IRQ %d.\n",
--			__func__, data->irq);
-+		pr_err("Cannot assign multiple trigger modes to IRQ %d.\n",
-+			data->irq);
- 		return -EBADR;
- 	}
- 
-@@ -130,22 +133,21 @@ static int __init sunxi_sc_nmi_irq_init(struct device_node *node,
- 
- 	domain = irq_domain_add_linear(node, 1, &irq_generic_chip_ops, NULL);
- 	if (!domain) {
--		pr_err("%s: Could not register interrupt domain.\n", node->name);
-+		pr_err("Could not register interrupt domain.\n");
- 		return -ENOMEM;
- 	}
- 
--	ret = irq_alloc_domain_generic_chips(domain, 1, 2, node->name,
-+	ret = irq_alloc_domain_generic_chips(domain, 1, 2, DRV_NAME,
- 					     handle_fasteoi_irq, clr, 0,
- 					     IRQ_GC_INIT_MASK_CACHE);
- 	if (ret) {
--		 pr_err("%s: Could not allocate generic interrupt chip.\n",
--			 node->name);
--		 goto fail_irqd_remove;
-+		pr_err("Could not allocate generic interrupt chip.\n");
-+		goto fail_irqd_remove;
- 	}
- 
- 	irq = irq_of_parse_and_map(node, 0);
- 	if (irq <= 0) {
--		pr_err("%s: unable to parse irq\n", node->name);
-+		pr_err("unable to parse irq\n");
- 		ret = -EINVAL;
- 		goto fail_irqd_remove;
- 	}
-@@ -153,7 +155,7 @@ static int __init sunxi_sc_nmi_irq_init(struct device_node *node,
- 	gc = irq_get_domain_generic_chip(domain, 0);
- 	gc->reg_base = of_iomap(node, 0);
- 	if (!gc->reg_base) {
--		pr_err("%s: unable to map resource\n", node->name);
-+		pr_err("unable to map resource\n");
- 		ret = -ENOMEM;
- 		goto fail_irqd_remove;
- 	}
--- 
-2.5.3
+regards
+Suman
