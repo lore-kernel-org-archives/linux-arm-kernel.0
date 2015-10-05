@@ -1,37 +1,76 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Mon, 5 Oct 2015 17:19:40 +0530
-Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
-In-Reply-To: <20151005054652.GI26391@xsjsorenbubuntu>
-References: <560E53E3.7070207@free.fr> <560E8584.8000207@free.fr>
- <20151002180255.GK12338@codeaurora.org> <560ED1FB.9010000@free.fr>
- <yw1xbncgluad.fsf@unicorn.mansr.com>
- <20151003103219.1e10bdeb@arm.com> <560FA4B5.1040709@free.fr>
- <20151003111231.544ae8e2@arm.com>
- <20151005054652.GI26391@xsjsorenbubuntu>
-Message-ID: <20151005114940.GA4448@afzalpc>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Mon, 5 Oct 2015 13:53:00 +0200
+Subject: [PATCH v4] twd: Don't set CLOCK_EVT_FEAT_C3STOP unconditionally
+In-Reply-To: <20151005103539.GC19064@leverpostej>
+References: <56123BD0.8010005@sigmadesigns.com>
+ <56124035.6080107@sigmadesigns.com>
+ <CACRpkdbWRU3UH6aJnqdcuzdh_-sE7ryhs0vBTUbbRDcJ7PWXLw@mail.gmail.com>
+ <561247DF.1000308@sigmadesigns.com> <20151005103539.GC19064@leverpostej>
+Message-ID: <5612649C.5020401@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In 5388a6b266 ("ARM: SMP: Always enable clock event broadcast support")
+Russell noted that "the TWD local timers are unable to wake up the CPU
+when it is placed into a low power mode".
 
-On Sun, Oct 04, 2015 at 10:46:52PM -0700, S?ren Brinkmann wrote:
-> On Sat, 2015-10-03 at 11:12AM +0100, Marc Zyngier wrote:
+However, some platforms do not stop the TWD block in low-power mode,
+and can thus use the TWD timer in one-shot mode, without setting up
+a broadcast device.
 
-> > Indeed, I cannot see any code that does that in the GT driver. But if
-> > you have an A9 MP, you probably want to stick to TWD, which gives you a
-> > per-cpu timer instead of a global timer that will require IPIs to other
-> > CPUs.
-> 
-> I think the TWD only provides a clock_event device. Clocksource and
-> schedclock would have to be provided by something else.
+Make the driver check for the "twd-never-stops" boolean property,
+and set the CLOCK_EVT_FEAT_C3STOP flag accordingly.
 
-If no clocksource, sched clock is provided, default jiffies based ones
-would be sufficient for single core, no ?, though not a preferred one.
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+ Documentation/devicetree/bindings/arm/twd.txt | 4 ++++
+ arch/arm/kernel/smp_twd.c                     | 5 ++++-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
-Regards
-afzal
-
-> I looked at that once. IIRC, the problems are schedclock and clocksource.
-> Other than a clockevent device which can be adjusted for frequency
-> changes, there is (at least was) no such mechanism for clocksources and
-> schedclock. Those are required to run at a stable frequency at all times
+diff --git a/Documentation/devicetree/bindings/arm/twd.txt b/Documentation/devicetree/bindings/arm/twd.txt
+index 75b8610939fa..700a517b000e 100644
+--- a/Documentation/devicetree/bindings/arm/twd.txt
++++ b/Documentation/devicetree/bindings/arm/twd.txt
+@@ -19,6 +19,10 @@ interrupts.
+ - reg : Specify the base address and the size of the TWD timer
+ 	register window.
+ 
++Optional
++- twd-never-stops : boolean property. If present, TWD timers are expected
++  to keep generating interrupts, even when the CPU is in low-power mode.
++
+ Example:
+ 
+ 	twd-timer at 2c000600 {
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index e8f6d241881f..79298d4fb41f 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -33,6 +33,7 @@ static unsigned long twd_timer_rate;
+ static DEFINE_PER_CPU(bool, percpu_setup_called);
+ 
+ static struct clock_event_device __percpu *twd_evt;
++static int feat_c3stop;
+ static int twd_ppi;
+ 
+ static void twd_set_mode(enum clock_event_mode mode,
+@@ -293,7 +294,7 @@ static void twd_timer_setup(void)
+ 
+ 	clk->name = "local_timer";
+ 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+-			CLOCK_EVT_FEAT_C3STOP;
++			feat_c3stop;
+ 	clk->rating = 350;
+ 	clk->set_mode = twd_set_mode;
+ 	clk->set_next_event = twd_set_next_event;
+@@ -345,6 +346,8 @@ static int __init twd_local_timer_common_register(struct device_node *np)
+ 		goto out_irq;
+ 
+ 	twd_get_clock(np);
++	if (!of_property_read_bool(np, "twd-never-stops"))
++		feat_c3stop = CLOCK_EVT_FEAT_C3STOP;
+ 
+ 	/*
+ 	 * Immediately configure the timer on the boot CPU, unless we need
+-- 
+2.4.5
