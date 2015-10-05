@@ -1,76 +1,128 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Mon, 5 Oct 2015 11:50:23 +0200
-Subject: [PATCH v3] twd: Don't set CLOCK_EVT_FEAT_C3STOP unconditionally
-In-Reply-To: <CACRpkdbWRU3UH6aJnqdcuzdh_-sE7ryhs0vBTUbbRDcJ7PWXLw@mail.gmail.com>
-References: <56123BD0.8010005@sigmadesigns.com>
- <56124035.6080107@sigmadesigns.com>
- <CACRpkdbWRU3UH6aJnqdcuzdh_-sE7ryhs0vBTUbbRDcJ7PWXLw@mail.gmail.com>
-Message-ID: <561247DF.1000308@sigmadesigns.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 5 Oct 2015 10:54:05 +0100
+Subject: [PATCH] sparc(64)/iommu: fixup iommu_tbl_range_alloc() types
+In-Reply-To: <1442855829-11245-1-git-send-email-andre.przywara@arm.com>
+References: <55FC49B8.3020100@arm.com>
+ <1442855829-11245-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <561248BD.8080809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In 5388a6b266 ("ARM: SMP: Always enable clock event broadcast support")
-Russell noted that "the TWD local timers are unable to wake up the CPU
-when it is placed into a low power mode".
+Hi David,
 
-However, some platforms do not stop the TWD block in low-power mode,
-and can thus use the TWD timers in one-shot mode, without setting up
-a broadcast device.
+On 21/09/15 18:17, Andre Przywara wrote:
+> With DMA_ERROR_CODE now being dma_addr_t in most architectures, it
+> turned out that iommu_tbl_range_alloc (defined in lib/iommu-common.c)
+> is actually using a wrong return type.
+> This was easily fixed in a previous patch, but now the types in the
+> callers do not match anymore.
+> This patch fixes the obvious mismatches to allow sane comparisons with
+> the error return value.
+> Compile-tested on sparc, sparc64, x86, ARM, arm64.
 
-Make the driver check for the "twd_never_stops" property, and set the
-CLOCK_EVT_FEAT_C3STOP flag accordingly.
+Is there any news on that issue? Are you willing to take either of my
+patches to fix the compile warnings I see on ARM with LPAE enabled?
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
----
- Documentation/devicetree/bindings/arm/twd.txt | 5 +++++
- arch/arm/kernel/smp_twd.c                     | 5 ++++-
- 2 files changed, 9 insertions(+), 1 deletion(-)
+Cheers,
+Andre.
 
-diff --git a/Documentation/devicetree/bindings/arm/twd.txt b/Documentation/devicetree/bindings/arm/twd.txt
-index 75b8610939fa..7f849235e12a 100644
---- a/Documentation/devicetree/bindings/arm/twd.txt
-+++ b/Documentation/devicetree/bindings/arm/twd.txt
-@@ -19,6 +19,11 @@ interrupts.
- - reg : Specify the base address and the size of the TWD timer
- 	register window.
- 
-+Optional
-+- twd-never-stops : boolean property. If present, the twd driver will not set
-+  the CLOCK_EVT_FEAT_C3STOP flag. TWD timer can then operate in one-shot mode,
-+  no broadcast device required.
-+
- Example:
- 
- 	twd-timer at 2c000600 {
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index e8f6d241881f..79298d4fb41f 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -33,6 +33,7 @@ static unsigned long twd_timer_rate;
- static DEFINE_PER_CPU(bool, percpu_setup_called);
- 
- static struct clock_event_device __percpu *twd_evt;
-+static int feat_c3stop;
- static int twd_ppi;
- 
- static void twd_set_mode(enum clock_event_mode mode,
-@@ -293,7 +294,7 @@ static void twd_timer_setup(void)
- 
- 	clk->name = "local_timer";
- 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
--			CLOCK_EVT_FEAT_C3STOP;
-+			feat_c3stop;
- 	clk->rating = 350;
- 	clk->set_mode = twd_set_mode;
- 	clk->set_next_event = twd_set_next_event;
-@@ -345,6 +346,8 @@ static int __init twd_local_timer_common_register(struct device_node *np)
- 		goto out_irq;
- 
- 	twd_get_clock(np);
-+	if (!of_property_read_bool(np, "twd-never-stops"))
-+		feat_c3stop = CLOCK_EVT_FEAT_C3STOP;
- 
- 	/*
- 	 * Immediately configure the timer on the boot CPU, unless we need
--- 
-2.4.5
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Hi David,
+> 
+> as promised my first naive try on fixing the callers of
+> iommu_tbl_range_alloc() as well. This goes on top of the return type
+> fix I sent on Friday.
+> Please let me know if that makes sense or whether I am looking in the
+> totally wrong direction.
+> 
+> Cheers,
+> Andre.
+>  arch/sparc/kernel/iommu.c     | 5 +++--
+>  arch/sparc/kernel/ldc.c       | 5 +++--
+>  arch/sparc/kernel/pci_sun4v.c | 7 ++++---
+>  3 files changed, 10 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/sparc/kernel/iommu.c b/arch/sparc/kernel/iommu.c
+> index 5320689..7d04a87 100644
+> --- a/arch/sparc/kernel/iommu.c
+> +++ b/arch/sparc/kernel/iommu.c
+> @@ -157,7 +157,7 @@ static inline iopte_t *alloc_npages(struct device *dev,
+>  				    struct iommu *iommu,
+>  				    unsigned long npages)
+>  {
+> -	unsigned long entry;
+> +	dma_addr_t entry;
+>  
+>  	entry = iommu_tbl_range_alloc(dev, &iommu->tbl, npages, NULL,
+>  				      (unsigned long)(-1), 0);
+> @@ -476,7 +476,8 @@ static int dma_4u_map_sg(struct device *dev, struct scatterlist *sglist,
+>  				  IO_PAGE_SIZE) >> IO_PAGE_SHIFT;
+>  	base_shift = iommu->tbl.table_map_base >> IO_PAGE_SHIFT;
+>  	for_each_sg(sglist, s, nelems, i) {
+> -		unsigned long paddr, npages, entry, out_entry = 0, slen;
+> +		unsigned long paddr, npages, slen;
+> +		dma_addr_t entry, out_entry = 0;
+>  		iopte_t *base;
+>  
+>  		slen = s->length;
+> diff --git a/arch/sparc/kernel/ldc.c b/arch/sparc/kernel/ldc.c
+> index 1ae5eb1..41e79cb 100644
+> --- a/arch/sparc/kernel/ldc.c
+> +++ b/arch/sparc/kernel/ldc.c
+> @@ -10,6 +10,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/errno.h>
+>  #include <linux/string.h>
+> +#include <linux/dma-mapping.h>
+>  #include <linux/scatterlist.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/list.h>
+> @@ -1949,11 +1950,11 @@ static u64 make_cookie(u64 index, u64 pgsz_code, u64 page_offset)
+>  static struct ldc_mtable_entry *alloc_npages(struct ldc_iommu *iommu,
+>  					     unsigned long npages)
+>  {
+> -	long entry;
+> +	dma_addr_t entry;
+>  
+>  	entry = iommu_tbl_range_alloc(NULL, &iommu->iommu_map_table,
+>  				      npages, NULL, (unsigned long)-1, 0);
+> -	if (unlikely(entry < 0))
+> +	if (unlikely(entry == DMA_ERROR_CODE))
+>  		return NULL;
+>  
+>  	return iommu->page_table + entry;
+> diff --git a/arch/sparc/kernel/pci_sun4v.c b/arch/sparc/kernel/pci_sun4v.c
+> index d2fe57d..f86902f 100644
+> --- a/arch/sparc/kernel/pci_sun4v.c
+> +++ b/arch/sparc/kernel/pci_sun4v.c
+> @@ -136,7 +136,7 @@ static void *dma_4v_alloc_coherent(struct device *dev, size_t size,
+>  	struct iommu *iommu;
+>  	struct page *page;
+>  	void *ret;
+> -	long entry;
+> +	dma_addr_t entry;
+>  	int nid;
+>  
+>  	size = IO_PAGE_ALIGN(size);
+> @@ -242,7 +242,7 @@ static dma_addr_t dma_4v_map_page(struct device *dev, struct page *page,
+>  	unsigned long i, base_paddr;
+>  	u32 bus_addr, ret;
+>  	unsigned long prot;
+> -	long entry;
+> +	dma_addr_t entry;
+>  
+>  	iommu = dev->archdata.iommu;
+>  
+> @@ -361,7 +361,8 @@ static int dma_4v_map_sg(struct device *dev, struct scatterlist *sglist,
+>  				  IO_PAGE_SIZE) >> IO_PAGE_SHIFT;
+>  	base_shift = iommu->tbl.table_map_base >> IO_PAGE_SHIFT;
+>  	for_each_sg(sglist, s, nelems, i) {
+> -		unsigned long paddr, npages, entry, out_entry = 0, slen;
+> +		unsigned long paddr, npages, slen;
+> +		dma_addr_t entry, out_entry = 0;
+>  
+>  		slen = s->length;
+>  		/* Sanity check */
+> 
