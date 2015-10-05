@@ -1,249 +1,368 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon,  5 Oct 2015 18:02:11 +0100
-Subject: [PATCH v2 22/22] arm64: feature registers: Documentation
+Date: Mon,  5 Oct 2015 18:02:08 +0100
+Subject: [PATCH v2 19/22] arm64: cpufeature: Track the user visible fields
 In-Reply-To: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
 References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1444064531-25607-23-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1444064531-25607-20-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation of the infrastructure
+Track the user visible fields of a CPU feature register.
+This will be used later for exposing the value to the userspace
+via emulation of MRS instruction. For more information, check
+the documentation (patch follows).
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- Documentation/arm64/cpu-feature-registers.txt |  224 +++++++++++++++++++++++++
- 1 file changed, 224 insertions(+)
- create mode 100644 Documentation/arm64/cpu-feature-registers.txt
+ arch/arm64/include/asm/cpufeature.h |   10 +-
+ arch/arm64/kernel/cpufeature.c      |  192 ++++++++++++++++++-----------------
+ 2 files changed, 109 insertions(+), 93 deletions(-)
 
-diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
-new file mode 100644
-index 0000000..a046638
---- /dev/null
-+++ b/Documentation/arm64/cpu-feature-registers.txt
-@@ -0,0 +1,224 @@
-+		ARM64 CPU Feature Registers
-+		===========================
-+
-+Author: Suzuki K. Poulose <suzuki.poulose@arm.com>
-+
-+
-+This file describes the API for exporting the AArch64 CPU ID/feature registers
-+to userspace.
-+
-+1. Motivation
-+---------------
-+
-+The ARM architecture defines a set of feature registers, which describe
-+the capabilities of the CPU/system. Access to these system registers is
-+restricted from EL0 and there is no reliable way for an application to
-+extract this information to make better decisions at runtime. There is
-+limited information available to the application via ELF_HWCAPs, however
-+there are some issues with their usage.
-+
-+ a) Any change to the HWCAPs requires an update to userspace (e.g libc)
-+    to detect the new changes, which can take a long time to appear in
-+    distributions. Exposing the registers allows applications to get the
-+    information without requiring updates to the toolchains.
-+
-+ b) Access to HWCAPs is sometimes restricted (e.g prior to libc, or when ld is
-+    initialised at startup time).
-+
-+ c) HWCAPs cannot represent non-boolean information effectively. The
-+    architecture defines a canonical format for representing features
-+    in the ID registers; this is well defined and is capable of
-+    representing all valid architecture variations. Exposing the ID
-+    registers avoids having to come up with HWCAP representations
-+    and parsing code.
-+
-+
-+2. Requirements
-+-----------------
-+
-+ a) Safety :
-+    Applications should be able to use the information provided by the
-+    infrastructure to run optimally safely across the system. This has
-+    greater implications on a system with heterogeneous CPUs. The
-+    infrastructure exports a value that is safe across all the available
-+    CPU on the system.
-+
-+    e.g, If at least one CPU doesn't implement CRC32 instructions, while others
-+    do, we should report that the CRC32 is not implemented. Otherwise an
-+    application could crash when scheduled on the CPU which doesn't support
-+    CRC32.
-+
-+ b) Security :
-+    Applications should only be able to receive information that is relevant
-+    to the normal operation in userspace. Hence, some of the fields
-+    are masked out and the values of the fields are set to indicate the
-+    feature is 'not supported' (See the 'visible' field in the
-+    table in Section 4). Also, the kernel may manipulate the fields based on what
-+    it supports. e.g, If FP is not supported by the kernel, the values
-+    could indicate that the FP is not available (even when the CPU provides
-+    it).
-+
-+ c) Implementation Defined Features
-+    The infrastructure doesn't expose any register which is
-+    IMPLEMENTATION DEFINED as per ARMv8-A Architecture.
-+
-+ d) CPU Identification :
-+    MIDR_EL1 is exposed to help identify the processor. On a heterogeneous
-+    system, this could be racy (just like getcpu()). The process could be
-+    migrated to another CPU by the time it uses the register value, unless the
-+    CPU affinity is set. Hence, there is no guarantee that the value reflects the
-+    processor that it is currently executing on. The REVIDR is not exposed due
-+    to this constraint, as REVIDR makes sense only in conjunction with the MIDR.
-+    Alternately, MIDR_EL1 and REVIDR_EL1 are exposed via sysfs at :
-+	/sys/devices/system/cpu/cpu$ID/identification/
-+	                                              \- midr
-+	                                              \- revidr
-+
-+The list of supported registers and the attributes of individual
-+feature bits are listed in section 4. Unless there is absolute necessity,
-+we don't encourage the addition of new feature registers to the list.
-+In any case, it should comply to the requirements listed above.
-+
-+3. Implementation
-+--------------------
-+
-+The infrastructure is built on the emulation of the 'MRS' instruction.
-+Accessing a restricted system register from an application generates an
-+exception and ends up in SIGILL being delivered to the process.
-+The infrastructure hooks into the exception handler and emulates the
-+operation if the source belongs to the supported system register space.
-+
-+The infrastructure emulates only the following system register space:
-+	Op0=3, Op1=0, CRn=0
-+
-+(See Table C5-6 'System instruction encodings for System register accesses'
-+ in ARMv8 ARM, for the list of registers).
-+
-+
-+The following rules are applied to the value returned by the infrastructure:
-+
-+ a) The value of an 'IMPLEMENTATION DEFINED' field is set to 0.
-+ b) The value of a reserved field is populated with the reserved
-+    value as defined by the architecture.
-+ c) The value of a field marked as not 'visible', is set to indicate
-+    the feature is missing (as defined by the architecture).
-+ d) The value of a 'visible' field holds the system wide safe value
-+    for the particular feature(except for MIDR_EL1, see section 4).
-+    See Appendix I for more information on safe value.
-+
-+There are only a few registers visible to the userspace. See Section 4,
-+for the list of 'visible' registers.
-+
-+The registers which are either reserved RAZ or IMPLEMENTAION DEFINED are
-+emulated as 0.
-+
-+All others are emulated as having 'invisible' features.
-+
-+4. List of exposed registers
-+-----------------------------
-+
-+  1) ID_AA64ISAR0_EL1 - Instruction Set Attribute Register 0
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RAZ                          | [63-20] |    n    |
-+     |--------------------------------------------------|
-+     | CRC32                        | [19-16] |    y    |
-+     |--------------------------------------------------|
-+     | SHA2                         | [15-12] |    y    |
-+     |--------------------------------------------------|
-+     | SHA1                         | [11-8]  |    y    |
-+     |--------------------------------------------------|
-+     | AES                          | [7-4]   |    y    |
-+     |--------------------------------------------------|
-+     | RAZ                          | [3-0]   |    n    |
-+     x--------------------------------------------------x
-+
-+  2) ID_AA64ISAR1_EL1 - Instruction Set Attribute Register 1
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RAZ                          | [63-0]  |    y    |
-+     x--------------------------------------------------x
-+
-+  3) ID_AA64PFR0_EL1 - Processor Feature Register 0
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RAZ                          | [63-28] |    n    |
-+     |--------------------------------------------------|
-+     | GIC                          | [27-24] |    n    |
-+     |--------------------------------------------------|
-+     | AdvSIMD                      | [23-20] |    y    |
-+     |--------------------------------------------------|
-+     | FP                           | [19-16] |    y    |
-+     |--------------------------------------------------|
-+     | EL3                          | [15-12] |    n    |
-+     |--------------------------------------------------|
-+     | EL2                          | [11-8]  |    n    |
-+     |--------------------------------------------------|
-+     | EL1                          | [7-4]   |    n    |
-+     |--------------------------------------------------|
-+     | EL0                          | [3-0]   |    n    |
-+     x--------------------------------------------------x
-+
-+  4) ID_AA64PFR1_EL1 - Processor Feature Register 1
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RAZ                          | [63-0]  |    y    |
-+     x--------------------------------------------------x
-+
-+  5) MIDR_EL1 - Main ID Register
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RAZ                          | [63-32] |    n    |
-+     |--------------------------------------------------|
-+     | Implementer                  | [31-24] |    y    |
-+     |--------------------------------------------------|
-+     | Variant                      | [23-20] |    y    |
-+     |--------------------------------------------------|
-+     | Architecture                 | [19-16] |    y    |
-+     |--------------------------------------------------|
-+     | PartNum                      | [15-4]  |    y    |
-+     |--------------------------------------------------|
-+     | Revision                     | [3-0]   |    y    |
-+     x--------------------------------------------------x
-+
-+   NOTE: The 'visible' fields of MIDR_EL1 will contain the value
-+   as available on the CPU where it is fetched and is not a system
-+   wide safe value.
-+
-+
-+Appendix
-+-----------
-+
-+I. CPUID feature value types
-+
-+   The safe value of a CPUID feature field is dependent on the implications
-+   of the values assigned to it by the architecture. Based on the relationship
-+   between the values, the features are classified into 3 types.
-+
-+	a) Scalar Min - The value 'n+1' indicates, value 'n' and some
-+	additional features. (where n >= 0). The smaller value (n) is
-+	considered safer in this case.
-+
-+	b) Scalar Max - The value 'n+1' is safer than 'n' (for n>= 0).
-+
-+	c) Discrete - If the values of the feature don't have any relationship,
-+	a predefined safe value is used.
-+
-+II. CPUID feature value scheme for Scalar types
-+
-+   Each 4bit field is a signed value, with RAZ as the original value defined by
-+   the architecture. When a feature is added or extended the field is incremented.
-+   If an existing feature(whose value is 0) is removed, the value becomes negative(0xf).
-+
-+   e.g: 1) Value for ID_AA64PFR0:FP
-+		0   - Floating Point instructions supported.
-+		0xf - Floating Point instructions not supported.
-+
-+        2) Value for ID_AA64MMFR0:TGran16
-+		0   - 16K page size not supported.
-+		1   - 16K page size supported.
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 38400dc..f0a3977 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -44,25 +44,33 @@ enum ftr_type {
+ 
+ #define FTR_STRICT	true
+ #define FTR_NONSTRICT	false
++#define FTR_VISIBLE	true
++#define FTR_HIDDEN	false
+ 
+ struct arm64_ftr_bits {
++	bool		visible;	/* visible to userspace ? */
+ 	bool		strict;		/* CPU Sanity check
+ 					 *  strict matching required ? */
+ 	enum ftr_type	type;
+ 	u8		shift;
+ 	u8		width;
+-	s64		safe_val;	/* safe value for discrete features */
++	s64		safe_val;	/* safe value for discrete or
++					 * user invisible features */
+ };
+ 
+ /*
+  * @arm64_ftr_reg - Feature register
++ * @user_mask		Bits of @sys_val visible to user space.
+  * @strict_mask 	Bits which should match across all CPUs for sanity.
++ * @user_val		Safe value for user invisible fields.
+  * @sys_val		Safe value across the CPUs (system view)
+  */
+ struct arm64_ftr_reg {
+ 	u32			sys_id;
+ 	const char*		name;
++	u64			user_mask;
+ 	u64			strict_mask;
++	u64			user_val;
+ 	u64			sys_val;
+ 	struct arm64_ftr_bits*	ftr_bits;
+ };
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index a1c6d3c..f8fee51 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -42,8 +42,9 @@ unsigned int compat_elf_hwcap2 __read_mostly;
+ 
+ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ 
+-#define ARM64_FTR_BITS(ftr_strict, ftr_type, ftr_shift, ftr_width, ftr_safe_val) \
++#define ARM64_FTR_BITS(ftr_visible, ftr_strict, ftr_type, ftr_shift, ftr_width, ftr_safe_val)	\
+ 	{							\
++		.visible = ftr_visible,				\
+ 		.strict = ftr_strict,				\
+ 		.type = ftr_type,				\
+ 		.shift = ftr_shift,				\
+@@ -57,139 +58,139 @@ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ 	}
+ 
+ static struct arm64_ftr_bits ftr_id_aa64isar0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 24, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_AES_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 24, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_AES_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// RAZ
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 28, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 28, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
+ 	/* Linux doesn't care about the EL3 */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_DISCRETE, ID_AA64PFR0_EL3_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_EL2_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_EL1_SHIFT, 4, ID_AA64PFR0_EL1_64BIT_ONLY),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_EL0_SHIFT, 4, ID_AA64PFR0_EL0_64BIT_ONLY),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_DISCRETE, ID_AA64PFR0_EL3_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_EL2_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_EL1_SHIFT, 4, ID_AA64PFR0_EL1_64BIT_ONLY),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_EL0_SHIFT, 4, ID_AA64PFR0_EL0_64BIT_ONLY),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_TGRAN16_SHIFT, 4, ID_AA64MMFR0_TGRAN16_NI),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_BIGENDEL0_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_TGRAN16_SHIFT, 4, ID_AA64MMFR0_TGRAN16_NI),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_BIGENDEL0_SHIFT, 4, 0),
+ 	/* Linux shouldn't care about secure memory */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_DISCRETE, ID_AA64MMFR0_SNSMEM_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_BIGENDEL_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_DISCRETE, ID_AA64MMFR0_SNSMEM_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_BIGENDEL_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
+ 	/*
+ 	 * Differing PARange is fine as long as all peripherals and memory are mapped
+ 	 * within the minimum PARange of all CPUs
+ 	 */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_SCALAR_MIN, ID_AA64MMFR0_PARANGE_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_SCALAR_MIN, ID_AA64MMFR0_PARANGE_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_LOR_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_HPD_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_VMIDBITS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_HADBS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_LOR_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_HPD_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_VMIDBITS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_HADBS_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_ctr[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 31, 1, 1),	// RAO
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 28, 3, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MAX, 24, 4, 0),	// CWG
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 20, 4, 0),	// ERG
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 16, 4, 1),	// DminLine
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 31, 1, 1),	// RAO
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 28, 3, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MAX, 24, 4, 0),	// CWG
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 20, 4, 0),	// ERG
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 16, 4, 1),	// DminLine
+ 	/*
+ 	 * Linux can handle differing I-cache policies. Userspace JITs will
+ 	 * make use of *minLine
+ 	 */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_DISCRETE, 14, 2, 0),	// L1Ip
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 4, 10, 0),	// RAZ
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 0, 4, 0),	// IminLine
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_DISCRETE, 14, 2, 0),	// L1Ip
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 4, 10, 0),	// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 0, 4, 0),	// IminLine
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_mmfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 28, 4, 0),	// InnerShr
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 24, 4, 0),	// FCSE
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_SCALAR_MIN, 20, 4, 0),	// AuxReg
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 16, 4, 0),	// TCM
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 12, 4, 0),	// ShareLvl
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 8, 4, 0),	// OuterShr
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// PMSA
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// VMSA
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 28, 4, 0),	// InnerShr
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 24, 4, 0),	// FCSE
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_SCALAR_MIN, 20, 4, 0),	// AuxReg
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 16, 4, 0),	// TCM
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 12, 4, 0),	// ShareLvl
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 8, 4, 0),	// OuterShr
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// PMSA
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// VMSA
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_mvfr2[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 8, 24, 0),	// RAZ
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// FPMisc
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// SIMDMisc
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 8, 24, 0),	// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// FPMisc
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// SIMDMisc
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_dczid[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 5, 27, 0),// RAZ
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 4, 1, 1),	// DZP
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 0, 4, 0),	// BS
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 5, 27, 0),// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 4, 1, 1),	// DZP
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 0, 4, 0),	// BS
+ 	ARM64_FTR_END,
+ };
+ 
+ 
+ static struct arm64_ftr_bits ftr_id_isar5[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_ISAR5_RDM_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 20, 4, 0),	// RAZ
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_ISAR5_CRC32_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_ISAR5_SHA2_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_ISAR5_SHA1_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_ISAR5_AES_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_ISAR5_SEVL_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_ISAR5_RDM_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 20, 4, 0),	// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_ISAR5_CRC32_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_ISAR5_SHA2_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_ISAR5_SHA1_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_ISAR5_AES_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_ISAR5_SEVL_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_mmfr4[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 8, 24, 0),	// RAZ
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// ac2
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 8, 24, 0),	// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// ac2
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// RAZ
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_pfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 16, 16, 0),	// RAZ
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 12, 4, 0),	// State3
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 8, 4, 0),	// State2
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// State1
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// State0
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 16, 16, 0),	// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 12, 4, 0),	// State3
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 8, 4, 0),	// State2
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// State1
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// State0
+ 	ARM64_FTR_END,
+ };
+ 
+@@ -200,29 +201,29 @@ static struct arm64_ftr_bits ftr_id_pfr0[] = {
+  * id_isar[0-4], id_mmfr[1-3], id_pfr1, mvfr[0-1]
+  */
+ static struct arm64_ftr_bits ftr_generic_scalar_32bit[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 28, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 24, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 20, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 16, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 12, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 8, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 4, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 0, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 28, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 24, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 20, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 16, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 12, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 8, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 4, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 0, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_generic[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 64, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 0, 64, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_generic32[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 0, 32, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_aa64raz[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 64, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_DISCRETE, 0, 64, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+@@ -371,12 +372,13 @@ static s64 arm64_ftr_safe_value(struct arm64_ftr_bits *ftrp, s64 new, s64 cur)
+ 
+ /*
+  * Initialise the CPU feature register from Boot CPU values.
+- * Also initiliases the strict_mask for the register.
++ * Also initiliases the strict_mask, user_mask and user_val
++ * for the register.
+  */
+ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
+ {
+ 	u64 val = 0;
+-	u64 strict_mask = ~0x0ULL;
++	u64 user_mask = 0, strict_mask = ~0x0ULL;
+ 	struct arm64_ftr_bits *ftrp;
+ 	struct arm64_ftr_reg *reg = get_arm64_sys_reg(sys_reg);
+ 
+@@ -386,10 +388,16 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
+ 		s64 ftr_new = arm64_ftr_value(ftrp, new);
+ 
+ 		val = arm64_ftr_set_value(ftrp, val, ftr_new);
++		if (ftrp->visible)
++			user_mask |= ftr_mask(ftrp);
++		else
++			reg->user_val = arm64_ftr_set_value(ftrp, reg->user_val,
++								ftrp->safe_val);
+ 		if (!ftrp->strict)
+ 			strict_mask &= ~ftr_mask(ftrp);
+ 	}
+ 	reg->sys_val = val;
++	reg->user_mask = user_mask;
+ 	reg->strict_mask = strict_mask;
+ }
+ 
 -- 
 1.7.9.5
