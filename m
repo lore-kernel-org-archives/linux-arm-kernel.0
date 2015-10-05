@@ -1,30 +1,37 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 05 Oct 2015 13:48:12 +0100
-Subject: [PATCH v4 2/5] firmware: arm_scpi: Extend to support sensors
-In-Reply-To: <560EB273.7000804@arm.com> (Sudeep Holla's message of "Fri, 2 Oct
- 2015 17:36:03 +0100")
-References: <1442335861-7282-1-git-send-email-punit.agrawal@arm.com>
- <1442335861-7282-3-git-send-email-punit.agrawal@arm.com>
- <560EB273.7000804@arm.com>
-Message-ID: <9hhlhbhiir7.fsf@e105922-lin.cambridge.arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 5 Oct 2015 21:48:30 +0900
+Subject: [PATCH v2 0/7] Add support for Exynos SROM Controller driver
+In-Reply-To: <018501d0ff62$1650b410$42f21c30$@samsung.com>
+References: <1440403348-8974-1-git-send-email-pankaj.dubey@samsung.com>
+ <018501d0ff62$1650b410$42f21c30$@samsung.com>
+Message-ID: <5612719E.60006@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sudeep Holla <sudeep.holla@arm.com> writes:
+W dniu 05.10.2015 o 20:36, Pavel Fedin pisze:
+>  Hello!
+> 
+>> This patch set adds support for Exynos SROM controller DT based driver.
+>> Currently SROM register sets are used only during S2R, so driver
+>> basically added for taking care of S2R. It will help us in removing
+>> static mapping from exynos.c and other extra code handline during S2R.
+> 
+>  Very good news, but, your driver seems not to do anything except suspend/resume. But how do i add
+> some device plugged into it? In order to be operational, its outputs have to be configured. But how
+> do i do it with your driver? For example, on SMDK boards SROM controller is used to connect SMSC9111
+> etherner chip.
 
-> On 15/09/15 17:50, Punit Agrawal wrote:
->> ARM System Control Processor (SCP) provides an API to query and use
->> the sensors available in the system. Extend the SCPI driver to support
->>   sensor messages.
->>
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Cc: Sudeep Holla <sudeep.holla@arm.com>
->
-> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+That is interesting. What do you mean by that? Although SROM controller
+can access external memory (SRAM, ROM) but it is not exactly a bus. How
+is the SMSC9111 "connected"? What interface or protocol is used?
 
-Thanks, Sudeep!
+>  Currently i use hardcoded initialization based on of_machine_is_compatible(), but i believe this
+> would be considered a hack and such a thing cannot be pushed upstream. I guess i have to put all
+> needed configuration into device tree somehow. But how? Are there any recommentations?
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I am sorry but I cannot figure out what exactly are you talking about.
+The Device Tree is the glue to describe the board, the hardware and its
+configuration. Please elaborate a little more.
+
+Best regards,
+Krzysztof
