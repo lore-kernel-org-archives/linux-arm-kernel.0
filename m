@@ -1,42 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Oct 2015 15:24:03 +0100
-Subject: [PATCH] iommu/arm-smmu: Only return IRQ_NONE if FSR is not set
-In-Reply-To: <1443226325-28456-1-git-send-email-mitchelh@codeaurora.org>
-References: <1443226325-28456-1-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <20151005142402.GF8818@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon,  5 Oct 2015 16:23:05 +0200
+Subject: [PATCH v2 0/5] ARM: sunxi: Introduce CHIP support
+Message-ID: <1444054990-15946-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mitch,
+Hi,
 
-On Sat, Sep 26, 2015 at 01:12:05AM +0100, Mitchel Humpherys wrote:
-> Currently we return IRQ_NONE from the context fault handler if the FSR
-> doesn't actually have the fault bit set (some sort of miswired
-> interrupt?) or if the client doesn't register an IOMMU fault handler.
-> However, registering a client fault handler is optional, so telling the
-> interrupt framework that the interrupt wasn't for this device if the
-> client doesn't register a handler isn't exactly accurate.  Fix this by
-> returning IRQ_HANDLED even if the client doesn't register a handler.
-> 
-> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
-> ---
->  drivers/iommu/arm-smmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 48a39dfa9777..95560d447a54 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -653,7 +653,7 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
->  		dev_err_ratelimited(smmu->dev,
->  		    "Unhandled context fault: iova=0x%08lx, fsynr=0x%x, cb=%d\n",
->  		    iova, fsynr, cfg->cbndx);
-> -		ret = IRQ_NONE;
-> +		ret = IRQ_HANDLED;
->  		resume = RESUME_TERMINATE;
+Here is a serie introducing the support for the Allwinner R8 and the
+Nextthing's CHIP.
 
-Hmm, but if we haven't actually done anything to rectify the cause of the
-fault, what means that we won't take it again immediately? I guess I'm not
-understanding the use-case that triggered you to write this patch...
+Support is almost complete for the CHIP itself, the only missing part
+for now is the WiFi chip that needs to be powered through two combined
+regulators (AXP209's LDO3 and LDO4). The audio codec is also missing
+since it's not already enabled in the DT.
 
-Will
+Both these features will be addressed eventually.
+
+Let me know what you think,
+Maxime
+
+Changes from v1:
+  - Collected tags
+  - Removed unused include files
+  - Removed ipsout, dram and vcc regulators
+  - Added USB power supply
+
+Maxime Ripard (5):
+  ARM: sunxi: Add R8 support
+  ARM: sun5i: Add R8 DTSI
+  ARM: sun5i: dt: Move uart3 pinctrl node to common DTSI
+  ARM: sun5i: dt: Add UART3 CTS and RTS pins
+  ARM: sun5i: Add C.H.I.P DTS
+
+ Documentation/arm/sunxi/README                  |   2 +-
+ Documentation/devicetree/bindings/arm/sunxi.txt |   1 +
+ arch/arm/boot/dts/Makefile                      |   3 +-
+ arch/arm/boot/dts/sun5i-a10s.dtsi               |   7 -
+ arch/arm/boot/dts/sun5i-r8-chip.dts             | 224 ++++++++++++++++++++++++
+ arch/arm/boot/dts/sun5i-r8.dtsi                 |  59 +++++++
+ arch/arm/boot/dts/sun5i.dtsi                    |  14 ++
+ arch/arm/mach-sunxi/sunxi.c                     |   3 +-
+ drivers/clk/sunxi/clk-sunxi.c                   |   1 +
+ 9 files changed, 304 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun5i-r8-chip.dts
+ create mode 100644 arch/arm/boot/dts/sun5i-r8.dtsi
+
+-- 
+2.5.3
