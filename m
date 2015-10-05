@@ -1,88 +1,60 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon,  5 Oct 2015 18:01:51 +0100
-Subject: [PATCH v2 02/22] arm64: Delay ELF HWCAP initialisation until all CPUs
- are up
+Date: Mon,  5 Oct 2015 18:02:06 +0100
+Subject: [PATCH v2 17/22] arm64/kvm: Make use of the system wide safe values
 In-Reply-To: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
 References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1444064531-25607-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1444064531-25607-18-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Delay the ELF HWCAP initialisation untill all the (enabled) CPUs are
-up, i.e, smp_cpus_done(). This is in preparation for detecting the
-common features across the CPUS and creating a consistent ELF HWCAP
-for the system.
+Use the system wide safe value from the new API for safer
+decisions
 
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: kvmarm at lists.cs.columbia.edu
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h |    1 +
- arch/arm64/kernel/setup.c           |   16 ++++++++--------
- arch/arm64/kernel/smp.c             |    1 +
- 3 files changed, 10 insertions(+), 8 deletions(-)
+ arch/arm64/kvm/reset.c    |    2 +-
+ arch/arm64/kvm/sys_regs.c |   12 ++++++------
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 1715707..b7769f6 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -81,6 +81,7 @@ static inline int __attribute_const__ cpuid_feature_extract_field(u64 features,
- 	return (s64)(features << (64 - 4 - field)) >> (64 - 4);
- }
- 
-+void __init setup_cpu_features(void);
- 
- void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			    const char *info);
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 60fc9a9..d149c18 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -195,20 +195,13 @@ static void __init smp_build_mpidr_hash(void)
- 	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
- }
- 
--static void __init setup_processor(void)
-+void __init setup_cpu_features(void)
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 91cf535..f34745c 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -53,7 +53,7 @@ static bool cpu_has_32bit_el1(void)
  {
- 	u64 features;
- 	s64 block;
- 	u32 cwg;
- 	int cls;
+ 	u64 pfr0;
  
--	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
--
--	sprintf(init_utsname()->machine, ELF_PLATFORM);
--	elf_hwcap = 0;
--
--	cpuinfo_store_boot_cpu();
--
- 	/*
- 	 * Check for sane CTR_EL0.CWG value.
- 	 */
-@@ -292,6 +285,13 @@ static void __init setup_processor(void)
- #endif
+-	pfr0 = read_cpuid(ID_AA64PFR0_EL1);
++	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
+ 	return !!(pfr0 & 0x20);
  }
  
-+static void __init setup_processor(void)
-+{
-+	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
-+	sprintf(init_utsname()->machine, ELF_PLATFORM);
-+	cpuinfo_store_boot_cpu();
-+}
-+
- static void __init setup_machine_fdt(phys_addr_t dt_phys)
- {
- 	void *dt_virt = fixmap_remap_fdt(dt_phys);
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 641f529..cb3e0d8 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -326,6 +326,7 @@ static void __init hyp_mode_check(void)
- void __init smp_cpus_done(unsigned int max_cpus)
- {
- 	pr_info("SMP: Total of %d processors activated.\n", num_online_cpus());
-+	setup_cpu_features();
- 	hyp_mode_check();
- 	apply_alternatives_all();
- }
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index d03d3af..87a64e8 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -693,13 +693,13 @@ static bool trap_dbgidr(struct kvm_vcpu *vcpu,
+ 	if (p->is_write) {
+ 		return ignore_write(vcpu, p);
+ 	} else {
+-		u64 dfr = read_cpuid(ID_AA64DFR0_EL1);
+-		u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
+-		u32 el3 = !!((pfr >> 12) & 0xf);
++		u64 dfr = read_system_reg(SYS_ID_AA64DFR0_EL1);
++		u64 pfr = read_system_reg(SYS_ID_AA64PFR0_EL1);
++		u32 el3 = !!cpuid_feature_extract_field(pfr, ID_AA64PFR0_EL3_SHIFT);
+ 
+-		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> 20) & 0xf) << 28) |
+-					  (((dfr >> 12) & 0xf) << 24) |
+-					  (((dfr >> 28) & 0xf) << 20) |
++		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> ID_AA64DFR0_WRPS_SHIFT) & 0xf) << 28) |
++					  (((dfr >> ID_AA64DFR0_BRPS_SHIFT) & 0xf) << 24) |
++					  (((dfr >> ID_AA64DFR0_CTX_CMPS_SHIFT) & 0xf) << 20) |
+ 					  (6 << 16) | (el3 << 14) | (el3 << 12));
+ 		return true;
+ 	}
 -- 
 1.7.9.5
