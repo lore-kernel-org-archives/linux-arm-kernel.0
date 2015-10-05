@@ -1,80 +1,64 @@
-From: peda@lysator.liu.se (Peter Rosin)
-Date: Mon, 5 Oct 2015 10:45:29 +0200
-Subject: Regression: at24 eeprom writing
-In-Reply-To: <560F0DB1.2020101@lysator.liu.se>
-References: <560F0DB1.2020101@lysator.liu.se>
-Message-ID: <561238A9.1060406@lysator.liu.se>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon,  5 Oct 2015 10:49:40 +0200
+Subject: [PATCH 00/17] ARM: pxa: Use PWM lookup tables
+Message-ID: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-10-03 01:05, Peter Rosin wrote:
-> Hi!
-> 
-> I recently upgraded from the atmel linux-3.18-at91 kernel to vanilla 4.2
-> and everything seemed fine. Until I tried to write to the little eeprom
-> chip. I then tried the linux-4.1-at91 kernel and that suffers too.
-> 
-> The symptoms are that it seems like writes get interrupted, and restarted
-> again without properly initializing everything again. Inspecting the i2c
-> bus during these fails gets me something like this (int hex) when I
-> 
-> echo abcdefghijklmnopqr > /sys/bus/i2c/devices/0-0050/eeprom
-> 
-> S a0 00 61 62 63 64 65 66 67 68 69 6a 6b 6c 6d 6e 6f 70 P
-> S a0 10 (clk and data low for a "long" time) 10 71 72 0a P
-> 
-> Notice how the address byte in the second chunk (10) is repeated after
-> the strange event on the i2c bus.
-> 
-> I looked around and found that if I revert a839ce663b3183209fdf7b1fc4796bfe2a4679c3
-> "eeprom: at24: extend driver to allow writing via i2c_smbus_write_byte_data"
-> eeprom writing starts working again.
-> 
-> AFAICT, the i2c-at91 bus driver makes the eeprom driver use the
-> i2c_transfer code path both with that patch and with it reverted,
-> so I sadly don't see why the patch makes a difference.
-> 
-> I'm on a board that is based on the sama5d31 evaluation kit, with a
-> NXP SE97BTP,547 chip and this in the devicetree:
-> 
-> 			i2c0: i2c at f0014000 {
-> 				status = "okay";
-> 
-> 				jc42 at 18 {
-> 					compatible = "jc42";
-> 					reg = <0x18>;
-> 				};
-> 
-> 				eeprom at 50 {
-> 					compatible = "24c02";
-> 					reg = <0x50>;
-> 					pagesize = <16>;
-> 				};
-> 			};
+Back when the PWM framework was introduced the concept of PWM lookup
+tables was added to allow board code to register a table of PWM devices
+and their association with consumers. The goal is to allow drivers to
+use a unified method to request PWM devices. At the same time, since no
+boards were exposing these tables, fallback code was kept in drivers to
+allow old code to remain functional. Unfortunately I got the numbering
+of PWM devices wrong, so all these boards should now be without working
+backlight control, though only a few cases have been fixed since, so I
+guess most of this hardware is largely unused.
 
-Ok, I found the culprit, and I double and triple checked it this time...
+This series aims at finally fixing this up. It converts all PXA boards
+that hook up a pwm-backlight device to use the new PWM lookup tables.
+All patches have been compile-tested, but I don't have access to any of
+these boards, so I couldn't verify that they really work.
 
-If I move to the very latest on the linux-3.18-at91 branch, the bug is
-there too. Which made it vastly more palatable to bisect the bug.
+Thierry
 
-The offender (in the 4.2 kernel) is 93563a6a71bb69dd324fc7354c60fb05f84aae6b
-"i2c: at91: fix a race condition when using the DMA controller"
-which is far more understandable. Ao, adding Cyrille Pitchen to the Cc list.
+Thierry Reding (17):
+  ARM: pxa: cm-x300: Use PWM lookup table
+  ARM: pxa: colibri-pxa270-income: Use PWM lookup table
+  ARM: pxa: ezx: Use PWM lookup table
+  ARM: pxa: hx4700: Remove unused field initializers
+  ARM: pxa: lpd270: Use PWM lookup table
+  ARM: pxa: magician: Use PWM lookup table
+  ARM: pxa: mainstone: Use PWM lookup table
+  ARM: pxa: mioa701: Use PWM lookup table
+  ARM: pxa: palm27x: Use PWM lookup table
+  ARM: pxa: palmtc: Use PWM lookup table
+  ARM: pxa: palmte2: Use PWM lookup table
+  ARM: pxa: pcm990: Use PWM lookup table
+  ARM: pxa: raumfeld: Use PWM lookup table
+  ARM: pxa: tavorevb: Use PWM lookup table
+  ARM: pxa: viper: Use PWM lookup table
+  ARM: pxa: z2: Use PWM lookup table
+  ARM: pxa: zylonite: Use PWM lookup table
 
-If I add that patch on top of my previously working tree, it behaves just
-as newer kernels, i.e. equally bad. The patch doesn't revert cleanly, but
-reverting the patch and quick-n-dirty-fixing the conflict on vanilla 4.2
-makes the problem go away.
+ arch/arm/mach-pxa/cm-x300.c               |  9 +++++++--
+ arch/arm/mach-pxa/colibri-pxa270-income.c |  9 +++++++--
+ arch/arm/mach-pxa/ezx.c                   |  9 +++++++--
+ arch/arm/mach-pxa/hx4700.c                |  2 --
+ arch/arm/mach-pxa/lpd270.c                |  9 +++++++--
+ arch/arm/mach-pxa/magician.c              |  9 +++++++--
+ arch/arm/mach-pxa/mainstone.c             | 18 ++++++++++++++----
+ arch/arm/mach-pxa/mioa701.c               |  9 +++++++--
+ arch/arm/mach-pxa/palm27x.c               |  9 +++++++--
+ arch/arm/mach-pxa/palmtc.c                |  9 +++++++--
+ arch/arm/mach-pxa/palmte2.c               |  9 +++++++--
+ arch/arm/mach-pxa/pcm990-baseboard.c      |  9 +++++++--
+ arch/arm/mach-pxa/raumfeld.c              | 11 ++++++++---
+ arch/arm/mach-pxa/tavorevb.c              | 13 +++++++++----
+ arch/arm/mach-pxa/viper.c                 |  9 +++++++--
+ arch/arm/mach-pxa/z2.c                    | 13 +++++++++----
+ arch/arm/mach-pxa/zylonite.c              |  9 +++++++--
+ 17 files changed, 124 insertions(+), 41 deletions(-)
 
-I have attached what I actually reverted.
-
-Cheers,
-Peter
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-Revert-i2c-at91-fix-a-race-condition-when-using-the-.patch
-Type: text/x-patch
-Size: 7502 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151005/246115fb/attachment.bin>
+-- 
+2.5.0
