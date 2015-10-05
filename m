@@ -1,43 +1,96 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Mon, 5 Oct 2015 18:28:20 -0500
-Subject: [PATCH v2 0/4] DRA7 Timer12 Support
-Message-ID: <1444087704-1429-1-git-send-email-s-anna@ti.com>
+Date: Mon, 5 Oct 2015 18:28:24 -0500
+Subject: [PATCH v2 4/4] ARM: DRA7: hwmod: Add data for GPTimer 12
+In-Reply-To: <1444087704-1429-1-git-send-email-s-anna@ti.com>
+References: <1444087704-1429-1-git-send-email-s-anna@ti.com>
+Message-ID: <1444087704-1429-5-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Add the hwmod data for GPTimer 12. GPTimer 12 is present in
+WKUPAON power domain and is clocked from a secure 32K clock.
+GPTimer 12 serves as a secure timer on HS devices, but is
+available for kernel on regular GP devices.
 
-This is a revised version of the DRA7 Timer12 support patch series [1].
-The series mainly is respun to fix a build issue caused by Patch1 [2]
-with omap1_defconfig due to the absence of Common Clock framework for
-OMAP1.
+The hwmod link is registered only on GP devices. The hwmod data
+also reused the existing timer class instead of reintroducing
+the identical dra7xx_timer_secure_sysc class which was dropped
+in commit edec17863362 ("ARM: DRA7: hwmod: Fix the hwmod class
+for GPTimer4").
 
-Only Patch 1 is modified from the previous series. I have also revised
-the check slightly to fix another issue seen when requesting Timer12
-on OMAP3, as that is a fixed clock and does return back with a parent
-count of 1.
-
-Series baselined on v4.3-rc3 just like the original series, and tested
-on all generations (AMx3x, OMAP4, OMAP5 and DRA7) except OMAP1 and OMAP2
-generations. 
-
-regards
-Suman
-
-[1] http://marc.info/?l=linux-omap&m=144372799601354&w=2
-[2] https://patchwork.kernel.org/patch/7311021/
-
-Suman Anna (4):
-  ARM: OMAP: dmtimer: check for fixed timers during config
-  ARM: OMAP2+: timer: Remove secure timer for DRA7xx HS devices
-  ARM: dts: DRA7: Add timer12 node
-  ARM: DRA7: hwmod: Add data for GPTimer 12
-
- arch/arm/boot/dts/dra7.dtsi               | 10 +++++++++
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 36 +++++++++++++++++++++++++++++--
- arch/arm/mach-omap2/timer.c               |  6 +++---
- arch/arm/plat-omap/dmtimer.c              |  7 ++++++
- 4 files changed, 54 insertions(+), 5 deletions(-)
+ 1 file changed, 34 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index 562247bced49..37a10f87fbcd 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -1929,6 +1929,20 @@ static struct omap_hwmod dra7xx_timer11_hwmod = {
+ 	},
+ };
+ 
++/* timer12 */
++static struct omap_hwmod dra7xx_timer12_hwmod = {
++	.name		= "timer12",
++	.class		= &dra7xx_timer_hwmod_class,
++	.clkdm_name	= "wkupaon_clkdm",
++	.main_clk	= "secure_32k_clk_src_ck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = DRA7XX_CM_WKUPAON_TIMER12_CLKCTRL_OFFSET,
++			.context_offs = DRA7XX_RM_WKUPAON_TIMER12_CONTEXT_OFFSET,
++		},
++	},
++};
++
+ /* timer13 */
+ static struct omap_hwmod dra7xx_timer13_hwmod = {
+ 	.name		= "timer13",
+@@ -3135,6 +3149,14 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per1__timer11 = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++/* l4_wkup -> timer12 */
++static struct omap_hwmod_ocp_if dra7xx_l4_wkup__timer12 = {
++	.master		= &dra7xx_l4_wkup_hwmod,
++	.slave		= &dra7xx_timer12_hwmod,
++	.clk		= "wkupaon_iclk_mux",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ /* l4_per3 -> timer13 */
+ static struct omap_hwmod_ocp_if dra7xx_l4_per3__timer13 = {
+ 	.master		= &dra7xx_l4_per3_hwmod,
+@@ -3429,6 +3451,13 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+ 	NULL,
+ };
+ 
++/* GP-only hwmod links */
++static struct omap_hwmod_ocp_if *dra7xx_gp_hwmod_ocp_ifs[] __initdata = {
++	&dra7xx_l4_wkup__timer12,
++	NULL,
++};
++
++/* SoC variant specific hwmod links */
+ static struct omap_hwmod_ocp_if *dra74x_hwmod_ocp_ifs[] __initdata = {
+ 	&dra7xx_l4_per3__usb_otg_ss4,
+ 	NULL,
+@@ -3446,9 +3475,12 @@ int __init dra7xx_hwmod_init(void)
+ 	ret = omap_hwmod_register_links(dra7xx_hwmod_ocp_ifs);
+ 
+ 	if (!ret && soc_is_dra74x())
+-		return omap_hwmod_register_links(dra74x_hwmod_ocp_ifs);
++		ret = omap_hwmod_register_links(dra74x_hwmod_ocp_ifs);
+ 	else if (!ret && soc_is_dra72x())
+-		return omap_hwmod_register_links(dra72x_hwmod_ocp_ifs);
++		ret = omap_hwmod_register_links(dra72x_hwmod_ocp_ifs);
++
++	if (!ret && omap_type() == OMAP2_DEVICE_TYPE_GP)
++		ret = omap_hwmod_register_links(dra7xx_gp_hwmod_ocp_ifs);
+ 
+ 	return ret;
+ }
 -- 
 2.6.0
