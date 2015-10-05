@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  5 Oct 2015 10:49:51 +0200
-Subject: [PATCH 11/17] ARM: pxa: palmte2: Use PWM lookup table
+Date: Mon,  5 Oct 2015 10:49:53 +0200
+Subject: [PATCH 13/17] ARM: pxa: raumfeld: Use PWM lookup table
 In-Reply-To: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
 References: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1444034997-9805-12-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1444034997-9805-14-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,51 +17,48 @@ Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
 Cc: Robert Jarzmik <robert.jarzmik@free.fr>
 Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
 ---
- arch/arm/mach-pxa/palmte2.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/raumfeld.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/palmte2.c b/arch/arm/mach-pxa/palmte2.c
-index 956fd24ee6fd..e64bb4326e69 100644
---- a/arch/arm/mach-pxa/palmte2.c
-+++ b/arch/arm/mach-pxa/palmte2.c
-@@ -21,6 +21,7 @@
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
- #include <linux/pda_power.h>
+diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
+index 88f70c37ad0d..adb96d8d5b7a 100644
+--- a/arch/arm/mach-pxa/raumfeld.c
++++ b/arch/arm/mach-pxa/raumfeld.c
+@@ -29,6 +29,7 @@
+ #include <linux/leds.h>
+ #include <linux/w1-gpio.h>
+ #include <linux/sched.h>
 +#include <linux/pwm.h>
  #include <linux/pwm_backlight.h>
- #include <linux/gpio.h>
- #include <linux/wm97xx.h>
-@@ -138,6 +139,11 @@ static struct platform_device palmte2_pxa_keys = {
- /******************************************************************************
-  * Backlight
-  ******************************************************************************/
-+static struct pwm_lookup palmte2_pwm_lookup[] = {
-+	PWM_LOOKUP("pxa25x-pwm.0", 0, "pwm-backlight.0", NULL,
-+		   PALMTE2_PERIOD_NS, PWM_POLARITY_NORMAL),
+ #include <linux/i2c.h>
+ #include <linux/i2c/pxa-i2c.h>
+@@ -531,13 +532,15 @@ static void __init raumfeld_w1_init(void)
+  * Framebuffer device
+  */
+ 
++static struct pwm_lookup raumfeld_pwm_lookup[] = {
++	PWM_LOOKUP("pxa27x-pwm.0", 0, "pwm-backlight", NULL, 10000,
++		   PWM_POLARITY_NORMAL),
 +};
 +
- static struct gpio palmte_bl_gpios[] = {
- 	{ GPIO_NR_PALMTE2_BL_POWER, GPIOF_INIT_LOW, "Backlight power" },
- 	{ GPIO_NR_PALMTE2_LCD_POWER, GPIOF_INIT_LOW, "LCD power" },
-@@ -161,10 +167,8 @@ static void palmte2_backlight_exit(struct device *dev)
- }
- 
- static struct platform_pwm_backlight_data palmte2_backlight_data = {
+ /* PWM controlled backlight */
+ static struct platform_pwm_backlight_data raumfeld_pwm_backlight_data = {
 -	.pwm_id		= 0,
- 	.max_brightness	= PALMTE2_MAX_INTENSITY,
- 	.dft_brightness	= PALMTE2_MAX_INTENSITY,
--	.pwm_period_ns	= PALMTE2_PERIOD_NS,
+ 	.max_brightness	= 100,
+ 	.dft_brightness	= 100,
+-	/* 10000 ns = 10 ms ^= 100 kHz */
+-	.pwm_period_ns	= 10000,
  	.enable_gpio	= -1,
- 	.init		= palmte2_backlight_init,
- 	.notify		= palmte2_backlight_notify,
-@@ -355,6 +359,7 @@ static void __init palmte2_init(void)
- 	pxa_set_ac97_info(&palmte2_ac97_pdata);
- 	pxa_set_ficp_info(&palmte2_ficp_platform_data);
+ };
  
-+	pwm_add_table(palmte2_pwm_lookup, ARRAY_SIZE(palmte2_pwm_lookup));
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- }
+@@ -618,6 +621,8 @@ static void __init raumfeld_lcd_init(void)
+ 	} else {
+ 		mfp_cfg_t raumfeld_pwm_pin_config = GPIO17_PWM0_OUT;
+ 		pxa3xx_mfp_config(&raumfeld_pwm_pin_config, 1);
++		pwm_add_table(raumfeld_pwm_lookup,
++			      ARRAY_SIZE(raumfeld_pwm_lookup));
+ 		platform_device_register(&raumfeld_pwm_backlight_device);
+ 	}
  
 -- 
 2.5.0
