@@ -1,36 +1,57 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 5 Oct 2015 17:45:40 +0200
-Subject: [RFT - PATCH v2 0/2] KVM/arm64: add fp/simd lazy switch support
-In-Reply-To: <1442964843-11953-1-git-send-email-m.smarduch@samsung.com>
-References: <1442964843-11953-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20151005154540.GJ9011@cbox>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Mon, 5 Oct 2015 15:48:39 +0000
+Subject: [PATCH v9] dmaengine: Add Xilinx AXI Direct Memory Access
+ Engine driver support
+In-Reply-To: <20151005152628.GE13501@vkoul-mobl.iind.intel.com>
+References: <1440432666-10310-1-git-send-email-appanad@xilinx.com>
+ <20151005152628.GE13501@vkoul-mobl.iind.intel.com>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A4EC2DE@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 04:34:01PM -0700, Mario Smarduch wrote:
-> This is a 2nd itteration for arm64, v1 patches were posted by mistake from an 
-> older branch which included several bugs. Hopefully didn't waste too much of 
-> anyones time.
-> 
-> This patch series is a followup to the armv7 fp/simd lazy switch
-> implementation, uses similar approach and depends on the series - see
-> https://lists.cs.columbia.edu/pipermail/kvmarm/2015-September/016516.html
-> 
-> It's based on earlier arm64 fp/simd optimization work - see
-> https://lists.cs.columbia.edu/pipermail/kvmarm/2015-July/015748.html
-> 
-> And subsequent fixes by Marc and Christoffer at KVM Forum hackathon to handle
-> 32-bit guest on 64 bit host (and may require more here) - see
-> https://lists.cs.columbia.edu/pipermail/kvmarm/2015-August/016128.html
-> 
-> This series has be tested with arm64 on arm64 with several FP applications 
-> running on host and guest, with substantial decrease on number of 
-> fp/simd context switches. From about 30% down to 2% with one guest running.
-> 
-> At this time I don't have arm32/arm64 working and hoping Christoffer and/or
-> Marc (or anyone) can test 32-bit guest/64-bit host.
-> 
-Did you already have some test infrastructure/applications that I can
-reuse for this purpose or do I have to write userspace software?
+Hi Vinod,
 
--Christoffer
+
+> -----Original Message-----
+> From: Vinod Koul [mailto:vinod.koul at intel.com]
+> Sent: Monday, October 05, 2015 8:57 PM
+> To: Appana Durga Kedareswara Rao
+> Cc: dan.j.williams at intel.com; Michal Simek; Soren Brinkmann;
+> moritz.fischer at ettus.com; Appana Durga Kedareswara Rao;
+> anirudha at xilinx.com; dmaengine at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH v9] dmaengine: Add Xilinx AXI Direct Memory Access Engine
+> driver support
+> 
+> On Mon, Aug 24, 2015 at 09:41:06PM +0530, Kedareswara rao Appana wrote:
+> > This is the driver for the AXI Direct Memory Access (AXI DMA) core,
+> > which is a soft Xilinx IP core that provides high- bandwidth direct
+> > memory access between memory and AXI4-Stream type target peripherals.
+> 
+> Okay reviewing this after the other Xilinx driver with very similar name, I am very
+> concerned about code duplication. Both codes seems to be pretty much copy
+> paste and some modifications for IP. In Linux kernel we reuse!
+> 
+> Please create common lib for Xilinx drivers to use and have HW diff is two
+> drivers, or manage those with different driver ops
+> 
+> Pls justify why we should have two drivers. Looking at code makes me think
+> otherwise
+
+
+I agree with you and even initially we had a common driver with the similar implementation as you were mentioning. 
+Later on, being soft IPs, new features were added and the IPs became diversified. As an example, this driver has a residue
+Calculation whereas the other driver (VDMA) is not applicable and the way interrupts are handled is completely different.
+Briefly, they are two complete different IPs with a different register set and descriptor format. Eventually, it became too complex
+To manage the common driver as the code became messy with lot of conditions around. Mainly the validation process is a big concern, as every change
+In the IP compels to test all the complete features of both IPs.  So, we got convinced to the approach of separating the drivers to overcome this and it comes with
+Few addition lines of common code.
+
+Please let me know if I am not clear.
+
+Regards,
+Kedar.
+
+> 
+> --
+> ~Vinod
