@@ -1,108 +1,167 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Oct 2015 07:51:27 -0700
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20151005143532.GA23801@atomide.com>
-References: <20150924090048.GA21626@n2100.arm.linux.org.uk>
- <20150924233756.GN23801@atomide.com>
- <20151001093325.GU21513@n2100.arm.linux.org.uk>
- <CAPDyKFpnqJBrtiBekikrNHAf-agZm12KnF9n+=+72HH=jti-KA@mail.gmail.com>
- <20151001100326.GV21513@n2100.arm.linux.org.uk>
- <20151005112304.GZ23801@atomide.com>
- <20151005143532.GA23801@atomide.com>
-Message-ID: <20151005145127.GB23801@atomide.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 5 Oct 2015 15:52:59 +0100
+Subject: [PATCH v2 5/7] hwrng: st: Add support for ST's HW Random Number
+ Generator
+In-Reply-To: <561272EC.6080300@linaro.org>
+References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
+ <1442497557-9271-6-git-send-email-lee.jones@linaro.org>
+ <5612548E.8090405@linaro.org> <20151005121102.GB17172@x1>
+ <561272EC.6080300@linaro.org>
+Message-ID: <20151005145259.GD17172@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [151005 07:44]:
-> * Tony Lindgren <tony@atomide.com> [151005 04:28]:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [151001 03:07]:
-> > > On Thu, Oct 01, 2015 at 11:50:00AM +0200, Ulf Hansson wrote:
-> > > > On 1 October 2015 at 11:33, Russell King - ARM Linux
-> > > > <linux@arm.linux.org.uk> wrote:
-> > > > > On Thu, Sep 24, 2015 at 04:37:56PM -0700, Tony Lindgren wrote:
-> > > > >> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150924 02:04]:
-> > > > >> > Nightly testing has revealed that both the OMAP3430 LDP and the OMAP4430
-> > > > >> > SDP fail to boot due to lack of working MMC.  Both platforms fail to
-> > > > >> > find their rootfs, which is on a SD card.
-> > > > >> >
-> > > > >> > The breakage occurred somewhere between trees of September 9th (commit
-> > > > >> > 4e4adb2f4628) and September 12th (commit b0a1ea51bda4), so during the
-> > > > >> > merge window.
-> > > > >>
-> > > > >> Yes sorry things got messed up in multiple ways :( I've summarized
-> > > > >> the mess here earlier:
-> > > > >>
-> > > > >> http://article.gmane.org/gmane.linux.kernel.mmc/33911
-> > > > >>
-> > > > >> And today commit b9c93646fd5c ("regulator: pbias: program pbias register
-> > > > >> offset in pbias driver") hit mainline so I'll send a pull request for
-> > > > >> the related dts change.
-> > > > >
-> > > > > It's still broken and untestable.  We're 8 days off it being a full
-> > > > > month worth of failed testing for OMAP3 and OMAP4 platforms.
-> > > > >
-> > > > > I think OMAP and MMC people need to do a post-mortem and work out why
-> > > > > this happened, and how to stop it happening again in the future.
-> > > > 
-> > > > You are probably right!
-> > > > 
-> > > > I think I should have been more persistent when asking on how to deal
-> > > > with these patches. Typically they should all have gone together via
-> > > > one tree, or we needed a slower way forward keeping changes more
-> > > > standalone.
-> > > > 
-> > > > Anyway, according to kernelci.org, which builds and boot my next
-> > > > branch omap3/4 seems to boot now...
-> > > > http://kernelci.org/boot/all/job/ulfh/kernel/v4.3-rc3-27-gf7734d097520/
-> > > 
-> > > It continues to fail here.
-> > > 
-> > > Okay, sod it, I'm at the point of just not giving a damn about whether
-> > > OMAP3 and OMAP4 boot anymore.
-> > > 
-> > > I'm taking all OMAP platforms out of my boot farm.  I'm totally fed up
-> > > with this kind of regression happening.  It's probably some config option
-> > > that someone's recently introduced which defaults to being off, thereby
-> > > breaking the ability for people to move forward without constantly having
-> > > to re-configure.  This is not acceptable.
-> > > 
-> > > STOP BREAKING THE KERNEL.
-> > 
-> > I totally agree, this is unacceptable. And I'm fed up chasing driver
-> > breakage and trying to test everything myself.
-> > 
-> > If Kihon is not starting to respond to these issues, we better start
-> > reverting some of the MMC patches. And I'd say in the future non-trivial
-> > patches really have to sit in linux next for two weeks before merging.
-> > 
-> > We have still the omap3 legacy booting issue remaining, and warnings
-> > at least on omap4 overo.
+On Mon, 05 Oct 2015, Daniel Thompson wrote:
+> On 05/10/15 13:11, Lee Jones wrote:
+> >On Mon, 05 Oct 2015, Daniel Thompson wrote:
+> >>Late but...
+> >
+> >That's okay.  Fixup patches can always be submitted.
+> >
+> >We have forever. :)
+> >
+> >>On 17/09/15 14:45, Lee Jones wrote:
+> >>>diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
+> >>>index 055bb01..8bcfb45 100644
+> >>>--- a/drivers/char/hw_random/Makefile
+> >>>+++ b/drivers/char/hw_random/Makefile
+> >>>@@ -30,4 +30,5 @@ obj-$(CONFIG_HW_RANDOM_TPM) += tpm-rng.o
+> >>>  obj-$(CONFIG_HW_RANDOM_BCM2835) += bcm2835-rng.o
+> >>>  obj-$(CONFIG_HW_RANDOM_IPROC_RNG200) += iproc-rng200.o
+> >>>  obj-$(CONFIG_HW_RANDOM_MSM) += msm-rng.o
+> >>>+obj-$(CONFIG_HW_RANDOM_ST) += st-rng.o
+> >>>  obj-$(CONFIG_HW_RANDOM_XGENE) += xgene-rng.o
+> >>>diff --git a/drivers/char/hw_random/st-rng.c b/drivers/char/hw_random/st-rng.c
+> >>>new file mode 100644
+> >>>index 0000000..8c8a435
+> >>>--- /dev/null
+> >>>+++ b/drivers/char/hw_random/st-rng.c
+> >>>@@ -0,0 +1,144 @@
+> >>>+/*
+> >>>+ * ST Random Number Generator Driver ST's Platforms
+> >>>+ *
+> >>>+ * Author: Pankaj Dev: <pankaj.dev@st.com>
+> >>>+ *         Lee Jones <lee.jones@linaro.org>
+> >>>+ *
+> >>>+ * Copyright (C) 2015 STMicroelectronics (R&D) Limited
+> >>>+ *
+> >>>+ * This program is free software; you can redistribute it and/or modify
+> >>>+ * it under the terms of the GNU General Public License version 2 as
+> >>>+ * published by the Free Software Foundation.
+> >>>+ */
+> >>>+
+> >>>+#include <linux/clk.h>
+> >>>+#include <linux/delay.h>
+> >>>+#include <linux/hw_random.h>
+> >>>+#include <linux/io.h>
+> >>>+#include <linux/module.h>
+> >>>+#include <linux/of.h>
+> >>>+#include <linux/platform_device.h>
+> >>>+#include <linux/slab.h>
+> >>>+
+> >>>+/* Registers */
+> >>>+#define ST_RNG_STATUS_REG		0x20
+> >>>+#define ST_RNG_DATA_REG			0x24
+> >>>+
+> >>>+/* Registers fields */
+> >>>+#define ST_RNG_STATUS_BAD_SEQUENCE	BIT(0)
+> >>>+#define ST_RNG_STATUS_BAD_ALTERNANCE	BIT(1)
+> >>>+#define ST_RNG_STATUS_FIFO_FULL		BIT(5)
+> >>>+
+> >>>+#define ST_RNG_FIFO_SIZE		8
+> >>>+#define ST_RNG_SAMPLE_SIZE		2 /* 2 Byte (16bit) samples */
+> >>>+
+> >>>+/* Samples are available every 0.667us, which we round to 1us */
+> >>>+#define ST_RNG_FILL_FIFO_TIMEOUT   (1 * (ST_RNG_FIFO_SIZE / ST_RNG_SAMPLE_SIZE))
+> >>>+
+> >>>+struct st_rng_data {
+> >>>+	void __iomem	*base;
+> >>>+	struct clk	*clk;
+> >>>+	struct hwrng	ops;
+> >>>+};
+> >>>+
+> >>>+static int st_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
+> >>>+{
+> >>>+	struct st_rng_data *ddata = (struct st_rng_data *)rng->priv;
+> >>>+	u32 status;
+> >>>+	int i;
+> >>>+
+> >>>+	if (max < sizeof(u16))
+> >>>+		return -EINVAL;
+> >>>+
+> >>>+	/* Wait until FIFO is full - max 4uS*/
+> >>>+	for (i = 0; i < ST_RNG_FILL_FIFO_TIMEOUT; i++) {
+> >>>+		status = readl_relaxed(ddata->base + ST_RNG_STATUS_REG);
+> >>>+		if (status & ST_RNG_STATUS_FIFO_FULL)
+> >>>+			break;
+> >>>+		udelay(1);
+> >>
+> >>How much bandwidth does using udelay() cost? I think it could be
+> >>>10% compared to a tighter polling loop.
+> >
+> >Samples are only available every 0.7uS and we only do this for every
+> >4.  The maximum it could 'cost' is <1uS.  Do we really want to fuss
+> >over that tiny amount of time?  It's an understandable point if we
+> >were talking about milliseconds, but a single microsecond?
 > 
-> Sorry i mean Kishon instead of Kihon above.
+> This code is called in a tight loop so we're not talking about a
+> *single* microsecond! We are are talking about about one microsecond
+> in every five[1] and yes, I think we should care about that.
 > 
-> Based on some tests it seems that the duovero unpaired regulator usage
-> is fixed by reverting:
+> It takes 2.67uS for the FIFO to come ready so with a polling
+> interval of 1uS + loop overhead so I would fully expect on average
+> to "waste" 0.5uS each time st_rng_read() is called (in a tight
+> loop).
 > 
-> c55d7a055364 ("mmc: host: omap_hsmmc: use regulator_is_enabled to
-> find pbias status")
+> [1]... point three recurring  ;-)
 
-With commit c55d7a055364 my guess is that the PBIAS regulator is
-already on from an earlier MMC probe and getting re-enabled when
-a deferred probe happens?
+`time dd if=/dev/hwrng of=/dev/null bs=1 count=10M`
 
-> And it seems that omap3 legacy MMC is broken earlier in the
-> series with:
+/* Current code, inc delay */
+Run 1: real 0m17.996s
+Run 2: real 0m17.991s
+Run 3: real 0m17.996s
+Run 4: real 0m18.000s
+Run 5: real 0m18.000s
+Total       0m89.983s
+
+/* Tight loop, no delay */
+Run 1: real 0m18.011s
+Run 2: real 0m17.995s
+Run 3: real 0m18.005s
+Run 4: real 0m18.020s
+Run 5: real 0m17.990s
+Total       0m90.021s
+
+(89.983 / 90.021) * 100 = 99.958%
+
+0.042% saving.
+
+Not quite the >10% predicted.  I'd say that's negligible. 
+
+> >>>+	}
+> >>>+
+> >>>+	if (i == ST_RNG_FILL_FIFO_TIMEOUT)
+> >>>+		return 0;
+> >>
+> >>Isn't a timeout an error condition?
+> >
+> >Yes, which is why we're returning 0.  In this context 0 == 'no data'.
+> >This will be converted to -EAGAIN if the caller did not request
+> >NONBLOCKING.
 > 
-> 7d607f917008 ("mmc: host: omap_hsmmc: use
-> devm_regulator_get_optional() for vmmc")
-> 
-> This one does not cleanly revert so have not yet tried reverting
-> it.
+> I took the view that hitting the timeout means the hardware is
+> broken. Is it likely that the next time we call it there will be
+> data ready? If it is should it be trusted?
 
-And with commit 7d607f917008 I'm guessing we can't return an
-error if the PBIAS regulator does not exist as that's not there
-for the legacy booting.
+>From experience gained whilst testing, I can say that when returning
+an error the HNG breaks and the user receives an error.  If instead we
+return 0, we get to have another go and random numbers again pour
+out.  Perhaps we're just not waiting long enough?  Either way, the
+current implementation works real well.
 
-Regards,
-
-Tony
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
