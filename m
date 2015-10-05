@@ -1,90 +1,281 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon,  5 Oct 2015 18:01:59 +0100
-Subject: [PATCH v2 10/22] arm64: Cleanup mixed endian support detection
+Date: Mon,  5 Oct 2015 18:01:52 +0100
+Subject: [PATCH v2 03/22] arm64: Move cpu feature detection code
 In-Reply-To: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
 References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1444064531-25607-11-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1444064531-25607-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of the system wide safe register to decide the support
-for mixed endian.
+This patch moves the CPU feature detection code from
+ arch/arm64/kernel/{setup.c to cpufeature.c}
+
+The plan is to consolidate all the CPU feature handling
+in cpufeature.c.
+
+Changes pr_fmt from "alternatives" to "cpu features"
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c |   32 ++++++++++----------------------
- 1 file changed, 10 insertions(+), 22 deletions(-)
+ arch/arm64/kernel/cpufeature.c |  110 +++++++++++++++++++++++++++++++++++++++-
+ arch/arm64/kernel/setup.c      |  107 --------------------------------------
+ 2 files changed, 109 insertions(+), 108 deletions(-)
 
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index a4eff72..3506876 100644
+index 3c9aed3..e49be15 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -24,7 +24,6 @@
+@@ -16,13 +16,31 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+-#define pr_fmt(fmt) "alternatives: " fmt
++#define pr_fmt(fmt) "CPU features: " fmt
+ 
+ #include <linux/types.h>
+ #include <asm/cpu.h>
+ #include <asm/cpufeature.h>
  #include <asm/processor.h>
- #include <asm/sysreg.h>
  
--static bool mixed_endian_el0 = true;
- unsigned long elf_hwcap __read_mostly;
- EXPORT_SYMBOL_GPL(elf_hwcap);
- 
-@@ -42,22 +41,6 @@ unsigned int compat_elf_hwcap2 __read_mostly;
- 
- DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- 
--
--bool cpu_supports_mixed_endian_el0(void)
--{
--	return id_aa64mmfr0_mixed_endian_el0(read_cpuid(ID_AA64MMFR0_EL1));
--}
--
--bool system_supports_mixed_endian_el0(void)
--{
--	return mixed_endian_el0;
--}
--
--static void update_mixed_endian_el0_support(struct cpuinfo_arm64 *info)
--{
--	mixed_endian_el0 &= id_aa64mmfr0_mixed_endian_el0(info->reg_id_aa64mmfr0);
--}
--
- #define ARM64_FTR_BITS(ftr_strict, ftr_type, ftr_shift, ftr_width, ftr_safe_val) \
- 	{							\
- 		.strict = ftr_strict,				\
-@@ -438,9 +421,6 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
- 	init_cpu_ftr_reg(SYS_MVFR0_EL1, info->reg_mvfr0);
- 	init_cpu_ftr_reg(SYS_MVFR1_EL1, info->reg_mvfr1);
- 	init_cpu_ftr_reg(SYS_MVFR2_EL1, info->reg_mvfr2);
--
--	/* This will be removed later, once we start using the infrastructure */
--	update_mixed_endian_el0_support(info);
- }
- 
- static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
-@@ -590,8 +570,6 @@ void update_cpu_features(int cpu,
- 	 */
- 	WARN_TAINT_ONCE(taint, TAINT_CPU_OUT_OF_SPEC,
- 			"Unsupported CPU feature variation.\n");
--
--	update_mixed_endian_el0_support(info);
- }
- 
- u64 read_system_reg(u32 id)
-@@ -681,6 +659,16 @@ void check_local_cpu_features(void)
++unsigned long elf_hwcap __read_mostly;
++EXPORT_SYMBOL_GPL(elf_hwcap);
++
++#ifdef CONFIG_COMPAT
++#define COMPAT_ELF_HWCAP_DEFAULT	\
++				(COMPAT_HWCAP_HALF|COMPAT_HWCAP_THUMB|\
++				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
++				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
++				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
++				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV|\
++				 COMPAT_HWCAP_LPAE)
++unsigned int compat_elf_hwcap __read_mostly = COMPAT_ELF_HWCAP_DEFAULT;
++unsigned int compat_elf_hwcap2 __read_mostly;
++#endif
++
++DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
++
++
+ static bool
+ feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
+ {
+@@ -100,3 +118,93 @@ void check_local_cpu_features(void)
+ {
  	check_cpu_capabilities(arm64_features, "detected feature:");
  }
++
++void __init setup_cpu_features(void)
++{
++	u64 features;
++	s64 block;
++	u32 cwg;
++	int cls;
++
++	/*
++	 * Check for sane CTR_EL0.CWG value.
++	 */
++	cwg = cache_type_cwg();
++	cls = cache_line_size();
++	if (!cwg)
++		pr_warn("No Cache Writeback Granule information, assuming cache line size %d\n",
++			cls);
++	if (L1_CACHE_BYTES < cls)
++		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
++			L1_CACHE_BYTES, cls);
++
++	/*
++	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
++	 * The blocks we test below represent incremental functionality
++	 * for non-negative values. Negative values are reserved.
++	 */
++	features = read_cpuid(ID_AA64ISAR0_EL1);
++	block = cpuid_feature_extract_field(features, 4);
++	if (block > 0) {
++		switch (block) {
++		default:
++		case 2:
++			elf_hwcap |= HWCAP_PMULL;
++		case 1:
++			elf_hwcap |= HWCAP_AES;
++		case 0:
++			break;
++		}
++	}
++
++	if (cpuid_feature_extract_field(features, 8) > 0)
++		elf_hwcap |= HWCAP_SHA1;
++
++	if (cpuid_feature_extract_field(features, 12) > 0)
++		elf_hwcap |= HWCAP_SHA2;
++
++	if (cpuid_feature_extract_field(features, 16) > 0)
++		elf_hwcap |= HWCAP_CRC32;
++
++	block = cpuid_feature_extract_field(features, 20);
++	if (block > 0) {
++		switch (block) {
++		default:
++		case 2:
++			elf_hwcap |= HWCAP_ATOMICS;
++		case 1:
++			/* RESERVED */
++		case 0:
++			break;
++		}
++	}
++
++#ifdef CONFIG_COMPAT
++	/*
++	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
++	 * the AArch32 32-bit execution state.
++	 */
++	features = read_cpuid(ID_ISAR5_EL1);
++	block = cpuid_feature_extract_field(features, 4);
++	if (block > 0) {
++		switch (block) {
++		default:
++		case 2:
++			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
++		case 1:
++			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
++		case 0:
++			break;
++		}
++	}
++
++	if (cpuid_feature_extract_field(features, 8) > 0)
++		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
++
++	if (cpuid_feature_extract_field(features, 12) > 0)
++		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
++
++	if (cpuid_feature_extract_field(features, 16) > 0)
++		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
++#endif
++}
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index d149c18..4c7bca8 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -64,23 +64,6 @@
+ #include <asm/efi.h>
+ #include <asm/xen/hypervisor.h>
  
-+bool cpu_supports_mixed_endian_el0(void)
-+{
-+	return id_aa64mmfr0_mixed_endian_el0(read_cpuid(ID_AA64MMFR0_EL1));
-+}
-+
-+bool system_supports_mixed_endian_el0(void)
-+{
-+	return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
-+}
-+
- void __init setup_cpu_features(void)
+-unsigned long elf_hwcap __read_mostly;
+-EXPORT_SYMBOL_GPL(elf_hwcap);
+-
+-#ifdef CONFIG_COMPAT
+-#define COMPAT_ELF_HWCAP_DEFAULT	\
+-				(COMPAT_HWCAP_HALF|COMPAT_HWCAP_THUMB|\
+-				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
+-				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
+-				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
+-				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV|\
+-				 COMPAT_HWCAP_LPAE)
+-unsigned int compat_elf_hwcap __read_mostly = COMPAT_ELF_HWCAP_DEFAULT;
+-unsigned int compat_elf_hwcap2 __read_mostly;
+-#endif
+-
+-DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+-
+ phys_addr_t __fdt_pointer __initdata;
+ 
+ /*
+@@ -195,96 +178,6 @@ static void __init smp_build_mpidr_hash(void)
+ 	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
+ }
+ 
+-void __init setup_cpu_features(void)
+-{
+-	u64 features;
+-	s64 block;
+-	u32 cwg;
+-	int cls;
+-
+-	/*
+-	 * Check for sane CTR_EL0.CWG value.
+-	 */
+-	cwg = cache_type_cwg();
+-	cls = cache_line_size();
+-	if (!cwg)
+-		pr_warn("No Cache Writeback Granule information, assuming cache line size %d\n",
+-			cls);
+-	if (L1_CACHE_BYTES < cls)
+-		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
+-			L1_CACHE_BYTES, cls);
+-
+-	/*
+-	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
+-	 * The blocks we test below represent incremental functionality
+-	 * for non-negative values. Negative values are reserved.
+-	 */
+-	features = read_cpuid(ID_AA64ISAR0_EL1);
+-	block = cpuid_feature_extract_field(features, 4);
+-	if (block > 0) {
+-		switch (block) {
+-		default:
+-		case 2:
+-			elf_hwcap |= HWCAP_PMULL;
+-		case 1:
+-			elf_hwcap |= HWCAP_AES;
+-		case 0:
+-			break;
+-		}
+-	}
+-
+-	if (cpuid_feature_extract_field(features, 8) > 0)
+-		elf_hwcap |= HWCAP_SHA1;
+-
+-	if (cpuid_feature_extract_field(features, 12) > 0)
+-		elf_hwcap |= HWCAP_SHA2;
+-
+-	if (cpuid_feature_extract_field(features, 16) > 0)
+-		elf_hwcap |= HWCAP_CRC32;
+-
+-	block = cpuid_feature_extract_field(features, 20);
+-	if (block > 0) {
+-		switch (block) {
+-		default:
+-		case 2:
+-			elf_hwcap |= HWCAP_ATOMICS;
+-		case 1:
+-			/* RESERVED */
+-		case 0:
+-			break;
+-		}
+-	}
+-
+-#ifdef CONFIG_COMPAT
+-	/*
+-	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
+-	 * the AArch32 32-bit execution state.
+-	 */
+-	features = read_cpuid(ID_ISAR5_EL1);
+-	block = cpuid_feature_extract_field(features, 4);
+-	if (block > 0) {
+-		switch (block) {
+-		default:
+-		case 2:
+-			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
+-		case 1:
+-			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
+-		case 0:
+-			break;
+-		}
+-	}
+-
+-	if (cpuid_feature_extract_field(features, 8) > 0)
+-		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
+-
+-	if (cpuid_feature_extract_field(features, 12) > 0)
+-		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
+-
+-	if (cpuid_feature_extract_field(features, 16) > 0)
+-		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
+-#endif
+-}
+-
+ static void __init setup_processor(void)
  {
- 	u64 features;
+ 	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
 -- 
 1.7.9.5
