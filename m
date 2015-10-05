@@ -1,106 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Oct 2015 10:11:56 -0700
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20151005145127.GB23801@atomide.com>
-References: <20150924090048.GA21626@n2100.arm.linux.org.uk>
- <20150924233756.GN23801@atomide.com>
- <20151001093325.GU21513@n2100.arm.linux.org.uk>
- <CAPDyKFpnqJBrtiBekikrNHAf-agZm12KnF9n+=+72HH=jti-KA@mail.gmail.com>
- <20151001100326.GV21513@n2100.arm.linux.org.uk>
- <20151005112304.GZ23801@atomide.com>
- <20151005143532.GA23801@atomide.com>
- <20151005145127.GB23801@atomide.com>
-Message-ID: <20151005171155.GF23801@atomide.com>
+From: ahs3@redhat.com (Al Stone)
+Date: Mon, 5 Oct 2015 11:12:04 -0600
+Subject: [PATCH v5 0/5] Provide better MADT subtable sanity checks
+In-Reply-To: <2808057.teMg2oCLf6@vostro.rjw.lan>
+References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
+ <560BA4C9.7090607@huawei.com> <560C0968.6020904@redhat.com>
+ <2808057.teMg2oCLf6@vostro.rjw.lan>
+Message-ID: <5612AF64.4060900@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [151005 07:57]:
-> * Tony Lindgren <tony@atomide.com> [151005 07:44]:
-> > * Tony Lindgren <tony@atomide.com> [151005 04:28]:
-> > 
-> > Based on some tests it seems that the duovero unpaired regulator usage
-> > is fixed by reverting:
-> > 
-> > c55d7a055364 ("mmc: host: omap_hsmmc: use regulator_is_enabled to
-> > find pbias status")
+On 10/05/2015 07:39 AM, Rafael J. Wysocki wrote:
+> On Wednesday, September 30, 2015 10:10:16 AM Al Stone wrote:
+>> On 09/30/2015 03:00 AM, Hanjun Guo wrote:
+>>> On 2015/9/30 7:45, Al Stone wrote:
+>>>> NB: this patch set is for use against the linux-pm bleeding edge branch.
+>>>>
+>>
+>> [snip...]
+>>
+>>>
+>>> For this patch set,
+>>>
+>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>
+>>> Thanks
+>>> Hanjun
+>>
+>> Thanks, Hanjun!
 > 
-> With commit c55d7a055364 my guess is that the PBIAS regulator is
-> already on from an earlier MMC probe and getting re-enabled when
-> a deferred probe happens?
-
-Unless somebody has a better fix in mind for the above, I suggest
-we revert it for the -rc kernel.
-
-> > And it seems that omap3 legacy MMC is broken earlier in the
-> > series with:
-> > 
-> > 7d607f917008 ("mmc: host: omap_hsmmc: use
-> > devm_regulator_get_optional() for vmmc")
-> > 
-> > This one does not cleanly revert so have not yet tried reverting
-> > it.
+> Series applied, thanks!
 > 
-> And with commit 7d607f917008 I'm guessing we can't return an
-> error if the PBIAS regulator does not exist as that's not there
-> for the legacy booting.
+> Rafael
+> 
 
-For omap3 legacy booting, we keep getting -EPROBE_DEFER for
-all the optional regulators.
+Thanks, Rafael!
 
-Something like the following might be the minimal fix for the -rc
-cycle?
-
-Regards,
-
-Tony
-
-8< ----------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 5 Oct 2015 09:37:36 -0700
-Subject: [PATCH] mmc: host: omap_hsmmc: Fix MMC for omap3 legacy booting
-
-Starting with commit 7d607f917008 ("mmc: host: omap_hsmmc: use
-devm_regulator_get_optional() for vmmc") MMC on omap3 stopped working
-for legacy booting.
-
-This is because legacy booting sets up some of the resource in the
-platform init code, and for optional regulators always seem to
-return -EPROBE_DEFER for the legacy booting.
-
-Let's fix the issue by checking for device tree based booting for
-now. Then when omap3 boots in device tree only mode, this patch
-can be just reverted.
-
-Fixes: 7d607f917008 ("mmc: host: omap_hsmmc: use
-devm_regulator_get_optional() for vmmc")
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -478,7 +478,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
- 	mmc->supply.vmmc = devm_regulator_get_optional(host->dev, "vmmc");
- 	if (IS_ERR(mmc->supply.vmmc)) {
- 		ret = PTR_ERR(mmc->supply.vmmc);
--		if (ret != -ENODEV)
-+		if ((ret != -ENODEV) && host->dev->of_node)
- 			return ret;
- 		dev_dbg(host->dev, "unable to get vmmc regulator %ld\n",
- 			PTR_ERR(mmc->supply.vmmc));
-@@ -493,7 +493,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
- 	mmc->supply.vqmmc = devm_regulator_get_optional(host->dev, "vmmc_aux");
- 	if (IS_ERR(mmc->supply.vqmmc)) {
- 		ret = PTR_ERR(mmc->supply.vqmmc);
--		if (ret != -ENODEV)
-+		if ((ret != -ENODEV) && host->dev->of_node)
- 			return ret;
- 		dev_dbg(host->dev, "unable to get vmmc_aux regulator %ld\n",
- 			PTR_ERR(mmc->supply.vqmmc));
-@@ -503,7 +503,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
- 	host->pbias = devm_regulator_get_optional(host->dev, "pbias");
- 	if (IS_ERR(host->pbias)) {
- 		ret = PTR_ERR(host->pbias);
--		if (ret != -ENODEV)
-+		if ((ret != -ENODEV) && host->dev->of_node)
- 			return ret;
- 		dev_dbg(host->dev, "unable to get pbias regulator %ld\n",
- 			PTR_ERR(host->pbias));
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
