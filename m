@@ -1,47 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Oct 2015 13:32:42 +0100
-Subject: [PATCH] arm: perf: Fix userspace call stack walking
-In-Reply-To: <20151001172643.GA23147@dreric01-gentoo.localdomain>
-References: <20151001172643.GA23147@dreric01-gentoo.localdomain>
-Message-ID: <20151005123242.GB8818@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 5 Oct 2015 14:38:48 +0200
+Subject: [PATCH 0/3] ARM: dts: sun4i: USB DRC and voltage-scaling for
+ pcDuino1/2
+In-Reply-To: <1443985128-23137-1-git-send-email-siarhei.siamashka@gmail.com>
+References: <1443985128-23137-1-git-send-email-siarhei.siamashka@gmail.com>
+Message-ID: <20151005123848.GL2696@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Drew,
+Hi,
 
-On Thu, Oct 01, 2015 at 06:26:47PM +0100, Drew Richardson wrote:
-> I got some undeliverable responses the first time, sorry if you get this twice
+On Sun, Oct 04, 2015 at 09:58:45PM +0300, Siarhei Siamashka wrote:
+> Hello,
 > 
-> ---
+> This brings LinkSprite pcDuino1/2 boards up to date with the latest
+> kernel features. And the first patch in this set is a bugfix for the
+> PH3/PH6 pins misuse.
 > 
-> The layout of stack frames has changed over time. Testing using a
-> arm-linux-gnueabi gcc-4.2 from 2007 the original code didn't work but
-> this new code does. It also works with clang as well as newer versions
-> of gcc.
-> 
-> gcc has this layout for it's stackframes
-> 
-> caller_fp
-> caller_lr <- fp
-> 
-> However clang has this layout
-> 
-> caller_fp <- fp
-> caller_lr
+> There is currently a single dts file for pcDuino1 and pcDuino2 boards.
+> They obviously had been designed to be compatible with each other, but
+> have some minor differences, as can be seen when comparing schematics:
+>     https://s3.amazonaws.com/pcduino/Hardware/PC+Duino_V01-20130128.pdf
+>     https://s3.amazonaws.com/pcduino/Hardware/v2/pcDuino_v2_sch.pdf
 
-Do you have any buy-in from the toolchain people that this won't continue
-to change over time? Adding more and more heuristics to walk the stack of
-binaries compiled using GCC x.y doesn't really scale...
+Usually, the way we handle this is simply by including just the other
+DT that will only hold those differences.
 
-> Since the layouts are not compatible use a heuristic to determine for
-> each stack frame which layout is used.
-> 
-> Signed-off-by: Drew Richardson <drew.richardson@arm.com>
-> ---
->  arch/arm/kernel/perf_callchain.c | 86 +++++++++++++++++++++++++++++++++++-----
->  1 file changed, 76 insertions(+), 10 deletions(-)
+What are those differences exactly ?
 
-Please can you update the compat stack walker in
-arch/arm64/kernel/perf_callchain.c too?
+Thanks,
+Maxime
 
-Will
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151005/cc585a0a/attachment.sig>
