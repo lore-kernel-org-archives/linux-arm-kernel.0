@@ -1,30 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  5 Oct 2015 16:10:42 +0100
-Subject: [PATCH] hwrng: st: dt: Fix trivial typo in node address
-Message-ID: <1444057842-23439-1-git-send-email-lee.jones@linaro.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 5 Oct 2015 08:13:03 -0700
+Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
+In-Reply-To: <20151005114940.GA4448@afzalpc>
+References: <560E53E3.7070207@free.fr> <560E8584.8000207@free.fr>
+ <20151002180255.GK12338@codeaurora.org> <560ED1FB.9010000@free.fr>
+ <yw1xbncgluad.fsf@unicorn.mansr.com>
+ <20151003103219.1e10bdeb@arm.com> <560FA4B5.1040709@free.fr>
+ <20151003111231.544ae8e2@arm.com>
+ <20151005054652.GI26391@xsjsorenbubuntu>
+ <20151005114940.GA4448@afzalpc>
+Message-ID: <20151005151303.GJ26391@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT nodes should not append their addresses with '0x'.
+On Mon, 2015-10-05 at 05:19PM +0530, Afzal Mohammed wrote:
+> Hi,
+> 
+> On Sun, Oct 04, 2015 at 10:46:52PM -0700, S?ren Brinkmann wrote:
+> > On Sat, 2015-10-03 at 11:12AM +0100, Marc Zyngier wrote:
+> 
+> > > Indeed, I cannot see any code that does that in the GT driver. But if
+> > > you have an A9 MP, you probably want to stick to TWD, which gives you a
+> > > per-cpu timer instead of a global timer that will require IPIs to other
+> > > CPUs.
+> > 
+> > I think the TWD only provides a clock_event device. Clocksource and
+> > schedclock would have to be provided by something else.
+> 
+> If no clocksource, sched clock is provided, default jiffies based ones
+> would be sufficient for single core, no ?, though not a preferred one.
 
-Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- Documentation/devicetree/bindings/rng/st,rng.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Yes that is correct. My point was more, that twd+cpufreq is a rather
+easy case since it doesn't provide a clocksource/schedclock. A driver
+that provides those needs quite some more work if it depends on the CPU
+frequency and needs to be usable with cpufreq.
 
-diff --git a/Documentation/devicetree/bindings/rng/st,rng.txt b/Documentation/devicetree/bindings/rng/st,rng.txt
-index dbc64e6..35734bc 100644
---- a/Documentation/devicetree/bindings/rng/st,rng.txt
-+++ b/Documentation/devicetree/bindings/rng/st,rng.txt
-@@ -8,7 +8,7 @@ clocks		: Phandle to device's clock (See: ../clocks/clock-bindings.txt)
- 
- Example:
- 
--rng at 0xfee80000 {
-+rng at fee80000 {
- 	compatible      = "st,rng";
- 	reg		= <0xfee80000 0x1000>;
- 	clocks          = <&clk_sysin>;
--- 
-1.9.1
+	S?ren
