@@ -1,48 +1,58 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 05 Oct 2015 12:24:40 +0200
-Subject: [PATCH 5/7] [media] mipi-csis: make sparse happy
-In-Reply-To: <4962836.RxBJeKxGZM@wuerfel>
-References: <cover.1443737682.git.mchehab@osg.samsung.com>
- <de2ce8fd84f965a270bad28d284932bf20c349be.1443737683.git.mchehab@osg.samsung.com>
- <4962836.RxBJeKxGZM@wuerfel>
-Message-ID: <56124FE8.8070400@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 5 Oct 2015 12:25:50 +0200
+Subject: [PATCH] ASoC: sun4i-codec: Rework and fix headphone routing
+In-Reply-To: <20151005094435.GI12635@sirena.org.uk>
+References: <1443965896-6205-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20151005094435.GI12635@sirena.org.uk>
+Message-ID: <20151005102550.GI2696@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/15 00:25, Arnd Bergmann wrote:
-> On Thursday 01 October 2015 19:17:27 Mauro Carvalho Chehab wrote:
->> > diff --git a/drivers/media/platform/exynos4-is/mipi-csis.c b/drivers/media/platform/exynos4-is/mipi-csis.c
->> > index d74e1bec3d86..4b85105dc159 100644
->> > --- a/drivers/media/platform/exynos4-is/mipi-csis.c
->> > +++ b/drivers/media/platform/exynos4-is/mipi-csis.c
->> > @@ -706,7 +706,8 @@ static irqreturn_t s5pcsis_irq_handler(int irq, void *dev_id)
->> >                 else
->> >                         offset = S5PCSIS_PKTDATA_ODD;
->> >  
->> > -               memcpy(pktbuf->data, state->regs + offset, pktbuf->len);
->> > +               memcpy(pktbuf->data, (u8 __force *)state->regs + offset,
->> > +                      pktbuf->len);
->> >                 pktbuf->data = NULL;
->> > 
->
-> I think this is what memcpy_toio() is meant for.
+Hi Mark,
 
-Exactly memcpy_fromio().  But it's implementation is inefficient on
-ARCH=arm, memcpy_fromio() will be translated to a loop of readb(),
-only if an arm sub-architecture provides a processor instruction
-to access memory by byte.  Each readb() also involves a memory barrier.
-That's all what we wanted to avoid. AFAIR using memcpy_fromio() was
-causing increase of the copy operation several times comparing to
-memcpy(). On arm64 it looks better, but this driver is currently
-used only on arm32.
+On Mon, Oct 05, 2015 at 10:44:35AM +0100, Mark Brown wrote:
+> On Sun, Oct 04, 2015 at 03:38:16PM +0200, Maxime Ripard wrote:
+> 
+> > Most of the boards have their headphone jack directly connected to the
+> > matching pins of the SoCs. Since most of the time we will have the same
+> > routing path, it makes sense to put that in the driver, and only have a
+> > property describing whether that route is enabled or not.
+> 
+> What is the value in having just a dumb jack with no detection
+> configured?  It doesn't actually do anything...
 
-I would prefer to add (void __force *) instead:
+Well, it's how it's wired on most boards. The jack is directly
+connected to the SoC, without any detection mechanism, not even a
+GPIO, so we can only assume it's always there if we want it to work
+properly.
 
-memcpy(pktbuf->data, (void __force *)state->regs + offset, pktbuf->len);
+> > It also fixes the following warning messages that were seen so far:
+> > sun4i-codec 1c22c00.codec: ASoC: no sink widget found for Headphone Jack
+> > sun4i-codec 1c22c00.codec: ASoC: Failed to add route HP Left -> direct -> Headphone Jack
+> > sun4i-codec 1c22c00.codec: ASoC: no sink widget found for Headphone Jack
+> > sun4i-codec 1c22c00.codec: ASoC: Failed to add route HP Right -> direct -> Headphone Jack
+> 
+> Why are these routes being added separately to adding the jack?  Just
+> remove the broken routes.
 
-Alternatively, the memset could just be replaced by a loop of
-u32 reads - __raw_readl();
+I'm not sure I understand here. The former DT bindings example was
+adding this route, which was broken because of the missing output
+widget for the headphone jack.
 
---
-Thanks,
-Sylwester
+My patch here adds both if the DT says that the headphone jack is
+actually used on that board, so it should fix both issues: no broken
+route, and no missing widgets. right?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151005/74e9705e/attachment.sig>
