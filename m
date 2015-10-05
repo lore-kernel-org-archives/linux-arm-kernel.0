@@ -1,108 +1,33 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Mon,  5 Oct 2015 14:32:51 -0700
-Subject: [v3 PATCH] arm64: replace read_lock to rcu lock in call_break_hook
-Message-ID: <1444080771-22468-1-git-send-email-yang.shi@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Oct 2015 00:02:37 +0200
+Subject: [PATCH v2 2/2] irqchip: sunxi-nmi: switch to
+ of_io_request_and_map() from of_iomap()
+In-Reply-To: <1444063334-19832-3-git-send-email-wens@csie.org>
+References: <1444063334-19832-1-git-send-email-wens@csie.org>
+ <1444063334-19832-3-git-send-email-wens@csie.org>
+Message-ID: <20151005220237.GO2696@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
-in_atomic(): 0, irqs_disabled(): 128, pid: 342, name: perf
-1 lock held by perf/342:
- #0:  (break_hook_lock){+.+...}, at: [<ffffffc0000851ac>] call_break_hook+0x34/0xd0
-irq event stamp: 62224
-hardirqs last  enabled at (62223): [<ffffffc00010b7bc>] __call_rcu.constprop.59+0x104/0x270
-hardirqs last disabled at (62224): [<ffffffc0000fbe20>] vprintk_emit+0x68/0x640
-softirqs last  enabled at (0): [<ffffffc000097928>] copy_process.part.8+0x428/0x17f8
-softirqs last disabled at (0): [<          (null)>]           (null)
-CPU: 0 PID: 342 Comm: perf Not tainted 4.1.6-rt5 #4
-Hardware name: linux,dummy-virt (DT)
-Call trace:
-[<ffffffc000089968>] dump_backtrace+0x0/0x128
-[<ffffffc000089ab0>] show_stack+0x20/0x30
-[<ffffffc0007030d0>] dump_stack+0x7c/0xa0
-[<ffffffc0000c878c>] ___might_sleep+0x174/0x260
-[<ffffffc000708ac8>] __rt_spin_lock+0x28/0x40
-[<ffffffc000708db0>] rt_read_lock+0x60/0x80
-[<ffffffc0000851a8>] call_break_hook+0x30/0xd0
-[<ffffffc000085a70>] brk_handler+0x30/0x98
-[<ffffffc000082248>] do_debug_exception+0x50/0xb8
-Exception stack(0xffffffc00514fe30 to 0xffffffc00514ff50)
-fe20:                                     00000000 00000000 c1594680 0000007f
-fe40: ffffffff ffffffff 92063940 0000007f 0550dcd8 ffffffc0 00000000 00000000
-fe60: 0514fe70 ffffffc0 000be1f8 ffffffc0 0514feb0 ffffffc0 0008948c ffffffc0
-fe80: 00000004 00000000 0514fed0 ffffffc0 ffffffff ffffffff 9282a948 0000007f
-fea0: 00000000 00000000 9282b708 0000007f c1592820 0000007f 00083914 ffffffc0
-fec0: 00000000 00000000 00000010 00000000 00000064 00000000 00000001 00000000
-fee0: 005101e0 00000000 c1594680 0000007f c1594740 0000007f ffffffd8 ffffff80
-ff00: 00000000 00000000 00000000 00000000 c1594770 0000007f c1594770 0000007f
-ff20: 00665e10 00000000 7f7f7f7f 7f7f7f7f 01010101 01010101 00000000 00000000
-ff40: 928e4cc0 0000007f 91ff11e8 0000007f
+On Tue, Oct 06, 2015 at 12:42:14AM +0800, Chen-Yu Tsai wrote:
+> Switch to the new of_io_request_and_map() call, so the IO resource is
+> properly held, and also shows up in /proc/iomem.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-call_break_hook is called in atomic context (hard irq disabled), so replace
-the sleepable lock to rcu lock, replace relevant list operations to rcu
-version and call synchronize_rcu() in unregister_break_hook().
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-And, replace write lock to spinlock in {un}register_break_hook.
+Thanks!
+Maxime
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
-v2 -> v3
-Add synchronize_rcu() in ungister_break_hook()
-Replace write lock to spinlock
-
-v1 -> v2
-Replace list operations to rcu version.
-
- arch/arm64/kernel/debug-monitors.c | 21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index cebf786..13ca9cd 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -271,20 +271,21 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
-  * Use reader/writer locks instead of plain spinlock.
-  */
- static LIST_HEAD(break_hook);
--static DEFINE_RWLOCK(break_hook_lock);
-+static DEFINE_SPINLOCK(break_hook_lock);
- 
- void register_break_hook(struct break_hook *hook)
- {
--	write_lock(&break_hook_lock);
--	list_add(&hook->node, &break_hook);
--	write_unlock(&break_hook_lock);
-+	spin_lock(&break_hook_lock);
-+	list_add_rcu(&hook->node, &break_hook);
-+	spin_unlock(&break_hook_lock);
- }
- 
- void unregister_break_hook(struct break_hook *hook)
- {
--	write_lock(&break_hook_lock);
--	list_del(&hook->node);
--	write_unlock(&break_hook_lock);
-+	spin_lock(&break_hook_lock);
-+	list_del_rcu(&hook->node);
-+	spin_unlock(&break_hook_lock);
-+	synchronize_rcu();
- }
- 
- static int call_break_hook(struct pt_regs *regs, unsigned int esr)
-@@ -292,11 +293,11 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
- 	struct break_hook *hook;
- 	int (*fn)(struct pt_regs *regs, unsigned int esr) = NULL;
- 
--	read_lock(&break_hook_lock);
--	list_for_each_entry(hook, &break_hook, node)
-+	rcu_read_lock();
-+	list_for_each_entry_rcu(hook, &break_hook, node)
- 		if ((esr & hook->esr_mask) == hook->esr_val)
- 			fn = hook->fn;
--	read_unlock(&break_hook_lock);
-+	rcu_read_unlock();
- 
- 	return fn ? fn(regs, esr) : DBG_HOOK_ERROR;
- }
 -- 
-2.0.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/22863f84/attachment.sig>
