@@ -1,43 +1,52 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 5 Oct 2015 17:27:06 +0200
-Subject: [PATCH v4 4/4] misc: atmel_tclib: get and use slow clock
-In-Reply-To: <1439717026-30634-5-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1439717026-30634-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1439717026-30634-5-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20151005152706.GC17612@ulmo>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Oct 2015 16:25:22 +0100
+Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
+In-Reply-To: <20151005151303.GJ26391@xsjsorenbubuntu>
+References: <560E8584.8000207@free.fr> <20151002180255.GK12338@codeaurora.org>
+ <560ED1FB.9010000@free.fr> <yw1xbncgluad.fsf@unicorn.mansr.com>
+ <20151003103219.1e10bdeb@arm.com> <560FA4B5.1040709@free.fr>
+ <20151003111231.544ae8e2@arm.com>
+ <20151005054652.GI26391@xsjsorenbubuntu>
+ <20151005114940.GA4448@afzalpc>
+ <20151005151303.GJ26391@xsjsorenbubuntu>
+Message-ID: <20151005152522.GJ21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 16, 2015 at 11:23:46AM +0200, Alexandre Belloni wrote:
-> From: Boris Brezillon <boris.brezillon@free-electrons.com>
+On Mon, Oct 05, 2015 at 08:13:03AM -0700, S?ren Brinkmann wrote:
+> On Mon, 2015-10-05 at 05:19PM +0530, Afzal Mohammed wrote:
+> > Hi,
+> > 
+> > On Sun, Oct 04, 2015 at 10:46:52PM -0700, S?ren Brinkmann wrote:
+> > > On Sat, 2015-10-03 at 11:12AM +0100, Marc Zyngier wrote:
+> > 
+> > > > Indeed, I cannot see any code that does that in the GT driver. But if
+> > > > you have an A9 MP, you probably want to stick to TWD, which gives you a
+> > > > per-cpu timer instead of a global timer that will require IPIs to other
+> > > > CPUs.
+> > > 
+> > > I think the TWD only provides a clock_event device. Clocksource and
+> > > schedclock would have to be provided by something else.
+> > 
+> > If no clocksource, sched clock is provided, default jiffies based ones
+> > would be sufficient for single core, no ?, though not a preferred one.
 > 
-> Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
-> hang") added a workaround for the slow clock as it is not properly handled
-> by its users.
-> 
-> Get and use the slow clock as it is necessary for the timer counters.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> ---
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: linux-pwm at vger.kernel.org
->  drivers/clocksource/tcb_clksrc.c | 10 +++++++++-
->  drivers/misc/atmel_tclib.c       |  4 ++++
->  drivers/pwm/pwm-atmel-tcb.c      | 26 +++++++++++++++++++-------
->  include/linux/atmel_tc.h         |  1 +
->  4 files changed, 33 insertions(+), 8 deletions(-)
+> Yes that is correct. My point was more, that twd+cpufreq is a rather
+> easy case since it doesn't provide a clocksource/schedclock. A driver
+> that provides those needs quite some more work if it depends on the CPU
+> frequency and needs to be usable with cpufreq.
 
-This doesn't seem to apply anymore. Does it need to be rebased? Or do I
-need some other patch as a dependency?
+_And_ you need to take the decision that you don't care about time
+keeping accuracy - because each and every time you change the
+clocksource's frequency, you will never be able to know exactly when
+the frequency change took effect in comparison with the counter value.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151005/a4bba5ae/attachment.sig>
+You could do a very tight "read counter before, write clock rate, read
+counter after" and use that to calculate the number of timer ticks at
+the old rate, and re-set the timing parameters with the new initial
+counter value after the change, but even that's not perfect as you don't
+actually know when the write hits the hardware compared to the reads.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
