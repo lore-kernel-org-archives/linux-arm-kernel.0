@@ -1,34 +1,36 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Mon, 5 Oct 2015 04:15:18 +0200
-Subject: [PATCH v4 07/26] ARM: pxa: magician: Fix HTC Magician pin mux
- definitions
-In-Reply-To: <1443875409.4186.20.camel@gmail.com>
-References: <cover.1443472089.git.petr.cvek@tul.cz> <5609ADF5.9070003@tul.cz>
- <1443875409.4186.20.camel@gmail.com>
-Message-ID: <5611DD36.5030108@tul.cz>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 5 Oct 2015 11:57:19 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.4
+In-Reply-To: <13270236.rKZXaT9lIB@wuerfel>
+References: <cover.1442536920.git.horms+renesas@verge.net.au>
+ <20150924050843.GA3822@verge.net.au>
+ <20151002022838.GA15481@verge.net.au> <13270236.rKZXaT9lIB@wuerfel>
+Message-ID: <20151005025719.GA29979@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 3.10.2015 v 14:30 Philipp Zabel napsal(a):
-> Am Montag, den 28.09.2015, 23:15 +0200 schrieb Petr Cvek:
->> This patch fixes a pin mux for the HTC Magician machine. Wrong and
->> missing
->> definitions caused a bad LCD operation and an unavailability of
->> several
->> peripherals.
->>
->> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+On Sat, Oct 03, 2015 at 12:18:00AM +0200, Arnd Bergmann wrote:
+> On Friday 02 October 2015 11:28:39 Simon Horman wrote:
+> > > > 
+> > > > Yes, perfectly fine.
+> > > 
+> > > I am wondering if you need anything from me at this point.
+> > 
+> > In the interest of moving things forwards I am:
+> > 
+> > * Withdrawing this pull request
+> > * Preparing a pull request with only the fixes
+> > 
+> > I will also prepare an updated, v2, version of this pull request
+> > without the fixes and with some new patches I have queued-up in
+> > the mean time.
 > 
-> NAK on this one. Until this patch I can boot my o2 Xda mini with
-> Toppoly display and see the framebuffer kernel console output. Can we
-> split the LCD changes from the rest, I assume those are what breaks my
-> display.
-
-I read the Toppoly datasheet and it seems, the LCD panel implements V/HSYNC, while Samsung does not (and I'm sure at least one of these sync pins must be GPIO for DC-DC control). A solution is probably to reconfigure the GPIO muxes by detected LCD type.
-
+> Hi Simon,
 > 
-> best regards
-> Philipp
-> 
+> I'm very sorry for dropping the ball here. I'm definitely fine with this,
+> I just screwed up and didn't do any merges at all since I returned from
+> my leave, and Olof was also busy otherwise this week.
 
-Petr
+Hi And
+
+No problem. I assumed you were busy with something.
