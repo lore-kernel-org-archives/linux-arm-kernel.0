@@ -1,40 +1,67 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 05 Oct 2015 14:02:00 +0100
-Subject: [PATCH 09/15] arm64: Add page size to the kernel image header
-In-Reply-To: <20151002154900.GN6963@e104818-lin.cambridge.arm.com>
-References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
- <1442331684-28818-10-git-send-email-suzuki.poulose@arm.com>
- <20151002154900.GN6963@e104818-lin.cambridge.arm.com>
-Message-ID: <561274C8.20500@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon,  5 Oct 2015 14:02:15 +0100
+Subject: [PATCH v4 0/5] Mailbox: Provide support STi based platforms
+Message-ID: <1444050140-24733-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/15 16:49, Catalin Marinas wrote:
-> On Tue, Sep 15, 2015 at 04:41:18PM +0100, Suzuki K. Poulose wrote:
->> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>
->> This patch adds the page size to the arm64 kernel image header
->> so that one can infer the PAGESIZE used by the kernel. This will
->> be helpful to diagnose failures to boot the kernel with page size
->> not supported by the CPU.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> This patch needs you signed-off-by as well since you are posting it. And
-> IIRC I acked it as well, I'll check.
->
+Hi Jassi,
 
-Yes, you did mention that you were OK with the patch. But I thought there was
-no  'Acked-by' tag added. Hence didn't pick that up.
+This should be it.  Exciting times!
 
+ST's platforms currently support a maximum of 5 Mailboxes, one for
+each of the supported co-processors situated on the platform.  Each
+Mailbox is divided up into 4 instances which consist of 32 channels.
+Messages are passed between the application and co-processors using
+shared memory areas.
 
-> If you are fine with adding your signed-of-by, I can add it to the patch
-> when applying (unless I see other issues with the series).
->
+Also included in the set is an example Client which should be generic
+enough to use as a testing environment for all Mailbox IPs which use
+shared memory or the API to pass messages.  With small changes, it
+should also be able to test more extravagant implementations.
 
-Yes, please go ahead, if I don't have to send another version depending on
-the review of KVM bits. If I not, I will add the S-o-b and your Acked-by.
+v3 -> v4:
+ - More protection in MBOX_BASE() MACRO
+ - Remove unused tx-only marker
 
+v2 => v3:
+ - Controller
+   - Shared (DT <=> Device Driver) defines removed
+   - Return actual error codes instead of NULL in xlate()
+   - Not passing 'direction' configuration via DT anymore
+     - Removed all accompanying configuration checking code
+ - Test F/W
+   - Allow Rx-only and Tx-only controllers to be tested
+   - Cater for controllers requiring pre-Tx 'signal' to be sent
+   - Supply 'wr-' message debugfs file
+     - When written to, will Tx message through Mailbox Framework
+     - When read from, will print out a hexdump of Rx'ed message
 
-Thanks
-Suzuki
+v1 => v2:
+ - New MACRO() to obtain base address for a given instance
+ - Move locking into the structure it protects
+ - Stop checking for 'ready' state when sending data
+ - Don't clear channel data (that belongs to the API)
+ - #define register offsets instead of providing via pdata
+ - Register driver with module_platform_driver()
+
+Lee Jones (5):
+  mailbox: dt: Supply bindings for ST's Mailbox IP
+  mailbox: Add support for ST's Mailbox IP
+  ARM: STi: stih407-family: Add nodes for Mailbox
+  mailbox: Add generic mechanism for testing Mailbox Controllers
+  ARM: STi: DT: STiH407: Enable Mailbox testing facility
+
+ .../devicetree/bindings/mailbox/sti-mailbox.txt    |  52 +++
+ arch/arm/boot/dts/stih407-family.dtsi              |  42 ++
+ drivers/mailbox/Kconfig                            |  14 +
+ drivers/mailbox/Makefile                           |   4 +
+ drivers/mailbox/mailbox-sti.c                      | 516 +++++++++++++++++++++
+ drivers/mailbox/mailbox-test.c                     | 361 ++++++++++++++
+ 6 files changed, 989 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+ create mode 100644 drivers/mailbox/mailbox-sti.c
+ create mode 100644 drivers/mailbox/mailbox-test.c
+
+-- 
+1.9.1
