@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  5 Oct 2015 10:49:48 +0200
-Subject: [PATCH 08/17] ARM: pxa: mioa701: Use PWM lookup table
+Date: Mon,  5 Oct 2015 10:49:47 +0200
+Subject: [PATCH 07/17] ARM: pxa: mainstone: Use PWM lookup table
 In-Reply-To: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
 References: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1444034997-9805-9-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1444034997-9805-8-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,46 +17,55 @@ Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
 Cc: Robert Jarzmik <robert.jarzmik@free.fr>
 Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
 ---
- arch/arm/mach-pxa/mioa701.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/mainstone.c | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
-index 29997bde277d..039f2601487b 100644
---- a/arch/arm/mach-pxa/mioa701.c
-+++ b/arch/arm/mach-pxa/mioa701.c
+diff --git a/arch/arm/mach-pxa/mainstone.c b/arch/arm/mach-pxa/mainstone.c
+index 2c0658cf6be2..4ee9f59d45f5 100644
+--- a/arch/arm/mach-pxa/mainstone.c
++++ b/arch/arm/mach-pxa/mainstone.c
 @@ -26,6 +26,7 @@
+ #include <linux/mtd/partitions.h>
  #include <linux/input.h>
- #include <linux/delay.h>
  #include <linux/gpio_keys.h>
 +#include <linux/pwm.h>
  #include <linux/pwm_backlight.h>
- #include <linux/rtc.h>
- #include <linux/leds.h>
-@@ -181,12 +182,15 @@ static unsigned long mioa701_pin_config[] = {
- 	MFP_CFG_OUT(GPIO116, AF0, DRIVE_HIGH),
+ #include <linux/smc91x.h>
+ #include <linux/i2c/pxa-i2c.h>
+@@ -248,11 +249,14 @@ static struct platform_device mst_flash_device[2] = {
  };
  
-+static struct pwm_lookup mioa701_pwm_lookup[] = {
-+	PWM_LOOKUP("pxa27x-pwm.0", 0, "pwm-backlight", NULL, 4000 * 1024,
+ #if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
++static struct pwm_lookup mainstone_pwm_lookup[] = {
++	PWM_LOOKUP("pxa27x-pwm.0", 0, "pwm-backlight.0", NULL, 78770,
 +		   PWM_POLARITY_NORMAL),
 +};
 +
- /* LCD Screen and Backlight */
- static struct platform_pwm_backlight_data mioa701_backlight_data = {
+ static struct platform_pwm_backlight_data mainstone_backlight_data = {
 -	.pwm_id		= 0,
- 	.max_brightness	= 100,
- 	.dft_brightness	= 50,
--	.pwm_period_ns	= 4000 * 1024,	/* Fl = 250kHz */
+ 	.max_brightness	= 1023,
+ 	.dft_brightness	= 1023,
+-	.pwm_period_ns	= 78770,
  	.enable_gpio	= -1,
  };
  
-@@ -751,6 +755,7 @@ static void __init mioa701_machine_init(void)
- 	pxa_set_udc_info(&mioa701_udc_info);
- 	pxa_set_ac97_info(&mioa701_ac97_info);
- 	pm_power_off = mioa701_poweroff;
-+	pwm_add_table(mioa701_pwm_lookup, ARRAY_SIZE(mioa701_pwm_lookup));
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- 	gsm_init();
+@@ -266,9 +270,15 @@ static struct platform_device mainstone_backlight_device = {
  
+ static void __init mainstone_backlight_register(void)
+ {
+-	int ret = platform_device_register(&mainstone_backlight_device);
+-	if (ret)
++	int ret;
++
++	pwm_add_table(mainstone_pwm_lookup, ARRAY_SIZE(mainstone_pwm_lookup));
++
++	ret = platform_device_register(&mainstone_backlight_device);
++	if (ret) {
+ 		printk(KERN_ERR "mainstone: failed to register backlight device: %d\n", ret);
++		pwm_remove_table(mainstone_pwm_lookup, ARRAY_SIZE(mainstone_pwm_lookup));
++	}
+ }
+ #else
+ #define mainstone_backlight_register()	do { } while (0)
 -- 
 2.5.0
