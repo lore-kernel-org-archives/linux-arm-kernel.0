@@ -1,73 +1,74 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon,  5 Oct 2015 18:02:07 +0100
-Subject: [PATCH v2 18/22] arm64: Add helper to decode register from instruction
+Date: Mon,  5 Oct 2015 18:02:05 +0100
+Subject: [PATCH v2 16/22] arm64/debug: Make use of the system wide safe value
 In-Reply-To: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
 References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1444064531-25607-19-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1444064531-25607-17-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper to extract the register field from a given
-instruction.
+Use the system wide value of ID_AA64DFR0 to make safer decisions
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/insn.h |    2 ++
- arch/arm64/kernel/insn.c      |   29 +++++++++++++++++++++++++++++
- 2 files changed, 31 insertions(+)
+ arch/arm64/include/asm/hw_breakpoint.h |    9 +++++++--
+ arch/arm64/kernel/debug-monitors.c     |    6 ++++--
+ 2 files changed, 11 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index 30e50eb..6dea3bc 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -289,6 +289,8 @@ enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
- u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn);
- u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
- 				  u32 insn, u64 imm);
-+u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
-+					 u32 insn);
- u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
- 				enum aarch64_insn_branch_type type);
- u32 aarch64_insn_gen_comp_branch_imm(unsigned long pc, unsigned long addr,
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index f341866..4286fed 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -388,6 +388,35 @@ u32 __kprobes aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
- 	return insn;
+diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
+index 4c47cb2..e54415e 100644
+--- a/arch/arm64/include/asm/hw_breakpoint.h
++++ b/arch/arm64/include/asm/hw_breakpoint.h
+@@ -17,6 +17,7 @@
+ #define __ASM_HW_BREAKPOINT_H
+ 
+ #include <asm/cputype.h>
++#include <asm/cpufeature.h>
+ 
+ #ifdef __KERNEL__
+ 
+@@ -137,13 +138,17 @@ extern struct pmu perf_ops_bp;
+ /* Determine number of BRP registers available. */
+ static inline int get_num_brps(void)
+ {
+-	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
++	return 1 +
++		cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
++						ID_AA64DFR0_BRPS_SHIFT);
  }
  
-+u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
-+					u32 insn)
-+{
-+	int shift;
-+
-+	switch (type) {
-+	case AARCH64_INSN_REGTYPE_RT:
-+	case AARCH64_INSN_REGTYPE_RD:
-+		shift = 0;
-+		break;
-+	case AARCH64_INSN_REGTYPE_RN:
-+		shift = 5;
-+		break;
-+	case AARCH64_INSN_REGTYPE_RT2:
-+	case AARCH64_INSN_REGTYPE_RA:
-+		shift = 10;
-+		break;
-+	case AARCH64_INSN_REGTYPE_RM:
-+		shift = 16;
-+		break;
-+	default:
-+		pr_err("%s: unknown register type encoding %d\n", __func__,
-+		       type);
-+		return 0;
-+	}
-+
-+	return (insn >> shift) & GENMASK(4, 0);
-+}
-+
- static u32 aarch64_insn_encode_register(enum aarch64_insn_register_type type,
- 					u32 insn,
- 					enum aarch64_insn_register reg)
+ /* Determine number of WRP registers available. */
+ static inline int get_num_wrps(void)
+ {
+-	return ((read_cpuid(ID_AA64DFR0_EL1) >> 20) & 0xf) + 1;
++	return 1 +
++		cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
++						ID_AA64DFR0_WRPS_SHIFT);
+ }
+ 
+ #endif	/* __KERNEL__ */
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index cebf786..c0a2327 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -26,14 +26,16 @@
+ #include <linux/stat.h>
+ #include <linux/uaccess.h>
+ 
+-#include <asm/debug-monitors.h>
++#include <asm/cpufeature.h>
+ #include <asm/cputype.h>
++#include <asm/debug-monitors.h>
+ #include <asm/system_misc.h>
+ 
+ /* Determine debug architecture. */
+ u8 debug_monitors_arch(void)
+ {
+-	return read_cpuid(ID_AA64DFR0_EL1) & 0xf;
++	return cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
++						ID_AA64DFR0_DEBUGVER_SHIFT);
+ }
+ 
+ /*
 -- 
 1.7.9.5
