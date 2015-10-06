@@ -1,34 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Oct 2015 16:39:08 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.4
-In-Reply-To: <20151002022838.GA15481@verge.net.au>
-References: <cover.1442536920.git.horms+renesas@verge.net.au>
- <20150924050843.GA3822@verge.net.au> <20151002022838.GA15481@verge.net.au>
-Message-ID: <106667691.9Zar7Zj46A@wuerfel>
+Date: Tue, 06 Oct 2015 16:43:07 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.4
+In-Reply-To: <cover.1443072491.git.horms+renesas@verge.net.au>
+References: <cover.1443072491.git.horms+renesas@verge.net.au>
+Message-ID: <5084387.KxgjSGLa7G@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 October 2015 11:28:39 Simon Horman wrote:
-> On Thu, Sep 24, 2015 at 02:08:46PM +0900, Simon Horman wrote:
-> > On Fri, Sep 18, 2015 at 05:19:36PM +0900, Simon Horman wrote:
-> > > On Fri, Sep 18, 2015 at 09:29:58AM +0200, Geert Uytterhoeven wrote:
-> > > Yes, perfectly fine.
-> > 
-> > I am wondering if you need anything from me at this point.
+On Thursday 24 September 2015 14:30:20 Simon Horman wrote:
+>   This part of a multi-stage effort by Geert Uytterhoeven to add:
 > 
-> In the interest of moving things forwards I am:
+>   "Clock Domain support to the Clock Pulse Generator (CPG) Module Stop
+>    (MSTP) Clocks driver using the generic PM Domain, to be used on shmobile
+>    SoCs without device power domains (R-Car Gen1 and Gen2, RZ).  This allows
+>    to power-manage the module clocks of SoC devices that are part of the
+>    CPG/MSTP Clock Domain using Runtime PM, or for system suspend/resume,
+>    similar to SoCs with device power domains (SH-Mobile and R-Mobile)."
 > 
-> * Withdrawing this pull request
-> * Preparing a pull request with only the fixes
-> 
-> I will also prepare an updated, v2, version of this pull request
-> without the fixes and with some new patches I have queued-up in
-> the mean time.
 > 
 
-As you noticed, I have finally started merging stuff now. Based on
-your mail here, I'm waiting for v2 of this pull request now, but
-I can also apply the remaining patches as I suggested earlier if
-you prefer.
+Merged into next/soc, thanks!
 
 	Arnd
