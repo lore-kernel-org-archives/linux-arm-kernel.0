@@ -1,41 +1,27 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  6 Oct 2015 15:43:59 +0100
-Subject: [PATCH 2/3] hwrng: st: Report correct FIFO size
-In-Reply-To: <1444142640-14721-1-git-send-email-lee.jones@linaro.org>
-References: <1444142640-14721-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1444142640-14721-2-git-send-email-lee.jones@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Oct 2015 16:47:09 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Clk Updates for v4.4
+In-Reply-To: <cover.1443072085.git.horms+renesas@verge.net.au>
+References: <cover.1443072085.git.horms+renesas@verge.net.au>
+Message-ID: <4977830.HvfsxT5pKz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The values supplied to the 'read random data from FIFO' arithmetic
-are not correct.  The value fed in to initialise the iterator
-describes the FIFO depth, but then the iterator is treated in
-Bytes and subsequently increased by 2 in value for every read
-word.  This means only 4 of the 8 available values are being read
-during each invocation of .read().
+On Thursday 24 September 2015 14:29:59 Simon Horman wrote:
+> Renesas ARM Based SoC Clk Updates for v4.4
+> 
+> * Consider "zb_clk" suitable for power management
+> 
+>   This part of a multi-stage effort by Geert Uytterhoeven to add:
+> 
+>   "Clock Domain support to the Clock Pulse Generator (CPG) Module Stop
+>    (MSTP) Clocks driver using the generic PM Domain, to be used on shmobile
+>    SoCs without device power domains (R-Car Gen1 and Gen2, RZ).  This allows
+>    to power-manage the module clocks of SoC devices that are part of the
+>    CPG/MSTP Clock Domain using Runtime PM, or for system suspend/resume,
+>    similar to SoCs with device power domains (SH-Mobile and R-Mobile)."
+> 
 
-This change increased the device bandwidth by a factor of 2.
+Pulled into next/drivers, thanks!
 
-Reported-by: Daniel Thompson <daniel.thompson@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/char/hw_random/st-rng.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/char/hw_random/st-rng.c b/drivers/char/hw_random/st-rng.c
-index 8c8a435..44480fe 100644
---- a/drivers/char/hw_random/st-rng.c
-+++ b/drivers/char/hw_random/st-rng.c
-@@ -29,8 +29,9 @@
- #define ST_RNG_STATUS_BAD_ALTERNANCE	BIT(1)
- #define ST_RNG_STATUS_FIFO_FULL		BIT(5)
- 
--#define ST_RNG_FIFO_SIZE		8
- #define ST_RNG_SAMPLE_SIZE		2 /* 2 Byte (16bit) samples */
-+#define ST_RNG_FIFO_DEPTH		8
-+#define ST_RNG_FIFO_SIZE		(ST_RNG_FIFO_DEPTH * ST_RNG_SAMPLE_SIZE)
- 
- /* Samples are available every 0.667us, which we round to 1us */
- #define ST_RNG_FILL_FIFO_TIMEOUT   (1 * (ST_RNG_FIFO_SIZE / ST_RNG_SAMPLE_SIZE))
--- 
-1.9.1
+	Arnd
