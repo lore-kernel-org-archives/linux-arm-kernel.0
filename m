@@ -1,253 +1,95 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Oct 2015 18:36:29 +0100
-Subject: [PATCH 16/16] irqdomain/msi: Use fwnode instead of of_node
-In-Reply-To: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
-References: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1444152989-31726-17-git-send-email-marc.zyngier@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 6 Oct 2015 10:42:43 -0700
+Subject: [PATCH] selftests/seccomp: build on aarch64, document ABI
+In-Reply-To: <55F15CF5.3000409@linaro.org>
+References: <20150909193025.GA29244@www.outflux.net>
+ <55F15CF5.3000409@linaro.org>
+Message-ID: <CAGXu5jJ+jgVq=Za1VT+Ydt3a_shkewyudx8qCTw0JNu8vZytgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we continue to push of_node towards the outskirts of irq domains,
-let's start tackling the case of msi_create_irq_domain and its little
-friends.
+On Thu, Sep 10, 2015 at 3:35 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> On 09/10/2015 04:30 AM, Kees Cook wrote:
+>>
+>> The syscall ABI is inconsistent on aarch64 compat, so at least we should
+>> document it in the seccomp_bpf tests.
+>>
+>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>> ---
+>> Can someone with access to native aarch64 double-check this for me? I
+>> think we need to change these tests to pass if it's expected, but the
+>> compat behavior seems bad. It means compat code will break under an
+>> aarch64 kernel, when dealing with syscalls, like through seccomp.
+>> ---
+>>   tools/testing/selftests/seccomp/seccomp_bpf.c | 15 +++++++++++++--
+>>   1 file changed, 13 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/tools/testing/selftests/seccomp/seccomp_bpf.c
+>> b/tools/testing/selftests/seccomp/seccomp_bpf.c
+>> index 770f47adf295..866ff42e000d 100644
+>> --- a/tools/testing/selftests/seccomp/seccomp_bpf.c
+>> +++ b/tools/testing/selftests/seccomp/seccomp_bpf.c
+>> @@ -33,6 +33,10 @@
+>>   #include <unistd.h>
+>>   #include <sys/syscall.h>
+>>
+>> +#if defined(__aarch64__) && !defined(__NR_poll)
+>> +# define __NR_poll 0x49
+>> +#endif
+>> +
+>>   #include "test_harness.h"
+>>
+>>   #ifndef PR_SET_PTRACER
+>> @@ -2124,10 +2128,17 @@ TEST(syscall_restart)
+>>         ASSERT_EQ(SIGTRAP, WSTOPSIG(status));
+>>         ASSERT_EQ(PTRACE_EVENT_SECCOMP, (status >> 16));
+>>         ASSERT_EQ(0, ptrace(PTRACE_GETEVENTMSG, child_pid, NULL, &msg));
+>> -       ASSERT_EQ(0x200, msg);
+>> +
+>> +       /*
+>> +        * FIXME:
+>> +        * - native ARM does not expose true syscall.
+>> +        * - compat ARM on ARM64 does expose true syscall.
+>> +        * - native ARM64 hides true syscall even from seccomp.
+>
+>
+> Are you sure about the last line?
+> The kernel pushes __NR_compat_restart_syscall to w7 in compat mode, while
+> __NR_restart_syscall to x8 in native mode. But it is the only difference,
+> as far as I understand, in terms of restarting a system call.
+> So the behavior should be basically the same.
 
-This has limited impact in both PCI/MSI, platform MSI, and a few
-drivers.
+I've spent a little more time looking at this, and no, that last
+statement is wrong. My current testing shows that seccomp always sees
+the "true" syscall, which is what we want (matches all other
+architectures).
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/base/platform-msi.c                   |  6 +++---
- drivers/irqchip/irq-gic-v2m.c                 |  5 +++--
- drivers/irqchip/irq-gic-v3-its-pci-msi.c      |  3 ++-
- drivers/irqchip/irq-gic-v3-its-platform-msi.c |  3 ++-
- drivers/pci/host/pci-xgene-msi.c              |  2 +-
- drivers/pci/msi.c                             | 14 +++++++-------
- include/linux/msi.h                           |  9 +++++----
- kernel/irq/msi.c                              |  8 ++++----
- 8 files changed, 27 insertions(+), 23 deletions(-)
+However, the other two statements continue to appear true: there is a
+register visibility difference. During the restart_syscall syscall,
+this routine behaves different on native arm and compat arm:
 
-diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
-index 134483d..5df4575 100644
---- a/drivers/base/platform-msi.c
-+++ b/drivers/base/platform-msi.c
-@@ -152,7 +152,7 @@ static int platform_msi_alloc_descs(struct device *dev, int nvec,
- 
- /**
-  * platform_msi_create_irq_domain - Create a platform MSI interrupt domain
-- * @np:		Optional device-tree node of the interrupt controller
-+ * @fwnode:		Optional fwnode of the interrupt controller
-  * @info:	MSI domain info
-  * @parent:	Parent irq domain
-  *
-@@ -162,7 +162,7 @@ static int platform_msi_alloc_descs(struct device *dev, int nvec,
-  * Returns:
-  * A domain pointer or NULL in case of failure.
-  */
--struct irq_domain *platform_msi_create_irq_domain(struct device_node *np,
-+struct irq_domain *platform_msi_create_irq_domain(struct fwnode_handle *fwnode,
- 						  struct msi_domain_info *info,
- 						  struct irq_domain *parent)
- {
-@@ -173,7 +173,7 @@ struct irq_domain *platform_msi_create_irq_domain(struct device_node *np,
- 	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
- 		platform_msi_update_chip_ops(info);
- 
--	domain = msi_create_irq_domain(np, info, parent);
-+	domain = msi_create_irq_domain(fwnode, info, parent);
- 	if (domain)
- 		domain->bus_token = DOMAIN_BUS_PLATFORM_MSI;
- 
-diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-index b2b08dd..93bb843 100644
---- a/drivers/irqchip/irq-gic-v2m.c
-+++ b/drivers/irqchip/irq-gic-v2m.c
-@@ -286,9 +286,10 @@ static int __init gicv2m_init_one(struct device_node *node,
- 
- 	inner_domain->bus_token = DOMAIN_BUS_NEXUS;
- 	inner_domain->parent = parent;
--	pci_domain = pci_msi_create_irq_domain(node, &gicv2m_msi_domain_info,
-+	pci_domain = pci_msi_create_irq_domain(of_node_to_fwnode(node),
-+					       &gicv2m_msi_domain_info,
- 					       inner_domain);
--	plat_domain = platform_msi_create_irq_domain(node,
-+	plat_domain = platform_msi_create_irq_domain(of_node_to_fwnode(node),
- 						     &gicv2m_pmsi_domain_info,
- 						     inner_domain);
- 	if (!pci_domain || !plat_domain) {
-diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-index a7c8c9f..693c2f9 100644
---- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-@@ -125,7 +125,8 @@ static int __init its_pci_msi_init(void)
- 			continue;
- 		}
- 
--		if (!pci_msi_create_irq_domain(np, &its_pci_msi_domain_info,
-+		if (!pci_msi_create_irq_domain(of_node_to_fwnode(np),
-+					       &its_pci_msi_domain_info,
- 					       parent)) {
- 			pr_err("%s: unable to create PCI domain\n",
- 			       np->full_name);
-diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-index a865505..960a816 100644
---- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-@@ -78,7 +78,8 @@ static int __init its_pmsi_init(void)
- 			continue;
- 		}
- 
--		if (!platform_msi_create_irq_domain(np, &its_pmsi_domain_info,
-+		if (!platform_msi_create_irq_domain(of_node_to_fwnode(np),
-+						    &its_pmsi_domain_info,
- 						    parent)) {
- 			pr_err("%s: unable to create platform domain\n",
- 			       np->full_name);
-diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
-index e491681..a6456b5 100644
---- a/drivers/pci/host/pci-xgene-msi.c
-+++ b/drivers/pci/host/pci-xgene-msi.c
-@@ -256,7 +256,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
- 	if (!msi->inner_domain)
- 		return -ENOMEM;
- 
--	msi->msi_domain = pci_msi_create_irq_domain(msi->node,
-+	msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
- 						    &xgene_msi_domain_info,
- 						    msi->inner_domain);
- 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index d449714..ddd59fe 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -1246,8 +1246,8 @@ static void pci_msi_domain_update_chip_ops(struct msi_domain_info *info)
- }
- 
- /**
-- * pci_msi_create_irq_domain - Creat a MSI interrupt domain
-- * @node:	Optional device-tree node of the interrupt controller
-+ * pci_msi_create_irq_domain - Create a MSI interrupt domain
-+ * @fwnode:	Optional fwnode of the interrupt controller
-  * @info:	MSI domain info
-  * @parent:	Parent irq domain
-  *
-@@ -1256,7 +1256,7 @@ static void pci_msi_domain_update_chip_ops(struct msi_domain_info *info)
-  * Returns:
-  * A domain pointer or NULL in case of failure.
-  */
--struct irq_domain *pci_msi_create_irq_domain(struct device_node *node,
-+struct irq_domain *pci_msi_create_irq_domain(struct fwnode_handle *fwnode,
- 					     struct msi_domain_info *info,
- 					     struct irq_domain *parent)
- {
-@@ -1267,7 +1267,7 @@ struct irq_domain *pci_msi_create_irq_domain(struct device_node *node,
- 	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
- 		pci_msi_domain_update_chip_ops(info);
- 
--	domain = msi_create_irq_domain(node, info, parent);
-+	domain = msi_create_irq_domain(fwnode, info, parent);
- 	if (!domain)
- 		return NULL;
- 
-@@ -1303,14 +1303,14 @@ void pci_msi_domain_free_irqs(struct irq_domain *domain, struct pci_dev *dev)
- 
- /**
-  * pci_msi_create_default_irq_domain - Create a default MSI interrupt domain
-- * @node:	Optional device-tree node of the interrupt controller
-+ * @fwnode:	Optional fwnode of the interrupt controller
-  * @info:	MSI domain info
-  * @parent:	Parent irq domain
-  *
-  * Returns: A domain pointer or NULL in case of failure. If successful
-  * the default PCI/MSI irqdomain pointer is updated.
-  */
--struct irq_domain *pci_msi_create_default_irq_domain(struct device_node *node,
-+struct irq_domain *pci_msi_create_default_irq_domain(struct fwnode_handle *fwnode,
- 		struct msi_domain_info *info, struct irq_domain *parent)
- {
- 	struct irq_domain *domain;
-@@ -1320,7 +1320,7 @@ struct irq_domain *pci_msi_create_default_irq_domain(struct device_node *node,
- 		pr_err("PCI: default irq domain for PCI MSI has already been created.\n");
- 		domain = NULL;
- 	} else {
--		domain = pci_msi_create_irq_domain(node, info, parent);
-+		domain = pci_msi_create_irq_domain(fwnode, info, parent);
- 		pci_msi_default_domain = domain;
- 	}
- 	mutex_unlock(&pci_msi_domain_lock);
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index ad939d0..32a24b9 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -174,6 +174,7 @@ struct msi_controller {
- struct irq_domain;
- struct irq_chip;
- struct device_node;
-+struct fwnode_handle;
- struct msi_domain_info;
- 
- /**
-@@ -262,7 +263,7 @@ enum {
- int msi_domain_set_affinity(struct irq_data *data, const struct cpumask *mask,
- 			    bool force);
- 
--struct irq_domain *msi_create_irq_domain(struct device_node *of_node,
-+struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
- 					 struct msi_domain_info *info,
- 					 struct irq_domain *parent);
- int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
-@@ -270,7 +271,7 @@ int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
- void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev);
- struct msi_domain_info *msi_get_domain_info(struct irq_domain *domain);
- 
--struct irq_domain *platform_msi_create_irq_domain(struct device_node *np,
-+struct irq_domain *platform_msi_create_irq_domain(struct fwnode_handle *fwnode,
- 						  struct msi_domain_info *info,
- 						  struct irq_domain *parent);
- int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
-@@ -280,13 +281,13 @@ void platform_msi_domain_free_irqs(struct device *dev);
- 
- #ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
- void pci_msi_domain_write_msg(struct irq_data *irq_data, struct msi_msg *msg);
--struct irq_domain *pci_msi_create_irq_domain(struct device_node *node,
-+struct irq_domain *pci_msi_create_irq_domain(struct fwnode_handle *fwnode,
- 					     struct msi_domain_info *info,
- 					     struct irq_domain *parent);
- int pci_msi_domain_alloc_irqs(struct irq_domain *domain, struct pci_dev *dev,
- 			      int nvec, int type);
- void pci_msi_domain_free_irqs(struct irq_domain *domain, struct pci_dev *dev);
--struct irq_domain *pci_msi_create_default_irq_domain(struct device_node *node,
-+struct irq_domain *pci_msi_create_default_irq_domain(struct fwnode_handle *fwnode,
- 		 struct msi_domain_info *info, struct irq_domain *parent);
- 
- irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
-diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-index 7e6512b..95354bb 100644
---- a/kernel/irq/msi.c
-+++ b/kernel/irq/msi.c
-@@ -239,11 +239,11 @@ static void msi_domain_update_chip_ops(struct msi_domain_info *info)
- 
- /**
-  * msi_create_irq_domain - Create a MSI interrupt domain
-- * @of_node:	Optional device-tree node of the interrupt controller
-+ * @fwnode:	Optional fwnode of the interrupt controller
-  * @info:	MSI domain info
-  * @parent:	Parent irq domain
-  */
--struct irq_domain *msi_create_irq_domain(struct device_node *node,
-+struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
- 					 struct msi_domain_info *info,
- 					 struct irq_domain *parent)
- {
-@@ -252,8 +252,8 @@ struct irq_domain *msi_create_irq_domain(struct device_node *node,
- 	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
- 		msi_domain_update_chip_ops(info);
- 
--	return irq_domain_add_hierarchy(parent, 0, 0, node, &msi_domain_ops,
--					info);
-+	return irq_domain_create_hierarchy(parent, 0, 0, fwnode,
-+					   &msi_domain_ops, info);
- }
- 
- /**
+int get_syscall(pid_t tracee)
+{
+        struct iovec iov;
+        struct pt_regs regs;
+
+        iov.iov_base = &regs;
+        iov.iov_len = sizeof(regs);
+        assert(0 == ptrace(PTRACE_GETREGSET, tracee, NT_PRSTATUS, &iov));
+
+        return regs.ARM_r7;
+}
+
+On native ARM, this returns the restarted syscall (in my test case,
+nanosleep). On compat ARM, this returns restart_syscall syscall.
+
+Either we should fix native ARM to do what all other architectures do
+(show restart_syscall syscall) or we should fix compat ARM to behave
+like native ARM.
+
+-Kees
+
 -- 
-2.1.4
+Kees Cook
+Chrome OS Security
