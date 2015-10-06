@@ -1,78 +1,78 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 6 Oct 2015 09:57:45 -0500
-Subject: [RFC/PATCH 11/11] arm: boot: dts: omap: add missing default
- status for 32k counter
-In-Reply-To: <13543270.oBfHhoNL28@wuerfel>
-References: <1443559446-26969-1-git-send-email-balbi@ti.com>
- <20151005175230.GG18784@saruman.tx.rr.com> <87io6lf6i4.fsf@saruman.tx.rr.com>
- <13543270.oBfHhoNL28@wuerfel>
-Message-ID: <87612k3uza.fsf@saruman.tx.rr.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 06 Oct 2015 16:51:15 +0200
+Subject: [PATCH 4/8] mmc: sdhci-pxav3: enable proper resuming on Armada
+ 38x SoC
+In-Reply-To: <1444094562-31165-5-git-send-email-mw@semihalf.com> (Marcin
+ Wojtas's message of "Tue, 6 Oct 2015 03:22:38 +0200")
+References: <1444094562-31165-1-git-send-email-mw@semihalf.com>
+ <1444094562-31165-5-git-send-email-mw@semihalf.com>
+Message-ID: <877fn09hjw.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Hi Marcin,
+ 
+ On mar., oct. 06 2015, Marcin Wojtas <mw@semihalf.com> wrote:
 
-> On Monday 05 October 2015 14:41:07 Felipe Balbi wrote:
->> 
->> /**
->>  * omap_get_timer_dt - get a timer using device-tree
->>  * @match       - device-tree match structure for matching a device type
->>  * @property    - optional timer property to match
->>  *
->>  * Helper function to get a timer during early boot using device-tree for use
->>  * as kernel system timer. Optionally, the property argument can be used to
->>  * select a timer with a specific property. Once a timer is found then mark
->>  * the timer node in device-tree as disabled, to prevent the kernel from
->>  * registering this timer as a platform device and so no one else can use it.
->>  */
->> static struct device_node * __init omap_get_timer_dt(const struct of_device_id *match,
->>                                                      const char *property)
->> {
->>         struct device_node *np;
->> 
->>         for_each_matching_node(np, match) {
->>                 if (!of_device_is_available(np))
->>                         continue;
->> 
->>                 if (property && !of_get_property(np, property, NULL))
->>                         continue;
->> 
->>                 if (!property && (of_get_property(np, "ti,timer-alwon", NULL) ||
->>                                   of_get_property(np, "ti,timer-dsp", NULL) ||
->>                                   of_get_property(np, "ti,timer-pwm", NULL) ||
->>                                   of_get_property(np, "ti,timer-secure", NULL)))
->>                         continue;
->> 
->>                 of_add_property(np, &device_disabled);
->>                 return np;
->>         }
->> 
->>         return NULL;
->> }
->> 
->> I'll patch this up and drop $subject
->> 
+> When resuming from suspend on Armada 38x SoC MBus windows have to be
+> re-configured and for that purpose mv_conf_mbus_windows function needed
+> rework. MBus windows register base address obtaining was moved to
+> armada_38x_quirks function in order to be kept in pxa global structure,
+> because it is used during a resume.
 >
-> Ah, good.
+> This commit fixes resuming from suspend by calling MBus windows
+> configuration routine and therefore enabling proper DMA operation.
 >
-> I'm seeing the "ti,timer-alwon" property here, we probably need to take
-> that into account when setting the CLOCK_SOURCE_SUSPEND_NONSTOP flag, if
-> that isn't how it gets done already.
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+> ---
+>  drivers/mmc/host/sdhci-pxav3.c | 39 ++++++++++++++++++++-------------------
+>  1 file changed, 20 insertions(+), 19 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+> index f5edf9d..3f71894 100644
+> --- a/drivers/mmc/host/sdhci-pxav3.c
+> +++ b/drivers/mmc/host/sdhci-pxav3.c
+> @@ -63,6 +63,7 @@ struct sdhci_pxa {
+>  	struct clk *clk_io;
+>  	u8	power_mode;
+>  	void __iomem *sdio3_conf_reg;
+> +	void __iomem *mbus_win_regs;
+>  };
 
-that flag is not set for 32k in any dts. Seems like it should, though,
-judging by the binding documentation:
 
-- ti,timer-alwon:	Indicates the timer is in an alway-on power
-  domain.
+>  
+> @@ -135,6 +120,14 @@ static int armada_38x_quirks(struct platform_device *pdev,
+>  	struct sdhci_pxa *pxa = pltfm_host->priv;
+>  	struct resource *res;
+>  
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mbus");
+> +	pxa->mbus_win_regs = devm_ioremap_resource(&pdev->dev, res);
 
-Tony, care to comment if we should add timer-alwon to 32k ?
+[...]
+
+> @@ -520,6 +514,13 @@ static int sdhci_pxav3_resume(struct device *dev)
+>  {
+>  	int ret;
+>  	struct sdhci_host *host = dev_get_drvdata(dev);
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct sdhci_pxa *pxa = pltfm_host->priv;
+> +	struct device_node *np = dev->of_node;
+> +
+> +	if (of_device_is_compatible(np, "marvell,armada-380-sdhci"))
+> +		ret = mv_conf_mbus_windows(dev, pxa->mbus_win_regs,
+> +					   mv_mbus_dram_info());
+
+I would find it cleaner to not rely on the device tree outise the probe
+function. What about just testing pxa->mbus_win_regs ? As it is set only
+if we need it, it should be a good test.
+
+Thanks,
+
+Gregory
+
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/40ca5657/attachment.sig>
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
