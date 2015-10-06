@@ -1,41 +1,62 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 6 Oct 2015 15:45:32 -0300
-Subject: [PATCH 1/9] drm: bridge/dw_hdmi-ahb-audio: add audio driver
-In-Reply-To: <20151006181806.GS21513@n2100.arm.linux.org.uk>
-References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
- <E1ZO6hC-0003M5-EU@rmk-PC.arm.linux.org.uk>
- <CAOMZO5COgoGU-3YNpnmSkctHMRDJ3=DuKc82Wb5zTTX7Bx2jNw@mail.gmail.com>
- <20151006181806.GS21513@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5DaowTGQqN_NW7T2zv-P6a_YZUCumq4-m+OtpsKqFzELw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue,  6 Oct 2015 18:46:25 +0100
+Subject: [PATCH v2 05/10] arm64: tlbflush: remove redundant ASID casts to
+ (unsigned long)
+In-Reply-To: <1444153590-24173-1-git-send-email-will.deacon@arm.com>
+References: <1444153590-24173-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1444153590-24173-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 6, 2015 at 3:18 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+The ASID macro returns a 64-bit (long long) value, so there is no need
+to cast to (unsigned long) before shifting prior to a TLBI operation.
 
-> Sorry, I've been out for most of the day.  There's no DT patches required.
->
-> The dw_hdmi bridge driver creates its own platform device for the audio,
-> which should then bind to the dw_hdmi-ahb-audio driver using normal Linux
-> methods.
->
-> I don't know what's wrong with your setup, for me, it just works:
->
-> [    1.358829] dwhdmi-imx 120000.hdmi: Detected HDMI controller 0x13:0xa:0xa0:0xc1
-> [    1.377173] imx-drm display-subsystem: bound 120000.hdmi (ops dw_hdmi_imx_ops)
-> ...
-> [    2.851343] ALSA device list:
-> [    2.857364]   #0: DW-HDMI rev 0x0a, irq 21
->
-> as it always has done for me.  There's nothing special about it.
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/tlbflush.h | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-Great, got it to probe now:
-
-[    7.454760] ALSA device list:
-[    7.457764]   #0: DW-HDMI rev 0x0a, irq 19
-[    7.461990]   #1: wm8962-audio
-
-There was a conflict and I resolved incorrectly here. Will try to play
-a wav file via aplay now.
-
-Thanks
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 96f944e75dc4..93e9f964805c 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -81,7 +81,7 @@ static inline void flush_tlb_all(void)
+ 
+ static inline void flush_tlb_mm(struct mm_struct *mm)
+ {
+-	unsigned long asid = (unsigned long)ASID(mm) << 48;
++	unsigned long asid = ASID(mm) << 48;
+ 
+ 	dsb(ishst);
+ 	asm("tlbi	aside1is, %0" : : "r" (asid));
+@@ -91,8 +91,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
+ static inline void flush_tlb_page(struct vm_area_struct *vma,
+ 				  unsigned long uaddr)
+ {
+-	unsigned long addr = uaddr >> 12 |
+-		((unsigned long)ASID(vma->vm_mm) << 48);
++	unsigned long addr = uaddr >> 12 | (ASID(vma->vm_mm) << 48);
+ 
+ 	dsb(ishst);
+ 	asm("tlbi	vale1is, %0" : : "r" (addr));
+@@ -109,7 +108,7 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
+ 				     unsigned long start, unsigned long end,
+ 				     bool last_level)
+ {
+-	unsigned long asid = (unsigned long)ASID(vma->vm_mm) << 48;
++	unsigned long asid = ASID(vma->vm_mm) << 48;
+ 	unsigned long addr;
+ 
+ 	if ((end - start) > MAX_TLB_RANGE) {
+@@ -162,7 +161,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
+ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
+ 				       unsigned long uaddr)
+ {
+-	unsigned long addr = uaddr >> 12 | ((unsigned long)ASID(mm) << 48);
++	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
+ 
+ 	dsb(ishst);
+ 	asm("tlbi	vae1is, %0" : : "r" (addr));
+-- 
+2.1.4
