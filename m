@@ -1,64 +1,29 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 06 Oct 2015 10:54:52 +0900
-Subject: [GIT PULL] ARM: dts: Exynos improvements for 4.4-2
-Message-ID: <1444096492-15166-1-git-send-email-k.kozlowski@samsung.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 6 Oct 2015 09:57:50 +0800
+Subject: [PATCH] soc: mediatek: Fix random hang up issue while kernel init
+In-Reply-To: <1443162717-64831-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1443162717-64831-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <CAGS+omD0FSefd9vF0iUvFRXK1+m7YPEANpxngTibGwgR_rTNvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
+On Fri, Sep 25, 2015 at 2:31 PM, James Liao <jamesjj.liao@mediatek.com> wrote:
+> In kernel late init, it turns off all unused clocks, which
+> needs to access subsystem registers such as VENC and VENC_LT.
+>
+> Accessing MT8173 VENC registers needs two top clocks, mm_sel and
+> venc_sel. Accessing VENC_LT registers needs mm_sel and venclt_sel.
+> So we need to keep these clocks on before accessing their registers.
+>
+> This patch keeps venc_sel / venclt_sel clock on when
+> VENC / VENC_LT's power is on, to prevent system hang up while
+> accessing its registeres.
+>
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 
-This is an updated pull request with DTS related changes for 4.4.
+After the discussions with James here on the list, I'm happy with this fix.
+Compared to any proposed alternative, this patch seems just as
+effective and is also simpler and more maintainable and extensible (if
+other clocks/power domains need the same treatment).
 
-Description along with a tag.
-You can find them also on the lists with my reviewed-by.
-
-Best regards,
-Krzysztof
-
-
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
-
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
-
-are available in the git repository at:
-
-  https://github.com/krzk/linux.git tags/samsung-dt-4.4-2
-
-for you to fetch changes up to c21dbcfefc9dc9abc42971dc1f2681b6a8677c3c:
-
-  ARM: dts: Remove regulator-compatible usage in exynos4412-trats2 (2015-10-06 10:47:13 +0900)
-
-----------------------------------------------------------------
-Device Tree improvements for Exynos based boards (updated pull request):
-1. Enable DMA on Exynos4 serial ports. This old patch uncovered
-   a number of other issues in dmaengine and samsung serial driver.
-   All of known issues are resolved so finally enable the DMA for UART.
-2. Fix incorrect location of display-timings node (FIMD->DP node)
-   on Arndale, SMDK5250 and SMDK5240 boards.
-3. Minor cleanups.
-
-----------------------------------------------------------------
-Javier Martinez Canillas (1):
-      ARM: dts: Remove regulator-compatible usage in exynos4412-trats2
-
-Robert Baldyga (1):
-      ARM: dts: Add DMA support for serial ports in exynos4
-
-Sean Paul (1):
-      ARM: dts: Move display-timings node from fimd to dp in exynos5250-arndale, smdk5250 and smdk5420
-
-Tobias Jakobi (2):
-      ARM: dts: Remove redundant pinctrl settings in exynos4412-odroid
-      ARM: dts: Unify voltage regulator style in exynos4412-odroid
-
-Vladimir Zapolskiy (1):
-      ARM: dts: Fix cpu compatible value for s3c2416
-
- arch/arm/boot/dts/exynos4.dtsi                  |   8 ++
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  12 +--
- arch/arm/boot/dts/exynos4412-trats2.dts         | 105 ++++++++----------------
- arch/arm/boot/dts/exynos5250-arndale.dts        |   8 +-
- arch/arm/boot/dts/exynos5250-smdk5250.dts       |  16 ++--
- arch/arm/boot/dts/exynos5420-smdk5420.dts       |   7 +-
- arch/arm/boot/dts/s3c2416.dtsi                  |   2 +-
- 7 files changed, 62 insertions(+), 96 deletions(-)
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
