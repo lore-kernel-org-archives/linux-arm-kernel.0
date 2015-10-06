@@ -1,52 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Oct 2015 12:03:09 +0200
-Subject: [PATCH 0/2] ARM: EXYNOS: Allow to use architected timer
-In-Reply-To: <00e901d1001b$a7fae610$f7f0b230$@samsung.com>
-References: <cover.1444119342.git.p.fedin@samsung.com>
- <5008072.V9UdTVvpUS@wuerfel> <00e901d1001b$a7fae610$f7f0b230$@samsung.com>
-Message-ID: <11155544.mMhEXg27TI@wuerfel>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 6 Oct 2015 12:09:35 +0200
+Subject: [PATCH v2 01/10] pwm: introduce default period and polarity
+ concepts
+In-Reply-To: <1437406327-6207-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1437406327-6207-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1437406327-6207-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20151006100935.GK2694@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 October 2015 12:44:54 Pavel Fedin wrote:
->  Hello!
+On 20/07/2015 at 17:31:58 +0200, Boris Brezillon wrote :
+> When requested by a user, the PWM is assigned a default period and polarity
+> extracted from the DT, the platform data or statically set by the driver.
+> Those default values are currently stored in the period and polarity
+> fields of the pwm_device struct, but they will be stored somewhere else
+> once we have introduced the architecture allowing for hardware state
+> retrieval.
 > 
-> > My feeling is that is shouldn't be keyed off the presence of the device in DT
-> > though. Maybe we can find a way that allows you to put the device into DT
-> > but not have it used by default unless the user explicitly enables it, e.g. though
-> > a kernel command line option like "force_broken_archtimer"?
+> The pwm_set_default_polarity and pwm_set_default_period should only be
+> used by PWM drivers or the PWM core infrastructure to specify the
+> default period and polarity values.
 > 
->  For this purpose we have status = "disabled" in the device tree. We can add CP15 timer node and
-> disable it. If the user needs it, the bootloader could just change "disabled" to "ok", and it's
-> done.
->  The only problem here would be that CP15 timer on Exynos is actually tied to MCT. We need to enable
-> MCT, otherwise clocks don't tick. That's why i decided to make CP15 timer a subnode.
->  My current patch lacks "status" property check, i could add it if you agree with this approach.
-
-It's not ideal, because the hardware is always there and always slightly
-broken, so it's not really a property of the platform. I'd be happier with
-something that is easier for users to change if they know what they are
-doing and also makes it clear that it is slightly risky.
-
-> > Or maybe we could find a way to keep using MCT in the host but use the
-> > arch timer in the guest only?
+> PWM users might call the pwm_get_default_period to query the default
+> period value. There is currently no helper to query the default
+> polarity, but it might be added later on if there is a need for it.
 > 
->  That's an interesting question, but, perhaps, it would require more changes to the code, and KVM
-> maintainers don't like these things, calling them "broken non-compliant hardware". So, i guess, we
-> could move from simple things to more complex ones.
-
-It's probably worth trying to see how much complexity you need for that
-approach, maybe it's not as hard in the end.
-
-> > For all I can tell, nobody every /saw/ the problem, we just know that it
-> > hasn't passed verification (or something like that) and you shouldn't
-> > use it in production.
+> This patch also modifies all the places where the default helpers should
+> be used in place of the standard ones.
 > 
->  Yes, and i agreed that this should be an option, not the default. 
-> 
->  P.S. I cc'ed to linux-samsung-soc, but i'm not subscribed. Will it reach there?
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-I think it should, at least I didn't get an email back for my reply,
-and I'm not subscribed either.
-
-	Arnd
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
