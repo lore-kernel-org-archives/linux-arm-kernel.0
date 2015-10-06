@@ -1,94 +1,92 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Oct 2015 18:04:00 +0100
-Subject: [PATCH v2 5/8] of/irq: Split of_msi_map_rid to reuse msi-map lookup
+Date: Tue,  6 Oct 2015 18:04:03 +0100
+Subject: [PATCH v2 8/8] PCI/MSI: Allow the MSI domain to be device-specific
 In-Reply-To: <1444151043-31084-1-git-send-email-marc.zyngier@arm.com>
 References: <1444151043-31084-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1444151043-31084-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1444151043-31084-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The msi-map property is also used to identify the MSI controller
-as a form of grown-up msi-parent property.
+So far, we've always considered that for a given PCI device, its
+MSI controller was either set by the architecture-specific
+pcibios hook, or simply inherited from the host bridge.
 
-Looking it up is complicated enough, and since of_msi_map_rid
-already implements this, let's turn it into an internal utility
-function. We'll put that to good use later on.
+This doesn't cover things like firmware-defined topologies like
+msi-map (DT) or IORT (ACPI), which can provide information about
+which MSI controller to use on a per-device basis.
+
+This patch adds the necessary hook into the MSI code to allow this
+feature, and provides the msi-map functionnality as a first
+implementation.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/of/irq.c | 43 ++++++++++++++++++++++++++++---------------
- 1 file changed, 28 insertions(+), 15 deletions(-)
+ drivers/pci/msi.c   | 17 +++++++++++++++++
+ drivers/pci/probe.c |  8 ++++++++
+ include/linux/msi.h |  6 ++++++
+ 3 files changed, 31 insertions(+)
 
-diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-index 89ebc61..ed64d98 100644
---- a/drivers/of/irq.c
-+++ b/drivers/of/irq.c
-@@ -579,21 +579,12 @@ err:
- 	}
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 81a2798..3daff31 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -1357,4 +1357,21 @@ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
+ 
+ 	return rid;
  }
- 
--/**
-- * of_msi_map_rid - Map a MSI requester ID for a device.
-- * @dev: device for which the mapping is to be done.
-- * @msi_np: device node of the expected msi controller.
-- * @rid_in: unmapped MSI requester ID for the device.
-- *
-- * Walk up the device hierarchy looking for devices with a "msi-map"
-- * property.  If found, apply the mapping to @rid_in.
-- *
-- * Returns the mapped MSI requester ID.
-- */
--u32 of_msi_map_rid(struct device *dev, struct device_node *msi_np, u32 rid_in)
-+static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
-+			    u32 rid_in)
- {
- 	struct device *parent_dev;
- 	struct device_node *msi_controller_node;
-+	struct device_node *msi_np = *np;
- 	u32 map_mask, masked_rid, rid_base, msi_base, rid_len, phandle;
- 	int msi_map_len;
- 	bool matched;
-@@ -643,9 +634,15 @@ u32 of_msi_map_rid(struct device *dev, struct device_node *msi_np, u32 rid_in)
- 
- 		msi_controller_node = of_find_node_by_phandle(phandle);
- 
--		matched = masked_rid >= rid_base &&
--			masked_rid < rid_base + rid_len &&
--			msi_np == msi_controller_node;
-+		matched = (masked_rid >= rid_base &&
-+			   masked_rid < rid_base + rid_len);
-+		if (msi_np)
-+			matched &= msi_np == msi_controller_node;
 +
-+		if (matched && !msi_np) {
-+			*np = msi_np = msi_controller_node;
-+			break;
-+		}
- 
- 		of_node_put(msi_controller_node);
- 		msi_map_len -= 4 * sizeof(__be32);
-@@ -663,6 +660,22 @@ u32 of_msi_map_rid(struct device *dev, struct device_node *msi_np, u32 rid_in)
- 	return rid_out;
- }
- 
 +/**
-+ * of_msi_map_rid - Map a MSI requester ID for a device.
-+ * @dev: device for which the mapping is to be done.
-+ * @msi_np: device node of the expected msi controller.
-+ * @rid_in: unmapped MSI requester ID for the device.
++ * pci_msi_get_device_domain - Get the MSI domain for a given PCI device
++ * @pdev:	The PCI device
 + *
-+ * Walk up the device hierarchy looking for devices with a "msi-map"
-+ * property.  If found, apply the mapping to @rid_in.
++ * Use the firmware data to find a device-specific MSI domain
++ * (i.e. not one that is ste as a default).
 + *
-+ * Returns the mapped MSI requester ID.
++ * Returns: The coresponding MSI domain or NULL if none has been found.
 + */
-+u32 of_msi_map_rid(struct device *dev, struct device_node *msi_np, u32 rid_in)
++struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev)
 +{
-+	return __of_msi_map_rid(dev, &msi_np, rid_in);
-+}
++	u32 rid = 0;
 +
- static struct irq_domain *__of_get_msi_domain(struct device_node *np,
- 					      enum irq_domain_bus_token token)
- {
++	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
++	return of_msi_map_get_device_domain(&pdev->dev, rid);
++}
+ #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 7c333f8..f14a970 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1639,6 +1639,14 @@ static struct irq_domain *pci_dev_msi_domain(struct pci_dev *dev)
+ 	if (d)
+ 		return d;
+ 
++	/*
++	 * Let's see if we have a firmware interface able to provide
++	 * the domain.
++	 */
++	d = pci_msi_get_device_domain(dev);
++	if (d)
++		return d;
++
+ 	return NULL;
+ }
+ 
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 56e3b76..375be7c 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -294,6 +294,12 @@ irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
+ int pci_msi_domain_check_cap(struct irq_domain *domain,
+ 			     struct msi_domain_info *info, struct device *dev);
+ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev);
++struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev);
++#else
++static inline struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev)
++{
++	return NULL;
++}
+ #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+ 
+ #endif /* LINUX_MSI_H */
 -- 
 2.1.4
