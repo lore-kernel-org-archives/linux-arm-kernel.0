@@ -1,54 +1,39 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  6 Oct 2015 18:46:20 +0100
-Subject: [PATCH v2 00/10] arm64 switch_mm improvements
-Message-ID: <1444153590-24173-1-git-send-email-will.deacon@arm.com>
+Date: Tue,  6 Oct 2015 18:46:22 +0100
+Subject: [PATCH v2 02/10] arm64: proc: de-scope TLBI operation during cold boot
+In-Reply-To: <1444153590-24173-1-git-send-email-will.deacon@arm.com>
+References: <1444153590-24173-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1444153590-24173-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+When cold-booting a CPU, we must invalidate any junk entries from the
+local TLB prior to enabling the MMU. This doesn't require broadcasting
+within the inner-shareable domain, so de-scope the operation to apply
+only to the local CPU.
 
-This is version two of the patches previously posted here:
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/mm/proc.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/370720.html
-
-Changes since v1 include:
-
-  * More comments
-  * Added reviewed-by tags
-
-Cheers,
-
-Will
-
---->8
-
-Will Deacon (10):
-  arm64: mm: remove unused cpu_set_idmap_tcr_t0sz function
-  arm64: proc: de-scope TLBI operation during cold boot
-  arm64: flush: use local TLB and I-cache invalidation
-  arm64: mm: rewrite ASID allocator and MM context-switching code
-  arm64: tlbflush: remove redundant ASID casts to (unsigned long)
-  arm64: tlbflush: avoid flushing when fullmm == 1
-  arm64: switch_mm: simplify mm and CPU checks
-  arm64: mm: kill mm_cpumask usage
-  arm64: tlb: remove redundant barrier from __flush_tlb_pgtable
-  arm64: mm: remove dsb from update_mmu_cache
-
- arch/arm64/include/asm/cacheflush.h  |   7 ++
- arch/arm64/include/asm/mmu.h         |  15 +--
- arch/arm64/include/asm/mmu_context.h | 113 ++++-------------
- arch/arm64/include/asm/pgtable.h     |   6 +-
- arch/arm64/include/asm/thread_info.h |   1 -
- arch/arm64/include/asm/tlb.h         |  26 ++--
- arch/arm64/include/asm/tlbflush.h    |  18 ++-
- arch/arm64/kernel/asm-offsets.c      |   2 +-
- arch/arm64/kernel/efi.c              |   5 +-
- arch/arm64/kernel/smp.c              |   9 +-
- arch/arm64/kernel/suspend.c          |   2 +-
- arch/arm64/mm/context.c              | 236 +++++++++++++++++++++--------------
- arch/arm64/mm/mmu.c                  |   2 +-
- arch/arm64/mm/proc.S                 |   6 +-
- 14 files changed, 222 insertions(+), 226 deletions(-)
-
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index e4ee7bd8830a..bbde13d77da5 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -146,8 +146,8 @@ ENDPROC(cpu_do_switch_mm)
+  *	value of the SCTLR_EL1 register.
+  */
+ ENTRY(__cpu_setup)
+-	tlbi	vmalle1is			// invalidate I + D TLBs
+-	dsb	ish
++	tlbi	vmalle1				// Invalidate local TLB
++	dsb	nsh
+ 
+ 	mov	x0, #3 << 20
+ 	msr	cpacr_el1, x0			// Enable FP/ASIMD
 -- 
 2.1.4
