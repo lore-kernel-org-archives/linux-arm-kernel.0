@@ -1,130 +1,115 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 07 Oct 2015 02:05:41 +0300
-Subject: [PATCH] ARM: shmobile: porter: add SDHI0/2 DT support
-Message-ID: <2228837.DO5U5OvRSi@wasted.cogentembedded.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 06 Oct 2015 16:20:44 -0700
+Subject: [PATCH 3/5] mtd: brcmnand: Optional DT flag to reset IPROC NAND
+ controller
+In-Reply-To: <56144A62.70300@broadcom.com>
+References: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
+ <1443808606-21203-4-git-send-email-anup.patel@broadcom.com>
+ <20151004214943.GA28904@localhost>
+ <39063E8F96E11742B35A201CC5D095B7AD54C1@SJEXCHMB10.corp.ad.broadcom.com>
+ <20151006134119.GB26818@localhost> <56144A62.70300@broadcom.com>
+Message-ID: <5614574C.2060701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Porter board dependent part of the SDHI0/2 device nodes along with
-the  necessary  voltage regulators (note that the Vcc regulators are dummy --
-they are required but don't actually exist on the board). Also, GPIOs have to
-be used for the CD and WP signals due to the SDHI driver constraints...
+On 06/10/15 15:25, Scott Branden wrote:
+> Hi Brian,
+> 
+> On 15-10-06 06:41 AM, Brian Norris wrote:
+> 
+>>>>
+>>>> Is there a reason not to do this reset unconditionally? I recall
+>>>> this came up in
+>>>> discussion previously, when the OpenWRT folks were trying to
+>>>> integrate with
+>>>> BCMA, where this reset was one of the few differences between the
+>>>> platform-
+>>>> device-based driver (i.e., this one) and the BCMA based driver.
+>>>> Might it help
+>>>> simplify things a bit if we just did the same thing everywhere?
+>>>
+>>> This driver is currently shared by Cygnus and NS2.
+>>>
+>>> We had similar suggestion when this patch was reviewed
+>>> internally in Broadcom.
+>>>
+>>> The rationale for adding optional DT flag is as follows:
+>>> 1. The NAND controller reset is currently required for NS2 only so
+>>> that it is in sane state before any NAND commands are issued. We
+>>> are not sure if Cygnus and all future iProc SoCs will require NAND
+>>> controller reset.
+>>
+>> I'm not sure this is a very strong reason. It seems fairly reasonable in
+>> general to reset a HW block before using it.
+> 
+> Efficient Boot time is a very strong reason for needing this actually.
+> We use the NAND controller in the bootROM, boot1/BL1, u-boot/UEFI, and
+> then Kernel stage.  By properly initializing the controller once we do
+> not need to reset it 4 different times.
 
-This patch is analogous to the commit 1299df03d719 (ARM: shmobile: henninger:
-add SDHI0/2 DT support) as there  are no differences between those boards in
-this respect.
+This could be used as a reverse argument, issuing a reset will increase
+the boot time.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+>>
+>>> 2. The NAND controller reset in probe would certainly increase
+>>> Linux boot time so for certain iProc SoCs we might choose avoid
+>>> NAND controller reset to reduce boot time if possible.
+>>
+>> I recall this reason being mentioned before. I believe this only happens
+>> because the brcmnand driver doesn't yet handle configuring the timing
+>> registers, so iProc is implicitly relying on the bootloader to configure
+>> the NAND timings. Perhaps it's time that we fix that. I'd rather not add
+>> extra DT properties unless we actually need to [1]. And having proper
+>> timing configuration in the Linux driver will help improve speeds for
+>> all users (whose timings may not be configured in the bootloader).
+> 
+> This is the very reason we need the optional reset property.  We need to
+> have timings configured by the linux driver or not.  Yes, in some cases
+> we will be relying on earlier boot stages to configure some of the
+> hardware.
 
----
-This patch is against the 'renesas-devel-20151006-v4.3-rc4' tag of Simon
-Horman's 'renesas.git' repo.
+Then instead of adding a "reset flag" to Device Tree, another approach
+could be to put the desired or currently configured exhaustive list of
+NAND timings in Device Tree, and based on that you could have this:
 
- arch/arm/boot/dts/r8a7791-porter.dts |   76 +++++++++++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
+- the NAND controller driver finds that these timings match the current
+configuration, you are good to go
 
-Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791-porter.dts
-+++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -10,6 +10,7 @@
- 
- /dts-v1/;
- #include "r8a7791.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "Porter";
-@@ -33,6 +34,50 @@
- 		device_type = "memory";
- 		reg = <2 0x00000000 0 0x40000000>;
- 	};
-+
-+	vcc_sdhi0: regulator at 0 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "SDHI0 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
-+
-+	vccq_sdhi0: regulator at 1 {
-+		compatible = "regulator-gpio";
-+
-+		regulator-name = "SDHI0 VccQ";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpios = <&gpio2 12 GPIO_ACTIVE_HIGH>;
-+		gpios-states = <1>;
-+		states = <3300000 1
-+			  1800000 0>;
-+	};
-+
-+	vcc_sdhi2: regulator at 2 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "SDHI2 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
-+
-+	vccq_sdhi2: regulator at 3 {
-+		compatible = "regulator-gpio";
-+
-+		regulator-name = "SDHI2 VccQ";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpios = <&gpio2 26 GPIO_ACTIVE_HIGH>;
-+		gpios-states = <1>;
-+		states = <3300000 1
-+			  1800000 0>;
-+	};
- };
- 
- &extal_clk {
-@@ -54,6 +99,16 @@
- 		renesas,groups = "intc_irq0";
- 		renesas,function = "intc";
- 	};
-+
-+	sdhi0_pins: sd0 {
-+		renesas,groups = "sdhi0_data4", "sdhi0_ctrl";
-+		renesas,function = "sdhi0";
-+	};
-+
-+	sdhi2_pins: sd2 {
-+		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
-+		renesas,function = "sdhi2";
-+	};
- };
- 
- &scif0 {
-@@ -78,3 +133,24 @@
- 		micrel,led-mode = <1>;
- 	};
- };
-+
-+&sdhi0 {
-+	pinctrl-0 = <&sdhi0_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&vcc_sdhi0>;
-+	vqmmc-supply = <&vccq_sdhi0>;
-+	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
-+	wp-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&sdhi2 {
-+	pinctrl-0 = <&sdhi2_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&vcc_sdhi2>;
-+	vqmmc-supply = <&vccq_sdhi2>;
-+	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
+- the NAND controller drivers finds a difference in how current timings
+are configured vs. desired timings, and issues a controller reset, prior
+to applying new timing configuration
+
+- no timings are configured, reset the controller and use existing
+auto-detection capabilities like ONFI modes
+
+Typically you would put the desired timings instead of the currently
+configured timings though..
+
+> 
+>>
+>> I actually had some preliminary work to do some timing configuration
+>> according to the new timing information from nand_base.c/nand_timing.c.
+>> Unfortunately, I didn't complete this, and I'm no longer working at
+>> Broadcom, so I don't exactly have access to the HW docs for all the NAND
+>> controller revisions, nor do I have access to as much HW for testing...
+>>
+>> Brian
+>>
+>> [1] If we really do need a device tree differentiation, perhaps it would
+>> be better to just differentiate the compatible string than to have
+>> individual boolean properties. e.g.:
+>>
+>>     compatible = "brcm,iproc-nand-ns2", ...;
+>>
+> As described above - the option is not SoC specific.  It is system
+> specific.  In some systems we may wish to reset the NAND controller in
+> linux.  In some we may wish to rely on initialization that has already
+> been done to speed up boot times.
+
+It seems to me like having this property is fine as long as you are
+describing that the controller *needs* a reset to operate properly, it
+does not strike me as a particularly well suited property if its side
+effect and main usage is to keep or wipe-out existing NAND timings.
+-- 
+Florian
