@@ -1,33 +1,87 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Tue, 06 Oct 2015 11:56:33 +0300
-Subject: [PATCH 0/2] ARM: EXYNOS: Allow to use architected timer
-In-Reply-To: <6613638.q5qyQZxXy7@wuerfel>
-References: <cover.1444119342.git.p.fedin@samsung.com>
- <6613638.q5qyQZxXy7@wuerfel>
-Message-ID: <00d801d10014$e6d994a0$b48cbde0$@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Oct 2015 10:00:15 +0100
+Subject: All OMAP platforms: MMC is broken
+In-Reply-To: <20151005183813.GD21626@n2100.arm.linux.org.uk>
+References: <20150924090048.GA21626@n2100.arm.linux.org.uk>
+ <20150924233756.GN23801@atomide.com>
+ <20151001093325.GU21513@n2100.arm.linux.org.uk>
+ <CAPDyKFpnqJBrtiBekikrNHAf-agZm12KnF9n+=+72HH=jti-KA@mail.gmail.com>
+ <20151001100326.GV21513@n2100.arm.linux.org.uk>
+ <20151005112304.GZ23801@atomide.com>
+ <20151005143532.GA23801@atomide.com>
+ <20151005145127.GB23801@atomide.com>
+ <20151005171155.GF23801@atomide.com>
+ <20151005183813.GD21626@n2100.arm.linux.org.uk>
+Message-ID: <20151006090015.GE21626@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+On Mon, Oct 05, 2015 at 07:38:13PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Oct 05, 2015 at 10:11:56AM -0700, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [151005 07:57]:
+> > > * Tony Lindgren <tony@atomide.com> [151005 07:44]:
+> > > > * Tony Lindgren <tony@atomide.com> [151005 04:28]:
+> > > > 
+> > > > Based on some tests it seems that the duovero unpaired regulator usage
+> > > > is fixed by reverting:
+> > > > 
+> > > > c55d7a055364 ("mmc: host: omap_hsmmc: use regulator_is_enabled to
+> > > > find pbias status")
+> > > 
+> > > With commit c55d7a055364 my guess is that the PBIAS regulator is
+> > > already on from an earlier MMC probe and getting re-enabled when
+> > > a deferred probe happens?
+> > 
+> > Unless somebody has a better fix in mind for the above, I suggest
+> > we revert it for the -rc kernel.
+> 
+> Let me try reverting that in my build tree, and...
+> 
+> > > > And it seems that omap3 legacy MMC is broken earlier in the
+> > > > series with:
+> > > > 
+> > > > 7d607f917008 ("mmc: host: omap_hsmmc: use
+> > > > devm_regulator_get_optional() for vmmc")
+> > > > 
+> > > > This one does not cleanly revert so have not yet tried reverting
+> > > > it.
+> > > 
+> > > And with commit 7d607f917008 I'm guessing we can't return an
+> > > error if the PBIAS regulator does not exist as that's not there
+> > > for the legacy booting.
+> > 
+> > For omap3 legacy booting, we keep getting -EPROBE_DEFER for
+> > all the optional regulators.
+> > 
+> > Something like the following might be the minimal fix for the -rc
+> > cycle?
+> 
+> applying this patch.  If that gets things going again, then we
+> _definitely_ should get both of these to Linus ASAP.  The breakage
+> has been around far too long already.
 
-> IIRC the use of the CP15 timer is not reliable on this platform.
-> I don't have a link ready, but this has come up a few times.
+Last night's build shows that this fixes the non-DT LDP3430 booting, but
+DT-based LDP3430 and SDP4430 both remain broken for the same reason -
+neither can find their SD cards.
 
- I know that Samsung SoC guys are not very keen on this, therefore i actually made this optional. If
-you want, you could omit the second patch, and by default Exynos platform will use MCT. But if
-someone wants to use KVM, it would be enough only to modify device tree in order to enable CP15.
-Would this be a good compromise?
+We're at -rc4.  That means we're could be only three weeks away from 4.3
+being released, and DT OMAP has yet to boot _once_ here.
 
-> Regarding KVM usage, would it be possible to emulate the architected
-> timer from qemu instead?
+What I find *totally* unacceptable is the lack of reaction from the MMC
+and TI people: it's just like "we'll break your crap, and we'll ignore
+reports of regressions."  That is *not* acceptable in any shape or form,
+and people who do this _should_ have their future patches ignored until
+they demonstrate that they understand the need to not break stuff.
 
- Unfortunately no. Accesses to virtual timer registers cannot be trapped. It is possible to trap
-physical timer accesses, and trick the kernel into using it, but it's slow, and it is a different
-story, which you can read here: http://www.spinics.net/lists/kvm/msg121714.html.
- So, i think that having an option to use CP15 would be a good solution. It is known to work, and i
-use this configuration here on SMDK5410 without any problems.
+I'm at the point of suggesting that there should be a moritorium on all
+OMAP related development for 4.4: delay all development to 4.5, and have
+4.4 as a pure bug-fixing _only_ cycle for OMAP.  If 4.3 is released and
+OMAP is still broken, then I don't think there's an option on that.
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Maybe the idea that development work won't hit mainline for another 4
+months will help focus the minds on not breaking stuff and then ignoring
+regression reports.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
