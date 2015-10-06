@@ -1,29 +1,32 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Tue, 06 Oct 2015 12:59:45 +0200
-Subject: [PATCHv2] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
-In-Reply-To: <5340366.WTVksOGb0G@wuerfel> (Arnd Bergmann's message of "Tue, 06
- Oct 2015 12:51:24 +0200")
-References: <1444109743-8561-1-git-send-email-manjeet.p@samsung.com>
- <5022096.8QRzW0l3EJ@wuerfel>
- <20151006103128.GN6281@e103592.cambridge.arm.com>
- <5340366.WTVksOGb0G@wuerfel>
-Message-ID: <mvmh9m48dpa.fsf@hawking.suse.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 6 Oct 2015 13:59:36 +0300
+Subject: [PATCH v4 00/25] dmaengine/ARM: Merge the edma drivers into one
+In-Reply-To: <1444116637.3579.39.camel@intel.com>
+References: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
+ <561366ED.8010800@ti.com> <1444116637.3579.39.camel@intel.com>
+Message-ID: <5613A998.6040208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On 10/06/2015 10:30 AM, Koul, Vinod wrote:
+> On Tue, 2015-10-06 at 09:15 +0300, Peter Ujfalusi wrote:
+>> Hi
+>>
+>> On 09/24/2015 01:01 PM, Peter Ujfalusi wrote:
+>>> Hi,
+>>>
+>>> Changes since v3:
+>>> - Separated the two (patch 10/11 in v2 patch 10 in v3) patch which got squashed
+>>>   by accident for v3
+>>> - Added Tony's Acked-by to patch 11 (for mach-oamp2 part)
+>>
+>> Gentle ping on this series ;)
+> 
+> Its a long one :)
 
-> I think it makes sense to stick with the traditional definition
-> of MINSIGSTKSZ == "the minimum amount that you will always need,
-> add whatever you require yourself" and SIGSTKSZ == "Should be
-> enough for a couple of function calls".
+Yes, it is and I have already 7 mode on top of this series :o
 
-The python3 testsuite wants to put two signal frames in a SIGSTKSZ
-stack.
+> I hope to get this done next week after am back from Dublin
 
-Andreas.
-
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+Sure, thank you,
+P?ter
