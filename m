@@ -1,85 +1,89 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Oct 2015 18:36:22 +0100
-Subject: [PATCH 09/16] acpi/gsi: Always perform an irq domain lookup
+Date: Tue,  6 Oct 2015 18:36:28 +0100
+Subject: [PATCH 15/16] irqdomain: Introduce irq_domain_create_hierarchy
 In-Reply-To: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
 References: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1444152989-31726-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1444152989-31726-16-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of directly passing NULL to the various irq_domain functions,
-start by looking up the domain with a domain identifier..
-
-As this identifier is permanently set to NULL, the lookup function will
-return the same value (no domain found) and the default will be used,
-preserving the current behaviour.
+As we're about to start converting the various MSI layers to
+use fwnode_handle instead of device_node, add irq_domain_create_hierarchy
+as a directly equivalent of irq_domain_add_hierarchy (which still
+exists as a compatibility interface).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/acpi/gsi.c | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+ include/linux/irqdomain.h | 17 +++++++++++++++--
+ kernel/irq/irqdomain.c    | 10 +++++-----
+ 2 files changed, 20 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
-index 38208f2..2c39fe1 100644
---- a/drivers/acpi/gsi.c
-+++ b/drivers/acpi/gsi.c
-@@ -11,9 +11,12 @@
- #include <linux/acpi.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
-+#include <linux/of.h>
- 
- enum acpi_irq_model_id acpi_irq_model;
- 
-+static struct fwnode_handle *acpi_gsi_domain_id;
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index 949caa7..2b3340ae 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -340,10 +340,23 @@ extern void irq_domain_set_info(struct irq_domain *domain, unsigned int virq,
+ 				void *chip_data, irq_flow_handler_t handler,
+ 				void *handler_data, const char *handler_name);
+ #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+-extern struct irq_domain *irq_domain_add_hierarchy(struct irq_domain *parent,
++extern struct irq_domain *irq_domain_create_hierarchy(struct irq_domain *parent,
+ 			unsigned int flags, unsigned int size,
+-			struct device_node *node,
++			struct fwnode_handle *fwnode,
+ 			const struct irq_domain_ops *ops, void *host_data);
 +
- static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
- {
- 	switch (polarity) {
-@@ -45,12 +48,10 @@ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
-  */
- int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
- {
--	/*
--	 * Only default domain is supported at present, always find
--	 * the mapping corresponding to default domain by passing NULL
--	 * as irq_domain parameter
--	 */
--	*irq = irq_find_mapping(NULL, gsi);
-+	struct irq_domain *d = irq_find_matching_fwnode(acpi_gsi_domain_id,
-+							DOMAIN_BUS_ANY);
++static inline struct irq_domain *irq_domain_add_hierarchy(struct irq_domain *parent,
++					    unsigned int flags,
++					    unsigned int size,
++					    struct device_node *node,
++					    const struct irq_domain_ops *ops,
++					    void *host_data)
++{
++	return irq_domain_create_hierarchy(parent, flags, size,
++					   of_node_to_fwnode(node),
++					   ops, host_data);
++}
 +
-+	*irq = irq_find_mapping(d, gsi);
- 	/*
- 	 * *irq == 0 means no mapping, that should
- 	 * be reported as a failure
-@@ -74,13 +75,10 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
- {
- 	unsigned int irq;
- 	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
-+	struct irq_domain *d = irq_find_matching_fwnode(acpi_gsi_domain_id,
-+							DOMAIN_BUS_ANY);
- 
--	/*
--	 * There is no way at present to look-up the IRQ domain on ACPI,
--	 * hence always create mapping referring to the default domain
--	 * by passing NULL as irq_domain parameter
--	 */
--	irq = irq_create_mapping(NULL, gsi);
-+	irq = irq_create_mapping(d, gsi);
- 	if (!irq)
- 		return -EINVAL;
- 
-@@ -98,7 +96,9 @@ EXPORT_SYMBOL_GPL(acpi_register_gsi);
+ extern int __irq_domain_alloc_irqs(struct irq_domain *domain, int irq_base,
+ 				   unsigned int nr_irqs, int node, void *arg,
+ 				   bool realloc);
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 6fbecae..a53b60f 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -858,7 +858,7 @@ static int irq_domain_alloc_descs(int virq, unsigned int cnt,
+  * @parent:	Parent irq domain to associate with the new domain
+  * @flags:	Irq domain flags associated to the domain
+  * @size:	Size of the domain. See below
+- * @node:	Optional device-tree node of the interrupt controller
++ * @fwnode:	Optional fwnode of the interrupt controller
+  * @ops:	Pointer to the interrupt domain callbacks
+  * @host_data:	Controller private data pointer
+  *
+@@ -868,19 +868,19 @@ static int irq_domain_alloc_descs(int virq, unsigned int cnt,
+  * domain flags are set.
+  * Returns pointer to IRQ domain, or NULL on failure.
   */
- void acpi_unregister_gsi(u32 gsi)
+-struct irq_domain *irq_domain_add_hierarchy(struct irq_domain *parent,
++struct irq_domain *irq_domain_create_hierarchy(struct irq_domain *parent,
+ 					    unsigned int flags,
+ 					    unsigned int size,
+-					    struct device_node *node,
++					    struct fwnode_handle *fwnode,
+ 					    const struct irq_domain_ops *ops,
+ 					    void *host_data)
  {
--	int irq = irq_find_mapping(NULL, gsi);
-+	struct irq_domain *d = irq_find_matching_fwnode(acpi_gsi_domain_id,
-+							DOMAIN_BUS_ANY);
-+	int irq = irq_find_mapping(d, gsi);
+ 	struct irq_domain *domain;
  
- 	irq_dispose_mapping(irq);
- }
+ 	if (size)
+-		domain = irq_domain_add_linear(node, size, ops, host_data);
++		domain = irq_domain_create_linear(fwnode, size, ops, host_data);
+ 	else
+-		domain = irq_domain_add_tree(node, ops, host_data);
++		domain = irq_domain_create_tree(fwnode, ops, host_data);
+ 	if (domain) {
+ 		domain->parent = parent;
+ 		domain->flags |= flags;
 -- 
 2.1.4
