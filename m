@@ -1,56 +1,39 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 6 Oct 2015 15:01:05 -0500
-Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
-In-Reply-To: <20151006193815.GI12338@codeaurora.org>
-References: <560E53E3.7070207@free.fr> <560E8584.8000207@free.fr>
- <20151002180255.GK12338@codeaurora.org> <56138485.4090600@free.fr>
- <20151006193815.GI12338@codeaurora.org>
-Message-ID: <87k2qz22da.fsf@saruman.tx.rr.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue,  6 Oct 2015 22:07:49 +0200
+Subject: [PATCH 1/2] memory: omap-gpmc: dump "before" state before first
+ modification
+Message-ID: <1444162070-22034-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd <sboyd@codeaurora.org> writes:
+When gpmc_cs_show_timings is called in gpmc_cs_set_timings()
+gpmc_cs_program_settings() was already run which modifies the CONFIG1
+register. So to be more useful do the "before" dump earlier.
 
-> On 10/06, Mason wrote:
->> On 02/10/2015 20:02, Stephen Boyd wrote:
->> 
->> > The warning has been removed in commit 5028090d1da1 (ARM: 8434/1:
->> > Revert "7655/1: smp_twd: make twd_local_timer_of_register() no-op
->> > for nosmp", 2015-09-14) sitting in linux-next. Oddly, that commit
->> > doesn't remove the depends on SMP for the Kconfig. So it seems
->> > that we can apply this patch and everyone is happy? We could also
->> > drop the "if SMP" part of most of the platform selects if anyone
->> > actually cares.
->> > 
->> > ---8<----
->> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> > index 369791fb619c..be64d9d604c3 100644
->> > --- a/arch/arm/Kconfig
->> > +++ b/arch/arm/Kconfig
->> > @@ -1389,7 +1389,6 @@ config HAVE_ARM_ARCH_TIMER
->> >  
->> >  config HAVE_ARM_TWD
->> >  	bool
->> > -	depends on SMP
->> >  	select CLKSRC_OF if OF
->> >  	help
->> >  	  This options enables support for the ARM timer and watchdog unit
->> 
->> Hello Stephen,
->> 
->> Should I make a formal submission for the above patch to be accepted?
->
-> No. I believe Felipe is going to update commit 5028090d1da1 to
-> remove the depends on.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ drivers/memory/omap-gpmc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Already did it. Should be in next shortly.
-
+diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
+index 32ac049f2bc4..6515dfc2b805 100644
+--- a/drivers/memory/omap-gpmc.c
++++ b/drivers/memory/omap-gpmc.c
+@@ -696,7 +696,6 @@ int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t,
+ 	int div;
+ 	u32 l;
+ 
+-	gpmc_cs_show_timings(cs, "before gpmc_cs_set_timings");
+ 	div = gpmc_calc_divider(t->sync_clk);
+ 	if (div < 0)
+ 		return div;
+@@ -1988,6 +1987,7 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
+ 	if (ret < 0)
+ 		goto err;
+ 
++	gpmc_cs_show_timings(cs, "before gpmc_cs_program_settings");
+ 	ret = gpmc_cs_program_settings(cs, &gpmc_s);
+ 	if (ret < 0)
+ 		goto err;
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/5823d60b/attachment.sig>
+2.6.0
