@@ -1,55 +1,54 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 6 Oct 2015 12:41:51 +0800
-Subject: [PATCH v2 12/22] arm64: Delay cpu feature checks
-In-Reply-To: <1444064531-25607-13-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <201510061230.QVbFYdKy%fengguang.wu@intel.com>
+From: manjeet.p@samsung.com (Manjeet Pawar)
+Date: Tue, 06 Oct 2015 11:05:43 +0530
+Subject: [PATCHv2] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
+Message-ID: <1444109743-8561-1-git-send-email-manjeet.p@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+MINSIGSTKSZ and SIGSTKSZ for ARM64 are not correctly set in latest kernel.
+This patch fixes this issue.
 
-[auto build test ERROR on v4.3-rc4 -- if it's inappropriate base, please ignore]
+This issue is reported in LTP (testcase: sigaltstack02.c).
+Testcase failed when sigaltstack() called with stack size "MINSIGSTKSZ - 1"
+Since in Glibc-2.22, MINSIGSTKSZ is set to 5120 but in kernel
+it is set to 2048 so testcase gets failed.
 
-config: arm64-alldefconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Testcase Output:
+sigaltstack02 1  TPASS  :  stgaltstack() fails, Invalid Flag value,errno:22
+sigaltstack02 2  TFAIL  :  sigaltstack() returned 0, expected -1,errno:12
 
-Note: the linux-review/Suzuki-K-Poulose/arm64-Consolidate-CPU-feature-handling HEAD bfdef3a10032e84cc7ae186a058443219f110679 builds fine.
-      It only hurts bisectibility.
+Reported Issue in Glibc Bugzilla:
+https://sourceware.org/bugzilla/show_bug.cgi?id=16850
 
-All errors (new ones prefixed by >>):
+Bugfix in Glibc-2.22:
+https://sourceware.org/git/gitweb.cgi?p=glibc.git;a=blob;f=sysdeps/unix/
+sysv/linux/aarch64/bits/sigstack.h;h=8f2fb76e3e81734ef8a9cf9ae40daf4705
+f31c35;hb=b763f6ae859ecea70a5dacb8ad45c71d5f667e2e
 
-   arch/arm64/kernel/cpufeature.c: In function 'cpu_enable_features':
->> arch/arm64/kernel/cpufeature.c:733:52: error: 'const struct arm64_cpu_capabilities' has no member named 'sys_reg'
-      if(!cpus_have_cap(caps[i].capability) || !caps[i].sys_reg)
-                                                       ^
-   arch/arm64/kernel/cpufeature.c:739:47: error: 'const struct arm64_cpu_capabilities' has no member named 'sys_reg'
-      if (!feature_matches(read_cpu_sysreg(caps[i].sys_reg), &caps[i]))
-                                                  ^
-
-vim +733 arch/arm64/kernel/cpufeature.c
-
-   727		const struct arm64_cpu_capabilities *caps = arm64_features;
-   728	
-   729		for(i = 0; caps[i].desc; i++)
-   730			if (caps[i].enable && cpus_have_cap(caps[i].capability))
-   731				caps[i].enable(NULL);
-   732		for(i = 0; caps[i].desc; i++) {
- > 733			if(!cpus_have_cap(caps[i].capability) || !caps[i].sys_reg)
-   734				continue;
-   735			/*
-   736			 * If the new CPU misses an advertised feature, we cannot proceed
+Signed-off-by: Akhilesh Kumar <akhilesh.k@samsung.com>
+Signed-off-by: Manjeet Pawar <manjeet.p@samsung.com>
+Signed-off-by: Rohit Thapliyal <r.thapliyal@samsung.com>
 
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 7583 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/54c877c6/attachment.obj>
+v1 -> Changes in uapi overall header
+v2 -> Changes done in arm64 headers
+
+ arch/arm64/include/uapi/asm/signal.h |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/include/uapi/asm/signal.h b/arch/arm64/include/uapi/asm/signal.h
+index 8d1e723..5ac56cf 100644
+--- a/arch/arm64/include/uapi/asm/signal.h
++++ b/arch/arm64/include/uapi/asm/signal.h
+@@ -21,4 +21,9 @@
+ 
+ #include <asm-generic/signal.h>
+ 
++#undef MINSIGSTKSZ
++#undef SIGSTKSZ
++#define MINSIGSTKSZ 5120
++#define SIGSTKSZ    16384
++
+ #endif
+-- 
+1.7.9.5
