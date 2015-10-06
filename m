@@ -1,56 +1,70 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 06 Oct 2015 16:47:59 +0200
-Subject: [PATCH 3/8] mmc: sdhci-pxav3: fix error handling of
- armada_38x_quirks
-In-Reply-To: <1444094562-31165-4-git-send-email-mw@semihalf.com> (Marcin
- Wojtas's message of "Tue, 6 Oct 2015 03:22:37 +0200")
-References: <1444094562-31165-1-git-send-email-mw@semihalf.com>
- <1444094562-31165-4-git-send-email-mw@semihalf.com>
-Message-ID: <87bncc9hpc.fsf@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Oct 2015 15:54:31 +0100
+Subject: [PATCH v3] arm: Adding support for atomic half word
+ exchange
+In-Reply-To: <795992290.5810091444118582583.JavaMail.weblogic@epmlwas01d>
+References: <795992290.5810091444118582583.JavaMail.weblogic@epmlwas01d>
+Message-ID: <20151006145431.GA12382@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On mar., oct. 06 2015, Marcin Wojtas <mw@semihalf.com> wrote:
+On Tue, Oct 06, 2015 at 08:03:02AM +0000, Sarbojit Ganguly wrote:
+> Here is the version 3 of the patch correcting earlier issues.
 
-> In case of armada_38x_quirks error, all clocks should be cleaned-up, same
-> as after mv_conf_mbus_windows failure.
->
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> Cc: <stable@vger.kernel.org> # v4.2
+This looks good to me now:
 
-Good catch.
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> v2 -> v3 : Removed the comment related to Qspinlock, changed !defined to
+> #ifndef.
+> v1 -> v2 : Extended the guard code to cover the byte exchange case as 
+> well following opinion of Will Deacon.
+> Checkpatch has been run and issues were taken care of.
 
-Thanks,
+The part of your text up until here doesn't belong in the commit message.
+You'll also need to send this to Russell's patch system.
 
-Gregory
+Will
 
+> Since support for half-word atomic exchange was not there and Qspinlock
+> on ARM requires it, modified __xchg() to add support for that as well.
+> ARMv6 and lower does not support ldrex{b,h} so, added a guard code
+> to prevent build breaks.
+> 
+> Signed-off-by: Sarbojit Ganguly <ganguly.s@samsung.com>
 > ---
->  drivers/mmc/host/sdhci-pxav3.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-> index 89a9e49..f5edf9d 100644
-> --- a/drivers/mmc/host/sdhci-pxav3.c
-> +++ b/drivers/mmc/host/sdhci-pxav3.c
-> @@ -402,7 +402,7 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
->  	if (of_device_is_compatible(np, "marvell,armada-380-sdhci")) {
->  		ret = armada_38x_quirks(pdev, host);
->  		if (ret < 0)
-> -			goto err_clk_get;
-> +			goto err_mbus_win;
->  		ret = mv_conf_mbus_windows(pdev, mv_mbus_dram_info());
->  		if (ret < 0)
->  			goto err_mbus_win;
+>  arch/arm/include/asm/cmpxchg.h | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
+> index 916a274..c6436c1 100644
+> --- a/arch/arm/include/asm/cmpxchg.h
+> +++ b/arch/arm/include/asm/cmpxchg.h
+> @@ -39,6 +39,7 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+>  
+>  	switch (size) {
+>  #if __LINUX_ARM_ARCH__ >= 6
+> +#ifndef CONFIG_CPU_V6 /* MIN ARCH >= V6K */
+>  	case 1:
+>  		asm volatile("@	__xchg1\n"
+>  		"1:	ldrexb	%0, [%3]\n"
+> @@ -49,6 +50,17 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+>  			: "r" (x), "r" (ptr)
+>  			: "memory", "cc");
+>  		break;
+> +	case 2:
+> +		asm volatile("@	__xchg2\n"
+> +		"1:	ldrexh	%0, [%3]\n"
+> +		"	strexh	%1, %2, [%3]\n"
+> +		"	teq	%1, #0\n"
+> +		"	bne	1b"
+> +			: "=&r" (ret), "=&r" (tmp)
+> +			: "r" (x), "r" (ptr)
+> +			: "memory", "cc");
+> +		break;
+> +#endif
+>  	case 4:
+>  		asm volatile("@	__xchg4\n"
+>  		"1:	ldrex	%0, [%3]\n"
 > -- 
-> 1.8.3.1
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 1.9.1
