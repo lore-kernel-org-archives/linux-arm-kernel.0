@@ -1,40 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 6 Oct 2015 11:45:15 +0100
-Subject: [PATCH v6 21/22] driver core: Start processing deferred probes
- earlier
-In-Reply-To: <CAL_JsqKBKSsvEuoufc=xesSvcA1bf-X43O0YOvuntUJE5NYCJA@mail.gmail.com>
-References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
- <1442844182-27787-22-git-send-email-tomeu.vizoso@collabora.com>
- <56130D43.10200@gmail.com>
- <CAL_JsqKBKSsvEuoufc=xesSvcA1bf-X43O0YOvuntUJE5NYCJA@mail.gmail.com>
-Message-ID: <20151006104515.GJ12635@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Oct 2015 12:51:24 +0200
+Subject: [PATCHv2] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
+In-Reply-To: <20151006103128.GN6281@e103592.cambridge.arm.com>
+References: <1444109743-8561-1-git-send-email-manjeet.p@samsung.com>
+ <5022096.8QRzW0l3EJ@wuerfel>
+ <20151006103128.GN6281@e103592.cambridge.arm.com>
+Message-ID: <5340366.WTVksOGb0G@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 05, 2015 at 09:49:38PM -0500, Rob Herring wrote:
-> On Mon, Oct 5, 2015 at 6:52 PM, Frank Rowand <frowand.list@gmail.com> wrote:
+On Tuesday 06 October 2015 11:31:34 Dave Martin wrote:
+> On Tue, Oct 06, 2015 at 09:49:29AM +0200, Arnd Bergmann wrote:
 
-> > The purpose of the *_sync initcall levels is to allow the corresponding
-> > initcall level to use multiple threads of execution instead of a single
-> > thread.  The *_sync level provides a location for a wait for all of the
-> > threads at the corresponding init level to complete.  This is better
-> > explained in the git log:
+> > * Can you explain in the changelog how the numbers were decided?
+> >   I don't see any other architecture using 5kb and cannot see why
+> >   it has to be this value rather than something else.
+> 
+> glibc quietly "fixed" this earlier this year, by inventing these numbers
+> and putting them in the glibc headers. [1]
 
-> The things I was worried about like clk and regulator disabling are
-> actually late_initcall_sync, so maybe late_initcall is fine here after
-> all.
+I saw the commit, but the changelog is not really useful.
 
-> However, looking at other *_initcall_sync users, I'm not so sure they
-> are doing the same abuse.
+> Except for a moribund architecture that will never be extended I
+> think that the idea of MINSIGSTKSZ is badly flawed -- a #define
+> for not-necessarily-quite-enough-stack-to-realistically-take-a-signal
+> is a pretty useless concept even if the signal frame never grows, and
+> it looks like it is little used in practice.
 
-They're trying to run at the point where we've completed deferred
-probe processing - in other words, at the sync point.  What they really
-want is an additional callback at the point where the syncs have
-actually happened.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/e75e2ea5/attachment.sig>
+Right, even if we modified the constants in the kernel/glibc
+headers at that point, it would remain broken for new kernels
+and old user space.
+
+> Since this bug hasn't been reported until now, I suspect that
+> MINSIGSTKSZ is used very rarely or not at all by real userspace
+> software.  I wonder whether we can get away with simply raising
+> MINSIGSTKSZ to match SIGSTKSZ, since it's clear that any software
+> using MINSIGSTKSZ was already broken.
+
+I think it makes sense to stick with the traditional definition
+of MINSIGSTKSZ == "the minimum amount that you will always need,
+add whatever you require yourself" and SIGSTKSZ == "Should be
+enough for a couple of function calls". If we want to be conservative
+in the kernel, using 8192 and 32768, to stay with the x4 ratio
+that everyone else uses would be my first pick, though I'm not
+particularly attached to those values.
+
+	Arnd
+
+> [1] https://sourceware.org/ml/libc-alpha/2015-04/msg00033.html
