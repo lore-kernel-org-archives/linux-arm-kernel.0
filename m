@@ -1,145 +1,71 @@
-From: a.aubert@overkiz.com (Antoine Aubert)
-Date: Tue, 6 Oct 2015 17:26:26 +0200
-Subject: at91sam9 Main crystal frequency problems
-In-Reply-To: <20151006161244.06f3ceb4@bbrezillon>
-References: <55ED3D3B.8060700@overkiz.com>
- <20150908181212.0b4336f0@bbrezillon> <55F6C07C.8080803@overkiz.com>
- <20151006161244.06f3ceb4@bbrezillon>
-Message-ID: <5613E822.2020004@overkiz.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 6 Oct 2015 23:26:06 +0800
+Subject: [arm-platforms:irq/gsi-irq-domain-v5 16/16]
+ drivers/pci/msi.c:1323:38: warning: passing argument 1 of
+ 'pci_msi_create_irq_domain' from incompatible pointer type
+Message-ID: <201510062305.0lgLckvO%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gsi-irq-domain-v5
+head:   77d2d8815f4d2d622f69dd383deb60f62ca0de15
+commit: 77d2d8815f4d2d622f69dd383deb60f62ca0de15 [16/16] irqdomain/msi: Use fwnode instead of of_node
+config: i386-randconfig-x004-201540 (attached as .config)
+reproduce:
+        git checkout 77d2d8815f4d2d622f69dd383deb60f62ca0de15
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Le 06/10/2015 16:12, Boris Brezillon a ?crit :
-> Hi Antoine,
-> 
-> On Mon, 14 Sep 2015 14:41:32 +0200
-> Antoine Aubert <a.aubert@overkiz.com> wrote:
-> 
->> Hi Boris,
->>
->> Thank you for your help. I have some news thanks to traces in clk driver.
-> 
-> Any progress regarding this problem. I think Jiri (in Cc) has pretty
-> much the same problem (see this thread [1]).
-> IIRC, activating NO_HZ_IDLE solved the problem for you, but have you
-> find the root cause?
-I'm not sure that the same issue. Here I don't have slow xtal.
+All warnings (new ones prefixed by >>):
 
-What I found:
-* DTB was not up to date (build with an other kernel version)
-  Since we start from kexec, we added --dtb option
-* slow_xtal wasn't disabled in our DTS
-* defconfig was outdated
+   drivers/pci/msi.c: In function 'pci_msi_create_default_irq_domain':
+>> drivers/pci/msi.c:1323:38: warning: passing argument 1 of 'pci_msi_create_irq_domain' from incompatible pointer type [-Wincompatible-pointer-types]
+      domain = pci_msi_create_irq_domain(node, info, parent);
+                                         ^
+   drivers/pci/msi.c:1259:20: note: expected 'struct fwnode_handle *' but argument is of type 'struct device_node *'
+    struct irq_domain *pci_msi_create_irq_domain(struct fwnode_handle *fwnode,
+                       ^
 
-What i did first:
-* updated the dts, disabled slow xtal
-* Update DTB
-* activating NO_HZ_IDLE
+vim +/pci_msi_create_irq_domain +1323 drivers/pci/msi.c
 
-> 20d updtime without WRST
+8e047ada Jiang Liu 2014-11-15  1307   * @info:	MSI domain info
+8e047ada Jiang Liu 2014-11-15  1308   * @parent:	Parent irq domain
+8e047ada Jiang Liu 2014-11-15  1309   *
+8e047ada Jiang Liu 2014-11-15  1310   * Returns: A domain pointer or NULL in case of failure. If successful
+8e047ada Jiang Liu 2014-11-15  1311   * the default PCI/MSI irqdomain pointer is updated.
+8e047ada Jiang Liu 2014-11-15  1312   */
+8e047ada Jiang Liu 2014-11-15  1313  struct irq_domain *pci_msi_create_default_irq_domain(struct device_node *node,
+8e047ada Jiang Liu 2014-11-15  1314  		struct msi_domain_info *info, struct irq_domain *parent)
+8e047ada Jiang Liu 2014-11-15  1315  {
+8e047ada Jiang Liu 2014-11-15  1316  	struct irq_domain *domain;
+8e047ada Jiang Liu 2014-11-15  1317  
+8e047ada Jiang Liu 2014-11-15  1318  	mutex_lock(&pci_msi_domain_lock);
+8e047ada Jiang Liu 2014-11-15  1319  	if (pci_msi_default_domain) {
+8e047ada Jiang Liu 2014-11-15  1320  		pr_err("PCI: default irq domain for PCI MSI has already been created.\n");
+8e047ada Jiang Liu 2014-11-15  1321  		domain = NULL;
+8e047ada Jiang Liu 2014-11-15  1322  	} else {
+8e047ada Jiang Liu 2014-11-15 @1323  		domain = pci_msi_create_irq_domain(node, info, parent);
+8e047ada Jiang Liu 2014-11-15  1324  		pci_msi_default_domain = domain;
+8e047ada Jiang Liu 2014-11-15  1325  	}
+8e047ada Jiang Liu 2014-11-15  1326  	mutex_unlock(&pci_msi_domain_lock);
+8e047ada Jiang Liu 2014-11-15  1327  
+8e047ada Jiang Liu 2014-11-15  1328  	return domain;
+8e047ada Jiang Liu 2014-11-15  1329  }
+3878eaef Jiang Liu 2014-11-11  1330  #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
 
-Today what I did:
-* use LTS last kernel: 4.1.6
-* updated the dts, disabled slow xtal
-* generate config from scratch using "make ARCH=arm at91_dt_defconfig"
-  (without NO_HZ_IDLE=
+:::::: The code at line 1323 was first introduced by commit
+:::::: 8e047adae969701c6cec136484bb9de8572af934 PCI/MSI: Provide mechanism to alloc/free MSI/MSIX interrupt from irqdomain
 
-12h uptime, at this time no WRST
+:::::: TO: Jiang Liu <jiang.liu@linux.intel.com>
+:::::: CC: Thomas Gleixner <tglx@linutronix.de>
 
-
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> [1]http://thread.gmane.org/gmane.linux.ports.arm.kernel/413356
-> 
->>
->>
->> Le 08/09/2015 18:12, Boris Brezillon a ?crit :
->>> Hi Antoine,
->>>
->>> On Mon, 7 Sep 2015 09:31:07 +0200
->>> Antoine Aubert <a.aubert@overkiz.com> wrote:
->>>
->>>> Hi,
->>>>
->>>> I currently bring up a board based on AT91SAM9G25cu, and I having
->>>> problems of watchdogs resets.
->>>>
->>>> We use linux-4.04 mainline, and i found some weird warnings on kernel
->>>> traces, concerning main clk.
->>>>
->>>> [    0.000000] Main crystal frequency not set, using approximate value
->>>> [    0.000000] master clk is overclocked
->>>> [    0.000000] sched_clock: 32 bits at 128 Hz, resolution 7812500ns,
->>>> wraps every 16777216000000000ns
->>>> [    0.007812] Calibrating delay loop... 198.76 BogoMIPS (lpj=775168)
->>>>
->>>> I set crystal clock in the DT, but it doesn't seems to work.. I feel
->>>> that the board works out of the specified range.
->>>
->>> According to your clk_summary dump that's not the case.
->>>
->>>>
->>>> So here comes my questions:
->>>> Can there be a relationship with watchdog problems ? (1 per day)
->>>
->>> I'd say no, but could you tell me more about your watchdog issues.
->>
->> Yet, we did not take the analysis. We just observed these resets.
->>
->> But, I found a clue:
->> We recently removed the slow clock to the PCB. I forgot to disabled the
->> slow_xtal. :/
->>  Can there be a link ? (I think so...)
->>
->>>
->>>> Why is it that the frequency of Crystal is not found ?
->>>
->>> That's a good question, and honestly I don't. Everything seems to be
->>> defined properly in your device tree.
->>>
->>> Could you add some traces in the fixed-rate clk driver [1] to see if the
->>> main_xtal is correctly registered and if its registration occurs before
->>> the main_osc registration?
->>
->> On our board, there is two kernel boot phases.
->>
->> First, we boot from at91-bootstrap.
->> Second we launched kexec with an other kernel.
->>
->> I found that the device tree is well loaded from the at91-bootstrap. Any
->> crystal issues. But, on kexec --exec, (with the same kernel) those
->> issues appears. (see dmesg attached)
->>
->> If I launch kexec with --dtb, it's working ...
->> I thought kexec keep old dtb. Was I wrong ?
->>
->>>
->>> Best Regards,
->>>
->>> Boris
->>>
->>> [1]https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/drivers/clk/clk-fixed-rate.c?id=refs/tags/v4.0.4#n115
->>>
->>
->> Best regards,
->> Antoine Aubert
->> a.aubert at overkiz.com
-> 
-> 
-> 
-
-Antoine Aubert
-a.aubert at overkiz.com
-
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/b7d54765/attachment.sig>
+Name: .config.gz
+Type: application/octet-stream
+Size: 20374 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/0cc8da78/attachment-0001.obj>
