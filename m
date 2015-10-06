@@ -1,179 +1,101 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 05 Oct 2015 19:33:14 -0700
-Subject: [PATCH v2 2/2] enable armv8 fp/simd lazy switch
-In-Reply-To: <1444098794-19244-1-git-send-email-m.smarduch@samsung.com>
-References: <1444098794-19244-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1444098794-19244-3-git-send-email-m.smarduch@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 5 Oct 2015 21:49:38 -0500
+Subject: [PATCH v6 21/22] driver core: Start processing deferred probes
+ earlier
+In-Reply-To: <56130D43.10200@gmail.com>
+References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1442844182-27787-22-git-send-email-tomeu.vizoso@collabora.com>
+ <56130D43.10200@gmail.com>
+Message-ID: <CAL_JsqKBKSsvEuoufc=xesSvcA1bf-X43O0YOvuntUJE5NYCJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables arm64 lazy fp/simd switch. Removes the ARM constraint,
-and follows the same approach as armv7 version - found here.
+On Mon, Oct 5, 2015 at 6:52 PM, Frank Rowand <frowand.list@gmail.com> wrote:
+> On 9/21/2015 7:03 AM, Tomeu Vizoso wrote:
+>> Some initcalls in the late level assume that some devices will have
+>> already probed without explicitly checking for that.
+>>
+>> After the recent move to defer most device probes when they are
+>> registered, pressure increased in the late initcall level.
+>>
+>> By starting the processing of the deferred queue in device_initcall_sync
+>> we increase the chances that the initcalls mentioned before will find
+>> the devices they depend on to have already probed.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> ---
+>>
+>> Changes in v4:
+>> - Start processing deferred probes in device_initcall_sync
+>>
+>>  drivers/base/dd.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+>> index 269ea76c1a4f..f0ef9233fcd6 100644
+>> --- a/drivers/base/dd.c
+>> +++ b/drivers/base/dd.c
+>> @@ -176,7 +176,7 @@ static void driver_deferred_probe_trigger(void)
+>>   *
+>>   * We don't want to get in the way when the bulk of drivers are getting probed.
+>>   * Instead, this initcall makes sure that deferred probing is delayed until
+>> - * late_initcall time.
+>> + * device_initcall_sync time.
+>
+> This is a misuse of the *_sync initcall level.
+>
+> If a deferred probe created a thread and expected a wait at the
+> following *_sync level then the wait would not occur because
+> there is no subsequent *_sync level.  This is not a problem today
+> because (as far as I know) there are no threads in the probe
+> functions.  But there has been interest in adding parallel
+> probing and that could expose this problem.
+>
+> The purpose of the *_sync initcall levels is to allow the corresponding
+> initcall level to use multiple threads of execution instead of a single
+> thread.  The *_sync level provides a location for a wait for all of the
+> threads at the corresponding init level to complete.  This is better
+> explained in the git log:
 
-https://lists.cs.columbia.edu/pipermail/kvmarm/2015-September/016567.html
+The things I was worried about like clk and regulator disabling are
+actually late_initcall_sync, so maybe late_initcall is fine here after
+all.
 
-To summarize - provided the guest accesses fp/simd unit we limit number
-of fp/simd context switches to two per vCPU execution schedule.
+However, looking at other *_initcall_sync users, I'm not so sure they
+are doing the same abuse.
 
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
----
- arch/arm/kvm/arm.c               |  2 --
- arch/arm64/include/asm/kvm_asm.h |  1 +
- arch/arm64/kvm/hyp.S             | 59 +++++++++++++++++++++++++++-------------
- 3 files changed, 41 insertions(+), 21 deletions(-)
+Rob
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 1b1f9e9..fe609f1 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -112,12 +112,10 @@ void kvm_arch_check_processor_compat(void *rtn)
-  */
- static void kvm_switch_fp_regs(struct kvm_vcpu *vcpu)
- {
--#ifdef CONFIG_ARM
- 	if (vcpu->arch.vfp_lazy == 1) {
- 		kvm_call_hyp(__kvm_restore_host_vfp_state, vcpu);
- 		vcpu->arch.vfp_lazy = 0;
- 	}
--#endif
- }
- 
- /**
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 5e37710..83dcac5 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -117,6 +117,7 @@ extern char __kvm_hyp_vector[];
- extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
- extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
-+extern void __kvm_restore_host_vfp_state(struct kvm_vcpu *vcpu);
- 
- extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
- 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index e583613..ea99f66 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -385,14 +385,6 @@
- 	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
- .endm
- 
--/*
-- * Branch to target if CPTR_EL2.TFP bit is set (VFP/SIMD trapping enabled)
-- */
--.macro skip_fpsimd_state tmp, target
--	mrs	\tmp, cptr_el2
--	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
--.endm
--
- .macro compute_debug_state target
- 	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
- 	// is set, we do a full save/restore cycle and disable trapping.
-@@ -433,10 +425,6 @@
- 	mrs	x5, ifsr32_el2
- 	stp	x4, x5, [x3]
- 
--	skip_fpsimd_state x8, 2f
--	mrs	x6, fpexc32_el2
--	str	x6, [x3, #16]
--2:
- 	skip_debug_state x8, 1f
- 	mrs	x7, dbgvcr32_el2
- 	str	x7, [x3, #24]
-@@ -481,8 +469,15 @@
- 	isb
- 99:
- 	msr     hcr_el2, x2
--	mov	x2, #CPTR_EL2_TTA
-+
-+	mov     x2, #0
-+	ldr     w3, [x0, #VCPU_VFP_LAZY]
-+	tbnz    w3, #0, 98f
-+
- 	orr     x2, x2, #CPTR_EL2_TFP
-+98:
-+	orr     x2, x2, #CPTR_EL2_TTA
-+
- 	msr	cptr_el2, x2
- 
- 	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
-@@ -669,14 +664,12 @@ __restore_debug:
- 	ret
- 
- __save_fpsimd:
--	skip_fpsimd_state x3, 1f
- 	save_fpsimd
--1:	ret
-+	ret
- 
- __restore_fpsimd:
--	skip_fpsimd_state x3, 1f
- 	restore_fpsimd
--1:	ret
-+	ret
- 
- switch_to_guest_fpsimd:
- 	push	x4, lr
-@@ -688,6 +681,9 @@ switch_to_guest_fpsimd:
- 
- 	mrs	x0, tpidr_el2
- 
-+	mov     w2, #1
-+	str     w2, [x0, #VCPU_VFP_LAZY]
-+
- 	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
- 	kern_hyp_va x2
- 	bl __save_fpsimd
-@@ -763,7 +759,6 @@ __kvm_vcpu_return:
- 	add	x2, x0, #VCPU_CONTEXT
- 
- 	save_guest_regs
--	bl __save_fpsimd
- 	bl __save_sysregs
- 
- 	skip_debug_state x3, 1f
-@@ -784,7 +779,6 @@ __kvm_vcpu_return:
- 	kern_hyp_va x2
- 
- 	bl __restore_sysregs
--	bl __restore_fpsimd
- 	/* Clear FPSIMD and Trace trapping */
- 	msr     cptr_el2, xzr
- 
-@@ -863,6 +857,33 @@ ENTRY(__kvm_flush_vm_context)
- 	ret
- ENDPROC(__kvm_flush_vm_context)
- 
-+/**
-+ * kvm_switch_fp_regs() - switch guest/host VFP/SIMD registers
-+ * @vcpu:      pointer to vcpu structure.
-+ *
-+ */
-+ENTRY(__kvm_restore_host_vfp_state)
-+	push    x4, lr
-+
-+	kern_hyp_va x0
-+	add     x2, x0, #VCPU_CONTEXT
-+
-+	// Load Guest HCR, determine if guest is 32 or 64 bit
-+	ldr     x3, [x0, #VCPU_HCR_EL2]
-+	tbnz    x3, #HCR_RW_SHIFT, 1f
-+	mrs     x4, fpexc32_el2
-+	str     x4, [x2, #CPU_SYSREG_OFFSET(FPEXC32_EL2)]
-+1:
-+	bl __save_fpsimd
-+
-+	ldr     x2, [x0, #VCPU_HOST_CONTEXT]
-+	kern_hyp_va x2
-+	bl __restore_fpsimd
-+
-+	pop     x4, lr
-+	ret
-+ENDPROC(__kvm_restore_host_vfp_state)
-+
- __kvm_hyp_panic:
- 	// Guess the context by looking@VTTBR:
- 	// If zero, then we're already a host.
--- 
-1.9.1
+>
+> commit 735a7ffb739b6efeaeb1e720306ba308eaaeb20e
+> Author: Andrew Morton <akpm@osdl.org>
+> Date:   Fri Oct 27 11:42:37 2006 -0700
+>
+>     [PATCH] drivers: wait for threaded probes between initcall levels
+>
+>     The multithreaded-probing code has a problem: after one initcall level (eg,
+>     core_initcall) has been processed, we will then start processing the next
+>     level (postcore_initcall) while the kernel threads which are handling
+>     core_initcall are still executing.  This breaks the guarantees which the
+>     layered initcalls previously gave us.
+>
+>     IOW, we want to be multithreaded _within_ an initcall level, but not between
+>     different levels.
+>
+>     Fix that up by causing the probing code to wait for all outstanding probes at
+>     one level to complete before we start processing the next level.
+>
+>>   */
+>>  static int deferred_probe_initcall(void)
+>>  {
+>> @@ -190,7 +190,7 @@ static int deferred_probe_initcall(void)
+>>       flush_workqueue(deferred_wq);
+>>       return 0;
+>>  }
+>> -late_initcall(deferred_probe_initcall);
+>> +device_initcall_sync(deferred_probe_initcall);
+>>
+>>  static void driver_bound(struct device *dev)
+>>  {
+>>
+>
