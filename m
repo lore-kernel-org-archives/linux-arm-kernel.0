@@ -1,67 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Oct 2015 08:37:11 -0700
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20151006150009.GF21626@n2100.arm.linux.org.uk>
-References: <CAPDyKFpnqJBrtiBekikrNHAf-agZm12KnF9n+=+72HH=jti-KA@mail.gmail.com>
- <20151001100326.GV21513@n2100.arm.linux.org.uk>
- <20151005112304.GZ23801@atomide.com>
- <20151005143532.GA23801@atomide.com>
- <20151005145127.GB23801@atomide.com>
- <20151005171155.GF23801@atomide.com>
- <20151005183813.GD21626@n2100.arm.linux.org.uk>
- <20151006090015.GE21626@n2100.arm.linux.org.uk>
- <20151006094425.GM23801@atomide.com>
- <20151006150009.GF21626@n2100.arm.linux.org.uk>
-Message-ID: <20151006153710.GS23801@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 6 Oct 2015 16:37:49 +0100
+Subject: [PATCH V5 0/2] copy to/in/from user optimization
+In-Reply-To: <1443034539-1848-1-git-send-email-fkan@apm.com>
+References: <1443034539-1848-1-git-send-email-fkan@apm.com>
+Message-ID: <20151006153748.GD3069@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [151006 08:04]:
-> On Tue, Oct 06, 2015 at 02:44:25AM -0700, Tony Lindgren wrote:
-> > 
-> > Hmm DT-based boot finds the MMC card for LDP, dmesg below from DT boot [1].
-> > Looks like you're on on -rc4 and not -rc3. My guess is that MMC is not
-> > working for you with DT-based booting because you don't seem to have
-> > CONFIG_REGULATOR_PBIAS in your seed config for. Care to try enabling that
-> > for both your omap3 and omap4 seed config files?
+On Wed, Sep 23, 2015 at 11:55:37AM -0700, Feng Kan wrote:
+> This coverts all copy in/from/to user file to use the copy template file.
+> The copy template file is based on the memcpy.S. The first patch converts
+> the memcpy to use the copy template as well. Overnight trinity test and
+> 10G iperf was used to test correctness and performance. Noticeable
+> iperf improvement (~30%) on the receive side.
 > 
-> This is precisely the kind of crap I'm objecting to.  New kernel versions
-> come along, and things break because people add extra Kconfig symbols that
-> previous versions did not rely upon - and there's no communication of
-> what's required for new kernel versions.
+> V5 Changes:
+>    1. Switch patch ordering.
+>    2. Simplify assembly code and use fixed large tags in marco
+>    3. Fixed indentation issue.
 > 
-> This stuff needs documenting, so that people are aware what changes they
-> need to make - please put something in Documentation/arm/OMAP which
-> tracks what new additions are required to the Kconfig to keep things
-> working.
+> Feng Kan (2):
+>   arm64: Change memcpy in kernel to use the copy template file
+>   arm64: copy_to-from-in_user optimization using copy template
 
-Good idea, how about something like the following? AFAIK that's the
-only .config option needed as MFD_SYSCON is selected by Kconfig
-already.
+Queued for 4.4 (subject to passing my LTP testing). Thanks.
 
-Regrds,
-
-Tony
-
-8< ----------
-From: Tony Lindgren <tony@atomide.com>
-Date: Tue, 6 Oct 2015 08:33:16 -0700
-Subject: [PATCH] Documentation: ARM: List new omap MMC requirements
-
-Earlier the PBIAS regulator was optional, not so with recent
-omap_hsmmc changes. To make things easier for people with
-custom .config files, let's add minimal documentation for it
-as suggested by Russell King <rmk+kernel@arm.linux.org.uk>.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- /dev/null
-+++ b/Documentation/arm/OMAP/README
-@@ -0,0 +1,7 @@
-+This file contains documentation for running mainline
-+kernel on omaps.
-+
-+KERNEL		NEW DEPENDENCIES
-+v4.3+		Update is needed for custom .config files to make sure
-+		CONFIG_REGULATOR_PBIAS is enabled for MMC1 to work
-+		properly.
+-- 
+Catalin
