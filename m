@@ -1,127 +1,37 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 7 Oct 2015 00:59:29 +0530
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20151006150751.GG21626@n2100.arm.linux.org.uk>
-References: <20151001100326.GV21513@n2100.arm.linux.org.uk>
- <20151005112304.GZ23801@atomide.com> <20151005143532.GA23801@atomide.com>
- <20151005145127.GB23801@atomide.com> <20151005171155.GF23801@atomide.com>
- <20151005183813.GD21626@n2100.arm.linux.org.uk>
- <20151006090015.GE21626@n2100.arm.linux.org.uk>
- <20151006094425.GM23801@atomide.com>
- <CAPDyKFowuHHoYq3pRa11rg8KThQA5=Pzg5CpKfzMgz1to9+XLA@mail.gmail.com>
- <5613A419.5070006@ti.com> <20151006150751.GG21626@n2100.arm.linux.org.uk>
-Message-ID: <56142119.6050603@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Oct 2015 20:37:57 +0100
+Subject: [PATCH 3/3] hwrng: st: Use real-world device timings for timeout
+In-Reply-To: <1444142640-14721-3-git-send-email-lee.jones@linaro.org>
+References: <1444142640-14721-1-git-send-email-lee.jones@linaro.org>
+ <1444142640-14721-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20151006193757.GY21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Oct 06, 2015 at 03:44:00PM +0100, Lee Jones wrote:
+> Samples are documented to be available every 0.667us, so in theory
+> the 8 sample deep FIFO should take 5.336us to fill.  However, during
+> thorough testing, it became apparent that filling the FIFO actually
+> takes closer to 12us.
 
-On Tuesday 06 October 2015 08:37 PM, Russell King - ARM Linux wrote:
-> On Tue, Oct 06, 2015 at 04:06:09PM +0530, Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> On Tuesday 06 October 2015 03:41 PM, Ulf Hansson wrote:
->>> On 6 October 2015 at 11:44, Tony Lindgren <tony@atomide.com> wrote:
->>>> * Russell King - ARM Linux <linux@arm.linux.org.uk> [151006 02:04]:
->>>>> On Mon, Oct 05, 2015 at 07:38:13PM +0100, Russell King - ARM Linux wrote:
->>>>>> On Mon, Oct 05, 2015 at 10:11:56AM -0700, Tony Lindgren wrote:
->>>>>>> * Tony Lindgren <tony@atomide.com> [151005 07:57]:
->>>>>>>> * Tony Lindgren <tony@atomide.com> [151005 07:44]:
->>>>>>>>> * Tony Lindgren <tony@atomide.com> [151005 04:28]:
->>>>>>>>>
->>>>>>>>> Based on some tests it seems that the duovero unpaired regulator usage
->>>>>>>>> is fixed by reverting:
->>>>>>>>>
->>>>>>>>> c55d7a055364 ("mmc: host: omap_hsmmc: use regulator_is_enabled to
->>>>>>>>> find pbias status")
->>>>>>>>
->>>>>>>> With commit c55d7a055364 my guess is that the PBIAS regulator is
->>>>>>>> already on from an earlier MMC probe and getting re-enabled when
->>>>>>>> a deferred probe happens?
->>>>>>>
->>>>>>> Unless somebody has a better fix in mind for the above, I suggest
->>>>>>> we revert it for the -rc kernel.
->>>>>>
->>>>>> Let me try reverting that in my build tree, and...
->>>>>>
->>>>>>>>> And it seems that omap3 legacy MMC is broken earlier in the
->>>>>>>>> series with:
->>>>>>>>>
->>>>>>>>> 7d607f917008 ("mmc: host: omap_hsmmc: use
->>>>>>>>> devm_regulator_get_optional() for vmmc")
->>>>>>>>>
->>>>>>>>> This one does not cleanly revert so have not yet tried reverting
->>>>>>>>> it.
->>>>>>>>
->>>>>>>> And with commit 7d607f917008 I'm guessing we can't return anHi,
->>>>>>>> error if the PBIAS regulator does not exist as that's not there
->>>>>>>> for the legacy booting.
->>>>>>>
->>>>>>> For omap3 legacy booting, we keep getting -EPROBE_DEFER for
->>>>>>> all the optional regulators.
->>>>>>>
->>>>>>> Something like the following might be the minimal fix for the -rc
->>>>>>> cycle?
->>>>>>
->>>>>> applying this patch.  If that gets things going again, then we
->>>>>> _definitely_ should get both of these to Linus ASAP.  The breakage
->>>>>> has been around far too long already.
->>>>>
->>>>> Last night's build shows that this fixes the non-DT LDP3430 booting, but
->>>>> DT-based LDP3430 and SDP4430 both remain broken for the same reason -
->>>>> neither can find their SD cards.
->>>>
->>>> Hmm DT-based boot finds the MMC card for LDP, dmesg below from DT boot [1].
->>>> Looks like you're on on -rc4 and not -rc3. My guess is that MMC is not
->>>> working for you with DT-based booting because you don't seem to have
->>>> CONFIG_REGULATOR_PBIAS in your seed config for. Care to try enabling that
->>>> for both your omap3 and omap4 seed config files?
->>>>
->>>>> We're at -rc4.  That means we're could be only three weeks away from 4.3
->>>>> being released, and DT OMAP has yet to boot _once_ here.
->>>>>
->>>>> What I find *totally* unacceptable is the lack of reaction from the MMC
->>>>> and TI people: it's just like "we'll break your crap, and we'll ignore
->>>>> reports of regressions."  That is *not* acceptable in any shape or form,
->>>>> and people who do this _should_ have their future patches ignored until
->>>>> they demonstrate that they understand the need to not break stuff.
->>>>>
->>>>> I'm at the point of suggesting that there should be a moritorium on all
->>>>> OMAP related development for 4.4: delay all development to 4.5, and have
->>>>> 4.4 as a pure bug-fixing _only_ cycle for OMAP.  If 4.3 is released and
->>>>> OMAP is still broken, then I don't think there's an option on that.
->>>>>
->>>>> Maybe the idea that development work won't hit mainline for another 4
->>>>> months will help focus the minds on not breaking stuff and then ignoring
->>>>> regression reports.
->>>>
->>>> I'm thinking along the same lines. In general, I do not and will not
->>>> apply any patches that are not fixes until all critical regressions are
->>>> out of the way. So not applying anything new for v4.4 until these MMC
->>>> regressions are fixed for v4.3.
->>>>
->>>
->>> Tony, Russell - just wanted to say thanks for putting a big effort in
->>> fixing this. I was expecting support from Kishon, but I guess he's
->>> busy.
->>>
->>> Unfortunate, I don't have any of the hardware that fails, otherwise I
->>> would of course be helping out more. The only thing I can think of is
->>> to revert the entire patchset I picked up for 4.3 from Kishon for the
->>> omap_hsmmc driver, but then I am not sure if that would cause other
->>> issues...
->>
->> Please don't do that as that will just mask lot of bugs in the
->> devicetree and might get MMC working. Indeed I was busy but I'll try to
->> get this resolved asap. The 2 pending issues as far as I know
-> 
-> Sorry, but no.  None of this "mask bugs ... might" crap.  Either they're
-> bug fixes, or they aren't bug fixes.  This should be a definite decision,
-> not some vague crap.
+Is that measured?
 
-What I meant is the patches merged by Ulf *did* exposed bugs in device
-tree (for instance a dt patch caused PBIAS regulator from not being
-registered) and if those patches are reverted then a future dt breakage
-might again be not caught.
+> +/*
+> + * Samples are documented to be available every 0.667us, so in theory
+> + * the 8 sample deep FIFO should take 5.336us to fill.  However, during
+> + * thorough testing, it became apparent that filling the FIFO actually
+> + * takes closer to 12us.
+> + */
+> +#define ST_RNG_FILL_FIFO_TIMEOUT	12
 
--Kishon
+I hope you're not using such a precise figure with udelay().  udelay()
+is not guaranteed to give exactly (or even at least) the delay you
+request.  It's defined to give an approximate delay.
+
+Many people have a problem understanding that, so I won't explain why
+it is that way, just accept that it is and move on... it's not going
+to magically get "fixed" because someone has just learnt about this. :)
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
