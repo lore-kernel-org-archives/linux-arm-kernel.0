@@ -1,32 +1,32 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 6 Oct 2015 13:31:33 +0200
-Subject: [PATCH RFC] apei: xgene: Add ACPI APEI support for X-Gene
-In-Reply-To: <CAPw-ZTn5stnEobMH018oLPn3nDO1uweVeVs=Otg3-6cXBWLz6g@mail.gmail.com>
-References: <1443747112-24814-1-git-send-email-lho@apm.com>
- <20151002075411.GB16538@pd.tnic>
- <CAPw-ZTn5stnEobMH018oLPn3nDO1uweVeVs=Otg3-6cXBWLz6g@mail.gmail.com>
-Message-ID: <20151006113133.GA28484@nazgul.tnic>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 6 Oct 2015 12:33:28 +0100
+Subject: [PATCHv2] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
+In-Reply-To: <mvmh9m48dpa.fsf@hawking.suse.de>
+References: <1444109743-8561-1-git-send-email-manjeet.p@samsung.com>
+ <5022096.8QRzW0l3EJ@wuerfel>
+ <20151006103128.GN6281@e103592.cambridge.arm.com>
+ <5340366.WTVksOGb0G@wuerfel> <mvmh9m48dpa.fsf@hawking.suse.de>
+Message-ID: <20151006113328.GP6281@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 05, 2015 at 01:41:58PM -0700, Loc Ho wrote:
-> Yes... We can make this generic. The only non-generic is the way the
-> interrupt is cleared. As of right now, the method of clearing the
-> interrupt is by writing back the same value as read. This would be
-> fine for most.
+On Tue, Oct 06, 2015 at 12:59:45PM +0200, Andreas Schwab wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > I think it makes sense to stick with the traditional definition
+> > of MINSIGSTKSZ == "the minimum amount that you will always need,
+> > add whatever you require yourself" and SIGSTKSZ == "Should be
+> > enough for a couple of function calls".
+> 
+> The python3 testsuite wants to put two signal frames in a SIGSTKSZ
+> stack.
 
-Fine for most what? APM hardware, other hw?
+Whether it's valid to expect SIGSTKSZ to be big enough for that is
+debatable.
 
-> But to ensure 100% coverage, would an AML method be better or needed?
+But I guess that SIGSTKSZ = MINSIGSTKSZ * 4 provides some insurance
+against such assumptions (doubtless the python testsuite is not
+the only code affected).
 
-No idea, I'm not an ACPI guy. You probably should get in touch with the
-people working on the ARM64 APEI driver and hash that out with them.
-
-HTH.
-
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+Cheers
+---Dave
