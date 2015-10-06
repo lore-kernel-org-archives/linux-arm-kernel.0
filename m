@@ -1,39 +1,23 @@
-From: nikolay@cumulusnetworks.com (Nikolay Aleksandrov)
-Date: Tue, 6 Oct 2015 21:28:29 +0200
-Subject: [PATCH] bridge/netfilter: avoid unused label warning
-In-Reply-To: <7985748.1v9Gzszd4T@wuerfel>
-References: <7985748.1v9Gzszd4T@wuerfel>
-Message-ID: <561420DD.70009@cumulusnetworks.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Oct 2015 20:28:36 +0100
+Subject: [PATCH] ARM:mm: fix kmap_atomic_to_page
+In-Reply-To: <1444129773-12632-1-git-send-email-chanho.min@lge.com>
+References: <1444129773-12632-1-git-send-email-chanho.min@lge.com>
+Message-ID: <20151006192836.GX21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/2015 09:22 PM, Arnd Bergmann wrote:
-> With the ARM mini2440_defconfig, the bridge netfilter code gets
-> built with both CONFIG_NF_DEFRAG_IPV4 and CONFIG_NF_DEFRAG_IPV6
-> disabled, which leads to a harmless gcc warning:
-> 
-> net/bridge/br_netfilter_hooks.c: In function 'br_nf_dev_queue_xmit':
-> net/bridge/br_netfilter_hooks.c:792:2: warning: label 'drop' defined but not used [-Wunused-label]
-> 
-> This gets rid of the warning by cleaning up the code to avoid
-> the respective #ifdefs causing this problem, and replacing them
-> with if(IS_ENABLED()) checks. I have verified that the resulting
-> object code is unchanged, and an additional advantage is that
-> we now get compile coverage of the unused functions in more
-> configurations.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: dd302b59bde0 ("netfilter: bridge: don't leak skb in error paths")
-> 
+On Tue, Oct 06, 2015 at 08:09:33PM +0900, Chanho Min wrote:
+> Since kmap_atomic returns the pkmap address without a new mapping to
+> fixmap for the page that is already mapped by kmap, It should be
+> considered for the pkmap address in kmap_atomic_to_page.
 
-I posted a fix for this a couple of days ago, but I like your approach better.
-Since mine is not yet applied (I sent it to netfilter-devel only, wasn't sure which
-jurisdiction this falls into exactly) we can drop it.
-Just for reference my patch is here:
-http://patchwork.ozlabs.org/patch/526417/
-Pablo, could you please drop it ?
+What's the reasoning behind this change, given that I can find lots of
+definitions of kmap_atomic_to_page() in the kernel, but not a single
+user of this.
 
-By the way this takes care of another warning about unused variable (nf_bridge), too.
-So,
+If there's no users, should we be deleting this code?
 
-Reviewed-by: Nikolay Aleksandrov <nikolay@cumulusnetworks.com>
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
