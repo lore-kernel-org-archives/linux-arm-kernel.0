@@ -1,88 +1,55 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Mon, 05 Oct 2015 16:52:35 -0700
-Subject: [PATCH v6 21/22] driver core: Start processing deferred probes
- earlier
-In-Reply-To: <1442844182-27787-22-git-send-email-tomeu.vizoso@collabora.com>
-References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
- <1442844182-27787-22-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <56130D43.10200@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 06 Oct 2015 09:23:42 +0900
+Subject: [PATCH v2 0/7] Add support for Exynos SROM Controller driver
+In-Reply-To: <01cb01d0ff70$6027b760$20772620$@samsung.com>
+References: <1440403348-8974-1-git-send-email-pankaj.dubey@samsung.com>
+ <018501d0ff62$1650b410$42f21c30$@samsung.com> <5612719E.60006@samsung.com>
+ <01cb01d0ff70$6027b760$20772620$@samsung.com>
+Message-ID: <5613148E.8010903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/21/2015 7:03 AM, Tomeu Vizoso wrote:
-> Some initcalls in the late level assume that some devices will have
-> already probed without explicitly checking for that.
+On 05.10.2015 22:18, Pavel Fedin wrote:
+>  Hello!
 > 
-> After the recent move to defer most device probes when they are
-> registered, pressure increased in the late initcall level.
+>> That is interesting. What do you mean by that? Although SROM controller
+>> can access external memory (SRAM, ROM) but it is not exactly a bus. How
+>> is the SMSC9111 "connected"? What interface or protocol is used?
 > 
-> By starting the processing of the deferred queue in device_initcall_sync
-> we increase the chances that the initcalls mentioned before will find
-> the devices they depend on to have already probed.
+>  SROM controller actually provides a demultiplexed external address and data bus. This way you could
+> hook up old good ROM chip to it (hence its name). However, you can plug in there anything else with
+> the appropriate interface, and SMSC9111 uses exactly that. Just some address + control + data wires.
+> Therefore, you can think of SROMc as a simple bus.
+
+Ah, okay, thanks for details.
+
 > 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> ---
+>> I am sorry but I cannot figure out what exactly are you talking about.
+>> The Device Tree is the glue to describe the board, the hardware and its
+>> configuration. Please elaborate a little more.
 > 
-> Changes in v4:
-> - Start processing deferred probes in device_initcall_sync
+>  Yes, exactly that. SROM controller has 4 outputs, and for every of these outputs you have to choose
+> mode and timings. Once you set them correctly, you can use peripherial behind them. These timings
+> actually depend on the actual peripherial.
 > 
->  drivers/base/dd.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index 269ea76c1a4f..f0ef9233fcd6 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -176,7 +176,7 @@ static void driver_deferred_probe_trigger(void)
->   *
->   * We don't want to get in the way when the bulk of drivers are getting probed.
->   * Instead, this initcall makes sure that deferred probing is delayed until
-> - * late_initcall time.
-> + * device_initcall_sync time.
+>  By this time i remembered that u-boot guys also did something with this. And here are links:
+> http://git.denx.de/?p=u-boot.git;a=blob;f=arch/arm/dts/exynos5250-smdk5250.dts;h=8b695442b1a29dec4e3
+> 53ebd3cfee0ff89f218a6;hb=HEAD#l43 - this is how connection is described
+> http://git.denx.de/?p=u-boot.git;a=blob;f=board/samsung/common/board.c;h=d32c75de50858f131284e28db0c
+> 7ed55883f1cb0;hb=HEAD#l184 - and this is parsing code
 
-This is a misuse of the *_sync initcall level.
+I see... Pankaj's driver was not developed for that purpose. You would
+have to extend it. For the SROMC driver there shouldn't be much work to
+do: just parse additional bindings and configure the controller for
+ethernet adapter.
 
-If a deferred probe created a thread and expected a wait at the
-following *_sync level then the wait would not occur because
-there is no subsequent *_sync level.  This is not a problem today
-because (as far as I know) there are no threads in the probe
-functions.  But there has been interest in adding parallel
-probing and that could expose this problem.
+>  There's only one small problem with their code. "bank" parameter is device-wide, therefore you
+> cannot configure more than one bank. For SMDK boards it's OK, but in future you may run into problem
+> with this.
 
-The purpose of the *_sync initcall levels is to allow the corresponding
-initcall level to use multiple threads of execution instead of a single
-thread.  The *_sync level provides a location for a wait for all of the
-threads at the corresponding init level to complete.  This is better
-explained in the git log:
+You are not bound by u-boot bindings anyhow (at least to my
+understanding). You can try to re-use them but if some binding is
+problematic then just create your own.
 
-commit 735a7ffb739b6efeaeb1e720306ba308eaaeb20e
-Author: Andrew Morton <akpm@osdl.org>
-Date:   Fri Oct 27 11:42:37 2006 -0700
-
-    [PATCH] drivers: wait for threaded probes between initcall levels
-
-    The multithreaded-probing code has a problem: after one initcall level (eg,
-    core_initcall) has been processed, we will then start processing the next
-    level (postcore_initcall) while the kernel threads which are handling
-    core_initcall are still executing.  This breaks the guarantees which the
-    layered initcalls previously gave us.
-
-    IOW, we want to be multithreaded _within_ an initcall level, but not between
-    different levels.
-
-    Fix that up by causing the probing code to wait for all outstanding probes at
-    one level to complete before we start processing the next level.
-
->   */
->  static int deferred_probe_initcall(void)
->  {
-> @@ -190,7 +190,7 @@ static int deferred_probe_initcall(void)
->  	flush_workqueue(deferred_wq);
->  	return 0;
->  }
-> -late_initcall(deferred_probe_initcall);
-> +device_initcall_sync(deferred_probe_initcall);
->  
->  static void driver_bound(struct device *dev)
->  {
-> 
+Best regards,
+Krzysztof
