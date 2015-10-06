@@ -1,127 +1,118 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Tue, 6 Oct 2015 12:15:38 +1100
-Subject: [linux-sunxi] [PATCH v2 5/5] ARM: sun5i: Add C.H.I.P DTS
-In-Reply-To: <1444054990-15946-6-git-send-email-maxime.ripard@free-electrons.com>
-References: <1444054990-15946-1-git-send-email-maxime.ripard@free-electrons.com>
- <1444054990-15946-6-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGRGNgXyaenitKnZNj4vLsgEDKe0CtTk=KqPADSs9588k1t+GA@mail.gmail.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Tue,  6 Oct 2015 03:22:38 +0200
+Subject: [PATCH 4/8] mmc: sdhci-pxav3: enable proper resuming on Armada 38x SoC
+In-Reply-To: <1444094562-31165-1-git-send-email-mw@semihalf.com>
+References: <1444094562-31165-1-git-send-email-mw@semihalf.com>
+Message-ID: <1444094562-31165-5-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+When resuming from suspend on Armada 38x SoC MBus windows have to be
+re-configured and for that purpose mv_conf_mbus_windows function needed
+rework. MBus windows register base address obtaining was moved to
+armada_38x_quirks function in order to be kept in pxa global structure,
+because it is used during a resume.
 
-On Tue, Oct 6, 2015 at 1:23 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The C.H.I.P. is a small SBC with an Allwinner R8, 8GB of NAND, 512MB of
-> RAM, USB host and OTG, a wifi / bluetooth combo chip, an audio/video jack
-> and two connectors to plug additional boards on top of it.
+This commit fixes resuming from suspend by calling MBus windows
+configuration routine and therefore enabling proper DMA operation.
 
-Sorry for the late review, but a couple of minor things stuck out at me.
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+---
+ drivers/mmc/host/sdhci-pxav3.c | 39 ++++++++++++++++++++-------------------
+ 1 file changed, 20 insertions(+), 19 deletions(-)
 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/Makefile          |   3 +-
->  arch/arm/boot/dts/sun5i-r8-chip.dts | 224 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 226 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/sun5i-r8-chip.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index c7adaa85ef3f..2cf7e593270a 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -600,7 +600,8 @@ dtb-$(CONFIG_MACH_SUN5I) += \
->         sun5i-a13-olinuxino.dtb \
->         sun5i-a13-olinuxino-micro.dtb \
->         sun5i-a13-q8-tablet.dtb \
-> -       sun5i-a13-utoo-p66.dtb
-> +       sun5i-a13-utoo-p66.dtb \
-> +       sun5i-r8-chip.dtb
->  dtb-$(CONFIG_MACH_SUN6I) += \
->         sun6i-a31-app4-evb1.dtb \
->         sun6i-a31-colombus.dtb \
-> diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
-> new file mode 100644
-> index 000000000000..08ff70601c79
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
-> @@ -0,1 +1,224 @@
-> +/*
-> + * Copyright 2015 Free Electrons
-> + * Copyright 2015 NextThing Co
-> + *
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "sun5i-a13.dtsi"
-
-Am I missing something or should this include "sun5i-r8.dtsi" instead?
-
-> +#include "sunxi-common-regulators.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +
-> +/ {
-> +       model = "NextThing C.H.I.P.";
-> +       compatible = "nextthing,chip", "allwinner,sun5i-r8";
-> +
-> +       aliases {
-> +               i2c0 = &i2c0;
-> +               i2c1 = &i2c1;
-> +               i2c2 = &i2c2;
-> +               serial0 = &uart1;
-> +               serial1 = &uart3;
-> +       };
-> +
-> +       chosen {
-> +               stdout-path = "serial0:115200n8";
-
-Should the composite output be enabled here too?
-
-Thanks,
-
+diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+index f5edf9d..3f71894 100644
+--- a/drivers/mmc/host/sdhci-pxav3.c
++++ b/drivers/mmc/host/sdhci-pxav3.c
+@@ -63,6 +63,7 @@ struct sdhci_pxa {
+ 	struct clk *clk_io;
+ 	u8	power_mode;
+ 	void __iomem *sdio3_conf_reg;
++	void __iomem *mbus_win_regs;
+ };
+ 
+ /*
+@@ -81,30 +82,16 @@ struct sdhci_pxa {
+ #define SDIO3_CONF_CLK_INV	BIT(0)
+ #define SDIO3_CONF_SD_FB_CLK	BIT(2)
+ 
+-static int mv_conf_mbus_windows(struct platform_device *pdev,
++static int mv_conf_mbus_windows(struct device *dev, void __iomem *regs,
+ 				const struct mbus_dram_target_info *dram)
+ {
+ 	int i;
+-	void __iomem *regs;
+-	struct resource *res;
+ 
+ 	if (!dram) {
+-		dev_err(&pdev->dev, "no mbus dram info\n");
+-		return -EINVAL;
+-	}
+-
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	if (!res) {
+-		dev_err(&pdev->dev, "cannot get mbus registers\n");
++		dev_err(dev, "no mbus dram info\n");
+ 		return -EINVAL;
+ 	}
+ 
+-	regs = ioremap(res->start, resource_size(res));
+-	if (!regs) {
+-		dev_err(&pdev->dev, "cannot map mbus registers\n");
+-		return -ENOMEM;
+-	}
+-
+ 	for (i = 0; i < SDHCI_MAX_WIN_NUM; i++) {
+ 		writel(0, regs + SDHCI_WINDOW_CTRL(i));
+ 		writel(0, regs + SDHCI_WINDOW_BASE(i));
+@@ -122,8 +109,6 @@ static int mv_conf_mbus_windows(struct platform_device *pdev,
+ 		writel(cs->base, regs + SDHCI_WINDOW_BASE(i));
+ 	}
+ 
+-	iounmap(regs);
+-
+ 	return 0;
+ }
+ 
+@@ -135,6 +120,14 @@ static int armada_38x_quirks(struct platform_device *pdev,
+ 	struct sdhci_pxa *pxa = pltfm_host->priv;
+ 	struct resource *res;
+ 
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mbus");
++	pxa->mbus_win_regs = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(pxa->mbus_win_regs)) {
++		dev_err(mmc_dev(host->mmc),
++			"failed to obtain MBus windows register base\n");
++		return PTR_ERR(pxa->mbus_win_regs);
++	}
++
+ 	host->quirks &= ~SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN;
+ 	host->quirks |= SDHCI_QUIRK_MISSING_CAPS;
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+@@ -403,7 +396,8 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
+ 		ret = armada_38x_quirks(pdev, host);
+ 		if (ret < 0)
+ 			goto err_mbus_win;
+-		ret = mv_conf_mbus_windows(pdev, mv_mbus_dram_info());
++		ret = mv_conf_mbus_windows(&pdev->dev, pxa->mbus_win_regs,
++					   mv_mbus_dram_info());
+ 		if (ret < 0)
+ 			goto err_mbus_win;
+ 	}
+@@ -520,6 +514,13 @@ static int sdhci_pxav3_resume(struct device *dev)
+ {
+ 	int ret;
+ 	struct sdhci_host *host = dev_get_drvdata(dev);
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_pxa *pxa = pltfm_host->priv;
++	struct device_node *np = dev->of_node;
++
++	if (of_device_is_compatible(np, "marvell,armada-380-sdhci"))
++		ret = mv_conf_mbus_windows(dev, pxa->mbus_win_regs,
++					   mv_mbus_dram_info());
+ 
+ 	pm_runtime_get_sync(dev);
+ 	ret = sdhci_resume_host(host);
 -- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+1.8.3.1
