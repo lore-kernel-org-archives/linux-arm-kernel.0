@@ -1,50 +1,73 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 6 Oct 2015 08:45:02 +0100
-Subject: [PATCH v9] dmaengine: Add Xilinx AXI Direct Memory Access Engine
- driver support
-In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A4EC2DE@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1440432666-10310-1-git-send-email-appanad@xilinx.com>
- <20151005152628.GE13501@vkoul-mobl.iind.intel.com>
- <C246CAC1457055469EF09E3A7AC4E11A4A4EC2DE@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <20151006074459.GA23420@vkoul-mobl.iind.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Oct 2015 09:49:29 +0200
+Subject: [PATCHv2] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
+In-Reply-To: <1444109743-8561-1-git-send-email-manjeet.p@samsung.com>
+References: <1444109743-8561-1-git-send-email-manjeet.p@samsung.com>
+Message-ID: <5022096.8QRzW0l3EJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 05, 2015 at 03:48:39PM +0000, Appana Durga Kedareswara Rao wrote:
-> > Pls justify why we should have two drivers. Looking at code makes me think
-> > otherwise
+On Tuesday 06 October 2015 11:05:43 Manjeet Pawar wrote:
+> MINSIGSTKSZ and SIGSTKSZ for ARM64 are not correctly set in latest kernel.
+> This patch fixes this issue.
 > 
->
-[pls wrap your messages within 80 chars, I have reflowed below]
- 
-> I agree with you and even initially we had a common driver with the
-> similar implementation as you were mentioning.  Later on, being soft IPs,
-> new features were added and the IPs became diversified. As an example,
-> this driver has a residue Calculation whereas the other driver (VDMA) is
-> not applicable and the way interrupts are handled is completely different.
-> Briefly, they are two complete different IPs with a different register set
-> and descriptor format. Eventually, it became too complex To manage the
-> common driver as the code became messy with lot of conditions around.
-> Mainly the validation process is a big concern, as every change In the IP
-> compels to test all the complete features of both IPs.  So, we got
-> convinced to the approach of separating the drivers to overcome this and
-> it comes with Few addition lines of common code.
+> This issue is reported in LTP (testcase: sigaltstack02.c).
+> Testcase failed when sigaltstack() called with stack size "MINSIGSTKSZ - 1"
+> Since in Glibc-2.22, MINSIGSTKSZ is set to 5120 but in kernel
+> it is set to 2048 so testcase gets failed.
+> 
+> Testcase Output:
+> sigaltstack02 1  TPASS  :  stgaltstack() fails, Invalid Flag value,errno:22
+> sigaltstack02 2  TFAIL  :  sigaltstack() returned 0, expected -1,errno:12
+> 
+> Reported Issue in Glibc Bugzilla:
+> https://sourceware.org/bugzilla/show_bug.cgi?id=16850
+> 
+> Bugfix in Glibc-2.22:
+> https://sourceware.org/git/gitweb.cgi?p=glibc.git;a=blob;f=sysdeps/unix/
+> sysv/linux/aarch64/bits/sigstack.h;h=8f2fb76e3e81734ef8a9cf9ae40daf4705
+> f31c35;hb=b763f6ae859ecea70a5dacb8ad45c71d5f667e2e
+> 
+> Signed-off-by: Akhilesh Kumar <akhilesh.k@samsung.com>
+> Signed-off-by: Manjeet Pawar <manjeet.p@samsung.com>
+> Signed-off-by: Rohit Thapliyal <r.thapliyal@samsung.com>
 
-No it is not that hard, bunch of people already do that.
+This looks correct now. A few more points though:
 
-You need is a smart probe or perhaps invoke IP specfic method to
-initialize dma controller.
+* My first thought would have been to do this by first defining the
+  two symbols before the #include, and then adding an #ifdef in
+  the generic file. Both approaches work though, any other opinions
+  on this?
 
-In above case no one forces you to register status callback for both, you
-can do based on the controller probed...
+* It seems that PowerPC has the same bug. Care to fix that as well?
 
-I am sorry but validation is not a strong point here. I have a driver which
-manages bunch of different generations. Reuse helps in having lesser code
-and bug fixes across generations easily..
+* Do we need to backport this to stable?
 
-We cant have two drivers pretty much doing same thing in kernel
+* Can you explain in the changelog how the numbers were decided?
+  I don't see any other architecture using 5kb and cannot see why
+  it has to be this value rather than something else.
 
-Please fix this and come back
+	Arnd
 
--- 
-~Vinod
+> ---
+> v1 -> Changes in uapi overall header
+> v2 -> Changes done in arm64 headers
+> 
+>  arch/arm64/include/uapi/asm/signal.h |    5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm64/include/uapi/asm/signal.h b/arch/arm64/include/uapi/asm/signal.h
+> index 8d1e723..5ac56cf 100644
+> --- a/arch/arm64/include/uapi/asm/signal.h
+> +++ b/arch/arm64/include/uapi/asm/signal.h
+> @@ -21,4 +21,9 @@
+>  
+>  #include <asm-generic/signal.h>
+>  
+> +#undef MINSIGSTKSZ
+> +#undef SIGSTKSZ
+> +#define MINSIGSTKSZ 5120
+> +#define SIGSTKSZ    16384
+> +
+>  #endif
+> 
