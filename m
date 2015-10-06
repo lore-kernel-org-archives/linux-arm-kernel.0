@@ -1,27 +1,34 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Tue, 06 Oct 2015 11:49:27 +0300
-Subject: [PATCH 2/2] ARM: dts: Use architected timer on Exynos 5410
-In-Reply-To: <56138772.5030302@samsung.com>
+From: klimov.linux@gmail.com (Alexey Klimov)
+Date: Tue, 6 Oct 2015 11:51:50 +0300
+Subject: [PATCH 0/2] ARM: EXYNOS: Allow to use architected timer
+In-Reply-To: <6613638.q5qyQZxXy7@wuerfel>
 References: <cover.1444119342.git.p.fedin@samsung.com>
- <57f3491726014e3817bdf9988b1aa30436b45e00.1444119342.git.p.fedin@samsung.com>
- <56138772.5030302@samsung.com>
-Message-ID: <00d101d10013$e9e6f120$bdb4d360$@samsung.com>
+ <6613638.q5qyQZxXy7@wuerfel>
+Message-ID: <CALW4P+LfwHY=+0b8jZ4RH03D5cthW-sy-+-xFGPPY-dMCJWvDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+(add linux-samsung-soc mail list to cc)
 
-> > +
-> > +			arch_timer {
-> > +				compatible = "arm,armv7-timer";
-> > +				interrupt-parent = <&gic>;
-> 
-> You don't need to add 'interrupt-parent' because exynos5410.dtsi already includes
-> it on top.
+On Tue, Oct 6, 2015 at 11:37 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 06 October 2015 11:23:58 Pavel Fedin wrote:
+>> Exynos platform officially uses "multi-core timer" AKA MCT. However, it
+>> also has a possibility to access the same timer using CP15 (AKA
+>> architected timer) registers.
+>>
+>> In order to be able to use KVM, we need CP15 timer support. In its turn,
+>> MCT needs to be turned on before any accesses will work. This patchset
+>> allows to specify "CP15 compatibility mode" for the MCT by inserting
+>> armv7-timer node as a child for MCT device. In this case MCT driver will
+>> only enable the timer, leaving the rest for architected timer driver.
+>
+> IIRC the use of the CP15 timer is not reliable on this platform.
+> I don't have a link ready, but this has come up a few times.
+>
+> Kukjin Kim probably knows the details.
 
- I do, because otherwise it tries to use interrupt-map, written for MCT (which is specified as interrupt-parent for its node), and looks like interrupt-map specifies totally different things.
+Please take a look: http://www.gossamer-threads.com/lists/linux/kernel/2225900
+for some details. I don't know if it's related to 5410.
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Best regards,
+Alexey Klimov
