@@ -1,21 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Oct 2015 05:06:06 -0700
-Subject: [PATCH 01/17] ARM: OMAP2+: PRM: add support for reset controller
-In-Reply-To: <1443104818-993-2-git-send-email-t-kristo@ti.com>
-References: <1443104818-993-1-git-send-email-t-kristo@ti.com>
- <1443104818-993-2-git-send-email-t-kristo@ti.com>
-Message-ID: <20151006120606.GP23801@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Oct 2015 14:27:28 +0200
+Subject: [GIT PULL] Samsung fixes for v4.3
+In-Reply-To: <5613005D.70709@kernel.org>
+References: <5613005D.70709@kernel.org>
+Message-ID: <9766331.ahg3CroNOz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [150924 07:30]:
-> PRM driver now supports reset controller for the defined reset lines.
-> Reset configurations are provided through device tree. Later, functionality
-> like hwmod and system reboot will be changed to use the generic framework.
+On Tuesday 06 October 2015 07:57:33 Kukjin Kim wrote:
+> Samsung fixes for v4.3
+> 
+> - fix invalid clock used for FIMD IOMMU
+> - fix thermal boot issue smdk5250-smdk5250
+> - fix S2R on exynos4412 trats2 boards
+> - fix LEDs on exynos5422-odroidxu3-common
+> - fix booting of all 8 cores on exynos542x
+> 
+> 
 
-This approach seems good to me in general. This should have the related
-reset driver documentation too for the binding though.
+Pulled into fixes, thanks!
 
-Regards,
-
-Tony
+	Arnd
