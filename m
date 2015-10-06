@@ -1,20 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Oct 2015 16:00:11 +0200
-Subject: [PULL] ARM: efm32: cleanups
-In-Reply-To: <20150929181001.GF3982@pengutronix.de>
-References: <20150929181001.GF3982@pengutronix.de>
-Message-ID: <4961701.mOZx38dSs7@wuerfel>
+Date: Tue, 06 Oct 2015 16:03:24 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.4
+In-Reply-To: <cover.1442479800.git.horms+renesas@verge.net.au>
+References: <cover.1442479800.git.horms+renesas@verge.net.au>
+Message-ID: <8599667.VsjTy3CzNn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 September 2015 20:10:01 Uwe Kleine-K?nig wrote:
-> efm32 cleanups for 4.4-rc1
+On Thursday 17 September 2015 17:59:53 Simon Horman wrote:
+> Please consider these Renesas ARM based SoC defconfig updates for v4.4.
 > 
-> These are just two followup cleanups for commits that are in v3.17-rc1 and
-> waited in my private tree for application since that time.
+> This is a minor cleanup of defconfigs after reshuffling to
+> remove legacy board code.
 > 
 > 
-
-Pulled into next/cleanups, thanks!
+Merged into next/defconfig, thanks!
 
 	Arnd
