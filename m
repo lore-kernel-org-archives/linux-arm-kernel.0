@@ -1,40 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue,  6 Oct 2015 18:24:37 +0100
-Subject: [PATCH] arm64: Don't relocate non-existent initrd
-Message-ID: <1444152277-826-1-git-send-email-mark.rutland@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 6 Oct 2015 18:31:52 +0100
+Subject: [PATCH v2] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <1444151732.10788.13.camel@redhat.com>
+References: <1441906822-9222-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20151006165049.GE3069@e104818-lin.cambridge.arm.com>
+ <1444151732.10788.13.camel@redhat.com>
+Message-ID: <20151006173152.GA15091@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting a kernel without an initrd, the kernel reports that it
-moves -1 bytes worth, having gone through the motions with initrd_start
-equal to initrd_end:
+On Tue, Oct 06, 2015 at 01:15:32PM -0400, Mark Salter wrote:
+> On Tue, 2015-10-06 at 17:50 +0100, Catalin Marinas wrote:
+> > On Thu, Sep 10, 2015 at 06:40:22PM +0100, Lorenzo Pieralisi wrote:
+> > > The SBBR and ACPI specifications allow ACPI based systems that do not
+> > > implement PSCI (eg systems with no EL3) to boot through the ACPI parking
+> > > protocol specification[1].
+> > > 
+> > > This patch implements the ACPI parking protocol CPU operations, and adds
+> > > code that eases parsing the parking protocol data structures to the
+> > > ARM64 SMP initializion carried out at the same time as cpus enumeration.
+> > > 
+> > > To wake-up the CPUs from the parked state, this patch implements a
+> > > wakeup IPI for ARM64 (ie arch_send_wakeup_ipi_mask()) that mirrors the
+> > > ARM one, so that a specific IPI is sent for wake-up purpose in order
+> > > to distinguish it from other IPI sources.
+> > > 
+> > > Given the current ACPI MADT parsing API, the patch implements a glue
+> > > layer that helps passing MADT GICC data structure from SMP initialization
+> > > code to the parking protocol implementation somewhat overriding the CPU
+> > > operations interfaces. This to avoid creating a completely trasparent
+> > > DT/ACPI CPU operations layer that would require creating opaque
+> > > structure handling for CPUs data (DT represents CPU through DT nodes, ACPI
+> > > through static MADT table entries), which seems overkill given that ACPI
+> > > on ARM64 mandates only two booting protocols (PSCI and parking protocol),
+> > > so there is no need for further protocol additions.
+> > > 
+> > > Based on the original work by Mark Salter <msalter@redhat.com>
+> > > 
+> > > [1] https://acpica.org/sites/acpica/files/MP%20Startup%20for%20ARM%20platforms.docx
+> > 
+> > Question to Lorenzo and Mark Salter: was this patch successfully tested
+> > on real hardware (like Applied X-Gene)?
+> 
+> It doesn't work on X-Gene/Mustang because the existing firmware
+> implementations are not exactly compliant with the parking protocol
+> spec. I've been hacking on the firmware trying to get something
+> which will work wrt the spec but keep getting distracted by other
+> things.
 
-    Moving initrd from [4080000000-407fffffff] to [9fff49000-9fff48fff]
+I tested the code on AMD Supercharger even though I had to change
+the remap implementation since the existing firmware uses cacheable
+mappings for the mailboxes.
 
-Prevent this by bailing out early when the initrd size is zero (i.e. we
-have no initrd), avoiding the confusing message and other associated
-work.
+I put it together to make sure that it is there if any platform
+compliant with it relies on it and more importantly to prevent
+non-compliant implentations from trickling into the kernel,
+basically to prevent broken firmware implementations from being
+considered compliant and "working".
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Fixes: 1570f0d7ab425c1e ("arm64: support initrd outside kernel linear map")
-Cc: Mark Salter <msalter@redhat.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/setup.c | 2 ++
- 1 file changed, 2 insertions(+)
+I am happy to hold the patch off, but see above for my concerns.
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 6bab21f..2322479 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -364,6 +364,8 @@ static void __init relocate_initrd(void)
- 		to_free = ram_end - orig_start;
- 
- 	size = orig_end - orig_start;
-+	if (!size)
-+		return;
- 
- 	/* initrd needs to be relocated completely inside linear mapping */
- 	new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
--- 
-1.9.1
+Thanks,
+Lorenzo
