@@ -1,83 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Oct 2015 08:18:06 -0700
-Subject: [RFC/PATCH 11/11] arm: boot: dts: omap: add missing default
- status for 32k counter
-In-Reply-To: <87612k3uza.fsf@saruman.tx.rr.com>
-References: <1443559446-26969-1-git-send-email-balbi@ti.com>
- <20151005175230.GG18784@saruman.tx.rr.com>
- <87io6lf6i4.fsf@saruman.tx.rr.com> <13543270.oBfHhoNL28@wuerfel>
- <87612k3uza.fsf@saruman.tx.rr.com>
-Message-ID: <20151006151805.GR23801@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Oct 2015 16:18:58 +0100
+Subject: [PATCH v2 1/2] ARM: Availability of psci_smp_available depends
+ on CONFIG_SMP
+In-Reply-To: <20151006081122.GA21527@ulmo.nvidia.com>
+References: <cover.1442990383.git.jan.kiszka@siemens.com>
+ <8b94f7869972d64f442f97208707a5856cbc8b14.1442990383.git.jan.kiszka@siemens.com>
+ <20151006081122.GA21527@ulmo.nvidia.com>
+Message-ID: <20151006151857.GA2416@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [151006 08:02]:
-> Arnd Bergmann <arnd@arndb.de> writes:
+On Tue, Oct 06, 2015 at 10:11:24AM +0200, Thierry Reding wrote:
+> On Wed, Sep 23, 2015 at 08:39:43AM +0200, Jan Kiszka wrote:
+> > Ensure that we can use psci_smp_available without checking for
+> > CONFIG_SMP first.
+> > 
+> > Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+> > ---
+> >  arch/arm/include/asm/psci.h | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
+> > index 68ee3ce..ff956f4 100644
+> > --- a/arch/arm/include/asm/psci.h
+> > +++ b/arch/arm/include/asm/psci.h
+> > @@ -16,7 +16,7 @@
+> >  
+> >  extern struct smp_operations psci_smp_ops;
+> >  
+> > -#ifdef CONFIG_ARM_PSCI
+> > +#if defined(CONFIG_ARM_PSCI) && defined(CONFIG_SMP)
+> >  bool psci_smp_available(void);
+> >  #else
+> >  static inline bool psci_smp_available(void) { return false; }
 > 
-> > On Monday 05 October 2015 14:41:07 Felipe Balbi wrote:
-> >> 
-> >> /**
-> >>  * omap_get_timer_dt - get a timer using device-tree
-> >>  * @match       - device-tree match structure for matching a device type
-> >>  * @property    - optional timer property to match
-> >>  *
-> >>  * Helper function to get a timer during early boot using device-tree for use
-> >>  * as kernel system timer. Optionally, the property argument can be used to
-> >>  * select a timer with a specific property. Once a timer is found then mark
-> >>  * the timer node in device-tree as disabled, to prevent the kernel from
-> >>  * registering this timer as a platform device and so no one else can use it.
-> >>  */
-> >> static struct device_node * __init omap_get_timer_dt(const struct of_device_id *match,
-> >>                                                      const char *property)
-> >> {
-> >>         struct device_node *np;
-> >> 
-> >>         for_each_matching_node(np, match) {
-> >>                 if (!of_device_is_available(np))
-> >>                         continue;
-> >> 
-> >>                 if (property && !of_get_property(np, property, NULL))
-> >>                         continue;
-> >> 
-> >>                 if (!property && (of_get_property(np, "ti,timer-alwon", NULL) ||
-> >>                                   of_get_property(np, "ti,timer-dsp", NULL) ||
-> >>                                   of_get_property(np, "ti,timer-pwm", NULL) ||
-> >>                                   of_get_property(np, "ti,timer-secure", NULL)))
-> >>                         continue;
-> >> 
-> >>                 of_add_property(np, &device_disabled);
-> >>                 return np;
-> >>         }
-> >> 
-> >>         return NULL;
-> >> }
-> >> 
-> >> I'll patch this up and drop $subject
-> >> 
-> >
-> > Ah, good.
-> >
-> > I'm seeing the "ti,timer-alwon" property here, we probably need to take
-> > that into account when setting the CLOCK_SOURCE_SUSPEND_NONSTOP flag, if
-> > that isn't how it gets done already.
+> Hi Will,
+
+Hi Thierry,
+
+> you had questions about this when this was first submitted back in
+> May[0], but discussion stalled. Can you take another look, please?
 > 
-> that flag is not set for 32k in any dts. Seems like it should, though,
-> judging by the binding documentation:
-> 
-> - ti,timer-alwon:	Indicates the timer is in an alway-on power
->   domain.
-> 
-> Tony, care to comment if we should add timer-alwon to 32k ?
+> I think irrespective of what the series is trying to do this is a
+> correct fix. The arch/arm/kernel/psci_smp.c file is only compiled if
+> both ARM_PSCI and SMP are selected. Builds break if we don't mirror
+> that conditional in the header because for ARM_PSCI && !SMP no dummy
+> will be defined, but the implementation for the prototype won't be
+> available either, leading to a linker error.
 
-No that should not be needed for the 32k counter. We should be able
-to do everything we want with CLOCK_SOURCE_SUSPEND_NONSTOP for the
-32k counter.
+Sure, I'm fine with this patch in isolation, I just didn't (don't) fully
+grok what the series is trying to achieve.
 
-We still need ti,timer-alwon for a while for gptimers 1 and 12 as
-they are the only ones in the always-on domain. I guess that need
-will eventually go away too once we have a proper interconnect
-driver and are using genpd.
-
-Regards,
-
-Tony
+Will
