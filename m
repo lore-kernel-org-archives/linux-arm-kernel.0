@@ -1,45 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Oct 2015 11:12:53 +0200
-Subject: [PATCH 0/2] ARM: EXYNOS: Allow to use architected timer
-In-Reply-To: <00d801d10014$e6d994a0$b48cbde0$@samsung.com>
-References: <cover.1444119342.git.p.fedin@samsung.com>
- <6613638.q5qyQZxXy7@wuerfel> <00d801d10014$e6d994a0$b48cbde0$@samsung.com>
-Message-ID: <5008072.V9UdTVvpUS@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 6 Oct 2015 11:18:13 +0200
+Subject: [RFC PATCH v3 1/3] mmc: sprd: Add MMC host driver for Spreadtrum
+ SoC
+In-Reply-To: <CAG_R4_VTXCV4NVMOwv-9F56-_pVsK0hU4go79ZhV3OFxwcF0mA@mail.gmail.com>
+References: <1439571353-30165-1-git-send-email-wuht06@gmail.com>
+ <1439571353-30165-2-git-send-email-wuht06@gmail.com>
+ <CAPDyKFp=XH+Vo_diRyhrMuB+v1rmTmxo3Lid3Wc-u1ohqNisKw@mail.gmail.com>
+ <CAG_R4_VTXCV4NVMOwv-9F56-_pVsK0hU4go79ZhV3OFxwcF0mA@mail.gmail.com>
+Message-ID: <CAPDyKFo3xp3wU3XW3kMV7Xz7DFgkxts3CArthYY7-CyWk8cjXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 October 2015 11:56:33 Pavel Fedin wrote:
->  Hello!
-> 
-> > IIRC the use of the CP15 timer is not reliable on this platform.
-> > I don't have a link ready, but this has come up a few times.
-> 
->  I know that Samsung SoC guys are not very keen on this, therefore i actually made this optional. If
-> you want, you could omit the second patch, and by default Exynos platform will use MCT. But if
-> someone wants to use KVM, it would be enough only to modify device tree in order to enable CP15.
-> Would this be a good compromise?
-> 
-> > Regarding KVM usage, would it be possible to emulate the architected
-> > timer from qemu instead?
-> 
->  Unfortunately no. Accesses to virtual timer registers cannot be trapped. It is possible to trap
-> physical timer accesses, and trick the kernel into using it, but it's slow, and it is a different
-> story, which you can read here: http://www.spinics.net/lists/kvm/msg121714.html.
->  So, i think that having an option to use CP15 would be a good solution.
++Russell
 
-My feeling is that is shouldn't be keyed off the presence of the device in DT
-though. Maybe we can find a way that allows you to put the device into DT
-but not have it used by default unless the user explicitly enables it, e.g. though
-a kernel command line option like "force_broken_archtimer"?
+On 28 September 2015 at 09:18, Hongtao Wu <wuht06@gmail.com> wrote:
+>>>
+>
+> On Thu, Sep 10, 2015 at 9:28 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>
+>> On 14 August 2015 at 18:55, Hongtao Wu <wuht06@gmail.com> wrote:
+>> > the Spreadtrum MMC host driver is used to supply EMMC, SD, and
+>> > SDIO types of memory cards
+>>
+>> Perhaps some more information about the controller. Are there any
+>> specific features it support or doesn't support!?
+>
+> Thanks for kindly reply.
+> Yes, spreadtrum MMC host controllers have some specific features as follows:
+> (1) We don't have controls for sampling clock tuning and re-tuning, we take
+>       place of them with three registers as follows:
+>        (a) CLK_WR_DL(Offset 080h): Data write clock delay line.
+>        (b) CLK_RD_POS_DL(Offset 0x84h): Posedge data read clock delay line.
+>        (c) CLK_RD_NEG_DL(Offset 088h): Negedge data read clock delay line.
+>
+> (2) We don't have Power Control Register(Offset 029h), all our controller's
+> power
+>       come from PMIC, rather than directly from CPU.
+>
+> (3) We don't have bit[6](Card Insertion), bit[7] (Card Removal), bit[8]
+> (Card Interrupt)
+> and bit[12:9] in Normal Interrupt Status Register(Offset 030h). Because the
+> detect
+> gpio pin doesn't connect to the register of our host controller. So we can't
+> operate bit[18:16](Card Detect Pin Level, Card State stable and Card
+> Inserted)
+> in Present State Register(Offset 024h).
 
-Or maybe we could find a way to keep using MCT in the host but use the
-arch timer in the guest only? At least that would not potentially break
-anything that works today.
+Thanks for clarifying!
 
-> It is known to work, and i use this configuration here on SMDK5410 without any problems.
+You have some differences towards the "standard" sdhci variant, but
+that doesn't mean you should go off and implement a new driver from
+scratch, instead you should create a new sdhci variant and re-use code
+from the generic sdhci driver.
 
-For all I can tell, nobody every /saw/ the problem, we just know that it
-hasn't passed verification (or something like that) and you shouldn't
-use it in production.
+The current problem with such approach, is that the sdhci driver isn't
+designed as a library but instead a driver consisting of too many
+quirks and callbacks. While you start to adopt your driver towards
+sdhci, you will need to add yet another bunch of new quirks and
+callbacks to suite your hw.
 
-	Arnd
+Now, as the number of callbacks and quirks continues to increase I
+will sooner or later give up maintaining it, as each line of code will
+depend on a quirk. So, we need to start turning sdhci into a library
+*right now*! Russell King, has pointed out this several times as well,
+but unfortunate I haven't yet seen anyone willing to help out in this
+field.
+
+I would of course be very happy if you would like to have a look at
+that, but I realize it's a difficult task, So, unless you are happy
+with taking on such a challenge, I suggest you go for an intermediate
+step, which thus means convert your driver to a sdhci variant driver
+and add the quirks/callbacks you need to suite your hw.
+
+[...]
+
+Kind regards
+Uffe
