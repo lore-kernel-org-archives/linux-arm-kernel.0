@@ -1,57 +1,38 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 6 Oct 2015 11:29:34 +0100
-Subject: [PATCH v2 21/22] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1
- to sysfs
-In-Reply-To: <20151006102548.GC26433@leverpostej>
-References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
- <1444064531-25607-22-git-send-email-suzuki.poulose@arm.com>
- <20151006090959.GO21513@n2100.arm.linux.org.uk>
- <CAPvkgC31-gUmetN0S=t9yJ30M8=x7Y7prxO40tiEB=zJiUvwBg@mail.gmail.com>
- <20151006102548.GC26433@leverpostej>
-Message-ID: <CAPvkgC3gcS+Hpp28-dxTZLEcYbhethfYAtsQ5p1Fmb1WZw6Yrw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Oct 2015 12:30:19 +0200
+Subject: ARM64 PCIe legacy interrupts
+In-Reply-To: <loom.20151006T121259-647@post.gmane.org>
+References: <loom.20151001T142318-555@post.gmane.org>
+ <CAHM4w1kzt0wCCxfvofXqzgK=Te50_1ZsYnApbEojMQq8x+wcdA@mail.gmail.com>
+ <loom.20151006T121259-647@post.gmane.org>
+Message-ID: <5647794.zPHEyLbn48@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 October 2015 at 11:25, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Oct 06, 2015 at 11:18:42AM +0100, Steve Capper wrote:
->> On 6 October 2015 at 10:09, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Mon, Oct 05, 2015 at 06:02:10PM +0100, Suzuki K. Poulose wrote:
->> >> +static int __init cpuinfo_regs_init(void)
->> >> +{
->> >> +     int cpu, ret;
->> >> +
->> >> +     for_each_present_cpu(cpu) {
->> >> +             struct device *dev = get_cpu_device(cpu);
->> >> +
->> >> +             if (!dev)
->> >> +                     return -1;
->> >
->> > NAK.  Go figure out why, I'm too lazy to tell you.
->>
->> I will correct the return code to be -ENODEV.
->> Was that the reasoning behind the NAK?
->
-> I suspect the half-initialised sysfs groups also have something to do
-> with it...
+On Tuesday 06 October 2015 10:17:11 bharat kumar gogada wrote:
+> I have a confusion in handling legacy interrupts in driver, I'm seeing that
+> for legacy handling there is separate node being created. Ex: for
+> pcie-xilinx.c the following node is being used
+> 
+> pcie_intc: interrupt-controller {
+>                         interrupt-controller;
+>                         #address-cells = <0>;
+>                         #interrupt-cells = <1>;
+>                 };
+> 
+> Why do we need a separate child node for legacy handling
 
-Okay, cheers Mark, I see what you mean.
+This is a special case where the interrupt lines are not simply
+passed through to the parent interrupt controller but require
+an Ack in a separate register.
 
->
-> Mark.
->
->>
->> >
->> >> +
->> >> +             ret = sysfs_create_group(&dev->kobj, &cpuregs_attr_group);
->> >> +             if (ret)
->> >> +                     return ret;
->> >> +     }
->> >> +
->> >> +     return 0;
->> >> +}
->> >> +
->> >> +device_initcall(cpuinfo_regs_init);
->> >> --
->> >> 1.7.9.5
->>
+Most sane implementations only need an interrupt-map property
+that documents how the legacy interrupts are wired to the GIC.
+
+> and why is the address cells parameter assigned zero value
+
+It means that the interrupt can be identified by the interrupt
+number itself and does not need to be identified by an address
+as well. This is true for almost all interrupt controllers.
+
+	Arnd
