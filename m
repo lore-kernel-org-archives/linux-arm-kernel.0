@@ -1,56 +1,52 @@
-From: roger.pau@citrix.com (=?UTF-8?Q?Roger_Pau_Monn=c3=a9?=)
-Date: Tue, 6 Oct 2015 11:28:08 +0200
-Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
-In-Reply-To: <1442919576.10338.146.camel@citrix.com>
-References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
- <55F68BC9.6020509@citrix.com> <55F6A437.3040403@citrix.com>
- <55F6A9DB.8040503@citrix.com> <55F6ADAE.1010609@citrix.com>
- <55F6B8CC.5090406@citrix.com> <55F6C1D2.7010206@citrix.com>
- <55F6D9DC.8060607@citrix.com>
- <alpine.DEB.2.02.1509141542430.2672@kaball.uk.xensource.com>
- <55F6E658.4070908@citrix.com> <1442919576.10338.146.camel@citrix.com>
-Message-ID: <56139428.4050402@citrix.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 6 Oct 2015 10:37:19 +0100
+Subject: [PATCHv2] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
+In-Reply-To: <5022096.8QRzW0l3EJ@wuerfel>
+References: <1444109743-8561-1-git-send-email-manjeet.p@samsung.com>
+ <5022096.8QRzW0l3EJ@wuerfel>
+Message-ID: <20151006093718.GA30154@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El 22/09/15 a les 12.59, Ian Campbell ha escrit:
-> On Mon, 2015-09-14 at 17:23 +0200, Roger Pau Monn? wrote:
->> I'm not saying that we shouldn't take those patches, I'm just saying
->> that IMHO this is a workaround, and I would like to see a plan and
->> somebody committed to have it fixed in a proper way, by introducing a
->> 64KB PV block protocol.
+On Tue, Oct 06, 2015 at 09:49:29AM +0200, Arnd Bergmann wrote:
+> On Tuesday 06 October 2015 11:05:43 Manjeet Pawar wrote:
+> > MINSIGSTKSZ and SIGSTKSZ for ARM64 are not correctly set in latest kernel.
+> > This patch fixes this issue.
+> > 
+> > This issue is reported in LTP (testcase: sigaltstack02.c).
+> > Testcase failed when sigaltstack() called with stack size "MINSIGSTKSZ - 1"
+> > Since in Glibc-2.22, MINSIGSTKSZ is set to 5120 but in kernel
+> > it is set to 2048 so testcase gets failed.
+> > 
+> > Testcase Output:
+> > sigaltstack02 1  TPASS  :  stgaltstack() fails, Invalid Flag value,errno:22
+> > sigaltstack02 2  TFAIL  :  sigaltstack() returned 0, expected -1,errno:12
+> > 
+> > Reported Issue in Glibc Bugzilla:
+> > https://sourceware.org/bugzilla/show_bug.cgi?id=16850
+> > 
+> > Bugfix in Glibc-2.22:
+> > https://sourceware.org/git/gitweb.cgi?p=glibc.git;a=blob;f=sysdeps/unix/
+> > sysv/linux/aarch64/bits/sigstack.h;h=8f2fb76e3e81734ef8a9cf9ae40daf4705
+> > f31c35;hb=b763f6ae859ecea70a5dacb8ad45c71d5f667e2e
+> > 
+> > Signed-off-by: Akhilesh Kumar <akhilesh.k@samsung.com>
+> > Signed-off-by: Manjeet Pawar <manjeet.p@samsung.com>
+> > Signed-off-by: Rohit Thapliyal <r.thapliyal@samsung.com>
 > 
-> In my view the basic unit of operation for all Xen interfaces (on x86 and
-> arm at least[0]) is 4K. The peer at either end of a PV protocol should
-> therefore be entitled to assume that at a minimum the other end supports
-> operation in 4K mode (i.e. 4K is the baseline).
+> This looks correct now. A few more points though:
 > 
-> Operations in larger sizes (which would necessarily be multiples of 4K) are
-> then an extension which is subject to a negotiation between the two ends,
-> it doesn't really matter if those larger sizes arise because of the use of
-> superpages or because the guest is internally using some larger basic page
-> size (which ARM calls a "granule", and where 64K comes from here).
-> 
-> I think this line of reasoning applies just as strongly to the hypercall
-> ABI as well BTW, they all use 4K as their basic unit, but might support
-> extensions to operation on multiples of that (negotiated either via a
-> specific error return and fallback or via the use of XENFEAT).
+> * My first thought would have been to do this by first defining the
+>   two symbols before the #include, and then adding an #ifdef in
+>   the generic file. Both approaches work though, any other opinions
+>   on this?
 
-Yes, I completely agree that the current Xen interface is based on 4KB
-chunks. What I'm trying to say is that the approach taken, which is
-"let's not modify Xen" puts all the burden on the guest and it is going
-to hurt us in the long run.
+That's what I was thinking as well. Maybe with a single #ifndef
+MINSIGSTKSZ to cover both macros.
 
-Are we expecting all guests that want to use 64KB page to implement all
-the modifications that are needed? IMHO, those modifications are very
-far from trivial, and we are putting the bar for Xen guest support very
-high, and that is wrong. We are already struggling to have a decent set
-of PV drivers on guests different than Linux, and this is certainly not
-making things easier.
+> * Do we need to backport this to stable?
 
-Do KVM guests also need such extensive set of modifications in order to
-run using 64KB pages? I know it's not fair to compare KVM and Xen in
-this regard, because the interfaces are very different, but that's what
-developers are going to look at.
+I think it does.
 
-Roger.
+-- 
+Catalin
