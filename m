@@ -1,64 +1,81 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 6 Oct 2015 18:31:52 +0100
-Subject: [PATCH v2] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <1444151732.10788.13.camel@redhat.com>
-References: <1441906822-9222-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20151006165049.GE3069@e104818-lin.cambridge.arm.com>
- <1444151732.10788.13.camel@redhat.com>
-Message-ID: <20151006173152.GA15091@red-moon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  6 Oct 2015 18:36:15 +0100
+Subject: [PATCH 02/16] irqdomain: Convert irqdomain->of_node to fwnode
+In-Reply-To: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
+References: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1444152989-31726-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 01:15:32PM -0400, Mark Salter wrote:
-> On Tue, 2015-10-06 at 17:50 +0100, Catalin Marinas wrote:
-> > On Thu, Sep 10, 2015 at 06:40:22PM +0100, Lorenzo Pieralisi wrote:
-> > > The SBBR and ACPI specifications allow ACPI based systems that do not
-> > > implement PSCI (eg systems with no EL3) to boot through the ACPI parking
-> > > protocol specification[1].
-> > > 
-> > > This patch implements the ACPI parking protocol CPU operations, and adds
-> > > code that eases parsing the parking protocol data structures to the
-> > > ARM64 SMP initializion carried out at the same time as cpus enumeration.
-> > > 
-> > > To wake-up the CPUs from the parked state, this patch implements a
-> > > wakeup IPI for ARM64 (ie arch_send_wakeup_ipi_mask()) that mirrors the
-> > > ARM one, so that a specific IPI is sent for wake-up purpose in order
-> > > to distinguish it from other IPI sources.
-> > > 
-> > > Given the current ACPI MADT parsing API, the patch implements a glue
-> > > layer that helps passing MADT GICC data structure from SMP initialization
-> > > code to the parking protocol implementation somewhat overriding the CPU
-> > > operations interfaces. This to avoid creating a completely trasparent
-> > > DT/ACPI CPU operations layer that would require creating opaque
-> > > structure handling for CPUs data (DT represents CPU through DT nodes, ACPI
-> > > through static MADT table entries), which seems overkill given that ACPI
-> > > on ARM64 mandates only two booting protocols (PSCI and parking protocol),
-> > > so there is no need for further protocol additions.
-> > > 
-> > > Based on the original work by Mark Salter <msalter@redhat.com>
-> > > 
-> > > [1] https://acpica.org/sites/acpica/files/MP%20Startup%20for%20ARM%20platforms.docx
-> > 
-> > Question to Lorenzo and Mark Salter: was this patch successfully tested
-> > on real hardware (like Applied X-Gene)?
-> 
-> It doesn't work on X-Gene/Mustang because the existing firmware
-> implementations are not exactly compliant with the parking protocol
-> spec. I've been hacking on the firmware trying to get something
-> which will work wrt the spec but keep getting distracted by other
-> things.
+Now that we have everyone accessing the of_node field via the
+irq_domain_get_of_node accessor, it is pretty easy to swap it
+for a pointer to a fwnode_handle.
 
-I tested the code on AMD Supercharger even though I had to change
-the remap implementation since the existing firmware uses cacheable
-mappings for the mailboxes.
+This translates into a few limited changes in __irq_domain_add,
+and an updated irq_domain_get_of_node.
 
-I put it together to make sure that it is there if any platform
-compliant with it relies on it and more importantly to prevent
-non-compliant implentations from trickling into the kernel,
-basically to prevent broken firmware implementations from being
-considered compliant and "working".
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/linux/irqdomain.h | 5 +++--
+ kernel/irq/irqdomain.c    | 6 +++++-
+ 2 files changed, 8 insertions(+), 3 deletions(-)
 
-I am happy to hold the patch off, but see above for my concerns.
-
-Thanks,
-Lorenzo
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index f644fdb..2f508f4 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -34,6 +34,7 @@
+ 
+ #include <linux/types.h>
+ #include <linux/irqhandler.h>
++#include <linux/of.h>
+ #include <linux/radix-tree.h>
+ 
+ struct device_node;
+@@ -130,7 +131,7 @@ struct irq_domain {
+ 	unsigned int flags;
+ 
+ 	/* Optional data */
+-	struct device_node *of_node;
++	struct fwnode_handle *fwnode;
+ 	enum irq_domain_bus_token bus_token;
+ 	struct irq_domain_chip_generic *gc;
+ #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+@@ -163,7 +164,7 @@ enum {
+ 
+ static inline struct device_node *irq_domain_get_of_node(struct irq_domain *d)
+ {
+-	return d->of_node;
++	return to_of_node(d->fwnode);
+ }
+ 
+ #ifdef CONFIG_IRQ_DOMAIN
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 8f8b538..1aee5c1 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -46,17 +46,21 @@ struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
+ 				    void *host_data)
+ {
+ 	struct irq_domain *domain;
++	struct fwnode_handle *fwnode;
+ 
+ 	domain = kzalloc_node(sizeof(*domain) + (sizeof(unsigned int) * size),
+ 			      GFP_KERNEL, of_node_to_nid(of_node));
+ 	if (WARN_ON(!domain))
+ 		return NULL;
+ 
++	of_node_get(of_node);
++	fwnode = of_node ? &of_node->fwnode : NULL;
++
+ 	/* Fill structure */
+ 	INIT_RADIX_TREE(&domain->revmap_tree, GFP_KERNEL);
+ 	domain->ops = ops;
+ 	domain->host_data = host_data;
+-	domain->of_node = of_node_get(of_node);
++	domain->fwnode = fwnode;
+ 	domain->hwirq_max = hwirq_max;
+ 	domain->revmap_size = size;
+ 	domain->revmap_direct_max_irq = direct_max;
+-- 
+2.1.4
