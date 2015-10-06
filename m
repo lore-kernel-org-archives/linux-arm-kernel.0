@@ -1,175 +1,52 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 6 Oct 2015 13:33:22 -0500
-Subject: [PATCH 04/11] arm: omap2: timer: provide generic
- sync32k_timer_init function
-In-Reply-To: <1444150927-14771-5-git-send-email-balbi@ti.com>
-References: <1444150927-14771-1-git-send-email-balbi@ti.com>
- <1444150927-14771-5-git-send-email-balbi@ti.com>
-Message-ID: <561413F2.4000700@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Oct 2015 20:42:38 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Cleanup for v4.4
+In-Reply-To: <CAMuHMdUkzv9BE4PDjm3Qkk87f2Lq6Bn-CNb+r3dtSWhbkN39Wg@mail.gmail.com>
+References: <cover.1442478814.git.horms+renesas@verge.net.au>
+ <5419864.uERWTbJ9BK@wuerfel>
+ <CAMuHMdUkzv9BE4PDjm3Qkk87f2Lq6Bn-CNb+r3dtSWhbkN39Wg@mail.gmail.com>
+Message-ID: <13543534.MsGb8OrGPX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/2015 12:02 PM, Balbi, Felipe wrote:
-> instead of constantly defining a small wrapper
-> around __omap_sync32k_timer_init(), let's define
-> a generic one which can be used by all OMAPs.
+On Tuesday 06 October 2015 17:47:37 Geert Uytterhoeven wrote:
+> Hi Arnd,
 > 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  arch/arm/mach-omap2/board-generic.c | 10 +++++-----
->  arch/arm/mach-omap2/board-ldp.c     |  2 +-
->  arch/arm/mach-omap2/board-rx51.c    |  2 +-
->  arch/arm/mach-omap2/common.h        |  3 +--
->  arch/arm/mach-omap2/timer.c         | 20 +++-----------------
->  5 files changed, 11 insertions(+), 26 deletions(-)
+> On Tue, Oct 6, 2015 at 3:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 17 September 2015 17:59:33 Simon Horman wrote:
+> >> Please consider these Renesas ARM based SoC cleanup for v4.4.
+> >>
+> >>  24 files changed, 4 insertions(+), 2687 deletions(-)
+> >>
+> >> Is a pleasing diffstat if I do say so myself.
+> >>
+> >> Of particular note the last legacy board code for Renesas ARM based SoCs,
+> >> that of the bockw board, is removed in this pull request.
+> >
+> > After a long delay in response, I've merged it now into next/cleanup.
+> >
+> > So the transition is complete and you beat me with the multiplatform
+> > conversion that I have pending for the other ARMv7 platforms, nice work!
 > 
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index 9df14ed7dab1..871db0f0fa66 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -46,7 +46,7 @@ DT_MACHINE_START(OMAP242X_DT, "Generic OMAP2420 (Flattened Device Tree)")
->  	.map_io		= omap242x_map_io,
->  	.init_early	= omap2420_init_early,
->  	.init_machine	= omap_generic_init,
-> -	.init_time	= omap2_sync32k_timer_init,
-> +	.init_time	= omap_sync32k_timer_init,
->  	.dt_compat	= omap242x_boards_compat,
->  	.restart	= omap2xxx_restart,
->  MACHINE_END
-> @@ -63,7 +63,7 @@ DT_MACHINE_START(OMAP243X_DT, "Generic OMAP2430 (Flattened Device Tree)")
->  	.map_io		= omap243x_map_io,
->  	.init_early	= omap2430_init_early,
->  	.init_machine	= omap_generic_init,
-> -	.init_time	= omap2_sync32k_timer_init,
-> +	.init_time	= omap_sync32k_timer_init,
->  	.dt_compat	= omap243x_boards_compat,
->  	.restart	= omap2xxx_restart,
->  MACHINE_END
-> @@ -82,7 +82,7 @@ DT_MACHINE_START(OMAP3_N900_DT, "Nokia RX-51 board")
->  	.init_early	= omap3430_init_early,
->  	.init_machine	= omap_generic_init,
->  	.init_late	= omap3_init_late,
-> -	.init_time	= omap3_sync32k_timer_init,
-> +	.init_time	= omap_sync32k_timer_init,
->  	.dt_compat	= n900_boards_compat,
->  	.restart	= omap3xxx_restart,
->  MACHINE_END
-> @@ -100,7 +100,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
->  	.init_early	= omap3430_init_early,
->  	.init_machine	= omap_generic_init,
->  	.init_late	= omap3_init_late,
-> -	.init_time	= omap3_sync32k_timer_init,
-> +	.init_time	= omap_sync32k_timer_init,
->  	.dt_compat	= omap3_boards_compat,
->  	.restart	= omap3xxx_restart,
->  MACHINE_END
-> @@ -116,7 +116,7 @@ DT_MACHINE_START(OMAP36XX_DT, "Generic OMAP36xx (Flattened Device Tree)")
->  	.init_early	= omap3630_init_early,
->  	.init_machine	= omap_generic_init,
->  	.init_late	= omap3_init_late,
-> -	.init_time	= omap3_sync32k_timer_init,
-> +	.init_time	= omap_sync32k_timer_init,
->  	.dt_compat	= omap36xx_boards_compat,
->  	.restart	= omap3xxx_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
-> index c2975af4cd5d..0d3a57c6931f 100644
-> --- a/arch/arm/mach-omap2/board-ldp.c
-> +++ b/arch/arm/mach-omap2/board-ldp.c
-> @@ -424,6 +424,6 @@ MACHINE_START(OMAP_LDP, "OMAP LDP board")
->  	.init_irq	= omap3_init_irq,
->  	.init_machine	= omap_ldp_init,
->  	.init_late	= omap3430_init_late,
-> -	.init_time	= omap3_sync32k_timer_init,
-> +	.init_time	= omap_sync32k_timer_init,
->  	.restart	= omap3xxx_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
-> index 2d1e5a6beb85..830256c434ec 100644
-> --- a/arch/arm/mach-omap2/board-rx51.c
-> +++ b/arch/arm/mach-omap2/board-rx51.c
-> @@ -136,6 +136,6 @@ MACHINE_START(NOKIA_RX51, "Nokia RX-51 board")
->  	.init_irq	= omap3_init_irq,
->  	.init_machine	= rx51_init,
->  	.init_late	= omap3430_init_late,
-> -	.init_time	= omap3_sync32k_timer_init,
-> +	.init_time	= omap_sync32k_timer_init,
->  	.restart	= omap3xxx_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-> index 92e92cfc2775..844ad031f7f0 100644
-> --- a/arch/arm/mach-omap2/common.h
-> +++ b/arch/arm/mach-omap2/common.h
-> @@ -88,8 +88,7 @@ static inline int omap_mux_late_init(void)
->  
->  extern void omap2_init_common_infrastructure(void);
->  
-> -extern void omap2_sync32k_timer_init(void);
-> -extern void omap3_sync32k_timer_init(void);
-> +extern void omap_sync32k_timer_init(void);
->  extern void omap3_secure_sync32k_timer_init(void);
->  extern void omap3_gptimer_timer_init(void);
->  extern void omap4_local_timer_init(void);
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index 976ff9fa3594..d14e25b2d7a4 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -608,21 +608,13 @@ static void __init __omap_sync32k_timer_init(int clkev_nr, const char *clkev_src
->  		omap2_sync32k_clocksource_init();
->  }
->  
-> -#ifdef CONFIG_ARCH_OMAP2
-> -void __init omap2_sync32k_timer_init(void)
-> +void __init omap_sync32k_timer_init(void)
->  {
->  	__omap_sync32k_timer_init(1, "timer_32k_ck", "ti,timer-alwon",
->  			2, "timer_sys_ck", NULL, false);
->  }
-> -#endif /* CONFIG_ARCH_OMAP2 */
->  
->  #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM43XX)
-> -void __init omap3_sync32k_timer_init(void)
-> -{
-> -	__omap_sync32k_timer_init(1, "timer_32k_ck", "ti,timer-alwon",
-> -			2, "timer_sys_ck", NULL, false);
-> -}
-> -
->  void __init omap3_secure_sync32k_timer_init(void)
->  {
->  	__omap_sync32k_timer_init(12, "secure_32k_fck", "ti,timer-secure",
-> @@ -640,15 +632,9 @@ void __init omap3_gptimer_timer_init(void)
->  
->  #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
->  	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
-> -static void __init omap4_sync32k_timer_init(void)
-> -{
-> -	__omap_sync32k_timer_init(1, "timer_32k_ck", "ti,timer-alwon",
-> -			2, "sys_clkin_ck", NULL, false);
-> -}
-> -
->  void __init omap4_local_timer_init(void)
->  {
-> -	omap4_sync32k_timer_init();
-> +	omap_sync32k_timer_init();
-
-Hmm, this is changing the parent clock source for the timer from
-sys_clkin_ck to timer_sys_ck for OMAP4 and OMAP5 below. I am not sure of
-the history behind the parent source, but is this what you intended to
-do here.
-
-regards
-Suman
-
->  	clocksource_of_init();
->  }
->  #endif
-> @@ -656,7 +642,7 @@ void __init omap4_local_timer_init(void)
->  #if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
->  void __init omap5_realtime_timer_init(void)
->  {
-> -	omap4_sync32k_timer_init();
-> +	omap_sync32k_timer_init();
->  	realtime_counter_init();
->  
->  	clocksource_of_init();
+> Thanks for pulling!
 > 
+> Now I can start out sending my platform data removal series...
+
+Ok, cool.
+
+I don't think that there is generally a need to wait before sending
+stuff out that depends on pull requests to get merged.
+
+> > I've used the opportunity to look for any remaining code that you may
+> > have missed, by tracking symbols that are defined globally but never used
+> > in mach-shmobile, and didn't find much (which is good).
+> >
+> > Could you have a look at the patch below and integrate the parts that
+> > make sense to you?
+> 
+> I think most of this has already been fixed in Simon's next branch in the mean
+> time.
+
+Ok, thanks for taking a look.
+
+	Arnd
