@@ -1,68 +1,81 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue,  6 Oct 2015 03:22:42 +0200
-Subject: [PATCH 8/8] mmc: sdhci-pxav3: enable modifying MMC_CARD bit during
- card initialization
-In-Reply-To: <1444094562-31165-1-git-send-email-mw@semihalf.com>
-References: <1444094562-31165-1-git-send-email-mw@semihalf.com>
-Message-ID: <1444094562-31165-9-git-send-email-mw@semihalf.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 06 Oct 2015 10:42:08 +0900
+Subject: [GIT PULL] ARM: dts: Exynos improvements for 4.4
+In-Reply-To: <1443579766-15793-2-git-send-email-k.kozlowski@samsung.com>
+References: <1443579766-15793-1-git-send-email-k.kozlowski@samsung.com>
+ <1443579766-15793-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <175801d0ffd8$36b05910$a4110b30$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Marvell Armada 38x SoC's the MMC_CARD bit in SD_CE_ATA_1 register must
-be set to 0x1 when a MMC card is supposed to work in DDR mode, or when
-commands CMD11, CMD14 and CMD20 are used.
+Krzysztof Kozlowski wrote:
+> 
+> Dear Kukjin,
+> 
+Hi,
 
-This commit enables the above for all MMC cards by modifying the host
-registers during card initialization. It is done by using init_card()
-callback.
+> DTS related changes for 4.4.
+> 
+> Description along with a tag.
+> You can find them also on the lists with my reviewed-by.
+> 
+I have small comments. Then I could just pull your branch...
 
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
----
- drivers/mmc/host/sdhci-pxav3.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+> Best regards,
+> Krzysztof
+> 
+> 
+> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+> 
+>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/krzk/linux.git tags/samsung-dt-4.4
+> 
+> for you to fetch changes up to 01dd011b7a0230a426a79475ae452298421a16e4:
+> 
+>   ARM: dts: exynos4412-trats2: remove regulator-compatible usage (2015-09-30 09:03:03 +0900)
+> 
+> ----------------------------------------------------------------
+> Device Tree improvements for Exynos based boards:
+> 1. Enable DMA on Exynos4 serial ports. This old patch uncovered
+>    a number of other issues in dmaengine and samsung serial driver.
+>    All of known issues are resolved so finally enable the DMA for UART.
+> 2. Fix incorrect location of display-timings node (FIMD->DP node).
+> 3. Minor cleanups.
+> 
+> ----------------------------------------------------------------
+> Javier Martinez Canillas (1):
+>       ARM: dts: exynos4412-trats2: remove regulator-compatible usage
 
-diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-index ce96640..315dc4e 100644
---- a/drivers/mmc/host/sdhci-pxav3.c
-+++ b/drivers/mmc/host/sdhci-pxav3.c
-@@ -57,6 +57,7 @@
- 
- #define SD_SPI_MODE          0x108
- #define SD_CE_ATA_1          0x10C
-+#define SDCE_MMC_CARD		BIT(28)
- 
- #define SD_CE_ATA_2          0x10E
- #define SDCE_MISC_INT		(1<<2)
-@@ -221,6 +222,22 @@ static void pxav3_reset(struct sdhci_host *host, u8 mask)
- 	}
- }
- 
-+static void pxav3_init_card(struct sdhci_host *host, struct mmc_card *card)
-+{
-+	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
-+	struct device_node *np = pdev->dev.of_node;
-+	u32 reg_val;
-+
-+	if (of_device_is_compatible(np, "marvell,armada-380-sdhci")) {
-+		reg_val = sdhci_readl(host, SD_CE_ATA_1);
-+		if (mmc_card_mmc(card))
-+			reg_val |= SDCE_MMC_CARD;
-+		else
-+			reg_val &= ~SDCE_MMC_CARD;
-+		sdhci_writel(host, reg_val, SD_CE_ATA_1);
-+	}
-+}
-+
- #define MAX_WAIT_COUNT 5
- static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
- {
-@@ -338,6 +355,7 @@ static const struct sdhci_ops pxav3_sdhci_ops = {
- 	.set_bus_width = sdhci_set_bus_width,
- 	.reset = pxav3_reset,
- 	.set_uhs_signaling = pxav3_set_uhs_signaling,
-+	.init_card = pxav3_init_card,
- };
- 
- static struct sdhci_pltfm_data sdhci_pxav3_pdata = {
--- 
-1.8.3.1
+Can you please move the dt name at the end of subject like others?
+
+> 
+> Robert Baldyga (1):
+>       ARM: dts: Add DMA support for serial ports in exynos4
+> 
+> Sean Paul (1):
+>       ARM: dts: Move display-timings node from fimd to dp on Exynos
+
+For all of exynos? If not, please specify the dt file in subject so that we
+could realize what has been updated.
+
+> 
+> Tobias Jakobi (2):
+>       ARM: dts: Remove redundant pinctrl settings in exynos4412-odroid
+>       ARM: dts: Unify voltage regulator style in exynos4412-odroid
+> 
+> Vladimir Zapolskiy (1):
+>       ARM: dts: Fix cpu compatible value for s3c2416
+> 
+>  arch/arm/boot/dts/exynos4.dtsi                  |   8 ++
+>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  12 +--
+>  arch/arm/boot/dts/exynos4412-trats2.dts         | 105 ++++++++----------------
+>  arch/arm/boot/dts/exynos5250-arndale.dts        |   8 +-
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts       |  16 ++--
+>  arch/arm/boot/dts/exynos5420-smdk5420.dts       |   7 +-
+>  arch/arm/boot/dts/s3c2416.dtsi                  |   2 +-
+>  7 files changed, 62 insertions(+), 96 deletions(-)
+
+- Kukjin
