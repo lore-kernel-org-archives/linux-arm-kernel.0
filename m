@@ -1,111 +1,32 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 6 Oct 2015 12:11:41 +0200
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20151006094425.GM23801@atomide.com>
-References: <20150924233756.GN23801@atomide.com>
- <20151001093325.GU21513@n2100.arm.linux.org.uk>
- <CAPDyKFpnqJBrtiBekikrNHAf-agZm12KnF9n+=+72HH=jti-KA@mail.gmail.com>
- <20151001100326.GV21513@n2100.arm.linux.org.uk>
- <20151005112304.GZ23801@atomide.com>
- <20151005143532.GA23801@atomide.com>
- <20151005145127.GB23801@atomide.com>
- <20151005171155.GF23801@atomide.com>
- <20151005183813.GD21626@n2100.arm.linux.org.uk>
- <20151006090015.GE21626@n2100.arm.linux.org.uk>
- <20151006094425.GM23801@atomide.com>
-Message-ID: <CAPDyKFowuHHoYq3pRa11rg8KThQA5=Pzg5CpKfzMgz1to9+XLA@mail.gmail.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Tue, 06 Oct 2015 13:16:13 +0300
+Subject: [PATCH 0/2] ARM: EXYNOS: Allow to use architected timer
+In-Reply-To: <187701d1001f$284b1350$78e139f0$@kernel.org>
+References: <cover.1444119342.git.p.fedin@samsung.com>
+ <6613638.q5qyQZxXy7@wuerfel> <00d801d10014$e6d994a0$b48cbde0$@samsung.com>
+ <187701d1001f$284b1350$78e139f0$@kernel.org>
+Message-ID: <010601d10020$084de090$18e9a1b0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 October 2015 at 11:44, Tony Lindgren <tony@atomide.com> wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [151006 02:04]:
->> On Mon, Oct 05, 2015 at 07:38:13PM +0100, Russell King - ARM Linux wrote:
->> > On Mon, Oct 05, 2015 at 10:11:56AM -0700, Tony Lindgren wrote:
->> > > * Tony Lindgren <tony@atomide.com> [151005 07:57]:
->> > > > * Tony Lindgren <tony@atomide.com> [151005 07:44]:
->> > > > > * Tony Lindgren <tony@atomide.com> [151005 04:28]:
->> > > > >
->> > > > > Based on some tests it seems that the duovero unpaired regulator usage
->> > > > > is fixed by reverting:
->> > > > >
->> > > > > c55d7a055364 ("mmc: host: omap_hsmmc: use regulator_is_enabled to
->> > > > > find pbias status")
->> > > >
->> > > > With commit c55d7a055364 my guess is that the PBIAS regulator is
->> > > > already on from an earlier MMC probe and getting re-enabled when
->> > > > a deferred probe happens?
->> > >
->> > > Unless somebody has a better fix in mind for the above, I suggest
->> > > we revert it for the -rc kernel.
->> >
->> > Let me try reverting that in my build tree, and...
->> >
->> > > > > And it seems that omap3 legacy MMC is broken earlier in the
->> > > > > series with:
->> > > > >
->> > > > > 7d607f917008 ("mmc: host: omap_hsmmc: use
->> > > > > devm_regulator_get_optional() for vmmc")
->> > > > >
->> > > > > This one does not cleanly revert so have not yet tried reverting
->> > > > > it.
->> > > >
->> > > > And with commit 7d607f917008 I'm guessing we can't return an
->> > > > error if the PBIAS regulator does not exist as that's not there
->> > > > for the legacy booting.
->> > >
->> > > For omap3 legacy booting, we keep getting -EPROBE_DEFER for
->> > > all the optional regulators.
->> > >
->> > > Something like the following might be the minimal fix for the -rc
->> > > cycle?
->> >
->> > applying this patch.  If that gets things going again, then we
->> > _definitely_ should get both of these to Linus ASAP.  The breakage
->> > has been around far too long already.
->>
->> Last night's build shows that this fixes the non-DT LDP3430 booting, but
->> DT-based LDP3430 and SDP4430 both remain broken for the same reason -
->> neither can find their SD cards.
->
-> Hmm DT-based boot finds the MMC card for LDP, dmesg below from DT boot [1].
-> Looks like you're on on -rc4 and not -rc3. My guess is that MMC is not
-> working for you with DT-based booting because you don't seem to have
-> CONFIG_REGULATOR_PBIAS in your seed config for. Care to try enabling that
-> for both your omap3 and omap4 seed config files?
->
->> We're at -rc4.  That means we're could be only three weeks away from 4.3
->> being released, and DT OMAP has yet to boot _once_ here.
->>
->> What I find *totally* unacceptable is the lack of reaction from the MMC
->> and TI people: it's just like "we'll break your crap, and we'll ignore
->> reports of regressions."  That is *not* acceptable in any shape or form,
->> and people who do this _should_ have their future patches ignored until
->> they demonstrate that they understand the need to not break stuff.
->>
->> I'm at the point of suggesting that there should be a moritorium on all
->> OMAP related development for 4.4: delay all development to 4.5, and have
->> 4.4 as a pure bug-fixing _only_ cycle for OMAP.  If 4.3 is released and
->> OMAP is still broken, then I don't think there's an option on that.
->>
->> Maybe the idea that development work won't hit mainline for another 4
->> months will help focus the minds on not breaking stuff and then ignoring
->> regression reports.
->
-> I'm thinking along the same lines. In general, I do not and will not
-> apply any patches that are not fixes until all critical regressions are
-> out of the way. So not applying anything new for v4.4 until these MMC
-> regressions are fixed for v4.3.
->
+ Hello!
 
-Tony, Russell - just wanted to say thanks for putting a big effort in
-fixing this. I was expecting support from Kishon, but I guess he's
-busy.
+> No, because the MCT should be used by default _always_ and it is depending on hardware
+> scheme...
 
-Unfortunate, I don't have any of the hardware that fails, otherwise I
-would of course be helping out more. The only thing I can think of is
-to revert the entire patchset I picked up for 4.3 from Kishon for the
-omap_hsmmc driver, but then I am not sure if that would cause other
-issues...
+ You just said: "by default". My proposal follows this. What's wrong then?
+ Or don't you just want users to be able to use KVM on Exynos?
 
-Kind regards
-Uffe
+> >  So, i think that having an option to use CP15 would be a good solution. It is known to work,
+> and i
+> > use this configuration here on SMDK5410 without any problems.
+> >
+> Actually Exynos5410 has been designed differently so it is safe only on smdk5410 not others...
+
+ Odroid-XU users also report it working. So, i guess, it's Exynos-5410's property. Well, does not
+matter after all...
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
