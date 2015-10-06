@@ -1,62 +1,98 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 6 Oct 2015 12:22:03 +0100
-Subject: [PATCHv2] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
-In-Reply-To: <5340366.WTVksOGb0G@wuerfel>
-References: <1444109743-8561-1-git-send-email-manjeet.p@samsung.com>
- <5022096.8QRzW0l3EJ@wuerfel>
- <20151006103128.GN6281@e103592.cambridge.arm.com>
- <5340366.WTVksOGb0G@wuerfel>
-Message-ID: <20151006112203.GO6281@e103592.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 6 Oct 2015 12:23:20 +0100
+Subject: [PATCH v6 2/4] spi: bcm2835: add bcm2835 auxiliary spi device
+ driver
+In-Reply-To: <1441970527-2403-3-git-send-email-kernel@martin.sperl.org>
+References: <1441970527-2403-1-git-send-email-kernel@martin.sperl.org>
+ <1441970527-2403-3-git-send-email-kernel@martin.sperl.org>
+Message-ID: <20151006112320.GP12635@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 12:51:24PM +0200, Arnd Bergmann wrote:
-> On Tuesday 06 October 2015 11:31:34 Dave Martin wrote:
-> > On Tue, Oct 06, 2015 at 09:49:29AM +0200, Arnd Bergmann wrote:
-> 
-> > > * Can you explain in the changelog how the numbers were decided?
-> > >   I don't see any other architecture using 5kb and cannot see why
-> > >   it has to be this value rather than something else.
-> > 
-> > glibc quietly "fixed" this earlier this year, by inventing these numbers
-> > and putting them in the glibc headers. [1]
-> 
-> I saw the commit, but the changelog is not really useful.
-> 
-> > Except for a moribund architecture that will never be extended I
-> > think that the idea of MINSIGSTKSZ is badly flawed -- a #define
-> > for not-necessarily-quite-enough-stack-to-realistically-take-a-signal
-> > is a pretty useless concept even if the signal frame never grows, and
-> > it looks like it is little used in practice.
-> 
-> Right, even if we modified the constants in the kernel/glibc
-> headers at that point, it would remain broken for new kernels
-> and old user space.
-> 
-> > Since this bug hasn't been reported until now, I suspect that
-> > MINSIGSTKSZ is used very rarely or not at all by real userspace
-> > software.  I wonder whether we can get away with simply raising
-> > MINSIGSTKSZ to match SIGSTKSZ, since it's clear that any software
-> > using MINSIGSTKSZ was already broken.
-> 
-> I think it makes sense to stick with the traditional definition
-> of MINSIGSTKSZ == "the minimum amount that you will always need,
-> add whatever you require yourself" and SIGSTKSZ == "Should be
-> enough for a couple of function calls". If we want to be conservative
-> in the kernel, using 8192 and 32768, to stay with the x4 ratio
+On Fri, Sep 11, 2015 at 11:22:04AM +0000, kernel at martin.sperl.org wrote:
 
-That "x4" only makes sense if you expect to put copies of the signal
-frame on the stack during handling -- otherwise the extra overhead
-won't scale proportional to MINSIGSTKSZ at all.  OTOH there's no
-better answer I can think of...
+> +	bs->irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
+> +	if (bs->irq <= 0) {
+> +		dev_err(&pdev->dev, "could not get IRQ: %d\n", bs->irq);
+> +		err = bs->irq ? bs->irq : -ENODEV;
+> +		goto out_master_put;
+> +	}
 
-> that everyone else uses would be my first pick, though I'm not
-> particularly attached to those values.
+Why are we using this unusual DT specific API here?  I'd expect to see
+just use platform_get_irq() here and this seems to be the only DT
+dependency in the driver. 
 
-Maybe we could do something like that as a stopgap solution, while
-coming up with a runtime discovery mechanism independently of this
-patch.  The latter would require some buy-in from glibc, so I guess
-it couldn't happen overnight.
+> +	err = devm_request_irq(&pdev->dev, bs->irq,
+> +			       bcm2835aux_spi_interrupt,
+> +			       IRQF_SHARED,
+> +			       dev_name(&pdev->dev), master);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "could not request IRQ: %d\n", err);
+> +		goto out_clk_disable;
+> +	}
+> +
+> +	/* reset SPI-HW block */
+> +	bcm2835aux_spi_reset_hw(bs);
 
-Cheers
----Dave
+I'd expect to request the IRQ after we reset the hardware in order to
+ensure that the hardware is in a known good state 
+
+> +
+> +	err = devm_spi_register_master(&pdev->dev, master);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "could not register SPI master: %d\n", err);
+> +		goto out_clk_disable;
+> +	}
+> +
+> +	return 0;
+> +
+> +out_clk_disable:
+> +	clk_disable_unprepare(bs->clk);
+> +out_master_put:
+> +	spi_master_put(master);
+> +	return err;
+> +}
+> +
+> +static int bcm2835aux_spi_remove(struct platform_device *pdev)
+> +{
+> +	struct spi_master *master = platform_get_drvdata(pdev);
+> +	struct bcm2835aux_spi *bs = spi_master_get_devdata(master);
+> +
+> +	bcm2835aux_spi_reset_hw(bs);
+> +
+> +	/* disable the HW block by releasing the clock */
+> +	clk_disable_unprepare(bs->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id bcm2835aux_spi_match[] = {
+> +	{ .compatible = "brcm,bcm2835-aux-spi", },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, bcm2835aux_spi_match);
+> +
+> +static struct platform_driver bcm2835aux_spi_driver = {
+> +	.driver		= {
+> +		.name		= "spi-bcm2835aux",
+> +		.of_match_table	= bcm2835aux_spi_match,
+> +	},
+> +	.probe		= bcm2835aux_spi_probe,
+> +	.remove		= bcm2835aux_spi_remove,
+> +};
+> +module_platform_driver(bcm2835aux_spi_driver);
+> +
+> +MODULE_DESCRIPTION("SPI controller driver for Broadcom BCM2835 aux");
+> +MODULE_AUTHOR("Martin Sperl <kernel@martin.sperl.org>");
+> +MODULE_LICENSE("GPL v2");
+> --
+> 1.7.10.4
+> 
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/0b82b63c/attachment-0001.sig>
