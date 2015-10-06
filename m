@@ -1,87 +1,161 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Oct 2015 10:00:15 +0100
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20151005183813.GD21626@n2100.arm.linux.org.uk>
-References: <20150924090048.GA21626@n2100.arm.linux.org.uk>
- <20150924233756.GN23801@atomide.com>
- <20151001093325.GU21513@n2100.arm.linux.org.uk>
- <CAPDyKFpnqJBrtiBekikrNHAf-agZm12KnF9n+=+72HH=jti-KA@mail.gmail.com>
- <20151001100326.GV21513@n2100.arm.linux.org.uk>
- <20151005112304.GZ23801@atomide.com>
- <20151005143532.GA23801@atomide.com>
- <20151005145127.GB23801@atomide.com>
- <20151005171155.GF23801@atomide.com>
- <20151005183813.GD21626@n2100.arm.linux.org.uk>
-Message-ID: <20151006090015.GE21626@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Oct 2015 11:00:42 +0200
+Subject: [PATCH v2 4/4] ASOC: sunxi: Add support for the spdif block
+In-Reply-To: <CAEKpxB=_coi06gaixgqpLm=AFbw2mPVLPim7HCk-T-Lnsgt6mw@mail.gmail.com>
+References: <1443635458-8873-1-git-send-email-codekipper@gmail.com>
+ <1443635458-8873-5-git-send-email-codekipper@gmail.com>
+ <20151001201122.GM7104@lukather>
+ <CAEKpxB=_coi06gaixgqpLm=AFbw2mPVLPim7HCk-T-Lnsgt6mw@mail.gmail.com>
+Message-ID: <20151006090042.GR2696@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 05, 2015 at 07:38:13PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Oct 05, 2015 at 10:11:56AM -0700, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [151005 07:57]:
-> > > * Tony Lindgren <tony@atomide.com> [151005 07:44]:
-> > > > * Tony Lindgren <tony@atomide.com> [151005 04:28]:
-> > > > 
-> > > > Based on some tests it seems that the duovero unpaired regulator usage
-> > > > is fixed by reverting:
-> > > > 
-> > > > c55d7a055364 ("mmc: host: omap_hsmmc: use regulator_is_enabled to
-> > > > find pbias status")
-> > > 
-> > > With commit c55d7a055364 my guess is that the PBIAS regulator is
-> > > already on from an earlier MMC probe and getting re-enabled when
-> > > a deferred probe happens?
-> > 
-> > Unless somebody has a better fix in mind for the above, I suggest
-> > we revert it for the -rc kernel.
+On Fri, Oct 02, 2015 at 08:44:03AM +0200, Code Kipper wrote:
+> >> +config SND_SOC_SUNXI_DAI_SPDIF
+> >> +        tristate
+> >> +     depends on OF
+> >> +        select SND_SOC_GENERIC_DMAENGINE_PCM
+> >> +        select REGMAP_MMIO
+> >> +
+> >> +config SND_SOC_SUNXI_MACHINE_SPDIF
+> >> +        tristate "APB on-chip sun4i/sun5i/sun7i SPDIF"
+> >> +     depends on OF
+> >> +        select SND_SOC_SUNXI_DAI_SPDIF
+> >> +        help
+> >> +          Say Y if you want to add support for SoC S/PDIF audio as simple audio card.
+> >
+> > You still haven't said why you can't use simple-card...
 > 
-> Let me try reverting that in my build tree, and...
+> I mentioned in the covering letter that I thought that simple-card was
+> overkill.
+
+Overkill for what? It adds no code, that will put no new maintainance
+burden, without any duplication. While your code also adds all that.
+
+> There is also a thread concerning issues with the ordering
+> of module bringup here
+> http://mailman.alsa-project.org/pipermail/alsa-devel/2013-December/070534.html.
+> I was initially trying to use the dummy spdif transmitter but couldn't
+> get it working, this set up works for me. I haven't got an audio guy
+> sitting next to me to ping and have reached out for some guidance. I
+> can do this using simple-card, it just with all the driver refactoring
+> it was the main place where I thought things would break.
+
+We're all on IRC.
+
+
+> >> +static void sun4i_spdif_configure(struct sun4i_spdif_dev *host)
+> >> +{
+> >> +     u32 reg_val;
+> >> +
+> >> +     /* soft reset SPDIF */
+> >> +     regmap_write(host->regmap, SUN4I_SPDIF_CTL, SUN4I_SPDIF_CTL_RESET);
+> >> +
+> >> +     /* MCLK OUTPUT enable */
+> >> +     regmap_update_bits(host->regmap, SUN4I_SPDIF_CTL,
+> >> +                     SUN4I_SPDIF_CTL_MCLKOUTEN, SUN4I_SPDIF_CTL_MCLKOUTEN);
+> >
+> > The alignment is still not right....
 > 
-> > > > And it seems that omap3 legacy MMC is broken earlier in the
-> > > > series with:
-> > > > 
-> > > > 7d607f917008 ("mmc: host: omap_hsmmc: use
-> > > > devm_regulator_get_optional() for vmmc")
-> > > > 
-> > > > This one does not cleanly revert so have not yet tried reverting
-> > > > it.
-> > > 
-> > > And with commit 7d607f917008 I'm guessing we can't return an
-> > > error if the PBIAS regulator does not exist as that's not there
-> > > for the legacy booting.
-> > 
-> > For omap3 legacy booting, we keep getting -EPROBE_DEFER for
-> > all the optional regulators.
-> > 
-> > Something like the following might be the minimal fix for the -rc
-> > cycle?
+> I'm not even sure if we need mclk output enabled. Let me see what
+> happens when I remove this.
+
+It's not really the point. The alignment of all your wrapped lines is
+wrong.
+
+> >> +static int sun4i_spdif_startup(struct snd_pcm_substream *substream,
+> >> +                             struct snd_soc_dai *cpu_dai)
+> >> +{
+> >> +     struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> >> +     struct sun4i_spdif_dev *host = snd_soc_dai_get_drvdata(rtd->cpu_dai);
+> >> +
+> >> +     if (substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
+> >> +             return -EINVAL;
+> >> +
+> >> +     sun4i_spdif_configure(host);
+> >> +
+> >> +     return clk_prepare_enable(host->clk);
+> >
+> > You're still not using pm_runtime...
 > 
-> applying this patch.  If that gets things going again, then we
-> _definitely_ should get both of these to Linus ASAP.  The breakage
-> has been around far too long already.
+> I've removed the pm stuff and this is the same as you have it in
+> sun4i-codec.
 
-Last night's build shows that this fixes the non-DT LDP3430 booting, but
-DT-based LDP3430 and SDP4430 both remain broken for the same reason -
-neither can find their SD cards.
+You've removed the suspend code, and both Mark and I asked you to use
+runtime_pm to handle your bus clock.
 
-We're at -rc4.  That means we're could be only three weeks away from 4.3
-being released, and DT OMAP has yet to boot _once_ here.
+And this has also been asked for the codec.
 
-What I find *totally* unacceptable is the lack of reaction from the MMC
-and TI people: it's just like "we'll break your crap, and we'll ignore
-reports of regressions."  That is *not* acceptable in any shape or form,
-and people who do this _should_ have their future patches ignored until
-they demonstrate that they understand the need to not break stuff.
+> >> +
+> >> +     ret = clk_set_rate(host->audio_clk, mclk);
+> >> +     if (ret < 0) {
+> >> +             dev_err(&pdev->dev,
+> >> +                     "Setting pll2 clock rate for %d Hz failed!\n", mclk);
+> >> +             return ret;
+> >> +     }
+> >
+> > You're still using the PLL2...
+> 
+> I commented this out and it stopped working...let me check again.
 
-I'm at the point of suggesting that there should be a moritorium on all
-OMAP related development for 4.4: delay all development to 4.5, and have
-4.4 as a pure bug-fixing _only_ cycle for OMAP.  If 4.3 is released and
-OMAP is still broken, then I don't think there's an option on that.
+Then something is wrong somewhere else that needs to be fixed, either
+in the clock driver or in this driver. Did you update all the other
+references to PLL2 as well?
 
-Maybe the idea that development work won't hit mainline for another 4
-months will help focus the minds on not breaking stuff and then ignoring
-regression reports.
+> 
+> >
+> >> +
+> >> +     ret = clk_set_rate(host->clk, mclk);
+> >> +     if (ret < 0) {
+> >> +             dev_err(&pdev->dev,
+> >> +                     "Setting SPDIF clock rate for %d Hz failed!\n", mclk);
+> >> +             return ret;
+> >> +     }
+> >> +
+> >> +     reg_val = 0;
+> >> +     reg_val &= ~SUN4I_SPDIF_FCTL_FIFOSRC;
+> >> +     reg_val |= SUN4I_SPDIF_FCTL_TXTL_MASK;
+> >> +     reg_val |= SUN4I_SPDIF_FCTL_RXTL_MASK;
+> >> +     reg_val |= SUN4I_SPDIF_FCTL_TXIM;
+> >> +     reg_val |= SUN4I_SPDIF_FCTL_RXOM_MASK;
+> >> +     regmap_write(host->regmap, SUN4I_SPDIF_FCTL, reg_val);
+> >
+> > You're still not using regmap_update_bits...
+> 
+> Why would I need to?, this is the first write to the register before
+> playback and I'm not interested in keeping any of the previous fifo
+> settings. Will remove"reg_val &= ~SUN4I_SPDIF_FCTL_FIFOSRC;" as that's
+> not doing anything.
+
+Dropping the masking is also an option.
+
+> > IF you're really going to ignore all the comments we did, please tell
+> > us upfront. That way, we will not waste our time doing a review of
+> > your patches.
+> 
+> All is a strong word....did you even read my covering letter?....there
+> was a major refactoring of the code and I think I covered a majority
+> of the comments. Apologies if you feel that you'd wasted a lot of time
+> of this....it can't be any more that the EVB dts.
+
+The point of this is that this is a discussion. You simply ignored
+most of the comments, without even mentionning why you wanted to
+ignore them, and simply sent a new version.
+
+If you feel like one comment is invalid, let's discuss this, like you
+did here. But silently discarding them is not an option and actually
+quite rude.
+
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/95784d5c/attachment.sig>
