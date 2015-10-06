@@ -1,60 +1,89 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 06 Oct 2015 16:44:50 +0200
-Subject: [PATCH 2/8] mmc: sdhci-pxav3: disable clock inversion for HS MMC
- cards
-In-Reply-To: <1444094562-31165-3-git-send-email-mw@semihalf.com> (Marcin
- Wojtas's message of "Tue, 6 Oct 2015 03:22:36 +0200")
-References: <1444094562-31165-1-git-send-email-mw@semihalf.com>
- <1444094562-31165-3-git-send-email-mw@semihalf.com>
-Message-ID: <87fv1o9hul.fsf@free-electrons.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 6 Oct 2015 09:45:18 -0500
+Subject: [PATCH v5 2/3] PCI: st: Add Device Tree bindings for sti pcie
+In-Reply-To: <1444118168-13086-3-git-send-email-gabriel.fernandez@linaro.org>
+References: <1444118168-13086-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1444118168-13086-3-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <CAL_JsqKRby4ZWb6iU7d+yN5Cj0qM+m+sQPsFVM0SgAHGK===uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On mar., oct. 06 2015, Marcin Wojtas <mw@semihalf.com> wrote:
-
-> From: Nadav Haklai <nadavh@marvell.com>
+On Tue, Oct 6, 2015 at 2:56 AM, Gabriel Fernandez
+<gabriel.fernandez@linaro.org> wrote:
+> sti pcie is built around a Synopsis Designware PCIe IP.
 >
-> According to 'FE-2946959' erratum the clock inversion option is
-> needed to support slow frequencies when the card input hold time
-> requirement is high. This setting is not required for high speed
-> MMC and might cause timing violation.
->
-> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-> Cc: <stable@vger.kernel.org> # v4.2
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 
-Seems OK too.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
 > ---
->  drivers/mmc/host/sdhci-pxav3.c | 3 +++
->  1 file changed, 3 insertions(+)
+>  Documentation/devicetree/bindings/pci/st-pcie.txt | 56 +++++++++++++++++++++++
+>  1 file changed, 56 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/st-pcie.txt
 >
-> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-> index 976cddd..89a9e49 100644
-> --- a/drivers/mmc/host/sdhci-pxav3.c
-> +++ b/drivers/mmc/host/sdhci-pxav3.c
-> @@ -291,6 +291,9 @@ static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
->  		    uhs == MMC_TIMING_UHS_DDR50) {
->  			reg_val &= ~SDIO3_CONF_CLK_INV;
->  			reg_val |= SDIO3_CONF_SD_FB_CLK;
-> +		} else if (uhs == MMC_TIMING_MMC_HS) {
-> +			reg_val &= ~SDIO3_CONF_CLK_INV;
-> +			reg_val &= ~SDIO3_CONF_SD_FB_CLK;
->  		} else {
->  			reg_val |= SDIO3_CONF_CLK_INV;
->  			reg_val &= ~SDIO3_CONF_SD_FB_CLK;
-> -- 
-> 1.8.3.1
+> diff --git a/Documentation/devicetree/bindings/pci/st-pcie.txt b/Documentation/devicetree/bindings/pci/st-pcie.txt
+> new file mode 100644
+> index 0000000..32e76d0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/st-pcie.txt
+> @@ -0,0 +1,56 @@
+> +STMicroelectronics STi PCIe controller
+> +
+> +This PCIe host controller is based on the Synopsis Designware PCIe IP
+> +and thus inherits all the common properties defined in designware-pcie.txt.
+> +
+> +Required properties:
+> + - compatible: Should be "st,pcie", "snps,dw-pcie"
+> +
+> + - reg: base address and length of the pcie controller, mem-window address
+> +   and length available to the controller.
+> +
+> + - interrupts: one GIC interrupt line connected to PCI MSI interrupt line
+> +
+> + - st,syscfg : should be a phandle of the syscfg node. Also contains syscfg
+> +   offset for IP configuration.
+> +
+> + - resets: phandle to the powerdown and reset controller for the PCIe IP.
+> +   See ../reset/reset.txt for details.
+> + - reset-names: should be "powerdown" and "softreset".
+> +
+> + - phys: the phandle for the PHY device (used by generic PHY framework).
+> + - phys-names: must be "pcie".
+> +
+> +Optional properties:
+> + - reset-gpio: a GPIO spec to define which pin is connected to the bus reset.
+> +
+> +Example:
+> +
+> +pcie0: pcie at 9b00000 {
+> +       compatible = "st,pcie", "snps,dw-pcie";
+> +       device_type = "pci";
+> +       reg = <0x09b00000 0x4000>,      /* dbi cntrl registers */
+> +             <0x2fff0000 0x00010000>,  /* configuration space */
+> +             <0x40000000 0x80000000>;  /* lmi mem window */
+> +       reg-names = "dbi", "config", "mem-window";
+> +       st,syscfg = <&syscfg_core 0xd8 0xe0>;
+> +       #address-cells = <3>;
+> +       #size-cells = <2>;
+> +       ranges = <0x82000000 0 0x20000000 0x20000000 0 0x0FFF0000>; /* non-prefetchable memory */
+> +       num-lanes = <1>;
+> +       interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
+> +       interrupt-names = "msi";
+> +       #interrupt-cells = <1>;
+> +       interrupt-map-mask = <0 0 0 7>;
+> +       interrupt-map = <0 0 0 1 &intc GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>, /* INT A */
+> +                       <0 0 0 2 &intc GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>, /* INT B */
+> +                       <0 0 0 3 &intc GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>, /* INT C */
+> +                       <0 0 0 4 &intc GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>; /* INT D */
+> +
+> +       resets = <&powerdown STIH407_PCIE0_POWERDOWN>,
+> +                <&softreset STIH407_PCIE0_SOFTRESET>;
+> +       reset-names = "powerdown",
+> +                     "softreset";
+> +       phys = <&phy_port0 PHY_TYPE_PCIE>;
+> +       phy-names = "pcie";
+> +};
+> --
+> 1.9.1
 >
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
