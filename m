@@ -1,34 +1,43 @@
-From: bharatku@xilinx.com (bharat kumar gogada)
-Date: Tue, 6 Oct 2015 10:17:11 +0000 (UTC)
-Subject: ARM64 PCIe legacy interrupts
-References: <loom.20151001T142318-555@post.gmane.org>
- <CAHM4w1kzt0wCCxfvofXqzgK=Te50_1ZsYnApbEojMQq8x+wcdA@mail.gmail.com>
-Message-ID: <loom.20151006T121259-647@post.gmane.org>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 6 Oct 2015 11:18:42 +0100
+Subject: [PATCH v2 21/22] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1
+ to sysfs
+In-Reply-To: <20151006090959.GO21513@n2100.arm.linux.org.uk>
+References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+ <1444064531-25607-22-git-send-email-suzuki.poulose@arm.com>
+ <20151006090959.GO21513@n2100.arm.linux.org.uk>
+Message-ID: <CAPvkgC31-gUmetN0S=t9yJ30M8=x7Y7prxO40tiEB=zJiUvwBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pratyush Anand <pratyush.anand <at> gmail.com> writes:
+On 6 October 2015 at 10:09, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Oct 05, 2015 at 06:02:10PM +0100, Suzuki K. Poulose wrote:
+>> +static int __init cpuinfo_regs_init(void)
+>> +{
+>> +     int cpu, ret;
+>> +
+>> +     for_each_present_cpu(cpu) {
+>> +             struct device *dev = get_cpu_device(cpu);
+>> +
+>> +             if (!dev)
+>> +                     return -1;
+>
+> NAK.  Go figure out why, I'm too lazy to tell you.
 
-> 
-> On Thu, Oct 1, 2015 at 5:59 PM, bharat kumar gogada <bharatku <at>
-xilinx.com> wrote:
-> > Hi, in ARM32 bit pci_fixup_irqs is being used to support legacy interrupts,
-> > in ARM64 how legacy interrupts are being handled
-> 
-> See, arch/arm64/kernel/pci.c:pcibios_add_devices()
-> 
+I will correct the return code to be -ENODEV.
+Was that the reasoning behind the NAK?
 
-Thanks.
-
-I have a confusion in handling legacy interrupts in driver, I'm seeing that
-for legacy handling there is separate node being created. Ex: for
-pcie-xilinx.c the following node is being used
-
-pcie_intc: interrupt-controller {
-                        interrupt-controller;
-                        #address-cells = <0>;
-                        #interrupt-cells = <1>;
-                };
-
-Why do we need a separate child node for legacy handling and why is the
-address cells parameter assigned zero value
+>
+>> +
+>> +             ret = sysfs_create_group(&dev->kobj, &cpuregs_attr_group);
+>> +             if (ret)
+>> +                     return ret;
+>> +     }
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +device_initcall(cpuinfo_regs_init);
+>> --
+>> 1.7.9.5
