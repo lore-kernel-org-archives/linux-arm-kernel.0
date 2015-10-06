@@ -1,25 +1,40 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Tue, 6 Oct 2015 08:53:57 +0200
-Subject: [PATCH 04/17] ARM: pxa: hx4700: Remove unused field initializers
-In-Reply-To: <1444034997-9805-5-git-send-email-thierry.reding@gmail.com>
-References: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
- <1444034997-9805-5-git-send-email-thierry.reding@gmail.com>
-Message-ID: <CA+gwMcevzM9UTpRd7vGQ9mOa4vr=hAq5ZBG7tSWq0mf21fDX3w@mail.gmail.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Tue, 6 Oct 2015 09:02:25 +0200
+Subject: [PATCH 6/8] ARM: mvebu: enable SDHCI card detection using DAT3
+ pin on A388-GP
+In-Reply-To: <20151006033131.GA24230@lunn.ch>
+References: <1444094562-31165-1-git-send-email-mw@semihalf.com>
+ <1444094562-31165-7-git-send-email-mw@semihalf.com>
+ <20151006033131.GA24230@lunn.ch>
+Message-ID: <CAPv3WKeUQ6rsYWJ3C+aX8eHTAdS4SmQ3oCjA9feFf+d-n1RvhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 5, 2015 at 10:49 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> The ID and period for the backlight PWM are obtained from a PWM lookup
-> table, so the corresponding values don't need to be duplicated into the
-> platform data.
+Hi Andrew,
+
+2015-10-06 5:31 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
+> On Tue, Oct 06, 2015 at 03:22:40AM +0200, Marcin Wojtas wrote:
+>> The newest revisions of A388-GP (v1.5 and higher) support only
+>> DAT3-based card detection, which is enabled by this commit. Hitherto
+>> revisions, without such modification, will be impacted with a broken
+>> card detection - in order to operate the cards have to be present
+>> during kernel boot.
 >
-> Cc: Daniel Mack <daniel@zonque.org>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
-> Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
+> Humm. Is this acceptable, breaking old boards?
+>
+> I would say at minimum, there should be a big fat comment at the top
+> of armada-388-gp.dts explaining that this DTS file is broken on
+> v0.0-v1.4.
+>
+> Or we have two .dts files for the 388-gp file, and a dtsi file.
+>
 
-Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
+I expected this patch would be controversial, hence I propose a
+compromise: set A388-GP SDHCI to 'broken-cd' by defeault. However
+Marvell insisted on HW card detection, because software polling spoils
+the SD/MMC benchmarks, but this way the user would decide whether to
+stay with broken-cd or switch to GPIO/DAT3 detection. What do you
+think?
 
-regards
-Philipp
+Best regards,
+Marcin
