@@ -1,69 +1,51 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 06 Oct 2015 17:05:38 +0200
-Subject: [PATCH 6/8] ARM: mvebu: enable SDHCI card detection using DAT3
- pin on A388-GP
-In-Reply-To: <CAPv3WKeUQ6rsYWJ3C+aX8eHTAdS4SmQ3oCjA9feFf+d-n1RvhA@mail.gmail.com>
- (Marcin Wojtas's message of "Tue, 6 Oct 2015 09:02:25 +0200")
-References: <1444094562-31165-1-git-send-email-mw@semihalf.com>
- <1444094562-31165-7-git-send-email-mw@semihalf.com>
- <20151006033131.GA24230@lunn.ch>
- <CAPv3WKeUQ6rsYWJ3C+aX8eHTAdS4SmQ3oCjA9feFf+d-n1RvhA@mail.gmail.com>
-Message-ID: <8737xo9gvx.fsf@free-electrons.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 6 Oct 2015 16:48:23 +0100
+Subject: [PATCH 2/3] hwrng: st: Report correct FIFO size
+In-Reply-To: <1444142640-14721-2-git-send-email-lee.jones@linaro.org>
+References: <1444142640-14721-1-git-send-email-lee.jones@linaro.org>
+ <1444142640-14721-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <5613ED47.1040608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On mar., oct. 06 2015, Marcin Wojtas <mw@semihalf.com> wrote:
-
-> Hi Andrew,
+On 06/10/15 15:43, Lee Jones wrote:
+> The values supplied to the 'read random data from FIFO' arithmetic
+> are not correct.  The value fed in to initialise the iterator
+> describes the FIFO depth, but then the iterator is treated in
+> Bytes and subsequently increased by 2 in value for every read
+> word.  This means only 4 of the 8 available values are being read
+> during each invocation of .read().
 >
-> 2015-10-06 5:31 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
->> On Tue, Oct 06, 2015 at 03:22:40AM +0200, Marcin Wojtas wrote:
->>> The newest revisions of A388-GP (v1.5 and higher) support only
->>> DAT3-based card detection, which is enabled by this commit. Hitherto
->>> revisions, without such modification, will be impacted with a broken
->>> card detection - in order to operate the cards have to be present
->>> during kernel boot.
->>
->> Humm. Is this acceptable, breaking old boards?
->>
->> I would say at minimum, there should be a big fat comment at the top
->> of armada-388-gp.dts explaining that this DTS file is broken on
->> v0.0-v1.4.
->>
->> Or we have two .dts files for the 388-gp file, and a dtsi file.
->>
+> This change increased the device bandwidth by a factor of 2.
 >
-> I expected this patch would be controversial, hence I propose a
-> compromise: set A388-GP SDHCI to 'broken-cd' by defeault. However
-> Marvell insisted on HW card detection, because software polling spoils
-> the SD/MMC benchmarks, but this way the user would decide whether to
-> stay with broken-cd or switch to GPIO/DAT3 detection. What do you
-> think?
+> Reported-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   drivers/char/hw_random/st-rng.c | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/char/hw_random/st-rng.c b/drivers/char/hw_random/st-rng.c
+> index 8c8a435..44480fe 100644
+> --- a/drivers/char/hw_random/st-rng.c
+> +++ b/drivers/char/hw_random/st-rng.c
+> @@ -29,8 +29,9 @@
+>   #define ST_RNG_STATUS_BAD_ALTERNANCE	BIT(1)
+>   #define ST_RNG_STATUS_FIFO_FULL		BIT(5)
+>
+> -#define ST_RNG_FIFO_SIZE		8
+>   #define ST_RNG_SAMPLE_SIZE		2 /* 2 Byte (16bit) samples */
+> +#define ST_RNG_FIFO_DEPTH		8
+> +#define ST_RNG_FIFO_SIZE		(ST_RNG_FIFO_DEPTH * ST_RNG_SAMPLE_SIZE)
+>
+>   /* Samples are available every 0.667us, which we round to 1us */
+>   #define ST_RNG_FILL_FIFO_TIMEOUT   (1 * (ST_RNG_FIFO_SIZE / ST_RNG_SAMPLE_SIZE))
 
-I don't know hwo to correctly handle this case.
+This change doubles the timeout and doesn't mention it in the changelog. 
+Changing the order of 2/3 and 3/3 would avoid this.
 
->From my point of view in a ideal work it is typically something that
-sould be updated by the bootloader. However in the real world, we can't
-rely on the bootloader :(
+Other than that:
 
-I also don't like having a dts for each new version of the board but as
-the end you can see them as different boards. Also now it seems that the
-distribution are moving to link the dtb and the kernel: for eaxh new
-version of the kernel they also provide a new version of the dtb. That
-means, that if we modify the dts, then the old board won't work with the
-new kernel. So maybe creating a armada-388-gp-v1.5.dts could be the best
-option.
+Reviewed-by: Daniel Thompson <daniel.thompson@linaro.org>
 
-What do you think of it?
 
-Thanks,
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Daniel.
