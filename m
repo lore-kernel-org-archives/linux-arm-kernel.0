@@ -1,59 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Oct 2015 10:08:44 +0200
-Subject: [RFC/PATCH 11/11] arm: boot: dts: omap: add missing default
- status for 32k counter
-In-Reply-To: <87io6lf6i4.fsf@saruman.tx.rr.com>
-References: <1443559446-26969-1-git-send-email-balbi@ti.com>
- <20151005175230.GG18784@saruman.tx.rr.com> <87io6lf6i4.fsf@saruman.tx.rr.com>
-Message-ID: <13543270.oBfHhoNL28@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 6 Oct 2015 10:11:30 +0200
+Subject: [PATCH] arm: make psci_smp_available() depend on SMP + PSCI as
+ the makefile does
+In-Reply-To: <1443820404-16431-1-git-send-email-sebastian@breakpoint.cc>
+References: <1443820404-16431-1-git-send-email-sebastian@breakpoint.cc>
+Message-ID: <20151006081130.GE18633@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 October 2015 14:41:07 Felipe Balbi wrote:
+On Fri, Oct 02, 2015 at 11:13:24PM +0200, Sebastian Andrzej Siewior wrote:
+> From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 > 
-> /**
->  * omap_get_timer_dt - get a timer using device-tree
->  * @match       - device-tree match structure for matching a device type
->  * @property    - optional timer property to match
->  *
->  * Helper function to get a timer during early boot using device-tree for use
->  * as kernel system timer. Optionally, the property argument can be used to
->  * select a timer with a specific property. Once a timer is found then mark
->  * the timer node in device-tree as disabled, to prevent the kernel from
->  * registering this timer as a platform device and so no one else can use it.
->  */
-> static struct device_node * __init omap_get_timer_dt(const struct of_device_id *match,
->                                                      const char *property)
-> {
->         struct device_node *np;
+> with CONFIG_ARM_PSCI=y, CONFIG_SMP=n and CONFIG_ARCH_TEGRA_124_SOC=y I
+> end up with:
 > 
->         for_each_matching_node(np, match) {
->                 if (!of_device_is_available(np))
->                         continue;
+> |arch/arm/mach-tegra/built-in.o: In function `tegra114_cpuidle_init':
+> |arch/arm/mach-tegra/cpuidle-tegra114.c:93: undefined reference to `psci_smp_available'
+> |Makefile:927: recipe for target 'vmlinux' failed
 > 
->                 if (property && !of_get_property(np, property, NULL))
->                         continue;
+> during build testing.
 > 
->                 if (!property && (of_get_property(np, "ti,timer-alwon", NULL) ||
->                                   of_get_property(np, "ti,timer-dsp", NULL) ||
->                                   of_get_property(np, "ti,timer-pwm", NULL) ||
->                                   of_get_property(np, "ti,timer-secure", NULL)))
->                         continue;
-> 
->                 of_add_property(np, &device_disabled);
->                 return np;
->         }
-> 
->         return NULL;
-> }
-> 
-> I'll patch this up and drop $subject
-> 
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> ---
+>  arch/arm/include/asm/psci.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Ah, good.
+Jan Kiszka sent out an equivalent patch back in May, but it seems like
+discussion stalled on that. He resent a few days ago:
 
-I'm seeing the "ti,timer-alwon" property here, we probably need to take
-that into account when setting the CLOCK_SOURCE_SUSPEND_NONSTOP flag, if
-that isn't how it gets done already.
+	http://patchwork.ozlabs.org/patch/521597/
 
-	Arnd
+Let me see if I can get the original discussion resumed. I'll add you in
+the loop.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/fef61e7b/attachment.sig>
