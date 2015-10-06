@@ -1,78 +1,63 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 6 Oct 2015 11:18:13 +0200
-Subject: [RFC PATCH v3 1/3] mmc: sprd: Add MMC host driver for Spreadtrum
- SoC
-In-Reply-To: <CAG_R4_VTXCV4NVMOwv-9F56-_pVsK0hU4go79ZhV3OFxwcF0mA@mail.gmail.com>
-References: <1439571353-30165-1-git-send-email-wuht06@gmail.com>
- <1439571353-30165-2-git-send-email-wuht06@gmail.com>
- <CAPDyKFp=XH+Vo_diRyhrMuB+v1rmTmxo3Lid3Wc-u1ohqNisKw@mail.gmail.com>
- <CAG_R4_VTXCV4NVMOwv-9F56-_pVsK0hU4go79ZhV3OFxwcF0mA@mail.gmail.com>
-Message-ID: <CAPDyKFo3xp3wU3XW3kMV7Xz7DFgkxts3CArthYY7-CyWk8cjXw@mail.gmail.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Tue, 6 Oct 2015 17:21:13 +0800
+Subject: [PATCH v5 06/10] dmaengine: add API for getting dma controller's
+ quirk
+In-Reply-To: <20151005153746.GG13501@vkoul-mobl.iind.intel.com>
+References: <1442187923-5736-1-git-send-email-shawn.lin@rock-chips.com>
+ <1442188139-6017-1-git-send-email-shawn.lin@rock-chips.com>
+ <20151005153746.GG13501@vkoul-mobl.iind.intel.com>
+Message-ID: <56139289.7000005@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Russell
+Hi Vinod,
 
-On 28 September 2015 at 09:18, Hongtao Wu <wuht06@gmail.com> wrote:
->>>
->
-> On Thu, Sep 10, 2015 at 9:28 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+On 2015/10/5 23:37, Vinod Koul wrote:
+> On Mon, Sep 14, 2015 at 07:48:59AM +0800, Shawn Lin wrote:
+>> Add dmaengine_get_quirks API for peripheral devices to query
+>> quirks if they need it to make special workaround due to broken
+>> dma controller design.
 >>
->> On 14 August 2015 at 18:55, Hongtao Wu <wuht06@gmail.com> wrote:
->> > the Spreadtrum MMC host driver is used to supply EMMC, SD, and
->> > SDIO types of memory cards
+>> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+>> ---
 >>
->> Perhaps some more information about the controller. Are there any
->> specific features it support or doesn't support!?
+>> Changes in v5: None
+>> Changes in v4: None
+>> Changes in v3: None
+>> Changes in v2: None
+>> Changes in v1: None
+>>
+>>   include/linux/dmaengine.h | 9 +++++++++
+>>   1 file changed, 9 insertions(+)
+>>
+>> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+>> index e2f5eb4..5174ca4 100644
+>> --- a/include/linux/dmaengine.h
+>> +++ b/include/linux/dmaengine.h
+>> @@ -704,6 +704,7 @@ struct dma_device {
+>>
+>>   	int (*device_config)(struct dma_chan *chan,
+>>   			     struct dma_slave_config *config);
+>> +	int (*device_get_quirks)(struct dma_chan *chan);
 >
-> Thanks for kindly reply.
-> Yes, spreadtrum MMC host controllers have some specific features as follows:
-> (1) We don't have controls for sampling clock tuning and re-tuning, we take
->       place of them with three registers as follows:
->        (a) CLK_WR_DL(Offset 080h): Data write clock delay line.
->        (b) CLK_RD_POS_DL(Offset 0x84h): Posedge data read clock delay line.
->        (c) CLK_RD_NEG_DL(Offset 088h): Negedge data read clock delay line.
+> And why do we want to expose this to users? THis doesnt seem right!
 >
-> (2) We don't have Power Control Register(Offset 029h), all our controller's
-> power
->       come from PMIC, rather than directly from CPU.
+
+Basically I agree not to expose dma's quirk to slave controllers...But, 
+the fact I mentioned on cover letter explain the reasons why I have to 
+let slave controllers know that they are working with a broken dma. It's 
+a dilemma that if we don't want that to be exposed(let slave 
+controllers' driver get the info via a API), we have to add broken quirk 
+for all of them ,here and there, which seems to be a disaster:(
+
+I would appreciate it if you could give me some suggestions at your 
+earliest convenience. :)
+
+> A quirk may exists but should be handled inside the controller driver and do
+> appropriate action. You don't tell users or expect them to handle these
 >
-> (3) We don't have bit[6](Card Insertion), bit[7] (Card Removal), bit[8]
-> (Card Interrupt)
-> and bit[12:9] in Normal Interrupt Status Register(Offset 030h). Because the
-> detect
-> gpio pin doesn't connect to the register of our host controller. So we can't
-> operate bit[18:16](Card Detect Pin Level, Card State stable and Card
-> Inserted)
-> in Present State Register(Offset 024h).
 
-Thanks for clarifying!
 
-You have some differences towards the "standard" sdhci variant, but
-that doesn't mean you should go off and implement a new driver from
-scratch, instead you should create a new sdhci variant and re-use code
-from the generic sdhci driver.
-
-The current problem with such approach, is that the sdhci driver isn't
-designed as a library but instead a driver consisting of too many
-quirks and callbacks. While you start to adopt your driver towards
-sdhci, you will need to add yet another bunch of new quirks and
-callbacks to suite your hw.
-
-Now, as the number of callbacks and quirks continues to increase I
-will sooner or later give up maintaining it, as each line of code will
-depend on a quirk. So, we need to start turning sdhci into a library
-*right now*! Russell King, has pointed out this several times as well,
-but unfortunate I haven't yet seen anyone willing to help out in this
-field.
-
-I would of course be very happy if you would like to have a look at
-that, but I realize it's a difficult task, So, unless you are happy
-with taking on such a challenge, I suggest you go for an intermediate
-step, which thus means convert your driver to a sdhci variant driver
-and add the quirks/callbacks you need to suite your hw.
-
-[...]
-
-Kind regards
-Uffe
+-- 
+Best Regards
+Shawn Lin
