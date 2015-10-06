@@ -1,92 +1,81 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Oct 2015 18:04:03 +0100
-Subject: [PATCH v2 8/8] PCI/MSI: Allow the MSI domain to be device-specific
+Date: Tue,  6 Oct 2015 18:04:01 +0100
+Subject: [PATCH v2 6/8] of/irq: Use the msi-map property to provide
+ device-specific MSI domain
 In-Reply-To: <1444151043-31084-1-git-send-email-marc.zyngier@arm.com>
 References: <1444151043-31084-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1444151043-31084-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1444151043-31084-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, we've always considered that for a given PCI device, its
-MSI controller was either set by the architecture-specific
-pcibios hook, or simply inherited from the host bridge.
+While msi-parent is used to point to the MSI controller that
+works for all the devices behind a root complex, it doesn't
+allow configurations where each individual device can be routed
+to a separate MSI controller.
 
-This doesn't cover things like firmware-defined topologies like
-msi-map (DT) or IORT (ACPI), which can provide information about
-which MSI controller to use on a per-device basis.
-
-This patch adds the necessary hook into the MSI code to allow this
-feature, and provides the msi-map functionnality as a first
-implementation.
+The msi-map property provides this flexibility (and much more),
+so let's add a utility function that parses it, and return the
+corresponding MSI domain.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/pci/msi.c   | 17 +++++++++++++++++
- drivers/pci/probe.c |  8 ++++++++
- include/linux/msi.h |  6 ++++++
- 3 files changed, 31 insertions(+)
+ drivers/of/irq.c       | 18 ++++++++++++++++++
+ include/linux/of_irq.h |  7 +++++++
+ 2 files changed, 25 insertions(+)
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index 81a2798..3daff31 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -1357,4 +1357,21 @@ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
- 
- 	return rid;
+diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+index ed64d98..0baf626d 100644
+--- a/drivers/of/irq.c
++++ b/drivers/of/irq.c
+@@ -689,6 +689,24 @@ static struct irq_domain *__of_get_msi_domain(struct device_node *np,
  }
+ 
+ /**
++ * of_msi_map_get_device_domain - Use msi-map to find the relevant MSI domain
++ * @dev: device for which the mapping is to be done.
++ * @rid: Requester ID for the device.
++ *
++ * Walk up the device hierarchy looking for devices with a "msi-map"
++ * property.
++ *
++ * Returns: the MSI domain for this device (or NULL on failure)
++ */
++struct irq_domain *of_msi_map_get_device_domain(struct device *dev, u32 rid)
++{
++	struct device_node *np = NULL;
++
++	__of_msi_map_rid(dev, &np, rid);
++	return __of_get_msi_domain(np, DOMAIN_BUS_PCI_MSI);
++}
 +
 +/**
-+ * pci_msi_get_device_domain - Get the MSI domain for a given PCI device
-+ * @pdev:	The PCI device
-+ *
-+ * Use the firmware data to find a device-specific MSI domain
-+ * (i.e. not one that is ste as a default).
-+ *
-+ * Returns: The coresponding MSI domain or NULL if none has been found.
-+ */
-+struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev)
-+{
-+	u32 rid = 0;
-+
-+	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
-+	return of_msi_map_get_device_domain(&pdev->dev, rid);
-+}
- #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 7c333f8..f14a970 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1639,6 +1639,14 @@ static struct irq_domain *pci_dev_msi_domain(struct pci_dev *dev)
- 	if (d)
- 		return d;
- 
-+	/*
-+	 * Let's see if we have a firmware interface able to provide
-+	 * the domain.
-+	 */
-+	d = pci_msi_get_device_domain(dev);
-+	if (d)
-+		return d;
-+
+  * of_msi_get_domain - Use msi-parent to find the relevant MSI domain
+  * @dev: device for which the domain is requested
+  * @np: device node for @dev
+diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
+index 62ae6ed..65d9692 100644
+--- a/include/linux/of_irq.h
++++ b/include/linux/of_irq.h
+@@ -49,6 +49,8 @@ extern int of_irq_to_resource_table(struct device_node *dev,
+ extern struct irq_domain *of_msi_get_domain(struct device *dev,
+ 					    struct device_node *np,
+ 					    enum irq_domain_bus_token token);
++extern struct irq_domain *of_msi_map_get_device_domain(struct device *dev,
++						       u32 rid);
+ #else
+ static inline int of_irq_count(struct device_node *dev)
+ {
+@@ -73,6 +75,11 @@ static inline struct irq_domain *of_msi_get_domain(struct device *dev,
+ {
  	return NULL;
  }
- 
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 56e3b76..375be7c 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -294,6 +294,12 @@ irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
- int pci_msi_domain_check_cap(struct irq_domain *domain,
- 			     struct msi_domain_info *info, struct device *dev);
- u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev);
-+struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev);
-+#else
-+static inline struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev)
++static inline struct irq_domain *of_msi_map_get_device_domain(struct device *dev,
++							      u32 rid)
 +{
 +	return NULL;
 +}
- #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+ #endif
  
- #endif /* LINUX_MSI_H */
+ #if defined(CONFIG_OF)
 -- 
 2.1.4
