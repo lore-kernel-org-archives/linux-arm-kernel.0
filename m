@@ -1,40 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 06 Oct 2015 16:29:20 +0100
-Subject: [PATCH] ARM: Remove open-coded version of IRQCHIP_DECLARE
-In-Reply-To: <5611BBB5.9030403@samsung.com>
-References: <1443803057-9007-1-git-send-email-marc.zyngier@arm.com>
- <5611BBB5.9030403@samsung.com>
-Message-ID: <5613E8D0.8050604@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 6 Oct 2015 10:29:29 -0500
+Subject: [RFC/PATCH 11/11] arm: boot: dts: omap: add missing default
+ status for 32k counter
+In-Reply-To: <20151006151805.GR23801@atomide.com>
+References: <1443559446-26969-1-git-send-email-balbi@ti.com>
+ <20151005175230.GG18784@saruman.tx.rr.com> <87io6lf6i4.fsf@saruman.tx.rr.com>
+ <13543270.oBfHhoNL28@wuerfel> <87612k3uza.fsf@saruman.tx.rr.com>
+ <20151006151805.GR23801@atomide.com>
+Message-ID: <87oagc2exy.fsf@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/15 00:52, Krzysztof Kozlowski wrote:
-> On 03.10.2015 01:24, Marc Zyngier wrote:
->> Now that the IRQCHIP_DECLARE macro has been moved to linux/irqchip.h,
->> it becomes possible to cleanup the open-coded versions of the same
->> macro that have been added to some private irqchips implementations.
->>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Cc: Shawn Guo <shawnguo@kernel.org>
->> Cc: Sascha Hauer <kernel@pengutronix.de>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/mach-exynos/suspend.c       | 3 ++-
-> 
-> I guess you want to push it through the tip tree? If yes, then for Samsung:
-> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> (if not then please split it per mach)
 
-I was more angling to have it directly picked up via arm-soc. But
-otherwise yes, I can get it merged via tip if everyone agrees to it.
+Hi,
 
-Splitting it per platform is a waste of time.
+Tony Lindgren <tony@atomide.com> writes:
 
-Thanks,
+> * Felipe Balbi <balbi@ti.com> [151006 08:02]:
+>> - ti,timer-alwon:	Indicates the timer is in an alway-on power
+>>   domain.
+>> 
+>> Tony, care to comment if we should add timer-alwon to 32k ?
+>
+> No that should not be needed for the 32k counter. We should be able
+> to do everything we want with CLOCK_SOURCE_SUSPEND_NONSTOP for the
+> 32k counter.
+>
+> We still need ti,timer-alwon for a while for gptimers 1 and 12 as
+> they are the only ones in the always-on domain. I guess that need
+> will eventually go away too once we have a proper interconnect
+> driver and are using genpd.
 
-	M.
+cool, thanks. I'll try to respin this series, hopefully still this week.
+
 -- 
-Jazz is not dead. It just smells funny...
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/3be09424/attachment.sig>
