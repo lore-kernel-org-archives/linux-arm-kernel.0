@@ -1,76 +1,141 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  6 Oct 2015 18:46:21 +0100
-Subject: [PATCH v2 01/10] arm64: mm: remove unused cpu_set_idmap_tcr_t0sz
- function
+Date: Tue,  6 Oct 2015 18:46:23 +0100
+Subject: [PATCH v2 03/10] arm64: flush: use local TLB and I-cache invalidation
 In-Reply-To: <1444153590-24173-1-git-send-email-will.deacon@arm.com>
 References: <1444153590-24173-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1444153590-24173-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1444153590-24173-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With commit b08d4640a3dc ("arm64: remove dead code"),
-cpu_set_idmap_tcr_t0sz is no longer called and can therefore be removed
-from the kernel.
+There are a number of places where a single CPU is running with a
+private page-table and we need to perform maintenance on the TLB and
+I-cache in order to ensure correctness, but do not require the operation
+to be broadcast to other CPUs.
 
-This patch removes the function and effectively inlines the helper
-function __cpu_set_tcr_t0sz into cpu_set_default_tcr_t0sz.
+This patch adds local variants of tlb_flush_all and __flush_icache_all
+to support these use-cases and updates the callers respectively.
+__local_flush_icache_all also implies an isb, since it is intended to be
+used synchronously.
 
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/mmu_context.h | 35 ++++++++++++-----------------------
- 1 file changed, 12 insertions(+), 23 deletions(-)
+ arch/arm64/include/asm/cacheflush.h | 7 +++++++
+ arch/arm64/include/asm/tlbflush.h   | 8 ++++++++
+ arch/arm64/kernel/efi.c             | 4 ++--
+ arch/arm64/kernel/smp.c             | 2 +-
+ arch/arm64/kernel/suspend.c         | 2 +-
+ arch/arm64/mm/context.c             | 4 ++--
+ arch/arm64/mm/mmu.c                 | 2 +-
+ 7 files changed, 22 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 8ec41e5f56f0..549b89554ce8 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -77,34 +77,23 @@ static inline bool __cpu_uses_extended_idmap(void)
- 		unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS)));
- }
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index c75b8d027eb1..54efedaf331f 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -115,6 +115,13 @@ extern void copy_to_user_page(struct vm_area_struct *, struct page *,
+ #define ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE 1
+ extern void flush_dcache_page(struct page *);
  
--static inline void __cpu_set_tcr_t0sz(u64 t0sz)
--{
--	unsigned long tcr;
--
--	if (__cpu_uses_extended_idmap())
--		asm volatile (
--		"	mrs	%0, tcr_el1	;"
--		"	bfi	%0, %1, %2, %3	;"
--		"	msr	tcr_el1, %0	;"
--		"	isb"
--		: "=&r" (tcr)
--		: "r"(t0sz), "I"(TCR_T0SZ_OFFSET), "I"(TCR_TxSZ_WIDTH));
--}
--
--/*
-- * Set TCR.T0SZ to the value appropriate for activating the identity map.
-- */
--static inline void cpu_set_idmap_tcr_t0sz(void)
--{
--	__cpu_set_tcr_t0sz(idmap_t0sz);
--}
--
- /*
-  * Set TCR.T0SZ to its default value (based on VA_BITS)
-  */
- static inline void cpu_set_default_tcr_t0sz(void)
++static inline void __local_flush_icache_all(void)
++{
++	asm("ic iallu");
++	dsb(nsh);
++	isb();
++}
++
+ static inline void __flush_icache_all(void)
  {
--	__cpu_set_tcr_t0sz(TCR_T0SZ(VA_BITS));
-+	unsigned long tcr;
+ 	asm("ic	ialluis");
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 7bd2da021658..96f944e75dc4 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -63,6 +63,14 @@
+  *		only require the D-TLB to be invalidated.
+  *		- kaddr - Kernel virtual memory address
+  */
++static inline void local_flush_tlb_all(void)
++{
++	dsb(nshst);
++	asm("tlbi	vmalle1");
++	dsb(nsh);
++	isb();
++}
 +
-+	if (!__cpu_uses_extended_idmap())
-+		return;
-+
-+	asm volatile (
-+	"	mrs	%0, tcr_el1	;"
-+	"	bfi	%0, %1, %2, %3	;"
-+	"	msr	tcr_el1, %0	;"
-+	"	isb"
-+	: "=&r" (tcr)
-+	: "r"(TCR_T0SZ(VA_BITS)), "I"(TCR_T0SZ_OFFSET), "I"(TCR_TxSZ_WIDTH));
+ static inline void flush_tlb_all(void)
+ {
+ 	dsb(ishst);
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 13671a9cf016..4d12926ea40d 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -344,9 +344,9 @@ static void efi_set_pgd(struct mm_struct *mm)
+ 	else
+ 		cpu_switch_mm(mm->pgd, mm);
+ 
+-	flush_tlb_all();
++	local_flush_tlb_all();
+ 	if (icache_is_aivivt())
+-		__flush_icache_all();
++		__local_flush_icache_all();
  }
  
- static inline void switch_new_context(struct mm_struct *mm)
+ void efi_virtmap_load(void)
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index dbdaacddd9a5..fdd4d4dbd64f 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -152,7 +152,7 @@ asmlinkage void secondary_start_kernel(void)
+ 	 * point to zero page to avoid speculatively fetching new entries.
+ 	 */
+ 	cpu_set_reserved_ttbr0();
+-	flush_tlb_all();
++	local_flush_tlb_all();
+ 	cpu_set_default_tcr_t0sz();
+ 
+ 	preempt_disable();
+diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+index 8297d502217e..3c5e4e6dcf68 100644
+--- a/arch/arm64/kernel/suspend.c
++++ b/arch/arm64/kernel/suspend.c
+@@ -90,7 +90,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 		else
+ 			cpu_switch_mm(mm->pgd, mm);
+ 
+-		flush_tlb_all();
++		local_flush_tlb_all();
+ 
+ 		/*
+ 		 * Restore per-cpu offset before any kernel
+diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+index d70ff14dbdbd..48b53fb381af 100644
+--- a/arch/arm64/mm/context.c
++++ b/arch/arm64/mm/context.c
+@@ -48,9 +48,9 @@ static void flush_context(void)
+ {
+ 	/* set the reserved TTBR0 before flushing the TLB */
+ 	cpu_set_reserved_ttbr0();
+-	flush_tlb_all();
++	local_flush_tlb_all();
+ 	if (icache_is_aivivt())
+-		__flush_icache_all();
++		__local_flush_icache_all();
+ }
+ 
+ static void set_mm_context(struct mm_struct *mm, unsigned int asid)
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 9211b8527f25..71a310478c9e 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -456,7 +456,7 @@ void __init paging_init(void)
+ 	 * point to zero page to avoid speculatively fetching new entries.
+ 	 */
+ 	cpu_set_reserved_ttbr0();
+-	flush_tlb_all();
++	local_flush_tlb_all();
+ 	cpu_set_default_tcr_t0sz();
+ }
+ 
 -- 
 2.1.4
