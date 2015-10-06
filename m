@@ -1,59 +1,20 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 06 Oct 2015 16:43:48 +0200
-Subject: [PATCH 1/8] mmc: sdhci-pxav3: remove broken clock base quirk for
- Armada 38x sdhci driver
-In-Reply-To: <1444094562-31165-2-git-send-email-mw@semihalf.com> (Marcin
- Wojtas's message of "Tue, 6 Oct 2015 03:22:35 +0200")
-References: <1444094562-31165-1-git-send-email-mw@semihalf.com>
- <1444094562-31165-2-git-send-email-mw@semihalf.com>
-Message-ID: <87k2r09hwb.fsf@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Oct 2015 16:44:28 +0200
+Subject: [GIT PULL] at91: soc for 4.4 #1
+In-Reply-To: <1443702819-32032-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1443702819-32032-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <5256696.UMo3CH6d9z@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On mar., oct. 06 2015, Marcin Wojtas <mw@semihalf.com> wrote:
+On Thursday 01 October 2015 14:33:39 Nicolas Ferre wrote:
+> 
+> This is our first SoC batch for 4.4 and it's quite little.
+> Some content may come later but we still have to figure out if it goes through
+> arm-soc or the clock tree by Mike.
+> 
+> 
 
-> From: Nadav Haklai <nadavh@marvell.com>
->
-> shci-pxav3 driver is enabling by default the
-> SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN quirk. However this quirk is not
-> required for Armada 38x and leads to wrong clock setting in the divider.
->
-> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> Cc: <stable@vger.kernel.org> # v4.2
+Merged into next/soc, thanks!
 
-Seems OK.
-
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
-
-> ---
->  drivers/mmc/host/sdhci-pxav3.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-> index 946d37f..976cddd 100644
-> --- a/drivers/mmc/host/sdhci-pxav3.c
-> +++ b/drivers/mmc/host/sdhci-pxav3.c
-> @@ -135,6 +135,7 @@ static int armada_38x_quirks(struct platform_device *pdev,
->  	struct sdhci_pxa *pxa = pltfm_host->priv;
->  	struct resource *res;
->  
-> +	host->quirks &= ~SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN;
->  	host->quirks |= SDHCI_QUIRK_MISSING_CAPS;
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
->  					   "conf-sdio3");
-> -- 
-> 1.8.3.1
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
