@@ -1,24 +1,26 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 06 Oct 2015 14:53:12 -0700
-Subject: [PATCH] ARM: bcm2835: add label for uart0
-In-Reply-To: <1443810675-25558-1-git-send-email-stefan.wahren@i2se.com>
-References: <1443810675-25558-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <87oagbhdfb.fsf@eliezer.anholt.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 6 Oct 2015 19:16:28 -0300
+Subject: i.mx6 video out in mainline
+In-Reply-To: <CAD1M060ucNEjPceeK9R2s4drkZE1EWEadB1JtcUmnfuNx24zkA@mail.gmail.com>
+References: <CAD1M060ucNEjPceeK9R2s4drkZE1EWEadB1JtcUmnfuNx24zkA@mail.gmail.com>
+Message-ID: <CAOMZO5CwjC2dq3fWugAJsqThxAZ6o4wv0gV7ues28a51z0fXLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
-
-> This patch adds a label for uart0 to allow changing of uart0 pins.
+On Tue, Oct 6, 2015 at 6:52 PM, Pushpal Sidhu <psidhu@gateworks.com> wrote:
+> Hi All,
 >
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> I'm attempting to use a standard fb console (using the
+> imx6qdl-gw54xx.dtsi), but I find that it only draws to the 1024x768p
+> portion of the screen. This is also true when running the userspace
+> tool fb-test.
 
-This patch seems innocuous, but could you clarify for me how exactly you
-change the uart0 pins, and why one would do that?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/ed080d87/attachment.sig>
+Looking at imx6qdl-gw54xx.dtsi I see you have a LVDS panel with
+1024x768 resolution.
+
+I sent a patch that allows LDB and HDMI to work simultaneously:
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/boot/dts/imx6qdl-sabresd.dtsi?id=d28be499c45e6e16d7a042ce280eb872dc06952b
+
+Can you try to adapt it for imx6qdl-gw54xx.dtsi?
+
+If this still does not help your HDMI output, please try disabling the LVDS.
