@@ -1,33 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Oct 2015 16:36:03 +0200
-Subject: [PATCH v2] arm64: dts: add all hi6220 uart nodes
-In-Reply-To: <1443662388-25686-1-git-send-email-tyler.baker@linaro.org>
-References: <1443662388-25686-1-git-send-email-tyler.baker@linaro.org>
-Message-ID: <13756810.CXgbUlyXY5@wuerfel>
+Date: Tue, 06 Oct 2015 16:39:08 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.4
+In-Reply-To: <20151002022838.GA15481@verge.net.au>
+References: <cover.1442536920.git.horms+renesas@verge.net.au>
+ <20150924050843.GA3822@verge.net.au> <20151002022838.GA15481@verge.net.au>
+Message-ID: <106667691.9Zar7Zj46A@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 September 2015 18:19:48 Tyler Baker wrote:
-> This patch adds all UART nodes for the Hi6220 SoC. Recently a board[1] has
-> been developed to standardize UART access across all the 96boards consumer
-> edition boards. To use this hardware on HiKey we must configure and enable
-> UART3. However, to ensure backward compatibility we must keep UART0 enabled
-> as well.
+On Friday 02 October 2015 11:28:39 Simon Horman wrote:
+> On Thu, Sep 24, 2015 at 02:08:46PM +0900, Simon Horman wrote:
+> > On Fri, Sep 18, 2015 at 05:19:36PM +0900, Simon Horman wrote:
+> > > On Fri, Sep 18, 2015 at 09:29:58AM +0200, Geert Uytterhoeven wrote:
+> > > Yes, perfectly fine.
+> > 
+> > I am wondering if you need anything from me at this point.
 > 
-> I have removed the hard coded clock index values in favor of using the ones
-> already defined in include/dt-bindings/clock/hi6220-clock.h.
+> In the interest of moving things forwards I am:
 > 
-> Since UART0 needs to be soldered, it has been suggested to use the UART3 as
-> the default console.
+> * Withdrawing this pull request
+> * Preparing a pull request with only the fixes
 > 
-> This patch was boot tested on top of next-20150930, with both UART
-> configurations.
-> 
-> [1] http://www.seeedstudio.com/depot/96Boards-UART-p-2525.html?ref=newInBazaar
-> 
-> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+> I will also prepare an updated, v2, version of this pull request
+> without the fixes and with some new patches I have queued-up in
+> the mean time.
 > 
 
-Applied to next/dt, thanks!
+As you noticed, I have finally started merging stuff now. Based on
+your mail here, I'm waiting for v2 of this pull request now, but
+I can also apply the remaining patches as I suggested earlier if
+you prefer.
 
 	Arnd
