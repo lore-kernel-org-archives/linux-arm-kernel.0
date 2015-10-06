@@ -1,147 +1,85 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Wed, 7 Oct 2015 09:24:07 +1100
-Subject: [linux-sunxi] [PATCH v2 5/5] ARM: sun5i: Add C.H.I.P DTS
-In-Reply-To: <20151006161756.GT2696@lukather>
-References: <1444054990-15946-1-git-send-email-maxime.ripard@free-electrons.com>
- <1444054990-15946-6-git-send-email-maxime.ripard@free-electrons.com>
- <CAGRGNgXyaenitKnZNj4vLsgEDKe0CtTk=KqPADSs9588k1t+GA@mail.gmail.com>
- <20151006161756.GT2696@lukather>
-Message-ID: <CAGRGNgWw=eMn-YcALzE57xmumiydgH39S52LtuJO-+eT9vXQLQ@mail.gmail.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Tue, 6 Oct 2015 15:25:38 -0700
+Subject: [PATCH 3/5] mtd: brcmnand: Optional DT flag to reset IPROC NAND
+ controller
+In-Reply-To: <20151006134119.GB26818@localhost>
+References: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
+ <1443808606-21203-4-git-send-email-anup.patel@broadcom.com>
+ <20151004214943.GA28904@localhost>
+ <39063E8F96E11742B35A201CC5D095B7AD54C1@SJEXCHMB10.corp.ad.broadcom.com>
+ <20151006134119.GB26818@localhost>
+Message-ID: <56144A62.70300@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Maxime,
+Hi Brian,
 
-On Wed, Oct 7, 2015 at 3:17 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Tue, Oct 06, 2015 at 12:15:38PM +1100, Julian Calaby wrote:
->> Hi Maxime,
+On 15-10-06 06:41 AM, Brian Norris wrote:
+
+>>>
+>>> Is there a reason not to do this reset unconditionally? I recall this came up in
+>>> discussion previously, when the OpenWRT folks were trying to integrate with
+>>> BCMA, where this reset was one of the few differences between the platform-
+>>> device-based driver (i.e., this one) and the BCMA based driver. Might it help
+>>> simplify things a bit if we just did the same thing everywhere?
 >>
->> On Tue, Oct 6, 2015 at 1:23 AM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > The C.H.I.P. is a small SBC with an Allwinner R8, 8GB of NAND, 512MB of
->> > RAM, USB host and OTG, a wifi / bluetooth combo chip, an audio/video jack
->> > and two connectors to plug additional boards on top of it.
+>> This driver is currently shared by Cygnus and NS2.
 >>
->> Sorry for the late review, but a couple of minor things stuck out at me.
->
-> No problem :)
->
->> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> > Reviewed-by: Hans de Goede <hdegoede@redhat.com>
->> > ---
->> >  arch/arm/boot/dts/Makefile          |   3 +-
->> >  arch/arm/boot/dts/sun5i-r8-chip.dts | 224 ++++++++++++++++++++++++++++++++++++
->> >  2 files changed, 226 insertions(+), 1 deletion(-)
->> >  create mode 100644 arch/arm/boot/dts/sun5i-r8-chip.dts
->> >
->> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> > index c7adaa85ef3f..2cf7e593270a 100644
->> > --- a/arch/arm/boot/dts/Makefile
->> > +++ b/arch/arm/boot/dts/Makefile
->> > @@ -600,7 +600,8 @@ dtb-$(CONFIG_MACH_SUN5I) += \
->> >         sun5i-a13-olinuxino.dtb \
->> >         sun5i-a13-olinuxino-micro.dtb \
->> >         sun5i-a13-q8-tablet.dtb \
->> > -       sun5i-a13-utoo-p66.dtb
->> > +       sun5i-a13-utoo-p66.dtb \
->> > +       sun5i-r8-chip.dtb
->> >  dtb-$(CONFIG_MACH_SUN6I) += \
->> >         sun6i-a31-app4-evb1.dtb \
->> >         sun6i-a31-colombus.dtb \
->> > diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
->> > new file mode 100644
->> > index 000000000000..08ff70601c79
->> > --- /dev/null
->> > +++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
->> > @@ -0,1 +1,224 @@
->> > +/*
->> > + * Copyright 2015 Free Electrons
->> > + * Copyright 2015 NextThing Co
->> > + *
->> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
->> > + *
->> > + * This file is dual-licensed: you can use it either under the terms
->> > + * of the GPL or the X11 license, at your option. Note that this dual
->> > + * licensing only applies to this file, and not this project as a
->> > + * whole.
->> > + *
->> > + *  a) This file is free software; you can redistribute it and/or
->> > + *     modify it under the terms of the GNU General Public License as
->> > + *     published by the Free Software Foundation; either version 2 of the
->> > + *     License, or (at your option) any later version.
->> > + *
->> > + *     This file is distributed in the hope that it will be useful,
->> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> > + *     GNU General Public License for more details.
->> > + *
->> > + * Or, alternatively,
->> > + *
->> > + *  b) Permission is hereby granted, free of charge, to any person
->> > + *     obtaining a copy of this software and associated documentation
->> > + *     files (the "Software"), to deal in the Software without
->> > + *     restriction, including without limitation the rights to use,
->> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> > + *     sell copies of the Software, and to permit persons to whom the
->> > + *     Software is furnished to do so, subject to the following
->> > + *     conditions:
->> > + *
->> > + *     The above copyright notice and this permission notice shall be
->> > + *     included in all copies or substantial portions of the Software.
->> > + *
->> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> > + *     OTHER DEALINGS IN THE SOFTWARE.
->> > + */
->> > +
->> > +/dts-v1/;
->> > +#include "sun5i-a13.dtsi"
+>> We had similar suggestion when this patch was reviewed
+>> internally in Broadcom.
 >>
->> Am I missing something or should this include "sun5i-r8.dtsi" instead?
+>> The rationale for adding optional DT flag is as follows:
+>> 1. The NAND controller reset is currently required for NS2 only so
+>> that it is in sane state before any NAND commands are issued. We
+>> are not sure if Cygnus and all future iProc SoCs will require NAND
+>> controller reset.
 >
-> Indeed.
+> I'm not sure this is a very strong reason. It seems fairly reasonable in
+> general to reset a HW block before using it.
+
+Efficient Boot time is a very strong reason for needing this actually. 
+We use the NAND controller in the bootROM, boot1/BL1, u-boot/UEFI, and 
+then Kernel stage.  By properly initializing the controller once we do 
+not need to reset it 4 different times.
+
 >
->> > +#include "sunxi-common-regulators.dtsi"
->> > +
->> > +#include <dt-bindings/gpio/gpio.h>
->> > +#include <dt-bindings/interrupt-controller/irq.h>
->> > +
->> > +/ {
->> > +       model = "NextThing C.H.I.P.";
->> > +       compatible = "nextthing,chip", "allwinner,sun5i-r8";
->> > +
->> > +       aliases {
->> > +               i2c0 = &i2c0;
->> > +               i2c1 = &i2c1;
->> > +               i2c2 = &i2c2;
->> > +               serial0 = &uart1;
->> > +               serial1 = &uart3;
->> > +       };
->> > +
->> > +       chosen {
->> > +               stdout-path = "serial0:115200n8";
->>
->> Should the composite output be enabled here too?
+>> 2. The NAND controller reset in probe would certainly increase
+>> Linux boot time so for certain iProc SoCs we might choose avoid
+>> NAND controller reset to reduce boot time if possible.
 >
-> AFAIK, the stdout-path only supports a single output device, and I
-> don't think it really is an issue since framebuffer console will
-> attach to the framebuffer automatically.
+> I recall this reason being mentioned before. I believe this only happens
+> because the brcmnand driver doesn't yet handle configuring the timing
+> registers, so iProc is implicitly relying on the bootloader to configure
+> the NAND timings. Perhaps it's time that we fix that. I'd rather not add
+> extra DT properties unless we actually need to [1]. And having proper
+> timing configuration in the Linux driver will help improve speeds for
+> all users (whose timings may not be configured in the bootloader).
 
-I was referring to enabling it in chosen, not stdout-path, but I
-couldn't remember if uboot does that for us or not.
+This is the very reason we need the optional reset property.  We need to 
+have timings configured by the linux driver or not.  Yes, in some cases 
+we will be relying on earlier boot stages to configure some of the hardware.
 
-Thanks,
+>
+> I actually had some preliminary work to do some timing configuration
+> according to the new timing information from nand_base.c/nand_timing.c.
+> Unfortunately, I didn't complete this, and I'm no longer working at
+> Broadcom, so I don't exactly have access to the HW docs for all the NAND
+> controller revisions, nor do I have access to as much HW for testing...
+>
+> Brian
+>
+> [1] If we really do need a device tree differentiation, perhaps it would
+> be better to just differentiate the compatible string than to have
+> individual boolean properties. e.g.:
+>
+> 	compatible = "brcm,iproc-nand-ns2", ...;
+>
+As described above - the option is not SoC specific.  It is system 
+specific.  In some systems we may wish to reset the NAND controller in 
+linux.  In some we may wish to rely on initialization that has already 
+been done to speed up boot times.
 
--- 
-Julian Calaby
 
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+
+Regards,
+  Scott
