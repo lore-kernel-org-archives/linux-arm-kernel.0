@@ -1,36 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Oct 2015 23:47:44 +0200
-Subject: [PATCH] mlxsw: fix warnings for big-endian 32-bit dma_addr_t
-Message-ID: <30258520.VaA2vDyUiY@wuerfel>
+From: psidhu@gateworks.com (Pushpal Sidhu)
+Date: Tue, 6 Oct 2015 14:52:25 -0700
+Subject: i.mx6 video out in mainline
+Message-ID: <CAD1M060ucNEjPceeK9R2s4drkZE1EWEadB1JtcUmnfuNx24zkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recently added mlxsw driver produces warnings in ARM
-allmodconfig:
+Hi All,
 
-drivers/net/ethernet/mellanox/mlxsw/pci.c: In function 'mlxsw_pci_cmd_exec':
-drivers/net/ethernet/mellanox/mlxsw/pci.c:1585:59: warning: right shift count >= width of type [-Wshift-count-overflow]
-linux/byteorder/big_endian.h:38:51: note: in definition of macro '__cpu_to_be32'
-drivers/net/ethernet/mellanox/mlxsw/pci.c:76:2: note: in expansion of macro 'iowrite32be'
+I'm attempting to use a standard fb console (using the
+imx6qdl-gw54xx.dtsi), but I find that it only draws to the 1024x768p
+portion of the screen. This is also true when running the userspace
+tool fb-test.
 
-This changes the type of the local variable to u64, which gets rid of the
-warning and seems nicer than adding #ifdefs.
+When I $(cat /sys/class/graphics/fb0/modes), I see only the 1024x768p
+resolution there. I verified that the edid read from the monitor is
+correct, and that all of it's modes were properly read (in the
+drm_mode_std function and enumerated in
+/sys/devices/soc0/display-subsystem/drm/card0/card0-HDMI-A-1/modes),
+but I can't figure out how to choose a different resolution. I've also
+verified that dpms is 'On'.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: eda6500a987a "mlxsw: Add PCI bus implementation"
+The monitor appears to think that a 1080p signal is coming in, which
+might have to do with the virtual size being set to 1080p. I should
+note that I'm not running X11. Is there something I am missing that's
+required for changing framebuffer resolutions? Thanks ahead of time.
 
-diff --git a/drivers/net/ethernet/mellanox/mlxsw/pci.c b/drivers/net/ethernet/mellanox/mlxsw/pci.c
-index 462cea31ecbb..cd11e3591741 100644
---- a/drivers/net/ethernet/mellanox/mlxsw/pci.c
-+++ b/drivers/net/ethernet/mellanox/mlxsw/pci.c
-@@ -1567,8 +1567,8 @@ static int mlxsw_pci_cmd_exec(void *bus_priv, u16 opcode, u8 opcode_mod,
- 			      u8 *p_status)
- {
- 	struct mlxsw_pci *mlxsw_pci = bus_priv;
--	dma_addr_t in_mapaddr = mlxsw_pci->cmd.in_mbox.mapaddr;
--	dma_addr_t out_mapaddr = mlxsw_pci->cmd.out_mbox.mapaddr;
-+	u64 in_mapaddr = mlxsw_pci->cmd.in_mbox.mapaddr;
-+	u64 out_mapaddr = mlxsw_pci->cmd.out_mbox.mapaddr;
- 	bool evreq = mlxsw_pci->cmd.nopoll;
- 	unsigned long timeout = msecs_to_jiffies(MLXSW_PCI_CIR_TIMEOUT_MSECS);
- 	bool *p_wait_done = &mlxsw_pci->cmd.wait_done;
+- Pushpal
