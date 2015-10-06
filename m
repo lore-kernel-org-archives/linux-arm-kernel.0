@@ -1,47 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Oct 2015 23:24:28 +0200
-Subject: [PATCH] scsi: advansys: fix big-endian builds
-Message-ID: <5468884.cIlSBUgeTB@wuerfel>
+From: yang.shi@linaro.org (Yang Shi)
+Date: Tue,  6 Oct 2015 14:12:31 -0700
+Subject: [v2 PATCH] arm64: convert patch_lock to raw lock
+Message-ID: <1444165951-26065-1-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building the advansys driver in a big-endian configuration such as
-ARM allmodconfig shows a warning:
+When running kprobe test on arm64 rt kernel, it reports the below warning:
 
- drivers/scsi/advansys.c: In function 'adv_build_req':
- include/uapi/linux/byteorder/big_endian.h:32:26: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-  #define __cpu_to_le32(x) ((__force __le32)__swab32((x)))
- drivers/scsi/advansys.c:7806:22: note: in expansion of macro 'cpu_to_le32'
-   scsiqp->sense_len = cpu_to_le32(SCSI_SENSE_BUFFERSIZE);
+root at qemu7:~# modprobe kprobe_example
+BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
+in_atomic(): 0, irqs_disabled(): 128, pid: 484, name: modprobe
+CPU: 0 PID: 484 Comm: modprobe Not tainted 4.1.6-rt5 #2
+Hardware name: linux,dummy-virt (DT)
+Call trace:
+[<ffffffc0000891b8>] dump_backtrace+0x0/0x128
+[<ffffffc000089300>] show_stack+0x20/0x30
+[<ffffffc00061dae8>] dump_stack+0x1c/0x28
+[<ffffffc0000bbad0>] ___might_sleep+0x120/0x198
+[<ffffffc0006223e8>] rt_spin_lock+0x28/0x40
+[<ffffffc000622b30>] __aarch64_insn_write+0x28/0x78
+[<ffffffc000622e48>] aarch64_insn_patch_text_nosync+0x18/0x48
+[<ffffffc000622ee8>] aarch64_insn_patch_text_cb+0x70/0xa0
+[<ffffffc000622f40>] aarch64_insn_patch_text_sync+0x28/0x48
+[<ffffffc0006236e0>] arch_arm_kprobe+0x38/0x48
+[<ffffffc00010e6f4>] arm_kprobe+0x34/0x50
+[<ffffffc000110374>] register_kprobe+0x4cc/0x5b8
+[<ffffffbffc002038>] kprobe_init+0x38/0x7c [kprobe_example]
+[<ffffffc000084240>] do_one_initcall+0x90/0x1b0
+[<ffffffc00061c498>] do_init_module+0x6c/0x1cc
+[<ffffffc0000fd0c0>] load_module+0x17f8/0x1db0
+[<ffffffc0000fd8cc>] SyS_finit_module+0xb4/0xc8
 
-It turns out that the commit that introduced this used the cpu_to_le32()
-incorrectly on an 8-bit field, which results in the sense_len to always
-be set to zero, as the SCSI_SENSE_BUFFERSIZE value gets moved to upper
-byte of the 32-bit intermediate.
+Convert patch_lock to raw lock to avoid this issue.
 
-This removes the cpu_to_le32() call to restore the original version.
+Although the problem is found on rt kernel, the fix should be applicable to
+mainline kernel too.
 
-I found this only by looking at the compiler output and have not done
-a full review for possible further endianess bugs in the same driver.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 811ddc057aac ("advansys: use DMA-API for mapping sense buffer")
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
 ---
-Using willy at linux.intel.com, as the address listed in MAINTAINERS
-failed:
+v1 -> v2:
+ Add Steven's Acked-by
+ Fix subject (remove unnecessary "make")
+ Fix a typo error in commit log
 
-Failed to transport message. Message sending failed since the following recipients were rejected by the server: matthew at wil.cx (The server responded: Requested action not taken: mailbox unavailable invalid DNS MX or A/AAAA resource record)
+ arch/arm64/kernel/insn.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/scsi/advansys.c b/drivers/scsi/advansys.c
-index 4305178e4e01..1c1cd657c380 100644
---- a/drivers/scsi/advansys.c
-+++ b/drivers/scsi/advansys.c
-@@ -7803,7 +7803,7 @@ adv_build_req(struct asc_board *boardp, struct scsi_cmnd *scp,
- 		return ASC_BUSY;
- 	}
- 	scsiqp->sense_addr = cpu_to_le32(sense_addr);
--	scsiqp->sense_len = cpu_to_le32(SCSI_SENSE_BUFFERSIZE);
-+	scsiqp->sense_len = SCSI_SENSE_BUFFERSIZE;
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index f341866..c08b9ad 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -85,7 +85,7 @@ bool aarch64_insn_is_branch_imm(u32 insn)
+ 		aarch64_insn_is_bcond(insn));
+ }
  
- 	/* Build ADV_SCSI_REQ_Q */
+-static DEFINE_SPINLOCK(patch_lock);
++static DEFINE_RAW_SPINLOCK(patch_lock);
  
+ static void __kprobes *patch_map(void *addr, int fixmap)
+ {
+@@ -131,13 +131,13 @@ static int __kprobes __aarch64_insn_write(void *addr, u32 insn)
+ 	unsigned long flags = 0;
+ 	int ret;
+ 
+-	spin_lock_irqsave(&patch_lock, flags);
++	raw_spin_lock_irqsave(&patch_lock, flags);
+ 	waddr = patch_map(addr, FIX_TEXT_POKE0);
+ 
+ 	ret = probe_kernel_write(waddr, &insn, AARCH64_INSN_SIZE);
+ 
+ 	patch_unmap(FIX_TEXT_POKE0);
+-	spin_unlock_irqrestore(&patch_lock, flags);
++	raw_spin_unlock_irqrestore(&patch_lock, flags);
+ 
+ 	return ret;
+ }
+-- 
+2.0.2
