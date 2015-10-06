@@ -1,29 +1,35 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 6 Oct 2015 17:25:16 -0300
-Subject: [PATCH 1/9] drm: bridge/dw_hdmi-ahb-audio: add audio driver
-In-Reply-To: <20151006185429.GU21513@n2100.arm.linux.org.uk>
-References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
- <E1ZO6hC-0003M5-EU@rmk-PC.arm.linux.org.uk>
- <CAOMZO5COgoGU-3YNpnmSkctHMRDJ3=DuKc82Wb5zTTX7Bx2jNw@mail.gmail.com>
- <20151006181806.GS21513@n2100.arm.linux.org.uk>
- <CAOMZO5DaowTGQqN_NW7T2zv-P6a_YZUCumq4-m+OtpsKqFzELw@mail.gmail.com>
- <20151006185429.GU21513@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5C8O0p6C0hrAvHzanru9W2f8-C7MWsm3+HumoyZ9Hu6Jw@mail.gmail.com>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Tue,  6 Oct 2015 22:28:45 +0200
+Subject: [PATCH] watchdog: at91sam9: keep watchdog running in idle mode
+Message-ID: <1444163325-3041-1-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 6, 2015 at 3:54 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Since turning on idle-halt in commit 5161b31dc39a (watchdog:
+at91sam9_wdt: better watchdog support"), SoCs compatible with
+at91sam9260-wdt not using a device tree no longer reboot if the watchdog
+times out while the CPU is in idle state. Removing the
+AT91_WDT_WDIDLEHLT flag that was set by default fixes this.
 
-> Make sure you have the ALSA config file, as alsalib won't get on
-> with dw-hdmi only accepting 24-bit audio without this.  A copy is
-> attached.  It also tells ALSA how to deal with multi-channel audio
-> as well.
+Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+Fixes: 5161b31dc39a ("watchdog: at91sam9_wdt: better watchdog support")
+Cc: <stable@vger.kernel.org> # 3.14+
+---
+ drivers/watchdog/at91sam9_wdt.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks, Russell!
-
-Got audio to play on my HDMI TV :-)
-
-For the entire series:
-
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+index 7e6acaf..6e3a167 100644
+--- a/drivers/watchdog/at91sam9_wdt.c
++++ b/drivers/watchdog/at91sam9_wdt.c
+@@ -339,7 +339,7 @@ static int __init at91wdt_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	wdt->mr = (WDT_HW_TIMEOUT * 256) | AT91_WDT_WDRSTEN | AT91_WDT_WDD |
+-		  AT91_WDT_WDDBGHLT | AT91_WDT_WDIDLEHLT;
++		  AT91_WDT_WDDBGHLT;
+ 	wdt->mr_mask = 0x3FFFFFFF;
+ 	wdt->nowayout = nowayout;
+ 	wdt->wdd.parent = &pdev->dev;
+-- 
+2.5.1
