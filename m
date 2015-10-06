@@ -1,44 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 Oct 2015 17:50:50 +0100
-Subject: [PATCH v2] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <1441906822-9222-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1441906822-9222-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20151006165049.GE3069@e104818-lin.cambridge.arm.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Tue, 6 Oct 2015 17:53:03 +0100
+Subject: [GIT PULL]Hisilicon arm64 dt changes for 4.3
+In-Reply-To: <8863339.WR5lqoXBim@wuerfel>
+References: <56003213.2050306@hisilicon.com> <8863339.WR5lqoXBim@wuerfel>
+Message-ID: <5613FC6F.9080305@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 10, 2015 at 06:40:22PM +0100, Lorenzo Pieralisi wrote:
-> The SBBR and ACPI specifications allow ACPI based systems that do not
-> implement PSCI (eg systems with no EL3) to boot through the ACPI parking
-> protocol specification[1].
-> 
-> This patch implements the ACPI parking protocol CPU operations, and adds
-> code that eases parsing the parking protocol data structures to the
-> ARM64 SMP initializion carried out at the same time as cpus enumeration.
-> 
-> To wake-up the CPUs from the parked state, this patch implements a
-> wakeup IPI for ARM64 (ie arch_send_wakeup_ipi_mask()) that mirrors the
-> ARM one, so that a specific IPI is sent for wake-up purpose in order
-> to distinguish it from other IPI sources.
-> 
-> Given the current ACPI MADT parsing API, the patch implements a glue
-> layer that helps passing MADT GICC data structure from SMP initialization
-> code to the parking protocol implementation somewhat overriding the CPU
-> operations interfaces. This to avoid creating a completely trasparent
-> DT/ACPI CPU operations layer that would require creating opaque
-> structure handling for CPUs data (DT represents CPU through DT nodes, ACPI
-> through static MADT table entries), which seems overkill given that ACPI
-> on ARM64 mandates only two booting protocols (PSCI and parking protocol),
-> so there is no need for further protocol additions.
-> 
-> Based on the original work by Mark Salter <msalter@redhat.com>
-> 
-> [1] https://acpica.org/sites/acpica/files/MP%20Startup%20for%20ARM%20platforms.docx
 
-Question to Lorenzo and Mark Salter: was this patch successfully tested
-on real hardware (like Applied X-Gene)?
 
-Thanks.
+On 10/6/2015 3:24 PM, Arnd Bergmann wrote:
+> On Monday 21 September 2015 17:36:35 Wei Xu wrote:
+>> ARM64: DT: Hisilicon hip05 soc and D02 board updates for 4.3
+>>
+>> - Updated the hisilicon devicetree bindings document to support hip05-D02 board
+>> - Added dts files for hip05 SoC and D02 board
+>>
+> 
 
--- 
-Catalin
+Hi Arnd,
+
+> Sorry for the long delay on our side, I've now merged these
+> into the next/dt branch. Thanks for waiting,
+
+Thanks!
+
+Best Regards,
+Wei
+
+> 
+> 	Arnd
+> _______________________________________________
+> linuxarm mailing list
+> linuxarm at huawei.com
+> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+> 
+> .
+> 
