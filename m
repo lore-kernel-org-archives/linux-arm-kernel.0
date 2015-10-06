@@ -1,23 +1,106 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 6 Oct 2015 23:24:21 +0800
-Subject: [RESEND 1/3] hwrng: st: dt: Fix trivial typo in node address
-In-Reply-To: <1444142640-14721-1-git-send-email-lee.jones@linaro.org>
-References: <1444142640-14721-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20151006152421.GA5997@gondor.apana.org.au>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 6 Oct 2015 17:25:27 +0200
+Subject: [PATCH v4 00/26] ARM: pxa: magician: Rework HTC Magician support
+In-Reply-To: <5609AB45.9030009@tul.cz>
+References: <5609AB45.9030009@tul.cz>
+Message-ID: <20151006152527.GA32352@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 03:43:58PM +0100, Lee Jones wrote:
-> DT nodes should not append their addresses with '0x'.
+Hi!
+
+> This patchset will clean, fix, optimize and add multiple devices,
+> which can be found on the HTC Magician machine.
 > 
-> Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Platform data for the pasic3-leds driver has been removed, as this
+> driver do not exist in the vanilla. And it is expected to be recreated
+> in the future with an incompatible platform data structure.
+> 
+> Default setting of the Samsung LCD pixel clock period has been
+> increased, so resulting frequency is 50Hz (original 117Hz). Period
+> can be possibly incresed even more. At this moment there is no video
+> player with IWMMXT support and software only versions cannot make it
+> to 30fps. Frequency decreasing has a good impact to memory troughtput
+> as LCD controller does not do as many memory bursts as at original
+> speed. This was verified with the lat_mem_rd from the lmbench3.
+> 
+> The Omnivision OV9640 camera has a problem with running on 400kHz
+> of the I2C clock. It seems it freezes the bus until PXA I2C driver
+> reload. Datasheet says it OK on 400kHz though. There may be some
+> compatibility bug in the PXA I2C driver as Omnivision cameras often
+> uses special I2C protocol (SCCB).
+> 
+> Using the CPU frequency scaling (with help of an MAX1587A regulator)
+> sometimes causes an SoC failure. It is probably related to the PXA27x
+> erratum E37, E36, E80 or E89. Infreqent changes mostly works.
 
-If this is supposed to go in via the crypto tree it needs to be
-posted to linux-crypto at vger.kernel.org.
+Nice to see work done on a cellphone...
 
-Thanks,
+Seeing all the GPIO name changes... would it be possible / make sense
+to make to device tree one day?
+
+What userspace do you run on the phone? Can it do calls?
+
+[I have N900 here, kernel is in pretty good state, and I have Mate desktop
+running with python application for calls, but...]
+
+Thanks (a pozdrav :-),
+
+								Pavel
+> STUART removal is a prepare for:
+> 
+> 	net: irda: pxaficp_ir: dmaengine conversion
+> 
+> Function was tested on the board_id 0x3a version (specifically on
+> the T-Mobile MDA compact).
+> 
+> Changes from v3:
+>  * Nontrivial rebase for indentation fixup (EGPIO and PXA UDC)
+> 
+> Petr Cvek (26):
+>   ARM: pxa: magician: Fix indentation in machine files
+>   ARM: pxa: magician: Change comments to be more informative
+>   ARM: pxa: magician: Print more specific error message for global
+>     GPIOs
+>   ARM: pxa: magician: Optimize debug messages for LCD power
+>   ARM: pxa: magician: Change description of LCD power GPIO
+>   ARM: pxa: magician: Add new discovered EGPIO pins
+>   ARM: pxa: magician: Fix HTC Magician pin mux definitions
+>   ARM: pxa: magician: Rename abstract LCD GPIOs
+>   ARM: pxa: magician: Optimize powerup delays for Samsung LCD
+>   ARM: pxa: magician: Optimize Samsung LCD refresh to 50Hz
+>   ARM: pxa: magician: Optimize EGPIO initial values
+>   ARM: pxa: magician: Rename charger cable detection EGPIOs
+>   ARM: pxa: magician: Fix and add charging detection functions
+>   ARM: pxa: magician: Fix platform data for both PXA27x I2C controllers
+>   ARM: pxa: magician: Fix redundant GPIO request for pxaficp_ir
+>   ARM: pxa: magician: Fix support for Intel Strata NOR Flash
+>   ARM: pxa: magician: Fix wrongly enabled USB host ports
+>   ARM: pxa: magician: Add support for ADS7846
+>   ARM: pxa: magician: Add support for Omnivision OV9640 camera
+>   ARM: pxa: magician: Add support for MAX1587A Vcore regulator
+>   ARM: pxa: magician: Add support for PXA27x UDC
+>   ARM: pxa: magician: Remove pdata for pasic3-leds
+>   ARM: pxa: magician: Remove definition of the STUART port
+>   ARM: pxa: magician: Add debug message for backlight brightness
+>     function
+>   ARM: pxa: magician: Add missing regulator for PWM backlight
+>   ARM: pxa: magician: Move platform_add_devices() to the end of
+>     magician_init()
+> 
+>  arch/arm/mach-pxa/include/mach/magician.h |  70 ++-
+>  arch/arm/mach-pxa/magician.c              | 907 +++++++++++++++++++++---------
+>  2 files changed, 678 insertions(+), 299 deletions(-)
+> 
+> -- 
+> 1.7.12.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
