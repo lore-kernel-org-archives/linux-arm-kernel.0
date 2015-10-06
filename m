@@ -1,52 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Oct 2015 20:42:38 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Cleanup for v4.4
-In-Reply-To: <CAMuHMdUkzv9BE4PDjm3Qkk87f2Lq6Bn-CNb+r3dtSWhbkN39Wg@mail.gmail.com>
-References: <cover.1442478814.git.horms+renesas@verge.net.au>
- <5419864.uERWTbJ9BK@wuerfel>
- <CAMuHMdUkzv9BE4PDjm3Qkk87f2Lq6Bn-CNb+r3dtSWhbkN39Wg@mail.gmail.com>
-Message-ID: <13543534.MsGb8OrGPX@wuerfel>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 06 Oct 2015 11:42:40 -0700
+Subject: [PATCH 3.10-3.17] ARM: orion: Fix DSA platform device after mvmdio
+ conversion
+In-Reply-To: <87wpv09ihm.fsf@free-electrons.com>
+References: <1443902628-7861-1-git-send-email-f.fainelli@gmail.com>	<1443902628-7861-2-git-send-email-f.fainelli@gmail.com>
+ <87wpv09ihm.fsf@free-electrons.com>
+Message-ID: <56141620.1010900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 October 2015 17:47:37 Geert Uytterhoeven wrote:
-> Hi Arnd,
+On 06/10/15 07:31, Gregory CLEMENT wrote:
+> Hi Florian,
+>  
+>  On sam., oct. 03 2015, Florian Fainelli <f.fainelli@gmail.com> wrote:
 > 
-> On Tue, Oct 6, 2015 at 3:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 17 September 2015 17:59:33 Simon Horman wrote:
-> >> Please consider these Renesas ARM based SoC cleanup for v4.4.
-> >>
-> >>  24 files changed, 4 insertions(+), 2687 deletions(-)
-> >>
-> >> Is a pleasing diffstat if I do say so myself.
-> >>
-> >> Of particular note the last legacy board code for Renesas ARM based SoCs,
-> >> that of the bockw board, is removed in this pull request.
-> >
-> > After a long delay in response, I've merged it now into next/cleanup.
-> >
-> > So the transition is complete and you beat me with the multiplatform
-> > conversion that I have pending for the other ARMv7 platforms, nice work!
+>> DSA expects the host_dev pointer to be the device structure associated
+>> with the MDIO bus controller driver. First commit breaking that was
+>> c3a07134e6aa ("mv643xx_eth: convert to use the Marvell Orion MDIO
+>> driver"), and then, it got completely under the radar for a while.
+>>
+>> Reported-by: Frans van de Wiel" <fvdw@fvdw.eu>
+>> Fixes: c3a07134e6aa ("mv643xx_eth: convert to use the Marvell Orion MDIO driver")
+>> CC: stable at vger.kernel.org
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> ---
+>> This patch is for -stable kernels 3.10 to 3.17 (included)
 > 
-> Thanks for pulling!
+> is it something expected by the stable team?
 > 
-> Now I can start out sending my platform data removal series...
-
-Ok, cool.
-
-I don't think that there is generally a need to wait before sending
-stuff out that depends on pull requests to get merged.
-
-> > I've used the opportunity to look for any remaining code that you may
-> > have missed, by tracking symbols that are defined globally but never used
-> > in mach-shmobile, and didn't find much (which is good).
-> >
-> > Could you have a look at the patch below and integrate the parts that
-> > make sense to you?
+> I though that the normal flow was to send a fix, applying it on the
+> current kernel and from this point the stable team try to apply it on
+> all the relevant kernel. And only when the patch failed to apply you
+> have to send them a port of the patch for the given version.
 > 
-> I think most of this has already been fixed in Simon's next branch in the mean
-> time.
+> Here you anticipate it, I find it intersting, but I wonder if it fits in
+> the stable team workflow.
 
-Ok, thanks for taking a look.
+Yes, I am not too sure about that, the commit message is wrong anyway,
+since it references the new, and not the old member name, maybe it is
+just best to wait for the fix to hit the mainline tree, and when this
+patch gets scheduled for -stable inclusion, I will re-submit a proper
+one that applies to 3.10 through 3.17?
 
-	Arnd
+The other intent of this "double" submission was for people like Frans
+who reported the issue on a specific kernel, to be able to get it in
+their inbox so can test that patch.
+-- 
+Florian
