@@ -1,52 +1,84 @@
 From: labbott@fedoraproject.org (Laura Abbott)
-Date: Tue,  6 Oct 2015 13:47:11 -0700
-Subject: [RFC][PATCH 0/2] Devicetree bindings for Ion
-Message-ID: <1444164433-9107-1-git-send-email-labbott@fedoraproject.org>
+Date: Tue,  6 Oct 2015 13:47:12 -0700
+Subject: [RFC][PATCH 1/2] WIP: Devicetree bindings for Ion
+In-Reply-To: <1444164433-9107-1-git-send-email-labbott@fedoraproject.org>
+References: <1444164433-9107-1-git-send-email-labbott@fedoraproject.org>
+Message-ID: <1444164433-9107-2-git-send-email-labbott@fedoraproject.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laura Abbott <laura@labbott.name>
 
 
-Hi,
+This adds a base set of devicetree bindings for the Ion memory
+manager. This supports setting up the generic set of heaps and
+their properties.
 
-At the last Plumbers and Linaro Connect, there was some discussion
-related to Ion. One of the items that came up towards eventually
-getting Ion out of staging was some concept of stable devicetree
-bindings. This is a proof of concept for bindings.
-
-Most of this is based on previously submitted work
-(https://lkml.org/lkml/2015/6/30/425 thank you Andrew Andrianov for
-getting this started!) and also the
-out of tree qcom bindings (available somewhere on codeaurora.org).
-As the title indicates, this is an RFC and the purpose here is to
-get feedback on if these bindings would potentially work. If there
-are platforms out there that don't use devicetree, the bindings
-would hopefully also serve as a guide for how to setup the platform
-data for heaps like CMA.
-
-One of the big things this series improves on is giving a standard
-mechanism for defining and allocating memory for all heap types.
-DMA/CMA is handled as well as memory for carveout and chunk heaps.
-
-Further TODO:
-- Need to fixup include paths so heap types can be cleanly included
-  in DTS files
-- Figure out callbacks or similar for support custom platform heaps
-
-Laura Abbott (2):
-  WIP: Devicetree bindings for Ion
-  staging: ion: Add files for parsing the devicetree (WIP)
-
- drivers/staging/android/ion/Kconfig        |  10 ++
- drivers/staging/android/ion/Makefile       |   7 +-
- drivers/staging/android/ion/devicetree.txt |  53 +++++++++
- drivers/staging/android/ion/ion_of.c       | 185 +++++++++++++++++++++++++++++
- drivers/staging/android/ion/ion_of.h       |   3 +
- 5 files changed, 255 insertions(+), 3 deletions(-)
+Signed-off-by: Laura Abbott <laura@labbott.name>
+Signed-off-by: Andrew Andrianov <andrew@ncrmnt.org>
+---
+ drivers/staging/android/ion/devicetree.txt | 53 ++++++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
  create mode 100644 drivers/staging/android/ion/devicetree.txt
- create mode 100644 drivers/staging/android/ion/ion_of.c
- create mode 100644 drivers/staging/android/ion/ion_of.h
 
+diff --git a/drivers/staging/android/ion/devicetree.txt b/drivers/staging/android/ion/devicetree.txt
+new file mode 100644
+index 0000000..4a0c941
+--- /dev/null
++++ b/drivers/staging/android/ion/devicetree.txt
+@@ -0,0 +1,53 @@
++Ion Memory Manager
++
++Ion is a memory manager that allows for sharing of buffers via dma-buf.
++Ion allows for different types of allocation via an abstraction called
++a 'heap'. A heap represents a specific type of memory. Each heap has
++a different type. There can be multiple instances of the same heap
++type.
++
++Required properties for Ion
++
++- compatible: "linux,ion"
++
++All child nodes of a linux,ion node are interpreted as heaps
++
++required properties for heaps
++
++- linux,ion-heap-id: The Ion heap id used for allocation selection
++- linux,ion-heap-type: Ion heap type defined in ion.h
++- linux,ion-heap-name: Human readble name of the heap
++
++
++Optional properties
++- memory-region: A phandle to a memory region. Required for DMA heap type
++(see reserved-memory.txt for details on the reservation)
++- linux,ion-heap-align: Alignment for the heap.
++
++Example:
++
++	ion {
++		compatbile = "linux,ion";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ion-system-heap {
++			linux,ion-heap-id = <0>;
++			linux,ion-heap-type = <ION_SYSTEM_HEAP_TYPE>;
++			linux,ion-heap-name = "system";
++		};
++
++		ion-camera-region {
++			linux,ion-heap-id = <1>;
++			linux,ion-heap-type = <ION_DMA_HEAP_TYPE>;
++			linux,ion-heap-name = "camera"
++			memory-region = <&camera_region>;
++		};
++
++		ion-fb-region {
++			linux,ion-heap-id = <2>;
++			linux,ion-heap-type = <ION_DMA_HEAP_TYPE>;
++			linux,ion-heap-name = "fb"
++			memory-region = <&fb_region>;
++		};
++	}
 -- 
 2.4.3
