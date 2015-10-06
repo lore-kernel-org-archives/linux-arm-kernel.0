@@ -1,28 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Oct 2015 16:34:10 +0200
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.4
-In-Reply-To: <1444125744-21798-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1444125744-21798-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <6510812.tHLFEUGyjH@wuerfel>
+Date: Tue, 06 Oct 2015 16:36:03 +0200
+Subject: [PATCH v2] arm64: dts: add all hi6220 uart nodes
+In-Reply-To: <1443662388-25686-1-git-send-email-tyler.baker@linaro.org>
+References: <1443662388-25686-1-git-send-email-tyler.baker@linaro.org>
+Message-ID: <13756810.CXgbUlyXY5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 October 2015 05:02:24 dinguyen at opensource.altera.com wrote:
-> Hi Arnd, Kevin, and Olof,
+On Wednesday 30 September 2015 18:19:48 Tyler Baker wrote:
+> This patch adds all UART nodes for the Hi6220 SoC. Recently a board[1] has
+> been developed to standardize UART access across all the 96boards consumer
+> edition boards. To use this hardware on HiKey we must configure and enable
+> UART3. However, to ensure backward compatibility we must keep UART0 enabled
+> as well.
 > 
-> Please consider pulling these patches for v4.4. For the arm64 patch, I don't
-> have an official ACK from the DTS guys, but I did get an "its looks okay"
-> with a condition that I fix up the ranges property for /soc node.
+> I have removed the hard coded clock index values in favor of using the ones
+> already defined in include/dt-bindings/clock/hi6220-clock.h.
 > 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/372136.html
+> Since UART0 needs to be soldered, it has been suggested to use the UART3 as
+> the default console.
 > 
+> This patch was boot tested on top of next-20150930, with both UART
+> configurations.
+> 
+> [1] http://www.seeedstudio.com/depot/96Boards-UART-p-2525.html?ref=newInBazaar
+> 
+> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
 > 
 
-Looks ok, merged into next/dt now.
-
-I see one commit for the defconfig file. We normally put those into a separate
-branch with just defconfig changes, to avoid merge conflicts, but it doesn't
-seem worth to make you redo the pull request for that. Please do that next
-time though.
+Applied to next/dt, thanks!
 
 	Arnd
