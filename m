@@ -1,55 +1,33 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 06 Oct 2015 13:16:52 -0400
-Subject: [PATCH V4 2/3] arm64: support initrd outside kernel linear map
-In-Reply-To: <20151006171140.GE26433@leverpostej>
-References: <1439830867-14935-1-git-send-email-msalter@redhat.com>
- <1439830867-14935-3-git-send-email-msalter@redhat.com>
- <20150908113113.GA20562@leverpostej> <20151006171140.GE26433@leverpostej>
-Message-ID: <1444151812.10788.14.camel@redhat.com>
+From: ssantosh@kernel.org (Santosh Shilimkar)
+Date: Tue,  6 Oct 2015 10:19:19 -0700
+Subject: [GIT PULL 2/3] Keystone config updates for 4.4
+In-Reply-To: <1444151960-4941-1-git-send-email-ssantosh@kernel.org>
+References: <1444151960-4941-1-git-send-email-ssantosh@kernel.org>
+Message-ID: <1444151960-4941-2-git-send-email-ssantosh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-10-06 at 18:11 +0100, Mark Rutland wrote:
-> On Tue, Sep 08, 2015 at 12:31:13PM +0100, Mark Rutland wrote:
-> > Hi Mark,
-> > 
-> > On Mon, Aug 17, 2015 at 06:01:06PM +0100, Mark Salter wrote:
-> > > The use of mem= could leave part or all of the initrd outside of
-> > > the kernel linear map. This will lead to an error when unpacking
-> > > the initrd and a probable failure to boot. This patch catches that
-> > > situation and relocates the initrd to be fully within the linear
-> > > map.
-> > 
-> > With next-20150908, this patch results in a confusing message at boot when not
-> > using an initrd:
-> > 
-> > Moving initrd from [4080000000-407fffffff] to [9fff49000-9fff48fff]
-> > 
-> > I think that can be solved by folding in the diff below.
-> 
-> Mark, it looks like this fell by the wayside.
-> 
-> Do you have any objection to this? I'll promote this to it's own patch
-> if not.
-> 
-> Mark.
-> 
-> > 
-> > Thanks,
-> > Mark.
-> > 
-> > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> > index 6bab21f..2322479 100644
-> > --- a/arch/arm64/kernel/setup.c
-> > +++ b/arch/arm64/kernel/setup.c
-> > @@ -364,6 +364,8 @@ static void __init relocate_initrd(void)
-> >                 to_free = ram_end - orig_start;
-> >  
-> >         size = orig_end - orig_start;
-> > +       if (!size)
-> > +               return;
-> >  
-> >         /* initrd needs to be relocated completely inside linear mapping */
-> >         new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
-Sorry, no. That looks perfectly good to me.
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-config
+
+for you to fetch changes up to 1a3284542f2cedc14fa8c4b4de6b9a85eedf4402:
+
+  ARM: configs: keystone: Add basic systemd related options (2015-09-22 08:56:35 -0700)
+
+----------------------------------------------------------------
+Couple of ARM Keystone config patches
+	- Sync up the config with savedefconfig
+	- Add basic systemd options
+
+----------------------------------------------------------------
+Nishanth Menon (2):
+      ARM: configs: keystone: sync to savedefconfig
+      ARM: configs: keystone: Add basic systemd related options
+
+ arch/arm/configs/keystone_defconfig | 54 ++++++++++++++++++-------------------
+ 1 file changed, 27 insertions(+), 27 deletions(-)
