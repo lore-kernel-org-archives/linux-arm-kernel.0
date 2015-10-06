@@ -1,147 +1,101 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 6 Oct 2015 23:29:49 +0100
-Subject: [PATCH] arm64: errata: add module build workaround for erratum
- #843419
-In-Reply-To: <CALdTtnsyNeiRnqSdH6K1eHZ3KbAu02bqYCbnd7zWPGDjgGY8Ww@mail.gmail.com>
-References: <1442402197-20306-1-git-send-email-will.deacon@arm.com>
- <CALdTtnsyNeiRnqSdH6K1eHZ3KbAu02bqYCbnd7zWPGDjgGY8Ww@mail.gmail.com>
-Message-ID: <CAKv+Gu-srNtMq-DUJS1JrYuNwmV3Ku4+DvbR5e5QH39+3DA_cA@mail.gmail.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Tue, 6 Oct 2015 15:30:46 -0700
+Subject: [PATCH 1/1] irqchip/GICv2m: Add workaround for APM X-Gene GICv2m
+ erratum
+In-Reply-To: <20151003142650.16b291b4@arm.com>
+References: <1443824209-23611-1-git-send-email-dhdang@apm.com>
+ <20151003142650.16b291b4@arm.com>
+Message-ID: <CADaLNDkHP=Fs=wnmYuzWppZKcL26txOT2v1XA-ac20-C2bM3oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 October 2015 at 22:44, Dann Frazier <dann.frazier@canonical.com> wrote:
-> On Wed, Sep 16, 2015 at 5:16 AM, Will Deacon <will.deacon@arm.com> wrote:
->> Cortex-A53 processors <= r0p4 are affected by erratum #843419 which can
->> lead to a memory access using an incorrect address in certain sequences
->> headed by an ADRP instruction.
+On Sat, Oct 3, 2015 at 6:26 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Fri, 2 Oct 2015 15:16:49 -0700
+> Duc Dang <dhdang@apm.com> wrote:
 >
-> Just a heads up that we're seeing a regression in the Ubuntu 4.2 kernel on
-> X-Gene after this patch is applied and the CONFIG enabled.
+> Hi Duc,
 >
-> Modules loads fail with messages like:
->
-> [ 2.192721] module gpio_xgene_sb: unsupported RELA relocation: 275
-> [ 2.193609] module xgene_enet: unsupported RELA relocation: 275
-> [ 2.249402] module libahci: unsupported RELA relocation: 275
-> [ 2.249628] module xgene_enet: unsupported RELA relocation: 275
-> [ 2.359451] module xgene_enet: unsupported RELA relocation: 275
-> [ 2.389444] module xgene_enet: unsupported RELA relocation: 275
-> [ 3.473766] module linear: unsupported RELA relocation: 275
-> [ 3.543252] module multipath: unsupported RELA relocation: 275
-> [ 3.593268] module raid0: unsupported RELA relocation: 275
-> [ 3.663695] module raid1: unsupported RELA relocation: 275
-> [ 3.713964] module raid6_pq: unsupported RELA relocation: 275
-> [ 3.763983] module raid6_pq: unsupported RELA relocation: 275
-> [ 3.803975] module raid6_pq: unsupported RELA relocation: 275
-> [ 3.853881] module raid10: unsupported RELA relocation: 275
-> [ 3.924962] module raid6_pq: unsupported RELA relocation: 275
->
-
-RELA #275 is the relocation against ADRP instructions, which GCC
-should not emit anymore when -mcmodel=large is in effect.
-
-Can you confirm that the modules have been rebuilt with this config as
-well? Can you double check the GCC command line (with V=1) when doing
-'make modules' to ensure that '-mcmodel=large' is being passed? Can
-you check with 'readelf -r' which objects still contain
-R_AARCH64_ADR_PREL_PG_HI21 relocations?
-
-
-
-> I haven't attempted to reproduce with a pure upstream kernel yet.
->
-> https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1502946
->
->    -dann
->
->> There is a linker fix to generate veneers for ADRP instructions, but
->> this doesn't work for kernel modules which are built as unlinked ELF
->> objects.
+>> APM X-Gene GICv2m implementation has an erratum where the
+>> MSI data needs to be the offset from the spi_start in order to
+>> trigger the correct MSI interrupt. This is different from the
+>> standard GICv2m implementation where the MSI data is the absolute
+>> value within the range from spi_start to (spi_start + num_spis)
+>> of each v2m frame.
 >>
->> This patch adds a new config option for the erratum which, when enabled,
->> builds kernel modules with the mcmodel=large flag. This uses absolute
->> addressing for all kernel symbols, thereby removing the use of ADRP as
->> a PC-relative form of addressing. The ADRP relocs are removed from the
->> module loader so that we fail to load any potentially affected modules.
+>> This patch reads MSI_IIDR register (present in all GICv2m
+>> implementations) to identify X-Gene GICv2m implementation and
+>> apply workaround to change the data portion of MSI vector.
 >>
->> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Duc Dang <dhdang@apm.com>
 >> ---
->>  arch/arm64/Kconfig         | 16 ++++++++++++++++
->>  arch/arm64/Makefile        |  4 ++++
->>  arch/arm64/kernel/module.c |  2 ++
->>  3 files changed, 22 insertions(+)
+>>  drivers/irqchip/irq-gic-v2m.c | 14 ++++++++++++++
+>>  1 file changed, 14 insertions(+)
 >>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 7d95663c0160..11ff4d57c92a 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -331,6 +331,22 @@ config ARM64_ERRATUM_845719
+>> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+>> index db04fc1..470972c 100644
+>> --- a/drivers/irqchip/irq-gic-v2m.c
+>> +++ b/drivers/irqchip/irq-gic-v2m.c
+>> @@ -43,6 +43,10 @@
 >>
->>           If unsure, say Y.
+>>  #define V2M_MSI_TYPER_NUM_SPI(x)       ((x) & V2M_MSI_TYPER_NUM_MASK)
 >>
->> +config ARM64_ERRATUM_843419
->> +       bool "Cortex-A53: 843419: A load or store might access an incorrect address"
->> +       depends on MODULES
->> +       default y
->> +       help
->> +         This option builds kernel modules using the large memory model in
->> +         order to avoid the use of the ADRP instruction, which can cause
->> +         a subsequent memory access to use an incorrect address on Cortex-A53
->> +         parts up to r0p4.
->> +
->> +         Note that the kernel itself must be linked with a version of ld
->> +         which fixes potentially affected ADRP instructions through the
->> +         use of veneers.
->> +
->> +         If unsure, say Y.
->> +
->>  endmenu
->>
->>
->> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
->> index 15ff5b4156fd..f9914d7c1bb0 100644
->> --- a/arch/arm64/Makefile
->> +++ b/arch/arm64/Makefile
->> @@ -41,6 +41,10 @@ endif
->>
->>  CHECKFLAGS     += -D__aarch64__
->>
->> +ifeq ($(CONFIG_ARM64_ERRATUM_843419), y)
->> +CFLAGS_MODULE  += -mcmodel=large
->> +endif
->> +
->>  # Default value
->>  head-y         := arch/arm64/kernel/head.o
->>
->> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
->> index 67bf4107f6ef..876eb8df50bf 100644
->> --- a/arch/arm64/kernel/module.c
->> +++ b/arch/arm64/kernel/module.c
->> @@ -332,12 +332,14 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
->>                         ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 0, 21,
->>                                              AARCH64_INSN_IMM_ADR);
->>                         break;
->> +#ifndef CONFIG_ARM64_ERRATUM_843419
->>                 case R_AARCH64_ADR_PREL_PG_HI21_NC:
->>                         overflow_check = false;
->>                 case R_AARCH64_ADR_PREL_PG_HI21:
->>                         ovf = reloc_insn_imm(RELOC_OP_PAGE, loc, val, 12, 21,
->>                                              AARCH64_INSN_IMM_ADR);
->>                         break;
->> +#endif
->>                 case R_AARCH64_ADD_ABS_LO12_NC:
->>                 case R_AARCH64_LDST8_ABS_LO12_NC:
->>                         overflow_check = false;
->> --
->> 2.1.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> +#define V2M_MSI_IIDR                 0xFCC
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Please group this with the rest of the registers.
+>
+>> +/* APM X-Gene with GICv2m MSI_IIDR register value */
+>> +#define XGENE_GICV2M_MSI_IIDR                0x06000170
+>> +
+>
+> Is this value guaranteed to only identify the affected implementation?
+> Do we have strong guarantees that a fixed implementation will not have
+> this value?
+>
+> If not, I'd strongly suggest using a different method (compatible
+> string).
+>
+
+I got confirmation from my designer. This value (0x06000170) is unique
+for affected implementation. The fixed implementation will not have
+this value for MSI_IIDR register.
+
+>>  struct v2m_data {
+>>       spinlock_t msi_cnt_lock;
+>>       struct resource res;    /* GICv2m resource */
+>> @@ -98,6 +102,16 @@ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
+>>       msg->address_hi = (u32) (addr >> 32);
+>>       msg->address_lo = (u32) (addr);
+>>       msg->data = data->hwirq;
+>> +     /*
+>> +      * APM X-Gene GICv2m implementation has an erratum where
+>> +      * the MSI data needs to be the offset from the spi_start
+>> +      * in order to trigger the correct MSI interrupt. This is
+>> +      * different from the standard GICv2m implementation where
+>> +      * the MSI data is the absolute value within the range from
+>> +      * spi_start to (spi_start + num_spis).
+>> +      */
+>> +     if (readl_relaxed(v2m->base + V2M_MSI_IIDR) == XGENE_GICV2M_MSI_IIDR)
+>> +             msg->data = data->hwirq - v2m->spi_start;
+>>  }
+>>
+>>  static struct irq_chip gicv2m_irq_chip = {
+>
+> Please add a set of flags to struct v2m_data as well as a flag
+> (GICV2M_NEEDS_SPI_OFFSET?) that can be checked in the compose method
+> (we don't needs to read the IIDR register each time we program an MSI):
+>
+>         if (v2m->flags & GICV2M_NEEDS_SPI_OFFSET)
+>                 msg->data -= v2m->spi_start;
+>
+> You can set that flag from the probe function.
+
+Yes, I will update the patch with your suggestion shortly.
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny.
+
+Regards,
+Duc Dang.
