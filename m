@@ -1,71 +1,27 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue,  6 Oct 2015 16:13:44 +0200
-Subject: [PATCH v5 4/4] ARM: mvebu: enable options for Seagate NAS in
- mvebu_v7_defconfig
-In-Reply-To: <1444140824-24132-1-git-send-email-simon.guinot@sequanux.org>
-References: <1444140824-24132-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <1444140824-24132-5-git-send-email-simon.guinot@sequanux.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Oct 2015 16:14:14 +0200
+Subject: [PATCH v2 0/5] ARM: multi_v7_defconfig: Improve rockchip support
+In-Reply-To: <3696254.URXbzz0NG2@diego>
+References: <1443094759-28531-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <3696254.URXbzz0NG2@diego>
+Message-ID: <5148310.s4EONgC5KW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the following options needed by the Seagate
-Personal Cloud 1 and 2-Bay and the Seagate NAS 2 and 4-Bay:
+On Friday 25 September 2015 00:13:29 Heiko St?bner wrote:
+> Am Donnerstag, 24. September 2015, 13:39:14 schrieb Sjoerd Simons:
+> > Enable options to provide more complete support for Rockchip boards
+> > including: support for the common PMICs, common RTC chips, I2C, SPI,
+> > PMW, Thermal driver, HDMI video output and USB 2.
+> 
+> As these patches are supposed to go through arm-soc directly and options 
+> getting enabled + the whole what gets set as built-in vs. module looks sane to 
+> me, I'll just provide for the whole series a:
+> 
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-SATA_AHCI
-POWER_RESET_GPIO
-RTC_DRV_DS1307
-RTC_DRV_PCF8563
+Applied them all to next/defconfig
 
-Additionnally this patch also enables NEW_LEDS which was missing for
-some reasons.
+Thanks,
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-Acked-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/configs/mvebu_v7_defconfig | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
-
-Changes for v3:
-- Add Andrew's Acked-by.
-
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index 13fcd020e375..c6729bf0a8dd 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -61,6 +61,7 @@ CONFIG_MTD_SPI_NOR=y
- CONFIG_EEPROM_AT24=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_ATA=y
-+CONFIG_SATA_AHCI=y
- CONFIG_AHCI_MVEBU=y
- CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
-@@ -85,6 +86,9 @@ CONFIG_SPI=y
- CONFIG_SPI_ORION=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_PCA953X=y
-+CONFIG_POWER_SUPPLY=y
-+CONFIG_POWER_RESET=y
-+CONFIG_POWER_RESET_GPIO=y
- CONFIG_SENSORS_GPIO_FAN=y
- CONFIG_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
-@@ -111,12 +115,15 @@ CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_DOVE=y
- CONFIG_MMC_SDHCI_PXAV3=y
- CONFIG_MMC_MVSDIO=y
--CONFIG_LEDS_GPIO=y
-+CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_TIMER=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_DS1307=y
-+CONFIG_RTC_DRV_PCF8563=y
- CONFIG_RTC_DRV_S35390A=y
- CONFIG_RTC_DRV_MV=y
- CONFIG_RTC_DRV_ARMADA38X=y
--- 
-2.1.4
+	Arnd
