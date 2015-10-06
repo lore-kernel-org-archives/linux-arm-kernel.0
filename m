@@ -1,54 +1,117 @@
-From: manjeet.p@samsung.com (Manjeet Pawar)
-Date: Tue, 06 Oct 2015 11:05:43 +0530
-Subject: [PATCHv2] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
-Message-ID: <1444109743-8561-1-git-send-email-manjeet.p@samsung.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 6 Oct 2015 09:15:09 +0300
+Subject: [PATCH v4 00/25] dmaengine/ARM: Merge the edma drivers into one
+In-Reply-To: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <561366ED.8010800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MINSIGSTKSZ and SIGSTKSZ for ARM64 are not correctly set in latest kernel.
-This patch fixes this issue.
+Hi
 
-This issue is reported in LTP (testcase: sigaltstack02.c).
-Testcase failed when sigaltstack() called with stack size "MINSIGSTKSZ - 1"
-Since in Glibc-2.22, MINSIGSTKSZ is set to 5120 but in kernel
-it is set to 2048 so testcase gets failed.
+On 09/24/2015 01:01 PM, Peter Ujfalusi wrote:
+> Hi,
+> 
+> Changes since v3:
+> - Separated the two (patch 10/11 in v2 patch 10 in v3) patch which got squashed
+>   by accident for v3
+> - Added Tony's Acked-by to patch 11 (for mach-oamp2 part)
 
-Testcase Output:
-sigaltstack02 1  TPASS  :  stgaltstack() fails, Invalid Flag value,errno:22
-sigaltstack02 2  TFAIL  :  sigaltstack() returned 0, expected -1,errno:12
+Gentle ping on this series ;)
 
-Reported Issue in Glibc Bugzilla:
-https://sourceware.org/bugzilla/show_bug.cgi?id=16850
-
-Bugfix in Glibc-2.22:
-https://sourceware.org/git/gitweb.cgi?p=glibc.git;a=blob;f=sysdeps/unix/
-sysv/linux/aarch64/bits/sigstack.h;h=8f2fb76e3e81734ef8a9cf9ae40daf4705
-f31c35;hb=b763f6ae859ecea70a5dacb8ad45c71d5f667e2e
-
-Signed-off-by: Akhilesh Kumar <akhilesh.k@samsung.com>
-Signed-off-by: Manjeet Pawar <manjeet.p@samsung.com>
-Signed-off-by: Rohit Thapliyal <r.thapliyal@samsung.com>
-
----
-v1 -> Changes in uapi overall header
-v2 -> Changes done in arm64 headers
-
- arch/arm64/include/uapi/asm/signal.h |    5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm64/include/uapi/asm/signal.h b/arch/arm64/include/uapi/asm/signal.h
-index 8d1e723..5ac56cf 100644
---- a/arch/arm64/include/uapi/asm/signal.h
-+++ b/arch/arm64/include/uapi/asm/signal.h
-@@ -21,4 +21,9 @@
- 
- #include <asm-generic/signal.h>
- 
-+#undef MINSIGSTKSZ
-+#undef SIGSTKSZ
-+#define MINSIGSTKSZ 5120
-+#define SIGSTKSZ    16384
-+
- #endif
 -- 
-1.7.9.5
+P?ter
+
+> Changes since v2:
+> - devm_kasprintf format string fixed
+> - Additional patch to enable dynamic paRAM slot usage when the channel mapping
+>   is supported by the eDMA module.
+>   On am335x we have 256 paRAM slots and 64 DMA channels, this means that we had
+>   64 slots 'locked away' all the time. The dynamic paRAM slot logic will allow
+>   us to use all 256 slots freely for any purpose.
+> 
+> Changes since v1:
+> - Convert edma platform device registration to use platform_device_register_full
+> - Moved the PM callback also to the dmaengine driver - missed in v1
+> - Commit message added to:
+>   ARM/dmaengine: edma: Remove limitation on the number of eDMA controllers
+> - New patch which reads the flag for the channel mapping support in one place
+> 
+> Cover letter:
+> 
+> with this series the edma two driver setup will be changed to have only one
+> driver to support eDMA3. The legacy edma interface will be removed and eDMA can
+> only be used via dmaengine API from this point on.
+> In order to do the merge the following improvements has been done:
+> - One driver instance per eDMA:
+>  - Any number of eDMA instances are supported (both legacy and DT boot)
+> - Not relying on global variables, arrays, etc
+> - Code simplification and optimizations in several places
+> 
+> This change will also help us to do bigger changes in the eDMA driver since,
+> since now we have only one driver to work with.
+> 
+> The series has been tested on:
+> da850-evm (OMAP-L138)
+> - with legacy and DT boot (both eDMA0 and eDMA1 is enabled)
+> - In code swapping the eDMA instances in legacy mode to make sure the second
+>   instance is handled correctly.
+> 
+> am335x-evmsk
+> - DT boot
+> 
+> I think this series could go via the dmaengine tree. Changes are trivial under
+> arch/arm/
+> 
+> Regards,
+> Peter
+> ---
+> Peter Ujfalusi (25):
+>   ARM: common: edma: Fix channel parameter for irq callbacks
+>   ARM: common: edma: Remove unused functions
+>   dmaengine: edma: Simplify and optimize the edma_execute path
+>   ARM: davinci/common: Convert edma driver to handle one eDMA instance
+>     per driver
+>   ARM/dmaengine: edma: Move of_dma_controller_register to the dmaengine
+>     driver
+>   ARM: common: edma: Internal API to use pointer to 'struct edma'
+>   ARM/dmaengine: edma: Public API to use private struct pointer
+>   ARM/dmaengine: edma: Remove limitation on the number of eDMA
+>     controllers
+>   ARM: davinci: Use platform_device_register_full() to create pdev for
+>     eDMA
+>   ARM: davinci: Add dma_mask to eDMA devices
+>   ARM/dmaengine: edma: Merge the two drivers under drivers/dma/
+>   dmaengine: edma: Allocate memory dynamically for bitmaps and
+>     structures
+>   dmaengine: edma: Parameter alignment and long line fixes
+>   dmaengine: edma: Use devm_kcalloc when possible
+>   dmaengine: edma: Cleanup regarding the use of dev around the code
+>   dmaengine: edma: Use dev_dbg instead pr_debug
+>   dmaengine: edma: Use the edma_write_slot instead open coded
+>     memcpy_toio
+>   dmaengine: edma: Print warning when linking slots from different eDMA
+>   dmaengine: edma: Consolidate the comments for functions
+>   dmaengine: edma: Simplify the interrupt handling
+>   dmaengine: edma: Move the pending error check into helper function
+>   dmaengine: edma: Simplify and optimize ccerr interrupt handler
+>   dmaengine: edma: Read channel mapping support only once from HW
+>   dmaengine: edma: Rename bitfields for slot and channel usage tracking
+>   dmaengine: edma: Dynamic paRAM slot handling if HW supports it
+> 
+>  arch/arm/Kconfig                      |    1 -
+>  arch/arm/common/Kconfig               |    3 -
+>  arch/arm/common/Makefile              |    1 -
+>  arch/arm/common/edma.c                | 1876 ---------------------------------
+>  arch/arm/mach-davinci/devices-da8xx.c |  122 +--
+>  arch/arm/mach-davinci/dm355.c         |   40 +-
+>  arch/arm/mach-davinci/dm365.c         |   25 +-
+>  arch/arm/mach-davinci/dm644x.c        |   40 +-
+>  arch/arm/mach-davinci/dm646x.c        |   44 +-
+>  arch/arm/mach-omap2/Kconfig           |    1 -
+>  drivers/dma/Kconfig                   |    1 -
+>  drivers/dma/edma.c                    | 1569 ++++++++++++++++++++++++---
+>  include/linux/platform_data/edma.h    |  101 --
+>  13 files changed, 1523 insertions(+), 2301 deletions(-)
+>  delete mode 100644 arch/arm/common/edma.c
+> 
