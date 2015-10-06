@@ -1,35 +1,46 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Tue,  6 Oct 2015 22:28:45 +0200
-Subject: [PATCH] watchdog: at91sam9: keep watchdog running in idle mode
-Message-ID: <1444163325-3041-1-git-send-email-sylvain.rochet@finsecur.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Oct 2015 22:37:11 +0200
+Subject: [PATCH] nvme: fix 32-bit build warning
+Message-ID: <5851501.PBMrs03XFb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since turning on idle-halt in commit 5161b31dc39a (watchdog:
-at91sam9_wdt: better watchdog support"), SoCs compatible with
-at91sam9260-wdt not using a device tree no longer reboot if the watchdog
-times out while the CPU is in idle state. Removing the
-AT91_WDT_WDIDLEHLT flag that was set by default fixes this.
+Compiling the nvme driver on 32-bit warns about a cast from a __u64
+variable to a pointer:
 
-Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-Fixes: 5161b31dc39a ("watchdog: at91sam9_wdt: better watchdog support")
-Cc: <stable@vger.kernel.org> # 3.14+
----
- drivers/watchdog/at91sam9_wdt.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+drivers/block/nvme-core.c: In function 'nvme_submit_io':
+drivers/block/nvme-core.c:1847:4: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+    (void __user *)io.addr, length, NULL, 0);
 
-diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index 7e6acaf..6e3a167 100644
---- a/drivers/watchdog/at91sam9_wdt.c
-+++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -339,7 +339,7 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 		return -ENOMEM;
+The cast here is intentional and safe, so we can shut up the
+gcc warning by adding an intermediate cast to 'unsigned long'.
+
+I had previously submitted a patch to fix this problem in the
+nvme driver, but it was accepted on the same day that two new
+warnings got added.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: d29ec8241c10e ("nvme: submit internal commands through the block layer")
+
+diff --git a/drivers/block/nvme-core.c b/drivers/block/nvme-core.c
+index e917cf304ad0..f9faf276ce74 100644
+--- a/drivers/block/nvme-core.c
++++ b/drivers/block/nvme-core.c
+@@ -1844,7 +1844,7 @@ static int nvme_submit_io(struct nvme_ns *ns, struct nvme_user_io __user *uio)
+ 	c.rw.metadata = cpu_to_le64(meta_dma);
  
- 	wdt->mr = (WDT_HW_TIMEOUT * 256) | AT91_WDT_WDRSTEN | AT91_WDT_WDD |
--		  AT91_WDT_WDDBGHLT | AT91_WDT_WDIDLEHLT;
-+		  AT91_WDT_WDDBGHLT;
- 	wdt->mr_mask = 0x3FFFFFFF;
- 	wdt->nowayout = nowayout;
- 	wdt->wdd.parent = &pdev->dev;
--- 
-2.5.1
+ 	status = __nvme_submit_sync_cmd(ns->queue, &c, NULL,
+-			(void __user *)io.addr, length, NULL, 0);
++			(void __user *)(unsigned long)io.addr, length, NULL, 0);
+  unmap:
+ 	if (meta) {
+ 		if (status == NVME_SC_SUCCESS && !write) {
+@@ -1886,7 +1886,7 @@ static int nvme_user_cmd(struct nvme_dev *dev, struct nvme_ns *ns,
+ 		timeout = msecs_to_jiffies(cmd.timeout_ms);
+ 
+ 	status = __nvme_submit_sync_cmd(ns ? ns->queue : dev->admin_q, &c,
+-			NULL, (void __user *)cmd.addr, cmd.data_len,
++			NULL, (void __user *)(unsigned long)cmd.addr, cmd.data_len,
+ 			&cmd.result, timeout);
+ 	if (status >= 0) {
+ 		if (put_user(cmd.result, &ucmd->result))
