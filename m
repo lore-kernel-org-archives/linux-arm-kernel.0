@@ -1,81 +1,50 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Tue, 6 Oct 2015 15:40:43 +0800
-Subject: [PATCH] arm64: dts: mt8173: add MT8173 display PWM driver support node
-Message-ID: <1444117243-28391-1-git-send-email-yh.huang@mediatek.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 6 Oct 2015 08:45:02 +0100
+Subject: [PATCH v9] dmaengine: Add Xilinx AXI Direct Memory Access Engine
+ driver support
+In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A4EC2DE@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1440432666-10310-1-git-send-email-appanad@xilinx.com>
+ <20151005152628.GE13501@vkoul-mobl.iind.intel.com>
+ <C246CAC1457055469EF09E3A7AC4E11A4A4EC2DE@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <20151006074459.GA23420@vkoul-mobl.iind.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add display PWM node in mt8173-evb.dts and mt8173.dtsi.
+On Mon, Oct 05, 2015 at 03:48:39PM +0000, Appana Durga Kedareswara Rao wrote:
+> > Pls justify why we should have two drivers. Looking at code makes me think
+> > otherwise
+> 
+>
+[pls wrap your messages within 80 chars, I have reflowed below]
+ 
+> I agree with you and even initially we had a common driver with the
+> similar implementation as you were mentioning.  Later on, being soft IPs,
+> new features were added and the IPs became diversified. As an example,
+> this driver has a residue Calculation whereas the other driver (VDMA) is
+> not applicable and the way interrupts are handled is completely different.
+> Briefly, they are two complete different IPs with a different register set
+> and descriptor format. Eventually, it became too complex To manage the
+> common driver as the code became messy with lot of conditions around.
+> Mainly the validation process is a big concern, as every change In the IP
+> compels to test all the complete features of both IPs.  So, we got
+> convinced to the approach of separating the drivers to overcome this and
+> it comes with Few addition lines of common code.
 
-Signed-off-by: YH Huang <yh.huang@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts |   13 +++++++++++++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi    |   22 ++++++++++++++++++++++
- 2 files changed, 35 insertions(+)
+No it is not that hard, bunch of people already do that.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-index 811cb76..1b3fabd 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-@@ -92,6 +92,13 @@
- };
- 
- &pio {
-+	disp_pwm0_pins: disp_pwm0_pins {
-+		pins1 {
-+			pinmux = <MT8173_PIN_87_DISP_PWM0__FUNC_DISP_PWM0>;
-+			output-low;
-+		};
-+	};
-+
- 	mmc0_pins_default: mmc0default {
- 		pins_cmd_dat {
- 			pinmux = <MT8173_PIN_57_MSDC0_DAT0__FUNC_MSDC0_DAT0>,
-@@ -190,6 +197,12 @@
- 	};
- };
- 
-+&pwm0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&disp_pwm0_pins>;
-+	status = "okay";
-+};
-+
- &pwrap {
- 	pmic: mt6397 {
- 		compatible = "mediatek,mt6397";
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 4bce167..fd01134 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -500,6 +500,28 @@
- 			clock-names = "source", "hclk";
- 			status = "disabled";
- 		};
-+
-+		pwm0: pwm at 1401e000 {
-+			compatible = "mediatek,mt8173-disp-pwm",
-+				     "mediatek,mt6595-disp-pwm";
-+			reg = <0 0x1401e000 0 0x1000>;
-+			#pwm-cells = <2>;
-+			clocks = <&mmsys CLK_MM_DISP_PWM026M>,
-+				 <&mmsys CLK_MM_DISP_PWM0MM>;
-+			clock-names = "main", "mm";
-+			status = "disabled";
-+		};
-+
-+		pwm1: pwm at 1401f000 {
-+			compatible = "mediatek,mt8173-disp-pwm",
-+				     "mediatek,mt6595-disp-pwm";
-+			reg = <0 0x1401f000 0 0x1000>;
-+			#pwm-cells = <2>;
-+			clocks = <&mmsys CLK_MM_DISP_PWM126M>,
-+				 <&mmsys CLK_MM_DISP_PWM1MM>;
-+			clock-names = "main", "mm";
-+			status = "disabled";
-+		};
- 	};
- };
- 
+You need is a smart probe or perhaps invoke IP specfic method to
+initialize dma controller.
+
+In above case no one forces you to register status callback for both, you
+can do based on the controller probed...
+
+I am sorry but validation is not a strong point here. I have a driver which
+manages bunch of different generations. Reuse helps in having lesser code
+and bug fixes across generations easily..
+
+We cant have two drivers pretty much doing same thing in kernel
+
+Please fix this and come back
+
 -- 
-1.7.9.5
+~Vinod
