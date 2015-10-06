@@ -1,80 +1,42 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Tue, 6 Oct 2015 10:21:08 +0200
-Subject: [PATCH v2 2/2] ARM: tegra: Disable cpuidle driver if PSCI is
- present
-In-Reply-To: <5151ffebe8611545c55f8cc499cf2368b1b789c4.1442990383.git.jan.kiszka@siemens.com>
-References: <cover.1442990383.git.jan.kiszka@siemens.com>
- <5151ffebe8611545c55f8cc499cf2368b1b789c4.1442990383.git.jan.kiszka@siemens.com>
-Message-ID: <20151006082106.GB21527@ulmo.nvidia.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 6 Oct 2015 10:21:25 +0200
+Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
+In-Reply-To: <20151002180255.GK12338@codeaurora.org>
+References: <560E53E3.7070207@free.fr> <560E8584.8000207@free.fr>
+ <20151002180255.GK12338@codeaurora.org>
+Message-ID: <56138485.4090600@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 08:39:44AM +0200, Jan Kiszka wrote:
-> The firmware takes over the ownership of the flow controller when it
-> provides PSCI support. To avoid clashes, disable the Tegra cpuidle
-> driver if PSCI was detected.
+On 02/10/2015 20:02, Stephen Boyd wrote:
+
+> The warning has been removed in commit 5028090d1da1 (ARM: 8434/1:
+> Revert "7655/1: smp_twd: make twd_local_timer_of_register() no-op
+> for nosmp", 2015-09-14) sitting in linux-next. Oddly, that commit
+> doesn't remove the depends on SMP for the Kconfig. So it seems
+> that we can apply this patch and everyone is happy? We could also
+> drop the "if SMP" part of most of the platform selects if anyone
+> actually cares.
 > 
-> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-> ---
->  arch/arm/mach-tegra/Kconfig | 1 +
->  arch/arm/mach-tegra/tegra.c | 4 +++-
->  2 files changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-> index 0fa4c5f..373768c 100644
-> --- a/arch/arm/mach-tegra/Kconfig
-> +++ b/arch/arm/mach-tegra/Kconfig
-> @@ -4,6 +4,7 @@ menuconfig ARCH_TEGRA
->  	select ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
->  	select ARM_AMBA
->  	select ARM_GIC
-> +	select ARM_PSCI
->  	select CLKSRC_MMIO
->  	select HAVE_ARM_SCU if SMP
->  	select HAVE_ARM_TWD if SMP
-> diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
-> index 2378fa56..d97c961 100644
-> --- a/arch/arm/mach-tegra/tegra.c
-> +++ b/arch/arm/mach-tegra/tegra.c
-> @@ -44,6 +44,7 @@
->  #include <asm/mach-types.h>
->  #include <asm/setup.h>
->  #include <asm/trusted_foundations.h>
-> +#include <asm/psci.h>
+> ---8<----
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 369791fb619c..be64d9d604c3 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1389,7 +1389,6 @@ config HAVE_ARM_ARCH_TIMER
 >  
->  #include "board.h"
->  #include "common.h"
-> @@ -136,7 +137,8 @@ static void __init tegra_dt_init_late(void)
->  	int i;
->  
->  	tegra_init_suspend();
-> -	tegra_cpuidle_init();
-> +	if (!psci_smp_available())
-> +		tegra_cpuidle_init();
->  
->  	for (i = 0; i < ARRAY_SIZE(board_init_funcs); i++) {
->  		if (of_machine_is_compatible(board_init_funcs[i].machine)) {
+>  config HAVE_ARM_TWD
+>  	bool
+> -	depends on SMP
+>  	select CLKSRC_OF if OF
+>  	help
+>  	  This options enables support for the ARM timer and watchdog unit
 
-The equivalent of this part is already in cpuidle-tegra114.c and I'm not
-sure this adds anything. cpuidle-tegra114.c is the same code that is
-used on Tegra124. Anything before Tegra114 is now unlikely to gain PSCI
-support. Given that they're Cortex-A9 and lack virtualization extensions
-I don't think it's even possible to support PSCI on them. Anything after
-Tegra124 will very likely be 64-bit and hence require firmware support
-(such as PSCI) for CPU idle anyway.
+Hello Stephen,
 
-That still leaves the select ARM_PSCI which we don't have in mainline
-yet. I'm also not sure if select ARM_PSCI is the right approach here. It
-means that everyone will be forced to have PSCI support in the kernel.
-But what if for some reason you want to disable PSCI (and instead use
-the kernel's cpuidle support)? Maybe it'd be better to add this to the
-tegra_defconfig instead.
+Should I make a formal submission for the above patch to be accepted?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/1816c6a9/attachment.sig>
+(Did you see my "twd: Don't set CLOCK_EVT_FEAT_C3STOP unconditionally"
+patch? What should I do now for it to be accepted?)
+
+Regards.
