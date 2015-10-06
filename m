@@ -1,70 +1,175 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Oct 2015 19:18:07 +0100
-Subject: [PATCH 1/9] drm: bridge/dw_hdmi-ahb-audio: add audio driver
-In-Reply-To: <CAOMZO5COgoGU-3YNpnmSkctHMRDJ3=DuKc82Wb5zTTX7Bx2jNw@mail.gmail.com>
-References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
- <E1ZO6hC-0003M5-EU@rmk-PC.arm.linux.org.uk>
- <CAOMZO5COgoGU-3YNpnmSkctHMRDJ3=DuKc82Wb5zTTX7Bx2jNw@mail.gmail.com>
-Message-ID: <20151006181806.GS21513@n2100.arm.linux.org.uk>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 6 Oct 2015 13:33:22 -0500
+Subject: [PATCH 04/11] arm: omap2: timer: provide generic
+ sync32k_timer_init function
+In-Reply-To: <1444150927-14771-5-git-send-email-balbi@ti.com>
+References: <1444150927-14771-1-git-send-email-balbi@ti.com>
+ <1444150927-14771-5-git-send-email-balbi@ti.com>
+Message-ID: <561413F2.4000700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 03:07:40PM -0300, Fabio Estevam wrote:
-> On Sat, Aug 8, 2015 at 1:10 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> > Add ALSA based HDMI AHB audio driver for dw_hdmi.  The only buffer
-> > format supported by the hardware is its own special IEC958 based format,
-> > which is not compatible with any ALSA format.  To avoid doing too much
-> > data manipulation within the driver, we support only ALSAs IEC958 LE and
-> > 24-bit PCM formats for 2 to 6 channels, which we convert to its hardware
-> > format.
-> >
-> > A more desirable solution would be to have this conversion in userspace,
-> > but ALSA does not appear to allow such transformations outside of
-> > libasound itself.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On 10/06/2015 12:02 PM, Balbi, Felipe wrote:
+> instead of constantly defining a small wrapper
+> around __omap_sync32k_timer_init(), let's define
+> a generic one which can be used by all OMAPs.
 > 
-> I applied this series, but the HDMI audio card is not registered. I
-> guess I missed the dts pieces. Are the dts patches available?
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  arch/arm/mach-omap2/board-generic.c | 10 +++++-----
+>  arch/arm/mach-omap2/board-ldp.c     |  2 +-
+>  arch/arm/mach-omap2/board-rx51.c    |  2 +-
+>  arch/arm/mach-omap2/common.h        |  3 +--
+>  arch/arm/mach-omap2/timer.c         | 20 +++-----------------
+>  5 files changed, 11 insertions(+), 26 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index 9df14ed7dab1..871db0f0fa66 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -46,7 +46,7 @@ DT_MACHINE_START(OMAP242X_DT, "Generic OMAP2420 (Flattened Device Tree)")
+>  	.map_io		= omap242x_map_io,
+>  	.init_early	= omap2420_init_early,
+>  	.init_machine	= omap_generic_init,
+> -	.init_time	= omap2_sync32k_timer_init,
+> +	.init_time	= omap_sync32k_timer_init,
+>  	.dt_compat	= omap242x_boards_compat,
+>  	.restart	= omap2xxx_restart,
+>  MACHINE_END
+> @@ -63,7 +63,7 @@ DT_MACHINE_START(OMAP243X_DT, "Generic OMAP2430 (Flattened Device Tree)")
+>  	.map_io		= omap243x_map_io,
+>  	.init_early	= omap2430_init_early,
+>  	.init_machine	= omap_generic_init,
+> -	.init_time	= omap2_sync32k_timer_init,
+> +	.init_time	= omap_sync32k_timer_init,
+>  	.dt_compat	= omap243x_boards_compat,
+>  	.restart	= omap2xxx_restart,
+>  MACHINE_END
+> @@ -82,7 +82,7 @@ DT_MACHINE_START(OMAP3_N900_DT, "Nokia RX-51 board")
+>  	.init_early	= omap3430_init_early,
+>  	.init_machine	= omap_generic_init,
+>  	.init_late	= omap3_init_late,
+> -	.init_time	= omap3_sync32k_timer_init,
+> +	.init_time	= omap_sync32k_timer_init,
+>  	.dt_compat	= n900_boards_compat,
+>  	.restart	= omap3xxx_restart,
+>  MACHINE_END
+> @@ -100,7 +100,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
+>  	.init_early	= omap3430_init_early,
+>  	.init_machine	= omap_generic_init,
+>  	.init_late	= omap3_init_late,
+> -	.init_time	= omap3_sync32k_timer_init,
+> +	.init_time	= omap_sync32k_timer_init,
+>  	.dt_compat	= omap3_boards_compat,
+>  	.restart	= omap3xxx_restart,
+>  MACHINE_END
+> @@ -116,7 +116,7 @@ DT_MACHINE_START(OMAP36XX_DT, "Generic OMAP36xx (Flattened Device Tree)")
+>  	.init_early	= omap3630_init_early,
+>  	.init_machine	= omap_generic_init,
+>  	.init_late	= omap3_init_late,
+> -	.init_time	= omap3_sync32k_timer_init,
+> +	.init_time	= omap_sync32k_timer_init,
+>  	.dt_compat	= omap36xx_boards_compat,
+>  	.restart	= omap3xxx_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
+> index c2975af4cd5d..0d3a57c6931f 100644
+> --- a/arch/arm/mach-omap2/board-ldp.c
+> +++ b/arch/arm/mach-omap2/board-ldp.c
+> @@ -424,6 +424,6 @@ MACHINE_START(OMAP_LDP, "OMAP LDP board")
+>  	.init_irq	= omap3_init_irq,
+>  	.init_machine	= omap_ldp_init,
+>  	.init_late	= omap3430_init_late,
+> -	.init_time	= omap3_sync32k_timer_init,
+> +	.init_time	= omap_sync32k_timer_init,
+>  	.restart	= omap3xxx_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
+> index 2d1e5a6beb85..830256c434ec 100644
+> --- a/arch/arm/mach-omap2/board-rx51.c
+> +++ b/arch/arm/mach-omap2/board-rx51.c
+> @@ -136,6 +136,6 @@ MACHINE_START(NOKIA_RX51, "Nokia RX-51 board")
+>  	.init_irq	= omap3_init_irq,
+>  	.init_machine	= rx51_init,
+>  	.init_late	= omap3430_init_late,
+> -	.init_time	= omap3_sync32k_timer_init,
+> +	.init_time	= omap_sync32k_timer_init,
+>  	.restart	= omap3xxx_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+> index 92e92cfc2775..844ad031f7f0 100644
+> --- a/arch/arm/mach-omap2/common.h
+> +++ b/arch/arm/mach-omap2/common.h
+> @@ -88,8 +88,7 @@ static inline int omap_mux_late_init(void)
+>  
+>  extern void omap2_init_common_infrastructure(void);
+>  
+> -extern void omap2_sync32k_timer_init(void);
+> -extern void omap3_sync32k_timer_init(void);
+> +extern void omap_sync32k_timer_init(void);
+>  extern void omap3_secure_sync32k_timer_init(void);
+>  extern void omap3_gptimer_timer_init(void);
+>  extern void omap4_local_timer_init(void);
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index 976ff9fa3594..d14e25b2d7a4 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -608,21 +608,13 @@ static void __init __omap_sync32k_timer_init(int clkev_nr, const char *clkev_src
+>  		omap2_sync32k_clocksource_init();
+>  }
+>  
+> -#ifdef CONFIG_ARCH_OMAP2
+> -void __init omap2_sync32k_timer_init(void)
+> +void __init omap_sync32k_timer_init(void)
+>  {
+>  	__omap_sync32k_timer_init(1, "timer_32k_ck", "ti,timer-alwon",
+>  			2, "timer_sys_ck", NULL, false);
+>  }
+> -#endif /* CONFIG_ARCH_OMAP2 */
+>  
+>  #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM43XX)
+> -void __init omap3_sync32k_timer_init(void)
+> -{
+> -	__omap_sync32k_timer_init(1, "timer_32k_ck", "ti,timer-alwon",
+> -			2, "timer_sys_ck", NULL, false);
+> -}
+> -
+>  void __init omap3_secure_sync32k_timer_init(void)
+>  {
+>  	__omap_sync32k_timer_init(12, "secure_32k_fck", "ti,timer-secure",
+> @@ -640,15 +632,9 @@ void __init omap3_gptimer_timer_init(void)
+>  
+>  #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
+>  	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
+> -static void __init omap4_sync32k_timer_init(void)
+> -{
+> -	__omap_sync32k_timer_init(1, "timer_32k_ck", "ti,timer-alwon",
+> -			2, "sys_clkin_ck", NULL, false);
+> -}
+> -
+>  void __init omap4_local_timer_init(void)
+>  {
+> -	omap4_sync32k_timer_init();
+> +	omap_sync32k_timer_init();
 
-Sorry, I've been out for most of the day.  There's no DT patches required.
+Hmm, this is changing the parent clock source for the timer from
+sys_clkin_ck to timer_sys_ck for OMAP4 and OMAP5 below. I am not sure of
+the history behind the parent source, but is this what you intended to
+do here.
 
-The dw_hdmi bridge driver creates its own platform device for the audio,
-which should then bind to the dw_hdmi-ahb-audio driver using normal Linux
-methods.
+regards
+Suman
 
-I don't know what's wrong with your setup, for me, it just works:
-
-[    1.358829] dwhdmi-imx 120000.hdmi: Detected HDMI controller 0x13:0xa:0xa0:0xc1
-[    1.377173] imx-drm display-subsystem: bound 120000.hdmi (ops dw_hdmi_imx_ops)
-...
-[    2.851343] ALSA device list:
-[    2.857364]   #0: DW-HDMI rev 0x0a, irq 21
-
-as it always has done for me.  There's nothing special about it.
-
-There's nothing special about it - it's a standard ALSA PCM audio driver,
-it doesn't have any requirements over and above having ALSA and ALSA's PCM
-support enabled.  If you didn't have those enabled, but somehow had the
-dw_hdmi-ahb-audio set as built-in, you'd get a link time error, so it's
-not a configuration issue.
-
-It works for me on all iMX6 platforms (solo, dual-lite, dual and quad).
-
-As it's a straight ALSA device, it doesn't need any codec or any of the
-ASoC infrastructure either.
-
-I guess the thing to start looking at is whether the device and driver
-appear in /sys/bus/platform/{devices,drivers}/.  You should have:
-
-/sys/bus/platform/devices/dw-hdmi-ahb-audio.0.auto 
-/sys/bus/platform/drivers/dw-hdmi-ahb-audio
-
-and obviously the latter should contain the symlink to the device.  If
-that is present, then the driver has bound, and it should appear in
-/proc/asound/cards.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>  	clocksource_of_init();
+>  }
+>  #endif
+> @@ -656,7 +642,7 @@ void __init omap4_local_timer_init(void)
+>  #if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
+>  void __init omap5_realtime_timer_init(void)
+>  {
+> -	omap4_sync32k_timer_init();
+> +	omap_sync32k_timer_init();
+>  	realtime_counter_init();
+>  
+>  	clocksource_of_init();
+> 
