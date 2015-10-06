@@ -1,44 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 06 Oct 2015 17:41:44 +0100
-Subject: [PATCH v3] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
- PCIe Host Controller
-In-Reply-To: <8520D5D51A55D047800579B0941471980169063F@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1444146289-28940-1-git-send-email-bharatku@xilinx.com>
- <5613F310.6060305@arm.com>
- <8520D5D51A55D047800579B0941471980169063F@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <5613F9C8.9020000@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 6 Oct 2015 17:50:50 +0100
+Subject: [PATCH v2] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <1441906822-9222-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1441906822-9222-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20151006165049.GE3069@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/15 17:27, Bharat Kumar Gogada wrote:
-> Subject: Re: [PATCH v3] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL PCIe Host Controller
-
-[...]
-
-Please use an email client that does proper quoting - I cannot see what
-you are replying to. Or at least annotate your answers so that I can
-spot them.
-
->> +struct nwl_msi {			/* struct nwl_msi - MSI information */
->> +	struct msi_controller chip;	/* chip: MSI controller */
+On Thu, Sep 10, 2015 at 06:40:22PM +0100, Lorenzo Pieralisi wrote:
+> The SBBR and ACPI specifications allow ACPI based systems that do not
+> implement PSCI (eg systems with no EL3) to boot through the ACPI parking
+> protocol specification[1].
 > 
->> We're moving away from msi_controller altogether, as the kernel now
->> has all the necessary infrastructure to do this properly.
+> This patch implements the ACPI parking protocol CPU operations, and adds
+> code that eases parsing the parking protocol data structures to the
+> ARM64 SMP initializion carried out at the same time as cpus enumeration.
 > 
-> Our current GIC version does not have separate msi controller (we are
-> not using GICv2m or GICv3), so is it necessary to have separate msi
-> controller node ? Please give me clarity on this.
+> To wake-up the CPUs from the parked state, this patch implements a
+> wakeup IPI for ARM64 (ie arch_send_wakeup_ipi_mask()) that mirrors the
+> ARM one, so that a specific IPI is sent for wake-up purpose in order
+> to distinguish it from other IPI sources.
+> 
+> Given the current ACPI MADT parsing API, the patch implements a glue
+> layer that helps passing MADT GICC data structure from SMP initialization
+> code to the parking protocol implementation somewhat overriding the CPU
+> operations interfaces. This to avoid creating a completely trasparent
+> DT/ACPI CPU operations layer that would require creating opaque
+> structure handling for CPUs data (DT represents CPU through DT nodes, ACPI
+> through static MADT table entries), which seems overkill given that ACPI
+> on ARM64 mandates only two booting protocols (PSCI and parking protocol),
+> so there is no need for further protocol additions.
+> 
+> Based on the original work by Mark Salter <msalter@redhat.com>
+> 
+> [1] https://acpica.org/sites/acpica/files/MP%20Startup%20for%20ARM%20platforms.docx
 
-This has nothing to do with the version of the GIC you are using (XGene
-doesn't have GICv2m or v3 either). This is about reducing code
-duplication and having something that we can maintain. See also
-https://lkml.org/lkml/2015/9/20/193 for yet another example.
+Question to Lorenzo and Mark Salter: was this patch successfully tested
+on real hardware (like Applied X-Gene)?
 
-I still plan to kill msi_controller, and I'd like to avoid more
-dependencies with it. MSI domains are the way to do it.
+Thanks.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
