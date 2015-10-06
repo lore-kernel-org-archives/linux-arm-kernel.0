@@ -1,93 +1,104 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Tue,  6 Oct 2015 15:32:38 -0700
-Subject: [PATCH v2 1/1] irqchip/GICv2m: Add workaround for APM X-Gene GICv2m
- erratum
-In-Reply-To: <20151003142650.16b291b4@arm.com>
-References: <20151003142650.16b291b4@arm.com>
-Message-ID: <b0fcb89a51a86b5edb85d2b03cf26ca60bd51f01.1444069886.git.dhdang@apm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 6 Oct 2015 17:35:41 -0500
+Subject: [RFC][PATCH 1/2] WIP: Devicetree bindings for Ion
+In-Reply-To: <1444164433-9107-2-git-send-email-labbott@fedoraproject.org>
+References: <1444164433-9107-1-git-send-email-labbott@fedoraproject.org>
+ <1444164433-9107-2-git-send-email-labbott@fedoraproject.org>
+Message-ID: <CAL_JsqJ+i3zC7UJ3BcdtOhdmQd8YnRC7bs3D2Ei5JD-4-C+A0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-APM X-Gene GICv2m implementation has an erratum where the
-MSI data needs to be the offset from the spi_start in order to
-trigger the correct MSI interrupt. This is different from the
-standard GICv2m implementation where the MSI data is the absolute
-value within the range from spi_start to (spi_start + num_spis)
-of each v2m frame.
+On Tue, Oct 6, 2015 at 3:47 PM, Laura Abbott <labbott@fedoraproject.org> wrote:
+> From: Laura Abbott <laura@labbott.name>
+>
+>
+> This adds a base set of devicetree bindings for the Ion memory
+> manager. This supports setting up the generic set of heaps and
+> their properties.
+>
+> Signed-off-by: Laura Abbott <laura@labbott.name>
+> Signed-off-by: Andrew Andrianov <andrew@ncrmnt.org>
+> ---
+>  drivers/staging/android/ion/devicetree.txt | 53 ++++++++++++++++++++++++++++++
 
-This patch reads MSI_IIDR register (present in all GICv2m
-implementations) to identify X-Gene GICv2m implementation and
-apply workaround to change the data portion of MSI vector.
+I have no issue with this going in here, but I do have lots of issues
+with this binding.
 
-Signed-off-by: Duc Dang <dhdang@apm.com>
----
-Changes since v1:
-        + Group V2M_MSI_IIDR definition to V2M register group
-        + Set v2m flag during init to indicate the erratum and
-        use that flag to manipulate the MSI data when composing MSI msg.
+>  1 file changed, 53 insertions(+)
+>  create mode 100644 drivers/staging/android/ion/devicetree.txt
+>
+> diff --git a/drivers/staging/android/ion/devicetree.txt b/drivers/staging/android/ion/devicetree.txt
+> new file mode 100644
+> index 0000000..4a0c941
+> --- /dev/null
+> +++ b/drivers/staging/android/ion/devicetree.txt
+> @@ -0,0 +1,53 @@
+> +Ion Memory Manager
+> +
+> +Ion is a memory manager that allows for sharing of buffers via dma-buf.
+> +Ion allows for different types of allocation via an abstraction called
+> +a 'heap'. A heap represents a specific type of memory. Each heap has
+> +a different type. There can be multiple instances of the same heap
+> +type.
+> +
+> +Required properties for Ion
+> +
+> +- compatible: "linux,ion"
+> +
+> +All child nodes of a linux,ion node are interpreted as heaps
+> +
+> +required properties for heaps
+> +
+> +- linux,ion-heap-id: The Ion heap id used for allocation selection
+> +- linux,ion-heap-type: Ion heap type defined in ion.h
+> +- linux,ion-heap-name: Human readble name of the heap
+> +
+> +
+> +Optional properties
+> +- memory-region: A phandle to a memory region. Required for DMA heap type
+> +(see reserved-memory.txt for details on the reservation)
+> +- linux,ion-heap-align: Alignment for the heap.
+> +
+> +Example:
+> +
+> +       ion {
+> +               compatbile = "linux,ion";
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               ion-system-heap {
+> +                       linux,ion-heap-id = <0>;
+> +                       linux,ion-heap-type = <ION_SYSTEM_HEAP_TYPE>;
+> +                       linux,ion-heap-name = "system";
 
- drivers/irqchip/irq-gic-v2m.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+How does this vary across platforms? Is all of this being pushed down
+to DT, because there is no coordination of this at the kernel ABI
+level across platforms. In other words, why can't heap 0 be hardcoded
+as system heap in the driver. It seems to me any 1 of these 3
+properties could be used to derive the other 2.
 
-diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-index db04fc1..4c17c18 100644
---- a/drivers/irqchip/irq-gic-v2m.c
-+++ b/drivers/irqchip/irq-gic-v2m.c
-@@ -37,12 +37,19 @@
- #define V2M_MSI_SETSPI_NS	       0x040
- #define V2M_MIN_SPI		       32
- #define V2M_MAX_SPI		       1019
-+#define V2M_MSI_IIDR		       0xFCC
- 
- #define V2M_MSI_TYPER_BASE_SPI(x)      \
- 	       (((x) >> V2M_MSI_TYPER_BASE_SHIFT) & V2M_MSI_TYPER_BASE_MASK)
- 
- #define V2M_MSI_TYPER_NUM_SPI(x)       ((x) & V2M_MSI_TYPER_NUM_MASK)
- 
-+/* APM X-Gene with GICv2m MSI_IIDR register value */
-+#define XGENE_GICV2M_MSI_IIDR		0x06000170
-+
-+/* List of flags for specific v2m implementation */
-+#define GICV2M_NEEDS_SPI_OFFSET		0x00000001
-+
- struct v2m_data {
- 	spinlock_t msi_cnt_lock;
- 	struct resource res;	/* GICv2m resource */
-@@ -50,6 +57,7 @@ struct v2m_data {
- 	u32 spi_start;		/* The SPI number that MSIs start */
- 	u32 nr_spis;		/* The number of SPIs for MSIs */
- 	unsigned long *bm;	/* MSI vector bitmap */
-+	u32 flags;		/* v2m flags for specific implementation */
- };
- 
- static void gicv2m_mask_msi_irq(struct irq_data *d)
-@@ -98,6 +106,9 @@ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
- 	msg->address_hi = (u32) (addr >> 32);
- 	msg->address_lo = (u32) (addr);
- 	msg->data = data->hwirq;
-+
-+	if (v2m->flags & GICV2M_NEEDS_SPI_OFFSET)
-+		msg->data -= v2m->spi_start;
- }
- 
- static struct irq_chip gicv2m_irq_chip = {
-@@ -266,6 +277,17 @@ static int __init gicv2m_init_one(struct device_node *node,
- 		goto err_iounmap;
- 	}
- 
-+	/*
-+	 * APM X-Gene GICv2m implementation has an erratum where
-+	 * the MSI data needs to be the offset from the spi_start
-+	 * in order to trigger the correct MSI interrupt. This is
-+	 * different from the standard GICv2m implementation where
-+	 * the MSI data is the absolute value within the range from
-+	 * spi_start to (spi_start + num_spis).
-+	 */
-+	if (readl_relaxed(v2m->base + V2M_MSI_IIDR) == XGENE_GICV2M_MSI_IIDR)
-+		v2m->flags |= GICV2M_NEEDS_SPI_OFFSET;
-+
- 	v2m->bm = kzalloc(sizeof(long) * BITS_TO_LONGS(v2m->nr_spis),
- 			  GFP_KERNEL);
- 	if (!v2m->bm) {
--- 
-1.9.1
+
+> +               };
+> +
+> +               ion-camera-region {
+> +                       linux,ion-heap-id = <1>;
+> +                       linux,ion-heap-type = <ION_DMA_HEAP_TYPE>;
+> +                       linux,ion-heap-name = "camera"
+> +                       memory-region = <&camera_region>;
+
+Couldn't the memory-region node with addition properties or some
+standardization of existing ones provide enough information for ION's
+needs?
+
+> +               };
+> +
+> +               ion-fb-region {
+> +                       linux,ion-heap-id = <2>;
+> +                       linux,ion-heap-type = <ION_DMA_HEAP_TYPE>;
+> +                       linux,ion-heap-name = "fb"
+> +                       memory-region = <&fb_region>;
+> +               };
+> +       }
+> --
+> 2.4.3
+>
