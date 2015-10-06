@@ -1,30 +1,41 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  6 Oct 2015 17:12:49 +0100
-Subject: [RESEND 1/3] hwrng: st: dt: Fix trivial typo in node address
-Message-ID: <1444147971-25778-1-git-send-email-lee.jones@linaro.org>
+Date: Tue,  6 Oct 2015 17:12:50 +0100
+Subject: [RESEND 2/3] hwrng: st: Use real-world device timings for timeout
+In-Reply-To: <1444147971-25778-1-git-send-email-lee.jones@linaro.org>
+References: <1444147971-25778-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1444147971-25778-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT nodes should not append their addresses with '0x'.
+Samples are documented to be available every 0.667us, so in theory
+the 8 sample deep FIFO should take 5.336us to fill.  However, during
+thorough testing, it became apparent that filling the FIFO actually
+takes closer to 12us.
 
-Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/rng/st,rng.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/char/hw_random/st-rng.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/rng/st,rng.txt b/Documentation/devicetree/bindings/rng/st,rng.txt
-index dbc64e6..35734bc 100644
---- a/Documentation/devicetree/bindings/rng/st,rng.txt
-+++ b/Documentation/devicetree/bindings/rng/st,rng.txt
-@@ -8,7 +8,7 @@ clocks		: Phandle to device's clock (See: ../clocks/clock-bindings.txt)
+diff --git a/drivers/char/hw_random/st-rng.c b/drivers/char/hw_random/st-rng.c
+index 8c8a435..a1ff080 100644
+--- a/drivers/char/hw_random/st-rng.c
++++ b/drivers/char/hw_random/st-rng.c
+@@ -32,8 +32,13 @@
+ #define ST_RNG_FIFO_SIZE		8
+ #define ST_RNG_SAMPLE_SIZE		2 /* 2 Byte (16bit) samples */
  
- Example:
+-/* Samples are available every 0.667us, which we round to 1us */
+-#define ST_RNG_FILL_FIFO_TIMEOUT   (1 * (ST_RNG_FIFO_SIZE / ST_RNG_SAMPLE_SIZE))
++/*
++ * Samples are documented to be available every 0.667us, so in theory
++ * the 8 sample deep FIFO should take 5.336us to fill.  However, during
++ * thorough testing, it became apparent that filling the FIFO actually
++ * takes closer to 12us.
++ */
++#define ST_RNG_FILL_FIFO_TIMEOUT	12
  
--rng at 0xfee80000 {
-+rng at fee80000 {
- 	compatible      = "st,rng";
- 	reg		= <0xfee80000 0x1000>;
- 	clocks          = <&clk_sysin>;
+ struct st_rng_data {
+ 	void __iomem	*base;
 -- 
 1.9.1
