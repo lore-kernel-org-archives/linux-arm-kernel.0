@@ -1,40 +1,30 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 6 Oct 2015 09:02:25 +0200
-Subject: [PATCH 6/8] ARM: mvebu: enable SDHCI card detection using DAT3
- pin on A388-GP
-In-Reply-To: <20151006033131.GA24230@lunn.ch>
-References: <1444094562-31165-1-git-send-email-mw@semihalf.com>
- <1444094562-31165-7-git-send-email-mw@semihalf.com>
- <20151006033131.GA24230@lunn.ch>
-Message-ID: <CAPv3WKeUQ6rsYWJ3C+aX8eHTAdS4SmQ3oCjA9feFf+d-n1RvhA@mail.gmail.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Tue, 6 Oct 2015 07:30:39 +0000
+Subject: [PATCH v4 00/25] dmaengine/ARM: Merge the edma drivers into one
+In-Reply-To: <561366ED.8010800@ti.com>
+References: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
+ <561366ED.8010800@ti.com>
+Message-ID: <1444116637.3579.39.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Tue, 2015-10-06 at 09:15 +0300, Peter Ujfalusi wrote:
+> Hi
+> 
+> On 09/24/2015 01:01 PM, Peter Ujfalusi wrote:
+> > Hi,
+> > 
+> > Changes since v3:
+> > - Separated the two (patch 10/11 in v2 patch 10 in v3) patch which got squashed
+> >   by accident for v3
+> > - Added Tony's Acked-by to patch 11 (for mach-oamp2 part)
+> 
+> Gentle ping on this series ;)
 
-2015-10-06 5:31 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
-> On Tue, Oct 06, 2015 at 03:22:40AM +0200, Marcin Wojtas wrote:
->> The newest revisions of A388-GP (v1.5 and higher) support only
->> DAT3-based card detection, which is enabled by this commit. Hitherto
->> revisions, without such modification, will be impacted with a broken
->> card detection - in order to operate the cards have to be present
->> during kernel boot.
->
-> Humm. Is this acceptable, breaking old boards?
->
-> I would say at minimum, there should be a big fat comment at the top
-> of armada-388-gp.dts explaining that this DTS file is broken on
-> v0.0-v1.4.
->
-> Or we have two .dts files for the 388-gp file, and a dtsi file.
->
+Its a long one :)
 
-I expected this patch would be controversial, hence I propose a
-compromise: set A388-GP SDHCI to 'broken-cd' by defeault. However
-Marvell insisted on HW card detection, because software polling spoils
-the SD/MMC benchmarks, but this way the user would decide whether to
-stay with broken-cd or switch to GPIO/DAT3 detection. What do you
-think?
+I hope to get this done next week after am back from Dublin
 
-Best regards,
-Marcin
+> 
+-- 
+~Vinod
