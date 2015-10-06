@@ -1,28 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Oct 2015 14:37:51 +0200
-Subject: [PATCH 1/2] ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock
- Domain for sound
-In-Reply-To: <560E6B61.5000509@cogentembedded.com>
-References: <cover.1443752733.git.horms+renesas@verge.net.au>
- <560E6AAE.9080605@cogentembedded.com> <560E6B61.5000509@cogentembedded.com>
-Message-ID: <5814245.0FrCevzbqn@wuerfel>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 6 Oct 2015 13:49:02 +0100
+Subject: [PATCHv2] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
+In-Reply-To: <mvma8rw8b9j.fsf@hawking.suse.de>
+References: <1444109743-8561-1-git-send-email-manjeet.p@samsung.com>
+ <5022096.8QRzW0l3EJ@wuerfel>
+ <20151006103128.GN6281@e103592.cambridge.arm.com>
+ <5340366.WTVksOGb0G@wuerfel> <mvmh9m48dpa.fsf@hawking.suse.de>
+ <20151006113328.GP6281@e103592.cambridge.arm.com>
+ <mvma8rw8b9j.fsf@hawking.suse.de>
+Message-ID: <20151006124902.GQ6281@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 October 2015 14:32:49 Sergei Shtylyov wrote:
-> On 10/2/2015 2:29 PM, Sergei Shtylyov wrote:
+On Tue, Oct 06, 2015 at 01:52:24PM +0200, Andreas Schwab wrote:
+> Dave Martin <Dave.Martin@arm.com> writes:
 > 
-> >> From: Geert Uytterhoeven <geert+renesas@glider.be>
-> >>
-> >> 484adb005886 ("ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain")
-> >> added CPG/MSTP clock-cells domain support, but it was missing sound
-> >> support. This patch adds it.
+> > On Tue, Oct 06, 2015 at 12:59:45PM +0200, Andreas Schwab wrote:
+> >> Arnd Bergmann <arnd@arndb.de> writes:
+> >> 
+> >> > I think it makes sense to stick with the traditional definition
+> >> > of MINSIGSTKSZ == "the minimum amount that you will always need,
+> >> > add whatever you require yourself" and SIGSTKSZ == "Should be
+> >> > enough for a couple of function calls".
+> >> 
+> >> The python3 testsuite wants to put two signal frames in a SIGSTKSZ
+> >> stack.
 > >
-> >     Really? I'm only seeing "power-domains" prop added...
+> > Whether it's valid to expect SIGSTKSZ to be big enough for that is
+> > debatable.
 > 
->     Oh, I understand now. The log seems somewhat poorly worded though...
+> This is tracked in <https://bugs.python.org/issue22503>.
 
-I understood it right and merged it as is, but I agree this could
-have been clearer.
+Fair enough...
 
-	Arnd
+Cheers
+---Dave
