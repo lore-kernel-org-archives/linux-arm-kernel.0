@@ -1,18 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Oct 2015 14:30:45 +0200
-Subject: [GIT PULL] Allwinner Fixes for 4.3, round 1
-In-Reply-To: <20151004134619.GA9006@lukather>
-References: <20151004134619.GA9006@lukather>
-Message-ID: <6307964.r0vu6ERKQR@wuerfel>
+Date: Tue, 06 Oct 2015 14:32:22 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.3
+In-Reply-To: <cover.1443752733.git.horms+renesas@verge.net.au>
+References: <cover.1443752733.git.horms+renesas@verge.net.au>
+Message-ID: <16886284.6TliZiZDrK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 04 October 2015 15:46:19 Maxime Ripard wrote:
-> Allwinner fixes for 4.3
+On Friday 02 October 2015 11:29:28 Simon Horman wrote:
 > 
-> Two patches, one that fixes one of the DT build, and the other raising the
-> voltage of the lowest OPP of the A20 to remain within the SoC operating
-> boundaries
+> Please consider these Renesas ARM based SoC fixes for v4.3.
+> 
+> These changes are required to restore working sound for the r8a779[01] SoCs
+> in v4.3.
+> 
+> My understanding is that with the inclusion of
+> "drivers: sh: Disable PM runtime for multi-platform ARM with genpd"
+> in v4.3-rc3 sound stopped working for the SoCs in question.
+> 
+> These patches were previously posted as part of
+> "Renesas ARM Based SoC DT Updates for v4.4".
+> I have withdrawn that pull request.
+> 
 > 
 
 Merged into fixes, thanks!
