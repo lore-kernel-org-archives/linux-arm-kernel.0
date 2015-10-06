@@ -1,35 +1,40 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Tue, 6 Oct 2015 10:19:17 -0700
-Subject: [GIT PULL] ARM64: APM X-Gene 1 and X-Gene 2 DTS updates for 4.4
-In-Reply-To: <11814332.yjHcKuvPDI@wuerfel>
-References: <CADaLNDmeBz69eoU4PO6cAf2cKCQwVCORcXMUf5xdODJVUfb+Hw@mail.gmail.com>
- <11814332.yjHcKuvPDI@wuerfel>
-Message-ID: <CADaLNDnaOUioJPVP8cSYRj8qnbFb0QQ7B3dTBGuqJ37S+Q3iow@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue,  6 Oct 2015 18:24:37 +0100
+Subject: [PATCH] arm64: Don't relocate non-existent initrd
+Message-ID: <1444152277-826-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 6, 2015 at 7:30 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 17 September 2015 16:38:35 Duc Dang wrote:
->> ----------------------------------------------------------------
->> X-Gene DTS changes queued for v4.4
->>
->> ----------------------------------------------------------------
->>
->
-> Merged into next/dt, thanks.
->
-> In the future, please add a multi-line changelog text into the signed
-> tag, the way that you do for a patch, so it can get put into the merge
-> commit.
+When booting a kernel without an initrd, the kernel reports that it
+moves -1 bytes worth, having gone through the motions with initrd_start
+equal to initrd_end:
 
-Thanks, Arnd.
+    Moving initrd from [4080000000-407fffffff] to [9fff49000-9fff48fff]
 
-I will make sure I have the changelog text in the signed tag next time.
+Prevent this by bailing out early when the initrd size is zero (i.e. we
+have no initrd), avoiding the confusing message and other associated
+work.
 
->
-> Thanks,
->
->         Arnd
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Fixes: 1570f0d7ab425c1e ("arm64: support initrd outside kernel linear map")
+Cc: Mark Salter <msalter@redhat.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/setup.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Regards,
-Duc Dang.
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 6bab21f..2322479 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -364,6 +364,8 @@ static void __init relocate_initrd(void)
+ 		to_free = ram_end - orig_start;
+ 
+ 	size = orig_end - orig_start;
++	if (!size)
++		return;
+ 
+ 	/* initrd needs to be relocated completely inside linear mapping */
+ 	new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
+-- 
+1.9.1
