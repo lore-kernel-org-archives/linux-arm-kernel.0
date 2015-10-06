@@ -1,29 +1,45 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 6 Oct 2015 09:57:50 +0800
-Subject: [PATCH] soc: mediatek: Fix random hang up issue while kernel init
-In-Reply-To: <1443162717-64831-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1443162717-64831-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <CAGS+omD0FSefd9vF0iUvFRXK1+m7YPEANpxngTibGwgR_rTNvg@mail.gmail.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 05 Oct 2015 19:33:12 -0700
+Subject: [PATCH v2 0/2] KVM/arm64: add fp/simd lazy switch support
+Message-ID: <1444098794-19244-1-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 25, 2015 at 2:31 PM, James Liao <jamesjj.liao@mediatek.com> wrote:
-> In kernel late init, it turns off all unused clocks, which
-> needs to access subsystem registers such as VENC and VENC_LT.
->
-> Accessing MT8173 VENC registers needs two top clocks, mm_sel and
-> venc_sel. Accessing VENC_LT registers needs mm_sel and venclt_sel.
-> So we need to keep these clocks on before accessing their registers.
->
-> This patch keeps venc_sel / venclt_sel clock on when
-> VENC / VENC_LT's power is on, to prevent system hang up while
-> accessing its registeres.
->
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+This patch series is a followup to the armv7 fp/simd lazy switch
+implementation, uses similar approach and depends on the series -
+https://lists.cs.columbia.edu/pipermail/kvmarm/2015-September/016567.html
+Patches are based on 4.3-rc2 commit 1f93e4a96c91093
 
-After the discussions with James here on the list, I'm happy with this fix.
-Compared to any proposed alternative, this patch seems just as
-effective and is also simpler and more maintainable and extensible (if
-other clocks/power domains need the same treatment).
+Patches are based on earlier arm64 fp/simd optimization work -
+https://lists.cs.columbia.edu/pipermail/kvmarm/2015-July/015748.html
 
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+And subsequent fixes by Marc and Christoffer at KVM Forum hackathon to handle
+32-bit guest on 64 bit host - 
+https://lists.cs.columbia.edu/pipermail/kvmarm/2015-August/016128.html
+
+The patch series have been tested on Foundation Model arm64/arm64 and
+arm32/arm64. The test program used can be found here 
+
+https://github.com/mjsmar/arm-arm64-fpsimd-test
+
+Launched upto 16 instances on 4-way Guest and another 16 on the host (both 
+cases 1mS sleep), ran overnight. 
+
+Changes v1->v2:
+- Tested arm32/arm64
+- rebased to 4.3-rc2
+- changed a couple register accesses from 64 to 32 bit 
+
+Mario Smarduch (2):
+  add hooks for armv8 fp/simd lazy switch
+  enable armv8 fp/simd lazy switch
+
+ arch/arm/kvm/arm.c                |  2 --
+ arch/arm64/include/asm/kvm_asm.h  |  1 +
+ arch/arm64/include/asm/kvm_host.h |  3 ++
+ arch/arm64/kernel/asm-offsets.c   |  1 +
+ arch/arm64/kvm/hyp.S              | 59 ++++++++++++++++++++++++++-------------
+ 5 files changed, 45 insertions(+), 21 deletions(-)
+
+-- 
+1.9.1
