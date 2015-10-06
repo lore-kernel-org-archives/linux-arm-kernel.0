@@ -1,56 +1,56 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 6 Oct 2015 12:02:02 -0500
-Subject: [PATCH 06/11] arm: omap2: timer: always call clocksource_of_init()
- when DT
+Date: Tue, 6 Oct 2015 12:01:59 -0500
+Subject: [PATCH 03/11] arm: omap2: timer: remove __omap_gptimer_init()
 In-Reply-To: <1444150927-14771-1-git-send-email-balbi@ti.com>
 References: <1444150927-14771-1-git-send-email-balbi@ti.com>
-Message-ID: <1444150927-14771-7-git-send-email-balbi@ti.com>
+Message-ID: <1444150927-14771-4-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If booting with DT, let's make sure to always
-call clocksource_of_init() as this will make
-it easier to move timer code to drivers/clocksource
-in the future.
+__omap_sync32k_timer_init(), now takes the clock
+source as a parameter. This means we no longer need
+__omap_gptimer_init().
+
+Note that __omap_sync32k_timer_init() will be
+renamed in a follow-up patch as it's not longer 32k
+source specific.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/timer.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/timer.c | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index dcc0f032e717..b523426f38a5 100644
+index f53ed049d710..976ff9fa3594 100644
 --- a/arch/arm/mach-omap2/timer.c
 +++ b/arch/arm/mach-omap2/timer.c
-@@ -496,6 +496,9 @@ void __init omap_sync32k_timer_init(void)
- {
- 	__omap_sync32k_timer_init(1, "timer_32k_ck", "ti,timer-alwon",
- 			2, "timer_sys_ck", NULL, false);
-+
-+	if (of_have_populated_dt())
-+		clocksource_of_init();
- }
- 
- #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM43XX)
-@@ -519,7 +522,6 @@ void __init omap3_gptimer_timer_init(void)
- void __init omap4_local_timer_init(void)
- {
- 	omap_sync32k_timer_init();
--	clocksource_of_init();
- }
+@@ -592,16 +592,6 @@ static inline void __init realtime_counter_init(void)
+ {}
  #endif
  
-@@ -640,10 +642,8 @@ sysclk1_based:
- 
- void __init omap5_realtime_timer_init(void)
- {
--	omap_sync32k_timer_init();
- 	realtime_counter_init();
+-static void __init __omap_gptimer_init(int clkev_nr, const char *clkev_src,
+-		const char *clkev_prop, int clksrc_nr, const char *clksrc_src,
+-		const char *clksrc_prop)
+-{
+-	omap_clk_init();
+-	omap_dmtimer_init();
+-	omap2_gp_clockevent_init(clkev_nr, clkev_src, clkev_prop);
+-	omap2_gptimer_clocksource_init(clksrc_nr, clksrc_src, clksrc_prop);
+-}
 -
--	clocksource_of_init();
-+	omap_sync32k_timer_init();
+ static void __init __omap_sync32k_timer_init(int clkev_nr, const char *clkev_src,
+ 		const char *clkev_prop, int clksrc_nr, const char *clksrc_src,
+ 		const char *clksrc_prop, bool gptimer)
+@@ -643,8 +633,8 @@ void __init omap3_secure_sync32k_timer_init(void)
+ #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
+ void __init omap3_gptimer_timer_init(void)
+ {
+-	__omap_gptimer_init(2, "timer_sys_ck", NULL,
+-		       1, "timer_sys_ck", "ti,timer-alwon");
++	__omap_sync32k_timer_init(2, "timer_sys_ck", NULL,
++			1, "timer_sys_ck", "ti,timer-alwon", true);
  }
- #endif /* CONFIG_SOC_OMAP5 || CONFIG_SOC_DRA7XX */
+ #endif
  
 -- 
 2.5.3
