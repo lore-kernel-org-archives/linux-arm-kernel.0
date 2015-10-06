@@ -1,68 +1,130 @@
 From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue,  6 Oct 2015 16:13:40 +0200
-Subject: [PATCH v5 0/4] Add support for the Armada-370-based Seagate NAS
-Message-ID: <1444140824-24132-1-git-send-email-simon.guinot@sequanux.org>
+Date: Tue,  6 Oct 2015 16:13:41 +0200
+Subject: [PATCH v5 1/4] ARM: mvebu: add broken-idle option
+In-Reply-To: <1444140824-24132-1-git-send-email-simon.guinot@sequanux.org>
+References: <1444140824-24132-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <1444140824-24132-2-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Vincent Donnefort <vdonnefort@gmail.com>
 
-This patch series adds support for the Seagate machines based on the
-Armada-370 Marvell SoC. This includes the Personal Cloud 1 and 2-Bay
-and the Seagate NAS 2 and 4-Bay.
+The broken-idle option can be activated from the coherency-fabric DT
+node. This property allows to disable the idle capability, when the
+hardware doesn't support it, like the Seagate Personal Cloud boards.
 
-Changes for v2:
-- Rename DTS files using the products names.
-- Update model and compatible properties as well.
-- Add some information allowing to identify the devices in the commit
-  message and in the DTS files headers.
-- Remove duplicated rtc alias in armada-370-seagate-nas-xbay.dtsi.
-
-Changes for v3:
-- Use GPIO_ACTIVE_HIGH instead of 0 in gpios property (gpio-fan node).
-- Fix spelling for Personal Cloud DTS files: 'personal' instead of
-  'personnal'.
-- Add Andrew's Acked-by.
-
-Changes for v4:
-- Introduces a DT coherency-fabric property: broken-idle.
-- Use this new property to disable cpuidle support on Personal Cloud
-  boards.
-- Use this new property with Armada 38x SoCs as well.
+Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
+---
+ .../devicetree/bindings/arm/coherency-fabric.txt   |  5 ++++
+ arch/arm/mach-mvebu/pmsu.c                         | 29 +++++++++++++++++++---
+ 2 files changed, 31 insertions(+), 3 deletions(-)
 
 Changes for v5:
 - Make the broken-idle property boolean.
 - Don't use the broken-idle flag for Armada 38x.
 
-Thanks,
-
-Simon
-
-Simon Guinot (2):
-  ARM: mvebu: add DT support for Seagate Personal Cloud
-  ARM: mvebu: enable options for Seagate NAS in mvebu_v7_defconfig
-
-Vincent Donnefort (2):
-  ARM: mvebu: add broken-idle option
-  ARM: mvebu: add DT support for Seagate NAS 2 and 4-Bay
-
- .../devicetree/bindings/arm/coherency-fabric.txt   |   5 +
- arch/arm/boot/dts/Makefile                         |   4 +
- arch/arm/boot/dts/armada-370-seagate-nas-2bay.dts  |  36 ++++
- arch/arm/boot/dts/armada-370-seagate-nas-4bay.dts  | 133 ++++++++++++
- arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi | 231 +++++++++++++++++++++
- .../dts/armada-370-seagate-personal-cloud-2bay.dts |  51 +++++
- .../boot/dts/armada-370-seagate-personal-cloud.dts |  37 ++++
- .../dts/armada-370-seagate-personal-cloud.dtsi     | 178 ++++++++++++++++
- arch/arm/configs/mvebu_v7_defconfig                |   9 +-
- arch/arm/mach-mvebu/pmsu.c                         |  29 ++-
- 10 files changed, 709 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/boot/dts/armada-370-seagate-nas-2bay.dts
- create mode 100644 arch/arm/boot/dts/armada-370-seagate-nas-4bay.dts
- create mode 100644 arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi
- create mode 100644 arch/arm/boot/dts/armada-370-seagate-personal-cloud-2bay.dts
- create mode 100644 arch/arm/boot/dts/armada-370-seagate-personal-cloud.dts
- create mode 100644 arch/arm/boot/dts/armada-370-seagate-personal-cloud.dtsi
-
+diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+index 8dd46617c889..9b5c3f620e65 100644
+--- a/Documentation/devicetree/bindings/arm/coherency-fabric.txt
++++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+@@ -27,6 +27,11 @@ Required properties:
+  * For "marvell,armada-380-coherency-fabric", only one pair is needed
+    for the per-CPU fabric registers.
+ 
++Optional properties:
++
++- broken-idle: boolean to set when the Idle mode is not supported by the
++  hardware.
++
+ Examples:
+ 
+ coherency-fabric at d0020200 {
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index e8fdb9ceedf0..cba3fa985734 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -379,6 +379,16 @@ static struct notifier_block mvebu_v7_cpu_pm_notifier = {
+ 
+ static struct platform_device mvebu_v7_cpuidle_device;
+ 
++static int broken_idle(struct device_node *np)
++{
++	if (of_property_read_bool(np, "broken-idle")) {
++		pr_warn("CPU idle is currently broken: disabling\n");
++		return 0;
++	}
++
++	return 1;
++}
++
+ static __init int armada_370_cpuidle_init(void)
+ {
+ 	struct device_node *np;
+@@ -387,7 +397,9 @@ static __init int armada_370_cpuidle_init(void)
+ 	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
+ 	if (!np)
+ 		return -ENODEV;
+-	of_node_put(np);
++
++	if (!broken_idle(np))
++		goto end;
+ 
+ 	/*
+ 	 * On Armada 370, there is "a slow exit process from the deep
+@@ -406,6 +418,8 @@ static __init int armada_370_cpuidle_init(void)
+ 	mvebu_v7_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
+ 	mvebu_v7_cpuidle_device.name = "cpuidle-armada-370";
+ 
++end:
++	of_node_put(np);
+ 	return 0;
+ }
+ 
+@@ -422,6 +436,10 @@ static __init int armada_38x_cpuidle_init(void)
+ 				     "marvell,armada-380-coherency-fabric");
+ 	if (!np)
+ 		return -ENODEV;
++
++	if (!broken_idle(np))
++		goto end;
++
+ 	of_node_put(np);
+ 
+ 	np = of_find_compatible_node(NULL, NULL,
+@@ -430,7 +448,6 @@ static __init int armada_38x_cpuidle_init(void)
+ 		return -ENODEV;
+ 	mpsoc_base = of_iomap(np, 0);
+ 	BUG_ON(!mpsoc_base);
+-	of_node_put(np);
+ 
+ 	/* Set up reset mask when powering down the cpus */
+ 	reg = readl(mpsoc_base + MPCORE_RESET_CTL);
+@@ -450,6 +467,8 @@ static __init int armada_38x_cpuidle_init(void)
+ 	mvebu_v7_cpuidle_device.dev.platform_data = armada_38x_cpu_suspend;
+ 	mvebu_v7_cpuidle_device.name = "cpuidle-armada-38x";
+ 
++end:
++	of_node_put(np);
+ 	return 0;
+ }
+ 
+@@ -460,12 +479,16 @@ static __init int armada_xp_cpuidle_init(void)
+ 	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
+ 	if (!np)
+ 		return -ENODEV;
+-	of_node_put(np);
++
++	if (!broken_idle(np))
++		goto end;
+ 
+ 	mvebu_cpu_resume = armada_370_xp_cpu_resume;
+ 	mvebu_v7_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
+ 	mvebu_v7_cpuidle_device.name = "cpuidle-armada-xp";
+ 
++end:
++	of_node_put(np);
+ 	return 0;
+ }
+ 
 -- 
 2.1.4
