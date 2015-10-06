@@ -1,54 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Oct 2015 16:18:58 +0100
-Subject: [PATCH v2 1/2] ARM: Availability of psci_smp_available depends
- on CONFIG_SMP
-In-Reply-To: <20151006081122.GA21527@ulmo.nvidia.com>
-References: <cover.1442990383.git.jan.kiszka@siemens.com>
- <8b94f7869972d64f442f97208707a5856cbc8b14.1442990383.git.jan.kiszka@siemens.com>
- <20151006081122.GA21527@ulmo.nvidia.com>
-Message-ID: <20151006151857.GA2416@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 6 Oct 2015 16:23:26 +0100
+Subject: [PATCH 2/3] hwrng: st: Report correct FIFO size
+In-Reply-To: <5613ED47.1040608@linaro.org>
+References: <1444142640-14721-1-git-send-email-lee.jones@linaro.org>
+ <1444142640-14721-2-git-send-email-lee.jones@linaro.org>
+ <5613ED47.1040608@linaro.org>
+Message-ID: <20151006152326.GE17172@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 10:11:24AM +0200, Thierry Reding wrote:
-> On Wed, Sep 23, 2015 at 08:39:43AM +0200, Jan Kiszka wrote:
-> > Ensure that we can use psci_smp_available without checking for
-> > CONFIG_SMP first.
-> > 
-> > Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-> > ---
-> >  arch/arm/include/asm/psci.h | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-> > index 68ee3ce..ff956f4 100644
-> > --- a/arch/arm/include/asm/psci.h
-> > +++ b/arch/arm/include/asm/psci.h
-> > @@ -16,7 +16,7 @@
-> >  
-> >  extern struct smp_operations psci_smp_ops;
-> >  
-> > -#ifdef CONFIG_ARM_PSCI
-> > +#if defined(CONFIG_ARM_PSCI) && defined(CONFIG_SMP)
-> >  bool psci_smp_available(void);
-> >  #else
-> >  static inline bool psci_smp_available(void) { return false; }
+On Tue, 06 Oct 2015, Daniel Thompson wrote:
+
+> On 06/10/15 15:43, Lee Jones wrote:
+> >The values supplied to the 'read random data from FIFO' arithmetic
+> >are not correct.  The value fed in to initialise the iterator
+> >describes the FIFO depth, but then the iterator is treated in
+> >Bytes and subsequently increased by 2 in value for every read
+> >word.  This means only 4 of the 8 available values are being read
+> >during each invocation of .read().
+> >
+> >This change increased the device bandwidth by a factor of 2.
+> >
+> >Reported-by: Daniel Thompson <daniel.thompson@linaro.org>
+> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >---
+> >  drivers/char/hw_random/st-rng.c | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> >
+> >diff --git a/drivers/char/hw_random/st-rng.c b/drivers/char/hw_random/st-rng.c
+> >index 8c8a435..44480fe 100644
+> >--- a/drivers/char/hw_random/st-rng.c
+> >+++ b/drivers/char/hw_random/st-rng.c
+> >@@ -29,8 +29,9 @@
+> >  #define ST_RNG_STATUS_BAD_ALTERNANCE	BIT(1)
+> >  #define ST_RNG_STATUS_FIFO_FULL		BIT(5)
+> >
+> >-#define ST_RNG_FIFO_SIZE		8
+> >  #define ST_RNG_SAMPLE_SIZE		2 /* 2 Byte (16bit) samples */
+> >+#define ST_RNG_FIFO_DEPTH		8
+> >+#define ST_RNG_FIFO_SIZE		(ST_RNG_FIFO_DEPTH * ST_RNG_SAMPLE_SIZE)
+> >
+> >  /* Samples are available every 0.667us, which we round to 1us */
+> >  #define ST_RNG_FILL_FIFO_TIMEOUT   (1 * (ST_RNG_FIFO_SIZE / ST_RNG_SAMPLE_SIZE))
 > 
-> Hi Will,
+> This change doubles the timeout and doesn't mention it in the
+> changelog.
 
-Hi Thierry,
+The next patch renders this point moot.
 
-> you had questions about this when this was first submitted back in
-> May[0], but discussion stalled. Can you take another look, please?
+> Changing the order of 2/3 and 3/3 would avoid this.
+
+Right, if this is a real concern the patches can be applied in a
+different order.
+
+> Other than that:
 > 
-> I think irrespective of what the series is trying to do this is a
-> correct fix. The arch/arm/kernel/psci_smp.c file is only compiled if
-> both ARM_PSCI and SMP are selected. Builds break if we don't mirror
-> that conditional in the header because for ARM_PSCI && !SMP no dummy
-> will be defined, but the implementation for the prototype won't be
-> available either, leading to a linker error.
+> Reviewed-by: Daniel Thompson <daniel.thompson@linaro.org>
 
-Sure, I'm fine with this patch in isolation, I just didn't (don't) fully
-grok what the series is trying to achieve.
+Thanking you.
 
-Will
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
