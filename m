@@ -1,33 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Oct 2015 22:24:50 +0200
-Subject: [PATCH] genirq: export handle_bad_irq
-Message-ID: <5847725.4IBopItaOr@wuerfel>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 6 Oct 2015 17:25:16 -0300
+Subject: [PATCH 1/9] drm: bridge/dw_hdmi-ahb-audio: add audio driver
+In-Reply-To: <20151006185429.GU21513@n2100.arm.linux.org.uk>
+References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
+ <E1ZO6hC-0003M5-EU@rmk-PC.arm.linux.org.uk>
+ <CAOMZO5COgoGU-3YNpnmSkctHMRDJ3=DuKc82Wb5zTTX7Bx2jNw@mail.gmail.com>
+ <20151006181806.GS21513@n2100.arm.linux.org.uk>
+ <CAOMZO5DaowTGQqN_NW7T2zv-P6a_YZUCumq4-m+OtpsKqFzELw@mail.gmail.com>
+ <20151006185429.GU21513@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5C8O0p6C0hrAvHzanru9W2f8-C7MWsm3+HumoyZ9Hu6Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A cleanup of the omap gpio driver introduced a use of the
-handle_bad_irq() function in a device driver that can be
-a loadable module.
+On Tue, Oct 6, 2015 at 3:54 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-This broke the ARM allmodconfig build:
+> Make sure you have the ALSA config file, as alsalib won't get on
+> with dw-hdmi only accepting 24-bit audio without this.  A copy is
+> attached.  It also tells ALSA how to deal with multi-channel audio
+> as well.
 
-ERROR: "handle_bad_irq" [drivers/gpio/gpio-omap.ko] undefined!
+Thanks, Russell!
 
-This patch exports the handle_bad_irq symbol in order to
-allow the use in modules.
+Got audio to play on my HDMI TV :-)
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 450fa54cfd66 ("gpio: omap: convert to use generic irq handler")
+For the entire series:
 
-diff --git a/kernel/irq/handle.c b/kernel/irq/handle.c
-index ea7b5fd99ba5..142bbf3b607f 100644
---- a/kernel/irq/handle.c
-+++ b/kernel/irq/handle.c
-@@ -35,6 +35,7 @@ void handle_bad_irq(struct irq_desc *desc)
- 	kstat_incr_irqs_this_cpu(desc);
- 	ack_bad_irq(irq);
- }
-+EXPORT_SYMBOL_GPL(handle_bad_irq);
- 
- /*
-  * Special, empty irq handler:
+Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
