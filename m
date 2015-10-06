@@ -1,41 +1,33 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 6 Oct 2015 22:17:56 +0200
-Subject: Dropping "depends on SMP" for HAVE_ARM_TWD -- take 2
-In-Reply-To: <20151006193815.GI12338@codeaurora.org>
-References: <560E53E3.7070207@free.fr> <560E8584.8000207@free.fr>
- <20151002180255.GK12338@codeaurora.org> <56138485.4090600@free.fr>
- <20151006193815.GI12338@codeaurora.org>
-Message-ID: <56142C74.4010002@free.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Oct 2015 22:24:50 +0200
+Subject: [PATCH] genirq: export handle_bad_irq
+Message-ID: <5847725.4IBopItaOr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd wrote:
+A cleanup of the omap gpio driver introduced a use of the
+handle_bad_irq() function in a device driver that can be
+a loadable module.
 
-> Mason wrote:
->
->> Did you see my "twd: Don't set CLOCK_EVT_FEAT_C3STOP unconditionally"
->> patch? What should I do now for it to be accepted?
-> 
-> Assuming you sent it to the correct maintainer from the
-> MAINTAINERS file, I would expect them to apply it directly.
+This broke the ARM allmodconfig build:
 
-<confused>
+ERROR: "handle_bad_irq" [drivers/gpio/gpio-omap.ko] undefined!
 
-The patch touches arch/arm/kernel/smp_twd.c
-I do not see any entry for arch/arm/kernel in MAINTAINERS.
-This means I should fall back to the generic arch/arm entry, right?
+This patch exports the handle_bad_irq symbol in order to
+allow the use in modules.
 
-ARM PORT
-M:	Russell King <linux@arm.linux.org.uk>
-L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-W:	http://www.arm.linux.org.uk/
-S:	Maintained
-F:	arch/arm/
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 450fa54cfd66 ("gpio: omap: convert to use generic irq handler")
 
-AFAIU, there is a separate process for submitting patches for arch/arm:
-http://www.arm.linux.org.uk/developer/patches/
-
-Russell, Mark Rutland wrote: "Otherwise this looks ok."
-Does that mean I should now submit via the web form?
-
-Regards.
+diff --git a/kernel/irq/handle.c b/kernel/irq/handle.c
+index ea7b5fd99ba5..142bbf3b607f 100644
+--- a/kernel/irq/handle.c
++++ b/kernel/irq/handle.c
+@@ -35,6 +35,7 @@ void handle_bad_irq(struct irq_desc *desc)
+ 	kstat_incr_irqs_this_cpu(desc);
+ 	ack_bad_irq(irq);
+ }
++EXPORT_SYMBOL_GPL(handle_bad_irq);
+ 
+ /*
+  * Special, empty irq handler:
