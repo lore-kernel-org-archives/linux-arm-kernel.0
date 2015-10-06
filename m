@@ -1,51 +1,158 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 06 Oct 2015 20:49:49 +0200
-Subject: [PATCH 01/17] ARM: pxa: cm-x300: Use PWM lookup table
-In-Reply-To: <20151006075347.GD18633@ulmo> (Thierry Reding's message of "Tue,
- 6 Oct 2015 09:53:47 +0200")
-References: <1444034997-9805-1-git-send-email-thierry.reding@gmail.com>
- <1444034997-9805-2-git-send-email-thierry.reding@gmail.com>
- <87fv1pawu6.fsf@belgarion.home> <20151006075347.GD18633@ulmo>
-Message-ID: <87bncbbzn6.fsf@belgarion.home>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue,  6 Oct 2015 13:01:49 -0600
+Subject: [PATCH V9] dt: add NVIDIA Tegra XUSB controller binding
+Message-ID: <1444158109-1590-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry Reding <thierry.reding@gmail.com> writes:
+From: Stephen Warren <swarren@nvidia.com>
 
-> On Mon, Oct 05, 2015 at 10:23:29PM +0200, Robert Jarzmik wrote:
->> Thierry Reding <thierry.reding@gmail.com> writes:
->> 
->> > @@ -305,11 +306,14 @@ static inline void cm_x300_init_lcd(void) {}
->> >  #endif
->> >  
->> >  #if defined(CONFIG_BACKLIGHT_PWM) || defined(CONFIG_BACKLIGHT_PWM_MODULE)
->> > +static struct pwm_lookup cm_x300_pwm_lookup[] = {
->> > +	PWM_LOOKUP("pxa27x-pwm.0", 1, "pwm-backlight.0", NULL, 10000,
->> > +		   PWM_POLARITY_NORMAL),
->> > +};
->> That looks weird. It was pwm_id = 2, and I can't find the "2" in the statement
->> above. I would gladly fix it myself, but I wonder where that "2" should go ...
->
-> pwm_id = 2 should be equivalent to the 1 in the second argument of the
-> PWM_LOOKUP macro (i.e. the PWM index). The rationale for that change is
-> given in an old commit by Paul Parsons:
-> With the lookup tables the situation is somewhat more complicated
-> because the indices are relative to the provider. The above would
-> therefore map to something like this:
->
-> 	Address     Hardware  Device            Index
-> 	0x40b00000  PWM0      pxa2{5,7}x-pwm.0  0
-> 	0x40b00010  PWM2      pxa27x-pwm.0      1
-> 	0x40c00000  PWM1      pxa2{5,7}x-pwm.1  0
-> 	0x40c00010  PWM3      pxa27x-pwm.1      1
->
-> Does that clarify the situation?
-Yes, very much, thanks. That settles the situation for the patches I had not
-understood so far, ie. patches 1, 14,16,17.
+Add device-tree binding documentation for the XUSB (xHCI) controller
+present on Tegra124 and later SoCs.
 
-Therefore, I'll apply the whole serie this week. Thanks for your work.
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+[swarren, combined separate MFD, mailbox, XHCI bindings into one node]
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Mathias Nyman <mathias.nyman@intel.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+Changes from v8:
+ - Combined the separate MFD, mailbox, and XHCI bindings into one; there
+   is a single HW module, and so there should be a single DT node to
+   represent it. Any Linux-internal driver structure should not influence
+   the binding structure. This included squashing the various reg and
+   interrupt resources that were previously in the separate modules into
+   one list.
+ - Used lists to document the compatible, reg, and interrupts properties.
+ - Renamed the primary binding from xhci to xusb to reflect the name of
+   the overall module.
+Changes from v7:
+ - Added back non-shared reg/interrupts properties.
+Changes from v6:
+ - Removed XUSB_DEV related clocks/resets.  They will be consumed by
+   a separate driver and binding.
+ - Removed reg/interrupts properties.
+No changes from v5.
+Changes from v4:
+ - Updated regulator names, as suggested by Thierry.
+No changes from v3.
+Changes from v2:
+ - Added mbox-names property.
+Changes from v1:
+ - Updated to use common mailbox bindings.
+ - Added remaining XUSB-related clocks and resets.
+ - Updated list of power supplies to be more accurate wrt to the hardware.
+---
+ .../bindings/usb/nvidia,tegra124-xusb.txt          | 96 ++++++++++++++++++++++
+ 1 file changed, 96 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/nvidia,tegra124-xusb.txt
 
-Cheers.
-
+diff --git a/Documentation/devicetree/bindings/usb/nvidia,tegra124-xusb.txt b/Documentation/devicetree/bindings/usb/nvidia,tegra124-xusb.txt
+new file mode 100644
+index 000000000000..f8de8d49602e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/nvidia,tegra124-xusb.txt
+@@ -0,0 +1,96 @@
++NVIDIA Tegra XUSB (XHCI) controller
++===================================
++
++The Tegra XUSB controller supports both USB2 and USB3 interfaces exposed
++by the Tegra XUSB pad controller.
++
++Required properties:
++--------------------
++ - compatible: Valid options are:
++    - Tegra124: "nvidia,tegra124-xusb".
++    - Tegra132: "nvidia,tegra132-xusb", "nvidia,tegra124-xusb".
++ - reg: Must contain the following entries, in the following order:
++    - The xHCI host registers.
++    - The IPFS registers.
++    - The FPCI registers.
++ - interrupts: Must contain the following entries, in the following order:
++    - The xHCI host interrupt
++    - The XUSB mailbox interrupt.
++ - clocks: Must contain an entry for each entry in clock-names.
++   See ../clock/clock-bindings.txt for details.
++ - clock-names: Must include the following entries:
++    - xusb_host
++    - xusb_host_src
++    - xusb_falcon_src
++    - xusb_ss
++    - xusb_ss_src
++    - xusb_ss_div2
++    - xusb_hs_src
++    - xusb_fs_src
++    - pll_u_480m
++    - clk_m
++    - pll_e
++ - resets: Must contain an entry for each entry in reset-names.
++   See ../reset/reset.txt for details.
++ - reset-names: Must include the following entries:
++   - xusb_host
++   - xusb_ss
++   - xusb_src
++   Note that xusb_src is the shared reset for xusb_{ss,hs,fs,falcon,host}_src.
++ - avddio-pex-supply: PCIe/USB3 analog logic power supply.  Must supply 1.05V.
++ - dvddio-pex-supply: PCIe/USB3 digital logic power supply.  Must supply 1.05V.
++ - avdd-usb-supply: USB controller power supply.  Must supply 3.3V.
++ - avdd-pll-utmip-supply: UTMI PLL power supply.  Must supply 1.8V.
++ - avdd-pll-erefe-supply: PLLE reference PLL power supply.  Must supply 1.05V.
++ - avdd-usb-ss-pll-supply: PCIe/USB3 PLL power supply.  Must supply 1.05V.
++ - hvdd-usb-ss-supply: High-voltage PCIe/USB3 power supply.  Must supply 3.3V.
++ - hvdd-usb-ss-pll-e-supply: High-voltage PLLE power supply.  Must supply 3.3V.
++
++Optional properties:
++--------------------
++ - phys: Must contain an entry for each entry in phy-names.
++   See ../phy/phy-bindings.txt for details.
++ - phy-names: Should include an entry for each PHY used by the controller.
++   Names must be of the form "<type>-<number>" where <type> is one of "utmi",
++   "hsic", or "usb3" and <number> is a 0-based index.  On Tegra124, there may
++   be up to 3 UTMI, 2 HSIC, and 2 USB3 PHYs.
++
++Example:
++--------
++	usb-host at 0,70090000 {
++		compatible = "nvidia,tegra124-xusb";
++		reg = <0x0 0x70090000 0x0 0x8000>,
++		      <0x0 0x70099000 0x0 0x1000>,
++		      <0x0 0x70098000 0x0 0x1000>;
++		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&tegra_car TEGRA124_CLK_XUSB_HOST>,
++			 <&tegra_car TEGRA124_CLK_XUSB_HOST_SRC>,
++			 <&tegra_car TEGRA124_CLK_XUSB_FALCON_SRC>,
++			 <&tegra_car TEGRA124_CLK_XUSB_SS>,
++			 <&tegra_car TEGRA124_CLK_XUSB_SS_DIV2>,
++			 <&tegra_car TEGRA124_CLK_XUSB_SS_SRC>,
++			 <&tegra_car TEGRA124_CLK_XUSB_HS_SRC>,
++			 <&tegra_car TEGRA124_CLK_XUSB_FS_SRC>,
++			 <&tegra_car TEGRA124_CLK_PLL_U_480M>,
++			 <&tegra_car TEGRA124_CLK_CLK_M>,
++			 <&tegra_car TEGRA124_CLK_PLL_E>;
++		clock-names = "xusb_host", "xusb_host_src", "xusb_falcon_src",
++			      "xusb_ss", "xusb_ss_div2", "xusb_ss_src",
++			      "xusb_hs_src", "xusb_fs_src", "pll_u_480m",
++			      "clk_m", "pll_e";
++		resets = <&tegra_car 89>, <&tegra_car 156>, <&tegra_car 143>;
++		reset-names = "xusb_host", "xusb_ss", "xusb_src";
++		phys = <&padctl TEGRA_XUSB_PADCTL_UTMI_P1>, /* mini-PCIe USB */
++		       <&padctl TEGRA_XUSB_PADCTL_UTMI_P2>, /* USB A */
++		       <&padctl TEGRA_XUSB_PADCTL_USB3_P0>; /* USB A */
++		phy-names = "utmi-1", "utmi-2", "usb3-0";
++		avddio-pex-supply = <&vdd_1v05_run>;
++		dvddio-pex-supply = <&vdd_1v05_run>;
++		avdd-usb-supply = <&vdd_3v3_lp0>;
++		avdd-pll-utmip-supply = <&vddio_1v8>;
++		avdd-pll-erefe-supply = <&avdd_1v05_run>;
++		avdd-usb-ss-pll-supply = <&vdd_1v05_run>;
++		hvdd-usb-ss-supply = <&vdd_3v3_lp0>;
++		hvdd-usb-ss-pll-e-supply = <&vdd_3v3_lp0>;
++	};
 -- 
-Robert
+1.9.1
