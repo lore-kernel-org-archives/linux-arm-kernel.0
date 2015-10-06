@@ -1,44 +1,59 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  6 Oct 2015 18:46:30 +0100
-Subject: [PATCH v2 10/10] arm64: mm: remove dsb from update_mmu_cache
+Date: Tue,  6 Oct 2015 18:46:26 +0100
+Subject: [PATCH v2 06/10] arm64: tlbflush: avoid flushing when fullmm == 1
 In-Reply-To: <1444153590-24173-1-git-send-email-will.deacon@arm.com>
 References: <1444153590-24173-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1444153590-24173-11-git-send-email-will.deacon@arm.com>
+Message-ID: <1444153590-24173-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-update_mmu_cache() consists of a dsb(ishst) instruction so that new user
-mappings are guaranteed to be visible to the page table walker on
-exception return.
-
-In reality this can be a very expensive operation which is rarely needed.
-Removing this barrier shows a modest improvement in hackbench scores and
-, in the worst case, we re-take the user fault and establish that there
-was nothing to do.
+The TLB gather code sets fullmm=1 when tearing down the entire address
+space for an mm_struct on exit or execve. Given that the ASID allocator
+will never re-allocate a dirty ASID, this flushing is not needed and can
+simply be avoided in the flushing code.
 
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/pgtable.h | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/tlb.h | 26 +++++++++++++++-----------
+ 1 file changed, 15 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 26b066690593..0d18e88e1cfa 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -646,10 +646,10 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
- 				    unsigned long addr, pte_t *ptep)
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+index d6e6b6660380..ffdaea7954bb 100644
+--- a/arch/arm64/include/asm/tlb.h
++++ b/arch/arm64/include/asm/tlb.h
+@@ -37,17 +37,21 @@ static inline void __tlb_remove_table(void *_table)
+ 
+ static inline void tlb_flush(struct mmu_gather *tlb)
  {
- 	/*
--	 * set_pte() does not have a DSB for user mappings, so make sure that
--	 * the page table write is visible.
-+	 * We don't do anything here, so there's a very small chance of
-+	 * us retaking a user fault which we just fixed up. The alternative
-+	 * is doing a dsb(ishst), but that penalises the fastpath.
- 	 */
--	dsb(ishst);
+-	if (tlb->fullmm) {
+-		flush_tlb_mm(tlb->mm);
+-	} else {
+-		struct vm_area_struct vma = { .vm_mm = tlb->mm, };
+-		/*
+-		 * The intermediate page table levels are already handled by
+-		 * the __(pte|pmd|pud)_free_tlb() functions, so last level
+-		 * TLBI is sufficient here.
+-		 */
+-		__flush_tlb_range(&vma, tlb->start, tlb->end, true);
+-	}
++	struct vm_area_struct vma = { .vm_mm = tlb->mm, };
++
++	/*
++	 * The ASID allocator will either invalidate the ASID or mark
++	 * it as used.
++	 */
++	if (tlb->fullmm)
++		return;
++
++	/*
++	 * The intermediate page table levels are already handled by
++	 * the __(pte|pmd|pud)_free_tlb() functions, so last level
++	 * TLBI is sufficient here.
++	 */
++	__flush_tlb_range(&vma, tlb->start, tlb->end, true);
  }
  
- #define update_mmu_cache_pmd(vma, address, pmd) do { } while (0)
+ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
 -- 
 2.1.4
