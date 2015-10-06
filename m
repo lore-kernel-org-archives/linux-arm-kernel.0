@@ -1,147 +1,70 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Oct 2015 19:15:26 +0100
-Subject: [PATCH v2] iommu/arm-smmu: Add support for MSI on SMMUv3
-Message-ID: <1444155326-28379-1-git-send-email-marc.zyngier@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Oct 2015 19:18:07 +0100
+Subject: [PATCH 1/9] drm: bridge/dw_hdmi-ahb-audio: add audio driver
+In-Reply-To: <CAOMZO5COgoGU-3YNpnmSkctHMRDJ3=DuKc82Wb5zTTX7Bx2jNw@mail.gmail.com>
+References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
+ <E1ZO6hC-0003M5-EU@rmk-PC.arm.linux.org.uk>
+ <CAOMZO5COgoGU-3YNpnmSkctHMRDJ3=DuKc82Wb5zTTX7Bx2jNw@mail.gmail.com>
+Message-ID: <20151006181806.GS21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Despite being a platform device, the SMMUv3 is capable of signaling
-interrupts using MSIs. Hook it into the platform MSI framework and
-enjoy faults being reported in a new and exciting way.
+On Tue, Oct 06, 2015 at 03:07:40PM -0300, Fabio Estevam wrote:
+> On Sat, Aug 8, 2015 at 1:10 PM, Russell King
+> <rmk+kernel@arm.linux.org.uk> wrote:
+> > Add ALSA based HDMI AHB audio driver for dw_hdmi.  The only buffer
+> > format supported by the hardware is its own special IEC958 based format,
+> > which is not compatible with any ALSA format.  To avoid doing too much
+> > data manipulation within the driver, we support only ALSAs IEC958 LE and
+> > 24-bit PCM formats for 2 to 6 channels, which we convert to its hardware
+> > format.
+> >
+> > A more desirable solution would be to have this conversion in userspace,
+> > but ALSA does not appear to allow such transformations outside of
+> > libasound itself.
+> >
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> I applied this series, but the HDMI audio card is not registered. I
+> guess I missed the dts pieces. Are the dts patches available?
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
-Now rebased on top of Will's iommu/devel branch, which leads to
-a slightly different patch.
+Sorry, I've been out for most of the day.  There's no DT patches required.
 
- drivers/iommu/arm-smmu-v3.c | 82 ++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 78 insertions(+), 4 deletions(-)
+The dw_hdmi bridge driver creates its own platform device for the audio,
+which should then bind to the dw_hdmi-ahb-audio driver using normal Linux
+methods.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 5b11b77..3ccc8ed 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -26,6 +26,7 @@
- #include <linux/iommu.h>
- #include <linux/iopoll.h>
- #include <linux/module.h>
-+#include <linux/msi.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-@@ -2176,6 +2177,63 @@ static int arm_smmu_write_reg_sync(struct arm_smmu_device *smmu, u32 val,
- 					  1, ARM_SMMU_POLL_TIMEOUT_US);
- }
- 
-+static void arm_smmu_write_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
-+{
-+	struct device *dev = msi_desc_to_dev(desc);
-+	struct arm_smmu_device *smmu = dev_get_drvdata(dev);
-+	phys_addr_t cfg0_offset, cfg1_offset, cfg2_offset;
-+	phys_addr_t doorbell;
-+
-+	switch (desc->platform.msi_index) {
-+	case 0:			/* EVTQ */
-+		cfg0_offset = ARM_SMMU_EVTQ_IRQ_CFG0;
-+		cfg1_offset = ARM_SMMU_EVTQ_IRQ_CFG1;
-+		cfg2_offset = ARM_SMMU_EVTQ_IRQ_CFG2;
-+		break;
-+	case 1:			/* GERROR */
-+		cfg0_offset = ARM_SMMU_GERROR_IRQ_CFG0;
-+		cfg1_offset = ARM_SMMU_GERROR_IRQ_CFG1;
-+		cfg2_offset = ARM_SMMU_GERROR_IRQ_CFG2;
-+		break;
-+	case 2:			/* PRIQ */
-+		cfg0_offset = ARM_SMMU_PRIQ_IRQ_CFG0;
-+		cfg1_offset = ARM_SMMU_PRIQ_IRQ_CFG1;
-+		cfg2_offset = ARM_SMMU_PRIQ_IRQ_CFG2;
-+		break;
-+	default:		/* Unknown */
-+		return;
-+	}
-+
-+	doorbell = (((u64)msg->address_hi) << 32) | msg->address_lo;
-+	doorbell &= MSI_CFG0_ADDR_MASK << MSI_CFG0_ADDR_SHIFT;
-+
-+	writeq_relaxed(doorbell, smmu->base + cfg0_offset);
-+	writew_relaxed(msg->data, smmu->base + cfg1_offset);
-+	writew_relaxed(MSI_CFG2_MEMATTR_DEVICE_nGnRE,
-+		       smmu->base + cfg2_offset);
-+}
-+
-+static void arm_smmu_msi_override_irqs(struct arm_smmu_device *smmu)
-+{
-+	struct msi_desc *desc;
-+
-+	for_each_msi_entry(desc, smmu->dev) {
-+		switch (desc->platform.msi_index) {
-+		case 0:		/* EVTQ */
-+			smmu->evtq.q.irq = desc->irq;
-+			break;
-+		case 1:		/* GERROR */
-+			smmu->gerr_irq = desc->irq;
-+			break;
-+		case 2:		/* PRIQ */
-+			smmu->priq.q.irq = desc->irq;
-+			break;
-+		default:	/* Unknown */
-+			continue;
-+		}
-+	}
-+}
-+
- static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
- {
- 	int ret, irq;
-@@ -2192,6 +2250,23 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
- 	/* Clear the MSI address regs */
- 	writeq_relaxed(0, smmu->base + ARM_SMMU_GERROR_IRQ_CFG0);
- 	writeq_relaxed(0, smmu->base + ARM_SMMU_EVTQ_IRQ_CFG0);
-+	if (smmu->features & ARM_SMMU_FEAT_PRI)
-+		writeq_relaxed(0, smmu->base + ARM_SMMU_PRIQ_IRQ_CFG0);
-+
-+	/* Allocate MSIs for evtq, gerror and priq. Ignore cmdq */
-+	if (smmu->features & ARM_SMMU_FEAT_MSI) {
-+		int nvecs = 2;
-+
-+		if (smmu->features & ARM_SMMU_FEAT_PRI)
-+			nvecs++;
-+
-+		ret = platform_msi_domain_alloc_irqs(smmu->dev, nvecs,
-+						     arm_smmu_write_msi_msg);
-+		if (ret)
-+			dev_warn(smmu->dev, "failed to allocate MSIs\n");
-+		else
-+			arm_smmu_msi_override_irqs(smmu);
-+	}
- 
- 	/* Request wired interrupt lines */
- 	irq = smmu->evtq.q.irq;
-@@ -2222,8 +2297,6 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
- 	}
- 
- 	if (smmu->features & ARM_SMMU_FEAT_PRI) {
--		writeq_relaxed(0, smmu->base + ARM_SMMU_PRIQ_IRQ_CFG0);
--
- 		irq = smmu->priq.q.irq;
- 		if (irq) {
- 			ret = devm_request_threaded_irq(smmu->dev, irq,
-@@ -2602,13 +2675,14 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	/* Record our private device structure */
-+	platform_set_drvdata(pdev, smmu);
-+
- 	/* Reset the device */
- 	ret = arm_smmu_device_reset(smmu);
- 	if (ret)
- 		goto out_free_structures;
- 
--	/* Record our private device structure */
--	platform_set_drvdata(pdev, smmu);
- 	return 0;
- 
- out_free_structures:
+I don't know what's wrong with your setup, for me, it just works:
+
+[    1.358829] dwhdmi-imx 120000.hdmi: Detected HDMI controller 0x13:0xa:0xa0:0xc1
+[    1.377173] imx-drm display-subsystem: bound 120000.hdmi (ops dw_hdmi_imx_ops)
+...
+[    2.851343] ALSA device list:
+[    2.857364]   #0: DW-HDMI rev 0x0a, irq 21
+
+as it always has done for me.  There's nothing special about it.
+
+There's nothing special about it - it's a standard ALSA PCM audio driver,
+it doesn't have any requirements over and above having ALSA and ALSA's PCM
+support enabled.  If you didn't have those enabled, but somehow had the
+dw_hdmi-ahb-audio set as built-in, you'd get a link time error, so it's
+not a configuration issue.
+
+It works for me on all iMX6 platforms (solo, dual-lite, dual and quad).
+
+As it's a straight ALSA device, it doesn't need any codec or any of the
+ASoC infrastructure either.
+
+I guess the thing to start looking at is whether the device and driver
+appear in /sys/bus/platform/{devices,drivers}/.  You should have:
+
+/sys/bus/platform/devices/dw-hdmi-ahb-audio.0.auto 
+/sys/bus/platform/drivers/dw-hdmi-ahb-audio
+
+and obviously the latter should contain the symlink to the device.  If
+that is present, then the driver has bound, and it should appear in
+/proc/asound/cards.
+
 -- 
-2.1.4
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
