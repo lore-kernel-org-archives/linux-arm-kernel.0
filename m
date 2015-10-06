@@ -1,101 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Oct 2015 02:44:25 -0700
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20151006090015.GE21626@n2100.arm.linux.org.uk>
-References: <20150924233756.GN23801@atomide.com>
- <20151001093325.GU21513@n2100.arm.linux.org.uk>
- <CAPDyKFpnqJBrtiBekikrNHAf-agZm12KnF9n+=+72HH=jti-KA@mail.gmail.com>
- <20151001100326.GV21513@n2100.arm.linux.org.uk>
- <20151005112304.GZ23801@atomide.com>
- <20151005143532.GA23801@atomide.com>
- <20151005145127.GB23801@atomide.com>
- <20151005171155.GF23801@atomide.com>
- <20151005183813.GD21626@n2100.arm.linux.org.uk>
- <20151006090015.GE21626@n2100.arm.linux.org.uk>
-Message-ID: <20151006094425.GM23801@atomide.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Tue, 06 Oct 2015 12:44:54 +0300
+Subject: [PATCH 0/2] ARM: EXYNOS: Allow to use architected timer
+In-Reply-To: <5008072.V9UdTVvpUS@wuerfel>
+References: <cover.1444119342.git.p.fedin@samsung.com>
+ <6613638.q5qyQZxXy7@wuerfel> <00d801d10014$e6d994a0$b48cbde0$@samsung.com>
+ <5008072.V9UdTVvpUS@wuerfel>
+Message-ID: <00e901d1001b$a7fae610$f7f0b230$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [151006 02:04]:
-> On Mon, Oct 05, 2015 at 07:38:13PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Oct 05, 2015 at 10:11:56AM -0700, Tony Lindgren wrote:
-> > > * Tony Lindgren <tony@atomide.com> [151005 07:57]:
-> > > > * Tony Lindgren <tony@atomide.com> [151005 07:44]:
-> > > > > * Tony Lindgren <tony@atomide.com> [151005 04:28]:
-> > > > > 
-> > > > > Based on some tests it seems that the duovero unpaired regulator usage
-> > > > > is fixed by reverting:
-> > > > > 
-> > > > > c55d7a055364 ("mmc: host: omap_hsmmc: use regulator_is_enabled to
-> > > > > find pbias status")
-> > > > 
-> > > > With commit c55d7a055364 my guess is that the PBIAS regulator is
-> > > > already on from an earlier MMC probe and getting re-enabled when
-> > > > a deferred probe happens?
-> > > 
-> > > Unless somebody has a better fix in mind for the above, I suggest
-> > > we revert it for the -rc kernel.
-> > 
-> > Let me try reverting that in my build tree, and...
-> > 
-> > > > > And it seems that omap3 legacy MMC is broken earlier in the
-> > > > > series with:
-> > > > > 
-> > > > > 7d607f917008 ("mmc: host: omap_hsmmc: use
-> > > > > devm_regulator_get_optional() for vmmc")
-> > > > > 
-> > > > > This one does not cleanly revert so have not yet tried reverting
-> > > > > it.
-> > > > 
-> > > > And with commit 7d607f917008 I'm guessing we can't return an
-> > > > error if the PBIAS regulator does not exist as that's not there
-> > > > for the legacy booting.
-> > > 
-> > > For omap3 legacy booting, we keep getting -EPROBE_DEFER for
-> > > all the optional regulators.
-> > > 
-> > > Something like the following might be the minimal fix for the -rc
-> > > cycle?
-> > 
-> > applying this patch.  If that gets things going again, then we
-> > _definitely_ should get both of these to Linus ASAP.  The breakage
-> > has been around far too long already.
-> 
-> Last night's build shows that this fixes the non-DT LDP3430 booting, but
-> DT-based LDP3430 and SDP4430 both remain broken for the same reason -
-> neither can find their SD cards.
+ Hello!
 
-Hmm DT-based boot finds the MMC card for LDP, dmesg below from DT boot [1].
-Looks like you're on on -rc4 and not -rc3. My guess is that MMC is not
-working for you with DT-based booting because you don't seem to have
-CONFIG_REGULATOR_PBIAS in your seed config for. Care to try enabling that
-for both your omap3 and omap4 seed config files?
+> My feeling is that is shouldn't be keyed off the presence of the device in DT
+> though. Maybe we can find a way that allows you to put the device into DT
+> but not have it used by default unless the user explicitly enables it, e.g. though
+> a kernel command line option like "force_broken_archtimer"?
 
-> We're at -rc4.  That means we're could be only three weeks away from 4.3
-> being released, and DT OMAP has yet to boot _once_ here.
-> 
-> What I find *totally* unacceptable is the lack of reaction from the MMC
-> and TI people: it's just like "we'll break your crap, and we'll ignore
-> reports of regressions."  That is *not* acceptable in any shape or form,
-> and people who do this _should_ have their future patches ignored until
-> they demonstrate that they understand the need to not break stuff.
-> 
-> I'm at the point of suggesting that there should be a moritorium on all
-> OMAP related development for 4.4: delay all development to 4.5, and have
-> 4.4 as a pure bug-fixing _only_ cycle for OMAP.  If 4.3 is released and
-> OMAP is still broken, then I don't think there's an option on that.
-> 
-> Maybe the idea that development work won't hit mainline for another 4
-> months will help focus the minds on not breaking stuff and then ignoring
-> regression reports.
+ For this purpose we have status = "disabled" in the device tree. We can add CP15 timer node and
+disable it. If the user needs it, the bootloader could just change "disabled" to "ok", and it's
+done.
+ The only problem here would be that CP15 timer on Exynos is actually tied to MCT. We need to enable
+MCT, otherwise clocks don't tick. That's why i decided to make CP15 timer a subnode.
+ My current patch lacks "status" property check, i could add it if you agree with this approach.
 
-I'm thinking along the same lines. In general, I do not and will not
-apply any patches that are not fixes until all critical regressions are
-out of the way. So not applying anything new for v4.4 until these MMC
-regressions are fixed for v4.3.
+> Or maybe we could find a way to keep using MCT in the host but use the
+> arch timer in the guest only?
 
-Regards,
+ That's an interesting question, but, perhaps, it would require more changes to the code, and KVM
+maintainers don't like these things, calling them "broken non-compliant hardware". So, i guess, we
+could move from simple things to more complex ones.
 
-Tony
+> For all I can tell, nobody every /saw/ the problem, we just know that it
+> hasn't passed verification (or something like that) and you shouldn't
+> use it in production.
 
-[1] http://muru.com/for-rmk/dmesg-ldp-v4.3-rc4-mmc-fixes.txt
+ Yes, and i agreed that this should be an option, not the default. 
+
+ P.S. I cc'ed to linux-samsung-soc, but i'm not subscribed. Will it reach there?
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
