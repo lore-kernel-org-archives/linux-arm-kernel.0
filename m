@@ -1,85 +1,147 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Tue, 6 Oct 2015 15:25:38 -0700
-Subject: [PATCH 3/5] mtd: brcmnand: Optional DT flag to reset IPROC NAND
- controller
-In-Reply-To: <20151006134119.GB26818@localhost>
-References: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
- <1443808606-21203-4-git-send-email-anup.patel@broadcom.com>
- <20151004214943.GA28904@localhost>
- <39063E8F96E11742B35A201CC5D095B7AD54C1@SJEXCHMB10.corp.ad.broadcom.com>
- <20151006134119.GB26818@localhost>
-Message-ID: <56144A62.70300@broadcom.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 6 Oct 2015 23:29:49 +0100
+Subject: [PATCH] arm64: errata: add module build workaround for erratum
+ #843419
+In-Reply-To: <CALdTtnsyNeiRnqSdH6K1eHZ3KbAu02bqYCbnd7zWPGDjgGY8Ww@mail.gmail.com>
+References: <1442402197-20306-1-git-send-email-will.deacon@arm.com>
+ <CALdTtnsyNeiRnqSdH6K1eHZ3KbAu02bqYCbnd7zWPGDjgGY8Ww@mail.gmail.com>
+Message-ID: <CAKv+Gu-srNtMq-DUJS1JrYuNwmV3Ku4+DvbR5e5QH39+3DA_cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+On 6 October 2015 at 22:44, Dann Frazier <dann.frazier@canonical.com> wrote:
+> On Wed, Sep 16, 2015 at 5:16 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> Cortex-A53 processors <= r0p4 are affected by erratum #843419 which can
+>> lead to a memory access using an incorrect address in certain sequences
+>> headed by an ADRP instruction.
+>
+> Just a heads up that we're seeing a regression in the Ubuntu 4.2 kernel on
+> X-Gene after this patch is applied and the CONFIG enabled.
+>
+> Modules loads fail with messages like:
+>
+> [ 2.192721] module gpio_xgene_sb: unsupported RELA relocation: 275
+> [ 2.193609] module xgene_enet: unsupported RELA relocation: 275
+> [ 2.249402] module libahci: unsupported RELA relocation: 275
+> [ 2.249628] module xgene_enet: unsupported RELA relocation: 275
+> [ 2.359451] module xgene_enet: unsupported RELA relocation: 275
+> [ 2.389444] module xgene_enet: unsupported RELA relocation: 275
+> [ 3.473766] module linear: unsupported RELA relocation: 275
+> [ 3.543252] module multipath: unsupported RELA relocation: 275
+> [ 3.593268] module raid0: unsupported RELA relocation: 275
+> [ 3.663695] module raid1: unsupported RELA relocation: 275
+> [ 3.713964] module raid6_pq: unsupported RELA relocation: 275
+> [ 3.763983] module raid6_pq: unsupported RELA relocation: 275
+> [ 3.803975] module raid6_pq: unsupported RELA relocation: 275
+> [ 3.853881] module raid10: unsupported RELA relocation: 275
+> [ 3.924962] module raid6_pq: unsupported RELA relocation: 275
+>
 
-On 15-10-06 06:41 AM, Brian Norris wrote:
+RELA #275 is the relocation against ADRP instructions, which GCC
+should not emit anymore when -mcmodel=large is in effect.
 
->>>
->>> Is there a reason not to do this reset unconditionally? I recall this came up in
->>> discussion previously, when the OpenWRT folks were trying to integrate with
->>> BCMA, where this reset was one of the few differences between the platform-
->>> device-based driver (i.e., this one) and the BCMA based driver. Might it help
->>> simplify things a bit if we just did the same thing everywhere?
+Can you confirm that the modules have been rebuilt with this config as
+well? Can you double check the GCC command line (with V=1) when doing
+'make modules' to ensure that '-mcmodel=large' is being passed? Can
+you check with 'readelf -r' which objects still contain
+R_AARCH64_ADR_PREL_PG_HI21 relocations?
+
+
+
+> I haven't attempted to reproduce with a pure upstream kernel yet.
+>
+> https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1502946
+>
+>    -dann
+>
+>> There is a linker fix to generate veneers for ADRP instructions, but
+>> this doesn't work for kernel modules which are built as unlinked ELF
+>> objects.
 >>
->> This driver is currently shared by Cygnus and NS2.
+>> This patch adds a new config option for the erratum which, when enabled,
+>> builds kernel modules with the mcmodel=large flag. This uses absolute
+>> addressing for all kernel symbols, thereby removing the use of ADRP as
+>> a PC-relative form of addressing. The ADRP relocs are removed from the
+>> module loader so that we fail to load any potentially affected modules.
 >>
->> We had similar suggestion when this patch was reviewed
->> internally in Broadcom.
+>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>> ---
+>>  arch/arm64/Kconfig         | 16 ++++++++++++++++
+>>  arch/arm64/Makefile        |  4 ++++
+>>  arch/arm64/kernel/module.c |  2 ++
+>>  3 files changed, 22 insertions(+)
 >>
->> The rationale for adding optional DT flag is as follows:
->> 1. The NAND controller reset is currently required for NS2 only so
->> that it is in sane state before any NAND commands are issued. We
->> are not sure if Cygnus and all future iProc SoCs will require NAND
->> controller reset.
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 7d95663c0160..11ff4d57c92a 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -331,6 +331,22 @@ config ARM64_ERRATUM_845719
+>>
+>>           If unsure, say Y.
+>>
+>> +config ARM64_ERRATUM_843419
+>> +       bool "Cortex-A53: 843419: A load or store might access an incorrect address"
+>> +       depends on MODULES
+>> +       default y
+>> +       help
+>> +         This option builds kernel modules using the large memory model in
+>> +         order to avoid the use of the ADRP instruction, which can cause
+>> +         a subsequent memory access to use an incorrect address on Cortex-A53
+>> +         parts up to r0p4.
+>> +
+>> +         Note that the kernel itself must be linked with a version of ld
+>> +         which fixes potentially affected ADRP instructions through the
+>> +         use of veneers.
+>> +
+>> +         If unsure, say Y.
+>> +
+>>  endmenu
+>>
+>>
+>> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+>> index 15ff5b4156fd..f9914d7c1bb0 100644
+>> --- a/arch/arm64/Makefile
+>> +++ b/arch/arm64/Makefile
+>> @@ -41,6 +41,10 @@ endif
+>>
+>>  CHECKFLAGS     += -D__aarch64__
+>>
+>> +ifeq ($(CONFIG_ARM64_ERRATUM_843419), y)
+>> +CFLAGS_MODULE  += -mcmodel=large
+>> +endif
+>> +
+>>  # Default value
+>>  head-y         := arch/arm64/kernel/head.o
+>>
+>> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+>> index 67bf4107f6ef..876eb8df50bf 100644
+>> --- a/arch/arm64/kernel/module.c
+>> +++ b/arch/arm64/kernel/module.c
+>> @@ -332,12 +332,14 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
+>>                         ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 0, 21,
+>>                                              AARCH64_INSN_IMM_ADR);
+>>                         break;
+>> +#ifndef CONFIG_ARM64_ERRATUM_843419
+>>                 case R_AARCH64_ADR_PREL_PG_HI21_NC:
+>>                         overflow_check = false;
+>>                 case R_AARCH64_ADR_PREL_PG_HI21:
+>>                         ovf = reloc_insn_imm(RELOC_OP_PAGE, loc, val, 12, 21,
+>>                                              AARCH64_INSN_IMM_ADR);
+>>                         break;
+>> +#endif
+>>                 case R_AARCH64_ADD_ABS_LO12_NC:
+>>                 case R_AARCH64_LDST8_ABS_LO12_NC:
+>>                         overflow_check = false;
+>> --
+>> 2.1.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
-> I'm not sure this is a very strong reason. It seems fairly reasonable in
-> general to reset a HW block before using it.
-
-Efficient Boot time is a very strong reason for needing this actually. 
-We use the NAND controller in the bootROM, boot1/BL1, u-boot/UEFI, and 
-then Kernel stage.  By properly initializing the controller once we do 
-not need to reset it 4 different times.
-
->
->> 2. The NAND controller reset in probe would certainly increase
->> Linux boot time so for certain iProc SoCs we might choose avoid
->> NAND controller reset to reduce boot time if possible.
->
-> I recall this reason being mentioned before. I believe this only happens
-> because the brcmnand driver doesn't yet handle configuring the timing
-> registers, so iProc is implicitly relying on the bootloader to configure
-> the NAND timings. Perhaps it's time that we fix that. I'd rather not add
-> extra DT properties unless we actually need to [1]. And having proper
-> timing configuration in the Linux driver will help improve speeds for
-> all users (whose timings may not be configured in the bootloader).
-
-This is the very reason we need the optional reset property.  We need to 
-have timings configured by the linux driver or not.  Yes, in some cases 
-we will be relying on earlier boot stages to configure some of the hardware.
-
->
-> I actually had some preliminary work to do some timing configuration
-> according to the new timing information from nand_base.c/nand_timing.c.
-> Unfortunately, I didn't complete this, and I'm no longer working at
-> Broadcom, so I don't exactly have access to the HW docs for all the NAND
-> controller revisions, nor do I have access to as much HW for testing...
->
-> Brian
->
-> [1] If we really do need a device tree differentiation, perhaps it would
-> be better to just differentiate the compatible string than to have
-> individual boolean properties. e.g.:
->
-> 	compatible = "brcm,iproc-nand-ns2", ...;
->
-As described above - the option is not SoC specific.  It is system 
-specific.  In some systems we may wish to reset the NAND controller in 
-linux.  In some we may wish to rely on initialization that has already 
-been done to speed up boot times.
-
-
-
-Regards,
-  Scott
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
