@@ -1,90 +1,152 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 6 Oct 2015 12:02:07 -0500
-Subject: [PATCH 11/11] arm: omap2: timer: limit hwmod usage to non-DT boots
+Date: Tue, 6 Oct 2015 12:02:04 -0500
+Subject: [PATCH 08/11] arm: omap2: timer: rename omap_sync32k_timer_init()
 In-Reply-To: <1444150927-14771-1-git-send-email-balbi@ti.com>
 References: <1444150927-14771-1-git-send-email-balbi@ti.com>
-Message-ID: <1444150927-14771-12-git-send-email-balbi@ti.com>
+Message-ID: <1444150927-14771-9-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-now that we have a working 32k clocksource driver,
-we can limit HWMOD usage to non-DT boots and rely
-on clocksource_of_init() every time we boot
-with DT.
+this function is not only about the 32k sync
+timer, it's OMAP's generic init_time implementation.
 
-While at that, also make sure that we don't disable
-the 32-counter device so it gets probed by its driver.
+Let's rename it to make that detail easier to
+notice.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/timer.c | 33 +++++++++++++--------------------
- 1 file changed, 13 insertions(+), 20 deletions(-)
+ arch/arm/mach-omap2/board-generic.c | 14 +++++++-------
+ arch/arm/mach-omap2/board-ldp.c     |  2 +-
+ arch/arm/mach-omap2/board-rx51.c    |  2 +-
+ arch/arm/mach-omap2/common.h        |  2 +-
+ arch/arm/mach-omap2/timer.c         |  4 ++--
+ 5 files changed, 12 insertions(+), 12 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 20d5e82ab6ee..e51fb8245704 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -46,7 +46,7 @@ DT_MACHINE_START(OMAP242X_DT, "Generic OMAP2420 (Flattened Device Tree)")
+ 	.map_io		= omap242x_map_io,
+ 	.init_early	= omap2420_init_early,
+ 	.init_machine	= omap_generic_init,
+-	.init_time	= omap_sync32k_timer_init,
++	.init_time	= omap_init_time,
+ 	.dt_compat	= omap242x_boards_compat,
+ 	.restart	= omap2xxx_restart,
+ MACHINE_END
+@@ -63,7 +63,7 @@ DT_MACHINE_START(OMAP243X_DT, "Generic OMAP2430 (Flattened Device Tree)")
+ 	.map_io		= omap243x_map_io,
+ 	.init_early	= omap2430_init_early,
+ 	.init_machine	= omap_generic_init,
+-	.init_time	= omap_sync32k_timer_init,
++	.init_time	= omap_init_time,
+ 	.dt_compat	= omap243x_boards_compat,
+ 	.restart	= omap2xxx_restart,
+ MACHINE_END
+@@ -82,7 +82,7 @@ DT_MACHINE_START(OMAP3_N900_DT, "Nokia RX-51 board")
+ 	.init_early	= omap3430_init_early,
+ 	.init_machine	= omap_generic_init,
+ 	.init_late	= omap3_init_late,
+-	.init_time	= omap_sync32k_timer_init,
++	.init_time	= omap_init_time,
+ 	.dt_compat	= n900_boards_compat,
+ 	.restart	= omap3xxx_restart,
+ MACHINE_END
+@@ -100,7 +100,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
+ 	.init_early	= omap3430_init_early,
+ 	.init_machine	= omap_generic_init,
+ 	.init_late	= omap3_init_late,
+-	.init_time	= omap_sync32k_timer_init,
++	.init_time	= omap_init_time,
+ 	.dt_compat	= omap3_boards_compat,
+ 	.restart	= omap3xxx_restart,
+ MACHINE_END
+@@ -116,7 +116,7 @@ DT_MACHINE_START(OMAP36XX_DT, "Generic OMAP36xx (Flattened Device Tree)")
+ 	.init_early	= omap3630_init_early,
+ 	.init_machine	= omap_generic_init,
+ 	.init_late	= omap3_init_late,
+-	.init_time	= omap_sync32k_timer_init,
++	.init_time	= omap_init_time,
+ 	.dt_compat	= omap36xx_boards_compat,
+ 	.restart	= omap3xxx_restart,
+ MACHINE_END
+@@ -228,7 +228,7 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
+ 	.init_irq	= omap_gic_of_init,
+ 	.init_machine	= omap_generic_init,
+ 	.init_late	= omap4430_init_late,
+-	.init_time	= omap_sync32k_timer_init,
++	.init_time	= omap_init_time,
+ 	.dt_compat	= omap4_boards_compat,
+ 	.restart	= omap44xx_restart,
+ MACHINE_END
+@@ -272,7 +272,7 @@ DT_MACHINE_START(AM43_DT, "Generic AM43 (Flattened Device Tree)")
+ 	.init_late	= am43xx_init_late,
+ 	.init_irq	= omap_gic_of_init,
+ 	.init_machine	= omap_generic_init,
+-	.init_time	= omap_sync32k_timer_init,
++	.init_time	= omap_init_time,
+ 	.dt_compat	= am43_boards_compat,
+ 	.restart	= omap44xx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
+index 0d3a57c6931f..d9c3ffc39329 100644
+--- a/arch/arm/mach-omap2/board-ldp.c
++++ b/arch/arm/mach-omap2/board-ldp.c
+@@ -424,6 +424,6 @@ MACHINE_START(OMAP_LDP, "OMAP LDP board")
+ 	.init_irq	= omap3_init_irq,
+ 	.init_machine	= omap_ldp_init,
+ 	.init_late	= omap3430_init_late,
+-	.init_time	= omap_sync32k_timer_init,
++	.init_time	= omap_init_time,
+ 	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
+index 830256c434ec..41161ca97d74 100644
+--- a/arch/arm/mach-omap2/board-rx51.c
++++ b/arch/arm/mach-omap2/board-rx51.c
+@@ -136,6 +136,6 @@ MACHINE_START(NOKIA_RX51, "Nokia RX-51 board")
+ 	.init_irq	= omap3_init_irq,
+ 	.init_machine	= rx51_init,
+ 	.init_late	= omap3430_init_late,
+-	.init_time	= omap_sync32k_timer_init,
++	.init_time	= omap_init_time,
+ 	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index bf42fc4e78f4..e1e274334290 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -88,7 +88,7 @@ static inline int omap_mux_late_init(void)
+ 
+ extern void omap2_init_common_infrastructure(void);
+ 
+-extern void omap_sync32k_timer_init(void);
++extern void omap_init_time(void);
+ extern void omap3_secure_sync32k_timer_init(void);
+ extern void omap3_gptimer_timer_init(void);
+ #ifdef CONFIG_CACHE_L2X0
 diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 01452cb190cb..7c1b13fee68f 100644
+index f41e526ffa46..01452cb190cb 100644
 --- a/arch/arm/mach-omap2/timer.c
 +++ b/arch/arm/mach-omap2/timer.c
-@@ -183,7 +183,8 @@ static struct device_node * __init omap_get_timer_dt(const struct of_device_id *
- 				  of_get_property(np, "ti,timer-secure", NULL)))
- 			continue;
- 
--		of_add_property(np, &device_disabled);
-+		if (!of_device_is_compatible(np, "ti,omap-counter32k"))
-+			of_add_property(np, &device_disabled);
- 		return np;
- 	}
- 
-@@ -394,7 +395,6 @@ static int __init __maybe_unused omap2_sync32k_clocksource_init(void)
- 	int ret;
- 	struct device_node *np = NULL;
- 	struct omap_hwmod *oh;
--	void __iomem *vbase;
- 	const char *oh_name = "counter_32k";
- 
- 	/*
-@@ -420,18 +420,6 @@ static int __init __maybe_unused omap2_sync32k_clocksource_init(void)
- 
- 	omap_hwmod_setup_one(oh_name);
- 
--	if (np) {
--		vbase = of_iomap(np, 0);
--		of_node_put(np);
--	} else {
--		vbase = omap_hwmod_get_mpu_rt_va(oh);
--	}
--
--	if (!vbase) {
--		pr_warn("%s: failed to get counter_32k resource\n", __func__);
--		return -ENXIO;
--	}
--
- 	ret = omap_hwmod_enable(oh);
- 	if (ret) {
- 		pr_warn("%s: failed to enable counter_32k module (%d)\n",
-@@ -439,13 +427,18 @@ static int __init __maybe_unused omap2_sync32k_clocksource_init(void)
- 		return ret;
- 	}
- 
--	ret = omap_init_clocksource_32k(vbase);
--	if (ret) {
--		pr_warn("%s: failed to initialize counter_32k as a clocksource (%d)\n",
--							__func__, ret);
--		omap_hwmod_idle(oh);
--	}
-+	if (!of_have_populated_dt()) {
-+		void __iomem *vbase;
- 
-+		vbase = omap_hwmod_get_mpu_rt_va(oh);
-+
-+		ret = omap_init_clocksource_32k(vbase);
-+		if (ret) {
-+			pr_warn("%s: failed to initialize counter_32k as a clocksource (%d)\n",
-+					__func__, ret);
-+			omap_hwmod_idle(oh);
-+		}
-+	}
- 	return ret;
+@@ -492,7 +492,7 @@ static void __init __omap_sync32k_timer_init(int clkev_nr, const char *clkev_src
+ 		omap2_sync32k_clocksource_init();
  }
+ 
+-void __init omap_sync32k_timer_init(void)
++void __init omap_init_time(void)
+ {
+ 	__omap_sync32k_timer_init(1, "timer_32k_ck", "ti,timer-alwon",
+ 			2, "timer_sys_ck", NULL, false);
+@@ -635,7 +635,7 @@ sysclk1_based:
+ void __init omap5_realtime_timer_init(void)
+ {
+ 	realtime_counter_init();
+-	omap_sync32k_timer_init();
++	omap_init_time();
+ }
+ #endif /* CONFIG_SOC_OMAP5 || CONFIG_SOC_DRA7XX */
  
 -- 
 2.5.3
