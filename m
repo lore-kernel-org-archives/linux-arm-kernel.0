@@ -1,52 +1,133 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 6 Oct 2015 16:04:53 +0530
-Subject: [PATCH 1/3] dt-bindings: Add document of Rockchip mailbox
-In-Reply-To: <1442228798-15191-2-git-send-email-wxt@rock-chips.com>
-References: <1442228798-15191-1-git-send-email-wxt@rock-chips.com>
- <1442228798-15191-2-git-send-email-wxt@rock-chips.com>
-Message-ID: <CABb+yY2Z9soGR0OcCRcfr2Ei7zX29qHPhYEKf3LPe+OhAuZMjA@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 6 Oct 2015 16:06:09 +0530
+Subject: All OMAP platforms: MMC is broken
+In-Reply-To: <CAPDyKFowuHHoYq3pRa11rg8KThQA5=Pzg5CpKfzMgz1to9+XLA@mail.gmail.com>
+References: <20150924233756.GN23801@atomide.com>
+ <20151001093325.GU21513@n2100.arm.linux.org.uk>
+ <CAPDyKFpnqJBrtiBekikrNHAf-agZm12KnF9n+=+72HH=jti-KA@mail.gmail.com>
+ <20151001100326.GV21513@n2100.arm.linux.org.uk>
+ <20151005112304.GZ23801@atomide.com> <20151005143532.GA23801@atomide.com>
+ <20151005145127.GB23801@atomide.com> <20151005171155.GF23801@atomide.com>
+ <20151005183813.GD21626@n2100.arm.linux.org.uk>
+ <20151006090015.GE21626@n2100.arm.linux.org.uk>
+ <20151006094425.GM23801@atomide.com>
+ <CAPDyKFowuHHoYq3pRa11rg8KThQA5=Pzg5CpKfzMgz1to9+XLA@mail.gmail.com>
+Message-ID: <5613A419.5070006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 4:36 PM, Caesar Wang <wxt@rock-chips.com> wrote:
-> This add the necessary binding documentation for mailbox
-> found on RK3368 SoC.
->
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> ---
->
->  .../bindings/mailbox/rockchip-mailbox.txt          | 33 ++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/rockchip-mailbox.txt
->
-> diff --git a/Documentation/devicetree/bindings/mailbox/rockchip-mailbox.txt b/Documentation/devicetree/bindings/mailbox/rockchip-mailbox.txt
-> new file mode 100644
-> index 0000000..b9b4768
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/rockchip-mailbox.txt
-> @@ -0,0 +1,33 @@
-> +Rockchip mailbox
-> +
-> +The Rockchip mailbox is used by the Rockchip CPU cores to communicate
-> +requests to MCU processor.
-> +
-> +Refer to ./mailbox.txt for generic information about mailbox device-tree
-> +bindings.
-> +
-> +Required properties:
-> +
-> + - compatible: should be one of the following.
-> +   - "rockchip,rk3368-mbox" for rk3368
-> + - reg: physical base address of the controller and length of memory mapped
-> +       region.
-> +       physical base address of the share buffer and length of memory mapped
-> +       region.
-Please make shared-sram a property of user drivers.
+Hi,
 
-Location and size of shared-memory is a platform property, mailbox
-controller doesn't need sram to function.
-  For example, protocol on some platform, with this controller, may be
-trivial enough to not need a shared sram... say only 32-bits wide
-requests and responses which can be passed via mailbox registers
-directly.   mbox_client.tx_prepare() is where the user driver sets up
-the shared-memory.
+On Tuesday 06 October 2015 03:41 PM, Ulf Hansson wrote:
+> On 6 October 2015 at 11:44, Tony Lindgren <tony@atomide.com> wrote:
+>> * Russell King - ARM Linux <linux@arm.linux.org.uk> [151006 02:04]:
+>>> On Mon, Oct 05, 2015 at 07:38:13PM +0100, Russell King - ARM Linux wrote:
+>>>> On Mon, Oct 05, 2015 at 10:11:56AM -0700, Tony Lindgren wrote:
+>>>>> * Tony Lindgren <tony@atomide.com> [151005 07:57]:
+>>>>>> * Tony Lindgren <tony@atomide.com> [151005 07:44]:
+>>>>>>> * Tony Lindgren <tony@atomide.com> [151005 04:28]:
+>>>>>>>
+>>>>>>> Based on some tests it seems that the duovero unpaired regulator usage
+>>>>>>> is fixed by reverting:
+>>>>>>>
+>>>>>>> c55d7a055364 ("mmc: host: omap_hsmmc: use regulator_is_enabled to
+>>>>>>> find pbias status")
+>>>>>>
+>>>>>> With commit c55d7a055364 my guess is that the PBIAS regulator is
+>>>>>> already on from an earlier MMC probe and getting re-enabled when
+>>>>>> a deferred probe happens?
+>>>>>
+>>>>> Unless somebody has a better fix in mind for the above, I suggest
+>>>>> we revert it for the -rc kernel.
+>>>>
+>>>> Let me try reverting that in my build tree, and...
+>>>>
+>>>>>>> And it seems that omap3 legacy MMC is broken earlier in the
+>>>>>>> series with:
+>>>>>>>
+>>>>>>> 7d607f917008 ("mmc: host: omap_hsmmc: use
+>>>>>>> devm_regulator_get_optional() for vmmc")
+>>>>>>>
+>>>>>>> This one does not cleanly revert so have not yet tried reverting
+>>>>>>> it.
+>>>>>>
+>>>>>> And with commit 7d607f917008 I'm guessing we can't return anHi,
+>>>>>> error if the PBIAS regulator does not exist as that's not there
+>>>>>> for the legacy booting.
+>>>>>
+>>>>> For omap3 legacy booting, we keep getting -EPROBE_DEFER for
+>>>>> all the optional regulators.
+>>>>>
+>>>>> Something like the following might be the minimal fix for the -rc
+>>>>> cycle?
+>>>>
+>>>> applying this patch.  If that gets things going again, then we
+>>>> _definitely_ should get both of these to Linus ASAP.  The breakage
+>>>> has been around far too long already.
+>>>
+>>> Last night's build shows that this fixes the non-DT LDP3430 booting, but
+>>> DT-based LDP3430 and SDP4430 both remain broken for the same reason -
+>>> neither can find their SD cards.
+>>
+>> Hmm DT-based boot finds the MMC card for LDP, dmesg below from DT boot [1].
+>> Looks like you're on on -rc4 and not -rc3. My guess is that MMC is not
+>> working for you with DT-based booting because you don't seem to have
+>> CONFIG_REGULATOR_PBIAS in your seed config for. Care to try enabling that
+>> for both your omap3 and omap4 seed config files?
+>>
+>>> We're at -rc4.  That means we're could be only three weeks away from 4.3
+>>> being released, and DT OMAP has yet to boot _once_ here.
+>>>
+>>> What I find *totally* unacceptable is the lack of reaction from the MMC
+>>> and TI people: it's just like "we'll break your crap, and we'll ignore
+>>> reports of regressions."  That is *not* acceptable in any shape or form,
+>>> and people who do this _should_ have their future patches ignored until
+>>> they demonstrate that they understand the need to not break stuff.
+>>>
+>>> I'm at the point of suggesting that there should be a moritorium on all
+>>> OMAP related development for 4.4: delay all development to 4.5, and have
+>>> 4.4 as a pure bug-fixing _only_ cycle for OMAP.  If 4.3 is released and
+>>> OMAP is still broken, then I don't think there's an option on that.
+>>>
+>>> Maybe the idea that development work won't hit mainline for another 4
+>>> months will help focus the minds on not breaking stuff and then ignoring
+>>> regression reports.
+>>
+>> I'm thinking along the same lines. In general, I do not and will not
+>> apply any patches that are not fixes until all critical regressions are
+>> out of the way. So not applying anything new for v4.4 until these MMC
+>> regressions are fixed for v4.3.
+>>
+> 
+> Tony, Russell - just wanted to say thanks for putting a big effort in
+> fixing this. I was expecting support from Kishon, but I guess he's
+> busy.
+> 
+> Unfortunate, I don't have any of the hardware that fails, otherwise I
+> would of course be helping out more. The only thing I can think of is
+> to revert the entire patchset I picked up for 4.3 from Kishon for the
+> omap_hsmmc driver, but then I am not sure if that would cause other
+> issues...
+
+Please don't do that as that will just mask lot of bugs in the
+devicetree and might get MMC working. Indeed I was busy but I'll try to
+get this resolved asap. The 2 pending issues as far as I know
+
+1) warn dump while enabling pbias regulator in duovero. As I mentioned
+in some other thread it might be because the PBIAS regulator in 4430 is
+not setting the status bit properly because of which we can't use the
+regulator_is_enabled API to enable/disable the regulator. I don't think
+there is any other way to fix this other than reverting c55d7a055364.
+
+2) legacy booting is not working with OMAP3.
+I'm not sure what is causing this. I'm right now in ELCE and will be
+able to look at this on Friday when I'll be able to get hold of LDP3430.
+
+I really didn't intend to be unresponsive or something but just that the
+above 2 boards are not readily accessible to me for the debugging.
+Before posting the patches I tested in all the possible boards I had.
+
+Anyways apologies for not having been able to resolved this faster.
+
+Thanks
+Kishon
