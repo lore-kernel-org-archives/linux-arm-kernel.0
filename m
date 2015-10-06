@@ -1,57 +1,47 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 5 Oct 2015 19:47:12 -0500
-Subject: [PATCH v2 3/4] ARM: dts: DRA7: Add timer12 node
-In-Reply-To: <1444087704-1429-4-git-send-email-s-anna@ti.com>
-References: <1444087704-1429-1-git-send-email-s-anna@ti.com>
- <1444087704-1429-4-git-send-email-s-anna@ti.com>
-Message-ID: <87y4fgesbz.fsf@saruman.tx.rr.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Tue,  6 Oct 2015 03:22:34 +0200
+Subject: [PATCH 0/8] Armada 38x SDHCI driver improvements
+Message-ID: <1444094562-31165-1-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suman Anna <s-anna@ti.com> writes:
+Hi,
 
-> Add the DT node for Timer12 present on DRA7 family of
-> SoCs. Timer12 is present in PD_WKUPAON power domain, and
-> has the same capabilities as the other timers, except for
-> the fact that it serves as a secure timer on HS devices
-> and is clocked only from the secure 32K clock.
->
-> The node is marked disabled for now, and the kernel should
-> refrain from using this secure timer on HS devices.
->
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
->  arch/arm/boot/dts/dra7.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index e289c706d27d..37d632dad576 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -762,6 +762,16 @@
->  			ti,hwmods = "timer11";
->  		};
->  
-> +		timer12: timer at 4ae20000 {
-> +			compatible = "ti,omap5430-timer";
-> +			reg = <0x4ae20000 0x80>;
-> +			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
-> +			ti,hwmods = "timer12";
-> +			ti,timer-alwon;
-> +			ti,timer-secure;
-> +			status = "disabled";
+This series brings a couple of fixes and improvements to Armada 38x SDHCI
+controller driver. First four patches are fixes, of which three are stable
+CC'ed.
 
-according to Tony we should avoid using status at all for in-SoC
-devices.
+Another two add DAT3-pin based hardware card detection in the driver, what
+should be used by the newest revisions of A388-GP boards.
 
-Tony, can you confirm I understood you correctly ?
+The last patches enable MMC_CARD bit, using init_card() callback added to
+SDHCI hosts.
+
+Any remarks and comments are welcome.
+
+Best regards,
+Marcin
+
+Marcin Wojtas (6):
+  mmc: sdhci-pxav3: fix error handling of armada_38x_quirks
+  mmc: sdhci-pxav3: enable proper resuming on Armada 38x SoC
+  mmc: sdhci-pxav3: enable usage of DAT3 pin as HW card detect
+  ARM: mvebu: enable SDHCI card detection using DAT3 pin on A388-GP
+  mmc: sdhci: add init_card callback to sdhci
+  mmc: sdhci-pxav3: enable modifying MMC_CARD bit during card
+    initialization
+
+Nadav Haklai (2):
+  mmc: sdhci-pxav3: remove broken clock base quirk for Armada 38x sdhci
+    driver
+  mmc: sdhci-pxav3: disable clock inversion for HS MMC cards
+
+ .../devicetree/bindings/mmc/sdhci-pxa.txt          |   5 +
+ arch/arm/boot/dts/armada-388-gp.dts                |   3 +-
+ drivers/mmc/host/sdhci-pxav3.c                     | 101 ++++++++++++++++-----
+ drivers/mmc/host/sdhci.c                           |  14 ++-
+ drivers/mmc/host/sdhci.h                           |   4 +
+ 5 files changed, 102 insertions(+), 25 deletions(-)
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151005/72a82d63/attachment.sig>
+1.8.3.1
