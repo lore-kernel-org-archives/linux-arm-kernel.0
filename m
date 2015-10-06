@@ -1,37 +1,29 @@
 From: lkp@intel.com (kbuild test robot)
 Date: Wed, 7 Oct 2015 05:29:32 +0800
-Subject: [RFC PATCH] staging: ion: ion_parse_dt_heap_common() can be static
+Subject: [RFC][PATCH 2/2] staging: ion: Add files for parsing the
+ devicetree (WIP)
 In-Reply-To: <1444164433-9107-3-git-send-email-labbott@fedoraproject.org>
-References: <201510070535.v0amqMb0%fengguang.wu@intel.com>
-Message-ID: <20151006212932.GA59274@xian>
+Message-ID: <201510070535.v0amqMb0%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Laura,
 
-Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+[auto build test WARNING on v4.3-rc4 -- if it's inappropriate base, please ignore]
+
+reproduce:
+        # apt-get install sparse
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
+
+
+sparse warnings: (new ones prefixed by >>)
+
+>> drivers/staging/android/ion/ion_of.c:31:5: sparse: symbol 'ion_parse_dt_heap_common' was not declared. Should it be static?
+>> drivers/staging/android/ion/ion_of.c:70:5: sparse: symbol 'ion_setup_heap_common' was not declared. Should it be static?
+
+Please review and possibly fold the followup patch.
+
 ---
- ion_of.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/staging/android/ion/ion_of.c b/drivers/staging/android/ion/ion_of.c
-index 3c9b1e5..daded0c 100644
---- a/drivers/staging/android/ion/ion_of.c
-+++ b/drivers/staging/android/ion/ion_of.c
-@@ -28,7 +28,7 @@
-  * Future work: allow callback function for each heap?
-  */
- 
--int ion_parse_dt_heap_common(struct device_node *heap_node,
-+static int ion_parse_dt_heap_common(struct device_node *heap_node,
- 			struct ion_platform_heap *heap)
- {
- 	u32 ion_heap_id, ion_heap_align, ion_heap_type;
-@@ -67,7 +67,7 @@ int ion_parse_dt_heap_common(struct device_node *heap_node,
- 	return 0;
- }
- 
--int ion_setup_heap_common(struct platform_device *parent,
-+static int ion_setup_heap_common(struct platform_device *parent,
- 			struct device_node *heap_node,
- 			struct ion_platform_heap *heap)
- {
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
