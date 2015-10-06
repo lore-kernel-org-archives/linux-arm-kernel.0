@@ -1,54 +1,27 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 6 Oct 2015 16:22:38 +0800
-Subject: [arm-platforms:irq/gsi-irq-domain-v5 5/10]
- kernel/irq/irqdomain.c:491:12: error: 'const struct irq_domain_ops' has no
- member named 'translate'
-Message-ID: <201510061636.Cmak5G9A%fengguang.wu@intel.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Tue, 06 Oct 2015 11:23:58 +0300
+Subject: [PATCH 0/2] ARM: EXYNOS: Allow to use architected timer
+Message-ID: <cover.1444119342.git.p.fedin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gsi-irq-domain-v5
-head:   7ee1e49948841ea333fd8c0e6139be1addcd450a
-commit: d335dea54be8019a4f257d9dea9eff2818c67d40 [5/10] WIP: irq_fwspec
-config: i386-randconfig-x005-201540 (attached as .config)
-reproduce:
-        git checkout d335dea54be8019a4f257d9dea9eff2818c67d40
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Exynos platform officially uses "multi-core timer" AKA MCT. However, it
+also has a possibility to access the same timer using CP15 (AKA
+architected timer) registers.
 
-Note: the arm-platforms/irq/gsi-irq-domain-v5 HEAD 7ee1e49948841ea333fd8c0e6139be1addcd450a builds fine.
-      It only hurts bisectibility.
+In order to be able to use KVM, we need CP15 timer support. In its turn,
+MCT needs to be turned on before any accesses will work. This patchset
+allows to specify "CP15 compatibility mode" for the MCT by inserting
+armv7-timer node as a child for MCT device. In this case MCT driver will
+only enable the timer, leaving the rest for architected timer driver.
 
-All errors (new ones prefixed by >>):
+Pavel Fedin (2):
+  exynos_mct: Allow to use architected timer mode
+  ARM: dts: Use architected timer on Exynos 5410
 
-   kernel/irq/irqdomain.c: In function 'irq_domain_translate':
->> kernel/irq/irqdomain.c:491:12: error: 'const struct irq_domain_ops' has no member named 'translate'
-     if (d->ops->translate)
-               ^
-   kernel/irq/irqdomain.c:492:16: error: 'const struct irq_domain_ops' has no member named 'translate'
-      return d->ops->translate(d, fwspec, hwirq, type);
-                   ^
+ arch/arm/boot/dts/exynos5410.dtsi | 11 +++++++++++
+ drivers/clocksource/exynos_mct.c  | 19 +++++++++++++------
+ 2 files changed, 24 insertions(+), 6 deletions(-)
 
-vim +491 kernel/irq/irqdomain.c
-
-   485	EXPORT_SYMBOL_GPL(irq_create_strict_mappings);
-   486	
-   487	static int irq_domain_translate(struct irq_domain *d,
-   488					struct irq_fwspec *fwspec,
-   489					irq_hw_number_t *hwirq, unsigned int *type)
-   490	{
- > 491		if (d->ops->translate)
-   492			return d->ops->translate(d, fwspec, hwirq, type);
-   493	
-   494		if (d->ops->xlate)
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 23124 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/ddfe76c7/attachment-0001.obj>
+-- 
+2.4.4
