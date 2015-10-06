@@ -1,97 +1,85 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Oct 2015 18:36:23 +0100
-Subject: [PATCH 10/16] acpi/gsi: Add acpi_set_irq_model to initialize the GSI
- layer
+Date: Tue,  6 Oct 2015 18:36:22 +0100
+Subject: [PATCH 09/16] acpi/gsi: Always perform an irq domain lookup
 In-Reply-To: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
 References: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1444152989-31726-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1444152989-31726-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to start embrassing irqdomains at the GSI level, introduce
-a new initializer:
+Instead of directly passing NULL to the various irq_domain functions,
+start by looking up the domain with a domain identifier..
 
-void acpi_set_irq_model(enum acpi_irq_model_id model,
-			struct fwnode_handle *fwnode);
-
-where:
-- model is the value assigned to acpi_irq_model
-- fwnode is the identifier for the irqdomain mapping
-  GSI interrupts
-
-As nobody calls this code yet, the current code is (mostly)
-left in place.
+As this identifier is permanently set to NULL, the lookup function will
+return the same value (no domain found) and the default will be used,
+preserving the current behaviour.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Conflicts:
-	include/linux/acpi.h
 ---
- drivers/acpi/gsi.c   | 32 +++++++++++++++++++++++++++-----
- include/linux/acpi.h |  3 +++
- 2 files changed, 30 insertions(+), 5 deletions(-)
+ drivers/acpi/gsi.c | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
-index 2c39fe1..202a8fe 100644
+index 38208f2..2c39fe1 100644
 --- a/drivers/acpi/gsi.c
 +++ b/drivers/acpi/gsi.c
-@@ -75,12 +75,21 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
+@@ -11,9 +11,12 @@
+ #include <linux/acpi.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
++#include <linux/of.h>
+ 
+ enum acpi_irq_model_id acpi_irq_model;
+ 
++static struct fwnode_handle *acpi_gsi_domain_id;
++
+ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
+ {
+ 	switch (polarity) {
+@@ -45,12 +48,10 @@ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
+  */
+ int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+ {
+-	/*
+-	 * Only default domain is supported at present, always find
+-	 * the mapping corresponding to default domain by passing NULL
+-	 * as irq_domain parameter
+-	 */
+-	*irq = irq_find_mapping(NULL, gsi);
++	struct irq_domain *d = irq_find_matching_fwnode(acpi_gsi_domain_id,
++							DOMAIN_BUS_ANY);
++
++	*irq = irq_find_mapping(d, gsi);
+ 	/*
+ 	 * *irq == 0 means no mapping, that should
+ 	 * be reported as a failure
+@@ -74,13 +75,10 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
  {
  	unsigned int irq;
  	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
--	struct irq_domain *d = irq_find_matching_fwnode(acpi_gsi_domain_id,
--							DOMAIN_BUS_ANY);
++	struct irq_domain *d = irq_find_matching_fwnode(acpi_gsi_domain_id,
++							DOMAIN_BUS_ANY);
  
--	irq = irq_create_mapping(d, gsi);
--	if (!irq)
--		return -EINVAL;
-+	if (acpi_gsi_domain_id) {
-+		struct irq_fwspec fwspec;
-+
-+		fwspec.fwnode = acpi_gsi_domain_id;
-+		fwspec.param[0] = gsi;
-+		fwspec.param[1] = irq_type;
-+		fwspec.param_count = 2;
-+
-+		return irq_create_fwspec_mapping(&fwspec);
-+	} else {
-+		irq = irq_create_mapping(NULL, gsi);
-+		if (!irq)
-+			return -EINVAL;
-+	}
+-	/*
+-	 * There is no way at present to look-up the IRQ domain on ACPI,
+-	 * hence always create mapping referring to the default domain
+-	 * by passing NULL as irq_domain parameter
+-	 */
+-	irq = irq_create_mapping(NULL, gsi);
++	irq = irq_create_mapping(d, gsi);
+ 	if (!irq)
+ 		return -EINVAL;
  
- 	/* Set irq type if specified and different than the current one */
- 	if (irq_type != IRQ_TYPE_NONE &&
-@@ -103,3 +112,16 @@ void acpi_unregister_gsi(u32 gsi)
+@@ -98,7 +96,9 @@ EXPORT_SYMBOL_GPL(acpi_register_gsi);
+  */
+ void acpi_unregister_gsi(u32 gsi)
+ {
+-	int irq = irq_find_mapping(NULL, gsi);
++	struct irq_domain *d = irq_find_matching_fwnode(acpi_gsi_domain_id,
++							DOMAIN_BUS_ANY);
++	int irq = irq_find_mapping(d, gsi);
+ 
  	irq_dispose_mapping(irq);
  }
- EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
-+
-+/**
-+ * acpi_set_irq_model - Setup the GSI irqdomain information
-+ * @model: the value assigned to acpi_irq_model
-+ * @fwnode: the irq_domain identifier for mapping and looking up
-+ *          GSI interrupts
-+ */
-+void __init acpi_set_irq_model(enum acpi_irq_model_id model,
-+			       struct fwnode_handle *fwnode)
-+{
-+	acpi_irq_model = model;
-+	acpi_gsi_domain_id = fwnode;
-+}
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 43856d1..d863e12 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -201,6 +201,9 @@ int acpi_register_gsi (struct device *dev, u32 gsi, int triggering, int polarity
- int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
- int acpi_isa_irq_to_gsi (unsigned isa_irq, u32 *gsi);
- 
-+void acpi_set_irq_model(enum acpi_irq_model_id model,
-+			struct fwnode_handle *fwnode);
-+
- #ifdef CONFIG_X86_IO_APIC
- extern int acpi_get_override_irq(u32 gsi, int *trigger, int *polarity);
- #else
 -- 
 2.1.4
