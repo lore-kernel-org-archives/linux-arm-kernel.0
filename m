@@ -1,39 +1,41 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Tue, 6 Oct 2015 20:09:33 +0900
-Subject: [PATCH] ARM:mm: fix kmap_atomic_to_page
-Message-ID: <1444129773-12632-1-git-send-email-chanho.min@lge.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 6 Oct 2015 12:10:04 +0100
+Subject: [PATCH 2/7] arm64: PTE/PMD contiguous bit definition
+In-Reply-To: <1443818865-19846-3-git-send-email-jeremy.linton@arm.com>
+References: <1443818865-19846-1-git-send-email-jeremy.linton@arm.com>
+ <1443818865-19846-3-git-send-email-jeremy.linton@arm.com>
+Message-ID: <20151006111003.GB3069@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since kmap_atomic returns the pkmap address without a new mapping to
-fixmap for the page that is already mapped by kmap, It should be
-considered for the pkmap address in kmap_atomic_to_page.
+On Fri, Oct 02, 2015 at 03:47:40PM -0500, Jeremy Linton wrote:
+> Define the bit positions in the PTE and PMD for the
+> contiguous bit.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/include/asm/pgtable-hwdef.h | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+> index 24154b0..361352d 100644
+> --- a/arch/arm64/include/asm/pgtable-hwdef.h
+> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+> @@ -55,6 +55,13 @@
+>  #define SECTION_MASK		(~(SECTION_SIZE-1))
+>  
+>  /*
+> + * Contiguous page definitions.
+> + */
+> +#define CONT_RANGE		(_AC(1, UL) << CONT_SHIFT)
+> +#define CONT_RANGE_MASK		((CONT_RANGE-1) << PAGE_SHIFT)
+> +#define CONT_RANGE_OFFSET(addr) (((addr)>>PAGE_SHIFT)&(CONT_RANGE-1))
 
-Signed-off-by: Chanho Min <chanho.min@lge.com>
----
- arch/arm/mm/highmem.c |   11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+This still looks confusing to me: CONT_RANGE refers to the number of
+contiguous ptes while CONT_RANGE_MASK refers to actual addresses. I'd
+rather have CONT_PTES (since we only use this for ptes currently) and
+CONT_MASK used instead of CONT_RANGE_MASK. This is for consistency with
+SECTION_MASK which we already use.
 
-diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-index 45aeaac..3e973b7 100644
---- a/arch/arm/mm/highmem.c
-+++ b/arch/arm/mm/highmem.c
-@@ -145,8 +145,13 @@ struct page *kmap_atomic_to_page(const void *ptr)
- {
- 	unsigned long vaddr = (unsigned long)ptr;
- 
--	if (vaddr < FIXADDR_START)
--		return virt_to_page(ptr);
-+	if (vaddr >= PKMAP_ADDR(0) && vaddr < PKMAP_ADDR(LAST_PKMAP)) {
-+		int i = PKMAP_NR(vaddr);
-+		return pte_page(pkmap_page_table[i]);
-+	}
-+
-+	if (vaddr >= FIXADDR_START)
-+		return pte_page(get_fixmap_pte(vaddr));
- 
--	return pte_page(get_fixmap_pte(vaddr));
-+	return virt_to_page(ptr);
- }
 -- 
-1.7.9.5
+Catalin
