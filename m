@@ -1,41 +1,130 @@
-From: psidhu@gateworks.com (Pushpal Sidhu)
-Date: Tue, 6 Oct 2015 16:02:45 -0700
-Subject: i.mx6 video out in mainline
-In-Reply-To: <CAOMZO5CwjC2dq3fWugAJsqThxAZ6o4wv0gV7ues28a51z0fXLg@mail.gmail.com>
-References: <CAD1M060ucNEjPceeK9R2s4drkZE1EWEadB1JtcUmnfuNx24zkA@mail.gmail.com>
- <CAOMZO5CwjC2dq3fWugAJsqThxAZ6o4wv0gV7ues28a51z0fXLg@mail.gmail.com>
-Message-ID: <CAD1M061RTNOCuE5vwrTsR3mgOaWcuwt5mc-L+K3kdLCDQ=JfLQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 07 Oct 2015 02:05:41 +0300
+Subject: [PATCH] ARM: shmobile: porter: add SDHI0/2 DT support
+Message-ID: <2228837.DO5U5OvRSi@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 6, 2015 at 3:16 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Tue, Oct 6, 2015 at 6:52 PM, Pushpal Sidhu <psidhu@gateworks.com> wrote:
->> Hi All,
->>
->> I'm attempting to use a standard fb console (using the
->> imx6qdl-gw54xx.dtsi), but I find that it only draws to the 1024x768p
->> portion of the screen. This is also true when running the userspace
->> tool fb-test.
->
-> Looking at imx6qdl-gw54xx.dtsi I see you have a LVDS panel with
-> 1024x768 resolution.
->
-> I sent a patch that allows LDB and HDMI to work simultaneously:
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/boot/dts/imx6qdl-sabresd.dtsi?id=d28be499c45e6e16d7a042ce280eb872dc06952b
->
-> Can you try to adapt it for imx6qdl-gw54xx.dtsi?
->
-> If this still does not help your HDMI output, please try disabling the LVDS.
+Define the Porter board dependent part of the SDHI0/2 device nodes along with
+the  necessary  voltage regulators (note that the Vcc regulators are dummy --
+they are required but don't actually exist on the board). Also, GPIOs have to
+be used for the CD and WP signals due to the SDHI driver constraints...
 
-When I took your patch and adapted it for imx6qdl-gw54xx.dtsi, I found
-that HDMI video out was slightly shifted to the left and resolution
-remained at 1024x768p.
+This patch is analogous to the commit 1299df03d719 (ARM: shmobile: henninger:
+add SDHI0/2 DT support) as there  are no differences between those boards in
+this respect.
 
-I also found that when I disabled DRM_IMX_LDB, HDMI out stopped
-working altogether, though if I stripped out the ldb section in device
-tree, the resolution comes back at 1080p (regardless of setting
-DRM_IMX_LDB or not). There is definitely some strange interdependency
-between lvds and hdmi here. Do you have an idea of where I should
-start looking for this problem?
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-- Pushpal
+---
+This patch is against the 'renesas-devel-20151006-v4.3-rc4' tag of Simon
+Horman's 'renesas.git' repo.
+
+ arch/arm/boot/dts/r8a7791-porter.dts |   76 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791-porter.dts
++++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -10,6 +10,7 @@
+ 
+ /dts-v1/;
+ #include "r8a7791.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "Porter";
+@@ -33,6 +34,50 @@
+ 		device_type = "memory";
+ 		reg = <2 0x00000000 0 0x40000000>;
+ 	};
++
++	vcc_sdhi0: regulator at 0 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "SDHI0 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	vccq_sdhi0: regulator at 1 {
++		compatible = "regulator-gpio";
++
++		regulator-name = "SDHI0 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio2 12 GPIO_ACTIVE_HIGH>;
++		gpios-states = <1>;
++		states = <3300000 1
++			  1800000 0>;
++	};
++
++	vcc_sdhi2: regulator at 2 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "SDHI2 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	vccq_sdhi2: regulator at 3 {
++		compatible = "regulator-gpio";
++
++		regulator-name = "SDHI2 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio2 26 GPIO_ACTIVE_HIGH>;
++		gpios-states = <1>;
++		states = <3300000 1
++			  1800000 0>;
++	};
+ };
+ 
+ &extal_clk {
+@@ -54,6 +99,16 @@
+ 		renesas,groups = "intc_irq0";
+ 		renesas,function = "intc";
+ 	};
++
++	sdhi0_pins: sd0 {
++		renesas,groups = "sdhi0_data4", "sdhi0_ctrl";
++		renesas,function = "sdhi0";
++	};
++
++	sdhi2_pins: sd2 {
++		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
++		renesas,function = "sdhi2";
++	};
+ };
+ 
+ &scif0 {
+@@ -78,3 +133,24 @@
+ 		micrel,led-mode = <1>;
+ 	};
+ };
++
++&sdhi0 {
++	pinctrl-0 = <&sdhi0_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&vcc_sdhi0>;
++	vqmmc-supply = <&vccq_sdhi0>;
++	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
++
++&sdhi2 {
++	pinctrl-0 = <&sdhi2_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&vcc_sdhi2>;
++	vqmmc-supply = <&vccq_sdhi2>;
++	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
