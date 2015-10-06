@@ -1,50 +1,23 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 06 Oct 2015 09:39:26 +0900
-Subject: [PATCHv2 2/2] ARM: multi_v7_defconfig: Enable rtl8152 ethernet
- driver for Odroid-XU4
-In-Reply-To: <1444035629-1173-2-git-send-email-linux.amoon@gmail.com>
-References: <1444035629-1173-1-git-send-email-linux.amoon@gmail.com>
- <1444035629-1173-2-git-send-email-linux.amoon@gmail.com>
-Message-ID: <5613183E.60509@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 6 Oct 2015 09:45:02 +0900
+Subject: [PATCH] ARM: shmobile: porter: add Ether DT support
+In-Reply-To: <1507520.6rxyDiKYNB@wasted.cogentembedded.com>
+References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+ <1507520.6rxyDiKYNB@wasted.cogentembedded.com>
+Message-ID: <20151006004502.GC12506@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.10.2015 18:00, Anand Moon wrote:
-> Odroid XU4 supports RTL8152/RTL8153 Based USB 3.0 Ethernet Adapters.
-> Support speed upto 10/100/1000 Mbit Ethernet LAN.
+On Tue, Oct 06, 2015 at 01:51:01AM +0300, Sergei Shtylyov wrote:
+> Define  the Porter board dependent part of  the Ether device node.
+> Enable DHCP and NFS root for the kernel booting.
 > 
-
-Just:
-"Odroid XU4 has a RTL8153-CG gigabit Ethernet adapter, connected over
-USB 3.0."
-
-The message can be fixed when applying, so:
-
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
-
-
-
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> This  patch  is analogous to the commit 26b0d2cf73cb (ARM: shmobile: henninger:
+> add Ether DT support)  as there  are no differences between those boards in this
+> respect.
+> 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
 > ---
-> Changes: Fixed the commit log.
-> ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 03deb7f..009d714 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -221,6 +221,7 @@ CONFIG_BROADCOM_PHY=y
->  CONFIG_ICPLUS_PHY=y
->  CONFIG_MICREL_PHY=y
->  CONFIG_USB_PEGASUS=y
-> +CONFIG_USB_RTL8152=y
->  CONFIG_USB_USBNET=y
->  CONFIG_USB_NET_SMSC75XX=y
->  CONFIG_USB_NET_SMSC95XX=y
-> 
+
+Thanks, I have queued this up.
