@@ -1,46 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Oct 2015 22:37:11 +0200
-Subject: [PATCH] nvme: fix 32-bit build warning
-Message-ID: <5851501.PBMrs03XFb@wuerfel>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Tue, 06 Oct 2015 13:40:33 -0700
+Subject: [PATCH] iommu/arm-smmu: Only return IRQ_NONE if FSR is not set
+In-Reply-To: <20151005142402.GF8818@arm.com> (Will Deacon's message of "Mon, 5
+ Oct 2015 15:24:03 +0100")
+References: <1443226325-28456-1-git-send-email-mitchelh@codeaurora.org>
+ <20151005142402.GF8818@arm.com>
+Message-ID: <vnkwzizv688u.fsf@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compiling the nvme driver on 32-bit warns about a cast from a __u64
-variable to a pointer:
+On Mon, Oct 05 2015 at 03:24:03 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Mitch,
+>
+> On Sat, Sep 26, 2015 at 01:12:05AM +0100, Mitchel Humpherys wrote:
+>> Currently we return IRQ_NONE from the context fault handler if the FSR
+>> doesn't actually have the fault bit set (some sort of miswired
+>> interrupt?) or if the client doesn't register an IOMMU fault handler.
+>> However, registering a client fault handler is optional, so telling the
+>> interrupt framework that the interrupt wasn't for this device if the
+>> client doesn't register a handler isn't exactly accurate.  Fix this by
+>> returning IRQ_HANDLED even if the client doesn't register a handler.
+>> 
+>> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+>> ---
+>>  drivers/iommu/arm-smmu.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> 
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index 48a39dfa9777..95560d447a54 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -653,7 +653,7 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
+>>  		dev_err_ratelimited(smmu->dev,
+>>  		    "Unhandled context fault: iova=0x%08lx, fsynr=0x%x, cb=%d\n",
+>>  		    iova, fsynr, cfg->cbndx);
+>> -		ret = IRQ_NONE;
+>> +		ret = IRQ_HANDLED;
+>>  		resume = RESUME_TERMINATE;
+>
+> Hmm, but if we haven't actually done anything to rectify the cause of the
+> fault, what means that we won't take it again immediately? I guess I'm not
+> understanding the use-case that triggered you to write this patch...
 
-drivers/block/nvme-core.c: In function 'nvme_submit_io':
-drivers/block/nvme-core.c:1847:4: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-    (void __user *)io.addr, length, NULL, 0);
+Does returning IRQ_NONE actually prevent us from taking another
+interrupt (despite clearing the FSR below)?  We definitely take more
+interrupts on our platform despite returning IRQ_NONE, but maybe we have
+something misconfigured...
 
-The cast here is intentional and safe, so we can shut up the
-gcc warning by adding an intermediate cast to 'unsigned long'.
+I thought that returning IRQ_NONE would simply affect spurious interrupt
+accounting (only disabling the interrupt if we took enough of them in
+close enough succession to flag a misbehaving device).
 
-I had previously submitted a patch to fix this problem in the
-nvme driver, but it was accepted on the same day that two new
-warnings got added.
+As far as a valid use case, I can't think of one.  I just thought we
+were messing up the spurious interrupt accounting.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: d29ec8241c10e ("nvme: submit internal commands through the block layer")
 
-diff --git a/drivers/block/nvme-core.c b/drivers/block/nvme-core.c
-index e917cf304ad0..f9faf276ce74 100644
---- a/drivers/block/nvme-core.c
-+++ b/drivers/block/nvme-core.c
-@@ -1844,7 +1844,7 @@ static int nvme_submit_io(struct nvme_ns *ns, struct nvme_user_io __user *uio)
- 	c.rw.metadata = cpu_to_le64(meta_dma);
- 
- 	status = __nvme_submit_sync_cmd(ns->queue, &c, NULL,
--			(void __user *)io.addr, length, NULL, 0);
-+			(void __user *)(unsigned long)io.addr, length, NULL, 0);
-  unmap:
- 	if (meta) {
- 		if (status == NVME_SC_SUCCESS && !write) {
-@@ -1886,7 +1886,7 @@ static int nvme_user_cmd(struct nvme_dev *dev, struct nvme_ns *ns,
- 		timeout = msecs_to_jiffies(cmd.timeout_ms);
- 
- 	status = __nvme_submit_sync_cmd(ns ? ns->queue : dev->admin_q, &c,
--			NULL, (void __user *)cmd.addr, cmd.data_len,
-+			NULL, (void __user *)(unsigned long)cmd.addr, cmd.data_len,
- 			&cmd.result, timeout);
- 	if (status >= 0) {
- 		if (put_user(cmd.result, &ucmd->result))
+-Mitch
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
