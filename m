@@ -1,129 +1,41 @@
-From: laura@labbott.name (Laura Abbott)
-Date: Tue, 06 Oct 2015 16:01:45 -0700
-Subject: [RFC][PATCH 1/2] WIP: Devicetree bindings for Ion
-In-Reply-To: <CAL_JsqJ+i3zC7UJ3BcdtOhdmQd8YnRC7bs3D2Ei5JD-4-C+A0g@mail.gmail.com>
-References: <1444164433-9107-1-git-send-email-labbott@fedoraproject.org>
- <1444164433-9107-2-git-send-email-labbott@fedoraproject.org>
- <CAL_JsqJ+i3zC7UJ3BcdtOhdmQd8YnRC7bs3D2Ei5JD-4-C+A0g@mail.gmail.com>
-Message-ID: <561452D9.90605@labbott.name>
+From: psidhu@gateworks.com (Pushpal Sidhu)
+Date: Tue, 6 Oct 2015 16:02:45 -0700
+Subject: i.mx6 video out in mainline
+In-Reply-To: <CAOMZO5CwjC2dq3fWugAJsqThxAZ6o4wv0gV7ues28a51z0fXLg@mail.gmail.com>
+References: <CAD1M060ucNEjPceeK9R2s4drkZE1EWEadB1JtcUmnfuNx24zkA@mail.gmail.com>
+ <CAOMZO5CwjC2dq3fWugAJsqThxAZ6o4wv0gV7ues28a51z0fXLg@mail.gmail.com>
+Message-ID: <CAD1M061RTNOCuE5vwrTsR3mgOaWcuwt5mc-L+K3kdLCDQ=JfLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/6/15 3:35 PM, Rob Herring wrote:
-> On Tue, Oct 6, 2015 at 3:47 PM, Laura Abbott <labbott@fedoraproject.org> wrote:
->> From: Laura Abbott <laura@labbott.name>
+On Tue, Oct 6, 2015 at 3:16 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Tue, Oct 6, 2015 at 6:52 PM, Pushpal Sidhu <psidhu@gateworks.com> wrote:
+>> Hi All,
 >>
->>
->> This adds a base set of devicetree bindings for the Ion memory
->> manager. This supports setting up the generic set of heaps and
->> their properties.
->>
->> Signed-off-by: Laura Abbott <laura@labbott.name>
->> Signed-off-by: Andrew Andrianov <andrew@ncrmnt.org>
->> ---
->>   drivers/staging/android/ion/devicetree.txt | 53 ++++++++++++++++++++++++++++++
+>> I'm attempting to use a standard fb console (using the
+>> imx6qdl-gw54xx.dtsi), but I find that it only draws to the 1024x768p
+>> portion of the screen. This is also true when running the userspace
+>> tool fb-test.
 >
-> I have no issue with this going in here, but I do have lots of issues
-> with this binding.
+> Looking at imx6qdl-gw54xx.dtsi I see you have a LVDS panel with
+> 1024x768 resolution.
 >
->>   1 file changed, 53 insertions(+)
->>   create mode 100644 drivers/staging/android/ion/devicetree.txt
->>
->> diff --git a/drivers/staging/android/ion/devicetree.txt b/drivers/staging/android/ion/devicetree.txt
->> new file mode 100644
->> index 0000000..4a0c941
->> --- /dev/null
->> +++ b/drivers/staging/android/ion/devicetree.txt
->> @@ -0,0 +1,53 @@
->> +Ion Memory Manager
->> +
->> +Ion is a memory manager that allows for sharing of buffers via dma-buf.
->> +Ion allows for different types of allocation via an abstraction called
->> +a 'heap'. A heap represents a specific type of memory. Each heap has
->> +a different type. There can be multiple instances of the same heap
->> +type.
->> +
->> +Required properties for Ion
->> +
->> +- compatible: "linux,ion"
->> +
->> +All child nodes of a linux,ion node are interpreted as heaps
->> +
->> +required properties for heaps
->> +
->> +- linux,ion-heap-id: The Ion heap id used for allocation selection
->> +- linux,ion-heap-type: Ion heap type defined in ion.h
->> +- linux,ion-heap-name: Human readble name of the heap
->> +
->> +
->> +Optional properties
->> +- memory-region: A phandle to a memory region. Required for DMA heap type
->> +(see reserved-memory.txt for details on the reservation)
->> +- linux,ion-heap-align: Alignment for the heap.
->> +
->> +Example:
->> +
->> +       ion {
->> +               compatbile = "linux,ion";
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +
->> +               ion-system-heap {
->> +                       linux,ion-heap-id = <0>;
->> +                       linux,ion-heap-type = <ION_SYSTEM_HEAP_TYPE>;
->> +                       linux,ion-heap-name = "system";
+> I sent a patch that allows LDB and HDMI to work simultaneously:
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/boot/dts/imx6qdl-sabresd.dtsi?id=d28be499c45e6e16d7a042ce280eb872dc06952b
 >
-> How does this vary across platforms? Is all of this being pushed down
-> to DT, because there is no coordination of this at the kernel ABI
-> level across platforms. In other words, why can't heap 0 be hardcoded
-> as system heap in the driver. It seems to me any 1 of these 3
-> properties could be used to derive the other 2.
+> Can you try to adapt it for imx6qdl-gw54xx.dtsi?
 >
+> If this still does not help your HDMI output, please try disabling the LVDS.
 
-Right now there is no guarantee heap IDs will be the same across
-platforms. The heap IDs are currently part of the userspace ABI
-as well since userspace clients must pass in a mask of the heap
-IDs to allocate from. If we assume all existing clients could change,
-heaps such as the system heap could be mandated to have the same
-heap ID but we'd still run into problems if you have multiple
-heaps of the same type (e.g. multiple carveouts)
+When I took your patch and adapted it for imx6qdl-gw54xx.dtsi, I found
+that HDMI video out was slightly shifted to the left and resolution
+remained at 1024x768p.
 
-An alternative might be to have each heap just be a compatible string
-and pull everything (id, type etc.) into C files for setup. I debated
-doing that but decided to try putting everything in DT for my first
-pass.
+I also found that when I disabled DRM_IMX_LDB, HDMI out stopped
+working altogether, though if I stripped out the ldb section in device
+tree, the resolution comes back at 1080p (regardless of setting
+DRM_IMX_LDB or not). There is definitely some strange interdependency
+between lvds and hdmi here. Do you have an idea of where I should
+start looking for this problem?
 
->
->> +               };
->> +
->> +               ion-camera-region {
->> +                       linux,ion-heap-id = <1>;
->> +                       linux,ion-heap-type = <ION_DMA_HEAP_TYPE>;
->> +                       linux,ion-heap-name = "camera"
->> +                       memory-region = <&camera_region>;
->
-> Couldn't the memory-region node with addition properties or some
-> standardization of existing ones provide enough information for ION's
-> needs?
->
-
-I think we could probably derive most of it from the memory-region right
-now. If it's reusable, it's DMA, if not it goes to a carveout. Name can
-come from the node name. heap ID and whether or not a region is a chunk
-heap could be added as properties.
-
-We'd still need to be able to get the same information for heaps that
-don't correspond to a specific region like the system heap.
-
->> +               };
->> +
->> +               ion-fb-region {
->> +                       linux,ion-heap-id = <2>;
->> +                       linux,ion-heap-type = <ION_DMA_HEAP_TYPE>;
->> +                       linux,ion-heap-name = "fb"
->> +                       memory-region = <&fb_region>;
->> +               };
->> +       }
->> --
->> 2.4.3
->>
+- Pushpal
