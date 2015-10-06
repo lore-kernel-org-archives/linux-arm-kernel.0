@@ -1,51 +1,83 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 6 Oct 2015 16:48:23 +0100
-Subject: [PATCH 2/3] hwrng: st: Report correct FIFO size
-In-Reply-To: <1444142640-14721-2-git-send-email-lee.jones@linaro.org>
-References: <1444142640-14721-1-git-send-email-lee.jones@linaro.org>
- <1444142640-14721-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <5613ED47.1040608@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 Oct 2015 08:18:06 -0700
+Subject: [RFC/PATCH 11/11] arm: boot: dts: omap: add missing default
+ status for 32k counter
+In-Reply-To: <87612k3uza.fsf@saruman.tx.rr.com>
+References: <1443559446-26969-1-git-send-email-balbi@ti.com>
+ <20151005175230.GG18784@saruman.tx.rr.com>
+ <87io6lf6i4.fsf@saruman.tx.rr.com> <13543270.oBfHhoNL28@wuerfel>
+ <87612k3uza.fsf@saruman.tx.rr.com>
+Message-ID: <20151006151805.GR23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/15 15:43, Lee Jones wrote:
-> The values supplied to the 'read random data from FIFO' arithmetic
-> are not correct.  The value fed in to initialise the iterator
-> describes the FIFO depth, but then the iterator is treated in
-> Bytes and subsequently increased by 2 in value for every read
-> word.  This means only 4 of the 8 available values are being read
-> during each invocation of .read().
->
-> This change increased the device bandwidth by a factor of 2.
->
-> Reported-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->   drivers/char/hw_random/st-rng.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/char/hw_random/st-rng.c b/drivers/char/hw_random/st-rng.c
-> index 8c8a435..44480fe 100644
-> --- a/drivers/char/hw_random/st-rng.c
-> +++ b/drivers/char/hw_random/st-rng.c
-> @@ -29,8 +29,9 @@
->   #define ST_RNG_STATUS_BAD_ALTERNANCE	BIT(1)
->   #define ST_RNG_STATUS_FIFO_FULL		BIT(5)
->
-> -#define ST_RNG_FIFO_SIZE		8
->   #define ST_RNG_SAMPLE_SIZE		2 /* 2 Byte (16bit) samples */
-> +#define ST_RNG_FIFO_DEPTH		8
-> +#define ST_RNG_FIFO_SIZE		(ST_RNG_FIFO_DEPTH * ST_RNG_SAMPLE_SIZE)
->
->   /* Samples are available every 0.667us, which we round to 1us */
->   #define ST_RNG_FILL_FIFO_TIMEOUT   (1 * (ST_RNG_FIFO_SIZE / ST_RNG_SAMPLE_SIZE))
+* Felipe Balbi <balbi@ti.com> [151006 08:02]:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > On Monday 05 October 2015 14:41:07 Felipe Balbi wrote:
+> >> 
+> >> /**
+> >>  * omap_get_timer_dt - get a timer using device-tree
+> >>  * @match       - device-tree match structure for matching a device type
+> >>  * @property    - optional timer property to match
+> >>  *
+> >>  * Helper function to get a timer during early boot using device-tree for use
+> >>  * as kernel system timer. Optionally, the property argument can be used to
+> >>  * select a timer with a specific property. Once a timer is found then mark
+> >>  * the timer node in device-tree as disabled, to prevent the kernel from
+> >>  * registering this timer as a platform device and so no one else can use it.
+> >>  */
+> >> static struct device_node * __init omap_get_timer_dt(const struct of_device_id *match,
+> >>                                                      const char *property)
+> >> {
+> >>         struct device_node *np;
+> >> 
+> >>         for_each_matching_node(np, match) {
+> >>                 if (!of_device_is_available(np))
+> >>                         continue;
+> >> 
+> >>                 if (property && !of_get_property(np, property, NULL))
+> >>                         continue;
+> >> 
+> >>                 if (!property && (of_get_property(np, "ti,timer-alwon", NULL) ||
+> >>                                   of_get_property(np, "ti,timer-dsp", NULL) ||
+> >>                                   of_get_property(np, "ti,timer-pwm", NULL) ||
+> >>                                   of_get_property(np, "ti,timer-secure", NULL)))
+> >>                         continue;
+> >> 
+> >>                 of_add_property(np, &device_disabled);
+> >>                 return np;
+> >>         }
+> >> 
+> >>         return NULL;
+> >> }
+> >> 
+> >> I'll patch this up and drop $subject
+> >> 
+> >
+> > Ah, good.
+> >
+> > I'm seeing the "ti,timer-alwon" property here, we probably need to take
+> > that into account when setting the CLOCK_SOURCE_SUSPEND_NONSTOP flag, if
+> > that isn't how it gets done already.
+> 
+> that flag is not set for 32k in any dts. Seems like it should, though,
+> judging by the binding documentation:
+> 
+> - ti,timer-alwon:	Indicates the timer is in an alway-on power
+>   domain.
+> 
+> Tony, care to comment if we should add timer-alwon to 32k ?
 
-This change doubles the timeout and doesn't mention it in the changelog. 
-Changing the order of 2/3 and 3/3 would avoid this.
+No that should not be needed for the 32k counter. We should be able
+to do everything we want with CLOCK_SOURCE_SUSPEND_NONSTOP for the
+32k counter.
 
-Other than that:
+We still need ti,timer-alwon for a while for gptimers 1 and 12 as
+they are the only ones in the always-on domain. I guess that need
+will eventually go away too once we have a proper interconnect
+driver and are using genpd.
 
-Reviewed-by: Daniel Thompson <daniel.thompson@linaro.org>
+Regards,
 
-
-Daniel.
+Tony
