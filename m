@@ -1,76 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  7 Oct 2015 11:59:58 +0100
-Subject: [PATCH] ASoC: sun4i-codec: Remove the routing property
-Message-ID: <1444215598-13543-1-git-send-email-maxime.ripard@free-electrons.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed,  7 Oct 2015 11:58:56 +0100
+Subject: [PATCH v2 0/3] nvmem: make sysfs binary file permissions more
+ flexible.
+Message-ID: <1444215536-10783-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the boards have their headphone jack directly connected to the
-matching pins of the SoCs. Since most of the time we will have the same
-routing path, it makes no sense to put that in the DTS, since it will only
-be some useless duplication there.
+Hi Greg, 
 
-It also fixes the following warning messages that were seen so far, on
-boards where we were using the bindings in the documentation example.
+If its not too late for v4.4, can you please consider this patchset for v4.4.
 
-sun4i-codec 1c22c00.codec: ASoC: no sink widget found for Headphone Jack
-sun4i-codec 1c22c00.codec: ASoC: Failed to add route HP Left -> direct -> Headphone Jack
-sun4i-codec 1c22c00.codec: ASoC: no sink widget found for Headphone Jack
-sun4i-codec 1c22c00.codec: ASoC: Failed to add route HP Right -> direct -> Headphone Jack
+Recent discussion raised by Andrew Lunn and others regarding default permission
+set on the nvmem binary sysfs file resulted in this small fixup patchset.
 
-Reported-by: Priit Laes <plaes@plaes.org>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- Documentation/devicetree/bindings/sound/sun4i-codec.txt | 6 ------
- sound/soc/sunxi/sun4i-codec.c                           | 7 -------
- 2 files changed, 13 deletions(-)
+By default nvmem core sets the readonly permission to everyone (S_IRUGO), this
+is not desirable by many providers as they would not want everyone to view things
+like passwords stored in the nvmem.
 
-diff --git a/Documentation/devicetree/bindings/sound/sun4i-codec.txt b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-index 680144b74ae9..c92966bd5488 100644
---- a/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-+++ b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-@@ -13,10 +13,6 @@ Required properties:
- - clock-names: should contain followings:
-    - "apb": the parent APB clock for this controller
-    - "codec": the parent module clock
--- routing : A list of the connections between audio components.  Each
--  entry is a pair of strings, the first being the connection's sink,
--  the second being the connection's source.
--
- 
- Example:
- codec: codec at 01c22c00 {
-@@ -28,6 +24,4 @@ codec: codec at 01c22c00 {
- 	clock-names = "apb", "codec";
- 	dmas = <&dma 0 19>, <&dma 0 19>;
- 	dma-names = "rx", "tx";
--	routing = "Headphone Jack", "HP Right",
--		  "Headphone Jack", "HP Left";
- };
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 47780552dcd0..bcbf4da168b6 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -571,7 +571,6 @@ static struct snd_soc_dai_link *sun4i_codec_create_link(struct device *dev,
- static struct snd_soc_card *sun4i_codec_create_card(struct device *dev)
- {
- 	struct snd_soc_card *card;
--	int ret;
- 
- 	card = devm_kzalloc(dev, sizeof(*card), GFP_KERNEL);
- 	if (!card)
-@@ -584,12 +583,6 @@ static struct snd_soc_card *sun4i_codec_create_card(struct device *dev)
- 	card->dev		= dev;
- 	card->name		= "sun4i-codec";
- 
--	ret = snd_soc_of_parse_audio_routing(card, "routing");
--	if (ret) {
--		dev_err(dev, "Failed to create our audio routing\n");
--		return NULL;
--	}
--
- 	return card;
- };
- 
+This patchset fixes this by making the default as root-only and then the
+providers could supply with additional permissions if required. One of
+the patch in this set also sets correct size for the binary file too,
+so that the user would not even attempt to read past the size.
+
+I have tested this on IFC6410 with qfprom.
+
+Thanks,
+srini
+
+Changes since RFC (https://lkml.org/lkml/2015/8/11/319)
+- Renamed perm to mode flag as suggested by Stefan Wahren
+
+Srinivas Kandagatla (3):
+  nvmem: core: make default user binary file root-access only
+  nvmem: core: set the size for the nvmem binary file.
+  nvmem: core: add sysfs file mode flag in nvmem_config
+
+ drivers/nvmem/core.c           | 54 ++++++++++--------------------------------
+ include/linux/nvmem-provider.h |  1 +
+ 2 files changed, 14 insertions(+), 41 deletions(-)
+
 -- 
-2.5.3
+1.9.1
