@@ -1,39 +1,77 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Oct 2015 08:52:06 -0700
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <CAPDyKFoBPEnHuNR_bsrPU6X=q5pHa8cDR7_Ng9xLnLsudymvOg@mail.gmail.com>
-References: <20151005145127.GB23801@atomide.com>
- <20151005171155.GF23801@atomide.com>
- <20151005183813.GD21626@n2100.arm.linux.org.uk>
- <20151006090015.GE21626@n2100.arm.linux.org.uk>
- <20151006094425.GM23801@atomide.com>
- <20151006150009.GF21626@n2100.arm.linux.org.uk>
- <20151006153710.GS23801@atomide.com>
- <20151007124551.GI21626@n2100.arm.linux.org.uk>
- <20151007132642.GV23801@atomide.com>
- <CAPDyKFoBPEnHuNR_bsrPU6X=q5pHa8cDR7_Ng9xLnLsudymvOg@mail.gmail.com>
-Message-ID: <20151007155206.GX23801@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 7 Oct 2015 16:57:45 +0100
+Subject: [PATCH v2 1/2] thermal: mediatek: Add cpu power cooling model.
+In-Reply-To: <1444220561-26139-2-git-send-email-dawei.chien@mediatek.com>
+References: <1444220561-26139-1-git-send-email-dawei.chien@mediatek.com>
+ <1444220561-26139-2-git-send-email-dawei.chien@mediatek.com>
+Message-ID: <20151007155745.GD28981@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ulf Hansson <ulf.hansson@linaro.org> [151007 06:46]:
-> On 7 October 2015 at 15:26, Tony Lindgren <tony@atomide.com> wrote:
-> >> > Good idea, how about something like the following? AFAIK that's the
-> >> > only .config option needed as MFD_SYSCON is selected by Kconfig
-> >> > already.
+On Wed, Oct 07, 2015 at 08:22:40PM +0800, Dawei Chien wrote:
+> From: "Dawei.Chien" <dawei.chien@mediatek.com>
 > 
-> Similar to MFD_SYSCON, why don't we have REGULATOR_PBIAS to be
-> selected when omap_hsmmc is being used?
+> This power model is base on Intelligent Power Allocation (IPA) technical,
+> requires that the operating-points of the CPUs are registered using the
+> kernel's opp library and the `cpufreq_frequency_table` is assigned to the
+> `struct device` of the cpu MT8173.
 > 
-> It seems like that should also be a patch for the rc, right!?
+> Signed-off-by: Dawei.Chien <dawei.chien@mediatek.com>
+> ---
+> This patch is base on
+> https://patchwork.kernel.org/patch/7034601/
+> ---
+>  drivers/cpufreq/mt8173-cpufreq.c |   97 +++++++++++++++++++++++++++++++++-----
+>  1 file changed, 86 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
+> index 49caed2..9233ec5 100644
+> --- a/drivers/cpufreq/mt8173-cpufreq.c
+> +++ b/drivers/cpufreq/mt8173-cpufreq.c
+> @@ -28,7 +28,8 @@
+>  #define MAX_VOLT_SHIFT		(200000)
+>  #define MAX_VOLT_LIMIT		(1150000)
+>  #define VOLT_TOL		(10000)
+> -
+> +#define CAPACITANCE_CA53	(263)
+> +#define CAPACITANCE_CA57	(530)
+>  /*
+>   * The struct mtk_cpu_dvfs_info holds necessary information for doing CPU DVFS
+>   * on each CPU power/clock domain of Mediatek SoCs. Each CPU cluster in
+> @@ -51,6 +52,72 @@ struct mtk_cpu_dvfs_info {
+>  	bool need_voltage_tracking;
+>  };
+>  
+> +struct mtk_cpu_static_power {
+> +	unsigned long voltage;
+> +	unsigned int power;
+> +};
+> +
+> +/* measured by WA program. */
+> +static const struct mtk_cpu_static_power mtk_ca53_static_power[] = {
+> +	{859000, 43},
+> +	{908000, 52},
+> +	{983000, 86},
+> +	{1009000, 123},
+> +	{1028000, 138},
+> +	{1083000, 172},
+> +	{1109000, 180},
+> +	{1125000, 192},
+> +};
+> +
+> +/* measured by WA program. */
+> +static const struct mtk_cpu_static_power mtk_ca57_static_power[] = {
+> +	{828000, 72},
+> +	{867000, 90},
+> +	{927000, 156},
+> +	{968000, 181},
+> +	{1007000, 298},
+> +	{1049000, 435},
+> +	{1089000, 533},
+> +	{1125000, 533},
+> +};
 
-Well selecting CONFIG_REGULATOR is still optional and force selecting
-drivers usually leads into randconfig build issues sooner or later.
-And we'd like to make everything into loadable modules eventually.
+This should be described in the DT, rather than necessitating tonnes of
+these tables in the kernel.
 
-We could print a warning during MMC1 probe if REGULATOR_PBIAS
-is not selected and attempt to continue probing?
-
-Regards,
-
-Tony
+Mark.
