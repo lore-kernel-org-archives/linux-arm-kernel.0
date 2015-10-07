@@ -1,23 +1,45 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 7 Oct 2015 11:58:28 -0500
-Subject: [PATCH 2/2] pl011: factor our FIFO to TTY code
-In-Reply-To: <20151007163557.GN21513@n2100.arm.linux.org.uk>
-References: <1298146644-31007-1-git-send-email-linus.walleij@stericsson.com>
- <CAOZdJXVVgd=YTn33VAB2GbfuPkGGapr0C=dN7J+KhdcJuOpKuA@mail.gmail.com>
- <20151007163557.GN21513@n2100.arm.linux.org.uk>
-Message-ID: <CAOZdJXWx80Jrjecpi8Tt_To=Tyy-EQK8L53AARj8us7b-hTBBg@mail.gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed,  7 Oct 2015 12:00:19 -0500
+Subject: [PATCH 1/7] arm64: Add contiguous page flag shifts and constants
+In-Reply-To: <1444237225-13802-1-git-send-email-jeremy.linton@arm.com>
+References: <1444237225-13802-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1444237225-13802-2-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 7, 2015 at 11:35 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> When CREAD is clear, this should cause input to be discarded - except
-> in this case, because the bit is cropped by the u16, it'll always be
-> accepted.
+Add the number of pages required to form a contiguous range,
+as well as some supporting constants.
 
-Ok, I'll submit a patch that changes 'ch' back to an unsigned int.
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ arch/arm64/include/asm/page.h | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
+index 7d9c7e4..33892ef 100644
+--- a/arch/arm64/include/asm/page.h
++++ b/arch/arm64/include/asm/page.h
+@@ -20,14 +20,20 @@
+ #define __ASM_PAGE_H
+ 
+ /* PAGE_SHIFT determines the page size */
++/* CONT_SHIFT determines the number of pages which can be tracked together  */
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define PAGE_SHIFT		16
++#define CONT_SHIFT		5
+ #else
+ #define PAGE_SHIFT		12
++#define CONT_SHIFT		4
+ #endif
+-#define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
++#define PAGE_SIZE		(_AC(1, UL) << PAGE_SHIFT)
+ #define PAGE_MASK		(~(PAGE_SIZE-1))
+ 
++#define CONT_SIZE		(_AC(1, UL) << (CONT_SHIFT + PAGE_SHIFT))
++#define CONT_MASK		(~(CONT_SIZE-1))
++
+ /*
+  * The idmap and swapper page tables need some space reserved in the kernel
+  * image. Both require pgd, pud (4 levels only) and pmd tables to (section)
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+2.4.3
