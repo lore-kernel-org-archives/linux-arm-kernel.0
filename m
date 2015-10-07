@@ -1,37 +1,25 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed,  7 Oct 2015 15:27:16 -0500
-Subject: [PATCH] serial: amba-pl011: fix incorrect integer size in
- pl011_fifo_to_tty()
-Message-ID: <1444249636-25661-1-git-send-email-timur@codeaurora.org>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Wed, 7 Oct 2015 13:30:07 -0700
+Subject: [PATCH] ARM: configs: keystone: Add ramdisk support
+In-Reply-To: <12772658.mmM2ZKnfR4@wuerfel>
+References: <1444246089-1417-1-git-send-email-nm@ti.com>
+ <12772658.mmM2ZKnfR4@wuerfel>
+Message-ID: <561580CF.9090504@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The UART_DUMMY_DR_RX status bit is equal to (1 << 16), so a u16 is too small
-to hold that value.  The result is that UART_DUMMY_DR_RX is never passed
-to uart_insert_char().  This means that we're always accepting characters,
-even when CREAD (in termios) is not set.
+On 10/7/2015 12:37 PM, Arnd Bergmann wrote:
+> On Wednesday 07 October 2015 14:28:09 Nishanth Menon wrote:
+>> Add ramdisk support to allow for minimal kernel to be supported.
+>>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>
+>
+> I have not seen that in a while. Can you explain why the normal
+> initramfs method doesn't work on keystone?
+>
+It should work. It has been while I tried it, but IIRC, it use
+to work. At least can't recollect any issue around it.
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- drivers/tty/serial/amba-pl011.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index fd27e98..899a771 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -191,8 +191,8 @@ struct uart_amba_port {
-  */
- static int pl011_fifo_to_tty(struct uart_amba_port *uap)
- {
--	u16 status, ch;
--	unsigned int flag, max_count = 256;
-+	u16 status;
-+	unsigned int ch, flag, max_count = 256;
- 	int fifotaken = 0;
- 
- 	while (max_count--) {
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Regards,
+Santosh
