@@ -1,46 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Oct 2015 09:22:22 +0100
-Subject: Regression: USB OTG port breaks after a few hours in host mode on iMX6
-Message-ID: <20151007082222.GB21513@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 07 Oct 2015 09:25:42 +0100
+Subject: [PATCH v3 03/20] KVM: ARM64: Add offset defines for PMU registers
+In-Reply-To: <1443133885-3366-4-git-send-email-shannon.zhao@linaro.org>
+References: <1443133885-3366-1-git-send-email-shannon.zhao@linaro.org>
+ <1443133885-3366-4-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <5614D706.9000106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This bug is soo obscure, I'm not even sure how to start debugging it.
-This never used to be a problem, but I'm not sure when it started as
-USB (in general) is not something I use regularly.
+On 24/09/15 23:31, Shannon Zhao wrote:
+> We are about to trap and emulate acccesses to each PMU register
+> individually. This adds the context offsets for the AArch64 PMU
+> registers and their AArch32 counterparts.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/include/asm/kvm_asm.h | 59 +++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 52 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index 67fa0de..0a4dfcc 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -48,14 +48,36 @@
+>  #define MDSCR_EL1	22	/* Monitor Debug System Control Register */
+>  #define MDCCINT_EL1	23	/* Monitor Debug Comms Channel Interrupt Enable Reg */
+>  
+> +/* Performance Monitors Registers */
+> +#define PMCR_EL0	24	/* Control Register */
+> +#define PMOVSSET_EL0	25	/* Overflow Flag Status Set Register */
+> +#define PMOVSCLR_EL0	26	/* Overflow Flag Status Clear Register */
+> +#define PMSELR_EL0	27	/* Event Counter Selection Register */
+> +#define PMCEID0_EL0	28	/* Common Event Identification Register 0 */
+> +#define PMCEID1_EL0	29	/* Common Event Identification Register 1 */
+> +#define PMEVCNTR0_EL0	30	/* Event Counter Register (0-30) */
+> +#define PMEVCNTR30_EL0	60
+> +#define PMCCNTR_EL0	61	/* Cycle Counter Register */
+> +#define PMEVTYPER0_EL0	62	/* Event Type Register (0-30) */
+> +#define PMEVTYPER30_EL0	92
+> +#define PMCCFILTR_EL0	93	/* Cycle Count Filter Register */
+> +#define PMXEVCNTR_EL0	94	/* Selected Event Count Register */
+> +#define PMXEVTYPER_EL0	95	/* Selected Event Type Register */
+> +#define PMCNTENSET_EL0	96	/* Count Enable Set Register */
+> +#define PMCNTENCLR_EL0	97	/* Count Enable Clear Register */
+> +#define PMINTENSET_EL1	98	/* Interrupt Enable Set Register */
+> +#define PMINTENCLR_EL1	99	/* Interrupt Enable Clear Register */
+> +#define PMUSERENR_EL0	100	/* User Enable Register */
+> +#define PMSWINC_EL0	101	/* Software Increment Register */
+> +
+>  /* 32bit specific registers. Keep them at the end of the range */
+> -#define	DACR32_EL2	24	/* Domain Access Control Register */
+> -#define	IFSR32_EL2	25	/* Instruction Fault Status Register */
+> -#define	FPEXC32_EL2	26	/* Floating-Point Exception Control Register */
+> -#define	DBGVCR32_EL2	27	/* Debug Vector Catch Register */
+> -#define	TEECR32_EL1	28	/* ThumbEE Configuration Register */
+> -#define	TEEHBR32_EL1	29	/* ThumbEE Handler Base Register */
+> -#define	NR_SYS_REGS	30
+> +#define	DACR32_EL2	102	/* Domain Access Control Register */
+> +#define	IFSR32_EL2	103	/* Instruction Fault Status Register */
+> +#define	FPEXC32_EL2	104	/* Floating-Point Exception Control Register */
+> +#define	DBGVCR32_EL2	105	/* Debug Vector Catch Register */
+> +#define	TEECR32_EL1	106	/* ThumbEE Configuration Register */
+> +#define	TEEHBR32_EL1	107	/* ThumbEE Handler Base Register */
+> +#define	NR_SYS_REGS	108
 
-In this setup, the USB OTG port is wired in host mode via pinmix
-configuration of the USB OTG ID pin:
+This will need some rebasing - some of the registers have already
+changed or disappeared. I really need to find a way to make this mess
+more manageable...
 
-	MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x13059
-
-The problem characterised so far: after booting the kernel, USB seems
-to work fine.  You can plug and unplug devices from both USB host and
-USB OTG ports, and it's detected.
-
-If you boot a kernel with nothing plugged in, leave it for maybe four
-hours, then plug in a device to either port, the device will be seen
-in the USB host port, but completely ignored in the USB OTG port.
-Both USB OTG ports have power, confirmed last night when using a USB
-microscope with built-in LED lighting: the LEDs are functional, the
-device is otherwise completely ignored.
-
-The above is basically what I know so far: I don't know when the port
-fails, whether in the case of "boot, wait four hours, and it's dead"
-whether it's dead from boot: when I've tried testing it immediately
-after boot, it's worked.
-
-As it takes around four hours to reproduce, and I have a massive patch
-stack on top of the kernel for this platform, I'm unwilling to attempt
-a git bisection to try and find when this occurred, but I know it's
-been going on for a while now as I've noticed the same behaviour when
-I transfer my logitech USB receiver to that port.
-
-I had thought it was a power issue, but the USB camera last night
-confirmed that it's a port driver issue.
-
-Certainly earlier 3.x kernels did not have this behaviour.
-
+	M.
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Jazz is not dead. It just smells funny...
