@@ -1,44 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Oct 2015 10:57:43 +0900
-Subject: [PATCH 06/28] ARM: shmobile: marzen: Board specific serial port order
+Date: Wed,  7 Oct 2015 10:57:44 +0900
+Subject: [PATCH 07/28] ARM: shmobile: kzm9g dts: Use adxl345-specific
+ compatible property
 In-Reply-To: <cover.1444182812.git.horms+renesas@verge.net.au>
 References: <cover.1444182812.git.horms+renesas@verge.net.au>
-Message-ID: <8025e3ff4ca972a0ca2aa898562670a767f79889.1444182812.git.horms+renesas@verge.net.au>
+Message-ID: <755252d0e502627df6ddabbb2d628705bc256497.1444182812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Convert Marzen to use board-specific serial0 and serial1 instead
-of the older shared SoC-specific SCIF index.
+Replace the deprecated generic "adi,adxl34x" compatible value by the
+adxl345-specific "adi,adxl345" value, cfr. commit e465bf6fc55d5ce2 ("DT:
+i2c: Deprecate adi,adxl34x compatible string").
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7779-marzen.dts | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/sh73a0-kzm9g.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
-index 20afea6f06ef..fe396c8d58db 100644
---- a/arch/arm/boot/dts/r8a7779-marzen.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen.dts
-@@ -19,12 +19,12 @@
- 	compatible = "renesas,marzen", "renesas,r8a7779";
- 
- 	aliases {
--		serial2 = &scif2;
--		serial4 = &scif4;
-+		serial0 = &scif2;
-+		serial1 = &scif4;
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+index 24b4cd24dceb..7fc5602810ad 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+@@ -206,7 +206,7 @@
  	};
  
- 	chosen {
--		bootargs = "console=ttySC2,115200 ignore_loglevel root=/dev/nfs ip=on";
-+		bootargs = "ignore_loglevel root=/dev/nfs ip=on";
- 		stdout-path = &scif2;
- 	};
- 
+ 	accelerometer at 1d {
+-		compatible = "adi,adxl34x";
++		compatible = "adi,adxl345";
+ 		reg = <0x1d>;
+ 		interrupt-parent = <&irqpin3>;
+ 		interrupts = <2 IRQ_TYPE_LEVEL_HIGH>,
 -- 
 2.1.4
