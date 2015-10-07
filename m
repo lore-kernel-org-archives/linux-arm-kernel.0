@@ -1,52 +1,89 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Wed, 7 Oct 2015 11:33:52 +0200
-Subject: at91sam9 Main crystal frequency problems
-In-Reply-To: <5613E822.2020004@overkiz.com>
-References: <55ED3D3B.8060700@overkiz.com> <20150908181212.0b4336f0@bbrezillon>
- <55F6C07C.8080803@overkiz.com> <20151006161244.06f3ceb4@bbrezillon>
- <5613E822.2020004@overkiz.com>
-Message-ID: <20151007093352.GA15524@gradator.net>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 07 Oct 2015 17:35:29 +0800
+Subject: [PATCH 08/12] drm: bridge/dw_hdmi: avoid enabling interface in
+ mode_set
+In-Reply-To: <20151007091830.GE21513@n2100.arm.linux.org.uk>
+References: <20150808160251.GM7557@n2100.arm.linux.org.uk>
+ <E1ZO6bI-0002rG-PI@rmk-PC.arm.linux.org.uk> <5614969D.7030201@rock-chips.com>
+ <20151007091830.GE21513@n2100.arm.linux.org.uk>
+Message-ID: <5614E761.8020706@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
-
-On Tue, Oct 06, 2015 at 05:26:26PM +0200, Antoine Aubert wrote:
-> Le 06/10/2015 16:12, Boris Brezillon a ?crit :
-> > 
-> > Any progress regarding this problem. I think Jiri (in Cc) has pretty
-> > much the same problem (see this thread [1]).
-> > IIRC, activating NO_HZ_IDLE solved the problem for you, but have you
-> > find the root cause?
-> 
-> I'm not sure that the same issue. Here I don't have slow xtal.
-
-There was no issue, it was just a misunderstanding on how the watchdog 
-stack is working.
 
 
-> What I found:
-> * DTB was not up to date (build with an other kernel version)
->   Since we start from kexec, we added --dtb option
-> * slow_xtal wasn't disabled in our DTS
-> * defconfig was outdated
-> 
-> What i did first:
-> * updated the dts, disabled slow xtal
-> * Update DTB
-> * activating NO_HZ_IDLE
-> 
-> > 20d updtime without WRST
-> 
-> Today what I did:
-> * use LTS last kernel: 4.1.6
-> * updated the dts, disabled slow xtal
-> * generate config from scratch using "make ARCH=arm at91_dt_defconfig"
->   (without NO_HZ_IDLE=
-> 
-> 12h uptime, at this time no WRST
+On 10/07/2015 05:18 PM, Russell King - ARM Linux wrote:
+> On Wed, Oct 07, 2015 at 11:50:53AM +0800, Yakir Yang wrote:
+>>
+>> On 08/09/2015 12:04 AM, Russell King wrote:
+>>> On a mode set, DRM makes the following sequence of calls:
+>>> * for_each_encoder
+>>> *   bridge	mode_fixup
+>>> *   encoder	mode_fixup
+>>> * crtc		mode_fixup
+>>> * for_each_encoder
+>>> *   bridge	disable
+>>> *   encoder	prepare
+>>> *   bridge	post_disable
+>>> * disable unused encoders
+>>> * crtc		prepare
+>>> * crtc		mode_set
+>>> * for_each_encoder
+>>> *   encoder	mode_set
+>>> *   bridge	mode_set
+>>> * crtc		commit
+>>> * for_each_encoder
+>>> *   bridge	pre_enable
+>>> *   encoder	commit
+>>> *   bridge	enable
+>>>
+>>> dw_hdmi enables the HDMI output in both the bridge mode_set() and also
+>>> the bridge enable() step.  This is duplicated work - we can avoid the
+>>> setup in mode_set() and just do it in the enable() stage.  This
+>>> simplifies the code a little.
+>>>
+>>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> I have noticed that dw_hdmi driver have poweron/poweroff when
+>> driver detect HPD event in irq thread, that's also duplicated works,
+>> would you like to collect that changes into this one:
+>>
+>> static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
+>> {
+>>          ......
+>>
+>>          if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
+>>                  if (phy_int_pol & HDMI_PHY_HPD) {
+>>                          dev_dbg(hdmi->dev, "EVENT=plugin\n");
+>>
+>>                          hdmi_modb(hdmi, 0, HDMI_PHY_HPD, HDMI_PHY_POL0);
+>>
+>>                          dw_hdmi_poweron(hdmi);    // no need here
+>>                  } else {
+>>                          dev_dbg(hdmi->dev, "EVENT=plugout\n");
+>>
+>>                          hdmi_modb(hdmi, HDMI_PHY_HPD, HDMI_PHY_HPD,
+>>                                    HDMI_PHY_POL0);
+>>
+>>                          dw_hdmi_poweroff(hdmi);    // no need here
+>>                  }
+>>                  drm_helper_hpd_irq_event(hdmi->connector.dev);
+>>          }
+>>          ......
+>> }
+> I'm very much of the opinion of making small logical changes.  This
+> patch is one small logical change to the DRM-side logic to get rid
+> of the identified duplication there without touching anything else.
+> If removing the above calls to dw_hdmi_poweron()/dw_hdmi_poweroff()
+> were found to cause a regression, then the whole change would end
+> up being reverted, which would be annoying.
 
-Great, no issue then, thank you !
+Hmm... Yeah, it do make some driver logical changes, but I
+thought that's good, just make a clean on HPD thread, and I
+do give lots of test on chrome tree about this changes, guess
+a separate patch would be better.
 
+If you don't feel good enough about this, okay, I would give
+more test on that changes, and send upstream to request
+comment later.
 
-Sylvain
+- Yakir
