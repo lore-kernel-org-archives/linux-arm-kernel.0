@@ -1,45 +1,68 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 7 Oct 2015 18:33:24 +0530
-Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
-In-Reply-To: <20151007125735.GA8170@kroah.com>
-References: <5706174.BUsqiXljxZ@wuerfel> <20151007105911.GC9892@linux>
- <20151007110302.GD9892@linux> <20151007110755.GA6601@kroah.com>
- <20151007112149.GB22530@linux> <20151007125735.GA8170@kroah.com>
-Message-ID: <20151007130324.GA4557@linux>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 7 Oct 2015 15:03:39 +0200
+Subject: [PATCH] mfd: remove unused variables
+In-Reply-To: <7700818.mjdn6x2kkK@wuerfel>
+References: <7700818.mjdn6x2kkK@wuerfel>
+Message-ID: <5615182B.5060902@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc'ing Mike and Stephen..
+Hello Arnd,
 
-On 07-10-15, 13:57, Greg Kroah-Hartman wrote:
-> On Wed, Oct 07, 2015 at 04:51:49PM +0530, Viresh Kumar wrote:
-> > On 07-10-15, 12:07, Greg Kroah-Hartman wrote:
-> > > Why would you be wanting to create a "unsigned long" as an api anyway?
-> > > Just force it to be u64 all the time, can't you do that?
-> > 
-> > Okay, so the variable in question (lets say frequency) is an 'unsigned
-> > long' and that's how all the APIs of clock framework expect/define
-> > it.
-> > 
-> > And you are probably saying that we do this:
-> > 
-> > unsigned long freq;
-> > 
-> > debugfs_create_u64((u64 *)&freq);
-> > 
-> > Right? Or are you asking to update clock APIs to be converted to u64?
+On 10/07/2015 02:49 PM, Arnd Bergmann wrote:
+> A mass-cleanup by Javier Martinez Canillas removed a lot of
+> unused code, but left at least two variables in mfd drivers
+> in place that are now causing warnings:
 > 
-> Yes, they should be u64 as I doubt you want to debug problems that you
-> have in the driver where it works on a 64bit system but doesn't on a
-> 32bit one.
+> drivers/mfd/rtsx_pcr.c: In function 'rtsx_pci_set_pull_ctl':
+> drivers/mfd/rtsx_pcr.c:564:6: warning: unused variable 'err' [-Wunused-variable]
+> drivers/mfd/lm3533-core.c: In function 'lm3533_i2c_probe':
+> drivers/mfd/lm3533-core.c:595:6: warning: unused variable 'ret' [-Wunused-variable]
+> 
+> This removes them as well.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: c749db571dc ("mfd: lm3533: Simplify function return logic")
+> Fixes: a3c29b09982 ("mfd: rtsx: Simplify function return logic")
+> ---
 
-Firstly changing the clock API (and other similar APIs) to make
-frequency u64 instead of 'unsigned long', looks like a giant effort.
-There are too many users of those API, etc..
+I thought that I got rid of all the unused variables but somehow
+I missed these. Sorry and thanks a lot for taking care of this.
 
-Over that, it might be good performance wise to use u32 for 32 bit
-systems and u64 for 64 bit one, to represent clock frequency and maybe
-that's why we chose unsigned long there.
+> 
+> diff --git a/drivers/mfd/lm3533-core.c b/drivers/mfd/lm3533-core.c
+> index 193ecee1fa7e..5abcbb2e8849 100644
+> --- a/drivers/mfd/lm3533-core.c
+> +++ b/drivers/mfd/lm3533-core.c
+> @@ -592,7 +592,6 @@ static int lm3533_i2c_probe(struct i2c_client *i2c,
+>  					const struct i2c_device_id *id)
+>  {
+>  	struct lm3533 *lm3533;
+> -	int ret;
+>  
+>  	dev_dbg(&i2c->dev, "%s\n", __func__);
+>  
+> diff --git a/drivers/mfd/rtsx_pcr.c b/drivers/mfd/rtsx_pcr.c
+> index b98cf1de0a55..d63f3a896adb 100644
+> --- a/drivers/mfd/rtsx_pcr.c
+> +++ b/drivers/mfd/rtsx_pcr.c
+> @@ -561,8 +561,6 @@ EXPORT_SYMBOL_GPL(rtsx_pci_write_ppbuf);
+>  
+>  static int rtsx_pci_set_pull_ctl(struct rtsx_pcr *pcr, const u32 *tbl)
+>  {
+> -	int err;
+> -
+>  	rtsx_pci_init_cmd(pcr);
+>  
+>  	while (*tbl & 0xFFFF0000) {
+> 
 
+Patch looks good to me.
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
 -- 
-viresh
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
