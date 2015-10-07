@@ -1,69 +1,53 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 07 Oct 2015 07:45:59 +0100
-Subject: i.mx6 video out in mainline
-In-Reply-To: <CAD1M061RTNOCuE5vwrTsR3mgOaWcuwt5mc-L+K3kdLCDQ=JfLQ@mail.gmail.com>
-References: <CAD1M060ucNEjPceeK9R2s4drkZE1EWEadB1JtcUmnfuNx24zkA@mail.gmail.com>
- <CAOMZO5CwjC2dq3fWugAJsqThxAZ6o4wv0gV7ues28a51z0fXLg@mail.gmail.com>
- <CAD1M061RTNOCuE5vwrTsR3mgOaWcuwt5mc-L+K3kdLCDQ=JfLQ@mail.gmail.com>
-Message-ID: <1444200359.7656.4.camel@pengutronix.de>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 7 Oct 2015 08:47:15 +0200
+Subject: [PATCH] ARM: bcm2835: add label for uart0
+In-Reply-To: <561482CE.2020804@wwwdotorg.org>
+References: <1443810675-25558-1-git-send-email-stefan.wahren@i2se.com>
+ <87oagbhdfb.fsf@eliezer.anholt.net> <561482CE.2020804@wwwdotorg.org>
+Message-ID: <5614BFF3.9010708@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 06.10.2015, 16:02 -0700 schrieb Pushpal Sidhu:
-> On Tue, Oct 6, 2015 at 3:16 PM, Fabio Estevam <festevam@gmail.com>
-> wrote:
-> > On Tue, Oct 6, 2015 at 6:52 PM, Pushpal Sidhu <psidhu@gateworks.com
-> > > wrote:
-> > > Hi All,
-> > > 
-> > > I'm attempting to use a standard fb console (using the
-> > > imx6qdl-gw54xx.dtsi), but I find that it only draws to the
-> > > 1024x768p
-> > > portion of the screen. This is also true when running the
-> > > userspace
-> > > tool fb-test.
-> > 
-> > Looking at imx6qdl-gw54xx.dtsi I see you have a LVDS panel with
-> > 1024x768 resolution.
-> > 
-> > I sent a patch that allows LDB and HDMI to work simultaneously:
-> > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/com
-> > mit/arch/arm/boot/dts/imx6qdl
-> > -sabresd.dtsi?id=d28be499c45e6e16d7a042ce280eb872dc06952b
-> > 
-> > Can you try to adapt it for imx6qdl-gw54xx.dtsi?
-> > 
-> > If this still does not help your HDMI output, please try disabling
-> > the LVDS.
-> 
-> When I took your patch and adapted it for imx6qdl-gw54xx.dtsi, I
-> found
-> that HDMI video out was slightly shifted to the left and resolution
-> remained at 1024x768p.
-> 
-> I also found that when I disabled DRM_IMX_LDB, HDMI out stopped
-> working altogether, though if I stripped out the ldb section in
-> device
-> tree, the resolution comes back at 1080p (regardless of setting
-> DRM_IMX_LDB or not). There is definitely some strange interdependency
-> between lvds and hdmi here. Do you have an idea of where I should
-> start looking for this problem?
-> 
-This isn't strange, but actually really simple to explain:
+Am 07.10.2015 um 04:26 schrieb Stephen Warren:
+> On 10/06/2015 03:53 PM, Eric Anholt wrote:
+>> Stefan Wahren <stefan.wahren@i2se.com> writes:
+>>
+>>> This patch adds a label for uart0 to allow changing of uart0
+>>> pins.
+>>>
+>>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>> This patch seems innocuous, but could you clarify for me how
+>> exactly you change the uart0 pins, and why one would do that?
+> I /assume/ this is so that some other DT file (that includes the
+> edited file) can add some pinctrl-related properties to this DT node,
+> using syntax such as:
+>
+> &uart0 {
+>     new content;
+> };
+>
+> If so, the patch,
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 
-1. The DRM driver is a componentized driver that needs all of its
-components to come up before it registers the DRM device. So if you
-have the LDB enabled in your DT you also need the LDB driver, otherwise
-you won't get any video out. If you don't want to have LDB, don't
-disable the driver alone, but also add a status = "disabled" in the DT
-LDB node.
+Your assumption is correct. In case the UART should be used on a custom
+board with Raspberry Pi Compute Module and a microcontroller this change
+is necessary to reference the UART:
 
-2. The kernels framebuffer emulation layer will try to put the
-framebuffer on both displays. So if you have a smaller LVDS display
-connected the framebuffer will only have the size of the smaller
-display. Solution is to not depend on the kernels frambuffer emulation,
-but actually set a mode from userspace and work with the KMS interface
-directly.
+&gpio {
+  // ...
 
-Regards,
-Lucas
+  uart0_pins: uart0_pins {
+    brcm,pins = <36 37>;
+    brcm,function = <BCM2835_FSEL_ALT2>;
+  };
+}
+
+&uart0 {
+  pinctrl-names = "default";
+  pinctrl-0 = <&uart0_pins>;
+  status = "okay";
+};
+
+Thanks
+
+Stefan
