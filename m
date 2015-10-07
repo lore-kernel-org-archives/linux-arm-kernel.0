@@ -1,32 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Oct 2015 14:10:04 +0200
-Subject: [PATCH] RDMA/cxgb4: re-fix 32-bit build warning
-Message-ID: <13543971.LQ3Q8CCxhL@wuerfel>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 07 Oct 2015 15:14:16 +0300
+Subject: PING: [PATCH v4 TRIVIAL 1/2] ARM: Enable GICv2m on 32-bit virt
+ machine
+In-Reply-To: <20151007102313.GG21513@n2100.arm.linux.org.uk>
+References: <017801d100dc$77fe3a90$67faafb0$@samsung.com>
+ <20151007102313.GG21513@n2100.arm.linux.org.uk>
+Message-ID: <020c01d100f9$b02d23a0$10876ae0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Casting a pointer to __be64 produces a warning on 32-bit architectures:
+ Hello!
 
-drivers/infiniband/hw/cxgb4/mem.c:147:20: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-    req->wr.wr_lo = (__force __be64)&wr_wait;
+> I know we have MSI-using platforms working on 32-bit ARM at the moment,
+> which brings up the question about msi.h in your patch, and what are
+> the implications for the existing MSI using platforms of having
+> PCI_MSI_IRQ_DOMAIN enabled in a multiplatform kernel.
 
-This was fixed at least twice for this driver in different places,
-and accidentally reverted once more. This puts the correct version
-back in place.
+ I have just tested, what happens if i disable PCI_MSI_IRQ_DOMAIN. No, it's not going to work,
+irq-gic-v2m.c requires MSI domain API. Looks like old MSI drivers do not use IRQ domains and just
+transparently handle translation of MSIs to SPI IDs.
+ At this point unfortunately i cannot do anything else, because i don't have any of those platforms,
+so cannot test. Added also Christoffer to cc. Hopefully somebody in ARM or Linaro gets interested.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 6198dd8d7a6a7 ("iw_cxgb4: 32b platform fixes")
-
-diff --git a/drivers/infiniband/hw/cxgb4/mem.c b/drivers/infiniband/hw/cxgb4/mem.c
-index 026b91ebd5e2..140415d31bcc 100644
---- a/drivers/infiniband/hw/cxgb4/mem.c
-+++ b/drivers/infiniband/hw/cxgb4/mem.c
-@@ -144,7 +144,7 @@ static int _c4iw_write_mem_inline(struct c4iw_rdev *rdev, u32 addr, u32 len,
- 		if (i == (num_wqe-1)) {
- 			req->wr.wr_hi = cpu_to_be32(FW_WR_OP_V(FW_ULPTX_WR) |
- 						    FW_WR_COMPL_F);
--			req->wr.wr_lo = (__force __be64)&wr_wait;
-+			req->wr.wr_lo = (__force __be64)(unsigned long)&wr_wait;
- 		} else
- 			req->wr.wr_hi = cpu_to_be32(FW_WR_OP_V(FW_ULPTX_WR));
- 		req->wr.wr_mid = cpu_to_be32(
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
