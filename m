@@ -1,27 +1,69 @@
-From: jiri@resnulli.us (Jiri Pirko)
-Date: Wed, 7 Oct 2015 08:43:31 +0200
-Subject: [PATCH] mlxsw: fix warnings for big-endian 32-bit dma_addr_t
-In-Reply-To: <30258520.VaA2vDyUiY@wuerfel>
-References: <30258520.VaA2vDyUiY@wuerfel>
-Message-ID: <20151007064331.GC2152@nanopsycho.orion>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 07 Oct 2015 07:45:59 +0100
+Subject: i.mx6 video out in mainline
+In-Reply-To: <CAD1M061RTNOCuE5vwrTsR3mgOaWcuwt5mc-L+K3kdLCDQ=JfLQ@mail.gmail.com>
+References: <CAD1M060ucNEjPceeK9R2s4drkZE1EWEadB1JtcUmnfuNx24zkA@mail.gmail.com>
+ <CAOMZO5CwjC2dq3fWugAJsqThxAZ6o4wv0gV7ues28a51z0fXLg@mail.gmail.com>
+ <CAD1M061RTNOCuE5vwrTsR3mgOaWcuwt5mc-L+K3kdLCDQ=JfLQ@mail.gmail.com>
+Message-ID: <1444200359.7656.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tue, Oct 06, 2015 at 11:47:44PM CEST, arnd at arndb.de wrote:
->The recently added mlxsw driver produces warnings in ARM
->allmodconfig:
->
->drivers/net/ethernet/mellanox/mlxsw/pci.c: In function 'mlxsw_pci_cmd_exec':
->drivers/net/ethernet/mellanox/mlxsw/pci.c:1585:59: warning: right shift count >= width of type [-Wshift-count-overflow]
->linux/byteorder/big_endian.h:38:51: note: in definition of macro '__cpu_to_be32'
->drivers/net/ethernet/mellanox/mlxsw/pci.c:76:2: note: in expansion of macro 'iowrite32be'
->
->This changes the type of the local variable to u64, which gets rid of the
->warning and seems nicer than adding #ifdefs.
->
->Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->Fixes: eda6500a987a "mlxsw: Add PCI bus implementation"
+Am Dienstag, den 06.10.2015, 16:02 -0700 schrieb Pushpal Sidhu:
+> On Tue, Oct 6, 2015 at 3:16 PM, Fabio Estevam <festevam@gmail.com>
+> wrote:
+> > On Tue, Oct 6, 2015 at 6:52 PM, Pushpal Sidhu <psidhu@gateworks.com
+> > > wrote:
+> > > Hi All,
+> > > 
+> > > I'm attempting to use a standard fb console (using the
+> > > imx6qdl-gw54xx.dtsi), but I find that it only draws to the
+> > > 1024x768p
+> > > portion of the screen. This is also true when running the
+> > > userspace
+> > > tool fb-test.
+> > 
+> > Looking at imx6qdl-gw54xx.dtsi I see you have a LVDS panel with
+> > 1024x768 resolution.
+> > 
+> > I sent a patch that allows LDB and HDMI to work simultaneously:
+> > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/com
+> > mit/arch/arm/boot/dts/imx6qdl
+> > -sabresd.dtsi?id=d28be499c45e6e16d7a042ce280eb872dc06952b
+> > 
+> > Can you try to adapt it for imx6qdl-gw54xx.dtsi?
+> > 
+> > If this still does not help your HDMI output, please try disabling
+> > the LVDS.
+> 
+> When I took your patch and adapted it for imx6qdl-gw54xx.dtsi, I
+> found
+> that HDMI video out was slightly shifted to the left and resolution
+> remained at 1024x768p.
+> 
+> I also found that when I disabled DRM_IMX_LDB, HDMI out stopped
+> working altogether, though if I stripped out the ldb section in
+> device
+> tree, the resolution comes back at 1080p (regardless of setting
+> DRM_IMX_LDB or not). There is definitely some strange interdependency
+> between lvds and hdmi here. Do you have an idea of where I should
+> start looking for this problem?
+> 
+This isn't strange, but actually really simple to explain:
 
-Acked-by: Jiri Pirko <jiri@mellanox.com>
+1. The DRM driver is a componentized driver that needs all of its
+components to come up before it registers the DRM device. So if you
+have the LDB enabled in your DT you also need the LDB driver, otherwise
+you won't get any video out. If you don't want to have LDB, don't
+disable the driver alone, but also add a status = "disabled" in the DT
+LDB node.
 
-Thanks!
+2. The kernels framebuffer emulation layer will try to put the
+framebuffer on both displays. So if you have a smaller LVDS display
+connected the framebuffer will only have the size of the smaller
+display. Solution is to not depend on the kernels frambuffer emulation,
+but actually set a mode from userspace and work with the KMS interface
+directly.
+
+Regards,
+Lucas
