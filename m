@@ -1,32 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 07 Oct 2015 17:22:07 +0100
-Subject: [PATCH v3 00/16] KVM: arm64: GICv3 ITS emulation
-In-Reply-To: <029601d1011a$026e1000$074a3000$@samsung.com>
-References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
- <029601d1011a$026e1000$074a3000$@samsung.com>
-Message-ID: <561546AF.90903@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Oct 2015 17:23:42 +0100
+Subject: [PATCH v2 1/3] nvmem: core: make default user binary file
+ root-access only
+In-Reply-To: <56152250.2000200@linaro.org>
+References: <1444215536-10783-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1444215647-10836-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20151007113349.GJ21513@n2100.arm.linux.org.uk>
+ <56152250.2000200@linaro.org>
+Message-ID: <20151007162342.GK21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/15 17:05, Pavel Fedin wrote:
->  Hello!
+On Wed, Oct 07, 2015 at 02:46:56PM +0100, Srinivas Kandagatla wrote:
 > 
->  One more concern about the whole thing. I already replied to the previous series, but looks like my
-> reply was missed.
->  Your implementation does not care about live migration at all. And there's one fundamental issue
-> with it. In the redistributor LPIs can be only pending, but in the CPU interface they still can be
-> active. And they have priorities, therefore they can be preempted, so we can have even more than one
-> active LPI at once. How to migrate this state?
->  Here i am trying to prototype this by leaving active interrupts in LRs and allowing the userland to
-> read/write them. This looks a bit stupid, additionally this will create problems if we are e. g.
-> migrating from host with 8 LRs to host with 4 LRs, while having 6 active LPIs. Can anybody suggest
-> better solution?
->  Technically LPI pending table has unused bits from 0 to 8191, and we have 8192 LPIs, so we could
-> push active state there, just for migration. Would this be a big violation of specification? It says
-> nothing about these bits at all.
+> 
+> On 07/10/15 12:33, Russell King - ARM Linux wrote:
+> >On Wed, Oct 07, 2015 at 12:00:47PM +0100, Srinivas Kandagatla wrote:
+> >>As required by many providers like at24/at25/mxs-ocotp/qfprom and may be
+> >>other providers would want to allow root-only to read the nvmem content.
+> >>So making the defaults to be root-only access would address the request
+> >>and also provide flexibility to providers to specify there own permissions
+> >>on top of the root-only using the perm flag in nvmem_config.
+> >>Making this dynamic did cut down lot of static binary attributes in the
+> >>code.
+> >
+> >Check what the lifetime of a struct bin_attribute is before you embed it
+> >into any other structure.  Sorry, but I think you're going to have to
+> 
+> Lifetime of the "static struct bin_attribute bin_attr_template" is static
+> and a memcpy of which is made into nvmem->bin whose lifetime is till the
+> nvmem_release() which happens at device_release(), so there should be no
+> issue in using a copy of bin_attribute.
 
-LPIs do not have an active state, at the redistributor or otherwise.
+You're assuming that code doesn't touch the attribute after releasing
+the last refcount on the device... unless you've actually checked
+that, the code is unsafe.
 
-	M.
+I'm not saying it does or it doesn't (I don't know) but unless you
+actually have checked, you haven't done sufficient homework prior to
+sending this patch.
+
+Just remember for next time you want to do something similar to this.
+
 -- 
-Jazz is not dead. It just smells funny...
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
