@@ -1,31 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Oct 2015 12:33:49 +0100
-Subject: [PATCH v2 1/3] nvmem: core: make default user binary file
- root-access only
-In-Reply-To: <1444215647-10836-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1444215536-10783-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1444215647-10836-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20151007113349.GJ21513@n2100.arm.linux.org.uk>
+From: goran.cengic@ericsson.com (Goran Cengic)
+Date: Wed, 7 Oct 2015 11:50:26 +0000
+Subject: gpio-mvebu: patch for separate edge and level mask caches
+In-Reply-To: <20151007114054.GI13247@io.lakedaemon.net>
+References: <2F27BCDE355D444CB7EA7E1569D8465028987D43@ESESSMB203.ericsson.se>
+ <20151007114054.GI13247@io.lakedaemon.net>
+Message-ID: <2F27BCDE355D444CB7EA7E1569D8465028987DA1@ESESSMB203.ericsson.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 12:00:47PM +0100, Srinivas Kandagatla wrote:
-> As required by many providers like at24/at25/mxs-ocotp/qfprom and may be
-> other providers would want to allow root-only to read the nvmem content.
-> So making the defaults to be root-only access would address the request
-> and also provide flexibility to providers to specify there own permissions
-> on top of the root-only using the perm flag in nvmem_config.
-> Making this dynamic did cut down lot of static binary attributes in the
-> code.
+Including the patch and lakml.
 
-Check what the lifetime of a struct bin_attribute is before you embed it
-into any other structure.  Sorry, but I think you're going to have to
-read up on the driver model, sysfs, and kernfs implementations to find
-out - I don't know the answer to this without doing the same.
-
-However, this is basic checking that anyone should do when embedding
-a structure within another.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> -----Original Message-----
+> From: Jason Cooper [mailto:jason at lakedaemon.net]
+> Sent: den 7 oktober 2015 13:41
+> To: Goran Cengic; Linus Walleij
+> Cc: Thomas Petazzoni; Andrew Lunn; Gregory Clement; Sebastian
+> Hesselbarth
+> Subject: Re: gpio-mvebu: patch for separate edge and level mask caches
+> 
+> Hello Goran,
+> 
+> +Cc: LinusW (gpio maintainer)
+> 
+> On Wed, Oct 07, 2015 at 10:36:01AM +0000, Goran Cengic wrote:
+> > Hi again,
+> >
+> > I didn't found who maintains the drivers/gpio/gpio-mvebu.c in the
+> > MAINTAINERS and I've realized that Armada 38x SoC maintainers also
+> > might be relevant for this issue so I've included them here.
+> 
+> You're absolutely correct.  Those of us involved with kernel development
+> day-to-day 'just know' that the mvebu maintainers would handle such a
+> driver.  We should update MAINTAINERS.
+> 
+> 
+> > From: Goran Cengic
+> > Sent: den 5 oktober 2015 20:15
+> > To: 'Thomas Petazzoni'
+> > Subject: gpio-mvebu: patch for separate edge and level mask caches
+> >
+> > Hi Thomas,
+> >
+> > We've encountered a small issue with not being able to mix edge and
+> > level sensitive interrupts. The issue is that gpio-mvebu would trigger
+> > an edge sensitive interrupt even though mvebu_gpio_level_irq_mask()
+> > has been called for the same level interrupt. The issue is caused by
+> > the mask_cache in irq_chip_generic being shared between the
+> > chip_types.
+> >
+> > Here is a summary of what happens. Enable_irq(some level sensitive
+> > interrupt), as configured in dtb, enable_irq(some other edge sensitive
+> > interrupt). At this point the mask_cache is not masking bot
+> > interrupts. Since the same mask_cache is written to the edge mask
+> > register, at the second call to enable_irq(), the level sensitive
+> > interrupt is unmasked in the edge mask register also. Now as soon as
+> > the transition to, say, low level occurs the mvebu gpio controller
+> > registers one in the edge cause register while the data in is used as
+> > level cause register. The irq handling starts and masks the interrupt
+> > using mvebu_gpio_level_irq_mask(), since that interrupt is configured
+> > as level-sensitive. However, the edge cause register is never
+> > mvebu_gpio_irq_ack()'ed and continues to trigger interrupt handling
+> > and locks the processor since the edge mask register is not masking
+> > that bit.
+> 
+> Thanks for the bug report, however ...
+> 
+> > I've attached a small patch so that you can decide if it's ok for inclusion.
+> 
+> hmmm, I don't see it.  Could you please resend with it attached?
+> 
+> Please also Cc lakml at linux-arm-kernel at lists.infradead.org.  If you can, then
+> please try to adhere to the list conventions: no html, no legal footers, etc.
+> 
+> thx,
+> 
+> Jason.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-gpio-mvebu-separate-edge-and-level-mask-caches.patch
+Type: application/octet-stream
+Size: 2173 bytes
+Desc: 0001-gpio-mvebu-separate-edge-and-level-mask-caches.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151007/5d4715d9/attachment-0001.obj>
