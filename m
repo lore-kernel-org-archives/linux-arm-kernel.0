@@ -1,34 +1,44 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Wed, 07 Oct 2015 14:02:23 +0300
-Subject: PING: [PATCH v4 TRIVIAL 1/2] ARM: Enable GICv2m on 32-bit virt
- machine
-In-Reply-To: <20151007102313.GG21513@n2100.arm.linux.org.uk>
-References: <017801d100dc$77fe3a90$67faafb0$@samsung.com>
- <20151007102313.GG21513@n2100.arm.linux.org.uk>
-Message-ID: <01d701d100ef$a5510870$eff31950$@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 7 Oct 2015 13:02:31 +0200
+Subject: [PATCH 2/2] memory: omap-gpmc: expand the description of the
+ debug facility
+In-Reply-To: <20151007102822.GT23801@atomide.com>
+References: <1444162070-22034-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1444162070-22034-2-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5614CDAE.6070604@ti.com> <20151007075338.GH3982@pengutronix.de>
+ <20151007102822.GT23801@atomide.com>
+Message-ID: <20151007110231.GL3982@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+Hello Tony,
 
-> I don't know enough to be able to merge this patch, and there's not
-> enough information in the commit message either.
+On Wed, Oct 07, 2015 at 03:41:19AM -0700, Tony Lindgren wrote:
+> * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [151007 00:57]:
+> > On Wed, Oct 07, 2015 at 10:45:50AM +0300, Roger Quadros wrote:
+> > > 
+> > > How about this instead?
+> > > 
+> > > NOTE: Apart from matching the register setup with the bootloader you also need to
+> > > match the GPMC FCLK frequency used by the bootloader else the GPMC timings
+> > > won't be identical with the bootloader timings.
+> > Yeah, sounds better, thanks.
+> > 
+> > > Also you might need to build this patch on top of
+> > > http://article.gmane.org/gmane.linux.kernel/2054796
+> > I talked to Tony about this patch yesterday on irc, but I didn't find it
+> > in the archives yet when I sent my mail.
+> 
+> Yes sorry here's a repost with your and Roger's changes folded in and
+> edited a bit. Probably best to keep them together with this patch.
+> 
+> Does the following look OK to you guys?
+Yes,
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
- What kind of information would you need in the message?
+Thanks
+Uwe
 
->  Plus, with the lack
-> of acks from people in ARM, I'm very reluctant to take this
-
- cc'ing to Marc and Peter Maydell (the main person behind qemu).
-
-> (I don't
-> know whether the original patch got any, it's fallen out of my mailbox.)
-
- 2/2 from this series has been ACKed and picked up by Marc Zynger. He told me that 1/2 is your area
-of competence.
- Just in case, original series is here: http://www.spinics.net/lists/arm-kernel/msg442981.html
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
