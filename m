@@ -1,81 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Oct 2015 10:57:42 +0900
-Subject: [PATCH 05/28] ARM: shmobile: silk: add QSPI DT support
+Date: Wed,  7 Oct 2015 10:57:43 +0900
+Subject: [PATCH 06/28] ARM: shmobile: marzen: Board specific serial port order
 In-Reply-To: <cover.1444182812.git.horms+renesas@verge.net.au>
 References: <cover.1444182812.git.horms+renesas@verge.net.au>
-Message-ID: <0ebdbc505b620ab4397c3105d36a5383fb16b151.1444182812.git.horms+renesas@verge.net.au>
+Message-ID: <8025e3ff4ca972a0ca2aa898562670a767f79889.1444182812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Magnus Damm <damm+renesas@opensource.se>
 
-Define the SILK board dependent part of the QSPI device node.
-Add device nodes  for Spansion  S25FL512S SPI flash and MTD partitions on it.
+Convert Marzen to use board-specific serial0 and serial1 instead
+of the older shared SoC-specific SCIF index.
 
-Based on the original patch by Vladimir Barinov
-<vladimir.barinov@cogentembedded.com>.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794-silk.dts | 40 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ arch/arm/boot/dts/r8a7779-marzen.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index d4dd5a30ccdf..f49bc00738a3 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -65,6 +65,11 @@
- 		renesas,groups = "mmc_data8", "mmc_ctrl";
- 		renesas,function = "mmc";
- 	};
-+
-+	qspi_pins: spi0 {
-+		renesas,groups = "qspi_ctrl", "qspi_data4";
-+		renesas,function = "qspi";
-+	};
- };
+diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
+index 20afea6f06ef..fe396c8d58db 100644
+--- a/arch/arm/boot/dts/r8a7779-marzen.dts
++++ b/arch/arm/boot/dts/r8a7779-marzen.dts
+@@ -19,12 +19,12 @@
+ 	compatible = "renesas,marzen", "renesas,r8a7779";
  
- &scif2 {
-@@ -100,3 +105,38 @@
- 	non-removable;
- 	status = "okay";
- };
-+
-+&qspi {
-+	pinctrl-0 = <&qspi_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+
-+	flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "spansion,s25fl512s", "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <30000000>;
-+		spi-tx-bus-width = <4>;
-+		spi-rx-bus-width = <4>;
-+		spi-cpol;
-+		spi-cpha;
-+		m25p,fast-read;
-+
-+		partition at 0 {
-+			label = "loader";
-+			reg = <0x00000000 0x00040000>;
-+			read-only;
-+		};
-+		partition at 40000 {
-+			label = "user";
-+			reg = <0x00040000 0x00400000>;
-+			read-only;
-+		};
-+		partition at 440000 {
-+			label = "flash";
-+			reg = <0x00440000 0x03bc0000>;
-+		};
-+	};
-+};
+ 	aliases {
+-		serial2 = &scif2;
+-		serial4 = &scif4;
++		serial0 = &scif2;
++		serial1 = &scif4;
+ 	};
+ 
+ 	chosen {
+-		bootargs = "console=ttySC2,115200 ignore_loglevel root=/dev/nfs ip=on";
++		bootargs = "ignore_loglevel root=/dev/nfs ip=on";
+ 		stdout-path = &scif2;
+ 	};
+ 
 -- 
 2.1.4
