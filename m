@@ -1,114 +1,89 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 07 Oct 2015 12:13:41 +0100
-Subject: [PATCH 13/15] arm64: kvm: Rewrite fake pgd handling
-In-Reply-To: <1442331684-28818-14-git-send-email-suzuki.poulose@arm.com>
-References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
- <1442331684-28818-14-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <5614FE65.4030800@arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 7 Oct 2015 12:15:31 +0100
+Subject: [PATCH v2 4/9] dmaengine: st_fdma: Add STMicroelectronics FDMA
+ engine driver support
+In-Reply-To: <1441980871-24475-5-git-send-email-peter.griffin@linaro.org>
+References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
+ <1441980871-24475-5-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20151007111529.GA4810@vkoul-mobl.iind.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/15 16:41, Suzuki K. Poulose wrote:
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
-> 
-> The existing fake pgd handling code assumes that the stage-2 entry
-> level can only be one level down that of the host, which may not be
-> true always(e.g, with the introduction of 16k pagesize).
-> 
-> e.g.
-> With 16k page size and 48bit VA and 40bit IPA we have the following
-> split for page table levels:
-> 
-> level:  0       1         2         3
-> bits : [47] [46 - 36] [35 - 25] [24 - 14] [13 - 0]
->          ^       ^     ^
->          |       |     |
->    host entry    |     x---- stage-2 entry
->                  |
->         IPA -----x
-> 
-> The stage-2 entry level is 2, due to the concatenation of 16tables
-> at level 2(mandated by the hardware). So, we need to fake two levels
-> to actually reach the hyp page table. This case cannot be handled
+On Fri, Sep 11, 2015 at 03:14:26PM +0100, Peter Griffin wrote:
 
-Nit: this is the stage-2 PT, not HYP.
+> +static char *fdma_clk_name[CLK_MAX_NUM] = {
+> +	[CLK_SLIM]	= "fdma_slim",
+> +	[CLK_HI]	= "fdma_hi",
+> +	[CLK_LOW]	= "fdma_low",
+> +	[CLK_IC]	= "fdma_ic",
+> +};
 
-> with the existing code, as, all we know about is KVM_PREALLOC_LEVEL
-> which kind of stands for two different pieces of information.
-> 
-> 1) Whether we have fake page table entry levels.
-> 2) The entry level of stage-2 translation.
-> 
-> We loose the information about the number of fake levels that
-> we may have to use. Also, KVM_PREALLOC_LEVEL computation itself
-> is wrong, as we assume the hw entry level is always 1 level down
-> from the host.
-> 
-> This patch introduces two seperate indicators :
+why do we want to have this sort of data in kernel, we should get the clocks
+from DT here
 
-Nit: "separate".
+> +static int config_reqctrl(struct st_fdma_chan *fchan)
+> +{
+> +	u32 maxburst = 0, addr = 0;
+> +	enum dma_slave_buswidth width;
+> +	int ch_id = fchan->vchan.chan.chan_id;
+> +	struct st_fdma_dev *fdev = fchan->fdev;
+> +
+> +	if (fchan->scfg.direction == DMA_DEV_TO_MEM) {
+> +		fchan->cfg.req_ctrl &= ~REQ_CTRL_WNR;
+> +		maxburst = fchan->scfg.src_maxburst;
+> +		width = fchan->scfg.src_addr_width;
+> +		addr = fchan->scfg.src_addr;
+> +	} else if (fchan->scfg.direction == DMA_MEM_TO_DEV) {
+> +		fchan->cfg.req_ctrl |= REQ_CTRL_WNR;
+> +		maxburst = fchan->scfg.dst_maxburst;
+> +		width = fchan->scfg.dst_addr_width;
+> +		addr = fchan->scfg.dst_addr;
 
-> 1) Accurate entry level for stage-2 translation - HYP_PGTABLE_ENTRY_LEVEL -
->    using the new helpers.
+This raises red flags, why do we have direction in channel, and where is
+this set. Direction belong to a descriptor and you are supposed to use
+direction from prep_ calls!
 
-Same confusion here. HYP has its own set of page tables, and this
-definitely is S2, not HYP. Please update this symbol (and all the
-similar ones) so that it is not confusing.
 
-> 2) Number of levels of fake pagetable entries. (KVM_FAKE_PGTABLE_LEVELS)
-> 
-> The following conditions hold true for all cases(with 40bit IPA)
-> 1) The stage-2 entry level <= 2
-> 2) Number of fake page-table entries is in the inclusive range [0, 2].
-> 
-> Cc: kvmarm at lists.cs.columbia.edu
-> Cc: christoffer.dall at linaro.org
-> Cc: Marc.Zyngier at arm.com
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/kvm_mmu.h |  114 ++++++++++++++++++++------------------
->  1 file changed, 61 insertions(+), 53 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 2567fe8..72cfd9e 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -41,18 +41,6 @@
->   */
->  #define TRAMPOLINE_VA		(HYP_PAGE_OFFSET_MASK & PAGE_MASK)
->  
-> -/*
-> - * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation
-> - * levels in addition to the PGD and potentially the PUD which are
-> - * pre-allocated (we pre-allocate the fake PGD and the PUD when the Stage-2
-> - * tables use one level of tables less than the kernel.
-> - */
-> -#ifdef CONFIG_ARM64_64K_PAGES
-> -#define KVM_MMU_CACHE_MIN_PAGES	1
-> -#else
-> -#define KVM_MMU_CACHE_MIN_PAGES	2
-> -#endif
-> -
->  #ifdef __ASSEMBLY__
->  
->  /*
-> @@ -80,6 +68,26 @@
->  #define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
->  #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
->  
-> +/*
-> + * At stage-2 entry level, upto 16 tables can be concatenated and
-> + * the hardware expects us to use concatenation, whenever possible.
-> + * So, number of page table levels for KVM_PHYS_SHIFT is always
-> + * the number of normal page table levels for (KVM_PHYS_SHIFT - 4).
-> + */
-> +#define HYP_PGTABLE_LEVELS	ARM64_HW_PGTABLE_LEVELS(KVM_PHYS_SHIFT - 4)
-> +/* Number of bits normally addressed by HYP_PGTABLE_LEVELS */
-> +#define HYP_PGTABLE_SHIFT	ARM64_HW_PGTABLE_LEVEL_SHIFT(HYP_PGTABLE_LEVELS + 1)
+> +	if (!is_slave_direction(direction)) {
+> +		dev_err(fchan->fdev->dev, "bad direction?\n");
+> +		return NULL;
+> +	}
+> +
+> +	if (!config_reqctrl(fchan)) {
+> +		dev_err(fchan->fdev->dev, "bad width or direction\n");
 
-Why +1? I don't understand where that is coming from... which makes the
-rest of the patch fairly opaque to me...
+would make sense to print proper error in called fn
 
-	M.
+> +static enum dma_status st_fdma_tx_status(struct dma_chan *chan,
+> +					 dma_cookie_t cookie,
+> +					 struct dma_tx_state *txstate)
+> +{
+> +	struct st_fdma_chan *fchan = to_st_fdma_chan(chan);
+> +	struct virt_dma_desc *vd;
+> +	enum dma_status ret;
+> +	unsigned long flags;
+> +
+> +	ret = dma_cookie_status(chan, cookie, txstate);
+> +	if (ret == DMA_COMPLETE)
+> +		return ret;
+> +
+> +	if (!txstate)
+> +		return fchan->status;
+
+why channel status and not cookie status ?
+
+> +static const struct st_fdma_ram fdma_mpe31_mem[] = {
+> +	{ .name = "dmem", .offset = 0x10000, .size = 0x3000 },
+> +	{ .name = "imem", .offset = 0x18000, .size = 0x8000 },
+> +};
+
+why aren't these coming from DT ?
+
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_DESCRIPTION("STMicroelectronics FDMA engine driver");
+> +MODULE_AUTHOR("Ludovic.barre <Ludovic.barre@st.com>");
+
+No MODULE_ALIAS ?
+
 -- 
-Jazz is not dead. It just smells funny...
+~Vinod
