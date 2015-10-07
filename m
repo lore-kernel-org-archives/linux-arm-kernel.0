@@ -1,49 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Oct 2015 10:57:50 +0900
-Subject: [PATCH 13/28] ARM: shmobile: lager: use CCF for audio clock
+Date: Wed,  7 Oct 2015 10:57:52 +0900
+Subject: [PATCH 15/28] ARM: shmobile: r8a7791: tidyup SSI resource region
 In-Reply-To: <cover.1444182812.git.horms+renesas@verge.net.au>
 References: <cover.1444182812.git.horms+renesas@verge.net.au>
-Message-ID: <6bc651afec2dba4d3e40901a2c5cfc88ad35d97a.1444182812.git.horms+renesas@verge.net.au>
+Message-ID: <8c3f903bd362328aac997aba1adfea59e337918a.1444182812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Because of historical reason, audio clock didn't use CCF.
-Let's use it now.
-
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 37dec5269491..6f5d7f50d5ca 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -174,6 +174,13 @@
- 			  1800000 0>;
- 	};
- 
-+	audio_clock: clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <11289600>;
-+		clock-output-names = "audio_clock";
-+	};
-+
- 	rsnd_ak4643: sound {
- 		compatible = "simple-audio-card";
- 
-@@ -187,7 +194,7 @@
- 
- 		sndcodec: simple-audio-card,codec {
- 			sound-dai = <&ak4643>;
--			system-clock-frequency = <11289600>;
-+			clocks = <&audio_clock>;
- 		};
- 	};
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 831525dd39a6..3b8e26dde36d 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1649,7 +1649,7 @@
+ 		reg =	<0 0xec500000 0 0x1000>, /* SCU */
+ 			<0 0xec5a0000 0 0x100>,  /* ADG */
+ 			<0 0xec540000 0 0x1000>, /* SSIU */
+-			<0 0xec541000 0 0x1280>, /* SSI */
++			<0 0xec541000 0 0x280>,  /* SSI */
+ 			<0 0xec740000 0 0x200>;  /* Audio DMAC peri peri*/
+ 		reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
  
 -- 
 2.1.4
