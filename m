@@ -1,75 +1,55 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 7 Oct 2015 16:06:40 +0200
-Subject: [PATCH 2/2] mmc: host: omap_hsmmc: Fix MMC for omap3 legacy
- booting
-In-Reply-To: <1444224145-24333-2-git-send-email-tony@atomide.com>
-References: <1444224145-24333-1-git-send-email-tony@atomide.com>
- <1444224145-24333-2-git-send-email-tony@atomide.com>
-Message-ID: <CAPDyKFrT=E59OypujZNaXj+wELhdcyzK7pcdtNrT_=cEubMXtQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed,  7 Oct 2015 15:10:38 +0100
+Subject: [PATCH -tip] ARM: atomics: implement _relaxed variants of
+ atomic[64]_{inc, dec}
+Message-ID: <1444227038-12533-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 October 2015 at 15:22, Tony Lindgren <tony@atomide.com> wrote:
-> Starting with commit 7d607f917008 ("mmc: host: omap_hsmmc: use
-> devm_regulator_get_optional() for vmmc") MMC on omap3 stopped working
-> for legacy booting.
->
-> This is because legacy booting sets up some of the resource in the
-> platform init code, and for optional regulators always seem to
-> return -EPROBE_DEFER for the legacy booting.
->
-> Let's fix the issue by checking for device tree based booting for
-> now. Then when omap3 boots in device tree only mode, this patch
-> can be just reverted.
->
-> Fixes: 7d607f917008 ("mmc: host: omap_hsmmc: use
-> devm_regulator_get_optional() for vmmc")
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Now that the core code supports acquire/release/relaxed versions of
+the atomic_inc family, implement only the _relaxed flavours in the ARM
+backend so that we get all of the others for free.
 
-Thanks, applied for fixes!
+Cc: Davidlohr Bueso <dbueso@suse.de>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
 
-Kind regards
-Uffe
+This sits on top of tip/locking/core and it would be great to have it
+queued there.
 
-> ---
->  drivers/mmc/host/omap_hsmmc.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index ae3a2b9..7fb0753 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -478,7 +478,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
->         mmc->supply.vmmc = devm_regulator_get_optional(host->dev, "vmmc");
->         if (IS_ERR(mmc->supply.vmmc)) {
->                 ret = PTR_ERR(mmc->supply.vmmc);
-> -               if (ret != -ENODEV)
-> +               if ((ret != -ENODEV) && host->dev->of_node)
->                         return ret;
->                 dev_dbg(host->dev, "unable to get vmmc regulator %ld\n",
->                         PTR_ERR(mmc->supply.vmmc));
-> @@ -493,7 +493,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
->         mmc->supply.vqmmc = devm_regulator_get_optional(host->dev, "vmmc_aux");
->         if (IS_ERR(mmc->supply.vqmmc)) {
->                 ret = PTR_ERR(mmc->supply.vqmmc);
-> -               if (ret != -ENODEV)
-> +               if ((ret != -ENODEV) && host->dev->of_node)
->                         return ret;
->                 dev_dbg(host->dev, "unable to get vmmc_aux regulator %ld\n",
->                         PTR_ERR(mmc->supply.vqmmc));
-> @@ -503,7 +503,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
->         host->pbias = devm_regulator_get_optional(host->dev, "pbias");
->         if (IS_ERR(host->pbias)) {
->                 ret = PTR_ERR(host->pbias);
-> -               if (ret != -ENODEV)
-> +               if ((ret != -ENODEV) && host->dev->of_node)
->                         return ret;
->                 dev_dbg(host->dev, "unable to get pbias regulator %ld\n",
->                         PTR_ERR(host->pbias));
-> --
-> 2.1.4
->
+ arch/arm/include/asm/atomic.h | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+index 2bf80afb7841..9e10c4567eb4 100644
+--- a/arch/arm/include/asm/atomic.h
++++ b/arch/arm/include/asm/atomic.h
+@@ -210,8 +210,8 @@ ATOMIC_OP(xor, ^=, eor)
+ 
+ #define atomic_inc_and_test(v)	(atomic_add_return(1, v) == 0)
+ #define atomic_dec_and_test(v)	(atomic_sub_return(1, v) == 0)
+-#define atomic_inc_return(v)    (atomic_add_return(1, v))
+-#define atomic_dec_return(v)    (atomic_sub_return(1, v))
++#define atomic_inc_return_relaxed(v)    (atomic_add_return_relaxed(1, v))
++#define atomic_dec_return_relaxed(v)    (atomic_sub_return_relaxed(1, v))
+ #define atomic_sub_and_test(i, v) (atomic_sub_return(i, v) == 0)
+ 
+ #define atomic_add_negative(i,v) (atomic_add_return(i, v) < 0)
+@@ -442,11 +442,11 @@ static inline int atomic64_add_unless(atomic64_t *v, long long a, long long u)
+ 
+ #define atomic64_add_negative(a, v)	(atomic64_add_return((a), (v)) < 0)
+ #define atomic64_inc(v)			atomic64_add(1LL, (v))
+-#define atomic64_inc_return(v)		atomic64_add_return(1LL, (v))
++#define atomic64_inc_return_relaxed(v)	atomic64_add_return_relaxed(1LL, (v))
+ #define atomic64_inc_and_test(v)	(atomic64_inc_return(v) == 0)
+ #define atomic64_sub_and_test(a, v)	(atomic64_sub_return((a), (v)) == 0)
+ #define atomic64_dec(v)			atomic64_sub(1LL, (v))
+-#define atomic64_dec_return(v)		atomic64_sub_return(1LL, (v))
++#define atomic64_dec_return_relaxed(v)	atomic64_sub_return_relaxed(1LL, (v))
+ #define atomic64_dec_and_test(v)	(atomic64_dec_return((v)) == 0)
+ #define atomic64_inc_not_zero(v)	atomic64_add_unless((v), 1LL, 0LL)
+ 
+-- 
+2.1.4
