@@ -1,49 +1,73 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Oct 2015 06:40:10 -0700
-Subject: [PATCH 2/2] memory: omap-gpmc: expand the description of the
- debug facility
-In-Reply-To: <5614FD01.6090009@ti.com>
-References: <1444162070-22034-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1444162070-22034-2-git-send-email-u.kleine-koenig@pengutronix.de>
- <5614CDAE.6070604@ti.com> <20151007075338.GH3982@pengutronix.de>
- <20151007102822.GT23801@atomide.com>
- <20151007110231.GL3982@pengutronix.de> <5614FD01.6090009@ti.com>
-Message-ID: <20151007134010.GW23801@atomide.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 7 Oct 2015 15:41:46 +0200
+Subject: All OMAP platforms: MMC is broken
+In-Reply-To: <20151007132642.GV23801@atomide.com>
+References: <20151005112304.GZ23801@atomide.com>
+ <20151005143532.GA23801@atomide.com>
+ <20151005145127.GB23801@atomide.com>
+ <20151005171155.GF23801@atomide.com>
+ <20151005183813.GD21626@n2100.arm.linux.org.uk>
+ <20151006090015.GE21626@n2100.arm.linux.org.uk>
+ <20151006094425.GM23801@atomide.com>
+ <20151006150009.GF21626@n2100.arm.linux.org.uk>
+ <20151006153710.GS23801@atomide.com>
+ <20151007124551.GI21626@n2100.arm.linux.org.uk>
+ <20151007132642.GV23801@atomide.com>
+Message-ID: <CAPDyKFoBPEnHuNR_bsrPU6X=q5pHa8cDR7_Ng9xLnLsudymvOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [151007 04:12]:
-> On 07/10/15 14:02, Uwe Kleine-K?nig wrote:
-> > Hello Tony,
-> > 
-> > On Wed, Oct 07, 2015 at 03:41:19AM -0700, Tony Lindgren wrote:
-> >> * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [151007 00:57]:
-> >>> On Wed, Oct 07, 2015 at 10:45:50AM +0300, Roger Quadros wrote:
-> >>>>
-> >>>> How about this instead?
-> >>>>
-> >>>> NOTE: Apart from matching the register setup with the bootloader you also need to
-> >>>> match the GPMC FCLK frequency used by the bootloader else the GPMC timings
-> >>>> won't be identical with the bootloader timings.
-> >>> Yeah, sounds better, thanks.
-> >>>
-> >>>> Also you might need to build this patch on top of
-> >>>> http://article.gmane.org/gmane.linux.kernel/2054796
-> >>> I talked to Tony about this patch yesterday on irc, but I didn't find it
-> >>> in the archives yet when I sent my mail.
-> >>
-> >> Yes sorry here's a repost with your and Roger's changes folded in and
-> >> edited a bit. Probably best to keep them together with this patch.
-> >>
-> >> Does the following look OK to you guys?
-> > Yes,
-> > Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
-> Looks good to me too.
+On 7 October 2015 at 15:26, Tony Lindgren <tony@atomide.com> wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [151007 05:50]:
+>> On Tue, Oct 06, 2015 at 08:37:11AM -0700, Tony Lindgren wrote:
+>> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [151006 08:04]:
+>> > > On Tue, Oct 06, 2015 at 02:44:25AM -0700, Tony Lindgren wrote:
+>> > > >
+>> > > > Hmm DT-based boot finds the MMC card for LDP, dmesg below from DT boot [1].
+>> > > > Looks like you're on on -rc4 and not -rc3. My guess is that MMC is not
+>> > > > working for you with DT-based booting because you don't seem to have
+>> > > > CONFIG_REGULATOR_PBIAS in your seed config for. Care to try enabling that
+>> > > > for both your omap3 and omap4 seed config files?
+>> > >
+>> > > This is precisely the kind of crap I'm objecting to.  New kernel versions
+>> > > come along, and things break because people add extra Kconfig symbols that
+>> > > previous versions did not rely upon - and there's no communication of
+>> > > what's required for new kernel versions.
+>> > >
+>> > > This stuff needs documenting, so that people are aware what changes they
+>> > > need to make - please put something in Documentation/arm/OMAP which
+>> > > tracks what new additions are required to the Kconfig to keep things
+>> > > working.
+>> >
+>> > Good idea, how about something like the following? AFAIK that's the
+>> > only .config option needed as MFD_SYSCON is selected by Kconfig
+>> > already.
 
-Are you OK if I use your Acked-by from the previous version on
-this updated version?
+Similar to MFD_SYSCON, why don't we have REGULATOR_PBIAS to be
+selected when omap_hsmmc is being used?
 
-Regards,
+It seems like that should also be a patch for the rc, right!?
 
-Tony
+>>
+>> Right, that resolves the issue.  Now, what's the story on the revert
+>> and the other patch - have they already been taken for -rc kernels?
+
+Great!
+
+>
+> Not yet, I was waiting for the confirmation from you. I've now posted the
+> revert with proper description and the fix so Ulf can pick them up and
+> merged as regression fixes for the -rc series:
+
+I am on it!
+
+>
+> http://marc.info/?l=linux-omap&m=144422416621373&w=2
+> http://marc.info/?l=linux-omap&m=144422416921375&w=2
+
+Russell, may I add your tested by tag for these?
+
+Again, thanks!
+
+Kind regards
+Uffe
