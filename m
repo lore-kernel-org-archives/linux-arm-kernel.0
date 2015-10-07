@@ -1,31 +1,37 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Wed, 7 Oct 2015 17:14:38 +0800
-Subject: [PATCH v2 0/3] Fix random hang up issue while kernel init
-Message-ID: <1444209281-25536-1-git-send-email-jamesjj.liao@mediatek.com>
+Date: Wed, 7 Oct 2015 17:14:41 +0800
+Subject: [PATCH v2 3/3] arm64: dts: mt8173: Add clocks for SCPSYS unit
+In-Reply-To: <1444209281-25536-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1444209281-25536-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1444209281-25536-4-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is based on v4.3-rc4, to fix system hanging up issue
-while disabling unused clocks.
+Add clocks needed by Mediatek VENC and VENC_LT power domianis.
+These clocks were needed by accessing subsystem's registers,
+so they need to be enabled before power on these subsystems.
 
-There is nothing different in mtk-scpsys.c and mt8173.dtsi from v1 [1].
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Changes since v1:
-- Rebase to v4.3-rc4.
-- Add a patch to change the corresponding binding document.
-- Add a separated patch to change the dtsi.
-
-[1] https://patchwork.kernel.org/patch/7262411/
-
-James Liao (3):
-  dt-bindings: soc: Add clocks for Mediatek SCPSYS unit
-  soc: mediatek: Fix random hang up issue while kernel init
-  arm64: dts: mt8173: Add clocks for SCPSYS unit
-
- .../devicetree/bindings/soc/mediatek/scpsys.txt    | 10 ++--
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  6 +-
- drivers/soc/mediatek/mtk-scpsys.c                  | 67 ++++++++++++++--------
- 3 files changed, 54 insertions(+), 29 deletions(-)
-
---
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 06a1564..30fb201 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -227,8 +227,10 @@
+ 			#power-domain-cells = <1>;
+ 			reg = <0 0x10006000 0 0x1000>;
+ 			clocks = <&clk26m>,
+-				 <&topckgen CLK_TOP_MM_SEL>;
+-			clock-names = "mfg", "mm";
++				 <&topckgen CLK_TOP_MM_SEL>,
++				 <&topckgen CLK_TOP_VENC_SEL>,
++				 <&topckgen CLK_TOP_VENC_LT_SEL>;
++			clock-names = "mfg", "mm", "venc", "venc_lt";
+ 			infracfg = <&infracfg>;
+ 		};
+ 
+-- 
 1.9.1
