@@ -1,33 +1,47 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 7 Oct 2015 13:01:12 +0200
-Subject: [PATCH] watchdog: at91sam9: keep watchdog running in idle mode
-In-Reply-To: <1444163325-3041-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <1444163325-3041-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <20151007110112.GD3485@piout.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 7 Oct 2015 14:02:11 +0300
+Subject: [PATCH] ARM: shmobile: porter: add SDHI0/2 DT support
+In-Reply-To: <20151007033957.GA30650@verge.net.au>
+References: <2228837.DO5U5OvRSi@wasted.cogentembedded.com>
+ <20151007033957.GA30650@verge.net.au>
+Message-ID: <5614FBB3.5060806@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylvain,
+Hello.
 
-On 06/10/2015 at 22:28:45 +0200, Sylvain Rochet wrote :
-> Since turning on idle-halt in commit 5161b31dc39a (watchdog:
-> at91sam9_wdt: better watchdog support"), SoCs compatible with
-> at91sam9260-wdt not using a device tree no longer reboot if the watchdog
-> times out while the CPU is in idle state. Removing the
-> AT91_WDT_WDIDLEHLT flag that was set by default fixes this.
-> 
-> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-> Fixes: 5161b31dc39a ("watchdog: at91sam9_wdt: better watchdog support")
-> Cc: <stable@vger.kernel.org> # 3.14+
+On 10/7/2015 6:39 AM, Simon Horman wrote:
 
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>> Define the Porter board dependent part of the SDHI0/2 device nodes along with
+>> the  necessary  voltage regulators (note that the Vcc regulators are dummy --
+>> they are required but don't actually exist on the board). Also, GPIOs have to
+>> be used for the CD and WP signals due to the SDHI driver constraints...
+>>
+>> This patch is analogous to the commit 1299df03d719 (ARM: shmobile: henninger:
+>> add SDHI0/2 DT support) as there  are no differences between those boards in
+>> this respect.
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> ---
+>> This patch is against the 'renesas-devel-20151006-v4.3-rc4' tag of Simon
+>> Horman's 'renesas.git' repo.
+>
+> Thanks I have queued this up after addressing some issues
+> in the changelog that checkpatch complained about:
+>
+> * text > 75 characters wide
+> * Missing '"' around name of patch referred to
+>
+> Its looking like there is already quite a log shared between
 
-However, we don't really care about that for kernels after 3.18 as no
-users are using pdata anymore.
-I think you could send a follow-up patch removing pdata support
-completely.
+    Lot?
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> r8a7791-porter.dts and r8a7791-henninger.dts. Do you have any
+> thoughts on consolidating or sharing common elements between
+> them somehow?
+
+    I'm still planning to remove the Henninger's .dts for good. It was never 
+sold and so had no users outside Renesas (and Cogent Embedded), I was told.
+
+MBR, Sergei
