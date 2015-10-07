@@ -1,57 +1,55 @@
-From: ydroneaud@opteya.com (Yann Droneaud)
-Date: Wed, 07 Oct 2015 15:46:48 +0200
-Subject: [PATCH] IB/core: avoid 32-bit warning
-In-Reply-To: <56151BDF.8010504@dev.mellanox.co.il>
-References: <17269152.DqJfCm1LOx@wuerfel> <56151BDF.8010504@dev.mellanox.co.il>
-Message-ID: <1444225608.3188.67.camel@opteya.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 7 Oct 2015 14:54:13 +0100
+Subject: [PATCH 1/2] dmaengine: hdmac: factorise memset descriptor
+ allocation
+In-Reply-To: <1443711158-18495-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1443711158-18495-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1443711158-18495-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20151007135412.GB3320@vkoul-mobl.iind.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Oct 01, 2015 at 04:52:37PM +0200, Maxime Ripard wrote:
 
-Le mercredi 07 octobre 2015 ? 16:19 +0300, Sagi Grimberg a ?crit :
-> On 10/7/2015 3:29 PM, Arnd Bergmann wrote:
-> > The INIT_UDATA() macro requires a pointer or unsigned long argument
-> > for
-> > both input and output buffer, and all callers had a cast from when
-> > the code was merged until a recent restructuring, so now we get
-> > 
-> > core/uverbs_cmd.c: In function 'ib_uverbs_create_cq':
-> > core/uverbs_cmd.c:1481:66: warning: cast to pointer from integer of
-> > different size [-Wint-to-pointer-cast]
-> > 
-> > This makes the code behave as before by adding back the cast to
-> > unsigned long.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: 565197dd8fb1 ("IB/core: Extend ib_uverbs_create_cq")
-> > 
-> > diff --git a/drivers/infiniband/core/uverbs_cmd.c
-> > b/drivers/infiniband/core/uverbs_cmd.c
-> > index be4cb9f04be3..88b3b78340f2 100644
-> > --- a/drivers/infiniband/core/uverbs_cmd.c
-> > +++ b/drivers/infiniband/core/uverbs_cmd.c
-> > @@ -1478,7 +1478,7 @@ ssize_t ib_uverbs_create_cq(struct
-> > ib_uverbs_file *file,
-> >   	if (copy_from_user(&cmd, buf, sizeof(cmd)))
-> >   		return -EFAULT;
-> > 
-> > -	INIT_UDATA(&ucore, buf, cmd.response, sizeof(cmd),
-> > sizeof(resp));
-> > +	INIT_UDATA(&ucore, buf, (unsigned long)cmd.response,
-> > sizeof(cmd), sizeof(resp));
-> 
-> Would it make sense to cast inside INIT_UDATA() and not have callers
-> worry about it?
+> +static struct at_desc *atc_create_memset_desc(struct dma_chan *chan,
+> +					      dma_addr_t psrc,
+> +					      dma_addr_t pdst,
+> +					      size_t len)
+> +{
+> +	struct at_dma_chan *atchan = to_at_dma_chan(chan);
+> +	struct at_desc *desc;
+> +	size_t xfer_count;
+> +
+> +	u32 ctrla = ATC_SRC_WIDTH(2) |
+> +		ATC_DST_WIDTH(2);
 
-It's ... complicated. See INIT_UDATA_BUF_OR_NULL().
+why is this over two lines :)
 
-Awayway, I have patch to do the opposite, eg. explicitly cast u64 value
-to (void __user *)(unsigned long) in the caller function instead, as it
-allows some safer / new operations on the response buffer.
+> +	u32 ctrlb = ATC_DEFAULT_CTRLB | ATC_IEN |
+> +		ATC_SRC_ADDR_MODE_FIXED |
+> +		ATC_DST_ADDR_MODE_INCR |
+> +		ATC_FC_MEM2MEM;
+> +
+> +	xfer_count = len >> 2;
+> +	if (xfer_count > ATC_BTSIZE_MAX) {
+> +		dev_err(chan2dev(chan), "%s: buffer is too big\n",
+> +			__func__);
+> +		return NULL;
+> +	}
 
-Regards.
+This is fine, but this is driver limitation. We should really split the
+txn to multiple descriptors here..
+
+> @@ -914,46 +953,26 @@ atc_prep_dma_memset(struct dma_chan *chan, dma_addr_t dest, int value,
+>  		return NULL;
+>  	}
+>  
+> -	xfer_count = len >> 2;
+> -	if (xfer_count > ATC_BTSIZE_MAX) {
+> -		dev_err(chan2dev(chan), "%s: buffer is too big\n",
+> +	vaddr = dma_pool_alloc(atdma->memset_pool, GFP_ATOMIC, &paddr);
+
+Mostly people use _zalloc variant, any reason why you don't want that
 
 -- 
-Yann Droneaud
-OPTEYA
+~Vinod
