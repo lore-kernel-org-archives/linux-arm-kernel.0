@@ -1,51 +1,20 @@
 From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 7 Oct 2015 17:50:46 +0100
-Subject: [PATCH] nvmem: core: make default user binary file root-access
- only
-In-Reply-To: <1444235714-24365-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1444235714-24365-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20151007165046.GC12099@kroah.com>
+Date: Wed, 7 Oct 2015 17:53:25 +0100
+Subject: [PATCH 4/6] coresight: etm3x: adding cpu affinity to sysFS
+ interface
+In-Reply-To: <1444231603-26676-5-git-send-email-mathieu.poirier@linaro.org>
+References: <1444231603-26676-1-git-send-email-mathieu.poirier@linaro.org>
+ <1444231603-26676-5-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20151007165325.GA12439@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 05:35:14PM +0100, Srinivas Kandagatla wrote:
-> As required by many providers like at24/at25/mxs-ocotp/qfprom, which would
-> want to allow root-only to read/write the nvmem content.
-> So making the defaults to be root-only access which can prevent normal
-> users from reading the nvmem data.
+On Wed, Oct 07, 2015 at 09:26:41AM -0600, Mathieu Poirier wrote:
+> Without access to the device tree, it is impossible to know
+> what CPU a tracer is affined to.  As such adding a new sysFS
+> interface to convey the information.
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  drivers/nvmem/core.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-> index 6fd4e5a..4d2e476 100644
-> --- a/drivers/nvmem/core.c
-> +++ b/drivers/nvmem/core.c
-> @@ -112,7 +112,7 @@ static ssize_t bin_attr_nvmem_write(struct file *filp, struct kobject *kobj,
->  static struct bin_attribute bin_attr_rw_nvmem = {
->  	.attr	= {
->  		.name	= "nvmem",
-> -		.mode	= S_IWUSR | S_IRUGO,
-> +		.mode	= S_IWUSR | S_IRUSR,
->  	},
->  	.read	= bin_attr_nvmem_read,
->  	.write	= bin_attr_nvmem_write,
-> @@ -136,7 +136,7 @@ static const struct attribute_group *nvmem_rw_dev_groups[] = {
->  static struct bin_attribute bin_attr_ro_nvmem = {
->  	.attr	= {
->  		.name	= "nvmem",
-> -		.mode	= S_IRUGO,
-> +		.mode	= S_IRUSR,
->  	},
->  	.read	= bin_attr_nvmem_read,
->  };
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-How about using BIN_ATTR_RO() and friends instead, that way I _know_ you
-got the permissions correct as it's impossible to get them wrong by
-using those macros.
 
-thanks,
-
-greg k-h
+No documentation for this new attribute?
