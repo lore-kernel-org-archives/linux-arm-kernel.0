@@ -1,20 +1,20 @@
 From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 7 Oct 2015 17:53:25 +0100
-Subject: [PATCH 4/6] coresight: etm3x: adding cpu affinity to sysFS
- interface
-In-Reply-To: <1444231603-26676-5-git-send-email-mathieu.poirier@linaro.org>
+Date: Wed, 7 Oct 2015 17:53:39 +0100
+Subject: [PATCH 5/6] coresight: etm3x: breaking down sysFS status interface
+In-Reply-To: <1444231603-26676-6-git-send-email-mathieu.poirier@linaro.org>
 References: <1444231603-26676-1-git-send-email-mathieu.poirier@linaro.org>
- <1444231603-26676-5-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20151007165325.GA12439@kroah.com>
+ <1444231603-26676-6-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20151007165339.GB12439@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 09:26:41AM -0600, Mathieu Poirier wrote:
-> Without access to the device tree, it is impossible to know
-> what CPU a tracer is affined to.  As such adding a new sysFS
-> interface to convey the information.
+On Wed, Oct 07, 2015 at 09:26:42AM -0600, Mathieu Poirier wrote:
+> SysFS rules stipulate that only one value can be conveyed per
+> file.  As such splitting the "status" interface in individual files.
 > 
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> This is also useful for user space applications - that way they can
+> probe each file individually rather than having to parse a list of entries.
 
+Ah, much nicer, thanks for doing this.
 
-No documentation for this new attribute?
+greg k-h
