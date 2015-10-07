@@ -1,35 +1,51 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  7 Oct 2015 09:26:40 -0600
-Subject: [PATCH 3/6] coresight: adding comments to remove ambiguity
+Date: Wed,  7 Oct 2015 09:26:41 -0600
+Subject: [PATCH 4/6] coresight: etm3x: adding cpu affinity to sysFS interface
 In-Reply-To: <1444231603-26676-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1444231603-26676-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1444231603-26676-4-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1444231603-26676-5-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add comment to function coresight_enable_path() to make
-sure there is no misunderstanding about what the code does.
+Without access to the device tree, it is impossible to know
+what CPU a tracer is affined to.  As such adding a new sysFS
+interface to convey the information.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/hwtracing/coresight/coresight-etm3x.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 894531d315b8..e25492137d8b 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -240,6 +240,11 @@ static int coresight_enable_path(struct list_head *path)
- 	int ret = 0;
- 	struct coresight_device *cd;
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index bf2476ed9356..4797f56e7f13 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -1545,6 +1545,18 @@ static ssize_t status_show(struct device *dev,
+ }
+ static DEVICE_ATTR_RO(status);
  
-+	/*
-+	 * At this point we have a full @path, from source to sink.  The
-+	 * sink is the first entry and the source the last one.  Go through
-+	 * all the components and enable them one by one.
-+	 */
- 	list_for_each_entry(cd, path, path_link) {
- 		if (cd == list_first_entry(path, struct coresight_device,
- 					   path_link)) {
++static ssize_t cpu_show(struct device *dev,
++			struct device_attribute *attr, char *buf)
++{
++	int val;
++	struct etm_drvdata *drvdata = dev_get_drvdata(dev->parent);
++
++	val = drvdata->cpu;
++	return scnprintf(buf, PAGE_SIZE, "%d\n", val);
++
++}
++static DEVICE_ATTR_RO(cpu);
++
+ static ssize_t traceid_show(struct device *dev,
+ 			    struct device_attribute *attr, char *buf)
+ {
+@@ -1621,6 +1633,7 @@ static struct attribute *coresight_etm_attrs[] = {
+ 	&dev_attr_timestamp_event.attr,
+ 	&dev_attr_status.attr,
+ 	&dev_attr_traceid.attr,
++	&dev_attr_cpu.attr,
+ 	NULL,
+ };
+ ATTRIBUTE_GROUPS(coresight_etm);
 -- 
 1.9.1
