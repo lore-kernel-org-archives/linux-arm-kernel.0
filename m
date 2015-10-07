@@ -1,27 +1,73 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 6 Oct 2015 21:37:41 -0400 (EDT)
-Subject: [PATCH] ARM:mm: fix kmap_atomic_to_page
-In-Reply-To: <20151006192836.GX21513@n2100.arm.linux.org.uk>
-References: <1444129773-12632-1-git-send-email-chanho.min@lge.com>
- <20151006192836.GX21513@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.20.1510062136190.1531@knanqh.ubzr>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 07 Oct 2015 10:37:42 +0900
+Subject: [PATCH 5/6] ARM: s3c64xx: hmt: Use PWM lookup table
+In-Reply-To: <1444049237-29878-6-git-send-email-thierry.reding@gmail.com>
+References: <1444049237-29878-1-git-send-email-thierry.reding@gmail.com>
+ <1444049237-29878-6-git-send-email-thierry.reding@gmail.com>
+Message-ID: <56147766.6010703@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 Oct 2015, Russell King - ARM Linux wrote:
-
-> On Tue, Oct 06, 2015 at 08:09:33PM +0900, Chanho Min wrote:
-> > Since kmap_atomic returns the pkmap address without a new mapping to
-> > fixmap for the page that is already mapped by kmap, It should be
-> > considered for the pkmap address in kmap_atomic_to_page.
+On 05.10.2015 21:47, Thierry Reding wrote:
+> Use a PWM lookup table to provide the PWM to the pwm-backlight device.
+> The driver has a legacy code path that is required only because boards
+> still use the legacy method of requesting PWMs by global ID. Replacing
+> these usages allows that legacy fallback to be removed.
 > 
-> What's the reasoning behind this change, given that I can find lots of
-> definitions of kmap_atomic_to_page() in the kernel, but not a single
-> user of this.
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
+> ---
+>  arch/arm/mach-s3c64xx/mach-hmt.c | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
 > 
-> If there's no users, should we be deleting this code?
+> diff --git a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
+> index e4b087c58ee6..816b39d1e6d1 100644
+> --- a/arch/arm/mach-s3c64xx/mach-hmt.c
+> +++ b/arch/arm/mach-s3c64xx/mach-hmt.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/gpio.h>
+>  #include <linux/delay.h>
+>  #include <linux/leds.h>
+> +#include <linux/pwm.h>
+>  #include <linux/pwm_backlight.h>
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/mtd/partitions.h>
+> @@ -73,6 +74,11 @@ static struct s3c2410_uartcfg hmt_uartcfgs[] __initdata = {
+>  	},
+>  };
+>  
+> +static struct pwm_lookup hmt_pwm_lookup[] = {
+> +	PWM_LOOKUP("samsung-pwm", 1, "pwm-backlight.0", NULL,
 
-I think commit 5bbeed12bdc3 provides the answer to that question.
+Same questions as in patch 2 - why suffix ".0" for "pwm-backlight"?
 
+Best regards,
+Krzysztof
 
-Nicolas
+> +		   1000000000 / (100 * 256 * 20), PWM_POLARITY_NORMAL),
+> +};
+> +
+>  static int hmt_bl_init(struct device *dev)
+>  {
+>  	int ret;
+> @@ -110,10 +116,8 @@ static void hmt_bl_exit(struct device *dev)
+>  }
+>  
+>  static struct platform_pwm_backlight_data hmt_backlight_data = {
+> -	.pwm_id		= 1,
+>  	.max_brightness	= 100 * 256,
+>  	.dft_brightness	= 40 * 256,
+> -	.pwm_period_ns	= 1000000000 / (100 * 256 * 20),
+>  	.enable_gpio	= -1,
+>  	.init		= hmt_bl_init,
+>  	.notify		= hmt_bl_notify,
+> @@ -268,6 +272,7 @@ static void __init hmt_machine_init(void)
+>  	gpio_request(S3C64XX_GPF(13), "usb power");
+>  	gpio_direction_output(S3C64XX_GPF(13), 1);
+>  
+> +	pwm_add_table(hmt_pwm_lookup, ARRAY_SIZE(hmt_pwm_lookup));
+>  	platform_add_devices(hmt_devices, ARRAY_SIZE(hmt_devices));
+>  }
+>  
+> 
