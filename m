@@ -1,37 +1,32 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 7 Oct 2015 19:13:54 +0300
-Subject: [PATCH v5 10/23] arm64: introduce is_a32_task and is_a32_thread
- (for AArch32 compat)
-In-Reply-To: <5613929D.6070802@linaro.org>
-References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
- <1443564860-31208-11-git-send-email-ynorov@caviumnetworks.com>
- <5613929D.6070802@linaro.org>
-Message-ID: <20151007161354.GA28128@yury-N73SV>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 07 Oct 2015 17:22:07 +0100
+Subject: [PATCH v3 00/16] KVM: arm64: GICv3 ITS emulation
+In-Reply-To: <029601d1011a$026e1000$074a3000$@samsung.com>
+References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
+ <029601d1011a$026e1000$074a3000$@samsung.com>
+Message-ID: <561546AF.90903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 12:21:33PM +0300, Andrey Konovalov wrote:
-> Hi Yury,
+On 07/10/15 17:05, Pavel Fedin wrote:
+>  Hello!
 > 
-> With this patch set 4.3 kernel fails to build with arch/arm64/configs/defconfig plus CONFIG_AARCH32_EL0=y
-> and CONFIG_ARM64_ILP32=y giving the following three errors (the 3d one is warning actually):
+>  One more concern about the whole thing. I already replied to the previous series, but looks like my
+> reply was missed.
+>  Your implementation does not care about live migration at all. And there's one fundamental issue
+> with it. In the redistributor LPIs can be only pending, but in the CPU interface they still can be
+> active. And they have priorities, therefore they can be preempted, so we can have even more than one
+> active LPI at once. How to migrate this state?
+>  Here i am trying to prototype this by leaving active interrupts in LRs and allowing the userland to
+> read/write them. This looks a bit stupid, additionally this will create problems if we are e. g.
+> migrating from host with 8 LRs to host with 4 LRs, while having 6 active LPIs. Can anybody suggest
+> better solution?
+>  Technically LPI pending table has unused bits from 0 to 8191, and we have 8192 LPIs, so we could
+> push active state there, just for migration. Would this be a big violation of specification? It says
+> nothing about these bits at all.
 
-[...]
+LPIs do not have an active state, at the redistributor or otherwise.
 
-> Thanks,
-> Andrey
-
-Hi, Andrey,
-
-Thank you. If you're interested in early testing, you can pull
-my working branch here:
-
-https://github.com/norov/linux/tree/ilp
-
-There, build for all combinations of CONFIG_AARCH32_EL0 and
-CONFIG_ARM64_ILP32 is fixed.
-
-I can also share my testing tools, if needed.
-
-BR,
-Yury.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
