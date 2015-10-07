@@ -1,41 +1,46 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue, 06 Oct 2015 18:18:12 -0700
-Subject: [PATCH v2 03/10] arm64: flush: use local TLB and I-cache
- invalidation
-In-Reply-To: <1444153590-24173-4-git-send-email-will.deacon@arm.com>
-References: <1444153590-24173-1-git-send-email-will.deacon@arm.com>
- <1444153590-24173-4-git-send-email-will.deacon@arm.com>
-Message-ID: <561472D4.4060608@gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 06 Oct 2015 18:24:44 -0700
+Subject: [PATCH v4] clk: bcm2835: Add support for programming the audio
+ domain clocks.
+In-Reply-To: <56143AC9.60506@lategoodbye.de>
+References: <1443815696-11528-1-git-send-email-eric@anholt.net>
+ <56143AC9.60506@lategoodbye.de>
+Message-ID: <87bncbo4gz.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/2015 10:46 AM, Will Deacon wrote:
-> There are a number of places where a single CPU is running with a
-> private page-table and we need to perform maintenance on the TLB and
-> I-cache in order to ensure correctness, but do not require the operation
-> to be broadcast to other CPUs.
+Stefan Wahren <info@lategoodbye.de> writes:
+
+> Hi Eric,
 >
-> This patch adds local variants of tlb_flush_all and __flush_icache_all
-> to support these use-cases and updates the callers respectively.
-> __local_flush_icache_all also implies an isb, since it is intended to be
-> used synchronously.
+> Am 02.10.2015 um 21:54 schrieb Eric Anholt:
+>> This adds support for enabling, disabling, and setting the rate of the
+>> audio domain clocks.  It will be necessary for setting the pixel clock
+>> for HDMI in the VC4 driver and let us write a cpufreq driver.  It will
+>> also improve compatibility with user changes to the firmware's
+>> config.txt, since our previous fixed clocks are unaware of it.
+>>
+>> The firmware also has support for configuring the clocks through the
+>> mailbox channel, but the pixel clock setup by the firmware doesn't
+>> work, and it's Raspberry Pi specific anyway.  The only conflicts we
+>> should have with the firmware would be if we made firmware calls that
+>> result in clock management (like opening firmware V3D or ISP access,
+>> which we don't support in upstream), or on hardware over-thermal or
+>> under-voltage (when the firmware would rewrite PLLB to take the ARM
+>> out of overclock).  If that happens, our cached .recalc_rate() results
+>> would be incorrect, but that's no worse than our current state where
+>> we used fixed clocks.
+>>
+>> The existing fixed clocks in the code are left in place to provide
+>> backwards compatibility with old device tree files.
 >
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> only a few nits.
 
-I like this one.  It is similar to what some of my earlier patches did.
-
-Acked-by: David Daney <david.daney@cavium.com>
-
-
-> ---
->   arch/arm64/include/asm/cacheflush.h | 7 +++++++
->   arch/arm64/include/asm/tlbflush.h   | 8 ++++++++
->   arch/arm64/kernel/efi.c             | 4 ++--
->   arch/arm64/kernel/smp.c             | 2 +-
->   arch/arm64/kernel/suspend.c         | 2 +-
->   arch/arm64/mm/context.c             | 4 ++--
->   arch/arm64/mm/mmu.c                 | 2 +-
->   7 files changed, 22 insertions(+), 7 deletions(-)
->
-[...]
+I think I've done all of these now, sending out v5.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151006/a55bae8b/attachment.sig>
