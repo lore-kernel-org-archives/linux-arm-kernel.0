@@ -1,105 +1,48 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 7 Oct 2015 13:25:28 +0200
-Subject: [PATCH v5 0/17] Add Analogix Core Display Port Driver
-In-Reply-To: <5614FC6B.4080702@rock-chips.com>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
- <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
- <5614BADD.1070307@rock-chips.com> <5614DBE2.6080102@osg.samsung.com>
- <5614DFBC.8060105@rock-chips.com> <5614E553.6060108@osg.samsung.com>
- <5614FC6B.4080702@rock-chips.com>
-Message-ID: <56150128.2070309@osg.samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Oct 2015 12:29:14 +0100
+Subject: PING: [PATCH v4 TRIVIAL 1/2] ARM: Enable GICv2m on 32-bit virt
+ machine
+In-Reply-To: <01d701d100ef$a5510870$eff31950$@samsung.com>
+References: <017801d100dc$77fe3a90$67faafb0$@samsung.com>
+ <20151007102313.GG21513@n2100.arm.linux.org.uk>
+ <01d701d100ef$a5510870$eff31950$@samsung.com>
+Message-ID: <20151007112913.GI21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Yakir,
+On Wed, Oct 07, 2015 at 02:02:23PM +0300, Pavel Fedin wrote:
+>  2/2 from this series has been ACKed and picked up by Marc Zynger. He
+> told me that 1/2 is your area of competence.
 
-On 10/07/2015 01:05 PM, Yakir Yang wrote:
-> Hi Javier,
-> 
-> On 10/07/2015 05:26 PM, Javier Martinez Canillas wrote:
->> Hello Yakir,
->>
->> On 10/07/2015 11:02 AM, Yakir Yang wrote:
->>> Hi Javier,
->>>
->>> On 10/07/2015 04:46 PM, Javier Martinez Canillas wrote:
->>>> Hello Yakir,
->>>>
->>>> On 10/07/2015 08:25 AM, Yakir Yang wrote:
->>>>> Hi all,
->>>>>
->>>>> Friendly ping.....   :)
->>>>>
->>>>>
->>>>> Best regards,
->>>>> - Yakir
->>>>>
->>>>>
->>>> Do you have a tree that I can use to test these patches?
->>> Wow, thanks a lot, I do have a tree on github [https://github.com/yakir-Yang/linux/tree/analogix_dp],
->>> crossing my finger, wish things works......    ;)
->>>
->> I tried your analogix_dp branch on an Exynos5800 Peach Pi Chromebook
->> but the machine didn't boot. Unfortunately I need to do some soldering
->> to have a serial console on this board so don't have a kernel boot log.
->>
->> I'll let you know if I can get more info about this issue.
-> 
-> Whoops, sorry for the failed, much appreciated for your works.
-> 
-> Besides, I thought maybe I can find a Peach Pit Chromebook in my side,
-> I remember that some of our guys have brought one, but previously I
-> thought that mainline kernel wouldn't run on Peach Pit directly.
-> 
+... which is kind of funny, because all of ARM Ltd's platforms that
+have PCIe on the board, and thus might have MSI, the PCIe is non-
+functional.  So, until SolidRun sent me an Armada 388 platform a few
+weeks back, I had zero MSI platforms, and zero MSI knowledge.
 
-Great, mainline works correctly on all Exynos based Chromebooks.
+Just because code falls into a particular area of the tree does not
+mean that the person who's looking after that area knows everything
+inside out - especially when it comes to architecture maintanence
+and the code in that subtree covers virtually every technology out
+there, and the maintainer is kept functional hardware-starved [*].
 
-> Maybe you can email me the method the run mainline kernel on Peach
-> Pit, so I can debug the analogix_dp driver at the same time, that would
-> be great.
+Now, the Armada 388 doesn't use the GIC for MSI, but uses its own
+interrupt controller.  I haven't yet worked out which bits of the
+kernel are being used to provide this functionality yet, but I know
+it works.  What I don't want to do is to merge your patch and then
+have my one and only MSI platform break because of it, so what I'm
+looking for is an assurance that this has had some exposure on
+non-GIC MSI platforms, or has been reviewed with this in mind.
 
-I wrote a little blog post explaining how to run mainline on these boards:
+We're having far too many regressions of the kind of "let's get X
+working on platform Y which then causes platform Z to break".
 
-http://blogs.s-osg.org/install-linux-mainline-kernel-distro-exynos-chromebooks/
 
-That explains the simplest setup though so if you need a different one
-(i.e: chain loading a non verified u-boot) or if you have any questions,
-feel free to contact me in private and I can help you with the setup.
+* - I'm not saying that I want more hardware; I've been out of physical
+space for new hardware for some time, and the few extra platforms I've
+received recently are having to be stacked on top of each other - which
+isn't good when they're bare boards.  It would be nice, however, if the
+hardware I did have was fully functional!
 
->> Also, there is Kconfig recursive dependency that you may want to fix:
->>
->> $ make exynos_defconfig
->> drivers/video/fbdev/Kconfig:5:error: recursive dependency detected!
->> drivers/video/fbdev/Kconfig:5: symbol FB is selected by DRM_KMS_FB_HELPER
->> drivers/gpu/drm/Kconfig:34: symbol DRM_KMS_FB_HELPER depends on DRM_KMS_HELPER
->> drivers/gpu/drm/Kconfig:28: symbol DRM_KMS_HELPER is selected by DRM_ANALOGIX_DP
->> drivers/gpu/drm/bridge/analogix/Kconfig:1: symbol DRM_ANALOGIX_DP is selected by DRM_EXYNOS_DP
->> drivers/gpu/drm/exynos/Kconfig:57: symbol DRM_EXYNOS_DP depends on DRM_EXYNOS_FIMD
->> drivers/gpu/drm/exynos/Kconfig:19: symbol DRM_EXYNOS_FIMD depends on FB_S3C
->> drivers/video/fbdev/Kconfig:2023: symbol FB_S3C depends on FB
->>   
-> 
-> Yeah, recursive dependency detected, guess I should remove the
-> "DRM_KMS_HELPER" from bridge analogix_dp Kconfig file, thanks
-> for your remind.
-> 
-> --- a/drivers/gpu/drm/bridge/analogix/Kconfig
-> +++ b/drivers/gpu/drm/bridge/analogix/Kconfig
-> @@ -1,4 +1,3 @@
->  config DRM_ANALOGIX_DP
->         tristate
->         depends on DRM
-> -       select DRM_KMS_HELPER
-> 
-> 
-
-That fixes the recursive dependency issue indeed. Thanks.
-
-> Thanks,
-> - Yakir
-
-Best regards,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
