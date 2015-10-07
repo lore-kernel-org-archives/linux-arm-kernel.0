@@ -1,42 +1,37 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 7 Oct 2015 11:13:33 -0500
-Subject: [PATCH 2/2] pl011: factor our FIFO to TTY code
-In-Reply-To: <1298146644-31007-1-git-send-email-linus.walleij@stericsson.com>
-References: <1298146644-31007-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CAOZdJXVVgd=YTn33VAB2GbfuPkGGapr0C=dN7J+KhdcJuOpKuA@mail.gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 7 Oct 2015 19:13:54 +0300
+Subject: [PATCH v5 10/23] arm64: introduce is_a32_task and is_a32_thread
+ (for AArch32 compat)
+In-Reply-To: <5613929D.6070802@linaro.org>
+References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
+ <1443564860-31208-11-git-send-email-ynorov@caviumnetworks.com>
+ <5613929D.6070802@linaro.org>
+Message-ID: <20151007161354.GA28128@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 19, 2011 at 2:17 PM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
-> +static int pl011_fifo_to_tty(struct uart_amba_port *uap)
-> +{
-> +       u16 status, ch;
-> +       unsigned int flag, max_count = 256;
-> +       int fifotaken = 0;
-> +
-> +       while (max_count--) {
-> +               status = readw(uap->port.membase + UART01x_FR);
-> +               if (status & UART01x_FR_RXFE)
-> +                       break;
-> +
-> +               /* Take chars from the FIFO and update status */
-> +               ch = readw(uap->port.membase + UART01x_DR) |
-> +                       UART_DUMMY_DR_RX;
+On Tue, Oct 06, 2015 at 12:21:33PM +0300, Andrey Konovalov wrote:
+> Hi Yury,
+> 
+> With this patch set 4.3 kernel fails to build with arch/arm64/configs/defconfig plus CONFIG_AARCH32_EL0=y
+> and CONFIG_ARM64_ILP32=y giving the following three errors (the 3d one is warning actually):
 
-I know this patch is four years old, but I just noticed a bug, and I
-can't figure out how no else noticed it.  Or maybe I'm imagining
-things.
+[...]
 
-#define UART_DUMMY_DR_RX        (1 << 16)
+> Thanks,
+> Andrey
 
-UART_DUMMY_DR_RX cannot fit into 'ch', because ch is a 16-bit integer.
-So the UART_DUMMY_DR_RX is lost.
+Hi, Andrey,
 
-What does UART_DUMMY_DR_RX do, anyway?  It's set in two places, but no
-one ever checks for it.
+Thank you. If you're interested in early testing, you can pull
+my working branch here:
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+https://github.com/norov/linux/tree/ilp
+
+There, build for all combinations of CONFIG_AARCH32_EL0 and
+CONFIG_ARM64_ILP32 is fixed.
+
+I can also share my testing tools, if needed.
+
+BR,
+Yury.
