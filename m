@@ -1,47 +1,34 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 7 Oct 2015 14:02:11 +0300
-Subject: [PATCH] ARM: shmobile: porter: add SDHI0/2 DT support
-In-Reply-To: <20151007033957.GA30650@verge.net.au>
-References: <2228837.DO5U5OvRSi@wasted.cogentembedded.com>
- <20151007033957.GA30650@verge.net.au>
-Message-ID: <5614FBB3.5060806@cogentembedded.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 07 Oct 2015 14:02:23 +0300
+Subject: PING: [PATCH v4 TRIVIAL 1/2] ARM: Enable GICv2m on 32-bit virt
+ machine
+In-Reply-To: <20151007102313.GG21513@n2100.arm.linux.org.uk>
+References: <017801d100dc$77fe3a90$67faafb0$@samsung.com>
+ <20151007102313.GG21513@n2100.arm.linux.org.uk>
+Message-ID: <01d701d100ef$a5510870$eff31950$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+ Hello!
 
-On 10/7/2015 6:39 AM, Simon Horman wrote:
+> I don't know enough to be able to merge this patch, and there's not
+> enough information in the commit message either.
 
->> Define the Porter board dependent part of the SDHI0/2 device nodes along with
->> the  necessary  voltage regulators (note that the Vcc regulators are dummy --
->> they are required but don't actually exist on the board). Also, GPIOs have to
->> be used for the CD and WP signals due to the SDHI driver constraints...
->>
->> This patch is analogous to the commit 1299df03d719 (ARM: shmobile: henninger:
->> add SDHI0/2 DT support) as there  are no differences between those boards in
->> this respect.
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->> ---
->> This patch is against the 'renesas-devel-20151006-v4.3-rc4' tag of Simon
->> Horman's 'renesas.git' repo.
->
-> Thanks I have queued this up after addressing some issues
-> in the changelog that checkpatch complained about:
->
-> * text > 75 characters wide
-> * Missing '"' around name of patch referred to
->
-> Its looking like there is already quite a log shared between
+ What kind of information would you need in the message?
 
-    Lot?
+>  Plus, with the lack
+> of acks from people in ARM, I'm very reluctant to take this
 
-> r8a7791-porter.dts and r8a7791-henninger.dts. Do you have any
-> thoughts on consolidating or sharing common elements between
-> them somehow?
+ cc'ing to Marc and Peter Maydell (the main person behind qemu).
 
-    I'm still planning to remove the Henninger's .dts for good. It was never 
-sold and so had no users outside Renesas (and Cogent Embedded), I was told.
+> (I don't
+> know whether the original patch got any, it's fallen out of my mailbox.)
 
-MBR, Sergei
+ 2/2 from this series has been ACKed and picked up by Marc Zynger. He told me that 1/2 is your area
+of competence.
+ Just in case, original series is here: http://www.spinics.net/lists/arm-kernel/msg442981.html
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
