@@ -1,37 +1,36 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 07 Oct 2015 17:02:52 +0800
-Subject: [PATCH v5 0/17] Add Analogix Core Display Port Driver
-In-Reply-To: <5614DBE2.6080102@osg.samsung.com>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
- <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
- <5614BADD.1070307@rock-chips.com> <5614DBE2.6080102@osg.samsung.com>
-Message-ID: <5614DFBC.8060105@rock-chips.com>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Wed,  7 Oct 2015 11:08:55 +0200
+Subject: [PATCH v4 0/4] ST PLL improvement
+Message-ID: <1444208939-10233-1-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+Changes in v4:
+ - Spinlock affectation was removed unintentionally in clkgen_pll_register()
+   since v3
 
-On 10/07/2015 04:46 PM, Javier Martinez Canillas wrote:
-> Hello Yakir,
->
-> On 10/07/2015 08:25 AM, Yakir Yang wrote:
->> Hi all,
->>
->> Friendly ping.....   :)
->>
->>
->> Best regards,
->> - Yakir
->>
->>
-> Do you have a tree that I can use to test these patches?
+Changes in v3:
+ - reorganize patch 1 and 2 to avoid a break git bisect
 
-Wow, thanks a lot, I do have a tree on github 
-[https://github.com/yakir-Yang/linux/tree/analogix_dp],
-crossing my finger, wish things works......    ;)
+Changes in v2:
+ - Add const for st_pll4600c28_418_a9 structure
+ - Use readl_relaxed_poll_timeout macro instead Jiffies
+ - Add patch to enable stih418 A9 pll via DT.
 
-Thanks,
-- Yakir
+This patchset is based on '[PATCH 0/2] ST PLL fixes for 4.3'
 
->
-> Best regards,
+Gabriel Fernandez (4):
+  drivers: clk: st: Support for enable/disable in Clockgen PLLs
+  drivers: clk: st: PLL rate change implementation for DVFS
+  drivers: clk: st: Correct the pll-type for A9 for stih418
+  ARM: STi: DT: Add support for stih418 A9 pll
+
+ .../devicetree/bindings/clock/st/st,clkgen-pll.txt |   1 +
+ arch/arm/boot/dts/stih418-clock.dtsi               |   2 +-
+ drivers/clk/st/clkgen-mux.c                        |   3 +
+ drivers/clk/st/clkgen-pll.c                        | 469 ++++++++++++++++++++-
+ drivers/clk/st/clkgen.h                            |   2 +
+ 5 files changed, 468 insertions(+), 9 deletions(-)
+
+-- 
+1.9.1
