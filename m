@@ -1,19 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Oct 2015 21:37:04 +0200
-Subject: [PATCH] ARM: configs: keystone: Add ramdisk support
-In-Reply-To: <1444246089-1417-1-git-send-email-nm@ti.com>
-References: <1444246089-1417-1-git-send-email-nm@ti.com>
-Message-ID: <12772658.mmM2ZKnfR4@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 7 Oct 2015 21:40:42 +0200
+Subject: All OMAP platforms: MMC is broken
+In-Reply-To: <20151007155206.GX23801@atomide.com>
+References: <20151005145127.GB23801@atomide.com>
+ <20151005171155.GF23801@atomide.com>
+ <20151005183813.GD21626@n2100.arm.linux.org.uk>
+ <20151006090015.GE21626@n2100.arm.linux.org.uk>
+ <20151006094425.GM23801@atomide.com>
+ <20151006150009.GF21626@n2100.arm.linux.org.uk>
+ <20151006153710.GS23801@atomide.com>
+ <20151007124551.GI21626@n2100.arm.linux.org.uk>
+ <20151007132642.GV23801@atomide.com>
+ <CAPDyKFoBPEnHuNR_bsrPU6X=q5pHa8cDR7_Ng9xLnLsudymvOg@mail.gmail.com>
+ <20151007155206.GX23801@atomide.com>
+Message-ID: <CAPDyKFp5e_pizFSCzeYSM8sXGx6Jewgs2PRB-RQ1iWMM6WMOww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 October 2015 14:28:09 Nishanth Menon wrote:
-> Add ramdisk support to allow for minimal kernel to be supported.
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> 
+On 7 October 2015 at 17:52, Tony Lindgren <tony@atomide.com> wrote:
+> * Ulf Hansson <ulf.hansson@linaro.org> [151007 06:46]:
+>> On 7 October 2015 at 15:26, Tony Lindgren <tony@atomide.com> wrote:
+>> >> > Good idea, how about something like the following? AFAIK that's the
+>> >> > only .config option needed as MFD_SYSCON is selected by Kconfig
+>> >> > already.
+>>
+>> Similar to MFD_SYSCON, why don't we have REGULATOR_PBIAS to be
+>> selected when omap_hsmmc is being used?
+>>
+>> It seems like that should also be a patch for the rc, right!?
+>
+> Well selecting CONFIG_REGULATOR is still optional and force selecting
+> drivers usually leads into randconfig build issues sooner or later.
+> And we'd like to make everything into loadable modules eventually.
 
-I have not seen that in a while. Can you explain why the normal
-initramfs method doesn't work on keystone?
+I am not sure I get your point. Perhaps I was too vague in what I suggested.
 
-	Arnd
+Unless we express the dependencies via Kconfig files (or perhaps via
+updated defconfigs), how do you expect build/boot automated tools to
+handle this?
+
+*People* can of course manually poll a README to learn about new
+dependencies for each new kernel version, but me personally would
+prefer if don't have to.
+
+>
+> We could print a warning during MMC1 probe if REGULATOR_PBIAS
+> is not selected and attempt to continue probing?
+
+No thanks, it would sprinkle drivers with ugly code :-). I would also
+expect that we would get warnings even when we shouldn't, especially
+as a cross SoC/board driver may have different dependencies.
+
+To me REGULATOR_PBIAS is a dependency required by a certain SoC/board
+when MMC_OMAP_HS is selected. Isn't such dependency easiest dealt with
+from SoC/board Kconfig files? Llike for example in the OMAP2 case,
+arch/arm/mach-omap2/Kconfig.
+
+Kind regards
+Uffe
