@@ -1,17 +1,18 @@
 From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Wed, 7 Oct 2015 15:13:38 +0000
+Date: Wed, 7 Oct 2015 15:20:49 +0000
 Subject: Irq domain for legacy interrupts
-In-Reply-To: <41520723.9CcSmQjLSU@wuerfel>
 References: <loom.20151007T164737-541@post.gmane.org>
  <41520723.9CcSmQjLSU@wuerfel>
-Message-ID: <8520D5D51A55D047800579B094147198016907D5@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <8520D5D51A55D047800579B094147198016907E5@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Sorry for not being clear,in arch/arm64/kernel/pci.c, pcibios_add_device(struct pci_dev *dev) does the irq mapping so, at this point of time the registered .map will be invoked?
 
 In arch/arm64/kernel/pci.c, pcibios_add_device(struct pci_dev *dev) does the irq mapping so, at this point of time the registered irq domain mapping will be invoked at this time ?
 
 -----Original Message-----
-From: Arnd Bergmann [mailto:arnd at arndb.de] 
+From: Arnd Bergmann [mailto:arnd at arndb.de]
 Sent: Wednesday, October 07, 2015 8:33 PM
 To: linux-arm-kernel at lists.infradead.org
 Cc: Bharat Kumar Gogada
