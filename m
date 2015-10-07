@@ -1,36 +1,34 @@
-From: sagig@dev.mellanox.co.il (Sagi Grimberg)
-Date: Wed, 7 Oct 2015 16:19:27 +0300
-Subject: [PATCH] IB/core: avoid 32-bit warning
-In-Reply-To: <17269152.DqJfCm1LOx@wuerfel>
-References: <17269152.DqJfCm1LOx@wuerfel>
-Message-ID: <56151BDF.8010504@dev.mellanox.co.il>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 7 Oct 2015 14:20:16 +0100
+Subject: [PATCH v2] arm64: hw_breakpoint: use target state to determine
+ ABI behaviour
+In-Reply-To: <1444214256-24158-1-git-send-email-will.deacon@arm.com>
+References: <1444214256-24158-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20151007132016.GA17192@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/7/2015 3:29 PM, Arnd Bergmann wrote:
-> The INIT_UDATA() macro requires a pointer or unsigned long argument for
-> both input and output buffer, and all callers had a cast from when
-> the code was merged until a recent restructuring, so now we get
->
-> core/uverbs_cmd.c: In function 'ib_uverbs_create_cq':
-> core/uverbs_cmd.c:1481:66: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
->
-> This makes the code behave as before by adding back the cast to
-> unsigned long.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 565197dd8fb1 ("IB/core: Extend ib_uverbs_create_cq")
->
-> diff --git a/drivers/infiniband/core/uverbs_cmd.c b/drivers/infiniband/core/uverbs_cmd.c
-> index be4cb9f04be3..88b3b78340f2 100644
-> --- a/drivers/infiniband/core/uverbs_cmd.c
-> +++ b/drivers/infiniband/core/uverbs_cmd.c
-> @@ -1478,7 +1478,7 @@ ssize_t ib_uverbs_create_cq(struct ib_uverbs_file *file,
->   	if (copy_from_user(&cmd, buf, sizeof(cmd)))
->   		return -EFAULT;
->
-> -	INIT_UDATA(&ucore, buf, cmd.response, sizeof(cmd), sizeof(resp));
-> +	INIT_UDATA(&ucore, buf, (unsigned long)cmd.response, sizeof(cmd), sizeof(resp));
+On Wed, Oct 07, 2015 at 11:37:36AM +0100, Will Deacon wrote:
+> The arm64 hw_breakpoint interface is slightly less flexible than its
+> 32-bit counterpart, thanks to some changes in the architecture rendering
+> unaligned watchpoint addresses obselete for AArch64.
+> 
+> However, in a multi-arch environment (i.e. debugging a 32-bit target
+> with a 64-bit GDB under a 64-bit kernel), we need to provide a feature
+> compatible interface to GDB in order for debugging to function correctly.
+> 
+> This patch adds a new helper, is_compat_bp,  to our hw_breakpoint
+> implementation which changes the interface behaviour based on the
+> architecture of the debug target as opposed to the debugger itself.
+> This allows debugged to function as expected for multi-arch
+> configurations without relying on deprecated architectural behaviours
+> when debugging native applications.
+> 
+> Cc: Yao Qi <yao.qi@arm.com>
+> Cc: Catalin Marinas <Catalin.Marinas@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Would it make sense to cast inside INIT_UDATA() and not have callers
-worry about it?
+Queued for 4.4. Thanks.
+
+-- 
+Catalin
