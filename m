@@ -1,45 +1,33 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 7 Oct 2015 16:13:23 +0530
-Subject: [PATCH v4 00/25] dmaengine/ARM: Merge the edma drivers into one
-In-Reply-To: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <5614F74B.206@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Oct 2015 11:45:02 +0100
+Subject: [PATCH] drm/virtio: use %llu format string form atomic64_t
+In-Reply-To: <5082760.FgB9zHNfte@wuerfel>
+References: <5082760.FgB9zHNfte@wuerfel>
+Message-ID: <20151007104502.GH21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 September 2015 03:31 PM, Peter Ujfalusi wrote:
-
-> with this series the edma two driver setup will be changed to have only one
-> driver to support eDMA3. The legacy edma interface will be removed and eDMA can
-> only be used via dmaengine API from this point on.
-> In order to do the merge the following improvements has been done:
-> - One driver instance per eDMA:
->  - Any number of eDMA instances are supported (both legacy and DT boot)
-> - Not relying on global variables, arrays, etc
-> - Code simplification and optimizations in several places
+On Wed, Oct 07, 2015 at 12:41:21PM +0200, Arnd Bergmann wrote:
+> The virtgpu driver prints the last_seq variable using the %ld or
+> %lu format string, which does not work correctly on all architectures
+> and causes this compiler warning on ARM:
 > 
-> This change will also help us to do bigger changes in the eDMA driver since,
-> since now we have only one driver to work with.
+> drivers/gpu/drm/virtio/virtgpu_fence.c: In function 'virtio_timeline_value_str':
+> drivers/gpu/drm/virtio/virtgpu_fence.c:64:22: warning: format '%lu' expects argument of type 'long unsigned int', but argument 4 has type 'long long int' [-Wformat=]
+>   snprintf(str, size, "%lu", atomic64_read(&fence->drv->last_seq));
+>                       ^
+> drivers/gpu/drm/virtio/virtgpu_debugfs.c: In function 'virtio_gpu_debugfs_irq_info':
+> drivers/gpu/drm/virtio/virtgpu_debugfs.c:37:16: warning: format '%ld' expects argument of type 'long int', but argument 3 has type 'long long int' [-Wformat=]
+>   seq_printf(m, "fence %ld %lld\n",
+>                 ^
 > 
-> The series has been tested on:
-> da850-evm (OMAP-L138)
-> - with legacy and DT boot (both eDMA0 and eDMA1 is enabled)
-> - In code swapping the eDMA instances in legacy mode to make sure the second
->   instance is handled correctly.
-> 
-> am335x-evmsk
-> - DT boot
-> 
-> I think this series could go via the dmaengine tree. Changes are trivial under
-> arch/arm/
+> In order to avoid the warnings, this changes the format strings to %llu
+> and adds a cast to u64, which makes it work the same way everywhere.
 
-I tested this series on DM6446 EVM using MMC/SD as EDMA client. It
-worked well. For the arch/arm/mach-davinci parts, please add
+You have to wonder why atomic64_* functions do not use u64 types.
+If they're not reliant on manipulating 64-bit quantities, then what's
+the point of calling them atomic _64_.
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
-
-Vinod, if you prefer me replying with acks on individual patches, I can
-do that too.
-
-Regards,
-Sekhar
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
