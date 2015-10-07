@@ -1,83 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Oct 2015 03:41:19 -0700
-Subject: [PATCH 2/2] memory: omap-gpmc: expand the description of the
- debug facility
-In-Reply-To: <20151007075338.GH3982@pengutronix.de>
-References: <1444162070-22034-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1444162070-22034-2-git-send-email-u.kleine-koenig@pengutronix.de>
- <5614CDAE.6070604@ti.com> <20151007075338.GH3982@pengutronix.de>
-Message-ID: <20151007102822.GT23801@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Oct 2015 12:41:21 +0200
+Subject: [PATCH] drm/virtio: use %llu format string form atomic64_t
+Message-ID: <5082760.FgB9zHNfte@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [151007 00:57]:
-> On Wed, Oct 07, 2015 at 10:45:50AM +0300, Roger Quadros wrote:
-> > 
-> > How about this instead?
-> > 
-> > NOTE: Apart from matching the register setup with the bootloader you also need to
-> > match the GPMC FCLK frequency used by the bootloader else the GPMC timings
-> > won't be identical with the bootloader timings.
-> Yeah, sounds better, thanks.
-> 
-> > Also you might need to build this patch on top of
-> > http://article.gmane.org/gmane.linux.kernel/2054796
-> I talked to Tony about this patch yesterday on irc, but I didn't find it
-> in the archives yet when I sent my mail.
+The virtgpu driver prints the last_seq variable using the %ld or
+%lu format string, which does not work correctly on all architectures
+and causes this compiler warning on ARM:
 
-Yes sorry here's a repost with your and Roger's changes folded in and
-edited a bit. Probably best to keep them together with this patch.
+drivers/gpu/drm/virtio/virtgpu_fence.c: In function 'virtio_timeline_value_str':
+drivers/gpu/drm/virtio/virtgpu_fence.c:64:22: warning: format '%lu' expects argument of type 'long unsigned int', but argument 4 has type 'long long int' [-Wformat=]
+  snprintf(str, size, "%lu", atomic64_read(&fence->drv->last_seq));
+                      ^
+drivers/gpu/drm/virtio/virtgpu_debugfs.c: In function 'virtio_gpu_debugfs_irq_info':
+drivers/gpu/drm/virtio/virtgpu_debugfs.c:37:16: warning: format '%ld' expects argument of type 'long int', but argument 3 has type 'long long int' [-Wformat=]
+  seq_printf(m, "fence %ld %lld\n",
+                ^
 
-Does the following look OK to you guys?
+In order to avoid the warnings, this changes the format strings to %llu
+and adds a cast to u64, which makes it work the same way everywhere.
 
-Regards,
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Tony
-
-8< ----------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Tue, 6 Oct 2015 05:36:17 -0700
-Subject: [PATCH] memory: omap-gpmc: Fix unselectable debug option for GPMC
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-Commit 63aa945b1013 ("memory: omap-gpmc: Add Kconfig option for debug")
-added a debug option for GPMC, but somehow managed to keep it unselectable.
-
-This probably happened because I had some uncommitted changes and the
-GPMC option is selected in the platform specific Kconfig.
-
-Let's also update the description a bit, it does not mention that
-enabling the debug option also disables the reset of GPMC controller
-during the init as pointed out by Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> and Roger Quadros <rogerq@ti.com>.
-
-Fixes: 63aa945b1013 ("memory: omap-gpmc: Add Kconfig option for debug")
-Reported-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/drivers/memory/Kconfig
-+++ b/drivers/memory/Kconfig
-@@ -58,12 +58,18 @@ config OMAP_GPMC
- 	  memory drives like NOR, NAND, OneNAND, SRAM.
+diff --git a/drivers/gpu/drm/virtio/virtgpu_debugfs.c b/drivers/gpu/drm/virtio/virtgpu_debugfs.c
+index db8b49101a8b..512263919282 100644
+--- a/drivers/gpu/drm/virtio/virtgpu_debugfs.c
++++ b/drivers/gpu/drm/virtio/virtgpu_debugfs.c
+@@ -34,8 +34,8 @@ virtio_gpu_debugfs_irq_info(struct seq_file *m, void *data)
+ 	struct drm_info_node *node = (struct drm_info_node *) m->private;
+ 	struct virtio_gpu_device *vgdev = node->minor->dev->dev_private;
  
- config OMAP_GPMC_DEBUG
--	bool
-+	bool "Enable GPMC debug output and skip reset of GPMC during init"
- 	depends on OMAP_GPMC
- 	help
- 	  Enables verbose debugging mostly to decode the bootloader provided
--	  timings. Enable this during development to configure devices
--	  connected to the GPMC bus.
-+	  timings. To preserve the bootloader provided timings, the reset
-+	  of GPMC is skipped during init. Enable this during development to
-+	  configure devices connected to the GPMC bus.
-+
-+	  NOTE: In addition to matching the register setup with the bootloader
-+	  you also need to match the GPMC FCLK frequency used by the
-+	  bootloader or else the GPMC timings won't be identical with the
-+	  bootloader timings.
+-	seq_printf(m, "fence %ld %lld\n",
+-		   atomic64_read(&vgdev->fence_drv.last_seq),
++	seq_printf(m, "fence %llu %lld\n",
++		   (u64)atomic64_read(&vgdev->fence_drv.last_seq),
+ 		   vgdev->fence_drv.sync_seq);
+ 	return 0;
+ }
+diff --git a/drivers/gpu/drm/virtio/virtgpu_fence.c b/drivers/gpu/drm/virtio/virtgpu_fence.c
+index 1da632631dac..67097c9ce9c1 100644
+--- a/drivers/gpu/drm/virtio/virtgpu_fence.c
++++ b/drivers/gpu/drm/virtio/virtgpu_fence.c
+@@ -61,7 +61,7 @@ static void virtio_timeline_value_str(struct fence *f, char *str, int size)
+ {
+ 	struct virtio_gpu_fence *fence = to_virtio_fence(f);
  
- config MVEBU_DEVBUS
- 	bool "Marvell EBU Device Bus Controller"
+-	snprintf(str, size, "%lu", atomic64_read(&fence->drv->last_seq));
++	snprintf(str, size, "%llu", (u64)atomic64_read(&fence->drv->last_seq));
+ }
+ 
+ static const struct fence_ops virtio_fence_ops = {
