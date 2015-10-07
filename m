@@ -1,53 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Oct 2015 09:41:27 +0200
-Subject: [PATCH] drm/amdgpu: fix 32-bit compiler warning
-Message-ID: <14056299.vVOiOhUXfA@wuerfel>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 7 Oct 2015 10:45:50 +0300
+Subject: [PATCH 2/2] memory: omap-gpmc: expand the description of the
+ debug facility
+In-Reply-To: <1444162070-22034-2-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1444162070-22034-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1444162070-22034-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <5614CDAE.6070604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new amdgpu driver passes a user space pointer in a 64-bit structure
-member, which is the correct way to do it, but it attempts to
-directly cast it to a __user pointer in the kernel, which causes
-a warning in three places:
+On 06/10/15 23:07, Uwe Kleine-K?nig wrote:
+> Most register values for the chip select setup depend on the frequency
+> of the fck clock.
+> So add a hint that the values setup by the bootloader might differ from
+> the right setup for Linux if the bootloader uses a different frequency.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  drivers/memory/Kconfig | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+> index c6a644b22af4..1414dd53be57 100644
+> --- a/drivers/memory/Kconfig
+> +++ b/drivers/memory/Kconfig
+> @@ -64,6 +64,9 @@ config OMAP_GPMC_DEBUG
+>  	  Enables verbose debugging mostly to decode the bootloader provided
+>  	  timings. Enable this during development to configure devices
+>  	  connected to the GPMC bus.
+> +	  Note that you cannot just tweak your device tree until the registers
+> +	  setup by linux match what the bootloader did because that one might
+> +	  use a different fck frequency influencing most register settings.
 
-drm/amd/amdgpu/amdgpu_cs.c: In function 'amdgpu_cs_parser_init':
-drm/amd/amdgpu/amdgpu_cs.c:180:21: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-  chunk_array_user = (uint64_t __user *)(cs->in.chunks);
+Looks like we can't know for sure the GPMC fclk used at the bootloader
+else we could have just printed the GPMC fclk pre and post gpmc settings.
 
-This changes all three to add an intermediate cast to 'unsigned long'
-as other drivers do. This avoids the warning and works correctly on
-both 32-bit and 64-bit architectures.
+How about this instead?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+NOTE: Apart from matching the register setup with the bootloader you also need to
+match the GPMC FCLK frequency used by the bootloader else the GPMC timings
+won't be identical with the bootloader timings.
 
-diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
-index cb3c274edb0a..fd16652aa277 100644
---- a/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
-+++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
-@@ -177,7 +177,7 @@ int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, void *data)
- 
- 	/* get chunks */
- 	INIT_LIST_HEAD(&p->validated);
--	chunk_array_user = (uint64_t __user *)(cs->in.chunks);
-+	chunk_array_user = (uint64_t __user *)(unsigned long)(cs->in.chunks);
- 	if (copy_from_user(chunk_array, chunk_array_user,
- 			   sizeof(uint64_t)*cs->in.num_chunks)) {
- 		ret = -EFAULT;
-@@ -197,7 +197,7 @@ int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, void *data)
- 		struct drm_amdgpu_cs_chunk user_chunk;
- 		uint32_t __user *cdata;
- 
--		chunk_ptr = (void __user *)chunk_array[i];
-+		chunk_ptr = (void __user *)(unsigned long)chunk_array[i];
- 		if (copy_from_user(&user_chunk, chunk_ptr,
- 				       sizeof(struct drm_amdgpu_cs_chunk))) {
- 			ret = -EFAULT;
-@@ -208,7 +208,7 @@ int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, void *data)
- 		p->chunks[i].length_dw = user_chunk.length_dw;
- 
- 		size = p->chunks[i].length_dw;
--		cdata = (void __user *)user_chunk.chunk_data;
-+		cdata = (void __user *)(unsigned long)user_chunk.chunk_data;
- 		p->chunks[i].user_ptr = cdata;
- 
- 		p->chunks[i].kdata = drm_malloc_ab(size, sizeof(uint32_t));
+Also you might need to build this patch on top of
+http://article.gmane.org/gmane.linux.kernel/2054796
+
+>  
+>  config MVEBU_DEVBUS
+>  	bool "Marvell EBU Device Bus Controller"
+> 
+
+cheers,
+-roger
