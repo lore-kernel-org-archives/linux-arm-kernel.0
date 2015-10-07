@@ -1,27 +1,32 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  7 Oct 2015 13:23:26 +0100
-Subject: [PATCH v2 0/3] hwrng: st: Couple of improvements
-Message-ID: <1444220609-31251-1-git-send-email-lee.jones@linaro.org>
+Date: Wed,  7 Oct 2015 13:23:27 +0100
+Subject: [PATCH v2 1/3] hwrng: st: dt: Fix trivial typo in node address
+In-Reply-To: <1444220609-31251-1-git-send-email-lee.jones@linaro.org>
+References: <1444220609-31251-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1444220609-31251-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set contains a minor documentation fix, greater clarification
-with how the FIFO depth/size is represented and finally a fix to
-prevent early timeout during data acquisition.
+DT nodes should not append their addresses with '0x'.
 
-v1 => v2:
- - Remove phantom bugfix (FIFO really is 4 deep, not 8)
- - Double timeout value to account for inconsistent call to udelay()
-   - Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ Documentation/devicetree/bindings/rng/st,rng.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Lee Jones (3):
-  hwrng: st: dt: Fix trivial typo in node address
-  hwrng: st: Use real-world device timings for timeout
-  hwrng: st: Improve FIFO size/depth description
-
- Documentation/devicetree/bindings/rng/st,rng.txt |  2 +-
- drivers/char/hw_random/st-rng.c                  | 13 ++++++++++---
- 2 files changed, 11 insertions(+), 4 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/rng/st,rng.txt b/Documentation/devicetree/bindings/rng/st,rng.txt
+index dbc64e6..35734bc 100644
+--- a/Documentation/devicetree/bindings/rng/st,rng.txt
++++ b/Documentation/devicetree/bindings/rng/st,rng.txt
+@@ -8,7 +8,7 @@ clocks		: Phandle to device's clock (See: ../clocks/clock-bindings.txt)
+ 
+ Example:
+ 
+-rng at 0xfee80000 {
++rng at fee80000 {
+ 	compatible      = "st,rng";
+ 	reg		= <0xfee80000 0x1000>;
+ 	clocks          = <&clk_sysin>;
 -- 
 1.9.1
