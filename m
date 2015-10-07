@@ -1,63 +1,58 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 7 Oct 2015 11:26:43 +0200
-Subject: [PATCH v5 0/17] Add Analogix Core Display Port Driver
-In-Reply-To: <5614DFBC.8060105@rock-chips.com>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
- <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
- <5614BADD.1070307@rock-chips.com> <5614DBE2.6080102@osg.samsung.com>
- <5614DFBC.8060105@rock-chips.com>
-Message-ID: <5614E553.6060108@osg.samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Oct 2015 10:27:31 +0100
+Subject: [PATCH] iommu/arm-smmu: Only return IRQ_NONE if FSR is not set
+In-Reply-To: <vnkwzizv688u.fsf@codeaurora.org>
+References: <1443226325-28456-1-git-send-email-mitchelh@codeaurora.org>
+ <20151005142402.GF8818@arm.com> <vnkwzizv688u.fsf@codeaurora.org>
+Message-ID: <20151007092730.GA16065@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Yakir,
-
-On 10/07/2015 11:02 AM, Yakir Yang wrote:
-> Hi Javier,
+On Tue, Oct 06, 2015 at 01:40:33PM -0700, Mitchel Humpherys wrote:
+> On Mon, Oct 05 2015 at 03:24:03 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Sat, Sep 26, 2015 at 01:12:05AM +0100, Mitchel Humpherys wrote:
+> >> Currently we return IRQ_NONE from the context fault handler if the FSR
+> >> doesn't actually have the fault bit set (some sort of miswired
+> >> interrupt?) or if the client doesn't register an IOMMU fault handler.
+> >> However, registering a client fault handler is optional, so telling the
+> >> interrupt framework that the interrupt wasn't for this device if the
+> >> client doesn't register a handler isn't exactly accurate.  Fix this by
+> >> returning IRQ_HANDLED even if the client doesn't register a handler.
+> >> 
+> >> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> >> ---
+> >>  drivers/iommu/arm-smmu.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> 
+> >> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> >> index 48a39dfa9777..95560d447a54 100644
+> >> --- a/drivers/iommu/arm-smmu.c
+> >> +++ b/drivers/iommu/arm-smmu.c
+> >> @@ -653,7 +653,7 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
+> >>  		dev_err_ratelimited(smmu->dev,
+> >>  		    "Unhandled context fault: iova=0x%08lx, fsynr=0x%x, cb=%d\n",
+> >>  		    iova, fsynr, cfg->cbndx);
+> >> -		ret = IRQ_NONE;
+> >> +		ret = IRQ_HANDLED;
+> >>  		resume = RESUME_TERMINATE;
+> >
+> > Hmm, but if we haven't actually done anything to rectify the cause of the
+> > fault, what means that we won't take it again immediately? I guess I'm not
+> > understanding the use-case that triggered you to write this patch...
 > 
-> On 10/07/2015 04:46 PM, Javier Martinez Canillas wrote:
->> Hello Yakir,
->>
->> On 10/07/2015 08:25 AM, Yakir Yang wrote:
->>> Hi all,
->>>
->>> Friendly ping.....   :)
->>>
->>>
->>> Best regards,
->>> - Yakir
->>>
->>>
->> Do you have a tree that I can use to test these patches?
-> 
-> Wow, thanks a lot, I do have a tree on github [https://github.com/yakir-Yang/linux/tree/analogix_dp],
-> crossing my finger, wish things works......    ;)
->
+> Does returning IRQ_NONE actually prevent us from taking another
+> interrupt (despite clearing the FSR below)?  We definitely take more
+> interrupts on our platform despite returning IRQ_NONE, but maybe we have
+> something misconfigured...
 
-I tried your analogix_dp branch on an Exynos5800 Peach Pi Chromebook
-but the machine didn't boot. Unfortunately I need to do some soldering
-to have a serial console on this board so don't have a kernel boot log.
+No, IRQ_NONE doesn't prevent anything unless we trigger the spurious IRQ
+detector (1000 IRQs / second iirc). In that case, the handler ends up being
+invoked off the back of a timer tick last time I looked.
 
-I'll let you know if I can get more info about this issue.
+My concern is that the source of the interrupt isn't handled at all in
+the case above. Sure, we clear the FSR, but we haven't actually done
+anything to stop the fault occuring again. It would be like dealing with
+a page fault from userspace by simply returning back to the application
+without actually updating the page tables.
 
-Also, there is Kconfig recursive dependency that you may want to fix:
-
-$ make exynos_defconfig
-drivers/video/fbdev/Kconfig:5:error: recursive dependency detected!
-drivers/video/fbdev/Kconfig:5: symbol FB is selected by DRM_KMS_FB_HELPER
-drivers/gpu/drm/Kconfig:34: symbol DRM_KMS_FB_HELPER depends on DRM_KMS_HELPER
-drivers/gpu/drm/Kconfig:28: symbol DRM_KMS_HELPER is selected by DRM_ANALOGIX_DP
-drivers/gpu/drm/bridge/analogix/Kconfig:1: symbol DRM_ANALOGIX_DP is selected by DRM_EXYNOS_DP
-drivers/gpu/drm/exynos/Kconfig:57: symbol DRM_EXYNOS_DP depends on DRM_EXYNOS_FIMD
-drivers/gpu/drm/exynos/Kconfig:19: symbol DRM_EXYNOS_FIMD depends on FB_S3C
-drivers/video/fbdev/Kconfig:2023: symbol FB_S3C depends on FB
- 
-> Thanks,
-> - Yakir
-> 
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Will
