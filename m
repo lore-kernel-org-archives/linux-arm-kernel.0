@@ -1,33 +1,31 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  7 Oct 2015 09:26:37 -0600
-Subject: [PATCH 0/6] coresight: next v4.3-rc4 
-Message-ID: <1444231603-26676-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Wed,  7 Oct 2015 09:26:39 -0600
+Subject: [PATCH 2/6] coresight: fixing typographical error
+In-Reply-To: <1444231603-26676-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1444231603-26676-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1444231603-26676-3-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Good morning,
+Tracing gets enabled _for_ a source rather than _from_ a source.
 
-Please consider the following patches for merging in the 4.4 cycle.
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ include/linux/coresight.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Mathieu
-
-Chunyan Zhang (1):
-  Coresight: ETMv4: Prevent TRCRSCTLR0&1 from being accessed
-
-Mathieu Poirier (5):
-  coresight: fixing typographical error
-  coresight: adding comments to remove ambiguity
-  coresight: etm3x: adding cpu affinity to sysFS interface
-  coresight: etm3x: breaking down sysFS status interface
-  coresight: etm3x: making error message unambiguous
-
- .../ABI/testing/sysfs-bus-coresight-devices-etm3x  |  77 +++++++++++++--
- drivers/hwtracing/coresight/coresight-etm3x.c      | 107 ++++++++++++---------
- drivers/hwtracing/coresight/coresight-etm4x.c      |  22 +++--
- drivers/hwtracing/coresight/coresight.c            |   5 +
- include/linux/coresight.h                          |   2 +-
- 5 files changed, 154 insertions(+), 59 deletions(-)
-
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index c69e1b932809..a7cabfa23b55 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -207,7 +207,7 @@ struct coresight_ops_link {
+  * Operations available for sources.
+  * @trace_id:	returns the value of the component's trace ID as known
+ 		to the HW.
+- * @enable:	enables tracing from a source.
++ * @enable:	enables tracing for a source.
+  * @disable:	disables tracing for a source.
+  */
+ struct coresight_ops_source {
 -- 
 1.9.1
