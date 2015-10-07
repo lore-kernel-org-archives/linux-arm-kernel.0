@@ -1,28 +1,39 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Wed, 07 Oct 2015 15:14:16 +0300
-Subject: PING: [PATCH v4 TRIVIAL 1/2] ARM: Enable GICv2m on 32-bit virt
- machine
-In-Reply-To: <20151007102313.GG21513@n2100.arm.linux.org.uk>
-References: <017801d100dc$77fe3a90$67faafb0$@samsung.com>
- <20151007102313.GG21513@n2100.arm.linux.org.uk>
-Message-ID: <020c01d100f9$b02d23a0$10876ae0$@samsung.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Wed, 7 Oct 2015 14:14:46 +0200
+Subject: [PATCH v4] twd: Don't set CLOCK_EVT_FEAT_C3STOP unconditionally
+In-Reply-To: <5612A730.5030400@sigmadesigns.com>
+References: <56123BD0.8010005@sigmadesigns.com>
+ <56124035.6080107@sigmadesigns.com>
+ <CACRpkdbWRU3UH6aJnqdcuzdh_-sE7ryhs0vBTUbbRDcJ7PWXLw@mail.gmail.com>
+ <561247DF.1000308@sigmadesigns.com> <20151005103539.GC19064@leverpostej>
+ <5612649C.5020401@sigmadesigns.com> <5612A730.5030400@sigmadesigns.com>
+Message-ID: <56150CB6.2040701@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+On 05/10/2015 18:37, Marc Gonzalez wrote:
+> On 05/10/2015 13:53, Marc Gonzalez wrote:
+>> In 5388a6b266 ("ARM: SMP: Always enable clock event broadcast support")
+>> Russell noted that "the TWD local timers are unable to wake up the CPU
+>> when it is placed into a low power mode".
+>>
+>> However, some platforms do not stop the TWD block in low-power mode,
+>> and can thus use the TWD timer in one-shot mode, without setting up
+>> a broadcast device.
+>>
+>> Make the driver check for the "twd-never-stops" boolean property,
+>> and set the CLOCK_EVT_FEAT_C3STOP flag accordingly.
+>>
+>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/twd.txt | 4 ++++
+>>  arch/arm/kernel/smp_twd.c                     | 5 ++++-
+>>  2 files changed, 8 insertions(+), 1 deletion(-)
+> 
+> Sorry, I don't fully understand the submission process.
+> 
+> Should I now submit my patch to the patch queue?
+> http://www.arm.linux.org.uk/developer/patches/
 
-> I know we have MSI-using platforms working on 32-bit ARM at the moment,
-> which brings up the question about msi.h in your patch, and what are
-> the implications for the existing MSI using platforms of having
-> PCI_MSI_IRQ_DOMAIN enabled in a multiplatform kernel.
-
- I have just tested, what happens if i disable PCI_MSI_IRQ_DOMAIN. No, it's not going to work,
-irq-gic-v2m.c requires MSI domain API. Looks like old MSI drivers do not use IRQ domains and just
-transparently handle translation of MSIs to SPI IDs.
- At this point unfortunately i cannot do anything else, because i don't have any of those platforms,
-so cannot test. Added also Christoffer to cc. Hopefully somebody in ARM or Linaro gets interested.
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Submitted as patch 8441/1
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8441/1
