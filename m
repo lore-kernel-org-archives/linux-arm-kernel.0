@@ -1,25 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Oct 2015 14:19:30 +0100
-Subject: [PATCHv4 0/6] arm64: perf: heterogeneous PMU support
-In-Reply-To: <1443779708-26789-1-git-send-email-mark.rutland@arm.com>
-References: <1443779708-26789-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20151007131930.GJ16065@arm.com>
+From: sagig@dev.mellanox.co.il (Sagi Grimberg)
+Date: Wed, 7 Oct 2015 16:19:27 +0300
+Subject: [PATCH] IB/core: avoid 32-bit warning
+In-Reply-To: <17269152.DqJfCm1LOx@wuerfel>
+References: <17269152.DqJfCm1LOx@wuerfel>
+Message-ID: <56151BDF.8010504@dev.mellanox.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 02, 2015 at 10:55:02AM +0100, Mark Rutland wrote:
-> This patch series moves the arm64 code over to the librified perf code now used
-> by 32-bit arm, in the process gaining support for heterogeneous PMUs. Tailored
-> support is then added for Cortex-A53 and Cortex-A57 as used in Juno systems.
-> 
-> With this series applied, perf can be used to monitor 64-bit systems with
-> heterogeneous PMUs in an identical fashion to 32-bit systems, e.g.
+On 10/7/2015 3:29 PM, Arnd Bergmann wrote:
+> The INIT_UDATA() macro requires a pointer or unsigned long argument for
+> both input and output buffer, and all callers had a cast from when
+> the code was merged until a recent restructuring, so now we get
+>
+> core/uverbs_cmd.c: In function 'ib_uverbs_create_cq':
+> core/uverbs_cmd.c:1481:66: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+>
+> This makes the code behave as before by adding back the cast to
+> unsigned long.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 565197dd8fb1 ("IB/core: Extend ib_uverbs_create_cq")
+>
+> diff --git a/drivers/infiniband/core/uverbs_cmd.c b/drivers/infiniband/core/uverbs_cmd.c
+> index be4cb9f04be3..88b3b78340f2 100644
+> --- a/drivers/infiniband/core/uverbs_cmd.c
+> +++ b/drivers/infiniband/core/uverbs_cmd.c
+> @@ -1478,7 +1478,7 @@ ssize_t ib_uverbs_create_cq(struct ib_uverbs_file *file,
+>   	if (copy_from_user(&cmd, buf, sizeof(cmd)))
+>   		return -EFAULT;
+>
+> -	INIT_UDATA(&ucore, buf, cmd.response, sizeof(cmd), sizeof(resp));
+> +	INIT_UDATA(&ucore, buf, (unsigned long)cmd.response, sizeof(cmd), sizeof(resp));
 
-For the series:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-There's a trailing whitespace error in the first patch, but Catalin can
-probably fix that up.
-
-Will
+Would it make sense to cast inside INIT_UDATA() and not have callers
+worry about it?
