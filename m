@@ -1,36 +1,52 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 07 Oct 2015 21:45:46 +0200
-Subject: [PATCH v4 11/26] ARM: pxa: magician: Optimize EGPIO initial values
-In-Reply-To: <1443875705.4186.24.camel@gmail.com> (Philipp Zabel's message of
- "Sat, 03 Oct 2015 14:35:05 +0200")
-References: <cover.1443472089.git.petr.cvek@tul.cz> <5609B1E9.4020508@tul.cz>
- <1443875705.4186.24.camel@gmail.com>
-Message-ID: <87twq2a2dx.fsf@belgarion.home>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 7 Oct 2015 21:53:18 +0200
+Subject: [PATCH v2 11/15] KVM: arm64: handle pending bit for LPIs in ITS
+ emulation
+In-Reply-To: <017701d100db$b003c550$100b4ff0$@samsung.com>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-12-git-send-email-andre.przywara@arm.com>
+ <017701d100db$b003c550$100b4ff0$@samsung.com>
+Message-ID: <20151007195318.GB14315@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philipp Zabel <philipp.zabel@gmail.com> writes:
+On Wed, Oct 07, 2015 at 11:39:30AM +0300, Pavel Fedin wrote:
+>  Hello!
+> 
+> > +/* Called with the distributor lock held by the caller. */
+> > +void vits_unqueue_lpi(struct kvm_vcpu *vcpu, int lpi)
+> > +{
+> > +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
+> > +	struct its_itte *itte;
+> > +
+> > +	spin_lock(&its->lock);
+> > +
+> > +	/* Find the right ITTE and put the pending state back in there */
+> > +	itte = find_itte_by_lpi(vcpu->kvm, lpi);
+> > +	if (itte)
+> > +		__set_bit(vcpu->vcpu_id, itte->pending);
+> > +
+> > +	spin_unlock(&its->lock);
+> > +}
+> 
+>  I am working on implementing live migration for the ITS. And here i have one fundamental problem.
+> vits_unqueue_lpi() processes only PENDING state. And looks like this corresponds to the HW
+> implementation, which has only bitwise pending table. But, in terms of migration, we can actually
+> have LPI in active state, while it's being processed.
 
-> Am Montag, den 28.09.2015, 23:32 +0200 schrieb Petr Cvek:
->> This patch optimizes initial values of the EGPIO chip driver.
->> 
->> GSM and sound should be powered off during boot. A weak accumulator
->> and
->> a powered GSM sometimes cause a system reboot. A charging current
->> should be
->> as high as possible during boot.
->
-> Wouldn't that violate USB spec if we boot the magician while plugged
-> into an unpowered USB host?
+I thought LPIs had strict fire-and-forget semantics, not allowing any
+active state, and that they are either pending or inactive?
 
-You're right. As USB 2.0 device cannot draw more than 100mA until enumerated
-(prior to battery charging spec 1.1). It is described in USB 2.0 specification,
-chapter 7.3.2, in the table :
- - Unconfigured Function/Hub - ICCInit - maximum 100mA.
 
-So I'll drop this patch for now I think.
+>  The question is - how can we handle it? Should we have one more bitwise table for active LPIs, or
+> is it enough to remember only a single, currently active LPI? Can LPIs be preempted on a real
+> hardware, or not?
+> 
+Perhaps you're asking if LPIs have active state semantics on real
+hardware and thus supports threaded interrupt handling for LPIs?
 
-Cheers.
+That is not supported on real hardware, which I think addresses your
+concerns.
 
--- 
-Robert
+Thanks,
+-Christoffer
