@@ -1,89 +1,42 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 7 Oct 2015 12:15:31 +0100
-Subject: [PATCH v2 4/9] dmaengine: st_fdma: Add STMicroelectronics FDMA
- engine driver support
-In-Reply-To: <1441980871-24475-5-git-send-email-peter.griffin@linaro.org>
-References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
- <1441980871-24475-5-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20151007111529.GA4810@vkoul-mobl.iind.intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Oct 2015 12:20:11 +0100
+Subject: [PATCH] arm: perf: Add event descriptions
+In-Reply-To: <20150924175257.GH7356@arm.com>
+References: <20150804001522.GA13214@dreric01-gentoo.localdomain>
+ <20150817205809.GA16506@dreric01-gentoo.localdomain>
+ <20150826165148.GF30466@arm.com>
+ <20150817214035.GA25775@dreric01-gentoo.localdomain>
+ <20150924175257.GH7356@arm.com>
+Message-ID: <20151007112011.GH16065@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 03:14:26PM +0100, Peter Griffin wrote:
+Hi again, Drew,
 
-> +static char *fdma_clk_name[CLK_MAX_NUM] = {
-> +	[CLK_SLIM]	= "fdma_slim",
-> +	[CLK_HI]	= "fdma_hi",
-> +	[CLK_LOW]	= "fdma_low",
-> +	[CLK_IC]	= "fdma_ic",
-> +};
+On Thu, Sep 24, 2015 at 06:52:57PM +0100, Will Deacon wrote:
+> On Mon, Aug 17, 2015 at 10:40:36PM +0100, Drew Richardson wrote:
+> > So my suggestion to solve the problem is that the kernel can have the
+> > list of events as proposed in the patch.
+> 
+> Sorry, but I just don't buy this argument. Your problem is that the user
+> needs to be running an up-to-date perf tool, but with your proposed
+> solution, you're asking them to update the *kernel* instead, which is
+> (unfortunately) one of the hardest pieces of software to upgrade on a
+> typical ARM platform.
 
-why do we want to have this sort of data in kernel, we should get the clocks
-from DT here
+I've spent some time thinking about this and, actually, it makes sense
+to do this for the architected events. These event numbers are guaranteed
+to be portable between CPUs, so if we expose those through sysfs then
+we don't have this dependency on updating the kernel for newer cores
+(well, once the initial period without your patch has expired). It's the
+noon-portable, micro-architectural events that I object to.
 
-> +static int config_reqctrl(struct st_fdma_chan *fchan)
-> +{
-> +	u32 maxburst = 0, addr = 0;
-> +	enum dma_slave_buswidth width;
-> +	int ch_id = fchan->vchan.chan.chan_id;
-> +	struct st_fdma_dev *fdev = fchan->fdev;
-> +
-> +	if (fchan->scfg.direction == DMA_DEV_TO_MEM) {
-> +		fchan->cfg.req_ctrl &= ~REQ_CTRL_WNR;
-> +		maxburst = fchan->scfg.src_maxburst;
-> +		width = fchan->scfg.src_addr_width;
-> +		addr = fchan->scfg.src_addr;
-> +	} else if (fchan->scfg.direction == DMA_MEM_TO_DEV) {
-> +		fchan->cfg.req_ctrl |= REQ_CTRL_WNR;
-> +		maxburst = fchan->scfg.dst_maxburst;
-> +		width = fchan->scfg.dst_addr_width;
-> +		addr = fchan->scfg.dst_addr;
+So how about you roll a new version of this patch just exposing the
+architected events and making use of the macros in perf_event.h to make
+it a bit tidier (PMU_EVENT_ATTR, PMU_EVENT_ATTR_STRING etc)?
 
-This raises red flags, why do we have direction in channel, and where is
-this set. Direction belong to a descriptor and you are supposed to use
-direction from prep_ calls!
+Be aware that there's a fair amount of arm64 perf patches queue for 4.4,
+since we're moving over to the code in drivers/perf/. Hopefully these
+will appear on the arm64 for-next/core branch shortly.
 
-
-> +	if (!is_slave_direction(direction)) {
-> +		dev_err(fchan->fdev->dev, "bad direction?\n");
-> +		return NULL;
-> +	}
-> +
-> +	if (!config_reqctrl(fchan)) {
-> +		dev_err(fchan->fdev->dev, "bad width or direction\n");
-
-would make sense to print proper error in called fn
-
-> +static enum dma_status st_fdma_tx_status(struct dma_chan *chan,
-> +					 dma_cookie_t cookie,
-> +					 struct dma_tx_state *txstate)
-> +{
-> +	struct st_fdma_chan *fchan = to_st_fdma_chan(chan);
-> +	struct virt_dma_desc *vd;
-> +	enum dma_status ret;
-> +	unsigned long flags;
-> +
-> +	ret = dma_cookie_status(chan, cookie, txstate);
-> +	if (ret == DMA_COMPLETE)
-> +		return ret;
-> +
-> +	if (!txstate)
-> +		return fchan->status;
-
-why channel status and not cookie status ?
-
-> +static const struct st_fdma_ram fdma_mpe31_mem[] = {
-> +	{ .name = "dmem", .offset = 0x10000, .size = 0x3000 },
-> +	{ .name = "imem", .offset = 0x18000, .size = 0x8000 },
-> +};
-
-why aren't these coming from DT ?
-
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_DESCRIPTION("STMicroelectronics FDMA engine driver");
-> +MODULE_AUTHOR("Ludovic.barre <Ludovic.barre@st.com>");
-
-No MODULE_ALIAS ?
-
--- 
-~Vinod
+Will
