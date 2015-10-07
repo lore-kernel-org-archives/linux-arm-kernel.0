@@ -1,76 +1,33 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 Oct 2015 18:49:04 +0100
-Subject: [PATCH v2] ARM: dts: sunxi: Add regulators for LeMaker BananaPi
-In-Reply-To: <20151007154918.D6F856C800D4@dd34104.kasserver.com>
-References: <1438532305-5884-1-git-send-email-public_timo.s@silentcreek.de>
- <20150818153631.GH2547@lukather>
- <CAMAWPa-Q7o+Ys2FjhLZt6Nwq=Ja6TTdWFDZFTCYLkoLGjpLpxw@mail.gmail.com>
- <20151005173957.B1BD16C8150E@dd34104.kasserver.com>
- <7hzizu924y.fsf@deeprootsystems.com>
- <20151007154918.D6F856C800D4@dd34104.kasserver.com>
-Message-ID: <20151007174904.GH2278@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Oct 2015 18:53:25 +0100
+Subject: All OMAP platforms: MMC is broken
+In-Reply-To: <CAPDyKFoBPEnHuNR_bsrPU6X=q5pHa8cDR7_Ng9xLnLsudymvOg@mail.gmail.com>
+References: <20151005145127.GB23801@atomide.com>
+ <20151005171155.GF23801@atomide.com>
+ <20151005183813.GD21626@n2100.arm.linux.org.uk>
+ <20151006090015.GE21626@n2100.arm.linux.org.uk>
+ <20151006094425.GM23801@atomide.com>
+ <20151006150009.GF21626@n2100.arm.linux.org.uk>
+ <20151006153710.GS23801@atomide.com>
+ <20151007124551.GI21626@n2100.arm.linux.org.uk>
+ <20151007132642.GV23801@atomide.com>
+ <CAPDyKFoBPEnHuNR_bsrPU6X=q5pHa8cDR7_Ng9xLnLsudymvOg@mail.gmail.com>
+Message-ID: <20151007175325.GJ21626@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timo,
-
-On Wed, Oct 07, 2015 at 05:49:18PM +0200, Timo Sigurdsson wrote:
-> Hi Kevin,
-> Hi Maxime,
+On Wed, Oct 07, 2015 at 03:41:46PM +0200, Ulf Hansson wrote:
+> > http://marc.info/?l=linux-omap&m=144422416621373&w=2
+> > http://marc.info/?l=linux-omap&m=144422416921375&w=2
 > 
-> Kevin Hilman schrieb am 07.10.2015 16:36:
-> 
-> > "Timo Sigurdsson" <public_timo.s@silentcreek.de> writes:
-> >> I still think that the lower voltages may be the cause of your problem
-> >> with that specific board, so could you please test the attached patch on
-> >> top of my patch that you first experienced the problem with? Please let 
-> >> us know whether this solves your issue or whether we need to dig deeper.
-> > 
-> > Thanks for the patch.  Looks like it's the OPPs.
-> > 
-> > I went back to next-20150923 and verified it still fails.  Then, I
-> > applied your patch and saw that it boots just fine.
-> 
-> Good. Then we can easily fix this, I guess.
-> 
-> @Maxime: How should we handle this? In its current form, the patch applies
-> only to the BananaPi dts by overriding the inherited opp from the SoC dtsi.
-> In an earlier discussion, it was said that this can be done, even though it
-> might not be the most elegant approach. But then again, I think it
-> shouldn't be necessary to change the opp in the sun7i-a20.dtsi for all A20
-> boards since this is - to my knowledge - the first and only report that an
-> A20 board has stability issues at the lower voltages (although not too many
-> boards use voltage scaling yet).
+> Russell, may I add your tested by tag for these?
 
-If you count only the number of boards, indeed, but if you count the
-number of devices actually used in the field, we cover already a
-significant portion of them.
+You may -
 
-> So, would you prefer to keep this as a patch for BananaPi only, or
-> change the dtsi for all A20 devices instead?
+Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Yeah, we probably can keep that for bananapi only at the moment, and
-try to generalize that afterwards.
-
-> In case we keep it as it is, what is the correct commit to point to as
-> "Fixes commit ..."? I'd say it fixes the initial opp commit for A20, since
-> that's where these voltages were defined. But then again, if we don't
-> change the dtsi, should I point to my regulator patch instead?
-
-I don't think it fixes anything at this point. We droped your commit
-that was using the A20 OPPs, so in the history so far we don't have
-anything to fix, just enable cpufreq again.
-
-Maxime
+Thanks.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151007/a5b59575/attachment.sig>
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
