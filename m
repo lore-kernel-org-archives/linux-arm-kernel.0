@@ -1,41 +1,64 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 7 Oct 2015 12:04:16 -0500
-Subject: [PATCH] Documentation: dt: keystone: Fix up missing quotes
-Message-ID: <1444237456-28020-1-git-send-email-nm@ti.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 7 Oct 2015 18:12:27 +0100
+Subject: [PATCH] nvmem: core: make default user binary file root-access
+ only
+In-Reply-To: <56154FCF.6010105@linaro.org>
+References: <1444235714-24365-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20151007165046.GC12099@kroah.com> <56154FCF.6010105@linaro.org>
+Message-ID: <20151007171227.GA9485@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing commits for the suggest compatible flags in dt binding.
+On Wed, Oct 07, 2015 at 06:01:03PM +0100, Srinivas Kandagatla wrote:
+> 
+> 
+> On 07/10/15 17:50, Greg KH wrote:
+> >On Wed, Oct 07, 2015 at 05:35:14PM +0100, Srinivas Kandagatla wrote:
+> >>As required by many providers like at24/at25/mxs-ocotp/qfprom, which would
+> >>want to allow root-only to read/write the nvmem content.
+> >>So making the defaults to be root-only access which can prevent normal
+> >>users from reading the nvmem data.
+> >>
+> >>Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> >>---
+> >>  drivers/nvmem/core.c | 4 ++--
+> >>  1 file changed, 2 insertions(+), 2 deletions(-)
+> >>
+> >>diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+> >>index 6fd4e5a..4d2e476 100644
+> >>--- a/drivers/nvmem/core.c
+> >>+++ b/drivers/nvmem/core.c
+> >>@@ -112,7 +112,7 @@ static ssize_t bin_attr_nvmem_write(struct file *filp, struct kobject *kobj,
+> >>  static struct bin_attribute bin_attr_rw_nvmem = {
+> >>  	.attr	= {
+> >>  		.name	= "nvmem",
+> >>-		.mode	= S_IWUSR | S_IRUGO,
+> >>+		.mode	= S_IWUSR | S_IRUSR,
+> >>  	},
+> >>  	.read	= bin_attr_nvmem_read,
+> >>  	.write	= bin_attr_nvmem_write,
+> >>@@ -136,7 +136,7 @@ static const struct attribute_group *nvmem_rw_dev_groups[] = {
+> >>  static struct bin_attribute bin_attr_ro_nvmem = {
+> >>  	.attr	= {
+> >>  		.name	= "nvmem",
+> >>-		.mode	= S_IRUGO,
+> >>+		.mode	= S_IRUSR,
+> >>  	},
+> >>  	.read	= bin_attr_nvmem_read,
+> >>  };
+> >
+> >How about using BIN_ATTR_RO() and friends instead, that way I _know_ you
+> >got the permissions correct as it's impossible to get them wrong by
+> >using those macros.
+> Yes, that sounds good, but there are no macros for just "S_IRUSR" or
+> "(S_IWUSR | S_IRUSR)" in ./include/linux/sysfs.h
 
-Fixes: 8841cbf666d6 ("Documentation: dt: keystone: provide SoC specific compatible flags")
-Reported-by: Suman Anna <s-anna@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
+Then that means you are trying to do something "odd" and you shouldn't
+be doing that :)
 
-This could be squashed since the original patch was not merged yet..
-Apologies on the miss. (based on next-20151006)
+Use the standard attribute permissions (RO, RW), as those are the
+"safest" and what you really want to be using here, as you already are.
 
- Documentation/devicetree/bindings/arm/keystone/keystone.txt | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+thanks,
 
-diff --git a/Documentation/devicetree/bindings/arm/keystone/keystone.txt b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
-index 800d2d02e27b..3090a8a008c0 100644
---- a/Documentation/devicetree/bindings/arm/keystone/keystone.txt
-+++ b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
-@@ -17,11 +17,11 @@ SoC families:
- SoCs:
- 
- - Keystone 2 Hawking/Kepler
--   compatible = ti,k2hk", "ti,keystone"
-+   compatible = "ti,k2hk", "ti,keystone"
- - Keystone 2 Lamarr
--   compatible = ti,k2l", "ti,keystone"
-+   compatible = "ti,k2l", "ti,keystone"
- - Keystone 2 Edison
--   compatible = ti,k2e", "ti,keystone"
-+   compatible = "ti,k2e", "ti,keystone"
- 
- Boards:
- -  Keystone 2 Hawking/Kepler EVM
--- 
-2.1.4
+greg k-h
