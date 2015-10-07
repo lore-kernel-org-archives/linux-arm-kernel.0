@@ -1,72 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 07 Oct 2015 10:26:14 +0100
-Subject: [PATCH 03/15] arm64: Introduce helpers for page table levels
-In-Reply-To: <20151007082652.GM9011@cbox>
-References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
- <1442331684-28818-4-git-send-email-suzuki.poulose@arm.com>
- <20151007082652.GM9011@cbox>
-Message-ID: <5614E536.9040007@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 7 Oct 2015 11:26:43 +0200
+Subject: [PATCH v5 0/17] Add Analogix Core Display Port Driver
+In-Reply-To: <5614DFBC.8060105@rock-chips.com>
+References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
+ <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
+ <5614BADD.1070307@rock-chips.com> <5614DBE2.6080102@osg.samsung.com>
+ <5614DFBC.8060105@rock-chips.com>
+Message-ID: <5614E553.6060108@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/15 09:26, Christoffer Dall wrote:
-> Hi Suzuki,
+Hello Yakir,
+
+On 10/07/2015 11:02 AM, Yakir Yang wrote:
+> Hi Javier,
 > 
-> On Tue, Sep 15, 2015 at 04:41:12PM +0100, Suzuki K. Poulose wrote:
->> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+> On 10/07/2015 04:46 PM, Javier Martinez Canillas wrote:
+>> Hello Yakir,
 >>
->> Introduce helpers for finding the number of page table
->> levels required for a given VA width, shift for a particular
->> page table level.
->>
->> Convert the existing users to the new helpers. More users
->> to follow.
->>
->> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
->> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/include/asm/pgtable-hwdef.h |   15 ++++++++++++---
->>  1 file changed, 12 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
->> index 24154b0..ce18389 100644
->> --- a/arch/arm64/include/asm/pgtable-hwdef.h
->> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
->> @@ -16,13 +16,21 @@
->>  #ifndef __ASM_PGTABLE_HWDEF_H
->>  #define __ASM_PGTABLE_HWDEF_H
->>  
->> +/*
->> + * Number of page-table levels required to address 'va_bits' wide
->> + * address, without section mapping
->> + */
->> +#define ARM64_HW_PGTABLE_LEVELS(va_bits) (((va_bits) - 4) / (PAGE_SHIFT - 3))
+>> On 10/07/2015 08:25 AM, Yakir Yang wrote:
+>>> Hi all,
+>>>
+>>> Friendly ping.....   :)
+>>>
+>>>
+>>> Best regards,
+>>> - Yakir
+>>>
+>>>
+>> Do you have a tree that I can use to test these patches?
 > 
-> I don't understand the '(va_bits) - 4' here, can you explain it (and add a
-> comment to that effect) ?
+> Wow, thanks a lot, I do have a tree on github [https://github.com/yakir-Yang/linux/tree/analogix_dp],
+> crossing my finger, wish things works......    ;)
+>
 
-I just had a chat with Catalin, who did shed some light on this.
-It all has to do with rounding up. What you would like to have here is:
+I tried your analogix_dp branch on an Exynos5800 Peach Pi Chromebook
+but the machine didn't boot. Unfortunately I need to do some soldering
+to have a serial console on this board so don't have a kernel boot log.
 
-#define ARM64_HW_PGTABLE_LEVELS(va_bits) DIV_ROUND_UP(va_bits - PAGE_SHIFT, PAGE_SHIFT - 3)
+I'll let you know if I can get more info about this issue.
 
-where (va_bits - PAGE_SHIFT) is the total number of bits we deal
-with during a page table walk, and (PAGE_SHIFT - 3) is the number
-of bits we deal with per level.
+Also, there is Kconfig recursive dependency that you may want to fix:
 
-The clue is in how DIV_ROUND_UP is written:
+$ make exynos_defconfig
+drivers/video/fbdev/Kconfig:5:error: recursive dependency detected!
+drivers/video/fbdev/Kconfig:5: symbol FB is selected by DRM_KMS_FB_HELPER
+drivers/gpu/drm/Kconfig:34: symbol DRM_KMS_FB_HELPER depends on DRM_KMS_HELPER
+drivers/gpu/drm/Kconfig:28: symbol DRM_KMS_HELPER is selected by DRM_ANALOGIX_DP
+drivers/gpu/drm/bridge/analogix/Kconfig:1: symbol DRM_ANALOGIX_DP is selected by DRM_EXYNOS_DP
+drivers/gpu/drm/exynos/Kconfig:57: symbol DRM_EXYNOS_DP depends on DRM_EXYNOS_FIMD
+drivers/gpu/drm/exynos/Kconfig:19: symbol DRM_EXYNOS_FIMD depends on FB_S3C
+drivers/video/fbdev/Kconfig:2023: symbol FB_S3C depends on FB
+ 
+> Thanks,
+> - Yakir
+> 
 
-#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
-
-which gives you Suzuki's magic formula.
-
-I'd vote for the DIV_ROUND_UP(), which will make things a lot more readable.
-
-	M.
+Best regards,
 -- 
-Jazz is not dead. It just smells funny...
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
