@@ -1,110 +1,222 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Wed, 7 Oct 2015 08:11:34 +0300
-Subject: [linux-sunxi] [PATCH 1/3] ARM: dts: sun4i: Allow to use the PH6
- pin for GPIO on pcDuino1/2
-In-Reply-To: <20151005085853.2dd2373b@i7>
-References: <1443985128-23137-1-git-send-email-siarhei.siamashka@gmail.com>
- <1443985128-23137-2-git-send-email-siarhei.siamashka@gmail.com>
- <CAGb2v65n6ymon+sEASa726sam0KLOvMPbxTxCqvV4j0ust2PCA@mail.gmail.com>
- <20151005083940.78d04f63@i7> <20151005085853.2dd2373b@i7>
-Message-ID: <20151007081134.39d0992b@i7>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed,  7 Oct 2015 00:42:28 -0500
+Subject: [Patch v2] firmware: qcom: scm: Convert to platform driver
+Message-ID: <1444196548-1360-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 5 Oct 2015 08:58:53 +0300
-Siarhei Siamashka <siarhei.siamashka@gmail.com> wrote:
+This patch creates a platform driver for the SCM so that we can adequately
+manage resources.  This removes clients having to carry the necessary
+clocks to use the SCM resources.
 
-> On Mon, 5 Oct 2015 08:39:40 +0300
-> Siarhei Siamashka <siarhei.siamashka@gmail.com> wrote:
-> 
-> > On Mon, 5 Oct 2015 09:55:28 +0800
-> > Chen-Yu Tsai <wens@csie.org> wrote:
-> > 
-> > > On Mon, Oct 5, 2015 at 2:58 AM, Siarhei Siamashka
-> > > <siarhei.siamashka@gmail.com> wrote:
-> > > > The pcDuino1 board does not use any power switches at all for its
-> > > > two USB host ports and the VBUS pins are always connected to 5V.
-> > > >
-> > > > The pcDuino2 board uses the RT9701GB power switch for its single
-> > > > USB host port, but the USB_EN pin (PD2) is pulled up with a 10K
-> > > > resistor. So that the USB power is still enabled by default even
-> > > > if nobody bothers to configure the PD2 pin or runs the pcDuino1
-> > > > firmware.
-> > > 
-> > > Seems like it would be better if you had a regulator controlled
-> > > by PD2. At least can shut down VBUS power when it wants to?
-> > 
-> > That's a good question.
-> > 
-> > Describing the regulator controlled by PD2 in the dts file is surely
-> > the right solution for pcDuino2 boards. But in the case of using this
-> > dts for pcDuino1, the kernel would think that it can shut down VBUS
-> > power, while in fact this is not true.
-> > 
-> > The RT9701GB switch also provides the current limiting feature in
-> > addition to the ability to enable/disable the VBUS power. Probably
-> > this was a real reason why it was added to the board.
-> > 
-> > Everything boils down to the question whether we want to have a
-> > common dts file for pcDuino1 and pcDuino2 or decide to split them.
-> > Based on the schematics comparison, there do not seem to be any
-> > substantial differences between these boards if we ignore the PD2
-> > pin altogether. LinkSprite says that "Ubuntu images are same for
-> > both pcDuino1 and pcDuino2" at their website:
-> >     http://www.linksprite.com/?page_id=809
-> > 
-> > And I actually like their decision to have the PD2 pin pulled-up.
-> 
-> I'm not sure if everyone would like this, but the following trick
-> works. If we configure the PD2 pin as input with pull-down on the SoC
-> side and read it, then it still reads as 1 on pcDuino2. Which means
-> that the pull-up is apparently stronger (by how much and whether this
-> is really reliable is another question). It should read as 0 on
-> pcDuino1 and we might use this to detect the board type at runtime.
-> 
-> Still it is probably an overkill for just this really minor thing :-)
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ .../devicetree/bindings/firmware/qcom,scm.txt      |   25 ++++
+ drivers/firmware/qcom_scm.c                        |  135 ++++++++++++++++++--
+ 2 files changed, 152 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
 
-I few more details about this. I have actually measured the voltage
-with/without pull-down on the SoC side (which competes with the 10K
-pull-up resistor on the PCB) and the results are the following. The
-voltage drops from 3.306V to 3.187V on one board and from 3.325V to
-3.204V on another. Based on these numbers, we can in estimate
-pull-down resistors used for GPIO inside of the A10 SoC as something
-like ~270K Ohm.
-
-As such, it looks like we can do reliable runtime detection of
-pcDuino1 and pcDuino2 variants by probing this PD2 pin. The most
-appropriate place to do the runtime detection is probably the board
-type selection stub (sunxi-bootsetup), run as the initial part of
-a Linux distribution installer. We are perfectly fine having
-separate dts files for the pcDuino1/pcDuino2 boards and the
-kernel does not need to become more complicated.
-
-Probing for pull-up and pull-down resistors on the PCB can be
-generalized beyond just PD2 and used to further narrow down the
-selection of compatible boards (sunxi-bootsetup currently only
-considers the SoC type, DRAM size and DRAM bus width for this).
-
-Additional very interesting observation is that the reference
-Allwinner schematics and Cubieboard/Cubietruck boards use 510K
-pull-down resistor for the USB power switches. With 270K pull-up
-by the SoC and 510K pull-down by a resistor on the PCB, the
-resulting voltage is going to be around ~2.2V, which should be
-enough to be interpreted as digital 1. And indeed, a quick test
-shows that if we just configure either PH3 or PH6 pin as input
-with pull-up, then the corresponding USB port gets powered up
-on the Cubieboard :-)
-
-There are two important consequences:
-* As far as generic device independent code is concerned, we can
-  reasonably safely enable USB power on the Cubieboard, Cubietruck
-  and other device, which did not deviate from the reference
-  Allwinner schematics and used 510K pull-down resistors. Configuring
-  pins for input can't possibly do much harm (if any at all).
-* By doing run-time checks, we can see the difference between the
-  boards using 10K pull-down resistors (OLIMEX boards) and the boards
-  using 510K pull-down resistors (CubieTech boards).
-
+diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+new file mode 100644
+index 0000000..debcd32
+--- /dev/null
++++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+@@ -0,0 +1,25 @@
++QCOM Secure Channel Manager (SCM)
++
++Qualcomm processors include an interface to communicate to the secure firmware.
++This interface allows for clients to request different types of actions.  These
++can include CPU power up/down, HDCP requests, loading of firmware, and other
++assorted actions.
++
++Required properties:
++- compatible: must contain "qcom,scm"
++- clocks: Should contain the core, iface, and bus clocks.
++- clock-names: Must contain "core" for the core clock, "iface" for the interface
++  clock and "bus" for the bus clock.
++
++Example:
++
++	firmware {
++		compatible = "simple-bus";
++
++		scm {
++			compatible = "qcom,scm";
++			clocks = <&gcc GCC_CE1_CLK> , <&gcc GCC_CE1_AXI_CLK>, <&gcc GCC_CE1_AHB_CLK>;
++			clock-names = "core", "bus", "iface";
++		};
++	};
++
+diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
+index 45c008d..7c4ec48 100644
+--- a/drivers/firmware/qcom_scm.c
++++ b/drivers/firmware/qcom_scm.c
+@@ -10,19 +10,57 @@
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+- * 02110-1301, USA.
+  */
+-
++#include <linux/platform_device.h>
++#include <linux/module.h>
+ #include <linux/cpumask.h>
+ #include <linux/export.h>
+ #include <linux/types.h>
+ #include <linux/qcom_scm.h>
++#include <linux/of.h>
++#include <linux/clk.h>
+ 
+ #include "qcom_scm.h"
+ 
++struct qcom_scm {
++	struct clk *core_clk;
++	struct clk *iface_clk;
++	struct clk *bus_clk;
++};
++
++static struct qcom_scm *__scm;
++
++static int qcom_scm_clk_enable(void)
++{
++	int ret;
++
++	ret = clk_prepare_enable(__scm->core_clk);
++	if (ret)
++		goto bail;
++	ret = clk_prepare_enable(__scm->iface_clk);
++	if (ret)
++		goto disable_core;
++	ret = clk_prepare_enable(__scm->bus_clk);
++	if (ret)
++		goto disable_iface;
++
++	return 0;
++
++disable_iface:
++	clk_disable_unprepare(__scm->iface_clk);
++disable_core:
++	clk_disable_unprepare(__scm->core_clk);
++bail:
++	return ret;
++}
++
++static void qcom_scm_clk_disable(void)
++{
++	clk_disable_unprepare(__scm->core_clk);
++	clk_disable_unprepare(__scm->iface_clk);
++	clk_disable_unprepare(__scm->bus_clk);
++}
++
+ /**
+  * qcom_scm_set_cold_boot_addr() - Set the cold boot address for cpus
+  * @entry: Entry point function for the cpus
+@@ -72,11 +110,17 @@ EXPORT_SYMBOL(qcom_scm_cpu_power_down);
+  */
+ bool qcom_scm_hdcp_available(void)
+ {
+-	int ret;
++	int ret = qcom_scm_clk_enable();
++
++	if (ret)
++		goto clk_err;
+ 
+ 	ret = __qcom_scm_is_call_available(QCOM_SCM_SVC_HDCP,
+-		QCOM_SCM_CMD_HDCP);
++						QCOM_SCM_CMD_HDCP);
+ 
++	qcom_scm_clk_disable();
++
++clk_err:
+ 	return (ret > 0) ? true : false;
+ }
+ EXPORT_SYMBOL(qcom_scm_hdcp_available);
+@@ -91,6 +135,81 @@ EXPORT_SYMBOL(qcom_scm_hdcp_available);
+  */
+ int qcom_scm_hdcp_req(struct qcom_scm_hdcp_req *req, u32 req_cnt, u32 *resp)
+ {
+-	return __qcom_scm_hdcp_req(req, req_cnt, resp);
++	int ret = qcom_scm_clk_enable();
++
++	if (ret)
++		return ret;
++
++	ret = __qcom_scm_hdcp_req(req, req_cnt, resp);
++	qcom_scm_clk_disable();
++	return ret;
+ }
+ EXPORT_SYMBOL(qcom_scm_hdcp_req);
++
++/**
++ * qcom_scm_is_available() - Checks if SCM is available
++ */
++bool qcom_scm_is_available(void)
++{
++	return !!__scm;
++}
++EXPORT_SYMBOL(qcom_scm_is_available);
++
++static int qcom_scm_probe(struct platform_device *pdev)
++{
++	struct qcom_scm *scm;
++	long rate;
++	int ret;
++
++	scm = devm_kzalloc(&pdev->dev, sizeof(*scm), GFP_KERNEL);
++	if (!scm)
++		return -ENOMEM;
++
++	scm->core_clk = devm_clk_get(&pdev->dev, "core");
++	if (IS_ERR(scm->core_clk)) {
++		if (PTR_ERR(scm->core_clk) != -EPROBE_DEFER)
++			dev_err(&pdev->dev, "failed to acquire core clk\n");
++		return PTR_ERR(scm->core_clk);
++	}
++
++	scm->iface_clk = devm_clk_get(&pdev->dev, "iface");
++	if (IS_ERR(scm->iface_clk)) {
++		if (PTR_ERR(scm->iface_clk) != -EPROBE_DEFER)
++			dev_err(&pdev->dev, "failed to acquire iface clk\n");
++		return PTR_ERR(scm->iface_clk);
++	}
++
++	scm->bus_clk = devm_clk_get(&pdev->dev, "bus");
++	if (IS_ERR(scm->bus_clk)) {
++		if (PTR_ERR(scm->bus_clk) != -EPROBE_DEFER)
++			dev_err(&pdev->dev, "failed to acquire bus clk\n");
++		return PTR_ERR(scm->bus_clk);
++	}
++
++	/* vote for max clk rate for highest performance */
++	rate = clk_round_rate(scm->core_clk, INT_MAX);
++	ret = clk_set_rate(scm->core_clk, rate);
++	if (ret)
++		return ret;
++
++	__scm = scm;
++
++	return 0;
++}
++
++static const struct of_device_id qcom_scm_dt_match[] = {
++	{ .compatible = "qcom,scm",},
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, qcom_scm_dt_match);
++
++static struct platform_driver qcom_scm_driver = {
++	.driver = {
++		.name	= "qcom_scm",
++		.of_match_table = qcom_scm_dt_match,
++	},
++	.probe = qcom_scm_probe,
++};
++
++builtin_platform_driver(qcom_scm_driver);
 -- 
-Best regards,
-Siarhei Siamashka
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
