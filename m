@@ -1,43 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 Oct 2015 11:00:01 +0100
-Subject: [PATCH v5 0/5] ARM: sunxi: Add Reduced Serial Bus support
-In-Reply-To: <1443700673-24312-1-git-send-email-wens@csie.org>
-References: <1443700673-24312-1-git-send-email-wens@csie.org>
-Message-ID: <20151007100001.GD2278@lukather>
+From: sugar.zhang@rock-chips.com (sugar)
+Date: Wed, 7 Oct 2015 18:01:57 +0800
+Subject: [PATCH 1/2] ASoC: rockchip: i2s: add 8 channels capture and
+ lrck-mode support
+In-Reply-To: <20151007093940.GA12635@sirena.org.uk>
+References: <1442979683-9441-1-git-send-email-sugar.zhang@rock-chips.com>
+ <1442979683-9441-2-git-send-email-sugar.zhang@rock-chips.com>
+ <20150923162433.GQ30445@sirena.org.uk> <5608F74C.3000104@rock-chips.com>
+ <20150930184655.GX15635@sirena.org.uk> <5614D162.3020500@rock-chips.com>
+ <20151007092714.GZ12635@sirena.org.uk> <20151007093940.GA12635@sirena.org.uk>
+Message-ID: <5614ED95.80603@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 01, 2015 at 07:57:46PM +0800, Chen-Yu Tsai wrote:
-> Hi everyone,
-> 
-> This is my fifth attempt at adding support for Allwinner's Reduced
-> Serial Bus (RSB), which is used to communicate with PMICs and other
-> peripherals on their newer SoCs, such as the A23/A33/A80.
-> 
-> RSB is a simplified two wire interface using push-pull outputs,
-> supporting multiple slaves, address and data parity checks, and
-> clock speeds up to 20 MHz. The bus only supports simple register
-> read/writes, with possible register sizes of 8/16/32 bits. Access
-> sizes not matching the slave device register sizes result in NACKs
-> or errors. 32 bit registers in devices have yet to be seen.
-> 
-> v4 and later adds a platform driver for the RSB controller under
-> drivers/soc/sunxi, which adds a custom driver type and bus type
-> for slave drivers to use. Custom regmap support is also merged
-> into the controller driver. Currently the driver only exports 2
-> symbols: sunxi_rsb_driver_register() & __devm_regmap_init_sunxi_rsb().
 
-Applied, thanks!
-Maxime
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151007/1795f703/attachment.sig>
+? 10/7/2015 17:39, Mark Brown ??:
+> On Wed, Oct 07, 2015 at 10:27:14AM +0100, Mark Brown wrote:
+>> On Wed, Oct 07, 2015 at 04:01:38PM +0800, sugar wrote:
+>
+>>> if (dai->symmetric_rates)
+>>> 	regmap_update_bits(i2s->regmap, I2S_CKR,
+>>>                             I2S_CKR_TRCM_MASK,
+>>>                             I2S_CKR_TRCM(val));
+>
+>> Yes, something like that.  You'll need to check both links in the DAI
+>> and the DAI link itself rather than just your own DAI but we should have
+>> a helper function for that - I'll add one, look out for a patch shortly.
+>
+> Actually no, now I look at the code you probably want to just clone the
+> check from soc_pcm_apply_symmetry() so have that be:
+>
+> 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+>
+> 	if (rtd->dai_link->symmetrict_rates) {
+> 	}
+>
+> instead.
+>
+
+OK, this will be done in patchset v2, thanks.
