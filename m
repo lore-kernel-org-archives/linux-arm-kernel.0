@@ -1,30 +1,30 @@
-From: jiri@resnulli.us (Jiri Pirko)
-Date: Wed, 7 Oct 2015 09:00:37 +0200
-Subject: [PATCH v2] mlxsw: fix warnings for big-endian 32-bit dma_addr_t
-In-Reply-To: <9933338.DDyBa8BQum@wuerfel>
-References: <30258520.VaA2vDyUiY@wuerfel>
- <1444200782.26237.8.camel@perches.com> <9933338.DDyBa8BQum@wuerfel>
-Message-ID: <20151007070036.GE2152@nanopsycho.orion>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 07 Oct 2015 08:12:06 +0100
+Subject: [PATCH v2 1/1] irqchip/GICv2m: Add workaround for APM X-Gene
+ GICv2m erratum
+In-Reply-To: <b0fcb89a51a86b5edb85d2b03cf26ca60bd51f01.1444069886.git.dhdang@apm.com>
+References: <20151003142650.16b291b4@arm.com>
+ <b0fcb89a51a86b5edb85d2b03cf26ca60bd51f01.1444069886.git.dhdang@apm.com>
+Message-ID: <5614C5C6.5090207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wed, Oct 07, 2015 at 08:58:34AM CEST, arnd at arndb.de wrote:
->The recently added mlxsw driver produces warnings in ARM
->allmodconfig:
->
->drivers/net/ethernet/mellanox/mlxsw/pci.c: In function 'mlxsw_pci_cmd_exec':
->drivers/net/ethernet/mellanox/mlxsw/pci.c:1585:59: warning: right shift count >= width of type [-Wshift-count-overflow]
->linux/byteorder/big_endian.h:38:51: note: in definition of macro '__cpu_to_be32'
->drivers/net/ethernet/mellanox/mlxsw/pci.c:76:2: note: in expansion of macro 'iowrite32be'
->
->This uses upper_32_bits() to extract the bits while avoiding that warning.
->
->Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->Acked-by: Jiri Pirko <jiri@mellanox.com>
->Fixes: eda6500a987a "mlxsw: Add PCI bus implementation"
->---
->I've kept Jiri's Ack despite having in effect a completely different
->patch here, as the effect and the changelog is the same for practical purposes.
->Hope that's ok.
+On 06/10/15 23:32, Duc Dang wrote:
+> APM X-Gene GICv2m implementation has an erratum where the
+> MSI data needs to be the offset from the spi_start in order to
+> trigger the correct MSI interrupt. This is different from the
+> standard GICv2m implementation where the MSI data is the absolute
+> value within the range from spi_start to (spi_start + num_spis)
+> of each v2m frame.
+> 
+> This patch reads MSI_IIDR register (present in all GICv2m
+> implementations) to identify X-Gene GICv2m implementation and
+> apply workaround to change the data portion of MSI vector.
+> 
+> Signed-off-by: Duc Dang <dhdang@apm.com>
 
-It's ok, thanks.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
