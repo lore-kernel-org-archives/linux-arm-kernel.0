@@ -1,53 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Oct 2015 21:12:55 +0200
-Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
-In-Reply-To: <20151007130324.GA4557@linux>
-References: <5706174.BUsqiXljxZ@wuerfel> <20151007125735.GA8170@kroah.com>
- <20151007130324.GA4557@linux>
-Message-ID: <5308760.2G5KJFF9Pi@wuerfel>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 7 Oct 2015 12:15:03 -0700
+Subject: [PATCH v4 3/4] drivers: clk: st: Correct the pll-type for A9 for
+ stih418
+In-Reply-To: <1444208939-10233-4-git-send-email-gabriel.fernandez@linaro.org>
+References: <1444208939-10233-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1444208939-10233-4-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <20151007191503.GC12345@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 October 2015 18:33:24 Viresh Kumar wrote:
-> Cc'ing Mike and Stephen..
+On 10/07, Gabriel Fernandez wrote:
+> Add support for new PLL-type for stih418 A9-PLL.
+> Currently the 407_A9_PLL type being used, it is corrected with this patch
+> 4600c28 PLL allows to reach higher frequencies
+> so its programming algorithm is extended.
 > 
-> On 07-10-15, 13:57, Greg Kroah-Hartman wrote:
-> > On Wed, Oct 07, 2015 at 04:51:49PM +0530, Viresh Kumar wrote:
-> > > On 07-10-15, 12:07, Greg Kroah-Hartman wrote:
-> > > > Why would you be wanting to create a "unsigned long" as an api anyway?
-> > > > Just force it to be u64 all the time, can't you do that?
-> > > 
-> > > Okay, so the variable in question (lets say frequency) is an 'unsigned
-> > > long' and that's how all the APIs of clock framework expect/define
-> > > it.
-> > > 
-> > > And you are probably saying that we do this:
-> > > 
-> > > unsigned long freq;
-> > > 
-> > > debugfs_create_u64((u64 *)&freq);
-> > > 
-> > > Right? Or are you asking to update clock APIs to be converted to u64?
-> > 
-> > Yes, they should be u64 as I doubt you want to debug problems that you
-> > have in the driver where it works on a 64bit system but doesn't on a
-> > 32bit one.
-> 
-> Firstly changing the clock API (and other similar APIs) to make
-> frequency u64 instead of 'unsigned long', looks like a giant effort.
-> There are too many users of those API, etc..
-> 
-> Over that, it might be good performance wise to use u32 for 32 bit
-> systems and u64 for 64 bit one, to represent clock frequency and maybe
-> that's why we chose unsigned long there.
+> Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> ---
 
-I think it clearly makes sense to have a fixed length for each of these
-members: either 32 bit is enough to represent all possible values, then
-there is no need to make them 'long' on 64-bit architectures, or 32 bit
-is not enough and then the code is broken on 32-bit architectures today
-and should be fixed.
+Applied to clk-next
 
-In my patch, I assumed that if 32-bit architectures work fine today, then
-we don't need more range on 64-bit architectures either.
-
-	Arnd
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
