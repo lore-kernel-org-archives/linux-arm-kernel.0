@@ -1,104 +1,86 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed,  7 Oct 2015 15:55:14 +0100
-Subject: [PATCH v3 04/16] KVM: arm/arm64: add emulation model specific destroy
- function
+Date: Wed,  7 Oct 2015 15:55:13 +0100
+Subject: [PATCH v3 03/16] KVM: extend struct kvm_msi to hold a 32-bit device ID
 In-Reply-To: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
 References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1444229726-31559-5-git-send-email-andre.przywara@arm.com>
+Message-ID: <1444229726-31559-4-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we destroy the VGIC emulation in one function that cares for
-all emulated models. To be on par with init_model (which is model
-specific), lets introduce a per-emulation-model destroy method, too.
-Use it for a tiny GICv3 specific code already, later it will be handy
-for the ITS emulation.
+The ARM GICv3 ITS MSI controller requires a device ID to be able to
+assign the proper interrupt vector. On real hardware, this ID is
+sampled from the bus. To be able to emulate an ITS controller, extend
+the KVM MSI interface to let userspace provide such a device ID. For
+PCI devices, the device ID is simply the 16-bit bus-device-function
+triplet, which should be easily available to the userland tool.
+
+Also there is a new KVM capability which advertises whether the
+current VM requires a device ID to be set along with the MSI data.
+This flag is still reported as not available everywhere, later we will
+enable it when ITS emulation is used.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Eric Auger <eric.auger@linaro.org>
 ---
 Changelog v2..v3:
-- none
+- adjust KVM_CAP number to not clash with upstream
 
- include/kvm/arm_vgic.h      |  1 +
- virt/kvm/arm/vgic-v3-emul.c |  9 +++++++++
- virt/kvm/arm/vgic.c         | 11 ++++++++++-
- 3 files changed, 20 insertions(+), 1 deletion(-)
+ Documentation/virtual/kvm/api.txt | 12 ++++++++++--
+ include/uapi/linux/kvm.h          |  5 ++++-
+ 2 files changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 926d67c..2c10082 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -144,6 +144,7 @@ struct vgic_vm_ops {
- 	bool	(*queue_sgi)(struct kvm_vcpu *, int irq);
- 	void	(*add_sgi_source)(struct kvm_vcpu *, int irq, int source);
- 	int	(*init_model)(struct kvm *);
-+	void	(*destroy_model)(struct kvm *);
- 	int	(*map_resources)(struct kvm *, const struct vgic_params *);
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index d9eccee..a302e0a 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -2147,10 +2147,18 @@ struct kvm_msi {
+ 	__u32 address_hi;
+ 	__u32 data;
+ 	__u32 flags;
+-	__u8  pad[16];
++	__u32 devid;
++	__u8  pad[12];
  };
  
-diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-index e661e7f..d2eeb20 100644
---- a/virt/kvm/arm/vgic-v3-emul.c
-+++ b/virt/kvm/arm/vgic-v3-emul.c
-@@ -862,6 +862,14 @@ static int vgic_v3_init_model(struct kvm *kvm)
- 	return 0;
- }
- 
-+static void vgic_v3_destroy_model(struct kvm *kvm)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
+-No flags are defined so far. The corresponding field must be 0.
++flags: KVM_MSI_VALID_DEVID: devid contains a valid value
++devid: If KVM_MSI_VALID_DEVID is set, contains a unique device identifier
++       for the device that wrote the MSI message.
++       For PCI, this is usually a BFD identifier in the lower 16 bits.
 +
-+	kfree(dist->irq_spi_mpidr);
-+	dist->irq_spi_mpidr = NULL;
-+}
-+
- /* GICv3 does not keep track of SGI sources anymore. */
- static void vgic_v3_add_sgi_source(struct kvm_vcpu *vcpu, int irq, int source)
- {
-@@ -874,6 +882,7 @@ void vgic_v3_init_emulation(struct kvm *kvm)
- 	dist->vm_ops.queue_sgi = vgic_v3_queue_sgi;
- 	dist->vm_ops.add_sgi_source = vgic_v3_add_sgi_source;
- 	dist->vm_ops.init_model = vgic_v3_init_model;
-+	dist->vm_ops.destroy_model = vgic_v3_destroy_model;
- 	dist->vm_ops.map_resources = vgic_v3_map_resources;
++The per-VM KVM_CAP_MSI_DEVID capability advertises the need to provide
++the device ID. If this capability is not set, userland cannot rely on
++the kernel to allow the KVM_MSI_VALID_DEVID flag being set.
  
- 	kvm->arch.max_vcpus = KVM_MAX_VCPUS;
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index a5360b7..b71f627 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -125,6 +125,14 @@ int kvm_vgic_map_resources(struct kvm *kvm)
- 	return kvm->arch.vgic.vm_ops.map_resources(kvm, vgic);
- }
  
-+static void vgic_destroy_model(struct kvm *kvm)
-+{
-+	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
-+
-+	if (vm_ops->destroy_model)
-+		vm_ops->destroy_model(kvm);
-+}
-+
- /*
-  * struct vgic_bitmap contains a bitmap made of unsigned longs, but
-  * extracts u32s out of them.
-@@ -1941,6 +1949,8 @@ void kvm_vgic_destroy(struct kvm *kvm)
- 	struct kvm_vcpu *vcpu;
- 	int i;
+ 4.71 KVM_CREATE_PIT2
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index a9256f0..eae9ba1 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -824,6 +824,7 @@ struct kvm_ppc_smmu_info {
+ #define KVM_CAP_MULTI_ADDRESS_SPACE 118
+ #define KVM_CAP_GUEST_DEBUG_HW_BPS 119
+ #define KVM_CAP_GUEST_DEBUG_HW_WPS 120
++#define KVM_CAP_MSI_DEVID 121
  
-+	vgic_destroy_model(kvm);
-+
- 	kvm_for_each_vcpu(i, vcpu, kvm)
- 		kvm_vgic_vcpu_destroy(vcpu);
+ #ifdef KVM_CAP_IRQ_ROUTING
  
-@@ -1957,7 +1967,6 @@ void kvm_vgic_destroy(struct kvm *kvm)
- 	}
- 	kfree(dist->irq_sgi_sources);
- 	kfree(dist->irq_spi_cpu);
--	kfree(dist->irq_spi_mpidr);
- 	kfree(dist->irq_spi_target);
- 	kfree(dist->irq_pending_on_cpu);
- 	kfree(dist->irq_active_on_cpu);
+@@ -975,12 +976,14 @@ struct kvm_one_reg {
+ 	__u64 addr;
+ };
+ 
++#define KVM_MSI_VALID_DEVID	(1U << 0)
+ struct kvm_msi {
+ 	__u32 address_lo;
+ 	__u32 address_hi;
+ 	__u32 data;
+ 	__u32 flags;
+-	__u8  pad[16];
++	__u32 devid;
++	__u8  pad[12];
+ };
+ 
+ struct kvm_arm_device_addr {
 -- 
 2.5.1
