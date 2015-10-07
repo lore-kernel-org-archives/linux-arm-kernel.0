@@ -1,79 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 Oct 2015 18:33:17 +0100
-Subject: [PATCH 1/2] dmaengine: hdmac: factorise memset descriptor
- allocation
-In-Reply-To: <20151007135412.GB3320@vkoul-mobl.iind.intel.com>
-References: <1443711158-18495-1-git-send-email-maxime.ripard@free-electrons.com>
- <1443711158-18495-2-git-send-email-maxime.ripard@free-electrons.com>
- <20151007135412.GB3320@vkoul-mobl.iind.intel.com>
-Message-ID: <20151007173317.GG2278@lukather>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 7 Oct 2015 18:38:02 +0100
+Subject: [PATCH] nvmem: core: make default user binary file root-access
+ only
+In-Reply-To: <561555AA.5090000@linaro.org>
+References: <1444235714-24365-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20151007165046.GC12099@kroah.com> <56154FCF.6010105@linaro.org>
+ <20151007171227.GA9485@kroah.com> <561555AA.5090000@linaro.org>
+Message-ID: <20151007173802.GA10665@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
-
-On Wed, Oct 07, 2015 at 02:54:13PM +0100, Vinod Koul wrote:
-> On Thu, Oct 01, 2015 at 04:52:37PM +0200, Maxime Ripard wrote:
+On Wed, Oct 07, 2015 at 06:26:02PM +0100, Srinivas Kandagatla wrote:
 > 
-> > +static struct at_desc *atc_create_memset_desc(struct dma_chan *chan,
-> > +					      dma_addr_t psrc,
-> > +					      dma_addr_t pdst,
-> > +					      size_t len)
-> > +{
-> > +	struct at_dma_chan *atchan = to_at_dma_chan(chan);
-> > +	struct at_desc *desc;
-> > +	size_t xfer_count;
-> > +
-> > +	u32 ctrla = ATC_SRC_WIDTH(2) |
-> > +		ATC_DST_WIDTH(2);
 > 
-> why is this over two lines :)
+> On 07/10/15 18:12, Greg KH wrote:
+> >On Wed, Oct 07, 2015 at 06:01:03PM +0100, Srinivas Kandagatla wrote:
+> >>
+> >>
+> >>On 07/10/15 17:50, Greg KH wrote:
+> >>>On Wed, Oct 07, 2015 at 05:35:14PM +0100, Srinivas Kandagatla wrote:
+> >>>>As required by many providers like at24/at25/mxs-ocotp/qfprom, which would
+> >>>>want to allow root-only to read/write the nvmem content.
+> >>>>So making the defaults to be root-only access which can prevent normal
+> >>>>users from reading the nvmem data.
+> >>>>
+> >>>>Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> >>>>---
+> >>>>  drivers/nvmem/core.c | 4 ++--
+> >>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+> >>>>
+> >>>>diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+> >>>>index 6fd4e5a..4d2e476 100644
+> >>>>--- a/drivers/nvmem/core.c
+> >>>>+++ b/drivers/nvmem/core.c
+> >>>>@@ -112,7 +112,7 @@ static ssize_t bin_attr_nvmem_write(struct file *filp, struct kobject *kobj,
+> >>>>  static struct bin_attribute bin_attr_rw_nvmem = {
+> >>>>  	.attr	= {
+> >>>>  		.name	= "nvmem",
+> >>>>-		.mode	= S_IWUSR | S_IRUGO,
+> >>>>+		.mode	= S_IWUSR | S_IRUSR,
+> >>>>  	},
+> >>>>  	.read	= bin_attr_nvmem_read,
+> >>>>  	.write	= bin_attr_nvmem_write,
+> >>>>@@ -136,7 +136,7 @@ static const struct attribute_group *nvmem_rw_dev_groups[] = {
+> >>>>  static struct bin_attribute bin_attr_ro_nvmem = {
+> >>>>  	.attr	= {
+> >>>>  		.name	= "nvmem",
+> >>>>-		.mode	= S_IRUGO,
+> >>>>+		.mode	= S_IRUSR,
+> >>>>  	},
+> >>>>  	.read	= bin_attr_nvmem_read,
+> >>>>  };
+> >>>
+> >>>How about using BIN_ATTR_RO() and friends instead, that way I _know_ you
+> >>>got the permissions correct as it's impossible to get them wrong by
+> >>>using those macros.
+> >>Yes, that sounds good, but there are no macros for just "S_IRUSR" or
+> >>"(S_IWUSR | S_IRUSR)" in ./include/linux/sysfs.h
+> >
+> >Then that means you are trying to do something "odd" and you shouldn't
+> >be doing that :)
+> >
+> The requirement originally came from a discussion regarding file permissions
+> set by at24 (drivers/mis/eeprom/at24.c) vs nvmem.
 > 
-> > +	u32 ctrlb = ATC_DEFAULT_CTRLB | ATC_IEN |
-> > +		ATC_SRC_ADDR_MODE_FIXED |
-> > +		ATC_DST_ADDR_MODE_INCR |
-> > +		ATC_FC_MEM2MEM;
-> > +
-> > +	xfer_count = len >> 2;
-> > +	if (xfer_count > ATC_BTSIZE_MAX) {
-> > +		dev_err(chan2dev(chan), "%s: buffer is too big\n",
-> > +			__func__);
-> > +		return NULL;
-> > +	}
+> at24 driver sets the permission of root-only read/write, which is different
+> to what nvmem sets as default.
 > 
-> This is fine, but this is driver limitation. We should really split the
-> txn to multiple descriptors here..
+> So this patch was primarily make nvmem framework inline with what at24/at25
+> does.
 
-Both these things are actually just copy from the previous code.
+Doesn't sound like a good idea, take this time to fix that lapse in
+security :)
 
-I can probably fix the first style issue in this patch, but splitting
-the memset descriptors should go in a separate patch.
-
-> 
-> > @@ -914,46 +953,26 @@ atc_prep_dma_memset(struct dma_chan *chan, dma_addr_t dest, int value,
-> >  		return NULL;
-> >  	}
-> >  
-> > -	xfer_count = len >> 2;
-> > -	if (xfer_count > ATC_BTSIZE_MAX) {
-> > -		dev_err(chan2dev(chan), "%s: buffer is too big\n",
-> > +	vaddr = dma_pool_alloc(atdma->memset_pool, GFP_ATOMIC, &paddr);
-> 
-> Mostly people use _zalloc variant, any reason why you don't want that
-
-Not necessarily, but I don't need zeroed memory either, since I
-overwrite the content right after the allocation.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151007/77353878/attachment.sig>
+greg k-h
