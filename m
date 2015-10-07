@@ -1,162 +1,299 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed,  7 Oct 2015 15:55:25 +0100
-Subject: [PATCH v3 15/16] KVM: arm64: implement MSI injection in ITS emulation
+Date: Wed,  7 Oct 2015 15:55:19 +0100
+Subject: [PATCH v3 09/16] KVM: arm64: introduce ITS emulation file with stub
+ functions
 In-Reply-To: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
 References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1444229726-31559-16-git-send-email-andre.przywara@arm.com>
+Message-ID: <1444229726-31559-10-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When userland wants to inject a MSI into the guest, we have to use
-our data structures to find the LPI number and the VCPU to receive
-the interrupt.
-Use the wrapper functions to iterate the linked lists and find the
-proper Interrupt Translation Table Entry. Then set the pending bit
-in this ITTE to be later picked up by the LR handling code. Kick
-the VCPU which is meant to handle this interrupt.
-We provide a VGIC emulation model specific routine for the actual
-MSI injection. The wrapper functions return an error for models not
-(yet) implementing MSIs (like the GICv2 emulation).
-We also provide the handler for the ITS "INT" command, which allows a
-guest to trigger an MSI via the ITS command queue.
+The ARM GICv3 ITS emulation code goes into a separate file, but
+needs to be connected to the GICv3 emulation, of which it is an
+option.
+Introduce the skeleton with function stubs to be filled later.
+Introduce the basic ITS data structure and initialize it, but don't
+return any success yet, as we are not yet ready for the show.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
 ---
 Changelog v2..v3:
-- proper checking for unmapped collections
+- drop ITS check before doing GICR_CTLR access
 
- include/kvm/arm_vgic.h      |  1 +
- virt/kvm/arm/its-emul.c     | 65 +++++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/its-emul.h     |  2 ++
- virt/kvm/arm/vgic-v3-emul.c |  1 +
- 4 files changed, 69 insertions(+)
+ arch/arm64/kvm/Makefile            |   1 +
+ include/kvm/arm_vgic.h             |   6 ++
+ include/linux/irqchip/arm-gic-v3.h |   1 +
+ virt/kvm/arm/its-emul.c            | 125 +++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/its-emul.h            |  35 +++++++++++
+ virt/kvm/arm/vgic-v3-emul.c        |  20 +++++-
+ 6 files changed, 185 insertions(+), 3 deletions(-)
+ create mode 100644 virt/kvm/arm/its-emul.c
+ create mode 100644 virt/kvm/arm/its-emul.h
 
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index 1949fe5..75069a9 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -25,5 +25,6 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2-emul.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v2-switch.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/its-emul.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 4ea023c..7911059 100644
+index 06c33bc..c8c48e3 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -149,6 +149,7 @@ struct vgic_vm_ops {
- 	int	(*map_resources)(struct kvm *, const struct vgic_params *);
- 	bool	(*queue_lpis)(struct kvm_vcpu *);
- 	void	(*unqueue_lpi)(struct kvm_vcpu *, int irq);
-+	int	(*inject_msi)(struct kvm *, struct kvm_msi *);
+@@ -168,6 +168,11 @@ struct irq_phys_map_entry {
+ 	struct irq_phys_map	map;
  };
  
- struct vgic_io_device {
-diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
-index 642effb..cd8526a 100644
---- a/virt/kvm/arm/its-emul.c
-+++ b/virt/kvm/arm/its-emul.c
-@@ -333,6 +333,55 @@ static bool handle_mmio_gits_idregs(struct kvm_vcpu *vcpu,
- }
++struct vgic_its {
++	bool			enabled;
++	spinlock_t		lock;
++};
++
+ struct vgic_dist {
+ 	spinlock_t		lock;
+ 	bool			in_kernel;
+@@ -280,6 +285,7 @@ struct vgic_dist {
+ 	u64			*pendbaser;
  
- /*
-+ * Translates an incoming MSI request into the redistributor (=VCPU) and
-+ * the associated LPI number. Sets the LPI pending bit and also marks the
-+ * VCPU as having a pending interrupt.
+ 	bool			lpis_enabled;
++	struct vgic_its		its;
+ };
+ 
+ struct vgic_v2_cpu_if {
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 9eeeb95..70e9539 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -179,6 +179,7 @@
+ #define GITS_CWRITER			0x0088
+ #define GITS_CREADR			0x0090
+ #define GITS_BASER			0x0100
++#define GITS_IDREGS_BASE		0xffd0
+ #define GITS_PIDR2			GICR_PIDR2
+ 
+ #define GITS_TRANSLATER			0x10040
+diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
+new file mode 100644
+index 0000000..659dd39
+--- /dev/null
++++ b/virt/kvm/arm/its-emul.c
+@@ -0,0 +1,125 @@
++/*
++ * GICv3 ITS emulation
++ *
++ * Copyright (C) 2015 ARM Ltd.
++ * Author: Andre Przywara <andre.przywara@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+int vits_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
++
++#include <linux/cpu.h>
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++#include <linux/interrupt.h>
++
++#include <linux/irqchip/arm-gic-v3.h>
++#include <kvm/arm_vgic.h>
++
++#include <asm/kvm_emulate.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_mmu.h>
++
++#include "vgic.h"
++#include "its-emul.h"
++
++static bool handle_mmio_misc_gits(struct kvm_vcpu *vcpu,
++				  struct kvm_exit_mmio *mmio,
++				  phys_addr_t offset)
++{
++	return false;
++}
++
++static bool handle_mmio_gits_idregs(struct kvm_vcpu *vcpu,
++				    struct kvm_exit_mmio *mmio,
++				    phys_addr_t offset)
++{
++	return false;
++}
++
++static bool handle_mmio_gits_cbaser(struct kvm_vcpu *vcpu,
++				    struct kvm_exit_mmio *mmio,
++				    phys_addr_t offset)
++{
++	return false;
++}
++
++static bool handle_mmio_gits_cwriter(struct kvm_vcpu *vcpu,
++				     struct kvm_exit_mmio *mmio,
++				     phys_addr_t offset)
++{
++	return false;
++}
++
++static bool handle_mmio_gits_creadr(struct kvm_vcpu *vcpu,
++				    struct kvm_exit_mmio *mmio,
++				    phys_addr_t offset)
++{
++	return false;
++}
++
++static const struct vgic_io_range vgicv3_its_ranges[] = {
++	{
++		.base		= GITS_CTLR,
++		.len		= 0x10,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_misc_gits,
++	},
++	{
++		.base		= GITS_CBASER,
++		.len		= 0x08,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_gits_cbaser,
++	},
++	{
++		.base		= GITS_CWRITER,
++		.len		= 0x08,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_gits_cwriter,
++	},
++	{
++		.base		= GITS_CREADR,
++		.len		= 0x08,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_gits_creadr,
++	},
++	{
++		/* We don't need any memory from the guest. */
++		.base		= GITS_BASER,
++		.len		= 0x40,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_raz_wi,
++	},
++	{
++		.base		= GITS_IDREGS_BASE,
++		.len		= 0x30,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_gits_idregs,
++	},
++};
++
++/* This is called on setting the LPI enable bit in the redistributor. */
++void vgic_enable_lpis(struct kvm_vcpu *vcpu)
++{
++}
++
++int vits_init(struct kvm *kvm)
 +{
 +	struct vgic_dist *dist = &kvm->arch.vgic;
 +	struct vgic_its *its = &dist->its;
-+	struct its_itte *itte;
-+	int cpuid;
-+	bool inject = false;
-+	int ret = 0;
 +
-+	if (!vgic_has_its(kvm))
-+		return -ENODEV;
++	spin_lock_init(&its->lock);
 +
-+	if (!(msi->flags & KVM_MSI_VALID_DEVID))
-+		return -EINVAL;
++	its->enabled = false;
 +
-+	spin_lock(&its->lock);
-+
-+	if (!its->enabled || !dist->lpis_enabled) {
-+		ret = -EAGAIN;
-+		goto out_unlock;
-+	}
-+
-+	itte = find_itte(kvm, msi->devid, msi->data);
-+	/* Triggering an unmapped IRQ gets silently dropped. */
-+	if (!itte || !its_is_collection_mapped(itte->collection))
-+		goto out_unlock;
-+
-+	cpuid = itte->collection->target_addr;
-+	__set_bit(cpuid, itte->pending);
-+	inject = itte->enabled;
-+
-+out_unlock:
-+	spin_unlock(&its->lock);
-+
-+	if (inject) {
-+		spin_lock(&dist->lock);
-+		__set_bit(cpuid, dist->irq_pending_on_cpu);
-+		spin_unlock(&dist->lock);
-+		kvm_vcpu_kick(kvm_get_vcpu(kvm, cpuid));
-+	}
-+
-+	return ret;
++	return -ENXIO;
 +}
-+
-+/*
-  * Find all enabled and pending LPIs and queue them into the list
-  * registers.
-  * The dist lock is held by the caller.
-@@ -812,6 +861,19 @@ static int vits_cmd_handle_movall(struct kvm *kvm, u64 *its_cmd)
- 	return 0;
- }
- 
-+/* The INT command injects the LPI associated with that DevID/EvID pair. */
-+static int vits_cmd_handle_int(struct kvm *kvm, u64 *its_cmd)
-+{
-+	struct kvm_msi msi = {
-+		.data = its_cmd_get_id(its_cmd),
-+		.devid = its_cmd_get_deviceid(its_cmd),
-+		.flags = KVM_MSI_VALID_DEVID,
-+	};
-+
-+	vits_inject_msi(kvm, &msi);
-+	return 0;
-+}
-+
- /*
-  * This function is called with both the ITS and the distributor lock dropped,
-  * so the actual command handlers must take the respective locks when needed.
-@@ -846,6 +908,9 @@ static int vits_handle_command(struct kvm_vcpu *vcpu, u64 *its_cmd)
- 	case GITS_CMD_MOVALL:
- 		ret = vits_cmd_handle_movall(vcpu->kvm, its_cmd);
- 		break;
-+	case GITS_CMD_INT:
-+		ret = vits_cmd_handle_int(vcpu->kvm, its_cmd);
-+		break;
- 	case GITS_CMD_INV:
- 		ret = vits_cmd_handle_inv(vcpu->kvm, its_cmd);
- 		break;
 diff --git a/virt/kvm/arm/its-emul.h b/virt/kvm/arm/its-emul.h
-index 830524a..95e56a7 100644
---- a/virt/kvm/arm/its-emul.h
+new file mode 100644
+index 0000000..5dc8e2f
+--- /dev/null
 +++ b/virt/kvm/arm/its-emul.h
-@@ -36,6 +36,8 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu);
- int vits_init(struct kvm *kvm);
- void vits_destroy(struct kvm *kvm);
- 
-+int vits_inject_msi(struct kvm *kvm, struct kvm_msi *msi);
+@@ -0,0 +1,35 @@
++/*
++ * GICv3 ITS emulation definitions
++ *
++ * Copyright (C) 2015 ARM Ltd.
++ * Author: Andre Przywara <andre.przywara@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
- bool vits_queue_lpis(struct kvm_vcpu *vcpu);
- void vits_unqueue_lpi(struct kvm_vcpu *vcpu, int irq);
- 
++#ifndef __KVM_ITS_EMUL_H__
++#define __KVM_ITS_EMUL_H__
++
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++
++#include <asm/kvm_emulate.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_mmu.h>
++
++#include "vgic.h"
++
++void vgic_enable_lpis(struct kvm_vcpu *vcpu);
++int vits_init(struct kvm *kvm);
++
++#endif
 diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-index f482e34..90f3628 100644
+index 6939f7c..a7b60bdb 100644
 --- a/virt/kvm/arm/vgic-v3-emul.c
 +++ b/virt/kvm/arm/vgic-v3-emul.c
-@@ -944,6 +944,7 @@ void vgic_v3_init_emulation(struct kvm *kvm)
- 	dist->vm_ops.init_model = vgic_v3_init_model;
- 	dist->vm_ops.destroy_model = vgic_v3_destroy_model;
- 	dist->vm_ops.map_resources = vgic_v3_map_resources;
-+	dist->vm_ops.inject_msi = vits_inject_msi;
- 	dist->vm_ops.queue_lpis = vits_queue_lpis;
- 	dist->vm_ops.unqueue_lpi = vits_unqueue_lpi;
+@@ -48,6 +48,7 @@
+ #include <asm/kvm_mmu.h>
  
+ #include "vgic.h"
++#include "its-emul.h"
+ 
+ static bool handle_mmio_rao_wi(struct kvm_vcpu *vcpu,
+ 			       struct kvm_exit_mmio *mmio, phys_addr_t offset)
+@@ -530,9 +531,16 @@ static bool handle_mmio_ctlr_redist(struct kvm_vcpu *vcpu,
+ 				    struct kvm_exit_mmio *mmio,
+ 				    phys_addr_t offset)
+ {
+-	/* since we don't support LPIs, this register is zero for now */
+-	vgic_reg_access(mmio, NULL, offset,
+-			ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++	u32 reg;
++
++	reg = dist->lpis_enabled ? GICR_CTLR_ENABLE_LPIS : 0;
++	vgic_reg_access(mmio, &reg, offset,
++			ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
++	if (vgic_has_its(vcpu->kvm) && !dist->lpis_enabled &&
++	    (reg & GICR_CTLR_ENABLE_LPIS)) {
++		/* Eventually do something */
++	}
+ 	return false;
+ }
+ 
+@@ -861,6 +869,12 @@ static int vgic_v3_map_resources(struct kvm *kvm,
+ 		rdbase += GIC_V3_REDIST_SIZE;
+ 	}
+ 
++	if (vgic_has_its(kvm)) {
++		ret = vits_init(kvm);
++		if (ret)
++			goto out_unregister;
++	}
++
+ 	dist->redist_iodevs = iodevs;
+ 	dist->ready = true;
+ 	goto out;
 -- 
 2.5.1
