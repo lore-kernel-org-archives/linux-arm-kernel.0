@@ -1,73 +1,45 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 7 Oct 2015 15:41:46 +0200
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20151007132642.GV23801@atomide.com>
-References: <20151005112304.GZ23801@atomide.com>
- <20151005143532.GA23801@atomide.com>
- <20151005145127.GB23801@atomide.com>
- <20151005171155.GF23801@atomide.com>
- <20151005183813.GD21626@n2100.arm.linux.org.uk>
- <20151006090015.GE21626@n2100.arm.linux.org.uk>
- <20151006094425.GM23801@atomide.com>
- <20151006150009.GF21626@n2100.arm.linux.org.uk>
- <20151006153710.GS23801@atomide.com>
- <20151007124551.GI21626@n2100.arm.linux.org.uk>
- <20151007132642.GV23801@atomide.com>
-Message-ID: <CAPDyKFoBPEnHuNR_bsrPU6X=q5pHa8cDR7_Ng9xLnLsudymvOg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Oct 2015 15:46:35 +0200
+Subject: [PATCH] IB/core: avoid 32-bit warning
+In-Reply-To: <56151BDF.8010504@dev.mellanox.co.il>
+References: <17269152.DqJfCm1LOx@wuerfel> <56151BDF.8010504@dev.mellanox.co.il>
+Message-ID: <6219209.mJNClmP5Ym@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 October 2015 at 15:26, Tony Lindgren <tony@atomide.com> wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [151007 05:50]:
->> On Tue, Oct 06, 2015 at 08:37:11AM -0700, Tony Lindgren wrote:
->> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [151006 08:04]:
->> > > On Tue, Oct 06, 2015 at 02:44:25AM -0700, Tony Lindgren wrote:
->> > > >
->> > > > Hmm DT-based boot finds the MMC card for LDP, dmesg below from DT boot [1].
->> > > > Looks like you're on on -rc4 and not -rc3. My guess is that MMC is not
->> > > > working for you with DT-based booting because you don't seem to have
->> > > > CONFIG_REGULATOR_PBIAS in your seed config for. Care to try enabling that
->> > > > for both your omap3 and omap4 seed config files?
->> > >
->> > > This is precisely the kind of crap I'm objecting to.  New kernel versions
->> > > come along, and things break because people add extra Kconfig symbols that
->> > > previous versions did not rely upon - and there's no communication of
->> > > what's required for new kernel versions.
->> > >
->> > > This stuff needs documenting, so that people are aware what changes they
->> > > need to make - please put something in Documentation/arm/OMAP which
->> > > tracks what new additions are required to the Kconfig to keep things
->> > > working.
->> >
->> > Good idea, how about something like the following? AFAIK that's the
->> > only .config option needed as MFD_SYSCON is selected by Kconfig
->> > already.
+On Wednesday 07 October 2015 16:19:27 Sagi Grimberg wrote:
+> On 10/7/2015 3:29 PM, Arnd Bergmann wrote:
+> > The INIT_UDATA() macro requires a pointer or unsigned long argument for
+> > both input and output buffer, and all callers had a cast from when
+> > the code was merged until a recent restructuring, so now we get
+> >
+> > core/uverbs_cmd.c: In function 'ib_uverbs_create_cq':
+> > core/uverbs_cmd.c:1481:66: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+> >
+> > This makes the code behave as before by adding back the cast to
+> > unsigned long.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Fixes: 565197dd8fb1 ("IB/core: Extend ib_uverbs_create_cq")
+> >
+> > diff --git a/drivers/infiniband/core/uverbs_cmd.c b/drivers/infiniband/core/uverbs_cmd.c
+> > index be4cb9f04be3..88b3b78340f2 100644
+> > --- a/drivers/infiniband/core/uverbs_cmd.c
+> > +++ b/drivers/infiniband/core/uverbs_cmd.c
+> > @@ -1478,7 +1478,7 @@ ssize_t ib_uverbs_create_cq(struct ib_uverbs_file *file,
+> >       if (copy_from_user(&cmd, buf, sizeof(cmd)))
+> >               return -EFAULT;
+> >
+> > -     INIT_UDATA(&ucore, buf, cmd.response, sizeof(cmd), sizeof(resp));
+> > +     INIT_UDATA(&ucore, buf, (unsigned long)cmd.response, sizeof(cmd), sizeof(resp));
+> 
+> Would it make sense to cast inside INIT_UDATA() and not have callers
+> worry about it?
 
-Similar to MFD_SYSCON, why don't we have REGULATOR_PBIAS to be
-selected when omap_hsmmc is being used?
+If we want to do this properly, INIT_UDATA should be converted into a function
+call that has the right types.
 
-It seems like that should also be a patch for the rc, right!?
+My patch doesn't try to do that here, it just restores the code to how it
+was for the past 10 years.
 
->>
->> Right, that resolves the issue.  Now, what's the story on the revert
->> and the other patch - have they already been taken for -rc kernels?
-
-Great!
-
->
-> Not yet, I was waiting for the confirmation from you. I've now posted the
-> revert with proper description and the fix so Ulf can pick them up and
-> merged as regression fixes for the -rc series:
-
-I am on it!
-
->
-> http://marc.info/?l=linux-omap&m=144422416621373&w=2
-> http://marc.info/?l=linux-omap&m=144422416921375&w=2
-
-Russell, may I add your tested by tag for these?
-
-Again, thanks!
-
-Kind regards
-Uffe
+	Arnd
