@@ -1,78 +1,83 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  7 Oct 2015 11:37:36 +0100
-Subject: [PATCH v2] arm64: hw_breakpoint: use target state to determine ABI
- behaviour
-Message-ID: <1444214256-24158-1-git-send-email-will.deacon@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Oct 2015 03:41:19 -0700
+Subject: [PATCH 2/2] memory: omap-gpmc: expand the description of the
+ debug facility
+In-Reply-To: <20151007075338.GH3982@pengutronix.de>
+References: <1444162070-22034-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1444162070-22034-2-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5614CDAE.6070604@ti.com> <20151007075338.GH3982@pengutronix.de>
+Message-ID: <20151007102822.GT23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 hw_breakpoint interface is slightly less flexible than its
-32-bit counterpart, thanks to some changes in the architecture rendering
-unaligned watchpoint addresses obselete for AArch64.
+* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [151007 00:57]:
+> On Wed, Oct 07, 2015 at 10:45:50AM +0300, Roger Quadros wrote:
+> > 
+> > How about this instead?
+> > 
+> > NOTE: Apart from matching the register setup with the bootloader you also need to
+> > match the GPMC FCLK frequency used by the bootloader else the GPMC timings
+> > won't be identical with the bootloader timings.
+> Yeah, sounds better, thanks.
+> 
+> > Also you might need to build this patch on top of
+> > http://article.gmane.org/gmane.linux.kernel/2054796
+> I talked to Tony about this patch yesterday on irc, but I didn't find it
+> in the archives yet when I sent my mail.
 
-However, in a multi-arch environment (i.e. debugging a 32-bit target
-with a 64-bit GDB under a 64-bit kernel), we need to provide a feature
-compatible interface to GDB in order for debugging to function correctly.
+Yes sorry here's a repost with your and Roger's changes folded in and
+edited a bit. Probably best to keep them together with this patch.
 
-This patch adds a new helper, is_compat_bp,  to our hw_breakpoint
-implementation which changes the interface behaviour based on the
-architecture of the debug target as opposed to the debugger itself.
-This allows debugged to function as expected for multi-arch
-configurations without relying on deprecated architectural behaviours
-when debugging native applications.
+Does the following look OK to you guys?
 
-Cc: Yao Qi <yao.qi@arm.com>
-Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+Regards,
 
-v1 -> v2: Added comment regarding NULL tsk in is_compat_bp
+Tony
 
- arch/arm64/kernel/hw_breakpoint.c | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+8< ----------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 6 Oct 2015 05:36:17 -0700
+Subject: [PATCH] memory: omap-gpmc: Fix unselectable debug option for GPMC
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index bba85c8f8037..46465d9fbc4d 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -163,6 +163,20 @@ enum hw_breakpoint_ops {
- 	HW_BREAKPOINT_RESTORE
- };
+Commit 63aa945b1013 ("memory: omap-gpmc: Add Kconfig option for debug")
+added a debug option for GPMC, but somehow managed to keep it unselectable.
+
+This probably happened because I had some uncommitted changes and the
+GPMC option is selected in the platform specific Kconfig.
+
+Let's also update the description a bit, it does not mention that
+enabling the debug option also disables the reset of GPMC controller
+during the init as pointed out by Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> and Roger Quadros <rogerq@ti.com>.
+
+Fixes: 63aa945b1013 ("memory: omap-gpmc: Add Kconfig option for debug")
+Reported-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/drivers/memory/Kconfig
++++ b/drivers/memory/Kconfig
+@@ -58,12 +58,18 @@ config OMAP_GPMC
+ 	  memory drives like NOR, NAND, OneNAND, SRAM.
  
-+static int is_compat_bp(struct perf_event *bp)
-+{
-+	struct task_struct *tsk = bp->hw.target;
+ config OMAP_GPMC_DEBUG
+-	bool
++	bool "Enable GPMC debug output and skip reset of GPMC during init"
+ 	depends on OMAP_GPMC
+ 	help
+ 	  Enables verbose debugging mostly to decode the bootloader provided
+-	  timings. Enable this during development to configure devices
+-	  connected to the GPMC bus.
++	  timings. To preserve the bootloader provided timings, the reset
++	  of GPMC is skipped during init. Enable this during development to
++	  configure devices connected to the GPMC bus.
 +
-+	/*
-+	 * tsk can be NULL for per-cpu (non-ptrace) breakpoints.
-+	 * In this case, use the native interface, since we don't have
-+	 * the notion of a "compat CPU" and could end up relying on
-+	 * deprecated behaviour if we use unaligned watchpoints in
-+	 * AArch64 state.
-+	 */
-+	return tsk && is_compat_thread(task_thread_info(tsk));
-+}
-+
- /**
-  * hw_breakpoint_slot_setup - Find and setup a perf slot according to
-  *			      operations
-@@ -420,7 +434,7 @@ static int arch_build_bp_info(struct perf_event *bp)
- 	 * Watchpoints can be of length 1, 2, 4 or 8 bytes.
- 	 */
- 	if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE) {
--		if (is_compat_task()) {
-+		if (is_compat_bp(bp)) {
- 			if (info->ctrl.len != ARM_BREAKPOINT_LEN_2 &&
- 			    info->ctrl.len != ARM_BREAKPOINT_LEN_4)
- 				return -EINVAL;
-@@ -477,7 +491,7 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
- 	 * AArch32 tasks expect some simple alignment fixups, so emulate
- 	 * that here.
- 	 */
--	if (is_compat_task()) {
-+	if (is_compat_bp(bp)) {
- 		if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
- 			alignment_mask = 0x7;
- 		else
--- 
-2.1.4
++	  NOTE: In addition to matching the register setup with the bootloader
++	  you also need to match the GPMC FCLK frequency used by the
++	  bootloader or else the GPMC timings won't be identical with the
++	  bootloader timings.
+ 
+ config MVEBU_DEVBUS
+ 	bool "Marvell EBU Device Bus Controller"
