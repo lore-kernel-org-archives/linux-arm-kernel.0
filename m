@@ -1,63 +1,157 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed,  7 Oct 2015 12:00:23 -0500
-Subject: [PATCH 5/7] arm64: Make the kernel page dump utility aware of the
- CONT bit
+Date: Wed,  7 Oct 2015 12:00:25 -0500
+Subject: [PATCH 7/7] arm64: Mark kernel page ranges contiguous
 In-Reply-To: <1444237225-13802-1-git-send-email-jeremy.linton@arm.com>
 References: <1444237225-13802-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1444237225-13802-6-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1444237225-13802-8-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel page dump utility needs to be aware of the CONT bit before
-it will break up pages ranges for display.
+With 64k pages, the next larger segment size is 512M. The linux
+kernel also uses different protection flags to cover its code and data.
+Because of this requirement, the vast majority of the kernel code and
+data structures end up being mapped with 64k pages instead of the larger
+pages common with a 4k page kernel.
+
+Recent ARM processors support a contiguous bit in the
+page tables which allows the a TLB to cover a range larger than a
+single PTE if that range is mapped into physically contiguous
+ram.
+
+So, for the kernel its a good idea to set this flag. Some basic
+micro benchmarks show it can significantly reduce the number of
+L1 dTLB refills.
+
+Add boot option to enable/disable CONT marking, as well as fix a
+bug found by Steve Capper.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/mm/dump.c | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+ arch/arm64/mm/mmu.c | 81 +++++++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 72 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-index f3d6221..5a22a11 100644
---- a/arch/arm64/mm/dump.c
-+++ b/arch/arm64/mm/dump.c
-@@ -67,6 +67,12 @@ static struct addr_marker address_markers[] = {
- 	{ -1,			NULL },
- };
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 9211b85..031ea7a 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -69,6 +69,10 @@ static void __init *early_alloc(unsigned long sz)
+ 	return ptr;
+ }
+ 
++#ifndef CONFIG_ARM64_CONT_PTE
++#define CONFIG_ARM64_CONT_PTE 0
++#endif
++
+ /*
+  * remap a PMD into pages
+  */
+@@ -80,19 +84,58 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
+ 	do {
+ 		/*
+ 		 * Need to have the least restrictive permissions available
+-		 * permissions will be fixed up later
++		 * permissions will be fixed up later. Default the new page
++		 * range as contiguous ptes.
+ 		 */
+-		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
++		if (CONFIG_ARM64_CONT_PTE)
++			set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC_CONT));
++		else
++			set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
+ 		pfn++;
+ 	} while (pte++, i++, i < PTRS_PER_PTE);
+ }
  
 +/*
-+ * The page dumper groups page table entries of the same type into a single
-+ * description. It uses pg_state to track the range information while
-+ * iterating over the pte entries. When the continuity is broken it then
-+ * dumps out a description of the range.
++ * Given a PTE with the CONT bit set, determine where the CONT range
++ * starts, and clear the entire range of PTE CONT bits.
 + */
- struct pg_state {
- 	struct seq_file *seq;
- 	const struct addr_marker *marker;
-@@ -114,6 +120,16 @@ static const struct prot_bits pte_bits[] = {
- 		.set	= "NG",
- 		.clear	= "  ",
- 	}, {
-+		.mask	= PTE_CONT,
-+		.val	= PTE_CONT,
-+		.set	= "CON",
-+		.clear	= "   ",
-+	}, {
-+		.mask	= PTE_TABLE_BIT,
-+		.val	= PTE_TABLE_BIT,
-+		.set	= "   ",
-+		.clear	= "BLK",
-+	}, {
- 		.mask	= PTE_UXN,
- 		.val	= PTE_UXN,
- 		.set	= "UXN",
-@@ -198,7 +214,7 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
- 		unsigned long delta;
++static void clear_cont_pte_range(pte_t *pte, unsigned long addr)
++{
++	int i;
++
++	pte -= CONT_RANGE_OFFSET(addr);
++	for (i = 0; i < CONT_PTES; i++) {
++		set_pte(pte, pte_mknoncont(*pte));
++		pte++;
++	}
++	flush_tlb_all();
++}
++
++/*
++ * Given a range of PTEs set the pfn and provided page protection flags
++ */
++static void __populate_init_pte(pte_t *pte, unsigned long addr,
++				unsigned long end, phys_addr_t phys,
++				pgprot_t prot)
++{
++	unsigned long pfn = __phys_to_pfn(phys);
++
++	do {
++		/* clear all the bits except the pfn, then apply the prot */
++		set_pte(pte, pfn_pte(pfn, prot));
++		pte++;
++		pfn++;
++		addr += PAGE_SIZE;
++	} while (addr != end);
++}
++
+ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+-				  unsigned long end, unsigned long pfn,
++				  unsigned long end, phys_addr_t phys,
+ 				  pgprot_t prot,
+ 				  void *(*alloc)(unsigned long size))
+ {
+ 	pte_t *pte;
++	unsigned long next;
  
- 		if (st->current_prot) {
--			seq_printf(st->seq, "0x%16lx-0x%16lx   ",
-+			seq_printf(st->seq, "0x%016lx-0x%016lx   ",
- 				   st->start_address, addr);
+ 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
+ 		pte = alloc(PTRS_PER_PTE * sizeof(pte_t));
+@@ -104,10 +147,31 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	BUG_ON(pmd_bad(*pmd));
  
- 			delta = (addr - st->start_address) >> 10;
+ 	pte = pte_offset_kernel(pmd, addr);
+-	do {
+-		set_pte(pte, pfn_pte(pfn, prot));
+-		pfn++;
+-	} while (pte++, addr += PAGE_SIZE, addr != end);
++	if (!CONFIG_ARM64_CONT_PTE)
++		__populate_init_pte(pte, addr, end, phys, prot);
++	else
++	    do {
++		next = min(end, (addr + CONT_SIZE) & CONT_MASK);
++		if (((addr | next | phys) & ~CONT_MASK) == 0) {
++			/* a block of CONT_PTES  */
++			__populate_init_pte(pte, addr, next, phys,
++					    prot | __pgprot(PTE_CONT));
++		} else {
++			/*
++			 * If the range being split is already inside of a
++			 * contiguous range but this PTE isn't going to be
++			 * contiguous, then we want to unmark the adjacent
++			 * ranges, then update the portion of the range we
++			 * are interrested in.
++			 */
++			 clear_cont_pte_range(pte, addr);
++			 __populate_init_pte(pte, addr, next, phys, prot);
++		}
++
++		pte += (next - addr) >> PAGE_SHIFT;
++		phys += next - addr;
++		addr = next;
++	} while (addr != end);
+ }
+ 
+ void split_pud(pud_t *old_pud, pmd_t *pmd)
+@@ -168,8 +232,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ 				}
+ 			}
+ 		} else {
+-			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
+-				       prot, alloc);
++			alloc_init_pte(pmd, addr, next, phys, prot, alloc);
+ 		}
+ 		phys += next - addr;
+ 	} while (pmd++, addr = next, addr != end);
 -- 
 2.4.3
