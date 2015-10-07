@@ -1,49 +1,36 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 7 Oct 2015 12:33:51 -0700
-Subject: [PATCH 4/4] dma-debug: Allow poisoning nonzero allocations
-In-Reply-To: <56156FAF.9020002@arm.com>
-References: <cover.1443178314.git.robin.murphy@arm.com>
- <0405c6131def5aa179ff4ba5d4201ebde89cede3.1443178314.git.robin.murphy@arm.com>
- <20150925124447.GO21513@n2100.arm.linux.org.uk>
- <560585EB.3060908@arm.com>
- <20150929142727.e95a2d2ebff65dda86315248@linux-foundation.org>
- <56156FAF.9020002@arm.com>
-Message-ID: <20151007123351.763b98a8fe82a86ce7fdaf0c@linux-foundation.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 7 Oct 2015 22:34:48 +0300
+Subject: [PATCH] ARM: shmobile: porter: add SDHI0/2 DT support
+In-Reply-To: <20151007033957.GA30650@verge.net.au>
+References: <2228837.DO5U5OvRSi@wasted.cogentembedded.com>
+ <20151007033957.GA30650@verge.net.au>
+Message-ID: <561573D8.6060203@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Oct 2015 20:17:03 +0100 Robin Murphy <robin.murphy@arm.com> wrote:
+On 10/07/2015 06:39 AM, Simon Horman wrote:
 
-> > It might be helpful to provide a runtime knob as well - having to
-> > rebuild&reinstall just to enable/disable this feature is a bit painful.
-> 
-> Good point - there's always the global DMA debug disable knob, but this 
-> particular feature probably does warrant finer-grained control to be 
-> really practical. Having thought about it some more, it's also probably 
-> wrong that this doesn't respect the dma_debug_driver filter, given that 
-> it is actually invasive; in fixing that, how about if it also *only* 
-> applied when a specific driver is filtered? Then there would be no 
-> problematic "break anything and everything" mode, and the existing 
-> debugfs controls should suffice.
+>> Define the Porter board dependent part of the SDHI0/2 device nodes along with
+>> the  necessary  voltage regulators (note that the Vcc regulators are dummy --
+>> they are required but don't actually exist on the board). Also, GPIOs have to
+>> be used for the CD and WP signals due to the SDHI driver constraints...
+>>
+>> This patch is analogous to the commit 1299df03d719 (ARM: shmobile: henninger:
+>> add SDHI0/2 DT support) as there  are no differences between those boards in
+>> this respect.
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> ---
+>> This patch is against the 'renesas-devel-20151006-v4.3-rc4' tag of Simon
+>> Horman's 'renesas.git' repo.
+>
+> Thanks I have queued this up after addressing some issues
+> in the changelog that checkpatch complained about:
 
-Yes, this should respect the driver filtering.
+> * text > 75 characters wide
+> * Missing '"' around name of patch referred to
 
-On reflection...
+    Sorry about that, forgot to run thru checkpatch.pl (as usual :-).
 
-The patch poisons dma buffers if CONFIG_DMA_API_DEBUG and if __GFP_ZERO
-wasn't explicitly used.  I'm rather surprised that the dma-debug code
-didn't do this from day one.
-
-I'd be inclined to enable this buffer-poisoning by default.  Do you
-have a feeling for how much overhead that will add?  Presumably not
-much, if __GFP_ZERO is acceptable.
-
-Also, how about we remove CONFIG_DMA_API_DEBUG_POISON and switch to a
-debugfs knob?
-
-
-btw, the documentation could do with a bit of a tune-up.  The comments
-in dma-debug.c regarding driver filtering are non-existent. 
-Documentation/kernel-parameters.txt says "The filter can be disabled or
-changed to another driver later using sysfs" but
-Documentation/DMA-API.txt talks about debugfs.
+MBR, Sergei
