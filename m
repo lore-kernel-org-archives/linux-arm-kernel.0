@@ -1,170 +1,148 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 07 Oct 2015 11:23:52 +0100
-Subject: [PATCH 12/15] arm: kvm: Move fake PGD handling to arch specific
- files
-In-Reply-To: <1442331684-28818-13-git-send-email-suzuki.poulose@arm.com>
-References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
- <1442331684-28818-13-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <5614F2B8.6030509@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Oct 2015 11:32:57 +0100
+Subject: [PATCH v2] iommu/arm-smmu: Add support for MSI on SMMUv3
+In-Reply-To: <1444155326-28379-1-git-send-email-marc.zyngier@arm.com>
+References: <1444155326-28379-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151007103256.GF16065@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/15 16:41, Suzuki K. Poulose wrote:
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+Hi Marc,
+
+On Tue, Oct 06, 2015 at 07:15:26PM +0100, Marc Zyngier wrote:
+> Despite being a platform device, the SMMUv3 is capable of signaling
+> interrupts using MSIs. Hook it into the platform MSI framework and
+> enjoy faults being reported in a new and exciting way.
 > 
-> Rearrange the code for fake pgd handling, which is applicable
-> to only ARM64. The intention is to keep the common code cleaner,
-> unaware of the underlying hacks.
-> 
-> Cc: kvmarm at lists.cs.columbia.edu
-> Cc: christoffer.dall at linaro.org
-> Cc: Marc.Zyngier at arm.com
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/include/asm/kvm_mmu.h   |    7 ++++++
->  arch/arm/kvm/mmu.c               |   44 +++++---------------------------------
->  arch/arm64/include/asm/kvm_mmu.h |   43 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 55 insertions(+), 39 deletions(-)
+> Now rebased on top of Will's iommu/devel branch, which leads to
+> a slightly different patch.
 > 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index 405aa18..1c9aa8a 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -173,6 +173,13 @@ static inline unsigned int kvm_get_hwpgd_size(void)
->  	return PTRS_PER_S2_PGD * sizeof(pgd_t);
+>  drivers/iommu/arm-smmu-v3.c | 82 ++++++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 78 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 5b11b77..3ccc8ed 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/iommu.h>
+>  #include <linux/iopoll.h>
+>  #include <linux/module.h>
+> +#include <linux/msi.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_platform.h>
+> @@ -2176,6 +2177,63 @@ static int arm_smmu_write_reg_sync(struct arm_smmu_device *smmu, u32 val,
+>  					  1, ARM_SMMU_POLL_TIMEOUT_US);
 >  }
 >  
-> +static inline pgd_t *kvm_setup_fake_pgd(pgd_t *pgd)
+> +static void arm_smmu_write_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
 > +{
-> +	return pgd;
-> +}
+> +	struct device *dev = msi_desc_to_dev(desc);
+> +	struct arm_smmu_device *smmu = dev_get_drvdata(dev);
+> +	phys_addr_t cfg0_offset, cfg1_offset, cfg2_offset;
+> +	phys_addr_t doorbell;
 > +
-> +static inline void kvm_free_fake_pgd(pgd_t *pgd) {}
-> +
->  struct kvm;
->  
->  #define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 7b42012..b210622 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -677,43 +677,11 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
->  	 * guest, we allocate a fake PGD and pre-populate it to point
->  	 * to the next-level page table, which will be the real
->  	 * initial page table pointed to by the VTTBR.
-> -	 *
-> -	 * When KVM_PREALLOC_LEVEL==2, we allocate a single page for
-> -	 * the PMD and the kernel will use folded pud.
-> -	 * When KVM_PREALLOC_LEVEL==1, we allocate 2 consecutive PUD
-> -	 * pages.
->  	 */
-> -	if (KVM_PREALLOC_LEVEL > 0) {
-> -		int i;
-> -
-> -		/*
-> -		 * Allocate fake pgd for the page table manipulation macros to
-> -		 * work.  This is not used by the hardware and we have no
-> -		 * alignment requirement for this allocation.
-> -		 */
-> -		pgd = kmalloc(PTRS_PER_S2_PGD * sizeof(pgd_t),
-> -				GFP_KERNEL | __GFP_ZERO);
-> -
-> -		if (!pgd) {
-> -			kvm_free_hwpgd(hwpgd);
-> -			return -ENOMEM;
-> -		}
-> -
-> -		/* Plug the HW PGD into the fake one. */
-> -		for (i = 0; i < PTRS_PER_S2_PGD; i++) {
-> -			if (KVM_PREALLOC_LEVEL == 1)
-> -				pgd_populate(NULL, pgd + i,
-> -					     (pud_t *)hwpgd + i * PTRS_PER_PUD);
-> -			else if (KVM_PREALLOC_LEVEL == 2)
-> -				pud_populate(NULL, pud_offset(pgd, 0) + i,
-> -					     (pmd_t *)hwpgd + i * PTRS_PER_PMD);
-> -		}
-> -	} else {
-> -		/*
-> -		 * Allocate actual first-level Stage-2 page table used by the
-> -		 * hardware for Stage-2 page table walks.
-> -		 */
-> -		pgd = (pgd_t *)hwpgd;
-> +	pgd = kvm_setup_fake_pgd(hwpgd);
-> +	if (IS_ERR(pgd)) {
-> +		kvm_free_hwpgd(hwpgd);
-> +		return PTR_ERR(pgd);
->  	}
->  
->  	kvm_clean_pgd(pgd);
-> @@ -820,9 +788,7 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
->  
->  	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
->  	kvm_free_hwpgd(kvm_get_hwpgd(kvm));
-> -	if (KVM_PREALLOC_LEVEL > 0)
-> -		kfree(kvm->arch.pgd);
-> -
-> +	kvm_free_fake_pgd(kvm->arch.pgd);
->  	kvm->arch.pgd = NULL;
->  }
->  
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 6150567..2567fe8 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -198,6 +198,49 @@ static inline unsigned int kvm_get_hwpgd_size(void)
->  	return PTRS_PER_S2_PGD * sizeof(pgd_t);
->  }
->  
-> +/*
-> + * Allocate fake pgd for the page table manipulation macros to
-> + * work.  This is not used by the hardware and we have no
-> + * alignment requirement for this allocation.
-> + */
-> +static inline pgd_t* kvm_setup_fake_pgd(pgd_t *hwpgd)
-> +{
-> +	int i;
-> +	pgd_t *pgd;
-> +
-> +	if (!KVM_PREALLOC_LEVEL)
-> +		return hwpgd;
-> +	/*
-> +	 * When KVM_PREALLOC_LEVEL==2, we allocate a single page for
-> +	 * the PMD and the kernel will use folded pud.
-> +	 * When KVM_PREALLOC_LEVEL==1, we allocate 2 consecutive PUD
-> +	 * pages.
-> +	 */
-> +	pgd = kmalloc(PTRS_PER_S2_PGD * sizeof(pgd_t),
-> +			GFP_KERNEL | __GFP_ZERO);
-> +
-> +	if (!pgd)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	/* Plug the HW PGD into the fake one. */
-> +	for (i = 0; i < PTRS_PER_S2_PGD; i++) {
-> +		if (KVM_PREALLOC_LEVEL == 1)
-> +			pgd_populate(NULL, pgd + i,
-> +				     (pud_t *)hwpgd + i * PTRS_PER_PUD);
-> +		else if (KVM_PREALLOC_LEVEL == 2)
-> +			pud_populate(NULL, pud_offset(pgd, 0) + i,
-> +				     (pmd_t *)hwpgd + i * PTRS_PER_PMD);
+> +	switch (desc->platform.msi_index) {
+> +	case 0:			/* EVTQ */
+> +		cfg0_offset = ARM_SMMU_EVTQ_IRQ_CFG0;
+> +		cfg1_offset = ARM_SMMU_EVTQ_IRQ_CFG1;
+> +		cfg2_offset = ARM_SMMU_EVTQ_IRQ_CFG2;
+> +		break;
+> +	case 1:			/* GERROR */
+> +		cfg0_offset = ARM_SMMU_GERROR_IRQ_CFG0;
+> +		cfg1_offset = ARM_SMMU_GERROR_IRQ_CFG1;
+> +		cfg2_offset = ARM_SMMU_GERROR_IRQ_CFG2;
+> +		break;
+> +	case 2:			/* PRIQ */
+> +		cfg0_offset = ARM_SMMU_PRIQ_IRQ_CFG0;
+> +		cfg1_offset = ARM_SMMU_PRIQ_IRQ_CFG1;
+> +		cfg2_offset = ARM_SMMU_PRIQ_IRQ_CFG2;
+> +		break;
+
+Can we have some #defines or an enum for these indices please?
+
+> +	default:		/* Unknown */
+> +		return;
 > +	}
 > +
-> +	return pgd;
+> +	doorbell = (((u64)msg->address_hi) << 32) | msg->address_lo;
+> +	doorbell &= MSI_CFG0_ADDR_MASK << MSI_CFG0_ADDR_SHIFT;
+> +
+> +	writeq_relaxed(doorbell, smmu->base + cfg0_offset);
+> +	writew_relaxed(msg->data, smmu->base + cfg1_offset);
+> +	writew_relaxed(MSI_CFG2_MEMATTR_DEVICE_nGnRE,
+> +		       smmu->base + cfg2_offset);
+
+writel_relaxed?
+
 > +}
 > +
-> +static inline void kvm_free_fake_pgd(pgd_t *pgd)
+> +static void arm_smmu_msi_override_irqs(struct arm_smmu_device *smmu)
 > +{
-> +	if (KVM_PREALLOC_LEVEL > 0)
-> +		kfree(pgd);
+> +	struct msi_desc *desc;
+> +
+> +	for_each_msi_entry(desc, smmu->dev) {
+> +		switch (desc->platform.msi_index) {
+> +		case 0:		/* EVTQ */
+> +			smmu->evtq.q.irq = desc->irq;
+> +			break;
+> +		case 1:		/* GERROR */
+> +			smmu->gerr_irq = desc->irq;
+> +			break;
+> +		case 2:		/* PRIQ */
+> +			smmu->priq.q.irq = desc->irq;
+> +			break;
+> +		default:	/* Unknown */
+> +			continue;
+> +		}
+> +	}
 > +}
 > +
->  static inline bool kvm_page_empty(void *ptr)
+>  static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
 >  {
->  	struct page *ptr_page = virt_to_page(ptr);
-> 
+>  	int ret, irq;
+> @@ -2192,6 +2250,23 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+>  	/* Clear the MSI address regs */
+>  	writeq_relaxed(0, smmu->base + ARM_SMMU_GERROR_IRQ_CFG0);
+>  	writeq_relaxed(0, smmu->base + ARM_SMMU_EVTQ_IRQ_CFG0);
+> +	if (smmu->features & ARM_SMMU_FEAT_PRI)
+> +		writeq_relaxed(0, smmu->base + ARM_SMMU_PRIQ_IRQ_CFG0);
+> +
+> +	/* Allocate MSIs for evtq, gerror and priq. Ignore cmdq */
+> +	if (smmu->features & ARM_SMMU_FEAT_MSI) {
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+We should probably add an IS_ENABLED(CONFIG_MSI) to the feature setting
+in arm_smmu_device_probe too.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> +		int nvecs = 2;
+> +
+> +		if (smmu->features & ARM_SMMU_FEAT_PRI)
+> +			nvecs++;
+> +
+> +		ret = platform_msi_domain_alloc_irqs(smmu->dev, nvecs,
+> +						     arm_smmu_write_msi_msg);
+
+Since this is doing kzallocs and stuff we're going to need some extra code
+on the failure and teardown paths, methinks. Or you could write a devm_
+interface like we have for wired interrupts.
+
+> +		if (ret)
+> +			dev_warn(smmu->dev, "failed to allocate MSIs\n");
+> +		else
+> +			arm_smmu_msi_override_irqs(smmu);
+> +	}
+
+Let's just move all this out into arm_smmu_setup_msi_vecs, which can do
+the MSI feature check and zero or configure the MSI cfg register
+accordingly.
+
+>  
+>  	/* Request wired interrupt lines */
+
+We should probably remove "wired" from this comment now that we could
+be overriding the irqs using the MSI descriptors.
+
+Will
