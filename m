@@ -1,29 +1,33 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 07 Oct 2015 21:49:33 +0200
-Subject: [PATCH v4 19/26] ARM: pxa: magician: Add support for Omnivision
- OV9640 camera
-In-Reply-To: <1443876607.4186.35.camel@gmail.com> (Philipp Zabel's message of
- "Sat, 03 Oct 2015 14:50:07 +0200")
-References: <cover.1443472089.git.petr.cvek@tul.cz> <5609B365.4060307@tul.cz>
- <1443876607.4186.35.camel@gmail.com>
-Message-ID: <87pp0qa27m.fsf@belgarion.home>
+From: lho@apm.com (Loc Ho)
+Date: Wed, 7 Oct 2015 12:55:31 -0700
+Subject: [PATCH RFC] apei: xgene: Add ACPI APEI support for X-Gene
+In-Reply-To: <20151006113133.GA28484@nazgul.tnic>
+References: <1443747112-24814-1-git-send-email-lho@apm.com>
+ <20151002075411.GB16538@pd.tnic>
+ <CAPw-ZTn5stnEobMH018oLPn3nDO1uweVeVs=Otg3-6cXBWLz6g@mail.gmail.com>
+ <20151006113133.GA28484@nazgul.tnic>
+Message-ID: <CAPw-ZTnxKPM1oU3OayGTGphrdAdJLTPXT4Yna7raRqROvhksSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philipp Zabel <philipp.zabel@gmail.com> writes:
+Hi Tomasx/Fu,
 
-> Am Montag, den 28.09.2015, 23:38 +0200 schrieb Petr Cvek:
->> This patch adds support for an OV9640 camera to the HTC Magician
->> machine.
->> 
->> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+>> Yes... We can make this generic. The only non-generic is the way the
+>> interrupt is cleared. As of right now, the method of clearing the
+>> interrupt is by writing back the same value as read. This would be
+>> fine for most.
 >
-> Still untested, but looks good to me.
-I'm still reluctant to have the reset with the timings handled in the board code
-as I consider this should be in the camera driver code
-(magician_camera_reset()).
+> Fine for most what? APM hardware, other hw?
 
-Cheers.
+In general, most HW states are cleared with writing an 1 - but it is
+HW implementation specific.
 
--- 
-Robert
+>
+>> But to ensure 100% coverage, would an AML method be better or needed?
+>
+> No idea, I'm not an ACPI guy. You probably should get in touch with the
+> people working on the ARM64 APEI driver and hash that out with them.
+
+Is there an thread on ACPI APEI support going on currently for ARM?
+
+-Loc
