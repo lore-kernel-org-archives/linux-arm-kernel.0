@@ -1,56 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Oct 2015 15:20:21 +0100
-Subject: [GIT PULL] arm64: fixes for -rc5
-Message-ID: <20151007142021.GA12577@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 07 Oct 2015 16:26:58 +0200
+Subject: [RFT 0/3] usb: usb3503: Fix probing on Arndale board (missing phy)
+In-Reply-To: <1444177807-15524-1-git-send-email-k.kozlowski@samsung.com>
+References: <1444177807-15524-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <56152BB2.4020202@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hello,
 
-Please pull the following arm64 fixes for 4.3-rc5. They address a couple
-of issues found with RT, a broken initrd message in the console log and
-a simple performance fix for some MMC workloads. Headlines in the tag.
+On 2015-10-07 02:30, Krzysztof Kozlowski wrote:
+> Introduction
+> ============
+> This patchset tries to fix probing of usb3503 on Arndale board
+> if the Samsung PHY driver is probed later (or built as a module).
+>
+> *The patchset was not tested on Arndale board.*
+> I don't have that board. Please test it and say if the usb3503 deferred probe
+> works fine and the issue is solved.
+>
+> The patchset was tested on Odroid U3 board (which is different!)
+> in a simulated environment. It is not sufficient testing.
+>
+>
+> Difference
+> ==========
+> The usb3503 device driver can be used as a I2C device (on Odroid U3)
+> or as a platform device connected through phy (on Arndale). In the second
+> case the necessary phy reference has to be obtained and enabled.
+>
+> For some details please look also at thread [0][1].
+>
+> [0] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348524.html
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348875.html
+>
 
-Thanks,
+I'm not sure that this is the correct approach. usb3503 chip is simply 
+connected
+to Exynos USB2 phy, so it visible on the USB bus. The real driver that 
+controls USB2
+PHY is Exynos EHCI driver and USB3503 should not mess around it.
 
-Will
+In my opinion all that is needed in case of Arndale board is forcing 
+reset of
+usb3503 chip after successful EHCI and USB2 PHY initialization (for some 
+reason
+initialization of usb3503 chip must be done after usb host initialization).
+However I have no idea which driver should trigger this reset. Right now 
+I didn't
+find any good solution for additional control for devices which are on 
+autoprobed
+bus like usb.
 
---->8
-
-The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
-
-  Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 62c6c61adbc623cdacf74b8f29c278e539060c48:
-
-  arm64: replace read_lock to rcu lock in call_break_hook (2015-10-06 19:10:28 +0100)
-
-----------------------------------------------------------------
-arm64 fixes for 4.3-rc5
-
-- A couple of locking fixes for RT kernels
-- Avoid printing bogus initrd warnings when initrd isn't present
-- Performance fix for random mmap file readahead
-- Typo fix
-
-----------------------------------------------------------------
-Mark Rutland (1):
-      arm64: Don't relocate non-existent initrd
-
-Mark Salyzyn (1):
-      arm64: readahead: fault retry breaks mmap file read random detection
-
-Yang Shi (3):
-      arm64: debug: Fix typo in debug-monitors.c
-      arm64: convert patch_lock to raw lock
-      arm64: replace read_lock to rcu lock in call_break_hook
-
- arch/arm64/kernel/debug-monitors.c | 23 ++++++++++++-----------
- arch/arm64/kernel/insn.c           |  6 +++---
- arch/arm64/kernel/setup.c          |  2 ++
- arch/arm64/mm/fault.c              |  1 +
- 4 files changed, 18 insertions(+), 14 deletions(-)
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
