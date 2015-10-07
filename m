@@ -1,155 +1,87 @@
 From: dawei.chien@mediatek.com (Dawei Chien)
-Date: Wed, 7 Oct 2015 20:22:40 +0800
-Subject: [PATCH v2 1/2] thermal: mediatek: Add cpu power cooling model.
+Date: Wed, 7 Oct 2015 20:22:41 +0800
+Subject: [PATCH v2 2/2] arm64: dts: mt8173: Add thermal zone node for mt8173.
 In-Reply-To: <1444220561-26139-1-git-send-email-dawei.chien@mediatek.com>
 References: <1444220561-26139-1-git-send-email-dawei.chien@mediatek.com>
-Message-ID: <1444220561-26139-2-git-send-email-dawei.chien@mediatek.com>
+Message-ID: <1444220561-26139-3-git-send-email-dawei.chien@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Dawei.Chien" <dawei.chien@mediatek.com>
 
-This power model is base on Intelligent Power Allocation (IPA) technical,
-requires that the operating-points of the CPUs are registered using the
-kernel's opp library and the `cpufreq_frequency_table` is assigned to the
-`struct device` of the cpu MT8173.
+Add thermal zone node to mt8173.dtsi.
 
 Signed-off-by: Dawei.Chien <dawei.chien@mediatek.com>
 ---
 This patch is base on
-https://patchwork.kernel.org/patch/7034601/
+https://patchwork.kernel.org/patch/7249821/
+https://patchwork.kernel.org/patch/7249861/
+https://patchwork.kernel.org/patch/7249891/
 ---
- drivers/cpufreq/mt8173-cpufreq.c |   97 +++++++++++++++++++++++++++++++++-----
- 1 file changed, 86 insertions(+), 11 deletions(-)
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |   44 ++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
-index 49caed2..9233ec5 100644
---- a/drivers/cpufreq/mt8173-cpufreq.c
-+++ b/drivers/cpufreq/mt8173-cpufreq.c
-@@ -28,7 +28,8 @@
- #define MAX_VOLT_SHIFT		(200000)
- #define MAX_VOLT_LIMIT		(1150000)
- #define VOLT_TOL		(10000)
--
-+#define CAPACITANCE_CA53	(263)
-+#define CAPACITANCE_CA57	(530)
- /*
-  * The struct mtk_cpu_dvfs_info holds necessary information for doing CPU DVFS
-  * on each CPU power/clock domain of Mediatek SoCs. Each CPU cluster in
-@@ -51,6 +52,72 @@ struct mtk_cpu_dvfs_info {
- 	bool need_voltage_tracking;
- };
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 3b18f37..01a7c46c 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -16,6 +16,7 @@
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/power/mt8173-power.h>
+ #include <dt-bindings/reset-controller/mt8173-resets.h>
++#include <dt-bindings/thermal/mt8173.h>
+ #include "mt8173-pinfunc.h"
  
-+struct mtk_cpu_static_power {
-+	unsigned long voltage;
-+	unsigned int power;
-+};
-+
-+/* measured by WA program. */
-+static const struct mtk_cpu_static_power mtk_ca53_static_power[] = {
-+	{859000, 43},
-+	{908000, 52},
-+	{983000, 86},
-+	{1009000, 123},
-+	{1028000, 138},
-+	{1083000, 172},
-+	{1109000, 180},
-+	{1125000, 192},
-+};
-+
-+/* measured by WA program. */
-+static const struct mtk_cpu_static_power mtk_ca57_static_power[] = {
-+	{828000, 72},
-+	{867000, 90},
-+	{927000, 156},
-+	{968000, 181},
-+	{1007000, 298},
-+	{1049000, 435},
-+	{1089000, 533},
-+	{1125000, 533},
-+};
-+
-+unsigned int mtk_cpufreq_lookup_power(const struct mtk_cpu_static_power *table,
-+		unsigned int count, unsigned long voltage)
-+{
-+	int i;
-+
-+	for (i = 0; i < count; i++) {
-+		if (voltage <= table[i].voltage)
-+			return table[i].power;
-+	}
-+
-+	return table[count - 1].power;
-+}
-+
-+int mtk_cpufreq_get_static(cpumask_t *cpumask, int interval,
-+		unsigned long voltage, u32 *power)
-+{
-+	int nr_cpus = cpumask_weight(cpumask);
-+
-+	*power = 0;
-+
-+	if (nr_cpus) {
-+
-+		if (cpumask_test_cpu(0, cpumask))
-+			*power += mtk_cpufreq_lookup_power(
-+				mtk_ca53_static_power,
-+				ARRAY_SIZE(mtk_ca53_static_power),
-+				voltage);
-+
-+		if (cpumask_test_cpu(2, cpumask))
-+			*power += mtk_cpufreq_lookup_power(
-+				mtk_ca57_static_power,
-+				ARRAY_SIZE(mtk_ca57_static_power),
-+				voltage);
-+	}
-+	return 0;
-+}
-+
- static int mtk_cpufreq_voltage_tracking(struct mtk_cpu_dvfs_info *info,
- 					int new_vproc)
- {
-@@ -272,15 +339,21 @@ static void mtk_cpufreq_ready(struct cpufreq_policy *policy)
- 		return;
+ / {
+@@ -116,6 +117,49 @@
+ 		clock-output-names = "clk32k";
+ 	};
  
- 	if (of_find_property(np, "#cooling-cells", NULL)) {
--		info->cdev = of_cpufreq_cooling_register(np,
--							 policy->related_cpus);
--
--		if (IS_ERR(info->cdev)) {
--			dev_err(info->cpu_dev,
--				"running cpufreq without cooling device: %ld\n",
--				PTR_ERR(info->cdev));
--
--			info->cdev = NULL;
-+		u32 capacitance = cpumask_test_cpu(0, policy->related_cpus) ?
-+			CAPACITANCE_CA53 : CAPACITANCE_CA57;
++	thermal-zones {
++		cpu_thermal: cpu_thermal {
++			polling-delay-passive = <1000>; /* milliseconds */
++			polling-delay = <1000>; /* milliseconds */
 +
-+		if (!info->cdev) {
-+			info->cdev = of_cpufreq_power_cooling_register(np,
-+				policy->related_cpus,
-+				capacitance,
-+				mtk_cpufreq_get_static);
++			thermal-sensors = <&thermal MT8173_THERMAL_ZONE_CA57>;
++			sustainable-power = <1500>;
 +
-+			if (IS_ERR(info->cdev)) {
-+				dev_err(info->cpu_dev,
-+					"running cpufreq without cooling device: %ld\n",
-+					PTR_ERR(info->cdev));
-+					info->cdev = NULL;
-+			}
- 		}
- 	}
- 
-@@ -460,7 +533,9 @@ static int mtk_cpufreq_exit(struct cpufreq_policy *policy)
- {
- 	struct mtk_cpu_dvfs_info *info = policy->driver_data;
- 
--	cpufreq_cooling_unregister(info->cdev);
-+	if (info->cdev)
-+		cpufreq_cooling_unregister(info->cdev);
++			trips {
++				threshold: trip-point at 0 {
++					temperature = <68000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
 +
- 	dev_pm_opp_free_cpufreq_table(info->cpu_dev, &policy->freq_table);
- 	mtk_cpu_dvfs_info_release(info);
- 	kfree(info);
++				target: trip-point at 1 {
++					temperature = <85000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				cpu_crit: cpu_crit at 0 {
++					temperature = <115000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++				map at 0 {
++					trip = <&target>;
++					cooling-device = <&cpu0 0 0>;
++					contribution = <1024>;
++				};
++				map at 1 {
++					trip = <&target>;
++					cooling-device = <&cpu2 0 0>;
++					contribution = <2048>;
++				};
++			};
++		};
++	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupt-parent = <&gic>;
 -- 
 1.7.9.5
