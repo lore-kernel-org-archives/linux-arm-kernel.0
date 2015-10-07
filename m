@@ -1,87 +1,27 @@
-From: dawei.chien@mediatek.com (Dawei Chien)
-Date: Wed, 7 Oct 2015 20:22:41 +0800
-Subject: [PATCH v2 2/2] arm64: dts: mt8173: Add thermal zone node for mt8173.
-In-Reply-To: <1444220561-26139-1-git-send-email-dawei.chien@mediatek.com>
-References: <1444220561-26139-1-git-send-email-dawei.chien@mediatek.com>
-Message-ID: <1444220561-26139-3-git-send-email-dawei.chien@mediatek.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed,  7 Oct 2015 13:23:26 +0100
+Subject: [PATCH v2 0/3] hwrng: st: Couple of improvements
+Message-ID: <1444220609-31251-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Dawei.Chien" <dawei.chien@mediatek.com>
+This set contains a minor documentation fix, greater clarification
+with how the FIFO depth/size is represented and finally a fix to
+prevent early timeout during data acquisition.
 
-Add thermal zone node to mt8173.dtsi.
+v1 => v2:
+ - Remove phantom bugfix (FIFO really is 4 deep, not 8)
+ - Double timeout value to account for inconsistent call to udelay()
+   - Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Signed-off-by: Dawei.Chien <dawei.chien@mediatek.com>
----
-This patch is base on
-https://patchwork.kernel.org/patch/7249821/
-https://patchwork.kernel.org/patch/7249861/
-https://patchwork.kernel.org/patch/7249891/
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi |   44 ++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+Lee Jones (3):
+  hwrng: st: dt: Fix trivial typo in node address
+  hwrng: st: Use real-world device timings for timeout
+  hwrng: st: Improve FIFO size/depth description
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 3b18f37..01a7c46c 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -16,6 +16,7 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/power/mt8173-power.h>
- #include <dt-bindings/reset-controller/mt8173-resets.h>
-+#include <dt-bindings/thermal/mt8173.h>
- #include "mt8173-pinfunc.h"
- 
- / {
-@@ -116,6 +117,49 @@
- 		clock-output-names = "clk32k";
- 	};
- 
-+	thermal-zones {
-+		cpu_thermal: cpu_thermal {
-+			polling-delay-passive = <1000>; /* milliseconds */
-+			polling-delay = <1000>; /* milliseconds */
-+
-+			thermal-sensors = <&thermal MT8173_THERMAL_ZONE_CA57>;
-+			sustainable-power = <1500>;
-+
-+			trips {
-+				threshold: trip-point at 0 {
-+					temperature = <68000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				target: trip-point at 1 {
-+					temperature = <85000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				cpu_crit: cpu_crit at 0 {
-+					temperature = <115000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+				map at 0 {
-+					trip = <&target>;
-+					cooling-device = <&cpu0 0 0>;
-+					contribution = <1024>;
-+				};
-+				map at 1 {
-+					trip = <&target>;
-+					cooling-device = <&cpu2 0 0>;
-+					contribution = <2048>;
-+				};
-+			};
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupt-parent = <&gic>;
+ Documentation/devicetree/bindings/rng/st,rng.txt |  2 +-
+ drivers/char/hw_random/st-rng.c                  | 13 ++++++++++---
+ 2 files changed, 11 insertions(+), 4 deletions(-)
+
 -- 
-1.7.9.5
+1.9.1
