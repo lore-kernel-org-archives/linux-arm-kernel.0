@@ -1,45 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Oct 2015 10:58:03 +0900
-Subject: [PATCH 26/28] ARM: shmobile: r8a7794: add HS-USB DT support
+Date: Wed,  7 Oct 2015 10:58:04 +0900
+Subject: [PATCH 27/28] ARM: shmobile: fix SILK board name
 In-Reply-To: <cover.1444182812.git.horms+renesas@verge.net.au>
 References: <cover.1444182812.git.horms+renesas@verge.net.au>
-Message-ID: <2f33b9f796ce6ebb00f6e8238fba07149c5264f2.1444182812.git.horms+renesas@verge.net.au>
+Message-ID: <7265405f74b33f256073ea233690b6ee866c252c.1444182812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Define the R8A7794 generic part of the HS-USB device node.
-It is up to the board file to enable the device.
+Unfortunately, the SILK board bindings were not quite correct, as the  board
+name should be all caps.  Fix that,  adding the board model #  in parens and
+removing stray semicolon.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ Documentation/devicetree/bindings/arm/shmobile.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index efc3548511c4..a9977d6ee81a 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -718,6 +718,18 @@
- 		};
- 	};
- 
-+	hsusb: usb at e6590000 {
-+		compatible = "renesas,usbhs-r8a7794";
-+		reg = <0 0xe6590000 0 0x100>;
-+		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp7_clks R8A7794_CLK_HSUSB>;
-+		power-domains = <&cpg_clocks>;
-+		renesas,buswait = <4>;
-+		phys = <&usb0 1>;
-+		phy-names = "usb";
-+		status = "disabled";
-+	};
-+
- 	usbphy: usb-phy at e6590100 {
- 		compatible = "renesas,usb-phy-r8a7794";
- 		reg = <0 0xe6590100 0 0x100>;
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index a9148b1dcd96..40bb9007cd0d 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -57,5 +57,5 @@ Boards:
+     compatible = "renesas,marzen", "renesas,r8a7779"
+   - Porter (M2-LCDP)
+     compatible = "renesas,porter", "renesas,r8a7791"
+-  - Silk
+-    compatible = "renesas,silk", "renesas,r8a7794";
++  - SILK (RTP0RC7794LCB00011S)
++    compatible = "renesas,silk", "renesas,r8a7794"
 -- 
 2.1.4
