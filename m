@@ -1,35 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 7 Oct 2015 14:35:00 +0100
-Subject: [PATCHv4 0/6] arm64: perf: heterogeneous PMU support
-In-Reply-To: <20151007132727.GB17192@e104818-lin.cambridge.arm.com>
-References: <1443779708-26789-1-git-send-email-mark.rutland@arm.com>
- <20151007131930.GJ16065@arm.com>
- <20151007132727.GB17192@e104818-lin.cambridge.arm.com>
-Message-ID: <20151007133459.GA28981@leverpostej>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Oct 2015 06:40:10 -0700
+Subject: [PATCH 2/2] memory: omap-gpmc: expand the description of the
+ debug facility
+In-Reply-To: <5614FD01.6090009@ti.com>
+References: <1444162070-22034-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1444162070-22034-2-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5614CDAE.6070604@ti.com> <20151007075338.GH3982@pengutronix.de>
+ <20151007102822.GT23801@atomide.com>
+ <20151007110231.GL3982@pengutronix.de> <5614FD01.6090009@ti.com>
+Message-ID: <20151007134010.GW23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 02:27:28PM +0100, Catalin Marinas wrote:
-> On Wed, Oct 07, 2015 at 02:19:30PM +0100, Will Deacon wrote:
-> > On Fri, Oct 02, 2015 at 10:55:02AM +0100, Mark Rutland wrote:
-> > > This patch series moves the arm64 code over to the librified perf code now used
-> > > by 32-bit arm, in the process gaining support for heterogeneous PMUs. Tailored
-> > > support is then added for Cortex-A53 and Cortex-A57 as used in Juno systems.
-> > > 
-> > > With this series applied, perf can be used to monitor 64-bit systems with
-> > > heterogeneous PMUs in an identical fashion to 32-bit systems, e.g.
+* Roger Quadros <rogerq@ti.com> [151007 04:12]:
+> On 07/10/15 14:02, Uwe Kleine-K?nig wrote:
+> > Hello Tony,
 > > 
-> > For the series:
-> > 
-> >   Acked-by: Will Deacon <will.deacon@arm.com>
+> > On Wed, Oct 07, 2015 at 03:41:19AM -0700, Tony Lindgren wrote:
+> >> * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [151007 00:57]:
+> >>> On Wed, Oct 07, 2015 at 10:45:50AM +0300, Roger Quadros wrote:
+> >>>>
+> >>>> How about this instead?
+> >>>>
+> >>>> NOTE: Apart from matching the register setup with the bootloader you also need to
+> >>>> match the GPMC FCLK frequency used by the bootloader else the GPMC timings
+> >>>> won't be identical with the bootloader timings.
+> >>> Yeah, sounds better, thanks.
+> >>>
+> >>>> Also you might need to build this patch on top of
+> >>>> http://article.gmane.org/gmane.linux.kernel/2054796
+> >>> I talked to Tony about this patch yesterday on irc, but I didn't find it
+> >>> in the archives yet when I sent my mail.
+> >>
+> >> Yes sorry here's a repost with your and Roger's changes folded in and
+> >> edited a bit. Probably best to keep them together with this patch.
+> >>
+> >> Does the following look OK to you guys?
+> > Yes,
+> > Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > 
-> Thanks.
-> 
-> > There's a trailing whitespace error in the first patch, but Catalin can
-> > probably fix that up.
-> 
-> I fixed this as well. Queued.
+> Looks good to me too.
 
-Thanks to you both, sorry about the whitespace.
+Are you OK if I use your Acked-by from the previous version on
+this updated version?
 
-Mark.
+Regards,
+
+Tony
