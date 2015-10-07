@@ -1,62 +1,64 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 07 Oct 2015 18:01:03 +0100
-Subject: [PATCH] nvmem: core: make default user binary file root-access
- only
-In-Reply-To: <20151007165046.GC12099@kroah.com>
-References: <1444235714-24365-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20151007165046.GC12099@kroah.com>
-Message-ID: <56154FCF.6010105@linaro.org>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 7 Oct 2015 18:03:34 +0100
+Subject: [PATCH v2 06/22] arm64: sys_reg: Define System register encoding
+In-Reply-To: <20151007163650.GC17192@e104818-lin.cambridge.arm.com>
+References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+ <1444064531-25607-7-git-send-email-suzuki.poulose@arm.com>
+ <20151007163650.GC17192@e104818-lin.cambridge.arm.com>
+Message-ID: <56155066.9000000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 07/10/15 17:50, Greg KH wrote:
-> On Wed, Oct 07, 2015 at 05:35:14PM +0100, Srinivas Kandagatla wrote:
->> As required by many providers like at24/at25/mxs-ocotp/qfprom, which would
->> want to allow root-only to read/write the nvmem content.
->> So making the defaults to be root-only access which can prevent normal
->> users from reading the nvmem data.
+On 07/10/15 17:36, Catalin Marinas wrote:
+> On Mon, Oct 05, 2015 at 06:01:55PM +0100, Suzuki K. Poulose wrote:
+>> --- a/arch/arm64/include/asm/sysreg.h
+>> +++ b/arch/arm64/include/asm/sysreg.h
+>> @@ -22,11 +22,11 @@
 >>
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>   drivers/nvmem/core.c | 4 ++--
->>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>   #include <asm/opcodes.h>
 >>
->> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
->> index 6fd4e5a..4d2e476 100644
->> --- a/drivers/nvmem/core.c
->> +++ b/drivers/nvmem/core.c
->> @@ -112,7 +112,7 @@ static ssize_t bin_attr_nvmem_write(struct file *filp, struct kobject *kobj,
->>   static struct bin_attribute bin_attr_rw_nvmem = {
->>   	.attr	= {
->>   		.name	= "nvmem",
->> -		.mode	= S_IWUSR | S_IRUGO,
->> +		.mode	= S_IWUSR | S_IRUSR,
->>   	},
->>   	.read	= bin_attr_nvmem_read,
->>   	.write	= bin_attr_nvmem_write,
->> @@ -136,7 +136,7 @@ static const struct attribute_group *nvmem_rw_dev_groups[] = {
->>   static struct bin_attribute bin_attr_ro_nvmem = {
->>   	.attr	= {
->>   		.name	= "nvmem",
->> -		.mode	= S_IRUGO,
->> +		.mode	= S_IRUSR,
->>   	},
->>   	.read	= bin_attr_nvmem_read,
->>   };
+>> -#define SCTLR_EL1_CP15BEN	(0x1 << 5)
+>> -#define SCTLR_EL1_SED		(0x1 << 8)
+>> -
+>>   /*
+>> - * ARMv8 ARM reserves the following encoding for system registers:
+>> + * sys_reg: Defines the ARMv8 ARM encoding for the System register.
+>> + *
+>> + * ARMv8 ARM reserves the following encoding for system registers in the
+>> + * instructions accessing them.
 >
-> How about using BIN_ATTR_RO() and friends instead, that way I _know_ you
-> got the permissions correct as it's impossible to get them wrong by
-> using those macros.
-Yes, that sounds good, but there are no macros for just "S_IRUSR" or 
-"(S_IWUSR | S_IRUSR)" in ./include/linux/sysfs.h
+> Nitpick: the sentence should end with a colon.
 
-
---srini
+OK
 
 >
-> thanks,
+>>    * (Ref: ARMv8 ARM, Section: "System instruction class encoding overview",
+>>    *  C5.2, version:ARM DDI 0487A.f)
+>>    *	[20-19] : Op0
+>> @@ -34,15 +34,40 @@
+>>    *	[15-12] : CRn
+>>    *	[11-8]  : CRm
+>>    *	[7-5]   : Op2
+>> + * Hence we use [ sys_reg() << 5 ] in the mrs/msr instructions.
 >
-> greg k-h
+> Do we really need to have all the ids shifted right by 5? I can't see
+> where it helps. OTOH, it makes the code more complicated by having to
+> remember to shift the id left by 5.
+
+This is a cosmetic change, to reuse the sys_reg() definitions for both
+mrs_s/msr_s macros and the CPU ID. The (existing)left shift is only needed
+for the mrs_s/msr_s, so the existing users don't have to worry about the shift
+unless they have hard-open-coded values for the register. On the plus
+side it becomes slightly easier to use the same encoding for CPU id
+tracking (and manual decoding). If you think this is superfluous, I could
+change the CPU-id to use right shifted values from sys_reg.
+
 >
+>> + *
+>
+> Nitpick: no need for another line.
+>
+
+OK
+
+Suzuki
