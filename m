@@ -1,33 +1,19 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 7 Oct 2015 12:07:55 +0100
-Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
-In-Reply-To: <20151007110302.GD9892@linux>
-References: <5706174.BUsqiXljxZ@wuerfel> <20151007105911.GC9892@linux>
- <20151007110302.GD9892@linux>
-Message-ID: <20151007110755.GA6601@kroah.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 7 Oct 2015 16:38:33 +0530
+Subject: [PATCH 1/1] ARM: davinci: re-use %*ph specifier
+In-Reply-To: <1443705185-85280-1-git-send-email-andriy.shevchenko@linux.intel.com>
+References: <1443705185-85280-1-git-send-email-andriy.shevchenko@linux.intel.com>
+Message-ID: <5614FD31.4070108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 04:33:02PM +0530, Viresh Kumar wrote:
-> On 07-10-15, 16:29, Viresh Kumar wrote:
-> > What about adding something like debugfs_create_unsigned_long() for
-> > such cases?
+On Thursday 01 October 2015 06:43 PM, Andy Shevchenko wrote:
+> %*ph specifier allows to dump data in hex format using the poiter to a buffer.
+> This is suitable to use here.
 > 
-> And that can be as simple (or ugly, not sure if its buggy) as:
-> 
-> debugfs_create_unsigned_long()
-> {
->         if (sizeof(unsigned long) == sizeof(u32))
->                 return debugfs_create_u32();
->         if (sizeof(unsigned long) == sizeof(u64))
->                 return debugfs_create_u64();
-> 
->         return -EINVAL;
-> }
+> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
-Why would you be wanting to create a "unsigned long" as an api anyway?
-Just force it to be u64 all the time, can't you do that?
+Will queue for v4.4 with ARM-SoC.
 
-thanks,
-
-greg k-h
+Thanks,
+Sekhar
