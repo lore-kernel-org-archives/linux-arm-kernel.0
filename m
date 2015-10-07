@@ -1,51 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 Oct 2015 09:00:51 +0100
-Subject: [PATCH v5 2/5] soc: sunxi: Add driver for Allwinner Reduced
- Serial Bus
-In-Reply-To: <CAGb2v6693tYRFukPw-XaYVxsh9q8QHG9Z=KNs4xgeX+3UkgHWA@mail.gmail.com>
-References: <1443700673-24312-1-git-send-email-wens@csie.org>
- <1443700673-24312-3-git-send-email-wens@csie.org>
- <20151004141639.GD2696@lukather>
- <CAGb2v6693tYRFukPw-XaYVxsh9q8QHG9Z=KNs4xgeX+3UkgHWA@mail.gmail.com>
-Message-ID: <20151007080051.GA2278@lukather>
+From: sugar.zhang@rock-chips.com (sugar)
+Date: Wed, 7 Oct 2015 16:01:38 +0800
+Subject: [PATCH 1/2] ASoC: rockchip: i2s: add 8 channels capture and
+ lrck-mode support
+In-Reply-To: <20150930184655.GX15635@sirena.org.uk>
+References: <1442979683-9441-1-git-send-email-sugar.zhang@rock-chips.com>
+ <1442979683-9441-2-git-send-email-sugar.zhang@rock-chips.com>
+ <20150923162433.GQ30445@sirena.org.uk> <5608F74C.3000104@rock-chips.com>
+ <20150930184655.GX15635@sirena.org.uk>
+Message-ID: <5614D162.3020500@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Sorry for late reply, we were in the National Day Holiday.
 
-On Mon, Oct 05, 2015 at 11:43:48PM +0800, Chen-Yu Tsai wrote:
-> On Sun, Oct 4, 2015 at 10:16 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Thu, Oct 01, 2015 at 07:57:48PM +0800, Chen-Yu Tsai wrote:
-> >> Reduced Serial Bus (RSB) is an Allwinner proprietery interface
-> >> used to communicate with PMICs and other peripheral ICs.
-> >>
-> >> RSB is a two-wire push-pull serial bus that supports 1 master
-> >> device and up to 15 active slave devices.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >
-> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Slightly confused. Are we merging this through your tree or directly
-> through arm-soc?
+? 10/1/2015 02:46, Mark Brown ??:
+> On Mon, Sep 28, 2015 at 04:16:12PM +0800, sugar wrote:
+>> ? 9/24/2015 00:24, Mark Brown ??:
+>
+>>> My initial thought here is that the machine driver should be responsible
+>>> for setting this and then the DAI driver should check to see if
+>>> symmetric_rates are in use and configure itself appropriately.  Is there
+>>> a reason why this won't work here?
+>
+>> It's for i2s ip configuration, in the most situation, there is no need
+>> to use this property, except one case:
+>
+>> In order to save gpio pins for other function use, we may use single
+>> lrck(tx or rx) pin. of course, it depends on product design. when in i2s
+>> slave mode, we need to configure this to share lrck with tx/rx inside i2s
+>> logic.
+>
+>> symmetric_rates flag works fine on rockchip platform, but it can't cover the
+>> above case.
+>
+>> Do you have any suggestion about this or maybe there is no need to upstream
+>> this special part?
+>
+> What makes you say that the symmetric_rates flag can't be used to cover
+> this case?  What you describe above is hte normal reason for needing to
+> enforce symmetric_rates.  The driver should be able to check if the flag
+> has been set just as well as the core is.
+>
 
-I thought Arnd was the maintainer of drivers/soc, but it doesn't seem
-like there's any. I'll apply your patches.
+Got it, How about the following modify?
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151007/eaf1e80b/attachment.sig>
+if (dai->symmetric_rates)
+	regmap_update_bits(i2s->regmap, I2S_CKR,
+                            I2S_CKR_TRCM_MASK,
+                            I2S_CKR_TRCM(val));
