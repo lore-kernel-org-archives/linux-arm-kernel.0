@@ -1,32 +1,51 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 7 Oct 2015 22:06:59 +0530
-Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
-In-Reply-To: <20151007163309.GM21513@n2100.arm.linux.org.uk>
-References: <5706174.BUsqiXljxZ@wuerfel> <20151007105911.GC9892@linux>
- <20151007110302.GD9892@linux> <20151007110755.GA6601@kroah.com>
- <20151007112149.GB22530@linux>
- <20151007163309.GM21513@n2100.arm.linux.org.uk>
-Message-ID: <20151007163659.GB4557@linux>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 7 Oct 2015 17:50:46 +0100
+Subject: [PATCH] nvmem: core: make default user binary file root-access
+ only
+In-Reply-To: <1444235714-24365-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1444235714-24365-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20151007165046.GC12099@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07-10-15, 17:33, Russell King - ARM Linux wrote:
-> Don't you even think about doing that - that's totally broken no matter
-> what, and this is a good example of why casts are Bad.
+On Wed, Oct 07, 2015 at 05:35:14PM +0100, Srinivas Kandagatla wrote:
+> As required by many providers like at24/at25/mxs-ocotp/qfprom, which would
+> want to allow root-only to read/write the nvmem content.
+> So making the defaults to be root-only access which can prevent normal
+> users from reading the nvmem data.
 > 
-> debugfs_create_u64() will create a debugfs object that will want to
-> access a 64-bit value, but the value pointed to is only 32-bit.  The
-> net result is that the debugfs file ends up reading or writing the
-> neigbouring 32-bits, which may potentially be unaligned.
-
-Yeah, that's what I was also saying. Its broken.
-
-> The variable pointed to for debugfs_create_u64() must be a 64-bit
-> value.  No casts allowed.
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  drivers/nvmem/core.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> An alternative would be to have debugfs_create_ulong()
+> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+> index 6fd4e5a..4d2e476 100644
+> --- a/drivers/nvmem/core.c
+> +++ b/drivers/nvmem/core.c
+> @@ -112,7 +112,7 @@ static ssize_t bin_attr_nvmem_write(struct file *filp, struct kobject *kobj,
+>  static struct bin_attribute bin_attr_rw_nvmem = {
+>  	.attr	= {
+>  		.name	= "nvmem",
+> -		.mode	= S_IWUSR | S_IRUGO,
+> +		.mode	= S_IWUSR | S_IRUSR,
+>  	},
+>  	.read	= bin_attr_nvmem_read,
+>  	.write	= bin_attr_nvmem_write,
+> @@ -136,7 +136,7 @@ static const struct attribute_group *nvmem_rw_dev_groups[] = {
+>  static struct bin_attribute bin_attr_ro_nvmem = {
+>  	.attr	= {
+>  		.name	= "nvmem",
+> -		.mode	= S_IRUGO,
+> +		.mode	= S_IRUSR,
+>  	},
+>  	.read	= bin_attr_nvmem_read,
+>  };
 
-And that's what I suggested.
+How about using BIN_ATTR_RO() and friends instead, that way I _know_ you
+got the permissions correct as it's impossible to get them wrong by
+using those macros.
 
--- 
-viresh
+thanks,
+
+greg k-h
