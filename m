@@ -1,39 +1,33 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Wed, 7 Oct 2015 15:20:49 +0000
-Subject: Irq domain for legacy interrupts
-References: <loom.20151007T164737-541@post.gmane.org>
- <41520723.9CcSmQjLSU@wuerfel>
-Message-ID: <8520D5D51A55D047800579B094147198016907E5@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed,  7 Oct 2015 09:26:37 -0600
+Subject: [PATCH 0/6] coresight: next v4.3-rc4 
+Message-ID: <1444231603-26676-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for not being clear,in arch/arm64/kernel/pci.c, pcibios_add_device(struct pci_dev *dev) does the irq mapping so, at this point of time the registered .map will be invoked?
+Good morning,
 
-In arch/arm64/kernel/pci.c, pcibios_add_device(struct pci_dev *dev) does the irq mapping so, at this point of time the registered irq domain mapping will be invoked at this time ?
+Please consider the following patches for merging in the 4.4 cycle.
 
------Original Message-----
-From: Arnd Bergmann [mailto:arnd at arndb.de]
-Sent: Wednesday, October 07, 2015 8:33 PM
-To: linux-arm-kernel at lists.infradead.org
-Cc: Bharat Kumar Gogada
-Subject: Re: Irq domain for legacy interrupts
+Thanks,
+Mathieu
 
-On Wednesday 07 October 2015 14:53:03 bharat kumar gogada wrote:
-> why do we need a irq domain for legacy interrupts ?
+Chunyan Zhang (1):
+  Coresight: ETMv4: Prevent TRCRSCTLR0&1 from being accessed
 
-You need an irq domain if you want to refer to the interrupts from DT, otherwise you have no way to describe them.
+Mathieu Poirier (5):
+  coresight: fixing typographical error
+  coresight: adding comments to remove ambiguity
+  coresight: etm3x: adding cpu affinity to sysFS interface
+  coresight: etm3x: breaking down sysFS status interface
+  coresight: etm3x: making error message unambiguous
 
-> Do we need any specific
-> parameter in device tree other that interrupt-map, interrupt-map-mask, 
-> for handling with irq domain ?
+ .../ABI/testing/sysfs-bus-coresight-devices-etm3x  |  77 +++++++++++++--
+ drivers/hwtracing/coresight/coresight-etm3x.c      | 107 ++++++++++++---------
+ drivers/hwtracing/coresight/coresight-etm4x.c      |  22 +++--
+ drivers/hwtracing/coresight/coresight.c            |   5 +
+ include/linux/coresight.h                          |   2 +-
+ 5 files changed, 154 insertions(+), 59 deletions(-)
 
-no.
-
-> when will the .map method in struct irq_domain_ops get invoked for 
-> legacy interrupts ?
-
-when the interrupt gets mapped ;-)
-
-This should happen whenever the first PCIe device starts using non-MSI interrupts.
-
-	Arnd
+-- 
+1.9.1
