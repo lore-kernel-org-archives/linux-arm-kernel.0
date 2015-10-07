@@ -1,186 +1,36 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed,  7 Oct 2015 21:50:30 +0200
-Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
-Message-ID: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 07 Oct 2015 21:45:46 +0200
+Subject: [PATCH v4 11/26] ARM: pxa: magician: Optimize EGPIO initial values
+In-Reply-To: <1443875705.4186.24.camel@gmail.com> (Philipp Zabel's message of
+ "Sat, 03 Oct 2015 14:35:05 +0200")
+References: <cover.1443472089.git.petr.cvek@tul.cz> <5609B1E9.4020508@tul.cz>
+ <1443875705.4186.24.camel@gmail.com>
+Message-ID: <87twq2a2dx.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Factor out the GICv3-specific documentation into a separate
-documentation file.  Add description for how to access distributor,
-redistributor, and CPU interface registers for GICv3 in this new file.
+Philipp Zabel <philipp.zabel@gmail.com> writes:
 
-Acked-by: Peter Maydell <peter.maydell@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- Documentation/virtual/kvm/devices/arm-vgic-v3.txt | 114 ++++++++++++++++++++++
- Documentation/virtual/kvm/devices/arm-vgic.txt    |  20 +---
- 2 files changed, 118 insertions(+), 16 deletions(-)
- create mode 100644 Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+> Am Montag, den 28.09.2015, 23:32 +0200 schrieb Petr Cvek:
+>> This patch optimizes initial values of the EGPIO chip driver.
+>> 
+>> GSM and sound should be powered off during boot. A weak accumulator
+>> and
+>> a powered GSM sometimes cause a system reboot. A charging current
+>> should be
+>> as high as possible during boot.
+>
+> Wouldn't that violate USB spec if we boot the magician while plugged
+> into an unpowered USB host?
 
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-new file mode 100644
-index 0000000..383f9be
---- /dev/null
-+++ b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-@@ -0,0 +1,114 @@
-+ARM Virtual Generic Interrupt Controller v3 and later (VGICv3)
-+==============================================================
-+
-+
-+Device types supported:
-+  KVM_DEV_TYPE_ARM_VGIC_V3     ARM Generic Interrupt Controller v3.0
-+
-+Only one VGIC instance may be instantiated through this API.  The created VGIC
-+will act as the VM interrupt controller, requiring emulated user-space devices
-+to inject interrupts to the VGIC instead of directly to CPUs.  It is not
-+possible to create both a GICv3 and GICv2 on the same VM.
-+
-+Creating a guest GICv3 device requires a host GICv3 as well.
-+
-+Groups:
-+  KVM_DEV_ARM_VGIC_GRP_ADDR
-+  Attributes:
-+    KVM_VGIC_V3_ADDR_TYPE_DIST (rw, 64-bit)
-+      Base address in the guest physical address space of the GICv3 distributor
-+      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
-+      This address needs to be 64K aligned and the region covers 64 KByte.
-+
-+    KVM_VGIC_V3_ADDR_TYPE_REDIST (rw, 64-bit)
-+      Base address in the guest physical address space of the GICv3
-+      redistributor register mappings. There are two 64K pages for each
-+      VCPU and all of the redistributor pages are contiguous.
-+      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
-+      This address needs to be 64K aligned.
-+
-+
-+  KVM_DEV_ARM_VGIC_GRP_DIST_REGS
-+  KVM_DEV_ARM_VGIC_GRP_REDIST_REGS
-+  Attributes:
-+    The attr field of kvm_device_attr encodes two values:
-+    bits:     | 63   ....  32  |  31   ....    0 |
-+    values:   |      mpidr     |      offset     |
-+
-+    All distributor regs are (rw, 64-bit).
-+
-+    KVM_DEV_ARM_VGIC_GRP_DIST_REGS accesses the main distributor registers.
-+    KVM_DEV_ARM_VGIC_GRP_REDIST_REGS accesses the redistributor of the CPU
-+    specified by the mpidr.
-+
-+    The offset is relative to the "[Re]Distributor base address" as defined
-+    in the GICv3/4 specs.  Getting or setting such a register has the same
-+    effect as reading or writing the register on real hardware, and the mpidr
-+    field is used to specify which redistributor is accessed.  The mpidr is
-+    ignored for the distributor.
-+
-+    The mpidr encoding is based on the affinity information in the
-+    architecture defined MPIDR, and the field is encoded as follows:
-+      | 63 .... 56 | 55 .... 48 | 47 .... 40 | 39 .... 32 |
-+      |    Aff3    |    Aff2    |    Aff1    |    Aff0    |
-+
-+    Note that distributor fields are not banked, but return the same value
-+    regardless of the mpidr used to access the register.
-+  Limitations:
-+    - Priorities are not implemented, and registers are RAZ/WI
-+  Errors:
-+    -ENXIO: Getting or setting this register is not yet supported
-+    -EBUSY: One or more VCPUs are running
-+
-+
-+  KVM_DEV_ARM_VGIC_CPU_SYSREGS
-+  Attributes:
-+    The attr field of kvm_device_attr encodes two values:
-+    bits:     | 63      ....       32 | 31  ....  16 | 15  ....  0 |
-+    values:   |         mpidr         |      RES     |    instr    |
-+
-+    The mpidr field encodes the CPU ID based on the affinity information in the
-+    architecture defined MPIDR, and the field is encoded as follows:
-+      | 63 .... 56 | 55 .... 48 | 47 .... 40 | 39 .... 32 |
-+      |    Aff3    |    Aff2    |    Aff1    |    Aff0   |
-+
-+    The instr field encodes the system register to access based on the fields
-+    defined in the A64 instruction set encoding for system register access
-+    (RES means the bits are reserved for future use and should be zero):
-+
-+      | 15 ... 14 | 13 ... 11 | 10 ... 7 | 6 ... 3 | 2 ... 0 |
-+      |   Op 0    |    Op1    |    CRn   |   CRm   |   Op2   |
-+
-+    All system regs accessed through this API are (rw, 64-bit).
-+
-+    KVM_DEV_ARM_VGIC_CPU_SYSREGS accesses the CPU interface registers for the
-+    CPU specified by the mpidr field.
-+
-+
-+  Limitations:
-+    - Priorities are not implemented, and registers are RAZ/WI
-+  Errors:
-+    -ENXIO: Getting or setting this register is not yet supported
-+    -EBUSY: One or more VCPUs are running
-+
-+
-+  KVM_DEV_ARM_VGIC_GRP_NR_IRQS
-+  Attributes:
-+    A value describing the number of interrupts (SGI, PPI and SPI) for
-+    this GIC instance, ranging from 64 to 1024, in increments of 32.
-+
-+  Errors:
-+    -EINVAL: Value set is out of the expected range
-+    -EBUSY: Value has already be set.
-+
-+
-+  KVM_DEV_ARM_VGIC_GRP_CTRL
-+  Attributes:
-+    KVM_DEV_ARM_VGIC_CTRL_INIT
-+      request the initialization of the VGIC, no additional parameter in
-+      kvm_device_attr.addr.
-+  Errors:
-+    -ENXIO: VGIC not properly configured as required prior to calling
-+     this attribute
-+    -ENODEV: no online VCPU
-+    -ENOMEM: memory shortage when allocating vgic internal data
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
-index 3fb9054..e61d7a0 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
-@@ -3,16 +3,16 @@ ARM Virtual Generic Interrupt Controller (VGIC)
- 
- Device types supported:
-   KVM_DEV_TYPE_ARM_VGIC_V2     ARM Generic Interrupt Controller v2.0
--  KVM_DEV_TYPE_ARM_VGIC_V3     ARM Generic Interrupt Controller v3.0
- 
- Only one VGIC instance may be instantiated through either this API or the
- legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM interrupt
- controller, requiring emulated user-space devices to inject interrupts to the
- VGIC instead of directly to CPUs.
- 
--Creating a guest GICv3 device requires a host GICv3 as well.
--GICv3 implementations with hardware compatibility support allow a guest GICv2
--as well.
-+GICv3 implementations with hardware compatibility support allow creating a
-+guest GICv2 through this interface.  For information on creating a guest GICv3
-+device, see arm-vgic-v3.txt.  It is not possible to create both a GICv3 and
-+GICv2 device on the same VM.
- 
- Groups:
-   KVM_DEV_ARM_VGIC_GRP_ADDR
-@@ -27,18 +27,6 @@ Groups:
-       interface register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
-       This address needs to be 4K aligned and the region covers 4 KByte.
- 
--    KVM_VGIC_V3_ADDR_TYPE_DIST (rw, 64-bit)
--      Base address in the guest physical address space of the GICv3 distributor
--      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
--      This address needs to be 64K aligned and the region covers 64 KByte.
--
--    KVM_VGIC_V3_ADDR_TYPE_REDIST (rw, 64-bit)
--      Base address in the guest physical address space of the GICv3
--      redistributor register mappings. There are two 64K pages for each
--      VCPU and all of the redistributor pages are contiguous.
--      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
--      This address needs to be 64K aligned.
--
- 
-   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
-   Attributes:
+You're right. As USB 2.0 device cannot draw more than 100mA until enumerated
+(prior to battery charging spec 1.1). It is described in USB 2.0 specification,
+chapter 7.3.2, in the table :
+ - Unconfigured Function/Hub - ICCInit - maximum 100mA.
+
+So I'll drop this patch for now I think.
+
+Cheers.
+
 -- 
-2.1.2.330.g565301e.dirty
+Robert
