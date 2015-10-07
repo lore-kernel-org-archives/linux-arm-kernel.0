@@ -1,60 +1,102 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 7 Oct 2015 21:40:42 +0200
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20151007155206.GX23801@atomide.com>
-References: <20151005145127.GB23801@atomide.com>
- <20151005171155.GF23801@atomide.com>
- <20151005183813.GD21626@n2100.arm.linux.org.uk>
- <20151006090015.GE21626@n2100.arm.linux.org.uk>
- <20151006094425.GM23801@atomide.com>
- <20151006150009.GF21626@n2100.arm.linux.org.uk>
- <20151006153710.GS23801@atomide.com>
- <20151007124551.GI21626@n2100.arm.linux.org.uk>
- <20151007132642.GV23801@atomide.com>
- <CAPDyKFoBPEnHuNR_bsrPU6X=q5pHa8cDR7_Ng9xLnLsudymvOg@mail.gmail.com>
- <20151007155206.GX23801@atomide.com>
-Message-ID: <CAPDyKFp5e_pizFSCzeYSM8sXGx6Jewgs2PRB-RQ1iWMM6WMOww@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 7 Oct 2015 14:44:26 -0500
+Subject: [PATCH v4 1/5] PCI: Add pci_bus_fixup_irqs().
+In-Reply-To: <1443811443-18878-2-git-send-email-ddaney.cavm@gmail.com>
+References: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
+ <1443811443-18878-2-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20151007194426.GF27633@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 October 2015 at 17:52, Tony Lindgren <tony@atomide.com> wrote:
-> * Ulf Hansson <ulf.hansson@linaro.org> [151007 06:46]:
->> On 7 October 2015 at 15:26, Tony Lindgren <tony@atomide.com> wrote:
->> >> > Good idea, how about something like the following? AFAIK that's the
->> >> > only .config option needed as MFD_SYSCON is selected by Kconfig
->> >> > already.
->>
->> Similar to MFD_SYSCON, why don't we have REGULATOR_PBIAS to be
->> selected when omap_hsmmc is being used?
->>
->> It seems like that should also be a patch for the rc, right!?
->
-> Well selecting CONFIG_REGULATOR is still optional and force selecting
-> drivers usually leads into randconfig build issues sooner or later.
-> And we'd like to make everything into loadable modules eventually.
+Hi David,
 
-I am not sure I get your point. Perhaps I was too vague in what I suggested.
+On Fri, Oct 02, 2015 at 11:43:59AM -0700, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> pci_bus_fixup_irqs() works like pci_fixup_irqs(), except it only does
+> the fixups for devices on the specified bus.
+> 
+> Follow-on patch will use the new function.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+> No change from v2.
+> 
+>  drivers/pci/setup-irq.c | 30 ++++++++++++++++++++++++++++++
+>  include/linux/pci.h     |  4 ++++
+>  2 files changed, 34 insertions(+)
+> 
+> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
+> index 95c225b..189ad17 100644
+> --- a/drivers/pci/setup-irq.c
+> +++ b/drivers/pci/setup-irq.c
+> @@ -66,3 +66,33 @@ void pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
+>  		pdev_fixup_irq(dev, swizzle, map_irq);
+>  }
+>  EXPORT_SYMBOL_GPL(pci_fixup_irqs);
+> +
+> +struct pci_bus_fixup_cb_info {
+> +	u8 (*swizzle)(struct pci_dev *, u8 *);
+> +	int (*map_irq)(const struct pci_dev *, u8, u8);
+> +};
+> +
+> +static int pci_bus_fixup_irq_cb(struct pci_dev *dev, void *arg)
+> +{
+> +	struct pci_bus_fixup_cb_info *info = arg;
+> +
+> +	pdev_fixup_irq(dev, info->swizzle, info->map_irq);
+> +	return 0;
+> +}
+> +
+> +/*
+> + * Fixup the irqs only for devices on the given bus using supplied
+> + * swizzle and map_irq function pointers
+> + */
+> +void pci_bus_fixup_irqs(struct pci_bus *bus,
+> +			u8 (*swizzle)(struct pci_dev *, u8 *),
+> +			int (*map_irq)(const struct pci_dev *, u8, u8))
+> +{
+> +	struct pci_bus_fixup_cb_info info;
+> +
+> +	info.swizzle = swizzle;
+> +	info.map_irq = map_irq;
+> +	pci_walk_bus(bus, pci_bus_fixup_irq_cb, &info);
 
-Unless we express the dependencies via Kconfig files (or perhaps via
-updated defconfigs), how do you expect build/boot automated tools to
-handle this?
+I don't like the existing pci_fixup_irqs(), so by transitivity, I
+don't like pci_bus_fixup_irqs() either.  The problem is that in both
+cases this is a one-time pass over the tree, so we don't handle
+hot-added devices correctly.
 
-*People* can of course manually poll a README to learn about new
-dependencies for each new kernel version, but me personally would
-prefer if don't have to.
+I think we need to get rid of pci_fixup_irqs() and somehow integrate
+it into the pci_device_add() path, where it would be done once for
+every device we enumerate.  If we did that, I don't think you would
+need to add pci_bus_fixup_irqs(), would you?
 
->
-> We could print a warning during MMC1 probe if REGULATOR_PBIAS
-> is not selected and attempt to continue probing?
+Bjorn
 
-No thanks, it would sprinkle drivers with ugly code :-). I would also
-expect that we would get warnings even when we shouldn't, especially
-as a cross SoC/board driver may have different dependencies.
-
-To me REGULATOR_PBIAS is a dependency required by a certain SoC/board
-when MMC_OMAP_HS is selected. Isn't such dependency easiest dealt with
-from SoC/board Kconfig files? Llike for example in the OMAP2 case,
-arch/arm/mach-omap2/Kconfig.
-
-Kind regards
-Uffe
+> +
+> +}
+> +EXPORT_SYMBOL_GPL(pci_bus_fixup_irqs);
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index e90eb22..b505b50 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1120,6 +1120,10 @@ void pdev_enable_device(struct pci_dev *);
+>  int pci_enable_resources(struct pci_dev *, int mask);
+>  void pci_fixup_irqs(u8 (*)(struct pci_dev *, u8 *),
+>  		    int (*)(const struct pci_dev *, u8, u8));
+> +void pci_bus_fixup_irqs(struct pci_bus *,
+> +			u8 (*)(struct pci_dev *, u8 *),
+> +			int (*)(const struct pci_dev *, u8, u8));
+> +
+>  #define HAVE_PCI_REQ_REGIONS	2
+>  int __must_check pci_request_regions(struct pci_dev *, const char *);
+>  int __must_check pci_request_regions_exclusive(struct pci_dev *, const char *);
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
