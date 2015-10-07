@@ -1,232 +1,162 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed,  7 Oct 2015 15:55:23 +0100
-Subject: [PATCH v3 13/16] KVM: arm64: sync LPI configuration and pending tables
+Date: Wed,  7 Oct 2015 15:55:25 +0100
+Subject: [PATCH v3 15/16] KVM: arm64: implement MSI injection in ITS emulation
 In-Reply-To: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
 References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1444229726-31559-14-git-send-email-andre.przywara@arm.com>
+Message-ID: <1444229726-31559-16-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LPI configuration and pending tables of the GICv3 LPIs are held
-in tables in (guest) memory. To achieve reasonable performance, we
-cache this data in our own data structures, so we need to sync those
-two views from time to time. This behaviour is well described in the
-GICv3 spec and is also exercised by hardware, so the sync points are
-well known.
-
-Provide functions that read the guest memory and store the
-information from the configuration and pending tables in the kernel.
+When userland wants to inject a MSI into the guest, we have to use
+our data structures to find the LPI number and the VCPU to receive
+the interrupt.
+Use the wrapper functions to iterate the linked lists and find the
+proper Interrupt Translation Table Entry. Then set the pending bit
+in this ITTE to be later picked up by the LR handling code. Kick
+the VCPU which is meant to handle this interrupt.
+We provide a VGIC emulation model specific routine for the actual
+MSI injection. The wrapper functions return an error for models not
+(yet) implementing MSIs (like the GICv2 emulation).
+We also provide the handler for the ITS "INT" command, which allows a
+guest to trigger an MSI via the ITS command queue.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
 Changelog v2..v3:
-- rework functions to avoid propbaser/pendbaser accesses inside lock
+- proper checking for unmapped collections
 
- include/kvm/arm_vgic.h  |   2 +
- virt/kvm/arm/its-emul.c | 133 ++++++++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/its-emul.h |   3 ++
- 3 files changed, 138 insertions(+)
+ include/kvm/arm_vgic.h      |  1 +
+ virt/kvm/arm/its-emul.c     | 65 +++++++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/its-emul.h     |  2 ++
+ virt/kvm/arm/vgic-v3-emul.c |  1 +
+ 4 files changed, 69 insertions(+)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 035911f..4ea023c 100644
+index 4ea023c..7911059 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -179,6 +179,8 @@ struct vgic_its {
- 	int			cwriter;
- 	struct list_head	device_list;
- 	struct list_head	collection_list;
-+	/* memory used for buffering guest's memory */
-+	void			*buffer_page;
+@@ -149,6 +149,7 @@ struct vgic_vm_ops {
+ 	int	(*map_resources)(struct kvm *, const struct vgic_params *);
+ 	bool	(*queue_lpis)(struct kvm_vcpu *);
+ 	void	(*unqueue_lpi)(struct kvm_vcpu *, int irq);
++	int	(*inject_msi)(struct kvm *, struct kvm_msi *);
  };
  
- struct vgic_dist {
+ struct vgic_io_device {
 diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
-index 8349970..7a8c5db 100644
+index 642effb..cd8526a 100644
 --- a/virt/kvm/arm/its-emul.c
 +++ b/virt/kvm/arm/its-emul.c
-@@ -59,6 +59,7 @@ struct its_itte {
- 	struct its_collection *collection;
- 	u32 lpi;
- 	u32 event_id;
-+	u8 priority;
- 	bool enabled;
- 	unsigned long *pending;
- };
-@@ -80,8 +81,124 @@ static struct its_itte *find_itte_by_lpi(struct kvm *kvm, int lpi)
- 	return NULL;
+@@ -333,6 +333,55 @@ static bool handle_mmio_gits_idregs(struct kvm_vcpu *vcpu,
  }
  
-+#define LPI_PROP_ENABLE_BIT(p)	((p) & LPI_PROP_ENABLED)
-+#define LPI_PROP_PRIORITY(p)	((p) & 0xfc)
-+
-+/* stores the priority and enable bit for a given LPI */
-+static void update_lpi_config(struct kvm *kvm, struct its_itte *itte, u8 prop)
-+{
-+	itte->priority = LPI_PROP_PRIORITY(prop);
-+	itte->enabled  = LPI_PROP_ENABLE_BIT(prop);
-+}
-+
-+#define GIC_LPI_OFFSET 8192
-+
-+/* We scan the table in chunks the size of the smallest page size */
-+#define CHUNK_SIZE 4096U
-+
- #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
- 
-+static int nr_idbits_propbase(u64 propbaser)
-+{
-+	int nr_idbits = (1U << (propbaser & 0x1f)) + 1;
-+
-+	return max(nr_idbits, INTERRUPT_ID_BITS_ITS);
-+}
-+
-+/*
-+ * Scan the whole LPI configuration table and put the LPI configuration
-+ * data in our own data structures. This relies on the LPI being
-+ * mapped before.
+ /*
++ * Translates an incoming MSI request into the redistributor (=VCPU) and
++ * the associated LPI number. Sets the LPI pending bit and also marks the
++ * VCPU as having a pending interrupt.
 + */
-+static bool its_update_lpis_configuration(struct kvm *kvm, u64 prop_base_reg)
++int vits_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
 +{
 +	struct vgic_dist *dist = &kvm->arch.vgic;
-+	u8 *prop = dist->its.buffer_page;
-+	u32 tsize;
-+	gpa_t propbase;
-+	int lpi = GIC_LPI_OFFSET;
++	struct vgic_its *its = &dist->its;
 +	struct its_itte *itte;
-+	struct its_device *device;
-+	int ret;
++	int cpuid;
++	bool inject = false;
++	int ret = 0;
 +
-+	propbase = BASER_BASE_ADDRESS(prop_base_reg);
-+	tsize = nr_idbits_propbase(prop_base_reg);
++	if (!vgic_has_its(kvm))
++		return -ENODEV;
 +
-+	while (tsize > 0) {
-+		int chunksize = min(tsize, CHUNK_SIZE);
++	if (!(msi->flags & KVM_MSI_VALID_DEVID))
++		return -EINVAL;
 +
-+		ret = kvm_read_guest(kvm, propbase, prop, chunksize);
-+		if (ret)
-+			return false;
++	spin_lock(&its->lock);
 +
-+		spin_lock(&dist->its.lock);
-+		/*
-+		 * Updating the status for all allocated LPIs. We catch
-+		 * those LPIs that get disabled. We really don't care
-+		 * about unmapped LPIs, as they need to be updated
-+		 * later manually anyway once they get mapped.
-+		 */
-+		for_each_lpi(device, itte, kvm) {
-+			if (itte->lpi < lpi || itte->lpi >= lpi + chunksize)
-+				continue;
-+
-+			update_lpi_config(kvm, itte, prop[itte->lpi - lpi]);
-+		}
-+		spin_unlock(&dist->its.lock);
-+		tsize -= chunksize;
-+		lpi += chunksize;
-+		propbase += chunksize;
++	if (!its->enabled || !dist->lpis_enabled) {
++		ret = -EAGAIN;
++		goto out_unlock;
 +	}
 +
-+	return true;
++	itte = find_itte(kvm, msi->devid, msi->data);
++	/* Triggering an unmapped IRQ gets silently dropped. */
++	if (!itte || !its_is_collection_mapped(itte->collection))
++		goto out_unlock;
++
++	cpuid = itte->collection->target_addr;
++	__set_bit(cpuid, itte->pending);
++	inject = itte->enabled;
++
++out_unlock:
++	spin_unlock(&its->lock);
++
++	if (inject) {
++		spin_lock(&dist->lock);
++		__set_bit(cpuid, dist->irq_pending_on_cpu);
++		spin_unlock(&dist->lock);
++		kvm_vcpu_kick(kvm_get_vcpu(kvm, cpuid));
++	}
++
++	return ret;
 +}
 +
 +/*
-+ * Scan the whole LPI pending table and sync the pending bit in there
-+ * with our own data structures. This relies on the LPI being
-+ * mapped before.
-+ */
-+static bool its_sync_lpi_pending_table(struct kvm_vcpu *vcpu, u64 base_addr_reg)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	unsigned long *pendmask = dist->its.buffer_page;
-+	u32 nr_lpis = VITS_NR_LPIS;
-+	gpa_t pendbase;
-+	int lpi = 0;
-+	struct its_itte *itte;
-+	struct its_device *device;
-+	int ret;
-+	int lpi_bit, nr_bits;
-+
-+	pendbase = BASER_BASE_ADDRESS(base_addr_reg);
-+
-+	while (nr_lpis > 0) {
-+		nr_bits = min(nr_lpis, CHUNK_SIZE * 8);
-+
-+		ret = kvm_read_guest(vcpu->kvm, pendbase, pendmask,
-+				     nr_bits / 8);
-+		if (ret)
-+			return false;
-+
-+		spin_lock(&dist->its.lock);
-+		for_each_lpi(device, itte, vcpu->kvm) {
-+			lpi_bit = itte->lpi - lpi;
-+			if (lpi_bit < 0 || lpi_bit >= nr_bits)
-+				continue;
-+			if (test_bit(lpi_bit, pendmask))
-+				__set_bit(vcpu->vcpu_id, itte->pending);
-+			else
-+				__clear_bit(vcpu->vcpu_id, itte->pending);
-+		}
-+		spin_unlock(&dist->its.lock);
-+		nr_lpis -= nr_bits;
-+		lpi += nr_bits;
-+		pendbase += nr_bits / 8;
-+	}
-+
-+	return true;
-+}
-+
- /* The distributor lock is held by the VGIC MMIO handler. */
- static bool handle_mmio_misc_gits(struct kvm_vcpu *vcpu,
- 				  struct kvm_exit_mmio *mmio,
-@@ -418,6 +535,17 @@ static const struct vgic_io_range vgicv3_its_ranges[] = {
- /* This is called on setting the LPI enable bit in the redistributor. */
- void vgic_enable_lpis(struct kvm_vcpu *vcpu)
- {
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	u64 prop_base_reg, pend_base_reg;
-+
-+	pend_base_reg = dist->pendbaser[vcpu->vcpu_id];
-+	prop_base_reg = dist->propbaser;
-+	spin_unlock(&dist->lock);
-+
-+	its_update_lpis_configuration(vcpu->kvm, prop_base_reg);
-+	its_sync_lpi_pending_table(vcpu, pend_base_reg);
-+
-+	spin_lock(&dist->lock);
+  * Find all enabled and pending LPIs and queue them into the list
+  * registers.
+  * The dist lock is held by the caller.
+@@ -812,6 +861,19 @@ static int vits_cmd_handle_movall(struct kvm *kvm, u64 *its_cmd)
+ 	return 0;
  }
  
- int vits_init(struct kvm *kvm)
-@@ -429,6 +557,10 @@ int vits_init(struct kvm *kvm)
- 	if (!dist->pendbaser)
- 		return -ENOMEM;
- 
-+	its->buffer_page = kmalloc(CHUNK_SIZE, GFP_KERNEL);
-+	if (!its->buffer_page)
-+		return -ENOMEM;
++/* The INT command injects the LPI associated with that DevID/EvID pair. */
++static int vits_cmd_handle_int(struct kvm *kvm, u64 *its_cmd)
++{
++	struct kvm_msi msi = {
++		.data = its_cmd_get_id(its_cmd),
++		.devid = its_cmd_get_deviceid(its_cmd),
++		.flags = KVM_MSI_VALID_DEVID,
++	};
 +
- 	spin_lock_init(&its->lock);
- 
- 	INIT_LIST_HEAD(&its->device_list);
-@@ -474,6 +606,7 @@ void vits_destroy(struct kvm *kvm)
- 		kfree(container_of(cur, struct its_collection, coll_list));
- 	}
- 
-+	kfree(its->buffer_page);
- 	kfree(dist->pendbaser);
- 
- 	its->enabled = false;
++	vits_inject_msi(kvm, &msi);
++	return 0;
++}
++
+ /*
+  * This function is called with both the ITS and the distributor lock dropped,
+  * so the actual command handlers must take the respective locks when needed.
+@@ -846,6 +908,9 @@ static int vits_handle_command(struct kvm_vcpu *vcpu, u64 *its_cmd)
+ 	case GITS_CMD_MOVALL:
+ 		ret = vits_cmd_handle_movall(vcpu->kvm, its_cmd);
+ 		break;
++	case GITS_CMD_INT:
++		ret = vits_cmd_handle_int(vcpu->kvm, its_cmd);
++		break;
+ 	case GITS_CMD_INV:
+ 		ret = vits_cmd_handle_inv(vcpu->kvm, its_cmd);
+ 		break;
 diff --git a/virt/kvm/arm/its-emul.h b/virt/kvm/arm/its-emul.h
-index cc5d5ff..cbc3877 100644
+index 830524a..95e56a7 100644
 --- a/virt/kvm/arm/its-emul.h
 +++ b/virt/kvm/arm/its-emul.h
-@@ -29,6 +29,9 @@
- 
- #include "vgic.h"
- 
-+#define INTERRUPT_ID_BITS_ITS 16
-+#define VITS_NR_LPIS (1U << INTERRUPT_ID_BITS_ITS)
-+
- void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+@@ -36,6 +36,8 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu);
  int vits_init(struct kvm *kvm);
  void vits_destroy(struct kvm *kvm);
+ 
++int vits_inject_msi(struct kvm *kvm, struct kvm_msi *msi);
++
+ bool vits_queue_lpis(struct kvm_vcpu *vcpu);
+ void vits_unqueue_lpi(struct kvm_vcpu *vcpu, int irq);
+ 
+diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+index f482e34..90f3628 100644
+--- a/virt/kvm/arm/vgic-v3-emul.c
++++ b/virt/kvm/arm/vgic-v3-emul.c
+@@ -944,6 +944,7 @@ void vgic_v3_init_emulation(struct kvm *kvm)
+ 	dist->vm_ops.init_model = vgic_v3_init_model;
+ 	dist->vm_ops.destroy_model = vgic_v3_destroy_model;
+ 	dist->vm_ops.map_resources = vgic_v3_map_resources;
++	dist->vm_ops.inject_msi = vits_inject_msi;
+ 	dist->vm_ops.queue_lpis = vits_queue_lpis;
+ 	dist->vm_ops.unqueue_lpi = vits_unqueue_lpi;
+ 
 -- 
 2.5.1
