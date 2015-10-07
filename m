@@ -1,39 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  7 Oct 2015 13:23:29 +0100
-Subject: [PATCH v2 3/3] hwrng: st: Improve FIFO size/depth description
-In-Reply-To: <1444220609-31251-1-git-send-email-lee.jones@linaro.org>
-References: <1444220609-31251-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1444220609-31251-4-git-send-email-lee.jones@linaro.org>
+From: dawei.chien@mediatek.com (Dawei Chien)
+Date: Wed, 7 Oct 2015 20:22:39 +0800
+Subject: [PATCH v2 0/2] thermal: mediatek: Add cpu power cooling model
+Message-ID: <1444220561-26139-1-git-send-email-dawei.chien@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original representation of FIFO size in the driver coupled with the
-ambiguity in the documentation meant that it was easy to confuse readers.
-This lead to a false positive BUG-find and subsequently time wastage
-debugging this phantom issue.
+Use Intelligent Power Allocation (IPA) technical to add static/dynamic power model for binding CPU thermal zone.
+The power allocator governor allocates power budget to control CPU temperature.
 
-Hopefully this patch can prevent future readers from falling into the
-same trap.
+Power Allocator governor is able to keep SOC temperature within a defined temperature range to avoid SOC overheat and keep it's performance. mt8173-cpufreq.c need to register its' own power model with power allocator thermal governor, so that power allocator governor can allocates suitable power budget to control CPU temperature.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/char/hw_random/st-rng.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+PATCH1 is base on
+https://patchwork.kernel.org/patch/7034601/
 
-diff --git a/drivers/char/hw_random/st-rng.c b/drivers/char/hw_random/st-rng.c
-index 17f0a09..1d35363 100644
---- a/drivers/char/hw_random/st-rng.c
-+++ b/drivers/char/hw_random/st-rng.c
-@@ -29,8 +29,9 @@
- #define ST_RNG_STATUS_BAD_ALTERNANCE	BIT(1)
- #define ST_RNG_STATUS_FIFO_FULL		BIT(5)
- 
--#define ST_RNG_FIFO_SIZE		8
- #define ST_RNG_SAMPLE_SIZE		2 /* 2 Byte (16bit) samples */
-+#define ST_RNG_FIFO_DEPTH		4
-+#define ST_RNG_FIFO_SIZE		(ST_RNG_FIFO_DEPTH * ST_RNG_SAMPLE_SIZE)
- 
- /*
-  * Samples are documented to be available every 0.667us, so in theory
--- 
-1.9.1
+PATCH2 is base on Sascha's thermal driver V9 https://patchwork.kernel.org/patch/7249821/
+https://patchwork.kernel.org/patch/7249861/
+https://patchwork.kernel.org/patch/7249891/
+
+Change since V1:
+include mt8171.h and sort header file for mt8173.dtsi
+
+Dawei.Chien (2):
+  thermal: mediatek: Add cpu power cooling model.
+  arm64: dts: mt8173: Add thermal zone node for mt8173.
+
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |   44 ++++++++++++++
+ drivers/cpufreq/mt8173-cpufreq.c         |   97 ++++++++++++++++++++++++++----
+ 2 files changed, 130 insertions(+), 11 deletions(-)
+
+--
+1.7.9.5
