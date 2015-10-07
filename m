@@ -1,40 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 7 Oct 2015 10:27:14 +0100
-Subject: [PATCH 1/2] ASoC: rockchip: i2s: add 8 channels capture and
- lrck-mode support
-In-Reply-To: <5614D162.3020500@rock-chips.com>
-References: <1442979683-9441-1-git-send-email-sugar.zhang@rock-chips.com>
- <1442979683-9441-2-git-send-email-sugar.zhang@rock-chips.com>
- <20150923162433.GQ30445@sirena.org.uk>
- <5608F74C.3000104@rock-chips.com>
- <20150930184655.GX15635@sirena.org.uk>
- <5614D162.3020500@rock-chips.com>
-Message-ID: <20151007092714.GZ12635@sirena.org.uk>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Wed, 7 Oct 2015 11:33:52 +0200
+Subject: at91sam9 Main crystal frequency problems
+In-Reply-To: <5613E822.2020004@overkiz.com>
+References: <55ED3D3B.8060700@overkiz.com> <20150908181212.0b4336f0@bbrezillon>
+ <55F6C07C.8080803@overkiz.com> <20151006161244.06f3ceb4@bbrezillon>
+ <5613E822.2020004@overkiz.com>
+Message-ID: <20151007093352.GA15524@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 04:01:38PM +0800, sugar wrote:
-> ? 10/1/2015 02:46, Mark Brown ??:
+Hi Antoine,
 
-> >What makes you say that the symmetric_rates flag can't be used to cover
-> >this case?  What you describe above is hte normal reason for needing to
-> >enforce symmetric_rates.  The driver should be able to check if the flag
-> >has been set just as well as the core is.
+On Tue, Oct 06, 2015 at 05:26:26PM +0200, Antoine Aubert wrote:
+> Le 06/10/2015 16:12, Boris Brezillon a ?crit :
+> > 
+> > Any progress regarding this problem. I think Jiri (in Cc) has pretty
+> > much the same problem (see this thread [1]).
+> > IIRC, activating NO_HZ_IDLE solved the problem for you, but have you
+> > find the root cause?
+> 
+> I'm not sure that the same issue. Here I don't have slow xtal.
 
-> Got it, How about the following modify?
+There was no issue, it was just a misunderstanding on how the watchdog 
+stack is working.
 
-> if (dai->symmetric_rates)
-> 	regmap_update_bits(i2s->regmap, I2S_CKR,
->                            I2S_CKR_TRCM_MASK,
->                            I2S_CKR_TRCM(val));
 
-Yes, something like that.  You'll need to check both links in the DAI
-and the DAI link itself rather than just your own DAI but we should have
-a helper function for that - I'll add one, look out for a patch shortly.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151007/c08940b1/attachment.sig>
+> What I found:
+> * DTB was not up to date (build with an other kernel version)
+>   Since we start from kexec, we added --dtb option
+> * slow_xtal wasn't disabled in our DTS
+> * defconfig was outdated
+> 
+> What i did first:
+> * updated the dts, disabled slow xtal
+> * Update DTB
+> * activating NO_HZ_IDLE
+> 
+> > 20d updtime without WRST
+> 
+> Today what I did:
+> * use LTS last kernel: 4.1.6
+> * updated the dts, disabled slow xtal
+> * generate config from scratch using "make ARCH=arm at91_dt_defconfig"
+>   (without NO_HZ_IDLE=
+> 
+> 12h uptime, at this time no WRST
+
+Great, no issue then, thank you !
+
+
+Sylvain
