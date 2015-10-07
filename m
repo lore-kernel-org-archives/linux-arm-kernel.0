@@ -1,58 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 07 Oct 2015 16:35:46 +0100
-Subject: [PATCH v3 12/16] KVM: arm64: handle pending bit for LPIs in ITS
- emulation
-In-Reply-To: <026901d10112$4dea39d0$e9bead70$@samsung.com>
-References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
- <1444229726-31559-13-git-send-email-andre.przywara@arm.com>
- <026901d10112$4dea39d0$e9bead70$@samsung.com>
-Message-ID: <56153BD2.1050904@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 7 Oct 2015 17:37:24 +0200
+Subject: [PATCH 5/6] ARM: s3c64xx: hmt: Use PWM lookup table
+In-Reply-To: <56147766.6010703@samsung.com>
+References: <1444049237-29878-1-git-send-email-thierry.reding@gmail.com>
+ <1444049237-29878-6-git-send-email-thierry.reding@gmail.com>
+ <56147766.6010703@samsung.com>
+Message-ID: <20151007153724.GC1975@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/15 16:10, Pavel Fedin wrote:
->  Hello!
+On Wed, Oct 07, 2015 at 10:37:42AM +0900, Krzysztof Kozlowski wrote:
+> On 05.10.2015 21:47, Thierry Reding wrote:
+> > Use a PWM lookup table to provide the PWM to the pwm-backlight device.
+> > The driver has a legacy code path that is required only because boards
+> > still use the legacy method of requesting PWMs by global ID. Replacing
+> > these usages allows that legacy fallback to be removed.
+> > 
+> > Cc: Kukjin Kim <kgene@kernel.org>
+> > Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
+> > ---
+> >  arch/arm/mach-s3c64xx/mach-hmt.c | 9 +++++++--
+> >  1 file changed, 7 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
+> > index e4b087c58ee6..816b39d1e6d1 100644
+> > --- a/arch/arm/mach-s3c64xx/mach-hmt.c
+> > +++ b/arch/arm/mach-s3c64xx/mach-hmt.c
+> > @@ -19,6 +19,7 @@
+> >  #include <linux/gpio.h>
+> >  #include <linux/delay.h>
+> >  #include <linux/leds.h>
+> > +#include <linux/pwm.h>
+> >  #include <linux/pwm_backlight.h>
+> >  #include <linux/mtd/mtd.h>
+> >  #include <linux/mtd/partitions.h>
+> > @@ -73,6 +74,11 @@ static struct s3c2410_uartcfg hmt_uartcfgs[] __initdata = {
+> >  	},
+> >  };
+> >  
+> > +static struct pwm_lookup hmt_pwm_lookup[] = {
+> > +	PWM_LOOKUP("samsung-pwm", 1, "pwm-backlight.0", NULL,
 > 
->> As the actual LPI number in a guest can be quite high, but is mostly
->> assigned using a very sparse allocation scheme, bitmaps and arrays
->> for storing the virtual interrupt status are a waste of memory.
->> We use our equivalent of the "Interrupt Translation Table Entry"
->> (ITTE) to hold this extra status information for a virtual LPI.
-> 
-> You know, not that i'm strongly against current approach and want you
-> to redo everything once again, but... Is it architecturally correct
-> to intertwine LPIs and ITS so much? As far as i
+> Same questions as in patch 2 - why suffix ".0" for "pwm-backlight"?
 
-Yes it is.
+For the same reason that I explained in patch 2. Not sure if the .id = 0
+was really supposed to be. For most devices it would probably make sense
+to initialize it to -1 because they typically only have a single
+backlight. But given that userspace might be using the name to control
+the backlight via sysfs it's probably not a good idea to go and change
+that.
 
-> understand arch manual, it is possible to have LPIs without ITS
-> (triggered by something else?). Shouldn't we do the same, and just
-> add LPI support to our redistributors, and then proceed with the 
-> ITS?
-
-No. We're implementing a monolithic GICv3 that doesn't offer writing to
-the redistributors directly from a device. And frankly, that's good enough.
-
-> As to memory consumption, do we really need to store own copy of
-> tables? After all, it's just a memory. What if we map a pointer
-> directly into guest's memory (which it writes to 
-> PROPBASER/PENDBASER), and just keep it? There will be no issues with
-> caching and synchronization at all.
-
-Sure. And you then have to parse and validate all the tables each and
-every time you're going to inject an interrupt (because the guest can
-change the table content behind your back). You are quickly going to
-notice that your performance is abysmal.
-
-At that point, you're going to start being clever, and add a cache. And
-guess what, that's what the HW does too. And then you'll make your cache
-a convenient structure to be able to quickly inject interrupts. And
-that's what the HW does too. And finally, you're going to realize that
-populating a cache sucks, and you're going to keep all the state where
-it is convenient, when it is convenient (and that's basically always).
-
-The HW can't do that, but we can.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151007/0a97cee3/attachment-0001.sig>
