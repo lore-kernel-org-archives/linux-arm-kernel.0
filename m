@@ -1,46 +1,73 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 07 Oct 2015 14:21:55 +0100
-Subject: [PATCH v2 2/3] nvmem: core: set the size for the nvmem binary
- file.
-In-Reply-To: <20151007125612.GB7962@kroah.com>
-References: <1444215536-10783-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1444215655-10878-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20151007125612.GB7962@kroah.com>
-Message-ID: <56151C73.90704@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed,  7 Oct 2015 06:22:24 -0700
+Subject: [PATCH 1/2] Revert "mmc: host: omap_hsmmc: use regulator_is_enabled
+ to find pbias status"
+Message-ID: <1444224145-24333-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This reverts commit c55d7a0553643a7e8f120688b82b594471084d3c.
 
+Without reverting this commit we get "unbalanced disables for pbias_mmc_omap4"
+errors on omap4430. It seems that 4430 and 4460 behave in a different way for
+the PBIAS regulator registers and until that has been debugged further we
+cannot rely on the regulator status registers in hardare on 4430.
 
-On 07/10/15 13:56, Greg KH wrote:
-> On Wed, Oct 07, 2015 at 12:00:55PM +0100, Srinivas Kandagatla wrote:
->> This patch sets the actual size of binary file to the nvmem size.
->> Previously this was not possible as the core was using the static global
->> data structures for attributes.
->>
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>   drivers/nvmem/core.c | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
->> index 0a70e31..737fa75 100644
->> --- a/drivers/nvmem/core.c
->> +++ b/drivers/nvmem/core.c
->> @@ -315,6 +315,7 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
->>   	if (!nvmem->read_only)
->>   		nvmem->bin.attr.mode |= S_IWUSR;
->>
->> +	nvmem->bin.size = nvmem->size;
->
-> Why does the size matter?  What userspace tool needs to know this?
-Yes, you are correct, sized should not matter as read would return EOF 
-anyway.
-I think I overdone this :-)
+Fixes: 7d607f917008 ("mmc: host: omap_hsmmc: use
+devm_regulator_get_optional() for vmmc")
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Nishanth Menon <nm@ti.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ drivers/mmc/host/omap_hsmmc.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
---srini
->
-> thanks,
->
-> greg k-h
->
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 781e4db3..ae3a2b9 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -182,6 +182,7 @@ struct omap_hsmmc_host {
+ 	struct	clk		*fclk;
+ 	struct	clk		*dbclk;
+ 	struct	regulator	*pbias;
++	bool			pbias_enabled;
+ 	void	__iomem		*base;
+ 	int			vqmmc_enabled;
+ 	resource_size_t		mapbase;
+@@ -328,20 +329,22 @@ static int omap_hsmmc_set_pbias(struct omap_hsmmc_host *host, bool power_on,
+ 			return ret;
+ 		}
+ 
+-		if (!regulator_is_enabled(host->pbias)) {
++		if (host->pbias_enabled == 0) {
+ 			ret = regulator_enable(host->pbias);
+ 			if (ret) {
+ 				dev_err(host->dev, "pbias reg enable fail\n");
+ 				return ret;
+ 			}
++			host->pbias_enabled = 1;
+ 		}
+ 	} else {
+-		if (regulator_is_enabled(host->pbias)) {
++		if (host->pbias_enabled == 1) {
+ 			ret = regulator_disable(host->pbias);
+ 			if (ret) {
+ 				dev_err(host->dev, "pbias reg disable fail\n");
+ 				return ret;
+ 			}
++			host->pbias_enabled = 0;
+ 		}
+ 	}
+ 
+@@ -2053,6 +2056,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 	host->base	= base + pdata->reg_offset;
+ 	host->power_mode = MMC_POWER_OFF;
+ 	host->next_data.cookie = 1;
++	host->pbias_enabled = 0;
+ 	host->vqmmc_enabled = 0;
+ 
+ 	ret = omap_hsmmc_gpio_init(mmc, host, pdata);
+-- 
+2.1.4
