@@ -1,33 +1,23 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 7 Oct 2015 16:51:49 +0530
-Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
-In-Reply-To: <20151007110755.GA6601@kroah.com>
-References: <5706174.BUsqiXljxZ@wuerfel> <20151007105911.GC9892@linux>
- <20151007110302.GD9892@linux> <20151007110755.GA6601@kroah.com>
-Message-ID: <20151007112149.GB22530@linux>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 7 Oct 2015 12:22:02 +0100
+Subject: [PATCH v2 5/9] dmaengine: st_fdma: Add xp70 firmware loading
+ mechanism.
+In-Reply-To: <1441980871-24475-6-git-send-email-peter.griffin@linaro.org>
+References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
+ <1441980871-24475-6-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20151007112201.GB4810@vkoul-mobl.iind.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07-10-15, 12:07, Greg Kroah-Hartman wrote:
-> Why would you be wanting to create a "unsigned long" as an api anyway?
-> Just force it to be u64 all the time, can't you do that?
+On Fri, Sep 11, 2015 at 03:14:27PM +0100, Peter Griffin wrote:
+> This patch adds the code to load the xp70 fdma firmware
+> using the asynchronous request_firmware_nowait call
+> so as not to delay bootup of builtin code.
 
-Okay, so the variable in question (lets say frequency) is an 'unsigned
-long' and that's how all the APIs of clock framework expect/define
-it.
+Okay we need to check here. Can the driver be built in, if so this is not
+the right usage. You should load the firmware on first open for this device
 
-And you are probably saying that we do this:
-
-unsigned long freq;
-
-debugfs_create_u64((u64 *)&freq);
-
-Right? Or are you asking to update clock APIs to be converted to u64?
-
-This will break things on a 32 bit architecture where unsigned long is
-32 bits long, as doing this will overwrite the next 32 bits:
-
-*freq = XYZ;
+See https://lkml.org/lkml/2015/8/26/588
 
 -- 
-viresh
+~Vinod
