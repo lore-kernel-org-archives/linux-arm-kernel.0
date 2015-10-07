@@ -1,68 +1,45 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 7 Oct 2015 15:03:39 +0200
-Subject: [PATCH] mfd: remove unused variables
-In-Reply-To: <7700818.mjdn6x2kkK@wuerfel>
-References: <7700818.mjdn6x2kkK@wuerfel>
-Message-ID: <5615182B.5060902@osg.samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 7 Oct 2015 14:03:47 +0100
+Subject: [PATCH v2] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <20151006173152.GA15091@red-moon>
+References: <1441906822-9222-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20151006165049.GE3069@e104818-lin.cambridge.arm.com>
+ <1444151732.10788.13.camel@redhat.com>
+ <20151006173152.GA15091@red-moon>
+Message-ID: <20151007130347.GB875@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
-
-On 10/07/2015 02:49 PM, Arnd Bergmann wrote:
-> A mass-cleanup by Javier Martinez Canillas removed a lot of
-> unused code, but left at least two variables in mfd drivers
-> in place that are now causing warnings:
+On Tue, Oct 06, 2015 at 06:31:52PM +0100, Lorenzo Pieralisi wrote:
+> On Tue, Oct 06, 2015 at 01:15:32PM -0400, Mark Salter wrote:
+> > On Tue, 2015-10-06 at 17:50 +0100, Catalin Marinas wrote:
+> > > Question to Lorenzo and Mark Salter: was this patch successfully tested
+> > > on real hardware (like Applied X-Gene)?
+> > 
+> > It doesn't work on X-Gene/Mustang because the existing firmware
+> > implementations are not exactly compliant with the parking protocol
+> > spec. I've been hacking on the firmware trying to get something
+> > which will work wrt the spec but keep getting distracted by other
+> > things.
 > 
-> drivers/mfd/rtsx_pcr.c: In function 'rtsx_pci_set_pull_ctl':
-> drivers/mfd/rtsx_pcr.c:564:6: warning: unused variable 'err' [-Wunused-variable]
-> drivers/mfd/lm3533-core.c: In function 'lm3533_i2c_probe':
-> drivers/mfd/lm3533-core.c:595:6: warning: unused variable 'ret' [-Wunused-variable]
+> I tested the code on AMD Supercharger even though I had to change
+> the remap implementation since the existing firmware uses cacheable
+> mappings for the mailboxes.
 > 
-> This removes them as well.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: c749db571dc ("mfd: lm3533: Simplify function return logic")
-> Fixes: a3c29b09982 ("mfd: rtsx: Simplify function return logic")
-> ---
+> I put it together to make sure that it is there if any platform
+> compliant with it relies on it and more importantly to prevent
+> non-compliant implentations from trickling into the kernel,
+> basically to prevent broken firmware implementations from being
+> considered compliant and "working".
 
-I thought that I got rid of all the unused variables but somehow
-I missed these. Sorry and thanks a lot for taking care of this.
+That's a good point. However, AFAIK, AMD are using PSCI already in their
+firmware implementation and that's what we recommend anyway if EL3 is
+available.
 
-> 
-> diff --git a/drivers/mfd/lm3533-core.c b/drivers/mfd/lm3533-core.c
-> index 193ecee1fa7e..5abcbb2e8849 100644
-> --- a/drivers/mfd/lm3533-core.c
-> +++ b/drivers/mfd/lm3533-core.c
-> @@ -592,7 +592,6 @@ static int lm3533_i2c_probe(struct i2c_client *i2c,
->  					const struct i2c_device_id *id)
->  {
->  	struct lm3533 *lm3533;
-> -	int ret;
->  
->  	dev_dbg(&i2c->dev, "%s\n", __func__);
->  
-> diff --git a/drivers/mfd/rtsx_pcr.c b/drivers/mfd/rtsx_pcr.c
-> index b98cf1de0a55..d63f3a896adb 100644
-> --- a/drivers/mfd/rtsx_pcr.c
-> +++ b/drivers/mfd/rtsx_pcr.c
-> @@ -561,8 +561,6 @@ EXPORT_SYMBOL_GPL(rtsx_pci_write_ppbuf);
->  
->  static int rtsx_pci_set_pull_ctl(struct rtsx_pcr *pcr, const u32 *tbl)
->  {
-> -	int err;
-> -
->  	rtsx_pci_init_cmd(pcr);
->  
->  	while (*tbl & 0xFFFF0000) {
-> 
+So this patch is mainly aimed at X-Gene since other implementations I'm
+aware of have EL3 already. What are the chances of Applied Micro fixing
+their firmware and actually using this patch? (not a question for you;
+I'm hoping some Applied engineers would comment).
 
-Patch looks good to me.
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Catalin
