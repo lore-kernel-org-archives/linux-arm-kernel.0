@@ -1,49 +1,35 @@
-From: public_timo.s@silentcreek.de (Timo Sigurdsson)
-Date: Wed,  7 Oct 2015 17:49:18 +0200 (CEST)
-Subject: [PATCH v2] ARM: dts: sunxi: Add regulators for LeMaker BananaPi
-In-Reply-To: <7hzizu924y.fsf@deeprootsystems.com>
-References: <1438532305-5884-1-git-send-email-public_timo.s@silentcreek.de>
- <20150818153631.GH2547@lukather>
- <CAMAWPa-Q7o+Ys2FjhLZt6Nwq=Ja6TTdWFDZFTCYLkoLGjpLpxw@mail.gmail.com>
- <20151005173957.B1BD16C8150E@dd34104.kasserver.com><7hzizu924y.fsf@deeprootsystems.com>
-Message-ID: <20151007154918.D6F856C800D4@dd34104.kasserver.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 07 Oct 2015 16:49:41 +0100
+Subject: [PATCH v3 12/16] KVM: arm64: handle pending bit for LPIs in ITS
+ emulation
+In-Reply-To: <028c01d10117$46bd9440$d438bcc0$@samsung.com>
+References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
+ <1444229726-31559-13-git-send-email-andre.przywara@arm.com>
+ <026901d10112$4dea39d0$e9bead70$@samsung.com> <56153BD2.1050904@arm.com>
+ <028c01d10117$46bd9440$d438bcc0$@samsung.com>
+Message-ID: <56153F15.1080800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-Hi Maxime,
-
-Kevin Hilman schrieb am 07.10.2015 16:36:
-
-> "Timo Sigurdsson" <public_timo.s@silentcreek.de> writes:
->> I still think that the lower voltages may be the cause of your problem
->> with that specific board, so could you please test the attached patch on
->> top of my patch that you first experienced the problem with? Please let 
->> us know whether this solves your issue or whether we need to dig deeper.
+On 07/10/15 16:46, Pavel Fedin wrote:
+>  Hello!
 > 
-> Thanks for the patch.  Looks like it's the OPPs.
+>> Sure. And you then have to parse and validate all the tables each and
+>> every time you're going to inject an interrupt (because the guest can
+>> change the table content behind your back). You are quickly going to
+>> notice that your performance is abysmal.
 > 
-> I went back to next-20150923 and verified it still fails.  Then, I
-> applied your patch and saw that it boots just fine.
+>  I don't see any real problems, at least with LPI tables. If the guest changes something, it will be
+> immediately available to us. I don't see any need to seriously validate something, at least here.
+> Pending bit is just pending bit, and configuration is just priority value plus enable bit.
+>  But, well, if we think a bit better, in case of pending bit modification, the operations on both
+> guest and host side have to be atomic, otherwise we can clobber our table if, for example, both host
+> and guest modify adjacent bits. And there's no way to interlock with the guest. So, OK, i accept
+> your point.
 
-Good. Then we can easily fix this, I guess.
+The pending table is the least of our concerns. Device table, ITTs,
+collections. That's the real problem.
 
-@Maxime: How should we handle this? In its current form, the patch applies
-only to the BananaPi dts by overriding the inherited opp from the SoC dtsi.
-In an earlier discussion, it was said that this can be done, even though it
-might not be the most elegant approach. But then again, I think it
-shouldn't be necessary to change the opp in the sun7i-a20.dtsi for all A20
-boards since this is - to my knowledge - the first and only report that an
-A20 board has stability issues at the lower voltages (although not too many
-boards use voltage scaling yet). So, would you prefer to keep this as a
-patch for BananaPi only, or change the dtsi for all A20 devices instead?
-
-In case we keep it as it is, what is the correct commit to point to as
-"Fixes commit ..."? I'd say it fixes the initial opp commit for A20, since
-that's where these voltages were defined. But then again, if we don't
-change the dtsi, should I point to my regulator patch instead?
-
-
-Thanks and regards,
-
-Timo
+	M.
+-- 
+Jazz is not dead. It just smells funny...
