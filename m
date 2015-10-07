@@ -1,23 +1,71 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 7 Oct 2015 11:04:11 +0100
-Subject: [PATCH v6 0/6] KASAN for arm64
-In-Reply-To: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
-References: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
-Message-ID: <20151007100411.GG3069@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 07 Oct 2015 11:11:28 +0100
+Subject: [PATCH 11/15] arm64: Cleanup VTCR_EL2 computation
+In-Reply-To: <1442331684-28818-12-git-send-email-suzuki.poulose@arm.com>
+References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
+ <1442331684-28818-12-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <5614EFD0.20709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 12:38:06PM +0300, Andrey Ryabinin wrote:
-> As usual patches available in git
-> 	git://github.com/aryabinin/linux.git kasan/arm64v6
+On 15/09/15 16:41, Suzuki K. Poulose wrote:
+> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 > 
-> Changes since v5:
->  - Rebase on top of 4.3-rc1
->  - Fixed EFI boot.
->  - Updated Doc/features/KASAN.
+> No functional changes. Group the common bits for VCTR_EL2
+> initialisation for better readability. The granule size
+> and the entry level are controlled by the page size.
+> 
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: kvmarm at lists.cs.columbia.edu
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_arm.h |   13 +++++++------
+>  1 file changed, 7 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index bdf139e..699554d 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -138,6 +138,9 @@
+>   * The magic numbers used for VTTBR_X in this patch can be found in Tables
+>   * D4-23 and D4-25 in ARM DDI 0487A.b.
+>   */
+> +#define VTCR_EL2_COMMON_BITS	(VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
+> +				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_T0SZ_40B)
+> +
+>  #ifdef CONFIG_ARM64_64K_PAGES
+>  /*
+>   * Stage2 translation configuration:
+> @@ -145,9 +148,8 @@
+>   * 64kB pages (TG0 = 1)
+>   * 2 level page tables (SL = 1)
+>   */
+> -#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
+> -				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+> -				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+> +#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1 | \
+> +				 VTCR_EL2_COMMON_BITS)
+>  #define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
+>  #else
+>  /*
+> @@ -156,9 +158,8 @@
+>   * 4kB pages (TG0 = 0)
+>   * 3 level page tables (SL = 1)
+>   */
+> -#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
+> -				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+> -				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+> +#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SL0_LVL1 | \
+> +				 VTCR_EL2_COMMON_BITS)
+>  #define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
+>  #endif
+>  
+> 
 
-I tried to merge these patches (apart from the x86 one which is already
-merged) but it still doesn't boot on Juno as an EFI application.
+This looks OK, but is going to clash badly with 857d1a9 ("arm64: KVM:
+set {v,}TCR_EL2 RES1 bits"). Nothing we can't fix though.
 
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
