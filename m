@@ -1,30 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 07 Oct 2015 16:43:54 +0100
-Subject: when to use devm_request_irq and irq_set_chained_handler_and_data
-In-Reply-To: <loom.20151007T172212-792@post.gmane.org>
-References: <loom.20151007T172212-792@post.gmane.org>
-Message-ID: <56153DBA.9070700@arm.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 07 Oct 2015 18:46:04 +0300
+Subject: [PATCH v3 12/16] KVM: arm64: handle pending bit for LPIs in ITS
+ emulation
+In-Reply-To: <56153BD2.1050904@arm.com>
+References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
+ <1444229726-31559-13-git-send-email-andre.przywara@arm.com>
+ <026901d10112$4dea39d0$e9bead70$@samsung.com> <56153BD2.1050904@arm.com>
+Message-ID: <028c01d10117$46bd9440$d438bcc0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/15 16:29, bharat kumar gogada wrote:
-> when to use devm_request_irq and when to use irq_set_chained_handler_and_data.
-> I see that some drivers are not using devm_request_irq instead using
-> irq_set_chained_handler_and_data for setting up irq handling.
+ Hello!
 
-If you're writing code for a driver that is not consuming the interrupt
-itself, but demultiplexing and forwarding it to another subsystem by
-calling generic_handle_irq() (or something similar), then you must
-implement a chained irqchip (as I mentioned yesterday while reviewing
-your PCIe controler driver).
+> Sure. And you then have to parse and validate all the tables each and
+> every time you're going to inject an interrupt (because the guest can
+> change the table content behind your back). You are quickly going to
+> notice that your performance is abysmal.
 
-> If we use  irq_set_chained_handler_and_data will it show up in cat
-> /proc/interrupts
+ I don't see any real problems, at least with LPI tables. If the guest changes something, it will be
+immediately available to us. I don't see any need to seriously validate something, at least here.
+Pending bit is just pending bit, and configuration is just priority value plus enable bit.
+ But, well, if we think a bit better, in case of pending bit modification, the operations on both
+guest and host side have to be atomic, otherwise we can clobber our table if, for example, both host
+and guest modify adjacent bits. And there's no way to interlock with the guest. So, OK, i accept
+your point.
 
-No. Because this intermediate irqchip doesn't handle the interrupt, the
-final handler is. Otherwise, you'd end up with twice the number of
-interrupts...
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
