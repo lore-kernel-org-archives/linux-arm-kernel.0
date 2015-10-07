@@ -1,70 +1,89 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 07 Oct 2015 11:42:08 +0800
-Subject: [PATCH 07/12] drm: bridge/dw_hdmi: enable audio only if sink
- supports audio
-In-Reply-To: <E1ZO6bD-0002r7-KP@rmk-PC.arm.linux.org.uk>
+Date: Wed, 07 Oct 2015 11:50:53 +0800
+Subject: [PATCH 08/12] drm: bridge/dw_hdmi: avoid enabling interface in
+ mode_set
+In-Reply-To: <E1ZO6bI-0002rG-PI@rmk-PC.arm.linux.org.uk>
 References: <20150808160251.GM7557@n2100.arm.linux.org.uk>
- <E1ZO6bD-0002r7-KP@rmk-PC.arm.linux.org.uk>
-Message-ID: <56149490.60902@rock-chips.com>
+ <E1ZO6bI-0002rG-PI@rmk-PC.arm.linux.org.uk>
+Message-ID: <5614969D.7030201@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell & Andy
 
-On 08/09/2015 12:03 AM, Russell King wrote:
-> Only enable audio support if the sink supports audio in some form, as
-> defined via its EDID.  We discover this capability using the generic
-> drm_detect_monitor_audio() function.
+
+On 08/09/2015 12:04 AM, Russell King wrote:
+> On a mode set, DRM makes the following sequence of calls:
+> * for_each_encoder
+> *   bridge	mode_fixup
+> *   encoder	mode_fixup
+> * crtc		mode_fixup
+> * for_each_encoder
+> *   bridge	disable
+> *   encoder	prepare
+> *   bridge	post_disable
+> * disable unused encoders
+> * crtc		prepare
+> * crtc		mode_set
+> * for_each_encoder
+> *   encoder	mode_set
+> *   bridge	mode_set
+> * crtc		commit
+> * for_each_encoder
+> *   bridge	pre_enable
+> *   encoder	commit
+> *   bridge	enable
+>
+> dw_hdmi enables the HDMI output in both the bridge mode_set() and also
+> the bridge enable() step.  This is duplicated work - we can avoid the
+> setup in mode_set() and just do it in the enable() stage.  This
+> simplifies the code a little.
 >
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Some to 06/12 reply.
+I have noticed that dw_hdmi driver have poweron/poweroff when
+driver detect HPD event in irq thread, that's also duplicated works,
+would you like to collect that changes into this one:
 
-Tested-by: Yakir Yang <ykk@rock-chips.com>
+static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
+{
+         ......
 
+         if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
+                 if (phy_int_pol & HDMI_PHY_HPD) {
+                         dev_dbg(hdmi->dev, "EVENT=plugin\n");
+
+                         hdmi_modb(hdmi, 0, HDMI_PHY_HPD, HDMI_PHY_POL0);
+
+                         dw_hdmi_poweron(hdmi);    // no need here
+                 } else {
+                         dev_dbg(hdmi->dev, "EVENT=plugout\n");
+
+                         hdmi_modb(hdmi, HDMI_PHY_HPD, HDMI_PHY_HPD,
+                                   HDMI_PHY_POL0);
+
+                         dw_hdmi_poweroff(hdmi);    // no need here
+                 }
+                 drm_helper_hpd_irq_event(hdmi->connector.dev);
+         }
+         ......
+}
+
+Thanks,
 - Yakir
 > ---
->   drivers/gpu/drm/bridge/dw_hdmi.c | 12 +++++++++---
->   1 file changed, 9 insertions(+), 3 deletions(-)
+>   drivers/gpu/drm/bridge/dw_hdmi.c | 2 --
+>   1 file changed, 2 deletions(-)
 >
 > diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-> index 7f764716f3c4..578d7362cd65 100644
+> index 578d7362cd65..fbac8386552b 100644
 > --- a/drivers/gpu/drm/bridge/dw_hdmi.c
 > +++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-> @@ -123,6 +123,7 @@ struct dw_hdmi {
->   	struct i2c_adapter *ddc;
->   	void __iomem *regs;
->   	bool sink_is_hdmi;
-> +	bool sink_has_audio;
+> @@ -1389,8 +1389,6 @@ static void dw_hdmi_bridge_mode_set(struct drm_bridge *bridge,
+>   {
+>   	struct dw_hdmi *hdmi = bridge->driver_private;
 >   
->   	spinlock_t audio_lock;
->   	struct mutex audio_mutex;
-> @@ -1271,13 +1272,17 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
->   	/* HDMI Initialization Step B.3 */
->   	dw_hdmi_enable_video_path(hdmi);
->   
-> -	/* not for DVI mode */
-> -	if (hdmi->sink_is_hdmi) {
-> -		dev_dbg(hdmi->dev, "%s HDMI mode\n", __func__);
-> +	if (hdmi->sink_has_audio) {
-> +		dev_dbg(hdmi->dev, "sink has audio support\n");
->   
->   		/* HDMI Initialization Step E - Configure audio */
->   		hdmi_clk_regenerator_update_pixel_clock(hdmi);
->   		hdmi_enable_audio_clk(hdmi);
-> +	}
-> +
-> +	/* not for DVI mode */
-> +	if (hdmi->sink_is_hdmi) {
-> +		dev_dbg(hdmi->dev, "%s HDMI mode\n", __func__);
->   
->   		/* HDMI Initialization Step F - Configure AVI InfoFrame */
->   		hdmi_config_AVI(hdmi, mode);
-> @@ -1442,6 +1447,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
->   			edid->width_cm, edid->height_cm);
->   
->   		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
-> +		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
->   		drm_mode_connector_update_edid_property(connector, edid);
->   		ret = drm_add_edid_modes(connector, edid);
->   		kfree(edid);
+> -	dw_hdmi_setup(hdmi, mode);
+> -
+>   	/* Store the display mode for plugin/DKMS poweron events */
+>   	memcpy(&hdmi->previous_mode, mode, sizeof(hdmi->previous_mode));
+>   }
