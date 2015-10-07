@@ -1,89 +1,44 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 07 Oct 2015 17:35:29 +0800
-Subject: [PATCH 08/12] drm: bridge/dw_hdmi: avoid enabling interface in
- mode_set
-In-Reply-To: <20151007091830.GE21513@n2100.arm.linux.org.uk>
-References: <20150808160251.GM7557@n2100.arm.linux.org.uk>
- <E1ZO6bI-0002rG-PI@rmk-PC.arm.linux.org.uk> <5614969D.7030201@rock-chips.com>
- <20151007091830.GE21513@n2100.arm.linux.org.uk>
-Message-ID: <5614E761.8020706@rock-chips.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 7 Oct 2015 10:39:40 +0100
+Subject: [PATCH 1/2] ASoC: rockchip: i2s: add 8 channels capture and
+ lrck-mode support
+In-Reply-To: <20151007092714.GZ12635@sirena.org.uk>
+References: <1442979683-9441-1-git-send-email-sugar.zhang@rock-chips.com>
+ <1442979683-9441-2-git-send-email-sugar.zhang@rock-chips.com>
+ <20150923162433.GQ30445@sirena.org.uk>
+ <5608F74C.3000104@rock-chips.com>
+ <20150930184655.GX15635@sirena.org.uk>
+ <5614D162.3020500@rock-chips.com>
+ <20151007092714.GZ12635@sirena.org.uk>
+Message-ID: <20151007093940.GA12635@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Oct 07, 2015 at 10:27:14AM +0100, Mark Brown wrote:
+> On Wed, Oct 07, 2015 at 04:01:38PM +0800, sugar wrote:
 
+> > if (dai->symmetric_rates)
+> > 	regmap_update_bits(i2s->regmap, I2S_CKR,
+> >                            I2S_CKR_TRCM_MASK,
+> >                            I2S_CKR_TRCM(val));
 
-On 10/07/2015 05:18 PM, Russell King - ARM Linux wrote:
-> On Wed, Oct 07, 2015 at 11:50:53AM +0800, Yakir Yang wrote:
->>
->> On 08/09/2015 12:04 AM, Russell King wrote:
->>> On a mode set, DRM makes the following sequence of calls:
->>> * for_each_encoder
->>> *   bridge	mode_fixup
->>> *   encoder	mode_fixup
->>> * crtc		mode_fixup
->>> * for_each_encoder
->>> *   bridge	disable
->>> *   encoder	prepare
->>> *   bridge	post_disable
->>> * disable unused encoders
->>> * crtc		prepare
->>> * crtc		mode_set
->>> * for_each_encoder
->>> *   encoder	mode_set
->>> *   bridge	mode_set
->>> * crtc		commit
->>> * for_each_encoder
->>> *   bridge	pre_enable
->>> *   encoder	commit
->>> *   bridge	enable
->>>
->>> dw_hdmi enables the HDMI output in both the bridge mode_set() and also
->>> the bridge enable() step.  This is duplicated work - we can avoid the
->>> setup in mode_set() and just do it in the enable() stage.  This
->>> simplifies the code a little.
->>>
->>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> I have noticed that dw_hdmi driver have poweron/poweroff when
->> driver detect HPD event in irq thread, that's also duplicated works,
->> would you like to collect that changes into this one:
->>
->> static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
->> {
->>          ......
->>
->>          if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
->>                  if (phy_int_pol & HDMI_PHY_HPD) {
->>                          dev_dbg(hdmi->dev, "EVENT=plugin\n");
->>
->>                          hdmi_modb(hdmi, 0, HDMI_PHY_HPD, HDMI_PHY_POL0);
->>
->>                          dw_hdmi_poweron(hdmi);    // no need here
->>                  } else {
->>                          dev_dbg(hdmi->dev, "EVENT=plugout\n");
->>
->>                          hdmi_modb(hdmi, HDMI_PHY_HPD, HDMI_PHY_HPD,
->>                                    HDMI_PHY_POL0);
->>
->>                          dw_hdmi_poweroff(hdmi);    // no need here
->>                  }
->>                  drm_helper_hpd_irq_event(hdmi->connector.dev);
->>          }
->>          ......
->> }
-> I'm very much of the opinion of making small logical changes.  This
-> patch is one small logical change to the DRM-side logic to get rid
-> of the identified duplication there without touching anything else.
-> If removing the above calls to dw_hdmi_poweron()/dw_hdmi_poweroff()
-> were found to cause a regression, then the whole change would end
-> up being reverted, which would be annoying.
+> Yes, something like that.  You'll need to check both links in the DAI
+> and the DAI link itself rather than just your own DAI but we should have
+> a helper function for that - I'll add one, look out for a patch shortly.
 
-Hmm... Yeah, it do make some driver logical changes, but I
-thought that's good, just make a clean on HPD thread, and I
-do give lots of test on chrome tree about this changes, guess
-a separate patch would be better.
+Actually no, now I look at the code you probably want to just clone the
+check from soc_pcm_apply_symmetry() so have that be:
 
-If you don't feel good enough about this, okay, I would give
-more test on that changes, and send upstream to request
-comment later.
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 
-- Yakir
+	if (rtd->dai_link->symmetrict_rates) {
+	}
+
+instead.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151007/6fca16fa/attachment.sig>
