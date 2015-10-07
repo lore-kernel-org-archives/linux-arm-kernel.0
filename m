@@ -1,43 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 Oct 2015 10:28:03 +0100
-Subject: [linux-sunxi] [PATCH v2 5/5] ARM: sun5i: Add C.H.I.P DTS
-In-Reply-To: <CAGRGNgWw=eMn-YcALzE57xmumiydgH39S52LtuJO-+eT9vXQLQ@mail.gmail.com>
-References: <1444054990-15946-1-git-send-email-maxime.ripard@free-electrons.com>
- <1444054990-15946-6-git-send-email-maxime.ripard@free-electrons.com>
- <CAGRGNgXyaenitKnZNj4vLsgEDKe0CtTk=KqPADSs9588k1t+GA@mail.gmail.com>
- <20151006161756.GT2696@lukather>
- <CAGRGNgWw=eMn-YcALzE57xmumiydgH39S52LtuJO-+eT9vXQLQ@mail.gmail.com>
-Message-ID: <20151007092803.GB2278@lukather>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 7 Oct 2015 10:27:14 +0100
+Subject: [PATCH 1/2] ASoC: rockchip: i2s: add 8 channels capture and
+ lrck-mode support
+In-Reply-To: <5614D162.3020500@rock-chips.com>
+References: <1442979683-9441-1-git-send-email-sugar.zhang@rock-chips.com>
+ <1442979683-9441-2-git-send-email-sugar.zhang@rock-chips.com>
+ <20150923162433.GQ30445@sirena.org.uk>
+ <5608F74C.3000104@rock-chips.com>
+ <20150930184655.GX15635@sirena.org.uk>
+ <5614D162.3020500@rock-chips.com>
+Message-ID: <20151007092714.GZ12635@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 09:24:07AM +1100, Julian Calaby wrote:
-> >> > +       chosen {
-> >> > +               stdout-path = "serial0:115200n8";
-> >>
-> >> Should the composite output be enabled here too?
-> >
-> > AFAIK, the stdout-path only supports a single output device, and I
-> > don't think it really is an issue since framebuffer console will
-> > attach to the framebuffer automatically.
-> 
-> I was referring to enabling it in chosen, not stdout-path, but I
-> couldn't remember if uboot does that for us or not.
+On Wed, Oct 07, 2015 at 04:01:38PM +0800, sugar wrote:
+> ? 10/1/2015 02:46, Mark Brown ??:
 
-It's not really u-boot that does that. the framebuffer console stuff
-will attach automatically to the first framebuffer that comes in and
-log the kernel logs there, it's all in-kernel.
+> >What makes you say that the symmetric_rates flag can't be used to cover
+> >this case?  What you describe above is hte normal reason for needing to
+> >enforce symmetric_rates.  The driver should be able to check if the flag
+> >has been set just as well as the core is.
 
-Maxime
+> Got it, How about the following modify?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> if (dai->symmetric_rates)
+> 	regmap_update_bits(i2s->regmap, I2S_CKR,
+>                            I2S_CKR_TRCM_MASK,
+>                            I2S_CKR_TRCM(val));
+
+Yes, something like that.  You'll need to check both links in the DAI
+and the DAI link itself rather than just your own DAI but we should have
+a helper function for that - I'll add one, look out for a patch shortly.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
+Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151007/897ff114/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151007/c08940b1/attachment.sig>
