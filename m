@@ -1,35 +1,53 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 7 Oct 2015 13:57:35 +0100
-Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
-In-Reply-To: <20151007112149.GB22530@linux>
-References: <5706174.BUsqiXljxZ@wuerfel> <20151007105911.GC9892@linux>
- <20151007110302.GD9892@linux> <20151007110755.GA6601@kroah.com>
- <20151007112149.GB22530@linux>
-Message-ID: <20151007125735.GA8170@kroah.com>
+From: ydroneaud@opteya.com (Yann Droneaud)
+Date: Wed, 07 Oct 2015 15:00:26 +0200
+Subject: [PATCH] IB/core: avoid 32-bit warning
+In-Reply-To: <17269152.DqJfCm1LOx@wuerfel>
+References: <17269152.DqJfCm1LOx@wuerfel>
+Message-ID: <1444222826.3188.62.camel@opteya.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 04:51:49PM +0530, Viresh Kumar wrote:
-> On 07-10-15, 12:07, Greg Kroah-Hartman wrote:
-> > Why would you be wanting to create a "unsigned long" as an api anyway?
-> > Just force it to be u64 all the time, can't you do that?
-> 
-> Okay, so the variable in question (lets say frequency) is an 'unsigned
-> long' and that's how all the APIs of clock framework expect/define
-> it.
-> 
-> And you are probably saying that we do this:
-> 
-> unsigned long freq;
-> 
-> debugfs_create_u64((u64 *)&freq);
-> 
-> Right? Or are you asking to update clock APIs to be converted to u64?
+Hi,
 
-Yes, they should be u64 as I doubt you want to debug problems that you
-have in the driver where it works on a 64bit system but doesn't on a
-32bit one.
+Le mercredi 07 octobre 2015 ? 14:29 +0200, Arnd Bergmann a ?crit :
+> The INIT_UDATA() macro requires a pointer or unsigned long argument 
+> for both input and output buffer, and all callers had a cast from 
+> when the code was merged until a recent restructuring, so now we get
+> 
+> core/uverbs_cmd.c: In function 'ib_uverbs_create_cq':
+> core/uverbs_cmd.c:1481:66: warning: cast to pointer from integer of
+> different size [-Wint-to-pointer-cast]
+> 
+> This makes the code behave as before by adding back the cast to
+> unsigned long.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 565197dd8fb1 ("IB/core: Extend ib_uverbs_create_cq")
+> 
 
-thanks,
+Reviewed-by: Yann Droneaud <ydroneaud@opteya.com>
 
-greg k-h
+> diff --git a/drivers/infiniband/core/uverbs_cmd.c
+> b/drivers/infiniband/core/uverbs_cmd.c
+> index be4cb9f04be3..88b3b78340f2 100644
+> --- a/drivers/infiniband/core/uverbs_cmd.c
+> +++ b/drivers/infiniband/core/uverbs_cmd.c
+> @@ -1478,7 +1478,7 @@ ssize_t ib_uverbs_create_cq(struct
+> ib_uverbs_file *file,
+>  	if (copy_from_user(&cmd, buf, sizeof(cmd)))
+>  		return -EFAULT;
+>  
+> -	INIT_UDATA(&ucore, buf, cmd.response, sizeof(cmd),
+> sizeof(resp));
+> +	INIT_UDATA(&ucore, buf, (unsigned long)cmd.response,
+> sizeof(cmd), sizeof(resp));
+>  
+>  	INIT_UDATA(&uhw, buf + sizeof(cmd),
+>  		   (unsigned long)cmd.response + sizeof(resp),
+> 
+
+Regards.
+
+-- 
+Yann Droneaud
+OPTEYA
