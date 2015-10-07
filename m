@@ -1,109 +1,56 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 7 Oct 2015 18:08:47 -0500
-Subject: [PATCH v4 1/5] PCI: Add pci_bus_fixup_irqs().
-In-Reply-To: <56157BC8.3070406@caviumnetworks.com>
-References: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
- <1443811443-18878-2-git-send-email-ddaney.cavm@gmail.com>
- <20151007194426.GF27633@localhost>
- <56157BC8.3070406@caviumnetworks.com>
-Message-ID: <20151007230847.GG27633@localhost>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 8 Oct 2015 04:43:39 +0530
+Subject: All OMAP platforms: MMC is broken
+In-Reply-To: <CAPDyKFp5e_pizFSCzeYSM8sXGx6Jewgs2PRB-RQ1iWMM6WMOww@mail.gmail.com>
+References: <20151005145127.GB23801@atomide.com>
+ <20151005171155.GF23801@atomide.com>
+ <20151005183813.GD21626@n2100.arm.linux.org.uk>
+ <20151006090015.GE21626@n2100.arm.linux.org.uk>
+ <20151006094425.GM23801@atomide.com>
+ <20151006150009.GF21626@n2100.arm.linux.org.uk>
+ <20151006153710.GS23801@atomide.com>
+ <20151007124551.GI21626@n2100.arm.linux.org.uk>
+ <20151007132642.GV23801@atomide.com>
+ <CAPDyKFoBPEnHuNR_bsrPU6X=q5pHa8cDR7_Ng9xLnLsudymvOg@mail.gmail.com>
+ <20151007155206.GX23801@atomide.com>
+ <CAPDyKFp5e_pizFSCzeYSM8sXGx6Jewgs2PRB-RQ1iWMM6WMOww@mail.gmail.com>
+Message-ID: <5615A723.6090907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Matthew]
+Hi,
 
-On Wed, Oct 07, 2015 at 01:08:40PM -0700, David Daney wrote:
-> On 10/07/2015 12:44 PM, Bjorn Helgaas wrote:
-> >Hi David,
-> >
-> >On Fri, Oct 02, 2015 at 11:43:59AM -0700, David Daney wrote:
-> >>From: David Daney <david.daney@cavium.com>
-> >>
-> >>pci_bus_fixup_irqs() works like pci_fixup_irqs(), except it only does
-> >>the fixups for devices on the specified bus.
-> >>
-> >>Follow-on patch will use the new function.
-> >>
-> >>Signed-off-by: David Daney <david.daney@cavium.com>
-> >>---
-> >>No change from v2.
-> >>
-> >>  drivers/pci/setup-irq.c | 30 ++++++++++++++++++++++++++++++
-> >>  include/linux/pci.h     |  4 ++++
-> >>  2 files changed, 34 insertions(+)
-> >>
-> >>diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
-> >>index 95c225b..189ad17 100644
-> >>--- a/drivers/pci/setup-irq.c
-> >>+++ b/drivers/pci/setup-irq.c
-> >>@@ -66,3 +66,33 @@ void pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
-> >>  		pdev_fixup_irq(dev, swizzle, map_irq);
-> >>  }
-> >>  EXPORT_SYMBOL_GPL(pci_fixup_irqs);
-> >>+
-> >>+struct pci_bus_fixup_cb_info {
-> >>+	u8 (*swizzle)(struct pci_dev *, u8 *);
-> >>+	int (*map_irq)(const struct pci_dev *, u8, u8);
-> >>+};
-> >>+
-> >>+static int pci_bus_fixup_irq_cb(struct pci_dev *dev, void *arg)
-> >>+{
-> >>+	struct pci_bus_fixup_cb_info *info = arg;
-> >>+
-> >>+	pdev_fixup_irq(dev, info->swizzle, info->map_irq);
-> >>+	return 0;
-> >>+}
-> >>+
-> >>+/*
-> >>+ * Fixup the irqs only for devices on the given bus using supplied
-> >>+ * swizzle and map_irq function pointers
-> >>+ */
-> >>+void pci_bus_fixup_irqs(struct pci_bus *bus,
-> >>+			u8 (*swizzle)(struct pci_dev *, u8 *),
-> >>+			int (*map_irq)(const struct pci_dev *, u8, u8))
-> >>+{
-> >>+	struct pci_bus_fixup_cb_info info;
-> >>+
-> >>+	info.swizzle = swizzle;
-> >>+	info.map_irq = map_irq;
-> >>+	pci_walk_bus(bus, pci_bus_fixup_irq_cb, &info);
-> >
-> >I don't like the existing pci_fixup_irqs(), so by transitivity, I
-> >don't like pci_bus_fixup_irqs() either.
+On Thursday 08 October 2015 01:10 AM, Ulf Hansson wrote:
+> On 7 October 2015 at 17:52, Tony Lindgren <tony@atomide.com> wrote:
+>> * Ulf Hansson <ulf.hansson@linaro.org> [151007 06:46]:
+>>> On 7 October 2015 at 15:26, Tony Lindgren <tony@atomide.com> wrote:
+>>>>>> Good idea, how about something like the following? AFAIK that's the
+>>>>>> only .config option needed as MFD_SYSCON is selected by Kconfig
+>>>>>> already.
+>>>
+>>> Similar to MFD_SYSCON, why don't we have REGULATOR_PBIAS to be
+>>> selected when omap_hsmmc is being used?
+>>>
+>>> It seems like that should also be a patch for the rc, right!?
+>>
+>> Well selecting CONFIG_REGULATOR is still optional and force selecting
+>> drivers usually leads into randconfig build issues sooner or later.
+>> And we'd like to make everything into loadable modules eventually.
 > 
-> We are in agreement with respect to this point.
+> I am not sure I get your point. Perhaps I was too vague in what I suggested.
 > 
-> > The problem is that in both
-> >cases this is a one-time pass over the tree, so we don't handle
-> >hot-added devices correctly.
-> >
-> >I think we need to get rid of pci_fixup_irqs() and somehow integrate
-> >it into the pci_device_add() path, where it would be done once for
-> >every device we enumerate.
-> 
-> I also agree with this point.
-> 
-> > If we did that, I don't think you would
-> >need to add pci_bus_fixup_irqs(), would you?
-> 
-> Nope.
-> 
-> However, such a change is essentially untestable by me.  So, I
-> didn't attempt it.   pci_fixup_irqs() is used by alpha, arm, m68k,
-> mips, sh, sparc, tile, unicore32 and other things as well.  If the
-> core pci_device_add() code were to suddenly start doing the fixup,
-> there would be the potential to break all these things I cannot
-> test.
+> Unless we express the dependencies via Kconfig files (or perhaps via
+> updated defconfigs), how do you expect build/boot automated tools to
+> handle this?
 
-Yep, that's certainly a risk.  I can't test all those arches either,
-but I think it's a risk worth taking because the end result is more
-maintainable.
+Both omap2plus_defconfig and multi_v7_defconfig has
+CONFIG_PBIAS_REGULATOR enabled [1].
 
-Matthew Minter did some really nice work on this last year, but it got
-stalled somehow.  I wonder if we can resurrect it?  It seems like it
-was pretty close to being ready.  Here's a pointer to the last posting
-I saw:
+I think by using *depends on* in Kconfig, we'll end up in the same issue
+faced by Russell (since even with that CONFIG_PBIAS_REGULATOR won't be
+enabled) and using *select* can lead to randconfig errors.
 
-http://lkml.kernel.org/r/1412222866-21068-1-git-send-email-matt at masarand.com
+[1] -> https://lkml.org/lkml/2015/9/3/119
 
-Bjorn
+Thanks
+Kishon
