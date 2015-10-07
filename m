@@ -1,34 +1,37 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 7 Oct 2015 18:39:34 +0100
-Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
-In-Reply-To: <20151007172701.GF4557@linux>
-References: <5706174.BUsqiXljxZ@wuerfel> <20151007105911.GC9892@linux>
- <20151007110302.GD9892@linux> <20151007110755.GA6601@kroah.com>
- <20151007112149.GB22530@linux> <20151007125735.GA8170@kroah.com>
- <20151007130324.GA4557@linux> <20151007171949.GB9702@kroah.com>
- <20151007172701.GF4557@linux>
-Message-ID: <20151007173934.GB10665@kroah.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed,  7 Oct 2015 18:39:40 +0100
+Subject: [PATCH] MAINTAINERS: Update Allwinner entry and add new maintainer
+Message-ID: <1444239580-32688-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 10:57:01PM +0530, Viresh Kumar wrote:
-> On 07-10-15, 18:19, Greg Kroah-Hartman wrote:
-> > Ok, then stop exporting it in debugfs and everyone will be happy :)
-> 
-> Hehe, not really. See I am not happy :(
+Add Chen-Yu Tsai as a co-maintainer to the ARM sunxi support.
 
-Why not?  Why does this have to be exported in debugfs?  Just delete it,
-who cares about it?  It's just "debugging".
+While we are doing so, also update the entry for new SoCs.
 
-> So, what do you suggest? Should we create debugfs_create_ulong()?
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ MAINTAINERS | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Ick, do we _really_ need and want that?
-
-> And how to implement that? With existing u32/u64 APIs or from scratch?
-
-It's probably easy to just do in a few lines "from scratch", if you
-really need/want it, right?
-
-thanks,
-
-greg k-h
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 797236befd27..d6a9a016f3d4 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -894,11 +894,12 @@ M:	Lennert Buytenhek <kernel@wantstofly.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ 
+-ARM/Allwinner A1X SoC support
++ARM/Allwinner sunXi SoC support
+ M:	Maxime Ripard <maxime.ripard@free-electrons.com>
++M:	Chen-Yu Tsai <wens@csie.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+-N:	sun[x4567]i
++N:	sun[x456789]i
+ 
+ ARM/Allwinner SoC Clock Support
+ M:	Emilio L?pez <emilio@elopez.com.ar>
+-- 
+2.5.3
