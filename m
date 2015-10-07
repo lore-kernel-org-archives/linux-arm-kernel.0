@@ -1,48 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 7 Oct 2015 17:36:51 +0100
-Subject: [PATCH v2 06/22] arm64: sys_reg: Define System register encoding
-In-Reply-To: <1444064531-25607-7-git-send-email-suzuki.poulose@arm.com>
-References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
- <1444064531-25607-7-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20151007163650.GC17192@e104818-lin.cambridge.arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 7 Oct 2015 22:06:59 +0530
+Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
+In-Reply-To: <20151007163309.GM21513@n2100.arm.linux.org.uk>
+References: <5706174.BUsqiXljxZ@wuerfel> <20151007105911.GC9892@linux>
+ <20151007110302.GD9892@linux> <20151007110755.GA6601@kroah.com>
+ <20151007112149.GB22530@linux>
+ <20151007163309.GM21513@n2100.arm.linux.org.uk>
+Message-ID: <20151007163659.GB4557@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 05, 2015 at 06:01:55PM +0100, Suzuki K. Poulose wrote:
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -22,11 +22,11 @@
->  
->  #include <asm/opcodes.h>
->  
-> -#define SCTLR_EL1_CP15BEN	(0x1 << 5)
-> -#define SCTLR_EL1_SED		(0x1 << 8)
-> -
->  /*
-> - * ARMv8 ARM reserves the following encoding for system registers:
-> + * sys_reg: Defines the ARMv8 ARM encoding for the System register.
-> + *
-> + * ARMv8 ARM reserves the following encoding for system registers in the
-> + * instructions accessing them.
+On 07-10-15, 17:33, Russell King - ARM Linux wrote:
+> Don't you even think about doing that - that's totally broken no matter
+> what, and this is a good example of why casts are Bad.
+> 
+> debugfs_create_u64() will create a debugfs object that will want to
+> access a 64-bit value, but the value pointed to is only 32-bit.  The
+> net result is that the debugfs file ends up reading or writing the
+> neigbouring 32-bits, which may potentially be unaligned.
 
-Nitpick: the sentence should end with a colon.
+Yeah, that's what I was also saying. Its broken.
 
->   * (Ref: ARMv8 ARM, Section: "System instruction class encoding overview",
->   *  C5.2, version:ARM DDI 0487A.f)
->   *	[20-19] : Op0
-> @@ -34,15 +34,40 @@
->   *	[15-12] : CRn
->   *	[11-8]  : CRm
->   *	[7-5]   : Op2
-> + * Hence we use [ sys_reg() << 5 ] in the mrs/msr instructions.
+> The variable pointed to for debugfs_create_u64() must be a 64-bit
+> value.  No casts allowed.
+> 
+> An alternative would be to have debugfs_create_ulong()
 
-Do we really need to have all the ids shifted right by 5? I can't see
-where it helps. OTOH, it makes the code more complicated by having to
-remember to shift the id left by 5.
-
-> + *
-
-Nitpick: no need for another line.
+And that's what I suggested.
 
 -- 
-Catalin
+viresh
