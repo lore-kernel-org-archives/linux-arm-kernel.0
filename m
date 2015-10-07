@@ -1,82 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Oct 2015 10:57:48 +0900
-Subject: [PATCH 11/28] ARM: shmobile: silk: add VIN0/ADV7180 DT support
+Date: Wed,  7 Oct 2015 10:57:49 +0900
+Subject: [PATCH 12/28] ARM: shmobile: koelsch: use CCF for audio clock
 In-Reply-To: <cover.1444182812.git.horms+renesas@verge.net.au>
 References: <cover.1444182812.git.horms+renesas@verge.net.au>
-Message-ID: <8614daf299cbab2bcada922e727fdc9ad45b2412.1444182812.git.horms+renesas@verge.net.au>
+Message-ID: <c19c84ff3ab1280894bb2cdd99027f751922e2ba.1444182812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Define  the  SILK board dependent part of the  VIN0  device  node.
-Add the device node for Analog Devices ADV7180 video decoder to I2C1 bus.
-Add the necessary subnodes to interconnect VIN0 and ADV7180 devices.
+Because of historical reason, audio clock didn't use CCF.
+Let's use it now.
 
-Based on the Henninger VIN0/ADV8170 device tree patch by myself.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794-silk.dts | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index 3f808724106e..bb0a22423dc4 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -75,6 +75,11 @@
- 		renesas,groups = "qspi_ctrl", "qspi_data4";
- 		renesas,function = "qspi";
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index dc158845afdc..fc44ea361a4b 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -242,6 +242,13 @@
+ 			  1800000 0>;
  	};
-+
-+	vin0_pins: vin0 {
-+		renesas,groups = "vin0_data8", "vin0_clk";
-+		renesas,function = "vin0";
+ 
++	audio_clock: clock {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <11289600>;
++		clock-output-names = "audio_clock";
 +	};
- };
- 
- &scif2 {
-@@ -106,6 +111,19 @@
- 
- 	status = "okay";
- 	clock-frequency = <400000>;
 +
-+	composite-in at 20 {
-+		compatible = "adi,adv7180";
-+		reg = <0x20>;
-+		remote = <&vin0>;
-+
-+		port {
-+			adv7180: endpoint {
-+				bus-width = <8>;
-+				remote-endpoint = <&vin0ep>;
-+			};
-+		};
-+	};
- };
+ 	rsnd_ak4643: sound {
+ 		compatible = "simple-audio-card";
  
- &mmcif0 {
-@@ -153,3 +171,20 @@
+@@ -255,7 +262,7 @@
+ 
+ 		sndcodec: simple-audio-card,codec {
+ 			sound-dai = <&ak4643>;
+-			system-clock-frequency = <11289600>;
++			clocks = <&audio_clock>;
  		};
  	};
- };
-+
-+/* composite video input */
-+&vin0 {
-+	status = "okay";
-+	pinctrl-0 = <&vin0_pins>;
-+	pinctrl-names = "default";
-+
-+	port {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		vin0ep: endpoint {
-+			remote-endpoint = <&adv7180>;
-+			bus-width = <8>;
-+		};
-+	};
-+};
+ 
 -- 
 2.1.4
