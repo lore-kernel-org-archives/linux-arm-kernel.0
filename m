@@ -1,188 +1,165 @@
-From: drew.richardson@arm.com (Drew Richardson)
-Date: Wed, 7 Oct 2015 11:28:18 -0700
-Subject: [PATCHv2] arm: perf: Add event descriptions
-Message-ID: <20151007182735.GA18706@dreric01-gentoo.localdomain>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 7 Oct 2015 13:36:38 -0500
+Subject: [RFC][PATCH 1/2] WIP: Devicetree bindings for Ion
+In-Reply-To: <f486f9f4f23c697f72e5ddcf49e38c9b@mail.ncrmnt.org>
+References: <1444164433-9107-1-git-send-email-labbott@fedoraproject.org>
+ <1444164433-9107-2-git-send-email-labbott@fedoraproject.org>
+ <CAL_JsqJ+i3zC7UJ3BcdtOhdmQd8YnRC7bs3D2Ei5JD-4-C+A0g@mail.gmail.com>
+ <561452D9.90605@labbott.name>
+ <f486f9f4f23c697f72e5ddcf49e38c9b@mail.ncrmnt.org>
+Message-ID: <CAL_JsqJXNDcAPf7ijgFiorHrR93W_KctMQAY27=YyXHe8RDuAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add additional information about the ARM architected hardware events
-to make counters self describing. This makes the hardware PMUs easier
-to use as perf list contains possible events instead of users having
-to refer to documentation like the ARM TRMs.
+On Wed, Oct 7, 2015 at 5:36 AM, Andrew <andrew@ncrmnt.org> wrote:
+> On 2015-10-07 02:01, Laura Abbott wrote:
+>>
+>> On 10/6/15 3:35 PM, Rob Herring wrote:
+>>>
+>>> On Tue, Oct 6, 2015 at 3:47 PM, Laura Abbott <labbott@fedoraproject.org>
+>>> wrote:
+>>>>
+>>>> From: Laura Abbott <laura@labbott.name>
+>>>>
+>>>>
+>>>> This adds a base set of devicetree bindings for the Ion memory
+>>>> manager. This supports setting up the generic set of heaps and
+>>>> their properties.
+>>>>
+>>>> Signed-off-by: Laura Abbott <laura@labbott.name>
+>>>> Signed-off-by: Andrew Andrianov <andrew@ncrmnt.org>
+>>>> ---
+>>>>   drivers/staging/android/ion/devicetree.txt | 53
+>>>> ++++++++++++++++++++++++++++++
+>>>
+>>>
+>>> I have no issue with this going in here, but I do have lots of issues
+>>> with this binding.
+>>>
+>>>>   1 file changed, 53 insertions(+)
+>>>>   create mode 100644 drivers/staging/android/ion/devicetree.txt
+>>>>
+>>>> diff --git a/drivers/staging/android/ion/devicetree.txt
+>>>> b/drivers/staging/android/ion/devicetree.txt
+>>>> new file mode 100644
+>>>> index 0000000..4a0c941
+>>>> --- /dev/null
+>>>> +++ b/drivers/staging/android/ion/devicetree.txt
+>>>> @@ -0,0 +1,53 @@
+>>>> +Ion Memory Manager
+>>>> +
+>>>> +Ion is a memory manager that allows for sharing of buffers via dma-buf.
+>>>> +Ion allows for different types of allocation via an abstraction called
+>>>> +a 'heap'. A heap represents a specific type of memory. Each heap has
+>>>> +a different type. There can be multiple instances of the same heap
+>>>> +type.
+>>>> +
+>>>> +Required properties for Ion
+>>>> +
+>>>> +- compatible: "linux,ion"
+>>>> +
+>>>> +All child nodes of a linux,ion node are interpreted as heaps
+>>>> +
+>>>> +required properties for heaps
+>>>> +
+>>>> +- linux,ion-heap-id: The Ion heap id used for allocation selection
+>>>> +- linux,ion-heap-type: Ion heap type defined in ion.h
+>>>> +- linux,ion-heap-name: Human readble name of the heap
+>>>> +
+>>>> +
+>>>> +Optional properties
+>>>> +- memory-region: A phandle to a memory region. Required for DMA heap
+>>>> type
+>>>> +(see reserved-memory.txt for details on the reservation)
+>>>> +- linux,ion-heap-align: Alignment for the heap.
+>>>> +
+>>>> +Example:
+>>>> +
+>>>> +       ion {
+>>>> +               compatbile = "linux,ion";
+>>>> +               #address-cells = <1>;
+>>>> +               #size-cells = <0>;
+>>>> +
+>>>> +               ion-system-heap {
+>>>> +                       linux,ion-heap-id = <0>;
+>>>> +                       linux,ion-heap-type = <ION_SYSTEM_HEAP_TYPE>;
+>>>> +                       linux,ion-heap-name = "system";
+>>>
+>>>
+>>> How does this vary across platforms? Is all of this being pushed down
+>>> to DT, because there is no coordination of this at the kernel ABI
+>>> level across platforms. In other words, why can't heap 0 be hardcoded
+>>> as system heap in the driver. It seems to me any 1 of these 3
+>>> properties could be used to derive the other 2.
+>>>
+>>
+>> Right now there is no guarantee heap IDs will be the same across
+>> platforms. The heap IDs are currently part of the userspace ABI
+>> as well since userspace clients must pass in a mask of the heap
+>> IDs to allocate from. If we assume all existing clients could change,
+>> heaps such as the system heap could be mandated to have the same
+>> heap ID but we'd still run into problems if you have multiple
+>> heaps of the same type (e.g. multiple carveouts)
 
-Signed-off-by: Drew Richardson <drew.richardson@arm.com>
----
- arch/arm/kernel/perf_event_v7.c | 96 +++++++++++++++++++++++++++++++++++++++++
- drivers/perf/arm_pmu.c          |  1 +
- 2 files changed, 97 insertions(+)
+Vendors largely ignore the kernel-userspace ABI and anything in
+staging is not a ABI. So arguments about what the ABI is currently is
+pointless IMO.
 
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 126dc679b230..6623bd0d8a1d 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -547,6 +547,95 @@ static const unsigned scorpion_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)] = ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
- };
- 
-+static ssize_t armv7_event_sysfs_show(struct device *dev,
-+				      struct device_attribute *attr, char *page)
-+{
-+	struct perf_pmu_events_attr *pmu_attr;
-+
-+	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr);
-+
-+	return sprintf(page, "event=0x%02llx\n", pmu_attr->id);
-+}
-+
-+#define ARMV7_EVENT_ATTR(name, config) \
-+	PMU_EVENT_ATTR(name, armv7_event_attr_##name, config, \
-+		       armv7_event_sysfs_show);
-+
-+ARMV7_EVENT_ATTR(sw_incr, ARMV7_PERFCTR_PMNC_SW_INCR);
-+ARMV7_EVENT_ATTR(l1i_cache_refill, ARMV7_PERFCTR_L1_ICACHE_REFILL);
-+ARMV7_EVENT_ATTR(l1i_tlb_refill, ARMV7_PERFCTR_ITLB_REFILL);
-+ARMV7_EVENT_ATTR(l1d_cache_refill, ARMV7_PERFCTR_L1_DCACHE_REFILL);
-+ARMV7_EVENT_ATTR(l1d_cache, ARMV7_PERFCTR_L1_DCACHE_ACCESS);
-+ARMV7_EVENT_ATTR(l1d_tlb_refill, ARMV7_PERFCTR_DTLB_REFILL);
-+ARMV7_EVENT_ATTR(ld_retired, ARMV7_PERFCTR_MEM_READ);
-+ARMV7_EVENT_ATTR(st_retired, ARMV7_PERFCTR_MEM_WRITE);
-+ARMV7_EVENT_ATTR(inst_retired, ARMV7_PERFCTR_INSTR_EXECUTED);
-+ARMV7_EVENT_ATTR(exc_taken, ARMV7_PERFCTR_EXC_TAKEN);
-+ARMV7_EVENT_ATTR(exc_return, ARMV7_PERFCTR_EXC_EXECUTED);
-+ARMV7_EVENT_ATTR(cid_write_retired, ARMV7_PERFCTR_CID_WRITE);
-+ARMV7_EVENT_ATTR(pc_write_retired, ARMV7_PERFCTR_PC_WRITE);
-+ARMV7_EVENT_ATTR(br_immed_retired, ARMV7_PERFCTR_PC_IMM_BRANCH);
-+ARMV7_EVENT_ATTR(br_return_retired, ARMV7_PERFCTR_PC_PROC_RETURN);
-+ARMV7_EVENT_ATTR(unaligned_ldst_retired, ARMV7_PERFCTR_MEM_UNALIGNED_ACCESS);
-+ARMV7_EVENT_ATTR(br_mis_pred, ARMV7_PERFCTR_PC_BRANCH_MIS_PRED);
-+ARMV7_EVENT_ATTR(cpu_cycles, ARMV7_PERFCTR_CLOCK_CYCLES);
-+ARMV7_EVENT_ATTR(br_pred, ARMV7_PERFCTR_PC_BRANCH_PRED);
-+ARMV7_EVENT_ATTR(mem_access, ARMV7_PERFCTR_MEM_ACCESS);
-+ARMV7_EVENT_ATTR(l1i_cache, ARMV7_PERFCTR_L1_ICACHE_ACCESS);
-+ARMV7_EVENT_ATTR(l1d_cache_wb, ARMV7_PERFCTR_L1_DCACHE_WB);
-+ARMV7_EVENT_ATTR(l2d_cache, ARMV7_PERFCTR_L2_CACHE_ACCESS);
-+ARMV7_EVENT_ATTR(l2d_cache_refill, ARMV7_PERFCTR_L2_CACHE_REFILL);
-+ARMV7_EVENT_ATTR(l2d_cache_wb, ARMV7_PERFCTR_L2_CACHE_WB);
-+ARMV7_EVENT_ATTR(bus_access, ARMV7_PERFCTR_BUS_ACCESS);
-+ARMV7_EVENT_ATTR(memory_error, ARMV7_PERFCTR_MEM_ERROR);
-+ARMV7_EVENT_ATTR(inst_spec, ARMV7_PERFCTR_INSTR_SPEC);
-+ARMV7_EVENT_ATTR(ttbr_write_retired, ARMV7_PERFCTR_TTBR_WRITE);
-+ARMV7_EVENT_ATTR(bus_cycles, ARMV7_PERFCTR_BUS_CYCLES);
-+
-+static struct attribute *armv7_pmuv2_event_attrs[] = {
-+	&armv7_event_attr_sw_incr.attr.attr,
-+	&armv7_event_attr_l1i_cache_refill.attr.attr,
-+	&armv7_event_attr_l1i_tlb_refill.attr.attr,
-+	&armv7_event_attr_l1d_cache_refill.attr.attr,
-+	&armv7_event_attr_l1d_cache.attr.attr,
-+	&armv7_event_attr_l1d_tlb_refill.attr.attr,
-+	&armv7_event_attr_ld_retired.attr.attr,
-+	&armv7_event_attr_st_retired.attr.attr,
-+	&armv7_event_attr_inst_retired.attr.attr,
-+	&armv7_event_attr_exc_taken.attr.attr,
-+	&armv7_event_attr_exc_return.attr.attr,
-+	&armv7_event_attr_cid_write_retired.attr.attr,
-+	&armv7_event_attr_pc_write_retired.attr.attr,
-+	&armv7_event_attr_br_immed_retired.attr.attr,
-+	&armv7_event_attr_br_return_retired.attr.attr,
-+	&armv7_event_attr_unaligned_ldst_retired.attr.attr,
-+	&armv7_event_attr_br_mis_pred.attr.attr,
-+	&armv7_event_attr_cpu_cycles.attr.attr,
-+	&armv7_event_attr_br_pred.attr.attr,
-+	&armv7_event_attr_mem_access.attr.attr,
-+	&armv7_event_attr_l1i_cache.attr.attr,
-+	&armv7_event_attr_l1d_cache_wb.attr.attr,
-+	&armv7_event_attr_l2d_cache.attr.attr,
-+	&armv7_event_attr_l2d_cache_refill.attr.attr,
-+	&armv7_event_attr_l2d_cache_wb.attr.attr,
-+	&armv7_event_attr_bus_access.attr.attr,
-+	&armv7_event_attr_memory_error.attr.attr,
-+	&armv7_event_attr_inst_spec.attr.attr,
-+	&armv7_event_attr_ttbr_write_retired.attr.attr,
-+	&armv7_event_attr_bus_cycles.attr.attr,
-+	NULL
-+};
-+
-+static struct attribute_group armv7_pmuv2_events_attr_group = {
-+	.name = "events",
-+	.attrs = armv7_pmuv2_event_attrs,
-+};
-+
-+static const struct attribute_group *armv7_pmuv2_attr_groups[] = {
-+	&armv7_pmuv2_events_attr_group,
-+	NULL
-+};
-+
- /*
-  * Perf Events' indices
-  */
-@@ -1085,6 +1174,7 @@ static int armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
- 	armv7pmu_init(cpu_pmu);
- 	cpu_pmu->name		= "armv7_cortex_a8";
- 	cpu_pmu->map_event	= armv7_a8_map_event;
-+	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
- 	return armv7_probe_num_events(cpu_pmu);
- }
- 
-@@ -1093,6 +1183,7 @@ static int armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
- 	armv7pmu_init(cpu_pmu);
- 	cpu_pmu->name		= "armv7_cortex_a9";
- 	cpu_pmu->map_event	= armv7_a9_map_event;
-+	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
- 	return armv7_probe_num_events(cpu_pmu);
- }
- 
-@@ -1101,6 +1192,7 @@ static int armv7_a5_pmu_init(struct arm_pmu *cpu_pmu)
- 	armv7pmu_init(cpu_pmu);
- 	cpu_pmu->name		= "armv7_cortex_a5";
- 	cpu_pmu->map_event	= armv7_a5_map_event;
-+	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
- 	return armv7_probe_num_events(cpu_pmu);
- }
- 
-@@ -1110,6 +1202,7 @@ static int armv7_a15_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->name		= "armv7_cortex_a15";
- 	cpu_pmu->map_event	= armv7_a15_map_event;
- 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
-+	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
- 	return armv7_probe_num_events(cpu_pmu);
- }
- 
-@@ -1119,6 +1212,7 @@ static int armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->name		= "armv7_cortex_a7";
- 	cpu_pmu->map_event	= armv7_a7_map_event;
- 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
-+	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
- 	return armv7_probe_num_events(cpu_pmu);
- }
- 
-@@ -1128,6 +1222,7 @@ static int armv7_a12_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->name		= "armv7_cortex_a12";
- 	cpu_pmu->map_event	= armv7_a12_map_event;
- 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
-+	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
- 	return armv7_probe_num_events(cpu_pmu);
- }
- 
-@@ -1135,6 +1230,7 @@ static int armv7_a17_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	int ret = armv7_a12_pmu_init(cpu_pmu);
- 	cpu_pmu->name = "armv7_cortex_a17";
-+	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
- 	return ret;
- }
- 
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 2365a32a595e..e933d2dd71c0 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -548,6 +548,7 @@ static void armpmu_init(struct arm_pmu *armpmu)
- 		.stop		= armpmu_stop,
- 		.read		= armpmu_read,
- 		.filter_match	= armpmu_filter_match,
-+		.attr_groups	= armpmu->pmu.attr_groups,
- 	};
- }
- 
--- 
-2.1.4
+Pushing an inconsistent kernel ABI to DT is not the answer.
+
+>
+> I don't really like the idea of enforcing any IDs here. As of now
+> heap ids are generally something VERY platform-specific
+> (or even product-specific). Personally I'd prefer something like this
+> for userspace apps:
+>
+> int id1 = ion_get_heap_id("camera");
+> if (id1 < 0) {
+>       fprintf(stderr, "Invalid heap id");
+>       exit(1);
+> }
+>
+> int id2 = ion_get_heap_id("backup-heap");
+> if (id2 < 0) {
+>       fprintf(stderr, "Invalid heap id");
+>       exit(1);
+> }
+
+We've learned that creating number spaces like this are bad (irqs,
+gpios, /dev nodes). We should move away from that. Why should
+userspace care about IDs or what the IDs are? An ID is just encoding
+certain implicit requirements. So are the strings here. Users should
+express what capabilities, restrictions, etc. they have, and then the
+kernel can find the best heap.
+
+> ...
+>
+> int ret = ion_alloc(fd, 0x100, 0x4,
+>               (id1 | id2),
+>               0, &handle);
+>
+>
+> What concerns kernel stuff, things are simpler - we may just pass the heap
+> to use
+> by a reference in devicetree node for that driver. Something like that:
+>
+> ...
+>                ion-decoder-region : region_ddr {
+>                        linux,ion-heap-id = <1>;
+>                        linux,ion-heap-type = <ION_DMA_HEAP_TYPE>;
+>                        linux,ion-heap-name = "decoder_mem"
+>                        memory-region = <&camera_region>;
+>                 };
+> ...
+>                 video_decoder at 80180000 {
+>                         compatible = "acme,h266dec";
+>                         reg = <0x80180000 0x20000>,
+>                         reg-names = "registers";
+>                         interrupts = <12>;
+>                         interrupt-parent = <&vic1>;
+>                         ion-heaps-for-buffers = <&ion-decoder-region>
+
+This is how memory-region is supposed to work. I don't see why we need
+an additional level of indirection.
+
+Rob
