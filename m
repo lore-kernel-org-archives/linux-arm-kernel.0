@@ -1,168 +1,217 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Oct 2015 20:17:31 +0100
-Subject: [PATCH 10/12] drm: bridge/dw_hdmi: fix phy enable/disable handling
-In-Reply-To: <5614F68B.6050808@rock-chips.com>
-References: <20150808160251.GM7557@n2100.arm.linux.org.uk>
- <E1ZO6bT-0002vk-3d@rmk-PC.arm.linux.org.uk>
- <56149A11.4070102@rock-chips.com>
- <20151007094831.GF21513@n2100.arm.linux.org.uk>
- <5614F68B.6050808@rock-chips.com>
-Message-ID: <20151007191731.GA32064@n2100.arm.linux.org.uk>
+From: andrew@ncrmnt.org (Andrew)
+Date: Wed, 07 Oct 2015 22:23:46 +0300
+Subject: [RFC][PATCH 1/2] WIP: Devicetree bindings for Ion
+In-Reply-To: <CAL_JsqJXNDcAPf7ijgFiorHrR93W_KctMQAY27=YyXHe8RDuAA@mail.gmail.com>
+References: <1444164433-9107-1-git-send-email-labbott@fedoraproject.org>
+ <1444164433-9107-2-git-send-email-labbott@fedoraproject.org>
+ <CAL_JsqJ+i3zC7UJ3BcdtOhdmQd8YnRC7bs3D2Ei5JD-4-C+A0g@mail.gmail.com>
+ <561452D9.90605@labbott.name>
+ <f486f9f4f23c697f72e5ddcf49e38c9b@mail.ncrmnt.org>
+ <CAL_JsqJXNDcAPf7ijgFiorHrR93W_KctMQAY27=YyXHe8RDuAA@mail.gmail.com>
+Message-ID: <a5eefe6f397110a2af82dc4ebd3e292e@mail.ncrmnt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 06:40:11PM +0800, Yakir Yang wrote:
+On 2015-10-07 21:36, Rob Herring wrote:
+> On Wed, Oct 7, 2015 at 5:36 AM, Andrew <andrew@ncrmnt.org> wrote:
+>> On 2015-10-07 02:01, Laura Abbott wrote:
+>>> 
+>>> On 10/6/15 3:35 PM, Rob Herring wrote:
+>>>> 
+>>>> On Tue, Oct 6, 2015 at 3:47 PM, Laura Abbott 
+>>>> <labbott@fedoraproject.org>
+>>>> wrote:
+>>>>> 
+>>>>> From: Laura Abbott <laura@labbott.name>
+>>>>> 
+>>>>> 
+>>>>> This adds a base set of devicetree bindings for the Ion memory
+>>>>> manager. This supports setting up the generic set of heaps and
+>>>>> their properties.
+>>>>> 
+>>>>> Signed-off-by: Laura Abbott <laura@labbott.name>
+>>>>> Signed-off-by: Andrew Andrianov <andrew@ncrmnt.org>
+>>>>> ---
+>>>>>   drivers/staging/android/ion/devicetree.txt | 53
+>>>>> ++++++++++++++++++++++++++++++
+>>>> 
+>>>> 
+>>>> I have no issue with this going in here, but I do have lots of 
+>>>> issues
+>>>> with this binding.
+>>>> 
+>>>>>   1 file changed, 53 insertions(+)
+>>>>>   create mode 100644 drivers/staging/android/ion/devicetree.txt
+>>>>> 
+>>>>> diff --git a/drivers/staging/android/ion/devicetree.txt
+>>>>> b/drivers/staging/android/ion/devicetree.txt
+>>>>> new file mode 100644
+>>>>> index 0000000..4a0c941
+>>>>> --- /dev/null
+>>>>> +++ b/drivers/staging/android/ion/devicetree.txt
+>>>>> @@ -0,0 +1,53 @@
+>>>>> +Ion Memory Manager
+>>>>> +
+>>>>> +Ion is a memory manager that allows for sharing of buffers via 
+>>>>> dma-buf.
+>>>>> +Ion allows for different types of allocation via an abstraction 
+>>>>> called
+>>>>> +a 'heap'. A heap represents a specific type of memory. Each heap 
+>>>>> has
+>>>>> +a different type. There can be multiple instances of the same heap
+>>>>> +type.
+>>>>> +
+>>>>> +Required properties for Ion
+>>>>> +
+>>>>> +- compatible: "linux,ion"
+>>>>> +
+>>>>> +All child nodes of a linux,ion node are interpreted as heaps
+>>>>> +
+>>>>> +required properties for heaps
+>>>>> +
+>>>>> +- linux,ion-heap-id: The Ion heap id used for allocation selection
+>>>>> +- linux,ion-heap-type: Ion heap type defined in ion.h
+>>>>> +- linux,ion-heap-name: Human readble name of the heap
+>>>>> +
+>>>>> +
+>>>>> +Optional properties
+>>>>> +- memory-region: A phandle to a memory region. Required for DMA 
+>>>>> heap
+>>>>> type
+>>>>> +(see reserved-memory.txt for details on the reservation)
+>>>>> +- linux,ion-heap-align: Alignment for the heap.
+>>>>> +
+>>>>> +Example:
+>>>>> +
+>>>>> +       ion {
+>>>>> +               compatbile = "linux,ion";
+>>>>> +               #address-cells = <1>;
+>>>>> +               #size-cells = <0>;
+>>>>> +
+>>>>> +               ion-system-heap {
+>>>>> +                       linux,ion-heap-id = <0>;
+>>>>> +                       linux,ion-heap-type = 
+>>>>> <ION_SYSTEM_HEAP_TYPE>;
+>>>>> +                       linux,ion-heap-name = "system";
+>>>> 
+>>>> 
+>>>> How does this vary across platforms? Is all of this being pushed 
+>>>> down
+>>>> to DT, because there is no coordination of this at the kernel ABI
+>>>> level across platforms. In other words, why can't heap 0 be 
+>>>> hardcoded
+>>>> as system heap in the driver. It seems to me any 1 of these 3
+>>>> properties could be used to derive the other 2.
+>>>> 
+>>> 
+>>> Right now there is no guarantee heap IDs will be the same across
+>>> platforms. The heap IDs are currently part of the userspace ABI
+>>> as well since userspace clients must pass in a mask of the heap
+>>> IDs to allocate from. If we assume all existing clients could change,
+>>> heaps such as the system heap could be mandated to have the same
+>>> heap ID but we'd still run into problems if you have multiple
+>>> heaps of the same type (e.g. multiple carveouts)
 > 
+> Vendors largely ignore the kernel-userspace ABI and anything in
+> staging is not a ABI. So arguments about what the ABI is currently is
+> pointless IMO.
 > 
-> On 10/07/2015 05:48 PM, Russell King - ARM Linux wrote:
-> >On Wed, Oct 07, 2015 at 12:05:37PM +0800, Yakir Yang wrote:
-> >>
-> >>On 08/09/2015 12:04 AM, Russell King wrote:
-> >>>The dw_hdmi enable/disable handling is particularly weak in several
-> >>>regards:
-> >>>* The hotplug interrupt could call hdmi_poweron() or hdmi_poweroff()
-> >>>   while DRM is setting a mode, which could race with a mode being set.
-> >>>* Hotplug will always re-enable the phy whenever it detects an active
-> >>>   hotplug signal, even if DRM has disabled the output.
-> >>>
-> >>>Resolve all of these by introducing a mutex to prevent races, and a
-> >>>state-tracking bool so we know whether DRM wishes the output to be
-> >>>enabled.  We choose to use our own mutex rather than ->struct_mutex
-> >>>so that we can still process interrupts in a timely fashion.
-> >>>
-> >>>Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> >>>---
-> >>>  drivers/gpu/drm/bridge/dw_hdmi.c | 29 ++++++++++++++++++++++-------
-> >>>  1 file changed, 22 insertions(+), 7 deletions(-)
-> >>>
-> >>>diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-> >>>index 7b8a4e942a71..0ee188930d26 100644
-> >>>--- a/drivers/gpu/drm/bridge/dw_hdmi.c
-> >>>+++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-> >>>@@ -125,6 +125,9 @@ struct dw_hdmi {
-> >>>  	bool sink_is_hdmi;
-> >>>  	bool sink_has_audio;
-> >>>+	struct mutex mutex;		/* for state below and previous_mode */
-> >>>+	bool disabled;			/* DRM has disabled our bridge */
-> >>>+
-> >>>  	spinlock_t audio_lock;
-> >>>  	struct mutex audio_mutex;
-> >>>  	unsigned int sample_rate;
-> >>>@@ -1389,8 +1392,12 @@ static void dw_hdmi_bridge_mode_set(struct drm_bridge *bridge,
-> >>>  {
-> >>>  	struct dw_hdmi *hdmi = bridge->driver_private;
-> >>>+	mutex_lock(&hdmi->mutex);
-> >>>+
-> >>>  	/* Store the display mode for plugin/DKMS poweron events */
-> >>>  	memcpy(&hdmi->previous_mode, mode, sizeof(hdmi->previous_mode));
-> >>>+
-> >>>+	mutex_unlock(&hdmi->mutex);
-> >>>  }
-> >>>  static bool dw_hdmi_bridge_mode_fixup(struct drm_bridge *bridge,
-> >>>@@ -1404,14 +1411,20 @@ static void dw_hdmi_bridge_disable(struct drm_bridge *bridge)
-> >>>  {
-> >>>  	struct dw_hdmi *hdmi = bridge->driver_private;
-> >>>+	mutex_lock(&hdmi->mutex);
-> >>>+	hdmi->disabled = true;
-> >>>  	dw_hdmi_poweroff(hdmi);
-> >>>+	mutex_unlock(&hdmi->mutex);
-> >>>  }
-> >>>  static void dw_hdmi_bridge_enable(struct drm_bridge *bridge)
-> >>>  {
-> >>>  	struct dw_hdmi *hdmi = bridge->driver_private;
-> >>>+	mutex_lock(&hdmi->mutex);
-> >>>  	dw_hdmi_poweron(hdmi);
-> >>>+	hdmi->disabled = false;
-> >>>+	mutex_unlock(&hdmi->mutex);
-> >>>  }
-> >>>  static void dw_hdmi_bridge_nop(struct drm_bridge *bridge)
-> >>>@@ -1534,20 +1547,20 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
-> >>>  	phy_int_pol = hdmi_readb(hdmi, HDMI_PHY_POL0);
-> >>>  	if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
-> >>>+		hdmi_modb(hdmi, ~phy_int_pol, HDMI_PHY_HPD, HDMI_PHY_POL0);
-> >>>+		mutex_lock(&hdmi->mutex);
-> >>>  		if (phy_int_pol & HDMI_PHY_HPD) {
-> >>>  			dev_dbg(hdmi->dev, "EVENT=plugin\n");
-> >>>-			hdmi_modb(hdmi, 0, HDMI_PHY_HPD, HDMI_PHY_POL0);
-> >>>-
-> >>>-			dw_hdmi_poweron(hdmi);
-> >>>+			if (!hdmi->disabled)
-> >>>+				dw_hdmi_poweron(hdmi);
-> >>>  		} else {
-> >>>  			dev_dbg(hdmi->dev, "EVENT=plugout\n");
-> >>>-			hdmi_modb(hdmi, HDMI_PHY_HPD, HDMI_PHY_HPD,
-> >>>-				  HDMI_PHY_POL0);
-> >>>-
-> >>>-			dw_hdmi_poweroff(hdmi);
-> >>>+			if (!hdmi->disabled)
-> >>>+				dw_hdmi_poweroff(hdmi);
-> >>Just like my reply on 08/12, I thought this could be removed, so
-> >>poweron/poweroff would only be called with bridge->enable/
-> >>bridge->disable, them maybe no need mutex here.
-> >The bridge enable/disable methods do not get called on hotplug changes.
-> >
-> >[    1.363011] dwhdmi-imx 120000.hdmi: Detected HDMI controller 0x13:0xa:0xa0:0xc1
-> >[    1.371341] dwhdmi-imx 120000.hdmi: dw_hdmi_irq(I:RX----,HPD P:RX3210,HPD S:RX----,HPD)
-> >[    1.381345] imx-drm display-subsystem: bound 120000.hdmi (ops dw_hdmi_imx_ops)
-> >[    1.448691] dwhdmi-imx 120000.hdmi: dw_hdmi_bridge_disable()
-> >[    1.450963] dwhdmi-imx 120000.hdmi: dw_hdmi_bridge_enable()
-> >
-> >and then unplugging and re-plugging the HDMI cable:
-> >
-> >[   68.307505] dwhdmi-imx 120000.hdmi: dw_hdmi_irq(I:RX----,HPD P:RX3210,--- S:RX----,---)
-> >[   73.813970] dwhdmi-imx 120000.hdmi: dw_hdmi_irq(I:RX----,HPD P:RX3210,HPD S:RX----,HPD)
-> >
-> >As you can see, during the period of disconnection for five seconds,
-> >dw_hdmi_bridge_disable() was not called.
-> >
-> >So, without the code above, we'd be needlessly wasting power with the
-> >bridge enabled, trying to drive a disconnected display.
-> 
-> Strangely, I do see bridge enable/disable in my side, past the log and
-> dump_stack bellow.
-> 
-> And I guess your HDMI maybe not really hot pluged, could you confirm that
-> the "status" of HDMI display card have been changed between "connected"
-> and "disconnected".
+> Pushing an inconsistent kernel ABI to DT is not the answer.
 
-It does.
+Totally agree here.
 
-> Do see bridge_disable when I unpluging the HDMI cable
-> [   16.358717] dwhdmi-rockchip ff980000.hdmi: EVENT=plugout
-> [   20.613221] [<c010e030>] (unwind_backtrace) from [<c010a4e0>]
-> (show_stack+0x20/0x24)
-> [   20.631561] [<c010a4e0>] (show_stack) from [<c0896828>]
-> (dump_stack+0x70/0x8c)
-> [   20.649337] [<c0896828>] (dump_stack) from [<c0414038>]
-> (dw_hdmi_bridge_disable+0x1c/0x88)
-> [   20.668178] [<c0414038>] (dw_hdmi_bridge_disable) from [<c03e3888>]
-> (drm_encoder_disable+0x34/0x78)
-> [   20.687857] [<c03e3888>] (drm_encoder_disable) from [<c03e3b1c>]
-> (__drm_helper_disable_unused_functions+0x68/0xe4)
-> [   20.708975] [<c03e3b1c>] (__drm_helper_disable_unused_functions) from
-> [<c03e4320>] (drm_crtc_helper_set_config+0x128/0x85c)
-> [   20.731180] [<c03e4320>] (drm_crtc_helper_set_config) from [<c03f5e3c>]
-> (drm_mode_set_config_internal+0x58/0xdc)
-> [   20.752507] [<c03f5e3c>] (drm_mode_set_config_internal) from [<c0405ed0>]
-> (commit_crtc_state+0x124/0x1ec)
-> [   20.773342] [<c0405ed0>] (commit_crtc_state) from [<c04055d4>]
-> (atomic_commit.isra.3+0x5c/0xc8)
-> [   20.793397] [<c04055d4>] (atomic_commit.isra.3) from [<c040565c>]
-> (drm_atomic_commit+0x1c/0x20)
-> [   20.813467] [<c040565c>] (drm_atomic_commit) from [<c03fa480>]
-> (drm_mode_setcrtc+0x324/0x3e4)
-> [   20.833379] [<c03fa480>] (drm_mode_setcrtc) from [<c03eb320>]
-> (drm_ioctl+0x304/0x478)
-> [   20.852557] [<c03eb320>] (drm_ioctl) from [<c021f024>]
-> (do_vfs_ioctl+0x494/0x5a8)
-> [   20.871377] [<c021f024>] (do_vfs_ioctl) from [<c021f194>]
-> (SyS_ioctl+0x5c/0x84)
-> [   20.890038] [<c021f194>] (SyS_ioctl) from [<c010646c>]
-> (__sys_trace_return+0x0/0x14)
+> 
+>> 
+>> I don't really like the idea of enforcing any IDs here. As of now
+>> heap ids are generally something VERY platform-specific
+>> (or even product-specific). Personally I'd prefer something like this
+>> for userspace apps:
+>> 
+>> int id1 = ion_get_heap_id("camera");
+>> if (id1 < 0) {
+>>       fprintf(stderr, "Invalid heap id");
+>>       exit(1);
+>> }
+>> 
+>> int id2 = ion_get_heap_id("backup-heap");
+>> if (id2 < 0) {
+>>       fprintf(stderr, "Invalid heap id");
+>>       exit(1);
+>> }
+> 
+> We've learned that creating number spaces like this are bad (irqs,
+> gpios, /dev nodes). We should move away from that. Why should
+> userspace care about IDs or what the IDs are? An ID is just encoding
+> certain implicit requirements. So are the strings here. Users should
+> express what capabilities, restrictions, etc. they have, and then the
+> kernel can find the best heap.
 
-Your userspace is issuing an ioctl to disable the output.  I guess you
-have other active outputs besides HDMI.
+I'd argue about that point, since sometimes kernel might NOT know
+all the hardware details behind some of the heaps or how they are going 
+to
+be used. Hence it can't decide a proper heap. And that's where things 
+get ugly.
+
+Real-world example: There are several on-chip SRAM banks that make up 
+several
+heaps. Say, IM0, IM1, IM2.
+
+Technically - they are all DMA, and all work. But the hardware guys hand 
+you
+a handful of weird recommendations, like:
+* Decoder will work faster if you use bank IM2 for internal buffers,
+and prefer DDR bank A for decoded frames.
+* DSP should stick with IM1, and please prefer DDR bank B for buffers
+
+When several such devices are involved in one chain - things may get
+even weirder. Having manual control over where allocations are made 
+allows
+us to keep all these voodoo magicks away from the kernel and (hopefully) 
+keep
+vendors from dirty hacks into ion itself.
+
+> 
+>> ...
+>> 
+>> int ret = ion_alloc(fd, 0x100, 0x4,
+>>               (id1 | id2),
+>>               0, &handle);
+>> 
+>> 
+>> What concerns kernel stuff, things are simpler - we may just pass the 
+>> heap
+>> to use
+>> by a reference in devicetree node for that driver. Something like 
+>> that:
+>> 
+>> ...
+>>                ion-decoder-region : region_ddr {
+>>                        linux,ion-heap-id = <1>;
+>>                        linux,ion-heap-type = <ION_DMA_HEAP_TYPE>;
+>>                        linux,ion-heap-name = "decoder_mem"
+>>                        memory-region = <&camera_region>;
+>>                 };
+>> ...
+>>                 video_decoder at 80180000 {
+>>                         compatible = "acme,h266dec";
+>>                         reg = <0x80180000 0x20000>,
+>>                         reg-names = "registers";
+>>                         interrupts = <12>;
+>>                         interrupt-parent = <&vic1>;
+>>                         ion-heaps-for-buffers = <&ion-decoder-region>
+> 
+> This is how memory-region is supposed to work. I don't see why we need
+> an additional level of indirection.
+
+I don't see right now a clean way of getting ion heap id from driver 
+when
+having a memory-region referenced there. Correct me if if I'm all wrong 
+about it.
+
+> 
+> Rob
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Andrew
+RC Module
