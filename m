@@ -1,56 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Oct 2015 06:26:42 -0700
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20151007124551.GI21626@n2100.arm.linux.org.uk>
-References: <20151005112304.GZ23801@atomide.com>
- <20151005143532.GA23801@atomide.com>
- <20151005145127.GB23801@atomide.com>
- <20151005171155.GF23801@atomide.com>
- <20151005183813.GD21626@n2100.arm.linux.org.uk>
- <20151006090015.GE21626@n2100.arm.linux.org.uk>
- <20151006094425.GM23801@atomide.com>
- <20151006150009.GF21626@n2100.arm.linux.org.uk>
- <20151006153710.GS23801@atomide.com>
- <20151007124551.GI21626@n2100.arm.linux.org.uk>
-Message-ID: <20151007132642.GV23801@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 7 Oct 2015 14:27:28 +0100
+Subject: [PATCHv4 0/6] arm64: perf: heterogeneous PMU support
+In-Reply-To: <20151007131930.GJ16065@arm.com>
+References: <1443779708-26789-1-git-send-email-mark.rutland@arm.com>
+ <20151007131930.GJ16065@arm.com>
+Message-ID: <20151007132727.GB17192@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [151007 05:50]:
-> On Tue, Oct 06, 2015 at 08:37:11AM -0700, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [151006 08:04]:
-> > > On Tue, Oct 06, 2015 at 02:44:25AM -0700, Tony Lindgren wrote:
-> > > > 
-> > > > Hmm DT-based boot finds the MMC card for LDP, dmesg below from DT boot [1].
-> > > > Looks like you're on on -rc4 and not -rc3. My guess is that MMC is not
-> > > > working for you with DT-based booting because you don't seem to have
-> > > > CONFIG_REGULATOR_PBIAS in your seed config for. Care to try enabling that
-> > > > for both your omap3 and omap4 seed config files?
-> > > 
-> > > This is precisely the kind of crap I'm objecting to.  New kernel versions
-> > > come along, and things break because people add extra Kconfig symbols that
-> > > previous versions did not rely upon - and there's no communication of
-> > > what's required for new kernel versions.
-> > > 
-> > > This stuff needs documenting, so that people are aware what changes they
-> > > need to make - please put something in Documentation/arm/OMAP which
-> > > tracks what new additions are required to the Kconfig to keep things
-> > > working.
+On Wed, Oct 07, 2015 at 02:19:30PM +0100, Will Deacon wrote:
+> On Fri, Oct 02, 2015 at 10:55:02AM +0100, Mark Rutland wrote:
+> > This patch series moves the arm64 code over to the librified perf code now used
+> > by 32-bit arm, in the process gaining support for heterogeneous PMUs. Tailored
+> > support is then added for Cortex-A53 and Cortex-A57 as used in Juno systems.
 > > 
-> > Good idea, how about something like the following? AFAIK that's the
-> > only .config option needed as MFD_SYSCON is selected by Kconfig
-> > already.
+> > With this series applied, perf can be used to monitor 64-bit systems with
+> > heterogeneous PMUs in an identical fashion to 32-bit systems, e.g.
 > 
-> Right, that resolves the issue.  Now, what's the story on the revert
-> and the other patch - have they already been taken for -rc kernels?
+> For the series:
+> 
+>   Acked-by: Will Deacon <will.deacon@arm.com>
 
-Not yet, I was waiting for the confirmation from you. I've now posted the
-revert with proper description and the fix so Ulf can pick them up and
-merged as regression fixes for the -rc series:
+Thanks.
 
-http://marc.info/?l=linux-omap&m=144422416621373&w=2
-http://marc.info/?l=linux-omap&m=144422416921375&w=2
+> There's a trailing whitespace error in the first patch, but Catalin can
+> probably fix that up.
 
-Regards,
+I fixed this as well. Queued.
 
-Tony
+-- 
+Catalin
