@@ -1,45 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Oct 2015 15:46:35 +0200
-Subject: [PATCH] IB/core: avoid 32-bit warning
-In-Reply-To: <56151BDF.8010504@dev.mellanox.co.il>
-References: <17269152.DqJfCm1LOx@wuerfel> <56151BDF.8010504@dev.mellanox.co.il>
-Message-ID: <6219209.mJNClmP5Ym@wuerfel>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 07 Oct 2015 14:46:56 +0100
+Subject: [PATCH v2 1/3] nvmem: core: make default user binary file
+ root-access only
+In-Reply-To: <20151007113349.GJ21513@n2100.arm.linux.org.uk>
+References: <1444215536-10783-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1444215647-10836-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20151007113349.GJ21513@n2100.arm.linux.org.uk>
+Message-ID: <56152250.2000200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 October 2015 16:19:27 Sagi Grimberg wrote:
-> On 10/7/2015 3:29 PM, Arnd Bergmann wrote:
-> > The INIT_UDATA() macro requires a pointer or unsigned long argument for
-> > both input and output buffer, and all callers had a cast from when
-> > the code was merged until a recent restructuring, so now we get
-> >
-> > core/uverbs_cmd.c: In function 'ib_uverbs_create_cq':
-> > core/uverbs_cmd.c:1481:66: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-> >
-> > This makes the code behave as before by adding back the cast to
-> > unsigned long.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: 565197dd8fb1 ("IB/core: Extend ib_uverbs_create_cq")
-> >
-> > diff --git a/drivers/infiniband/core/uverbs_cmd.c b/drivers/infiniband/core/uverbs_cmd.c
-> > index be4cb9f04be3..88b3b78340f2 100644
-> > --- a/drivers/infiniband/core/uverbs_cmd.c
-> > +++ b/drivers/infiniband/core/uverbs_cmd.c
-> > @@ -1478,7 +1478,7 @@ ssize_t ib_uverbs_create_cq(struct ib_uverbs_file *file,
-> >       if (copy_from_user(&cmd, buf, sizeof(cmd)))
-> >               return -EFAULT;
-> >
-> > -     INIT_UDATA(&ucore, buf, cmd.response, sizeof(cmd), sizeof(resp));
-> > +     INIT_UDATA(&ucore, buf, (unsigned long)cmd.response, sizeof(cmd), sizeof(resp));
-> 
-> Would it make sense to cast inside INIT_UDATA() and not have callers
-> worry about it?
 
-If we want to do this properly, INIT_UDATA should be converted into a function
-call that has the right types.
 
-My patch doesn't try to do that here, it just restores the code to how it
-was for the past 10 years.
+On 07/10/15 12:33, Russell King - ARM Linux wrote:
+> On Wed, Oct 07, 2015 at 12:00:47PM +0100, Srinivas Kandagatla wrote:
+>> As required by many providers like at24/at25/mxs-ocotp/qfprom and may be
+>> other providers would want to allow root-only to read the nvmem content.
+>> So making the defaults to be root-only access would address the request
+>> and also provide flexibility to providers to specify there own permissions
+>> on top of the root-only using the perm flag in nvmem_config.
+>> Making this dynamic did cut down lot of static binary attributes in the
+>> code.
+>
+> Check what the lifetime of a struct bin_attribute is before you embed it
+> into any other structure.  Sorry, but I think you're going to have to
 
-	Arnd
+Lifetime of the "static struct bin_attribute bin_attr_template" is 
+static and a memcpy of which is made into nvmem->bin whose lifetime is 
+till the nvmem_release() which happens at device_release(), so there 
+should be no issue in using a copy of bin_attribute.
+
+However there are other issues as Greg pointed, so am dropping this 
+series altogether.
+
+--srini
+> read up on the driver model, sysfs, and kernfs implementations to find
+> out - I don't know the answer to this without doing the same.
+>
+> However, this is basic checking that anyone should do when embedding
+> a structure within another.
+>
