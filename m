@@ -1,51 +1,54 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 7 Oct 2015 16:55:01 +0300
-Subject: [PATCH 2/2] memory: omap-gpmc: expand the description of the
- debug facility
-In-Reply-To: <20151007134010.GW23801@atomide.com>
-References: <1444162070-22034-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1444162070-22034-2-git-send-email-u.kleine-koenig@pengutronix.de>
- <5614CDAE.6070604@ti.com> <20151007075338.GH3982@pengutronix.de>
- <20151007102822.GT23801@atomide.com> <20151007110231.GL3982@pengutronix.de>
- <5614FD01.6090009@ti.com> <20151007134010.GW23801@atomide.com>
-Message-ID: <56152435.6050500@ti.com>
+From: alexdeucher@gmail.com (Alex Deucher)
+Date: Wed, 7 Oct 2015 10:00:05 -0400
+Subject: [PATCH] drm/amdgpu: fix 32-bit compiler warning
+In-Reply-To: <5244259.kNg2jHSi3h@wuerfel>
+References: <14056299.vVOiOhUXfA@wuerfel> <5614DE67.2070507@amd.com>
+ <5244259.kNg2jHSi3h@wuerfel>
+Message-ID: <CADnq5_OmALs90zQGdt09j+CgbDf6M9mWLb+UQm4zMHXVqr9Vog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/15 16:40, Tony Lindgren wrote:
-> * Roger Quadros <rogerq@ti.com> [151007 04:12]:
->> On 07/10/15 14:02, Uwe Kleine-K?nig wrote:
->>> Hello Tony,
->>>
->>> On Wed, Oct 07, 2015 at 03:41:19AM -0700, Tony Lindgren wrote:
->>>> * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [151007 00:57]:
->>>>> On Wed, Oct 07, 2015 at 10:45:50AM +0300, Roger Quadros wrote:
->>>>>>
->>>>>> How about this instead?
->>>>>>
->>>>>> NOTE: Apart from matching the register setup with the bootloader you also need to
->>>>>> match the GPMC FCLK frequency used by the bootloader else the GPMC timings
->>>>>> won't be identical with the bootloader timings.
->>>>> Yeah, sounds better, thanks.
->>>>>
->>>>>> Also you might need to build this patch on top of
->>>>>> http://article.gmane.org/gmane.linux.kernel/2054796
->>>>> I talked to Tony about this patch yesterday on irc, but I didn't find it
->>>>> in the archives yet when I sent my mail.
->>>>
->>>> Yes sorry here's a repost with your and Roger's changes folded in and
->>>> edited a bit. Probably best to keep them together with this patch.
->>>>
->>>> Does the following look OK to you guys?
->>> Yes,
->>> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On Wed, Oct 7, 2015 at 5:18 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 07 October 2015 10:57:11 Christian K?nig wrote:
+>> On 07.10.2015 09:41, Arnd Bergmann wrote:
+>> > The new amdgpu driver passes a user space pointer in a 64-bit structure
+>> > member, which is the correct way to do it, but it attempts to
+>> > directly cast it to a __user pointer in the kernel, which causes
+>> > a warning in three places:
+>> >
+>> > drm/amd/amdgpu/amdgpu_cs.c: In function 'amdgpu_cs_parser_init':
+>> > drm/amd/amdgpu/amdgpu_cs.c:180:21: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+>> >    chunk_array_user = (uint64_t __user *)(cs->in.chunks);
+>> >
+>> > This changes all three to add an intermediate cast to 'unsigned long'
+>> > as other drivers do. This avoids the warning and works correctly on
+>> > both 32-bit and 64-bit architectures.
+>> >
+>> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 >>
->> Looks good to me too.
-> 
-> Are you OK if I use your Acked-by from the previous version on
-> this updated version?
+>> Well if I'm not completely mistaken this is the second time we need to
+>> fix this because somebody thought the cast was unnecessary.
+>>
+>> Anyway the patch is Reviewed-by: Christian K?nig
+>> <christian.koenig@amd.com> and I'm going to keep an eye open for the
+>> next time somebody tries to remove this.
+>>
+>
+> Ok, thanks.
+>
+> I guess I should have added
+>
+> Fixes: e60b344f6c0eff ("drm/amdgpu: optimize amdgpu_parser_init")
 
-Yes please.
+Applied this that comment added.
 
-cheers,
--roger
+Thanks!
+
+Alex
+
+>
+>         Arnd
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
