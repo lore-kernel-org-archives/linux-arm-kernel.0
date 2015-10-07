@@ -1,308 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 7 Oct 2015 18:16:21 +0100
-Subject: [PATCH v2 07/22] arm64: Keep track of CPU feature registers
-In-Reply-To: <1444064531-25607-8-git-send-email-suzuki.poulose@arm.com>
-References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
- <1444064531-25607-8-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20151007171621.GD17192@e104818-lin.cambridge.arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 7 Oct 2015 18:19:49 +0100
+Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
+In-Reply-To: <20151007130324.GA4557@linux>
+References: <5706174.BUsqiXljxZ@wuerfel> <20151007105911.GC9892@linux>
+ <20151007110302.GD9892@linux> <20151007110755.GA6601@kroah.com>
+ <20151007112149.GB22530@linux> <20151007125735.GA8170@kroah.com>
+ <20151007130324.GA4557@linux>
+Message-ID: <20151007171949.GB9702@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 05, 2015 at 06:01:56PM +0100, Suzuki K. Poulose wrote:
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index b5f313d..7ed92f2 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -35,6 +35,38 @@
->  
->  #include <linux/kernel.h>
->  
-> +/* CPU feature register tracking */
-> +enum ftr_type {
-> +	FTR_DISCRETE,	/* Use a predefined safe value */
-> +	FTR_SCALAR_MIN,	/* Smaller value is safer */
-> +	FTR_SCALAR_MAX,	/* Bigger value is safer */
-> +};
+On Wed, Oct 07, 2015 at 06:33:24PM +0530, Viresh Kumar wrote:
+> Cc'ing Mike and Stephen..
+> 
+> On 07-10-15, 13:57, Greg Kroah-Hartman wrote:
+> > On Wed, Oct 07, 2015 at 04:51:49PM +0530, Viresh Kumar wrote:
+> > > On 07-10-15, 12:07, Greg Kroah-Hartman wrote:
+> > > > Why would you be wanting to create a "unsigned long" as an api anyway?
+> > > > Just force it to be u64 all the time, can't you do that?
+> > > 
+> > > Okay, so the variable in question (lets say frequency) is an 'unsigned
+> > > long' and that's how all the APIs of clock framework expect/define
+> > > it.
+> > > 
+> > > And you are probably saying that we do this:
+> > > 
+> > > unsigned long freq;
+> > > 
+> > > debugfs_create_u64((u64 *)&freq);
+> > > 
+> > > Right? Or are you asking to update clock APIs to be converted to u64?
+> > 
+> > Yes, they should be u64 as I doubt you want to debug problems that you
+> > have in the driver where it works on a 64bit system but doesn't on a
+> > 32bit one.
+> 
+> Firstly changing the clock API (and other similar APIs) to make
+> frequency u64 instead of 'unsigned long', looks like a giant effort.
+> There are too many users of those API, etc..
+> 
+> Over that, it might be good performance wise to use u32 for 32 bit
+> systems and u64 for 64 bit one, to represent clock frequency and maybe
+> that's why we chose unsigned long there.
 
-I think s/safer/safe/ sounds better, otherwise it looks like we are not
-entirely sure.
+Ok, then stop exporting it in debugfs and everyone will be happy :)
 
-BTW, I don't fully understand the name choosing here (e.g. discrete vs.
-scalar; a scalar type is also a discrete type). "MIN" looks to me like
-any higher value should be safe but instead the comment states "smaller
-value is safe". Maybe something like:
-
-	FTR_EXACT
-	FTR_LOWER_SAFE
-	FTR_HIGHER_SAFE
-
-> +
-> +#define FTR_STRICT	true
-> +#define FTR_NONSTRICT	false
-> +
-> +struct arm64_ftr_bits {
-> +	bool		strict;		/* CPU Sanity check
-> +					 *  strict matching required ? */
-
-I don't care about 80 characters line, especially around comments. So
-please place the comment on a single line.
-
-> +	enum ftr_type	type;
-> +	u8		shift;
-> +	u8		width;
-> +	s64		safe_val;	/* safe value for discrete features */
-> +};
-> +
-> +/*
-> + * @arm64_ftr_reg - Feature register
-> + * @strict_mask 	Bits which should match across all CPUs for sanity.
-> + * @sys_val		Safe value across the CPUs (system view)
-> + */
-> +struct arm64_ftr_reg {
-> +	u32			sys_id;
-> +	const char*		name;
-> +	u64			strict_mask;
-> +	u64			sys_val;
-> +	struct arm64_ftr_bits*	ftr_bits;
-> +};
-
-Move '*' near the struct member names, not the type.
-
-> +
->  struct arm64_cpu_capabilities {
->  	const char *desc;
->  	u16 capability;
-> @@ -82,6 +114,22 @@ static inline int __attribute_const__ cpuid_feature_extract_field(u64 features,
->  	return (s64)(features << (64 - 4 - field)) >> (64 - 4);
->  }
->  
-> +static inline s64 __attribute_const__
-> +cpuid_feature_extract_field_width(u64 features, int field, u8 width)
-> +{
-> +	return (s64)(features << (64 - width - field)) >> (64 - width);
-> +}
-
-I think you should rewrite cpuid_feature_extract_field() in terms of the
-_width one (the latter being more generic).
-
-> +
-> +static inline u64 ftr_mask(struct arm64_ftr_bits *ftrp)
-> +{
-> +	return (u64) GENMASK(ftrp->shift + ftrp->width - 1, ftrp->shift);
-> +}
-
-Nitpick: remove the space after (u64).
-
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 1ae8b24..d42ad90 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -58,8 +58,442 @@ static void update_mixed_endian_el0_support(struct cpuinfo_arm64 *info)
->  	mixed_endian_el0 &= id_aa64mmfr0_mixed_endian_el0(info->reg_id_aa64mmfr0);
->  }
->  
-> +#define ARM64_FTR_BITS(ftr_strict, ftr_type, ftr_shift, ftr_width, ftr_safe_val) \
-> +	{							\
-> +		.strict = ftr_strict,				\
-> +		.type = ftr_type,				\
-> +		.shift = ftr_shift,				\
-> +		.width = ftr_width,				\
-> +		.safe_val = ftr_safe_val,			\
-> +	}
-
-You can drop "ftr_" from all the arguments, it makes the macro
-definition shorter.
-
-[...]
-> +static struct arm64_ftr_bits ftr_id_pfr0[] = {
-> +	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 16, 16, 0),	// RAZ
-> +	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 12, 4, 0),	// State3
-> +	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 8, 4, 0),	// State2
-> +	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// State1
-> +	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// State0
-> +	ARM64_FTR_END,
-> +};
-
-Do we care about the RAZ/RAO fields? Or we use this later to check a new
-CPU's compatibility with the overall features?
-
-Also, you captured lots of fields that Linux does not care about. Is it
-possible to ignore them altogether, only keep those which are relevant.
-
-> +static struct arm64_ftr_reg crm_1[] = {
-> +	ARM64_FTR_REG(SYS_ID_PFR0_EL1, ftr_id_pfr0),
-> +	ARM64_FTR_REG(SYS_ID_PFR1_EL1, ftr_generic_scalar_32bit),
-> +	ARM64_FTR_REG(SYS_ID_DFR0_EL1, ftr_generic_scalar_32bit),
-> +	ARM64_FTR_REG(SYS_ID_MMFR0_EL1, ftr_id_mmfr0),
-> +	ARM64_FTR_REG(SYS_ID_MMFR1_EL1, ftr_generic_scalar_32bit),
-> +	ARM64_FTR_REG(SYS_ID_MMFR2_EL1, ftr_generic_scalar_32bit),
-> +	ARM64_FTR_REG(SYS_ID_MMFR3_EL1, ftr_generic_scalar_32bit),
-> +};
-> +
-> +static struct arm64_ftr_reg crm_2[] = {
-> +	ARM64_FTR_REG(SYS_ID_ISAR0_EL1, ftr_generic_scalar_32bit),
-> +	ARM64_FTR_REG(SYS_ID_ISAR1_EL1, ftr_generic_scalar_32bit),
-> +	ARM64_FTR_REG(SYS_ID_ISAR2_EL1, ftr_generic_scalar_32bit),
-> +	ARM64_FTR_REG(SYS_ID_ISAR3_EL1, ftr_generic_scalar_32bit),
-> +	ARM64_FTR_REG(SYS_ID_ISAR4_EL1, ftr_generic_scalar_32bit),
-> +	ARM64_FTR_REG(SYS_ID_ISAR5_EL1, ftr_id_isar5),
-> +	ARM64_FTR_REG(SYS_ID_MMFR4_EL1, ftr_id_mmfr4),
-> +};
-> +
-> +static struct arm64_ftr_reg crm_3[] = {
-> +	ARM64_FTR_REG(SYS_MVFR0_EL1, ftr_generic_scalar_32bit),
-> +	ARM64_FTR_REG(SYS_MVFR1_EL1, ftr_generic_scalar_32bit),
-> +	ARM64_FTR_REG(SYS_MVFR2_EL1, ftr_mvfr2),
-> +};
-> +
-> +static struct arm64_ftr_reg crm_4[] = {
-> +	ARM64_FTR_REG(SYS_ID_AA64PFR0_EL1, ftr_id_aa64pfr0),
-> +	ARM64_FTR_REG(SYS_ID_AA64PFR1_EL1, ftr_aa64raz),
-> +};
-> +
-> +static struct arm64_ftr_reg crm_5[] = {
-> +	ARM64_FTR_REG(SYS_ID_AA64DFR0_EL1, ftr_id_aa64dfr0),
-> +	ARM64_FTR_REG(SYS_ID_AA64DFR1_EL1, ftr_generic),
-> +};
-> +
-> +static struct arm64_ftr_reg crm_6[] = {
-> +	ARM64_FTR_REG(SYS_ID_AA64ISAR0_EL1, ftr_id_aa64isar0),
-> +	ARM64_FTR_REG(SYS_ID_AA64ISAR1_EL1, ftr_aa64raz),
-> +};
-> +
-> +static struct arm64_ftr_reg crm_7[] = {
-> +	ARM64_FTR_REG(SYS_ID_AA64MMFR0_EL1, ftr_id_aa64mmfr0),
-> +	ARM64_FTR_REG(SYS_ID_AA64MMFR1_EL1, ftr_id_aa64mmfr1),
-> +};
-> +
-> +static struct arm64_ftr_reg op1_3[] = {
-> +	ARM64_FTR_REG(SYS_CTR_EL0, ftr_ctr),
-> +	ARM64_FTR_REG(SYS_DCZID_EL0, ftr_dczid),
-> +	ARM64_FTR_REG(SYS_CNTFRQ_EL0, ftr_generic32),
-> +};
-> +
-> +#define ARM64_REG_TABLE(table) 		\
-> +	{ .n = ARRAY_SIZE(table), .regs = table }
-> +static struct arm64_reg_table {
-> +	int n;
-> +	struct arm64_ftr_reg *regs;
-> +} op1_0[] = {
-> +	ARM64_REG_TABLE(crm_1),
-> +	ARM64_REG_TABLE(crm_2),
-> +	ARM64_REG_TABLE(crm_3),
-> +	ARM64_REG_TABLE(crm_4),
-> +	ARM64_REG_TABLE(crm_5),
-> +	ARM64_REG_TABLE(crm_6),
-> +	ARM64_REG_TABLE(crm_7),
-> +};
-> +
-> +/*
-> + * get_arm6_sys_reg - Lookup a feature register entry using its
-
-arm64_...
-
-> + * sys_reg() encoding.
-> + *
-> + * We track only the following space:
-> + * Op0 = 3, Op1 = 0, CRn = 0, CRm = [1 - 7], Op2 = [0 - 7]
-> + * Op0 = 3, Op1 = 3, CRn = 0, CRm = 0, Op2 = { 1, 7 } 	(CTR, DCZID)
-> + * Op0 = 3, Op1 = 3, CRn = 14, CRm = 0, Op2 = 0		(CNTFRQ)
-> + *
-> + * The space (3, 0, 0, {1-7}, {0-7}) is arranged in a 2D array op1_0,
-> + * indexed by CRm and Op2. Since not all CRm's have fully allocated Op2's
-> + * arm64_reg_table[CRm-1].n indicates the largest Op2 tracked for CRm.
-> + *
-> + * Since we have limited number of entries with Op1 = 3, we use linear search
-> + * to find the reg.
-> + *
-> + */
-> +static struct arm64_ftr_reg* get_arm64_sys_reg(u32 sys_id)
-> +{
-> +	int i;
-> +	u8 op2, crn, crm;
-> +	u8 op1 = sys_reg_Op1(sys_id);
-> +
-> +	if (sys_reg_Op0(sys_id) != 3)
-> +		return NULL;
-> +	switch (op1) {
-> +	case 0:
-> +
-> +		crm = sys_reg_CRm(sys_id);
-> +		op2 = sys_reg_Op2(sys_id);
-> +		crn = sys_reg_CRn(sys_id);
-> +		if (crn || !crm || crm > 7)
-> +			return NULL;
-> +		if (op2 < op1_0[crm - 1].n &&
-> +			op1_0[crm - 1].regs[op2].sys_id == sys_id)
-> +			return &op1_0[crm - 1].regs[op2];
-> +		return NULL;
-> +	case 3:
-> +		for (i = 0; i < ARRAY_SIZE(op1_3); i++)
-> +			if (op1_3[i].sys_id == sys_id)
-> +				return &op1_3[i];
-> +	}
-> +	return NULL;
-> +}
-
-For this function, do we ever expect to be called with an invalid
-sys_id? You could add a BUG_ON(!ret) here.
-
-Is this function ever called on a hot path? If not, just keep everything
-in an array and do a linear search rather than having different arrays
-based on op*. Especially if we managed to limit the number of registers
-to only those that Linux cares about.
-
-As a general coding style comment, I would much prefer to have a "ret"
-local variable and one or two points of return from a function rather
-than multiple returns. I've seen this as a general trend in your
-patches, so please fix.
-
-> +
-> +static u64 arm64_ftr_set_value(struct arm64_ftr_bits *ftrp, s64 reg, s64 ftr_val)
-> +{
-> +	u64 mask = ftr_mask(ftrp);
-> +
-> +	reg &= ~mask;
-> +	reg |= (ftr_val << ftrp->shift) & mask;
-> +	return reg;
-> +}
-> +
-> +static s64 arm64_ftr_safe_value(struct arm64_ftr_bits *ftrp, s64 new, s64 cur)
-> +{
-> +	switch(ftrp->type) {
-> +	case FTR_DISCRETE:
-> +		return ftrp->safe_val;
-> +	case FTR_SCALAR_MIN:
-> +		return new < cur ? new : cur;
-> +	case FTR_SCALAR_MAX:
-> +		return new > cur ? new : cur;
-> +	}
-
-Same here about the returns.
-
-> +static void update_cpu_ftr_reg(u32 sys_reg, u64 new)
-> +{
-> +	struct arm64_ftr_bits *ftrp;
-> +	struct arm64_ftr_reg *reg = get_arm64_sys_reg(sys_reg);
-> +
-> +	BUG_ON(!reg);
-> +
-> +	for(ftrp = reg->ftr_bits; ftrp->width; ftrp++) {
-> +		s64 ftr_cur = arm64_ftr_value(ftrp, reg->sys_val);
-> +		s64 ftr_new = arm64_ftr_value(ftrp, new);
-> +
-> +		if (ftr_cur == ftr_new)
-> +			continue;
-> +		/* Find a safe value */
-> +		ftr_new = arm64_ftr_safe_value(ftrp, ftr_new, ftr_cur);
-> +		reg->sys_val = arm64_ftr_set_value(ftrp, reg->sys_val, ftr_new);
-> +	}
-> +
-> +}
-> +
-> +/* Update CPU feature register from non-boot CPU */
-
-s/register from/registers for/
-
--- 
-Catalin
+greg k-h
