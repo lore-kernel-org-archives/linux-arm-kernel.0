@@ -1,20 +1,23 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 7 Oct 2015 17:53:39 +0100
-Subject: [PATCH 5/6] coresight: etm3x: breaking down sysFS status interface
-In-Reply-To: <1444231603-26676-6-git-send-email-mathieu.poirier@linaro.org>
-References: <1444231603-26676-1-git-send-email-mathieu.poirier@linaro.org>
- <1444231603-26676-6-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20151007165339.GB12439@kroah.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 7 Oct 2015 11:58:28 -0500
+Subject: [PATCH 2/2] pl011: factor our FIFO to TTY code
+In-Reply-To: <20151007163557.GN21513@n2100.arm.linux.org.uk>
+References: <1298146644-31007-1-git-send-email-linus.walleij@stericsson.com>
+ <CAOZdJXVVgd=YTn33VAB2GbfuPkGGapr0C=dN7J+KhdcJuOpKuA@mail.gmail.com>
+ <20151007163557.GN21513@n2100.arm.linux.org.uk>
+Message-ID: <CAOZdJXWx80Jrjecpi8Tt_To=Tyy-EQK8L53AARj8us7b-hTBBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 09:26:42AM -0600, Mathieu Poirier wrote:
-> SysFS rules stipulate that only one value can be conveyed per
-> file.  As such splitting the "status" interface in individual files.
-> 
-> This is also useful for user space applications - that way they can
-> probe each file individually rather than having to parse a list of entries.
+On Wed, Oct 7, 2015 at 11:35 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> When CREAD is clear, this should cause input to be discarded - except
+> in this case, because the bit is cropped by the u16, it'll always be
+> accepted.
 
-Ah, much nicer, thanks for doing this.
+Ok, I'll submit a patch that changes 'ch' back to an unsigned int.
 
-greg k-h
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
