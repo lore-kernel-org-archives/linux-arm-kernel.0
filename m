@@ -1,29 +1,58 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Thu, 8 Oct 2015 00:33:43 +0900
-Subject: [PATCH v3] arm64: Introduce IRQ stack
-In-Reply-To: <CA+tMzQE58f9OGt5ucJvOg1wFb-0KruUxmTKjT7Zd9cFEpMCDAg@mail.gmail.com>
-References: <1442837993-2364-1-git-send-email-jungseoklee85@gmail.com>
- <CA+tMzQE58f9OGt5ucJvOg1wFb-0KruUxmTKjT7Zd9cFEpMCDAg@mail.gmail.com>
-Message-ID: <3BA81258-2B7F-4625-9A72-EA043F2CCA99@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 07 Oct 2015 16:35:46 +0100
+Subject: [PATCH v3 12/16] KVM: arm64: handle pending bit for LPIs in ITS
+ emulation
+In-Reply-To: <026901d10112$4dea39d0$e9bead70$@samsung.com>
+References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
+ <1444229726-31559-13-git-send-email-andre.przywara@arm.com>
+ <026901d10112$4dea39d0$e9bead70$@samsung.com>
+Message-ID: <56153BD2.1050904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sep 28, 2015, at 11:24 PM, Sungjinn Chung wrote:
-> Hi Jeongseok,
-
-Hi Sungjinn,
-
-> I expect to save memory and easily fork processes with your patchset.
+On 07/10/15 16:10, Pavel Fedin wrote:
+>  Hello!
 > 
-> Acked-by: Sungjinn Chung <barami97@gmail.com>
+>> As the actual LPI number in a guest can be quite high, but is mostly
+>> assigned using a very sparse allocation scheme, bitmaps and arrays
+>> for storing the virtual interrupt status are a waste of memory.
+>> We use our equivalent of the "Interrupt Translation Table Entry"
+>> (ITTE) to hold this extra status information for a virtual LPI.
 > 
+> You know, not that i'm strongly against current approach and want you
+> to redo everything once again, but... Is it architecturally correct
+> to intertwine LPIs and ITS so much? As far as i
 
-I've done re-spin the series which is version four.
+Yes it is.
 
-Could you review it since it includes stack trace support feature?
-I will take the tag at that time.
+> understand arch manual, it is possible to have LPIs without ITS
+> (triggered by something else?). Shouldn't we do the same, and just
+> add LPI support to our redistributors, and then proceed with the 
+> ITS?
 
-I always thank you!
+No. We're implementing a monolithic GICv3 that doesn't offer writing to
+the redistributors directly from a device. And frankly, that's good enough.
 
-Best Regards
-Jungseok Lee
+> As to memory consumption, do we really need to store own copy of
+> tables? After all, it's just a memory. What if we map a pointer
+> directly into guest's memory (which it writes to 
+> PROPBASER/PENDBASER), and just keep it? There will be no issues with
+> caching and synchronization at all.
+
+Sure. And you then have to parse and validate all the tables each and
+every time you're going to inject an interrupt (because the guest can
+change the table content behind your back). You are quickly going to
+notice that your performance is abysmal.
+
+At that point, you're going to start being clever, and add a cache. And
+guess what, that's what the HW does too. And then you'll make your cache
+a convenient structure to be able to quickly inject interrupts. And
+that's what the HW does too. And finally, you're going to realize that
+populating a cache sucks, and you're going to keep all the state where
+it is convenient, when it is convenient (and that's basically always).
+
+The HW can't do that, but we can.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
