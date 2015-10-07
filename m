@@ -1,45 +1,32 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed,  7 Oct 2015 22:31:05 +0200
-Subject: [PATCH v2 4/4] ARM: meson: Enable Meson8b SoCs
-In-Reply-To: <1444249865-6897-1-git-send-email-carlo@caione.org>
-References: <1444249865-6897-1-git-send-email-carlo@caione.org>
-Message-ID: <1444249865-6897-5-git-send-email-carlo@caione.org>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Wed, 7 Oct 2015 13:31:39 -0700
+Subject: [PATCH] ARM: configs: keystone: Add ramdisk support
+In-Reply-To: <561578F0.80809@ti.com>
+References: <1444246089-1417-1-git-send-email-nm@ti.com>
+ <12772658.mmM2ZKnfR4@wuerfel> <561578F0.80809@ti.com>
+Message-ID: <5615812B.2010904@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+Nishant,
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- arch/arm/mach-meson/Kconfig | 5 +++++
- arch/arm/mach-meson/meson.c | 1 +
- 2 files changed, 6 insertions(+)
+On 10/7/2015 12:56 PM, Nishanth Menon wrote:
+> On 10/07/2015 02:37 PM, Arnd Bergmann wrote:
+>> On Wednesday 07 October 2015 14:28:09 Nishanth Menon wrote:
+>>> Add ramdisk support to allow for minimal kernel to be supported.
+>>>
+>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>>
+>>
+>> I have not seen that in a while. Can you explain why the normal
+>> initramfs method doesn't work on keystone?
+>
+> It probably does - I have'nt used it - i am using an initrd thanks to
+> legacy testing support framework I am stuck with. The SoC I am
+> attempting to bring up has no support (yet) for any storage device for
+> filesystem yet.
+>
+If not checked already, please check with Vitaly.
 
-diff --git a/arch/arm/mach-meson/Kconfig b/arch/arm/mach-meson/Kconfig
-index 0743e20..5d56f86 100644
---- a/arch/arm/mach-meson/Kconfig
-+++ b/arch/arm/mach-meson/Kconfig
-@@ -19,4 +19,9 @@ config MACH_MESON8
- 	default ARCH_MESON
- 	select MESON6_TIMER
- 
-+config MACH_MESON8B
-+	bool "Amlogic Meson8b SoCs support"
-+	default ARCH_MESON
-+	select MESON6_TIMER
-+
- endif
-diff --git a/arch/arm/mach-meson/meson.c b/arch/arm/mach-meson/meson.c
-index 5d6affe..4e23571 100644
---- a/arch/arm/mach-meson/meson.c
-+++ b/arch/arm/mach-meson/meson.c
-@@ -19,6 +19,7 @@
- static const char * const meson_common_board_compat[] = {
- 	"amlogic,meson6",
- 	"amlogic,meson8",
-+	"amlogic,meson8b",
- 	NULL,
- };
- 
--- 
-1.9.1
+Regards,
+Santosh
