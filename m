@@ -1,41 +1,42 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 7 Oct 2015 17:12:28 +0100
-Subject: [PATCH v2 1/3] nvmem: core: make default user binary file
- root-access only
-In-Reply-To: <56151BB7.5090407@linaro.org>
-References: <1444215536-10783-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1444215647-10836-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20151007125531.GA7962@kroah.com> <56151BB7.5090407@linaro.org>
-Message-ID: <20151007161228.GD9669@kroah.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 7 Oct 2015 11:13:33 -0500
+Subject: [PATCH 2/2] pl011: factor our FIFO to TTY code
+In-Reply-To: <1298146644-31007-1-git-send-email-linus.walleij@stericsson.com>
+References: <1298146644-31007-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CAOZdJXVVgd=YTn33VAB2GbfuPkGGapr0C=dN7J+KhdcJuOpKuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 02:18:47PM +0100, Srinivas Kandagatla wrote:
-> 
-> 
-> On 07/10/15 13:55, Greg KH wrote:
-> >On Wed, Oct 07, 2015 at 12:00:47PM +0100, Srinivas Kandagatla wrote:
-> >>As required by many providers like at24/at25/mxs-ocotp/qfprom and may be
-> >>other providers would want to allow root-only to read the nvmem content.
-> >>So making the defaults to be root-only access would address the request
-> >>and also provide flexibility to providers to specify there own permissions
-> >>on top of the root-only using the perm flag in nvmem_config.
-> >
-> >Eeek, no, don't mess with different permissions, that's not ok, be
-> >consistent and only allow root write access, that's why we have static
-> >build-time checks to ensure you get this correct and do not accidentally
-> >let a "normal" user access to things they shouldn't have access to.
-> Thanks for your inputs,
-> 
-> Code as it is in mainline would provide a write permission to root-only and
-> read to all the group.
-> 
-> Fixing/removing the group read permissions should stop normal user accessing
-> the binary file.
+On Sat, Feb 19, 2011 at 2:17 PM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> +static int pl011_fifo_to_tty(struct uart_amba_port *uap)
+> +{
+> +       u16 status, ch;
+> +       unsigned int flag, max_count = 256;
+> +       int fifotaken = 0;
+> +
+> +       while (max_count--) {
+> +               status = readw(uap->port.membase + UART01x_FR);
+> +               if (status & UART01x_FR_RXFE)
+> +                       break;
+> +
+> +               /* Take chars from the FIFO and update status */
+> +               ch = readw(uap->port.membase + UART01x_DR) |
+> +                       UART_DUMMY_DR_RX;
 
-Great, send a simple patch that does this and I'll be glad to queue it
-up.
+I know this patch is four years old, but I just noticed a bug, and I
+can't figure out how no else noticed it.  Or maybe I'm imagining
+things.
 
-thanks,
+#define UART_DUMMY_DR_RX        (1 << 16)
 
-greg k-h
+UART_DUMMY_DR_RX cannot fit into 'ch', because ch is a 16-bit integer.
+So the UART_DUMMY_DR_RX is lost.
+
+What does UART_DUMMY_DR_RX do, anyway?  It's set in two places, but no
+one ever checks for it.
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
