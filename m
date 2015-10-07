@@ -1,102 +1,62 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 7 Oct 2015 14:44:26 -0500
-Subject: [PATCH v4 1/5] PCI: Add pci_bus_fixup_irqs().
-In-Reply-To: <1443811443-18878-2-git-send-email-ddaney.cavm@gmail.com>
-References: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
- <1443811443-18878-2-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20151007194426.GF27633@localhost>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 7 Oct 2015 20:48:10 +0100
+Subject: [PATCH v3 00/16] KVM: arm64: GICv3 ITS emulation
+In-Reply-To: <02c301d1012b$42cb8270$c8628750$@samsung.com>
+References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
+ <029601d1011a$026e1000$074a3000$@samsung.com>
+ <561546AF.90903@arm.com>
+ <02c301d1012b$42cb8270$c8628750$@samsung.com>
+Message-ID: <20151007204810.66e2b1d6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Wed, 7 Oct 2015 21:09:07 +0300
+Pavel Fedin <p.fedin@samsung.com> wrote:
 
-On Fri, Oct 02, 2015 at 11:43:59AM -0700, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
+>  Hello!
 > 
-> pci_bus_fixup_irqs() works like pci_fixup_irqs(), except it only does
-> the fixups for devices on the specified bus.
+> > LPIs do not have an active state, at the redistributor or otherwise.
 > 
-> Follow-on patch will use the new function.
-> 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
-> No change from v2.
-> 
->  drivers/pci/setup-irq.c | 30 ++++++++++++++++++++++++++++++
->  include/linux/pci.h     |  4 ++++
->  2 files changed, 34 insertions(+)
-> 
-> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
-> index 95c225b..189ad17 100644
-> --- a/drivers/pci/setup-irq.c
-> +++ b/drivers/pci/setup-irq.c
-> @@ -66,3 +66,33 @@ void pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
->  		pdev_fixup_irq(dev, swizzle, map_irq);
->  }
->  EXPORT_SYMBOL_GPL(pci_fixup_irqs);
-> +
-> +struct pci_bus_fixup_cb_info {
-> +	u8 (*swizzle)(struct pci_dev *, u8 *);
-> +	int (*map_irq)(const struct pci_dev *, u8, u8);
-> +};
-> +
-> +static int pci_bus_fixup_irq_cb(struct pci_dev *dev, void *arg)
-> +{
-> +	struct pci_bus_fixup_cb_info *info = arg;
-> +
-> +	pdev_fixup_irq(dev, info->swizzle, info->map_irq);
-> +	return 0;
-> +}
-> +
-> +/*
-> + * Fixup the irqs only for devices on the given bus using supplied
-> + * swizzle and map_irq function pointers
-> + */
-> +void pci_bus_fixup_irqs(struct pci_bus *bus,
-> +			u8 (*swizzle)(struct pci_dev *, u8 *),
-> +			int (*map_irq)(const struct pci_dev *, u8, u8))
-> +{
-> +	struct pci_bus_fixup_cb_info info;
-> +
-> +	info.swizzle = swizzle;
-> +	info.map_irq = map_irq;
-> +	pci_walk_bus(bus, pci_bus_fixup_irq_cb, &info);
+>  Then what do they become after they were ACK'ed and before EOI'ed?
 
-I don't like the existing pci_fixup_irqs(), so by transitivity, I
-don't like pci_bus_fixup_irqs() either.  The problem is that in both
-cases this is a one-time pass over the tree, so we don't handle
-hot-added devices correctly.
+Nothing. They are gone. What is left at the CPU interface is the active
+priority.
 
-I think we need to get rid of pci_fixup_irqs() and somehow integrate
-it into the pci_device_add() path, where it would be done once for
-every device we enumerate.  If we did that, I don't think you would
-need to add pci_bus_fixup_irqs(), would you?
+>  I tried to google up this thing, and came up with this email:
+> http://www.spinics.net/lists/kvm-arm/msg16032.html. It says that "SW must issue a write to EOI to
+> clear the active priorities register, hence the CPU interface still requires an active state for
+> LPIs". They give a link to some document which seems to be top-secret and never published, because
+> my arch reference manual does not have section 4.8.3 named "Properties of LPI".
 
-Bjorn
+Your architecture document has a section 1.2.1 which contains the
+sentence: "LPIs do not have an active state, and therefore do not
+require explicit deactivation.". It also has 1.2.2 ("Interrupt states")
+that repeatedly states the same thing. Finally, the email you quote is
+about priority drop vs deactivation, not about the active state of an
+LPI.
 
-> +
-> +}
-> +EXPORT_SYMBOL_GPL(pci_bus_fixup_irqs);
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index e90eb22..b505b50 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -1120,6 +1120,10 @@ void pdev_enable_device(struct pci_dev *);
->  int pci_enable_resources(struct pci_dev *, int mask);
->  void pci_fixup_irqs(u8 (*)(struct pci_dev *, u8 *),
->  		    int (*)(const struct pci_dev *, u8, u8));
-> +void pci_bus_fixup_irqs(struct pci_bus *,
-> +			u8 (*)(struct pci_dev *, u8 *),
-> +			int (*)(const struct pci_dev *, u8, u8));
-> +
->  #define HAVE_PCI_REQ_REGIONS	2
->  int __must_check pci_request_regions(struct pci_dev *, const char *);
->  int __must_check pci_request_regions_exclusive(struct pci_dev *, const char *);
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+>  And another thread,
+> http://lists.xen.org/archives/html/xen-devel/2014-09/msg01141.html,
+> says that virtual LPIs actually do have active state in LR.
+
+Or not. Read again. The only case where something vaguely relevant
+happens is when you inject a virtual SPI backed by a HW LPI. In that
+case, the LR does have an active state (of course, this is an SPI). Or
+when you inject a virtual LPI backed by a HW SPI (in which case the
+relevant active state is in the physical distributor, not in the LR).
+
+I'd appreciate if you could try to read and understand the architecture
+spec instead of randomly googling and quoting various bits of
+irrelevant information.
+
+If something is unclear in the architecture specification (yes, this
+is complicated and sometimes confusing), please ask relevant questions.
+At the moment, you're just asserting fallacies, and I'd rather spend
+time doing something useful instead of setting the record straight
+again and again.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
