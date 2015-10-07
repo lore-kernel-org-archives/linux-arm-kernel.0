@@ -1,148 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Oct 2015 11:32:57 +0100
-Subject: [PATCH v2] iommu/arm-smmu: Add support for MSI on SMMUv3
-In-Reply-To: <1444155326-28379-1-git-send-email-marc.zyngier@arm.com>
-References: <1444155326-28379-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20151007103256.GF16065@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 7 Oct 2015 11:35:10 +0100
+Subject: [PATCH v2 3/3] ARM: dts: sun6i: hummingbird: Drop AXP221 DC1SW
+ and DC5LDO supplies
+In-Reply-To: <1443595188-1283-4-git-send-email-wens@csie.org>
+References: <1443595188-1283-1-git-send-email-wens@csie.org>
+ <1443595188-1283-4-git-send-email-wens@csie.org>
+Message-ID: <20151007103510.GE2278@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On Tue, Oct 06, 2015 at 07:15:26PM +0100, Marc Zyngier wrote:
-> Despite being a platform device, the SMMUv3 is capable of signaling
-> interrupts using MSIs. Hook it into the platform MSI framework and
-> enjoy faults being reported in a new and exciting way.
+On Wed, Sep 30, 2015 at 02:39:47PM +0800, Chen-Yu Tsai wrote:
+> "dcdc1-supply" and "dcdc5-supply" have been dropped, as they are
+> internally connected and should not be represented in the device
+> tree.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> Now rebased on top of Will's iommu/devel branch, which leads to
-> a slightly different patch.
-> 
->  drivers/iommu/arm-smmu-v3.c | 82 ++++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 78 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 5b11b77..3ccc8ed 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -26,6 +26,7 @@
->  #include <linux/iommu.h>
->  #include <linux/iopoll.h>
->  #include <linux/module.h>
-> +#include <linux/msi.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/of_platform.h>
-> @@ -2176,6 +2177,63 @@ static int arm_smmu_write_reg_sync(struct arm_smmu_device *smmu, u32 val,
->  					  1, ARM_SMMU_POLL_TIMEOUT_US);
->  }
->  
-> +static void arm_smmu_write_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
-> +{
-> +	struct device *dev = msi_desc_to_dev(desc);
-> +	struct arm_smmu_device *smmu = dev_get_drvdata(dev);
-> +	phys_addr_t cfg0_offset, cfg1_offset, cfg2_offset;
-> +	phys_addr_t doorbell;
-> +
-> +	switch (desc->platform.msi_index) {
-> +	case 0:			/* EVTQ */
-> +		cfg0_offset = ARM_SMMU_EVTQ_IRQ_CFG0;
-> +		cfg1_offset = ARM_SMMU_EVTQ_IRQ_CFG1;
-> +		cfg2_offset = ARM_SMMU_EVTQ_IRQ_CFG2;
-> +		break;
-> +	case 1:			/* GERROR */
-> +		cfg0_offset = ARM_SMMU_GERROR_IRQ_CFG0;
-> +		cfg1_offset = ARM_SMMU_GERROR_IRQ_CFG1;
-> +		cfg2_offset = ARM_SMMU_GERROR_IRQ_CFG2;
-> +		break;
-> +	case 2:			/* PRIQ */
-> +		cfg0_offset = ARM_SMMU_PRIQ_IRQ_CFG0;
-> +		cfg1_offset = ARM_SMMU_PRIQ_IRQ_CFG1;
-> +		cfg2_offset = ARM_SMMU_PRIQ_IRQ_CFG2;
-> +		break;
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Can we have some #defines or an enum for these indices please?
+Applied, thanks!
+Maxime
 
-> +	default:		/* Unknown */
-> +		return;
-> +	}
-> +
-> +	doorbell = (((u64)msg->address_hi) << 32) | msg->address_lo;
-> +	doorbell &= MSI_CFG0_ADDR_MASK << MSI_CFG0_ADDR_SHIFT;
-> +
-> +	writeq_relaxed(doorbell, smmu->base + cfg0_offset);
-> +	writew_relaxed(msg->data, smmu->base + cfg1_offset);
-> +	writew_relaxed(MSI_CFG2_MEMATTR_DEVICE_nGnRE,
-> +		       smmu->base + cfg2_offset);
-
-writel_relaxed?
-
-> +}
-> +
-> +static void arm_smmu_msi_override_irqs(struct arm_smmu_device *smmu)
-> +{
-> +	struct msi_desc *desc;
-> +
-> +	for_each_msi_entry(desc, smmu->dev) {
-> +		switch (desc->platform.msi_index) {
-> +		case 0:		/* EVTQ */
-> +			smmu->evtq.q.irq = desc->irq;
-> +			break;
-> +		case 1:		/* GERROR */
-> +			smmu->gerr_irq = desc->irq;
-> +			break;
-> +		case 2:		/* PRIQ */
-> +			smmu->priq.q.irq = desc->irq;
-> +			break;
-> +		default:	/* Unknown */
-> +			continue;
-> +		}
-> +	}
-> +}
-> +
->  static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
->  {
->  	int ret, irq;
-> @@ -2192,6 +2250,23 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
->  	/* Clear the MSI address regs */
->  	writeq_relaxed(0, smmu->base + ARM_SMMU_GERROR_IRQ_CFG0);
->  	writeq_relaxed(0, smmu->base + ARM_SMMU_EVTQ_IRQ_CFG0);
-> +	if (smmu->features & ARM_SMMU_FEAT_PRI)
-> +		writeq_relaxed(0, smmu->base + ARM_SMMU_PRIQ_IRQ_CFG0);
-> +
-> +	/* Allocate MSIs for evtq, gerror and priq. Ignore cmdq */
-> +	if (smmu->features & ARM_SMMU_FEAT_MSI) {
-
-We should probably add an IS_ENABLED(CONFIG_MSI) to the feature setting
-in arm_smmu_device_probe too.
-
-> +		int nvecs = 2;
-> +
-> +		if (smmu->features & ARM_SMMU_FEAT_PRI)
-> +			nvecs++;
-> +
-> +		ret = platform_msi_domain_alloc_irqs(smmu->dev, nvecs,
-> +						     arm_smmu_write_msi_msg);
-
-Since this is doing kzallocs and stuff we're going to need some extra code
-on the failure and teardown paths, methinks. Or you could write a devm_
-interface like we have for wired interrupts.
-
-> +		if (ret)
-> +			dev_warn(smmu->dev, "failed to allocate MSIs\n");
-> +		else
-> +			arm_smmu_msi_override_irqs(smmu);
-> +	}
-
-Let's just move all this out into arm_smmu_setup_msi_vecs, which can do
-the MSI feature check and zero or configure the MSI cfg register
-accordingly.
-
->  
->  	/* Request wired interrupt lines */
-
-We should probably remove "wired" from this comment now that we could
-be overriding the irqs using the MSI descriptors.
-
-Will
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151007/00882231/attachment.sig>
