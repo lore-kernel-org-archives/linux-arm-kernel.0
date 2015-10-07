@@ -1,84 +1,32 @@
-From: goran.cengic@ericsson.com (Goran Cengic)
-Date: Wed, 7 Oct 2015 11:50:26 +0000
-Subject: gpio-mvebu: patch for separate edge and level mask caches
-In-Reply-To: <20151007114054.GI13247@io.lakedaemon.net>
-References: <2F27BCDE355D444CB7EA7E1569D8465028987D43@ESESSMB203.ericsson.se>
- <20151007114054.GI13247@io.lakedaemon.net>
-Message-ID: <2F27BCDE355D444CB7EA7E1569D8465028987DA1@ESESSMB203.ericsson.se>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Oct 2015 14:10:04 +0200
+Subject: [PATCH] RDMA/cxgb4: re-fix 32-bit build warning
+Message-ID: <13543971.LQ3Q8CCxhL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Including the patch and lakml.
+Casting a pointer to __be64 produces a warning on 32-bit architectures:
 
-> -----Original Message-----
-> From: Jason Cooper [mailto:jason at lakedaemon.net]
-> Sent: den 7 oktober 2015 13:41
-> To: Goran Cengic; Linus Walleij
-> Cc: Thomas Petazzoni; Andrew Lunn; Gregory Clement; Sebastian
-> Hesselbarth
-> Subject: Re: gpio-mvebu: patch for separate edge and level mask caches
-> 
-> Hello Goran,
-> 
-> +Cc: LinusW (gpio maintainer)
-> 
-> On Wed, Oct 07, 2015 at 10:36:01AM +0000, Goran Cengic wrote:
-> > Hi again,
-> >
-> > I didn't found who maintains the drivers/gpio/gpio-mvebu.c in the
-> > MAINTAINERS and I've realized that Armada 38x SoC maintainers also
-> > might be relevant for this issue so I've included them here.
-> 
-> You're absolutely correct.  Those of us involved with kernel development
-> day-to-day 'just know' that the mvebu maintainers would handle such a
-> driver.  We should update MAINTAINERS.
-> 
-> 
-> > From: Goran Cengic
-> > Sent: den 5 oktober 2015 20:15
-> > To: 'Thomas Petazzoni'
-> > Subject: gpio-mvebu: patch for separate edge and level mask caches
-> >
-> > Hi Thomas,
-> >
-> > We've encountered a small issue with not being able to mix edge and
-> > level sensitive interrupts. The issue is that gpio-mvebu would trigger
-> > an edge sensitive interrupt even though mvebu_gpio_level_irq_mask()
-> > has been called for the same level interrupt. The issue is caused by
-> > the mask_cache in irq_chip_generic being shared between the
-> > chip_types.
-> >
-> > Here is a summary of what happens. Enable_irq(some level sensitive
-> > interrupt), as configured in dtb, enable_irq(some other edge sensitive
-> > interrupt). At this point the mask_cache is not masking bot
-> > interrupts. Since the same mask_cache is written to the edge mask
-> > register, at the second call to enable_irq(), the level sensitive
-> > interrupt is unmasked in the edge mask register also. Now as soon as
-> > the transition to, say, low level occurs the mvebu gpio controller
-> > registers one in the edge cause register while the data in is used as
-> > level cause register. The irq handling starts and masks the interrupt
-> > using mvebu_gpio_level_irq_mask(), since that interrupt is configured
-> > as level-sensitive. However, the edge cause register is never
-> > mvebu_gpio_irq_ack()'ed and continues to trigger interrupt handling
-> > and locks the processor since the edge mask register is not masking
-> > that bit.
-> 
-> Thanks for the bug report, however ...
-> 
-> > I've attached a small patch so that you can decide if it's ok for inclusion.
-> 
-> hmmm, I don't see it.  Could you please resend with it attached?
-> 
-> Please also Cc lakml at linux-arm-kernel at lists.infradead.org.  If you can, then
-> please try to adhere to the list conventions: no html, no legal footers, etc.
-> 
-> thx,
-> 
-> Jason.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-gpio-mvebu-separate-edge-and-level-mask-caches.patch
-Type: application/octet-stream
-Size: 2173 bytes
-Desc: 0001-gpio-mvebu-separate-edge-and-level-mask-caches.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151007/5d4715d9/attachment-0001.obj>
+drivers/infiniband/hw/cxgb4/mem.c:147:20: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+    req->wr.wr_lo = (__force __be64)&wr_wait;
+
+This was fixed at least twice for this driver in different places,
+and accidentally reverted once more. This puts the correct version
+back in place.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 6198dd8d7a6a7 ("iw_cxgb4: 32b platform fixes")
+
+diff --git a/drivers/infiniband/hw/cxgb4/mem.c b/drivers/infiniband/hw/cxgb4/mem.c
+index 026b91ebd5e2..140415d31bcc 100644
+--- a/drivers/infiniband/hw/cxgb4/mem.c
++++ b/drivers/infiniband/hw/cxgb4/mem.c
+@@ -144,7 +144,7 @@ static int _c4iw_write_mem_inline(struct c4iw_rdev *rdev, u32 addr, u32 len,
+ 		if (i == (num_wqe-1)) {
+ 			req->wr.wr_hi = cpu_to_be32(FW_WR_OP_V(FW_ULPTX_WR) |
+ 						    FW_WR_COMPL_F);
+-			req->wr.wr_lo = (__force __be64)&wr_wait;
++			req->wr.wr_lo = (__force __be64)(unsigned long)&wr_wait;
+ 		} else
+ 			req->wr.wr_hi = cpu_to_be32(FW_WR_OP_V(FW_ULPTX_WR));
+ 		req->wr.wr_mid = cpu_to_be32(
