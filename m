@@ -1,42 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Oct 2015 12:20:11 +0100
-Subject: [PATCH] arm: perf: Add event descriptions
-In-Reply-To: <20150924175257.GH7356@arm.com>
-References: <20150804001522.GA13214@dreric01-gentoo.localdomain>
- <20150817205809.GA16506@dreric01-gentoo.localdomain>
- <20150826165148.GF30466@arm.com>
- <20150817214035.GA25775@dreric01-gentoo.localdomain>
- <20150924175257.GH7356@arm.com>
-Message-ID: <20151007112011.GH16065@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 7 Oct 2015 16:51:49 +0530
+Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
+In-Reply-To: <20151007110755.GA6601@kroah.com>
+References: <5706174.BUsqiXljxZ@wuerfel> <20151007105911.GC9892@linux>
+ <20151007110302.GD9892@linux> <20151007110755.GA6601@kroah.com>
+Message-ID: <20151007112149.GB22530@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again, Drew,
+On 07-10-15, 12:07, Greg Kroah-Hartman wrote:
+> Why would you be wanting to create a "unsigned long" as an api anyway?
+> Just force it to be u64 all the time, can't you do that?
 
-On Thu, Sep 24, 2015 at 06:52:57PM +0100, Will Deacon wrote:
-> On Mon, Aug 17, 2015 at 10:40:36PM +0100, Drew Richardson wrote:
-> > So my suggestion to solve the problem is that the kernel can have the
-> > list of events as proposed in the patch.
-> 
-> Sorry, but I just don't buy this argument. Your problem is that the user
-> needs to be running an up-to-date perf tool, but with your proposed
-> solution, you're asking them to update the *kernel* instead, which is
-> (unfortunately) one of the hardest pieces of software to upgrade on a
-> typical ARM platform.
+Okay, so the variable in question (lets say frequency) is an 'unsigned
+long' and that's how all the APIs of clock framework expect/define
+it.
 
-I've spent some time thinking about this and, actually, it makes sense
-to do this for the architected events. These event numbers are guaranteed
-to be portable between CPUs, so if we expose those through sysfs then
-we don't have this dependency on updating the kernel for newer cores
-(well, once the initial period without your patch has expired). It's the
-noon-portable, micro-architectural events that I object to.
+And you are probably saying that we do this:
 
-So how about you roll a new version of this patch just exposing the
-architected events and making use of the macros in perf_event.h to make
-it a bit tidier (PMU_EVENT_ATTR, PMU_EVENT_ATTR_STRING etc)?
+unsigned long freq;
 
-Be aware that there's a fair amount of arm64 perf patches queue for 4.4,
-since we're moving over to the code in drivers/perf/. Hopefully these
-will appear on the arm64 for-next/core branch shortly.
+debugfs_create_u64((u64 *)&freq);
 
-Will
+Right? Or are you asking to update clock APIs to be converted to u64?
+
+This will break things on a 32 bit architecture where unsigned long is
+32 bits long, as doing this will overwrite the next 32 bits:
+
+*freq = XYZ;
+
+-- 
+viresh
