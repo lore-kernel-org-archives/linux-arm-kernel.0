@@ -1,52 +1,60 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Oct 2015 10:57:46 +0900
-Subject: [PATCH 09/28] ARM: shmobile: silk: add I2C1 DT support
+Date: Wed,  7 Oct 2015 10:57:47 +0900
+Subject: [PATCH 10/28] ARM: shmobile: r8a7794: add VIN DT support
 In-Reply-To: <cover.1444182812.git.horms+renesas@verge.net.au>
 References: <cover.1444182812.git.horms+renesas@verge.net.au>
-Message-ID: <fa070791c1e7df91ca07fc7c9a431fac0d7d2832.1444182812.git.horms+renesas@verge.net.au>
+Message-ID: <1afe77ca7846489fff3d1675b82bd2116a56474a.1444182812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Define the SILK board dependent part of the I2C1 device node.
+Define the generic R8A7794 part of the VIN[01] device nodes. Add aliases for
+the VIN[01] device nodes.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794-silk.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/r8a7794.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index f49bc00738a3..3f808724106e 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -61,6 +61,11 @@
- 		renesas,function = "intc";
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 7384db2a3992..e54f3dea2d70 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -27,6 +27,8 @@
+ 		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
+ 		spi0 = &qspi;
++		vin0 = &vin0;
++		vin1 = &vin1;
  	};
  
-+	i2c1_pins: i2c1 {
-+		renesas,groups = "i2c1";
-+		renesas,function = "i2c1";
+ 	cpus {
+@@ -628,6 +630,24 @@
+ 		status = "disabled";
+ 	};
+ 
++	vin0: video at e6ef0000 {
++		compatible = "renesas,vin-r8a7794";
++		reg = <0 0xe6ef0000 0 0x1000>;
++		interrupts = <0 188 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp8_clks R8A7794_CLK_VIN0>;
++		power-domains = <&cpg_clocks>;
++		status = "disabled";
 +	};
 +
- 	mmcif0_pins: mmcif0 {
- 		renesas,groups = "mmc_data8", "mmc_ctrl";
- 		renesas,function = "mmc";
-@@ -95,6 +100,14 @@
- 	};
- };
- 
-+&i2c1 {
-+	pinctrl-0 = <&i2c1_pins>;
-+	pinctrl-names = "default";
++	vin1: video at e6ef1000 {
++		compatible = "renesas,vin-r8a7794";
++		reg = <0 0xe6ef1000 0 0x1000>;
++		interrupts = <0 189 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp8_clks R8A7794_CLK_VIN1>;
++		power-domains = <&cpg_clocks>;
++		status = "disabled";
++	};
 +
-+	status = "okay";
-+	clock-frequency = <400000>;
-+};
-+
- &mmcif0 {
- 	pinctrl-0 = <&mmcif0_pins>;
- 	pinctrl-names = "default";
+ 	clocks {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
 -- 
 2.1.4
