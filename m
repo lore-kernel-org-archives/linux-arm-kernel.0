@@ -1,65 +1,56 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed,  7 Oct 2015 06:22:25 -0700
-Subject: [PATCH 2/2] mmc: host: omap_hsmmc: Fix MMC for omap3 legacy booting
-In-Reply-To: <1444224145-24333-1-git-send-email-tony@atomide.com>
-References: <1444224145-24333-1-git-send-email-tony@atomide.com>
-Message-ID: <1444224145-24333-2-git-send-email-tony@atomide.com>
+Date: Wed, 7 Oct 2015 06:26:42 -0700
+Subject: All OMAP platforms: MMC is broken
+In-Reply-To: <20151007124551.GI21626@n2100.arm.linux.org.uk>
+References: <20151005112304.GZ23801@atomide.com>
+ <20151005143532.GA23801@atomide.com>
+ <20151005145127.GB23801@atomide.com>
+ <20151005171155.GF23801@atomide.com>
+ <20151005183813.GD21626@n2100.arm.linux.org.uk>
+ <20151006090015.GE21626@n2100.arm.linux.org.uk>
+ <20151006094425.GM23801@atomide.com>
+ <20151006150009.GF21626@n2100.arm.linux.org.uk>
+ <20151006153710.GS23801@atomide.com>
+ <20151007124551.GI21626@n2100.arm.linux.org.uk>
+Message-ID: <20151007132642.GV23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Starting with commit 7d607f917008 ("mmc: host: omap_hsmmc: use
-devm_regulator_get_optional() for vmmc") MMC on omap3 stopped working
-for legacy booting.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [151007 05:50]:
+> On Tue, Oct 06, 2015 at 08:37:11AM -0700, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [151006 08:04]:
+> > > On Tue, Oct 06, 2015 at 02:44:25AM -0700, Tony Lindgren wrote:
+> > > > 
+> > > > Hmm DT-based boot finds the MMC card for LDP, dmesg below from DT boot [1].
+> > > > Looks like you're on on -rc4 and not -rc3. My guess is that MMC is not
+> > > > working for you with DT-based booting because you don't seem to have
+> > > > CONFIG_REGULATOR_PBIAS in your seed config for. Care to try enabling that
+> > > > for both your omap3 and omap4 seed config files?
+> > > 
+> > > This is precisely the kind of crap I'm objecting to.  New kernel versions
+> > > come along, and things break because people add extra Kconfig symbols that
+> > > previous versions did not rely upon - and there's no communication of
+> > > what's required for new kernel versions.
+> > > 
+> > > This stuff needs documenting, so that people are aware what changes they
+> > > need to make - please put something in Documentation/arm/OMAP which
+> > > tracks what new additions are required to the Kconfig to keep things
+> > > working.
+> > 
+> > Good idea, how about something like the following? AFAIK that's the
+> > only .config option needed as MFD_SYSCON is selected by Kconfig
+> > already.
+> 
+> Right, that resolves the issue.  Now, what's the story on the revert
+> and the other patch - have they already been taken for -rc kernels?
 
-This is because legacy booting sets up some of the resource in the
-platform init code, and for optional regulators always seem to
-return -EPROBE_DEFER for the legacy booting.
+Not yet, I was waiting for the confirmation from you. I've now posted the
+revert with proper description and the fix so Ulf can pick them up and
+merged as regression fixes for the -rc series:
 
-Let's fix the issue by checking for device tree based booting for
-now. Then when omap3 boots in device tree only mode, this patch
-can be just reverted.
+http://marc.info/?l=linux-omap&m=144422416621373&w=2
+http://marc.info/?l=linux-omap&m=144422416921375&w=2
 
-Fixes: 7d607f917008 ("mmc: host: omap_hsmmc: use
-devm_regulator_get_optional() for vmmc")
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- drivers/mmc/host/omap_hsmmc.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Regards,
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index ae3a2b9..7fb0753 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -478,7 +478,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
- 	mmc->supply.vmmc = devm_regulator_get_optional(host->dev, "vmmc");
- 	if (IS_ERR(mmc->supply.vmmc)) {
- 		ret = PTR_ERR(mmc->supply.vmmc);
--		if (ret != -ENODEV)
-+		if ((ret != -ENODEV) && host->dev->of_node)
- 			return ret;
- 		dev_dbg(host->dev, "unable to get vmmc regulator %ld\n",
- 			PTR_ERR(mmc->supply.vmmc));
-@@ -493,7 +493,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
- 	mmc->supply.vqmmc = devm_regulator_get_optional(host->dev, "vmmc_aux");
- 	if (IS_ERR(mmc->supply.vqmmc)) {
- 		ret = PTR_ERR(mmc->supply.vqmmc);
--		if (ret != -ENODEV)
-+		if ((ret != -ENODEV) && host->dev->of_node)
- 			return ret;
- 		dev_dbg(host->dev, "unable to get vmmc_aux regulator %ld\n",
- 			PTR_ERR(mmc->supply.vqmmc));
-@@ -503,7 +503,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
- 	host->pbias = devm_regulator_get_optional(host->dev, "pbias");
- 	if (IS_ERR(host->pbias)) {
- 		ret = PTR_ERR(host->pbias);
--		if (ret != -ENODEV)
-+		if ((ret != -ENODEV) && host->dev->of_node)
- 			return ret;
- 		dev_dbg(host->dev, "unable to get pbias regulator %ld\n",
- 			PTR_ERR(host->pbias));
--- 
-2.1.4
+Tony
