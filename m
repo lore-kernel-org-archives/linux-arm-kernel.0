@@ -1,32 +1,24 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 7 Oct 2015 14:27:28 +0100
-Subject: [PATCHv4 0/6] arm64: perf: heterogeneous PMU support
-In-Reply-To: <20151007131930.GJ16065@arm.com>
-References: <1443779708-26789-1-git-send-email-mark.rutland@arm.com>
- <20151007131930.GJ16065@arm.com>
-Message-ID: <20151007132727.GB17192@e104818-lin.cambridge.arm.com>
+From: mlombard@redhat.com (Maurizio Lombardi)
+Date: Wed, 7 Oct 2015 15:28:35 +0200
+Subject: [PATCH] bnx2fc: reduce stack usage in __bnx2fc_enable
+In-Reply-To: <5002023.QHmpbQ8s70@wuerfel>
+References: <5002023.QHmpbQ8s70@wuerfel>
+Message-ID: <56151E03.4050908@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 02:19:30PM +0100, Will Deacon wrote:
-> On Fri, Oct 02, 2015 at 10:55:02AM +0100, Mark Rutland wrote:
-> > This patch series moves the arm64 code over to the librified perf code now used
-> > by 32-bit arm, in the process gaining support for heterogeneous PMUs. Tailored
-> > support is then added for Cortex-A53 and Cortex-A57 as used in Juno systems.
-> > 
-> > With this series applied, perf can be used to monitor 64-bit systems with
-> > heterogeneous PMUs in an identical fashion to 32-bit systems, e.g.
-> 
-> For the series:
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
+Hi,
 
-Thanks.
+On 10/07/2015 03:11 PM, Arnd Bergmann wrote:
+> -	memset(&npiv_tbl, 0, sizeof(npiv_tbl));
+> -	if (hba->cnic->get_fc_npiv_tbl(hba->cnic, &npiv_tbl))
+> +	npiv_tbl = kzalloc(sizeof(struct cnic_fc_npiv_tbl), GFP_KERNEL);
+> +	if (!npiv_tbl)
+>  		goto done;
+>  
 
-> There's a trailing whitespace error in the first patch, but Catalin can
-> probably fix that up.
+If kzalloc() fails perhaps the function should return -ENOMEM, not zero.
 
-I fixed this as well. Queued.
 
--- 
-Catalin
+Regards,
+Maurizio Lombardi
