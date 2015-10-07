@@ -1,64 +1,58 @@
-From: caleb@crome.org (Caleb Crome)
-Date: Wed, 7 Oct 2015 06:04:51 -0700
-Subject: [alsa-devel] [PATCH 1/2] ASoC: rockchip: i2s: add 8 channels
- capture and lrck-mode support
-In-Reply-To: <5614D162.3020500@rock-chips.com>
-References: <1442979683-9441-1-git-send-email-sugar.zhang@rock-chips.com>
- <1442979683-9441-2-git-send-email-sugar.zhang@rock-chips.com>
- <20150923162433.GQ30445@sirena.org.uk> <5608F74C.3000104@rock-chips.com>
- <20150930184655.GX15635@sirena.org.uk> <5614D162.3020500@rock-chips.com>
-Message-ID: <F2F204F7-F5A8-4152-BF1D-454EB3E35F34@crome.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Oct 2015 15:11:04 +0200
+Subject: [PATCH] bnx2fc: reduce stack usage in __bnx2fc_enable
+Message-ID: <5002023.QHmpbQ8s70@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi sugar,
-   Can the rockchip support more than 8 channels?  Ideally, we would like to capture 16 channels and playback 16 channels simultaneously.  
+When the bnx2fc driver was changed to read the npiv table from
+nvram, the stack of the __bnx2fc_enable function gained an
+additional 1028 byte structure that gcc rightfully warns about:
 
-Thanks,  Caleb 
+drivers/scsi/bnx2fc/bnx2fc_fcoe.c: In function '__bnx2fc_enable':
+drivers/scsi/bnx2fc/bnx2fc_fcoe.c:2134:1: warning: the frame size of 1128 bytes is larger than 1024 bytes [-Wframe-larger-than=]
 
-Sent from my iPhone
+In order to avoid a possible kernel stack overflow and to get rid
+of the warning, this changes the function to use a dynamic allocation
+of the structure using kzalloc.
 
-> On Oct 7, 2015, at 1:01 AM, sugar <sugar.zhang@rock-chips.com> wrote:
-> 
-> Sorry for late reply, we were in the National Day Holiday.
-> 
->> ? 10/1/2015 02:46, Mark Brown ??:
->>> On Mon, Sep 28, 2015 at 04:16:12PM +0800, sugar wrote:
->>> ? 9/24/2015 00:24, Mark Brown ??:
->> 
->>>> My initial thought here is that the machine driver should be responsible
->>>> for setting this and then the DAI driver should check to see if
->>>> symmetric_rates are in use and configure itself appropriately.  Is there
->>>> a reason why this won't work here?
->> 
->>> It's for i2s ip configuration, in the most situation, there is no need
->>> to use this property, except one case:
->> 
->>> In order to save gpio pins for other function use, we may use single
->>> lrck(tx or rx) pin. of course, it depends on product design. when in i2s
->>> slave mode, we need to configure this to share lrck with tx/rx inside i2s
->>> logic.
->> 
->>> symmetric_rates flag works fine on rockchip platform, but it can't cover the
->>> above case.
->> 
->>> Do you have any suggestion about this or maybe there is no need to upstream
->>> this special part?
->> 
->> What makes you say that the symmetric_rates flag can't be used to cover
->> this case?  What you describe above is hte normal reason for needing to
->> enforce symmetric_rates.  The driver should be able to check if the flag
->> has been set just as well as the core is.
-> 
-> Got it, How about the following modify?
-> 
-> if (dai->symmetric_rates)
->    regmap_update_bits(i2s->regmap, I2S_CKR,
->                           I2S_CKR_TRCM_MASK,
->                           I2S_CKR_TRCM(val));
-> 
-> 
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 2971ff67bd3 ("bnx2fc: Read npiv table from nvram and create vports.")
+---
+The original patch was merged through netdev along with the respective
+ethernet driver changes, but this should probably go through the scsi
+tree, as no ethernet changes are involved.
+
+diff --git a/drivers/scsi/bnx2fc/bnx2fc_fcoe.c b/drivers/scsi/bnx2fc/bnx2fc_fcoe.c
+index d5cdc4776707..72ba0dfae3e0 100644
+--- a/drivers/scsi/bnx2fc/bnx2fc_fcoe.c
++++ b/drivers/scsi/bnx2fc/bnx2fc_fcoe.c
+@@ -2092,7 +2092,7 @@ static int __bnx2fc_enable(struct fcoe_ctlr *ctlr)
+ {
+ 	struct bnx2fc_interface *interface = fcoe_ctlr_priv(ctlr);
+ 	struct bnx2fc_hba *hba;
+-	struct cnic_fc_npiv_tbl npiv_tbl;
++	struct cnic_fc_npiv_tbl *npiv_tbl;
+ 	struct fc_lport *lport;
+ 
+ 	if (interface->enabled == false) {
+@@ -2124,11 +2124,16 @@ static int __bnx2fc_enable(struct fcoe_ctlr *ctlr)
+ 	if (!hba->cnic->get_fc_npiv_tbl)
+ 		goto done;
+ 
+-	memset(&npiv_tbl, 0, sizeof(npiv_tbl));
+-	if (hba->cnic->get_fc_npiv_tbl(hba->cnic, &npiv_tbl))
++	npiv_tbl = kzalloc(sizeof(struct cnic_fc_npiv_tbl), GFP_KERNEL);
++	if (!npiv_tbl)
+ 		goto done;
+ 
+-	bnx2fc_npiv_create_vports(lport, &npiv_tbl);
++	if (hba->cnic->get_fc_npiv_tbl(hba->cnic, npiv_tbl))
++		goto done_free;
++
++	bnx2fc_npiv_create_vports(lport, npiv_tbl);
++done_free:
++	kfree(npiv_tbl);
+ done:
+ 	return 0;
+ }
