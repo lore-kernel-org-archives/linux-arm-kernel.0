@@ -1,23 +1,27 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 06 Oct 2015 23:53:02 -0700
+From: jiri@resnulli.us (Jiri Pirko)
+Date: Wed, 7 Oct 2015 08:56:36 +0200
 Subject: [PATCH] mlxsw: fix warnings for big-endian 32-bit dma_addr_t
-In-Reply-To: <30258520.VaA2vDyUiY@wuerfel>
+In-Reply-To: <1444200782.26237.8.camel@perches.com>
 References: <30258520.VaA2vDyUiY@wuerfel>
-Message-ID: <1444200782.26237.8.camel@perches.com>
+ <1444200782.26237.8.camel@perches.com>
+Message-ID: <20151007065636.GD2152@nanopsycho.orion>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-10-06 at 23:47 +0200, Arnd Bergmann wrote:
-> The recently added mlxsw driver produces warnings in ARM
-> allmodconfig:
-> 
-> drivers/net/ethernet/mellanox/mlxsw/pci.c: In function 'mlxsw_pci_cmd_exec':
-> drivers/net/ethernet/mellanox/mlxsw/pci.c:1585:59: warning: right shift count >= width of type [-Wshift-count-overflow]
-> linux/byteorder/big_endian.h:38:51: note: in definition of macro '__cpu_to_be32'
-> drivers/net/ethernet/mellanox/mlxsw/pci.c:76:2: note: in expansion of macro 'iowrite32be'
-> 
-> This changes the type of the local variable to u64, which gets rid of the
-> warning and seems nicer than adding #ifdefs.
+Wed, Oct 07, 2015 at 08:53:02AM CEST, joe at perches.com wrote:
+>On Tue, 2015-10-06 at 23:47 +0200, Arnd Bergmann wrote:
+>> The recently added mlxsw driver produces warnings in ARM
+>> allmodconfig:
+>> 
+>> drivers/net/ethernet/mellanox/mlxsw/pci.c: In function 'mlxsw_pci_cmd_exec':
+>> drivers/net/ethernet/mellanox/mlxsw/pci.c:1585:59: warning: right shift count >= width of type [-Wshift-count-overflow]
+>> linux/byteorder/big_endian.h:38:51: note: in definition of macro '__cpu_to_be32'
+>> drivers/net/ethernet/mellanox/mlxsw/pci.c:76:2: note: in expansion of macro 'iowrite32be'
+>> 
+>> This changes the type of the local variable to u64, which gets rid of the
+>> warning and seems nicer than adding #ifdefs.
+>
+>Using upper_32_bits instead of the shift might be
+>nicer than changing the type.
 
-Using upper_32_bits instead of the shift might be
-nicer than changing the type.
+Wasn't aware of this macro. Indeed this looks more appropriate. Thanks!
