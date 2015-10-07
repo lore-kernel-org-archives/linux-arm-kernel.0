@@ -1,49 +1,33 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  7 Oct 2015 12:01:04 +0100
-Subject: [PATCH v2 3/3] nvmem: core: add sysfs file mode flag in nvmem_config
-In-Reply-To: <1444215536-10783-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1444215536-10783-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1444215664-10921-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 7 Oct 2015 13:01:12 +0200
+Subject: [PATCH] watchdog: at91sam9: keep watchdog running in idle mode
+In-Reply-To: <1444163325-3041-1-git-send-email-sylvain.rochet@finsecur.com>
+References: <1444163325-3041-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <20151007110112.GD3485@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds mode variable to nvmem_config structure which will allow
-providers to specify the permissions for the sysfs binary file.
-This mode is applied on top of root-only access permissions set by
-the core.
+Hi Sylvain,
 
-Having this flag would give more flexibility to providers to decide
-which permissions to set on the sysfs binary file entry.
+On 06/10/2015 at 22:28:45 +0200, Sylvain Rochet wrote :
+> Since turning on idle-halt in commit 5161b31dc39a (watchdog:
+> at91sam9_wdt: better watchdog support"), SoCs compatible with
+> at91sam9260-wdt not using a device tree no longer reboot if the watchdog
+> times out while the CPU is in idle state. Removing the
+> AT91_WDT_WDIDLEHLT flag that was set by default fixes this.
+> 
+> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> Fixes: 5161b31dc39a ("watchdog: at91sam9_wdt: better watchdog support")
+> Cc: <stable@vger.kernel.org> # 3.14+
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/nvmem/core.c           | 1 +
- include/linux/nvmem-provider.h | 1 +
- 2 files changed, 2 insertions(+)
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 737fa75..4b6f219 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -315,6 +315,7 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
- 	if (!nvmem->read_only)
- 		nvmem->bin.attr.mode |= S_IWUSR;
- 
-+	nvmem->bin.attr.mode |= config->mode;
- 	nvmem->bin.size = nvmem->size;
- 	device_initialize(&nvmem->dev);
- 
-diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
-index 0b68caf..3f22caa 100644
---- a/include/linux/nvmem-provider.h
-+++ b/include/linux/nvmem-provider.h
-@@ -23,6 +23,7 @@ struct nvmem_config {
- 	const struct nvmem_cell_info	*cells;
- 	int			ncells;
- 	bool			read_only;
-+	umode_t			mode;  /* visibility in sysfs */
- };
- 
- #if IS_ENABLED(CONFIG_NVMEM)
+However, we don't really care about that for kernels after 3.18 as no
+users are using pdata anymore.
+I think you could send a follow-up patch removing pdata support
+completely.
+
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
