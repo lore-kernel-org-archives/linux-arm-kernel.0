@@ -1,56 +1,52 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 8 Oct 2015 04:43:39 +0530
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <CAPDyKFp5e_pizFSCzeYSM8sXGx6Jewgs2PRB-RQ1iWMM6WMOww@mail.gmail.com>
-References: <20151005145127.GB23801@atomide.com>
- <20151005171155.GF23801@atomide.com>
- <20151005183813.GD21626@n2100.arm.linux.org.uk>
- <20151006090015.GE21626@n2100.arm.linux.org.uk>
- <20151006094425.GM23801@atomide.com>
- <20151006150009.GF21626@n2100.arm.linux.org.uk>
- <20151006153710.GS23801@atomide.com>
- <20151007124551.GI21626@n2100.arm.linux.org.uk>
- <20151007132642.GV23801@atomide.com>
- <CAPDyKFoBPEnHuNR_bsrPU6X=q5pHa8cDR7_Ng9xLnLsudymvOg@mail.gmail.com>
- <20151007155206.GX23801@atomide.com>
- <CAPDyKFp5e_pizFSCzeYSM8sXGx6Jewgs2PRB-RQ1iWMM6WMOww@mail.gmail.com>
-Message-ID: <5615A723.6090907@ti.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 07 Oct 2015 16:34:30 -0700
+Subject: [PATCH v12 2/5] mtd: nand: vf610_nfc: add hardware BCH-ECC support
+In-Reply-To: <20150929205727.GP31505@google.com>
+References: <1441242397-870-1-git-send-email-stefan@agner.ch>
+ <1441242397-870-3-git-send-email-stefan@agner.ch>
+ <20150929205727.GP31505@google.com>
+Message-ID: <0291312bcff1d7a22f7cdee69848dfcb@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Brian,
 
-On Thursday 08 October 2015 01:10 AM, Ulf Hansson wrote:
-> On 7 October 2015 at 17:52, Tony Lindgren <tony@atomide.com> wrote:
->> * Ulf Hansson <ulf.hansson@linaro.org> [151007 06:46]:
->>> On 7 October 2015 at 15:26, Tony Lindgren <tony@atomide.com> wrote:
->>>>>> Good idea, how about something like the following? AFAIK that's the
->>>>>> only .config option needed as MFD_SYSCON is selected by Kconfig
->>>>>> already.
->>>
->>> Similar to MFD_SYSCON, why don't we have REGULATOR_PBIAS to be
->>> selected when omap_hsmmc is being used?
->>>
->>> It seems like that should also be a patch for the rc, right!?
+On 2015-09-29 13:57, Brian Norris wrote:
+> Pushed this patch to l2-mtd.git, as it looks pretty much good. Although,
+> I'd like raw read support...
+> 
+> On Wed, Sep 02, 2015 at 06:06:34PM -0700, Stefan Agner wrote:
+>> This adds hardware ECC support using the BCH encoder in the NFC IP.
+>> The ECC encoder supports up to 32-bit correction by using 60 error
+>> correction bytes. There is no sub-page ECC step, ECC is calculated
+>> always accross the whole page (up to 2k pages).
 >>
->> Well selecting CONFIG_REGULATOR is still optional and force selecting
->> drivers usually leads into randconfig build issues sooner or later.
->> And we'd like to make everything into loadable modules eventually.
+>> Limitations:
+>> - HW ECC: Only 2K page with 64+ OOB.
+>> - HW ECC: Only 24 and 32-bit error correction implemented.
+>>
+>> Raw writes have been tested using the generic nand_write_page_raw
+>> implementation. However, raw reads are currently not possible
+>> because the controller need to know whether we are going to use
+>> the ECC mode already at NAND_CMD_READ0 command time. At this point
+>> we do not have the information whether it is a raw read or a
+>> regular read at driver level...
 > 
-> I am not sure I get your point. Perhaps I was too vague in what I suggested.
-> 
-> Unless we express the dependencies via Kconfig files (or perhaps via
-> updated defconfigs), how do you expect build/boot automated tools to
-> handle this?
+> Hmm, can you get this in ecc.read_page_raw()?
 
-Both omap2plus_defconfig and multi_v7_defconfig has
-CONFIG_PBIAS_REGULATOR enabled [1].
+Even just a read_page_raw implementation doesn't help. The controller
+requires the ECC to be configured at command issue time, and the driver
+issues the command in the cmdfunc callback. The function
+nand_do_read_ops calls cmdfunc before ecc.read_page_raw...
 
-I think by using *depends on* in Kconfig, we'll end up in the same issue
-faced by Russell (since even with that CONFIG_PBIAS_REGULATOR won't be
-enabled) and using *select* can lead to randconfig errors.
+I could just bail out in the NAND_CMD_READ0 case, and execute the
+command from within the ecc.read_page_raw callback function. A bit
+hacky, but that would work.
 
-[1] -> https://lkml.org/lkml/2015/9/3/119
+For that case, it would be nicer if cmdfunc somehow provides the
+information that a raw read is requested, we would have that information
+in nand_do_read_ops. However, that would need an extension of the
+cmdfunc interface... Also, not sure how that should look like.
 
-Thanks
-Kishon
+--
+Stefan
