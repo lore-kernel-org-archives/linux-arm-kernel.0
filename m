@@ -1,53 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Oct 2015 10:28:23 +0100
-Subject: [v2 PATCH] arm64: convert patch_lock to raw lock
-In-Reply-To: <1444165951-26065-1-git-send-email-yang.shi@linaro.org>
-References: <1444165951-26065-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <20151007092822.GB16065@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 7 Oct 2015 10:28:03 +0100
+Subject: [linux-sunxi] [PATCH v2 5/5] ARM: sun5i: Add C.H.I.P DTS
+In-Reply-To: <CAGRGNgWw=eMn-YcALzE57xmumiydgH39S52LtuJO-+eT9vXQLQ@mail.gmail.com>
+References: <1444054990-15946-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1444054990-15946-6-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGRGNgXyaenitKnZNj4vLsgEDKe0CtTk=KqPADSs9588k1t+GA@mail.gmail.com>
+ <20151006161756.GT2696@lukather>
+ <CAGRGNgWw=eMn-YcALzE57xmumiydgH39S52LtuJO-+eT9vXQLQ@mail.gmail.com>
+Message-ID: <20151007092803.GB2278@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 02:12:31PM -0700, Yang Shi wrote:
-> When running kprobe test on arm64 rt kernel, it reports the below warning:
+On Wed, Oct 07, 2015 at 09:24:07AM +1100, Julian Calaby wrote:
+> >> > +       chosen {
+> >> > +               stdout-path = "serial0:115200n8";
+> >>
+> >> Should the composite output be enabled here too?
+> >
+> > AFAIK, the stdout-path only supports a single output device, and I
+> > don't think it really is an issue since framebuffer console will
+> > attach to the framebuffer automatically.
 > 
-> root at qemu7:~# modprobe kprobe_example
-> BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
-> in_atomic(): 0, irqs_disabled(): 128, pid: 484, name: modprobe
-> CPU: 0 PID: 484 Comm: modprobe Not tainted 4.1.6-rt5 #2
-> Hardware name: linux,dummy-virt (DT)
-> Call trace:
-> [<ffffffc0000891b8>] dump_backtrace+0x0/0x128
-> [<ffffffc000089300>] show_stack+0x20/0x30
-> [<ffffffc00061dae8>] dump_stack+0x1c/0x28
-> [<ffffffc0000bbad0>] ___might_sleep+0x120/0x198
-> [<ffffffc0006223e8>] rt_spin_lock+0x28/0x40
-> [<ffffffc000622b30>] __aarch64_insn_write+0x28/0x78
-> [<ffffffc000622e48>] aarch64_insn_patch_text_nosync+0x18/0x48
-> [<ffffffc000622ee8>] aarch64_insn_patch_text_cb+0x70/0xa0
-> [<ffffffc000622f40>] aarch64_insn_patch_text_sync+0x28/0x48
-> [<ffffffc0006236e0>] arch_arm_kprobe+0x38/0x48
-> [<ffffffc00010e6f4>] arm_kprobe+0x34/0x50
-> [<ffffffc000110374>] register_kprobe+0x4cc/0x5b8
-> [<ffffffbffc002038>] kprobe_init+0x38/0x7c [kprobe_example]
-> [<ffffffc000084240>] do_one_initcall+0x90/0x1b0
-> [<ffffffc00061c498>] do_init_module+0x6c/0x1cc
-> [<ffffffc0000fd0c0>] load_module+0x17f8/0x1db0
-> [<ffffffc0000fd8cc>] SyS_finit_module+0xb4/0xc8
-> 
-> Convert patch_lock to raw lock to avoid this issue.
-> 
-> Although the problem is found on rt kernel, the fix should be applicable to
-> mainline kernel too.
-> 
-> Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> Acked-by: Steven Rostedt <rostedt@goodmis.org>
-> ---
-> v1 -> v2:
->  Add Steven's Acked-by
->  Fix subject (remove unnecessary "make")
->  Fix a typo error in commit log
+> I was referring to enabling it in chosen, not stdout-path, but I
+> couldn't remember if uboot does that for us or not.
 
-I already queued with this Steve's Ack, so we'll just have to live with
-the typos.
+It's not really u-boot that does that. the framebuffer console stuff
+will attach automatically to the first framebuffer that comes in and
+log the kernel logs there, it's all in-kernel.
 
-Will
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151007/897ff114/attachment.sig>
