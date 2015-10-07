@@ -1,41 +1,51 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  7 Oct 2015 17:35:14 +0100
-Subject: [PATCH] nvmem: core: make default user binary file root-access only
-Message-ID: <1444235714-24365-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Oct 2015 17:35:57 +0100
+Subject: [PATCH 2/2] pl011: factor our FIFO to TTY code
+In-Reply-To: <CAOZdJXVVgd=YTn33VAB2GbfuPkGGapr0C=dN7J+KhdcJuOpKuA@mail.gmail.com>
+References: <1298146644-31007-1-git-send-email-linus.walleij@stericsson.com>
+ <CAOZdJXVVgd=YTn33VAB2GbfuPkGGapr0C=dN7J+KhdcJuOpKuA@mail.gmail.com>
+Message-ID: <20151007163557.GN21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As required by many providers like at24/at25/mxs-ocotp/qfprom, which would
-want to allow root-only to read/write the nvmem content.
-So making the defaults to be root-only access which can prevent normal
-users from reading the nvmem data.
+On Wed, Oct 07, 2015 at 11:13:33AM -0500, Timur Tabi wrote:
+> On Sat, Feb 19, 2011 at 2:17 PM, Linus Walleij
+> <linus.walleij@stericsson.com> wrote:
+> > +static int pl011_fifo_to_tty(struct uart_amba_port *uap)
+> > +{
+> > +       u16 status, ch;
+> > +       unsigned int flag, max_count = 256;
+> > +       int fifotaken = 0;
+> > +
+> > +       while (max_count--) {
+> > +               status = readw(uap->port.membase + UART01x_FR);
+> > +               if (status & UART01x_FR_RXFE)
+> > +                       break;
+> > +
+> > +               /* Take chars from the FIFO and update status */
+> > +               ch = readw(uap->port.membase + UART01x_DR) |
+> > +                       UART_DUMMY_DR_RX;
+> 
+> I know this patch is four years old, but I just noticed a bug, and I
+> can't figure out how no else noticed it.  Or maybe I'm imagining
+> things.
+> 
+> #define UART_DUMMY_DR_RX        (1 << 16)
+> 
+> UART_DUMMY_DR_RX cannot fit into 'ch', because ch is a 16-bit integer.
+> So the UART_DUMMY_DR_RX is lost.
+> 
+> What does UART_DUMMY_DR_RX do, anyway?  It's set in two places, but no
+> one ever checks for it.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/nvmem/core.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ch is supposed to cover that bit.  It is checked - inside uart_insert_char()
+by comparing the status (in the higer order bits in ch) with
+port->ignore_status_mask to see whether the character should be ignored.
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 6fd4e5a..4d2e476 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -112,7 +112,7 @@ static ssize_t bin_attr_nvmem_write(struct file *filp, struct kobject *kobj,
- static struct bin_attribute bin_attr_rw_nvmem = {
- 	.attr	= {
- 		.name	= "nvmem",
--		.mode	= S_IWUSR | S_IRUGO,
-+		.mode	= S_IWUSR | S_IRUSR,
- 	},
- 	.read	= bin_attr_nvmem_read,
- 	.write	= bin_attr_nvmem_write,
-@@ -136,7 +136,7 @@ static const struct attribute_group *nvmem_rw_dev_groups[] = {
- static struct bin_attribute bin_attr_ro_nvmem = {
- 	.attr	= {
- 		.name	= "nvmem",
--		.mode	= S_IRUGO,
-+		.mode	= S_IRUSR,
- 	},
- 	.read	= bin_attr_nvmem_read,
- };
+When CREAD is clear, this should cause input to be discarded - except
+in this case, because the bit is cropped by the u16, it'll always be
+accepted.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
