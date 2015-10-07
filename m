@@ -1,142 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Oct 2015 09:35:41 +0200
-Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
-Message-ID: <5706174.BUsqiXljxZ@wuerfel>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 7 Oct 2015 10:37:18 +0300
+Subject: [PATCH 1/2] memory: omap-gpmc: dump "before" state before first
+ modification
+In-Reply-To: <1444162070-22034-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1444162070-22034-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <5614CBAE.8030603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recently added debugfs support for OPP creates files using the
-debugfs_create_bool() and debugfs_create_u32() interfaces, but
-casts the data argument to u32*, which is broken on some architectures.
+On 06/10/15 23:07, Uwe Kleine-K?nig wrote:
+> When gpmc_cs_show_timings is called in gpmc_cs_set_timings()
+> gpmc_cs_program_settings() was already run which modifies the CONFIG1
+> register. So to be more useful do the "before" dump earlier.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-In case of debugfs_create_bool(), the API has changed as of 621a5f7ad9cd
-("debugfs: Pass bool pointer to debugfs_create_bool()"), so we now get
-a warning about the new interface in linux-next, which contains both
-patches. Removing the cast makes it work in linux-next, and makes it
-warn in cases where it does not work.
+Acked-by: Roger Quadros <rogerq@ti.com>
 
-For debugfs_create_u32(), the current usage is broken on 64-bit
-architectures when the values exceed the range of 32-bit variables
-(which should not happen), or when the kernel is built for as
-big-endian. This patch removes the casts and changes the types
-to u32 to make them match and print the correct value on all
-architectures.
+> ---
+>  drivers/memory/omap-gpmc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
+> index 32ac049f2bc4..6515dfc2b805 100644
+> --- a/drivers/memory/omap-gpmc.c
+> +++ b/drivers/memory/omap-gpmc.c
+> @@ -696,7 +696,6 @@ int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t,
+>  	int div;
+>  	u32 l;
+>  
+> -	gpmc_cs_show_timings(cs, "before gpmc_cs_set_timings");
+>  	div = gpmc_calc_divider(t->sync_clk);
+>  	if (div < 0)
+>  		return div;
+> @@ -1988,6 +1987,7 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
+>  	if (ret < 0)
+>  		goto err;
+>  
+> +	gpmc_cs_show_timings(cs, "before gpmc_cs_program_settings");
+>  	ret = gpmc_cs_program_settings(cs, &gpmc_s);
+>  	if (ret < 0)
+>  		goto err;
+> 
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 5cb5fdbf38770 ("PM / OPP: Add debugfs support")
----
-Found while building ARM allmodconfig
-
-diff --git a/drivers/base/power/opp/core.c b/drivers/base/power/opp/core.c
-index 25f3efef24db..1cbc0acf831a 100644
---- a/drivers/base/power/opp/core.c
-+++ b/drivers/base/power/opp/core.c
-@@ -696,7 +696,7 @@ static int _opp_add(struct device *dev, struct dev_pm_opp *new_opp,
- 			break;
- 
- 		/* Duplicate OPPs */
--		dev_warn(dev, "%s: duplicate OPPs detected. Existing: freq: %lu, volt: %lu, enabled: %d. New: freq: %lu, volt: %lu, enabled: %d\n",
-+		dev_warn(dev, "%s: duplicate OPPs detected. Existing: freq: %u, volt: %u, enabled: %d. New: freq: %u, volt: %u, enabled: %d\n",
- 			 __func__, opp->rate, opp->u_volt, opp->available,
- 			 new_opp->rate, new_opp->u_volt, new_opp->available);
- 
-@@ -898,7 +898,7 @@ static int _opp_add_static_v2(struct device *dev, struct device_node *np)
- 	/* OPP to select on device suspend */
- 	if (of_property_read_bool(np, "opp-suspend")) {
- 		if (dev_opp->suspend_opp)
--			dev_warn(dev, "%s: Multiple suspend OPPs found (%lu %lu)\n",
-+			dev_warn(dev, "%s: Multiple suspend OPPs found (%u %u)\n",
- 				 __func__, dev_opp->suspend_opp->rate,
- 				 new_opp->rate);
- 		else
-@@ -910,7 +910,7 @@ static int _opp_add_static_v2(struct device *dev, struct device_node *np)
- 
- 	mutex_unlock(&dev_opp_list_lock);
- 
--	pr_debug("%s: turbo:%d rate:%lu uv:%lu uvmin:%lu uvmax:%lu latency:%lu\n",
-+	pr_debug("%s: turbo:%d rate:%u uv:%u uvmin:%u uvmax:%u latency:%u\n",
- 		 __func__, new_opp->turbo, new_opp->rate, new_opp->u_volt,
- 		 new_opp->u_volt_min, new_opp->u_volt_max,
- 		 new_opp->clock_latency_ns);
-diff --git a/drivers/base/power/opp/debugfs.c b/drivers/base/power/opp/debugfs.c
-index 865cbfa24640..45436dabae8d 100644
---- a/drivers/base/power/opp/debugfs.c
-+++ b/drivers/base/power/opp/debugfs.c
-@@ -38,43 +38,42 @@ int opp_debug_create_one(struct dev_pm_opp *opp, struct device_opp *dev_opp)
- 	char name[15];
- 
- 	/* Rate is unique to each OPP, use it to give opp-name */
--	sprintf(name, "opp:%lu", opp->rate);
-+	sprintf(name, "opp:%u", opp->rate);
- 
- 	/* Create per-opp directory */
- 	d = debugfs_create_dir(name, pdentry);
- 	if (!d)
- 		return -ENOMEM;
- 
--	if (!debugfs_create_bool("available", S_IRUGO, d,
--				 (u32 *)&opp->available))
-+	if (!debugfs_create_bool("available", S_IRUGO, d, &opp->available))
- 		return -ENOMEM;
- 
--	if (!debugfs_create_bool("dynamic", S_IRUGO, d, (u32 *)&opp->dynamic))
-+	if (!debugfs_create_bool("dynamic", S_IRUGO, d, &opp->dynamic))
- 		return -ENOMEM;
- 
--	if (!debugfs_create_bool("turbo", S_IRUGO, d, (u32 *)&opp->turbo))
-+	if (!debugfs_create_bool("turbo", S_IRUGO, d, &opp->turbo))
- 		return -ENOMEM;
- 
--	if (!debugfs_create_u32("rate_hz", S_IRUGO, d, (u32 *)&opp->rate))
-+	if (!debugfs_create_u32("rate_hz", S_IRUGO, d, &opp->rate))
- 		return -ENOMEM;
- 
- 	if (!debugfs_create_u32("u_volt_target", S_IRUGO, d,
--				(u32 *)&opp->u_volt))
-+				&opp->u_volt))
- 		return -ENOMEM;
- 
- 	if (!debugfs_create_u32("u_volt_min", S_IRUGO, d,
--				(u32 *)&opp->u_volt_min))
-+				&opp->u_volt_min))
- 		return -ENOMEM;
- 
- 	if (!debugfs_create_u32("u_volt_max", S_IRUGO, d,
--				(u32 *)&opp->u_volt_max))
-+				&opp->u_volt_max))
- 		return -ENOMEM;
- 
--	if (!debugfs_create_u32("u_amp", S_IRUGO, d, (u32 *)&opp->u_amp))
-+	if (!debugfs_create_u32("u_amp", S_IRUGO, d, &opp->u_amp))
- 		return -ENOMEM;
- 
- 	if (!debugfs_create_u32("clock_latency_ns", S_IRUGO, d,
--				(u32 *)&opp->clock_latency_ns))
-+				&opp->clock_latency_ns))
- 		return -ENOMEM;
- 
- 	opp->dentry = d;
-diff --git a/drivers/base/power/opp/opp.h b/drivers/base/power/opp/opp.h
-index 0e4c27fb0c4a..ef573e650773 100644
---- a/drivers/base/power/opp/opp.h
-+++ b/drivers/base/power/opp/opp.h
-@@ -71,13 +71,13 @@ struct dev_pm_opp {
- 	bool available;
- 	bool dynamic;
- 	bool turbo;
--	unsigned long rate;
-+	u32 rate;
- 
--	unsigned long u_volt;
--	unsigned long u_volt_min;
--	unsigned long u_volt_max;
--	unsigned long u_amp;
--	unsigned long clock_latency_ns;
-+	u32 u_volt;
-+	u32 u_volt_min;
-+	u32 u_volt_max;
-+	u32 u_amp;
-+	u32 clock_latency_ns;
- 
- 	struct device_opp *dev_opp;
- 	struct rcu_head rcu_head;
+cheers,
+-roger
