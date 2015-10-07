@@ -1,37 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Oct 2015 13:04:06 +0200
-Subject: [PATCH] drm/virtio: use %llu format string form atomic64_t
-In-Reply-To: <20151007104502.GH21513@n2100.arm.linux.org.uk>
-References: <5082760.FgB9zHNfte@wuerfel>
- <20151007104502.GH21513@n2100.arm.linux.org.uk>
-Message-ID: <6260324.3MlUEc3veg@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 7 Oct 2015 12:04:57 +0100
+Subject: [PATCH v3 1/5] clk: Add a basic multiplier clock
+In-Reply-To: <20151005180929.GB12338@codeaurora.org>
+References: <1443512353-28073-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1443512353-28073-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20151002204308.GY12338@codeaurora.org>
+ <20151005101932.GH2696@lukather>
+ <20151005180929.GB12338@codeaurora.org>
+Message-ID: <20151007110457.GF2278@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 October 2015 11:45:02 Russell King - ARM Linux wrote:
-> On Wed, Oct 07, 2015 at 12:41:21PM +0200, Arnd Bergmann wrote:
-> > The virtgpu driver prints the last_seq variable using the %ld or
-> > %lu format string, which does not work correctly on all architectures
-> > and causes this compiler warning on ARM:
+On Mon, Oct 05, 2015 at 11:09:29AM -0700, Stephen Boyd wrote:
+> On 10/05, Maxime Ripard wrote:
+> > Hi,
 > > 
-> > drivers/gpu/drm/virtio/virtgpu_fence.c: In function 'virtio_timeline_value_str':
-> > drivers/gpu/drm/virtio/virtgpu_fence.c:64:22: warning: format '%lu' expects argument of type 'long unsigned int', but argument 4 has type 'long long int' [-Wformat=]
-> >   snprintf(str, size, "%lu", atomic64_read(&fence->drv->last_seq));
-> >                       ^
-> > drivers/gpu/drm/virtio/virtgpu_debugfs.c: In function 'virtio_gpu_debugfs_irq_info':
-> > drivers/gpu/drm/virtio/virtgpu_debugfs.c:37:16: warning: format '%ld' expects argument of type 'long int', but argument 3 has type 'long long int' [-Wformat=]
-> >   seq_printf(m, "fence %ld %lld\n",
-> >                 ^
+> > On Fri, Oct 02, 2015 at 01:43:08PM -0700, Stephen Boyd wrote:
+> > > On 09/29, Maxime Ripard wrote:
+> > > > +
+> > > > +	if (!val && mult->flags & CLK_MULTIPLIER_ZERO_BYPASS)
+> > > > +		val = 1;
+> > > > +	
+> > > > +	return parent_rate * val;
+> > > > +}
+> > > > +
+> > > > +static bool __is_best_rate(unsigned long rate, unsigned long new,
+> > > > +			   unsigned long best, unsigned long flags)
+> > > > +{
+> > > > +	if (flags & CLK_MULTIPLIER_ROUND_CLOSEST)
+> > > 
+> > > Is the only difference in this function vs the divider one that
+> > > flag? Maybe we should make this function generic to the framework
+> > > and pass a flag indicating closest or not.
 > > 
-> > In order to avoid the warnings, this changes the format strings to %llu
-> > and adds a cast to u64, which makes it work the same way everywhere.
+> > Actually, the logic is also reversed.
+> > 
+> > The divider driver will always try to find some rate that is higher
+> > than the one we already have, without going above than the one
+> > requested.
+> > 
+> > Here, we're tring to be lower than the best rate, without going below
+> > the requested rate.
 > 
-> You have to wonder why atomic64_* functions do not use u64 types.
-> If they're not reliant on manipulating 64-bit quantities, then what's
-> the point of calling them atomic _64_.
+> So then a tri-state flag that indicates, closest, less than,
+> greater than?
 
-I haven't checked all architectures, but I assume what happens is that
-64-bit ones just #define atomic64_t atomic_long_t, so they don't have
-to provide three sets of functions.
+Still, the computation itself is different, and the only consolidation
+we could possibly do is by not duplicating the ROUND_CLOSEST. We would
+end up with two different code pathes in the same function, which I
+feel would make it unnecessarily complex.
 
-	Arnd
+> 
+> > 
+> > > 
+> > > > +	unsigned long val;
+> > > > +
+> > > > +	if (mult->lock)
+> > > > +		spin_lock_irqsave(mult->lock, flags);
+> > > 
+> > > This needs the same "trick" that we did in the generic clock
+> > > types to avoid sparse warnings.
+> > 
+> > The __acquire call ?
+> 
+> Yes.
+
+Ok.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151007/46995fa7/attachment.sig>
