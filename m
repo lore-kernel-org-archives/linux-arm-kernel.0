@@ -1,48 +1,66 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed,  7 Oct 2015 12:00:21 -0500
-Subject: [PATCH 3/7] arm64: Macros to check/set/unset the contiguous bit
-In-Reply-To: <1444237225-13802-1-git-send-email-jeremy.linton@arm.com>
-References: <1444237225-13802-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1444237225-13802-4-git-send-email-jeremy.linton@arm.com>
+Date: Wed,  7 Oct 2015 12:00:18 -0500
+Subject: [PATCHv3 0/7] arm64: Use contiguous PTE bit for the kernel linear
+ mapping
+Message-ID: <1444237225-13802-1-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the supporting macros to check if the contiguous bit
-is set, set the bit, or clear it in a PTE entry.
+Changes from V2:
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
- arch/arm64/include/asm/pgtable.h | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+This version removes the kernel command line parameter and replaces it with a
+config option. It also renames a couple of the macros. Patches rebased to 4.3rc4.
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 26b0666..cc19ec1 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -140,6 +140,7 @@ extern struct page *empty_zero_page;
- #define pte_special(pte)	(!!(pte_val(pte) & PTE_SPECIAL))
- #define pte_write(pte)		(!!(pte_val(pte) & PTE_WRITE))
- #define pte_exec(pte)		(!(pte_val(pte) & PTE_UXN))
-+#define pte_cont(pte)		(!!(pte_val(pte) & PTE_CONT))
- 
- #ifdef CONFIG_ARM64_HW_AFDBM
- #define pte_hw_dirty(pte)	(pte_write(pte) && !(pte_val(pte) & PTE_RDONLY))
-@@ -202,6 +203,16 @@ static inline pte_t pte_mkspecial(pte_t pte)
- 	return set_pte_bit(pte, __pgprot(PTE_SPECIAL));
- }
- 
-+static inline pte_t pte_mkcont(pte_t pte)
-+{
-+	return set_pte_bit(pte, __pgprot(PTE_CONT));
-+}
-+
-+static inline pte_t pte_mknoncont(pte_t pte)
-+{
-+	return clear_pte_bit(pte, __pgprot(PTE_CONT));
-+}
-+
- static inline void set_pte(pte_t *ptep, pte_t pte)
- {
- 	*ptep = pte;
+Changes from V1:
+
+This version is similar to the previous versions with the addition of
+contpte/nocontpte kernel parameters for enabling/disabling the functionality.
+I defaulted it to contpte, but will change it to nocontpte if someone feels
+strongly about that. I considered making the default a kconfig option, but
+decided against it to avoid adding clutter for what should eventually be a
+fairly normal piece of functionality. I also used the early_param_on_off()
+macro, which is a small and concise piece of code, but varies a little from
+the more common parameter=value kernel parameters. 
+
+Also, continuing thanks to Steve Capper who has been religiously testing these patch sets,
+and found a bug in the previous implementation.
+
+Finally, I removed the formatting change per Catalin.
+
+Original Description:
+
+When running 64k pages it became apparent that it was possible that the
+kernel could create more TLB pressure in certain circumstances when
+compared to the 4k page kernel. This is due to the fact that large
+portions of the 4k kernel can be mapped with 2M blocks.
+While the larger block size for 64k pages is 512M, it 
+frequently won't be used for assorted reasons.
+
+ARMv8 has a contiguous PTE bit that allows the TLBs to map a range larger
+than a single PTE if the range is physically contiguous. So its
+a good idea to use this where appropriate for the kernel mapping.
+
+This patch adds the definitions for the contiguous bit, updates the kernel
+page range dump to understand them (and block translations),
+and updates the code in mmu.c to use the contiguous bit where appropriate
+for the kernel linear mapping.
+
+Jeremy Linton (7):
+  arm64: Add contiguous page flag shifts and constants
+  arm64: PTE/PMD contiguous bit definition
+  arm64: Macros to check/set/unset the contiguous bit
+  arm64: Default kernel pages should be contiguous
+  arm64: Make the kernel page dump utility aware of the CONT bit
+  arm64: Add a kernel Kconfig option to enable contiguous PTE marking
+  arm64: Mark kernel page ranges contiguous
+
+ arch/arm64/Kconfig                     |  7 +++
+ arch/arm64/include/asm/page.h          |  8 +++-
+ arch/arm64/include/asm/pgtable-hwdef.h |  9 ++++
+ arch/arm64/include/asm/pgtable.h       | 13 ++++++
+ arch/arm64/mm/dump.c                   | 18 +++++++-
+ arch/arm64/mm/mmu.c                    | 81 ++++++++++++++++++++++++++++++----
+ 6 files changed, 125 insertions(+), 11 deletions(-)
+
 -- 
 2.4.3
