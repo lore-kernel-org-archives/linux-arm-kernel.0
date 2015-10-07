@@ -1,114 +1,52 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Oct 2015 10:57:45 +0900
-Subject: [PATCH 08/28] ARM: shmobile: r8a7794: add I2C DT support
+Date: Wed,  7 Oct 2015 10:57:46 +0900
+Subject: [PATCH 09/28] ARM: shmobile: silk: add I2C1 DT support
 In-Reply-To: <cover.1444182812.git.horms+renesas@verge.net.au>
 References: <cover.1444182812.git.horms+renesas@verge.net.au>
-Message-ID: <5428521ba123dddda4d2ac9ab19d173b692a8acb.1444182812.git.horms+renesas@verge.net.au>
+Message-ID: <fa070791c1e7df91ca07fc7c9a431fac0d7d2832.1444182812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Define the generic R8A7794 parts of the I2C[0-5] device nodes.
-
-Based on the original patch by Koji Matsuoka <koji.matsuoka.xm@renesas.com>.
+Define the SILK board dependent part of the I2C1 device node.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 73 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 73 insertions(+)
+ arch/arm/boot/dts/r8a7794-silk.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index e0f32ede2181..7384db2a3992 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -20,6 +20,12 @@
- 	#size-cells = <2>;
- 
- 	aliases {
-+		i2c0 = &i2c0;
-+		i2c1 = &i2c1;
-+		i2c2 = &i2c2;
-+		i2c3 = &i2c3;
-+		i2c4 = &i2c4;
-+		i2c5 = &i2c5;
- 		spi0 = &qspi;
+diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
+index f49bc00738a3..3f808724106e 100644
+--- a/arch/arm/boot/dts/r8a7794-silk.dts
++++ b/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -61,6 +61,11 @@
+ 		renesas,function = "intc";
  	};
  
-@@ -502,6 +508,73 @@
- 		status = "disabled";
++	i2c1_pins: i2c1 {
++		renesas,groups = "i2c1";
++		renesas,function = "i2c1";
++	};
++
+ 	mmcif0_pins: mmcif0 {
+ 		renesas,groups = "mmc_data8", "mmc_ctrl";
+ 		renesas,function = "mmc";
+@@ -95,6 +100,14 @@
  	};
+ };
  
-+	/* The memory map in the User's Manual maps the cores to bus numbers */
-+	i2c0: i2c at e6508000 {
-+		compatible = "renesas,i2c-r8a7794";
-+		reg = <0 0xe6508000 0 0x40>;
-+		interrupts = <0 287 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7794_CLK_I2C0>;
-+		power-domains = <&cpg_clocks>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
++&i2c1 {
++	pinctrl-0 = <&i2c1_pins>;
++	pinctrl-names = "default";
 +
-+	i2c1: i2c at e6518000 {
-+		compatible = "renesas,i2c-r8a7794";
-+		reg = <0 0xe6518000 0 0x40>;
-+		interrupts = <0 288 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7794_CLK_I2C1>;
-+		power-domains = <&cpg_clocks>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
++	status = "okay";
++	clock-frequency = <400000>;
++};
 +
-+	i2c2: i2c at e6530000 {
-+		compatible = "renesas,i2c-r8a7794";
-+		reg = <0 0xe6530000 0 0x40>;
-+		interrupts = <0 286 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7794_CLK_I2C2>;
-+		power-domains = <&cpg_clocks>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	i2c3: i2c at e6540000 {
-+		compatible = "renesas,i2c-r8a7794";
-+		reg = <0 0xe6540000 0 0x40>;
-+		interrupts = <0 290 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7794_CLK_I2C3>;
-+		power-domains = <&cpg_clocks>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	i2c4: i2c at e6520000 {
-+		compatible = "renesas,i2c-r8a7794";
-+		reg = <0 0xe6520000 0 0x40>;
-+		interrupts = <0 19 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7794_CLK_I2C4>;
-+		power-domains = <&cpg_clocks>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	i2c5: i2c at e6528000 {
-+		compatible = "renesas,i2c-r8a7794";
-+		reg = <0 0xe6528000 0 0x40>;
-+		interrupts = <0 20 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7794_CLK_I2C5>;
-+		power-domains = <&cpg_clocks>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
- 	mmcif0: mmc at ee200000 {
- 		compatible = "renesas,mmcif-r8a7794", "renesas,sh-mmcif";
- 		reg = <0 0xee200000 0 0x80>;
+ &mmcif0 {
+ 	pinctrl-0 = <&mmcif0_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.1.4
