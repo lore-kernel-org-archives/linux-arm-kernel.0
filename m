@@ -1,147 +1,81 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed,  7 Oct 2015 15:55:17 +0100
-Subject: [PATCH v3 07/16] KVM: arm64: Introduce new MMIO region for the ITS
- base address
+Date: Wed,  7 Oct 2015 15:55:15 +0100
+Subject: [PATCH v3 05/16] KVM: arm/arm64: extend arch CAP checks to allow
+ per-VM capabilities
 In-Reply-To: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
 References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1444229726-31559-8-git-send-email-andre.przywara@arm.com>
+Message-ID: <1444229726-31559-6-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM GICv3 ITS controller requires a separate register frame to
-cover ITS specific registers. Add a new VGIC address type and store
-the address in a field in the vgic_dist structure.
-Provide a function to check whether userland has provided the address,
-so ITS functionality can be guarded by that check.
+KVM capabilities can be a per-VM property, though ARM/ARM64 currently
+does not pass on the VM pointer to the architecture specific
+capability handlers.
+Add a "struct kvm*" parameter to those function to later allow proper
+per-VM capability reporting.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
 ---
 Changelog v2..v3:
 - none
 
- Documentation/virtual/kvm/devices/arm-vgic.txt |  9 +++++++++
- arch/arm64/include/uapi/asm/kvm.h              |  2 ++
- include/kvm/arm_vgic.h                         |  3 +++
- virt/kvm/arm/vgic-v3-emul.c                    |  2 ++
- virt/kvm/arm/vgic.c                            | 16 ++++++++++++++++
- virt/kvm/arm/vgic.h                            |  1 +
- 6 files changed, 33 insertions(+)
+ arch/arm/include/asm/kvm_host.h   | 2 +-
+ arch/arm/kvm/arm.c                | 2 +-
+ arch/arm64/include/asm/kvm_host.h | 2 +-
+ arch/arm64/kvm/reset.c            | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
-index 3fb9054..ec715f9e 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
-@@ -39,6 +39,15 @@ Groups:
-       Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
-       This address needs to be 64K aligned.
- 
-+    KVM_VGIC_V3_ADDR_TYPE_ITS (rw, 64-bit)
-+      Base address in the guest physical address space of the GICv3 ITS
-+      control register frame. The ITS allows MSI(-X) interrupts to be
-+      injected into guests. This extension is optional, if the kernel
-+      does not support the ITS, the call returns -ENODEV.
-+      This memory is solely for the guest to access the ITS control
-+      registers and does not cover the ITS translation register.
-+      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
-+      This address needs to be 64K aligned and the region covers 64 KByte.
- 
-   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
-   Attributes:
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 0cd7b59..99e4006 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -87,9 +87,11 @@ struct kvm_regs {
- /* Supported VGICv3 address types  */
- #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
- #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
-+#define KVM_VGIC_V3_ADDR_TYPE_ITS	4
- 
- #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
- #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
-+#define KVM_VGIC_V3_ITS_SIZE		SZ_64K
- 
- #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
- #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 2c10082..067ad09 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -190,6 +190,9 @@ struct vgic_dist {
- 		phys_addr_t		vgic_redist_base;
- 	};
- 
-+	/* The base address of the ITS control register frame */
-+	phys_addr_t		vgic_its_base;
-+
- 	/* Distributor enabled */
- 	u32			enabled;
- 
-diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-index 1f42348..a8cf669 100644
---- a/virt/kvm/arm/vgic-v3-emul.c
-+++ b/virt/kvm/arm/vgic-v3-emul.c
-@@ -887,6 +887,7 @@ void vgic_v3_init_emulation(struct kvm *kvm)
- 
- 	dist->vgic_dist_base = VGIC_ADDR_UNDEF;
- 	dist->vgic_redist_base = VGIC_ADDR_UNDEF;
-+	dist->vgic_its_base = VGIC_ADDR_UNDEF;
- 
- 	kvm->arch.max_vcpus = KVM_MAX_VCPUS;
- }
-@@ -1059,6 +1060,7 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
- 			return -ENXIO;
- 		case KVM_VGIC_V3_ADDR_TYPE_DIST:
- 		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
-+		case KVM_VGIC_V3_ADDR_TYPE_ITS:
- 			return 0;
- 		}
- 		break;
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 1dd79e1..4219f22 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -953,6 +953,16 @@ int vgic_register_kvm_io_dev(struct kvm *kvm, gpa_t base, int len,
- 	return ret;
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 3df1e97..88e84db 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -210,7 +210,7 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+ 	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
  }
  
-+bool vgic_has_its(struct kvm *kvm)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+
-+	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
-+		return false;
-+
-+	return !IS_VGIC_ADDR_UNDEF(dist->vgic_its_base);
-+}
-+
- static int vgic_nr_shared_irqs(struct vgic_dist *dist)
+-static inline int kvm_arch_dev_ioctl_check_extension(long ext)
++static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
  {
- 	return dist->nr_irqs - VGIC_NR_PRIVATE_IRQS;
-@@ -2257,6 +2267,12 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
- 		block_size = KVM_VGIC_V3_REDIST_SIZE;
- 		alignment = SZ_64K;
+ 	return 0;
+ }
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 6c7f4520..bdbefcd 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -197,7 +197,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+ 		r = KVM_MAX_VCPUS;
  		break;
-+	case KVM_VGIC_V3_ADDR_TYPE_ITS:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-+		addr_ptr = &vgic->vgic_its_base;
-+		block_size = KVM_VGIC_V3_ITS_SIZE;
-+		alignment = SZ_64K;
-+		break;
- #endif
  	default:
- 		r = -ENODEV;
-diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
-index 0df74cb..a093f5c 100644
---- a/virt/kvm/arm/vgic.h
-+++ b/virt/kvm/arm/vgic.h
-@@ -136,5 +136,6 @@ int vgic_get_common_attr(struct kvm_device *dev, struct kvm_device_attr *attr);
- int vgic_init(struct kvm *kvm);
- void vgic_v2_init_emulation(struct kvm *kvm);
- void vgic_v3_init_emulation(struct kvm *kvm);
-+bool vgic_has_its(struct kvm *kvm);
+-		r = kvm_arch_dev_ioctl_check_extension(ext);
++		r = kvm_arch_dev_ioctl_check_extension(kvm, ext);
+ 		break;
+ 	}
+ 	return r;
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 4562459..c41e613 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -43,7 +43,7 @@
  
- #endif
+ int __attribute_const__ kvm_target_cpu(void);
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+-int kvm_arch_dev_ioctl_check_extension(long ext);
++int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext);
+ 
+ struct kvm_arch {
+ 	/* The VMID generation used for the virt. memory system */
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 91cf535..4d7f78b4 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -63,7 +63,7 @@ static bool cpu_has_32bit_el1(void)
+  * We currently assume that the number of HW registers is uniform
+  * across all CPUs (see cpuinfo_sanity_check).
+  */
+-int kvm_arch_dev_ioctl_check_extension(long ext)
++int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+ {
+ 	int r;
+ 
 -- 
 2.5.1
