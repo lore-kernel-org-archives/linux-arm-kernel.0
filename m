@@ -1,58 +1,44 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 07 Oct 2015 16:26:58 +0200
-Subject: [RFT 0/3] usb: usb3503: Fix probing on Arndale board (missing phy)
-In-Reply-To: <1444177807-15524-1-git-send-email-k.kozlowski@samsung.com>
-References: <1444177807-15524-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56152BB2.4020202@samsung.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 7 Oct 2015 15:32:06 +0100
+Subject: [PATCH v5 06/10] dmaengine: add API for getting dma controller's
+ quirk
+In-Reply-To: <56139289.7000005@rock-chips.com>
+References: <1442187923-5736-1-git-send-email-shawn.lin@rock-chips.com>
+ <1442188139-6017-1-git-send-email-shawn.lin@rock-chips.com>
+ <20151005153746.GG13501@vkoul-mobl.iind.intel.com>
+ <56139289.7000005@rock-chips.com>
+Message-ID: <20151007143205.GG3320@vkoul-mobl.iind.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Oct 06, 2015 at 05:21:13PM +0800, Shawn Lin wrote:
 
-On 2015-10-07 02:30, Krzysztof Kozlowski wrote:
-> Introduction
-> ============
-> This patchset tries to fix probing of usb3503 on Arndale board
-> if the Samsung PHY driver is probed later (or built as a module).
->
-> *The patchset was not tested on Arndale board.*
-> I don't have that board. Please test it and say if the usb3503 deferred probe
-> works fine and the issue is solved.
->
-> The patchset was tested on Odroid U3 board (which is different!)
-> in a simulated environment. It is not sufficient testing.
->
->
-> Difference
-> ==========
-> The usb3503 device driver can be used as a I2C device (on Odroid U3)
-> or as a platform device connected through phy (on Arndale). In the second
-> case the necessary phy reference has to be obtained and enabled.
->
-> For some details please look also at thread [0][1].
->
-> [0] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348524.html
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348875.html
->
+> >>+	int (*device_get_quirks)(struct dma_chan *chan);
+> >
+> >And why do we want to expose this to users? THis doesnt seem right!
+> >
+> 
+> Basically I agree not to expose dma's quirk to slave controllers...But, the
+> fact I mentioned on cover letter explain the reasons why I have to let slave
+> controllers know that they are working with a broken dma. It's a dilemma
+> that if we don't want that to be exposed(let slave controllers' driver get
+> the info via a API), we have to add broken quirk for all of them ,here and
+> there, which seems to be a disaster:(
+> 
+> I would appreciate it if you could give me some suggestions at your earliest
+> convenience. :)
+> 
+> >A quirk may exists but should be handled inside the controller driver and do
+> >appropriate action. You don't tell users or expect them to handle these
+> >
+I laready gave one re-read the above lines.
 
-I'm not sure that this is the correct approach. usb3503 chip is simply 
-connected
-to Exynos USB2 phy, so it visible on the USB bus. The real driver that 
-controls USB2
-PHY is Exynos EHCI driver and USB3503 should not mess around it.
+Anyway I went ahead and read the usage. You are setting the slave parameters
+for this. I can see two ways:
+1. Have the quirk to driver and based on quirk reset the slave settings when
+they are set by client.
+2. Put this in DT and set the dma properties based on these quirks and let
+driver and cleint be agnostic to it
 
-In my opinion all that is needed in case of Arndale board is forcing 
-reset of
-usb3503 chip after successful EHCI and USB2 PHY initialization (for some 
-reason
-initialization of usb3503 chip must be done after usb host initialization).
-However I have no idea which driver should trigger this reset. Right now 
-I didn't
-find any good solution for additional control for devices which are on 
-autoprobed
-bus like usb.
-
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+~Vinod
