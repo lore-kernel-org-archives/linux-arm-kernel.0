@@ -1,175 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 07 Oct 2015 09:17:25 +0100
-Subject: [PATCH v3 17/20] KVM: ARM64: Add PMU overflow interrupt routing
-In-Reply-To: <1443133885-3366-18-git-send-email-shannon.zhao@linaro.org>
-References: <1443133885-3366-1-git-send-email-shannon.zhao@linaro.org>
- <1443133885-3366-18-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <5614D515.3060800@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Oct 2015 09:22:22 +0100
+Subject: Regression: USB OTG port breaks after a few hours in host mode on iMX6
+Message-ID: <20151007082222.GB21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/09/15 23:31, Shannon Zhao wrote:
-> When calling perf_event_create_kernel_counter to create perf_event,
-> assign a overflow handler. Then when perf event overflows, set
-> irq_pending and call kvm_vcpu_kick() to sync the interrupt.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm/kvm/arm.c    |  4 ++++
->  include/kvm/arm_pmu.h |  2 ++
->  virt/kvm/arm/pmu.c    | 54 ++++++++++++++++++++++++++++++++++++++++++++++++++-
->  3 files changed, 59 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index ce404a5..3fca263 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -28,6 +28,7 @@
->  #include <linux/sched.h>
->  #include <linux/kvm.h>
->  #include <trace/events/kvm.h>
-> +#include <kvm/arm_pmu.h>
->  
->  #define CREATE_TRACE_POINTS
->  #include "trace.h"
-> @@ -554,6 +555,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  			kvm_vgic_sync_hwstate(vcpu);
->  			preempt_enable();
->  			kvm_timer_sync_hwstate(vcpu);
-> +			kvm_pmu_sync_hwstate(vcpu);
->  			continue;
->  		}
->  
-> @@ -604,6 +606,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  
->  		kvm_timer_sync_hwstate(vcpu);
->  
-> +		kvm_pmu_sync_hwstate(vcpu);
-> +
->  		ret = handle_exit(vcpu, run, ret);
->  	}
+This bug is soo obscure, I'm not even sure how to start debugging it.
+This never used to be a problem, but I'm not sure when it started as
+USB (in general) is not something I use regularly.
 
-The code around here is about to change with Christopher's patches. Most
-importantly, virtual devices must signal their changes before we touch
-the vgic. I suspect this will have some impacts, see below.
+In this setup, the USB OTG port is wired in host mode via pinmix
+configuration of the USB OTG ID pin:
 
->  
-> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-> index 9293133..953c400 100644
-> --- a/include/kvm/arm_pmu.h
-> +++ b/include/kvm/arm_pmu.h
-> @@ -38,6 +38,7 @@ struct kvm_pmu {
->  };
->  
->  #ifdef CONFIG_KVM_ARM_PMU
-> +void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu);
->  unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx);
->  void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val);
->  void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u32 val);
-> @@ -45,6 +46,7 @@ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u32 val);
->  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
->  				    u32 select_idx);
->  #else
-> +void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu) {}
->  unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
->  {
->  	return 0;
-> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> index 18637c9..ca7e849 100644
-> --- a/virt/kvm/arm/pmu.c
-> +++ b/virt/kvm/arm/pmu.c
-> @@ -21,6 +21,7 @@
->  #include <linux/perf_event.h>
->  #include <asm/kvm_emulate.h>
->  #include <kvm/arm_pmu.h>
-> +#include <kvm/arm_vgic.h>
->  
->  static void kvm_pmu_set_evttyper(struct kvm_vcpu *vcpu, u32 idx, u32 val)
->  {
-> @@ -62,6 +63,56 @@ static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, u32 select_idx)
->  }
->  
->  /**
-> + * kvm_pmu_sync_hwstate - sync pmu state for cpu
-> + * @vcpu: The vcpu pointer
-> + *
-> + * Inject virtual PMU IRQ if IRQ is pending for this cpu.
-> + */
-> +void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu)
-> +{
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +
-> +	if (pmu->irq_pending && (pmu->irq_num != -1)) {
+	MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x13059
 
-How likely is that pmu->irq_num could be -1? I don't think the interrupt
-can be made optional.
+The problem characterised so far: after booting the kernel, USB seems
+to work fine.  You can plug and unplug devices from both USB host and
+USB OTG ports, and it's detected.
 
-> +		kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, pmu->irq_num, 1);
-> +		pmu->irq_pending = false;
-> +	}
+If you boot a kernel with nothing plugged in, leave it for maybe four
+hours, then plug in a device to either port, the device will be seen
+in the USB host port, but completely ignored in the USB OTG port.
+Both USB OTG ports have power, confirmed last night when using a USB
+microscope with built-in LED lighting: the LEDs are functional, the
+device is otherwise completely ignored.
 
-So you're signalling the interrupt as an edge, not a level. Is that an
-accurate modelling of the PMU interrupt?
+The above is basically what I know so far: I don't know when the port
+fails, whether in the case of "boot, wait four hours, and it's dead"
+whether it's dead from boot: when I've tried testing it immediately
+after boot, it's worked.
 
-My hunch is that the interrupt should still be pending until the guest
-has cleared the overflow condition (by writing to PMOVSCLR_EL0). You can
-probably lift most of that logic from  Christoffer's rework of the timer
-state.
+As it takes around four hours to reproduce, and I have a massive patch
+stack on top of the kernel for this platform, I'm unwilling to attempt
+a git bisection to try and find when this occurred, but I know it's
+been going on for a while now as I've noticed the same behaviour when
+I transfer my logitech USB receiver to that port.
 
-> +}
-> +
-> +/**
-> + * When perf event overflows, set irq_pending and call kvm_vcpu_kick() to inject
-> + * the interrupt.
-> + */
-> +static void kvm_pmu_perf_overflow(struct perf_event *perf_event,
-> +				  struct perf_sample_data *data,
-> +				  struct pt_regs *regs)
-> +{
-> +	struct kvm_pmc *pmc = perf_event->overflow_handler_context;
-> +	struct kvm_vcpu *vcpu = pmc->vcpu;
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +	int idx = pmc->idx;
-> +
-> +	if (!vcpu_mode_is_32bit(vcpu)) {
-> +		if ((vcpu_sys_reg(vcpu, PMINTENSET_EL1) >> idx) & 0x1) {
-> +			__set_bit(idx,
-> +			    (unsigned long *)&vcpu_sys_reg(vcpu, PMOVSSET_EL0));
-> +			__set_bit(idx,
-> +			    (unsigned long *)&vcpu_sys_reg(vcpu, PMOVSCLR_EL0));
-> +			pmu->irq_pending = true;
-> +			kvm_vcpu_kick(vcpu);
-> +		}
-> +	} else {
-> +		if ((vcpu_cp15(vcpu, c9_PMINTENSET) >> idx) & 0x1) {
-> +			__set_bit(idx,
-> +				(unsigned long *)&vcpu_cp15(vcpu, c9_PMOVSSET));
-> +			__set_bit(idx,
-> +				(unsigned long *)&vcpu_cp15(vcpu, c9_PMOVSCLR));
-> +			pmu->irq_pending = true;
-> +			kvm_vcpu_kick(vcpu);
-> +		}
-> +	}
-> +}
-> +
-> +/**
->   * kvm_pmu_get_counter_value - get PMU counter value
->   * @vcpu: The vcpu pointer
->   * @select_idx: The counter index
-> @@ -225,7 +276,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
->  	/* The initial sample period (overflow count) of an event. */
->  	attr.sample_period = (-counter) & (((u64)1 << overflow_bit) - 1);
->  
-> -	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
-> +	event = perf_event_create_kernel_counter(&attr, -1, current,
-> +						 kvm_pmu_perf_overflow, pmc);
->  	if (IS_ERR(event)) {
->  		printk_once("kvm: pmu event creation failed %ld\n",
->  			    PTR_ERR(event));
-> 
+I had thought it was a power issue, but the USB camera last night
+confirmed that it's a port driver issue.
 
-Thanks,
+Certainly earlier 3.x kernels did not have this behaviour.
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
