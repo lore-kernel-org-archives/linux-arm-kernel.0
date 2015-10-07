@@ -1,32 +1,33 @@
-From: dawei.chien@mediatek.com (Dawei Chien)
-Date: Wed, 7 Oct 2015 20:22:39 +0800
-Subject: [PATCH v2 0/2] thermal: mediatek: Add cpu power cooling model
-Message-ID: <1444220561-26139-1-git-send-email-dawei.chien@mediatek.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Oct 2015 14:29:51 +0200
+Subject: [PATCH] IB/core: avoid 32-bit warning
+Message-ID: <17269152.DqJfCm1LOx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use Intelligent Power Allocation (IPA) technical to add static/dynamic power model for binding CPU thermal zone.
-The power allocator governor allocates power budget to control CPU temperature.
+The INIT_UDATA() macro requires a pointer or unsigned long argument for
+both input and output buffer, and all callers had a cast from when
+the code was merged until a recent restructuring, so now we get
 
-Power Allocator governor is able to keep SOC temperature within a defined temperature range to avoid SOC overheat and keep it's performance. mt8173-cpufreq.c need to register its' own power model with power allocator thermal governor, so that power allocator governor can allocates suitable power budget to control CPU temperature.
+core/uverbs_cmd.c: In function 'ib_uverbs_create_cq':
+core/uverbs_cmd.c:1481:66: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
 
-PATCH1 is base on
-https://patchwork.kernel.org/patch/7034601/
+This makes the code behave as before by adding back the cast to
+unsigned long.
 
-PATCH2 is base on Sascha's thermal driver V9 https://patchwork.kernel.org/patch/7249821/
-https://patchwork.kernel.org/patch/7249861/
-https://patchwork.kernel.org/patch/7249891/
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 565197dd8fb1 ("IB/core: Extend ib_uverbs_create_cq")
 
-Change since V1:
-include mt8171.h and sort header file for mt8173.dtsi
-
-Dawei.Chien (2):
-  thermal: mediatek: Add cpu power cooling model.
-  arm64: dts: mt8173: Add thermal zone node for mt8173.
-
- arch/arm64/boot/dts/mediatek/mt8173.dtsi |   44 ++++++++++++++
- drivers/cpufreq/mt8173-cpufreq.c         |   97 ++++++++++++++++++++++++++----
- 2 files changed, 130 insertions(+), 11 deletions(-)
-
---
-1.7.9.5
+diff --git a/drivers/infiniband/core/uverbs_cmd.c b/drivers/infiniband/core/uverbs_cmd.c
+index be4cb9f04be3..88b3b78340f2 100644
+--- a/drivers/infiniband/core/uverbs_cmd.c
++++ b/drivers/infiniband/core/uverbs_cmd.c
+@@ -1478,7 +1478,7 @@ ssize_t ib_uverbs_create_cq(struct ib_uverbs_file *file,
+ 	if (copy_from_user(&cmd, buf, sizeof(cmd)))
+ 		return -EFAULT;
+ 
+-	INIT_UDATA(&ucore, buf, cmd.response, sizeof(cmd), sizeof(resp));
++	INIT_UDATA(&ucore, buf, (unsigned long)cmd.response, sizeof(cmd), sizeof(resp));
+ 
+ 	INIT_UDATA(&uhw, buf + sizeof(cmd),
+ 		   (unsigned long)cmd.response + sizeof(resp),
