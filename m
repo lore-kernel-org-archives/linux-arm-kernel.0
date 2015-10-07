@@ -1,55 +1,51 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 7 Oct 2015 14:54:13 +0100
-Subject: [PATCH 1/2] dmaengine: hdmac: factorise memset descriptor
- allocation
-In-Reply-To: <1443711158-18495-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1443711158-18495-1-git-send-email-maxime.ripard@free-electrons.com>
- <1443711158-18495-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20151007135412.GB3320@vkoul-mobl.iind.intel.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 7 Oct 2015 16:55:01 +0300
+Subject: [PATCH 2/2] memory: omap-gpmc: expand the description of the
+ debug facility
+In-Reply-To: <20151007134010.GW23801@atomide.com>
+References: <1444162070-22034-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1444162070-22034-2-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5614CDAE.6070604@ti.com> <20151007075338.GH3982@pengutronix.de>
+ <20151007102822.GT23801@atomide.com> <20151007110231.GL3982@pengutronix.de>
+ <5614FD01.6090009@ti.com> <20151007134010.GW23801@atomide.com>
+Message-ID: <56152435.6050500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 01, 2015 at 04:52:37PM +0200, Maxime Ripard wrote:
+On 07/10/15 16:40, Tony Lindgren wrote:
+> * Roger Quadros <rogerq@ti.com> [151007 04:12]:
+>> On 07/10/15 14:02, Uwe Kleine-K?nig wrote:
+>>> Hello Tony,
+>>>
+>>> On Wed, Oct 07, 2015 at 03:41:19AM -0700, Tony Lindgren wrote:
+>>>> * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [151007 00:57]:
+>>>>> On Wed, Oct 07, 2015 at 10:45:50AM +0300, Roger Quadros wrote:
+>>>>>>
+>>>>>> How about this instead?
+>>>>>>
+>>>>>> NOTE: Apart from matching the register setup with the bootloader you also need to
+>>>>>> match the GPMC FCLK frequency used by the bootloader else the GPMC timings
+>>>>>> won't be identical with the bootloader timings.
+>>>>> Yeah, sounds better, thanks.
+>>>>>
+>>>>>> Also you might need to build this patch on top of
+>>>>>> http://article.gmane.org/gmane.linux.kernel/2054796
+>>>>> I talked to Tony about this patch yesterday on irc, but I didn't find it
+>>>>> in the archives yet when I sent my mail.
+>>>>
+>>>> Yes sorry here's a repost with your and Roger's changes folded in and
+>>>> edited a bit. Probably best to keep them together with this patch.
+>>>>
+>>>> Does the following look OK to you guys?
+>>> Yes,
+>>> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>>
+>> Looks good to me too.
+> 
+> Are you OK if I use your Acked-by from the previous version on
+> this updated version?
 
-> +static struct at_desc *atc_create_memset_desc(struct dma_chan *chan,
-> +					      dma_addr_t psrc,
-> +					      dma_addr_t pdst,
-> +					      size_t len)
-> +{
-> +	struct at_dma_chan *atchan = to_at_dma_chan(chan);
-> +	struct at_desc *desc;
-> +	size_t xfer_count;
-> +
-> +	u32 ctrla = ATC_SRC_WIDTH(2) |
-> +		ATC_DST_WIDTH(2);
+Yes please.
 
-why is this over two lines :)
-
-> +	u32 ctrlb = ATC_DEFAULT_CTRLB | ATC_IEN |
-> +		ATC_SRC_ADDR_MODE_FIXED |
-> +		ATC_DST_ADDR_MODE_INCR |
-> +		ATC_FC_MEM2MEM;
-> +
-> +	xfer_count = len >> 2;
-> +	if (xfer_count > ATC_BTSIZE_MAX) {
-> +		dev_err(chan2dev(chan), "%s: buffer is too big\n",
-> +			__func__);
-> +		return NULL;
-> +	}
-
-This is fine, but this is driver limitation. We should really split the
-txn to multiple descriptors here..
-
-> @@ -914,46 +953,26 @@ atc_prep_dma_memset(struct dma_chan *chan, dma_addr_t dest, int value,
->  		return NULL;
->  	}
->  
-> -	xfer_count = len >> 2;
-> -	if (xfer_count > ATC_BTSIZE_MAX) {
-> -		dev_err(chan2dev(chan), "%s: buffer is too big\n",
-> +	vaddr = dma_pool_alloc(atdma->memset_pool, GFP_ATOMIC, &paddr);
-
-Mostly people use _zalloc variant, any reason why you don't want that
-
--- 
-~Vinod
+cheers,
+-roger
