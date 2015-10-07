@@ -1,48 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Oct 2015 13:45:51 +0100
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20151006153710.GS23801@atomide.com>
-References: <20151001100326.GV21513@n2100.arm.linux.org.uk>
- <20151005112304.GZ23801@atomide.com>
- <20151005143532.GA23801@atomide.com>
- <20151005145127.GB23801@atomide.com>
- <20151005171155.GF23801@atomide.com>
- <20151005183813.GD21626@n2100.arm.linux.org.uk>
- <20151006090015.GE21626@n2100.arm.linux.org.uk>
- <20151006094425.GM23801@atomide.com>
- <20151006150009.GF21626@n2100.arm.linux.org.uk>
- <20151006153710.GS23801@atomide.com>
-Message-ID: <20151007124551.GI21626@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Oct 2015 14:49:30 +0200
+Subject: [PATCH] mfd: remove unused variables
+Message-ID: <7700818.mjdn6x2kkK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 08:37:11AM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [151006 08:04]:
-> > On Tue, Oct 06, 2015 at 02:44:25AM -0700, Tony Lindgren wrote:
-> > > 
-> > > Hmm DT-based boot finds the MMC card for LDP, dmesg below from DT boot [1].
-> > > Looks like you're on on -rc4 and not -rc3. My guess is that MMC is not
-> > > working for you with DT-based booting because you don't seem to have
-> > > CONFIG_REGULATOR_PBIAS in your seed config for. Care to try enabling that
-> > > for both your omap3 and omap4 seed config files?
-> > 
-> > This is precisely the kind of crap I'm objecting to.  New kernel versions
-> > come along, and things break because people add extra Kconfig symbols that
-> > previous versions did not rely upon - and there's no communication of
-> > what's required for new kernel versions.
-> > 
-> > This stuff needs documenting, so that people are aware what changes they
-> > need to make - please put something in Documentation/arm/OMAP which
-> > tracks what new additions are required to the Kconfig to keep things
-> > working.
-> 
-> Good idea, how about something like the following? AFAIK that's the
-> only .config option needed as MFD_SYSCON is selected by Kconfig
-> already.
+A mass-cleanup by Javier Martinez Canillas removed a lot of
+unused code, but left at least two variables in mfd drivers
+in place that are now causing warnings:
 
-Right, that resolves the issue.  Now, what's the story on the revert
-and the other patch - have they already been taken for -rc kernels?
+drivers/mfd/rtsx_pcr.c: In function 'rtsx_pci_set_pull_ctl':
+drivers/mfd/rtsx_pcr.c:564:6: warning: unused variable 'err' [-Wunused-variable]
+drivers/mfd/lm3533-core.c: In function 'lm3533_i2c_probe':
+drivers/mfd/lm3533-core.c:595:6: warning: unused variable 'ret' [-Wunused-variable]
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+This removes them as well.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: c749db571dc ("mfd: lm3533: Simplify function return logic")
+Fixes: a3c29b09982 ("mfd: rtsx: Simplify function return logic")
+---
+
+diff --git a/drivers/mfd/lm3533-core.c b/drivers/mfd/lm3533-core.c
+index 193ecee1fa7e..5abcbb2e8849 100644
+--- a/drivers/mfd/lm3533-core.c
++++ b/drivers/mfd/lm3533-core.c
+@@ -592,7 +592,6 @@ static int lm3533_i2c_probe(struct i2c_client *i2c,
+ 					const struct i2c_device_id *id)
+ {
+ 	struct lm3533 *lm3533;
+-	int ret;
+ 
+ 	dev_dbg(&i2c->dev, "%s\n", __func__);
+ 
+diff --git a/drivers/mfd/rtsx_pcr.c b/drivers/mfd/rtsx_pcr.c
+index b98cf1de0a55..d63f3a896adb 100644
+--- a/drivers/mfd/rtsx_pcr.c
++++ b/drivers/mfd/rtsx_pcr.c
+@@ -561,8 +561,6 @@ EXPORT_SYMBOL_GPL(rtsx_pci_write_ppbuf);
+ 
+ static int rtsx_pci_set_pull_ctl(struct rtsx_pcr *pcr, const u32 *tbl)
+ {
+-	int err;
+-
+ 	rtsx_pci_init_cmd(pcr);
+ 
+ 	while (*tbl & 0xFFFF0000) {
