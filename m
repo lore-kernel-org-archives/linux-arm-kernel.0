@@ -1,79 +1,32 @@
-From: dann.frazier@canonical.com (Dann Frazier)
-Date: Thu, 8 Oct 2015 08:21:24 -0700
-Subject: [PATCH] arm64: errata: add module build workaround for erratum
- #843419
-In-Reply-To: <20151008100723.GB16807@arm.com>
-References: <1442402197-20306-1-git-send-email-will.deacon@arm.com>
- <CALdTtnsyNeiRnqSdH6K1eHZ3KbAu02bqYCbnd7zWPGDjgGY8Ww@mail.gmail.com>
- <CAKv+Gu-srNtMq-DUJS1JrYuNwmV3Ku4+DvbR5e5QH39+3DA_cA@mail.gmail.com>
- <CALdTtnsSeWJxnJwhReWGmW9g7APo52p88UNpu59nNYqgW3fmag@mail.gmail.com>
- <20151008100723.GB16807@arm.com>
-Message-ID: <CALdTtnvwwfT4xwTrAqqyn9MbbCYDi-vrHZBf18oOJjLhrdwM0A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Oct 2015 17:23:29 +0200
+Subject: [PATCH v2 0/4] Add support for Amlogic Meson8b and couple of
+ boards
+In-Reply-To: <1444249865-6897-1-git-send-email-carlo@caione.org>
+References: <1444249865-6897-1-git-send-email-carlo@caione.org>
+Message-ID: <7134511.rF2lEWc2fm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 8, 2015 at 3:07 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Oct 08, 2015 at 12:07:54AM -0600, Dann Frazier wrote:
->> On Tue, Oct 6, 2015 at 4:29 PM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->> > On 6 October 2015 at 22:44, Dann Frazier <dann.frazier@canonical.com> wrote:
->> >> On Wed, Sep 16, 2015 at 5:16 AM, Will Deacon <will.deacon@arm.com> wrote:
->> >>> Cortex-A53 processors <= r0p4 are affected by erratum #843419 which can
->> >>> lead to a memory access using an incorrect address in certain sequences
->> >>> headed by an ADRP instruction.
->> >>
->> >> Just a heads up that we're seeing a regression in the Ubuntu 4.2 kernel on
->> >> X-Gene after this patch is applied and the CONFIG enabled.
->> >>
->> >> Modules loads fail with messages like:
->> >>
->> >> [ 2.192721] module gpio_xgene_sb: unsupported RELA relocation: 275
->> >> [ 2.193609] module xgene_enet: unsupported RELA relocation: 275
->> >> [ 2.249402] module libahci: unsupported RELA relocation: 275
->> >> [ 2.249628] module xgene_enet: unsupported RELA relocation: 275
->> >> [ 2.359451] module xgene_enet: unsupported RELA relocation: 275
->> >> [ 2.389444] module xgene_enet: unsupported RELA relocation: 275
->> >> [ 3.473766] module linear: unsupported RELA relocation: 275
->> >> [ 3.543252] module multipath: unsupported RELA relocation: 275
->> >> [ 3.593268] module raid0: unsupported RELA relocation: 275
->> >> [ 3.663695] module raid1: unsupported RELA relocation: 275
->> >> [ 3.713964] module raid6_pq: unsupported RELA relocation: 275
->> >> [ 3.763983] module raid6_pq: unsupported RELA relocation: 275
->> >> [ 3.803975] module raid6_pq: unsupported RELA relocation: 275
->> >> [ 3.853881] module raid10: unsupported RELA relocation: 275
->> >> [ 3.924962] module raid6_pq: unsupported RELA relocation: 275
->> >>
->> >
->> > RELA #275 is the relocation against ADRP instructions, which GCC
->> > should not emit anymore when -mcmodel=large is in effect.
->> >
->> > Can you confirm that the modules have been rebuilt with this config as
->> > well?
->>
->> Yeah, it was.
->>
->> > Can you double check the GCC command line (with V=1) when doing
->> > 'make modules' to ensure that '-mcmodel=large' is being passed?
->>
->> I did, and I don't see -mcmodel at all. On a whim I changed
->> CFLAGS_MODULE in the patch to KBUILD_CFLAGS_MODULE, and V=1 now shows
->> -mcmodel=large. I haven't had time yet to figure out why the KBUILD
->> variant is important, nor time to boot test such a build (travel day).
->
-> CFLAGS_MODULE is the environment variable (i.e. you can set it on the
-> cmdline), so we probably *should* be using KBUILD_CFLAGS_MODULE here
-> instead (and the thumb2 gas issue on arch/arm/ should be updated as
-> well).
->
-> However, I'd still like to understand how it's getting clobbered for
-> you. Are you overriding CFLAGS_MODULE someplace?
+On Wednesday 07 October 2015 22:31:01 Carlo Caione wrote:
+> From: Carlo Caione <carlo@endlessm.com>
+> 
+> A patchset sitting in my personal repo since forever. It adds the basic support
+> for Amlogic Meson8B SoCs and two common boards: Hardkernel Odroid-C1 and Tronfy
+> MXQ.
+> 
+> Changelog:
+> ** v2:
+>  - Specified which board compatibles apply to which SOC
+>  - Added commit message specifying who is Tronfy
+> 
+> Carlo Caione (4):
+>   of: documentation: Add vendor prefix for Tronfy
+>   of: documentation: add bindings documentation for Meson8b
+>   ARM: meson: Add DTS for Odroid-C1 and Tronfy MXQ boards
+>   ARM: meson: Enable Meson8b SoCs
+> 
 
-Yep - apparently the Ubuntu kernel packaging uses it to pass the ABI number:
+Applied to next/dt and next/soc, respectively, thanks!
 
-kmake = make ARCH=$(build_arch) \
-        CROSS_COMPILE=$(CROSS_COMPILE) \
-        KERNELVERSION=$(abi_release)-$(target_flavour) \
-        CONFIG_DEBUG_SECTION_MISMATCH=y \
-        KBUILD_BUILD_VERSION="$(uploadnum)" \
-        LOCALVERSION= localver-extra= \
-        CFLAGS_MODULE="-DPKG_ABI=$(abinum)"
+	Arnd
