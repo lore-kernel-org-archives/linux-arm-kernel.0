@@ -1,34 +1,40 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 08 Oct 2015 14:34:04 +0900
-Subject: [PATCH 3/5] thermal: exynos: Use IS_ERR() because regulator cannot be
- NULL
+Date: Thu, 08 Oct 2015 14:34:05 +0900
+Subject: [PATCH 4/5] thermal: exynos: Remove unneeded semicolon
 In-Reply-To: <1444282446-6419-1-git-send-email-k.kozlowski@samsung.com>
 References: <1444282446-6419-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1444282446-6419-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1444282446-6419-4-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NULL check in probe's error path is not needed because in that time
-the regulator cannot be NULL (regulator_get() returns valid pointer or
-ERR_PTR).
+Remove semicolons after switch statement.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/thermal/samsung/exynos_tmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/thermal/samsung/exynos_tmu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index bc71a61f0c4a..eac6aebf82f3 100644
+index eac6aebf82f3..1af7ea8dda71 100644
 --- a/drivers/thermal/samsung/exynos_tmu.c
 +++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -1396,7 +1396,7 @@ err_clk_sec:
- 	if (!IS_ERR(data->clk_sec))
- 		clk_unprepare(data->clk_sec);
- err_sensor:
--	if (!IS_ERR_OR_NULL(data->regulator))
-+	if (!IS_ERR(data->regulator))
- 		regulator_disable(data->regulator);
+@@ -548,7 +548,7 @@ static int exynos5433_tmu_initialize(struct platform_device *pdev)
+ 	default:
+ 		pdata->cal_type = TYPE_ONE_POINT_TRIMMING;
+ 		break;
+-	};
++	}
  
- 	return ret;
+ 	dev_info(&pdev->dev, "Calibration type is %d-point calibration\n",
+ 			cal_type ?  2 : 1);
+@@ -1356,7 +1356,7 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+ 		break;
+ 	default:
+ 		break;
+-	};
++	}
+ 
+ 	/*
+ 	 * data->tzd must be registered before calling exynos_tmu_initialize(),
 -- 
 1.9.1
