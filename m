@@ -1,64 +1,99 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Thu, 8 Oct 2015 17:28:28 +0800
-Subject: [PATCH v2 5/8] spi: imx: Add support for loopback for ECSPI
- controllers
-In-Reply-To: <04376A3D786BD947B28569C998A374A62E280E0F@NA-MBX-02.mgc.mentorg.com>
-References: <cover.1442923630.git.anton_bondarenko@mentor.com>
- <ca96561d8010acf587a93d0f357774bf77efbe16.1442923630.git.anton_bondarenko@mentor.com>
- <20150930084219.GE2709@shlinux2>
- <04376A3D786BD947B28569C998A374A62E280E0F@NA-MBX-02.mgc.mentorg.com>
-Message-ID: <20151008092827.GB6101@shlinux2>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 8 Oct 2015 11:35:41 +0200
+Subject: [RFT 0/3] usb: usb3503: Fix probing on Arndale board (missing phy)
+In-Reply-To: <56160BFD.4050702@samsung.com>
+References: <1444177807-15524-1-git-send-email-k.kozlowski@samsung.com>
+ <56152BB2.4020202@samsung.com> <561606FE.2090007@samsung.com>
+ <56160BFD.4050702@samsung.com>
+Message-ID: <561638ED.1060503@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 01, 2015 at 12:16:49AM +0000, Bondarenko, Anton wrote:
-> On 30.09.2015 10:42, Robin Gong wrote:
-> > On Fri, Sep 25, 2015 at 07:57:12PM +0200, Anton Bondarenko wrote:
-> >> @@ -370,8 +374,12 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
-> >>  	if (config->mode & SPI_CS_HIGH)
-> >>  		cfg |= MX51_ECSPI_CONFIG_SSBPOL(config->cs);
-> >>  
-> >> +	if (config->mode & SPI_LOOP)
-> >> +		lpb |= MX51_ECSPI_LOOP;
-> >> +
-> >>  	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
-> >>  	writel(cfg, spi_imx->base + MX51_ECSPI_CONFIG);
-> >> +	writel(lpb, spi_imx->base + MX51_ECSPI_TEST);
-> > It's better write this MX51_ECSPI_TEST only in LOOP mode.
-> LOOP mode can be set dynamically. This mean we should be able to set and clear the flag.
-> Currently only LOOP flag is used. I did not find any problems with writing 0 in the rest
-> fields of TEST register.
-Yes, I know writing 0 is harmless, but we never need to touch this register if
-SPI_LOOP flags not set, I'd like below:
-	if (config->mode & SPI_LOOP) {
-		lpb |= MX51_ECSPI_LOOP;
-		writel(lgb, spi_imx->base + MX51_ECSPI_TEST);
-	}
+Hello,
 
-> >>  
-> >>  	/*
-> >>  	 * Wait until the changes in the configuration register CONFIGREG
-> >> @@ -1276,12 +1287,13 @@ static int spi_imx_probe(struct platform_device *pdev)
-> >>  	spi_imx->bitbang.master->cleanup = spi_imx_cleanup;
-> >>  	spi_imx->bitbang.master->prepare_message = spi_imx_prepare_message;
-> >>  	spi_imx->bitbang.master->unprepare_message = spi_imx_unprepare_message;
-> >> -	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
-> >> +	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA |
-> >> +				SPI_CS_HIGH;
-> > Any change?
-> Will be fixed in V3
-> >>  
-> >> -	init_completion(&spi_imx->xfer_done);
-> >> +	if (is_imx5x_ecspi(spi_imx))
-> >> +		spi_imx->bitbang.master->mode_bits |= SPI_LOOP;
-> >>  
-> >> -	spi_imx->devtype_data = of_id ? of_id->data :
-> >> -		(struct spi_imx_devtype_data *) pdev->id_entry->driver_data;
-> >> +	init_completion(&spi_imx->xfer_done);
-> >>  
-> >>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >>  	spi_imx->base = devm_ioremap_resource(&pdev->dev, res);
-> >> -- 
-> >> 2.5.2
-> >>
+On 10/08/2015 08:23 AM, Marek Szyprowski wrote:
+> Hello,
 > 
+> On 2015-10-08 08:02, Krzysztof Kozlowski wrote:
+>> On 07.10.2015 23:26, Marek Szyprowski wrote:
+>>> Hello,
+>>>
+>>> On 2015-10-07 02:30, Krzysztof Kozlowski wrote:
+>>>> Introduction
+>>>> ============
+>>>> This patchset tries to fix probing of usb3503 on Arndale board
+>>>> if the Samsung PHY driver is probed later (or built as a module).
+>>>>
+>>>> *The patchset was not tested on Arndale board.*
+>>>> I don't have that board. Please test it and say if the usb3503
+>>>> deferred probe
+>>>> works fine and the issue is solved.
+>>>>
+>>>> The patchset was tested on Odroid U3 board (which is different!)
+>>>> in a simulated environment. It is not sufficient testing.
+>>>>
+>>>>
+>>>> Difference
+>>>> ==========
+>>>> The usb3503 device driver can be used as a I2C device (on Odroid U3)
+>>>> or as a platform device connected through phy (on Arndale). In the second
+>>>> case the necessary phy reference has to be obtained and enabled.
+>>>>
+>>>> For some details please look also at thread [0][1].
+>>>>
+>>>> [0]
+>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348524.html
+>>>>
+>>>> [1]
+>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348875.html
+>>>>
+>>>>
+>>> I'm not sure that this is the correct approach. usb3503 chip is simply
+>>> connected
+>>> to Exynos USB2 phy, so it visible on the USB bus. The real driver that
+>>> controls USB2
+>>> PHY is Exynos EHCI driver and USB3503 should not mess around it.
+>> The ehci node (usb at 12110000) has one port configured and it takes one
+>> PHY reference (phy of id 1 - USB host). I can't see driver taking
+>> reference to HSIC0 or HSIC1 phys... Since I cannot diagnose the error I
+>> don't know what is really expected here.
+> 
+> It looks that EHCI in Exynos 5250 and 5420 still use old phy bindings. For
+> the reference, see Exynos4 dts and exynos4412-odroidu3.dts to check how to enable
+> more than one USB port (Odroid U3 has both HSIC ports enabled).
+> 
+>>
+>>> In my opinion all that is needed in case of Arndale board is forcing
+>>> reset of
+>>> usb3503 chip after successful EHCI and USB2 PHY initialization (for some
+>>> reason
+>>> initialization of usb3503 chip must be done after usb host initialization).
+>>> However I have no idea which driver should trigger this reset. Right now
+>>> I didn't
+>>> find any good solution for additional control for devices which are on
+>>> autoprobed
+>>> bus like usb.
+>> The reset is done at the end of usb3503's probe. The question "why
+>> usb3503 has to be initialized after EHCI and USB PHY" is still valid...
+> 
+> I remember that I saw some code to reset HSIC device after phy power on in case
+> of HSIC-connected modem chip, so maybe this is somehow common for HSIC chips
+> (which are some special case of 'embedded usb').
+>
+
+I also don't have an Arndale board and haven't followed the thread to closely
+but I just wanted to mention that the ChromiumOS 3.8 tree has a workaround to
+reset the HSIC phys:
+
+https://chromium.googlesource.com/chromiumos/third_party/kernel/+/81685c447954a29d1098268776582457258dd98f%5E%21/
+
+and later a "supports-hsicphy-reset" DT property was added to force the reset
+per board instead of unconditionally:
+
+https://chromium.googlesource.com/chromiumos/third_party/kernel/+/a4d1c1a223ffa1ed38a4257d0378ca70c6667be0%5E%21/
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
