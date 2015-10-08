@@ -1,79 +1,71 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Thu, 08 Oct 2015 16:05:00 +0300
-Subject: [PATCH v9 4/5] xhci: mediatek: support MTK xHCI host controller
-In-Reply-To: <5616616D.3080205@linaro.org>
-References: <1443495698-32233-1-git-send-email-chunfeng.yun@mediatek.com>
- <1443495698-32233-5-git-send-email-chunfeng.yun@mediatek.com>
- <560D1CA9.1050009@linaro.org> <1444305958.26198.14.camel@mhfsdcap03>
- <5616616D.3080205@linaro.org>
-Message-ID: <561669FC.3030600@linux.intel.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 8 Oct 2015 16:03:04 +0300
+Subject: [PATCH v2] mmc: core: Fix init_card in 52Mhz
+In-Reply-To: <CAPDyKFqrjP3-y+ucm5ybwXefsDLOYcPF9XqMciwhRkjD5NXLBg@mail.gmail.com>
+References: <1444288147-24013-1-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFqrjP3-y+ucm5ybwXefsDLOYcPF9XqMciwhRkjD5NXLBg@mail.gmail.com>
+Message-ID: <56166988.20900@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.10.2015 15:28, Daniel Thompson wrote:
-> On 08/10/15 13:05, chunfeng yun wrote:
->> Hi,
->> On Thu, 2015-10-01 at 12:44 +0100, Daniel Thompson wrote:
->>> On 29/09/15 04:01, Chunfeng Yun wrote:
->>>> There some vendor quirks for MTK xhci host controller:
->>>> 1. It defines some extra SW scheduling parameters for HW
->>>>     to minimize the scheduling effort for synchronous and
->>>>     interrupt endpoints. The parameters are put into reseved
->>>>     DWs of slot context and endpoint context.
->>>> 2. Its IMODI unit for Interrupter Moderation register is
->>>>     8 times as much as that defined in xHCI spec.
->>>> 3. Its TDS in  Normal TRB defines a number of packets that
->>>>     remains to be transferred for a TD after processing all
->>>>     Max packets in all previous TRBs.
->>>>
->>>> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
->>>
->>> I've done some basic soak tests, both with a directly attached USB3 HDD
->>> and, given the extra code to manage isochronous xfer, also with a hub,
->>> disc and two audio interfaces.
->>>
->>> Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
->>>
->>>
->>>> diff --git a/drivers/usb/host/xhci-ring.c b/drivers/usb/host/xhci-ring.c
->>>> index 57f40a1..243f696 100644
->>>> --- a/drivers/usb/host/xhci-ring.c
->>>> +++ b/drivers/usb/host/xhci-ring.c
->>>> @@ -68,6 +68,7 @@
->>>>    #include <linux/slab.h>
->>>>    #include "xhci.h"
->>>>    #include "xhci-trace.h"
->>>> +#include "xhci-mtk.h"
->>>>
->>>>    /*
->>>>     * Returns zero if the TRB isn't in this segment, otherwise it returns the DMA
->>>> @@ -3044,18 +3045,27 @@ static u32 xhci_td_remainder(struct xhci_hcd *xhci, int transferred,
->>>>                      struct urb *urb, unsigned int num_trbs_left)
->>>>    {
->>>>        u32 maxp, total_packet_count;
->>>> +    u32 skip_current_trb = 0;
->>>
->>> A bit of a nitpick but why do we need skip_current_trb? Testing
->>> (xhci->quirks & XHCI_MTK_HOST) twice would make what the code does, and
->>> why, more obvious.
->>>
->> I am not sure which way it is better, so add variable of
->> skip_current_trb to reduce test times.
->
-> I can't imagine either approach impacts performance. However introducing skip_current_trb makes the flow of the branches harder to follow.
->
-> The first branch was a version check and can remain so; we only need to do something special with the quirks because the MTK controller is 0.97 but with a few bits added:
->
->      /* MTK xHCI is mostly 0.97 but contains some features from 1.0 */
->      if (xhci->hci_version < 0x100 && !(xhci->quirks & XHCI_MTK_HOST))
->          return ...
->
-> Setting trb_buff_len to zero is accommodating a quirk and this is clearer when we have:
->
->      /* for MTK xHCI, TD size doesn't include this TRB */
->      if (xhci->quirks & XHCI_MTK_HOST)
->          trb_buff_len = 0;
+On 08/10/15 13:59, Ulf Hansson wrote:
+> On 8 October 2015 at 09:09, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+>> Suppose that we got a data crc error, and it triggers the mmc_reset.
+>> mmc_reset will call mmc_send_status to see if HW reset was supported.
+>> before issue CMD13, it will do retune, and if EMMC was in HS400 mode,
+>> it will reduce frequency to 52Mhz firstly, then results in card init
+>> was doing at 52Mhz.
+>> The mmc_send_status was originally only done for mmc_test, so if retune
+>> needed, do not call mmc_send_status.
+>>
+>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+>> Suggested-by: Adrian Hunter <adrian.hunter@intel.com>
+>> ---
+>>  drivers/mmc/card/mmc_test.c | 6 ++++++
+>>  drivers/mmc/core/mmc.c      | 2 +-
+>>  2 files changed, 7 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
+>> index b78cf5d..2f78bfb 100644
+>> --- a/drivers/mmc/card/mmc_test.c
+>> +++ b/drivers/mmc/card/mmc_test.c
+>> @@ -2272,6 +2272,12 @@ static int mmc_test_hw_reset(struct mmc_test_card *test)
+>>         if (!mmc_card_mmc(card) || !mmc_can_reset(card))
+>>                 return RESULT_UNSUP_CARD;
+>>
+>> +       if (host->need_retune) {
+>> +               pr_info("%s: cannot test hw reset because retune needed\n",
+>> +                       mmc_hostname(test->card->host));
+>> +               return RESULT_FAIL;
+>> +       }
+>> +
+>>         err = mmc_hw_reset(host);
+>>         if (!err)
+>>                 return RESULT_OK;
+>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>> index e726903..647c96d 100644
+>> --- a/drivers/mmc/core/mmc.c
+>> +++ b/drivers/mmc/core/mmc.c
+>> @@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
+>>         host->ops->hw_reset(host);
+>>
+>>         /* If the reset has happened, then a status command will fail */
+>> -       if (!mmc_send_status(card, &status)) {
+>> +       if (!host->need_retune && !mmc_send_status(card, &status)) {
+> 
+> No, this seem like the wrong solution! The main purpose of mmc_reset()
+> is to try to reset and re-initiate the card, to make it operational
+> again.
+> 
+> I can't find a good reason to why we want to do a mmc_send_status() at
+> this point, as even if it succeeds it will only tell us that the card
+> has not been "hw-reset". No matter what, we should still try to make
+> it fully operational again and thus give mmc_init_card() a try.
+> 
+>>From this reasoning, I suggest we remove the call to mmc_send_status()
+> from this path, as that will also address your issue with CRC errors
+> in combination with re-tune.
 
-Both will work, but I'd prefer this solution as well.
+Then you need to remove the hw_reset test from mmc_test.  Refer:
 
--Mathias
+	http://marc.info/?l=linux-mmc&m=144360165906544&w=2
