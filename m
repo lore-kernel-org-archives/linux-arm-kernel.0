@@ -1,43 +1,74 @@
-From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Thu,  8 Oct 2015 13:55:16 +0530
-Subject: [PATCH] dmaengine: xgene-dma: Disable memcpy operation due to
- performance drop
-Message-ID: <1444292716-1877-1-git-send-email-rsahu@apm.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 08 Oct 2015 10:31:18 +0200
+Subject: [alsa-devel] [PATCH v5 06/10] dmaengine: add API for getting
+ dma controller's quirk
+In-Reply-To: <56139289.7000005@rock-chips.com>
+References: <1442187923-5736-1-git-send-email-shawn.lin@rock-chips.com>
+ <1442188139-6017-1-git-send-email-shawn.lin@rock-chips.com>
+ <20151005153746.GG13501@vkoul-mobl.iind.intel.com>
+ <56139289.7000005@rock-chips.com>
+Message-ID: <561629D6.9010702@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA engine supports memory copy, RAID5 XOR, RAID6 PQ, and other
-computations. But the bandwidth of the entire DMA engine is shared
-among all channels. This patch re-configures operations availability
-such that one can achieve maximum performance for XOR and PQ
-computation by removing the memory offload operations.
+On 10/06/2015 11:21 AM, Shawn Lin wrote:
+> Hi Vinod,
+> 
+> On 2015/10/5 23:37, Vinod Koul wrote:
+>> On Mon, Sep 14, 2015 at 07:48:59AM +0800, Shawn Lin wrote:
+>>> Add dmaengine_get_quirks API for peripheral devices to query
+>>> quirks if they need it to make special workaround due to broken
+>>> dma controller design.
+>>>
+>>> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+>>> ---
+>>>
+>>> Changes in v5: None
+>>> Changes in v4: None
+>>> Changes in v3: None
+>>> Changes in v2: None
+>>> Changes in v1: None
+>>>
+>>>   include/linux/dmaengine.h | 9 +++++++++
+>>>   1 file changed, 9 insertions(+)
+>>>
+>>> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+>>> index e2f5eb4..5174ca4 100644
+>>> --- a/include/linux/dmaengine.h
+>>> +++ b/include/linux/dmaengine.h
+>>> @@ -704,6 +704,7 @@ struct dma_device {
+>>>
+>>>       int (*device_config)(struct dma_chan *chan,
+>>>                    struct dma_slave_config *config);
+>>> +    int (*device_get_quirks)(struct dma_chan *chan);
+>>
+>> And why do we want to expose this to users? THis doesnt seem right!
+>>
+> 
+> Basically I agree not to expose dma's quirk to slave controllers...But, the
+> fact I mentioned on cover letter explain the reasons why I have to let slave
+> controllers know that they are working with a broken dma. It's a dilemma
+> that if we don't want that to be exposed(let slave controllers' driver get
+> the info via a API), we have t add broken quirk for all of them ,here and
+> there, which seems to be a disaster:(
 
-Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
----
- drivers/dma/xgene-dma.c | 3 +++
- 1 file changed, 3 insertions(+)
+The problem with this API is that it transports values with device specific
+meanings over a generic API. Which is generally speaking not a good idea
+because the consumer witch is supposed to be generic suddenly needs to know
+which provider it is talking to.
 
-diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
-index 8d57b1b..2998fcb 100644
---- a/drivers/dma/xgene-dma.c
-+++ b/drivers/dma/xgene-dma.c
-@@ -154,6 +154,7 @@
- #define XGENE_DMA_MAX_XOR_SRC		5
- #define XGENE_DMA_16K_BUFFER_LEN_CODE	0x0
- #define XGENE_DMA_INVALID_LEN_CODE	0x7800000000000000ULL
-+#undef XGENE_DMA_MEMCPY_ENABLE
+A better solution in this case typically is either introduce a generic API
+with generic values or a custom API with custom values, but don't mix the two.
 
- /* X-Gene DMA descriptor error codes */
- #define ERR_DESC_AXI			0x01
-@@ -1707,7 +1708,9 @@ static void xgene_dma_set_caps(struct xgene_dma_chan *chan,
- 	dma_cap_zero(dma_dev->cap_mask);
+> 
+> I would appreciate it if you could give me some suggestions at your earliest
+> convenience. :)
 
- 	/* Set DMA device capability */
-+#ifdef XGENE_DMA_MEMCPY_ENABLE
- 	dma_cap_set(DMA_MEMCPY, dma_dev->cap_mask);
-+#endif
- 	dma_cap_set(DMA_SG, dma_dev->cap_mask);
+In this case I think the best way to handle this is not quirks, but rather
+expose the actual maximum burst size using the DMA capabilities API. Since
+supporting only a certain burst depth is not really a quirk. All hardware
+has a limit for this and for some it might be larger or smaller than for
+others and it might be the same IP core but the maximum size depends on some
+IP core parameters. So this should be discoverable.
 
- 	/* Basically here, the X-Gene SoC DMA engine channel 0 supports XOR
---
-1.8.2.1
+- Lars
