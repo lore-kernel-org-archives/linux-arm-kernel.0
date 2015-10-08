@@ -1,203 +1,214 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 8 Oct 2015 06:16:19 +0530
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20151006195742.GH21626@n2100.arm.linux.org.uk>
-References: <20151005143532.GA23801@atomide.com>
- <20151005145127.GB23801@atomide.com> <20151005171155.GF23801@atomide.com>
- <20151005183813.GD21626@n2100.arm.linux.org.uk>
- <20151006090015.GE21626@n2100.arm.linux.org.uk>
- <20151006094425.GM23801@atomide.com>
- <CAPDyKFowuHHoYq3pRa11rg8KThQA5=Pzg5CpKfzMgz1to9+XLA@mail.gmail.com>
- <5613A419.5070006@ti.com> <20151006150751.GG21626@n2100.arm.linux.org.uk>
- <56142119.6050603@ti.com> <20151006195742.GH21626@n2100.arm.linux.org.uk>
-Message-ID: <5615BCDB.9080701@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 7 Oct 2015 17:55:32 -0700
+Subject: [PATCH v5] clk: bcm2835: Add support for programming the audio
+ domain clocks.
+In-Reply-To: <1444181140-3570-1-git-send-email-eric@anholt.net>
+References: <1444181140-3570-1-git-send-email-eric@anholt.net>
+Message-ID: <20151008005532.GB26883@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/06, Eric Anholt wrote:
+> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+> index dd295e4..b4d4421 100644
+> --- a/drivers/clk/bcm/clk-bcm2835.c
+> +++ b/drivers/clk/bcm/clk-bcm2835.c
+> @@ -17,10 +17,273 @@
+>  #include <linux/clk-provider.h>
+>  #include <linux/clkdev.h>
+>  #include <linux/clk/bcm2835.h>
+> +#include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <dt-bindings/clock/bcm2835.h>
 
-On Wednesday 07 October 2015 01:27 AM, Russell King - ARM Linux wrote:
-> On Wed, Oct 07, 2015 at 12:59:29AM +0530, Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> On Tuesday 06 October 2015 08:37 PM, Russell King - ARM Linux wrote:
->>> On Tue, Oct 06, 2015 at 04:06:09PM +0530, Kishon Vijay Abraham I wrote:
->>>> Hi,
->>>>
->>>> On Tuesday 06 October 2015 03:41 PM, Ulf Hansson wrote:
->>>>> On 6 October 2015 at 11:44, Tony Lindgren <tony@atomide.com> wrote:
->>>>>> * Russell King - ARM Linux <linux@arm.linux.org.uk> [151006 02:04]:
->>>>>>> On Mon, Oct 05, 2015 at 07:38:13PM +0100, Russell King - ARM Linux wrote:
->>>>>>>> On Mon, Oct 05, 2015 at 10:11:56AM -0700, Tony Lindgren wrote:
->>>>>>>>> * Tony Lindgren <tony@atomide.com> [151005 07:57]:
->>>>>>>>>> * Tony Lindgren <tony@atomide.com> [151005 07:44]:
->>>>>>>>>>> * Tony Lindgren <tony@atomide.com> [151005 04:28]:
->>>>>>>>>>>
->>>>>>>>>>> Based on some tests it seems that the duovero unpaired regulator usage
->>>>>>>>>>> is fixed by reverting:
->>>>>>>>>>>
->>>>>>>>>>> c55d7a055364 ("mmc: host: omap_hsmmc: use regulator_is_enabled to
->>>>>>>>>>> find pbias status")
->>>>>>>>>>
->>>>>>>>>> With commit c55d7a055364 my guess is that the PBIAS regulator is
->>>>>>>>>> already on from an earlier MMC probe and getting re-enabled when
->>>>>>>>>> a deferred probe happens?
->>>>>>>>>
->>>>>>>>> Unless somebody has a better fix in mind for the above, I suggest
->>>>>>>>> we revert it for the -rc kernel.
->>>>>>>>
->>>>>>>> Let me try reverting that in my build tree, and...
->>>>>>>>
->>>>>>>>>>> And it seems that omap3 legacy MMC is broken earlier in the
->>>>>>>>>>> series with:
->>>>>>>>>>>
->>>>>>>>>>> 7d607f917008 ("mmc: host: omap_hsmmc: use
->>>>>>>>>>> devm_regulator_get_optional() for vmmc")
->>>>>>>>>>>
->>>>>>>>>>> This one does not cleanly revert so have not yet tried reverting
->>>>>>>>>>> it.
->>>>>>>>>>
->>>>>>>>>> And with commit 7d607f917008 I'm guessing we can't return anHi,
->>>>>>>>>> error if the PBIAS regulator does not exist as that's not there
->>>>>>>>>> for the legacy booting.
->>>>>>>>>
->>>>>>>>> For omap3 legacy booting, we keep getting -EPROBE_DEFER for
->>>>>>>>> all the optional regulators.
->>>>>>>>>
->>>>>>>>> Something like the following might be the minimal fix for the -rc
->>>>>>>>> cycle?
->>>>>>>>
->>>>>>>> applying this patch.  If that gets things going again, then we
->>>>>>>> _definitely_ should get both of these to Linus ASAP.  The breakage
->>>>>>>> has been around far too long already.
->>>>>>>
->>>>>>> Last night's build shows that this fixes the non-DT LDP3430 booting, but
->>>>>>> DT-based LDP3430 and SDP4430 both remain broken for the same reason -
->>>>>>> neither can find their SD cards.
->>>>>>
->>>>>> Hmm DT-based boot finds the MMC card for LDP, dmesg below from DT boot [1].
->>>>>> Looks like you're on on -rc4 and not -rc3. My guess is that MMC is not
->>>>>> working for you with DT-based booting because you don't seem to have
->>>>>> CONFIG_REGULATOR_PBIAS in your seed config for. Care to try enabling that
->>>>>> for both your omap3 and omap4 seed config files?
->>>>>>
->>>>>>> We're at -rc4.  That means we're could be only three weeks away from 4.3
->>>>>>> being released, and DT OMAP has yet to boot _once_ here.
->>>>>>>
->>>>>>> What I find *totally* unacceptable is the lack of reaction from the MMC
->>>>>>> and TI people: it's just like "we'll break your crap, and we'll ignore
->>>>>>> reports of regressions."  That is *not* acceptable in any shape or form,
->>>>>>> and people who do this _should_ have their future patches ignored until
->>>>>>> they demonstrate that they understand the need to not break stuff.
->>>>>>>
->>>>>>> I'm at the point of suggesting that there should be a moritorium on all
->>>>>>> OMAP related development for 4.4: delay all development to 4.5, and have
->>>>>>> 4.4 as a pure bug-fixing _only_ cycle for OMAP.  If 4.3 is released and
->>>>>>> OMAP is still broken, then I don't think there's an option on that.
->>>>>>>
->>>>>>> Maybe the idea that development work won't hit mainline for another 4
->>>>>>> months will help focus the minds on not breaking stuff and then ignoring
->>>>>>> regression reports.
->>>>>>
->>>>>> I'm thinking along the same lines. In general, I do not and will not
->>>>>> apply any patches that are not fixes until all critical regressions are
->>>>>> out of the way. So not applying anything new for v4.4 until these MMC
->>>>>> regressions are fixed for v4.3.
->>>>>>
->>>>>
->>>>> Tony, Russell - just wanted to say thanks for putting a big effort in
->>>>> fixing this. I was expecting support from Kishon, but I guess he's
->>>>> busy.
->>>>>
->>>>> Unfortunate, I don't have any of the hardware that fails, otherwise I
->>>>> would of course be helping out more. The only thing I can think of is
->>>>> to revert the entire patchset I picked up for 4.3 from Kishon for the
->>>>> omap_hsmmc driver, but then I am not sure if that would cause other
->>>>> issues...
->>>>
->>>> Please don't do that as that will just mask lot of bugs in the
->>>> devicetree and might get MMC working. Indeed I was busy but I'll try to
->>>> get this resolved asap. The 2 pending issues as far as I know
->>>
->>> Sorry, but no.  None of this "mask bugs ... might" crap.  Either they're
->>> bug fixes, or they aren't bug fixes.  This should be a definite decision,
->>> not some vague crap.
->>
->> What I meant is the patches merged by Ulf *did* exposed bugs in device
->> tree (for instance a dt patch caused PBIAS regulator from not being
->> registered) and if those patches are reverted then a future dt breakage
->> might again be not caught.
-> 
-> That makes it even worse then.
-> 
-> What you seem to be saying now is that the old DT files were wrong, and
-> you've fixed the DT files up in the latest kernel.  You've also changed
-> the kernel in a way to make the old DT files fail.
+Please include slab.h for the kzalloc usage
 
-I'll try to explain the changes that went in MMC driver, PBIAS regulator
-driver and devicetree.
+> +
+> +
+> +static struct clk *bcm2835_register_pll(struct bcm2835_cprman *cprman,
+> +					const struct bcm2835_pll_data *data)
+> +{
+> +	struct bcm2835_pll *pll;
+> +	struct clk_init_data init;
+> +
+> +	memset(&init, 0, sizeof(init));
+> +
+> +	/* All of the PLLs derive from the external oscillator. */
+> +	init.parent_names = &cprman->osc_name;
+> +	init.num_parents = 1;
+> +	init.name = data->name;
+> +	init.ops = &bcm2835_pll_clk_ops;
+> +	init.flags = CLK_IGNORE_UNUSED;
+> +
+> +	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+> +	if (!pll)
+> +		return NULL;
+> +
+> +	pll->cprman = cprman;
+> +	pll->data = data;
+> +	pll->hw.init = &init;
+> +
+> +	return clk_register(cprman->dev, &pll->hw);
 
-******
-MMC controller in OMAP platforms uses PBIAS to know when the voltage to
-the IO lines are stable. So PBIAS regulator device tree node was added
-(as a child node of ocp), CONFIG_PBIAS_REGULATOR was added to
-omap2plus_defconfig and code to get and enable pbias regulator was added
-in MMC driver. But then error checking in MMC driver wasn't correct. It
-was something like this
+devm_clk_register?
 
-        reg = devm_regulator_get_optional(host->dev, "pbias");
-        host->pbias = IS_ERR(reg) ? NULL : reg;
+> +}
+> +
+> +static struct clk *
+> +bcm2835_register_pll_divider(struct bcm2835_cprman *cprman,
+> +			     const struct bcm2835_pll_divider_data *data)
+> +{
+> +	struct bcm2835_pll_divider *divider;
+> +	struct clk_init_data init;
+> +	struct clk *clk;
+> +	const char *divider_name;
+> +
+> +	if (data->fixed_divider != 1) {
+> +		divider_name = devm_kasprintf(cprman->dev, GFP_KERNEL,
+> +					      "%s_prediv", data->name);
+> +		if (!divider_name)
+> +			return NULL;
+> +	} else {
+> +		divider_name = data->name;
+> +	}
+> +
+> +	memset(&init, 0, sizeof(init));
+> +
+> +	init.parent_names = &data->source_pll->name;
+> +	init.num_parents = 1;
+> +	init.name = divider_name;
+> +	init.ops = &bcm2835_pll_divider_clk_ops;
+> +	init.flags = (CLK_SET_RATE_PARENT |
+> +		      CLK_IGNORE_UNUSED);
 
-For *any* errors it just sets pbias to NULL and proceeds normally.
+Drop () and put on one line.
 
-With this code the behavior is same if CONFIG_PBIAS_REGULATOR is either
-set or unset. The behavior is same if pbias driver gets probed properly
-or not.
+> +
+> +	divider = kzalloc(sizeof(*divider), GFP_KERNEL);
 
-******
-Then certain modifications were done in devicetree in order to correctly
-model users of syscon registers. With this pbias regulator device tree
-node was made as child node of scm_conf node.
+Use devm_kzalloc() to auto free on errors?
 
-This resulted in pbias device not being created (fixed by [1]), probe of
-pbias regulator driver fails while doing platform_get_resource (fixed by
-[2]) and pbias regulator enable was failing (fixed by [3])
+> +	if (!divider)
+> +		return NULL;
+> +
+> +	divider->div.reg = cprman->regs + data->a2w_reg;
+> +	divider->div.shift = A2W_PLL_DIV_SHIFT;
+> +	divider->div.width = A2W_PLL_DIV_BITS;
+> +	divider->div.flags = 0;
+> +	divider->div.lock = &cprman->regs_lock;
+> +	divider->div.hw.init = &init;
+> +	divider->div.table = NULL;
+> +
+> +	divider->cprman = cprman;
+> +	divider->data = data;
+> +
+> +	clk = clk_register(cprman->dev, &divider->div.hw);
 
-[1] -> https://lkml.org/lkml/2015/7/27/391
-[2] -> https://lkml.org/lkml/2015/9/4/210
-[3] -> https://lkml.org/lkml/2015/9/4/205
+devm_clk_register?
 
-But even without any of these fixes MMC continued to work because error
-checking in MMC driver was not proper.
+> +	if (IS_ERR(clk))
+> +		return clk;
+> +
+> +	/*
+> +	 * PLLH's channels have a fixed divide by 10 afterwards, which
+> +	 * is what our consumers are actually using.
+> +	 */
+> +	if (data->fixed_divider != 1) {
+> +		return clk_register_fixed_factor(cprman->dev, data->name,
+> +						 divider_name,
+> +						 CLK_SET_RATE_PARENT,
+> +						 1,
+> +						 data->fixed_divider);
+> +	}
+> +
+> +	return clk;
+> +}
+> +
+> +static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
+> +					  const struct bcm2835_clock_data *data)
+> +{
+[..]
+> +
+> +	memset(&init, 0, sizeof(init));
+> +	init.parent_names = &parent;
+> +	init.num_parents = 1;
+> +	init.name = data->name;
+> +	init.flags = CLK_IGNORE_UNUSED;
+> +
+> +	if (data->is_vpu_clock) {
+> +		init.ops = &bcm2835_vpu_clock_clk_ops;
+> +	} else {
+> +		init.ops = &bcm2835_clock_clk_ops;
+> +		init.flags |= CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
+> +	}
+> +
+> +	clock = kzalloc(sizeof(*clock), GFP_KERNEL);
 
-******
-Along with PBIAS fixes, patches were sent to clean-up and fix MMC [4].
-With this series MMC fails on real failures like if "pbias-supply"
-property is populated in MMC dt node, then MMC driver will fail if it
-doesn't get the pbias regulator (which means now if
-CONFIG_PBIAS_REGULATOR is not enabled, MMC driver will fail if it finds
-pbias-supply property in devicetree node). Since omap2plus_defconfig
-already had CONFIG_PBIAS_REGULATOR, it was added for multi_v7_defconfig [5].
+devm_kzalloc()?
 
-However not adding this detail in *Documentation* resulted in MMC
-failures and $subject.
+> +	if (!clock)
+> +		return NULL;
+> +
+> +	clock->cprman = cprman;
+> +	clock->data = data;
+> +	clock->hw.init = &init;
+> +
+> +	return clk_register(cprman->dev, &clock->hw);
 
-[4] -> https://lkml.org/lkml/2015/8/27/122
-[5] -> https://lkml.org/lkml/2015/9/3/119
+devm_clk_register()?
 
-> 
-> That's totally unacceptable.  Users have the right to expect that old DT
-> files work with later kernels.
-> 
-> It's fine to detect the broken DT files and print a warning, and have
-> the kernel fix up the breakage, but it is unacceptable to decide that
-> old DT files are broken and to then change stuff to prevent them working
-> with later kernels.
+> +}
+> +
+> +static int bcm2835_clk_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct clk **clks;
+> +	struct bcm2835_cprman *cprman;
+> +
+> +	cprman = devm_kzalloc(dev, sizeof(*cprman), GFP_KERNEL);
+> +	if (!cprman)
+> +		return -ENOMEM;
+> +
+> +	spin_lock_init(&cprman->regs_lock);
+> +	cprman->dev = &pdev->dev;
 
-No, we didn't break old DT files. We added new compatible string to
-handle newer DT [6]
+Just use dev?
 
-[6] -> https://lkml.org/lkml/2015/9/3/51
+> +	cprman->regs = of_iomap(dev->of_node, 0);
 
-Thanks
-Kishon
+Please use platform driver APIs:
+
+	platform_get_resource()
+	devm_ioremap_resource()
+
+> +	if (!cprman->regs)
+> +		return -ENODEV;
+> +
+> +	cprman->osc_name = of_clk_get_parent_name(dev->of_node, 0);
+> +	if (!cprman->osc_name) {
+> +		iounmap(cprman->regs);
+> +		return -ENODEV;
+> +	}
+[...]
+> +
+> +	/*
+> +	 * CM_PERIICTL (and CM_PERIACTL, CM_SYSCTL and CM_VPUCTL if
+> +	 * you have the debug bit set in the power manager, which we
+> +	 * don't bother exposing) are individual gates off of the
+> +	 * non-stop vpu clock.
+> +	 */
+> +	clks[BCM2835_CLOCK_PERI_IMAGE] =
+> +		clk_register_gate(dev, "peri_image", "vpu",
+> +				  CLK_IGNORE_UNUSED | CLK_SET_RATE_GATE,
+> +				  cprman->regs + CM_PERIICTL, CM_GATE_BIT,
+> +				  0, &cprman->regs_lock);
+> +
+> +	return of_clk_add_provider(pdev->dev.of_node, of_clk_src_onecell_get,
+
+Just use dev?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
