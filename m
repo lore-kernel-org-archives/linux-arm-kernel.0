@@ -1,47 +1,28 @@
-From: w.f@huawei.com (wangfei)
-Date: Thu, 8 Oct 2015 14:33:06 +0800
-Subject: [PATCH 1/8] dt-bindings: pmic: Document Hi655x pmic driver
-In-Reply-To: <20150930173921.GJ15635@sirena.org.uk>
-References: <1443611111-3196-1-git-send-email-w.f@huawei.com>
- <1443611111-3196-2-git-send-email-w.f@huawei.com>
- <20150930173921.GJ15635@sirena.org.uk>
-Message-ID: <56160E22.3010703@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 8 Oct 2015 14:37:23 +0800
+Subject: [PATCH v8 2/2] ARM: imx: support suspend states on imx7D
+In-Reply-To: <CAHrpEqQjp+iEYR3QhXhm2ak+CcZ4gyfK1JekCsVR78FE-0CfMw@mail.gmail.com>
+References: <1438378439-11569-1-git-send-email-shenwei.wang@freescale.com>
+ <1438378439-11569-3-git-send-email-shenwei.wang@freescale.com>
+ <20150907151106.GA30723@tiger>
+ <CY1PR0301MB084344B059A4178B09E949DF83530@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <20150918141524.GC3770@tiger>
+ <CY1PR0301MB0843D4E46210525521F9453483590@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <20150919011247.GD3770@tiger>
+ <CAHrpEqQjp+iEYR3QhXhm2ak+CcZ4gyfK1JekCsVR78FE-0CfMw@mail.gmail.com>
+Message-ID: <20151008063723.GA22673@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/10/1 1:39, Mark Brown wrote:
-> On Wed, Sep 30, 2015 at 07:05:04PM +0800, Fei Wang wrote:
+On Thu, Oct 01, 2015 at 11:31:11AM -0500, Zhi Li wrote:
+> On Fri, Sep 18, 2015 at 8:12 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > I have zero interest to maintain this pile of code in the mainline
+> > kernel.  Take it as a motivation to move to PSCI soon, or you maintain
+> > it on your own as a out-of-tree patch for whatever long time you like.
+> >
 > 
->> +Hisilicon hi655x Power Management Integrated Circuit (PMIC)
->> +
->> +hi655x consists of a large and varied group of sub-devices:
->> +
->> +Device			 Supply Names	 Description
->> +------			 ------------	 -----------
->> +hi655x-powerkey		:		: Powerkey
->> +hi655x-regulator-pmic	:		: Regulators
->> +hi655x-usbvbus		:		: USB plug detection
->> +hi655x-pmu-rtc		:		: RTC
->> +hi655x-coul		:		: Coulomb
-> 
-> ...counter?
-> 
-> There's no documentation of the bindings for any of the above devices or
-> how things are structured, you need to provide binding documentation
-> which is understandable standalone.  None of the properties are
-> documented, nor is the set of regulators supported or how this is
-> structured.
+> Does it means that SMP support also need go through PSCI?
 
-OK,i will add them.
-> 
->> +                coul: coul at 1 {
->> +                        compatible = "hisilicon,hi655x-coul";
->> +                        interrupt-parent = <&pmic>;
->> +                        interrupts = <24 0>, <25 0>, <26 0>, <27 0>;
->> +                        interrupt-names = "cl_int_i", "cl_out_i", "cl_in_i", "vbat_int_i";
->> +                        battery_product_index = <0>;
-> 
-> For example, the "battery_product_index" property here is undocumented.
+Yes, please.
 
-now on hikey, we only enable hi655x-regulator-pmic function, and regulator is child node of pmic.do i need to document regulator dt-binding in this file or create a new regulator dt-binding file?
-> 
+Shawn
