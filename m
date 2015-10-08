@@ -1,28 +1,35 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 08 Oct 2015 05:07:19 -0700 (PDT)
-Subject: [PATCH v2] mlxsw: fix warnings for big-endian 32-bit dma_addr_t
-In-Reply-To: <9933338.DDyBa8BQum@wuerfel>
-References: <30258520.VaA2vDyUiY@wuerfel>
- <1444200782.26237.8.camel@perches.com> <9933338.DDyBa8BQum@wuerfel>
-Message-ID: <20151008.050719.1791217246493289007.davem@davemloft.net>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Thu, 8 Oct 2015 12:56:28 +0100
+Subject: [PATCH v2 16/22] arm64/debug: Make use of the system wide safe
+ value
+In-Reply-To: <20151008111128.GH17192@e104818-lin.cambridge.arm.com>
+References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+ <1444064531-25607-17-git-send-email-suzuki.poulose@arm.com>
+ <20151008111128.GH17192@e104818-lin.cambridge.arm.com>
+Message-ID: <561659EC.7030508@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 07 Oct 2015 08:58:34 +0200
+On 08/10/15 12:11, Catalin Marinas wrote:
+> On Mon, Oct 05, 2015 at 06:02:05PM +0100, Suzuki K. Poulose wrote:
+>> @@ -137,13 +138,17 @@ extern struct pmu perf_ops_bp;
+>>   /* Determine number of BRP registers available. */
+>>   static inline int get_num_brps(void)
+>>   {
+>> -	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
+>> +	return 1 +
+>> +		cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
+>> +						ID_AA64DFR0_BRPS_SHIFT);
+>>   }
+>
+> cpuid_feature_extract_field() is fine but we should we bother with
+> read_system_reg vs just read_cpuid?
+> Similar question for patch 17/22.
 
-> The recently added mlxsw driver produces warnings in ARM
-> allmodconfig:
-> 
-> drivers/net/ethernet/mellanox/mlxsw/pci.c: In function 'mlxsw_pci_cmd_exec':
-> drivers/net/ethernet/mellanox/mlxsw/pci.c:1585:59: warning: right shift count >= width of type [-Wshift-count-overflow]
-> linux/byteorder/big_endian.h:38:51: note: in definition of macro '__cpu_to_be32'
-> drivers/net/ethernet/mellanox/mlxsw/pci.c:76:2: note: in expansion of macro 'iowrite32be'
-> 
-> This uses upper_32_bits() to extract the bits while avoiding that warning.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Jiri Pirko <jiri@mellanox.com>
-> Fixes: eda6500a987a "mlxsw: Add PCI bus implementation"
+Well, we would have already TAINTed the kernel, if these fields are different.
+It is just the matter of, whether we want to provide the safer value on a tainted
+kernel or not. I am open to suggestions.
 
-Applied, thanks.
+
+Thanks
+Suzuki
