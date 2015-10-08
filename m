@@ -1,28 +1,81 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 8 Oct 2015 14:58:40 -0700
-Subject: [PATCH 1/3] clk: add flag for clocks that need to be enabled on
- rate changes
-In-Reply-To: <3137165.kmu68gRS44@diego>
-References: <1929669.AsgMSusdJb@phil>
- <3137165.kmu68gRS44@diego>
-Message-ID: <20151008215840.GJ26883@codeaurora.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 8 Oct 2015 17:05:07 -0500
+Subject: [PATCH] PCI: generic: Fix address window calculation for non-zero
+ starting bus.
+In-Reply-To: <1444334056-4870-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1444334056-4870-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <CAL_JsqKobjdCOHiQLEStp4Q12e9=3dLZUgq+TuTkmoFVtAz5xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02, Heiko St?bner wrote:
-> Hi,
-> 
-> any comment on these 3 patches?
-> 
+On Thu, Oct 8, 2015 at 2:54 PM, David Daney <ddaney.cavm@gmail.com> wrote:
+> From: David Daney <david.daney@cavium.com>
+>
+> Make the offset from the beginning of the "reg" property be from the
+> starting bus number, rather than zero.  Hoist the invariant size
+> calculation out of the mapping for loop.
+>
+> Update host-generic-pci.txt to clarify the semantics of the "reg"
+> property with respect to non-zero starting bus numbers.
+>
+> Signed-off-by: David Daney <david.daney@cavium.com>
 
-Dong has a similar problem, but those patches conflate this with
-enabling parent clocks during clk_disable_unused() which makes no
-sense to me. So I'm ok with the requirement that we turn clocks
-on to change rates, but I wonder if in this case we need to turn
-on the clock that's changing rates itself, or if we just need to
-turn on the parent and/or future parent of the clock during the
-rate switch. Care to elaborate on that?
+Acked-by: Rob Herring <robh@kernel.org>
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> ---
+> This is a replacement for:
+>
+> https://lkml.org/lkml/2015/10/2/653
+>
+> Since that patch is getting too much push-back, this is the only other
+> option for fixing the driver to be internally consistent in its
+> treatment of the offset from "reg" to the first bus in the "bus-range"
+> property.
+>
+>  Documentation/devicetree/bindings/pci/host-generic-pci.txt | 5 +++--
+>  drivers/pci/host/pci-host-generic.c                        | 4 ++--
+>  2 files changed, 5 insertions(+), 4 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> index cf3e205..3f1d3fc 100644
+> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> @@ -34,8 +34,9 @@ Properties of the host controller node:
+>  - #size-cells    : Must be 2.
+>
+>  - reg            : The Configuration Space base address and size, as accessed
+> -                   from the parent bus.
+> -
+> +                   from the parent bus.  The base address corresponds to
+> +                   the first bus in the "bus-range" property.  If no
+> +                   "bus-range" is specified, this will be bus 0 (the default).
+>
+>  Properties of the /chosen node:
+>
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index fe9a81b..bb93346 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -169,6 +169,7 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>         struct resource *bus_range;
+>         struct device *dev = pci->host.dev.parent;
+>         struct device_node *np = dev->of_node;
+> +       u32 sz = 1 << pci->cfg.ops->bus_shift;
+>
+>         err = of_address_to_resource(np, 0, &pci->cfg.res);
+>         if (err) {
+> @@ -196,10 +197,9 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>         bus_range = pci->cfg.bus_range;
+>         for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
+>                 u32 idx = busn - bus_range->start;
+> -               u32 sz = 1 << pci->cfg.ops->bus_shift;
+>
+>                 pci->cfg.win[idx] = devm_ioremap(dev,
+> -                                                pci->cfg.res.start + busn * sz,
+> +                                                pci->cfg.res.start + idx * sz,
+>                                                  sz);
+>                 if (!pci->cfg.win[idx])
+>                         return -ENOMEM;
+> --
+> 1.9.1
+>
