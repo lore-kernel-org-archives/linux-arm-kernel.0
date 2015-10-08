@@ -1,81 +1,28 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 09 Oct 2015 00:45:49 +0300
-Subject: [PATCH] ARM: shmobile: porter: add VIN0/ADV7180 DT support
-In-Reply-To: <1750082.WpWf34HsI6@wasted.cogentembedded.com>
-References: <1750082.WpWf34HsI6@wasted.cogentembedded.com>
-Message-ID: <2169211.txWv7mmrno@wasted.cogentembedded.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 8 Oct 2015 14:58:40 -0700
+Subject: [PATCH 1/3] clk: add flag for clocks that need to be enabled on
+ rate changes
+In-Reply-To: <3137165.kmu68gRS44@diego>
+References: <1929669.AsgMSusdJb@phil>
+ <3137165.kmu68gRS44@diego>
+Message-ID: <20151008215840.GJ26883@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the  Porter board dependent part of the VIN0 device node.
-Add the device node for Analog Devices  ADV7180 video decoder to I2C2 bus.
-Add the necessary subnodes to interconnect VIN0 and ADV7180 devices.
+On 10/02, Heiko St?bner wrote:
+> Hi,
+> 
+> any comment on these 3 patches?
+> 
 
-This patch is  analogous to the commit 8d62f4f75320 ("ARM: shmobile:
-henninger: add VIN0/ADV7180 DT support") as there are no differences
-between the boards in this respect.
+Dong has a similar problem, but those patches conflate this with
+enabling parent clocks during clk_disable_unused() which makes no
+sense to me. So I'm ok with the requirement that we turn clocks
+on to change rates, but I wonder if in this case we need to turn
+on the clock that's changing rates itself, or if we just need to
+turn on the parent and/or future parent of the clock during the
+rate switch. Care to elaborate on that?
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
-This patch is against 'renesas-devel-20151008-v4.3-rc4' tag of Simon Horman's
-'renesas.git' repo plus the Porter I2C2 support patch just posted.
-
- arch/arm/boot/dts/r8a7791-porter.dts |   35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791-porter.dts
-+++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -114,6 +114,11 @@
- 		renesas,groups = "i2c2";
- 		renesas,function = "i2c2";
- 	};
-+
-+	vin0_pins: vin0 {
-+		renesas,groups = "vin0_data8", "vin0_clk";
-+		renesas,function = "vin0";
-+	};
- };
- 
- &scif0 {
-@@ -166,8 +171,38 @@
- 
- 	status = "okay";
- 	clock-frequency = <400000>;
-+
-+	composite-in at 20 {
-+		compatible = "adi,adv7180";
-+		reg = <0x20>;
-+		remote = <&vin0>;
-+
-+		port {
-+			adv7180: endpoint {
-+				bus-width = <8>;
-+				remote-endpoint = <&vin0ep>;
-+			};
-+		};
-+	};
- };
- 
- &sata0 {
- 	status = "okay";
- };
-+
-+/* composite video input */
-+&vin0 {
-+	status = "ok";
-+	pinctrl-0 = <&vin0_pins>;
-+	pinctrl-names = "default";
-+
-+	port {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		vin0ep: endpoint {
-+			remote-endpoint = <&adv7180>;
-+			bus-width = <8>;
-+		};
-+	};
-+};
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
