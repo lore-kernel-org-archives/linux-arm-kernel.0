@@ -1,33 +1,27 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 08 Oct 2015 12:45:58 +0530
-Subject: [PATCH v3 5/9] thermal: qcom: tsens-8960: Add support for 8960
- family of SoCs
-In-Reply-To: <20151008061243.GE26883@codeaurora.org>
-References: <1444280468-17159-1-git-send-email-rnayak@codeaurora.org>
- <1444280468-17159-6-git-send-email-rnayak@codeaurora.org>
- <20151008061243.GE26883@codeaurora.org>
-Message-ID: <5616182E.5060707@codeaurora.org>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 08 Oct 2015 10:17:09 +0300
+Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
+In-Reply-To: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
+References: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <003a01d10199$58e96590$0abc30b0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ Hello!
 
+> +    The mpidr encoding is based on the affinity information in the
+> +    architecture defined MPIDR, and the field is encoded as follows:
+> +      | 63 .... 56 | 55 .... 48 | 47 .... 40 | 39 .... 32 |
+> +      |    Aff3    |    Aff2    |    Aff1    |    Aff0    |
 
-On 10/08/2015 11:42 AM, Stephen Boyd wrote:
-> On 10/08, Rajendra Nayak wrote:
->> diff --git a/drivers/thermal/qcom/Makefile b/drivers/thermal/qcom/Makefile
->> index a471100..f3cefd1 100644
->> --- a/drivers/thermal/qcom/Makefile
->> +++ b/drivers/thermal/qcom/Makefile
->> @@ -1,2 +1,2 @@
->>  obj-$(CONFIG_QCOM_TSENS)	+= qcom_tsens.o
->> -qcom_tsens-y			+= tsens.o tsens-common.o tsens-8916.o tsens-8974.o
->> +qcom_tsens-y			+= tsens.o tsens-common.o tsens-8916.o tsens-8974.o tsens-8960.o
-> 
-> Maybe a dumb question: What's the point of multiple files for
-> each SoC if they're always built?
+ One concern about this... Does it already have "We are Bosses, we Decided it, It's not subject to
+change, We do not care" status? Actually, current approach with using index instead of Aff bits
+works pretty well. It works fine with qemu too, because internally qemu also maintains CPU index,
+which it uses for GICv2 accesses.
+ Keeping index allows to reuse more code, and provides better backwards compatibility. So could we
+do this?
 
-Just for code segregation and better readability.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
