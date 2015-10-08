@@ -1,34 +1,64 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Thu, 8 Oct 2015 08:05:25 +0200
-Subject: [PATCH v4 19/26] ARM: pxa: magician: Add support for Omnivision
- OV9640 camera
-In-Reply-To: <87pp0qa27m.fsf@belgarion.home>
-References: <cover.1443472089.git.petr.cvek@tul.cz> <5609B365.4060307@tul.cz>
- <1443876607.4186.35.camel@gmail.com>
- <87pp0qa27m.fsf@belgarion.home>
-Message-ID: <561607A5.50406@tul.cz>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 7 Oct 2015 23:05:57 -0700
+Subject: [PATCH v3 4/9] clk: qcom: create virtual child device for TSENS
+In-Reply-To: <1444280468-17159-5-git-send-email-rnayak@codeaurora.org>
+References: <1444280468-17159-1-git-send-email-rnayak@codeaurora.org>
+ <1444280468-17159-5-git-send-email-rnayak@codeaurora.org>
+Message-ID: <20151008060557.GD26883@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 7.10.2015 v 21:49 Robert Jarzmik napsal(a):
-> Philipp Zabel <philipp.zabel@gmail.com> writes:
-> 
->> Am Montag, den 28.09.2015, 23:38 +0200 schrieb Petr Cvek:
->>> This patch adds support for an OV9640 camera to the HTC Magician
->>> machine.
->>>
->>> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
->>
->> Still untested, but looks good to me.
-> I'm still reluctant to have the reset with the timings handled in the board code
-> as I consider this should be in the camera driver code
-> (magician_camera_reset()).
+On 10/08, Rajendra Nayak wrote:
+> @@ -3520,11 +3522,26 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
+>  	if (IS_ERR(clk))
+>  		return PTR_ERR(clk);
+>  
+> -	return qcom_cc_probe(pdev, match->data);
+> +	ret = qcom_cc_probe(pdev, match->data);
+> +	if (ret)
+> +		return ret;
+> +
+> +	tsens = platform_device_register_data(&pdev->dev, "qcom-tsens", -1,
+> +					      NULL, 0);
+> +	if (IS_ERR(tsens)) {
+> +		qcom_cc_remove(pdev);
+> +		return PTR_ERR(tsens);
+> +	}
+> +	platform_set_drvdata(pdev, tsens);
 
-It supports an actual state of the OV9640 driver handling. But I can exclude it until
-OV9640 will be transitioned. I don't have enough information about gpiod and soc-camera
-and not enough time to maintain multiple different (and dependent) patchsets.
+We just blew away the pointer that qcom_cc_probe() stores.
 
-I forgot to test the timings ... actually I think I forgot results :-D . It was around the same time
-I have found I2C fast mode is not working. Will test again.
+> +
+> +	return 0;
+>  }
+>  
+>  static int gcc_msm8960_remove(struct platform_device *pdev)
+>  {
+> +	struct platform_device *tsens = platform_get_drvdata(pdev);
+> +
+> +	platform_device_unregister(tsens);
+>  	qcom_cc_remove(pdev);
 
-Petr
+So now we've leaked the reset controller.
+
+I suppose the simplest solution is to get the drvdata pointer
+after qcom_cc_probe(), allocate a container structure to hold
+that as a void * plus the tsens device, i.e.
+
+	struct container {
+		void *data;
+		struct platform_device *tsens;
+	};
+	
+and then set the drvdata to that. And finally undo all that and
+restore the drvdata pointer on remove.
+
+I've also been considering putting some devm stuff inside
+qcom_cc_probe() itself so that in the normal case you don't even
+need to call qcom_cc_remove(), it just gets done automatically.
+That would open up the possibility for drivers to use the drvdata
+member as they wish.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
