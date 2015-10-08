@@ -1,97 +1,154 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 8 Oct 2015 10:02:43 -0500
-Subject: [PATCH v4 4/5] PCI: generic: Correct, and avoid overflow, in
- bus_max calculation.
-In-Reply-To: <1443811443-18878-5-git-send-email-ddaney.cavm@gmail.com>
-References: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
- <1443811443-18878-5-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20151008150243.GC3885@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Oct 2015 16:03:46 +0100
+Subject: [PATCH v2 07/22] arm64: Keep track of CPU feature registers
+In-Reply-To: <56163D7F.4000003@arm.com>
+References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+ <1444064531-25607-8-git-send-email-suzuki.poulose@arm.com>
+ <20151007171621.GD17192@e104818-lin.cambridge.arm.com>
+ <56163D7F.4000003@arm.com>
+Message-ID: <20151008150346.GK17192@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Arnd]
+On Thu, Oct 08, 2015 at 10:55:11AM +0100, Suzuki K. Poulose wrote:
+> >>@@ -82,6 +114,22 @@ static inline int __attribute_const__ cpuid_feature_extract_field(u64 features,
+> >>  	return (s64)(features << (64 - 4 - field)) >> (64 - 4);
+> >>  }
+> >>
+> >>+static inline s64 __attribute_const__
+> >>+cpuid_feature_extract_field_width(u64 features, int field, u8 width)
+> >>+{
+> >>+	return (s64)(features << (64 - width - field)) >> (64 - width);
+> >>+}
+> >
+> >I think you should rewrite cpuid_feature_extract_field() in terms of the
+> >_width one (the latter being more generic).
+> >
+> 
+> OK, somehow, I was thinking that cpuid_feature_extract_field() could be
+> optimised by the compiler for a fixed width of for. Hence didn't change it.
 
-And this one?
+Since both are static inline, the compiler should be smart enough to
+optimise it already.
 
-On Fri, Oct 02, 2015 at 11:44:02AM -0700, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
+> >>diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> >>index 1ae8b24..d42ad90 100644
+> >>--- a/arch/arm64/kernel/cpufeature.c
+> >>+++ b/arch/arm64/kernel/cpufeature.c
+> >>@@ -58,8 +58,442 @@ static void update_mixed_endian_el0_support(struct cpuinfo_arm64 *info)
+> >>  	mixed_endian_el0 &= id_aa64mmfr0_mixed_endian_el0(info->reg_id_aa64mmfr0);
+> >>  }
+> >>
+> >>+#define ARM64_FTR_BITS(ftr_strict, ftr_type, ftr_shift, ftr_width, ftr_safe_val) \
+> >>+	{							\
+> >>+		.strict = ftr_strict,				\
+> >>+		.type = ftr_type,				\
+> >>+		.shift = ftr_shift,				\
+> >>+		.width = ftr_width,				\
+> >>+		.safe_val = ftr_safe_val,			\
+> >>+	}
+> >
+> >You can drop "ftr_" from all the arguments, it makes the macro
+> >definition shorter.
 > 
-> There are two problems with the bus_max calculation:
+> In fact I tried that before, but then the macro expansion will replace the
+> field names with the supplied values and hence won't compile. Either we
+> should change the field names or the values.
+
+OK, keep them in this case.
+
+> >[...]
+> >>+static struct arm64_ftr_bits ftr_id_pfr0[] = {
+> >>+	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 16, 16, 0),	// RAZ
+> >>+	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 12, 4, 0),	// State3
+> >>+	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 8, 4, 0),	// State2
+> >>+	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// State1
+> >>+	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// State0
+> >>+	ARM64_FTR_END,
+> >>+};
+> >
+> >Do we care about the RAZ/RAO fields? Or we use this later to check a new
+> >CPU's compatibility with the overall features?
 > 
-> 1) The u8 data type can overflow for large config space windows.
+> Its just for sanity checks.
 > 
-> 2) The calculation is incorrect for a bus range that doesn't start at
->    zero.
+> >Also, you captured lots of fields that Linux does not care about. Is it
+> >possible to ignore them altogether, only keep those which are relevant.
+> >
 > 
-> Since the configuration space is relative to bus zero, make bus_max
-> just be the size of the config window scaled by bus_shift.  Then clamp
-> it to a maximum of 255, per PCI.  Use a data type of int to avoid
-> overflow problems.
+> The list is entierly from the SANITY check. If there are any registers
+> that we think need not be cross checked, we could get rid of them.
+
+So we have three types of fields in these registers:
+
+a) features defined but not something we care about in Linux
+b) reserved fields
+c) features important to Linux
+
+I guess for (a), Linux may not even care if they don't match (though we
+need to be careful which fields we ignore). As for (b), even if they
+differ, since we don't know the meaning at this point, I think we should
+just ignore them. If, for example, they add a feature that Linux doesn't
+care about, they practically fall under the (a) category.
+
+Regarding exposing reserved CPUID fields to user, I assume we would
+always return 0.
+
+> >>+ * sys_reg() encoding.
+> >>+ *
+> >>+ * We track only the following space:
+> >>+ * Op0 = 3, Op1 = 0, CRn = 0, CRm = [1 - 7], Op2 = [0 - 7]
+> >>+ * Op0 = 3, Op1 = 3, CRn = 0, CRm = 0, Op2 = { 1, 7 } 	(CTR, DCZID)
+> >>+ * Op0 = 3, Op1 = 3, CRn = 14, CRm = 0, Op2 = 0		(CNTFRQ)
+> >>+ *
+> >>+ * The space (3, 0, 0, {1-7}, {0-7}) is arranged in a 2D array op1_0,
+> >>+ * indexed by CRm and Op2. Since not all CRm's have fully allocated Op2's
+> >>+ * arm64_reg_table[CRm-1].n indicates the largest Op2 tracked for CRm.
+> >>+ *
+> >>+ * Since we have limited number of entries with Op1 = 3, we use linear search
+> >>+ * to find the reg.
+> >>+ *
+> >>+ */
+> >>+static struct arm64_ftr_reg* get_arm64_sys_reg(u32 sys_id)
+> >>+{
+> >>+	int i;
+> >>+	u8 op2, crn, crm;
+> >>+	u8 op1 = sys_reg_Op1(sys_id);
+> >>+
+> >>+	if (sys_reg_Op0(sys_id) != 3)
+> >>+		return NULL;
+> >>+	switch (op1) {
+> >>+	case 0:
+> >>+
+> >>+		crm = sys_reg_CRm(sys_id);
+> >>+		op2 = sys_reg_Op2(sys_id);
+> >>+		crn = sys_reg_CRn(sys_id);
+> >>+		if (crn || !crm || crm > 7)
+> >>+			return NULL;
+> >>+		if (op2 < op1_0[crm - 1].n &&
+> >>+			op1_0[crm - 1].regs[op2].sys_id == sys_id)
+> >>+			return &op1_0[crm - 1].regs[op2];
+> >>+		return NULL;
+> >>+	case 3:
+> >>+		for (i = 0; i < ARRAY_SIZE(op1_3); i++)
+> >>+			if (op1_3[i].sys_id == sys_id)
+> >>+				return &op1_3[i];
+> >>+	}
+> >>+	return NULL;
+> >>+}
+[...]
+> >Is this function ever called on a hot path? If not, just keep everything
+> >in an array and do a linear search rather than having different arrays
+> >based on op*. Especially if we managed to limit the number of registers
+> >to only those that Linux cares about.
 > 
-> Update host-generic-pci.txt to clarify the semantics of the "reg"
-> property with respect to non-zero starting bus numbers.
-> 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
-> Change from V3: Add to explanation of "reg" property in
-> host-generic-pci.txt.  Add error message if "reg" property is too big.
-> 
->  Documentation/devicetree/bindings/pci/host-generic-pci.txt |  6 +++++-
->  drivers/pci/host/pci-host-generic.c                        | 12 +++++++++---
->  2 files changed, 14 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> index cf3e205..42303bb 100644
-> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> @@ -34,7 +34,11 @@ Properties of the host controller node:
->  - #size-cells    : Must be 2.
->  
->  - reg            : The Configuration Space base address and size, as accessed
-> -                   from the parent bus.
-> +                   from the parent bus.  The base address corresponds to
-> +                   bus zero, even though the "bus-range" property may specify
-> +                   a different starting bus number.  The driver must only map
-> +                   or access the portion of the Configuration Space that
-> +                   corresponds to the "bus-range"
->  
->  
->  Properties of the /chosen node:
-> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> index 216ded5..5cce837 100644
-> --- a/drivers/pci/host/pci-host-generic.c
-> +++ b/drivers/pci/host/pci-host-generic.c
-> @@ -164,7 +164,7 @@ out_release_res:
->  static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
->  {
->  	int err;
-> -	u8 bus_max;
-> +	int bus_max;
->  	resource_size_t busn;
->  	struct resource *bus_range;
->  	struct device *dev = pci->host.dev.parent;
-> @@ -177,8 +177,14 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
->  	}
->  
->  	/* Limit the bus-range to fit within reg */
-> -	bus_max = pci->cfg.bus_range->start +
-> -		  (resource_size(&pci->cfg.res) >> pci->cfg.ops->bus_shift) - 1;
-> +	bus_max = (resource_size(&pci->cfg.res) >> pci->cfg.ops->bus_shift) - 1;
-> +	if (bus_max > 255) {
-> +		dev_err(dev,
-> +			"\"reg\" size corresponds to bus %d, truncating to 255\n",
-> +			bus_max);
-> +		bus_max = 255;
-> +	}
-> +
->  	pci->cfg.bus_range->end = min_t(resource_size_t,
->  					pci->cfg.bus_range->end, bus_max);
->  
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> I started with linear array in the RFC post. But since then the number of
+> users for the API has gone up. Hence thought of optimising it. The only
+> 'intensive' user is SANITY check for each register at CPU bring up.
+
+This shouldn't be that bad since it's not happening very often. However,
+do we need this thing for MRS emulation (not many registers though)? You
+could use a binary search (something like radix tree seems overkill)
+
+-- 
+Catalin
