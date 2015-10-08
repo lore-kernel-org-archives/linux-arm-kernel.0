@@ -1,35 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Oct 2015 10:40:55 +0100
-Subject: [PATCH V4 2/3] arm64: support initrd outside kernel linear map
-In-Reply-To: <FC378C09-F140-4A62-9FFA-09293E65E866@gmail.com>
-References: <1439830867-14935-1-git-send-email-msalter@redhat.com>
- <1439830867-14935-3-git-send-email-msalter@redhat.com>
- <20150908113113.GA20562@leverpostej>
- <20151006171140.GE26433@leverpostej>
- <1444151812.10788.14.camel@redhat.com>
- <20151008084953.GA20114@cbox>
- <FC378C09-F140-4A62-9FFA-09293E65E866@gmail.com>
-Message-ID: <20151008094055.GC32532@n2100.arm.linux.org.uk>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Thu, 8 Oct 2015 17:43:08 +0800
+Subject: [PATCH v8 0/6] Altera PCIe host controller driver with MSI support
+Message-ID: <1444297394-3122-1-git-send-email-lftan@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 05:18:14PM +0800, yalin wang wrote:
-> is it also possible to implement it on ARM platforms?
-> ARM64 platform don?t have HIGH_MEM zone .
-> but ARM platform have .
-> i remember boot loader must put init rd  into low memory region,
-> so if some boot loader put init rd into HIGH men zone
-> we can also relocate it to low men region ?
-> then boot loader don?t need care about this ,
-> and since vmalloc= boot option will change HIGH mem region size,
-> if we can relocate init rd , boot loader don?t need care about init rd load address,
-> when change vmalloc= boot options .
+This is the 8th version of patch set to add support for Altera PCIe host
+controller with MSI feature on Altera FPGA device families. This patchset
+mainly resolve comments from Rob Herring and Marc Zyngier in v7 and minor fix.
 
-I'd be more inclined to say yes if the kernel wasn't buggering around
-passing virtual addresses (initrd_start) of the initrd image around,
-but instead used a physical address.  initrd_start must be a lowmem
-address.
+This patchset is based on v4.3-rc3.
+
+v7->v8 changes:
+- pcie-altera/Documentation: change to support one case of reg-names.
+- Documentation: remove <1> for msi-controller.
+- pci: remove depends on ARCH_SOCFPGA and NIOS2 in Kconfig
+- pci: change PCIE_ALTERA to bool in Kconfig. It requires pci fixups to work correctly,
+       so it needs to be builtin module.
+
+History:
+-------
+[v1]: https://lkml.org/lkml/2015/7/28/395
+[v2]: https://lkml.org/lkml/2015/7/31/267
+[v3]: http://www.kernelhub.org/?msg=811940&p=2
+[v4]: https://lkml.org/lkml/2015/8/17/141
+[v5]: https://lkml.org/lkml/2015/8/25/238
+[v6]: https://lkml.org/lkml/2015/9/1/177
+[v7]: https://lkml.org/lkml/2015/9/20/193
+
+Ley Foon Tan (6):
+  arm: add msi.h to Kbuild
+  pci: add Altera PCI vendor ID
+  pci:host: Add Altera PCIe host controller driver
+  pci: altera: Add Altera PCIe MSI driver
+  Documentation: dt-bindings: pci: altera pcie device tree binding
+  MAINTAINERS: Add Altera PCIe and MSI drivers maintainer
+
+ .../devicetree/bindings/pci/altera-pcie-msi.txt    |  28 +
+ .../devicetree/bindings/pci/altera-pcie.txt        |  49 ++
+ MAINTAINERS                                        |  16 +
+ arch/arm/include/asm/Kbuild                        |   1 +
+ drivers/pci/host/Kconfig                           |  15 +
+ drivers/pci/host/Makefile                          |   2 +
+ drivers/pci/host/pcie-altera-msi.c                 | 310 +++++++++++
+ drivers/pci/host/pcie-altera.c                     | 588 +++++++++++++++++++++
+ include/linux/pci_ids.h                            |   2 +
+ 9 files changed, 1011 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
+ create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie.txt
+ create mode 100644 drivers/pci/host/pcie-altera-msi.c
+ create mode 100644 drivers/pci/host/pcie-altera.c
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.8.2.1
