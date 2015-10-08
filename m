@@ -1,55 +1,52 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 8 Oct 2015 20:15:59 +0200
-Subject: [PATCH v2 05/13] arm64: enable building of all dtbs
-In-Reply-To: <1444326827-3565-6-git-send-email-robh@kernel.org>
-References: <1444326827-3565-1-git-send-email-robh@kernel.org>
- <1444326827-3565-6-git-send-email-robh@kernel.org>
-Message-ID: <CAMuHMdVDdNOp5z_TjwBVUDqZuZ0NZNAu7cJ6stsZqqXOBsY_tw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 8 Oct 2015 11:16:35 -0700
+Subject: [PATCH 4/4] arm64: dts: apq8016-sbc: enable spi buses on LS and HS
+In-Reply-To: <1444303181-32574-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1444303124-32402-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1444303181-32574-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <5616B303.9030909@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 8, 2015 at 7:53 PM, Rob Herring <robh@kernel.org> wrote:
-> Enable building all dtb files when CONFIG_OF_ALL_DTBS is enabled. The dtbs
-> are not really dependent on a platform being enabled or any other kernel
-> config, so for testing coverage it is convenient to build all of the dtbs.
-> This builds all dts files in the tree, not just targets listed. This
-> is simpler for arm64 which has a bunch of sub-dirs.
-
-This doesn't look simpler than the arm(32) version?
-
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
+On 10/08/2015 04:19 AM, Srinivas Kandagatla wrote:
+> This patch enables spi buses on low speed and high speed expansion
+> connectors on DB410C
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 > ---
->  arch/arm64/boot/dts/Makefile | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 >
-> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> index d9f8833..b01ec43 100644
-> --- a/arch/arm64/boot/dts/Makefile
-> +++ b/arch/arm64/boot/dts/Makefile
-> @@ -14,3 +14,9 @@ dts-dirs += sprd
->  dts-dirs += xilinx
->
->  subdir-y       := $(dts-dirs)
+> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> index 3581272..d872654 100644
+> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> @@ -92,11 +92,21 @@
+>  	status = "okay";
+>  };
+>  
+> +&blsp_spi3 {
+> +	/* On High speed expansion */
+> +	status = "okay";
+> +};
 > +
-> +dtstree                := $(srctree)/$(src)
+>  &blsp_i2c4 {
+>  	/* On High speed expansion */
+>  	status = "okay";
+>  };
+>  
+> +&blsp_spi5 {
+> +	/* On Low speed expansion */
+> +	status = "okay";
+> +};
 > +
-> +dtb-$(CONFIG_OF_ALL_DTBS) := $(patsubst $(dtstree)/%.dts,%.dtb, $(foreach d,$(dts-dirs), $(wildcard $(dtstree)/$(d)/*.dts)))
-> +
+>  &blsp_i2c6 {
+>  	/* On Low speed expansion */
+>  	status = "okay";
 
-
-
+We've been using absolute nodes to mark device nodes as status = "okay".
+Can we keep doing that here please?
 
 -- 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
