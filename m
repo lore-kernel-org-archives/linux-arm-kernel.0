@@ -1,160 +1,50 @@
-From: matt@masarand.com (Matthew Minter)
-Date: Thu, 08 Oct 2015 03:07:34 +0100
-Subject: [PATCH v4 1/5] PCI: Add pci_bus_fixup_irqs().
-In-Reply-To: <20151007230847.GG27633@localhost>
-References: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
- <56157BC8.3070406@caviumnetworks.com> <20151007230847.GG27633@localhost>
-Message-ID: <1906663.FAJXtJhtPt@shredder>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 8 Oct 2015 11:12:47 +0900
+Subject: [PATCH] ARM: shmobile: porter: add SDHI0/2 DT support
+In-Reply-To: <5614FBB3.5060806@cogentembedded.com>
+References: <2228837.DO5U5OvRSi@wasted.cogentembedded.com>
+ <20151007033957.GA30650@verge.net.au>
+ <5614FBB3.5060806@cogentembedded.com>
+Message-ID: <20151008021247.GD8756@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 October 2015 18:08:47 Bjorn Helgaas wrote:
-> [+cc Matthew]
+On Wed, Oct 07, 2015 at 02:02:11PM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> On Wed, Oct 07, 2015 at 01:08:40PM -0700, David Daney wrote:
-> > On 10/07/2015 12:44 PM, Bjorn Helgaas wrote:
-> > >Hi David,
-> > >
-> > >On Fri, Oct 02, 2015 at 11:43:59AM -0700, David Daney wrote:
-> > >>From: David Daney <david.daney@cavium.com>
-> > >>
-> > >>pci_bus_fixup_irqs() works like pci_fixup_irqs(), except it only does
-> > >>the fixups for devices on the specified bus.
-> > >>
-> > >>Follow-on patch will use the new function.
-> > >>
-> > >>Signed-off-by: David Daney <david.daney@cavium.com>
-> > >>---
-> > >>No change from v2.
-> > >>
-> > >>  drivers/pci/setup-irq.c | 30 ++++++++++++++++++++++++++++++
-> > >>  include/linux/pci.h     |  4 ++++
-> > >>  2 files changed, 34 insertions(+)
-> > >>
-> > >>diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
-> > >>index 95c225b..189ad17 100644
-> > >>--- a/drivers/pci/setup-irq.c
-> > >>+++ b/drivers/pci/setup-irq.c
-> > >>@@ -66,3 +66,33 @@ void pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *,
-> > >>u8 *),> >>
-> > >>  		pdev_fixup_irq(dev, swizzle, map_irq);
-> > >>  
-> > >>  }
-> > >>  EXPORT_SYMBOL_GPL(pci_fixup_irqs);
-> > >>
-> > >>+
-> > >>+struct pci_bus_fixup_cb_info {
-> > >>+	u8 (*swizzle)(struct pci_dev *, u8 *);
-> > >>+	int (*map_irq)(const struct pci_dev *, u8, u8);
-> > >>+};
-> > >>+
-> > >>+static int pci_bus_fixup_irq_cb(struct pci_dev *dev, void *arg)
-> > >>+{
-> > >>+	struct pci_bus_fixup_cb_info *info = arg;
-> > >>+
-> > >>+	pdev_fixup_irq(dev, info->swizzle, info->map_irq);
-> > >>+	return 0;
-> > >>+}
-> > >>+
-> > >>+/*
-> > >>+ * Fixup the irqs only for devices on the given bus using supplied
-> > >>+ * swizzle and map_irq function pointers
-> > >>+ */
-> > >>+void pci_bus_fixup_irqs(struct pci_bus *bus,
-> > >>+			u8 (*swizzle)(struct pci_dev *, u8 *),
-> > >>+			int (*map_irq)(const struct pci_dev *, u8, u8))
-> > >>+{
-> > >>+	struct pci_bus_fixup_cb_info info;
-> > >>+
-> > >>+	info.swizzle = swizzle;
-> > >>+	info.map_irq = map_irq;
-> > >>+	pci_walk_bus(bus, pci_bus_fixup_irq_cb, &info);
-> > >
-> > >I don't like the existing pci_fixup_irqs(), so by transitivity, I
-> > >don't like pci_bus_fixup_irqs() either.
-> > 
-> > We are in agreement with respect to this point.
-> > 
-> > > The problem is that in both
-> > >
-> > >cases this is a one-time pass over the tree, so we don't handle
-> > >hot-added devices correctly.
-> > >
-> > >I think we need to get rid of pci_fixup_irqs() and somehow integrate
-> > >it into the pci_device_add() path, where it would be done once for
-> > >every device we enumerate.
-> > 
-> > I also agree with this point.
-> > 
-> > > If we did that, I don't think you would
-> > >
-> > >need to add pci_bus_fixup_irqs(), would you?
-> > 
-> > Nope.
-> > 
-> > However, such a change is essentially untestable by me.  So, I
-> > didn't attempt it.   pci_fixup_irqs() is used by alpha, arm, m68k,
-> > mips, sh, sparc, tile, unicore32 and other things as well.  If the
-> > core pci_device_add() code were to suddenly start doing the fixup,
-> > there would be the potential to break all these things I cannot
-> > test.
+> On 10/7/2015 6:39 AM, Simon Horman wrote:
 > 
-> Yep, that's certainly a risk.  I can't test all those arches either,
-> but I think it's a risk worth taking because the end result is more
-> maintainable.
+> >>Define the Porter board dependent part of the SDHI0/2 device nodes along with
+> >>the  necessary  voltage regulators (note that the Vcc regulators are dummy --
+> >>they are required but don't actually exist on the board). Also, GPIOs have to
+> >>be used for the CD and WP signals due to the SDHI driver constraints...
+> >>
+> >>This patch is analogous to the commit 1299df03d719 (ARM: shmobile: henninger:
+> >>add SDHI0/2 DT support) as there  are no differences between those boards in
+> >>this respect.
+> >>
+> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>
+> >>---
+> >>This patch is against the 'renesas-devel-20151006-v4.3-rc4' tag of Simon
+> >>Horman's 'renesas.git' repo.
+> >
+> >Thanks I have queued this up after addressing some issues
+> >in the changelog that checkpatch complained about:
+> >
+> >* text > 75 characters wide
+> >* Missing '"' around name of patch referred to
+> >
+> >Its looking like there is already quite a log shared between
 > 
-> Matthew Minter did some really nice work on this last year, but it got
-> stalled somehow.  I wonder if we can resurrect it?  It seems like it
-> was pretty close to being ready.  Here's a pointer to the last posting
-> I saw:
+>    Lot?
 > 
-> http://lkml.kernel.org/r/1412222866-21068-1-git-send-email-matt at masarand.com
+> >r8a7791-porter.dts and r8a7791-henninger.dts. Do you have any
+> >thoughts on consolidating or sharing common elements between
+> >them somehow?
 > 
-> Bjorn
+>    I'm still planning to remove the Henninger's .dts for good. It was never
+> sold and so had no users outside Renesas (and Cogent Embedded), I was told.
 
-Thanks for adding me into the loop,
-
-Yes, I had been working on this last year, and got a patchset that was tested 
-on arm, x86 (and amd64), and slightly tested on powerpc. However I was not 
-able to test other architectures as they were not available in the software 
-lab I work in but should in theory work on all arches the kernel runs on.
-
-I can say that that patchset is being used by several projects out of tree 
-currently but unfortunately due to a shift in priorities in the lab I was 
-working for I lost access to the resources to develop and test the patch 
-easily.
-
-I have done some additional work personally on it but so far have not got 
-anything that I am happy to submit for inclusion in tree. (due to a number of 
-issues in structure and  a complication relating to weak functions where 
-multiple variations of the same arch exist.
-
-You can see in thread that is linked above 
-(http://lkml.kernel.org/r/1412222866-21068-1-git-send-email-matt at masarand.com)
-some feedback on the issues that need to be solved.
-
-I also expect that the patchset needs to be pulled forward to a newer kernel 
-as I have been working in a frozen tree without rebasing to reduce test 
-complexity.
-
-I would be happy to put some time this weekend if possible into reviewing the 
-state of this and seeing if I can at least put together a version running on a 
-recent kernel. I can also go over the issues again which were proving 
-problematic and see if any of them are easy to fix.
-
-However I can only work on this in my own time for now and on my own boxes 
-(which are all x86 and amd64) so the amount I can do will be limited. However 
-any assistance in fixing the issues would be appreciated, I will try and throw 
-up a git repo somewhere this weekend with the latest patches if anyone is able 
-to take a look.
-
-In the mean time, the biggest issues with the current iteration and the full 
-thread are here:
-
-http://comments.gmane.org/gmane.linux.kernel.pci/35756
-
-I will get a repo somewhere online for browsing soon but cannot quite yet as I 
-need to clean up the repo a little first.
-
-Kind regards to all,
-Matthew Minter
+Thanks, that sounds like a good plan to me.
+Do you have any thoughts on when?
