@@ -1,140 +1,54 @@
-From: w.f@huawei.com (wangfei)
-Date: Thu, 8 Oct 2015 15:38:01 +0800
-Subject: [PATCH 4/8] regulator: Hi655x: Add support for Hi655x regulator
-In-Reply-To: <20150930175857.GK15635@sirena.org.uk>
-References: <1443611111-3196-1-git-send-email-w.f@huawei.com>
- <1443611111-3196-5-git-send-email-w.f@huawei.com>
- <20150930175857.GK15635@sirena.org.uk>
-Message-ID: <56161D59.1020207@huawei.com>
+From: songjun.wu@atmel.com (Songjun Wu)
+Date: Thu, 8 Oct 2015 15:36:54 +0800
+Subject: [PATCH v3 0/2] ASoC: atmel-classd: add driver for Atmel CLASSD
+Message-ID: <1444289816-11648-1-git-send-email-songjun.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/10/1 1:58, Mark Brown wrote:
-> On Wed, Sep 30, 2015 at 07:05:07PM +0800, Fei Wang wrote:
-> 
->> +config REGULATOR_HI655X
->> +        tristate "Hisilicon HI655X PMIC regulators support"
->> +        depends on ARCH_HISI
->> +	depends on MFD_HI655X_PMIC && OF
-> 
-> You've got some tab/space confusion above.  Also, can't we have an ||
-> COMPILE_TEST here?
-> 
-OK, i will add it.
->> +#define REG_VALUE_SETBITS(reg_value, pos, bits, bits_value) \
->> +		(reg_value = (reg_value & \
->> +		~((((unsigned int)1 << bits) - 1) << pos)) | \
->> +		((unsigned int)(bits_value & \
->> +		(((unsigned int)1 << bits) - 1)) << pos))
->> +
->> +#define REG_VALUE_GETBITS(reg_value, pos, bits) \
->> +			((reg_value >> pos) & (((unsigned int)1 << bits) - 1))
-> 
-> These are just really hard to read, sorry, and they appear to duplicate
-> existing regmap functionality.  If there is a strong reason to add them
-> consider doing so in the core and if you can then please at least make
-> them regular inline functions rather than using macros.  It's much safer
-> and more readable.
-> 
-i agree with you ?i will refactor all the unreadable code?
->> +static int hi655x_regulator_pmic_is_enabled(struct regulator_dev *rdev)
->> +{
->> +	int ret = 0;
->> +	unsigned int value = 0;
->> +
->> +	struct hi655x_regulator *sreg = rdev_get_drvdata(rdev);
->> +	struct hi655x_regulator_ctrl_regs  *ctrl_regs = &(sreg->ctrl_regs);
->> +	struct hi655x_regulator_ctrl_data  *ctrl_data = &(sreg->ctrl_data);
->> +
->> +	/*
->> +	* regulator is all set,but the pmu is only subset.
->> +	* maybe this "buck"/"ldo"/"lvs" is not contrl by a core.
->> +	* and in regulator have a "status" member ("okey" or "disable").
->> +	*/
-> 
-> I'm having a hard time parsing the above comment.  Please also use the
-> normal kernel comment style (this is a problem throughout the driver).
-> 
-OK. i will modify all of these?
->> +	regmap_read(rdev->regmap, ctrl_regs->status_reg, &value);
->> +	ret = (int)REG_VALUE_GETBITS(value, ctrl_data->shift,
->> +					ctrl_data->mask);
-> 
-> This appears to just duplicate regulator core functionality for reading
-> enable state from a bitfield?  Also note that the cast here isn't a
-> great advert for the macros above.
-> 
->> +static int hi655x_regulator_pmic_enable(struct regulator_dev *rdev)
->> +{
->> +	int ret = 0;
->> +	unsigned char value_u8 = 0;
->> +	unsigned int value_u32 = 0;
->> +	struct hi655x_regulator *sreg = rdev_get_drvdata(rdev);
->> +	struct hi655x_regulator_ctrl_regs  *ctrl_regs = &(sreg->ctrl_regs);
->> +	struct hi655x_regulator_ctrl_data  *ctrl_data = &(sreg->ctrl_data);
->> +
->> +	REG_VALUE_SETBITS(value_u32, ctrl_data->shift, ctrl_data->mask, 0x1);
->> +	value_u8  = (unsigned char)value_u32;
->> +	regmap_write(rdev->regmap, ctrl_regs->enable_reg, value_u8);
-> 
-> I'm not *entirely* sure what this is supposed to be doing but it looks
-> like it's duplicating core functionality in a fashion that's really
-> quite hard to read.  Why not just use the core functions for setting
-> bits?
-> 
->> +	udelay(sreg->off_on_delay);
-> 
-> Use the regualtor core delay functionality please.
+The Audio Class D Amplifier driver includes two parts.
+1) Driver code to implement the Audio Class D Amplifier function.
+2) Device tree binding document, it describes how to add the Audio
+   Class D Amplifier in device tree.
 
-OK?i will modify it?
-> 
->> +static int hi655x_regulator_pmic_list_voltage_linear(struct regulator_dev *rdev,
->> +				  unsigned int selector)
-> 
-> This is *definitely* duplicating core functionality, I think you want to
-> use regulator_list_voltage_linear_range() or possibly just plain
-> _linear() and use separate operations for the LVS regulator.
-> 
-> We at least need to restructure the code so that the core helper
-> functions are used and we don't have regulator type decisions everywhere
-> - the whole goal of having per regulator ops is to avoid having to open
-> code decisions about which regulator we're dealing with into each op
-> function.
-> 
-OK?i will modify it?
->> +static unsigned int hi655x_regulator_pmic_get_mode(
->> +			struct regulator_dev *rdev)
->> +{
->> +	return REGULATOR_MODE_NORMAL;
->> +}
-> 
-> Don't implement empty functions, remove all these.
-> 
->> +	num_consumer_supplies = of_get_property(np,
->> +				"hisilicon,num_consumer_supplies", NULL);
->> +
->> +	if ((NULL == num_consumer_supplies) || (0 == *num_consumer_supplies)) {
->> +		dev_warn(dev, "%s no consumer_supplies\n", __func__);
->> +		return init_data;
->> +	}
-> 
-> Obviously the binding is completely undocumented but this is setting off
-> alarm bells - why is the driver even considering consumers?  Please make
-> sure you are using the core regulator bindings rather than open coding
-> something which translates into platform data (which is what this looks
-> like).
-> 
-> I'm not going to review any more of the DT code without binding
-> documentation.
+Changes in v3:
+- Remove '.owner' field in variable 'atmel_classd_driver',
+  since the core will do it.
+- Correct 'IS_ERR(dd->aclk)' to 'IS_ERR(dd->gclk)',
+  when geting the clock 'dd->gclk'.
 
-I will document the dt-binding first?
-> 
->> +	/*
->> +	*initdata mem will release auto;
->> +	*this is kernel 3.10 import.
->> +	*/
-> 
-> Remove anything related to your vendor kernel support, this is not
-> relevant to upstream.
-> 
-Thanks?Mark?i agree with you and  will modify all of you mentioned soon?
+Changes in v2:
+- Change the "Mono", "Swap" and "Deemphasis" controls to
+  "Mono Switch", "Swap Switch" and "Deemphasis Switch".
+- Merge "EQ Bass", "EQ Medium" and "EQ Treble" controls
+  into one "EQ" control.
+- Change the "single-ended" and "differential" to
+  "Single ended", "Differential".
+- Merge separate left and right controls into one single
+  stereo control.
+- Add a warning if the user trys to specify an invalid
+  value in function "atmel_classd_codec_probe".
+- Use the "dev_get_regmap()" in function
+  "atmel_classd_codec_get_remap".
+- Check for errors when invoking the "clk_prepare_enable".
+- Remove the "dev_info" in function "atmel_classd_probe".
+- Add some code to create a sound card in function
+  "atmel_classd_probe".
+- Remove the DT node "Sound" and the related code.
+- Delete the device node "Sound" in dts.
+
+Songjun Wu (2):
+  ASoC: atmel-classd: add the Audio Class D Amplifier
+  ASoC: atmel-classd: DT binding for Class D audio amplifier driver
+
+ .../devicetree/bindings/sound/atmel-classd.txt     |   52 ++
+ sound/soc/atmel/Kconfig                            |    9 +
+ sound/soc/atmel/Makefile                           |    2 +
+ sound/soc/atmel/atmel-classd.c                     |  679 ++++++++++++++++++++
+ sound/soc/atmel/atmel-classd.h                     |  120 ++++
+ 5 files changed, 862 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/atmel-classd.txt
+ create mode 100644 sound/soc/atmel/atmel-classd.c
+ create mode 100644 sound/soc/atmel/atmel-classd.h
+
+-- 
+1.7.9.5
