@@ -1,128 +1,67 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  8 Oct 2015 13:36:09 +0100
-Subject: [PATCH] KVM: arm/arm64: Keep mapped, disabled interrupts quiet
-Message-ID: <1444307769-11400-1-git-send-email-marc.zyngier@arm.com>
+From: sugar.zhang@rock-chips.com (Sugar Zhang)
+Date: Thu,  8 Oct 2015 20:40:09 +0800
+Subject: [PATCH v2 3/3] ASoC: rockchip: i2s: share tx/rx lrck when
+ symmetric_rates enabled
+In-Reply-To: <1444308009-29088-1-git-send-email-sugar.zhang@rock-chips.com>
+References: <1444308009-29088-1-git-send-email-sugar.zhang@rock-chips.com>
+Message-ID: <1444308009-29088-4-git-send-email-sugar.zhang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a mapped interrupt is disabled, we must make sure the
-corresponding physical interrupt cannot fire, as we are not
-injecting the interrupt, and not setting the active bit.
+share lrck_tx to lrck_rx when symmetric_rates enabled.
 
-For example, a guest disabling its timer interrupt at the GIC level
-but leaving the timer firing would stop making progress as noone
-would be able to prevent this timer from firing and interrupting
-the host. Not quite what is expected. And if we're rebooting
-or turning a vcpu off while the interrupt is about to fire,
-we're exactly going to face this.
-
-In order to cope with this, parse the list of mapped interrupts,
-and mark it as active if we're about to run the guest (or inactive
-if we've exited). Hopefully, nobody is going to run with zillions
-of disabled, mapped interrupts, right?
-
-Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
 ---
-My gut feeling is that this vgic_dist_irq_set_pending should always
-be done, but I'd like some other eyes to have a look at it.
 
-Tested on Seattle (running 4.3-rc4) with a script hammering CPU hotplug.
+Changes in v2: 
+- new patch
 
- virt/kvm/arm/vgic.c | 60 +++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
+ sound/soc/rockchip/rockchip_i2s.c | 8 ++++++++
+ sound/soc/rockchip/rockchip_i2s.h | 6 ++++++
+ 2 files changed, 14 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 6bd1c9b..0ad3f7e 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1092,6 +1092,11 @@ static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	struct vgic_lr vlr = vgic_get_lr(vcpu, lr_nr);
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index f07833b..58ee645 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -226,6 +226,7 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
+ 				  struct snd_soc_dai *dai)
+ {
+ 	struct rk_i2s_dev *i2s = to_info(dai);
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+ 	unsigned int val = 0;
  
-+	if (vlr.state & LR_HW) {
-+		vgic_dist_irq_set_pending(vcpu, irq);
-+		vlr.hwirq = 0;
-+	}
+ 	switch (params_format(params)) {
+@@ -278,6 +279,13 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
+ 	regmap_update_bits(i2s->regmap, I2S_DMACR, I2S_DMACR_RDL_MASK,
+ 			   I2S_DMACR_RDL(16));
+ 
++	val = I2S_CKR_TRCM_TXRX;
++	if (dai->driver->symmetric_rates || rtd->dai_link->symmetric_rates)
++		val = I2S_CKR_TRCM_TXSHARE;
 +
- 	vlr.state = 0;
- 	vgic_set_lr(vcpu, lr_nr, vlr);
- 	clear_bit(lr_nr, vgic_cpu->lr_used);
-@@ -1232,6 +1237,57 @@ static bool vgic_queue_hwirq(struct kvm_vcpu *vcpu, int irq)
++	regmap_update_bits(i2s->regmap, I2S_CKR,
++			   I2S_CKR_TRCM_MASK,
++			   val);
+ 	return 0;
  }
  
- /*
-+ * If a mapped interrupt is disabled, we must make sure the
-+ * corresponding physical interrupt cannot fire, as we are not
-+ * injecting the interrupt, and not setting the active bit.
-+ *
-+ * Parse the list of mapped interrupts, and mark it as active if we're
-+ * about to run the guest (or inactive if we've exited). Hopefully,
-+ * nobody is going to run with zillions of disabled, mapped
-+ * interrupts...
-+ */
-+static void vgic_handle_disabled_mapped_irq(struct kvm_vcpu *vcpu, bool enter)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	struct vgic_bitmap *spi_bitmap;
-+	struct list_head *root;
-+	struct irq_phys_map_entry *entry;
-+	struct irq_phys_map *map;
-+	int ret;
-+
-+	rcu_read_lock();
-+
-+	/* Check for PPIs */
-+	root = &vgic_cpu->irq_phys_map_list;
-+	list_for_each_entry_rcu(entry, root, entry) {
-+		map = &entry->map;
-+		if (!vgic_irq_is_enabled(vcpu, map->virt_irq)) {
-+			ret = irq_set_irqchip_state(map->irq,
-+						    IRQCHIP_STATE_ACTIVE,
-+						    enter);
-+			WARN_ON(ret);
-+		}
-+	}
-+
-+	/* Check for SPIs routed to this vcpu */
-+	root = &dist->irq_phys_map_list;
-+	spi_bitmap = &dist->irq_spi_target[vcpu->vcpu_id];
-+	list_for_each_entry_rcu(entry, root, entry) {
-+		map = &entry->map;
-+		if (!vgic_irq_is_enabled(vcpu, map->virt_irq) &&
-+		    vgic_bitmap_get_irq_val(spi_bitmap, 0, map->virt_irq)) {
-+			ret = irq_set_irqchip_state(map->irq,
-+						    IRQCHIP_STATE_ACTIVE,
-+						    enter);
-+			WARN_ON(ret);
-+		}
-+	}
-+
-+	rcu_read_unlock();
-+}
-+
-+/*
-  * Fill the list registers with pending interrupts before running the
-  * guest.
-  */
-@@ -1320,6 +1376,8 @@ epilog:
- 			WARN_ON(ret);
- 		}
- 	}
-+
-+	vgic_handle_disabled_mapped_irq(vcpu, true);
- }
- 
- static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
-@@ -1484,6 +1542,8 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- 		vgic_cpu->vgic_irq_lr_map[vlr.irq] = LR_EMPTY;
- 	}
- 
-+	vgic_handle_disabled_mapped_irq(vcpu, false);
-+
- 	/* Check if we still have something up our sleeve... */
- 	pending = find_first_zero_bit(elrsr_ptr, vgic->nr_lr);
- 	if (level_pending || pending < vgic->nr_lr)
+diff --git a/sound/soc/rockchip/rockchip_i2s.h b/sound/soc/rockchip/rockchip_i2s.h
+index a54ee35..dc6e2c7 100644
+--- a/sound/soc/rockchip/rockchip_i2s.h
++++ b/sound/soc/rockchip/rockchip_i2s.h
+@@ -78,6 +78,12 @@
+  * CKR
+  * clock generation register
+ */
++#define I2S_CKR_TRCM_SHIFT	28
++#define I2S_CKR_TRCM(x)	(x << I2S_CKR_TRCM_SHIFT)
++#define I2S_CKR_TRCM_TXRX	(0 << I2S_CKR_TRCM_SHIFT)
++#define I2S_CKR_TRCM_TXSHARE	(1 << I2S_CKR_TRCM_SHIFT)
++#define I2S_CKR_TRCM_RXSHARE	(2 << I2S_CKR_TRCM_SHIFT)
++#define I2S_CKR_TRCM_MASK	(3 << I2S_CKR_TRCM_SHIFT)
+ #define I2S_CKR_MSS_SHIFT	27
+ #define I2S_CKR_MSS_MASTER	(0 << I2S_CKR_MSS_SHIFT)
+ #define I2S_CKR_MSS_SLAVE	(1 << I2S_CKR_MSS_SHIFT)
 -- 
-2.1.4
+2.3.6
