@@ -1,57 +1,74 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 8 Oct 2015 10:18:43 +0100
-Subject: [PATCH v4 1/5] PCI: Add pci_bus_fixup_irqs().
-In-Reply-To: <1906663.FAJXtJhtPt@shredder>
-References: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
- <56157BC8.3070406@caviumnetworks.com>
- <20151007230847.GG27633@localhost> <1906663.FAJXtJhtPt@shredder>
-Message-ID: <20151008091843.GA31644@red-moon>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Thu, 8 Oct 2015 17:18:14 +0800
+Subject: [PATCH V4 2/3] arm64: support initrd outside kernel linear map
+In-Reply-To: <20151008084953.GA20114@cbox>
+References: <1439830867-14935-1-git-send-email-msalter@redhat.com>
+ <1439830867-14935-3-git-send-email-msalter@redhat.com>
+ <20150908113113.GA20562@leverpostej> <20151006171140.GE26433@leverpostej>
+ <1444151812.10788.14.camel@redhat.com> <20151008084953.GA20114@cbox>
+Message-ID: <FC378C09-F140-4A62-9FFA-09293E65E866@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthew,
 
-On Thu, Oct 08, 2015 at 03:07:34AM +0100, Matthew Minter wrote:
-> On Wednesday 07 October 2015 18:08:47 Bjorn Helgaas wrote:
+> On Oct 8, 2015, at 16:49, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> 
+> On Tue, Oct 06, 2015 at 01:16:52PM -0400, Mark Salter wrote:
+>> On Tue, 2015-10-06 at 18:11 +0100, Mark Rutland wrote:
+>>> On Tue, Sep 08, 2015 at 12:31:13PM +0100, Mark Rutland wrote:
+>>>> Hi Mark,
+>>>> 
+>>>> On Mon, Aug 17, 2015 at 06:01:06PM +0100, Mark Salter wrote:
+>>>>> The use of mem= could leave part or all of the initrd outside of
+>>>>> the kernel linear map. This will lead to an error when unpacking
+>>>>> the initrd and a probable failure to boot. This patch catches that
+>>>>> situation and relocates the initrd to be fully within the linear
+>>>>> map.
+>>>> 
+>>>> With next-20150908, this patch results in a confusing message at boot when not
+>>>> using an initrd:
+>>>> 
+>>>> Moving initrd from [4080000000-407fffffff] to [9fff49000-9fff48fff]
+>>>> 
+>>>> I think that can be solved by folding in the diff below.
+>>> 
+>>> Mark, it looks like this fell by the wayside.
+>>> 
+>>> Do you have any objection to this? I'll promote this to it's own patch
+>>> if not.
+>>> 
+>>> Mark.
+>>> 
+>>>> 
+>>>> Thanks,
+>>>> Mark.
+>>>> 
+>>>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+>>>> index 6bab21f..2322479 100644
+>>>> --- a/arch/arm64/kernel/setup.c
+>>>> +++ b/arch/arm64/kernel/setup.c
+>>>> @@ -364,6 +364,8 @@ static void __init relocate_initrd(void)
+>>>>                to_free = ram_end - orig_start;
+>>>> 
+>>>>        size = orig_end - orig_start;
+>>>> +       if (!size)
+>>>> +               return;
+>>>> 
+>>>>        /* initrd needs to be relocated completely inside linear mapping */
+>>>>        new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
+>> 
+>> Sorry, no. That looks perfectly good to me.
+>> 
+is it also possible to implement it on ARM platforms?
+ARM64 platform don?t have HIGH_MEM zone .
+but ARM platform have .
+i remember boot loader must put init rd  into low memory region,
+so if some boot loader put init rd into HIGH men zone
+we can also relocate it to low men region ?
+then boot loader don?t need care about this ,
+and since vmalloc= boot option will change HIGH mem region size,
+if we can relocate init rd , boot loader don?t need care about init rd load address,
+when change vmalloc= boot options .
 
-[...]
 
-> Yes, I had been working on this last year, and got a patchset that was tested 
-> on arm, x86 (and amd64), and slightly tested on powerpc. However I was not 
-> able to test other architectures as they were not available in the software 
-> lab I work in but should in theory work on all arches the kernel runs on.
-> 
-> I can say that that patchset is being used by several projects out of tree 
-> currently but unfortunately due to a shift in priorities in the lab I was 
-> working for I lost access to the resources to develop and test the patch 
-> easily.
-> 
-> I have done some additional work personally on it but so far have not got 
-> anything that I am happy to submit for inclusion in tree. (due to a number of 
-> issues in structure and  a complication relating to weak functions where 
-> multiple variations of the same arch exist.
-> 
-> You can see in thread that is linked above 
-> (http://lkml.kernel.org/r/1412222866-21068-1-git-send-email-matt at masarand.com)
-> some feedback on the issues that need to be solved.
-> 
-> I also expect that the patchset needs to be pulled forward to a newer kernel 
-> as I have been working in a frozen tree without rebasing to reduce test 
-> complexity.
-> 
-> I would be happy to put some time this weekend if possible into reviewing the 
-> state of this and seeing if I can at least put together a version running on a 
-> recent kernel. I can also go over the issues again which were proving 
-> problematic and see if any of them are easy to fix.
-> 
-> However I can only work on this in my own time for now and on my own boxes 
-> (which are all x86 and amd64) so the amount I can do will be limited. 
-
-I was not aware of your patchset but I am happy to see that code since it
-is definitely the right approach and I am willing to help you test it on
-arm with the HW I have (probably it will also help remove some code
-from arm64 too), let me know when you have a branch ready to test and
-if you need any help in rebasing the set.
-
-Thanks,
-Lorenzo
+Thanks
