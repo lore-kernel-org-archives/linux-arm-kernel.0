@@ -1,57 +1,60 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 8 Oct 2015 20:08:31 +0900
-Subject: [PATCH] ARM: shmobile: porter: add SDHI0/2 DT support
-In-Reply-To: <56164B48.6050300@cogentembedded.com>
-References: <2228837.DO5U5OvRSi@wasted.cogentembedded.com>
- <20151007033957.GA30650@verge.net.au>
- <5614FBB3.5060806@cogentembedded.com>
- <20151008021247.GD8756@verge.net.au>
- <56164B48.6050300@cogentembedded.com>
-Message-ID: <20151008110831.GC4961@verge.net.au>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Oct 2015 12:08:40 +0100
+Subject: [PATCH v2 12/22] arm64: Delay cpu feature checks
+In-Reply-To: <1444064531-25607-13-git-send-email-suzuki.poulose@arm.com>
+References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+ <1444064531-25607-13-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151008110840.GF17192@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 01:54:00PM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 10/8/2015 5:12 AM, Simon Horman wrote:
-> 
-> >>>>Define the Porter board dependent part of the SDHI0/2 device nodes along with
-> >>>>the  necessary  voltage regulators (note that the Vcc regulators are dummy --
-> >>>>they are required but don't actually exist on the board). Also, GPIOs have to
-> >>>>be used for the CD and WP signals due to the SDHI driver constraints...
-> >>>>
-> >>>>This patch is analogous to the commit 1299df03d719 (ARM: shmobile: henninger:
-> >>>>add SDHI0/2 DT support) as there  are no differences between those boards in
-> >>>>this respect.
-> >>>>
-> >>>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >>>>
-> >>>>---
-> >>>>This patch is against the 'renesas-devel-20151006-v4.3-rc4' tag of Simon
-> >>>>Horman's 'renesas.git' repo.
-> >>>
-> >>>Thanks I have queued this up after addressing some issues
-> >>>in the changelog that checkpatch complained about:
-> >>>
-> >>>* text > 75 characters wide
-> >>>* Missing '"' around name of patch referred to
-> >>>
-> >>>Its looking like there is already quite a log shared between
-> >>
-> >>    Lot?
-> >>
-> >>>r8a7791-porter.dts and r8a7791-henninger.dts. Do you have any
-> >>>thoughts on consolidating or sharing common elements between
-> >>>them somehow?
-> >>
-> >>    I'm still planning to remove the Henninger's .dts for good. It was never
-> >>sold and so had no users outside Renesas (and Cogent Embedded), I was told.
-> >
-> >Thanks, that sounds like a good plan to me.
-> >Do you have any thoughts on when?
-> 
->    Well, I was going to reach the feature parity between these 2 boards,
-> i.e. to support all devices on Porter that are supported on Henninger...
+On Mon, Oct 05, 2015 at 06:02:01PM +0100, Suzuki K. Poulose wrote:
+> @@ -647,16 +648,119 @@ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+>  		cpus_set_cap(caps[i].capability);
+>  	}
+>  
+> -	/* second pass allows enable() to consider interacting capabilities */
+> -	for (i = 0; caps[i].desc; i++) {
+> -		if (cpus_have_cap(caps[i].capability) && caps[i].enable)
+> -			caps[i].enable();
+> +	/*
+> +	 * second pass allows enable() invoked on active each CPU
+> +	 * to consider interacting capabilities.
+> +	 */
 
-THanks, that sounds like an entirely reasonable plan to me.
+This comment doesn't read properly.
+
+> -void check_local_cpu_features(void)
+> +/*
+> + * Park the CPU which doesn't have the capability as advertised
+> + * by the system.
+> + */
+> +static void fail_incapable_cpu(char *cap_type,
+> +				 const struct arm64_cpu_capabilities *cap)
+> +{
+> +	/*XXX: Are we really safe to call printk here ? */
+> +	pr_crit("FATAL: CPU%d is missing %s : %s \n",
+> +			smp_processor_id(), cap_type, cap->desc);
+
+I'm not sure it's safe either, basically we haven't fully brought the
+CPU into the system.
+
+> +	asm volatile(
+> +			" 1:	wfe \n\t"
+> +			"	b 1b\n"
+> +		    );
+> +}
+
+We could add a wfi as well in the mix.
+
+However, if we have PSCI, we should use it to park the CPUs back into
+firmware (via cpu_operations.cpu_die), and only use the above loop if
+that fails.
+
+> +/*
+> + * Run through the enabled system capabilities and enable() it on this CPU.
+
+s/it/them/
+
+-- 
+Catalin
