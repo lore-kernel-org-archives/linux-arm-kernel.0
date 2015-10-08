@@ -1,156 +1,72 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 8 Oct 2015 09:43:26 +0100
-Subject: [linux-sunxi] [PATCH v2 1/2] mmc: Add support for marking hpi as
- broken through devicetree
-In-Reply-To: <5614DB4E.8040807@schinagl.nl>
-References: <1427901984-26469-1-git-send-email-hdegoede@redhat.com>
- <5614DB4E.8040807@schinagl.nl>
-Message-ID: <56162CAE.6000105@redhat.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 8 Oct 2015 10:49:53 +0200
+Subject: [PATCH V4 2/3] arm64: support initrd outside kernel linear map
+In-Reply-To: <1444151812.10788.14.camel@redhat.com>
+References: <1439830867-14935-1-git-send-email-msalter@redhat.com>
+ <1439830867-14935-3-git-send-email-msalter@redhat.com>
+ <20150908113113.GA20562@leverpostej>
+ <20151006171140.GE26433@leverpostej>
+ <1444151812.10788.14.camel@redhat.com>
+Message-ID: <20151008084953.GA20114@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Oct 06, 2015 at 01:16:52PM -0400, Mark Salter wrote:
+> On Tue, 2015-10-06 at 18:11 +0100, Mark Rutland wrote:
+> > On Tue, Sep 08, 2015 at 12:31:13PM +0100, Mark Rutland wrote:
+> > > Hi Mark,
+> > > 
+> > > On Mon, Aug 17, 2015 at 06:01:06PM +0100, Mark Salter wrote:
+> > > > The use of mem= could leave part or all of the initrd outside of
+> > > > the kernel linear map. This will lead to an error when unpacking
+> > > > the initrd and a probable failure to boot. This patch catches that
+> > > > situation and relocates the initrd to be fully within the linear
+> > > > map.
+> > > 
+> > > With next-20150908, this patch results in a confusing message at boot when not
+> > > using an initrd:
+> > > 
+> > > Moving initrd from [4080000000-407fffffff] to [9fff49000-9fff48fff]
+> > > 
+> > > I think that can be solved by folding in the diff below.
+> > 
+> > Mark, it looks like this fell by the wayside.
+> > 
+> > Do you have any objection to this? I'll promote this to it's own patch
+> > if not.
+> > 
+> > Mark.
+> > 
+> > > 
+> > > Thanks,
+> > > Mark.
+> > > 
+> > > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> > > index 6bab21f..2322479 100644
+> > > --- a/arch/arm64/kernel/setup.c
+> > > +++ b/arch/arm64/kernel/setup.c
+> > > @@ -364,6 +364,8 @@ static void __init relocate_initrd(void)
+> > >                 to_free = ram_end - orig_start;
+> > >  
+> > >         size = orig_end - orig_start;
+> > > +       if (!size)
+> > > +               return;
+> > >  
+> > >         /* initrd needs to be relocated completely inside linear mapping */
+> > >         new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
+> 
+> Sorry, no. That looks perfectly good to me.
+> 
+FYI: I applied these patches to 4.0 (only a trivial conflict on the x86
+side) and this fixed an issue for me booting systems with mem=X,
+reducing the amount of physical memory available on a system, which
+would otherwise cause the system to just silently halt during boot.
 
-On 10/07/2015 09:43 AM, Olliver Schinagl wrote:
-> Hey Hans,
->
-> On 01-04-15 17:26, Hans de Goede wrote:
->> The eMMC on a tablet I've will stop working / communicating as soon as
->> the kernel executes:
->>
->>         mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
->>                   EXT_CSD_HPI_MGMT, 1,
->>                   card->ext_csd.generic_cmd6_time);
->>
->> There seems to be no way to reliable identify eMMC-s which have a broken
->> hpi implementation, but at least for eMMC's which are soldered onto a board
->> we can work around this by specifying that hpi is broken in devicetree.
-> We've been talking about this a little off-list, and I was just triggered again by this so I'm following up on it again.
->
-> The same issue bit me in the ass on a Micron 'industrial' grade eMMC (MTFC4GACAANA) and luckily you found this back then to help me.
->
-> As we discussed, this may very well be a limitation of the mmc controller, rather then the MMC chip. While we only have a sample size of 2 on 2 different socs (with likely the same mmc IP) (A13/A20) I found in the JEDEC spec in the appendix on changes from 4.4 to 4.41:
-> Introduce of High Priority Interrupt mechanism, HPI background and one of possible solutions.
->
-> Which leaves me to believe, that HPI was added to eMMC in version 4.41 and was not available before. Both the A13 and A20 user manuals state that the MMC controller in these socs is only version 4.3.
->
-> Obviously I know far to little as to what does and what does not work with an MMC-host, since it's just a simple data-bus, but I would not be surprised if these things are somewhere somewhat related, so hopefully someone on this list can give their opinion on this.
->
-> I already checked the core/mmc.c where the version is read from the mmc controller to see if we can trigger on this based on version, however it seems only the major version number is stored here [0]?
->
-> So in my opinion, it is quite likely that this setting be moved up to the mmc-core level, for the SoC, rather then the card itself?
+Note that this seems to fix even more than it promises, because one of
+those systems does not use an initrd, but I'm thinking maybe this fixes
+issues with the DT as well?
 
-Yes I was talking to Tsvetan from Olimex and he says they have seen the problem with yet
-another emmc, so this indeed seems to be a sunxi SoC specific problem, and we just need to
-disable hpi on all sunxi SoC's.
+In any case, I think this may be a good candidate for cc'ing to stable?
 
-Do you have time to look into doing a kernel patch for this ?
-
-I'm thinking adding a host-cap called MMC_CAP_BROKEN_HPI and adding
-support for that to drivers/mmc/core/host.c: mmc_of_parse() and
-extending the current card check for broken-hpi to also check
-host->caps
-
-And then we need to decide whether to just hard set that cap
-in drivers/mmc/host/sunxi_mmc.c or if we are going to add it
-to our dtsi files. I think we should probably just hard-code
-it in drivers/mmc/host/sunxi_mmc.c.
-
-Regards,
-
-Hans
-
-
-
-
-
-
->
-> [0] http://lxr.free-electrons.com/source/drivers/mmc/core/mmc.c#L148
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->> Changes in v2:
->> -Fix of_node leakage
->> ---
->>   Documentation/devicetree/bindings/mmc/mmc-card.txt | 31 ++++++++++++++++++++++
->>   drivers/mmc/core/mmc.c                             | 10 ++++++-
->>   2 files changed, 40 insertions(+), 1 deletion(-)
->>   create mode 100644 Documentation/devicetree/bindings/mmc/mmc-card.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mmc/mmc-card.txt b/Documentation/devicetree/bindings/mmc/mmc-card.txt
->> new file mode 100644
->> index 0000000..a70fcd6
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mmc/mmc-card.txt
->> @@ -0,0 +1,31 @@
->> +mmc-card / eMMC bindings
->> +------------------------
->> +
->> +This documents describes the devicetree bindings for a mmc-host controller
->> +child node describing a mmc-card / an eMMC, see "Use of Function subnodes"
->> +in mmc.txt
->> +
->> +Required properties:
->> +-compatible : Must be "mmc-card"
->> +-reg        : Must be <0>
->> +
->> +Optional properties:
->> +-broken-hpi : Use this to indicate that the mmc-card has a broken hpi
->> +              implementation, and that hpi should not be used
->> +
->> +Example:
->> +
->> +&mmc2 {
->> +    pinctrl-names = "default";
->> +    pinctrl-0 = <&mmc2_pins_a>;
->> +    vmmc-supply = <&reg_vcc3v3>;
->> +    bus-width = <8>;
->> +    non-removable;
->> +    status = "okay";
->> +
->> +    mmccard: mmccard at 0 {
->> +        reg = <0>;
->> +        compatible = "mmc-card";
->> +        broken-hpi;
->> +    };
->> +};
->> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
->> index 1d41e85..c84131e 100644
->> --- a/drivers/mmc/core/mmc.c
->> +++ b/drivers/mmc/core/mmc.c
->> @@ -11,6 +11,7 @@
->>    */
->>   #include <linux/err.h>
->> +#include <linux/of.h>
->>   #include <linux/slab.h>
->>   #include <linux/stat.h>
->>   #include <linux/pm_runtime.h>
->> @@ -336,6 +337,8 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
->>   {
->>       int err = 0, idx;
->>       unsigned int part_size;
->> +    struct device_node *np;
->> +    bool broken_hpi = false;
->>       /* Version is coded in the CSD_STRUCTURE byte in the EXT_CSD register */
->>       card->ext_csd.raw_ext_csd_structure = ext_csd[EXT_CSD_STRUCTURE];
->> @@ -349,6 +352,11 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
->>           }
->>       }
->> +    np = mmc_of_find_child_device(card->host, 0);
->> +    if (np && of_device_is_compatible(np, "mmc-card"))
->> +        broken_hpi = of_property_read_bool(np, "broken-hpi");
->> +    of_node_put(np);
->> +
->>       /*
->>        * The EXT_CSD format is meant to be forward compatible. As long
->>        * as CSD_STRUCTURE does not change, all values for EXT_CSD_REV
->> @@ -494,7 +502,7 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
->>           }
->>           /* check whether the eMMC card supports HPI */
->> -        if (ext_csd[EXT_CSD_HPI_FEATURES] & 0x1) {
->> +        if (!broken_hpi && (ext_csd[EXT_CSD_HPI_FEATURES] & 0x1)) {
->>               card->ext_csd.hpi = 1;
->>               if (ext_csd[EXT_CSD_HPI_FEATURES] & 0x2)
->>                   card->ext_csd.hpi_cmd =    MMC_STOP_TRANSMISSION;
->
+Thanks,
+-Christoffer
