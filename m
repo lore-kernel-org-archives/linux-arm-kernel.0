@@ -1,37 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  8 Oct 2015 18:32:35 +0100
-Subject: [PATCH] arm64: errata: use KBUILD_CFLAGS_MODULE for erratum #843419
-Message-ID: <1444325555-32108-1-git-send-email-will.deacon@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 8 Oct 2015 19:35:46 +0200
+Subject: [PATCH 1/8] mmc: sdhci-pxav3: remove broken clock base quirk for
+ Armada 38x sdhci driver
+In-Reply-To: <1444094562-31165-2-git-send-email-mw@semihalf.com>
+References: <1444094562-31165-1-git-send-email-mw@semihalf.com>
+ <1444094562-31165-2-git-send-email-mw@semihalf.com>
+Message-ID: <CAPDyKFrdZPbmK1Gtw8f-uKeYGbZLdfTtsCnLPUPC1XFa8Xmb1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit df057cc7b4fa ("arm64: errata: add module build workaround for
-erratum #843419") sets CFLAGS_MODULE to ensure that the large memory
-model is used by the compiler when building kernel modules.
+On 6 October 2015 at 03:22, Marcin Wojtas <mw@semihalf.com> wrote:
+> From: Nadav Haklai <nadavh@marvell.com>
+>
+> shci-pxav3 driver is enabling by default the
+> SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN quirk. However this quirk is not
+> required for Armada 38x and leads to wrong clock setting in the divider.
+>
+> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+> Cc: <stable@vger.kernel.org> # v4.2
 
-However, CFLAGS_MODULE is an environment variable and intended to be
-overridden on the command line, which appears to be the case with the
-Ubuntu kernel packaging system, so use KBUILD_CFLAGS_MODULE instead.
+Thanks, applied for fixes!
 
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reported-by: Dann Frazier <dann.frazier@canonical.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Kind regards
+Uffe
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index f9914d7c1bb0..d10b5d483022 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -42,7 +42,7 @@ endif
- CHECKFLAGS	+= -D__aarch64__
- 
- ifeq ($(CONFIG_ARM64_ERRATUM_843419), y)
--CFLAGS_MODULE	+= -mcmodel=large
-+KBUILD_CFLAGS_MODULE	+= -mcmodel=large
- endif
- 
- # Default value
--- 
-2.1.4
+> ---
+>  drivers/mmc/host/sdhci-pxav3.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+> index 946d37f..976cddd 100644
+> --- a/drivers/mmc/host/sdhci-pxav3.c
+> +++ b/drivers/mmc/host/sdhci-pxav3.c
+> @@ -135,6 +135,7 @@ static int armada_38x_quirks(struct platform_device *pdev,
+>         struct sdhci_pxa *pxa = pltfm_host->priv;
+>         struct resource *res;
+>
+> +       host->quirks &= ~SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN;
+>         host->quirks |= SDHCI_QUIRK_MISSING_CAPS;
+>         res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+>                                            "conf-sdio3");
+> --
+> 1.8.3.1
+>
