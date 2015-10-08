@@ -1,120 +1,58 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Thu, 8 Oct 2015 17:25:13 +0100
-Subject: [PATCHv4 4/6] arm64: dts: juno: describe PMUs separately
-In-Reply-To: <1443779708-26789-5-git-send-email-mark.rutland@arm.com>
-References: <1443779708-26789-1-git-send-email-mark.rutland@arm.com>
- <1443779708-26789-5-git-send-email-mark.rutland@arm.com>
-Message-ID: <20151008162512.GA17100@bart.dudau.co.uk>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Thu, 8 Oct 2015 09:25:14 -0700
+Subject: [GIT PULL 1/3] Keystone SOC driver updates for 4.4
+In-Reply-To: <5870815.PiO7rCVXjJ@wuerfel>
+References: <1444151960-4941-1-git-send-email-ssantosh@kernel.org>
+ <5870815.PiO7rCVXjJ@wuerfel>
+Message-ID: <561698EA.4030707@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 02, 2015 at 10:55:06AM +0100, Mark Rutland wrote:
-> The A57 and A53 PMUs in Juno support different events, so describe them
-> separately in both the Juno and Juno R1 DTs.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
+On 10/8/15 8:41 AM, Arnd Bergmann wrote:
+> On Tuesday 06 October 2015 10:19:18 Santosh Shilimkar wrote:
+>> Couple of patches for ARM Keystone SOC drivers
+>>          - irq affinity bug fix
+>>          - display the firmware name
+>>
+>> ----------------------------------------------------------------
+>> Murali Karicheri (2):
+>>        soc: ti: reset irq affinity before freeing irq
+>>        soc: ti: display firmware file name as part of boot log
+>>
+>>   .../bindings/soc/ti/keystone-navigator-qmss.txt      | 20 +++++++++++++++++++-
+>>   drivers/soc/ti/knav_qmss_acc.c                       |  4 ++++
+>>   drivers/soc/ti/knav_qmss_queue.c                     |  3 +++
+>>   3 files changed, 26 insertions(+), 1 deletion(-)
+>
+> The new text you add to the binding document doesn't really seem to
+> belong in there, so I'm not pulling this until we've discussed how
+> this should be better handled.
+>
+OK. Can you please pick the affinity fix alone?
 
-I'm sending this from my personal account as the corporate one is having hickups
-with external mailing lists.
+> Ideally, the firmware should just get merged into the linux-firmware.git
+> tree.
+>
+IIRC, Murali got the firmware file merged to linux-firmware.git. Looping 
+him to confirm that.
 
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Regarding the method of storing the firmware file name in DT, we
+> recently had a longer discussion about that and basically concluded
+> that this doesn't work for most devices, in particular when the
+> communication between the driver and the firmware uses an interface
+> that is not 100% stable and can change depending on the firmware
+> blob.
+>
+Thanks for the info.
 
-Best regards,
-Liviu
+> Can you guarantee that there will never be changes to the interface?
+> If not, we should try to come up with a better mechanism here, and
+> only provide the current method for backwards compatibility.
+>
+I see your point and agree that its not future proof.
 
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/boot/dts/arm/juno-r1.dts | 18 +++++++++++-------
->  arch/arm64/boot/dts/arm/juno.dts    | 18 +++++++++++-------
->  2 files changed, 22 insertions(+), 14 deletions(-)
-> 
-> Note: as older kernels don't handle multiple PMUs being listed in the DT, this
-> should be applied after the core changes.
-> 
-> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-> index c627511..734e127 100644
-> --- a/arch/arm64/boot/dts/arm/juno-r1.dts
-> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-> @@ -91,17 +91,21 @@
->  		};
->  	};
->  
-> -	pmu {
-> -		compatible = "arm,armv8-pmuv3";
-> +	pmu_a57 {
-> +		compatible = "arm,cortex-a57-pmu";
->  		interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-affinity = <&A57_0>,
-> +				     <&A57_1>;
-> +	};
-> +
-> +	pmu_a53 {
-> +		compatible = "arm,cortex-a53-pmu";
-> +		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
->  			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
->  			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
->  			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-> -		interrupt-affinity = <&A57_0>,
-> -				     <&A57_1>,
-> -				     <&A53_0>,
-> +		interrupt-affinity = <&A53_0>,
->  				     <&A53_1>,
->  				     <&A53_2>,
->  				     <&A53_3>;
-> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-> index d7cbdd4..ffa05ae 100644
-> --- a/arch/arm64/boot/dts/arm/juno.dts
-> +++ b/arch/arm64/boot/dts/arm/juno.dts
-> @@ -91,17 +91,21 @@
->  		};
->  	};
->  
-> -	pmu {
-> -		compatible = "arm,armv8-pmuv3";
-> +	pmu_a57 {
-> +		compatible = "arm,cortex-a57-pmu";
->  		interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-affinity = <&A57_0>,
-> +				     <&A57_1>;
-> +	};
-> +
-> +	pmu_a53 {
-> +		compatible = "arm,cortex-a53-pmu";
-> +		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
->  			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
->  			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
->  			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-> -		interrupt-affinity = <&A57_0>,
-> -				     <&A57_1>,
-> -				     <&A53_0>,
-> +		interrupt-affinity = <&A53_0>,
->  				     <&A53_1>,
->  				     <&A53_2>,
->  				     <&A53_3>;
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards,
+Santosh
 
--- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
-
- One small step
-   for me ...
+Regards,
+Santosh
