@@ -1,58 +1,60 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 8 Oct 2015 16:11:44 +0100
-Subject: [PATCH v6 0/6] KASAN for arm64
-In-Reply-To: <CAKv+Gu_v7J1BA+xFcowBrW05bRFs=_WFf_HCeCmWgdZVRo0eQw@mail.gmail.com>
-References: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
- <20151007100411.GG3069@e104818-lin.cambridge.arm.com>
- <CAPAsAGxR-yqtmFeo65Xw_0RQyEy=mN1uG=GKtqoMLr_x_N0u5w@mail.gmail.com>
- <20151008111144.GC7275@leverpostej> <56165228.8060201@gmail.com>
- <CAKv+Gu_v7J1BA+xFcowBrW05bRFs=_WFf_HCeCmWgdZVRo0eQw@mail.gmail.com>
-Message-ID: <20151008151144.GM17192@e104818-lin.cambridge.arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 8 Oct 2015 17:17:46 +0200
+Subject: [PATCH 10/15] arm64: kvm: Fix {V}TCR_EL2_TG0 mask
+In-Reply-To: <1442331684-28818-11-git-send-email-suzuki.poulose@arm.com>
+References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
+ <1442331684-28818-11-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151008151746.GE20936@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 02:09:26PM +0200, Ard Biesheuvel wrote:
-> On 8 October 2015 at 13:23, Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
-> > On 10/08/2015 02:11 PM, Mark Rutland wrote:
-> >> On Thu, Oct 08, 2015 at 01:36:09PM +0300, Andrey Ryabinin wrote:
-> >>> 2015-10-07 13:04 GMT+03:00 Catalin Marinas <catalin.marinas@arm.com>:
-> >>>> On Thu, Sep 17, 2015 at 12:38:06PM +0300, Andrey Ryabinin wrote:
-> >>>>> As usual patches available in git
-> >>>>>       git://github.com/aryabinin/linux.git kasan/arm64v6
-> >>>>>
-> >>>>> Changes since v5:
-> >>>>>  - Rebase on top of 4.3-rc1
-> >>>>>  - Fixed EFI boot.
-> >>>>>  - Updated Doc/features/KASAN.
-> >>>>
-> >>>> I tried to merge these patches (apart from the x86 one which is already
-> >>>> merged) but it still doesn't boot on Juno as an EFI application.
-> >>>>
-> >>>
-> >>> 4.3-rc1 was ok and 4.3-rc4 is not. Break caused by 0ce3cc008ec04
-> >>> ("arm64/efi: Fix boot crash by not padding between EFI_MEMORY_RUNTIME
-> >>> regions")
-> >>> It introduced sort() call in efi_get_virtmap().
-> >>> sort() is generic kernel function and it's instrumented, so we crash
-> >>> when KASAN tries to access shadow in sort().
-> >>
-> >> I believe this is solved by Ard's stub isolation series [1,2], which
-> >> will build a stub-specific copy of sort() and various other functions
-> >> (see the arm-deps in [2]).
-> >>
-> >> So long as the stub is not built with ASAN, that should work.
-> >
-> > Thanks, this should help, as we already build the stub without ASAN instrumentation.
+On Tue, Sep 15, 2015 at 04:41:19PM +0100, Suzuki K. Poulose wrote:
+> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 > 
-> Indeed. I did not mention instrumentation in the commit log for those
-> patches, but obviously, something like KASAN instrumentation cannot be
-> tolerated in the stub since it makes assumptions about the memory
-> layout
+> {V}TCR_EL2_TG0 is a 2bit wide field, where:
+> 
+>  00 - 4K
+>  01 - 64K
+>  10 - 16K
+> 
+> But we use only 1 bit, which has worked well so far since
+> we never cared about 16K. Fix it for 16K support.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: kvmarm at lists.cs.columbia.edu
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_arm.h |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index 7605e09..bdf139e 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -98,7 +98,7 @@
+>  #define TCR_EL2_TBI	(1 << 20)
+>  #define TCR_EL2_PS	(7 << 16)
+>  #define TCR_EL2_PS_40B	(2 << 16)
+> -#define TCR_EL2_TG0	(1 << 14)
+> +#define TCR_EL2_TG0	(3 << 14)
+>  #define TCR_EL2_SH0	(3 << 12)
+>  #define TCR_EL2_ORGN0	(3 << 10)
+>  #define TCR_EL2_IRGN0	(3 << 8)
+> @@ -110,7 +110,7 @@
+>  
+>  /* VTCR_EL2 Registers bits */
+>  #define VTCR_EL2_PS_MASK	(7 << 16)
+> -#define VTCR_EL2_TG0_MASK	(1 << 14)
+> +#define VTCR_EL2_TG0_MASK	(3 << 14)
+>  #define VTCR_EL2_TG0_4K		(0 << 14)
+>  #define VTCR_EL2_TG0_64K	(1 << 14)
+>  #define VTCR_EL2_SH0_MASK	(3 << 12)
+> -- 
+> 1.7.9.5
+> 
 
-I'll review your latest EFI stub isolation patches and try Kasan again
-on top (most likely tomorrow).
-
-Thanks.
-
--- 
-Catalin
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
