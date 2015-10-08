@@ -1,42 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 8 Oct 2015 18:28:56 +0100
-Subject: [PATCH 03/15] arm64: Introduce helpers for page table levels
-In-Reply-To: <5616A65A.50003@arm.com>
-References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
- <1442331684-28818-4-git-send-email-suzuki.poulose@arm.com>
- <20151007082652.GM9011@cbox> <5614E536.9040007@arm.com>
- <20151008144546.GD20936@cbox> <5616A65A.50003@arm.com>
-Message-ID: <20151008172856.GQ17192@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu,  8 Oct 2015 18:32:35 +0100
+Subject: [PATCH] arm64: errata: use KBUILD_CFLAGS_MODULE for erratum #843419
+Message-ID: <1444325555-32108-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 06:22:34PM +0100, Suzuki K. Poulose wrote:
-> On 08/10/15 15:45, Christoffer Dall wrote:
-> >On Wed, Oct 07, 2015 at 10:26:14AM +0100, Marc Zyngier wrote:
-> >>I just had a chat with Catalin, who did shed some light on this.
-> >>It all has to do with rounding up. What you would like to have here is:
-> >>
-> >>#define ARM64_HW_PGTABLE_LEVELS(va_bits) DIV_ROUND_UP(va_bits - PAGE_SHIFT, PAGE_SHIFT - 3)
-> >>
-> >>where (va_bits - PAGE_SHIFT) is the total number of bits we deal
-> >>with during a page table walk, and (PAGE_SHIFT - 3) is the number
-> >>of bits we deal with per level.
-> >>
-> >>The clue is in how DIV_ROUND_UP is written:
-> >>
-> >>#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
-> >>
-> >>which gives you Suzuki's magic formula.
-> >>
-> >>I'd vote for the DIV_ROUND_UP(), which will make things a lot more readable.
-> >>
-> >Thanks for the explanation, I vote for DIV_ROUND_UP too.
-> 
-> Btw, DIV_ROUND_UP is defined in linux/kernel.h, including which in the required
-> headers breaks the build. I could add the definition of the same locally.
+Commit df057cc7b4fa ("arm64: errata: add module build workaround for
+erratum #843419") sets CFLAGS_MODULE to ensure that the large memory
+model is used by the compiler when building kernel modules.
 
-Or just keep the original magic formula and add the DIV_ROUND_UP one in
-a comment.
+However, CFLAGS_MODULE is an environment variable and intended to be
+overridden on the command line, which appears to be the case with the
+Ubuntu kernel packaging system, so use KBUILD_CFLAGS_MODULE instead.
 
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reported-by: Dann Frazier <dann.frazier@canonical.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index f9914d7c1bb0..d10b5d483022 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -42,7 +42,7 @@ endif
+ CHECKFLAGS	+= -D__aarch64__
+ 
+ ifeq ($(CONFIG_ARM64_ERRATUM_843419), y)
+-CFLAGS_MODULE	+= -mcmodel=large
++KBUILD_CFLAGS_MODULE	+= -mcmodel=large
+ endif
+ 
+ # Default value
 -- 
-Catalin
+2.1.4
