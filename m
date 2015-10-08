@@ -1,52 +1,32 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 8 Oct 2015 11:16:35 -0700
-Subject: [PATCH 4/4] arm64: dts: apq8016-sbc: enable spi buses on LS and HS
-In-Reply-To: <1444303181-32574-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1444303124-32402-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1444303181-32574-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <5616B303.9030909@codeaurora.org>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 8 Oct 2015 20:16:24 +0200
+Subject: [PATCH v4] twd: Don't set CLOCK_EVT_FEAT_C3STOP unconditionally
+In-Reply-To: <20151008174333.GI32532@n2100.arm.linux.org.uk>
+References: <56123BD0.8010005@sigmadesigns.com>
+ <56124035.6080107@sigmadesigns.com>
+ <CACRpkdbWRU3UH6aJnqdcuzdh_-sE7ryhs0vBTUbbRDcJ7PWXLw@mail.gmail.com>
+ <561247DF.1000308@sigmadesigns.com> <20151005103539.GC19064@leverpostej>
+ <5612649C.5020401@sigmadesigns.com> <20151008171616.GG7275@leverpostej>
+ <5616AA2D.2070101@free.fr> <20151008174333.GI32532@n2100.arm.linux.org.uk>
+Message-ID: <5616B2F8.3010602@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2015 04:19 AM, Srinivas Kandagatla wrote:
-> This patch enables spi buses on low speed and high speed expansion
-> connectors on DB410C
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> index 3581272..d872654 100644
-> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> @@ -92,11 +92,21 @@
->  	status = "okay";
->  };
->  
-> +&blsp_spi3 {
-> +	/* On High speed expansion */
-> +	status = "okay";
-> +};
-> +
->  &blsp_i2c4 {
->  	/* On High speed expansion */
->  	status = "okay";
->  };
->  
-> +&blsp_spi5 {
-> +	/* On Low speed expansion */
-> +	status = "okay";
-> +};
-> +
->  &blsp_i2c6 {
->  	/* On Low speed expansion */
->  	status = "okay";
+On 08/10/2015 19:43, Russell King - ARM Linux wrote:
+> On Thu, Oct 08, 2015 at 07:38:53PM +0200, Mason wrote:
+>> On 08/10/2015 19:16, Mark Rutland wrote:
+>>> Otherwise this looks ok. If you can respin with the above wording, and
+>>> s/twd-never-stops/always-on/ in the patch, you can add:
+>>>
+>>> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>>
+>> Wouldn't you feel like going all-in and Signing-off? ;-)
+> 
+> Then I'd reject it, because it would be wrong.
+> 
+> Documentation/SubmittingPatches: [snip]
 
-We've been using absolute nodes to mark device nodes as status = "okay".
-Can we keep doing that here please?
+Could someone explain the difference between Acked-by and
+Reviewed-by?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards.
