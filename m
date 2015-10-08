@@ -1,48 +1,24 @@
-From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
-Date: Thu, 8 Oct 2015 19:51:29 +0530
-Subject: [PATCH] thermal: exynos: fix register read in TMU
-In-Reply-To: <CAJKOXPdVs9i9sVP84wa2wU0qVH1-o4unvaDC+O7c1za6bJUSLw@mail.gmail.com>
-References: <1443699599-9693-1-git-send-email-sudipm.mukherjee@gmail.com>
- <CAJKOXPfyC8etcPe373q6Pc1qWb2zVnHE96V+Rh5mPmpzAxFjiA@mail.gmail.com>
- <20151001141243.GA5061@sudip-pc>
- <CAJKOXPdVs9i9sVP84wa2wU0qVH1-o4unvaDC+O7c1za6bJUSLw@mail.gmail.com>
-Message-ID: <20151008142129.GC10587@sudip-pc>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 8 Oct 2015 22:23:40 +0800
+Subject: [PATCH v2 0/3] hwrng: st: Couple of improvements
+In-Reply-To: <1444220609-31251-1-git-send-email-lee.jones@linaro.org>
+References: <1444220609-31251-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20151008142340.GD25166@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 02, 2015 at 08:43:52AM +0900, Krzysztof Kozlowski wrote:
-> 2015-10-01 23:12 GMT+09:00 Sudip Mukherjee <sudipm.mukherjee@gmail.com>:
-> > On Thu, Oct 01, 2015 at 10:18:57PM +0900, Krzysztof Kozlowski wrote:
-> >> 2015-10-01 20:39 GMT+09:00 Sudip Mukherjee <sudipm.mukherjee@gmail.com>:
-> >> > The value of emul_con was getting overwritten if the selected soc is
-> >> > SOC_ARCH_EXYNOS5260. And so as a result we were reading from the wrong
-> >> > register in the case of SOC_ARCH_EXYNOS5260.
-> >>
-> >> How the value is overwritten if the soc is Exynos5260? I can't see it
-> >> (although the "else if" is still more obvious than "if" but how does
-> >> the description match the code?).
-> > The code here is:
-> > if (data->soc == SOC_ARCH_EXYNOS5260)
-> >         emul_con = EXYNOS5260_EMUL_CON;
-> > if (data->soc == SOC_ARCH_EXYNOS5433)
-> >         emul_con = EXYNOS5433_TMU_EMUL_CON;
-> > else if (data->soc == SOC_ARCH_EXYNOS7)
-> >         emul_con = EXYNOS7_TMU_REG_EMUL_CON;
-> > else
-> >         emul_con = EXYNOS_EMUL_CON;
-> >
-> > So if data->soc is SOC_ARCH_EXYNOS5260 , then emul_con becomes
-> > EXYNOS5260_EMUL_CON. But again for the else part it will become
-> > EXYNOS_EMUL_CON.
+On Wed, Oct 07, 2015 at 01:23:26PM +0100, Lee Jones wrote:
+> This set contains a minor documentation fix, greater clarification
+> with how the FIFO depth/size is represented and finally a fix to
+> prevent early timeout during data acquisition.
 > 
-> Indeed!
-> 
-> Fixes: 488c7455d74c ("thermal: exynos: Add the support for Exynos5433 TMU")
-> 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> v1 => v2:
+>  - Remove phantom bugfix (FIFO really is 4 deep, not 8)
+>  - Double timeout value to account for inconsistent call to udelay()
+>    - Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Hi Krzysztof,
-Who will pick this one up? I still do not see it in linux-next.
-
-regards
-sudip
+All applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
