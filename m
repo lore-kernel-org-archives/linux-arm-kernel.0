@@ -1,31 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 8 Oct 2015 18:19:51 +0100
-Subject: [PATCH v3 0/3] arm64: EFI stub isolation
-In-Reply-To: <1444129424-8284-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1444129424-8284-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151008171950.GP17192@e104818-lin.cambridge.arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Thu, 8 Oct 2015 18:22:34 +0100
+Subject: [PATCH 03/15] arm64: Introduce helpers for page table levels
+In-Reply-To: <20151008144546.GD20936@cbox>
+References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
+ <1442331684-28818-4-git-send-email-suzuki.poulose@arm.com>
+ <20151007082652.GM9011@cbox> <5614E536.9040007@arm.com>
+ <20151008144546.GD20936@cbox>
+Message-ID: <5616A65A.50003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 12:03:41PM +0100, Ard Biesheuvel wrote:
-> We need to ensure that the EFI stub only uses parts of the kernel proper
-> that are safe to use when the kernel virtual mapping is not active yet.
-> 
-> So move all C code dependencies to the libstub, and do a verification pass
-> to ensure that no absolute relocations are used.
-> 
-> On the arm64 side, annotate all the stub's dependencies as safe for PI
-> (position independent
-[...]
-> Ard Biesheuvel (3):
->   arm64/efi: remove /chosen/linux,uefi-stub-kern-ver DT property
->   arm64: use ENDPIPROC() to annotate position independent assembler
->     routines
->   arm64/efi: isolate EFI stub from the kernel proper
+On 08/10/15 15:45, Christoffer Dall wrote:
+> On Wed, Oct 07, 2015 at 10:26:14AM +0100, Marc Zyngier wrote:
+>> On 07/10/15 09:26, Christoffer Dall wrote:
+>>> Hi Suzuki,
+>>>
 
-The patches look fine to me. I haven't tested them yet since they don't
-apply to the arm64 for-next/core cleanly and you said you are going to
-repost the series anyway. I'll wait.
 
--- 
-Catalin
+>> I just had a chat with Catalin, who did shed some light on this.
+>> It all has to do with rounding up. What you would like to have here is:
+>>
+>> #define ARM64_HW_PGTABLE_LEVELS(va_bits) DIV_ROUND_UP(va_bits - PAGE_SHIFT, PAGE_SHIFT - 3)
+>>
+>> where (va_bits - PAGE_SHIFT) is the total number of bits we deal
+>> with during a page table walk, and (PAGE_SHIFT - 3) is the number
+>> of bits we deal with per level.
+>>
+>> The clue is in how DIV_ROUND_UP is written:
+>>
+>> #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
+>>
+>> which gives you Suzuki's magic formula.
+>>
+>> I'd vote for the DIV_ROUND_UP(), which will make things a lot more readable.
+>>
+> Thanks for the explanation, I vote for DIV_ROUND_UP too.
+
+Btw, DIV_ROUND_UP is defined in linux/kernel.h, including which in the required
+headers breaks the build. I could add the definition of the same locally.
+
+>
+> You can stash this away for a cryptic interview question ;)
+
+;)
+
+
+Suzuki
