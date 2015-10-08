@@ -1,52 +1,75 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Thu, 8 Oct 2015 23:45:01 +0900
-Subject: [PATCH v3 0/7] arm64: ftrace: fix incorrect output from stack
- tracer
-In-Reply-To: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <36B8D79C-E3BD-4937-94D1-B9725CA4FD68@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 8 Oct 2015 16:45:46 +0200
+Subject: [PATCH 03/15] arm64: Introduce helpers for page table levels
+In-Reply-To: <5614E536.9040007@arm.com>
+References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
+ <1442331684-28818-4-git-send-email-suzuki.poulose@arm.com>
+ <20151007082652.GM9011@cbox> <5614E536.9040007@arm.com>
+Message-ID: <20151008144546.GD20936@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 8, 2015, at 7:01 PM, AKASHI Takahiro wrote:
-
-Hi Akashi,
-
-> This is the third patch series for fixing stack tracer on arm64.
-> The original issue was reported by Jungseok[1], and then I found more
-> issues[2].
-> (Steven, Jungseok, sorry for not replying to your comments directly.)
+On Wed, Oct 07, 2015 at 10:26:14AM +0100, Marc Zyngier wrote:
+> On 07/10/15 09:26, Christoffer Dall wrote:
+> > Hi Suzuki,
+> > 
+> > On Tue, Sep 15, 2015 at 04:41:12PM +0100, Suzuki K. Poulose wrote:
+> >> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+> >>
+> >> Introduce helpers for finding the number of page table
+> >> levels required for a given VA width, shift for a particular
+> >> page table level.
+> >>
+> >> Convert the existing users to the new helpers. More users
+> >> to follow.
+> >>
+> >> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> Cc: Mark Rutland <mark.rutland@arm.com>
+> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> >> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  arch/arm64/include/asm/pgtable-hwdef.h |   15 ++++++++++++---
+> >>  1 file changed, 12 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+> >> index 24154b0..ce18389 100644
+> >> --- a/arch/arm64/include/asm/pgtable-hwdef.h
+> >> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+> >> @@ -16,13 +16,21 @@
+> >>  #ifndef __ASM_PGTABLE_HWDEF_H
+> >>  #define __ASM_PGTABLE_HWDEF_H
+> >>  
+> >> +/*
+> >> + * Number of page-table levels required to address 'va_bits' wide
+> >> + * address, without section mapping
+> >> + */
+> >> +#define ARM64_HW_PGTABLE_LEVELS(va_bits) (((va_bits) - 4) / (PAGE_SHIFT - 3))
+> > 
+> > I don't understand the '(va_bits) - 4' here, can you explain it (and add a
+> > comment to that effect) ?
 > 
-> I address here all the issues and implement fixes described in [2] except
-> for interrupt-triggered problems, ie. II-3). Recent discussions[3] about
-> introducing a dedicated interrupt stack suggests that we may avoid walking
-> through from an interrupt stack to a process stack.
-> (So interrupt-stack patch is a prerequisite.)
+> I just had a chat with Catalin, who did shed some light on this.
+> It all has to do with rounding up. What you would like to have here is:
 > 
-> Basically,
-> patch1 corresponds to the original issue.
-> patch2 is a proactive improvement of function_graph tracer. 
-> patch3 corresponds to II-4(functions under function_graph tracer).
-> patch4 corresponds to II-5(leaf function).
-> patch5, 6 and 7 correspond to II-1(slurping stack) and II-2(differences
-> between x86 and arm64).
+> #define ARM64_HW_PGTABLE_LEVELS(va_bits) DIV_ROUND_UP(va_bits - PAGE_SHIFT, PAGE_SHIFT - 3)
 > 
-> Each fix can be applied independently, but if patch5, 6 and 7 are
-> acceptable, patch1 is not necessary because patch7 replaces a default
-> stack tracer.
+> where (va_bits - PAGE_SHIFT) is the total number of bits we deal
+> with during a page table walk, and (PAGE_SHIFT - 3) is the number
+> of bits we deal with per level.
 > 
-> I tested the code with v4.3-rc3 + Jungseok's patch v3[4].
+> The clue is in how DIV_ROUND_UP is written:
 > 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354126.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/355920.html 
-> [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/368003.html
-> [4] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/371451.html
+> #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
+> 
+> which gives you Suzuki's magic formula.
+> 
+> I'd vote for the DIV_ROUND_UP(), which will make things a lot more readable.
+> 
+Thanks for the explanation, I vote for DIV_ROUND_UP too.
 
-The [4] is not a valid patch. I hope the test has been going with the following one.
+You can stash this away for a cryptic interview question ;)
 
-	http://www.kernelhub.org/?msg=841034&p=2
-
-I will leave comments after playing with this series on top of my IRQ stack tree.
-
-Best Regards
-Jungseok Lee
+-Christoffer
