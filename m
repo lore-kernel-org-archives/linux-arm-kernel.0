@@ -1,65 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 8 Oct 2015 12:06:33 +0100
-Subject: [PATCH v6 0/6] KASAN for arm64
-In-Reply-To: <CAPAsAGxR-yqtmFeo65Xw_0RQyEy=mN1uG=GKtqoMLr_x_N0u5w@mail.gmail.com>
-References: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
- <20151007100411.GG3069@e104818-lin.cambridge.arm.com>
- <CAPAsAGxR-yqtmFeo65Xw_0RQyEy=mN1uG=GKtqoMLr_x_N0u5w@mail.gmail.com>
-Message-ID: <20151008110633.GB7275@leverpostej>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 8 Oct 2015 20:08:31 +0900
+Subject: [PATCH] ARM: shmobile: porter: add SDHI0/2 DT support
+In-Reply-To: <56164B48.6050300@cogentembedded.com>
+References: <2228837.DO5U5OvRSi@wasted.cogentembedded.com>
+ <20151007033957.GA30650@verge.net.au>
+ <5614FBB3.5060806@cogentembedded.com>
+ <20151008021247.GD8756@verge.net.au>
+ <56164B48.6050300@cogentembedded.com>
+Message-ID: <20151008110831.GC4961@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 01:36:09PM +0300, Andrey Ryabinin wrote:
-> 2015-10-07 13:04 GMT+03:00 Catalin Marinas <catalin.marinas@arm.com>:
-> > On Thu, Sep 17, 2015 at 12:38:06PM +0300, Andrey Ryabinin wrote:
-> >> As usual patches available in git
-> >>       git://github.com/aryabinin/linux.git kasan/arm64v6
+On Thu, Oct 08, 2015 at 01:54:00PM +0300, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 10/8/2015 5:12 AM, Simon Horman wrote:
+> 
+> >>>>Define the Porter board dependent part of the SDHI0/2 device nodes along with
+> >>>>the  necessary  voltage regulators (note that the Vcc regulators are dummy --
+> >>>>they are required but don't actually exist on the board). Also, GPIOs have to
+> >>>>be used for the CD and WP signals due to the SDHI driver constraints...
+> >>>>
+> >>>>This patch is analogous to the commit 1299df03d719 (ARM: shmobile: henninger:
+> >>>>add SDHI0/2 DT support) as there  are no differences between those boards in
+> >>>>this respect.
+> >>>>
+> >>>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>>>
+> >>>>---
+> >>>>This patch is against the 'renesas-devel-20151006-v4.3-rc4' tag of Simon
+> >>>>Horman's 'renesas.git' repo.
+> >>>
+> >>>Thanks I have queued this up after addressing some issues
+> >>>in the changelog that checkpatch complained about:
+> >>>
+> >>>* text > 75 characters wide
+> >>>* Missing '"' around name of patch referred to
+> >>>
+> >>>Its looking like there is already quite a log shared between
 > >>
-> >> Changes since v5:
-> >>  - Rebase on top of 4.3-rc1
-> >>  - Fixed EFI boot.
-> >>  - Updated Doc/features/KASAN.
+> >>    Lot?
+> >>
+> >>>r8a7791-porter.dts and r8a7791-henninger.dts. Do you have any
+> >>>thoughts on consolidating or sharing common elements between
+> >>>them somehow?
+> >>
+> >>    I'm still planning to remove the Henninger's .dts for good. It was never
+> >>sold and so had no users outside Renesas (and Cogent Embedded), I was told.
 > >
-> > I tried to merge these patches (apart from the x86 one which is already
-> > merged) but it still doesn't boot on Juno as an EFI application.
-> >
+> >Thanks, that sounds like a good plan to me.
+> >Do you have any thoughts on when?
 > 
-> 4.3-rc1 was ok and 4.3-rc4 is not. Break caused by 0ce3cc008ec04
-> ("arm64/efi: Fix boot crash by not padding between EFI_MEMORY_RUNTIME
-> regions")
-> It introduced sort() call in efi_get_virtmap().
-> sort() is generic kernel function and it's instrumented, so we crash
-> when KASAN tries to access shadow in sort().
-> 
-> [+CC efi some guys]
-> 
-> Comment in drivers/firmware/efi/libstub/Makefile says that EFI stub
-> executes with MMU disabled:
->     # The stub may be linked into the kernel proper or into a separate
-> boot binary,
->     # but in either case, it executes before the kernel does (with MMU
-> disabled) so
->     # things like ftrace and stack-protector are likely to cause trouble if left
->     # enabled, even if doing so doesn't break the build.
-> 
-> But in arch/arm64/kernel/efi-entry.S:
-> * We arrive here from the EFI boot manager with:
-> *
-> *    * CPU in little-endian mode
-> *    * MMU on with identity-mapped RAM
-> 
-> So is MMU enabled in ARM64 efi-stub?
+>    Well, I was going to reach the feature parity between these 2 boards,
+> i.e. to support all devices on Porter that are supported on Henninger...
 
-The stub is executed as an EFI application, which means that the MMU is
-on, and the page tables are an idmap owned by the EFI implementation.
-
-> If yes, we could solve this issue by mapping KASAN early shadow in efi stub.
-
-As the page tables are owned by the implemenation and not the kernel, we
-cannot alter them (at least not until we've called ExitBootServices(),
-which happens relatively late).
-
-Can we not build the stub without ASAN protections?
-
-Thanks,
-Mark.
+THanks, that sounds like an entirely reasonable plan to me.
