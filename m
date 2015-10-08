@@ -1,69 +1,94 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 Oct 2015 11:07:24 +0100
-Subject: [PATCH] arm64: errata: add module build workaround for erratum
- #843419
-In-Reply-To: <CALdTtnsSeWJxnJwhReWGmW9g7APo52p88UNpu59nNYqgW3fmag@mail.gmail.com>
-References: <1442402197-20306-1-git-send-email-will.deacon@arm.com>
- <CALdTtnsyNeiRnqSdH6K1eHZ3KbAu02bqYCbnd7zWPGDjgGY8Ww@mail.gmail.com>
- <CAKv+Gu-srNtMq-DUJS1JrYuNwmV3Ku4+DvbR5e5QH39+3DA_cA@mail.gmail.com>
- <CALdTtnsSeWJxnJwhReWGmW9g7APo52p88UNpu59nNYqgW3fmag@mail.gmail.com>
-Message-ID: <20151008100723.GB16807@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 08 Oct 2015 11:14:13 +0100
+Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
+In-Reply-To: <20151008092858.GA16100@cbox>
+References: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
+ <003a01d10199$58e96590$0abc30b0$@samsung.com> <20151008082302.GE14315@cbox>
+ <005e01d101a9$31ee80f0$95cb82d0$@samsung.com> <20151008092858.GA16100@cbox>
+Message-ID: <561641F5.4060202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 12:07:54AM -0600, Dann Frazier wrote:
-> On Tue, Oct 6, 2015 at 4:29 PM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
-> > On 6 October 2015 at 22:44, Dann Frazier <dann.frazier@canonical.com> wrote:
-> >> On Wed, Sep 16, 2015 at 5:16 AM, Will Deacon <will.deacon@arm.com> wrote:
-> >>> Cortex-A53 processors <= r0p4 are affected by erratum #843419 which can
-> >>> lead to a memory access using an incorrect address in certain sequences
-> >>> headed by an ADRP instruction.
-> >>
-> >> Just a heads up that we're seeing a regression in the Ubuntu 4.2 kernel on
-> >> X-Gene after this patch is applied and the CONFIG enabled.
-> >>
-> >> Modules loads fail with messages like:
-> >>
-> >> [ 2.192721] module gpio_xgene_sb: unsupported RELA relocation: 275
-> >> [ 2.193609] module xgene_enet: unsupported RELA relocation: 275
-> >> [ 2.249402] module libahci: unsupported RELA relocation: 275
-> >> [ 2.249628] module xgene_enet: unsupported RELA relocation: 275
-> >> [ 2.359451] module xgene_enet: unsupported RELA relocation: 275
-> >> [ 2.389444] module xgene_enet: unsupported RELA relocation: 275
-> >> [ 3.473766] module linear: unsupported RELA relocation: 275
-> >> [ 3.543252] module multipath: unsupported RELA relocation: 275
-> >> [ 3.593268] module raid0: unsupported RELA relocation: 275
-> >> [ 3.663695] module raid1: unsupported RELA relocation: 275
-> >> [ 3.713964] module raid6_pq: unsupported RELA relocation: 275
-> >> [ 3.763983] module raid6_pq: unsupported RELA relocation: 275
-> >> [ 3.803975] module raid6_pq: unsupported RELA relocation: 275
-> >> [ 3.853881] module raid10: unsupported RELA relocation: 275
-> >> [ 3.924962] module raid6_pq: unsupported RELA relocation: 275
-> >>
-> >
-> > RELA #275 is the relocation against ADRP instructions, which GCC
-> > should not emit anymore when -mcmodel=large is in effect.
-> >
-> > Can you confirm that the modules have been rebuilt with this config as
-> > well?
+On 08/10/15 10:28, Christoffer Dall wrote:
+> On Thu, Oct 08, 2015 at 12:10:35PM +0300, Pavel Fedin wrote:
+>>  Hello!
+>>
+> [...]
+>>
+>>> The architecture defines how to address a specific CPU, and that's using
+>>> the MPIDR, not inventing our own scheme, so that's what we should do.
+>>
+>>  But doesn't the same apply to GICv2 then? It just happened so that we had Aff0 == idx, therefore
+>> looks like nobody cared.
 > 
-> Yeah, it was.
+> I don't think it's about caring, but we (I) didn't consider it when
+> designing that API.
 > 
-> > Can you double check the GCC command line (with V=1) when doing
-> > 'make modules' to ensure that '-mcmodel=large' is being passed?
+>>  My argument is to have GICv3 API as similar to GICv2 as possible, IMHO that would make it easier to
+>> maintain the code, and perhaps give some way to reusing it.
 > 
-> I did, and I don't see -mcmodel at all. On a whim I changed
-> CFLAGS_MODULE in the patch to KBUILD_CFLAGS_MODULE, and V=1 now shows
-> -mcmodel=large. I haven't had time yet to figure out why the KBUILD
-> variant is important, nor time to boot test such a build (travel day).
+> Plenty of things are broken about the VGICv2 implementation and API, so
+> my goal is not to have GICv3 be similar to GICv2, but to design a good
+> API.
+> 
+>>
+>>> For example, I don't think you had the full 32-bits available to address
+>>> a CPU in your proposal, so if nothing else, that proposal had less
+>>> expressive power than what the architecture defines.
+>>
+>>  My proposal was:
+>>
+>> --- cut ---
+>>   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
+>>   Attributes:
+>>     The attr field of kvm_device_attr encodes two values:
+>>     bits:     |  63  | 62 .. 52 | 51 ..  32  |  31   ....    0 |
+>>     values:   | size | reserved |  cpu idx   |      offset     |
+>>
+>>     All distributor regs can be accessed as (rw, 32-bit)
+>>     For GICv3 some regsisters are actually (rw, 64-bit) according to the
+>>     specification. In order to perform full 64-bit access 'size' bit should be
+>>     set to 1. KVM_DEV_ARM_VGIC_64BIT flag value is provided for this purpose.
+>> --- cut ---
+>>
+>>  Bit 63 was meant to specify access size (u64 or u32), and bits 62 - 52 were reserved just in order
+>> to match ARM64_SYS_REG() macro, which uses these bits for own purpose.
+>>
+>>  But, since your proposal suggests that all GICv3 accesses are 64-bit wide, and we use own system
+>> register encoding (i don't see any serious problems with this), it is possible just to use bits
+>> 63...32 for vCPU index. So, maximum number of CPUs would be the same 0xFFFFFFFF as in your proposal,
+>> and the API would be fully compatible with GICv2 one (well, except access size), and we would use
+>> the same definitions and the same approach to handle both. This would bring more consistency and
+>> less confusion to userspace developers who use the API.
+> 
+> I don't agree; using the same API with slightly different semantics
+> depending on which device you created is much more error prone than
+> having a clear separation between the two different APIs, IMHO.
+> 
+>>
+>>  By the way, the rest of KVM API (KVM_IRQ_LINE, for example), also uses vCPU index.
+>>
+>>  That's all my arguments for vCPU index instead of affinity value
+> 
+> I'm not convinced that we should be compatible with GICv2 at all.  (The
+> deeper argument here is that GICv2 had an architectural limitation to 8
+> CPUs so all the CPU addressing is simple in that case.  This is a
+> fundamental evolution from GICv2 to GICv3 so it is only natural that
+> there are substantial changes in this area.)
+> 
+> I'll let Marc or Peter chime in if they disagree.
 
-CFLAGS_MODULE is the environment variable (i.e. you can set it on the
-cmdline), so we probably *should* be using KBUILD_CFLAGS_MODULE here
-instead (and the thumb2 gas issue on arch/arm/ should be updated as
-well).
+Well, compatibility with GICv2 is the biggest mistake we made when
+designing the GICv3 architecture. And that's why our emulation doesn't
+give a damn about v2 compatibility.
 
-However, I'd still like to understand how it's getting clobbered for
-you. Are you overriding CFLAGS_MODULE someplace?
+Designing the kernel API in terms of GICv2 is nothing short of
+revolting, if you ask me. We've already shoe-horned GICv3 in GICv2 data
+structures in KVM, and that's an absolute mess. I can't wait to simple
+nuke the thing. Once v2 is out of the picture, everything is much simpler.
 
-Will
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
