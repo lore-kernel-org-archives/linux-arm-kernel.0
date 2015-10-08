@@ -1,311 +1,847 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  8 Oct 2015 20:02:04 +0100
-Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
-In-Reply-To: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu,  8 Oct 2015 20:15:18 +0100
+Subject: [PATCH] arm64: atomics: implement native {relaxed, acquire,
+ release} atomics
+Message-ID: <1444331718-24036-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since arm64 does not use a builtin decompressor, the EFI stub is built
-into the kernel proper. So far, this has been working fine, but actually,
-since the stub is in fact a PE/COFF relocatable binary that is executed
-at an unknown offset in the 1:1 mapping provided by the UEFI firmware, we
-should not be seamlessly sharing code with the kernel proper, which is a
-position dependent executable linked at a high virtual offset.
+Commit 654672d4ba1a ("locking/atomics: Add _{acquire|release|relaxed}()
+variants of some atomic operation") introduced a relaxed atomic API to
+Linux that maps nicely onto the arm64 memory model, including the new
+ARMv8.1 atomic instructions.
 
-So instead, separate the contents of libstub and its dependencies, by
-putting them into their own namespace by prefixing all of its symbols
-with __efistub. This way, we have tight control over what parts of the
-kernel proper are referenced by the stub.
+This patch hooks up the API to our relaxed atomic instructions, rather
+than have them all expand to the full-barrier variants as they do
+currently.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/Makefile            | 12 ++++-
- arch/arm64/kernel/efi-entry.S         | 10 ++--
- arch/arm64/kernel/head.S              | 14 ++---
- arch/arm64/kernel/image.h             | 27 ++++++++++
- drivers/firmware/efi/libstub/Makefile | 39 +++++++++++---
- drivers/firmware/efi/libstub/string.c | 57 ++++++++++++++++++++
- 6 files changed, 139 insertions(+), 20 deletions(-)
+ arch/arm64/include/asm/atomic.h       |  63 +++++++-
+ arch/arm64/include/asm/atomic_ll_sc.h |  98 +++++++-----
+ arch/arm64/include/asm/atomic_lse.h   | 193 +++++++++++++----------
+ arch/arm64/include/asm/cmpxchg.h      | 279 +++++++++++++++++-----------------
+ 4 files changed, 371 insertions(+), 262 deletions(-)
 
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 22dc9bc781be..7b17f6245f1e 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -20,6 +20,14 @@ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
- 			   cpufeature.o alternative.o cacheinfo.o		\
- 			   smp.o smp_spin_table.o topology.o
+diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
+index 35a67783cfa0..5e13ad76a249 100644
+--- a/arch/arm64/include/asm/atomic.h
++++ b/arch/arm64/include/asm/atomic.h
+@@ -55,13 +55,42 @@
  
-+stub-obj				:= efi-stub.o efi-entry.o
-+extra-y					:= $(stub-obj)
-+stub-obj				:= $(patsubst %.o,%.stub.o,$(stub-obj))
+ #define atomic_read(v)			READ_ONCE((v)->counter)
+ #define atomic_set(v, i)		(((v)->counter) = (i))
 +
-+OBJCOPYFLAGS := --prefix-symbols=__efistub_
-+$(obj)/%.stub.o: $(obj)/%.o FORCE
-+	$(call if_changed,objcopy)
++#define atomic_add_return_relaxed	atomic_add_return_relaxed
++#define atomic_add_return_acquire	atomic_add_return_acquire
++#define atomic_add_return_release	atomic_add_return_release
++#define atomic_add_return		atomic_add_return
 +
- arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o entry32.o		\
- 					   ../../arm/kernel/opcodes.o
-@@ -32,7 +40,7 @@ arm64-obj-$(CONFIG_CPU_PM)		+= sleep.o suspend.o
- arm64-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
- arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
--arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
-+arm64-obj-$(CONFIG_EFI)			+= efi.o $(stub-obj)
- arm64-obj-$(CONFIG_PCI)			+= pci.o
- arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
- arm64-obj-$(CONFIG_ACPI)		+= acpi.o
-@@ -40,7 +48,7 @@ arm64-obj-$(CONFIG_ACPI)		+= acpi.o
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
- head-y					:= head.o
--extra-y					:= $(head-y) vmlinux.lds
-+extra-y					+= $(head-y) vmlinux.lds
++#define atomic_inc_return_relaxed(v)	atomic_add_return_relaxed(1, (v))
++#define atomic_inc_return_acquire(v)	atomic_add_return_acquire(1, (v))
++#define atomic_inc_return_release(v)	atomic_add_return_release(1, (v))
++#define atomic_inc_return(v)		atomic_add_return(1, (v))
++
++#define atomic_sub_return_relaxed	atomic_sub_return_relaxed
++#define atomic_sub_return_acquire	atomic_sub_return_acquire
++#define atomic_sub_return_release	atomic_sub_return_release
++#define atomic_sub_return		atomic_sub_return
++
++#define atomic_dec_return_relaxed(v)	atomic_sub_return_relaxed(1, (v))
++#define atomic_dec_return_acquire(v)	atomic_sub_return_acquire(1, (v))
++#define atomic_dec_return_release(v)	atomic_sub_return_release(1, (v))
++#define atomic_dec_return(v)		atomic_sub_return(1, (v))
++
++#define atomic_xchg_relaxed(v, new)	xchg_relaxed(&((v)->counter), (new))
++#define atomic_xchg_acquire(v, new)	xchg_acquire(&((v)->counter), (new))
++#define atomic_xchg_release(v, new)	xchg_release(&((v)->counter), (new))
+ #define atomic_xchg(v, new)		xchg(&((v)->counter), (new))
++
++#define atomic_cmpxchg_relaxed(v, old, new)				\
++	cmpxchg_relaxed(&((v)->counter), (old), (new))
++#define atomic_cmpxchg_acquire(v, old, new)				\
++	cmpxchg_acquire(&((v)->counter), (old), (new))
++#define atomic_cmpxchg_release(v, old, new)				\
++	cmpxchg_release(&((v)->counter), (old), (new))
+ #define atomic_cmpxchg(v, old, new)	cmpxchg(&((v)->counter), (old), (new))
  
- # vDSO - this must be built first to generate the symbol offsets
- $(call objectify,$(arm64-obj-y)): $(obj)/vdso/vdso-offsets.h
-diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-index 8ce9b0577442..a773db92908b 100644
---- a/arch/arm64/kernel/efi-entry.S
-+++ b/arch/arm64/kernel/efi-entry.S
-@@ -29,7 +29,7 @@
- 	 * we want to be. The kernel image wants to be placed at TEXT_OFFSET
- 	 * from start of RAM.
- 	 */
--ENTRY(efi_stub_entry)
-+ENTRY(entry)
- 	/*
- 	 * Create a stack frame to save FP/LR with extra space
- 	 * for image_addr variable passed to efi_entry().
-@@ -86,8 +86,8 @@ ENTRY(efi_stub_entry)
- 	 * entries for the VA range of the current image, so no maintenance is
- 	 * necessary.
- 	 */
--	adr	x0, efi_stub_entry
--	adr	x1, efi_stub_entry_end
-+	adr	x0, entry
-+	adr	x1, entry_end
- 	sub	x1, x1, x0
- 	bl	__flush_dcache_area
+ #define atomic_inc(v)			atomic_add(1, (v))
+ #define atomic_dec(v)			atomic_sub(1, (v))
+-#define atomic_inc_return(v)		atomic_add_return(1, (v))
+-#define atomic_dec_return(v)		atomic_sub_return(1, (v))
+ #define atomic_inc_and_test(v)		(atomic_inc_return(v) == 0)
+ #define atomic_dec_and_test(v)		(atomic_dec_return(v) == 0)
+ #define atomic_sub_and_test(i, v)	(atomic_sub_return((i), (v)) == 0)
+@@ -75,13 +104,39 @@
+ #define ATOMIC64_INIT			ATOMIC_INIT
+ #define atomic64_read			atomic_read
+ #define atomic64_set			atomic_set
++
++#define atomic64_add_return_relaxed	atomic64_add_return_relaxed
++#define atomic64_add_return_acquire	atomic64_add_return_acquire
++#define atomic64_add_return_release	atomic64_add_return_release
++#define atomic64_add_return		atomic64_add_return
++
++#define atomic64_inc_return_relaxed(v)	atomic64_add_return_relaxed(1, (v))
++#define atomic64_inc_return_acquire(v)	atomic64_add_return_acquire(1, (v))
++#define atomic64_inc_return_release(v)	atomic64_add_return_release(1, (v))
++#define atomic64_inc_return(v)		atomic64_add_return(1, (v))
++
++#define atomic64_sub_return_relaxed	atomic64_sub_return_relaxed
++#define atomic64_sub_return_acquire	atomic64_sub_return_acquire
++#define atomic64_sub_return_release	atomic64_sub_return_release
++#define atomic64_sub_return		atomic64_sub_return
++
++#define atomic64_dec_return_relaxed(v)	atomic64_sub_return_relaxed(1, (v))
++#define atomic64_dec_return_acquire(v)	atomic64_sub_return_acquire(1, (v))
++#define atomic64_dec_return_release(v)	atomic64_sub_return_release(1, (v))
++#define atomic64_dec_return(v)		atomic64_sub_return(1, (v))
++
++#define atomic64_xchg_relaxed		atomic_xchg_relaxed
++#define atomic64_xchg_acquire		atomic_xchg_acquire
++#define atomic64_xchg_release		atomic_xchg_release
+ #define atomic64_xchg			atomic_xchg
++
++#define atomic64_cmpxchg_relaxed	atomic_cmpxchg_relaxed
++#define atomic64_cmpxchg_acquire	atomic_cmpxchg_acquire
++#define atomic64_cmpxchg_release	atomic_cmpxchg_release
+ #define atomic64_cmpxchg		atomic_cmpxchg
  
-@@ -120,5 +120,5 @@ efi_load_fail:
- 	ldp	x29, x30, [sp], #32
- 	ret
+ #define atomic64_inc(v)			atomic64_add(1, (v))
+ #define atomic64_dec(v)			atomic64_sub(1, (v))
+-#define atomic64_inc_return(v)		atomic64_add_return(1, (v))
+-#define atomic64_dec_return(v)		atomic64_sub_return(1, (v))
+ #define atomic64_inc_and_test(v)	(atomic64_inc_return(v) == 0)
+ #define atomic64_dec_and_test(v)	(atomic64_dec_return(v) == 0)
+ #define atomic64_sub_and_test(i, v)	(atomic64_sub_return((i), (v)) == 0)
+diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
+index b3b5c4ae3800..74d0b8eb0799 100644
+--- a/arch/arm64/include/asm/atomic_ll_sc.h
++++ b/arch/arm64/include/asm/atomic_ll_sc.h
+@@ -55,40 +55,47 @@ __LL_SC_PREFIX(atomic_##op(int i, atomic_t *v))				\
+ }									\
+ __LL_SC_EXPORT(atomic_##op);
  
--efi_stub_entry_end:
--ENDPROC(efi_stub_entry)
-+entry_end:
-+ENDPROC(entry)
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 90d09eddd5b2..28a81e948df9 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -120,8 +120,8 @@ efi_head:
- #endif
+-#define ATOMIC_OP_RETURN(op, asm_op)					\
++#define ATOMIC_OP_RETURN(name, mb, acq, rel, cl, op, asm_op)		\
+ __LL_SC_INLINE int							\
+-__LL_SC_PREFIX(atomic_##op##_return(int i, atomic_t *v))		\
++__LL_SC_PREFIX(atomic_##op##_return##name(int i, atomic_t *v))		\
+ {									\
+ 	unsigned long tmp;						\
+ 	int result;							\
+ 									\
+-	asm volatile("// atomic_" #op "_return\n"			\
++	asm volatile("// atomic_" #op "_return" #name "\n"		\
+ "	prfm	pstl1strm, %2\n"					\
+-"1:	ldxr	%w0, %2\n"						\
++"1:	ld" #acq "xr	%w0, %2\n"					\
+ "	" #asm_op "	%w0, %w0, %w3\n"				\
+-"	stlxr	%w1, %w0, %2\n"						\
+-"	cbnz	%w1, 1b"						\
++"	st" #rel "xr	%w1, %w0, %2\n"					\
++"	cbnz	%w1, 1b\n"						\
++"	" #mb								\
+ 	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)		\
+ 	: "Ir" (i)							\
+-	: "memory");							\
++	: cl);								\
+ 									\
+-	smp_mb();							\
+ 	return result;							\
+ }									\
+-__LL_SC_EXPORT(atomic_##op##_return);
++__LL_SC_EXPORT(atomic_##op##_return##name);
++
++#define ATOMIC_OPS(...)							\
++	ATOMIC_OP(__VA_ARGS__)						\
++	ATOMIC_OP_RETURN(        , dmb ish,  , l, "memory", __VA_ARGS__)
  
- #ifdef CONFIG_EFI
--	.globl	stext_offset
--	.set	stext_offset, stext - efi_head
-+	.globl	__efistub_stext_offset
-+	.set	__efistub_stext_offset, stext - efi_head
- 	.align 3
- pe_header:
- 	.ascii	"PE"
-@@ -144,8 +144,8 @@ optional_header:
- 	.long	_end - stext			// SizeOfCode
- 	.long	0				// SizeOfInitializedData
- 	.long	0				// SizeOfUninitializedData
--	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
--	.long	stext_offset			// BaseOfCode
-+	.long	__efistub_entry - efi_head	// AddressOfEntryPoint
-+	.long	__efistub_stext_offset		// BaseOfCode
+-#define ATOMIC_OPS(op, asm_op)						\
+-	ATOMIC_OP(op, asm_op)						\
+-	ATOMIC_OP_RETURN(op, asm_op)
++#define ATOMIC_OPS_RLX(...)						\
++	ATOMIC_OPS(__VA_ARGS__)						\
++	ATOMIC_OP_RETURN(_relaxed,        ,  ,  ,         , __VA_ARGS__)\
++	ATOMIC_OP_RETURN(_acquire,        , a,  , "memory", __VA_ARGS__)\
++	ATOMIC_OP_RETURN(_release,        ,  , l, "memory", __VA_ARGS__)
  
- extra_header_fields:
- 	.quad	0				// ImageBase
-@@ -162,7 +162,7 @@ extra_header_fields:
- 	.long	_end - efi_head			// SizeOfImage
+-ATOMIC_OPS(add, add)
+-ATOMIC_OPS(sub, sub)
++ATOMIC_OPS_RLX(add, add)
++ATOMIC_OPS_RLX(sub, sub)
  
- 	// Everything before the kernel image is considered part of the header
--	.long	stext_offset			// SizeOfHeaders
-+	.long	__efistub_stext_offset		// SizeOfHeaders
- 	.long	0				// CheckSum
- 	.short	0xa				// Subsystem (EFI application)
- 	.short	0				// DllCharacteristics
-@@ -207,9 +207,9 @@ section_table:
- 	.byte	0
- 	.byte	0        		// end of 0 padding of section name
- 	.long	_end - stext		// VirtualSize
--	.long	stext_offset		// VirtualAddress
-+	.long	__efistub_stext_offset	// VirtualAddress
- 	.long	_edata - stext		// SizeOfRawData
--	.long	stext_offset		// PointerToRawData
-+	.long	__efistub_stext_offset	// PointerToRawData
+ ATOMIC_OP(and, and)
+ ATOMIC_OP(andnot, bic)
+ ATOMIC_OP(or, orr)
+ ATOMIC_OP(xor, eor)
  
- 	.long	0		// PointerToRelocations (0 for executables)
- 	.long	0		// PointerToLineNumbers (0 for executables)
-diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
-index 8fae0756e175..e083af0dd546 100644
---- a/arch/arm64/kernel/image.h
-+++ b/arch/arm64/kernel/image.h
-@@ -59,4 +59,31 @@
- 	_kernel_offset_le	= DATA_LE64(TEXT_OFFSET);	\
- 	_kernel_flags_le	= DATA_LE64(__HEAD_FLAGS);
++#undef ATOMIC_OPS_RLX
+ #undef ATOMIC_OPS
+ #undef ATOMIC_OP_RETURN
+ #undef ATOMIC_OP
+@@ -111,40 +118,47 @@ __LL_SC_PREFIX(atomic64_##op(long i, atomic64_t *v))			\
+ }									\
+ __LL_SC_EXPORT(atomic64_##op);
  
-+#ifdef CONFIG_EFI
+-#define ATOMIC64_OP_RETURN(op, asm_op)					\
++#define ATOMIC64_OP_RETURN(name, mb, acq, rel, cl, op, asm_op)		\
+ __LL_SC_INLINE long							\
+-__LL_SC_PREFIX(atomic64_##op##_return(long i, atomic64_t *v))		\
++__LL_SC_PREFIX(atomic64_##op##_return##name(long i, atomic64_t *v))	\
+ {									\
+ 	long result;							\
+ 	unsigned long tmp;						\
+ 									\
+-	asm volatile("// atomic64_" #op "_return\n"			\
++	asm volatile("// atomic64_" #op "_return" #name "\n"		\
+ "	prfm	pstl1strm, %2\n"					\
+-"1:	ldxr	%0, %2\n"						\
++"1:	ld" #acq "xr	%0, %2\n"					\
+ "	" #asm_op "	%0, %0, %3\n"					\
+-"	stlxr	%w1, %0, %2\n"						\
+-"	cbnz	%w1, 1b"						\
++"	st" #rel "xr	%w1, %0, %2\n"					\
++"	cbnz	%w1, 1b\n"						\
++"	" #mb								\
+ 	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)		\
+ 	: "Ir" (i)							\
+-	: "memory");							\
++	: cl);								\
+ 									\
+-	smp_mb();							\
+ 	return result;							\
+ }									\
+-__LL_SC_EXPORT(atomic64_##op##_return);
++__LL_SC_EXPORT(atomic64_##op##_return##name);
 +
-+/*
-+ * The EFI stub has its own symbol namespace prefixed by __efistub_, to
-+ * isolate it from the kernel proper. The following symbols are legally
-+ * accessed by the stub, so provide some aliases to make them accessible.
-+ * Only include data symbols here, or text symbols of functions that are
-+ * guaranteed to be safe when executed at another offset than they were
-+ * linked at. The routines below are all implemented in assembler in a
-+ * position independent manner
-+ */
-+__efistub_memcmp		= __pi_memcmp;
-+__efistub_memchr		= __pi_memchr;
-+__efistub_memcpy		= __pi_memcpy;
-+__efistub_memmove		= __pi_memmove;
-+__efistub_memset		= __pi_memset;
-+__efistub_strlen		= __pi_strlen;
-+__efistub_strcmp		= __pi_strcmp;
-+__efistub_strncmp		= __pi_strncmp;
-+__efistub___flush_dcache_area	= __pi___flush_dcache_area;
-+
-+__efistub__text			= _text;
-+__efistub__end			= _end;
-+__efistub__edata		= _edata;
-+
-+#endif
-+
- #endif /* __ASM_IMAGE_H */
-diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-index 816dbe9f4b82..bca9a76cbd33 100644
---- a/drivers/firmware/efi/libstub/Makefile
-+++ b/drivers/firmware/efi/libstub/Makefile
-@@ -14,6 +14,8 @@ cflags-$(CONFIG_ARM64)		:= $(subst -pg,,$(KBUILD_CFLAGS))
- cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) \
- 				   -fno-builtin -fpic -mno-single-pic-base
++#define ATOMIC64_OPS(...)						\
++	ATOMIC64_OP(__VA_ARGS__)					\
++	ATOMIC64_OP_RETURN(, dmb ish,  , l, "memory", __VA_ARGS__)
  
-+cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
-+
- KBUILD_CFLAGS			:= $(cflags-y) \
- 				   $(call cc-option,-ffreestanding) \
- 				   $(call cc-option,-fno-stack-protector)
-@@ -22,7 +24,15 @@ GCOV_PROFILE			:= n
- KASAN_SANITIZE			:= n
+-#define ATOMIC64_OPS(op, asm_op)					\
+-	ATOMIC64_OP(op, asm_op)						\
+-	ATOMIC64_OP_RETURN(op, asm_op)
++#define ATOMIC64_OPS_RLX(...)						\
++	ATOMIC64_OPS(__VA_ARGS__)					\
++	ATOMIC64_OP_RETURN(_relaxed,,  ,  ,         , __VA_ARGS__)	\
++	ATOMIC64_OP_RETURN(_acquire,, a,  , "memory", __VA_ARGS__)	\
++	ATOMIC64_OP_RETURN(_release,,  , l, "memory", __VA_ARGS__)
  
- lib-y				:= efi-stub-helper.o
--lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o
-+
-+# include the stub's generic dependencies from lib/ when building for ARM/arm64
-+arm-deps := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c sort.c
-+
-+$(obj)/lib-%.o: $(srctree)/lib/%.c FORCE
-+	$(call if_changed_rule,cc_o_c)
-+
-+lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o string.o \
-+				   $(patsubst %.c,lib-%.o,$(arm-deps))
+-ATOMIC64_OPS(add, add)
+-ATOMIC64_OPS(sub, sub)
++ATOMIC64_OPS_RLX(add, add)
++ATOMIC64_OPS_RLX(sub, sub)
  
- #
- # arm64 puts the stub in the kernel proper, which will unnecessarily retain all
-@@ -30,10 +40,27 @@ lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o
- # So let's apply the __init annotations at the section level, by prefixing
- # the section names directly. This will ensure that even all the inline string
- # literals are covered.
-+# The fact that the stub and the kernel proper are essentially the same binary
-+# also means that we need to be extra careful to make sure that the stub does
-+# not rely on any absolute symbol references, considering that the virtual
-+# kernel mapping that the linker uses is not active yet when the stub is
-+# executing. So build all C dependencies of the EFI stub into libstub, and do
-+# a verification pass to see if any absolute relocations exist in any of the
-+# object files.
- #
--extra-$(CONFIG_ARM64)		:= $(lib-y)
--lib-$(CONFIG_ARM64)		:= $(patsubst %.o,%.init.o,$(lib-y))
-+extra-$(CONFIG_EFI_ARMSTUB)	:= $(lib-y)
-+lib-$(CONFIG_EFI_ARMSTUB)	:= $(patsubst %.o,%.stub.o,$(lib-y))
-+
-+STUBCOPY_FLAGS-y		:= -R .debug* -R *ksymtab*
-+STUBCOPY_FLAGS-$(CONFIG_ARM64)	+= --prefix-alloc-sections=.init \
-+				   --prefix-symbols=__efistub_
-+STUBCOPY_RELOC-$(CONFIG_ARM64)	:= R_AARCH64_ABS
-+
-+$(obj)/%.stub.o: $(obj)/%.o FORCE
-+	$(call if_changed,stubcopy)
+ ATOMIC64_OP(and, and)
+ ATOMIC64_OP(andnot, bic)
+ ATOMIC64_OP(or, orr)
+ ATOMIC64_OP(xor, eor)
  
--OBJCOPYFLAGS := --prefix-alloc-sections=.init
--$(obj)/%.init.o: $(obj)/%.o FORCE
--	$(call if_changed,objcopy)
-+quiet_cmd_stubcopy = STUBCPY $@
-+      cmd_stubcopy = if $(OBJCOPY) $(STUBCOPY_FLAGS-y) $< $@; then	\
-+		     $(OBJDUMP) -r $@ | grep $(STUBCOPY_RELOC-y)	\
-+		     && (echo >&2 "$@: absolute symbol references not allowed in the EFI stub"; \
-+			 rm -f $@; /bin/false); else /bin/false; fi
-diff --git a/drivers/firmware/efi/libstub/string.c b/drivers/firmware/efi/libstub/string.c
-new file mode 100644
-index 000000000000..09d5a0894343
---- /dev/null
-+++ b/drivers/firmware/efi/libstub/string.c
-@@ -0,0 +1,57 @@
-+/*
-+ * Taken from:
-+ *  linux/lib/string.c
-+ *
-+ *  Copyright (C) 1991, 1992  Linus Torvalds
-+ */
-+
-+#include <linux/types.h>
-+#include <linux/string.h>
-+
-+#ifndef __HAVE_ARCH_STRSTR
-+/**
-+ * strstr - Find the first substring in a %NUL terminated string
-+ * @s1: The string to be searched
-+ * @s2: The string to search for
-+ */
-+char *strstr(const char *s1, const char *s2)
-+{
-+	size_t l1, l2;
-+
-+	l2 = strlen(s2);
-+	if (!l2)
-+		return (char *)s1;
-+	l1 = strlen(s1);
-+	while (l1 >= l2) {
-+		l1--;
-+		if (!memcmp(s1, s2, l2))
-+			return (char *)s1;
-+		s1++;
-+	}
-+	return NULL;
++#undef ATOMIC64_OPS_RLX
+ #undef ATOMIC64_OPS
+ #undef ATOMIC64_OP_RETURN
+ #undef ATOMIC64_OP
+@@ -172,7 +186,7 @@ __LL_SC_PREFIX(atomic64_dec_if_positive(atomic64_t *v))
+ }
+ __LL_SC_EXPORT(atomic64_dec_if_positive);
+ 
+-#define __CMPXCHG_CASE(w, sz, name, mb, rel, cl)			\
++#define __CMPXCHG_CASE(w, sz, name, mb, acq, rel, cl)			\
+ __LL_SC_INLINE unsigned long						\
+ __LL_SC_PREFIX(__cmpxchg_case_##name(volatile void *ptr,		\
+ 				     unsigned long old,			\
+@@ -182,7 +196,7 @@ __LL_SC_PREFIX(__cmpxchg_case_##name(volatile void *ptr,		\
+ 									\
+ 	asm volatile(							\
+ 	"	prfm	pstl1strm, %[v]\n"				\
+-	"1:	ldxr" #sz "\t%" #w "[oldval], %[v]\n"			\
++	"1:	ld" #acq "xr" #sz "\t%" #w "[oldval], %[v]\n"		\
+ 	"	eor	%" #w "[tmp], %" #w "[oldval], %" #w "[old]\n"	\
+ 	"	cbnz	%" #w "[tmp], 2f\n"				\
+ 	"	st" #rel "xr" #sz "\t%w[tmp], %" #w "[new], %[v]\n"	\
+@@ -199,14 +213,22 @@ __LL_SC_PREFIX(__cmpxchg_case_##name(volatile void *ptr,		\
+ }									\
+ __LL_SC_EXPORT(__cmpxchg_case_##name);
+ 
+-__CMPXCHG_CASE(w, b,    1,        ,  ,         )
+-__CMPXCHG_CASE(w, h,    2,        ,  ,         )
+-__CMPXCHG_CASE(w,  ,    4,        ,  ,         )
+-__CMPXCHG_CASE( ,  ,    8,        ,  ,         )
+-__CMPXCHG_CASE(w, b, mb_1, dmb ish, l, "memory")
+-__CMPXCHG_CASE(w, h, mb_2, dmb ish, l, "memory")
+-__CMPXCHG_CASE(w,  , mb_4, dmb ish, l, "memory")
+-__CMPXCHG_CASE( ,  , mb_8, dmb ish, l, "memory")
++__CMPXCHG_CASE(w, b,     1,        ,  ,  ,         )
++__CMPXCHG_CASE(w, h,     2,        ,  ,  ,         )
++__CMPXCHG_CASE(w,  ,     4,        ,  ,  ,         )
++__CMPXCHG_CASE( ,  ,     8,        ,  ,  ,         )
++__CMPXCHG_CASE(w, b, acq_1,        , a,  , "memory")
++__CMPXCHG_CASE(w, h, acq_2,        , a,  , "memory")
++__CMPXCHG_CASE(w,  , acq_4,        , a,  , "memory")
++__CMPXCHG_CASE( ,  , acq_8,        , a,  , "memory")
++__CMPXCHG_CASE(w, b, rel_1,        ,  , l, "memory")
++__CMPXCHG_CASE(w, h, rel_2,        ,  , l, "memory")
++__CMPXCHG_CASE(w,  , rel_4,        ,  , l, "memory")
++__CMPXCHG_CASE( ,  , rel_8,        ,  , l, "memory")
++__CMPXCHG_CASE(w, b,  mb_1, dmb ish,  , l, "memory")
++__CMPXCHG_CASE(w, h,  mb_2, dmb ish,  , l, "memory")
++__CMPXCHG_CASE(w,  ,  mb_4, dmb ish,  , l, "memory")
++__CMPXCHG_CASE( ,  ,  mb_8, dmb ish,  , l, "memory")
+ 
+ #undef __CMPXCHG_CASE
+ 
+diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
+index 55d740e63459..1fce7908e690 100644
+--- a/arch/arm64/include/asm/atomic_lse.h
++++ b/arch/arm64/include/asm/atomic_lse.h
+@@ -75,24 +75,32 @@ static inline void atomic_add(int i, atomic_t *v)
+ 	: "x30");
+ }
+ 
+-static inline int atomic_add_return(int i, atomic_t *v)
+-{
+-	register int w0 asm ("w0") = i;
+-	register atomic_t *x1 asm ("x1") = v;
++#define ATOMIC_OP_ADD_RETURN(name, mb, cl...)				\
++static inline int atomic_add_return##name(int i, atomic_t *v)		\
++{									\
++	register int w0 asm ("w0") = i;					\
++	register atomic_t *x1 asm ("x1") = v;				\
++									\
++	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
++	/* LL/SC */							\
++	"	nop\n"							\
++	__LL_SC_ATOMIC(add_return##name),				\
++	/* LSE atomics */						\
++	"	ldadd" #mb "	%w[i], w30, %[v]\n"			\
++	"	add	%w[i], %w[i], w30")				\
++	: [i] "+r" (w0), [v] "+Q" (v->counter)				\
++	: "r" (x1)							\
++	: "x30" , ##cl);						\
++									\
++	return w0;							\
 +}
-+#endif
+ 
+-	asm volatile(ARM64_LSE_ATOMIC_INSN(
+-	/* LL/SC */
+-	"	nop\n"
+-	__LL_SC_ATOMIC(add_return),
+-	/* LSE atomics */
+-	"	ldaddal	%w[i], w30, %[v]\n"
+-	"	add	%w[i], %w[i], w30")
+-	: [i] "+r" (w0), [v] "+Q" (v->counter)
+-	: "r" (x1)
+-	: "x30", "memory");
++ATOMIC_OP_ADD_RETURN(_relaxed,   )
++ATOMIC_OP_ADD_RETURN(_acquire,  a, "memory")
++ATOMIC_OP_ADD_RETURN(_release,  l, "memory")
++ATOMIC_OP_ADD_RETURN(        , al, "memory")
+ 
+-	return w0;
+-}
++#undef ATOMIC_OP_ADD_RETURN
+ 
+ static inline void atomic_and(int i, atomic_t *v)
+ {
+@@ -128,27 +136,34 @@ static inline void atomic_sub(int i, atomic_t *v)
+ 	: "x30");
+ }
+ 
+-static inline int atomic_sub_return(int i, atomic_t *v)
+-{
+-	register int w0 asm ("w0") = i;
+-	register atomic_t *x1 asm ("x1") = v;
+-
+-	asm volatile(ARM64_LSE_ATOMIC_INSN(
+-	/* LL/SC */
+-	"	nop\n"
+-	__LL_SC_ATOMIC(sub_return)
+-	"	nop",
+-	/* LSE atomics */
+-	"	neg	%w[i], %w[i]\n"
+-	"	ldaddal	%w[i], w30, %[v]\n"
+-	"	add	%w[i], %w[i], w30")
+-	: [i] "+r" (w0), [v] "+Q" (v->counter)
+-	: "r" (x1)
+-	: "x30", "memory");
+-
+-	return w0;
++#define ATOMIC_OP_SUB_RETURN(name, mb, cl...)				\
++static inline int atomic_sub_return##name(int i, atomic_t *v)		\
++{									\
++	register int w0 asm ("w0") = i;					\
++	register atomic_t *x1 asm ("x1") = v;				\
++									\
++	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
++	/* LL/SC */							\
++	"	nop\n"							\
++	__LL_SC_ATOMIC(sub_return##name)				\
++	"	nop",							\
++	/* LSE atomics */						\
++	"	neg	%w[i], %w[i]\n"					\
++	"	ldadd" #mb "	%w[i], w30, %[v]\n"			\
++	"	add	%w[i], %w[i], w30")				\
++	: [i] "+r" (w0), [v] "+Q" (v->counter)				\
++	: "r" (x1)							\
++	: "x30" , ##cl);						\
++									\
++	return w0;							\
+ }
+ 
++ATOMIC_OP_SUB_RETURN(_relaxed,   )
++ATOMIC_OP_SUB_RETURN(_acquire,  a, "memory")
++ATOMIC_OP_SUB_RETURN(_release,  l, "memory")
++ATOMIC_OP_SUB_RETURN(        , al, "memory")
 +
-+#ifndef __HAVE_ARCH_STRNCMP
-+/**
-+ * strncmp - Compare two length-limited strings
-+ * @cs: One string
-+ * @ct: Another string
-+ * @count: The maximum number of bytes to compare
-+ */
-+int strncmp(const char *cs, const char *ct, size_t count)
-+{
-+	unsigned char c1, c2;
-+
-+	while (count) {
-+		c1 = *cs++;
-+		c2 = *ct++;
-+		if (c1 != c2)
-+			return c1 < c2 ? -1 : 1;
-+		if (!c1)
-+			break;
-+		count--;
-+	}
-+	return 0;
++#undef ATOMIC_OP_SUB_RETURN
+ #undef __LL_SC_ATOMIC
+ 
+ #define __LL_SC_ATOMIC64(op)	__LL_SC_CALL(atomic64_##op)
+@@ -201,24 +216,32 @@ static inline void atomic64_add(long i, atomic64_t *v)
+ 	: "x30");
+ }
+ 
+-static inline long atomic64_add_return(long i, atomic64_t *v)
+-{
+-	register long x0 asm ("x0") = i;
+-	register atomic64_t *x1 asm ("x1") = v;
++#define ATOMIC64_OP_ADD_RETURN(name, mb, cl...)				\
++static inline long atomic64_add_return##name(long i, atomic64_t *v)	\
++{									\
++	register long x0 asm ("x0") = i;				\
++	register atomic64_t *x1 asm ("x1") = v;				\
++									\
++	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
++	/* LL/SC */							\
++	"	nop\n"							\
++	__LL_SC_ATOMIC64(add_return##name),				\
++	/* LSE atomics */						\
++	"	ldadd" #mb "	%[i], x30, %[v]\n"			\
++	"	add	%[i], %[i], x30")				\
++	: [i] "+r" (x0), [v] "+Q" (v->counter)				\
++	: "r" (x1)							\
++	: "x30" , ##cl);						\
++									\
++	return x0;							\
 +}
-+#endif
+ 
+-	asm volatile(ARM64_LSE_ATOMIC_INSN(
+-	/* LL/SC */
+-	"	nop\n"
+-	__LL_SC_ATOMIC64(add_return),
+-	/* LSE atomics */
+-	"	ldaddal	%[i], x30, %[v]\n"
+-	"	add	%[i], %[i], x30")
+-	: [i] "+r" (x0), [v] "+Q" (v->counter)
+-	: "r" (x1)
+-	: "x30", "memory");
++ATOMIC64_OP_ADD_RETURN(_relaxed,   )
++ATOMIC64_OP_ADD_RETURN(_acquire,  a, "memory")
++ATOMIC64_OP_ADD_RETURN(_release,  l, "memory")
++ATOMIC64_OP_ADD_RETURN(        , al, "memory")
+ 
+-	return x0;
+-}
++#undef ATOMIC64_OP_ADD_RETURN
+ 
+ static inline void atomic64_and(long i, atomic64_t *v)
+ {
+@@ -254,26 +277,34 @@ static inline void atomic64_sub(long i, atomic64_t *v)
+ 	: "x30");
+ }
+ 
+-static inline long atomic64_sub_return(long i, atomic64_t *v)
+-{
+-	register long x0 asm ("x0") = i;
+-	register atomic64_t *x1 asm ("x1") = v;
++#define ATOMIC64_OP_SUB_RETURN(name, mb, cl...)				\
++static inline long atomic64_sub_return##name(long i, atomic64_t *v)	\
++{									\
++	register long x0 asm ("x0") = i;				\
++	register atomic64_t *x1 asm ("x1") = v;				\
++									\
++	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
++	/* LL/SC */							\
++	"	nop\n"							\
++	__LL_SC_ATOMIC64(sub_return##name)				\
++	"	nop",							\
++	/* LSE atomics */						\
++	"	neg	%[i], %[i]\n"					\
++	"	ldadd" #mb "	%[i], x30, %[v]\n"			\
++	"	add	%[i], %[i], x30")				\
++	: [i] "+r" (x0), [v] "+Q" (v->counter)				\
++	: "r" (x1)							\
++	: "x30" , ##cl);						\
++									\
++	return x0;							\
++}
+ 
+-	asm volatile(ARM64_LSE_ATOMIC_INSN(
+-	/* LL/SC */
+-	"	nop\n"
+-	__LL_SC_ATOMIC64(sub_return)
+-	"	nop",
+-	/* LSE atomics */
+-	"	neg	%[i], %[i]\n"
+-	"	ldaddal	%[i], x30, %[v]\n"
+-	"	add	%[i], %[i], x30")
+-	: [i] "+r" (x0), [v] "+Q" (v->counter)
+-	: "r" (x1)
+-	: "x30", "memory");
++ATOMIC64_OP_SUB_RETURN(_relaxed,   )
++ATOMIC64_OP_SUB_RETURN(_acquire,  a, "memory")
++ATOMIC64_OP_SUB_RETURN(_release,  l, "memory")
++ATOMIC64_OP_SUB_RETURN(        , al, "memory")
+ 
+-	return x0;
+-}
++#undef ATOMIC64_OP_SUB_RETURN
+ 
+ static inline long atomic64_dec_if_positive(atomic64_t *v)
+ {
+@@ -333,14 +364,22 @@ static inline unsigned long __cmpxchg_case_##name(volatile void *ptr,	\
+ 	return x0;							\
+ }
+ 
+-__CMPXCHG_CASE(w, b,    1,   )
+-__CMPXCHG_CASE(w, h,    2,   )
+-__CMPXCHG_CASE(w,  ,    4,   )
+-__CMPXCHG_CASE(x,  ,    8,   )
+-__CMPXCHG_CASE(w, b, mb_1, al, "memory")
+-__CMPXCHG_CASE(w, h, mb_2, al, "memory")
+-__CMPXCHG_CASE(w,  , mb_4, al, "memory")
+-__CMPXCHG_CASE(x,  , mb_8, al, "memory")
++__CMPXCHG_CASE(w, b,     1,   )
++__CMPXCHG_CASE(w, h,     2,   )
++__CMPXCHG_CASE(w,  ,     4,   )
++__CMPXCHG_CASE(x,  ,     8,   )
++__CMPXCHG_CASE(w, b, acq_1,  a, "memory")
++__CMPXCHG_CASE(w, h, acq_2,  a, "memory")
++__CMPXCHG_CASE(w,  , acq_4,  a, "memory")
++__CMPXCHG_CASE(x,  , acq_8,  a, "memory")
++__CMPXCHG_CASE(w, b, rel_1,  l, "memory")
++__CMPXCHG_CASE(w, h, rel_2,  l, "memory")
++__CMPXCHG_CASE(w,  , rel_4,  l, "memory")
++__CMPXCHG_CASE(x,  , rel_8,  l, "memory")
++__CMPXCHG_CASE(w, b,  mb_1, al, "memory")
++__CMPXCHG_CASE(w, h,  mb_2, al, "memory")
++__CMPXCHG_CASE(w,  ,  mb_4, al, "memory")
++__CMPXCHG_CASE(x,  ,  mb_8, al, "memory")
+ 
+ #undef __LL_SC_CMPXCHG
+ #undef __CMPXCHG_CASE
+diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+index 899e9f1d19e4..9ea611ea69df 100644
+--- a/arch/arm64/include/asm/cmpxchg.h
++++ b/arch/arm64/include/asm/cmpxchg.h
+@@ -25,154 +25,151 @@
+ #include <asm/barrier.h>
+ #include <asm/lse.h>
+ 
+-static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
+-{
+-	unsigned long ret, tmp;
+-
+-	switch (size) {
+-	case 1:
+-		asm volatile(ARM64_LSE_ATOMIC_INSN(
+-		/* LL/SC */
+-		"	prfm	pstl1strm, %2\n"
+-		"1:	ldxrb	%w0, %2\n"
+-		"	stlxrb	%w1, %w3, %2\n"
+-		"	cbnz	%w1, 1b\n"
+-		"	dmb	ish",
+-		/* LSE atomics */
+-		"	nop\n"
+-		"	nop\n"
+-		"	swpalb	%w3, %w0, %2\n"
+-		"	nop\n"
+-		"	nop")
+-			: "=&r" (ret), "=&r" (tmp), "+Q" (*(u8 *)ptr)
+-			: "r" (x)
+-			: "memory");
+-		break;
+-	case 2:
+-		asm volatile(ARM64_LSE_ATOMIC_INSN(
+-		/* LL/SC */
+-		"	prfm	pstl1strm, %2\n"
+-		"1:	ldxrh	%w0, %2\n"
+-		"	stlxrh	%w1, %w3, %2\n"
+-		"	cbnz	%w1, 1b\n"
+-		"	dmb	ish",
+-		/* LSE atomics */
+-		"	nop\n"
+-		"	nop\n"
+-		"	swpalh	%w3, %w0, %2\n"
+-		"	nop\n"
+-		"	nop")
+-			: "=&r" (ret), "=&r" (tmp), "+Q" (*(u16 *)ptr)
+-			: "r" (x)
+-			: "memory");
+-		break;
+-	case 4:
+-		asm volatile(ARM64_LSE_ATOMIC_INSN(
+-		/* LL/SC */
+-		"	prfm	pstl1strm, %2\n"
+-		"1:	ldxr	%w0, %2\n"
+-		"	stlxr	%w1, %w3, %2\n"
+-		"	cbnz	%w1, 1b\n"
+-		"	dmb	ish",
+-		/* LSE atomics */
+-		"	nop\n"
+-		"	nop\n"
+-		"	swpal	%w3, %w0, %2\n"
+-		"	nop\n"
+-		"	nop")
+-			: "=&r" (ret), "=&r" (tmp), "+Q" (*(u32 *)ptr)
+-			: "r" (x)
+-			: "memory");
+-		break;
+-	case 8:
+-		asm volatile(ARM64_LSE_ATOMIC_INSN(
+-		/* LL/SC */
+-		"	prfm	pstl1strm, %2\n"
+-		"1:	ldxr	%0, %2\n"
+-		"	stlxr	%w1, %3, %2\n"
+-		"	cbnz	%w1, 1b\n"
+-		"	dmb	ish",
+-		/* LSE atomics */
+-		"	nop\n"
+-		"	nop\n"
+-		"	swpal	%3, %0, %2\n"
+-		"	nop\n"
+-		"	nop")
+-			: "=&r" (ret), "=&r" (tmp), "+Q" (*(u64 *)ptr)
+-			: "r" (x)
+-			: "memory");
+-		break;
+-	default:
+-		BUILD_BUG();
+-	}
+-
+-	return ret;
++/*
++ * We need separate acquire parameters for ll/sc and lse, since the full
++ * barrier case is generated as release+dmb for the former and
++ * acquire+release for the latter.
++ */
++#define __XCHG_CASE(w, sz, name, mb, nop_lse, acq, acq_lse, rel, cl)	\
++static inline unsigned long __xchg_case_##name(unsigned long x,		\
++					       volatile void *ptr)	\
++{									\
++	unsigned long ret, tmp;						\
++									\
++	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
++	/* LL/SC */							\
++	"	prfm	pstl1strm, %2\n"				\
++	"1:	ld" #acq "xr" #sz "\t%" #w "0, %2\n"			\
++	"	st" #rel "xr" #sz "\t%w1, %" #w "3, %2\n"		\
++	"	cbnz	%w1, 1b\n"					\
++	"	" #mb,							\
++	/* LSE atomics */						\
++	"	nop\n"							\
++	"	nop\n"							\
++	"	swp" #acq_lse #rel #sz "\t%" #w "3, %" #w "0, %2\n"	\
++	"	nop\n"							\
++	"	" #nop_lse)						\
++	: "=&r" (ret), "=&r" (tmp), "+Q" (*(u8 *)ptr)			\
++	: "r" (x)							\
++	: cl);								\
++									\
++	return ret;							\
+ }
+ 
+-#define xchg(ptr,x) \
+-({ \
+-	__typeof__(*(ptr)) __ret; \
+-	__ret = (__typeof__(*(ptr))) \
+-		__xchg((unsigned long)(x), (ptr), sizeof(*(ptr))); \
+-	__ret; \
++__XCHG_CASE(w, b,     1,        ,    ,  ,  ,  ,         )
++__XCHG_CASE(w, h,     2,        ,    ,  ,  ,  ,         )
++__XCHG_CASE(w,  ,     4,        ,    ,  ,  ,  ,         )
++__XCHG_CASE( ,  ,     8,        ,    ,  ,  ,  ,         )
++__XCHG_CASE(w, b, acq_1,        ,    , a, a,  , "memory")
++__XCHG_CASE(w, h, acq_2,        ,    , a, a,  , "memory")
++__XCHG_CASE(w,  , acq_4,        ,    , a, a,  , "memory")
++__XCHG_CASE( ,  , acq_8,        ,    , a, a,  , "memory")
++__XCHG_CASE(w, b, rel_1,        ,    ,  ,  , l, "memory")
++__XCHG_CASE(w, h, rel_2,        ,    ,  ,  , l, "memory")
++__XCHG_CASE(w,  , rel_4,        ,    ,  ,  , l, "memory")
++__XCHG_CASE( ,  , rel_8,        ,    ,  ,  , l, "memory")
++__XCHG_CASE(w, b,  mb_1, dmb ish, nop,  , a, l, "memory")
++__XCHG_CASE(w, h,  mb_2, dmb ish, nop,  , a, l, "memory")
++__XCHG_CASE(w,  ,  mb_4, dmb ish, nop,  , a, l, "memory")
++__XCHG_CASE( ,  ,  mb_8, dmb ish, nop,  , a, l, "memory")
++
++#undef __XCHG_CASE
++
++#define __XCHG_GEN(sfx)							\
++static inline unsigned long __xchg##sfx(unsigned long x,		\
++					volatile void *ptr,		\
++					int size)			\
++{									\
++	switch (size) {							\
++	case 1:								\
++		return __xchg_case##sfx##_1(x, ptr);			\
++	case 2:								\
++		return __xchg_case##sfx##_2(x, ptr);			\
++	case 4:								\
++		return __xchg_case##sfx##_4(x, ptr);			\
++	case 8:								\
++		return __xchg_case##sfx##_8(x, ptr);			\
++	default:							\
++		BUILD_BUG();						\
++	}								\
++									\
++	unreachable();							\
++}
++
++__XCHG_GEN()
++__XCHG_GEN(_acq)
++__XCHG_GEN(_rel)
++__XCHG_GEN(_mb)
++
++#undef __XCHG_GEN
++
++#define __xchg_wrapper(sfx, ptr, x)					\
++({									\
++	__typeof__(*(ptr)) __ret;					\
++	__ret = (__typeof__(*(ptr)))					\
++		__xchg##sfx((unsigned long)(x), (ptr), sizeof(*(ptr))); \
++	__ret;								\
+ })
+ 
+-static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
+-				      unsigned long new, int size)
+-{
+-	switch (size) {
+-	case 1:
+-		return __cmpxchg_case_1(ptr, (u8)old, new);
+-	case 2:
+-		return __cmpxchg_case_2(ptr, (u16)old, new);
+-	case 4:
+-		return __cmpxchg_case_4(ptr, old, new);
+-	case 8:
+-		return __cmpxchg_case_8(ptr, old, new);
+-	default:
+-		BUILD_BUG();
+-	}
+-
+-	unreachable();
++/* xchg */
++#define xchg_relaxed(...)	__xchg_wrapper(    , __VA_ARGS__)
++#define xchg_acquire(...)	__xchg_wrapper(_acq, __VA_ARGS__)
++#define xchg_release(...)	__xchg_wrapper(_rel, __VA_ARGS__)
++#define xchg(...)		__xchg_wrapper( _mb, __VA_ARGS__)
++
++#define __CMPXCHG_GEN(sfx)						\
++static inline unsigned long __cmpxchg##sfx(volatile void *ptr,		\
++					   unsigned long old,		\
++					   unsigned long new,		\
++					   int size)			\
++{									\
++	switch (size) {							\
++	case 1:								\
++		return __cmpxchg_case##sfx##_1(ptr, (u8)old, new);	\
++	case 2:								\
++		return __cmpxchg_case##sfx##_2(ptr, (u16)old, new);	\
++	case 4:								\
++		return __cmpxchg_case##sfx##_4(ptr, old, new);		\
++	case 8:								\
++		return __cmpxchg_case##sfx##_8(ptr, old, new);		\
++	default:							\
++		BUILD_BUG();						\
++	}								\
++									\
++	unreachable();							\
+ }
+ 
+-static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+-					 unsigned long new, int size)
+-{
+-	switch (size) {
+-	case 1:
+-		return __cmpxchg_case_mb_1(ptr, (u8)old, new);
+-	case 2:
+-		return __cmpxchg_case_mb_2(ptr, (u16)old, new);
+-	case 4:
+-		return __cmpxchg_case_mb_4(ptr, old, new);
+-	case 8:
+-		return __cmpxchg_case_mb_8(ptr, old, new);
+-	default:
+-		BUILD_BUG();
+-	}
+-
+-	unreachable();
+-}
++__CMPXCHG_GEN()
++__CMPXCHG_GEN(_acq)
++__CMPXCHG_GEN(_rel)
++__CMPXCHG_GEN(_mb)
+ 
+-#define cmpxchg(ptr, o, n) \
+-({ \
+-	__typeof__(*(ptr)) __ret; \
+-	__ret = (__typeof__(*(ptr))) \
+-		__cmpxchg_mb((ptr), (unsigned long)(o), (unsigned long)(n), \
+-			     sizeof(*(ptr))); \
+-	__ret; \
+-})
++#undef __CMPXCHG_GEN
+ 
+-#define cmpxchg_local(ptr, o, n) \
+-({ \
+-	__typeof__(*(ptr)) __ret; \
+-	__ret = (__typeof__(*(ptr))) \
+-		__cmpxchg((ptr), (unsigned long)(o), \
+-			  (unsigned long)(n), sizeof(*(ptr))); \
+-	__ret; \
++#define __cmpxchg_wrapper(sfx, ptr, o, n)				\
++({									\
++	__typeof__(*(ptr)) __ret;					\
++	__ret = (__typeof__(*(ptr)))					\
++		__cmpxchg##sfx((ptr), (unsigned long)(o),		\
++				(unsigned long)(n), sizeof(*(ptr)));	\
++	__ret;								\
+ })
+ 
++/* cmpxchg */
++#define cmpxchg_relaxed(...)	__cmpxchg_wrapper(    , __VA_ARGS__)
++#define cmpxchg_acquire(...)	__cmpxchg_wrapper(_acq, __VA_ARGS__)
++#define cmpxchg_release(...)	__cmpxchg_wrapper(_rel, __VA_ARGS__)
++#define cmpxchg(...)		__cmpxchg_wrapper( _mb, __VA_ARGS__)
++#define cmpxchg_local		cmpxchg_relaxed
++
++/* cmpxchg64 */
++#define cmpxchg64_relaxed	cmpxchg_relaxed
++#define cmpxchg64_acquire	cmpxchg_acquire
++#define cmpxchg64_release	cmpxchg_release
++#define cmpxchg64		cmpxchg
++#define cmpxchg64_local		cmpxchg_local
++
++/* cmpxchg_double */
+ #define system_has_cmpxchg_double()     1
+ 
+ #define __cmpxchg_double_check(ptr1, ptr2)					\
+@@ -202,6 +199,7 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ 	__ret; \
+ })
+ 
++/* this_cpu_cmpxchg */
+ #define _protect_cmpxchg_local(pcp, o, n)			\
+ ({								\
+ 	typeof(*raw_cpu_ptr(&(pcp))) __ret;			\
+@@ -227,9 +225,4 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ 	__ret;								\
+ })
+ 
+-#define cmpxchg64(ptr,o,n)		cmpxchg((ptr),(o),(n))
+-#define cmpxchg64_local(ptr,o,n)	cmpxchg_local((ptr),(o),(n))
+-
+-#define cmpxchg64_relaxed(ptr,o,n)	cmpxchg_local((ptr),(o),(n))
+-
+ #endif	/* __ASM_CMPXCHG_H */
 -- 
-1.9.1
+2.1.4
