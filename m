@@ -1,33 +1,46 @@
 From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Thu,  8 Oct 2015 23:34:29 +0200
-Subject: [PATCH 1/6] watchdog: at91sam9: use devm_request_irq instead of
- request_irq
+Date: Thu,  8 Oct 2015 23:34:34 +0200
+Subject: [PATCH 6/6] watchdog: sama5d4: try to set timeout from device tree
+ first
 In-Reply-To: <1444340074-15437-1-git-send-email-sylvain.rochet@finsecur.com>
 References: <1444340074-15437-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <1444340074-15437-2-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <1444340074-15437-7-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-free_irq was missing in the module remove function, fix it by using
-devm_request_irq instead of request_irq.
+watchdog_init_timeout function doesn't try to get the "timeout-sec" DT
+property if timeout_parm is not zero. This change makes this DT property
+working for the sama5d4 watchdog driver.
 
 Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
 ---
- drivers/watchdog/at91sam9_wdt.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/watchdog/sama5d4_wdt.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index 434353a..88f56b5 100644
---- a/drivers/watchdog/at91sam9_wdt.c
-+++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -209,7 +209,7 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
- 			 "min heartbeat and max heartbeat might be too close for the system to handle it correctly\n");
+diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+index a49634c..2e2049b 100644
+--- a/drivers/watchdog/sama5d4_wdt.c
++++ b/drivers/watchdog/sama5d4_wdt.c
+@@ -222,7 +222,10 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+ 		}
+ 	}
  
- 	if ((tmp & AT91_WDT_WDFIEN) && wdt->irq) {
--		err = request_irq(wdt->irq, wdt_interrupt,
-+		err = devm_request_irq(&pdev->dev, wdt->irq, wdt_interrupt,
- 				  IRQF_SHARED | IRQF_IRQPOLL |
- 				  IRQF_NO_SUSPEND,
- 				  pdev->name, wdt);
+-	ret = watchdog_init_timeout(wdd, wdt_timeout, &pdev->dev);
++	/* Try to set timeout from device tree first */
++	ret = watchdog_init_timeout(wdd, 0, &pdev->dev);
++	if (ret)
++		ret = watchdog_init_timeout(wdd, wdt_timeout, &pdev->dev);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "unable to set timeout value\n");
+ 		return ret;
+@@ -243,7 +246,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, wdt);
+ 
+ 	dev_info(&pdev->dev, "initialized (timeout = %d sec, nowayout = %d)\n",
+-		 wdt_timeout, nowayout);
++		 wdd->timeout, nowayout);
+ 
+ 	return 0;
+ }
 -- 
 2.5.1
