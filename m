@@ -1,274 +1,59 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu,  8 Oct 2015 00:17:58 -0700
-Subject: [PATCH] clk: qcom: Drop calls to qcom_cc_remove()
-In-Reply-To: <20151008070345.GF26883@codeaurora.org>
-Message-ID: <1444288678-24594-1-git-send-email-sboyd@codeaurora.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 8 Oct 2015 15:20:05 +0800
+Subject: [arm-platforms:irq/irq-domain-fwnode-v1 2/16]
+ arch/arm/mach-exynos/suspend.c:220:33: error: 'struct irq_domain' has no
+ member named 'of_node'
+Message-ID: <201510081502.1LnW7Bx3%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that qcom_cc_remove() is a nop, drop calls to
-qcom_cc_remove() and any empty driver remove functions.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/irq-domain-fwnode-v1
+head:   a4ae7ebbb7c498e690ff71e936ce45806f5177d8
+commit: f874e7d148bd22c2d111b97d40a1d2f15e287de7 [2/16] irqdomain: Convert irqdomain->of_node to fwnode
+config: arm-exynos_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout f874e7d148bd22c2d111b97d40a1d2f15e287de7
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Note: the arm-platforms/irq/irq-domain-fwnode-v1 HEAD a4ae7ebbb7c498e690ff71e936ce45806f5177d8 builds fine.
+      It only hurts bisectibility.
+
+All errors (new ones prefixed by >>):
+
+   arch/arm/mach-exynos/suspend.c: In function 'exynos_pmu_domain_alloc':
+>> arch/arm/mach-exynos/suspend.c:220:33: error: 'struct irq_domain' has no member named 'of_node'
+     parent_args.np = domain->parent->of_node;
+                                    ^
+
+vim +220 arch/arm/mach-exynos/suspend.c
+
+8b283c02 Marc Zyngier 2015-03-11  214  
+8b283c02 Marc Zyngier 2015-03-11  215  	for (i = 0; i < nr_irqs; i++)
+8b283c02 Marc Zyngier 2015-03-11  216  		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
+8b283c02 Marc Zyngier 2015-03-11  217  					      &exynos_pmu_chip, NULL);
+8b283c02 Marc Zyngier 2015-03-11  218  
+8b283c02 Marc Zyngier 2015-03-11  219  	parent_args = *args;
+8b283c02 Marc Zyngier 2015-03-11 @220  	parent_args.np = domain->parent->of_node;
+8b283c02 Marc Zyngier 2015-03-11  221  	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &parent_args);
+8b283c02 Marc Zyngier 2015-03-11  222  }
+8b283c02 Marc Zyngier 2015-03-11  223  
+
+:::::: The code at line 220 was first introduced by commit
+:::::: 8b283c025443e4c3a3323c92777f422fa504caa5 ARM: exynos4/5: convert pmu wakeup to stacked domains
+
+:::::: TO: Marc Zyngier <marc.zyngier@arm.com>
+:::::: CC: Jason Cooper <jason@lakedaemon.net>
+
 ---
-
-And here's the driver part. I left 8960_remove in place to make your patch
-easier to apply. Time to sleep.
-
- drivers/clk/qcom/common.c       | 5 -----
- drivers/clk/qcom/common.h       | 2 --
- drivers/clk/qcom/gcc-apq8084.c  | 7 -------
- drivers/clk/qcom/gcc-ipq806x.c  | 7 -------
- drivers/clk/qcom/gcc-msm8660.c  | 7 -------
- drivers/clk/qcom/gcc-msm8916.c  | 7 -------
- drivers/clk/qcom/gcc-msm8960.c  | 1 -
- drivers/clk/qcom/gcc-msm8974.c  | 7 -------
- drivers/clk/qcom/lcc-ipq806x.c  | 7 -------
- drivers/clk/qcom/lcc-msm8960.c  | 7 -------
- drivers/clk/qcom/mmcc-apq8084.c | 7 -------
- drivers/clk/qcom/mmcc-msm8960.c | 7 -------
- drivers/clk/qcom/mmcc-msm8974.c | 6 +-----
- 13 files changed, 1 insertion(+), 76 deletions(-)
-
-diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
-index 327d2e5d9f1c..8fa477293ae0 100644
---- a/drivers/clk/qcom/common.c
-+++ b/drivers/clk/qcom/common.c
-@@ -168,9 +168,4 @@ int qcom_cc_probe(struct platform_device *pdev, const struct qcom_cc_desc *desc)
- }
- EXPORT_SYMBOL_GPL(qcom_cc_probe);
- 
--void qcom_cc_remove(struct platform_device *pdev)
--{
--}
--EXPORT_SYMBOL_GPL(qcom_cc_remove);
--
- MODULE_LICENSE("GPL v2");
-diff --git a/drivers/clk/qcom/common.h b/drivers/clk/qcom/common.h
-index 2892b71fbd71..7c1fba3ebc03 100644
---- a/drivers/clk/qcom/common.h
-+++ b/drivers/clk/qcom/common.h
-@@ -45,6 +45,4 @@ extern int qcom_cc_really_probe(struct platform_device *pdev,
- extern int qcom_cc_probe(struct platform_device *pdev,
- 			 const struct qcom_cc_desc *desc);
- 
--extern void qcom_cc_remove(struct platform_device *pdev);
--
- #endif
-diff --git a/drivers/clk/qcom/gcc-apq8084.c b/drivers/clk/qcom/gcc-apq8084.c
-index b88c40115263..1567c3a79534 100644
---- a/drivers/clk/qcom/gcc-apq8084.c
-+++ b/drivers/clk/qcom/gcc-apq8084.c
-@@ -3623,15 +3623,8 @@ static int gcc_apq8084_probe(struct platform_device *pdev)
- 	return qcom_cc_probe(pdev, &gcc_apq8084_desc);
- }
- 
--static int gcc_apq8084_remove(struct platform_device *pdev)
--{
--	qcom_cc_remove(pdev);
--	return 0;
--}
--
- static struct platform_driver gcc_apq8084_driver = {
- 	.probe		= gcc_apq8084_probe,
--	.remove		= gcc_apq8084_remove,
- 	.driver		= {
- 		.name	= "gcc-apq8084",
- 		.of_match_table = gcc_apq8084_match_table,
-diff --git a/drivers/clk/qcom/gcc-ipq806x.c b/drivers/clk/qcom/gcc-ipq806x.c
-index 40e480220cd3..16fc64c082a5 100644
---- a/drivers/clk/qcom/gcc-ipq806x.c
-+++ b/drivers/clk/qcom/gcc-ipq806x.c
-@@ -3058,15 +3058,8 @@ static int gcc_ipq806x_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int gcc_ipq806x_remove(struct platform_device *pdev)
--{
--	qcom_cc_remove(pdev);
--	return 0;
--}
--
- static struct platform_driver gcc_ipq806x_driver = {
- 	.probe		= gcc_ipq806x_probe,
--	.remove		= gcc_ipq806x_remove,
- 	.driver		= {
- 		.name	= "gcc-ipq806x",
- 		.of_match_table = gcc_ipq806x_match_table,
-diff --git a/drivers/clk/qcom/gcc-msm8660.c b/drivers/clk/qcom/gcc-msm8660.c
-index b02826ed770a..f110bb5a1df3 100644
---- a/drivers/clk/qcom/gcc-msm8660.c
-+++ b/drivers/clk/qcom/gcc-msm8660.c
-@@ -2735,15 +2735,8 @@ static int gcc_msm8660_probe(struct platform_device *pdev)
- 	return qcom_cc_probe(pdev, &gcc_msm8660_desc);
- }
- 
--static int gcc_msm8660_remove(struct platform_device *pdev)
--{
--	qcom_cc_remove(pdev);
--	return 0;
--}
--
- static struct platform_driver gcc_msm8660_driver = {
- 	.probe		= gcc_msm8660_probe,
--	.remove		= gcc_msm8660_remove,
- 	.driver		= {
- 		.name	= "gcc-msm8660",
- 		.of_match_table = gcc_msm8660_match_table,
-diff --git a/drivers/clk/qcom/gcc-msm8916.c b/drivers/clk/qcom/gcc-msm8916.c
-index f7aff814368a..d0a0313d6bef 100644
---- a/drivers/clk/qcom/gcc-msm8916.c
-+++ b/drivers/clk/qcom/gcc-msm8916.c
-@@ -3372,15 +3372,8 @@ static int gcc_msm8916_probe(struct platform_device *pdev)
- 	return qcom_cc_probe(pdev, &gcc_msm8916_desc);
- }
- 
--static int gcc_msm8916_remove(struct platform_device *pdev)
--{
--	qcom_cc_remove(pdev);
--	return 0;
--}
--
- static struct platform_driver gcc_msm8916_driver = {
- 	.probe		= gcc_msm8916_probe,
--	.remove		= gcc_msm8916_remove,
- 	.driver		= {
- 		.name	= "gcc-msm8916",
- 		.of_match_table = gcc_msm8916_match_table,
-diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
-index aa294b1bad34..b52153903893 100644
---- a/drivers/clk/qcom/gcc-msm8960.c
-+++ b/drivers/clk/qcom/gcc-msm8960.c
-@@ -3525,7 +3525,6 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
- 
- static int gcc_msm8960_remove(struct platform_device *pdev)
- {
--	qcom_cc_remove(pdev);
- 	return 0;
- }
- 
-diff --git a/drivers/clk/qcom/gcc-msm8974.c b/drivers/clk/qcom/gcc-msm8974.c
-index ebad55c74917..28abb8f8f293 100644
---- a/drivers/clk/qcom/gcc-msm8974.c
-+++ b/drivers/clk/qcom/gcc-msm8974.c
-@@ -2744,15 +2744,8 @@ static int gcc_msm8974_probe(struct platform_device *pdev)
- 	return qcom_cc_probe(pdev, &gcc_msm8974_desc);
- }
- 
--static int gcc_msm8974_remove(struct platform_device *pdev)
--{
--	qcom_cc_remove(pdev);
--	return 0;
--}
--
- static struct platform_driver gcc_msm8974_driver = {
- 	.probe		= gcc_msm8974_probe,
--	.remove		= gcc_msm8974_remove,
- 	.driver		= {
- 		.name	= "gcc-msm8974",
- 		.of_match_table = gcc_msm8974_match_table,
-diff --git a/drivers/clk/qcom/lcc-ipq806x.c b/drivers/clk/qcom/lcc-ipq806x.c
-index 93ad42b14366..db3998e5e2d8 100644
---- a/drivers/clk/qcom/lcc-ipq806x.c
-+++ b/drivers/clk/qcom/lcc-ipq806x.c
-@@ -452,15 +452,8 @@ static int lcc_ipq806x_probe(struct platform_device *pdev)
- 	return qcom_cc_really_probe(pdev, &lcc_ipq806x_desc, regmap);
- }
- 
--static int lcc_ipq806x_remove(struct platform_device *pdev)
--{
--	qcom_cc_remove(pdev);
--	return 0;
--}
--
- static struct platform_driver lcc_ipq806x_driver = {
- 	.probe		= lcc_ipq806x_probe,
--	.remove		= lcc_ipq806x_remove,
- 	.driver		= {
- 		.name	= "lcc-ipq806x",
- 		.of_match_table = lcc_ipq806x_match_table,
-diff --git a/drivers/clk/qcom/lcc-msm8960.c b/drivers/clk/qcom/lcc-msm8960.c
-index ecb96c284675..4fcf9d1d233c 100644
---- a/drivers/clk/qcom/lcc-msm8960.c
-+++ b/drivers/clk/qcom/lcc-msm8960.c
-@@ -565,15 +565,8 @@ static int lcc_msm8960_probe(struct platform_device *pdev)
- 	return qcom_cc_really_probe(pdev, &lcc_msm8960_desc, regmap);
- }
- 
--static int lcc_msm8960_remove(struct platform_device *pdev)
--{
--	qcom_cc_remove(pdev);
--	return 0;
--}
--
- static struct platform_driver lcc_msm8960_driver = {
- 	.probe		= lcc_msm8960_probe,
--	.remove		= lcc_msm8960_remove,
- 	.driver		= {
- 		.name	= "lcc-msm8960",
- 		.of_match_table = lcc_msm8960_match_table,
-diff --git a/drivers/clk/qcom/mmcc-apq8084.c b/drivers/clk/qcom/mmcc-apq8084.c
-index aa3809d9cec5..30777f9f1a43 100644
---- a/drivers/clk/qcom/mmcc-apq8084.c
-+++ b/drivers/clk/qcom/mmcc-apq8084.c
-@@ -3402,15 +3402,8 @@ static int mmcc_apq8084_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int mmcc_apq8084_remove(struct platform_device *pdev)
--{
--	qcom_cc_remove(pdev);
--	return 0;
--}
--
- static struct platform_driver mmcc_apq8084_driver = {
- 	.probe		= mmcc_apq8084_probe,
--	.remove		= mmcc_apq8084_remove,
- 	.driver		= {
- 		.name	= "mmcc-apq8084",
- 		.of_match_table = mmcc_apq8084_match_table,
-diff --git a/drivers/clk/qcom/mmcc-msm8960.c b/drivers/clk/qcom/mmcc-msm8960.c
-index bad02aebf959..fa55e27dd905 100644
---- a/drivers/clk/qcom/mmcc-msm8960.c
-+++ b/drivers/clk/qcom/mmcc-msm8960.c
-@@ -2686,15 +2686,8 @@ static int mmcc_msm8960_probe(struct platform_device *pdev)
- 	return qcom_cc_really_probe(pdev, match->data, regmap);
- }
- 
--static int mmcc_msm8960_remove(struct platform_device *pdev)
--{
--	qcom_cc_remove(pdev);
--	return 0;
--}
--
- static struct platform_driver mmcc_msm8960_driver = {
- 	.probe		= mmcc_msm8960_probe,
--	.remove		= mmcc_msm8960_remove,
- 	.driver		= {
- 		.name	= "mmcc-msm8960",
- 		.of_match_table = mmcc_msm8960_match_table,
-diff --git a/drivers/clk/qcom/mmcc-msm8974.c b/drivers/clk/qcom/mmcc-msm8974.c
-index cf2a7c9c95e6..9d790bcadf25 100644
---- a/drivers/clk/qcom/mmcc-msm8974.c
-+++ b/drivers/clk/qcom/mmcc-msm8974.c
-@@ -2628,16 +2628,12 @@ static int mmcc_msm8974_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	ret = pm_genpd_add_subdomain(&oxili_gdsc.pd, &oxilicx_gdsc.pd);
--	if (ret)
--		qcom_cc_remove(pdev);
--	return ret;
-+	return pm_genpd_add_subdomain(&oxili_gdsc.pd, &oxilicx_gdsc.pd);
- }
- 
- static int mmcc_msm8974_remove(struct platform_device *pdev)
- {
- 	pm_genpd_remove_subdomain(&oxili_gdsc.pd, &oxilicx_gdsc.pd);
--	qcom_cc_remove(pdev);
- 	return 0;
- }
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 21345 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151008/5f25c8c0/attachment-0001.obj>
