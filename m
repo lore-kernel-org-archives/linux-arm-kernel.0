@@ -1,49 +1,79 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 8 Oct 2015 13:55:08 +0100
-Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
-In-Reply-To: <009901d101c7$3331b3b0$99951b10$@samsung.com>
-References: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
- <003a01d10199$58e96590$0abc30b0$@samsung.com> <20151008082302.GE14315@cbox>
- <005e01d101a9$31ee80f0$95cb82d0$@samsung.com> <20151008092858.GA16100@cbox>
- <561641F5.4060202@arm.com> <009501d101c4$dde8e2e0$99baa8a0$@samsung.com>
- <20151008123630.GC20936@cbox> <009901d101c7$3331b3b0$99951b10$@samsung.com>
-Message-ID: <CAFEAcA8RWqipM7LRXc-Se6xJ9FkbVm=2Mr=pe1pB_NnS2wfsvw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Oct 2015 14:00:26 +0100
+Subject: [PATCH v2 14/22] arm64: Cleanup HWCAP handling
+In-Reply-To: <20151008111709.GE32532@n2100.arm.linux.org.uk>
+References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+ <1444064531-25607-15-git-send-email-suzuki.poulose@arm.com>
+ <20151008111000.GG17192@e104818-lin.cambridge.arm.com>
+ <20151008111709.GE32532@n2100.arm.linux.org.uk>
+Message-ID: <20151008130026.GI17192@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 October 2015 at 13:45, Pavel Fedin <p.fedin@samsung.com> wrote:
+On Thu, Oct 08, 2015 at 12:17:09PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Oct 08, 2015 at 12:10:00PM +0100, Catalin Marinas wrote:
+> > On Mon, Oct 05, 2015 at 06:02:03PM +0100, Suzuki K. Poulose wrote:
+> > > +static bool cpus_have_hwcap(const struct arm64_cpu_capabilities *cap)
+> > > +{
+> > > +	switch(cap->hwcap_type) {
+> > > +	case CAP_HWCAP:
+> > > +		return !!(elf_hwcap & cap->hwcap);
+> > > +#ifdef CONFIG_COMPAT
+> > > +	case CAP_COMPAT_HWCAP:
+> > > +		return !!(compat_elf_hwcap & (u32)cap->hwcap);
+> > > +	case CAP_COMPAT_HWCAP2:
+> > > +		return !!(compat_elf_hwcap2 & (u32)cap->hwcap);
+> > > +#endif
+> > > +	default:
+> > > +		BUG();
+> > > +		return false;
+> > > +	}
+> > > +}
+> > 
+> > Apart from the multiple returns, you don't really need !! since the
+> > return type is bool already.
+> 
+> That's wrong.  a & b doesn't return 0 or 1, but the bitwise-and result.
 
->> Speaking of which, does the QEMU side of this patch set require first
->> adding the GICv3 emulation for the data structures or is there a
->> stand-alone migration patch set somewhere?
->
->  I rolled it out a week ago: https://www.mail-archive.com/qemu-devel at nongnu.org/msg325331.html. I
-> tried to get reviewed/accepted/whatever at least data structure part, but Peter replied that he
-> isn't interested before we have the kernel.
+a & b is indeed a bitwise operation and, in this particular case, its
+type is an unsigned long. However, because the return type of the
+function is a bool, the result of the bitwise operation (unsigned long)
+is converted to a bool.
 
-More specifically, I wanted us to agree on the kernel API for
-migration, because that significantly affects how the QEMU
-code looks.
+The above may be true only for gcc, I haven't checked other compilers,
+nor the standard (AFAIK, it appeared in C99).
 
-A quick look at your patch suggests you still have data
-structures like
+On AArch64, the compiler generates something like:
 
-+struct gicv3_irq_state {
-+    /* The enable bits are only banked for per-cpu interrupts.  */
-+    unsigned long *enabled;
-+    unsigned long *pending;
-+    unsigned long *active;
-+    unsigned long *level;
-+    unsigned long *group;
-+    bool edge_trigger; /* true: edge-triggered, false: level-triggered  */
-+    uint32_t mask_size; /* Size of bitfields in long's, for migration */
-+};
+	tst	x0, x1
+	cset	w0, ne
+	ret
 
-I think it's probably going to be better to have an array
-of redistributor structures (one per CPU), and then keep
-the state that in hardware is in each redistributor inside
-those sub-structures. Similarly for state that in hardware
-is inside the distributor, and inside each cpu interface.
+On AArch32, Thumb-2, I get:
 
-thanks
--- PMM
+	tst	r2, r3
+	ite	ne
+	movne	r0, #1
+	moveq	r0, #0
+	bx	lr
+
+So a bool type function always returns 0 or 1 and does the appropriate
+conversion.
+
+> http://yarchive.net/comp/linux/bool.html
+> 
+> especially hpa's response.
+
+This seems to be more about a union of int and bool rather than
+automatic type conversion. But I can see in the simple test that Linus
+did towards the end of the thread that x86 does something similar with
+converting a char to a bool:
+
+	testb	%al, %al
+	setne	%al
+	ret
+
+I stand by my original comment.
+
+-- 
+Catalin
