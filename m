@@ -1,62 +1,40 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 8 Oct 2015 09:37:39 +0100
-Subject: [linux-sunxi] Re: [PATCH 2/6] ARM: dts: sun7i: Enable USB DRC on
- Bananapi
-In-Reply-To: <20151001083242.GB7104@lukather>
-References: <1442928966-6418-1-git-send-email-hdegoede@redhat.com>
- <1442928966-6418-2-git-send-email-hdegoede@redhat.com>
- <20150929080453.GN7104@lukather> <560A4B3D.4040007@redhat.com>
- <20151001083242.GB7104@lukather>
-Message-ID: <56162B53.8020800@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Oct 2015 10:37:51 +0200
+Subject: [PATCHv3 1/2] ARM: exynos_defconfig: Enable rtl8152 ethernet
+ driver for Odroid-XU4
+In-Reply-To: <56161F53.50505@samsung.com>
+References: <1444276117-3657-1-git-send-email-linux.amoon@gmail.com>
+ <5077751.tKglqqEUaI@wuerfel> <56161F53.50505@samsung.com>
+Message-ID: <26439960.pU0jZ9hpjg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thursday 08 October 2015 16:46:27 Krzysztof Kozlowski wrote:
+> On 08.10.2015 16:41, Arnd Bergmann wrote:
+> > On Thursday 08 October 2015 03:48:36 Anand Moon wrote:
+> >> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> >> index 1ff2bfa..5d1937b 100644
+> >> --- a/arch/arm/configs/exynos_defconfig
+> >> +++ b/arch/arm/configs/exynos_defconfig
+> >> @@ -61,6 +61,7 @@ CONFIG_BLK_DEV_DM=y
+> >>  CONFIG_DM_CRYPT=m
+> >>  CONFIG_NETDEVICES=y
+> >>  CONFIG_SMSC911X=y
+> >> +CONFIG_USB_RTL8152=y
+> >>  CONFIG_USB_USBNET=y
+> >>  CONFIG_USB_NET_SMSC75XX=y
+> >>  CONFIG_USB_NET_SMSC95XX=y
+> > 
+> > Can we make that a loadable module for multi_v7_defconfig?
+> 
+> What about nfsroot boots? We were discussing this also here:
+> http://linux-arm-kernel.infradead.narkive.com/lG5g4hrB/patch-arm-multi-v7-defconfig-enable-usb3503
+> 
+> and actually I would be happy to see a confirmed policy about that.
+> Everything should be a module for multi_v7?
 
-On 10/01/2015 09:32 AM, Maxime Ripard wrote:
-> Hi,
->
-> On Tue, Sep 29, 2015 at 10:26:37AM +0200, Hans de Goede wrote:
->> Hi,
->>
->> On 29-09-15 10:04, Maxime Ripard wrote:
->>> On Tue, Sep 22, 2015 at 03:36:01PM +0200, Hans de Goede wrote:
->>>> Enable the otg/drc usb controller on the Bananapi.
->>>>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>
->>> Applied all the other patches but this one.
->>
->> Thanks, seems you did not push this to your git.kernel.org repo though ?
->
-> I think I did, but maybe not at the time you sent the mail.
->
->>> Since we dropped the patch adding the regulators support on the
->>> Bananapi until we figure out why the board crash, it doesn't compile
->>> anymore.
->>
->> How about me doing a v2 of the regulators patch which removes the
->>
->> &cpu0 {
->>          cpu-supply = <&reg_dcdc2>;
->> };
->>
->> So that we do not get cpu voltage scaling, then the regulator
->> changes should be a NOP, everything should just keep the u-boot
->> set voltages, and we can enable oth support.
->>
->> And then when we've figured out a safe way to enable cpu voltage
->> scaling we can do so with a follow up patch ?
->>
->> Is that a plan ? If so say yes and I'll do a v2 of these patches :)
->
-> Yep, it sounds like a good plan :)
+We try to make as much as possible modular here, and NFS root is a corner
+case: it's possible to do NFS root with an initramfs, but it's easier not
+to. Is it something you do a lot on this hardware?
 
-With the new v3 of the regulators patch with the corrected opp-s which
-was just send this should no longer be necessary, can you apply the
-original "ARM: dts: sun7i: Enable USB DRC on Bananapi" after applying
-v3 of the regulators patch please ?
-
-Regards,
-
-Hans
+	Arnd
