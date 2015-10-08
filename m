@@ -1,103 +1,44 @@
-From: wuht06@gmail.com (Hongtao Wu)
-Date: Thu, 8 Oct 2015 21:37:04 +0800
-Subject: [RFC PATCH v3 1/3] mmc: sprd: Add MMC host driver for Spreadtrum
- SoC
-In-Reply-To: <CAPDyKFo3xp3wU3XW3kMV7Xz7DFgkxts3CArthYY7-CyWk8cjXw@mail.gmail.com>
-References: <1439571353-30165-1-git-send-email-wuht06@gmail.com>
- <1439571353-30165-2-git-send-email-wuht06@gmail.com>
- <CAPDyKFp=XH+Vo_diRyhrMuB+v1rmTmxo3Lid3Wc-u1ohqNisKw@mail.gmail.com>
- <CAG_R4_VTXCV4NVMOwv-9F56-_pVsK0hU4go79ZhV3OFxwcF0mA@mail.gmail.com>
- <CAPDyKFo3xp3wU3XW3kMV7Xz7DFgkxts3CArthYY7-CyWk8cjXw@mail.gmail.com>
-Message-ID: <CAG_R4_X3kQj5xSA5KLyu75aqusPNXj0H4Xqx+m+5Sg5cZ15bBg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 8 Oct 2015 08:45:00 -0500
+Subject: [PATCH v2 1/4] of: documentation: Add vendor prefix for Tronfy
+In-Reply-To: <1444249865-6897-2-git-send-email-carlo@caione.org>
+References: <1444249865-6897-1-git-send-email-carlo@caione.org>
+ <1444249865-6897-2-git-send-email-carlo@caione.org>
+Message-ID: <CAL_JsqLKbfbJJuPe93M8nd4n7eHUQX=9KwGXQ+LOQYVHKKLMXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 6, 2015 at 5:18 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> +Russell
->
-> On 28 September 2015 at 09:18, Hongtao Wu <wuht06@gmail.com> wrote:
->>>>
->>
->> On Thu, Sep 10, 2015 at 9:28 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>
->>> On 14 August 2015 at 18:55, Hongtao Wu <wuht06@gmail.com> wrote:
->>> > the Spreadtrum MMC host driver is used to supply EMMC, SD, and
->>> > SDIO types of memory cards
->>>
->>> Perhaps some more information about the controller. Are there any
->>> specific features it support or doesn't support!?
->>
->> Thanks for kindly reply.
->> Yes, spreadtrum MMC host controllers have some specific features as follows:
->> (1) We don't have controls for sampling clock tuning and re-tuning, we take
->>       place of them with three registers as follows:
->>        (a) CLK_WR_DL(Offset 080h): Data write clock delay line.
->>        (b) CLK_RD_POS_DL(Offset 0x84h): Posedge data read clock delay line.
->>        (c) CLK_RD_NEG_DL(Offset 088h): Negedge data read clock delay line.
->>
->> (2) We don't have Power Control Register(Offset 029h), all our controller's
->> power
->>       come from PMIC, rather than directly from CPU.
->>
->> (3) We don't have bit[6](Card Insertion), bit[7] (Card Removal), bit[8]
->> (Card Interrupt)
->> and bit[12:9] in Normal Interrupt Status Register(Offset 030h). Because the
->> detect
->> gpio pin doesn't connect to the register of our host controller. So we can't
->> operate bit[18:16](Card Detect Pin Level, Card State stable and Card
->> Inserted)
->> in Present State Register(Offset 024h).
->
-> Thanks for clarifying!
->
-> You have some differences towards the "standard" sdhci variant, but
-> that doesn't mean you should go off and implement a new driver from
-> scratch, instead you should create a new sdhci variant and re-use code
-> from the generic sdhci driver.
->
-> The current problem with such approach, is that the sdhci driver isn't
-> designed as a library but instead a driver consisting of too many
-> quirks and callbacks. While you start to adopt your driver towards
-> sdhci, you will need to add yet another bunch of new quirks and
-> callbacks to suite your hw.
->
-> Now, as the number of callbacks and quirks continues to increase I
-> will sooner or later give up maintaining it, as each line of code will
-> depend on a quirk. So, we need to start turning sdhci into a library
-> *right now*! Russell King, has pointed out this several times as well,
-> but unfortunate I haven't yet seen anyone willing to help out in this
-> field.
->
-> I would of course be very happy if you would like to have a look at
-> that, but I realize it's a difficult task, So, unless you are happy
-> with taking on such a challenge, I suggest you go for an intermediate
-> step, which thus means convert your driver to a sdhci variant driver
-> and add the quirks/callbacks you need to suite your hw.
->
-> [...]
->
-> Kind regards
-> Uffe
++dt list
 
-Thanks for kindly suggestion!
-I think it's a good idea to turn sdhci into a library. But for me it's
-too difficult to
-take on such a challenge. However, I will try my best to support you to do
-it.
+On Wed, Oct 7, 2015 at 3:31 PM, Carlo Caione <carlo@caione.org> wrote:
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> Tronfy is an emerging brand in China specializing in Home Theater
+> solutions for the normal consumers.
+>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
 
-As you suggested, I will consider converting our eMMC host driver to a
-sdhci variant driver. However, our controller has some features, which
-differentiate it from standard sd host controller. For example, our controller
-doesn't have such functions as follows: tuning or re-tuning, Power Control
-Register, PIO or ADMA transfer mode, UHS-II and so on. So, if we use sdchi
-variant driver right now, I think it has a litter redundancy.
+Please use scripts/get_maintainers.pl in the future to send to the
+right people and lists.
 
-Now our sdio team are discussing improving  our eMMC host controller, we are
-making it more standardized. But you know, changing a IP block is a long
-process. Maybe it will take us about one or two years. So what do you think
-if we use ourself eMMC host driver right now, and convert it when our new host
-controller is ready.
+Acked-by: Rob Herring <robh@kernel.org>
 
-thanks.
-
-Hongtao.
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 82d2ac9..54c91ef 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -222,6 +222,7 @@ toradex     Toradex AG
+>  toshiba        Toshiba Corporation
+>  toumaz Toumaz
+>  tplink TP-LINK Technologies Co., Ltd.
+> +tronfy Tronfy
+>  truly  Truly Semiconductors Limited
+>  usi    Universal Scientific Industrial Co., Ltd.
+>  v3     V3 Semiconductor
+> --
+> 1.9.1
+>
