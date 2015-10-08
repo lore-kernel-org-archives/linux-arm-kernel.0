@@ -1,22 +1,44 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Thu, 8 Oct 2015 15:43:59 +0000
-Subject: [PATCH v2 3/9] dmaengine: st_fdma:  Add STMicroelectronics FDMA
- driver header file
-In-Reply-To: <1441980871-24475-4-git-send-email-peter.griffin@linaro.org>
-References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
- <1441980871-24475-4-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1444118413.3579.46.camel@intel.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Thu, 8 Oct 2015 08:44:15 -0700
+Subject: [PATCH v4 0/5] PCI: generic: Misc. bug fixes/enhancements
+In-Reply-To: <20151008152811.GD3885@localhost>
+References: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
+ <20151008152811.GD3885@localhost>
+Message-ID: <56168F4F.7030000@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-09-11 at 15:14 +0100, Peter Griffin wrote:
+On 10/08/2015 08:28 AM, Bjorn Helgaas wrote:
+> On Fri, Oct 02, 2015 at 11:43:58AM -0700, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+[...]
+>>
+>> David Daney (5):
+>>    PCI: Add pci_bus_fixup_irqs().
+>>    PCI: generic: Only fixup irqs for bus we are creating.
+>
+> I'm hoping we won't need the above if we can resurrect Matthew's
+> patches.
 
-> +#define FDMA_ID_OFST		0x00000
-> +#define FDMA_VER_OFST		0x00004
-> > +
-> +#define FDMA_EN_OFST		0x00008
+I will test some things with this today.
 
-Why cant these be BIT() to maintain consistency?
 
--- 
-~Vinod
+>
+>>    PCI: generic: Quit clobbering our pci_ops.
+>
+> Applied to pci/host-generic for v4.4 with Arnd's Reviewed-by and minor
+> changelog tweaks (as below).
+>
+>>    PCI: generic: Correct, and avoid overflow, in bus_max calculation.
+>
+> Seems not settled yet.
+>
+>>    PCI: generic: Pass proper starting bus number to pci_scan_root_bus().
+>
+> Also applied to pci/host-generic, thanks!
+>
+
+Many thanks for getting those two in,
+
+
+David Daney
