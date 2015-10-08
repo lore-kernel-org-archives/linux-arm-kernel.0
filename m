@@ -1,37 +1,26 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Thu,  8 Oct 2015 03:48:37 +0000
-Subject: [PATCHv3 2/2] ARM: multi_v7_defconfig: Enable rtl8152 ethernet driver
- for Odroid-XU4
-In-Reply-To: <1444276117-3657-1-git-send-email-linux.amoon@gmail.com>
-References: <1444276117-3657-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <1444276117-3657-2-git-send-email-linux.amoon@gmail.com>
+From: sugar.zhang@rock-chips.com (sugar)
+Date: Thu, 8 Oct 2015 11:59:44 +0800
+Subject: [alsa-devel] [PATCH 1/2] ASoC: rockchip: i2s: add 8 channels
+ capture and lrck-mode support
+In-Reply-To: <59C359E6-1944-4093-B008-1FB9CD695484@crome.org>
+References: <1442979683-9441-1-git-send-email-sugar.zhang@rock-chips.com>
+ <1442979683-9441-2-git-send-email-sugar.zhang@rock-chips.com>
+ <20150923162433.GQ30445@sirena.org.uk> <5608F74C.3000104@rock-chips.com>
+ <20150930184655.GX15635@sirena.org.uk> <5614D162.3020500@rock-chips.com>
+ <F2F204F7-F5A8-4152-BF1D-454EB3E35F34@crome.org>
+ <5615CB39.1060208@rock-chips.com>
+ <35DAC0DA-9141-4D6B-A065-4D0FE340E5D0@crome.org>
+ <5615D898.1090101@rock-chips.com>
+ <59C359E6-1944-4093-B008-1FB9CD695484@crome.org>
+Message-ID: <5615EA30.8000205@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Odroid XU4 has a RTL8153-CG gigabit Ethernet adapter, connected over
-USB 3.0.
+Only the new design support 8 channels capture now, the others support 2 
+channels capture. but all of them support 32bits/sample.
 
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
----
-Changes: Fixed the commit message thanks to Krzysztof Kozlowski
-         Added reviewed by Krzysztof Kozlowski
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 03deb7f..009d714 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -221,6 +221,7 @@ CONFIG_BROADCOM_PHY=y
- CONFIG_ICPLUS_PHY=y
- CONFIG_MICREL_PHY=y
- CONFIG_USB_PEGASUS=y
-+CONFIG_USB_RTL8152=y
- CONFIG_USB_USBNET=y
- CONFIG_USB_NET_SMSC75XX=y
- CONFIG_USB_NET_SMSC95XX=y
--- 
-2.1.4
+On 10/8/2015 11:19, Caleb Crome wrote:
+>   That will work!  Do all your cortex-a parts support that?
+>
+> Thanks, Caleb
+> Sent from my iPhone
