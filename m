@@ -1,68 +1,57 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 08 Oct 2015 12:10:35 +0300
-Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
-In-Reply-To: <20151008082302.GE14315@cbox>
-References: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
- <003a01d10199$58e96590$0abc30b0$@samsung.com> <20151008082302.GE14315@cbox>
-Message-ID: <005e01d101a9$31ee80f0$95cb82d0$@samsung.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 8 Oct 2015 10:18:43 +0100
+Subject: [PATCH v4 1/5] PCI: Add pci_bus_fixup_irqs().
+In-Reply-To: <1906663.FAJXtJhtPt@shredder>
+References: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
+ <56157BC8.3070406@caviumnetworks.com>
+ <20151007230847.GG27633@localhost> <1906663.FAJXtJhtPt@shredder>
+Message-ID: <20151008091843.GA31644@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+Hi Matthew,
 
-> >  One concern about this... Does it already have "We are Bosses, we Decided it, It's not
-> subject to
-> > change, We do not care" status?
+On Thu, Oct 08, 2015 at 03:07:34AM +0100, Matthew Minter wrote:
+> On Wednesday 07 October 2015 18:08:47 Bjorn Helgaas wrote:
+
+[...]
+
+> Yes, I had been working on this last year, and got a patchset that was tested 
+> on arm, x86 (and amd64), and slightly tested on powerpc. However I was not 
+> able to test other architectures as they were not available in the software 
+> lab I work in but should in theory work on all arches the kernel runs on.
 > 
-> That's a rather negative question.
+> I can say that that patchset is being used by several projects out of tree 
+> currently but unfortunately due to a shift in priorities in the lab I was 
+> working for I lost access to the resources to develop and test the patch 
+> easily.
+> 
+> I have done some additional work personally on it but so far have not got 
+> anything that I am happy to submit for inclusion in tree. (due to a number of 
+> issues in structure and  a complication relating to weak functions where 
+> multiple variations of the same arch exist.
+> 
+> You can see in thread that is linked above 
+> (http://lkml.kernel.org/r/1412222866-21068-1-git-send-email-matt at masarand.com)
+> some feedback on the issues that need to be solved.
+> 
+> I also expect that the patchset needs to be pulled forward to a newer kernel 
+> as I have been working in a frozen tree without rebasing to reduce test 
+> complexity.
+> 
+> I would be happy to put some time this weekend if possible into reviewing the 
+> state of this and seeing if I can at least put together a version running on a 
+> recent kernel. I can also go over the issues again which were proving 
+> problematic and see if any of them are easy to fix.
+> 
+> However I can only work on this in my own time for now and on my own boxes 
+> (which are all x86 and amd64) so the amount I can do will be limited. 
 
- Sorry, didn't want to offend anyone. I just wanted to tell that i know that you, as maintainers,
-have much more power than i do, and you can always say "it's political decision, we just want it and
-that's final", and if you choose to do this, i'm perfectly OK with that, just say it.
+I was not aware of your patchset but I am happy to see that code since it
+is definitely the right approach and I am willing to help you test it on
+arm with the HW I have (probably it will also help remove some code
+from arm64 too), let me know when you have a branch ready to test and
+if you need any help in rebasing the set.
 
-> The architecture defines how to address a specific CPU, and that's using
-> the MPIDR, not inventing our own scheme, so that's what we should do.
-
- But doesn't the same apply to GICv2 then? It just happened so that we had Aff0 == idx, therefore
-looks like nobody cared.
- My argument is to have GICv3 API as similar to GICv2 as possible, IMHO that would make it easier to
-maintain the code, and perhaps give some way to reusing it.
-
-> For example, I don't think you had the full 32-bits available to address
-> a CPU in your proposal, so if nothing else, that proposal had less
-> expressive power than what the architecture defines.
-
- My proposal was:
-
---- cut ---
-  KVM_DEV_ARM_VGIC_GRP_DIST_REGS
-  Attributes:
-    The attr field of kvm_device_attr encodes two values:
-    bits:     |  63  | 62 .. 52 | 51 ..  32  |  31   ....    0 |
-    values:   | size | reserved |  cpu idx   |      offset     |
-
-    All distributor regs can be accessed as (rw, 32-bit)
-    For GICv3 some regsisters are actually (rw, 64-bit) according to the
-    specification. In order to perform full 64-bit access 'size' bit should be
-    set to 1. KVM_DEV_ARM_VGIC_64BIT flag value is provided for this purpose.
---- cut ---
-
- Bit 63 was meant to specify access size (u64 or u32), and bits 62 - 52 were reserved just in order
-to match ARM64_SYS_REG() macro, which uses these bits for own purpose.
-
- But, since your proposal suggests that all GICv3 accesses are 64-bit wide, and we use own system
-register encoding (i don't see any serious problems with this), it is possible just to use bits
-63...32 for vCPU index. So, maximum number of CPUs would be the same 0xFFFFFFFF as in your proposal,
-and the API would be fully compatible with GICv2 one (well, except access size), and we would use
-the same definitions and the same approach to handle both. This would bring more consistency and
-less confusion to userspace developers who use the API.
-
- By the way, the rest of KVM API (KVM_IRQ_LINE, for example), also uses vCPU index.
-
- That's all my arguments for vCPU index instead of affinity value, and if you say "that doesn't
-count, we don't have to be compatible with GICv2", i'll accept this and proceed with the rewrite.
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Thanks,
+Lorenzo
