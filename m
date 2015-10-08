@@ -1,54 +1,75 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Thu, 8 Oct 2015 15:09:07 +0800
-Subject: [PATCH v2] mmc: core: Fix init_card in 52Mhz
-Message-ID: <1444288147-24013-1-git-send-email-chaotian.jing@mediatek.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Thu, 08 Oct 2015 12:43:14 +0530
+Subject: [PATCH v3 4/9] clk: qcom: create virtual child device for TSENS
+In-Reply-To: <20151008060557.GD26883@codeaurora.org>
+References: <1444280468-17159-1-git-send-email-rnayak@codeaurora.org>
+ <1444280468-17159-5-git-send-email-rnayak@codeaurora.org>
+ <20151008060557.GD26883@codeaurora.org>
+Message-ID: <5616178A.6000202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suppose that we got a data crc error, and it triggers the mmc_reset.
-mmc_reset will call mmc_send_status to see if HW reset was supported.
-before issue CMD13, it will do retune, and if EMMC was in HS400 mode,
-it will reduce frequency to 52Mhz firstly, then results in card init
-was doing at 52Mhz.
-The mmc_send_status was originally only done for mmc_test, so if retune
-needed, do not call mmc_send_status.
 
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-Suggested-by: Adrian Hunter <adrian.hunter@intel.com>
----
- drivers/mmc/card/mmc_test.c | 6 ++++++
- drivers/mmc/core/mmc.c      | 2 +-
- 2 files changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
-index b78cf5d..2f78bfb 100644
---- a/drivers/mmc/card/mmc_test.c
-+++ b/drivers/mmc/card/mmc_test.c
-@@ -2272,6 +2272,12 @@ static int mmc_test_hw_reset(struct mmc_test_card *test)
- 	if (!mmc_card_mmc(card) || !mmc_can_reset(card))
- 		return RESULT_UNSUP_CARD;
- 
-+	if (host->need_retune) {
-+		pr_info("%s: cannot test hw reset because retune needed\n",
-+			mmc_hostname(test->card->host));
-+		return RESULT_FAIL;
-+	}
-+
- 	err = mmc_hw_reset(host);
- 	if (!err)
- 		return RESULT_OK;
-diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-index e726903..647c96d 100644
---- a/drivers/mmc/core/mmc.c
-+++ b/drivers/mmc/core/mmc.c
-@@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
- 	host->ops->hw_reset(host);
- 
- 	/* If the reset has happened, then a status command will fail */
--	if (!mmc_send_status(card, &status)) {
-+	if (!host->need_retune && !mmc_send_status(card, &status)) {
- 		mmc_host_clk_release(host);
- 		return -ENOSYS;
- 	}
+On 10/08/2015 11:35 AM, Stephen Boyd wrote:
+> On 10/08, Rajendra Nayak wrote:
+>> @@ -3520,11 +3522,26 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
+>>  	if (IS_ERR(clk))
+>>  		return PTR_ERR(clk);
+>>  
+>> -	return qcom_cc_probe(pdev, match->data);
+>> +	ret = qcom_cc_probe(pdev, match->data);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	tsens = platform_device_register_data(&pdev->dev, "qcom-tsens", -1,
+>> +					      NULL, 0);
+>> +	if (IS_ERR(tsens)) {
+>> +		qcom_cc_remove(pdev);
+>> +		return PTR_ERR(tsens);
+>> +	}
+>> +	platform_set_drvdata(pdev, tsens);
+> 
+> We just blew away the pointer that qcom_cc_probe() stores.
+
+Oops, I seem to have completely overlooked that.
+
+> 
+>> +
+>> +	return 0;
+>>  }
+>>  
+>>  static int gcc_msm8960_remove(struct platform_device *pdev)
+>>  {
+>> +	struct platform_device *tsens = platform_get_drvdata(pdev);
+>> +
+>> +	platform_device_unregister(tsens);
+>>  	qcom_cc_remove(pdev);
+> 
+> So now we've leaked the reset controller.
+> 
+> I suppose the simplest solution is to get the drvdata pointer
+> after qcom_cc_probe(), allocate a container structure to hold
+> that as a void * plus the tsens device, i.e.
+> 
+> 	struct container {
+> 		void *data;
+> 		struct platform_device *tsens;
+> 	};
+> 	
+> and then set the drvdata to that. And finally undo all that and
+> restore the drvdata pointer on remove.
+> 
+> I've also been considering putting some devm stuff inside
+> qcom_cc_probe() itself so that in the normal case you don't even
+> need to call qcom_cc_remove(), it just gets done automatically.
+> That would open up the possibility for drivers to use the drvdata
+> member as they wish.
+
+I'll test with the patch you just sent.
+
+> 
+
 -- 
-1.8.1.1.dirty
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
