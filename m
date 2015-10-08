@@ -1,64 +1,84 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Thu,  8 Oct 2015 15:31:17 +0200
-Subject: [PATCH v4 6/8] ARM: dts: rockchip: Add SPDIF transceiver for RK3288
-In-Reply-To: <1444311079-2892-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1444311079-2892-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <1444311079-2892-7-git-send-email-sjoerd.simons@collabora.co.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 8 Oct 2015 15:35:44 +0200
+Subject: [PATCH v2] mmc: core: Fix init_card in 52Mhz
+In-Reply-To: <56166988.20900@intel.com>
+References: <1444288147-24013-1-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFqrjP3-y+ucm5ybwXefsDLOYcPF9XqMciwhRkjD5NXLBg@mail.gmail.com>
+ <56166988.20900@intel.com>
+Message-ID: <CAPDyKFoWWMXC-DECqhw=EXerid5toWKxr4uLq0WevPo8LrrDqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the SPDIF transceiver controller definition and pin setup for RK3288
-SoCs
+On 8 October 2015 at 15:03, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> On 08/10/15 13:59, Ulf Hansson wrote:
+>> On 8 October 2015 at 09:09, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+>>> Suppose that we got a data crc error, and it triggers the mmc_reset.
+>>> mmc_reset will call mmc_send_status to see if HW reset was supported.
+>>> before issue CMD13, it will do retune, and if EMMC was in HS400 mode,
+>>> it will reduce frequency to 52Mhz firstly, then results in card init
+>>> was doing at 52Mhz.
+>>> The mmc_send_status was originally only done for mmc_test, so if retune
+>>> needed, do not call mmc_send_status.
+>>>
+>>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+>>> Suggested-by: Adrian Hunter <adrian.hunter@intel.com>
+>>> ---
+>>>  drivers/mmc/card/mmc_test.c | 6 ++++++
+>>>  drivers/mmc/core/mmc.c      | 2 +-
+>>>  2 files changed, 7 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
+>>> index b78cf5d..2f78bfb 100644
+>>> --- a/drivers/mmc/card/mmc_test.c
+>>> +++ b/drivers/mmc/card/mmc_test.c
+>>> @@ -2272,6 +2272,12 @@ static int mmc_test_hw_reset(struct mmc_test_card *test)
+>>>         if (!mmc_card_mmc(card) || !mmc_can_reset(card))
+>>>                 return RESULT_UNSUP_CARD;
+>>>
+>>> +       if (host->need_retune) {
+>>> +               pr_info("%s: cannot test hw reset because retune needed\n",
+>>> +                       mmc_hostname(test->card->host));
+>>> +               return RESULT_FAIL;
+>>> +       }
+>>> +
+>>>         err = mmc_hw_reset(host);
+>>>         if (!err)
+>>>                 return RESULT_OK;
+>>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>>> index e726903..647c96d 100644
+>>> --- a/drivers/mmc/core/mmc.c
+>>> +++ b/drivers/mmc/core/mmc.c
+>>> @@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
+>>>         host->ops->hw_reset(host);
+>>>
+>>>         /* If the reset has happened, then a status command will fail */
+>>> -       if (!mmc_send_status(card, &status)) {
+>>> +       if (!host->need_retune && !mmc_send_status(card, &status)) {
+>>
+>> No, this seem like the wrong solution! The main purpose of mmc_reset()
+>> is to try to reset and re-initiate the card, to make it operational
+>> again.
+>>
+>> I can't find a good reason to why we want to do a mmc_send_status() at
+>> this point, as even if it succeeds it will only tell us that the card
+>> has not been "hw-reset". No matter what, we should still try to make
+>> it fully operational again and thus give mmc_init_card() a try.
+>>
+>>>From this reasoning, I suggest we remove the call to mmc_send_status()
+>> from this path, as that will also address your issue with CRC errors
+>> in combination with re-tune.
+>
+> Then you need to remove the hw_reset test from mmc_test.  Refer:
+>
+>         http://marc.info/?l=linux-mmc&m=144360165906544&w=2
+>
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
----
+I realize that the test becomes a bit different, but I don't think it's useless.
 
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+If we add a check for MMC_CAP_HW_RESET and verify that the
+host->ops->hw_reset exists, then we can assume that the "hw_reset"
+sequence has executed. And if mmc_init_card() fails, that would
+probably mean that the reset also failed, right?
 
- arch/arm/boot/dts/rk3288.dtsi | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 906e938..b905cf6 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -653,6 +653,23 @@
- 		status = "disabled";
- 	};
- 
-+	spdif: sound at ff88b0000 {
-+		compatible = "rockchip,rk3288-spdif", "rockchip,rk3066-spdif";
-+		reg = <0xff8b0000 0x10000>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		#sound-dai-cells = <0>;
-+		clock-names = "hclk", "mclk";
-+		clocks = <&cru HCLK_SPDIF8CH>, <&cru SCLK_SPDIF8CH>;
-+		dmas = <&dmac_bus_s 3>;
-+		dma-names = "tx";
-+		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&spdif_tx>;
-+		rockchip,grf = <&grf>;
-+		status = "disabled";
-+	};
-+
- 	i2s: i2s at ff890000 {
- 		compatible = "rockchip,rk3288-i2s", "rockchip,rk3066-i2s";
- 		reg = <0xff890000 0x10000>;
-@@ -1334,5 +1351,11 @@
- 						<4 3 3 &pcfg_pull_none>;
- 			};
- 		};
-+
-+		spdif {
-+			spdif_tx: spdif-tx {
-+				rockchip,pins = <RK_GPIO6 11 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
- 	};
- };
--- 
-2.6.1
+Kind regards
+Uffe
