@@ -1,56 +1,66 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 8 Oct 2015 11:26:31 -0500
-Subject: [PATCH 0/6] mvebu PCI fixes and cleanups
-In-Reply-To: <20150923171706.GL21084@n2100.arm.linux.org.uk>
-References: <20150923171706.GL21084@n2100.arm.linux.org.uk>
-Message-ID: <20151008162631.GE3885@localhost>
+From: benjamint@bsquare.com (Ben Tucker)
+Date: Thu,  8 Oct 2015 17:19:49 +0100
+Subject: [PATCH] ARM: OMAP2+: Fixed inverted OMAP_OFFOUT_EN
+Message-ID: <1444321189-9921-1-git-send-email-benjamint@bsquare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 06:17:07PM +0100, Russell King - ARM Linux wrote:
-> This small series contains a number of fixes and cleanups to the
-> mvebu PCI host code.
-> 
-> The first patch makes the PCIe host controller more conformant with the
-> requirements of the PCI specification, which requires where a device is
-> present, unused PCI configuration space returns zero.  This patch
-> ensures that is the case.
-> 
-> The second patch fixes the very broken idea that it's somehow legal to
-> read-modify-write the PCI configuration space using 32-bit accessors,
-> even when accessing a smaller register.  There are _multiple_ registers
-> in PCI space where bits are defined to be "RW1C" - which means "read,
-> write 1 to clear".  Registers include the PCI status register, and all
-> PCIe status registers.  Hardware which does not support generating 16-bit
-> and 8-bit configuration cycles is essentially broken and non-conformant.
-> Luckily, that is not true of Armada hardware.  This patch fixes it.
-> Tested on Armada 388.
-> 
-> These two patches should be considered as fixes.  I don't see a need for
-> them to be backported to stable kernels as there is no serious breakage
-> resulting from them with the driver in its current state.  The remainder
-> are cleanups.
-> 
-> Patch 3 gets rid of the open coded "of_get_available_child_count()"
-> implementation.
-> 
-> Patch 4 uses for_each_available_child_of_node(), rather than
-> for_each_child_of_node() and checking whether of_device_is_available()
-> returns true.  for_each_available_child_of_node() is meant for this.
-> 
-> Patch 5 makes the warning message for the lack of the "marvell,pcie-port"
-> property more useful, by printing the DT path of the offending node
-> rather than the wooly "PCIe DT node".
-> 
-> Lastly, patch 6 converts all the "PCIe%d.%d" and "pcie%d.%d" with the
-> port name string, which is a pre-prepared string of that format.  This
-> means we end up with a consistent name for the port being used everywhere
-> which is good for user experience.
-> 
->  drivers/pci/host/pci-mvebu.c | 87 ++++++++++++++++++++++++--------------------
->  1 file changed, 47 insertions(+), 40 deletions(-)
+The OFFOUTENABLE bit of the omap PADCONF registers is active low.
+The mux code assumed that it was active high and this patch fixes this
+problem.
 
-Applied to pci/host-mvebu for v4.4, with Tested-by Thomas and Andrew
-and Reviewed-by Thomas.  Thanks, Russell!
+Tested on an AM37x device.
 
-Bjorn
+Signed-off-by: Ben Tucker <benjamint@bsquare.com>
+---
+ arch/arm/mach-omap2/mux.c |  2 +-
+ arch/arm/mach-omap2/mux.h | 13 +++++++------
+ 2 files changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+index 176eef6..427a7f88 100644
+--- a/arch/arm/mach-omap2/mux.c
++++ b/arch/arm/mach-omap2/mux.c
+@@ -523,7 +523,7 @@ static inline void omap_mux_decode(struct seq_file *s, u16 val)
+ 
+ 	OMAP_MUX_TEST_FLAG(val, OMAP_PIN_OFF_WAKEUPENABLE);
+ 	if (val & OMAP_OFF_EN) {
+-		if (!(val & OMAP_OFFOUT_EN)) {
++		if (val & OMAP_OFFOUT_EN) {
+ 			if (!(val & OMAP_OFF_PULL_UP)) {
+ 				OMAP_MUX_TEST_FLAG(val,
+ 					OMAP_PIN_OFF_INPUT_PULLDOWN);
+diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
+index d121fb6..9a5fd76 100644
+--- a/arch/arm/mach-omap2/mux.h
++++ b/arch/arm/mach-omap2/mux.h
+@@ -29,7 +29,7 @@
+ /* omap3/4/5 specific mux bit defines */
+ #define OMAP_INPUT_EN			(1 << 8)
+ #define OMAP_OFF_EN			(1 << 9)
+-#define OMAP_OFFOUT_EN			(1 << 10)
++#define OMAP_OFFOUT_EN			(1 << 10) /* 1 for input, 0 for output */
+ #define OMAP_OFFOUT_VAL			(1 << 11)
+ #define OMAP_OFF_PULL_EN		(1 << 12)
+ #define OMAP_OFF_PULL_UP		(1 << 13)
+@@ -45,12 +45,13 @@
+ 
+ /* Off mode states */
+ #define OMAP_PIN_OFF_NONE		0
+-#define OMAP_PIN_OFF_OUTPUT_HIGH	(OMAP_OFF_EN | OMAP_OFFOUT_EN \
+-						| OMAP_OFFOUT_VAL)
+-#define OMAP_PIN_OFF_OUTPUT_LOW		(OMAP_OFF_EN | OMAP_OFFOUT_EN)
+-#define OMAP_PIN_OFF_INPUT_PULLUP	(OMAP_OFF_EN | OMAP_OFF_PULL_EN \
++#define OMAP_PIN_OFF_OUTPUT_HIGH	(OMAP_OFF_EN | OMAP_OFFOUT_VAL)
++#define OMAP_PIN_OFF_OUTPUT_LOW		(OMAP_OFF_EN)
++#define OMAP_PIN_OFF_INPUT_PULLUP	(OMAP_OFF_EN | OMAP_OFFOUT_EN \
++						| OMAP_OFF_PULL_EN \
+ 						| OMAP_OFF_PULL_UP)
+-#define OMAP_PIN_OFF_INPUT_PULLDOWN	(OMAP_OFF_EN | OMAP_OFF_PULL_EN)
++#define OMAP_PIN_OFF_INPUT_PULLDOWN	(OMAP_OFF_EN | OMAP_OFFOUT_EN \
++						| OMAP_OFF_PULL_EN)
+ #define OMAP_PIN_OFF_WAKEUPENABLE	OMAP_WAKEUP_EN
+ 
+ #define OMAP_MODE_GPIO(partition, x)	(((x) & OMAP_MUX_MODE7) == \
+-- 
+1.9.1
