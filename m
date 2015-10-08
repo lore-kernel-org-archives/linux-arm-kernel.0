@@ -1,214 +1,54 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 7 Oct 2015 17:55:32 -0700
-Subject: [PATCH v5] clk: bcm2835: Add support for programming the audio
- domain clocks.
-In-Reply-To: <1444181140-3570-1-git-send-email-eric@anholt.net>
-References: <1444181140-3570-1-git-send-email-eric@anholt.net>
-Message-ID: <20151008005532.GB26883@codeaurora.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 08 Oct 2015 10:00:23 +0900
+Subject: [PATCH 2/6] ARM: s3c24xx: rx1950: Use PWM lookup table
+In-Reply-To: <20151007153151.GB1975@ulmo>
+References: <1444049237-29878-1-git-send-email-thierry.reding@gmail.com>
+ <1444049237-29878-3-git-send-email-thierry.reding@gmail.com>
+ <561476FA.4090209@samsung.com> <20151007153151.GB1975@ulmo>
+Message-ID: <5615C027.8090406@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06, Eric Anholt wrote:
-> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-> index dd295e4..b4d4421 100644
-> --- a/drivers/clk/bcm/clk-bcm2835.c
-> +++ b/drivers/clk/bcm/clk-bcm2835.c
-> @@ -17,10 +17,273 @@
->  #include <linux/clk-provider.h>
->  #include <linux/clkdev.h>
->  #include <linux/clk/bcm2835.h>
-> +#include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <dt-bindings/clock/bcm2835.h>
+On 08.10.2015 00:31, Thierry Reding wrote:
+> On Wed, Oct 07, 2015 at 10:35:54AM +0900, Krzysztof Kozlowski wrote:
+>> On 05.10.2015 21:47, Thierry Reding wrote:
+>>> Use a PWM lookup table to provide the PWM to the pwm-backlight device.
+>>> The driver has a legacy code path that is required only because boards
+>>> still use the legacy method of requesting PWMs by global ID. Replacing
+>>> these usages allows that legacy fallback to be removed.
+>>>
+>>> Cc: Kukjin Kim <kgene@kernel.org>
+>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>> Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
+>>> ---
+>>>  arch/arm/mach-s3c24xx/mach-rx1950.c | 8 ++++++--
+>>>  1 file changed, 6 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
+>>> index 1d35ff375a01..774c982a7b7e 100644
+>>> --- a/arch/arm/mach-s3c24xx/mach-rx1950.c
+>>> +++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
+>>> @@ -375,6 +375,11 @@ static struct s3c2410fb_mach_info rx1950_lcd_cfg = {
+>>>  
+>>>  };
+>>>  
+>>> +static struct pwm_lookup rx1950_pwm_lookup[] = {
+>>> +	PWM_LOOKUP("samsung-pwm", 0, "pwm-backlight.0", NULL, 48000,
+>>
+>> Why the dev_id is "pwm-backlight.0"? Created platform device name is
+>> "pwm-backlight".
+> 
+> "pwm-backlight" is only the base name. The platform bus code will use
+> the platform_device.id field and append it to the name as .<id> unless
+> it is -1 in which case it will be skipped. So in the rx1950_backlight
+> device the .id field isn't initialized at all, so it will be zeroed
+> out and hence the device name will become "pwm-backlight.0".
 
-Please include slab.h for the kzalloc usage
+Right, I missed the difference in device id.
 
-> +
-> +
-> +static struct clk *bcm2835_register_pll(struct bcm2835_cprman *cprman,
-> +					const struct bcm2835_pll_data *data)
-> +{
-> +	struct bcm2835_pll *pll;
-> +	struct clk_init_data init;
-> +
-> +	memset(&init, 0, sizeof(init));
-> +
-> +	/* All of the PLLs derive from the external oscillator. */
-> +	init.parent_names = &cprman->osc_name;
-> +	init.num_parents = 1;
-> +	init.name = data->name;
-> +	init.ops = &bcm2835_pll_clk_ops;
-> +	init.flags = CLK_IGNORE_UNUSED;
-> +
-> +	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
-> +	if (!pll)
-> +		return NULL;
-> +
-> +	pll->cprman = cprman;
-> +	pll->data = data;
-> +	pll->hw.init = &init;
-> +
-> +	return clk_register(cprman->dev, &pll->hw);
+The patch is fine:
 
-devm_clk_register?
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-> +}
-> +
-> +static struct clk *
-> +bcm2835_register_pll_divider(struct bcm2835_cprman *cprman,
-> +			     const struct bcm2835_pll_divider_data *data)
-> +{
-> +	struct bcm2835_pll_divider *divider;
-> +	struct clk_init_data init;
-> +	struct clk *clk;
-> +	const char *divider_name;
-> +
-> +	if (data->fixed_divider != 1) {
-> +		divider_name = devm_kasprintf(cprman->dev, GFP_KERNEL,
-> +					      "%s_prediv", data->name);
-> +		if (!divider_name)
-> +			return NULL;
-> +	} else {
-> +		divider_name = data->name;
-> +	}
-> +
-> +	memset(&init, 0, sizeof(init));
-> +
-> +	init.parent_names = &data->source_pll->name;
-> +	init.num_parents = 1;
-> +	init.name = divider_name;
-> +	init.ops = &bcm2835_pll_divider_clk_ops;
-> +	init.flags = (CLK_SET_RATE_PARENT |
-> +		      CLK_IGNORE_UNUSED);
-
-Drop () and put on one line.
-
-> +
-> +	divider = kzalloc(sizeof(*divider), GFP_KERNEL);
-
-Use devm_kzalloc() to auto free on errors?
-
-> +	if (!divider)
-> +		return NULL;
-> +
-> +	divider->div.reg = cprman->regs + data->a2w_reg;
-> +	divider->div.shift = A2W_PLL_DIV_SHIFT;
-> +	divider->div.width = A2W_PLL_DIV_BITS;
-> +	divider->div.flags = 0;
-> +	divider->div.lock = &cprman->regs_lock;
-> +	divider->div.hw.init = &init;
-> +	divider->div.table = NULL;
-> +
-> +	divider->cprman = cprman;
-> +	divider->data = data;
-> +
-> +	clk = clk_register(cprman->dev, &divider->div.hw);
-
-devm_clk_register?
-
-> +	if (IS_ERR(clk))
-> +		return clk;
-> +
-> +	/*
-> +	 * PLLH's channels have a fixed divide by 10 afterwards, which
-> +	 * is what our consumers are actually using.
-> +	 */
-> +	if (data->fixed_divider != 1) {
-> +		return clk_register_fixed_factor(cprman->dev, data->name,
-> +						 divider_name,
-> +						 CLK_SET_RATE_PARENT,
-> +						 1,
-> +						 data->fixed_divider);
-> +	}
-> +
-> +	return clk;
-> +}
-> +
-> +static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
-> +					  const struct bcm2835_clock_data *data)
-> +{
-[..]
-> +
-> +	memset(&init, 0, sizeof(init));
-> +	init.parent_names = &parent;
-> +	init.num_parents = 1;
-> +	init.name = data->name;
-> +	init.flags = CLK_IGNORE_UNUSED;
-> +
-> +	if (data->is_vpu_clock) {
-> +		init.ops = &bcm2835_vpu_clock_clk_ops;
-> +	} else {
-> +		init.ops = &bcm2835_clock_clk_ops;
-> +		init.flags |= CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
-> +	}
-> +
-> +	clock = kzalloc(sizeof(*clock), GFP_KERNEL);
-
-devm_kzalloc()?
-
-> +	if (!clock)
-> +		return NULL;
-> +
-> +	clock->cprman = cprman;
-> +	clock->data = data;
-> +	clock->hw.init = &init;
-> +
-> +	return clk_register(cprman->dev, &clock->hw);
-
-devm_clk_register()?
-
-> +}
-> +
-> +static int bcm2835_clk_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct clk **clks;
-> +	struct bcm2835_cprman *cprman;
-> +
-> +	cprman = devm_kzalloc(dev, sizeof(*cprman), GFP_KERNEL);
-> +	if (!cprman)
-> +		return -ENOMEM;
-> +
-> +	spin_lock_init(&cprman->regs_lock);
-> +	cprman->dev = &pdev->dev;
-
-Just use dev?
-
-> +	cprman->regs = of_iomap(dev->of_node, 0);
-
-Please use platform driver APIs:
-
-	platform_get_resource()
-	devm_ioremap_resource()
-
-> +	if (!cprman->regs)
-> +		return -ENODEV;
-> +
-> +	cprman->osc_name = of_clk_get_parent_name(dev->of_node, 0);
-> +	if (!cprman->osc_name) {
-> +		iounmap(cprman->regs);
-> +		return -ENODEV;
-> +	}
-[...]
-> +
-> +	/*
-> +	 * CM_PERIICTL (and CM_PERIACTL, CM_SYSCTL and CM_VPUCTL if
-> +	 * you have the debug bit set in the power manager, which we
-> +	 * don't bother exposing) are individual gates off of the
-> +	 * non-stop vpu clock.
-> +	 */
-> +	clks[BCM2835_CLOCK_PERI_IMAGE] =
-> +		clk_register_gate(dev, "peri_image", "vpu",
-> +				  CLK_IGNORE_UNUSED | CLK_SET_RATE_GATE,
-> +				  cprman->regs + CM_PERIICTL, CM_GATE_BIT,
-> +				  0, &cprman->regs_lock);
-> +
-> +	return of_clk_add_provider(pdev->dev.of_node, of_clk_src_onecell_get,
-
-Just use dev?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Best regards,
+Krzysztof
