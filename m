@@ -1,37 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Oct 2015 20:50:35 +0200
-Subject: [GIT PULL 1/3] Keystone SOC driver updates for 4.4
-In-Reply-To: <561698EA.4030707@oracle.com>
-References: <1444151960-4941-1-git-send-email-ssantosh@kernel.org>
- <5870815.PiO7rCVXjJ@wuerfel> <561698EA.4030707@oracle.com>
-Message-ID: <27586837.4pMcRLWPs5@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 8 Oct 2015 13:54:05 -0500
+Subject: [PATCH v2 05/13] arm64: enable building of all dtbs
+In-Reply-To: <CAMuHMdVDdNOp5z_TjwBVUDqZuZ0NZNAu7cJ6stsZqqXOBsY_tw@mail.gmail.com>
+References: <1444326827-3565-1-git-send-email-robh@kernel.org>
+ <1444326827-3565-6-git-send-email-robh@kernel.org>
+ <CAMuHMdVDdNOp5z_TjwBVUDqZuZ0NZNAu7cJ6stsZqqXOBsY_tw@mail.gmail.com>
+Message-ID: <CAL_JsqLrRc==SPbs6a1irkGA0rFYdJfUg-wWV8yq7MjGtRC58g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 October 2015 09:25:14 santosh.shilimkar at oracle.com wrote:
-> On 10/8/15 8:41 AM, Arnd Bergmann wrote:
-> > On Tuesday 06 October 2015 10:19:18 Santosh Shilimkar wrote:
-> >> Couple of patches for ARM Keystone SOC drivers
-> >>          - irq affinity bug fix
-> >>          - display the firmware name
-> >>
-> >> ----------------------------------------------------------------
-> >> Murali Karicheri (2):
-> >>        soc: ti: reset irq affinity before freeing irq
-> >>        soc: ti: display firmware file name as part of boot log
-> >>
-> >>   .../bindings/soc/ti/keystone-navigator-qmss.txt      | 20 +++++++++++++++++++-
-> >>   drivers/soc/ti/knav_qmss_acc.c                       |  4 ++++
-> >>   drivers/soc/ti/knav_qmss_queue.c                     |  3 +++
-> >>   3 files changed, 26 insertions(+), 1 deletion(-)
-> >
-> > The new text you add to the binding document doesn't really seem to
-> > belong in there, so I'm not pulling this until we've discussed how
-> > this should be better handled.
-> >
-> OK. Can you please pick the affinity fix alone?
+On Thu, Oct 8, 2015 at 1:15 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Thu, Oct 8, 2015 at 7:53 PM, Rob Herring <robh@kernel.org> wrote:
+>> Enable building all dtb files when CONFIG_OF_ALL_DTBS is enabled. The dtbs
+>> are not really dependent on a platform being enabled or any other kernel
+>> config, so for testing coverage it is convenient to build all of the dtbs.
+>> This builds all dts files in the tree, not just targets listed. This
+>> is simpler for arm64 which has a bunch of sub-dirs.
+>
+> This doesn't look simpler than the arm(32) version?
 
-Sure. Actually this looks like it should go into 4.3, possibly stable.
-Can you confirm which kernels need it?
+I discussed this with Olof in the last version. In the ARM version, I
+could have done just one line "dtb-$(CONFIG_OF_ALL_DTBS) += $(dtb-)"
+to add all the disabled dtbs. On arm64, I would have to do that for
+each sub-dir Makefile as well as make sure any new sub-dirs have this
+line. In the end, I also prefer to build everything in the tree and
+not rely on the dtbs to be explicitly listed.
 
-	Arnd
+Rob
