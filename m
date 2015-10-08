@@ -1,43 +1,25 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 8 Oct 2015 12:11:44 +0100
-Subject: [PATCH v6 0/6] KASAN for arm64
-In-Reply-To: <CAPAsAGxR-yqtmFeo65Xw_0RQyEy=mN1uG=GKtqoMLr_x_N0u5w@mail.gmail.com>
-References: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
- <20151007100411.GG3069@e104818-lin.cambridge.arm.com>
- <CAPAsAGxR-yqtmFeo65Xw_0RQyEy=mN1uG=GKtqoMLr_x_N0u5w@mail.gmail.com>
-Message-ID: <20151008111144.GC7275@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 8 Oct 2015 12:12:48 +0100
+Subject: Run armv7 32 bit userspace on aarch64
+In-Reply-To: <5615A0E1.1050402@linaro.org>
+References: <5615A0E1.1050402@linaro.org>
+Message-ID: <20151008111248.GE16807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 01:36:09PM +0300, Andrey Ryabinin wrote:
-> 2015-10-07 13:04 GMT+03:00 Catalin Marinas <catalin.marinas@arm.com>:
-> > On Thu, Sep 17, 2015 at 12:38:06PM +0300, Andrey Ryabinin wrote:
-> >> As usual patches available in git
-> >>       git://github.com/aryabinin/linux.git kasan/arm64v6
-> >>
-> >> Changes since v5:
-> >>  - Rebase on top of 4.3-rc1
-> >>  - Fixed EFI boot.
-> >>  - Updated Doc/features/KASAN.
-> >
-> > I tried to merge these patches (apart from the x86 one which is already
-> > merged) but it still doesn't boot on Juno as an EFI application.
-> >
+On Wed, Oct 07, 2015 at 03:46:57PM -0700, Shi, Yang wrote:
+> I'm trying to run armv7 little endian userspace on qemu aarch64 with 4.1.x
+> kernel. I was told by someone such usecase is valid and I have CONFIG_COMPAT
+> enabled in my kernel.
 > 
-> 4.3-rc1 was ok and 4.3-rc4 is not. Break caused by 0ce3cc008ec04
-> ("arm64/efi: Fix boot crash by not padding between EFI_MEMORY_RUNTIME
-> regions")
-> It introduced sort() call in efi_get_virtmap().
-> sort() is generic kernel function and it's instrumented, so we crash
-> when KASAN tries to access shadow in sort().
+> But, I ran into the below error. It looks the userspace application is
+> trying to write a readonly page. I got the similar failure on arm vfp with
+> Linaro images (4.1 kernel) too.
+> 
+> Did anyone have tried it recently?
 
-I believe this is solved by Ard's stub isolation series [1,2], which
-will build a stub-specific copy of sort() and various other functions
-(see the arm-deps in [2]).
+-rc4 seems to be working fine with Debian Jessie armhf on my Juno boards.
 
-So long as the stub is not built with ASAN, that should work.
+Do you have a good way of reproducing this with a mainline kernel?
 
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/373807.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/373808.html
+Will
