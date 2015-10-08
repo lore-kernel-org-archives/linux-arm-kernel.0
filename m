@@ -1,62 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 Oct 2015 01:40:21 -0700
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <5615A723.6090907@ti.com>
-References: <20151006090015.GE21626@n2100.arm.linux.org.uk>
- <20151006094425.GM23801@atomide.com>
- <20151006150009.GF21626@n2100.arm.linux.org.uk>
- <20151006153710.GS23801@atomide.com>
- <20151007124551.GI21626@n2100.arm.linux.org.uk>
- <20151007132642.GV23801@atomide.com>
- <CAPDyKFoBPEnHuNR_bsrPU6X=q5pHa8cDR7_Ng9xLnLsudymvOg@mail.gmail.com>
- <20151007155206.GX23801@atomide.com>
- <CAPDyKFp5e_pizFSCzeYSM8sXGx6Jewgs2PRB-RQ1iWMM6WMOww@mail.gmail.com>
- <5615A723.6090907@ti.com>
-Message-ID: <20151008084020.GY23801@atomide.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 08 Oct 2015 11:41:49 +0300
+Subject: [PATCH v3 00/16] KVM: arm64: GICv3 ITS emulation
+In-Reply-To: <20151007204810.66e2b1d6@arm.com>
+References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
+ <029601d1011a$026e1000$074a3000$@samsung.com> <561546AF.90903@arm.com>
+ <02c301d1012b$42cb8270$c8628750$@samsung.com>
+ <20151007204810.66e2b1d6@arm.com>
+Message-ID: <005301d101a5$35700360$a0500a20$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [151007 16:18]:
-> Hi,
-> 
-> On Thursday 08 October 2015 01:10 AM, Ulf Hansson wrote:
-> > On 7 October 2015 at 17:52, Tony Lindgren <tony@atomide.com> wrote:
-> >> * Ulf Hansson <ulf.hansson@linaro.org> [151007 06:46]:
-> >>> On 7 October 2015 at 15:26, Tony Lindgren <tony@atomide.com> wrote:
-> >>>>>> Good idea, how about something like the following? AFAIK that's the
-> >>>>>> only .config option needed as MFD_SYSCON is selected by Kconfig
-> >>>>>> already.
-> >>>
-> >>> Similar to MFD_SYSCON, why don't we have REGULATOR_PBIAS to be
-> >>> selected when omap_hsmmc is being used?
-> >>>
-> >>> It seems like that should also be a patch for the rc, right!?
-> >>
-> >> Well selecting CONFIG_REGULATOR is still optional and force selecting
-> >> drivers usually leads into randconfig build issues sooner or later.
-> >> And we'd like to make everything into loadable modules eventually.
-> > 
-> > I am not sure I get your point. Perhaps I was too vague in what I suggested.
-> > 
-> > Unless we express the dependencies via Kconfig files (or perhaps via
-> > updated defconfigs), how do you expect build/boot automated tools to
-> > handle this?
-> 
-> Both omap2plus_defconfig and multi_v7_defconfig has
-> CONFIG_PBIAS_REGULATOR enabled [1].
-> 
-> I think by using *depends on* in Kconfig, we'll end up in the same issue
-> faced by Russell (since even with that CONFIG_PBIAS_REGULATOR won't be
-> enabled) and using *select* can lead to randconfig errors.
+ Hello!
 
-Well the way distros deal with issues like this is have everything
-possible as loadable modules. We should get the regulator_pbiaa
-loaded automatically in that case as long as it's in the dts.. And
-as long as we have the MODULE_DEVICE_TABLE entries right.
+ Sorry for taking up your time, and thank you very much for the explanation.
 
-Maybe we could also use the composite device to indicate when MMC1
-is using PBIAS regulator?
+> I'd appreciate if you could try to read and understand the architecture
+> spec instead of randomly googling and quoting various bits of
+> irrelevant information.
 
-Regrads,
+ I give my apologizes for not having time to read the whole specs from beginning to the end. Can
+only add that it's quite weird to have these important things in "Terminology" section. I would
+expect them to be in 6.1, for example. That was the part i read, but failed to find the exact
+answer:
+--- cut ---
+LPIs do not have an active state, and transition to the inactive state on being acknowledged by a PE
+--- cut ---
 
-Tony
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
