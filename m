@@ -1,63 +1,87 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Thu, 8 Oct 2015 22:17:01 +0530
-Subject: [PATCH 5/5] thermal: exynos: Directly return 0 instead of using
- local ret variable
-In-Reply-To: <1444282446-6419-5-git-send-email-k.kozlowski@samsung.com>
-References: <1444282446-6419-1-git-send-email-k.kozlowski@samsung.com>
- <1444282446-6419-5-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CAGOxZ52iP98Dh4tsFmmkOC8CszUYwGmSWf7QXBWWJeyEnnDGYw@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 8 Oct 2015 12:47:52 -0400
+Subject: [GIT PULL 1/3] Keystone SOC driver updates for 4.4
+In-Reply-To: <5870815.PiO7rCVXjJ@wuerfel>
+References: <1444151960-4941-1-git-send-email-ssantosh@kernel.org>
+ <5870815.PiO7rCVXjJ@wuerfel>
+Message-ID: <56169E38.1050803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Arnd,
 
-On Thu, Oct 8, 2015 at 11:04 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> The 'ret' variable in exynos5440_tmu_initialize() is initialized to 0
-> and returned as is. Replace it with direct return statement. This also
-> fixes coccinelle warning:
-> drivers/thermal/samsung/exynos_tmu.c:611:5-8: Unneeded variable: "ret". Return "0" on line 654
+On 10/08/2015 11:41 AM, Arnd Bergmann wrote:
+> On Tuesday 06 October 2015 10:19:18 Santosh Shilimkar wrote:
+>> Couple of patches for ARM Keystone SOC drivers
+>>          - irq affinity bug fix
+>>          - display the firmware name
+>>
+>> ----------------------------------------------------------------
+>> Murali Karicheri (2):
+>>        soc: ti: reset irq affinity before freeing irq
+>>        soc: ti: display firmware file name as part of boot log
+>>
+>>   .../bindings/soc/ti/keystone-navigator-qmss.txt      | 20 +++++++++++++++++++-
+>>   drivers/soc/ti/knav_qmss_acc.c                       |  4 ++++
+>>   drivers/soc/ti/knav_qmss_queue.c                     |  3 +++
+>>   3 files changed, 26 insertions(+), 1 deletion(-)
 >
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
-Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+> The new text you add to the binding document doesn't really seem to
+> belong in there, so I'm not pulling this until we've discussed how
+> this should be better handled.
+>
+> Ideally, the firmware should just get merged into the linux-firmware.git
+> tree.
 
->  drivers/thermal/samsung/exynos_tmu.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-> index 1af7ea8dda71..f340e6edcb49 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.c
-> +++ b/drivers/thermal/samsung/exynos_tmu.c
-> @@ -608,7 +608,7 @@ static int exynos5440_tmu_initialize(struct platform_device *pdev)
->  {
->         struct exynos_tmu_data *data = platform_get_drvdata(pdev);
->         unsigned int trim_info = 0, con, rising_threshold;
-> -       int ret = 0, threshold_code;
-> +       int threshold_code;
->         int crit_temp = 0;
->
->         /*
-> @@ -651,7 +651,8 @@ static int exynos5440_tmu_initialize(struct platform_device *pdev)
->         /* Clear the PMIN in the common TMU register */
->         if (!data->id)
->                 writel(0, data->base_second + EXYNOS5440_TMU_PMIN);
-> -       return ret;
-> +
-> +       return 0;
->  }
->
->  static int exynos7_tmu_initialize(struct platform_device *pdev)
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I have got the firmware merged to the linux-firmware.git. I will post a 
+patch to change the document to reflect that. Will it suffice?
 
+>
+> Regarding the method of storing the firmware file name in DT, we
+> recently had a longer discussion about that and basically concluded
+> that this doesn't work for most devices, in particular when the
+> communication between the driver and the firmware uses an interface
+> that is not 100% stable and can change depending on the firmware
+> blob.
+>
+> Can you guarantee that there will never be changes to the interface?
+This firmware is in use for almost 3 years for now on K2 SoCs, but in a 
+different kernel version. The interface itself is used not only by Linux 
+OS, but other OS as well. So it is not expected to change in the future 
+as backward compatibility will be an issue for other OS as well.
+> If not, we should try to come up with a better mechanism here, and
+> only provide the current method for backwards compatibility.
+Assuming we need to change interface in the future, How is this handled 
+in other devices? Do they have something like a version to check 
+compatibility between software and firmware? As this firmware has been 
+frozen for almost 3 years, I wouldn't expect any change to it. Could you 
+point me to the thread where this was discussed in the past. Also in my 
+experience, mostly changes are to the firmware itself, but not to the 
+interface. In such cases, do we keep the name of firmware in DT without 
+version information so that in the file system, user could  create a 
+soft link to the firmware matching with the DT name. So this way as long 
+as interface doesn't change, firmware upgrade is possible. If you agree, 
+I can send an incremental patch to rename the firmware to exclude the 
+version information.
+
+W.r.t to the patch for documentation update, can I send an incremental 
+patch to the update the linux-firmware.git reference as well?
+
+Thanks
+
+Murali
+
+>
+> 	Arnd
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
 
 
 -- 
-Regards,
-Alim
+Murali Karicheri
+Linux Kernel, Keystone
