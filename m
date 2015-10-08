@@ -1,69 +1,30 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 08 Oct 2015 15:32:13 +0100
-Subject: [PATCH v2 2/9] thermal: qcom: tsens-8916: Add support for 8916
- family of SoCs
-In-Reply-To: <5615F99C.5000004@codeaurora.org> (Rajendra Nayak's message of
- "Thu, 08 Oct 2015 10:35:32 +0530")
-References: <1442384603-26053-1-git-send-email-rnayak@codeaurora.org>
- <1442384603-26053-3-git-send-email-rnayak@codeaurora.org>
- <9hh4miutr21.fsf@e105922-lin.cambridge.arm.com>
- <55FF8761.9010808@codeaurora.org> <5615F99C.5000004@codeaurora.org>
-Message-ID: <9hhk2qxfn2q.fsf@e105922-lin.cambridge.arm.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 8 Oct 2015 10:25:56 -0400 (EDT)
+Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
+In-Reply-To: <20151008074828.GF4570@linux>
+Message-ID: <Pine.LNX.4.44L0.1510081023080.1502-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra Nayak <rnayak@codeaurora.org> writes:
+On Thu, 8 Oct 2015, Viresh Kumar wrote:
 
-> On 09/21/2015 09:58 AM, Rajendra Nayak wrote:
->> []..
->> 
->>>> +static inline int code_to_degc(u32 adc_code, const struct tsens_sensor *s)
->>>> +{
->>>> +    int degc, num, den;
->>>> +
->>>> +    num = (adc_code * SLOPE_FACTOR) - s->offset;
->>>> +    den = s->slope;
->>>> +
->>>> +    if (num > 0)
->>>> +        degc = num + (den / 2);
->>>> +    else if (num < 0)
->>>> +        degc = num - (den / 2);
->>>> +    else
->>>> +        degc = num;
->>>> +
->>>> +    degc /= den;
->>>> +
->>>> +    return degc;
->>>> +}
->>>> +
->>>> +int get_temp_common(struct tsens_device *tmdev, int id, int *temp)
->>>> +{
->>>> +    struct tsens_sensor *s = &tmdev->sensor[id];
->>>> +    u32 code;
->>>> +    unsigned int sensor_addr;
->>>> +    int last_temp = 0, ret;
->>>> +
->>>> +    sensor_addr = S0_ST_ADDR + s->hw_id * SN_ADDR_OFFSET;
->>>> +    ret = regmap_read(tmdev->map, sensor_addr, &code);
->>>> +    if (ret)
->>>> +        return ret;
->>>> +    last_temp = code & SN_ST_TEMP_MASK;
->>>> +
->>>> +    *temp = code_to_degc(last_temp, s) * 1000;
->>>> +
->>>> +    return 0;
->>>> +}
->>>
->>> The way this function is coded the temperature will only ever change by
->>> 1C (i.e., 1000mC). Is there a chance that you're losing precision in the
->>> code_to_degc conversion that could be preserved perhaps?
->>>
->>> This is useful in scenarios where you use the power allocator governor
->>> and the greater precision allows better power budget estimation.
->> 
->> I'll take a look to see if we can get better precision. Thanks.
->
-> I checked, and it does not look like these devices can support better precision
-> than degC.
+> > In my patch, I assumed that if 32-bit architectures work fine today, then
+> > we don't need more range on 64-bit architectures either.
+> 
+> The problem here is that we haven't fixed it properly.
+> - clock framework expects it to be unsigned long
+> - DT is sending a 64 bit value in Hz
+> - But we are storing and exposing it in u32
+> 
+> That's weird, isn't it?
+> 
+> So, either we update clock API and other similar APIs to u64 or u32
+> (which may not be the right thing to do), Or we keep it unsigned long
+> here as well and add debugfs_create_ulong().
 
-Ah well. Thanks for checking!
+I don't see why debugfs can't accomodate C's builtin types, rather than 
+insisting on predetermined sizes.  After, the printf family of 
+functions does that: %u vs. %lu.  In fact, there's no way to tell 
+printf that a particular value is 32 bits or 64 bits.
+
+Alan Stern
