@@ -1,48 +1,26 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 08 Oct 2015 15:49:40 -0700
-Subject: [GIT PULL] Broadcom defconfig changes for v4.4
-In-Reply-To: <5304418.6fqMhuFpMr@wuerfel>
-References: <1443824458-20799-1-git-send-email-f.fainelli@gmail.com>
- <13829954.xtFPljFphp@wuerfel> <5616A67E.2000101@gmail.com>
- <5304418.6fqMhuFpMr@wuerfel>
-Message-ID: <5616F304.6050000@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 9 Oct 2015 01:19:36 +0200
+Subject: [PATCH 0/9] Further mvebu PCIe patches
+In-Reply-To: <20151003181228.GI21513@n2100.arm.linux.org.uk>
+References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
+Message-ID: <20151008231936.GA14688@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/15 11:38, Arnd Bergmann wrote:
-> On Thursday 08 October 2015 10:23:10 Florian Fainelli wrote:
->> On 06/10/15 07:04, Arnd Bergmann wrote:
->>> On Friday 02 October 2015 15:20:55 Florian Fainelli wrote:
->>>> This pull request contains the following changes for the multi_v7_defconfig:
->>>>
->>>> - Jon adds support for the NorthStar Plus SocS to the multi_v7_defconfig file
->>>>
->>>>
->>>
->>> Merged into next/defconfig, thanks!
->>
->> There are 3 other pull requests for Device Tree, SoC/driver and
->> MAINTAINERS file updates, is the threading confusing?
+On Sat, Oct 03, 2015 at 07:12:28PM +0100, Russell King - ARM Linux wrote:
+> Jason, Thomas,
 > 
-> Yes, I guess I was confused by that.
-> 
-> I see now that I moved the entire mail thread into my 'done' folder.
-> Some other maintainers post all patches in the series as replies to
-> the git pull mail, and I must have assumed you did the same, or I
-> just didn't look when moving this thread.
+> Here are further PCIe patches which follow on from the previous set of
+> six I sent earlier in September.  This set:
 
-Not a problem.
+Hi Russell
 
-> 
-> I think it would help if you change the subject line to [GIT PULL 1/4],
-> which makes it a bit more obvious in the future.
+Tested on my Kirkwood based DLINK DIR665 with a topdog wireless lan
+card. This does not make use of the GPIO reset, so those parts of the
+patch are untested. But otherwise, no obvious regressions, i can join
+the wireless LAN etc.
 
-Will do, just updated my script to do that.
+Tested-by: Andrew Lunn <andrew@lunn.ch>
 
-> 
-> Thanks for the report, I've now put them back into my todo folder and
-> should get to it by tomorrow at the latest.
-
-Thanks, let me know how things go ;)
--- 
-Florian
+Thanks
+	   Andrew
