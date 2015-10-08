@@ -1,26 +1,87 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 9 Oct 2015 01:19:36 +0200
-Subject: [PATCH 0/9] Further mvebu PCIe patches
-In-Reply-To: <20151003181228.GI21513@n2100.arm.linux.org.uk>
-References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
-Message-ID: <20151008231936.GA14688@lunn.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 8 Oct 2015 16:21:11 -0700
+Subject: [PATCH v3 4/9] clk: qcom: create virtual child device for TSENS
+In-Reply-To: <1444280468-17159-5-git-send-email-rnayak@codeaurora.org>
+References: <1444280468-17159-1-git-send-email-rnayak@codeaurora.org>
+ <1444280468-17159-5-git-send-email-rnayak@codeaurora.org>
+Message-ID: <20151008232110.GK26883@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 03, 2015 at 07:12:28PM +0100, Russell King - ARM Linux wrote:
-> Jason, Thomas,
+On 10/08, Rajendra Nayak wrote:
+> 8960 family of devices have TSENS as part of GCC in hardware.
+> Hence DT would represent a GCC node with GCC properties as well
+> as TSENS. Create a virtual platform child device here for TSENS
+> so the driver can probe it and use the parent (GCC) to extract DT
+> properties.
 > 
-> Here are further PCIe patches which follow on from the previous set of
-> six I sent earlier in September.  This set:
+> Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> ---
 
-Hi Russell
+Applied to clk-next with some massaging. Is there going to be an
+update to the gcc binding too?
 
-Tested on my Kirkwood based DLINK DIR665 with a topdog wireless lan
-card. This does not make use of the GPIO reset, so those parts of the
-patch are untested. But otherwise, no obvious regressions, i can join
-the wireless LAN etc.
+---8<----
+From: Rajendra Nayak <rnayak@codeaurora.org>
+Subject: [PATCH] clk: qcom: create virtual child device for TSENS
 
-Tested-by: Andrew Lunn <andrew@lunn.ch>
+8960 family of devices have TSENS as part of GCC in hardware.
+Hence DT would represent a GCC node with GCC properties as well
+as TSENS. Create a virtual platform child device here for TSENS
+so the driver can probe it and use the parent (GCC) to extract DT
+properties.
 
-Thanks
-	   Andrew
+Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+[sboyd at codeaurora.org: Massaged to work with devm friendly
+qcom_cc_probe()]
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clk/qcom/gcc-msm8960.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
+index b52153903893..66c18bc97857 100644
+--- a/drivers/clk/qcom/gcc-msm8960.c
++++ b/drivers/clk/qcom/gcc-msm8960.c
+@@ -3506,6 +3506,8 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
+ 	struct clk *clk;
+ 	struct device *dev = &pdev->dev;
+ 	const struct of_device_id *match;
++	struct platform_device *tsens;
++	int ret;
+ 
+ 	match = of_match_device(gcc_msm8960_match_table, &pdev->dev);
+ 	if (!match)
+@@ -3520,11 +3522,26 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
+ 	if (IS_ERR(clk))
+ 		return PTR_ERR(clk);
+ 
+-	return qcom_cc_probe(pdev, match->data);
++	ret = qcom_cc_probe(pdev, match->data);
++	if (ret)
++		return ret;
++
++	tsens = platform_device_register_data(&pdev->dev, "qcom-tsens", -1,
++					      NULL, 0);
++	if (IS_ERR(tsens))
++		return PTR_ERR(tsens);
++
++	platform_set_drvdata(pdev, tsens);
++
++	return 0;
+ }
+ 
+ static int gcc_msm8960_remove(struct platform_device *pdev)
+ {
++	struct platform_device *tsens = platform_get_drvdata(pdev);
++
++	platform_device_unregister(tsens);
++
+ 	return 0;
+ }
+ 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
