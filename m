@@ -1,69 +1,140 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 8 Oct 2015 08:26:02 +0100
-Subject: [PATCH] mfd: remove unused variables
-In-Reply-To: <20151008072304.GJ17172@x1>
-References: <7700818.mjdn6x2kkK@wuerfel>
- <20151008072304.GJ17172@x1>
-Message-ID: <20151008072602.GK17172@x1>
+From: w.f@huawei.com (wangfei)
+Date: Thu, 8 Oct 2015 15:38:01 +0800
+Subject: [PATCH 4/8] regulator: Hi655x: Add support for Hi655x regulator
+In-Reply-To: <20150930175857.GK15635@sirena.org.uk>
+References: <1443611111-3196-1-git-send-email-w.f@huawei.com>
+ <1443611111-3196-5-git-send-email-w.f@huawei.com>
+ <20150930175857.GK15635@sirena.org.uk>
+Message-ID: <56161D59.1020207@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 08 Oct 2015, Lee Jones wrote:
-
-> On Wed, 07 Oct 2015, Arnd Bergmann wrote:
+On 2015/10/1 1:58, Mark Brown wrote:
+> On Wed, Sep 30, 2015 at 07:05:07PM +0800, Fei Wang wrote:
 > 
-> > A mass-cleanup by Javier Martinez Canillas removed a lot of
-> > unused code, but left at least two variables in mfd drivers
-> > in place that are now causing warnings:
-> > 
-> > drivers/mfd/rtsx_pcr.c: In function 'rtsx_pci_set_pull_ctl':
-> > drivers/mfd/rtsx_pcr.c:564:6: warning: unused variable 'err' [-Wunused-variable]
-> > drivers/mfd/lm3533-core.c: In function 'lm3533_i2c_probe':
-> > drivers/mfd/lm3533-core.c:595:6: warning: unused variable 'ret' [-Wunused-variable]
-> > 
-> > This removes them as well.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: c749db571dc ("mfd: lm3533: Simplify function return logic")
-> > Fixes: a3c29b09982 ("mfd: rtsx: Simplify function return logic")
+>> +config REGULATOR_HI655X
+>> +        tristate "Hisilicon HI655X PMIC regulators support"
+>> +        depends on ARCH_HISI
+>> +	depends on MFD_HI655X_PMIC && OF
 > 
-> Where's your diffstat?
-
-By the way, someone sent a patch to fix these 20 mins before you
-did. :)
-
-> > ---
-> > 
-> > diff --git a/drivers/mfd/lm3533-core.c b/drivers/mfd/lm3533-core.c
-> > index 193ecee1fa7e..5abcbb2e8849 100644
-> > --- a/drivers/mfd/lm3533-core.c
-> > +++ b/drivers/mfd/lm3533-core.c
-> > @@ -592,7 +592,6 @@ static int lm3533_i2c_probe(struct i2c_client *i2c,
-> >  					const struct i2c_device_id *id)
-> >  {
-> >  	struct lm3533 *lm3533;
-> > -	int ret;
-> >  
-> >  	dev_dbg(&i2c->dev, "%s\n", __func__);
-> >  
-> > diff --git a/drivers/mfd/rtsx_pcr.c b/drivers/mfd/rtsx_pcr.c
-> > index b98cf1de0a55..d63f3a896adb 100644
-> > --- a/drivers/mfd/rtsx_pcr.c
-> > +++ b/drivers/mfd/rtsx_pcr.c
-> > @@ -561,8 +561,6 @@ EXPORT_SYMBOL_GPL(rtsx_pci_write_ppbuf);
-> >  
-> >  static int rtsx_pci_set_pull_ctl(struct rtsx_pcr *pcr, const u32 *tbl)
-> >  {
-> > -	int err;
-> > -
-> >  	rtsx_pci_init_cmd(pcr);
-> >  
-> >  	while (*tbl & 0xFFFF0000) {
-> > 
+> You've got some tab/space confusion above.  Also, can't we have an ||
+> COMPILE_TEST here?
 > 
+OK, i will add it.
+>> +#define REG_VALUE_SETBITS(reg_value, pos, bits, bits_value) \
+>> +		(reg_value = (reg_value & \
+>> +		~((((unsigned int)1 << bits) - 1) << pos)) | \
+>> +		((unsigned int)(bits_value & \
+>> +		(((unsigned int)1 << bits) - 1)) << pos))
+>> +
+>> +#define REG_VALUE_GETBITS(reg_value, pos, bits) \
+>> +			((reg_value >> pos) & (((unsigned int)1 << bits) - 1))
+> 
+> These are just really hard to read, sorry, and they appear to duplicate
+> existing regmap functionality.  If there is a strong reason to add them
+> consider doing so in the core and if you can then please at least make
+> them regular inline functions rather than using macros.  It's much safer
+> and more readable.
+> 
+i agree with you ?i will refactor all the unreadable code?
+>> +static int hi655x_regulator_pmic_is_enabled(struct regulator_dev *rdev)
+>> +{
+>> +	int ret = 0;
+>> +	unsigned int value = 0;
+>> +
+>> +	struct hi655x_regulator *sreg = rdev_get_drvdata(rdev);
+>> +	struct hi655x_regulator_ctrl_regs  *ctrl_regs = &(sreg->ctrl_regs);
+>> +	struct hi655x_regulator_ctrl_data  *ctrl_data = &(sreg->ctrl_data);
+>> +
+>> +	/*
+>> +	* regulator is all set,but the pmu is only subset.
+>> +	* maybe this "buck"/"ldo"/"lvs" is not contrl by a core.
+>> +	* and in regulator have a "status" member ("okey" or "disable").
+>> +	*/
+> 
+> I'm having a hard time parsing the above comment.  Please also use the
+> normal kernel comment style (this is a problem throughout the driver).
+> 
+OK. i will modify all of these?
+>> +	regmap_read(rdev->regmap, ctrl_regs->status_reg, &value);
+>> +	ret = (int)REG_VALUE_GETBITS(value, ctrl_data->shift,
+>> +					ctrl_data->mask);
+> 
+> This appears to just duplicate regulator core functionality for reading
+> enable state from a bitfield?  Also note that the cast here isn't a
+> great advert for the macros above.
+> 
+>> +static int hi655x_regulator_pmic_enable(struct regulator_dev *rdev)
+>> +{
+>> +	int ret = 0;
+>> +	unsigned char value_u8 = 0;
+>> +	unsigned int value_u32 = 0;
+>> +	struct hi655x_regulator *sreg = rdev_get_drvdata(rdev);
+>> +	struct hi655x_regulator_ctrl_regs  *ctrl_regs = &(sreg->ctrl_regs);
+>> +	struct hi655x_regulator_ctrl_data  *ctrl_data = &(sreg->ctrl_data);
+>> +
+>> +	REG_VALUE_SETBITS(value_u32, ctrl_data->shift, ctrl_data->mask, 0x1);
+>> +	value_u8  = (unsigned char)value_u32;
+>> +	regmap_write(rdev->regmap, ctrl_regs->enable_reg, value_u8);
+> 
+> I'm not *entirely* sure what this is supposed to be doing but it looks
+> like it's duplicating core functionality in a fashion that's really
+> quite hard to read.  Why not just use the core functions for setting
+> bits?
+> 
+>> +	udelay(sreg->off_on_delay);
+> 
+> Use the regualtor core delay functionality please.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+OK?i will modify it?
+> 
+>> +static int hi655x_regulator_pmic_list_voltage_linear(struct regulator_dev *rdev,
+>> +				  unsigned int selector)
+> 
+> This is *definitely* duplicating core functionality, I think you want to
+> use regulator_list_voltage_linear_range() or possibly just plain
+> _linear() and use separate operations for the LVS regulator.
+> 
+> We at least need to restructure the code so that the core helper
+> functions are used and we don't have regulator type decisions everywhere
+> - the whole goal of having per regulator ops is to avoid having to open
+> code decisions about which regulator we're dealing with into each op
+> function.
+> 
+OK?i will modify it?
+>> +static unsigned int hi655x_regulator_pmic_get_mode(
+>> +			struct regulator_dev *rdev)
+>> +{
+>> +	return REGULATOR_MODE_NORMAL;
+>> +}
+> 
+> Don't implement empty functions, remove all these.
+> 
+>> +	num_consumer_supplies = of_get_property(np,
+>> +				"hisilicon,num_consumer_supplies", NULL);
+>> +
+>> +	if ((NULL == num_consumer_supplies) || (0 == *num_consumer_supplies)) {
+>> +		dev_warn(dev, "%s no consumer_supplies\n", __func__);
+>> +		return init_data;
+>> +	}
+> 
+> Obviously the binding is completely undocumented but this is setting off
+> alarm bells - why is the driver even considering consumers?  Please make
+> sure you are using the core regulator bindings rather than open coding
+> something which translates into platform data (which is what this looks
+> like).
+> 
+> I'm not going to review any more of the DT code without binding
+> documentation.
+
+I will document the dt-binding first?
+> 
+>> +	/*
+>> +	*initdata mem will release auto;
+>> +	*this is kernel 3.10 import.
+>> +	*/
+> 
+> Remove anything related to your vendor kernel support, this is not
+> relevant to upstream.
+> 
+Thanks?Mark?i agree with you and  will modify all of you mentioned soon?
