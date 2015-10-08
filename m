@@ -1,72 +1,50 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 8 Oct 2015 10:49:53 +0200
-Subject: [PATCH V4 2/3] arm64: support initrd outside kernel linear map
-In-Reply-To: <1444151812.10788.14.camel@redhat.com>
-References: <1439830867-14935-1-git-send-email-msalter@redhat.com>
- <1439830867-14935-3-git-send-email-msalter@redhat.com>
- <20150908113113.GA20562@leverpostej>
- <20151006171140.GE26433@leverpostej>
- <1444151812.10788.14.camel@redhat.com>
-Message-ID: <20151008084953.GA20114@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Oct 2015 10:53:54 +0200
+Subject: [PATCH] dmaengine: xgene-dma: Disable memcpy operation due to
+ performance drop
+In-Reply-To: <1444292716-1877-1-git-send-email-rsahu@apm.com>
+References: <1444292716-1877-1-git-send-email-rsahu@apm.com>
+Message-ID: <57007053.YYaOe8h6ng@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 01:16:52PM -0400, Mark Salter wrote:
-> On Tue, 2015-10-06 at 18:11 +0100, Mark Rutland wrote:
-> > On Tue, Sep 08, 2015 at 12:31:13PM +0100, Mark Rutland wrote:
-> > > Hi Mark,
-> > > 
-> > > On Mon, Aug 17, 2015 at 06:01:06PM +0100, Mark Salter wrote:
-> > > > The use of mem= could leave part or all of the initrd outside of
-> > > > the kernel linear map. This will lead to an error when unpacking
-> > > > the initrd and a probable failure to boot. This patch catches that
-> > > > situation and relocates the initrd to be fully within the linear
-> > > > map.
-> > > 
-> > > With next-20150908, this patch results in a confusing message at boot when not
-> > > using an initrd:
-> > > 
-> > > Moving initrd from [4080000000-407fffffff] to [9fff49000-9fff48fff]
-> > > 
-> > > I think that can be solved by folding in the diff below.
-> > 
-> > Mark, it looks like this fell by the wayside.
-> > 
-> > Do you have any objection to this? I'll promote this to it's own patch
-> > if not.
-> > 
-> > Mark.
-> > 
-> > > 
-> > > Thanks,
-> > > Mark.
-> > > 
-> > > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> > > index 6bab21f..2322479 100644
-> > > --- a/arch/arm64/kernel/setup.c
-> > > +++ b/arch/arm64/kernel/setup.c
-> > > @@ -364,6 +364,8 @@ static void __init relocate_initrd(void)
-> > >                 to_free = ram_end - orig_start;
-> > >  
-> > >         size = orig_end - orig_start;
-> > > +       if (!size)
-> > > +               return;
-> > >  
-> > >         /* initrd needs to be relocated completely inside linear mapping */
-> > >         new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
+On Thursday 08 October 2015 13:55:16 Rameshwar Prasad Sahu wrote:
+> The DMA engine supports memory copy, RAID5 XOR, RAID6 PQ, and other
+> computations. But the bandwidth of the entire DMA engine is shared
+> among all channels. This patch re-configures operations availability
+> such that one can achieve maximum performance for XOR and PQ
+> computation by removing the memory offload operations.
 > 
-> Sorry, no. That looks perfectly good to me.
+> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+> ---
+>  drivers/dma/xgene-dma.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-FYI: I applied these patches to 4.0 (only a trivial conflict on the x86
-side) and this fixed an issue for me booting systems with mem=X,
-reducing the amount of physical memory available on a system, which
-would otherwise cause the system to just silently halt during boot.
+> diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
+> index 8d57b1b..2998fcb 100644
+> --- a/drivers/dma/xgene-dma.c
+> +++ b/drivers/dma/xgene-dma.c
+> @@ -154,6 +154,7 @@
+>  #define XGENE_DMA_MAX_XOR_SRC          5
+>  #define XGENE_DMA_16K_BUFFER_LEN_CODE  0x0
+>  #define XGENE_DMA_INVALID_LEN_CODE     0x7800000000000000ULL
+> +#undef XGENE_DMA_MEMCPY_ENABLE
+> 
+>  /* X-Gene DMA descriptor error codes */
+>  #define ERR_DESC_AXI                   0x01
+> @@ -1707,7 +1708,9 @@ static void xgene_dma_set_caps(struct xgene_dma_chan *chan,
+>         dma_cap_zero(dma_dev->cap_mask);
+> 
+>         /* Set DMA device capability */
+> +#ifdef XGENE_DMA_MEMCPY_ENABLE
+>         dma_cap_set(DMA_MEMCPY, dma_dev->cap_mask);
+> +#endif
+>         dma_cap_set(DMA_SG, dma_dev->cap_mask);
+> 
+>         /* Basically here, the X-Gene SoC DMA engine channel 0 supports XOR
 
-Note that this seems to fix even more than it promises, because one of
-those systems does not use an initrd, but I'm thinking maybe this fixes
-issues with the DT as well?
+I don't see what the #ifdef gains you here when the setting is
+hardcoded. Why not just remove that DMA_MEMCPY capability completely
+if you don't want to use it?
 
-In any case, I think this may be a good candidate for cc'ing to stable?
-
-Thanks,
--Christoffer
+	Arnd
