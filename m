@@ -1,43 +1,66 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 8 Oct 2015 11:46:10 +0100
-Subject: [PATCH v2 11/22] arm64: Populate cpuinfo after notify_cpu_starting
-In-Reply-To: <20151008101508.GE17192@e104818-lin.cambridge.arm.com>
-References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
- <1444064531-25607-12-git-send-email-suzuki.poulose@arm.com>
- <20151008101508.GE17192@e104818-lin.cambridge.arm.com>
-Message-ID: <56164972.3030906@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 8 Oct 2015 18:45:37 +0800
+Subject: [PATCH v8 3/6] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <1444297394-3122-4-git-send-email-lftan@altera.com>
+Message-ID: <201510081812.sJm6ZLVH%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/15 11:15, Catalin Marinas wrote:
-> On Mon, Oct 05, 2015 at 06:02:00PM +0100, Suzuki K. Poulose wrote:
->> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
->> index cb3e0d8..6987de4 100644
->> --- a/arch/arm64/kernel/smp.c
->> +++ b/arch/arm64/kernel/smp.c
->> @@ -163,14 +163,14 @@ asmlinkage void secondary_start_kernel(void)
->>   		cpu_ops[cpu]->cpu_postboot();
->>
->>   	/*
->> -	 * Log the CPU info before it is marked online and might get read.
->> +	 * Enable GIC and timers.
->>   	 */
->> -	cpuinfo_store_cpu();
->> +	notify_cpu_starting(cpu);
->>
->>   	/*
->> -	 * Enable GIC and timers.
->> +	 * Log the CPU info before it is marked online and might get read.
->>   	 */
->> -	notify_cpu_starting(cpu);
->> +	cpuinfo_store_cpu();
->>
->>   	smp_store_cpu_info(cpu);
->
-> You can move the cpuinfo_store_cpu() call directly to
-> smp_store_cpu_info().
->
+Hi Ley,
 
-That looks better, Thanks.
+[auto build test WARNING on v4.3-rc4 -- if it's inappropriate base, please ignore]
 
-Suzuki
+config: x86_64-allmodconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
+
+All warnings (new ones prefixed by >>):
+
+   drivers/pci/host/pcie-altera.c: In function 'tlp_cfg_dword_read':
+>> drivers/pci/host/pcie-altera.c:243:12: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+      *value = ~0UL; /* return 0xFFFFFFFF if error */
+               ^
+   drivers/pci/host/pcie-altera.c: In function 'altera_pcie_cfg_read':
+   drivers/pci/host/pcie-altera.c:291:12: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+      *value = ~0UL;
+               ^
+
+vim +243 drivers/pci/host/pcie-altera.c
+
+   227		int ret;
+   228		u32 headers[TLP_HDR_SIZE];
+   229	
+   230		if (bus == pcie->root_bus_nr)
+   231			headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGRD0);
+   232		else
+   233			headers[0] = TLP_CFG_DW0(TLP_FMTTYPE_CFGRD1);
+   234	
+   235		headers[1] = TLP_CFG_DW1(TLP_REQ_ID(pcie->root_bus_nr, devfn),
+   236						TLP_READ_TAG);
+   237		headers[2] = TLP_CFG_DW2(bus, devfn, where);
+   238	
+   239		tlp_write_packet(pcie, headers, 0, false);
+   240	
+   241		ret = tlp_read_packet(pcie, value);
+   242		if (ret != PCIBIOS_SUCCESSFUL)
+ > 243			*value = ~0UL;	/* return 0xFFFFFFFF if error */
+   244	
+   245		return ret;
+   246	}
+   247	
+   248	static int tlp_cfg_dword_write(struct altera_pcie *pcie, u8 bus, u32 devfn,
+   249				       int where, u32 value)
+   250	{
+   251		u32 headers[TLP_HDR_SIZE];
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 50062 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151008/a30a135e/attachment-0001.obj>
