@@ -1,51 +1,44 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 8 Oct 2015 17:13:27 +0100
-Subject: [PATCH v2 06/22] arm64: sys_reg: Define System register encoding
-In-Reply-To: <20151008144348.GJ17192@e104818-lin.cambridge.arm.com>
-References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
- <1444064531-25607-7-git-send-email-suzuki.poulose@arm.com>
- <20151007163650.GC17192@e104818-lin.cambridge.arm.com>
- <56155066.9000000@arm.com>
- <20151008144348.GJ17192@e104818-lin.cambridge.arm.com>
-Message-ID: <56169627.9090307@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Oct 2015 17:16:06 +0100
+Subject: Regression: USB OTG port breaks after a few hours in host mode
+ on iMX6
+In-Reply-To: <BN3PR0301MB0849F94B72B10051ABE9CCA581350@BN3PR0301MB0849.namprd03.prod.outlook.com>
+References: <20151007082222.GB21513@n2100.arm.linux.org.uk>
+ <20151008044412.GA8169@shlinux2>
+ <BN3PR0301MB0849F94B72B10051ABE9CCA581350@BN3PR0301MB0849.namprd03.prod.outlook.com>
+Message-ID: <20151008161605.GH32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/15 15:43, Catalin Marinas wrote:
-> On Wed, Oct 07, 2015 at 06:03:34PM +0100, Suzuki K. Poulose wrote:
->> On 07/10/15 17:36, Catalin Marinas wrote:
->>> On Mon, Oct 05, 2015 at 06:01:55PM +0100, Suzuki K. Poulose wrote:
->>>>    * (Ref: ARMv8 ARM, Section: "System instruction class encoding overview",
->>>>    *  C5.2, version:ARM DDI 0487A.f)
->>>>    *	[20-19] : Op0
->>>> @@ -34,15 +34,40 @@
->>>>    *	[15-12] : CRn
->>>>    *	[11-8]  : CRm
->>>>    *	[7-5]   : Op2
->>>> + * Hence we use [ sys_reg() << 5 ] in the mrs/msr instructions.
->>>
->>> Do we really need to have all the ids shifted right by 5? I can't see
->>> where it helps. OTOH, it makes the code more complicated by having to
->>> remember to shift the id left by 5.
->>
->> This is a cosmetic change, to reuse the sys_reg() definitions for both
->> mrs_s/msr_s macros and the CPU ID. The (existing)left shift is only needed
->> for the mrs_s/msr_s, so the existing users don't have to worry about the shift
->> unless they have hard-open-coded values for the register. On the plus
->> side it becomes slightly easier to use the same encoding for CPU id
->> tracking (and manual decoding). If you think this is superfluous, I could
->> change the CPU-id to use right shifted values from sys_reg.
->
-> You may be right but I still fail to see whether the shifted values are
-> useful to the CPUID code. Are you referring to the 'switch' statements?
->
+On Thu, Oct 08, 2015 at 09:52:52AM +0000, Peter Chen wrote:
+> I can't reproduce it for 5 hours, and will change pinmux (do the same
+> thing with your platform), and do the overnight test.
 
-Yes. Again we can adjust the macros to get the right fields for switch().
-Its also about the meaning of sys_reg(). The name kind of implies the system
-register encoding defined by ARM ARM. However the current version
-defines the encoding as it appears in the mrs/msr instructions, which can
-be confusing if we start using the same encoding for representing the sys_reg
-elsewhere(in this case CPUID infrastructure). Again, I am not too particular
-about this change.
+There's definitely something weird going on.  Over night last night,
+I left the Logitech universal receiver in the port, and this morning
+it was indicating in /proc/interrupts:
 
-Suzuki
+283:         50          0          0          0       GPC  43 Edge      2184000.usb
+
+I removed it, and now I have:
+
+283:         50          0       1716          0       GPC  43 Edge      2184000.usb
+
+which is increasing at a rate of 90 per minute.
+
+Nothing in the kernel message log indicating why this may be.  It looks
+like runtime PM doesn't work on this port:
+
+/sys/bus/platform/devices/2184000.usb/power/runtime_active_time:109850496
+/sys/bus/platform/devices/2184000.usb/power/runtime_status:active
+/sys/bus/platform/devices/2184000.usb/power/runtime_suspended_time:0
+
+whereas the other port (which has zero interrupts) it does:
+
+/sys/bus/platform/devices/2184200.usb/power/runtime_active_time:16924
+/sys/bus/platform/devices/2184200.usb/power/runtime_status:suspended
+/sys/bus/platform/devices/2184200.usb/power/runtime_suspended_time:109861760
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
