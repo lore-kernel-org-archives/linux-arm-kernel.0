@@ -1,95 +1,59 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu,  8 Oct 2015 16:56:07 +0200
-Subject: [PATCH] can: at91: remove at91_can_data
-Message-ID: <1444316167-25940-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Oct 2015 16:01:21 +0100
+Subject: [PATCH] serial: atmel: fix compiler warning on address cast
+In-Reply-To: <56168292.5030207@arm.com>
+References: <1444064452-12285-1-git-send-email-andre.przywara@arm.com>
+ <20151008090148.GE3485@piout.net>
+ <20151008093749.GB32532@n2100.arm.linux.org.uk>
+ <20151008103835.GF3485@piout.net> <56168292.5030207@arm.com>
+Message-ID: <20151008150120.GF32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct at91_can_data was used to pass a callback to the driver, allowing it
-to switch the transceiver on and off. As all at91 boards are now using DT,
-this is not used anymore, remove that structure.
+On Thu, Oct 08, 2015 at 03:49:54PM +0100, Andre Przywara wrote:
+> Hi,
+> 
+> On 08/10/15 11:38, Alexandre Belloni wrote:
+> > On 08/10/2015 at 10:37:49 +0100, Russell King - ARM Linux wrote :
+> >> On Thu, Oct 08, 2015 at 11:01:48AM +0200, Alexandre Belloni wrote:
+> >>> On 05/10/2015 at 18:00:52 +0100, Andre Przywara wrote :
+> >>>> Turning on KVM and LPAE support on top of a multi_v7_defconfig will
+> >>>> produce a compiler warning in the Atmel serial driver:
+> >>>> drivers/tty/serial/atmel_serial.c: In function 'atmel_verify_port':
+> >>>> drivers/tty/serial/atmel_serial.c:2299:6: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+> >>>>   if ((void *)port->mapbase != ser->iomem_base)
+> >>>>       ^
+> >>>>
+> >>>> Fix that by using the cast on the right hand side instead, as similar
+> >>>> code already does in other drivers.
+> >>>>
+> >>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >>> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> >>
+> >> Hmm, this actually points at a problem, and the cast screems out about it.
+> >> Think about it, can you guess what it is?
+> 
+> Russell, I'd really appreciate if we wouldn't have to play
+> "guess-what-I-am-thinking" here. Can't you just say what's bothering you?
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/net/can/at91_can.c          | 21 ---------------------
- include/linux/platform_data/atmel.h |  5 -----
- 2 files changed, 26 deletions(-)
+Actually, I think it's fine - the interface is just another one of the
+weird cases we have in the kernel.
 
-diff --git a/drivers/net/can/at91_can.c b/drivers/net/can/at91_can.c
-index 945c0955a967..8b3275d7792a 100644
---- a/drivers/net/can/at91_can.c
-+++ b/drivers/net/can/at91_can.c
-@@ -8,15 +8,6 @@
-  * Public License ("GPL") version 2 as distributed in the 'COPYING'
-  * file from the main directory of the linux kernel source.
-  *
-- *
-- * Your platform definition file should specify something like:
-- *
-- * static struct at91_can_data ek_can_data = {
-- *	transceiver_switch = sam9263ek_transceiver_switch,
-- * };
-- *
-- * at91_add_device_can(&ek_can_data);
-- *
-  */
- 
- #include <linux/clk.h>
-@@ -33,7 +24,6 @@
- #include <linux/spinlock.h>
- #include <linux/string.h>
- #include <linux/types.h>
--#include <linux/platform_data/atmel.h>
- 
- #include <linux/can/dev.h>
- #include <linux/can/error.h>
-@@ -324,15 +314,6 @@ static inline u32 at91_can_id_to_reg_mid(canid_t can_id)
- 	return reg_mid;
- }
- 
--/*
-- * Swtich transceiver on or off
-- */
--static void at91_transceiver_switch(const struct at91_priv *priv, int on)
--{
--	if (priv->pdata && priv->pdata->transceiver_switch)
--		priv->pdata->transceiver_switch(on);
--}
--
- static void at91_setup_mailboxes(struct net_device *dev)
- {
- 	struct at91_priv *priv = netdev_priv(dev);
-@@ -416,7 +397,6 @@ static void at91_chip_start(struct net_device *dev)
- 
- 	at91_set_bittiming(dev);
- 	at91_setup_mailboxes(dev);
--	at91_transceiver_switch(priv, 1);
- 
- 	/* enable chip */
- 	if (priv->can.ctrlmode & CAN_CTRLMODE_LISTENONLY)
-@@ -444,7 +424,6 @@ static void at91_chip_stop(struct net_device *dev, enum can_state state)
- 	reg_mr = at91_read(priv, AT91_MR);
- 	at91_write(priv, AT91_MR, reg_mr & ~AT91_MR_CANEN);
- 
--	at91_transceiver_switch(priv, 0);
- 	priv->can.state = state;
- }
- 
-diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
-index 527a85c61924..c121ddf74f7f 100644
---- a/include/linux/platform_data/atmel.h
-+++ b/include/linux/platform_data/atmel.h
-@@ -74,11 +74,6 @@ struct atmel_uart_data {
- 	struct serial_rs485	rs485;		/* rs485 settings */
- };
- 
--/* CAN */
--struct at91_can_data {
--	void (*transceiver_switch)(int on);
--};
--
- /* FIXME: this needs a better location, but gets stuff building again */
- extern int at91_suspend_entering_slow_clock(void);
- 
+However, for the record, things get typed a certain way for a reason.
+Virtual addresses that can be dereferenced are generally pointer like.
+Physical addresses are generally integers.
+
+Casting between the two generally indicates a bug, and whenever you see
+a cast between the two, it should have special attention paid to it to
+make sure that it really is correct.
+
+There are a few famous places in the kernel where casting between an
+unsigned long and a virtual address is pretty standard, but they're
+the exception to the rule (eg, the argument to a timer, get_free_page()).
+This is another example.
+
+Sorry for creating confusion.
+
 -- 
-2.1.4
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
