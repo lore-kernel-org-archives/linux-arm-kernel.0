@@ -1,76 +1,100 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 8 Oct 2015 19:36:04 +0200
-Subject: [PATCH v2 0/8] mmc: dw_mmc-rockchip: allow tuning using the
- clk-phase api
-In-Reply-To: <1443622064-14362-1-git-send-email-heiko@sntech.de>
-References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
-Message-ID: <CAPDyKFqeo--AiW_zHHrSqoOdFNZ3J_FgJpz2L7Z8gZnNmQZSig@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 8 Oct 2015 19:38:53 +0200
+Subject: [PATCH v4] twd: Don't set CLOCK_EVT_FEAT_C3STOP unconditionally
+In-Reply-To: <20151008171616.GG7275@leverpostej>
+References: <56123BD0.8010005@sigmadesigns.com>
+ <56124035.6080107@sigmadesigns.com>
+ <CACRpkdbWRU3UH6aJnqdcuzdh_-sE7ryhs0vBTUbbRDcJ7PWXLw@mail.gmail.com>
+ <561247DF.1000308@sigmadesigns.com> <20151005103539.GC19064@leverpostej>
+ <5612649C.5020401@sigmadesigns.com> <20151008171616.GG7275@leverpostej>
+Message-ID: <5616AA2D.2070101@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 September 2015 at 16:07, Heiko Stuebner <heiko@sntech.de> wrote:
-> This series resurrects and adapts some individual patches whose sum
-> enable the dw_mmc hosts on Rockchip socs to tune clock phases using
-> the generic phase api (rk3288 and following have this capability).
->
-> The changes to the original mmc-phase clocks are expanded by further
-> findings resulting from devices being used in the field.
->
-> Similarly the regulator handling changes do use the brand new
-> regulator_set_voltage_triplet call to allow specifying lower and upper
-> limits. One possible point of discussion are the two voltage ranges
-> that are tried for the 3.3V signal level. Trying to stay near vmmc
-> at first and only then opening the range to the full 2.7-3.6V.
->
-> This mainly circumvents a shortcoming of the regulator voltage
-> setting, in that even with regulator_set_voltage_triplet the regulator
-> framework will take the lowest possible voltage when the possible
-> voltages are below the target voltage. While it may be ideal to solve
-> this on the regulator side, I'm not seeing this appearing in the short
-> term, mainly because all regulator parts (including regulator drivers)
-> are keyed to selecting the lowest voltage from the range, while on the
-> mmc side we know which voltages may work and trying this in two steps
-> does not create to much overhead, as unsupported voltages are already
-> filtered out by the regulator_is_voltage_selected calls.
->
-> changes since v1:
-> - address comment from Jaehoon Chung and keep this local to Rockchip
->   for the time being
-> - address comments from Ulf and Doug in making it more explicit
->   that the two-step 3.3V voltage setting essentially works around
->   a limitation of regulator_set_voltage_triplet
->
-> Alexandru M Stan (3):
->   mmc: dw_mmc-rockchip: dt-binding: Add tuning related things
->   mmc: dw_mmc: Generic MMC tuning with the clock phase framework
->   ARM: dts: rockchip: Add drive/sample clocks for rk3288 dw_mmc devices
->
-> Douglas Anderson (4):
->   clk: rockchip: Allow more precision for some mmc clock phases
->   clk: rockchip: Make calculations use rounding
->   mmc: core: Add mmc_regulator_set_vqmmc()
->   mmc: dw_mmc: Use mmc_regulator_set_vqmmc in
->     start_signal_voltage_switch
->
-> Heiko Stuebner (1):
->   ARM: dts: rockchip: add tuning related settings to veyron devices
->
->  .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |  13 ++
->  arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi         |   7 +-
->  arch/arm/boot/dts/rk3288-veyron.dtsi               |   6 +
->  arch/arm/boot/dts/rk3288.dtsi                      |  20 ++-
->  drivers/clk/rockchip/clk-mmc-phase.c               |  54 ++++---
->  drivers/mmc/core/core.c                            |  74 ++++++++++
->  drivers/mmc/host/dw_mmc-rockchip.c                 | 162 +++++++++++++++++++++
->  drivers/mmc/host/dw_mmc.c                          |  17 +--
->  include/linux/mmc/host.h                           |   7 +
->  9 files changed, 321 insertions(+), 39 deletions(-)
->
-> --
-> 2.5.1
->
+On 08/10/2015 19:16, Mark Rutland wrote:
+> On Mon, Oct 05, 2015 at 01:53:00PM +0200, Marc Gonzalez wrote:
+>> In 5388a6b266 ("ARM: SMP: Always enable clock event broadcast support")
+>> Russell noted that "the TWD local timers are unable to wake up the CPU
+>> when it is placed into a low power mode".
+>>
+>> However, some platforms do not stop the TWD block in low-power mode,
+>> and can thus use the TWD timer in one-shot mode, without setting up
+>> a broadcast device.
+>>
+>> Make the driver check for the "twd-never-stops" boolean property,
+>> and set the CLOCK_EVT_FEAT_C3STOP flag accordingly.
+>>
+>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/twd.txt | 4 ++++
+>>  arch/arm/kernel/smp_twd.c                     | 5 ++++-
+>>  2 files changed, 8 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/twd.txt b/Documentation/devicetree/bindings/arm/twd.txt
+>> index 75b8610939fa..700a517b000e 100644
+>> --- a/Documentation/devicetree/bindings/arm/twd.txt
+>> +++ b/Documentation/devicetree/bindings/arm/twd.txt
+>> @@ -19,6 +19,10 @@ interrupts.
+>>  - reg : Specify the base address and the size of the TWD timer
+>>  	register window.
+>>  
+>> +Optional
+>> +- twd-never-stops : boolean property. If present, TWD timers are expected
+>> +  to keep generating interrupts, even when the CPU is in low-power mode.
+> 
+> Sorry for the last minute bikeshed, but it would be better if we could
+> align this with the ARM generic timer binding, both in naming and
+> description:
+> 
+>  - always-on : a boolean property. If present, the timer is powered through an
+>    always-on power domain, therefore it never loses context.
 
-Thanks, applied for next!
+No problemo. Too bad I didn't think to copy that description
+in the first place!
 
-Kind regards
-Uffe
+> Otherwise this looks ok. If you can respin with the above wording, and
+> s/twd-never-stops/always-on/ in the patch, you can add:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Wouldn't you feel like going all-in and Signing-off? ;-)
+
+One last nit (see below).
+
+>> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+>> index e8f6d241881f..79298d4fb41f 100644
+>> --- a/arch/arm/kernel/smp_twd.c
+>> +++ b/arch/arm/kernel/smp_twd.c
+>> @@ -33,6 +33,7 @@ static unsigned long twd_timer_rate;
+>>  static DEFINE_PER_CPU(bool, percpu_setup_called);
+>>  
+>>  static struct clock_event_device __percpu *twd_evt;
+>> +static int feat_c3stop;
+>>  static int twd_ppi;
+>>  
+>>  static void twd_set_mode(enum clock_event_mode mode,
+>> @@ -293,7 +294,7 @@ static void twd_timer_setup(void)
+>>  
+>>  	clk->name = "local_timer";
+>>  	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+>> -			CLOCK_EVT_FEAT_C3STOP;
+>> +			feat_c3stop;
+>>  	clk->rating = 350;
+>>  	clk->set_mode = twd_set_mode;
+>>  	clk->set_next_event = twd_set_next_event;
+>> @@ -345,6 +346,8 @@ static int __init twd_local_timer_common_register(struct device_node *np)
+>>  		goto out_irq;
+>>  
+>>  	twd_get_clock(np);
+>> +	if (!of_property_read_bool(np, "twd-never-stops"))
+>> +		feat_c3stop = CLOCK_EVT_FEAT_C3STOP;
+
+Is it possible that twd_local_timer_common_register() would be
+called more than once?
+
+twd_local_timer_register() guards against multiple invocations,
+but twd_local_timer_of_register() doesn't (but maybe there is
+some guarantee from OF, or it's invalid to have multiple
+"arm,cortex-a9-twd-timer" strings in the DT).
+
+Regards.
