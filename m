@@ -1,75 +1,34 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 08 Oct 2015 15:02:38 +0900
-Subject: [RFT 0/3] usb: usb3503: Fix probing on Arndale board (missing phy)
-In-Reply-To: <56152BB2.4020202@samsung.com>
-References: <1444177807-15524-1-git-send-email-k.kozlowski@samsung.com>
- <56152BB2.4020202@samsung.com>
-Message-ID: <561606FE.2090007@samsung.com>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Thu, 8 Oct 2015 08:05:25 +0200
+Subject: [PATCH v4 19/26] ARM: pxa: magician: Add support for Omnivision
+ OV9640 camera
+In-Reply-To: <87pp0qa27m.fsf@belgarion.home>
+References: <cover.1443472089.git.petr.cvek@tul.cz> <5609B365.4060307@tul.cz>
+ <1443876607.4186.35.camel@gmail.com>
+ <87pp0qa27m.fsf@belgarion.home>
+Message-ID: <561607A5.50406@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.10.2015 23:26, Marek Szyprowski wrote:
-> Hello,
+Dne 7.10.2015 v 21:49 Robert Jarzmik napsal(a):
+> Philipp Zabel <philipp.zabel@gmail.com> writes:
 > 
-> On 2015-10-07 02:30, Krzysztof Kozlowski wrote:
->> Introduction
->> ============
->> This patchset tries to fix probing of usb3503 on Arndale board
->> if the Samsung PHY driver is probed later (or built as a module).
+>> Am Montag, den 28.09.2015, 23:38 +0200 schrieb Petr Cvek:
+>>> This patch adds support for an OV9640 camera to the HTC Magician
+>>> machine.
+>>>
+>>> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
 >>
->> *The patchset was not tested on Arndale board.*
->> I don't have that board. Please test it and say if the usb3503
->> deferred probe
->> works fine and the issue is solved.
->>
->> The patchset was tested on Odroid U3 board (which is different!)
->> in a simulated environment. It is not sufficient testing.
->>
->>
->> Difference
->> ==========
->> The usb3503 device driver can be used as a I2C device (on Odroid U3)
->> or as a platform device connected through phy (on Arndale). In the second
->> case the necessary phy reference has to be obtained and enabled.
->>
->> For some details please look also at thread [0][1].
->>
->> [0]
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348524.html
->>
->> [1]
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348875.html
->>
->>
+>> Still untested, but looks good to me.
+> I'm still reluctant to have the reset with the timings handled in the board code
+> as I consider this should be in the camera driver code
+> (magician_camera_reset()).
 
-> 
-> I'm not sure that this is the correct approach. usb3503 chip is simply
-> connected
-> to Exynos USB2 phy, so it visible on the USB bus. The real driver that
-> controls USB2
-> PHY is Exynos EHCI driver and USB3503 should not mess around it.
+It supports an actual state of the OV9640 driver handling. But I can exclude it until
+OV9640 will be transitioned. I don't have enough information about gpiod and soc-camera
+and not enough time to maintain multiple different (and dependent) patchsets.
 
-The ehci node (usb at 12110000) has one port configured and it takes one
-PHY reference (phy of id 1 - USB host). I can't see driver taking
-reference to HSIC0 or HSIC1 phys... Since I cannot diagnose the error I
-don't know what is really expected here.
+I forgot to test the timings ... actually I think I forgot results :-D . It was around the same time
+I have found I2C fast mode is not working. Will test again.
 
-> 
-> In my opinion all that is needed in case of Arndale board is forcing
-> reset of
-> usb3503 chip after successful EHCI and USB2 PHY initialization (for some
-> reason
-> initialization of usb3503 chip must be done after usb host initialization).
-> However I have no idea which driver should trigger this reset. Right now
-> I didn't
-> find any good solution for additional control for devices which are on
-> autoprobed
-> bus like usb.
-
-The reset is done at the end of usb3503's probe. The question "why
-usb3503 has to be initialized after EHCI and USB PHY" is still valid...
-
-Anyway thanks for feedback! I really appreciate it.
-
-Best regards,
-Krzysztof
+Petr
