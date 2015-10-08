@@ -1,88 +1,64 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 8 Oct 2015 11:28:58 +0200
-Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
-In-Reply-To: <005e01d101a9$31ee80f0$95cb82d0$@samsung.com>
-References: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
- <003a01d10199$58e96590$0abc30b0$@samsung.com>
- <20151008082302.GE14315@cbox>
- <005e01d101a9$31ee80f0$95cb82d0$@samsung.com>
-Message-ID: <20151008092858.GA16100@cbox>
+From: b38343@freescale.com (Robin Gong)
+Date: Thu, 8 Oct 2015 17:28:28 +0800
+Subject: [PATCH v2 5/8] spi: imx: Add support for loopback for ECSPI
+ controllers
+In-Reply-To: <04376A3D786BD947B28569C998A374A62E280E0F@NA-MBX-02.mgc.mentorg.com>
+References: <cover.1442923630.git.anton_bondarenko@mentor.com>
+ <ca96561d8010acf587a93d0f357774bf77efbe16.1442923630.git.anton_bondarenko@mentor.com>
+ <20150930084219.GE2709@shlinux2>
+ <04376A3D786BD947B28569C998A374A62E280E0F@NA-MBX-02.mgc.mentorg.com>
+Message-ID: <20151008092827.GB6101@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 12:10:35PM +0300, Pavel Fedin wrote:
->  Hello!
-> 
-[...]
-> 
-> > The architecture defines how to address a specific CPU, and that's using
-> > the MPIDR, not inventing our own scheme, so that's what we should do.
-> 
->  But doesn't the same apply to GICv2 then? It just happened so that we had Aff0 == idx, therefore
-> looks like nobody cared.
+On Thu, Oct 01, 2015 at 12:16:49AM +0000, Bondarenko, Anton wrote:
+> On 30.09.2015 10:42, Robin Gong wrote:
+> > On Fri, Sep 25, 2015 at 07:57:12PM +0200, Anton Bondarenko wrote:
+> >> @@ -370,8 +374,12 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+> >>  	if (config->mode & SPI_CS_HIGH)
+> >>  		cfg |= MX51_ECSPI_CONFIG_SSBPOL(config->cs);
+> >>  
+> >> +	if (config->mode & SPI_LOOP)
+> >> +		lpb |= MX51_ECSPI_LOOP;
+> >> +
+> >>  	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
+> >>  	writel(cfg, spi_imx->base + MX51_ECSPI_CONFIG);
+> >> +	writel(lpb, spi_imx->base + MX51_ECSPI_TEST);
+> > It's better write this MX51_ECSPI_TEST only in LOOP mode.
+> LOOP mode can be set dynamically. This mean we should be able to set and clear the flag.
+> Currently only LOOP flag is used. I did not find any problems with writing 0 in the rest
+> fields of TEST register.
+Yes, I know writing 0 is harmless, but we never need to touch this register if
+SPI_LOOP flags not set, I'd like below:
+	if (config->mode & SPI_LOOP) {
+		lpb |= MX51_ECSPI_LOOP;
+		writel(lgb, spi_imx->base + MX51_ECSPI_TEST);
+	}
 
-I don't think it's about caring, but we (I) didn't consider it when
-designing that API.
-
->  My argument is to have GICv3 API as similar to GICv2 as possible, IMHO that would make it easier to
-> maintain the code, and perhaps give some way to reusing it.
-
-Plenty of things are broken about the VGICv2 implementation and API, so
-my goal is not to have GICv3 be similar to GICv2, but to design a good
-API.
-
+> >>  
+> >>  	/*
+> >>  	 * Wait until the changes in the configuration register CONFIGREG
+> >> @@ -1276,12 +1287,13 @@ static int spi_imx_probe(struct platform_device *pdev)
+> >>  	spi_imx->bitbang.master->cleanup = spi_imx_cleanup;
+> >>  	spi_imx->bitbang.master->prepare_message = spi_imx_prepare_message;
+> >>  	spi_imx->bitbang.master->unprepare_message = spi_imx_unprepare_message;
+> >> -	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
+> >> +	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA |
+> >> +				SPI_CS_HIGH;
+> > Any change?
+> Will be fixed in V3
+> >>  
+> >> -	init_completion(&spi_imx->xfer_done);
+> >> +	if (is_imx5x_ecspi(spi_imx))
+> >> +		spi_imx->bitbang.master->mode_bits |= SPI_LOOP;
+> >>  
+> >> -	spi_imx->devtype_data = of_id ? of_id->data :
+> >> -		(struct spi_imx_devtype_data *) pdev->id_entry->driver_data;
+> >> +	init_completion(&spi_imx->xfer_done);
+> >>  
+> >>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >>  	spi_imx->base = devm_ioremap_resource(&pdev->dev, res);
+> >> -- 
+> >> 2.5.2
+> >>
 > 
-> > For example, I don't think you had the full 32-bits available to address
-> > a CPU in your proposal, so if nothing else, that proposal had less
-> > expressive power than what the architecture defines.
-> 
->  My proposal was:
-> 
-> --- cut ---
->   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
->   Attributes:
->     The attr field of kvm_device_attr encodes two values:
->     bits:     |  63  | 62 .. 52 | 51 ..  32  |  31   ....    0 |
->     values:   | size | reserved |  cpu idx   |      offset     |
-> 
->     All distributor regs can be accessed as (rw, 32-bit)
->     For GICv3 some regsisters are actually (rw, 64-bit) according to the
->     specification. In order to perform full 64-bit access 'size' bit should be
->     set to 1. KVM_DEV_ARM_VGIC_64BIT flag value is provided for this purpose.
-> --- cut ---
-> 
->  Bit 63 was meant to specify access size (u64 or u32), and bits 62 - 52 were reserved just in order
-> to match ARM64_SYS_REG() macro, which uses these bits for own purpose.
-> 
->  But, since your proposal suggests that all GICv3 accesses are 64-bit wide, and we use own system
-> register encoding (i don't see any serious problems with this), it is possible just to use bits
-> 63...32 for vCPU index. So, maximum number of CPUs would be the same 0xFFFFFFFF as in your proposal,
-> and the API would be fully compatible with GICv2 one (well, except access size), and we would use
-> the same definitions and the same approach to handle both. This would bring more consistency and
-> less confusion to userspace developers who use the API.
-
-I don't agree; using the same API with slightly different semantics
-depending on which device you created is much more error prone than
-having a clear separation between the two different APIs, IMHO.
-
-> 
->  By the way, the rest of KVM API (KVM_IRQ_LINE, for example), also uses vCPU index.
-> 
->  That's all my arguments for vCPU index instead of affinity value
-
-I'm not convinced that we should be compatible with GICv2 at all.  (The
-deeper argument here is that GICv2 had an architectural limitation to 8
-CPUs so all the CPU addressing is simple in that case.  This is a
-fundamental evolution from GICv2 to GICv3 so it is only natural that
-there are substantial changes in this area.)
-
-I'll let Marc or Peter chime in if they disagree.
-
->, and if you say "that doesn't
-> count, we don't have to be compatible with GICv2", i'll accept this and proceed with the rewrite.
-> 
-
-Cool!
-
-Thanks,
--Christoffer
