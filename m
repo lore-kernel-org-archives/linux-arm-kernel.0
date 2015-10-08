@@ -1,52 +1,86 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Thu,  8 Oct 2015 15:10:50 -0700
-Subject: [PATCH v5 4/4] irqchip/gic-v3-its: Add handling of PCI requester id.
+Date: Thu,  8 Oct 2015 15:10:49 -0700
+Subject: [PATCH v5 3/4] PCI/MSI: Add helper function
+ pci_msi_domain_get_msi_rid().
 In-Reply-To: <1444342250-6196-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1444342250-6196-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1444342250-6196-5-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1444342250-6196-4-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-Replace open coded generation PCI/MSI requester id with call to the
-new function pci_msi_domain_get_msi_rid() which applies the "msi-map"
-to the id value.
+Add pci_msi_domain_get_msi_rid() to return the MSI requester id (RID).
+Initially needed by gic-v3 based systems. It will be used by follow on
+patch to drivers/irqchip/irq-gic-v3-its-pci-msi.c
+
+Initially supports mapping the RID via OF device tree.  In the future,
+this could be extended to use ACPI _IORT tables as well.
 
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- drivers/irqchip/irq-gic-v3-its-pci-msi.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/pci/msi.c   | 30 ++++++++++++++++++++++++++++++
+ include/linux/msi.h |  1 +
+ 2 files changed, 31 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-index a7c8c9f..96f5f5f 100644
---- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-@@ -42,7 +42,6 @@ static struct irq_chip its_msi_irq_chip = {
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index d449714..81a2798 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -20,6 +20,7 @@
+ #include <linux/io.h>
+ #include <linux/slab.h>
+ #include <linux/irqdomain.h>
++#include <linux/of_irq.h>
  
- struct its_pci_alias {
- 	struct pci_dev	*pdev;
--	u32		dev_id;
- 	u32		count;
- };
+ #include "pci.h"
  
-@@ -60,7 +59,6 @@ static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
- {
- 	struct its_pci_alias *dev_alias = data;
+@@ -1327,4 +1328,33 @@ struct irq_domain *pci_msi_create_default_irq_domain(struct device_node *node,
  
--	dev_alias->dev_id = alias;
- 	if (pdev != dev_alias->pdev)
- 		dev_alias->count += its_pci_msi_vec_count(pdev);
+ 	return domain;
+ }
++
++static int get_msi_id_cb(struct pci_dev *pdev, u16 alias, void *data)
++{
++	u32 *pa = data;
++
++	*pa = alias;
++	return 0;
++}
++/**
++ * pci_msi_domain_get_msi_rid - Get the MSI requester id (RID)
++ * @domain:	The interrupt domain
++ * @pdev:	The PCI device.
++ *
++ * The RID for a device is formed from the alias, with a firmware
++ * supplied mapping applied
++ *
++ * Returns: The RID.
++ */
++u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
++{
++	u32 rid = 0;
++
++	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
++
++	if (domain->of_node)
++		rid = of_msi_map_rid(&pdev->dev, domain->of_node, rid);
++
++	return rid;
++}
+ #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index ad939d0..56e3b76 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -293,6 +293,7 @@ irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
+ 					  struct msi_desc *desc);
+ int pci_msi_domain_check_cap(struct irq_domain *domain,
+ 			     struct msi_domain_info *info, struct device *dev);
++u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev);
+ #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
  
-@@ -86,7 +84,7 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
- 	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
- 
- 	/* ITS specific DeviceID, as the core ITS ignores dev. */
--	info->scratchpad[0].ul = dev_alias.dev_id;
-+	info->scratchpad[0].ul = pci_msi_domain_get_msi_rid(domain, pdev);
- 
- 	return msi_info->ops->msi_prepare(domain->parent,
- 					  dev, dev_alias.count, info);
+ #endif /* LINUX_MSI_H */
 -- 
 1.9.1
