@@ -1,49 +1,37 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Thu, 8 Oct 2015 14:23:20 +0300
-Subject: [PATCH v6 0/6] KASAN for arm64
-In-Reply-To: <20151008111144.GC7275@leverpostej>
-References: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
- <20151007100411.GG3069@e104818-lin.cambridge.arm.com>
- <CAPAsAGxR-yqtmFeo65Xw_0RQyEy=mN1uG=GKtqoMLr_x_N0u5w@mail.gmail.com>
- <20151008111144.GC7275@leverpostej>
-Message-ID: <56165228.8060201@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 08 Oct 2015 04:42:53 -0700 (PDT)
+Subject: [PATCH] bridge/netfilter: avoid unused label warning
+In-Reply-To: <7985748.1v9Gzszd4T@wuerfel>
+References: <7985748.1v9Gzszd4T@wuerfel>
+Message-ID: <20151008.044253.925506191056148131.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2015 02:11 PM, Mark Rutland wrote:
-> On Thu, Oct 08, 2015 at 01:36:09PM +0300, Andrey Ryabinin wrote:
->> 2015-10-07 13:04 GMT+03:00 Catalin Marinas <catalin.marinas@arm.com>:
->>> On Thu, Sep 17, 2015 at 12:38:06PM +0300, Andrey Ryabinin wrote:
->>>> As usual patches available in git
->>>>       git://github.com/aryabinin/linux.git kasan/arm64v6
->>>>
->>>> Changes since v5:
->>>>  - Rebase on top of 4.3-rc1
->>>>  - Fixed EFI boot.
->>>>  - Updated Doc/features/KASAN.
->>>
->>> I tried to merge these patches (apart from the x86 one which is already
->>> merged) but it still doesn't boot on Juno as an EFI application.
->>>
->>
->> 4.3-rc1 was ok and 4.3-rc4 is not. Break caused by 0ce3cc008ec04
->> ("arm64/efi: Fix boot crash by not padding between EFI_MEMORY_RUNTIME
->> regions")
->> It introduced sort() call in efi_get_virtmap().
->> sort() is generic kernel function and it's instrumented, so we crash
->> when KASAN tries to access shadow in sort().
-> 
-> I believe this is solved by Ard's stub isolation series [1,2], which
-> will build a stub-specific copy of sort() and various other functions
-> (see the arm-deps in [2]).
-> 
-> So long as the stub is not built with ASAN, that should work.
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 06 Oct 2015 21:22:12 +0200
 
-Thanks, this should help, as we already build the stub without ASAN instrumentation.
+> With the ARM mini2440_defconfig, the bridge netfilter code gets
+> built with both CONFIG_NF_DEFRAG_IPV4 and CONFIG_NF_DEFRAG_IPV6
+> disabled, which leads to a harmless gcc warning:
+> 
+> net/bridge/br_netfilter_hooks.c: In function 'br_nf_dev_queue_xmit':
+> net/bridge/br_netfilter_hooks.c:792:2: warning: label 'drop' defined but not used [-Wunused-label]
+> 
+> This gets rid of the warning by cleaning up the code to avoid
+> the respective #ifdefs causing this problem, and replacing them
+> with if(IS_ENABLED()) checks. I have verified that the resulting
+> object code is unchanged, and an additional advantage is that
+> we now get compile coverage of the unused functions in more
+> configurations.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: dd302b59bde0 ("netfilter: bridge: don't leak skb in error paths")
 
-> 
-> Mark.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/373807.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/373808.html
-> 
+This commit is in v4.2-rc3 and later, but this patch only applies to net-next
+as far as I can tell.
+
+Wouldn't it be better to base this on 'net', or even better Pablo's netfilter
+fixes tree, and while you are at it submit it properly to netfilter-devel
+with Pablo CC:'d as well?
+
+Thanks.
