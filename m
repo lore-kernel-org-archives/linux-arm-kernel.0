@@ -1,101 +1,38 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 8 Oct 2015 10:28:11 -0500
-Subject: [PATCH v4 0/5] PCI: generic: Misc. bug fixes/enhancements
-In-Reply-To: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20151008152811.GD3885@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Oct 2015 17:27:37 +0200
+Subject: [GIT PULL] at91: cleanup for 4.4 #1
+In-Reply-To: <20151006152841.GA17947@piout.net>
+References: <20151006152841.GA17947@piout.net>
+Message-ID: <30261297.PResHp2kVS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 02, 2015 at 11:43:58AM -0700, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
+On Tuesday 06 October 2015 17:28:41 Alexandre Belloni wrote:
+> A few cross subsystem cleanups to soon be able to get rid of a nasty
+> hack in the clock driver. To ease synchronisation, I'm planning to send
+> the hack removal to for 4.5.
 > 
-> While using the pci-host-generic driver to add PCI support for the
-> Cavium ThunderX processors, several bugs were discovered.  This patch
-> set fixes the bugs, a follow-on set will add the ThunderX support.
+> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 > 
-> Changes from v3:
+>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 > 
->   - Drop "PCI: generic: Claim device resources if PCI_PROBE_ONLY"
+> are available in the git repository at:
 > 
->   - Add some Acked-by:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-cleanup-4.4
 > 
->   - Add to explanation of "reg" property in host-generic-pci.txt.
+> for you to fetch changes up to 7d8d05d11473a169ab4d53bc7fc23d1fe3f1959f:
 > 
->   - Add error message if "reg" property is too big.
+>   misc: atmel_tclib: get and use slow clock (2015-10-06 12:33:14 +0200)
 > 
->   - Use pointer to ops rather than make a copy.
-> 
-> Changes from v2:
-> 
->   - Added " PCI: generic: Claim device resources if PCI_PROBE_ONLY"
-> 
-> Changes from v1:
-> 
->   - "PCI: generic: Allow bus default MSI controller to be specified."
->     patch was dropped as it is no longer necessary.
-> 
->   - "PCI: Make global and export pdev_fixup_irq()." and "PCI: generic:
->     Only fixup irqs for bus we are creating." were rewritten to move
->     the support into a somewhat more generic form in setup-irq.c.
-> 
->   - Add some clarifying text to host-generic-pci.txt
-> 
->   - Add some Acked-by:
+> ----------------------------------------------------------------
+> First batch of cleanups for 4.4:
+>  - properly get the slow clock from timer-atmel-st, tcb_clksrc and pwm-atmel-tcb
+>  - small fix in an error path for tcb_clksrc
 > 
 > 
-> David Daney (5):
->   PCI: Add pci_bus_fixup_irqs().
->   PCI: generic: Only fixup irqs for bus we are creating.
 
-I'm hoping we won't need the above if we can resurrect Matthew's
-patches.
+Merged into next/drivers, which seems more appropriate than next/cleanup here.
 
->   PCI: generic: Quit clobbering our pci_ops.
+Thanks,
 
-Applied to pci/host-generic for v4.4 with Arnd's Reviewed-by and minor
-changelog tweaks (as below).
-
->   PCI: generic: Correct, and avoid overflow, in bus_max calculation.
-
-Seems not settled yet.
-
->   PCI: generic: Pass proper starting bus number to pci_scan_root_bus().
-
-Also applied to pci/host-generic, thanks!
-
-commit 9a28033753ca
-Author: David Daney <david.daney@cavium.com>
-Date:   Thu Oct 8 10:15:10 2015 -0500
-
-    PCI: generic: Allow multiple hosts with different map_bus() methods
-    
-    The generic driver kept a global struct pci_ops ("gen_pci_ops") which it
-    patched with the .map_bus() method appropriate for the bus device.  This is
-    a problem when we have two different types of bus devices: the .map_bus()
-    method for the last device probed clobbers the method for previous devices.
-    The result is that only the last bus device probed has the correct
-    .map_bus(), and the others fail.
-    
-    Move the struct pci_ops into the bus-specific structure and initialize a
-    pointer to it when the bus device is probed.
-    
-    Signed-off-by: David Daney <david.daney@cavium.com>
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-    Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-    Acked-by: Will Deacon <will.deacon@arm.com>
-
-commit 47ddb949029f
-Author: David Daney <david.daney@cavium.com>
-Date:   Thu Oct 8 10:24:41 2015 -0500
-
-    PCI: generic: Pass starting bus number to pci_scan_root_bus()
-    
-    If the bus is being configured with a bus-range that does not start at
-    zero, pass that starting bus number to pci_scan_root_bus().  Passing the
-    incorrect value of zero causes attempted config accesses outside of the
-    supported range, which cascades to an OOPs spew and eventual kernel panic.
-    
-    Signed-off-by: David Daney <david.daney@cavium.com>
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-    Acked-by: Will Deacon <will.deacon@arm.com>
+	Arnd
