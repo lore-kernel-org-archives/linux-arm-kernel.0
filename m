@@ -1,40 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 8 Oct 2015 16:08:19 +0100
-Subject: [PATCH v2 16/22] arm64/debug: Make use of the system wide safe
- value
-In-Reply-To: <561659EC.7030508@arm.com>
-References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
- <1444064531-25607-17-git-send-email-suzuki.poulose@arm.com>
- <20151008111128.GH17192@e104818-lin.cambridge.arm.com>
- <561659EC.7030508@arm.com>
-Message-ID: <20151008150819.GL17192@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Oct 2015 17:09:56 +0200
+Subject: [PATCH v4 3/5] PCI: generic: Quit clobbering our pci_ops.
+In-Reply-To: <20151008150215.GB3885@localhost>
+References: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
+ <1443811443-18878-4-git-send-email-ddaney.cavm@gmail.com>
+ <20151008150215.GB3885@localhost>
+Message-ID: <5128429.u9O5dh5qKB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 12:56:28PM +0100, Suzuki K. Poulose wrote:
-> On 08/10/15 12:11, Catalin Marinas wrote:
-> >On Mon, Oct 05, 2015 at 06:02:05PM +0100, Suzuki K. Poulose wrote:
-> >>@@ -137,13 +138,17 @@ extern struct pmu perf_ops_bp;
-> >>  /* Determine number of BRP registers available. */
-> >>  static inline int get_num_brps(void)
-> >>  {
-> >>-	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
-> >>+	return 1 +
-> >>+		cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
-> >>+						ID_AA64DFR0_BRPS_SHIFT);
-> >>  }
-> >
-> >cpuid_feature_extract_field() is fine but we should we bother with
-> >read_system_reg vs just read_cpuid?
-> >Similar question for patch 17/22.
+On Thursday 08 October 2015 10:02:16 Bjorn Helgaas wrote:
+> [+cc Arnd]
 > 
-> Well, we would have already TAINTed the kernel, if these fields are different.
-> It is just the matter of, whether we want to provide the safer value on a tainted
-> kernel or not. I am open to suggestions.
+> Arnd, you had comments on the previous version.  What do you think of
+> this one?
 
-Ah, sorry, I mixed read_system_reg() with read_cpu_sysreg(). I think we
-need to rename the latter as it gets confusing. Maybe something like
-read_native_sys_reg() or __raw_read_system_reg().
+Looks good to me
 
--- 
-Catalin
+> On Fri, Oct 02, 2015 at 11:44:01AM -0700, David Daney wrote:
+> > From: David Daney <david.daney@cavium.com>
+> > 
+> > The pci-host-generic driver keeps a global struct pci_ops which it
+> > then patches with the .map_bus method appropriate for the bus device.
+> > A problem arises when the driver is used for two different types of
+> > bus devices, the .map_bus method for the last device probed clobbers
+> > the method for all previous devices.  The result, only the last bus
+> > device probed has the proper .map_bus, and the others fail.
+> > 
+> > Move the struct pci_ops into the bus specific structure, and
+> > initialize a pointer to it when the bus device is probed.
+> > 
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> > Signed-off-by: David Daney <david.daney@cavium.com>
+> 
+
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
