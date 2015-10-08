@@ -1,43 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Oct 2015 21:29:42 +0200
-Subject: [GIT PULL 1/3] Keystone SOC driver updates for 4.4
-In-Reply-To: <5616C1F5.6050201@oracle.com>
-References: <1444151960-4941-1-git-send-email-ssantosh@kernel.org>
- <27586837.4pMcRLWPs5@wuerfel> <5616C1F5.6050201@oracle.com>
-Message-ID: <5000605.4VJZfFh1uH@wuerfel>
+From: psidhu@gateworks.com (Pushpal Sidhu)
+Date: Thu, 8 Oct 2015 12:31:05 -0700
+Subject: i.mx6 video out in mainline
+In-Reply-To: <1444200359.7656.4.camel@pengutronix.de>
+References: <CAD1M060ucNEjPceeK9R2s4drkZE1EWEadB1JtcUmnfuNx24zkA@mail.gmail.com>
+ <CAOMZO5CwjC2dq3fWugAJsqThxAZ6o4wv0gV7ues28a51z0fXLg@mail.gmail.com>
+ <CAD1M061RTNOCuE5vwrTsR3mgOaWcuwt5mc-L+K3kdLCDQ=JfLQ@mail.gmail.com>
+ <1444200359.7656.4.camel@pengutronix.de>
+Message-ID: <CAD1M062hdjvqFvS=RbFabofb8O70C0Js-TCbUOMy_0KXnQ7sJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 October 2015 12:20:21 santosh.shilimkar at oracle.com wrote:
-> On 10/8/15 11:50 AM, Arnd Bergmann wrote:
-> > On Thursday 08 October 2015 09:25:14 santosh.shilimkar at oracle.com wrote:
-> >> On 10/8/15 8:41 AM, Arnd Bergmann wrote:
-> >>> On Tuesday 06 October 2015 10:19:18 Santosh Shilimkar wrote:
-> >>>> Couple of patches for ARM Keystone SOC drivers
-> >>>>           - irq affinity bug fix
-> >>>>           - display the firmware name
-> >>>>
-> >>>> ----------------------------------------------------------------
-> >>>> Murali Karicheri (2):
-> >>>>         soc: ti: reset irq affinity before freeing irq
-> >>>>         soc: ti: display firmware file name as part of boot log
-> >>>>
-> >>>>    .../bindings/soc/ti/keystone-navigator-qmss.txt      | 20 +++++++++++++++++++-
-> >>>>    drivers/soc/ti/knav_qmss_acc.c                       |  4 ++++
-> >>>>    drivers/soc/ti/knav_qmss_queue.c                     |  3 +++
-> >>>>    3 files changed, 26 insertions(+), 1 deletion(-)
-> >>>
-> >>> The new text you add to the binding document doesn't really seem to
-> >>> belong in there, so I'm not pulling this until we've discussed how
-> >>> this should be better handled.
-> >>>
-> >> OK. Can you please pick the affinity fix alone?
-> >
-> > Sure. Actually this looks like it should go into 4.3, possibly stable.
-> > Can you confirm which kernels need it?
-> >
-> Upcoming 4.4 is just fine.
+On Tue, Oct 6, 2015 at 11:45 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Am Dienstag, den 06.10.2015, 16:02 -0700 schrieb Pushpal Sidhu:
+>> On Tue, Oct 6, 2015 at 3:16 PM, Fabio Estevam <festevam@gmail.com>
+>> wrote:
+>> > On Tue, Oct 6, 2015 at 6:52 PM, Pushpal Sidhu <psidhu@gateworks.com
+>> > > wrote:
+>> > > Hi All,
+>> > >
+>> > > I'm attempting to use a standard fb console (using the
+>> > > imx6qdl-gw54xx.dtsi), but I find that it only draws to the
+>> > > 1024x768p
+>> > > portion of the screen. This is also true when running the
+>> > > userspace
+>> > > tool fb-test.
+>> >
+>> > Looking at imx6qdl-gw54xx.dtsi I see you have a LVDS panel with
+>> > 1024x768 resolution.
+>> >
+>> > I sent a patch that allows LDB and HDMI to work simultaneously:
+>> > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/com
+>> > mit/arch/arm/boot/dts/imx6qdl
+>> > -sabresd.dtsi?id=d28be499c45e6e16d7a042ce280eb872dc06952b
+>> >
+>> > Can you try to adapt it for imx6qdl-gw54xx.dtsi?
+>> >
+>> > If this still does not help your HDMI output, please try disabling
+>> > the LVDS.
+>>
+>> When I took your patch and adapted it for imx6qdl-gw54xx.dtsi, I
+>> found
+>> that HDMI video out was slightly shifted to the left and resolution
+>> remained at 1024x768p.
+>>
+>> I also found that when I disabled DRM_IMX_LDB, HDMI out stopped
+>> working altogether, though if I stripped out the ldb section in
+>> device
+>> tree, the resolution comes back at 1080p (regardless of setting
+>> DRM_IMX_LDB or not). There is definitely some strange interdependency
+>> between lvds and hdmi here. Do you have an idea of where I should
+>> start looking for this problem?
+>>
+> This isn't strange, but actually really simple to explain:
+>
+> 1. The DRM driver is a componentized driver that needs all of its
+> components to come up before it registers the DRM device. So if you
+> have the LDB enabled in your DT you also need the LDB driver, otherwise
+> you won't get any video out. If you don't want to have LDB, don't
+> disable the driver alone, but also add a status = "disabled" in the DT
+> LDB node.
+>
+> 2. The kernels framebuffer emulation layer will try to put the
+> framebuffer on both displays. So if you have a smaller LVDS display
+> connected the framebuffer will only have the size of the smaller
+> display. Solution is to not depend on the kernels frambuffer emulation,
+> but actually set a mode from userspace and work with the KMS interface
+> directly.
 
-Ok, applied to next/fixes-non-critical.
+Ah, that makes total sense then. Do you know of any userspace
+application that works using the KMS interface, other than using
+x11/wayland (in other words, something extremely simple like fbset)?
+I've gotten too used to using the downstream vendor kernel way of
+using sysfs to set the modes per display so I'm trying to learn the
+"right" way of doing things.
 
-	Arnd
+About sysfs, why is it that the seemingly obsolete
+/sys/class/graphics/fbX/{mode,modes} still exist in the kernel when
+they seem to serve no function? Is that just some cleanup that hasn't
+occurred yet?
+
+- Pushpal
