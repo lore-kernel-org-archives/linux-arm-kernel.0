@@ -1,74 +1,75 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 8 Oct 2015 12:44:13 +0800
-Subject: Regression: USB OTG port breaks after a few hours in host mode
- on iMX6
-In-Reply-To: <20151007082222.GB21513@n2100.arm.linux.org.uk>
-References: <20151007082222.GB21513@n2100.arm.linux.org.uk>
-Message-ID: <20151008044412.GA8169@shlinux2>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Thu,  8 Oct 2015 10:30:59 +0530
+Subject: [PATCH v3 0/9] qcom: Add support for TSENS driver
+Message-ID: <1444280468-17159-1-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 09:22:22AM +0100, Russell King - ARM Linux wrote:
-> This bug is soo obscure, I'm not even sure how to start debugging it.
-> This never used to be a problem, but I'm not sure when it started as
-> USB (in general) is not something I use regularly.
-> 
-> In this setup, the USB OTG port is wired in host mode via pinmix
-> configuration of the USB OTG ID pin:
-> 
-> 	MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x13059
-> 
+Changes since v2:
+* Minor review fixes from Stephen/Punit and rebase on 4.3-rc4
 
-If the port has only host function, you can set dr_mode = "host" at
-dts, it will configure this port for host only, and ignore id interrupt.
+Changes since v1:
+* Created virtual tsens device from gcc driver for 8960,
+with DT having a single node for gcc and tsens
+* Minor fixes with rebasing on 4.3-rc1
 
-> The problem characterised so far: after booting the kernel, USB seems
-> to work fine.  You can plug and unplug devices from both USB host and
-> USB OTG ports, and it's detected.
-> 
-> If you boot a kernel with nothing plugged in, leave it for maybe four
-> hours, then plug in a device to either port, the device will be seen
-> in the USB host port, but completely ignored in the USB OTG port.
-> Both USB OTG ports have power, confirmed last night when using a USB
-> microscope with built-in LED lighting: the LEDs are functional, the
-> device is otherwise completely ignored.
+Changes since RFC:
+* Added support for 8916 and 8084
+* Based off the latest nvmem framework patches [1]
+* Minor review fixes for comments mostly from Lina
 
-Does interrupt occur after plugging in? If not, it means wake-on-connect
-does not wake up otg port. Else, the USB PHY may not be recovered well
-after suspend.
+This is an attempt to have a single TSENS driver for
+the different versions of the TSENS IP that exist, on
+different qcom msm/apq SoCs'
+Support is added for msm8916, msm8960 and msm8974 families.
 
-> 
-> The above is basically what I know so far: I don't know when the port
-> fails, whether in the case of "boot, wait four hours, and it's dead"
-> whether it's dead from boot: when I've tried testing it immediately
-> after boot, it's worked.
-> 
-> As it takes around four hours to reproduce, and I have a massive patch
-> stack on top of the kernel for this platform, I'm unwilling to attempt
-> a git bisection to try and find when this occurred, but I know it's
-> been going on for a while now as I've noticed the same behaviour when
-> I transfer my logitech USB receiver to that port.
-> 
-> I had thought it was a power issue, but the USB camera last night
-> confirmed that it's a port driver issue.
+A lot of the work is based of original code from Stephen Boyd
+and Siddartha Mohanadoss. I have also picked some of what
+Narendran Rajan did in his attempt to upstream the support
+for 8960 family. I could not keep the original authorship on
+any of the patches because I ended up moving the code around
+quite a bit in an effort to have a single driver for the
+various devices. I would be glad to change the authorship
+for any of the patches if needed.
 
-I am testing it with two boards to see if it can be reproduced.
+Rajendra Nayak (9):
+  thermal: qcom: tsens: Add a skeletal TSENS drivers
+  thermal: qcom: tsens-8916: Add support for 8916 family of SoCs
+  thermal: qcom: tsens-8974: Add support for 8974 family of SoCs
+  clk: qcom: create virtual child device for TSENS
+  thermal: qcom: tsens-8960: Add support for 8960 family of SoCs
+  arm: dts: msm8974: Add thermal zones, tsens and qfprom nodes
+  arm: dts: apq8064: Add thermal zones, tsens and qfprom nodes
+  arm: dts: apq8084: Add thermal zones, tsens and qfprom nodes
+  arm64: dts: msm8916: Add thermal zones, tsens and qfprom nodes
 
-> 
-> Certainly earlier 3.x kernels did not have this behaviour.
-> 
-
-The biggest change is runtime pm has enabled at the controller side, it
-will leave the phy in low power mode, and enable the usb wakeup if
-nothing in the port. With below change at ci_hdrc_imx.c, the runtime pm
-can be disabled at controller side.
-
- static const struct ci_hdrc_imx_platform_flag imx6q_usb_data = {
-	 -       .flags = CI_HDRC_SUPPORTS_RUNTIME_PM |
-	+      .flags = /*CI_HDRC_SUPPORTS_RUNTIME_PM | */
-			CI_HDRC_TURN_VBUS_EARLY_ON |
+ .../devicetree/bindings/thermal/qcom-tsens.txt     |  33 +++
+ arch/arm/boot/dts/qcom-apq8064.dtsi                | 101 +++++++
+ arch/arm/boot/dts/qcom-apq8084.dtsi                | 105 ++++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi                | 105 ++++++++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |  66 +++++
+ drivers/clk/qcom/gcc-msm8960.c                     |  19 +-
+ drivers/thermal/Kconfig                            |   5 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/qcom/Kconfig                       |  10 +
+ drivers/thermal/qcom/Makefile                      |   2 +
+ drivers/thermal/qcom/tsens-8916.c                  | 107 ++++++++
+ drivers/thermal/qcom/tsens-8960.c                  | 291 +++++++++++++++++++++
+ drivers/thermal/qcom/tsens-8974.c                  | 239 +++++++++++++++++
+ drivers/thermal/qcom/tsens-common.c                | 130 +++++++++
+ drivers/thermal/qcom/tsens.c                       | 206 +++++++++++++++
+ drivers/thermal/qcom/tsens.h                       |  69 +++++
+ 16 files changed, 1488 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+ create mode 100644 drivers/thermal/qcom/Kconfig
+ create mode 100644 drivers/thermal/qcom/Makefile
+ create mode 100644 drivers/thermal/qcom/tsens-8916.c
+ create mode 100644 drivers/thermal/qcom/tsens-8960.c
+ create mode 100644 drivers/thermal/qcom/tsens-8974.c
+ create mode 100644 drivers/thermal/qcom/tsens-common.c
+ create mode 100644 drivers/thermal/qcom/tsens.c
+ create mode 100644 drivers/thermal/qcom/tsens.h
 
 -- 
-
-Best Regards,
-Peter Chen
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
