@@ -1,75 +1,65 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 8 Oct 2015 12:59:12 +0200
-Subject: [PATCH v2] mmc: core: Fix init_card in 52Mhz
-In-Reply-To: <1444288147-24013-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1444288147-24013-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFqrjP3-y+ucm5ybwXefsDLOYcPF9XqMciwhRkjD5NXLBg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 8 Oct 2015 12:06:33 +0100
+Subject: [PATCH v6 0/6] KASAN for arm64
+In-Reply-To: <CAPAsAGxR-yqtmFeo65Xw_0RQyEy=mN1uG=GKtqoMLr_x_N0u5w@mail.gmail.com>
+References: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
+ <20151007100411.GG3069@e104818-lin.cambridge.arm.com>
+ <CAPAsAGxR-yqtmFeo65Xw_0RQyEy=mN1uG=GKtqoMLr_x_N0u5w@mail.gmail.com>
+Message-ID: <20151008110633.GB7275@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 October 2015 at 09:09, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> Suppose that we got a data crc error, and it triggers the mmc_reset.
-> mmc_reset will call mmc_send_status to see if HW reset was supported.
-> before issue CMD13, it will do retune, and if EMMC was in HS400 mode,
-> it will reduce frequency to 52Mhz firstly, then results in card init
-> was doing at 52Mhz.
-> The mmc_send_status was originally only done for mmc_test, so if retune
-> needed, do not call mmc_send_status.
->
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> Suggested-by: Adrian Hunter <adrian.hunter@intel.com>
-> ---
->  drivers/mmc/card/mmc_test.c | 6 ++++++
->  drivers/mmc/core/mmc.c      | 2 +-
->  2 files changed, 7 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
-> index b78cf5d..2f78bfb 100644
-> --- a/drivers/mmc/card/mmc_test.c
-> +++ b/drivers/mmc/card/mmc_test.c
-> @@ -2272,6 +2272,12 @@ static int mmc_test_hw_reset(struct mmc_test_card *test)
->         if (!mmc_card_mmc(card) || !mmc_can_reset(card))
->                 return RESULT_UNSUP_CARD;
->
-> +       if (host->need_retune) {
-> +               pr_info("%s: cannot test hw reset because retune needed\n",
-> +                       mmc_hostname(test->card->host));
-> +               return RESULT_FAIL;
-> +       }
-> +
->         err = mmc_hw_reset(host);
->         if (!err)
->                 return RESULT_OK;
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> index e726903..647c96d 100644
-> --- a/drivers/mmc/core/mmc.c
-> +++ b/drivers/mmc/core/mmc.c
-> @@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
->         host->ops->hw_reset(host);
->
->         /* If the reset has happened, then a status command will fail */
-> -       if (!mmc_send_status(card, &status)) {
-> +       if (!host->need_retune && !mmc_send_status(card, &status)) {
+On Thu, Oct 08, 2015 at 01:36:09PM +0300, Andrey Ryabinin wrote:
+> 2015-10-07 13:04 GMT+03:00 Catalin Marinas <catalin.marinas@arm.com>:
+> > On Thu, Sep 17, 2015 at 12:38:06PM +0300, Andrey Ryabinin wrote:
+> >> As usual patches available in git
+> >>       git://github.com/aryabinin/linux.git kasan/arm64v6
+> >>
+> >> Changes since v5:
+> >>  - Rebase on top of 4.3-rc1
+> >>  - Fixed EFI boot.
+> >>  - Updated Doc/features/KASAN.
+> >
+> > I tried to merge these patches (apart from the x86 one which is already
+> > merged) but it still doesn't boot on Juno as an EFI application.
+> >
+> 
+> 4.3-rc1 was ok and 4.3-rc4 is not. Break caused by 0ce3cc008ec04
+> ("arm64/efi: Fix boot crash by not padding between EFI_MEMORY_RUNTIME
+> regions")
+> It introduced sort() call in efi_get_virtmap().
+> sort() is generic kernel function and it's instrumented, so we crash
+> when KASAN tries to access shadow in sort().
+> 
+> [+CC efi some guys]
+> 
+> Comment in drivers/firmware/efi/libstub/Makefile says that EFI stub
+> executes with MMU disabled:
+>     # The stub may be linked into the kernel proper or into a separate
+> boot binary,
+>     # but in either case, it executes before the kernel does (with MMU
+> disabled) so
+>     # things like ftrace and stack-protector are likely to cause trouble if left
+>     # enabled, even if doing so doesn't break the build.
+> 
+> But in arch/arm64/kernel/efi-entry.S:
+> * We arrive here from the EFI boot manager with:
+> *
+> *    * CPU in little-endian mode
+> *    * MMU on with identity-mapped RAM
+> 
+> So is MMU enabled in ARM64 efi-stub?
 
-No, this seem like the wrong solution! The main purpose of mmc_reset()
-is to try to reset and re-initiate the card, to make it operational
-again.
+The stub is executed as an EFI application, which means that the MMU is
+on, and the page tables are an idmap owned by the EFI implementation.
 
-I can't find a good reason to why we want to do a mmc_send_status() at
-this point, as even if it succeeds it will only tell us that the card
-has not been "hw-reset". No matter what, we should still try to make
-it fully operational again and thus give mmc_init_card() a try.
+> If yes, we could solve this issue by mapping KASAN early shadow in efi stub.
 
->From this reasoning, I suggest we remove the call to mmc_send_status()
-from this path, as that will also address your issue with CRC errors
-in combination with re-tune.
+As the page tables are owned by the implemenation and not the kernel, we
+cannot alter them (at least not until we've called ExitBootServices(),
+which happens relatively late).
 
->                 mmc_host_clk_release(host);
->                 return -ENOSYS;
->         }
-> --
-> 1.8.1.1.dirty
->
+Can we not build the stub without ASAN protections?
 
-Kind regards
-Uffe
+Thanks,
+Mark.
