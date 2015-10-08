@@ -1,57 +1,49 @@
 From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Thu,  8 Oct 2015 23:34:32 +0200
-Subject: [PATCH 4/6] watchdog: at91sam9: remove nowayout useless copy
+Date: Thu,  8 Oct 2015 23:34:30 +0200
+Subject: [PATCH 2/6] watchdog: at91sam9: use watchdog_get_drvdata instead of
+ container_of
 In-Reply-To: <1444340074-15437-1-git-send-email-sylvain.rochet@finsecur.com>
 References: <1444340074-15437-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <1444340074-15437-5-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <1444340074-15437-3-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nowayout is a global variable set by module parameter, remove the
-nowayout useless copy.
+Use watchdog_get_drvdata instead of container_of.
 
 Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
 ---
- drivers/watchdog/at91sam9_wdt.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/watchdog/at91sam9_wdt.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index 2c506e0..8629f48 100644
+index 88f56b5..8c1c9de 100644
 --- a/drivers/watchdog/at91sam9_wdt.c
 +++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -86,7 +86,6 @@ struct at91wdt {
- 	u32 mr;
- 	u32 mr_mask;
- 	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
--	bool nowayout;
- 	unsigned int irq;
- 	struct clk *sclk;
- };
-@@ -233,7 +232,7 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
- 	/* Try to set timeout from device tree first */
- 	if (watchdog_init_timeout(&wdt->wdd, 0, dev))
- 		watchdog_init_timeout(&wdt->wdd, wdt_timeout, dev);
--	watchdog_set_nowayout(&wdt->wdd, wdt->nowayout);
-+	watchdog_set_nowayout(&wdt->wdd, nowayout);
- 	err = watchdog_register_device(&wdt->wdd);
- 	if (err)
- 		goto out_stop_timer;
-@@ -338,7 +337,6 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 	wdt->mr = (WDT_HW_TIMEOUT * 256) | AT91_WDT_WDRSTEN | AT91_WDT_WDD |
- 		  AT91_WDT_WDDBGHLT;
- 	wdt->mr_mask = 0x3FFFFFFF;
--	wdt->nowayout = nowayout;
- 	wdt->wdd.parent = &pdev->dev;
- 	wdt->wdd.info = &at91_wdt_info;
- 	wdt->wdd.ops = &at91_wdt_ops;
-@@ -376,7 +374,7 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, wdt);
+@@ -80,7 +80,6 @@ module_param(nowayout, bool, 0);
+ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started "
+ 	"(default=" __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
  
- 	pr_info("initialized (timeout=%d sec, nowayout=%d)\n",
--		wdt->wdd.timeout, wdt->nowayout);
-+		wdt->wdd.timeout, nowayout);
+-#define to_wdt(wdd) container_of(wdd, struct at91wdt, wdd)
+ struct at91wdt {
+ 	struct watchdog_device wdd;
+ 	void __iomem *base;
+@@ -134,7 +133,7 @@ static void at91_ping(unsigned long data)
  
+ static int at91_wdt_start(struct watchdog_device *wdd)
+ {
+-	struct at91wdt *wdt = to_wdt(wdd);
++	struct at91wdt *wdt = watchdog_get_drvdata(wdd);
+ 	/* calculate when the next userspace timeout will be */
+ 	wdt->next_heartbeat = jiffies + wdd->timeout * HZ;
  	return 0;
+@@ -349,6 +348,8 @@ static int __init at91wdt_probe(struct platform_device *pdev)
+ 	wdt->wdd.min_timeout = 1;
+ 	wdt->wdd.max_timeout = 0xFFFF;
  
++	watchdog_set_drvdata(&wdt->wdd, wdt);
++
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	wdt->base = devm_ioremap_resource(&pdev->dev, r);
+ 	if (IS_ERR(wdt->base))
 -- 
 2.5.1
