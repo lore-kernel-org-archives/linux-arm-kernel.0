@@ -1,86 +1,40 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Thu,  8 Oct 2015 15:10:49 -0700
-Subject: [PATCH v5 3/4] PCI/MSI: Add helper function
- pci_msi_domain_get_msi_rid().
-In-Reply-To: <1444342250-6196-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1444342250-6196-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1444342250-6196-4-git-send-email-ddaney.cavm@gmail.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Fri,  9 Oct 2015 00:45:04 +0200
+Subject: [PATCH 0/3] Adding Xilinx Zynq 7000 FPGA Manager driver
+Message-ID: <1444344307-22509-1-git-send-email-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
+Hi all,
 
-Add pci_msi_domain_get_msi_rid() to return the MSI requester id (RID).
-Initially needed by gic-v3 based systems. It will be used by follow on
-patch to drivers/irqchip/irq-gic-v3-its-pci-msi.c
+this patchset adds support for the Xilinx Zynq 7000 FPGA Manager,
+based on Alan's FPGA manager framework.
 
-Initially supports mapping the RID via OF device tree.  In the future,
-this could be extended to use ACPI _IORT tables as well.
+The patchset has lived for a while already in the Xilinx tree,
+however, I don't know if anyone besides me tested it so far?
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: David Daney <david.daney@cavium.com>
----
- drivers/pci/msi.c   | 30 ++++++++++++++++++++++++++++++
- include/linux/msi.h |  1 +
- 2 files changed, 31 insertions(+)
+The version in their tree got ACKs by Michal and Soeren already,
+but was based against an older version of Alan's patchset.
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index d449714..81a2798 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -20,6 +20,7 @@
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/irqdomain.h>
-+#include <linux/of_irq.h>
- 
- #include "pci.h"
- 
-@@ -1327,4 +1328,33 @@ struct irq_domain *pci_msi_create_default_irq_domain(struct device_node *node,
- 
- 	return domain;
- }
-+
-+static int get_msi_id_cb(struct pci_dev *pdev, u16 alias, void *data)
-+{
-+	u32 *pa = data;
-+
-+	*pa = alias;
-+	return 0;
-+}
-+/**
-+ * pci_msi_domain_get_msi_rid - Get the MSI requester id (RID)
-+ * @domain:	The interrupt domain
-+ * @pdev:	The PCI device.
-+ *
-+ * The RID for a device is formed from the alias, with a firmware
-+ * supplied mapping applied
-+ *
-+ * Returns: The RID.
-+ */
-+u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
-+{
-+	u32 rid = 0;
-+
-+	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
-+
-+	if (domain->of_node)
-+		rid = of_msi_map_rid(&pdev->dev, domain->of_node, rid);
-+
-+	return rid;
-+}
- #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index ad939d0..56e3b76 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -293,6 +293,7 @@ irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
- 					  struct msi_desc *desc);
- int pci_msi_domain_check_cap(struct irq_domain *domain,
- 			     struct msi_domain_info *info, struct device *dev);
-+u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev);
- #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
- 
- #endif /* LINUX_MSI_H */
+Michal, Soeren, could I get ACKs from you guys for this version?
+
+Cheers,
+
+    Moritz
+
+Moritz Fischer (3):
+  doc: dt: fpga: Added Documentation for Xilinx Zynq FPGA manager.
+  dts: Updated devicetree bindings for Zynq 7000 platform
+  fpga manager: Adding FPGA Manager support for Xilinx Zynq 7000
+
+ .../bindings/fpga/xilinx-zynq-fpga-mgr.txt         |  26 ++
+ arch/arm/boot/dts/zynq-7000.dtsi                   |   5 +
+ drivers/fpga/Kconfig                               |   5 +
+ drivers/fpga/Makefile                              |   1 +
+ drivers/fpga/zynq-fpga.c                           | 478 +++++++++++++++++++++
+ 5 files changed, 515 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt
+ create mode 100644 drivers/fpga/zynq-fpga.c
+
 -- 
-1.9.1
+2.6.1
