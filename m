@@ -1,79 +1,83 @@
 From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Thu,  8 Oct 2015 23:34:33 +0200
-Subject: [PATCH 5/6] watchdog: at91sam9: remove unused pdata support
+Date: Thu,  8 Oct 2015 23:34:31 +0200
+Subject: [PATCH 3/6] watchdog: at91sam9: rename heartbeats into timeout where
+ necessary
 In-Reply-To: <1444340074-15437-1-git-send-email-sylvain.rochet@finsecur.com>
 References: <1444340074-15437-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <1444340074-15437-6-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <1444340074-15437-4-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All SoC using this driver were converted to device tree. Remove pdata
-support and initialization steps which are only used for pdata.
+There is a confusing naming here, heartbeats is used instead of timeout
+where the real meaning is timeout in various places.
+
+Remove the unused WDT_TIMEOUT variable, which used to be a heartbeat
+value. Rename WDT_HEARTBEAT into WDT_DEFAULT_TIMEOUT and rename
+"heartbeats" into "timeout" in pr_ strings where necessary.
+
+Rename the "enabled" in the watchdog welcome message ("enabled (timeout
+= %d sec, nowayout = %d)\n") to "initialized", the watchdog user land
+timeout and nowayout values are not used before userland starts to pat
+the watchdog, reduce confusion by not telling those values are used
+right now while there are not.
 
 Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
 ---
- drivers/watchdog/at91sam9_wdt.c | 15 ---------------
- 1 file changed, 15 deletions(-)
+ drivers/watchdog/at91sam9_wdt.c | 20 +++++++++-----------
+ 1 file changed, 9 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index 8629f48..5d3e8c0 100644
+index 8c1c9de..2c506e0 100644
 --- a/drivers/watchdog/at91sam9_wdt.c
 +++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -62,9 +62,6 @@
- /* Watchdog max delta/value in secs */
- #define WDT_COUNTER_MAX_SECS	ticks_to_secs(WDT_COUNTER_MAX_TICKS)
+@@ -65,15 +65,13 @@
+ /* Hardware timeout in seconds */
+ #define WDT_HW_TIMEOUT 16
  
--/* Hardware timeout in seconds */
--#define WDT_HW_TIMEOUT 16
--
- /* User land default timeout */
- #define WDT_DEFAULT_TIMEOUT 15
+-/* Timer heartbeat (500ms) */
+-#define WDT_TIMEOUT	(HZ/2)
++/* User land default timeout */
++#define WDT_DEFAULT_TIMEOUT 15
  
-@@ -261,7 +258,6 @@ static const struct watchdog_ops at91_wdt_ops = {
- 	.set_timeout =	at91_wdt_set_timeout,
- };
+-/* User land timeout */
+-#define WDT_HEARTBEAT 15
+-static int heartbeat;
+-module_param(heartbeat, int, 0);
+-MODULE_PARM_DESC(heartbeat, "Watchdog heartbeats in seconds. "
+-	"(default = " __MODULE_STRING(WDT_HEARTBEAT) ")");
++static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
++module_param(wdt_timeout, int, 0);
++MODULE_PARM_DESC(wdt_timeout, "Watchdog timeout in seconds. "
++	"(default = " __MODULE_STRING(WDT_DEFAULT_TIMEOUT) ")");
  
--#if defined(CONFIG_OF)
- static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
- {
- 	u32 min = 0;
-@@ -317,12 +313,6 @@ static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
+ static bool nowayout = WATCHDOG_NOWAYOUT;
+ module_param(nowayout, bool, 0);
+@@ -234,7 +232,7 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
  
- 	return 0;
- }
--#else
--static inline int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
--{
--	return 0;
--}
--#endif
- 
- static int __init at91wdt_probe(struct platform_device *pdev)
- {
-@@ -334,9 +324,6 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 	if (!wdt)
- 		return -ENOMEM;
- 
--	wdt->mr = (WDT_HW_TIMEOUT * 256) | AT91_WDT_WDRSTEN | AT91_WDT_WDD |
--		  AT91_WDT_WDDBGHLT;
--	wdt->mr_mask = 0x3FFFFFFF;
+ 	/* Try to set timeout from device tree first */
+ 	if (watchdog_init_timeout(&wdt->wdd, 0, dev))
+-		watchdog_init_timeout(&wdt->wdd, heartbeat, dev);
++		watchdog_init_timeout(&wdt->wdd, wdt_timeout, dev);
+ 	watchdog_set_nowayout(&wdt->wdd, wdt->nowayout);
+ 	err = watchdog_register_device(&wdt->wdd);
+ 	if (err)
+@@ -344,7 +342,7 @@ static int __init at91wdt_probe(struct platform_device *pdev)
  	wdt->wdd.parent = &pdev->dev;
  	wdt->wdd.info = &at91_wdt_info;
  	wdt->wdd.ops = &at91_wdt_ops;
-@@ -396,14 +383,12 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
+-	wdt->wdd.timeout = WDT_HEARTBEAT;
++	wdt->wdd.timeout = wdt_timeout;
+ 	wdt->wdd.min_timeout = 1;
+ 	wdt->wdd.max_timeout = 0xFFFF;
+ 
+@@ -377,7 +375,7 @@ static int __init at91wdt_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, wdt);
+ 
+-	pr_info("enabled (heartbeat=%d sec, nowayout=%d)\n",
++	pr_info("initialized (timeout=%d sec, nowayout=%d)\n",
+ 		wdt->wdd.timeout, wdt->nowayout);
+ 
  	return 0;
- }
- 
--#if defined(CONFIG_OF)
- static const struct of_device_id at91_wdt_dt_ids[] = {
- 	{ .compatible = "atmel,at91sam9260-wdt" },
- 	{ /* sentinel */ }
- };
- 
- MODULE_DEVICE_TABLE(of, at91_wdt_dt_ids);
--#endif
- 
- static struct platform_driver at91wdt_driver = {
- 	.remove		= __exit_p(at91wdt_remove),
 -- 
 2.5.1
