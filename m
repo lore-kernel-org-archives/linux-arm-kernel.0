@@ -1,79 +1,79 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 8 Oct 2015 14:00:26 +0100
-Subject: [PATCH v2 14/22] arm64: Cleanup HWCAP handling
-In-Reply-To: <20151008111709.GE32532@n2100.arm.linux.org.uk>
-References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
- <1444064531-25607-15-git-send-email-suzuki.poulose@arm.com>
- <20151008111000.GG17192@e104818-lin.cambridge.arm.com>
- <20151008111709.GE32532@n2100.arm.linux.org.uk>
-Message-ID: <20151008130026.GI17192@e104818-lin.cambridge.arm.com>
+From: mathias.nyman@linux.intel.com (Mathias Nyman)
+Date: Thu, 08 Oct 2015 16:05:00 +0300
+Subject: [PATCH v9 4/5] xhci: mediatek: support MTK xHCI host controller
+In-Reply-To: <5616616D.3080205@linaro.org>
+References: <1443495698-32233-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1443495698-32233-5-git-send-email-chunfeng.yun@mediatek.com>
+ <560D1CA9.1050009@linaro.org> <1444305958.26198.14.camel@mhfsdcap03>
+ <5616616D.3080205@linaro.org>
+Message-ID: <561669FC.3030600@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 12:17:09PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Oct 08, 2015 at 12:10:00PM +0100, Catalin Marinas wrote:
-> > On Mon, Oct 05, 2015 at 06:02:03PM +0100, Suzuki K. Poulose wrote:
-> > > +static bool cpus_have_hwcap(const struct arm64_cpu_capabilities *cap)
-> > > +{
-> > > +	switch(cap->hwcap_type) {
-> > > +	case CAP_HWCAP:
-> > > +		return !!(elf_hwcap & cap->hwcap);
-> > > +#ifdef CONFIG_COMPAT
-> > > +	case CAP_COMPAT_HWCAP:
-> > > +		return !!(compat_elf_hwcap & (u32)cap->hwcap);
-> > > +	case CAP_COMPAT_HWCAP2:
-> > > +		return !!(compat_elf_hwcap2 & (u32)cap->hwcap);
-> > > +#endif
-> > > +	default:
-> > > +		BUG();
-> > > +		return false;
-> > > +	}
-> > > +}
-> > 
-> > Apart from the multiple returns, you don't really need !! since the
-> > return type is bool already.
-> 
-> That's wrong.  a & b doesn't return 0 or 1, but the bitwise-and result.
+On 08.10.2015 15:28, Daniel Thompson wrote:
+> On 08/10/15 13:05, chunfeng yun wrote:
+>> Hi,
+>> On Thu, 2015-10-01 at 12:44 +0100, Daniel Thompson wrote:
+>>> On 29/09/15 04:01, Chunfeng Yun wrote:
+>>>> There some vendor quirks for MTK xhci host controller:
+>>>> 1. It defines some extra SW scheduling parameters for HW
+>>>>     to minimize the scheduling effort for synchronous and
+>>>>     interrupt endpoints. The parameters are put into reseved
+>>>>     DWs of slot context and endpoint context.
+>>>> 2. Its IMODI unit for Interrupter Moderation register is
+>>>>     8 times as much as that defined in xHCI spec.
+>>>> 3. Its TDS in  Normal TRB defines a number of packets that
+>>>>     remains to be transferred for a TD after processing all
+>>>>     Max packets in all previous TRBs.
+>>>>
+>>>> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+>>>
+>>> I've done some basic soak tests, both with a directly attached USB3 HDD
+>>> and, given the extra code to manage isochronous xfer, also with a hub,
+>>> disc and two audio interfaces.
+>>>
+>>> Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
+>>>
+>>>
+>>>> diff --git a/drivers/usb/host/xhci-ring.c b/drivers/usb/host/xhci-ring.c
+>>>> index 57f40a1..243f696 100644
+>>>> --- a/drivers/usb/host/xhci-ring.c
+>>>> +++ b/drivers/usb/host/xhci-ring.c
+>>>> @@ -68,6 +68,7 @@
+>>>>    #include <linux/slab.h>
+>>>>    #include "xhci.h"
+>>>>    #include "xhci-trace.h"
+>>>> +#include "xhci-mtk.h"
+>>>>
+>>>>    /*
+>>>>     * Returns zero if the TRB isn't in this segment, otherwise it returns the DMA
+>>>> @@ -3044,18 +3045,27 @@ static u32 xhci_td_remainder(struct xhci_hcd *xhci, int transferred,
+>>>>                      struct urb *urb, unsigned int num_trbs_left)
+>>>>    {
+>>>>        u32 maxp, total_packet_count;
+>>>> +    u32 skip_current_trb = 0;
+>>>
+>>> A bit of a nitpick but why do we need skip_current_trb? Testing
+>>> (xhci->quirks & XHCI_MTK_HOST) twice would make what the code does, and
+>>> why, more obvious.
+>>>
+>> I am not sure which way it is better, so add variable of
+>> skip_current_trb to reduce test times.
+>
+> I can't imagine either approach impacts performance. However introducing skip_current_trb makes the flow of the branches harder to follow.
+>
+> The first branch was a version check and can remain so; we only need to do something special with the quirks because the MTK controller is 0.97 but with a few bits added:
+>
+>      /* MTK xHCI is mostly 0.97 but contains some features from 1.0 */
+>      if (xhci->hci_version < 0x100 && !(xhci->quirks & XHCI_MTK_HOST))
+>          return ...
+>
+> Setting trb_buff_len to zero is accommodating a quirk and this is clearer when we have:
+>
+>      /* for MTK xHCI, TD size doesn't include this TRB */
+>      if (xhci->quirks & XHCI_MTK_HOST)
+>          trb_buff_len = 0;
 
-a & b is indeed a bitwise operation and, in this particular case, its
-type is an unsigned long. However, because the return type of the
-function is a bool, the result of the bitwise operation (unsigned long)
-is converted to a bool.
+Both will work, but I'd prefer this solution as well.
 
-The above may be true only for gcc, I haven't checked other compilers,
-nor the standard (AFAIK, it appeared in C99).
-
-On AArch64, the compiler generates something like:
-
-	tst	x0, x1
-	cset	w0, ne
-	ret
-
-On AArch32, Thumb-2, I get:
-
-	tst	r2, r3
-	ite	ne
-	movne	r0, #1
-	moveq	r0, #0
-	bx	lr
-
-So a bool type function always returns 0 or 1 and does the appropriate
-conversion.
-
-> http://yarchive.net/comp/linux/bool.html
-> 
-> especially hpa's response.
-
-This seems to be more about a union of int and bool rather than
-automatic type conversion. But I can see in the simple test that Linus
-did towards the end of the thread that x86 does something similar with
-converting a char to a bool:
-
-	testb	%al, %al
-	setne	%al
-	ret
-
-I stand by my original comment.
-
--- 
-Catalin
+-Mathias
