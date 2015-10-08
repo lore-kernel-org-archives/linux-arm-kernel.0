@@ -1,24 +1,52 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 8 Oct 2015 16:02:56 +0800
-Subject: [RESEND][PATCH v3 0/9] ARM: dts: update Boundary Devices boards
- support
-In-Reply-To: <1443620806-14792-1-git-send-email-gary.bisson@boundarydevices.com>
-References: <1441645069-27263-1-git-send-email-gary.bisson@boundarydevices.com>
- <1443620806-14792-1-git-send-email-gary.bisson@boundarydevices.com>
-Message-ID: <20151008080255.GE22673@tiger>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 8 Oct 2015 10:23:02 +0200
+Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
+In-Reply-To: <003a01d10199$58e96590$0abc30b0$@samsung.com>
+References: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
+ <003a01d10199$58e96590$0abc30b0$@samsung.com>
+Message-ID: <20151008082302.GE14315@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 03:46:37PM +0200, Gary Bisson wrote:
-> Gary Bisson (9):
->   ARM: dts: imx6dql-nitrogen6x: add touchscreen support
->   ARM: dts: imx6qdl-nitrogen6x: add wifi wl1271 support
->   ARM: dts: imx6qdl-nitrogen6x: relicense under GPLv2/X11
->   ARM: dts: imx6qdl-sabrelite: relicense under GPLv2/X11
->   of: Add Boundary Devices Inc. vendor prefix
->   ARM: dts: imx6q-nitrogen6x: change manufacturer to Boundary Devices
->   ARM: dts: imx6dl-nitrogen6x: change manufacturer to Boundary Devices
->   ARM: dts: imx: add Boundary Devices Nitrogen6_Max board
->   ARM: dts: imx: add Boundary Devices Nitrogen6_Lite board
+On Thu, Oct 08, 2015 at 10:17:09AM +0300, Pavel Fedin wrote:
+>  Hello!
+> 
+> > +    The mpidr encoding is based on the affinity information in the
+> > +    architecture defined MPIDR, and the field is encoded as follows:
+> > +      | 63 .... 56 | 55 .... 48 | 47 .... 40 | 39 .... 32 |
+> > +      |    Aff3    |    Aff2    |    Aff1    |    Aff0    |
+> 
+>  One concern about this... Does it already have "We are Bosses, we Decided it, It's not subject to
+> change, We do not care" status? 
 
-Applied all, thanks.
+That's a rather negative question.
+
+We spent a fair amount of time discussing this during SFO15 and arrived
+at the conclusion that this was the way to go.
+
+If there are good arguments for why this is not sufficient or causes
+problems, then of course we'll make changes as required.
+
+> Actually, current approach with using index instead of Aff bits
+> works pretty well. It works fine with qemu too, because internally qemu also maintains CPU index,
+> which it uses for GICv2 accesses.
+>  Keeping index allows to reuse more code, and provides better backwards compatibility. So could we
+> do this?
+> 
+
+The architecture defines how to address a specific CPU, and that's using
+the MPIDR, not inventing our own scheme, so that's what we should do.
+
+For example, I don't think you had the full 32-bits available to address
+a CPU in your proposal, so if nothing else, that proposal had less
+expressive power than what the architecture defines.
+
+I also don't buy the argument that this saves a lot of code.
+
+If you have something that deals with a cpu index, surely two simple
+functions can allow the same amount of code reuse:
+
+unsigned long mpidr_to_vcpu_idx(unsigned long mpidr);
+unsigned long vcpu_idx_to_mpidr(unsigned long vcpu_idx);
+
+-Christoffer
