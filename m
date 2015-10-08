@@ -1,81 +1,104 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 08 Oct 2015 14:34:02 +0900
-Subject: [PATCH 1/5] thermal: exynos: Fix unbalanced regulator disable on probe
- failure
-Message-ID: <1444282446-6419-1-git-send-email-k.kozlowski@samsung.com>
+Date: Thu, 08 Oct 2015 14:34:03 +0900
+Subject: [PATCH 2/5] thermal: exynos: Fix first temperature read after
+ registering sensor
+In-Reply-To: <1444282446-6419-1-git-send-email-k.kozlowski@samsung.com>
+References: <1444282446-6419-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1444282446-6419-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During probe if the regulator could not be enabled, the error exit path
-would still disable it. This could lead to unbalanced counter of
-regulator enable/disable.
+Thermal core could not read the temperature after registering the
+thermal sensor with thermal_zone_of_sensor_register() because the driver
+was not yet initialized.
 
-The patch moves code for getting and enabling the regulator from
-exynos_map_dt_data() to probe function because it is really not a part
-of getting Device Tree properties.
+The call trace looked like:
+    exynos_tmu_probe()
+        thermal_zone_of_sensor_register()
+            of_thermal_set_mode()
+                thermal_zone_device_update()
+                    exynos_get_temp()
+                        if (!data->tmu_read) return -EINVAL;
+        exynos_map_dt_data()
+            data->tmu_read = ...
+
+This produced an error in dmesg:
+thermal thermal_zone0: failed to read out thermal zone (-22)
+
+Register the thermal_zone_device later, after parsing Device Tree and
+enabling necessary clocks, but before calling exynos_tmu_initialize()
+which uses the registered thermal_zone_device.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Fixes: 5f09a5cbd14a ("thermal: exynos: Disable the regulator on probe failure")
-Cc: <stable@vger.kernel.org>
+Fixes: 3b6a1a805f34 ("thermal: samsung: core: Exynos TMU rework to use device tree for configuration")
 ---
- drivers/thermal/samsung/exynos_tmu.c | 34 +++++++++++++++++-----------------
- 1 file changed, 17 insertions(+), 17 deletions(-)
+ drivers/thermal/samsung/exynos_tmu.c | 27 +++++++++++++++++----------
+ 1 file changed, 17 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index 0bae8cc6c23a..23f4320f8ef7 100644
+index 23f4320f8ef7..bc71a61f0c4a 100644
 --- a/drivers/thermal/samsung/exynos_tmu.c
 +++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -1168,27 +1168,10 @@ static int exynos_map_dt_data(struct platform_device *pdev)
- 	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
- 	struct exynos_tmu_platform_data *pdata;
- 	struct resource res;
--	int ret;
+@@ -1289,13 +1289,6 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, data);
+ 	mutex_init(&data->lock);
  
- 	if (!data || !pdev->dev.of_node)
- 		return -ENODEV;
- 
--	/*
--	 * Try enabling the regulator if found
--	 * TODO: Add regulator as an SOC feature, so that regulator enable
--	 * is a compulsory call.
--	 */
--	data->regulator = devm_regulator_get(&pdev->dev, "vtmu");
--	if (!IS_ERR(data->regulator)) {
--		ret = regulator_enable(data->regulator);
--		if (ret) {
--			dev_err(&pdev->dev, "failed to enable vtmu\n");
--			return ret;
--		}
--	} else {
--		dev_info(&pdev->dev, "Regulator node (vtmu) not found\n");
+-	data->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
+-						    &exynos_sensor_ops);
+-	if (IS_ERR(data->tzd)) {
+-		pr_err("thermal: tz: %p ERROR\n", data->tzd);
+-		return PTR_ERR(data->tzd);
 -	}
 -
- 	data->id = of_alias_get_id(pdev->dev.of_node, "tmuctrl");
- 	if (data->id < 0)
- 		data->id = 0;
-@@ -1312,6 +1295,23 @@ static int exynos_tmu_probe(struct platform_device *pdev)
- 		pr_err("thermal: tz: %p ERROR\n", data->tzd);
- 		return PTR_ERR(data->tzd);
- 	}
-+
+ 	/*
+ 	 * Try enabling the regulator if found
+ 	 * TODO: Add regulator as an SOC feature, so that regulator enable
+@@ -1365,21 +1358,36 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+ 		break;
+ 	};
+ 
 +	/*
-+	 * Try enabling the regulator if found
-+	 * TODO: Add regulator as an SOC feature, so that regulator enable
-+	 * is a compulsory call.
++	 * data->tzd must be registered before calling exynos_tmu_initialize(),
++	 * requesting irq and calling exynos_tmu_control().
 +	 */
-+	data->regulator = devm_regulator_get(&pdev->dev, "vtmu");
-+	if (!IS_ERR(data->regulator)) {
-+		ret = regulator_enable(data->regulator);
-+		if (ret) {
-+			dev_err(&pdev->dev, "failed to enable vtmu\n");
-+			return ret;
-+		}
-+	} else {
-+		dev_info(&pdev->dev, "Regulator node (vtmu) not found\n");
++	data->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
++						    &exynos_sensor_ops);
++	if (IS_ERR(data->tzd)) {
++		ret = PTR_ERR(data->tzd);
++		dev_err(&pdev->dev, "Failed to register sensor: %d\n", ret);
++		goto err_sclk;
 +	}
 +
- 	ret = exynos_map_dt_data(pdev);
- 	if (ret)
- 		goto err_sensor;
+ 	ret = exynos_tmu_initialize(pdev);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to initialize TMU\n");
+-		goto err_sclk;
++		goto err_thermal;
+ 	}
+ 
+ 	ret = devm_request_irq(&pdev->dev, data->irq, exynos_tmu_irq,
+ 		IRQF_TRIGGER_RISING | IRQF_SHARED, dev_name(&pdev->dev), data);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to request irq: %d\n", data->irq);
+-		goto err_sclk;
++		goto err_thermal;
+ 	}
+ 
+ 	exynos_tmu_control(pdev, true);
+ 	return 0;
++
++err_thermal:
++	thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
+ err_sclk:
+ 	clk_disable_unprepare(data->sclk);
+ err_clk:
+@@ -1390,7 +1398,6 @@ err_clk_sec:
+ err_sensor:
+ 	if (!IS_ERR_OR_NULL(data->regulator))
+ 		regulator_disable(data->regulator);
+-	thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
+ 
+ 	return ret;
+ }
 -- 
 1.9.1
