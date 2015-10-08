@@ -1,199 +1,86 @@
-From: oliver+list@schinagl.nl (Olliver Schinagl)
-Date: Thu, 08 Oct 2015 14:13:13 +0200
-Subject: [linux-sunxi] [PATCH v2 1/2] mmc: Add support for marking hpi
- as broken through devicetree
-In-Reply-To: <56162CAE.6000105@redhat.com>
-References: <1427901984-26469-1-git-send-email-hdegoede@redhat.com>
- <5614DB4E.8040807@schinagl.nl> <56162CAE.6000105@redhat.com>
-Message-ID: <56165DD9.2000008@schinagl.nl>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 8 Oct 2015 13:28:29 +0100
+Subject: [PATCH v9 4/5] xhci: mediatek: support MTK xHCI host controller
+In-Reply-To: <1444305958.26198.14.camel@mhfsdcap03>
+References: <1443495698-32233-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1443495698-32233-5-git-send-email-chunfeng.yun@mediatek.com>
+ <560D1CA9.1050009@linaro.org> <1444305958.26198.14.camel@mhfsdcap03>
+Message-ID: <5616616D.3080205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Hans,
-
-
-On 08-10-15 10:43, Hans de Goede wrote:
+On 08/10/15 13:05, chunfeng yun wrote:
 > Hi,
->
-> On 10/07/2015 09:43 AM, Olliver Schinagl wrote:
->> Hey Hans,
->>
->> On 01-04-15 17:26, Hans de Goede wrote:
->>> The eMMC on a tablet I've will stop working / communicating as soon as
->>> the kernel executes:
+> On Thu, 2015-10-01 at 12:44 +0100, Daniel Thompson wrote:
+>> On 29/09/15 04:01, Chunfeng Yun wrote:
+>>> There some vendor quirks for MTK xhci host controller:
+>>> 1. It defines some extra SW scheduling parameters for HW
+>>>     to minimize the scheduling effort for synchronous and
+>>>     interrupt endpoints. The parameters are put into reseved
+>>>     DWs of slot context and endpoint context.
+>>> 2. Its IMODI unit for Interrupter Moderation register is
+>>>     8 times as much as that defined in xHCI spec.
+>>> 3. Its TDS in  Normal TRB defines a number of packets that
+>>>     remains to be transferred for a TD after processing all
+>>>     Max packets in all previous TRBs.
 >>>
->>>         mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
->>>                   EXT_CSD_HPI_MGMT, 1,
->>>                   card->ext_csd.generic_cmd6_time);
+>>> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+>>
+>> I've done some basic soak tests, both with a directly attached USB3 HDD
+>> and, given the extra code to manage isochronous xfer, also with a hub,
+>> disc and two audio interfaces.
+>>
+>> Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
+>>
+>>
+>>> diff --git a/drivers/usb/host/xhci-ring.c b/drivers/usb/host/xhci-ring.c
+>>> index 57f40a1..243f696 100644
+>>> --- a/drivers/usb/host/xhci-ring.c
+>>> +++ b/drivers/usb/host/xhci-ring.c
+>>> @@ -68,6 +68,7 @@
+>>>    #include <linux/slab.h>
+>>>    #include "xhci.h"
+>>>    #include "xhci-trace.h"
+>>> +#include "xhci-mtk.h"
 >>>
->>> There seems to be no way to reliable identify eMMC-s which have a 
->>> broken
->>> hpi implementation, but at least for eMMC's which are soldered onto 
->>> a board
->>> we can work around this by specifying that hpi is broken in devicetree.
->> We've been talking about this a little off-list, and I was just 
->> triggered again by this so I'm following up on it again.
+>>>    /*
+>>>     * Returns zero if the TRB isn't in this segment, otherwise it returns the DMA
+>>> @@ -3044,18 +3045,27 @@ static u32 xhci_td_remainder(struct xhci_hcd *xhci, int transferred,
+>>>    			      struct urb *urb, unsigned int num_trbs_left)
+>>>    {
+>>>    	u32 maxp, total_packet_count;
+>>> +	u32 skip_current_trb = 0;
 >>
->> The same issue bit me in the ass on a Micron 'industrial' grade eMMC 
->> (MTFC4GACAANA) and luckily you found this back then to help me.
+>> A bit of a nitpick but why do we need skip_current_trb? Testing
+>> (xhci->quirks & XHCI_MTK_HOST) twice would make what the code does, and
+>> why, more obvious.
 >>
->> As we discussed, this may very well be a limitation of the mmc 
->> controller, rather then the MMC chip. While we only have a sample 
->> size of 2 on 2 different socs (with likely the same mmc IP) (A13/A20) 
->> I found in the JEDEC spec in the appendix on changes from 4.4 to 4.41:
->> Introduce of High Priority Interrupt mechanism, HPI background and 
->> one of possible solutions.
->>
->> Which leaves me to believe, that HPI was added to eMMC in version 
->> 4.41 and was not available before. Both the A13 and A20 user manuals 
->> state that the MMC controller in these socs is only version 4.3.
->>
->> Obviously I know far to little as to what does and what does not work 
->> with an MMC-host, since it's just a simple data-bus, but I would not 
->> be surprised if these things are somewhere somewhat related, so 
->> hopefully someone on this list can give their opinion on this.
->>
->> I already checked the core/mmc.c where the version is read from the 
->> mmc controller to see if we can trigger on this based on version, 
->> however it seems only the major version number is stored here [0]?
->>
->> So in my opinion, it is quite likely that this setting be moved up to 
->> the mmc-core level, for the SoC, rather then the card itself?
->
-> Yes I was talking to Tsvetan from Olimex and he says they have seen 
-> the problem with yet
-> another emmc, so this indeed seems to be a sunxi SoC specific problem, 
-> and we just need to
-> disable hpi on all sunxi SoC's.
->
-> Do you have time to look into doing a kernel patch for this ?
->
-> I'm thinking adding a host-cap called MMC_CAP_BROKEN_HPI and adding
-> support for that to drivers/mmc/core/host.c: mmc_of_parse() and
-> extending the current card check for broken-hpi to also check
-> host->caps
->
-> And then we need to decide whether to just hard set that cap
-> in drivers/mmc/host/sunxi_mmc.c or if we are going to add it
-> to our dtsi files. I think we should probably just hard-code
-> it in drivers/mmc/host/sunxi_mmc.c.
-Yeah I'll see if I can look into that.
+> I am not sure which way it is better, so add variable of
+> skip_current_trb to reduce test times.
 
-I was also looking if we really cannot detect older MMC versions, and I 
-think we can somewhat. I haven't figured out the details yet though.
+I can't imagine either approach impacts performance. However introducing 
+skip_current_trb makes the flow of the branches harder to follow.
 
-The EXT_CSD_REV field does yield a version number matching the various 4 
-sub-versions, so for now I'm thinking of simply disabeling HPI for 
-anything before 4.41 (unless maybe overriden). Since before 4.41 it 
-shouldn't have been supported. Maybe add an override that allows use of 
-HPI? but then we have the whole backwards compatibility thing.
+The first branch was a version check and can remain so; we only need to 
+do something special with the quirks because the MTK controller is 0.97 
+but with a few bits added:
 
-[0] http://lxr.free-electrons.com/source/drivers/mmc/core/mmc.c#L368
->
-> Regards,
->
-> Hans
->
->
->
->
->
->
->>
->> [0] http://lxr.free-electrons.com/source/drivers/mmc/core/mmc.c#L148
->>>
->>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>> ---
->>> Changes in v2:
->>> -Fix of_node leakage
->>> ---
->>>   Documentation/devicetree/bindings/mmc/mmc-card.txt | 31 
->>> ++++++++++++++++++++++
->>>   drivers/mmc/core/mmc.c                             | 10 ++++++-
->>>   2 files changed, 40 insertions(+), 1 deletion(-)
->>>   create mode 100644 Documentation/devicetree/bindings/mmc/mmc-card.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/mmc/mmc-card.txt 
->>> b/Documentation/devicetree/bindings/mmc/mmc-card.txt
->>> new file mode 100644
->>> index 0000000..a70fcd6
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/mmc/mmc-card.txt
->>> @@ -0,0 +1,31 @@
->>> +mmc-card / eMMC bindings
->>> +------------------------
->>> +
->>> +This documents describes the devicetree bindings for a mmc-host 
->>> controller
->>> +child node describing a mmc-card / an eMMC, see "Use of Function 
->>> subnodes"
->>> +in mmc.txt
->>> +
->>> +Required properties:
->>> +-compatible : Must be "mmc-card"
->>> +-reg        : Must be <0>
->>> +
->>> +Optional properties:
->>> +-broken-hpi : Use this to indicate that the mmc-card has a broken hpi
->>> +              implementation, and that hpi should not be used
->>> +
->>> +Example:
->>> +
->>> +&mmc2 {
->>> +    pinctrl-names = "default";
->>> +    pinctrl-0 = <&mmc2_pins_a>;
->>> +    vmmc-supply = <&reg_vcc3v3>;
->>> +    bus-width = <8>;
->>> +    non-removable;
->>> +    status = "okay";
->>> +
->>> +    mmccard: mmccard at 0 {
->>> +        reg = <0>;
->>> +        compatible = "mmc-card";
->>> +        broken-hpi;
->>> +    };
->>> +};
->>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
->>> index 1d41e85..c84131e 100644
->>> --- a/drivers/mmc/core/mmc.c
->>> +++ b/drivers/mmc/core/mmc.c
->>> @@ -11,6 +11,7 @@
->>>    */
->>>   #include <linux/err.h>
->>> +#include <linux/of.h>
->>>   #include <linux/slab.h>
->>>   #include <linux/stat.h>
->>>   #include <linux/pm_runtime.h>
->>> @@ -336,6 +337,8 @@ static int mmc_decode_ext_csd(struct mmc_card 
->>> *card, u8 *ext_csd)
->>>   {
->>>       int err = 0, idx;
->>>       unsigned int part_size;
->>> +    struct device_node *np;
->>> +    bool broken_hpi = false;
->>>       /* Version is coded in the CSD_STRUCTURE byte in the EXT_CSD 
->>> register */
->>>       card->ext_csd.raw_ext_csd_structure = ext_csd[EXT_CSD_STRUCTURE];
->>> @@ -349,6 +352,11 @@ static int mmc_decode_ext_csd(struct mmc_card 
->>> *card, u8 *ext_csd)
->>>           }
->>>       }
->>> +    np = mmc_of_find_child_device(card->host, 0);
->>> +    if (np && of_device_is_compatible(np, "mmc-card"))
->>> +        broken_hpi = of_property_read_bool(np, "broken-hpi");
->>> +    of_node_put(np);
->>> +
->>>       /*
->>>        * The EXT_CSD format is meant to be forward compatible. As long
->>>        * as CSD_STRUCTURE does not change, all values for EXT_CSD_REV
->>> @@ -494,7 +502,7 @@ static int mmc_decode_ext_csd(struct mmc_card 
->>> *card, u8 *ext_csd)
->>>           }
->>>           /* check whether the eMMC card supports HPI */
->>> -        if (ext_csd[EXT_CSD_HPI_FEATURES] & 0x1) {
->>> +        if (!broken_hpi && (ext_csd[EXT_CSD_HPI_FEATURES] & 0x1)) {
->>>               card->ext_csd.hpi = 1;
->>>               if (ext_csd[EXT_CSD_HPI_FEATURES] & 0x2)
->>>                   card->ext_csd.hpi_cmd = MMC_STOP_TRANSMISSION;
+     /* MTK xHCI is mostly 0.97 but contains some features from 1.0 */
+     if (xhci->hci_version < 0x100 && !(xhci->quirks & XHCI_MTK_HOST))
+	    return ...
+
+Setting trb_buff_len to zero is accommodating a quirk and this is 
+clearer when we have:
+
+     /* for MTK xHCI, TD size doesn't include this TRB */
+     if (xhci->quirks & XHCI_MTK_HOST)
+	    trb_buff_len = 0;
+
+
+>> Anyhow with that looked at, and the caveat that I'm not much of USB
+>> expert, you're welcome to add my Reviewed-by: to v10.
 >>
 >
+> Thanks a lot
+
+No worries.
