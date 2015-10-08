@@ -1,55 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 08 Oct 2015 17:09:20 +0100
-Subject: [PATCH 0/5] arm64: Allow booting with GICv3 in GICv2 mode
-In-Reply-To: <20151008155655.GO17192@e104818-lin.cambridge.arm.com>
-References: <1443803874-9566-1-git-send-email-marc.zyngier@arm.com>
- <20151008155655.GO17192@e104818-lin.cambridge.arm.com>
-Message-ID: <56169530.9030902@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Thu, 8 Oct 2015 17:13:27 +0100
+Subject: [PATCH v2 06/22] arm64: sys_reg: Define System register encoding
+In-Reply-To: <20151008144348.GJ17192@e104818-lin.cambridge.arm.com>
+References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+ <1444064531-25607-7-git-send-email-suzuki.poulose@arm.com>
+ <20151007163650.GC17192@e104818-lin.cambridge.arm.com>
+ <56155066.9000000@arm.com>
+ <20151008144348.GJ17192@e104818-lin.cambridge.arm.com>
+Message-ID: <56169627.9090307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/15 16:56, Catalin Marinas wrote:
-> On Fri, Oct 02, 2015 at 05:37:49PM +0100, Marc Zyngier wrote:
->> Recent evolutions of the ARM Trusted Firmware have outlined issues
->> when the system is equipped with a GICv3 interrupt controller, but the
->> firmware has decided to restrict it to GICv2 compatibility mode.
+On 08/10/15 15:43, Catalin Marinas wrote:
+> On Wed, Oct 07, 2015 at 06:03:34PM +0100, Suzuki K. Poulose wrote:
+>> On 07/10/15 17:36, Catalin Marinas wrote:
+>>> On Mon, Oct 05, 2015 at 06:01:55PM +0100, Suzuki K. Poulose wrote:
+>>>>    * (Ref: ARMv8 ARM, Section: "System instruction class encoding overview",
+>>>>    *  C5.2, version:ARM DDI 0487A.f)
+>>>>    *	[20-19] : Op0
+>>>> @@ -34,15 +34,40 @@
+>>>>    *	[15-12] : CRn
+>>>>    *	[11-8]  : CRm
+>>>>    *	[7-5]   : Op2
+>>>> + * Hence we use [ sys_reg() << 5 ] in the mrs/msr instructions.
+>>>
+>>> Do we really need to have all the ids shifted right by 5? I can't see
+>>> where it helps. OTOH, it makes the code more complicated by having to
+>>> remember to shift the id left by 5.
 >>
->> In this mode, system registers cannot be enabled, and the firmware is
->> expected to pass a GICv2 description (DT or ACPI tables).
->>
->> This series makes sure that system register access is checked at EL2
->> setup time and when the feature detection is performed. Additionally,
->> the GICv2 driver checks that system registers are disabled, and warns
->> if they are enabled.
->>
->> The booting requirements are also updated to make the above explicit.
->>
->> Marc Zyngier (5):
->>   arm64: el2_setup: Make sure ICC_SRE_EL2.SRE sticks before using GICv3
->>     sysregs
->>   irqchip/gic-v3: Make gic_enable_sre an inline function
->>   arm64: cpufeatures: Check ICC_EL1_SRE.SRE before enabling
->>     ARM64_HAS_SYSREG_GIC_CPUIF
->>   irqchip/gic: Warn if GICv3 system registers are enabled
->>   arm64: Update booting requirements for GICv3 in GICv2 mode
->>
->>  Documentation/arm64/booting.txt    | 11 ++++++++++-
->>  arch/arm64/kernel/cpufeature.c     | 19 ++++++++++++++++++-
->>  arch/arm64/kernel/head.S           |  2 ++
->>  drivers/irqchip/irq-gic-v3.c       | 32 +++++++++-----------------------
->>  drivers/irqchip/irq-gic.c          | 15 +++++++++++++++
->>  include/linux/irqchip/arm-gic-v3.h | 16 ++++++++++++++++
->>  6 files changed, 70 insertions(+), 25 deletions(-)
-> 
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> How do you plan to merge these patches? I'm fine for them to go via the
-> irqchip maintainers since they are all GIC related.
+>> This is a cosmetic change, to reuse the sys_reg() definitions for both
+>> mrs_s/msr_s macros and the CPU ID. The (existing)left shift is only needed
+>> for the mrs_s/msr_s, so the existing users don't have to worry about the shift
+>> unless they have hard-open-coded values for the register. On the plus
+>> side it becomes slightly easier to use the same encoding for CPU id
+>> tracking (and manual decoding). If you think this is superfluous, I could
+>> change the CPU-id to use right shifted values from sys_reg.
+>
+> You may be right but I still fail to see whether the shifted values are
+> useful to the CPUID code. Are you referring to the 'switch' statements?
+>
 
-I guess we can direct this via tip if Thomas is OK with it.
+Yes. Again we can adjust the macros to get the right fields for switch().
+Its also about the meaning of sys_reg(). The name kind of implies the system
+register encoding defined by ARM ARM. However the current version
+defines the encoding as it appears in the mrs/msr instructions, which can
+be confusing if we start using the same encoding for representing the sys_reg
+elsewhere(in this case CPUID infrastructure). Again, I am not too particular
+about this change.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Suzuki
