@@ -1,87 +1,91 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 8 Oct 2015 12:47:52 -0400
-Subject: [GIT PULL 1/3] Keystone SOC driver updates for 4.4
-In-Reply-To: <5870815.PiO7rCVXjJ@wuerfel>
-References: <1444151960-4941-1-git-send-email-ssantosh@kernel.org>
- <5870815.PiO7rCVXjJ@wuerfel>
-Message-ID: <56169E38.1050803@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 8 Oct 2015 11:50:56 -0500
+Subject: [PATCH v4 1/8] ASoC: dt-bindings: add rockchip tranceiver bindings
+In-Reply-To: <1444311079-2892-2-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1444311079-2892-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <1444311079-2892-2-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <CAL_JsqL_ox3TtjAL552X8-D21n47_hBCpeSkUcNdZu6+wj2h3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
-
-On 10/08/2015 11:41 AM, Arnd Bergmann wrote:
-> On Tuesday 06 October 2015 10:19:18 Santosh Shilimkar wrote:
->> Couple of patches for ARM Keystone SOC drivers
->>          - irq affinity bug fix
->>          - display the firmware name
->>
->> ----------------------------------------------------------------
->> Murali Karicheri (2):
->>        soc: ti: reset irq affinity before freeing irq
->>        soc: ti: display firmware file name as part of boot log
->>
->>   .../bindings/soc/ti/keystone-navigator-qmss.txt      | 20 +++++++++++++++++++-
->>   drivers/soc/ti/knav_qmss_acc.c                       |  4 ++++
->>   drivers/soc/ti/knav_qmss_queue.c                     |  3 +++
->>   3 files changed, 26 insertions(+), 1 deletion(-)
+On Thu, Oct 8, 2015 at 8:31 AM, Sjoerd Simons
+<sjoerd.simons@collabora.co.uk> wrote:
+> Add devicetree bindings for the spdif tranceiver found on
+> found on rk3066, rk3188 and rk3288 SoCs
 >
-> The new text you add to the binding document doesn't really seem to
-> belong in there, so I'm not pulling this until we've discussed how
-> this should be better handled.
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 >
-> Ideally, the firmware should just get merged into the linux-firmware.git
-> tree.
-
-I have got the firmware merged to the linux-firmware.git. I will post a 
-patch to change the document to reflect that. Will it suffice?
-
+> ---
 >
-> Regarding the method of storing the firmware file name in DT, we
-> recently had a longer discussion about that and basically concluded
-> that this doesn't work for most devices, in particular when the
-> communication between the driver and the firmware uses an interface
-> that is not 100% stable and can change depending on the firmware
-> blob.
+> Changes in v4:
+> - Require rockchip,grf on RK3288 as the 8 channel solution has to be
+>   selected on that SoC
+> - Make the compatibility string one of a known list rather then
+>   requiring a precise list of options.
+> - Change the clock names to hclk and mclk instead of spdif_hclk and
+>   spdif_mclk to better match the implementation and data sheets.
 >
-> Can you guarantee that there will never be changes to the interface?
-This firmware is in use for almost 3 years for now on K2 SoCs, but in a 
-different kernel version. The interface itself is used not only by Linux 
-OS, but other OS as well. So it is not expected to change in the future 
-as backward compatibility will be an issue for other OS as well.
-> If not, we should try to come up with a better mechanism here, and
-> only provide the current method for backwards compatibility.
-Assuming we need to change interface in the future, How is this handled 
-in other devices? Do they have something like a version to check 
-compatibility between software and firmware? As this firmware has been 
-frozen for almost 3 years, I wouldn't expect any change to it. Could you 
-point me to the thread where this was discussed in the past. Also in my 
-experience, mostly changes are to the firmware itself, but not to the 
-interface. In such cases, do we keep the name of firmware in DT without 
-version information so that in the file system, user could  create a 
-soft link to the firmware matching with the DT name. So this way as long 
-as interface doesn't change, firmware upgrade is possible. If you agree, 
-I can send an incremental patch to rename the firmware to exclude the 
-version information.
-
-W.r.t to the patch for documentation update, can I send an incremental 
-patch to the update the linux-firmware.git reference as well?
-
-Thanks
-
-Murali
-
+> Changes in v3: None
+> Changes in v2: None
 >
-> 	Arnd
+>  .../devicetree/bindings/sound/rockchip-spdif.txt   | 44 ++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/rockchip-spdif.txt
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
+> diff --git a/Documentation/devicetree/bindings/sound/rockchip-spdif.txt b/Documentation/devicetree/bindings/sound/rockchip-spdif.txt
+> new file mode 100644
+> index 0000000..33dd82c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/rockchip-spdif.txt
+> @@ -0,0 +1,44 @@
+> +* Rockchip SPDIF transceiver
+> +
+> +The S/PDIF audio block is a stereo transceiver that allows the
+> +processor to receive and transmit digital audio via an coaxial cable or
+> +a fibre cable.
+> +
+> +Required properties:
+> +
+> +- compatible: should be one of the following:
+> +   - "rockchip,rk3288-spdif", "rockchip,rk3188-spdif" or
+> +     "rockchip,rk3066-spdif"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: should contain the SPDIF interrupt.
 
+> +- #address-cells: should be 1.
+> +- #size-cells: should be 0.
 
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+Why do you need these? Are you going to have sub nodes?
+
+> +- dmas: DMA specifiers for tx dma. See the DMA client binding,
+> +  Documentation/devicetree/bindings/dma/dma.txt
+> +- dma-names: should be "tx"
+> +- clocks: a list of phandle + clock-specifier pairs, one for each entry
+> +  in clock-names.
+> +- clock-names: should contain following:
+> +   - "hclk": clock for SPDIF controller
+> +   - "mclk" : clock for SPDIF bus
+> +
+> +Required properties on RK3288:
+> +  - rockchip,grf: the phandle of the syscon node for the general register
+> +                   file (GRF)
+> +
+> +Example for the rk3188 SPDIF controller:
+> +
+> +spdif: spdif at 0x1011e000 {
+> +       compatible = "rockchip,rk3188-spdif", "rockchip,rk3066-spdif";
+> +       reg = <0x1011e000 0x2000>;
+> +       interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+> +       #address-cells = <1>;
+> +       #size-cells = <0>;
+> +       dmas = <&dmac1_s 8>;
+> +       dma-names = "tx";
+> +       clock-names = "hclk", "mclk";
+> +       clocks = <&cru HCLK_SPDIF>, <&cru SCLK_SPDIF>;
+> +       status = "disabled";
+> +       #sound-dai-cells = <0>;
+> +};
+> --
+> 2.6.1
+>
