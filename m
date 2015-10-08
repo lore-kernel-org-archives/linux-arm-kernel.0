@@ -1,66 +1,143 @@
-From: benjamint@bsquare.com (Ben Tucker)
-Date: Thu,  8 Oct 2015 17:19:49 +0100
-Subject: [PATCH] ARM: OMAP2+: Fixed inverted OMAP_OFFOUT_EN
-Message-ID: <1444321189-9921-1-git-send-email-benjamint@bsquare.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Thu, 8 Oct 2015 22:13:21 +0530
+Subject: [PATCH 2/5] thermal: exynos: Fix first temperature read after
+ registering sensor
+In-Reply-To: <1444282446-6419-2-git-send-email-k.kozlowski@samsung.com>
+References: <1444282446-6419-1-git-send-email-k.kozlowski@samsung.com>
+ <1444282446-6419-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CAGOxZ51BuqBGBECngB3YnNQJ4Ae+LNfTvqntg+GxdAih4GPXzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OFFOUTENABLE bit of the omap PADCONF registers is active low.
-The mux code assumed that it was active high and this patch fixes this
-problem.
+Hello,
 
-Tested on an AM37x device.
+On Thu, Oct 8, 2015 at 11:04 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> Thermal core could not read the temperature after registering the
+> thermal sensor with thermal_zone_of_sensor_register() because the driver
+> was not yet initialized.
+>
+> The call trace looked like:
+>     exynos_tmu_probe()
+>         thermal_zone_of_sensor_register()
+>             of_thermal_set_mode()
+>                 thermal_zone_device_update()
+>                     exynos_get_temp()
+>                         if (!data->tmu_read) return -EINVAL;
+>         exynos_map_dt_data()
+>             data->tmu_read = ...
+>
+> This produced an error in dmesg:
+> thermal thermal_zone0: failed to read out thermal zone (-22)
+>
+> Register the thermal_zone_device later, after parsing Device Tree and
+> enabling necessary clocks, but before calling exynos_tmu_initialize()
+> which uses the registered thermal_zone_device.
+>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Fixes: 3b6a1a805f34 ("thermal: samsung: core: Exynos TMU rework to use device tree for configuration")
+> ---
+Patch looks good to me.
 
-Signed-off-by: Ben Tucker <benjamint@bsquare.com>
----
- arch/arm/mach-omap2/mux.c |  2 +-
- arch/arm/mach-omap2/mux.h | 13 +++++++------
- 2 files changed, 8 insertions(+), 7 deletions(-)
+Before this patch I was getting below on exynos5800 board:
+[    2.648629] thermal thermal_zone0: failed to read out thermal zone (-22)
+[    2.653906] 10060000.tmu supply vtmu not found, using dummy regulator
+[    2.660521] thermal thermal_zone1: failed to read out thermal zone (-22)
+[    2.666985] 10064000.tmu supply vtmu not found, using dummy regulator
+[    2.673658] thermal thermal_zone2: failed to read out thermal zone (-22)
+[    2.680093] 10068000.tmu supply vtmu not found, using dummy regulator
+[    2.686901] thermal thermal_zone3: failed to read out thermal zone (-22)
+[    2.693187] 1006c000.tmu supply vtmu not found, using dummy regulator
+[    2.699914] thermal thermal_zone4: failed to read out thermal zone (-22)
+[    2.706332] 100a0000.tmu supply vtmu not found, using dummy regulator
 
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index 176eef6..427a7f88 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -523,7 +523,7 @@ static inline void omap_mux_decode(struct seq_file *s, u16 val)
- 
- 	OMAP_MUX_TEST_FLAG(val, OMAP_PIN_OFF_WAKEUPENABLE);
- 	if (val & OMAP_OFF_EN) {
--		if (!(val & OMAP_OFFOUT_EN)) {
-+		if (val & OMAP_OFFOUT_EN) {
- 			if (!(val & OMAP_OFF_PULL_UP)) {
- 				OMAP_MUX_TEST_FLAG(val,
- 					OMAP_PIN_OFF_INPUT_PULLDOWN);
-diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
-index d121fb6..9a5fd76 100644
---- a/arch/arm/mach-omap2/mux.h
-+++ b/arch/arm/mach-omap2/mux.h
-@@ -29,7 +29,7 @@
- /* omap3/4/5 specific mux bit defines */
- #define OMAP_INPUT_EN			(1 << 8)
- #define OMAP_OFF_EN			(1 << 9)
--#define OMAP_OFFOUT_EN			(1 << 10)
-+#define OMAP_OFFOUT_EN			(1 << 10) /* 1 for input, 0 for output */
- #define OMAP_OFFOUT_VAL			(1 << 11)
- #define OMAP_OFF_PULL_EN		(1 << 12)
- #define OMAP_OFF_PULL_UP		(1 << 13)
-@@ -45,12 +45,13 @@
- 
- /* Off mode states */
- #define OMAP_PIN_OFF_NONE		0
--#define OMAP_PIN_OFF_OUTPUT_HIGH	(OMAP_OFF_EN | OMAP_OFFOUT_EN \
--						| OMAP_OFFOUT_VAL)
--#define OMAP_PIN_OFF_OUTPUT_LOW		(OMAP_OFF_EN | OMAP_OFFOUT_EN)
--#define OMAP_PIN_OFF_INPUT_PULLUP	(OMAP_OFF_EN | OMAP_OFF_PULL_EN \
-+#define OMAP_PIN_OFF_OUTPUT_HIGH	(OMAP_OFF_EN | OMAP_OFFOUT_VAL)
-+#define OMAP_PIN_OFF_OUTPUT_LOW		(OMAP_OFF_EN)
-+#define OMAP_PIN_OFF_INPUT_PULLUP	(OMAP_OFF_EN | OMAP_OFFOUT_EN \
-+						| OMAP_OFF_PULL_EN \
- 						| OMAP_OFF_PULL_UP)
--#define OMAP_PIN_OFF_INPUT_PULLDOWN	(OMAP_OFF_EN | OMAP_OFF_PULL_EN)
-+#define OMAP_PIN_OFF_INPUT_PULLDOWN	(OMAP_OFF_EN | OMAP_OFFOUT_EN \
-+						| OMAP_OFF_PULL_EN)
- #define OMAP_PIN_OFF_WAKEUPENABLE	OMAP_WAKEUP_EN
- 
- #define OMAP_MODE_GPIO(partition, x)	(((x) & OMAP_MUX_MODE7) == \
+
+Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+
+Tested on exynos5800 peach board, so
+Tested-by: Alim Akhtar <alim.akhtar@samsung.com>
+
+
+>  drivers/thermal/samsung/exynos_tmu.c | 27 +++++++++++++++++--------
+--
+>  1 file changed, 17 insertions(+), 10 deletions(-)
+>
+> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+> index 23f4320f8ef7..bc71a61f0c4a 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.c
+> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> @@ -1289,13 +1289,6 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+>         platform_set_drvdata(pdev, data);
+>         mutex_init(&data->lock);
+>
+> -       data->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
+> -                                                   &exynos_sensor_ops);
+> -       if (IS_ERR(data->tzd)) {
+> -               pr_err("thermal: tz: %p ERROR\n", data->tzd);
+> -               return PTR_ERR(data->tzd);
+> -       }
+> -
+>         /*
+>          * Try enabling the regulator if found
+>          * TODO: Add regulator as an SOC feature, so that regulator enable
+> @@ -1365,21 +1358,36 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+>                 break;
+>         };
+>
+> +       /*
+> +        * data->tzd must be registered before calling exynos_tmu_initialize(),
+> +        * requesting irq and calling exynos_tmu_control().
+> +        */
+> +       data->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
+> +                                                   &exynos_sensor_ops);
+> +       if (IS_ERR(data->tzd)) {
+> +               ret = PTR_ERR(data->tzd);
+> +               dev_err(&pdev->dev, "Failed to register sensor: %d\n", ret);
+> +               goto err_sclk;
+> +       }
+> +
+>         ret = exynos_tmu_initialize(pdev);
+>         if (ret) {
+>                 dev_err(&pdev->dev, "Failed to initialize TMU\n");
+> -               goto err_sclk;
+> +               goto err_thermal;
+>         }
+>
+>         ret = devm_request_irq(&pdev->dev, data->irq, exynos_tmu_irq,
+>                 IRQF_TRIGGER_RISING | IRQF_SHARED, dev_name(&pdev->dev), data);
+>         if (ret) {
+>                 dev_err(&pdev->dev, "Failed to request irq: %d\n", data->irq);
+> -               goto err_sclk;
+> +               goto err_thermal;
+>         }
+>
+>         exynos_tmu_control(pdev, true);
+>         return 0;
+> +
+> +err_thermal:
+> +       thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
+>  err_sclk:
+>         clk_disable_unprepare(data->sclk);
+>  err_clk:
+> @@ -1390,7 +1398,6 @@ err_clk_sec:
+>  err_sensor:
+>         if (!IS_ERR_OR_NULL(data->regulator))
+>                 regulator_disable(data->regulator);
+> -       thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
+>
+>         return ret;
+>  }
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
 -- 
-1.9.1
+Regards,
+Alim
