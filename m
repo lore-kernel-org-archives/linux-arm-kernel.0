@@ -1,59 +1,31 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu,  8 Oct 2015 19:01:39 +0900
-Subject: [PATCH v3 2/7] arm64: ftrace: modify a stack frame in a safe way
-In-Reply-To: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1444298504-10392-3-git-send-email-takahiro.akashi@linaro.org>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Thu, 08 Oct 2015 12:03:18 +0200
+Subject: [PATCH v2] ARM: cns3xxx: pci: avoid potential stack overflow
+In-Reply-To: <12713701.B4epxIQJNF@wuerfel> (Arnd Bergmann's message of "Wed,
+ 07 Oct 2015 22:05:49 +0200")
+References: <2273145.0Ls8cProhs@wuerfel> <m3fv6i8qnh.fsf@t19.piap.pl>
+ <201510072201.51697.arnd@arndb.de> <12713701.B4epxIQJNF@wuerfel>
+Message-ID: <m3vbahy8wp.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function graph tracer modifies a return address (LR) in a stack frame by
-calling ftrace_prepare_return() in a traced function's function prologue.
-The current code does this modification before preserving an original
-address at ftrace_push_return_trace() and there is always a small window
-of inconsistency when an interrupt occurs.
+Hi,
 
-This doesn't matter, as far as an interrupt stack is introduced, because
-stack tracer won't be invoked in an interrupt context. But it would be
-better to proactively minimize such a window by moving the LR modification
-after ftrace_push_return_trace().
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/kernel/ftrace.c |   11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+> With those two changes in place, we no longer need the fake
+> pci_sys_data/pci_bus structures for faking config space writes,
+> and the stack usage goes down as well.
 
-diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-index c851be7..314f82d 100644
---- a/arch/arm64/kernel/ftrace.c
-+++ b/arch/arm64/kernel/ftrace.c
-@@ -125,23 +125,20 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
- 	 * on other archs. It's unlikely on AArch64.
- 	 */
- 	old = *parent;
--	*parent = return_hooker;
- 
- 	trace.func = self_addr;
- 	trace.depth = current->curr_ret_stack + 1;
- 
- 	/* Only trace if the calling function expects to */
--	if (!ftrace_graph_entry(&trace)) {
--		*parent = old;
-+	if (!ftrace_graph_entry(&trace))
- 		return;
--	}
- 
- 	err = ftrace_push_return_trace(old, self_addr, &trace.depth,
- 				       frame_pointer);
--	if (err == -EBUSY) {
--		*parent = old;
-+	if (err == -EBUSY)
- 		return;
--	}
-+	else
-+		*parent = return_hooker;
- }
- 
- #ifdef CONFIG_DYNAMIC_FTRACE
+>  arch/arm/mach-cns3xxx/pcie.c | 71 +++++++++++++++++++++++++++++----------------------------------------
+
+I'm ATM unable to test this change, but will do that at some point.
+Meanwhile, I guess there is nothing I can say against this patch.
+Thanks.
+
+Acked-by: Krzysztof Ha?asa <khalasa@piap.pl>
 -- 
-1.7.9.5
+Krzysztof Halasa
+
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
