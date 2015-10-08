@@ -1,64 +1,43 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Thu, 8 Oct 2015 08:39:58 -0700
-Subject: [PATCH v4 4/5] PCI: generic: Correct, and avoid overflow, in
- bus_max calculation.
-In-Reply-To: <5178627.ufUfdomGdT@wuerfel>
-References: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
- <20151008150243.GC3885@localhost> <5230007.h2fkbnOlh5@wuerfel>
- <5178627.ufUfdomGdT@wuerfel>
-Message-ID: <56168E4E.3070405@caviumnetworks.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Oct 2015 17:41:13 +0200
+Subject: [GIT PULL 1/3] Keystone SOC driver updates for 4.4
+In-Reply-To: <1444151960-4941-1-git-send-email-ssantosh@kernel.org>
+References: <1444151960-4941-1-git-send-email-ssantosh@kernel.org>
+Message-ID: <5870815.PiO7rCVXjJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2015 08:18 AM, Arnd Bergmann wrote:
-> On Thursday 08 October 2015 17:11:32 Arnd Bergmann wrote:
->>>> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
->>>> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
->>>> @@ -34,7 +34,11 @@ Properties of the host controller node:
->>>>   - #size-cells    : Must be 2.
->>>>
->>>>   - reg            : The Configuration Space base address and size, as accessed
->>>> -                   from the parent bus.
->>>> +                   from the parent bus.  The base address corresponds to
->>>> +                   bus zero, even though the "bus-range" property may specify
->>>> +                   a different starting bus number.  The driver must only map
->>>> +                   or access the portion of the Configuration Space that
->>>> +                   corresponds to the "bus-range"
->>
->> I thought we had reached an agreement that it is a bad idea to have a 'reg'
->> property that lists registers belonging to a different device.
->>
->>
->
-> To further clarify: the argument was to make it mirror what ACPI does for
-> PCI. However, this is unlike what all other devices do with DT, where you
-> have non-overlapping register ranges (start, length) for each device.
-> ACPI as far as I understand it does not give a range for a PCIe host, but
-> instead provides a way to get the start address of the ECAM register area
-> for the domain that the host is part of, and that needs to be the same
-> address for each host in the domain.
->
+On Tuesday 06 October 2015 10:19:18 Santosh Shilimkar wrote:
+> Couple of patches for ARM Keystone SOC drivers
+>         - irq affinity bug fix
+>         - display the firmware name
+> 
+> ----------------------------------------------------------------
+> Murali Karicheri (2):
+>       soc: ti: reset irq affinity before freeing irq
+>       soc: ti: display firmware file name as part of boot log
+> 
+>  .../bindings/soc/ti/keystone-navigator-qmss.txt      | 20 +++++++++++++++++++-
+>  drivers/soc/ti/knav_qmss_acc.c                       |  4 ++++
+>  drivers/soc/ti/knav_qmss_queue.c                     |  3 +++
+>  3 files changed, 26 insertions(+), 1 deletion(-)
 
-We are agreed that it is a bad thing to do.  There is disagreement about 
-if we should do it.
+The new text you add to the binding document doesn't really seem to
+belong in there, so I'm not pulling this until we've discussed how
+this should be better handled.
 
-I think there are two schools of thought (I will attribute them to their 
-proponents and my apologies if I misrepresent someone's stance):
+Ideally, the firmware should just get merged into the linux-firmware.git
+tree.
 
-1) (Arnd) Don't make the the "reg" ranges overlap because it is ugly, 
-dangerous and arguably incorrect in general.
+Regarding the method of storing the firmware file name in DT, we
+recently had a longer discussion about that and basically concluded
+that this doesn't work for most devices, in particular when the
+communication between the driver and the firmware uses an interface
+that is not 100% stable and can change depending on the firmware
+blob.
 
-2) (Me, Will Deacon, Lorenzo Pieralisi) Overlapping "reg" properties 
-should be maintained, as that is the current behavior and seems to agree 
-with legacy OF device-tree specifications (although there is some debate 
-about this).
+Can you guarantee that there will never be changes to the interface?
+If not, we should try to come up with a better mechanism here, and
+only provide the current method for backwards compatibility.
 
-Because the driver is broken in this area (thus the patch), it indicates 
-that there are probably no users with non-zero starting bus numbers. 
-So, we may have some latitude to change it.
-
-I will generate another patch that does it Arnd's way, and if Will is OK 
-with it, we might be able to do that instead.  One thing is certain: 
-The driver is currently broken for non-zero starting bus numbers.
-
-David Daney
+	Arnd
