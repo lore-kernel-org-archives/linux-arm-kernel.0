@@ -1,50 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Oct 2015 10:47:44 +0100
-Subject: [PATCH v8 3/6] pci:host: Add Altera PCIe host controller driver
-In-Reply-To: <1444297394-3122-4-git-send-email-lftan@altera.com>
-References: <1444297394-3122-1-git-send-email-lftan@altera.com>
- <1444297394-3122-4-git-send-email-lftan@altera.com>
-Message-ID: <20151008094744.GD32532@n2100.arm.linux.org.uk>
+From: b38343@freescale.com (Robin Gong)
+Date: Thu, 8 Oct 2015 17:51:03 +0800
+Subject: [PATCH v2 3/8] spi: imx: add support for all SPI word width for
+ DMA transfer
+In-Reply-To: <04376A3D786BD947B28569C998A374A62E280E21@NA-MBX-02.mgc.mentorg.com>
+References: <cover.1442923630.git.anton_bondarenko@mentor.com>
+ <f8844a7a52ab44f00e7b6a1c3ce55d72d7999514.1442923630.git.anton_bondarenko@mentor.com>
+ <20150930083539.GD2709@shlinux2>
+ <04376A3D786BD947B28569C998A374A62E280E21@NA-MBX-02.mgc.mentorg.com>
+Message-ID: <20151008095102.GC6101@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 05:43:11PM +0800, Ley Foon Tan wrote:
-> +static int altera_pcie_cfg_write(struct pci_bus *bus, unsigned int devfn,
-> +				 int where, int size, u32 value)
-> +{
-> +	struct altera_pcie *pcie = bus->sysdata;
-> +	u32 data32;
-> +	u32 shift = 8 * (where & 3);
-> +	int ret;
-> +
-> +	if (!altera_pcie_valid_config(pcie, bus, PCI_SLOT(devfn)))
-> +		return PCIBIOS_DEVICE_NOT_FOUND;
-> +
-> +	/* write partial */
-> +	if (size != sizeof(u32)) {
-> +		ret = tlp_cfg_dword_read(pcie, bus->number, devfn,
-> +					 where & ~DWORD_MASK, &data32);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	switch (size) {
-> +	case 1:
-> +		data32 = (data32 & ~(0xff << shift)) |
-> +				((value & 0xff) << shift);
-> +		break;
-> +	case 2:
-> +		data32 = (data32 & ~(0xffff << shift)) |
-> +				((value & 0xffff) << shift);
-> +		break;
-> +	default:
-> +		data32 = value;
-
-Can you generate proper 1, 2 and 4 byte configuration accesses?  That
-is much preferred over the above read-modify-write, as there are
-registers in PCI and PCIe that are read/write-1-to-clear.  The above
-has the effect of inadvertently clearing those RW1C bits.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+On Thu, Oct 01, 2015 at 12:34:54AM +0000, Bondarenko, Anton wrote:
+> On 30.09.2015 10:35, Robin Gong wrote:
+> > On Fri, Sep 25, 2015 at 07:57:10PM +0200, Anton Bondarenko wrote:
+> >> @@ -91,11 +91,15 @@ struct spi_imx_data {
+> >>  
+> >>  	struct completion xfer_done;
+> >>  	void __iomem *base;
+> >> +	unsigned long base_phys;
+> >> +
+> >>  	struct clk *clk_per;
+> >>  	struct clk *clk_ipg;
+> >>  	unsigned long spi_clk;
+> >>  	unsigned int spi_bus_clk;
+> >>  
+> >> +	unsigned int bpw_w;
+> >> +
+> > It's better to change bytes_per_word for clear understanding,since bpw in spi means
+> > bits_per_word...
+> Agree. Fixed in V3
+> >>  	unsigned int count;
+> >>  	void (*tx)(struct spi_imx_data *);
+> >>  	void (*rx)(struct spi_imx_data *);
+> >> @@ -201,9 +205,13 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
+> >>  			 struct spi_transfer *transfer)
+> >>  {
+> >>  	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
+> >> +	unsigned int bpw_w = transfer->bits_per_word;
+> >>  
+> >> -	if (spi_imx->dma_is_inited &&
+> >> -	    (transfer->len > spi_imx->wml * sizeof(u32)))
+> >> +	if (!bpw_w)
+> >> +		bpw_w = spi->bits_per_word;
+> >> +
+> >> +	bpw_w = DIV_ROUND_UP(bpw_w, 8);
+> >> +	if (spi_imx->dma_is_inited && (transfer->len > spi_imx->wml * bpw_w))
+> > Please remove bpw_w here as I talked in the first patch.
+> As explained in patch1 we need to use SPI word size in calculation to decide 
+> if we want to go with DMA or PIO mode. Just a short example:
+> We need to transfer 24 SPI words with BPW == 32. This will take ~ 24 PIO writes
+> to FIFO (and same for reads). But transfer->len will be 24*4=96 bytes.
+> WML is 32 SPI words. The decision will be incorrect if we do not take into account
+> SPI bits per word. 
+Yes, you are right, but I'm thinking so many 'DIV_ROUND_UP()'in your patch to
+get bpw, can you centralize it or just use the 'bpw_w' in 'struct spi_imx_data'?
+> >>  		return true;
+> >>  	return false;
+> >>  }
+> >> @@ -1007,7 +1058,8 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+> >>  					    DMA_FROM_DEVICE);
+> >>  
+> >>  			spi_imx->rx_buf = pio_buffer;
+> >> -			spi_imx->txfifo = left;
+> >> +			spi_imx->txfifo = DIV_ROUND_UP(left, spi_imx->bpw_w);
+> >> +
+> > Looks not enough here, you have to set 'spi_imx->rx' per the right bpw.
+> What do you mean? We have had bpw_w == 1 before so 
+> spi_imx->txfifo = DIV_ROUND_UP(left, spi_imx->bpw_w);
+> is equivalent to
+> spi_imx->txfifo = left;
+> Now we could have bpw_w equal to 2 or 4 also. txfifo is number of SPI words
+> and not number of bytes.
+Sorry, please ignore this comment, since 'spi_imx->rx' will be correctly set
+per the right bpw in spi_imx_setupxfer whatever in DMA or PIO mode.
+> >>  			reinit_completion(&spi_imx->xfer_done);
+> >>  
+> >>  			spi_imx->devtype_data->intctrl(spi_imx, MXC_INT_TCEN);
