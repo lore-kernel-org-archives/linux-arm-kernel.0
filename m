@@ -1,53 +1,183 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Thu, 8 Oct 2015 13:36:09 +0300
-Subject: [PATCH v6 0/6] KASAN for arm64
-In-Reply-To: <20151007100411.GG3069@e104818-lin.cambridge.arm.com>
-References: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
- <20151007100411.GG3069@e104818-lin.cambridge.arm.com>
-Message-ID: <CAPAsAGxR-yqtmFeo65Xw_0RQyEy=mN1uG=GKtqoMLr_x_N0u5w@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 8 Oct 2015 18:32:42 +0800
+Subject: [PATCH v2 1/6] pinctrl: berlin: regmap as an extra argument of
+ berlin_pinctrl_probe()
+In-Reply-To: <20151002130456.GC3162@kwain>
+References: <1442829860-4647-1-git-send-email-jszhang@marvell.com>
+ <1442829860-4647-2-git-send-email-jszhang@marvell.com>
+ <20151002130456.GC3162@kwain>
+Message-ID: <20151008183242.7bcaff30@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-07 13:04 GMT+03:00 Catalin Marinas <catalin.marinas@arm.com>:
-> On Thu, Sep 17, 2015 at 12:38:06PM +0300, Andrey Ryabinin wrote:
->> As usual patches available in git
->>       git://github.com/aryabinin/linux.git kasan/arm64v6
->>
->> Changes since v5:
->>  - Rebase on top of 4.3-rc1
->>  - Fixed EFI boot.
->>  - Updated Doc/features/KASAN.
->
-> I tried to merge these patches (apart from the x86 one which is already
-> merged) but it still doesn't boot on Juno as an EFI application.
->
+Hi Antoine,
 
-4.3-rc1 was ok and 4.3-rc4 is not. Break caused by 0ce3cc008ec04
-("arm64/efi: Fix boot crash by not padding between EFI_MEMORY_RUNTIME
-regions")
-It introduced sort() call in efi_get_virtmap().
-sort() is generic kernel function and it's instrumented, so we crash
-when KASAN tries to access shadow in sort().
+On Fri, 2 Oct 2015 15:04:56 +0200
+Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 
-[+CC efi some guys]
+> Hi Jisheng,
+> 
+> Thanks for providing this!
 
-Comment in drivers/firmware/efi/libstub/Makefile says that EFI stub
-executes with MMU disabled:
-    # The stub may be linked into the kernel proper or into a separate
-boot binary,
-    # but in either case, it executes before the kernel does (with MMU
-disabled) so
-    # things like ftrace and stack-protector are likely to cause trouble if left
-    # enabled, even if doing so doesn't break the build.
+Just back from vocation. Thanks for the review feedbacks
 
-But in arch/arm64/kernel/efi-entry.S:
-* We arrive here from the EFI boot manager with:
-*
-*    * CPU in little-endian mode
-*    * MMU on with identity-mapped RAM
+> 
+> On Mon, Sep 21, 2015 at 06:04:15PM +0800, Jisheng Zhang wrote:
+> > Let berlin_pinctrl_probe() accepts an extra argument: regmap, this is to
+> > prepare for the next berlin4ct support, where we won't use simple-mfd
+> > any more.
+> 
+> Just a question here: why don't we have instead one
+> berlin_pinctrl_probe() and one berlin_pinctrl_probe_regmap(), both
+> calling a static probe function in berlin.c, to avoid duplicating code?
 
-So is MMU enabled in ARM64 efi-stub?
-If yes, we could solve this issue by mapping KASAN early shadow in efi stub.
+It's better! Will take this solution in v3
 
-> --
-> Catalin
+> 
+> Antoine
+> 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  drivers/pinctrl/berlin/berlin-bg2.c   | 10 +++++++++-
+> >  drivers/pinctrl/berlin/berlin-bg2cd.c | 10 +++++++++-
+> >  drivers/pinctrl/berlin/berlin-bg2q.c  | 10 +++++++++-
+> >  drivers/pinctrl/berlin/berlin.c       |  9 +--------
+> >  drivers/pinctrl/berlin/berlin.h       |  1 +
+> >  5 files changed, 29 insertions(+), 11 deletions(-)
+> > 
+> > diff --git a/drivers/pinctrl/berlin/berlin-bg2.c b/drivers/pinctrl/berlin/berlin-bg2.c
+> > index 274c553..4aede2e 100644
+> > --- a/drivers/pinctrl/berlin/berlin-bg2.c
+> > +++ b/drivers/pinctrl/berlin/berlin-bg2.c
+> > @@ -10,6 +10,7 @@
+> >   * warranty of any kind, whether express or implied.
+> >   */
+> >  
+> > +#include <linux/mfd/syscon.h>
+> >  #include <linux/module.h>
+> >  #include <linux/of_device.h>
+> >  #include <linux/platform_device.h>
+> > @@ -233,8 +234,15 @@ static int berlin2_pinctrl_probe(struct platform_device *pdev)
+> >  {
+> >  	const struct of_device_id *match =
+> >  		of_match_device(berlin2_pinctrl_match, &pdev->dev);
+> > +	struct device *dev = &pdev->dev;
+> > +	struct device_node *parent_np = of_get_parent(dev->of_node);
+> > +	struct regmap *regmap = syscon_node_to_regmap(parent_np);
+> >  
+> > -	return berlin_pinctrl_probe(pdev, match->data);
+> > +	of_node_put(parent_np);
+> > +	if (IS_ERR(regmap))
+> > +		return PTR_ERR(regmap);
+> > +
+> > +	return berlin_pinctrl_probe(pdev, regmap, match->data);
+> >  }
+> >  
+> >  static struct platform_driver berlin2_pinctrl_driver = {
+> > diff --git a/drivers/pinctrl/berlin/berlin-bg2cd.c b/drivers/pinctrl/berlin/berlin-bg2cd.c
+> > index 0cb793a..6378dd8 100644
+> > --- a/drivers/pinctrl/berlin/berlin-bg2cd.c
+> > +++ b/drivers/pinctrl/berlin/berlin-bg2cd.c
+> > @@ -10,6 +10,7 @@
+> >   * warranty of any kind, whether express or implied.
+> >   */
+> >  
+> > +#include <linux/mfd/syscon.h>
+> >  #include <linux/module.h>
+> >  #include <linux/of_device.h>
+> >  #include <linux/platform_device.h>
+> > @@ -176,8 +177,15 @@ static int berlin2cd_pinctrl_probe(struct platform_device *pdev)
+> >  {
+> >  	const struct of_device_id *match =
+> >  		of_match_device(berlin2cd_pinctrl_match, &pdev->dev);
+> > +	struct device *dev = &pdev->dev;
+> > +	struct device_node *parent_np = of_get_parent(dev->of_node);
+> > +	struct regmap *regmap = syscon_node_to_regmap(parent_np);
+> >  
+> > -	return berlin_pinctrl_probe(pdev, match->data);
+> > +	of_node_put(parent_np);
+> > +	if (IS_ERR(regmap))
+> > +		return PTR_ERR(regmap);
+> > +
+> > +	return berlin_pinctrl_probe(pdev, regmap, match->data);
+> >  }
+> >  
+> >  static struct platform_driver berlin2cd_pinctrl_driver = {
+> > diff --git a/drivers/pinctrl/berlin/berlin-bg2q.c b/drivers/pinctrl/berlin/berlin-bg2q.c
+> > index a466054..907bdf0 100644
+> > --- a/drivers/pinctrl/berlin/berlin-bg2q.c
+> > +++ b/drivers/pinctrl/berlin/berlin-bg2q.c
+> > @@ -10,6 +10,7 @@
+> >   * warranty of any kind, whether express or implied.
+> >   */
+> >  
+> > +#include <linux/mfd/syscon.h>
+> >  #include <linux/module.h>
+> >  #include <linux/of_device.h>
+> >  #include <linux/platform_device.h>
+> > @@ -395,8 +396,15 @@ static int berlin2q_pinctrl_probe(struct platform_device *pdev)
+> >  {
+> >  	const struct of_device_id *match =
+> >  		of_match_device(berlin2q_pinctrl_match, &pdev->dev);
+> > +	struct device *dev = &pdev->dev;
+> > +	struct device_node *parent_np = of_get_parent(dev->of_node);
+> > +	struct regmap *regmap = syscon_node_to_regmap(parent_np);
+> >  
+> > -	return berlin_pinctrl_probe(pdev, match->data);
+> > +	of_node_put(parent_np);
+> > +	if (IS_ERR(regmap))
+> > +		return PTR_ERR(regmap);
+> > +
+> > +	return berlin_pinctrl_probe(pdev, regmap, match->data);
+> >  }
+> >  
+> >  static struct platform_driver berlin2q_pinctrl_driver = {
+> > diff --git a/drivers/pinctrl/berlin/berlin.c b/drivers/pinctrl/berlin/berlin.c
+> > index f495806..0557bbe 100644
+> > --- a/drivers/pinctrl/berlin/berlin.c
+> > +++ b/drivers/pinctrl/berlin/berlin.c
+> > @@ -11,7 +11,6 @@
+> >   */
+> >  
+> >  #include <linux/io.h>
+> > -#include <linux/mfd/syscon.h>
+> >  #include <linux/module.h>
+> >  #include <linux/of.h>
+> >  #include <linux/of_address.h>
+> > @@ -293,19 +292,13 @@ static struct pinctrl_desc berlin_pctrl_desc = {
+> >  };
+> >  
+> >  int berlin_pinctrl_probe(struct platform_device *pdev,
+> > +			 struct regmap *regmap,
+> >  			 const struct berlin_pinctrl_desc *desc)
+> >  {
+> >  	struct device *dev = &pdev->dev;
+> > -	struct device_node *parent_np = of_get_parent(dev->of_node);
+> >  	struct berlin_pinctrl *pctrl;
+> > -	struct regmap *regmap;
+> >  	int ret;
+> >  
+> > -	regmap = syscon_node_to_regmap(parent_np);
+> > -	of_node_put(parent_np);
+> > -	if (IS_ERR(regmap))
+> > -		return PTR_ERR(regmap);
+> > -
+> >  	pctrl = devm_kzalloc(dev, sizeof(*pctrl), GFP_KERNEL);
+> >  	if (!pctrl)
+> >  		return -ENOMEM;
+> > diff --git a/drivers/pinctrl/berlin/berlin.h b/drivers/pinctrl/berlin/berlin.h
+> > index e1aa841..bf5781a 100644
+> > --- a/drivers/pinctrl/berlin/berlin.h
+> > +++ b/drivers/pinctrl/berlin/berlin.h
+> > @@ -56,6 +56,7 @@ struct berlin_pinctrl_function {
+> >  #define BERLIN_PINCTRL_FUNCTION_UNKNOWN		{}
+> >  
+> >  int berlin_pinctrl_probe(struct platform_device *pdev,
+> > +			 struct regmap *regmap,
+> >  			 const struct berlin_pinctrl_desc *desc);
+> >  
+> >  #endif /* __PINCTRL_BERLIN_H */
+> > -- 
+> > 2.5.3
+> > 
+> 
