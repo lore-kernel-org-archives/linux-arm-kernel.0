@@ -1,48 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 8 Oct 2015 16:56:55 +0100
-Subject: [PATCH 0/5] arm64: Allow booting with GICv3 in GICv2 mode
-In-Reply-To: <1443803874-9566-1-git-send-email-marc.zyngier@arm.com>
-References: <1443803874-9566-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20151008155655.GO17192@e104818-lin.cambridge.arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Thu, 8 Oct 2015 16:57:56 +0100
+Subject: [PATCH v2 16/22] arm64/debug: Make use of the system wide safe
+ value
+In-Reply-To: <20151008150819.GL17192@e104818-lin.cambridge.arm.com>
+References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+ <1444064531-25607-17-git-send-email-suzuki.poulose@arm.com>
+ <20151008111128.GH17192@e104818-lin.cambridge.arm.com>
+ <561659EC.7030508@arm.com>
+ <20151008150819.GL17192@e104818-lin.cambridge.arm.com>
+Message-ID: <56169284.5070706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 02, 2015 at 05:37:49PM +0100, Marc Zyngier wrote:
-> Recent evolutions of the ARM Trusted Firmware have outlined issues
-> when the system is equipped with a GICv3 interrupt controller, but the
-> firmware has decided to restrict it to GICv2 compatibility mode.
-> 
-> In this mode, system registers cannot be enabled, and the firmware is
-> expected to pass a GICv2 description (DT or ACPI tables).
-> 
-> This series makes sure that system register access is checked at EL2
-> setup time and when the feature detection is performed. Additionally,
-> the GICv2 driver checks that system registers are disabled, and warns
-> if they are enabled.
-> 
-> The booting requirements are also updated to make the above explicit.
-> 
-> Marc Zyngier (5):
->   arm64: el2_setup: Make sure ICC_SRE_EL2.SRE sticks before using GICv3
->     sysregs
->   irqchip/gic-v3: Make gic_enable_sre an inline function
->   arm64: cpufeatures: Check ICC_EL1_SRE.SRE before enabling
->     ARM64_HAS_SYSREG_GIC_CPUIF
->   irqchip/gic: Warn if GICv3 system registers are enabled
->   arm64: Update booting requirements for GICv3 in GICv2 mode
-> 
->  Documentation/arm64/booting.txt    | 11 ++++++++++-
->  arch/arm64/kernel/cpufeature.c     | 19 ++++++++++++++++++-
->  arch/arm64/kernel/head.S           |  2 ++
->  drivers/irqchip/irq-gic-v3.c       | 32 +++++++++-----------------------
->  drivers/irqchip/irq-gic.c          | 15 +++++++++++++++
->  include/linux/irqchip/arm-gic-v3.h | 16 ++++++++++++++++
->  6 files changed, 70 insertions(+), 25 deletions(-)
+On 08/10/15 16:08, Catalin Marinas wrote:
+> On Thu, Oct 08, 2015 at 12:56:28PM +0100, Suzuki K. Poulose wrote:
+>> On 08/10/15 12:11, Catalin Marinas wrote:
+>>> On Mon, Oct 05, 2015 at 06:02:05PM +0100, Suzuki K. Poulose wrote:
+>>>> @@ -137,13 +138,17 @@ extern struct pmu perf_ops_bp;
+>>>>   /* Determine number of BRP registers available. */
+>>>>   static inline int get_num_brps(void)
+>>>>   {
+>>>> -	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
+>>>> +	return 1 +
+>>>> +		cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
+>>>> +						ID_AA64DFR0_BRPS_SHIFT);
+>>>>   }
+>>>
+>>> cpuid_feature_extract_field() is fine but we should we bother with
+>>> read_system_reg vs just read_cpuid?
+>>> Similar question for patch 17/22.
+>>
+>> Well, we would have already TAINTed the kernel, if these fields are different.
+>> It is just the matter of, whether we want to provide the safer value on a tainted
+>> kernel or not. I am open to suggestions.
+>
+> Ah, sorry, I mixed read_system_reg() with read_cpu_sysreg(). I think we
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Oh, ok. I think we should rename it as you suggest below to avoid the
+confusion.
 
-How do you plan to merge these patches? I'm fine for them to go via the
-irqchip maintainers since they are all GIC related.
+> need to rename the latter as it gets confusing. Maybe something like
+> read_native_sys_reg() or __raw_read_system_reg().
+>
 
--- 
-Catalin
+
+Thanks
+Suzuki
