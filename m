@@ -1,69 +1,72 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Thu, 8 Oct 2015 18:04:29 +0200
-Subject: [PATCH v2 1/2] ARM: Availability of psci_smp_available depends
- on CONFIG_SMP
-In-Reply-To: <20151006151857.GA2416@arm.com>
-References: <cover.1442990383.git.jan.kiszka@siemens.com>
- <8b94f7869972d64f442f97208707a5856cbc8b14.1442990383.git.jan.kiszka@siemens.com>
- <20151006081122.GA21527@ulmo.nvidia.com>
- <20151006151857.GA2416@arm.com>
-Message-ID: <20151008160427.GA29417@ulmo.nvidia.com>
+From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
+Date: Thu, 8 Oct 2015 19:07:45 +0300
+Subject: [PATCH v6 0/6] KASAN for arm64
+In-Reply-To: <20151008151144.GM17192@e104818-lin.cambridge.arm.com>
+References: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
+ <20151007100411.GG3069@e104818-lin.cambridge.arm.com>
+ <CAPAsAGxR-yqtmFeo65Xw_0RQyEy=mN1uG=GKtqoMLr_x_N0u5w@mail.gmail.com>
+ <20151008111144.GC7275@leverpostej> <56165228.8060201@gmail.com>
+ <CAKv+Gu_v7J1BA+xFcowBrW05bRFs=_WFf_HCeCmWgdZVRo0eQw@mail.gmail.com>
+ <20151008151144.GM17192@e104818-lin.cambridge.arm.com>
+Message-ID: <CAPAsAGxhcRtks40u3O29t=KMKkuLy4Pf8u8TeeBy2f2-MuSf+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 04:18:58PM +0100, Will Deacon wrote:
-> On Tue, Oct 06, 2015 at 10:11:24AM +0200, Thierry Reding wrote:
-> > On Wed, Sep 23, 2015 at 08:39:43AM +0200, Jan Kiszka wrote:
-> > > Ensure that we can use psci_smp_available without checking for
-> > > CONFIG_SMP first.
-> > > 
-> > > Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-> > > ---
-> > >  arch/arm/include/asm/psci.h | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-> > > index 68ee3ce..ff956f4 100644
-> > > --- a/arch/arm/include/asm/psci.h
-> > > +++ b/arch/arm/include/asm/psci.h
-> > > @@ -16,7 +16,7 @@
-> > >  
-> > >  extern struct smp_operations psci_smp_ops;
-> > >  
-> > > -#ifdef CONFIG_ARM_PSCI
-> > > +#if defined(CONFIG_ARM_PSCI) && defined(CONFIG_SMP)
-> > >  bool psci_smp_available(void);
-> > >  #else
-> > >  static inline bool psci_smp_available(void) { return false; }
-> > 
-> > Hi Will,
-> 
-> Hi Thierry,
-> 
-> > you had questions about this when this was first submitted back in
-> > May[0], but discussion stalled. Can you take another look, please?
-> > 
-> > I think irrespective of what the series is trying to do this is a
-> > correct fix. The arch/arm/kernel/psci_smp.c file is only compiled if
-> > both ARM_PSCI and SMP are selected. Builds break if we don't mirror
-> > that conditional in the header because for ARM_PSCI && !SMP no dummy
-> > will be defined, but the implementation for the prototype won't be
-> > available either, leading to a linker error.
-> 
-> Sure, I'm fine with this patch in isolation, I just didn't (don't) fully
-> grok what the series is trying to achieve.
+2015-10-08 18:11 GMT+03:00 Catalin Marinas <catalin.marinas@arm.com>:
+> On Thu, Oct 08, 2015 at 02:09:26PM +0200, Ard Biesheuvel wrote:
+>> On 8 October 2015 at 13:23, Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
+>> > On 10/08/2015 02:11 PM, Mark Rutland wrote:
+>> >> On Thu, Oct 08, 2015 at 01:36:09PM +0300, Andrey Ryabinin wrote:
+>> >>> 2015-10-07 13:04 GMT+03:00 Catalin Marinas <catalin.marinas@arm.com>:
+>> >>>> On Thu, Sep 17, 2015 at 12:38:06PM +0300, Andrey Ryabinin wrote:
+>> >>>>> As usual patches available in git
+>> >>>>>       git://github.com/aryabinin/linux.git kasan/arm64v6
+>> >>>>>
+>> >>>>> Changes since v5:
+>> >>>>>  - Rebase on top of 4.3-rc1
+>> >>>>>  - Fixed EFI boot.
+>> >>>>>  - Updated Doc/features/KASAN.
+>> >>>>
+>> >>>> I tried to merge these patches (apart from the x86 one which is already
+>> >>>> merged) but it still doesn't boot on Juno as an EFI application.
+>> >>>>
+>> >>>
+>> >>> 4.3-rc1 was ok and 4.3-rc4 is not. Break caused by 0ce3cc008ec04
+>> >>> ("arm64/efi: Fix boot crash by not padding between EFI_MEMORY_RUNTIME
+>> >>> regions")
+>> >>> It introduced sort() call in efi_get_virtmap().
+>> >>> sort() is generic kernel function and it's instrumented, so we crash
+>> >>> when KASAN tries to access shadow in sort().
+>> >>
+>> >> I believe this is solved by Ard's stub isolation series [1,2], which
+>> >> will build a stub-specific copy of sort() and various other functions
+>> >> (see the arm-deps in [2]).
+>> >>
+>> >> So long as the stub is not built with ASAN, that should work.
+>> >
+>> > Thanks, this should help, as we already build the stub without ASAN instrumentation.
+>>
+>> Indeed. I did not mention instrumentation in the commit log for those
+>> patches, but obviously, something like KASAN instrumentation cannot be
+>> tolerated in the stub since it makes assumptions about the memory
+>> layout
+>
+> I'll review your latest EFI stub isolation patches and try Kasan again
+> on top (most likely tomorrow).
 
-The goal is to prevent the kernel from registering a CPU idle driver if
-PSCI is going to be used for SMP. This is necessary because both the CPU
-idle driver and the PSCI implementation (provided by U-Boot in this
-case) access the same resources. The effect of having both enabled is
-usually that the system will simply hang sometime during boot.
+You'd better wait for v7, because kasan patches will need some adjustment.
+Since stub is isolated,  we need to handle memcpy vs __memcpy stuff the same
+way as we do in x86. Now we also need to #undef memset/memcpy/memmove in ARM64
+(just like this was done for x86).
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151008/586b161c/attachment-0001.sig>
+But instead of spreading these #undef across various headers, I will
+make a patch (most likely tomorrow)
+which will get rid of these #undefs completely (the idea was described
+here: https://lkml.org/lkml/2015/9/29/607)
+And I'll will send v7 on top of that patch + Ard's work.
+
+
+> Thanks.
+>
+> --
+> Catalin
