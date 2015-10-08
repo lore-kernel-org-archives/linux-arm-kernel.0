@@ -1,19 +1,74 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 8 Oct 2015 11:16:44 +0900
-Subject: [PATCH] ARM: shmobile: porter: enable SATA0
-In-Reply-To: <2739743.SVEuIvyJ6z@wasted.cogentembedded.com>
-References: <2739743.SVEuIvyJ6z@wasted.cogentembedded.com>
-Message-ID: <20151008021644.GA10023@verge.net.au>
+From: Dongsheng.Wang@freescale.com (Wang Dongsheng)
+Date: Thu, 8 Oct 2015 02:32:10 +0000
+Subject: [PATCH v3 1/2] fsl: Add binding for RCPM
+In-Reply-To: <CY1PR0301MB0748AB1CE2D93FFD79FE6009874C0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+References: <1443083354-37369-1-git-send-email-dongsheng.wang@freescale.com>
+ <CALRxmdDwGgxCG5SfSOaEXK8_fJcG4UUw_9D2=NA7nQhikDyb+A@mail.gmail.com>
+ <CY1PR0301MB0748AB1CE2D93FFD79FE6009874C0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+Message-ID: <SN1PR0301MB161632E7B6EB131A35C137939D350@SN1PR0301MB1616.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 01:00:06AM +0300, Sergei Shtylyov wrote:
-> Enable SATA0 device for the Porter board.
+> > +++ b/Documentation/devicetree/bindings/soc/fsl/rcpm.txt
+> > @@ -0,0 +1,63 @@
+> > +* Run Control and Power Management
+> > +-------------------------------------------
+> > +The RCPM performs all device-level tasks associated with device run
+> > +control and power management.
+> > +
+> > +Required properites:
+> > +  - reg : Offset and length of the register set of RCPM block.
 > 
-> This patch is analogous to the commit 5a62ec57004f ("ARM: shmobile:
-> henninger: enable SATA0") as there are no differences between the boards
-> in this respect.
+> s/RCPM block/the RCPM block/
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > +  - fsl,#rcpm-wakeup-cells : The number of cells in rcpm-wakeup property.
+> 
+> s/rcpm-wakeup-property/the rcpm-wakeup-property/
+> 
+> > +  - compatible : Sould contain a chip-specific RCPM block compatible
+> > + string
+> 
+> s/Sould/Should
+> 
+> "Should" means it is recommended, but does not mean "must".  Is it really
+> optional?
+> 
 
-Thanks, I have queued this up for v4.4.
+Thanks for your patient explain, change to "must".
+
+Regards,
+-Dongsheng
+
+> > +       and (if applicable) may contain a chassis-version RCPM compatible
+> > +       string. Chip-specific strings are of the form "fsl,<chip>-rcpm",
+> > +       such as:
+> > +       * "fsl,p2041-rcpm"
+> > +       * "fsl,p3041-rcpm"
+> > +       * "fsl,p4080-rcpm"
+> > +       * "fsl,p5020-rcpm"
+> > +       * "fsl,p5040-rcpm"
+> > +       * "fsl,t4240-rcpm"
+> > +       * "fsl,b4420-rcpm"
+> > +       * "fsl,b4860-rcpm"
+> 
+> 2 or 3 examples is enough.
+> 
+> > +       Chassis-version strings are of the form "fsl,qoriq-rcpm-<version>",
+> > +       such as:
+> > +       * "fsl,qoriq-rcpm-1.0": for chassis 1.0 rcpm
+> > +       * "fsl,qoriq-rcpm-2.0": for chassis 2.0 rcpm
+> > +       * "fsl,qoriq-rcpm-2.1": for chassis 2.1 rcpm
+> > +
+> > +All references to "1.0" and "2.0" refer to the QorIQ chassis version
+> > +to which the chip complies.
+> > +Chassis Version                Example Chips
+> > +---------------                -------------------------------
+> > +1.0                            p4080, p5020, p5040, p2041, p3041
+> > +2.0                            t4240, b4860, b4420
+> > +2.1                            t1040, ls1021
+> 
+> Not sure this binding is the place to maintain a table of chassis versions to
+> SoCs.
+> 
+> Thanks,
+> Stuart
