@@ -1,83 +1,44 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu,  8 Oct 2015 19:01:40 +0900
-Subject: [PATCH v3 3/7] arm64: ftrace: fix a stack tracer's output under
- function graph tracer
+Date: Thu,  8 Oct 2015 19:01:41 +0900
+Subject: [PATCH v3 4/7] arm64: ftrace: allow for tracing leaf functions
 In-Reply-To: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1444298504-10392-4-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1444298504-10392-5-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function graph tracer modifies a return address (LR) in a stack frame
-to hook a function return. This will result in many useless entries
-(return_to_handler) showing up in a stack tracer's output.
+CONFIG_FRAME_POINTER is always enabled on arm64, adding
+-fno-omit-frame-pointer, while ftrace, CONFIG_FUNCTION_TRACER, adds -pg
+to KBUILD_CFLAGS.
+The combination of these options, however, does not implicitly enables
+-fno-omit-leaf-frame-pointer option, and no leaf functions are actually
+traced under ftrace.
 
-This patch replaces such entries with originals values preserved in
-current->ret_stack[].
+This patch allows for tracing leaf functions by adding
+-fno-omit-leaf-frame-pointer option, but does it only when
+CONFIG_STACK_TRACER is configured because it will increase the kernel
+size and add extra instructions on runtime.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/include/asm/ftrace.h |    2 ++
- arch/arm64/kernel/stacktrace.c  |   20 ++++++++++++++++++++
- 2 files changed, 22 insertions(+)
+ arch/arm64/Makefile |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
-index 2b43e20..b7d597c 100644
---- a/arch/arm64/include/asm/ftrace.h
-+++ b/arch/arm64/include/asm/ftrace.h
-@@ -29,6 +29,8 @@ struct dyn_arch_ftrace {
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index f9914d7..71cad91 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -28,6 +28,11 @@ endif
  
- extern unsigned long ftrace_graph_call;
+ KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr)
+ KBUILD_AFLAGS	+= $(lseinstr)
++ifdef CONFIG_STACK_TRACER
++ifdef CONFIG_FRAME_POINTER
++KBUILD_CFLAGS	+= -mno-omit-leaf-frame-pointer
++endif
++endif
  
-+extern void return_to_handler(void);
-+
- static inline unsigned long ftrace_call_adjust(unsigned long addr)
- {
- 	/*
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index bc0689a..1555a8b 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -78,6 +78,9 @@ struct stack_trace_data {
- 	struct stack_trace *trace;
- 	unsigned int no_sched_functions;
- 	unsigned int skip;
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	unsigned int ret_stack_index;
-+#endif
- };
- 
- static int save_trace(struct stackframe *frame, void *d)
-@@ -86,6 +89,20 @@ static int save_trace(struct stackframe *frame, void *d)
- 	struct stack_trace *trace = data->trace;
- 	unsigned long addr = frame->pc;
- 
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	if (addr == (unsigned long)return_to_handler - AARCH64_INSN_SIZE) {
-+		/*
-+		 * This is a case where function graph tracer has
-+		 * modified a return address (LR) in a stack frame
-+		 * to hook a function return.
-+		 * So replace it to an original value.
-+		 */
-+		frame->pc = addr =
-+			current->ret_stack[data->ret_stack_index--].ret
-+							- AARCH64_INSN_SIZE;
-+	}
-+#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
-+
- 	if (data->no_sched_functions && in_sched_functions(addr))
- 		return 0;
- 	if (data->skip) {
-@@ -105,6 +122,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
- 
- 	data.trace = trace;
- 	data.skip = trace->skip;
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	data.ret_stack_index = current->curr_ret_stack;
-+#endif
- 
- 	if (tsk != current) {
- 		data.no_sched_functions = 1;
+ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+ KBUILD_CPPFLAGS	+= -mbig-endian
 -- 
 1.7.9.5
