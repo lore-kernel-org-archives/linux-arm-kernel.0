@@ -1,22 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Oct 2015 17:43:11 +0200
-Subject: [PATCH 1/4] dt-bindings: Document the STM32 DMA bindings
-In-Reply-To: <1444317612-818-2-git-send-email-cedric.madianga@gmail.com>
-References: <1444317612-818-1-git-send-email-cedric.madianga@gmail.com>
- <1444317612-818-2-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <13614799.2Hi64P0fJ2@wuerfel>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Thu, 8 Oct 2015 15:43:59 +0000
+Subject: [PATCH v2 3/9] dmaengine: st_fdma:  Add STMicroelectronics FDMA
+ driver header file
+In-Reply-To: <1441980871-24475-4-git-send-email-peter.griffin@linaro.org>
+References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
+ <1441980871-24475-4-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1444118413.3579.46.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 October 2015 17:20:09 M'boumba Cedric Madianga wrote:
-> +Each dmas request consists of 5 cells:
-> +1. A phandle pointing to the STM32 DMA controller
-> +2. The channel id
-> +3. The request line number
-> +4. A 32bit mask specifying the DMA channel configuration
-> 
+On Fri, 2015-09-11 at 15:14 +0100, Peter Griffin wrote:
 
-It's fairly unusual to encode the channel id here, rather than
-letting the driver pick one. Is that actually required here?
+> +#define FDMA_ID_OFST		0x00000
+> +#define FDMA_VER_OFST		0x00004
+> > +
+> +#define FDMA_EN_OFST		0x00008
 
-	Arnd
+Why cant these be BIT() to maintain consistency?
+
+-- 
+~Vinod
