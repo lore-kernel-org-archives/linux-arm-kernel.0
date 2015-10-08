@@ -1,34 +1,32 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Thu, 8 Oct 2015 15:55:20 +0530
-Subject: [PATCH v4 1/2] arm64: Introduce IRQ stack
-In-Reply-To: <1444231692-32722-2-git-send-email-jungseoklee85@gmail.com>
-References: <1444231692-32722-1-git-send-email-jungseoklee85@gmail.com>
- <1444231692-32722-2-git-send-email-jungseoklee85@gmail.com>
-Message-ID: <20151008102520.GA10912@dhcppc13.redhat.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 8 Oct 2015 11:25:41 +0100
+Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
+In-Reply-To: <005e01d101a9$31ee80f0$95cb82d0$@samsung.com>
+References: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
+ <003a01d10199$58e96590$0abc30b0$@samsung.com> <20151008082302.GE14315@cbox>
+ <005e01d101a9$31ee80f0$95cb82d0$@samsung.com>
+Message-ID: <CAFEAcA-3vUgB=LCsiEwGoM0G28yszw+90LFajOB8akgwiQwuuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jungseok,
+On 8 October 2015 at 10:10, Pavel Fedin <p.fedin@samsung.com> wrote:
+>  Sorry, didn't want to offend anyone. I just wanted to tell that i know
+> that you, as maintainers, have much more power than i do, and you can
+> always say "it's political decision, we just want it and that's final",
+> and if you choose to do this, i'm perfectly OK with that, just say it.
 
-On 07/10/2015:03:28:11 PM, Jungseok Lee wrote:
-> Currently, kernel context and interrupts are handled using a single
-> kernel stack navigated by sp_el1. This forces a system to use 16KB
-> stack, not 8KB one. This restriction makes low memory platforms suffer
-> from memory pressure accompanied by performance degradation.
+This isn't intended to be a political decision; it's our joint
+technical opinion on the best design for this API. Since we all
+happened to be in one physical location the other week it was a good
+opportunity for us to work through how we thought the API should
+look from a technical perspective. At that point it seemed to us
+to be clearer to write up the results of that discussion as a
+single patch to the API documentation, rather than doing it by
+(for instance) making lots of different review comments on your patches.
+Christoffer's API documentation patch is a patch like any other and
+it has to go through review. If there are parts where you don't
+understand the rationale or you think we got something wrong you
+should let us know.
 
-How will it behave on 64K Page system? There, it would take atleast 64K per cpu,
-right?
-
-> +int alloc_irq_stack(unsigned int cpu)
-> +{
-> +	void *stack;
-> +
-> +	if (per_cpu(irq_stacks, cpu).stack)
-> +		return 0;
-> +
-> +	stack = (void *)__get_free_pages(THREADINFO_GFP, THREAD_SIZE_ORDER);
-
-Above would not compile for 64K pages as THREAD_SIZE_ORDER is only defined for
-non 64K. This need to be fixed.
-
-~Pratyush
+thanks
+-- PMM
