@@ -1,31 +1,35 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 08 Oct 2015 15:45:22 +0300
-Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
-In-Reply-To: <20151008123630.GC20936@cbox>
-References: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
- <003a01d10199$58e96590$0abc30b0$@samsung.com> <20151008082302.GE14315@cbox>
- <005e01d101a9$31ee80f0$95cb82d0$@samsung.com> <20151008092858.GA16100@cbox>
- <561641F5.4060202@arm.com> <009501d101c4$dde8e2e0$99baa8a0$@samsung.com>
- <20151008123630.GC20936@cbox>
-Message-ID: <009901d101c7$3331b3b0$99951b10$@samsung.com>
+From: nikolay@cumulusnetworks.com (Nikolay Aleksandrov)
+Date: Thu, 8 Oct 2015 14:51:05 +0200
+Subject: [PATCH v2] bridge/netfilter: avoid unused label warning
+In-Reply-To: <5180534.sSnu9AX8xS@wuerfel>
+References: <5180534.sSnu9AX8xS@wuerfel>
+Message-ID: <561666B9.8070802@cumulusnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+On 10/08/2015 02:30 PM, Arnd Bergmann wrote:
+> With the ARM mini2440_defconfig, the bridge netfilter code gets
+> built with both CONFIG_NF_DEFRAG_IPV4 and CONFIG_NF_DEFRAG_IPV6
+> disabled, which leads to a harmless gcc warning:
+> 
+> net/bridge/br_netfilter_hooks.c: In function 'br_nf_dev_queue_xmit':
+> net/bridge/br_netfilter_hooks.c:792:2: warning: label 'drop' defined but not used [-Wunused-label]
+> 
+> This gets rid of the warning by cleaning up the code to avoid
+> the respective #ifdefs causing this problem, and replacing them
+> with if(IS_ENABLED()) checks. I have verified that the resulting
+> object code is unchanged, and an additional advantage is that
+> we now get compile coverage of the unused functions in more
+> configurations.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: dd302b59bde0 ("netfilter: bridge: don't leak skb in error paths")
+> ---
+> Version 2:
+> 
+> Rebased to git://git.kernel.org/pub/scm/linux/kernel/git/pablo/nf-next
+> 
 
-> There's no rush, I don't think this will make it into v4.4 anyhow
+Looks good to me,
 
- Did you mean 4.3 here?
-
-> Speaking of which, does the QEMU side of this patch set require first
-> adding the GICv3 emulation for the data structures or is there a
-> stand-alone migration patch set somewhere?
-
- I rolled it out a week ago: https://www.mail-archive.com/qemu-devel at nongnu.org/msg325331.html. I
-tried to get reviewed/accepted/whatever at least data structure part, but Peter replied that he
-isn't interested before we have the kernel.
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Reviewed-by: Nikolay Aleksandrov <nikolay@cumulusnetworks.com>
