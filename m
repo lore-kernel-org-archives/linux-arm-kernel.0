@@ -1,39 +1,35 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu,  8 Oct 2015 12:53:39 -0500
-Subject: [PATCH v2 05/13] arm64: enable building of all dtbs
-In-Reply-To: <1444326827-3565-1-git-send-email-robh@kernel.org>
-References: <1444326827-3565-1-git-send-email-robh@kernel.org>
-Message-ID: <1444326827-3565-6-git-send-email-robh@kernel.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 8 Oct 2015 18:57:34 +0100
+Subject: [PATCH v4] twd: Don't set CLOCK_EVT_FEAT_C3STOP unconditionally
+In-Reply-To: <5616AA2D.2070101@free.fr>
+References: <56123BD0.8010005@sigmadesigns.com>
+ <56124035.6080107@sigmadesigns.com>
+ <CACRpkdbWRU3UH6aJnqdcuzdh_-sE7ryhs0vBTUbbRDcJ7PWXLw@mail.gmail.com>
+ <561247DF.1000308@sigmadesigns.com>
+ <20151005103539.GC19064@leverpostej>
+ <5612649C.5020401@sigmadesigns.com>
+ <20151008171616.GG7275@leverpostej> <5616AA2D.2070101@free.fr>
+Message-ID: <20151008175734.GH7275@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable building all dtb files when CONFIG_OF_ALL_DTBS is enabled. The dtbs
-are not really dependent on a platform being enabled or any other kernel
-config, so for testing coverage it is convenient to build all of the dtbs.
-This builds all dts files in the tree, not just targets listed. This
-is simpler for arm64 which has a bunch of sub-dirs.
+> Is it possible that twd_local_timer_common_register() would be
+> called more than once?
+> 
+> twd_local_timer_register() guards against multiple invocations,
+> but twd_local_timer_of_register() doesn't (but maybe there is
+> some guarantee from OF, or it's invalid to have multiple
+> "arm,cortex-a9-twd-timer" strings in the DT).
 
-Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm64/boot/dts/Makefile | 6 ++++++
- 1 file changed, 6 insertions(+)
+It does appear that were you to have have two or more
+"arm,cortex-a9-twd-timer" nodes in the DT, things would go wrong. As far
+as I am aware, that would result in multiple calls to
+twd_local_timer_of_register.
 
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index d9f8833..b01ec43 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -14,3 +14,9 @@ dts-dirs += sprd
- dts-dirs += xilinx
- 
- subdir-y	:= $(dts-dirs)
-+
-+dtstree		:= $(srctree)/$(src)
-+
-+dtb-$(CONFIG_OF_ALL_DTBS) := $(patsubst $(dtstree)/%.dts,%.dtb, $(foreach d,$(dts-dirs), $(wildcard $(dtstree)/$(d)/*.dts)))
-+
-+always		:= $(dtb-y)
--- 
-2.1.4
+I don't think it would ever be valid to have two nodes for this
+particular device, but it's probably worth having the same check as
+twd_local_timer_register does, with a warning that there was more than
+one such node logged to the console.
+
+Thanks,
+Mark
