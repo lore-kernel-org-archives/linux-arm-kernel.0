@@ -1,102 +1,49 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 08 Oct 2015 11:58:12 +0200
-Subject: [RFT 0/3] usb: usb3503: Fix probing on Arndale board (missing phy)
-In-Reply-To: <561638ED.1060503@osg.samsung.com>
-References: <1444177807-15524-1-git-send-email-k.kozlowski@samsung.com>
- <56152BB2.4020202@samsung.com> <561606FE.2090007@samsung.com>
- <56160BFD.4050702@samsung.com> <561638ED.1060503@osg.samsung.com>
-Message-ID: <56163E34.8040706@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Oct 2015 11:00:38 +0100
+Subject: All OMAP platforms: MMC is broken
+In-Reply-To: <20151008095635.GZ23801@atomide.com>
+References: <20151006153710.GS23801@atomide.com>
+ <20151007124551.GI21626@n2100.arm.linux.org.uk>
+ <20151007132642.GV23801@atomide.com>
+ <CAPDyKFoBPEnHuNR_bsrPU6X=q5pHa8cDR7_Ng9xLnLsudymvOg@mail.gmail.com>
+ <20151007155206.GX23801@atomide.com>
+ <CAPDyKFp5e_pizFSCzeYSM8sXGx6Jewgs2PRB-RQ1iWMM6WMOww@mail.gmail.com>
+ <5615A723.6090907@ti.com> <20151008084020.GY23801@atomide.com>
+ <20151008093543.GA32536@n2100.arm.linux.org.uk>
+ <20151008095635.GZ23801@atomide.com>
+Message-ID: <20151008100038.GB32536@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Oct 08, 2015 at 02:56:36AM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [151008 02:40]:
+> > On Thu, Oct 08, 2015 at 01:40:21AM -0700, Tony Lindgren wrote:
+> > > Well the way distros deal with issues like this is have everything
+> > > possible as loadable modules. We should get the regulator_pbiaa
+> > > loaded automatically in that case as long as it's in the dts.. And
+> > > as long as we have the MODULE_DEVICE_TABLE entries right.
+> > 
+> > Assuming you have a rootfs which doesn't depend on one of those modules,
+> > or an initramfs, and a way to get the built modules into that initial
+> > filesystem.  Automated test boot systems do not have that luxury: the
+> > generation of initramfs is distro specific, and would be very large if
+> > it were to include all possible modules.
+> 
+> Right, we need to keep the kernel usable in all these configurations
+> somehow.
+> 
+> For the kernel generated minimal initramfs we could grep for the
+> needed modules in the dts file.
 
-On 2015-10-08 11:35, Javier Martinez Canillas wrote:
-> Hello,
->
-> On 10/08/2015 08:23 AM, Marek Szyprowski wrote:
->> Hello,
->>
->> On 2015-10-08 08:02, Krzysztof Kozlowski wrote:
->>> On 07.10.2015 23:26, Marek Szyprowski wrote:
->>>> Hello,
->>>>
->>>> On 2015-10-07 02:30, Krzysztof Kozlowski wrote:
->>>>> Introduction
->>>>> ============
->>>>> This patchset tries to fix probing of usb3503 on Arndale board
->>>>> if the Samsung PHY driver is probed later (or built as a module).
->>>>>
->>>>> *The patchset was not tested on Arndale board.*
->>>>> I don't have that board. Please test it and say if the usb3503
->>>>> deferred probe
->>>>> works fine and the issue is solved.
->>>>>
->>>>> The patchset was tested on Odroid U3 board (which is different!)
->>>>> in a simulated environment. It is not sufficient testing.
->>>>>
->>>>>
->>>>> Difference
->>>>> ==========
->>>>> The usb3503 device driver can be used as a I2C device (on Odroid U3)
->>>>> or as a platform device connected through phy (on Arndale). In the second
->>>>> case the necessary phy reference has to be obtained and enabled.
->>>>>
->>>>> For some details please look also at thread [0][1].
->>>>>
->>>>> [0]
->>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348524.html
->>>>>
->>>>> [1]
->>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348875.html
->>>>>
->>>>>
->>>> I'm not sure that this is the correct approach. usb3503 chip is simply
->>>> connected
->>>> to Exynos USB2 phy, so it visible on the USB bus. The real driver that
->>>> controls USB2
->>>> PHY is Exynos EHCI driver and USB3503 should not mess around it.
->>> The ehci node (usb at 12110000) has one port configured and it takes one
->>> PHY reference (phy of id 1 - USB host). I can't see driver taking
->>> reference to HSIC0 or HSIC1 phys... Since I cannot diagnose the error I
->>> don't know what is really expected here.
->> It looks that EHCI in Exynos 5250 and 5420 still use old phy bindings. For
->> the reference, see Exynos4 dts and exynos4412-odroidu3.dts to check how to enable
->> more than one USB port (Odroid U3 has both HSIC ports enabled).
->>
->>>> In my opinion all that is needed in case of Arndale board is forcing
->>>> reset of
->>>> usb3503 chip after successful EHCI and USB2 PHY initialization (for some
->>>> reason
->>>> initialization of usb3503 chip must be done after usb host initialization).
->>>> However I have no idea which driver should trigger this reset. Right now
->>>> I didn't
->>>> find any good solution for additional control for devices which are on
->>>> autoprobed
->>>> bus like usb.
->>> The reset is done at the end of usb3503's probe. The question "why
->>> usb3503 has to be initialized after EHCI and USB PHY" is still valid...
->> I remember that I saw some code to reset HSIC device after phy power on in case
->> of HSIC-connected modem chip, so maybe this is somehow common for HSIC chips
->> (which are some special case of 'embedded usb').
->>
-> I also don't have an Arndale board and haven't followed the thread to closely
-> but I just wanted to mention that the ChromiumOS 3.8 tree has a workaround to
-> reset the HSIC phys:
->
-> https://chromium.googlesource.com/chromiumos/third_party/kernel/+/81685c447954a29d1098268776582457258dd98f%5E%21/
->
-> and later a "supports-hsicphy-reset" DT property was added to force the reset
-> per board instead of unconditionally:
->
-> https://chromium.googlesource.com/chromiumos/third_party/kernel/+/a4d1c1a223ffa1ed38a4257d0378ca70c6667be0%5E%21/
+Yes, you might be able to do that, but the only thing that can generate
+the initramfs is the target system itself, or a similar target system.
+For example, you can't sanely generate an initramfs for an ARM Ubuntu
+system on an x86 Fedora host.
 
-I didn't check this approach, but for me it looks that the problem is caused
-by the lack of resetting the chip connected to hsic phy not the lack of
-resetting the phy itself. However this is pure speculation and one should
-check it with the real hardware.
+Distros have the luxury of always being able to do the initramfs
+generation on the target system at installation or distro kernel update
+time.
 
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
