@@ -1,72 +1,55 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Thu, 8 Oct 2015 19:07:45 +0300
-Subject: [PATCH v6 0/6] KASAN for arm64
-In-Reply-To: <20151008151144.GM17192@e104818-lin.cambridge.arm.com>
-References: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
- <20151007100411.GG3069@e104818-lin.cambridge.arm.com>
- <CAPAsAGxR-yqtmFeo65Xw_0RQyEy=mN1uG=GKtqoMLr_x_N0u5w@mail.gmail.com>
- <20151008111144.GC7275@leverpostej> <56165228.8060201@gmail.com>
- <CAKv+Gu_v7J1BA+xFcowBrW05bRFs=_WFf_HCeCmWgdZVRo0eQw@mail.gmail.com>
- <20151008151144.GM17192@e104818-lin.cambridge.arm.com>
-Message-ID: <CAPAsAGxhcRtks40u3O29t=KMKkuLy4Pf8u8TeeBy2f2-MuSf+A@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 08 Oct 2015 17:09:20 +0100
+Subject: [PATCH 0/5] arm64: Allow booting with GICv3 in GICv2 mode
+In-Reply-To: <20151008155655.GO17192@e104818-lin.cambridge.arm.com>
+References: <1443803874-9566-1-git-send-email-marc.zyngier@arm.com>
+ <20151008155655.GO17192@e104818-lin.cambridge.arm.com>
+Message-ID: <56169530.9030902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-08 18:11 GMT+03:00 Catalin Marinas <catalin.marinas@arm.com>:
-> On Thu, Oct 08, 2015 at 02:09:26PM +0200, Ard Biesheuvel wrote:
->> On 8 October 2015 at 13:23, Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
->> > On 10/08/2015 02:11 PM, Mark Rutland wrote:
->> >> On Thu, Oct 08, 2015 at 01:36:09PM +0300, Andrey Ryabinin wrote:
->> >>> 2015-10-07 13:04 GMT+03:00 Catalin Marinas <catalin.marinas@arm.com>:
->> >>>> On Thu, Sep 17, 2015 at 12:38:06PM +0300, Andrey Ryabinin wrote:
->> >>>>> As usual patches available in git
->> >>>>>       git://github.com/aryabinin/linux.git kasan/arm64v6
->> >>>>>
->> >>>>> Changes since v5:
->> >>>>>  - Rebase on top of 4.3-rc1
->> >>>>>  - Fixed EFI boot.
->> >>>>>  - Updated Doc/features/KASAN.
->> >>>>
->> >>>> I tried to merge these patches (apart from the x86 one which is already
->> >>>> merged) but it still doesn't boot on Juno as an EFI application.
->> >>>>
->> >>>
->> >>> 4.3-rc1 was ok and 4.3-rc4 is not. Break caused by 0ce3cc008ec04
->> >>> ("arm64/efi: Fix boot crash by not padding between EFI_MEMORY_RUNTIME
->> >>> regions")
->> >>> It introduced sort() call in efi_get_virtmap().
->> >>> sort() is generic kernel function and it's instrumented, so we crash
->> >>> when KASAN tries to access shadow in sort().
->> >>
->> >> I believe this is solved by Ard's stub isolation series [1,2], which
->> >> will build a stub-specific copy of sort() and various other functions
->> >> (see the arm-deps in [2]).
->> >>
->> >> So long as the stub is not built with ASAN, that should work.
->> >
->> > Thanks, this should help, as we already build the stub without ASAN instrumentation.
+On 08/10/15 16:56, Catalin Marinas wrote:
+> On Fri, Oct 02, 2015 at 05:37:49PM +0100, Marc Zyngier wrote:
+>> Recent evolutions of the ARM Trusted Firmware have outlined issues
+>> when the system is equipped with a GICv3 interrupt controller, but the
+>> firmware has decided to restrict it to GICv2 compatibility mode.
 >>
->> Indeed. I did not mention instrumentation in the commit log for those
->> patches, but obviously, something like KASAN instrumentation cannot be
->> tolerated in the stub since it makes assumptions about the memory
->> layout
->
-> I'll review your latest EFI stub isolation patches and try Kasan again
-> on top (most likely tomorrow).
+>> In this mode, system registers cannot be enabled, and the firmware is
+>> expected to pass a GICv2 description (DT or ACPI tables).
+>>
+>> This series makes sure that system register access is checked at EL2
+>> setup time and when the feature detection is performed. Additionally,
+>> the GICv2 driver checks that system registers are disabled, and warns
+>> if they are enabled.
+>>
+>> The booting requirements are also updated to make the above explicit.
+>>
+>> Marc Zyngier (5):
+>>   arm64: el2_setup: Make sure ICC_SRE_EL2.SRE sticks before using GICv3
+>>     sysregs
+>>   irqchip/gic-v3: Make gic_enable_sre an inline function
+>>   arm64: cpufeatures: Check ICC_EL1_SRE.SRE before enabling
+>>     ARM64_HAS_SYSREG_GIC_CPUIF
+>>   irqchip/gic: Warn if GICv3 system registers are enabled
+>>   arm64: Update booting requirements for GICv3 in GICv2 mode
+>>
+>>  Documentation/arm64/booting.txt    | 11 ++++++++++-
+>>  arch/arm64/kernel/cpufeature.c     | 19 ++++++++++++++++++-
+>>  arch/arm64/kernel/head.S           |  2 ++
+>>  drivers/irqchip/irq-gic-v3.c       | 32 +++++++++-----------------------
+>>  drivers/irqchip/irq-gic.c          | 15 +++++++++++++++
+>>  include/linux/irqchip/arm-gic-v3.h | 16 ++++++++++++++++
+>>  6 files changed, 70 insertions(+), 25 deletions(-)
+> 
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> How do you plan to merge these patches? I'm fine for them to go via the
+> irqchip maintainers since they are all GIC related.
 
-You'd better wait for v7, because kasan patches will need some adjustment.
-Since stub is isolated,  we need to handle memcpy vs __memcpy stuff the same
-way as we do in x86. Now we also need to #undef memset/memcpy/memmove in ARM64
-(just like this was done for x86).
+I guess we can direct this via tip if Thomas is OK with it.
 
-But instead of spreading these #undef across various headers, I will
-make a patch (most likely tomorrow)
-which will get rid of these #undefs completely (the idea was described
-here: https://lkml.org/lkml/2015/9/29/607)
-And I'll will send v7 on top of that patch + Ard's work.
+Thanks,
 
-
-> Thanks.
->
-> --
-> Catalin
+	M.
+-- 
+Jazz is not dead. It just smells funny...
