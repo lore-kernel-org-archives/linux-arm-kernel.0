@@ -1,60 +1,39 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 8 Oct 2015 17:17:46 +0200
-Subject: [PATCH 10/15] arm64: kvm: Fix {V}TCR_EL2_TG0 mask
-In-Reply-To: <1442331684-28818-11-git-send-email-suzuki.poulose@arm.com>
-References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
- <1442331684-28818-11-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20151008151746.GE20936@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Oct 2015 17:18:15 +0200
+Subject: [PATCH v4 4/5] PCI: generic: Correct, and avoid overflow,
+ in bus_max calculation.
+In-Reply-To: <5230007.h2fkbnOlh5@wuerfel>
+References: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
+ <20151008150243.GC3885@localhost> <5230007.h2fkbnOlh5@wuerfel>
+Message-ID: <5178627.ufUfdomGdT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 04:41:19PM +0100, Suzuki K. Poulose wrote:
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+On Thursday 08 October 2015 17:11:32 Arnd Bergmann wrote:
+> > > --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> > > +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> > > @@ -34,7 +34,11 @@ Properties of the host controller node:
+> > >  - #size-cells    : Must be 2.
+> > >  
+> > >  - reg            : The Configuration Space base address and size, as accessed
+> > > -                   from the parent bus.
+> > > +                   from the parent bus.  The base address corresponds to
+> > > +                   bus zero, even though the "bus-range" property may specify
+> > > +                   a different starting bus number.  The driver must only map
+> > > +                   or access the portion of the Configuration Space that
+> > > +                   corresponds to the "bus-range"
 > 
-> {V}TCR_EL2_TG0 is a 2bit wide field, where:
+> I thought we had reached an agreement that it is a bad idea to have a 'reg'
+> property that lists registers belonging to a different device.
 > 
->  00 - 4K
->  01 - 64K
->  10 - 16K
-> 
-> But we use only 1 bit, which has worked well so far since
-> we never cared about 16K. Fix it for 16K support.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: kvmarm at lists.cs.columbia.edu
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/kvm_arm.h |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index 7605e09..bdf139e 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -98,7 +98,7 @@
->  #define TCR_EL2_TBI	(1 << 20)
->  #define TCR_EL2_PS	(7 << 16)
->  #define TCR_EL2_PS_40B	(2 << 16)
-> -#define TCR_EL2_TG0	(1 << 14)
-> +#define TCR_EL2_TG0	(3 << 14)
->  #define TCR_EL2_SH0	(3 << 12)
->  #define TCR_EL2_ORGN0	(3 << 10)
->  #define TCR_EL2_IRGN0	(3 << 8)
-> @@ -110,7 +110,7 @@
->  
->  /* VTCR_EL2 Registers bits */
->  #define VTCR_EL2_PS_MASK	(7 << 16)
-> -#define VTCR_EL2_TG0_MASK	(1 << 14)
-> +#define VTCR_EL2_TG0_MASK	(3 << 14)
->  #define VTCR_EL2_TG0_4K		(0 << 14)
->  #define VTCR_EL2_TG0_64K	(1 << 14)
->  #define VTCR_EL2_SH0_MASK	(3 << 12)
-> -- 
-> 1.7.9.5
 > 
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+To further clarify: the argument was to make it mirror what ACPI does for
+PCI. However, this is unlike what all other devices do with DT, where you
+have non-overlapping register ranges (start, length) for each device.
+ACPI as far as I understand it does not give a range for a PCIe host, but
+instead provides a way to get the start address of the ECAM register area
+for the domain that the host is part of, and that needs to be the same
+address for each host in the domain.
+
+	Arnd
