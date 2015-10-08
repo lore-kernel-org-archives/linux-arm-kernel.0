@@ -1,74 +1,39 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 08 Oct 2015 10:31:18 +0200
-Subject: [alsa-devel] [PATCH v5 06/10] dmaengine: add API for getting
- dma controller's quirk
-In-Reply-To: <56139289.7000005@rock-chips.com>
-References: <1442187923-5736-1-git-send-email-shawn.lin@rock-chips.com>
- <1442188139-6017-1-git-send-email-shawn.lin@rock-chips.com>
- <20151005153746.GG13501@vkoul-mobl.iind.intel.com>
- <56139289.7000005@rock-chips.com>
-Message-ID: <561629D6.9010702@metafoo.de>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 8 Oct 2015 09:32:40 +0100
+Subject: [linux-sunxi] Re: [PATCH v2] ARM: dts: sunxi: Add regulators for
+ LeMaker BananaPi
+In-Reply-To: <jwvegh6d60k.fsf-monnier+gmane.comp.hardware.netbook.arm.sunxi@gnu.org>
+References: <1438532305-5884-1-git-send-email-public_timo.s@silentcreek.de>
+ <20150818153631.GH2547@lukather>
+ <CAMAWPa-Q7o+Ys2FjhLZt6Nwq=Ja6TTdWFDZFTCYLkoLGjpLpxw@mail.gmail.com>
+ <20151005173957.B1BD16C8150E@dd34104.kasserver.com>
+ <7hzizu924y.fsf@deeprootsystems.com>
+ <20151007154918.D6F856C800D4@dd34104.kasserver.com>
+ <jwvegh6d60k.fsf-monnier+gmane.comp.hardware.netbook.arm.sunxi@gnu.org>
+Message-ID: <56162A28.8000104@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/2015 11:21 AM, Shawn Lin wrote:
-> Hi Vinod,
-> 
-> On 2015/10/5 23:37, Vinod Koul wrote:
->> On Mon, Sep 14, 2015 at 07:48:59AM +0800, Shawn Lin wrote:
->>> Add dmaengine_get_quirks API for peripheral devices to query
->>> quirks if they need it to make special workaround due to broken
->>> dma controller design.
->>>
->>> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
->>> ---
->>>
->>> Changes in v5: None
->>> Changes in v4: None
->>> Changes in v3: None
->>> Changes in v2: None
->>> Changes in v1: None
->>>
->>>   include/linux/dmaengine.h | 9 +++++++++
->>>   1 file changed, 9 insertions(+)
->>>
->>> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
->>> index e2f5eb4..5174ca4 100644
->>> --- a/include/linux/dmaengine.h
->>> +++ b/include/linux/dmaengine.h
->>> @@ -704,6 +704,7 @@ struct dma_device {
->>>
->>>       int (*device_config)(struct dma_chan *chan,
->>>                    struct dma_slave_config *config);
->>> +    int (*device_get_quirks)(struct dma_chan *chan);
->>
->> And why do we want to expose this to users? THis doesnt seem right!
->>
-> 
-> Basically I agree not to expose dma's quirk to slave controllers...But, the
-> fact I mentioned on cover letter explain the reasons why I have to let slave
-> controllers know that they are working with a broken dma. It's a dilemma
-> that if we don't want that to be exposed(let slave controllers' driver get
-> the info via a API), we have t add broken quirk for all of them ,here and
-> there, which seems to be a disaster:(
+Hi,
 
-The problem with this API is that it transports values with device specific
-meanings over a generic API. Which is generally speaking not a good idea
-because the consumer witch is supposed to be generic suddenly needs to know
-which provider it is talking to.
+On 10/07/2015 05:01 PM, Stefan Monnier wrote:
+>> @Maxime: How should we handle this? In its current form, the patch applies
+>> only to the BananaPi dts by overriding the inherited opp from the SoC dtsi.
+>> In an earlier discussion, it was said that this can be done, even though it
+>> might not be the most elegant approach. But then again, I think it
+>> shouldn't be necessary to change the opp in the sun7i-a20.dtsi for all A20
+>> boards since this is - to my knowledge - the first and only report that an
+>> A20 board has stability issues at the lower voltages (although not too many
+>> boards use voltage scaling yet).
+>
+> IIUC this setting doesn't affect signals external to the A20, so it
+> seems like it should be board-agnostic.
 
-A better solution in this case typically is either introduce a generic API
-with generic values or a custom API with custom values, but don't mix the two.
+This setting configures the voltage at the pmic output pin, not at the SoC
+power-input pins. And how much of the voltage actually makes it from the pmic
+to the SoC definitely is board-specific. So we are going to need board-specific
+opp-s in some cases (like this one for example).
 
-> 
-> I would appreciate it if you could give me some suggestions at your earliest
-> convenience. :)
+Regards,
 
-In this case I think the best way to handle this is not quirks, but rather
-expose the actual maximum burst size using the DMA capabilities API. Since
-supporting only a certain burst depth is not really a quirk. All hardware
-has a limit for this and for some it might be larger or smaller than for
-others and it might be the same IP core but the maximum size depends on some
-IP core parameters. So this should be discoverable.
-
-- Lars
+Hans
