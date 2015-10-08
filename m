@@ -1,27 +1,46 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 8 Oct 2015 15:51:25 +0200
-Subject: [PATCH v4 8/8] ARM: multi_v7_defconfig: Add rockchip audio support
-In-Reply-To: <1444311079-2892-9-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1444311079-2892-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1444311079-2892-9-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <561674DD.5040704@osg.samsung.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 8 Oct 2015 08:51:50 -0500
+Subject: [PATCH v2 2/4] of: documentation: add bindings documentation for
+ Meson8b
+In-Reply-To: <1444249865-6897-3-git-send-email-carlo@caione.org>
+References: <1444249865-6897-1-git-send-email-carlo@caione.org>
+ <1444249865-6897-3-git-send-email-carlo@caione.org>
+Message-ID: <CAL_JsqK02cKArzcLj2hEXkWRvVhM4dY6JmXfeuxDMP8_jSOodA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sjoerd,
++dt list
 
-On 10/08/2015 03:31 PM, Sjoerd Simons wrote:
-> Enable support for audio device found on rockchip boards.
-> 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+On Wed, Oct 7, 2015 at 3:31 PM, Carlo Caione <carlo@caione.org> wrote:
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+
+Acked-by: Rob Herring <robh@kernel.org>
+
 > ---
-
-Patch looks good to me.
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+>  Documentation/devicetree/bindings/arm/amlogic.txt | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+> index 973884a..1dfee20 100644
+> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
+> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+> @@ -9,6 +9,12 @@ Boards with the Amlogic Meson8 SoC shall have the following properties:
+>    Required root node property:
+>      compatible: "amlogic,meson8";
+>
+> +Boards with the Amlogic Meson8b SoC shall have the following properties:
+> +  Required root node property:
+> +    compatible: "amlogic,meson8b";
+> +
+>  Board compatible values:
+> -  - "geniatech,atv1200"
+> -  - "minix,neo-x8"
+> +  - "geniatech,atv1200" (Meson6)
+> +  - "minix,neo-x8" (Meson8)
+> +  - "tronfy,mxq" (Meson8b)
+> +  - "hardkernel,odroid-c1" (Meson8b)
+> --
+> 1.9.1
+>
