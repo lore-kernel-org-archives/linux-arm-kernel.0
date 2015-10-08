@@ -1,74 +1,61 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Thu,  8 Oct 2015 12:54:16 -0700
-Subject: [PATCH] PCI: generic: Fix address window calculation for non-zero
- starting bus.
-Message-ID: <1444334056-4870-1-git-send-email-ddaney.cavm@gmail.com>
+From: clabbe.montjoie@gmail.com (Corentin LABBE)
+Date: Thu, 8 Oct 2015 22:05:09 +0200
+Subject: [PATCH v8 4/6] pci: altera: Add Altera PCIe MSI driver
+In-Reply-To: <E1ZkHFw-0007bx-3v@feisty.vs19.net>
+References: <E1ZkHFw-0007bx-3v@feisty.vs19.net>
+Message-ID: <5616CC75.5030700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
 
-Make the offset from the beginning of the "reg" property be from the
-starting bus number, rather than zero.  Hoist the invariant size
-calculation out of the mapping for loop.
+> This patch adds Altera PCIe MSI driver. This soft IP supports configurable
+> number of vectors, which is a dts parameter.
+> 
+> Signed-off-by: Ley Foon Tan <lftan@altera.com>
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> +
+> +static inline void msi_writel(struct altera_msi *msi, u32 value, u32 reg)
+> +{
+> +	writel_relaxed(value, msi->csr_base + reg);
+> +}
+> +
+> +static inline u32 msi_readl(struct altera_msi *msi, u32 reg)
+> +{
+> +	return readl_relaxed(msi->csr_base + reg);
+> +}
+> +
 
-Update host-generic-pci.txt to clarify the semantics of the "reg"
-property with respect to non-zero starting bus numbers.
+You could set value and reg parameter as const
 
-Signed-off-by: David Daney <david.daney@cavium.com>
----
-This is a replacement for:
+> +
+> +static int altera_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+> +				   unsigned int nr_irqs, void *args)
+> +{
+> +	struct altera_msi *msi = domain->host_data;
+> +	unsigned long bit;
+> +	u32 mask;
+> +
+> +	WARN_ON(nr_irqs != 1);
+> +	mutex_lock(&msi->lock);
+> +
+> +	bit = find_first_zero_bit(msi->used, msi->num_of_vectors);
+> +	if (bit >= msi->num_of_vectors)
+> +		return -ENOSPC;
+> +
+> +	set_bit(bit, msi->used);
+> +
+> +	mutex_unlock(&msi->lock);
+> +
+> +	irq_domain_set_info(domain, virq, bit, &altera_msi_bottom_irq_chip,
+> +			    domain->host_data, handle_simple_irq,
+> +			    NULL, NULL);
+> +
+> +	mask = msi_readl(msi, MSI_INTMASK);
+> +	mask |= 1 << bit;
+> +	msi_writel(msi, mask, MSI_INTMASK);
+> +
+> +	return 0;
+> +}
 
-https://lkml.org/lkml/2015/10/2/653
-
-Since that patch is getting too much push-back, this is the only other
-option for fixing the driver to be internally consistent in its
-treatment of the offset from "reg" to the first bus in the "bus-range"
-property.
-
- Documentation/devicetree/bindings/pci/host-generic-pci.txt | 5 +++--
- drivers/pci/host/pci-host-generic.c                        | 4 ++--
- 2 files changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-index cf3e205..3f1d3fc 100644
---- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-@@ -34,8 +34,9 @@ Properties of the host controller node:
- - #size-cells    : Must be 2.
- 
- - reg            : The Configuration Space base address and size, as accessed
--                   from the parent bus.
--
-+                   from the parent bus.  The base address corresponds to
-+                   the first bus in the "bus-range" property.  If no
-+                   "bus-range" is specified, this will be bus 0 (the default).
- 
- Properties of the /chosen node:
- 
-diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-index fe9a81b..bb93346 100644
---- a/drivers/pci/host/pci-host-generic.c
-+++ b/drivers/pci/host/pci-host-generic.c
-@@ -169,6 +169,7 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
- 	struct resource *bus_range;
- 	struct device *dev = pci->host.dev.parent;
- 	struct device_node *np = dev->of_node;
-+	u32 sz = 1 << pci->cfg.ops->bus_shift;
- 
- 	err = of_address_to_resource(np, 0, &pci->cfg.res);
- 	if (err) {
-@@ -196,10 +197,9 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
- 	bus_range = pci->cfg.bus_range;
- 	for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
- 		u32 idx = busn - bus_range->start;
--		u32 sz = 1 << pci->cfg.ops->bus_shift;
- 
- 		pci->cfg.win[idx] = devm_ioremap(dev,
--						 pci->cfg.res.start + busn * sz,
-+						 pci->cfg.res.start + idx * sz,
- 						 sz);
- 		if (!pci->cfg.win[idx])
- 			return -ENOMEM;
--- 
-1.9.1
+You do not unlock the mutex when returning -ENOSPC
+And again some parameter could be set as const
