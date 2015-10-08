@@ -1,84 +1,40 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Thu, 8 Oct 2015 23:32:43 +0900
-Subject: [PATCH v4 1/2] arm64: Introduce IRQ stack
-In-Reply-To: <20151008102520.GA10912@dhcppc13.redhat.com>
-References: <1444231692-32722-1-git-send-email-jungseoklee85@gmail.com>
- <1444231692-32722-2-git-send-email-jungseoklee85@gmail.com>
- <20151008102520.GA10912@dhcppc13.redhat.com>
-Message-ID: <66863807-964F-41D1-9788-D0FD8E79ADB6@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Oct 2015 16:38:31 +0200
+Subject: [PATCH v2] ARM: cns3xxx: pci: avoid potential stack overflow
+In-Reply-To: <m3vbahy8wp.fsf@t19.piap.pl>
+References: <2273145.0Ls8cProhs@wuerfel> <12713701.B4epxIQJNF@wuerfel>
+ <m3vbahy8wp.fsf@t19.piap.pl>
+Message-ID: <6292196.7OZzGKz28l@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 8, 2015, at 7:25 PM, Pratyush Anand wrote:
-> Hi Jungseok,
-
-Hi Pratyush,
-
+On Thursday 08 October 2015 12:03:18 Krzysztof Ha?asa wrote:
+> Hi,
 > 
-> On 07/10/2015:03:28:11 PM, Jungseok Lee wrote:
->> Currently, kernel context and interrupts are handled using a single
->> kernel stack navigated by sp_el1. This forces a system to use 16KB
->> stack, not 8KB one. This restriction makes low memory platforms suffer
->> from memory pressure accompanied by performance degradation.
+> Arnd Bergmann <arnd@arndb.de> writes:
 > 
-> How will it behave on 64K Page system? There, it would take atleast 64K per cpu,
-> right?
-
-It would take 16KB per cpu even on 64KB page system.
-The following code snippet from kernel/fork.c would be helpful.
-
-----8<----
-# if THREAD_SIZE >= PAGE_SIZE                                                                  
-static struct thread_info *alloc_thread_info_node(struct task_struct *tsk,                     
-                                                  int node)                                    
-{
-        struct page *page = alloc_kmem_pages_node(node, THREADINFO_GFP,                        
-                                                  THREAD_SIZE_ORDER);                          
-
-        return page ? page_address(page) : NULL;                                               
-}
-
-static inline void free_thread_info(struct thread_info *ti)                                    
-{
-        free_kmem_pages((unsigned long)ti, THREAD_SIZE_ORDER);                                 
-}
-# else                                                                                         
-static struct kmem_cache *thread_info_cache;                                                   
-
-static struct thread_info *alloc_thread_info_node(struct task_struct *tsk,                     
-                                                  int node)                                    
-{
-        return kmem_cache_alloc_node(thread_info_cache, THREADINFO_GFP, node);                 
-}
-
-static void free_thread_info(struct thread_info *ti)                                           
-{
-        kmem_cache_free(thread_info_cache, ti);                                                
-}
-
-void thread_info_cache_init(void)                                                              
-{
-        thread_info_cache = kmem_cache_create("thread_info", THREAD_SIZE,
-                                              THREAD_SIZE, 0, NULL);
-        BUG_ON(thread_info_cache == NULL);                                                     
-}
-# endif
-----8<----
-
+> > With those two changes in place, we no longer need the fake
+> > pci_sys_data/pci_bus structures for faking config space writes,
+> > and the stack usage goes down as well.
 > 
->> +int alloc_irq_stack(unsigned int cpu)
->> +{
->> +	void *stack;
->> +
->> +	if (per_cpu(irq_stacks, cpu).stack)
->> +		return 0;
->> +
->> +	stack = (void *)__get_free_pages(THREADINFO_GFP, THREAD_SIZE_ORDER);
+> >  arch/arm/mach-cns3xxx/pcie.c | 71 +++++++++++++++++++++++++++++----------------------------------------
 > 
-> Above would not compile for 64K pages as THREAD_SIZE_ORDER is only defined for
-> non 64K. This need to be fixed.
+> I'm ATM unable to test this change, but will do that at some point.
+> Meanwhile, I guess there is nothing I can say against this patch.
+> Thanks.
+> 
+> Acked-by: Krzysztof Ha?asa <khalasa@piap.pl>
+> 
 
-Thanks for pointing it out! I will update it.
+Thanks! I've queued it up in next/fixes-non-critical for linux-4.4
+now, if you find something wrong later, we can revert or fix up.
 
-Best Regards
-Jungseok Lee
+There is no urgency for this one, especially since you still want to
+test it, so no reason to put it in 4.3.
+
+This was the last pre-2015 build warning for the ARM defconfigs
+and allmodconfig, all remaining warnings are regressions or new
+code, and I've submitted patches for those. Let's see if we can
+get to a warning-free kernel build in 4.4.
+
+	Arnd
