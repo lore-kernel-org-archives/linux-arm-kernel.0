@@ -1,91 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 8 Oct 2015 11:50:56 -0500
-Subject: [PATCH v4 1/8] ASoC: dt-bindings: add rockchip tranceiver bindings
-In-Reply-To: <1444311079-2892-2-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1444311079-2892-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1444311079-2892-2-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <CAL_JsqL_ox3TtjAL552X8-D21n47_hBCpeSkUcNdZu6+wj2h3A@mail.gmail.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Thu, 8 Oct 2015 22:21:18 +0530
+Subject: [PATCH v4 1/2] arm64: Introduce IRQ stack
+In-Reply-To: <66863807-964F-41D1-9788-D0FD8E79ADB6@gmail.com>
+References: <1444231692-32722-1-git-send-email-jungseoklee85@gmail.com>
+ <1444231692-32722-2-git-send-email-jungseoklee85@gmail.com>
+ <20151008102520.GA10912@dhcppc13.redhat.com>
+ <66863807-964F-41D1-9788-D0FD8E79ADB6@gmail.com>
+Message-ID: <20151008165118.GC10912@dhcppc13.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 8, 2015 at 8:31 AM, Sjoerd Simons
-<sjoerd.simons@collabora.co.uk> wrote:
-> Add devicetree bindings for the spdif tranceiver found on
-> found on rk3066, rk3188 and rk3288 SoCs
->
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
->
-> ---
->
-> Changes in v4:
-> - Require rockchip,grf on RK3288 as the 8 channel solution has to be
->   selected on that SoC
-> - Make the compatibility string one of a known list rather then
->   requiring a precise list of options.
-> - Change the clock names to hclk and mclk instead of spdif_hclk and
->   spdif_mclk to better match the implementation and data sheets.
->
-> Changes in v3: None
-> Changes in v2: None
->
->  .../devicetree/bindings/sound/rockchip-spdif.txt   | 44 ++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/rockchip-spdif.txt
->
-> diff --git a/Documentation/devicetree/bindings/sound/rockchip-spdif.txt b/Documentation/devicetree/bindings/sound/rockchip-spdif.txt
-> new file mode 100644
-> index 0000000..33dd82c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/rockchip-spdif.txt
-> @@ -0,0 +1,44 @@
-> +* Rockchip SPDIF transceiver
-> +
-> +The S/PDIF audio block is a stereo transceiver that allows the
-> +processor to receive and transmit digital audio via an coaxial cable or
-> +a fibre cable.
-> +
-> +Required properties:
-> +
-> +- compatible: should be one of the following:
-> +   - "rockchip,rk3288-spdif", "rockchip,rk3188-spdif" or
-> +     "rockchip,rk3066-spdif"
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +- interrupts: should contain the SPDIF interrupt.
+Hi Jungseok,
 
-> +- #address-cells: should be 1.
-> +- #size-cells: should be 0.
+On 08/10/2015:11:32:43 PM, Jungseok Lee wrote:
+> On Oct 8, 2015, at 7:25 PM, Pratyush Anand wrote:
+> > Hi Jungseok,
+> 
+> Hi Pratyush,
+> 
+> > 
+> > On 07/10/2015:03:28:11 PM, Jungseok Lee wrote:
+> >> Currently, kernel context and interrupts are handled using a single
+> >> kernel stack navigated by sp_el1. This forces a system to use 16KB
+> >> stack, not 8KB one. This restriction makes low memory platforms suffer
+> >> from memory pressure accompanied by performance degradation.
+> > 
+> > How will it behave on 64K Page system? There, it would take atleast 64K per cpu,
+> > right?
+> 
+> It would take 16KB per cpu even on 64KB page system.
+> The following code snippet from kernel/fork.c would be helpful.
 
-Why do you need these? Are you going to have sub nodes?
+Yes..Yes..its understood.
+Thanks for pointing to the code.
 
-> +- dmas: DMA specifiers for tx dma. See the DMA client binding,
-> +  Documentation/devicetree/bindings/dma/dma.txt
-> +- dma-names: should be "tx"
-> +- clocks: a list of phandle + clock-specifier pairs, one for each entry
-> +  in clock-names.
-> +- clock-names: should contain following:
-> +   - "hclk": clock for SPDIF controller
-> +   - "mclk" : clock for SPDIF bus
-> +
-> +Required properties on RK3288:
-> +  - rockchip,grf: the phandle of the syscon node for the general register
-> +                   file (GRF)
-> +
-> +Example for the rk3188 SPDIF controller:
-> +
-> +spdif: spdif at 0x1011e000 {
-> +       compatible = "rockchip,rk3188-spdif", "rockchip,rk3066-spdif";
-> +       reg = <0x1011e000 0x2000>;
-> +       interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-> +       #address-cells = <1>;
-> +       #size-cells = <0>;
-> +       dmas = <&dmac1_s 8>;
-> +       dma-names = "tx";
-> +       clock-names = "hclk", "mclk";
-> +       clocks = <&cru HCLK_SPDIF>, <&cru SCLK_SPDIF>;
-> +       status = "disabled";
-> +       #sound-dai-cells = <0>;
-> +};
-> --
-> 2.6.1
->
+~Pratyush
