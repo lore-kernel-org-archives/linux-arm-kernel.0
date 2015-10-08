@@ -1,111 +1,59 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu,  8 Oct 2015 19:01:38 +0900
-Subject: [PATCH v3 1/7] arm64: ftrace: adjust callsite addresses examined by
- stack tracer
+Date: Thu,  8 Oct 2015 19:01:39 +0900
+Subject: [PATCH v3 2/7] arm64: ftrace: modify a stack frame in a safe way
 In-Reply-To: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1444298504-10392-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1444298504-10392-3-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm64, no PC values returned by save_stack_trace() will match to LR
-values saved in stack frames on a stack after the following commit:
-    commit e306dfd06fcb ("ARM64: unwind: Fix PC calculation")
-As a result, the output from stack tracer will be messed up.
+Function graph tracer modifies a return address (LR) in a stack frame by
+calling ftrace_prepare_return() in a traced function's function prologue.
+The current code does this modification before preserving an original
+address at ftrace_push_return_trace() and there is always a small window
+of inconsistency when an interrupt occurs.
 
-This patch introduces an arch-defined macro, FTRACE_STACK_FRAME_OFFSET,
-so that check_stack() can handle this case correctly.
+This doesn't matter, as far as an interrupt stack is introduced, because
+stack tracer won't be invoked in an interrupt context. But it would be
+better to proactively minimize such a window by moving the LR modification
+after ftrace_push_return_trace().
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/include/asm/ftrace.h |    5 +++--
- arch/arm64/kernel/stacktrace.c  |    7 ++++---
- include/linux/ftrace.h          |    7 +++++++
- kernel/trace/trace_stack.c      |    5 +++--
- 4 files changed, 17 insertions(+), 7 deletions(-)
+ arch/arm64/kernel/ftrace.c |   11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
-index c5534fa..2b43e20 100644
---- a/arch/arm64/include/asm/ftrace.h
-+++ b/arch/arm64/include/asm/ftrace.h
-@@ -13,8 +13,9 @@
- 
- #include <asm/insn.h>
- 
--#define MCOUNT_ADDR		((unsigned long)_mcount)
--#define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
-+#define MCOUNT_ADDR			((unsigned long)_mcount)
-+#define MCOUNT_INSN_SIZE		AARCH64_INSN_SIZE
-+#define FTRACE_STACK_FRAME_OFFSET	AARCH64_INSN_SIZE
- 
- #ifndef __ASSEMBLY__
- #include <linux/compat.h>
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index 407991b..bc0689a 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -20,6 +20,7 @@
- #include <linux/sched.h>
- #include <linux/stacktrace.h>
- 
-+#include <asm/insn.h>
- #include <asm/stacktrace.h>
- 
- /*
-@@ -49,10 +50,10 @@ int notrace unwind_frame(struct stackframe *frame)
- 	frame->sp = fp + 0x10;
- 	frame->fp = *(unsigned long *)(fp);
- 	/*
--	 * -4 here because we care about the PC at time of bl,
--	 * not where the return will go.
-+	 * decrement PC by AARCH64_INSN_SIZE here because we care about
-+	 * the PC at time of bl, not where the return will go.
+diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+index c851be7..314f82d 100644
+--- a/arch/arm64/kernel/ftrace.c
++++ b/arch/arm64/kernel/ftrace.c
+@@ -125,23 +125,20 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
+ 	 * on other archs. It's unlikely on AArch64.
  	 */
--	frame->pc = *(unsigned long *)(fp + 8) - 4;
-+	frame->pc = *(unsigned long *)(fp + 8) - AARCH64_INSN_SIZE;
+ 	old = *parent;
+-	*parent = return_hooker;
  
- 	return 0;
+ 	trace.func = self_addr;
+ 	trace.depth = current->curr_ret_stack + 1;
+ 
+ 	/* Only trace if the calling function expects to */
+-	if (!ftrace_graph_entry(&trace)) {
+-		*parent = old;
++	if (!ftrace_graph_entry(&trace))
+ 		return;
+-	}
+ 
+ 	err = ftrace_push_return_trace(old, self_addr, &trace.depth,
+ 				       frame_pointer);
+-	if (err == -EBUSY) {
+-		*parent = old;
++	if (err == -EBUSY)
+ 		return;
+-	}
++	else
++		*parent = return_hooker;
  }
-diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
-index 6cd8c0e..d77b195 100644
---- a/include/linux/ftrace.h
-+++ b/include/linux/ftrace.h
-@@ -263,6 +263,13 @@ static inline void ftrace_kill(void) { }
- #endif /* CONFIG_FUNCTION_TRACER */
  
- #ifdef CONFIG_STACK_TRACER
-+/*
-+ * the offset value to add to return address from save_stack_trace()
-+ */
-+#ifndef FTRACE_STACK_FRAME_OFFSET
-+#define FTRACE_STACK_FRAME_OFFSET 0
-+#endif
-+
- extern int stack_tracer_enabled;
- int
- stack_trace_sysctl(struct ctl_table *table, int write,
-diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
-index b746399..30521ea 100644
---- a/kernel/trace/trace_stack.c
-+++ b/kernel/trace/trace_stack.c
-@@ -105,7 +105,7 @@ check_stack(unsigned long ip, unsigned long *stack)
- 
- 	/* Skip over the overhead of the stack tracer itself */
- 	for (i = 0; i < max_stack_trace.nr_entries; i++) {
--		if (stack_dump_trace[i] == ip)
-+		if ((stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET) == ip)
- 			break;
- 	}
- 
-@@ -133,7 +133,8 @@ check_stack(unsigned long ip, unsigned long *stack)
- 		for (; p < top && i < max_stack_trace.nr_entries; p++) {
- 			if (stack_dump_trace[i] == ULONG_MAX)
- 				break;
--			if (*p == stack_dump_trace[i]) {
-+			if (*p == (stack_dump_trace[i]
-+					+ FTRACE_STACK_FRAME_OFFSET)) {
- 				stack_dump_trace[x] = stack_dump_trace[i++];
- 				this_size = stack_dump_index[x++] =
- 					(top - p) * sizeof(unsigned long);
+ #ifdef CONFIG_DYNAMIC_FTRACE
 -- 
 1.7.9.5
