@@ -1,71 +1,41 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 8 Oct 2015 16:03:04 +0300
-Subject: [PATCH v2] mmc: core: Fix init_card in 52Mhz
-In-Reply-To: <CAPDyKFqrjP3-y+ucm5ybwXefsDLOYcPF9XqMciwhRkjD5NXLBg@mail.gmail.com>
-References: <1444288147-24013-1-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFqrjP3-y+ucm5ybwXefsDLOYcPF9XqMciwhRkjD5NXLBg@mail.gmail.com>
-Message-ID: <56166988.20900@intel.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Thu, 8 Oct 2015 15:21:11 +0200
+Subject: [PATCH 0/8] Armada 38x SDHCI driver improvements
+In-Reply-To: <CAPv3WKcFDVwdnBbTAbV2FGQu5s+WbLmM7s98mAJQc8hpUhW+9w@mail.gmail.com>
+References: <1444094562-31165-1-git-send-email-mw@semihalf.com>
+ <87lhbg9hx7.fsf@free-electrons.com>
+ <CAPv3WKcFDVwdnBbTAbV2FGQu5s+WbLmM7s98mAJQc8hpUhW+9w@mail.gmail.com>
+Message-ID: <CAPv3WKfQk9DkD+0=Nh736sGhF99rcEVPP7bb00PzT2oAGLmoaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/15 13:59, Ulf Hansson wrote:
-> On 8 October 2015 at 09:09, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
->> Suppose that we got a data crc error, and it triggers the mmc_reset.
->> mmc_reset will call mmc_send_status to see if HW reset was supported.
->> before issue CMD13, it will do retune, and if EMMC was in HS400 mode,
->> it will reduce frequency to 52Mhz firstly, then results in card init
->> was doing at 52Mhz.
->> The mmc_send_status was originally only done for mmc_test, so if retune
->> needed, do not call mmc_send_status.
->>
->> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
->> Suggested-by: Adrian Hunter <adrian.hunter@intel.com>
->> ---
->>  drivers/mmc/card/mmc_test.c | 6 ++++++
->>  drivers/mmc/core/mmc.c      | 2 +-
->>  2 files changed, 7 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
->> index b78cf5d..2f78bfb 100644
->> --- a/drivers/mmc/card/mmc_test.c
->> +++ b/drivers/mmc/card/mmc_test.c
->> @@ -2272,6 +2272,12 @@ static int mmc_test_hw_reset(struct mmc_test_card *test)
->>         if (!mmc_card_mmc(card) || !mmc_can_reset(card))
->>                 return RESULT_UNSUP_CARD;
->>
->> +       if (host->need_retune) {
->> +               pr_info("%s: cannot test hw reset because retune needed\n",
->> +                       mmc_hostname(test->card->host));
->> +               return RESULT_FAIL;
->> +       }
->> +
->>         err = mmc_hw_reset(host);
->>         if (!err)
->>                 return RESULT_OK;
->> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
->> index e726903..647c96d 100644
->> --- a/drivers/mmc/core/mmc.c
->> +++ b/drivers/mmc/core/mmc.c
->> @@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
->>         host->ops->hw_reset(host);
->>
->>         /* If the reset has happened, then a status command will fail */
->> -       if (!mmc_send_status(card, &status)) {
->> +       if (!host->need_retune && !mmc_send_status(card, &status)) {
-> 
-> No, this seem like the wrong solution! The main purpose of mmc_reset()
-> is to try to reset and re-initiate the card, to make it operational
-> again.
-> 
-> I can't find a good reason to why we want to do a mmc_send_status() at
-> this point, as even if it succeeds it will only tell us that the card
-> has not been "hw-reset". No matter what, we should still try to make
-> it fully operational again and thus give mmc_init_card() a try.
-> 
->>From this reasoning, I suggest we remove the call to mmc_send_status()
-> from this path, as that will also address your issue with CRC errors
-> in combination with re-tune.
+Hi Gregory,
 
-Then you need to remove the hw_reset test from mmc_test.  Refer:
+I have an update about s2ram status - after adding suspend/resume
+support to pinctrl driver rootfs on SDHCI card survived suspend/resume
+sequence without any problem (with broken-cd software polling, I also
+have GP < v1.5).
 
-	http://marc.info/?l=linux-mmc&m=144360165906544&w=2
+Best regards,
+Marcin
+
+2015-10-06 17:48 GMT+02:00 Marcin Wojtas <mw@semihalf.com>:
+> Gregory,
+>
+>>
+>> Thanks for this series, it looks good I have only one or two comments.
+>>
+>> I also want to test it, how do you test the resume?
+>> using standby or suspend to ram (by hacking the kernel as currently we
+>> disbaled it) ?
+>>
+>
+> Standby works even without the patch, as the registers' contents do
+> not disappear. I added rejected s2ram support on top of 4.3-rc4 and
+> used it. Today however I changed my card to another one and got -110
+> error (timeout) - I have to re-check it. Anyway the patch is needed
+> for sure, because without MBUS window configuration any access to the
+> card ends up with a kernel hang.
+>
+> Best regards,
+> Marcin
