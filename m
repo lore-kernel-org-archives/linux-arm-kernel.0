@@ -1,58 +1,53 @@
-From: rsahu@apm.com (Rameshwar Sahu)
-Date: Thu, 8 Oct 2015 14:27:07 +0530
-Subject: [PATCH] dmaengine: xgene-dma: Disable memcpy operation due to
- performance drop
-In-Reply-To: <57007053.YYaOe8h6ng@wuerfel>
-References: <1444292716-1877-1-git-send-email-rsahu@apm.com>
- <57007053.YYaOe8h6ng@wuerfel>
-Message-ID: <CAFd313x5cS=WX2iAKuQnE3UEEEj_MyCPdRosJtS4V9ZCEiSK=g@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 8 Oct 2015 11:01:48 +0200
+Subject: [PATCH] serial: atmel: fix compiler warning on address cast
+In-Reply-To: <1444064452-12285-1-git-send-email-andre.przywara@arm.com>
+References: <1444064452-12285-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <20151008090148.GE3485@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 8, 2015 at 2:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 08 October 2015 13:55:16 Rameshwar Prasad Sahu wrote:
->> The DMA engine supports memory copy, RAID5 XOR, RAID6 PQ, and other
->> computations. But the bandwidth of the entire DMA engine is shared
->> among all channels. This patch re-configures operations availability
->> such that one can achieve maximum performance for XOR and PQ
->> computation by removing the memory offload operations.
->>
->> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
->> ---
->>  drivers/dma/xgene-dma.c | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
->> index 8d57b1b..2998fcb 100644
->> --- a/drivers/dma/xgene-dma.c
->> +++ b/drivers/dma/xgene-dma.c
->> @@ -154,6 +154,7 @@
->>  #define XGENE_DMA_MAX_XOR_SRC          5
->>  #define XGENE_DMA_16K_BUFFER_LEN_CODE  0x0
->>  #define XGENE_DMA_INVALID_LEN_CODE     0x7800000000000000ULL
->> +#undef XGENE_DMA_MEMCPY_ENABLE
->>
->>  /* X-Gene DMA descriptor error codes */
->>  #define ERR_DESC_AXI                   0x01
->> @@ -1707,7 +1708,9 @@ static void xgene_dma_set_caps(struct xgene_dma_chan *chan,
->>         dma_cap_zero(dma_dev->cap_mask);
->>
->>         /* Set DMA device capability */
->> +#ifdef XGENE_DMA_MEMCPY_ENABLE
->>         dma_cap_set(DMA_MEMCPY, dma_dev->cap_mask);
->> +#endif
->>         dma_cap_set(DMA_SG, dma_dev->cap_mask);
->>
->>         /* Basically here, the X-Gene SoC DMA engine channel 0 supports XOR
->
-> I don't see what the #ifdef gains you here when the setting is
-> hardcoded. Why not just remove that DMA_MEMCPY capability completely
-> if you don't want to use it?
+On 05/10/2015 at 18:00:52 +0100, Andre Przywara wrote :
+> Turning on KVM and LPAE support on top of a multi_v7_defconfig will
+> produce a compiler warning in the Atmel serial driver:
+> drivers/tty/serial/atmel_serial.c: In function 'atmel_verify_port':
+> drivers/tty/serial/atmel_serial.c:2299:6: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+>   if ((void *)port->mapbase != ser->iomem_base)
+>       ^
+> 
+> Fix that by using the cast on the right hand side instead, as similar
+> code already does in other drivers.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Okay Arnd,
->
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> ---
+>  drivers/tty/serial/atmel_serial.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index cd30a45..28039ce 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -2296,7 +2296,7 @@ static int atmel_verify_port(struct uart_port *port, struct serial_struct *ser)
+>  		ret = -EINVAL;
+>  	if (port->uartclk / 16 != ser->baud_base)
+>  		ret = -EINVAL;
+> -	if ((void *)port->mapbase != ser->iomem_base)
+> +	if (port->mapbase != (unsigned long)ser->iomem_base)
+>  		ret = -EINVAL;
+>  	if (port->iobase != ser->port)
+>  		ret = -EINVAL;
+> -- 
+> 2.5.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
