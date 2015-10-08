@@ -1,45 +1,35 @@
-From: caleb@crome.org (Caleb Crome)
-Date: Wed, 7 Oct 2015 20:19:41 -0700
-Subject: [alsa-devel] [PATCH 1/2] ASoC: rockchip: i2s: add 8 channels
- capture and lrck-mode support
-In-Reply-To: <5615D898.1090101@rock-chips.com>
-References: <1442979683-9441-1-git-send-email-sugar.zhang@rock-chips.com>
- <1442979683-9441-2-git-send-email-sugar.zhang@rock-chips.com>
- <20150923162433.GQ30445@sirena.org.uk> <5608F74C.3000104@rock-chips.com>
- <20150930184655.GX15635@sirena.org.uk> <5614D162.3020500@rock-chips.com>
- <F2F204F7-F5A8-4152-BF1D-454EB3E35F34@crome.org>
- <5615CB39.1060208@rock-chips.com>
- <35DAC0DA-9141-4D6B-A065-4D0FE340E5D0@crome.org>
- <5615D898.1090101@rock-chips.com>
-Message-ID: <59C359E6-1944-4093-B008-1FB9CD695484@crome.org>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Thu,  8 Oct 2015 03:48:36 +0000
+Subject: [PATCHv3 1/2] ARM: exynos_defconfig: Enable rtl8152 ethernet driver
+ for Odroid-XU4
+Message-ID: <1444276117-3657-1-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- That will work!  Do all your cortex-a parts support that?
+Odroid XU4 has a RTL8153-CG gigabit Ethernet adapter, connected over
+USB 3.0.
 
-Thanks, Caleb 
-Sent from my iPhone
+Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-> On Oct 7, 2015, at 7:44 PM, sugar <sugar.zhang@rock-chips.com> wrote:
-> 
-> Yes, we can support 8 channels with 32bits/sample, thanks.
-> 
->> ? 10/8/2015 10:36, Caleb Crome ??:
->> We make microphone arrays with lots of microphones.  Some as few as 2, many with 7 channels, and a few with 14 or more.
->> 
->> Can you support 8 channels with 32 bits/sample?  That would work, we can just set the codecs for 16-bit samples, which would be 256 bits/frame.
->> 
->> Hope you had a great golden week holiday!
->> 
->> Thanks,
->>     Caleb Crome
->> 
->> 
->> 
->> 
->> Sent from my iPhone
-> 
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+---
+Changes: Fixed the commit message thanks to Krzysztof Kozlowski
+         Added reviewed by Krzysztof Kozlowski
+---
+ arch/arm/configs/exynos_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 1ff2bfa..5d1937b 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -61,6 +61,7 @@ CONFIG_BLK_DEV_DM=y
+ CONFIG_DM_CRYPT=m
+ CONFIG_NETDEVICES=y
+ CONFIG_SMSC911X=y
++CONFIG_USB_RTL8152=y
+ CONFIG_USB_USBNET=y
+ CONFIG_USB_NET_SMSC75XX=y
+ CONFIG_USB_NET_SMSC95XX=y
+-- 
+2.1.4
