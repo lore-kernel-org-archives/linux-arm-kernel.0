@@ -1,73 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Oct 2015 16:41:15 +0200
-Subject: [PATCHv3 1/2] ARM: exynos_defconfig: Enable rtl8152 ethernet
- driver for Odroid-XU4
-In-Reply-To: <1444296433.9895.234.camel@collabora.co.uk>
-References: <1444276117-3657-1-git-send-email-linux.amoon@gmail.com>
- <26439960.pU0jZ9hpjg@wuerfel> <1444296433.9895.234.camel@collabora.co.uk>
-Message-ID: <5551783.9EQ5GEjhxX@wuerfel>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Thu, 8 Oct 2015 22:42:16 +0800
+Subject: [PATCH v9 4/5] xhci: mediatek: support MTK xHCI host controller
+In-Reply-To: <561669FC.3030600@linux.intel.com>
+References: <1443495698-32233-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1443495698-32233-5-git-send-email-chunfeng.yun@mediatek.com>
+ <560D1CA9.1050009@linaro.org> <1444305958.26198.14.camel@mhfsdcap03>
+ <5616616D.3080205@linaro.org> <561669FC.3030600@linux.intel.com>
+Message-ID: <1444315336.26198.18.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 October 2015 11:27:13 Sjoerd Simons wrote:
-> On Thu, 2015-10-08 at 10:37 +0200, Arnd Bergmann wrote:
-> > On Thursday 08 October 2015 16:46:27 Krzysztof Kozlowski wrote:
-> > > On 08.10.2015 16:41, Arnd Bergmann wrote:
-> > > > On Thursday 08 October 2015 03:48:36 Anand Moon wrote:
-> > > > > diff --git a/arch/arm/configs/exynos_defconfig
-> > > > > b/arch/arm/configs/exynos_defconfig
-> > > > > index 1ff2bfa..5d1937b 100644
-> > > > > --- a/arch/arm/configs/exynos_defconfig
-> > > > > +++ b/arch/arm/configs/exynos_defconfig
-> > > > > @@ -61,6 +61,7 @@ CONFIG_BLK_DEV_DM=y
-> > > > >  CONFIG_DM_CRYPT=m
-> > > > >  CONFIG_NETDEVICES=y
-> > > > >  CONFIG_SMSC911X=y
-> > > > > +CONFIG_USB_RTL8152=y
-> > > > >  CONFIG_USB_USBNET=y
-> > > > >  CONFIG_USB_NET_SMSC75XX=y
-> > > > >  CONFIG_USB_NET_SMSC95XX=y
-> > > > 
-> > > > Can we make that a loadable module for multi_v7_defconfig?
-> > > 
-> > > What about nfsroot boots? We were discussing this also here:
-> > > http://linux-arm-kernel.infradead.narkive.com/lG5g4hrB/patch-arm-mu
-> > > lti-v7-defconfig-enable-usb3503
-> > > 
-> > > and actually I would be happy to see a confirmed policy about that.
-> > > Everything should be a module for multi_v7?
-> > 
-> > We try to make as much as possible modular here, and NFS root is a
-> > corner
-> > case: it's possible to do NFS root with an initramfs, but it's easier
-> > not
-> > to. Is it something you do a lot on this hardware?
+Hi,
+On Thu, 2015-10-08 at 16:05 +0300, Mathias Nyman wrote:
+> On 08.10.2015 15:28, Daniel Thompson wrote:
+> > On 08/10/15 13:05, chunfeng yun wrote:
+> >> Hi,
+> >> On Thu, 2015-10-01 at 12:44 +0100, Daniel Thompson wrote:
+> >>> On 29/09/15 04:01, Chunfeng Yun wrote:
+> >>>> There some vendor quirks for MTK xhci host controller:
+> >>>> 1. It defines some extra SW scheduling parameters for HW
+> >>>>     to minimize the scheduling effort for synchronous and
+> >>>>     interrupt endpoints. The parameters are put into reseved
+> >>>>     DWs of slot context and endpoint context.
+> >>>> 2. Its IMODI unit for Interrupter Moderation register is
+> >>>>     8 times as much as that defined in xHCI spec.
+> >>>> 3. Its TDS in  Normal TRB defines a number of packets that
+> >>>>     remains to be transferred for a TD after processing all
+> >>>>     Max packets in all previous TRBs.
+> >>>>
+> >>>> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> >>>
+> >>> I've done some basic soak tests, both with a directly attached USB3 HDD
+> >>> and, given the extra code to manage isochronous xfer, also with a hub,
+> >>> disc and two audio interfaces.
+> >>>
+> >>> Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
+> >>>
+> >>>
+> >>>> diff --git a/drivers/usb/host/xhci-ring.c b/drivers/usb/host/xhci-ring.c
+> >>>> index 57f40a1..243f696 100644
+> >>>> --- a/drivers/usb/host/xhci-ring.c
+> >>>> +++ b/drivers/usb/host/xhci-ring.c
+> >>>> @@ -68,6 +68,7 @@
+> >>>>    #include <linux/slab.h>
+> >>>>    #include "xhci.h"
+> >>>>    #include "xhci-trace.h"
+> >>>> +#include "xhci-mtk.h"
+> >>>>
+> >>>>    /*
+> >>>>     * Returns zero if the TRB isn't in this segment, otherwise it returns the DMA
+> >>>> @@ -3044,18 +3045,27 @@ static u32 xhci_td_remainder(struct xhci_hcd *xhci, int transferred,
+> >>>>                      struct urb *urb, unsigned int num_trbs_left)
+> >>>>    {
+> >>>>        u32 maxp, total_packet_count;
+> >>>> +    u32 skip_current_trb = 0;
+> >>>
+> >>> A bit of a nitpick but why do we need skip_current_trb? Testing
+> >>> (xhci->quirks & XHCI_MTK_HOST) twice would make what the code does, and
+> >>> why, more obvious.
+> >>>
+> >> I am not sure which way it is better, so add variable of
+> >> skip_current_trb to reduce test times.
+> >
+> > I can't imagine either approach impacts performance. However introducing skip_current_trb makes the flow of the branches harder to follow.
+> >
+> > The first branch was a version check and can remain so; we only need to do something special with the quirks because the MTK controller is 0.97 but with a few bits added:
+> >
+> >      /* MTK xHCI is mostly 0.97 but contains some features from 1.0 */
+> >      if (xhci->hci_version < 0x100 && !(xhci->quirks & XHCI_MTK_HOST))
+> >          return ...
+> >
+> > Setting trb_buff_len to zero is accommodating a quirk and this is clearer when we have:
+> >
+> >      /* for MTK xHCI, TD size doesn't include this TRB */
+> >      if (xhci->quirks & XHCI_MTK_HOST)
+> >          trb_buff_len = 0;
 > 
-> It's a workflow thing though, not a hardware specific thing. I
-> personally tend to use NFS root quite often and so do various
-> colleagues irrespective of the hardware (and an XU4 is bound to appear
-> on my desk someday). 
+> Both will work, but I'd prefer this solution as well.
 > 
-> Now I personally really don't mind whether NFS root requires a ramdisk
-> or not (though some consistency would be nice). However deciding it on
-> a per device basis just makes everything quite fuzzy (e.g. my recent
-> rockchip multi_v7 patchset first ended up in a similar discussion,
-> though v2 was merged without further comments when I indicated in the
-> cover letter that i used the NFS root use-case as one of the deciding
-> factors for y vs. m).
+Thanks for your suggestion as well
+
+> -Mathias
 > 
-> It would be really good to see someone put their foot down on the
-> general policy (e.g. the arm-soc maintainers?), such that this
-> discussion doesn't need to happen every time 
-
-Yes, agreed, that what I'm trying to do here ;-)
-
-I realize that building things as modules is a hassle, it is so for
-some things more than for others, so I keep asking the question
-to everyone to find out what a good balance is to make as much as
-possible modules without hurting too much.
-
-Once we have a firm policy in place, we should probably change all
-the existing symbols.
-
-	Arnd
