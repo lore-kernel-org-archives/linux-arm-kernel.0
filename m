@@ -1,35 +1,28 @@
-From: nikolay@cumulusnetworks.com (Nikolay Aleksandrov)
-Date: Thu, 8 Oct 2015 14:51:05 +0200
-Subject: [PATCH v2] bridge/netfilter: avoid unused label warning
-In-Reply-To: <5180534.sSnu9AX8xS@wuerfel>
-References: <5180534.sSnu9AX8xS@wuerfel>
-Message-ID: <561666B9.8070802@cumulusnetworks.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 08 Oct 2015 13:51:51 +0100
+Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
+In-Reply-To: <009901d101c7$3331b3b0$99951b10$@samsung.com>
+References: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
+ <003a01d10199$58e96590$0abc30b0$@samsung.com> <20151008082302.GE14315@cbox>
+ <005e01d101a9$31ee80f0$95cb82d0$@samsung.com> <20151008092858.GA16100@cbox>
+ <561641F5.4060202@arm.com> <009501d101c4$dde8e2e0$99baa8a0$@samsung.com>
+ <20151008123630.GC20936@cbox> <009901d101c7$3331b3b0$99951b10$@samsung.com>
+Message-ID: <561666E7.5040004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2015 02:30 PM, Arnd Bergmann wrote:
-> With the ARM mini2440_defconfig, the bridge netfilter code gets
-> built with both CONFIG_NF_DEFRAG_IPV4 and CONFIG_NF_DEFRAG_IPV6
-> disabled, which leads to a harmless gcc warning:
+On 08/10/15 13:45, Pavel Fedin wrote:
+>  Hello!
 > 
-> net/bridge/br_netfilter_hooks.c: In function 'br_nf_dev_queue_xmit':
-> net/bridge/br_netfilter_hooks.c:792:2: warning: label 'drop' defined but not used [-Wunused-label]
+>> There's no rush, I don't think this will make it into v4.4 anyhow
 > 
-> This gets rid of the warning by cleaning up the code to avoid
-> the respective #ifdefs causing this problem, and replacing them
-> with if(IS_ENABLED()) checks. I have verified that the resulting
-> object code is unchanged, and an additional advantage is that
-> we now get compile coverage of the unused functions in more
-> configurations.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: dd302b59bde0 ("netfilter: bridge: don't leak skb in error paths")
-> ---
-> Version 2:
-> 
-> Rebased to git://git.kernel.org/pub/scm/linux/kernel/git/pablo/nf-next
-> 
+>  Did you mean 4.3 here?
 
-Looks good to me,
+No, that'd be really 4.4. 4.3 has closed 4 weeks ago, and 4.4 is about
+to open. This work is unlikely to make it before 4.5 TBH.
 
-Reviewed-by: Nikolay Aleksandrov <nikolay@cumulusnetworks.com>
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
