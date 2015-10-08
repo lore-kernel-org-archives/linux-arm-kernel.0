@@ -1,68 +1,81 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 08 Oct 2015 10:35:32 +0530
-Subject: [PATCH v2 2/9] thermal: qcom: tsens-8916: Add support for 8916
- family of SoCs
-In-Reply-To: <55FF8761.9010808@codeaurora.org>
-References: <1442384603-26053-1-git-send-email-rnayak@codeaurora.org>	<1442384603-26053-3-git-send-email-rnayak@codeaurora.org>
- <9hh4miutr21.fsf@e105922-lin.cambridge.arm.com>
- <55FF8761.9010808@codeaurora.org>
-Message-ID: <5615F99C.5000004@codeaurora.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 08 Oct 2015 14:34:02 +0900
+Subject: [PATCH 1/5] thermal: exynos: Fix unbalanced regulator disable on probe
+ failure
+Message-ID: <1444282446-6419-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+During probe if the regulator could not be enabled, the error exit path
+would still disable it. This could lead to unbalanced counter of
+regulator enable/disable.
 
-On 09/21/2015 09:58 AM, Rajendra Nayak wrote:
-> []..
-> 
->>> +static inline int code_to_degc(u32 adc_code, const struct tsens_sensor *s)
->>> +{
->>> +    int degc, num, den;
->>> +
->>> +    num = (adc_code * SLOPE_FACTOR) - s->offset;
->>> +    den = s->slope;
->>> +
->>> +    if (num > 0)
->>> +        degc = num + (den / 2);
->>> +    else if (num < 0)
->>> +        degc = num - (den / 2);
->>> +    else
->>> +        degc = num;
->>> +
->>> +    degc /= den;
->>> +
->>> +    return degc;
->>> +}
->>> +
->>> +int get_temp_common(struct tsens_device *tmdev, int id, int *temp)
->>> +{
->>> +    struct tsens_sensor *s = &tmdev->sensor[id];
->>> +    u32 code;
->>> +    unsigned int sensor_addr;
->>> +    int last_temp = 0, ret;
->>> +
->>> +    sensor_addr = S0_ST_ADDR + s->hw_id * SN_ADDR_OFFSET;
->>> +    ret = regmap_read(tmdev->map, sensor_addr, &code);
->>> +    if (ret)
->>> +        return ret;
->>> +    last_temp = code & SN_ST_TEMP_MASK;
->>> +
->>> +    *temp = code_to_degc(last_temp, s) * 1000;
->>> +
->>> +    return 0;
->>> +}
->>
->> The way this function is coded the temperature will only ever change by
->> 1C (i.e., 1000mC). Is there a chance that you're losing precision in the
->> code_to_degc conversion that could be preserved perhaps?
->>
->> This is useful in scenarios where you use the power allocator governor
->> and the greater precision allows better power budget estimation.
-> 
-> I'll take a look to see if we can get better precision. Thanks.
+The patch moves code for getting and enabling the regulator from
+exynos_map_dt_data() to probe function because it is really not a part
+of getting Device Tree properties.
 
-I checked, and it does not look like these devices can support better precision
-than degC.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Fixes: 5f09a5cbd14a ("thermal: exynos: Disable the regulator on probe failure")
+Cc: <stable@vger.kernel.org>
+---
+ drivers/thermal/samsung/exynos_tmu.c | 34 +++++++++++++++++-----------------
+ 1 file changed, 17 insertions(+), 17 deletions(-)
 
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index 0bae8cc6c23a..23f4320f8ef7 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -1168,27 +1168,10 @@ static int exynos_map_dt_data(struct platform_device *pdev)
+ 	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
+ 	struct exynos_tmu_platform_data *pdata;
+ 	struct resource res;
+-	int ret;
+ 
+ 	if (!data || !pdev->dev.of_node)
+ 		return -ENODEV;
+ 
+-	/*
+-	 * Try enabling the regulator if found
+-	 * TODO: Add regulator as an SOC feature, so that regulator enable
+-	 * is a compulsory call.
+-	 */
+-	data->regulator = devm_regulator_get(&pdev->dev, "vtmu");
+-	if (!IS_ERR(data->regulator)) {
+-		ret = regulator_enable(data->regulator);
+-		if (ret) {
+-			dev_err(&pdev->dev, "failed to enable vtmu\n");
+-			return ret;
+-		}
+-	} else {
+-		dev_info(&pdev->dev, "Regulator node (vtmu) not found\n");
+-	}
+-
+ 	data->id = of_alias_get_id(pdev->dev.of_node, "tmuctrl");
+ 	if (data->id < 0)
+ 		data->id = 0;
+@@ -1312,6 +1295,23 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+ 		pr_err("thermal: tz: %p ERROR\n", data->tzd);
+ 		return PTR_ERR(data->tzd);
+ 	}
++
++	/*
++	 * Try enabling the regulator if found
++	 * TODO: Add regulator as an SOC feature, so that regulator enable
++	 * is a compulsory call.
++	 */
++	data->regulator = devm_regulator_get(&pdev->dev, "vtmu");
++	if (!IS_ERR(data->regulator)) {
++		ret = regulator_enable(data->regulator);
++		if (ret) {
++			dev_err(&pdev->dev, "failed to enable vtmu\n");
++			return ret;
++		}
++	} else {
++		dev_info(&pdev->dev, "Regulator node (vtmu) not found\n");
++	}
++
+ 	ret = exynos_map_dt_data(pdev);
+ 	if (ret)
+ 		goto err_sensor;
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.1
