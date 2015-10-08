@@ -1,52 +1,43 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 8 Oct 2015 10:23:02 +0200
-Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
-In-Reply-To: <003a01d10199$58e96590$0abc30b0$@samsung.com>
-References: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
- <003a01d10199$58e96590$0abc30b0$@samsung.com>
-Message-ID: <20151008082302.GE14315@cbox>
+From: rsahu@apm.com (Rameshwar Prasad Sahu)
+Date: Thu,  8 Oct 2015 13:55:16 +0530
+Subject: [PATCH] dmaengine: xgene-dma: Disable memcpy operation due to
+ performance drop
+Message-ID: <1444292716-1877-1-git-send-email-rsahu@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 10:17:09AM +0300, Pavel Fedin wrote:
->  Hello!
-> 
-> > +    The mpidr encoding is based on the affinity information in the
-> > +    architecture defined MPIDR, and the field is encoded as follows:
-> > +      | 63 .... 56 | 55 .... 48 | 47 .... 40 | 39 .... 32 |
-> > +      |    Aff3    |    Aff2    |    Aff1    |    Aff0    |
-> 
->  One concern about this... Does it already have "We are Bosses, we Decided it, It's not subject to
-> change, We do not care" status? 
+The DMA engine supports memory copy, RAID5 XOR, RAID6 PQ, and other
+computations. But the bandwidth of the entire DMA engine is shared
+among all channels. This patch re-configures operations availability
+such that one can achieve maximum performance for XOR and PQ
+computation by removing the memory offload operations.
 
-That's a rather negative question.
+Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+---
+ drivers/dma/xgene-dma.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-We spent a fair amount of time discussing this during SFO15 and arrived
-at the conclusion that this was the way to go.
+diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
+index 8d57b1b..2998fcb 100644
+--- a/drivers/dma/xgene-dma.c
++++ b/drivers/dma/xgene-dma.c
+@@ -154,6 +154,7 @@
+ #define XGENE_DMA_MAX_XOR_SRC		5
+ #define XGENE_DMA_16K_BUFFER_LEN_CODE	0x0
+ #define XGENE_DMA_INVALID_LEN_CODE	0x7800000000000000ULL
++#undef XGENE_DMA_MEMCPY_ENABLE
 
-If there are good arguments for why this is not sufficient or causes
-problems, then of course we'll make changes as required.
+ /* X-Gene DMA descriptor error codes */
+ #define ERR_DESC_AXI			0x01
+@@ -1707,7 +1708,9 @@ static void xgene_dma_set_caps(struct xgene_dma_chan *chan,
+ 	dma_cap_zero(dma_dev->cap_mask);
 
-> Actually, current approach with using index instead of Aff bits
-> works pretty well. It works fine with qemu too, because internally qemu also maintains CPU index,
-> which it uses for GICv2 accesses.
->  Keeping index allows to reuse more code, and provides better backwards compatibility. So could we
-> do this?
-> 
+ 	/* Set DMA device capability */
++#ifdef XGENE_DMA_MEMCPY_ENABLE
+ 	dma_cap_set(DMA_MEMCPY, dma_dev->cap_mask);
++#endif
+ 	dma_cap_set(DMA_SG, dma_dev->cap_mask);
 
-The architecture defines how to address a specific CPU, and that's using
-the MPIDR, not inventing our own scheme, so that's what we should do.
-
-For example, I don't think you had the full 32-bits available to address
-a CPU in your proposal, so if nothing else, that proposal had less
-expressive power than what the architecture defines.
-
-I also don't buy the argument that this saves a lot of code.
-
-If you have something that deals with a cpu index, surely two simple
-functions can allow the same amount of code reuse:
-
-unsigned long mpidr_to_vcpu_idx(unsigned long mpidr);
-unsigned long vcpu_idx_to_mpidr(unsigned long vcpu_idx);
-
--Christoffer
+ 	/* Basically here, the X-Gene SoC DMA engine channel 0 supports XOR
+--
+1.8.2.1
