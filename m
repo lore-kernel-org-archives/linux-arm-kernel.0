@@ -1,45 +1,49 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu,  8 Oct 2015 12:19:41 +0100
-Subject: [PATCH 4/4] arm64: dts: apq8016-sbc: enable spi buses on LS and HS
-In-Reply-To: <1444303124-32402-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1444303124-32402-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1444303181-32574-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
+Date: Thu, 8 Oct 2015 14:23:20 +0300
+Subject: [PATCH v6 0/6] KASAN for arm64
+In-Reply-To: <20151008111144.GC7275@leverpostej>
+References: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
+ <20151007100411.GG3069@e104818-lin.cambridge.arm.com>
+ <CAPAsAGxR-yqtmFeo65Xw_0RQyEy=mN1uG=GKtqoMLr_x_N0u5w@mail.gmail.com>
+ <20151008111144.GC7275@leverpostej>
+Message-ID: <56165228.8060201@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables spi buses on low speed and high speed expansion
-connectors on DB410C
+On 10/08/2015 02:11 PM, Mark Rutland wrote:
+> On Thu, Oct 08, 2015 at 01:36:09PM +0300, Andrey Ryabinin wrote:
+>> 2015-10-07 13:04 GMT+03:00 Catalin Marinas <catalin.marinas@arm.com>:
+>>> On Thu, Sep 17, 2015 at 12:38:06PM +0300, Andrey Ryabinin wrote:
+>>>> As usual patches available in git
+>>>>       git://github.com/aryabinin/linux.git kasan/arm64v6
+>>>>
+>>>> Changes since v5:
+>>>>  - Rebase on top of 4.3-rc1
+>>>>  - Fixed EFI boot.
+>>>>  - Updated Doc/features/KASAN.
+>>>
+>>> I tried to merge these patches (apart from the x86 one which is already
+>>> merged) but it still doesn't boot on Juno as an EFI application.
+>>>
+>>
+>> 4.3-rc1 was ok and 4.3-rc4 is not. Break caused by 0ce3cc008ec04
+>> ("arm64/efi: Fix boot crash by not padding between EFI_MEMORY_RUNTIME
+>> regions")
+>> It introduced sort() call in efi_get_virtmap().
+>> sort() is generic kernel function and it's instrumented, so we crash
+>> when KASAN tries to access shadow in sort().
+> 
+> I believe this is solved by Ard's stub isolation series [1,2], which
+> will build a stub-specific copy of sort() and various other functions
+> (see the arm-deps in [2]).
+> 
+> So long as the stub is not built with ASAN, that should work.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Thanks, this should help, as we already build the stub without ASAN instrumentation.
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-index 3581272..d872654 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-@@ -92,11 +92,21 @@
- 	status = "okay";
- };
- 
-+&blsp_spi3 {
-+	/* On High speed expansion */
-+	status = "okay";
-+};
-+
- &blsp_i2c4 {
- 	/* On High speed expansion */
- 	status = "okay";
- };
- 
-+&blsp_spi5 {
-+	/* On Low speed expansion */
-+	status = "okay";
-+};
-+
- &blsp_i2c6 {
- 	/* On Low speed expansion */
- 	status = "okay";
--- 
-1.9.1
+> 
+> Mark.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/373807.html
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/373808.html
+> 
