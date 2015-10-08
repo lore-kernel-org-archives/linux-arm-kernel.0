@@ -1,26 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Oct 2015 23:09:16 +0200
-Subject: [PATCH] PCI: generic: Fix address window calculation for non-zero
- starting bus.
-In-Reply-To: <1444334056-4870-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1444334056-4870-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <5232073.r65S9X2O3H@wuerfel>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Thu,  8 Oct 2015 23:34:28 +0200
+Subject: [PATCH 0/6] watchdog: sama5d4 and at91sam9: trivial rework
+Message-ID: <1444340074-15437-1-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 October 2015 12:54:16 David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> Make the offset from the beginning of the "reg" property be from the
-> starting bus number, rather than zero.  Hoist the invariant size
-> calculation out of the mapping for loop.
-> 
-> Update host-generic-pci.txt to clarify the semantics of the "reg"
-> property with respect to non-zero starting bus numbers.
-> 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> 
+A little bit of trivial rework for both sama5d4 and at91sam9 drivers.
 
-Thanks a lot!
+Sylvain Rochet (6):
+  watchdog: at91sam9: use devm_request_irq instead of request_irq
+  watchdog: at91sam9: use watchdog_get_drvdata instead of container_of
+  watchdog: at91sam9: rename heartbeats into timeout where necessary
+  watchdog: at91sam9: remove nowayout useless copy
+  watchdog: at91sam9: remove unused pdata support
+  watchdog: sama5d4: try to set timeout from device tree first
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+ drivers/watchdog/at91sam9_wdt.c | 48 +++++++++++++----------------------------
+ drivers/watchdog/sama5d4_wdt.c  |  7 ++++--
+ 2 files changed, 20 insertions(+), 35 deletions(-)
+
+-- 
+2.5.1
