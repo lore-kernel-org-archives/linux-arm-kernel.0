@@ -1,49 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Oct 2015 11:00:38 +0100
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20151008095635.GZ23801@atomide.com>
-References: <20151006153710.GS23801@atomide.com>
- <20151007124551.GI21626@n2100.arm.linux.org.uk>
- <20151007132642.GV23801@atomide.com>
- <CAPDyKFoBPEnHuNR_bsrPU6X=q5pHa8cDR7_Ng9xLnLsudymvOg@mail.gmail.com>
- <20151007155206.GX23801@atomide.com>
- <CAPDyKFp5e_pizFSCzeYSM8sXGx6Jewgs2PRB-RQ1iWMM6WMOww@mail.gmail.com>
- <5615A723.6090907@ti.com> <20151008084020.GY23801@atomide.com>
- <20151008093543.GA32536@n2100.arm.linux.org.uk>
- <20151008095635.GZ23801@atomide.com>
-Message-ID: <20151008100038.GB32536@n2100.arm.linux.org.uk>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu,  8 Oct 2015 19:01:37 +0900
+Subject: [PATCH v3 0/7] arm64: ftrace: fix incorrect output from stack tracer
+Message-ID: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 02:56:36AM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [151008 02:40]:
-> > On Thu, Oct 08, 2015 at 01:40:21AM -0700, Tony Lindgren wrote:
-> > > Well the way distros deal with issues like this is have everything
-> > > possible as loadable modules. We should get the regulator_pbiaa
-> > > loaded automatically in that case as long as it's in the dts.. And
-> > > as long as we have the MODULE_DEVICE_TABLE entries right.
-> > 
-> > Assuming you have a rootfs which doesn't depend on one of those modules,
-> > or an initramfs, and a way to get the built modules into that initial
-> > filesystem.  Automated test boot systems do not have that luxury: the
-> > generation of initramfs is distro specific, and would be very large if
-> > it were to include all possible modules.
-> 
-> Right, we need to keep the kernel usable in all these configurations
-> somehow.
-> 
-> For the kernel generated minimal initramfs we could grep for the
-> needed modules in the dts file.
+This is the third patch series for fixing stack tracer on arm64.
+The original issue was reported by Jungseok[1], and then I found more
+issues[2].
+(Steven, Jungseok, sorry for not replying to your comments directly.)
 
-Yes, you might be able to do that, but the only thing that can generate
-the initramfs is the target system itself, or a similar target system.
-For example, you can't sanely generate an initramfs for an ARM Ubuntu
-system on an x86 Fedora host.
+I address here all the issues and implement fixes described in [2] except
+for interrupt-triggered problems, ie. II-3). Recent discussions[3] about
+introducing a dedicated interrupt stack suggests that we may avoid walking
+through from an interrupt stack to a process stack.
+(So interrupt-stack patch is a prerequisite.)
 
-Distros have the luxury of always being able to do the initramfs
-generation on the target system at installation or distro kernel update
-time.
+Basically,
+patch1 corresponds to the original issue.
+patch2 is a proactive improvement of function_graph tracer. 
+patch3 corresponds to II-4(functions under function_graph tracer).
+patch4 corresponds to II-5(leaf function).
+patch5, 6 and 7 correspond to II-1(slurping stack) and II-2(differences
+between x86 and arm64).
+
+Each fix can be applied independently, but if patch5, 6 and 7 are
+acceptable, patch1 is not necessary because patch7 replaces a default
+stack tracer.
+
+I tested the code with v4.3-rc3 + Jungseok's patch v3[4].
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354126.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/355920.html 
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/368003.html
+[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/371451.html
+
+AKASHI Takahiro (7):
+  arm64: ftrace: adjust callsite addresses examined by stack tracer
+  arm64: ftrace: modify a stack frame in a safe way
+  arm64: ftrace: fix a stack tracer's output under function graph
+    tracer
+  arm64: ftrace: allow for tracing leaf functions
+  ftrace: allow arch-specific stack tracer
+  arm64: insn: add instruction decoders for ldp/stp and add/sub
+  arm64: ftrace: add arch-specific stack tracer
+
+ arch/arm64/Makefile                 |    5 +
+ arch/arm64/include/asm/ftrace.h     |    7 +-
+ arch/arm64/include/asm/insn.h       |   18 +++
+ arch/arm64/include/asm/stacktrace.h |    1 +
+ arch/arm64/kernel/ftrace.c          |   77 +++++++++++--
+ arch/arm64/kernel/insn.c            |  102 +++++++++++++++++
+ arch/arm64/kernel/stacktrace.c      |  213 ++++++++++++++++++++++++++++++++++-
+ include/linux/ftrace.h              |   17 +++
+ kernel/trace/trace_stack.c          |   27 +++--
+ 9 files changed, 442 insertions(+), 25 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.7.9.5
