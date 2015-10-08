@@ -1,33 +1,42 @@
-From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Thu,  8 Oct 2015 14:36:57 +0530
-Subject: [PATCH v2] dmaengine: xgene-dma: Disable memcpy operation due to
- performance drop
-Message-ID: <1444295217-3099-1-git-send-email-rsahu@apm.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Thu, 8 Oct 2015 17:07:28 +0800
+Subject: [PATCH 2/2] arm64: to allow EFI_RTC can be selected on ARM64
+In-Reply-To: <56090C08.8070003@huawei.com>
+References: <1443418478-8240-1-git-send-email-thunder.leizhen@huawei.com>
+ <1783631.jH4WY2RqXu@wuerfel> <5608FA85.8070009@huawei.com>
+ <2245172.1ESUGv0DKo@wuerfel> <56090C08.8070003@huawei.com>
+Message-ID: <56163250.90207@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA engine supports memory copy, RAID5 XOR, RAID6 PQ, and other
-computations. But the bandwidth of the entire DMA engine is shared
-among all channels. This patch re-configures operations availability
-such that one can achieve maximum performance for XOR and PQ
-computation by removing the memory offload operations.
 
-Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
----
- drivers/dma/xgene-dma.c | 1 -
- 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
-index 8d57b1b..cd38022 100644
---- a/drivers/dma/xgene-dma.c
-+++ b/drivers/dma/xgene-dma.c
-@@ -1707,7 +1707,6 @@ static void xgene_dma_set_caps(struct xgene_dma_chan *chan,
- 	dma_cap_zero(dma_dev->cap_mask);
+On 2015/9/28 17:44, Leizhen (ThunderTown) wrote:
+>> > 
+>>> >> --------------drivers/char/Kconfig--------------
+>>> >> if RTC_LIB=n
+>>> >>
+>>> >> config RTC
+>>> >> tristate "Enhanced Real Time Clock Support (legacy PC RTC driver)"
+>>> >>
+>>> >> .......
+>>> >>
+>>> >> config EFI_RTC
+>>> >>         bool "EFI Real Time Clock Services"
+>>> >>         depends on IA64 || ARM64
+>>> >>
+>>> >> .......
+>>> >>
+>>> >> endif # RTC_LIB
+>> > 
+>> > The driver you want is RTC_DRV_EFI, not EFI_RTC.
+> OK, I will try it tommorrow.
 
- 	/* Set DMA device capability */
--	dma_cap_set(DMA_MEMCPY, dma_dev->cap_mask);
- 	dma_cap_set(DMA_SG, dma_dev->cap_mask);
+Sorry, the coach called me to learn to drive these days. I opened RTC_DRV_EFI and the RTC worked fine, thanks a lot.
 
- 	/* Basically here, the X-Gene SoC DMA engine channel 0 supports XOR
---
-1.8.2.1
+> 
+>> > 
+>> > 	Arnd
+>> > 
+>> > .
+>> > 
