@@ -1,119 +1,115 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 8 Oct 2015 00:03:46 -0700
-Subject: [PATCH v3 4/9] clk: qcom: create virtual child device for TSENS
-In-Reply-To: <20151008060557.GD26883@codeaurora.org>
-References: <1444280468-17159-1-git-send-email-rnayak@codeaurora.org>
- <1444280468-17159-5-git-send-email-rnayak@codeaurora.org>
- <20151008060557.GD26883@codeaurora.org>
-Message-ID: <20151008070345.GF26883@codeaurora.org>
+From: w.f@huawei.com (wangfei)
+Date: Thu, 8 Oct 2015 15:03:17 +0800
+Subject: [PATCH 1/8] dt-bindings: pmic: Document Hi655x pmic driver
+In-Reply-To: <20151001075844.GL3214@x1>
+References: <1443611111-3196-1-git-send-email-w.f@huawei.com>
+ <1443611111-3196-2-git-send-email-w.f@huawei.com> <20151001075844.GL3214@x1>
+Message-ID: <56161535.1030801@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07, Stephen Boyd wrote:
-> On 10/08, Rajendra Nayak wrote:
+On 2015/10/1 15:58, Lee Jones wrote:
+> I just noticed that you Cc'ed all of the Core ARM people too.  Please
+> do not do that.  I'm sure they have enough of their own mail to trawl
+> though.
 > 
-> I've also been considering putting some devm stuff inside
-> qcom_cc_probe() itself so that in the normal case you don't even
-> need to call qcom_cc_remove(), it just gets done automatically.
-> That would open up the possibility for drivers to use the drvdata
-> member as they wish.
+> Only mail relevant parties i.e. those who show up when you use:
 > 
-
-Something like this untested patch
-
----8<---
-From: Stephen Boyd <sboyd@codeaurora.org>
-Subject: [PATCH] qcom: clk: Make qcom_cc_probe() fully devm safe
-
-Some APIs in qcom_cc_probe() don't have a devm counterpart, so we
-have to use the calling device's platform data to pass pointers
-to the remove path. Let's use devm_add_action() instead, so that
-the remove path doesn't need to do anything, allowing us to
-remove qcom_cc_remove() entirely.
-
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/qcom/common.c | 35 ++++++++++++++++++++++++-----------
- 1 file changed, 24 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
-index 150692879e92..327d2e5d9f1c 100644
---- a/drivers/clk/qcom/common.c
-+++ b/drivers/clk/qcom/common.c
-@@ -73,6 +73,21 @@ qcom_cc_map(struct platform_device *pdev, const struct qcom_cc_desc *desc)
- }
- EXPORT_SYMBOL_GPL(qcom_cc_map);
- 
-+static void qcom_cc_del_clk_provider(void *data)
-+{
-+	of_clk_del_provider(data);
-+}
-+
-+static void qcom_cc_reset_unregister(void *data)
-+{
-+	reset_controller_unregister(data);
-+}
-+
-+static void qcom_cc_gdsc_unregister(void *data)
-+{
-+	gdsc_unregister(data);
-+}
-+
- int qcom_cc_really_probe(struct platform_device *pdev,
- 			 const struct qcom_cc_desc *desc, struct regmap *regmap)
- {
-@@ -111,6 +126,8 @@ int qcom_cc_really_probe(struct platform_device *pdev,
- 	if (ret)
- 		return ret;
- 
-+	devm_add_action(dev, qcom_cc_del_clk_provider, pdev->dev.of_node);
-+
- 	reset = &cc->reset;
- 	reset->rcdev.of_node = dev->of_node;
- 	reset->rcdev.ops = &qcom_reset_ops;
-@@ -118,25 +135,24 @@ int qcom_cc_really_probe(struct platform_device *pdev,
- 	reset->rcdev.nr_resets = desc->num_resets;
- 	reset->regmap = regmap;
- 	reset->reset_map = desc->resets;
--	platform_set_drvdata(pdev, &reset->rcdev);
- 
- 	ret = reset_controller_register(&reset->rcdev);
- 	if (ret)
--		goto err_reset;
-+		return ret;
-+
-+	devm_add_action(dev, qcom_cc_reset_unregister, &reset->rcdev);
- 
- 	if (desc->gdscs && desc->num_gdscs) {
- 		ret = gdsc_register(dev, desc->gdscs, desc->num_gdscs,
- 				    &reset->rcdev, regmap);
- 		if (ret)
--			goto err_pd;
-+			return ret;
- 	}
- 
-+	devm_add_action(dev, qcom_cc_gdsc_unregister, dev);
-+
-+
- 	return 0;
--err_pd:
--	reset_controller_unregister(&reset->rcdev);
--err_reset:
--	of_clk_del_provider(dev->of_node);
--	return ret;
- }
- EXPORT_SYMBOL_GPL(qcom_cc_really_probe);
- 
-@@ -154,9 +170,6 @@ EXPORT_SYMBOL_GPL(qcom_cc_probe);
- 
- void qcom_cc_remove(struct platform_device *pdev)
- {
--	gdsc_unregister(&pdev->dev);
--	of_clk_del_provider(pdev->dev.of_node);
--	reset_controller_unregister(platform_get_drvdata(pdev));
- }
- EXPORT_SYMBOL_GPL(qcom_cc_remove);
- 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>   ./scripts/get_maintainer.pl.
+> 
+OK?i see?thank you?
+>> Document the new compatible for Hisilicon Hi655x pmic driver.
+>>
+>> Signed-off-by: Fei Wang <w.f@huawei.com>
+>> ---
+>>  .../devicetree/bindings/mfd/hisilicon,hi655x.txt   |   80 ++++++++++++++++++++
+>>  1 file changed, 80 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt b/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
+>> new file mode 100644
+>> index 0000000..17bd8ca
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
+>> @@ -0,0 +1,80 @@
+>> +Hisilicon hi655x Power Management Integrated Circuit (PMIC)
+>> +
+>> +hi655x consists of a large and varied group of sub-devices:
+>> +
+>> +Device			 Supply Names	 Description
+>> +------			 ------------	 -----------
+>> +hi655x-powerkey		:		: Powerkey
+>> +hi655x-regulator-pmic	:		: Regulators
+>> +hi655x-usbvbus		:		: USB plug detection
+>> +hi655x-pmu-rtc		:		: RTC
+>> +hi655x-coul		:		: Coulomb
+>> +
+>> +Required properties:
+>> +- compatible : Should be "hisilicon,hi655x-pmic-driver"
+>> +- reg: Base address of PMIC on hi6220 soc
+>> +- #interrupt-cells: Should be 2, is the local IRQ number for hi655x.
+>> +- interrupt-controller: hi655x has internal IRQs (has own IRQ domain).
+>> +- pmu_irq_gpio: should be &gpio_pmu_irq_n, is the IRQ gpio of hi655x.
+>> +
+>> +Example:
+>> +	pmic: pmic at F8000000 {
+>> +                compatible = "hisilicon,hi655x-pmic-driver";
+>> +                reg = <0x0 0xF8000000 0x0 0x1000>;
+>> +                #interrupt-cells = <2>;
+>> +                interrupt-controller;
+>> +                pmu_irq_gpio = <&gpio_pmu_irq_n>;
+>> +                status = "ok";
+>> +
+>> +                ponkey:ponkey at b1{
+>> +                        compatible = "hisilicon,hi655x-powerkey";
+>> +                        interrupt-parent = <&pmic>;
+>> +                        interrupts = <6 0>, <5 0>, <4 0>;
+>> +                        interrupt-names = "down", "up", "hold 1s";
+>> +                };
+>> +
+>> +                coul: coul at 1 {
+>> +                        compatible = "hisilicon,hi655x-coul";
+>> +                        interrupt-parent = <&pmic>;
+>> +                        interrupts = <24 0>, <25 0>, <26 0>, <27 0>;
+>> +                        interrupt-names = "cl_int_i", "cl_out_i", "cl_in_i", "vbat_int_i";
+>> +                        battery_product_index = <0>;
+>> +                        status = "ok";
+>> +                };
+>> +
+>> +                rtc: rtc at 1 {
+>> +                        compatible = "hisilicon,hi655x-pmu-rtc";
+>> +                        interrupt-parent = <&pmic>;
+>> +                        interrupts = <20 0>;
+>> +                        interrupt-names = "hi655x_pmu_rtc";
+>> +                        board_id = <1>;
+>> +                };
+>> +
+>> +                usbvbus:usbvbus at b2{
+>> +                        compatible = "hisilicon,hi655x-usbvbus";
+>> +                        interrupt-parent = <&pmic>;
+>> +                        interrupts = <9 0>, <8 0>;
+>> +                        interrupt-names = "connect", "disconnect";
+>> +                };
+>> +
+>> +		ldo2: regulator at a21 {
+>> +                        compatible = "hisilicon,hi655x-regulator-pmic";
+>> +                        regulator-name = "ldo2";
+>> +                        regulator-min-microvolt = <2500000>;
+>> +                        regulator-max-microvolt = <3200000>;
+>> +                        hisilicon,valid-modes-mask = <0x02>;
+>> +                        hisilicon,valid-ops-mask = <0x01d>;
+>> +                        hisilicon,initial-mode = <0x02>;
+>> +                        hisilicon,regulator-type = <0x01>;
+>> +
+>> +                        hisilicon,off-on-delay = <120>;
+>> +                        hisilicon,ctrl-regs = <0x029 0x02a 0x02b>;
+>> +                        hisilicon,ctrl-data = <0x1 0x1>;
+>> +                        hisilicon,vset-regs = <0x072>;
+>> +                        hisilicon,vset-data = <0 0x3>;
+>> +                        hisilicon,regulator-n-vol = <8>;
+>> +                        hisilicon,vset-table = <2500000>,<2600000>,<2700000>,<2800000>,<2900000>,<3000000>,<3100000>,<3200000>;
+>> +                        hisilicon,num_consumer_supplies = <1>;
+>> +                        hisilicon,consumer-supplies = "sensor_analog";
+>> +                };
+>> +	};
+> 
