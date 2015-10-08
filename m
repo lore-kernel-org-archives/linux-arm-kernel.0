@@ -1,79 +1,36 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 08 Oct 2015 17:10:40 +0200
-Subject: [PATCH v4 5/8] clk: rockchip: Allow the RK3288 SPDIF clocks to
- change their parent
-In-Reply-To: <1444311079-2892-6-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1444311079-2892-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1444311079-2892-6-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <11755202.f1LLWMlYi0@phil>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Oct 2015 17:11:32 +0200
+Subject: [PATCH v4 4/5] PCI: generic: Correct, and avoid overflow,
+ in bus_max calculation.
+In-Reply-To: <20151008150243.GC3885@localhost>
+References: <1443811443-18878-1-git-send-email-ddaney.cavm@gmail.com>
+ <1443811443-18878-5-git-send-email-ddaney.cavm@gmail.com>
+ <20151008150243.GC3885@localhost>
+Message-ID: <5230007.h2fkbnOlh5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 8. Oktober 2015, 15:31:16 schrieb Sjoerd Simons:
-> The clock branches leading to sclk_spdif and sclk_spdif_8ch on RK3288
-> SoCs only feed those clocks, allow those clocks to change their parents
-> all the way up the hierarchy.
+On Thursday 08 October 2015 10:02:43 Bjorn Helgaas wrote:
+> [+cc Arnd]
 > 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> And this one?
 
-Just as comment, if I'm seeing that right, this patch needs "clk: rockchip: 
-handle mux dependency of fractional dividers" and friends [0] to apply and 
-also actually handle the fractional dividers correctly.
+Not so good.
 
-For the clock change itself:
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> > --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> > +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> > @@ -34,7 +34,11 @@ Properties of the host controller node:
+> >  - #size-cells    : Must be 2.
+> >  
+> >  - reg            : The Configuration Space base address and size, as accessed
+> > -                   from the parent bus.
+> > +                   from the parent bus.  The base address corresponds to
+> > +                   bus zero, even though the "bus-range" property may specify
+> > +                   a different starting bus number.  The driver must only map
+> > +                   or access the portion of the Configuration Space that
+> > +                   corresponds to the "bus-range"
 
+I thought we had reached an agreement that it is a bad idea to have a 'reg'
+property that lists registers belonging to a different device.
 
-Heiko
-
-[0] http://lists.infradead.org/pipermail/linux-rockchip/2015-August/003930.html
-
-
-> ---
-> 
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
-> 
->  drivers/clk/rockchip/clk-rk3288.c | 16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/clk/rockchip/clk-rk3288.c
-> b/drivers/clk/rockchip/clk-rk3288.c index 90c1c9b..4e90252 100644
-> --- a/drivers/clk/rockchip/clk-rk3288.c
-> +++ b/drivers/clk/rockchip/clk-rk3288.c
-> @@ -317,25 +317,25 @@ static struct rockchip_clk_branch
-> rk3288_clk_branches[] __initdata = {
-> 
->  	MUX(0, "spdif_src", mux_pll_src_cpll_gpll_p, 0,
->  			RK3288_CLKSEL_CON(5), 15, 1, MFLAGS),
-> -	COMPOSITE_NOMUX(0, "spdif_pre", "spdif_src", 0,
-> +	COMPOSITE_NOMUX(0, "spdif_pre", "spdif_src", CLK_SET_RATE_PARENT,
->  			RK3288_CLKSEL_CON(5), 0, 7, DFLAGS,
->  			RK3288_CLKGATE_CON(4), 4, GFLAGS),
-> -	COMPOSITE_FRACMUX(0, "spdif_frac", "spdif_src", 0,
-> +	COMPOSITE_FRACMUX(0, "spdif_frac", "spdif_src", CLK_SET_RATE_PARENT,
->  			RK3288_CLKSEL_CON(9), 0,
->  			RK3288_CLKGATE_CON(4), 5, GFLAGS,
-> -		MUX(0, "spdif_mux", mux_spdif_p, 0,
-> +		MUX(0, "spdif_mux", mux_spdif_p, CLK_SET_RATE_PARENT,
->  				RK3288_CLKSEL_CON(5), 8, 2, MFLAGS)),
-> -	GATE(SCLK_SPDIF, "sclk_spdif", "spdif_mux", 0,
-> +	GATE(SCLK_SPDIF, "sclk_spdif", "spdif_mux", CLK_SET_RATE_PARENT,
->  			RK3288_CLKGATE_CON(4), 6, GFLAGS),
-> -	COMPOSITE_NOMUX(0, "spdif_8ch_pre", "spdif_src", 0,
-> +	COMPOSITE_NOMUX(0, "spdif_8ch_pre", "spdif_src", CLK_SET_RATE_PARENT,
->  			RK3288_CLKSEL_CON(40), 0, 7, DFLAGS,
->  			RK3288_CLKGATE_CON(4), 7, GFLAGS),
-> -	COMPOSITE_FRACMUX(0, "spdif_8ch_frac", "spdif_8ch_pre", 0,
-> +	COMPOSITE_FRACMUX(0, "spdif_8ch_frac", "spdif_8ch_pre",
-> CLK_SET_RATE_PARENT, RK3288_CLKSEL_CON(41), 0,
->  			RK3288_CLKGATE_CON(4), 8, GFLAGS,
-> -		MUX(0, "spdif_8ch_mux", mux_spdif_8ch_p, 0,
-> +		MUX(0, "spdif_8ch_mux", mux_spdif_8ch_p, CLK_SET_RATE_PARENT,
->  				RK3288_CLKSEL_CON(40), 8, 2, MFLAGS)),
-> -	GATE(SCLK_SPDIF8CH, "sclk_spdif_8ch", "spdif_8ch_mux", 0,
-> +	GATE(SCLK_SPDIF8CH, "sclk_spdif_8ch", "spdif_8ch_mux",
-> CLK_SET_RATE_PARENT, RK3288_CLKGATE_CON(4), 9, GFLAGS),
-> 
->  	GATE(0, "sclk_acc_efuse", "xin24m", 0,
+	Arnd
