@@ -1,72 +1,122 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Fri, 9 Oct 2015 17:54:32 +0200 (CEST)
-Subject: [PATCH 2/9] pci: mvebu: fix memory leaks and refcount leaks
-In-Reply-To: <20151009171442.52988f0b@free-electrons.com>
-References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
- <E1ZiRIs-0004Id-AN@rmk-PC.arm.linux.org.uk>
- <20151009165240.3ba17ece@free-electrons.com> <20151009150710.GJ14688@lunn.ch>
- <20151009171442.52988f0b@free-electrons.com>
-Message-ID: <alpine.DEB.2.10.1510091753460.2665@hadrien>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Fri,  9 Oct 2015 23:55:09 +0800
+Subject: [RFC] arm: add relocate initrd support
+Message-ID: <1444406109-28354-1-git-send-email-yalin.wang2010@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add support for initrd on ARM arch, in case
+mem= boot option change the memory size or the initrd are
+not placed in low memory region, we need copy the initrd
+to low memory region.
 
+Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+---
+ arch/arm/include/asm/fixmap.h |  1 +
+ arch/arm/kernel/setup.c       | 72 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 73 insertions(+)
 
-On Fri, 9 Oct 2015, Thomas Petazzoni wrote:
-
-> Hello
->
-> (Julia added in the list of recipients).
->
-> On Fri, 9 Oct 2015 17:07:10 +0200, Andrew Lunn wrote:
->
-> > > > @@ -1052,10 +1086,12 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
-> > > >  		struct mvebu_pcie_port *port = &pcie->ports[i];
-> > > >
-> > > >  		ret = mvebu_pcie_parse_port(pcie, port, child);
-> > > > -		if (ret < 0)
-> > > > +		if (ret < 0) {
-> > > > +			of_node_put(child);
-> > > >  			return ret;
-> > > > -		else if (ret == 0)
-> > > > +		} else if (ret == 0) {
-> > > >  			continue;
-> > > > +		}
-> > >
-> > > This is not trivial. If I understand correctly,
-> > > for_each_available_child_of_node() will automatically release the
-> > > reference on the previous node and take the reference on the new one
-> > > before entering the loop code. So in the skipping case, we don't need
-> > > to release the reference as it will be done by the next iteration of
-> > > the loop, but in the error case, since we are unexpectedly breaking the
-> > > loop, we need to do it manually.
-> > >
-> > > The sort of tricky thing that should be documented near
-> > > for_each_child_of_node(), since I believe a lot of code gets this
-> > > wrong.
-> >
-> > Sounds like a good candidate for a coccinelle script. Maybe you could
-> > ask Julia Lawall?
->
-> Julia: some of the Device Tree iterator functions have a somewhat
-> "interesting" behavior in that they take the reference on the current
-> child when entering the loop, and release it before entering the next
-> iteration (which will also take a reference to the next child).
->
-> This means that if you have an exit point inside the loop (break or
-> return), you are loosing a reference. For example,
-> http://lxr.free-electrons.com/source/arch/arm/mach-shmobile/pm-rmobile.c#L367
-> is wrong because there is a missing of_node_put(np) before the "return
-> -ENOMEM".
->
-> So essentially, every exit point in such Device Tree iteration loops
-> should make to call of_node_put() on the current element before exiting
-> the loop unexpectedly.
->
-> As Andrew suggested, this is probably something a Coccinelle semantic
-> patch could easily detect and probably fix automatically.
-
-Yeah, I looked at this along time ago, including the interesting
-loop behavior. I'll check on it again.  Thanks for the pointer.
-
-julia
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 58cfe9f..18ad90f 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -10,6 +10,7 @@
+ 
+ enum fixed_addresses {
+ 	FIX_EARLYCON_MEM_BASE,
++	FIX_RELOCATE_INITRD,
+ 	__end_of_permanent_fixed_addresses,
+ 
+ 	FIX_KMAP_BEGIN = __end_of_permanent_fixed_addresses,
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 20edd34..4260d59 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -811,6 +811,77 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
+ 		request_resource(&ioport_resource, &lp2);
+ }
+ 
++#if defined(CONFIG_BLK_DEV_INITRD) && defined(CONFIG_MMU)
++/*
++ * Relocate initrd if it is not completely within the linear mapping.
++ * This would be the case if mem= cuts out all or part of it
++ * or the initrd are not in low mem region place.
++ */
++static void __init relocate_initrd(void)
++{
++	phys_addr_t orig_start = __virt_to_phys(initrd_start);
++	phys_addr_t orig_end = __virt_to_phys(initrd_end);
++	phys_addr_t ram_end = memblock_end_of_DRAM();
++	phys_addr_t new_start;
++	phys_addr_t src;
++	unsigned long size, to_free = 0;
++	unsigned long slop, clen, p;
++	void *dest;
++
++	if (orig_end <= memblock_get_current_limit())
++		return;
++
++	/*
++	 * Any of the original initrd which overlaps the linear map should
++	 * be freed after relocating.
++	 */
++	if (orig_start < ram_end)
++		to_free = min(ram_end, orig_end) - orig_start;
++
++	size = orig_end - orig_start;
++
++	/* initrd needs to be relocated completely inside linear mapping */
++	new_start = memblock_find_in_range(0, 0, size, PAGE_SIZE);
++	if (!new_start)
++		panic("Cannot relocate initrd of size %ld\n", size);
++	memblock_reserve(new_start, size);
++
++	initrd_start = __phys_to_virt(new_start);
++	initrd_end   = initrd_start + size;
++
++	pr_info("Moving initrd from [%llx-%llx] to [%llx-%llx]\n",
++		(unsigned long long)orig_start,
++		(unsigned long long)(orig_start + size - 1),
++		(unsigned long long)new_start,
++		(unsigned long long)(new_start + size - 1));
++
++	dest = (void *)initrd_start;
++
++	src = orig_start;
++	while (size) {
++		slop = src & ~PAGE_MASK;
++		clen = min(PAGE_SIZE - slop, size);
++		p = set_fixmap_offset(FIX_RELOCATE_INITRD, src);
++		memcpy(dest, (void *)p, clen);
++		clear_fixmap(FIX_RELOCATE_INITRD);
++		dest += clen;
++		src += clen;
++		size -= clen;
++	}
++
++	if (to_free) {
++		pr_info("Freeing original RAMDISK from [%llx-%llx]\n",
++			(unsigned long long)orig_start,
++			(unsigned long long)(orig_start + to_free - 1));
++		memblock_free(orig_start, to_free);
++	}
++}
++#else
++static inline void __init relocate_initrd(void)
++{
++}
++#endif
++
+ #if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
+ struct screen_info screen_info = {
+  .orig_video_lines	= 30,
+@@ -969,6 +1040,7 @@ void __init setup_arch(char **cmdline_p)
+ 	arm_memblock_init(mdesc);
+ 
+ 	paging_init(mdesc);
++	relocate_initrd();
+ 	request_standard_resources(mdesc);
+ 
+ 	if (mdesc->restart)
+-- 
+1.9.1
