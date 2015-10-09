@@ -1,40 +1,44 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri,  9 Oct 2015 09:55:29 +0100
-Subject: [PATCH v2 4/4] arm64: dts: apq8016-sbc: enable spi buses on LS and HS
-In-Reply-To: <1444380825-1355-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1444380825-1355-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1444380929-1557-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 9 Oct 2015 16:57:00 +0800
+Subject: [PATCH 4/4] arm64: dts: enable idle states for Hi6220
+In-Reply-To: <56177F51.1080806@arm.com>
+References: <1444365376-10728-1-git-send-email-leo.yan@linaro.org>
+ <1444365376-10728-5-git-send-email-leo.yan@linaro.org>
+ <56177F51.1080806@arm.com>
+Message-ID: <20151009085700.GA31022@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables spi buses on low speed and high speed expansion
-connectors on DB410C
+Hi Sudeep,
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+On Fri, Oct 09, 2015 at 09:48:17AM +0100, Sudeep Holla wrote:
+> 
+> 
+> On 09/10/15 05:36, Leo Yan wrote:
+> >Add cpu and cluster level's low power state for Hi6220.
+> >
+> >Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> >---
+> >  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 31 +++++++++++++++++++++++++++++++
+> >  1 file changed, 31 insertions(+)
+> >
+> >diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> >index 7edbe42..e83802a 100644
+> >--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> >+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> >@@ -52,11 +52,35 @@
+> >  			};
+> >  		};
+> >
+> >+		idle-states {
+> >+			entry-method = "arm,psci";
+> 
+> Please refer the bindings:           ^ should be just "psci"
+> 
+> Otherwise looks good.
+> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-index cd1d0b5..64b06d8 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-@@ -49,6 +49,16 @@
- 			status = "okay";
- 		};
- 
-+		spi at 78b7000 {
-+		/* On High speed expansion */
-+			status = "okay";
-+		};
-+
-+		spi at 78b9000 {
-+		/* On Low speed expansion */
-+			status = "okay";
-+		};
-+
- 		leds {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&msmgpio_leds>,
--- 
-1.9.1
+Will fix it, thanks for review.
+
+Thanks,
+Leo Yan
