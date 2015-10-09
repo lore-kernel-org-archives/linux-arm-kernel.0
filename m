@@ -1,162 +1,355 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Fri, 9 Oct 2015 15:21:42 -0700
-Subject: arm/arm64: GICv2 driver does not have irq_disable implemented
-In-Reply-To: <alpine.DEB.2.11.1510092348370.6097@nanos>
-References: <CADaLND=spbEHLZXmqsVRDsPAyNKXJHnc=Yy6ujY0em74dB5CbA@mail.gmail.com>
- <alpine.DEB.2.11.1510091951250.6097@nanos>
- <CADaLNDmgWnOAugY20nXWz_-2m-KPKnARMWeYMDTuPdRe8SA8sQ@mail.gmail.com>
- <alpine.DEB.2.11.1510092348370.6097@nanos>
-Message-ID: <CADaLNDnoGnzUSDrXMBujVRkMybJNHXY3_j9-YXsCZHJJRZMG3w@mail.gmail.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Fri, 09 Oct 2015 18:16:30 -0400
+Subject: [PATCH 10/20] acpi: switch from ioremap_cache to memremap
+In-Reply-To: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
+References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
+Message-ID: <20151009221630.32203.96152.stgit@dwillia2-desk3.jf.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 9, 2015 at 2:52 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Fri, 9 Oct 2015, Duc Dang wrote:
->> On Fri, Oct 9, 2015 at 10:52 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
->> > On Fri, 9 Oct 2015, Duc Dang wrote:
->> >> In APM ARM64 X-Gene Enet controller driver, we use disable_irq_nosync to
->> >> disable interrupt before calling __napi_schedule to schedule packet handler
->> >> to process the Tx/Rx packets.
->> >
->> > Which is wrong to begin with. Disable the interrupt at the device
->> > level not at the interrupt line level.
->> >
->> We could not disable the interrupt at Enet controller level due to the
->> controller limitation. As you said, using  disable_irq_nosync is wrong
->> but it looks like that the only option that we have.
->
-> Oh well.
->
->> Do you have any suggestion about different approach that we could try?
->
-> Try the patch below and add
->
->     irq_set_status_flags(irq, IRQ_DISABLE_UNLAZY);
->
-> to your driver before requesting the interrupt. Unset it when freeing
-> the interrupt.
+In preparation for deprecating ioremap_cache() convert its usage in
+drivers/acpi and include/acpi/ to memremap.  This includes dropping the
+__iomem annotation throughout ACPI since the memremap can be treated as
+a normal memory pointer.
 
-Thanks, Thomas!
+Finally, memremap automatically handles requests to map normal memory
+pages, so this also drops the calls to "should_use_kmap()".
 
-We will try and let you know soon.
+It seems ARM had a local definition of acpi_os_ioremap() to handle RAM
+addresses, but it can be deleted now that memremap() handles this
+generically.
 
->
-> Thanks,
->
->         tglx
->
-> 8<--------------
->
-> Subject: genirq: Add flag to force mask in disable_irq[_nosync]()
-> From: Thomas Gleixner <tglx@linutronix.de>
-> Date: Fri, 09 Oct 2015 23:28:58 +0200
->
-> If an irq chip does not implement the irq_disable callback, then we
-> use a lazy approach for disabling the interrupt. That means that the
-> interrupt is marked disabled, but the interrupt line is not
-> immediately masked in the interrupt chip. It only becomes masked if
-> the interrupt is raised while it's marked disabled. We use this to avoid
-> possibly expensive mask/unmask operations for common case operations.
->
-> Unfortunately there are devices which do not allow the interrupt to be
-> disabled easily at the device level. They are forced to use
-> disable_irq_nosync(). This can result in taking each interrupt twice.
->
-> Instead of enforcing the non lazy mode on all interrupts of a irq
-> chip, provide a settings flag, which can be set by the driver for that
-> particular interrupt line.
->
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> ---
->  include/linux/irq.h   |    4 +++-
->  kernel/irq/chip.c     |    9 +++++++++
->  kernel/irq/settings.h |    7 +++++++
->  3 files changed, 19 insertions(+), 1 deletion(-)
->
-> Index: tip/include/linux/irq.h
-> ===================================================================
-> --- tip.orig/include/linux/irq.h
-> +++ tip/include/linux/irq.h
-> @@ -72,6 +72,7 @@ enum irqchip_irq_state;
->   * IRQ_IS_POLLED               - Always polled by another interrupt. Exclude
->   *                               it from the spurious interrupt detection
->   *                               mechanism and from core side polling.
-> + * IRQ_DISABLE_UNLAZY          - Disable lazy irq disable
->   */
->  enum {
->         IRQ_TYPE_NONE           = 0x00000000,
-> @@ -97,13 +98,14 @@ enum {
->         IRQ_NOTHREAD            = (1 << 16),
->         IRQ_PER_CPU_DEVID       = (1 << 17),
->         IRQ_IS_POLLED           = (1 << 18),
-> +       IRQ_DISABLE_UNLAZY      = (1 << 19),
->  };
->
->  #define IRQF_MODIFY_MASK       \
->         (IRQ_TYPE_SENSE_MASK | IRQ_NOPROBE | IRQ_NOREQUEST | \
->          IRQ_NOAUTOEN | IRQ_MOVE_PCNTXT | IRQ_LEVEL | IRQ_NO_BALANCING | \
->          IRQ_PER_CPU | IRQ_NESTED_THREAD | IRQ_NOTHREAD | IRQ_PER_CPU_DEVID | \
-> -        IRQ_IS_POLLED)
-> +        IRQ_IS_POLLED | IRQ_DISABLE_UNLAZY)
->
->  #define IRQ_NO_BALANCING_MASK  (IRQ_PER_CPU | IRQ_NO_BALANCING)
->
-> Index: tip/kernel/irq/chip.c
-> ===================================================================
-> --- tip.orig/kernel/irq/chip.c
-> +++ tip/kernel/irq/chip.c
-> @@ -241,6 +241,13 @@ void irq_enable(struct irq_desc *desc)
->   * disabled. If an interrupt happens, then the interrupt flow
->   * handler masks the line at the hardware level and marks it
->   * pending.
-> + *
-> + * If the interrupt chip does not implement the irq_disable callback,
-> + * a driver can disable the lazy approach for a particular irq line by
-> + * calling 'irq_set_status_flags(irq, IRQ_DISABLE_UNLAZY)'. This can be
-> + * used for devices which cannot disable the interrupt at the device
-> + * level under certain circumstances and have to use
-> + * disable_irq[_nosync] instead.
->   */
->  void irq_disable(struct irq_desc *desc)
->  {
-> @@ -248,6 +255,8 @@ void irq_disable(struct irq_desc *desc)
->         if (desc->irq_data.chip->irq_disable) {
->                 desc->irq_data.chip->irq_disable(&desc->irq_data);
->                 irq_state_set_masked(desc);
-> +       } else if (irq_settings_disable_unlazy(desc)) {
-> +               mask_irq(desc);
->         }
->  }
->
-> Index: tip/kernel/irq/settings.h
-> ===================================================================
-> --- tip.orig/kernel/irq/settings.h
-> +++ tip/kernel/irq/settings.h
-> @@ -15,6 +15,7 @@ enum {
->         _IRQ_NESTED_THREAD      = IRQ_NESTED_THREAD,
->         _IRQ_PER_CPU_DEVID      = IRQ_PER_CPU_DEVID,
->         _IRQ_IS_POLLED          = IRQ_IS_POLLED,
-> +       _IRQ_DISABLE_UNLAZY     = IRQ_DISABLE_UNLAZY,
->         _IRQF_MODIFY_MASK       = IRQF_MODIFY_MASK,
->  };
->
-> @@ -28,6 +29,7 @@ enum {
->  #define IRQ_NESTED_THREAD      GOT_YOU_MORON
->  #define IRQ_PER_CPU_DEVID      GOT_YOU_MORON
->  #define IRQ_IS_POLLED          GOT_YOU_MORON
-> +#define IRQ_DISABLE_UNLAZY     GOT_YOU_MORON
->  #undef IRQF_MODIFY_MASK
->  #define IRQF_MODIFY_MASK       GOT_YOU_MORON
->
-> @@ -154,3 +156,8 @@ static inline bool irq_settings_is_polle
->  {
->         return desc->status_use_accessors & _IRQ_IS_POLLED;
->  }
-> +
-> +static inline bool irq_settings_disable_unlazy(struct irq_desc *desc)
-> +{
-> +       return desc->status_use_accessors & _IRQ_DISABLE_UNLAZY;
-> +}
+Cc: Bob Moore <robert.moore@intel.com>
+Cc: Lv Zheng <lv.zheng@intel.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+---
+ arch/arm64/include/asm/acpi.h |    8 -----
+ drivers/acpi/apei/einj.c      |    9 +++--
+ drivers/acpi/apei/erst.c      |    6 ++--
+ drivers/acpi/nvs.c            |    6 ++--
+ drivers/acpi/osl.c            |   70 +++++++++++------------------------------
+ include/acpi/acpi_io.h        |    6 +---
+ 6 files changed, 32 insertions(+), 73 deletions(-)
 
-Regards,
-Duc Dang.
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index a24a9b1cc91d..197d02047d00 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -29,14 +29,6 @@
+ 
+ /* Basic configuration for ACPI */
+ #ifdef	CONFIG_ACPI
+-/* ACPI table mapping after acpi_gbl_permanent_mmap is set */
+-static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+-					    acpi_size size)
+-{
+-	return memremap(phys, size, MEMREMAP_WB);
+-}
+-#define acpi_os_ioremap acpi_os_ioremap
+-
+ typedef u64 phys_cpuid_t;
+ #define PHYS_CPUID_INVALID INVALID_HWID
+ 
+diff --git a/drivers/acpi/apei/einj.c b/drivers/acpi/apei/einj.c
+index 0431883653be..9f71010f6339 100644
+--- a/drivers/acpi/apei/einj.c
++++ b/drivers/acpi/apei/einj.c
+@@ -314,7 +314,8 @@ static int __einj_error_trigger(u64 trigger_paddr, u32 type,
+ 			    sizeof(*trigger_tab) - 1);
+ 		goto out;
+ 	}
+-	trigger_tab = ioremap_cache(trigger_paddr, sizeof(*trigger_tab));
++	trigger_tab = memremap(trigger_paddr, sizeof(*trigger_tab),
++			MEMREMAP_WB);
+ 	if (!trigger_tab) {
+ 		pr_err(EINJ_PFX "Failed to map trigger table!\n");
+ 		goto out_rel_header;
+@@ -342,8 +343,8 @@ static int __einj_error_trigger(u64 trigger_paddr, u32 type,
+ 		       (unsigned long long)trigger_paddr + table_size - 1);
+ 		goto out_rel_header;
+ 	}
+-	iounmap(trigger_tab);
+-	trigger_tab = ioremap_cache(trigger_paddr, table_size);
++	memunmap(trigger_tab);
++	trigger_tab = memremap(trigger_paddr, table_size, MEMREMAP_WB);
+ 	if (!trigger_tab) {
+ 		pr_err(EINJ_PFX "Failed to map trigger table!\n");
+ 		goto out_rel_entry;
+@@ -405,7 +406,7 @@ out_rel_header:
+ 	release_mem_region(trigger_paddr, sizeof(*trigger_tab));
+ out:
+ 	if (trigger_tab)
+-		iounmap(trigger_tab);
++		memunmap(trigger_tab);
+ 
+ 	return rc;
+ }
+diff --git a/drivers/acpi/apei/erst.c b/drivers/acpi/apei/erst.c
+index 6682c5daf742..4ef62b54fabf 100644
+--- a/drivers/acpi/apei/erst.c
++++ b/drivers/acpi/apei/erst.c
+@@ -73,7 +73,7 @@ static struct acpi_table_erst *erst_tab;
+ static struct erst_erange {
+ 	u64 base;
+ 	u64 size;
+-	void __iomem *vaddr;
++	void *vaddr;
+ 	u32 attr;
+ } erst_erange;
+ 
+@@ -1181,8 +1181,8 @@ static int __init erst_init(void)
+ 		goto err_unmap_reg;
+ 	}
+ 	rc = -ENOMEM;
+-	erst_erange.vaddr = ioremap_cache(erst_erange.base,
+-					  erst_erange.size);
++	erst_erange.vaddr = memremap(erst_erange.base, erst_erange.size,
++			MEMREMAP_WB);
+ 	if (!erst_erange.vaddr)
+ 		goto err_release_erange;
+ 
+diff --git a/drivers/acpi/nvs.c b/drivers/acpi/nvs.c
+index 85287b8fe3aa..e0e15af93b22 100644
+--- a/drivers/acpi/nvs.c
++++ b/drivers/acpi/nvs.c
+@@ -136,7 +136,7 @@ void suspend_nvs_free(void)
+ 			entry->data = NULL;
+ 			if (entry->kaddr) {
+ 				if (entry->unmap) {
+-					iounmap(entry->kaddr);
++					memunmap(entry->kaddr);
+ 					entry->unmap = false;
+ 				} else {
+ 					acpi_os_unmap_iomem(entry->kaddr,
+@@ -180,7 +180,7 @@ int suspend_nvs_save(void)
+ 
+ 			entry->kaddr = acpi_os_get_iomem(phys, size);
+ 			if (!entry->kaddr) {
+-				entry->kaddr = acpi_os_ioremap(phys, size);
++				entry->kaddr = acpi_os_memremap(phys, size);
+ 				entry->unmap = !!entry->kaddr;
+ 			}
+ 			if (!entry->kaddr) {
+@@ -197,7 +197,7 @@ int suspend_nvs_save(void)
+  *	suspend_nvs_restore - restore NVS memory regions
+  *
+  *	This function is going to be called with interrupts disabled, so it
+- *	cannot iounmap the virtual addresses used to access the NVS region.
++ *	cannot memunmap the virtual addresses used to access the NVS region.
+  */
+ void suspend_nvs_restore(void)
+ {
+diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
+index 739a4a6b3b9b..d629eef2a56e 100644
+--- a/drivers/acpi/osl.c
++++ b/drivers/acpi/osl.c
+@@ -27,7 +27,6 @@
+ #include <linux/kernel.h>
+ #include <linux/slab.h>
+ #include <linux/mm.h>
+-#include <linux/highmem.h>
+ #include <linux/pci.h>
+ #include <linux/interrupt.h>
+ #include <linux/kmod.h>
+@@ -40,8 +39,8 @@
+ #include <linux/list.h>
+ #include <linux/jiffies.h>
+ #include <linux/semaphore.h>
++#include <linux/io.h>
+ 
+-#include <asm/io.h>
+ #include <asm/uaccess.h>
+ #include <asm-generic/io-64-nonatomic-lo-hi.h>
+ 
+@@ -88,7 +87,7 @@ static bool acpi_os_initialized;
+  */
+ struct acpi_ioremap {
+ 	struct list_head list;
+-	void __iomem *virt;
++	void *virt;
+ 	acpi_physical_address phys;
+ 	acpi_size size;
+ 	unsigned long refcount;
+@@ -292,7 +291,7 @@ acpi_map_lookup(acpi_physical_address phys, acpi_size size)
+ }
+ 
+ /* Must be called with 'acpi_ioremap_lock' or RCU read lock held. */
+-static void __iomem *
++static void *
+ acpi_map_vaddr_lookup(acpi_physical_address phys, unsigned int size)
+ {
+ 	struct acpi_ioremap *map;
+@@ -304,10 +303,10 @@ acpi_map_vaddr_lookup(acpi_physical_address phys, unsigned int size)
+ 	return NULL;
+ }
+ 
+-void __iomem *acpi_os_get_iomem(acpi_physical_address phys, unsigned int size)
++void *acpi_os_get_iomem(acpi_physical_address phys, unsigned int size)
+ {
+ 	struct acpi_ioremap *map;
+-	void __iomem *virt = NULL;
++	void *virt = NULL;
+ 
+ 	mutex_lock(&acpi_ioremap_lock);
+ 	map = acpi_map_lookup(phys, size);
+@@ -322,7 +321,7 @@ EXPORT_SYMBOL_GPL(acpi_os_get_iomem);
+ 
+ /* Must be called with 'acpi_ioremap_lock' or RCU read lock held. */
+ static struct acpi_ioremap *
+-acpi_map_lookup_virt(void __iomem *virt, acpi_size size)
++acpi_map_lookup_virt(void *virt, acpi_size size)
+ {
+ 	struct acpi_ioremap *map;
+ 
+@@ -334,44 +333,13 @@ acpi_map_lookup_virt(void __iomem *virt, acpi_size size)
+ 	return NULL;
+ }
+ 
+-#if defined(CONFIG_IA64) || defined(CONFIG_ARM64)
+-/* ioremap will take care of cache attributes */
+-#define should_use_kmap(pfn)   0
+-#else
+-#define should_use_kmap(pfn)   page_is_ram(pfn)
+-#endif
+-
+-static void __iomem *acpi_map(acpi_physical_address pg_off, unsigned long pg_sz)
+-{
+-	unsigned long pfn;
+-
+-	pfn = pg_off >> PAGE_SHIFT;
+-	if (should_use_kmap(pfn)) {
+-		if (pg_sz > PAGE_SIZE)
+-			return NULL;
+-		return (void __iomem __force *)kmap(pfn_to_page(pfn));
+-	} else
+-		return acpi_os_ioremap(pg_off, pg_sz);
+-}
+-
+-static void acpi_unmap(acpi_physical_address pg_off, void __iomem *vaddr)
+-{
+-	unsigned long pfn;
+-
+-	pfn = pg_off >> PAGE_SHIFT;
+-	if (should_use_kmap(pfn))
+-		kunmap(pfn_to_page(pfn));
+-	else
+-		iounmap(vaddr);
+-}
+-
+-void __iomem *__init_refok
++void *__init_refok
+ acpi_os_map_iomem(acpi_physical_address phys, acpi_size size)
+ {
+ 	struct acpi_ioremap *map;
+-	void __iomem *virt;
+ 	acpi_physical_address pg_off;
+ 	acpi_size pg_sz;
++	void *virt;
+ 
+ 	if (phys > ULONG_MAX) {
+ 		printk(KERN_ERR PREFIX "Cannot map memory that high\n");
+@@ -397,7 +365,7 @@ acpi_os_map_iomem(acpi_physical_address phys, acpi_size size)
+ 
+ 	pg_off = round_down(phys, PAGE_SIZE);
+ 	pg_sz = round_up(phys + size, PAGE_SIZE) - pg_off;
+-	virt = acpi_map(pg_off, pg_sz);
++	virt = acpi_os_memremap(pg_off, pg_sz);
+ 	if (!virt) {
+ 		mutex_unlock(&acpi_ioremap_lock);
+ 		kfree(map);
+@@ -435,7 +403,7 @@ static void acpi_os_map_cleanup(struct acpi_ioremap *map)
+ {
+ 	if (!map->refcount) {
+ 		synchronize_rcu_expedited();
+-		acpi_unmap(map->phys, map->virt);
++		memunmap(map->virt);
+ 		kfree(map);
+ 	}
+ }
+@@ -948,7 +916,7 @@ EXPORT_SYMBOL(acpi_os_write_port);
+ acpi_status
+ acpi_os_read_memory(acpi_physical_address phys_addr, u64 *value, u32 width)
+ {
+-	void __iomem *virt_addr;
++	void *virt_addr;
+ 	unsigned int size = width / 8;
+ 	bool unmap = false;
+ 	u64 dummy;
+@@ -957,7 +925,7 @@ acpi_os_read_memory(acpi_physical_address phys_addr, u64 *value, u32 width)
+ 	virt_addr = acpi_map_vaddr_lookup(phys_addr, size);
+ 	if (!virt_addr) {
+ 		rcu_read_unlock();
+-		virt_addr = acpi_os_ioremap(phys_addr, size);
++		virt_addr = acpi_os_memremap(phys_addr, size);
+ 		if (!virt_addr)
+ 			return AE_BAD_ADDRESS;
+ 		unmap = true;
+@@ -968,23 +936,23 @@ acpi_os_read_memory(acpi_physical_address phys_addr, u64 *value, u32 width)
+ 
+ 	switch (width) {
+ 	case 8:
+-		*(u8 *) value = readb(virt_addr);
++		*(u8 *) value = *(u8 *) virt_addr;
+ 		break;
+ 	case 16:
+-		*(u16 *) value = readw(virt_addr);
++		*(u16 *) value = *(u16 *) virt_addr;
+ 		break;
+ 	case 32:
+-		*(u32 *) value = readl(virt_addr);
++		*(u32 *) value = *(u32 *) virt_addr;
+ 		break;
+ 	case 64:
+-		*(u64 *) value = readq(virt_addr);
++		*(u64 *) value = *(u64 *) virt_addr;
+ 		break;
+ 	default:
+ 		BUG();
+ 	}
+ 
+ 	if (unmap)
+-		iounmap(virt_addr);
++		memunmap(virt_addr);
+ 	else
+ 		rcu_read_unlock();
+ 
+@@ -1002,7 +970,7 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u64 value, u32 width)
+ 	virt_addr = acpi_map_vaddr_lookup(phys_addr, size);
+ 	if (!virt_addr) {
+ 		rcu_read_unlock();
+-		virt_addr = acpi_os_ioremap(phys_addr, size);
++		virt_addr = acpi_os_memremap(phys_addr, size);
+ 		if (!virt_addr)
+ 			return AE_BAD_ADDRESS;
+ 		unmap = true;
+@@ -1026,7 +994,7 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u64 value, u32 width)
+ 	}
+ 
+ 	if (unmap)
+-		iounmap(virt_addr);
++		memunmap(virt_addr);
+ 	else
+ 		rcu_read_unlock();
+ 
+diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
+index dd86c5fc102d..646ce8714109 100644
+--- a/include/acpi/acpi_io.h
++++ b/include/acpi/acpi_io.h
+@@ -5,13 +5,11 @@
+ 
+ #include <asm/acpi.h>
+ 
+-#ifndef acpi_os_ioremap
+-static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
++static inline void *acpi_os_memremap(acpi_physical_address phys,
+ 					    acpi_size size)
+ {
+-       return ioremap_cache(phys, size);
++       return memremap(phys, size, MEMREMAP_WB);
+ }
+-#endif
+ 
+ void __iomem *__init_refok
+ acpi_os_map_iomem(acpi_physical_address phys, acpi_size size);
