@@ -1,41 +1,44 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 9 Oct 2015 13:02:11 -0300
-Subject: [PATCH 1/9] drm: bridge/dw_hdmi-ahb-audio: add audio driver
-In-Reply-To: <20151009160036.GZ32532@n2100.arm.linux.org.uk>
-References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
- <E1ZO6hC-0003M5-EU@rmk-PC.arm.linux.org.uk>
- <CAOMZO5COgoGU-3YNpnmSkctHMRDJ3=DuKc82Wb5zTTX7Bx2jNw@mail.gmail.com>
- <20151006181806.GS21513@n2100.arm.linux.org.uk>
- <CAOMZO5DaowTGQqN_NW7T2zv-P6a_YZUCumq4-m+OtpsKqFzELw@mail.gmail.com>
- <20151006185429.GU21513@n2100.arm.linux.org.uk>
- <CAOMZO5C8O0p6C0hrAvHzanru9W2f8-C7MWsm3+HumoyZ9Hu6Jw@mail.gmail.com>
- <20151009160036.GZ32532@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5Ah=AKXr__uuYsYp1KvSHptVp1NR7YUr7akzQJ3xW2XiA@mail.gmail.com>
+From: joshc@ni.com (Josh Cartwright)
+Date: Fri, 9 Oct 2015 11:04:23 -0500
+Subject: [PATCH 1/3] doc: dt: fpga: Added Documentation for Xilinx Zynq
+ FPGA manager.
+In-Reply-To: <1444344307-22509-2-git-send-email-moritz.fischer@ettus.com>
+References: <1444344307-22509-1-git-send-email-moritz.fischer@ettus.com>
+ <1444344307-22509-2-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <20151009160423.GL10631@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 9, 2015 at 1:00 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Fri, Oct 09, 2015 at 12:45:05AM +0200, Moritz Fischer wrote:
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> ---
+>  .../bindings/fpga/xilinx-zynq-fpga-mgr.txt         | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt
+> new file mode 100644
+> index 0000000..82ffda8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt
+> @@ -0,0 +1,26 @@
+> +Xilinx Zynq FPGA Manager
+> +
+> +Required properties:
+> +- compatible:		should contain "xlnx,zynq-devcfg-1.0"
+> +- reg:			base address and size for memory mapped io
+> +- interrupt parent:	interrupt source phandle
 
->> Thanks, Russell!
->>
->> Got audio to play on my HDMI TV :-)
->>
->> For the entire series:
->>
->> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
->
-> Just to confirm - that's for _all_ of these 8 patches, including the
-> changes to the ACR code in the last four patches, and you're happy that
-> I send all of these:
->
-> drm: bridge/dw_hdmi-ahb-audio: add audio driver
-> drm: bridge/dw_hdmi-ahb-audio: parse ELD from HDMI driver
-> drm: bridge/dw_hdmi-ahb-audio: basic support for multi-channel PCM audio
-> drm: bridge/dw_hdmi-ahb-audio: allow larger buffer sizes
-> drm: bridge/dw_hdmi: avoid being recursive in N calculation
-> drm: bridge/dw_hdmi: adjust pixel clock values in N calculation
-> drm: bridge/dw_hdmi: remove ratio support from ACR code
-> drm: bridge/dw_hdmi: replace CTS calculation for the ACR
+I think you mean 'interrupt-parent', with the hyphen.
 
-That's correct. Thanks, Russell
+Actually, this isn't really a 'required' property of this node, as it
+could be specified in a parent node.
+
+  Josh
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151009/2a9e3420/attachment.sig>
