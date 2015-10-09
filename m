@@ -1,71 +1,42 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Fri, 9 Oct 2015 12:48:16 +0300
-Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
-In-Reply-To: <20151009094324.GE26278@arm.com>
-References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
- <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
- <CAPAsAGz7Tp6Z87tPq_NNh_mcwPF_DOaXzu0po5f6AQxPAcsALQ@mail.gmail.com>
- <20151009091037.GC26278@arm.com>
- <CAPAsAGzgqOZVdTfpBGADAhZjOJTCqdB1Paq-14vk-_1hu4DCyw@mail.gmail.com>
- <20151009094324.GE26278@arm.com>
-Message-ID: <CAPAsAGw1CN5FMxnPTW+00jyF2Q5GCSeS8S7ygR35Ls7fWPpnYQ@mail.gmail.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Fri, 9 Oct 2015 11:48:34 +0200
+Subject: [PATCH 4/8] mmc: sdhci-pxav3: enable proper resuming on Armada
+ 38x SoC
+In-Reply-To: <20151009090902.3b5b9bc8@xhacker>
+References: <1444094562-31165-1-git-send-email-mw@semihalf.com>
+ <1444094562-31165-5-git-send-email-mw@semihalf.com>
+ <20151009090902.3b5b9bc8@xhacker>
+Message-ID: <CAPv3WKfB=5Xz+f=BMiPTD1EYZifX41g0BK0kwX5rNFjG3PQ3ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-09 12:43 GMT+03:00 Will Deacon <will.deacon@arm.com>:
-> On Fri, Oct 09, 2015 at 12:40:21PM +0300, Andrey Ryabinin wrote:
->> 2015-10-09 12:10 GMT+03:00 Will Deacon <will.deacon@arm.com>:
->> > On Fri, Oct 09, 2015 at 11:12:24AM +0300, Andrey Ryabinin wrote:
->> >> 2015-10-08 22:02 GMT+03:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
->> >> > --- a/arch/arm64/kernel/image.h
->> >> > +++ b/arch/arm64/kernel/image.h
->> >> > @@ -59,4 +59,31 @@
->> >> >         _kernel_offset_le       = DATA_LE64(TEXT_OFFSET);       \
->> >> >         _kernel_flags_le        = DATA_LE64(__HEAD_FLAGS);
->> >> >
->> >> > +#ifdef CONFIG_EFI
->> >> > +
->> >> > +/*
->> >> > + * The EFI stub has its own symbol namespace prefixed by __efistub_, to
->> >> > + * isolate it from the kernel proper. The following symbols are legally
->> >> > + * accessed by the stub, so provide some aliases to make them accessible.
->> >> > + * Only include data symbols here, or text symbols of functions that are
->> >> > + * guaranteed to be safe when executed at another offset than they were
->> >> > + * linked at. The routines below are all implemented in assembler in a
->> >> > + * position independent manner
->> >> > + */
->> >> > +__efistub_memcmp               = __pi_memcmp;
->> >> > +__efistub_memchr               = __pi_memchr;
->> >> > +__efistub_memcpy               = __pi_memcpy;
->> >> > +__efistub_memmove              = __pi_memmove;
->> >> > +__efistub_memset               = __pi_memset;
->> >> > +__efistub_strlen               = __pi_strlen;
->> >> > +__efistub_strcmp               = __pi_strcmp;
->> >> > +__efistub_strncmp              = __pi_strncmp;
->> >> > +__efistub___flush_dcache_area  = __pi___flush_dcache_area;
->> >>
->> >> So why we need these __pi_* aliases?
->> >> We could just do __efistub_memcmp = memcmp; Right?
->> >
->> > We *could*, but that defeats the whole purpose of tagging
->> > position-independent functions explicitly in the kernel text.
->> >
->>
->> I just don't get that "the whole purpose of tagging".
->>
->> Yes, the EFI stub is allowed to call only PI kernel functions.
->> But the EFI stub already protected by __efistub_ namespace.
->> If we want to use some new PI function in the stub, we would need add
->> it into this list at first.
->> So that __pi_ namespace doesn't bring any protection or isolation.
+Hi Jisheng,
+
+
+>> +     res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mbus");
+>> +     pxa->mbus_win_regs = devm_ioremap_resource(&pdev->dev, res);
+>> +     if (IS_ERR(pxa->mbus_win_regs)) {
+>> +             dev_err(mmc_dev(host->mmc),
+>> +                     "failed to obtain MBus windows register base\n");
 >
-> What it does it force people making future changes to the __pi_* functions
-> to think about the stub, otherwise if the function happens to be
-> position-independent when efistub starts using it, it could easily break
-> due to some future patch where the author didn't realise that it was
-> being used in that manner.
+> devm_ioremap_resource() has warned us if it fails, so is it better to remove
+> this dev_err() here?
 >
 
-That makes sense, thanks.
+Indeed, I'll remove this excessive verbosity.
 
-> Will
+>>       struct sdhci_host *host = dev_get_drvdata(dev);
+>> +     struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>> +     struct sdhci_pxa *pxa = pltfm_host->priv;
+>> +     struct device_node *np = dev->of_node;
+>> +
+>> +     if (of_device_is_compatible(np, "marvell,armada-380-sdhci"))
+>
+> this would increase resume time especially those non armada-380-sdhci host
+> although it's trivial. Is it better to check "if (pxa->mbus_win_regs)"?
+>
+
+Already implemented in v2.
+
+Thanks for the comments,
+Marcin
