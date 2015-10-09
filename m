@@ -1,73 +1,129 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 9 Oct 2015 10:08:50 +0800
-Subject: Regression: USB OTG port breaks after a few hours in host mode
- on iMX6
-In-Reply-To: <20151008161605.GH32532@n2100.arm.linux.org.uk>
-References: <20151007082222.GB21513@n2100.arm.linux.org.uk>
- <20151008044412.GA8169@shlinux2>
- <BN3PR0301MB0849F94B72B10051ABE9CCA581350@BN3PR0301MB0849.namprd03.prod.outlook.com>
- <20151008161605.GH32532@n2100.arm.linux.org.uk>
-Message-ID: <20151009020849.GD21057@shlinux2>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Fri, 9 Oct 2015 10:23:02 +0800
+Subject: [PATCH v5 0/6] MT8173 IOMMU SUPPORT
+Message-ID: <1444357388-30257-1-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 05:16:06PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Oct 08, 2015 at 09:52:52AM +0000, Peter Chen wrote:
-> > I can't reproduce it for 5 hours, and will change pinmux (do the same
-> > thing with your platform), and do the overnight test.
-> 
+  This patch set adds support for m4u(Multimedia Memory Management Unit),
+Currently it only support the m4u with 2 levels of pagetable on mt8173.
 
-I still not reproduce it.
+  It's based on Robin Murphy's latest ARM64 DMA-v6[1]. The dsti is based
+on MTK clock patch[2].
+ 
+  Please check the hardware block diagram of Mediatek IOMMU.
+ 
+              EMI (External Memory Interface)
+               |
+              m4u (Multimedia Memory Management Unit)
+               |
+              smi (Smart Multimedia Interface)
+               |
+        +---------------+-------
+        |               |
+        |               |
+    vdec larb       disp larb      ... SoCs have different local arbiter(larb).
+        |               |
+        |               |
+   +----+----+    +-----+-----+
+   |    |    |    |     |     |    ...
+   |    |    |    |     |     |    ...
+   |    |    |    |     |     |    ...
+  MC   PP   VLD  OVL0 RDMA0 WDMA0  ... There are different ports in each larb.
+  
+  Normally we specify a local arbiter(larb) for each multimedia hardware like
+display, video decode, video encode and camera. And there are different ports in
+each larb. Take a example, there are some ports like MC, PP, UFO, VLD, AVC_MV,
+PRED_RD in video larb, all the ports are according to the video hardware.
+ 
+  From the diagram, all the multimedia module connect with m4u via smi.
+SMI is responsible to enable/disable iommu and control the clocks for each local
+arbiter. If we would like to enable the iommu of video decode, the video decode
+HW ports have to be configed. And if the video hardware work whether
+enable/disable iommu, it need enable the clock of its larb's clock. And smi also
+help bandwidth control for each local. So we add a special driver for smi and
+locate it drivers/memory.
 
-> There's definitely something weird going on.  Over night last night,
-> I left the Logitech universal receiver in the port, and this morning
-> it was indicating in /proc/interrupts:
-> 
-> 283:         50          0          0          0       GPC  43 Edge      2184000.usb
-> 
-> I removed it, and now I have:
-> 
-> 283:         50          0       1716          0       GPC  43 Edge      2184000.usb
-> 
-> which is increasing at a rate of 90 per minute.
+v5:
+-rebase onto v4.3-rc1.
+-About MTK iommu: don't return the same domain while domain_alloc, change the
+ domain's flow according to the M4U HW.
+-About Short-descriptor: Improve many error-handles, NO_PERMS quirk, and 
+ add TLBI_MAP quirk following Will's Suggestion; Add io-pgtable don't use 
+ dma_to_phys; Add a loop in arm_short_unmap since iommu_unmap don't care the 
+ physical address align.
+-About SMI driver: Add a help funcion for some similar code. Add PROPRE_DEFER
+ for power-domain as MTK SCPSYS is module_init currently.
 
-It is strange your interrupt occurs at cpu2 at that time, and
-so many interrupts during the removal. In order to avoid other
-interrupts occurring during the removal, would you please change
-your dts like below:
+v4: http://lists.linuxfoundation.org/pipermail/iommu/2015-August/013903.html
+-use only one iommu domain here based on the Robin's DMA-v5:
+ http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013900.html
+-remove flush_pgtable.
+-change writel to writel_relaxed.
+-about Short-descriptor: move dma_map_single into io-pgtable-arm-short.
+ Improve the flow of free pgtable and add NO_XN+NO_PERMS quirk following
+ Will's suggestion.
+-Change two sytle issues in dtsi according to Daniel's suggestion.
 
-&usbotg {
-	vbus-supply = <&reg_usb_otg_vbus>;
-	dr_mode = "host";
-	disable-over-current;
-	status = "okay";
-};
+v3: http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013632.html
+-rebased onto v4.2-rc1
+-improve iommu flow based on the Robin's DMA v3:
+ http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013597.html
+-change mtk iommu-cells from 1 to 2.
+-about Short-descriptor: add split function; add self-test; add some other bits like nG,
+ XN according to the spec; add SUPERSECTION and MTK quirk; move io_pgtable_ops_to_pgtable
+ out from LPAE to the header file.
+-about SMI: move from driver/soc/mediatek to driver/memory; change the clocks from
+ clk[2] to clk_apb and clk_smi; add pm.
+-add iommu suspend/resume to backup/restore register.
 
-> 
-> Nothing in the kernel message log indicating why this may be.  It looks
-> like runtime PM doesn't work on this port:
-> 
-> /sys/bus/platform/devices/2184000.usb/power/runtime_active_time:109850496
-> /sys/bus/platform/devices/2184000.usb/power/runtime_status:active
-> /sys/bus/platform/devices/2184000.usb/power/runtime_suspended_time:0
-> 
+v2: http://lists.linuxfoundation.org/pipermail/iommu/2015-May/013028.html
+-add arm short descriptor support.
+-seperate smi common from smi and change the clock-names according
+ to smi HW.
+-delete the hardcode of the port-names in mt8173.
+ replace this with larb-portes-nr in dtsi.
+-fix some coding style issues.
 
-This may be correct, assume your usb receiver does not support runtime
-pm, so the controller is active when it is on the port, when the
-removal, the interrupt occurs so frequently, it has no chance to enter
-suspend status.
+v1: http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000058.html
+-initial version.
 
-> whereas the other port (which has zero interrupts) it does:
-> 
-> /sys/bus/platform/devices/2184200.usb/power/runtime_active_time:16924
-> /sys/bus/platform/devices/2184200.usb/power/runtime_status:suspended
-> /sys/bus/platform/devices/2184200.usb/power/runtime_suspended_time:109861760
-> 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+[1]: http://lists.linuxfoundation.org/pipermail/iommu/2015-October/014504.html
+[2]: http://lists.infradead.org/pipermail/linux-mediatek/2015-August/001962.html
+
+Yong Wu (6):
+  dt-bindings: iommu: Add binding for mediatek IOMMU
+  dt-bindings: mediatek: Add smi dts binding
+  iommu: add ARM short descriptor page table allocator
+  memory: mediatek: Add SMI driver
+  iommu/mediatek: Add mt8173 IOMMU driver
+  dts: mt8173: Add iommu/smi nodes for mt8173
+
+ .../devicetree/bindings/iommu/mediatek,iommu.txt   |  61 ++
+ .../memory-controllers/mediatek,smi-larb.txt       |  25 +
+ .../bindings/memory-controllers/mediatek,smi.txt   |  24 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  81 ++
+ drivers/iommu/Kconfig                              |  33 +
+ drivers/iommu/Makefile                             |   2 +
+ drivers/iommu/io-pgtable-arm-short.c               | 827 +++++++++++++++++++++
+ drivers/iommu/io-pgtable-arm.c                     |   3 -
+ drivers/iommu/io-pgtable.c                         |   3 +
+ drivers/iommu/io-pgtable.h                         |  18 +-
+ drivers/iommu/mtk_iommu.c                          | 767 +++++++++++++++++++
+ drivers/memory/Kconfig                             |   8 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/mtk-smi.c                           | 274 +++++++
+ include/dt-bindings/memory/mt8173-larb-port.h      | 105 +++
+ include/soc/mediatek/smi.h                         |  60 ++
+ 16 files changed, 2288 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/mediatek,smi.txt
+ create mode 100644 drivers/iommu/io-pgtable-arm-short.c
+ create mode 100644 drivers/iommu/mtk_iommu.c
+ create mode 100644 drivers/memory/mtk-smi.c
+ create mode 100644 include/dt-bindings/memory/mt8173-larb-port.h
+ create mode 100644 include/soc/mediatek/smi.h
 
 -- 
-
-Best Regards,
-Peter Chen
+1.8.1.1.dirty
