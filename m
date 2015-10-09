@@ -1,51 +1,60 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Fri, 9 Oct 2015 14:41:19 +0800
-Subject: [PATCH v3 7/7] arm64: ftrace: add arch-specific stack tracer
-In-Reply-To: <1444298504-10392-8-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <201510091403.6zgr6kRc%fengguang.wu@intel.com>
+Date: Fri, 9 Oct 2015 14:46:19 +0800
+Subject: [PATCH v3 3/7] arm64: ftrace: fix a stack tracer's output under
+ function graph tracer
+In-Reply-To: <1444298504-10392-4-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <201510091449.9RhxPRNA%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi AKASHI,
 
-[auto build test WARNING on v4.3-rc4 -- if it's inappropriate base, please ignore]
+[auto build test ERROR on v4.3-rc4 -- if it's inappropriate base, please ignore]
 
-config: arm64-defconfig (attached as .config)
+config: arm64-allmodconfig (attached as .config)
 reproduce:
         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
         make.cross ARCH=arm64 
 
-All warnings (new ones prefixed by >>):
+Note: the linux-review/AKASHI-Takahiro/arm64-ftrace-fix-incorrect-output-from-stack-tracer HEAD f6c03913c640aa1d196348c49f15cfdc264393e0 builds fine.
+      It only hurts bisectibility.
 
-   In file included from arch/arm64/kernel/process.c:53:0:
->> arch/arm64/include/asm/stacktrace.h:28:40: warning: 'struct stack_trace' declared inside parameter list
-    extern void save_stack_trace_sp(struct stack_trace *trace, unsigned long *sp);
-                                           ^
->> arch/arm64/include/asm/stacktrace.h:28:40: warning: its scope is only this definition or declaration, which is probably not what you want
+All errors (new ones prefixed by >>):
 
-vim +28 arch/arm64/include/asm/stacktrace.h
+   arch/arm64/kernel/stacktrace.c: In function 'save_trace':
+>> arch/arm64/kernel/stacktrace.c:93:29: error: 'return_to_handler' undeclared (first use in this function)
+     if (addr == (unsigned long)return_to_handler - AARCH64_INSN_SIZE) {
+                                ^
+   arch/arm64/kernel/stacktrace.c:93:29: note: each undeclared identifier is reported only once for each function it appears in
+>> arch/arm64/kernel/stacktrace.c:101:4: error: invalid use of undefined type 'struct ftrace_ret_stack'
+       current->ret_stack[data->ret_stack_index--].ret
+       ^
+>> arch/arm64/kernel/stacktrace.c:101:22: error: dereferencing pointer to incomplete type
+       current->ret_stack[data->ret_stack_index--].ret
+                         ^
 
-    12	 *
-    13	 * You should have received a copy of the GNU General Public License
-    14	 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-    15	 */
-    16	#ifndef __ASM_STACKTRACE_H
-    17	#define __ASM_STACKTRACE_H
-    18	
-    19	struct stackframe {
-    20		unsigned long fp;
-    21		unsigned long sp;
-    22		unsigned long pc;
-    23	};
-    24	
-    25	extern int unwind_frame(struct stackframe *frame);
-    26	extern void walk_stackframe(struct stackframe *frame,
-    27				    int (*fn)(struct stackframe *, void *), void *data);
-  > 28	extern void save_stack_trace_sp(struct stack_trace *trace, unsigned long *sp);
-    29	
-    30	#endif	/* __ASM_STACKTRACE_H */
+vim +/return_to_handler +93 arch/arm64/kernel/stacktrace.c
+
+    87	{
+    88		struct stack_trace_data *data = d;
+    89		struct stack_trace *trace = data->trace;
+    90		unsigned long addr = frame->pc;
+    91	
+    92	#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+  > 93		if (addr == (unsigned long)return_to_handler - AARCH64_INSN_SIZE) {
+    94			/*
+    95			 * This is a case where function graph tracer has
+    96			 * modified a return address (LR) in a stack frame
+    97			 * to hook a function return.
+    98			 * So replace it to an original value.
+    99			 */
+   100			frame->pc = addr =
+ > 101				current->ret_stack[data->ret_stack_index--].ret
+   102								- AARCH64_INSN_SIZE;
+   103		}
+   104	#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -54,6 +63,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/octet-stream
-Size: 16486 bytes
+Size: 45525 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151009/9176171a/attachment.obj>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151009/8c359503/attachment-0001.obj>
