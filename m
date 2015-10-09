@@ -1,256 +1,117 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  9 Oct 2015 09:42:57 +0100
-Subject: [PATCH v3 5/5] ARM: sun5i: Add C.H.I.P DTS
-In-Reply-To: <1444380177-15302-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1444380177-15302-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1444380177-15302-6-git-send-email-maxime.ripard@free-electrons.com>
+From: Minghuan.Lian@freescale.com (Lian M.H.)
+Date: Fri, 9 Oct 2015 08:46:08 +0000
+Subject: [PATCH 2/2] irqchip/Layerscape: Add Layerscape MSI controller
+ support
+In-Reply-To: <CY1PR0301MB07483282288CA4B9F02D6C3F87340@CY1PR0301MB0748.namprd03.prod.outlook.com>
+References: <1442482127-32674-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1442482127-32674-2-git-send-email-Minghuan.Lian@freescale.com>
+ <CALRxmdChWu7UBK4v4fzuA3KZ5XXRQGoGxAgt_UB0zgJ0ten_uw@mail.gmail.com>
+ <CY1PR0301MB07483282288CA4B9F02D6C3F87340@CY1PR0301MB0748.namprd03.prod.outlook.com>
+Message-ID: <DM2PR0301MB06402FBAD3D7F70BCB1453C5E2340@DM2PR0301MB0640.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The C.H.I.P. is a small SBC with an Allwinner R8, 8GB of NAND, 512MB of
-RAM, USB host and OTG, a wifi / bluetooth combo chip, an audio/video jack
-and two connectors to plug additional boards on top of it.
+Hi Stuart,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/Makefile          |   3 +-
- arch/arm/boot/dts/sun5i-r8-chip.dts | 213 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 215 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun5i-r8-chip.dts
+Please see my comments inline.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 342ab3116feb..bf165ed4e7fa 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -600,7 +600,8 @@ dtb-$(CONFIG_MACH_SUN5I) += \
- 	sun5i-a13-olinuxino.dtb \
- 	sun5i-a13-olinuxino-micro.dtb \
- 	sun5i-a13-q8-tablet.dtb \
--	sun5i-a13-utoo-p66.dtb
-+	sun5i-a13-utoo-p66.dtb \
-+	sun5i-r8-chip.dtb
- dtb-$(CONFIG_MACH_SUN6I) += \
- 	sun6i-a31-app4-evb1.dtb \
- 	sun6i-a31-colombus.dtb \
-diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
-new file mode 100644
-index 000000000000..0d450a828372
---- /dev/null
-+++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
-@@ -0,0 +1,213 @@
-+/*
-+ * Copyright 2015 Free Electrons
-+ * Copyright 2015 NextThing Co
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun5i-r8.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
-+/ {
-+	model = "NextThing C.H.I.P.";
-+	compatible = "nextthing,chip", "allwinner,sun5i-r8";
-+
-+	aliases {
-+		i2c0 = &i2c0;
-+		i2c2 = &i2c2;
-+		serial0 = &uart1;
-+		serial1 = &uart3;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		reg = <0x34>;
-+
-+		/*
-+		 * The interrupt is routed through the "External Fast
-+		 * Interrupt Request" pin (ball G13 of the module)
-+		 * directly to the main interrupt controller, without
-+		 * any other controller interfering.
-+		 */
-+		interrupts = <0>;
-+	};
-+};
-+
-+#include "axp209.dtsi"
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+
-+	xio: gpio at 38 {
-+		compatible = "nxp,pcf8574a";
-+		reg = <0x38>;
-+
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-parent = <&pio>;
-+		interrupts = <6 0 IRQ_TYPE_EDGE_FALLING>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&otg_sram {
-+	status = "okay";
-+};
-+
-+&pio {
-+	chip_vbus_pin: chip_vbus_pin at 0 {
-+		allwinner,pins = "PB10";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	chip_id_det_pin: chip_id_det_pin at 0 {
-+		allwinner,pins = "PG2";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&reg_dcdc2 {
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "cpuvdd";
-+	regulator-always-on;
-+};
-+
-+&reg_dcdc3 {
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1300000>;
-+	regulator-name = "corevdd";
-+	regulator-always-on;
-+};
-+
-+&reg_ldo1 {
-+	regulator-name = "rtcvdd";
-+};
-+
-+&reg_ldo2 {
-+	regulator-min-microvolt = <2700000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "avcc";
-+	regulator-always-on;
-+};
-+
-+&reg_ldo5 {
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+	regulator-name = "vcc-1v8";
-+};
-+
-+&reg_usb0_vbus {
-+	pinctrl-0 = <&chip_vbus_pin>;
-+	vin-supply = <&reg_vcc5v0>;
-+	gpio = <&pio 1 10 GPIO_ACTIVE_HIGH>; /* PB10 */
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins_b>;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins_a>,
-+		    <&uart3_pins_cts_rts_a>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usb_power_supply {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&chip_id_det_pin>;
-+	status = "okay";
-+
-+	usb0_id_det-gpio = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
-+	usb0_vbus_power-supply = <&usb_power_supply>;
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
-+	usb1_vbus-supply = <&reg_vcc5v0>;
-+};
--- 
-2.5.3
+Thanks,
+Minghuan
+
+> -----Original Message-----
+> From: Yoder Stuart-B08248
+> Sent: Friday, October 09, 2015 8:52 AM
+> To: Lian Minghuan-B31939 <Minghuan.Lian@freescale.com>
+> Cc: linux-arm-kernel at lists.infradead.org; Jason Cooper
+> <jason@lakedaemon.net>; Hu Mingkai-B21284 <Mingkai.Hu@freescale.com>;
+> Zang Roy-R61911 <tie-fei.zang@freescale.com>; Thomas Gleixner
+> <tglx@linutronix.de>; Li Yang-Leo-R58472 <LeoLi@freescale.com>
+> Subject: RE: [PATCH 2/2] irqchip/Layerscape: Add Layerscape MSI controller
+> support
+> 
+> 
+> 
+> > -----Original Message-----
+> > From: Stuart Yoder [mailto:b08248 at gmail.com]
+> > Sent: Thursday, October 08, 2015 7:48 PM
+> > To: Yoder Stuart-B08248
+> > Subject: Fwd: [PATCH 2/2] irqchip/Layerscape: Add Layerscape MSI
+> > controller support
+> >
+> > ---------- Forwarded message ----------
+> > From: Minghuan Lian <Minghuan.Lian@freescale.com>
+> > Date: Thu, Sep 17, 2015 at 4:28 AM
+> > Subject: [PATCH 2/2] irqchip/Layerscape: Add Layerscape MSI controller
+> > support
+> > To: linux-arm-kernel at lists.infradead.org
+> > Cc: Jason Cooper <jason@lakedaemon.net>, Hu Mingkai-B21284
+> > <B21284@freescale.com>, Yoder Stuart-B08248
+> > <stuart.yoder@freescale.com>, Zang Roy-R61911 <r61911@freescale.com>,
+> > Minghuan Lian <Minghuan.Lian@freescale.com>, Thomas Gleixner
+> > <tglx@linutronix.de>, Li Yang <leoli@freescale.com>
+> >
+> >
+> > Some SoC of Freescale Layerscape provide a kind of MSI controller
+> > which uses two registers MSIIR and MSIR to support 32 MSI interrupts
+> > for each PCIe controller. The patch is to support it.
+> >
+> > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> > ---
+> >  .../bindings/interrupt-controller/fsl,ls1-msi.txt  |  26 +++
+> >  arch/arm/mach-imx/Kconfig                          |   1 +
+> >  drivers/irqchip/Kconfig                            |   5 +
+> >  drivers/irqchip/Makefile                           |   1 +
+> >  drivers/irqchip/irq-ls1-msi.c                      | 247
+> +++++++++++++++++++++
+> >  5 files changed, 280 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/interrupt-controller/fsl,ls1-msi.txt
+> >  create mode 100644 drivers/irqchip/irq-ls1-msi.c
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls1-msi.t
+> > xt
+> > b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls1-msi.t
+> > xt
+> > new file mode 100644
+> > index 0000000..29296c1
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls1-m
+> > +++ si.txt
+> > @@ -0,0 +1,26 @@
+> > +* Freescale Layerscape PCIe MSI controller
+> > +
+> > +Required properties:
+> > +
+> > +- compatible: should be "fsl,<chip>-msi" to identify
+> > +             Layerscape PCIe MSI controller block.
+> > +- msi-controller: indicates that this is a PCIe MSI controller node
+> > +- reg: Should contain msiir and msir registers location and length.
+> > +       MSIIR is a MSI index register to trigger interrupts.
+> > +       MSIR indicates which of the 32 interrupt sources have pending
+> interrupt.
+> > +- reg-names: should be "msiir" and "msir".
+> > +- interrupts: A interrupt of the controller.
+> > +
+> > +Each PCIe node needs to have property msi-parent that points to MSI
+> > +controller node
+> > +
+> > +Examples:
+> > +
+> > +       msi1: msi-controller1 at 1571000 {
+> > +               compatible = "fsl,1s1043a-msi";
+> > +               reg = <0x0 0x1571000 0x0 0x4>,
+> > +                     <0x0 0x1571004 0x0 0x4>;
+> > +               reg-names = "msiir", "msir";
+> > +               msi-controller;
+> > +               interrupts = <0 116 0x4>;
+> > +       };
+> 
+> Why does this binding explicitly define registers like this?  The 2 registers are
+> in consecutive words, so why isn't a reg property defining both regs enough?
+> Why do you have a reg-names property?  It does not seem to be used by the
+> driver.
+> 
+[Lian Minghuan-B31939] Because the register MSIIR and MSIR on our PowerPC implementation is discontinuous, even the offset between them is different for different MSI controller. So I defines the register separately. Maybe I thought too much. If they are  always continuous on all the Layerscape MSI implementation, I will remove 'reg-names'.
+
+> Stuart
