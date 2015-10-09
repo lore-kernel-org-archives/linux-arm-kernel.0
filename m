@@ -1,60 +1,69 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 9 Oct 2015 11:16:13 -0700
-Subject: [PATCH 3/3] fpga manager: Adding FPGA Manager support for Xilinx
- Zynq 7000
-In-Reply-To: <alpine.DEB.2.10.1510091903240.2257@atull-730U3E-740U3E>
-References: <1444344307-22509-1-git-send-email-moritz.fischer@ettus.com>
- <1444344307-22509-4-git-send-email-moritz.fischer@ettus.com>
- <alpine.DEB.2.10.1510091903240.2257@atull-730U3E-740U3E>
-Message-ID: <20151009181613.GA12738@kroah.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Oct 2015 19:19:29 +0100
+Subject: [PATCH v4 3/6] iommu: add ARM short descriptor page table
+ allocator.
+In-Reply-To: <5617FC5F.60505@arm.com>
+References: <1438597279-2937-1-git-send-email-yong.wu@mediatek.com>
+ <1438597279-2937-4-git-send-email-yong.wu@mediatek.com>
+ <20150916155824.GM28771@arm.com>
+ <1442501662.8145.151.camel@mhfsdcap03>
+ <1442931167.17514.39.camel@mhfsdcap03>
+ <20151009155750.GS26278@arm.com> <5617FC5F.60505@arm.com>
+Message-ID: <20151009181929.GU26278@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 07:09:15PM +0100, atull wrote:
-> On Thu, 8 Oct 2015, Moritz Fischer wrote:
+On Fri, Oct 09, 2015 at 06:41:51PM +0100, Robin Murphy wrote:
+> On 09/10/15 16:57, Will Deacon wrote:
+> >On Tue, Sep 22, 2015 at 03:12:47PM +0100, Yong Wu wrote:
+> >>      I would like to show you a problem I met, The recursion here may
+> >>lead to stack overflow while we test FHD video decode.
+> >>
+> >>     From the log, I get the internal variable in the error case: the
+> >>"size" is 0x100000, the "iova" is 0xfea00000, but at that time the
+> >>"blk_size" is 0x1000 as it was the map of small-page. so it enter the
+> >>recursion here.
+> >>
+> >>     After check the unmap flow, there is only a iommu_unmap in
+> >>__iommu_dma_unmap, and it won't check the physical address align in
+> >>iommu_unmap.
+> >
+> >That sounds like a bug in __iommu_dma_unmap. Robin?
 > 
-> > --- /dev/null
-> > +++ b/drivers/fpga/zynq-fpga.c
-> > @@ -0,0 +1,478 @@
-> > +/*
-> > + * Copyright (c) 2011-2015 Xilinx Inc.
-> > + * Copyright (c) 2015, National Instruments Corp.
-> > + *
-> > + * FPGA Manager Driver for Xilinx Zynq, heavily based on xdevcfg driver
-> > + * in their vendor tree.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; version 2 of the License.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#include <linux/clk.h>
-> > +#include <linux/completion.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/dma-mapping.h>
-> > +#include <linux/fpga/fpga-mgr.h>
-> > +#include <linux/io.h>
-> > +#include <linux/iopoll.h>
-> > +#include <linux/module.h>
-> > +#include <linux/mfd/syscon.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/of_irq.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/pm.h>
-> > +#include <linux/regmap.h>
-> > +#include <linux/string.h>
-> 
-> Hi Moritz,
-> 
-> That was fast!  I just have a couple of very minor comments...
-> 
-> Please alphabetize the #includes.
+> Isn't it just cf27ec930be9 again wearing different trousers? All I do is
+> call iommu_unmap with the same total size that was mapped originally.
 
-Bah, who cares about that, it's not a requirement at all.
+I don't think it's the same as that issue, which was to do with installing
+block mappings over the top of an existing table entry. The problem here
+seems to be that we don't walk the page table properly on unmap.
 
-greg k-h
+The long descriptor code has:
+
+	/* If the size matches this level, we're in the right place */
+	if (size == blk_size) {
+		__arm_lpae_set_pte(ptep, 0, &data->iop.cfg);
+
+		if (!iopte_leaf(pte, lvl)) {
+			/* Also flush any partial walks */
+			tlb->tlb_add_flush(iova, size, false, cookie);
+			tlb->tlb_sync(cookie);
+			ptep = iopte_deref(pte, data);
+			__arm_lpae_free_pgtable(data, lvl + 1, ptep);
+		} else {
+			tlb->tlb_add_flush(iova, size, true, cookie);
+		}
+
+		return size;
+	} else if (iopte_leaf(pte, lvl)) {
+		/*
+		 * Insert a table at the next level to map the old region,
+		 * minus the part we want to unmap
+		 */
+		return arm_lpae_split_blk_unmap(data, iova, size,
+						iopte_prot(pte), lvl, ptep,
+						blk_size);
+	}
+
+why doesn't something similar work for short descriptors?
+
+Will
