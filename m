@@ -1,302 +1,95 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri,  9 Oct 2015 08:05:31 +0000
-Subject: [PATCH] clk: atlas7: merge lots of discrete clocks into arrays
-Message-ID: <1444377931-5178-1-git-send-email-21cnbao@gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Fri, 9 Oct 2015 10:57:53 +0300
+Subject: [PATCH v2] mmc: core: Fix init_card in 52Mhz
+In-Reply-To: <CAPDyKFoWWMXC-DECqhw=EXerid5toWKxr4uLq0WevPo8LrrDqw@mail.gmail.com>
+References: <1444288147-24013-1-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFqrjP3-y+ucm5ybwXefsDLOYcPF9XqMciwhRkjD5NXLBg@mail.gmail.com>
+ <56166988.20900@intel.com>
+ <CAPDyKFoWWMXC-DECqhw=EXerid5toWKxr4uLq0WevPo8LrrDqw@mail.gmail.com>
+Message-ID: <56177381.9020509@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guo Zeng <Guo.Zeng@csr.com>
+On 08/10/15 16:35, Ulf Hansson wrote:
+> On 8 October 2015 at 15:03, Adrian Hunter <adrian.hunter@intel.com> wrote:
+>> On 08/10/15 13:59, Ulf Hansson wrote:
+>>> On 8 October 2015 at 09:09, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+>>>> Suppose that we got a data crc error, and it triggers the mmc_reset.
+>>>> mmc_reset will call mmc_send_status to see if HW reset was supported.
+>>>> before issue CMD13, it will do retune, and if EMMC was in HS400 mode,
+>>>> it will reduce frequency to 52Mhz firstly, then results in card init
+>>>> was doing at 52Mhz.
+>>>> The mmc_send_status was originally only done for mmc_test, so if retune
+>>>> needed, do not call mmc_send_status.
+>>>>
+>>>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+>>>> Suggested-by: Adrian Hunter <adrian.hunter@intel.com>
+>>>> ---
+>>>>  drivers/mmc/card/mmc_test.c | 6 ++++++
+>>>>  drivers/mmc/core/mmc.c      | 2 +-
+>>>>  2 files changed, 7 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
+>>>> index b78cf5d..2f78bfb 100644
+>>>> --- a/drivers/mmc/card/mmc_test.c
+>>>> +++ b/drivers/mmc/card/mmc_test.c
+>>>> @@ -2272,6 +2272,12 @@ static int mmc_test_hw_reset(struct mmc_test_card *test)
+>>>>         if (!mmc_card_mmc(card) || !mmc_can_reset(card))
+>>>>                 return RESULT_UNSUP_CARD;
+>>>>
+>>>> +       if (host->need_retune) {
+>>>> +               pr_info("%s: cannot test hw reset because retune needed\n",
+>>>> +                       mmc_hostname(test->card->host));
+>>>> +               return RESULT_FAIL;
+>>>> +       }
+>>>> +
+>>>>         err = mmc_hw_reset(host);
+>>>>         if (!err)
+>>>>                 return RESULT_OK;
+>>>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>>>> index e726903..647c96d 100644
+>>>> --- a/drivers/mmc/core/mmc.c
+>>>> +++ b/drivers/mmc/core/mmc.c
+>>>> @@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
+>>>>         host->ops->hw_reset(host);
+>>>>
+>>>>         /* If the reset has happened, then a status command will fail */
+>>>> -       if (!mmc_send_status(card, &status)) {
+>>>> +       if (!host->need_retune && !mmc_send_status(card, &status)) {
+>>>
+>>> No, this seem like the wrong solution! The main purpose of mmc_reset()
+>>> is to try to reset and re-initiate the card, to make it operational
+>>> again.
+>>>
+>>> I can't find a good reason to why we want to do a mmc_send_status() at
+>>> this point, as even if it succeeds it will only tell us that the card
+>>> has not been "hw-reset". No matter what, we should still try to make
+>>> it fully operational again and thus give mmc_init_card() a try.
+>>>
+>>> >From this reasoning, I suggest we remove the call to mmc_send_status()
+>>> from this path, as that will also address your issue with CRC errors
+>>> in combination with re-tune.
+>>
+>> Then you need to remove the hw_reset test from mmc_test.  Refer:
+>>
+>>         http://marc.info/?l=linux-mmc&m=144360165906544&w=2
+>>
+> 
+> I realize that the test becomes a bit different, but I don't think it's useless.
+> 
+> If we add a check for MMC_CAP_HW_RESET and verify that the
+> host->ops->hw_reset exists, then we can assume that the "hw_reset"
+> sequence has executed. And if mmc_init_card() fails, that would
+> probably mean that the reset also failed, right?
 
-this patch merges lots of discrete dividers, divider tables and dto
-into arrays, then drops lots of codes.
+In the test case, the card is in a working state.  Generally I would then
+expect reinitialization to work irrespective of whether or not the hardware
+is actually reset.
 
-Signed-off-by: Guo Zeng <Guo.Zeng@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/clk/sirf/clk-atlas7.c | 211 ++++++++++--------------------------------
- 1 file changed, 47 insertions(+), 164 deletions(-)
-
-diff --git a/drivers/clk/sirf/clk-atlas7.c b/drivers/clk/sirf/clk-atlas7.c
-index 957aae6..6c6cbe4 100644
---- a/drivers/clk/sirf/clk-atlas7.c
-+++ b/drivers/clk/sirf/clk-atlas7.c
-@@ -211,6 +211,8 @@
- #define SIRFSOC_NOC_CLK_SLVRDY_CLR		0x02EC
- #define SIRFSOC_NOC_CLK_IDLE_STATUS		0x02F4
- 
-+#define SIRFSOC_DIVIDOR_TYPE_TABLE	0x1
-+
- struct clk_pll {
- 	struct clk_hw hw;
- 	u16 regofs;  /* register offset */
-@@ -653,6 +655,12 @@ static struct clk_dto clk_disp1_dto = {
- 	},
- };
- 
-+static struct clk_dto *dto_list[] __initdata = {
-+	&clk_audio_dto,
-+	&clk_disp0_dto,
-+	&clk_disp1_dto,
-+};
-+
- static struct atlas7_div_init_data divider_list[] __initdata = {
- 	/* div_name, parent_name, gate_name, clk_flag, divider_flag, gate_flag, div_offset, shift, wdith, gate_offset, bit_enable, lock */
- 	{ "sys0pll_qa1", "sys0pll_fixdiv", "sys0pll_a1", 0, 0, 0, SIRFSOC_CLKC_USBPHY_CLKDIV_CFG, 0, 6, SIRFSOC_CLKC_USBPHY_CLKDIV_ENA, 0, &usbphy_div_lock },
-@@ -719,6 +727,24 @@ static struct atlas7_div_init_data divider_list[] __initdata = {
- 	{ "sys2pll_qa20", "sys2pll_fixdiv", "sys2pll_a20", 0, 0, 0, SIRFSOC_CLKC_SHARED_DIVIDER_CFG0, 0, 6, SIRFSOC_CLKC_SHARED_DIVIDER_ENA, 0, &share_div_lock },
- 	{ "sys1pll_qa17", "sys1pll_fixdiv", "sys1pll_a17", 0, 0, CLK_IGNORE_UNUSED, SIRFSOC_CLKC_SHARED_DIVIDER_CFG1, 8, 6, SIRFSOC_CLKC_SHARED_DIVIDER_ENA, 20, &share_div_lock },
- 	{ "sys0pll_qa20", "sys0pll_fixdiv", "sys0pll_a20", 0, 0, 0, SIRFSOC_CLKC_SHARED_DIVIDER_CFG1, 0, 6, SIRFSOC_CLKC_SHARED_DIVIDER_ENA, 16, &share_div_lock },
-+	{ "sys0pll_div1", "sys0pll_vco", "sys0pll_clk1", 1, 0, 0, SIRFSOC_CLKC_SYS0PLL_AB_CTRL1, 0, 3, SIRFSOC_CLKC_SYS0PLL_AB_CTRL1, 12, &sys0pll_ctrl1_lock },
-+	{ "sys0pll_div2", "sys0pll_vco", "sys0pll_clk2", 1, 0, 0, SIRFSOC_CLKC_SYS0PLL_AB_CTRL1, 4, 3, SIRFSOC_CLKC_SYS0PLL_AB_CTRL1, 13, &sys0pll_ctrl1_lock },
-+	{ "sys0pll_div3", "sys0pll_vco", "sys0pll_clk3", 1, 0, 0, SIRFSOC_CLKC_SYS0PLL_AB_CTRL1, 8, 3, SIRFSOC_CLKC_SYS0PLL_AB_CTRL1, 14, &sys0pll_ctrl1_lock },
-+	{ "sys1pll_div1", "sys1pll_vco", "sys1pll_clk1", 1, 0, 0, SIRFSOC_CLKC_SYS1PLL_AB_CTRL1, 0, 3, SIRFSOC_CLKC_SYS1PLL_AB_CTRL1, 12, &sys1pll_ctrl1_lock },
-+	{ "sys1pll_div2", "sys1pll_vco", "sys1pll_clk2", 1, 0, 0, SIRFSOC_CLKC_SYS1PLL_AB_CTRL1, 4, 3, SIRFSOC_CLKC_SYS1PLL_AB_CTRL1, 13, &sys1pll_ctrl1_lock },
-+	{ "sys1pll_div3", "sys1pll_vco", "sys1pll_clk3", 1, 0, 0, SIRFSOC_CLKC_SYS1PLL_AB_CTRL1, 8, 3, SIRFSOC_CLKC_SYS1PLL_AB_CTRL1, 14, &sys1pll_ctrl1_lock },
-+	{ "sys2pll_div1", "sys2pll_vco", "sys2pll_clk1", 1, 0, 0, SIRFSOC_CLKC_SYS2PLL_AB_CTRL1, 0, 3, SIRFSOC_CLKC_SYS2PLL_AB_CTRL1, 12, &sys2pll_ctrl1_lock },
-+	{ "sys2pll_div2", "sys2pll_vco", "sys2pll_clk2", 1, 0, 0, SIRFSOC_CLKC_SYS2PLL_AB_CTRL1, 4, 3, SIRFSOC_CLKC_SYS2PLL_AB_CTRL1, 13, &sys2pll_ctrl1_lock },
-+	{ "sys2pll_div3", "sys2pll_vco", "sys2pll_clk3", 1, 0, 0, SIRFSOC_CLKC_SYS2PLL_AB_CTRL1, 8, 3, SIRFSOC_CLKC_SYS2PLL_AB_CTRL1, 14, &sys2pll_ctrl1_lock },
-+	{ "sys3pll_div1", "sys3pll_vco", "sys3pll_clk1", 1, 0, 0, SIRFSOC_CLKC_SYS3PLL_AB_CTRL1, 0, 3, SIRFSOC_CLKC_SYS3PLL_AB_CTRL1, 12, &sys3pll_ctrl1_lock },
-+	{ "sys3pll_div2", "sys3pll_vco", "sys3pll_clk2", 1, 0, 0, SIRFSOC_CLKC_SYS3PLL_AB_CTRL1, 4, 3, SIRFSOC_CLKC_SYS3PLL_AB_CTRL1, 13, &sys3pll_ctrl1_lock },
-+	{ "sys3pll_div3", "sys3pll_vco", "sys3pll_clk3", 1, 0, 0, SIRFSOC_CLKC_SYS3PLL_AB_CTRL1, 8, 3, SIRFSOC_CLKC_SYS3PLL_AB_CTRL1, 14, &sys3pll_ctrl1_lock },
-+	{ "cpupll_div1", "cpupll_vco", "cpupll_clk1", 1, 0, 0, SIRFSOC_CLKC_CPUPLL_AB_CTRL1, 0, 3, SIRFSOC_CLKC_CPUPLL_AB_CTRL1, 12, &cpupll_ctrl1_lock },
-+	{ "cpupll_div2", "cpupll_vco", "cpupll_clk2", 1, 0, 0, SIRFSOC_CLKC_CPUPLL_AB_CTRL1, 4, 3, SIRFSOC_CLKC_CPUPLL_AB_CTRL1, 13, &cpupll_ctrl1_lock },
-+	{ "cpupll_div3", "cpupll_vco", "cpupll_clk3", 1, 0, 0, SIRFSOC_CLKC_CPUPLL_AB_CTRL1, 8, 3, SIRFSOC_CLKC_CPUPLL_AB_CTRL1, 14, &cpupll_ctrl1_lock },
-+	{ "mempll_div1", "mempll_vco", "mempll_clk1", 1, 0, 0, SIRFSOC_CLKC_MEMPLL_AB_CTRL1, 0, 3, SIRFSOC_CLKC_MEMPLL_AB_CTRL1, 12, &mempll_ctrl1_lock },
-+	{ "mempll_div2", "mempll_vco", "mempll_clk2", 1, 0, 0, SIRFSOC_CLKC_MEMPLL_AB_CTRL1, 4, 3, SIRFSOC_CLKC_MEMPLL_AB_CTRL1, 13, &mempll_ctrl1_lock },
-+	{ "mempll_div3", "mempll_vco", "mempll_clk3", 1, 0, 0, SIRFSOC_CLKC_MEMPLL_AB_CTRL1, 8, 3, SIRFSOC_CLKC_MEMPLL_AB_CTRL1, 14, &mempll_ctrl1_lock },
- };
- 
- static const char * const i2s_clk_parents[] = {
-@@ -1199,7 +1225,8 @@ static struct atlas7_unit_init_data unit_list[] __initdata = {
- 	{ 141, "thcgum_sys", "sys_mux", 0, SIRFSOC_CLKC_LEAF_CLK_EN0_SET, 3, 0, 0, &leaf0_gate_lock },
- };
- 
--static struct clk *atlas7_clks[ARRAY_SIZE(unit_list) + ARRAY_SIZE(mux_list)];
-+static struct clk *atlas7_clks[ARRAY_SIZE(unit_list) + ARRAY_SIZE(mux_list) +
-+			ARRAY_SIZE(divider_list) + ARRAY_SIZE(dto_list)];
- 
- static int unit_clk_is_enabled(struct clk_hw *hw)
- {
-@@ -1461,88 +1488,14 @@ static void __init atlas7_clk_init(struct device_node *np)
- 	clk = clk_register(NULL, &clk_sys3pll.hw);
- 	BUG_ON(!clk);
- 
--	clk = clk_register_divider_table(NULL, "cpupll_div1", "cpupll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_CPUPLL_AB_CTRL1, 0, 3, 0,
--			 pll_div_table, &cpupll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_divider_table(NULL, "cpupll_div2", "cpupll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_CPUPLL_AB_CTRL1, 4, 3, 0,
--			 pll_div_table, &cpupll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_divider_table(NULL, "cpupll_div3", "cpupll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_CPUPLL_AB_CTRL1, 8, 3, 0,
--			 pll_div_table, &cpupll_ctrl1_lock);
--	BUG_ON(!clk);
--
--	clk = clk_register_divider_table(NULL, "mempll_div1", "mempll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_MEMPLL_AB_CTRL1, 0, 3, 0,
--			 pll_div_table, &mempll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_divider_table(NULL, "mempll_div2", "mempll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_MEMPLL_AB_CTRL1, 4, 3, 0,
--			 pll_div_table, &mempll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_divider_table(NULL, "mempll_div3", "mempll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_MEMPLL_AB_CTRL1, 8, 3, 0,
--			 pll_div_table, &mempll_ctrl1_lock);
--	BUG_ON(!clk);
--
--	clk = clk_register_divider_table(NULL, "sys0pll_div1", "sys0pll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS0PLL_AB_CTRL1, 0, 3, 0,
--			 pll_div_table, &sys0pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_divider_table(NULL, "sys0pll_div2", "sys0pll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS0PLL_AB_CTRL1, 4, 3, 0,
--			 pll_div_table, &sys0pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_divider_table(NULL, "sys0pll_div3", "sys0pll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS0PLL_AB_CTRL1, 8, 3, 0,
--			 pll_div_table, &sys0pll_ctrl1_lock);
--	BUG_ON(!clk);
- 	clk = clk_register_fixed_factor(NULL, "sys0pll_fixdiv", "sys0pll_vco",
- 					CLK_SET_RATE_PARENT, 1, 2);
--
--	clk = clk_register_divider_table(NULL, "sys1pll_div1", "sys1pll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS1PLL_AB_CTRL1, 0, 3, 0,
--			 pll_div_table, &sys1pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_divider_table(NULL, "sys1pll_div2", "sys1pll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS1PLL_AB_CTRL1, 4, 3, 0,
--			 pll_div_table, &sys1pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_divider_table(NULL, "sys1pll_div3", "sys1pll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS1PLL_AB_CTRL1, 8, 3, 0,
--			 pll_div_table, &sys1pll_ctrl1_lock);
- 	BUG_ON(!clk);
- 	clk = clk_register_fixed_factor(NULL, "sys1pll_fixdiv", "sys1pll_vco",
- 					CLK_SET_RATE_PARENT, 1, 2);
--
--	clk = clk_register_divider_table(NULL, "sys2pll_div1", "sys2pll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS2PLL_AB_CTRL1, 0, 3, 0,
--			 pll_div_table, &sys2pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_divider_table(NULL, "sys2pll_div2", "sys2pll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS2PLL_AB_CTRL1, 4, 3, 0,
--			 pll_div_table, &sys2pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_divider_table(NULL, "sys2pll_div3", "sys2pll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS2PLL_AB_CTRL1, 8, 3, 0,
--			 pll_div_table, &sys2pll_ctrl1_lock);
- 	BUG_ON(!clk);
- 	clk = clk_register_fixed_factor(NULL, "sys2pll_fixdiv", "sys2pll_vco",
- 					CLK_SET_RATE_PARENT, 1, 2);
--
--	clk = clk_register_divider_table(NULL, "sys3pll_div1", "sys3pll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS3PLL_AB_CTRL1, 0, 3, 0,
--			 pll_div_table, &sys3pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_divider_table(NULL, "sys3pll_div2", "sys3pll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS3PLL_AB_CTRL1, 4, 3, 0,
--			 pll_div_table, &sys3pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_divider_table(NULL, "sys3pll_div3", "sys3pll_vco", 0,
--			 sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS3PLL_AB_CTRL1, 8, 3, 0,
--			 pll_div_table, &sys3pll_ctrl1_lock);
- 	BUG_ON(!clk);
- 	clk = clk_register_fixed_factor(NULL, "sys3pll_fixdiv", "sys3pll_vco",
- 					CLK_SET_RATE_PARENT, 1, 2);
-@@ -1552,104 +1505,33 @@ static void __init atlas7_clk_init(struct device_node *np)
- 					CLK_SET_RATE_PARENT, 1, 4);
- 
- 	BUG_ON(!clk);
--	clk = clk_register_gate(NULL, "cpupll_clk1", "cpupll_div1",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_CPUPLL_AB_CTRL1,
--				12, 0, &cpupll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_gate(NULL, "cpupll_clk2", "cpupll_div2",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_CPUPLL_AB_CTRL1,
--				13, 0, &cpupll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_gate(NULL, "cpupll_clk3", "cpupll_div3",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_CPUPLL_AB_CTRL1,
--				14, 0, &cpupll_ctrl1_lock);
--	BUG_ON(!clk);
--
--	clk = clk_register_gate(NULL, "mempll_clk1", "mempll_div1",
--		CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
--		sirfsoc_clk_vbase + SIRFSOC_CLKC_MEMPLL_AB_CTRL1,
--		12, 0, &mempll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_gate(NULL, "mempll_clk2", "mempll_div2",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_MEMPLL_AB_CTRL1,
--				13, 0, &mempll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_gate(NULL, "mempll_clk3", "mempll_div3",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_MEMPLL_AB_CTRL1,
--				14, 0, &mempll_ctrl1_lock);
--	BUG_ON(!clk);
--
--	clk = clk_register_gate(NULL, "sys0pll_clk1", "sys0pll_div1",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS0PLL_AB_CTRL1,
--				12, 0, &sys0pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_gate(NULL, "sys0pll_clk2", "sys0pll_div2",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS0PLL_AB_CTRL1,
--				13, 0, &sys0pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_gate(NULL, "sys0pll_clk3", "sys0pll_div3",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS0PLL_AB_CTRL1,
--				14, 0, &sys0pll_ctrl1_lock);
--	BUG_ON(!clk);
--
--	clk = clk_register_gate(NULL, "sys1pll_clk1", "sys1pll_div1",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS1PLL_AB_CTRL1,
--				12, 0, &sys1pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_gate(NULL, "sys1pll_clk2", "sys1pll_div2",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS1PLL_AB_CTRL1,
--				13, 0, &sys1pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_gate(NULL, "sys1pll_clk3", "sys1pll_div3",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS1PLL_AB_CTRL1,
--				14, 0, &sys1pll_ctrl1_lock);
--	BUG_ON(!clk);
- 
--	clk = clk_register_gate(NULL, "sys2pll_clk1", "sys2pll_div1",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS2PLL_AB_CTRL1,
--				12, 0, &sys2pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_gate(NULL, "sys2pll_clk2", "sys2pll_div2",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS2PLL_AB_CTRL1,
--				13, 0, &sys2pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_gate(NULL, "sys2pll_clk3", "sys2pll_div3",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS2PLL_AB_CTRL1,
--				14, 0, &sys2pll_ctrl1_lock);
--	BUG_ON(!clk);
--
--	clk = clk_register_gate(NULL, "sys3pll_clk1", "sys3pll_div1",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS3PLL_AB_CTRL1,
--				12, 0, &sys3pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_gate(NULL, "sys3pll_clk2", "sys3pll_div2",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS3PLL_AB_CTRL1,
--				13, 0, &sys3pll_ctrl1_lock);
--	BUG_ON(!clk);
--	clk = clk_register_gate(NULL, "sys3pll_clk3", "sys3pll_div3",
--		CLK_SET_RATE_PARENT, sirfsoc_clk_vbase + SIRFSOC_CLKC_SYS3PLL_AB_CTRL1,
--				14, 0, &sys3pll_ctrl1_lock);
--	BUG_ON(!clk);
--
--	clk = clk_register(NULL, &clk_audio_dto.hw);
--	BUG_ON(!clk);
--
--	clk = clk_register(NULL, &clk_disp0_dto.hw);
--	BUG_ON(!clk);
-+	for (i = 0; i < ARRAY_SIZE(dto_list); i++) {
-+		clk = clk_register(NULL, &dto_list[i]->hw);
-+		BUG_ON(!clk);
- 
--	clk = clk_register(NULL, &clk_disp1_dto.hw);
--	BUG_ON(!clk);
-+		atlas7_clks[ARRAY_SIZE(unit_list) + ARRAY_SIZE(mux_list) +
-+			ARRAY_SIZE(divider_list) + i] = clk;
-+	}
- 
- 	for (i = 0; i < ARRAY_SIZE(divider_list); i++) {
- 		div = &divider_list[i];
--		clk = clk_register_divider(NULL, div->div_name,
--			div->parent_name, div->divider_flags, sirfsoc_clk_vbase + div->div_offset,
--			div->shift, div->width, 0, div->lock);
-+		if (div->flags == SIRFSOC_DIVIDOR_TYPE_TABLE)
-+			clk = clk_register_divider_table(NULL, div->div_name,
-+				div->parent_name, div->divider_flags, sirfsoc_clk_vbase + div->div_offset,
-+				div->shift, div->width, 0, pll_div_table, div->lock);
-+		else
-+			clk = clk_register_divider(NULL, div->div_name,
-+				div->parent_name, div->divider_flags, sirfsoc_clk_vbase + div->div_offset,
-+				div->shift, div->width, 0, div->lock);
- 		BUG_ON(!clk);
-+
- 		clk = clk_register_gate(NULL, div->gate_name, div->div_name,
- 			div->gate_flags, sirfsoc_clk_vbase + div->gate_offset,
- 				div->gate_bit, 0, div->lock);
- 		BUG_ON(!clk);
-+
-+		atlas7_clks[ARRAY_SIZE(unit_list) + ARRAY_SIZE(mux_list) + i] = clk;
- 	}
- 	/* ignore selector status register check */
- 	for (i = 0; i < ARRAY_SIZE(mux_list); i++) {
-@@ -1671,7 +1553,8 @@ static void __init atlas7_clk_init(struct device_node *np)
- 	}
- 
- 	clk_data.clks = atlas7_clks;
--	clk_data.clk_num = ARRAY_SIZE(unit_list) + ARRAY_SIZE(mux_list);
-+	clk_data.clk_num = ARRAY_SIZE(unit_list) + ARRAY_SIZE(mux_list) +
-+		ARRAY_SIZE(divider_list) + ARRAY_SIZE(dto_list);
- 
- 	ret = of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
- 	BUG_ON(ret);
--- 
-1.9.1
+Here are some other options:
+	1. have mmc_test hook the host->ops->hw_reset() fn and do the send_status
+itself.
+	2. have mmc_test set a flag on the card that it is being tested
+and only do the send_status if the flag is set
+	3. remove the send_status call and rename the mmc_test from "eMMC hardware
+reset" to just "Reset test (doesn't check hw reset did reset)"
