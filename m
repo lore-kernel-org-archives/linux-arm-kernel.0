@@ -1,82 +1,42 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 09 Oct 2015 18:16:36 -0400
-Subject: [PATCH 11/20] sound, skylake: switch from ioremap_cache to memremap
+Date: Fri, 09 Oct 2015 18:16:57 -0400
+Subject: [PATCH 15/20] sfi: switch from ioremap_cache to memremap
 In-Reply-To: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
 References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <20151009221635.32203.30755.stgit@dwillia2-desk3.jf.intel.com>
+Message-ID: <20151009221657.32203.42989.stgit@dwillia2-desk3.jf.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for deprecating ioremap_cache() convert its usage in
-skl-nhlt to memremap.
+In preparation for deprecating ioremap_cache() convert its usage in sfi
+to memremap.  It's a bit awkward that we go and add back a fake __iomem
+annotation, but this is to keep consistency with early_ioremap() which
+does not have a 'memremap' flavor.
 
-Cc: Liam Girdwood <lgirdwood@gmail.com>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Jaroslav Kysela <perex@perex.cz>
-Cc: Takashi Iwai <tiwai@suse.com>
-Cc: Jeeja KP <jeeja.kp@intel.com>
+Cc: Len Brown <lenb@kernel.org>
 Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
- sound/soc/intel/skylake/skl-nhlt.c |   10 +++++-----
- sound/soc/intel/skylake/skl.h      |    6 +++---
- 2 files changed, 8 insertions(+), 8 deletions(-)
+ drivers/sfi/sfi_core.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/intel/skylake/skl-nhlt.c b/sound/soc/intel/skylake/skl-nhlt.c
-index 13036b19d7e5..b0c7bd113aac 100644
---- a/sound/soc/intel/skylake/skl-nhlt.c
-+++ b/sound/soc/intel/skylake/skl-nhlt.c
-@@ -25,7 +25,7 @@ static u8 OSC_UUID[16] = {0x6E, 0x88, 0x9F, 0xA6, 0xEB, 0x6C, 0x94, 0x45,
+diff --git a/drivers/sfi/sfi_core.c b/drivers/sfi/sfi_core.c
+index 296db7a69c27..d9430b845dfa 100644
+--- a/drivers/sfi/sfi_core.c
++++ b/drivers/sfi/sfi_core.c
+@@ -101,7 +101,7 @@ static void __iomem * __ref sfi_map_memory(u64 phys, u32 size)
+ 		return NULL;
  
- #define DSDT_NHLT_PATH "\\_SB.PCI0.HDAS"
- 
--void __iomem *skl_nhlt_init(struct device *dev)
-+void *skl_nhlt_init(struct device *dev)
- {
- 	acpi_handle handle;
- 	union acpi_object *obj;
-@@ -40,17 +40,17 @@ void __iomem *skl_nhlt_init(struct device *dev)
- 	if (obj && obj->type == ACPI_TYPE_BUFFER) {
- 		nhlt_ptr = (struct nhlt_resource_desc  *)obj->buffer.pointer;
- 
--		return ioremap_cache(nhlt_ptr->min_addr, nhlt_ptr->length);
-+		return memremap(nhlt_ptr->min_addr, nhlt_ptr->length,
-+				MEMREMAP_WB);
- 	}
- 
- 	dev_err(dev, "device specific method to extract NHLT blob failed\n");
- 	return NULL;
+ 	if (sfi_use_ioremap)
+-		return ioremap_cache(phys, size);
++		return (void __iomem *) memremap(phys, size, MEMREMAP_WB);
+ 	else
+ 		return early_ioremap(phys, size);
  }
+@@ -112,7 +112,7 @@ static void __ref sfi_unmap_memory(void __iomem *virt, u32 size)
+ 		return;
  
--void skl_nhlt_free(void __iomem *addr)
-+void skl_nhlt_free(void *addr)
- {
--	iounmap(addr);
--	addr = NULL;
-+	memunmap(addr);
+ 	if (sfi_use_ioremap)
+-		iounmap(virt);
++		memunmap((void __force *) virt);
+ 	else
+ 		early_iounmap(virt, size);
  }
- 
- static struct nhlt_specific_cfg *skl_get_specific_cfg(
-diff --git a/sound/soc/intel/skylake/skl.h b/sound/soc/intel/skylake/skl.h
-index f7fdbb02947f..551c6db25f34 100644
---- a/sound/soc/intel/skylake/skl.h
-+++ b/sound/soc/intel/skylake/skl.h
-@@ -55,7 +55,7 @@ struct skl {
- 	unsigned int init_failed:1; /* delayed init failed */
- 	struct platform_device *dmic_dev;
- 
--	void __iomem *nhlt; /* nhlt ptr */
-+	void *nhlt; /* nhlt ptr */
- 	struct skl_sst *skl_sst; /* sst skl ctx */
- };
- 
-@@ -72,8 +72,8 @@ struct skl_dma_params {
- int skl_platform_unregister(struct device *dev);
- int skl_platform_register(struct device *dev);
- 
--void __iomem *skl_nhlt_init(struct device *dev);
--void skl_nhlt_free(void __iomem *addr);
-+void *skl_nhlt_init(struct device *dev);
-+void skl_nhlt_free(void *addr);
- struct nhlt_specific_cfg *skl_get_ep_blob(struct skl *skl, u32 instance,
- 			u8 link_type, u8 s_fmt, u8 no_ch, u32 s_rate, u8 dirn);
- 
