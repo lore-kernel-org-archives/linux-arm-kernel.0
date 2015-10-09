@@ -1,74 +1,53 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 9 Oct 2015 15:17:44 +0100
-Subject: [GIT PULL][1/2] ARM System Control and Power Interface(SCPI) support
-Message-ID: <20151009141744.GC28928@e103737-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 09 Oct 2015 15:18:03 +0100
+Subject: [PATCH v3] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <8520D5D51A55D047800579B09414719801690DEC@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1444146289-28940-1-git-send-email-bharatku@xilinx.com>
+ <5613F310.6060305@arm.com>
+ <8520D5D51A55D047800579B09414719801690DEC@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <5617CC9B.7070405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+On 09/10/15 14:47, Bharat Kumar Gogada wrote:
+>> Hi Bharat,
+>>>> Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
+>>> 
+>>> +/* SSPL ERROR */ +#define SLVERR					0x02 +#define DECERR
+>>> 0x03 + +struct nwl_msi {			/* struct nwl_msi - MSI information
+>> */
+>>> +	struct msi_controller chip;	/* chip: MSI controller */
+>> 
+>> We're moving away from msi_controller altogether, as the kernel now
+>> has all the necessary infrastructure to do this properly.
+>> 
+>> Please convert this driver to msi domains (see
+>> drivers/pci/host/pci-xgene- msi.c or the gic-v2m driver as examples
+>> of how this is being done).
+> 
+> As suggested I have gone through the code in pci-gene-msi.c for msi
+> domains, and have gone through IRQ Domain documentation. I mainly
+> observe when we have more than one interrupt controller involved 
+> between device and cpu we use "Hierarchy IRQ domain" (parent and
+> child msi domains). But in our case we don't have any such Hierarchy
+> and we have single interrupt controller. In such case is it necessary
+> to use multiple domains in software which actually isn't case in
+> hardware.
 
-Please consider pulling the following commits for v4.4.
+This is not optional. The generic MSI domain is stacked on top of the
+one that drives the HW. Which is exactly the XGene case. Your case is
+not different in any way, and the exact same methods apply:
 
-Regards,
-Sudeep
+	MSI -> RandomHW -> Interrupt controller (GIC)
 
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+We can argue about it as long as you want, but there is no way we're
+adding more msi_controller madness to the tree. It took us a long time,
+but we now have a generic way to do MSIs in the kernel, and you need to
+use it, not sidestep it.
 
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+Thanks,
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/arm-scpi-for-v4.4
-
-for you to fetch changes up to 68acc77a2d5197141ba376fd8872eccb43bfcd7d:
-
-  hwmon: Support thermal zones registration for SCP temperature sensors (2015-10-09 11:05:53 +0100)
-
-----------------------------------------------------------------
-ARM System Control and Power Interface(SCPI) support
-
-It adds support for the following features provided by SCP firmware
-using different subsystems in Linux:
-  1. SCPI mailbox protocol driver which using mailbox framework
-  2. Clocks provided by SCP using clock framework
-  3. CPU DVFS(cpufreq) using existing arm-big-little driver
-  4. SCPI based sensors including temperature sensors
-
-----------------------------------------------------------------
-Punit Agrawal (4):
-      Documentation: add DT bindings for ARM SCPI sensors
-      firmware: arm_scpi: Extend to support sensors
-      hwmon: Support sensors exported via ARM SCP interface
-      hwmon: Support thermal zones registration for SCP temperature sensors
-
-Sudeep Holla (5):
-      Documentation: add DT binding for ARM System Control and Power Interface(SCPI) protocol
-      firmware: add support for ARM System Control and Power Interface(SCPI) protocol
-      clk: add support for clocks provided by SCP(System Control Processor)
-      clk: scpi: add support for cpufreq virtual device
-      cpufreq: arm_big_little: add SCPI interface driver
-
- Documentation/devicetree/bindings/arm/arm,scpi.txt | 188 +++++
- Documentation/hwmon/scpi-hwmon                     |  33 +
- MAINTAINERS                                        |  10 +
- drivers/clk/Kconfig                                |  10 +
- drivers/clk/Makefile                               |   1 +
- drivers/clk/clk-scpi.c                             | 325 +++++++++
- drivers/cpufreq/Kconfig.arm                        |  10 +
- drivers/cpufreq/Makefile                           |   1 +
- drivers/cpufreq/scpi-cpufreq.c                     | 124 ++++
- drivers/firmware/Kconfig                           |  19 +
- drivers/firmware/Makefile                          |   1 +
- drivers/firmware/arm_scpi.c                        | 771 +++++++++++++++++++++
- drivers/hwmon/Kconfig                              |   8 +
- drivers/hwmon/Makefile                             |   1 +
- drivers/hwmon/scpi-hwmon.c                         | 288 ++++++++
- include/linux/scpi_protocol.h                      |  78 +++
- 16 files changed, 1868 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/arm,scpi.txt
- create mode 100644 Documentation/hwmon/scpi-hwmon
- create mode 100644 drivers/clk/clk-scpi.c
- create mode 100644 drivers/cpufreq/scpi-cpufreq.c
- create mode 100644 drivers/firmware/arm_scpi.c
- create mode 100644 drivers/hwmon/scpi-hwmon.c
- create mode 100644 include/linux/scpi_protocol.h
+	M.
+-- 
+Jazz is not dead. It just smells funny...
