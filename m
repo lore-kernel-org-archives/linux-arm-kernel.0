@@ -1,53 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 09 Oct 2015 15:18:03 +0100
-Subject: [PATCH v3] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
- PCIe Host Controller
-In-Reply-To: <8520D5D51A55D047800579B09414719801690DEC@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1444146289-28940-1-git-send-email-bharatku@xilinx.com>
- <5613F310.6060305@arm.com>
- <8520D5D51A55D047800579B09414719801690DEC@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <5617CC9B.7070405@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Oct 2015 15:18:14 +0100
+Subject: [PATCH 3/4] arm64: Juno: Add support for the PCIe host bridge on
+ Juno R1
+In-Reply-To: <20151009141107.GD3394@e106497-lin.cambridge.arm.com>
+References: <1444398323-17354-1-git-send-email-Liviu.Dudau@arm.com>
+ <1444398323-17354-4-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqJsb53VXiUfjGBXK37dBEi1r-PXVohg-c-7_x63R04VMA@mail.gmail.com>
+ <20151009141107.GD3394@e106497-lin.cambridge.arm.com>
+Message-ID: <20151009141814.GR26278@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/15 14:47, Bharat Kumar Gogada wrote:
->> Hi Bharat,
->>>> Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
->>> 
->>> +/* SSPL ERROR */ +#define SLVERR					0x02 +#define DECERR
->>> 0x03 + +struct nwl_msi {			/* struct nwl_msi - MSI information
->> */
->>> +	struct msi_controller chip;	/* chip: MSI controller */
->> 
->> We're moving away from msi_controller altogether, as the kernel now
->> has all the necessary infrastructure to do this properly.
->> 
->> Please convert this driver to msi domains (see
->> drivers/pci/host/pci-xgene- msi.c or the gic-v2m driver as examples
->> of how this is being done).
+On Fri, Oct 09, 2015 at 03:11:07PM +0100, Liviu Dudau wrote:
+> On Fri, Oct 09, 2015 at 08:54:33AM -0500, Rob Herring wrote:
+> > On Fri, Oct 9, 2015 at 8:45 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > > Juno R1 board sports a functional PCIe host bridge that is
+> > > compliant with the SBSA standard found here[1]. With the right
+> > > firmware that initialises the XpressRICH3 controller one can
+> > > use the generic Host Bridge driver to use the PCIe hardware.
+> > >
+> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > >
+> > > [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0029a/
+> > > ---
+> > >  arch/arm64/boot/dts/arm/juno-r1.dts | 20 ++++++++++++++++++++
+> > >  1 file changed, 20 insertions(+)
+> > >
+> > > diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+> > > index c627511..a702a6b 100644
+> > > --- a/arch/arm64/boot/dts/arm/juno-r1.dts
+> > > +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+> > > @@ -109,6 +109,26 @@
+> > >
+> > >         #include "juno-base.dtsi"
+> > >
+> > > +       pcie-controller at 40000000 {
+> > > +               compatible = "pci-host-ecam-generic";
+> > 
+> > I think this is the first case of real h/w using this. We should have
+> > a specific compatible here additionally.
 > 
-> As suggested I have gone through the code in pci-gene-msi.c for msi
-> domains, and have gone through IRQ Domain documentation. I mainly
-> observe when we have more than one interrupt controller involved 
-> between device and cpu we use "Hierarchy IRQ domain" (parent and
-> child msi domains). But in our case we don't have any such Hierarchy
-> and we have single interrupt controller. In such case is it necessary
-> to use multiple domains in software which actually isn't case in
-> hardware.
+> Or maybe I can claim the use of the string on account on being the first
+> on arm64 ;)
 
-This is not optional. The generic MSI domain is stacked on top of the
-one that drives the HW. Which is exactly the XGene case. Your case is
-not different in any way, and the exact same methods apply:
+This is already being used on arm64 with kvmtool, qemu, the ARM fastmodel
+and AMD Seattle.
 
-	MSI -> RandomHW -> Interrupt controller (GIC)
-
-We can argue about it as long as you want, but there is no way we're
-adding more msi_controller madness to the tree. It took us a long time,
-but we now have a generic way to do MSIs in the kernel, and you need to
-use it, not sidestep it.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
