@@ -1,39 +1,37 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri,  9 Oct 2015 14:45:19 +0100
-Subject: [PATCH 0/4] arm64: Juno: Add support for PCIe on R1 board
-Message-ID: <1444398323-17354-1-git-send-email-Liviu.Dudau@arm.com>
+Date: Fri,  9 Oct 2015 14:45:21 +0100
+Subject: [PATCH 2/4] PCI: Add quirk for PLDA's XpressRICH3 host bridge class.
+In-Reply-To: <1444398323-17354-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1444398323-17354-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1444398323-17354-3-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Juno R1 board has a working PCIe host bridge that can be enabled and
-configured by the firmware and made use of by Linux. For UEFI, the
-Linaro releases contain firmware that configure the XpressRICH3 host
-bridge correctly. For U-Boot based setups, one needs the patchset
-posted here[1].
+The XpressRICH3 host bridge at power up has an unassigned class on
+some of ARM Ltd boards, add a quirk to correct that.
 
-This patchset adds a quirk for setting the correct class to the host
-bridge device and the device tree changes that enable PCIe on Juno R1.
-We also update the defconfig to enable the generic PCI host bridge driver.
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ drivers/pci/quirks.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Best regards,
-Liviu
-
-1. http://lists.denx.de/pipermail/u-boot/2015-October/229669.html
-
-
-Andrew Murray (1):
-  pci: Add PLDA's XpressRICH3 PCIe host bridge PCI ID
-
-Liviu Dudau (3):
-  PCI: Add quirk for PLDA's XpressRICH3 host bridge class.
-  arm64: Juno: Add support for the PCIe host bridge on Juno R1
-  arm64: defconfig: Enable PCI generic host bridge by default
-
- arch/arm64/boot/dts/arm/juno-r1.dts | 20 ++++++++++++++++++++
- arch/arm64/configs/defconfig        |  1 +
- drivers/pci/quirks.c                | 10 ++++++++++
- include/linux/pci_ids.h             |  3 +++
- 4 files changed, 34 insertions(+)
-
+diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+index b03373f..ae24bb4 100644
+--- a/drivers/pci/quirks.c
++++ b/drivers/pci/quirks.c
+@@ -4149,3 +4149,13 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
+ 	}
+ }
+ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
++
++/*
++ * The PLDA's XpressRICH3 doesn't describe itself as a bridge. This is required
++ * for correct/normal enumeration.
++ */
++static void xr3pci_quirk_class(struct pci_dev *pdev)
++{
++	pdev->class = PCI_CLASS_BRIDGE_PCI << 8;
++}
++DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_PLDA, PCI_DEVICE_ID_XR3PCI, xr3pci_quirk_class);
 -- 
 2.6.0
