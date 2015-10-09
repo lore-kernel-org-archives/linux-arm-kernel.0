@@ -1,59 +1,23 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 9 Oct 2015 08:27:00 +0100
-Subject: [PATCH v4 8/8] ARM: multi_v7_defconfig: Add rockchip audio support
-In-Reply-To: <1444311079-2892-9-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1444311079-2892-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1444311079-2892-9-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <20151009072700.GN17172@x1>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Fri, 09 Oct 2015 10:30:31 +0300
+Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
+In-Reply-To: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
+References: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <00e601d10264$61cdafb0$25690f10$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks an awful lot of people you've spammed there.
+ Hello!
 
-Are you sure they all care about your Rockchip changes?
+> +  KVM_DEV_ARM_VGIC_CPU_SYSREGS
+> +  Attributes:
+> +    The attr field of kvm_device_attr encodes two values:
+> +    bits:     | 63      ....       32 | 31  ....  16 | 15  ....  0 |
+> +    values:   |         mpidr         |      RES     |    instr    |
 
-Hint: I'm sure that they don't.
+ One small clarification: do you really want it to be different from KVM_DEV_ARM_VGIC_GRP_CPU_REGS?
 
-Please be careful and only send patches to relevant people.
-
-> Enable support for audio device found on rockchip boards.
-> 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> ---
-> 
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
-> 
->  arch/arm/configs/multi_v7_defconfig | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 03deb7f..febce7e 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -478,6 +478,10 @@ CONFIG_SND_USB_AUDIO=y
->  CONFIG_SND_SOC=m
->  CONFIG_SND_ATMEL_SOC=m
->  CONFIG_SND_ATMEL_SOC_WM8904=m
-> +CONFIG_SND_SOC_ROCKCHIP=m
-> +CONFIG_SND_SOC_ROCKCHIP_SPDIF=m
-> +CONFIG_SND_SOC_ROCKCHIP_MAX98090=m
-> +CONFIG_SND_SOC_ROCKCHIP_RT5645=m
->  CONFIG_SND_SOC_SH4_FSI=m
->  CONFIG_SND_SOC_RCAR=m
->  CONFIG_SND_SOC_RSRC_CARD=m
-> @@ -489,6 +493,7 @@ CONFIG_SND_SOC_TEGRA_TRIMSLICE=m
->  CONFIG_SND_SOC_TEGRA_ALC5632=m
->  CONFIG_SND_SOC_TEGRA_MAX98090=m
->  CONFIG_SND_SOC_AK4642=m
-> +CONFIG_SND_SOC_SPDIF=m
->  CONFIG_SND_SOC_WM8978=m
->  CONFIG_USB=y
->  CONFIG_USB_XHCI_HCD=y
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
