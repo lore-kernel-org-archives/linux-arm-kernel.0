@@ -1,38 +1,55 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 09 Oct 2015 09:42:51 +0100
-Subject: [PATCH 2/4] arm64: dts: qcom: Add msm8916 I2C nodes.
-In-Reply-To: <5616B353.9000207@codeaurora.org>
-References: <1444303124-32402-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1444303168-32490-1-git-send-email-srinivas.kandagatla@linaro.org>
- <5616B353.9000207@codeaurora.org>
-Message-ID: <56177E0B.1050908@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri,  9 Oct 2015 09:42:52 +0100
+Subject: [PATCH v3 0/5] ARM: sunxi: Introduce CHIP support
+Message-ID: <1444380177-15302-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+Here is a serie introducing the support for the Allwinner R8 and the
+Nextthing's CHIP.
 
-On 08/10/15 19:17, Stephen Boyd wrote:
-> On 10/08/2015 04:19 AM, Srinivas Kandagatla wrote:
->> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
->> index 85f7bee..d49ac37 100644
->> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
->> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
->> @@ -233,6 +233,22 @@
->>   			status = "disabled";
->>   		};
->>
->> +		/* BLSP1 QUP2 */
->
-> This comment is useless.
+Support is almost complete for the CHIP itself, the only missing part
+for now is the WiFi chip that needs to be powered through two combined
+regulators (AXP209's LDO3 and LDO4). The audio codec is also missing
+since it's not already enabled in the DT.
 
-Absolutely.. :-)
-will fix it in next version.
+Both these features will be addressed eventually.
 
---srini
->
->> +		blsp_i2c2: i2c at 78b6000 {
->> +			compatible = "qcom,i2c-qup-v2.2.1";
->> +			reg = <0x78b6000 0x1000>;
->> +			interrupts = <GIC_SPI 96 0>;
->>
->
+Let me know what you think,
+Maxime
+
+Changes from v2:
+  - Fixed whitespace issue
+  - Changed DTSI include to R8
+  - Removed i2c1 to be consitent with the other boards
+
+Changes from v1:
+  - Collected tags
+  - Removed unused include files
+  - Removed ipsout, dram and vcc regulators
+  - Added USB power supply
+
+Maxime Ripard (5):
+  ARM: sunxi: Add R8 support
+  ARM: sun5i: Add R8 DTSI
+  ARM: sun5i: dt: Move uart3 pinctrl node to common DTSI
+  ARM: sun5i: dt: Add UART3 CTS and RTS pins
+  ARM: sun5i: Add C.H.I.P DTS
+
+ Documentation/arm/sunxi/README                  |   2 +-
+ Documentation/devicetree/bindings/arm/sunxi.txt |   1 +
+ arch/arm/boot/dts/Makefile                      |   3 +-
+ arch/arm/boot/dts/sun5i-a10s.dtsi               |   7 -
+ arch/arm/boot/dts/sun5i-r8-chip.dts             | 213 ++++++++++++++++++++++++
+ arch/arm/boot/dts/sun5i-r8.dtsi                 |  59 +++++++
+ arch/arm/boot/dts/sun5i.dtsi                    |  14 ++
+ arch/arm/mach-sunxi/sunxi.c                     |   3 +-
+ drivers/clk/sunxi/clk-sunxi.c                   |   1 +
+ 9 files changed, 293 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun5i-r8-chip.dts
+ create mode 100644 arch/arm/boot/dts/sun5i-r8.dtsi
+
+-- 
+2.5.3
