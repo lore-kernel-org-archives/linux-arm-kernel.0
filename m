@@ -1,48 +1,111 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 9 Oct 2015 15:21:00 +0100
-Subject: [GIT PULL][2/2] SCPI support on ARM64 Juno Development Platform
-In-Reply-To: <20151009141744.GC28928@e103737-lin.cambridge.arm.com>
-Message-ID: <20151009142100.GD28928@e103737-lin.cambridge.arm.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 9 Oct 2015 22:20:34 +0800
+Subject: [PATCH 1/4] arm64: dts: Reserve memory regions for hi6220
+In-Reply-To: <CAL_Jsq+TrsS39L4nsRgqszTxKHyc00fLUf+BmftHnn=EV0PxhA@mail.gmail.com>
+References: <1444365376-10728-1-git-send-email-leo.yan@linaro.org>
+ <1444365376-10728-2-git-send-email-leo.yan@linaro.org>
+ <CAL_JsqJapPM6CpaG+AYDAUQajZ4V5jREdCwA5F4vkD5jqC3bzg@mail.gmail.com>
+ <20151009133028.GB21629@leverpostej>
+ <CAL_Jsq+TrsS39L4nsRgqszTxKHyc00fLUf+BmftHnn=EV0PxhA@mail.gmail.com>
+Message-ID: <20151009142034.GB528@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+Hi Rob,
 
-Please consider pulling the following commits for v4.4.
+On Fri, Oct 09, 2015 at 08:50:13AM -0500, Rob Herring wrote:
+> On Fri, Oct 9, 2015 at 8:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Fri, Oct 09, 2015 at 08:17:16AM -0500, Rob Herring wrote:
+> >> On Thu, Oct 8, 2015 at 11:36 PM, Leo Yan <leo.yan@linaro.org> wrote:
+> >> > On Hi6220, below memory regions in DDR have specific purpose:
+> >> >
+> >> >   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
+> >> >   0x06df,f000 - 0x06df,ffff: For mailbox message data;
+> >> >   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
+> >> >   0x3e00,0000 - 0x3fff,ffff: For OP-TEE.
+> >> >
+> >> > This patch reserves these memory regions in DT.
+> >> >
+> >> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> >> > ---
+> >> >  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 16 ++++++++++++----
+> >> >  1 file changed, 12 insertions(+), 4 deletions(-)
+> >> >
+> >> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> >> > index e36a539..e3f4cb3 100644
+> >> > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> >> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> >> > @@ -7,9 +7,6 @@
+> >> >
+> >> >  /dts-v1/;
+> >> >
+> >> > -/*Reserved 1MB memory for MCU*/
+> >> > -/memreserve/ 0x05e00000 0x00100000;
+> >> > -
+> >>
+> >> Why does memreserve not work for you? You can have multiple entries.
+> >>
+> >> >  #include "hi6220.dtsi"
+> >> >
+> >> >  / {
+> >> > @@ -24,8 +21,19 @@
+> >> >                 stdout-path = "serial0:115200n8";
+> >> >         };
+> >> >
+> >> > +       /*
+> >> > +        * Reserve below regions from memory node:
+> >> > +        *
+> >> > +        *  - 0x05e0,0000 - 0x05ef,ffff: MCU firmware runtime using
+> >> > +        *  - 0x06df,f000 - 0x06df,ffff: Mailbox message data
+> >> > +        *  - 0x0740,f000 - 0x0740,ffff: MCU firmware section
+> >> > +        *  - 0x3e00,0000 - 0x3fff,ffff: OP-TEE
+> >> > +        */
+> >> >         memory at 0 {
+> >> >                 device_type = "memory";
+> >> > -               reg = <0x0 0x0 0x0 0x40000000>;
+> >> > +               reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
+> >> > +                     <0x00000000 0x05f00000 0x00000000 0x00eff000>,
+> >> > +                     <0x00000000 0x06e00000 0x00000000 0x0060f000>,
+> >> > +                     <0x00000000 0x07410000 0x00000000 0x36bf0000>;
+> >>
+> >> No, don't do this. Please use memreserve or reserved-memory binding[1]
+> >> or combination of both. Probably reserved-memory if you need the
+> >> kernel to access some of these regions.
+> >
+> > I disagree at least for those portions owned by the secure world. The
+> > kernel shouldn't map those at all, so memreserve isn't appropriate. That
+> > covers OP-TEE and the MCU firmware regions, and I'd expec the EFI memory
+> > map to not list those as available to the kernel.
+> 
+> I'm fine carving out the beginning or end, but otherwise think memory
+> should correspond to the physical memory. We have a way to describe
+> holes to keep out, so we should use them. If secure world uses the DT,
+> then it would either want to know its region in memory or add the DT
+> data to say what it is using. We need that to be easy to find or easy
+> to set, respectively. The size secure world needs could vary as well.
+> 
+> The fact that the kernel maps the memory is the kernel's problem, not
+> a DT problem.
+> 
 
-Regards,
-Sudeep
+Just give more input here. In previous time, we have long discussion [1];
+So actually your suggestion is exactly same what my old patch.
 
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+>From previous discussion, i think here have an assumtion: Use UEFI as
+bootloader, the kernel will ignore (or remove) memreserve and reserved-memory
+nodes, so just like Mark said "the EFI memory map to not list those
+as available to the kernel". My new patch is just to follow this and
+also make sure they have same behavior for different bootloader
+(between UEFI and uboot).
 
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+[1] http://archive.arm.linux.org.uk/lurker/thread/20150819.093735.59724a58.en.html#i20150819.093735.59724a58
 
-are available in the git repository at:
+Thanks,
+Leo Yan
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/juno-scpi-for-v4.4
-
-for you to fetch changes up to dfacaf0e7cbe9f845459f3332f94cdbc368932af:
-
-  arm64: dts: Add sensor node to Juno dt (2015-10-09 10:26:41 +0100)
-
-----------------------------------------------------------------
-SCPI support on ARM64 Juno Development Platform
-
-  1. SRAM, MHU mailbox and SCPI support
-  2. CPU topology using cpu-map
-  3. Clock support for all the cpus
-  4. Support for SoC sensors
-
-----------------------------------------------------------------
-Punit Agrawal (1):
-      arm64: dts: Add sensor node to Juno dt
-
-Sudeep Holla (3):
-      arm64: dts: add SRAM, MHU mailbox and SCPI support on Juno
-      arm64: dts: add CPU topology on Juno
-      arm64: dts: add clock support for all the cpus
-
- arch/arm64/boot/dts/arm/juno-base.dtsi | 59 ++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/arm/juno-r1.dts    | 32 ++++++++++++++++++
- arch/arm64/boot/dts/arm/juno.dts       | 32 ++++++++++++++++++
- 3 files changed, 123 insertions(+)
+> >
+> > For the mailbox memory reserved-memory should be OK.
+> 
+> That only gets us from 4 regions to 3.
+> 
+> Rob
