@@ -1,32 +1,41 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri,  9 Oct 2015 17:57:25 +0100
-Subject: [PATCH v2 1/5] pci: Add PLDA's XpressRICH3 PCIe host bridge PCI ID
-In-Reply-To: <1444409849-5685-1-git-send-email-Liviu.Dudau@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 9 Oct 2015 17:59:29 +0100
+Subject: [PATCH v2 3/5] of: Add vendor prefix for PLDA.
+In-Reply-To: <1444409849-5685-4-git-send-email-Liviu.Dudau@arm.com>
 References: <1444409849-5685-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1444409849-5685-2-git-send-email-Liviu.Dudau@arm.com>
+ <1444409849-5685-4-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20151009165929.GF21629@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Murray <Andrew.Murray@arm.com>
+On Fri, Oct 09, 2015 at 05:57:27PM +0100, Liviu Dudau wrote:
+> Use "plda" as vendor prefix for PLDA.
+> 
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
- include/linux/pci_ids.h | 3 +++
- 1 file changed, 3 insertions(+)
+Having looked on PLDA's website it seems "PLDA" is their preferred name,
+and I can't find any suffix used, so this looks fine to me:
 
-diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
-index d9ba49c..1542b2b 100644
---- a/include/linux/pci_ids.h
-+++ b/include/linux/pci_ids.h
-@@ -1319,6 +1319,9 @@
- #define PCI_DEVICE_ID_NVIDIA_NFORCE_MCP79_SMBUS     0x0AA2
- #define PCI_DEVICE_ID_NVIDIA_NFORCE_MCP89_SATA	    0x0D85
- 
-+#define PCI_VENDOR_ID_PLDA		0x1556
-+#define PCI_DEVICE_ID_XR3PCI		0x1100
-+
- #define PCI_VENDOR_ID_IMS		0x10e0
- #define PCI_DEVICE_ID_IMS_TT128		0x9128
- #define PCI_DEVICE_ID_IMS_TT3D		0x9135
--- 
-2.6.0
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 82d2ac9..57653eb 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -168,6 +168,7 @@ pericom	Pericom Technology Inc.
+>  phytec	PHYTEC Messtechnik GmbH
+>  picochip	Picochip Ltd
+>  plathome	Plat'Home Co., Ltd.
+> +plda	PLDA
+>  pixcir  PIXCIR MICROELECTRONICS Co., Ltd
+>  powervr	PowerVR (deprecated, use img)
+>  qca	Qualcomm Atheros, Inc.
+> -- 
+> 2.6.0
+> 
