@@ -1,21 +1,61 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 9 Oct 2015 10:00:14 -0500
-Subject: [PATCHv3 0/7] arm64: Use contiguous PTE bit for the kernel linear
- mapping
-In-Reply-To: <20151009125052.GV17192@e104818-lin.cambridge.arm.com>
-References: <1444237225-13802-1-git-send-email-jeremy.linton@arm.com>
- <20151009125052.GV17192@e104818-lin.cambridge.arm.com>
-Message-ID: <5617D67E.8080607@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Fri, 9 Oct 2015 16:01:24 +0100
+Subject: [PATCH v2 11/22] arm64: Populate cpuinfo after notify_cpu_starting
+In-Reply-To: <56164972.3030906@arm.com>
+References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+ <1444064531-25607-12-git-send-email-suzuki.poulose@arm.com>
+ <20151008101508.GE17192@e104818-lin.cambridge.arm.com>
+ <56164972.3030906@arm.com>
+Message-ID: <5617D6C4.7030602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2015 07:50 AM, Catalin Marinas wrote:
+On 08/10/15 11:46, Suzuki K. Poulose wrote:
+> On 08/10/15 11:15, Catalin Marinas wrote:
+>> On Mon, Oct 05, 2015 at 06:02:00PM +0100, Suzuki K. Poulose wrote:
+>>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>>> index cb3e0d8..6987de4 100644
+>>> --- a/arch/arm64/kernel/smp.c
+>>> +++ b/arch/arm64/kernel/smp.c
+>>> @@ -163,14 +163,14 @@ asmlinkage void secondary_start_kernel(void)
+>>>           cpu_ops[cpu]->cpu_postboot();
+>>>
+>>>       /*
+>>> -     * Log the CPU info before it is marked online and might get read.
+>>> +     * Enable GIC and timers.
+>>>        */
+>>> -    cpuinfo_store_cpu();
+>>> +    notify_cpu_starting(cpu);
+>>>
+>>>       /*
+>>> -     * Enable GIC and timers.
+>>> +     * Log the CPU info before it is marked online and might get read.
+>>>        */
+>>> -    notify_cpu_starting(cpu);
+>>> +    cpuinfo_store_cpu();
+>>>
+>>>       smp_store_cpu_info(cpu);
+>>
+>> You can move the cpuinfo_store_cpu() call directly to
+>> smp_store_cpu_info().
+>>
+>
+> That looks better, Thanks.
 
-> I queued the series without patch 6 (and a modification of patch 7 to
-> get rid of the config option check). If we need this option, we can add
-> it later but for (hardware) debugging purposes it looks to me like we
-> can simply set PTE_CONT to 0.
+On a second look, smp_store_cpu_info() is also called from
+smp_prepare_cpus() by the Boot CPU to update its topology
+information, just after init_cpu_topology(). So moving the
+cpuinfo_store_cpu() could be called for the boot CPU (which
+we don't want, as it takes a different route to storing the
+info).
 
-Sounds good to me.
+One thing we could do is:
 
-Thanks,
+- Move init_cpu_topology() to setup_processor()
+- Have the boot CPU update the topology from setup_processor()
+   there, without going via the smp_store_cpu_info()
+- Remove the smp_store_cpu_info() from smp_prepare_cpus().
+
+Should we do that ? Or retain the code as above ?
+
+Suzuki
