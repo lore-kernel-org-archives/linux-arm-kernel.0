@@ -1,42 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 09 Oct 2015 17:59:41 +0200
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.3
-Message-ID: <87si5krq1e.fsf@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Oct 2015 17:00:36 +0100
+Subject: [PATCH 1/9] drm: bridge/dw_hdmi-ahb-audio: add audio driver
+In-Reply-To: <CAOMZO5C8O0p6C0hrAvHzanru9W2f8-C7MWsm3+HumoyZ9Hu6Jw@mail.gmail.com>
+References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
+ <E1ZO6hC-0003M5-EU@rmk-PC.arm.linux.org.uk>
+ <CAOMZO5COgoGU-3YNpnmSkctHMRDJ3=DuKc82Wb5zTTX7Bx2jNw@mail.gmail.com>
+ <20151006181806.GS21513@n2100.arm.linux.org.uk>
+ <CAOMZO5DaowTGQqN_NW7T2zv-P6a_YZUCumq4-m+OtpsKqFzELw@mail.gmail.com>
+ <20151006185429.GU21513@n2100.arm.linux.org.uk>
+ <CAOMZO5C8O0p6C0hrAvHzanru9W2f8-C7MWsm3+HumoyZ9Hu6Jw@mail.gmail.com>
+Message-ID: <20151009160036.GZ32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Oct 06, 2015 at 05:25:16PM -0300, Fabio Estevam wrote:
+> On Tue, Oct 6, 2015 at 3:54 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> 
+> > Make sure you have the ALSA config file, as alsalib won't get on
+> > with dw-hdmi only accepting 24-bit audio without this.  A copy is
+> > attached.  It also tells ALSA how to deal with multi-channel audio
+> > as well.
+> 
+> Thanks, Russell!
+> 
+> Got audio to play on my HDMI TV :-)
+> 
+> For the entire series:
+> 
+> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Here is the first pull request for fixes for mvebu for v4.3.
+Just to confirm - that's for _all_ of these 8 patches, including the
+changes to the ACR code in the last four patches, and you're happy that
+I send all of these:
 
-Gregory
-
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
-
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.3-1
-
-for you to fetch changes up to d836ace65ee98d7079bc3c5afdbcc0e27dca20a3:
-
-  ARM: orion: Fix DSA platform device after mvmdio conversion (2015-10-06 16:22:37 +0200)
-
-----------------------------------------------------------------
-mvebu fixes for 4.3 (part 1)
-
-DSA fixes for orion platform
-
-----------------------------------------------------------------
-Florian Fainelli (1):
-      ARM: orion: Fix DSA platform device after mvmdio conversion
-
- arch/arm/plat-orion/common.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+drm: bridge/dw_hdmi-ahb-audio: add audio driver
+drm: bridge/dw_hdmi-ahb-audio: parse ELD from HDMI driver
+drm: bridge/dw_hdmi-ahb-audio: basic support for multi-channel PCM audio
+drm: bridge/dw_hdmi-ahb-audio: allow larger buffer sizes
+drm: bridge/dw_hdmi: avoid being recursive in N calculation
+drm: bridge/dw_hdmi: adjust pixel clock values in N calculation
+drm: bridge/dw_hdmi: remove ratio support from ACR code
+drm: bridge/dw_hdmi: replace CTS calculation for the ACR
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
