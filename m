@@ -1,38 +1,45 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 9 Oct 2015 17:12:09 +0100
-Subject: [PATCH v2] dmaengine: xgene-dma: Disable memcpy operation due to
- performance drop
-In-Reply-To: <1444295217-3099-1-git-send-email-rsahu@apm.com>
-References: <1444295217-3099-1-git-send-email-rsahu@apm.com>
-Message-ID: <20151009161208.GJ3609@vkoul-mobl.iind.intel.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Fri, 9 Oct 2015 09:12:15 -0700
+Subject: [PATCH v5 1/4] Docs: dt: Add PCI MSI map bindings
+In-Reply-To: <CAL_JsqK1kB30h=zse1LcaBisjYEGSBhD4FutvtqbUxpSU+2NjA@mail.gmail.com>
+References: <1444342250-6196-1-git-send-email-ddaney.cavm@gmail.com>
+ <1444342250-6196-2-git-send-email-ddaney.cavm@gmail.com>
+ <CAL_JsqK1kB30h=zse1LcaBisjYEGSBhD4FutvtqbUxpSU+2NjA@mail.gmail.com>
+Message-ID: <5617E75F.2090907@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 02:36:57PM +0530, Rameshwar Prasad Sahu wrote:
-> The DMA engine supports memory copy, RAID5 XOR, RAID6 PQ, and other
-> computations. But the bandwidth of the entire DMA engine is shared
-> among all channels. This patch re-configures operations availability
-> such that one can achieve maximum performance for XOR and PQ
-> computation by removing the memory offload operations.
-> 
-> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
-> ---
->  drivers/dma/xgene-dma.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
-> index 8d57b1b..cd38022 100644
-> --- a/drivers/dma/xgene-dma.c
-> +++ b/drivers/dma/xgene-dma.c
-> @@ -1707,7 +1707,6 @@ static void xgene_dma_set_caps(struct xgene_dma_chan *chan,
->  	dma_cap_zero(dma_dev->cap_mask);
-> 
->  	/* Set DMA device capability */
-> -	dma_cap_set(DMA_MEMCPY, dma_dev->cap_mask);
->  	dma_cap_set(DMA_SG, dma_dev->cap_mask);
+On 10/09/2015 06:20 AM, Rob Herring wrote:
+> On Thu, Oct 8, 2015 at 5:10 PM, David Daney <ddaney.cavm@gmail.com> wrote:
+>> From: Mark Rutland <mark.rutland@arm.com>
+>>
+>> Currently msi-parent is used by a few bindings to describe the
+>> relationship between a PCI root complex and a single MSI controller, but
+>> this property does not have a generic binding document.
+>>
+>> Additionally, msi-parent is insufficient to describe more complex
+>> relationships between MSI controllers and devices under a root complex,
+>> where devices may be able to target multiple MSI controllers, or where
+>> MSI controllers use (non-probeable) sideband information to distinguish
+>> devices.
+>>
+>> This patch adds a generic binding for mapping PCI devices to MSI
+>> controllers. This document covers msi-parent, and a new msi-map property
+>> (specific to PCI*) which may be used to map devices (identified by their
+>> Requester ID) to sideband data for each MSI controller that they may
+>> target.
+>>
+>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>
+> I acked v3. Please add it so I can stop paying attention.
+>
 
-This will not work. Still clients can invoke memcpy operation. You need to
-remove the callback
+My apologies for missing that.
 
--- 
-~Vinod
+The Acked-by is now in my local tree.  Can the MSI maintainer take it as 
+is and add your Acked-by?  If not, I can resend with this added.
+
+Thanks for taking the time to review it,
+David Daney
