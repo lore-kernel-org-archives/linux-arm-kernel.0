@@ -1,45 +1,83 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Fri, 9 Oct 2015 09:12:15 -0700
-Subject: [PATCH v5 1/4] Docs: dt: Add PCI MSI map bindings
-In-Reply-To: <CAL_JsqK1kB30h=zse1LcaBisjYEGSBhD4FutvtqbUxpSU+2NjA@mail.gmail.com>
-References: <1444342250-6196-1-git-send-email-ddaney.cavm@gmail.com>
- <1444342250-6196-2-git-send-email-ddaney.cavm@gmail.com>
- <CAL_JsqK1kB30h=zse1LcaBisjYEGSBhD4FutvtqbUxpSU+2NjA@mail.gmail.com>
-Message-ID: <5617E75F.2090907@caviumnetworks.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 09 Oct 2015 18:13:04 +0200
+Subject: [GIT PULL] ARM: mvebu: dt for v4.4
+Message-ID: <87fv1krpf3.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2015 06:20 AM, Rob Herring wrote:
-> On Thu, Oct 8, 2015 at 5:10 PM, David Daney <ddaney.cavm@gmail.com> wrote:
->> From: Mark Rutland <mark.rutland@arm.com>
->>
->> Currently msi-parent is used by a few bindings to describe the
->> relationship between a PCI root complex and a single MSI controller, but
->> this property does not have a generic binding document.
->>
->> Additionally, msi-parent is insufficient to describe more complex
->> relationships between MSI controllers and devices under a root complex,
->> where devices may be able to target multiple MSI controllers, or where
->> MSI controllers use (non-probeable) sideband information to distinguish
->> devices.
->>
->> This patch adds a generic binding for mapping PCI devices to MSI
->> controllers. This document covers msi-parent, and a new msi-map property
->> (specific to PCI*) which may be used to map devices (identified by their
->> Requester ID) to sideband data for each MSI controller that they may
->> target.
->>
->> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: David Daney <david.daney@cavium.com>
->
-> I acked v3. Please add it so I can stop paying attention.
->
+Hi,
 
-My apologies for missing that.
+Here is the first pull request for dt for mvebu for v4.4.
 
-The Acked-by is now in my local tree.  Can the MSI maintainer take it as 
-is and add your Acked-by?  If not, I can resend with this added.
+Gregory
 
-Thanks for taking the time to review it,
-David Daney
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.4-1
+
+for you to fetch changes up to 9b24a35cb59888194706825b9c5ac550b0880277:
+
+  ARM: mvebu: modify Orion and Kirkwoord crypto compatible strings (2015-10-09 17:08:02 +0200)
+
+----------------------------------------------------------------
+mvebu dt for 4.4 (part 1)
+
+Update dts to use the new crypto driver on mvebu SoCs
+
+----------------------------------------------------------------
+Arnaud Ebalard (1):
+      ARM: mvebu: add crypto related nodes to armada 370 dtsi
+
+Boris Brezillon (9):
+      ARM: mvebu: add crypto related nodes to armada-xp.dtsi
+      ARM: mvebu: define crypto SRAM ranges for all armada-xp boards
+      ARM: mvebu: define crypto SRAM ranges for all armada-370 boards
+      ARM: mvebu: add crypto related nodes to armada 375 dtsi
+      ARM: mvebu: define crypto SRAM ranges in armada-375-db.dts
+      ARM: mvebu: add crypto related nodes to armada 38x dtsi
+      ARM: mvebu: define crypto SRAM ranges for all armada-38x boards
+      ARM: mvebu: use new bindings for existing crypto devices
+      ARM: mvebu: modify Orion and Kirkwoord crypto compatible strings
+
+Thomas Petazzoni (1):
+      ARM: mvebu: add CPU config registers in the Armada 370/XP Device Tree
+
+ arch/arm/boot/dts/armada-370-db.dts              |  3 +-
+ arch/arm/boot/dts/armada-370-dlink-dns327l.dts   |  3 +-
+ arch/arm/boot/dts/armada-370-mirabox.dts         |  7 ++++-
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts   |  3 +-
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts   |  3 +-
+ arch/arm/boot/dts/armada-370-rd.dts              |  3 +-
+ arch/arm/boot/dts/armada-370-synology-ds213j.dts |  3 +-
+ arch/arm/boot/dts/armada-370.dtsi                | 37 ++++++++++++++++++++++++
+ arch/arm/boot/dts/armada-375-db.dts              |  4 ++-
+ arch/arm/boot/dts/armada-375.dtsi                | 33 +++++++++++++++++++++
+ arch/arm/boot/dts/armada-385-db-ap.dts           |  4 ++-
+ arch/arm/boot/dts/armada-385-linksys.dtsi        |  4 ++-
+ arch/arm/boot/dts/armada-388-db.dts              |  4 ++-
+ arch/arm/boot/dts/armada-388-gp.dts              |  4 ++-
+ arch/arm/boot/dts/armada-388-rd.dts              |  4 ++-
+ arch/arm/boot/dts/armada-38x.dtsi                | 33 +++++++++++++++++++++
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts        |  4 ++-
+ arch/arm/boot/dts/armada-xp-db.dts               |  4 ++-
+ arch/arm/boot/dts/armada-xp-gp.dts               |  4 ++-
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  |  4 ++-
+ arch/arm/boot/dts/armada-xp-linksys-mamba.dts    |  4 ++-
+ arch/arm/boot/dts/armada-xp-matrix.dts           |  4 ++-
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   |  4 ++-
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  4 ++-
+ arch/arm/boot/dts/armada-xp-synology-ds414.dts   |  4 ++-
+ arch/arm/boot/dts/armada-xp.dtsi                 | 35 ++++++++++++++++++++++
+ arch/arm/boot/dts/dove.dtsi                      | 17 ++++++++---
+ arch/arm/boot/dts/kirkwood.dtsi                  | 29 ++++++++++++-------
+ arch/arm/boot/dts/orion5x.dtsi                   | 22 +++++++++-----
+ 29 files changed, 248 insertions(+), 43 deletions(-)
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
