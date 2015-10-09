@@ -1,29 +1,22 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 9 Oct 2015 20:53:18 +0300
-Subject: [PATCH] ARM: shmobile: porter: add I2C2 DT support
-In-Reply-To: <20151009011336.GB14231@verge.net.au>
-References: <84974694.25bFZffQKN@wasted.cogentembedded.com>
- <20151009011336.GB14231@verge.net.au>
-Message-ID: <5617FF0E.1000300@cogentembedded.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 9 Oct 2015 19:52:49 +0200 (CEST)
+Subject: arm/arm64: GICv2 driver does not have irq_disable implemented
+In-Reply-To: <CADaLND=spbEHLZXmqsVRDsPAyNKXJHnc=Yy6ujY0em74dB5CbA@mail.gmail.com>
+References: <CADaLND=spbEHLZXmqsVRDsPAyNKXJHnc=Yy6ujY0em74dB5CbA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.11.1510091951250.6097@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, 9 Oct 2015, Duc Dang wrote:
+> Hi Thomas, Marc, Jason and All,
+> 
+> In APM ARM64 X-Gene Enet controller driver, we use disable_irq_nosync to
+> disable interrupt before calling __napi_schedule to schedule packet handler
+> to process the Tx/Rx packets.
 
-On 10/09/2015 04:13 AM, Simon Horman wrote:
+Which is wrong to begin with. Disable the interrupt at the device
+level not at the interrupt line level.
+ 
+Thanks,
 
->> Define the Porter board dependent part of the I2C2 device node.
->>
->> This patch is  analogous to the commit 29a647c396a0 ("ARM: shmobile:
->> henninger: add I2C2 DT support") as there are no differences between
->> the boards in this respect.
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
-> Thanks Sergei,
-
-> I have queued this up for v4.4.
-
-    Not seeing anything from renesas.git running 'git fetch'. Forgot to push? :-)
-
-MBR, Sergei
+	tglx
