@@ -1,66 +1,38 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Fri, 9 Oct 2015 13:18:09 +0300
-Subject: [PATCH v6 0/6] KASAN for arm64
-In-Reply-To: <20151009094851.GA20507@leverpostej>
-References: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
- <20151007100411.GG3069@e104818-lin.cambridge.arm.com>
- <CAPAsAGxR-yqtmFeo65Xw_0RQyEy=mN1uG=GKtqoMLr_x_N0u5w@mail.gmail.com>
- <20151008111144.GC7275@leverpostej> <56165228.8060201@gmail.com>
- <CAKv+Gu_v7J1BA+xFcowBrW05bRFs=_WFf_HCeCmWgdZVRo0eQw@mail.gmail.com>
- <20151008151144.GM17192@e104818-lin.cambridge.arm.com>
- <CAPAsAGxhcRtks40u3O29t=KMKkuLy4Pf8u8TeeBy2f2-MuSf+A@mail.gmail.com>
- <561789A2.5050601@gmail.com> <20151009094851.GA20507@leverpostej>
-Message-ID: <CAPAsAGzOXOXDu+K3VG31BgcKCkk0LPmRv_YE4syNLCwr9h+2ug@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 09 Oct 2015 12:28:09 +0200
+Subject: [PATCHv3 1/2] ARM: exynos_defconfig: Enable rtl8152 ethernet
+ driver for Odroid-XU4
+In-Reply-To: <1444384745.9895.265.camel@collabora.co.uk>
+References: <1444276117-3657-1-git-send-email-linux.amoon@gmail.com>
+ <5551783.9EQ5GEjhxX@wuerfel> <1444384745.9895.265.camel@collabora.co.uk>
+Message-ID: <5276113.A7SSumyVrv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-09 12:48 GMT+03:00 Mark Rutland <mark.rutland@arm.com>:
-> On Fri, Oct 09, 2015 at 12:32:18PM +0300, Andrey Ryabinin wrote:
-> [...]
->
->> I thought the EFI stub isolation patches create a copy of mem*() functions in the stub,
->> but they are just create aliases with __efistub_ prefix.
->>
->> We only need to create some more aliases for KASAN.
->> The following patch on top of the EFI stub isolation series works for me.
->>
->>
->> Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
->> ---
->>  arch/arm64/kernel/image.h | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
->> index e083af0..6eb8fee 100644
->> --- a/arch/arm64/kernel/image.h
->> +++ b/arch/arm64/kernel/image.h
->> @@ -80,6 +80,12 @@ __efistub_strcmp           = __pi_strcmp;
->>  __efistub_strncmp            = __pi_strncmp;
->>  __efistub___flush_dcache_area        = __pi___flush_dcache_area;
->>
->> +#ifdef CONFIG_KASAN
->> +__efistub___memcpy           = __pi_memcpy;
->> +__efistub___memmove          = __pi_memmove;
->> +__efistub___memset           = __pi_memset;
->> +#endif
->
-> Ard's v4 stub isolation series has these aliases [1], as the stub
-> requires these aliases regardless of KASAN in order to link.
+On Friday 09 October 2015 11:59:05 Sjoerd Simons wrote:
+> 
+> > I realize that building things as modules is a hassle, it is so for
+> > some things more than for others, so I keep asking the question
+> > to everyone to find out what a good balance is to make as much as
+> > possible modules without hurting too much.
+> 
+> Fwiw, I don't find building modules overly cumbersome. Getting an
+> initramfs capable of moving on to an NFS root is mostly a one-time
+> thing (not unlike setting up the nfs root itself) and injecting modules
+> into it is relatively simple (doubly so if taking advantage of the
+> multiple cpio archive feature linux has). 
+> 
+> Interestingly, for me not building things as modules in multi_v7 tends
+> to cause more work as it hides a few categories of bugs that tend to
+> crop up once building distro kernels (e.g. missing module aliases,
+> missing module device table entries, implicitly relying on clocks being
+> active during probe as unused clocks only get turned of late in the
+> init sequence etc).
+> 
 
-Stub isolation series has __efistub_memcpy, not __efistub___memcpy
-(two additional '_').
-The thing is, KASAN provides own implementation of memcpy() which
-checks memory before access.
-The original 'memcpy()' becomes __memcpy(), so we could still use it.
-In code that not instrumented by KASAN (like the EFI stub) we replace
-KASAN's memcpy() with the original __mempcy():
-#define memcpy() __memcpy()
+Ok, let's try to make all future network drivers modules in the
+multi_v7_defconfig then, and get people to use an initramfs
+if they need NFS root. If nobody complains too loudly for the
+next few releases, we can change the existing drivers to =m as well.
 
-So with CONFIG_KASAN=y the EFI stub uses __memcpy, thus we need to
-create the __efistub___memcpy alias.
-
->
-> Thanks,
-> Mark.
->
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/375708.html
+	Arnd
