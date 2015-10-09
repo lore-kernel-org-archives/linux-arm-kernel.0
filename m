@@ -1,48 +1,30 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Fri, 9 Oct 2015 11:12:24 +0300
-Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
-In-Reply-To: <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
- <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAPAsAGz7Tp6Z87tPq_NNh_mcwPF_DOaXzu0po5f6AQxPAcsALQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 09 Oct 2015 10:15:02 +0200
+Subject: [PATCHv3 1/2] ARM: exynos_defconfig: Enable rtl8152 ethernet
+ driver for Odroid-XU4
+In-Reply-To: <CANAwSgS1AKwg8U0WBW8JmveHd0qdRL6RAOV4F4P22a9F28xopQ@mail.gmail.com>
+References: <1444276117-3657-1-git-send-email-linux.amoon@gmail.com>
+ <5551783.9EQ5GEjhxX@wuerfel>
+ <CANAwSgS1AKwg8U0WBW8JmveHd0qdRL6RAOV4F4P22a9F28xopQ@mail.gmail.com>
+Message-ID: <18718651.GRDoBKLmUe@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-08 22:02 GMT+03:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
-> --- a/arch/arm64/kernel/image.h
-> +++ b/arch/arm64/kernel/image.h
-> @@ -59,4 +59,31 @@
->         _kernel_offset_le       = DATA_LE64(TEXT_OFFSET);       \
->         _kernel_flags_le        = DATA_LE64(__HEAD_FLAGS);
->
-> +#ifdef CONFIG_EFI
-> +
-> +/*
-> + * The EFI stub has its own symbol namespace prefixed by __efistub_, to
-> + * isolate it from the kernel proper. The following symbols are legally
-> + * accessed by the stub, so provide some aliases to make them accessible.
-> + * Only include data symbols here, or text symbols of functions that are
-> + * guaranteed to be safe when executed at another offset than they were
-> + * linked at. The routines below are all implemented in assembler in a
-> + * position independent manner
-> + */
-> +__efistub_memcmp               = __pi_memcmp;
-> +__efistub_memchr               = __pi_memchr;
-> +__efistub_memcpy               = __pi_memcpy;
-> +__efistub_memmove              = __pi_memmove;
-> +__efistub_memset               = __pi_memset;
-> +__efistub_strlen               = __pi_strlen;
-> +__efistub_strcmp               = __pi_strcmp;
-> +__efistub_strncmp              = __pi_strncmp;
-> +__efistub___flush_dcache_area  = __pi___flush_dcache_area;
+On Friday 09 October 2015 09:14:33 Anand Moon wrote:
+> As long as we use correct exynos5422-odroidxu4.dtb is used in the
+> boot.scr/boot.ini ethernet come up,
+> build and tested using CONFIG_USB_RTL8152=m using multi_v7_defconfig.
+> 
+> Not sure what is the policy for NFS booting.
+> 
+> Do you want CONFIG_USB_RTL8152 to be build as module in
+> exynos/multi_v7_defconfig.
 
-So why we need these __pi_* aliases?
-We could just do __efistub_memcmp = memcmp; Right?
+The NFS booting is exactly the question here: Would it be a significant
+hassle for anyone to require using a ramdisk if they need NFS root?
 
+If we all think it would be an acceptable price, we should probably
+make all ethernet drivers loadable modules, as it is commonly
+done on distros.
 
-> +
-> +__efistub__text                        = _text;
-> +__efistub__end                 = _end;
-> +__efistub__edata               = _edata;
-> +
-> +#endif
+	Arnd
