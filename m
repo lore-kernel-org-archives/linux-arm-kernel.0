@@ -1,75 +1,34 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 9 Oct 2015 18:15:40 -0500
-Subject: [PATCH v8 3/6] pci:host: Add Altera PCIe host controller driver
-In-Reply-To: <CAFiDJ58oMa6rgQe_STCiWRpdL+P22BN1=Nin_+QnLXC9RGiSzQ@mail.gmail.com>
-References: <1444297394-3122-1-git-send-email-lftan@altera.com>
- <1444297394-3122-4-git-send-email-lftan@altera.com>
- <20151008094744.GD32532@n2100.arm.linux.org.uk>
- <CAFiDJ58oMa6rgQe_STCiWRpdL+P22BN1=Nin_+QnLXC9RGiSzQ@mail.gmail.com>
-Message-ID: <20151009231540.GE16112@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 10 Oct 2015 00:20:15 +0100
+Subject: [PATCH] sched_clock: add data pointer argument to read callback
+In-Reply-To: <1444427858-576-1-git-send-email-mans@mansr.com>
+References: <1444427858-576-1-git-send-email-mans@mansr.com>
+Message-ID: <20151009232015.GC32536@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 06:03:24PM +0800, Ley Foon Tan wrote:
-> On Thu, Oct 8, 2015 at 5:47 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> >
-> > On Thu, Oct 08, 2015 at 05:43:11PM +0800, Ley Foon Tan wrote:
-> > > +static int altera_pcie_cfg_write(struct pci_bus *bus, unsigned int devfn,
-> > > +                              int where, int size, u32 value)
-> > > +{
-> > > +     struct altera_pcie *pcie = bus->sysdata;
-> > > +     u32 data32;
-> > > +     u32 shift = 8 * (where & 3);
-> > > +     int ret;
-> > > +
-> > > +     if (!altera_pcie_valid_config(pcie, bus, PCI_SLOT(devfn)))
-> > > +             return PCIBIOS_DEVICE_NOT_FOUND;
-> > > +
-> > > +     /* write partial */
-> > > +     if (size != sizeof(u32)) {
-> > > +             ret = tlp_cfg_dword_read(pcie, bus->number, devfn,
-> > > +                                      where & ~DWORD_MASK, &data32);
-> > > +             if (ret)
-> > > +                     return ret;
-> > > +     }
-> > > +
-> > > +     switch (size) {
-> > > +     case 1:
-> > > +             data32 = (data32 & ~(0xff << shift)) |
-> > > +                             ((value & 0xff) << shift);
-> > > +             break;
-> > > +     case 2:
-> > > +             data32 = (data32 & ~(0xffff << shift)) |
-> > > +                             ((value & 0xffff) << shift);
-> > > +             break;
-> > > +     default:
-> > > +             data32 = value;
-> >
-> > Can you generate proper 1, 2 and 4 byte configuration accesses?  That
-> > is much preferred over the above read-modify-write, as there are
-> > registers in PCI and PCIe that are read/write-1-to-clear.  The above
-> > has the effect of inadvertently clearing those RW1C bits.
-> No, hardware can only access 4-byte aligned address.
+On Fri, Oct 09, 2015 at 10:57:35PM +0100, Mans Rullgard wrote:
+> This passes a data pointer specified in the sched_clock_register()
+> call to the read callback allowing simpler implementations thereof.
+> 
+> In this patch, existing uses of this interface are simply updated
+> with a null pointer.
 
-This is non-spec compliant, and we really should have some way of
-flagging that because it may break things in ways that would be very
-difficult to debug, e.g., we can lose RW1C status bits when writing an
-adjacent register, so they would just silently disappear.
+This is a bad description.  It tells us what the patch is doing,
+(which we can see by reading the patch) but not _why_.  Please include
+information on why the change is necessary - describe what you are
+trying to achieve.
 
-I don't know if this should be a kernel taint, a simple warning in
-dmesg, or what.  I guess the tainting mechanism is probably too
-general-purpose for this, and add_taint() doesn't give any dmesg
-indication.  We wouldn't see the taint unless the problem actually
-caused an oops or panic.  In this case, I think I want a clue in dmesg
-so we have a chance of seeing it even if there is no oops.  So
-probably something like a dev_warn("non-compliant config accesses")
-would work.
+I generally don't accept patches what add new stuff to the kernel with
+no users of that new stuff - that's called experience, experience of
+people who submit stuff like that, and then vanish leaving their junk
+in the kernel without any users.  Please ensure that this gets a user
+very quickly, or better still, submit this patch as part of a series
+which makes use of it.
 
-You really should double-check with the hardware guys, because it's
-pretty obvious that the PCI spec requires 1- and 2-byte config
-accesses to work correctly.  For example, if you read/modify/write to
-update PCI_COMMAND, you will inadvertently clear the RW1C bits in
-PCI_STATUS.
+Also, copying soo many people is guaranteed to be silently dropped by
+mailing lists.
 
-Bjorn
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
