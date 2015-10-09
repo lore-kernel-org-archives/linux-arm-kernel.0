@@ -1,70 +1,86 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Oct 2015 11:53:09 +0100
-Subject: [PATCH v2 10/10] ARM: software-based priviledged-no-access support
-In-Reply-To: <CACRpkdZhJfsH0wU0VBotT=yomDqBkKWrz3MNFOin=CCz62v_nw@mail.gmail.com>
-References: <20150825154026.GT7557@n2100.arm.linux.org.uk>
- <E1ZUGMS-0000BG-8B@rmk-PC.arm.linux.org.uk>
- <CACRpkdZhJfsH0wU0VBotT=yomDqBkKWrz3MNFOin=CCz62v_nw@mail.gmail.com>
-Message-ID: <20151009105309.GM26278@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Fri, 9 Oct 2015 11:56:14 +0100
+Subject: [PATCH v2 07/22] arm64: Keep track of CPU feature registers
+In-Reply-To: <56163D7F.4000003@arm.com>
+References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+ <1444064531-25607-8-git-send-email-suzuki.poulose@arm.com>
+ <20151007171621.GD17192@e104818-lin.cambridge.arm.com>
+ <56163D7F.4000003@arm.com>
+Message-ID: <56179D4E.9030403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 10:28:14AM +0200, Linus Walleij wrote:
-> On Tue, Aug 25, 2015 at 5:42 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> 
-> > Provide a software-based implementation of the priviledged no access
-> > support found in ARMv8.1.
-> >
-> > Userspace pages are mapped using a different domain number from the
-> > kernel and IO mappings.  If we switch the user domain to "no access"
-> > when we enter the kernel, we can prevent the kernel from touching
-> > userspace.
-> >
-> > However, the kernel needs to be able to access userspace via the
-> > various user accessor functions.  With the wrapping in the previous
-> > patch, we can temporarily enable access when the kernel needs user
-> > access, and re-disable it afterwards.
-> >
-> > This allows us to trap non-intended accesses to userspace, eg, caused
-> > by an inadvertent dereference of the LIST_POISON* values, which, with
-> > appropriate user mappings setup, can be made to succeed.  This in turn
-> > can allow use-after-free bugs to be further exploited than would
-> > otherwise be possible.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> For some reason this patch explodes on my ARM PB11MPCore, it
-> is a weird beast and corner case machine so I guess that is why
-> it wasn't noticed. This happens a bit into the boot when freeing
-> unused pages:
-> 
-> Freeing unused kernel memory: 2672K (c0448000 - c06e4000)
-> Unable to handle kernel paging request at virtual address b6f069f4
-> pgd = c6e58000
-> [b6f069f4] *pgd=76e09831, *pte=77ff759f, *ppte=77ff7e6e
-> Internal error: Oops: 17 [#1] SMP ARM
-> Modules linked in:
-> CPU: 2 PID: 1 Comm: init Not tainted 4.3.0-rc4-00015-gf6702681a0af #48
-> Hardware name: ARM-RealView PB11MPCore
-> task: c7827bc0 ti: c782c000 task.ti: c782c000
-> PC is at v6wbi_flush_user_tlb_range+0x28/0x48
-> LR is at on_each_cpu_mask+0x58/0x60
-> pc : [<c001abf0>]    lr : [<c007c18c>]    psr: 20000093
-> sp : c782deb8  ip : 00000000  fp : 00000000
-> r10: c6e5adc8  r9 : 00000001  r8 : b6f02000
-> r7 : c7a17180  r6 : c782ded4  r5 : c0015118  r4 : 20000013
-> r3 : 00000002  r2 : 00100075  r1 : b6f02000  r0 : b6f01002
-> Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
-> Control: 00c5787d  Table: 76e5800a  DAC: 00000051
+On 08/10/15 10:55, Suzuki K. Poulose wrote:
+> On 07/10/15 18:16, Catalin Marinas wrote:
+>> On Mon, Oct 05, 2015 at 06:01:56PM +0100, Suzuki K. Poulose wrote:
+>>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>>> index 1ae8b24..d42ad90 100644
+>>> --- a/arch/arm64/kernel/cpufeature.c
+>>> +++ b/arch/arm64/kernel/cpufeature.c
+>>> @@ -58,8 +58,442 @@ static void update_mixed_endian_el0_support(struct cpuinfo_arm64 *info)
+>>>       mixed_endian_el0 &= id_aa64mmfr0_mixed_endian_el0(info->reg_id_aa64mmfr0);
 
-It looks like we're faulting on the TLBI instruction, because it's
-targetting a userspace address (r0 == 0xb6f01002) and the DAC prohibits
-access to userspace. It's weird that this only seems to happen on 11MPCore
-though; if this core was one of the guys getting cross-called, then I
-could understand the bug, but the lr suggests that CPU 2 is initiating
-the flush, so I'd expect the same problem to appear on any ARMv6 part.
+>>> + * sys_reg() encoding.
+>>> + *
+>>> + * We track only the following space:
+>>> + * Op0 = 3, Op1 = 0, CRn = 0, CRm = [1 - 7], Op2 = [0 - 7]
+>>> + * Op0 = 3, Op1 = 3, CRn = 0, CRm = 0, Op2 = { 1, 7 }     (CTR, DCZID)
+>>> + * Op0 = 3, Op1 = 3, CRn = 14, CRm = 0, Op2 = 0        (CNTFRQ)
+>>> + *
+>>> + * The space (3, 0, 0, {1-7}, {0-7}) is arranged in a 2D array op1_0,
+>>> + * indexed by CRm and Op2. Since not all CRm's have fully allocated Op2's
+>>> + * arm64_reg_table[CRm-1].n indicates the largest Op2 tracked for CRm.
+>>> + *
+>>> + * Since we have limited number of entries with Op1 = 3, we use linear search
+>>> + * to find the reg.
+>>> + *
+>>> + */
+>>> +static struct arm64_ftr_reg* get_arm64_sys_reg(u32 sys_id)
+>>> +{
+>>> +    int i;
+>>> +    u8 op2, crn, crm;
+>>> +    u8 op1 = sys_reg_Op1(sys_id);
+>>> +
+>>> +    if (sys_reg_Op0(sys_id) != 3)
+>>> +        return NULL;
+>>> +    switch (op1) {
+>>> +    case 0:
+>>> +
+>>> +        crm = sys_reg_CRm(sys_id);
+>>> +        op2 = sys_reg_Op2(sys_id);
+>>> +        crn = sys_reg_CRn(sys_id);
+>>> +        if (crn || !crm || crm > 7)
+>>> +            return NULL;
+>>> +        if (op2 < op1_0[crm - 1].n &&
+>>> +            op1_0[crm - 1].regs[op2].sys_id == sys_id)
+>>> +            return &op1_0[crm - 1].regs[op2];
+>>> +        return NULL;
+>>> +    case 3:
+>>> +        for (i = 0; i < ARRAY_SIZE(op1_3); i++)
+>>> +            if (op1_3[i].sys_id == sys_id)
+>>> +                return &op1_3[i];
+>>> +    }
+>>> +    return NULL;
+>>> +}
+>>
+>> For this function, do we ever expect to be called with an invalid
+>> sys_id? You could add a BUG_ON(!ret) here.
+>>
+>
+> It could be called for an id which Reserved RAZ in the id range, we
+> plan to emulate. i.e, (3, 0, 0, [0-7], [0-7]).
+> See emulate_sys_reg(u32 id, u64 *valp) in Patch 20/22.
+> Since we don't track them, we return NULL here..
+> We could BUG_ON() all the other cases (e.g, MIDR and the other
+> classes).
+>
+> Thanks for pointing that out.
 
-Russell, have you tried the s/w PAN stuff on any v6 CPUs?
+Actually, the error handling is left to the users of the function.
+We do a BUG_ON() in the caller. e.g, init/update_cpu_ftr_reg can't
+accept a NULL and BUGs. While the emulate_sys_reg() issues the call
+only for the emualted feature registers(excluding MIDR/REVIDR etc),
+so a NULL is perfectly acceptable for them.
 
-Will
+Thanks
+Suzuki
