@@ -1,37 +1,60 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Fri,  9 Oct 2015 03:03:53 +0200
-Subject: [PATCH v2 3/5] ARM: mvebu: set SW polling as SDHCI card detection on
- A388-GP
+Date: Fri,  9 Oct 2015 03:03:54 +0200
+Subject: [PATCH v2 4/5] mmc: sdhci: add init_card callback to sdhci
 In-Reply-To: <1444352635-21965-1-git-send-email-mw@semihalf.com>
 References: <1444352635-21965-1-git-send-email-mw@semihalf.com>
-Message-ID: <1444352635-21965-4-git-send-email-mw@semihalf.com>
+Message-ID: <1444352635-21965-5-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newest revisions of A388-GP (v1.5 and higher) support only
-DAT3-based card detection. Revisions < v1.5 based on GPIO detection
-via I2C expander, but this solution is supposed to be deprecated on
-new boards. In order to satisfy all type of hardware this commit
-changes card detection to use software polling mechanism.
+Some sdhci hosts may require handling quirks during card initialization at
+the time when its type is already known. Hence a new callback (init_card)
+is added in sdhci_ops.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 ---
- arch/arm/boot/dts/armada-388-gp.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mmc/host/sdhci.c | 9 +++++++++
+ drivers/mmc/host/sdhci.h | 1 +
+ 2 files changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-index 391dea9..403a86b 100644
---- a/arch/arm/boot/dts/armada-388-gp.dts
-+++ b/arch/arm/boot/dts/armada-388-gp.dts
-@@ -213,8 +213,8 @@
- 			sdhci at d8000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&sdhci_pins>;
--				cd-gpios = <&expander0 5 GPIO_ACTIVE_LOW>;
- 				no-1-8-v;
-+				broken-cd;
- 				wp-inverted;
- 				bus-width = <8>;
- 				status = "okay";
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index cfed695..a1c308d 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -2200,6 +2200,14 @@ static void sdhci_card_event(struct mmc_host *mmc)
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ }
+ 
++static void sdhci_init_card(struct mmc_host *mmc, struct mmc_card *card)
++{
++	struct sdhci_host *host = mmc_priv(mmc);
++
++	if (host->ops->init_card)
++		host->ops->init_card(host, card);
++}
++
+ static const struct mmc_host_ops sdhci_ops = {
+ 	.request	= sdhci_request,
+ 	.post_req	= sdhci_post_req,
+@@ -2215,6 +2223,7 @@ static const struct mmc_host_ops sdhci_ops = {
+ 	.select_drive_strength		= sdhci_select_drive_strength,
+ 	.card_event			= sdhci_card_event,
+ 	.card_busy	= sdhci_card_busy,
++	.init_card	= sdhci_init_card,
+ };
+ 
+ /*****************************************************************************\
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index c751b78..365c860 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -547,6 +547,7 @@ struct sdhci_ops {
+ 					 struct mmc_card *card,
+ 					 unsigned int max_dtr, int host_drv,
+ 					 int card_drv, int *drv_type);
++	void	(*init_card)(struct sdhci_host *host, struct mmc_card *card);
+ };
+ 
+ #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
 -- 
 1.8.3.1
