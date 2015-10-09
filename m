@@ -1,355 +1,82 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 09 Oct 2015 18:16:30 -0400
-Subject: [PATCH 10/20] acpi: switch from ioremap_cache to memremap
+Date: Fri, 09 Oct 2015 18:16:36 -0400
+Subject: [PATCH 11/20] sound, skylake: switch from ioremap_cache to memremap
 In-Reply-To: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
 References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <20151009221630.32203.96152.stgit@dwillia2-desk3.jf.intel.com>
+Message-ID: <20151009221635.32203.30755.stgit@dwillia2-desk3.jf.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 In preparation for deprecating ioremap_cache() convert its usage in
-drivers/acpi and include/acpi/ to memremap.  This includes dropping the
-__iomem annotation throughout ACPI since the memremap can be treated as
-a normal memory pointer.
+skl-nhlt to memremap.
 
-Finally, memremap automatically handles requests to map normal memory
-pages, so this also drops the calls to "should_use_kmap()".
-
-It seems ARM had a local definition of acpi_os_ioremap() to handle RAM
-addresses, but it can be deleted now that memremap() handles this
-generically.
-
-Cc: Bob Moore <robert.moore@intel.com>
-Cc: Lv Zheng <lv.zheng@intel.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Cc: Liam Girdwood <lgirdwood@gmail.com>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Jaroslav Kysela <perex@perex.cz>
+Cc: Takashi Iwai <tiwai@suse.com>
+Cc: Jeeja KP <jeeja.kp@intel.com>
 Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
- arch/arm64/include/asm/acpi.h |    8 -----
- drivers/acpi/apei/einj.c      |    9 +++--
- drivers/acpi/apei/erst.c      |    6 ++--
- drivers/acpi/nvs.c            |    6 ++--
- drivers/acpi/osl.c            |   70 +++++++++++------------------------------
- include/acpi/acpi_io.h        |    6 +---
- 6 files changed, 32 insertions(+), 73 deletions(-)
+ sound/soc/intel/skylake/skl-nhlt.c |   10 +++++-----
+ sound/soc/intel/skylake/skl.h      |    6 +++---
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index a24a9b1cc91d..197d02047d00 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -29,14 +29,6 @@
+diff --git a/sound/soc/intel/skylake/skl-nhlt.c b/sound/soc/intel/skylake/skl-nhlt.c
+index 13036b19d7e5..b0c7bd113aac 100644
+--- a/sound/soc/intel/skylake/skl-nhlt.c
++++ b/sound/soc/intel/skylake/skl-nhlt.c
+@@ -25,7 +25,7 @@ static u8 OSC_UUID[16] = {0x6E, 0x88, 0x9F, 0xA6, 0xEB, 0x6C, 0x94, 0x45,
  
- /* Basic configuration for ACPI */
- #ifdef	CONFIG_ACPI
--/* ACPI table mapping after acpi_gbl_permanent_mmap is set */
--static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
--					    acpi_size size)
--{
--	return memremap(phys, size, MEMREMAP_WB);
--}
--#define acpi_os_ioremap acpi_os_ioremap
--
- typedef u64 phys_cpuid_t;
- #define PHYS_CPUID_INVALID INVALID_HWID
+ #define DSDT_NHLT_PATH "\\_SB.PCI0.HDAS"
  
-diff --git a/drivers/acpi/apei/einj.c b/drivers/acpi/apei/einj.c
-index 0431883653be..9f71010f6339 100644
---- a/drivers/acpi/apei/einj.c
-+++ b/drivers/acpi/apei/einj.c
-@@ -314,7 +314,8 @@ static int __einj_error_trigger(u64 trigger_paddr, u32 type,
- 			    sizeof(*trigger_tab) - 1);
- 		goto out;
- 	}
--	trigger_tab = ioremap_cache(trigger_paddr, sizeof(*trigger_tab));
-+	trigger_tab = memremap(trigger_paddr, sizeof(*trigger_tab),
-+			MEMREMAP_WB);
- 	if (!trigger_tab) {
- 		pr_err(EINJ_PFX "Failed to map trigger table!\n");
- 		goto out_rel_header;
-@@ -342,8 +343,8 @@ static int __einj_error_trigger(u64 trigger_paddr, u32 type,
- 		       (unsigned long long)trigger_paddr + table_size - 1);
- 		goto out_rel_header;
- 	}
--	iounmap(trigger_tab);
--	trigger_tab = ioremap_cache(trigger_paddr, table_size);
-+	memunmap(trigger_tab);
-+	trigger_tab = memremap(trigger_paddr, table_size, MEMREMAP_WB);
- 	if (!trigger_tab) {
- 		pr_err(EINJ_PFX "Failed to map trigger table!\n");
- 		goto out_rel_entry;
-@@ -405,7 +406,7 @@ out_rel_header:
- 	release_mem_region(trigger_paddr, sizeof(*trigger_tab));
- out:
- 	if (trigger_tab)
--		iounmap(trigger_tab);
-+		memunmap(trigger_tab);
- 
- 	return rc;
- }
-diff --git a/drivers/acpi/apei/erst.c b/drivers/acpi/apei/erst.c
-index 6682c5daf742..4ef62b54fabf 100644
---- a/drivers/acpi/apei/erst.c
-+++ b/drivers/acpi/apei/erst.c
-@@ -73,7 +73,7 @@ static struct acpi_table_erst *erst_tab;
- static struct erst_erange {
- 	u64 base;
- 	u64 size;
--	void __iomem *vaddr;
-+	void *vaddr;
- 	u32 attr;
- } erst_erange;
- 
-@@ -1181,8 +1181,8 @@ static int __init erst_init(void)
- 		goto err_unmap_reg;
- 	}
- 	rc = -ENOMEM;
--	erst_erange.vaddr = ioremap_cache(erst_erange.base,
--					  erst_erange.size);
-+	erst_erange.vaddr = memremap(erst_erange.base, erst_erange.size,
-+			MEMREMAP_WB);
- 	if (!erst_erange.vaddr)
- 		goto err_release_erange;
- 
-diff --git a/drivers/acpi/nvs.c b/drivers/acpi/nvs.c
-index 85287b8fe3aa..e0e15af93b22 100644
---- a/drivers/acpi/nvs.c
-+++ b/drivers/acpi/nvs.c
-@@ -136,7 +136,7 @@ void suspend_nvs_free(void)
- 			entry->data = NULL;
- 			if (entry->kaddr) {
- 				if (entry->unmap) {
--					iounmap(entry->kaddr);
-+					memunmap(entry->kaddr);
- 					entry->unmap = false;
- 				} else {
- 					acpi_os_unmap_iomem(entry->kaddr,
-@@ -180,7 +180,7 @@ int suspend_nvs_save(void)
- 
- 			entry->kaddr = acpi_os_get_iomem(phys, size);
- 			if (!entry->kaddr) {
--				entry->kaddr = acpi_os_ioremap(phys, size);
-+				entry->kaddr = acpi_os_memremap(phys, size);
- 				entry->unmap = !!entry->kaddr;
- 			}
- 			if (!entry->kaddr) {
-@@ -197,7 +197,7 @@ int suspend_nvs_save(void)
-  *	suspend_nvs_restore - restore NVS memory regions
-  *
-  *	This function is going to be called with interrupts disabled, so it
-- *	cannot iounmap the virtual addresses used to access the NVS region.
-+ *	cannot memunmap the virtual addresses used to access the NVS region.
-  */
- void suspend_nvs_restore(void)
+-void __iomem *skl_nhlt_init(struct device *dev)
++void *skl_nhlt_init(struct device *dev)
  {
-diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
-index 739a4a6b3b9b..d629eef2a56e 100644
---- a/drivers/acpi/osl.c
-+++ b/drivers/acpi/osl.c
-@@ -27,7 +27,6 @@
- #include <linux/kernel.h>
- #include <linux/slab.h>
- #include <linux/mm.h>
--#include <linux/highmem.h>
- #include <linux/pci.h>
- #include <linux/interrupt.h>
- #include <linux/kmod.h>
-@@ -40,8 +39,8 @@
- #include <linux/list.h>
- #include <linux/jiffies.h>
- #include <linux/semaphore.h>
-+#include <linux/io.h>
+ 	acpi_handle handle;
+ 	union acpi_object *obj;
+@@ -40,17 +40,17 @@ void __iomem *skl_nhlt_init(struct device *dev)
+ 	if (obj && obj->type == ACPI_TYPE_BUFFER) {
+ 		nhlt_ptr = (struct nhlt_resource_desc  *)obj->buffer.pointer;
  
--#include <asm/io.h>
- #include <asm/uaccess.h>
- #include <asm-generic/io-64-nonatomic-lo-hi.h>
+-		return ioremap_cache(nhlt_ptr->min_addr, nhlt_ptr->length);
++		return memremap(nhlt_ptr->min_addr, nhlt_ptr->length,
++				MEMREMAP_WB);
+ 	}
  
-@@ -88,7 +87,7 @@ static bool acpi_os_initialized;
-  */
- struct acpi_ioremap {
- 	struct list_head list;
--	void __iomem *virt;
-+	void *virt;
- 	acpi_physical_address phys;
- 	acpi_size size;
- 	unsigned long refcount;
-@@ -292,7 +291,7 @@ acpi_map_lookup(acpi_physical_address phys, acpi_size size)
- }
- 
- /* Must be called with 'acpi_ioremap_lock' or RCU read lock held. */
--static void __iomem *
-+static void *
- acpi_map_vaddr_lookup(acpi_physical_address phys, unsigned int size)
- {
- 	struct acpi_ioremap *map;
-@@ -304,10 +303,10 @@ acpi_map_vaddr_lookup(acpi_physical_address phys, unsigned int size)
+ 	dev_err(dev, "device specific method to extract NHLT blob failed\n");
  	return NULL;
  }
  
--void __iomem *acpi_os_get_iomem(acpi_physical_address phys, unsigned int size)
-+void *acpi_os_get_iomem(acpi_physical_address phys, unsigned int size)
+-void skl_nhlt_free(void __iomem *addr)
++void skl_nhlt_free(void *addr)
  {
- 	struct acpi_ioremap *map;
--	void __iomem *virt = NULL;
-+	void *virt = NULL;
- 
- 	mutex_lock(&acpi_ioremap_lock);
- 	map = acpi_map_lookup(phys, size);
-@@ -322,7 +321,7 @@ EXPORT_SYMBOL_GPL(acpi_os_get_iomem);
- 
- /* Must be called with 'acpi_ioremap_lock' or RCU read lock held. */
- static struct acpi_ioremap *
--acpi_map_lookup_virt(void __iomem *virt, acpi_size size)
-+acpi_map_lookup_virt(void *virt, acpi_size size)
- {
- 	struct acpi_ioremap *map;
- 
-@@ -334,44 +333,13 @@ acpi_map_lookup_virt(void __iomem *virt, acpi_size size)
- 	return NULL;
+-	iounmap(addr);
+-	addr = NULL;
++	memunmap(addr);
  }
  
--#if defined(CONFIG_IA64) || defined(CONFIG_ARM64)
--/* ioremap will take care of cache attributes */
--#define should_use_kmap(pfn)   0
--#else
--#define should_use_kmap(pfn)   page_is_ram(pfn)
--#endif
--
--static void __iomem *acpi_map(acpi_physical_address pg_off, unsigned long pg_sz)
--{
--	unsigned long pfn;
--
--	pfn = pg_off >> PAGE_SHIFT;
--	if (should_use_kmap(pfn)) {
--		if (pg_sz > PAGE_SIZE)
--			return NULL;
--		return (void __iomem __force *)kmap(pfn_to_page(pfn));
--	} else
--		return acpi_os_ioremap(pg_off, pg_sz);
--}
--
--static void acpi_unmap(acpi_physical_address pg_off, void __iomem *vaddr)
--{
--	unsigned long pfn;
--
--	pfn = pg_off >> PAGE_SHIFT;
--	if (should_use_kmap(pfn))
--		kunmap(pfn_to_page(pfn));
--	else
--		iounmap(vaddr);
--}
--
--void __iomem *__init_refok
-+void *__init_refok
- acpi_os_map_iomem(acpi_physical_address phys, acpi_size size)
- {
- 	struct acpi_ioremap *map;
--	void __iomem *virt;
- 	acpi_physical_address pg_off;
- 	acpi_size pg_sz;
-+	void *virt;
+ static struct nhlt_specific_cfg *skl_get_specific_cfg(
+diff --git a/sound/soc/intel/skylake/skl.h b/sound/soc/intel/skylake/skl.h
+index f7fdbb02947f..551c6db25f34 100644
+--- a/sound/soc/intel/skylake/skl.h
++++ b/sound/soc/intel/skylake/skl.h
+@@ -55,7 +55,7 @@ struct skl {
+ 	unsigned int init_failed:1; /* delayed init failed */
+ 	struct platform_device *dmic_dev;
  
- 	if (phys > ULONG_MAX) {
- 		printk(KERN_ERR PREFIX "Cannot map memory that high\n");
-@@ -397,7 +365,7 @@ acpi_os_map_iomem(acpi_physical_address phys, acpi_size size)
+-	void __iomem *nhlt; /* nhlt ptr */
++	void *nhlt; /* nhlt ptr */
+ 	struct skl_sst *skl_sst; /* sst skl ctx */
+ };
  
- 	pg_off = round_down(phys, PAGE_SIZE);
- 	pg_sz = round_up(phys + size, PAGE_SIZE) - pg_off;
--	virt = acpi_map(pg_off, pg_sz);
-+	virt = acpi_os_memremap(pg_off, pg_sz);
- 	if (!virt) {
- 		mutex_unlock(&acpi_ioremap_lock);
- 		kfree(map);
-@@ -435,7 +403,7 @@ static void acpi_os_map_cleanup(struct acpi_ioremap *map)
- {
- 	if (!map->refcount) {
- 		synchronize_rcu_expedited();
--		acpi_unmap(map->phys, map->virt);
-+		memunmap(map->virt);
- 		kfree(map);
- 	}
- }
-@@ -948,7 +916,7 @@ EXPORT_SYMBOL(acpi_os_write_port);
- acpi_status
- acpi_os_read_memory(acpi_physical_address phys_addr, u64 *value, u32 width)
- {
--	void __iomem *virt_addr;
-+	void *virt_addr;
- 	unsigned int size = width / 8;
- 	bool unmap = false;
- 	u64 dummy;
-@@ -957,7 +925,7 @@ acpi_os_read_memory(acpi_physical_address phys_addr, u64 *value, u32 width)
- 	virt_addr = acpi_map_vaddr_lookup(phys_addr, size);
- 	if (!virt_addr) {
- 		rcu_read_unlock();
--		virt_addr = acpi_os_ioremap(phys_addr, size);
-+		virt_addr = acpi_os_memremap(phys_addr, size);
- 		if (!virt_addr)
- 			return AE_BAD_ADDRESS;
- 		unmap = true;
-@@ -968,23 +936,23 @@ acpi_os_read_memory(acpi_physical_address phys_addr, u64 *value, u32 width)
+@@ -72,8 +72,8 @@ struct skl_dma_params {
+ int skl_platform_unregister(struct device *dev);
+ int skl_platform_register(struct device *dev);
  
- 	switch (width) {
- 	case 8:
--		*(u8 *) value = readb(virt_addr);
-+		*(u8 *) value = *(u8 *) virt_addr;
- 		break;
- 	case 16:
--		*(u16 *) value = readw(virt_addr);
-+		*(u16 *) value = *(u16 *) virt_addr;
- 		break;
- 	case 32:
--		*(u32 *) value = readl(virt_addr);
-+		*(u32 *) value = *(u32 *) virt_addr;
- 		break;
- 	case 64:
--		*(u64 *) value = readq(virt_addr);
-+		*(u64 *) value = *(u64 *) virt_addr;
- 		break;
- 	default:
- 		BUG();
- 	}
+-void __iomem *skl_nhlt_init(struct device *dev);
+-void skl_nhlt_free(void __iomem *addr);
++void *skl_nhlt_init(struct device *dev);
++void skl_nhlt_free(void *addr);
+ struct nhlt_specific_cfg *skl_get_ep_blob(struct skl *skl, u32 instance,
+ 			u8 link_type, u8 s_fmt, u8 no_ch, u32 s_rate, u8 dirn);
  
- 	if (unmap)
--		iounmap(virt_addr);
-+		memunmap(virt_addr);
- 	else
- 		rcu_read_unlock();
- 
-@@ -1002,7 +970,7 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u64 value, u32 width)
- 	virt_addr = acpi_map_vaddr_lookup(phys_addr, size);
- 	if (!virt_addr) {
- 		rcu_read_unlock();
--		virt_addr = acpi_os_ioremap(phys_addr, size);
-+		virt_addr = acpi_os_memremap(phys_addr, size);
- 		if (!virt_addr)
- 			return AE_BAD_ADDRESS;
- 		unmap = true;
-@@ -1026,7 +994,7 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u64 value, u32 width)
- 	}
- 
- 	if (unmap)
--		iounmap(virt_addr);
-+		memunmap(virt_addr);
- 	else
- 		rcu_read_unlock();
- 
-diff --git a/include/acpi/acpi_io.h b/include/acpi/acpi_io.h
-index dd86c5fc102d..646ce8714109 100644
---- a/include/acpi/acpi_io.h
-+++ b/include/acpi/acpi_io.h
-@@ -5,13 +5,11 @@
- 
- #include <asm/acpi.h>
- 
--#ifndef acpi_os_ioremap
--static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
-+static inline void *acpi_os_memremap(acpi_physical_address phys,
- 					    acpi_size size)
- {
--       return ioremap_cache(phys, size);
-+       return memremap(phys, size, MEMREMAP_WB);
- }
--#endif
- 
- void __iomem *__init_refok
- acpi_os_map_iomem(acpi_physical_address phys, acpi_size size);
