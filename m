@@ -1,52 +1,32 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 9 Oct 2015 00:37:46 -0700
-Subject: [PATCH 02/10] clk: nsp: add clock support for Broadcom Northstar
- Plus SoC
-In-Reply-To: <1443826665-17570-3-git-send-email-jonmason@broadcom.com>
-References: <1443826665-17570-1-git-send-email-jonmason@broadcom.com>
- <1443826665-17570-3-git-send-email-jonmason@broadcom.com>
-Message-ID: <20151009073746.GP26883@codeaurora.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 9 Oct 2015 09:52:04 +0200
+Subject: [PATCH v2 3/5] ARM: mvebu: set SW polling as SDHCI card
+ detection on A388-GP
+In-Reply-To: <1444352635-21965-4-git-send-email-mw@semihalf.com>
+References: <1444352635-21965-1-git-send-email-mw@semihalf.com>
+ <1444352635-21965-4-git-send-email-mw@semihalf.com>
+Message-ID: <20151009095204.41010dd9@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02, Jon Mason wrote:
-> diff --git a/drivers/clk/bcm/clk-nsp.c b/drivers/clk/bcm/clk-nsp.c
-> new file mode 100644
-> index 0000000..708961a
-> --- /dev/null
-> +++ b/drivers/clk/bcm/clk-nsp.c
-> @@ -0,0 +1,139 @@
-> +/*
-> + * Copyright (C) 2015 Broadcom Corporation
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation version 2.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/err.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/clkdev.h>
+Dear Marcin Wojtas,
 
-Is this used?
+On Fri,  9 Oct 2015 03:03:53 +0200, Marcin Wojtas wrote:
+> The newest revisions of A388-GP (v1.5 and higher) support only
+> DAT3-based card detection. Revisions < v1.5 based on GPIO detection
+> via I2C expander, but this solution is supposed to be deprecated on
+> new boards. In order to satisfy all type of hardware this commit
+> changes card detection to use software polling mechanism.
+> 
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 
-> +#include <linux/of_address.h>
-> +#include <linux/delay.h>
+Can we add a comment on the DT that explains why SW polling is used,
+and which other mechanism can be used depending on the board revision?
 
-Is this used?
+Thanks,
 
-> +
-> +#include <dt-bindings/clock/bcm-nsp.h>
-> +#include "clk-iproc.h"
-
+Thomas
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
