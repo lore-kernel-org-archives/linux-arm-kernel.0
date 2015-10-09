@@ -1,52 +1,69 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 9 Oct 2015 14:15:23 +0100
-Subject: [PATCH v3 0/6] GICv3: add 32bit compatibility
-In-Reply-To: <1443703639-3730-1-git-send-email-jean-philippe.brucker@arm.com>
-References: <1443703639-3730-1-git-send-email-jean-philippe.brucker@arm.com>
-Message-ID: <20151009141523.1228b63e@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 9 Oct 2015 08:17:16 -0500
+Subject: [PATCH 1/4] arm64: dts: Reserve memory regions for hi6220
+In-Reply-To: <1444365376-10728-2-git-send-email-leo.yan@linaro.org>
+References: <1444365376-10728-1-git-send-email-leo.yan@linaro.org>
+ <1444365376-10728-2-git-send-email-leo.yan@linaro.org>
+Message-ID: <CAL_JsqJapPM6CpaG+AYDAUQajZ4V5jREdCwA5F4vkD5jqC3bzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  1 Oct 2015 13:47:13 +0100
-Jean-Philippe Brucker <jean-philippe.brucker@arm.com> wrote:
+On Thu, Oct 8, 2015 at 11:36 PM, Leo Yan <leo.yan@linaro.org> wrote:
+> On Hi6220, below memory regions in DDR have specific purpose:
+>
+>   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
+>   0x06df,f000 - 0x06df,ffff: For mailbox message data;
+>   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
+>   0x3e00,0000 - 0x3fff,ffff: For OP-TEE.
+>
+> This patch reserves these memory regions in DT.
+>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 16 ++++++++++++----
+>  1 file changed, 12 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> index e36a539..e3f4cb3 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> @@ -7,9 +7,6 @@
+>
+>  /dts-v1/;
+>
+> -/*Reserved 1MB memory for MCU*/
+> -/memreserve/ 0x05e00000 0x00100000;
+> -
 
-> Hi,
-> 
-> This series adds 32bit support to the GICv3 driver. Only SGIs, PPIs and
-> SPIs support is present, no ITS.
-> Currently, the main targets for those patches are 32bit guests running under
-> KVM. They can now use affinity routing and theoretically have a lot more than
-> 8 CPUs. During my tests, I was able to use 16 virtual CPUs on an AEM model.
-> 
-> We don't support 32bit hosts with GICv3 at the moment. I added a patch to allow
-> building a host when CONFIG_ARM_GIC_V3 enabled, as pointed out by Vladimir in
-> the last series. When attempting to run such host with a device-tree that
-> declares GICv3, KVM will refuse to start, and throw a -ENODEV error.
-> 
-> Some time has passed since last series, but I am now available full-time to act
-> on reviews and comments.
-> 
-> Changes since v2 [2]:
-> - rebased on 4.3-rc3,
-> - add a sixth patch to handle build with CONFIG_KVM + CONFIG_ARM_GIC_V3.
-> 
-> Changes since v1 [1]:
-> - fix the mistakes pointed out on the list,
-> - add a patch to select ARM_GIC_V3 under ARCH_VIRT.
-> 
-> Cheers,
-> Jean
+Why does memreserve not work for you? You can have multiple entries.
 
-Hi Jean-Philippe,
+>  #include "hi6220.dtsi"
+>
+>  / {
+> @@ -24,8 +21,19 @@
+>                 stdout-path = "serial0:115200n8";
+>         };
+>
+> +       /*
+> +        * Reserve below regions from memory node:
+> +        *
+> +        *  - 0x05e0,0000 - 0x05ef,ffff: MCU firmware runtime using
+> +        *  - 0x06df,f000 - 0x06df,ffff: Mailbox message data
+> +        *  - 0x0740,f000 - 0x0740,ffff: MCU firmware section
+> +        *  - 0x3e00,0000 - 0x3fff,ffff: OP-TEE
+> +        */
+>         memory at 0 {
+>                 device_type = "memory";
+> -               reg = <0x0 0x0 0x0 0x40000000>;
+> +               reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
+> +                     <0x00000000 0x05f00000 0x00000000 0x00eff000>,
+> +                     <0x00000000 0x06e00000 0x00000000 0x0060f000>,
+> +                     <0x00000000 0x07410000 0x00000000 0x36bf0000>;
 
-Looks good to me: Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+No, don't do this. Please use memreserve or reserved-memory binding[1]
+or combination of both. Probably reserved-memory if you need the
+kernel to access some of these regions.
 
-There is some conflicts with stuff I have queued already (the 64bit
-SRE stuff), but I can fix that up pretty easily, assuming Christoffer
-doesn't have any objection to the last patch.
+Rob
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+[1] Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
