@@ -1,22 +1,30 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 9 Oct 2015 22:22:40 +0800
-Subject: [PATCH v3 3/5] ARM: sun5i: dt: Move uart3 pinctrl node to common
- DTSI
-In-Reply-To: <1444380177-15302-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1444380177-15302-1-git-send-email-maxime.ripard@free-electrons.com>
- <1444380177-15302-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v656+cD__KkFASQ=dPkzE-d2OPoxzU94-yyA8+Y6XQmhiw@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 9 Oct 2015 16:24:20 +0200 (CEST)
+Subject: [PATCH 01/16] irqdomain: Use an accessor for the of_node field
+In-Reply-To: <1444152989-31726-2-git-send-email-marc.zyngier@arm.com>
+References: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
+ <1444152989-31726-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <alpine.DEB.2.11.1510091623090.6097@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 9, 2015 at 4:42 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The uart3 pins are shared between the A10s and A13, move the pinctrl node
-> to the common DTSI to avoid duplication.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+On Tue, 6 Oct 2015, Marc Zyngier wrote:
+> index d3ca792..f644fdb 100644
+> --- a/include/linux/irqdomain.h
+> +++ b/include/linux/irqdomain.h
+> @@ -161,6 +161,11 @@ enum {
+>  	IRQ_DOMAIN_FLAG_NONCORE		= (1 << 16),
+>  };
+>  
+> +static inline struct device_node *irq_domain_get_of_node(struct irq_domain *d)
+> +{
+> +	return d->of_node;
+> +}
+> +
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Can you please make that a seperate patch, which I can expedite to
+Linus? That way we can fix stuff which shows up in next as well.
 
-Thanks
+Thanks,
+
+	tglx
