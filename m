@@ -1,51 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Oct 2015 17:11:52 +0100
-Subject: [PATCH 1/9] drm: bridge/dw_hdmi-ahb-audio: add audio driver
-In-Reply-To: <CAOMZO5Ah=AKXr__uuYsYp1KvSHptVp1NR7YUr7akzQJ3xW2XiA@mail.gmail.com>
-References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
- <E1ZO6hC-0003M5-EU@rmk-PC.arm.linux.org.uk>
- <CAOMZO5COgoGU-3YNpnmSkctHMRDJ3=DuKc82Wb5zTTX7Bx2jNw@mail.gmail.com>
- <20151006181806.GS21513@n2100.arm.linux.org.uk>
- <CAOMZO5DaowTGQqN_NW7T2zv-P6a_YZUCumq4-m+OtpsKqFzELw@mail.gmail.com>
- <20151006185429.GU21513@n2100.arm.linux.org.uk>
- <CAOMZO5C8O0p6C0hrAvHzanru9W2f8-C7MWsm3+HumoyZ9Hu6Jw@mail.gmail.com>
- <20151009160036.GZ32532@n2100.arm.linux.org.uk>
- <CAOMZO5Ah=AKXr__uuYsYp1KvSHptVp1NR7YUr7akzQJ3xW2XiA@mail.gmail.com>
-Message-ID: <20151009161152.GB32532@n2100.arm.linux.org.uk>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 9 Oct 2015 17:12:09 +0100
+Subject: [PATCH v2] dmaengine: xgene-dma: Disable memcpy operation due to
+ performance drop
+In-Reply-To: <1444295217-3099-1-git-send-email-rsahu@apm.com>
+References: <1444295217-3099-1-git-send-email-rsahu@apm.com>
+Message-ID: <20151009161208.GJ3609@vkoul-mobl.iind.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 01:02:11PM -0300, Fabio Estevam wrote:
-> On Fri, Oct 9, 2015 at 1:00 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
+On Thu, Oct 08, 2015 at 02:36:57PM +0530, Rameshwar Prasad Sahu wrote:
+> The DMA engine supports memory copy, RAID5 XOR, RAID6 PQ, and other
+> computations. But the bandwidth of the entire DMA engine is shared
+> among all channels. This patch re-configures operations availability
+> such that one can achieve maximum performance for XOR and PQ
+> computation by removing the memory offload operations.
 > 
-> >> Thanks, Russell!
-> >>
-> >> Got audio to play on my HDMI TV :-)
-> >>
-> >> For the entire series:
-> >>
-> >> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
-> >
-> > Just to confirm - that's for _all_ of these 8 patches, including the
-> > changes to the ACR code in the last four patches, and you're happy that
-> > I send all of these:
-> >
-> > drm: bridge/dw_hdmi-ahb-audio: add audio driver
-> > drm: bridge/dw_hdmi-ahb-audio: parse ELD from HDMI driver
-> > drm: bridge/dw_hdmi-ahb-audio: basic support for multi-channel PCM audio
-> > drm: bridge/dw_hdmi-ahb-audio: allow larger buffer sizes
-> > drm: bridge/dw_hdmi: avoid being recursive in N calculation
-> > drm: bridge/dw_hdmi: adjust pixel clock values in N calculation
-> > drm: bridge/dw_hdmi: remove ratio support from ACR code
-> > drm: bridge/dw_hdmi: replace CTS calculation for the ACR
+> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+> ---
+>  drivers/dma/xgene-dma.c | 1 -
+>  1 file changed, 1 deletion(-)
 > 
-> That's correct. Thanks, Russell
+> diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
+> index 8d57b1b..cd38022 100644
+> --- a/drivers/dma/xgene-dma.c
+> +++ b/drivers/dma/xgene-dma.c
+> @@ -1707,7 +1707,6 @@ static void xgene_dma_set_caps(struct xgene_dma_chan *chan,
+>  	dma_cap_zero(dma_dev->cap_mask);
+> 
+>  	/* Set DMA device capability */
+> -	dma_cap_set(DMA_MEMCPY, dma_dev->cap_mask);
+>  	dma_cap_set(DMA_SG, dma_dev->cap_mask);
 
-Thanks.  I'll drop that set into linux-next tonight, along with the TDA998x
-and Armada DRM patches that haven't seen an airing there yet - before asking
-David to pull them next week (the timescale has slipped...)
+This will not work. Still clients can invoke memcpy operation. You need to
+remove the callback
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+~Vinod
