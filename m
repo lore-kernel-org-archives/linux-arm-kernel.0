@@ -1,29 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 9 Oct 2015 13:50:53 +0100
-Subject: [PATCHv3 0/7] arm64: Use contiguous PTE bit for the kernel
- linear mapping
-In-Reply-To: <1444237225-13802-1-git-send-email-jeremy.linton@arm.com>
-References: <1444237225-13802-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <20151009125052.GV17192@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 09 Oct 2015 14:53:54 +0200
+Subject: [PATCH] net: HNS: fix MDIO dependencies
+Message-ID: <8114651.XErShuFr2W@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 12:00:18PM -0500, Jeremy Linton wrote:
-> Jeremy Linton (7):
->   arm64: Add contiguous page flag shifts and constants
->   arm64: PTE/PMD contiguous bit definition
->   arm64: Macros to check/set/unset the contiguous bit
->   arm64: Default kernel pages should be contiguous
->   arm64: Make the kernel page dump utility aware of the CONT bit
->   arm64: Add a kernel Kconfig option to enable contiguous PTE marking
->   arm64: Mark kernel page ranges contiguous
+The newly introduced HNS_MDIO Kconfig symbol selects 'MDIO', but
+that is the wrong symbol as the code used by this driver is
+provided by PHYLIB rather than the MDIO driver. Also, there is
+no need to make this driver user selectable, because it is already
+selected by all drivers that need it.
 
-I queued the series without patch 6 (and a modification of patch 7 to
-get rid of the config option check). If we need this option, we can add
-it later but for (hardware) debugging purposes it looks to me like we
-can simply set PTE_CONT to 0.
+This changes the Kconfig file to select the correct library, and
+to make the option silent.
 
-Thanks.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 5b904d39406 ("net: add Hisilicon Network Subsystem MDIO support")
 
--- 
-Catalin
+diff --git a/drivers/net/ethernet/hisilicon/Kconfig b/drivers/net/ethernet/hisilicon/Kconfig
+index 165b5a8aa2ea..8d12b587809e 100644
+--- a/drivers/net/ethernet/hisilicon/Kconfig
++++ b/drivers/net/ethernet/hisilicon/Kconfig
+@@ -24,7 +24,6 @@ config HIX5HD2_GMAC
+ 
+ config HIP04_ETH
+ 	tristate "HISILICON P04 Ethernet support"
+-	select PHYLIB
+ 	select MARVELL_PHY
+ 	select MFD_SYSCON
+ 	select HNS_MDIO
+@@ -33,8 +32,8 @@ config HIP04_ETH
+ 	  want to use the internal ethernet then you should answer Y to this.
+ 
+ config HNS_MDIO
+-	tristate "Hisilicon HNS MDIO device Support"
+-	select MDIO
++	tristate
++	select PHYLIB
+ 	---help---
+ 	  This selects the HNS MDIO support. It is needed by HNS_DSAF to access
+ 	  the PHY
