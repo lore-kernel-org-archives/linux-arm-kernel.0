@@ -1,56 +1,88 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Fri, 9 Oct 2015 12:40:21 +0300
-Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
-In-Reply-To: <20151009091037.GC26278@arm.com>
-References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
- <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
- <CAPAsAGz7Tp6Z87tPq_NNh_mcwPF_DOaXzu0po5f6AQxPAcsALQ@mail.gmail.com>
- <20151009091037.GC26278@arm.com>
-Message-ID: <CAPAsAGzgqOZVdTfpBGADAhZjOJTCqdB1Paq-14vk-_1hu4DCyw@mail.gmail.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Fri,  9 Oct 2015 15:11:02 +0530
+Subject: [PATCH v4 0/8] qcom: Add support for TSENS driver
+Message-ID: <1444383670-32693-1-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-09 12:10 GMT+03:00 Will Deacon <will.deacon@arm.com>:
-> On Fri, Oct 09, 2015 at 11:12:24AM +0300, Andrey Ryabinin wrote:
->> 2015-10-08 22:02 GMT+03:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
->> > --- a/arch/arm64/kernel/image.h
->> > +++ b/arch/arm64/kernel/image.h
->> > @@ -59,4 +59,31 @@
->> >         _kernel_offset_le       = DATA_LE64(TEXT_OFFSET);       \
->> >         _kernel_flags_le        = DATA_LE64(__HEAD_FLAGS);
->> >
->> > +#ifdef CONFIG_EFI
->> > +
->> > +/*
->> > + * The EFI stub has its own symbol namespace prefixed by __efistub_, to
->> > + * isolate it from the kernel proper. The following symbols are legally
->> > + * accessed by the stub, so provide some aliases to make them accessible.
->> > + * Only include data symbols here, or text symbols of functions that are
->> > + * guaranteed to be safe when executed at another offset than they were
->> > + * linked at. The routines below are all implemented in assembler in a
->> > + * position independent manner
->> > + */
->> > +__efistub_memcmp               = __pi_memcmp;
->> > +__efistub_memchr               = __pi_memchr;
->> > +__efistub_memcpy               = __pi_memcpy;
->> > +__efistub_memmove              = __pi_memmove;
->> > +__efistub_memset               = __pi_memset;
->> > +__efistub_strlen               = __pi_strlen;
->> > +__efistub_strcmp               = __pi_strcmp;
->> > +__efistub_strncmp              = __pi_strncmp;
->> > +__efistub___flush_dcache_area  = __pi___flush_dcache_area;
->>
->> So why we need these __pi_* aliases?
->> We could just do __efistub_memcmp = memcmp; Right?
->
-> We *could*, but that defeats the whole purpose of tagging
-> position-independent functions explicitly in the kernel text.
->
+Patches 1/8 to 4/8 will need to go via the thermal tree/Eduardo.
+Patches 5/8 to 8/8 will need to go via qcom-msm tree/Andy.
 
-I just don't get that "the whole purpose of tagging".
+Eduardo, can you please take a look at the patches and let me
+know if you see any issues.
 
-Yes, the EFI stub is allowed to call only PI kernel functions.
-But the EFI stub already protected by __efistub_ namespace.
-If we want to use some new PI function in the stub, we would need add
-it into this list at first.
-So that __pi_ namespace doesn't bring any protection or isolation.
+Current set of patches apply on 4.3-rc4. Need to pull in clk-next
+(for a dependent patch) to be able to test on ifc6410 board.
+
+Changes since v3:
+* Dropped 'clk: qcom: create virtual child device for TSENS' which
+is picked up by Stephen
+* Updated GCC bindings with optional TSENS properties
+
+Changes since v2:
+* Minor review fixes from Stephen/Punit and rebase on 4.3-rc4
+
+Changes since v1:
+* Created virtual tsens device from gcc driver for 8960,
+with DT having a single node for gcc and tsens
+* Minor fixes with rebasing on 4.3-rc1
+
+Changes since RFC:
+* Added support for 8916 and 8084
+* Based off the latest nvmem framework patches [1]
+* Minor review fixes for comments mostly from Lina
+
+This is an attempt to have a single TSENS driver for
+the different versions of the TSENS IP that exist, on
+different qcom msm/apq SoCs'
+Support is added for msm8916, msm8960 and msm8974 families.
+
+A lot of the work is based of original code from Stephen Boyd
+and Siddartha Mohanadoss. I have also picked some of what
+Narendran Rajan did in his attempt to upstream the support
+for 8960 family. I could not keep the original authorship on
+any of the patches because I ended up moving the code around
+quite a bit in an effort to have a single driver for the
+various devices. I would be glad to change the authorship
+for any of the patches if needed.
+
+Rajendra Nayak (8):
+  thermal: qcom: tsens: Add a skeletal TSENS drivers
+  thermal: qcom: tsens-8916: Add support for 8916 family of SoCs
+  thermal: qcom: tsens-8974: Add support for 8974 family of SoCs
+  thermal: qcom: tsens-8960: Add support for 8960 family of SoCs
+  arm: dts: msm8974: Add thermal zones, tsens and qfprom nodes
+  arm: dts: apq8064: Add thermal zones, tsens and qfprom nodes
+  arm: dts: apq8084: Add thermal zones, tsens and qfprom nodes
+  arm64: dts: msm8916: Add thermal zones, tsens and qfprom nodes
+
+ .../devicetree/bindings/clock/qcom,gcc.txt         |  20 ++
+ .../devicetree/bindings/thermal/qcom-tsens.txt     |  33 +++
+ arch/arm/boot/dts/qcom-apq8064.dtsi                | 101 +++++++
+ arch/arm/boot/dts/qcom-apq8084.dtsi                | 105 ++++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi                | 105 ++++++++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |  66 +++++
+ drivers/thermal/Kconfig                            |   5 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/qcom/Kconfig                       |  10 +
+ drivers/thermal/qcom/Makefile                      |   2 +
+ drivers/thermal/qcom/tsens-8916.c                  | 107 ++++++++
+ drivers/thermal/qcom/tsens-8960.c                  | 291 +++++++++++++++++++++
+ drivers/thermal/qcom/tsens-8974.c                  | 239 +++++++++++++++++
+ drivers/thermal/qcom/tsens-common.c                | 130 +++++++++
+ drivers/thermal/qcom/tsens.c                       | 206 +++++++++++++++
+ drivers/thermal/qcom/tsens.h                       |  69 +++++
+ 16 files changed, 1490 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+ create mode 100644 drivers/thermal/qcom/Kconfig
+ create mode 100644 drivers/thermal/qcom/Makefile
+ create mode 100644 drivers/thermal/qcom/tsens-8916.c
+ create mode 100644 drivers/thermal/qcom/tsens-8960.c
+ create mode 100644 drivers/thermal/qcom/tsens-8974.c
+ create mode 100644 drivers/thermal/qcom/tsens-common.c
+ create mode 100644 drivers/thermal/qcom/tsens.c
+ create mode 100644 drivers/thermal/qcom/tsens.h
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
