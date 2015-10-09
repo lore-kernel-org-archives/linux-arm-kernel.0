@@ -1,43 +1,23 @@
-From: wei@redhat.com (Wei Huang)
-Date: Fri,  9 Oct 2015 10:08:43 -0500
-Subject: [PATCH] arm/arm64: KVM : Enable vhost device selection under KVM
- config menu
-Message-ID: <1444403323-8333-1-git-send-email-wei@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 09 Oct 2015 17:09:38 +0200
+Subject: [GIT PULL 1/2] Rockchip drivers for 4.4
+In-Reply-To: <160496219.B4xWx83NpX@phil>
+References: <160496219.B4xWx83NpX@phil>
+Message-ID: <8691740.7EoGdKhH7X@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vhost drivers provide guest VMs with better I/O performance and lower
-CPU utilization. This patch allows users to select vhost devices under
-KVM configuration menu on ARM. This makes vhost support on arm/arm64
-on a par with other architectures (e.g. x86, ppc).
+On Friday 09 October 2015 02:34:44 Heiko Stuebner wrote:
+> Add the power-domain base-driver which currently contains
+> support for the rk3288 powerdomain layout but can be easily
+> extended for the socs (including arm64) later on.
+> A big thanks to Ceasar Wang for pulling through on this
+> during 18 revisions.
+> Also included is a fix to the pm-clock handling in the generic
+> powerdomains to adapt it to the per-user clock handling we now
+> do, Acked by Rafael Wysocki.
+> 
 
-Signed-off-by: Wei Huang <wei@redhat.com>
----
- arch/arm/kvm/Kconfig   | 2 ++
- arch/arm64/kvm/Kconfig | 2 ++
- 2 files changed, 4 insertions(+)
+Merged into next/driver, thanks!
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 210ecca..68045e7 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -45,4 +45,6 @@ config KVM_ARM_HOST
- 	---help---
- 	  Provides host support for ARM processors.
- 
-+source drivers/vhost/Kconfig
-+
- endif # VIRTUALIZATION
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index 5c7e920..38102f5 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -41,4 +41,6 @@ config KVM_ARM_HOST
- 	---help---
- 	  Provides host support for ARM processors.
- 
-+source drivers/vhost/Kconfig
-+
- endif # VIRTUALIZATION
--- 
-2.4.3
+	Arnd
