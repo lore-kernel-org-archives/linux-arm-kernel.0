@@ -1,81 +1,133 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 9 Oct 2015 19:23:40 +0800
-Subject: [PATCH v5 06/10] dmaengine: add API for getting dma controller's
- quirk
-In-Reply-To: <20151007143205.GG3320@vkoul-mobl.iind.intel.com>
-References: <1442187923-5736-1-git-send-email-shawn.lin@rock-chips.com>
- <1442188139-6017-1-git-send-email-shawn.lin@rock-chips.com>
- <20151005153746.GG13501@vkoul-mobl.iind.intel.com>
- <56139289.7000005@rock-chips.com>
- <20151007143205.GG3320@vkoul-mobl.iind.intel.com>
-Message-ID: <5617A3BC.3050401@rock-chips.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Oct 2015 12:24:18 +0100
+Subject: [PATCH v2 10/10] ARM: software-based priviledged-no-access support
+In-Reply-To: <20151009105309.GM26278@arm.com>
+References: <20150825154026.GT7557@n2100.arm.linux.org.uk>
+ <E1ZUGMS-0000BG-8B@rmk-PC.arm.linux.org.uk>
+ <CACRpkdZhJfsH0wU0VBotT=yomDqBkKWrz3MNFOin=CCz62v_nw@mail.gmail.com>
+ <20151009105309.GM26278@arm.com>
+Message-ID: <20151009112418.GN32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/10/7 22:32, Vinod Koul wrote:
-> On Tue, Oct 06, 2015 at 05:21:13PM +0800, Shawn Lin wrote:
->
->>>> +	int (*device_get_quirks)(struct dma_chan *chan);
->>>
->>> And why do we want to expose this to users? THis doesnt seem right!
->>>
->>
->> Basically I agree not to expose dma's quirk to slave controllers...But, the
->> fact I mentioned on cover letter explain the reasons why I have to let slave
->> controllers know that they are working with a broken dma. It's a dilemma
->> that if we don't want that to be exposed(let slave controllers' driver get
->> the info via a API), we have to add broken quirk for all of them ,here and
->> there, which seems to be a disaster:(
->>
->> I would appreciate it if you could give me some suggestions at your earliest
->> convenience. :)
->>
->>> A quirk may exists but should be handled inside the controller driver and do
->>> appropriate action. You don't tell users or expect them to handle these
->>>
-> I laready gave one re-read the above lines.
->
-> Anyway I went ahead and read the usage. You are setting the slave parameters
-> for this. I can see two ways:
-> 1. Have the quirk to driver and based on quirk reset the slave settings when
-> they are set by client.
-> 2. Put this in DT and set the dma properties based on these quirks and let
-> driver and cleint be agnostic to it
+On Fri, Oct 09, 2015 at 11:53:09AM +0100, Will Deacon wrote:
+> On Fri, Oct 09, 2015 at 10:28:14AM +0200, Linus Walleij wrote:
+> > On Tue, Aug 25, 2015 at 5:42 PM, Russell King
+> > <rmk+kernel@arm.linux.org.uk> wrote:
+> > 
+> > > Provide a software-based implementation of the priviledged no access
+> > > support found in ARMv8.1.
+> > >
+> > > Userspace pages are mapped using a different domain number from the
+> > > kernel and IO mappings.  If we switch the user domain to "no access"
+> > > when we enter the kernel, we can prevent the kernel from touching
+> > > userspace.
+> > >
+> > > However, the kernel needs to be able to access userspace via the
+> > > various user accessor functions.  With the wrapping in the previous
+> > > patch, we can temporarily enable access when the kernel needs user
+> > > access, and re-disable it afterwards.
+> > >
+> > > This allows us to trap non-intended accesses to userspace, eg, caused
+> > > by an inadvertent dereference of the LIST_POISON* values, which, with
+> > > appropriate user mappings setup, can be made to succeed.  This in turn
+> > > can allow use-after-free bugs to be further exploited than would
+> > > otherwise be possible.
+> > >
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > 
+> > For some reason this patch explodes on my ARM PB11MPCore, it
+> > is a weird beast and corner case machine so I guess that is why
+> > it wasn't noticed. This happens a bit into the boot when freeing
+> > unused pages:
+> > 
+> > Freeing unused kernel memory: 2672K (c0448000 - c06e4000)
+> > Unable to handle kernel paging request at virtual address b6f069f4
+> > pgd = c6e58000
+> > [b6f069f4] *pgd=76e09831, *pte=77ff759f, *ppte=77ff7e6e
+> > Internal error: Oops: 17 [#1] SMP ARM
+> > Modules linked in:
+> > CPU: 2 PID: 1 Comm: init Not tainted 4.3.0-rc4-00015-gf6702681a0af #48
+> > Hardware name: ARM-RealView PB11MPCore
+> > task: c7827bc0 ti: c782c000 task.ti: c782c000
+> > PC is at v6wbi_flush_user_tlb_range+0x28/0x48
+> > LR is at on_each_cpu_mask+0x58/0x60
+> > pc : [<c001abf0>]    lr : [<c007c18c>]    psr: 20000093
+> > sp : c782deb8  ip : 00000000  fp : 00000000
+> > r10: c6e5adc8  r9 : 00000001  r8 : b6f02000
+> > r7 : c7a17180  r6 : c782ded4  r5 : c0015118  r4 : 20000013
+> > r3 : 00000002  r2 : 00100075  r1 : b6f02000  r0 : b6f01002
+> > Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
+> > Control: 00c5787d  Table: 76e5800a  DAC: 00000051
+> 
+> It looks like we're faulting on the TLBI instruction, because it's
+> targetting a userspace address (r0 == 0xb6f01002) and the DAC prohibits
+> access to userspace.
 
-+Mark Brown
+That's kind'a weird - I'd have expected _cache_ operations to fault,
+but not TLB operations.  From a quick search of the ARM ARM, I can't
+find anything that says that TLB operations are allowed to fault.
 
-Thanks for these.
+> It's weird that this only seems to happen on 11MPCore
+> though; if this core was one of the guys getting cross-called, then I
+> could understand the bug, but the lr suggests that CPU 2 is initiating
+> the flush, so I'd expect the same problem to appear on any ARMv6 part.
 
-The first one is hard for dma to distinguish "broken 
-slave"(I2S/SPI/UART..) from the unbroken ones(block devices like 
-mmc/SFC...). If all clients are broken for that, it's easy to reset the 
-slave parameters in dma driver. Unfortunately, not always, at least for 
-rockchips' Socs.
+It sounds to me like a CPU bug, but one which we need to work around.
+ipi_flush_tlb_range() will be the function concerned, we need to
+save-and-enable, and then restore the user access state around that
+call.
 
-And before V4, I did pass quirks to clents from DT, but Mark thought we 
-should avoid to get it from dt. Anyway, now I think about it again,
+> Russell, have you tried the s/w PAN stuff on any v6 CPUs?
 
-(1) dma drivers doesn't know the users who should use limited burst and 
-who won't. That make it's impossible for dma drivers to handle it alone 
-or expose new API of burst capabilities to clients.
-(2) It's inappropriate to expose quirks to clients.
+No.  I have considered having the Realview EB board as part of the test
+farm, but as that board is hassle to get going, I deem the hardware to
+be too unreliable for that.  (I reported the problem at the time.)
 
-so the only way I can see is to make some tricks from DT.
-I would prefer to add "burst limit" property for the broken slaves 
-instead of quirks for them which I did before V4.
+Linus, can you try the patch below to see if it resolves the problem
+you're seeing please?
 
-Something like:
+ arch/arm/kernel/smp_tlb.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-&spi{
-max-burst-len=<1>;
-}
-
-How about?
-:)
-
->
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index 2e72be4f623e..7cb079e74010 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -9,6 +9,7 @@
+  */
+ #include <linux/preempt.h>
+ #include <linux/smp.h>
++#include <linux/uaccess.h>
+ 
+ #include <asm/smp_plat.h>
+ #include <asm/tlbflush.h>
+@@ -40,8 +41,11 @@ static inline void ipi_flush_tlb_mm(void *arg)
+ static inline void ipi_flush_tlb_page(void *arg)
+ {
+ 	struct tlb_args *ta = (struct tlb_args *)arg;
++	unsigned int __ua_flags = uaccess_save_and_enable();
+ 
+ 	local_flush_tlb_page(ta->ta_vma, ta->ta_start);
++
++	uaccess_restore(__ua_flags);
+ }
+ 
+ static inline void ipi_flush_tlb_kernel_page(void *arg)
+@@ -54,8 +58,11 @@ static inline void ipi_flush_tlb_kernel_page(void *arg)
+ static inline void ipi_flush_tlb_range(void *arg)
+ {
+ 	struct tlb_args *ta = (struct tlb_args *)arg;
++	unsigned int __ua_flags = uaccess_save_and_enable();
+ 
+ 	local_flush_tlb_range(ta->ta_vma, ta->ta_start, ta->ta_end);
++
++	uaccess_restore(__ua_flags);
+ }
+ 
+ static inline void ipi_flush_tlb_kernel_range(void *arg)
 
 
 -- 
-Best Regards
-Shawn Lin
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
