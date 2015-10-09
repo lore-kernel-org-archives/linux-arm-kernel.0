@@ -1,66 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Oct 2015 10:43:24 +0100
-Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
-In-Reply-To: <CAPAsAGzgqOZVdTfpBGADAhZjOJTCqdB1Paq-14vk-_1hu4DCyw@mail.gmail.com>
-References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
- <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
- <CAPAsAGz7Tp6Z87tPq_NNh_mcwPF_DOaXzu0po5f6AQxPAcsALQ@mail.gmail.com>
- <20151009091037.GC26278@arm.com>
- <CAPAsAGzgqOZVdTfpBGADAhZjOJTCqdB1Paq-14vk-_1hu4DCyw@mail.gmail.com>
-Message-ID: <20151009094324.GE26278@arm.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Fri, 09 Oct 2015 11:43:37 +0200
+Subject: [PATCH v6 0/5] Add DT support for netxbig LEDs
+In-Reply-To: <1443301358-2131-1-git-send-email-simon.guinot@sequanux.org>
+References: <1443301358-2131-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <56178C49.4070704@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 12:40:21PM +0300, Andrey Ryabinin wrote:
-> 2015-10-09 12:10 GMT+03:00 Will Deacon <will.deacon@arm.com>:
-> > On Fri, Oct 09, 2015 at 11:12:24AM +0300, Andrey Ryabinin wrote:
-> >> 2015-10-08 22:02 GMT+03:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
-> >> > --- a/arch/arm64/kernel/image.h
-> >> > +++ b/arch/arm64/kernel/image.h
-> >> > @@ -59,4 +59,31 @@
-> >> >         _kernel_offset_le       = DATA_LE64(TEXT_OFFSET);       \
-> >> >         _kernel_flags_le        = DATA_LE64(__HEAD_FLAGS);
-> >> >
-> >> > +#ifdef CONFIG_EFI
-> >> > +
-> >> > +/*
-> >> > + * The EFI stub has its own symbol namespace prefixed by __efistub_, to
-> >> > + * isolate it from the kernel proper. The following symbols are legally
-> >> > + * accessed by the stub, so provide some aliases to make them accessible.
-> >> > + * Only include data symbols here, or text symbols of functions that are
-> >> > + * guaranteed to be safe when executed at another offset than they were
-> >> > + * linked at. The routines below are all implemented in assembler in a
-> >> > + * position independent manner
-> >> > + */
-> >> > +__efistub_memcmp               = __pi_memcmp;
-> >> > +__efistub_memchr               = __pi_memchr;
-> >> > +__efistub_memcpy               = __pi_memcpy;
-> >> > +__efistub_memmove              = __pi_memmove;
-> >> > +__efistub_memset               = __pi_memset;
-> >> > +__efistub_strlen               = __pi_strlen;
-> >> > +__efistub_strcmp               = __pi_strcmp;
-> >> > +__efistub_strncmp              = __pi_strncmp;
-> >> > +__efistub___flush_dcache_area  = __pi___flush_dcache_area;
-> >>
-> >> So why we need these __pi_* aliases?
-> >> We could just do __efistub_memcmp = memcmp; Right?
-> >
-> > We *could*, but that defeats the whole purpose of tagging
-> > position-independent functions explicitly in the kernel text.
-> >
-> 
-> I just don't get that "the whole purpose of tagging".
-> 
-> Yes, the EFI stub is allowed to call only PI kernel functions.
-> But the EFI stub already protected by __efistub_ namespace.
-> If we want to use some new PI function in the stub, we would need add
-> it into this list at first.
-> So that __pi_ namespace doesn't bring any protection or isolation.
+On 09/26/2015 11:02 PM, Simon Guinot wrote:
+> Hello,
+>
+> This patch series adds DT support for the LEDs found on the
+> Kirkwood-based LaCie boards 2Big and 5Big Network v2.
+>
+> Changes for v2:
+> - Check timer mode value retrieved from DT.
+> - In netxbig_leds_get_of_pdata, don't use unsigned long variables to get
+>    timer delay values from DT with function of_property_read_u32_index.
+>    Instead, use a temporary u32 variable. This allows to silence a static
+>    checker warning.
+> - Make timer property optional in the binding documentation. It is now
+>    aligned with the driver code.
+>
+> Changes for v3:
+> - Fix pointer usage with the temporary u32 variable while calling
+>    of_property_read_u32_index.
+>
+> Changes for v4:
+> - In DT binding document netxbig-gpio-ext.txt, detail byte order for
+>    registers and latch mechanism for "enable-gpio".
+> - In leds-netxbig.c, add some error messages.
+> - In leds-netxbig.c, fix some "sizeof" style issues.
+> - In leds-netxbig.c, in netxbig_leds_get_of_pdata(), move the
+>    of_property_read_string() calls after the error-prone checks.
+> - Add some Acked-by.
+>
+> Changes for v5:
+> - Rename DT property "bright-max" into the more common "max-brightness".
+> - Make use of the "max-brightness" DT property. Instead of counting the
+>    data pins of the GPIO extension bus, use "max-brightness" to get the
+>    maximum brightness level.
+> - Add a patch to convert the leds-netxbig driver to the devm_ functions.
+>
+> Changes for v6:
+> - Add a patch to set led_classdev max_brightness in the leds-netxbig
+>    driver.
+> - Decrement the current child node refcount with of_node_put() when an
+>    error happens while iterating with for_each_child_of_node().
+>
+> Thanks,
+>
+> Simon
+>
+> Simon Guinot (5):
+>    leds: netxbig: add device tree binding
+>    ARM: Kirkwood: add LED DT entries for netxbig boards
+>    ARM: mvebu: remove static LED setup for netxbig boards
+>    leds: netxbig: convert to use the devm_ functions
+>    leds: netxbig: set led_classdev max_brightness
+>
+>   .../devicetree/bindings/gpio/netxbig-gpio-ext.txt  |  22 ++
+>   .../devicetree/bindings/leds/leds-netxbig.txt      |  92 ++++++
+>   arch/arm/boot/dts/kirkwood-net5big.dts             |  60 ++++
+>   arch/arm/boot/dts/kirkwood-netxbig.dtsi            |  80 +++++
+>   arch/arm/mach-mvebu/Kconfig                        |   7 -
+>   arch/arm/mach-mvebu/Makefile                       |   1 -
+>   arch/arm/mach-mvebu/board.h                        |  21 --
+>   arch/arm/mach-mvebu/kirkwood.c                     |   4 -
+>   arch/arm/mach-mvebu/netxbig.c                      | 191 ------------
+>   drivers/leds/leds-netxbig.c                        | 336 ++++++++++++++++-----
+>   include/dt-bindings/leds/leds-netxbig.h            |  18 ++
+>   .../linux/platform_data/leds-kirkwood-netxbig.h    |   1 +
+>   12 files changed, 531 insertions(+), 302 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/gpio/netxbig-gpio-ext.txt
+>   create mode 100644 Documentation/devicetree/bindings/leds/leds-netxbig.txt
+>   delete mode 100644 arch/arm/mach-mvebu/board.h
+>   delete mode 100644 arch/arm/mach-mvebu/netxbig.c
+>   create mode 100644 include/dt-bindings/leds/leds-netxbig.h
+>
 
-What it does it force people making future changes to the __pi_* functions
-to think about the stub, otherwise if the function happens to be
-position-independent when efistub starts using it, it could easily break
-due to some future patch where the author didn't realise that it was
-being used in that manner.
+Since no comment regarding DT bindings has appeared for a long time,
+I decided to merge the patch set without DT maintainer's ack, thanks.
 
-Will
+-- 
+Best Regards,
+Jacek Anaszewski
