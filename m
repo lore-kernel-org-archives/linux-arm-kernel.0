@@ -1,95 +1,30 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Fri, 9 Oct 2015 10:57:53 +0300
-Subject: [PATCH v2] mmc: core: Fix init_card in 52Mhz
-In-Reply-To: <CAPDyKFoWWMXC-DECqhw=EXerid5toWKxr4uLq0WevPo8LrrDqw@mail.gmail.com>
-References: <1444288147-24013-1-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFqrjP3-y+ucm5ybwXefsDLOYcPF9XqMciwhRkjD5NXLBg@mail.gmail.com>
- <56166988.20900@intel.com>
- <CAPDyKFoWWMXC-DECqhw=EXerid5toWKxr4uLq0WevPo8LrrDqw@mail.gmail.com>
-Message-ID: <56177381.9020509@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 09 Oct 2015 09:06:42 +0100
+Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
+In-Reply-To: <00e601d10264$61cdafb0$25690f10$@samsung.com>
+References: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
+ <00e601d10264$61cdafb0$25690f10$@samsung.com>
+Message-ID: <56177592.2080702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/15 16:35, Ulf Hansson wrote:
-> On 8 October 2015 at 15:03, Adrian Hunter <adrian.hunter@intel.com> wrote:
->> On 08/10/15 13:59, Ulf Hansson wrote:
->>> On 8 October 2015 at 09:09, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
->>>> Suppose that we got a data crc error, and it triggers the mmc_reset.
->>>> mmc_reset will call mmc_send_status to see if HW reset was supported.
->>>> before issue CMD13, it will do retune, and if EMMC was in HS400 mode,
->>>> it will reduce frequency to 52Mhz firstly, then results in card init
->>>> was doing at 52Mhz.
->>>> The mmc_send_status was originally only done for mmc_test, so if retune
->>>> needed, do not call mmc_send_status.
->>>>
->>>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
->>>> Suggested-by: Adrian Hunter <adrian.hunter@intel.com>
->>>> ---
->>>>  drivers/mmc/card/mmc_test.c | 6 ++++++
->>>>  drivers/mmc/core/mmc.c      | 2 +-
->>>>  2 files changed, 7 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
->>>> index b78cf5d..2f78bfb 100644
->>>> --- a/drivers/mmc/card/mmc_test.c
->>>> +++ b/drivers/mmc/card/mmc_test.c
->>>> @@ -2272,6 +2272,12 @@ static int mmc_test_hw_reset(struct mmc_test_card *test)
->>>>         if (!mmc_card_mmc(card) || !mmc_can_reset(card))
->>>>                 return RESULT_UNSUP_CARD;
->>>>
->>>> +       if (host->need_retune) {
->>>> +               pr_info("%s: cannot test hw reset because retune needed\n",
->>>> +                       mmc_hostname(test->card->host));
->>>> +               return RESULT_FAIL;
->>>> +       }
->>>> +
->>>>         err = mmc_hw_reset(host);
->>>>         if (!err)
->>>>                 return RESULT_OK;
->>>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
->>>> index e726903..647c96d 100644
->>>> --- a/drivers/mmc/core/mmc.c
->>>> +++ b/drivers/mmc/core/mmc.c
->>>> @@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
->>>>         host->ops->hw_reset(host);
->>>>
->>>>         /* If the reset has happened, then a status command will fail */
->>>> -       if (!mmc_send_status(card, &status)) {
->>>> +       if (!host->need_retune && !mmc_send_status(card, &status)) {
->>>
->>> No, this seem like the wrong solution! The main purpose of mmc_reset()
->>> is to try to reset and re-initiate the card, to make it operational
->>> again.
->>>
->>> I can't find a good reason to why we want to do a mmc_send_status() at
->>> this point, as even if it succeeds it will only tell us that the card
->>> has not been "hw-reset". No matter what, we should still try to make
->>> it fully operational again and thus give mmc_init_card() a try.
->>>
->>> >From this reasoning, I suggest we remove the call to mmc_send_status()
->>> from this path, as that will also address your issue with CRC errors
->>> in combination with re-tune.
->>
->> Then you need to remove the hw_reset test from mmc_test.  Refer:
->>
->>         http://marc.info/?l=linux-mmc&m=144360165906544&w=2
->>
+On 09/10/15 08:30, Pavel Fedin wrote:
+>  Hello!
 > 
-> I realize that the test becomes a bit different, but I don't think it's useless.
+>> +  KVM_DEV_ARM_VGIC_CPU_SYSREGS
+>> +  Attributes:
+>> +    The attr field of kvm_device_attr encodes two values:
+>> +    bits:     | 63      ....       32 | 31  ....  16 | 15  ....  0 |
+>> +    values:   |         mpidr         |      RES     |    instr    |
 > 
-> If we add a check for MMC_CAP_HW_RESET and verify that the
-> host->ops->hw_reset exists, then we can assume that the "hw_reset"
-> sequence has executed. And if mmc_init_card() fails, that would
-> probably mean that the reset also failed, right?
+>  One small clarification: do you really want it to be different from KVM_DEV_ARM_VGIC_GRP_CPU_REGS?
 
-In the test case, the card is in a working state.  Generally I would then
-expect reinitialization to work irrespective of whether or not the hardware
-is actually reset.
+One is memory mapped, the other one is a system register. One is
+addressed by a linear index, the other one by affinity.
 
-Here are some other options:
-	1. have mmc_test hook the host->ops->hw_reset() fn and do the send_status
-itself.
-	2. have mmc_test set a flag on the card that it is being tested
-and only do the send_status if the flag is set
-	3. remove the send_status call and rename the mmc_test from "eMMC hardware
-reset" to just "Reset test (doesn't check hw reset did reset)"
+How do you reconcile the two? What's the point of trying to shoehorn a
+different concept into the existing API?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
