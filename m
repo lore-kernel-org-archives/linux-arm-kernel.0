@@ -1,115 +1,54 @@
-From: m-karicheri2@ti.com (Karicheri, Muralidharan)
-Date: Fri, 9 Oct 2015 14:48:15 +0000
-Subject: [GIT PULL 1/3] Keystone SOC driver updates for 4.4
-In-Reply-To: <5673608.IRgyBTXroY@wuerfel>
-References: <1444151960-4941-1-git-send-email-ssantosh@kernel.org>
- <5870815.PiO7rCVXjJ@wuerfel> <56169E38.1050803@ti.com>
- <5673608.IRgyBTXroY@wuerfel>
-Message-ID: <3E54258959B69E4282D79E01AB1F32B704B93FF7@DFLE11.ent.ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 9 Oct 2015 16:52:40 +0200
+Subject: [PATCH 2/9] pci: mvebu: fix memory leaks and refcount leaks
+In-Reply-To: <E1ZiRIs-0004Id-AN@rmk-PC.arm.linux.org.uk>
+References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
+ <E1ZiRIs-0004Id-AN@rmk-PC.arm.linux.org.uk>
+Message-ID: <20151009165240.3ba17ece@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+Russell,
 
->-----Original Message-----
->From: Arnd Bergmann [mailto:arnd at arndb.de]
->Sent: Thursday, October 08, 2015 3:17 PM
->To: Karicheri, Muralidharan
->Cc: Santosh Shilimkar; olof at lixom.net; arm at kernel.org; linux-arm-
->kernel at lists.infradead.org; khilman at kernel.org
->Subject: Re: [GIT PULL 1/3] Keystone SOC driver updates for 4.4
->
->On Thursday 08 October 2015 12:47:52 Murali Karicheri wrote:
->> Arnd,
->>
->> On 10/08/2015 11:41 AM, Arnd Bergmann wrote:
->> > On Tuesday 06 October 2015 10:19:18 Santosh Shilimkar wrote:
->> >> Couple of patches for ARM Keystone SOC drivers
->> >>          - irq affinity bug fix
->> >>          - display the firmware name
->> >>
->> >> ----------------------------------------------------------------
->> >> Murali Karicheri (2):
->> >>        soc: ti: reset irq affinity before freeing irq
->> >>        soc: ti: display firmware file name as part of boot log
->> >>
->> >>   .../bindings/soc/ti/keystone-navigator-qmss.txt      | 20
->+++++++++++++++++++-
->> >>   drivers/soc/ti/knav_qmss_acc.c                       |  4 ++++
->> >>   drivers/soc/ti/knav_qmss_queue.c                     |  3 +++
->> >>   3 files changed, 26 insertions(+), 1 deletion(-)
->> >
->> > The new text you add to the binding document doesn't really seem to
->> > belong in there, so I'm not pulling this until we've discussed how
->> > this should be better handled.
->> >
->> > Ideally, the firmware should just get merged into the
->> > linux-firmware.git tree.
->>
->> I have got the firmware merged to the linux-firmware.git. I will post
->> a patch to change the document to reflect that. Will it suffice?
->
->The binding document isn't really the right place for that. It's certainly good to document
->this, but somewhere else would be more appropriate.
->
->How about the Kconfig text for this driver?
+On Sat, 03 Oct 2015 19:13:02 +0100, Russell King wrote:
 
-Ok. Make sense. I will add the information to the QMSS Kconfig option description.
+> +	ret = devm_add_action(dev, mvebu_pcie_port_clk_put, port);
 
-Murali
->
->> > Regarding the method of storing the firmware file name in DT, we
->> > recently had a longer discussion about that and basically concluded
->> > that this doesn't work for most devices, in particular when the
->> > communication between the driver and the firmware uses an interface
->> > that is not 100% stable and can change depending on the firmware
->> > blob.
->> >
->> > Can you guarantee that there will never be changes to the interface?
->> This firmware is in use for almost 3 years for now on K2 SoCs, but in
->> a different kernel version. The interface itself is used not only by
->> Linux OS, but other OS as well. So it is not expected to change in the
->> future as backward compatibility will be an issue for other OS as well.
->
->Ok.
->
->> > If not, we should try to come up with a better mechanism here, and
->> > only provide the current method for backwards compatibility.
->> Assuming we need to change interface in the future, How is this
->> handled in other devices? Do they have something like a version to
->> check compatibility between software and firmware? As this firmware
->> has been frozen for almost 3 years, I wouldn't expect any change to
->> it. Could you point me to the thread where this was discussed in the
->> past. Also in my experience, mostly changes are to the firmware
->> itself, but not to the interface. In such cases, do we keep the name
->> of firmware in DT without version information so that in the file
->> system, user could  create a soft link to the firmware matching with
->> the DT name. So this way as long as interface doesn't change, firmware
->> upgrade is possible. If you agree, I can send an incremental patch to
->> rename the firmware to exclude the version information.
->
->Normally, the firmware name is fixed in the driver. If the API changes in order to support a
->new feature, the driver of course needs to be aware of that, but it should not require a device
->tree change to update the file name.
->
->Conversely, if you get a new chip that needs a slightly different blob but has an identical API,
->the driver should ideally not need to be changed, but still see  a new file name.
->
->The first can be done once you need it, e.g. by appending the number of the API version to
->the file name inside of the driver, and trying the highest version supported by the driver first,
->before falling back to older version in reverse order until the oldest version that is supported
->by the driver.
->
->The second one basically depends on the "compatible" string of the device, which identifies
->which device you have. The driver can then look up the file name for each device it supports
->based on this string, and by using multiple compatible strings in DT, you can provide the
->specific version of the hardware that is used for the file name without having to match that
->hardware name in the driver
->
->> W.r.t to the patch for documentation update, can I send an incremental
->> patch to the update the linux-firmware.git reference as well?
->
->I'd rather skip that documentation change until we have decided on how to handle the
->firmware loading in the future.
->
->	Arnd
+I didn't know about devm_add_action(). Definitely very useful for such
+situations.
+
+> @@ -1052,10 +1086,12 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+>  		struct mvebu_pcie_port *port = &pcie->ports[i];
+>  
+>  		ret = mvebu_pcie_parse_port(pcie, port, child);
+> -		if (ret < 0)
+> +		if (ret < 0) {
+> +			of_node_put(child);
+>  			return ret;
+> -		else if (ret == 0)
+> +		} else if (ret == 0) {
+>  			continue;
+> +		}
+
+This is not trivial. If I understand correctly,
+for_each_available_child_of_node() will automatically release the
+reference on the previous node and take the reference on the new one
+before entering the loop code. So in the skipping case, we don't need
+to release the reference as it will be done by the next iteration of
+the loop, but in the error case, since we are unexpectedly breaking the
+loop, we need to do it manually.
+
+The sort of tricky thing that should be documented near
+for_each_child_of_node(), since I believe a lot of code gets this
+wrong. See:
+
+   http://lxr.free-electrons.com/source/arch/arm/mach-shmobile/pm-rmobile.c#L367
+   http://lxr.free-electrons.com/source/drivers/phy/phy-miphy365x.c#L564
+
+and many more.
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
