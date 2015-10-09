@@ -1,33 +1,32 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri,  9 Oct 2015 09:53:45 +0100
-Subject: [PATCH v2 0/4] arm64: dts: qcom: add support to LS and HS connectors
-Message-ID: <1444380825-1355-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Fri,  9 Oct 2015 09:54:45 +0100
+Subject: [PATCH v2 1/4] arm64: dts: fix i2c pinconf sleep state function
+In-Reply-To: <1444380825-1355-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1444380825-1355-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1444380885-1410-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy, 
+This patch fixes the i2c pinctrl sleep state by changing the pinconf
+function to be in gpio mode rather than i2c.
 
-This patchset adds support for i2c and spi on High-Speed and Low speed
-connectors on DB410c.
-One of the patch fixes the sleep state of existing i2c node.
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-thanks,
-srini
-
-Changes since v1:
-	- removed useless comment spotted by Stephen Boyd.
-	- Use absolute names instead of lables for consistency suggested by Stephen Boyd.
-
-Srinivas Kandagatla (4):
-  arm64: dts: fix i2c pinconf sleep state function
-  arm64: dts: qcom: Add msm8916 I2C nodes.
-  arm64: dts: apq8016-sbc: enable i2c buses on LS and HS
-  arm64: dts: apq8016-sbc: enable spi buses on LS and HS
-
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi  | 25 +++++++++++++++
- arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 50 +++++++++++++++++++++++++++++-
- arch/arm64/boot/dts/qcom/msm8916.dtsi      | 30 ++++++++++++++++++
- 3 files changed, 104 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
+index 42941b9..a6105d7 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
+@@ -279,7 +279,7 @@
+ 
+ 	i2c4_sleep: i2c4_sleep {
+ 		pinmux {
+-			function = "blsp_i2c4";
++			function = "gpio";
+ 			pins = "gpio14", "gpio15";
+ 		};
+ 		pinconf {
 -- 
 1.9.1
