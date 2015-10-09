@@ -1,26 +1,124 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 9 Oct 2015 11:05:23 +0800
-Subject: [PATCH 3/5] clk: imx7d: add ADC root clock
-In-Reply-To: <20151008183556.GI26883@codeaurora.org>
-References: <1444301948-21721-1-git-send-email-haibo.chen@freescale.com>
- <1444301948-21721-3-git-send-email-haibo.chen@freescale.com>
- <20151008183556.GI26883@codeaurora.org>
-Message-ID: <20151009030523.GG22673@tiger>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Fri, 9 Oct 2015 05:07:52 +0200
+Subject: [PATCH v4 00/26] ARM: pxa: magician: Rework HTC Magician support
+In-Reply-To: <20151006152527.GA32352@xo-6d-61-c0.localdomain>
+References: <5609AB45.9030009@tul.cz>
+ <20151006152527.GA32352@xo-6d-61-c0.localdomain>
+Message-ID: <56172F88.2060602@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 11:35:56AM -0700, Stephen Boyd wrote:
-> On 10/08, Haibo Chen wrote:
-> > Add ADC root clock support in imx7d clock tree.
-> > 
-> > Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-> > ---
-> 
-> I see no cover letter indicating how you want this merged, so:
-> 
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Dne 6.10.2015 v 17:25 Pavel Machek napsal(a):
+> Hi!
 
-To clarify, I applied it on my imx/clk branch, which will be sent to you
-and Mike later.
+Ahoj :-),
 
-Shawn
+> 
+>> This patchset will clean, fix, optimize and add multiple devices,
+>> which can be found on the HTC Magician machine.
+>>
+>> Platform data for the pasic3-leds driver has been removed, as this
+>> driver do not exist in the vanilla. And it is expected to be recreated
+>> in the future with an incompatible platform data structure.
+>>
+>> Default setting of the Samsung LCD pixel clock period has been
+>> increased, so resulting frequency is 50Hz (original 117Hz). Period
+>> can be possibly incresed even more. At this moment there is no video
+>> player with IWMMXT support and software only versions cannot make it
+>> to 30fps. Frequency decreasing has a good impact to memory troughtput
+>> as LCD controller does not do as many memory bursts as at original
+>> speed. This was verified with the lat_mem_rd from the lmbench3.
+>>
+>> The Omnivision OV9640 camera has a problem with running on 400kHz
+>> of the I2C clock. It seems it freezes the bus until PXA I2C driver
+>> reload. Datasheet says it OK on 400kHz though. There may be some
+>> compatibility bug in the PXA I2C driver as Omnivision cameras often
+>> uses special I2C protocol (SCCB).
+>>
+>> Using the CPU frequency scaling (with help of an MAX1587A regulator)
+>> sometimes causes an SoC failure. It is probably related to the PXA27x
+>> erratum E37, E36, E80 or E89. Infreqent changes mostly works.
+> 
+> Nice to see work done on a cellphone...
+> 
+> Seeing all the GPIO name changes... would it be possible / make sense
+> to make to device tree one day?
+Probably, but there are still some missing parts (camera, usb webcam gadget,
+sound, leds, gsm GPIOs)
+
+> 
+> What userspace do you run on the phone? Can it do calls?
+
+I have found it is faster and funny to create from scratch (and openmoko
+image is too old), so I've built it by Buildroot:
+
+Busybox, Xorg and Matchbox, but as GTK apps are not too good for 240x320 resolution
+I have made my own "GUI" (so I can control Magician even without any USB/IrDA connection).
+
+Calls are planned but by now I'm receiving SMS by hand by writing AT commands :-D.
+
+> 
+> [I have N900 here, kernel is in pretty good state, and I have Mate desktop
+> running with python application for calls, but...]
+
+Magician is very limited by RAM (64MB + 64MB Flash), so I can only have C
+applications (or shell :-D).
+
+> 
+> Thanks (a pozdrav :-),
+> 
+> 								Pavel
+>> STUART removal is a prepare for:
+>>
+>> 	net: irda: pxaficp_ir: dmaengine conversion
+>>
+>> Function was tested on the board_id 0x3a version (specifically on
+>> the T-Mobile MDA compact).
+>>
+>> Changes from v3:
+>>  * Nontrivial rebase for indentation fixup (EGPIO and PXA UDC)
+>>
+>> Petr Cvek (26):
+>>   ARM: pxa: magician: Fix indentation in machine files
+>>   ARM: pxa: magician: Change comments to be more informative
+>>   ARM: pxa: magician: Print more specific error message for global
+>>     GPIOs
+>>   ARM: pxa: magician: Optimize debug messages for LCD power
+>>   ARM: pxa: magician: Change description of LCD power GPIO
+>>   ARM: pxa: magician: Add new discovered EGPIO pins
+>>   ARM: pxa: magician: Fix HTC Magician pin mux definitions
+>>   ARM: pxa: magician: Rename abstract LCD GPIOs
+>>   ARM: pxa: magician: Optimize powerup delays for Samsung LCD
+>>   ARM: pxa: magician: Optimize Samsung LCD refresh to 50Hz
+>>   ARM: pxa: magician: Optimize EGPIO initial values
+>>   ARM: pxa: magician: Rename charger cable detection EGPIOs
+>>   ARM: pxa: magician: Fix and add charging detection functions
+>>   ARM: pxa: magician: Fix platform data for both PXA27x I2C controllers
+>>   ARM: pxa: magician: Fix redundant GPIO request for pxaficp_ir
+>>   ARM: pxa: magician: Fix support for Intel Strata NOR Flash
+>>   ARM: pxa: magician: Fix wrongly enabled USB host ports
+>>   ARM: pxa: magician: Add support for ADS7846
+>>   ARM: pxa: magician: Add support for Omnivision OV9640 camera
+>>   ARM: pxa: magician: Add support for MAX1587A Vcore regulator
+>>   ARM: pxa: magician: Add support for PXA27x UDC
+>>   ARM: pxa: magician: Remove pdata for pasic3-leds
+>>   ARM: pxa: magician: Remove definition of the STUART port
+>>   ARM: pxa: magician: Add debug message for backlight brightness
+>>     function
+>>   ARM: pxa: magician: Add missing regulator for PWM backlight
+>>   ARM: pxa: magician: Move platform_add_devices() to the end of
+>>     magician_init()
+>>
+>>  arch/arm/mach-pxa/include/mach/magician.h |  70 ++-
+>>  arch/arm/mach-pxa/magician.c              | 907 +++++++++++++++++++++---------
+>>  2 files changed, 678 insertions(+), 299 deletions(-)
+>>
+>> -- 
+>> 1.7.12.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
