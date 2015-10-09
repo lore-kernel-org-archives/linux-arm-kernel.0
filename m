@@ -1,45 +1,43 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 9 Oct 2015 16:17:03 +0800
-Subject: [PATCH v4 0/6] arm64: berlin: add pinctrl support
-Message-ID: <1444378629-3057-1-git-send-email-jszhang@marvell.com>
+Date: Fri, 9 Oct 2015 16:17:09 +0800
+Subject: [PATCH v4 6/6] arm64: dts: berlin4ct: add default pinmux for uart0
+In-Reply-To: <1444378629-3057-1-git-send-email-jszhang@marvell.com>
+References: <1444378629-3057-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1444378629-3057-7-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for Marvell berlin4ct pin-controller, allowing
-to configure the pin muxing from the device tree.
+Add urt0 txd and rxd muxing setup in the dtsi because uart0 always uses
+them to work, no other possibilities.
 
-Since v3:
- - fix stupid build error: I missed local changes to berlin-bg4ct.c
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Since v2:
- - introduce new berlin_pinctrl_probe_regmap() to avoid duplicated code
- - renaming such as s/urt/uart etc. but keep the group name as URT* to keep
-   consistent with HW/ASIC
-
-Since v1:
- - use generic name for pin functions
- - a new commit to add pinmux for uart0
- - correct pinctrl usage in dts
-
-
-Jisheng Zhang (6):
-  pinctrl: berlin: introduce berlin_pinctrl_probe_regmap()
-  pinctrl: berlin: add the berlin4ct pinctrl driver
-  arm64: berlin: add the pinctrl dependency for Marvell Berlin SoCs
-  pinctrl: dt-binding: document berlin4ct SoC pinctrl
-  arm64: dts: berlin4ct: add the pinctrl node
-  arm64: dts: berlin4ct: add default pinmux for uart0
-
- .../devicetree/bindings/pinctrl/berlin,pinctrl.txt |   5 +-
- arch/arm64/Kconfig.platforms                       |   1 +
- arch/arm64/boot/dts/marvell/berlin4ct.dtsi         |  22 +
- drivers/pinctrl/berlin/Kconfig                     |   5 +
- drivers/pinctrl/berlin/Makefile                    |   1 +
- drivers/pinctrl/berlin/berlin-bg4ct.c              | 503 +++++++++++++++++++++
- drivers/pinctrl/berlin/berlin.c                    |  26 +-
- drivers/pinctrl/berlin/berlin.h                    |   4 +
- 8 files changed, 557 insertions(+), 10 deletions(-)
- create mode 100644 drivers/pinctrl/berlin/berlin-bg4ct.c
-
+diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+index 8e66355..a4a1876 100644
+--- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
++++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+@@ -288,12 +288,19 @@
+ 				clocks = <&osc>;
+ 				reg-shift = <2>;
+ 				status = "disabled";
++				pinctrl-0 = <&uart0_pmux>;
++				pinctrl-names = "default";
+ 			};
+ 		};
+ 
+ 		system_pinctrl: pin-controller at fe2200 {
+ 			compatible = "marvell,berlin4ct-system-pinctrl";
+ 			reg = <0xfe2200 0xc>;
++
++			uart0_pmux: uart0-pmux {
++				groups = "SM_URT0_TXD", "SM_URT0_RXD";
++				function = "uart0";
++			};
+ 		};
+ 	};
+ };
 -- 
 2.6.1
