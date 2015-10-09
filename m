@@ -1,92 +1,57 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 9 Oct 2015 19:31:21 +0800
-Subject: [alsa-devel] [PATCH v5 06/10] dmaengine: add API for getting dma
- controller's quirk
-In-Reply-To: <561629D6.9010702@metafoo.de>
-References: <1442187923-5736-1-git-send-email-shawn.lin@rock-chips.com>
- <1442188139-6017-1-git-send-email-shawn.lin@rock-chips.com>
- <20151005153746.GG13501@vkoul-mobl.iind.intel.com>
- <56139289.7000005@rock-chips.com> <561629D6.9010702@metafoo.de>
-Message-ID: <5617A589.4090102@rock-chips.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 9 Oct 2015 20:35:50 +0900
+Subject: [PATCH] thermal: exynos: fix register read in TMU
+In-Reply-To: <20151008142129.GC10587@sudip-pc>
+References: <1443699599-9693-1-git-send-email-sudipm.mukherjee@gmail.com>
+ <CAJKOXPfyC8etcPe373q6Pc1qWb2zVnHE96V+Rh5mPmpzAxFjiA@mail.gmail.com>
+ <20151001141243.GA5061@sudip-pc>
+ <CAJKOXPdVs9i9sVP84wa2wU0qVH1-o4unvaDC+O7c1za6bJUSLw@mail.gmail.com>
+ <20151008142129.GC10587@sudip-pc>
+Message-ID: <CAJKOXPfbrdm75n_v+dRnq8dqAFAGvHj28QQ4ZY8WZms1D6eLZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2015/10/8 16:31, Lars-Peter Clausen ??:
-> On 10/06/2015 11:21 AM, Shawn Lin wrote:
->> Hi Vinod,
+2015-10-08 23:21 GMT+09:00 Sudip Mukherjee <sudipm.mukherjee@gmail.com>:
+> On Fri, Oct 02, 2015 at 08:43:52AM +0900, Krzysztof Kozlowski wrote:
+>> 2015-10-01 23:12 GMT+09:00 Sudip Mukherjee <sudipm.mukherjee@gmail.com>:
+>> > On Thu, Oct 01, 2015 at 10:18:57PM +0900, Krzysztof Kozlowski wrote:
+>> >> 2015-10-01 20:39 GMT+09:00 Sudip Mukherjee <sudipm.mukherjee@gmail.com>:
+>> >> > The value of emul_con was getting overwritten if the selected soc is
+>> >> > SOC_ARCH_EXYNOS5260. And so as a result we were reading from the wrong
+>> >> > register in the case of SOC_ARCH_EXYNOS5260.
+>> >>
+>> >> How the value is overwritten if the soc is Exynos5260? I can't see it
+>> >> (although the "else if" is still more obvious than "if" but how does
+>> >> the description match the code?).
+>> > The code here is:
+>> > if (data->soc == SOC_ARCH_EXYNOS5260)
+>> >         emul_con = EXYNOS5260_EMUL_CON;
+>> > if (data->soc == SOC_ARCH_EXYNOS5433)
+>> >         emul_con = EXYNOS5433_TMU_EMUL_CON;
+>> > else if (data->soc == SOC_ARCH_EXYNOS7)
+>> >         emul_con = EXYNOS7_TMU_REG_EMUL_CON;
+>> > else
+>> >         emul_con = EXYNOS_EMUL_CON;
+>> >
+>> > So if data->soc is SOC_ARCH_EXYNOS5260 , then emul_con becomes
+>> > EXYNOS5260_EMUL_CON. But again for the else part it will become
+>> > EXYNOS_EMUL_CON.
 >>
->> On 2015/10/5 23:37, Vinod Koul wrote:
->>> On Mon, Sep 14, 2015 at 07:48:59AM +0800, Shawn Lin wrote:
->>>> Add dmaengine_get_quirks API for peripheral devices to query
->>>> quirks if they need it to make special workaround due to broken
->>>> dma controller design.
->>>>
->>>> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
->>>> ---
->>>>
->>>> Changes in v5: None
->>>> Changes in v4: None
->>>> Changes in v3: None
->>>> Changes in v2: None
->>>> Changes in v1: None
->>>>
->>>>    include/linux/dmaengine.h | 9 +++++++++
->>>>    1 file changed, 9 insertions(+)
->>>>
->>>> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
->>>> index e2f5eb4..5174ca4 100644
->>>> --- a/include/linux/dmaengine.h
->>>> +++ b/include/linux/dmaengine.h
->>>> @@ -704,6 +704,7 @@ struct dma_device {
->>>>
->>>>        int (*device_config)(struct dma_chan *chan,
->>>>                     struct dma_slave_config *config);
->>>> +    int (*device_get_quirks)(struct dma_chan *chan);
->>>
->>> And why do we want to expose this to users? THis doesnt seem right!
->>>
+>> Indeed!
 >>
->> Basically I agree not to expose dma's quirk to slave controllers...But, the
->> fact I mentioned on cover letter explain the reasons why I have to let slave
->> controllers know that they are working with a broken dma. It's a dilemma
->> that if we don't want that to be exposed(let slave controllers' driver get
->> the info via a API), we have t add broken quirk for all of them ,here and
->> there, which seems to be a disaster:(
->
-> The problem with this API is that it transports values with device specific
-> meanings over a generic API. Which is generally speaking not a good idea
-> because the consumer witch is supposed to be generic suddenly needs to know
-> which provider it is talking to.
->
-> A better solution in this case typically is either introduce a generic API
-> with generic values or a custom API with custom values, but don't mix the two.
->
+>> Fixes: 488c7455d74c ("thermal: exynos: Add the support for Exynos5433 TMU")
 >>
->> I would appreciate it if you could give me some suggestions at your earliest
->> convenience. :)
+>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 >
-> In this case I think the best way to handle this is not quirks, but rather
-> expose the actual maximum burst size using the DMA capabilities API. Since
-> supporting only a certain burst depth is not really a quirk. All hardware
-> has a limit for this and for some it might be larger or smaller than for
-> others and it might be the same IP core but the maximum size depends on some
-> IP core parameters. So this should be discoverable.
->
+> Hi Krzysztof,
+> Who will pick this one up? I still do not see it in linux-next.
 
-Hi Lars,
+Hi!
 
-Thanks for looking for that.
+I guess it is a patch for Lukasz.
 
-It's a good idea if all clients of the Soc are broken, but unfortunately 
-some of them work. So... max burst shoule be different for individuals.
+Lukasz,
+Do you plan to pick it up or maybe this should go through samsung-soc tree?
 
-> - Lars
->
->
->
->
-
-
--- 
-Best Regards
-Shawn Lin
+Best regards,
+Krzysztof
