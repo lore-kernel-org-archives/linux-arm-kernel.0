@@ -1,41 +1,134 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Fri, 9 Oct 2015 16:45:25 +0200
-Subject: [PATCH v2 2/5] mmc: sdhci-pxav3: enable usage of DAT3 pin as HW
- card detect
-In-Reply-To: <20151009201356.78488116@xhacker>
-References: <1444352635-21965-1-git-send-email-mw@semihalf.com>
- <1444352635-21965-3-git-send-email-mw@semihalf.com>
- <20151009201356.78488116@xhacker>
-Message-ID: <CAPv3WKddfCOSCCOSByAEzyZ3qnAX22TFi2acrNDcTgEvy+ioFA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 9 Oct 2015 09:48:04 -0500
+Subject: [PATCH v3] arm-soc: Add support for Sigma Designs Tango4
+In-Reply-To: <5617CC48.2020904@sigmadesigns.com>
+References: <560EAA7C.3070302@free.fr> <5124277.UR9sg1IOHT@wuerfel>
+ <560EFDB3.9010305@free.fr> <11113740.WL812ZaRcZ@wuerfel>
+ <5612A473.8030405@sigmadesigns.com>
+ <5613EF4C.30603@sigmadesigns.com>
+ <CAL_JsqJ+WTBYF=sJWbkgNzL48H5AiXL4aoVV3DNiL6T_UQKQfg@mail.gmail.com>
+ <5617CC48.2020904@sigmadesigns.com>
+Message-ID: <CAL_JsqJtWpwfoiP2N7JZA00aP7GHwaQYOJ-kabdBC6=EqgdU5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jisheng,
-
-
+On Fri, Oct 9, 2015 at 9:16 AM, Marc Gonzalez
+<marc_gonzalez@sigmadesigns.com> wrote:
+> On 09/10/2015 16:08, Rob Herring wrote:
+>
+>> Marc Gonzalez wrote:
 >>
->> When using DAT3-based detection Armada 38x SDIO IP expects its internal
->> clock to be always on, which had to be ensured twofold:
+>>> This patch adds support for Sigma Designs "Tango4" platform, which is
+>>> built around the ARM Cortex A9 MPCore (single and dual core SoCs).
+>>>
+>>> Tango4 is not to be confused with Tango3, which was built around a
+>>> MIPS 74kf CPU.
+>>>
+>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>> ---
+>>> v3 changes: Updated clock tree DT (clk driver submitted)
+>>> ---
+>>>  arch/arm/Kconfig                          |   2 +
+>>>  arch/arm/Makefile                         |   1 +
+>>>  arch/arm/boot/dts/Makefile                |   2 +
+>>>  arch/arm/boot/dts/tango4-vantage-1172.dts |  17 ++++
+>>>  arch/arm/boot/dts/tango4.dtsi             | 133 ++++++++++++++++++++++++++++++
+>>>  arch/arm/mach-tangox/Kconfig              |  11 +++
+>>>  arch/arm/mach-tangox/Makefile             |   1 +
+>>>  arch/arm/mach-tangox/setup.c              |   7 ++
+>>>  8 files changed, 174 insertions(+)
+>>>  create mode 100644 arch/arm/boot/dts/tango4-vantage-1172.dts
+>>>  create mode 100644 arch/arm/boot/dts/tango4.dtsi
+>>>  create mode 100644 arch/arm/mach-tangox/Kconfig
+>>>  create mode 100644 arch/arm/mach-tangox/Makefile
+>>>  create mode 100644 arch/arm/mach-tangox/setup.c
+>>>
+>>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>>> index 1c5021002fe4..94a1a0277c94 100644
+>>> --- a/arch/arm/Kconfig
+>>> +++ b/arch/arm/Kconfig
+>>> @@ -934,6 +934,8 @@ source "arch/arm/mach-sunxi/Kconfig"
+>>>
+>>>  source "arch/arm/mach-prima2/Kconfig"
+>>>
+>>> +source "arch/arm/mach-tangox/Kconfig"
+>>> +
+>>>  source "arch/arm/mach-tegra/Kconfig"
+>>>
+>>>  source "arch/arm/mach-u300/Kconfig"
+>>> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+>>> index 7451b447cc2d..7fcb4c63cdf7 100644
+>>> --- a/arch/arm/Makefile
+>>> +++ b/arch/arm/Makefile
+>>> @@ -203,6 +203,7 @@ machine-$(CONFIG_ARCH_SOCFPGA)              += socfpga
+>>>  machine-$(CONFIG_ARCH_STI)             += sti
+>>>  machine-$(CONFIG_ARCH_STM32)           += stm32
+>>>  machine-$(CONFIG_ARCH_SUNXI)           += sunxi
+>>> +machine-$(CONFIG_ARCH_TANGOX)          += tangox
+>>>  machine-$(CONFIG_ARCH_TEGRA)           += tegra
+>>>  machine-$(CONFIG_ARCH_U300)            += u300
+>>>  machine-$(CONFIG_ARCH_U8500)           += ux500
+>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>> index 246473a244f6..2499295051d5 100644
+>>> --- a/arch/arm/boot/dts/Makefile
+>>> +++ b/arch/arm/boot/dts/Makefile
+>>> @@ -605,6 +605,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+>>>  dtb-$(CONFIG_MACH_SUN9I) += \
+>>>         sun9i-a80-optimus.dtb \
+>>>         sun9i-a80-cubieboard4.dtb
+>>> +dtb-$(CONFIG_ARCH_TANGOX) += \
+>>> +       tango4-vantage-1172.dtb
+>>>  dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += \
+>>>         tegra20-harmony.dtb \
+>>>         tegra20-iris-512.dtb \
+>>> diff --git a/arch/arm/boot/dts/tango4-vantage-1172.dts b/arch/arm/boot/dts/tango4-vantage-1172.dts
+>>> new file mode 100644
+>>> index 000000000000..3eff944e2103
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/tango4-vantage-1172.dts
+>>> @@ -0,0 +1,17 @@
+>>> +/dts-v1/;
+>>> +
+>>> +#include "tango4.dtsi"
+>>> +
+>>> +/ {
+>>> +       model = "Sigma Designs SMP8758 Vantage-1172 dev board";
+>>> +       compatible = "sigma,vantage-1172", "sigma,smp8758", "sigma,tango4";
+>>> +
+>>> +       chosen {
+>>> +               stdout-path = &uart;
+>>> +       };
+>>> +};
+>>> +
+>>> +&eth0 {
+>>> +       phy-connection-type = "rgmii";
+>>> +       max-speed = <1000>;
+>>> +};
+>>> diff --git a/arch/arm/boot/dts/tango4.dtsi b/arch/arm/boot/dts/tango4.dtsi
+>>> new file mode 100644
+>>> index 000000000000..c682617866e9
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/tango4.dtsi
+>>> @@ -0,0 +1,133 @@
+>>> +#include <dt-bindings/interrupt-controller/irq.h>
+>>> +
+>>> +/ {
+>>> +       compatible = "sigma,tango4";
+>>> +
+>>> +       #address-cells = <1>;
+>>> +       #size-cells = <1>;
+>>
+>> No memory node?
+>>
+>> cpus node?
+>>
+>> No pl310? A9 performance mon?
 >
-> What happen if runtime suspend disables its core clk and axi clk? I guess
-> dat3-based detection isn't compatible with runtime pm. If so, do we also
-> need to disable runtime pm in probe function?
+> Can't these nodes be added at a later time?
 
-Is runtime resume supposed to be triggered by card detection? Is there
-a way to manually trigger runtime suspend and resume of sdhci? Anyway
-coreclk is not a problem, as it's not used by A38x.
+IMO, no, you add anything for which bindings already exist. For
+bindings you have to figure out sure, those can come later. Certainly
+the memory node should be there. Bootloaders generally only expect to
+adjust the memory range, not add everything.
 
->
->> - Each time controller is reset by updating appropriate registers. On the
->>   occasion of adding new register @0x104, register @0x100 name is modified
->>   in order to the be aligned with Armada 38x documentation.
->> - Leaving the clock enabled despite power-down. For this purpose a new
->>   quirk had to be added to SDHCI subsystem - SDHCI_QUIRK2_KEEP_INT_CLK_ON.
->
-> As seen from other mails, Ulf calls for no more quirks...
->
-
-Ok, I'll try to find another solution.
-
-Best regards,
-Marcin
+Rob
