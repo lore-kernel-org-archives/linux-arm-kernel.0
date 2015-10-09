@@ -1,50 +1,45 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 9 Oct 2015 16:17:08 +0800
-Subject: [PATCH v4 5/6] arm64: dts: berlin4ct: add the pinctrl node
-In-Reply-To: <1444378629-3057-1-git-send-email-jszhang@marvell.com>
-References: <1444378629-3057-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1444378629-3057-6-git-send-email-jszhang@marvell.com>
+Date: Fri, 9 Oct 2015 16:17:03 +0800
+Subject: [PATCH v4 0/6] arm64: berlin: add pinctrl support
+Message-ID: <1444378629-3057-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the avio, soc, sm pinctrl nodes for Marvell berlin4ct SoC.
+This series adds support for Marvell berlin4ct pin-controller, allowing
+to configure the pin muxing from the device tree.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+Since v3:
+ - fix stupid build error: I missed local changes to berlin-bg4ct.c
 
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-index a3b5f1d..8e66355 100644
---- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-+++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-@@ -225,6 +225,16 @@
- 			};
- 		};
- 
-+		soc_pinctrl: pin-controller at ea8000 {
-+			compatible = "marvell,berlin4ct-soc-pinctrl";
-+			reg = <0xea8000 0x14>;
-+		};
-+
-+		avio_pinctrl: pin-controller at ea8400 {
-+			compatible = "marvell,berlin4ct-avio-pinctrl";
-+			reg = <0xea8400 0x8>;
-+		};
-+
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
-@@ -280,5 +290,10 @@
- 				status = "disabled";
- 			};
- 		};
-+
-+		system_pinctrl: pin-controller at fe2200 {
-+			compatible = "marvell,berlin4ct-system-pinctrl";
-+			reg = <0xfe2200 0xc>;
-+		};
- 	};
- };
+Since v2:
+ - introduce new berlin_pinctrl_probe_regmap() to avoid duplicated code
+ - renaming such as s/urt/uart etc. but keep the group name as URT* to keep
+   consistent with HW/ASIC
+
+Since v1:
+ - use generic name for pin functions
+ - a new commit to add pinmux for uart0
+ - correct pinctrl usage in dts
+
+
+Jisheng Zhang (6):
+  pinctrl: berlin: introduce berlin_pinctrl_probe_regmap()
+  pinctrl: berlin: add the berlin4ct pinctrl driver
+  arm64: berlin: add the pinctrl dependency for Marvell Berlin SoCs
+  pinctrl: dt-binding: document berlin4ct SoC pinctrl
+  arm64: dts: berlin4ct: add the pinctrl node
+  arm64: dts: berlin4ct: add default pinmux for uart0
+
+ .../devicetree/bindings/pinctrl/berlin,pinctrl.txt |   5 +-
+ arch/arm64/Kconfig.platforms                       |   1 +
+ arch/arm64/boot/dts/marvell/berlin4ct.dtsi         |  22 +
+ drivers/pinctrl/berlin/Kconfig                     |   5 +
+ drivers/pinctrl/berlin/Makefile                    |   1 +
+ drivers/pinctrl/berlin/berlin-bg4ct.c              | 503 +++++++++++++++++++++
+ drivers/pinctrl/berlin/berlin.c                    |  26 +-
+ drivers/pinctrl/berlin/berlin.h                    |   4 +
+ 8 files changed, 557 insertions(+), 10 deletions(-)
+ create mode 100644 drivers/pinctrl/berlin/berlin-bg4ct.c
+
 -- 
 2.6.1
