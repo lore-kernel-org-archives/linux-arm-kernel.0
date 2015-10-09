@@ -1,60 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Oct 2015 10:05:50 +0100
-Subject: [v3 PATCH] arm64: replace read_lock to rcu lock in call_break_hook
-In-Reply-To: <20151008235538.GJ3910@linux.vnet.ibm.com>
-References: <1444080771-22468-1-git-send-email-yang.shi@linaro.org>
- <20151008235538.GJ3910@linux.vnet.ibm.com>
-Message-ID: <20151009090550.GA26278@arm.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Fri, 9 Oct 2015 11:05:47 +0200
+Subject: [PATCH v4 4/6] pinctrl: dt-binding: document berlin4ct SoC pinctrl
+In-Reply-To: <1444378629-3057-5-git-send-email-jszhang@marvell.com>
+References: <1444378629-3057-1-git-send-email-jszhang@marvell.com>
+ <1444378629-3057-5-git-send-email-jszhang@marvell.com>
+Message-ID: <20151009090547.GD2842@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 04:55:38PM -0700, Paul E. McKenney wrote:
-> On Mon, Oct 05, 2015 at 02:32:51PM -0700, Yang Shi wrote:
-> > BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
-> > in_atomic(): 0, irqs_disabled(): 128, pid: 342, name: perf
-> > 1 lock held by perf/342:
-> >  #0:  (break_hook_lock){+.+...}, at: [<ffffffc0000851ac>] call_break_hook+0x34/0xd0
-> > irq event stamp: 62224
-> > hardirqs last  enabled at (62223): [<ffffffc00010b7bc>] __call_rcu.constprop.59+0x104/0x270
-> > hardirqs last disabled at (62224): [<ffffffc0000fbe20>] vprintk_emit+0x68/0x640
-> > softirqs last  enabled at (0): [<ffffffc000097928>] copy_process.part.8+0x428/0x17f8
-> > softirqs last disabled at (0): [<          (null)>]           (null)
-> > CPU: 0 PID: 342 Comm: perf Not tainted 4.1.6-rt5 #4
-> > Hardware name: linux,dummy-virt (DT)
-> > Call trace:
-> > [<ffffffc000089968>] dump_backtrace+0x0/0x128
-> > [<ffffffc000089ab0>] show_stack+0x20/0x30
-> > [<ffffffc0007030d0>] dump_stack+0x7c/0xa0
-> > [<ffffffc0000c878c>] ___might_sleep+0x174/0x260
-> > [<ffffffc000708ac8>] __rt_spin_lock+0x28/0x40
-> > [<ffffffc000708db0>] rt_read_lock+0x60/0x80
-> > [<ffffffc0000851a8>] call_break_hook+0x30/0xd0
-> > [<ffffffc000085a70>] brk_handler+0x30/0x98
-> > [<ffffffc000082248>] do_debug_exception+0x50/0xb8
-> > Exception stack(0xffffffc00514fe30 to 0xffffffc00514ff50)
-> > fe20:                                     00000000 00000000 c1594680 0000007f
-> > fe40: ffffffff ffffffff 92063940 0000007f 0550dcd8 ffffffc0 00000000 00000000
-> > fe60: 0514fe70 ffffffc0 000be1f8 ffffffc0 0514feb0 ffffffc0 0008948c ffffffc0
-> > fe80: 00000004 00000000 0514fed0 ffffffc0 ffffffff ffffffff 9282a948 0000007f
-> > fea0: 00000000 00000000 9282b708 0000007f c1592820 0000007f 00083914 ffffffc0
-> > fec0: 00000000 00000000 00000010 00000000 00000064 00000000 00000001 00000000
-> > fee0: 005101e0 00000000 c1594680 0000007f c1594740 0000007f ffffffd8 ffffff80
-> > ff00: 00000000 00000000 00000000 00000000 c1594770 0000007f c1594770 0000007f
-> > ff20: 00665e10 00000000 7f7f7f7f 7f7f7f7f 01010101 01010101 00000000 00000000
-> > ff40: 928e4cc0 0000007f 91ff11e8 0000007f
-> > 
-> > call_break_hook is called in atomic context (hard irq disabled), so replace
-> > the sleepable lock to rcu lock, replace relevant list operations to rcu
-> > version and call synchronize_rcu() in unregister_break_hook().
-> > 
-> > And, replace write lock to spinlock in {un}register_break_hook.
-> > 
-> > Signed-off-by: Yang Shi <yang.shi@linaro.org>
+On Fri, Oct 09, 2015 at 04:17:07PM +0800, Jisheng Zhang wrote:
+> Add berlin4ct to existing berlin pinctrl device tree binding.
 > 
-> Looks more plausible to me.  Does it look OK to you, Steven?
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
-This is already in mainline as a fix, so please shout loudly if you think
-it's broken (it looked ok to me and didn't cause any regressions in my
-testing).
+Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-Will
+> ---
+>  Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
+> index a8bb5e2..f8fa28c 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
+> @@ -20,7 +20,10 @@ Required properties:
+>  	"marvell,berlin2cd-soc-pinctrl",
+>  	"marvell,berlin2cd-system-pinctrl",
+>  	"marvell,berlin2q-soc-pinctrl",
+> -	"marvell,berlin2q-system-pinctrl"
+> +	"marvell,berlin2q-system-pinctrl",
+> +	"marvell,berlin4ct-avio-pinctrl",
+> +	"marvell,berlin4ct-soc-pinctrl",
+> +	"marvell,berlin4ct-system-pinctrl"
+>  
+>  Required subnode-properties:
+>  - groups: a list of strings describing the group names.
+> -- 
+> 2.6.1
+> 
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
