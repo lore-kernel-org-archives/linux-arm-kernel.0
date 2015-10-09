@@ -1,107 +1,162 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 09 Oct 2015 18:16:19 -0400
-Subject: [PATCH 08/20] gma500: switch from acpi_os_ioremap to memremap
-In-Reply-To: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
-References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <20151009221619.32203.41564.stgit@dwillia2-desk3.jf.intel.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 9 Oct 2015 15:21:42 -0700
+Subject: arm/arm64: GICv2 driver does not have irq_disable implemented
+In-Reply-To: <alpine.DEB.2.11.1510092348370.6097@nanos>
+References: <CADaLND=spbEHLZXmqsVRDsPAyNKXJHnc=Yy6ujY0em74dB5CbA@mail.gmail.com>
+ <alpine.DEB.2.11.1510091951250.6097@nanos>
+ <CADaLNDmgWnOAugY20nXWz_-2m-KPKnARMWeYMDTuPdRe8SA8sQ@mail.gmail.com>
+ <alpine.DEB.2.11.1510092348370.6097@nanos>
+Message-ID: <CADaLNDnoGnzUSDrXMBujVRkMybJNHXY3_j9-YXsCZHJJRZMG3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gma500 expects the OpRegion to be cached (i.e. not __iomem), so
-explicitly map it with memremap rather than the implied cache setting of
-acpi_os_ioremap().
+On Fri, Oct 9, 2015 at 2:52 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Fri, 9 Oct 2015, Duc Dang wrote:
+>> On Fri, Oct 9, 2015 at 10:52 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
+>> > On Fri, 9 Oct 2015, Duc Dang wrote:
+>> >> In APM ARM64 X-Gene Enet controller driver, we use disable_irq_nosync to
+>> >> disable interrupt before calling __napi_schedule to schedule packet handler
+>> >> to process the Tx/Rx packets.
+>> >
+>> > Which is wrong to begin with. Disable the interrupt at the device
+>> > level not at the interrupt line level.
+>> >
+>> We could not disable the interrupt at Enet controller level due to the
+>> controller limitation. As you said, using  disable_irq_nosync is wrong
+>> but it looks like that the only option that we have.
+>
+> Oh well.
+>
+>> Do you have any suggestion about different approach that we could try?
+>
+> Try the patch below and add
+>
+>     irq_set_status_flags(irq, IRQ_DISABLE_UNLAZY);
+>
+> to your driver before requesting the interrupt. Unset it when freeing
+> the interrupt.
 
-Cc: David Airlie <airlied@linux.ie>
-Cc: dri-devel at lists.freedesktop.org
-Signed-off-by: Dan Williams <dan.j.williams@intel.com>
----
- drivers/gpu/drm/gma500/opregion.c |    8 ++++----
- drivers/gpu/drm/gma500/psb_drv.h  |    2 +-
- drivers/gpu/drm/gma500/psb_lid.c  |    8 ++++----
- 3 files changed, 9 insertions(+), 9 deletions(-)
+Thanks, Thomas!
 
-diff --git a/drivers/gpu/drm/gma500/opregion.c b/drivers/gpu/drm/gma500/opregion.c
-index ab696ca7eeec..7672ac4d4217 100644
---- a/drivers/gpu/drm/gma500/opregion.c
-+++ b/drivers/gpu/drm/gma500/opregion.c
-@@ -297,7 +297,7 @@ void psb_intel_opregion_fini(struct drm_device *dev)
- 	cancel_work_sync(&opregion->asle_work);
- 
- 	/* just clear all opregion memory pointers now */
--	iounmap(opregion->header);
-+	memunmap(opregion->header);
- 	opregion->header = NULL;
- 	opregion->acpi = NULL;
- 	opregion->swsci = NULL;
-@@ -310,8 +310,8 @@ int psb_intel_opregion_setup(struct drm_device *dev)
- 	struct drm_psb_private *dev_priv = dev->dev_private;
- 	struct psb_intel_opregion *opregion = &dev_priv->opregion;
- 	u32 opregion_phy, mboxes;
--	void __iomem *base;
- 	int err = 0;
-+	void *base;
- 
- 	pci_read_config_dword(dev->pdev, PCI_ASLS, &opregion_phy);
- 	if (opregion_phy == 0) {
-@@ -322,7 +322,7 @@ int psb_intel_opregion_setup(struct drm_device *dev)
- 	INIT_WORK(&opregion->asle_work, psb_intel_opregion_asle_work);
- 
- 	DRM_DEBUG("OpRegion detected at 0x%8x\n", opregion_phy);
--	base = acpi_os_ioremap(opregion_phy, 8*1024);
-+	base = memremap(opregion_phy, 8*1024, MEMREMAP_WB);
- 	if (!base)
- 		return -ENOMEM;
- 
-@@ -351,7 +351,7 @@ int psb_intel_opregion_setup(struct drm_device *dev)
- 	return 0;
- 
- err_out:
--	iounmap(base);
-+	memunmap(base);
- 	return err;
- }
- 
-diff --git a/drivers/gpu/drm/gma500/psb_drv.h b/drivers/gpu/drm/gma500/psb_drv.h
-index e38057b91865..189f57135d47 100644
---- a/drivers/gpu/drm/gma500/psb_drv.h
-+++ b/drivers/gpu/drm/gma500/psb_drv.h
-@@ -253,7 +253,7 @@ struct psb_intel_opregion {
- 	struct opregion_swsci *swsci;
- 	struct opregion_asle *asle;
- 	void *vbt;
--	u32 __iomem *lid_state;
-+	u32 *lid_state;
- 	struct work_struct asle_work;
- };
- 
-diff --git a/drivers/gpu/drm/gma500/psb_lid.c b/drivers/gpu/drm/gma500/psb_lid.c
-index 1d2ebb5e530f..6b1b9d0741df 100644
---- a/drivers/gpu/drm/gma500/psb_lid.c
-+++ b/drivers/gpu/drm/gma500/psb_lid.c
-@@ -28,14 +28,14 @@ static void psb_lid_timer_func(unsigned long data)
- 	struct drm_psb_private * dev_priv = (struct drm_psb_private *)data;
- 	struct drm_device *dev = (struct drm_device *)dev_priv->dev;
- 	struct timer_list *lid_timer = &dev_priv->lid_timer;
-+	u32 *lid_state = dev_priv->opregion.lid_state;
- 	unsigned long irq_flags;
--	u32 __iomem *lid_state = dev_priv->opregion.lid_state;
- 	u32 pp_status;
- 
--	if (readl(lid_state) == dev_priv->lid_last_state)
-+	if (*lid_state == dev_priv->lid_last_state)
- 		goto lid_timer_schedule;
- 
--	if ((readl(lid_state)) & 0x01) {
-+	if ((*lid_state) & 0x01) {
- 		/*lid state is open*/
- 		REG_WRITE(PP_CONTROL, REG_READ(PP_CONTROL) | POWER_TARGET_ON);
- 		do {
-@@ -58,7 +58,7 @@ static void psb_lid_timer_func(unsigned long data)
- 			pp_status = REG_READ(PP_STATUS);
- 		} while ((pp_status & PP_ON) == 0);
- 	}
--	dev_priv->lid_last_state =  readl(lid_state);
-+	dev_priv->lid_last_state =  *lid_state;
- 
- lid_timer_schedule:
- 	spin_lock_irqsave(&dev_priv->lid_lock, irq_flags);
+We will try and let you know soon.
+
+>
+> Thanks,
+>
+>         tglx
+>
+> 8<--------------
+>
+> Subject: genirq: Add flag to force mask in disable_irq[_nosync]()
+> From: Thomas Gleixner <tglx@linutronix.de>
+> Date: Fri, 09 Oct 2015 23:28:58 +0200
+>
+> If an irq chip does not implement the irq_disable callback, then we
+> use a lazy approach for disabling the interrupt. That means that the
+> interrupt is marked disabled, but the interrupt line is not
+> immediately masked in the interrupt chip. It only becomes masked if
+> the interrupt is raised while it's marked disabled. We use this to avoid
+> possibly expensive mask/unmask operations for common case operations.
+>
+> Unfortunately there are devices which do not allow the interrupt to be
+> disabled easily at the device level. They are forced to use
+> disable_irq_nosync(). This can result in taking each interrupt twice.
+>
+> Instead of enforcing the non lazy mode on all interrupts of a irq
+> chip, provide a settings flag, which can be set by the driver for that
+> particular interrupt line.
+>
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> ---
+>  include/linux/irq.h   |    4 +++-
+>  kernel/irq/chip.c     |    9 +++++++++
+>  kernel/irq/settings.h |    7 +++++++
+>  3 files changed, 19 insertions(+), 1 deletion(-)
+>
+> Index: tip/include/linux/irq.h
+> ===================================================================
+> --- tip.orig/include/linux/irq.h
+> +++ tip/include/linux/irq.h
+> @@ -72,6 +72,7 @@ enum irqchip_irq_state;
+>   * IRQ_IS_POLLED               - Always polled by another interrupt. Exclude
+>   *                               it from the spurious interrupt detection
+>   *                               mechanism and from core side polling.
+> + * IRQ_DISABLE_UNLAZY          - Disable lazy irq disable
+>   */
+>  enum {
+>         IRQ_TYPE_NONE           = 0x00000000,
+> @@ -97,13 +98,14 @@ enum {
+>         IRQ_NOTHREAD            = (1 << 16),
+>         IRQ_PER_CPU_DEVID       = (1 << 17),
+>         IRQ_IS_POLLED           = (1 << 18),
+> +       IRQ_DISABLE_UNLAZY      = (1 << 19),
+>  };
+>
+>  #define IRQF_MODIFY_MASK       \
+>         (IRQ_TYPE_SENSE_MASK | IRQ_NOPROBE | IRQ_NOREQUEST | \
+>          IRQ_NOAUTOEN | IRQ_MOVE_PCNTXT | IRQ_LEVEL | IRQ_NO_BALANCING | \
+>          IRQ_PER_CPU | IRQ_NESTED_THREAD | IRQ_NOTHREAD | IRQ_PER_CPU_DEVID | \
+> -        IRQ_IS_POLLED)
+> +        IRQ_IS_POLLED | IRQ_DISABLE_UNLAZY)
+>
+>  #define IRQ_NO_BALANCING_MASK  (IRQ_PER_CPU | IRQ_NO_BALANCING)
+>
+> Index: tip/kernel/irq/chip.c
+> ===================================================================
+> --- tip.orig/kernel/irq/chip.c
+> +++ tip/kernel/irq/chip.c
+> @@ -241,6 +241,13 @@ void irq_enable(struct irq_desc *desc)
+>   * disabled. If an interrupt happens, then the interrupt flow
+>   * handler masks the line at the hardware level and marks it
+>   * pending.
+> + *
+> + * If the interrupt chip does not implement the irq_disable callback,
+> + * a driver can disable the lazy approach for a particular irq line by
+> + * calling 'irq_set_status_flags(irq, IRQ_DISABLE_UNLAZY)'. This can be
+> + * used for devices which cannot disable the interrupt at the device
+> + * level under certain circumstances and have to use
+> + * disable_irq[_nosync] instead.
+>   */
+>  void irq_disable(struct irq_desc *desc)
+>  {
+> @@ -248,6 +255,8 @@ void irq_disable(struct irq_desc *desc)
+>         if (desc->irq_data.chip->irq_disable) {
+>                 desc->irq_data.chip->irq_disable(&desc->irq_data);
+>                 irq_state_set_masked(desc);
+> +       } else if (irq_settings_disable_unlazy(desc)) {
+> +               mask_irq(desc);
+>         }
+>  }
+>
+> Index: tip/kernel/irq/settings.h
+> ===================================================================
+> --- tip.orig/kernel/irq/settings.h
+> +++ tip/kernel/irq/settings.h
+> @@ -15,6 +15,7 @@ enum {
+>         _IRQ_NESTED_THREAD      = IRQ_NESTED_THREAD,
+>         _IRQ_PER_CPU_DEVID      = IRQ_PER_CPU_DEVID,
+>         _IRQ_IS_POLLED          = IRQ_IS_POLLED,
+> +       _IRQ_DISABLE_UNLAZY     = IRQ_DISABLE_UNLAZY,
+>         _IRQF_MODIFY_MASK       = IRQF_MODIFY_MASK,
+>  };
+>
+> @@ -28,6 +29,7 @@ enum {
+>  #define IRQ_NESTED_THREAD      GOT_YOU_MORON
+>  #define IRQ_PER_CPU_DEVID      GOT_YOU_MORON
+>  #define IRQ_IS_POLLED          GOT_YOU_MORON
+> +#define IRQ_DISABLE_UNLAZY     GOT_YOU_MORON
+>  #undef IRQF_MODIFY_MASK
+>  #define IRQF_MODIFY_MASK       GOT_YOU_MORON
+>
+> @@ -154,3 +156,8 @@ static inline bool irq_settings_is_polle
+>  {
+>         return desc->status_use_accessors & _IRQ_IS_POLLED;
+>  }
+> +
+> +static inline bool irq_settings_disable_unlazy(struct irq_desc *desc)
+> +{
+> +       return desc->status_use_accessors & _IRQ_DISABLE_UNLAZY;
+> +}
+
+Regards,
+Duc Dang.
