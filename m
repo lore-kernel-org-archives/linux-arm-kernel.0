@@ -1,57 +1,51 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 9 Oct 2015 20:35:50 +0900
-Subject: [PATCH] thermal: exynos: fix register read in TMU
-In-Reply-To: <20151008142129.GC10587@sudip-pc>
-References: <1443699599-9693-1-git-send-email-sudipm.mukherjee@gmail.com>
- <CAJKOXPfyC8etcPe373q6Pc1qWb2zVnHE96V+Rh5mPmpzAxFjiA@mail.gmail.com>
- <20151001141243.GA5061@sudip-pc>
- <CAJKOXPdVs9i9sVP84wa2wU0qVH1-o4unvaDC+O7c1za6bJUSLw@mail.gmail.com>
- <20151008142129.GC10587@sudip-pc>
-Message-ID: <CAJKOXPfbrdm75n_v+dRnq8dqAFAGvHj28QQ4ZY8WZms1D6eLZQ@mail.gmail.com>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Fri, 09 Oct 2015 13:35:55 +0200
+Subject: [PATCH v4 5/8] clk: rockchip: Allow the RK3288 SPDIF clocks to
+ change their parent
+In-Reply-To: <11755202.f1LLWMlYi0@phil>
+References: <1444311079-2892-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <1444311079-2892-6-git-send-email-sjoerd.simons@collabora.co.uk>
+ <11755202.f1LLWMlYi0@phil>
+Message-ID: <1444390555.9895.271.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-08 23:21 GMT+09:00 Sudip Mukherjee <sudipm.mukherjee@gmail.com>:
-> On Fri, Oct 02, 2015 at 08:43:52AM +0900, Krzysztof Kozlowski wrote:
->> 2015-10-01 23:12 GMT+09:00 Sudip Mukherjee <sudipm.mukherjee@gmail.com>:
->> > On Thu, Oct 01, 2015 at 10:18:57PM +0900, Krzysztof Kozlowski wrote:
->> >> 2015-10-01 20:39 GMT+09:00 Sudip Mukherjee <sudipm.mukherjee@gmail.com>:
->> >> > The value of emul_con was getting overwritten if the selected soc is
->> >> > SOC_ARCH_EXYNOS5260. And so as a result we were reading from the wrong
->> >> > register in the case of SOC_ARCH_EXYNOS5260.
->> >>
->> >> How the value is overwritten if the soc is Exynos5260? I can't see it
->> >> (although the "else if" is still more obvious than "if" but how does
->> >> the description match the code?).
->> > The code here is:
->> > if (data->soc == SOC_ARCH_EXYNOS5260)
->> >         emul_con = EXYNOS5260_EMUL_CON;
->> > if (data->soc == SOC_ARCH_EXYNOS5433)
->> >         emul_con = EXYNOS5433_TMU_EMUL_CON;
->> > else if (data->soc == SOC_ARCH_EXYNOS7)
->> >         emul_con = EXYNOS7_TMU_REG_EMUL_CON;
->> > else
->> >         emul_con = EXYNOS_EMUL_CON;
->> >
->> > So if data->soc is SOC_ARCH_EXYNOS5260 , then emul_con becomes
->> > EXYNOS5260_EMUL_CON. But again for the else part it will become
->> > EXYNOS_EMUL_CON.
->>
->> Indeed!
->>
->> Fixes: 488c7455d74c ("thermal: exynos: Add the support for Exynos5433 TMU")
->>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->
-> Hi Krzysztof,
-> Who will pick this one up? I still do not see it in linux-next.
+Hey Heiko,
 
-Hi!
+On Thu, 2015-10-08 at 17:10 +0200, Heiko Stuebner wrote:
+> Am Donnerstag, 8. Oktober 2015, 15:31:16 schrieb Sjoerd Simons:
+> > The clock branches leading to sclk_spdif and sclk_spdif_8ch on
+> > RK3288
+> > SoCs only feed those clocks, allow those clocks to change their
+> > parents
+> > all the way up the hierarchy.
+> > 
+> > Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> 
+> Just as comment, if I'm seeing that right, this patch needs "clk:
+> rockchip: 
+> handle mux dependency of fractional dividers" and friends [0] to
+> apply and 
+> also actually handle the fractional dividers correctly.
+> 
+> For the clock change itself:
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-I guess it is a patch for Lukasz.
+Oh sorry yes, i completely forgot to at that as note on this patch
+(series). These are on top of your series as those are required to make
+things actually work as expected. 
 
-Lukasz,
-Do you plan to pick it up or maybe this should go through samsung-soc tree?
+Which reminds me, i was wondering how to best move that forward. Could
+you pick this one up to include it in the next round of your series?
+(Otherwise i'm happy to rebase it once you do a v2)
 
-Best regards,
-Krzysztof
+> 
+> Heiko
+> 
+> [0] http://lists.infradead.org/pipermail/linux-rockchip/2015-August/0
+> 03930.html
+
+
+-- 
+Sjoerd Simons
+Collabora Ltd.
