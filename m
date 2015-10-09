@@ -1,30 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 09 Oct 2015 10:41:43 +0200
-Subject: [PATCHv2] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
-In-Reply-To: <5340366.WTVksOGb0G@wuerfel>
-References: <1444109743-8561-1-git-send-email-manjeet.p@samsung.com>
- <20151006103128.GN6281@e103592.cambridge.arm.com>
- <5340366.WTVksOGb0G@wuerfel>
-Message-ID: <5223992.qv9q1k7gFp@wuerfel>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 09 Oct 2015 09:42:22 +0100
+Subject: [PATCH 4/4] arm64: dts: apq8016-sbc: enable spi buses on LS and HS
+In-Reply-To: <5616B303.9030909@codeaurora.org>
+References: <1444303124-32402-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1444303181-32574-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <5616B303.9030909@codeaurora.org>
+Message-ID: <56177DEE.1070405@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 October 2015 12:51:24 Arnd Bergmann wrote:
-> 
-> I think it makes sense to stick with the traditional definition
-> of MINSIGSTKSZ == "the minimum amount that you will always need,
-> add whatever you require yourself" and SIGSTKSZ == "Should be
-> enough for a couple of function calls". If we want to be conservative
-> in the kernel, using 8192 and 32768, to stay with the x4 ratio
-> that everyone else uses would be my first pick, though I'm not
-> particularly attached to those values.
-> 
-> 
 
-On second thought, it really seems to late to make up our minds
-about the size now that glibc has already established 5KB as the
-minimum size. If we set it to 8KB/32KB, not just the testcase but
-real applications would start failing when they use the 5KB
-constant from glibc.
 
-	Arnd
+On 08/10/15 19:16, Stephen Boyd wrote:
+> On 10/08/2015 04:19 AM, Srinivas Kandagatla wrote:
+>> This patch enables spi buses on low speed and high speed expansion
+>> connectors on DB410C
+>>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>>   arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 10 ++++++++++
+>>   1 file changed, 10 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+>> index 3581272..d872654 100644
+>> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+>> +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+>> @@ -92,11 +92,21 @@
+>>   	status = "okay";
+>>   };
+>>
+>> +&blsp_spi3 {
+>> +	/* On High speed expansion */
+>> +	status = "okay";
+>> +};
+>> +
+>>   &blsp_i2c4 {
+>>   	/* On High speed expansion */
+>>   	status = "okay";
+>>   };
+>>
+>> +&blsp_spi5 {
+>> +	/* On Low speed expansion */
+>> +	status = "okay";
+>> +};
+>> +
+>>   &blsp_i2c6 {
+>>   	/* On Low speed expansion */
+>>   	status = "okay";
+>
+> We've been using absolute nodes to mark device nodes as status = "okay".
+> Can we keep doing that here please?
+
+Sure, I will re-spin a new version.
+
+--srini
+>
