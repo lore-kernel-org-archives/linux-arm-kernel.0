@@ -1,42 +1,42 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 09 Oct 2015 18:16:57 -0400
-Subject: [PATCH 15/20] sfi: switch from ioremap_cache to memremap
+Date: Fri, 09 Oct 2015 18:16:41 -0400
+Subject: [PATCH 12/20] memconsole: fix __iomem mishandling, switch to memremap
 In-Reply-To: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
 References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <20151009221657.32203.42989.stgit@dwillia2-desk3.jf.intel.com>
+Message-ID: <20151009221641.32203.201.stgit@dwillia2-desk3.jf.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for deprecating ioremap_cache() convert its usage in sfi
-to memremap.  It's a bit awkward that we go and add back a fake __iomem
-annotation, but this is to keep consistency with early_ioremap() which
-does not have a 'memremap' flavor.
+The memconsole driver is not using proper accessors for __iomem.  Switch
+to memremap to fix this issue, and this also prepares the driver for the
+removal of ioremap_cache.
 
-Cc: Len Brown <lenb@kernel.org>
+Cc: Mike Waychison <mikew@google.com>
 Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
- drivers/sfi/sfi_core.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/firmware/google/memconsole.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/sfi/sfi_core.c b/drivers/sfi/sfi_core.c
-index 296db7a69c27..d9430b845dfa 100644
---- a/drivers/sfi/sfi_core.c
-+++ b/drivers/sfi/sfi_core.c
-@@ -101,7 +101,7 @@ static void __iomem * __ref sfi_map_memory(u64 phys, u32 size)
- 		return NULL;
+diff --git a/drivers/firmware/google/memconsole.c b/drivers/firmware/google/memconsole.c
+index 2f569aaed4c7..fd5041716860 100644
+--- a/drivers/firmware/google/memconsole.c
++++ b/drivers/firmware/google/memconsole.c
+@@ -52,14 +52,15 @@ static ssize_t memconsole_read(struct file *filp, struct kobject *kobp,
+ 	char *memconsole;
+ 	ssize_t ret;
  
- 	if (sfi_use_ioremap)
--		return ioremap_cache(phys, size);
-+		return (void __iomem *) memremap(phys, size, MEMREMAP_WB);
- 	else
- 		return early_ioremap(phys, size);
+-	memconsole = ioremap_cache(memconsole_baseaddr, memconsole_length);
++	memconsole = memremap(memconsole_baseaddr, memconsole_length,
++			MEMREMAP_WB);
+ 	if (!memconsole) {
+-		pr_err("memconsole: ioremap_cache failed\n");
++		pr_err("memconsole: memremap failed\n");
+ 		return -ENOMEM;
+ 	}
+ 	ret = memory_read_from_buffer(buf, count, &pos, memconsole,
+ 				      memconsole_length);
+-	iounmap(memconsole);
++	memunmap(memconsole);
+ 	return ret;
  }
-@@ -112,7 +112,7 @@ static void __ref sfi_unmap_memory(void __iomem *virt, u32 size)
- 		return;
  
- 	if (sfi_use_ioremap)
--		iounmap(virt);
-+		memunmap((void __force *) virt);
- 	else
- 		early_iounmap(virt, size);
- }
