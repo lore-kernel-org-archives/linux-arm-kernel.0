@@ -1,44 +1,90 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 09 Oct 2015 18:16:51 -0400
-Subject: [PATCH 14/20] pxa2xx-flash: switch from ioremap_cache to memremap
+Date: Fri, 09 Oct 2015 18:17:07 -0400
+Subject: [PATCH 17/20] arch: kill ioremap_cached()
 In-Reply-To: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
 References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <20151009221651.32203.63446.stgit@dwillia2-desk3.jf.intel.com>
+Message-ID: <20151009221707.32203.94356.stgit@dwillia2-desk3.jf.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for deprecating ioremap_cache() convert its usage in
-pxa2xx-flash to memremap.
+Nothing calls this helper, and now that ioremap_cache() is being
+deprecated these can also be removed.
 
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Brian Norris <computersforpeace@gmail.com>
-[brian: also convert iounmap to memunmap]
 Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
- drivers/mtd/maps/pxa2xx-flash.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mm/mmu.c               |    2 +-
+ arch/metag/include/asm/io.h     |    3 ---
+ arch/unicore32/include/asm/io.h |    4 +---
+ arch/unicore32/mm/ioremap.c     |    8 --------
+ 4 files changed, 2 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
-index 12fa75df5008..5ff6cc5b4844 100644
---- a/drivers/mtd/maps/pxa2xx-flash.c
-+++ b/drivers/mtd/maps/pxa2xx-flash.c
-@@ -71,8 +71,8 @@ static int pxa2xx_flash_probe(struct platform_device *pdev)
- 		       info->map.name);
- 		return -ENOMEM;
- 	}
--	info->map.cached =
--		ioremap_cache(info->map.phys, info->map.size);
-+	info->map.cached = memremap(info->map.phys, info->map.size,
-+			MEMREMAP_WB);
- 	if (!info->map.cached)
- 		printk(KERN_WARNING "Failed to ioremap cached %s\n",
- 		       info->map.name);
-@@ -111,7 +111,7 @@ static int pxa2xx_flash_remove(struct platform_device *dev)
- 	map_destroy(info->mtd);
- 	iounmap(info->map.virt);
- 	if (info->map.cached)
--		iounmap(info->map.cached);
-+		memunmap(info->map.cached);
- 	kfree(info);
- 	return 0;
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 7cd15143a507..da3ce68a89b3 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -259,7 +259,7 @@ static struct mem_type mem_types[] = {
+ 		.prot_sect	= PROT_SECT_DEVICE,
+ 		.domain		= DOMAIN_IO,
+ 	},
+-	[MT_DEVICE_CACHED] = {	  /* ioremap_cached */
++	[MT_DEVICE_CACHED] = {	  /* memremap(MEMREMAP_WB) */
+ 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_CACHED,
+ 		.prot_l1	= PMD_TYPE_TABLE,
+ 		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_WB,
+diff --git a/arch/metag/include/asm/io.h b/arch/metag/include/asm/io.h
+index 9890f21eadbe..5432949e627e 100644
+--- a/arch/metag/include/asm/io.h
++++ b/arch/metag/include/asm/io.h
+@@ -154,9 +154,6 @@ extern void __iounmap(void __iomem *addr);
+ #define ioremap_nocache(offset, size)           \
+ 	__ioremap((offset), (size), 0)
+ 
+-#define ioremap_cached(offset, size)            \
+-	__ioremap((offset), (size), _PAGE_CACHEABLE)
+-
+ #define ioremap_wc(offset, size)                \
+ 	__ioremap((offset), (size), _PAGE_WR_COMBINE)
+ 
+diff --git a/arch/unicore32/include/asm/io.h b/arch/unicore32/include/asm/io.h
+index cb1d8fd2b16b..1eea482b3cb9 100644
+--- a/arch/unicore32/include/asm/io.h
++++ b/arch/unicore32/include/asm/io.h
+@@ -21,10 +21,9 @@
+ #include <asm-generic/io.h>
+ 
+ /*
+- * __uc32_ioremap and __uc32_ioremap_cached takes CPU physical address.
++ * __uc32_ioremap takes CPU physical address.
+  */
+ extern void __iomem *__uc32_ioremap(unsigned long, size_t);
+-extern void __iomem *__uc32_ioremap_cached(unsigned long, size_t);
+ extern void __uc32_iounmap(volatile void __iomem *addr);
+ 
+ /*
+@@ -35,7 +34,6 @@ extern void __uc32_iounmap(volatile void __iomem *addr);
+  *
+  */
+ #define ioremap(cookie, size)		__uc32_ioremap(cookie, size)
+-#define ioremap_cached(cookie, size)	__uc32_ioremap_cached(cookie, size)
+ #define ioremap_nocache(cookie, size)	__uc32_ioremap(cookie, size)
+ #define iounmap(cookie)			__uc32_iounmap(cookie)
+ 
+diff --git a/arch/unicore32/mm/ioremap.c b/arch/unicore32/mm/ioremap.c
+index bf012b2b71a9..f9b6d918de6f 100644
+--- a/arch/unicore32/mm/ioremap.c
++++ b/arch/unicore32/mm/ioremap.c
+@@ -224,14 +224,6 @@ __uc32_ioremap(unsigned long phys_addr, size_t size)
  }
+ EXPORT_SYMBOL(__uc32_ioremap);
+ 
+-void __iomem *
+-__uc32_ioremap_cached(unsigned long phys_addr, size_t size)
+-{
+-	return __uc32_ioremap_caller(phys_addr, size, MT_DEVICE_CACHED,
+-			__builtin_return_address(0));
+-}
+-EXPORT_SYMBOL(__uc32_ioremap_cached);
+-
+ void __uc32_iounmap(volatile void __iomem *io_addr)
+ {
+ 	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
