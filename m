@@ -1,63 +1,103 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 9 Oct 2015 21:01:44 +0200
-Subject: [PATCH v3] arm-soc: Add support for Sigma Designs Tango4
-In-Reply-To: <5898159.aPJzsGHAv7@wuerfel>
-References: <560EAA7C.3070302@free.fr> <5612A473.8030405@sigmadesigns.com>
- <5613EF4C.30603@sigmadesigns.com> <5898159.aPJzsGHAv7@wuerfel>
-Message-ID: <56180F18.9010801@free.fr>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 9 Oct 2015 21:06:25 +0200
+Subject: [PATCH v2 4/8] mmc: dw_mmc: Use mmc_regulator_set_vqmmc in
+ start_signal_voltage_switch
+In-Reply-To: <1443622064-14362-5-git-send-email-heiko@sntech.de>
+References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
+ <1443622064-14362-5-git-send-email-heiko@sntech.de>
+Message-ID: <CAMAWPa9o=bQJPK+tJ38=5jngTFcOsAi=s9RcETbPN=3SsyQ8gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2015 15:18, Arnd Bergmann wrote:
-> On Tuesday 06 October 2015 17:57:00 Marc Gonzalez wrote:
->> This patch adds support for Sigma Designs "Tango4" platform, which is
->> built around the ARM Cortex A9 MPCore (single and dual core SoCs).
->>
->> Tango4 is not to be confused with Tango3, which was built around a
->> MIPS 74kf CPU.
->>
->> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->> ---
->> v3 changes: Updated clock tree DT (clk driver submitted)
->>
-> 
-> Looks all reasonable to me now. Can I get an Ack from M?ns? It sounds
-> like he is the original author of the port.
+On Wed, Sep 30, 2015 at 4:07 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> From: Douglas Anderson <dianders@chromium.org>
+>
+> We've introduced a new helper in the MMC core:
+> mmc_regulator_set_vqmmc().  Let's use this in dw_mmc.  Using this new
+> helper has some advantages:
+>
+> 1. We get the mmc_regulator_set_vqmmc() behavior of trying to match
+>    VQMMC and VMMC when the signal voltage is 3.3V.  This ensures max
+>    compatibility.
+>
+> 2. We get rid of a few more warnings when probing unsupported
+>    voltages.
+>
+> 3. We get rid of some non-dw_mmc specific code in dw_mmc.
+>
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Arnd,
+kernelci.org found a new failure in linux-next on
+exynos5800-peach-pi[1] and it was bisected down to this patch, which
+has hit linux-next in the form of commit fba2e23128d0 (mmc: dw_mmc:
+Use mmc_regulator_set_vqmmc in start_signal_voltage_switch).  Based on
+a quick glance at the boot log[2], it looks to be a bad pointer
+dereference in regulator_get_voltage().
 
-It seems that Mans has a problem with my submission :-(
+I confirmed that reverting this patch on top of next-20151009 gets my
+peach-pi booting again.
 
-I understand that there is some bad blood between him and Sigma.
-I also understand that Sigma's open source track record is below par.
+Note that the boot failure is only on exynos_defconfig, not multi_v7_defconfig.
 
-However, I think it needs to be pointed out that:
+Kevin
 
-1) I don't speak for Sigma, I merely work for them; and I always
-try to "do the right thing".
 
-2) I accept valid technical criticism of my code, but Mans' points
-are sometimes clouded in a bit of hyperbole. (Especially wrt to the
-clk driver)
+[1] http://kernelci.org/boot/exynos5800-peach-pi/job/next/kernel/next-20151009/defconfig/exynos_defconfig/lab/lab-khilman/?_id=56177d3659b514a50c6c3267
 
-Looking at the diffstat:
+[2] http://storage.kernelci.org/next/next-20151009/arm-exynos_defconfig/lab-khilman/boot-exynos5800-peach-pi.html
 
- arch/arm/Kconfig                          |   2 +
- arch/arm/Makefile                         |   1 +
- arch/arm/boot/dts/Makefile                |   2 +
- arch/arm/boot/dts/tango4-vantage-1172.dts |  17 ++++
- arch/arm/boot/dts/tango4.dtsi             | 133 ++++++++++++++++++++++++++++++
- arch/arm/mach-tangox/Kconfig              |  11 +++
- arch/arm/mach-tangox/Makefile             |   1 +
- arch/arm/mach-tangox/setup.c              |   7 ++
 
-it can be argued that /all/ my changes are trivial, except for
-the device tree. Perhaps I should credit Mans by adding his
-copyright at the top of the tango4.dtsi? (Although he has
-expressed disdain for it, so I'm not sure he would welcome
-such an addition.)
-
-Arnd, I understand you are the arm-soc maintainer? How am I
-supposed to resolve this gridlock?
-
-Regards.
+> ---
+>  drivers/mmc/host/dw_mmc.c | 17 ++++++-----------
+>  1 file changed, 6 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index fcbf552..b1b7e7f 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -1279,7 +1279,6 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
+>         const struct dw_mci_drv_data *drv_data = host->drv_data;
+>         u32 uhs;
+>         u32 v18 = SDMMC_UHS_18V << slot->id;
+> -       int min_uv, max_uv;
+>         int ret;
+>
+>         if (drv_data && drv_data->switch_voltage)
+> @@ -1291,22 +1290,18 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
+>          * does no harm but you need to set the regulator directly.  Try both.
+>          */
+>         uhs = mci_readl(host, UHS_REG);
+> -       if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
+> -               min_uv = 2700000;
+> -               max_uv = 3600000;
+> +       if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330)
+>                 uhs &= ~v18;
+> -       } else {
+> -               min_uv = 1700000;
+> -               max_uv = 1950000;
+> +       else
+>                 uhs |= v18;
+> -       }
+> +
+>         if (!IS_ERR(mmc->supply.vqmmc)) {
+> -               ret = regulator_set_voltage(mmc->supply.vqmmc, min_uv, max_uv);
+> +               ret = mmc_regulator_set_vqmmc(mmc, ios);
+>
+>                 if (ret) {
+>                         dev_dbg(&mmc->class_dev,
+> -                                        "Regulator set error %d: %d - %d\n",
+> -                                        ret, min_uv, max_uv);
+> +                                        "Regulator set error %d - %s V\n",
+> +                                        ret, uhs & v18 ? "1.8" : "3.3");
+>                         return ret;
+>                 }
+>         }
+> --
+> 2.5.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
