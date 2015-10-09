@@ -1,43 +1,31 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 9 Oct 2015 14:52:02 +0800
-Subject: [PATCH v3 6/6] arm64: dts: berlin4ct: add default pinmux for uart0
-In-Reply-To: <1444373522-2119-1-git-send-email-jszhang@marvell.com>
-References: <1444373522-2119-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1444373522-2119-7-git-send-email-jszhang@marvell.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 9 Oct 2015 00:03:57 -0700
+Subject: [PATCH 05/10] clk: iproc: Add PLL base write function
+In-Reply-To: <1443826665-17570-6-git-send-email-jonmason@broadcom.com>
+References: <1443826665-17570-1-git-send-email-jonmason@broadcom.com>
+ <1443826665-17570-6-git-send-email-jonmason@broadcom.com>
+Message-ID: <20151009070357.GN26883@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add urt0 txd and rxd muxing setup in the dtsi because uart0 always uses
-them to work, no other possibilities.
+On 10/02, Jon Mason wrote:
+> diff --git a/drivers/clk/bcm/clk-iproc-pll.c b/drivers/clk/bcm/clk-iproc-pll.c
+> index e029ab3..a4602aa 100644
+> --- a/drivers/clk/bcm/clk-iproc-pll.c
+> +++ b/drivers/clk/bcm/clk-iproc-pll.c
+> @@ -137,6 +137,18 @@ static int pll_wait_for_lock(struct iproc_pll *pll)
+>  	return -EIO;
+>  }
+>  
+> +static void iproc_pll_write(struct iproc_pll *pll, void __iomem *base,
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+Seems that pll could be const too?
 
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-index 8e66355..a4a1876 100644
---- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-+++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-@@ -288,12 +288,19 @@
- 				clocks = <&osc>;
- 				reg-shift = <2>;
- 				status = "disabled";
-+				pinctrl-0 = <&uart0_pmux>;
-+				pinctrl-names = "default";
- 			};
- 		};
- 
- 		system_pinctrl: pin-controller at fe2200 {
- 			compatible = "marvell,berlin4ct-system-pinctrl";
- 			reg = <0xfe2200 0xc>;
-+
-+			uart0_pmux: uart0-pmux {
-+				groups = "SM_URT0_TXD", "SM_URT0_RXD";
-+				function = "uart0";
-+			};
- 		};
- 	};
- };
+> +			    u32 offset, u32 val)
+> +{
+> +	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
+> +
+
 -- 
-2.6.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
