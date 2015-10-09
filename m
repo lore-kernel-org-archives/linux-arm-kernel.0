@@ -1,94 +1,34 @@
-From: wuht06@gmail.com (Hongtao Wu)
-Date: Fri, 9 Oct 2015 21:23:16 +0800
-Subject: [RFC PATCH v3 1/3] mmc: sprd: Add MMC host driver for Spreadtrum
- SoC
-In-Reply-To: <CAPDyKFp2o=RAnizGrWgt080kYqWkBabh6NsCR11q3SPVCfaBAw@mail.gmail.com>
-References: <1439571353-30165-1-git-send-email-wuht06@gmail.com>
- <1439571353-30165-2-git-send-email-wuht06@gmail.com>
- <CAPDyKFp=XH+Vo_diRyhrMuB+v1rmTmxo3Lid3Wc-u1ohqNisKw@mail.gmail.com>
- <CAG_R4_VTXCV4NVMOwv-9F56-_pVsK0hU4go79ZhV3OFxwcF0mA@mail.gmail.com>
- <CAPDyKFo3xp3wU3XW3kMV7Xz7DFgkxts3CArthYY7-CyWk8cjXw@mail.gmail.com>
- <CAG_R4_X3kQj5xSA5KLyu75aqusPNXj0H4Xqx+m+5Sg5cZ15bBg@mail.gmail.com>
- <CAPDyKFp2o=RAnizGrWgt080kYqWkBabh6NsCR11q3SPVCfaBAw@mail.gmail.com>
-Message-ID: <CAG_R4_VRht=7VQYNCBDmYt31zSBp-=_wKJM+pTQZUZV8hdTuGQ@mail.gmail.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Fri, 9 Oct 2015 15:30:47 +0200
+Subject: [PATCH v3] arm-soc: Add support for Sigma Designs Tango4
+In-Reply-To: <5898159.aPJzsGHAv7@wuerfel>
+References: <560EAA7C.3070302@free.fr> <5612A473.8030405@sigmadesigns.com>
+ <5613EF4C.30603@sigmadesigns.com> <5898159.aPJzsGHAv7@wuerfel>
+Message-ID: <5617C187.4010105@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 8, 2015 at 9:54 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> [...]
->
->>> Thanks for clarifying!
->>>
->>> You have some differences towards the "standard" sdhci variant, but
->>> that doesn't mean you should go off and implement a new driver from
->>> scratch, instead you should create a new sdhci variant and re-use code
->>> from the generic sdhci driver.
->>>
->>> The current problem with such approach, is that the sdhci driver isn't
->>> designed as a library but instead a driver consisting of too many
->>> quirks and callbacks. While you start to adopt your driver towards
->>> sdhci, you will need to add yet another bunch of new quirks and
->>> callbacks to suite your hw.
->>>
->>> Now, as the number of callbacks and quirks continues to increase I
->>> will sooner or later give up maintaining it, as each line of code will
->>> depend on a quirk. So, we need to start turning sdhci into a library
->>> *right now*! Russell King, has pointed out this several times as well,
->>> but unfortunate I haven't yet seen anyone willing to help out in this
->>> field.
->>>
->>> I would of course be very happy if you would like to have a look at
->>> that, but I realize it's a difficult task, So, unless you are happy
->>> with taking on such a challenge, I suggest you go for an intermediate
->>> step, which thus means convert your driver to a sdhci variant driver
->>> and add the quirks/callbacks you need to suite your hw.
->>>
->>> [...]
->>>
->>> Kind regards
->>> Uffe
->>
->> Thanks for kindly suggestion!
->> I think it's a good idea to turn sdhci into a library. But for me it's
->> too difficult to
->> take on such a challenge. However, I will try my best to support you to do
->> it.
->
-> Yes, I totally understand and thanks for your support.
->
->>
->> As you suggested, I will consider converting our eMMC host driver to a
->> sdhci variant driver. However, our controller has some features, which
->> differentiate it from standard sd host controller. For example, our controller
->> doesn't have such functions as follows: tuning or re-tuning, Power Control
->> Register, PIO or ADMA transfer mode, UHS-II and so on. So, if we use sdchi
->> variant driver right now, I think it has a litter redundancy.
->
-> I realize that, but I would very much appreciate if you give it try -
-> I think it should be doable.
->
-> Of course, you will need to change the "sdhci core" to suite your
-> needs and normally people do that via adding callbacks and quirks.
-> Perhaps you can keep my request in mind of turning sdhci into a
-> library and thus limit the number of added quirks and callbacks...
->
->>
->> Now our sdio team are discussing improving  our eMMC host controller, we are
->> making it more standardized. But you know, changing a IP block is a long
->> process. Maybe it will take us about one or two years. So what do you think
->> if we use ourself eMMC host driver right now, and convert it when our new host
->> controller is ready.
->>
->
-> Well, that won't help the current HW so I would encourage you to do
-> the "sdhci variant" work anyway. Likely it will also benefit you when
-> you try to upstream the next variant of the driver to cope with your
-> new HW.
->
-> Kind regards
-> Uffe
+On 09/10/2015 15:18, Arnd Bergmann wrote:
 
+> On Tuesday 06 October 2015 17:57:00 Marc Gonzalez wrote:
+>> This patch adds support for Sigma Designs "Tango4" platform, which is
+>> built around the ARM Cortex A9 MPCore (single and dual core SoCs).
+>>
+>> Tango4 is not to be confused with Tango3, which was built around a
+>> MIPS 74kf CPU.
+>>
+>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> ---
+>> v3 changes: Updated clock tree DT (clk driver submitted)
+>>
+> 
+> Looks all reasonable to me now. Can I get an Ack from M?ns? It sounds
+> like he is the original author of the port.
 
-Thanks for your quick reply.
-We will use the "standard" sdhci variant to cope with our new HW as you
-suggest. Maybe it will take us a long time, but we will try to do it.
+I have a v4 coming up to account for the change from "twd-never-stops"
+to "always-on" requested by Mark Rutland.
+
+I started the port by looking at Mans' Tango3 port, but the code
+submitted was written by me (bugs included).
+
+Regards.
