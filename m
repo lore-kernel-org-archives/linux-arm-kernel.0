@@ -1,75 +1,80 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 9 Oct 2015 23:02:32 +0200
-Subject: [PATCH v3 00/12] pwm: add support for atomic update
-In-Reply-To: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20151009230232.6d21d9be@bbrezillon>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 9 Oct 2015 23:12:31 +0200
+Subject: [PATCH v3] arm-soc: Add support for Sigma Designs Tango4
+In-Reply-To: <yw1xmvvriye7.fsf@unicorn.mansr.com>
+References: <560EAA7C.3070302@free.fr> <5612A473.8030405@sigmadesigns.com>
+ <5613EF4C.30603@sigmadesigns.com> <5898159.aPJzsGHAv7@wuerfel>
+ <56180F18.9010801@free.fr> <yw1xmvvriye7.fsf@unicorn.mansr.com>
+Message-ID: <56182DBF.8000906@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On 09/10/2015 22:24, M?ns Rullg?rd wrote:
 
-On Mon, 21 Sep 2015 11:33:17 +0200
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> Mason wrote:
+> 
+>> On 09/10/2015 15:18, Arnd Bergmann wrote:
+>>> On Tuesday 06 October 2015 17:57:00 Marc Gonzalez wrote:
+>>>> This patch adds support for Sigma Designs "Tango4" platform, which is
+>>>> built around the ARM Cortex A9 MPCore (single and dual core SoCs).
+>>>>
+>>>> Tango4 is not to be confused with Tango3, which was built around a
+>>>> MIPS 74kf CPU.
+>>>>
+>>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>>> ---
+>>>> v3 changes: Updated clock tree DT (clk driver submitted)
+>>>>
+>>>
+>>> Looks all reasonable to me now. Can I get an Ack from M?ns? It sounds
+>>> like he is the original author of the port.
+>>
+>> Arnd,
+>>
+>> It seems that Mans has a problem with my submission :-(
+>>
+>> I understand that there is some bad blood between him and Sigma.
+>> I also understand that Sigma's open source track record is below par.
+>>
+>> However, I think it needs to be pointed out that:
+>>
+>> 1) I don't speak for Sigma,
+> 
+> You've previously said that you do:
+> http://www.spinics.net/lists/arm-kernel/msg449191.html
 
-> Hello,
-> 
-> This series adds support for atomic PWM update, or IOW, the capability
-> to update all the parameters of a PWM device (enabled/disabled, period,
-> duty and polarity) in one go.
+"As far as the upstreaming process is concerned, I speak for Sigma."
+means "Sigma allows me to handle the upstreaming process details."
 
-Anything preventing this series from being applied (AKA ping)?
+"I don't speak for Sigma." means
+"I am not responsible for Sigma's past (or present) business
+decisions, as I have no influence on that process, apart from
+requesting time for working on upstreaming."
 
+>> I merely work for them; and I always try to "do the right thing".
+>>
+>> 2) I accept valid technical criticism of my code, but Mans' points
+>> are sometimes clouded in a bit of hyperbole. (Especially wrt to the
+>> clk driver)
 > 
-> Best Regards,
-> 
-> Boris
-> 
-> Changes since v2:
-> - rebased on top of 4.3-rc2
-> - reintroduced pwm-regulator patches
-> 
-> Changes since v1:
-> - dropped applied patches
-> - squashed Heiko's fixes into the rockchip driver changes
-> - made a few cosmetic changes
-> - added kerneldoc comments
-> - added Heiko's patch to display more information in debugfs
-> - dropped pwm-regulator patches (should be submitted separately)
-> 
-> Boris Brezillon (11):
->   pwm: introduce default period and polarity concepts
->   pwm: define a new pwm_state struct
->   pwm: move the enabled/disabled info to pwm_state struct
->   backlight: pwm_bl: remove useless call to pwm_set_period
->   pwm: declare a default PWM state
->   pwm: add the PWM initial state retrieval infra
->   pwm: add the core infrastructure to allow atomic update
->   pwm: rockchip: add initial state retrieval
->   pwm: rockchip: add support for atomic update
->   regulator: pwm: implement ->enable(), ->disable() and ->is_enabled
->     methods
->   regulator: pwm: properly initialize the ->state field
-> 
-> Heiko St?bner (1):
->   pwm: add information about polarity, duty cycle and period to debugfs
-> 
->  drivers/leds/leds-pwm.c              |   2 +-
->  drivers/pwm/core.c                   | 169 +++++++++++++++++++++++++++++++----
->  drivers/pwm/pwm-pxa.c                |   2 +-
->  drivers/pwm/pwm-rockchip.c           | 119 +++++++++++++++++++-----
->  drivers/pwm/pwm-sun4i.c              |   3 +-
->  drivers/regulator/pwm-regulator.c    |  65 ++++++++++++--
->  drivers/video/backlight/lm3630a_bl.c |   4 +-
->  drivers/video/backlight/pwm_bl.c     |  10 ++-
->  drivers/video/fbdev/ssd1307fb.c      |   2 +-
->  include/linux/pwm.h                  |  89 +++++++++++++++---
->  10 files changed, 392 insertions(+), 73 deletions(-)
-> 
+> You keep insisting that your overly simplistic driver is smaller and
+> therefore better.  The truth is that the clock tree in these chips is
+> somewhat complex, and the right thing to do is to represent it as
+> accurately as possible.  If you do not, it will fail in some setup or
+> other, and this is not just a hypothetical.  Your clock driver gives the
+> wrong frequencies on my boards.
 
+Let me get this straight.
 
+You took my clk driver, labeled "Tango4 cpuclk driver", named clk-tango4.c,
+which exports compatible "sigma,tango4-pll" and "sigma,tango4-cpuclk" and
+which reads a register that doesn't exist on Tango3.
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Then you took it for a spin on your Tango3 boards, and... would you look
+at that! It doesn't even work.
+
+Why don't you submit your clk driver for Tango3, and just let me finish
+the Tango4 port? I have gone out of my way to send you a dev board and
+some documentation, but now you just keep sniping at my work. Why?
+
+EOT
