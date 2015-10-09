@@ -1,58 +1,60 @@
-From: bfields@fieldses.org (J. Bruce Fields)
-Date: Fri, 9 Oct 2015 16:10:59 -0400
-Subject: [PATCH] sunrpc: avoid warning in gss_key_timeout
-In-Reply-To: <6995148.OQIKcAcqHW@wuerfel>
-References: <6995148.OQIKcAcqHW@wuerfel>
-Message-ID: <20151009201059.GC8188@fieldses.org>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 09 Oct 2015 21:24:00 +0100
+Subject: [PATCH v3] arm-soc: Add support for Sigma Designs Tango4
+In-Reply-To: <56180F18.9010801@free.fr> (Mason's message of "Fri, 9 Oct 2015
+ 21:01:44 +0200")
+References: <560EAA7C.3070302@free.fr> <5612A473.8030405@sigmadesigns.com>
+ <5613EF4C.30603@sigmadesigns.com> <5898159.aPJzsGHAv7@wuerfel>
+ <56180F18.9010801@free.fr>
+Message-ID: <yw1xmvvriye7.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 04:13:45PM +0200, Arnd Bergmann wrote:
-> The gss_key_timeout() function causes a harmless warning in some
-> configurations, e.g. ARM imx_v6_v7_defconfig with gcc-5.2, if the
-> compiler cannot figure out the state of the 'expire' variable across
-> an rcu_read_unlock():
-> 
-> net/sunrpc/auth_gss/auth_gss.c: In function 'gss_key_timeout':
-> net/sunrpc/auth_gss/auth_gss.c:1422:211: warning: 'expire' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> 
-> To avoid this warning without adding a bogus initialization, this
-> rewrites the function so the comparison is done inside of the
-> critical section. As a side-effect, it also becomes slightly
-> easier to understand because the implementation now more closely
-> resembles the comment above it.
+Mason <slash.tmp@free.fr> writes:
 
-Looks reasonable, thanks; applying for 4.4--b.
+> On 09/10/2015 15:18, Arnd Bergmann wrote:
+>> On Tuesday 06 October 2015 17:57:00 Marc Gonzalez wrote:
+>>> This patch adds support for Sigma Designs "Tango4" platform, which is
+>>> built around the ARM Cortex A9 MPCore (single and dual core SoCs).
+>>>
+>>> Tango4 is not to be confused with Tango3, which was built around a
+>>> MIPS 74kf CPU.
+>>>
+>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>> ---
+>>> v3 changes: Updated clock tree DT (clk driver submitted)
+>>>
+>> 
+>> Looks all reasonable to me now. Can I get an Ack from M?ns? It sounds
+>> like he is the original author of the port.
+>
+> Arnd,
+>
+> It seems that Mans has a problem with my submission :-(
+>
+> I understand that there is some bad blood between him and Sigma.
+> I also understand that Sigma's open source track record is below par.
+>
+> However, I think it needs to be pointed out that:
+>
+> 1) I don't speak for Sigma,
 
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: c5e6aecd034e7 ("sunrpc: fix RCU handling of gc_ctx field")
-> 
-> diff --git a/net/sunrpc/auth_gss/auth_gss.c b/net/sunrpc/auth_gss/auth_gss.c
-> index dace13d7638e..799e65b944b9 100644
-> --- a/net/sunrpc/auth_gss/auth_gss.c
-> +++ b/net/sunrpc/auth_gss/auth_gss.c
-> @@ -1411,17 +1411,16 @@ gss_key_timeout(struct rpc_cred *rc)
->  {
->  	struct gss_cred *gss_cred = container_of(rc, struct gss_cred, gc_base);
->  	struct gss_cl_ctx *ctx;
-> -	unsigned long now = jiffies;
-> -	unsigned long expire;
-> +	unsigned long timeout = jiffies + (gss_key_expire_timeo * HZ);
-> +	int ret = 0;
->  
->  	rcu_read_lock();
->  	ctx = rcu_dereference(gss_cred->gc_ctx);
-> -	if (ctx)
-> -		expire = ctx->gc_expiry - (gss_key_expire_timeo * HZ);
-> +	if (!ctx || time_after(timeout, ctx->gc_expiry))
-> +		ret = -EACCES;
->  	rcu_read_unlock();
-> -	if (!ctx || time_after(now, expire))
-> -		return -EACCES;
-> -	return 0;
-> +
-> +	return ret;
->  }
->  
->  static int
+You've previously said that you do:
+http://www.spinics.net/lists/arm-kernel/msg449191.html
+
+> I merely work for them; and I always try to "do the right thing".
+>
+> 2) I accept valid technical criticism of my code, but Mans' points
+> are sometimes clouded in a bit of hyperbole. (Especially wrt to the
+> clk driver)
+
+You keep insisting that your overly simplistic driver is smaller and
+therefore better.  The truth is that the clock tree in these chips is
+somewhat complex, and the right thing to do is to represent it as
+accurately as possible.  If you do not, it will fail in some setup or
+other, and this is not just a hypothetical.  Your clock driver gives the
+wrong frequencies on my boards.
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
