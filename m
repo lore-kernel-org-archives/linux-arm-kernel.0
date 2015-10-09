@@ -1,83 +1,47 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 09 Oct 2015 18:13:04 +0200
-Subject: [GIT PULL] ARM: mvebu: dt for v4.4
-Message-ID: <87fv1krpf3.fsf@free-electrons.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 9 Oct 2015 11:27:00 -0500
+Subject: [PATCH 0/9] Further mvebu PCIe patches
+In-Reply-To: <20151003181228.GI21513@n2100.arm.linux.org.uk>
+References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
+Message-ID: <20151009162700.GA16112@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Oct 03, 2015 at 07:12:28PM +0100, Russell King - ARM Linux wrote:
+> Jason, Thomas,
+> 
+> Here are further PCIe patches which follow on from the previous set of
+> six I sent earlier in September.  This set:
+> 
+> * Separates the DT parsing from the use of this parsed data.
+> * Fixes memory leaks from kasprintf() and refcount leaks of the DT
+>   node where we break out from the loop early.
+> * Uses gpio_set_value_cansleep() so that GPIOs on I2C expanders can
+>   be used for the PCIe reset functionality.
+> * Switch to using devm_kcalloc() instead of devm_kzalloc(), which
+>   eliminates the multiplication, moving it into core code.
+> * Switch to using a gpio descriptor for the reset gpio, which can
+>   contain the active level information from DT.  (It would be nice
+>   if gpiolib automated some of the resource claiming there.)
+> * Make PERST# vs clock timing to match PCIe specifications.  PCIe
+>   specs require the clock to be running for 100us prior to releasing
+>   reset.
+> * Add the standard PCIe capability block in root port form to the
+>   emulated PCIe configuration block.  This allows the PCI layer to
+>   identify the "host bridge" as a PCIe device, and allows us to
+>   take advantage of the code in drivers/pci/pcie, particularly
+>   aspm for link power management.
+> * As a result of identifying ourselves as a PCIe root port, this
+>   eliminates the need to special case accesses to non-slot 0 in
+>   the driver; the lack of other "slots" is something which the
+>   generic PCI code knows about for PCIe root ports.
+> 
+>  drivers/pci/host/pci-mvebu.c | 404 ++++++++++++++++++++++++++++++++-----------
+>  1 file changed, 305 insertions(+), 99 deletions(-)
 
-Here is the first pull request for dt for mvebu for v4.4.
+Applied to pci/host-mvebu for v4.4 with Tested-by from Willy, Andrew,
+and Thomas, and Reviewed-by from Thomas.  I adjusted subject line
+capitalization to match the history.  Thanks, Russell and reviewers
+and testers!
 
-Gregory
-
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
-
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.4-1
-
-for you to fetch changes up to 9b24a35cb59888194706825b9c5ac550b0880277:
-
-  ARM: mvebu: modify Orion and Kirkwoord crypto compatible strings (2015-10-09 17:08:02 +0200)
-
-----------------------------------------------------------------
-mvebu dt for 4.4 (part 1)
-
-Update dts to use the new crypto driver on mvebu SoCs
-
-----------------------------------------------------------------
-Arnaud Ebalard (1):
-      ARM: mvebu: add crypto related nodes to armada 370 dtsi
-
-Boris Brezillon (9):
-      ARM: mvebu: add crypto related nodes to armada-xp.dtsi
-      ARM: mvebu: define crypto SRAM ranges for all armada-xp boards
-      ARM: mvebu: define crypto SRAM ranges for all armada-370 boards
-      ARM: mvebu: add crypto related nodes to armada 375 dtsi
-      ARM: mvebu: define crypto SRAM ranges in armada-375-db.dts
-      ARM: mvebu: add crypto related nodes to armada 38x dtsi
-      ARM: mvebu: define crypto SRAM ranges for all armada-38x boards
-      ARM: mvebu: use new bindings for existing crypto devices
-      ARM: mvebu: modify Orion and Kirkwoord crypto compatible strings
-
-Thomas Petazzoni (1):
-      ARM: mvebu: add CPU config registers in the Armada 370/XP Device Tree
-
- arch/arm/boot/dts/armada-370-db.dts              |  3 +-
- arch/arm/boot/dts/armada-370-dlink-dns327l.dts   |  3 +-
- arch/arm/boot/dts/armada-370-mirabox.dts         |  7 ++++-
- arch/arm/boot/dts/armada-370-netgear-rn102.dts   |  3 +-
- arch/arm/boot/dts/armada-370-netgear-rn104.dts   |  3 +-
- arch/arm/boot/dts/armada-370-rd.dts              |  3 +-
- arch/arm/boot/dts/armada-370-synology-ds213j.dts |  3 +-
- arch/arm/boot/dts/armada-370.dtsi                | 37 ++++++++++++++++++++++++
- arch/arm/boot/dts/armada-375-db.dts              |  4 ++-
- arch/arm/boot/dts/armada-375.dtsi                | 33 +++++++++++++++++++++
- arch/arm/boot/dts/armada-385-db-ap.dts           |  4 ++-
- arch/arm/boot/dts/armada-385-linksys.dtsi        |  4 ++-
- arch/arm/boot/dts/armada-388-db.dts              |  4 ++-
- arch/arm/boot/dts/armada-388-gp.dts              |  4 ++-
- arch/arm/boot/dts/armada-388-rd.dts              |  4 ++-
- arch/arm/boot/dts/armada-38x.dtsi                | 33 +++++++++++++++++++++
- arch/arm/boot/dts/armada-xp-axpwifiap.dts        |  4 ++-
- arch/arm/boot/dts/armada-xp-db.dts               |  4 ++-
- arch/arm/boot/dts/armada-xp-gp.dts               |  4 ++-
- arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  |  4 ++-
- arch/arm/boot/dts/armada-xp-linksys-mamba.dts    |  4 ++-
- arch/arm/boot/dts/armada-xp-matrix.dts           |  4 ++-
- arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   |  4 ++-
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  4 ++-
- arch/arm/boot/dts/armada-xp-synology-ds414.dts   |  4 ++-
- arch/arm/boot/dts/armada-xp.dtsi                 | 35 ++++++++++++++++++++++
- arch/arm/boot/dts/dove.dtsi                      | 17 ++++++++---
- arch/arm/boot/dts/kirkwood.dtsi                  | 29 ++++++++++++-------
- arch/arm/boot/dts/orion5x.dtsi                   | 22 +++++++++-----
- 29 files changed, 248 insertions(+), 43 deletions(-)
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Bjorn
