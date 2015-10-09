@@ -1,50 +1,59 @@
-From: rsahu@apm.com (Rameshwar Sahu)
-Date: Fri, 9 Oct 2015 22:08:32 +0530
-Subject: [PATCH v2] dmaengine: xgene-dma: Disable memcpy operation due to
- performance drop
-In-Reply-To: <20151009161208.GJ3609@vkoul-mobl.iind.intel.com>
-References: <1444295217-3099-1-git-send-email-rsahu@apm.com>
- <20151009161208.GJ3609@vkoul-mobl.iind.intel.com>
-Message-ID: <CAFd313w3010=LN7rfrxwohM=h-9xWzK6UNtcWxn+eXtx-pNv4Q@mail.gmail.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Fri, 9 Oct 2015 18:39:47 +0200 (CEST)
+Subject: [PATCH 2/9] pci: mvebu: fix memory leaks and refcount leaks
+In-Reply-To: <20151009153543.GX32532@n2100.arm.linux.org.uk>
+References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
+ <E1ZiRIs-0004Id-AN@rmk-PC.arm.linux.org.uk>
+ <20151009165240.3ba17ece@free-electrons.com> <20151009150710.GJ14688@lunn.ch>
+ <20151009171442.52988f0b@free-electrons.com>
+ <20151009153543.GX32532@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.10.1510091838440.2665@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
 
-On Fri, Oct 9, 2015 at 9:42 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Thu, Oct 08, 2015 at 02:36:57PM +0530, Rameshwar Prasad Sahu wrote:
->> The DMA engine supports memory copy, RAID5 XOR, RAID6 PQ, and other
->> computations. But the bandwidth of the entire DMA engine is shared
->> among all channels. This patch re-configures operations availability
->> such that one can achieve maximum performance for XOR and PQ
->> computation by removing the memory offload operations.
->>
->> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
->> ---
->>  drivers/dma/xgene-dma.c | 1 -
->>  1 file changed, 1 deletion(-)
->>
->> diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
->> index 8d57b1b..cd38022 100644
->> --- a/drivers/dma/xgene-dma.c
->> +++ b/drivers/dma/xgene-dma.c
->> @@ -1707,7 +1707,6 @@ static void xgene_dma_set_caps(struct xgene_dma_chan *chan,
->>       dma_cap_zero(dma_dev->cap_mask);
->>
->>       /* Set DMA device capability */
->> -     dma_cap_set(DMA_MEMCPY, dma_dev->cap_mask);
->>       dma_cap_set(DMA_SG, dma_dev->cap_mask);
+
+On Fri, 9 Oct 2015, Russell King - ARM Linux wrote:
+
+> On Fri, Oct 09, 2015 at 05:14:42PM +0200, Thomas Petazzoni wrote:
+> > Julia: some of the Device Tree iterator functions have a somewhat
+> > "interesting" behavior in that they take the reference on the current
+> > child when entering the loop, and release it before entering the next
+> > iteration (which will also take a reference to the next child).
+> >
+> > This means that if you have an exit point inside the loop (break or
+> > return), you are loosing a reference. For example,
+> > http://lxr.free-electrons.com/source/arch/arm/mach-shmobile/pm-rmobile.c#L367
+> > is wrong because there is a missing of_node_put(np) before the "return
+> > -ENOMEM".
+> >
+> > So essentially, every exit point in such Device Tree iteration loops
+> > should make to call of_node_put() on the current element before exiting
+> > the loop unexpectedly.
 >
-> This will not work. Still clients can invoke memcpy operation. You need to
-> remove the callback
-
-Got it, instead of removing the callback registration can we keep it
-inside the condition like..
-
-if (dma_has_cap(DMA_MEMCPY, dma_dev->cap_mask))
-            dma_dev->device_prep_dma_memcpy = xgene_dma_prep_memcpy;
-
-
+> There is an exception to that... if the loop is part of a DT node lookup
+> function, which would return a DT node based on some search criteria, it
+> would be valid to break out of the loop while holding a reference.
 >
-> --
-> ~Vinod
+> For example, of_get_child_by_name(), of_find_next_cache_node(),
+> of_graph_get_port_by_id(), are valid breaker-outer cases. ;)
+>
+> However, of_platform_bus_probe(), of_platform_populate(),
+> of_overlay_apply_one(), overlay_subtree_check() are examples of
+> incorrect break-out cases.
+
+Thanks for the examples.
+
+I guess that this incorrect too, for the opposite reason (double put)?
+
+drivers/clk/tegra/clk-emc.c:
+
+	for_each_child_of_node(np, node) {
+                err = of_property_read_u32(node, "nvidia,ram-code",
+                                           &node_ram_code);
+                if (err) {
+                        of_node_put(node);
+                        continue;
+		}
+
+julia
