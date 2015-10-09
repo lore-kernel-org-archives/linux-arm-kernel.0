@@ -1,35 +1,80 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Fri, 9 Oct 2015 13:45:47 -0700
-Subject: arm/arm64: GICv2 driver does not have irq_disable implemented
-In-Reply-To: <alpine.DEB.2.11.1510091951250.6097@nanos>
-References: <CADaLND=spbEHLZXmqsVRDsPAyNKXJHnc=Yy6ujY0em74dB5CbA@mail.gmail.com>
- <alpine.DEB.2.11.1510091951250.6097@nanos>
-Message-ID: <CADaLNDmgWnOAugY20nXWz_-2m-KPKnARMWeYMDTuPdRe8SA8sQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 09 Oct 2015 23:51:05 +0300
+Subject: [PATCH] ARM: shmobile: porter: add QSPI DT support
+Message-ID: <1738678.v21ITp1gYW@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 9, 2015 at 10:52 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Fri, 9 Oct 2015, Duc Dang wrote:
->> Hi Thomas, Marc, Jason and All,
->>
->> In APM ARM64 X-Gene Enet controller driver, we use disable_irq_nosync to
->> disable interrupt before calling __napi_schedule to schedule packet handler
->> to process the Tx/Rx packets.
->
-> Which is wrong to begin with. Disable the interrupt at the device
-> level not at the interrupt line level.
->
-Hi Thomas,
+Define the Porter board dependent part of the QSPI device node.
+Add device nodes  for Spansion  S25FL512S SPI flash and the MTD partitions
+on it.
 
-We could not disable the interrupt at Enet controller level due to the
-controller limitation. As you said, using  disable_irq_nosync is wrong
-but it looks like that the only option that we have.
+This patch is  mostly analogous to the commit f59838d44835 (ARM: shmobile:
+henninger: add QSPI DT support) as there  are no differences between the
+boards in this respect.
 
-Do you have any suggestion about different approach that we could try?
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-> Thanks,
->
->         tglx
+---
+This patch is against 'renesas-devel-20151008-v4.3-rc4' tag of Simon Horman's
+'renesas.git' repo plus the Porter I2C2 and VIN0/ADV7180 patches posted earlier.
 
-Regards,
-Duc Dang.
+ arch/arm/boot/dts/r8a7791-porter.dts |   38 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791-porter.dts
++++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -110,6 +110,11 @@
+ 		renesas,function = "sdhi2";
+ 	};
+ 
++	qspi_pins: spi0 {
++		renesas,groups = "qspi_ctrl", "qspi_data4";
++		renesas,function = "qspi";
++	};
++
+ 	i2c2_pins: i2c2 {
+ 		renesas,groups = "i2c2";
+ 		renesas,function = "i2c2";
+@@ -165,6 +170,39 @@
+ 	status = "okay";
+ };
+ 
++&qspi {
++	pinctrl-0 = <&qspi_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++
++	flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "spansion,s25fl512s", "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <30000000>;
++		spi-tx-bus-width = <4>;
++		spi-rx-bus-width = <4>;
++		m25p,fast-read;
++
++		partition at 0 {
++			label = "loader_prg";
++			reg = <0x00000000 0x00040000>;
++			read-only;
++		};
++		partition at 40000 {
++			label = "user_prg";
++			reg = <0x00040000 0x00400000>;
++			read-only;
++		};
++		partition at 440000 {
++			label = "flash_fs";
++			reg = <0x00440000 0x03bc0000>;
++		};
++	};
++};
++
+ &i2c2 {
+ 	pinctrl-0 = <&i2c2_pins>;
+ 	pinctrl-names = "default";
