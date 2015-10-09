@@ -1,46 +1,73 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Fri, 9 Oct 2015 10:22:23 +0100
-Subject: [PATCH 03/15] arm64: Introduce helpers for page table levels
-In-Reply-To: <20151008172856.GQ17192@e104818-lin.cambridge.arm.com>
-References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
- <1442331684-28818-4-git-send-email-suzuki.poulose@arm.com>
- <20151007082652.GM9011@cbox> <5614E536.9040007@arm.com>
- <20151008144546.GD20936@cbox> <5616A65A.50003@arm.com>
- <20151008172856.GQ17192@e104818-lin.cambridge.arm.com>
-Message-ID: <5617874F.5010104@arm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 9 Oct 2015 17:22:38 +0800
+Subject: [PATCH v4 2/6] pinctrl: berlin: add the berlin4ct pinctrl driver
+In-Reply-To: <20151009090353.GA2842@kwain>
+References: <1444378629-3057-1-git-send-email-jszhang@marvell.com>
+ <1444378629-3057-3-git-send-email-jszhang@marvell.com>
+ <20151009090353.GA2842@kwain>
+Message-ID: <20151009172238.68fdd51c@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/15 18:28, Catalin Marinas wrote:
-> On Thu, Oct 08, 2015 at 06:22:34PM +0100, Suzuki K. Poulose wrote:
->> On 08/10/15 15:45, Christoffer Dall wrote:
->>> On Wed, Oct 07, 2015 at 10:26:14AM +0100, Marc Zyngier wrote:
->>>> I just had a chat with Catalin, who did shed some light on this.
->>>> It all has to do with rounding up. What you would like to have here is:
->>>>
->>>> #define ARM64_HW_PGTABLE_LEVELS(va_bits) DIV_ROUND_UP(va_bits - PAGE_SHIFT, PAGE_SHIFT - 3)
->>>>
->>>> where (va_bits - PAGE_SHIFT) is the total number of bits we deal
->>>> with during a page table walk, and (PAGE_SHIFT - 3) is the number
->>>> of bits we deal with per level.
->>>>
->>>> The clue is in how DIV_ROUND_UP is written:
->>>>
->>>> #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
->>>>
->>>> which gives you Suzuki's magic formula.
->>>>
->>>> I'd vote for the DIV_ROUND_UP(), which will make things a lot more readable.
->>>>
->>> Thanks for the explanation, I vote for DIV_ROUND_UP too.
->>
->> Btw, DIV_ROUND_UP is defined in linux/kernel.h, including which in the required
->> headers breaks the build. I could add the definition of the same locally.
->
-> Or just keep the original magic formula and add the DIV_ROUND_UP one in
-> a comment.
->
+Hi Antoine,
 
-OK, will keep proper documentation with the cryptic formula ;)
+On Fri, 9 Oct 2015 11:03:53 +0200
+Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 
-Suzuki
+> Hi Jisheng,
+> 
+> On Fri, Oct 09, 2015 at 04:17:05PM +0800, Jisheng Zhang wrote:
+> > diff --git a/drivers/pinctrl/berlin/Kconfig b/drivers/pinctrl/berlin/Kconfig
+> > index b18322b..c13f6d2 100644
+> > --- a/drivers/pinctrl/berlin/Kconfig
+> > +++ b/drivers/pinctrl/berlin/Kconfig
+> > @@ -17,4 +17,9 @@ config PINCTRL_BERLIN_BG2Q
+> >  	bool
+> >  	select PINCTRL_BERLIN
+> >  
+> > +config PINCTRL_BERLIN_BG4CT
+> > +	depends on OF && (ARCH_BERLIN || COMPILE_TEST)
+> > +	bool "Marvell berlin4ct pin controller driver"
+> > +	select PINCTRL_BERLIN
+> > +
+> >  endif
+> 
+> This endif ends the following condition:
+> 
+> 	if ARCH_BERLIN
+> 	[...]
+> 
+> So the "depends on ARCH_BERLIN" here can be dropped. Also the
+> COMPILE_TEST can be moved as it isn't BG4CT specific and all other
+> Berlin pinctrl drivers would benefit from this.
+> 
+> So we would have something like:
+> 
+> 	if (ARCH_BERLIN || COMPILE_TEST)
+
+Oh yeah! This is better.
+
+> 	[...]
+> 	endif
+> 
+> Finally you can move the OF dependency to the PINCTRL_BERLIN config as
+> all Berlin pinctrl drivers depends on it.
+
+PINCTRL_BERLIN isn't user visible and it's selected by PINCTRL_BERLIN_BG4CT. So
+we may have the following random config case:
+
+CONFIG_OF=n
+CONFIG_PINCTRL_BERLIN_BG4CT=y
+
+In this case, there will be build errors for we missed OF. So we have to
+make PINCTRL_BERLIN_BG4CT depends on OF. What do you think? Or is there
+better solution?
+
+Thanks for kind review,
+Jisheng
+
+> 
+> Thanks!
+> 
+> Antoine
+> 
