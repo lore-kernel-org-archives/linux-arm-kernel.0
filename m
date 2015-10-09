@@ -1,73 +1,61 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Fri, 9 Oct 2015 08:51:25 +0000
-Subject: [PATCH v3] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
- PCIe Host Controller
-In-Reply-To: <56177669.2000302@arm.com>
-References: <1444146289-28940-1-git-send-email-bharatku@xilinx.com>
- <5613F310.6060305@arm.com>
- <8520D5D51A55D047800579B0941471980169063F@XAP-PVEXMBX01.xlnx.xilinx.com>
- <5613F9C8.9020000@arm.com>
- <8520D5D51A55D047800579B09414719801690CD0@XAP-PVEXMBX01.xlnx.xilinx.com>
- <56177669.2000302@arm.com>
-Message-ID: <8520D5D51A55D047800579B09414719801690D3D@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 9 Oct 2015 10:53:49 +0200
+Subject: [GIT PULL] MMC fixes for v.4.3 rc5
+Message-ID: <CAPDyKFp2D2twO03ncFtOePzCmdx3jYfJ8hr317VAiUDWgbDrZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 09/10/15 06:11, Bharat Kumar Gogada wrote:
-> >>>> +struct nwl_msi {                  /* struct nwl_msi - MSI information
-> >> */
-> >>>> +  struct msi_controller chip;     /* chip: MSI controller */
-> >>>
-> >>>> We're moving away from msi_controller altogether, as the kernel now
-> >>>> has all the necessary infrastructure to do this properly.
-> >>>
-> >>> Our current GIC version does not have separate msi controller (we
-> >>> are not using GICv2m or GICv3), so is it necessary to have separate
-> >>> msi controller node ? Please give me clarity on this.
-> >>
-> >> This has nothing to do with the version of the GIC you are using
-> >> (XGene doesn't have GICv2m or v3 either). This is about reducing code
-> >> duplication and having something that we can maintain. See also
-> >> https://lkml.org/lkml/2015/9/20/193 for yet another example.
-> >>
-> >> I still plan to kill msi_controller, and I'd like to avoid more
-> >> dependencies with it. MSI domains are the way to do it.
-> >>
-> > Sorry previously I haven't configured my email client properly so resending.
-> 
-> Thanks for doing so, much appreciated.
-> 
-> > Since we don't have separate MSI controller, and our PCIe controller
-> > is handling MSI, is it necessary to create a separate MSI controller
-> > node because we don't have any 'reg' space.
-> 
-> No, your PCI controller can perfectly be part of the PCIe node.
-You meant 'msi-controller' property to be part of PCIe node?
+Hi Linus,
 
-> 
-> > Please let me know whether we require a separate msi file as suggested
-> > in your previous comments to separate MSI controller and PCIE
-> > controller in two files, if we don't have separate node. If we do not
-> > need a separate node do we need to embed MSI controller child node  in
-> > PCIe controller node itself, and what properties does this child node
-> > will require other than 'interrupts'.
-> 
-> If you want to keep them in the same file, please at least have two separate
-> patches. These are two different functions, and they should be reviewed
-> separately.
-> 
-What I meant is if we don't have separate msi node do we need separate file? 
-If you meant msi controller to be part of same node then we will use single file and will
-try to have two separate patches.
+Here are some mmc fixes intended for v4.3 rc5 and it's based on v4.3-rc4.
+Details are as usual found in the signed tag. Please pull this in!
 
-Thanks,
-Bharat
+Kind regards
+Ulf Hansson
 
-> It will help everyone to understand your code, and speed up the reviewing
-> process.
-> 
-> Thanks,
-> 
-> 	M.
-> --
-> Jazz is not dead. It just smells funny...
+
+The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
+
+  Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/ulf.hansson/mmc.git tags/mmc-v4.3-rc4
+
+for you to fetch changes up to 88c6eb0e3b81a30514d21679735fa25d028c2299:
+
+  mmc: sdhci-of-at91: use SDHCI_QUIRK2_NEED_DELAY_AFTER_INT_CLK_RST
+quirk (2015-10-08 19:55:05 +0200)
+
+----------------------------------------------------------------
+MMC host:
+ - omap_hsmmc: Fix boot regressions for omap4430
+ - omap_hsmmc: Fix legacy boot regression for omap3
+ - sdhci-pxav3: Fix some clock issues for Armada 38x
+ - sdhci-pxav3: Fix error handling at probe
+ - sdhci-of-at91: Fix clock stabilization problem
+
+----------------------------------------------------------------
+Marcin Wojtas (1):
+      mmc: sdhci-pxav3: fix error handling of armada_38x_quirks
+
+Nadav Haklai (2):
+      mmc: sdhci-pxav3: remove broken clock base quirk for Armada 38x
+sdhci driver
+      mmc: sdhci-pxav3: disable clock inversion for HS MMC cards
+
+Tony Lindgren (2):
+      Revert "mmc: host: omap_hsmmc: use regulator_is_enabled to find
+pbias status"
+      mmc: host: omap_hsmmc: Fix MMC for omap3 legacy booting
+
+ludovic.desroches at atmel.com (2):
+      mmc: sdhci: add quirk SDHCI_QUIRK2_NEED_DELAY_AFTER_INT_CLK_RST
+      mmc: sdhci-of-at91: use SDHCI_QUIRK2_NEED_DELAY_AFTER_INT_CLK_RST quirk
+
+ drivers/mmc/host/omap_hsmmc.c    | 14 +++++++++-----
+ drivers/mmc/host/sdhci-of-at91.c |  1 +
+ drivers/mmc/host/sdhci-pxav3.c   |  6 +++++-
+ drivers/mmc/host/sdhci.c         |  2 ++
+ drivers/mmc/host/sdhci.h         |  5 +++++
+ 5 files changed, 22 insertions(+), 6 deletions(-)
