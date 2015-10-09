@@ -1,85 +1,41 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sat, 10 Oct 2015 00:10:24 +0200
-Subject: [PATCH 1/2] arm: mvebu: disable unused Armada RTC on ReadyNAS 102,
- 104 and 2120
-In-Reply-To: <cover.1444428035.git.arno@natisbad.org>
-References: <cover.1444428035.git.arno@natisbad.org>
-Message-ID: <2e62abb84de02c0495bde9d60a90282deae40967.1444428035.git.arno@natisbad.org>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Fri, 9 Oct 2015 23:12:47 +0100
+Subject: [PATCH v3 2/7] MAINTAINERS: Add myself for the new VC4 (RPi GPU)
+ graphics driver.
+In-Reply-To: <1444426068-15817-3-git-send-email-eric@anholt.net>
+References: <1444426068-15817-1-git-send-email-eric@anholt.net>
+ <1444426068-15817-3-git-send-email-eric@anholt.net>
+Message-ID: <CACvgo53ftyjj=LhsNuePnjH2Bez5SAG5cwk=7gzMhmMPMYOnew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Eric,
 
-By default, armada-370-xp.dtsi file has internal RTC enabled.
-NETGEAR ReadyNAS 102, 104 and 2120 all use an Intersil ISL12057
-I2C RTC chip. The internal RTC not being disabled in the .dts
-files of those devices result in the following useless first
-line during boot:
+On 9 October 2015 at 22:27, Eric Anholt <eric@anholt.net> wrote:
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+>
+> v2: Mark it Supported, not Maintained.
+>
+>  MAINTAINERS | 6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 7ba7ab7..e331e46 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -3653,6 +3653,12 @@ S:       Maintained
+>  F:     drivers/gpu/drm/sti
+>  F:     Documentation/devicetree/bindings/gpu/st,stih4xx.txt
+>
+> +DRM DRIVERS FOR VC4
+> +M:     Eric Anholt <eric@anholt.net>
+> +T:     git git://github.com/anholt/linux
+You might want to add dri-devel as mailing list, at least initially.
 
-[    4.500056] rtc-mv d0010300.rtc: internal RTC not ticking
-[    4.505684] i2c /dev entries driver
-[    4.513246] rtc-isl12057 0-0068: rtc core: registered rtc-isl12057 as rtc0
+> +S:     Supported
+> +F:     drivers/gpu/drm/vc4/*
+Imho, the binding documentation should also be listed here.
 
-This patch marks Armada internal RTC as disabled in individual .dts
-files of those devices.
-
-Reported-by: TuxOholic <tuxoholic@hotmail.de>
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
----
- arch/arm/boot/dts/armada-370-netgear-rn102.dts | 6 ++++++
- arch/arm/boot/dts/armada-370-netgear-rn104.dts | 6 ++++++
- arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 6 ++++++
- 3 files changed, 18 insertions(+)
-
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-index a31207860f34..5851964196bd 100644
---- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-@@ -82,6 +82,12 @@
- 		};
- 
- 		internal-regs {
-+
-+			/* RTC is provided by Intersil ISL12057 I2C RTC chip */
-+			rtc at 10300 {
-+				status = "disabled";
-+			};
-+
- 			serial at 12000 {
- 				status = "okay";
- 			};
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-index 00540f292979..b0b07ba677b9 100644
---- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-@@ -82,6 +82,12 @@
- 		};
- 
- 		internal-regs {
-+
-+			/* RTC is provided by Intersil ISL12057 I2C RTC chip */
-+			rtc at 10300 {
-+				status = "disabled";
-+			};
-+
- 			serial at 12000 {
- 				status = "okay";
- 			};
-diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-index 1516fc2627f9..85b2f87c0b8a 100644
---- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-+++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-@@ -88,6 +88,12 @@
- 		};
- 
- 		internal-regs {
-+
-+			/* RTC is provided by Intersil ISL12057 I2C RTC chip */
-+			rtc at 10300 {
-+				status = "disabled";
-+			};
-+
- 			/* Two rear eSATA ports */
- 			sata at a0000 {
- 				nr-ports = <2>;
--- 
-2.5.3
+Regards,
+Emil
