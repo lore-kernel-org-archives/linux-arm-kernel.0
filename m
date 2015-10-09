@@ -1,67 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 09 Oct 2015 20:58:46 +0200
-Subject: [PATCH v2] nvme: fix 32-bit build warning
-In-Reply-To: <20151009144221.GA12760@infradead.org>
-References: <5851501.PBMrs03XFb@wuerfel> <20151009144221.GA12760@infradead.org>
-Message-ID: <6199457.Ih8H4dRbvg@wuerfel>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 9 Oct 2015 21:01:44 +0200
+Subject: [PATCH v3] arm-soc: Add support for Sigma Designs Tango4
+In-Reply-To: <5898159.aPJzsGHAv7@wuerfel>
+References: <560EAA7C.3070302@free.fr> <5612A473.8030405@sigmadesigns.com>
+ <5613EF4C.30603@sigmadesigns.com> <5898159.aPJzsGHAv7@wuerfel>
+Message-ID: <56180F18.9010801@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From 877a323df080bda54a71e26ecf20b4244b31a180 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 6 Oct 2015 22:29:48 +0200
-Subject: [PATCH] nvme: fix 32-bit build warning
+On 09/10/2015 15:18, Arnd Bergmann wrote:
+> On Tuesday 06 October 2015 17:57:00 Marc Gonzalez wrote:
+>> This patch adds support for Sigma Designs "Tango4" platform, which is
+>> built around the ARM Cortex A9 MPCore (single and dual core SoCs).
+>>
+>> Tango4 is not to be confused with Tango3, which was built around a
+>> MIPS 74kf CPU.
+>>
+>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> ---
+>> v3 changes: Updated clock tree DT (clk driver submitted)
+>>
+> 
+> Looks all reasonable to me now. Can I get an Ack from M?ns? It sounds
+> like he is the original author of the port.
 
-Compiling the nvme driver on 32-bit warns about a cast from a __u64
-variable to a pointer:
+Arnd,
 
-drivers/block/nvme-core.c: In function 'nvme_submit_io':
-drivers/block/nvme-core.c:1847:4: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-    (void __user *)io.addr, length, NULL, 0);
+It seems that Mans has a problem with my submission :-(
 
-The cast here is intentional and safe, so we can shut up the
-gcc warning by adding an intermediate cast to 'uintptr_t'.
+I understand that there is some bad blood between him and Sigma.
+I also understand that Sigma's open source track record is below par.
 
-I had previously submitted a patch to fix this problem in the
-nvme driver, but it was accepted on the same day that two new
-warnings got added.
+However, I think it needs to be pointed out that:
 
-For clarification, I also change the third instance of this cast
-to use uintptr_t instead of unsigned long now.
+1) I don't speak for Sigma, I merely work for them; and I always
+try to "do the right thing".
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: d29ec8241c10e ("nvme: submit internal commands through the block layer")
----
-v2: use uintptr_t for intermediate cast
+2) I accept valid technical criticism of my code, but Mans' points
+are sometimes clouded in a bit of hyperbole. (Especially wrt to the
+clk driver)
 
-diff --git a/drivers/block/nvme-core.c b/drivers/block/nvme-core.c
-index e917cf304ad0..e8ff16c63977 100644
---- a/drivers/block/nvme-core.c
-+++ b/drivers/block/nvme-core.c
-@@ -1804,7 +1804,7 @@ static int nvme_submit_io(struct nvme_ns *ns, struct nvme_user_io __user *uio)
- 
- 	length = (io.nblocks + 1) << ns->lba_shift;
- 	meta_len = (io.nblocks + 1) * ns->ms;
--	metadata = (void __user *)(unsigned long)io.metadata;
-+	metadata = (void __user *)(uintptr_t)io.metadata;
- 	write = io.opcode & 1;
- 
- 	if (ns->ext) {
-@@ -1844,7 +1844,7 @@ static int nvme_submit_io(struct nvme_ns *ns, struct nvme_user_io __user *uio)
- 	c.rw.metadata = cpu_to_le64(meta_dma);
- 
- 	status = __nvme_submit_sync_cmd(ns->queue, &c, NULL,
--			(void __user *)io.addr, length, NULL, 0);
-+			(void __user *)(uintptr_t)io.addr, length, NULL, 0);
-  unmap:
- 	if (meta) {
- 		if (status == NVME_SC_SUCCESS && !write) {
-@@ -1886,7 +1886,7 @@ static int nvme_user_cmd(struct nvme_dev *dev, struct nvme_ns *ns,
- 		timeout = msecs_to_jiffies(cmd.timeout_ms);
- 
- 	status = __nvme_submit_sync_cmd(ns ? ns->queue : dev->admin_q, &c,
--			NULL, (void __user *)cmd.addr, cmd.data_len,
-+			NULL, (void __user *)(uintptr_t)cmd.addr, cmd.data_len,
- 			&cmd.result, timeout);
- 	if (status >= 0) {
- 		if (put_user(cmd.result, &ucmd->result))
+Looking at the diffstat:
+
+ arch/arm/Kconfig                          |   2 +
+ arch/arm/Makefile                         |   1 +
+ arch/arm/boot/dts/Makefile                |   2 +
+ arch/arm/boot/dts/tango4-vantage-1172.dts |  17 ++++
+ arch/arm/boot/dts/tango4.dtsi             | 133 ++++++++++++++++++++++++++++++
+ arch/arm/mach-tangox/Kconfig              |  11 +++
+ arch/arm/mach-tangox/Makefile             |   1 +
+ arch/arm/mach-tangox/setup.c              |   7 ++
+
+it can be argued that /all/ my changes are trivial, except for
+the device tree. Perhaps I should credit Mans by adding his
+copyright at the top of the tango4.dtsi? (Although he has
+expressed disdain for it, so I'm not sure he would welcome
+such an addition.)
+
+Arnd, I understand you are the arm-soc maintainer? How am I
+supposed to resolve this gridlock?
+
+Regards.
