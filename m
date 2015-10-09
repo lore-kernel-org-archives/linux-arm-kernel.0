@@ -1,354 +1,167 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 09 Oct 2015 18:16:25 -0400
-Subject: [PATCH 09/20] i915: switch from acpi_os_ioremap to memremap
+Date: Fri, 09 Oct 2015 18:16:09 -0400
+Subject: [PATCH 06/20] arm: switch from ioremap_cache to memremap
 In-Reply-To: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
 References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <20151009221625.32203.74117.stgit@dwillia2-desk3.jf.intel.com>
+Message-ID: <20151009221609.32203.79381.stgit@dwillia2-desk3.jf.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i915 expects the OpRegion to be cached (i.e. not __iomem), so explicitly
-map it with memremap rather than the implied cache setting of
-acpi_os_ioremap().
+In preparation for deprecating ioremap_cache() convert its usage in
+arch/arm[64]/ to memremap.
 
-Cc: Daniel Vetter <daniel.vetter@intel.com>
-Cc: Jani Nikula <jani.nikula@linux.intel.com>
-Cc: intel-gfx at lists.freedesktop.org
-Cc: David Airlie <airlied@linux.ie>
-Cc: dri-devel at lists.freedesktop.org
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
- drivers/gpu/drm/i915/i915_debugfs.c   |    2 -
- drivers/gpu/drm/i915/i915_drv.h       |   12 +++--
- drivers/gpu/drm/i915/intel_bios.c     |    7 +--
- drivers/gpu/drm/i915/intel_opregion.c |   73 ++++++++++++++++-----------------
- drivers/gpu/drm/i915/intel_panel.c    |    2 -
- 5 files changed, 47 insertions(+), 49 deletions(-)
+ arch/arm/include/asm/xen/page.h    |    4 ++--
+ arch/arm64/include/asm/acpi.h      |    5 +----
+ arch/arm64/include/asm/dmi.h       |    8 ++++----
+ arch/arm64/kernel/efi.c            |    9 +++++----
+ arch/arm64/kernel/smp_spin_table.c |   19 +++++++++----------
+ 5 files changed, 21 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/gpu/drm/i915/i915_debugfs.c b/drivers/gpu/drm/i915/i915_debugfs.c
-index e3ec9049081f..15989cc16e92 100644
---- a/drivers/gpu/drm/i915/i915_debugfs.c
-+++ b/drivers/gpu/drm/i915/i915_debugfs.c
-@@ -1849,7 +1849,7 @@ static int i915_opregion(struct seq_file *m, void *unused)
- 		goto out;
- 
- 	if (opregion->header) {
--		memcpy_fromio(data, opregion->header, OPREGION_SIZE);
-+		memcpy(data, opregion->header, OPREGION_SIZE);
- 		seq_write(m, data, OPREGION_SIZE);
- 	}
- 
-diff --git a/drivers/gpu/drm/i915/i915_drv.h b/drivers/gpu/drm/i915/i915_drv.h
-index e1db8de52851..d8684634a31d 100644
---- a/drivers/gpu/drm/i915/i915_drv.h
-+++ b/drivers/gpu/drm/i915/i915_drv.h
-@@ -444,14 +444,14 @@ struct opregion_swsci;
- struct opregion_asle;
- 
- struct intel_opregion {
--	struct opregion_header __iomem *header;
--	struct opregion_acpi __iomem *acpi;
--	struct opregion_swsci __iomem *swsci;
-+	struct opregion_header *header;
-+	struct opregion_acpi *acpi;
-+	struct opregion_swsci *swsci;
- 	u32 swsci_gbda_sub_functions;
- 	u32 swsci_sbcb_sub_functions;
--	struct opregion_asle __iomem *asle;
--	void __iomem *vbt;
--	u32 __iomem *lid_state;
-+	struct opregion_asle *asle;
-+	void *vbt;
-+	u32 *lid_state;
- 	struct work_struct asle_work;
- };
- #define OPREGION_SIZE            (8*1024)
-diff --git a/drivers/gpu/drm/i915/intel_bios.c b/drivers/gpu/drm/i915/intel_bios.c
-index c19e669ffe50..1ee2f11d355d 100644
---- a/drivers/gpu/drm/i915/intel_bios.c
-+++ b/drivers/gpu/drm/i915/intel_bios.c
-@@ -1238,11 +1238,10 @@ static const struct bdb_header *validate_vbt(const void __iomem *_base,
- {
- 	/*
- 	 * This is the one place where we explicitly discard the address space
--	 * (__iomem) of the BIOS/VBT. (And this will cause a sparse complaint.)
--	 * From now on everything is based on 'base', and treated as regular
--	 * memory.
-+	 * (__iomem) of the BIOS/VBT. From now on everything is based on
-+	 * 'base', and treated as regular memory.
- 	 */
--	const void *base = (const void *) _base;
-+	const void *base = (const void __force *) _base;
- 	size_t offset = _vbt - _base;
- 	const struct vbt_header *vbt = base + offset;
- 	const struct bdb_header *bdb;
-diff --git a/drivers/gpu/drm/i915/intel_opregion.c b/drivers/gpu/drm/i915/intel_opregion.c
-index cb1c65739425..4f65cdb38e1b 100644
---- a/drivers/gpu/drm/i915/intel_opregion.c
-+++ b/drivers/gpu/drm/i915/intel_opregion.c
-@@ -239,7 +239,7 @@ struct opregion_asle {
- static int swsci(struct drm_device *dev, u32 function, u32 parm, u32 *parm_out)
- {
- 	struct drm_i915_private *dev_priv = dev->dev_private;
--	struct opregion_swsci __iomem *swsci = dev_priv->opregion.swsci;
-+	struct opregion_swsci *swsci = dev_priv->opregion.swsci;
- 	u32 main_function, sub_function, scic;
- 	u16 pci_swsci;
- 	u32 dslp;
-@@ -264,7 +264,7 @@ static int swsci(struct drm_device *dev, u32 function, u32 parm, u32 *parm_out)
- 	}
- 
- 	/* Driver sleep timeout in ms. */
--	dslp = ioread32(&swsci->dslp);
-+	dslp = swsci->dslp;
- 	if (!dslp) {
- 		/* The spec says 2ms should be the default, but it's too small
- 		 * for some machines. */
-@@ -277,7 +277,7 @@ static int swsci(struct drm_device *dev, u32 function, u32 parm, u32 *parm_out)
- 	}
- 
- 	/* The spec tells us to do this, but we are the only user... */
--	scic = ioread32(&swsci->scic);
-+	scic = swsci->scic;
- 	if (scic & SWSCI_SCIC_INDICATOR) {
- 		DRM_DEBUG_DRIVER("SWSCI request already in progress\n");
- 		return -EBUSY;
-@@ -285,8 +285,8 @@ static int swsci(struct drm_device *dev, u32 function, u32 parm, u32 *parm_out)
- 
- 	scic = function | SWSCI_SCIC_INDICATOR;
- 
--	iowrite32(parm, &swsci->parm);
--	iowrite32(scic, &swsci->scic);
-+	swsci->parm = parm;
-+	swsci->scic = scic;
- 
- 	/* Ensure SCI event is selected and event trigger is cleared. */
- 	pci_read_config_word(dev->pdev, PCI_SWSCI, &pci_swsci);
-@@ -301,7 +301,7 @@ static int swsci(struct drm_device *dev, u32 function, u32 parm, u32 *parm_out)
- 	pci_write_config_word(dev->pdev, PCI_SWSCI, pci_swsci);
- 
- 	/* Poll for the result. */
--#define C (((scic = ioread32(&swsci->scic)) & SWSCI_SCIC_INDICATOR) == 0)
-+#define C (((scic = swsci->scic) & SWSCI_SCIC_INDICATOR) == 0)
- 	if (wait_for(C, dslp)) {
- 		DRM_DEBUG_DRIVER("SWSCI request timed out\n");
- 		return -ETIMEDOUT;
-@@ -317,7 +317,7 @@ static int swsci(struct drm_device *dev, u32 function, u32 parm, u32 *parm_out)
- 	}
- 
- 	if (parm_out)
--		*parm_out = ioread32(&swsci->parm);
-+		*parm_out = swsci->parm;
- 
- 	return 0;
- 
-@@ -407,7 +407,7 @@ static u32 asle_set_backlight(struct drm_device *dev, u32 bclp)
- {
- 	struct drm_i915_private *dev_priv = dev->dev_private;
- 	struct intel_connector *intel_connector;
--	struct opregion_asle __iomem *asle = dev_priv->opregion.asle;
-+	struct opregion_asle *asle = dev_priv->opregion.asle;
- 
- 	DRM_DEBUG_DRIVER("bclp = 0x%08x\n", bclp);
- 
-@@ -432,7 +432,7 @@ static u32 asle_set_backlight(struct drm_device *dev, u32 bclp)
- 	DRM_DEBUG_KMS("updating opregion backlight %d/255\n", bclp);
- 	list_for_each_entry(intel_connector, &dev->mode_config.connector_list, base.head)
- 		intel_panel_set_backlight_acpi(intel_connector, bclp, 255);
--	iowrite32(DIV_ROUND_UP(bclp * 100, 255) | ASLE_CBLV_VALID, &asle->cblv);
-+	asle->cblv = DIV_ROUND_UP(bclp * 100, 255) | ASLE_CBLV_VALID;
- 
- 	drm_modeset_unlock(&dev->mode_config.connection_mutex);
- 
-@@ -519,14 +519,14 @@ static void asle_work(struct work_struct *work)
- 	struct drm_i915_private *dev_priv =
- 		container_of(opregion, struct drm_i915_private, opregion);
- 	struct drm_device *dev = dev_priv->dev;
--	struct opregion_asle __iomem *asle = dev_priv->opregion.asle;
-+	struct opregion_asle *asle = dev_priv->opregion.asle;
- 	u32 aslc_stat = 0;
- 	u32 aslc_req;
- 
- 	if (!asle)
- 		return;
- 
--	aslc_req = ioread32(&asle->aslc);
-+	aslc_req = asle->aslc;
- 
- 	if (!(aslc_req & ASLC_REQ_MSK)) {
- 		DRM_DEBUG_DRIVER("No request on ASLC interrupt 0x%08x\n",
-@@ -535,34 +535,34 @@ static void asle_work(struct work_struct *work)
- 	}
- 
- 	if (aslc_req & ASLC_SET_ALS_ILLUM)
--		aslc_stat |= asle_set_als_illum(dev, ioread32(&asle->alsi));
-+		aslc_stat |= asle_set_als_illum(dev, asle->alsi);
- 
- 	if (aslc_req & ASLC_SET_BACKLIGHT)
--		aslc_stat |= asle_set_backlight(dev, ioread32(&asle->bclp));
-+		aslc_stat |= asle_set_backlight(dev, asle->bclp);
- 
- 	if (aslc_req & ASLC_SET_PFIT)
--		aslc_stat |= asle_set_pfit(dev, ioread32(&asle->pfit));
-+		aslc_stat |= asle_set_pfit(dev, asle->pfit);
- 
- 	if (aslc_req & ASLC_SET_PWM_FREQ)
--		aslc_stat |= asle_set_pwm_freq(dev, ioread32(&asle->pfmb));
-+		aslc_stat |= asle_set_pwm_freq(dev, asle->pfmb);
- 
- 	if (aslc_req & ASLC_SUPPORTED_ROTATION_ANGLES)
- 		aslc_stat |= asle_set_supported_rotation_angles(dev,
--							ioread32(&asle->srot));
-+							asle->srot);
- 
- 	if (aslc_req & ASLC_BUTTON_ARRAY)
--		aslc_stat |= asle_set_button_array(dev, ioread32(&asle->iuer));
-+		aslc_stat |= asle_set_button_array(dev, asle->iuer);
- 
- 	if (aslc_req & ASLC_CONVERTIBLE_INDICATOR)
--		aslc_stat |= asle_set_convertible(dev, ioread32(&asle->iuer));
-+		aslc_stat |= asle_set_convertible(dev, asle->iuer);
- 
- 	if (aslc_req & ASLC_DOCKING_INDICATOR)
--		aslc_stat |= asle_set_docking(dev, ioread32(&asle->iuer));
-+		aslc_stat |= asle_set_docking(dev, asle->iuer);
- 
- 	if (aslc_req & ASLC_ISCT_STATE_CHANGE)
- 		aslc_stat |= asle_isct_state(dev);
- 
--	iowrite32(aslc_stat, &asle->aslc);
-+	asle->aslc = aslc_stat;
+diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+index 127956353b00..91ac751a5baa 100644
+--- a/arch/arm/include/asm/xen/page.h
++++ b/arch/arm/include/asm/xen/page.h
+@@ -103,8 +103,8 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+ 	return __set_phys_to_machine(pfn, mfn);
  }
  
- void intel_opregion_asle_intr(struct drm_device *dev)
-@@ -587,8 +587,8 @@ static int intel_opregion_video_event(struct notifier_block *nb,
- 	   Linux, these are handled by the dock, button and video drivers.
- 	*/
+-#define xen_remap(cookie, size) ioremap_cache((cookie), (size))
+-#define xen_unmap(cookie) iounmap((cookie))
++#define xen_remap(cookie, size) memremap((cookie), (size), MEMREMAP_WB)
++#define xen_unmap(cookie) memunmap((cookie))
  
--	struct opregion_acpi __iomem *acpi;
- 	struct acpi_bus_event *event = data;
-+	struct opregion_acpi *acpi;
- 	int ret = NOTIFY_OK;
- 
- 	if (strcmp(event->device_class, ACPI_VIDEO_CLASS) != 0)
-@@ -599,11 +599,10 @@ static int intel_opregion_video_event(struct notifier_block *nb,
- 
- 	acpi = system_opregion->acpi;
- 
--	if (event->type == 0x80 &&
--	    (ioread32(&acpi->cevt) & 1) == 0)
-+	if (event->type == 0x80 && ((acpi->cevt & 1) == 0))
- 		ret = NOTIFY_BAD;
- 
--	iowrite32(0, &acpi->csts);
-+	acpi->csts = 0;
- 
- 	return ret;
- }
-@@ -787,16 +786,16 @@ void intel_opregion_init(struct drm_device *dev)
- 		/* Notify BIOS we are ready to handle ACPI video ext notifs.
- 		 * Right now, all the events are handled by the ACPI video module.
- 		 * We don't actually need to do anything with them. */
--		iowrite32(0, &opregion->acpi->csts);
--		iowrite32(1, &opregion->acpi->drdy);
-+		opregion->acpi->csts = 0;
-+		opregion->acpi->drdy = 1;
- 
- 		system_opregion = opregion;
- 		register_acpi_notifier(&intel_opregion_notifier);
- 	}
- 
- 	if (opregion->asle) {
--		iowrite32(ASLE_TCHE_BLC_EN, &opregion->asle->tche);
--		iowrite32(ASLE_ARDY_READY, &opregion->asle->ardy);
-+		opregion->asle->tche = ASLE_TCHE_BLC_EN;
-+		opregion->asle->ardy = ASLE_ARDY_READY;
- 	}
- }
- 
-@@ -809,19 +808,19 @@ void intel_opregion_fini(struct drm_device *dev)
- 		return;
- 
- 	if (opregion->asle)
--		iowrite32(ASLE_ARDY_NOT_READY, &opregion->asle->ardy);
-+		opregion->asle->ardy = ASLE_ARDY_NOT_READY;
- 
- 	cancel_work_sync(&dev_priv->opregion.asle_work);
- 
- 	if (opregion->acpi) {
--		iowrite32(0, &opregion->acpi->drdy);
-+		opregion->acpi->drdy = 0;
- 
- 		system_opregion = NULL;
- 		unregister_acpi_notifier(&intel_opregion_notifier);
- 	}
- 
- 	/* just clear all opregion memory pointers now */
--	iounmap(opregion->header);
-+	memunmap(opregion->header);
- 	opregion->header = NULL;
- 	opregion->acpi = NULL;
- 	opregion->swsci = NULL;
-@@ -894,10 +893,10 @@ int intel_opregion_setup(struct drm_device *dev)
+ bool xen_arch_need_swiotlb(struct device *dev,
+ 			   unsigned long pfn,
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 208cec08a74f..a24a9b1cc91d 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -33,10 +33,7 @@
+ static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+ 					    acpi_size size)
  {
- 	struct drm_i915_private *dev_priv = dev->dev_private;
- 	struct intel_opregion *opregion = &dev_priv->opregion;
--	void __iomem *base;
- 	u32 asls, mboxes;
- 	char buf[sizeof(OPREGION_SIGNATURE)];
- 	int err = 0;
-+	void *base;
+-	if (!page_is_ram(phys >> PAGE_SHIFT))
+-		return ioremap(phys, size);
+-
+-	return ioremap_cache(phys, size);
++	return memremap(phys, size, MEMREMAP_WB);
+ }
+ #define acpi_os_ioremap acpi_os_ioremap
  
- 	BUILD_BUG_ON(sizeof(struct opregion_header) != 0x100);
- 	BUILD_BUG_ON(sizeof(struct opregion_acpi) != 0x100);
-@@ -915,11 +914,11 @@ int intel_opregion_setup(struct drm_device *dev)
- 	INIT_WORK(&opregion->asle_work, asle_work);
+diff --git a/arch/arm64/include/asm/dmi.h b/arch/arm64/include/asm/dmi.h
+index 69d37d87b159..82682d27c6ee 100644
+--- a/arch/arm64/include/asm/dmi.h
++++ b/arch/arm64/include/asm/dmi.h
+@@ -22,10 +22,10 @@
+  * request a virtual mapping for configuration tables such as SMBIOS.
+  * This means we have to map them before use.
+  */
+-#define dmi_early_remap(x, l)		ioremap_cache(x, l)
+-#define dmi_early_unmap(x, l)		iounmap(x)
+-#define dmi_remap(x, l)			ioremap_cache(x, l)
+-#define dmi_unmap(x)			iounmap(x)
++#define dmi_early_remap(x, l)		memremap(x, l, MEMREMAP_WB)
++#define dmi_early_unmap(x, l)		memunmap(x)
++#define dmi_remap(x, l)			memremap(x, l, MEMREMAP_WB)
++#define dmi_unmap(x)			memunmap(x)
+ #define dmi_alloc(l)			kzalloc(l, GFP_KERNEL)
+ 
  #endif
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 13671a9cf016..7dd05eb2c186 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -26,6 +26,7 @@
+ #include <linux/sched.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
++#include <linux/io.h>
  
--	base = acpi_os_ioremap(asls, OPREGION_SIZE);
-+	base = memremap(asls, OPREGION_SIZE, MEMREMAP_WB);
- 	if (!base)
+ #include <asm/cacheflush.h>
+ #include <asm/efi.h>
+@@ -291,8 +292,8 @@ static int __init arm64_enable_runtime_services(void)
+ 	pr_info("Remapping and enabling EFI services.\n");
+ 
+ 	mapsize = memmap.map_end - memmap.map;
+-	memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
+-						   mapsize);
++	memmap.map = memremap((phys_addr_t) memmap.phys_map, mapsize,
++			MEMREMAP_WB);
+ 	if (!memmap.map) {
+ 		pr_err("Failed to remap EFI memory map\n");
+ 		return -1;
+@@ -300,8 +301,8 @@ static int __init arm64_enable_runtime_services(void)
+ 	memmap.map_end = memmap.map + mapsize;
+ 	efi.memmap = &memmap;
+ 
+-	efi.systab = (__force void *)ioremap_cache(efi_system_table,
+-						   sizeof(efi_system_table_t));
++	efi.systab = memremap(efi_system_table, sizeof(efi_system_table_t),
++			MEMREMAP_WB);
+ 	if (!efi.systab) {
+ 		pr_err("Failed to remap EFI System Table\n");
+ 		return -1;
+diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
+index aef3605a8c47..2c06c1a36154 100644
+--- a/arch/arm64/kernel/smp_spin_table.c
++++ b/arch/arm64/kernel/smp_spin_table.c
+@@ -21,11 +21,11 @@
+ #include <linux/of.h>
+ #include <linux/smp.h>
+ #include <linux/types.h>
++#include <linux/io.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cpu_ops.h>
+ #include <asm/cputype.h>
+-#include <asm/io.h>
+ #include <asm/smp_plat.h>
+ 
+ extern void secondary_holding_pen(void);
+@@ -73,19 +73,19 @@ static int smp_spin_table_cpu_init(unsigned int cpu)
+ 
+ static int smp_spin_table_cpu_prepare(unsigned int cpu)
+ {
+-	__le64 __iomem *release_addr;
++	__le64 *release_addr;
+ 
+ 	if (!cpu_release_addr[cpu])
+ 		return -ENODEV;
+ 
+ 	/*
+ 	 * The cpu-release-addr may or may not be inside the linear mapping.
+-	 * As ioremap_cache will either give us a new mapping or reuse the
+-	 * existing linear mapping, we can use it to cover both cases. In
+-	 * either case the memory will be MT_NORMAL.
++	 * As memremap will either give us a new mapping or reuse the existing
++	 * linear mapping, we can use it to cover both cases. In either case
++	 * the memory will be MT_NORMAL.
+ 	 */
+-	release_addr = ioremap_cache(cpu_release_addr[cpu],
+-				     sizeof(*release_addr));
++	release_addr = memremap(cpu_release_addr[cpu], sizeof(*release_addr),
++			MEMREMAP_WB);
+ 	if (!release_addr)
  		return -ENOMEM;
  
--	memcpy_fromio(buf, base, sizeof(buf));
-+	memcpy(buf, base, sizeof(buf));
+@@ -97,15 +97,14 @@ static int smp_spin_table_cpu_prepare(unsigned int cpu)
+ 	 * the boot protocol.
+ 	 */
+ 	writeq_relaxed(__pa(secondary_holding_pen), release_addr);
+-	__flush_dcache_area((__force void *)release_addr,
+-			    sizeof(*release_addr));
++	__flush_dcache_area(release_addr, sizeof(*release_addr));
  
- 	if (memcmp(buf, OPREGION_SIGNATURE, 16)) {
- 		DRM_DEBUG_DRIVER("opregion signature mismatch\n");
-@@ -931,7 +930,7 @@ int intel_opregion_setup(struct drm_device *dev)
+ 	/*
+ 	 * Send an event to wake up the secondary CPU.
+ 	 */
+ 	sev();
  
- 	opregion->lid_state = base + ACPI_CLID;
- 
--	mboxes = ioread32(&opregion->header->mboxes);
-+	mboxes = opregion->header->mboxes;
- 	if (mboxes & MBOX_ACPI) {
- 		DRM_DEBUG_DRIVER("Public ACPI methods supported\n");
- 		opregion->acpi = base + OPREGION_ACPI_OFFSET;
-@@ -946,12 +945,12 @@ int intel_opregion_setup(struct drm_device *dev)
- 		DRM_DEBUG_DRIVER("ASLE supported\n");
- 		opregion->asle = base + OPREGION_ASLE_OFFSET;
- 
--		iowrite32(ASLE_ARDY_NOT_READY, &opregion->asle->ardy);
-+		opregion->asle->ardy = ASLE_ARDY_NOT_READY;
- 	}
+-	iounmap(release_addr);
++	memunmap(release_addr);
  
  	return 0;
- 
- err_out:
--	iounmap(base);
-+	memunmap(base);
- 	return err;
  }
-diff --git a/drivers/gpu/drm/i915/intel_panel.c b/drivers/gpu/drm/i915/intel_panel.c
-index e2ab3f6ed022..c8444d5f549f 100644
---- a/drivers/gpu/drm/i915/intel_panel.c
-+++ b/drivers/gpu/drm/i915/intel_panel.c
-@@ -387,7 +387,7 @@ intel_panel_detect(struct drm_device *dev)
- 
- 	/* Assume that the BIOS does not lie through the OpRegion... */
- 	if (!i915.panel_ignore_lid && dev_priv->opregion.lid_state) {
--		return ioread32(dev_priv->opregion.lid_state) & 0x1 ?
-+		return *(dev_priv->opregion.lid_state) & 0x1 ?
- 			connector_status_connected :
- 			connector_status_disconnected;
- 	}
