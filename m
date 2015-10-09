@@ -1,33 +1,147 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 9 Oct 2015 12:07:40 +0200
-Subject: [PATCH] can: at91: remove at91_can_data
-In-Reply-To: <1444316167-25940-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1444316167-25940-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <561791EC.7050102@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Oct 2015 11:13:38 +0100
+Subject: [PATCHv2] arm: perf: Add event descriptions
+In-Reply-To: <20151007182735.GA18706@dreric01-gentoo.localdomain>
+References: <20151007182735.GA18706@dreric01-gentoo.localdomain>
+Message-ID: <20151009101338.GH26278@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2015 04:56 PM, Alexandre Belloni wrote:
-> struct at91_can_data was used to pass a callback to the driver, allowing it
-> to switch the transceiver on and off. As all at91 boards are now using DT,
-> this is not used anymore, remove that structure.
+On Wed, Oct 07, 2015 at 11:28:18AM -0700, Drew Richardson wrote:
+> Add additional information about the ARM architected hardware events
+> to make counters self describing. This makes the hardware PMUs easier
+> to use as perf list contains possible events instead of users having
+> to refer to documentation like the ARM TRMs.
+> 
+> Signed-off-by: Drew Richardson <drew.richardson@arm.com>
+> ---
+>  arch/arm/kernel/perf_event_v7.c | 96 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/perf/arm_pmu.c          |  1 +
+>  2 files changed, 97 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+> index 126dc679b230..6623bd0d8a1d 100644
+> --- a/arch/arm/kernel/perf_event_v7.c
+> +++ b/arch/arm/kernel/perf_event_v7.c
+> @@ -547,6 +547,95 @@ static const unsigned scorpion_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+>  	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)] = ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
+>  };
+>  
+> +static ssize_t armv7_event_sysfs_show(struct device *dev,
+> +				      struct device_attribute *attr, char *page)
+> +{
+> +	struct perf_pmu_events_attr *pmu_attr;
+> +
+> +	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr);
+> +
+> +	return sprintf(page, "event=0x%02llx\n", pmu_attr->id);
+> +}
 
-One board was obviously not converted properly to DT. As I don't have to
-board to test, I'll apply this patch.
+Can we not do this with a couple of macros, stringification of the event
+code and PMU_EVENT_ATTR_STRING, therefore avoiding this function entirely?
+
+> +#define ARMV7_EVENT_ATTR(name, config) \
+> +	PMU_EVENT_ATTR(name, armv7_event_attr_##name, config, \
+> +		       armv7_event_sysfs_show);
+> +
+> +ARMV7_EVENT_ATTR(sw_incr, ARMV7_PERFCTR_PMNC_SW_INCR);
+> +ARMV7_EVENT_ATTR(l1i_cache_refill, ARMV7_PERFCTR_L1_ICACHE_REFILL);
+> +ARMV7_EVENT_ATTR(l1i_tlb_refill, ARMV7_PERFCTR_ITLB_REFILL);
+> +ARMV7_EVENT_ATTR(l1d_cache_refill, ARMV7_PERFCTR_L1_DCACHE_REFILL);
+> +ARMV7_EVENT_ATTR(l1d_cache, ARMV7_PERFCTR_L1_DCACHE_ACCESS);
+> +ARMV7_EVENT_ATTR(l1d_tlb_refill, ARMV7_PERFCTR_DTLB_REFILL);
+> +ARMV7_EVENT_ATTR(ld_retired, ARMV7_PERFCTR_MEM_READ);
+> +ARMV7_EVENT_ATTR(st_retired, ARMV7_PERFCTR_MEM_WRITE);
+> +ARMV7_EVENT_ATTR(inst_retired, ARMV7_PERFCTR_INSTR_EXECUTED);
+> +ARMV7_EVENT_ATTR(exc_taken, ARMV7_PERFCTR_EXC_TAKEN);
+> +ARMV7_EVENT_ATTR(exc_return, ARMV7_PERFCTR_EXC_EXECUTED);
+> +ARMV7_EVENT_ATTR(cid_write_retired, ARMV7_PERFCTR_CID_WRITE);
+> +ARMV7_EVENT_ATTR(pc_write_retired, ARMV7_PERFCTR_PC_WRITE);
+> +ARMV7_EVENT_ATTR(br_immed_retired, ARMV7_PERFCTR_PC_IMM_BRANCH);
+> +ARMV7_EVENT_ATTR(br_return_retired, ARMV7_PERFCTR_PC_PROC_RETURN);
+> +ARMV7_EVENT_ATTR(unaligned_ldst_retired, ARMV7_PERFCTR_MEM_UNALIGNED_ACCESS);
+> +ARMV7_EVENT_ATTR(br_mis_pred, ARMV7_PERFCTR_PC_BRANCH_MIS_PRED);
+> +ARMV7_EVENT_ATTR(cpu_cycles, ARMV7_PERFCTR_CLOCK_CYCLES);
+> +ARMV7_EVENT_ATTR(br_pred, ARMV7_PERFCTR_PC_BRANCH_PRED);
+> +ARMV7_EVENT_ATTR(mem_access, ARMV7_PERFCTR_MEM_ACCESS);
+> +ARMV7_EVENT_ATTR(l1i_cache, ARMV7_PERFCTR_L1_ICACHE_ACCESS);
+> +ARMV7_EVENT_ATTR(l1d_cache_wb, ARMV7_PERFCTR_L1_DCACHE_WB);
+> +ARMV7_EVENT_ATTR(l2d_cache, ARMV7_PERFCTR_L2_CACHE_ACCESS);
+> +ARMV7_EVENT_ATTR(l2d_cache_refill, ARMV7_PERFCTR_L2_CACHE_REFILL);
+> +ARMV7_EVENT_ATTR(l2d_cache_wb, ARMV7_PERFCTR_L2_CACHE_WB);
+> +ARMV7_EVENT_ATTR(bus_access, ARMV7_PERFCTR_BUS_ACCESS);
+> +ARMV7_EVENT_ATTR(memory_error, ARMV7_PERFCTR_MEM_ERROR);
+> +ARMV7_EVENT_ATTR(inst_spec, ARMV7_PERFCTR_INSTR_SPEC);
+> +ARMV7_EVENT_ATTR(ttbr_write_retired, ARMV7_PERFCTR_TTBR_WRITE);
+> +ARMV7_EVENT_ATTR(bus_cycles, ARMV7_PERFCTR_BUS_CYCLES);
+> +
+> +static struct attribute *armv7_pmuv2_event_attrs[] = {
+> +	&armv7_event_attr_sw_incr.attr.attr,
+> +	&armv7_event_attr_l1i_cache_refill.attr.attr,
+> +	&armv7_event_attr_l1i_tlb_refill.attr.attr,
+> +	&armv7_event_attr_l1d_cache_refill.attr.attr,
+> +	&armv7_event_attr_l1d_cache.attr.attr,
+> +	&armv7_event_attr_l1d_tlb_refill.attr.attr,
+> +	&armv7_event_attr_ld_retired.attr.attr,
+> +	&armv7_event_attr_st_retired.attr.attr,
+> +	&armv7_event_attr_inst_retired.attr.attr,
+> +	&armv7_event_attr_exc_taken.attr.attr,
+> +	&armv7_event_attr_exc_return.attr.attr,
+> +	&armv7_event_attr_cid_write_retired.attr.attr,
+> +	&armv7_event_attr_pc_write_retired.attr.attr,
+> +	&armv7_event_attr_br_immed_retired.attr.attr,
+> +	&armv7_event_attr_br_return_retired.attr.attr,
+> +	&armv7_event_attr_unaligned_ldst_retired.attr.attr,
+> +	&armv7_event_attr_br_mis_pred.attr.attr,
+> +	&armv7_event_attr_cpu_cycles.attr.attr,
+> +	&armv7_event_attr_br_pred.attr.attr,
+> +	&armv7_event_attr_mem_access.attr.attr,
+> +	&armv7_event_attr_l1i_cache.attr.attr,
+> +	&armv7_event_attr_l1d_cache_wb.attr.attr,
+> +	&armv7_event_attr_l2d_cache.attr.attr,
+> +	&armv7_event_attr_l2d_cache_refill.attr.attr,
+> +	&armv7_event_attr_l2d_cache_wb.attr.attr,
+> +	&armv7_event_attr_bus_access.attr.attr,
+> +	&armv7_event_attr_memory_error.attr.attr,
+> +	&armv7_event_attr_inst_spec.attr.attr,
+> +	&armv7_event_attr_ttbr_write_retired.attr.attr,
+> +	&armv7_event_attr_bus_cycles.attr.attr,
+> +	NULL
+> +};
+> +
+> +static struct attribute_group armv7_pmuv2_events_attr_group = {
+> +	.name = "events",
+> +	.attrs = armv7_pmuv2_event_attrs,
+> +};
+> +
+> +static const struct attribute_group *armv7_pmuv2_attr_groups[] = {
+> +	&armv7_pmuv2_events_attr_group,
+> +	NULL
+> +};
+> +
+>  /*
+>   * Perf Events' indices
+>   */
+> @@ -1085,6 +1174,7 @@ static int armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
+>  	armv7pmu_init(cpu_pmu);
+>  	cpu_pmu->name		= "armv7_cortex_a8";
+>  	cpu_pmu->map_event	= armv7_a8_map_event;
+> +	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
+>  	return armv7_probe_num_events(cpu_pmu);
+>  }
+>  
+> @@ -1093,6 +1183,7 @@ static int armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
+>  	armv7pmu_init(cpu_pmu);
+>  	cpu_pmu->name		= "armv7_cortex_a9";
+>  	cpu_pmu->map_event	= armv7_a9_map_event;
+> +	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
+
+I didn't think these guys supported PMUv2, or is that backwards compatible
+with the older event definitions?
+
+Also, would you be able to do something similar for AArch64 too, please?
+(take a look at our for-next/core branch for the latest perf changes).
 
 Thanks,
-Marc
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151009/f2d386db/attachment.sig>
+Will
