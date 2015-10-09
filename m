@@ -1,59 +1,95 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Fri, 9 Oct 2015 18:39:47 +0200 (CEST)
-Subject: [PATCH 2/9] pci: mvebu: fix memory leaks and refcount leaks
-In-Reply-To: <20151009153543.GX32532@n2100.arm.linux.org.uk>
-References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
- <E1ZiRIs-0004Id-AN@rmk-PC.arm.linux.org.uk>
- <20151009165240.3ba17ece@free-electrons.com> <20151009150710.GJ14688@lunn.ch>
- <20151009171442.52988f0b@free-electrons.com>
- <20151009153543.GX32532@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.10.1510091838440.2665@hadrien>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 9 Oct 2015 17:41:29 +0100
+Subject: [PATCH 3/4] arm64: Juno: Add support for the PCIe host bridge on
+ Juno R1
+In-Reply-To: <20151009163252.GE21629@leverpostej>
+References: <1444398323-17354-1-git-send-email-Liviu.Dudau@arm.com>
+ <20151009141107.GD3394@e106497-lin.cambridge.arm.com>
+ <20151009154408.GD21629@leverpostej> <40550712.xdsq5nNSTG@wuerfel>
+ <20151009160910.GF3394@e106497-lin.cambridge.arm.com>
+ <20151009163252.GE21629@leverpostej>
+Message-ID: <20151009164129.GG3394@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 09, 2015 at 05:32:52PM +0100, Mark Rutland wrote:
+> On Fri, Oct 09, 2015 at 05:09:10PM +0100, Liviu Dudau wrote:
+> > On Fri, Oct 09, 2015 at 05:49:18PM +0200, Arnd Bergmann wrote:
+> > > On Friday 09 October 2015 16:44:08 Mark Rutland wrote:
+> > > > On Fri, Oct 09, 2015 at 03:11:07PM +0100, Liviu Dudau wrote:
+> > > > > On Fri, Oct 09, 2015 at 08:54:33AM -0500, Rob Herring wrote:
+> > > > > Or maybe I can claim the use of the string on account on being the first on arm64 
+> > > > > 
+> > > > > I can add a vendor prefix if you want, but pci-host-generic is going to ignore it 
+> > > > > *because* it is trying to be a generic driver.
+> > > > 
+> > > > The point here is to have the string ready if we need it later, so it's
+> > > > fine that it's not used currently.
+> > > > 
+> > > > Rob's suggestion is that the compatible list should look something like:
+> > > > 
+> > > > compatible = "arm,juno-r1-pcie", "plda,xpressrich3", "pci-host-ecam-generic";
+> > > > 
+> > > > We can match on "pci-host-ecam-generic" for now (and hopefully forever),
+> > > > but if for some reason we need to special-case this host controller (or
+> > > > Juno's integration thereof), we can do that based on the compatible
+> > > > string.
+> > > 
+> > > Sounds good to me, it certainly can't hurt.
+> > > 
+> > > 	Arnd
+> > 
+> > Hmm, I'm sorry, but this time I'm going to disagree.
+> > 
+> > I understand the principle that the DTS is a description of the
+> > hardware and it should not have any built in knowledge of how a driver
+> > works but describe the physical properties of the device (where such
+> > description makes sense, in this case it does).
+> > 
+> > However, when ARM has created the Juno platform it has also created a
+> > standard called SBSA and has claimed that Juno is compliant with that
+> > standard. My current position (and it used to be MarkR's as well when
+> > we have argued internally the pros and cons of having a bespoke driver
+> > for PLDA's XpressRICH3) is that SBSA compliant behaviour *is* the
+> > expected behaviour and if the device doesn't conform it needs to be
+> > fixed in firmware.
+> 
+> We are not arguing for a bespoke driver, and in fact we hope to never
+> have to use the addition strings.
+> 
+> However, experience shows that we might not be lucky, and if we
+> encounter some bizarre quirk in future we might need to handle that by
+> knowing what the hardware is.
+> 
+> > Otherwise, I could've posted months ago the other public driver[1]
+> > that I've wrote that doesn't depend on firmware and could have been
+> > done with this long time ago.
+> 
+> We're not arguing for kernel support code. What we're arguing for is
+> data in the DTB that ideally turns out to be irrelevant.
+> 
+> I can't see why you object to that.
 
+It is not a strong objection but I don't want to ever have to add bespoke
+code to the pci-host-generic.c driver so adding a compatible property that
+is going to be ignored is kind of pointless. Yes, one will have a better
+idea on what the hardware actually is, but so what?
 
-On Fri, 9 Oct 2015, Russell King - ARM Linux wrote:
+I will send a v2 with the added values.
 
-> On Fri, Oct 09, 2015 at 05:14:42PM +0200, Thomas Petazzoni wrote:
-> > Julia: some of the Device Tree iterator functions have a somewhat
-> > "interesting" behavior in that they take the reference on the current
-> > child when entering the loop, and release it before entering the next
-> > iteration (which will also take a reference to the next child).
-> >
-> > This means that if you have an exit point inside the loop (break or
-> > return), you are loosing a reference. For example,
-> > http://lxr.free-electrons.com/source/arch/arm/mach-shmobile/pm-rmobile.c#L367
-> > is wrong because there is a missing of_node_put(np) before the "return
-> > -ENOMEM".
-> >
-> > So essentially, every exit point in such Device Tree iteration loops
-> > should make to call of_node_put() on the current element before exiting
-> > the loop unexpectedly.
->
-> There is an exception to that... if the loop is part of a DT node lookup
-> function, which would return a DT node based on some search criteria, it
-> would be valid to break out of the loop while holding a reference.
->
-> For example, of_get_child_by_name(), of_find_next_cache_node(),
-> of_graph_get_port_by_id(), are valid breaker-outer cases. ;)
->
-> However, of_platform_bus_probe(), of_platform_populate(),
-> of_overlay_apply_one(), overlay_subtree_check() are examples of
-> incorrect break-out cases.
+Best regards,
+Liviu
 
-Thanks for the examples.
+> 
+> Mark.
+> 
 
-I guess that this incorrect too, for the opposite reason (double put)?
-
-drivers/clk/tegra/clk-emc.c:
-
-	for_each_child_of_node(np, node) {
-                err = of_property_read_u32(node, "nvidia,ram-code",
-                                           &node_ram_code);
-                if (err) {
-                        of_node_put(node);
-                        continue;
-		}
-
-julia
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
