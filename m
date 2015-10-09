@@ -1,31 +1,34 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 9 Oct 2015 19:56:47 +0800
-Subject: [PATCH v5 4/7] arm64: berlin: add the pinctrl dependency for Marvell
- Berlin SoCs
+Date: Fri, 9 Oct 2015 19:56:48 +0800
+Subject: [PATCH v5 5/7] pinctrl: dt-binding: document berlin4ct SoC pinctrl
 In-Reply-To: <1444391810-5045-1-git-send-email-jszhang@marvell.com>
 References: <1444391810-5045-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1444391810-5045-5-git-send-email-jszhang@marvell.com>
+Message-ID: <1444391810-5045-6-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is to add the pinctrl dependency for Marvell Berlin SoCs.
+Add berlin4ct to existing berlin pinctrl device tree binding.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index c6e2c75..3d17ee2 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -9,6 +9,7 @@ config ARCH_BERLIN
- 	bool "Marvell Berlin SoC Family"
- 	select ARCH_REQUIRE_GPIOLIB
- 	select DW_APB_ICTL
-+	select PINCTRL
- 	help
- 	  This enables support for Marvell Berlin SoC Family
+diff --git a/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
+index a8bb5e2..f8fa28c 100644
+--- a/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
+@@ -20,7 +20,10 @@ Required properties:
+ 	"marvell,berlin2cd-soc-pinctrl",
+ 	"marvell,berlin2cd-system-pinctrl",
+ 	"marvell,berlin2q-soc-pinctrl",
+-	"marvell,berlin2q-system-pinctrl"
++	"marvell,berlin2q-system-pinctrl",
++	"marvell,berlin4ct-avio-pinctrl",
++	"marvell,berlin4ct-soc-pinctrl",
++	"marvell,berlin4ct-system-pinctrl"
  
+ Required subnode-properties:
+ - groups: a list of strings describing the group names.
 -- 
 2.6.1
