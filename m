@@ -1,61 +1,52 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Fri, 9 Oct 2015 16:01:24 +0100
-Subject: [PATCH v2 11/22] arm64: Populate cpuinfo after notify_cpu_starting
-In-Reply-To: <56164972.3030906@arm.com>
-References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
- <1444064531-25607-12-git-send-email-suzuki.poulose@arm.com>
- <20151008101508.GE17192@e104818-lin.cambridge.arm.com>
- <56164972.3030906@arm.com>
-Message-ID: <5617D6C4.7030602@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 9 Oct 2015 17:07:10 +0200
+Subject: [PATCH 2/9] pci: mvebu: fix memory leaks and refcount leaks
+In-Reply-To: <20151009165240.3ba17ece@free-electrons.com>
+References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
+ <E1ZiRIs-0004Id-AN@rmk-PC.arm.linux.org.uk>
+ <20151009165240.3ba17ece@free-electrons.com>
+Message-ID: <20151009150710.GJ14688@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/15 11:46, Suzuki K. Poulose wrote:
-> On 08/10/15 11:15, Catalin Marinas wrote:
->> On Mon, Oct 05, 2015 at 06:02:00PM +0100, Suzuki K. Poulose wrote:
->>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
->>> index cb3e0d8..6987de4 100644
->>> --- a/arch/arm64/kernel/smp.c
->>> +++ b/arch/arm64/kernel/smp.c
->>> @@ -163,14 +163,14 @@ asmlinkage void secondary_start_kernel(void)
->>>           cpu_ops[cpu]->cpu_postboot();
->>>
->>>       /*
->>> -     * Log the CPU info before it is marked online and might get read.
->>> +     * Enable GIC and timers.
->>>        */
->>> -    cpuinfo_store_cpu();
->>> +    notify_cpu_starting(cpu);
->>>
->>>       /*
->>> -     * Enable GIC and timers.
->>> +     * Log the CPU info before it is marked online and might get read.
->>>        */
->>> -    notify_cpu_starting(cpu);
->>> +    cpuinfo_store_cpu();
->>>
->>>       smp_store_cpu_info(cpu);
->>
->> You can move the cpuinfo_store_cpu() call directly to
->> smp_store_cpu_info().
->>
->
-> That looks better, Thanks.
+On Fri, Oct 09, 2015 at 04:52:40PM +0200, Thomas Petazzoni wrote:
+> Russell,
+> 
+> On Sat, 03 Oct 2015 19:13:02 +0100, Russell King wrote:
+> 
+> > +	ret = devm_add_action(dev, mvebu_pcie_port_clk_put, port);
+> 
+> I didn't know about devm_add_action(). Definitely very useful for such
+> situations.
 
-On a second look, smp_store_cpu_info() is also called from
-smp_prepare_cpus() by the Boot CPU to update its topology
-information, just after init_cpu_topology(). So moving the
-cpuinfo_store_cpu() could be called for the boot CPU (which
-we don't want, as it takes a different route to storing the
-info).
+I was also surprised by this. Nice.
+ 
+> > @@ -1052,10 +1086,12 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+> >  		struct mvebu_pcie_port *port = &pcie->ports[i];
+> >  
+> >  		ret = mvebu_pcie_parse_port(pcie, port, child);
+> > -		if (ret < 0)
+> > +		if (ret < 0) {
+> > +			of_node_put(child);
+> >  			return ret;
+> > -		else if (ret == 0)
+> > +		} else if (ret == 0) {
+> >  			continue;
+> > +		}
+> 
+> This is not trivial. If I understand correctly,
+> for_each_available_child_of_node() will automatically release the
+> reference on the previous node and take the reference on the new one
+> before entering the loop code. So in the skipping case, we don't need
+> to release the reference as it will be done by the next iteration of
+> the loop, but in the error case, since we are unexpectedly breaking the
+> loop, we need to do it manually.
+> 
+> The sort of tricky thing that should be documented near
+> for_each_child_of_node(), since I believe a lot of code gets this
+> wrong.
 
-One thing we could do is:
+Sounds like a good candidate for a coccinelle script. Maybe you could
+ask Julia Lawall?
 
-- Move init_cpu_topology() to setup_processor()
-- Have the boot CPU update the topology from setup_processor()
-   there, without going via the smp_store_cpu_info()
-- Remove the smp_store_cpu_info() from smp_prepare_cpus().
-
-Should we do that ? Or retain the code as above ?
-
-Suzuki
+    Andrew
