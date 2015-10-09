@@ -1,39 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 09 Oct 2015 09:29:35 +0100
-Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
-In-Reply-To: <00ec01d10269$f6c82af0$e45880d0$@samsung.com>
-References: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
- <00e601d10264$61cdafb0$25690f10$@samsung.com> <56177592.2080702@arm.com>
- <00ec01d10269$f6c82af0$e45880d0$@samsung.com>
-Message-ID: <56177AEF.50304@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 9 Oct 2015 10:29:57 +0200
+Subject: [PATCH v2] mmc: core: Fix init_card in 52Mhz
+In-Reply-To: <56177381.9020509@intel.com>
+References: <1444288147-24013-1-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFqrjP3-y+ucm5ybwXefsDLOYcPF9XqMciwhRkjD5NXLBg@mail.gmail.com>
+ <56166988.20900@intel.com>
+ <CAPDyKFoWWMXC-DECqhw=EXerid5toWKxr4uLq0WevPo8LrrDqw@mail.gmail.com>
+ <56177381.9020509@intel.com>
+Message-ID: <CAPDyKFpa4RZJaEEaVuhceOeOeQg_OWKwsXvFWf9ZLkyTgWfx7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/15 09:10, Pavel Fedin wrote:
->  Hello!
-> 
->> How do you reconcile the two? What's the point of trying to shoehorn a
->> different concept into the existing API?
-> 
->  Keeping amount of #define's as small as possible, and try to reuse everything that can be reused.
+[...]
 
-Reusing existing code is a noble goal, but I think that having clear
-abstractions and following the architecture trumps it completely.
+>>> Then you need to remove the hw_reset test from mmc_test.  Refer:
+>>>
+>>>         http://marc.info/?l=linux-mmc&m=144360165906544&w=2
+>>>
+>>
+>> I realize that the test becomes a bit different, but I don't think it's useless.
+>>
+>> If we add a check for MMC_CAP_HW_RESET and verify that the
+>> host->ops->hw_reset exists, then we can assume that the "hw_reset"
+>> sequence has executed. And if mmc_init_card() fails, that would
+>> probably mean that the reset also failed, right?
+>
+> In the test case, the card is in a working state.  Generally I would then
+> expect reinitialization to work irrespective of whether or not the hardware
+> is actually reset.
 
-Experience has shown that trying to be clever with userspace interfaces
-comes and bites us in the rear sooner or later. Not enough bits, being
-unable to represent valid architecture features, pointlessly complicated
-code that is hard to maintain. Those are the things I care about today.
+That's not always the case. I have seen many strange things happening
+while trying to re-initialize/reset the card. :-)
 
-So a #define is completely free, additional code is still very cheap. My
-brain cells are few, and I like to look at the code and get this warm
-fuzzy feeling that it is doing the right thing.
+>
+> Here are some other options:
+>         1. have mmc_test hook the host->ops->hw_reset() fn and do the send_status
+> itself.
+>         2. have mmc_test set a flag on the card that it is being tested
+> and only do the send_status if the flag is set
 
-Having separate interfaces for different devices is a very good way to
-ensure the above.
+I assume that both 1) and 2) still means we need to manage the
+scenario with re-tuning, which I rather would like us to prevent.
 
-Thanks,
+Unless we find a way to call mmc_set_initial_state() before doing the
+reset, as that would disable re-tuning...
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>         3. remove the send_status call and rename the mmc_test from "eMMC hardware
+> reset" to just "Reset test (doesn't check hw reset did reset)"
+
+That's would work and perhaps this is the best way to go as we would
+then also be able to use the test for SD-cards. Let's do this then!
+
+Kind regards
+Uffe
