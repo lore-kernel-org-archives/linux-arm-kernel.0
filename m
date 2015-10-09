@@ -1,47 +1,71 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 9 Oct 2015 11:27:00 -0500
-Subject: [PATCH 0/9] Further mvebu PCIe patches
-In-Reply-To: <20151003181228.GI21513@n2100.arm.linux.org.uk>
-References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
-Message-ID: <20151009162700.GA16112@localhost>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 9 Oct 2015 17:32:52 +0100
+Subject: [PATCH 3/4] arm64: Juno: Add support for the PCIe host bridge on
+ Juno R1
+In-Reply-To: <20151009160910.GF3394@e106497-lin.cambridge.arm.com>
+References: <1444398323-17354-1-git-send-email-Liviu.Dudau@arm.com>
+ <20151009141107.GD3394@e106497-lin.cambridge.arm.com>
+ <20151009154408.GD21629@leverpostej> <40550712.xdsq5nNSTG@wuerfel>
+ <20151009160910.GF3394@e106497-lin.cambridge.arm.com>
+Message-ID: <20151009163252.GE21629@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 03, 2015 at 07:12:28PM +0100, Russell King - ARM Linux wrote:
-> Jason, Thomas,
+On Fri, Oct 09, 2015 at 05:09:10PM +0100, Liviu Dudau wrote:
+> On Fri, Oct 09, 2015 at 05:49:18PM +0200, Arnd Bergmann wrote:
+> > On Friday 09 October 2015 16:44:08 Mark Rutland wrote:
+> > > On Fri, Oct 09, 2015 at 03:11:07PM +0100, Liviu Dudau wrote:
+> > > > On Fri, Oct 09, 2015 at 08:54:33AM -0500, Rob Herring wrote:
+> > > > Or maybe I can claim the use of the string on account on being the first on arm64 
+> > > > 
+> > > > I can add a vendor prefix if you want, but pci-host-generic is going to ignore it 
+> > > > *because* it is trying to be a generic driver.
+> > > 
+> > > The point here is to have the string ready if we need it later, so it's
+> > > fine that it's not used currently.
+> > > 
+> > > Rob's suggestion is that the compatible list should look something like:
+> > > 
+> > > compatible = "arm,juno-r1-pcie", "plda,xpressrich3", "pci-host-ecam-generic";
+> > > 
+> > > We can match on "pci-host-ecam-generic" for now (and hopefully forever),
+> > > but if for some reason we need to special-case this host controller (or
+> > > Juno's integration thereof), we can do that based on the compatible
+> > > string.
+> > 
+> > Sounds good to me, it certainly can't hurt.
+> > 
+> > 	Arnd
 > 
-> Here are further PCIe patches which follow on from the previous set of
-> six I sent earlier in September.  This set:
+> Hmm, I'm sorry, but this time I'm going to disagree.
 > 
-> * Separates the DT parsing from the use of this parsed data.
-> * Fixes memory leaks from kasprintf() and refcount leaks of the DT
->   node where we break out from the loop early.
-> * Uses gpio_set_value_cansleep() so that GPIOs on I2C expanders can
->   be used for the PCIe reset functionality.
-> * Switch to using devm_kcalloc() instead of devm_kzalloc(), which
->   eliminates the multiplication, moving it into core code.
-> * Switch to using a gpio descriptor for the reset gpio, which can
->   contain the active level information from DT.  (It would be nice
->   if gpiolib automated some of the resource claiming there.)
-> * Make PERST# vs clock timing to match PCIe specifications.  PCIe
->   specs require the clock to be running for 100us prior to releasing
->   reset.
-> * Add the standard PCIe capability block in root port form to the
->   emulated PCIe configuration block.  This allows the PCI layer to
->   identify the "host bridge" as a PCIe device, and allows us to
->   take advantage of the code in drivers/pci/pcie, particularly
->   aspm for link power management.
-> * As a result of identifying ourselves as a PCIe root port, this
->   eliminates the need to special case accesses to non-slot 0 in
->   the driver; the lack of other "slots" is something which the
->   generic PCI code knows about for PCIe root ports.
+> I understand the principle that the DTS is a description of the
+> hardware and it should not have any built in knowledge of how a driver
+> works but describe the physical properties of the device (where such
+> description makes sense, in this case it does).
 > 
->  drivers/pci/host/pci-mvebu.c | 404 ++++++++++++++++++++++++++++++++-----------
->  1 file changed, 305 insertions(+), 99 deletions(-)
+> However, when ARM has created the Juno platform it has also created a
+> standard called SBSA and has claimed that Juno is compliant with that
+> standard. My current position (and it used to be MarkR's as well when
+> we have argued internally the pros and cons of having a bespoke driver
+> for PLDA's XpressRICH3) is that SBSA compliant behaviour *is* the
+> expected behaviour and if the device doesn't conform it needs to be
+> fixed in firmware.
 
-Applied to pci/host-mvebu for v4.4 with Tested-by from Willy, Andrew,
-and Thomas, and Reviewed-by from Thomas.  I adjusted subject line
-capitalization to match the history.  Thanks, Russell and reviewers
-and testers!
+We are not arguing for a bespoke driver, and in fact we hope to never
+have to use the addition strings.
 
-Bjorn
+However, experience shows that we might not be lucky, and if we
+encounter some bizarre quirk in future we might need to handle that by
+knowing what the hardware is.
+
+> Otherwise, I could've posted months ago the other public driver[1]
+> that I've wrote that doesn't depend on firmware and could have been
+> done with this long time ago.
+
+We're not arguing for kernel support code. What we're arguing for is
+data in the DTB that ideally turns out to be irrelevant.
+
+I can't see why you object to that.
+
+Mark.
