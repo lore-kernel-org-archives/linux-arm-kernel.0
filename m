@@ -1,80 +1,20 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 09 Oct 2015 23:51:05 +0300
-Subject: [PATCH] ARM: shmobile: porter: add QSPI DT support
-Message-ID: <1738678.v21ITp1gYW@wasted.cogentembedded.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 9 Oct 2015 22:52:48 +0200 (CEST)
+Subject: [PULL] GIC changes for Linux 4.4
+In-Reply-To: <1444404432-1992-1-git-send-email-marc.zyngier@arm.com>
+References: <1444404432-1992-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <alpine.DEB.2.11.1510092251420.6097@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Porter board dependent part of the QSPI device node.
-Add device nodes  for Spansion  S25FL512S SPI flash and the MTD partitions
-on it.
+On Fri, 9 Oct 2015, Marc Zyngier wrote:
+> The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
+> 
+>   Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
 
-This patch is  mostly analogous to the commit f59838d44835 (ARM: shmobile:
-henninger: add QSPI DT support) as there  are no differences between the
-boards in this respect.
+That's not the best base. tip irq/core already has gic modifications
+which conflict. Can you please rebase to tip irq/core?
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Thanks,
 
----
-This patch is against 'renesas-devel-20151008-v4.3-rc4' tag of Simon Horman's
-'renesas.git' repo plus the Porter I2C2 and VIN0/ADV7180 patches posted earlier.
-
- arch/arm/boot/dts/r8a7791-porter.dts |   38 +++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791-porter.dts
-+++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -110,6 +110,11 @@
- 		renesas,function = "sdhi2";
- 	};
- 
-+	qspi_pins: spi0 {
-+		renesas,groups = "qspi_ctrl", "qspi_data4";
-+		renesas,function = "qspi";
-+	};
-+
- 	i2c2_pins: i2c2 {
- 		renesas,groups = "i2c2";
- 		renesas,function = "i2c2";
-@@ -165,6 +170,39 @@
- 	status = "okay";
- };
- 
-+&qspi {
-+	pinctrl-0 = <&qspi_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+
-+	flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "spansion,s25fl512s", "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <30000000>;
-+		spi-tx-bus-width = <4>;
-+		spi-rx-bus-width = <4>;
-+		m25p,fast-read;
-+
-+		partition at 0 {
-+			label = "loader_prg";
-+			reg = <0x00000000 0x00040000>;
-+			read-only;
-+		};
-+		partition at 40000 {
-+			label = "user_prg";
-+			reg = <0x00040000 0x00400000>;
-+			read-only;
-+		};
-+		partition at 440000 {
-+			label = "flash_fs";
-+			reg = <0x00440000 0x03bc0000>;
-+		};
-+	};
-+};
-+
- &i2c2 {
- 	pinctrl-0 = <&i2c2_pins>;
- 	pinctrl-names = "default";
+	tglx
