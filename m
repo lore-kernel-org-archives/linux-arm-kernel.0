@@ -1,60 +1,34 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 10 Oct 2015 00:31:22 +0200
-Subject: [PATCH v2 0/8] mmc: dw_mmc-rockchip: allow tuning using the
- clk-phase api
-In-Reply-To: <CAD=FV=VaZQcbgByQOAQL4qDCCOb_pNRHnXBS77L8D-dc_eYR5A@mail.gmail.com>
-References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
- <CAD=FV=XdVt5Uop5WAUv6vY3=qPksnc9HzR4C9CBWpXJKuteTEQ@mail.gmail.com>
- <CAD=FV=VaZQcbgByQOAQL4qDCCOb_pNRHnXBS77L8D-dc_eYR5A@mail.gmail.com>
-Message-ID: <9143852.fAJ0a7C1AC@phil>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Fri, 09 Oct 2015 15:32:25 -0700
+Subject: Run armv7 32 bit userspace on aarch64
+In-Reply-To: <20151008111248.GE16807@arm.com>
+References: <5615A0E1.1050402@linaro.org> <20151008111248.GE16807@arm.com>
+Message-ID: <56184079.1040905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 9. Oktober 2015, 13:11:21 schrieb Doug Anderson:
-> Hi,
-> 
-> On Fri, Oct 9, 2015 at 10:19 AM, Doug Anderson <dianders@chromium.org> 
-wrote:
-> > Hi,
-> > 
-> > On Fri, Oct 9, 2015 at 1:10 AM, Ulf Hansson <ulf.hansson@linaro.org> 
-wrote:
-> >> Dough, Heiko,
-> >> 
-> >> This patchset seems to be causing a boot regression for
-> >> exynos5800-peach-pi [1].
-> >> 
-> >> Apparently, the vmmc regulator doesn't exist for one of the controller
-> >> but vqmmc is. This leads to the following NULL pointer exception.
-> > 
-> > Ugh.  Hrm, it didn't used to be possible for vmmc to be NULL.  :-/  It
-> > 
-> > changed in v3.16:
-> >   4d1f52f mmc: core: Improve support for deferred regulators
-> > 
-> > ...and I didn't notice it (most of my development is done on 3.14).  :(
-> > 
-> > 
-> > Is it sensible to have vqmmc without vmmc.  One option would be to
-> > change mmc_regulator_get_supply() to not even bother trying to get
-> > vqmmc if vmmc is not there.
-> > 
-> > Another option would be to just totally fail mmc_regulator_set_vqmmc()
-> > always if vmmc is an error.  ...or assume that any bogus vmmc (either
-> > vmmc is an error or regulator_get_voltage(vmmc) returns an error) is
-> > 3.3V?
-> > 
-> > 
-> > I guess the safest is to assume that bogus vmmc means 3.3V...
-> 
-> Ah, doh.  Just noticed Ulf's suggestion all the way at the bottom of
-> the crash info, which I somehow missed before.  Yes, let's do that.
-> Heiko: are you going to re-post?
+On 10/8/2015 4:12 AM, Will Deacon wrote:
+> On Wed, Oct 07, 2015 at 03:46:57PM -0700, Shi, Yang wrote:
+>> I'm trying to run armv7 little endian userspace on qemu aarch64 with 4.1.x
+>> kernel. I was told by someone such usecase is valid and I have CONFIG_COMPAT
+>> enabled in my kernel.
+>>
+>> But, I ran into the below error. It looks the userspace application is
+>> trying to write a readonly page. I got the similar failure on arm vfp with
+>> Linaro images (4.1 kernel) too.
+>>
+>> Did anyone have tried it recently?
+>
+> -rc4 seems to be working fine with Debian Jessie armhf on my Juno boards.
+>
+> Do you have a good way of reproducing this with a mainline kernel?
 
-definitly :-) .
+It seems a qemu's bug. I can get both ubuntu and openembedded userspace 
+bootup on my LS2085 board with 4.1 kernel.
 
-I was just travelling back from ELCE today, otherwise I would've done that 
-directly today. So I'm hoping to get that done tomorrow.
+Thanks,
+Yang
 
-
-Heiko
+>
+> Will
+>
