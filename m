@@ -1,30 +1,37 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Fri,  9 Oct 2015 12:36:14 +0800
-Subject: [PATCH 2/4] arm64: Kconfig: select sp804 timer for ARCH_HISI
+Date: Fri,  9 Oct 2015 12:36:15 +0800
+Subject: [PATCH 3/4] arm64: dts: add sp804 timer node for Hi6220
 In-Reply-To: <1444365376-10728-1-git-send-email-leo.yan@linaro.org>
 References: <1444365376-10728-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1444365376-10728-3-git-send-email-leo.yan@linaro.org>
+Message-ID: <1444365376-10728-4-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select sp804 timer for ARCH_HISI, which is used as broadcast timer.
+Add sp804 timer for hi6220, so it can be used as broadcast timer.
 
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 23800a1..6d730fb 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -35,6 +35,7 @@ config ARCH_FSL_LS2085A
- 
- config ARCH_HISI
- 	bool "Hisilicon SoC Family"
-+	select ARM_TIMER_SP804
- 	help
- 	  This enables support for Hisilicon ARMv8 SoC family
- 
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 3f03380..7edbe42 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -167,5 +167,14 @@
+ 			clocks = <&ao_ctrl 36>, <&ao_ctrl 36>;
+ 			clock-names = "uartclk", "apb_pclk";
+ 		};
++
++		dual_timer0: dual_timer at f8008000 {
++			compatible = "arm,sp804", "arm,primecell";
++			reg = <0x0 0xf8008000 0x0 0x1000>;
++			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ao_ctrl 27>, <&ao_ctrl 27>;
++			clock-names = "apb_pclk", "apb_pclk";
++		};
+ 	};
+ };
 -- 
 1.9.1
