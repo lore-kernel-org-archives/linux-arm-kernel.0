@@ -1,76 +1,106 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Fri, 9 Oct 2015 14:00:21 +0100
-Subject: [PATCH v2 07/22] arm64: Keep track of CPU feature registers
-In-Reply-To: <20151008150346.GK17192@e104818-lin.cambridge.arm.com>
-References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
- <1444064531-25607-8-git-send-email-suzuki.poulose@arm.com>
- <20151007171621.GD17192@e104818-lin.cambridge.arm.com>
- <56163D7F.4000003@arm.com>
- <20151008150346.GK17192@e104818-lin.cambridge.arm.com>
-Message-ID: <5617BA65.5060405@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 9 Oct 2015 14:10:06 +0100
+Subject: [PATCH v3 6/6] arm/arm64: KVM: only allow 64bit hosts to build
+ VGICv3
+In-Reply-To: <1443703639-3730-7-git-send-email-jean-philippe.brucker@arm.com>
+References: <1443703639-3730-1-git-send-email-jean-philippe.brucker@arm.com>
+ <1443703639-3730-7-git-send-email-jean-philippe.brucker@arm.com>
+Message-ID: <20151009141006.213e252d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/15 16:03, Catalin Marinas wrote:
-> On Thu, Oct 08, 2015 at 10:55:11AM +0100, Suzuki K. Poulose wrote:
->>>> +#define ARM64_FTR_BITS(ftr_strict, ftr_type, ftr_shift, ftr_width, ftr_safe_val) \
+On Thu,  1 Oct 2015 13:47:19 +0100
+Jean-Philippe Brucker <jean-philippe.brucker@arm.com> wrote:
 
->>>
->>> You can drop "ftr_" from all the arguments, it makes the macro
->>> definition shorter.
->>
->> In fact I tried that before, but then the macro expansion will replace the
->> field names with the supplied values and hence won't compile. Either we
->> should change the field names or the values.
->
-> OK, keep them in this case.
+> Hardware virtualisation of GICv3 is only supported by 64bit hosts for
+> the moment. Some VGICv3 bits are missing from the 32bit side, and this
+> patch allows to still be able to build 32bit hosts when CONFIG_ARM_GIC_V3
+> is selected.
+> 
+> To this end, we introduce a new option, CONFIG_KVM_ARM_VGIC_V3, that is
+> only enabled on the 64bit side. The selection is done unconditionally
+> because CONFIG_ARM_GIC_V3 is always enabled on arm64.
+> 
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> ---
+>  arch/arm64/kvm/Kconfig |    4 ++++
+>  include/kvm/arm_vgic.h |    4 ++--
+>  virt/kvm/arm/vgic.c    |    4 ++--
+>  3 files changed, 8 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> index 5c7e920..ff5292c 100644
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -16,6 +16,9 @@ menuconfig VIRTUALIZATION
+>  
+>  if VIRTUALIZATION
+>  
+> +config KVM_ARM_VGIC_V3
+> +	bool
+> +
+>  config KVM
+>  	bool "Kernel-based Virtual Machine (KVM) support"
+>  	depends on OF
+> @@ -31,6 +34,7 @@ config KVM
+>  	select KVM_VFIO
+>  	select HAVE_KVM_EVENTFD
+>  	select HAVE_KVM_IRQFD
+> +	select KVM_ARM_VGIC_V3
+>  	---help---
+>  	  Support hosting virtualized guest machines.
+>  
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 4e14dac..6a3538e 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -282,7 +282,7 @@ struct vgic_v2_cpu_if {
+>  };
+>  
+>  struct vgic_v3_cpu_if {
+> -#ifdef CONFIG_ARM_GIC_V3
+> +#ifdef CONFIG_KVM_ARM_VGIC_V3
+>  	u32		vgic_hcr;
+>  	u32		vgic_vmcr;
+>  	u32		vgic_sre;	/* Restored only, change ignored */
+> @@ -364,7 +364,7 @@ void kvm_vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
+>  int vgic_v2_probe(struct device_node *vgic_node,
+>  		  const struct vgic_ops **ops,
+>  		  const struct vgic_params **params);
+> -#ifdef CONFIG_ARM_GIC_V3
+> +#ifdef CONFIG_KVM_ARM_VGIC_V3
+>  int vgic_v3_probe(struct device_node *vgic_node,
+>  		  const struct vgic_ops **ops,
+>  		  const struct vgic_params **params);
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 6bd1c9b..77b0176 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -2122,7 +2122,7 @@ static int init_vgic_model(struct kvm *kvm, int type)
+>  	case KVM_DEV_TYPE_ARM_VGIC_V2:
+>  		vgic_v2_init_emulation(kvm);
+>  		break;
+> -#ifdef CONFIG_ARM_GIC_V3
+> +#ifdef CONFIG_KVM_ARM_VGIC_V3
+>  	case KVM_DEV_TYPE_ARM_VGIC_V3:
+>  		vgic_v3_init_emulation(kvm);
+>  		break;
+> @@ -2284,7 +2284,7 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+>  		block_size = KVM_VGIC_V2_CPU_SIZE;
+>  		alignment = SZ_4K;
+>  		break;
+> -#ifdef CONFIG_ARM_GIC_V3
+> +#ifdef CONFIG_KVM_ARM_VGIC_V3
+>  	case KVM_VGIC_V3_ADDR_TYPE_DIST:
+>  		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+>  		addr_ptr = &vgic->vgic_dist_base;
 
-I have changed it to :
 
-ARM64_FTR_BITS(STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL)
+Christoffer, do you have any objection to that patch, and to have it
+merged though the irqchip tree?
 
->>
->>> Also, you captured lots of fields that Linux does not care about. Is it
->>> possible to ignore them altogether, only keep those which are relevant.
->>>
->>
->> The list is entierly from the SANITY check. If there are any registers
->> that we think need not be cross checked, we could get rid of them.
->
-> So we have three types of fields in these registers:
->
-> a) features defined but not something we care about in Linux
-> b) reserved fields
-> c) features important to Linux
->
-> I guess for (a), Linux may not even care if they don't match (though we
-> need to be careful which fields we ignore). As for (b), even if they
-> differ, since we don't know the meaning at this point, I think we should
-> just ignore them. If, for example, they add a feature that Linux doesn't
-> care about, they practically fall under the (a) category.
+Thanks,
 
-OK. So we can pack the consecutive features of type (a) and make it NONSTRICT.
-
->
-> Regarding exposing reserved CPUID fields to user, I assume we would
-> always return 0.
-
-Ideally, the architecturally reserved value (i.e, 0 for RAZ and 1 for RES1).
-
->>> Is this function ever called on a hot path? If not, just keep everything
->>> in an array and do a linear search rather than having different arrays
->>> based on op*. Especially if we managed to limit the number of registers
->>> to only those that Linux cares about.
->>
->> I started with linear array in the RFC post. But since then the number of
->> users for the API has gone up. Hence thought of optimising it. The only
->> 'intensive' user is SANITY check for each register at CPU bring up.
->
-> This shouldn't be that bad since it's not happening very often. However,
-> do we need this thing for MRS emulation (not many registers though)? You
-> could use a binary search (something like radix tree seems overkill)
-
-Yes we do need this for MRS emulation. I will change it to binary search.
-
-Thanks
-Suzuki
+	M.
+-- 
+Jazz is not dead. It just smells funny.
