@@ -1,79 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Oct 2015 11:33:52 +0100
-Subject: [PATCHv3] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
-In-Reply-To: <1444386580-10917-1-git-send-email-manjeet.p@samsung.com>
-References: <1444386580-10917-1-git-send-email-manjeet.p@samsung.com>
-Message-ID: <20151009103352.GK26278@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 9 Oct 2015 19:47:15 +0900
+Subject: [PATCHv3 1/2] ARM: exynos_defconfig: Enable rtl8152 ethernet
+ driver for Odroid-XU4
+In-Reply-To: <5276113.A7SSumyVrv@wuerfel>
+References: <1444276117-3657-1-git-send-email-linux.amoon@gmail.com>
+ <5551783.9EQ5GEjhxX@wuerfel> <1444384745.9895.265.camel@collabora.co.uk>
+ <5276113.A7SSumyVrv@wuerfel>
+Message-ID: <56179B33.9030803@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 03:59:40PM +0530, Manjeet Pawar wrote:
-> MINSIGSTKSZ and SIGSTKSZ for ARM64 are not correctly set in latest kernel.
-> This patch fixes this issue.
+W dniu 09.10.2015 o 19:28, Arnd Bergmann pisze:
+> On Friday 09 October 2015 11:59:05 Sjoerd Simons wrote:
+>>
+>>> I realize that building things as modules is a hassle, it is so for
+>>> some things more than for others, so I keep asking the question
+>>> to everyone to find out what a good balance is to make as much as
+>>> possible modules without hurting too much.
+>>
+>> Fwiw, I don't find building modules overly cumbersome. Getting an
+>> initramfs capable of moving on to an NFS root is mostly a one-time
+>> thing (not unlike setting up the nfs root itself) and injecting modules
+>> into it is relatively simple (doubly so if taking advantage of the
+>> multiple cpio archive feature linux has). 
+>>
+>> Interestingly, for me not building things as modules in multi_v7 tends
+>> to cause more work as it hides a few categories of bugs that tend to
+>> crop up once building distro kernels (e.g. missing module aliases,
+>> missing module device table entries, implicitly relying on clocks being
+>> active during probe as unused clocks only get turned of late in the
+>> init sequence etc).
+>>
 > 
-> This issue is reported in LTP (testcase: sigaltstack02.c).
-> Testcase failed when sigaltstack() called with stack size "MINSIGSTKSZ - 1"
-> Since in Glibc-2.22, MINSIGSTKSZ is set to 5120 but in kernel
-> it is set to 2048 so testcase gets failed.
-> 
-> Testcase Output:
-> sigaltstack02 1  TPASS  :  stgaltstack() fails, Invalid Flag value,errno:22
-> sigaltstack02 2  TFAIL  :  sigaltstack() returned 0, expected -1,errno:12
+> Ok, let's try to make all future network drivers modules in the
+> multi_v7_defconfig then, and get people to use an initramfs
+> if they need NFS root. If nobody complains too loudly for the
+> next few releases, we can change the existing drivers to =m as well.
 
-I'm still unable to reproduce this failure. Is this with defconfig?
+Personally I don't use NFS root and we don't have such configurations at
+work. At least I am not aware of such. So from my point of view network
+adapters as module is okay.
 
-> Reported Issue in Glibc Bugzilla:
-> Bugfix in Glibc-2.22: [Bug 16850]
-> https://sourceware.org/bugzilla/show_bug.cgi?id=16850
-> 
-> Signed-off-by: Akhilesh Kumar <akhilesh.k@samsung.com>
-> Signed-off-by: Manjeet Pawar <manjeet.p@samsung.com>
-> Signed-off-by: Rohit Thapliyal <r.thapliyal@samsung.com>
-> ---
-> v1 -> Changes in uapi overall header
-> v2 -> Changes done in arm64 headers
-> v3 -> Changes done in both uapi & arm64 headers
-> 
->  arch/arm64/include/uapi/asm/signal.h |    3 +++
->  include/uapi/asm-generic/signal.h    |    2 ++
->  2 files changed, 5 insertions(+)
+Anand,
+Can you change it in multi_v7 patch to module?
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Arnd: are you planning to take this via asm-generic, or shall I queue it
-on the arm64 fixes branch?
-
-Will
-
-> diff --git a/arch/arm64/include/uapi/asm/signal.h b/arch/arm64/include/uapi/asm/signal.h
-> index 8d1e723..991bf5d 100644
-> --- a/arch/arm64/include/uapi/asm/signal.h
-> +++ b/arch/arm64/include/uapi/asm/signal.h
-> @@ -19,6 +19,9 @@
->  /* Required for AArch32 compatibility. */
->  #define SA_RESTORER	0x04000000
->  
-> +#define MINSIGSTKSZ 5120
-> +#define SIGSTKSZ    16384
-> +
->  #include <asm-generic/signal.h>
->  
->  #endif
-> diff --git a/include/uapi/asm-generic/signal.h b/include/uapi/asm-generic/signal.h
-> index 9df61f1..b98b67b 100644
-> --- a/include/uapi/asm-generic/signal.h
-> +++ b/include/uapi/asm-generic/signal.h
-> @@ -80,8 +80,10 @@
->   *	SA_RESTORER	0x04000000
->   */
->  
-> +#if !defined MINSIGSTKSZ || !defined SIGSTKSZ
->  #define MINSIGSTKSZ	2048
->  #define SIGSTKSZ	8192
-> +#endif
->  
->  #ifndef __ASSEMBLY__
->  typedef struct {
-> -- 
-> 1.7.9.5
-> 
+Best regards,
+Krzysztof
