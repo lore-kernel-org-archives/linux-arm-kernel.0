@@ -1,81 +1,44 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Fri, 09 Oct 2015 14:07:16 +0200
-Subject: [PATCH] thermal: exynos: fix register read in TMU
-In-Reply-To: <CAJKOXPfbrdm75n_v+dRnq8dqAFAGvHj28QQ4ZY8WZms1D6eLZQ@mail.gmail.com>
-References: <1443699599-9693-1-git-send-email-sudipm.mukherjee@gmail.com>
- <CAJKOXPfyC8etcPe373q6Pc1qWb2zVnHE96V+Rh5mPmpzAxFjiA@mail.gmail.com>
- <20151001141243.GA5061@sudip-pc>
- <CAJKOXPdVs9i9sVP84wa2wU0qVH1-o4unvaDC+O7c1za6bJUSLw@mail.gmail.com>
- <20151008142129.GC10587@sudip-pc>
- <CAJKOXPfbrdm75n_v+dRnq8dqAFAGvHj28QQ4ZY8WZms1D6eLZQ@mail.gmail.com>
-Message-ID: <20151009140716.0c6e57b7@amdc2363>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 09 Oct 2015 14:12:36 +0200
+Subject: [PATCH] md: fix 32-bit build warning
+Message-ID: <5304496.D8N6u074t0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On 32-bit architectures, the md code produces this warning when CONFIG_LDAF
+is set:
 
-> 2015-10-08 23:21 GMT+09:00 Sudip Mukherjee
-> <sudipm.mukherjee@gmail.com>:
-> > On Fri, Oct 02, 2015 at 08:43:52AM +0900, Krzysztof Kozlowski wrote:
-> >> 2015-10-01 23:12 GMT+09:00 Sudip Mukherjee
-> >> <sudipm.mukherjee@gmail.com>:
-> >> > On Thu, Oct 01, 2015 at 10:18:57PM +0900, Krzysztof Kozlowski
-> >> > wrote:
-> >> >> 2015-10-01 20:39 GMT+09:00 Sudip Mukherjee
-> >> >> <sudipm.mukherjee@gmail.com>:
-> >> >> > The value of emul_con was getting overwritten if the selected
-> >> >> > soc is SOC_ARCH_EXYNOS5260. And so as a result we were
-> >> >> > reading from the wrong register in the case of
-> >> >> > SOC_ARCH_EXYNOS5260.
-> >> >>
-> >> >> How the value is overwritten if the soc is Exynos5260? I can't
-> >> >> see it (although the "else if" is still more obvious than "if"
-> >> >> but how does the description match the code?).
-> >> > The code here is:
-> >> > if (data->soc == SOC_ARCH_EXYNOS5260)
-> >> >         emul_con = EXYNOS5260_EMUL_CON;
-> >> > if (data->soc == SOC_ARCH_EXYNOS5433)
-> >> >         emul_con = EXYNOS5433_TMU_EMUL_CON;
-> >> > else if (data->soc == SOC_ARCH_EXYNOS7)
-> >> >         emul_con = EXYNOS7_TMU_REG_EMUL_CON;
-> >> > else
-> >> >         emul_con = EXYNOS_EMUL_CON;
-> >> >
-> >> > So if data->soc is SOC_ARCH_EXYNOS5260 , then emul_con becomes
-> >> > EXYNOS5260_EMUL_CON. But again for the else part it will become
-> >> > EXYNOS_EMUL_CON.
-> >>
-> >> Indeed!
-> >>
-> >> Fixes: 488c7455d74c ("thermal: exynos: Add the support for
-> >> Exynos5433 TMU")
-> >>
-> >> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >
-> > Hi Krzysztof,
-> > Who will pick this one up? I still do not see it in linux-next.
-> 
-> Hi!
-> 
-> I guess it is a patch for Lukasz.
-> 
-> Lukasz,
-> Do you plan to pick it up or maybe this should go through samsung-soc
-> tree?
+drivers/md/md.c: In function 'check_sb_changes':
+drivers/md/md.c:8990:10: warning: format '%lu' expects argument of type 'long unsigned int', but argument 4 has type 'sector_t {aka long long unsigned int}' [-Wformat=]
+   pr_info("%s:%d recovery_cp changed from %lu to %lu\n", __func__,
 
-This is the only one patch, which is waiting in my queue. Since no more
-fixes available, please feel free to grab this patch to samsung-soc.
+The code was only recently introduced, and uses the wrong format string
+for sector_t. As a workaround, this patch adds an explicit cast to 'u64'
+so we can use the %llu format string on all architectures.
 
-Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: e0212320066e ("md-cluster: Improve md_reload_sb to be less error prone")
+Cc: Goldwyn Rodrigues <rgoldwyn@suse.com>
+---
 
-> 
-> Best regards,
-> Krzysztof
+I also noticed that some commmits in md/for-next including the one causing
+the problem lack a Signed-off-by line. It might make sense to just fold this
+patch and add the lines at the same time.
 
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+diff --git a/drivers/md/md.c b/drivers/md/md.c
+index 7fff1e6884d6..e13f72a3b561 100644
+--- a/drivers/md/md.c
++++ b/drivers/md/md.c
+@@ -8987,9 +8987,9 @@ static void check_sb_changes(struct mddev *mddev, struct md_rdev *rdev)
+ 
+ 	/* recovery_cp changed */
+ 	if (le64_to_cpu(sb->resync_offset) != mddev->recovery_cp) {
+-		pr_info("%s:%d recovery_cp changed from %lu to %lu\n", __func__,
+-				__LINE__, mddev->recovery_cp,
+-				(unsigned long) le64_to_cpu(sb->resync_offset));
++		pr_info("%s:%d recovery_cp changed from %llu to %llu\n", __func__,
++				__LINE__, (u64)mddev->recovery_cp,
++				(u64) le64_to_cpu(sb->resync_offset));
+ 		mddev->recovery_cp = le64_to_cpu(sb->resync_offset);
+ 	}
+ 
