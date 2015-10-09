@@ -1,47 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Oct 2015 10:10:37 +0100
-Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
-In-Reply-To: <CAPAsAGz7Tp6Z87tPq_NNh_mcwPF_DOaXzu0po5f6AQxPAcsALQ@mail.gmail.com>
-References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
- <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
- <CAPAsAGz7Tp6Z87tPq_NNh_mcwPF_DOaXzu0po5f6AQxPAcsALQ@mail.gmail.com>
-Message-ID: <20151009091037.GC26278@arm.com>
+From: shengjiu.wang@freescale.com (Shengjiu Wang)
+Date: Fri, 9 Oct 2015 17:15:30 +0800
+Subject: [PATCH V2 1/2] clk: imx6: Add SPDIF_GCLK clock in clock tree
+In-Reply-To: <20150924115737.GM3529@tiger>
+References: <cover.1442310569.git.shengjiu.wang@freescale.com>
+ <113f1cecf1d83c6b96fd23ab9d7a73d1923e0d21.1442310569.git.shengjiu.wang@freescale.com>
+ <20150923153340.GK3529@tiger> <20150924054321.GA32196@shlinux2>
+ <20150924115737.GM3529@tiger>
+Message-ID: <20151009091528.GA25804@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 11:12:24AM +0300, Andrey Ryabinin wrote:
-> 2015-10-08 22:02 GMT+03:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
-> > --- a/arch/arm64/kernel/image.h
-> > +++ b/arch/arm64/kernel/image.h
-> > @@ -59,4 +59,31 @@
-> >         _kernel_offset_le       = DATA_LE64(TEXT_OFFSET);       \
-> >         _kernel_flags_le        = DATA_LE64(__HEAD_FLAGS);
-> >
-> > +#ifdef CONFIG_EFI
-> > +
-> > +/*
-> > + * The EFI stub has its own symbol namespace prefixed by __efistub_, to
-> > + * isolate it from the kernel proper. The following symbols are legally
-> > + * accessed by the stub, so provide some aliases to make them accessible.
-> > + * Only include data symbols here, or text symbols of functions that are
-> > + * guaranteed to be safe when executed at another offset than they were
-> > + * linked at. The routines below are all implemented in assembler in a
-> > + * position independent manner
-> > + */
-> > +__efistub_memcmp               = __pi_memcmp;
-> > +__efistub_memchr               = __pi_memchr;
-> > +__efistub_memcpy               = __pi_memcpy;
-> > +__efistub_memmove              = __pi_memmove;
-> > +__efistub_memset               = __pi_memset;
-> > +__efistub_strlen               = __pi_strlen;
-> > +__efistub_strcmp               = __pi_strcmp;
-> > +__efistub_strncmp              = __pi_strncmp;
-> > +__efistub___flush_dcache_area  = __pi___flush_dcache_area;
+On Thu, Sep 24, 2015 at 04:57:37AM -0700, Shawn Guo wrote:
+> On Thu, Sep 24, 2015 at 01:43:24PM +0800, Shengjiu Wang wrote:
+> > On Wed, Sep 23, 2015 at 08:33:41AM -0700, Shawn Guo wrote:
+> > > On Tue, Sep 15, 2015 at 06:01:01PM +0800, Shengjiu Wang wrote:
+> > > > As spdif driver will register SPDIF clock to regmap, regmap will do
+> > > > clk_prepare in init function, so SPDIF clock is prepared in probe, then its
+> > > > root clock (pll clock) is prepared also, which cause the arm can't enter
+> > > > low power mode.
+> > > 
+> > > Can you help me understand why ARM cannot enter low power mode when pll
+> > > clock is prepared?
+> > > 
+> > > Shawn
+> > Hi Shawn
+> > 
+> >    In i.mx clock framework, when pll clk is prepared, it will be powerup. when
+> > enterring low power idle mode, the powerdown bit is checked, when pll is not
+> > powerdown state, chip will not enter low power idle mode.
 > 
-> So why we need these __pi_* aliases?
-> We could just do __efistub_memcmp = memcmp; Right?
+> So this is not a SPDIF specific problem, and any device driver preparing
+> its clock that is a child of pll clock will run into this problem,
+> right?  If so, we should purchase a more generic solution than such
+> device specific one.
+> 
+> Shawn
+Hi shawn
 
-We *could*, but that defeats the whole purpose of tagging
-position-independent functions explicitly in the kernel text.
+SPDIF_GCLK is also spdif's clock, it use a same enable bit with SPDIF_ROOT_CLK,
+We didn't separate them in clock tree before.
 
-Will
+I can't find a generic solution. But anyway if there is a solution or not, I
+think we'd better to separate them.
+
+best regards
+wang shengjiu
