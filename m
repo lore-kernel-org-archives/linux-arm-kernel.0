@@ -1,20 +1,53 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 9 Oct 2015 22:52:48 +0200 (CEST)
-Subject: [PULL] GIC changes for Linux 4.4
-In-Reply-To: <1444404432-1992-1-git-send-email-marc.zyngier@arm.com>
-References: <1444404432-1992-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <alpine.DEB.2.11.1510092251420.6097@nanos>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 9 Oct 2015 22:56:25 +0200
+Subject: [PATCH] drm: atmel-hlcdc: add support for sama5d2 SoCs
+In-Reply-To: <1441806435-12346-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1441806435-12346-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20151009225625.7e60def2@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Oct 2015, Marc Zyngier wrote:
-> The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
+Hi Nicolas,
+
+Sorry for the late reply.
+
+On Wed, 9 Sep 2015 15:47:15 +0200
+Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+
+> As the hardware description for this chip is the same as the sama5d4, we use
+> this SoC structures for layers and DC descriptions. Thus only 2 lines are added
+> to the atmel_hlcdc_of_match table.
+> The compatible string is already documented in the parent MFD driver's binding.
 > 
->   Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-That's not the best base. tip irq/core already has gic modifications
-which conflict. Can you please rebase to tip irq/core?
+Just for the record, since Thierry already applied it in his tree:
 
-Thanks,
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-	tglx
+> ---
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> index 8bc62ec407f9..498add1e5e58 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> @@ -333,6 +333,10 @@ static const struct of_device_id atmel_hlcdc_of_match[] = {
+>  		.data = &atmel_hlcdc_dc_at91sam9x5,
+>  	},
+>  	{
+> +		.compatible = "atmel,sama5d2-hlcdc",
+> +		.data = &atmel_hlcdc_dc_sama5d4,
+> +	},
+> +	{
+>  		.compatible = "atmel,sama5d3-hlcdc",
+>  		.data = &atmel_hlcdc_dc_sama5d3,
+>  	},
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
