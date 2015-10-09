@@ -1,30 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Oct 2015 16:57:50 +0100
-Subject: [PATCH v4 3/6] iommu: add ARM short descriptor page table
- allocator.
-In-Reply-To: <1442931167.17514.39.camel@mhfsdcap03>
-References: <1438597279-2937-1-git-send-email-yong.wu@mediatek.com>
- <1438597279-2937-4-git-send-email-yong.wu@mediatek.com>
- <20150916155824.GM28771@arm.com>
- <1442501662.8145.151.camel@mhfsdcap03>
- <1442931167.17514.39.camel@mhfsdcap03>
-Message-ID: <20151009155750.GS26278@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 09 Oct 2015 17:59:41 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.3
+Message-ID: <87si5krq1e.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 03:12:47PM +0100, Yong Wu wrote:
->      I would like to show you a problem I met, The recursion here may
-> lead to stack overflow while we test FHD video decode.
-> 
->     From the log, I get the internal variable in the error case: the
-> "size" is 0x100000, the "iova" is 0xfea00000, but at that time the
-> "blk_size" is 0x1000 as it was the map of small-page. so it enter the
-> recursion here.
->     
->     After check the unmap flow, there is only a iommu_unmap in
-> __iommu_dma_unmap, and it won't check the physical address align in
-> iommu_unmap.
+Hi,
 
-That sounds like a bug in __iommu_dma_unmap. Robin?
+Here is the first pull request for fixes for mvebu for v4.3.
 
-Will
+Gregory
+
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.3-1
+
+for you to fetch changes up to d836ace65ee98d7079bc3c5afdbcc0e27dca20a3:
+
+  ARM: orion: Fix DSA platform device after mvmdio conversion (2015-10-06 16:22:37 +0200)
+
+----------------------------------------------------------------
+mvebu fixes for 4.3 (part 1)
+
+DSA fixes for orion platform
+
+----------------------------------------------------------------
+Florian Fainelli (1):
+      ARM: orion: Fix DSA platform device after mvmdio conversion
+
+ arch/arm/plat-orion/common.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
