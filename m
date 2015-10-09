@@ -1,81 +1,43 @@
-From: lars.persson@axis.com (Lars Persson)
-Date: Fri,  9 Oct 2015 17:33:33 +0200
-Subject: [PATCH 1/1] arm: Add generic smc wrapper
-In-Reply-To: <cover.1444404015.git.larper@axis.com>
-References: <cover.1444404015.git.larper@axis.com>
-Message-ID: <f25638d6fd776790f6d137ab3de761fc076c7f9f.1444404015.git.larper@axis.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Oct 2015 16:35:43 +0100
+Subject: [PATCH 2/9] pci: mvebu: fix memory leaks and refcount leaks
+In-Reply-To: <20151009171442.52988f0b@free-electrons.com>
+References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
+ <E1ZiRIs-0004Id-AN@rmk-PC.arm.linux.org.uk>
+ <20151009165240.3ba17ece@free-electrons.com>
+ <20151009150710.GJ14688@lunn.ch>
+ <20151009171442.52988f0b@free-electrons.com>
+Message-ID: <20151009153543.GX32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds an smc wrapper according to the ARM standard for secure
-monitor calling conventions (ARM DEN 0028A).
+On Fri, Oct 09, 2015 at 05:14:42PM +0200, Thomas Petazzoni wrote:
+> Julia: some of the Device Tree iterator functions have a somewhat
+> "interesting" behavior in that they take the reference on the current
+> child when entering the loop, and release it before entering the next
+> iteration (which will also take a reference to the next child).
+> 
+> This means that if you have an exit point inside the loop (break or
+> return), you are loosing a reference. For example,
+> http://lxr.free-electrons.com/source/arch/arm/mach-shmobile/pm-rmobile.c#L367
+> is wrong because there is a missing of_node_put(np) before the "return
+> -ENOMEM".
+> 
+> So essentially, every exit point in such Device Tree iteration loops
+> should make to call of_node_put() on the current element before exiting
+> the loop unexpectedly.
 
-Signed-off-by: Lars Persson <larper@axis.com>
----
- arch/arm/include/asm/smc-call.h | 12 ++++++++++++
- arch/arm/kernel/Makefile        |  3 +++
- arch/arm/kernel/smc-call.S      | 22 ++++++++++++++++++++++
- 3 files changed, 37 insertions(+)
- create mode 100644 arch/arm/include/asm/smc-call.h
- create mode 100644 arch/arm/kernel/smc-call.S
+There is an exception to that... if the loop is part of a DT node lookup
+function, which would return a DT node based on some search criteria, it
+would be valid to break out of the loop while holding a reference.
 
-diff --git a/arch/arm/include/asm/smc-call.h b/arch/arm/include/asm/smc-call.h
-new file mode 100644
-index 0000000..88a83d4
---- /dev/null
-+++ b/arch/arm/include/asm/smc-call.h
-@@ -0,0 +1,12 @@
-+/*
-+ * Wrapper for secure monitor calls using the ARM SMC calling
-+ * convention.
-+ */
-+#ifndef __ASM_SMC_CALL_H
-+#define __ASM_SMC_CALL_H
-+
-+#include <linux/types.h>
-+
-+extern int invoke_smc(u32 function_id, u32 arg0, u32 arg1, u32 arg2);
-+
-+#endif
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index af9e59b..73c95e0 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -92,4 +92,7 @@ obj-y				+= psci-call.o
- obj-$(CONFIG_SMP)		+= psci_smp.o
- endif
- 
-+obj-$(CONFIG_CPU_V6)		+= smc-call.o
-+obj-$(CONFIG_CPU_V7)		+= smc-call.o
-+
- extra-y := $(head-y) vmlinux.lds
-diff --git a/arch/arm/kernel/smc-call.S b/arch/arm/kernel/smc-call.S
-new file mode 100644
-index 0000000..a07ebf9
---- /dev/null
-+++ b/arch/arm/kernel/smc-call.S
-@@ -0,0 +1,22 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Copied from: psci-call.S.
-+ */
-+
-+#include <linux/linkage.h>
-+
-+#include <asm/opcodes-sec.h>
-+
-+/* int invoke_smc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
-+ENTRY(invoke_smc)
-+	__SMC(0)
-+	bx	lr
-+ENDPROC(invoke_smc)
+For example, of_get_child_by_name(), of_find_next_cache_node(),
+of_graph_get_port_by_id(), are valid breaker-outer cases. ;)
+
+However, of_platform_bus_probe(), of_platform_populate(),
+of_overlay_apply_one(), overlay_subtree_check() are examples of
+incorrect break-out cases.
+
 -- 
-2.1.4
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
