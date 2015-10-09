@@ -1,88 +1,31 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 9 Oct 2015 18:21:10 -0500
-Subject: [PATCH] PCI: generic: Fix address window calculation for
- non-zero starting bus.
-In-Reply-To: <1444334056-4870-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1444334056-4870-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20151009232110.GF16112@localhost>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sat, 10 Oct 2015 01:31:49 +0200
+Subject: [PATCH v3 1/7] drm/vc4: Add devicetree bindings for VC4.
+In-Reply-To: <1444426068-15817-2-git-send-email-eric@anholt.net>
+References: <1444426068-15817-1-git-send-email-eric@anholt.net>
+ <1444426068-15817-2-git-send-email-eric@anholt.net>
+Message-ID: <20151009233148.GA31997@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 12:54:16PM -0700, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> Make the offset from the beginning of the "reg" property be from the
-> starting bus number, rather than zero.  Hoist the invariant size
-> calculation out of the mapping for loop.
-> 
-> Update host-generic-pci.txt to clarify the semantics of the "reg"
-> property with respect to non-zero starting bus numbers.
-> 
-> Signed-off-by: David Daney <david.daney@cavium.com>
+Hi,
 
-Applied to pci/host-generic for v4.4 with Reviewed-by and Acked-by from
-Arnd and Rob, thanks David!
+On Fri, Oct 09, 2015 at 02:27:42PM -0700, Eric Anholt wrote:
+> VC4 is the GPU (display and 3D) subsystem present on the 2835 and some
+> other Broadcom SoCs.
+> 
+> This binding follows the model of msm, imx, sti, and others, where
+> there is a subsystem node for the whole GPU, with nodes for the
+> individual HW components within it.
 
-Bjorn
+I think it would be useful to have the acronyms written out one time
+in the document (VC4, HVS).
 
-> ---
-> This is a replacement for:
-> 
-> https://lkml.org/lkml/2015/10/2/653
-> 
-> Since that patch is getting too much push-back, this is the only other
-> option for fixing the driver to be internally consistent in its
-> treatment of the offset from "reg" to the first bus in the "bus-range"
-> property.
-> 
->  Documentation/devicetree/bindings/pci/host-generic-pci.txt | 5 +++--
->  drivers/pci/host/pci-host-generic.c                        | 4 ++--
->  2 files changed, 5 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> index cf3e205..3f1d3fc 100644
-> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> @@ -34,8 +34,9 @@ Properties of the host controller node:
->  - #size-cells    : Must be 2.
->  
->  - reg            : The Configuration Space base address and size, as accessed
-> -                   from the parent bus.
-> -
-> +                   from the parent bus.  The base address corresponds to
-> +                   the first bus in the "bus-range" property.  If no
-> +                   "bus-range" is specified, this will be bus 0 (the default).
->  
->  Properties of the /chosen node:
->  
-> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> index fe9a81b..bb93346 100644
-> --- a/drivers/pci/host/pci-host-generic.c
-> +++ b/drivers/pci/host/pci-host-generic.c
-> @@ -169,6 +169,7 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
->  	struct resource *bus_range;
->  	struct device *dev = pci->host.dev.parent;
->  	struct device_node *np = dev->of_node;
-> +	u32 sz = 1 << pci->cfg.ops->bus_shift;
->  
->  	err = of_address_to_resource(np, 0, &pci->cfg.res);
->  	if (err) {
-> @@ -196,10 +197,9 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
->  	bus_range = pci->cfg.bus_range;
->  	for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
->  		u32 idx = busn - bus_range->start;
-> -		u32 sz = 1 << pci->cfg.ops->bus_shift;
->  
->  		pci->cfg.win[idx] = devm_ioremap(dev,
-> -						 pci->cfg.res.start + busn * sz,
-> +						 pci->cfg.res.start + idx * sz,
->  						 sz);
->  		if (!pci->cfg.win[idx])
->  			return -ENOMEM;
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151010/151bf951/attachment.sig>
