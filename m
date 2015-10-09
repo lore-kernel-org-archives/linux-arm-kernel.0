@@ -1,45 +1,19 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 9 Oct 2015 11:05:47 +0200
-Subject: [PATCH v4 4/6] pinctrl: dt-binding: document berlin4ct SoC pinctrl
-In-Reply-To: <1444378629-3057-5-git-send-email-jszhang@marvell.com>
-References: <1444378629-3057-1-git-send-email-jszhang@marvell.com>
- <1444378629-3057-5-git-send-email-jszhang@marvell.com>
-Message-ID: <20151009090547.GD2842@kwain>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Oct 2015 10:07:06 +0100
+Subject: [PATCH v3] arm: Adding support for atomic
+ half word exchange
+In-Reply-To: <2070425329.784231444358514302.JavaMail.weblogic@epmlwas03b>
+References: <2070425329.784231444358514302.JavaMail.weblogic@epmlwas03b>
+Message-ID: <20151009090706.GB26278@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 04:17:07PM +0800, Jisheng Zhang wrote:
-> Add berlin4ct to existing berlin pinctrl device tree binding.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+On Fri, Oct 09, 2015 at 02:41:54AM +0000, Sarbojit Ganguly wrote:
+> Thank you Will, I will make the required corrections and mail it to
+> patchesAtarm.linux.co.uk and mark [1] as "superseded".
 
-Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Thanks. Also, you don't need to continually prepend "Re: " to your mail
+subject every time you reply and/or update the patch. Doing so breaks
+the email threading for everybody else.
 
-> ---
->  Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
-> index a8bb5e2..f8fa28c 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
-> @@ -20,7 +20,10 @@ Required properties:
->  	"marvell,berlin2cd-soc-pinctrl",
->  	"marvell,berlin2cd-system-pinctrl",
->  	"marvell,berlin2q-soc-pinctrl",
-> -	"marvell,berlin2q-system-pinctrl"
-> +	"marvell,berlin2q-system-pinctrl",
-> +	"marvell,berlin4ct-avio-pinctrl",
-> +	"marvell,berlin4ct-soc-pinctrl",
-> +	"marvell,berlin4ct-system-pinctrl"
->  
->  Required subnode-properties:
->  - groups: a list of strings describing the group names.
-> -- 
-> 2.6.1
-> 
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Will
