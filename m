@@ -1,67 +1,121 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 9 Oct 2015 08:54:33 -0500
-Subject: [PATCH 3/4] arm64: Juno: Add support for the PCIe host bridge on
- Juno R1
-In-Reply-To: <1444398323-17354-4-git-send-email-Liviu.Dudau@arm.com>
-References: <1444398323-17354-1-git-send-email-Liviu.Dudau@arm.com>
- <1444398323-17354-4-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <CAL_JsqJsb53VXiUfjGBXK37dBEi1r-PXVohg-c-7_x63R04VMA@mail.gmail.com>
+Date: Fri, 9 Oct 2015 09:08:58 -0500
+Subject: [PATCH v3] arm-soc: Add support for Sigma Designs Tango4
+In-Reply-To: <5613EF4C.30603@sigmadesigns.com>
+References: <560EAA7C.3070302@free.fr> <5124277.UR9sg1IOHT@wuerfel>
+ <560EFDB3.9010305@free.fr> <11113740.WL812ZaRcZ@wuerfel>
+ <5612A473.8030405@sigmadesigns.com>
+ <5613EF4C.30603@sigmadesigns.com>
+Message-ID: <CAL_JsqJ+WTBYF=sJWbkgNzL48H5AiXL4aoVV3DNiL6T_UQKQfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 9, 2015 at 8:45 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> Juno R1 board sports a functional PCIe host bridge that is
-> compliant with the SBSA standard found here[1]. With the right
-> firmware that initialises the XpressRICH3 controller one can
-> use the generic Host Bridge driver to use the PCIe hardware.
+On Tue, Oct 6, 2015 at 10:57 AM, Marc Gonzalez
+<marc_gonzalez@sigmadesigns.com> wrote:
+> This patch adds support for Sigma Designs "Tango4" platform, which is
+> built around the ARM Cortex A9 MPCore (single and dual core SoCs).
 >
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Tango4 is not to be confused with Tango3, which was built around a
+> MIPS 74kf CPU.
 >
-> [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0029a/
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 > ---
->  arch/arm64/boot/dts/arm/juno-r1.dts | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
+> v3 changes: Updated clock tree DT (clk driver submitted)
+> ---
+>  arch/arm/Kconfig                          |   2 +
+>  arch/arm/Makefile                         |   1 +
+>  arch/arm/boot/dts/Makefile                |   2 +
+>  arch/arm/boot/dts/tango4-vantage-1172.dts |  17 ++++
+>  arch/arm/boot/dts/tango4.dtsi             | 133 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-tangox/Kconfig              |  11 +++
+>  arch/arm/mach-tangox/Makefile             |   1 +
+>  arch/arm/mach-tangox/setup.c              |   7 ++
+>  8 files changed, 174 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/tango4-vantage-1172.dts
+>  create mode 100644 arch/arm/boot/dts/tango4.dtsi
+>  create mode 100644 arch/arm/mach-tangox/Kconfig
+>  create mode 100644 arch/arm/mach-tangox/Makefile
+>  create mode 100644 arch/arm/mach-tangox/setup.c
 >
-> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-> index c627511..a702a6b 100644
-> --- a/arch/arm64/boot/dts/arm/juno-r1.dts
-> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-> @@ -109,6 +109,26 @@
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 1c5021002fe4..94a1a0277c94 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -934,6 +934,8 @@ source "arch/arm/mach-sunxi/Kconfig"
 >
->         #include "juno-base.dtsi"
+>  source "arch/arm/mach-prima2/Kconfig"
 >
-> +       pcie-controller at 40000000 {
-> +               compatible = "pci-host-ecam-generic";
-
-I think this is the first case of real h/w using this. We should have
-a specific compatible here additionally. Perhaps the firmware did not
-setup something correctly.
-
-> +               device_type = "pci";
-> +               reg = <0 0x40000000 0 0x10000000>;      /* ECAM config space */
-> +               bus-range = <0 255>;
-> +               linux,pci-domain = <0>;
-> +               #address-cells = <3>;
-> +               #size-cells = <2>;
-> +               dma-coherent;
-> +               ranges = <0x01000000 0x00 0x5f800000 0x00 0x5f800000 0x0 0x00800000
-> +                         0x02000000 0x00 0x50000000 0x00 0x50000000 0x0 0x08000000
-> +                         0x42000000 0x40 0x00000000 0x40 0x00000000 0x1 0x00000000>;
-> +               #interrupt-cells = <1>;
-> +               interrupt-map-mask = <0 0 0 7>;
-> +               interrupt-map = <0 0 0 1 &gic 0 0 0 136 4
-> +                                0 0 0 2 &gic 0 0 0 137 4
-> +                                0 0 0 3 &gic 0 0 0 138 4
-> +                                0 0 0 4 &gic 0 0 0 139 4>;
-> +               msi-parent = <&v2m_0>;
+> +source "arch/arm/mach-tangox/Kconfig"
+> +
+>  source "arch/arm/mach-tegra/Kconfig"
+>
+>  source "arch/arm/mach-u300/Kconfig"
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 7451b447cc2d..7fcb4c63cdf7 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -203,6 +203,7 @@ machine-$(CONFIG_ARCH_SOCFPGA)              += socfpga
+>  machine-$(CONFIG_ARCH_STI)             += sti
+>  machine-$(CONFIG_ARCH_STM32)           += stm32
+>  machine-$(CONFIG_ARCH_SUNXI)           += sunxi
+> +machine-$(CONFIG_ARCH_TANGOX)          += tangox
+>  machine-$(CONFIG_ARCH_TEGRA)           += tegra
+>  machine-$(CONFIG_ARCH_U300)            += u300
+>  machine-$(CONFIG_ARCH_U8500)           += ux500
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 246473a244f6..2499295051d5 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -605,6 +605,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+>  dtb-$(CONFIG_MACH_SUN9I) += \
+>         sun9i-a80-optimus.dtb \
+>         sun9i-a80-cubieboard4.dtb
+> +dtb-$(CONFIG_ARCH_TANGOX) += \
+> +       tango4-vantage-1172.dtb
+>  dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += \
+>         tegra20-harmony.dtb \
+>         tegra20-iris-512.dtb \
+> diff --git a/arch/arm/boot/dts/tango4-vantage-1172.dts b/arch/arm/boot/dts/tango4-vantage-1172.dts
+> new file mode 100644
+> index 000000000000..3eff944e2103
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/tango4-vantage-1172.dts
+> @@ -0,0 +1,17 @@
+> +/dts-v1/;
+> +
+> +#include "tango4.dtsi"
+> +
+> +/ {
+> +       model = "Sigma Designs SMP8758 Vantage-1172 dev board";
+> +       compatible = "sigma,vantage-1172", "sigma,smp8758", "sigma,tango4";
+> +
+> +       chosen {
+> +               stdout-path = &uart;
 > +       };
->  };
->
->  &memtimer {
-> --
-> 2.6.0
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +};
+> +
+> +&eth0 {
+> +       phy-connection-type = "rgmii";
+> +       max-speed = <1000>;
+> +};
+> diff --git a/arch/arm/boot/dts/tango4.dtsi b/arch/arm/boot/dts/tango4.dtsi
+> new file mode 100644
+> index 000000000000..c682617866e9
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/tango4.dtsi
+> @@ -0,0 +1,133 @@
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +
+> +/ {
+> +       compatible = "sigma,tango4";
+> +
+> +       #address-cells = <1>;
+> +       #size-cells = <1>;
+
+No memory node?
+
+cpus node?
+
+No pl310? A9 performance mon?
+
+Rob
