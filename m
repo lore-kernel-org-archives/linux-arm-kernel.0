@@ -1,71 +1,314 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 Oct 2015 17:32:52 +0100
-Subject: [PATCH 3/4] arm64: Juno: Add support for the PCIe host bridge on
- Juno R1
-In-Reply-To: <20151009160910.GF3394@e106497-lin.cambridge.arm.com>
-References: <1444398323-17354-1-git-send-email-Liviu.Dudau@arm.com>
- <20151009141107.GD3394@e106497-lin.cambridge.arm.com>
- <20151009154408.GD21629@leverpostej> <40550712.xdsq5nNSTG@wuerfel>
- <20151009160910.GF3394@e106497-lin.cambridge.arm.com>
-Message-ID: <20151009163252.GE21629@leverpostej>
+From: joshc@ni.com (Josh Cartwright)
+Date: Fri, 9 Oct 2015 11:33:36 -0500
+Subject: [PATCH 3/3] fpga manager: Adding FPGA Manager support for Xilinx
+ Zynq 7000
+In-Reply-To: <1444344307-22509-4-git-send-email-moritz.fischer@ettus.com>
+References: <1444344307-22509-1-git-send-email-moritz.fischer@ettus.com>
+ <1444344307-22509-4-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <20151009163336.GM10631@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 05:09:10PM +0100, Liviu Dudau wrote:
-> On Fri, Oct 09, 2015 at 05:49:18PM +0200, Arnd Bergmann wrote:
-> > On Friday 09 October 2015 16:44:08 Mark Rutland wrote:
-> > > On Fri, Oct 09, 2015 at 03:11:07PM +0100, Liviu Dudau wrote:
-> > > > On Fri, Oct 09, 2015 at 08:54:33AM -0500, Rob Herring wrote:
-> > > > Or maybe I can claim the use of the string on account on being the first on arm64 
-> > > > 
-> > > > I can add a vendor prefix if you want, but pci-host-generic is going to ignore it 
-> > > > *because* it is trying to be a generic driver.
-> > > 
-> > > The point here is to have the string ready if we need it later, so it's
-> > > fine that it's not used currently.
-> > > 
-> > > Rob's suggestion is that the compatible list should look something like:
-> > > 
-> > > compatible = "arm,juno-r1-pcie", "plda,xpressrich3", "pci-host-ecam-generic";
-> > > 
-> > > We can match on "pci-host-ecam-generic" for now (and hopefully forever),
-> > > but if for some reason we need to special-case this host controller (or
-> > > Juno's integration thereof), we can do that based on the compatible
-> > > string.
-> > 
-> > Sounds good to me, it certainly can't hurt.
-> > 
-> > 	Arnd
+Hey Moritz-
+
+On Fri, Oct 09, 2015 at 12:45:07AM +0200, Moritz Fischer wrote:
+> This commit adds FPGA Manager support for the Xilinx Zynq chip.
+> The code heavily borrows from the xdevcfg driver in Xilinx'
+> vendor tree.
 > 
-> Hmm, I'm sorry, but this time I'm going to disagree.
-> 
-> I understand the principle that the DTS is a description of the
-> hardware and it should not have any built in knowledge of how a driver
-> works but describe the physical properties of the device (where such
-> description makes sense, in this case it does).
-> 
-> However, when ARM has created the Juno platform it has also created a
-> standard called SBSA and has claimed that Juno is compliant with that
-> standard. My current position (and it used to be MarkR's as well when
-> we have argued internally the pros and cons of having a bespoke driver
-> for PLDA's XpressRICH3) is that SBSA compliant behaviour *is* the
-> expected behaviour and if the device doesn't conform it needs to be
-> fixed in firmware.
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+[..]
+> +++ b/drivers/fpga/zynq-fpga.c
+[..]
+> +static irqreturn_t zynq_fpga_isr(int irq, void *data)
+> +{
+> +	u32 intr_status;
+> +	struct zynq_fpga_priv *priv = data;
+> +
+> +	spin_lock(&priv->lock);
 
-We are not arguing for a bespoke driver, and in fact we hope to never
-have to use the addition strings.
+I'm confused about the locking here.  You have this lock, but it's only
+used in the isr.  It's claimed purpose is to protect 'error', but that
+clearly isn't happening.
 
-However, experience shows that we might not be lucky, and if we
-encounter some bizarre quirk in future we might need to handle that by
-knowing what the hardware is.
+> +	intr_status = zynq_fpga_read(priv, INT_STS_OFFSET);
+> +
+> +	if (!intr_status) {
+> +		spin_unlock(&priv->lock);
+> +		return IRQ_NONE;
+> +	}
+> +
+> +	zynq_fpga_write(priv, INT_STS_OFFSET, intr_status);
+> +
+> +	if ((intr_status & IXR_D_P_DONE_MASK) == IXR_D_P_DONE_MASK)
+> +		complete(&priv->dma_done);
 
-> Otherwise, I could've posted months ago the other public driver[1]
-> that I've wrote that doesn't depend on firmware and could have been
-> done with this long time ago.
+Just so I understand, wouldn't you also want to complete() in the error
+case, too?
 
-We're not arguing for kernel support code. What we're arguing for is
-data in the DTB that ideally turns out to be irrelevant.
+> +	if ((intr_status & IXR_ERROR_FLAGS_MASK) ==
+> +			IXR_ERROR_FLAGS_MASK) {
+> +		priv->error = true;
+> +		dev_err(priv->dev, "%s dma error\n", __func__);
+> +	}
+> +	spin_unlock(&priv->lock);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+> +				    const char *buf, size_t count)
+> +{
+> +	struct zynq_fpga_priv *priv;
+> +	u32 ctrl, status;
+> +	int err;
+> +
+> +	priv = mgr->priv;
+> +
+> +	err = clk_enable(priv->clk);
+> +	if (err)
+> +		return err;
+> +
+> +	/* only reset if we're not doing partial reconfig */
+> +	if (!(flags & FPGA_MGR_PARTIAL_RECONFIG)) {
+> +		/* assert AXI interface resets */
+> +		regmap_write(priv->slcr, SLCR_FPGA_RST_CTRL_OFFSET,
+> +			     FPGA_RST_ALL_MASK);
+> +
+> +		/* disable level shifters */
+> +		regmap_write(priv->slcr, SLCR_LVL_SHFTR_EN_OFFSET,
+> +			     LVL_SHFTR_DISABLE_ALL_MASK);
+> +		/* enable output level shifters */
+> +		regmap_write(priv->slcr, SLCR_LVL_SHFTR_EN_OFFSET,
+> +			     LVL_SHFTR_ENABLE_PS_TO_PL);
+> +
+> +		/* create a rising edge on PCFG_INIT. PCFG_INIT follows
+> +		 * PCFG_PROG_B, so we need to poll it after setting PCFG_PROG_B
+> +		 * to make sure the rising edge actually happens
+> +		 */
+> +		ctrl = zynq_fpga_read(priv, CTRL_OFFSET);
+> +		ctrl |= CTRL_PCFG_PROG_B_MASK;
+> +
+> +		zynq_fpga_write(priv, CTRL_OFFSET, ctrl);
+> +
+> +		zynq_fpga_poll_timeout(priv, STATUS_OFFSET, status, status &
+> +				       STATUS_PCFG_INIT_MASK, 20, 0);
 
-I can't see why you object to that.
+And if we timeout?
 
-Mark.
+> +
+> +		ctrl = zynq_fpga_read(priv, CTRL_OFFSET);
+> +		ctrl &= ~CTRL_PCFG_PROG_B_MASK;
+> +
+> +		zynq_fpga_write(priv, CTRL_OFFSET, ctrl);
+> +
+> +		zynq_fpga_poll_timeout(priv, STATUS_OFFSET, status, !(status &
+> +				       STATUS_PCFG_INIT_MASK), 20, 0);
+
+And if we timeout?
+
+> +
+> +		ctrl = zynq_fpga_read(priv, CTRL_OFFSET);
+> +		ctrl |= CTRL_PCFG_PROG_B_MASK;
+> +
+> +		zynq_fpga_write(priv, CTRL_OFFSET, ctrl);
+> +
+> +		zynq_fpga_poll_timeout(priv, STATUS_OFFSET, status, status &
+> +				       STATUS_PCFG_INIT_MASK, 20, 0);
+
+And if we timeout?
+
+> +	}
+> +
+> +	clk_disable(priv->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+> +			       const char *buf, size_t count)
+> +{
+> +	struct zynq_fpga_priv *priv;
+> +	int err;
+> +	char *kbuf;
+> +	size_t i, in_count;
+> +	dma_addr_t dma_addr;
+> +	u32 transfer_length = 0;
+> +	bool endian_swap = false;
+> +
+> +	in_count = count;
+> +	priv = mgr->priv;
+> +
+> +	kbuf = dma_alloc_coherent(priv->dev, count, &dma_addr, GFP_KERNEL);
+> +	if (!kbuf)
+> +		return -ENOMEM;
+> +
+> +	memcpy(kbuf, buf, count);
+> +
+> +	/* look for the sync word */
+> +	for (i = 0; i < count - 4; i++) {
+> +		if (memcmp(kbuf + i, "\x66\x55\x99\xAA", 4) == 0) {
+> +			dev_dbg(priv->dev, "Found normal sync word\n");
+> +			endian_swap = false;
+> +			break;
+> +		}
+> +		if (memcmp(kbuf + i, "\xAA\x99\x55\x66", 4) == 0) {
+> +			dev_dbg(priv->dev, "Found swapped sync word\n");
+> +			endian_swap = true;
+> +			break;
+> +		}
+> +	}
+
+How much control do we have over mandating the format of firmware at
+this point?  It'd be swell if we could just mandate a specific
+endianness, and leave this munging to usermode.
+
+> +	/* remove the header, align the data on word boundary */
+> +	if (i != count - 4) {
+> +		count -= i;
+> +		memmove(kbuf, kbuf + i, count);
+> +	}
+> +
+> +	/* fixup endianness of the data */
+> +	if (endian_swap) {
+> +		for (i = 0; i < count; i += 4) {
+
+Aren't we writing beyond the buffer, if count isn't word-aligned?
+
+> +			u32 *p = (u32 *)&kbuf[i];
+> +			*p = swab32(*p);
+> +		}
+> +	}
+> +
+> +	/* enable clock */
+> +	err = clk_enable(priv->clk);
+> +	if (err)
+> +		goto out_free;
+> +
+> +	zynq_fpga_write(priv, INT_STS_OFFSET, IXR_ALL_MASK);
+> +
+> +	/* enable DMA and error IRQs */
+> +	zynq_fpga_unmask_irqs(priv);
+> +
+> +	priv->error = false;
+> +
+> +	/* the +1 in the src addr is used to hold off on DMA_DONE IRQ */
+> +	/* until both AXI and PCAP are done */
+> +	if (count < PAGE_SIZE)
+> +		zynq_fpga_write(priv, DMA_SRC_ADDR_OFFSET, (u32)(dma_addr + 1));
+> +	else
+> +		zynq_fpga_write(priv, DMA_SRC_ADDR_OFFSET, (u32)(dma_addr));
+> +
+> +	zynq_fpga_write(priv, DMA_DEST_ADDR_OFFSET, (u32)DMA_INVALID_ADDRESS);
+> +
+> +	/* convert #bytes to #words */
+> +	transfer_length = (count + 3) / 4;
+> +
+> +	zynq_fpga_write(priv, DMA_SRC_LEN_OFFSET, transfer_length);
+> +	zynq_fpga_write(priv, DMA_DEST_LEN_OFFSET, 0);
+> +
+> +	wait_for_completion_interruptible(&priv->dma_done);
+
+And if we're interrupted?
+
+> +	if (priv->error) {
+> +		dev_err(priv->dev, "Error configuring FPGA.\n");
+> +		err = -EFAULT;
+> +	}
+> +
+> +	/* disable DMA and error IRQs */
+> +	zynq_fpga_mask_irqs(priv);
+> +
+> +	clk_disable(priv->clk);
+> +
+> +out_free:
+> +	dma_free_coherent(priv->dev, in_count, kbuf, dma_addr);
+> +
+> +	return err;
+> +}
+[..]
+> +static int zynq_fpga_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct zynq_fpga_priv *priv;
+> +	struct resource *res;
+> +	u32 ctrl_reg;
+> +	int ret;
+> +
+[..]
+> +	priv->irq = platform_get_irq(pdev, 0);
+> +	if (priv->irq < 0) {
+> +		dev_err(dev, "No IRQ available");
+> +		return priv->irq;
+> +	}
+> +
+> +	ret = devm_request_irq(dev, priv->irq, zynq_fpga_isr, 0,
+> +			       dev_name(dev), priv);
+> +	if (IS_ERR_VALUE(ret))
+
+This is the wrong check for error in this case.  You should check 'ret'
+being non-zero.
+
+> +		return ret;
+> +
+> +	priv->clk = devm_clk_get(dev, "ref_clk");
+> +	if (IS_ERR(priv->clk)) {
+> +		dev_err(dev, "input clock not found\n");
+> +		return PTR_ERR(priv->clk);
+> +	}
+> +
+> +	ret = clk_prepare_enable(priv->clk);
+> +	if (ret) {
+> +		dev_err(dev, "unable to enable clock\n");
+> +		return ret;
+> +	}
+> +
+> +	/* unlock the device */
+> +	zynq_fpga_write(priv, UNLOCK_OFFSET, UNLOCK_MASK);
+> +
+> +	/* set configuration register with following options:
+> +	* - reset FPGA
+> +	* - enable PCAP interface for partial reconfig
+> +	* - set throughput for maximum speed
+> +	* - set CPU in user mode
+> +	*/
+> +	ctrl_reg = zynq_fpga_read(priv, CTRL_OFFSET);
+> +	zynq_fpga_write(priv, CTRL_OFFSET, (CTRL_PCFG_PROG_B_MASK |
+> +		CTRL_PCAP_PR_MASK | CTRL_PCAP_MODE_MASK | ctrl_reg));
+> +
+> +	/* ensure internal PCAP loopback is disabled */
+> +	ctrl_reg = zynq_fpga_read(priv, MCTRL_OFFSET);
+> +	zynq_fpga_write(priv, MCTRL_OFFSET, (~MCTRL_PCAP_LPBK_MASK & ctrl_reg));
+
+Why do all of this initialization in probe()?  Is it necessary to read
+FPGA state()?
+>
+> +
+> +	ret = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
+> +				&zynq_fpga_ops, priv);
+> +	if (ret) {
+> +		dev_err(dev, "unable to register FPGA manager");
+> +		clk_disable_unprepare(priv->clk);
+> +		return ret;
+> +	}
+
+I would have expected the clock to have been disabled after even a
+successful probe.
+
+> +	return 0;
+> +}
+> +
+> +static int zynq_fpga_remove(struct platform_device *pdev)
+> +{
+> +	fpga_mgr_unregister(&pdev->dev);
+
+Your clock management is unbalanced.
+
+  Josh
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151009/1eaf3c95/attachment.sig>
