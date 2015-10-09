@@ -1,28 +1,56 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 9 Oct 2015 08:24:24 +0100
-Subject: [PATCH v2 0/3] hwrng: st: Couple of improvements
-In-Reply-To: <20151008142340.GD25166@gondor.apana.org.au>
-References: <1444220609-31251-1-git-send-email-lee.jones@linaro.org>
- <20151008142340.GD25166@gondor.apana.org.au>
-Message-ID: <20151009072424.GM17172@x1>
+Date: Fri, 9 Oct 2015 08:27:00 +0100
+Subject: [PATCH v4 8/8] ARM: multi_v7_defconfig: Add rockchip audio support
+In-Reply-To: <1444311079-2892-9-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1444311079-2892-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <1444311079-2892-9-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <20151009072700.GN17172@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 08 Oct 2015, Herbert Xu wrote:
+Thanks an awful lot of people you've spammed there.
 
-> On Wed, Oct 07, 2015 at 01:23:26PM +0100, Lee Jones wrote:
-> > This set contains a minor documentation fix, greater clarification
-> > with how the FIFO depth/size is represented and finally a fix to
-> > prevent early timeout during data acquisition.
-> > 
-> > v1 => v2:
-> >  - Remove phantom bugfix (FIFO really is 4 deep, not 8)
-> >  - Double timeout value to account for inconsistent call to udelay()
-> >    - Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Are you sure they all care about your Rockchip changes?
+
+Hint: I'm sure that they don't.
+
+Please be careful and only send patches to relevant people.
+
+> Enable support for audio device found on rockchip boards.
 > 
-> All applied.  Thanks.
-
-Thanks Herbert.
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> ---
+> 
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  arch/arm/configs/multi_v7_defconfig | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 03deb7f..febce7e 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -478,6 +478,10 @@ CONFIG_SND_USB_AUDIO=y
+>  CONFIG_SND_SOC=m
+>  CONFIG_SND_ATMEL_SOC=m
+>  CONFIG_SND_ATMEL_SOC_WM8904=m
+> +CONFIG_SND_SOC_ROCKCHIP=m
+> +CONFIG_SND_SOC_ROCKCHIP_SPDIF=m
+> +CONFIG_SND_SOC_ROCKCHIP_MAX98090=m
+> +CONFIG_SND_SOC_ROCKCHIP_RT5645=m
+>  CONFIG_SND_SOC_SH4_FSI=m
+>  CONFIG_SND_SOC_RCAR=m
+>  CONFIG_SND_SOC_RSRC_CARD=m
+> @@ -489,6 +493,7 @@ CONFIG_SND_SOC_TEGRA_TRIMSLICE=m
+>  CONFIG_SND_SOC_TEGRA_ALC5632=m
+>  CONFIG_SND_SOC_TEGRA_MAX98090=m
+>  CONFIG_SND_SOC_AK4642=m
+> +CONFIG_SND_SOC_SPDIF=m
+>  CONFIG_SND_SOC_WM8978=m
+>  CONFIG_USB=y
+>  CONFIG_USB_XHCI_HCD=y
 
 -- 
 Lee Jones
