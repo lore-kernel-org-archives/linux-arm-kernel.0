@@ -1,22 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 09 Oct 2015 17:12:08 +0200
-Subject: [GIT PULL 2/2] Rockchip dts32 changes for 4.4
-In-Reply-To: <12464097.evEmzqNxWf@phil>
-References: <160496219.B4xWx83NpX@phil> <12464097.evEmzqNxWf@phil>
-Message-ID: <5005279.8ZW1cGH2Tj@wuerfel>
+Date: Fri, 09 Oct 2015 17:13:31 +0200
+Subject: [PATCH] arm64: defconfig: Enable devices for MSM8916
+In-Reply-To: <1444336628-21855-1-git-send-email-agross@codeaurora.org>
+References: <1444336628-21855-1-git-send-email-agross@codeaurora.org>
+Message-ID: <5719863.ZH1B4tCvb1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 October 2015 02:52:35 Heiko Stuebner wrote:
-> DTS changes including one new Veyron-board and the Radxa Rock2
-> system-on-module as well as the square baseboard. On top of that
-> a lot of mmc-related changes to improve speeds on the Cortex-A9
-> socs and also setting up the supplies for rk3288 mmc-controllers
-> for the following mmc-tuning support. And of course the dts-part
-> of the rk3288 power-domains.
+On Thursday 08 October 2015 15:37:08 Andy Gross wrote:
+> This patch enables a number of devices currently supported by the MSM8916
+> boards.  These include I2C, SPI, DMA, SMEM, SMD, and SMD regulator support.
 > 
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
 > 
 
-Pulled into next/dt, thanks!
+
+Merged into next/defconfig, thanks!
 
 	Arnd
