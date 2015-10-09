@@ -1,134 +1,115 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 9 Oct 2015 09:48:04 -0500
-Subject: [PATCH v3] arm-soc: Add support for Sigma Designs Tango4
-In-Reply-To: <5617CC48.2020904@sigmadesigns.com>
-References: <560EAA7C.3070302@free.fr> <5124277.UR9sg1IOHT@wuerfel>
- <560EFDB3.9010305@free.fr> <11113740.WL812ZaRcZ@wuerfel>
- <5612A473.8030405@sigmadesigns.com>
- <5613EF4C.30603@sigmadesigns.com>
- <CAL_JsqJ+WTBYF=sJWbkgNzL48H5AiXL4aoVV3DNiL6T_UQKQfg@mail.gmail.com>
- <5617CC48.2020904@sigmadesigns.com>
-Message-ID: <CAL_JsqJtWpwfoiP2N7JZA00aP7GHwaQYOJ-kabdBC6=EqgdU5A@mail.gmail.com>
+From: m-karicheri2@ti.com (Karicheri, Muralidharan)
+Date: Fri, 9 Oct 2015 14:48:15 +0000
+Subject: [GIT PULL 1/3] Keystone SOC driver updates for 4.4
+In-Reply-To: <5673608.IRgyBTXroY@wuerfel>
+References: <1444151960-4941-1-git-send-email-ssantosh@kernel.org>
+ <5870815.PiO7rCVXjJ@wuerfel> <56169E38.1050803@ti.com>
+ <5673608.IRgyBTXroY@wuerfel>
+Message-ID: <3E54258959B69E4282D79E01AB1F32B704B93FF7@DFLE11.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 9, 2015 at 9:16 AM, Marc Gonzalez
-<marc_gonzalez@sigmadesigns.com> wrote:
-> On 09/10/2015 16:08, Rob Herring wrote:
->
->> Marc Gonzalez wrote:
->>
->>> This patch adds support for Sigma Designs "Tango4" platform, which is
->>> built around the ARM Cortex A9 MPCore (single and dual core SoCs).
->>>
->>> Tango4 is not to be confused with Tango3, which was built around a
->>> MIPS 74kf CPU.
->>>
->>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->>> ---
->>> v3 changes: Updated clock tree DT (clk driver submitted)
->>> ---
->>>  arch/arm/Kconfig                          |   2 +
->>>  arch/arm/Makefile                         |   1 +
->>>  arch/arm/boot/dts/Makefile                |   2 +
->>>  arch/arm/boot/dts/tango4-vantage-1172.dts |  17 ++++
->>>  arch/arm/boot/dts/tango4.dtsi             | 133 ++++++++++++++++++++++++++++++
->>>  arch/arm/mach-tangox/Kconfig              |  11 +++
->>>  arch/arm/mach-tangox/Makefile             |   1 +
->>>  arch/arm/mach-tangox/setup.c              |   7 ++
->>>  8 files changed, 174 insertions(+)
->>>  create mode 100644 arch/arm/boot/dts/tango4-vantage-1172.dts
->>>  create mode 100644 arch/arm/boot/dts/tango4.dtsi
->>>  create mode 100644 arch/arm/mach-tangox/Kconfig
->>>  create mode 100644 arch/arm/mach-tangox/Makefile
->>>  create mode 100644 arch/arm/mach-tangox/setup.c
->>>
->>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->>> index 1c5021002fe4..94a1a0277c94 100644
->>> --- a/arch/arm/Kconfig
->>> +++ b/arch/arm/Kconfig
->>> @@ -934,6 +934,8 @@ source "arch/arm/mach-sunxi/Kconfig"
->>>
->>>  source "arch/arm/mach-prima2/Kconfig"
->>>
->>> +source "arch/arm/mach-tangox/Kconfig"
->>> +
->>>  source "arch/arm/mach-tegra/Kconfig"
->>>
->>>  source "arch/arm/mach-u300/Kconfig"
->>> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
->>> index 7451b447cc2d..7fcb4c63cdf7 100644
->>> --- a/arch/arm/Makefile
->>> +++ b/arch/arm/Makefile
->>> @@ -203,6 +203,7 @@ machine-$(CONFIG_ARCH_SOCFPGA)              += socfpga
->>>  machine-$(CONFIG_ARCH_STI)             += sti
->>>  machine-$(CONFIG_ARCH_STM32)           += stm32
->>>  machine-$(CONFIG_ARCH_SUNXI)           += sunxi
->>> +machine-$(CONFIG_ARCH_TANGOX)          += tangox
->>>  machine-$(CONFIG_ARCH_TEGRA)           += tegra
->>>  machine-$(CONFIG_ARCH_U300)            += u300
->>>  machine-$(CONFIG_ARCH_U8500)           += ux500
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>> index 246473a244f6..2499295051d5 100644
->>> --- a/arch/arm/boot/dts/Makefile
->>> +++ b/arch/arm/boot/dts/Makefile
->>> @@ -605,6 +605,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
->>>  dtb-$(CONFIG_MACH_SUN9I) += \
->>>         sun9i-a80-optimus.dtb \
->>>         sun9i-a80-cubieboard4.dtb
->>> +dtb-$(CONFIG_ARCH_TANGOX) += \
->>> +       tango4-vantage-1172.dtb
->>>  dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += \
->>>         tegra20-harmony.dtb \
->>>         tegra20-iris-512.dtb \
->>> diff --git a/arch/arm/boot/dts/tango4-vantage-1172.dts b/arch/arm/boot/dts/tango4-vantage-1172.dts
->>> new file mode 100644
->>> index 000000000000..3eff944e2103
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/tango4-vantage-1172.dts
->>> @@ -0,0 +1,17 @@
->>> +/dts-v1/;
->>> +
->>> +#include "tango4.dtsi"
->>> +
->>> +/ {
->>> +       model = "Sigma Designs SMP8758 Vantage-1172 dev board";
->>> +       compatible = "sigma,vantage-1172", "sigma,smp8758", "sigma,tango4";
->>> +
->>> +       chosen {
->>> +               stdout-path = &uart;
->>> +       };
->>> +};
->>> +
->>> +&eth0 {
->>> +       phy-connection-type = "rgmii";
->>> +       max-speed = <1000>;
->>> +};
->>> diff --git a/arch/arm/boot/dts/tango4.dtsi b/arch/arm/boot/dts/tango4.dtsi
->>> new file mode 100644
->>> index 000000000000..c682617866e9
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/tango4.dtsi
->>> @@ -0,0 +1,133 @@
->>> +#include <dt-bindings/interrupt-controller/irq.h>
->>> +
->>> +/ {
->>> +       compatible = "sigma,tango4";
->>> +
->>> +       #address-cells = <1>;
->>> +       #size-cells = <1>;
->>
->> No memory node?
->>
->> cpus node?
->>
->> No pl310? A9 performance mon?
->
-> Can't these nodes be added at a later time?
+Arnd,
 
-IMO, no, you add anything for which bindings already exist. For
-bindings you have to figure out sure, those can come later. Certainly
-the memory node should be there. Bootloaders generally only expect to
-adjust the memory range, not add everything.
+>-----Original Message-----
+>From: Arnd Bergmann [mailto:arnd at arndb.de]
+>Sent: Thursday, October 08, 2015 3:17 PM
+>To: Karicheri, Muralidharan
+>Cc: Santosh Shilimkar; olof at lixom.net; arm at kernel.org; linux-arm-
+>kernel at lists.infradead.org; khilman at kernel.org
+>Subject: Re: [GIT PULL 1/3] Keystone SOC driver updates for 4.4
+>
+>On Thursday 08 October 2015 12:47:52 Murali Karicheri wrote:
+>> Arnd,
+>>
+>> On 10/08/2015 11:41 AM, Arnd Bergmann wrote:
+>> > On Tuesday 06 October 2015 10:19:18 Santosh Shilimkar wrote:
+>> >> Couple of patches for ARM Keystone SOC drivers
+>> >>          - irq affinity bug fix
+>> >>          - display the firmware name
+>> >>
+>> >> ----------------------------------------------------------------
+>> >> Murali Karicheri (2):
+>> >>        soc: ti: reset irq affinity before freeing irq
+>> >>        soc: ti: display firmware file name as part of boot log
+>> >>
+>> >>   .../bindings/soc/ti/keystone-navigator-qmss.txt      | 20
+>+++++++++++++++++++-
+>> >>   drivers/soc/ti/knav_qmss_acc.c                       |  4 ++++
+>> >>   drivers/soc/ti/knav_qmss_queue.c                     |  3 +++
+>> >>   3 files changed, 26 insertions(+), 1 deletion(-)
+>> >
+>> > The new text you add to the binding document doesn't really seem to
+>> > belong in there, so I'm not pulling this until we've discussed how
+>> > this should be better handled.
+>> >
+>> > Ideally, the firmware should just get merged into the
+>> > linux-firmware.git tree.
+>>
+>> I have got the firmware merged to the linux-firmware.git. I will post
+>> a patch to change the document to reflect that. Will it suffice?
+>
+>The binding document isn't really the right place for that. It's certainly good to document
+>this, but somewhere else would be more appropriate.
+>
+>How about the Kconfig text for this driver?
 
-Rob
+Ok. Make sense. I will add the information to the QMSS Kconfig option description.
+
+Murali
+>
+>> > Regarding the method of storing the firmware file name in DT, we
+>> > recently had a longer discussion about that and basically concluded
+>> > that this doesn't work for most devices, in particular when the
+>> > communication between the driver and the firmware uses an interface
+>> > that is not 100% stable and can change depending on the firmware
+>> > blob.
+>> >
+>> > Can you guarantee that there will never be changes to the interface?
+>> This firmware is in use for almost 3 years for now on K2 SoCs, but in
+>> a different kernel version. The interface itself is used not only by
+>> Linux OS, but other OS as well. So it is not expected to change in the
+>> future as backward compatibility will be an issue for other OS as well.
+>
+>Ok.
+>
+>> > If not, we should try to come up with a better mechanism here, and
+>> > only provide the current method for backwards compatibility.
+>> Assuming we need to change interface in the future, How is this
+>> handled in other devices? Do they have something like a version to
+>> check compatibility between software and firmware? As this firmware
+>> has been frozen for almost 3 years, I wouldn't expect any change to
+>> it. Could you point me to the thread where this was discussed in the
+>> past. Also in my experience, mostly changes are to the firmware
+>> itself, but not to the interface. In such cases, do we keep the name
+>> of firmware in DT without version information so that in the file
+>> system, user could  create a soft link to the firmware matching with
+>> the DT name. So this way as long as interface doesn't change, firmware
+>> upgrade is possible. If you agree, I can send an incremental patch to
+>> rename the firmware to exclude the version information.
+>
+>Normally, the firmware name is fixed in the driver. If the API changes in order to support a
+>new feature, the driver of course needs to be aware of that, but it should not require a device
+>tree change to update the file name.
+>
+>Conversely, if you get a new chip that needs a slightly different blob but has an identical API,
+>the driver should ideally not need to be changed, but still see  a new file name.
+>
+>The first can be done once you need it, e.g. by appending the number of the API version to
+>the file name inside of the driver, and trying the highest version supported by the driver first,
+>before falling back to older version in reverse order until the oldest version that is supported
+>by the driver.
+>
+>The second one basically depends on the "compatible" string of the device, which identifies
+>which device you have. The driver can then look up the file name for each device it supports
+>based on this string, and by using multiple compatible strings in DT, you can provide the
+>specific version of the hardware that is used for the file name without having to match that
+>hardware name in the driver
+>
+>> W.r.t to the patch for documentation update, can I send an incremental
+>> patch to the update the linux-firmware.git reference as well?
+>
+>I'd rather skip that documentation change until we have decided on how to handle the
+>firmware loading in the future.
+>
+>	Arnd
