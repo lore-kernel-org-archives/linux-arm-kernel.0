@@ -1,184 +1,111 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 9 Oct 2015 20:13:56 +0800
-Subject: [PATCH v2 2/5] mmc: sdhci-pxav3: enable usage of DAT3 pin as HW
- card detect
-In-Reply-To: <1444352635-21965-3-git-send-email-mw@semihalf.com>
-References: <1444352635-21965-1-git-send-email-mw@semihalf.com>
- <1444352635-21965-3-git-send-email-mw@semihalf.com>
-Message-ID: <20151009201356.78488116@xhacker>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Oct 2015 13:26:02 +0100
+Subject: [PATCH v3] arm: Adding support for atomic half word exchange
+In-Reply-To: <254593560.800231444389001687.JavaMail.weblogic@epmlwas03b>
+References: <254593560.800231444389001687.JavaMail.weblogic@epmlwas03b>
+Message-ID: <20151009122602.GO32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Oct 2015 03:03:52 +0200
-Marcin Wojtas <mw@semihalf.com> wrote:
-
-> Marvell Armada 38x SDHCI controller enable using DAT3 pin as a hardware
-> card detection. According to the SD sdandard this signal can be used for
-> this purpose combined with a pull-up resistor, implying inverted (active
-> low) polarization of a card detect. MMC standard does not support this
-> feature and does not operate with such connectivity of DAT3.
+On Fri, Oct 09, 2015 at 11:10:02AM +0000, Sarbojit Ganguly wrote:
+> Hello Will,
 > 
-> When using DAT3-based detection Armada 38x SDIO IP expects its internal
-> clock to be always on, which had to be ensured twofold:
-
-What happen if runtime suspend disables its core clk and axi clk? I guess
-dat3-based detection isn't compatible with runtime pm. If so, do we also
-need to disable runtime pm in probe function?
-
-> - Each time controller is reset by updating appropriate registers. On the
->   occasion of adding new register @0x104, register @0x100 name is modified
->   in order to the be aligned with Armada 38x documentation.
-> - Leaving the clock enabled despite power-down. For this purpose a new
->   quirk had to be added to SDHCI subsystem - SDHCI_QUIRK2_KEEP_INT_CLK_ON.
-
-As seen from other mails, Ulf calls for no more quirks...
-
-Thanks,
-Jisheng
-
+> Thank you so much for your patience. My sincere apologies with the issues with
+> formatting. I have taken care of them and hope now things are ok.
 > 
-> In addition to the changes above this commit adds a new property to Armada
-> 38x SDHCI node ('dat3-cd') with an according binding documentation update.
+> - Included patchesATarm.linux.org.uk.
+> - Removed the changelog from commit message.
+> - Moved the patch to "superseded" in patch system.
+> - Corrected the truncated Signed-off line.
 > 
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+> KernelVersion: 4.3-rc4
+> 
+> Since support for half-word atomic exchange was not there and Qspinlock on ARM
+> requires it, modified __xchg() to add support for that as well. ARMv6 and lower
+> does not support ldrex{b,h} so, added a guard code to prevent build breaks.
+> 
+> Signed-off-by: Sarbojit Ganguly <ganguly.s@samsung.com>
 > ---
->  .../devicetree/bindings/mmc/sdhci-pxa.txt          |  5 +++
->  drivers/mmc/host/sdhci-pxav3.c                     | 38 ++++++++++++++++++++--
->  drivers/mmc/host/sdhci.c                           |  5 ++-
->  drivers/mmc/host/sdhci.h                           |  3 ++
->  4 files changed, 47 insertions(+), 4 deletions(-)
+
+The commit message is everything above the "---" line.  It starts
+with the subject line, a blank line, and then "Hello Will,".
+
+I'll fix up the commit message this time, but please take note for
+future patches.
+
+You're also the first one to send a patch where the body _inside_ the
+base64 container has CRLF line endings...
+
+>  arch/arm/include/asm/cmpxchg.h | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-> index 3d1b449..ffd6b14 100644
-> --- a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-> +++ b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-> @@ -23,6 +23,11 @@ Required properties:
+> diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
+> index 916a274..97882f9 100644
+> --- a/arch/arm/include/asm/cmpxchg.h
+> +++ b/arch/arm/include/asm/cmpxchg.h
+> @@ -39,6 +39,7 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
 >  
->  Optional properties:
->  - mrvl,clk-delay-cycles: Specify a number of cycles to delay for tuning.
-> +- dat3-cd: use DAT3 pin as hardware card detect - option available for
-> +  "marvell,armada-380-sdhci" only. The detection is supposed to work with
-> +  active high polarity, which implies usage of "cd-inverted" property.
-> +  Note that according to the specifications DAT3-based card detection can be
-> +  used with SD cards only. MMC standard doesn't support this feature.
->  
->  Example:
->  
-> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-> index 76b9a70..352c5eb 100644
-> --- a/drivers/mmc/host/sdhci-pxav3.c
-> +++ b/drivers/mmc/host/sdhci-pxav3.c
-> @@ -46,10 +46,14 @@
->  #define SDCLK_DELAY_SHIFT	9
->  #define SDCLK_DELAY_MASK	0x1f
->  
-> -#define SD_CFG_FIFO_PARAM       0x100
-> +#define SD_EXTRA_PARAM_REG	0x100
->  #define SDCFG_GEN_PAD_CLK_ON	(1<<6)
->  #define SDCFG_GEN_PAD_CLK_CNT_MASK	0xFF
->  #define SDCFG_GEN_PAD_CLK_CNT_SHIFT	24
-> +#define SD_FIFO_PARAM_REG	0x104
-> +#define SD_USE_DAT3		BIT(7)
-> +#define SD_OVRRD_CLK_OEN	BIT(11)
-> +#define SD_FORCE_CLK_ON		BIT(12)
->  
->  #define SD_SPI_MODE          0x108
->  #define SD_CE_ATA_1          0x10C
-> @@ -163,6 +167,15 @@ static int armada_38x_quirks(struct platform_device *pdev,
->  	}
->  	host->caps1 &= ~(SDHCI_SUPPORT_SDR104 | SDHCI_USE_SDR50_TUNING);
->  
-> +	/*
-> +	 * The interface clock enable is also used as control
-> +	 * for the A38x SDIO IP, so it can't be powered down
-> +	 * when using HW-based card detection.
-> +	 */
-> +	if (of_property_read_bool(np, "dat3-cd") &&
-> +	    !of_property_read_bool(np, "broken-cd"))
-> +		host->quirks2 |= SDHCI_QUIRK2_KEEP_INT_CLK_ON;
-> +
->  	return 0;
->  }
->  
-> @@ -170,6 +183,8 @@ static void pxav3_reset(struct sdhci_host *host, u8 mask)
->  {
->  	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
->  	struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
-> +	struct device_node *np = pdev->dev.of_node;
-> +	u32 reg_val;
->  
->  	sdhci_reset(host, mask);
->  
-> @@ -187,6 +202,22 @@ static void pxav3_reset(struct sdhci_host *host, u8 mask)
->  			tmp |= SDCLK_SEL;
->  			writew(tmp, host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
->  		}
-> +
-> +		if (of_device_is_compatible(np, "marvell,armada-380-sdhci") &&
-> +		    host->quirks2 & SDHCI_QUIRK2_KEEP_INT_CLK_ON) {
-> +			reg_val = sdhci_readl(host, SD_FIFO_PARAM_REG);
-> +			reg_val |= SD_USE_DAT3 | SD_OVRRD_CLK_OEN |
-> +				   SD_FORCE_CLK_ON;
-> +			sdhci_writel(host, reg_val, SD_FIFO_PARAM_REG);
-> +
-> +			/*
-> +			 * For HW detection based on DAT3 pin keep internal
-> +			 * clk switched on after controller reset.
-> +			 */
-> +			reg_val = sdhci_readl(host, SDHCI_CLOCK_CONTROL);
-> +			reg_val |= SDHCI_CLOCK_INT_EN;
-> +			sdhci_writel(host, reg_val, SDHCI_CLOCK_CONTROL);
-> +		}
->  	}
->  }
->  
-> @@ -214,9 +245,9 @@ static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
->  		writew(tmp, host->ioaddr + SD_CE_ATA_2);
->  
->  		/* start sending the 74 clocks */
-> -		tmp = readw(host->ioaddr + SD_CFG_FIFO_PARAM);
-> +		tmp = readw(host->ioaddr + SD_EXTRA_PARAM_REG);
->  		tmp |= SDCFG_GEN_PAD_CLK_ON;
-> -		writew(tmp, host->ioaddr + SD_CFG_FIFO_PARAM);
-> +		writew(tmp, host->ioaddr + SD_EXTRA_PARAM_REG);
->  
->  		/* slowest speed is about 100KHz or 10usec per clock */
->  		udelay(740);
-> @@ -410,6 +441,7 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
->  		sdhci_get_of_property(pdev);
->  		pdata = pxav3_get_mmc_pdata(dev);
->  		pdev->dev.platform_data = pdata;
-> +
->  	} else if (pdata) {
->  		/* on-chip device */
->  		if (pdata->flags & PXA_FLAG_CARD_PERMANENT)
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 64b7fdb..cfed695 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1159,7 +1159,10 @@ void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
->  
->  	host->mmc->actual_clock = 0;
->  
-> -	sdhci_writew(host, 0, SDHCI_CLOCK_CONTROL);
-> +	/* Some controllers need to keep internal clk always enabled */
-> +	if (host->quirks2 & SDHCI_QUIRK2_KEEP_INT_CLK_ON)
-> +		clk = SDHCI_CLOCK_INT_EN;
-> +	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
->  
->  	if (clock == 0)
->  		return;
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index 7c02ff4..c751b78 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -412,6 +412,9 @@ struct sdhci_host {
->  #define SDHCI_QUIRK2_ACMD23_BROKEN			(1<<14)
->  /* Broken Clock divider zero in controller */
->  #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
-> +/* Do not disable internal clk on power-off */
-> +#define SDHCI_QUIRK2_KEEP_INT_CLK_ON			(1<<16)
-> +
->  
->  	int irq;		/* Device IRQ */
->  	void __iomem *ioaddr;	/* Mapped address */
+>  	switch (size) {
+>  #if __LINUX_ARM_ARCH__ >= 6
+> +#ifndef CONFIG_CPU_V6 /* MIN ARCH >= V6K */
+>  	case 1:
+>  		asm volatile("@	__xchg1\n"
+>  		"1:	ldrexb	%0, [%3]\n"
+> @@ -49,6 +50,17 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+>  			: "r" (x), "r" (ptr)
+>  			: "memory", "cc");
+>  		break;
+> +	case 2:
+> +		asm volatile("@	__xchg2\n"
+> +		"1:	ldrexh	%0, [%3]\n"
+> +		"	strexh	%1, %2, [%3]\n"
+> +		"	teq	%1, #0\n"
+> +		"	bne	1b"
+> +			: "=&r" (ret), "=&r" (tmp)
+> +			: "r" (x), "r" (ptr)
+> +			: "memory", "cc");
+> +		break;
+> +#endif
+>  	case 4:
+>  		asm volatile("@	__xchg4\n"
+>  		"1:	ldrex	%0, [%3]\n"
+> -- 
+> 1.9.1
+> 
+> Sarbojit
+> 
+> ------- Original Message -------
+> Sender : Will Deacon<will.deacon@arm.com>
+> Date : Oct 08, 2015 22:26 (GMT+05:30)
+> Title : Re: Re: Re: Re: Re: [PATCH v3] arm: Adding support for atomic half word exchange
+> 
+> On Wed, Oct 07, 2015 at 02:36:41PM +0000, Sarbojit Ganguly wrote:
+> > Please have a look at this patch, please let me know if any modification
+> > is required.
+> > I have also submitted the same in your patch system.
+> 
+> There are some problems with the version in the patch system[1]:
+> 
+>   (1) You still have the changelog in the commit message (I asked you to
+>       remove this last time).
+> 
+>   (2) The commit message isn't line-wrapper appropriately
+> 
+>   (3) Your Signed-off-by line is truncated
+> 
+> The patch system does actually support git, so you can add:
+> 
+>   KernelVersion: 4.3-rc4
+> 
+> or whatever kernel you based your patch on somewhere after your SoB but
+> before the diff and then mail it to patchesATarm.linux.org.uk. You
+> probably also want to move the current patch to "superseded" so Russell
+> doesn't end up with two copies.
+> 
+> Will
+> 
+> [1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8442/1
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
