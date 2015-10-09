@@ -1,17 +1,14 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri,  9 Oct 2015 20:48:14 +0200
-Subject: [GIT PULL 3/3] ARM: berlin: SoC changes for v4.4 (round 1)
-In-Reply-To: <1444416494-3117-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1444416494-3117-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1444416494-3117-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Fri,  9 Oct 2015 20:48:49 +0200
+Subject: [GIT PULL 1/2] ARM64: berlin: DT changes for v4.4 (round 1)
+Message-ID: <1444416530-3207-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Arnd, Kevin, Olof,
 
-this is Marvell Berlin SoC changes for v4.4. It only contains a
-single patch to register a cpufreq-dt device that we have properties
-for now.
+this is Marvell Berlin ARM64 DT changes round 1 for v4.4. Jisheng
+from Marvell added GPIO nodes and a new board for the BG4-CT SoC.
 
 Please pull.
 
@@ -23,19 +20,24 @@ The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
 are available in the git repository at:
 
-  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-soc-for-4.4-1
+  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin64-dt-for-4.4-1
 
-for you to fetch changes up to e1a3e724a25761a2b2e9e0e059e33afac6409a76:
+for you to fetch changes up to 59995f55973e23d957f1dad13446554f6aef73d0:
 
-  ARM: berlin: register cpufreq-dt (2015-09-21 22:57:24 +0200)
-
-----------------------------------------------------------------
-Marvell SoC for 4.4 take 1
-- register cpufreq-dt device
+  arm64: dts: add dts file for Marvell Berlin4CT STB board (2015-09-20 21:04:02 +0200)
 
 ----------------------------------------------------------------
-Antoine Tenart (1):
-      ARM: berlin: register cpufreq-dt
+Marvell Berlin ARM64 DT for 4.4 take 1
+- add BG4CT GPIO nodes
+- add BG4CT STB reference board
 
- arch/arm/mach-berlin/berlin.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+----------------------------------------------------------------
+Jisheng Zhang (2):
+      arm64: dts: berlin4ct: add GPIO nodes
+      arm64: dts: add dts file for Marvell Berlin4CT STB board
+
+ arch/arm64/boot/dts/marvell/Makefile          |   1 +
+ arch/arm64/boot/dts/marvell/berlin4ct-stb.dts |  66 ++++++++++++++
+ arch/arm64/boot/dts/marvell/berlin4ct.dtsi    | 120 ++++++++++++++++++++++++++
+ 3 files changed, 187 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
