@@ -1,98 +1,60 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 09 Oct 2015 18:17:02 -0400
-Subject: [PATCH 16/20] fbdev: switch from ioremap_wt to memremap
-In-Reply-To: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
-References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <20151009221702.32203.34504.stgit@dwillia2-desk3.jf.intel.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 10 Oct 2015 00:31:22 +0200
+Subject: [PATCH v2 0/8] mmc: dw_mmc-rockchip: allow tuning using the
+ clk-phase api
+In-Reply-To: <CAD=FV=VaZQcbgByQOAQL4qDCCOb_pNRHnXBS77L8D-dc_eYR5A@mail.gmail.com>
+References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
+ <CAD=FV=XdVt5Uop5WAUv6vY3=qPksnc9HzR4C9CBWpXJKuteTEQ@mail.gmail.com>
+ <CAD=FV=VaZQcbgByQOAQL4qDCCOb_pNRHnXBS77L8D-dc_eYR5A@mail.gmail.com>
+Message-ID: <9143852.fAJ0a7C1AC@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for deprecating ioremap_wt() convert its usage in
-drivers/video/fbdev to memremap.
+Am Freitag, 9. Oktober 2015, 13:11:21 schrieb Doug Anderson:
+> Hi,
+> 
+> On Fri, Oct 9, 2015 at 10:19 AM, Doug Anderson <dianders@chromium.org> 
+wrote:
+> > Hi,
+> > 
+> > On Fri, Oct 9, 2015 at 1:10 AM, Ulf Hansson <ulf.hansson@linaro.org> 
+wrote:
+> >> Dough, Heiko,
+> >> 
+> >> This patchset seems to be causing a boot regression for
+> >> exynos5800-peach-pi [1].
+> >> 
+> >> Apparently, the vmmc regulator doesn't exist for one of the controller
+> >> but vqmmc is. This leads to the following NULL pointer exception.
+> > 
+> > Ugh.  Hrm, it didn't used to be possible for vmmc to be NULL.  :-/  It
+> > 
+> > changed in v3.16:
+> >   4d1f52f mmc: core: Improve support for deferred regulators
+> > 
+> > ...and I didn't notice it (most of my development is done on 3.14).  :(
+> > 
+> > 
+> > Is it sensible to have vqmmc without vmmc.  One option would be to
+> > change mmc_regulator_get_supply() to not even bother trying to get
+> > vqmmc if vmmc is not there.
+> > 
+> > Another option would be to just totally fail mmc_regulator_set_vqmmc()
+> > always if vmmc is an error.  ...or assume that any bogus vmmc (either
+> > vmmc is an error or regulator_get_voltage(vmmc) returns an error) is
+> > 3.3V?
+> > 
+> > 
+> > I guess the safest is to assume that bogus vmmc means 3.3V...
+> 
+> Ah, doh.  Just noticed Ulf's suggestion all the way at the bottom of
+> the crash info, which I somehow missed before.  Yes, let's do that.
+> Heiko: are you going to re-post?
 
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: linux-fbdev at vger.kernel.org
-Signed-off-by: Dan Williams <dan.j.williams@intel.com>
----
- drivers/video/fbdev/amifb.c |    5 +++--
- drivers/video/fbdev/atafb.c |    5 +++--
- drivers/video/fbdev/hpfb.c  |    6 +++---
- 3 files changed, 9 insertions(+), 7 deletions(-)
+definitly :-) .
 
-diff --git a/drivers/video/fbdev/amifb.c b/drivers/video/fbdev/amifb.c
-index 1d702e13aaff..0cde451046d0 100644
---- a/drivers/video/fbdev/amifb.c
-+++ b/drivers/video/fbdev/amifb.c
-@@ -52,6 +52,7 @@
- #include <linux/ioport.h>
- #include <linux/platform_device.h>
- #include <linux/uaccess.h>
-+#include <linux/io.h>
- 
- #include <asm/irq.h>
- #include <asm/amigahw.h>
-@@ -3705,8 +3706,8 @@ default_chipset:
- 	 * access the videomem with writethrough cache
- 	 */
- 	info->fix.smem_start = (u_long)ZTWO_PADDR(videomemory);
--	videomemory = (u_long)ioremap_wt(info->fix.smem_start,
--					 info->fix.smem_len);
-+	videomemory = (u_long)memremap(info->fix.smem_start, info->fix.smem_len,
-+			MEMREMAP_WT);
- 	if (!videomemory) {
- 		dev_warn(&pdev->dev,
- 			 "Unable to map videomem cached writethrough\n");
-diff --git a/drivers/video/fbdev/atafb.c b/drivers/video/fbdev/atafb.c
-index d6ce613e12ad..5615e8c31ea2 100644
---- a/drivers/video/fbdev/atafb.c
-+++ b/drivers/video/fbdev/atafb.c
-@@ -55,12 +55,12 @@
- #include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
-+#include <linux/io.h>
- 
- #include <asm/setup.h>
- #include <linux/uaccess.h>
- #include <asm/pgtable.h>
- #include <asm/irq.h>
--#include <asm/io.h>
- 
- #include <asm/atarihw.h>
- #include <asm/atariints.h>
-@@ -3185,7 +3185,8 @@ int __init atafb_init(void)
- 		/* Map the video memory (physical address given) to somewhere
- 		 * in the kernel address space.
- 		 */
--		external_screen_base = ioremap_wt(external_addr, external_len);
-+		external_screen_base = memremap(external_addr, external_len,
-+				MEMREMAP_WT);
- 		if (external_vgaiobase)
- 			external_vgaiobase =
- 			  (unsigned long)ioremap(external_vgaiobase, 0x10000);
-diff --git a/drivers/video/fbdev/hpfb.c b/drivers/video/fbdev/hpfb.c
-index 9476d196f510..d08c320b06fc 100644
---- a/drivers/video/fbdev/hpfb.c
-+++ b/drivers/video/fbdev/hpfb.c
-@@ -14,8 +14,8 @@
- #include <linux/init.h>
- #include <linux/fb.h>
- #include <linux/dio.h>
-+#include <linux/io.h>
- 
--#include <asm/io.h>
- #include <asm/uaccess.h>
- 
- static struct fb_info fb_info = {
-@@ -241,8 +241,8 @@ static int hpfb_init_one(unsigned long phys_base, unsigned long virt_base)
- 	fb_info.fix.line_length = fb_width;
- 	fb_height = (in_8(fb_regs + HPFB_FBHMSB) << 8) | in_8(fb_regs + HPFB_FBHLSB);
- 	fb_info.fix.smem_len = fb_width * fb_height;
--	fb_start = (unsigned long)ioremap_wt(fb_info.fix.smem_start,
--					     fb_info.fix.smem_len);
-+	fb_start = (unsigned long) memremap(fb_info.fix.smem_start,
-+					     fb_info.fix.smem_len, MEMREMAP_WT);
- 	hpfb_defined.xres = (in_8(fb_regs + HPFB_DWMSB) << 8) | in_8(fb_regs + HPFB_DWLSB);
- 	hpfb_defined.yres = (in_8(fb_regs + HPFB_DHMSB) << 8) | in_8(fb_regs + HPFB_DHLSB);
- 	hpfb_defined.xres_virtual = hpfb_defined.xres;
+I was just travelling back from ELCE today, otherwise I would've done that 
+directly today. So I'm hoping to get that done tomorrow.
+
+
+Heiko
