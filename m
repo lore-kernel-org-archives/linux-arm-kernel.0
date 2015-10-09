@@ -1,37 +1,38 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri,  9 Oct 2015 14:45:21 +0100
-Subject: [PATCH 2/4] PCI: Add quirk for PLDA's XpressRICH3 host bridge class.
-In-Reply-To: <1444398323-17354-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1444398323-17354-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1444398323-17354-3-git-send-email-Liviu.Dudau@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri,  9 Oct 2015 15:46:18 +0200
+Subject: [PATCH] soc/rockchip: Restrict to ARCH_ROCKCHIP
+Message-ID: <1444398378-24974-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The XpressRICH3 host bridge at power up has an unassigned class on
-some of ARM Ltd boards, add a quirk to correct that.
+From: Thierry Reding <treding@nvidia.com>
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+By definition this directory contains drivers that are specific to the
+Rockchip architecture. All Kconfig options should therefore depend on
+ARCH_ROCKCHIP to avoid exposing these symbols on other architectures.
+For example, this options currently shows up as new when doing an
+incremental build on PowerPC.
+
+Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- drivers/pci/quirks.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/soc/rockchip/Kconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index b03373f..ae24bb4 100644
---- a/drivers/pci/quirks.c
-+++ b/drivers/pci/quirks.c
-@@ -4149,3 +4149,13 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
- 	}
- }
- DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
+diff --git a/drivers/soc/rockchip/Kconfig b/drivers/soc/rockchip/Kconfig
+index 6ee03994801c..d09b5ede7deb 100644
+--- a/drivers/soc/rockchip/Kconfig
++++ b/drivers/soc/rockchip/Kconfig
+@@ -1,3 +1,5 @@
++if ARCH_ROCKCHIP
 +
-+/*
-+ * The PLDA's XpressRICH3 doesn't describe itself as a bridge. This is required
-+ * for correct/normal enumeration.
-+ */
-+static void xr3pci_quirk_class(struct pci_dev *pdev)
-+{
-+	pdev->class = PCI_CLASS_BRIDGE_PCI << 8;
-+}
-+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_PLDA, PCI_DEVICE_ID_XR3PCI, xr3pci_quirk_class);
+ #
+ # Rockchip Soc drivers
+ #
+@@ -12,3 +14,5 @@ config ROCKCHIP_PM_DOMAINS
+           mode. The RK3288 PMU is dedicated for managing the power of the whole chip.
+ 
+           If unsure, say N.
++
++endif
 -- 
-2.6.0
+2.5.0
