@@ -1,49 +1,71 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 9 Oct 2015 22:56:25 +0200
-Subject: [PATCH] drm: atmel-hlcdc: add support for sama5d2 SoCs
-In-Reply-To: <1441806435-12346-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1441806435-12346-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20151009225625.7e60def2@bbrezillon>
+Date: Fri, 9 Oct 2015 23:02:32 +0200
+Subject: [PATCH v3 00/12] pwm: add support for atomic update
+In-Reply-To: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20151009230232.6d21d9be@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi Thierry,
 
-Sorry for the late reply.
+On Mon, 21 Sep 2015 11:33:17 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 
-On Wed, 9 Sep 2015 15:47:15 +0200
-Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-
-> As the hardware description for this chip is the same as the sama5d4, we use
-> this SoC structures for layers and DC descriptions. Thus only 2 lines are added
-> to the atmel_hlcdc_of_match table.
-> The compatible string is already documented in the parent MFD driver's binding.
+> Hello,
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> This series adds support for atomic PWM update, or IOW, the capability
+> to update all the parameters of a PWM device (enabled/disabled, period,
+> duty and polarity) in one go.
 
-Just for the record, since Thierry already applied it in his tree:
+Anything preventing this series from being applied (AKA ping)?
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-> ---
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 4 ++++
->  1 file changed, 4 insertions(+)
 > 
-> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> index 8bc62ec407f9..498add1e5e58 100644
-> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> @@ -333,6 +333,10 @@ static const struct of_device_id atmel_hlcdc_of_match[] = {
->  		.data = &atmel_hlcdc_dc_at91sam9x5,
->  	},
->  	{
-> +		.compatible = "atmel,sama5d2-hlcdc",
-> +		.data = &atmel_hlcdc_dc_sama5d4,
-> +	},
-> +	{
->  		.compatible = "atmel,sama5d3-hlcdc",
->  		.data = &atmel_hlcdc_dc_sama5d3,
->  	},
+> Best Regards,
+> 
+> Boris
+> 
+> Changes since v2:
+> - rebased on top of 4.3-rc2
+> - reintroduced pwm-regulator patches
+> 
+> Changes since v1:
+> - dropped applied patches
+> - squashed Heiko's fixes into the rockchip driver changes
+> - made a few cosmetic changes
+> - added kerneldoc comments
+> - added Heiko's patch to display more information in debugfs
+> - dropped pwm-regulator patches (should be submitted separately)
+> 
+> Boris Brezillon (11):
+>   pwm: introduce default period and polarity concepts
+>   pwm: define a new pwm_state struct
+>   pwm: move the enabled/disabled info to pwm_state struct
+>   backlight: pwm_bl: remove useless call to pwm_set_period
+>   pwm: declare a default PWM state
+>   pwm: add the PWM initial state retrieval infra
+>   pwm: add the core infrastructure to allow atomic update
+>   pwm: rockchip: add initial state retrieval
+>   pwm: rockchip: add support for atomic update
+>   regulator: pwm: implement ->enable(), ->disable() and ->is_enabled
+>     methods
+>   regulator: pwm: properly initialize the ->state field
+> 
+> Heiko St?bner (1):
+>   pwm: add information about polarity, duty cycle and period to debugfs
+> 
+>  drivers/leds/leds-pwm.c              |   2 +-
+>  drivers/pwm/core.c                   | 169 +++++++++++++++++++++++++++++++----
+>  drivers/pwm/pwm-pxa.c                |   2 +-
+>  drivers/pwm/pwm-rockchip.c           | 119 +++++++++++++++++++-----
+>  drivers/pwm/pwm-sun4i.c              |   3 +-
+>  drivers/regulator/pwm-regulator.c    |  65 ++++++++++++--
+>  drivers/video/backlight/lm3630a_bl.c |   4 +-
+>  drivers/video/backlight/pwm_bl.c     |  10 ++-
+>  drivers/video/fbdev/ssd1307fb.c      |   2 +-
+>  include/linux/pwm.h                  |  89 +++++++++++++++---
+>  10 files changed, 392 insertions(+), 73 deletions(-)
+> 
 
 
 
