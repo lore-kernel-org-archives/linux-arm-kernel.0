@@ -1,51 +1,75 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 09 Oct 2015 16:13:34 -0700
-Subject: [PATCH v3 2/7] MAINTAINERS: Add myself for the new VC4 (RPi GPU)
- graphics driver.
-In-Reply-To: <CACvgo53ftyjj=LhsNuePnjH2Bez5SAG5cwk=7gzMhmMPMYOnew@mail.gmail.com>
-References: <1444426068-15817-1-git-send-email-eric@anholt.net>
- <1444426068-15817-3-git-send-email-eric@anholt.net>
- <CACvgo53ftyjj=LhsNuePnjH2Bez5SAG5cwk=7gzMhmMPMYOnew@mail.gmail.com>
-Message-ID: <87fv1jljoh.fsf@eliezer.anholt.net>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 9 Oct 2015 18:15:40 -0500
+Subject: [PATCH v8 3/6] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <CAFiDJ58oMa6rgQe_STCiWRpdL+P22BN1=Nin_+QnLXC9RGiSzQ@mail.gmail.com>
+References: <1444297394-3122-1-git-send-email-lftan@altera.com>
+ <1444297394-3122-4-git-send-email-lftan@altera.com>
+ <20151008094744.GD32532@n2100.arm.linux.org.uk>
+ <CAFiDJ58oMa6rgQe_STCiWRpdL+P22BN1=Nin_+QnLXC9RGiSzQ@mail.gmail.com>
+Message-ID: <20151009231540.GE16112@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Emil Velikov <emil.l.velikov@gmail.com> writes:
+On Thu, Oct 08, 2015 at 06:03:24PM +0800, Ley Foon Tan wrote:
+> On Thu, Oct 8, 2015 at 5:47 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> >
+> > On Thu, Oct 08, 2015 at 05:43:11PM +0800, Ley Foon Tan wrote:
+> > > +static int altera_pcie_cfg_write(struct pci_bus *bus, unsigned int devfn,
+> > > +                              int where, int size, u32 value)
+> > > +{
+> > > +     struct altera_pcie *pcie = bus->sysdata;
+> > > +     u32 data32;
+> > > +     u32 shift = 8 * (where & 3);
+> > > +     int ret;
+> > > +
+> > > +     if (!altera_pcie_valid_config(pcie, bus, PCI_SLOT(devfn)))
+> > > +             return PCIBIOS_DEVICE_NOT_FOUND;
+> > > +
+> > > +     /* write partial */
+> > > +     if (size != sizeof(u32)) {
+> > > +             ret = tlp_cfg_dword_read(pcie, bus->number, devfn,
+> > > +                                      where & ~DWORD_MASK, &data32);
+> > > +             if (ret)
+> > > +                     return ret;
+> > > +     }
+> > > +
+> > > +     switch (size) {
+> > > +     case 1:
+> > > +             data32 = (data32 & ~(0xff << shift)) |
+> > > +                             ((value & 0xff) << shift);
+> > > +             break;
+> > > +     case 2:
+> > > +             data32 = (data32 & ~(0xffff << shift)) |
+> > > +                             ((value & 0xffff) << shift);
+> > > +             break;
+> > > +     default:
+> > > +             data32 = value;
+> >
+> > Can you generate proper 1, 2 and 4 byte configuration accesses?  That
+> > is much preferred over the above read-modify-write, as there are
+> > registers in PCI and PCIe that are read/write-1-to-clear.  The above
+> > has the effect of inadvertently clearing those RW1C bits.
+> No, hardware can only access 4-byte aligned address.
 
-> Hi Eric,
->
-> On 9 October 2015 at 22:27, Eric Anholt <eric@anholt.net> wrote:
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> ---
->>
->> v2: Mark it Supported, not Maintained.
->>
->>  MAINTAINERS | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 7ba7ab7..e331e46 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -3653,6 +3653,12 @@ S:       Maintained
->>  F:     drivers/gpu/drm/sti
->>  F:     Documentation/devicetree/bindings/gpu/st,stih4xx.txt
->>
->> +DRM DRIVERS FOR VC4
->> +M:     Eric Anholt <eric@anholt.net>
->> +T:     git git://github.com/anholt/linux
-> You might want to add dri-devel as mailing list, at least initially.
+This is non-spec compliant, and we really should have some way of
+flagging that because it may break things in ways that would be very
+difficult to debug, e.g., we can lose RW1C status bits when writing an
+adjacent register, so they would just silently disappear.
 
-I believe that's already implied by the general entry for dri-devel:
+I don't know if this should be a kernel taint, a simple warning in
+dmesg, or what.  I guess the tainting mechanism is probably too
+general-purpose for this, and add_taint() doesn't give any dmesg
+indication.  We wouldn't see the taint unless the problem actually
+caused an oops or panic.  In this case, I think I want a clue in dmesg
+so we have a chance of seeing it even if there is no oops.  So
+probably something like a dev_warn("non-compliant config accesses")
+would work.
 
-./scripts/get_maintainer.pl -f drivers/gpu/drm/vc4/vc4_drv.c
-Eric Anholt <eric@anholt.net> (supporter:DRM DRIVERS FOR VC4)
-David Airlie <airlied@linux.ie> (maintainer:DRM DRIVERS)
-dri-devel at lists.freedesktop.org (open list:DRM DRIVERS)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151009/312d8e77/attachment.sig>
+You really should double-check with the hardware guys, because it's
+pretty obvious that the PCI spec requires 1- and 2-byte config
+accesses to work correctly.  For example, if you read/modify/write to
+update PCI_COMMAND, you will inadvertently clear the RW1C bits in
+PCI_STATUS.
+
+Bjorn
