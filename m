@@ -1,43 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Oct 2015 16:35:43 +0100
-Subject: [PATCH 2/9] pci: mvebu: fix memory leaks and refcount leaks
-In-Reply-To: <20151009171442.52988f0b@free-electrons.com>
-References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
- <E1ZiRIs-0004Id-AN@rmk-PC.arm.linux.org.uk>
- <20151009165240.3ba17ece@free-electrons.com>
- <20151009150710.GJ14688@lunn.ch>
- <20151009171442.52988f0b@free-electrons.com>
-Message-ID: <20151009153543.GX32532@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 9 Oct 2015 16:44:08 +0100
+Subject: [PATCH 3/4] arm64: Juno: Add support for the PCIe host bridge on
+ Juno R1
+In-Reply-To: <20151009141107.GD3394@e106497-lin.cambridge.arm.com>
+References: <1444398323-17354-1-git-send-email-Liviu.Dudau@arm.com>
+ <1444398323-17354-4-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqJsb53VXiUfjGBXK37dBEi1r-PXVohg-c-7_x63R04VMA@mail.gmail.com>
+ <20151009141107.GD3394@e106497-lin.cambridge.arm.com>
+Message-ID: <20151009154408.GD21629@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 05:14:42PM +0200, Thomas Petazzoni wrote:
-> Julia: some of the Device Tree iterator functions have a somewhat
-> "interesting" behavior in that they take the reference on the current
-> child when entering the loop, and release it before entering the next
-> iteration (which will also take a reference to the next child).
+On Fri, Oct 09, 2015 at 03:11:07PM +0100, Liviu Dudau wrote:
+> On Fri, Oct 09, 2015 at 08:54:33AM -0500, Rob Herring wrote:
+> > On Fri, Oct 9, 2015 at 8:45 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > > Juno R1 board sports a functional PCIe host bridge that is
+> > > compliant with the SBSA standard found here[1]. With the right
+> > > firmware that initialises the XpressRICH3 controller one can
+> > > use the generic Host Bridge driver to use the PCIe hardware.
+> > >
+> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > >
+> > > [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0029a/
+> > > ---
+> > >  arch/arm64/boot/dts/arm/juno-r1.dts | 20 ++++++++++++++++++++
+> > >  1 file changed, 20 insertions(+)
+> > >
+> > > diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+> > > index c627511..a702a6b 100644
+> > > --- a/arch/arm64/boot/dts/arm/juno-r1.dts
+> > > +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+> > > @@ -109,6 +109,26 @@
+> > >
+> > >         #include "juno-base.dtsi"
+> > >
+> > > +       pcie-controller at 40000000 {
+> > > +               compatible = "pci-host-ecam-generic";
+> > 
+> > I think this is the first case of real h/w using this. We should have
+> > a specific compatible here additionally.
 > 
-> This means that if you have an exit point inside the loop (break or
-> return), you are loosing a reference. For example,
-> http://lxr.free-electrons.com/source/arch/arm/mach-shmobile/pm-rmobile.c#L367
-> is wrong because there is a missing of_node_put(np) before the "return
-> -ENOMEM".
+> Or maybe I can claim the use of the string on account on being the first on arm64 ;)
 > 
-> So essentially, every exit point in such Device Tree iteration loops
-> should make to call of_node_put() on the current element before exiting
-> the loop unexpectedly.
+> I can add a vendor prefix if you want, but pci-host-generic is going to ignore it 
+> *because* it is trying to be a generic driver.
 
-There is an exception to that... if the loop is part of a DT node lookup
-function, which would return a DT node based on some search criteria, it
-would be valid to break out of the loop while holding a reference.
+The point here is to have the string ready if we need it later, so it's
+fine that it's not used currently.
 
-For example, of_get_child_by_name(), of_find_next_cache_node(),
-of_graph_get_port_by_id(), are valid breaker-outer cases. ;)
+Rob's suggestion is that the compatible list should look something like:
 
-However, of_platform_bus_probe(), of_platform_populate(),
-of_overlay_apply_one(), overlay_subtree_check() are examples of
-incorrect break-out cases.
+compatible = "arm,juno-r1-pcie", "plda,xpressrich3", "pci-host-ecam-generic";
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+We can match on "pci-host-ecam-generic" for now (and hopefully forever),
+but if for some reason we need to special-case this host controller (or
+Juno's integration thereof), we can do that based on the compatible
+string.
+
+Thanks,
+Mark.
