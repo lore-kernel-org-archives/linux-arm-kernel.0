@@ -1,75 +1,26 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  9 Oct 2015 16:27:12 +0100
-Subject: [PULL] GIC changes for Linux 4.4
-Message-ID: <1444404432-1992-1-git-send-email-marc.zyngier@arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 9 Oct 2015 16:29:27 +0100
+Subject: [PATCH 1/2] dmaengine: hdmac: factorise memset descriptor
+ allocation
+In-Reply-To: <20151007173317.GG2278@lukather>
+References: <1443711158-18495-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1443711158-18495-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20151007135412.GB3320@vkoul-mobl.iind.intel.com>
+ <20151007173317.GG2278@lukather>
+Message-ID: <20151009152926.GD3609@vkoul-mobl.iind.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Jason,
+On Wed, Oct 07, 2015 at 06:33:17PM +0100, Maxime Ripard wrote:
+> > This is fine, but this is driver limitation. We should really split the
+> > txn to multiple descriptors here..
+> 
+> Both these things are actually just copy from the previous code.
+> 
+> I can probably fix the first style issue in this patch, but splitting
+> the memset descriptors should go in a separate patch.
 
-Here's the pull request for the GIC updates I stashed over the past
-few weeks. Only real new feature is the 32bit support from
-Jean-Philippe, the rest is all about dealing with errata and firmware.
+That sounds fine
 
-Please pull!
-
-Thanks,
-
-	M.
-
-The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
-
-  Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git tags/gic-4.4
-
-for you to fetch changes up to 44a2e8fcc4f41ddf514b7f5e541a64ddb7a00cd7:
-
-  arm/arm64: KVM: Only allow 64bit hosts to build VGICv3 (2015-10-09 15:35:11 +0100)
-
-----------------------------------------------------------------
-GIC updates for Linux 4.4:
-
-- Enable basic GICv3 support on 32bit ARM (mostly for running VMs with
-  more than 8 virtual CPUs)
-- arm64 changes to deal with firmware limitations that forces a GICv3
-  to be used as a GICv2
-- A GICv2m erratum workaround on Applied Micro X-Gene2
-
-----------------------------------------------------------------
-Duc Dang (1):
-      irqchip/gic-v2m: Add workaround for APM X-Gene GICv2m erratum
-
-Jean-Philippe Brucker (6):
-      irqchip/gic-v3: Refactor the arm64 specific parts
-      irqchip/gic-v3: Change unsigned types for AArch32 compatibility
-      irqchip/gic-v3: Specialize readq and writeq accesses
-      ARM: add 32bit support to GICv3
-      ARM: virt: select ARM_GIC_V3
-      arm/arm64: KVM: Only allow 64bit hosts to build VGICv3
-
-Marc Zyngier (5):
-      arm64: el2_setup: Make sure ICC_SRE_EL2.SRE sticks before using GICv3 sysregs
-      irqchip/gic-v3: Make gic_enable_sre an inline function
-      arm64: cpufeatures: Check ICC_EL1_SRE.SRE before enabling ARM64_HAS_SYSREG_GIC_CPUIF
-      irqchip/gic: Warn if GICv3 system registers are enabled
-      arm64: Update booting requirements for GICv3 in GICv2 mode
-
- Documentation/arm64/booting.txt     |  11 ++-
- arch/arm/Kconfig                    |   1 +
- arch/arm/include/asm/arch_gicv3.h   | 188 ++++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/arch_gicv3.h | 148 ++++++++++++++++++++++++++++
- arch/arm64/kernel/cpufeature.c      |  19 +++-
- arch/arm64/kernel/head.S            |   2 +
- arch/arm64/kvm/Kconfig              |   4 +
- drivers/irqchip/irq-gic-v2m.c       |  22 +++++
- drivers/irqchip/irq-gic-v3.c        |  94 +++++-------------
- drivers/irqchip/irq-gic.c           |  15 +++
- include/kvm/arm_vgic.h              |   4 +-
- include/linux/irqchip/arm-gic-v3.h  | 102 +++++--------------
- virt/kvm/arm/vgic.c                 |   4 +-
- 13 files changed, 461 insertions(+), 153 deletions(-)
- create mode 100644 arch/arm/include/asm/arch_gicv3.h
- create mode 100644 arch/arm64/include/asm/arch_gicv3.h
+-- 
+~Vinod
