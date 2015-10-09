@@ -1,61 +1,36 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 Oct 2015 16:44:08 +0100
-Subject: [PATCH 3/4] arm64: Juno: Add support for the PCIe host bridge on
- Juno R1
-In-Reply-To: <20151009141107.GD3394@e106497-lin.cambridge.arm.com>
-References: <1444398323-17354-1-git-send-email-Liviu.Dudau@arm.com>
- <1444398323-17354-4-git-send-email-Liviu.Dudau@arm.com>
- <CAL_JsqJsb53VXiUfjGBXK37dBEi1r-PXVohg-c-7_x63R04VMA@mail.gmail.com>
- <20151009141107.GD3394@e106497-lin.cambridge.arm.com>
-Message-ID: <20151009154408.GD21629@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 09 Oct 2015 17:46:46 +0200
+Subject: [GIT PULL] Broadcom soc changes for v4.4
+In-Reply-To: <1443824458-20799-4-git-send-email-f.fainelli@gmail.com>
+References: <1443824458-20799-1-git-send-email-f.fainelli@gmail.com>
+ <1443824458-20799-4-git-send-email-f.fainelli@gmail.com>
+Message-ID: <10665189.Vh1KLFXpVv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 03:11:07PM +0100, Liviu Dudau wrote:
-> On Fri, Oct 09, 2015 at 08:54:33AM -0500, Rob Herring wrote:
-> > On Fri, Oct 9, 2015 at 8:45 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > > Juno R1 board sports a functional PCIe host bridge that is
-> > > compliant with the SBSA standard found here[1]. With the right
-> > > firmware that initialises the XpressRICH3 controller one can
-> > > use the generic Host Bridge driver to use the PCIe hardware.
-> > >
-> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > >
-> > > [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0029a/
-> > > ---
-> > >  arch/arm64/boot/dts/arm/juno-r1.dts | 20 ++++++++++++++++++++
-> > >  1 file changed, 20 insertions(+)
-> > >
-> > > diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-> > > index c627511..a702a6b 100644
-> > > --- a/arch/arm64/boot/dts/arm/juno-r1.dts
-> > > +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-> > > @@ -109,6 +109,26 @@
-> > >
-> > >         #include "juno-base.dtsi"
-> > >
-> > > +       pcie-controller at 40000000 {
-> > > +               compatible = "pci-host-ecam-generic";
-> > 
-> > I think this is the first case of real h/w using this. We should have
-> > a specific compatible here additionally.
+On Friday 02 October 2015 15:20:58 Florian Fainelli wrote:
+> This pull request contains the following Broadcom SoC platform and driver changes:
 > 
-> Or maybe I can claim the use of the string on account on being the first on arm64 ;)
-> 
-> I can add a vendor prefix if you want, but pci-host-generic is going to ignore it 
-> *because* it is trying to be a generic driver.
+> - Brian Norris create a drivers/soc/brcmstb/ stub and then adds support for S2/S3/S5
+>   suspend/resume modes for the Broadcom BCM7xxx Set Top Box SoCs
 
-The point here is to have the string ready if we need it later, so it's
-fine that it's not used currently.
+I'm not overly happy with this part of the code (sorry Brian):
 
-Rob's suggestion is that the compatible list should look something like:
+- it looks like it should be a cpuidle driver. Not completely sure about this,
+  but I'd like to see at least an Ack from the cpuidle maintainers to confirm
+  that they want it to be done in drivers/soc
 
-compatible = "arm,juno-r1-pcie", "plda,xpressrich3", "pci-host-ecam-generic";
+- any code here that is not going into a cpuidle driver for this part looks
+  like it's better suited to go to arch/arm/mach-bcm, as the code doesn't
+  feel like a driver. This is of course a gray area, and can be debated.
 
-We can match on "pci-host-ecam-generic" for now (and hopefully forever),
-but if for some reason we need to special-case this host controller (or
-Juno's integration thereof), we can do that based on the compatible
-string.
+- it's clearly not endian-safe. There really is no reason to use __raw
+  mmio accessors here, or to define the interface to the firmware in terms
+  of native endianess when the registers and firmware is known to be
+  little-endian.
 
-Thanks,
-Mark.
+Sorry for not noticing the driver earlier when it was discussed on the list,
+but I think the above is reason enough to do another revision.
+Can you submit a new pull request without the suspend/resume handling?
+
+	Arnd
