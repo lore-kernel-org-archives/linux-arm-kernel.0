@@ -1,69 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Oct 2015 19:19:29 +0100
-Subject: [PATCH v4 3/6] iommu: add ARM short descriptor page table
- allocator.
-In-Reply-To: <5617FC5F.60505@arm.com>
-References: <1438597279-2937-1-git-send-email-yong.wu@mediatek.com>
- <1438597279-2937-4-git-send-email-yong.wu@mediatek.com>
- <20150916155824.GM28771@arm.com>
- <1442501662.8145.151.camel@mhfsdcap03>
- <1442931167.17514.39.camel@mhfsdcap03>
- <20151009155750.GS26278@arm.com> <5617FC5F.60505@arm.com>
-Message-ID: <20151009181929.GU26278@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 09 Oct 2015 20:23:52 +0200
+Subject: [GIT PULL] Broadcom soc changes for v4.4
+In-Reply-To: <5617F2F3.1000501@gmail.com>
+References: <1443824458-20799-1-git-send-email-f.fainelli@gmail.com>
+ <10665189.Vh1KLFXpVv@wuerfel> <5617F2F3.1000501@gmail.com>
+Message-ID: <5035103.o995oYvXHj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 06:41:51PM +0100, Robin Murphy wrote:
-> On 09/10/15 16:57, Will Deacon wrote:
-> >On Tue, Sep 22, 2015 at 03:12:47PM +0100, Yong Wu wrote:
-> >>      I would like to show you a problem I met, The recursion here may
-> >>lead to stack overflow while we test FHD video decode.
+On Friday 09 October 2015 10:01:39 Florian Fainelli wrote:
+> On 09/10/15 08:46, Arnd Bergmann wrote:
+> > On Friday 02 October 2015 15:20:58 Florian Fainelli wrote:
+> >> This pull request contains the following Broadcom SoC platform and driver changes:
 > >>
-> >>     From the log, I get the internal variable in the error case: the
-> >>"size" is 0x100000, the "iova" is 0xfea00000, but at that time the
-> >>"blk_size" is 0x1000 as it was the map of small-page. so it enter the
-> >>recursion here.
-> >>
-> >>     After check the unmap flow, there is only a iommu_unmap in
-> >>__iommu_dma_unmap, and it won't check the physical address align in
-> >>iommu_unmap.
-> >
-> >That sounds like a bug in __iommu_dma_unmap. Robin?
+> >> - Brian Norris create a drivers/soc/brcmstb/ stub and then adds support for S2/S3/S5
+> >>   suspend/resume modes for the Broadcom BCM7xxx Set Top Box SoCs
+> > 
+> > I'm not overly happy with this part of the code (sorry Brian):
+> > 
+> > - it looks like it should be a cpuidle driver. Not completely sure about this,
+> >   but I'd like to see at least an Ack from the cpuidle maintainers to confirm
+> >   that they want it to be done in drivers/soc
 > 
-> Isn't it just cf27ec930be9 again wearing different trousers? All I do is
-> call iommu_unmap with the same total size that was mapped originally.
+> Could you clarify how you think this should be fitting in the cpuidle
+> framework? This is system-wide S2/S3/S5 states we are talking about
+> here, and that comes with specific constraints, like moving code from
+> DRAM execution to SRAM execution for instance, not sure where cpuidle
+> can help with that. And if it does, how we coordinate with that framework.
 
-I don't think it's the same as that issue, which was to do with installing
-block mappings over the top of an existing table entry. The problem here
-seems to be that we don't walk the page table properly on unmap.
+Ok, I see. So probably not cpuidle then, but I'd still have a better
+feeling if this was reviewed by someone who understands power management
+and is outside of the brcmstb team.
 
-The long descriptor code has:
+Maybe just send it to linux-pm to get feedback from the suspend maintainers?
 
-	/* If the size matches this level, we're in the right place */
-	if (size == blk_size) {
-		__arm_lpae_set_pte(ptep, 0, &data->iop.cfg);
+> > - any code here that is not going into a cpuidle driver for this part looks
+> >   like it's better suited to go to arch/arm/mach-bcm, as the code doesn't
+> >   feel like a driver. This is of course a gray area, and can be debated.
+> 
+> There are some large portions of this code that are shared between SoCs,
+> past, current and future chips, with the exception of the small assembly
+> part which needs to be architecture specific for obvious reasons.
+> 
+> For instance, the power state machine code is fairly SoC-independant,
+> and to some extent, the DDR controller code is as well, that is what
+> motivated putting that code here, so it can be re-used in the future
+> when we submit support for new chips as well.
 
-		if (!iopte_leaf(pte, lvl)) {
-			/* Also flush any partial walks */
-			tlb->tlb_add_flush(iova, size, false, cookie);
-			tlb->tlb_sync(cookie);
-			ptep = iopte_deref(pte, data);
-			__arm_lpae_free_pgtable(data, lvl + 1, ptep);
-		} else {
-			tlb->tlb_add_flush(iova, size, true, cookie);
-		}
+Maybe drivers/firmware/broadcom/ then? That directory already
+exists and the main parts seem to be for a firmware interface.
 
-		return size;
-	} else if (iopte_leaf(pte, lvl)) {
-		/*
-		 * Insert a table at the next level to map the old region,
-		 * minus the part we want to unmap
-		 */
-		return arm_lpae_split_blk_unmap(data, iova, size,
-						iopte_prot(pte), lvl, ptep,
-						blk_size);
-	}
+The DDR controller stuff probably better fits into drivers/memory/,
+which already has similar bits from other platforms. Of course
+that implies restructuring the code a bit to separate the two.
 
-why doesn't something similar work for short descriptors?
-
-Will
+	Arnd
