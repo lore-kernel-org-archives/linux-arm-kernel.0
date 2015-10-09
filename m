@@ -1,42 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 09 Oct 2015 14:53:54 +0200
-Subject: [PATCH] net: HNS: fix MDIO dependencies
-Message-ID: <8114651.XErShuFr2W@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 9 Oct 2015 07:59:15 -0500
+Subject: [PATCH 2/5] Documentation: add the binding file for Freescale
+ imx7d ADC driver
+In-Reply-To: <1444301948-21721-2-git-send-email-haibo.chen@freescale.com>
+References: <1444301948-21721-1-git-send-email-haibo.chen@freescale.com>
+ <1444301948-21721-2-git-send-email-haibo.chen@freescale.com>
+Message-ID: <CAL_JsqLpZ9+3L8=3QQt6VhYn=jAkO6kw4C4eHxjGmGwL4O3_vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly introduced HNS_MDIO Kconfig symbol selects 'MDIO', but
-that is the wrong symbol as the code used by this driver is
-provided by PHYLIB rather than the MDIO driver. Also, there is
-no need to make this driver user selectable, because it is already
-selected by all drivers that need it.
+On Thu, Oct 8, 2015 at 5:59 AM, Haibo Chen <haibo.chen@freescale.com> wrote:
+> The patch adds the binding file for Freescale imx7d ADC driver.
+>
+> Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
 
-This changes the Kconfig file to select the correct library, and
-to make the option silent.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 5b904d39406 ("net: add Hisilicon Network Subsystem MDIO support")
-
-diff --git a/drivers/net/ethernet/hisilicon/Kconfig b/drivers/net/ethernet/hisilicon/Kconfig
-index 165b5a8aa2ea..8d12b587809e 100644
---- a/drivers/net/ethernet/hisilicon/Kconfig
-+++ b/drivers/net/ethernet/hisilicon/Kconfig
-@@ -24,7 +24,6 @@ config HIX5HD2_GMAC
- 
- config HIP04_ETH
- 	tristate "HISILICON P04 Ethernet support"
--	select PHYLIB
- 	select MARVELL_PHY
- 	select MFD_SYSCON
- 	select HNS_MDIO
-@@ -33,8 +32,8 @@ config HIP04_ETH
- 	  want to use the internal ethernet then you should answer Y to this.
- 
- config HNS_MDIO
--	tristate "Hisilicon HNS MDIO device Support"
--	select MDIO
-+	tristate
-+	select PHYLIB
- 	---help---
- 	  This selects the HNS MDIO support. It is needed by HNS_DSAF to access
- 	  the PHY
+> ---
+>  .../devicetree/bindings/iio/adc/imx7d-adc.txt      | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/adc/imx7d-adc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/iio/adc/imx7d-adc.txt b/Documentation/devicetree/bindings/iio/adc/imx7d-adc.txt
+> new file mode 100644
+> index 0000000..6b21fd27
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iio/adc/imx7d-adc.txt
+> @@ -0,0 +1,26 @@
+> +Freescale imx7d ADC bindings
+> +
+> +The devicetree bingdings are for the nwe ADC driver written for
+> +imx7d SoC.
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,imx7d-adc"
+> +- reg: Offset and length of the register set for the ADC device
+> +- interrupts: The interrupt number for the ADC device
+> +- clocks: The root clock of the ADC controller
+> +- clock-names: Must contain "adc", matching entry in the clocks property
+> +- vref-supply: The regulator supply ADC reference voltage
+> +
+> +Optional properties:
+> +- num-channels: the number of channels used
+> +
+> +Example:
+> +adc1: adc at 30610000 {
+> +       compatible = "fsl,imx7d-adc";
+> +       reg = <0x30610000 0x10000>;
+> +       interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+> +       clocks = <&clks IMX7D_ADC_ROOT_CLK>;
+> +       clock-names = "adc";
+> +       num-channels = <4>;
+> +       vref-supply = <&reg_vcc_3v3_mcu>;
+> +};
+> --
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
