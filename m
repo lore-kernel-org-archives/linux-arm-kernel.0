@@ -1,34 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 10 Oct 2015 00:20:15 +0100
-Subject: [PATCH] sched_clock: add data pointer argument to read callback
-In-Reply-To: <1444427858-576-1-git-send-email-mans@mansr.com>
-References: <1444427858-576-1-git-send-email-mans@mansr.com>
-Message-ID: <20151009232015.GC32536@n2100.arm.linux.org.uk>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 9 Oct 2015 18:21:10 -0500
+Subject: [PATCH] PCI: generic: Fix address window calculation for
+ non-zero starting bus.
+In-Reply-To: <1444334056-4870-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1444334056-4870-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20151009232110.GF16112@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 10:57:35PM +0100, Mans Rullgard wrote:
-> This passes a data pointer specified in the sched_clock_register()
-> call to the read callback allowing simpler implementations thereof.
+On Thu, Oct 08, 2015 at 12:54:16PM -0700, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
 > 
-> In this patch, existing uses of this interface are simply updated
-> with a null pointer.
+> Make the offset from the beginning of the "reg" property be from the
+> starting bus number, rather than zero.  Hoist the invariant size
+> calculation out of the mapping for loop.
+> 
+> Update host-generic-pci.txt to clarify the semantics of the "reg"
+> property with respect to non-zero starting bus numbers.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
 
-This is a bad description.  It tells us what the patch is doing,
-(which we can see by reading the patch) but not _why_.  Please include
-information on why the change is necessary - describe what you are
-trying to achieve.
+Applied to pci/host-generic for v4.4 with Reviewed-by and Acked-by from
+Arnd and Rob, thanks David!
 
-I generally don't accept patches what add new stuff to the kernel with
-no users of that new stuff - that's called experience, experience of
-people who submit stuff like that, and then vanish leaving their junk
-in the kernel without any users.  Please ensure that this gets a user
-very quickly, or better still, submit this patch as part of a series
-which makes use of it.
+Bjorn
 
-Also, copying soo many people is guaranteed to be silently dropped by
-mailing lists.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> ---
+> This is a replacement for:
+> 
+> https://lkml.org/lkml/2015/10/2/653
+> 
+> Since that patch is getting too much push-back, this is the only other
+> option for fixing the driver to be internally consistent in its
+> treatment of the offset from "reg" to the first bus in the "bus-range"
+> property.
+> 
+>  Documentation/devicetree/bindings/pci/host-generic-pci.txt | 5 +++--
+>  drivers/pci/host/pci-host-generic.c                        | 4 ++--
+>  2 files changed, 5 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> index cf3e205..3f1d3fc 100644
+> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> @@ -34,8 +34,9 @@ Properties of the host controller node:
+>  - #size-cells    : Must be 2.
+>  
+>  - reg            : The Configuration Space base address and size, as accessed
+> -                   from the parent bus.
+> -
+> +                   from the parent bus.  The base address corresponds to
+> +                   the first bus in the "bus-range" property.  If no
+> +                   "bus-range" is specified, this will be bus 0 (the default).
+>  
+>  Properties of the /chosen node:
+>  
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index fe9a81b..bb93346 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -169,6 +169,7 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>  	struct resource *bus_range;
+>  	struct device *dev = pci->host.dev.parent;
+>  	struct device_node *np = dev->of_node;
+> +	u32 sz = 1 << pci->cfg.ops->bus_shift;
+>  
+>  	err = of_address_to_resource(np, 0, &pci->cfg.res);
+>  	if (err) {
+> @@ -196,10 +197,9 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>  	bus_range = pci->cfg.bus_range;
+>  	for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
+>  		u32 idx = busn - bus_range->start;
+> -		u32 sz = 1 << pci->cfg.ops->bus_shift;
+>  
+>  		pci->cfg.win[idx] = devm_ioremap(dev,
+> -						 pci->cfg.res.start + busn * sz,
+> +						 pci->cfg.res.start + idx * sz,
+>  						 sz);
+>  		if (!pci->cfg.win[idx])
+>  			return -ENOMEM;
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
