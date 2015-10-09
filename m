@@ -1,60 +1,46 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri,  9 Oct 2015 14:27:47 -0700
-Subject: [PATCH v3 6/7] ARM: bcm2835: Add the DDC I2C controller to the device
- tree.
-In-Reply-To: <1444426068-15817-1-git-send-email-eric@anholt.net>
-References: <1444426068-15817-1-git-send-email-eric@anholt.net>
-Message-ID: <1444426068-15817-7-git-send-email-eric@anholt.net>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Fri, 9 Oct 2015 14:33:22 -0700
+Subject: [PATCH v2 19/25] pxa2xx-flash: switch from ioremap_cache to
+ memremap
+In-Reply-To: <20151002175127.GH107187@google.com>
+References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150725023945.8664.34842.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20151002175127.GH107187@google.com>
+Message-ID: <CAPcyv4hVNykjWbmdpm4rN3Kf7GNPzNXxxH0jriMe2fpjNJYukg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to use it for getting video modes over HDMI.
+On Fri, Oct 2, 2015 at 10:51 AM, Brian Norris
+<computersforpeace@gmail.com> wrote:
+> + linux-mtd
+>
+> On Fri, Jul 24, 2015 at 10:39:45PM -0400, Dan Williams wrote:
+>> In preparation for deprecating ioremap_cache() convert its usage in
+>> pxa2xx-flash to memremap.
+>>
+>> Cc: David Woodhouse <dwmw2@infradead.org>
+>> Cc: Brian Norris <computersforpeace@gmail.com>
+>> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+>> ---
+>>  drivers/mtd/maps/pxa2xx-flash.c |    4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
+>> index 12fa75df5008..758a8a7f86d9 100644
+>> --- a/drivers/mtd/maps/pxa2xx-flash.c
+>> +++ b/drivers/mtd/maps/pxa2xx-flash.c
+>> @@ -71,8 +71,8 @@ static int pxa2xx_flash_probe(struct platform_device *pdev)
+>>                      info->map.name);
+>>               return -ENOMEM;
+>>       }
+>> -     info->map.cached =
+>> -             ioremap_cache(info->map.phys, info->map.size);
+>> +     info->map.cached = memremap(info->map.phys, info->map.size,
+>> +                     MEMREMAP_CACHE);
+>
+> Should the corresponding iounmap() be changed too? Looks like a pretty
+> thin wrapper right now, but it seems like the API would suggest we do
+> this anyway.
+>
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
----
-
-v2: Mark it as disabled by default, and enable it in bcm2835-rpi.
-
- arch/arm/boot/dts/bcm2835-rpi.dtsi |  4 ++++
- arch/arm/boot/dts/bcm2835.dtsi     | 10 ++++++++++
- 2 files changed, 14 insertions(+)
-
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index ab5474e..3572f03 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -52,6 +52,10 @@
- 	clock-frequency = <100000>;
- };
- 
-+&i2c2 {
-+	status = "okay";
-+};
-+
- &sdhci {
- 	status = "okay";
- 	bus-width = <4>;
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index a6a55b7..1e61eb7 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -167,6 +167,16 @@
- 			status = "disabled";
- 		};
- 
-+		i2c2: i2c at 7e805000 {
-+			compatible = "brcm,bcm2835-i2c";
-+			reg = <0x7e805000 0x1000>;
-+			interrupts = <2 21>;
-+			clocks = <&clocks BCM2835_CLOCK_VPU>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		usb at 7e980000 {
- 			compatible = "brcm,bcm2835-usb";
- 			reg = <0x7e980000 0x10000>;
--- 
-2.1.4
+Yes, thanks for that catch, addressed in the next rev.
