@@ -1,108 +1,72 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri,  9 Oct 2015 17:51:47 +0200
-Subject: [PATCH] ARM: tegra: Comment out gpio-ranges properties
-Message-ID: <1444405907-17996-1-git-send-email-thierry.reding@gmail.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Fri, 9 Oct 2015 17:54:32 +0200 (CEST)
+Subject: [PATCH 2/9] pci: mvebu: fix memory leaks and refcount leaks
+In-Reply-To: <20151009171442.52988f0b@free-electrons.com>
+References: <20151003181228.GI21513@n2100.arm.linux.org.uk>
+ <E1ZiRIs-0004Id-AN@rmk-PC.arm.linux.org.uk>
+ <20151009165240.3ba17ece@free-electrons.com> <20151009150710.GJ14688@lunn.ch>
+ <20151009171442.52988f0b@free-electrons.com>
+Message-ID: <alpine.DEB.2.10.1510091753460.2665@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
 
-While the addition of these properties is technically correct it unveils
-a bug with deferred probe. The problem is that the presence of the gpio-
-range property causes the gpio-tegra driver to defer probe (it needs the
-pinctrl driver to be ready). That's technically correct, but it causes a
-couple of issues:
 
-  - The keyboard on Chromebooks stops working. The reason for that is
-    that the gpio-tegra device has not registered an IRQ domain by the
-    time the EC SPI device is registered, hence the interrupt number
-    resolves to 0. This is technically a bug in the SPI core, since it
-    should really resolve the interrupt at probe time and defer if the
-    IRQ domain isn't available yet. This is similar to what's done for
-    I2C and platform device already.
+On Fri, 9 Oct 2015, Thomas Petazzoni wrote:
 
-  - The gpio-tegra device deferring probe means that it is moved to the
-    end of the dpm_list. This list defines the suspend/resume order for
-    devices. However the core lacks a way to move all users of the
-    gpio-tegra device to the end of the dpm_list at the same time. This
-    in turn results in a subtle bug on Jetson TK1, where the gpio-keys
-    device is used to expose the power key as input. The power key is a
-    convenient way to wake the system from suspend. Interestingly, the
-    gpio-keys device ends up getting probed at a point after gpio-tegra
-    has been probed successfully from having been deferred earlier. As
-    such the driver doesn't need to defer the probe itself, and hence
-    the device isn't moved to the end of the dpm_list. This causes the
-    gpio-tegra device to be suspended before gpio-keys, which in turn
-    leaves gpio-keys unable to wake the system from suspend.
+> Hello
+>
+> (Julia added in the list of recipients).
+>
+> On Fri, 9 Oct 2015 17:07:10 +0200, Andrew Lunn wrote:
+>
+> > > > @@ -1052,10 +1086,12 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+> > > >  		struct mvebu_pcie_port *port = &pcie->ports[i];
+> > > >
+> > > >  		ret = mvebu_pcie_parse_port(pcie, port, child);
+> > > > -		if (ret < 0)
+> > > > +		if (ret < 0) {
+> > > > +			of_node_put(child);
+> > > >  			return ret;
+> > > > -		else if (ret == 0)
+> > > > +		} else if (ret == 0) {
+> > > >  			continue;
+> > > > +		}
+> > >
+> > > This is not trivial. If I understand correctly,
+> > > for_each_available_child_of_node() will automatically release the
+> > > reference on the previous node and take the reference on the new one
+> > > before entering the loop code. So in the skipping case, we don't need
+> > > to release the reference as it will be done by the next iteration of
+> > > the loop, but in the error case, since we are unexpectedly breaking the
+> > > loop, we need to do it manually.
+> > >
+> > > The sort of tricky thing that should be documented near
+> > > for_each_child_of_node(), since I believe a lot of code gets this
+> > > wrong.
+> >
+> > Sounds like a good candidate for a coccinelle script. Maybe you could
+> > ask Julia Lawall?
+>
+> Julia: some of the Device Tree iterator functions have a somewhat
+> "interesting" behavior in that they take the reference on the current
+> child when entering the loop, and release it before entering the next
+> iteration (which will also take a reference to the next child).
+>
+> This means that if you have an exit point inside the loop (break or
+> return), you are loosing a reference. For example,
+> http://lxr.free-electrons.com/source/arch/arm/mach-shmobile/pm-rmobile.c#L367
+> is wrong because there is a missing of_node_put(np) before the "return
+> -ENOMEM".
+>
+> So essentially, every exit point in such Device Tree iteration loops
+> should make to call of_node_put() on the current element before exiting
+> the loop unexpectedly.
+>
+> As Andrew suggested, this is probably something a Coccinelle semantic
+> patch could easily detect and probably fix automatically.
 
-There are patches in the works to fix both of the above issues, but they
-are too involved to make it into v4.3, so in the meantime let's fix the
-regressions by commenting out the gpio-ranges properties until the fixes
-have landed.
+Yeah, I looked at this along time ago, including the interesting
+loop behavior. I'll check on it again.  Thanks for the pointer.
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm/boot/dts/tegra114.dtsi | 2 ++
- arch/arm/boot/dts/tegra124.dtsi | 2 ++
- arch/arm/boot/dts/tegra20.dtsi  | 2 ++
- arch/arm/boot/dts/tegra30.dtsi  | 2 ++
- 4 files changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index 71b992dba71c..136fe2043b2f 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -243,7 +243,9 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		/*
- 		gpio-ranges = <&pinmux 0 0 246>;
-+		*/
- 	};
- 
- 	apbmisc at 70000800 {
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index ec10e769819f..a8828dbe621d 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -273,7 +273,9 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		/*
- 		gpio-ranges = <&pinmux 0 0 251>;
-+		*/
- 	};
- 
- 	apbdma: dma at 0,60020000 {
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 6ac74be843d1..9c7759697d58 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -256,7 +256,9 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		/*
- 		gpio-ranges = <&pinmux 0 0 224>;
-+		*/
- 	};
- 
- 	apbmisc at 70000800 {
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 9b4fa02be321..dcbccb6e9206 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -365,7 +365,9 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		/*
- 		gpio-ranges = <&pinmux 0 0 248>;
-+		*/
- 	};
- 
- 	apbmisc at 70000800 {
--- 
-2.5.0
+julia
