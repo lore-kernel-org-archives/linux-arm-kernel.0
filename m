@@ -1,23 +1,35 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 9 Oct 2015 23:40:52 +0300
-Subject: [PATCH] ARM: shmobile: henninger: add MSIOF0 DT support
-In-Reply-To: <201405070048.00213.sergei.shtylyov@cogentembedded.com>
-References: <201405070048.00213.sergei.shtylyov@cogentembedded.com>
-Message-ID: <56182654.6070205@cogentembedded.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 9 Oct 2015 13:45:47 -0700
+Subject: arm/arm64: GICv2 driver does not have irq_disable implemented
+In-Reply-To: <alpine.DEB.2.11.1510091951250.6097@nanos>
+References: <CADaLND=spbEHLZXmqsVRDsPAyNKXJHnc=Yy6ujY0em74dB5CbA@mail.gmail.com>
+ <alpine.DEB.2.11.1510091951250.6097@nanos>
+Message-ID: <CADaLNDmgWnOAugY20nXWz_-2m-KPKnARMWeYMDTuPdRe8SA8sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2014 12:47 AM, Sergei Shtylyov wrote:
-
-> Define the Henninger board dependent part of the MSIOF0 device node.
-> Add device node for Renesas R2A11302FT PMIC for which no bindings exist yet.
-
-    I've just realized that there's no such PMIC on the Henninger/Porter 
-boards and MSIOF0 is only connected to CN6, hence this patch was wrong.
-The .dts is going to be deleted anyway though...
-
-> Based on the Koelsch MSIOF device tree patch by Geert Uytterhoeven.
+On Fri, Oct 9, 2015 at 10:52 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Fri, 9 Oct 2015, Duc Dang wrote:
+>> Hi Thomas, Marc, Jason and All,
+>>
+>> In APM ARM64 X-Gene Enet controller driver, we use disable_irq_nosync to
+>> disable interrupt before calling __napi_schedule to schedule packet handler
+>> to process the Tx/Rx packets.
 >
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Which is wrong to begin with. Disable the interrupt at the device
+> level not at the interrupt line level.
+>
+Hi Thomas,
 
-MBR, Sergei
+We could not disable the interrupt at Enet controller level due to the
+controller limitation. As you said, using  disable_irq_nosync is wrong
+but it looks like that the only option that we have.
+
+Do you have any suggestion about different approach that we could try?
+
+> Thanks,
+>
+>         tglx
+
+Regards,
+Duc Dang.
