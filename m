@@ -1,95 +1,30 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 9 Oct 2015 15:11:07 +0100
-Subject: [PATCH 3/4] arm64: Juno: Add support for the PCIe host bridge on
- Juno R1
-In-Reply-To: <CAL_JsqJsb53VXiUfjGBXK37dBEi1r-PXVohg-c-7_x63R04VMA@mail.gmail.com>
-References: <1444398323-17354-1-git-send-email-Liviu.Dudau@arm.com>
- <1444398323-17354-4-git-send-email-Liviu.Dudau@arm.com>
- <CAL_JsqJsb53VXiUfjGBXK37dBEi1r-PXVohg-c-7_x63R04VMA@mail.gmail.com>
-Message-ID: <20151009141107.GD3394@e106497-lin.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 9 Oct 2015 09:12:01 -0500
+Subject: [PATCH v2] arm-soc: Add support for Sigma Designs Tango4
+In-Reply-To: <5612A473.8030405@sigmadesigns.com>
+References: <560EAA7C.3070302@free.fr> <5124277.UR9sg1IOHT@wuerfel>
+ <560EFDB3.9010305@free.fr> <11113740.WL812ZaRcZ@wuerfel>
+ <5612A473.8030405@sigmadesigns.com>
+Message-ID: <CAL_Jsq+kgAF_2QJXjcc0Vy3kn4r5s1ZQiX40x77ohpJj7KhCOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 08:54:33AM -0500, Rob Herring wrote:
-> On Fri, Oct 9, 2015 at 8:45 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > Juno R1 board sports a functional PCIe host bridge that is
-> > compliant with the SBSA standard found here[1]. With the right
-> > firmware that initialises the XpressRICH3 controller one can
-> > use the generic Host Bridge driver to use the PCIe hardware.
-> >
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> >
-> > [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0029a/
-> > ---
-> >  arch/arm64/boot/dts/arm/juno-r1.dts | 20 ++++++++++++++++++++
-> >  1 file changed, 20 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-> > index c627511..a702a6b 100644
-> > --- a/arch/arm64/boot/dts/arm/juno-r1.dts
-> > +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-> > @@ -109,6 +109,26 @@
-> >
-> >         #include "juno-base.dtsi"
-> >
-> > +       pcie-controller at 40000000 {
-> > +               compatible = "pci-host-ecam-generic";
-> 
-> I think this is the first case of real h/w using this. We should have
-> a specific compatible here additionally.
+On Mon, Oct 5, 2015 at 11:25 AM, Marc Gonzalez
+<marc_gonzalez@sigmadesigns.com> wrote:
+> This patch adds support for Sigma Designs "Tango4" platform, which is
+> built around the ARM Cortex A9 MPCore (single and dual core SoCs).
 
-Or maybe I can claim the use of the string on account on being the first on arm64 ;)
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/tango4-vantage-1172.dts
+> @@ -0,0 +1,17 @@
+> +/dts-v1/;
+> +
+> +#include "tango4.dtsi"
+> +
+> +/ {
+> +       model = "Sigma Designs SMP8758 Vantage-1172 dev board";
+> +       compatible = "sigma,vantage-1172", "sigma,smp8758", "sigma,tango4";
 
-I can add a vendor prefix if you want, but pci-host-generic is going to ignore it 
-*because* it is trying to be a generic driver.
+Also, these compatible strings need to be documented.
 
->  Perhaps the firmware did not setup something correctly.
-
-Hope not :) I no longer have that much input into the UEFI firmware, but for U-Boot is
-is all in the open and can be fixed at any time (?).
-
-Thanks for reviewing this!
-
-Best regards,
-Liviu
-
-> 
-> > +               device_type = "pci";
-> > +               reg = <0 0x40000000 0 0x10000000>;      /* ECAM config space */
-> > +               bus-range = <0 255>;
-> > +               linux,pci-domain = <0>;
-> > +               #address-cells = <3>;
-> > +               #size-cells = <2>;
-> > +               dma-coherent;
-> > +               ranges = <0x01000000 0x00 0x5f800000 0x00 0x5f800000 0x0 0x00800000
-> > +                         0x02000000 0x00 0x50000000 0x00 0x50000000 0x0 0x08000000
-> > +                         0x42000000 0x40 0x00000000 0x40 0x00000000 0x1 0x00000000>;
-> > +               #interrupt-cells = <1>;
-> > +               interrupt-map-mask = <0 0 0 7>;
-> > +               interrupt-map = <0 0 0 1 &gic 0 0 0 136 4
-> > +                                0 0 0 2 &gic 0 0 0 137 4
-> > +                                0 0 0 3 &gic 0 0 0 138 4
-> > +                                0 0 0 4 &gic 0 0 0 139 4>;
-> > +               msi-parent = <&v2m_0>;
-> > +       };
-> >  };
-> >
-> >  &memtimer {
-> > --
-> > 2.6.0
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Rob
