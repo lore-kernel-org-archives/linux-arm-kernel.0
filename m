@@ -1,57 +1,89 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  9 Oct 2015 09:42:55 +0100
-Subject: [PATCH v3 3/5] ARM: sun5i: dt: Move uart3 pinctrl node to common DTSI
+Date: Fri,  9 Oct 2015 09:42:54 +0100
+Subject: [PATCH v3 2/5] ARM: sun5i: Add R8 DTSI
 In-Reply-To: <1444380177-15302-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1444380177-15302-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1444380177-15302-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1444380177-15302-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The uart3 pins are shared between the A10s and A13, move the pinctrl node
-to the common DTSI to avoid duplication.
+The R8 is very close to the A13, but it still has a few differences,
+notably a composite output, which the A13 lacks.
+
+Add a DTSI based on the A13's to hold those differences.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun5i-a10s.dtsi | 7 -------
- arch/arm/boot/dts/sun5i.dtsi      | 7 +++++++
- 2 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/sun5i-r8.dtsi | 59 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun5i-r8.dtsi
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 0fdabe8eb9e8..2ebd32f5bc6e 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -204,13 +204,6 @@
- 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- 
--	uart3_pins_a: uart3 at 0 {
--		allwinner,pins = "PG9", "PG10";
--		allwinner,function = "uart3";
--		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--	};
--
- 	emac_pins_a: emac0 at 0 {
- 		allwinner,pins = "PA0", "PA1", "PA2",
- 				"PA3", "PA4", "PA5", "PA6",
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index 78b993abbaa3..433c83a321ca 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -529,6 +529,13 @@
- 				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
- 				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
+diff --git a/arch/arm/boot/dts/sun5i-r8.dtsi b/arch/arm/boot/dts/sun5i-r8.dtsi
+new file mode 100644
+index 000000000000..0ef865601ac9
+--- /dev/null
++++ b/arch/arm/boot/dts/sun5i-r8.dtsi
+@@ -0,0 +1,59 @@
++/*
++ * Copyright 2015 Free Electrons
++ * Copyright 2015 NextThing Co
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+			uart3_pins_a: uart3 at 0 {
-+				allwinner,pins = "PG9", "PG10";
-+				allwinner,function = "uart3";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
- 		};
- 
- 		timer at 01c20c00 {
++#include "sun5i-a13.dtsi"
++
++/ {
++	chosen {
++		framebuffer at 1 {
++			compatible = "allwinner,simple-framebuffer",
++				     "simple-framebuffer";
++			allwinner,pipeline = "de_be0-lcd0-tve0";
++			clocks = <&pll5 1>, <&ahb_gates 34>, <&ahb_gates 36>,
++				 <&ahb_gates 44>;
++			status = "disabled";
++		};
++	};
++};
 -- 
 2.5.3
