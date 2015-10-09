@@ -1,111 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Oct 2015 13:26:02 +0100
-Subject: [PATCH v3] arm: Adding support for atomic half word exchange
-In-Reply-To: <254593560.800231444389001687.JavaMail.weblogic@epmlwas03b>
-References: <254593560.800231444389001687.JavaMail.weblogic@epmlwas03b>
-Message-ID: <20151009122602.GO32532@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Oct 2015 13:32:54 +0100
+Subject: [PATCH v2 10/10] ARM: software-based priviledged-no-access support
+In-Reply-To: <20151009112418.GN32532@n2100.arm.linux.org.uk>
+References: <20150825154026.GT7557@n2100.arm.linux.org.uk>
+ <E1ZUGMS-0000BG-8B@rmk-PC.arm.linux.org.uk>
+ <CACRpkdZhJfsH0wU0VBotT=yomDqBkKWrz3MNFOin=CCz62v_nw@mail.gmail.com>
+ <20151009105309.GM26278@arm.com>
+ <20151009112418.GN32532@n2100.arm.linux.org.uk>
+Message-ID: <20151009123254.GN26278@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 11:10:02AM +0000, Sarbojit Ganguly wrote:
-> Hello Will,
+On Fri, Oct 09, 2015 at 12:24:18PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Oct 09, 2015 at 11:53:09AM +0100, Will Deacon wrote:
+> > It looks like we're faulting on the TLBI instruction, because it's
+> > targetting a userspace address (r0 == 0xb6f01002) and the DAC prohibits
+> > access to userspace.
 > 
-> Thank you so much for your patience. My sincere apologies with the issues with
-> formatting. I have taken care of them and hope now things are ok.
-> 
-> - Included patchesATarm.linux.org.uk.
-> - Removed the changelog from commit message.
-> - Moved the patch to "superseded" in patch system.
-> - Corrected the truncated Signed-off line.
-> 
-> KernelVersion: 4.3-rc4
-> 
-> Since support for half-word atomic exchange was not there and Qspinlock on ARM
-> requires it, modified __xchg() to add support for that as well. ARMv6 and lower
-> does not support ldrex{b,h} so, added a guard code to prevent build breaks.
-> 
-> Signed-off-by: Sarbojit Ganguly <ganguly.s@samsung.com>
-> ---
+> That's kind'a weird - I'd have expected _cache_ operations to fault,
+> but not TLB operations.  From a quick search of the ARM ARM, I can't
+> find anything that says that TLB operations are allowed to fault.
 
-The commit message is everything above the "---" line.  It starts
-with the subject line, a blank line, and then "Hello Will,".
+Yes, you're right. I was concentrating on the cross-call scenario and
+forgot this was TLB not cache maintenance, so faulting is indeed bizarre.
 
-I'll fix up the commit message this time, but please take note for
-future patches.
+> > It's weird that this only seems to happen on 11MPCore
+> > though; if this core was one of the guys getting cross-called, then I
+> > could understand the bug, but the lr suggests that CPU 2 is initiating
+> > the flush, so I'd expect the same problem to appear on any ARMv6 part.
+> 
+> It sounds to me like a CPU bug, but one which we need to work around.
+> ipi_flush_tlb_range() will be the function concerned, we need to
+> save-and-enable, and then restore the user access state around that
+> call.
+> 
+> > Russell, have you tried the s/w PAN stuff on any v6 CPUs?
+> 
+> No.  I have considered having the Realview EB board as part of the test
+> farm, but as that board is hassle to get going, I deem the hardware to
+> be too unreliable for that.  (I reported the problem at the time.)
+> 
+> Linus, can you try the patch below to see if it resolves the problem
+> you're seeing please?
 
-You're also the first one to send a patch where the body _inside_ the
-base64 container has CRLF line endings...
+If this fixes things, I'll dig up the errata document to see if this is
+a known hardware issue.
 
->  arch/arm/include/asm/cmpxchg.h | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
-> index 916a274..97882f9 100644
-> --- a/arch/arm/include/asm/cmpxchg.h
-> +++ b/arch/arm/include/asm/cmpxchg.h
-> @@ -39,6 +39,7 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
->  
->  	switch (size) {
->  #if __LINUX_ARM_ARCH__ >= 6
-> +#ifndef CONFIG_CPU_V6 /* MIN ARCH >= V6K */
->  	case 1:
->  		asm volatile("@	__xchg1\n"
->  		"1:	ldrexb	%0, [%3]\n"
-> @@ -49,6 +50,17 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
->  			: "r" (x), "r" (ptr)
->  			: "memory", "cc");
->  		break;
-> +	case 2:
-> +		asm volatile("@	__xchg2\n"
-> +		"1:	ldrexh	%0, [%3]\n"
-> +		"	strexh	%1, %2, [%3]\n"
-> +		"	teq	%1, #0\n"
-> +		"	bne	1b"
-> +			: "=&r" (ret), "=&r" (tmp)
-> +			: "r" (x), "r" (ptr)
-> +			: "memory", "cc");
-> +		break;
-> +#endif
->  	case 4:
->  		asm volatile("@	__xchg4\n"
->  		"1:	ldrex	%0, [%3]\n"
-> -- 
-> 1.9.1
-> 
-> Sarbojit
-> 
-> ------- Original Message -------
-> Sender : Will Deacon<will.deacon@arm.com>
-> Date : Oct 08, 2015 22:26 (GMT+05:30)
-> Title : Re: Re: Re: Re: Re: [PATCH v3] arm: Adding support for atomic half word exchange
-> 
-> On Wed, Oct 07, 2015 at 02:36:41PM +0000, Sarbojit Ganguly wrote:
-> > Please have a look at this patch, please let me know if any modification
-> > is required.
-> > I have also submitted the same in your patch system.
-> 
-> There are some problems with the version in the patch system[1]:
-> 
->   (1) You still have the changelog in the commit message (I asked you to
->       remove this last time).
-> 
->   (2) The commit message isn't line-wrapper appropriately
-> 
->   (3) Your Signed-off-by line is truncated
-> 
-> The patch system does actually support git, so you can add:
-> 
->   KernelVersion: 4.3-rc4
-> 
-> or whatever kernel you based your patch on somewhere after your SoB but
-> before the diff and then mail it to patchesATarm.linux.org.uk. You
-> probably also want to move the current patch to "superseded" so Russell
-> doesn't end up with two copies.
-> 
-> Will
-> 
-> [1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8442/1
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Will
