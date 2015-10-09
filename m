@@ -1,57 +1,44 @@
-From: edward.cragg@codethink.co.uk (Edward Cragg)
-Date: Fri,  9 Oct 2015 15:37:10 +0100
-Subject: [PATCH 1/1] ARM: meson: Add status LED for Odroid-C1
-In-Reply-To: <1444401430-4396-1-git-send-email-edward.cragg@codethink.co.uk>
-References: <1444401430-4396-1-git-send-email-edward.cragg@codethink.co.uk>
-Message-ID: <1444401430-4396-2-git-send-email-edward.cragg@codethink.co.uk>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 09 Oct 2015 15:40:39 +0100
+Subject: [PATCH v3] arm-soc: Add support for Sigma Designs Tango4
+In-Reply-To: <5898159.aPJzsGHAv7@wuerfel> (Arnd Bergmann's message of "Fri, 09
+ Oct 2015 15:18:15 +0200")
+References: <560EAA7C.3070302@free.fr> <5612A473.8030405@sigmadesigns.com>
+ <5613EF4C.30603@sigmadesigns.com> <5898159.aPJzsGHAv7@wuerfel>
+Message-ID: <yw1xbnc8jeag.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the blue status LED to the Hardkernel Odroid C1 board DTS.
-This is the only programmable LED on the board.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Signed-off-by: Edward Cragg <edward.cragg@codethink.co.uk>
----
- arch/arm/boot/dts/meson8b-odroidc1.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+> On Tuesday 06 October 2015 17:57:00 Marc Gonzalez wrote:
+>> This patch adds support for Sigma Designs "Tango4" platform, which is
+>> built around the ARM Cortex A9 MPCore (single and dual core SoCs).
+>> 
+>> Tango4 is not to be confused with Tango3, which was built around a
+>> MIPS 74kf CPU.
+>> 
+>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> ---
+>> v3 changes: Updated clock tree DT (clk driver submitted)
+>> 
+>
+> Looks all reasonable to me now. Can I get an Ack from M?ns? It sounds
+> like he is the original author of the port.
 
-diff --git a/arch/arm/boot/dts/meson8b-odroidc1.dts b/arch/arm/boot/dts/meson8b-odroidc1.dts
-index a8e2911..3b03523 100644
---- a/arch/arm/boot/dts/meson8b-odroidc1.dts
-+++ b/arch/arm/boot/dts/meson8b-odroidc1.dts
-@@ -1,6 +1,8 @@
- /*
-  * Copyright 2015 Endless Mobile, Inc.
-  * Author: Carlo Caione <carlo@endlessm.com>
-+ * Copyright 2015 Codethink Ltd.
-+ * Author: Edward Cragg <edward.cragg@codethink.co.uk>
-  *
-  * This file is dual-licensed: you can use it either under the terms
-  * of the GPL or the X11 license, at your option. Note that this dual
-@@ -46,6 +48,7 @@
- 
- /dts-v1/;
- #include "meson8b.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "Hardkernel ODROID-C1";
-@@ -58,6 +61,16 @@
- 	memory {
- 		reg = <0x40000000 0x40000000>;
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		blue {
-+			label = "c1:blue:alive";
-+			gpios = <&gpio_ao GPIOAO_13 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+			default-state = "off";
-+		};
-+	};
- };
- 
- &uart_AO {
+NAK.  The clock parts are a complete shambles (compare to the patch I
+sent earlier today), and the rest has a bunch of pointless and
+misleading changes compared to my code.  This version won't work
+correctly even on the SMP8759 hardware I have, let alone on the older
+members of the chip family.  My code does.
+
+The reason I haven't posted my patches is that I'm still working them
+(albeit slowly), and I don't yet consider the code fit for upstreaming.
+
+I've tried to work nicely with Sigma on this, but that's proving
+difficult.  The patches posted so far by Marc seem to me like nothing
+but poor NIH rewrites of my code.
+
 -- 
-2.5.0
+M?ns Rullg?rd
+mans at mansr.com
