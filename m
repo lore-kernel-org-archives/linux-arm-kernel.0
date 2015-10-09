@@ -1,54 +1,56 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri,  9 Oct 2015 10:39:26 +0100
-Subject: [PATCH v2 3/4] i2c: s3c2410: enable RuntimePM before registering to
- the core
-In-Reply-To: <1444383567-18113-1-git-send-email-wsa@the-dreams.de>
-References: <1444383567-18113-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1444383567-18113-3-git-send-email-wsa@the-dreams.de>
+From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
+Date: Fri, 9 Oct 2015 12:40:21 +0300
+Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
+In-Reply-To: <20151009091037.GC26278@arm.com>
+References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
+ <CAPAsAGz7Tp6Z87tPq_NNh_mcwPF_DOaXzu0po5f6AQxPAcsALQ@mail.gmail.com>
+ <20151009091037.GC26278@arm.com>
+Message-ID: <CAPAsAGzgqOZVdTfpBGADAhZjOJTCqdB1Paq-14vk-_1hu4DCyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+2015-10-09 12:10 GMT+03:00 Will Deacon <will.deacon@arm.com>:
+> On Fri, Oct 09, 2015 at 11:12:24AM +0300, Andrey Ryabinin wrote:
+>> 2015-10-08 22:02 GMT+03:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
+>> > --- a/arch/arm64/kernel/image.h
+>> > +++ b/arch/arm64/kernel/image.h
+>> > @@ -59,4 +59,31 @@
+>> >         _kernel_offset_le       = DATA_LE64(TEXT_OFFSET);       \
+>> >         _kernel_flags_le        = DATA_LE64(__HEAD_FLAGS);
+>> >
+>> > +#ifdef CONFIG_EFI
+>> > +
+>> > +/*
+>> > + * The EFI stub has its own symbol namespace prefixed by __efistub_, to
+>> > + * isolate it from the kernel proper. The following symbols are legally
+>> > + * accessed by the stub, so provide some aliases to make them accessible.
+>> > + * Only include data symbols here, or text symbols of functions that are
+>> > + * guaranteed to be safe when executed at another offset than they were
+>> > + * linked at. The routines below are all implemented in assembler in a
+>> > + * position independent manner
+>> > + */
+>> > +__efistub_memcmp               = __pi_memcmp;
+>> > +__efistub_memchr               = __pi_memchr;
+>> > +__efistub_memcpy               = __pi_memcpy;
+>> > +__efistub_memmove              = __pi_memmove;
+>> > +__efistub_memset               = __pi_memset;
+>> > +__efistub_strlen               = __pi_strlen;
+>> > +__efistub_strcmp               = __pi_strcmp;
+>> > +__efistub_strncmp              = __pi_strncmp;
+>> > +__efistub___flush_dcache_area  = __pi___flush_dcache_area;
+>>
+>> So why we need these __pi_* aliases?
+>> We could just do __efistub_memcmp = memcmp; Right?
+>
+> We *could*, but that defeats the whole purpose of tagging
+> position-independent functions explicitly in the kernel text.
+>
 
-The core may register clients attached to this master which may use
-funtionality from the master. So, RuntimePM must be enabled before, otherwise
-this will fail. While here, move drvdata, too.
+I just don't get that "the whole purpose of tagging".
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
----
- drivers/i2c/busses/i2c-s3c2410.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 50bfd8cef5f224..336e34e1ca597d 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -1243,19 +1243,21 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
- 	i2c->adap.nr = i2c->pdata->bus_num;
- 	i2c->adap.dev.of_node = pdev->dev.of_node;
- 
-+	platform_set_drvdata(pdev, i2c);
-+
-+	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_enable(&i2c->adap.dev);
-+
- 	ret = i2c_add_numbered_adapter(&i2c->adap);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "failed to add bus to i2c core\n");
-+		pm_runtime_disable(&i2c->adap.dev);
-+		pm_runtime_disable(&pdev->dev);
- 		s3c24xx_i2c_deregister_cpufreq(i2c);
- 		clk_unprepare(i2c->clk);
- 		return ret;
- 	}
- 
--	platform_set_drvdata(pdev, i2c);
--
--	pm_runtime_enable(&pdev->dev);
--	pm_runtime_enable(&i2c->adap.dev);
--
- 	dev_info(&pdev->dev, "%s: S3C I2C adapter\n", dev_name(&i2c->adap.dev));
- 	return 0;
- }
--- 
-2.1.4
+Yes, the EFI stub is allowed to call only PI kernel functions.
+But the EFI stub already protected by __efistub_ namespace.
+If we want to use some new PI function in the stub, we would need add
+it into this list at first.
+So that __pi_ namespace doesn't bring any protection or isolation.
