@@ -1,109 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 09 Oct 2015 10:10:27 +0100
-Subject: [PATCH RFC 1/1] irqchip/GICv2m: Add support for multiple v2m
- frames
-In-Reply-To: <1444290518-18527-1-git-send-email-dhdang@apm.com>
-References: <1444290518-18527-1-git-send-email-dhdang@apm.com>
-Message-ID: <56178483.5040404@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Oct 2015 10:10:37 +0100
+Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
+In-Reply-To: <CAPAsAGz7Tp6Z87tPq_NNh_mcwPF_DOaXzu0po5f6AQxPAcsALQ@mail.gmail.com>
+References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
+ <CAPAsAGz7Tp6Z87tPq_NNh_mcwPF_DOaXzu0po5f6AQxPAcsALQ@mail.gmail.com>
+Message-ID: <20151009091037.GC26278@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Duc,
-
-On 08/10/15 08:48, Duc Dang wrote:
-> GICv2m driver currently only supports single v2m frame. This
-> patch extend this driver to support multiple v2m frames. All of
-> the v2m frames will be own by a single MSI domain. Each PCIe node
-> can specify msi-parent as the first frame of the v2m frame list
-> to be able to use all available v2m frames for MSI interrupts.
+On Fri, Oct 09, 2015 at 11:12:24AM +0300, Andrey Ryabinin wrote:
+> 2015-10-08 22:02 GMT+03:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
+> > --- a/arch/arm64/kernel/image.h
+> > +++ b/arch/arm64/kernel/image.h
+> > @@ -59,4 +59,31 @@
+> >         _kernel_offset_le       = DATA_LE64(TEXT_OFFSET);       \
+> >         _kernel_flags_le        = DATA_LE64(__HEAD_FLAGS);
+> >
+> > +#ifdef CONFIG_EFI
+> > +
+> > +/*
+> > + * The EFI stub has its own symbol namespace prefixed by __efistub_, to
+> > + * isolate it from the kernel proper. The following symbols are legally
+> > + * accessed by the stub, so provide some aliases to make them accessible.
+> > + * Only include data symbols here, or text symbols of functions that are
+> > + * guaranteed to be safe when executed at another offset than they were
+> > + * linked at. The routines below are all implemented in assembler in a
+> > + * position independent manner
+> > + */
+> > +__efistub_memcmp               = __pi_memcmp;
+> > +__efistub_memchr               = __pi_memchr;
+> > +__efistub_memcpy               = __pi_memcpy;
+> > +__efistub_memmove              = __pi_memmove;
+> > +__efistub_memset               = __pi_memset;
+> > +__efistub_strlen               = __pi_strlen;
+> > +__efistub_strcmp               = __pi_strcmp;
+> > +__efistub_strncmp              = __pi_strncmp;
+> > +__efistub___flush_dcache_area  = __pi___flush_dcache_area;
 > 
-> This patch should be applied on top of patch 
-> (irqchip/GICv2m: Add workaround for APM X-Gene GICv2m erratum):
-> https://lkml.org/lkml/2015/10/6/922
-> 
-> Signed-off-by: Duc Dang <dhdang@apm.com>
-> ---
->  drivers/irqchip/irq-gic-v2m.c | 221 ++++++++++++++++++++++++++++++------------
->  1 file changed, 159 insertions(+), 62 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-> index 4c17c18..8ecaf9e 100644
-> --- a/drivers/irqchip/irq-gic-v2m.c
-> +++ b/drivers/irqchip/irq-gic-v2m.c
-> @@ -51,13 +51,19 @@
->  #define GICV2M_NEEDS_SPI_OFFSET		0x00000001
->  
->  struct v2m_data {
-> -	spinlock_t msi_cnt_lock;
->  	struct resource res;	/* GICv2m resource */
->  	void __iomem *base;	/* GICv2m virt address */
->  	u32 spi_start;		/* The SPI number that MSIs start */
->  	u32 nr_spis;		/* The number of SPIs for MSIs */
-> -	unsigned long *bm;	/* MSI vector bitmap */
->  	u32 flags;		/* v2m flags for specific implementation */
-> +	struct list_head list;  /* Link to other v2m frames */
-> +};
-> +
-> +struct gicv2m_ctrlr {
-> +	spinlock_t v2m_ctrlr_lock;      /* Lock for all v2m frames */
-> +	u32 nr_vecs;                    /* Total MSI vectors */
-> +	unsigned long *bm;              /* MSI vector bitmap */
-> +	struct list_head v2m_frms;      /* List of v2m frames */
->  };
->  
->  static void gicv2m_mask_msi_irq(struct irq_data *d)
-> @@ -98,11 +104,29 @@ static int gicv2m_set_affinity(struct irq_data *irq_data,
->  	return ret;
->  }
->  
-> +static struct v2m_data *irq_data_to_v2m_frm(struct irq_data *data,
-> +					    struct gicv2m_ctrlr *v2m_ctrlr)
-> +{
-> +	struct v2m_data *v2m;
-> +
-> +	list_for_each_entry(v2m, &v2m_ctrlr->v2m_frms, list) {
-> +		if ((data->hwirq >= v2m->spi_start) &&
-> +		    (data->hwirq < (v2m->spi_start + v2m->nr_spis)))
-> +			return v2m;
-> +	}
-> +
-> +	return NULL;
-> +}
-> +
->  static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
->  {
-> -	struct v2m_data *v2m = irq_data_get_irq_chip_data(data);
-> -	phys_addr_t addr = v2m->res.start + V2M_MSI_SETSPI_NS;
-> +	struct gicv2m_ctrlr *v2m_ctrlr = irq_data_get_irq_chip_data(data);
-> +	struct v2m_data *v2m;
-> +	phys_addr_t addr;
->  
-> +	v2m = irq_data_to_v2m_frm(data, v2m_ctrlr);
-> +	WARN_ON(!v2m);
-> +	addr = v2m->res.start + V2M_MSI_SETSPI_NS;
+> So why we need these __pi_* aliases?
+> We could just do __efistub_memcmp = memcmp; Right?
 
-At that particular point, I've stopped reading.
+We *could*, but that defeats the whole purpose of tagging
+position-independent functions explicitly in the kernel text.
 
-Pointlessly iterating over the frames when you can store the right one
-in irq_data was bad enough, but having a WARN_ON() followed by a panic
-is just not acceptable. Either you warn and avoid the crash, or you just
-assume that the whole thing is sane and will never be inconsistent.
-
-You are also changing the way this driver works, and not for the best.
-I've just written something fairly similar, with the following diffstat:
-
- 1 file changed, 76 insertions(+), 45 deletions(-)
-
-The current infrastructure is sound, you just have to make use of it.
-
-I've pushed the following (untested) patch:
-
-https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/multi-v2m&id=45e35adb60087792626570ff21bb23ab0f67a6ac
-
-Let me know if that works for you.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
