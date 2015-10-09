@@ -1,147 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Oct 2015 11:13:38 +0100
-Subject: [PATCHv2] arm: perf: Add event descriptions
-In-Reply-To: <20151007182735.GA18706@dreric01-gentoo.localdomain>
-References: <20151007182735.GA18706@dreric01-gentoo.localdomain>
-Message-ID: <20151009101338.GH26278@arm.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Fri, 9 Oct 2015 12:16:39 +0200
+Subject: [PATCH v2 3/5] ARM: mvebu: set SW polling as SDHCI card detection
+ on A388-GP
+In-Reply-To: <20151009095204.41010dd9@free-electrons.com>
+References: <1444352635-21965-1-git-send-email-mw@semihalf.com>
+ <1444352635-21965-4-git-send-email-mw@semihalf.com>
+ <20151009095204.41010dd9@free-electrons.com>
+Message-ID: <CAPv3WKcy4iDwcLoeu8zn1CVDJrwcRsXFHBjEt60Bi9F9q8JXzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 11:28:18AM -0700, Drew Richardson wrote:
-> Add additional information about the ARM architected hardware events
-> to make counters self describing. This makes the hardware PMUs easier
-> to use as perf list contains possible events instead of users having
-> to refer to documentation like the ARM TRMs.
-> 
-> Signed-off-by: Drew Richardson <drew.richardson@arm.com>
-> ---
->  arch/arm/kernel/perf_event_v7.c | 96 +++++++++++++++++++++++++++++++++++++++++
->  drivers/perf/arm_pmu.c          |  1 +
->  2 files changed, 97 insertions(+)
-> 
-> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-> index 126dc679b230..6623bd0d8a1d 100644
-> --- a/arch/arm/kernel/perf_event_v7.c
-> +++ b/arch/arm/kernel/perf_event_v7.c
-> @@ -547,6 +547,95 @@ static const unsigned scorpion_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
->  	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)] = ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
->  };
->  
-> +static ssize_t armv7_event_sysfs_show(struct device *dev,
-> +				      struct device_attribute *attr, char *page)
-> +{
-> +	struct perf_pmu_events_attr *pmu_attr;
-> +
-> +	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr);
-> +
-> +	return sprintf(page, "event=0x%02llx\n", pmu_attr->id);
-> +}
+Hi Thomas,
 
-Can we not do this with a couple of macros, stringification of the event
-code and PMU_EVENT_ATTR_STRING, therefore avoiding this function entirely?
 
-> +#define ARMV7_EVENT_ATTR(name, config) \
-> +	PMU_EVENT_ATTR(name, armv7_event_attr_##name, config, \
-> +		       armv7_event_sysfs_show);
-> +
-> +ARMV7_EVENT_ATTR(sw_incr, ARMV7_PERFCTR_PMNC_SW_INCR);
-> +ARMV7_EVENT_ATTR(l1i_cache_refill, ARMV7_PERFCTR_L1_ICACHE_REFILL);
-> +ARMV7_EVENT_ATTR(l1i_tlb_refill, ARMV7_PERFCTR_ITLB_REFILL);
-> +ARMV7_EVENT_ATTR(l1d_cache_refill, ARMV7_PERFCTR_L1_DCACHE_REFILL);
-> +ARMV7_EVENT_ATTR(l1d_cache, ARMV7_PERFCTR_L1_DCACHE_ACCESS);
-> +ARMV7_EVENT_ATTR(l1d_tlb_refill, ARMV7_PERFCTR_DTLB_REFILL);
-> +ARMV7_EVENT_ATTR(ld_retired, ARMV7_PERFCTR_MEM_READ);
-> +ARMV7_EVENT_ATTR(st_retired, ARMV7_PERFCTR_MEM_WRITE);
-> +ARMV7_EVENT_ATTR(inst_retired, ARMV7_PERFCTR_INSTR_EXECUTED);
-> +ARMV7_EVENT_ATTR(exc_taken, ARMV7_PERFCTR_EXC_TAKEN);
-> +ARMV7_EVENT_ATTR(exc_return, ARMV7_PERFCTR_EXC_EXECUTED);
-> +ARMV7_EVENT_ATTR(cid_write_retired, ARMV7_PERFCTR_CID_WRITE);
-> +ARMV7_EVENT_ATTR(pc_write_retired, ARMV7_PERFCTR_PC_WRITE);
-> +ARMV7_EVENT_ATTR(br_immed_retired, ARMV7_PERFCTR_PC_IMM_BRANCH);
-> +ARMV7_EVENT_ATTR(br_return_retired, ARMV7_PERFCTR_PC_PROC_RETURN);
-> +ARMV7_EVENT_ATTR(unaligned_ldst_retired, ARMV7_PERFCTR_MEM_UNALIGNED_ACCESS);
-> +ARMV7_EVENT_ATTR(br_mis_pred, ARMV7_PERFCTR_PC_BRANCH_MIS_PRED);
-> +ARMV7_EVENT_ATTR(cpu_cycles, ARMV7_PERFCTR_CLOCK_CYCLES);
-> +ARMV7_EVENT_ATTR(br_pred, ARMV7_PERFCTR_PC_BRANCH_PRED);
-> +ARMV7_EVENT_ATTR(mem_access, ARMV7_PERFCTR_MEM_ACCESS);
-> +ARMV7_EVENT_ATTR(l1i_cache, ARMV7_PERFCTR_L1_ICACHE_ACCESS);
-> +ARMV7_EVENT_ATTR(l1d_cache_wb, ARMV7_PERFCTR_L1_DCACHE_WB);
-> +ARMV7_EVENT_ATTR(l2d_cache, ARMV7_PERFCTR_L2_CACHE_ACCESS);
-> +ARMV7_EVENT_ATTR(l2d_cache_refill, ARMV7_PERFCTR_L2_CACHE_REFILL);
-> +ARMV7_EVENT_ATTR(l2d_cache_wb, ARMV7_PERFCTR_L2_CACHE_WB);
-> +ARMV7_EVENT_ATTR(bus_access, ARMV7_PERFCTR_BUS_ACCESS);
-> +ARMV7_EVENT_ATTR(memory_error, ARMV7_PERFCTR_MEM_ERROR);
-> +ARMV7_EVENT_ATTR(inst_spec, ARMV7_PERFCTR_INSTR_SPEC);
-> +ARMV7_EVENT_ATTR(ttbr_write_retired, ARMV7_PERFCTR_TTBR_WRITE);
-> +ARMV7_EVENT_ATTR(bus_cycles, ARMV7_PERFCTR_BUS_CYCLES);
-> +
-> +static struct attribute *armv7_pmuv2_event_attrs[] = {
-> +	&armv7_event_attr_sw_incr.attr.attr,
-> +	&armv7_event_attr_l1i_cache_refill.attr.attr,
-> +	&armv7_event_attr_l1i_tlb_refill.attr.attr,
-> +	&armv7_event_attr_l1d_cache_refill.attr.attr,
-> +	&armv7_event_attr_l1d_cache.attr.attr,
-> +	&armv7_event_attr_l1d_tlb_refill.attr.attr,
-> +	&armv7_event_attr_ld_retired.attr.attr,
-> +	&armv7_event_attr_st_retired.attr.attr,
-> +	&armv7_event_attr_inst_retired.attr.attr,
-> +	&armv7_event_attr_exc_taken.attr.attr,
-> +	&armv7_event_attr_exc_return.attr.attr,
-> +	&armv7_event_attr_cid_write_retired.attr.attr,
-> +	&armv7_event_attr_pc_write_retired.attr.attr,
-> +	&armv7_event_attr_br_immed_retired.attr.attr,
-> +	&armv7_event_attr_br_return_retired.attr.attr,
-> +	&armv7_event_attr_unaligned_ldst_retired.attr.attr,
-> +	&armv7_event_attr_br_mis_pred.attr.attr,
-> +	&armv7_event_attr_cpu_cycles.attr.attr,
-> +	&armv7_event_attr_br_pred.attr.attr,
-> +	&armv7_event_attr_mem_access.attr.attr,
-> +	&armv7_event_attr_l1i_cache.attr.attr,
-> +	&armv7_event_attr_l1d_cache_wb.attr.attr,
-> +	&armv7_event_attr_l2d_cache.attr.attr,
-> +	&armv7_event_attr_l2d_cache_refill.attr.attr,
-> +	&armv7_event_attr_l2d_cache_wb.attr.attr,
-> +	&armv7_event_attr_bus_access.attr.attr,
-> +	&armv7_event_attr_memory_error.attr.attr,
-> +	&armv7_event_attr_inst_spec.attr.attr,
-> +	&armv7_event_attr_ttbr_write_retired.attr.attr,
-> +	&armv7_event_attr_bus_cycles.attr.attr,
-> +	NULL
-> +};
-> +
-> +static struct attribute_group armv7_pmuv2_events_attr_group = {
-> +	.name = "events",
-> +	.attrs = armv7_pmuv2_event_attrs,
-> +};
-> +
-> +static const struct attribute_group *armv7_pmuv2_attr_groups[] = {
-> +	&armv7_pmuv2_events_attr_group,
-> +	NULL
-> +};
-> +
->  /*
->   * Perf Events' indices
->   */
-> @@ -1085,6 +1174,7 @@ static int armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
->  	armv7pmu_init(cpu_pmu);
->  	cpu_pmu->name		= "armv7_cortex_a8";
->  	cpu_pmu->map_event	= armv7_a8_map_event;
-> +	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
->  	return armv7_probe_num_events(cpu_pmu);
->  }
->  
-> @@ -1093,6 +1183,7 @@ static int armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
->  	armv7pmu_init(cpu_pmu);
->  	cpu_pmu->name		= "armv7_cortex_a9";
->  	cpu_pmu->map_event	= armv7_a9_map_event;
-> +	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
+2015-10-09 9:52 GMT+02:00 Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com>:
+> Dear Marcin Wojtas,
+>
+> On Fri,  9 Oct 2015 03:03:53 +0200, Marcin Wojtas wrote:
+>> The newest revisions of A388-GP (v1.5 and higher) support only
+>> DAT3-based card detection. Revisions < v1.5 based on GPIO detection
+>> via I2C expander, but this solution is supposed to be deprecated on
+>> new boards. In order to satisfy all type of hardware this commit
+>> changes card detection to use software polling mechanism.
+>>
+>> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+>
+> Can we add a comment on the DT that explains why SW polling is used,
+> and which other mechanism can be used depending on the board revision?
 
-I didn't think these guys supported PMUv2, or is that backwards compatible
-with the older event definitions?
+Sure, good idea. Do you think the below would be sufficient?
+sdhci at d8000 {
+    pinctrl-names = "default";
+    pinctrl-0 = <&sdhci_pins>;
+    no-1-8-v;
+    /*
+     * A388-GP board v1.5 and higher replace
+     * hitherto card detection method based on GPIO
+     * with the one using DAT3 pin. As they are
+     * incompatible, software-based polling is
+     * enabled with 'broken-cd' property. For boards
+     * older than v1.5 it can be replaced with:
+     * 'cd-gpios = <&expander0 5 GPIO_ACTIVE_LOW>;',
+     * whereas for the newer ones following can be
+     * used instead:
+     * 'dat3-cd;'
+     * 'cd-inverted;'
+     */
+broken-cd;
+wp-inverted;
+bus-width = <8>;
+status = "okay";
+};
 
-Also, would you be able to do something similar for AArch64 too, please?
-(take a look at our for-next/core branch for the latest perf changes).
-
-Thanks,
-
-Will
+Best regards,
+Marcin
