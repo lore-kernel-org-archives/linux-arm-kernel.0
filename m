@@ -1,105 +1,66 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Fri,  9 Oct 2015 15:11:10 +0530
-Subject: [PATCH v4 8/8] arm64: dts: msm8916: Add thermal zones,
- tsens and qfprom nodes
-In-Reply-To: <1444383670-32693-1-git-send-email-rnayak@codeaurora.org>
-References: <1444383670-32693-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1444383670-32693-9-git-send-email-rnayak@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Oct 2015 10:43:24 +0100
+Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
+In-Reply-To: <CAPAsAGzgqOZVdTfpBGADAhZjOJTCqdB1Paq-14vk-_1hu4DCyw@mail.gmail.com>
+References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
+ <CAPAsAGz7Tp6Z87tPq_NNh_mcwPF_DOaXzu0po5f6AQxPAcsALQ@mail.gmail.com>
+ <20151009091037.GC26278@arm.com>
+ <CAPAsAGzgqOZVdTfpBGADAhZjOJTCqdB1Paq-14vk-_1hu4DCyw@mail.gmail.com>
+Message-ID: <20151009094324.GE26278@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add thermal zones, tsens and qfprom nodes
+On Fri, Oct 09, 2015 at 12:40:21PM +0300, Andrey Ryabinin wrote:
+> 2015-10-09 12:10 GMT+03:00 Will Deacon <will.deacon@arm.com>:
+> > On Fri, Oct 09, 2015 at 11:12:24AM +0300, Andrey Ryabinin wrote:
+> >> 2015-10-08 22:02 GMT+03:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
+> >> > --- a/arch/arm64/kernel/image.h
+> >> > +++ b/arch/arm64/kernel/image.h
+> >> > @@ -59,4 +59,31 @@
+> >> >         _kernel_offset_le       = DATA_LE64(TEXT_OFFSET);       \
+> >> >         _kernel_flags_le        = DATA_LE64(__HEAD_FLAGS);
+> >> >
+> >> > +#ifdef CONFIG_EFI
+> >> > +
+> >> > +/*
+> >> > + * The EFI stub has its own symbol namespace prefixed by __efistub_, to
+> >> > + * isolate it from the kernel proper. The following symbols are legally
+> >> > + * accessed by the stub, so provide some aliases to make them accessible.
+> >> > + * Only include data symbols here, or text symbols of functions that are
+> >> > + * guaranteed to be safe when executed at another offset than they were
+> >> > + * linked at. The routines below are all implemented in assembler in a
+> >> > + * position independent manner
+> >> > + */
+> >> > +__efistub_memcmp               = __pi_memcmp;
+> >> > +__efistub_memchr               = __pi_memchr;
+> >> > +__efistub_memcpy               = __pi_memcpy;
+> >> > +__efistub_memmove              = __pi_memmove;
+> >> > +__efistub_memset               = __pi_memset;
+> >> > +__efistub_strlen               = __pi_strlen;
+> >> > +__efistub_strcmp               = __pi_strcmp;
+> >> > +__efistub_strncmp              = __pi_strncmp;
+> >> > +__efistub___flush_dcache_area  = __pi___flush_dcache_area;
+> >>
+> >> So why we need these __pi_* aliases?
+> >> We could just do __efistub_memcmp = memcmp; Right?
+> >
+> > We *could*, but that defeats the whole purpose of tagging
+> > position-independent functions explicitly in the kernel text.
+> >
+> 
+> I just don't get that "the whole purpose of tagging".
+> 
+> Yes, the EFI stub is allowed to call only PI kernel functions.
+> But the EFI stub already protected by __efistub_ namespace.
+> If we want to use some new PI function in the stub, we would need add
+> it into this list at first.
+> So that __pi_ namespace doesn't bring any protection or isolation.
 
-Cc: Andy Gross <agross@codeaurora.org>
-Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 66 +++++++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
+What it does it force people making future changes to the __pi_* functions
+to think about the stub, otherwise if the function happens to be
+position-independent when efistub starts using it, it could easily break
+due to some future patch where the author didn't realise that it was
+being used in that manner.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 3e7083c..63b5262 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -68,6 +68,49 @@
- 		};
- 	};
- 
-+	thermal-zones {
-+		cpu-thermal0 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors = <&tsens 4>;
-+
-+			trips {
-+				cpu_alert0: trip at 0 {
-+					temperature = <100000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+				cpu_crit0: trip at 1 {
-+					temperature = <125000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+
-+		cpu-thermal1 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors = <&tsens 3>;
-+
-+			trips {
-+				cpu_alert1: trip at 0 {
-+					temperature = <100000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+				cpu_crit1: trip at 1 {
-+					temperature = <125000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <GIC_PPI 2 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-@@ -392,6 +435,29 @@
- 			interrupt-controller;
- 			#interrupt-cells = <4>;
- 		};
-+
-+		qfprom: qfprom at 5c000 {
-+			compatible = "qcom,qfprom";
-+			reg = <0x5c000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			tsens_caldata: caldata at d0 {
-+				reg = <0xd0 0x8>;
-+			};
-+			tsens_calsel: calsel at ec {
-+				reg = <0xec 0x4>;
-+			};
-+		};
-+
-+		tsens: thermal-sensor at 4a8000 {
-+			compatible = "qcom,msm8916-tsens";
-+			reg = <0x4a8000 0x2000>;
-+			nvmem-cells = <&tsens_caldata>, <&tsens_calsel>;
-+			nvmem-cell-names = "calib", "calib_sel";
-+			qcom,tsens-slopes = <3200 3200 3200 3200 3200>;
-+			qcom,sensor-id = <0 1 2 4 5>;
-+			#thermal-sensor-cells = <1>;
-+		};
- 	};
- };
- 
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+Will
