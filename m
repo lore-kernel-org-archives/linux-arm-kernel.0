@@ -1,23 +1,41 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Fri, 09 Oct 2015 10:30:31 +0300
-Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
-In-Reply-To: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
-References: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <00e601d10264$61cdafb0$25690f10$@samsung.com>
+From: b51503@freescale.com (Bai Ping)
+Date: Fri, 9 Oct 2015 23:35:30 +0800
+Subject: [PATCH] ARM: imx: add cpufreq device for imx6ul
+Message-ID: <1444404930-15390-1-git-send-email-b51503@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+Add cpufreq device for i.MX6UL. Using the common
+cpufreq of i.MX6 SOC.
 
-> +  KVM_DEV_ARM_VGIC_CPU_SYSREGS
-> +  Attributes:
-> +    The attr field of kvm_device_attr encodes two values:
-> +    bits:     | 63      ....       32 | 31  ....  16 | 15  ....  0 |
-> +    values:   |         mpidr         |      RES     |    instr    |
+Signed-off-by: Bai Ping <b51503@freescale.com>
+---
+ arch/arm/mach-imx/mach-imx6ul.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
- One small clarification: do you really want it to be different from KVM_DEV_ARM_VGIC_GRP_CPU_REGS?
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
+index be832b9..acaf705 100644
+--- a/arch/arm/mach-imx/mach-imx6ul.c
++++ b/arch/arm/mach-imx/mach-imx6ul.c
+@@ -78,6 +78,12 @@ static void __init imx6ul_init_irq(void)
+ 	imx6_pm_ccm_init("fsl,imx6ul-ccm");
+ }
+ 
++static void __init imx6ul_init_late(void)
++{
++	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
++		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
++}
++
+ static const char *imx6ul_dt_compat[] __initconst = {
+ 	"fsl,imx6ul",
+ 	NULL,
+@@ -86,5 +92,6 @@ static const char *imx6ul_dt_compat[] __initconst = {
+ DT_MACHINE_START(IMX6UL, "Freescale i.MX6 Ultralite (Device Tree)")
+ 	.init_irq	= imx6ul_init_irq,
+ 	.init_machine	= imx6ul_init_machine,
++	.init_late	= imx6ul_init_late,
+ 	.dt_compat	= imx6ul_dt_compat,
+ MACHINE_END
+-- 
+1.9.1
