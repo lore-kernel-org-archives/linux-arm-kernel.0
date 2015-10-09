@@ -1,63 +1,24 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 09 Oct 2015 09:10:17 +0100
-Subject: [PATCH v3] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
- PCIe Host Controller
-In-Reply-To: <8520D5D51A55D047800579B09414719801690CD0@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1444146289-28940-1-git-send-email-bharatku@xilinx.com>
- <5613F310.6060305@arm.com>
- <8520D5D51A55D047800579B0941471980169063F@XAP-PVEXMBX01.xlnx.xilinx.com>
- <5613F9C8.9020000@arm.com>
- <8520D5D51A55D047800579B09414719801690CD0@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <56177669.2000302@arm.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Fri, 09 Oct 2015 11:10:29 +0300
+Subject: [PATCH] KVM: arm/arm64: Add VGICv3 save/restore API documentation
+In-Reply-To: <56177592.2080702@arm.com>
+References: <1444247430-14808-1-git-send-email-christoffer.dall@linaro.org>
+ <00e601d10264$61cdafb0$25690f10$@samsung.com> <56177592.2080702@arm.com>
+Message-ID: <00ec01d10269$f6c82af0$e45880d0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/15 06:11, Bharat Kumar Gogada wrote:
->>>> +struct nwl_msi {                  /* struct nwl_msi - MSI information
->> */
->>>> +  struct msi_controller chip;     /* chip: MSI controller */
->>>
->>>> We're moving away from msi_controller altogether, as the kernel now
->>>> has all the necessary infrastructure to do this properly.
->>>
->>> Our current GIC version does not have separate msi controller (we are
->>> not using GICv2m or GICv3), so is it necessary to have separate msi
->>> controller node ? Please give me clarity on this.
->>
->> This has nothing to do with the version of the GIC you are using (XGene
->> doesn't have GICv2m or v3 either). This is about reducing code duplication
->> and having something that we can maintain. See also
->> https://lkml.org/lkml/2015/9/20/193 for yet another example.
->>
->> I still plan to kill msi_controller, and I'd like to avoid more dependencies with
->> it. MSI domains are the way to do it.
->>
-> Sorry previously I haven't configured my email client properly so resending.
+ Hello!
 
-Thanks for doing so, much appreciated.
+> How do you reconcile the two? What's the point of trying to shoehorn a
+> different concept into the existing API?
 
-> Since we don't have separate MSI controller, and our PCIe controller
-> is handling MSI, is it necessary to create a separate MSI controller
-> node because we don't have any 'reg' space.
+ Keeping amount of #define's as small as possible, and try to reuse everything that can be reused.
+ It's just my personal taste, nothing serious. :) The question was just a clarification. Ok, this is
+not a problem. By the way, i've just finished v5 patchset, now need to rewrite qemu and test before
+posting it.
 
-No, your PCI controller can perfectly be part of the PCIe node.
-
-> Please let me know whether we require a separate msi file as
-> suggested in your previous comments to separate MSI controller and
-> PCIE controller in two files, if we don't have separate node. If we
-> do not need a separate node do we need to embed MSI controller child
-> node  in PCIe controller node itself, and what properties does this
-> child node will require other than 'interrupts'.
-
-If you want to keep them in the same file, please at least have two
-separate patches. These are two different functions, and they should be
-reviewed separately.
-
-It will help everyone to understand your code, and speed up the
-reviewing process.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
