@@ -1,43 +1,81 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 9 Oct 2015 19:56:50 +0800
-Subject: [PATCH v5 7/7] arm64: dts: berlin4ct: add default pinmux for uart0
-In-Reply-To: <1444391810-5045-1-git-send-email-jszhang@marvell.com>
-References: <1444391810-5045-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1444391810-5045-8-git-send-email-jszhang@marvell.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Fri, 09 Oct 2015 14:07:16 +0200
+Subject: [PATCH] thermal: exynos: fix register read in TMU
+In-Reply-To: <CAJKOXPfbrdm75n_v+dRnq8dqAFAGvHj28QQ4ZY8WZms1D6eLZQ@mail.gmail.com>
+References: <1443699599-9693-1-git-send-email-sudipm.mukherjee@gmail.com>
+ <CAJKOXPfyC8etcPe373q6Pc1qWb2zVnHE96V+Rh5mPmpzAxFjiA@mail.gmail.com>
+ <20151001141243.GA5061@sudip-pc>
+ <CAJKOXPdVs9i9sVP84wa2wU0qVH1-o4unvaDC+O7c1za6bJUSLw@mail.gmail.com>
+ <20151008142129.GC10587@sudip-pc>
+ <CAJKOXPfbrdm75n_v+dRnq8dqAFAGvHj28QQ4ZY8WZms1D6eLZQ@mail.gmail.com>
+Message-ID: <20151009140716.0c6e57b7@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add urt0 txd and rxd muxing setup in the dtsi because uart0 always uses
-them to work, no other possibilities.
+Hi Krzysztof,
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+> 2015-10-08 23:21 GMT+09:00 Sudip Mukherjee
+> <sudipm.mukherjee@gmail.com>:
+> > On Fri, Oct 02, 2015 at 08:43:52AM +0900, Krzysztof Kozlowski wrote:
+> >> 2015-10-01 23:12 GMT+09:00 Sudip Mukherjee
+> >> <sudipm.mukherjee@gmail.com>:
+> >> > On Thu, Oct 01, 2015 at 10:18:57PM +0900, Krzysztof Kozlowski
+> >> > wrote:
+> >> >> 2015-10-01 20:39 GMT+09:00 Sudip Mukherjee
+> >> >> <sudipm.mukherjee@gmail.com>:
+> >> >> > The value of emul_con was getting overwritten if the selected
+> >> >> > soc is SOC_ARCH_EXYNOS5260. And so as a result we were
+> >> >> > reading from the wrong register in the case of
+> >> >> > SOC_ARCH_EXYNOS5260.
+> >> >>
+> >> >> How the value is overwritten if the soc is Exynos5260? I can't
+> >> >> see it (although the "else if" is still more obvious than "if"
+> >> >> but how does the description match the code?).
+> >> > The code here is:
+> >> > if (data->soc == SOC_ARCH_EXYNOS5260)
+> >> >         emul_con = EXYNOS5260_EMUL_CON;
+> >> > if (data->soc == SOC_ARCH_EXYNOS5433)
+> >> >         emul_con = EXYNOS5433_TMU_EMUL_CON;
+> >> > else if (data->soc == SOC_ARCH_EXYNOS7)
+> >> >         emul_con = EXYNOS7_TMU_REG_EMUL_CON;
+> >> > else
+> >> >         emul_con = EXYNOS_EMUL_CON;
+> >> >
+> >> > So if data->soc is SOC_ARCH_EXYNOS5260 , then emul_con becomes
+> >> > EXYNOS5260_EMUL_CON. But again for the else part it will become
+> >> > EXYNOS_EMUL_CON.
+> >>
+> >> Indeed!
+> >>
+> >> Fixes: 488c7455d74c ("thermal: exynos: Add the support for
+> >> Exynos5433 TMU")
+> >>
+> >> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> >
+> > Hi Krzysztof,
+> > Who will pick this one up? I still do not see it in linux-next.
+> 
+> Hi!
+> 
+> I guess it is a patch for Lukasz.
+> 
+> Lukasz,
+> Do you plan to pick it up or maybe this should go through samsung-soc
+> tree?
 
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-index 8e66355..a4a1876 100644
---- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-+++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-@@ -288,12 +288,19 @@
- 				clocks = <&osc>;
- 				reg-shift = <2>;
- 				status = "disabled";
-+				pinctrl-0 = <&uart0_pmux>;
-+				pinctrl-names = "default";
- 			};
- 		};
- 
- 		system_pinctrl: pin-controller at fe2200 {
- 			compatible = "marvell,berlin4ct-system-pinctrl";
- 			reg = <0xfe2200 0xc>;
-+
-+			uart0_pmux: uart0-pmux {
-+				groups = "SM_URT0_TXD", "SM_URT0_RXD";
-+				function = "uart0";
-+			};
- 		};
- 	};
- };
+This is the only one patch, which is waiting in my queue. Since no more
+fixes available, please feel free to grab this patch to samsung-soc.
+
+Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+
+> 
+> Best regards,
+> Krzysztof
+
+
 -- 
-2.6.1
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
