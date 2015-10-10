@@ -1,77 +1,94 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sat, 10 Oct 2015 13:36:16 +0900
-Subject: [PATCH] thermal: exynos: fix register read in TMU
-In-Reply-To: <20151009140716.0c6e57b7@amdc2363>
-References: <1443699599-9693-1-git-send-email-sudipm.mukherjee@gmail.com>
- <CAJKOXPfyC8etcPe373q6Pc1qWb2zVnHE96V+Rh5mPmpzAxFjiA@mail.gmail.com>
- <20151001141243.GA5061@sudip-pc>
- <CAJKOXPdVs9i9sVP84wa2wU0qVH1-o4unvaDC+O7c1za6bJUSLw@mail.gmail.com>
- <20151008142129.GC10587@sudip-pc>
- <CAJKOXPfbrdm75n_v+dRnq8dqAFAGvHj28QQ4ZY8WZms1D6eLZQ@mail.gmail.com>
- <20151009140716.0c6e57b7@amdc2363>
-Message-ID: <561895C0.5030400@samsung.com>
+Date: Sat, 10 Oct 2015 15:08:52 +0900
+Subject: [PATCH v2 3/4] i2c: s3c2410: enable RuntimePM before registering
+ to the core
+In-Reply-To: <1444383567-18113-3-git-send-email-wsa@the-dreams.de>
+References: <1444383567-18113-1-git-send-email-wsa@the-dreams.de>
+ <1444383567-18113-3-git-send-email-wsa@the-dreams.de>
+Message-ID: <5618AB74.2070001@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 09.10.2015 o 21:07, Lukasz Majewski pisze:
-> Hi Krzysztof,
+W dniu 09.10.2015 o 18:39, Wolfram Sang pisze:
+> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 > 
->> 2015-10-08 23:21 GMT+09:00 Sudip Mukherjee
->> <sudipm.mukherjee@gmail.com>:
->>> On Fri, Oct 02, 2015 at 08:43:52AM +0900, Krzysztof Kozlowski wrote:
->>>> 2015-10-01 23:12 GMT+09:00 Sudip Mukherjee
->>>> <sudipm.mukherjee@gmail.com>:
->>>>> On Thu, Oct 01, 2015 at 10:18:57PM +0900, Krzysztof Kozlowski
->>>>> wrote:
->>>>>> 2015-10-01 20:39 GMT+09:00 Sudip Mukherjee
->>>>>> <sudipm.mukherjee@gmail.com>:
->>>>>>> The value of emul_con was getting overwritten if the selected
->>>>>>> soc is SOC_ARCH_EXYNOS5260. And so as a result we were
->>>>>>> reading from the wrong register in the case of
->>>>>>> SOC_ARCH_EXYNOS5260.
->>>>>>
->>>>>> How the value is overwritten if the soc is Exynos5260? I can't
->>>>>> see it (although the "else if" is still more obvious than "if"
->>>>>> but how does the description match the code?).
->>>>> The code here is:
->>>>> if (data->soc == SOC_ARCH_EXYNOS5260)
->>>>>         emul_con = EXYNOS5260_EMUL_CON;
->>>>> if (data->soc == SOC_ARCH_EXYNOS5433)
->>>>>         emul_con = EXYNOS5433_TMU_EMUL_CON;
->>>>> else if (data->soc == SOC_ARCH_EXYNOS7)
->>>>>         emul_con = EXYNOS7_TMU_REG_EMUL_CON;
->>>>> else
->>>>>         emul_con = EXYNOS_EMUL_CON;
->>>>>
->>>>> So if data->soc is SOC_ARCH_EXYNOS5260 , then emul_con becomes
->>>>> EXYNOS5260_EMUL_CON. But again for the else part it will become
->>>>> EXYNOS_EMUL_CON.
->>>>
->>>> Indeed!
->>>>
->>>> Fixes: 488c7455d74c ("thermal: exynos: Add the support for
->>>> Exynos5433 TMU")
->>>>
->>>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>
->>> Hi Krzysztof,
->>> Who will pick this one up? I still do not see it in linux-next.
->>
->> Hi!
->>
->> I guess it is a patch for Lukasz.
->>
->> Lukasz,
->> Do you plan to pick it up or maybe this should go through samsung-soc
->> tree?
+> The core may register clients attached to this master which may use
+> funtionality from the master. So, RuntimePM must be enabled before, otherwise
+> this will fail. While here, move drvdata, too.
 > 
-> This is the only one patch, which is waiting in my queue. Since no more
-> fixes available, please feel free to grab this patch to samsung-soc.
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> ---
+>  drivers/i2c/busses/i2c-s3c2410.c | 12 +++++++-----
+>  1 file changed, 7 insertions(+), 5 deletions(-)
 > 
-> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+> index 50bfd8cef5f224..336e34e1ca597d 100644
+> --- a/drivers/i2c/busses/i2c-s3c2410.c
+> +++ b/drivers/i2c/busses/i2c-s3c2410.c
+> @@ -1243,19 +1243,21 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
+>  	i2c->adap.nr = i2c->pdata->bus_num;
+>  	i2c->adap.dev.of_node = pdev->dev.of_node;
+>  
+> +	platform_set_drvdata(pdev, i2c);
+> +
+> +	pm_runtime_enable(&pdev->dev);
+> +	pm_runtime_enable(&i2c->adap.dev);
+> +
+>  	ret = i2c_add_numbered_adapter(&i2c->adap);
+>  	if (ret < 0) {
+>  		dev_err(&pdev->dev, "failed to add bus to i2c core\n");
+> +		pm_runtime_disable(&i2c->adap.dev);
+> +		pm_runtime_disable(&pdev->dev);
+>  		s3c24xx_i2c_deregister_cpufreq(i2c);
+>  		clk_unprepare(i2c->clk);
+>  		return ret;
+>  	}
+>  
+> -	platform_set_drvdata(pdev, i2c);
+> -
+> -	pm_runtime_enable(&pdev->dev);
+> -	pm_runtime_enable(&i2c->adap.dev);
+> -
+>  	dev_info(&pdev->dev, "%s: S3C I2C adapter\n", dev_name(&i2c->adap.dev));
+>  	return 0;
+>  }
+> 
 
-Okay, thanks! Applied to fixes for current cycle. I'll it send later to
-Kukjin (unless he picks it as well).
+Hi,
+
+Unfortunately on Odroid XU3, Exynos5420, samsung,s3c2440-i2c,
+next-20151009-1-ga93b1a6f5055:
+
+[    0.437678] s3c-i2c 12c80000.i2c: slave address 0x00
+[    0.437748] s3c-i2c 12c80000.i2c: bus frequency set to 65 KHz
+[    0.438136] INFO: trying to register non-static key.
+[    0.438180] the code is fine but needs lockdep annotation.
+[    0.438225] turning off the locking correctness validator.
+[    0.438277] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.3.0-rc4-next-20151009-00001-ga93b1a6f5055-dirty #237
+[    0.438353] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[    0.438427] [<c0016780>] (unwind_backtrace) from [<c00132f0>] (show_stack+0x10/0x14)
+[    0.438512] [<c00132f0>] (show_stack) from [<c0224884>] (dump_stack+0x70/0xbc)
+[    0.438590] [<c0224884>] (dump_stack) from [<c006be20>] (__lock_acquire+0xa84/0xb18)
+[    0.438667] [<c006be20>] (__lock_acquire) from [<c006c238>] (lock_acquire+0x70/0x90)
+[    0.438746] [<c006c238>] (lock_acquire) from [<c05e8c88>] (_raw_spin_lock_irqsave+0x48/0x5c)
+[    0.438830] [<c05e8c88>] (_raw_spin_lock_irqsave) from [<c02fea68>] (pm_runtime_enable+0x14/0x5c)
+[    0.438921] [<c02fea68>] (pm_runtime_enable) from [<c03eee9c>] (s3c24xx_i2c_probe+0x450/0x5f0)
+[    0.439006] [<c03eee9c>] (s3c24xx_i2c_probe) from [<c02f8180>] (platform_drv_probe+0x50/0xac)
+[    0.439086] [<c02f8180>] (platform_drv_probe) from [<c02f683c>] (driver_probe_device+0x1e0/0x418)
+[    0.439165] [<c02f683c>] (driver_probe_device) from [<c02f6b08>] (__driver_attach+0x94/0x98)
+[    0.439250] [<c02f6b08>] (__driver_attach) from [<c02f4be8>] (bus_for_each_dev+0x54/0x88)
+[    0.439332] [<c02f4be8>] (bus_for_each_dev) from [<c02f5da8>] (bus_add_driver+0x178/0x254)
+[    0.439411] [<c02f5da8>] (bus_add_driver) from [<c02f72f8>] (driver_register+0x78/0xf4)
+[    0.439488] [<c02f72f8>] (driver_register) from [<c00097f4>] (do_one_initcall+0xb0/0x1f4)
+[    0.439571] [<c00097f4>] (do_one_initcall) from [<c0852dc4>] (kernel_init_freeable+0x11c/0x1e8)
+[    0.439660] [<c0852dc4>] (kernel_init_freeable) from [<c05e2e04>] (kernel_init+0x8/0xec)
+[    0.439740] [<c05e2e04>] (kernel_init) from [<c0010350>] (ret_from_fork+0x14/0x24)
+[    0.439810]  (null): Unbalanced pm_runtime_enable!
+[    0.440965] s3c-i2c 12c80000.i2c: i2c-2: S3C I2C adapter
+
+The message appears after second pm_runtime_enable().
+
+Next without the patch works.
 
 Best regards,
 Krzysztof
