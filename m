@@ -1,186 +1,157 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Sat, 10 Oct 2015 23:49:02 +0800
-Subject: [PATCH v6 06/17] Documentation: drm/bridge: add document for
- analogix_dp
+Date: Sat, 10 Oct 2015 23:49:14 +0800
+Subject: [PATCH v6 07/17] ARM: dts: exynos/dp: remove some properties that
+ deprecated by analogix_dp driver
 In-Reply-To: <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
 References: <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1444492142-26919-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1444492154-26970-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Analogix dp driver is split from exynos dp driver, so we just
-make an copy of exynos_dp.txt, and then simplify exynos_dp.txt
+After exynos_dp have been split the common IP code into analogix_dp driver,
+the analogix_dp driver have deprecated some Samsung platform properties which
+could be dynamically parsed from EDID/MODE/DPCD message, so this is an update
+for Exynos DTS file for dp-controller.
 
-Beside update some exynos dtsi file with the latest change
-according to the devicetree binding documents.
+Beside the backward compatibility is fully preserved, so there are no
+bisectability break that make this change in a separate patch.
 
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
-Changes in v6: None
-Changes in v5: None
+Changes in v6:
+- Fix Peach Pit hpd property name error:
+-       hpd-gpio = <&gpx2 6 0>;
++       hpd-gpios = <&gpx2 6 0>;
+
+Changes in v5:
+- Correct the misspell in commit message. (Krzysztof)
+
 Changes in v4:
-- Split all DTS changes, and provide backward compatibility. Mark old
-  properties as deprecated but still support them. (Krzysztof)
-- Update "analogix,hpd-gpio" to "hpd-gpios" prop name. (Rob)
-- Deprecated some properties which could parsed from Edid/Mode/DPCD. (Thierry)
-    "analogix,color-space" & "analogix,color-depth"   &
-    "analogix,link-rate"   & "analogix,lane-count"    &
-    "analogix,ycbcr-coeff" & "analogix,dynamic-range" &
-    "vsync-active-high"    & "hsync-active-high"      & "interlaces"
+- Separate all DTS changes to a separate patch. (Krzysztof)
 
-Changes in v3:
-- Add devicetree binding documents. (Heiko)
-- Remove sync pol & colorimetry properies from the new analogix dp driver
-  devicetree binding. (Thierry)
-- Update the exist exynos dtsi file with the latest DP DT properies.
-
+Changes in v3: None
 Changes in v2: None
 
- .../devicetree/bindings/drm/bridge/analogix_dp.txt | 50 +++++++++++++++++
- .../devicetree/bindings/video/exynos_dp.txt        | 63 ++++++++--------------
- 2 files changed, 71 insertions(+), 42 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
+ arch/arm/boot/dts/exynos5250-arndale.dts      | 2 --
+ arch/arm/boot/dts/exynos5250-smdk5250.dts     | 2 --
+ arch/arm/boot/dts/exynos5250-snow-common.dtsi | 4 +---
+ arch/arm/boot/dts/exynos5250-spring.dts       | 4 +---
+ arch/arm/boot/dts/exynos5420-peach-pit.dts    | 4 +---
+ arch/arm/boot/dts/exynos5420-smdk5420.dts     | 2 --
+ arch/arm/boot/dts/exynos5800-peach-pi.dts     | 4 +---
+ 7 files changed, 4 insertions(+), 18 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt b/Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
-new file mode 100644
-index 0000000..f54dc3e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
-@@ -0,0 +1,50 @@
-+Analogix Display Port bridge bindings
-+
-+Required properties for dp-controller:
-+	-compatible:
-+		platform specific such as:
-+		 * "samsung,exynos5-dp"
-+		 * "rockchip,rk3288-dp"
-+	-reg:
-+		physical base address of the controller and length
-+		of memory mapped region.
-+	-interrupts:
-+		interrupt combiner values.
-+	-clocks:
-+		from common clock binding: handle to dp clock.
-+	-clock-names:
-+		from common clock binding: Shall be "dp".
-+	-interrupt-parent:
-+		phandle to Interrupt combiner node.
-+	-phys:
-+		from general PHY binding: the phandle for the PHY device.
-+	-phy-names:
-+		from general PHY binding: Should be "dp".
-+
-+Optional properties for dp-controller:
-+	-hpd-gpios:
-+		Hotplug detect GPIO.
-+		Indicates which GPIO should be used for hotplug detection
-+	-port@[X]: SoC specific port nodes with endpoint definitions as defined
-+		in Documentation/devicetree/bindings/media/video-interfaces.txt,
-+		please refer to the SoC specific binding document:
-+		* Documentation/devicetree/bindings/video/exynos_dp.txt
-+		* Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
-+
-+
-+[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
-+-------------------------------------------------------------------------------
-+
-+Example:
-+
-+	dp-controller {
-+		compatible = "samsung,exynos5-dp";
-+		reg = <0x145b0000 0x10000>;
-+		interrupts = <10 3>;
-+		interrupt-parent = <&combiner>;
-+		clocks = <&clock 342>;
-+		clock-names = "dp";
-+
-+		phys = <&dp_phy>;
-+		phy-names = "dp";
-+	};
-diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt b/Documentation/devicetree/bindings/video/exynos_dp.txt
-index 7a3a9cd..ea03b3a 100644
---- a/Documentation/devicetree/bindings/video/exynos_dp.txt
-+++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
-@@ -31,45 +31,31 @@ Required properties for dp-controller:
- 		from general PHY binding: the phandle for the PHY device.
- 	-phy-names:
- 		from general PHY binding: Should be "dp".
--	-samsung,color-space:
--		input video data format.
--			COLOR_RGB = 0, COLOR_YCBCR422 = 1, COLOR_YCBCR444 = 2
--	-samsung,dynamic-range:
--		dynamic range for input video data.
--			VESA = 0, CEA = 1
--	-samsung,ycbcr-coeff:
--		YCbCr co-efficients for input video.
--			COLOR_YCBCR601 = 0, COLOR_YCBCR709 = 1
--	-samsung,color-depth:
--		number of bits per colour component.
--			COLOR_6 = 0, COLOR_8 = 1, COLOR_10 = 2, COLOR_12 = 3
--	-samsung,link-rate:
--		link rate supported by the panel.
--			LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A
--	-samsung,lane-count:
--		number of lanes supported by the panel.
--			LANE_COUNT1 = 1, LANE_COUNT2 = 2, LANE_COUNT4 = 4
-+
-+Optional properties for dp-controller:
- 	- display-timings: timings for the connected panel as described by
- 		Documentation/devicetree/bindings/video/display-timing.txt
+diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+index c000532..b1790cf 100644
+--- a/arch/arm/boot/dts/exynos5250-arndale.dts
++++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+@@ -124,8 +124,6 @@
+ &dp {
+ 	status = "okay";
+ 	samsung,color-space = <0>;
+-	samsung,dynamic-range = <0>;
+-	samsung,ycbcr-coeff = <0>;
+ 	samsung,color-depth = <1>;
+ 	samsung,link-rate = <0x0a>;
+ 	samsung,lane-count = <4>;
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 0f5dcd4..f30c2db 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -80,8 +80,6 @@
  
--Optional properties for dp-controller:
--	-interlaced:
--		interlace scan mode.
--			Progressive if defined, Interlaced if not defined
--	-vsync-active-high:
--		VSYNC polarity configuration.
--			High if defined, Low if not defined
--	-hsync-active-high:
--		HSYNC polarity configuration.
--			High if defined, Low if not defined
--	-samsung,hpd-gpio:
--		Hotplug detect GPIO.
--			Indicates which GPIO should be used for hotplug
--			detection
--	-video interfaces: Device node can contain video interface port
--			    nodes according to [1].
-+For the below properties, please refer to Analogix DP binding document:
-+ * Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
-+	-phys (required)
-+	-phy-names (required)
-+	-hpd-gpios (optional)
-+	-video interfaces (optional)
+ &dp {
+ 	samsung,color-space = <0>;
+-	samsung,dynamic-range = <0>;
+-	samsung,ycbcr-coeff = <0>;
+ 	samsung,color-depth = <1>;
+ 	samsung,link-rate = <0x0a>;
+ 	samsung,lane-count = <4>;
+diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+index 0a7f408..ee94110 100644
+--- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
++++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+@@ -236,12 +236,10 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&dp_hpd>;
+ 	samsung,color-space = <0>;
+-	samsung,dynamic-range = <0>;
+-	samsung,ycbcr-coeff = <0>;
+ 	samsung,color-depth = <1>;
+ 	samsung,link-rate = <0x0a>;
+ 	samsung,lane-count = <2>;
+-	samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
++	hpd-gpios = <&gpx0 7 GPIO_ACTIVE_HIGH>;
  
--[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
-+Deprecated properties for DisplayPort:
-+-interlaced:            deprecated prop that can parsed frm drm_display_mode.
-+-vsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
-+-hsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
-+-samsung,ycbcr-coeff:   deprecated prop that can parsed frm drm_display_mode.
-+-samsung,dynamic-range: deprecated prop that can parsed frm drm_display_mode.
-+-samsung,color-space:   deprecated prop that can parsed from drm_display_info.
-+-samsung,color-depth:   deprecated prop that can parsed from drm_display_info.
-+-samsung,link-rate:     deprecated prop that can reading from monitor by dpcd method.
-+-samsung,lane-count:    deprecated prop that can reading from monitor by dpcd method.
-+-samsung,hpd-gpio:      deprecated name for hpd-gpios.
-+
-+-------------------------------------------------------------------------------
+ 	ports {
+ 		port at 0 {
+diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
+index c1edd6d..91881d7 100644
+--- a/arch/arm/boot/dts/exynos5250-spring.dts
++++ b/arch/arm/boot/dts/exynos5250-spring.dts
+@@ -74,12 +74,10 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&dp_hpd_gpio>;
+ 	samsung,color-space = <0>;
+-	samsung,dynamic-range = <0>;
+-	samsung,ycbcr-coeff = <0>;
+ 	samsung,color-depth = <1>;
+ 	samsung,link-rate = <0x0a>;
+ 	samsung,lane-count = <1>;
+-	samsung,hpd-gpio = <&gpc3 0 GPIO_ACTIVE_HIGH>;
++	hpd-gpios = <&gpc3 0 GPIO_ACTIVE_HIGH>;
+ };
  
- Example:
+ &ehci {
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index e722c22..776cae9 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -148,12 +148,10 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&dp_hpd_gpio>;
+ 	samsung,color-space = <0>;
+-	samsung,dynamic-range = <0>;
+-	samsung,ycbcr-coeff = <0>;
+ 	samsung,color-depth = <1>;
+ 	samsung,link-rate = <0x06>;
+ 	samsung,lane-count = <2>;
+-	samsung,hpd-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
++	hpd-gpios = <&gpx2 6 GPIO_ACTIVE_HIGH>;
  
-@@ -88,13 +74,6 @@ SOC specific portion:
+ 	ports {
+ 		port at 0 {
+diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+index ac35aef..f67344f 100644
+--- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
++++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+@@ -93,8 +93,6 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&dp_hpd>;
+ 	samsung,color-space = <0>;
+-	samsung,dynamic-range = <0>;
+-	samsung,ycbcr-coeff = <0>;
+ 	samsung,color-depth = <1>;
+ 	samsung,link-rate = <0x0a>;
+ 	samsung,lane-count = <4>;
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 56275a6..f6b7a58 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -142,12 +142,10 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&dp_hpd_gpio>;
+ 	samsung,color-space = <0>;
+-	samsung,dynamic-range = <0>;
+-	samsung,ycbcr-coeff = <0>;
+ 	samsung,color-depth = <1>;
+ 	samsung,link-rate = <0x0a>;
+ 	samsung,lane-count = <2>;
+-	samsung,hpd-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
++	hpd-gpios = <&gpx2 6 GPIO_ACTIVE_HIGH>;
+ 	panel = <&panel>;
+ };
  
- Board Specific portion:
- 	dp-controller {
--		samsung,color-space = <0>;
--		samsung,dynamic-range = <0>;
--		samsung,ycbcr-coeff = <0>;
--		samsung,color-depth = <1>;
--		samsung,link-rate = <0x0a>;
--		samsung,lane-count = <4>;
--
- 		display-timings {
- 			native-mode = <&lcd_timing>;
- 			lcd_timing: 1366x768 {
 -- 
 1.9.1
