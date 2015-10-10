@@ -1,102 +1,98 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Sat, 10 Oct 2015 10:03:30 +0800
-Subject: [RFC] arm: add relocate initrd support
-In-Reply-To: <20151009161033.GA32532@n2100.arm.linux.org.uk>
-References: <1444406109-28354-1-git-send-email-yalin.wang2010@gmail.com>
- <20151009161033.GA32532@n2100.arm.linux.org.uk>
-Message-ID: <42FD0845-9A75-4FEE-BD11-65BA661EC35F@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 10 Oct 2015 10:17:52 +0800
+Subject: [linux-sunxi] [PATCH] ARM: dts: sun7i: Correct USB regulators on
+ pcDuino v3 Nano
+In-Reply-To: <1444441679-4802-1-git-send-email-ats@offog.org>
+References: <1444441679-4802-1-git-send-email-ats@offog.org>
+Message-ID: <CAGb2v67_dSCL2JP1D5SDaqSF3B4KDMKZUJcZ8QLHgFtcO8Bzug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-> On Oct 10, 2015, at 00:10, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> On Fri, Oct 09, 2015 at 11:55:09PM +0800, yalin wang wrote:
->> Add support for initrd on ARM arch, in case
->> mem= boot option change the memory size or the initrd are
->> not placed in low memory region, we need copy the initrd
->> to low memory region.
->> 
->> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
->> ---
->> arch/arm/include/asm/fixmap.h |  1 +
->> arch/arm/kernel/setup.c       | 72 +++++++++++++++++++++++++++++++++++++++++++
->> 2 files changed, 73 insertions(+)
->> 
->> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
->> index 58cfe9f..18ad90f 100644
->> --- a/arch/arm/include/asm/fixmap.h
->> +++ b/arch/arm/include/asm/fixmap.h
->> @@ -10,6 +10,7 @@
->> 
->> enum fixed_addresses {
->> 	FIX_EARLYCON_MEM_BASE,
->> +	FIX_RELOCATE_INITRD,
->> 	__end_of_permanent_fixed_addresses,
->> 
->> 	FIX_KMAP_BEGIN = __end_of_permanent_fixed_addresses,
->> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->> index 20edd34..4260d59 100644
->> --- a/arch/arm/kernel/setup.c
->> +++ b/arch/arm/kernel/setup.c
->> @@ -811,6 +811,77 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
->> 		request_resource(&ioport_resource, &lp2);
->> }
->> 
->> +#if defined(CONFIG_BLK_DEV_INITRD) && defined(CONFIG_MMU)
->> +/*
->> + * Relocate initrd if it is not completely within the linear mapping.
->> + * This would be the case if mem= cuts out all or part of it
->> + * or the initrd are not in low mem region place.
->> + */
->> +static void __init relocate_initrd(void)
->> +{
->> +	phys_addr_t orig_start = __virt_to_phys(initrd_start);
->> +	phys_addr_t orig_end = __virt_to_phys(initrd_end);
-> 
-> If initrd_start or initrd_end are outside of the lowmem region, it's
-> quite possible for these to return incorrect physical addresses.
-> The generic kernel's idea of using virtual addresses for the initrd
-> stuff is painfully wrong IMHO.
-> 
-> The unfortunate thing is that the DT code propagates this stuff:
-> 
->        initrd_start = (unsigned long)__va(start);
->        initrd_end = (unsigned long)__va(end);
-> 
-> and even this can give wrong results for the virtual address when the
-> physical is outside of lowmem.  For addresses outside of lowmem,
-> __virt_to_phys(__va(start)) is not guaranteed to return 'start'.
-> 
-> This is why I've said that if we want to support ramdisks outside of
-> the lowmem mapping, we need to get rid of the initrd_start/initrd_end
-> virtual addresses.
-> 
-> I'm sorry, but we need much wider code changes before we can cope with
-> this.
-> 
->> +	phys_addr_t ram_end = memblock_end_of_DRAM();
->> +	phys_addr_t new_start;
->> +	phys_addr_t src;
->> +	unsigned long size, to_free = 0;
->> +	unsigned long slop, clen, p;
->> +	void *dest;
->> +
->> +	if (orig_end <= memblock_get_current_limit())
->> +		return;
->> +
->> +	/*
->> +	 * Any of the original initrd which overlaps the linear map should
->> +	 * be freed after relocating.
-> 
-> How does this work?  The code in arm_memblock_init() will have already
-> reserved the physical addresses for the ramdisk:
-> 
-> 	memblock_reserve(phys_initrd_start, phys_initrd_size);
-> 
-> So any new allocation shouldn't overlap the existing ramdisk - unless
-> this is wrong.
->  
-i see, i will send a V2 patch for review .
+On Sat, Oct 10, 2015 at 9:47 AM, Adam Sampson <ats@offog.org> wrote:
+> The LinkSprite pcDuino v3 Nano's two USB host ports are powered by a
+> single RT9701GB regulator, which has its enable input tied to the A20's
+> PD2 pin, pulled up to 3v3 via a 10k resistor.
+>
+> However, the script.bin that shipped with the device listed PH11 and PH3
+> as Vbus control pins for the two USB ports. Neither of these are
+> actually connected to anything.
+>
+> Siarhei Siamashka spotted this problem while reviewing the other
+> LinkSprite boards. This patch fixes it by only defining a single
+> regulator, controlled by PD2. Testing shows that the USB ports are now
+> (correctly) only powered up once the USB PHY driver is loaded.
+>
+> Signed-off-by: Adam Sampson <ats@offog.org>
 
-Thanks
+Since Siarhei spotted the issue, maybe add a Reported-by tag where credit
+is due?
+
+> ---
+>  arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts | 13 ++++++-------
+>  1 file changed, 6 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts b/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
+> index 5361fce..f75e3bd 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
+> @@ -158,7 +158,7 @@
+>         };
+>
+>         usb1_vbus_pin_pcduino3_nano: usb1_vbus_pin at 0 {
+> -               allwinner,pins = "PH11";
+> +               allwinner,pins = "PD2";
+>                 allwinner,function = "gpio_out";
+>                 allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>                 allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> @@ -166,18 +166,17 @@
+>  };
+>
+>  &reg_ahci_5v {
+> +       pinctrl-names = "default";
+
+This is already in sunxi-common-regulators.dtsi.
+No need to add it again.
+
+>         pinctrl-0 = <&ahci_pwr_pin_pcduino3_nano>;
+>         gpio = <&pio 7 2 GPIO_ACTIVE_HIGH>; /* PH2 */
+>         status = "okay";
+>  };
+>
+> +/* A single regulator (U24) powers both USB host ports. */
+>  &reg_usb1_vbus {
+> +       pinctrl-names = "default";
+
+And this.
+
+The rest looks good.
+
+Thanks!
+ChenYu
+
+>         pinctrl-0 = <&usb1_vbus_pin_pcduino3_nano>;
+> -       gpio = <&pio 7 11 GPIO_ACTIVE_HIGH>; /* PH11 */
+> -       status = "okay";
+> -};
+> -
+> -&reg_usb2_vbus {
+> +       gpio = <&pio 3 2 GPIO_ACTIVE_HIGH>; /* PD2 */
+>         status = "okay";
+>  };
+>
+> @@ -189,6 +188,6 @@
+>
+>  &usbphy {
+>         usb1_vbus-supply = <&reg_usb1_vbus>;
+> -       usb2_vbus-supply = <&reg_usb2_vbus>;
+> +       usb2_vbus-supply = <&reg_usb1_vbus>;
+>         status = "okay";
+>  };
+> --
+> 2.1.4
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
