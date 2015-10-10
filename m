@@ -1,94 +1,344 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sat, 10 Oct 2015 15:08:52 +0900
-Subject: [PATCH v2 3/4] i2c: s3c2410: enable RuntimePM before registering
- to the core
-In-Reply-To: <1444383567-18113-3-git-send-email-wsa@the-dreams.de>
-References: <1444383567-18113-1-git-send-email-wsa@the-dreams.de>
- <1444383567-18113-3-git-send-email-wsa@the-dreams.de>
-Message-ID: <5618AB74.2070001@samsung.com>
+From: Minghuan.Lian@freescale.com (Minghuan Lian)
+Date: Sat, 10 Oct 2015 14:23:37 +0800
+Subject: [PATCH v3] PCI: layerscape: Add PCIe support for LS1043a and LS2080a
+Message-ID: <1444458217-31004-1-git-send-email-Minghuan.Lian@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 09.10.2015 o 18:39, Wolfram Sang pisze:
-> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> 
-> The core may register clients attached to this master which may use
-> funtionality from the master. So, RuntimePM must be enabled before, otherwise
-> this will fail. While here, move drvdata, too.
-> 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> ---
->  drivers/i2c/busses/i2c-s3c2410.c | 12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-> index 50bfd8cef5f224..336e34e1ca597d 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> @@ -1243,19 +1243,21 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
->  	i2c->adap.nr = i2c->pdata->bus_num;
->  	i2c->adap.dev.of_node = pdev->dev.of_node;
->  
-> +	platform_set_drvdata(pdev, i2c);
-> +
-> +	pm_runtime_enable(&pdev->dev);
-> +	pm_runtime_enable(&i2c->adap.dev);
-> +
->  	ret = i2c_add_numbered_adapter(&i2c->adap);
->  	if (ret < 0) {
->  		dev_err(&pdev->dev, "failed to add bus to i2c core\n");
-> +		pm_runtime_disable(&i2c->adap.dev);
-> +		pm_runtime_disable(&pdev->dev);
->  		s3c24xx_i2c_deregister_cpufreq(i2c);
->  		clk_unprepare(i2c->clk);
->  		return ret;
->  	}
->  
-> -	platform_set_drvdata(pdev, i2c);
-> -
-> -	pm_runtime_enable(&pdev->dev);
-> -	pm_runtime_enable(&i2c->adap.dev);
-> -
->  	dev_info(&pdev->dev, "%s: S3C I2C adapter\n", dev_name(&i2c->adap.dev));
->  	return 0;
->  }
-> 
+The patch adds PCIe support for LS1043a and LS2080a.
 
-Hi,
+Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+---
+This patch is based on v4.3-rc4 and [PATCH v10 3/6]
+PCI: designware: Add ARM64 support.
 
-Unfortunately on Odroid XU3, Exynos5420, samsung,s3c2440-i2c,
-next-20151009-1-ga93b1a6f5055:
+change log
+v3:
+1. Use 8 or 16 bit access function to simplify code
+2. Add ls_add_pcie_port in accordance with other DesignWare-based drivers
 
-[    0.437678] s3c-i2c 12c80000.i2c: slave address 0x00
-[    0.437748] s3c-i2c 12c80000.i2c: bus frequency set to 65 KHz
-[    0.438136] INFO: trying to register non-static key.
-[    0.438180] the code is fine but needs lockdep annotation.
-[    0.438225] turning off the locking correctness validator.
-[    0.438277] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.3.0-rc4-next-20151009-00001-ga93b1a6f5055-dirty #237
-[    0.438353] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-[    0.438427] [<c0016780>] (unwind_backtrace) from [<c00132f0>] (show_stack+0x10/0x14)
-[    0.438512] [<c00132f0>] (show_stack) from [<c0224884>] (dump_stack+0x70/0xbc)
-[    0.438590] [<c0224884>] (dump_stack) from [<c006be20>] (__lock_acquire+0xa84/0xb18)
-[    0.438667] [<c006be20>] (__lock_acquire) from [<c006c238>] (lock_acquire+0x70/0x90)
-[    0.438746] [<c006c238>] (lock_acquire) from [<c05e8c88>] (_raw_spin_lock_irqsave+0x48/0x5c)
-[    0.438830] [<c05e8c88>] (_raw_spin_lock_irqsave) from [<c02fea68>] (pm_runtime_enable+0x14/0x5c)
-[    0.438921] [<c02fea68>] (pm_runtime_enable) from [<c03eee9c>] (s3c24xx_i2c_probe+0x450/0x5f0)
-[    0.439006] [<c03eee9c>] (s3c24xx_i2c_probe) from [<c02f8180>] (platform_drv_probe+0x50/0xac)
-[    0.439086] [<c02f8180>] (platform_drv_probe) from [<c02f683c>] (driver_probe_device+0x1e0/0x418)
-[    0.439165] [<c02f683c>] (driver_probe_device) from [<c02f6b08>] (__driver_attach+0x94/0x98)
-[    0.439250] [<c02f6b08>] (__driver_attach) from [<c02f4be8>] (bus_for_each_dev+0x54/0x88)
-[    0.439332] [<c02f4be8>] (bus_for_each_dev) from [<c02f5da8>] (bus_add_driver+0x178/0x254)
-[    0.439411] [<c02f5da8>] (bus_add_driver) from [<c02f72f8>] (driver_register+0x78/0xf4)
-[    0.439488] [<c02f72f8>] (driver_register) from [<c00097f4>] (do_one_initcall+0xb0/0x1f4)
-[    0.439571] [<c00097f4>] (do_one_initcall) from [<c0852dc4>] (kernel_init_freeable+0x11c/0x1e8)
-[    0.439660] [<c0852dc4>] (kernel_init_freeable) from [<c05e2e04>] (kernel_init+0x8/0xec)
-[    0.439740] [<c05e2e04>] (kernel_init) from [<c0010350>] (ret_from_fork+0x14/0x24)
-[    0.439810]  (null): Unbalanced pm_runtime_enable!
-[    0.440965] s3c-i2c 12c80000.i2c: i2c-2: S3C I2C adapter
+v2:
+1. Rename ls2085a to ls2080a
+2. Add ls_pcie_msi_host_init()
 
-The message appears after second pm_runtime_enable().
+ drivers/pci/host/Kconfig          |   2 +-
+ drivers/pci/host/pci-layerscape.c | 215 +++++++++++++++++++++++++++-----------
+ 2 files changed, 153 insertions(+), 64 deletions(-)
 
-Next without the patch works.
-
-Best regards,
-Krzysztof
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index d5e58ba..b5f1a3b 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -105,7 +105,7 @@ config PCI_XGENE_MSI
+ 
+ config PCI_LAYERSCAPE
+ 	bool "Freescale Layerscape PCIe controller"
+-	depends on OF && ARM
++	depends on OF && (ARM || ARM64)
+ 	select PCIE_DW
+ 	select MFD_SYSCON
+ 	help
+diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+index b2328ea1..024727f 100644
+--- a/drivers/pci/host/pci-layerscape.c
++++ b/drivers/pci/host/pci-layerscape.c
+@@ -11,7 +11,6 @@
+  */
+ 
+ #include <linux/kernel.h>
+-#include <linux/delay.h>
+ #include <linux/interrupt.h>
+ #include <linux/module.h>
+ #include <linux/of_pci.h>
+@@ -32,27 +31,60 @@
+ #define LTSSM_STATE_MASK	0x3f
+ #define LTSSM_PCIE_L0		0x11 /* L0 state */
+ 
+-/* Symbol Timer Register and Filter Mask Register 1 */
+-#define PCIE_STRFMR1 0x71c
++/* PEX Internal Configuration Registers */
++#define PCIE_STRFMR1		0x71c /* Symbol Timer & Filter Mask Register1 */
++#define PCIE_DBI_RO_WR_EN	0x8bc /* DBI Read-Only Write Enable Register */
++
++/* PEX LUT registers */
++#define PCIE_LUT_DBG		0x7FC /* PEX LUT Debug Register */
++
++struct ls_pcie_drvdata {
++	u32 lut_offset;
++	u32 ltssm_shift;
++	struct pcie_host_ops *ops;
++};
+ 
+ struct ls_pcie {
+-	struct list_head node;
+-	struct device *dev;
+-	struct pci_bus *bus;
+-	void __iomem *dbi;
+-	struct regmap *scfg;
+ 	struct pcie_port pp;
++	const struct ls_pcie_drvdata *drvdata;
++	void __iomem *regs;
++	void __iomem *lut;
++	struct regmap *scfg;
+ 	int index;
+-	int msi_irq;
+ };
+ 
+ #define to_ls_pcie(x)	container_of(x, struct ls_pcie, pp)
+ 
+-static int ls_pcie_link_up(struct pcie_port *pp)
++static bool ls_pcie_is_bridge(struct ls_pcie *pcie)
++{
++	u32 header_type;
++
++	header_type = ioread8(pcie->regs + PCI_HEADER_TYPE);
++	header_type &= 0x7f;
++
++	return header_type == PCI_HEADER_TYPE_BRIDGE;
++}
++
++/* Clear multi-function bit */
++static void ls_pcie_clear_multifunction(struct ls_pcie *pcie)
++{
++	iowrite8(PCI_HEADER_TYPE_BRIDGE, pcie->regs + PCI_HEADER_TYPE);
++}
++
++/* Fix class value */
++static void ls_pcie_fix_class(struct ls_pcie *pcie)
++{
++	iowrite16(PCI_CLASS_BRIDGE_PCI, pcie->regs + PCI_CLASS_DEVICE);
++}
++
++static int ls1021_pcie_link_up(struct pcie_port *pp)
+ {
+ 	u32 state;
+ 	struct ls_pcie *pcie = to_ls_pcie(pp);
+ 
++	if (!pcie->scfg)
++		return 0;
++
+ 	regmap_read(pcie->scfg, SCFG_PEXMSCPORTSR(pcie->index), &state);
+ 	state = (state >> LTSSM_STATE_SHIFT) & LTSSM_STATE_MASK;
+ 
+@@ -62,56 +94,124 @@ static int ls_pcie_link_up(struct pcie_port *pp)
+ 	return 1;
+ }
+ 
+-static int ls_pcie_establish_link(struct pcie_port *pp)
++static void ls1021_pcie_host_init(struct pcie_port *pp)
+ {
+-	unsigned int retries;
++	struct ls_pcie *pcie = to_ls_pcie(pp);
++	u32 val, index[2];
+ 
+-	for (retries = 0; retries < 200; retries++) {
+-		if (dw_pcie_link_up(pp))
+-			return 0;
+-		usleep_range(100, 1000);
++	pcie->scfg = syscon_regmap_lookup_by_phandle(pp->dev->of_node,
++						     "fsl,pcie-scfg");
++	if (IS_ERR(pcie->scfg)) {
++		dev_err(pp->dev, "No syscfg phandle specified\n");
++		pcie->scfg = NULL;
++		return;
+ 	}
+ 
+-	dev_err(pp->dev, "phy link never came up\n");
+-	return -EINVAL;
++	if (of_property_read_u32_array(pp->dev->of_node,
++				       "fsl,pcie-scfg", index, 2)) {
++		pcie->scfg = NULL;
++		return;
++	}
++	pcie->index = index[1];
++
++	/*
++	 * LS1021A Workaround for internal TKT228622
++	 * to fix the INTx hang issue
++	 */
++	val = ioread32(pcie->regs + PCIE_STRFMR1);
++	val &= 0xffff;
++	iowrite32(val, pcie->regs + PCIE_STRFMR1);
++}
++
++static int ls_pcie_link_up(struct pcie_port *pp)
++{
++	struct ls_pcie *pcie = to_ls_pcie(pp);
++	u32 state;
++
++	state = (ioread32(pcie->lut + PCIE_LUT_DBG) >>
++		 pcie->drvdata->ltssm_shift) &
++		 LTSSM_STATE_MASK;
++
++	if (state < LTSSM_PCIE_L0)
++		return 0;
++
++	return 1;
+ }
+ 
+ static void ls_pcie_host_init(struct pcie_port *pp)
+ {
+ 	struct ls_pcie *pcie = to_ls_pcie(pp);
+-	u32 val;
+ 
+-	dw_pcie_setup_rc(pp);
+-	ls_pcie_establish_link(pp);
++	iowrite32(1, pcie->regs + PCIE_DBI_RO_WR_EN);
++	ls_pcie_fix_class(pcie);
++	ls_pcie_clear_multifunction(pcie);
++	iowrite32(0, pcie->regs + PCIE_DBI_RO_WR_EN);
++}
+ 
+-	/*
+-	 * LS1021A Workaround for internal TKT228622
+-	 * to fix the INTx hang issue
+-	 */
+-	val = ioread32(pcie->dbi + PCIE_STRFMR1);
+-	val &= 0xffff;
+-	iowrite32(val, pcie->dbi + PCIE_STRFMR1);
++static int ls_pcie_msi_host_init(struct pcie_port *pp,
++				 struct msi_controller *chip)
++{
++	struct device_node *msi_node;
++	struct device_node *np = pp->dev->of_node;
++
++	msi_node = of_parse_phandle(np, "msi-parent", 0);
++	if (!msi_node) {
++		dev_err(pp->dev, "failed to find msi-parent\n");
++		return -EINVAL;
++	}
++
++	return 0;
+ }
+ 
++static struct pcie_host_ops ls1021_pcie_host_ops = {
++	.link_up = ls1021_pcie_link_up,
++	.host_init = ls1021_pcie_host_init,
++	.msi_host_init = ls_pcie_msi_host_init,
++};
++
+ static struct pcie_host_ops ls_pcie_host_ops = {
+ 	.link_up = ls_pcie_link_up,
+ 	.host_init = ls_pcie_host_init,
++	.msi_host_init = ls_pcie_msi_host_init,
++};
++
++static struct ls_pcie_drvdata ls1021_drvdata = {
++	.ops = &ls1021_pcie_host_ops,
++};
++
++static struct ls_pcie_drvdata ls1043_drvdata = {
++	.lut_offset = 0x10000,
++	.ltssm_shift = 24,
++	.ops = &ls_pcie_host_ops,
++};
++
++static struct ls_pcie_drvdata ls2080_drvdata = {
++	.lut_offset = 0x80000,
++	.ltssm_shift = 0,
++	.ops = &ls_pcie_host_ops,
+ };
+ 
+-static int ls_add_pcie_port(struct ls_pcie *pcie)
++static const struct of_device_id ls_pcie_of_match[] = {
++	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata },
++	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata },
++	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
++
++static int __init ls_add_pcie_port(struct pcie_port *pp,
++				   struct platform_device *pdev)
+ {
+-	struct pcie_port *pp;
+ 	int ret;
++	struct ls_pcie *pcie = to_ls_pcie(pp);
+ 
+-	pp = &pcie->pp;
+-	pp->dev = pcie->dev;
+-	pp->dbi_base = pcie->dbi;
+-	pp->root_bus_nr = -1;
+-	pp->ops = &ls_pcie_host_ops;
++	pp->dev = &pdev->dev;
++	pp->dbi_base = pcie->regs;
++	pp->ops = pcie->drvdata->ops;
+ 
+ 	ret = dw_pcie_host_init(pp);
+ 	if (ret) {
+-		dev_err(pp->dev, "failed to initialize host\n");
++		dev_err(&pdev->dev, "failed to initialize host\n");
+ 		return ret;
+ 	}
+ 
+@@ -120,39 +220,34 @@ static int ls_add_pcie_port(struct ls_pcie *pcie)
+ 
+ static int __init ls_pcie_probe(struct platform_device *pdev)
+ {
++	const struct of_device_id *match;
+ 	struct ls_pcie *pcie;
+-	struct resource *dbi_base;
+-	u32 index[2];
++	struct resource *res;
+ 	int ret;
+ 
++	match = of_match_device(ls_pcie_of_match, &pdev->dev);
++	if (!match)
++		return -ENODEV;
++
+ 	pcie = devm_kzalloc(&pdev->dev, sizeof(*pcie), GFP_KERNEL);
+ 	if (!pcie)
+ 		return -ENOMEM;
+ 
+-	pcie->dev = &pdev->dev;
+-
+-	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
+-	pcie->dbi = devm_ioremap_resource(&pdev->dev, dbi_base);
+-	if (IS_ERR(pcie->dbi)) {
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
++	pcie->regs = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(pcie->regs)) {
+ 		dev_err(&pdev->dev, "missing *regs* space\n");
+-		return PTR_ERR(pcie->dbi);
++		return PTR_ERR(pcie->regs);
+ 	}
+ 
+-	pcie->scfg = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+-						     "fsl,pcie-scfg");
+-	if (IS_ERR(pcie->scfg)) {
+-		dev_err(&pdev->dev, "No syscfg phandle specified\n");
+-		return PTR_ERR(pcie->scfg);
+-	}
++	pcie->drvdata = match->data;
++	pcie->lut = pcie->regs + pcie->drvdata->lut_offset;
+ 
+-	ret = of_property_read_u32_array(pdev->dev.of_node,
+-					 "fsl,pcie-scfg", index, 2);
+-	if (ret)
+-		return ret;
+-	pcie->index = index[1];
++	if (!ls_pcie_is_bridge(pcie))
++		return -ENODEV;
+ 
+-	ret = ls_add_pcie_port(pcie);
+-	if (ret < 0)
++	ret = ls_add_pcie_port(&pcie->pp, pdev);
++	if (ret)
+ 		return ret;
+ 
+ 	platform_set_drvdata(pdev, pcie);
+@@ -160,12 +255,6 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static const struct of_device_id ls_pcie_of_match[] = {
+-	{ .compatible = "fsl,ls1021a-pcie" },
+-	{ },
+-};
+-MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
+-
+ static struct platform_driver ls_pcie_driver = {
+ 	.driver = {
+ 		.name = "layerscape-pcie",
+-- 
+1.9.1
