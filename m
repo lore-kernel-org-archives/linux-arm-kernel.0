@@ -1,184 +1,258 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Sat, 10 Oct 2015 22:31:17 +0800
-Subject: [PATCH v5 0/17] Add Analogix Core Display Port Driver
-In-Reply-To: <5615BB93.9020008@rock-chips.com>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
- <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
- <5614BADD.1070307@rock-chips.com> <5614DBE2.6080102@osg.samsung.com>
- <5614DFBC.8060105@rock-chips.com> <5614E553.6060108@osg.samsung.com>
- <5614FC6B.4080702@rock-chips.com> <56150128.2070309@osg.samsung.com>
- <5615BB93.9020008@rock-chips.com>
-Message-ID: <56192135.2080608@rock-chips.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Sat, 10 Oct 2015 16:39:00 +0200
+Subject: [PATCH 1/2] ARM: dts: bcm5301x: Add BCM SVK DT files
+In-Reply-To: <1443824564-17291-1-git-send-email-jonmason@broadcom.com>
+References: <1443824564-17291-1-git-send-email-jonmason@broadcom.com>
+Message-ID: <56192304.1050500@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On 10/03/2015 12:22 AM, Jon Mason wrote:
+> Add device tree files for Broadcom Northstar based SVKs.  Since the
+> bcm5301x.dtsi already exists, all that is necessary is the dts files to
+> enable the UARTs (and specify the RAM size for the 4708/9).  With these
+> files, the SVKs are able to boot to shell.
+> 
+> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> ---
+>  arch/arm/boot/dts/Makefile       |  5 +++-
+>  arch/arm/boot/dts/bcm94708.dts   | 52 +++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/bcm94709.dts   | 52 +++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/bcm953012k.dts | 59 ++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 167 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/bcm94708.dts
+>  create mode 100644 arch/arm/boot/dts/bcm94709.dts
+>  create mode 100644 arch/arm/boot/dts/bcm953012k.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 233159d..96a1b58 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -72,7 +72,10 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+>  	bcm47081-buffalo-wzr-900dhp.dtb \
+>  	bcm4709-asus-rt-ac87u.dtb \
+>  	bcm4709-buffalo-wxr-1900dhp.dtb \
+> -	bcm4709-netgear-r8000.dtb
+> +	bcm4709-netgear-r8000.dtb \
+> +	bcm94708.dtb \
+> +	bcm94709.dtb \
+> +	bcm953012k.dtb
+>  dtb-$(CONFIG_ARCH_BCM_63XX) += \
+>  	bcm963138dvt.dtb
+>  dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
+> diff --git a/arch/arm/boot/dts/bcm94708.dts b/arch/arm/boot/dts/bcm94708.dts
+> new file mode 100644
+> index 0000000..57a74c6
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm94708.dts
 
-On 10/08/2015 08:40 AM, Yakir Yang wrote:
-> On 10/07/2015 07:25 PM, Javier Martinez Canillas wrote:
->> On 10/07/2015 01:05 PM, Yakir Yang wrote:
->>> On 10/07/2015 05:26 PM, Javier Martinez Canillas wrote:
->>>> On 10/07/2015 11:02 AM, Yakir Yang wrote:
->>>>> On 10/07/2015 04:46 PM, Javier Martinez Canillas wrote:
->>>>>> On 10/07/2015 08:25 AM, Yakir Yang wrote:
->>>>>>> Hi all,
->>>>>>>
->>>>>>> Friendly ping.....   :)
->>>>>>>
->>>>>>>
->>>>>>> Best regards,
->>>>>>> - Yakir
->>>>>>>
->>>>>>>
->>>>>> Do you have a tree that I can use to test these patches?
->>>>> Wow, thanks a lot, I do have a tree on github 
->>>>> [https://github.com/yakir-Yang/linux/tree/analogix_dp],
->>>>> crossing my finger, wish things works......    ;)
->>>>>
->>>> I tried your analogix_dp branch on an Exynos5800 Peach Pi Chromebook
->>>> but the machine didn't boot. Unfortunately I need to do some soldering
->>>> to have a serial console on this board so don't have a kernel boot 
->>>> log.
->>>>
->>>> I'll let you know if I can get more info about this issue.
->>> Whoops, sorry for the failed, much appreciated for your works.
->>>
->>> Besides, I thought maybe I can find a Peach Pit Chromebook in my side,
->>> I remember that some of our guys have brought one, but previously I
->>> thought that mainline kernel wouldn't run on Peach Pit directly.
->>>
->> Great, mainline works correctly on all Exynos based Chromebooks.
->>
->>> Maybe you can email me the method the run mainline kernel on Peach
->>> Pit, so I can debug the analogix_dp driver at the same time, that would
->>> be great.
->> I wrote a little blog post explaining how to run mainline on these 
->> boards:
->>
->> http://blogs.s-osg.org/install-linux-mainline-kernel-distro-exynos-chromebooks/ 
->>
->>
->> That explains the simplest setup though so if you need a different one
->> (i.e: chain loading a non verified u-boot) or if you have any questions,
->> feel free to contact me in private and I can help you with the setup.
->>
->
-> Ah, thanks, gonna to step-by-step.
+Currently the files are named beginning with the chip name something
+like this should fit better the other naming schema:
+arch/arm/boot/dts/bcm4708-brcm-bcm94708.dts
 
-Thanks for your great material, although I meet some problems in the 
-step-by-step
-process, and failed at this way to setup mainline kernel environment on 
-Exynos chromebooks.
+> @@ -0,0 +1,52 @@
+> +/*
+> + *  BSD LICENSE
+> + *
+> + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
+> + *
+> + *  Redistribution and use in source and binary forms, with or without
+> + *  modification, are permitted provided that the following conditions
+> + *  are met:
+> + *
+> + *    * Redistributions of source code must retain the above copyright
+> + *      notice, this list of conditions and the following disclaimer.
+> + *    * Redistributions in binary form must reproduce the above copyright
+> + *      notice, this list of conditions and the following disclaimer in
+> + *      the documentation and/or other materials provided with the
+> + *      distribution.
+> + *    * Neither the name of Broadcom Corporation nor the names of its
+> + *      contributors may be used to endorse or promote products derived
+> + *      from this software without specific prior written permission.
+> + *
+> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "bcm5301x.dtsi"
+> +
+> +/ {
+> +	model = "NorthStar SVK (BCM94708)";
+> +	compatible = "brcm,bcm4708";
 
-But i do find another way to install mainline kernel to Exynos Chromebook:
-1. Install any ChromeOS image into a USB media device (like dd tools)
-2. "enable_dev_usb_boot" on Exynos chromebooks which would allowed boot 
-from USB.
-3. Flash the mainline kernel into the KERNEL-A and KERNEL-B partitions 
-on host PC.
-4. Insert USB device into Exynos chromebooks, and press CTRL+U, boot 
-into USB OS.
+The compatible string should also contain this exactly board like this:
+compatible = "brcm,bcm94708", "brcm,bcm4708";
 
-And it's better to enable pstore function on mainline kernel, so we can 
-analysis the last log when
-the mainline kernel crashed. After enable PSTORE_RAM in .config, we 
-still need add ramoops node
-into file, like:
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -750,6 +750,15 @@
-                 iommu = <&sysmmu_gsc3>;
-         };
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 mem=128M";
 
-+       ramoops: ramoops {
-+               compatible = "ramoops";
-+               name = "ramoops";
-+               reg = <0x41f00000 0x100000>;
-+               record-size = <0x20000>;
-+               dump-oops;
-+               status = "okay";
-+       };
-+
-         hdmi: hdmi {
-                 compatible = "samsung,exynos4212-hdmi";
-                 reg = <0x14530000 0x70000>;
+Instead of using mem=128M you should add an extra node like this:
 
+	memory {
+		reg = <0x00000000 0x08000000>;
+	};
 
-Aha, I have tested this series on two Exynos Chromebooks that I 
-borrowed(Snow and Peach Pit)
-with previously method (actually I believed it's a common method without 
-broken the original
-ChromeOS image).
+Does this board only has 128M of RAM? currently we restrict all of them
+to that, but I just want to know.
 
-And I do find the crash place that make you failed at this series, here 
-is the diff changes:
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c 
-b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index 5f8fc11..bcbc009 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -1169,6 +1169,7 @@ static int analogix_dp_create_bridge(struct 
-drm_device *drm_dev,
+> +	};
+> +};
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/bcm94709.dts b/arch/arm/boot/dts/bcm94709.dts
+> new file mode 100644
+> index 0000000..bf4b6e1
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm94709.dts
+> @@ -0,0 +1,52 @@
+> +/*
+> + *  BSD LICENSE
+> + *
+> + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
+> + *
+> + *  Redistribution and use in source and binary forms, with or without
+> + *  modification, are permitted provided that the following conditions
+> + *  are met:
+> + *
+> + *    * Redistributions of source code must retain the above copyright
+> + *      notice, this list of conditions and the following disclaimer.
+> + *    * Redistributions in binary form must reproduce the above copyright
+> + *      notice, this list of conditions and the following disclaimer in
+> + *      the documentation and/or other materials provided with the
+> + *      distribution.
+> + *    * Neither the name of Broadcom Corporation nor the names of its
+> + *      contributors may be used to endorse or promote products derived
+> + *      from this software without specific prior written permission.
+> + *
+> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "bcm5301x.dtsi"
+> +
+> +/ {
+> +	model = "NorthStar SVK (BCM94709)";
+> +	compatible = "brcm,bcm4709", "brcm,bcm4708";
+Better this:
+compatible = "brcm,bcm94709", "brcm,bcm4709", "brcm,bcm4708";
 
-         dp->bridge = bridge;
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 mem=128M";
+same as above.
 
-+       dp->encoder->bridge = bridge;
-         bridge->driver_private = dp;
-         bridge->encoder = dp->encoder;
-         bridge->funcs = &analogix_dp_bridge_funcs;
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -151,7 +151,7 @@
-         samsung,color-depth = <1>;
-         samsung,link-rate = <0x06>;
-         samsung,lane-count = <2>;
--       hpd-gpio = <&gpx2 6 0>;
-+       hpd-gpios = <&gpx2 6 0>;
+> +	};
+> +};
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/bcm953012k.dts b/arch/arm/boot/dts/bcm953012k.dts
+> new file mode 100644
+> index 0000000..1726ba0
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm953012k.dts
+> @@ -0,0 +1,59 @@
+> +/*
+> + *  BSD LICENSE
+> + *
+> + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
+> + *
+> + *  Redistribution and use in source and binary forms, with or without
+> + *  modification, are permitted provided that the following conditions
+> + *  are met:
+> + *
+> + *    * Redistributions of source code must retain the above copyright
+> + *      notice, this list of conditions and the following disclaimer.
+> + *    * Redistributions in binary form must reproduce the above copyright
+> + *      notice, this list of conditions and the following disclaimer in
+> + *      the documentation and/or other materials provided with the
+> + *      distribution.
+> + *    * Neither the name of Broadcom Corporation nor the names of its
+> + *      contributors may be used to endorse or promote products derived
+> + *      from this software without specific prior written permission.
+> + *
+> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "bcm5301x.dtsi"
+> +
+> +/ {
+> +	model = "NorthStar SVK (BCM953012K)";
+> +	compatible = "brcm,bcm5301k", "brcm,bcm4708";
 
-         ports {
-                 port at 0 {
+same as other file.
 
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200";
 
-Anyway I'm going to send the v6 series, thanks for your good idea.
+Why is no memory size given here at all?
 
-- Yakir
+> +	};
+> +};
+> +
+> +&uart0 {
+> +	clock-frequency = <62499840>;
 
->
-> - Yakir
->
->>>> Also, there is Kconfig recursive dependency that you may want to fix:
->>>>
->>>> $ make exynos_defconfig
->>>> drivers/video/fbdev/Kconfig:5:error: recursive dependency detected!
->>>> drivers/video/fbdev/Kconfig:5: symbol FB is selected by 
->>>> DRM_KMS_FB_HELPER
->>>> drivers/gpu/drm/Kconfig:34: symbol DRM_KMS_FB_HELPER depends on 
->>>> DRM_KMS_HELPER
->>>> drivers/gpu/drm/Kconfig:28: symbol DRM_KMS_HELPER is selected by 
->>>> DRM_ANALOGIX_DP
->>>> drivers/gpu/drm/bridge/analogix/Kconfig:1: symbol DRM_ANALOGIX_DP 
->>>> is selected by DRM_EXYNOS_DP
->>>> drivers/gpu/drm/exynos/Kconfig:57: symbol DRM_EXYNOS_DP depends on 
->>>> DRM_EXYNOS_FIMD
->>>> drivers/gpu/drm/exynos/Kconfig:19: symbol DRM_EXYNOS_FIMD depends 
->>>> on FB_S3C
->>>> drivers/video/fbdev/Kconfig:2023: symbol FB_S3C depends on FB
->>> Yeah, recursive dependency detected, guess I should remove the
->>> "DRM_KMS_HELPER" from bridge analogix_dp Kconfig file, thanks
->>> for your remind.
->>>
->>> --- a/drivers/gpu/drm/bridge/analogix/Kconfig
->>> +++ b/drivers/gpu/drm/bridge/analogix/Kconfig
->>> @@ -1,4 +1,3 @@
->>>   config DRM_ANALOGIX_DP
->>>          tristate
->>>          depends on DRM
->>> -       select DRM_KMS_HELPER
->>>
->>>
->> That fixes the recursive dependency issue indeed. Thanks.
->>
->>> Thanks,
->>> - Yakir
->> Best regards,
->
+Just out of curiosity on what does this clock frequency depend? I saw
+your patch adding a real clock driver which should make this obsolete.
+
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	clock-frequency = <62499840>;
+> +	status = "okay";
+> +};
+> 
