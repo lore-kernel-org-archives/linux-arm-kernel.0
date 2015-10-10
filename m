@@ -1,68 +1,85 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 10 Oct 2015 11:40:29 -0700
-Subject: [GIT PULL] Broadcom soc changes for v4.4 (try 2)
-In-Reply-To: <1443824458-20799-4-git-send-email-f.fainelli@gmail.com>
-References: <1443824458-20799-4-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1444502429-11100-1-git-send-email-f.fainelli@gmail.com>
+From: ats@offog.org (Adam Sampson)
+Date: Sat, 10 Oct 2015 21:15:21 +0100
+Subject: [PATCH] ARM: dts: sun7i: Add regulator configuration for pcDuino v3
+ Nano
+Message-ID: <1444508121-20233-1-git-send-email-ats@offog.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The power configuration on this board is the same as the pcDuino v3.
+This will enable frequency/voltage scaling over the standard A20
+operating points from 144 MHz to 960 MHz.
 
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+Tested using cpufreq-ljt-stress-test on two pcDuino v3 Nano boards; also
+tested successfully with voltages reduced by 0.025 V.
 
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+Signed-off-by: Adam Sampson <ats@offog.org>
+---
+ arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts | 35 ++++++++++++++++++++++++---
+ 1 file changed, 31 insertions(+), 4 deletions(-)
 
-are available in the git repository at:
-
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.4/soc
-
-for you to fetch changes up to c4a8ea9e0698945b182ba1e1063a0981b1f35139:
-
-  ARM: brcmstb: Setup BIU control registers during boot (2015-10-09 13:42:18 -0700)
-
-----------------------------------------------------------------
-This pull request contains the following Broadcom SoC platform and driver changes:
-
-- Brian Norris create a drivers/soc/brcmstb/ stub as a place holder for SoC-specific
-  code which is coming next
-
-- Florian Fainelli adds support for configuring the BCM7xxx SoCs Bus Interface Unit
-  with their specific write-pairing setting, which must be saved and restored during
-  system-wide suspend/resume, and consequently updates the brcmstb machine code to
-  initialize the BIU
-
-- Jon Mason adds support for the Northstar Plus SoCs by introducing a custom machine
-  descriptor matching their compatible string and setting up the PL310 L2 cache and
-  enabling the relevant ARM errata for their Cortex-A9
-
-----------------------------------------------------------------
-Brian Norris (1):
-      soc: add stubs for brcmstb SoC's
-
-Florian Fainelli (2):
-      soc: brcmstb: Add Bus Interface Unit control setup
-      ARM: brcmstb: Setup BIU control registers during boot
-
-Jon Mason (1):
-      ARM: NSP: Add basic support for Broadcom Northstar Plus SoC
-
- arch/arm/mach-bcm/Kconfig           |  15 +++++
- arch/arm/mach-bcm/Makefile          |   5 +-
- arch/arm/mach-bcm/bcm_nsp.c         |  25 ++++++++
- arch/arm/mach-bcm/brcmstb.c         |   9 +++
- drivers/soc/Kconfig                 |   1 +
- drivers/soc/Makefile                |   1 +
- drivers/soc/brcmstb/Kconfig         |   9 +++
- drivers/soc/brcmstb/Makefile        |   1 +
- drivers/soc/brcmstb/biuctrl.c       | 116 ++++++++++++++++++++++++++++++++++++
- drivers/soc/brcmstb/common.c        |  33 ++++++++++
- include/linux/soc/brcmstb/brcmstb.h |  10 ++++
- include/soc/brcmstb/common.h        |  15 +++++
- 12 files changed, 239 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-bcm/bcm_nsp.c
- create mode 100644 drivers/soc/brcmstb/Kconfig
- create mode 100644 drivers/soc/brcmstb/Makefile
- create mode 100644 drivers/soc/brcmstb/biuctrl.c
- create mode 100644 drivers/soc/brcmstb/common.c
- create mode 100644 include/linux/soc/brcmstb/brcmstb.h
- create mode 100644 include/soc/brcmstb/common.h
+diff --git a/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts b/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
+index ee85e07..1757a6a 100644
+--- a/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
++++ b/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
+@@ -82,6 +82,10 @@
+ 	status = "okay";
+ };
+ 
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -108,13 +112,9 @@
+ 	status = "okay";
+ 
+ 	axp209: pmic at 34 {
+-		compatible = "x-powers,axp209";
+ 		reg = <0x34>;
+ 		interrupt-parent = <&nmi_intc>;
+ 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+-
+-		interrupt-controller;
+-		#interrupt-cells = <1>;
+ 	};
+ };
+ 
+@@ -182,6 +182,33 @@
+ 	status = "okay";
+ };
+ 
++#include "axp209.dtsi"
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-pll";
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
+ /* A single regulator (U24) powers both USB host ports. */
+ &reg_usb1_vbus {
+ 	pinctrl-0 = <&usb1_vbus_pin_pcduino3_nano>;
+-- 
+2.1.4
