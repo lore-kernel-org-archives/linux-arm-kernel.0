@@ -1,90 +1,61 @@
-From: shengjiu.wang@freescale.com (Shengjiu Wang)
-Date: Sat, 10 Oct 2015 18:15:07 +0800
-Subject: [PATCH V3 2/2] ARM: dts: imx6: change the core clock of spdif
-In-Reply-To: <cover.1444471684.git.shengjiu.wang@freescale.com>
-References: <cover.1444471684.git.shengjiu.wang@freescale.com>
-Message-ID: <2f2656454f7385b575af298d6350269534460a1b.1444471684.git.shengjiu.wang@freescale.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Sat, 10 Oct 2015 14:13:51 +0200
+Subject: [PATCH v2 2/5] mmc: sdhci-pxav3: enable usage of DAT3 pin as HW
+ card detect
+In-Reply-To: <20151010150535.6047dab9@xhacker>
+References: <1444352635-21965-1-git-send-email-mw@semihalf.com>
+ <1444352635-21965-3-git-send-email-mw@semihalf.com>
+ <20151009201356.78488116@xhacker>
+ <CAPv3WKddfCOSCCOSByAEzyZ3qnAX22TFi2acrNDcTgEvy+ioFA@mail.gmail.com>
+ <20151010150535.6047dab9@xhacker>
+Message-ID: <CAPv3WKcPAieXFBWD9m2LLZLaiUprh83ySB9LCG2DyAq5p-RT=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The correct core clock of spdif is SPDIF_GCLK, which is added to
-clock tree. So the dts also need to be updated.
+Hi Jisheng,
 
-Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
----
- arch/arm/boot/dts/imx6qdl.dtsi | 12 ++++++------
- arch/arm/boot/dts/imx6sl.dtsi  | 16 ++++++++++++++++
- arch/arm/boot/dts/imx6sx.dtsi  |  2 +-
- 3 files changed, 23 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index e716e6f..2b6cc8b 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -218,16 +218,16 @@
- 					dmas = <&sdma 14 18 0>,
- 					       <&sdma 15 18 0>;
- 					dma-names = "rx", "tx";
--					clocks = <&clks IMX6QDL_CLK_SPDIF>, <&clks IMX6QDL_CLK_OSC>,
--						 <&clks IMX6QDL_CLK_SPDIF>, <&clks IMX6QDL_CLK_DUMMY>,
--						 <&clks IMX6QDL_CLK_DUMMY>, <&clks IMX6QDL_CLK_DUMMY>,
--						 <&clks IMX6QDL_CLK_DUMMY>, <&clks IMX6QDL_CLK_DUMMY>,
--						 <&clks IMX6QDL_CLK_DUMMY>;
-+					clocks = <&clks IMX6QDL_CLK_SPDIF_GCLK>, <&clks IMX6QDL_CLK_OSC>,
-+						 <&clks IMX6QDL_CLK_SPDIF>, <&clks IMX6QDL_CLK_ASRC>,
-+						 <&clks IMX6QDL_CLK_DUMMY>, <&clks IMX6QDL_CLK_ESAI_EXTAL>,
-+						 <&clks IMX6QDL_CLK_IPG>, <&clks IMX6QDL_CLK_MLB>,
-+						 <&clks IMX6QDL_CLK_DUMMY>, <&clks IMX6QDL_CLK_SPBA>;
- 					clock-names = "core",  "rxtx0",
- 						      "rxtx1", "rxtx2",
- 						      "rxtx3", "rxtx4",
- 						      "rxtx5", "rxtx6",
--						      "rxtx7";
-+						      "rxtx7", "dma";
- 					status = "disabled";
- 				};
- 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index ebe8670..d8ba99f 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -135,8 +135,24 @@
- 				ranges;
- 
- 				spdif: spdif at 02004000 {
-+					compatible = "fsl,imx6sl-spdif",
-+						"fsl,imx35-spdif";
- 					reg = <0x02004000 0x4000>;
- 					interrupts = <0 52 IRQ_TYPE_LEVEL_HIGH>;
-+					dmas = <&sdma 14 18 0>,
-+						<&sdma 15 18 0>;
-+					dma-names = "rx", "tx";
-+					clocks = <&clks IMX6SL_CLK_SPDIF_GCLK>, <&clks IMX6SL_CLK_OSC>,
-+						 <&clks IMX6SL_CLK_SPDIF>, <&clks IMX6SL_CLK_DUMMY>,
-+						 <&clks IMX6SL_CLK_DUMMY>, <&clks IMX6SL_CLK_DUMMY>,
-+						 <&clks IMX6SL_CLK_IPG>, <&clks IMX6SL_CLK_DUMMY>,
-+						 <&clks IMX6SL_CLK_DUMMY>, <&clks IMX6SL_CLK_SPBA>;
-+					clock-names = "core", "rxtx0",
-+						"rxtx1", "rxtx2",
-+						"rxtx3", "rxtx4",
-+						"rxtx5", "rxtx6",
-+						"rxtx7", "dma";
-+					status = "disabled";
- 				};
- 
- 				ecspi1: ecspi at 02008000 {
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index c94f2ea..167f77b 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -211,7 +211,7 @@
- 					dmas = <&sdma 14 18 0>,
- 					       <&sdma 15 18 0>;
- 					dma-names = "rx", "tx";
--					clocks = <&clks IMX6SX_CLK_SPDIF>,
-+					clocks = <&clks IMX6SX_CLK_SPDIF_GCLK>,
- 						 <&clks IMX6SX_CLK_OSC>,
- 						 <&clks IMX6SX_CLK_SPDIF>,
- 						 <&clks 0>, <&clks 0>, <&clks 0>,
--- 
-1.9.1
+>>
+>> >>
+>> >> When using DAT3-based detection Armada 38x SDIO IP expects its internal
+>> >> clock to be always on, which had to be ensured twofold:
+>> >
+>> > What happen if runtime suspend disables its core clk and axi clk? I guess
+>> > dat3-based detection isn't compatible with runtime pm. If so, do we also
+>> > need to disable runtime pm in probe function?
+>>
+>> Is runtime resume supposed to be triggered by card detection? Is there
+>
+> I think so. Take marvell berlin for example, card insert => gpio interrupt
+> or => sdhci runtime resume.
+>
+>> a way to manually trigger runtime suspend and resume of sdhci? Anyway
+>
+> If runtime-pm is builtin and the host driver supports runtime-pm (sdhci-pxav3
+> supports runtime-pm well), when there's no sdhc transactions, runtime suspend
+> will be triggered automatically after some time (50ms?)
+>
+>> coreclk is not a problem, as it's not used by A38x.
+>
+> I checked A38x dts files, it's <&gateclk 17>. So the question is: what will
+> happen if <&gateclk 17> is disabled in runtime suspend? Is the dat3-based
+> CD still works? In theory, it should not work any more.
+>
+
+Actually in pxav3 driver there is one obligatory clock ("io") which
+can be either named in dts on not (like in armada38x.dtsi). "coreclk"
+is optional, however all this does not matter, as both are disabled in
+runtime_suspend function. I think that when we disable the gate clock,
+dat3 detection won't work, but I guess that card detection is not the
+only thing that wakes up the mmc subsystem and make runtime_pm useful.
+
+I will try to check how it works. If there's problem with detection I
+propose, in order not to spoil the code too much and not to loose all
+runtime_pm benefits, to avoid disabling/enabling clock in
+runtime_suspend/resume functions on a38x working with dat3 detection.
+In such case sdhci_runtime_suspend/resume would execute without
+problems and we will be sure that detection will work in such
+configuration.
+
+Best regards,
+Marcin
