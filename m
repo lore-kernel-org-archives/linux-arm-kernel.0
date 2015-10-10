@@ -1,52 +1,38 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 10 Oct 2015 22:49:00 +0800
-Subject: [PATCH v2 5/5] ARM: dts: sun6i: Add support for Sinlinx A31s SDK board
+Date: Sat, 10 Oct 2015 22:48:57 +0800
+Subject: [PATCH v2 2/5] ARM: dts: sunxi: Add dtsi for AXP22x PMIC
 In-Reply-To: <1444488540-11263-1-git-send-email-wens@csie.org>
 References: <1444488540-11263-1-git-send-email-wens@csie.org>
-Message-ID: <1444488540-11263-6-git-send-email-wens@csie.org>
+Message-ID: <1444488540-11263-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Sinlinx A31s SDK is a A31s based module/baseboard development kit.
+The AXP22x family of PMIC is used with some Allwinner SoCs. This
+includes the AXP221, AXP221s and AXP223. They differ in the host
+interface, maximum supply current for DCDC1 regulator, and default
+voltage and state for various LDO regulators. Also, the AXP221s
+does not support fine calibration of the battery fuel gauge.
 
-The core module has the SoC, PMIC, DRAM, eMMC and supporting components.
-There are also pads for UART0, JTAG and I2S.
-
-The baseboard has 100 Mbps Ethernet, 5x USB 2.0 host ports via a USB 2.0
-hub chip, MMC, HDMI, SPDIF, CIR, audio jacks, 2 tablet-like volume
-buttons, RS232 style UART and USB OTG (though VBUS is not connected).
-Various headers are available for other addon modules, such as SDIO
-WiFi, LCD display, camera sensor, UARTs, I2C, SPI and GPIOs.
+This patch adds a dtsi file for all the common bindings for these
+PMICs. Currently this is just listing all the regulator nodes. The
+regulators are initialized based on their device node names.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/Makefile                     |   1 +
- arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi | 140 +++++++++++++++++++++
- arch/arm/boot/dts/sun6i-a31s-sina31s.dts       | 167 +++++++++++++++++++++++++
- 3 files changed, 308 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
- create mode 100644 arch/arm/boot/dts/sun6i-a31s-sina31s.dts
+ arch/arm/boot/dts/axp22x.dtsi | 143 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 143 insertions(+)
+ create mode 100644 arch/arm/boot/dts/axp22x.dtsi
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 342ab3116feb..9fb5ece17b8e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -609,6 +609,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
- 	sun6i-a31-m9.dtb \
- 	sun6i-a31-mele-a1000g-quad.dtb \
- 	sun6i-a31s-cs908.dtb \
-+	sun6i-a31s-sina31s.dtb \
- 	sun6i-a31s-yones-toptech-bs1078-v2.dtb
- dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-bananapi.dtb \
-diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+diff --git a/arch/arm/boot/dts/axp22x.dtsi b/arch/arm/boot/dts/axp22x.dtsi
 new file mode 100644
-index 000000000000..ea69fb8ad4d8
+index 000000000000..76302f58c478
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
-@@ -0,0 +1,140 @@
++++ b/arch/arm/boot/dts/axp22x.dtsi
+@@ -0,0 +1,143 @@
 +/*
-+ * Copyright 2015 Chen-Yu Tsai <wens@csie.org>
++ * Copyright 2015 Chen-Yu Tsai
++ *
++ * Chen-Yu Tsai <wens@csie.org>
 + *
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
@@ -87,276 +73,104 @@ index 000000000000..ea69fb8ad4d8
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+/dts-v1/;
-+#include "sun6i-a31s.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Sinlinx SinA31s Core Board";
-+	compatible = "sinlinx,sina31s", "allwinner,sun6i-a31s";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+};
-+
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc3>;
-+};
-+
-+/* eMMC on core board */
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_8bit_emmc_pins>;
-+	vmmc-supply = <&reg_dcdc1>;
-+	bus-width = <8>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+/* AXP221s PMIC on core board */
-+&p2wi {
-+	status = "okay";
-+
-+	axp22x: pmic at 68 {
-+		compatible = "x-powers,axp221";
-+		reg = <0x68>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+#include "axp22x.dtsi"
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2700000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "avcc";
-+};
-+
-+&reg_dc5ldo {
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-cpus";
-+};
-+
-+&reg_dcdc1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-3v0";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-gpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc4 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-sys-dll";
-+};
-+
-+&reg_dcdc5 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vcc-dram";
-+};
-+
-+/* UART0 pads available on core board */
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s.dts b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
-new file mode 100644
-index 000000000000..80e4fc7138ec
---- /dev/null
-+++ b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
-@@ -0,0 +1,167 @@
 +/*
-+ * Copyright 2015 Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
++ * AXP221/221s/223 Integrated Power Management Chip
++ * http://www.x-powers.com/product/AXP22X.php
++ * http://dl.linux-sunxi.org/AXP/AXP221%20Datasheet%20V1.2%2020130326%20.pdf
 + */
 +
-+/* The SinA31s development board has the SinA31s core board soldered on */
-+#include "sun6i-a31s-sina31s-core.dtsi"
++&axp22x {
++	interrupt-controller;
++	#interrupt-cells = <1>;
 +
-+#include <dt-bindings/input/input.h>
++	regulators {
++		/* Default work frequency for buck regulators */
++		x-powers,dcdc-freq = <3000>;
 +
-+/ {
-+	model = "Sinlinx SinA31s Development Board";
-+	compatible = "sinlinx,sina31s-sdk", "allwinner,sun6i-a31s";
++		reg_dcdc1: dcdc1 {
++			regulator-name = "dcdc1";
++		};
 +
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
++		reg_dcdc2: dcdc2 {
++			regulator-name = "dcdc2";
++		};
 +
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pin_sina31s>;
++		reg_dcdc3: dcdc3 {
++			regulator-name = "dcdc3";
++		};
 +
-+		status {
-+			label = "sina31s:status:usr";
-+			gpios = <&pio 7 13 GPIO_ACTIVE_HIGH>; /* PH13 */
++		reg_dcdc4: dcdc4 {
++			regulator-name = "dcdc4";
++		};
++
++		reg_dcdc5: dcdc5 {
++			regulator-name = "dcdc5";
++		};
++
++		reg_dc1sw: dc1sw {
++			regulator-name = "dc1sw";
++		};
++
++		reg_dc5ldo: dc5ldo {
++			regulator-name = "dc5ldo";
++		};
++
++		reg_aldo1: aldo1 {
++			regulator-name = "aldo1";
++		};
++
++		reg_aldo2: aldo2 {
++			regulator-name = "aldo2";
++		};
++
++		reg_aldo3: aldo3 {
++			regulator-name = "aldo3";
++		};
++
++		reg_dldo1: dldo1 {
++			regulator-name = "dldo1";
++		};
++
++		reg_dldo2: dldo2 {
++			regulator-name = "dldo2";
++		};
++
++		reg_dldo3: dldo3 {
++			regulator-name = "dldo3";
++		};
++
++		reg_dldo4: dldo4 {
++			regulator-name = "dldo4";
++		};
++
++		reg_eldo1: eldo1 {
++			regulator-name = "eldo1";
++		};
++
++		reg_eldo2: eldo2 {
++			regulator-name = "eldo2";
++		};
++
++		reg_eldo3: eldo3 {
++			regulator-name = "eldo3";
++		};
++
++		reg_ldo_io0: ldo_io0 {
++			regulator-name = "ldo_io0";
++		};
++
++		reg_ldo_io1: ldo_io1 {
++			regulator-name = "ldo_io1";
++		};
++
++		reg_rtc_ldo: rtc_ldo {
++			/* RTC_LDO is a fixed, always-on regulator */
++			regulator-always-on;
++			regulator-min-microvolt = <3000000>;
++			regulator-max-microvolt = <3000000>;
++			regulator-name = "rtc_ldo";
 +		};
 +	};
-+};
-+
-+&ehci0 {
-+	/* USB 2.0 4 port hub IC */
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_mii_a>;
-+	phy = <&phy1>;
-+	phy-mode = "mii";
-+	phy-supply = <&reg_dldo1>;
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&i2c0 {
-+	/* Available on camera header */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	/* Available on LCD header */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
-+
-+&ir {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir_pins_a>;
-+	status = "okay";
-+};
-+
-+&lradc {
-+	vref-supply = <&reg_aldo3>;
-+	status = "okay";
-+
-+	button at 158 {
-+		label = "Volume Up";
-+		linux,code = <KEY_VOLUMEUP>;
-+		channel = <0>;
-+		voltage = <158730>;
-+	};
-+
-+	button at 349 {
-+		label = "Volume Down";
-+		linux,code = <KEY_VOLUMEDOWN>;
-+		channel = <0>;
-+		voltage = <349206>;
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_sina31s>;
-+	vmmc-supply = <&reg_dcdc1>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 0 4 GPIO_ACTIVE_HIGH>; /* PA4 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&pio {
-+	led_pin_sina31s: led_pin at 0 {
-+		allwinner,pins = "PH13";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	mmc0_cd_pin_sina31s: mmc0_cd_pin at 0 {
-+		allwinner,pins = "PA4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+};
-+
-+&reg_dldo1 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-gmac-phy";
-+};
-+
-+&usbphy {
-+	status = "okay";
 +};
 -- 
 2.5.3
