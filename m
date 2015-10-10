@@ -1,61 +1,66 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 10 Oct 2015 19:22:03 +0200
-Subject: [PATCH 09/15] arm64: Add page size to the kernel image header
-In-Reply-To: <1442331684-28818-10-git-send-email-suzuki.poulose@arm.com>
+Date: Sat, 10 Oct 2015 19:22:14 +0200
+Subject: [PATCH 11/15] arm64: Cleanup VTCR_EL2 computation
+In-Reply-To: <1442331684-28818-12-git-send-email-suzuki.poulose@arm.com>
 References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
- <1442331684-28818-10-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20151010172203.GI29128@cbox>
+ <1442331684-28818-12-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151010172214.GJ29128@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 04:41:18PM +0100, Suzuki K. Poulose wrote:
-> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Tue, Sep 15, 2015 at 04:41:20PM +0100, Suzuki K. Poulose wrote:
+> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 > 
-> This patch adds the page size to the arm64 kernel image header
-> so that one can infer the PAGESIZE used by the kernel. This will
-> be helpful to diagnose failures to boot the kernel with page size
-> not supported by the CPU.
+> No functional changes. Group the common bits for VCTR_EL2
+> initialisation for better readability. The granule size
+> and the entry level are controlled by the page size.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: kvmarm at lists.cs.columbia.edu
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 > ---
->  Documentation/arm64/booting.txt |    7 ++++++-
->  arch/arm64/kernel/image.h       |    5 ++++-
->  2 files changed, 10 insertions(+), 2 deletions(-)
+>  arch/arm64/include/asm/kvm_arm.h |   13 +++++++------
+>  1 file changed, 7 insertions(+), 6 deletions(-)
 > 
-> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-> index 7d9d3c2..aaf6d77 100644
-> --- a/Documentation/arm64/booting.txt
-> +++ b/Documentation/arm64/booting.txt
-> @@ -104,7 +104,12 @@ Header notes:
->  - The flags field (introduced in v3.17) is a little-endian 64-bit field
->    composed as follows:
->    Bit 0:	Kernel endianness.  1 if BE, 0 if LE.
-> -  Bits 1-63:	Reserved.
-> +  Bit 1-2:	Kernel Page size.
-> +			0 - Unspecified.
-> +			1 - 4K
-> +			2 - 16K
-> +			3 - 64K
-> +  Bits 3-63:	Reserved.
->  
->  - When image_size is zero, a bootloader should attempt to keep as much
->    memory as possible free for use by the kernel immediately after the
-> diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
-> index 8fae075..73b736c 100644
-> --- a/arch/arm64/kernel/image.h
-> +++ b/arch/arm64/kernel/image.h
-> @@ -47,7 +47,10 @@
->  #define __HEAD_FLAG_BE	0
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index bdf139e..699554d 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -138,6 +138,9 @@
+>   * The magic numbers used for VTTBR_X in this patch can be found in Tables
+>   * D4-23 and D4-25 in ARM DDI 0487A.b.
+>   */
+> +#define VTCR_EL2_COMMON_BITS	(VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
+> +				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_T0SZ_40B)
+> +
+>  #ifdef CONFIG_ARM64_64K_PAGES
+>  /*
+>   * Stage2 translation configuration:
+> @@ -145,9 +148,8 @@
+>   * 64kB pages (TG0 = 1)
+>   * 2 level page tables (SL = 1)
+>   */
+> -#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
+> -				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+> -				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+> +#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1 | \
+> +				 VTCR_EL2_COMMON_BITS)
+>  #define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
+>  #else
+>  /*
+> @@ -156,9 +158,8 @@
+>   * 4kB pages (TG0 = 0)
+>   * 3 level page tables (SL = 1)
+>   */
+> -#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
+> -				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+> -				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+> +#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SL0_LVL1 | \
+> +				 VTCR_EL2_COMMON_BITS)
+>  #define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
 >  #endif
 >  
-> -#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0)
-> +#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
-> +
-> +#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0) |		\
-> +			(__HEAD_FLAG_PAGE_SIZE << 1)
->  
->  /*
->   * These will output as part of the Image header, which should be little-endian
 > -- 
 > 1.7.9.5
 > 
