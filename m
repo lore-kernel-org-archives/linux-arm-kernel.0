@@ -1,49 +1,58 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 9 Oct 2015 17:33:52 -0700
-Subject: [PATCH 09/10] clk: ns2: add clock support for Broadcom Northstar
- 2 SoC
-In-Reply-To: <1443826665-17570-10-git-send-email-jonmason@broadcom.com>
-References: <1443826665-17570-1-git-send-email-jonmason@broadcom.com>
- <1443826665-17570-10-git-send-email-jonmason@broadcom.com>
-Message-ID: <20151010003352.GA26883@codeaurora.org>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Sat, 10 Oct 2015 01:42:47 +0100
+Subject: [PATCH] sched_clock: add data pointer argument to read callback
+In-Reply-To: <20151009235441.GD32536@n2100.arm.linux.org.uk> (Russell King's
+ message of "Sat, 10 Oct 2015 00:54:41 +0100")
+References: <1444427858-576-1-git-send-email-mans@mansr.com>
+ <20151009232015.GC32536@n2100.arm.linux.org.uk>
+ <yw1x4mhzioxl.fsf@unicorn.mansr.com>
+ <20151009235441.GD32536@n2100.arm.linux.org.uk>
+Message-ID: <yw1xzizrh7ug.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02, Jon Mason wrote:
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index 23800a1..2790f21 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -2,6 +2,7 @@ menu "Platform selection"
->  
->  config ARCH_BCM_IPROC
->  	bool "Broadcom iProc SoC Family"
-> +	select COMMON_CLK_IPROC
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-Given that this is a visible option, I'd expect the defconfig to
-enable this.
+> On Sat, Oct 10, 2015 at 12:48:22AM +0100, M?ns Rullg?rd wrote:
+>> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+>> 
+>> > On Fri, Oct 09, 2015 at 10:57:35PM +0100, Mans Rullgard wrote:
+>> >> This passes a data pointer specified in the sched_clock_register()
+>> >> call to the read callback allowing simpler implementations thereof.
+>> >> 
+>> >> In this patch, existing uses of this interface are simply updated
+>> >> with a null pointer.
+>> >
+>> > This is a bad description.  It tells us what the patch is doing,
+>> > (which we can see by reading the patch) but not _why_.  Please include
+>> > information on why the change is necessary - describe what you are
+>> > trying to achieve.
+>> 
+>> Currently most of the callbacks use a global variable to store the
+>> address of a counter register.  This has several downsides:
+>> 
+>> - Loading the address of a global variable can be more expensive than
+>>   keeping a pointer next to the function pointer.
+>> 
+>> - It makes it impossible to have multiple instances of a driver call
+>>   sched_clock_register() since the caller can't know which clock will
+>>   win in the end.
+>> 
+>> - Many of the existing callbacks are practically identical and could be
+>>   replaced with a common generic function if it had a pointer argument.
+>> 
+>> If I've missed something that makes this a stupid idea, please tell.
+>
+> So my next question is whether you intend to pass an iomem pointer
+> through this, or a some kind of structure, or both.  It matters,
+> because iomem pointers have a __iomem attribute to keep sparse
+> happy.  Having to force that attribute on and off pointers is frowned
+> upon, as it defeats the purpose of the sparse static checker.
 
->  	help
->  	  This enables support for Broadcom iProc based SoCs
->  
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index d08b3e5..ea81eaa 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -47,7 +47,8 @@ obj-$(CONFIG_COMMON_CLK_WM831X)		+= clk-wm831x.o
->  obj-$(CONFIG_COMMON_CLK_XGENE)		+= clk-xgene.o
->  obj-$(CONFIG_COMMON_CLK_PWM)		+= clk-pwm.o
->  obj-$(CONFIG_COMMON_CLK_AT91)		+= at91/
-> -obj-$(CONFIG_ARCH_BCM)			+= bcm/
-> +obj-$(CONFIG_CLK_BCM_KONA)		+= bcm/
-> +obj-$(CONFIG_COMMON_CLK_IPROC)		+= bcm/
-
-Also, perhaps we need some sort of Kconfig thing for overall bcm
-clock drivers, so that we don't have duplicate Makefile rules.
-
-	config COMMON_CLK_BCM
-		bool "Support for Broadcom clocks"
+So this is an instance where tools like sparse get in the way of doing
+the simplest, most efficient, and obviously correct thing.  Who wins in
+such cases?
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+M?ns Rullg?rd
+mans at mansr.com
