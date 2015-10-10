@@ -1,130 +1,71 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Sat, 10 Oct 2015 07:16:27 +0530
-Subject: [PATCH 1/5] thermal: exynos: Fix unbalanced regulator disable on
- probe failure
-In-Reply-To: <56179DC0.1040003@samsung.com>
-References: <1444282446-6419-1-git-send-email-k.kozlowski@samsung.com>
- <CAGOxZ52DE42YA3b5z-16H7fxs58f6Mv+AjMcaaaJEM6bftEmnA@mail.gmail.com>
- <56179DC0.1040003@samsung.com>
-Message-ID: <CAGOxZ53KA3bB6F4Ucc8r7rLZFfYiATPsQjKs2BOeWV2BdK=nvA@mail.gmail.com>
+From: ats@offog.org (Adam Sampson)
+Date: Sat, 10 Oct 2015 02:47:59 +0100
+Subject: [PATCH] ARM: dts: sun7i: Correct USB regulators on pcDuino v3 Nano
+Message-ID: <1444441679-4802-1-git-send-email-ats@offog.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The LinkSprite pcDuino v3 Nano's two USB host ports are powered by a
+single RT9701GB regulator, which has its enable input tied to the A20's
+PD2 pin, pulled up to 3v3 via a 10k resistor.
 
-On Fri, Oct 9, 2015 at 4:28 PM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> W dniu 09.10.2015 o 01:45, Alim Akhtar pisze:
->> Hello,
->>
->> On Thu, Oct 8, 2015 at 11:04 AM, Krzysztof Kozlowski
->> <k.kozlowski@samsung.com> wrote:
->>> During probe if the regulator could not be enabled, the error exit path
->>> would still disable it. This could lead to unbalanced counter of
->>> regulator enable/disable.
->>>
->> Do you see a regulator unbalanced reported here during boot? You may
->> want to add that to commit message.
->
-> I did not see the warning/error message about unbalanced disable. It
-> would happen in certain condition only - no other enables of regulator
-> and count going below 0.
->
-> I would have to simulate this error to get the warning message. I don't
-> think it is worth the effort.
->
-Ok, looking at code, it does looks to be calling regulator disable in
-case regulator enable fails.
-Feel free to add
-Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
-Thanks!!
+However, the script.bin that shipped with the device listed PH11 and PH3
+as Vbus control pins for the two USB ports. Neither of these are
+actually connected to anything.
 
-> Best regards,
-> Krzysztof
->
->>
->>> The patch moves code for getting and enabling the regulator from
->>> exynos_map_dt_data() to probe function because it is really not a part
->>> of getting Device Tree properties.
->>>
->>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>> Fixes: 5f09a5cbd14a ("thermal: exynos: Disable the regulator on probe failure")
->>> Cc: <stable@vger.kernel.org>
->>> ---
->>>  drivers/thermal/samsung/exynos_tmu.c | 34 +++++++++++++++++-----------------
->>>  1 file changed, 17 insertions(+), 17 deletions(-)
->>>
->>> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
->>> index 0bae8cc6c23a..23f4320f8ef7 100644
->>> --- a/drivers/thermal/samsung/exynos_tmu.c
->>> +++ b/drivers/thermal/samsung/exynos_tmu.c
->>> @@ -1168,27 +1168,10 @@ static int exynos_map_dt_data(struct platform_device *pdev)
->>>         struct exynos_tmu_data *data = platform_get_drvdata(pdev);
->>>         struct exynos_tmu_platform_data *pdata;
->>>         struct resource res;
->>> -       int ret;
->>>
->>>         if (!data || !pdev->dev.of_node)
->>>                 return -ENODEV;
->>>
->>> -       /*
->>> -        * Try enabling the regulator if found
->>> -        * TODO: Add regulator as an SOC feature, so that regulator enable
->>> -        * is a compulsory call.
->>> -        */
->>> -       data->regulator = devm_regulator_get(&pdev->dev, "vtmu");
->>> -       if (!IS_ERR(data->regulator)) {
->>> -               ret = regulator_enable(data->regulator);
->>> -               if (ret) {
->>> -                       dev_err(&pdev->dev, "failed to enable vtmu\n");
->>> -                       return ret;
->>> -               }
->>> -       } else {
->>> -               dev_info(&pdev->dev, "Regulator node (vtmu) not found\n");
->>> -       }
->>> -
->>>         data->id = of_alias_get_id(pdev->dev.of_node, "tmuctrl");
->>>         if (data->id < 0)
->>>                 data->id = 0;
->>> @@ -1312,6 +1295,23 @@ static int exynos_tmu_probe(struct platform_device *pdev)
->>>                 pr_err("thermal: tz: %p ERROR\n", data->tzd);
->>>                 return PTR_ERR(data->tzd);
->>>         }
->>> +
->>> +       /*
->>> +        * Try enabling the regulator if found
->>> +        * TODO: Add regulator as an SOC feature, so that regulator enable
->>> +        * is a compulsory call.
->>> +        */
->>> +       data->regulator = devm_regulator_get(&pdev->dev, "vtmu");
->>> +       if (!IS_ERR(data->regulator)) {
->>> +               ret = regulator_enable(data->regulator);
->>> +               if (ret) {
->>> +                       dev_err(&pdev->dev, "failed to enable vtmu\n");
->>> +                       return ret;
->>> +               }
->>> +       } else {
->>> +               dev_info(&pdev->dev, "Regulator node (vtmu) not found\n");
->>> +       }
->>> +
->>>         ret = exynos_map_dt_data(pdev);
->>>         if (ret)
->>>                 goto err_sensor;
->>> --
->>> 1.9.1
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->>
->>
->
+Siarhei Siamashka spotted this problem while reviewing the other
+LinkSprite boards. This patch fixes it by only defining a single
+regulator, controlled by PD2. Testing shows that the USB ports are now
+(correctly) only powered up once the USB PHY driver is loaded.
 
+Signed-off-by: Adam Sampson <ats@offog.org>
+---
+ arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
-
+diff --git a/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts b/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
+index 5361fce..f75e3bd 100644
+--- a/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
++++ b/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
+@@ -158,7 +158,7 @@
+ 	};
+ 
+ 	usb1_vbus_pin_pcduino3_nano: usb1_vbus_pin at 0 {
+-		allwinner,pins = "PH11";
++		allwinner,pins = "PD2";
+ 		allwinner,function = "gpio_out";
+ 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+@@ -166,18 +166,17 @@
+ };
+ 
+ &reg_ahci_5v {
++	pinctrl-names = "default";
+ 	pinctrl-0 = <&ahci_pwr_pin_pcduino3_nano>;
+ 	gpio = <&pio 7 2 GPIO_ACTIVE_HIGH>; /* PH2 */
+ 	status = "okay";
+ };
+ 
++/* A single regulator (U24) powers both USB host ports. */
+ &reg_usb1_vbus {
++	pinctrl-names = "default";
+ 	pinctrl-0 = <&usb1_vbus_pin_pcduino3_nano>;
+-	gpio = <&pio 7 11 GPIO_ACTIVE_HIGH>; /* PH11 */
+-	status = "okay";
+-};
+-
+-&reg_usb2_vbus {
++	gpio = <&pio 3 2 GPIO_ACTIVE_HIGH>; /* PD2 */
+ 	status = "okay";
+ };
+ 
+@@ -189,6 +188,6 @@
+ 
+ &usbphy {
+ 	usb1_vbus-supply = <&reg_usb1_vbus>;
+-	usb2_vbus-supply = <&reg_usb2_vbus>;
++	usb2_vbus-supply = <&reg_usb1_vbus>;
+ 	status = "okay";
+ };
 -- 
-Regards,
-Alim
+2.1.4
