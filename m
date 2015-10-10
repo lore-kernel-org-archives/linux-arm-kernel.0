@@ -1,17 +1,16 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat, 10 Oct 2015 23:12:30 +0200
-Subject: [GIT PULL] LPC18xx DTS changes for v4.4
-Message-ID: <1444511551-23853-1-git-send-email-manabian@gmail.com>
+Date: Sat, 10 Oct 2015 23:12:31 +0200
+Subject: [GIT PULL] PL172 driver updates for v4.4
+In-Reply-To: <1444511551-23853-1-git-send-email-manabian@gmail.com>
+References: <1444511551-23853-1-git-send-email-manabian@gmail.com>
+Message-ID: <1444511551-23853-2-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi arm-soc team,
 
-Please consider pulling these DTS changes for the NXP LPC18xx
-platform and related boards into arm-soc/dt.
-
-Contain DTS additions for drivers that went upstream during the
-previous merge cycle and some board updates.
+Please consider pulling these changes for memory/pl172 into
+arm-soc/drivers.
 
 The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
@@ -19,45 +18,27 @@ The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
 are available in the git repository at:
 
-  https://github.com/manabian/linux-lpc.git tags/lpc18xx_dts_for_4.4
+  https://github.com/manabian/linux-lpc.git tags/drivers_pl172_for_4.4
 
-for you to fetch changes up to 6031d8bbf29e7bdb22d69dc4dd7b2ad7a402e57a:
+for you to fetch changes up to 961a86d22e89428516fa7183b7750a4ba9866f4d:
 
-  ARM: dts: lpc4350-hitex-eval: add joystick, buttons and leds (2015-09-30 22:49:03 +0200)
-
-----------------------------------------------------------------
-Device Tree additions for NXP LPC18xx platform
- - Reset controller (RGU)
- - DMA controller and mux
- - SPI Flash (SPIFI) controller
- - I2C controller
- - Watchdog and SCT PWM from Ariel D'Alessandro
-
-And board updates for EA4357 dev kit and Hitex LPC4350 eval board
-adding I2C, SPIFI Flash and some miscellaneous stuff.
+  doc: dt: arm,pl172: add description of PL175 and PL176 controllers (2015-09-29 22:19:02 +0200)
 
 ----------------------------------------------------------------
-Ariel D'Alessandro (3):
-      ARM: dts: lpc18xx: add watchdog node
-      ARM: dts: lpc18xx: add sct pwm node
-      ARM: dts: lpc4350-hitex-eval: add i2c0 and devices
+Support for additional ARM MPMCs to the PL172 driver and an update to
+the bindings documentation to reflect this from Vladimir Zapolskiy.
 
-Joachim Eastwood (13):
-      ARM: dts: lpc18xx: add rgu node
-      ARM: dts: lpc18xx: add spifi node
-      ARM: dts: lpc18xx: add dmac node
-      ARM: dts: lpc18xx: add dmamux node
-      ARM: dts: lpc18xx: add dma to ssp0/1
-      ARM: dts: lpc18xx: add dma to uart0/1/2/3
-      ARM: dts: lpc18xx: add i2c nodes
-      ARM: dts: lpc18xx: add resets entry to device nodes
-      ARM: dts: lpc4357-ea4357: add spifi and flash device
-      ARM: dts: lpc4357-ea4357: add ssp0
-      ARM: dts: lpc4357-ea4357: add i2c0 and devices
-      ARM: dts: lpc4350-hitex-eval: add spifi and flash device
-      ARM: dts: lpc4350-hitex-eval: add joystick, buttons and leds
+"The change adds support of ARM PrimeCell PL175 MPMC and PL176 MPMC,
+ the static memory controllers on devices are similar to one found on
+ ARM PrimeCell PL172, add support to the existing driver."
 
- arch/arm/boot/dts/lpc18xx.dtsi              | 134 +++++++++++++++++++++
- arch/arm/boot/dts/lpc4350-hitex-eval.dts    | 175 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/lpc4357-ea4357-devkit.dts |  95 +++++++++++++++
- 3 files changed, 404 insertions(+)
+----------------------------------------------------------------
+Vladimir Zapolskiy (4):
+      memory: pl172: correct MPMC peripheral ID register bits
+      memory: pl172: add ARM PrimeCell PL175 MPMC support
+      memory: pl172: add ARM PrimeCell PL176 MPMC support
+      doc: dt: arm,pl172: add description of PL175 and PL176 controllers
+
+ .../bindings/memory-controllers/arm,pl172.txt      |  8 ++++---
+ drivers/memory/pl172.c                             | 26 +++++++++++++++++++---
+ 2 files changed, 28 insertions(+), 6 deletions(-)
