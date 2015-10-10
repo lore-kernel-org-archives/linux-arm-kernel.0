@@ -1,7 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat, 10 Oct 2015 17:10:38 +0200
+Date: Sat, 10 Oct 2015 17:11:34 +0200
 Subject: [PATCH v3 pre-03/12] pwm: rcar: make use of pwm_is_enabled()
-Message-ID: <1444489838-13953-1-git-send-email-boris.brezillon@free-electrons.com>
+In-Reply-To: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1444489894-14035-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
