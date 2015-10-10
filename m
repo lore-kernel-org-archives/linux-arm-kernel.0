@@ -1,30 +1,42 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Sat, 10 Oct 2015 23:31:36 +0100
-Subject: [PATCH v4 1/3] arm64/efi: remove
- /chosen/linux,uefi-stub-kern-ver DT property
-In-Reply-To: <1444330924-17830-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
- <1444330924-17830-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151010223136.GI2723@codeblueprint.co.uk>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Sun, 11 Oct 2015 00:33:38 +0200
+Subject: [PATCH v4 2/6] pinctrl: berlin: add the berlin4ct pinctrl driver
+In-Reply-To: <20151009172238.68fdd51c@xhacker>
+References: <1444378629-3057-1-git-send-email-jszhang@marvell.com>
+ <1444378629-3057-3-git-send-email-jszhang@marvell.com>
+ <20151009090353.GA2842@kwain> <20151009172238.68fdd51c@xhacker>
+Message-ID: <20151010223338.GG2842@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 08 Oct, at 08:02:02PM, Ard Biesheuvel wrote:
-> With the stub to kernel interface being promoted to a proper interface
-> so that other agents than the stub can boot the kernel proper in EFI
-> mode, we can remove the linux,uefi-stub-kern-ver field, considering
-> that its original purpose was to prevent this from happening in the
-> first place.
+Hi Jisheng,
+
+On Fri, Oct 09, 2015 at 05:22:38PM +0800, Jisheng Zhang wrote:
+> On Fri, 9 Oct 2015 11:03:53 +0200
+> Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+> > 
+> > Finally you can move the OF dependency to the PINCTRL_BERLIN config as
+> > all Berlin pinctrl drivers depends on it.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  Documentation/arm/uefi.txt         | 2 --
->  drivers/firmware/efi/libstub/fdt.c | 9 ---------
->  2 files changed, 11 deletions(-)
+> PINCTRL_BERLIN isn't user visible and it's selected by PINCTRL_BERLIN_BG4CT. So
+> we may have the following random config case:
+> 
+> CONFIG_OF=n
+> CONFIG_PINCTRL_BERLIN_BG4CT=y
+> 
+> In this case, there will be build errors for we missed OF. So we have to
+> make PINCTRL_BERLIN_BG4CT depends on OF. What do you think? Or is there
+> better solution?
 
-Good riddance ;-)
+That's true.
 
-Reviewed-by: Matt Fleming <matt.fleming@intel.com>
+But because other Berlin pinctrl drivers also depends on CONFIG_OF, we
+need to make then depend on it too. This isn't the topic of this series
+so I'll send a separate patch later.
+
+Antoine
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
