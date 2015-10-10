@@ -1,378 +1,98 @@
 From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Sat, 10 Oct 2015 10:59:15 +0800
-Subject: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for HiSilicon SoC
- Hip05
+Date: Sat, 10 Oct 2015 10:59:16 +0800
+Subject: [PATCH v10 5/6] Documentation: DT: Add HiSilicon PCIe host binding
 In-Reply-To: <1444445957-239522-1-git-send-email-wangzhou1@hisilicon.com>
 References: <1444445957-239522-1-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <1444445957-239522-5-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <1444445957-239522-6-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds PCIe host support for HiSilicon SoC Hip05.
+This patch adds related DTS binding document for HiSilicon PCIe host driver.
 
 Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
-Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-Signed-off-by: liudongdong <liudongdong3@huawei.com>
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-Signed-off-by: qiuzhenfa <qiuzhenfa@hisilicon.com>
 ---
- drivers/pci/host/Kconfig     |   8 ++
- drivers/pci/host/Makefile    |   1 +
- drivers/pci/host/pcie-hisi.c | 320 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 329 insertions(+)
- create mode 100644 drivers/pci/host/pcie-hisi.c
+ .../bindings/arm/hisilicon/hisilicon.txt           | 17 +++++++++
+ .../devicetree/bindings/pci/hisilicon-pcie.txt     | 44 ++++++++++++++++++++++
+ 2 files changed, 61 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index d5e58ba..ae873be 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -145,4 +145,12 @@ config PCIE_IPROC_BCMA
- 	  Say Y here if you want to use the Broadcom iProc PCIe controller
- 	  through the BCMA bus interface
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+index 3504dca..6ac7c00 100644
+--- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
++++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+@@ -171,6 +171,23 @@ Example:
+ 	};
  
-+config PCI_HISI
-+	depends on OF && ARM64
-+	bool "HiSilicon SoC HIP05 PCIe controller"
-+	select PCIEPORTBUS
-+	select PCIE_DW
-+	help
-+	  Say Y here if you want PCIe controller support on HiSilicon HIP05 SoC
+ -----------------------------------------------------------------------
++Hisilicon HiP05 PCIe-SAS system controller
 +
- endmenu
-diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index 140d66f..ea1dbf2 100644
---- a/drivers/pci/host/Makefile
-+++ b/drivers/pci/host/Makefile
-@@ -17,3 +17,4 @@ obj-$(CONFIG_PCI_VERSATILE) += pci-versatile.o
- obj-$(CONFIG_PCIE_IPROC) += pcie-iproc.o
- obj-$(CONFIG_PCIE_IPROC_PLATFORM) += pcie-iproc-platform.o
- obj-$(CONFIG_PCIE_IPROC_BCMA) += pcie-iproc-bcma.o
-+obj-$(CONFIG_PCI_HISI) += pcie-hisi.o
-diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
++Required properties:
++- compatible : "hisilicon,pcie-sas-subctrl", "syscon";
++- reg : Register address and size
++
++The HiP05 PCIe-SAS system controller is shared by PCIe and SAS controllers in
++HiP05 Soc to implement some basic configurations.
++
++Example:
++	/* for HiP05 PCIe-SAS system */
++	pcie_sas: system_controller at 0xb0000000 {
++		compatible = "hisilicon,pcie-sas-subctrl", "syscon";
++		reg = <0xb0000000 0x10000>;
++	};
++
++-----------------------------------------------------------------------
+ Hisilicon CPU controller
+ 
+ Required properties:
+diff --git a/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
 new file mode 100644
-index 0000000..26aa0d9
+index 0000000..17c6ed9
 --- /dev/null
-+++ b/drivers/pci/host/pcie-hisi.c
-@@ -0,0 +1,320 @@
-+/*
-+ * PCIe host controller driver for HiSilicon Hip05 SoC
-+ *
-+ * Copyright (C) 2015 HiSilicon Co., Ltd. http://www.hisilicon.com
-+ *
-+ * Author: Zhou Wang <wangzhou1@hisilicon.com>
-+ *         Dacai Zhu <zhudacai@hisilicon.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/interrupt.h>
-+#include <linux/irqdomain.h>
-+#include <linux/module.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_pci.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
++++ b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+@@ -0,0 +1,44 @@
++HiSilicon PCIe host bridge DT description
 +
-+#include "pcie-designware.h"
++HiSilicon PCIe host controller is based on Designware PCI core.
++It shares common functions with PCIe Designware core driver and inherits
++common properties defined in
++Documentation/devicetree/bindings/pci/designware-pci.txt.
 +
-+#define PCIE_SUBCTRL_MODE_REG                           0x2800
-+#define PCIE_SUBCTRL_SYS_STATE4_REG                     0x6818
-+#define PCIE_SLV_DBI_MODE                               0x0
-+#define PCIE_SLV_SYSCTRL_MODE                           0x1
-+#define PCIE_SLV_CONTENT_MODE                           0x2
-+#define PCIE_SLV_MSI_ASID                               0x10
-+#define PCIE_LTSSM_LINKUP_STATE                         0x11
-+#define PCIE_LTSSM_STATE_MASK                           0x3F
-+#define PCIE_MSI_ASID_ENABLE                            (0x1 << 12)
-+#define PCIE_MSI_ASID_VALUE                             (0x1 << 16)
-+#define PCIE_MSI_TRANS_ENABLE                           (0x1 << 12)
-+#define PCIE_MSI_TRANS_REG                              0x1c8
-+#define PCIE_MSI_LOW_ADDRESS                            0x1b4
-+#define PCIE_MSI_HIGH_ADDRESS                           0x1c4
-+#define PCIE_GITS_TRANSLATER                            0x10040
++Additional properties are described here:
 +
-+#define PCIE_SYS_CTRL20_REG                             0x20
-+#define PCIE_RD_TAB_SEL                                 BIT(31)
-+#define PCIE_RD_TAB_EN                                  BIT(30)
++Required properties:
++- compatible: Should contain "hisilicon,hip05-pcie".
++- reg: Should contain rc_dbi, config registers location and length.
++- reg-names: Must include the following entries:
++  "rc_dbi": controller configuration registers;
++  "config": PCIe configuration space registers.
++- msi-parent: Should be its_pcie which is an ITS receiving MSI interrupts.
++- port-id: Should be 0, 1, 2 or 3.
 +
-+#define to_hisi_pcie(x)	container_of(x, struct hisi_pcie, pp)
++Optional properties:
++- status: Either "ok" or "disabled".
++- dma-coherent: Present if DMA operations are coherent.
 +
-+struct hisi_pcie {
-+	struct regmap *subctrl;
-+	void __iomem *reg_base;
-+	u32 port_id;
-+	struct pcie_port pp;
-+};
-+
-+static inline void hisi_pcie_apb_writel(struct hisi_pcie *pcie,
-+					u32 val, u32 reg)
-+{
-+	writel(val, pcie->reg_base + reg);
-+}
-+
-+static inline u32 hisi_pcie_apb_readl(struct hisi_pcie *pcie, u32 reg)
-+{
-+	return readl(pcie->reg_base + reg);
-+}
-+
-+/*
-+ * Change mode to indicate the same reg_base to base of PCIe host configure
-+ * registers, base of RC configure space or base of vmid/asid context table
-+ */
-+static void hisi_pcie_change_apb_mode(struct hisi_pcie *pcie, u32 mode)
-+{
-+	u32 val;
-+	u32 bit_mask;
-+	u32 bit_shift;
-+	u32 port_id = pcie->port_id;
-+	u32 reg = PCIE_SUBCTRL_MODE_REG + 0x100 * port_id;
-+
-+	if ((port_id == 1) || (port_id == 2)) {
-+		bit_mask = 0xc;
-+		bit_shift = 0x2;
-+	} else {
-+		bit_mask = 0x6;
-+		bit_shift = 0x1;
-+	}
-+
-+	regmap_update_bits(pcie->subctrl, reg, bit_mask, mode << bit_shift);
-+}
-+
-+/* Configure vmid/asid table in PCIe host */
-+static void hisi_pcie_config_context(struct hisi_pcie *pcie)
-+{
-+	int i;
-+	u32 val;
-+
-+	/* enable to clean vmid and asid tables though apb bus */
-+	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_SYSCTRL_MODE);
-+
-+	val = hisi_pcie_apb_readl(pcie, PCIE_SYS_CTRL20_REG);
-+	/* enable ar channel */
-+	val |= PCIE_RD_TAB_SEL | PCIE_RD_TAB_EN;
-+	hisi_pcie_apb_writel(pcie, val, PCIE_SYS_CTRL20_REG);
-+
-+	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_CONTENT_MODE);
-+
-+	/*
-+	 * init vmid and asid tables for all PCIe devices as 0
-+	 * vmid table: 0 ~ 0x3ff, asid table: 0x400 ~ 0x7ff
-+	 */
-+	for (i = 0; i < 0x800; i++)
-+		hisi_pcie_apb_writel(pcie, 0x0, i * 4);
-+
-+	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_SYSCTRL_MODE);
-+
-+	/* enable aw channel */
-+	val &= (~PCIE_RD_TAB_SEL);
-+	val |= PCIE_RD_TAB_EN;
-+	hisi_pcie_apb_writel(pcie, val, PCIE_SYS_CTRL20_REG);
-+
-+	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_CONTENT_MODE);
-+
-+	for (i = 0; i < 0x800; i++)
-+		hisi_pcie_apb_writel(pcie, 0x0, i * 4);
-+
-+	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_SYSCTRL_MODE);
-+
-+	val = hisi_pcie_apb_readl(pcie, PCIE_SYS_CTRL20_REG);
-+	/* disable ar channel */
-+	val |= PCIE_RD_TAB_SEL;
-+	val &= (~PCIE_RD_TAB_EN);
-+	hisi_pcie_apb_writel(pcie, val, PCIE_SYS_CTRL20_REG);
-+	/* disable aw channel */
-+	val &= ((~PCIE_RD_TAB_SEL) & (~PCIE_RD_TAB_EN));
-+	hisi_pcie_apb_writel(pcie, val, PCIE_SYS_CTRL20_REG);
-+
-+	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_DBI_MODE);
-+}
-+
-+static int hisi_pcie_link_up(struct pcie_port *pp)
-+{
-+	u32 val;
-+	struct hisi_pcie *hisi_pcie = to_hisi_pcie(pp);
-+
-+	regmap_read(hisi_pcie->subctrl, PCIE_SUBCTRL_SYS_STATE4_REG +
-+		    0x100 * hisi_pcie->port_id, &val);
-+
-+	return ((val & PCIE_LTSSM_STATE_MASK) == PCIE_LTSSM_LINKUP_STATE);
-+}
-+
-+static
-+int hisi_pcie_msi_host_init(struct pcie_port *pp, struct msi_controller *chip)
-+{
-+	u64 addr;
-+	struct device_node *msi_node;
-+	struct resource res;
-+	struct device_node *np = pp->dev->of_node;
-+	struct hisi_pcie *pcie = to_hisi_pcie(pp);
-+
-+	msi_node = of_parse_phandle(np, "msi-parent", 0);
-+	if (!msi_node) {
-+		dev_err(pp->dev, "failed to find msi-parent\n");
-+		return -EINVAL;
-+	}
-+	of_address_to_resource(msi_node, 0, &res);
-+	addr = res.start + PCIE_GITS_TRANSLATER;
-+
-+	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_SYSCTRL_MODE);
-+
-+	hisi_pcie_apb_writel(pcie, addr & 0xffffffff, PCIE_MSI_LOW_ADDRESS);
-+	hisi_pcie_apb_writel(pcie, addr >> 32, PCIE_MSI_HIGH_ADDRESS);
-+	hisi_pcie_apb_writel(pcie, PCIE_MSI_ASID_ENABLE | PCIE_MSI_ASID_VALUE,
-+			     PCIE_SLV_MSI_ASID);
-+	hisi_pcie_apb_writel(pcie, PCIE_MSI_TRANS_ENABLE, PCIE_MSI_TRANS_REG);
-+
-+	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_DBI_MODE);
-+
-+	return 0;
-+}
-+
-+static int hisi_pcie_cfg_write(struct pcie_port *pp, int where, int  size,
-+				u32 val)
-+{
-+	u32 reg_val;
-+	u32 reg;
-+	struct hisi_pcie *pcie = to_hisi_pcie(pp);
-+	void *walker = &reg_val;
-+
-+	walker += (where & 0x3);
-+	reg = where & ~0x3;
-+	if (size == 4)
-+		hisi_pcie_apb_writel(pcie, val, reg);
-+	else if (size == 2) {
-+		reg_val = hisi_pcie_apb_readl(pcie, reg);
-+		*(u16 __force *) walker = val;
-+		hisi_pcie_apb_writel(pcie, reg_val, reg);
-+	} else if (size == 1) {
-+		reg_val = hisi_pcie_apb_readl(pcie, reg);
-+		*(u8 __force *) walker = val;
-+		hisi_pcie_apb_writel(pcie, reg_val, reg);
-+	} else
-+		return PCIBIOS_BAD_REGISTER_NUMBER;
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
-+static int hisi_pcie_cfg_read(struct pcie_port *pp, int where, int size,
-+			      u32 *val)
-+{
-+	u32 reg;
-+	u32 reg_val;
-+	struct hisi_pcie *pcie = to_hisi_pcie(pp);
-+	void *walker = &reg_val;
-+
-+	walker += (where & 0x3);
-+	reg = where & ~0x3;
-+	reg_val = hisi_pcie_apb_readl(pcie, reg);
-+
-+	if (size == 1)
-+		*val = *(u8 __force *) walker;
-+	else if (size == 2)
-+		*val = *(u16 __force *) walker;
-+	else if (size != 4)
-+		return PCIBIOS_BAD_REGISTER_NUMBER;
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
-+static struct pcie_host_ops hisi_pcie_host_ops = {
-+	.link_up = hisi_pcie_link_up,
-+	.msi_host_init = hisi_pcie_msi_host_init,
-+	.wr_own_conf = hisi_pcie_cfg_write,
-+	.rd_own_conf = hisi_pcie_cfg_read,
-+};
-+
-+static int __init hisi_add_pcie_port(struct pcie_port *pp,
-+				     struct platform_device *pdev)
-+{
-+	int ret;
-+	u32 port_id;
-+	struct hisi_pcie *hisi_pcie = to_hisi_pcie(pp);
-+
-+	if (of_property_read_u32(pdev->dev.of_node, "port-id", &port_id)) {
-+		dev_err(&pdev->dev, "failed to read port-id\n");
-+		return -EINVAL;
-+	}
-+	if (port_id > 3) {
-+		dev_err(&pdev->dev, "Invalid port-id: %d\n", port_id);
-+		return -EINVAL;
-+	}
-+	hisi_pcie->port_id = port_id;
-+
-+	pp->ops = &hisi_pcie_host_ops;
-+
-+	hisi_pcie_config_context(hisi_pcie);
-+
-+	ret = dw_pcie_host_init(pp);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to initialize host\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init hisi_pcie_probe(struct platform_device *pdev)
-+{
-+	struct hisi_pcie *hisi_pcie;
-+	struct pcie_port *pp;
-+	struct resource *reg;
-+	int ret;
-+
-+	hisi_pcie = devm_kzalloc(&pdev->dev, sizeof(*hisi_pcie), GFP_KERNEL);
-+	if (!hisi_pcie)
-+		return -ENOMEM;
-+
-+	pp = &hisi_pcie->pp;
-+	pp->dev = &pdev->dev;
-+
-+	hisi_pcie->subctrl =
-+	syscon_regmap_lookup_by_compatible("hisilicon,pcie-sas-subctrl");
-+	if (IS_ERR(hisi_pcie->subctrl)) {
-+		dev_err(pp->dev, "cannot get subctrl base\n");
-+		return PTR_ERR(hisi_pcie->subctrl);
-+	}
-+
-+	reg = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rc_dbi");
-+	hisi_pcie->reg_base = devm_ioremap_resource(&pdev->dev, reg);
-+	if (IS_ERR(hisi_pcie->reg_base)) {
-+		dev_err(pp->dev, "cannot get rc_dbi base\n");
-+		return PTR_ERR(hisi_pcie->reg_base);
-+	}
-+
-+	hisi_pcie->pp.dbi_base = hisi_pcie->reg_base;
-+
-+	ret = hisi_add_pcie_port(pp, pdev);
-+	if (ret)
-+		return ret;
-+
-+	platform_set_drvdata(pdev, hisi_pcie);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id hisi_pcie_of_match[] = {
-+	{.compatible = "hisilicon,hip05-pcie",},
-+	{},
-+};
-+
-+MODULE_DEVICE_TABLE(of, hisi_pcie_of_match);
-+
-+static struct platform_driver hisi_pcie_driver = {
-+	.driver = {
-+		   .name = "hisi-pcie",
-+		   .of_match_table = hisi_pcie_of_match,
-+	},
-+};
-+
-+static int __init hisi_pcie_init(void)
-+{
-+	return platform_driver_probe(&hisi_pcie_driver, hisi_pcie_probe);
-+}
-+subsys_initcall(hisi_pcie_init);
++Example:
++	pcie at 0xb0080000 {
++		compatible = "hisilicon,hip05-pcie", "snps,dw-pcie";
++		reg = <0 0xb0080000 0 0x10000>, <0x220 0x00000000 0 0x2000>;
++		reg-names = "rc_dbi", "config";
++		bus-range = <0  15>;
++		msi-parent = <&its_pcie>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		dma-coherent;
++		ranges = <0x82000000 0 0x00000000 0x220 0x00000000 0 0x10000000>;
++		num-lanes = <8>;
++		port-id = <1>;
++		#interrupts-cells = <1>;
++		interrupts-map-mask = <0xf800 0 0 7>;
++		interrupts-map = <0x0 0 0 1 &mbigen_pcie 1 10
++				  0x0 0 0 2 &mbigen_pcie 2 11
++				  0x0 0 0 3 &mbigen_pcie 3 12
++				  0x0 0 0 4 &mbigen_pcie 4 13>;
++		status = "ok";
++	};
 -- 
 1.9.1
