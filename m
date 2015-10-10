@@ -1,37 +1,71 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Sat, 10 Oct 2015 23:40:09 +0100
-Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
-In-Reply-To: <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
- <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151010224009.GJ2723@codeblueprint.co.uk>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Sun, 11 Oct 2015 00:40:08 +0200
+Subject: [PATCH v5 0/7] arm64: berlin: add pinctrl support
+In-Reply-To: <1444391810-5045-1-git-send-email-jszhang@marvell.com>
+References: <1444391810-5045-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20151010224008.GI2842@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 08 Oct, at 08:02:04PM, Ard Biesheuvel wrote:
-> Since arm64 does not use a builtin decompressor, the EFI stub is built
-> into the kernel proper. So far, this has been working fine, but actually,
-> since the stub is in fact a PE/COFF relocatable binary that is executed
-> at an unknown offset in the 1:1 mapping provided by the UEFI firmware, we
-> should not be seamlessly sharing code with the kernel proper, which is a
-> position dependent executable linked at a high virtual offset.
-> 
-> So instead, separate the contents of libstub and its dependencies, by
-> putting them into their own namespace by prefixing all of its symbols
-> with __efistub. This way, we have tight control over what parts of the
-> kernel proper are referenced by the stub.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/Makefile            | 12 ++++-
->  arch/arm64/kernel/efi-entry.S         | 10 ++--
->  arch/arm64/kernel/head.S              | 14 ++---
->  arch/arm64/kernel/image.h             | 27 ++++++++++
->  drivers/firmware/efi/libstub/Makefile | 39 +++++++++++---
->  drivers/firmware/efi/libstub/string.c | 57 ++++++++++++++++++++
->  6 files changed, 139 insertions(+), 20 deletions(-)
+Jisheng,
 
-Reviewed-by: Matt Fleming <matt.fleming@intel.com>
+On Fri, Oct 09, 2015 at 07:56:43PM +0800, Jisheng Zhang wrote:
+> This series adds support for Marvell berlin4ct pin-controller, allowing
+> to configure the pin muxing from the device tree.
+
+For the whole series,
+
+Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+
+Thanks!
+
+Antoine
+
+> 
+> Since v4:
+>  - drop ARCH_BERLIN dependency for it has been met
+>  - drop COMPILE_TEST dependency but make berlin pinctrl driver visible
+>    if COMPILE_TEST=y, and let this change be a seperate commit.
+> 
+> Since v3:
+>  - fix stupid build error: I missed local changes to berlin-bg4ct.c
+> 
+> Since v2:
+>  - introduce new berlin_pinctrl_probe_regmap() to avoid duplicated code
+>  - renaming such as s/urt/uart etc. but keep the group name as URT* to keep
+>    consistent with HW/ASIC
+> 
+> Since v1:
+>  - use generic name for pin functions
+>  - a new commit to add pinmux for uart0
+>  - correct pinctrl usage in dts
+> 
+> 
+> Jisheng Zhang (7):
+>   pinctrl: berlin: introduce berlin_pinctrl_probe_regmap()
+>   pinctrl: berlin: Make berlin pinctrl driver visible if COMPILE_TEST=y
+>   pinctrl: berlin: add the berlin4ct pinctrl driver
+>   arm64: berlin: add the pinctrl dependency for Marvell Berlin SoCs
+>   pinctrl: dt-binding: document berlin4ct SoC pinctrl
+>   arm64: dts: berlin4ct: add the pinctrl node
+>   arm64: dts: berlin4ct: add default pinmux for uart0
+> 
+>  .../devicetree/bindings/pinctrl/berlin,pinctrl.txt |   5 +-
+>  arch/arm64/Kconfig.platforms                       |   1 +
+>  arch/arm64/boot/dts/marvell/berlin4ct.dtsi         |  22 +
+>  drivers/pinctrl/berlin/Kconfig                     |   7 +-
+>  drivers/pinctrl/berlin/Makefile                    |   1 +
+>  drivers/pinctrl/berlin/berlin-bg4ct.c              | 503 +++++++++++++++++++++
+>  drivers/pinctrl/berlin/berlin.c                    |  26 +-
+>  drivers/pinctrl/berlin/berlin.h                    |   4 +
+>  8 files changed, 558 insertions(+), 11 deletions(-)
+>  create mode 100644 drivers/pinctrl/berlin/berlin-bg4ct.c
+> 
+> -- 
+> 2.6.1
+> 
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
