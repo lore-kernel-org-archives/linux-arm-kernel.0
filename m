@@ -1,39 +1,63 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Sat, 10 Oct 2015 23:10:06 +0200 (CEST)
-Subject: [PATCH 5/5] arm: add missing of_node_put
-In-Reply-To: <8655275.vMqHQfLN9g@wuerfel>
-References: <1444480254-14399-1-git-send-email-Julia.Lawall@lip6.fr>
- <1444480254-14399-6-git-send-email-Julia.Lawall@lip6.fr>
- <8655275.vMqHQfLN9g@wuerfel>
-Message-ID: <alpine.DEB.2.02.1510102307570.2053@localhost6.localdomain6>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 10 Oct 2015 23:12:30 +0200
+Subject: [GIT PULL] LPC18xx DTS changes for v4.4
+Message-ID: <1444511551-23853-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 10 Oct 2015, Arnd Bergmann wrote:
+Hi arm-soc team,
 
-> On Saturday 10 October 2015 14:30:54 Julia Lawall wrote:
-> > diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> > index 11c54de..432ff34 100644
-> > --- a/arch/arm/kernel/devtree.c
-> > +++ b/arch/arm/kernel/devtree.c
-> > @@ -143,6 +143,7 @@ void __init arm_dt_init_cpu_maps(void)
-> >                                                "max cores %u, capping them\n",
-> >                                                cpuidx, nr_cpu_ids)) {
-> >                         cpuidx = nr_cpu_ids;
-> > +                       of_node_put(cpu);
-> >                         break;
-> >                 }
-> > 
-> 
-> The same for_each_child_of_node() loop has three 'return' statements'
-> aside from the 'break' statement here. I think you should change your
-> semantic patch to cover both cases.
+Please consider pulling these DTS changes for the NXP LPC18xx
+platform and related boards into arm-soc/dt.
 
-It was intended to, but it seems that it's not working on the case where 
-there is no argument to return.
+Contain DTS additions for drivers that went upstream during the
+previous merge cycle and some board updates.
 
-In any case, it's an opportunity to ask a question.  Would one want a 
-of_node_put in front of every return, or should the returns become gotos, 
-to a single of_node_put after the current end of the function?
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
-julia
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+
+are available in the git repository at:
+
+  https://github.com/manabian/linux-lpc.git tags/lpc18xx_dts_for_4.4
+
+for you to fetch changes up to 6031d8bbf29e7bdb22d69dc4dd7b2ad7a402e57a:
+
+  ARM: dts: lpc4350-hitex-eval: add joystick, buttons and leds (2015-09-30 22:49:03 +0200)
+
+----------------------------------------------------------------
+Device Tree additions for NXP LPC18xx platform
+ - Reset controller (RGU)
+ - DMA controller and mux
+ - SPI Flash (SPIFI) controller
+ - I2C controller
+ - Watchdog and SCT PWM from Ariel D'Alessandro
+
+And board updates for EA4357 dev kit and Hitex LPC4350 eval board
+adding I2C, SPIFI Flash and some miscellaneous stuff.
+
+----------------------------------------------------------------
+Ariel D'Alessandro (3):
+      ARM: dts: lpc18xx: add watchdog node
+      ARM: dts: lpc18xx: add sct pwm node
+      ARM: dts: lpc4350-hitex-eval: add i2c0 and devices
+
+Joachim Eastwood (13):
+      ARM: dts: lpc18xx: add rgu node
+      ARM: dts: lpc18xx: add spifi node
+      ARM: dts: lpc18xx: add dmac node
+      ARM: dts: lpc18xx: add dmamux node
+      ARM: dts: lpc18xx: add dma to ssp0/1
+      ARM: dts: lpc18xx: add dma to uart0/1/2/3
+      ARM: dts: lpc18xx: add i2c nodes
+      ARM: dts: lpc18xx: add resets entry to device nodes
+      ARM: dts: lpc4357-ea4357: add spifi and flash device
+      ARM: dts: lpc4357-ea4357: add ssp0
+      ARM: dts: lpc4357-ea4357: add i2c0 and devices
+      ARM: dts: lpc4350-hitex-eval: add spifi and flash device
+      ARM: dts: lpc4350-hitex-eval: add joystick, buttons and leds
+
+ arch/arm/boot/dts/lpc18xx.dtsi              | 134 +++++++++++++++++++++
+ arch/arm/boot/dts/lpc4350-hitex-eval.dts    | 175 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/lpc4357-ea4357-devkit.dts |  95 +++++++++++++++
+ 3 files changed, 404 insertions(+)
