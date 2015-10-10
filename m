@@ -1,66 +1,108 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 10 Oct 2015 17:17:28 +0200
-Subject: [PATCH v2 17/22] arm64/kvm: Make use of the system wide safe
- values
-In-Reply-To: <1444064531-25607-18-git-send-email-suzuki.poulose@arm.com>
-References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
- <1444064531-25607-18-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20151010151728.GD29128@cbox>
+Date: Sat, 10 Oct 2015 17:19:32 +0200
+Subject: [PATCH v3 6/6] arm/arm64: KVM: only allow 64bit hosts to build
+ VGICv3
+In-Reply-To: <20151009141006.213e252d@arm.com>
+References: <1443703639-3730-1-git-send-email-jean-philippe.brucker@arm.com>
+ <1443703639-3730-7-git-send-email-jean-philippe.brucker@arm.com>
+ <20151009141006.213e252d@arm.com>
+Message-ID: <20151010151932.GE29128@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 05, 2015 at 06:02:06PM +0100, Suzuki K. Poulose wrote:
-> Use the system wide safe value from the new API for safer
-> decisions
+On Fri, Oct 09, 2015 at 02:10:06PM +0100, Marc Zyngier wrote:
+> On Thu,  1 Oct 2015 13:47:19 +0100
+> Jean-Philippe Brucker <jean-philippe.brucker@arm.com> wrote:
 > 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: kvmarm at lists.cs.columbia.edu
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/kvm/reset.c    |    2 +-
->  arch/arm64/kvm/sys_regs.c |   12 ++++++------
->  2 files changed, 7 insertions(+), 7 deletions(-)
+> > Hardware virtualisation of GICv3 is only supported by 64bit hosts for
+> > the moment. Some VGICv3 bits are missing from the 32bit side, and this
+> > patch allows to still be able to build 32bit hosts when CONFIG_ARM_GIC_V3
+> > is selected.
+> > 
+> > To this end, we introduce a new option, CONFIG_KVM_ARM_VGIC_V3, that is
+> > only enabled on the 64bit side. The selection is done unconditionally
+> > because CONFIG_ARM_GIC_V3 is always enabled on arm64.
+> > 
+> > Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> > ---
+> >  arch/arm64/kvm/Kconfig |    4 ++++
+> >  include/kvm/arm_vgic.h |    4 ++--
+> >  virt/kvm/arm/vgic.c    |    4 ++--
+> >  3 files changed, 8 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> > index 5c7e920..ff5292c 100644
+> > --- a/arch/arm64/kvm/Kconfig
+> > +++ b/arch/arm64/kvm/Kconfig
+> > @@ -16,6 +16,9 @@ menuconfig VIRTUALIZATION
+> >  
+> >  if VIRTUALIZATION
+> >  
+> > +config KVM_ARM_VGIC_V3
+> > +	bool
+> > +
+> >  config KVM
+> >  	bool "Kernel-based Virtual Machine (KVM) support"
+> >  	depends on OF
+> > @@ -31,6 +34,7 @@ config KVM
+> >  	select KVM_VFIO
+> >  	select HAVE_KVM_EVENTFD
+> >  	select HAVE_KVM_IRQFD
+> > +	select KVM_ARM_VGIC_V3
+> >  	---help---
+> >  	  Support hosting virtualized guest machines.
+> >  
+> > diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> > index 4e14dac..6a3538e 100644
+> > --- a/include/kvm/arm_vgic.h
+> > +++ b/include/kvm/arm_vgic.h
+> > @@ -282,7 +282,7 @@ struct vgic_v2_cpu_if {
+> >  };
+> >  
+> >  struct vgic_v3_cpu_if {
+> > -#ifdef CONFIG_ARM_GIC_V3
+> > +#ifdef CONFIG_KVM_ARM_VGIC_V3
+> >  	u32		vgic_hcr;
+> >  	u32		vgic_vmcr;
+> >  	u32		vgic_sre;	/* Restored only, change ignored */
+> > @@ -364,7 +364,7 @@ void kvm_vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
+> >  int vgic_v2_probe(struct device_node *vgic_node,
+> >  		  const struct vgic_ops **ops,
+> >  		  const struct vgic_params **params);
+> > -#ifdef CONFIG_ARM_GIC_V3
+> > +#ifdef CONFIG_KVM_ARM_VGIC_V3
+> >  int vgic_v3_probe(struct device_node *vgic_node,
+> >  		  const struct vgic_ops **ops,
+> >  		  const struct vgic_params **params);
+> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> > index 6bd1c9b..77b0176 100644
+> > --- a/virt/kvm/arm/vgic.c
+> > +++ b/virt/kvm/arm/vgic.c
+> > @@ -2122,7 +2122,7 @@ static int init_vgic_model(struct kvm *kvm, int type)
+> >  	case KVM_DEV_TYPE_ARM_VGIC_V2:
+> >  		vgic_v2_init_emulation(kvm);
+> >  		break;
+> > -#ifdef CONFIG_ARM_GIC_V3
+> > +#ifdef CONFIG_KVM_ARM_VGIC_V3
+> >  	case KVM_DEV_TYPE_ARM_VGIC_V3:
+> >  		vgic_v3_init_emulation(kvm);
+> >  		break;
+> > @@ -2284,7 +2284,7 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+> >  		block_size = KVM_VGIC_V2_CPU_SIZE;
+> >  		alignment = SZ_4K;
+> >  		break;
+> > -#ifdef CONFIG_ARM_GIC_V3
+> > +#ifdef CONFIG_KVM_ARM_VGIC_V3
+> >  	case KVM_VGIC_V3_ADDR_TYPE_DIST:
+> >  		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+> >  		addr_ptr = &vgic->vgic_dist_base;
 > 
-> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> index 91cf535..f34745c 100644
-> --- a/arch/arm64/kvm/reset.c
-> +++ b/arch/arm64/kvm/reset.c
-> @@ -53,7 +53,7 @@ static bool cpu_has_32bit_el1(void)
->  {
->  	u64 pfr0;
->  
-> -	pfr0 = read_cpuid(ID_AA64PFR0_EL1);
-> +	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
->  	return !!(pfr0 & 0x20);
->  }
->  
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index d03d3af..87a64e8 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -693,13 +693,13 @@ static bool trap_dbgidr(struct kvm_vcpu *vcpu,
->  	if (p->is_write) {
->  		return ignore_write(vcpu, p);
->  	} else {
-> -		u64 dfr = read_cpuid(ID_AA64DFR0_EL1);
-> -		u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
-> -		u32 el3 = !!((pfr >> 12) & 0xf);
-> +		u64 dfr = read_system_reg(SYS_ID_AA64DFR0_EL1);
-> +		u64 pfr = read_system_reg(SYS_ID_AA64PFR0_EL1);
-> +		u32 el3 = !!cpuid_feature_extract_field(pfr, ID_AA64PFR0_EL3_SHIFT);
->  
-> -		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> 20) & 0xf) << 28) |
-> -					  (((dfr >> 12) & 0xf) << 24) |
-> -					  (((dfr >> 28) & 0xf) << 20) |
-> +		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> ID_AA64DFR0_WRPS_SHIFT) & 0xf) << 28) |
-> +					  (((dfr >> ID_AA64DFR0_BRPS_SHIFT) & 0xf) << 24) |
-> +					  (((dfr >> ID_AA64DFR0_CTX_CMPS_SHIFT) & 0xf) << 20) |
->  					  (6 << 16) | (el3 << 14) | (el3 << 12));
->  		return true;
->  	}
-> -- 
-> 1.7.9.5
 > 
+> Christoffer, do you have any objection to that patch, and to have it
+> merged though the irqchip tree?
+> 
+No objections, you can add my tag if that helps:
 
 Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+-Christoffer
