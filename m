@@ -1,98 +1,93 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 10 Oct 2015 10:17:52 +0800
-Subject: [linux-sunxi] [PATCH] ARM: dts: sun7i: Correct USB regulators on
- pcDuino v3 Nano
-In-Reply-To: <1444441679-4802-1-git-send-email-ats@offog.org>
-References: <1444441679-4802-1-git-send-email-ats@offog.org>
-Message-ID: <CAGb2v67_dSCL2JP1D5SDaqSF3B4KDMKZUJcZ8QLHgFtcO8Bzug@mail.gmail.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Sat, 10 Oct 2015 10:59:13 +0800
+Subject: [PATCH v10 2/6] ARM/PCI: remove align_resource in pci_sys_data
+In-Reply-To: <1444445957-239522-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1444445957-239522-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <1444445957-239522-3-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: gabriele paoloni <gabriele.paoloni@huawei.com>
 
-On Sat, Oct 10, 2015 at 9:47 AM, Adam Sampson <ats@offog.org> wrote:
-> The LinkSprite pcDuino v3 Nano's two USB host ports are powered by a
-> single RT9701GB regulator, which has its enable input tied to the A20's
-> PD2 pin, pulled up to 3v3 via a 10k resistor.
->
-> However, the script.bin that shipped with the device listed PH11 and PH3
-> as Vbus control pins for the two USB ports. Neither of these are
-> actually connected to anything.
->
-> Siarhei Siamashka spotted this problem while reviewing the other
-> LinkSprite boards. This patch fixes it by only defining a single
-> regulator, controlled by PD2. Testing shows that the USB ports are now
-> (correctly) only powered up once the USB PHY driver is loaded.
->
-> Signed-off-by: Adam Sampson <ats@offog.org>
+This patch is needed in order to unify the PCIe designware framework for ARM and
+ARM64 architectures. In the PCIe designware unification process we are calling
+pci_create_root_bus() passing a "sysdata" parameter that is the same for both
+ARM and ARM64 and is of type "struct pcie_port*". In the ARM case this will
+cause a problem with the function pcibios_align_resource(); in fact this will
+cast "dev->sysdata" to "struct pci_sys_data*", whereas designware had passed a
+"struct pcie_port*" pointer.
 
-Since Siarhei spotted the issue, maybe add a Reported-by tag where credit
-is due?
+This patch solves the issue by removing "align_resource" from "pci_sys_data"
+struct and defining a static global function pointer in "bios32.c"
 
-> ---
->  arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts | 13 ++++++-------
->  1 file changed, 6 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts b/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
-> index 5361fce..f75e3bd 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
-> @@ -158,7 +158,7 @@
->         };
->
->         usb1_vbus_pin_pcduino3_nano: usb1_vbus_pin at 0 {
-> -               allwinner,pins = "PH11";
-> +               allwinner,pins = "PD2";
->                 allwinner,function = "gpio_out";
->                 allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->                 allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> @@ -166,18 +166,17 @@
->  };
->
->  &reg_ahci_5v {
-> +       pinctrl-names = "default";
+Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
+---
+ arch/arm/include/asm/mach/pci.h |  6 ------
+ arch/arm/kernel/bios32.c        | 12 ++++++++----
+ 2 files changed, 8 insertions(+), 10 deletions(-)
 
-This is already in sunxi-common-regulators.dtsi.
-No need to add it again.
-
->         pinctrl-0 = <&ahci_pwr_pin_pcduino3_nano>;
->         gpio = <&pio 7 2 GPIO_ACTIVE_HIGH>; /* PH2 */
->         status = "okay";
->  };
->
-> +/* A single regulator (U24) powers both USB host ports. */
->  &reg_usb1_vbus {
-> +       pinctrl-names = "default";
-
-And this.
-
-The rest looks good.
-
-Thanks!
-ChenYu
-
->         pinctrl-0 = <&usb1_vbus_pin_pcduino3_nano>;
-> -       gpio = <&pio 7 11 GPIO_ACTIVE_HIGH>; /* PH11 */
-> -       status = "okay";
-> -};
-> -
-> -&reg_usb2_vbus {
-> +       gpio = <&pio 3 2 GPIO_ACTIVE_HIGH>; /* PD2 */
->         status = "okay";
->  };
->
-> @@ -189,6 +188,6 @@
->
->  &usbphy {
->         usb1_vbus-supply = <&reg_usb1_vbus>;
-> -       usb2_vbus-supply = <&reg_usb2_vbus>;
-> +       usb2_vbus-supply = <&reg_usb1_vbus>;
->         status = "okay";
->  };
-> --
-> 2.1.4
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+index 8857d28..0070e85 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -52,12 +52,6 @@ struct pci_sys_data {
+ 	u8		(*swizzle)(struct pci_dev *, u8 *);
+ 					/* IRQ mapping				*/
+ 	int		(*map_irq)(const struct pci_dev *, u8, u8);
+-					/* Resource alignement requirements	*/
+-	resource_size_t (*align_resource)(struct pci_dev *dev,
+-					  const struct resource *res,
+-					  resource_size_t start,
+-					  resource_size_t size,
+-					  resource_size_t align);
+ 	void		*private_data;	/* platform controller private data	*/
+ };
+ 
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 874e182..6551d28 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -17,6 +17,11 @@
+ #include <asm/mach/pci.h>
+ 
+ static int debug_pci;
++static resource_size_t (*align_resource)(struct pci_dev *dev,
++		  const struct resource *res,
++		  resource_size_t start,
++		  resource_size_t size,
++		  resource_size_t align) = NULL;
+ 
+ /*
+  * We can't use pci_get_device() here since we are
+@@ -456,7 +461,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 		sys->busnr   = busnr;
+ 		sys->swizzle = hw->swizzle;
+ 		sys->map_irq = hw->map_irq;
+-		sys->align_resource = hw->align_resource;
++		align_resource = hw->align_resource;
+ 		INIT_LIST_HEAD(&sys->resources);
+ 
+ 		if (hw->private_data)
+@@ -572,7 +577,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 				resource_size_t size, resource_size_t align)
+ {
+ 	struct pci_dev *dev = data;
+-	struct pci_sys_data *sys = dev->sysdata;
+ 	resource_size_t start = res->start;
+ 
+ 	if (res->flags & IORESOURCE_IO && start & 0x300)
+@@ -580,8 +584,8 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 
+ 	start = (start + align - 1) & ~(align - 1);
+ 
+-	if (sys->align_resource)
+-		return sys->align_resource(dev, res, start, size, align);
++	if (align_resource)
++		return align_resource(dev, res, start, size, align);
+ 
+ 	return start;
+ }
+-- 
+1.9.1
