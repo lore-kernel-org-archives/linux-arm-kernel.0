@@ -1,176 +1,177 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 10 Oct 2015 22:48:57 +0800
-Subject: [PATCH v2 2/5] ARM: dts: sunxi: Add dtsi for AXP22x PMIC
+Date: Sat, 10 Oct 2015 22:48:58 +0800
+Subject: [PATCH v2 3/5] ARM: dts: sun6i: hummingbird: Use axp22x.dtsi for
+ AXP221 regulators
 In-Reply-To: <1444488540-11263-1-git-send-email-wens@csie.org>
 References: <1444488540-11263-1-git-send-email-wens@csie.org>
-Message-ID: <1444488540-11263-3-git-send-email-wens@csie.org>
+Message-ID: <1444488540-11263-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP22x family of PMIC is used with some Allwinner SoCs. This
-includes the AXP221, AXP221s and AXP223. They differ in the host
-interface, maximum supply current for DCDC1 regulator, and default
-voltage and state for various LDO regulators. Also, the AXP221s
-does not support fine calibration of the battery fuel gauge.
+Now that we have axp22x.dtsi describing common axp22x hardware, use
+it and reference the nodes instead of declaring the whole tree.
 
-This patch adds a dtsi file for all the common bindings for these
-PMICs. Currently this is just listing all the regulator nodes. The
-regulators are initialized based on their device node names.
+Also drop the "always-on" from the vdd-gpu regulator, since we don't
+support the GPU anyway.
+
+And add a regulator reference for cpu0.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/axp22x.dtsi | 143 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 143 insertions(+)
- create mode 100644 arch/arm/boot/dts/axp22x.dtsi
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 113 ++++++++++++++--------------
+ 1 file changed, 56 insertions(+), 57 deletions(-)
 
-diff --git a/arch/arm/boot/dts/axp22x.dtsi b/arch/arm/boot/dts/axp22x.dtsi
-new file mode 100644
-index 000000000000..76302f58c478
---- /dev/null
-+++ b/arch/arm/boot/dts/axp22x.dtsi
-@@ -0,0 +1,143 @@
-+/*
-+ * Copyright 2015 Chen-Yu Tsai
-+ *
-+ * Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/*
-+ * AXP221/221s/223 Integrated Power Management Chip
-+ * http://www.x-powers.com/product/AXP22X.php
-+ * http://dl.linux-sunxi.org/AXP/AXP221%20Datasheet%20V1.2%2020130326%20.pdf
-+ */
-+
-+&axp22x {
-+	interrupt-controller;
-+	#interrupt-cells = <1>;
-+
-+	regulators {
-+		/* Default work frequency for buck regulators */
-+		x-powers,dcdc-freq = <3000>;
-+
-+		reg_dcdc1: dcdc1 {
-+			regulator-name = "dcdc1";
-+		};
-+
-+		reg_dcdc2: dcdc2 {
-+			regulator-name = "dcdc2";
-+		};
-+
-+		reg_dcdc3: dcdc3 {
-+			regulator-name = "dcdc3";
-+		};
-+
-+		reg_dcdc4: dcdc4 {
-+			regulator-name = "dcdc4";
-+		};
-+
-+		reg_dcdc5: dcdc5 {
-+			regulator-name = "dcdc5";
-+		};
-+
-+		reg_dc1sw: dc1sw {
-+			regulator-name = "dc1sw";
-+		};
-+
-+		reg_dc5ldo: dc5ldo {
-+			regulator-name = "dc5ldo";
-+		};
-+
-+		reg_aldo1: aldo1 {
-+			regulator-name = "aldo1";
-+		};
-+
-+		reg_aldo2: aldo2 {
-+			regulator-name = "aldo2";
-+		};
-+
-+		reg_aldo3: aldo3 {
-+			regulator-name = "aldo3";
-+		};
-+
-+		reg_dldo1: dldo1 {
-+			regulator-name = "dldo1";
-+		};
-+
-+		reg_dldo2: dldo2 {
-+			regulator-name = "dldo2";
-+		};
-+
-+		reg_dldo3: dldo3 {
-+			regulator-name = "dldo3";
-+		};
-+
-+		reg_dldo4: dldo4 {
-+			regulator-name = "dldo4";
-+		};
-+
-+		reg_eldo1: eldo1 {
-+			regulator-name = "eldo1";
-+		};
-+
-+		reg_eldo2: eldo2 {
-+			regulator-name = "eldo2";
-+		};
-+
-+		reg_eldo3: eldo3 {
-+			regulator-name = "eldo3";
-+		};
-+
-+		reg_ldo_io0: ldo_io0 {
-+			regulator-name = "ldo_io0";
-+		};
-+
-+		reg_ldo_io1: ldo_io1 {
-+			regulator-name = "ldo_io1";
-+		};
-+
-+		reg_rtc_ldo: rtc_ldo {
-+			/* RTC_LDO is a fixed, always-on regulator */
-+			regulator-always-on;
-+			regulator-min-microvolt = <3000000>;
-+			regulator-max-microvolt = <3000000>;
-+			regulator-name = "rtc_ldo";
-+		};
-+	};
+diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+index e25d4924dbe7..a9b87ae89855 100644
+--- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
++++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+@@ -69,6 +69,10 @@
+ 	};
+ };
+ 
++&cpu0 {
++	cpu-supply = <&reg_dcdc3>;
 +};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -121,7 +125,7 @@
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_hummingbird>;
+-	vmmc-supply = <&vcc_3v0>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
+ 	cd-inverted;
+@@ -136,7 +140,7 @@
+ &mmc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc1_pins_a>, <&wifi_reset_pin_hummingbird>;
+-	vmmc-supply = <&vcc_wifi>;
++	vmmc-supply = <&reg_aldo1>;
+ 	mmc-pwrseq = <&wifi_pwrseq>;
+ 	bus-width = <4>;
+ 	non-removable;
+@@ -173,68 +177,63 @@
+ &p2wi {
+ 	status = "okay";
+ 
+-	axp221: pmic at 68 {
++	axp22x: pmic at 68 {
+ 		compatible = "x-powers,axp221";
+ 		reg = <0x68>;
+ 		interrupt-parent = <&nmi_intc>;
+ 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+-		interrupt-controller;
+-		#interrupt-cells = <1>;
+-
+-		regulators {
+-			x-powers,dcdc-freq = <3000>;
+-
+-			vcc_3v0: dcdc1 {
+-				regulator-always-on;
+-				regulator-min-microvolt = <3000000>;
+-				regulator-max-microvolt = <3000000>;
+-				regulator-name = "vcc-3v0";
+-			};
+-
+-			vdd_gpu: dcdc2 {
+-				regulator-always-on;
+-				regulator-min-microvolt = <700000>;
+-				regulator-max-microvolt = <1320000>;
+-				regulator-name = "vdd-gpu";
+-			};
+-
+-			vdd_cpu: dcdc3 {
+-				regulator-always-on;
+-				regulator-min-microvolt = <700000>;
+-				regulator-max-microvolt = <1320000>;
+-				regulator-name = "vdd-cpu";
+-			};
+-
+-			vdd_sys_dll: dcdc4 {
+-				regulator-always-on;
+-				regulator-min-microvolt = <1100000>;
+-				regulator-max-microvolt = <1100000>;
+-				regulator-name = "vdd-sys-dll";
+-			};
+-
+-			vcc_dram: dcdc5 {
+-				regulator-always-on;
+-				regulator-min-microvolt = <1500000>;
+-				regulator-max-microvolt = <1500000>;
+-				regulator-name = "vcc-dram";
+-			};
+-
+-			vcc_wifi: aldo1 {
+-				regulator-min-microvolt = <3300000>;
+-				regulator-max-microvolt = <3300000>;
+-				regulator-name = "vcc_wifi";
+-			};
+-
+-			avcc: aldo3 {
+-				regulator-always-on;
+-				regulator-min-microvolt = <3000000>;
+-				regulator-max-microvolt = <3000000>;
+-				regulator-name = "avcc";
+-			};
+-		};
+ 	};
+ };
+ 
++#include "axp22x.dtsi"
++
++&reg_aldo1 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi";
++};
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <2700000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "avcc";
++};
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-3v0";
++};
++
++&reg_dcdc2 {
++	regulator-min-microvolt = <700000>;
++	regulator-max-microvolt = <1320000>;
++	regulator-name = "vdd-gpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <700000>;
++	regulator-max-microvolt = <1320000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc4 {
++	regulator-always-on;
++	regulator-min-microvolt = <700000>;
++	regulator-max-microvolt = <1320000>;
++	regulator-name = "vdd-sys-dll";
++};
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1500000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vcc-dram";
++};
++
+ &reg_usb1_vbus {
+ 	gpio = <&pio 7 24 GPIO_ACTIVE_HIGH>; /* PH24 */
+ 	status = "okay";
 -- 
 2.5.3
