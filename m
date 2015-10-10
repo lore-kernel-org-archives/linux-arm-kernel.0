@@ -1,41 +1,37 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sat, 10 Oct 2015 16:42:04 +0200
-Subject: [PATCH 2/2] dt-bindings: Add new boards to bcm4708 DT bindings
-In-Reply-To: <1443824564-17291-2-git-send-email-jonmason@broadcom.com>
-References: <1443824564-17291-1-git-send-email-jonmason@broadcom.com>
- <1443824564-17291-2-git-send-email-jonmason@broadcom.com>
-Message-ID: <561923BC.5040906@hauke-m.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 10 Oct 2015 22:48:59 +0800
+Subject: [PATCH v2 4/5] ARM: dts: sun6i: hummingbird: Enable AXP221 DC5LDO
+ regulator as "vdd-cpus"
+In-Reply-To: <1444488540-11263-1-git-send-email-wens@csie.org>
+References: <1444488540-11263-1-git-send-email-wens@csie.org>
+Message-ID: <1444488540-11263-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2015 12:22 AM, Jon Mason wrote:
-> Add the 4708, 4709, and 953012k SVKs to the the documentation for the
-> Broadcom Northstar device tree bindings.
-> 
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> ---
->  Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
-> index 6b0f49f..bdf4c06 100644
-> --- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
-> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
+The DC5LDO regulator supplies VDD-CPUS, which is for the embedded
+controller in the A31 SoC.
 
-What should be documented in this file? This is more a question to the
-guys more familiar with arm in Linux. Currently the Linux kernel only
-supports brcm,bcm4708 and all goes back to that one.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-> @@ -5,4 +5,11 @@ Boards with the BCM4708 SoC shall have the following properties:
->  
->  Required root node property:
->  
-> +bcm94709
->  compatible = "brcm,bcm4708";
-> +
-> +bcm94709
-> +compatible = "brcm,bcm4709", "brcm,bcm4708";
-> +
-> +bcm953012k
-> +compatible = "brcm,bcm5301k", "brcm,bcm4708";
-> 
+diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+index a9b87ae89855..9a74637f677f 100644
+--- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
++++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+@@ -200,6 +200,12 @@
+ 	regulator-name = "avcc";
+ };
+ 
++&reg_dc5ldo {
++	regulator-min-microvolt = <700000>;
++	regulator-max-microvolt = <1320000>;
++	regulator-name = "vdd-cpus";
++};
++
+ &reg_dcdc1 {
+ 	regulator-always-on;
+ 	regulator-min-microvolt = <3000000>;
+-- 
+2.5.3
