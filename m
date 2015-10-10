@@ -1,101 +1,63 @@
-From: majun258@huawei.com (majun (F))
-Date: Sat, 10 Oct 2015 17:01:32 +0800
-Subject: [PATCH v5 1/3] initialize each mbigen device node as a interrupt
- controller.
-In-Reply-To: <alpine.DEB.2.11.1510091441200.6097@nanos>
-References: <1443605949-15396-1-git-send-email-majun258@huawei.com>
- <1443605949-15396-2-git-send-email-majun258@huawei.com>
- <alpine.DEB.2.11.1509302242220.4500@nanos> <5610D3BD.1040408@huawei.com>
- <alpine.DEB.2.11.1510091441200.6097@nanos>
-Message-ID: <5618D3EC.6050501@huawei.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Sat, 10 Oct 2015 17:55:20 +0800
+Subject: [PATCH 00/10] Add mipi dsi support for rk3288
+Message-ID: <1444470930-17150-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The rk3288 MIPI DSI is a Synopsys DesignWare MIPI DSI host controller
+IP. This series adds support for a Synopsys DesignWare MIPI DSI host
+controller DRM bridge driver and a rockchip MIPI DSI specific DRM
+driver.
 
+This series also includes a DRM panel driver for BOE TV080WUM-NL0 panel.
+This panel only use the MIPI DSI video mode.
 
-? 2015/10/9 21:47, Thomas Gleixner ??:
-> On Sun, 4 Oct 2015, majun (F) wrote:
->>>> +	info->reg_offset = get_mbigen_vec_reg_addr(info->nid, info->local_pin_offset);
->>>
->>> So you fill in a structure with 5 fields and the only information
-[...]
->> On the other hand, it's a interrupt controller for the devices
->> connected to it.(handled in current patch).
->>
->> To bind these two different irqs, I made a data sutruce named
->> mbigen_irq_data which contains some information of this irq,
->> including private index, pin_offset, nid, and local_pin_offset.
->>
->> All these information can help us to find the corresponding reg addr
->> and msi_irq quickly.
-> 
-> This is completely wrong. Why would you need two linux virq numbers
-> for one interrupt?
-> 
-> This needs to be expressed in one hierarchy. mbigen is just a
-> translator between wired interrupts and MSI, nothing else.
-> 
-> So the hierarchy is:
-> 
->   mbigen -> ITS-MSI -> ITS -> GIC
+The MIPI DSI feature is tested on rk3288 evb board, backport them to
+chrome os kernel v3.14, and it can display normally.
 
-I think maybe you mean: mbigen -> ITS-pMSI -> ITS- > GIC
-
-But there is a problem If i make the structure like you said.
-
-For example, my hardware structure likes below:
-
-uart ------> mbigen --> ITS-pMSI --> ITS --> GIC
-     virq1
-
-virq1 means the virq number allocted by irq_of_parse_and_map() function
-when system parse the uart dts node in initializing  stage.
-
-To create a ITS device, I need to call msi_domain_alloc_irqs() function
-in my mbigen alloc function.
-
-In this function, a new virq number(named as virq2 ) which different from
-virq1 is allocated.
-So, this is a big problem.
-
-If we want to use the hierarchy structure, I think
-
-mbigen -> ITS -> GIC
-
-maybe is a possible way .
-
-The only problem is I need to do some change in ITS driver.
-
-I mean move its_create_device() and its_find_device() into
- its_irq_domain_alloc()
-
-But this solution is similar to my v3 patch.
-
-Thanks!
-Ma Jun
+This patchset is base on the patchset from Ying.liu at freescale.com.
+<http://www.spinics.net/lists/dri-devel/msg77181.html>
 
 
 
+Chris Zhong (8):
+  clk: rockchip: Add sclk_mipidsi_24m for mipi dsi
+  drm/rockchip: return a true clock rate to adjusted_mode
+  drm/bridge: Add Synopsys DesignWare MIPI DSI host controller driver
+  drm: rockchip: Support Synopsys DesignWare MIPI DSI host controller
+  Documentation: dt-bindings: Add bindings for rk3288 DW MIPI DSI driver
+  ARM: dts: rockchip: add rk3288 mipi_dsi nodes
+  drm/panel: simple: Add support for BOE TV080WUM-NL0
+  ARM: dts: rockchip: add support mipi panel tv080wum-nl0 for rk3288-evb
 
+Liu Ying (2):
+  drm/dsi: Add a helper to get bits per pixel of MIPI DSI pixel format
+  Documentation: dt-bindings: Add bindings for Synopsys DW MIPI DSI DRM
+    bridge driver
 
+ .../devicetree/bindings/drm/bridge/dw_mipi_dsi.txt |   76 ++
+ .../bindings/video/dw_mipi_dsi_rockchip.txt        |   56 ++
+ arch/arm/boot/dts/rk3288-evb.dtsi                  |   20 +-
+ arch/arm/boot/dts/rk3288.dtsi                      |   39 +
+ drivers/clk/rockchip/clk-rk3288.c                  |    2 +-
+ drivers/gpu/drm/bridge/Kconfig                     |   10 +
+ drivers/gpu/drm/bridge/Makefile                    |    1 +
+ drivers/gpu/drm/bridge/dw_mipi_dsi.c               | 1055 ++++++++++++++++++++
+ drivers/gpu/drm/panel/panel-simple.c               |   33 +
+ drivers/gpu/drm/rockchip/Kconfig                   |   10 +
+ drivers/gpu/drm/rockchip/Makefile                  |    1 +
+ drivers/gpu/drm/rockchip/dw_mipi_dsi_rockchip.c    |  249 +++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |    9 +
+ include/drm/bridge/dw_mipi_dsi.h                   |   27 +
+ include/drm/drm_mipi_dsi.h                         |   14 +
+ include/dt-bindings/clock/rk3288-cru.h             |    1 +
+ 16 files changed, 1601 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
+ create mode 100644 Documentation/devicetree/bindings/video/dw_mipi_dsi_rockchip.txt
+ create mode 100644 drivers/gpu/drm/bridge/dw_mipi_dsi.c
+ create mode 100644 drivers/gpu/drm/rockchip/dw_mipi_dsi_rockchip.c
+ create mode 100644 include/drm/bridge/dw_mipi_dsi.h
 
-
-
-
-
-
-
-
-
-
-
-
-> 
-> No need for extra levels of indirection. Your mbigen irqchip callbacks
-> are simply doing:
-> 
->     parent->callback(parent_data);
-> 
-> and you get that for free when using the hierarchy. No need for that
-> chained interrupt handler either.
-> 
+-- 
+2.6.1
