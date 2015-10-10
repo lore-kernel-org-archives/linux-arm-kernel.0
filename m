@@ -1,64 +1,66 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat, 10 Oct 2015 17:14:20 +0200
-Subject: [PATCH v3 pre-03/12] pwm: rcar: make use of pwm_is_enabled()
-In-Reply-To: <1444489838-13953-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1444489838-13953-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20151010171420.6c41f2b5@bbrezillon>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sat, 10 Oct 2015 17:17:28 +0200
+Subject: [PATCH v2 17/22] arm64/kvm: Make use of the system wide safe
+ values
+In-Reply-To: <1444064531-25607-18-git-send-email-suzuki.poulose@arm.com>
+References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+ <1444064531-25607-18-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151010151728.GD29128@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 10 Oct 2015 17:10:38 +0200
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-
-> Commit 5c31252c4a86 ("pwm: Add the pwm_is_enabled() helper") introduced a
-> new function to test whether a PWM device is enabled or not without
-> manipulating PWM internal fields.
-> Hiding this is necessary if we want to smoothly move to the atomic PWM
-> config approach without impacting PWM drivers.
-> Fix this driver to use pwm_is_enabled() instead of directly accessing the
-> ->flags field.
+On Mon, Oct 05, 2015 at 06:02:06PM +0100, Suzuki K. Poulose wrote:
+> Use the system wide safe value from the new API for safer
+> decisions
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: kvmarm at lists.cs.columbia.edu
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 > ---
-> Hi Thierry,
-
-Please ignore this patch: it was meant to be sent in reply to the
-pwm-atomic series.
-
+>  arch/arm64/kvm/reset.c    |    2 +-
+>  arch/arm64/kvm/sys_regs.c |   12 ++++++------
+>  2 files changed, 7 insertions(+), 7 deletions(-)
 > 
-> I noticed you applied a few patches adding new PWM drivers in your
-> pwm-next tree, and one of them is directly testing the PWMF_ENABLED
-> flag which is removed by patch 3 of this series, which means you have to
-> apply this patch before patch 3.
-> 
-> I can resend the whole series if you want, but, unless you have a strong
-> reason to refuse it, I'd really like to get those changes in, so that I
-> don't have to rebase and fix the series each time a new driver is added.
-> 
-> Best Regards,
-> 
-> Boris
-> 
->  drivers/pwm/pwm-rcar.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pwm/pwm-rcar.c b/drivers/pwm/pwm-rcar.c
-> index 6e99a63..70899c9 100644
-> --- a/drivers/pwm/pwm-rcar.c
-> +++ b/drivers/pwm/pwm-rcar.c
-> @@ -157,7 +157,7 @@ static int rcar_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  		return div;
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index 91cf535..f34745c 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -53,7 +53,7 @@ static bool cpu_has_32bit_el1(void)
+>  {
+>  	u64 pfr0;
 >  
->  	/* Let the core driver set pwm->period if disabled and duty_ns == 0 */
-> -	if (!test_bit(PWMF_ENABLED, &pwm->flags) && !duty_ns)
-> +	if (!pwm_is_enabled(pwm) && !duty_ns)
->  		return 0;
+> -	pfr0 = read_cpuid(ID_AA64PFR0_EL1);
+> +	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
+>  	return !!(pfr0 & 0x20);
+>  }
 >  
->  	rcar_pwm_update(rp, RCAR_PWMCR_SYNC, RCAR_PWMCR_SYNC, RCAR_PWMCR);
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index d03d3af..87a64e8 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -693,13 +693,13 @@ static bool trap_dbgidr(struct kvm_vcpu *vcpu,
+>  	if (p->is_write) {
+>  		return ignore_write(vcpu, p);
+>  	} else {
+> -		u64 dfr = read_cpuid(ID_AA64DFR0_EL1);
+> -		u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
+> -		u32 el3 = !!((pfr >> 12) & 0xf);
+> +		u64 dfr = read_system_reg(SYS_ID_AA64DFR0_EL1);
+> +		u64 pfr = read_system_reg(SYS_ID_AA64PFR0_EL1);
+> +		u32 el3 = !!cpuid_feature_extract_field(pfr, ID_AA64PFR0_EL3_SHIFT);
+>  
+> -		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> 20) & 0xf) << 28) |
+> -					  (((dfr >> 12) & 0xf) << 24) |
+> -					  (((dfr >> 28) & 0xf) << 20) |
+> +		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> ID_AA64DFR0_WRPS_SHIFT) & 0xf) << 28) |
+> +					  (((dfr >> ID_AA64DFR0_BRPS_SHIFT) & 0xf) << 24) |
+> +					  (((dfr >> ID_AA64DFR0_CTX_CMPS_SHIFT) & 0xf) << 20) |
+>  					  (6 << 16) | (el3 << 14) | (el3 << 12));
+>  		return true;
+>  	}
+> -- 
+> 1.7.9.5
+> 
 
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
