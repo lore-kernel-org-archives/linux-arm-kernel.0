@@ -1,58 +1,24 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Sat, 10 Oct 2015 01:42:47 +0100
-Subject: [PATCH] sched_clock: add data pointer argument to read callback
-In-Reply-To: <20151009235441.GD32536@n2100.arm.linux.org.uk> (Russell King's
- message of "Sat, 10 Oct 2015 00:54:41 +0100")
-References: <1444427858-576-1-git-send-email-mans@mansr.com>
- <20151009232015.GC32536@n2100.arm.linux.org.uk>
- <yw1x4mhzioxl.fsf@unicorn.mansr.com>
- <20151009235441.GD32536@n2100.arm.linux.org.uk>
-Message-ID: <yw1xzizrh7ug.fsf@unicorn.mansr.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat, 10 Oct 2015 09:11:55 +0800
+Subject: [PATCH V2 1/2] clk: imx6: Add SPDIF_GCLK clock in clock tree
+In-Reply-To: <20151009091528.GA25804@shlinux2>
+References: <cover.1442310569.git.shengjiu.wang@freescale.com>
+ <113f1cecf1d83c6b96fd23ab9d7a73d1923e0d21.1442310569.git.shengjiu.wang@freescale.com>
+ <20150923153340.GK3529@tiger> <20150924054321.GA32196@shlinux2>
+ <20150924115737.GM3529@tiger> <20151009091528.GA25804@shlinux2>
+Message-ID: <20151010011155.GH22673@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+On Fri, Oct 09, 2015 at 05:15:30PM +0800, Shengjiu Wang wrote:
+> SPDIF_GCLK is also spdif's clock, it use a same enable bit with SPDIF_ROOT_CLK,
+> We didn't separate them in clock tree before.
 
-> On Sat, Oct 10, 2015 at 12:48:22AM +0100, M?ns Rullg?rd wrote:
->> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
->> 
->> > On Fri, Oct 09, 2015 at 10:57:35PM +0100, Mans Rullgard wrote:
->> >> This passes a data pointer specified in the sched_clock_register()
->> >> call to the read callback allowing simpler implementations thereof.
->> >> 
->> >> In this patch, existing uses of this interface are simply updated
->> >> with a null pointer.
->> >
->> > This is a bad description.  It tells us what the patch is doing,
->> > (which we can see by reading the patch) but not _why_.  Please include
->> > information on why the change is necessary - describe what you are
->> > trying to achieve.
->> 
->> Currently most of the callbacks use a global variable to store the
->> address of a counter register.  This has several downsides:
->> 
->> - Loading the address of a global variable can be more expensive than
->>   keeping a pointer next to the function pointer.
->> 
->> - It makes it impossible to have multiple instances of a driver call
->>   sched_clock_register() since the caller can't know which clock will
->>   win in the end.
->> 
->> - Many of the existing callbacks are practically identical and could be
->>   replaced with a common generic function if it had a pointer argument.
->> 
->> If I've missed something that makes this a stupid idea, please tell.
->
-> So my next question is whether you intend to pass an iomem pointer
-> through this, or a some kind of structure, or both.  It matters,
-> because iomem pointers have a __iomem attribute to keep sparse
-> happy.  Having to force that attribute on and off pointers is frowned
-> upon, as it defeats the purpose of the sparse static checker.
+Is it the clock described as "Global clock" in Reference Manual, SPDIF
+chapter?  If that's the case, you are just adding a missing SPDIF clock
+rather than fixing a low power mode issue, and I will be fine.  But
+still you should reword the commit log to make it clear, that the patch
+is to correct a SPDIF clock setting issue, which is just discovered by
+low power mode support.
 
-So this is an instance where tools like sparse get in the way of doing
-the simplest, most efficient, and obviously correct thing.  Who wins in
-such cases?
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
+Shawn
