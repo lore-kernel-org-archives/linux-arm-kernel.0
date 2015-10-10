@@ -1,181 +1,268 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 10 Oct 2015 17:37:44 +0200
-Subject: [PATCH v3 00/16] KVM: arm64: GICv3 ITS emulation
-In-Reply-To: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
-References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <20151010153744.GH29128@cbox>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Sat, 10 Oct 2015 23:35:57 +0800
+Subject: [PATCH v6 0/17] Add Analogix Core Display Port Driver
+In-Reply-To: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
+References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
 
+Hi all,
 
-On Wed, Oct 07, 2015 at 03:55:10PM +0100, Andre Przywara wrote:
-> Hi,
-> 
-> another respin and rebase of the ITS emulation series.
-> Major changes compared to v2 (beside some minor things like added
-> comments and function renames) are the rebasing and adaption to 4.3-rc
-> and Christoffer's timer rework series. Also the locking has been
-> reworked to cope with the dependencies of the its and the dist lock
-> in connection with the PROPBASER/PENDBASER and the command handling.
-> For a more detailed changelog see below or look at the respective
-> commit messages.
-> 
-> This should address most of the comments I got on the list.
-> Many thanks to the diligent reviewers!
-> I didn't bother to fine-tune patch 01/16 too much, as I guess there
-> will be more discussion around this based on Pavel's latest post.
-> 
-> These patches go on top of Christoffer's timer rework series [1],
-> which itself is on top of 4.3-rc2.
-> You can find all of this code in the its-emul/v3 branch of my
-> repository [2].
+   The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
+share the same IP, so a lot of parts can be re-used. I split the common
+code into bridge directory, then rk3288 and exynos only need to keep
+some platform code. Cause I can't find the exact IP name of exynos dp
+controller, so I decide to name dp core driver with "analogix" which I
+find in rk3288 eDP TRM :)
 
-Thanks for rebasing the series!
+But  there are still three light registers setting differents bewteen
+exynos and rk3288.
+1. RK3288 have five special pll resigters which not indicata in exynos
+   dp controller.
+2. The address of DP_PHY_PD(dp phy power manager register) are different
+   between rk3288 and exynos.
+3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
+   register).
 
-Just a heads up that I may not be able to review this series for the
-next 1-2 weeks, so I'm afraid it's not going to make it in for v4.4,
-sorry.
+This series have been well tested on Rockchip platform with eDP panel
+on Jerry Chromebook and Display Port Monitor on RK3288 board and thanks
+to Javier at Samsung help me to find a way to install mainline kernel to
+Samsung Exynos Chromebooks, so this series also have been tested on Samsung
+Snow and Peach Pit Chromebooks which borrowed from my friends.
 
-Please let me know if this breaks expectations from everyone.
+Besides, This version was build on linux-next branch (tag next-20150918), and
+the above test experiments also base on that tag. But I know the latest tag is
+next-20151009, so i do rebase this series again on next-20151009, there were
+little conflicts(exynos_dp removed the suspend/resume).
 
-Othersie, I will try review it with due dilligence so it makes it in for
-v4.5.
+But after I retest this series on next-20151009, I saw kernel crashed in mmc
+driver(dw_mci_probe failed to get regulator). So i have to disabled the MMC
+module(after all I boot with USB device), and I can see eDP light up normally
+in startup stage, but kernel keep crashed when it try to mount the filesystem.
+I thought this isn't related to dp driver directly, so i choice not to debug
+more depth.
 
-Best,
--Christoffer
+That's to say if someone want to test this series, I suggest you applied this
+series on tag-20150918, just need to fix some light conflicts with the 01 & 02
+patches (or just email me, I can send you directly).
 
-> 
-> Changelog v2..v3:
-> - adapt to 4.3-rc and Christoffer's timer rework
-> - adapt spin locks on handling PROPBASER/PENDBASER registers
-> - rework locking in ITS command handling (dropping dist where needed)
-> - only clear LPI pending bit if LPI could actually be queued
-> - simplify GICR_CTLR handling
-> - properly free ITTEs (including our pending bitmap)
-> - fix corner cases with unmapped collections
-> - keep retire_lr() around
-> - rename vgic_handle_base_register to vgic_reg64_access()
-> - use kcalloc instead of kmalloc
-> - minor fixes, renames and added comments
-> 
-> Changelog v1..v2
-> - fix issues when using non-ITS GICv3 emulation
-> - streamline frame address initialization (new patch 05/15)
-> - preallocate buffer memory for reading from guest's memory
-> - move locking into the actual command handlers
-> -   preallocate memory for new structures if needed
-> - use non-atomic __set_bit() and __clear_bit() when under the lock
-> - add INT command handler to allow LPI injection from the guest
-> - rewrite CWRITER handler to align with new locking scheme
-> - remove unneeded CONFIG_HAVE_KVM_MSI #ifdefs
-> - check memory table size against our LPI limit (65536 interrupts)
-> - observe initial gap of 1024 interrupts in pending table
-> - use term "configuration table" to be in line with the spec
-> - clarify and extend documentation on API extensions
-> - introduce new KVM_CAP_MSI_DEVID capability to advertise device ID requirement
-> - update, fix and add many comments
-> - minor style changes as requested by reviewers
-> 
-> ---------------
-> 
-> The GICv3 ITS (Interrupt Translation Service) is a part of the
-> ARM GICv3 interrupt controller [4] used for implementing MSIs.
-> It specifies a new kind of interrupts (LPIs), which are mapped to
-> establish a connection between a device, its MSI payload value and
-> the target processor the IRQ is eventually delivered to.
-> In order to allow using MSIs in an ARM64 KVM guest, we emulate this
-> ITS widget in the kernel.
-> The ITS works by reading commands written by software (from the guest
-> in our case) into a (guest allocated) memory region and establishing
-> the mapping between a device, the MSI payload and the target CPU.
-> We parse these commands and update our internal data structures to
-> reflect those changes. On an MSI injection we iterate those
-> structures to learn the LPI number we have to inject.
-> For the time being we use simple lists to hold the data, this is
-> good enough for the small number of entries each of the components
-> currently have. Should this become a performance bottleneck in the
-> future, those can be extended to arrays or trees if needed.
-> 
-> Most of the code lives in a separate source file (its-emul.c), though
-> there are some changes necessary both in vgic.c and vgic-v3-emul.c.
-> 
-> Patch 01/16 gets rid of the internal tracking of the used LR for
-> an injected IRQ, see the commit message for more details.
-> Patch 03/16 extends the KVM MSI ioctl to hold a device ID.
-> Patch 04-06 make small changes to the existing VGIC code which make
-> adaptions to the ITS later easier.
-> The rest of the patches implement the ITS functionality step by step.
-> For more details see the respective commit messages.
-> 
-> For the time being this series gives us the ability to use emulated
-> PCI devices that can use MSIs in the guest. Those have to be
-> triggered by letting the userland device emulation simulate the MSI
-> write with the KVM_SIGNAL_MSI ioctl. This will be translated into
-> the proper LPI by the ITS emulation and injected into the guest in
-> the usual way (just with a higher IRQ number).
-> 
-> This series is based on 4.3-rc2 and can be found at the its-emul/v3
-> branch of this repository [2].
-> For this to be used you need a GICv3 host machine (a fast model would
-> do), though it does not rely on any host ITS bits (neither in hardware
-> or software).
-> 
-> To test this you can use the kvmtool patches available in the "its"
-> branch here [3].
-> Start a guest with: "$ lkvm run --irqchip=gicv3-its --force-pci"
-> and see the ITS being used for instance by the virtio devices.
-> 
-> [1]: https://git.linaro.org/people/christoffer.dall/linux-kvm-arm.git/shortlog/refs/heads/timer-rework-v3
-> [2]: git://linux-arm.org/linux-ap.git
->      http://www.linux-arm.org/git?p=linux-ap.git;a=log;h=refs/heads/its-emul/v3
-> [3]: git://linux-arm.org/kvmtool.git
->      http://www.linux-arm.org/git?p=kvmtool.git;a=log;h=refs/heads/its
-> [4]: http://arminfo.emea.arm.com/help/topic/com.arm.doc.ihi0069a/IHI0069A_gic_architecture_specification.pdf
-> 
-> Andre Przywara (16):
->   KVM: arm/arm64: VGIC: don't track used LRs in the distributor
->   KVM: arm/arm64: remove now unused code after stay-in-LR rework
->   KVM: extend struct kvm_msi to hold a 32-bit device ID
->   KVM: arm/arm64: add emulation model specific destroy function
->   KVM: arm/arm64: extend arch CAP checks to allow per-VM capabilities
->   KVM: arm/arm64: make GIC frame address initialization model specific
->   KVM: arm64: Introduce new MMIO region for the ITS base address
->   KVM: arm64: handle ITS related GICv3 redistributor registers
->   KVM: arm64: introduce ITS emulation file with stub functions
->   KVM: arm64: implement basic ITS register handlers
->   KVM: arm64: add data structures to model ITS interrupt translation
->   KVM: arm64: handle pending bit for LPIs in ITS emulation
->   KVM: arm64: sync LPI configuration and pending tables
->   KVM: arm64: implement ITS command queue command handlers
->   KVM: arm64: implement MSI injection in ITS emulation
->   KVM: arm64: enable ITS emulation as a virtual MSI controller
-> 
->  Documentation/virtual/kvm/api.txt              |   14 +-
->  Documentation/virtual/kvm/devices/arm-vgic.txt |    9 +
->  arch/arm/include/asm/kvm_host.h                |    2 +-
->  arch/arm/kvm/arm.c                             |    2 +-
->  arch/arm64/include/asm/kvm_host.h              |    2 +-
->  arch/arm64/include/uapi/asm/kvm.h              |    2 +
->  arch/arm64/kvm/Kconfig                         |    1 +
->  arch/arm64/kvm/Makefile                        |    1 +
->  arch/arm64/kvm/reset.c                         |    8 +-
->  include/kvm/arm_vgic.h                         |   43 +-
->  include/linux/irqchip/arm-gic-v3.h             |   14 +-
->  include/uapi/linux/kvm.h                       |    5 +-
->  virt/kvm/arm/its-emul.c                        | 1187 ++++++++++++++++++++++++
->  virt/kvm/arm/its-emul.h                        |   55 ++
->  virt/kvm/arm/vgic-v2-emul.c                    |    3 +
->  virt/kvm/arm/vgic-v2.c                         |    1 +
->  virt/kvm/arm/vgic-v3-emul.c                    |  101 +-
->  virt/kvm/arm/vgic-v3.c                         |    1 +
->  virt/kvm/arm/vgic.c                            |  292 +++---
->  virt/kvm/arm/vgic.h                            |    3 +
->  20 files changed, 1601 insertions(+), 145 deletions(-)
->  create mode 100644 virt/kvm/arm/its-emul.c
->  create mode 100644 virt/kvm/arm/its-emul.h
-> 
-> -- 
-> 2.5.1
-> 
+Thanks,
+- Yakir
+
+Changes in v6:
+- Fix the wrong code in previous series, and test on Samsung snow Chromebook
+  successfully, here are the detail changes:
+=============>
+-       if (!dp->panel && !dp->bridge) {
++       if (!dp->panel && !dp->ptn_bridge) {
+                ret = exynos_dp_dt_parse_panel(dp);
+                if (ret)
+=============>
++       encoder->bridge = bridge;
+	bridge->driver_private = dp;
+        bridge->encoder = encoder;
+        bridge->funcs = &exynos_dp_bridge_funcs;
+        ret = drm_bridge_attach(drm_dev, bridge);
+- Fix the Kconfig recursive dependency (Javier)
+- Fix Peach Pit hpd property name error:
+-       hpd-gpio = <&gpx2 6 0>;
++       hpd-gpios = <&gpx2 6 0>;
+
+Changes in v5:
+- Correct the check condition of gpio_is_valid when driver try to get
+  the "hpd-gpios" DT propery. (Heiko)
+- Move the platform attach callback in the front of core driver bridge
+  attch function. Cause once platform failed at attach, core driver should
+  still failed, so no need to init connector before platform attached (Krzysztof)
+- Keep code style no changes with the previous exynos_dp_code.c in this
+  patch, and update commit message about the new export symbol (Krzysztof)
+- Gather the device type patch (v4 11/16) into this one. (Krzysztof)
+- leave out the connector registration to analogix platform driver. (Thierry)
+- Resequence this patch after analogix_dp driver have been split
+  from exynos_dp code, and rephrase reasonable commit message, and
+  remove some controversial style (Krzysztof)
+    -		analogix_dp_write_byte_to_dpcd(
+    - 				dp, DP_TEST_RESPONSE,
+    +		analogix_dp_write_byte_to_dpcd(dp,
+    +				DP_TEST_RESPONSE,
+				DP_TEST_EDID_CHECKSUM_WRITE);
+- Switch video timing type to "u32", so driver could use "of_property_read_u32"
+  to get the backword timing values. Krzysztof suggest me that driver could use
+  the "of_property_read_bool" to get backword timing values, but that interfacs
+  would modify the original drm_display_mode timing directly (whether those
+  properties exists or not).
+- Correct the misspell in commit message. (Krzysztof)
+- Remove the empty line at the end of document, and correct the endpoint
+  numbers in the example DT node, and remove the regulator iomux setting
+  in driver code while using the pinctl in devicetree instead. (Heiko)
+- Add device type declared, cause the previous "platform device type
+  support (v4 11/16)" already merge into (v5 02/14).
+- Implement connector registration code. (Thierry)
+- Split binding doc's from driver changes. (Rob)
+- Add eDP hotplug pinctrl property. (Heiko)
+- Remove "reg" DT property, cause driver could poweron/poweroff phy via
+  the exist "grf" syscon already. And rename the example DT node from
+  "edp_phy: phy at ff770274" to "edp_phy: edp-phy" directly. (Heiko)
+- Add deivce_node at the front of driver, update phy_ops type from "static
+  struct" to "static const struct". And correct the input paramters of
+  devm_phy_create() interfaces. (Heiko)
+- Split binding doc's from driver changes. (Rob)
+- Update the rockchip,grf explain in document, and correct the clock required
+  elemets in document. (Rob & Heiko)
+- Fix compiled error (Heiko)
+- Using the connector display info message to configure eDP driver input
+  video mode, but hard code CRTC video output mode to RGBaaa.
+
+Changes in v4:
+- Update "analogix,hpd-gpios" to "hpd-gpios" DT propery. (Rob)
+- Rename "analogix_dp-exynos.c" file name to "exynos_dp.c" (Jingoo)
+- Create a separate folder for analogix code in bridge/ (Archit)
+- Update commit message more readable. (Jingoo)
+- Adjust the order from 05 to 04
+- Provide backword compatibility with samsung. (Krzysztof)
+- Split all DTS changes, and provide backward compatibility. Mark old
+  properties as deprecated but still support them. (Krzysztof)
+- Update "analogix,hpd-gpio" to "hpd-gpios" prop name. (Rob)
+- Deprecated some properties which could parsed from Edid/Mode/DPCD. (Thierry)
+    "analogix,color-space" & "analogix,color-depth"   &
+    "analogix,link-rate"   & "analogix,lane-count"    &
+    "analogix,ycbcr-coeff" & "analogix,dynamic-range" &
+    "vsync-active-high"    & "hsync-active-high"      & "interlaces"
+- Separate all DTS changes to a separate patch. (Krzysztof)
+- Remove some deprecated DT properties in rockchip dp document.
+- Add commit message, and remove the redundant rockchip_dp_phy_init()
+  function, move those code to probe() method. And remove driver .owner
+  number. (Kishon)
+- Seprate the link-rate and lane-count limit out with the device_type
+  flag. (Thierry)
+- Take Jingoo suggest, add commit messages.
+- Call drm_panel_prepare() in .get_modes function, ensure panel should
+  power on before driver try to read edid message.
+
+Changes in v3:
+- Move exynos's video_timing code to analogix_dp-exynos platform driver,
+  add get_modes method to struct analogix_dp_plat_data. (Thierry)
+- Rename some "samsung*" dts propery to "analogix*". (Heiko)
+- The link_rate and lane_count shouldn't config to the DT property value
+  directly, but we can take those as hardware limite. For example, RK3288
+  only support 4 physical lanes of 2.7/1.62 Gbps/lane, so DT property would
+  like "link-rate = 0x0a" "lane-count = 4". (Thierry)
+- Dynamic parse video timing info from struct drm_display_mode and
+  struct drm_display_info. (Thierry)
+- Add devicetree binding documents. (Heiko)
+- Remove sync pol & colorimetry properies from the new analogix dp driver
+  devicetree binding. (Thierry)
+- Update the exist exynos dtsi file with the latest DP DT properies.
+- Leave "sclk_edp_24m" to rockchip dp phy driver which name to "24m",
+  and leave "sclk_edp" to analogix dp core driver which name to "dp",
+  and leave "pclk_edp" to rockchip dp platform driver which name to
+  "pclk". (Thierry & Heiko)
+- Add devicetree binding document. (Heiko)
+- Remove "rockchip,panel" DT property, take use of remote point to get panel
+  node. (Heiko)
+- Add the new function point dp_platdata->get_modes() init.
+- Suggest, add rockchip dp phy driver, collect the phy clocks and
+  power control. (Heiko)
+- Add "analogix,need-force-hpd" to indicate whether driver need foce
+  hpd when hpd detect failed.
+- move dp hpd detect to connector detect function.
+- Add edid modes parse support
+
+Changes in v2:
+- Keep author name list no changed (Jingoo)
+- Remove new copyright (Jingoo)
+- Fix compiled failed due to analogix_dp_device misspell
+- Improved commit message more readable, and avoid using some
+  uncommon style like bellow: (Joe Preches)
+    -  retval = exynos_dp_read_bytes_from_i2c(...
+  				  ...);
+    +  retval =
+    +  exynos_dp_read_bytes_from_i2c(......);
+- Get panel node with remote-endpoint method, and create devicetree binding
+  for driver. (Heiko)
+- Remove the clock enable/disbale with "sclk_edp" & "sclk_edp_24m",
+  leave those clock to rockchip dp phy driver.
+- Fix compile failed dut to phy_pd_addr variable misspell error
+
+Mark Yao (1):
+  drm: rockchip: vop: add bpc and color mode setting
+
+Yakir Yang (16):
+  drm: exynos: dp: convert to drm bridge mode
+  drm: bridge: analogix/dp: split exynos dp driver to bridge directory
+  drm: bridge: analogix/dp: fix some obvious code style
+  drm: bridge: analogix/dp: remove duplicate configuration of link rate
+    and link count
+  drm: bridge: analogix/dp: dynamic parse sync_pol & interlace &
+    dynamic_range
+  Documentation: drm/bridge: add document for analogix_dp
+  ARM: dts: exynos/dp: remove some properties that deprecated by
+    analogix_dp driver
+  drm: rockchip: dp: add rockchip platform dp driver
+  Documentation: drm/bridge: add document for analogix_dp
+  phy: Add driver for rockchip Display Port PHY
+  Documentation: phy: add document for rockchip dp phy
+  drm: bridge: analogix/dp: add some rk3288 special registers setting
+  drm: bridge: analogix/dp: add max link rate and lane count limit for
+    RK3288
+  drm: bridge: analogix/dp: try force hpd after plug in lookup failed
+  drm: bridge: analogix/dp: move hpd detect to connector detect function
+  drm: bridge: analogix/dp: add edid modes parse in get_modes method
+
+ .../devicetree/bindings/drm/bridge/analogix_dp.txt |   52 +
+ .../devicetree/bindings/phy/rockchip-dp-phy.txt    |   22 +
+ .../bindings/video/analogix_dp-rockchip.txt        |   91 ++
+ .../devicetree/bindings/video/exynos_dp.txt        |   64 +-
+ arch/arm/boot/dts/exynos5250-arndale.dts           |    2 -
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    2 -
+ arch/arm/boot/dts/exynos5250-snow-common.dtsi      |    4 +-
+ arch/arm/boot/dts/exynos5250-spring.dts            |    4 +-
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         |    4 +-
+ arch/arm/boot/dts/exynos5420-smdk5420.dts          |    2 -
+ arch/arm/boot/dts/exynos5800-peach-pi.dts          |    4 +-
+ drivers/gpu/drm/bridge/Kconfig                     |    2 +
+ drivers/gpu/drm/bridge/Makefile                    |    1 +
+ drivers/gpu/drm/bridge/analogix/Kconfig            |    3 +
+ drivers/gpu/drm/bridge/analogix/Makefile           |    1 +
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 1373 +++++++++++++++++++
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  286 ++++
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  | 1294 ++++++++++++++++++
+ .../analogix/analogix_dp_reg.h}                    |  270 ++--
+ drivers/gpu/drm/exynos/Kconfig                     |    3 +-
+ drivers/gpu/drm/exynos/Makefile                    |    2 +-
+ drivers/gpu/drm/exynos/exynos_dp.c                 |  349 +++++
+ drivers/gpu/drm/exynos/exynos_dp_core.c            | 1404 --------------------
+ drivers/gpu/drm/exynos/exynos_dp_core.h            |  281 ----
+ drivers/gpu/drm/exynos/exynos_dp_reg.c             | 1263 ------------------
+ drivers/gpu/drm/rockchip/Kconfig                   |    9 +
+ drivers/gpu/drm/rockchip/Makefile                  |    1 +
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    |  457 +++++++
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        |    2 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h        |    2 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |   32 +-
+ drivers/phy/Kconfig                                |    7 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-rockchip-dp.c                      |  151 +++
+ include/drm/bridge/analogix_dp.h                   |   42 +
+ 35 files changed, 4343 insertions(+), 3144 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+ create mode 100644 Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
+ create mode 100644 drivers/gpu/drm/bridge/analogix/Kconfig
+ create mode 100644 drivers/gpu/drm/bridge/analogix/Makefile
+ create mode 100644 drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+ create mode 100644 drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+ create mode 100644 drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+ rename drivers/gpu/drm/{exynos/exynos_dp_reg.h => bridge/analogix/analogix_dp_reg.h} (62%)
+ create mode 100644 drivers/gpu/drm/exynos/exynos_dp.c
+ delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_core.c
+ delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_core.h
+ delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_reg.c
+ create mode 100644 drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+ create mode 100644 drivers/phy/phy-rockchip-dp.c
+ create mode 100644 include/drm/bridge/analogix_dp.h
+
+-- 
+1.9.1
