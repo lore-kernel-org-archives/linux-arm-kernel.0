@@ -1,40 +1,66 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Sun, 11 Oct 2015 00:33:38 +0200
-Subject: [PATCH v4 2/6] pinctrl: berlin: add the berlin4ct pinctrl driver
-In-Reply-To: <20151009172238.68fdd51c@xhacker>
-References: <1444378629-3057-1-git-send-email-jszhang@marvell.com>
- <1444378629-3057-3-git-send-email-jszhang@marvell.com>
- <20151009090353.GA2842@kwain> <20151009172238.68fdd51c@xhacker>
-Message-ID: <20151010223338.GG2842@kwain>
+Date: Sun, 11 Oct 2015 00:36:36 +0200
+Subject: [PATCH v5 0/7] arm64: berlin: add pinctrl support
+In-Reply-To: <1444391810-5045-1-git-send-email-jszhang@marvell.com>
+References: <1444391810-5045-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20151010223636.GH2842@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Jisheng,
 
-On Fri, Oct 09, 2015 at 05:22:38PM +0800, Jisheng Zhang wrote:
-> On Fri, 9 Oct 2015 11:03:53 +0200
-> Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
-> > 
-> > Finally you can move the OF dependency to the PINCTRL_BERLIN config as
-> > all Berlin pinctrl drivers depends on it.
-> 
-> PINCTRL_BERLIN isn't user visible and it's selected by PINCTRL_BERLIN_BG4CT. So
-> we may have the following random config case:
-> 
-> CONFIG_OF=n
-> CONFIG_PINCTRL_BERLIN_BG4CT=y
-> 
-> In this case, there will be build errors for we missed OF. So we have to
-> make PINCTRL_BERLIN_BG4CT depends on OF. What do you think? Or is there
-> better solution?
+Please keep Acked-by tags when you submit a new version of a series.
 
-That's true.
-
-But because other Berlin pinctrl drivers also depends on CONFIG_OF, we
-need to make then depend on it too. This isn't the topic of this series
-so I'll send a separate patch later.
+Thanks,
 
 Antoine
+
+On Fri, Oct 09, 2015 at 07:56:43PM +0800, Jisheng Zhang wrote:
+> This series adds support for Marvell berlin4ct pin-controller, allowing
+> to configure the pin muxing from the device tree.
+> 
+> Since v4:
+>  - drop ARCH_BERLIN dependency for it has been met
+>  - drop COMPILE_TEST dependency but make berlin pinctrl driver visible
+>    if COMPILE_TEST=y, and let this change be a seperate commit.
+> 
+> Since v3:
+>  - fix stupid build error: I missed local changes to berlin-bg4ct.c
+> 
+> Since v2:
+>  - introduce new berlin_pinctrl_probe_regmap() to avoid duplicated code
+>  - renaming such as s/urt/uart etc. but keep the group name as URT* to keep
+>    consistent with HW/ASIC
+> 
+> Since v1:
+>  - use generic name for pin functions
+>  - a new commit to add pinmux for uart0
+>  - correct pinctrl usage in dts
+> 
+> 
+> Jisheng Zhang (7):
+>   pinctrl: berlin: introduce berlin_pinctrl_probe_regmap()
+>   pinctrl: berlin: Make berlin pinctrl driver visible if COMPILE_TEST=y
+>   pinctrl: berlin: add the berlin4ct pinctrl driver
+>   arm64: berlin: add the pinctrl dependency for Marvell Berlin SoCs
+>   pinctrl: dt-binding: document berlin4ct SoC pinctrl
+>   arm64: dts: berlin4ct: add the pinctrl node
+>   arm64: dts: berlin4ct: add default pinmux for uart0
+> 
+>  .../devicetree/bindings/pinctrl/berlin,pinctrl.txt |   5 +-
+>  arch/arm64/Kconfig.platforms                       |   1 +
+>  arch/arm64/boot/dts/marvell/berlin4ct.dtsi         |  22 +
+>  drivers/pinctrl/berlin/Kconfig                     |   7 +-
+>  drivers/pinctrl/berlin/Makefile                    |   1 +
+>  drivers/pinctrl/berlin/berlin-bg4ct.c              | 503 +++++++++++++++++++++
+>  drivers/pinctrl/berlin/berlin.c                    |  26 +-
+>  drivers/pinctrl/berlin/berlin.h                    |   4 +
+>  8 files changed, 558 insertions(+), 11 deletions(-)
+>  create mode 100644 drivers/pinctrl/berlin/berlin-bg4ct.c
+> 
+> -- 
+> 2.6.1
+> 
 
 -- 
 Antoine T?nart, Free Electrons
