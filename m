@@ -1,28 +1,29 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Sat, 10 Oct 2015 23:40:51 +0100
-Subject: [PATCH v4 0/3] arm64: EFI stub isolation
-In-Reply-To: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151010224051.GK2723@codeblueprint.co.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 11 Oct 2015 10:22:02 +0200
+Subject: [PATCH v4 00/26] ARM: pxa: magician: Rework HTC Magician support
+In-Reply-To: <56172F88.2060602@tul.cz> (Petr Cvek's message of "Fri, 9 Oct
+ 2015 05:07:52 +0200")
+References: <5609AB45.9030009@tul.cz>
+ <20151006152527.GA32352@xo-6d-61-c0.localdomain>
+ <56172F88.2060602@tul.cz>
+Message-ID: <87si5h7r2t.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 08 Oct, at 08:02:01PM, Ard Biesheuvel wrote:
-> We need to ensure that the EFI stub only uses parts of the kernel proper
-> that are safe to use when the kernel virtual mapping is not active yet.
-> 
-> So move all C code dependencies to the libstub, which is built with all
-> instrumentation (gcov, kasan) disabled, and do a verification pass to
-> ensure that no absolute relocations are used.
-> 
-> On the arm64 side, annotate all the stub's dependencies as safe for PI
-> (position independent
-> 
-> @Matt: if you are OK with these, may we please have your ack on patches #1 and
-> #2 so that Catalin can pick up the series? Thanks.
+Petr Cvek <petr.cvek@tul.cz> writes:
 
-I assumed you meant PATCH 1 and PATCH 3. If so, yeah, these look fine
-to be taken through Catalin's tree.
+>> Thanks (a pozdrav :-),
+>> 
+>> 								Pavel
+Hi Petr,
 
--- 
-Matt Fleming, Intel Open Source Technology Center
+I'll start applying part of this serie today evening (my evening).
+All Philipp's acked patches for a start.
+
+For the minor changes required by Philipp (comments, ...), if you just state by
+mail that you agree I'll make them inline before applying.
+
+Cheers.
+
+--
+Robert
