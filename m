@@ -1,63 +1,111 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 11 Oct 2015 21:59:24 +0200
-Subject: [PATCH v4 00/26] ARM: pxa: magician: Rework HTC Magician support
-In-Reply-To: <87si5h7r2t.fsf@belgarion.home> (Robert Jarzmik's message of
- "Sun, 11 Oct 2015 10:22:02 +0200")
-References: <5609AB45.9030009@tul.cz>
- <20151006152527.GA32352@xo-6d-61-c0.localdomain>
- <56172F88.2060602@tul.cz> <87si5h7r2t.fsf@belgarion.home>
-Message-ID: <87oag56usj.fsf@belgarion.home>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 11 Oct 2015 22:40:41 +0200
+Subject: [PATCH] ARM: configs: update lpc18xx defconfig
+Message-ID: <1444596042-31904-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+- Enable SPIFI Flash and JFFS2 to support rootfs on Flash memory
+- Enable USB Phy, mass storage and SCSI to support USB memory
+- Enable PCF857x and JC42 I2C devices found on Hitex board
+- Enable PL172 to support memory mapped NOR Flash
+- New LPC18xx drivers: I2C, Watchdog, SCT PWM and RTC
 
-> Petr Cvek <petr.cvek@tul.cz> writes:
->
->>> Thanks (a pozdrav :-),
->>> 
->>> 								Pavel
-> Hi Petr,
->
-> I'll start applying part of this serie today evening (my evening).
-> All Philipp's acked patches for a start.
->
-> For the minor changes required by Philipp (comments, ...), if you just state by
-> mail that you agree I'll make them inline before applying.
->
-> Cheers.
->
-> --
-> Robert
-Ok, applied and pushed out in pxa/for-next
-    https://github.com/rjarzmik/linux.git pxa/for-next :
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+Hi arm-soc team,
 
-425c97c3c937 ARM: pxa: magician: Move platform_add_devices() to the end of magician_init()
-3b1c0c4ae8fd ARM: pxa: magician: Add missing regulator for PWM backlight
-452f1945c9b7 ARM: pxa: magician: Add debug message for backlight brightness function
-20c1c7bb35c2 ARM: pxa: magician: Remove definition of the STUART port
-3181b4a3815d ARM: pxa: magician: Fix wrongly enabled USB host ports
-ba79d845999d ARM: pxa: magician: Fix support for Intel Strata NOR Flash
-d62591e4e5d1 ARM: pxa: magician: Fix redundant GPIO request for pxaficp_ir
-d73219de5868 ARM: pxa: magician: Fix platform data for both PXA27x I2C controllers
-48e112eb54eb ARM: pxa: magician: Fix and add charging detection functions
-65cd6cc24910 ARM: pxa: magician: Optimize Samsung LCD refresh to 50Hz
-c85c66dbc212 ARM: pxa: magician: Rename charger cable detection EGPIOs
-6fd9d402d8c4 ARM: pxa: magician: Optimize powerup delays for Samsung LCD
-e391a4d95dd4 ARM: pxa: magician: Rename abstract LCD GPIOs
-32bed563d51f ARM: pxa: magician: Add new discovered EGPIO pins
-ab558b6c5834 ARM: pxa: magician: Change description of LCD power GPIO
-c1ed9f57e853 ARM: pxa: magician: Optimize debug messages for LCD power
-33e910e79b77 ARM: pxa: magician: Print more specific error message for global GPIOs
-4c006b908a07 ARM: pxa: magician: Fix indentation in machine files
+Please apply this single defconfig update for lpc18xx to
+arm-soc/defconfig for v4.4.
 
-That leaves out 8 patches, for you to :
- - either resubmit (rebased on top of the pxa/for-next tree)
- - or drop (mostly because of Philipp's NACK or the camera reset)
+ arch/arm/configs/lpc18xx_defconfig | 26 ++++++++++++++++++++++----
+ 1 file changed, 22 insertions(+), 4 deletions(-)
 
-This way your next submission should be quite shorter and easy to manage.
-
-Cheers.
-
+diff --git a/arch/arm/configs/lpc18xx_defconfig b/arch/arm/configs/lpc18xx_defconfig
+index 1c47f86c3970..b758a808d310 100644
+--- a/arch/arm/configs/lpc18xx_defconfig
++++ b/arch/arm/configs/lpc18xx_defconfig
+@@ -52,15 +52,22 @@ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ # CONFIG_FW_LOADER is not set
+ CONFIG_MTD=y
++CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_CFI_AMDSTD=y
+ CONFIG_MTD_CFI_STAA=y
+ CONFIG_MTD_PHYSMAP=y
+ CONFIG_MTD_PHYSMAP_OF=y
++CONFIG_MTD_SPI_NOR=y
++# CONFIG_MTD_SPI_NOR_USE_4K_SECTORS is not set
++CONFIG_SPI_NXP_SPIFI=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_SRAM=y
+ CONFIG_EEPROM_AT24=y
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++# CONFIG_SCSI_LOWLEVEL is not set
+ CONFIG_NETDEVICES=y
+ # CONFIG_NET_VENDOR_ARC is not set
+ # CONFIG_NET_CADENCE is not set
+@@ -102,14 +109,17 @@ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
++CONFIG_I2C_LPC2K=y
+ CONFIG_SPI=y
+ CONFIG_SPI_PL022=y
++CONFIG_GPIOLIB=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_74XX_MMIO=y
++CONFIG_GPIO_PCF857X=y
++CONFIG_SENSORS_JC42=y
+ CONFIG_SENSORS_LM75=y
+ CONFIG_WATCHDOG=y
+-CONFIG_WATCHDOG_CORE=y
+-CONFIG_MFD_SYSCON=y
++CONFIG_LPC18XX_WATCHDOG=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_FB=y
+@@ -117,6 +127,8 @@ CONFIG_FB_ARMCLCD=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_ROOT_HUB_TT=y
++CONFIG_USB_EHCI_HCD_PLATFORM=y
++CONFIG_USB_STORAGE=y
+ CONFIG_MMC=y
+ CONFIG_MMC_DW=y
+ CONFIG_MMC_DW_IDMAC=y
+@@ -128,12 +140,20 @@ CONFIG_LEDS_GPIO=y
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_LPC24XX=y
+ CONFIG_DMADEVICES=y
+ CONFIG_AMBA_PL08X=y
++CONFIG_LPC18XX_DMAMUX=y
++CONFIG_MEMORY=y
++CONFIG_ARM_PL172_MPMC=y
++CONFIG_PWM=y
++CONFIG_PWM_LPC18XX_SCT=y
++CONFIG_PHY_LPC18XX_USB_OTG=y
+ CONFIG_EXT2_FS=y
+ # CONFIG_FILE_LOCKING is not set
+ # CONFIG_DNOTIFY is not set
+ # CONFIG_INOTIFY_USER is not set
++CONFIG_JFFS2_FS=y
+ # CONFIG_NETWORK_FILESYSTEMS is not set
+ CONFIG_PRINTK_TIME=y
+ CONFIG_DEBUG_INFO=y
+@@ -143,8 +163,6 @@ CONFIG_DEBUG_FS=y
+ CONFIG_MAGIC_SYSRQ=y
+ # CONFIG_SCHED_DEBUG is not set
+ # CONFIG_DEBUG_BUGVERBOSE is not set
+-# CONFIG_RCU_CPU_STALL_INFO is not set
+-# CONFIG_FTRACE is not set
+ CONFIG_DEBUG_LL=y
+ CONFIG_EARLY_PRINTK=y
+ CONFIG_CRC_ITU_T=y
 -- 
-Robert
+1.8.0
