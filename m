@@ -1,50 +1,50 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 11 Oct 2015 11:55:08 +0200
-Subject: [PATCH v3 4/4] ARM: dts: sun5i: Add backlight node to
- sun5i-q8-common.dtsi
-In-Reply-To: <1444557308-10892-1-git-send-email-hdegoede@redhat.com>
-References: <1444557308-10892-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1444557308-10892-4-git-send-email-hdegoede@redhat.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sun, 11 Oct 2015 11:54:49 +0200 (CEST)
+Subject: [PATCH v5 1/3] initialize each mbigen device node as a interrupt
+ controller.
+In-Reply-To: <20151010110942.52d34a4b@arm.com>
+References: <1443605949-15396-1-git-send-email-majun258@huawei.com>
+ <1443605949-15396-2-git-send-email-majun258@huawei.com>
+ <alpine.DEB.2.11.1509302242220.4500@nanos> <5610D3BD.1040408@huawei.com>
+ <alpine.DEB.2.11.1510091441200.6097@nanos> <5618D3EC.6050501@huawei.com>
+ <20151010110942.52d34a4b@arm.com>
+Message-ID: <alpine.DEB.2.11.1510111150270.6097@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All A13 based q8 formfactor tablets use the same backlight setup, add
-a backlight devicetree node for controlling the backlight on these devices.
+On Sat, 10 Oct 2015, Marc Zyngier wrote:
+> On Sat, 10 Oct 2015 17:01:32 +0800
+> "majun (F)" <majun258@huawei.com> wrote:
+> > But there is a problem If i make the structure like you said.
+> > 
+> > For example, my hardware structure likes below:
+> > 
+> > uart ------> mbigen --> ITS-pMSI --> ITS --> GIC
+> >      virq1
+> > 
+> > virq1 means the virq number allocted by irq_of_parse_and_map() function
+> > when system parse the uart dts node in initializing  stage.
+> > 
+> > To create a ITS device, I need to call msi_domain_alloc_irqs() function
+> > in my mbigen alloc function.
+> > 
+> > In this function, a new virq number(named as virq2 ) which different from
+> > virq1 is allocated.
+> > So, this is a big problem.
+> 
+> I think I see what your problem is:
+> - The wired interrupt (uart -> mbigen) is allocated through DT (and
+>   must be available early, because of of_platform_populate),
+> - The MSI (mgigen -> ITS) is dynamic (and allocated much later,
+>   because the device model kicks in after irqchip init, and we cannot
+>   allocate MSIs without a device).
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--Drop the comment about DCDC1SW, the axp209 used on A13 boards does not
- have a DCDC1SW
----
- arch/arm/boot/dts/sun5i-q8-common.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Why do we need that wired interrupt at all? 
 
-diff --git a/arch/arm/boot/dts/sun5i-q8-common.dtsi b/arch/arm/boot/dts/sun5i-q8-common.dtsi
-index 0641d68..a78e189 100644
---- a/arch/arm/boot/dts/sun5i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun5i-q8-common.dtsi
-@@ -41,11 +41,21 @@
-  */
- #include "sunxi-q8-common.dtsi"
- 
-+#include <dt-bindings/pwm/pwm.h>
-+
- / {
- 	aliases {
- 		serial0 = &uart1;
- 	};
- 
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
-+		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
-+		default-brightness-level = <8>;
-+		/* TODO: backlight uses axp gpio1 as enable pin */
-+	};
-+
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
--- 
-2.5.0
+We can make mbigen the 'msi-parent' of the device and let the
+msi_domain_ops::msi_prepare() callback figure out the actual wiring
+through device->fwnode.
+
+Thanks,
+
+	tglx
