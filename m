@@ -1,156 +1,50 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sun, 11 Oct 2015 14:10:27 -0500
-Subject: [PATCH v2] PCI: layerscape: Add PCIe support for LS1043a and
- LS2080a
-In-Reply-To: <20151007175725.GC27633@localhost>
-References: <1442481219-28299-1-git-send-email-Minghuan.Lian@freescale.com>
- <20151007175725.GC27633@localhost>
-Message-ID: <20151011191027.GA29221@localhost>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Sun, 11 Oct 2015 20:15:01 +0100
+Subject: [PATCH 2/3] hwrng: stm32 - add support for STM32 HW RNG
+In-Reply-To: <CAMTL27G9j8tR4WKQgj6HbVCTd-5Xx0HYs40Rij91GgT4D8PevA@mail.gmail.com>
+References: <1443904519-24012-1-git-send-email-daniel.thompson@linaro.org>
+ <1443904519-24012-3-git-send-email-daniel.thompson@linaro.org>
+ <CACRpkdaCBUnFMYMSdjF4bHwQH3zxu2ou7b54E4FzgH9UbNQEHw@mail.gmail.com>
+ <CAMTL27G9j8tR4WKQgj6HbVCTd-5Xx0HYs40Rij91GgT4D8PevA@mail.gmail.com>
+Message-ID: <CAMTL27HvK3H64O2qA4hhjHOmgkJfQZO95-BnmJL7tyd+TKhz0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Thomas, Jason, Tanmay]
-
-Hi Minghuan,
-
-You responded to this message, but your response was rejected by the
-mailing list, I think because it was not plain text.  See
-http://vger.kernel.org/majordomo-info.html
-
-I went ahead and reconstructed what your response would have looked
-like so I could continue the conversation.  But please fix your email
-setup before responding again :)
-
-Minghuan wrote:
-> On Wed, Oct 07, 2015 at 12:57:25PM -0500, Bjorn Helgaas wrote:
-> > Hi Minghuan,
-> > 
-> > On Thu, Sep 17, 2015 at 05:13:39PM +0800, Minghuan Lian wrote:
-> > > The patch adds PCIe support for LS1043a and LS2080a.
-> > > 
-> > > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> > > ---
-> > > This patch is based on v4.3-rc1 and [PATCH v9 0/6]
-> > > PCI: hisi: Add PCIe host support for HiSilicon SoC Hip05
-> > > patchset from Zhou Wang.
-> > > 
-> > > change log
-> > > v2:
-> > > 1. rename ls2085a to ls2080a
-> > > 2. Add ls_pcie_msi_host_init()
-> > > 
-> > >  drivers/pci/host/Kconfig          |   2 +-
-> > >  drivers/pci/host/pci-layerscape.c | 227 ++++++++++++++++++++++++++------------
-> > >  2 files changed, 157 insertions(+), 72 deletions(-)
-> > > 
-> > > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> > > index ae873be..38fe8a8 100644
-> > > --- a/drivers/pci/host/Kconfig
-> > > +++ b/drivers/pci/host/Kconfig
-> > > @@ -105,7 +105,7 @@ config PCI_XGENE_MSI
-> > >  
-> > >  config PCI_LAYERSCAPE
-> > >  	bool "Freescale Layerscape PCIe controller"
-> > > -	depends on OF && ARM
-> > > +	depends on OF && (ARM || ARM64)
-> > 
-> > It seems like there are a couple things going on here, and I wonder if
-> > you can split them out into separate patches.
-> > 
-> > 1) Making this work on ARM64 as well as on ARM.  This may be of
-> > interest for other DesignWare-based drivers, so if you split this out,
-> > maybe it would be a useful template for converting the other drivers,
-> > too.
-> > 
-> > 2) Adding LS1043a and LS2080a.  Obviously, this is only of interest to
-> > this driver, but maybe it could be separated out into a separate
-> > patch?
-
-> The patch is based on v4.3-rc1 and [PATCH v9 0/6] PCI: hisi: Add PCIe host
-> support for HiSilicon SoC Hip05 patchset from Zhou Wang which adds arm and
-> arm64 support.
+On 5 October 2015 at 10:22, Daniel Thompson <daniel.thompson@linaro.org> wrote:
+> On 4 October 2015 at 11:32, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Sat, Oct 3, 2015 at 10:35 PM, Daniel Thompson
+>> 3. I took out the datasheet for Nomadik STn8820 and it seems that
+>> the hardware is very similar to what this driver is trying to drive.
+>> CR, SR and DR are in the same place, can you check if you also even
+>> have the PrimeCell magic in the words at offset 0xfe0 thru 0xffc?
 >
-> The original code with the Zhou Wang's patches can support arm64 as well.
-> Because both LS1043a and LS2085 are armv8 (arm64) architecture, the patch
-> updates Kconfig to add 'arm64'.
+> The register window for the STM32 RNG is only 0x400 (and I'll fix the
+> DT for v2 ;-) ) so the STM32 version isn't primecell-like.
 >
-> If splitting two patches, the first patch for arm64 support only includes one
-> line changes of Kconfig. So, I think it is unnecessary.
+>
+>> In any case it seems likely that this driver should supercede and replace
+>> drivers/char/hw_random/nomadik-rng.c
+>> still using the PrimeCell bus, and if it doesn't have the PrimeCell
+>> IDs in hardware, this can be specified in the device tree using
+>> arm,primecell-periphid = <0x000805e1>; in the node if need be.
+>> The in-tree driver is dangerously simple and assume too much IMO.
+>
+> Not sure about this, but I'll take a closer look. There is a certain
+> family resemblance in the register set but there are significant
+> differences in data transfer between the Nomadik and STM32 hardware.
 
-It's OK if the first patch is very small.  The point is that the patch
-does two orthogonal things, and those two things should be in separate
-commits.  This makes bisection work better, and it reduces the amount
-of functionality removed if we have to revert something.
+Having looked at this I don't really think we would gain very much
+from combining these drivers. The cells have different (albeit
+slightly similar) register layouts, different ways to transfer data
+(16- versus 32-bit) and different ways to report test/report incorrect
+clocking. In the case of the RNG the differences therefore span the
+entire of its feature set.
 
-> > > +static int ls_pcie_msi_host_init(struct pcie_port *pp,
-> > > +				 struct msi_controller *chip)
-> > > +{
-> > > +	struct device_node *msi_node;
-> > > +	struct device_node *np = pp->dev->of_node;
-> > > +
-> > > +	msi_node = of_parse_phandle(np, "msi-parent", 0);
-> > > +	if (!msi_node) {
-> > > +		dev_err(pp->dev, "failed to find msi-parent\n");
-> > > +		return -EINVAL;
-> > > +	}
-> > 
-> > This doesn't actually *do* anything except complain if "msi-parent" is
-> > missing.  I'm not sure that's worth doing: if we need "msi-parent"
-> > somewhere, we should complain there if we don't find it.  If we don't
-> > need it, why complain if it's missing?
+I think combining them just results in two drivers that happen to
+share a file and I dislike having to add "fake" information to the
+devicetree to make it hang together.
 
-> driver/of/irq.c  void of_msi_configure(struct device *dev, struct
-> device_node *np) will bind "msi-parent" to each device if there is
-> "msi-parent" handler. The PCIe driver do not need to do anything. If
-> we do not check "msi-parent" here, we will have no chance to check it.
-> The common code of 'of' and 'pci' bus driver will not complain,
-> because the msi controller may be found by other way.
+Is that convincing for you?
 
-Hmm.   In mvebu_pcie_msi_enable() and xgene_pcie_msi_enable(), we
-also look for "msi-parent".  If that fails, mvebu continues silently
-and xgene complains (but only if CONFIG_PCI_MSI=y).
 
-This seems like three unnecessarily different ways of doing the same
-thing.
-
-I cc'd the maintainers of those drivers; maybe we can agree on a single
-strategy.
-
-> > >  static int __init ls_pcie_probe(struct platform_device *pdev)
-> > >  {
-> > > ...
-> > > -	ret = ls_add_pcie_port(pcie);
-> > > -	if (ret < 0)
-> > > +	ret = dw_pcie_host_init(pp);
-> > 
-> > We have several DesignWare-based drivers (dra7xx, exynos, imx6, ks,
-> > ls, spear13xx), and I'd like to keep their structure as similar as
-> > possible.  For example, they all have basically this structure:
-> > 
-> >   X_pcie_probe
-> >     X_add_pcie_port
-> >       dw_pcie_host_init             # pp->ops->host_init callback
-> >         X_pcie_host_init
-> >           X_pcie_establish_link
-> > 
-> > This patch removes ls_add_pcie_port() and ls_pcie_establish_link(), so
-> > we're diverging a bit.  That makes it harder to see the similarities
-> > across these drivers, which I think is a loss.
-
-> I will add X_add_pcie_port. But we do not need X_pcie_establish_link
-> because we do not need change/reset phy to establish link, besides,
-> the PCIe controller slot may be not inserted any PCIe device at all.
-> If each controller waits some time for link, the start time will
-> increase a lot. In some scenes, long start-up time is not acceptable.
-
-If we wait for a timeout trying to establish a link when the slot is
-empty, it sounds like something's wrong.  Can't we tell from presence
-detect whether a card is present, even without trying to bring up the
-link?
-
-If we truly do not need a piece like X_pcie_establish_link(), I'm OK
-with entirely omitting it.  What I really object to is when we have
-the same functionality two places with different names or structured
-two different ways.
-
-Bjorn
+Daniel.
