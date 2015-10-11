@@ -1,29 +1,38 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 11 Oct 2015 10:22:02 +0200
-Subject: [PATCH v4 00/26] ARM: pxa: magician: Rework HTC Magician support
-In-Reply-To: <56172F88.2060602@tul.cz> (Petr Cvek's message of "Fri, 9 Oct
- 2015 05:07:52 +0200")
-References: <5609AB45.9030009@tul.cz>
- <20151006152527.GA32352@xo-6d-61-c0.localdomain>
- <56172F88.2060602@tul.cz>
-Message-ID: <87si5h7r2t.fsf@belgarion.home>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 11 Oct 2015 11:49:39 +0200
+Subject: [linux-sunxi] Re: [PATCH v2 resend 0/4] ARM: dts: sunxi: q8 A13
+ tablet backlight support
+In-Reply-To: <20151001203331.GP7104@lukather>
+References: <1443522591-6590-1-git-send-email-hdegoede@redhat.com>
+ <20151001203331.GP7104@lukather>
+Message-ID: <561A30B3.8060106@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
+Hi,
 
->> Thanks (a pozdrav :-),
->> 
->> 								Pavel
-Hi Petr,
+On 01-10-15 22:33, Maxime Ripard wrote:
+> Hi,
+>
+> On Tue, Sep 29, 2015 at 12:29:47PM +0200, Hans de Goede wrote:
+>> Hi Maxime,
+>>
+>> This series seems to have fallen through the cracks, hence this
+>> resend.
+>
+> No, it didn't fall through the cracks, I asked a question on the first
+> patch and never got a reply.
+>
+> The way we handled *all* the controllers so far is that the compatible
+> was representing what the controllers what features the controller was
+> exposing. This is the case for the clocks or pinctrl for example.
+>
+> We should be consistent with that (beside the fact that using a
+> compatible from a later SoC is wrong).
 
-I'll start applying part of this serie today evening (my evening).
-All Philipp's acked patches for a start.
+Ah ok, I somehow missed that reply, a pwm patch to add the compatibles
++ v3 of the dts patches is coming up.
 
-For the minor changes required by Philipp (comments, ...), if you just state by
-mail that you agree I'll make them inline before applying.
+Regards,
 
-Cheers.
-
---
-Robert
+Hans
