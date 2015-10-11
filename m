@@ -1,32 +1,29 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 12 Oct 2015 08:54:23 +0900
-Subject: [PATCH] ARM: shmobile: porter: add I2C2 DT support
-In-Reply-To: <5617FF0E.1000300@cogentembedded.com>
-References: <84974694.25bFZffQKN@wasted.cogentembedded.com>
- <20151009011336.GB14231@verge.net.au>
- <5617FF0E.1000300@cogentembedded.com>
-Message-ID: <20151011235420.GA20025@verge.net.au>
+Date: Mon, 12 Oct 2015 08:55:40 +0900
+Subject: [PATCH] ARM: shmobile: henninger: add MSIOF0 DT support
+In-Reply-To: <56182654.6070205@cogentembedded.com>
+References: <201405070048.00213.sergei.shtylyov@cogentembedded.com>
+ <56182654.6070205@cogentembedded.com>
+Message-ID: <20151011235540.GB20025@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 08:53:18PM +0300, Sergei Shtylyov wrote:
-> Hello.
+On Fri, Oct 09, 2015 at 11:40:52PM +0300, Sergei Shtylyov wrote:
+> On 05/07/2014 12:47 AM, Sergei Shtylyov wrote:
 > 
-> On 10/09/2015 04:13 AM, Simon Horman wrote:
+> >Define the Henninger board dependent part of the MSIOF0 device node.
+> >Add device node for Renesas R2A11302FT PMIC for which no bindings exist yet.
 > 
-> >>Define the Porter board dependent part of the I2C2 device node.
-> >>
-> >>This patch is  analogous to the commit 29a647c396a0 ("ARM: shmobile:
-> >>henninger: add I2C2 DT support") as there are no differences between
-> >>the boards in this respect.
-> >>
-> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> >Thanks Sergei,
-> 
-> >I have queued this up for v4.4.
-> 
->    Not seeing anything from renesas.git running 'git fetch'. Forgot to push? :-)
+>    I've just realized that there's no such PMIC on the Henninger/Porter
+> boards and MSIOF0 is only connected to CN6, hence this patch was wrong.
+> The .dts is going to be deleted anyway though...
 
-Yes, sorry about that.
-I've pushed it now.
+Feel free to send an incremental update to the henninger if you
+want to clean this up before removing the file entirely.
+
+> >Based on the Koelsch MSIOF device tree patch by Geert Uytterhoeven.
+> >
+> >Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> MBR, Sergei
+> 
