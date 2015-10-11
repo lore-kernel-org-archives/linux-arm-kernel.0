@@ -1,50 +1,31 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sun, 11 Oct 2015 11:54:49 +0200 (CEST)
-Subject: [PATCH v5 1/3] initialize each mbigen device node as a interrupt
- controller.
-In-Reply-To: <20151010110942.52d34a4b@arm.com>
-References: <1443605949-15396-1-git-send-email-majun258@huawei.com>
- <1443605949-15396-2-git-send-email-majun258@huawei.com>
- <alpine.DEB.2.11.1509302242220.4500@nanos> <5610D3BD.1040408@huawei.com>
- <alpine.DEB.2.11.1510091441200.6097@nanos> <5618D3EC.6050501@huawei.com>
- <20151010110942.52d34a4b@arm.com>
-Message-ID: <alpine.DEB.2.11.1510111150270.6097@nanos>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sun, 11 Oct 2015 12:02 +0200
+Subject: [PATCH] soc/rockchip: Restrict to ARCH_ROCKCHIP
+In-Reply-To: <1444398378-24974-1-git-send-email-thierry.reding@gmail.com>
+References: <1444398378-24974-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <11653010.7KoG7eRGs0@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 10 Oct 2015, Marc Zyngier wrote:
-> On Sat, 10 Oct 2015 17:01:32 +0800
-> "majun (F)" <majun258@huawei.com> wrote:
-> > But there is a problem If i make the structure like you said.
-> > 
-> > For example, my hardware structure likes below:
-> > 
-> > uart ------> mbigen --> ITS-pMSI --> ITS --> GIC
-> >      virq1
-> > 
-> > virq1 means the virq number allocted by irq_of_parse_and_map() function
-> > when system parse the uart dts node in initializing  stage.
-> > 
-> > To create a ITS device, I need to call msi_domain_alloc_irqs() function
-> > in my mbigen alloc function.
-> > 
-> > In this function, a new virq number(named as virq2 ) which different from
-> > virq1 is allocated.
-> > So, this is a big problem.
+Hi Thierry,
+
+Am Freitag, 9. Oktober 2015, 15:46:18 schrieb Thierry Reding:
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> I think I see what your problem is:
-> - The wired interrupt (uart -> mbigen) is allocated through DT (and
->   must be available early, because of of_platform_populate),
-> - The MSI (mgigen -> ITS) is dynamic (and allocated much later,
->   because the device model kicks in after irqchip init, and we cannot
->   allocate MSIs without a device).
+> By definition this directory contains drivers that are specific to the
+> Rockchip architecture. All Kconfig options should therefore depend on
+> ARCH_ROCKCHIP to avoid exposing these symbols on other architectures.
+> For example, this options currently shows up as new when doing an
+> incremental build on PowerPC.
+> 
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
 
-Why do we need that wired interrupt at all? 
+thanks for catching this and I agree that Rockchip stuff should not leak into 
+other arches :-) .
 
-We can make mbigen the 'msi-parent' of the device and let the
-msi_domain_ops::msi_prepare() callback figure out the actual wiring
-through device->fwnode.
+I've applied this after adding a "|| COMPILE_TEST" alternative to the 
+condition.
 
-Thanks,
 
-	tglx
+Thanks
+Heiko
