@@ -1,77 +1,40 @@
-From: info@lategoodbye.de (Stefan Wahren)
-Date: Sun, 11 Oct 2015 16:23:02 +0200
-Subject: [PATCH v3 7/7] ARM: bcm2835: Add VC4 to the device tree.
-In-Reply-To: <1444426068-15817-8-git-send-email-eric@anholt.net>
-References: <1444426068-15817-1-git-send-email-eric@anholt.net>
- <1444426068-15817-8-git-send-email-eric@anholt.net>
-Message-ID: <561A70C6.4070602@lategoodbye.de>
+From: fijam@archlinux.us (JM)
+Date: Sun, 11 Oct 2015 16:37:52 +0200
+Subject: I/O issues with writing to mtdblock devices on kirkwood
+In-Reply-To: <20150905210846.GF6040@lunn.ch>
+References: <1440159857.19360.50.camel@debian.org>
+ <20150905210846.GF6040@lunn.ch>
+Message-ID: <CAKzmTe0Bq8itvKoOTwZ+ZjY5pTqFYWt0-ihO4jn0qew_NYGhFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 09.10.2015 um 23:27 schrieb Eric Anholt:
-> VC4 is the GPU (display and 3D) present on the 2835.
+On Sat, Sep 5, 2015 at 11:08 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Fri, Aug 21, 2015 at 01:24:17PM +0100, Ian Campbell wrote:
+>> Hi kirkwood-upstream,
+>>
+>> We (Debian) have had a couple of reports of I/O errors running Debian
+>> on kirkwood, specifically it seems to relate to later kernels (e.g.
+>> 4.0+) and I _suspect_ (without proof) that it may be due to the switch
+>> from board files to the DTS based kernel, or some change implied by
+>> this (e.g. different SATA driver now or timeouts have changed
+>> perhaps?).
 >
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
+> Hi Ian
 >
-> v2: Sort by register address, mark HDMI as disabled by default in the
->      SoC file and enable it from -rpi.
+> I've not reproduced this exactly, but something similar.
 >
-> v3: Add references to the pixel/HSM clocks for HDMI.  Rename
->      compatibility strings and clean up node names.
+> I do a find / and in parallel a cat /dev/mtdblock3 > /dev/null
 >
->   arch/arm/boot/dts/bcm2835-rpi.dtsi |  4 ++++
->   arch/arm/boot/dts/bcm2835.dtsi     | 42 ++++++++++++++++++++++++++++++++++++++
->   2 files changed, 46 insertions(+)
+> While the cat is active, the find grinds to a halt. I don't get any
+> SATA timeouts, but that could be because /dev/mtdblock3 is small
+> enough that the timers don't expire.
 >
-> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> index 3572f03..dcaaee2 100644
-> --- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> +++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> @@ -56,6 +56,10 @@
->   	status = "okay";
->   };
+> So i will now try to track down if there is a lock getting contended,
+> or at least why only the cat process makes progress.
 >
-> +&hdmi {
-> +	status = "okay";
-> +};
-> +
->   &sdhci {
->   	status = "okay";
->   	bus-width = <4>;
-> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-> index 1e61eb7..21e354a9 100644
-> --- a/arch/arm/boot/dts/bcm2835.dtsi
-> +++ b/arch/arm/boot/dts/bcm2835.dtsi
-> @@ -1,4 +1,5 @@
->   #include <dt-bindings/pinctrl/bcm2835.h>
-> +#include <dt-bindings/gpio/gpio.h>
->   #include <dt-bindings/clock/bcm2835.h>
->   #include "skeleton.dtsi"
->
-> @@ -149,6 +150,18 @@
->   			status = "disabled";
->   		};
->
-> +		pixelvalve at 7e206000 {
-> +			compatible = "brcm,bcm2835-pixelvalve0";
-> +			reg = <0x7e206000 0x100>;
-> +			interrupts = <2 13>; /* pwa2 */
+>    Andrew
 
-According to BCM2835-ARM-Peripherals this should be pwa0.
+Is there any update on this? The bug persists with kernel 4.2.1
 
-Is it just a typo?
-What does pwa mean?
-
-> +		};
-> +
-> +		pixelvalve at 7e207000 {
-> +			compatible = "brcm,bcm2835-pixelvalve1";
-> +			reg = <0x7e207000 0x100>;
-> +			interrupts = <2 14>; /* pwa1 */
-> +		};
-> +
-
-Thanks
-
-Stefan
+Best regards,
+Jan
