@@ -1,44 +1,68 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Sun, 11 Oct 2015 15:46:04 +0000
-Subject: [PATCH 3/3] ARM: dts: exynos5422-odroidxu3: Added UHS-I bus speed
- support
-In-Reply-To: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
-References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <1444578364-1384-3-git-send-email-linux.amoon@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 11 Oct 2015 17:18:44 +0100
+Subject: [linux-sunxi] [PATCH] MAINTAINERS: Update Allwinner entry and
+ add new maintainer
+In-Reply-To: <CAGb2v67TFuFQ3ZVHRtzPQHXcM=PAo3Duvt77v9_RtjkJ9_=D1Q@mail.gmail.com>
+References: <1444239580-32688-1-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v67TFuFQ3ZVHRtzPQHXcM=PAo3Duvt77v9_RtjkJ9_=D1Q@mail.gmail.com>
+Message-ID: <20151011161844.GL2278@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added support for UHS-I bus speed 50MB/s (SDR50, DDR50) 104MB/s (SDR104)
+Hi,
 
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+On Thu, Oct 08, 2015 at 09:32:09AM +0800, Chen-Yu Tsai wrote:
+> On Thu, Oct 8, 2015 at 1:39 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Add Chen-Yu Tsai as a co-maintainer to the ARM sunxi support.
+> >
+> > While we are doing so, also update the entry for new SoCs.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  MAINTAINERS | 5 +++--
+> >  1 file changed, 3 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index 797236befd27..d6a9a016f3d4 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -894,11 +894,12 @@ M:        Lennert Buytenhek <kernel@wantstofly.org>
+> >  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> >  S:     Maintained
+> >
+> > -ARM/Allwinner A1X SoC support
+> > +ARM/Allwinner sunXi SoC support
+> >  M:     Maxime Ripard <maxime.ripard@free-electrons.com>
+> > +M:     Chen-Yu Tsai <wens@csie.org>
+> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> 
+> >  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> >  S:     Maintained
+> > -N:     sun[x4567]i
+> > +N:     sun[x456789]i
+> 
+> I thought we updated this already, in d30dbc6de5732 ("ARM: sunxi:
+>  Add sun[89]i to MAINTAINERS entry"). It's in your
+>  sunxi/core-for-4.4 branch.
 
----
-Changes based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v4.4-next/dt-samsung branch
+Ah right. I wanted this to be applied directly for 4.3, so I based it
+on 4.3-rc4, that didn't have that commit.
 
-Changes Fixed the UHS-I bus speed detedtion on cold boot.
+In order to avoid the potential conflicts, I think the ARM-SoC
+maintainers should simply merge this one, and I'll drop my branch.
 
-[    2.439806] mmc_host mmc1: Bus speed (slot 0) = 100000000Hz (slot req 100000000Hz, actual 100000000HZ div = 0)
-[    2.449729] mmc1: new ultra high speed SDR50 SDHC card at address aaaa
-[    2.455984] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
-[    2.461743]  mmcblk0: p1 p2
----
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+Maxime
 
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-index 58c06d3..ba4a87b 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-@@ -364,6 +364,10 @@
- 	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
- 	bus-width = <4>;
- 	cap-sd-highspeed;
-+	sd-uhs-sdr12;
-+	sd-uhs-sdr25;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr104;
- };
- 
- &pinctrl_0 {
 -- 
-2.1.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151011/c1e51c57/attachment.sig>
