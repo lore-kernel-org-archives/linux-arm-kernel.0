@@ -1,227 +1,63 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Sun, 11 Oct 2015 21:49:10 +0200
-Subject: [PATCH] thermal: Add Raspberry Pi BCM2835 thermal driver
-Message-ID: <1444592950-16533-1-git-send-email-lkundrak@v3.sk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 11 Oct 2015 21:59:24 +0200
+Subject: [PATCH v4 00/26] ARM: pxa: magician: Rework HTC Magician support
+In-Reply-To: <87si5h7r2t.fsf@belgarion.home> (Robert Jarzmik's message of
+ "Sun, 11 Oct 2015 10:22:02 +0200")
+References: <5609AB45.9030009@tul.cz>
+ <20151006152527.GA32352@xo-6d-61-c0.localdomain>
+ <56172F88.2060602@tul.cz> <87si5h7r2t.fsf@belgarion.home>
+Message-ID: <87oag56usj.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BCM2835 thermal sensor accessible via Raspberry Pi VideoCore 4 firmware
-interface.
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-Based on work by Craig McGeachie, ported to the Raspberry Pi firmware
-interface (from the original mailbox client version).
+> Petr Cvek <petr.cvek@tul.cz> writes:
+>
+>>> Thanks (a pozdrav :-),
+>>> 
+>>> 								Pavel
+> Hi Petr,
+>
+> I'll start applying part of this serie today evening (my evening).
+> All Philipp's acked patches for a start.
+>
+> For the minor changes required by Philipp (comments, ...), if you just state by
+> mail that you agree I'll make them inline before applying.
+>
+> Cheers.
+>
+> --
+> Robert
+Ok, applied and pushed out in pxa/for-next
+    https://github.com/rjarzmik/linux.git pxa/for-next :
 
-Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Lee Jones <lee@kernel.org>
-Cc: Eric Anholt <eric@anholt.net>
-Cc: linux-rpi-kernel at lists.infradead.org
-Cc: linux-arm-kernel at lists.infradead.org
----
-Needs the RPi firmware patchset from branch 'rpi-firmware' of 
-https://github.com/anholt/linux
+425c97c3c937 ARM: pxa: magician: Move platform_add_devices() to the end of magician_init()
+3b1c0c4ae8fd ARM: pxa: magician: Add missing regulator for PWM backlight
+452f1945c9b7 ARM: pxa: magician: Add debug message for backlight brightness function
+20c1c7bb35c2 ARM: pxa: magician: Remove definition of the STUART port
+3181b4a3815d ARM: pxa: magician: Fix wrongly enabled USB host ports
+ba79d845999d ARM: pxa: magician: Fix support for Intel Strata NOR Flash
+d62591e4e5d1 ARM: pxa: magician: Fix redundant GPIO request for pxaficp_ir
+d73219de5868 ARM: pxa: magician: Fix platform data for both PXA27x I2C controllers
+48e112eb54eb ARM: pxa: magician: Fix and add charging detection functions
+65cd6cc24910 ARM: pxa: magician: Optimize Samsung LCD refresh to 50Hz
+c85c66dbc212 ARM: pxa: magician: Rename charger cable detection EGPIOs
+6fd9d402d8c4 ARM: pxa: magician: Optimize powerup delays for Samsung LCD
+e391a4d95dd4 ARM: pxa: magician: Rename abstract LCD GPIOs
+32bed563d51f ARM: pxa: magician: Add new discovered EGPIO pins
+ab558b6c5834 ARM: pxa: magician: Change description of LCD power GPIO
+c1ed9f57e853 ARM: pxa: magician: Optimize debug messages for LCD power
+33e910e79b77 ARM: pxa: magician: Print more specific error message for global GPIOs
+4c006b908a07 ARM: pxa: magician: Fix indentation in machine files
 
- drivers/thermal/Kconfig           |   8 ++
- drivers/thermal/Makefile          |   1 +
- drivers/thermal/bcm2835-thermal.c | 161 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 170 insertions(+)
- create mode 100644 drivers/thermal/bcm2835-thermal.c
+That leaves out 8 patches, for you to :
+ - either resubmit (rebased on top of the pxa/for-next tree)
+ - or drop (mostly because of Philipp's NACK or the camera reset)
 
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index 5aabc4b..5305a95 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -222,6 +222,14 @@ config DOVE_THERMAL
- 	  Support for the Dove thermal sensor driver in the Linux thermal
- 	  framework.
- 
-+config BCM2835_THERMAL
-+	tristate "BCM2835 Temperature sensor on Raspberry Pi"
-+	depends on RASPBERRYPI_FIRMWARE
-+	help
-+	  Support for the Broadcom BCM2835 thermal sensor driver on Raspberry Pi
-+	  devices in the Linux thermal framework. The BCM2835 has one sensor on
-+	  chip, with one trip point and no cooling devices.
-+
- config DB8500_THERMAL
- 	bool "DB8500 thermal management"
- 	depends on ARCH_U8500
-diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-index 26f1608..e71182b 100644
---- a/drivers/thermal/Makefile
-+++ b/drivers/thermal/Makefile
-@@ -45,3 +45,4 @@ obj-$(CONFIG_INTEL_PCH_THERMAL)	+= intel_pch_thermal.o
- obj-$(CONFIG_ST_THERMAL)	+= st/
- obj-$(CONFIG_TEGRA_SOCTHERM)	+= tegra_soctherm.o
- obj-$(CONFIG_HISI_THERMAL)     += hisi_thermal.o
-+obj-$(CONFIG_BCM2835_THERMAL)	+= bcm2835-thermal.o
-diff --git a/drivers/thermal/bcm2835-thermal.c b/drivers/thermal/bcm2835-thermal.c
-new file mode 100644
-index 0000000..7989c60
---- /dev/null
-+++ b/drivers/thermal/bcm2835-thermal.c
-@@ -0,0 +1,161 @@
-+/*
-+ *  Copyright (C) 2013 Craig McGeachie
-+ *  Copyright (C) 2014,2015 Lubomir Rintel
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This device presents the BCM2835 SoC temperature sensor as a thermal
-+ * device.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/device.h>
-+#include <linux/slab.h>
-+#include <linux/thermal.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/mailbox_client.h>
-+#include <linux/mutex.h>
-+#include <soc/bcm2835/raspberrypi-firmware.h>
-+
-+#define VC_TAG_GET_TEMP 0x00030006
-+#define VC_TAG_GET_MAX_TEMP 0x0003000A
-+#define VC_SUCCESS 0x80000000
-+
-+struct prop {
-+	u32 id;
-+	u32 val;
-+} __packed;
-+
-+struct bcm2835_therm {
-+	struct device *dev;
-+	struct thermal_zone_device *thermal_dev;
-+	struct rpi_firmware *fw;
-+};
-+
-+static int bcm2835_get_temp_common(struct thermal_zone_device *thermal_dev,
-+						int *temp, u32 temp_type)
-+{
-+	struct bcm2835_therm *therm = thermal_dev->devdata;
-+	struct device *dev = therm->dev;
-+	struct prop msg = {
-+		.id = 0,
-+		.val = 0
-+	};
-+	int ret;
-+
-+	ret = rpi_firmware_property(therm->fw, temp_type, &msg, sizeof(msg));
-+	if (ret) {
-+		dev_err(dev, "VC temperature request failed\n");
-+		goto exit;
-+	}
-+
-+	*temp = msg.val;
-+
-+exit:
-+	return ret;
-+}
-+
-+static int bcm2835_get_temp(struct thermal_zone_device *thermal_dev, int *temp)
-+{
-+	return bcm2835_get_temp_common(thermal_dev, temp, VC_TAG_GET_TEMP);
-+}
-+
-+static int bcm2835_get_max_temp(struct thermal_zone_device *thermal_dev,
-+						int trip_num, int *temp)
-+{
-+	return bcm2835_get_temp_common(thermal_dev, temp, VC_TAG_GET_MAX_TEMP);
-+}
-+
-+static int bcm2835_get_trip_type(struct thermal_zone_device *thermal_dev,
-+			int trip_num, enum thermal_trip_type *trip_type)
-+{
-+	*trip_type = THERMAL_TRIP_HOT;
-+
-+	return 0;
-+}
-+
-+static int bcm2835_get_mode(struct thermal_zone_device *thermal_dev,
-+		enum thermal_device_mode *dev_mode)
-+{
-+	*dev_mode = THERMAL_DEVICE_ENABLED;
-+
-+	return 0;
-+}
-+
-+static struct thermal_zone_device_ops ops  = {
-+	.get_temp = bcm2835_get_temp,
-+	.get_trip_temp = bcm2835_get_max_temp,
-+	.get_trip_type = bcm2835_get_trip_type,
-+	.get_mode = bcm2835_get_mode,
-+};
-+
-+static int bcm2835_thermal_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct bcm2835_therm *therm;
-+	struct device_node *fw;
-+
-+	therm = devm_kzalloc(dev, sizeof(*therm), GFP_KERNEL);
-+	if (!therm)
-+		return -ENOMEM;
-+
-+	therm->dev = dev;
-+	dev_set_drvdata(dev, therm);
-+
-+	fw = of_parse_phandle(pdev->dev.of_node, "firmware", 0);
-+	if (!fw) {
-+		dev_err(dev, "no firmware node");
-+		return -ENODEV;
-+	}
-+	therm->fw = rpi_firmware_get(fw);
-+	if (!therm->fw)
-+		return -EPROBE_DEFER;
-+
-+	therm->thermal_dev = thermal_zone_device_register("bcm2835_thermal",
-+					1, 0, therm, &ops, NULL, 0, 0);
-+	if (IS_ERR(therm->thermal_dev)) {
-+		dev_err(dev, "Unable to register the thermal device");
-+		return PTR_ERR(therm->thermal_dev);
-+	}
-+
-+	dev_info(dev, "Broadcom BCM2835 thermal sensor\n");
-+
-+	return 0;
-+}
-+
-+static int bcm2835_thermal_remove(struct platform_device *pdev)
-+{
-+	struct bcm2835_therm *therm = dev_get_drvdata(&pdev->dev);
-+
-+	thermal_zone_device_unregister(therm->thermal_dev);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id bcm2835_thermal_of_match[] = {
-+	{ .compatible = "raspberrypi,bcm2835-thermal", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, bcm2835_thermal_of_match);
-+
-+static struct platform_driver bcm2835_thermal_driver = {
-+	.driver = {
-+		.name = "bcm2835_thermal",
-+		.owner = THIS_MODULE,
-+		.of_match_table = bcm2835_thermal_of_match,
-+	},
-+	.probe = bcm2835_thermal_probe,
-+	.remove = bcm2835_thermal_remove,
-+};
-+
-+module_platform_driver(bcm2835_thermal_driver);
-+
-+MODULE_AUTHOR("Craig McGeachie");
-+MODULE_AUTHOR("Lubomir Rintel");
-+MODULE_DESCRIPTION("Raspberry Pi BCM2835 thermal driver");
-+MODULE_LICENSE("GPL v2");
+This way your next submission should be quite shorter and easy to manage.
+
+Cheers.
+
 -- 
-2.4.3
+Robert
