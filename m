@@ -1,49 +1,32 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Mon, 12 Oct 2015 08:28:01 -0700
-Subject: [PATCH] scsi: advansys needs ISA dma api for ISA support
-In-Reply-To: <5081546.QjQ32dGX2L@wuerfel>
-References: <5081546.QjQ32dGX2L@wuerfel>
-Message-ID: <1444663681.2205.14.camel@HansenPartnership.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 12 Oct 2015 16:30:02 +0100
+Subject: [PATCH v4 0/3] arm64: EFI stub isolation
+In-Reply-To: <20151010224051.GK2723@codeblueprint.co.uk>
+References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20151010224051.GK2723@codeblueprint.co.uk>
+Message-ID: <20151012153002.GC6320@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-10-12 at 17:10 +0200, Arnd Bergmann wrote:
-> The advansys drvier uses the request_dma function that is used on ISA
-> machines for the internal DMA controller, which causes build errors
-> on platforms that have ISA slots but do not provide the ISA DMA API:
+On Sat, Oct 10, 2015 at 11:40:51PM +0100, Matt Fleming wrote:
+> On Thu, 08 Oct, at 08:02:01PM, Ard Biesheuvel wrote:
+> > We need to ensure that the EFI stub only uses parts of the kernel proper
+> > that are safe to use when the kernel virtual mapping is not active yet.
+> > 
+> > So move all C code dependencies to the libstub, which is built with all
+> > instrumentation (gcov, kasan) disabled, and do a verification pass to
+> > ensure that no absolute relocations are used.
+> > 
+> > On the arm64 side, annotate all the stub's dependencies as safe for PI
+> > (position independent
+> > 
+> > @Matt: if you are OK with these, may we please have your ack on patches #1 and
+> > #2 so that Catalin can pick up the series? Thanks.
 > 
-> drivers/scsi/advansys.c: In function 'advansys_board_found':
-> drivers/scsi/advansys.c:11300:10: error: implicit declaration of function 'request_dma' [-Werror=implicit-function-declaration]
-> 
-> The problem now showed up in ARM randconfig builds after commit
-> 6571fb3f8b7f ("advansys: Update to version 3.5 and remove compilation
-> warning") made it possible to build on platforms that have neither
-> VIRT_TO_BUS nor ISA_DMA_API but that do have ISA.
-> 
-> This adds the missing dependency.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/drivers/scsi/Kconfig b/drivers/scsi/Kconfig
-> index d2f480b04a52..d4aa6a1a806c 100644
-> --- a/drivers/scsi/Kconfig
-> +++ b/drivers/scsi/Kconfig
-> @@ -499,6 +499,7 @@ config SCSI_ADVANSYS
->  	tristate "AdvanSys SCSI support"
->  	depends on SCSI
->  	depends on ISA || EISA || PCI
-> +	depends on ISA_DMA_API || !ISA
->  	help
->  	  This is a driver for all SCSI host adapters manufactured by
->  	  AdvanSys. It is documented in the kernel source in
+> I assumed you meant PATCH 1 and PATCH 3. If so, yeah, these look fine
+> to be taken through Catalin's tree.
 
-This fix looks wrong.  the request_dma code is confined within an #ifdef
-CONFIG_ISA section but the advansys doesn't actually require an ISA DMA
-channel to function, so you're saying there are systems with ISA but
-without request_dma()?
+Thanks for the review. Patches queued for 4.4.
 
-If so I think we leave the depends alone and try to bring the board up
-in NO_ISA_DMA mode.  That means the narrowboard check should be gated by
-CONFIG_ISA_DMA_API ... do we also have to gate free_dma as well?
-
-James
+-- 
+Catalin
