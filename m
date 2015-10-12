@@ -1,95 +1,41 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Mon, 12 Oct 2015 17:48:20 +0530
-Subject: [PATCH] arm: dts: Fix audio card detection on peach boards
-In-Reply-To: <561B578E.1050308@samsung.com>
-References: <1444631169-19468-1-git-send-email-alim.akhtar@samsung.com>
- <561B578E.1050308@samsung.com>
-Message-ID: <561BA50C.6020602@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Oct 2015 14:36:29 +0200
+Subject: [PATCH v2] PCI: layerscape: Add PCIe support for LS1043a and
+ LS2080a
+In-Reply-To: <20151007175725.GC27633@localhost>
+References: <1442481219-28299-1-git-send-email-Minghuan.Lian@freescale.com>
+ <20151007175725.GC27633@localhost>
+Message-ID: <5274293.94FcFfK0fd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kezysztof
-Thanks for your review.
+On Wednesday 07 October 2015 12:57:25 Bjorn Helgaas wrote:
+> > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> > index ae873be..38fe8a8 100644
+> > --- a/drivers/pci/host/Kconfig
+> > +++ b/drivers/pci/host/Kconfig
+> > @@ -105,7 +105,7 @@ config PCI_XGENE_MSI
+> >  
+> >  config PCI_LAYERSCAPE
+> >       bool "Freescale Layerscape PCIe controller"
+> > -     depends on OF && ARM
+> > +     depends on OF && (ARM || ARM64)
+> 
+> It seems like there are a couple things going on here, and I wonder if
+> you can split them out into separate patches.
+> 
+> 1) Making this work on ARM64 as well as on ARM.  This may be of
+> interest for other DesignWare-based drivers, so if you split this out,
+> maybe it would be a useful template for converting the other drivers,
+> too.
 
-On 10/12/2015 12:17 PM, Krzysztof Kozlowski wrote:
-> On 12.10.2015 15:26, Alim Akhtar wrote:
->> Since the merge of 2fad972 ("ARM: dts: Add mclk entry for Peach boards"),
->
-> Please switch to longer SHA abbreviation:
-> $ git config core.abbrev 12
->
-ok, will do thanks
->> sound card detection is broken on peach boards and gives below errors:
->>
->> [    3.630457] max98090 7-0010: MAX98091 REVID=0x51
->> [    3.634233] max98090 7-0010: use default 2.8v micbias
->> [    3.640985] snow-audio sound: HiFi <-> 3830000.i2s mapping ok
->> [    3.645307] max98090 7-0010: Invalid master clock frequency
->> [    3.650824] snow-audio sound: ASoC: Peach-Pi-I2S-MAX98091 late_probe() failed: -22
->> [    3.658914] snow-audio sound: snd_soc_register_card failed (-22)
->> [    3.664366] snow-audio: probe of sound failed with error -22
->>
->> This patch adds missing assigned-clocks and assigned-clock-parents for
->> pmu_system_controller node which is used as "mclk" for audio codec.
->>
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->> Fixes: 2fad972 ("ARM: dts: Add mclk entry for Peach boards")
->> Cc: <stable@vger.kernel.org>
->> ---
->>   arch/arm/boot/dts/exynos5420-peach-pit.dts |    5 +++++
->>   arch/arm/boot/dts/exynos5800-peach-pi.dts  |    5 +++++
->>   2 files changed, 10 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> index 8f4d76c..525a93a 100644
->> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> @@ -1056,5 +1056,10 @@
->>   	timeout-sec = <32>;
->>   };
->>
->> +&pmu_system_controller {
->
-> Please put the node in alphabetical order.
->
-ok
->> +	assigned-clocks = <&pmu_system_controller 0>;
->> +	assigned-clock-parents =  <&clock CLK_FIN_PLL>;
->
-> I might be missing something here but isn't the first clock of
-> pmu_system_controller already a CLK_FIN_PLL? So you are reparenting the
-> FIN_PLL to FIN_PLL?
->
-> In the same time there is doubled space character after '='.
->
-will remove
+The Kconfig change apparently made it into linux-next now, but it
+doesn't actually build on arm64, because the dependency that was
+mentioned in the cover letter [0] is not there.
 
->> +};
->> +
->>   #include "cros-ec-keyboard.dtsi"
->>   #include "cros-adc-thermistors.dtsi"
->> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> index 7d5b386..411de8f 100644
->> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> @@ -1019,5 +1019,10 @@
->>   	timeout-sec = <32>;
->>   };
->>
->> +&pmu_system_controller {
->> +	assigned-clocks = <&pmu_system_controller 0>;
->> +	assigned-clock-parents =  <&clock CLK_FIN_PLL>;
->
-> Ditto.
->
-> Best regards,
-> Krzysztof
->
->
->> +};
->> +
->>   #include "cros-ec-keyboard.dtsi"
->>   #include "cros-adc-thermistors.dtsi"
->>
->
->
+	Arnd
+
+
+[0] This patch is based on v4.3-rc1 and [PATCH v9 0/6]
+PCI: hisi: Add PCIe host support for HiSilicon SoC Hip05
+patchset from Zhou Wang.
