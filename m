@@ -1,37 +1,21 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 12 Oct 2015 11:27:30 +0200
-Subject: [PATCH v2 2/5] ARM: dts: sunxi: Add dtsi for AXP22x PMIC
-In-Reply-To: <1444488540-11263-3-git-send-email-wens@csie.org>
-References: <1444488540-11263-1-git-send-email-wens@csie.org>
- <1444488540-11263-3-git-send-email-wens@csie.org>
-Message-ID: <20151012092730.GY2278@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Oct 2015 11:27:42 +0200
+Subject: [PATCH] ARM:mm: fix kmap_atomic_to_page
+In-Reply-To: <561B457F.5090104@lge.com>
+References: <1444129773-12632-1-git-send-email-chanho.min@lge.com>
+ <20151007090121.GC21513@n2100.arm.linux.org.uk> <561B457F.5090104@lge.com>
+Message-ID: <5778996.I0Vmityi0g@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 10, 2015 at 10:48:57PM +0800, Chen-Yu Tsai wrote:
-> The AXP22x family of PMIC is used with some Allwinner SoCs. This
-> includes the AXP221, AXP221s and AXP223. They differ in the host
-> interface, maximum supply current for DCDC1 regulator, and default
-> voltage and state for various LDO regulators. Also, the AXP221s
-> does not support fine calibration of the battery fuel gauge.
-> 
-> This patch adds a dtsi file for all the common bindings for these
-> PMICs. Currently this is just listing all the regulator nodes. The
-> regulators are initialized based on their device node names.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Monday 12 October 2015 14:30:39 Jongsung Kim wrote:
+> We tried to utilize a HW compressor as a zram backend. Current zram uses
+> kmap_atomic to map a page, and the HW DMAes. So we needed to use
+> kmap_atomic_to_page to get the page to be dma-mapped.
 
-Applied, thanks!
-Maxime
+How about changing the zcomp code to pass the page pointer instead of
+the kernel space pointer? That would avoid having to do the kmap_atomic,
+which can itself be expensive on 32-bit machines and should not
+be needed here if you have a HW DMA engine doing the compression.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151012/2797d1d1/attachment.sig>
+	Arnd
