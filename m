@@ -1,54 +1,47 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Tue, 13 Oct 2015 02:54:02 +0300
-Subject: [PATCH 2/5] arm: dts: lpc32xx: fix improper usage of ranges property
+Date: Tue, 13 Oct 2015 02:54:05 +0300
+Subject: [PATCH 5/5] arm: dts: lpc32xx: add device node for the second pwm
+ controller
 In-Reply-To: <1444694045-22000-1-git-send-email-vz@mleia.com>
 References: <1444694045-22000-1-git-send-email-vz@mleia.com>
-Message-ID: <1444694045-22000-3-git-send-email-vz@mleia.com>
+Message-ID: <1444694045-22000-6-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change corrects invalid custom translations to 1:1 translations,
-otherwise during initialization there are too many failed attempts to
-translate addresses from subnodes, which anyway result in fallback 1:1
-translations, also it is found that due to this problem proper usage
-of ranges property in subnodes (e.g. for defining flash partitions)
-can not be done.
+LPC32xx SoCs have two independent PWM controllers, they have different
+clock parents, clock gates and even slightly different controls,
+each of these two PWM controllers has one output channel. Due to
+almost similar controls arranged in a row it is incorrectly assumed
+that there is one PWM controller with two channels, fix this problem
+in lpc32xx.dtsi, which at the moment prevents separate configuration
+of different clock parents and gates for both PWM controllers.
 
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- arch/arm/boot/dts/lpc32xx.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/lpc32xx.dtsi | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-index f35e982..3ef804c 100644
+index 929458d..f4d2a0e 100644
 --- a/arch/arm/boot/dts/lpc32xx.dtsi
 +++ b/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -31,7 +31,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		compatible = "simple-bus";
--		ranges = <0x20000000 0x20000000 0x30000000>;
-+		ranges;
+@@ -286,9 +286,15 @@
+ 				status = "disabled";
+ 			};
  
- 		/*
- 		 * Enable either SLC or MLC
-@@ -89,7 +89,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			compatible = "simple-bus";
--			ranges = <0x20000000 0x20000000 0x30000000>;
-+			ranges;
- 
- 			ssp0: ssp at 20084000 {
- 				compatible = "arm,pl022", "arm,primecell";
-@@ -207,7 +207,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			compatible = "simple-bus";
--			ranges = <0x20000000 0x20000000 0x30000000>;
-+			ranges;
- 
- 			/*
- 			 * MIC Interrupt controller includes:
+-			pwm: pwm at 4005C000 {
++			pwm1: pwm at 4005C000 {
+ 				compatible = "nxp,lpc3220-pwm";
+-				reg = <0x4005C000 0x8>;
++				reg = <0x4005C000 0x4>;
++				status = "disabled";
++			};
++
++			pwm2: pwm at 4005C004 {
++				compatible = "nxp,lpc3220-pwm";
++				reg = <0x4005C004 0x4>;
+ 				status = "disabled";
+ 			};
+ 		};
 -- 
 2.1.4
