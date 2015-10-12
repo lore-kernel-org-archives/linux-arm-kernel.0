@@ -1,31 +1,56 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 12 Oct 2015 21:45:41 +0800
-Subject: [GIT PULL] ARM: imx: fixes for 4.3, 2nd round
-Message-ID: <20151012134541.GA18611@tiger>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Oct 2015 15:46:08 +0200
+Subject: [PATCH] pxa: remove incorrect __init annotation on pxa27x_set_pwrmode
+In-Reply-To: <5287252.pkh9x0t1Y6@wuerfel>
+References: <5287252.pkh9x0t1Y6@wuerfel>
+Message-ID: <11408970.yetkS1BjHr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 0af822110871400908d5b6f83a8908c45f881d8f:
+The z2 machine calls pxa27x_set_pwrmode() in order to power off
+the machine, but this function gets discarded early at boot because
+it is marked __init, as pointed out by kbuild:
 
-  ARM: dts: fix usb pin control for imx-rex dts (2015-09-24 05:13:40 -0700)
+WARNING: vmlinux.o(.text+0x145c4): Section mismatch in reference from the function z2_power_off() to the function .init.text:pxa27x_set_pwrmode()
+The function z2_power_off() references
+the function __init pxa27x_set_pwrmode().
+This is often because z2_power_off lacks a __init
+annotation or the annotation of pxa27x_set_pwrmode is wrong.
 
-are available in the git repository at:
+This removes the __init section modifier to fix rebooting and the
+build error.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.3-2
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: ba4a90a6d86a ("ARM: pxa/z2: fix building error of pxa27x_cpu_suspend() no longer available")
+---
+This is a fix for an old bug, I'd just put it into 4.4
 
-for you to fetch changes up to 178b2d09afc05a46f68b190c6594f3a429bc2385:
+It showed up now because section mismatches now produce errors instead
+of warnings.
 
-  ARM: dts: imx7d: Fix UART2 base address (2015-09-30 09:48:21 +0800)
-
-----------------------------------------------------------------
-The i.MX fixes for 4.3, 2nd round:
-
-It includes a single fix for i.MX7D, which corrects the base address of
-UART2 in device tree.
-
-----------------------------------------------------------------
-Fabio Estevam (1):
-      ARM: dts: imx7d: Fix UART2 base address
-
- arch/arm/boot/dts/imx7d.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index 885d83cfa522..3d5335f2bbe0 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -84,7 +84,7 @@ EXPORT_SYMBOL_GPL(pxa27x_configure_ac97reset);
+  */
+ static unsigned int pwrmode = PWRMODE_SLEEP;
+ 
+-int __init pxa27x_set_pwrmode(unsigned int mode)
++int pxa27x_set_pwrmode(unsigned int mode)
+ {
+ 	switch (mode) {
+ 	case PWRMODE_SLEEP:
+diff --git a/arch/arm/mach-pxa/pxa27x.h b/arch/arm/mach-pxa/pxa27x.h
+index d064e0a9f2ce..075131d83eab 100644
+--- a/arch/arm/mach-pxa/pxa27x.h
++++ b/arch/arm/mach-pxa/pxa27x.h
+@@ -19,7 +19,7 @@
+ #define ARB_CORE_PARK		(1<<24)	   /* Be parked with core when idle */
+ #define ARB_LOCK_FLAG		(1<<23)	   /* Only Locking masters gain access to the bus */
+ 
+-extern int __init pxa27x_set_pwrmode(unsigned int mode);
++extern int pxa27x_set_pwrmode(unsigned int mode);
+ extern void pxa27x_cpu_pm_enter(suspend_state_t state);
+ 
+ #endif /* __MACH_PXA27x_H */
