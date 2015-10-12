@@ -1,142 +1,86 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 12 Oct 2015 16:23:24 +0200
-Subject: [PATCH 2/2] arm: mvebu: reorder nodes under internal-regs by
- address in RN2120 .dts file
-In-Reply-To: <277de75473af2431849a7494ae65b57dbc9a8309.1444428035.git.arno@natisbad.org>
-References: <cover.1444428035.git.arno@natisbad.org>
- <277de75473af2431849a7494ae65b57dbc9a8309.1444428035.git.arno@natisbad.org>
-Message-ID: <20151012142324.GB30801@lunn.ch>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 12 Oct 2015 16:28:37 +0200
+Subject: [PATCH v2 00/14] ARM: at91: PMC driver rework
+Message-ID: <1444660131-14954-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 10, 2015 at 12:10:39AM +0200, Arnaud Ebalard wrote:
-> 
-> This cosmetic patch reorder nodes under internal-regs by increasing
-> address order, as epxected.
+Hi,
 
-expected.
+This patch set is a cleanup that properly separate drivers needing to access the
+PMC (PM and USB) from the clock driver by exposing the PMC as a syscon.
 
-Gregory, can you fix that as you commit?
+This also allows to implement a fix for preempt-rt. Currently, at91 platform are
+crashing when using preempt-rt because the irq handler are transformed in
+threaded irq handler but at the time the pmc registers its clocks, it is not
+possible to creat threads, leading to a NULL pointer dereference in the kernel.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+The new infrastructure uses polling until it is late enough to register threaded
+irqs.
 
-	  Andrew
 
-> 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> ---
->  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 86 +++++++++++++-------------
->  1 file changed, 43 insertions(+), 43 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-> index 85b2f87c0b8a..d72a69d97ba2 100644
-> --- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-> +++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-> @@ -94,54 +94,11 @@
->  				status = "disabled";
->  			};
->  
-> -			/* Two rear eSATA ports */
-> -			sata at a0000 {
-> -				nr-ports = <2>;
-> -				status = "okay";
-> -			};
-> -
-> -			serial at 12000 {
-> -				status = "okay";
-> -			};
-> -
-> -			mdio {
-> -				phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
-> -					reg = <0>;
-> -				};
-> -
-> -				phy1: ethernet-phy at 1 { /* Marvell 88E1318 */
-> -					reg = <1>;
-> -				};
-> -			};
-> -
-> -			ethernet at 70000 {
-> -				status = "okay";
-> -				phy = <&phy0>;
-> -				phy-mode = "rgmii-id";
-> -			};
-> -
-> -			ethernet at 74000 {
-> -				status = "okay";
-> -				phy = <&phy1>;
-> -				phy-mode = "rgmii-id";
-> -			};
-> -
-> -			/* Front USB 2.0 port */
-> -			usb at 50000 {
-> -				status = "okay";
-> -			};
-> -
->  			i2c at 11000 {
->  				compatible = "marvell,mv64xxx-i2c";
->  				clock-frequency = <400000>;
->  				status = "okay";
->  
-> -				isl12057: isl12057 at 68 {
-> -					compatible = "isil,isl12057";
-> -					reg = <0x68>;
-> -					isil,irq2-can-wakeup-machine;
-> -				};
-> -
->  				/* Controller for rear fan #1 of 3 (Protechnic
->  				 * MGT4012XB-O20, 8000RPM) near eSATA port */
->  				g762_fan1: g762 at 3e {
-> @@ -178,6 +135,49 @@
->  					compatible = "gmt,g751";
->  					reg = <0x4c>;
->  				};
-> +
-> +				isl12057: isl12057 at 68 {
-> +					compatible = "isil,isl12057";
-> +					reg = <0x68>;
-> +					isil,irq2-can-wakeup-machine;
-> +				};
-> +			};
-> +
-> +			serial at 12000 {
-> +				status = "okay";
-> +			};
-> +
-> +			/* Front USB 2.0 port */
-> +			usb at 50000 {
-> +				status = "okay";
-> +			};
-> +
-> +			mdio {
-> +				phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
-> +					reg = <0>;
-> +				};
-> +
-> +				phy1: ethernet-phy at 1 { /* Marvell 88E1318 */
-> +					reg = <1>;
-> +				};
-> +			};
-> +
-> +			ethernet at 70000 {
-> +				status = "okay";
-> +				phy = <&phy0>;
-> +				phy-mode = "rgmii-id";
-> +			};
-> +
-> +			ethernet at 74000 {
-> +				status = "okay";
-> +				phy = <&phy1>;
-> +				phy-mode = "rgmii-id";
-> +			};
-> +
-> +			/* Two rear eSATA ports */
-> +			sata at a0000 {
-> +				nr-ports = <2>;
-> +				status = "okay";
->  			};
->  
->  			nand at d0000 {
-> -- 
-> 2.5.3
-> 
+Changes in v2:
+ - added Felipe's ack
+ - dropped the first two patches as they are already in clk-next
+ - reworked struct clk_main as suggested by Boris
+ - changed the commit descritpion for "clk: at91: only disable available IRQs"
+   as suggested by Ludovic
+ - added Stephen's ack on patch 2
+
+Alexandre Belloni (11):
+  ARM: at91/dt: use syscon for PMC
+  clk: at91: clk-main: factorize irq handling
+  clk: at91: make IRQ optional and register them later
+  clk: at91: pmc: merge at91_pmc_init in atmel_pmc_probe
+  clk: at91: pmc: move pmc structures to C file
+  ARM: at91: pm: simply call at91_pm_init
+  ARM: at91: pm: find and remap the pmc
+  ARM: at91: pm: move idle functions to pm.c
+  ARM: at91: remove useless includes and function prototypes
+  usb: gadget: atmel: access the PMC using regmap
+  clk: at91: pmc: drop at91_pmc_base
+
+Boris Brezillon (3):
+  clk: at91: make use of syscon to share PMC registers in several
+    drivers
+  clk: at91: make use of syscon/regmap internally
+  clk: at91: only disable available IRQs
+
+ arch/arm/boot/dts/at91rm9200.dtsi       |   2 +-
+ arch/arm/boot/dts/at91sam9260.dtsi      |   2 +-
+ arch/arm/boot/dts/at91sam9261.dtsi      |   2 +-
+ arch/arm/boot/dts/at91sam9263.dtsi      |   2 +-
+ arch/arm/boot/dts/at91sam9g45.dtsi      |   2 +-
+ arch/arm/boot/dts/at91sam9n12.dtsi      |   2 +-
+ arch/arm/boot/dts/at91sam9rl.dtsi       |   2 +-
+ arch/arm/boot/dts/at91sam9x5.dtsi       |   2 +-
+ arch/arm/boot/dts/sama5d2.dtsi          |   2 +-
+ arch/arm/boot/dts/sama5d3.dtsi          |   2 +-
+ arch/arm/boot/dts/sama5d4.dtsi          |   2 +-
+ arch/arm/mach-at91/Kconfig              |   1 +
+ arch/arm/mach-at91/at91rm9200.c         |   2 -
+ arch/arm/mach-at91/at91sam9.c           |   2 -
+ arch/arm/mach-at91/generic.h            |  13 +-
+ arch/arm/mach-at91/pm.c                 |  69 ++++-
+ arch/arm/mach-at91/sama5.c              |   2 +-
+ drivers/clk/at91/clk-h32mx.c            |  33 ++-
+ drivers/clk/at91/clk-main.c             | 430 ++++++++++++++++++--------------
+ drivers/clk/at91/clk-master.c           | 134 ++++++----
+ drivers/clk/at91/clk-peripheral.c       | 131 ++++++----
+ drivers/clk/at91/clk-pll.c              | 190 +++++++++-----
+ drivers/clk/at91/clk-plldiv.c           |  42 ++--
+ drivers/clk/at91/clk-programmable.c     |  92 ++++---
+ drivers/clk/at91/clk-slow.c             |  27 +-
+ drivers/clk/at91/clk-smd.c              |  54 ++--
+ drivers/clk/at91/clk-system.c           | 129 +++++++---
+ drivers/clk/at91/clk-usb.c              | 121 +++++----
+ drivers/clk/at91/clk-utmi.c             | 116 ++++++---
+ drivers/clk/at91/pmc.c                  | 300 +++++-----------------
+ drivers/clk/at91/pmc.h                  |  93 +------
+ drivers/usb/gadget/udc/atmel_usba_udc.c |  20 +-
+ drivers/usb/gadget/udc/atmel_usba_udc.h |   2 +
+ include/linux/clk/at91_pmc.h            |  12 -
+ 34 files changed, 1069 insertions(+), 968 deletions(-)
+
+-- 
+2.1.4
