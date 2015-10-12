@@ -1,98 +1,170 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Mon, 12 Oct 2015 18:13:38 +0200
-Subject: Regression: at24 eeprom writing
-In-Reply-To: <561BCE33.2050904@lysator.liu.se>
-References: <560F0DB1.2020101@lysator.liu.se>
- <561238A9.1060406@lysator.liu.se> <20151005150032.GA12137@odux.rfo.atmel.com>
- <561292AC.8060408@lysator.liu.se> <561BCE33.2050904@lysator.liu.se>
-Message-ID: <561BDC32.2080401@atmel.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 12 Oct 2015 18:18:41 +0200
+Subject: [PATCH v6 10/17] phy: Add driver for rockchip Display Port PHY
+In-Reply-To: <561BCB97.3030201@ti.com>
+References: <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
+ <1444492559-27181-1-git-send-email-ykk@rock-chips.com>
+ <561BCB97.3030201@ti.com>
+Message-ID: <3399683.FyIv57FCEM@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/10/2015 17:13, Peter Rosin a ?crit :
-> On 2015-10-05 17:09, Peter Rosin wrote:
->> But what trouble does the i2c bus driver see? Admittedly I only
->> have a simple logic level bus viewer, and not a full-blown
->> oscilloscope, so there might be something analogue going on?
->> I don't think so though, those signals looked fine last time we
->> looked (but we obviously didn't have these issues then, and
->> didn't really look that closely). I'll see if I can recheck
->> with a real scope too.
+Am Montag, 12. Oktober 2015, 20:32:47 schrieb Kishon Vijay Abraham I:
+> Hi,
 > 
-> We redid the tests with a real scope, and the signal looks nice
-> and square, so it is not that.
+> On Saturday 10 October 2015 09:25 PM, Yakir Yang wrote:
+> > This phy driver would control the Rockchip DisplayPort module
+> > phy clock and phy power, it is relate to analogix_dp-rockchip
+> > dp driver. If you want DP works rightly on rockchip platform,
+> > then you should select both of them.
 > 
-> Speculating further on the cause of the long ACKs, I think that
-> the i2c driver gets confused by an interrupt that marks the
-> transfer complete, and thinks it's a NACK interrupt instead. Is that
-> plausible?
+> Add phy driver for the Rockchip DisplayPort PHY module. This is required
+> to get DisplayPort working in Rockchip SoCs.
 > 
-> If the peripheral unit is such that it generates a stop automatically
-> on NACKs, then this makes perfect sense. I.e. the TWI sees that the
-> transfer is complete, generates an interrupt, and waits for further
-> data or a stop command. Meanwhile the driver thinks it's a NACK and
-> that a stop condition has already been sent to the bus, and just
-> notifies the i2c consumer (the eeprom driver in this case) of the
-> failure and frees up the bus for any future user.
+> > Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> > ---
+> > Changes in v6: None
+> > Changes in v5:
+> > - Remove "reg" DT property, cause driver could poweron/poweroff phy via
+> > 
+> >   the exist "grf" syscon already. And rename the example DT node from
+> >   "edp_phy: phy at ff770274" to "edp_phy: edp-phy" directly. (Heiko)
+> > 
+> > - Add deivce_node at the front of driver, update phy_ops type from "static
+> > 
+> >   struct" to "static const struct". And correct the input paramters of
+> >   devm_phy_create() interfaces. (Heiko)
+> > 
+> > Changes in v4:
+> > - Add commit message, and remove the redundant rockchip_dp_phy_init()
+> > 
+> >   function, move those code to probe() method. And remove driver .owner
+> >   number. (Kishon)
+> > 
+> > Changes in v3:
+> > - Suggest, add rockchip dp phy driver, collect the phy clocks and
+> > 
+> >   power control. (Heiko)
+> > 
+> > Changes in v2: None
+> > 
+> >  drivers/phy/Kconfig           |   7 ++
+> >  drivers/phy/Makefile          |   1 +
+> >  drivers/phy/phy-rockchip-dp.c | 151
+> >  ++++++++++++++++++++++++++++++++++++++++++ 3 files changed, 159
+> >  insertions(+)
+> >  create mode 100644 drivers/phy/phy-rockchip-dp.c
+> > 
+> > diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> > index 47da573..8f2bc4f 100644
+> > --- a/drivers/phy/Kconfig
+> > +++ b/drivers/phy/Kconfig
+> > @@ -310,6 +310,13 @@ config PHY_ROCKCHIP_USB
+> > 
+> >  	help
+> >  	
+> >  	  Enable this to support the Rockchip USB 2.0 PHY.
+> > 
+> > +config PHY_ROCKCHIP_DP
+> > +	tristate "Rockchip Display Port PHY Driver"
+> > +	depends on ARCH_ROCKCHIP && OF
+> > +	select GENERIC_PHY
+> > +	help
+> > +	  Enable this to support the Rockchip Display Port PHY.
+> > +
+> > 
+> >  config PHY_ST_SPEAR1310_MIPHY
+> >  
+> >  	tristate "ST SPEAR1310-MIPHY driver"
+> >  	select GENERIC_PHY
+> > 
+> > diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> > index a5b18c1..e281f35 100644
+> > --- a/drivers/phy/Makefile
+> > +++ b/drivers/phy/Makefile
+> > @@ -34,6 +34,7 @@ phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)	+=
+> > phy-s5pv210-usb2.o> 
+> >  obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
+> >  obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)	+= phy-qcom-apq8064-sata.o
+> >  obj-$(CONFIG_PHY_ROCKCHIP_USB) += phy-rockchip-usb.o
+> > 
+> > +obj-$(CONFIG_PHY_ROCKCHIP_DP)		+= phy-rockchip-dp.o
+> > 
+> >  obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
+> >  obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
+> >  obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
+> > 
+> > diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
+> > new file mode 100644
+> > index 0000000..3a2ac120
+> > --- /dev/null
+> > +++ b/drivers/phy/phy-rockchip-dp.c
+> > @@ -0,0 +1,151 @@
+> > +/*
+> > + * Rockchip DP PHY driver
+> > + *
+> > + * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
+> > + * Author: Yakir Yang <ykk@@rock-chips.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License.
+> > + */
+> > +
+> > +#include <linux/io.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/phy/phy.h>
+> > +#include <linux/regmap.h>
+> > +#include <linux/mfd/syscon.h>
+> > +#include <linux/platform_device.h>
+> > +
+> > +#define GRF_SOC_CON12                   0x0274
+> > +#define GRF_EDP_REF_CLK_SEL_INTER	BIT(4)
+> > +#define GRF_EDP_PHY_SIDDQ_WRITE_EN      BIT(21)
+> > +#define GRF_EDP_PHY_SIDDQ_ON            0
+> > +#define GRF_EDP_PHY_SIDDQ_OFF           BIT(5)
+> > +
+> > +struct rockchip_dp_phy {
+> > +	struct device  *dev;
+> > +	struct regmap  *grf;
+> > +	struct clk     *phy_24m;
+> > +};
+> > +
+> > +static int rockchip_set_phy_state(struct phy *phy, bool enable)
+> > +{
+> > +	struct rockchip_dp_phy *dp = phy_get_drvdata(phy);
+> > +	int ret;
+> > +
+> > +	if (enable) {
+> > +		ret = clk_prepare_enable(dp->phy_24m);
+> > +		if (ret < 0) {
+> > +			dev_err(dp->dev, "Can't enable clock 24m %d\n", ret);
+> > +			return ret;
+> > +		}
+> > +
+> > +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
+> > +				   GRF_EDP_PHY_SIDDQ_WRITE_EN |
+> > +				   GRF_EDP_PHY_SIDDQ_ON);
+> > +	} else {
+> > +		clk_disable_unprepare(dp->phy_24m);
 > 
-> This also matches what I see when I turn on some more traffic on the
-> bus, that is interleaved with the eeprom traffic. AFAICT, it can be
-> any command that gets chewed up by the eeprom if it is sent to the
-> i2c driver during the long ACK.
+> should clk_disable come after regmap_write? It'll be symmetric to enable?
 > 
-> Are you Atmel people making any progress on this data corrupting
-> regression? Is there anything else I can do to help?
+> > +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
+> > +				   GRF_EDP_PHY_SIDDQ_WRITE_EN |
+> > +				   GRF_EDP_PHY_SIDDQ_OFF);
 > 
-> Cheers,
-> Peter
-> 
+> Is this syscon register used only by Display Port PHY? Better to use
+> regmap_update API?
 
-Hi Peter,
+Rockchip's GRF syscon registers use what gets called "Hiword-mask", so when 
+writing you actually need to set the write-enable bit (x+16, like 
+GRF_EDP_PHY_SIDDQ_WRITE_EN here) if you want to set bit x. No other bits get 
+affected by this.
 
-I have sent a patch to Ludovic for a first internal review before publishing to
-mainline. The patch should fix your issue since it fixes it on my sama5d36ek
-board with an at24 eeprom.
 
-More details on the reason of this bug would be provided in both the commit
-message and comments in the code provided by the reviewed patch but I you want
-an early fix just read the Status Register (AT91_TWI_SR) at the beginning of
-at91_do_twi_transfer(). This read clears the NACK bit in the Status Register.
-Then the following source code can safely enable the NACK interrupt, otherwise
-in some cases a pending NACK interrupt would rise immediately after the line:
-at91_twi_write(dev, AT91_TWI_IER, AT91_TWI_NACK);
-hence breaking the sequence of operations to be done because the interrupt
-handler would call complete() too early so wait_for_completion_timeout()
-also exits too early.
-
-So reading the Status Register at the beginning of at91_do_twi_transfer()
-should be enough to fix the issue.
-
-Another mistake is in the interrupt handler itself, ie atmel_twi_interrupt():
-we should check the TWI_TXRDY status bit before calling
-at91_twi_write_next_byte() only if both the TWI_TXCOMP and TWI_NACK status bits
-are clear. Otherwise, writing a new byte into the THR tells the I2C controller
-to start a new transfer. Then the I2C slave, the at24 eeprom, is likely to
-also reply by a second NACK. Hence the NACK bit is already set into the Status
-Register on the next call of at91_do_twi_transfer().
-This is what I saw on my scope for PIO transfers.
-
-By the way, in my case, the first NACK occurs because the at24 driver tries to
-perform a second write transfer too quickly and the eeprom is not ready yet,
-then replies with a NACK.
-However while debugging, placing debug traces in the I2C controller driver
-changed the timing: this small delay was enough to make the first NACK
-disappear because the eeprom was now ready to process the second write
-operation.
-
-For DMA transfer, you have to know that when NACK error is detected, the I2C
-controller sets the TWI_TXCOMP, TWI_NACK and TWI_TXRDY bits all together in
-the Status Register:
-- The TWI_NACK is cleared by reading the Status Register.
-- The TWI_TXRDY triggers the DMA controller to write the next byte in the THR,
-  which should also tell the I2C controller to start a new transfer.
-- The TWI_TXCOMP bit is cleared by writing into the THR: this is why the
-  interrupt handler may fail to detect NACK if it relies on TWI_TXCOMP.
-
-Best Regards,
-
-Cyrille
+Heiko
