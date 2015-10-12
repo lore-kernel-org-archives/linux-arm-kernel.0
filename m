@@ -1,80 +1,61 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 12 Oct 2015 10:52:12 +0800
-Subject: [PATCH v2 2/5] mmc: sdhci-pxav3: enable usage of DAT3 pin as HW
- card detect
-In-Reply-To: <CAPv3WKcPAieXFBWD9m2LLZLaiUprh83ySB9LCG2DyAq5p-RT=A@mail.gmail.com>
-References: <1444352635-21965-1-git-send-email-mw@semihalf.com>
- <1444352635-21965-3-git-send-email-mw@semihalf.com>
- <20151009201356.78488116@xhacker>
- <CAPv3WKddfCOSCCOSByAEzyZ3qnAX22TFi2acrNDcTgEvy+ioFA@mail.gmail.com>
- <20151010150535.6047dab9@xhacker>
- <CAPv3WKcPAieXFBWD9m2LLZLaiUprh83ySB9LCG2DyAq5p-RT=A@mail.gmail.com>
-Message-ID: <20151012105212.504a4ab1@xhacker>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 12 Oct 2015 11:49:01 +0800
+Subject: [Linaro-acpi] [PATCH v5 0/5] Provide better MADT subtable sanity
+ checks
+In-Reply-To: <561B2442.9050600@erley.org>
+References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
+ <560BA4C9.7090607@huawei.com> <560C0968.6020904@redhat.com>
+ <2808057.teMg2oCLf6@vostro.rjw.lan> <5612AF64.4060900@redhat.com>
+ <561B2442.9050600@erley.org>
+Message-ID: <561B2DAD.5070601@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
+On 10/12/2015 11:08 AM, Pat Erley wrote:
+> On 10/05/2015 10:12 AM, Al Stone wrote:
+>> On 10/05/2015 07:39 AM, Rafael J. Wysocki wrote:
+>>> On Wednesday, September 30, 2015 10:10:16 AM Al Stone wrote:
+>>>> On 09/30/2015 03:00 AM, Hanjun Guo wrote:
+>>>>> On 2015/9/30 7:45, Al Stone wrote:
+>>>>>> NB: this patch set is for use against the linux-pm bleeding edge
+>>>>>> branch.
+>>>>>>
+>>>>
+>>>> [snip...]
+>>>>
+>>>>>
+>>>>> For this patch set,
+>>>>>
+>>>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>>
+>>>>> Thanks
+>>>>> Hanjun
+>>>>
+>>>> Thanks, Hanjun!
+>>>
+>>> Series applied, thanks!
+>>>
+>>> Rafael
+>>>
+>>
+>> Thanks, Rafael!
+>>
+>
+> Just decided to test out linux-next (to see the new nouveau cleanups).
+> This change set prevents my Lenovo W510 from booting properly.
+>
+> Reverting: 7494b0 "ACPI: add in a bad_madt_entry() function to
+> eventually replace the macro"
+>
+> Gets the system booting again.  I'm attaching my dmesg from the failed
+> boot, who wants the acpidump?
 
-On Sat, 10 Oct 2015 14:13:51 +0200
-Marcin Wojtas <mw@semihalf.com> wrote:
+[    0.000000] ACPI: undefined version for either FADT 4.0 or MADT 1
+[    0.000000] ACPI: Error parsing LAPIC address override entry
+[    0.000000] ACPI: Invalid BIOS MADT, disabling ACPI
 
-> Hi Jisheng,
-> 
-> 
-> >>
-> >> >>
-> >> >> When using DAT3-based detection Armada 38x SDIO IP expects its internal
-> >> >> clock to be always on, which had to be ensured twofold:
-> >> >
-> >> > What happen if runtime suspend disables its core clk and axi clk? I guess
-> >> > dat3-based detection isn't compatible with runtime pm. If so, do we also
-> >> > need to disable runtime pm in probe function?
-> >>
-> >> Is runtime resume supposed to be triggered by card detection? Is there
-> >
-> > I think so. Take marvell berlin for example, card insert => gpio interrupt
-> > or => sdhci runtime resume.
-> >
-> >> a way to manually trigger runtime suspend and resume of sdhci? Anyway
-> >
-> > If runtime-pm is builtin and the host driver supports runtime-pm (sdhci-pxav3
-> > supports runtime-pm well), when there's no sdhc transactions, runtime suspend
-> > will be triggered automatically after some time (50ms?)
-> >
-> >> coreclk is not a problem, as it's not used by A38x.
-> >
-> > I checked A38x dts files, it's <&gateclk 17>. So the question is: what will
-> > happen if <&gateclk 17> is disabled in runtime suspend? Is the dat3-based
-> > CD still works? In theory, it should not work any more.
-> >
-> 
-> Actually in pxav3 driver there is one obligatory clock ("io") which
-> can be either named in dts on not (like in armada38x.dtsi). "coreclk"
-> is optional, however all this does not matter, as both are disabled in
+Seems the MADT revision is not right, could you dump the ACPI MADT
+(APIC) table and send it out? I will take a look :)
 
-Hmm, grep the dts, I think commit 8afdc9cca27f ("mmc: sdhci-pxav3: Get optional
-core clock") mainly targets for Marvell Berlin SoCs, but the two clks for sdhci
-in Berlin SoCs are coreclk and axiclk, rather than ioclk and coreclk, during
-which the axiclk is optional. Will cook one patch to fix this.
-
-> runtime_suspend function. I think that when we disable the gate clock,
-> dat3 detection won't work, but I guess that card detection is not the
-> only thing that wakes up the mmc subsystem and make runtime_pm useful.
-
-Card insert is not the only thing can wake up mmc, mmc initiate sdhc
-transactions will also wake up mmc.
-
-Thanks,
-Jisheng
-
-> 
-> I will try to check how it works. If there's problem with detection I
-> propose, in order not to spoil the code too much and not to loose all
-> runtime_pm benefits, to avoid disabling/enabling clock in
-> runtime_suspend/resume functions on a38x working with dat3 detection.
-> In such case sdhci_runtime_suspend/resume would execute without
-> problems and we will be sure that detection will work in such
-> configuration.
-> 
-> Best regards,
-> Marcin
+Thanks
+Hanjun
