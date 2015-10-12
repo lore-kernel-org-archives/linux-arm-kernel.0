@@ -1,56 +1,58 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 12 Oct 2015 15:54:03 +0900
-Subject: [PATCH v7 05/17] drm: bridge: analogix/dp: dynamic parse sync_pol
- & interlace & dynamic_range
-In-Reply-To: <1444624149-16180-1-git-send-email-ykk@rock-chips.com>
-References: <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
- <1444624149-16180-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <561B590B.6090806@samsung.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 12 Oct 2015 09:01:02 +0200
+Subject: [Intel-gfx] [PATCH 09/20] i915: switch from acpi_os_ioremap to
+ memremap
+In-Reply-To: <20151009221625.32203.74117.stgit@dwillia2-desk3.jf.intel.com>
+References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
+ <20151009221625.32203.74117.stgit@dwillia2-desk3.jf.intel.com>
+Message-ID: <20151012070102.GV26718@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.10.2015 13:29, Yakir Yang wrote:
-> Both hsync/vsync polarity and interlace mode can be parsed from
-> drm display mode, and dynamic_range and ycbcr_coeff can be judge
-> by the video code.
+On Fri, Oct 09, 2015 at 06:16:25PM -0400, Dan Williams wrote:
+> i915 expects the OpRegion to be cached (i.e. not __iomem), so explicitly
+> map it with memremap rather than the implied cache setting of
+> acpi_os_ioremap().
 > 
-> But presumably Exynos still relies on the DT properties, so take
-> good use of mode_fixup() in to achieve the compatibility hacks.
-> 
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> ---
-> *just add a note that this is v7 of only fifth patch.*
-> 
-> Changes in v7:
-> - Back to use the of_property_read_bool() interfacs to provoid backward
->   compatibility of "hsync-active-high" "vsync-active-high" "interlaced"
->   to avoid -EOVERFLOW error (Krzysztof)
-> 
-> Changes in v6: None
-> Changes in v5:
-> - Switch video timing type to "u32", so driver could use "of_property_read_u32"
->   to get the backword timing values. Krzysztof suggest me that driver could use
->   the "of_property_read_bool" to get backword timing values, but that interfacs
->   would modify the original drm_display_mode timing directly (whether those
->   properties exists or not).
-> 
-> Changes in v4:
-> - Provide backword compatibility with samsung. (Krzysztof)
-> 
-> Changes in v3:
-> - Dynamic parse video timing info from struct drm_display_mode and
->   struct drm_display_info. (Thierry)
-> 
-> Changes in v2: None
-> 
->  drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 148 +++++++++++++--------
->  drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |   2 +-
->  drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  |  14 +-
->  3 files changed, 103 insertions(+), 61 deletions(-)
-> 
+> Cc: Daniel Vetter <daniel.vetter@intel.com>
+> Cc: Jani Nikula <jani.nikula@linux.intel.com>
+> Cc: intel-gfx at lists.freedesktop.org
+> Cc: David Airlie <airlied@linux.ie>
+> Cc: dri-devel at lists.freedesktop.org
+> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 
-Looks good and backward compatible to me:
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Assuming you've run sparse over this to make sure you've caught them all,
+and with the nit below addressed this is
 
-Best regards,
-Krzysztof
+Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+
+Feel free to pull v2 into whatever tree you think it's suitable for (but
+you can also resend and I'll pick it up).
+
+> diff --git a/drivers/gpu/drm/i915/intel_panel.c b/drivers/gpu/drm/i915/intel_panel.c
+> index e2ab3f6ed022..c8444d5f549f 100644
+> --- a/drivers/gpu/drm/i915/intel_panel.c
+> +++ b/drivers/gpu/drm/i915/intel_panel.c
+> @@ -387,7 +387,7 @@ intel_panel_detect(struct drm_device *dev)
+>  
+>  	/* Assume that the BIOS does not lie through the OpRegion... */
+>  	if (!i915.panel_ignore_lid && dev_priv->opregion.lid_state) {
+> -		return ioread32(dev_priv->opregion.lid_state) & 0x1 ?
+> +		return *(dev_priv->opregion.lid_state) & 0x1 ?
+
+() are redundant now here.
+-Daniel
+
+>  			connector_status_connected :
+>  			connector_status_disconnected;
+>  	}
+> 
+> _______________________________________________
+> Intel-gfx mailing list
+> Intel-gfx at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/intel-gfx
+
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
