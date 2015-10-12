@@ -1,9 +1,10 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 13 Oct 2015 00:12:43 +0300
-Subject: [PATCH 14/37] ARM: dts: imx23-evk: Fix regulator enable GPIO polarity
+Date: Tue, 13 Oct 2015 00:12:44 +0300
+Subject: [PATCH 15/37] ARM: dts: imx23-stmp378x_devb: Fix regulator enable
+ GPIO polarity
 In-Reply-To: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
 References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1444684386-17094-15-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <1444684386-17094-16-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,16 +15,16 @@ starts making use of the flags. Fix it.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- arch/arm/boot/dts/imx23-evk.dts | 3 ++-
+ arch/arm/boot/dts/imx23-stmp378x_devb.dts | 3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Sascha Hauer <kernel@pengutronix.de>
 
-diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
-index 57e29977ba06..b6709ff69ebe 100644
---- a/arch/arm/boot/dts/imx23-evk.dts
-+++ b/arch/arm/boot/dts/imx23-evk.dts
+diff --git a/arch/arm/boot/dts/imx23-stmp378x_devb.dts b/arch/arm/boot/dts/imx23-stmp378x_devb.dts
+index 455169e99d49..928f5556ae7b 100644
+--- a/arch/arm/boot/dts/imx23-stmp378x_devb.dts
++++ b/arch/arm/boot/dts/imx23-stmp378x_devb.dts
 @@ -10,6 +10,7 @@
   */
  
@@ -32,14 +33,14 @@ index 57e29977ba06..b6709ff69ebe 100644
  #include "imx23.dtsi"
  
  / {
-@@ -136,7 +137,7 @@
+@@ -75,7 +76,7 @@
  			regulator-name = "vddio-sd0";
  			regulator-min-microvolt = <3300000>;
  			regulator-max-microvolt = <3300000>;
 -			gpio = <&gpio1 29 0>;
 +			gpio = <&gpio1 29 GPIO_ACTIVE_LOW>;
  		};
- 
- 		reg_lcd_3v3: regulator at 1 {
+ 	};
+ };
 -- 
 2.4.9
