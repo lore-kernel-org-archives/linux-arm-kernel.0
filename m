@@ -1,84 +1,67 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 12 Oct 2015 16:28:50 +0200
-Subject: [PATCH v2 13/14] usb: gadget: atmel: access the PMC using regmap
-In-Reply-To: <1444660131-14954-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1444660131-14954-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1444660131-14954-14-git-send-email-alexandre.belloni@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Oct 2015 15:29:26 +0100
+Subject: [PATCH v2 2/2] ARM64: kernel: PSCI: move PSCI idle management
+ code to drivers/firmware
+In-Reply-To: <1444648628-24790-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1444648628-24790-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1444648628-24790-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20151012142926.GB7452@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use regmap to access the PMC to avoid using at91_pmc_read and
-at91_pmc_write.
+Hi Lorenzo,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
----
- drivers/usb/gadget/udc/atmel_usba_udc.c | 20 ++++++++++----------
- drivers/usb/gadget/udc/atmel_usba_udc.h |  2 ++
- 2 files changed, 12 insertions(+), 10 deletions(-)
+On Mon, Oct 12, 2015 at 12:17:08PM +0100, Lorenzo Pieralisi wrote:
+> ARM64 PSCI kernel interfaces that initialize idle states and implement
+> the suspend API to enter them are generic and can be shared with the
+> ARM architecture.
+> 
+> To achieve that goal, this patch moves ARM64 PSCI idle management
+> code to drivers/firmware by creating a file that contains PSCI
+> helper functions implementing the common kernel interface required
+> by ARM and ARM64 to share the PSCI idle management code.
+> 
+> The ARM generic CPUidle implementation also requires the definition of
+> a cpuidle_ops section entry for the kernel to initialize the CPUidle
+> operations at boot based on the enable-method (ie ARM64 has the
+> statically initialized cpu_ops counterparts for that purpose); therefore
+> this patch also adds the required section entry on CONFIG_ARM for PSCI so
+> that the kernel can initialize the PSCI CPUidle back-end when PSCI is
+> the probed enable-method.
+> 
+> On ARM64 this patch provides no functional change.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>  arch/arm64/kernel/psci.c       |  99 +-----------------------------
+>  drivers/firmware/Makefile      |   2 +-
+>  drivers/firmware/psci_cpuops.c | 133 +++++++++++++++++++++++++++++++++++++++++
 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 3dfada8d6061..40977cd832af 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -17,7 +17,9 @@
- #include <linux/device.h>
- #include <linux/dma-mapping.h>
- #include <linux/list.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/platform_device.h>
-+#include <linux/regmap.h>
- #include <linux/usb/ch9.h>
- #include <linux/usb/gadget.h>
- #include <linux/usb/atmel_usba_udc.h>
-@@ -1888,20 +1890,15 @@ static int atmel_usba_stop(struct usb_gadget *gadget)
- #ifdef CONFIG_OF
- static void at91sam9rl_toggle_bias(struct usba_udc *udc, int is_on)
- {
--	unsigned int uckr = at91_pmc_read(AT91_CKGR_UCKR);
--
--	if (is_on)
--		at91_pmc_write(AT91_CKGR_UCKR, uckr | AT91_PMC_BIASEN);
--	else
--		at91_pmc_write(AT91_CKGR_UCKR, uckr & ~(AT91_PMC_BIASEN));
-+	regmap_update_bits(udc->pmc, AT91_CKGR_UCKR, AT91_PMC_BIASEN,
-+			   is_on ? AT91_PMC_BIASEN : 0);
- }
- 
- static void at91sam9g45_pulse_bias(struct usba_udc *udc)
- {
--	unsigned int uckr = at91_pmc_read(AT91_CKGR_UCKR);
--
--	at91_pmc_write(AT91_CKGR_UCKR, uckr & ~(AT91_PMC_BIASEN));
--	at91_pmc_write(AT91_CKGR_UCKR, uckr | AT91_PMC_BIASEN);
-+	regmap_update_bits(udc->pmc, AT91_CKGR_UCKR, AT91_PMC_BIASEN, 0);
-+	regmap_update_bits(udc->pmc, AT91_CKGR_UCKR, AT91_PMC_BIASEN,
-+			   AT91_PMC_BIASEN);
- }
- 
- static const struct usba_udc_errata at91sam9rl_errata = {
-@@ -1938,6 +1935,9 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
- 		return ERR_PTR(-EINVAL);
- 
- 	udc->errata = match->data;
-+	udc->pmc = syscon_regmap_lookup_by_compatible("atmel,at91sam9g45-pmc");
-+	if (udc->errata && IS_ERR(udc->pmc))
-+		return ERR_CAST(udc->pmc);
- 
- 	udc->num_ep = 0;
- 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.h b/drivers/usb/gadget/udc/atmel_usba_udc.h
-index ea448a344767..3e1c9d589dfa 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.h
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.h
-@@ -354,6 +354,8 @@ struct usba_udc {
- 	struct dentry *debugfs_root;
- 	struct dentry *debugfs_regs;
- #endif
-+
-+	struct regmap *pmc;
- };
- 
- static inline struct usba_ep *to_usba_ep(struct usb_ep *ep)
--- 
-2.1.4
+Do we really need the new file, given most of this lived happily in
+psci.c previously?
+
+> +#ifdef CONFIG_ARM
+> +struct cpuidle_ops psci_cpuidle_ops __initdata = {
+> +	.suspend = psci_cpu_suspend_enter,
+> +	.init = psci_dt_cpu_init_idle,
+> +};
+> +
+> +CPUIDLE_METHOD_OF_DECLARE(psci, "arm,psci", &psci_cpuidle_ops);
+> +#endif
+
+Don't these also need to be guarded for CONFIG_CPU_IDLE?
+
+The definitions of cpuidle_ops and CPUIDLE_METHOD_OF_DECLARE in
+arch/arm/include/asm/cpuidle.h depend on it.
+
+Otherwise this looks fine to me.
+
+Thanks,
+Mark.
