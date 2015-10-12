@@ -1,44 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 12 Oct 2015 16:07:13 +0100
-Subject: [PATCH] ARM64: dts: vexpress: Use a symlink to
- vexpress-v2m-rs1.dtsi from arch=arm
-In-Reply-To: <1444046032-31310-1-git-send-email-ian.campbell@citrix.com>
-References: <1444046032-31310-1-git-send-email-ian.campbell@citrix.com>
-Message-ID: <20151012150713.GB6320@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Oct 2015 17:10:16 +0200
+Subject: [PATCH] scsi: advansys needs ISA dma api for ISA support
+Message-ID: <5081546.QjQ32dGX2L@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 05, 2015 at 12:53:52PM +0100, Ian Campbell wrote:
-> Commit 9ccd608070b6 "arm64: dts: add device tree for ARM SMM-A53x2 on
-> LogicTile Express 20MG" added a new dts file to arch/arm64 which
-> included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
-> .dtsi supplied by arch/arm.
-> 
-> Unfortunately this causes some issues for the split device tree
-> repository[0], since things get moved around there. In that context
-> the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
-> while the include is at src/arm/vexpress-v2m-rs1.dtsi.
-> 
-> The sharing of the .dtsi is legitimate since the baseboard is the same
-> for various vexpress systems whatever processor they use.
-> 
-> Previously I attempted to resolve this by creating a shared location
-> for such things but we have been unable to come to a consensus on
-> where that should be.
-> 
-> Instead this patch simply replaces the use of ../../ in the dts
-> /include/ with a symlink in arch/arm64/boot/dts/arm pointing to the
-> file arch/arm/boot/dts.
-> 
-> Since the split device tree repo will shortly be required to flatten
-> symlinks for other reasons this will cause the dtsi file to appear in
-> both src/arm and src/arm64 in the split repo, which is an improvement
-> on not building for arm64 now.
-> 
-> [0] https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
+The advansys drvier uses the request_dma function that is used on ISA
+machines for the internal DMA controller, which causes build errors
+on platforms that have ISA slots but do not provide the ISA DMA API:
 
-I don't have any objections but these patches usually go in via the
-arm-soc tree.
+drivers/scsi/advansys.c: In function 'advansys_board_found':
+drivers/scsi/advansys.c:11300:10: error: implicit declaration of function 'request_dma' [-Werror=implicit-function-declaration]
 
--- 
-Catalin
+The problem now showed up in ARM randconfig builds after commit
+6571fb3f8b7f ("advansys: Update to version 3.5 and remove compilation
+warning") made it possible to build on platforms that have neither
+VIRT_TO_BUS nor ISA_DMA_API but that do have ISA.
+
+This adds the missing dependency.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/scsi/Kconfig b/drivers/scsi/Kconfig
+index d2f480b04a52..d4aa6a1a806c 100644
+--- a/drivers/scsi/Kconfig
++++ b/drivers/scsi/Kconfig
+@@ -499,6 +499,7 @@ config SCSI_ADVANSYS
+ 	tristate "AdvanSys SCSI support"
+ 	depends on SCSI
+ 	depends on ISA || EISA || PCI
++	depends on ISA_DMA_API || !ISA
+ 	help
+ 	  This is a driver for all SCSI host adapters manufactured by
+ 	  AdvanSys. It is documented in the kernel source in
