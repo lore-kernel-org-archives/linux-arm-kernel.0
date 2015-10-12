@@ -1,10 +1,10 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 13 Oct 2015 00:12:58 +0300
-Subject: [PATCH 29/37] ARM: dts: kirkwood-nsa3x0-common: Fix regulator enable
- GPIO polarity
+Date: Tue, 13 Oct 2015 00:12:59 +0300
+Subject: [PATCH 30/37] ARM: dts: omap3-beagle-xm: Fix regulator enable GPIO
+ polarity
 In-Reply-To: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
 References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1444684386-17094-30-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <1444684386-17094-31-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,26 +15,25 @@ starts making use of the flags. Fix it.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi | 2 +-
+ arch/arm/boot/dts/omap3-beagle-xm.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: linux-omap at vger.kernel.org
+Cc: Benoit Cousson <bcousson@baylibre.com>
+Cc: Tony Lindgren <tony@atomide.com>
 
-diff --git a/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi b/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
-index 2075a2e828f1..c4b17f396e1e 100644
---- a/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
-@@ -110,7 +110,7 @@
- 			regulator-max-microvolt = <5000000>;
- 			regulator-always-on;
- 			regulator-boot-on;
--			gpio = <&gpio0 21 GPIO_ACTIVE_HIGH>;
-+			gpio = <&gpio0 21 GPIO_ACTIVE_LOW>;
- 		};
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index 7c4dca122a91..f44f17673061 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -80,7 +80,7 @@
+ 		regulator-name = "hsusb2_vbus";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+-		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
++		gpio = <&twl_gpio 18 GPIO_ACTIVE_LOW>;	/* GPIO LEDA */
+ 		startup-delay-us = <70000>;
  	};
- };
+ 
 -- 
 2.4.9
