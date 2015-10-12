@@ -1,76 +1,71 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 12 Oct 2015 14:48:29 +0200
-Subject: [PATCH v3 6/7] ARM: dts: rockchip: Add drive/sample clocks for rk3288
- dw_mmc devices
+Date: Mon, 12 Oct 2015 14:48:30 +0200
+Subject: [PATCH v3 7/7] ARM: dts: rockchip: add tuning related settings to
+ veyron devices
 In-Reply-To: <1444654110-32293-1-git-send-email-heiko@sntech.de>
 References: <1444654110-32293-1-git-send-email-heiko@sntech.de>
-Message-ID: <1444654110-32293-7-git-send-email-heiko@sntech.de>
+Message-ID: <1444654110-32293-8-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandru M Stan <amstan@chromium.org>
+This allows the tuning code to run and use higher speeds on capable cards.
 
-The drive/sample clocks can be phase shifted.  The drive clock
-could be used in a future patch to adjust hold times.  The sample
-clock is used for tuning.
-
-Signed-off-by: Alexandru M Stan <amstan@chromium.org>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3288.dtsi | 20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi | 7 ++++++-
+ arch/arm/boot/dts/rk3288-veyron.dtsi       | 6 ++++++
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 27a397f6..37c5a02 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -225,8 +225,9 @@
- 	sdmmc: dwmmc at ff0c0000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
- 		clock-freq-min-max = <400000 150000000>;
--		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>;
--		clock-names = "biu", "ciu";
-+		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>,
-+			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
-+		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
- 		fifo-depth = <0x100>;
- 		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
- 		reg = <0xff0c0000 0x4000>;
-@@ -236,8 +237,9 @@
- 	sdio0: dwmmc at ff0d0000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
- 		clock-freq-min-max = <400000 150000000>;
--		clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>;
--		clock-names = "biu", "ciu";
-+		clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>,
-+			 <&cru SCLK_SDIO0_DRV>, <&cru SCLK_SDIO0_SAMPLE>;
-+		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
- 		fifo-depth = <0x100>;
- 		interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
- 		reg = <0xff0d0000 0x4000>;
-@@ -247,8 +249,9 @@
- 	sdio1: dwmmc at ff0e0000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
- 		clock-freq-min-max = <400000 150000000>;
--		clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>;
--		clock-names = "biu", "ciu";
-+		clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>,
-+			 <&cru SCLK_SDIO1_DRV>, <&cru SCLK_SDIO1_SAMPLE>;
-+		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
- 		fifo-depth = <0x100>;
- 		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
- 		reg = <0xff0e0000 0x4000>;
-@@ -258,8 +261,9 @@
- 	emmc: dwmmc at ff0f0000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
- 		clock-freq-min-max = <400000 150000000>;
--		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
--		clock-names = "biu", "ciu";
-+		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
-+			 <&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
-+		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
- 		fifo-depth = <0x100>;
- 		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
- 		reg = <0xff0f0000 0x4000>;
+diff --git a/arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi b/arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi
+index b5334ec..fec076e 100644
+--- a/arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi
++++ b/arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi
+@@ -90,7 +90,7 @@
+ 	regulators {
+ 		vccio_sd: LDO_REG4 {
+ 			regulator-name = "vccio_sd";
+-			regulator-min-microvolt = <3300000>;
++			regulator-min-microvolt = <1800000>;
+ 			regulator-max-microvolt = <3300000>;
+ 			regulator-state-mem {
+ 				regulator-off-in-suspend;
+@@ -116,7 +116,12 @@
+ 	cap-sd-highspeed;
+ 	card-detect-delay = <200>;
+ 	cd-gpios = <&gpio7 5 GPIO_ACTIVE_LOW>;
++	rockchip,default-sample-phase = <90>;
+ 	num-slots = <1>;
++	sd-uhs-sdr12;
++	sd-uhs-sdr25;
++	sd-uhs-sdr50;
++	sd-uhs-sdr104;
+ 	vmmc-supply = <&vcc33_sd>;
+ 	vqmmc-supply = <&vccio_sd>;
+ };
+diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
+index 6820977..04c3d2a 100644
+--- a/arch/arm/boot/dts/rk3288-veyron.dtsi
++++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
+@@ -196,7 +196,9 @@
+ 	broken-cd;
+ 	bus-width = <8>;
+ 	cap-mmc-highspeed;
++	rockchip,default-sample-phase = <158>;
+ 	disable-wp;
++	mmc-hs200-1_8v;
+ 	mmc-pwrseq = <&emmc_pwrseq>;
+ 	non-removable;
+ 	num-slots = <1>;
+@@ -413,6 +415,10 @@
+ 	num-slots = <1>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sdio0_clk &sdio0_cmd &sdio0_bus4>;
++	sd-uhs-sdr12;
++	sd-uhs-sdr25;
++	sd-uhs-sdr50;
++	sd-uhs-sdr104;
+ 	vmmc-supply = <&vcc33_sys>;
+ 	vqmmc-supply = <&vcc18_wl>;
+ };
 -- 
 2.6.1
