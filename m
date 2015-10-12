@@ -1,45 +1,15 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 12 Oct 2015 16:00:55 +0200
-Subject: [PATCH] crypto: mxs-dcp is an stmp device
-In-Reply-To: <6543300.PJNp8A08gY@wuerfel>
-References: <6543300.PJNp8A08gY@wuerfel>
-Message-ID: <201510121600.55665.marex@denx.de>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 12 Oct 2015 22:01:53 +0800
+Subject: [PATCH V3 0/2] Add SPDIF_GCLK clock in clock tree for imx6
+In-Reply-To: <cover.1444471684.git.shengjiu.wang@freescale.com>
+References: <cover.1444471684.git.shengjiu.wang@freescale.com>
+Message-ID: <20151012140153.GD18611@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, October 12, 2015 at 03:52:34 PM, Arnd Bergmann wrote:
-> The mxs-dcp driver relies on the stmp_reset_block() helper function, which
-> is provided by CONFIG_STMP_DEVICE. This symbol is always set on MXS,
-> but the driver can now also be built for MXC (i.MX6)
+On Sat, Oct 10, 2015 at 06:15:05PM +0800, Shengjiu Wang wrote:
+> Shengjiu Wang (2):
+>   clk: imx6: Add SPDIF_GCLK clock in clock tree
+>   ARM: dts: imx6: change the core clock of spdif
 
-That is correct.
-
-> , which results in a built error if no other driver selects STMP_DEVICE:
-
-Ouch.
-
-> drivers/built-in.o: In function `mxs_dcp_probe':
-> vf610-ocotp.c:(.text+0x3df302): undefined reference to `stmp_reset_block'
-> 
-> This adds the 'select', like all other stmp drivers have it.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: a2712e6c75f ("crypto: mxs-dcp - Allow MXS_DCP to be used on MX6SL")
-
-Acked-by: Marek Vasut <marex@denx.de>
-
-> diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-> index ab7e3b668890..2569e043317e 100644
-> --- a/drivers/crypto/Kconfig
-> +++ b/drivers/crypto/Kconfig
-> @@ -430,6 +430,7 @@ endif
->  config CRYPTO_DEV_MXS_DCP
->  	tristate "Support for Freescale MXS DCP"
->  	depends on (ARCH_MXS || ARCH_MXC)
-> +	select STMP_DEVICE
->  	select CRYPTO_CBC
->  	select CRYPTO_ECB
->  	select CRYPTO_AES
-
-Best regards,
-Marek Vasut
+Applied both, thanks.
