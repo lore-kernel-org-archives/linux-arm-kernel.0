@@ -1,200 +1,80 @@
-From: Minghuan.Lian@freescale.com (Lian M.H.)
-Date: Mon, 12 Oct 2015 02:53:16 +0000
-Subject: [PATCH v2] PCI: layerscape: Add PCIe support for LS1043a and
- LS2080a
-In-Reply-To: <CADaLNDmHewnyE81UOv61AQEh+uBjcHza9NGm6FaiPFheyjuh4A@mail.gmail.com>
-References: <1442481219-28299-1-git-send-email-Minghuan.Lian@freescale.com>
- <20151007175725.GC27633@localhost> <20151011191027.GA29221@localhost>
- <CADaLNDmHewnyE81UOv61AQEh+uBjcHza9NGm6FaiPFheyjuh4A@mail.gmail.com>
-Message-ID: <DM2PR0301MB0640E4928A0BE5393B37D5B3E2310@DM2PR0301MB0640.namprd03.prod.outlook.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 12 Oct 2015 10:52:12 +0800
+Subject: [PATCH v2 2/5] mmc: sdhci-pxav3: enable usage of DAT3 pin as HW
+ card detect
+In-Reply-To: <CAPv3WKcPAieXFBWD9m2LLZLaiUprh83ySB9LCG2DyAq5p-RT=A@mail.gmail.com>
+References: <1444352635-21965-1-git-send-email-mw@semihalf.com>
+ <1444352635-21965-3-git-send-email-mw@semihalf.com>
+ <20151009201356.78488116@xhacker>
+ <CAPv3WKddfCOSCCOSByAEzyZ3qnAX22TFi2acrNDcTgEvy+ioFA@mail.gmail.com>
+ <20151010150535.6047dab9@xhacker>
+ <CAPv3WKcPAieXFBWD9m2LLZLaiUprh83ySB9LCG2DyAq5p-RT=A@mail.gmail.com>
+Message-ID: <20151012105212.504a4ab1@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Duc,
+Hi Marcin,
 
-I notice your patches removed all the related MSI code and you descriptor said " Remove this unnecessary code. This also avoids a warning message ("failed to enable MSI") during boot ".  
-I have a question.
-Do we need a warning when MSI-parent is missing?
+On Sat, 10 Oct 2015 14:13:51 +0200
+Marcin Wojtas <mw@semihalf.com> wrote:
+
+> Hi Jisheng,
+> 
+> 
+> >>
+> >> >>
+> >> >> When using DAT3-based detection Armada 38x SDIO IP expects its internal
+> >> >> clock to be always on, which had to be ensured twofold:
+> >> >
+> >> > What happen if runtime suspend disables its core clk and axi clk? I guess
+> >> > dat3-based detection isn't compatible with runtime pm. If so, do we also
+> >> > need to disable runtime pm in probe function?
+> >>
+> >> Is runtime resume supposed to be triggered by card detection? Is there
+> >
+> > I think so. Take marvell berlin for example, card insert => gpio interrupt
+> > or => sdhci runtime resume.
+> >
+> >> a way to manually trigger runtime suspend and resume of sdhci? Anyway
+> >
+> > If runtime-pm is builtin and the host driver supports runtime-pm (sdhci-pxav3
+> > supports runtime-pm well), when there's no sdhc transactions, runtime suspend
+> > will be triggered automatically after some time (50ms?)
+> >
+> >> coreclk is not a problem, as it's not used by A38x.
+> >
+> > I checked A38x dts files, it's <&gateclk 17>. So the question is: what will
+> > happen if <&gateclk 17> is disabled in runtime suspend? Is the dat3-based
+> > CD still works? In theory, it should not work any more.
+> >
+> 
+> Actually in pxav3 driver there is one obligatory clock ("io") which
+> can be either named in dts on not (like in armada38x.dtsi). "coreclk"
+> is optional, however all this does not matter, as both are disabled in
+
+Hmm, grep the dts, I think commit 8afdc9cca27f ("mmc: sdhci-pxav3: Get optional
+core clock") mainly targets for Marvell Berlin SoCs, but the two clks for sdhci
+in Berlin SoCs are coreclk and axiclk, rather than ioclk and coreclk, during
+which the axiclk is optional. Will cook one patch to fix this.
+
+> runtime_suspend function. I think that when we disable the gate clock,
+> dat3 detection won't work, but I guess that card detection is not the
+> only thing that wakes up the mmc subsystem and make runtime_pm useful.
+
+Card insert is not the only thing can wake up mmc, mmc initiate sdhc
+transactions will also wake up mmc.
 
 Thanks,
-Minghuan
+Jisheng
 
-> -----Original Message-----
-> From: Duc Dang [mailto:dhdang at apm.com]
-> Sent: Monday, October 12, 2015 9:48 AM
-> To: Bjorn Helgaas <helgaas@kernel.org>
-> Cc: Lian Minghuan-B31939 <Minghuan.Lian@freescale.com>;
-> linux-pci at vger.kernel.org; linux-arm <linux-arm-kernel@lists.infradead.org>;
-> Zang Roy-R61911 <tie-fei.zang@freescale.com>; Hu Mingkai-B21284
-> <Mingkai.Hu@freescale.com>; Yoder Stuart-B08248
-> <stuart.yoder@freescale.com>; Li Yang-Leo-R58472 <LeoLi@freescale.com>;
-> Arnd Bergmann <arnd@arndb.de>; Bjorn Helgaas <bhelgaas@google.com>;
-> Jingoo Han <jg1.han@samsung.com>; Zhou Wang
-> <wangzhou1@hisilicon.com>; Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com>; Jason Cooper
-> <jason@lakedaemon.net>; Tanmay Inamdar <tinamdar@apm.com>
-> Subject: Re: [PATCH v2] PCI: layerscape: Add PCIe support for LS1043a and
-> LS2080a
 > 
-> On Sun, Oct 11, 2015 at 12:10 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > [+cc Thomas, Jason, Tanmay]
-> >
-> > Hi Minghuan,
-> >
-> > You responded to this message, but your response was rejected by the
-> > mailing list, I think because it was not plain text.  See
-> > http://vger.kernel.org/majordomo-info.html
-> >
-> > I went ahead and reconstructed what your response would have looked
-> > like so I could continue the conversation.  But please fix your email
-> > setup before responding again :)
-> >
-> > Minghuan wrote:
-> >> On Wed, Oct 07, 2015 at 12:57:25PM -0500, Bjorn Helgaas wrote:
-> >> > Hi Minghuan,
-> >> >
-> >> > On Thu, Sep 17, 2015 at 05:13:39PM +0800, Minghuan Lian wrote:
-> >> > > The patch adds PCIe support for LS1043a and LS2080a.
-> >> > >
-> >> > > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> >> > > ---
-> >> > > This patch is based on v4.3-rc1 and [PATCH v9 0/6]
-> >> > > PCI: hisi: Add PCIe host support for HiSilicon SoC Hip05 patchset
-> >> > > from Zhou Wang.
-> >> > >
-> >> > > change log
-> >> > > v2:
-> >> > > 1. rename ls2085a to ls2080a
-> >> > > 2. Add ls_pcie_msi_host_init()
-> >> > >
-> >> > >  drivers/pci/host/Kconfig          |   2 +-
-> >> > >  drivers/pci/host/pci-layerscape.c | 227
-> >> > > ++++++++++++++++++++++++++------------
-> >> > >  2 files changed, 157 insertions(+), 72 deletions(-)
-> >> > >
-> >> > > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> >> > > index ae873be..38fe8a8 100644
-> >> > > --- a/drivers/pci/host/Kconfig
-> >> > > +++ b/drivers/pci/host/Kconfig
-> >> > > @@ -105,7 +105,7 @@ config PCI_XGENE_MSI
-> >> > >
-> >> > >  config PCI_LAYERSCAPE
-> >> > >   bool "Freescale Layerscape PCIe controller"
-> >> > > - depends on OF && ARM
-> >> > > + depends on OF && (ARM || ARM64)
-> >> >
-> >> > It seems like there are a couple things going on here, and I wonder
-> >> > if you can split them out into separate patches.
-> >> >
-> >> > 1) Making this work on ARM64 as well as on ARM.  This may be of
-> >> > interest for other DesignWare-based drivers, so if you split this
-> >> > out, maybe it would be a useful template for converting the other
-> >> > drivers, too.
-> >> >
-> >> > 2) Adding LS1043a and LS2080a.  Obviously, this is only of interest
-> >> > to this driver, but maybe it could be separated out into a separate
-> >> > patch?
-> >
-> >> The patch is based on v4.3-rc1 and [PATCH v9 0/6] PCI: hisi: Add PCIe
-> >> host support for HiSilicon SoC Hip05 patchset from Zhou Wang which
-> >> adds arm and
-> >> arm64 support.
-> >>
-> >> The original code with the Zhou Wang's patches can support arm64 as well.
-> >> Because both LS1043a and LS2085 are armv8 (arm64) architecture, the
-> >> patch updates Kconfig to add 'arm64'.
-> >>
-> >> If splitting two patches, the first patch for arm64 support only
-> >> includes one line changes of Kconfig. So, I think it is unnecessary.
-> >
-> > It's OK if the first patch is very small.  The point is that the patch
-> > does two orthogonal things, and those two things should be in separate
-> > commits.  This makes bisection work better, and it reduces the amount
-> > of functionality removed if we have to revert something.
-> >
-> >> > > +static int ls_pcie_msi_host_init(struct pcie_port *pp,
-> >> > > +                          struct msi_controller *chip) {  struct
-> >> > > +device_node *msi_node;  struct device_node *np =
-> >> > > +pp->dev->of_node;
-> >> > > +
-> >> > > + msi_node = of_parse_phandle(np, "msi-parent", 0); if
-> >> > > + (!msi_node) {
-> >> > > +         dev_err(pp->dev, "failed to find msi-parent\n");
-> >> > > +         return -EINVAL;
-> >> > > + }
-> >> >
-> >> > This doesn't actually *do* anything except complain if "msi-parent"
-> >> > is missing.  I'm not sure that's worth doing: if we need "msi-parent"
-> >> > somewhere, we should complain there if we don't find it.  If we
-> >> > don't need it, why complain if it's missing?
-> >
-> >> driver/of/irq.c  void of_msi_configure(struct device *dev, struct
-> >> device_node *np) will bind "msi-parent" to each device if there is
-> >> "msi-parent" handler. The PCIe driver do not need to do anything. If
-> >> we do not check "msi-parent" here, we will have no chance to check it.
-> >> The common code of 'of' and 'pci' bus driver will not complain,
-> >> because the msi controller may be found by other way.
-> >
-> > Hmm.   In mvebu_pcie_msi_enable() and xgene_pcie_msi_enable(), we
-> > also look for "msi-parent".  If that fails, mvebu continues silently
-> > and xgene complains (but only if CONFIG_PCI_MSI=y).
-> >
-> > This seems like three unnecessarily different ways of doing the same
-> > thing.
+> I will try to check how it works. If there's problem with detection I
+> propose, in order not to spoil the code too much and not to loose all
+> runtime_pm benefits, to avoid disabling/enabling clock in
+> runtime_suspend/resume functions on a38x working with dat3 detection.
+> In such case sdhci_runtime_suspend/resume would execute without
+> problems and we will be sure that detection will work in such
+> configuration.
 > 
-> For X-Gene MSI, this is the old code where at the time the code was prepared,
-> msi_controller needs to be assigned to a host bridge so that the bridge can
-> support MSI. Until now, with recent changes on MSI irqdomain from Marc and
-> others, we can drop this msi_controller assignment completely as my recent
-> patch that you merged to pci/host-xgene branch:
-> https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/host
-> -xgene
-> 
-> >
-> > I cc'd the maintainers of those drivers; maybe we can agree on a
-> > single strategy.
-> >
-> >> > >  static int __init ls_pcie_probe(struct platform_device *pdev)  {
-> >> > > ...
-> >> > > - ret = ls_add_pcie_port(pcie);
-> >> > > - if (ret < 0)
-> >> > > + ret = dw_pcie_host_init(pp);
-> >> >
-> >> > We have several DesignWare-based drivers (dra7xx, exynos, imx6, ks,
-> >> > ls, spear13xx), and I'd like to keep their structure as similar as
-> >> > possible.  For example, they all have basically this structure:
-> >> >
-> >> >   X_pcie_probe
-> >> >     X_add_pcie_port
-> >> >       dw_pcie_host_init             # pp->ops->host_init callback
-> >> >         X_pcie_host_init
-> >> >           X_pcie_establish_link
-> >> >
-> >> > This patch removes ls_add_pcie_port() and ls_pcie_establish_link(),
-> >> > so we're diverging a bit.  That makes it harder to see the
-> >> > similarities across these drivers, which I think is a loss.
-> >
-> >> I will add X_add_pcie_port. But we do not need X_pcie_establish_link
-> >> because we do not need change/reset phy to establish link, besides,
-> >> the PCIe controller slot may be not inserted any PCIe device at all.
-> >> If each controller waits some time for link, the start time will
-> >> increase a lot. In some scenes, long start-up time is not acceptable.
-> >
-> > If we wait for a timeout trying to establish a link when the slot is
-> > empty, it sounds like something's wrong.  Can't we tell from presence
-> > detect whether a card is present, even without trying to bring up the
-> > link?
-> >
-> > If we truly do not need a piece like X_pcie_establish_link(), I'm OK
-> > with entirely omitting it.  What I really object to is when we have
-> > the same functionality two places with different names or structured
-> > two different ways.
-> >
-> > Bjorn
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-pci"
-> > in the body of a message to majordomo at vger.kernel.org More majordomo
-> > info at  http://vger.kernel.org/majordomo-info.html
-> 
-> Regards,
-> Duc Dang.
+> Best regards,
+> Marcin
