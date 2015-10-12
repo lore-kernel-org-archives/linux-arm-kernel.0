@@ -1,37 +1,63 @@
-From: neidhard.kim@lge.com (Jongsung Kim)
-Date: Mon, 12 Oct 2015 14:30:39 +0900
-Subject: [PATCH] ARM:mm: fix kmap_atomic_to_page
-In-Reply-To: <20151007090121.GC21513@n2100.arm.linux.org.uk>
-References: <1444129773-12632-1-git-send-email-chanho.min@lge.com>
- <20151006192836.GX21513@n2100.arm.linux.org.uk>
- <alpine.LFD.2.20.1510062136190.1531@knanqh.ubzr> <5614979C.30100@lge.com>
- <20151007090121.GC21513@n2100.arm.linux.org.uk>
-Message-ID: <561B457F.5090104@lge.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 12 Oct 2015 14:44:23 +0900
+Subject: [PATCH 3/3] ARM: dts: exynos5422-odroidxu3: Added UHS-I bus speed
+ support
+In-Reply-To: <1444578364-1384-3-git-send-email-linux.amoon@gmail.com>
+References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
+ <1444578364-1384-3-git-send-email-linux.amoon@gmail.com>
+Message-ID: <561B48B7.1040201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We tried to utilize a HW compressor as a zram backend. Current zram uses kmap_atomic to map a page, and the HW DMAes. So we needed to use kmap_atomic_to_page to get the page to be dma-mapped.
+On 12.10.2015 00:46, Anand Moon wrote:
+> Added support for UHS-I bus speed 50MB/s (SDR50, DDR50) 104MB/s (SDR104)
 
+This description is not entirely correct. The MMC driver already
+supports these UHS speeds (you did not any code) so you rather enabled
+it (description of bindings says "is supported").
 
-On 10/07/2015 06:01 PM, Russell King - ARM Linux wrote:
-> On Wed, Oct 07, 2015 at 12:55:08PM +0900, Jongsung Kim wrote:
->> Recently, we made a driver utilizing kmap_atomic_to_page. Of course,
->> it's not mainlined. People may be using it outside mainline just like us.
-> Since kmap_atomic() mappings are supposed to be short-lived, why do you
-> need it in your driver?  Don't you already have the struct page pointer
-> when setting up the kmap_atomic() mapping?
->
-> It is invalid to setup a mapping, and leave it setup across any context
-> switching or similar.
->
-> Also, kmap_atomic_to_page() is not exported to modules, so you can only
-> use it when built-in.
->
->> vmalloc has vmalloc_to_page, pkmap has kmap_to page, and fixmap has
->> kmap_atomic_to_page. Then.. how about letting virt_to_page do them all?
-> No.  virt_to_page() is defined to only work on the lowmem mapping, and
-> that's not going to change.
->
-> Please show the outline of your code making use of this function so we
-> can better understand your use case.
->
+You mentioned DDR50 but I don't see respective property below.
+
+How do you know that these modes are really supported? I don't know. Can
+you convince me?
+
+> 
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> 
+> ---
+> Changes based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v4.4-next/dt-samsung branch
+> 
+> Changes Fixed the UHS-I bus speed detedtion on cold boot.
+
+I don't get what is exactly fixed here. What was the error? What is the
+outcome of this fix? The log below is before or after?
+
+Best regards,
+Krzysztof
+
+> 
+> [    2.439806] mmc_host mmc1: Bus speed (slot 0) = 100000000Hz (slot req 100000000Hz, actual 100000000HZ div = 0)
+> [    2.449729] mmc1: new ultra high speed SDR50 SDHC card at address aaaa
+> [    2.455984] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
+> [    2.461743]  mmcblk0: p1 p2
+
+> ---
+>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> index 58c06d3..ba4a87b 100644
+> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> @@ -364,6 +364,10 @@
+>  	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+>  	bus-width = <4>;
+>  	cap-sd-highspeed;
+> +	sd-uhs-sdr12;
+> +	sd-uhs-sdr25;
+> +	sd-uhs-sdr50;
+> +	sd-uhs-sdr104;
+>  };
+>  
+>  &pinctrl_0 {
+> 
