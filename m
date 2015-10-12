@@ -1,34 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Oct 2015 10:16:02 +0100
-Subject: [PATCH] arm64: Increase the max granular size
-In-Reply-To: <CAOZdJXXYXTCAJdFY2kkjtsX9RdsTePdo4eMRjRXFodiX=gaU5g@mail.gmail.com>
-References: <1442944788-17254-1-git-send-email-rric@kernel.org>
- <CAOZdJXXYXTCAJdFY2kkjtsX9RdsTePdo4eMRjRXFodiX=gaU5g@mail.gmail.com>
-Message-ID: <20151012091601.GA16124@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 12 Oct 2015 11:18:55 +0200
+Subject: [PATCH] arm: dts: Fix audio card detection on peach boards
+In-Reply-To: <561B578E.1050308@samsung.com>
+References: <1444631169-19468-1-git-send-email-alim.akhtar@samsung.com>
+ <561B578E.1050308@samsung.com>
+Message-ID: <561B7AFF.1080707@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 10, 2015 at 12:39:25PM -0500, Timur Tabi wrote:
-> On Tue, Sep 22, 2015 at 12:59 PM, Robert Richter <rric@kernel.org> wrote:
-> >
-> > -#define L1_CACHE_SHIFT         6
-> > +#define L1_CACHE_SHIFT         7
-> >  #define L1_CACHE_BYTES         (1 << L1_CACHE_SHIFT)
+On 12/10/15 08:47, Krzysztof Kozlowski wrote:
+>> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>> > index 8f4d76c..525a93a 100644
+>> > --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>> > +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>> > @@ -1056,5 +1056,10 @@
+>> >  	timeout-sec = <32>;
+>> >  };
+>> >  
+>> > +&pmu_system_controller {
+>
+> Please put the node in alphabetical order.
 > 
-> Would it be better if this were a Kconfig option, like it is on ARM32?
-> 
-> http://lxr.free-electrons.com/source/arch/arm/include/asm/cache.h#L7
+>> > +	assigned-clocks = <&pmu_system_controller 0>;
+>> > +	assigned-clock-parents =  <&clock CLK_FIN_PLL>;
+>
+> I might be missing something here but isn't the first clock of
+> pmu_system_controller already a CLK_FIN_PLL? So you are reparenting the
+> FIN_PLL to FIN_PLL?
 
-I don't think it adds anything, to be honest. We really want one kernel
-that runs everywhere and we don't (yet) have the SoC variation that exists
-on arch/arm/, so we may as well just keep it as big as it needs to be.
-Of course, if we start to get significant divergence between the minimum
-and maximum value and that in turn shows a non-trivial impact on kernel
-size and/or performance, then we could consider a Kconfig option but at
-that point we'd probably also need to consider whether there are alternative
-ways of providing this information to the kernel.
+No, it's not, the first PMU consumer clock is indeed CLK_FIN_PLL,
+but pmu_system_controller is also a clock provider.  The first output
+clock of pmu_system_controller is CLKOUT, it's a composite mux and
+gate clock (registered in drivers/clk/samsung /clk-exynos-clkout.c).
+So  the above dts change is selecting an external oscillator input of
+the CLKOUT mux, i.e. it will route 24 MHz clock signal from the external
+oscillator to the CLKOUT output pin, to which audio CODEC is connected
+on peach-pit AFAICS.
 
-If somebody really wants to change it for their particular kernel build,
-modifying the #define isn't exactly rocket science.
-
-Will
+-- 
+Regards,
+Sylwester
