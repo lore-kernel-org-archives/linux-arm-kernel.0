@@ -1,31 +1,43 @@
-From: vikas.sajjan@samsung.com (VIKAS SAJJAN C)
-Date: Mon, 12 Oct 2015 16:38:15 +0000 (GMT)
-Subject: HANG at bootup on 3.10 kernel at memset in early_alloc_aligned with
- CMA
-Message-ID: <1773685879.894081444667895180.JavaMail.weblogic@epmlwas09a>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 12 Oct 2015 17:49:31 +0100
+Subject: [PATCH 1/8] dt-bindings: pmic: Document Hi655x pmic driver
+In-Reply-To: <56160E22.3010703@huawei.com>
+References: <1443611111-3196-1-git-send-email-w.f@huawei.com>
+ <1443611111-3196-2-git-send-email-w.f@huawei.com>
+ <20150930173921.GJ15635@sirena.org.uk>
+ <56160E22.3010703@huawei.com>
+Message-ID: <20151012164931.GK4238@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Oct 08, 2015 at 02:33:06PM +0800, wangfei wrote:
+> On 2015/10/1 1:39, Mark Brown wrote:
+> > On Wed, Sep 30, 2015 at 07:05:04PM +0800, Fei Wang wrote:
 
- we are recently migrating to 3.10 kernel on a 32bit SoC, I see that while boot up, the kernel HANGS in function early_alloc_aligned() at  memset(ptr, 0, sz);
+Please fix your mail client to word wrap within paragraphs at something
+substantially less than 80 columns.  Doing this makes your messages much
+easier to read and reply to.
 
-we are reserving memory using CMA 
+> >> +                coul: coul at 1 {
+> >> +                        compatible = "hisilicon,hi655x-coul";
+> >> +                        interrupt-parent = <&pmic>;
+> >> +                        interrupts = <24 0>, <25 0>, <26 0>, <27 0>;
+> >> +                        interrupt-names = "cl_int_i", "cl_out_i", "cl_in_i", "vbat_int_i";
+> >> +                        battery_product_index = <0>;
 
+> > For example, the "battery_product_index" property here is undocumented.
 
-we have 4 banks :
+> now on hikey, we only enable hi655x-regulator-pmic function, and
+> regulator is child node of pmic.do i need to document regulator
+> dt-binding in this file or create a new regulator dt-binding file?
 
-bank 1 : 0x200000000,  size 0x10000000
-
-bank 2 : 0x300000000,  size 0x10000000
-
-bank 3 : 0x400000000,  size 0x10000000
-
-bank 4 : 0x500000000,  size 0x0f500000
-
- 
-arm_lowmem_limit is set to 0x4f000000 and mapping is created for section: 20000000 ~ 4f000000
-
- I came across your patch "ARM: 8356/1: mm: handle non-pmd-aligned end of RAM"
-
-Was wondering whether patch is back ported to 3.10 stable branch, if so can you point me to the patch? if not, can you let us know the changes needed for 3.10  kernel.
+Either is possible, though it is common to split the DT documentation
+into per subsystem files for ease of reference and to avoid cross tree
+merge issues.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151012/123109fb/attachment.sig>
