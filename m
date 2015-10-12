@@ -1,45 +1,156 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Oct 2015 16:14:16 +0200
-Subject: [PATCH] samples: build configfs sample on when enabled
-Message-ID: <6271650.CdczvJuMsL@wuerfel>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 12 Oct 2015 15:17:52 +0100
+Subject: [PATCH v3 12/16] KVM: arm64: handle pending bit for LPIs in ITS
+ emulation
+In-Reply-To: <016d01d104c1$47a41570$d6ec4050$@samsung.com>
+References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
+ <1444229726-31559-13-git-send-email-andre.przywara@arm.com>
+ <016d01d104c1$47a41570$d6ec4050$@samsung.com>
+Message-ID: <561BC110.9090403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most samples have their own Kconfig option, but for some reason
-the configfs sample does not have one and gets built unconditionally
-when CONFIG_SAMPLES is enabled, which fails if CONFIG_CONFIGFS_FS
-is not:
+Hi Pavel,
 
-ERROR: "configfs_unregister_subsystem" [samples/configfs/configfs_sample.ko] undefined!
-ERROR: "configfs_register_subsystem" [samples/configfs/configfs_sample.ko] undefined!
+On 12/10/15 08:40, Pavel Fedin wrote:
+>  Hello!
+> 
+>> -----Original Message-----
+>> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On Behalf Of Andre Przywara
+>> Sent: Wednesday, October 07, 2015 5:55 PM
+>> To: marc.zyngier at arm.com; christoffer.dall at linaro.org
+>> Cc: eric.auger at linaro.org; p.fedin at samsung.com; kvmarm at lists.cs.columbia.edu; linux-arm-
+>> kernel at lists.infradead.org; kvm at vger.kernel.org
+>> Subject: [PATCH v3 12/16] KVM: arm64: handle pending bit for LPIs in ITS emulation
+>>
+>> As the actual LPI number in a guest can be quite high, but is mostly
+>> assigned using a very sparse allocation scheme, bitmaps and arrays
+>> for storing the virtual interrupt status are a waste of memory.
+>> We use our equivalent of the "Interrupt Translation Table Entry"
+>> (ITTE) to hold this extra status information for a virtual LPI.
+>> As the normal VGIC code cannot use its fancy bitmaps to manage
+>> pending interrupts, we provide a hook in the VGIC code to let the
+>> ITS emulation handle the list register queueing itself.
+>> LPIs are located in a separate number range (>=8192), so
+>> distinguishing them is easy. With LPIs being only edge-triggered, we
+>> get away with a less complex IRQ handling.
+>> We extend the number of bits for storing the IRQ number in our
+>> LR struct to 16 to cover the LPI numbers we support as well.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>> Changelog v2..v3:
+>> - extend LR data structure to hold 16-bit wide IRQ IDs
+>> - only clear pending bit if IRQ could be queued
+>> - adapt __kvm_vgic_sync_hwstate() to upstream changes
+>>
+>>  include/kvm/arm_vgic.h      |  4 +-
+>>  virt/kvm/arm/its-emul.c     | 75 ++++++++++++++++++++++++++++++++++++
+>>  virt/kvm/arm/its-emul.h     |  3 ++
+>>  virt/kvm/arm/vgic-v3-emul.c |  2 +
+>>  virt/kvm/arm/vgic.c         | 93 +++++++++++++++++++++++++++++++--------------
+>>  5 files changed, 148 insertions(+), 29 deletions(-)
+>>
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index c3eb414..035911f 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -95,7 +95,7 @@ enum vgic_type {
+>>  #define LR_HW			(1 << 3)
+>>
+>>  struct vgic_lr {
+>> -	unsigned irq:10;
+>> +	unsigned irq:16;
+>>  	union {
+>>  		unsigned hwirq:10;
+>>  		unsigned source:3;
+>> @@ -147,6 +147,8 @@ struct vgic_vm_ops {
+>>  	int	(*init_model)(struct kvm *);
+>>  	void	(*destroy_model)(struct kvm *);
+>>  	int	(*map_resources)(struct kvm *, const struct vgic_params *);
+>> +	bool	(*queue_lpis)(struct kvm_vcpu *);
+>> +	void	(*unqueue_lpi)(struct kvm_vcpu *, int irq);
+>>  };
+>>
+>>  struct vgic_io_device {
+>> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
+>> index bab8033..8349970 100644
+>> --- a/virt/kvm/arm/its-emul.c
+>> +++ b/virt/kvm/arm/its-emul.c
+>> @@ -59,8 +59,27 @@ struct its_itte {
+>>  	struct its_collection *collection;
+>>  	u32 lpi;
+>>  	u32 event_id;
+>> +	bool enabled;
+>> +	unsigned long *pending;
+>>  };
+>>
+>> +/* To be used as an iterator this macro misses the enclosing parentheses */
+>> +#define for_each_lpi(dev, itte, kvm) \
+>> +	list_for_each_entry(dev, &(kvm)->arch.vgic.its.device_list, dev_list) \
+>> +		list_for_each_entry(itte, &(dev)->itt, itte_list)
+>> +
+>> +static struct its_itte *find_itte_by_lpi(struct kvm *kvm, int lpi)
+>> +{
+>> +	struct its_device *device;
+>> +	struct its_itte *itte;
+>> +
+>> +	for_each_lpi(device, itte, kvm) {
+>> +		if (itte->lpi == lpi)
+>> +			return itte;
+>> +	}
+>> +	return NULL;
+>> +}
+>> +
+>>  #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
+>>
+>>  /* The distributor lock is held by the VGIC MMIO handler. */
+>> @@ -154,9 +173,65 @@ static bool handle_mmio_gits_idregs(struct kvm_vcpu *vcpu,
+>>  	return false;
+>>  }
+>>
+>> +/*
+>> + * Find all enabled and pending LPIs and queue them into the list
+>> + * registers.
+>> + * The dist lock is held by the caller.
+>> + */
+>> +bool vits_queue_lpis(struct kvm_vcpu *vcpu)
+>> +{
+>> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
+>> +	struct its_device *device;
+>> +	struct its_itte *itte;
+>> +	bool ret = true;
+>> +
+>> +	if (!vgic_has_its(vcpu->kvm))
+>> +		return true;
+>> +	if (!its->enabled || !vcpu->kvm->arch.vgic.lpis_enabled)
+>> +		return true;
+>> +
+>> +	spin_lock(&its->lock);
+>> +	for_each_lpi(device, itte, vcpu->kvm) {
+>> +		if (!itte->enabled || !test_bit(vcpu->vcpu_id, itte->pending))
+>> +			continue;
+>> +
+>> +		if (!itte->collection)
+>> +			continue;
+>> +
+>> +		if (itte->collection->target_addr != vcpu->vcpu_id)
+>> +			continue;
+>> +
+>> +
+>> +		if (vgic_queue_irq(vcpu, 0, itte->lpi))
+>> +			__clear_bit(vcpu->vcpu_id, itte->pending);
+>> +		else
+>> +			ret = false;
+> 
+>  Shouldn't we also have 'break' here? If vgic_queue_irq() returns false, this means we have no more
+> LRs to use, therefore it makes no sense to keep iterating.
 
-This adds a new Kconfig symbol to mirror the existing method and
-only let the user enable this sample if configfs is present.
+I consider this too much optimization at this point.
+vgic_queue_irq() just tells about the success for this interrupt, I'd
+rather not make assumptions about other IRQs (we could piggy-back those,
+for instance).
+Even if not, I'd prefer to not break abstraction here.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/samples/Kconfig b/samples/Kconfig
-index fbd55eefa418..b283dc2e8ed6 100644
---- a/samples/Kconfig
-+++ b/samples/Kconfig
-@@ -5,6 +5,12 @@ menuconfig SAMPLES
- 
- if SAMPLES
- 
-+config SAMPLE_CONFIGFS
-+	tristate "Build configfs sample -- loadable modules only"
-+	depends on CONFIGFS_FS && m
-+	help
-+	  This builds the same for configfs
-+
- config SAMPLE_TRACE_EVENTS
- 	tristate "Build trace_events examples -- loadable modules only"
- 	depends on EVENT_TRACING && m
-diff --git a/samples/configfs/Makefile b/samples/configfs/Makefile
-index 4d3c8b668f06..b9153ed0b7d6 100644
---- a/samples/configfs/Makefile
-+++ b/samples/configfs/Makefile
-@@ -1,2 +1 @@
--
--obj-m += configfs_sample.o
-+obj-$(CONFIG_SAMPLE_CONFIGFS) += configfs_sample.o
+Cheers,
+Andre.
