@@ -1,62 +1,63 @@
-From: davidm@egauge.net (David Mosberger)
-Date: Mon, 12 Oct 2015 16:32:01 -0600
-Subject: [PATCH] spi-atmel.c: fix DMA for bits_per_word > 8
-Message-ID: <CALnQHM3WxNDV3xzJwRfGRVTMYL1mo44VbBb2YawZVUzn0CzFfA@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 12 Oct 2015 17:32:59 -0500
+Subject: [REPOST PATCH 1/4] ARM: dts: DRA7: Add dsp1_system syscon node
+In-Reply-To: <20151012214304.GD23801@atomide.com>
+References: <1443828205-18706-1-git-send-email-s-anna@ti.com>
+ <1443828205-18706-2-git-send-email-s-anna@ti.com>
+ <20151012214304.GD23801@atomide.com>
+Message-ID: <561C351B.3060307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I need the patch below to make DMA work in spi-atmel.c when bits_per_word > 8.
+Hi Tony,
 
-  --david
--- 
-eGauge Systems LLC, http://egauge.net/, 1.877-EGAUGE1, fax 720.545.9768
+On 10/12/2015 04:43 PM, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [151002 16:27]:
+>> The DSP_SYSTEM sub-module is a dedicated system control logic
+>> module present within a DRA7 DSP processor sub-system. This
+>> module is responsible for power management, clock generation
+>> and connection to the device PRCM module.
+>>
+>> Add a syscon node for this module for the DSP1 processor
+>> sub-system. This is added as a syscon node as it is a common
+>> configuration module that can be used by the different IOMMU
+>> instances and the corresponding remoteproc device.
+>>
+>> The node is added to the common dra7.dtsi file, as the DSP1
+>> processor sub-system is mostly common across all the variants
+>> of the DRA7 SoC family.
+>>
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> ---
+>>  arch/arm/boot/dts/dra7.dtsi | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+>> index e289c706d27d..62055094e8d5 100644
+>> --- a/arch/arm/boot/dts/dra7.dtsi
+>> +++ b/arch/arm/boot/dts/dra7.dtsi
+>> @@ -292,6 +292,11 @@
+>>  				#thermal-sensor-cells = <1>;
+>>  		};
+>>  
+>> +		dsp1_system: dsp_system at 40d00000 {
+>> +			compatible = "syscon";
+>> +			reg = <0x40d00000 0x100>;
+>> +		};
+>> +
+>>  		sdma: dma-controller at 4a056000 {
+>>  			compatible = "ti,omap4430-sdma";
+>>  			reg = <0x4a056000 0x1000>;
+> 
+> Hmm so why would you want to set up a complete device as a syscon
+> mapping rather than just doing ioremap on it?
+> 
+> What drivers will be sharing access to these registers?
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 04e48e5..7bb361a 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -711,6 +711,7 @@ static void atmel_spi_next_xfer_pio(struct
-spi_master *master,
-  * Submit next transfer for DMA.
-  */
- static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
-+  struct spi_message *msg,
-  struct spi_transfer *xfer,
-  u32 *plen)
- {
-@@ -721,7 +722,7 @@ static int atmel_spi_next_xfer_dma_submit(struct
-spi_master *master,
-  struct dma_async_tx_descriptor *txdesc;
-  struct dma_slave_config slave_config;
-  dma_cookie_t cookie;
-- u32 len = *plen;
-+ u32 len = *plen, bpw;
+Two different instances of the MMU for now, both get probed
+independently. But there are other registers which a remoteproc driver
+will mostly be interested in (like DSP_SYS_STAT for knowing the C66x
+idle/active status).
 
-  dev_vdbg(master->dev.parent, "atmel_spi_next_xfer_dma_submit\n");
-
-@@ -758,7 +759,11 @@ static int atmel_spi_next_xfer_dma_submit(struct
-spi_master *master,
-
-  *plen = len;
-
-- if (atmel_spi_dma_slave_config(as, &slave_config, 8))
-+ bpw = xfer->bits_per_word;
-+ if (!bpw)
-+ bpw = msg->spi->bits_per_word;
-+
-+ if (atmel_spi_dma_slave_config(as, &slave_config, bpw))
-  goto err_exit;
-
-  /* Send both scatterlists */
-@@ -1316,8 +1321,8 @@ static int atmel_spi_one_transfer(struct
-spi_master *master,
-  atmel_spi_pdc_next_xfer(master, msg, xfer);
-  } else if (atmel_spi_use_dma(as, xfer)) {
-  len = as->current_remaining_bytes;
-- ret = atmel_spi_next_xfer_dma_submit(master,
-- xfer, &len);
-+ ret = atmel_spi_next_xfer_dma_submit(master, msg,
-+     xfer, &len);
-  if (ret) {
-  dev_err(&spi->dev,
-  "unable to use DMA, fallback to PIO\n");
+regards
+Suman
