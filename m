@@ -1,73 +1,27 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 12 Oct 2015 22:38:45 +0200
-Subject: [PATCH 00/16] Divorcing irqdomain and device_node
-In-Reply-To: <alpine.DEB.2.11.1510112255330.6097@nanos>
-References: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
- <alpine.DEB.2.11.1510112255330.6097@nanos>
-Message-ID: <4276106.FmN73grJgW@vostro.rjw.lan>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Mon, 12 Oct 2015 22:11:44 +0200
+Subject: [PATCH 4/4] ARM: configs: Add STM32 DMA support in STM32 defconfig
+In-Reply-To: <1444317612-818-5-git-send-email-cedric.madianga@gmail.com>
+References: <1444317612-818-1-git-send-email-cedric.madianga@gmail.com>
+ <1444317612-818-5-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <561C1400.30108@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, October 11, 2015 11:01:17 PM Thomas Gleixner wrote:
-> On Tue, 6 Oct 2015, Marc Zyngier wrote:
-> > [This patch series used to be called "Making the generic ACPI GSI
-> > layer irqdomain aware", but as I've radically changed my approach to
-> > this problem, I've decided to reset the counters...]
-> > 
-> > The irqdomain code is not entierely ACPI friendly, as it has some
-> > built-in knowledge of the device-tree. Nothing too harmful, but enough
-> > to scare the ARM ACPI developpers which end up with their own version
-> > of the square wheel. And some of the ramifications actually run deeper
-> > than initially expected.
-> > 
-> > This series adapts the irqdomain code to use 'struct fwnode_handle'
-> > instead of 'struct device_node' as the identifier for a domain
-> > (compatibility interfaces are of course added). It also introduces a
-> > generic IRQ specifier that firmware interfaces (DT or ACPI) can
-> > directly use to configure interrupts, and allow the ACPI GSI code to
-> > be plugged into this.
-> > 
-> > As examples, we convert the ARM GIC ACPI support to use irqdomains as
-> > originally intended, and rework the MSI code to also move away from
-> > using device nodes when using irqdomains.
-> > 
-> > Overall, this gives us a way to use irqdomains on both DT and ACPI
-> > enabled platforms, having very little changes made to the actual
-> > drivers (other than the probing infrastructure). Because we keep the
-> > flow of information between the various layers identical between ACPI
-> > and DT, we immediately benefit from the existing infrastructure.
-> > 
-> > This has been test-booted on Juno, is based on 4.3-rc4, and available at:
-> > 
-> > git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/irq-domain-fwnode-v1
-> > 
-> > Marc Zyngier (16):
-> >   irqdomain: Use an accessor for the of_node field
-> >   irqdomain: Convert irqdomain->of_node to fwnode
-> >   irqdomain: Allow irq domain lookup by fwnode
-> >   irqdomain: Introduce a firmware-specific IRQ specifier structure
-> >   irqchip: Convert all alloc/xlate users from of_node to fwnode
-> >   irqdomain: Introduce irq_create_fwspec_mapping
-> >   irqdomain: Introduce irq_domain_create_{linear,tree}
-> >   irqdomain: Add a fwnode_handle allocator
-> >   acpi/gsi: Always perform an irq domain lookup
-> >   acpi/gsi: Add acpi_set_irq_model to initialize the GSI layer
-> >   irqchip/gic: Get rid of gic_init_bases()
-> >   irqchip/gic: Switch ACPI support to stacked domains
-> >   irqchip/gic: Kill the xlate method
-> >   acpi/gsi: Cleanup acpi_register_gsi
-> >   irqdomain: Introduce irq_domain_create_hierarchy
-> >   irqdomain/msi: Use fwnode instead of of_node
-> 
-> I really like this one way better than the previous attempts and I
-> couldn't find any real issue when going through them with a fine comb.
-> 
-> I'd like to get that into 4.4, so I have to ask for the opinion of
-> ACPI folks. Having an ack on those patches would be nice.
 
-I've ACKed the generic ones, please let me know if I missed any of them.
 
-The rest seems to be ARM-specific ...
+On 10/08/2015 05:20 PM, M'boumba Cedric Madianga wrote:
+> This patch adds STM32 DMA support in stm32_defconfig file
+>
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> ---
+>   arch/arm/configs/stm32_defconfig | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+>
+Acked-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+
+I will apply it to my tree as soon as the driver is accepted.
 
 Thanks,
-Rafael
+Maxime
