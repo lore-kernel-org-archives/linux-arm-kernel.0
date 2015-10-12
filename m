@@ -1,46 +1,47 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Mon, 12 Oct 2015 07:55:13 +0000
-Subject: [PATCH] rtc: at91rm9200: clear RTC alarm status flag prior to
- suspending
-In-Reply-To: <20151012075115.GC3558@piout.net>
-References: <1444612677-26178-1-git-send-email-wenyou.yang@atmel.com>
- <20151012065323.GA3558@piout.net>
- <B256D81BAE5131468A838E5D7A243641D632111B@penmbx01>
- <20151012075115.GC3558@piout.net>
-Message-ID: <B256D81BAE5131468A838E5D7A243641D632214D@penmbx01>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 12 Oct 2015 09:57:40 +0200
+Subject: [PATCH 1/9] arm64/efi: split off EFI init and runtime code for
+ reuse by 32-bit ARM
+In-Reply-To: <20151010205311.GF2723@codeblueprint.co.uk>
+References: <1443719063-6832-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1443719063-6832-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20151010205311.GF2723@codeblueprint.co.uk>
+Message-ID: <CAKv+Gu8ESCXWnzz-7T9YGCn_cBT_Knx7u17P0uky31mU22j1EA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10 October 2015 at 22:53, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> On Thu, 01 Oct, at 07:04:15PM, Ard Biesheuvel wrote:
+>> This splits off the early EFI init and runtime code that
+>> - discovers the EFI params and the memory map from the FDT, and installs
+>>   the memblocks and config tables.
+>> - prepares and installs the EFI page tables so that UEFI Runtime Services
+>>   can be invoked at the virtual address installed by the stub.
+>>
+>> This will allow it to be reused for 32-bit ARM.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/kernel/efi.c            | 363 +-------------------
+>>  drivers/firmware/efi/Makefile      |   4 +-
+>>  drivers/firmware/efi/arm-init.c    | 214 ++++++++++++
+>>  drivers/firmware/efi/arm-runtime.c | 191 ++++++++++
+>>  4 files changed, 409 insertions(+), 363 deletions(-)
+>
+> [...]
+>
+>> +static int uefi_debug __initdata;
+>> +static int __init uefi_debug_setup(char *str)
+>> +{
+>> +     uefi_debug = 1;
+>> +
+>> +     return 0;
+>> +}
+>> +early_param("uefi_debug", uefi_debug_setup);
+>
+> Was this hunk an unintentional reintroduction of the code Leif deleted
+> in commit a9cc0cf5701b ("arm64: Use core efi=debug instead of
+> uefi_debug command line parameter")?
+>
 
-
-> -----Original Message-----
-> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
-> Sent: 2015?10?12? 15:51
-> To: Yang, Wenyou
-> Cc: Alessandro Zummo; Ferre, Nicolas; Desroches, Ludovic; rtc-
-> linux at googlegroups.com; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH] rtc: at91rm9200: clear RTC alarm status flag prior to
-> suspending
-> 
-> On 12/10/2015 at 07:48:18 +0000, Yang, Wenyou wrote :
-> > > On 12/10/2015 at 09:17:57 +0800, Wenyou Yang wrote :
-> > > > This patch is to clear the RTC alarm status flag prior to
-> > > > suspending to avoid the erroneous wake-up activity.
-> > > >
-> > >
-> > > Is this a new issue appearing with the sama5d2 or was it present
-> > > from the beginning?
-> > With the sama5d2 ULP1 mode, not from the beginning.
-> >
-> 
-> I think this information should appear in the commit log.
-I will add it in the next version, thanks.
-
-> 
-> --
-> Alexandre Belloni, Free Electrons
-> Embedded Linux, Kernel and Android engineering http://free-electrons.com
-
-Best Regards,
-Wenyou Yang
+Indeed. I will get rid of it on v2
