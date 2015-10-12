@@ -1,84 +1,83 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 12 Oct 2015 15:04:30 +0800
-Subject: [Linaro-acpi] [PATCH v5 0/5] Provide better MADT subtable sanity
- checks
-In-Reply-To: <561B2FCA.1010504@erley.org>
-References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
- <560BA4C9.7090607@huawei.com> <560C0968.6020904@redhat.com>
- <2808057.teMg2oCLf6@vostro.rjw.lan> <5612AF64.4060900@redhat.com>
- <561B2442.9050600@erley.org> <561B2DAD.5070601@linaro.org>
- <561B2FCA.1010504@erley.org>
-Message-ID: <561B5B7E.6080901@linaro.org>
+Date: Mon, 12 Oct 2015 15:09:50 +0800
+Subject: [PATCH 00/16] Divorcing irqdomain and device_node
+In-Reply-To: <561B1DB9.6010909@linaro.org>
+References: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
+ <alpine.DEB.2.11.1510112255330.6097@nanos> <561B1DB9.6010909@linaro.org>
+Message-ID: <561B5CBE.50701@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2015 11:58 AM, Pat Erley wrote:
-> On 10/11/2015 08:49 PM, Hanjun Guo wrote:
->> On 10/12/2015 11:08 AM, Pat Erley wrote:
->>> On 10/05/2015 10:12 AM, Al Stone wrote:
->>>> On 10/05/2015 07:39 AM, Rafael J. Wysocki wrote:
->>>>> On Wednesday, September 30, 2015 10:10:16 AM Al Stone wrote:
->>>>>> On 09/30/2015 03:00 AM, Hanjun Guo wrote:
->>>>>>> On 2015/9/30 7:45, Al Stone wrote:
->>>>>>>> NB: this patch set is for use against the linux-pm bleeding edge
->>>>>>>> branch.
->>>>>>>>
->>>>>>
->>>>>> [snip...]
->>>>>>
->>>>>>>
->>>>>>> For this patch set,
->>>>>>>
->>>>>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>>>>
->>>>>>> Thanks
->>>>>>> Hanjun
->>>>>>
->>>>>> Thanks, Hanjun!
->>>>>
->>>>> Series applied, thanks!
->>>>>
->>>>> Rafael
->>>>>
->>>>
->>>> Thanks, Rafael!
->>>>
+On 10/12/2015 10:40 AM, Hanjun Guo wrote:
+> On 10/12/2015 05:01 AM, Thomas Gleixner wrote:
+>> On Tue, 6 Oct 2015, Marc Zyngier wrote:
+>>> [This patch series used to be called "Making the generic ACPI GSI
+>>> layer irqdomain aware", but as I've radically changed my approach to
+>>> this problem, I've decided to reset the counters...]
 >>>
->>> Just decided to test out linux-next (to see the new nouveau cleanups).
->>> This change set prevents my Lenovo W510 from booting properly.
+>>> The irqdomain code is not entierely ACPI friendly, as it has some
+>>> built-in knowledge of the device-tree. Nothing too harmful, but enough
+>>> to scare the ARM ACPI developpers which end up with their own version
+>>> of the square wheel. And some of the ramifications actually run deeper
+>>> than initially expected.
 >>>
->>> Reverting: 7494b0 "ACPI: add in a bad_madt_entry() function to
->>> eventually replace the macro"
+>>> This series adapts the irqdomain code to use 'struct fwnode_handle'
+>>> instead of 'struct device_node' as the identifier for a domain
+>>> (compatibility interfaces are of course added). It also introduces a
+>>> generic IRQ specifier that firmware interfaces (DT or ACPI) can
+>>> directly use to configure interrupts, and allow the ACPI GSI code to
+>>> be plugged into this.
 >>>
->>> Gets the system booting again.  I'm attaching my dmesg from the failed
->>> boot, who wants the acpidump?
+>>> As examples, we convert the ARM GIC ACPI support to use irqdomains as
+>>> originally intended, and rework the MSI code to also move away from
+>>> using device nodes when using irqdomains.
+>>>
+>>> Overall, this gives us a way to use irqdomains on both DT and ACPI
+>>> enabled platforms, having very little changes made to the actual
+>>> drivers (other than the probing infrastructure). Because we keep the
+>>> flow of information between the various layers identical between ACPI
+>>> and DT, we immediately benefit from the existing infrastructure.
+>>>
+>>> This has been test-booted on Juno, is based on 4.3-rc4, and available
+>>> at:
+>>>
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+>>> irq/irq-domain-fwnode-v1
+
+I pulled, and I found that there is v2 :)
+
+>>>
+>>> Marc Zyngier (16):
+>>>    irqdomain: Use an accessor for the of_node field
+>>>    irqdomain: Convert irqdomain->of_node to fwnode
+>>>    irqdomain: Allow irq domain lookup by fwnode
+>>>    irqdomain: Introduce a firmware-specific IRQ specifier structure
+>>>    irqchip: Convert all alloc/xlate users from of_node to fwnode
+>>>    irqdomain: Introduce irq_create_fwspec_mapping
+>>>    irqdomain: Introduce irq_domain_create_{linear,tree}
+>>>    irqdomain: Add a fwnode_handle allocator
+>>>    acpi/gsi: Always perform an irq domain lookup
+>>>    acpi/gsi: Add acpi_set_irq_model to initialize the GSI layer
+>>>    irqchip/gic: Get rid of gic_init_bases()
+>>>    irqchip/gic: Switch ACPI support to stacked domains
+>>>    irqchip/gic: Kill the xlate method
+>>>    acpi/gsi: Cleanup acpi_register_gsi
+>>>    irqdomain: Introduce irq_domain_create_hierarchy
+>>>    irqdomain/msi: Use fwnode instead of of_node
 >>
->> [    0.000000] ACPI: undefined version for either FADT 4.0 or MADT 1
->> [    0.000000] ACPI: Error parsing LAPIC address override entry
->> [    0.000000] ACPI: Invalid BIOS MADT, disabling ACPI
->>
->> Seems the MADT revision is not right, could you dump the ACPI MADT
->> (APIC) table and send it out? I will take a look :)
->>
->> Thanks
->> Hanjun
+>> I really like this one way better than the previous attempts and I
+>> couldn't find any real issue when going through them with a fine comb.
 >
-> Here ya go, enjoy.  Feel free to CC me on any patches that might fix it.
+> Fully agree, this version removes the dependency on DT for ACPI.
+>
+>>
+>> I'd like to get that into 4.4, so I have to ask for the opinion of
+>> ACPI folks. Having an ack on those patches would be nice.
+>
+> I'm reviewing this patch set, and will have a test today.
 
-Thanks! I think I had the right guess, the MADT revision is not right
-for ACPI 4.0:
-
-[000h 0000   4]                    Signature : "APIC"    [Multiple APIC 
-Description Table (MADT)]
-[004h 0004   4]                 Table Length : 000000BC
-[008h 0008   1]                     *Revision : 01*
-
-I encountered such problem before because the table was just copied from
-previous version, and without the update for table revision.
-
-I think we may need to ignore the table revision for x86, but restrict
-it for ARM64, I'd like Al and Rafael's suggestion before I send out a
-patch.
+I'm pretty fine with this patch set (except some comments for patch 1),
+I will wait for your v2 to be sent out, then add reviews and acks.
 
 Thanks
 Hanjun
