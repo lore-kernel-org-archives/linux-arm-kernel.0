@@ -1,68 +1,79 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 12 Oct 2015 12:17:06 +0100
-Subject: [PATCH v2 0/2] Enabling PSCI based idle on ARM 32-bit platforms
-Message-ID: <1444648628-24790-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 12 Oct 2015 13:16:23 +0200
+Subject: [PATCH 3/3] fpga manager: Adding FPGA Manager support for Xilinx
+ Zynq 7000
+In-Reply-To: <CAAtXAHea7GZDLez5kYas2PFQ-=KmS_on8WxFDCuvVb4Nh05a_w@mail.gmail.com>
+References: <1444344307-22509-1-git-send-email-moritz.fischer@ettus.com>
+ <1444344307-22509-4-git-send-email-moritz.fischer@ettus.com>
+ <20151009163336.GM10631@jcartwri.amer.corp.natinst.com>
+ <CAAtXAHea7GZDLez5kYas2PFQ-=KmS_on8WxFDCuvVb4Nh05a_w@mail.gmail.com>
+Message-ID: <561B9687.1070103@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is v2 of a previous posting:
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/373756.html
+>>> +static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>>> +                            const char *buf, size_t count)
+>>> +{
+>>> +     struct zynq_fpga_priv *priv;
+>>> +     int err;
+>>> +     char *kbuf;
+>>> +     size_t i, in_count;
+>>> +     dma_addr_t dma_addr;
+>>> +     u32 transfer_length = 0;
+>>> +     bool endian_swap = false;
+>>> +
+>>> +     in_count = count;
+>>> +     priv = mgr->priv;
+>>> +
+>>> +     kbuf = dma_alloc_coherent(priv->dev, count, &dma_addr, GFP_KERNEL);
+>>> +     if (!kbuf)
+>>> +             return -ENOMEM;
+>>> +
+>>> +     memcpy(kbuf, buf, count);
+>>> +
+>>> +     /* look for the sync word */
+>>> +     for (i = 0; i < count - 4; i++) {
+>>> +             if (memcmp(kbuf + i, "\x66\x55\x99\xAA", 4) == 0) {
+>>> +                     dev_dbg(priv->dev, "Found normal sync word\n");
+>>> +                     endian_swap = false;
+>>> +                     break;
+>>> +             }
 
-v1->v2:
+This is bin format
 
-- Refactored patch 1 to remove cpu parameter from cpuidle_ops
-  suspend hook
-- Refactored psci_cpu_init_idle to stub out dt parsing function and
-  make it usable on both ARM/ARM64 with no additional changes
-- Updated ARM cpuidle_ops to new interfaces
-- Fixed PSCI enable method string in ARM cpuidle_ops struct
+>>> +             if (memcmp(kbuf + i, "\xAA\x99\x55\x66", 4) == 0) {
+>>> +                     dev_dbg(priv->dev, "Found swapped sync word\n");
+>>> +                     endian_swap = true;
+>>> +                     break;
+>>> +             }
 
-PSCI firmware provides a kernel API that, through a standard interface,
-allows to manage power states transitions in a seamless manner for
-ARM and ARM64 systems.
+This is bit format from header
 
-Current PSCI code that initializes CPUidle states on PSCI based
-systems lives in arch/arm64 directory but it is not ARM64 specific
-and can be shared with ARM 32-bit systems so that the generic
-ARM CPUidle driver can leverage the common PSCI interface.
+>>> +     }
+>>
+>> How much control do we have over mandating the format of firmware at
+>> this point?  It'd be swell if we could just mandate a specific
+>> endianness, and leave this munging to usermode.
+> 
+> That's a good question. Personally I do only care about one of both,
+> but that's just because I get to decide for my targets...
+> Opinions from the Xilinx guys?
 
-This patch series moves PSCI CPUidle management code to
-drivers/firmware directory so that ARM and ARM64 architecture
-can actually share the code.
+Don't know full history about this but in past bitstream in BIT format
+was used. Which is header (partially decoding in u-boot for example)
+with data.
+On zynq native format is BIN which is format without header and data is
+swapped.
+This code just detects which format is used. If BIT, header is skipped
+and data is swapped to BIN format.
 
-It is made up of two patches:
+Back to origin question if this is something what can be handled from
+user space. And answer is - yes it can be handled there.
+But based on my experience it is very useful to be able to handle BIT
+because it is built by tools by default.
+Also with BIN format you are loosing record what this data bitstream
+targets. Header in BIT gives you at least some ideas.
 
-Patch 1 refactors ARM 32-bit generic idle implementation to remove
-the cpu parameter from the cpuidle_ops suspend hook, in preparation
-for a common PSCI implementation for ARM/ARM64 PSCI idle.
-
-Patch 2 moves ARM64 PSCI CPUidle functions implementation to
-drivers/firmware so that it can be shared with ARM 32-bit platforms
-code. This patch also adds a PSCI entry section on ARM 32-bit systems
-so that the PSCI CPUidle back-end can be enabled when the enable-method
-corresponds to PSCI.
-
-Patches apply on top of current patch stack to enable PSCI 1.0:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/firmware/psci-1.0
-
-Tested on Juno board (ARM64), compile tested only on ARM 32-bit systems.
-
-Lorenzo Pieralisi (2):
-  ARM: cpuidle: remove cpu parameter from the cpuidle_ops suspend hook
-  ARM64: kernel: PSCI: move PSCI idle management code to
-    drivers/firmware
-
- arch/arm/include/asm/cpuidle.h |   2 +-
- arch/arm/kernel/cpuidle.c      |   2 +-
- arch/arm64/kernel/psci.c       |  99 +-----------------------------
- drivers/firmware/Makefile      |   2 +-
- drivers/firmware/psci_cpuops.c | 133 +++++++++++++++++++++++++++++++++++++++++
- drivers/soc/qcom/spm.c         |  10 ++--
- include/linux/psci.h           |   3 +
- 7 files changed, 146 insertions(+), 105 deletions(-)
- create mode 100644 drivers/firmware/psci_cpuops.c
-
--- 
-2.5.1
+Thanks,
+Michal
