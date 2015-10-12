@@ -1,49 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Oct 2015 18:10:18 +0100
-Subject: [PATCH RFC 1/2] dt-bindings: simplefb: Support a list of
- regulator supply properties
-In-Reply-To: <1444669458-5588-2-git-send-email-wens@csie.org>
-References: <1444669458-5588-1-git-send-email-wens@csie.org>
- <1444669458-5588-2-git-send-email-wens@csie.org>
-Message-ID: <20151012171018.GB3659@leverpostej>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 12 Oct 2015 19:10:10 +0200
+Subject: [PATCH] pxa: remove incorrect __init annotation on
+ pxa27x_set_pwrmode
+In-Reply-To: <11408970.yetkS1BjHr@wuerfel> (Arnd Bergmann's message of "Mon,
+ 12 Oct 2015 15:46:08 +0200")
+References: <5287252.pkh9x0t1Y6@wuerfel> <11408970.yetkS1BjHr@wuerfel>
+Message-ID: <874mhw6mj1.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 01:04:17AM +0800, Chen-Yu Tsai wrote:
-> The physical display tied to the framebuffer may have regulators
-> providing power to it, such as power for LCDs or interface conversion
-> chips.
-> 
-> The number of regulators in use may vary, but the regulator supply
-> binding can not be a list. Work around this by adding a "num-supplies"
-> property to communicate the number of supplies, and a list of 0 ~ N
-> "vinN-supply" properties for the actual regulator supply.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-This is getting more complicated by the minute...
-
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> The z2 machine calls pxa27x_set_pwrmode() in order to power off
+> the machine, but this function gets discarded early at boot because
+> it is marked __init, as pointed out by kbuild:
+>
+> WARNING: vmlinux.o(.text+0x145c4): Section mismatch in reference from the function z2_power_off() to the function .init.text:pxa27x_set_pwrmode()
+> The function z2_power_off() references
+> the function __init pxa27x_set_pwrmode().
+> This is often because z2_power_off lacks a __init
+> annotation or the annotation of pxa27x_set_pwrmode is wrong.
+>
+> This removes the __init section modifier to fix rebooting and the
+> build error.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: ba4a90a6d86a ("ARM: pxa/z2: fix building error of pxa27x_cpu_suspend() no longer available")
 > ---
->  .../devicetree/bindings/video/simple-framebuffer.txt       | 14 ++++++++++----
->  1 file changed, 10 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> index 4474ef6e0b95..0cc43e1be8b5 100644
-> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> @@ -47,10 +47,14 @@ Required properties:
->    - a8b8g8r8 (32-bit pixels, d[31:24]=a, d[23:16]=b, d[15:8]=g, d[7:0]=r).
->  
->  Optional properties:
-> -- clocks : List of clocks used by the framebuffer. Clocks listed here
-> -           are expected to already be configured correctly. The OS must
-> -           ensure these clocks are not modified or disabled while the
-> -           simple framebuffer remains active.
-> +- clocks : List of clocks used by the framebuffer.
-> +- num-supplies : The number of regulators used by the framebuffer.
-> +- vinN-supply : The N-th (from 0) regulator used by the framebuffer.
+> This is a fix for an old bug, I'd just put it into 4.4
+>
+> It showed up now because section mismatches now produce errors instead
+> of warnings.
 
-I don't see why you need num-supplies. Why not just try probing
-vin${N}-supply until such a property isn't present in the DT?
+Hi Arnd,
 
-Thanks,
-Mark.
+I already have this queued for 4.4 from Thierry's patch in :
+  http://www.spinics.net/lists/arm-kernel/msg449414.html
+
+Yet your patch is more complete, as it deals also with the header in pxa27x.h
+and has the fixes tag.
+
+Now I'm wondering if I should enhance Thierry's patch with yours and keeping
+your signoff with your permission, or drop Thierry's one to replace by yours (I
+don't know if it's sane behavior to drop an already queued patch ...)
+
+Cheers.
+
+--
+Robert
