@@ -1,104 +1,62 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 12 Oct 2015 18:31:07 +0200
-Subject: [PATCH 1/2] arm: mvebu: disable unused Armada RTC on ReadyNAS 102,
- 104 and 2120
-In-Reply-To: <2e62abb84de02c0495bde9d60a90282deae40967.1444428035.git.arno@natisbad.org>
- (Arnaud Ebalard's message of "Sat, 10 Oct 2015 00:10:24 +0200")
-References: <cover.1444428035.git.arno@natisbad.org>
- <2e62abb84de02c0495bde9d60a90282deae40967.1444428035.git.arno@natisbad.org>
-Message-ID: <8737xgkq0k.fsf@free-electrons.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 13 Oct 2015 00:32:11 +0800
+Subject: [PATCH v4 0/4] mailbox: hisilicon: add Hi6220 mailbox driver
+Message-ID: <1444667535-16948-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
- 
- On sam., oct. 10 2015, Arnaud Ebalard <arno@natisbad.org> wrote:
+Hi6220 mailbox supports up to 32 channels. Each channel is unidirectional
+with a maximum message size of 8 words. I/O is performed using register
+access (there is no DMA) and the cell raises an interrupt when messages
+are received.
 
-> By default, armada-370-xp.dtsi file has internal RTC enabled.
-> NETGEAR ReadyNAS 102, 104 and 2120 all use an Intersil ISL12057
-> I2C RTC chip. The internal RTC not being disabled in the .dts
-> files of those devices result in the following useless first
-> line during boot:
->
-> [    4.500056] rtc-mv d0010300.rtc: internal RTC not ticking
-> [    4.505684] i2c /dev entries driver
-> [    4.513246] rtc-isl12057 0-0068: rtc core: registered rtc-isl12057 as rtc0
->
-> This patch marks Armada internal RTC as disabled in individual .dts
-> files of those devices.
->
-> Reported-by: TuxOholic <tuxoholic@hotmail.de>
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+This patch series is to implement Hi6220 mailbox driver. It registers
+two channels into framework for communication with MCU, one is tx channel
+and another is rx channel. Now mailbox driver is used to send message to
+MCU to control dynamic voltage and frequency scaling for CPU, GPU and DDR.
 
-Applied on mvebu/dt with Andrew's acked-by
+Changes from v3:
+* The patch series for enabling idle state for Hi6220 has reserved memory
+  regions, so this series will not include it anymore
+* Refined mailbox driver according to Jassi's suggestion;
+  Removed kfifo from mailbox driver;
+  Removed spinlock for ipc registers accessing, due every channel has its
+  own dedicated bit in ipc register and readl/writel will introduce memory
+  barrier, so don't need spinlock to protect ipc registers accessing
+* After mailbox driver is ready, can use patch 4 to enable CPU's OPPs and
+  stub clock driver; finally can enable CPUFreq driver for CPU frequency
+  scaling
 
-Thanks,
+Changes from v2:
+* Get rid of unused memory regions from memory node in DT, and don't use
+  reserved-memory node according to Mark and Leif's suggestion; Haojian also
+  has updated UEFI for efi memory info
 
-Gregory
-> ---
->  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 6 ++++++
->  arch/arm/boot/dts/armada-370-netgear-rn104.dts | 6 ++++++
->  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 6 ++++++
->  3 files changed, 18 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-> index a31207860f34..5851964196bd 100644
-> --- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-> +++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-> @@ -82,6 +82,12 @@
->  		};
->  
->  		internal-regs {
-> +
-> +			/* RTC is provided by Intersil ISL12057 I2C RTC chip */
-> +			rtc at 10300 {
-> +				status = "disabled";
-> +			};
-> +
->  			serial at 12000 {
->  				status = "okay";
->  			};
-> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-> index 00540f292979..b0b07ba677b9 100644
-> --- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-> +++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-> @@ -82,6 +82,12 @@
->  		};
->  
->  		internal-regs {
-> +
-> +			/* RTC is provided by Intersil ISL12057 I2C RTC chip */
-> +			rtc at 10300 {
-> +				status = "disabled";
-> +			};
-> +
->  			serial at 12000 {
->  				status = "okay";
->  			};
-> diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-> index 1516fc2627f9..85b2f87c0b8a 100644
-> --- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-> +++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-> @@ -88,6 +88,12 @@
->  		};
->  
->  		internal-regs {
-> +
-> +			/* RTC is provided by Intersil ISL12057 I2C RTC chip */
-> +			rtc at 10300 {
-> +				status = "disabled";
-> +			};
-> +
->  			/* Two rear eSATA ports */
->  			sata at a0000 {
->  				nr-ports = <2>;
-> -- 
-> 2.5.3
->
->
+Changes from v1:
+* Correct lock usage for SMP scenario
+
+Changes from RFC:
+* According to Jassi's review, totally remove the abstract common driver
+  layer and only commit driver dedicated for Hi6220
+* According to Paul Bolle's review, fix typo issue for Kconfig and remove
+  unnecessary dependency with OF and fix minor for mailbox driver
+* Refine a little for dts nodes
+
+
+Leo Yan (4):
+  dt-bindings: mailbox: Document Hi6220 mailbox driver
+  mailbox: Hi6220: add mailbox driver
+  arm64: dts: add mailbox node for Hi6220
+  arm64: dts: add Hi6220's stub clock node
+
+ .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  |  57 ++++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  31 ++
+ drivers/mailbox/Kconfig                            |   8 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/hi6220-mailbox.c                   | 371 +++++++++++++++++++++
+ 5 files changed, 469 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+ create mode 100644 drivers/mailbox/hi6220-mailbox.c
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.9.1
