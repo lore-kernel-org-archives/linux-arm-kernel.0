@@ -1,24 +1,97 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Mon, 12 Oct 2015 16:20:28 +0200
-Subject: [PATCH] samples: build configfs sample on when enabled
-In-Reply-To: <6271650.CdczvJuMsL@wuerfel>
-References: <6271650.CdczvJuMsL@wuerfel>
-Message-ID: <20151012142028.GA24695@lst.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 12 Oct 2015 16:21:12 +0200
+Subject: [PATCH 1/2] arm: mvebu: disable unused Armada RTC on ReadyNAS
+ 102, 104 and 2120
+In-Reply-To: <2e62abb84de02c0495bde9d60a90282deae40967.1444428035.git.arno@natisbad.org>
+References: <cover.1444428035.git.arno@natisbad.org>
+ <2e62abb84de02c0495bde9d60a90282deae40967.1444428035.git.arno@natisbad.org>
+Message-ID: <20151012142112.GA30801@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 04:14:16PM +0200, Arnd Bergmann wrote:
-> Most samples have their own Kconfig option, but for some reason
-> the configfs sample does not have one and gets built unconditionally
-> when CONFIG_SAMPLES is enabled, which fails if CONFIG_CONFIGFS_FS
-> is not:
+On Sat, Oct 10, 2015 at 12:10:24AM +0200, Arnaud Ebalard wrote:
 > 
-> ERROR: "configfs_unregister_subsystem" [samples/configfs/configfs_sample.ko] undefined!
-> ERROR: "configfs_register_subsystem" [samples/configfs/configfs_sample.ko] undefined!
+> By default, armada-370-xp.dtsi file has internal RTC enabled.
+> NETGEAR ReadyNAS 102, 104 and 2120 all use an Intersil ISL12057
+> I2C RTC chip. The internal RTC not being disabled in the .dts
+> files of those devices result in the following useless first
+> line during boot:
 > 
-> This adds a new Kconfig symbol to mirror the existing method and
-> only let the user enable this sample if configfs is present.
+> [    4.500056] rtc-mv d0010300.rtc: internal RTC not ticking
+> [    4.505684] i2c /dev entries driver
+> [    4.513246] rtc-isl12057 0-0068: rtc core: registered rtc-isl12057 as rtc0
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> This patch marks Armada internal RTC as disabled in individual .dts
+> files of those devices.
+> 
+> Reported-by: TuxOholic <tuxoholic@hotmail.de>
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 
-This should already be in version two of the series I sent last week.
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+
+Thanks Arnaud
+
+       Andrew
+
+
+> ---
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 6 ++++++
+>  arch/arm/boot/dts/armada-370-netgear-rn104.dts | 6 ++++++
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 6 ++++++
+>  3 files changed, 18 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> index a31207860f34..5851964196bd 100644
+> --- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> +++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> @@ -82,6 +82,12 @@
+>  		};
+>  
+>  		internal-regs {
+> +
+> +			/* RTC is provided by Intersil ISL12057 I2C RTC chip */
+> +			rtc at 10300 {
+> +				status = "disabled";
+> +			};
+> +
+>  			serial at 12000 {
+>  				status = "okay";
+>  			};
+> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> index 00540f292979..b0b07ba677b9 100644
+> --- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> +++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> @@ -82,6 +82,12 @@
+>  		};
+>  
+>  		internal-regs {
+> +
+> +			/* RTC is provided by Intersil ISL12057 I2C RTC chip */
+> +			rtc at 10300 {
+> +				status = "disabled";
+> +			};
+> +
+>  			serial at 12000 {
+>  				status = "okay";
+>  			};
+> diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> index 1516fc2627f9..85b2f87c0b8a 100644
+> --- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> +++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> @@ -88,6 +88,12 @@
+>  		};
+>  
+>  		internal-regs {
+> +
+> +			/* RTC is provided by Intersil ISL12057 I2C RTC chip */
+> +			rtc at 10300 {
+> +				status = "disabled";
+> +			};
+> +
+>  			/* Two rear eSATA ports */
+>  			sata at a0000 {
+>  				nr-ports = <2>;
+> -- 
+> 2.5.3
+> 
+> 
