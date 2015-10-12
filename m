@@ -1,69 +1,71 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 13 Oct 2015 01:12:18 +0300
-Subject: [PATCH] ARM: shmobile: porter: enable internal PCI and USB PHY
-In-Reply-To: <3151312.grtDDBsSl8@wasted.cogentembedded.com>
-References: <3151312.grtDDBsSl8@wasted.cogentembedded.com>
-Message-ID: <4574604.BmF3DtBjpm@wasted.cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Oct 2015 15:12:56 -0700
+Subject: [PATCH v2 1/4] ARM: dts: dra7: Add dt node for the sycon pcie
+In-Reply-To: <561C2E93.3020809@ti.com>
+References: <1442323985-29939-1-git-send-email-kishon@ti.com>
+ <1442323985-29939-2-git-send-email-kishon@ti.com>
+ <20151012212149.GZ23801@atomide.com> <561C2A1B.3000201@ti.com>
+ <20151012220322.GF23801@atomide.com> <561C2E93.3020809@ti.com>
+Message-ID: <20151012221255.GG23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable  internal AHB-PCI bridges for the USB EHCI/OHCI controllers attached
-to them and also enable  USB PHY device  for the Porter board.  We have to
-enable  everything in one patch since EHCI/OHCI devices are already linked
-to the USB PHY device.
+* Kishon Vijay Abraham I <kishon@ti.com> [151012 15:09]:
+> Hi,
+> 
+> On Tuesday 13 October 2015 03:33 AM, Tony Lindgren wrote:
+> > * Kishon Vijay Abraham I <kishon@ti.com> [151012 14:50]:
+> >> Hi Tony,
+> >>
+> >> On Tuesday 13 October 2015 02:51 AM, Tony Lindgren wrote:
+> >>> * Kishon Vijay Abraham I <kishon@ti.com> [150915 06:37]:
+> >>>> Add new device tree node for the control module register space where
+> >>>> PCIe registers are present.
+> >>>>
+> >>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >>>> ---
+> >>>>  arch/arm/boot/dts/dra7.dtsi |    5 +++++
+> >>>>  1 file changed, 5 insertions(+)
+> >>>>
+> >>>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> >>>> index 5d65db9..0769b5d 100644
+> >>>> --- a/arch/arm/boot/dts/dra7.dtsi
+> >>>> +++ b/arch/arm/boot/dts/dra7.dtsi
+> >>>> @@ -154,6 +154,11 @@
+> >>>>  					compatible = "syscon";
+> >>>>  					reg = <0x1c04 0x0020>;
+> >>>>  				};
+> >>>> +
+> >>>> +				scm_conf_pcie: tisyscon at 1c24 {
+> >>>> +					compatible = "syscon";
+> >>>> +					reg = <0x1c24 0x0024>;
+> >>>> +				};
+> >>>>  			};
+> >>>>  
+> >>>>  			cm_core_aon: cm_core_aon at 5000 {
+> >>>
+> >>>
+> >>> Why don't you just extend the existing scm_conf1 area? This is not all pcie
+> >>> specific for scm_conf_pcie, at least for PLLEN_CONTROL, RMII_CLK_SETTING
+> >>> and MUXSEL_32K_CLKIN.
+> >>
+> >> scm_conf_pcie has only PCIe registers (it starts at 0x4A003C24).
+> >> PLLEN_CONTROL and others are at 0x4A003C14 as per
+> >> DRA75x_DRA74x_SR1.1_NDA_TRM_vW.
+> > 
+> > Oh sorry I guess I was looking at a wrong address then.
+> > 
+> >> Since PCIe itself has a bunch of registers for itself, thought of
+> >> creating a separate dt node. But I can extend scm_conf1 area.
+> > 
+> > Why not just ioremap them then? Do these need to be shared with
+> > some other driver?
+> 
+> yeah, some are used by PCIe controller driver and some are used by PCIe
+> PHY driver.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+OK makes sense to me then.
 
----
-This patch is against 'renesas-devel-20151012-v4.3-rc5' tag of Simon Horman's
-'renesas.git' repo.
+Thanks,
 
- arch/arm/boot/dts/r8a7791-porter.dts |   28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791-porter.dts
-+++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -120,6 +120,16 @@
- 		renesas,function = "i2c2";
- 	};
- 
-+	usb0_pins: usb0 {
-+		renesas,groups = "usb0";
-+		renesas,function = "usb0";
-+	};
-+
-+	usb1_pins: usb1 {
-+		renesas,groups = "usb1";
-+		renesas,function = "usb1";
-+	};
-+
- 	vin0_pins: vin0 {
- 		renesas,groups = "vin0_data8", "vin0_clk";
- 		renesas,function = "vin0";
-@@ -245,6 +255,24 @@
- 	};
- };
- 
-+&pci0 {
-+	pinctrl-0 = <&usb0_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
-+&pci1 {
-+	pinctrl-0 = <&usb1_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
-+
- &pcie_bus_clk {
- 	status = "okay";
- };
+Tony
