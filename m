@@ -1,69 +1,214 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Oct 2015 15:55:03 -0700
-Subject: [REPOST PATCH 1/4] ARM: dts: DRA7: Add dsp1_system syscon node
-In-Reply-To: <20151012225001.GK23801@atomide.com>
-References: <1443828205-18706-1-git-send-email-s-anna@ti.com>
- <1443828205-18706-2-git-send-email-s-anna@ti.com>
- <20151012214304.GD23801@atomide.com> <561C351B.3060307@ti.com>
- <20151012225001.GK23801@atomide.com>
-Message-ID: <20151012225502.GM23801@atomide.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 12 Oct 2015 16:02:18 -0700
+Subject: [PATCH v2] PCI: layerscape: Add PCIe support for LS1043a and
+ LS2080a
+In-Reply-To: <DM2PR0301MB0640E4928A0BE5393B37D5B3E2310@DM2PR0301MB0640.namprd03.prod.outlook.com>
+References: <1442481219-28299-1-git-send-email-Minghuan.Lian@freescale.com>
+ <20151007175725.GC27633@localhost> <20151011191027.GA29221@localhost>
+ <CADaLNDmHewnyE81UOv61AQEh+uBjcHza9NGm6FaiPFheyjuh4A@mail.gmail.com>
+ <DM2PR0301MB0640E4928A0BE5393B37D5B3E2310@DM2PR0301MB0640.namprd03.prod.outlook.com>
+Message-ID: <CADaLND=wqMSDPT0S=DXiw+zftxU4nNsGGoS9LvYYxqdpaTJzkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [151012 15:57]:
-> * Suman Anna <s-anna@ti.com> [151012 15:37]:
-> > Hi Tony,
-> > 
-> > On 10/12/2015 04:43 PM, Tony Lindgren wrote:
-> > > * Suman Anna <s-anna@ti.com> [151002 16:27]:
-> > >> The DSP_SYSTEM sub-module is a dedicated system control logic
-> > >> module present within a DRA7 DSP processor sub-system. This
-> > >> module is responsible for power management, clock generation
-> > >> and connection to the device PRCM module.
-> > >>
-> > >> Add a syscon node for this module for the DSP1 processor
-> > >> sub-system. This is added as a syscon node as it is a common
-> > >> configuration module that can be used by the different IOMMU
-> > >> instances and the corresponding remoteproc device.
-> > >>
-> > >> The node is added to the common dra7.dtsi file, as the DSP1
-> > >> processor sub-system is mostly common across all the variants
-> > >> of the DRA7 SoC family.
-> > >>
-> > >> Signed-off-by: Suman Anna <s-anna@ti.com>
-> > >> ---
-> > >>  arch/arm/boot/dts/dra7.dtsi | 5 +++++
-> > >>  1 file changed, 5 insertions(+)
-> > >>
-> > >> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> > >> index e289c706d27d..62055094e8d5 100644
-> > >> --- a/arch/arm/boot/dts/dra7.dtsi
-> > >> +++ b/arch/arm/boot/dts/dra7.dtsi
-> > >> @@ -292,6 +292,11 @@
-> > >>  				#thermal-sensor-cells = <1>;
-> > >>  		};
-> > >>  
-> > >> +		dsp1_system: dsp_system at 40d00000 {
-> > >> +			compatible = "syscon";
-> > >> +			reg = <0x40d00000 0x100>;
-> > >> +		};
-> > >> +
-> > >>  		sdma: dma-controller at 4a056000 {
-> > >>  			compatible = "ti,omap4430-sdma";
-> > >>  			reg = <0x4a056000 0x1000>;
-> > > 
-> > > Hmm so why would you want to set up a complete device as a syscon
-> > > mapping rather than just doing ioremap on it?
-> > > 
-> > > What drivers will be sharing access to these registers?
-> > 
-> > Two different instances of the MMU for now, both get probed
-> > independently. But there are other registers which a remoteproc driver
-> > will mostly be interested in (like DSP_SYS_STAT for knowing the C66x
-> > idle/active status).
-> 
-> OK makes sense to me then.
+On Sun, Oct 11, 2015 at 7:53 PM, Lian M.H. <Minghuan.Lian@freescale.com> wrote:
+> Hi Duc,
+>
+> I notice your patches removed all the related MSI code and you descriptor said " Remove this unnecessary code. This also avoids a warning message ("failed to enable MSI") during boot ".
+> I have a question.
+> Do we need a warning when MSI-parent is missing?
 
-And applying these into omap-for-v4.4/dt.
+Hi Lian,
 
-Tony
+In case of X-Gene PCIe: No. Initially, X-Gene PCIe driver does not
+support MSI. Later on, MSI support was added with the code to look for
+msi-parent property. But then thanks to recent works on msi irqdomain,
+these code is no longer needed to support MSI for X-Gene PCIe, so I
+removed them.
+
+>
+> Thanks,
+> Minghuan
+>
+>> -----Original Message-----
+>> From: Duc Dang [mailto:dhdang at apm.com]
+>> Sent: Monday, October 12, 2015 9:48 AM
+>> To: Bjorn Helgaas <helgaas@kernel.org>
+>> Cc: Lian Minghuan-B31939 <Minghuan.Lian@freescale.com>;
+>> linux-pci at vger.kernel.org; linux-arm <linux-arm-kernel@lists.infradead.org>;
+>> Zang Roy-R61911 <tie-fei.zang@freescale.com>; Hu Mingkai-B21284
+>> <Mingkai.Hu@freescale.com>; Yoder Stuart-B08248
+>> <stuart.yoder@freescale.com>; Li Yang-Leo-R58472 <LeoLi@freescale.com>;
+>> Arnd Bergmann <arnd@arndb.de>; Bjorn Helgaas <bhelgaas@google.com>;
+>> Jingoo Han <jg1.han@samsung.com>; Zhou Wang
+>> <wangzhou1@hisilicon.com>; Thomas Petazzoni
+>> <thomas.petazzoni@free-electrons.com>; Jason Cooper
+>> <jason@lakedaemon.net>; Tanmay Inamdar <tinamdar@apm.com>
+>> Subject: Re: [PATCH v2] PCI: layerscape: Add PCIe support for LS1043a and
+>> LS2080a
+>>
+>> On Sun, Oct 11, 2015 at 12:10 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+>> > [+cc Thomas, Jason, Tanmay]
+>> >
+>> > Hi Minghuan,
+>> >
+>> > You responded to this message, but your response was rejected by the
+>> > mailing list, I think because it was not plain text.  See
+>> > http://vger.kernel.org/majordomo-info.html
+>> >
+>> > I went ahead and reconstructed what your response would have looked
+>> > like so I could continue the conversation.  But please fix your email
+>> > setup before responding again :)
+>> >
+>> > Minghuan wrote:
+>> >> On Wed, Oct 07, 2015 at 12:57:25PM -0500, Bjorn Helgaas wrote:
+>> >> > Hi Minghuan,
+>> >> >
+>> >> > On Thu, Sep 17, 2015 at 05:13:39PM +0800, Minghuan Lian wrote:
+>> >> > > The patch adds PCIe support for LS1043a and LS2080a.
+>> >> > >
+>> >> > > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+>> >> > > ---
+>> >> > > This patch is based on v4.3-rc1 and [PATCH v9 0/6]
+>> >> > > PCI: hisi: Add PCIe host support for HiSilicon SoC Hip05 patchset
+>> >> > > from Zhou Wang.
+>> >> > >
+>> >> > > change log
+>> >> > > v2:
+>> >> > > 1. rename ls2085a to ls2080a
+>> >> > > 2. Add ls_pcie_msi_host_init()
+>> >> > >
+>> >> > >  drivers/pci/host/Kconfig          |   2 +-
+>> >> > >  drivers/pci/host/pci-layerscape.c | 227
+>> >> > > ++++++++++++++++++++++++++------------
+>> >> > >  2 files changed, 157 insertions(+), 72 deletions(-)
+>> >> > >
+>> >> > > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+>> >> > > index ae873be..38fe8a8 100644
+>> >> > > --- a/drivers/pci/host/Kconfig
+>> >> > > +++ b/drivers/pci/host/Kconfig
+>> >> > > @@ -105,7 +105,7 @@ config PCI_XGENE_MSI
+>> >> > >
+>> >> > >  config PCI_LAYERSCAPE
+>> >> > >   bool "Freescale Layerscape PCIe controller"
+>> >> > > - depends on OF && ARM
+>> >> > > + depends on OF && (ARM || ARM64)
+>> >> >
+>> >> > It seems like there are a couple things going on here, and I wonder
+>> >> > if you can split them out into separate patches.
+>> >> >
+>> >> > 1) Making this work on ARM64 as well as on ARM.  This may be of
+>> >> > interest for other DesignWare-based drivers, so if you split this
+>> >> > out, maybe it would be a useful template for converting the other
+>> >> > drivers, too.
+>> >> >
+>> >> > 2) Adding LS1043a and LS2080a.  Obviously, this is only of interest
+>> >> > to this driver, but maybe it could be separated out into a separate
+>> >> > patch?
+>> >
+>> >> The patch is based on v4.3-rc1 and [PATCH v9 0/6] PCI: hisi: Add PCIe
+>> >> host support for HiSilicon SoC Hip05 patchset from Zhou Wang which
+>> >> adds arm and
+>> >> arm64 support.
+>> >>
+>> >> The original code with the Zhou Wang's patches can support arm64 as well.
+>> >> Because both LS1043a and LS2085 are armv8 (arm64) architecture, the
+>> >> patch updates Kconfig to add 'arm64'.
+>> >>
+>> >> If splitting two patches, the first patch for arm64 support only
+>> >> includes one line changes of Kconfig. So, I think it is unnecessary.
+>> >
+>> > It's OK if the first patch is very small.  The point is that the patch
+>> > does two orthogonal things, and those two things should be in separate
+>> > commits.  This makes bisection work better, and it reduces the amount
+>> > of functionality removed if we have to revert something.
+>> >
+>> >> > > +static int ls_pcie_msi_host_init(struct pcie_port *pp,
+>> >> > > +                          struct msi_controller *chip) {  struct
+>> >> > > +device_node *msi_node;  struct device_node *np =
+>> >> > > +pp->dev->of_node;
+>> >> > > +
+>> >> > > + msi_node = of_parse_phandle(np, "msi-parent", 0); if
+>> >> > > + (!msi_node) {
+>> >> > > +         dev_err(pp->dev, "failed to find msi-parent\n");
+>> >> > > +         return -EINVAL;
+>> >> > > + }
+>> >> >
+>> >> > This doesn't actually *do* anything except complain if "msi-parent"
+>> >> > is missing.  I'm not sure that's worth doing: if we need "msi-parent"
+>> >> > somewhere, we should complain there if we don't find it.  If we
+>> >> > don't need it, why complain if it's missing?
+>> >
+>> >> driver/of/irq.c  void of_msi_configure(struct device *dev, struct
+>> >> device_node *np) will bind "msi-parent" to each device if there is
+>> >> "msi-parent" handler. The PCIe driver do not need to do anything. If
+>> >> we do not check "msi-parent" here, we will have no chance to check it.
+>> >> The common code of 'of' and 'pci' bus driver will not complain,
+>> >> because the msi controller may be found by other way.
+>> >
+>> > Hmm.   In mvebu_pcie_msi_enable() and xgene_pcie_msi_enable(), we
+>> > also look for "msi-parent".  If that fails, mvebu continues silently
+>> > and xgene complains (but only if CONFIG_PCI_MSI=y).
+>> >
+>> > This seems like three unnecessarily different ways of doing the same
+>> > thing.
+>>
+>> For X-Gene MSI, this is the old code where at the time the code was prepared,
+>> msi_controller needs to be assigned to a host bridge so that the bridge can
+>> support MSI. Until now, with recent changes on MSI irqdomain from Marc and
+>> others, we can drop this msi_controller assignment completely as my recent
+>> patch that you merged to pci/host-xgene branch:
+>> https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/host
+>> -xgene
+>>
+>> >
+>> > I cc'd the maintainers of those drivers; maybe we can agree on a
+>> > single strategy.
+>> >
+>> >> > >  static int __init ls_pcie_probe(struct platform_device *pdev)  {
+>> >> > > ...
+>> >> > > - ret = ls_add_pcie_port(pcie);
+>> >> > > - if (ret < 0)
+>> >> > > + ret = dw_pcie_host_init(pp);
+>> >> >
+>> >> > We have several DesignWare-based drivers (dra7xx, exynos, imx6, ks,
+>> >> > ls, spear13xx), and I'd like to keep their structure as similar as
+>> >> > possible.  For example, they all have basically this structure:
+>> >> >
+>> >> >   X_pcie_probe
+>> >> >     X_add_pcie_port
+>> >> >       dw_pcie_host_init             # pp->ops->host_init callback
+>> >> >         X_pcie_host_init
+>> >> >           X_pcie_establish_link
+>> >> >
+>> >> > This patch removes ls_add_pcie_port() and ls_pcie_establish_link(),
+>> >> > so we're diverging a bit.  That makes it harder to see the
+>> >> > similarities across these drivers, which I think is a loss.
+>> >
+>> >> I will add X_add_pcie_port. But we do not need X_pcie_establish_link
+>> >> because we do not need change/reset phy to establish link, besides,
+>> >> the PCIe controller slot may be not inserted any PCIe device at all.
+>> >> If each controller waits some time for link, the start time will
+>> >> increase a lot. In some scenes, long start-up time is not acceptable.
+>> >
+>> > If we wait for a timeout trying to establish a link when the slot is
+>> > empty, it sounds like something's wrong.  Can't we tell from presence
+>> > detect whether a card is present, even without trying to bring up the
+>> > link?
+>> >
+>> > If we truly do not need a piece like X_pcie_establish_link(), I'm OK
+>> > with entirely omitting it.  What I really object to is when we have
+>> > the same functionality two places with different names or structured
+>> > two different ways.
+>> >
+>> > Bjorn
+>> > --
+>> > To unsubscribe from this list: send the line "unsubscribe linux-pci"
+>> > in the body of a message to majordomo at vger.kernel.org More majordomo
+>> > info at  http://vger.kernel.org/majordomo-info.html
+>>
+>> Regards,
+>> Duc Dang.
+
+Regards.
+Duc Dang.
