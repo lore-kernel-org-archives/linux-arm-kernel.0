@@ -1,29 +1,47 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Mon, 12 Oct 2015 18:53:00 +0300
-Subject: [PATCH v7 4/4] Documentation/features/KASAN: arm64 supports KASAN now
-In-Reply-To: <1444665180-301-1-git-send-email-ryabinin.a.a@gmail.com>
-References: <1444665180-301-1-git-send-email-ryabinin.a.a@gmail.com>
-Message-ID: <1444665180-301-5-git-send-email-ryabinin.a.a@gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 12 Oct 2015 21:30:25 +0530
+Subject: [PATCH v4 11/25] ARM/dmaengine: edma: Merge the two drivers
+ under drivers/dma/
+In-Reply-To: <1443088932-21731-12-git-send-email-peter.ujfalusi@ti.com>
+References: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
+ <1443088932-21731-12-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20151012160024.GF27370@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
----
- Documentation/features/debug/KASAN/arch-support.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Thu, Sep 24, 2015 at 01:01:58PM +0300, Peter Ujfalusi wrote:
+> Move the code out from arch/arm/common and merge it inside of the dmaengine
+> driver.
+> This change is done with as minimal change to the code as possible to avoid
+> any possibilities to introducing regression.
 
-diff --git a/Documentation/features/debug/KASAN/arch-support.txt b/Documentation/features/debug/KASAN/arch-support.txt
-index 14531da..703f578 100644
---- a/Documentation/features/debug/KASAN/arch-support.txt
-+++ b/Documentation/features/debug/KASAN/arch-support.txt
-@@ -9,7 +9,7 @@
-     |       alpha: | TODO |
-     |         arc: | TODO |
-     |         arm: | TODO |
--    |       arm64: | TODO |
-+    |       arm64: |  ok  |
-     |       avr32: | TODO |
-     |    blackfin: | TODO |
-     |         c6x: | TODO |
+Is this a pure move patch or code has been modified, if latter am
+disappointed that existing code style issue have not been fixed
+
+
+> +static inline void edma_write(struct edma_cc *ecc, int offset, int val)
+> +{
+> +	__raw_writel(val, ecc->base + offset);
+> +}
+> +static inline void edma_modify(struct edma_cc *ecc, int offset, unsigned and,
+> +			       unsigned or)
+
+This looks bad on my 80 char screen, and few more places below
+
+> +{
+> +	unsigned val = edma_read(ecc, offset);
+
+checkpatch should have asked you to add empty line here, many places below
+too
+
+> +	val &= and;
+> +	val |= or;
+> +	edma_write(ecc, offset, val);
+> +}
+
+empty line here and few more places
+
+More later :)
+
 -- 
-2.4.9
+~Vinod
