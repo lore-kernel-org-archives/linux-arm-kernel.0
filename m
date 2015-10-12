@@ -1,68 +1,61 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Mon, 12 Oct 2015 14:00:38 +0800
-Subject: [PATCH] ARM:mm: fix kmap_atomic_to_page
-In-Reply-To: <1444129773-12632-1-git-send-email-chanho.min@lge.com>
-References: <1444129773-12632-1-git-send-email-chanho.min@lge.com>
-Message-ID: <3B252F19-0EE2-4CE3-81B5-E8BED7212A2D@gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 12 Oct 2015 14:04:28 +0800
+Subject: [PATCH 01/16] irqdomain: Use an accessor for the of_node field
+In-Reply-To: <1444152989-31726-2-git-send-email-marc.zyngier@arm.com>
+References: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
+ <1444152989-31726-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <561B4D6C.7000404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On Oct 6, 2015, at 19:09, Chanho Min <chanho.min@lge.com> wrote:
-> 
-> Since kmap_atomic returns the pkmap address without a new mapping to
-> fixmap for the page that is already mapped by kmap, It should be
-> considered for the pkmap address in kmap_atomic_to_page.
-> 
-> Signed-off-by: Chanho Min <chanho.min@lge.com>
+On 10/07/2015 01:36 AM, Marc Zyngier wrote:
+> The struct irq_domain contains a "struct device_node *" field
+> (of_node) that is almost the only link between the irqdomain
+> and the device tree infrastructure.
+>
+> In order to prepare for the removal of that field, convert all
+> users to use an accessor.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
-> arch/arm/mm/highmem.c |   11 ++++++++---
-> 1 file changed, 8 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-> index 45aeaac..3e973b7 100644-
-> --- a/arch/arm/mm/highmem.c
-> +++ b/arch/arm/mm/highmem.c
-> @@ -145,8 +145,13 @@ struct page *kmap_atomic_to_page(const void *ptr)
-> {
-> 	unsigned long vaddr = (unsigned long)ptr;
-> 
-> -	if (vaddr < FIXADDR_START)
-> -		return virt_to_page(ptr);
-> +	if (vaddr >= PKMAP_ADDR(0) && vaddr < PKMAP_ADDR(LAST_PKMAP)) {
-> +		int i = PKMAP_NR(vaddr);
-> +		return pte_page(pkmap_page_table[i]);
-> +	}
-> +
-> +	if (vaddr >= FIXADDR_START)
-> +		return pte_page(get_fixmap_pte(vaddr));
-> 
-> -	return pte_page(get_fixmap_pte(vaddr));
-> +	return virt_to_page(ptr);
-> }
-> -- 
-> 1.7.9.5
-> 
-why not change like this,
-more simple :
+>   arch/arm/mach-omap2/omap-wakeupgen.c          |  2 +-
+>   arch/c6x/platforms/megamod-pic.c              |  2 +-
+>   arch/mips/cavium-octeon/octeon-irq.c          |  4 ++--
+>   arch/powerpc/platforms/cell/axon_msi.c        |  2 +-
+>   arch/powerpc/platforms/cell/spider-pic.c      |  9 +++++---
+>   arch/powerpc/platforms/pasemi/msi.c           |  6 ++++--
+>   arch/powerpc/platforms/powernv/opal-irqchip.c |  2 +-
+>   arch/powerpc/sysdev/ehv_pic.c                 |  3 ++-
+>   arch/powerpc/sysdev/fsl_msi.c                 |  2 +-
+>   arch/powerpc/sysdev/i8259.c                   |  3 ++-
+>   arch/powerpc/sysdev/ipic.c                    |  3 ++-
+>   arch/powerpc/sysdev/mpic.c                    |  3 ++-
+>   arch/powerpc/sysdev/mpic_msi.c                |  2 +-
+>   arch/powerpc/sysdev/qe_lib/qe_ic.c            |  3 ++-
+>   drivers/gpio/gpio-sodaville.c                 |  2 +-
+>   drivers/irqchip/exynos-combiner.c             |  2 +-
+>   drivers/irqchip/irq-atmel-aic-common.c        |  2 +-
+>   drivers/irqchip/irq-crossbar.c                |  4 ++--
+>   drivers/irqchip/irq-gic-v2m.c                 |  2 +-
+>   drivers/irqchip/irq-gic-v3-its.c              |  2 +-
+>   drivers/irqchip/irq-gic-v3.c                  |  2 +-
+>   drivers/irqchip/irq-gic.c                     |  2 +-
+>   drivers/irqchip/irq-hip04.c                   |  2 +-
+>   drivers/irqchip/irq-imx-gpcv2.c               |  2 +-
+>   drivers/irqchip/irq-mtk-sysirq.c              |  2 +-
+>   drivers/irqchip/irq-s3c24xx.c                 |  4 ++--
+>   drivers/irqchip/irq-tegra.c                   |  4 ++--
+>   drivers/irqchip/irq-vf610-mscm-ir.c           |  5 +++--
+>   drivers/spmi/spmi-pmic-arb.c                  |  2 +-
+>   include/linux/irqdomain.h                     |  5 +++++
+>   kernel/irq/irqdomain.c                        | 30 +++++++++++++++++++--------
+>   31 files changed, 74 insertions(+), 46 deletions(-)
 
-diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-index 9df5f09..4eeed3d 100644
---- a/arch/arm/mm/highmem.c
-+++ b/arch/arm/mm/highmem.c
-@@ -152,8 +152,7 @@ struct page *kmap_atomic_to_page(const void *ptr)
- {
-        unsigned long vaddr = (unsigned long)ptr;
- 
--       if (vaddr < FIXADDR_START)
--               return virt_to_page(ptr);
--
--       return pte_page(get_fixmap_pte(vaddr));
-+       if (vaddr >= FIXADDR_START && vaddr <= FIXADDR_TOP)
-+               return pte_page(get_fixmap_pte(vaddr));
-+       return kmap_to_page(ptr);
- }
-
-
+Some missing files I noticed:
+./arch/arm/mach-imx/gpc.c:	if (domain->of_node != controller)
+./arch/arm/mach-imx/gpc.c:	parent_args.np = domain->parent->of_node;
+./arch/arm/mach-exynos/suspend.c:	if (domain->of_node != controller)
+./arch/arm/mach-exynos/suspend.c:	parent_args.np = domain->parent->of_node;
 
 Thanks
+Hanjun
