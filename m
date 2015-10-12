@@ -1,433 +1,157 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 13 Oct 2015 00:32:13 +0800
-Subject: [PATCH v4 2/4] mailbox: Hi6220: add mailbox driver
-In-Reply-To: <1444667535-16948-1-git-send-email-leo.yan@linaro.org>
-References: <1444667535-16948-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1444667535-16948-3-git-send-email-leo.yan@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 12 Oct 2015 18:32:17 +0200
+Subject: [PATCH 2/2] arm: mvebu: reorder nodes under internal-regs by
+ address in RN2120 .dts file
+In-Reply-To: <20151012142324.GB30801@lunn.ch> (Andrew Lunn's message of "Mon,
+ 12 Oct 2015 16:23:24 +0200")
+References: <cover.1444428035.git.arno@natisbad.org>
+ <277de75473af2431849a7494ae65b57dbc9a8309.1444428035.git.arno@natisbad.org>
+ <20151012142324.GB30801@lunn.ch>
+Message-ID: <87y4f8jbe6.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add driver for Hi6220 mailbox, the mailbox communicates with MCU; for
-sending data, it can support two methods for low level implementation:
-one is to use interrupt as acknowledge, another is automatic mode which
-without any acknowledge. These two methods have been supported in the
-driver. For receiving data, it will depend on the interrupt to notify
-the channel has incoming message.
-
-Now mailbox driver is used to send message to MCU to control dynamic
-voltage and frequency scaling for CPU, GPU and DDR.
-
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- drivers/mailbox/Kconfig          |   8 +
- drivers/mailbox/Makefile         |   2 +
- drivers/mailbox/hi6220-mailbox.c | 371 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 381 insertions(+)
- create mode 100644 drivers/mailbox/hi6220-mailbox.c
-
-diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-index bbec500..41fb7fa 100644
---- a/drivers/mailbox/Kconfig
-+++ b/drivers/mailbox/Kconfig
-@@ -71,4 +71,12 @@ config BCM2835_MBOX
- 	  the services of the Videocore. Say Y here if you want to use the
- 	  BCM2835 Mailbox.
+Hi Andrew,
  
-+config HI6220_MBOX
-+	tristate "Hi6220 Mailbox"
-+	depends on ARCH_HISI
-+	help
-+	  An implementation of the hi6220 mailbox. It is used to send message
-+	  between application processors and MCU. Say Y here if you want to build
-+	  the Hi6220 mailbox controller driver.
-+
- endif
-diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-index 8e6d822..4ba9f5f 100644
---- a/drivers/mailbox/Makefile
-+++ b/drivers/mailbox/Makefile
-@@ -13,3 +13,5 @@ obj-$(CONFIG_PCC)		+= pcc.o
- obj-$(CONFIG_ALTERA_MBOX)	+= mailbox-altera.o
- 
- obj-$(CONFIG_BCM2835_MBOX)	+= bcm2835-mailbox.o
-+
-+obj-$(CONFIG_HI6220_MBOX)	+= hi6220-mailbox.o
-diff --git a/drivers/mailbox/hi6220-mailbox.c b/drivers/mailbox/hi6220-mailbox.c
-new file mode 100644
-index 0000000..c0e19d5
---- /dev/null
-+++ b/drivers/mailbox/hi6220-mailbox.c
-@@ -0,0 +1,371 @@
-+/*
-+ * Hisilicon's Hi6220 mailbox driver
-+ *
-+ * Copyright (c) 2015 Hisilicon Limited.
-+ * Copyright (c) 2015 Linaro Limited.
-+ *
-+ * Author: Leo Yan <leo.yan@linaro.org>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation, version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/kfifo.h>
-+#include <linux/mailbox_controller.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+
-+#define MBOX_CHAN_MAX			32
-+#define MBOX_CHAN_NUM			2
-+
-+#define MBOX_RX				0x0
-+#define MBOX_TX				0x1
-+
-+/* Mailbox message length: 8 words */
-+#define MBOX_MSG_LEN			8
-+
-+/* Mailbox Registers */
-+#define MBOX_OFF(m)			(0x40 * (m))
-+#define MBOX_MODE_REG(m)		(MBOX_OFF(m) + 0x0)
-+#define MBOX_DATA_REG(m)		(MBOX_OFF(m) + 0x4)
-+
-+#define MBOX_STATE_MASK			(0xF << 4)
-+#define MBOX_STATE_IDLE			(0x1 << 4)
-+#define MBOX_STATE_TX			(0x2 << 4)
-+#define MBOX_STATE_RX			(0x4 << 4)
-+#define MBOX_STATE_ACK			(0x8 << 4)
-+#define MBOX_ACK_CONFIG_MASK		(0x1 << 0)
-+#define MBOX_ACK_AUTOMATIC		(0x1 << 0)
-+#define MBOX_ACK_IRQ			(0x0 << 0)
-+
-+/* IPC registers */
-+#define ACK_INT_RAW_REG(i)		((i) + 0x400)
-+#define ACK_INT_MSK_REG(i)		((i) + 0x404)
-+#define ACK_INT_STAT_REG(i)		((i) + 0x408)
-+#define ACK_INT_CLR_REG(i)		((i) + 0x40c)
-+#define ACK_INT_ENA_REG(i)		((i) + 0x500)
-+#define ACK_INT_DIS_REG(i)		((i) + 0x504)
-+#define DST_INT_RAW_REG(i)		((i) + 0x420)
-+
-+
-+struct hi6220_mbox_chan {
-+
-+	/*
-+	 * Description for channel's hardware info:
-+	 *  - direction: tx or rx
-+	 *  - dst irq: peer core's irq number
-+	 *  - ack irq: local irq number
-+	 *  - slot number
-+	 */
-+	unsigned int dir, dst_irq, ack_irq;
-+	unsigned int slot;
-+
-+	struct hi6220_mbox *parent;
-+};
-+
-+struct hi6220_mbox {
-+	struct device *dev;
-+
-+	int irq;
-+
-+	/* flag of enabling tx's irq mode */
-+	bool tx_irq_mode;
-+
-+	/* region for ipc event */
-+	void __iomem *ipc;
-+
-+	/* region for mailbox */
-+	void __iomem *base;
-+
-+	unsigned int chan_num;
-+	struct hi6220_mbox_chan *mchan;
-+
-+	void *irq_map_chan[MBOX_CHAN_MAX];
-+	struct mbox_chan *chan;
-+	struct mbox_controller controller;
-+};
-+
-+static void mbox_set_state(struct hi6220_mbox *mbox,
-+			   unsigned int slot, u32 val)
-+{
-+	u32 status;
-+
-+	status = readl(mbox->base + MBOX_MODE_REG(slot));
-+	status = (status & ~MBOX_STATE_MASK) | val;
-+	writel(status, mbox->base + MBOX_MODE_REG(slot));
-+}
-+
-+static void mbox_set_mode(struct hi6220_mbox *mbox,
-+			  unsigned int slot, u32 val)
-+{
-+	u32 mode;
-+
-+	mode = readl(mbox->base + MBOX_MODE_REG(slot));
-+	mode = (mode & ~MBOX_ACK_CONFIG_MASK) | val;
-+	writel(mode, mbox->base + MBOX_MODE_REG(slot));
-+}
-+
-+static bool hi6220_mbox_last_tx_done(struct mbox_chan *chan)
-+{
-+	struct hi6220_mbox_chan *mchan = chan->con_priv;
-+	struct hi6220_mbox *mbox = mchan->parent;
-+	u32 state;
-+
-+	/* Only set idle state for polling mode */
-+	BUG_ON(mbox->tx_irq_mode);
-+
-+	state = readl(mbox->base + MBOX_MODE_REG(mchan->slot));
-+	return ((state & MBOX_STATE_MASK) == MBOX_STATE_IDLE);
-+}
-+
-+static int hi6220_mbox_send_data(struct mbox_chan *chan, void *msg)
-+{
-+	struct hi6220_mbox_chan *mchan = chan->con_priv;
-+	struct hi6220_mbox *mbox = mchan->parent;
-+	unsigned int slot = mchan->slot;
-+	u32 *buf = msg;
-+	int i;
-+
-+	mbox_set_state(mbox, slot, MBOX_STATE_TX);
-+
-+	if (mbox->tx_irq_mode)
-+		mbox_set_mode(mbox, slot, MBOX_ACK_IRQ);
-+	else
-+		mbox_set_mode(mbox, slot, MBOX_ACK_AUTOMATIC);
-+
-+	for (i = 0; i < MBOX_MSG_LEN; i++)
-+		writel(buf[i], mbox->base + MBOX_DATA_REG(slot) + i * 4);
-+
-+	/* trigger remote request */
-+	writel(BIT(mchan->dst_irq), DST_INT_RAW_REG(mbox->ipc));
-+	return 0;
-+}
-+
-+static irqreturn_t hi6220_mbox_interrupt(int irq, void *p)
-+{
-+	struct hi6220_mbox *mbox = p;
-+	struct hi6220_mbox_chan *mchan;
-+	struct mbox_chan *chan;
-+	unsigned int state, intr_bit, i;
-+	u32 msg[MBOX_MSG_LEN];
-+
-+	state = readl(ACK_INT_STAT_REG(mbox->ipc));
-+	if (!state) {
-+		dev_warn(mbox->dev, "%s: spurious interrupt\n",
-+			 __func__);
-+		return IRQ_HANDLED;
-+	}
-+
-+	while (state) {
-+		intr_bit = __ffs(state);
-+		state &= (state - 1);
-+
-+		chan = mbox->irq_map_chan[intr_bit];
-+		if (!chan) {
-+			dev_warn(mbox->dev, "%s: unexpected irq vector %d\n",
-+				 __func__, intr_bit);
-+			continue;
-+		}
-+
-+		mchan = chan->con_priv;
-+		if (mchan->dir == MBOX_TX)
-+			mbox_chan_txdone(chan, 0);
-+		else {
-+			for (i = 0; i < MBOX_MSG_LEN; i++)
-+				msg[i] = readl(mbox->base +
-+					MBOX_DATA_REG(mchan->slot) + i * 4);
-+
-+			mbox_chan_received_data(chan, (void *)msg);
-+		}
-+
-+		/* clear IRQ source */
-+		writel(BIT(mchan->ack_irq), ACK_INT_CLR_REG(mbox->ipc));
-+		mbox_set_state(mbox, mchan->slot, MBOX_STATE_IDLE);
-+	}
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int hi6220_mbox_startup(struct mbox_chan *chan)
-+{
-+	struct hi6220_mbox_chan *mchan = chan->con_priv;
-+	struct hi6220_mbox *mbox = mchan->parent;
-+
-+	mbox->irq_map_chan[mchan->ack_irq] = (void *)chan;
-+
-+	/* enable interrupt */
-+	writel(BIT(mchan->ack_irq), ACK_INT_ENA_REG(mbox->ipc));
-+	return 0;
-+}
-+
-+static void hi6220_mbox_shutdown(struct mbox_chan *chan)
-+{
-+	struct hi6220_mbox_chan *mchan = chan->con_priv;
-+	struct hi6220_mbox *mbox = mchan->parent;
-+
-+	/* disable interrupt */
-+	writel(BIT(mchan->ack_irq), ACK_INT_DIS_REG(mbox->ipc));
-+	mbox->irq_map_chan[mchan->ack_irq] = NULL;
-+}
-+
-+static struct mbox_chan_ops hi6220_mbox_chan_ops = {
-+	.send_data    = hi6220_mbox_send_data,
-+	.startup      = hi6220_mbox_startup,
-+	.shutdown     = hi6220_mbox_shutdown,
-+	.last_tx_done = hi6220_mbox_last_tx_done,
-+};
-+
-+static void hi6220_mbox_init_hw(struct hi6220_mbox *mbox)
-+{
-+	struct hi6220_mbox_chan init_data[MBOX_CHAN_NUM] = {
-+		{ MBOX_RX, 1, 10 },
-+		{ MBOX_TX, 0, 11 },
-+	};
-+	struct hi6220_mbox_chan *mchan = mbox->mchan;
-+	int i;
-+
-+	for (i = 0; i < MBOX_CHAN_NUM; i++) {
-+		memcpy(&mchan[i], &init_data[i], sizeof(*mchan));
-+		mchan[i].slot = i;
-+		mchan[i].parent = mbox;
-+	}
-+
-+	/* mask and clear all interrupt vectors */
-+	writel(0x0,  ACK_INT_MSK_REG(mbox->ipc));
-+	writel(~0x0, ACK_INT_CLR_REG(mbox->ipc));
-+
-+	/* use interrupt for tx's ack */
-+	mbox->tx_irq_mode = true;
-+}
-+
-+static const struct of_device_id hi6220_mbox_of_match[] = {
-+	{ .compatible = "hisilicon,hi6220-mbox", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, hi6220_mbox_of_match);
-+
-+static int hi6220_mbox_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct hi6220_mbox *mbox;
-+	struct resource *res;
-+	int i, err;
-+
-+	mbox = devm_kzalloc(dev, sizeof(*mbox), GFP_KERNEL);
-+	if (!mbox)
-+		return -ENOMEM;
-+
-+	mbox->dev = dev;
-+	mbox->chan_num = MBOX_CHAN_NUM;
-+	mbox->mchan = devm_kzalloc(dev,
-+		mbox->chan_num * sizeof(*mbox->mchan), GFP_KERNEL);
-+	if (!mbox->mchan)
-+		return -ENOMEM;
-+
-+	mbox->chan = devm_kzalloc(dev,
-+		mbox->chan_num * sizeof(*mbox->chan), GFP_KERNEL);
-+	if (!mbox->chan)
-+		return -ENOMEM;
-+
-+	mbox->irq = platform_get_irq(pdev, 0);
-+	if (mbox->irq < 0)
-+		return mbox->irq;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mbox->ipc = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(mbox->ipc)) {
-+		dev_err(dev, "ioremap ipc failed\n");
-+		return PTR_ERR(mbox->ipc);
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	mbox->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(mbox->base)) {
-+		dev_err(dev, "ioremap buffer failed\n");
-+		return PTR_ERR(mbox->base);
-+	}
-+
-+	err = devm_request_irq(dev, mbox->irq, hi6220_mbox_interrupt, 0,
-+			dev_name(dev), mbox);
-+	if (err) {
-+		dev_err(dev, "Failed to register a mailbox IRQ handler: %d\n",
-+			err);
-+		return -ENODEV;
-+	}
-+
-+	/* init hardware parameters */
-+	hi6220_mbox_init_hw(mbox);
-+
-+	for (i = 0; i < mbox->chan_num; i++) {
-+		mbox->chan[i].con_priv = &mbox->mchan[i];
-+		mbox->irq_map_chan[i] = NULL;
-+	}
-+
-+	mbox->controller.dev = dev;
-+	mbox->controller.chans = &mbox->chan[0];
-+	mbox->controller.num_chans = mbox->chan_num;
-+	mbox->controller.ops = &hi6220_mbox_chan_ops;
-+
-+	if (mbox->tx_irq_mode)
-+		mbox->controller.txdone_irq = true;
-+	else {
-+		mbox->controller.txdone_poll = true;
-+		mbox->controller.txpoll_period = 5;
-+	}
-+
-+	err = mbox_controller_register(&mbox->controller);
-+	if (err) {
-+		dev_err(dev, "Failed to register mailbox %d\n", err);
-+		return err;
-+	}
-+
-+	platform_set_drvdata(pdev, mbox);
-+	dev_info(dev, "Mailbox enabled\n");
-+	return 0;
-+}
-+
-+static int hi6220_mbox_remove(struct platform_device *pdev)
-+{
-+	struct hi6220_mbox *mbox = platform_get_drvdata(pdev);
-+
-+	mbox_controller_unregister(&mbox->controller);
-+	return 0;
-+}
-+
-+static struct platform_driver hi6220_mbox_driver = {
-+	.driver = {
-+		.name = "hi6220-mbox",
-+		.owner = THIS_MODULE,
-+		.of_match_table = hi6220_mbox_of_match,
-+	},
-+	.probe	= hi6220_mbox_probe,
-+	.remove	= hi6220_mbox_remove,
-+};
-+
-+static int __init hi6220_mbox_init(void)
-+{
-+	return platform_driver_register(&hi6220_mbox_driver);
-+}
-+core_initcall(hi6220_mbox_init);
-+
-+static void __exit hi6220_mbox_exit(void)
-+{
-+	platform_driver_unregister(&hi6220_mbox_driver);
-+}
-+module_exit(hi6220_mbox_exit);
-+
-+MODULE_AUTHOR("Leo Yan <leo.yan@linaro.org>");
-+MODULE_DESCRIPTION("Hi6220 mailbox driver");
-+MODULE_LICENSE("GPL v2");
+ On lun., oct. 12 2015, Andrew Lunn <andrew@lunn.ch> wrote:
+
+> On Sat, Oct 10, 2015 at 12:10:39AM +0200, Arnaud Ebalard wrote:
+>> 
+>> This cosmetic patch reorder nodes under internal-regs by increasing
+>> address order, as epxected.
+>
+> expected.
+>
+> Gregory, can you fix that as you commit?
+
+Done!
+
+>
+> Acked-by: Andrew Lunn <andrew@lunn.ch>
+>
+> 	  Andrew
+>
+>> 
+>> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+>> ---
+>>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 86 +++++++++++++-------------
+>>  1 file changed, 43 insertions(+), 43 deletions(-)
+>> 
+>> diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+>> index 85b2f87c0b8a..d72a69d97ba2 100644
+>> --- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+>> +++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+>> @@ -94,54 +94,11 @@
+>>  				status = "disabled";
+>>  			};
+>>  
+>> -			/* Two rear eSATA ports */
+>> -			sata at a0000 {
+>> -				nr-ports = <2>;
+>> -				status = "okay";
+>> -			};
+>> -
+>> -			serial at 12000 {
+>> -				status = "okay";
+>> -			};
+>> -
+>> -			mdio {
+>> -				phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
+>> -					reg = <0>;
+>> -				};
+>> -
+>> -				phy1: ethernet-phy at 1 { /* Marvell 88E1318 */
+>> -					reg = <1>;
+>> -				};
+>> -			};
+>> -
+>> -			ethernet at 70000 {
+>> -				status = "okay";
+>> -				phy = <&phy0>;
+>> -				phy-mode = "rgmii-id";
+>> -			};
+>> -
+>> -			ethernet at 74000 {
+>> -				status = "okay";
+>> -				phy = <&phy1>;
+>> -				phy-mode = "rgmii-id";
+>> -			};
+>> -
+>> -			/* Front USB 2.0 port */
+>> -			usb at 50000 {
+>> -				status = "okay";
+>> -			};
+>> -
+>>  			i2c at 11000 {
+>>  				compatible = "marvell,mv64xxx-i2c";
+>>  				clock-frequency = <400000>;
+>>  				status = "okay";
+>>  
+>> -				isl12057: isl12057 at 68 {
+>> -					compatible = "isil,isl12057";
+>> -					reg = <0x68>;
+>> -					isil,irq2-can-wakeup-machine;
+>> -				};
+>> -
+>>  				/* Controller for rear fan #1 of 3 (Protechnic
+>>  				 * MGT4012XB-O20, 8000RPM) near eSATA port */
+>>  				g762_fan1: g762 at 3e {
+>> @@ -178,6 +135,49 @@
+>>  					compatible = "gmt,g751";
+>>  					reg = <0x4c>;
+>>  				};
+>> +
+>> +				isl12057: isl12057 at 68 {
+>> +					compatible = "isil,isl12057";
+>> +					reg = <0x68>;
+>> +					isil,irq2-can-wakeup-machine;
+>> +				};
+>> +			};
+>> +
+>> +			serial at 12000 {
+>> +				status = "okay";
+>> +			};
+>> +
+>> +			/* Front USB 2.0 port */
+>> +			usb at 50000 {
+>> +				status = "okay";
+>> +			};
+>> +
+>> +			mdio {
+>> +				phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
+>> +					reg = <0>;
+>> +				};
+>> +
+>> +				phy1: ethernet-phy at 1 { /* Marvell 88E1318 */
+>> +					reg = <1>;
+>> +				};
+>> +			};
+>> +
+>> +			ethernet at 70000 {
+>> +				status = "okay";
+>> +				phy = <&phy0>;
+>> +				phy-mode = "rgmii-id";
+>> +			};
+>> +
+>> +			ethernet at 74000 {
+>> +				status = "okay";
+>> +				phy = <&phy1>;
+>> +				phy-mode = "rgmii-id";
+>> +			};
+>> +
+>> +			/* Two rear eSATA ports */
+>> +			sata at a0000 {
+>> +				nr-ports = <2>;
+>> +				status = "okay";
+>>  			};
+>>  
+>>  			nand at d0000 {
+>> -- 
+>> 2.5.3
+>> 
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
