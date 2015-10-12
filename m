@@ -1,52 +1,62 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 11 Oct 2015 21:35:45 -0400
-Subject: [PATCH 1/3] amba: create builtin_amba_driver to avoid registration
- boilerplate
+Date: Sun, 11 Oct 2015 21:35:47 -0400
+Subject: [PATCH 3/3] drivers/amba: make tegra-ahb.c explicitly non-modular
 In-Reply-To: <1444613747-17715-1-git-send-email-paul.gortmaker@windriver.com>
 References: <1444613747-17715-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1444613747-17715-2-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1444613747-17715-4-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit f309d4443130bf814e991f836e919dca22df37ae ("platform_device:
-better support builtin boilerplate avoidance") we introduced the
-builtin_driver macro.
+The Kconfig currently controlling compilation of this code is:
 
-Here we use that support and extend it to amba driver registration,
-so where a driver is clearly non-modular and builtin-only, we can
-register it in a similar fashion.  And existing code that is clearly
-non-modular can be updated with the simple mapping of
+drivers/amba/Kconfig:config TEGRA_AHB
+drivers/amba/Kconfig:   bool "Enable AHB driver for NVIDIA Tegra SoCs"
 
-     module_amba_driver(...)  ---> builtin_amba_driver(...)
+...meaning that it currently is not being built as a module by anyone.
 
-We've essentially cloned the former to make the latter, and taken
-out the remove/module_exit parts since those never get used in a
-non-modular build of the code.
+Lets remove the couple traces of modularity so that when reading the
+driver there is no doubt it is builtin-only.
+
+Since module_platform_driver() uses the same init level priority as
+builtin_platform_driver() the init ordering remains unchanged with
+this commit.
+
+We also delete the MODULE_LICENSE tag etc. since all that information
+is already contained at the top of the file in the comments.
 
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Alexandre Courbot <gnurou@gmail.com>
+Cc: linux-tegra at vger.kernel.org
 Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
- include/linux/amba/bus.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/amba/tegra-ahb.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-index 50fc66868402..0e8cb21c20e5 100644
---- a/include/linux/amba/bus.h
-+++ b/include/linux/amba/bus.h
-@@ -165,4 +165,13 @@ struct amba_device name##_device = {				\
- #define module_amba_driver(__amba_drv) \
- 	module_driver(__amba_drv, amba_driver_register, amba_driver_unregister)
+diff --git a/drivers/amba/tegra-ahb.c b/drivers/amba/tegra-ahb.c
+index b0b688c481e8..5b53ebfa4f9e 100644
+--- a/drivers/amba/tegra-ahb.c
++++ b/drivers/amba/tegra-ahb.c
+@@ -22,7 +22,7 @@
  
-+/*
-+ * builtin_amba_driver() - Helper macro for drivers that don't do anything
-+ * special in driver initcall.  This eliminates a lot of boilerplate.  Each
-+ * driver may only use this macro once, and calling it replaces the instance
-+ * device_initcall().
-+ */
-+#define builtin_amba_driver(__amba_drv) \
-+	builtin_driver(__amba_drv, amba_driver_register)
-+
- #endif
+ #include <linux/err.h>
+ #include <linux/kernel.h>
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
+@@ -301,9 +301,4 @@ static struct platform_driver tegra_ahb_driver = {
+ 		.pm = &tegra_ahb_pm,
+ 	},
+ };
+-module_platform_driver(tegra_ahb_driver);
+-
+-MODULE_AUTHOR("Hiroshi DOYU <hdoyu@nvidia.com>");
+-MODULE_DESCRIPTION("Tegra AHB driver");
+-MODULE_LICENSE("GPL v2");
+-MODULE_ALIAS("platform:" DRV_NAME);
++builtin_platform_driver(tegra_ahb_driver);
 -- 
 2.6.1
