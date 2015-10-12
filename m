@@ -1,86 +1,217 @@
-From: moon.linux@yahoo.com (Anand Moon)
-Date: Mon, 12 Oct 2015 14:47:32 +0000 (UTC)
-Subject: [PATCH 1/3] ARM: dts: exynos5422-odroidxu3: use cd-gpio method
- to detect sd-card
-In-Reply-To: <561B3A83.6090607@samsung.com>
-References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
- <561B3739.4040701@samsung.com> <561B3A83.6090607@samsung.com>
-Message-ID: <1111856990.2419183.1444661252893.JavaMail.yahoo@mail.yahoo.com>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Mon, 12 Oct 2015 23:53:04 +0900
+Subject: [PATCH v4 2/2] arm64: Expand the stack trace feature to support
+ IRQ stack
+In-Reply-To: <5617CE26.10604@arm.com>
+References: <1444231692-32722-1-git-send-email-jungseoklee85@gmail.com>
+ <1444231692-32722-3-git-send-email-jungseoklee85@gmail.com>
+ <5617CE26.10604@arm.com>
+Message-ID: <07A53E87-C562-48D1-86DF-A373EAAA73F9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On Oct 9, 2015, at 11:24 PM, James Morse wrote:
+> Hi Jungseok,
 
-On Monday, October 12, 2015 10:14 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+Hi James,
 
-
-Hi,
-
-On 10/12/2015 01:29 PM, Krzysztof Kozlowski wrote:
-> On 12.10.2015 00:46, Anand Moon wrote:
->> From: Jaehoon Chung <jh80.chung@samsung.com>
->>
->> To detect sd-card use the cd-gpio method.
->> It can decrease the interrupt for detecting sd-card.
->>
->> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
->>
->> ---
->> Changes based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v4.4-next/dt-samsung branch
->> ---
->>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 4 +++-
->>  1 file changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->> index 1af5bdc..26decbd 100644
->> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->> @@ -352,8 +352,10 @@
->>      samsung,dw-mshc-ciu-div = <3>;
->>      samsung,dw-mshc-sdr-timing = <0 4>;
->>      samsung,dw-mshc-ddr-timing = <0 2>;
->> +    cd-gpios = <&gpc2 2 GPIO_ACTIVE_HIGH>;
->> +    cd-inverted;
->>      pinctrl-names = "default";
->> -    pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
->> +    pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
-
-Don't do change this.
-
+> On 07/10/15 16:28, Jungseok Lee wrote:
+>> Currently, a call trace drops a process stack walk when a separate IRQ
+>> stack is used. It makes a call trace information much less useful when
+>> a system gets paniked in interrupt context.
 > 
-> Anand,
+> panicked
+
+I will fix the typo.
+
+>> This patch addresses the issue with the following schemes:
+>> 
+>>  - Store aborted stack frame data
+>>  - Decide whether another stack walk is needed or not via current sp
+>>  - Loosen the frame pointer upper bound condition
 > 
-> You essentially reverted here af6ad88acbd6 ("ARM: dts: Mux XMMCnDATA[0]
-> pad correctly for Exynos5420 boards"). Why? There is no explanation in
-> the commit message about this.
+> It may be worth merging this patch with its predecessor - anyone trying to
+> bisect a problem could land between these two patches, and spend time
+> debugging the truncated call traces.
 
-I don't remember to send the patch relevant to this. Hmm...
-Well, Is this patch really signed-off by me?
+It was an original intention to lead them to this patch, not the [1/2] one.
+This separation would help anyone touching the call trace feature including
+me focus on these changes apart from stack allocation, IRQ recursion check
+and thread_info management.
 
-Best Regards,
+In addition, I would like to add a clear and sufficient explanation on the
+frame pointer condition.
 
-Jaehoon Chung
+>> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
+>> index 6ea82e8..e5904a1 100644
+>> --- a/arch/arm64/include/asm/irq.h
+>> +++ b/arch/arm64/include/asm/irq.h
+>> @@ -2,13 +2,25 @@
+>> #define __ASM_IRQ_H
+>> 
+>> #include <linux/irqchip/arm-gic-acpi.h>
+>> +#include <asm/stacktrace.h>
+>> 
+>> #include <asm-generic/irq.h>
+>> 
+>> struct irq_stack {
+>> 	void *stack;
+>> +	struct stackframe frame;
+>> };
+>> 
+>> +DECLARE_PER_CPU(struct irq_stack, irq_stacks);
 > 
-> Best regards,
-> Krzysztof
+> Good idea, storing this in the per-cpu data makes it immune to stack
+> corruption.
 > 
-
 > 
+>> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+>> index 407991b..5124649 100644
+>> --- a/arch/arm64/kernel/stacktrace.c
+>> +++ b/arch/arm64/kernel/stacktrace.c
+>> @@ -43,7 +43,27 @@ int notrace unwind_frame(struct stackframe *frame)
+>> 	low  = frame->sp;
+>> 	high = ALIGN(low, THREAD_SIZE);
+>> 
+>> -	if (fp < low || fp > high - 0x18 || fp & 0xf)
+>> +	/*
+>> +	 * A frame pointer would reach an upper bound if a prologue of the
+>> +	 * first function of call trace looks as follows:
+>> +	 *
+>> +	 *	stp     x29, x30, [sp,#-16]!
+>> +	 *	mov     x29, sp
+>> +	 *
+>> +	 * Thus, the upper bound is (top of stack - 0x20) with consideration
+> 
+> The terms 'top' and 'bottom' of the stack are confusing, your 'top' appears
+> to be the highest address, which is used first, making it the bottom of the
+> stack.
+> 
+> I would try to use the terms low/est and high/est, in keeping with the
+> variable names in use here.
 
+Good idea. I'm favor of those terms.
 
-Some how I don't receive these mail on my email id.
+>> +	 * of a 16-byte empty space in THREAD_START_SP.
+>> +	 *
+>> +	 * The value, 0x20, however, does not cover all cases as interrupts
+>> +	 * are handled using a separate stack. That is, a call trace can start
+>> +	 * from elx_irq exception vectors. The symbols could not be promoted
+>> +	 * to candidates for a stack trace under the restriction, 0x20.
+>> +	 *
+>> +	 * The scenario is handled without complexity as 1) considering
+>> +	 * (bottom of stack + THREAD_START_SP) as a dummy frame pointer, the
+>> +	 * content of which is 0, and 2) allowing the case, which changes
+>> +	 * the value to 0x10 from 0x20.
+> 
+> Where has 0x20 come from? The old value was 0x18.
 
-I have picked up these changes from tizen repository for OdroidXU3.
-I have tested with this changes to detect UHS-I micro cd cards.
-That's the reason for this email. 
+What I meant is 0x20 is the highest valid frame pointer. The comment should
+have been described more clearly.
 
+> My understanding is the highest part of the stack looks like this:
+> high        [ off-stack ]
+> high - 0x08 [ left free by THREAD_START_SP ]
+> high - 0x10 [ left free by THREAD_START_SP ]
+> high - 0x18 [#1 x30 ]
+> high - 0x20 [#1 x29 ]
 
-If it's wrong then I will drop it.
+Clear description than mine!
 
--Anand Moon
+> So the condition 'fp > high - 0x18' prevents returning either 'left free'
+> address, or off-stack-value as a frame. Changing it to 'fp > high - 0x10'
+> allows the first half of that reserved area to be a valid stack frame.
 
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I believe my understanding is aligned with yours.
+
+Under a current condition, 'fp > high - 0x18', it is impossible to catch the
+'el1_irq' symbol. This is why I set x29 to high - 0x10 and changed the frame
+pointer condition, but the changes fail to cover perf according to your data.
+
+> This change is breaking perf using incantations [0] and [1]:
+
+I'm reviewing how perf stack trace works..
+
+> Before, with just patch 1/2:
+>                  ---__do_softirq
+>                     |
+>                     |--92.95%-- __handle_domain_irq
+>                     |          __irqentry_text_start
+>                     |          el1_irq
+>                     |
+> 
+> After, with both patches:
+>                 ---__do_softirq
+>                    |
+>                    |--83.83%-- __handle_domain_irq
+>                    |          __irqentry_text_start
+>                    |          el1_irq
+>                    |          |
+>                    |          |--99.39%-- 0x400008040d00000c
+>                    |           --0.61%-- [...]
+>                    |
+> 
+> Changing the condition to 'fp >= high - 0x10' fixes this.
+
+'fp >= high - 0x10' drops 'el1_irq' when dump_stack() or panic() is called.
+
+> I agree it needs documenting, it is quite fiddly - I think Akashi Takahiro
+> is the expert.
+
+If possible, it would be greatly helpful.
+
+> I think unwind_frame() needs to walk the irq stack too. [2] is an example
+> of perf tracing back to userspace, (and there are patches on the list to
+> do/fix this), so we need to walk back to the start of the first stack for
+> the perf accounting to be correct.
+
+Frankly, I missed the case where perf does backtrace to userspace.
+
+IMO, this statement supports why the stack trace feature commit should be
+written independently. The [1/2] patch would be pretty stable if 64KB page
+is supported. The separation might help us concentrate on the stack trace
+feature in a generic dump stack, perf, and ftrace point of view.
+
+>> +	 */
+>> +	if (fp < low || fp > high - 0x10 || fp & 0xf)
+>> 		return -EINVAL;
+>> 
+>> 	frame->sp = fp + 0x10;
+>> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+>> index f93aae5..44b2f828 100644
+>> --- a/arch/arm64/kernel/traps.c
+>> +++ b/arch/arm64/kernel/traps.c
+>> @@ -146,6 +146,8 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
+>> static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+>> {
+>> 	struct stackframe frame;
+>> +	unsigned int cpu = smp_processor_id();
+> 
+> I wonder if there is any case where dump_backtrace() is called on another cpu?
+> 
+> Setting the cpu value from task_thread_info(tsk)->cpu would protect against
+> this.
+
+IMO, no, but your suggestion makes sense. I will update it.
+
+>> +	bool in_irq = in_irq_stack(cpu);
+>> 
+>> 	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
+>> 
+>> @@ -170,6 +172,10 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+>> 	}
+>> 
+>> 	pr_emerg("Call trace:\n");
+>> +repeat:
+>> +	if (in_irq)
+>> +		pr_emerg("<IRQ>\n");
+> 
+> Do we need these? 'el1_irq()' in the trace is a giveaway?
+
+I borrow this idea from x86 implementation in order to show a separate stack
+explicitly. There is no issue to remove these tags, <IRQ> and <EOI>.
+
+Great thanks!
+
+Best Regards
+Jungseok Lee
