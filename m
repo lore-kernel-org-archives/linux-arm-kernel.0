@@ -1,81 +1,53 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Mon, 12 Oct 2015 13:57:06 -0400
-Subject: [PATCH 04/10] ARM: dts: enable clock support for BCM5301X
-In-Reply-To: <20151010001408.GX26883@codeaurora.org>
-References: <1443826665-17570-1-git-send-email-jonmason@broadcom.com>
- <1443826665-17570-5-git-send-email-jonmason@broadcom.com>
- <20151009073540.GO26883@codeaurora.org>
- <20151009182728.GD17527@broadcom.com>
- <20151010001408.GX26883@codeaurora.org>
-Message-ID: <20151012175706.GF20867@broadcom.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 12 Oct 2015 10:58:03 -0700
+Subject: [PATCH 14/20] pxa2xx-flash: switch from ioremap_cache to memremap
+In-Reply-To: <20151009221651.32203.63446.stgit@dwillia2-desk3.jf.intel.com>
+References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
+ <20151009221651.32203.63446.stgit@dwillia2-desk3.jf.intel.com>
+Message-ID: <20151012175803.GL107187@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 05:14:08PM -0700, Stephen Boyd wrote:
-> On 10/09, Jon Mason wrote:
-> > On Fri, Oct 09, 2015 at 12:35:40AM -0700, Stephen Boyd wrote:
-> > > On 10/02, Jon Mason wrote:
-> > > 
-> > > >  arch/arm/boot/dts/bcm5301x.dtsi | 67 ++++++++++++++++++++++++++++++++++++-----
-> > > >  1 file changed, 60 insertions(+), 7 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-> > > > index 6f50f67..f717859 100644
-> > > > --- a/arch/arm/boot/dts/bcm5301x.dtsi
-> > > > +++ b/arch/arm/boot/dts/bcm5301x.dtsi
-> > > > @@ -55,14 +56,14 @@
-> > > >  			compatible = "arm,cortex-a9-global-timer";
-> > > >  			reg = <0x0200 0x100>;
-> > > >  			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
-> > > > -			clocks = <&clk_periph>;
-> > > > +			clocks = <&periph_clk>;
-> > > >  		};
-> > > >  
-> > > >  		local-timer at 0600 {
-> > > >  			compatible = "arm,cortex-a9-twd-timer";
-> > > >  			reg = <0x0600 0x100>;
-> > > >  			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> > > > -			clocks = <&clk_periph>;
-> > > > +			clocks = <&periph_clk>;
-> > > >  		};
-> > > >  
-> > > >  		gic: interrupt-controller at 1000 {
-> > > > @@ -94,14 +95,66 @@
-> > > >  
-> > > >  	clocks {
-> > > 
-> > > I'd expect this to only contain nodes that don't have a reg
-> > > property. Clock providers that have a reg property would go into
-> > > some soc node or bus. Perhaps that's the chipcommonA node, or
-> > > axi?
-> > 
-> > This might get a little ugly, as some of the clocks are in the
-> > 0x18000000 and others are in 0x19000000.  I would think it better to
-> > have them all in one place (as that is more readable).  Do you preferr
-> > I split the pieces up into their respective DT nodes?
+You missed linux-mtd again. Please use scripts/get_maintainer.pl next
+time to at least get the relevant mailing list(s). (The individual CC's
+are not always necessary, but the subsystem lists definitely are.)
+
+Brian
+
+On Fri, Oct 09, 2015 at 06:16:51PM -0400, Dan Williams wrote:
+> In preparation for deprecating ioremap_cache() convert its usage in
+> pxa2xx-flash to memremap.
 > 
-> Are there two clock controllers? Sorry I don't understand the
-> architecture here very well. Nodes with reg properties in the
-> same range should be near each other. We don't group all i2c
-> controllers into the same node because they're logically i2c
-> controllers. We express the hierarchy of devices with container
-> nodes. The clocks node is only useful for board-level clocks, not
-> things that are inside the SoC.
-
-3 clock sources: a9pll, lcpll, and genpll. The first one resides in
-the IP block living at the 0x19000000 address range, while the latter
-two live in the 0x18000000 address range.
-
-I'll split up the clocks amongst the respective entries, per your
-suggestion.
-
-Thanks,
-Jon 
-
-
-
-
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: Brian Norris <computersforpeace@gmail.com>
+> [brian: also convert iounmap to memunmap]
+> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+> ---
+>  drivers/mtd/maps/pxa2xx-flash.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
+> index 12fa75df5008..5ff6cc5b4844 100644
+> --- a/drivers/mtd/maps/pxa2xx-flash.c
+> +++ b/drivers/mtd/maps/pxa2xx-flash.c
+> @@ -71,8 +71,8 @@ static int pxa2xx_flash_probe(struct platform_device *pdev)
+>  		       info->map.name);
+>  		return -ENOMEM;
+>  	}
+> -	info->map.cached =
+> -		ioremap_cache(info->map.phys, info->map.size);
+> +	info->map.cached = memremap(info->map.phys, info->map.size,
+> +			MEMREMAP_WB);
+>  	if (!info->map.cached)
+>  		printk(KERN_WARNING "Failed to ioremap cached %s\n",
+>  		       info->map.name);
+> @@ -111,7 +111,7 @@ static int pxa2xx_flash_remove(struct platform_device *dev)
+>  	map_destroy(info->mtd);
+>  	iounmap(info->map.virt);
+>  	if (info->map.cached)
+> -		iounmap(info->map.cached);
+> +		memunmap(info->map.cached);
+>  	kfree(info);
+>  	return 0;
+>  }
+> 
