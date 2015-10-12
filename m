@@ -1,42 +1,82 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 12 Oct 2015 11:18:55 +0200
-Subject: [PATCH] arm: dts: Fix audio card detection on peach boards
-In-Reply-To: <561B578E.1050308@samsung.com>
-References: <1444631169-19468-1-git-send-email-alim.akhtar@samsung.com>
- <561B578E.1050308@samsung.com>
-Message-ID: <561B7AFF.1080707@samsung.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Mon, 12 Oct 2015 17:22:23 +0800
+Subject: [PATCH v3] mmc: core: Fix init_card in 52Mhz
+Message-ID: <1444641743-15614-1-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/15 08:47, Krzysztof Kozlowski wrote:
->> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> > index 8f4d76c..525a93a 100644
->> > --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> > +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> > @@ -1056,5 +1056,10 @@
->> >  	timeout-sec = <32>;
->> >  };
->> >  
->> > +&pmu_system_controller {
->
-> Please put the node in alphabetical order.
-> 
->> > +	assigned-clocks = <&pmu_system_controller 0>;
->> > +	assigned-clock-parents =  <&clock CLK_FIN_PLL>;
->
-> I might be missing something here but isn't the first clock of
-> pmu_system_controller already a CLK_FIN_PLL? So you are reparenting the
-> FIN_PLL to FIN_PLL?
+Suppose that we got a data crc error, and it triggers the mmc_reset.
+mmc_reset will call mmc_send_status to see if HW reset was supported.
+before issue CMD13, it will do retune, and if EMMC was in HS400 mode,
+it will reduce frequency to 52Mhz firstly, then results in card init
+was doing at 52Mhz.
+The mmc_send_status was originally only done for mmc_test, should drop
+it. And, rename the "eMMC hardware reset" to "Reset test", as we would
+also be able to use the test for SD-cards.
 
-No, it's not, the first PMU consumer clock is indeed CLK_FIN_PLL,
-but pmu_system_controller is also a clock provider.  The first output
-clock of pmu_system_controller is CLKOUT, it's a composite mux and
-gate clock (registered in drivers/clk/samsung /clk-exynos-clkout.c).
-So  the above dts change is selecting an external oscillator input of
-the CLKOUT mux, i.e. it will route 24 MHz clock signal from the external
-oscillator to the CLKOUT output pin, to which audio CODEC is connected
-on peach-pit AFAICS.
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+Suggested-by: Adrian Hunter <adrian.hunter@intel.com>
+---
+ drivers/mmc/card/mmc_test.c | 9 +++------
+ drivers/mmc/core/mmc.c      | 7 -------
+ 2 files changed, 3 insertions(+), 13 deletions(-)
 
+diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
+index b78cf5d..7fc9174 100644
+--- a/drivers/mmc/card/mmc_test.c
++++ b/drivers/mmc/card/mmc_test.c
+@@ -2263,15 +2263,12 @@ static int mmc_test_profile_sglen_r_nonblock_perf(struct mmc_test_card *test)
+ /*
+  * eMMC hardware reset.
+  */
+-static int mmc_test_hw_reset(struct mmc_test_card *test)
++static int mmc_test_reset(struct mmc_test_card *test)
+ {
+ 	struct mmc_card *card = test->card;
+ 	struct mmc_host *host = card->host;
+ 	int err;
+ 
+-	if (!mmc_card_mmc(card) || !mmc_can_reset(card))
+-		return RESULT_UNSUP_CARD;
+-
+ 	err = mmc_hw_reset(host);
+ 	if (!err)
+ 		return RESULT_OK;
+@@ -2605,8 +2602,8 @@ static const struct mmc_test_case mmc_test_cases[] = {
+ 	},
+ 
+ 	{
+-		.name = "eMMC hardware reset",
+-		.run = mmc_test_hw_reset,
++		.name = "Reset test",
++		.run = mmc_test_reset,
+ 	},
+ };
+ 
+diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+index e726903..f6cd995 100644
+--- a/drivers/mmc/core/mmc.c
++++ b/drivers/mmc/core/mmc.c
+@@ -1924,7 +1924,6 @@ EXPORT_SYMBOL(mmc_can_reset);
+ static int mmc_reset(struct mmc_host *host)
+ {
+ 	struct mmc_card *card = host->card;
+-	u32 status;
+ 
+ 	if (!(host->caps & MMC_CAP_HW_RESET) || !host->ops->hw_reset)
+ 		return -EOPNOTSUPP;
+@@ -1937,12 +1936,6 @@ static int mmc_reset(struct mmc_host *host)
+ 
+ 	host->ops->hw_reset(host);
+ 
+-	/* If the reset has happened, then a status command will fail */
+-	if (!mmc_send_status(card, &status)) {
+-		mmc_host_clk_release(host);
+-		return -ENOSYS;
+-	}
+-
+ 	/* Set initial state and call mmc_set_ios */
+ 	mmc_set_initial_state(host);
+ 	mmc_host_clk_release(host);
 -- 
-Regards,
-Sylwester
+1.8.1.1.dirty
