@@ -1,49 +1,61 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 12 Oct 2015 18:12:40 -0500
-Subject: [PATCH 0/3] ARM: multi_v7_defconfig: Enable more OMAP family
- platforms
-In-Reply-To: <20151012200419.GO23801@atomide.com>
-References: <1428614121-3374-1-git-send-email-nm@ti.com>
- <20150805102234.GZ16878@atomide.com> <7hfv3uwvdw.fsf@deeprootsystems.com>
- <20150811103751.GK4215@atomide.com>
- <CAGo_u6q+U_Yi7Oq2pAFr4hs28_-G6dFbiHJQg3s3aEj0vG1asg@mail.gmail.com>
- <20151012200419.GO23801@atomide.com>
-Message-ID: <561C3E68.1060107@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 12 Oct 2015 23:26:12 +0000
+Subject: [PATCH 12/37] ARM: dts: dove-sbc-a510: Fix regulator enable GPIO
+ polarity
+In-Reply-To: <2803928.h4I9c13V32@avalon>
+References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <1444684386-17094-13-git-send-email-laurent.pinchart@ideasonboard.com>
+ <20151012225009.GP13247@io.lakedaemon.net>
+ <2803928.h4I9c13V32@avalon>
+Message-ID: <20151012232612.GQ13247@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2015 03:04 PM, Tony Lindgren wrote:
-> * Nishanth Menon <nm@ti.com> [150813 08:12]:
->> On Tue, Aug 11, 2015 at 5:37 AM, Tony Lindgren <tony@atomide.com> wrote:
->>>
->>> * Kevin Hilman <khilman@kernel.org> [150807 16:10]:
->>>> Tony Lindgren <tony@atomide.com> writes:
->>>>
->>>>> Ping, looks like these are still pending. Probably should be
->>>>> applied directly by the arm-soc maintainers.
->>>>
->>>> If these should go through arm-soc, please resend to:arm at kernel.org so
->>>> they make it into our queue of stuff to be reviewed/applied.
->>>
->>> OK thanks, up to Nihshant to resend.
->>>
->>
->> Sorry about the slow response - i will have to do this at a later
->> point(probably based off 4.3-rc1). tied up with a few other internal
->> stuff atm :(
-> 
-> Ping, can you please resend arm at kernel.org? Would be good to have these
-> working for v4.4.
-> 
-> Anyways, untagging this old thread so don't expect more pings from
-> me on this.
-> 
+Hey Laurent,
 
-Will do. Sorry about the delay - we had to bring down our board
-farm(where the boards were hosted) for a few days due to some internal
-relocation. will get around to this asap.
+On Tue, Oct 13, 2015 at 02:10:10AM +0300, Laurent Pinchart wrote:
+> On Monday 12 October 2015 22:50:09 Jason Cooper wrote:
+> > On Tue, Oct 13, 2015 at 12:12:41AM +0300, Laurent Pinchart wrote:
+> > > The enable GPIO is active low, but is flagged as active high in the gpio
+> > > property. As the gpio property flags are currently unused by the driver
+> > > this doesn't cause any issue for now, but will break later if the driver
+> > > starts making use of the flags. Fix it.
+> > > 
+> > > Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > ---
+> > > 
+> > >  arch/arm/boot/dts/dove-sbc-a510.dts | 4 ++--
+> > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > 
+> > > Cc: Jason Cooper <jason@lakedaemon.net>
+> > > Cc: Andrew Lunn <andrew@lunn.ch>
+> > > Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> > > Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > > 
+> > > diff --git a/arch/arm/boot/dts/dove-sbc-a510.dts
+> > > b/arch/arm/boot/dts/dove-sbc-a510.dts index 288e707dea99..3bc5c96483be
+> > > 100644
+> > > --- a/arch/arm/boot/dts/dove-sbc-a510.dts
+> > > +++ b/arch/arm/boot/dts/dove-sbc-a510.dts
+> > > @@ -82,7 +82,7 @@
+> > >  			regulator-name = "USB Power";
+> > >  			regulator-min-microvolt = <5000000>;
+> > >  			regulator-max-microvolt = <5000000>;
+> > > -			gpio = <&gpio_ext 0 GPIO_ACTIVE_HIGH>;
+> > > +			gpio = <&gpio_ext 0 GPIO_ACTIVE_LOW>;
+> > 
+> > I'd feel a lot better about this if the commit log made a strong
+> > reference back to some documentation or other hardware description.
+> > Just because Linux doesn't use it or uses it wrong doesn't necessarily
+> > mean the DT is wrong.
+> 
+> It looks like I might be wrong, see Stephen's reply to patch 37/37. Let's 
+> discuss the issue there.
 
+No problem, as long as it's being addressed, I'll keep an eye out for a
+v2.  I've some email remailer sketchyness resulting in a lack of
+subscription to the MLs atm.  And I'm not on the 37/37 thread.
 
--- 
-Regards,
-Nishanth Menon
+thx,
+
+Jason.
