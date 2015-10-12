@@ -1,44 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Oct 2015 10:05:59 -0700
-Subject: [PATCH 1/2] ARM: OMAP2+: Remove legacy OMAP3 ISP instantiation
-In-Reply-To: <20150914163353.GN4215@atomide.com>
-References: <1437051319-9904-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <1437051319-9904-2-git-send-email-laurent.pinchart@ideasonboard.com>
- <20150716125800.GN17550@atomide.com> <55E8CAE7.3010301@ti.com>
- <55F6F5FF.2060801@ti.com> <20150914163353.GN4215@atomide.com>
-Message-ID: <20151012170558.GF23801@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Oct 2015 18:08:19 +0100
+Subject: HANG at bootup on 3.10 kernel at memset in early_alloc_aligned
+ with CMA
+In-Reply-To: <1773685879.894081444667895180.JavaMail.weblogic@epmlwas09a>
+References: <1773685879.894081444667895180.JavaMail.weblogic@epmlwas09a>
+Message-ID: <20151012170818.GA3659@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150914 09:37]:
-> * Suman Anna <s-anna@ti.com> [150914 09:33]:
-> > Hi Tony,
-> > 
-> > On 09/03/2015 05:34 PM, Suman Anna wrote:
-> > > Hi Sakari,
-> > > 
-> > > On 07/16/2015 07:58 AM, Tony Lindgren wrote:
-> > >> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [150716 05:57]:
-> > >>> The OMAP3 ISP is now fully supported in DT, remove its instantiation
-> > >>> from C code.
-> > >>
-> > >> Please feel to queue this along with the second patch in this series,
-> > >> this should not cause any merge conflicts:
-> > >>
-> > >> Acked-by: Tony Lindgren <tony@atomide.com>
-> > > 
-> > > Just wondering if you have already queued this, I see the v4l changes in
-> > > linux-next, but not this patch. Also, can you confirm if this series is
-> > > making it into 4.3?
-> > > 
-> > 
-> > This patch is not in 4.3-rc1, can you pick this up for the next merge
-> > window? I am gonna send out some additional cleanup patches (removing
-> > legacy mailbox and iommu pieces) on top on this patch. The second patch
-> > in this series did make it.
+On Mon, Oct 12, 2015 at 04:38:15PM +0000, VIKAS SAJJAN C wrote:
+> Hi,
+
+Hi,
+
+>  we are recently migrating to 3.10 kernel on a 32bit SoC, I see that
+>  while boot up, the kernel HANGS in function early_alloc_aligned() at
+>  memset(ptr, 0, sz);
 > 
-> OK tagging this one for next, will apply once I'm done with fixes.
+> we are reserving memory using CMA 
+> 
+> 
+> we have 4 banks :
+> 
+> bank 1 : 0x200000000,  size 0x10000000
+> 
+> bank 2 : 0x300000000,  size 0x10000000
+> 
+> bank 3 : 0x400000000,  size 0x10000000
+> 
+> bank 4 : 0x500000000,  size 0x0f500000
 
-Applying into omap-for-v4.4/cleanup finally thanks.
+As this isn't 2M-aligned, this certainly could be the same issue.
 
-Tony
+> arm_lowmem_limit is set to 0x4f000000 and mapping is created for
+> section: 20000000 ~ 4f000000
+> 
+>  I came across your patch "ARM: 8356/1: mm: handle non-pmd-aligned end
+>  of RAM"
+> 
+> Was wondering whether patch is back ported to 3.10 stable branch, if
+> so can you point me to the patch?
+
+To the best of my knowledge, it was not. If you haven't seen it in the
+v3.10.x commit logs, it presumably wasn't.
+
+> if not, can you let us know the changes needed for 3.10  kernel.
+
+I do not know. Have you tried backporting the patch?
+
+I believe that you will also need to backport commit 3de1f52a3ae82326
+("ARM: 8394/1: update memblock limit after mapping lowmem"). See [1,2].
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/353496.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/353602.html
