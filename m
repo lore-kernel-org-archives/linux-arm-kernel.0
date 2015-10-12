@@ -1,46 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Oct 2015 11:30:11 +0200
-Subject: [PATCH] md: fix 32-bit build warning
-In-Reply-To: <87fv1g1y34.fsf@notabene.neil.brown.name>
-References: <5304496.D8N6u074t0@wuerfel>
- <87fv1g1y34.fsf@notabene.neil.brown.name>
-Message-ID: <11281560.gJ28rX782P@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 12 Oct 2015 10:30:29 +0100
+Subject: [PATCH 01/16] irqdomain: Use an accessor for the of_node field
+In-Reply-To: <561B4D6C.7000404@linaro.org>
+References: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
+ <1444152989-31726-2-git-send-email-marc.zyngier@arm.com>
+ <561B4D6C.7000404@linaro.org>
+Message-ID: <561B7DB5.8010603@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 October 2015 15:59:27 Neil Brown wrote:
-> > diff --git a/drivers/md/md.c b/drivers/md/md.c
-> > index 7fff1e6884d6..e13f72a3b561 100644
-> > --- a/drivers/md/md.c
-> > +++ b/drivers/md/md.c
-> > @@ -8987,9 +8987,9 @@ static void check_sb_changes(struct mddev *mddev, struct md_rdev *rdev)
-> >  
-> >       /* recovery_cp changed */
-> >       if (le64_to_cpu(sb->resync_offset) != mddev->recovery_cp) {
-> > -             pr_info("%s:%d recovery_cp changed from %lu to %lu\n", __func__,
-> > -                             __LINE__, mddev->recovery_cp,
-> > -                             (unsigned long) le64_to_cpu(sb->resync_offset));
-> > +             pr_info("%s:%d recovery_cp changed from %llu to %llu\n", __func__,
-> > +                             __LINE__, (u64)mddev->recovery_cp,
-> > +                             (u64) le64_to_cpu(sb->resync_offset));
-> >               mddev->recovery_cp = le64_to_cpu(sb->resync_offset);
-> >       }
-> >  
+On 12/10/15 07:04, Hanjun Guo wrote:
+> On 10/07/2015 01:36 AM, Marc Zyngier wrote:
+>> The struct irq_domain contains a "struct device_node *" field
+>> (of_node) that is almost the only link between the irqdomain
+>> and the device tree infrastructure.
+>>
+>> In order to prepare for the removal of that field, convert all
+>> users to use an accessor.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>   arch/arm/mach-omap2/omap-wakeupgen.c          |  2 +-
+>>   arch/c6x/platforms/megamod-pic.c              |  2 +-
+>>   arch/mips/cavium-octeon/octeon-irq.c          |  4 ++--
+>>   arch/powerpc/platforms/cell/axon_msi.c        |  2 +-
+>>   arch/powerpc/platforms/cell/spider-pic.c      |  9 +++++---
+>>   arch/powerpc/platforms/pasemi/msi.c           |  6 ++++--
+>>   arch/powerpc/platforms/powernv/opal-irqchip.c |  2 +-
+>>   arch/powerpc/sysdev/ehv_pic.c                 |  3 ++-
+>>   arch/powerpc/sysdev/fsl_msi.c                 |  2 +-
+>>   arch/powerpc/sysdev/i8259.c                   |  3 ++-
+>>   arch/powerpc/sysdev/ipic.c                    |  3 ++-
+>>   arch/powerpc/sysdev/mpic.c                    |  3 ++-
+>>   arch/powerpc/sysdev/mpic_msi.c                |  2 +-
+>>   arch/powerpc/sysdev/qe_lib/qe_ic.c            |  3 ++-
+>>   drivers/gpio/gpio-sodaville.c                 |  2 +-
+>>   drivers/irqchip/exynos-combiner.c             |  2 +-
+>>   drivers/irqchip/irq-atmel-aic-common.c        |  2 +-
+>>   drivers/irqchip/irq-crossbar.c                |  4 ++--
+>>   drivers/irqchip/irq-gic-v2m.c                 |  2 +-
+>>   drivers/irqchip/irq-gic-v3-its.c              |  2 +-
+>>   drivers/irqchip/irq-gic-v3.c                  |  2 +-
+>>   drivers/irqchip/irq-gic.c                     |  2 +-
+>>   drivers/irqchip/irq-hip04.c                   |  2 +-
+>>   drivers/irqchip/irq-imx-gpcv2.c               |  2 +-
+>>   drivers/irqchip/irq-mtk-sysirq.c              |  2 +-
+>>   drivers/irqchip/irq-s3c24xx.c                 |  4 ++--
+>>   drivers/irqchip/irq-tegra.c                   |  4 ++--
+>>   drivers/irqchip/irq-vf610-mscm-ir.c           |  5 +++--
+>>   drivers/spmi/spmi-pmic-arb.c                  |  2 +-
+>>   include/linux/irqdomain.h                     |  5 +++++
+>>   kernel/irq/irqdomain.c                        | 30 +++++++++++++++++++--------
+>>   31 files changed, 74 insertions(+), 46 deletions(-)
 > 
-> Thanks, but is this really right?
-> I think u64 is "unsigned long" on 64bit.
-> I have always used (unsigned long long) when I want to use %llu on
-> sector_t.
-> 
-> How confident are you of using "u64" ?
+> Some missing files I noticed:
+> ./arch/arm/mach-imx/gpc.c:	if (domain->of_node != controller)
+> ./arch/arm/mach-imx/gpc.c:	parent_args.np = domain->parent->of_node;
+> ./arch/arm/mach-exynos/suspend.c:	if (domain->of_node != controller)
+> ./arch/arm/mach-exynos/suspend.c:	parent_args.np = domain->parent->of_node;
 
-Very confident ;-)
+I've already caught them with v2 - 01.org doing its usual fine job!
 
-This used to not work until some linux-2.6 version when we changed all
-architectures to use asm-generic/int-ll64.h in the kernel, because
-a lot of code relied on printing u64 variables using %lld.
+Thanks anyway,
 
-I tend to use u64 for things like this because it's shorter than
-'unsigned long long'.
-
-	Arnd
+	M.
+-- 
+Jazz is not dead. It just smells funny...
