@@ -1,66 +1,82 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 12 Oct 2015 16:28:45 +0200
-Subject: [PATCH v2 08/14] clk: at91: pmc: move pmc structures to C file
+Date: Mon, 12 Oct 2015 16:28:44 +0200
+Subject: [PATCH v2 07/14] clk: at91: pmc: merge at91_pmc_init in
+ atmel_pmc_probe
 In-Reply-To: <1444660131-14954-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1444660131-14954-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1444660131-14954-9-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1444660131-14954-8-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pmc.c is now the only user of struct at91_pmc*, move their definition in
-the C file.
+at91_pmc_init() doesn't do much anymore, merge it in atmel_pmc_probe().
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/clk/at91/pmc.c | 12 ++++++++++++
- drivers/clk/at91/pmc.h | 12 ------------
- 2 files changed, 12 insertions(+), 12 deletions(-)
+ drivers/clk/at91/pmc.c | 31 ++++++-------------------------
+ 1 file changed, 6 insertions(+), 25 deletions(-)
 
 diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index acc8f518b392..3aa886849304 100644
+index 45dd32bf2531..acc8f518b392 100644
 --- a/drivers/clk/at91/pmc.c
 +++ b/drivers/clk/at91/pmc.c
-@@ -29,6 +29,18 @@
+@@ -223,29 +223,6 @@ static const struct at91_pmc_caps sama5d3_caps = {
+ 			  AT91_PMC_CFDEV,
+ };
  
- #include "pmc.h"
- 
-+struct at91_pmc_caps {
-+	u32 available_irqs;
-+};
-+
-+struct at91_pmc {
-+	struct regmap *regmap;
-+	int virq;
-+	const struct at91_pmc_caps *caps;
-+	struct irq_domain *irqdomain;
-+	u32 imr;
-+};
-+
- void __iomem *at91_pmc_base;
- EXPORT_SYMBOL_GPL(at91_pmc_base);
- 
-diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index 3b96c53c194c..550a461c7201 100644
---- a/drivers/clk/at91/pmc.h
-+++ b/drivers/clk/at91/pmc.h
-@@ -24,18 +24,6 @@ struct clk_range {
- 
- #define CLK_RANGE(MIN, MAX) {.min = MIN, .max = MAX,}
- 
--struct at91_pmc_caps {
--	u32 available_irqs;
--};
+-static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
+-					     struct regmap *regmap,
+-					     void __iomem *regbase, int virq,
+-					     const struct at91_pmc_caps *caps)
+-{
+-	struct at91_pmc *pmc;
 -
--struct at91_pmc {
--	struct regmap *regmap;
--	int virq;
--	const struct at91_pmc_caps *caps;
--	struct irq_domain *irqdomain;
--	u32 imr;
--};
+-	if (!regbase || !virq ||  !caps)
+-		return NULL;
 -
- int of_at91_get_clk_range(struct device_node *np, const char *propname,
- 			  struct clk_range *range);
+-	at91_pmc_base = regbase;
+-
+-	pmc = kzalloc(sizeof(*pmc), GFP_KERNEL);
+-	if (!pmc)
+-		return NULL;
+-
+-	pmc->regmap = regmap;
+-	pmc->virq = virq;
+-	pmc->caps = caps;
+-
+-	return pmc;
+-}
+-
+ static const struct of_device_id atmel_pmc_dt_ids[] = {
+ 	{ .compatible = "atmel,at91rm9200-pmc", .data = &at91rm9200_caps },
+ 	{ .compatible = "atmel,at91sam9260-pmc", .data = &at91sam9260_caps },
+@@ -262,11 +239,12 @@ static int __init atmel_pmc_probe(struct platform_device *pdev)
+ 	const struct at91_pmc_caps *caps;
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct at91_pmc *pmc;
+-	void __iomem *regbase = of_iomap(np, 0);
+ 	struct regmap *regmap;
+ 	int virq;
+ 	int ret = 0;
  
++	at91_pmc_base = of_iomap(np, 0);
++
+ 	regmap = syscon_node_to_regmap(np);
+ 	if (IS_ERR(regmap))
+ 		panic("Could not retrieve syscon regmap");
+@@ -278,10 +256,13 @@ static int __init atmel_pmc_probe(struct platform_device *pdev)
+ 	of_id = of_match_device(atmel_pmc_dt_ids, &pdev->dev);
+ 	caps = of_id->data;
+ 
+-	pmc = at91_pmc_init(np, regmap, regbase, virq, caps);
++	pmc = kzalloc(sizeof(*pmc), GFP_KERNEL);
+ 	if (!pmc)
+ 		return 0;
+ 
++	pmc->regmap = regmap;
++	pmc->virq = virq;
++	pmc->caps = caps;
+ 	pmc->irqdomain = irq_domain_add_linear(pdev->dev.of_node, 32,
+ 					       &pmc_irq_ops, pmc);
+ 	if (!pmc->irqdomain)
 -- 
 2.1.4
