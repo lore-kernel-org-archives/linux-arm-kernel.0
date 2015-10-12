@@ -1,67 +1,47 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 12 Oct 2015 16:35:37 -0700
-Subject: [PATCH v3] mtd: nand: pass page number to ecc->write_xxx() methods
-In-Reply-To: <1443765205-8730-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1443765205-8730-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20151012233537.GR107187@google.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 13 Oct 2015 08:49:27 +0900
+Subject: [PATCH v2] arm: dts: Fix audio card detection on peach boards
+In-Reply-To: <561C0589.7010103@kernel.org>
+References: <1444653438-6532-1-git-send-email-alim.akhtar@samsung.com>
+ <561BAFE0.5070205@samsung.com> <561C0589.7010103@kernel.org>
+Message-ID: <CAJKOXPf8ZoHsP16fEWaRDMxd_7HRjzupOWOgp8ng2RjsL_BBuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 02, 2015 at 07:53:25AM +0200, Boris Brezillon wrote:
-> The ->read_xxx() methods are all passed the page number the NAND controller
-> is supposed to read, but ->write_xxx() do not have such a parameter.
-> 
-> This is a problem if we want to properly implement data
-> scrambling/randomization in order to mitigate MLC sensibility to repeated
-> pattern: to prevent bitflips in adjacent pages in the same block we need
-> to avoid repeating the same pattern at the same offset in those pages,
-> hence the randomizer/scrambler engine need to be passed the page value
-> in order to adapt its seed accordingly.
-> 
-> Moreover, adding the page parameter to the ->write_xxx() methods add some
-> consistency to the current API.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> CC: Josh Wu <josh.wu@atmel.com>
-> CC: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> CC: Maxime Ripard <maxime.ripard@free-electrons.com>
-> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> CC: Huang Shijie <shijie.huang@arm.com>
-> CC: Stefan Agner <stefan@agner.ch>
-> CC: devel at driverdev.osuosl.org
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: linux-kernel at vger.kernel.org
-> ---
-> Changes since v2:
-> - fixed compilation error in the gpmi driver
-> - compile tested all impacted drivers except the bf5xx_nand,
->   fsl_elbc_nand and fsl_ifc_nand ones
-> 
-> Changes since v1:
-> - rebased on l2-mtd/master
-> - fixed compilation error in the docg4 driver
-> ---
->  drivers/mtd/nand/atmel_nand.c                 |  6 ++++--
->  drivers/mtd/nand/bf5xx_nand.c                 |  3 ++-
->  drivers/mtd/nand/brcmnand/brcmnand.c          |  4 ++--
->  drivers/mtd/nand/cafe_nand.c                  |  3 ++-
->  drivers/mtd/nand/denali.c                     |  5 +++--
->  drivers/mtd/nand/docg4.c                      |  6 +++---
->  drivers/mtd/nand/fsl_elbc_nand.c              |  4 ++--
->  drivers/mtd/nand/fsl_ifc_nand.c               |  2 +-
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.c        |  8 +++----
->  drivers/mtd/nand/hisi504_nand.c               |  3 ++-
->  drivers/mtd/nand/lpc32xx_mlc.c                |  3 ++-
->  drivers/mtd/nand/lpc32xx_slc.c                |  5 +++--
->  drivers/mtd/nand/nand_base.c                  | 31 ++++++++++++++++++---------
->  drivers/mtd/nand/omap2.c                      |  3 ++-
->  drivers/mtd/nand/pxa3xx_nand.c                |  3 ++-
->  drivers/mtd/nand/sh_flctl.c                   |  3 ++-
->  drivers/mtd/nand/sunxi_nand.c                 |  5 +++--
->  drivers/mtd/nand/vf610_nfc.c                  |  2 +-
->  drivers/staging/mt29f_spinand/mt29f_spinand.c |  3 ++-
->  include/linux/mtd/nand.h                      |  6 +++---
->  20 files changed, 66 insertions(+), 42 deletions(-)
+2015-10-13 4:10 GMT+09:00 Kukjin Kim <kgene@kernel.org>:
+> On 10/12/15 22:04, Krzysztof Kozlowski wrote:
+>> W dniu 12.10.2015 o 21:37, Alim Akhtar pisze:
+>>> Since commit 2fad972d45c4 ("ARM: dts: Add mclk entry for Peach boards"),
+>>> sound card detection is broken on peach boards and gives below errors:
+>>>
+>>> [    3.630457] max98090 7-0010: MAX98091 REVID=0x51
+>>> [    3.634233] max98090 7-0010: use default 2.8v micbias
+>>> [    3.640985] snow-audio sound: HiFi <-> 3830000.i2s mapping ok
+>>> [    3.645307] max98090 7-0010: Invalid master clock frequency
+>>> [    3.650824] snow-audio sound: ASoC: Peach-Pi-I2S-MAX98091 late_probe() failed: -22
+>>> [    3.658914] snow-audio sound: snd_soc_register_card failed (-22)
+>>> [    3.664366] snow-audio: probe of sound failed with error -22
+>>>
+>>> This patch adds missing assigned-clocks and assigned-clock-parents for
+>>> pmu_system_controller node which is used as "mclk" for audio codec.
+>>>
+>>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>>> Fixes: 2fad972d45c4 ("ARM: dts: Add mclk entry for Peach boards")
+>>> Cc: <stable@vger.kernel.org>
+>>> ---
+>>> Changes since v1:
+>>> Addressed Krzysztof's review comments.
+>>
+>> Looks good, thanks!
+>>
+>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>
+> Applied, thanks.
 
-Hmm, am I missing something, or does this not apply to l2-mtd.git or
-linux-next.git?
+I see you pulled that one and of_node_put() fix into fixes. Thanks!
+Can you apply also Sudip's fix for thermal (acked by Lukasz)? I have
+it my try but since you applied these two already it does not have
+sense any more.
+
+Best regards,
+Krzysztof
