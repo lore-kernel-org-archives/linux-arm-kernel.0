@@ -1,33 +1,35 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 12 Oct 2015 13:46:35 +0800
-Subject: [PATCH 4/5] clk: berlin: bg2q: remove CLK_IGNORE_UNUSED flag for sdio
+Date: Mon, 12 Oct 2015 13:46:36 +0800
+Subject: [PATCH 5/5] clk: berlin: bg2: remove CLK_IGNORE_UNUSED flag for sdio
  clk
 In-Reply-To: <1444628796-5484-1-git-send-email-jszhang@marvell.com>
 References: <1444628796-5484-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1444628796-5484-5-git-send-email-jszhang@marvell.com>
+Message-ID: <1444628796-5484-6-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we have added the necessary axi clk properties in dts, we can
-remove the "sdio" clk's CLK_IGNORE_UNUSED flag now.
+The axi clock properties already exists, so there's no need to set this
+flag for sdio0 and sdio1 clk any more.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- drivers/clk/berlin/bg2q.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/berlin/bg2.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
-index 221f40c..243f421 100644
---- a/drivers/clk/berlin/bg2q.c
-+++ b/drivers/clk/berlin/bg2q.c
-@@ -283,7 +283,7 @@ static const struct berlin2_gate_data bg2q_gates[] __initconst = {
- 	{ "usb2",	"perif",	13 },
- 	{ "usb3",	"perif",	14 },
- 	{ "pbridge",	"perif",	15, CLK_IGNORE_UNUSED },
--	{ "sdio",	"perif",	16, CLK_IGNORE_UNUSED },
-+	{ "sdio",	"perif",	16 },
- 	{ "nfc",	"perif",	18 },
- 	{ "pcie",	"perif",	22 },
- };
+diff --git a/drivers/clk/berlin/bg2.c b/drivers/clk/berlin/bg2.c
+index 73153fc..23e0e3b 100644
+--- a/drivers/clk/berlin/bg2.c
++++ b/drivers/clk/berlin/bg2.c
+@@ -490,8 +490,8 @@ static const struct berlin2_gate_data bg2_gates[] __initconst = {
+ 	{ "usb0",	"perif",	11 },
+ 	{ "usb1",	"perif",	12 },
+ 	{ "pbridge",	"perif",	13, CLK_IGNORE_UNUSED },
+-	{ "sdio0",	"perif",	14, CLK_IGNORE_UNUSED },
+-	{ "sdio1",	"perif",	15, CLK_IGNORE_UNUSED },
++	{ "sdio0",	"perif",	14 },
++	{ "sdio1",	"perif",	15 },
+ 	{ "nfc",	"perif",	17 },
+ 	{ "smemc",	"perif",	19 },
+ 	{ "audiohd",	"audiohd_pll",	26 },
 -- 
 2.6.1
