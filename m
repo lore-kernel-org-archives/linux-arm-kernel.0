@@ -1,64 +1,148 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 12 Oct 2015 09:29:23 -0700
-Subject: [RFT - PATCH v2 0/2] KVM/arm64: add fp/simd lazy switch support
-In-Reply-To: <20151005154540.GJ9011@cbox>
-References: <1442964843-11953-1-git-send-email-m.smarduch@samsung.com>
- <20151005154540.GJ9011@cbox>
-Message-ID: <561BDFE3.5060403@samsung.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 12 Oct 2015 18:27:00 +0200
+Subject: [PATCH 2/2] arm: mvebu: reorder nodes under internal-regs by
+ address in RN2120 .dts file
+In-Reply-To: <277de75473af2431849a7494ae65b57dbc9a8309.1444428035.git.arno@natisbad.org>
+ (Arnaud Ebalard's message of "Sat, 10 Oct 2015 00:10:39 +0200")
+References: <cover.1444428035.git.arno@natisbad.org>
+ <277de75473af2431849a7494ae65b57dbc9a8309.1444428035.git.arno@natisbad.org>
+Message-ID: <87a8rokq7f.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer, Marc -
-  I just threw this test your way without any explanation.
+Hi Arnaud,
+ 
+ On sam., oct. 10 2015, Arnaud Ebalard <arno@natisbad.org> wrote:
 
-The test loops, does fp arithmetic and checks the truncated result.
-It could be a little more dynamic have an initial run to
-get the sum to compare against while looping, different fp
-hardware may come up with a different sum, but truncation is
-to 5'th decimal point.
+> This cosmetic patch reorder nodes under internal-regs by increasing
+> address order, as epxected.
+>
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 
-The rationale is that if there is any fp/simd corruption
-one of these runs should fail. I think most likely scenario
-for that is a world switch in midst of fp operation. I've
-instrumented (basically add some tracing to vcpu_put()) and
-validated vcpu_put gets called thousands of time (for v7,v8)
-for an over night test running two guests/host crunching
-fp operations.
-
-Other then that not sure how to really catch any problems
-with the patches applied. Obviously this is a huge issues, if this has
-any problems. If you or Marc have any other ideas I'd be happy
-to enhance the test.
+Applied on mvebu/dt with Andrew acked-by
 
 Thanks,
-  Mario
 
-On 10/5/2015 8:45 AM, Christoffer Dall wrote:
-> On Tue, Sep 22, 2015 at 04:34:01PM -0700, Mario Smarduch wrote:
->> This is a 2nd itteration for arm64, v1 patches were posted by mistake from an 
->> older branch which included several bugs. Hopefully didn't waste too much of 
->> anyones time.
->>
->> This patch series is a followup to the armv7 fp/simd lazy switch
->> implementation, uses similar approach and depends on the series - see
->> https://lists.cs.columbia.edu/pipermail/kvmarm/2015-September/016516.html
->>
->> It's based on earlier arm64 fp/simd optimization work - see
->> https://lists.cs.columbia.edu/pipermail/kvmarm/2015-July/015748.html
->>
->> And subsequent fixes by Marc and Christoffer at KVM Forum hackathon to handle
->> 32-bit guest on 64 bit host (and may require more here) - see
->> https://lists.cs.columbia.edu/pipermail/kvmarm/2015-August/016128.html
->>
->> This series has be tested with arm64 on arm64 with several FP applications 
->> running on host and guest, with substantial decrease on number of 
->> fp/simd context switches. From about 30% down to 2% with one guest running.
->>
->> At this time I don't have arm32/arm64 working and hoping Christoffer and/or
->> Marc (or anyone) can test 32-bit guest/64-bit host.
->>
-> Did you already have some test infrastructure/applications that I can
-> reuse for this purpose or do I have to write userspace software?
-> 
-> -Christoffer
-> 
+Gregory
+> ---
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 86 +++++++++++++-------------
+>  1 file changed, 43 insertions(+), 43 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> index 85b2f87c0b8a..d72a69d97ba2 100644
+> --- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> +++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> @@ -94,54 +94,11 @@
+>  				status = "disabled";
+>  			};
+>  
+> -			/* Two rear eSATA ports */
+> -			sata at a0000 {
+> -				nr-ports = <2>;
+> -				status = "okay";
+> -			};
+> -
+> -			serial at 12000 {
+> -				status = "okay";
+> -			};
+> -
+> -			mdio {
+> -				phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
+> -					reg = <0>;
+> -				};
+> -
+> -				phy1: ethernet-phy at 1 { /* Marvell 88E1318 */
+> -					reg = <1>;
+> -				};
+> -			};
+> -
+> -			ethernet at 70000 {
+> -				status = "okay";
+> -				phy = <&phy0>;
+> -				phy-mode = "rgmii-id";
+> -			};
+> -
+> -			ethernet at 74000 {
+> -				status = "okay";
+> -				phy = <&phy1>;
+> -				phy-mode = "rgmii-id";
+> -			};
+> -
+> -			/* Front USB 2.0 port */
+> -			usb at 50000 {
+> -				status = "okay";
+> -			};
+> -
+>  			i2c at 11000 {
+>  				compatible = "marvell,mv64xxx-i2c";
+>  				clock-frequency = <400000>;
+>  				status = "okay";
+>  
+> -				isl12057: isl12057 at 68 {
+> -					compatible = "isil,isl12057";
+> -					reg = <0x68>;
+> -					isil,irq2-can-wakeup-machine;
+> -				};
+> -
+>  				/* Controller for rear fan #1 of 3 (Protechnic
+>  				 * MGT4012XB-O20, 8000RPM) near eSATA port */
+>  				g762_fan1: g762 at 3e {
+> @@ -178,6 +135,49 @@
+>  					compatible = "gmt,g751";
+>  					reg = <0x4c>;
+>  				};
+> +
+> +				isl12057: isl12057 at 68 {
+> +					compatible = "isil,isl12057";
+> +					reg = <0x68>;
+> +					isil,irq2-can-wakeup-machine;
+> +				};
+> +			};
+> +
+> +			serial at 12000 {
+> +				status = "okay";
+> +			};
+> +
+> +			/* Front USB 2.0 port */
+> +			usb at 50000 {
+> +				status = "okay";
+> +			};
+> +
+> +			mdio {
+> +				phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
+> +					reg = <0>;
+> +				};
+> +
+> +				phy1: ethernet-phy at 1 { /* Marvell 88E1318 */
+> +					reg = <1>;
+> +				};
+> +			};
+> +
+> +			ethernet at 70000 {
+> +				status = "okay";
+> +				phy = <&phy0>;
+> +				phy-mode = "rgmii-id";
+> +			};
+> +
+> +			ethernet at 74000 {
+> +				status = "okay";
+> +				phy = <&phy1>;
+> +				phy-mode = "rgmii-id";
+> +			};
+> +
+> +			/* Two rear eSATA ports */
+> +			sata at a0000 {
+> +				nr-ports = <2>;
+> +				status = "okay";
+>  			};
+>  
+>  			nand at d0000 {
+> -- 
+> 2.5.3
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
