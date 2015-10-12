@@ -1,62 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 12 Oct 2015 11:32:39 +0200
-Subject: [PATCH v3 5/5] ARM: sun5i: Add C.H.I.P DTS
-In-Reply-To: <CAGb2v652CZAqU_S-p14g2sMQfOQYu_BBMnp0MdKR2Q5Y61UHog@mail.gmail.com>
-References: <1444380177-15302-1-git-send-email-maxime.ripard@free-electrons.com>
- <1444380177-15302-6-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v66JnJwDLYQ40ckYp_OTrLmprYKPhXrV1ME66fEeF=Vewg@mail.gmail.com>
- <20151011172005.GV2278@lukather>
- <CAGb2v652CZAqU_S-p14g2sMQfOQYu_BBMnp0MdKR2Q5Y61UHog@mail.gmail.com>
-Message-ID: <20151012093239.GA2278@lukather>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 12 Oct 2015 17:42:10 +0800
+Subject: [PATCH v2 5/5] ARM: dts: sun6i: Add support for Sinlinx A31s SDK
+ board
+In-Reply-To: <20151012093034.GZ2278@lukather>
+References: <1444488540-11263-1-git-send-email-wens@csie.org>
+ <1444488540-11263-6-git-send-email-wens@csie.org>
+ <20151012093034.GZ2278@lukather>
+Message-ID: <CAGb2v65zYqYWJ5C6yFgjyYV3RPMHcXZp3+PfbB_GXByb6Mt-Rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 10:20:37AM +0800, Chen-Yu Tsai wrote:
-> >> > +};
-> >> > +
-> >> > +&reg_ldo2 {
-> >> > +       regulator-min-microvolt = <2700000>;
-> >> > +       regulator-max-microvolt = <3300000>;
-> >> > +       regulator-name = "avcc";
-> >> > +       regulator-always-on;
-> >> > +};
-> >> > +
-> >> > +&reg_ldo5 {
-> >> > +       regulator-min-microvolt = <1800000>;
-> >> > +       regulator-max-microvolt = <1800000>;
-> >> > +       regulator-name = "vcc-1v8";
-> >> > +};
-> >> > +
-> >> > +&reg_usb0_vbus {
-> >> > +       pinctrl-0 = <&chip_vbus_pin>;
-> >> > +       vin-supply = <&reg_vcc5v0>;
-> >> > +       gpio = <&pio 1 10 GPIO_ACTIVE_HIGH>; /* PB10 */
-> >>
-> >>           status = "okay"; ?
-> >
-> > Ah, yes, indeed.
-> >
-> >> The rest looks good.
-> >
-> > Is that an Ack from you if I add the status ?
-> 
-> Yes. Thanks!
+On Mon, Oct 12, 2015 at 5:30 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Sat, Oct 10, 2015 at 10:49:00PM +0800, Chen-Yu Tsai wrote:
+>> +&i2c0 {
+>> +     /* Available on camera header */
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&i2c0_pins_a>;
+>> +     status = "okay";
+>> +};
+>> +
+>> +&i2c1 {
+>> +     /* Available on LCD header */
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&i2c1_pins_a>;
+>> +     status = "okay";
+>> +};
+>
+> Are those two actually used anywhere on the board itself, or just
+> exposed on the pin headers?
 
-Great :)
+They are exposed as grouped headers. 1 header has all the camera
+related stuff, like the CSI pins, and various voltage sources
+from the PMIC. The other has the LCD pins, resistive touchpanel,
+I2C for capacitive touchpanel, and of course voltage sources.
 
-Applied with the extra status and your Ack.
+The LCD header is an FPC connector, while the camera header is
+the common (common for sunxi devboards) 2.0mm pins. I'm not sure
+if there is some common pinout amongst vendors, but at least
+Sinlinx sells their own 7" LCD display w/ CTP, VGA converter,
+and camera modules. I have both the LCD and VGA converter.
 
-Thanks!
-Maxime
+Note that these I2C pins have valid external pull-ups. I doubt
+they can be easily re-purposed.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151012/5b98cf2a/attachment-0001.sig>
+Regards
+ChenYu
