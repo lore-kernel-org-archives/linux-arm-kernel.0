@@ -1,148 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 12 Oct 2015 18:27:00 +0200
-Subject: [PATCH 2/2] arm: mvebu: reorder nodes under internal-regs by
- address in RN2120 .dts file
-In-Reply-To: <277de75473af2431849a7494ae65b57dbc9a8309.1444428035.git.arno@natisbad.org>
- (Arnaud Ebalard's message of "Sat, 10 Oct 2015 00:10:39 +0200")
-References: <cover.1444428035.git.arno@natisbad.org>
- <277de75473af2431849a7494ae65b57dbc9a8309.1444428035.git.arno@natisbad.org>
-Message-ID: <87a8rokq7f.fsf@free-electrons.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 12 Oct 2015 18:32:27 +0200
+Subject: [PATCH v2 0/3] Fix random hang up issue while kernel init
+In-Reply-To: <1444209281-25536-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1444209281-25536-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <561BE09B.3040702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
- 
- On sam., oct. 10 2015, Arnaud Ebalard <arno@natisbad.org> wrote:
 
-> This cosmetic patch reorder nodes under internal-regs by increasing
-> address order, as epxected.
+
+On 07/10/15 11:14, James Liao wrote:
+> This patch is based on v4.3-rc4, to fix system hanging up issue
+> while disabling unused clocks.
 >
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> There is nothing different in mtk-scpsys.c and mt8173.dtsi from v1 [1].
+>
+> Changes since v1:
+> - Rebase to v4.3-rc4.
+> - Add a patch to change the corresponding binding document.
+> - Add a separated patch to change the dtsi.
+>
+> [1] https://patchwork.kernel.org/patch/7262411/
+>
+> James Liao (3):
+>    dt-bindings: soc: Add clocks for Mediatek SCPSYS unit
+>    soc: mediatek: Fix random hang up issue while kernel init
+>    arm64: dts: mt8173: Add clocks for SCPSYS unit
+>
+>   .../devicetree/bindings/soc/mediatek/scpsys.txt    | 10 ++--
+>   arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  6 +-
+>   drivers/soc/mediatek/mtk-scpsys.c                  | 67 ++++++++++++++--------
+>   3 files changed, 54 insertions(+), 29 deletions(-)
+>
+> --
+> 1.9.1
+>
+>
 
-Applied on mvebu/dt with Andrew acked-by
+Applied. Does this fix also needs to be applied to earlier kernel versions?
 
 Thanks,
-
-Gregory
-> ---
->  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 86 +++++++++++++-------------
->  1 file changed, 43 insertions(+), 43 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-> index 85b2f87c0b8a..d72a69d97ba2 100644
-> --- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-> +++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-> @@ -94,54 +94,11 @@
->  				status = "disabled";
->  			};
->  
-> -			/* Two rear eSATA ports */
-> -			sata at a0000 {
-> -				nr-ports = <2>;
-> -				status = "okay";
-> -			};
-> -
-> -			serial at 12000 {
-> -				status = "okay";
-> -			};
-> -
-> -			mdio {
-> -				phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
-> -					reg = <0>;
-> -				};
-> -
-> -				phy1: ethernet-phy at 1 { /* Marvell 88E1318 */
-> -					reg = <1>;
-> -				};
-> -			};
-> -
-> -			ethernet at 70000 {
-> -				status = "okay";
-> -				phy = <&phy0>;
-> -				phy-mode = "rgmii-id";
-> -			};
-> -
-> -			ethernet at 74000 {
-> -				status = "okay";
-> -				phy = <&phy1>;
-> -				phy-mode = "rgmii-id";
-> -			};
-> -
-> -			/* Front USB 2.0 port */
-> -			usb at 50000 {
-> -				status = "okay";
-> -			};
-> -
->  			i2c at 11000 {
->  				compatible = "marvell,mv64xxx-i2c";
->  				clock-frequency = <400000>;
->  				status = "okay";
->  
-> -				isl12057: isl12057 at 68 {
-> -					compatible = "isil,isl12057";
-> -					reg = <0x68>;
-> -					isil,irq2-can-wakeup-machine;
-> -				};
-> -
->  				/* Controller for rear fan #1 of 3 (Protechnic
->  				 * MGT4012XB-O20, 8000RPM) near eSATA port */
->  				g762_fan1: g762 at 3e {
-> @@ -178,6 +135,49 @@
->  					compatible = "gmt,g751";
->  					reg = <0x4c>;
->  				};
-> +
-> +				isl12057: isl12057 at 68 {
-> +					compatible = "isil,isl12057";
-> +					reg = <0x68>;
-> +					isil,irq2-can-wakeup-machine;
-> +				};
-> +			};
-> +
-> +			serial at 12000 {
-> +				status = "okay";
-> +			};
-> +
-> +			/* Front USB 2.0 port */
-> +			usb at 50000 {
-> +				status = "okay";
-> +			};
-> +
-> +			mdio {
-> +				phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
-> +					reg = <0>;
-> +				};
-> +
-> +				phy1: ethernet-phy at 1 { /* Marvell 88E1318 */
-> +					reg = <1>;
-> +				};
-> +			};
-> +
-> +			ethernet at 70000 {
-> +				status = "okay";
-> +				phy = <&phy0>;
-> +				phy-mode = "rgmii-id";
-> +			};
-> +
-> +			ethernet at 74000 {
-> +				status = "okay";
-> +				phy = <&phy1>;
-> +				phy-mode = "rgmii-id";
-> +			};
-> +
-> +			/* Two rear eSATA ports */
-> +			sata at a0000 {
-> +				nr-ports = <2>;
-> +				status = "okay";
->  			};
->  
->  			nand at d0000 {
-> -- 
-> 2.5.3
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Matthias
