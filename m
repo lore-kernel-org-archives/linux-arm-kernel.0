@@ -1,42 +1,24 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Oct 2015 13:04:19 -0700
-Subject: [PATCH 0/3] ARM: multi_v7_defconfig: Enable more OMAP family
- platforms
-In-Reply-To: <CAGo_u6q+U_Yi7Oq2pAFr4hs28_-G6dFbiHJQg3s3aEj0vG1asg@mail.gmail.com>
-References: <1428614121-3374-1-git-send-email-nm@ti.com>
- <20150805102234.GZ16878@atomide.com>
- <7hfv3uwvdw.fsf@deeprootsystems.com>
- <20150811103751.GK4215@atomide.com>
- <CAGo_u6q+U_Yi7Oq2pAFr4hs28_-G6dFbiHJQg3s3aEj0vG1asg@mail.gmail.com>
-Message-ID: <20151012200419.GO23801@atomide.com>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Mon, 12 Oct 2015 22:04:23 +0200
+Subject: [RFC] arm: add __initbss section attribute
+In-Reply-To: <1444622356-8263-1-git-send-email-yalin.wang2010@gmail.com>
+References: <1444622356-8263-1-git-send-email-yalin.wang2010@gmail.com>
+Message-ID: <20151012200422.GA29175@ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [150813 08:12]:
-> On Tue, Aug 11, 2015 at 5:37 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >
-> > * Kevin Hilman <khilman@kernel.org> [150807 16:10]:
-> > > Tony Lindgren <tony@atomide.com> writes:
-> > >
-> > > > Ping, looks like these are still pending. Probably should be
-> > > > applied directly by the arm-soc maintainers.
-> > >
-> > > If these should go through arm-soc, please resend to:arm at kernel.org so
-> > > they make it into our queue of stuff to be reviewed/applied.
-> >
-> > OK thanks, up to Nihshant to resend.
-> >
-> 
-> Sorry about the slow response - i will have to do this at a later
-> point(probably based off 4.3-rc1). tied up with a few other internal
-> stuff atm :(
+> --- a/include/asm-generic/vmlinux.lds.h
+> +++ b/include/asm-generic/vmlinux.lds.h
+>  
+> -#define BSS_SECTION(sbss_align, bss_align, stop_align)			\
+> +#define BSS_SECTION(sbss_align, bss_align, initbss_align, stop_align)			\
 
-Ping, can you please resend arm at kernel.org? Would be good to have these
-working for v4.4.
+A few comments:
 
-Anyways, untagging this old thread so don't expect more pings from
-me on this.
+1) - please align the backslash at the end of the
+     line with the backslash above it.
+2) - you need to fix all the remaining users of BSS_SECTION.
+3) - do we really need the flexibility to specify an alignment (stop_align)?
+        If not - drop the extra argument.
 
-Regards,
-
-Tony
+	Sam
