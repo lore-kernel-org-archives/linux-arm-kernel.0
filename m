@@ -1,40 +1,51 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 12 Oct 2015 14:53:13 +0100
-Subject: [PATCHv2] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
-In-Reply-To: <5223992.qv9q1k7gFp@wuerfel>
-References: <1444109743-8561-1-git-send-email-manjeet.p@samsung.com>
- <20151006103128.GN6281@e103592.cambridge.arm.com>
- <5340366.WTVksOGb0G@wuerfel> <5223992.qv9q1k7gFp@wuerfel>
-Message-ID: <20151012135300.GA26786@e103592.cambridge.arm.com>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Mon, 12 Oct 2015 15:56:22 +0200
+Subject: [PATCH 6/6] watchdog: sama5d4: try to set timeout from device
+ tree first
+In-Reply-To: <B256D81BAE5131468A838E5D7A243641D632216B@penmbx01>
+References: <1444340074-15437-1-git-send-email-sylvain.rochet@finsecur.com>
+ <1444340074-15437-7-git-send-email-sylvain.rochet@finsecur.com>
+ <20151012075001.GB3558@piout.net>
+ <B256D81BAE5131468A838E5D7A243641D632216B@penmbx01>
+Message-ID: <20151012135622.GA6845@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 10:41:43AM +0200, Arnd Bergmann wrote:
-> On Tuesday 06 October 2015 12:51:24 Arnd Bergmann wrote:
+Hi Wenyou,
+
+On Mon, Oct 12, 2015 at 08:12:42AM +0000, Yang, Wenyou wrote:
+> > -----Original Message-----
+> > From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
+> > Sent: 2015?10?12? 15:50
+> > To: Sylvain Rochet
+> > Cc: Guenter Roeck; Boris BREZILLON; linux-kernel at vger.kernel.org; Ferre,
+> > Nicolas; Desroches, Ludovic; linux-arm-kernel at lists.infradead.org; Yang,
+> > Wenyou; Wim Van Sebroeck
+> > Subject: Re: [PATCH 6/6] watchdog: sama5d4: try to set timeout from device tree
+> > first
 > > 
-> > I think it makes sense to stick with the traditional definition
-> > of MINSIGSTKSZ == "the minimum amount that you will always need,
-> > add whatever you require yourself" and SIGSTKSZ == "Should be
-> > enough for a couple of function calls". If we want to be conservative
-> > in the kernel, using 8192 and 32768, to stay with the x4 ratio
-> > that everyone else uses would be my first pick, though I'm not
-> > particularly attached to those values.
+> > Hi Sylvain,
 > > 
+> > The rest of the series looks good to me, one comment below:
 > > 
+> > On 08/10/2015 at 23:34:34 +0200, Sylvain Rochet wrote :
+> > > watchdog_init_timeout function doesn't try to get the "timeout-sec" DT
+> > > property if timeout_parm is not zero. This change makes this DT
+> > > property working for the sama5d4 watchdog driver.
+> > >
+> > 
+> > While I'm not sure of the feasibility, I think that the module parameter should
+> > override the DT property.
 > 
-> On second thought, it really seems to late to make up our minds
-> about the size now that glibc has already established 5KB as the
-> minimum size. If we set it to 8KB/32KB, not just the testcase but
-> real applications would start failing when they use the 5KB
-> constant from glibc.
+> The patch should be right, the DT property overrides the module 
+> parameter.
+> 
+> If the DT property is not a valid value, it uses the default value, 
+> initialized with the module parameter at the beginning of probe.
 
-I agree for MINSIGSTKSZ.  We could still raise SIGSTKSZ if we think
-that will be more future-proof (SIGSTKSZ would be less than the magic
-4*MINSIGSTKSZ that most arches assume, unless SIGSTKSZ is made >=20KB).
+Well, the principle of least surprise applied here means if you load the 
+module with a timeout argument, you expect the timeout argument to be 
+used and not the dt one. As such, it makes more sense to have the 
+parameter value takes precedence over the dt value.
 
-Those might be independent changes.  The definition of MINSIGSTKSZ
-is definitely broken right now, whereas SIGSTKSZ could be debated,
-but isn't actually broken.
-
-Cheers
----Dave
+Sylvain
