@@ -1,67 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Oct 2015 15:50:02 -0700
-Subject: [REPOST PATCH 1/4] ARM: dts: DRA7: Add dsp1_system syscon node
-In-Reply-To: <561C351B.3060307@ti.com>
-References: <1443828205-18706-1-git-send-email-s-anna@ti.com>
- <1443828205-18706-2-git-send-email-s-anna@ti.com>
- <20151012214304.GD23801@atomide.com> <561C351B.3060307@ti.com>
-Message-ID: <20151012225001.GK23801@atomide.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 12 Oct 2015 22:50:09 +0000
+Subject: [PATCH 12/37] ARM: dts: dove-sbc-a510: Fix regulator enable GPIO
+ polarity
+In-Reply-To: <1444684386-17094-13-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <1444684386-17094-13-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <20151012225009.GP13247@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [151012 15:37]:
-> Hi Tony,
+On Tue, Oct 13, 2015 at 12:12:41AM +0300, Laurent Pinchart wrote:
+> The enable GPIO is active low, but is flagged as active high in the gpio
+> property. As the gpio property flags are currently unused by the driver
+> this doesn't cause any issue for now, but will break later if the driver
+> starts making use of the flags. Fix it.
 > 
-> On 10/12/2015 04:43 PM, Tony Lindgren wrote:
-> > * Suman Anna <s-anna@ti.com> [151002 16:27]:
-> >> The DSP_SYSTEM sub-module is a dedicated system control logic
-> >> module present within a DRA7 DSP processor sub-system. This
-> >> module is responsible for power management, clock generation
-> >> and connection to the device PRCM module.
-> >>
-> >> Add a syscon node for this module for the DSP1 processor
-> >> sub-system. This is added as a syscon node as it is a common
-> >> configuration module that can be used by the different IOMMU
-> >> instances and the corresponding remoteproc device.
-> >>
-> >> The node is added to the common dra7.dtsi file, as the DSP1
-> >> processor sub-system is mostly common across all the variants
-> >> of the DRA7 SoC family.
-> >>
-> >> Signed-off-by: Suman Anna <s-anna@ti.com>
-> >> ---
-> >>  arch/arm/boot/dts/dra7.dtsi | 5 +++++
-> >>  1 file changed, 5 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> >> index e289c706d27d..62055094e8d5 100644
-> >> --- a/arch/arm/boot/dts/dra7.dtsi
-> >> +++ b/arch/arm/boot/dts/dra7.dtsi
-> >> @@ -292,6 +292,11 @@
-> >>  				#thermal-sensor-cells = <1>;
-> >>  		};
-> >>  
-> >> +		dsp1_system: dsp_system at 40d00000 {
-> >> +			compatible = "syscon";
-> >> +			reg = <0x40d00000 0x100>;
-> >> +		};
-> >> +
-> >>  		sdma: dma-controller at 4a056000 {
-> >>  			compatible = "ti,omap4430-sdma";
-> >>  			reg = <0x4a056000 0x1000>;
-> > 
-> > Hmm so why would you want to set up a complete device as a syscon
-> > mapping rather than just doing ioremap on it?
-> > 
-> > What drivers will be sharing access to these registers?
+> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> ---
+>  arch/arm/boot/dts/dove-sbc-a510.dts | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> Two different instances of the MMU for now, both get probed
-> independently. But there are other registers which a remoteproc driver
-> will mostly be interested in (like DSP_SYS_STAT for knowing the C66x
-> idle/active status).
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> 
+> diff --git a/arch/arm/boot/dts/dove-sbc-a510.dts b/arch/arm/boot/dts/dove-sbc-a510.dts
+> index 288e707dea99..3bc5c96483be 100644
+> --- a/arch/arm/boot/dts/dove-sbc-a510.dts
+> +++ b/arch/arm/boot/dts/dove-sbc-a510.dts
+> @@ -82,7 +82,7 @@
+>  			regulator-name = "USB Power";
+>  			regulator-min-microvolt = <5000000>;
+>  			regulator-max-microvolt = <5000000>;
+> -			gpio = <&gpio_ext 0 GPIO_ACTIVE_HIGH>;
+> +			gpio = <&gpio_ext 0 GPIO_ACTIVE_LOW>;
 
-OK makes sense to me then.
+I'd feel a lot better about this if the commit log made a strong
+reference back to some documentation or other hardware description.
+Just because Linux doesn't use it or uses it wrong doesn't necessarily
+mean the DT is wrong.
 
-Thanks,
+thx,
 
-Tony
+Jason.
+
+
+>  		};
+>  
+>  		mmc_power: regulator at 3 {
+> @@ -90,7 +90,7 @@
+>  			regulator-name = "MMC Power";
+>  			regulator-min-microvolt = <3300000>;
+>  			regulator-max-microvolt = <3300000>;
+> -			gpio = <&gpio_ext 13 GPIO_ACTIVE_HIGH>;
+> +			gpio = <&gpio_ext 13 GPIO_ACTIVE_LOW>;
+>  		};
+>  	};
+>  };
+> -- 
+> 2.4.9
+> 
