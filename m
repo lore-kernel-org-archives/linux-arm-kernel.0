@@ -1,61 +1,67 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 12 Oct 2015 23:26:12 +0000
-Subject: [PATCH 12/37] ARM: dts: dove-sbc-a510: Fix regulator enable GPIO
- polarity
-In-Reply-To: <2803928.h4I9c13V32@avalon>
-References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <1444684386-17094-13-git-send-email-laurent.pinchart@ideasonboard.com>
- <20151012225009.GP13247@io.lakedaemon.net>
- <2803928.h4I9c13V32@avalon>
-Message-ID: <20151012232612.GQ13247@io.lakedaemon.net>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 12 Oct 2015 16:35:37 -0700
+Subject: [PATCH v3] mtd: nand: pass page number to ecc->write_xxx() methods
+In-Reply-To: <1443765205-8730-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1443765205-8730-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20151012233537.GR107187@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Laurent,
-
-On Tue, Oct 13, 2015 at 02:10:10AM +0300, Laurent Pinchart wrote:
-> On Monday 12 October 2015 22:50:09 Jason Cooper wrote:
-> > On Tue, Oct 13, 2015 at 12:12:41AM +0300, Laurent Pinchart wrote:
-> > > The enable GPIO is active low, but is flagged as active high in the gpio
-> > > property. As the gpio property flags are currently unused by the driver
-> > > this doesn't cause any issue for now, but will break later if the driver
-> > > starts making use of the flags. Fix it.
-> > > 
-> > > Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > > ---
-> > > 
-> > >  arch/arm/boot/dts/dove-sbc-a510.dts | 4 ++--
-> > >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > > 
-> > > Cc: Jason Cooper <jason@lakedaemon.net>
-> > > Cc: Andrew Lunn <andrew@lunn.ch>
-> > > Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> > > Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > > 
-> > > diff --git a/arch/arm/boot/dts/dove-sbc-a510.dts
-> > > b/arch/arm/boot/dts/dove-sbc-a510.dts index 288e707dea99..3bc5c96483be
-> > > 100644
-> > > --- a/arch/arm/boot/dts/dove-sbc-a510.dts
-> > > +++ b/arch/arm/boot/dts/dove-sbc-a510.dts
-> > > @@ -82,7 +82,7 @@
-> > >  			regulator-name = "USB Power";
-> > >  			regulator-min-microvolt = <5000000>;
-> > >  			regulator-max-microvolt = <5000000>;
-> > > -			gpio = <&gpio_ext 0 GPIO_ACTIVE_HIGH>;
-> > > +			gpio = <&gpio_ext 0 GPIO_ACTIVE_LOW>;
-> > 
-> > I'd feel a lot better about this if the commit log made a strong
-> > reference back to some documentation or other hardware description.
-> > Just because Linux doesn't use it or uses it wrong doesn't necessarily
-> > mean the DT is wrong.
+On Fri, Oct 02, 2015 at 07:53:25AM +0200, Boris Brezillon wrote:
+> The ->read_xxx() methods are all passed the page number the NAND controller
+> is supposed to read, but ->write_xxx() do not have such a parameter.
 > 
-> It looks like I might be wrong, see Stephen's reply to patch 37/37. Let's 
-> discuss the issue there.
+> This is a problem if we want to properly implement data
+> scrambling/randomization in order to mitigate MLC sensibility to repeated
+> pattern: to prevent bitflips in adjacent pages in the same block we need
+> to avoid repeating the same pattern at the same offset in those pages,
+> hence the randomizer/scrambler engine need to be passed the page value
+> in order to adapt its seed accordingly.
+> 
+> Moreover, adding the page parameter to the ->write_xxx() methods add some
+> consistency to the current API.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> CC: Josh Wu <josh.wu@atmel.com>
+> CC: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> CC: Maxime Ripard <maxime.ripard@free-electrons.com>
+> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> CC: Huang Shijie <shijie.huang@arm.com>
+> CC: Stefan Agner <stefan@agner.ch>
+> CC: devel at driverdev.osuosl.org
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: linux-kernel at vger.kernel.org
+> ---
+> Changes since v2:
+> - fixed compilation error in the gpmi driver
+> - compile tested all impacted drivers except the bf5xx_nand,
+>   fsl_elbc_nand and fsl_ifc_nand ones
+> 
+> Changes since v1:
+> - rebased on l2-mtd/master
+> - fixed compilation error in the docg4 driver
+> ---
+>  drivers/mtd/nand/atmel_nand.c                 |  6 ++++--
+>  drivers/mtd/nand/bf5xx_nand.c                 |  3 ++-
+>  drivers/mtd/nand/brcmnand/brcmnand.c          |  4 ++--
+>  drivers/mtd/nand/cafe_nand.c                  |  3 ++-
+>  drivers/mtd/nand/denali.c                     |  5 +++--
+>  drivers/mtd/nand/docg4.c                      |  6 +++---
+>  drivers/mtd/nand/fsl_elbc_nand.c              |  4 ++--
+>  drivers/mtd/nand/fsl_ifc_nand.c               |  2 +-
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c        |  8 +++----
+>  drivers/mtd/nand/hisi504_nand.c               |  3 ++-
+>  drivers/mtd/nand/lpc32xx_mlc.c                |  3 ++-
+>  drivers/mtd/nand/lpc32xx_slc.c                |  5 +++--
+>  drivers/mtd/nand/nand_base.c                  | 31 ++++++++++++++++++---------
+>  drivers/mtd/nand/omap2.c                      |  3 ++-
+>  drivers/mtd/nand/pxa3xx_nand.c                |  3 ++-
+>  drivers/mtd/nand/sh_flctl.c                   |  3 ++-
+>  drivers/mtd/nand/sunxi_nand.c                 |  5 +++--
+>  drivers/mtd/nand/vf610_nfc.c                  |  2 +-
+>  drivers/staging/mt29f_spinand/mt29f_spinand.c |  3 ++-
+>  include/linux/mtd/nand.h                      |  6 +++---
+>  20 files changed, 66 insertions(+), 42 deletions(-)
 
-No problem, as long as it's being addressed, I'll keep an eye out for a
-v2.  I've some email remailer sketchyness resulting in a lack of
-subscription to the MLs atm.  And I'm not on the 37/37 thread.
-
-thx,
-
-Jason.
+Hmm, am I missing something, or does this not apply to l2-mtd.git or
+linux-next.git?
