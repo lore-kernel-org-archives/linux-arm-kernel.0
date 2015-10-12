@@ -1,129 +1,112 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Mon, 12 Oct 2015 11:59:16 +0800
-Subject: [RFC] arm: add __initbss section attribute
-Message-ID: <1444622356-8263-1-git-send-email-yalin.wang2010@gmail.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Mon, 12 Oct 2015 12:09:25 +0800
+Subject: [PATCH v6 05/17] drm: bridge: analogix/dp: dynamic parse sync_pol
+ & interlace & dynamic_range
+In-Reply-To: <561B2E56.5020102@samsung.com>
+References: <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
+ <1444491961-26799-1-git-send-email-ykk@rock-chips.com>
+ <561B00D4.9060302@rock-chips.com> <561B0385.1070704@samsung.com>
+ <561B1E65.1040806@rock-chips.com> <561B2E56.5020102@samsung.com>
+Message-ID: <561B3275.8000500@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This attribute can make init data to be into .initbss section,
-this will make the data to be NO_BITS in vmlinux, can shrink the
-Image file size, and speed up the boot up time.
 
-Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
----
- arch/arm/kernel/vmlinux.lds.S     |  2 +-
- arch/arm/mm/init.c                |  1 +
- include/asm-generic/sections.h    |  1 +
- include/asm-generic/vmlinux.lds.h | 11 ++++++++++-
- include/linux/init.h              |  1 +
- include/linux/mm.h                |  4 +++-
- 6 files changed, 17 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 8b60fde..ad6d740 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -330,7 +330,7 @@ SECTIONS
- 	}
- #endif
- 
--	BSS_SECTION(0, 0, 0)
-+	BSS_SECTION(0, 0, 0, 0)
- 	_end = .;
- 
- 	STABS_DEBUG
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 8a63b4c..50b881e 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -722,6 +722,7 @@ void free_initmem(void)
- 	free_tcmmem();
- 
- 	poison_init_mem(__init_begin, __init_end - __init_begin);
-+	poison_init_mem(__initbss_start, __initbss_start - __initbss_end);
- 	if (!machine_is_integrator() && !machine_is_cintegrator())
- 		free_initmem_default(-1);
- }
-diff --git a/include/asm-generic/sections.h b/include/asm-generic/sections.h
-index b58fd66..a63ebe9 100644
---- a/include/asm-generic/sections.h
-+++ b/include/asm-generic/sections.h
-@@ -29,6 +29,7 @@ extern char _text[], _stext[], _etext[];
- extern char _data[], _sdata[], _edata[];
- extern char __bss_start[], __bss_stop[];
- extern char __init_begin[], __init_end[];
-+extern char __initbss_start[], __initbss_end[];
- extern char _sinittext[], _einittext[];
- extern char _end[];
- extern char __per_cpu_load[], __per_cpu_start[], __per_cpu_end[];
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index c4bd0e2..b3db62d 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -574,6 +574,14 @@
- 		*(COMMON)						\
- 	}
- 
-+#define INITBSS(initbss_align)						\
-+	. = ALIGN(initbss_align);					\
-+	.initbss : AT(ADDR(.initbss) - LOAD_OFFSET) {			\
-+		VMLINUX_SYMBOL(__initbss_start) = .;			\
-+		*(.bss.init.data)					\
-+		VMLINUX_SYMBOL(__initbss_end) = .;			\
-+	}
-+
- /*
-  * DWARF debug sections.
-  * Symbols in the DWARF debugging sections are relative to
-@@ -831,10 +839,11 @@
- 		INIT_RAM_FS						\
- 	}
- 
--#define BSS_SECTION(sbss_align, bss_align, stop_align)			\
-+#define BSS_SECTION(sbss_align, bss_align, initbss_align, stop_align)			\
- 	. = ALIGN(sbss_align);						\
- 	VMLINUX_SYMBOL(__bss_start) = .;				\
- 	SBSS(sbss_align)						\
- 	BSS(bss_align)							\
-+	INITBSS(initbss_align)						\
- 	. = ALIGN(stop_align);						\
- 	VMLINUX_SYMBOL(__bss_stop) = .;
-diff --git a/include/linux/init.h b/include/linux/init.h
-index b449f37..f2960b2 100644
---- a/include/linux/init.h
-+++ b/include/linux/init.h
-@@ -41,6 +41,7 @@
-    discard it in modules) */
- #define __init		__section(.init.text) __cold notrace
- #define __initdata	__section(.init.data)
-+#define __initbss	__section(.bss.init.data)
- #define __initconst	__constsection(.init.rodata)
- #define __exitdata	__section(.exit.data)
- #define __exit_call	__used __section(.exitcall.exit)
-diff --git a/include/linux/mm.h b/include/linux/mm.h
-index d30eea3..1f266f7 100644
---- a/include/linux/mm.h
-+++ b/include/linux/mm.h
-@@ -21,6 +21,7 @@
- #include <linux/resource.h>
- #include <linux/page_ext.h>
- #include <linux/err.h>
-+#include <asm/sections.h>
- 
- struct mempolicy;
- struct anon_vma;
-@@ -1722,10 +1723,11 @@ static inline void mark_page_reserved(struct page *page)
-  */
- static inline unsigned long free_initmem_default(int poison)
- {
--	extern char __init_begin[], __init_end[];
- 
- 	return free_reserved_area(&__init_begin, &__init_end,
- 				  poison, "unused kernel");
-+	return free_reserved_area(&__initbss_start, &__initbss_end,
-+				  poison, "unused kernel");
- }
- 
- static inline unsigned long get_num_physpages(void)
--- 
-1.9.1
+On 10/12/2015 11:51 AM, Krzysztof Kozlowski wrote:
+> On 12.10.2015 11:43, Yakir Yang wrote:
+>> On 10/12/2015 08:49 AM, Krzysztof Kozlowski wrote:
+>>> On 12.10.2015 09:37, Yakir Yang wrote:
+>>>> Hi Krzysztof,
+>>>>
+>>>> On 10/10/2015 11:46 PM, Yakir Yang wrote:
+>>>>> Both hsync/vsync polarity and interlace mode can be parsed from
+>>>>> drm display mode, and dynamic_range and ycbcr_coeff can be judge
+>>>>> by the video code.
+>>>>>
+>>>>> But presumably Exynos still relies on the DT properties, so take
+>>>>> good use of mode_fixup() in to achieve the compatibility hacks.
+>>>>>
+>>>>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>>>>> ---
+>>>>> Changes in v6: None
+>>>> +    of_property_read_u32(dp_node, "hsync-active-high",
+>>>> +                 &video->h_sync_polarity);
+>>>> +    of_property_read_u32(dp_node, "vsync-active-high",
+>>>> +                 &video->v_sync_polarity);
+>>>> +    of_property_read_u32(dp_node, "interlaced",
+>>>> +                 &video->interlaced);
+>>>> +}
+>>>>
+>>>>
+>>>> Sorry, forget to fix your previous comment here, would
+>>>> remember to fix it to v7 version, wish v6 would collect
+>>>> more comment/reviewed/ack.  :)
+>>> Right.
+>>>
+>>> You can send a v7 of only this patch.
+>>>
+>>> In the same time I would prefer not to chain-reply next version of
+>>> entire patchset to cover letter of previous version. It confuses me
+>>> because v6 appears UNDER v4 so I can't really find v6. I see v4 at the
+>>> top of my email list.
+>> Okay, I wish this chain-reply would make people easy to find the
+>> previous comments, but actually it is little mess now. I would give
+>> up this way to send patchset  :)
+>>
+>>> In the same time the patchset is quite big. Put the latest version (with
+>>> this issue above fixed!) on some repo and link it in cover letter.
+>> Yeah, it's quite big now, I would like to back the patchset to previous
+>> format, like:
+>>
+>> ---> [PATCH v6 00/17] Cover letter
+>>    |----> [PATCH v6 01/17]
+>>    |----> [PATCH ......]
+>>    |----> [PATCH v6 05/17]
+>>       |----> [PATCH v7 05/17]
+>>    |----> [PATCH ......]
+>>    |----> [PATCH v6 17/17]
+>>
+>> Is it right, and can resend the v6 to fix this chain-reply issue with
+>> RESEND flag ([PATCH RESEND v6 ...]) ?
+>>
+>> ---> [PATCH RESEND v6 00/17] Cover letter
+>>    |----> [PATCH RESEND v6 01/17]
+>>    |----> [PATCH ......]
+>>    |----> [PATCH RESEND v6 05/17]
+>>       |----> [PATCH v7 05/17]
+>>    |----> [PATCH ......]
+>>    |----> [PATCH RESEND v6 17/17]
+>>
+> No, don't resend everything. I mean in this case with such big patchset
+> if you want to fix one patch just send one email [PATCH v7 05/17]
+> chained to proper id (cover letter or v6-05/17). Add a short note that
+> this is resend of only one patch from the set.
+
+Oh, understand now, just keep this chain-reply no changes for now.
+
+----> [PATCH v4 00/16] Cover letter
+    |----> [PATCH v5 00/17] Covert letter
+    |----> [PATCH ......]
+    |
+    |----> [PATCH v6 00/17] Covert letter
+    |----> [PATCH v6 01/17]
+    |----> [PATCH ......]
+    |----> [PATCH v6 17/17]
+    |----> [PATCH v7 05/17]
+
+
+> Of course you can just wait for some more comments and then send v7 of
+> everything.
+
+I would choice to send it now :)
+
+Thanks,
+- Yakir
+
+> Best regards,
+> Krzysztof
+>
+>
+>
+>
