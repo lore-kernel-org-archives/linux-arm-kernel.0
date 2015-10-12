@@ -1,62 +1,65 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 12 Oct 2015 13:43:47 +0900
-Subject: [PATCH 1/3] ARM: dts: exynos5422-odroidxu3: use cd-gpio method to
- detect sd-card
-In-Reply-To: <561B3739.4040701@samsung.com>
-References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
- <561B3739.4040701@samsung.com>
-Message-ID: <561B3A83.6090607@samsung.com>
+From: neilb@suse.com (Neil Brown)
+Date: Mon, 12 Oct 2015 15:59:27 +1100
+Subject: [PATCH] md: fix 32-bit build warning
+In-Reply-To: <5304496.D8N6u074t0@wuerfel>
+References: <5304496.D8N6u074t0@wuerfel>
+Message-ID: <87fv1g1y34.fsf@notabene.neil.brown.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-On 10/12/2015 01:29 PM, Krzysztof Kozlowski wrote:
-> On 12.10.2015 00:46, Anand Moon wrote:
->> From: Jaehoon Chung <jh80.chung@samsung.com>
->>
->> To detect sd-card use the cd-gpio method.
->> It can decrease the interrupt for detecting sd-card.
->>
->> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
->>
->> ---
->> Changes based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v4.4-next/dt-samsung branch
->> ---
->>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 4 +++-
->>  1 file changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->> index 1af5bdc..26decbd 100644
->> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->> @@ -352,8 +352,10 @@
->>  	samsung,dw-mshc-ciu-div = <3>;
->>  	samsung,dw-mshc-sdr-timing = <0 4>;
->>  	samsung,dw-mshc-ddr-timing = <0 2>;
->> +	cd-gpios = <&gpc2 2 GPIO_ACTIVE_HIGH>;
->> +	cd-inverted;
->>  	pinctrl-names = "default";
->> -	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
->> +	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+> On 32-bit architectures, the md code produces this warning when CONFIG_LDAF
+> is set:
+>
+> drivers/md/md.c: In function 'check_sb_changes':
+> drivers/md/md.c:8990:10: warning: format '%lu' expects argument of type 'long unsigned int', but argument 4 has type 'sector_t {aka long long unsigned int}' [-Wformat=]
+>    pr_info("%s:%d recovery_cp changed from %lu to %lu\n", __func__,
+>
+> The code was only recently introduced, and uses the wrong format string
+> for sector_t. As a workaround, this patch adds an explicit cast to 'u64'
+> so we can use the %llu format string on all architectures.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: e0212320066e ("md-cluster: Improve md_reload_sb to be less error prone")
+> Cc: Goldwyn Rodrigues <rgoldwyn@suse.com>
+> ---
+>
+> I also noticed that some commmits in md/for-next including the one causing
+> the problem lack a Signed-off-by line. It might make sense to just fold this
+> patch and add the lines at the same time.
+>
+> diff --git a/drivers/md/md.c b/drivers/md/md.c
+> index 7fff1e6884d6..e13f72a3b561 100644
+> --- a/drivers/md/md.c
+> +++ b/drivers/md/md.c
+> @@ -8987,9 +8987,9 @@ static void check_sb_changes(struct mddev *mddev, struct md_rdev *rdev)
+>  
+>  	/* recovery_cp changed */
+>  	if (le64_to_cpu(sb->resync_offset) != mddev->recovery_cp) {
+> -		pr_info("%s:%d recovery_cp changed from %lu to %lu\n", __func__,
+> -				__LINE__, mddev->recovery_cp,
+> -				(unsigned long) le64_to_cpu(sb->resync_offset));
+> +		pr_info("%s:%d recovery_cp changed from %llu to %llu\n", __func__,
+> +				__LINE__, (u64)mddev->recovery_cp,
+> +				(u64) le64_to_cpu(sb->resync_offset));
+>  		mddev->recovery_cp = le64_to_cpu(sb->resync_offset);
+>  	}
+>  
 
-Don't do change this.
+Thanks, but is this really right?
+I think u64 is "unsigned long" on 64bit.
+I have always used (unsigned long long) when I want to use %llu on
+sector_t.
 
-> 
-> Anand,
-> 
-> You essentially reverted here af6ad88acbd6 ("ARM: dts: Mux XMMCnDATA[0]
-> pad correctly for Exynos5420 boards"). Why? There is no explanation in
-> the commit message about this.
+How confident are you of using "u64" ?
 
-I don't remember to send the patch relevant to this. Hmm...
-Well, Is this patch really signed-off by me?
-
-Best Regards,
-Jaehoon Chung
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
+Thanks,
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151012/7ca58da1/attachment.sig>
