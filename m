@@ -1,16 +1,49 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 12 Oct 2015 21:48:21 +0800
-Subject: [PATCH] ARM: imx: add cpufreq device for imx6ul
-In-Reply-To: <1444404930-15390-1-git-send-email-b51503@freescale.com>
-References: <1444404930-15390-1-git-send-email-b51503@freescale.com>
-Message-ID: <20151012134820.GB18611@tiger>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 12 Oct 2015 14:48:39 +0100
+Subject: [PATCH RESEND] drivers/perf: arm_pmu: avoid CPU device_node reference
+ leak
+Message-ID: <1444657719-3801-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 11:35:30PM +0800, Bai Ping wrote:
-> Add cpufreq device for i.MX6UL. Using the common
-> cpufreq of i.MX6 SOC.
-> 
-> Signed-off-by: Bai Ping <b51503@freescale.com>
+of_cpu_device_node_get increments the reference count on the CPU
+device_node, so we must take care to of_node_put once we've finished
+with it.
 
-Applied, thanks.
+This patch fixes the perf IRQ probing code to avoid the leak.
+
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+
+Arnd/Olof: Please can you take this via arm-soc? It's a non-urgent, yet
+           simple fix and I don't have any other fixes queued for perf.
+
+ drivers/perf/arm_pmu.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index 2365a32a595e..be3755c973e9 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -823,9 +823,15 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
+ 		}
+ 
+ 		/* Now look up the logical CPU number */
+-		for_each_possible_cpu(cpu)
+-			if (dn == of_cpu_device_node_get(cpu))
++		for_each_possible_cpu(cpu) {
++			struct device_node *cpu_dn;
++
++			cpu_dn = of_cpu_device_node_get(cpu);
++			of_node_put(cpu_dn);
++
++			if (dn == cpu_dn)
+ 				break;
++		}
+ 
+ 		if (cpu >= nr_cpu_ids) {
+ 			pr_warn("Failed to find logical CPU for %s\n",
+-- 
+2.1.4
