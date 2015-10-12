@@ -1,54 +1,46 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 12 Oct 2015 10:29:18 +0100
-Subject: Tegra baseline test results for v4.3-rc5
-Message-ID: <561B7D6E.609@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Oct 2015 11:30:11 +0200
+Subject: [PATCH] md: fix 32-bit build warning
+In-Reply-To: <87fv1g1y34.fsf@notabene.neil.brown.name>
+References: <5304496.D8N6u074t0@wuerfel>
+ <87fv1g1y34.fsf@notabene.neil.brown.name>
+Message-ID: <11281560.gJ28rX782P@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.3-rc5.
-Logs and other details at:
+On Monday 12 October 2015 15:59:27 Neil Brown wrote:
+> > diff --git a/drivers/md/md.c b/drivers/md/md.c
+> > index 7fff1e6884d6..e13f72a3b561 100644
+> > --- a/drivers/md/md.c
+> > +++ b/drivers/md/md.c
+> > @@ -8987,9 +8987,9 @@ static void check_sb_changes(struct mddev *mddev, struct md_rdev *rdev)
+> >  
+> >       /* recovery_cp changed */
+> >       if (le64_to_cpu(sb->resync_offset) != mddev->recovery_cp) {
+> > -             pr_info("%s:%d recovery_cp changed from %lu to %lu\n", __func__,
+> > -                             __LINE__, mddev->recovery_cp,
+> > -                             (unsigned long) le64_to_cpu(sb->resync_offset));
+> > +             pr_info("%s:%d recovery_cp changed from %llu to %llu\n", __func__,
+> > +                             __LINE__, (u64)mddev->recovery_cp,
+> > +                             (u64) le64_to_cpu(sb->resync_offset));
+> >               mddev->recovery_cp = le64_to_cpu(sb->resync_offset);
+> >       }
+> >  
+> 
+> Thanks, but is this really right?
+> I think u64 is "unsigned long" on 64bit.
+> I have always used (unsigned long long) when I want to use %llu on
+> sector_t.
+> 
+> How confident are you of using "u64" ?
 
-    https://nvtb.github.io//linux/test_v4.3-rc5/20151011113102/
+Very confident ;-)
 
+This used to not work until some linux-2.6 version when we changed all
+architectures to use asm-generic/int-ll64.h in the kernel, because
+a lot of code relied on printing u64 variables using %lld.
 
-Test summary
-------------
+I tend to use u64 for things like this because it's shorter than
+'unsigned long long'.
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 1/ 1): qemu-vexpress64
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.3-rc4 (049e6dde7e57f0054fdc49102e7ef4830c698b46)):
-   text     data      bss    total  kernel
-  -8312    +5616      -64    -2760  defconfig
-  -4629    -1472        0    -6101  multi_v7_defconfig
-  -4904    -1544        0    -6448  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.3-rc4 (049e6dde7e57f0054fdc49102e7ef4830c698b46))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-      12k     -12k        .      -4k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-      12k     -12k        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-      12k     -12k        .      -4k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-      12k     -12k        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-      12k     -12k        .      -4k    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-      12k     -12k        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-      12k     -12k        .      -4k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-      12k     -12k        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+	Arnd
