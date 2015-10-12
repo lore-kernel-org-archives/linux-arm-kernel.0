@@ -1,181 +1,100 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Mon, 12 Oct 2015 06:39:54 +0200
-Subject: [PATCH v4 18/26] ARM: pxa: magician: Add support for ADS7846
-In-Reply-To: <1443876564.4186.34.camel@gmail.com>
-References: <cover.1443472089.git.petr.cvek@tul.cz> <5609B347.80202@tul.cz>
- <1443876564.4186.34.camel@gmail.com>
-Message-ID: <561B399A.3040508@tul.cz>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 12 Oct 2015 13:42:38 +0900
+Subject: [PATCH 2/3] ARM: dts: use vmmc-supply of emmc/sd for
+ exynos5422-odroidxu3
+In-Reply-To: <1444578364-1384-2-git-send-email-linux.amoon@gmail.com>
+References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
+ <1444578364-1384-2-git-send-email-linux.amoon@gmail.com>
+Message-ID: <561B3A3E.3030904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 3.10.2015 v 14:49 Philipp Zabel napsal(a):
-> Am Montag, den 28.09.2015, 23:38 +0200 schrieb Petr Cvek:
->> Add support for an ADS7846 touchscreen.
-> 
-> It's actually a TSC2045.
+On 12.10.2015 00:46, Anand Moon wrote:
+> Added support for vmmc/vqmmc-supply for emmc/sd cards.
+> Fixed the min values for regulator ldo13_reg (VDDQ_MMC2).
 
-2046...,  but I will mention it in next commit message (it was name of the driver).
+I can't see the description of a problem which is fixed. If you fix
+something, then please describe what is wrong.
 
+> Added ramp-delay for LDO9(VDD33_USB3_0).
+> Added ramp-delay for LDO13(VDDQ_MMC2).
+> Added ramp-delay for LDO15(ETH_P3V3).
 > 
->> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
->> ---
->>  arch/arm/mach-pxa/magician.c | 86
->> ++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 86 insertions(+)
->>
->> diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach
->> -pxa/magician.c
->> index af8133a..450f35f 100644
->> --- a/arch/arm/mach-pxa/magician.c
->> +++ b/arch/arm/mach-pxa/magician.c
->> @@ -28,6 +28,7 @@
->>  #include <linux/pwm_backlight.h>
->>  #include <linux/regulator/driver.h>
->>  #include <linux/regulator/gpio-regulator.h>
->> +#include <linux/regulator/fixed.h>
->>  #include <linux/regulator/machine.h>
->>  #include <linux/usb/gpio_vbus.h>
->>  #include <linux/i2c/pxa-i2c.h>
->> @@ -44,6 +45,10 @@
->>  #include <linux/platform_data/irda-pxaficp.h>
->>  #include <linux/platform_data/usb-ohci-pxa27x.h>
->>  
->> +#include <linux/spi/spi.h>
->> +#include <linux/spi/pxa2xx_spi.h>
->> +#include <linux/spi/ads7846.h>
->> +
->>  #include "devices.h"
->>  #include "generic.h"
->>  
->> @@ -748,6 +753,37 @@ static struct platform_device bq24022 = {
->>  };
->>  
->>  /*
->> + * fixed regulator for ads7846
->> + */
->> +
->> +static struct regulator_consumer_supply ads7846_supply =
->> +	REGULATOR_SUPPLY("vcc", "spi2.0");
->> +
->> +static struct regulator_init_data vads7846_regulator = {
->> +	.constraints = {
->> +		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
->> +	},
->> +	.num_consumer_supplies	= 1,
->> +	.consumer_supplies	= &ads7846_supply,
->> +};
->> +
->> +static struct fixed_voltage_config vads7846 = {
->> +	.supply_name	= "vads7846",
->> +	.microvolts	= 3300000, /* probably */
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 > 
-> I agree.
+> ---
+> Changes based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v4.4-next/dt-samsung branch
 > 
->> +	.gpio		= -EINVAL,
->> +	.startup_delay	= 0,
->> +	.init_data	= &vads7846_regulator,
->> +};
->> +
->> +static struct platform_device vads7846_device = {
->> +	.name	= "reg-fixed-voltage",
->> +	.id	= 1,
->> +	.dev	= {
->> +		.platform_data = &vads7846,
->> +	},
->> +};
->> +
->> +/*
->>   * MMC/SD
->>   */
->>  
->> @@ -879,6 +915,51 @@ static struct i2c_pxa_platform_data
->> magician_i2c_power_info = {
->>  };
->>  
->>  /*
->> + * Touchscreen
->> + */
->> +
->> +static struct ads7846_platform_data ads7846_pdata = {
->> +	.model			= 7846,
->> +	.x_min			= 0,
->> +	.y_min			= 0,
->> +	.x_max			= 4096,
->> +	.y_max			= 4096,
->> +	.x_plate_ohms		= 180,	/* for pressure
->> in 0-255 */
->> +	.y_plate_ohms		= 180,
->> +	.pressure_max		= 255,	/* up to 12bit
->> sampling */
->> +	.debounce_max		= 10,
->> +	.debounce_tol		= 3,
->> +	.debounce_rep		= 1,
->> +	.gpio_pendown		= GPIO115_MAGICIAN_nPEN_IRQ,
->> +	.keep_vref_on		= 1,	/* FIXME, external
->> Vref? */
->> +	.vref_delay_usecs	= 100,
->> +	/* .wait_for_sync, GPIO77_LCD_BIAS low noise measure,
->> latency! */
->> +};
->> +
->> +struct pxa2xx_spi_chip tsc2046_chip_info = {
->> +	.tx_threshold	= 1,
->> +	.rx_threshold	= 2,
->> +	.timeout	= 64,
->> +	.gpio_cs	= -1,
->> +};
->> +
->> +static struct pxa2xx_spi_master magician_spi_info = {
->> +	.num_chipselect	= 1,
->> +	.enable_dma	= 1,
->> +};
->> +
->> +static struct spi_board_info ads7846_spi_board_info[] __initdata = {
->> +	{
->> +		.modalias		= "ads7846",
->> +		.bus_num		= 2,
->> +		.max_speed_hz		= 1857143,
+> Note:
+> Changes need for support of UHS-I highspeed cards.
+> changes for vqmmc-supply for emmc is not supported.
 > 
-> I had used 2.6 MHz here.
+> [    1.831136] vdd_ldo9: ramp_delay not set
+> [    1.843049] vdd_ldo13: ramp_delay not set
+> [    1.850975] vdd_ldo15: ramp_delay not set
+> [    1.862816] vdd_sd: ramp_delay not set
+> ---
+>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> index 26decbd..58c06d3 100644
+> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> @@ -157,6 +157,7 @@
+>  				regulator-min-microvolt = <3000000>;
+>  				regulator-max-microvolt = <3000000>;
+>  				regulator-always-on;
+> +				regulator-ramp-delay = <12000>;
+>  			};
+>  
+>  			ldo10_reg: LDO10 {
+> @@ -182,9 +183,10 @@
+>  
+>  			ldo13_reg: LDO13 {
+>  				regulator-name = "vdd_ldo13";
+> -				regulator-min-microvolt = <2800000>;
+> +				regulator-min-microvolt = <1800000>;
+>  				regulator-max-microvolt = <2800000>;
+>  				regulator-always-on;
+> +				regulator-ramp-delay = <12000>;
+>  			};
+>  
+>  			ldo15_reg: LDO15 {
+> @@ -213,6 +215,7 @@
+>  				regulator-min-microvolt = <2800000>;
+>  				regulator-max-microvolt = <2800000>;
+>  				regulator-always-on;
+> +				regulator-ramp-delay = <12000>;
 
-Will change to something more visible, probably remnants of some debugging.
-BTW It sets frequency of a SPI? 
+Where did you get this value from? It looks wrong... My datasheet does
+not have 12000 uV/uS.
 
-> 
->> +		.platform_data		= &ads7846_pdata,
->> +		.controller_data	= &tsc2046_chip_info,
->> +		.irq = PXA_GPIO_TO_IRQ(GPIO115_MAGICIAN_nPEN_IRQ),
->> +	},
->> +};
->> +
->> +/*
->>   * Platform devices
->>   */
->>  
->> @@ -887,6 +968,7 @@ static struct platform_device *devices[]
->> __initdata = {
->>  	&egpio,
->>  	&backlight,
->>  	&pasic3,
->> +	&vads7846_device,
->>  	&bq24022,
->>  	&gpio_vbus,
->>  	&power_supply,
->> @@ -944,6 +1026,10 @@ static void __init magician_init(void)
->>  			lcd_select ? &samsung_info : &toppoly_info);
->>  	} else
->>  		pr_err("LCD detection: CPLD mapping failed\n");
->> +
->> +	pxa2xx_set_spi_info(2, &magician_spi_info);
->> +	spi_register_board_info(ARRAY_AND_SIZE(ads7846_spi_board_inf
->> o));
->> +
->>  }
->>  
->>  MACHINE_START(MAGICIAN, "HTC Magician")
-> 
-> regards
-> Philipp
-> 
+>  			};
+>  
+>  			ldo24_reg: LDO24 {
+> @@ -338,6 +341,7 @@
+>  	samsung,dw-mshc-ddr-timing = <0 2>;
+>  	samsung,dw-mshc-hs400-timing = <0 2>;
+>  	samsung,read-strobe-delay = <90>;
+> +	vmmc-supply = <&ldo3_reg>;
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_cd &sd0_rclk>;
+>  	bus-width = <8>;
+> @@ -352,6 +356,8 @@
+>  	samsung,dw-mshc-ciu-div = <3>;
+>  	samsung,dw-mshc-sdr-timing = <0 4>;
+>  	samsung,dw-mshc-ddr-timing = <0 2>;
+> +	vmmc-supply = <&ldo19_reg>;
+> +	vqmmc-supply = <&ldo13_reg>;
 
-Petr
+It looks wrong. LDO13 is used in one place as VQMMC and in other as
+VMMC. How did you figure out which regulator supplies which power domain?
+
+Best regards,
+Krzysztof
+
+>  	cd-gpios = <&gpc2 2 GPIO_ACTIVE_HIGH>;
+>  	cd-inverted;
+>  	pinctrl-names = "default";
+> 
