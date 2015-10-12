@@ -1,51 +1,40 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 12 Oct 2015 16:35:26 +0800
-Subject: [PATCH v2 1/5] ARM: dts: sun6i: hummingbird: Fix VDD-CPU and
- VDD-GPU regulator names
-In-Reply-To: <20151012083126.GX2278@lukather>
-References: <1444488540-11263-1-git-send-email-wens@csie.org>
- <1444488540-11263-2-git-send-email-wens@csie.org>
- <20151012083126.GX2278@lukather>
-Message-ID: <CAGb2v66cj-5EmfbE8Ci4BffSCrxeqd+Yaftp-enM+qcGQSjkFA@mail.gmail.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Mon, 12 Oct 2015 16:39:23 +0800
+Subject: [PATCH v2] rtc: at91rm9200: clear RTC alarm status flag prior to
+ suspending
+Message-ID: <1444639163-14255-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 4:31 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Sat, Oct 10, 2015 at 10:48:56PM +0800, Chen-Yu Tsai wrote:
->> The VDD-CPU and VDD-GPU regulators were incorrectly swapped.
->>
->> Fixes: bab03561224ba ("ARM: dts: sun6i: hummingbird: Add AXP221 regulator
->>        nodes")
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
->> index f9d9fc07bc63..e25d4924dbe7 100644
->> --- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
->> +++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
->> @@ -191,18 +191,18 @@
->>                               regulator-name = "vcc-3v0";
->>                       };
->>
->> -                     vdd_cpu: dcdc2 {
->> +                     vdd_gpu: dcdc2 {
->>                               regulator-always-on;
->>                               regulator-min-microvolt = <700000>;
->>                               regulator-max-microvolt = <1320000>;
->> -                             regulator-name = "vdd-cpu";
->> +                             regulator-name = "vdd-gpu";
->>                       };
->
-> Do we need to leave the GPU regulator on ?
+As said in the SAMA5D2 datasheet, "Prior to instructing the device
+to enter ULP mode 1, ... and the internal sources of wake-up must
+be cleared."
 
-No. But that is addressed in patch 3, which converts to using axp22x.dtsi.
+This patch is to clear the RTC alarm status flag prior to suspending
+to avoid the erroneous wake-up activity, as it is often used as
+the wake-up source for the ULP mode 1.
 
-I wanted to keep this fix as simple as possible.
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
 
-ChenYu
+Changes in v2:
+ - Add more detail commit log.
+
+ drivers/rtc/rtc-at91rm9200.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
+index cb62e21..b60fd47 100644
+--- a/drivers/rtc/rtc-at91rm9200.c
++++ b/drivers/rtc/rtc-at91rm9200.c
+@@ -495,6 +495,8 @@ static int at91_rtc_suspend(struct device *dev)
+ 	/* this IRQ is shared with DBGU and other hardware which isn't
+ 	 * necessarily doing PM like we are...
+ 	 */
++	at91_rtc_write(AT91_RTC_SCCR, AT91_RTC_ALARM);
++
+ 	at91_rtc_imr = at91_rtc_read_imr()
+ 			& (AT91_RTC_ALARM|AT91_RTC_SECEV);
+ 	if (at91_rtc_imr) {
+-- 
+1.7.9.5
