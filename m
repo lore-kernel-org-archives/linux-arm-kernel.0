@@ -1,95 +1,340 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 12 Oct 2015 12:17:07 +0100
-Subject: [PATCH v2 1/2] ARM: cpuidle: remove cpu parameter from the
- cpuidle_ops suspend hook
+Date: Mon, 12 Oct 2015 12:17:08 +0100
+Subject: [PATCH v2 2/2] ARM64: kernel: PSCI: move PSCI idle management code to
+ drivers/firmware
 In-Reply-To: <1444648628-24790-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1444648628-24790-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1444648628-24790-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1444648628-24790-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The suspend() hook in the cpuidle_ops struct is always called on
-the cpu entering idle, which means that the cpu parameter passed
-to the suspend hook always corresponds to the local cpu, making
-it somewhat redundant.
+ARM64 PSCI kernel interfaces that initialize idle states and implement
+the suspend API to enter them are generic and can be shared with the
+ARM architecture.
 
-This patch removes the logical cpu parameter from the ARM
-cpuidle_ops.suspend hook and updates all the existing kernel
-implementations to reflect this change.
+To achieve that goal, this patch moves ARM64 PSCI idle management
+code to drivers/firmware by creating a file that contains PSCI
+helper functions implementing the common kernel interface required
+by ARM and ARM64 to share the PSCI idle management code.
+
+The ARM generic CPUidle implementation also requires the definition of
+a cpuidle_ops section entry for the kernel to initialize the CPUidle
+operations at boot based on the enable-method (ie ARM64 has the
+statically initialized cpu_ops counterparts for that purpose); therefore
+this patch also adds the required section entry on CONFIG_ARM for PSCI so
+that the kernel can initialize the PSCI CPUidle back-end when PSCI is
+the probed enable-method.
+
+On ARM64 this patch provides no functional change.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Lina Iyer <lina.iyer@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Jisheng Zhang <jszhang@marvell.com>
 ---
- arch/arm/include/asm/cpuidle.h |  2 +-
- arch/arm/kernel/cpuidle.c      |  2 +-
- drivers/soc/qcom/spm.c         | 10 +++++-----
- 3 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm64/kernel/psci.c       |  99 +-----------------------------
+ drivers/firmware/Makefile      |   2 +-
+ drivers/firmware/psci_cpuops.c | 133 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/psci.h           |   3 +
+ 4 files changed, 139 insertions(+), 98 deletions(-)
+ create mode 100644 drivers/firmware/psci_cpuops.c
 
-diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
-index 0f84249..3848259 100644
---- a/arch/arm/include/asm/cpuidle.h
-+++ b/arch/arm/include/asm/cpuidle.h
-@@ -30,7 +30,7 @@ static inline int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
- struct device_node;
+diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+index f67f35b..42816be 100644
+--- a/arch/arm64/kernel/psci.c
++++ b/arch/arm64/kernel/psci.c
+@@ -20,7 +20,6 @@
+ #include <linux/smp.h>
+ #include <linux/delay.h>
+ #include <linux/psci.h>
+-#include <linux/slab.h>
  
- struct cpuidle_ops {
--	int (*suspend)(int cpu, unsigned long arg);
-+	int (*suspend)(unsigned long arg);
- 	int (*init)(struct device_node *, int cpu);
- };
+ #include <uapi/linux/psci.h>
  
-diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-index 318da33..703926e 100644
---- a/arch/arm/kernel/cpuidle.c
-+++ b/arch/arm/kernel/cpuidle.c
-@@ -56,7 +56,7 @@ int arm_cpuidle_suspend(int index)
- 	int cpu = smp_processor_id();
+@@ -28,73 +27,6 @@
+ #include <asm/cpu_ops.h>
+ #include <asm/errno.h>
+ #include <asm/smp_plat.h>
+-#include <asm/suspend.h>
+-
+-static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
+-
+-static int __maybe_unused cpu_psci_cpu_init_idle(unsigned int cpu)
+-{
+-	int i, ret, count = 0;
+-	u32 *psci_states;
+-	struct device_node *state_node, *cpu_node;
+-
+-	cpu_node = of_get_cpu_node(cpu, NULL);
+-	if (!cpu_node)
+-		return -ENODEV;
+-
+-	/*
+-	 * If the PSCI cpu_suspend function hook has not been initialized
+-	 * idle states must not be enabled, so bail out
+-	 */
+-	if (!psci_ops.cpu_suspend)
+-		return -EOPNOTSUPP;
+-
+-	/* Count idle states */
+-	while ((state_node = of_parse_phandle(cpu_node, "cpu-idle-states",
+-					      count))) {
+-		count++;
+-		of_node_put(state_node);
+-	}
+-
+-	if (!count)
+-		return -ENODEV;
+-
+-	psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
+-	if (!psci_states)
+-		return -ENOMEM;
+-
+-	for (i = 0; i < count; i++) {
+-		u32 state;
+-
+-		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
+-
+-		ret = of_property_read_u32(state_node,
+-					   "arm,psci-suspend-param",
+-					   &state);
+-		if (ret) {
+-			pr_warn(" * %s missing arm,psci-suspend-param property\n",
+-				state_node->full_name);
+-			of_node_put(state_node);
+-			goto free_mem;
+-		}
+-
+-		of_node_put(state_node);
+-		pr_debug("psci-power-state %#x index %d\n", state, i);
+-		if (!psci_power_state_is_valid(state)) {
+-			pr_warn("Invalid PSCI power state %#x\n", state);
+-			ret = -EINVAL;
+-			goto free_mem;
+-		}
+-		psci_states[i] = state;
+-	}
+-	/* Idle states parsed correctly, initialize per-cpu pointer */
+-	per_cpu(psci_power_state, cpu) = psci_states;
+-	return 0;
+-
+-free_mem:
+-	kfree(psci_states);
+-	return ret;
+-}
  
- 	if (cpuidle_ops[cpu].suspend)
--		ret = cpuidle_ops[cpu].suspend(cpu, index);
-+		ret = cpuidle_ops[cpu].suspend(index);
- 
- 	return ret;
- }
-diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
-index b04b05a..0ad66fa 100644
---- a/drivers/soc/qcom/spm.c
-+++ b/drivers/soc/qcom/spm.c
-@@ -116,7 +116,7 @@ static const struct spm_reg_data spm_reg_8064_cpu = {
- 
- static DEFINE_PER_CPU(struct spm_driver_data *, cpu_spm_drv);
- 
--typedef int (*idle_fn)(int);
-+typedef int (*idle_fn)(void);
- static DEFINE_PER_CPU(idle_fn*, qcom_idle_ops);
- 
- static inline void spm_register_write(struct spm_driver_data *drv,
-@@ -179,10 +179,10 @@ static int qcom_pm_collapse(unsigned long int unused)
- 	return -1;
- }
- 
--static int qcom_cpu_spc(int cpu)
-+static int qcom_cpu_spc(void)
+ static int __init cpu_psci_cpu_init(unsigned int cpu)
  {
- 	int ret;
--	struct spm_driver_data *drv = per_cpu(cpu_spm_drv, cpu);
-+	struct spm_driver_data *drv = __this_cpu_read(cpu_spm_drv);
- 
- 	spm_set_low_power_mode(drv, PM_SLEEP_MODE_SPC);
- 	ret = cpu_suspend(0, qcom_pm_collapse);
-@@ -197,9 +197,9 @@ static int qcom_cpu_spc(int cpu)
- 	return ret;
+@@ -178,38 +110,11 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
  }
+ #endif
  
--static int qcom_idle_enter(int cpu, unsigned long index)
-+static int qcom_idle_enter(unsigned long index)
- {
--	return per_cpu(qcom_idle_ops, cpu)[index](cpu);
-+	return __this_cpu_read(qcom_idle_ops)[index]();
- }
+-static int psci_suspend_finisher(unsigned long index)
+-{
+-	u32 *state = __this_cpu_read(psci_power_state);
+-
+-	return psci_ops.cpu_suspend(state[index - 1],
+-				    virt_to_phys(cpu_resume));
+-}
+-
+-static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
+-{
+-	int ret;
+-	u32 *state = __this_cpu_read(psci_power_state);
+-	/*
+-	 * idle state index 0 corresponds to wfi, should never be called
+-	 * from the cpu_suspend operations
+-	 */
+-	if (WARN_ON_ONCE(!index))
+-		return -EINVAL;
+-
+-	if (!psci_power_state_loses_context(state[index - 1]))
+-		ret = psci_ops.cpu_suspend(state[index - 1], 0);
+-	else
+-		ret = cpu_suspend(index, psci_suspend_finisher);
+-
+-	return ret;
+-}
+-
+ const struct cpu_operations cpu_psci_ops = {
+ 	.name		= "psci",
+ #ifdef CONFIG_CPU_IDLE
+-	.cpu_init_idle	= cpu_psci_cpu_init_idle,
+-	.cpu_suspend	= cpu_psci_cpu_suspend,
++	.cpu_init_idle	= psci_cpu_init_idle,
++	.cpu_suspend	= psci_cpu_suspend_enter,
+ #endif
+ 	.cpu_init	= cpu_psci_cpu_init,
+ 	.cpu_prepare	= cpu_psci_cpu_prepare,
+diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
+index 000830f..77553ab 100644
+--- a/drivers/firmware/Makefile
++++ b/drivers/firmware/Makefile
+@@ -1,7 +1,7 @@
+ #
+ # Makefile for the linux kernel.
+ #
+-obj-$(CONFIG_ARM_PSCI_FW)	+= psci.o
++obj-$(CONFIG_ARM_PSCI_FW)	+= psci.o psci_cpuops.o
+ obj-$(CONFIG_DMI)		+= dmi_scan.o
+ obj-$(CONFIG_DMI_SYSFS)		+= dmi-sysfs.o
+ obj-$(CONFIG_EDD)		+= edd.o
+diff --git a/drivers/firmware/psci_cpuops.c b/drivers/firmware/psci_cpuops.c
+new file mode 100644
+index 0000000..f9e68ab
+--- /dev/null
++++ b/drivers/firmware/psci_cpuops.c
+@@ -0,0 +1,133 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Copyright (C) 2015 ARM Limited
++ */
++#include <linux/cpuidle.h>
++#include <linux/of.h>
++#include <linux/psci.h>
++#include <linux/slab.h>
++
++#include <asm/cpuidle.h>
++#include <asm/suspend.h>
++
++static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
++
++static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
++{
++	int i, ret, count = 0;
++	u32 *psci_states;
++	struct device_node *state_node;
++
++	/*
++	 * If the PSCI cpu_suspend function hook has not been initialized
++	 * idle states must not be enabled, so bail out
++	 */
++	if (!psci_ops.cpu_suspend)
++		return -EOPNOTSUPP;
++
++	/* Count idle states */
++	while ((state_node = of_parse_phandle(cpu_node, "cpu-idle-states",
++					      count))) {
++		count++;
++		of_node_put(state_node);
++	}
++
++	if (!count)
++		return -ENODEV;
++
++	psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
++	if (!psci_states)
++		return -ENOMEM;
++
++	for (i = 0; i < count; i++) {
++		u32 state;
++
++		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
++
++		ret = of_property_read_u32(state_node,
++					   "arm,psci-suspend-param",
++					   &state);
++		if (ret) {
++			pr_warn(" * %s missing arm,psci-suspend-param property\n",
++				state_node->full_name);
++			of_node_put(state_node);
++			goto free_mem;
++		}
++
++		of_node_put(state_node);
++		pr_debug("psci-power-state %#x index %d\n", state, i);
++		if (!psci_power_state_is_valid(state)) {
++			pr_warn("Invalid PSCI power state %#x\n", state);
++			ret = -EINVAL;
++			goto free_mem;
++		}
++		psci_states[i] = state;
++	}
++	/* Idle states parsed correctly, initialize per-cpu pointer */
++	per_cpu(psci_power_state, cpu) = psci_states;
++	return 0;
++
++free_mem:
++	kfree(psci_states);
++	return ret;
++}
++
++int psci_cpu_init_idle(unsigned int cpu)
++{
++	struct device_node *cpu_node;
++	int ret;
++
++	cpu_node = of_get_cpu_node(cpu, NULL);
++	if (!cpu_node)
++		return -ENODEV;
++
++	ret = psci_dt_cpu_init_idle(cpu_node, cpu);
++
++	of_node_put(cpu_node);
++
++	return ret;
++}
++
++static int psci_suspend_finisher(unsigned long index)
++{
++	u32 *state = __this_cpu_read(psci_power_state);
++
++	return psci_ops.cpu_suspend(state[index - 1],
++				    virt_to_phys(cpu_resume));
++}
++
++int psci_cpu_suspend_enter(unsigned long index)
++{
++	int ret;
++	u32 *state = __this_cpu_read(psci_power_state);
++	/*
++	 * idle state index 0 corresponds to wfi, should never be called
++	 * from the cpu_suspend operations
++	 */
++	if (WARN_ON_ONCE(!index))
++		return -EINVAL;
++
++	if (!psci_power_state_loses_context(state[index - 1]))
++		ret = psci_ops.cpu_suspend(state[index - 1], 0);
++	else
++		ret = cpu_suspend(index, psci_suspend_finisher);
++
++	return ret;
++}
++
++#ifdef CONFIG_ARM
++struct cpuidle_ops psci_cpuidle_ops __initdata = {
++	.suspend = psci_cpu_suspend_enter,
++	.init = psci_dt_cpu_init_idle,
++};
++
++CPUIDLE_METHOD_OF_DECLARE(psci, "arm,psci", &psci_cpuidle_ops);
++#endif
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index 12c4865..393efe2 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -24,6 +24,9 @@ bool psci_tos_resident_on(int cpu);
+ bool psci_power_state_loses_context(u32 state);
+ bool psci_power_state_is_valid(u32 state);
  
- static const struct of_device_id qcom_idle_state_match[] __initconst = {
++int psci_cpu_init_idle(unsigned int cpu);
++int psci_cpu_suspend_enter(unsigned long index);
++
+ struct psci_operations {
+ 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+ 	int (*cpu_off)(u32 state);
 -- 
 2.5.1
