@@ -1,101 +1,208 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 12 Oct 2015 16:16:08 +0530
-Subject: [PATCH 3/3] ARM: dts: exynos5422-odroidxu3: Added UHS-I bus speed
- support
-In-Reply-To: <561B48B7.1040201@samsung.com>
-References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
- <1444578364-1384-3-git-send-email-linux.amoon@gmail.com>
- <561B48B7.1040201@samsung.com>
-Message-ID: <CANAwSgSk0yHGvnoVoTk9MnUqjyEw1+yzH=C-1s_wxVkpGRHCEg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 12 Oct 2015 11:48:26 +0100
+Subject: [PATCH] irqchip/gic-v2m: Add support for multiple MSI frames
+Message-ID: <1444646906-27120-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+The GICv2m driver is so far limited to a single MSI frame, but
+nothing prevents an implementation from having several of them.
 
-On 12 October 2015 at 11:14, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> On 12.10.2015 00:46, Anand Moon wrote:
->> Added support for UHS-I bus speed 50MB/s (SDR50, DDR50) 104MB/s (SDR104)
->
-> This description is not entirely correct. The MMC driver already
-> supports these UHS speeds (you did not any code) so you rather enabled
-> it (description of bindings says "is supported").
->
-> You mentioned DDR50 but I don't see respective property below.
-Looks like I missed it, I will add this in the next patch,
->
-> How do you know that these modes are really supported? I don't know. Can
-> you convince me?
->
+This patch expands the driver to enumerate all frames, keeping
+the first one as the canonical identifier for the MSI domains.
 
->>
->> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
->>
->> ---
->> Changes based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v4.4-next/dt-samsung branch
->>
->> Changes Fixed the UHS-I bus speed detedtion on cold boot.
->
-> I don't get what is exactly fixed here. What was the error? What is the
-> outcome of this fix? The log below is before or after?
->
-> Best regards,
-> Krzysztof
->
->>
->> [    2.439806] mmc_host mmc1: Bus speed (slot 0) = 100000000Hz (slot req 100000000Hz, actual 100000000HZ div = 0)
->> [    2.449729] mmc1: new ultra high speed SDR50 SDHC card at address aaaa
->> [    2.455984] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
->> [    2.461743]  mmcblk0: p1 p2
->
->> ---
->>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->> index 58c06d3..ba4a87b 100644
->> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->> @@ -364,6 +364,10 @@
->>       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
->>       bus-width = <4>;
->>       cap-sd-highspeed;
->> +     sd-uhs-sdr12;
->> +     sd-uhs-sdr25;
->> +     sd-uhs-sdr50;
->> +     sd-uhs-sdr104;
->>  };
->>
->>  &pinctrl_0 {
->>
->
+Tested-by: Duc Dang <dhdang@apm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-v2m.c | 121 ++++++++++++++++++++++++++----------------
+ 1 file changed, 76 insertions(+), 45 deletions(-)
 
-Changes were made to support Sandisk Ultra UHS-I class 10 card support.
-OdroidXU3/XU4 board would not boot up using this card.
-
-Depending on the capability of the UHS-I card, the speed of the card
-is selected.
-I have just added the enhance capability feature to support them.
-
-On warm boot: i.e reboot of the board.
-[    4.649073] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot
-req 50000000Hz, actual 50000000HZ div = 0)
-[    4.657555] mmc1: new high speed SDHC card at address aaaa
-[    4.663787] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
-[    4.669206]  mmcblk0: p1 p2
-
-On cold boot:: ie: power on the board.
-
-[    4.630237] mmc_host mmc1: Bus speed (slot 0) = 100000000Hz (slot
-req 100000000Hz, actual 100000000HZ div = 0)
-[    4.639820] mmc1: new ultra high speed SDR50 SDHC card at address aaaa
-[    4.646266] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
-[    4.650293] IRQ56 no longer affine to CPU7
-[    4.650581] CPU7: shutdown
-[    4.658293]  mmcblk0: p1 p2
-
-Note: Their is need to reset the PMIC
-S2MPS11_REG_L13CTRL/S2MPS11_REG_L19CTRL registers
-         to support this feature consistently on every reboot.
-
--Anand Moon
+diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+index 9a36ab0..3bd66c0 100644
+--- a/drivers/irqchip/irq-gic-v2m.c
++++ b/drivers/irqchip/irq-gic-v2m.c
+@@ -50,8 +50,12 @@
+ /* List of flags for specific v2m implementation */
+ #define GICV2M_NEEDS_SPI_OFFSET		0x00000001
+ 
++static LIST_HEAD(v2m_nodes);
++static DEFINE_SPINLOCK(v2m_lock);
++
+ struct v2m_data {
+-	spinlock_t msi_cnt_lock;
++	struct list_head entry;
++	struct device_node *node;
+ 	struct resource res;	/* GICv2m resource */
+ 	void __iomem *base;	/* GICv2m virt address */
+ 	u32 spi_start;		/* The SPI number that MSIs start */
+@@ -154,27 +158,30 @@ static void gicv2m_unalloc_msi(struct v2m_data *v2m, unsigned int hwirq)
+ 		return;
+ 	}
+ 
+-	spin_lock(&v2m->msi_cnt_lock);
++	spin_lock(&v2m_lock);
+ 	__clear_bit(pos, v2m->bm);
+-	spin_unlock(&v2m->msi_cnt_lock);
++	spin_unlock(&v2m_lock);
+ }
+ 
+ static int gicv2m_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+ 				   unsigned int nr_irqs, void *args)
+ {
+-	struct v2m_data *v2m = domain->host_data;
++	struct v2m_data *v2m = NULL, *tmp;
+ 	int hwirq, offset, err = 0;
+ 
+-	spin_lock(&v2m->msi_cnt_lock);
+-	offset = find_first_zero_bit(v2m->bm, v2m->nr_spis);
+-	if (offset < v2m->nr_spis)
+-		__set_bit(offset, v2m->bm);
+-	else
+-		err = -ENOSPC;
+-	spin_unlock(&v2m->msi_cnt_lock);
++	spin_lock(&v2m_lock);
++	list_for_each_entry(tmp, &v2m_nodes, entry) {
++		offset = find_first_zero_bit(tmp->bm, tmp->nr_spis);
++		if (offset < tmp->nr_spis) {
++			__set_bit(offset, tmp->bm);
++			v2m = tmp;
++			break;
++		}
++	}
++	spin_unlock(&v2m_lock);
+ 
+-	if (err)
+-		return err;
++	if (!v2m)
++		return -ENOSPC;
+ 
+ 	hwirq = v2m->spi_start + offset;
+ 
+@@ -235,12 +242,59 @@ static struct msi_domain_info gicv2m_pmsi_domain_info = {
+ 	.chip	= &gicv2m_pmsi_irq_chip,
+ };
+ 
++static void gicv2m_teardown(void)
++{
++	struct v2m_data *v2m, *tmp;
++
++	list_for_each_entry_safe(v2m, tmp, &v2m_nodes, entry) {
++		kfree(v2m->bm);
++		iounmap(v2m->base);
++		of_node_put(v2m->node);
++		kfree(v2m);
++	}
++}
++
++static int gicv2m_allocate_domains(struct irq_domain *parent)
++{
++	struct irq_domain *inner_domain, *pci_domain, *plat_domain;
++	struct v2m_data *v2m;
++
++	v2m = list_first_entry_or_null(&v2m_nodes, struct v2m_data, entry);
++	if (!v2m)
++		return 0;
++
++	inner_domain = irq_domain_add_tree(v2m->node, &gicv2m_domain_ops, v2m);
++	if (!inner_domain) {
++		pr_err("Failed to create GICv2m domain\n");
++		return -ENOMEM;
++	}
++
++	inner_domain->bus_token = DOMAIN_BUS_NEXUS;
++	inner_domain->parent = parent;
++	pci_domain = pci_msi_create_irq_domain(v2m->node,
++					       &gicv2m_msi_domain_info,
++					       inner_domain);
++	plat_domain = platform_msi_create_irq_domain(v2m->node,
++						     &gicv2m_pmsi_domain_info,
++						     inner_domain);
++	if (!pci_domain || !plat_domain) {
++		pr_err("Failed to create MSI domains\n");
++		if (plat_domain)
++			irq_domain_remove(plat_domain);
++		if (pci_domain)
++			irq_domain_remove(pci_domain);
++		irq_domain_remove(inner_domain);
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
+ static int __init gicv2m_init_one(struct device_node *node,
+ 				  struct irq_domain *parent)
+ {
+ 	int ret;
+ 	struct v2m_data *v2m;
+-	struct irq_domain *inner_domain, *pci_domain, *plat_domain;
+ 
+ 	v2m = kzalloc(sizeof(struct v2m_data), GFP_KERNEL);
+ 	if (!v2m) {
+@@ -248,6 +302,9 @@ static int __init gicv2m_init_one(struct device_node *node,
+ 		return -ENOMEM;
+ 	}
+ 
++	INIT_LIST_HEAD(&v2m->entry);
++	v2m->node = node;
++
+ 	ret = of_address_to_resource(node, 0, &v2m->res);
+ 	if (ret) {
+ 		pr_err("Failed to allocate v2m resource.\n");
+@@ -295,43 +352,13 @@ static int __init gicv2m_init_one(struct device_node *node,
+ 		goto err_iounmap;
+ 	}
+ 
+-	inner_domain = irq_domain_add_tree(node, &gicv2m_domain_ops, v2m);
+-	if (!inner_domain) {
+-		pr_err("Failed to create GICv2m domain\n");
+-		ret = -ENOMEM;
+-		goto err_free_bm;
+-	}
+-
+-	inner_domain->bus_token = DOMAIN_BUS_NEXUS;
+-	inner_domain->parent = parent;
+-	pci_domain = pci_msi_create_irq_domain(node, &gicv2m_msi_domain_info,
+-					       inner_domain);
+-	plat_domain = platform_msi_create_irq_domain(node,
+-						     &gicv2m_pmsi_domain_info,
+-						     inner_domain);
+-	if (!pci_domain || !plat_domain) {
+-		pr_err("Failed to create MSI domains\n");
+-		ret = -ENOMEM;
+-		goto err_free_domains;
+-	}
+-
+-	spin_lock_init(&v2m->msi_cnt_lock);
+-
++	list_add_tail(&v2m->entry, &v2m_nodes);
+ 	pr_info("Node %s: range[%#lx:%#lx], SPI[%d:%d]\n", node->name,
+ 		(unsigned long)v2m->res.start, (unsigned long)v2m->res.end,
+ 		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
+ 
+ 	return 0;
+ 
+-err_free_domains:
+-	if (plat_domain)
+-		irq_domain_remove(plat_domain);
+-	if (pci_domain)
+-		irq_domain_remove(pci_domain);
+-	if (inner_domain)
+-		irq_domain_remove(inner_domain);
+-err_free_bm:
+-	kfree(v2m->bm);
+ err_iounmap:
+ 	iounmap(v2m->base);
+ err_free_v2m:
+@@ -361,5 +388,9 @@ int __init gicv2m_of_init(struct device_node *node, struct irq_domain *parent)
+ 		}
+ 	}
+ 
++	if (!ret)
++		ret = gicv2m_allocate_domains(parent);
++	if (ret)
++		gicv2m_teardown();
+ 	return ret;
+ }
+-- 
+2.1.4
