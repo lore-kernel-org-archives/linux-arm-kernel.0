@@ -1,112 +1,80 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 12 Oct 2015 18:26:51 +0100
-Subject: [PATCH v2 1/2] thermal: mediatek: Add cpu power cooling model.
-In-Reply-To: <20151007155745.GD28981@leverpostej> (Mark Rutland's message of
- "Wed, 7 Oct 2015 16:57:45 +0100")
-References: <1444220561-26139-1-git-send-email-dawei.chien@mediatek.com>
- <1444220561-26139-2-git-send-email-dawei.chien@mediatek.com>
- <20151007155745.GD28981@leverpostej>
-Message-ID: <9hhoag4dmlg.fsf@e105922-lin.cambridge.arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 12 Oct 2015 19:30:36 +0200
+Subject: [PATCH v5 0/5] Add SMP bringup support for mt65xx socs
+In-Reply-To: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <561BEE3C.3030807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Rutland <mark.rutland@arm.com> writes:
 
-> On Wed, Oct 07, 2015 at 08:22:40PM +0800, Dawei Chien wrote:
->> From: "Dawei.Chien" <dawei.chien@mediatek.com>
->> 
->> This power model is base on Intelligent Power Allocation (IPA) technical,
->> requires that the operating-points of the CPUs are registered using the
->> kernel's opp library and the `cpufreq_frequency_table` is assigned to the
->> `struct device` of the cpu MT8173.
->> 
->> Signed-off-by: Dawei.Chien <dawei.chien@mediatek.com>
->> ---
->> This patch is base on
->> https://patchwork.kernel.org/patch/7034601/
->> ---
->>  drivers/cpufreq/mt8173-cpufreq.c |   97 +++++++++++++++++++++++++++++++++-----
->>  1 file changed, 86 insertions(+), 11 deletions(-)
->> 
->> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
->> index 49caed2..9233ec5 100644
->> --- a/drivers/cpufreq/mt8173-cpufreq.c
->> +++ b/drivers/cpufreq/mt8173-cpufreq.c
->> @@ -28,7 +28,8 @@
->>  #define MAX_VOLT_SHIFT		(200000)
->>  #define MAX_VOLT_LIMIT		(1150000)
->>  #define VOLT_TOL		(10000)
->> -
->> +#define CAPACITANCE_CA53	(263)
->> +#define CAPACITANCE_CA57	(530)
->>  /*
->>   * The struct mtk_cpu_dvfs_info holds necessary information for doing CPU DVFS
->>   * on each CPU power/clock domain of Mediatek SoCs. Each CPU cluster in
->> @@ -51,6 +52,72 @@ struct mtk_cpu_dvfs_info {
->>  	bool need_voltage_tracking;
->>  };
->>  
->> +struct mtk_cpu_static_power {
->> +	unsigned long voltage;
->> +	unsigned int power;
->> +};
->> +
->> +/* measured by WA program. */
->> +static const struct mtk_cpu_static_power mtk_ca53_static_power[] = {
->> +	{859000, 43},
->> +	{908000, 52},
->> +	{983000, 86},
->> +	{1009000, 123},
->> +	{1028000, 138},
->> +	{1083000, 172},
->> +	{1109000, 180},
->> +	{1125000, 192},
->> +};
->> +
->> +/* measured by WA program. */
->> +static const struct mtk_cpu_static_power mtk_ca57_static_power[] = {
->> +	{828000, 72},
->> +	{867000, 90},
->> +	{927000, 156},
->> +	{968000, 181},
->> +	{1007000, 298},
->> +	{1049000, 435},
->> +	{1089000, 533},
->> +	{1125000, 533},
->> +};
+
+On 02/10/15 17:19, Yingjoe Chen wrote:
+> This series add SMP brinup support for MediaTek SoCs. This is v5 and
+> is based on v4.3-rc1.
 >
-> This should be described in the DT, rather than necessitating tonnes of
-> these tables in the kernel.
-
-The above table is a simplification that is tying the static power of a
-device to a voltage (indirectly via frequency for ease of indexing
-perhaps).
-
-We should definitely look at describing the static power model in the
-device tree - but it is not entirely clear what is the best model to
-use as basis for the device tree bindings.
-
-Static power consumption depends on a few different parameters (silicon
-process, voltage, temperature, etc.). The relationship between them
-maybe non-linear and not all of these maybe significant for a given
-platform. e.g., for Juno, we are using a regression based on voltage and
-temperature which was deemed close enough (very subjective tbh).
-
-On the other hand, dynamic power consumption is somewhat simpler and I
-have patches[0][1][2] enabling it's description in device tree. Your comments
-there would be very much appreciated.
-
-As for this patch, I hope it can be moved to using the device tree when
-the bindings for static power are agreed upon. Although sub-optimal, I
-can't see any other way forward for now.
-
-[0] http://thread.gmane.org/gmane.linux.kernel/2011466/focus=130373
-[1] http://thread.gmane.org/gmane.linux.kernel/2011466/focus=2011465
-[2] http://article.gmane.org/gmane.linux.drivers.sensors/37859
-
+> There are similar but different SMP bringup up methods on MediaTek
+> mt65xx and mt81xx. On MT8135 & MT8127, system boots with a trustzone
+> firmware. Others, like MT6589, doesn't have trustzone, and run kernel
+> directly in secure world.
 >
-> Mark.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Patch 1 enable arch timer support.
+> Patch 2,3 add support for cpu enable-method "mediatek,mt6589-smp" and
+> "mediatek,mt81xx-tz-smp", which support Mediatek SMP bringup for non-TZ
+> and TZ platform.
+> Patch 4,5 finally enable SMP bringup for mt8135 and mt8127.
+>
+> Changes in v5:
+> - Fix dts error
+> - Add Rob's Ack tag.
+>
+> Changes in v4[3]:
+> - rebase to v4.3-rc1
+> - Reserve trustzone bootinfo memory area in device tree.
+>
+> Changes in v3:
+> - v3 in [1]
+> - The first 2 patches in v2 are merged in v4.2-rc1.
+> - Patch 3~4 in v2 are moved to another series [2]
+> - platsmp.c changes based on Stephen's suggestion
+> - Change cpu enable-method name to "mediatek,mt6589-smp"
+>
+> Changes in v2:
+> - Fix boot issue for THUMB2 kernel.
+> - Not enable GPT_CLK_EVT when setup to fix GPT spurious interrupt issue
+> - Change platsmp.c according to Matthias' suggestion
+> http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000714.html
+>
+> v1:
+> http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000528.html
+>
+> [1]
+> http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001570.html
+>
+> [2]
+> http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001544.html
+>
+> [3]
+> http://lists.infradead.org/pipermail/linux-mediatek/2015-September/002377.html
+>
+>
+> Matthias Brugger (1):
+>    ARM: mediatek: enable gpt6 on boot up to make arch timer working
+>
+> Yingjoe Chen (4):
+>    devicetree: bindings: add new SMP enable method Mediatek SoC
+>    ARM: mediatek: add smp bringup code
+>    ARM: dts: mt8135: enable basic SMP bringup for mt8135
+>    ARM: dts: mt8127: enable basic SMP bringup for mt8127
+>
+>   Documentation/devicetree/bindings/arm/cpus.txt |   2 +
+>   arch/arm/boot/dts/mt8127.dtsi                  |  27 +++++
+>   arch/arm/boot/dts/mt8135.dtsi                  |  27 +++++
+>   arch/arm/mach-mediatek/Makefile                |   3 +
+>   arch/arm/mach-mediatek/mediatek.c              |  27 +++++
+>   arch/arm/mach-mediatek/platsmp.c               | 141 +++++++++++++++++++++++++
+>   6 files changed, 227 insertions(+)
+>   create mode 100644 arch/arm/mach-mediatek/platsmp.c
+>
+
+Applied, thanks.
