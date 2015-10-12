@@ -1,85 +1,68 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 12 Oct 2015 13:53:50 +0800
-Subject: [PATCH RESEND 1/2] arm: berlin: use non-self-cleared reset
- register to reset cpu
-In-Reply-To: <20150921101825.099b304f@xhacker>
-References: <1442213265-1002-1-git-send-email-jszhang@marvell.com>
- <1442213265-1002-2-git-send-email-jszhang@marvell.com>
- <55FEF511.2050600@gmail.com>	<20150921101825.099b304f@xhacker>
-Message-ID: <20151012135350.0f127fa3@xhacker>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Mon, 12 Oct 2015 14:00:38 +0800
+Subject: [PATCH] ARM:mm: fix kmap_atomic_to_page
+In-Reply-To: <1444129773-12632-1-git-send-email-chanho.min@lge.com>
+References: <1444129773-12632-1-git-send-email-chanho.min@lge.com>
+Message-ID: <3B252F19-0EE2-4CE3-81B5-E8BED7212A2D@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian,
 
-On Mon, 21 Sep 2015 10:18:25 +0800
-Jisheng Zhang <jszhang@marvell.com> wrote:
+> On Oct 6, 2015, at 19:09, Chanho Min <chanho.min@lge.com> wrote:
+> 
+> Since kmap_atomic returns the pkmap address without a new mapping to
+> fixmap for the page that is already mapped by kmap, It should be
+> considered for the pkmap address in kmap_atomic_to_page.
+> 
+> Signed-off-by: Chanho Min <chanho.min@lge.com>
+> ---
+> arch/arm/mm/highmem.c |   11 ++++++++---
+> 1 file changed, 8 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+> index 45aeaac..3e973b7 100644-
+> --- a/arch/arm/mm/highmem.c
+> +++ b/arch/arm/mm/highmem.c
+> @@ -145,8 +145,13 @@ struct page *kmap_atomic_to_page(const void *ptr)
+> {
+> 	unsigned long vaddr = (unsigned long)ptr;
+> 
+> -	if (vaddr < FIXADDR_START)
+> -		return virt_to_page(ptr);
+> +	if (vaddr >= PKMAP_ADDR(0) && vaddr < PKMAP_ADDR(LAST_PKMAP)) {
+> +		int i = PKMAP_NR(vaddr);
+> +		return pte_page(pkmap_page_table[i]);
+> +	}
+> +
+> +	if (vaddr >= FIXADDR_START)
+> +		return pte_page(get_fixmap_pte(vaddr));
+> 
+> -	return pte_page(get_fixmap_pte(vaddr));
+> +	return virt_to_page(ptr);
+> }
+> -- 
+> 1.7.9.5
+> 
+why not change like this,
+more simple :
 
-> Dear Sebastian,
-> 
-> On Sun, 20 Sep 2015 20:04:01 +0200
-> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
-> 
-> > On 14.09.2015 08:47, Jisheng Zhang wrote:
-> > > In Berlin SoCs, there are two kinds of cpu reset control registers: the
-> > > first one's corresponding bits will be self-cleared after some cycles,
-> > > while the second one's bits won't. Previously the first kind of reset
-> > > control register is used, this patch uses the second kind one to prepare
-> > > for the next hotplug commit.
-> > >
-> > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > > ---
-> > >   arch/arm/mach-berlin/platsmp.c | 4 +++-
-> > >   1 file changed, 3 insertions(+), 1 deletion(-)
-> > >
-> > > diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
-> > > index 34a3753..bde327b 100644
-> > > --- a/arch/arm/mach-berlin/platsmp.c
-> > > +++ b/arch/arm/mach-berlin/platsmp.c
-> > > @@ -17,7 +17,7 @@
-> > >   #include <asm/smp_plat.h>
-> > >   #include <asm/smp_scu.h>
-> > >
-> > > -#define CPU_RESET		0x00
-> > > +#define CPU_RESET		0x20
-> > 
-> > Jisheng,
-> > 
-> > I am fine with the patch itself, except that I'd like to rather
-> > rename the 0x00-register to CPU_RESET_SC with a comment about
-> > the self-clearing nature. The 0x20-register would then be named
-> > CPU_RESET_NON_SC and used the way you propose.
-> 
-> Good idea. And such comment would let people understand why do we change
-> as that.
-> 
-> > 
-> > Are you fine with me naming the registers accordingly while
-> > applying the patches?
-> 
-> Sure, I'm fine. Thank you very much.
+diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+index 9df5f09..4eeed3d 100644
+--- a/arch/arm/mm/highmem.c
++++ b/arch/arm/mm/highmem.c
+@@ -152,8 +152,7 @@ struct page *kmap_atomic_to_page(const void *ptr)
+ {
+        unsigned long vaddr = (unsigned long)ptr;
+ 
+-       if (vaddr < FIXADDR_START)
+-               return virt_to_page(ptr);
+-
+-       return pte_page(get_fixmap_pte(vaddr));
++       if (vaddr >= FIXADDR_START && vaddr <= FIXADDR_TOP)
++               return pte_page(get_fixmap_pte(vaddr));
++       return kmap_to_page(ptr);
+ }
 
-I found these two patches are missing in your round 1 berlin pull request. Do
-you want me send v2 patches applying the above changes you suggested?
 
-Thanks,
-Jisheng
 
-> 
-> > 
-> > Sebastian
-> > 
-> > >   #define RESET_VECT		0x00
-> > >   #define SW_RESET_ADDR		0x94
-> > > @@ -31,6 +31,8 @@ static inline void berlin_perform_reset_cpu(unsigned int cpu)
-> > >   	u32 val;
-> > >
-> > >   	val = readl(cpu_ctrl + CPU_RESET);
-> > > +	val &= ~BIT(cpu_logical_map(cpu));
-> > > +	writel(val, cpu_ctrl + CPU_RESET);
-> > >   	val |= BIT(cpu_logical_map(cpu));
-> > >   	writel(val, cpu_ctrl + CPU_RESET);
-> > >   }
-> > >
-> > 
-> 
+Thanks
