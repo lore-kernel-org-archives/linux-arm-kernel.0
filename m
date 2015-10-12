@@ -1,43 +1,27 @@
-From: pablo@netfilter.org (Pablo Neira Ayuso)
-Date: Mon, 12 Oct 2015 17:48:20 +0200
-Subject: [PATCH v2] bridge/netfilter: avoid unused label warning
-In-Reply-To: <561666B9.8070802@cumulusnetworks.com>
-References: <5180534.sSnu9AX8xS@wuerfel> <561666B9.8070802@cumulusnetworks.com>
-Message-ID: <20151012154820.GA23092@salvia>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 12 Oct 2015 16:42:31 +0100
+Subject: [PATCH] regulator: core: avoid unused variable warning
+In-Reply-To: <5130320.kXvB35QoYU@wuerfel>
+References: <5130320.kXvB35QoYU@wuerfel>
+Message-ID: <20151012154231.GE4238@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 02:51:05PM +0200, Nikolay Aleksandrov wrote:
-> On 10/08/2015 02:30 PM, Arnd Bergmann wrote:
-> > With the ARM mini2440_defconfig, the bridge netfilter code gets
-> > built with both CONFIG_NF_DEFRAG_IPV4 and CONFIG_NF_DEFRAG_IPV6
-> > disabled, which leads to a harmless gcc warning:
-> > 
-> > net/bridge/br_netfilter_hooks.c: In function 'br_nf_dev_queue_xmit':
-> > net/bridge/br_netfilter_hooks.c:792:2: warning: label 'drop' defined but not used [-Wunused-label]
-> > 
-> > This gets rid of the warning by cleaning up the code to avoid
-> > the respective #ifdefs causing this problem, and replacing them
-> > with if(IS_ENABLED()) checks. I have verified that the resulting
-> > object code is unchanged, and an additional advantage is that
-> > we now get compile coverage of the unused functions in more
-> > configurations.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: dd302b59bde0 ("netfilter: bridge: don't leak skb in error paths")
-> > ---
-> > Version 2:
-> > 
-> > Rebased to git://git.kernel.org/pub/scm/linux/kernel/git/pablo/nf-next
-> > 
-> 
-> Looks good to me,
-> 
-> Reviewed-by: Nikolay Aleksandrov <nikolay@cumulusnetworks.com>
+On Fri, Oct 09, 2015 at 02:36:47PM +0200, Arnd Bergmann wrote:
 
-Nice that we got rid of that many ifdefs. Thanks!
+> The second argument of the mutex_lock_nested() helper is only
+> evaluated if CONFIG_DEBUG_LOCK_ALLOC is set. Otherwise we
+> get this build warning for the new regulator_lock_supply
+> function:
 
-BTW, just for the record in case someone search for this on the
-Internet: I have renamed the subject to "netfilter: bridge: avoid
-unused label warning" for consistency with other existing subject
-lines in the repo.
+Shouldn't we have an annotation or something for this in
+mutex_lock_nested()?  It seems like something that might come up
+elsewhere and it's a bit of a surprise to have one of the arguments
+there not be evaluated.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151012/7f04d4b2/attachment.sig>
