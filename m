@@ -1,41 +1,29 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Mon, 12 Oct 2015 09:11:04 +0100
-Subject: [PATCH] ARM: hisilicon: DT: Drop console= and earlyprintk bootargs
- parameter
-In-Reply-To: <9558245.SAyWiXU6Yf@wuerfel>
-References: <5617E6FC.6090304@hisilicon.com> <9558245.SAyWiXU6Yf@wuerfel>
-Message-ID: <561B6B18.1010906@hisilicon.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Oct 2015 10:21:25 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Cleanup for v4.4
+In-Reply-To: <CAMuHMdX8PPprPnYNfqkof9EmT7M1YHs3vtPQ1PY=RCwGdq2zhg@mail.gmail.com>
+References: <cover.1442478814.git.horms+renesas@verge.net.au>
+ <13543534.MsGb8OrGPX@wuerfel>
+ <CAMuHMdX8PPprPnYNfqkof9EmT7M1YHs3vtPQ1PY=RCwGdq2zhg@mail.gmail.com>
+Message-ID: <6255915.aGlt9oNRlo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/9/2015 7:26 PM, Arnd Bergmann wrote:
-> On Friday 09 October 2015 17:10:36 Wei Xu wrote:
->> Replace console with stdout-path so that we don't have to put the
->> console on the kernel command line.
->>
->> Remove earlyprintk to allow the kernel to boot on a system even
->> if DEBUG_LL is configured for another system.
->>
->> Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
->> Tested-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->>
-
-Hi Arnd,
-
+On Monday 12 October 2015 09:12:15 Geert Uytterhoeven wrote:
+> On Tue, Oct 6, 2015 at 8:42 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 06 October 2015 17:47:37 Geert Uytterhoeven wrote:
+> >>
+> >> Now I can start out sending my platform data removal series...
+> >
+> > Ok, cool.
+> >
+> > I don't think that there is generally a need to wait before sending
+> > stuff out that depends on pull requests to get merged.
 > 
-> Looks good to me. Do you want us to apply the patch directly, or
-> do you plan to send a pull request?
+> Seems like several subsystem maintainers are uncomfortable with taking
+> these patches even after the legacy removal has hit arm-soc/for-next...
 
-Thanks!
-I will send a pull request today.
+Ah, I was misunderstanding you here. I thought these were also patches
+for arm-soc.
 
-Best Regards,
-Wei
-
-> 
-> 	Arnd
-> 
-> .
-> 
+	Arnd
