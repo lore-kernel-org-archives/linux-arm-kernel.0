@@ -1,53 +1,48 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Mon, 12 Oct 2015 11:39:43 -0700
-Subject: [RFC][PATCH 1/2] WIP: Devicetree bindings for Ion
-In-Reply-To: <CAL_JsqJ+i3zC7UJ3BcdtOhdmQd8YnRC7bs3D2Ei5JD-4-C+A0g@mail.gmail.com>
- (Rob Herring's message of "Tue, 6 Oct 2015 17:35:41 -0500")
-References: <1444164433-9107-1-git-send-email-labbott@fedoraproject.org>
- <1444164433-9107-2-git-send-email-labbott@fedoraproject.org>
- <CAL_JsqJ+i3zC7UJ3BcdtOhdmQd8YnRC7bs3D2Ei5JD-4-C+A0g@mail.gmail.com>
-Message-ID: <vnkwh9lwlymo.fsf@codeaurora.org>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Mon, 12 Oct 2015 11:41:54 -0700
+Subject: Run armv7 32 bit userspace on aarch64
+In-Reply-To: <20151012175026.GL16124@arm.com>
+References: <5615A0E1.1050402@linaro.org> <56184079.1040905@linaro.org>
+ <56185B98.2060400@linaro.org> <6978725.cJktLf4M1X@wuerfel>
+ <561BED2C.8080008@linaro.org> <561BF011.80205@linaro.org>
+ <20151012175026.GL16124@arm.com>
+Message-ID: <561BFEF2.2030503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06 2015 at 05:35:41 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Tue, Oct 6, 2015 at 3:47 PM, Laura Abbott <labbott@fedoraproject.org> wrote:
-
-[...]
-
->> +Example:
->> +
->> +       ion {
->> +               compatbile = "linux,ion";
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +
->> +               ion-system-heap {
->> +                       linux,ion-heap-id = <0>;
->> +                       linux,ion-heap-type = <ION_SYSTEM_HEAP_TYPE>;
->> +                       linux,ion-heap-name = "system";
+On 10/12/2015 10:50 AM, Will Deacon wrote:
+> On Mon, Oct 12, 2015 at 10:38:25AM -0700, Shi, Yang wrote:
+>> BTW, it may be related to unaligned address.
+>>
+>> init[1]: unhandled level 3 translation fault (11) at 0x43acfad3, esr
+>> 0x92000047
+>> pgd = ffff80007b8be000
+>> [43acfad3] *pgd=00000000fb8c5003, *pud=00000000fb8c1003,
+>> *pmd=00000000fb8c2003, *pte=0000000000000000
+>>
+>> The userspace is trying to write to 0x43acfad3, the permission is
+>> readonly.
 >
-> How does this vary across platforms? Is all of this being pushed down
-> to DT, because there is no coordination of this at the kernel ABI
-> level across platforms. In other words, why can't heap 0 be hardcoded
-> as system heap in the driver. It seems to me any 1 of these 3
-> properties could be used to derive the other 2.
+> What's the instruction making the access? If it's a store-multiple, then
 
-The heap-id<->heap-type mapping isn't necessarily 1:1.  As Laura
-indicated elsewhere on this thread, a given heap might need to be
-contiguous on one platform but not on another.  In that case you just
-swap out the heap-type here and there's no need for userspace to change.
+My aarch64 gdb just shows hex code instead of human readable assembly code.
 
-The heap-name, OTOH, could be derived from the heap-id, which is what we
-hackishly do here [1] and here[2].
+It is 0xe5c02000.
 
-[1] https://www.codeaurora.org/cgit/quic/la/kernel/msm-3.14/tree/drivers/staging/android/ion/msm/msm_ion.c?h=msm-3.14#n53
-[2] https://www.codeaurora.org/cgit/quic/la/kernel/msm-3.14/tree/drivers/staging/android/ion/msm/msm_ion.c?h=msm-3.14#n398
+I just checked the ARMv7 manual, it looks like STRB instruction, so we 
+can rule this out.
 
+I just figured out it is caused by gcc 5.2 pre-link. It works if I 
+disable pre-link. The pre-link issue breaks all armv7 userspace even 
+though it is run on armv7 machines.
 
--Mitch
+Yang
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> we don't support that in the arm64 kernel. It would be nice if the 32-bit
+> kernel had the same behaviour, but the patch seems to have stalled and
+> probably doesn't apply anymore:
+>
+>    http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7944/1
+>
+> Will
+>
