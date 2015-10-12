@@ -1,55 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Oct 2015 14:43:04 -0700
-Subject: [REPOST PATCH 1/4] ARM: dts: DRA7: Add dsp1_system syscon node
-In-Reply-To: <1443828205-18706-2-git-send-email-s-anna@ti.com>
-References: <1443828205-18706-1-git-send-email-s-anna@ti.com>
- <1443828205-18706-2-git-send-email-s-anna@ti.com>
-Message-ID: <20151012214304.GD23801@atomide.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 13 Oct 2015 03:16:03 +0530
+Subject: [PATCH v2 1/4] ARM: dts: dra7: Add dt node for the sycon pcie
+In-Reply-To: <20151012212149.GZ23801@atomide.com>
+References: <1442323985-29939-1-git-send-email-kishon@ti.com>
+ <1442323985-29939-2-git-send-email-kishon@ti.com>
+ <20151012212149.GZ23801@atomide.com>
+Message-ID: <561C2A1B.3000201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [151002 16:27]:
-> The DSP_SYSTEM sub-module is a dedicated system control logic
-> module present within a DRA7 DSP processor sub-system. This
-> module is responsible for power management, clock generation
-> and connection to the device PRCM module.
-> 
-> Add a syscon node for this module for the DSP1 processor
-> sub-system. This is added as a syscon node as it is a common
-> configuration module that can be used by the different IOMMU
-> instances and the corresponding remoteproc device.
-> 
-> The node is added to the common dra7.dtsi file, as the DSP1
-> processor sub-system is mostly common across all the variants
-> of the DRA7 SoC family.
-> 
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
->  arch/arm/boot/dts/dra7.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index e289c706d27d..62055094e8d5 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -292,6 +292,11 @@
->  				#thermal-sensor-cells = <1>;
->  		};
->  
-> +		dsp1_system: dsp_system at 40d00000 {
-> +			compatible = "syscon";
-> +			reg = <0x40d00000 0x100>;
-> +		};
-> +
->  		sdma: dma-controller at 4a056000 {
->  			compatible = "ti,omap4430-sdma";
->  			reg = <0x4a056000 0x1000>;
+Hi Tony,
 
-Hmm so why would you want to set up a complete device as a syscon
-mapping rather than just doing ioremap on it?
+On Tuesday 13 October 2015 02:51 AM, Tony Lindgren wrote:
+> * Kishon Vijay Abraham I <kishon@ti.com> [150915 06:37]:
+>> Add new device tree node for the control module register space where
+>> PCIe registers are present.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  arch/arm/boot/dts/dra7.dtsi |    5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+>> index 5d65db9..0769b5d 100644
+>> --- a/arch/arm/boot/dts/dra7.dtsi
+>> +++ b/arch/arm/boot/dts/dra7.dtsi
+>> @@ -154,6 +154,11 @@
+>>  					compatible = "syscon";
+>>  					reg = <0x1c04 0x0020>;
+>>  				};
+>> +
+>> +				scm_conf_pcie: tisyscon at 1c24 {
+>> +					compatible = "syscon";
+>> +					reg = <0x1c24 0x0024>;
+>> +				};
+>>  			};
+>>  
+>>  			cm_core_aon: cm_core_aon at 5000 {
+> 
+> 
+> Why don't you just extend the existing scm_conf1 area? This is not all pcie
+> specific for scm_conf_pcie, at least for PLLEN_CONTROL, RMII_CLK_SETTING
+> and MUXSEL_32K_CLKIN.
 
-What drivers will be sharing access to these registers?
+scm_conf_pcie has only PCIe registers (it starts at 0x4A003C24).
+PLLEN_CONTROL and others are at 0x4A003C14 as per
+DRA75x_DRA74x_SR1.1_NDA_TRM_vW.
 
-Regards,
+Since PCIe itself has a bunch of registers for itself, thought of
+creating a separate dt node. But I can extend scm_conf1 area.
 
-Tony
+Thanks
+Kishon
