@@ -1,90 +1,75 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 12 Oct 2015 14:48:24 +0200
-Subject: [PATCH v3 1/7] mmc: core: move ocr-bit to voltage translation into
- separate function
+Date: Mon, 12 Oct 2015 14:48:26 +0200
+Subject: [PATCH v3 3/7] mmc: dw_mmc: Use mmc_regulator_set_vqmmc in
+ start_signal_voltage_switch
 In-Reply-To: <1444654110-32293-1-git-send-email-heiko@sntech.de>
 References: <1444654110-32293-1-git-send-email-heiko@sntech.de>
-Message-ID: <1444654110-32293-2-git-send-email-heiko@sntech.de>
+Message-ID: <1444654110-32293-4-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We will shortly need the calculation of an ocr-bit to the actual
-voltage in a second place too, so move it from mmc_regulator_set_ocr
-to a common function mmc_ocrbitnum_to_vdd to make that possible.
+From: Douglas Anderson <dianders@chromium.org>
 
+We've introduced a new helper in the MMC core:
+mmc_regulator_set_vqmmc().  Let's use this in dw_mmc.  Using this new
+helper has some advantages:
+
+1. We get the mmc_regulator_set_vqmmc() behavior of trying to match
+   VQMMC and VMMC when the signal voltage is 3.3V.  This ensures max
+   compatibility.
+
+2. We get rid of a few more warnings when probing unsupported
+   voltages.
+
+3. We get rid of some non-dw_mmc specific code in dw_mmc.
+
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
 ---
- drivers/mmc/core/core.c | 51 +++++++++++++++++++++++++++++++++----------------
- 1 file changed, 35 insertions(+), 16 deletions(-)
+ drivers/mmc/host/dw_mmc.c | 17 ++++++-----------
+ 1 file changed, 6 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 0520064..548b5e1 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -1265,6 +1265,40 @@ u32 mmc_vddrange_to_ocrmask(int vdd_min, int vdd_max)
- }
- EXPORT_SYMBOL(mmc_vddrange_to_ocrmask);
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index fcbf552..b1b7e7f 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -1279,7 +1279,6 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	const struct dw_mci_drv_data *drv_data = host->drv_data;
+ 	u32 uhs;
+ 	u32 v18 = SDMMC_UHS_18V << slot->id;
+-	int min_uv, max_uv;
+ 	int ret;
  
-+/**
-+ * mmc_ocrbitnum_to_vdd - Convert a OCR bit number to its voltage
-+ * @vdd_bit:	OCR bit number
-+ * @min_uV:	minimum voltage value (mV)
-+ * @max_uV:	maximum voltage value (mV)
-+ *
-+ * This function returns the voltage range according to the provided OCR
-+ * bit number. If conversion is not possible a negative errno value returned.
-+ */
-+static int mmc_ocrbitnum_to_vdd(int vdd_bit, int *min_uV, int *max_uV)
-+{
-+	int		tmp;
+ 	if (drv_data && drv_data->switch_voltage)
+@@ -1291,22 +1290,18 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	 * does no harm but you need to set the regulator directly.  Try both.
+ 	 */
+ 	uhs = mci_readl(host, UHS_REG);
+-	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
+-		min_uv = 2700000;
+-		max_uv = 3600000;
++	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330)
+ 		uhs &= ~v18;
+-	} else {
+-		min_uv = 1700000;
+-		max_uv = 1950000;
++	else
+ 		uhs |= v18;
+-	}
 +
-+	if (!vdd_bit)
-+		return -EINVAL;
-+
-+	/*
-+	 * REVISIT mmc_vddrange_to_ocrmask() may have set some
-+	 * bits this regulator doesn't quite support ... don't
-+	 * be too picky, most cards and regulators are OK with
-+	 * a 0.1V range goof (it's a small error percentage).
-+	 */
-+	tmp = vdd_bit - ilog2(MMC_VDD_165_195);
-+	if (tmp == 0) {
-+		*min_uV = 1650 * 1000;
-+		*max_uV = 1950 * 1000;
-+	} else {
-+		*min_uV = 1900 * 1000 + tmp * 100 * 1000;
-+		*max_uV = *min_uV + 100 * 1000;
-+	}
-+
-+	return 0;
-+}
-+
- #ifdef CONFIG_OF
+ 	if (!IS_ERR(mmc->supply.vqmmc)) {
+-		ret = regulator_set_voltage(mmc->supply.vqmmc, min_uv, max_uv);
++		ret = mmc_regulator_set_vqmmc(mmc, ios);
  
- /**
-@@ -1401,22 +1435,7 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
- 	int			min_uV, max_uV;
- 
- 	if (vdd_bit) {
--		int		tmp;
--
--		/*
--		 * REVISIT mmc_vddrange_to_ocrmask() may have set some
--		 * bits this regulator doesn't quite support ... don't
--		 * be too picky, most cards and regulators are OK with
--		 * a 0.1V range goof (it's a small error percentage).
--		 */
--		tmp = vdd_bit - ilog2(MMC_VDD_165_195);
--		if (tmp == 0) {
--			min_uV = 1650 * 1000;
--			max_uV = 1950 * 1000;
--		} else {
--			min_uV = 1900 * 1000 + tmp * 100 * 1000;
--			max_uV = min_uV + 100 * 1000;
--		}
-+		mmc_ocrbitnum_to_vdd(vdd_bit, &min_uV, &max_uV);
- 
- 		result = regulator_set_voltage(supply, min_uV, max_uV);
- 		if (result == 0 && !mmc->regulator_enabled) {
+ 		if (ret) {
+ 			dev_dbg(&mmc->class_dev,
+-					 "Regulator set error %d: %d - %d\n",
+-					 ret, min_uv, max_uv);
++					 "Regulator set error %d - %s V\n",
++					 ret, uhs & v18 ? "1.8" : "3.3");
+ 			return ret;
+ 		}
+ 	}
 -- 
 2.6.1
