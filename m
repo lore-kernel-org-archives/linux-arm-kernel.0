@@ -1,84 +1,32 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 12 Oct 2015 15:47:42 +0900
-Subject: [PATCH] arm: dts: Fix audio card detection on peach boards
-In-Reply-To: <1444631169-19468-1-git-send-email-alim.akhtar@samsung.com>
-References: <1444631169-19468-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <561B578E.1050308@samsung.com>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Mon, 12 Oct 2015 14:52:59 +0800
+Subject: [RFC] arm64: add kc_offset_to_vaddr and kc_vaddr_to_offset macro
+Message-ID: <1444632779-23369-1-git-send-email-yalin.wang2010@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.10.2015 15:26, Alim Akhtar wrote:
-> Since the merge of 2fad972 ("ARM: dts: Add mclk entry for Peach boards"),
+This patch add kc_offset_to_vaddr() and kc_vaddr_to_offset(),
+the default version doesn't work on arm64, because arm64 kernel address
+is below the PAGE_OFFSET, like module address and vmemmap address are
+all below PAGE_OFFSET address.
 
-Please switch to longer SHA abbreviation:
-$ git config core.abbrev 12
+Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+---
+ arch/arm64/include/asm/pgtable.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> sound card detection is broken on peach boards and gives below errors:
-> 
-> [    3.630457] max98090 7-0010: MAX98091 REVID=0x51
-> [    3.634233] max98090 7-0010: use default 2.8v micbias
-> [    3.640985] snow-audio sound: HiFi <-> 3830000.i2s mapping ok
-> [    3.645307] max98090 7-0010: Invalid master clock frequency
-> [    3.650824] snow-audio sound: ASoC: Peach-Pi-I2S-MAX98091 late_probe() failed: -22
-> [    3.658914] snow-audio sound: snd_soc_register_card failed (-22)
-> [    3.664366] snow-audio: probe of sound failed with error -22
-> 
-> This patch adds missing assigned-clocks and assigned-clock-parents for
-> pmu_system_controller node which is used as "mclk" for audio codec.
-> 
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> Fixes: 2fad972 ("ARM: dts: Add mclk entry for Peach boards")
-> Cc: <stable@vger.kernel.org>
-> ---
->  arch/arm/boot/dts/exynos5420-peach-pit.dts |    5 +++++
->  arch/arm/boot/dts/exynos5800-peach-pi.dts  |    5 +++++
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> index 8f4d76c..525a93a 100644
-> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> @@ -1056,5 +1056,10 @@
->  	timeout-sec = <32>;
->  };
->  
-> +&pmu_system_controller {
-
-Please put the node in alphabetical order.
-
-> +	assigned-clocks = <&pmu_system_controller 0>;
-> +	assigned-clock-parents =  <&clock CLK_FIN_PLL>;
-
-I might be missing something here but isn't the first clock of
-pmu_system_controller already a CLK_FIN_PLL? So you are reparenting the
-FIN_PLL to FIN_PLL?
-
-In the same time there is doubled space character after '='.
-
-> +};
-> +
->  #include "cros-ec-keyboard.dtsi"
->  #include "cros-adc-thermistors.dtsi"
-> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> index 7d5b386..411de8f 100644
-> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> @@ -1019,5 +1019,10 @@
->  	timeout-sec = <32>;
->  };
->  
-> +&pmu_system_controller {
-> +	assigned-clocks = <&pmu_system_controller 0>;
-> +	assigned-clock-parents =  <&clock CLK_FIN_PLL>;
-
-Ditto.
-
-Best regards,
-Krzysztof
-
-
-> +};
-> +
->  #include "cros-ec-keyboard.dtsi"
->  #include "cros-adc-thermistors.dtsi"
-> 
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 4331d84..23070a8 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -658,6 +658,8 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
+ 
+ #define update_mmu_cache_pmd(vma, address, pmd) do { } while (0)
+ 
++#define	kc_vaddr_to_offset(v) ((v) & ~VA_START)
++#define	kc_offset_to_vaddr(o) ((o) | VA_START)
+ #endif /* !__ASSEMBLY__ */
+ 
+ #endif /* __ASM_PGTABLE_H */
+-- 
+1.9.1
