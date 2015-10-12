@@ -1,44 +1,31 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Mon, 12 Oct 2015 13:48:53 -0400
-Subject: [PATCH 05/10] clk: iproc: Add PLL base write function
-In-Reply-To: <20151010002106.GZ26883@codeaurora.org>
-References: <1443826665-17570-1-git-send-email-jonmason@broadcom.com>
- <1443826665-17570-6-git-send-email-jonmason@broadcom.com>
- <20151010002106.GZ26883@codeaurora.org>
-Message-ID: <20151012174853.GD20867@broadcom.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 12 Oct 2015 18:50:26 +0100
+Subject: Run armv7 32 bit userspace on aarch64
+In-Reply-To: <561BF011.80205@linaro.org>
+References: <5615A0E1.1050402@linaro.org> <56184079.1040905@linaro.org>
+ <56185B98.2060400@linaro.org> <6978725.cJktLf4M1X@wuerfel>
+ <561BED2C.8080008@linaro.org> <561BF011.80205@linaro.org>
+Message-ID: <20151012175026.GL16124@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 05:21:06PM -0700, Stephen Boyd wrote:
-> On 10/02, Jon Mason wrote:
-> > diff --git a/drivers/clk/bcm/clk-iproc-pll.c b/drivers/clk/bcm/clk-iproc-pll.c
-> > index e029ab3..a4602aa 100644
-> > --- a/drivers/clk/bcm/clk-iproc-pll.c
-> > +++ b/drivers/clk/bcm/clk-iproc-pll.c
-> > @@ -137,6 +137,18 @@ static int pll_wait_for_lock(struct iproc_pll *pll)
-> >  	return -EIO;
-> >  }
-> >  
-> > +static void iproc_pll_write(struct iproc_pll *pll, void __iomem *base,
-> > +			    u32 offset, u32 val)
-> > +{
-> > +	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
-> > +
-> > +	writel(val, base + offset);
-> > +
-> > +	if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK &&
-> > +		     base == pll->pll_base))
-> > +		val = readl(base + offset);
+On Mon, Oct 12, 2015 at 10:38:25AM -0700, Shi, Yang wrote:
+> BTW, it may be related to unaligned address.
 > 
-> Is there any point to assign val here?
-
-It is a flush.  The val assignment could be excluded (and thus made
-const) if so desired.
-
-Thanks,
-Jon
-
+> init[1]: unhandled level 3 translation fault (11) at 0x43acfad3, esr
+> 0x92000047
+> pgd = ffff80007b8be000
+> [43acfad3] *pgd=00000000fb8c5003, *pud=00000000fb8c1003,
+> *pmd=00000000fb8c2003, *pte=0000000000000000
 > 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> The userspace is trying to write to 0x43acfad3, the permission is
+> readonly.
+
+What's the instruction making the access? If it's a store-multiple, then
+we don't support that in the arm64 kernel. It would be nice if the 32-bit
+kernel had the same behaviour, but the patch seems to have stalled and
+probably doesn't apply anymore:
+
+  http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7944/1
+
+Will
