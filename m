@@ -1,34 +1,23 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 12 Oct 2015 11:07:39 +0100
-Subject: [PATCH v3 5/5] arm64: defconfig: Enable PCI generic host bridge by
- default
-In-Reply-To: <1444644459-2780-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1444644459-2780-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1444644459-2780-6-git-send-email-Liviu.Dudau@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Oct 2015 12:21:16 +0200
+Subject: [RFC] arm: add __initbss section attribute
+In-Reply-To: <1444622356-8263-1-git-send-email-yalin.wang2010@gmail.com>
+References: <1444622356-8263-1-git-send-email-yalin.wang2010@gmail.com>
+Message-ID: <8530796.1MzFUDEUSY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that pci-host-generic can be used under arm64, enable it by
-default so that SBSA compliant systems can use it.
+On Monday 12 October 2015 11:59:16 yalin wang wrote:
+> This attribute can make init data to be into .initbss section,
+> this will make the data to be NO_BITS in vmlinux, can shrink the
+> Image file size, and speed up the boot up time.
+> 
+> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Do you have an estimate of how much it gains?
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 34d71dd..7c9455a 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -49,6 +49,7 @@ CONFIG_ARCH_XGENE=y
- CONFIG_ARCH_ZYNQMP=y
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
-+CONFIG_PCI_HOST_GENERIC=y
- CONFIG_PCI_XGENE=y
- CONFIG_SMP=y
- CONFIG_PREEMPT=y
--- 
-2.6.0
+In multi_v7_defconfig, I see a total of 3367 symbols with
+406016 bytes init.data, but only 348 bytes of those are
+in zero-initialized symbols.
+
+	Arnd
