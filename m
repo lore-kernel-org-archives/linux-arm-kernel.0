@@ -1,83 +1,101 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 12 Oct 2015 11:31:43 +0100
-Subject: [PATCH 00/16] Divorcing irqdomain and device_node
-In-Reply-To: <alpine.DEB.2.11.1510112255330.6097@nanos>
-References: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
- <alpine.DEB.2.11.1510112255330.6097@nanos>
-Message-ID: <561B8C0F.5010805@arm.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Mon, 12 Oct 2015 16:16:08 +0530
+Subject: [PATCH 3/3] ARM: dts: exynos5422-odroidxu3: Added UHS-I bus speed
+ support
+In-Reply-To: <561B48B7.1040201@samsung.com>
+References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
+ <1444578364-1384-3-git-send-email-linux.amoon@gmail.com>
+ <561B48B7.1040201@samsung.com>
+Message-ID: <CANAwSgSk0yHGvnoVoTk9MnUqjyEw1+yzH=C-1s_wxVkpGRHCEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/15 22:01, Thomas Gleixner wrote:
-> On Tue, 6 Oct 2015, Marc Zyngier wrote:
->> [This patch series used to be called "Making the generic ACPI GSI
->> layer irqdomain aware", but as I've radically changed my approach to
->> this problem, I've decided to reset the counters...]
->>
->> The irqdomain code is not entierely ACPI friendly, as it has some
->> built-in knowledge of the device-tree. Nothing too harmful, but enough
->> to scare the ARM ACPI developpers which end up with their own version
->> of the square wheel. And some of the ramifications actually run deeper
->> than initially expected.
->>
->> This series adapts the irqdomain code to use 'struct fwnode_handle'
->> instead of 'struct device_node' as the identifier for a domain
->> (compatibility interfaces are of course added). It also introduces a
->> generic IRQ specifier that firmware interfaces (DT or ACPI) can
->> directly use to configure interrupts, and allow the ACPI GSI code to
->> be plugged into this.
->>
->> As examples, we convert the ARM GIC ACPI support to use irqdomains as
->> originally intended, and rework the MSI code to also move away from
->> using device nodes when using irqdomains.
->>
->> Overall, this gives us a way to use irqdomains on both DT and ACPI
->> enabled platforms, having very little changes made to the actual
->> drivers (other than the probing infrastructure). Because we keep the
->> flow of information between the various layers identical between ACPI
->> and DT, we immediately benefit from the existing infrastructure.
->>
->> This has been test-booted on Juno, is based on 4.3-rc4, and available at:
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/irq-domain-fwnode-v1
->>
->> Marc Zyngier (16):
->>   irqdomain: Use an accessor for the of_node field
->>   irqdomain: Convert irqdomain->of_node to fwnode
->>   irqdomain: Allow irq domain lookup by fwnode
->>   irqdomain: Introduce a firmware-specific IRQ specifier structure
->>   irqchip: Convert all alloc/xlate users from of_node to fwnode
->>   irqdomain: Introduce irq_create_fwspec_mapping
->>   irqdomain: Introduce irq_domain_create_{linear,tree}
->>   irqdomain: Add a fwnode_handle allocator
->>   acpi/gsi: Always perform an irq domain lookup
->>   acpi/gsi: Add acpi_set_irq_model to initialize the GSI layer
->>   irqchip/gic: Get rid of gic_init_bases()
->>   irqchip/gic: Switch ACPI support to stacked domains
->>   irqchip/gic: Kill the xlate method
->>   acpi/gsi: Cleanup acpi_register_gsi
->>   irqdomain: Introduce irq_domain_create_hierarchy
->>   irqdomain/msi: Use fwnode instead of of_node
-> 
-> I really like this one way better than the previous attempts and I
-> couldn't find any real issue when going through them with a fine comb.
-> 
-> I'd like to get that into 4.4, so I have to ask for the opinion of
-> ACPI folks. Having an ack on those patches would be nice.
+Hi Krzysztof,
 
-FWIW, I've rebased this on top of -rc5, with a couple of fixes to the
-first patch (fixing missed of_node accessor conversions), but the series
-is otherwise unchanged:
+On 12 October 2015 at 11:14, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> On 12.10.2015 00:46, Anand Moon wrote:
+>> Added support for UHS-I bus speed 50MB/s (SDR50, DDR50) 104MB/s (SDR104)
+>
+> This description is not entirely correct. The MMC driver already
+> supports these UHS speeds (you did not any code) so you rather enabled
+> it (description of bindings says "is supported").
+>
+> You mentioned DDR50 but I don't see respective property below.
+Looks like I missed it, I will add this in the next patch,
+>
+> How do you know that these modes are really supported? I don't know. Can
+> you convince me?
+>
 
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-irq/irq-domain-fwnode-v2
+>>
+>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>
+>> ---
+>> Changes based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v4.4-next/dt-samsung branch
+>>
+>> Changes Fixed the UHS-I bus speed detedtion on cold boot.
+>
+> I don't get what is exactly fixed here. What was the error? What is the
+> outcome of this fix? The log below is before or after?
+>
+> Best regards,
+> Krzysztof
+>
+>>
+>> [    2.439806] mmc_host mmc1: Bus speed (slot 0) = 100000000Hz (slot req 100000000Hz, actual 100000000HZ div = 0)
+>> [    2.449729] mmc1: new ultra high speed SDR50 SDHC card at address aaaa
+>> [    2.455984] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
+>> [    2.461743]  mmcblk0: p1 p2
+>
+>> ---
+>>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>> index 58c06d3..ba4a87b 100644
+>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>> @@ -364,6 +364,10 @@
+>>       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+>>       bus-width = <4>;
+>>       cap-sd-highspeed;
+>> +     sd-uhs-sdr12;
+>> +     sd-uhs-sdr25;
+>> +     sd-uhs-sdr50;
+>> +     sd-uhs-sdr104;
+>>  };
+>>
+>>  &pinctrl_0 {
+>>
+>
 
-I'd very much appreciate some feedback from the ACPI folks as well
-(patch 8 is the potential point of contention, as it creates fwnodes
-ex-nihilo).
+Changes were made to support Sandisk Ultra UHS-I class 10 card support.
+OdroidXU3/XU4 board would not boot up using this card.
 
-Thanks,
+Depending on the capability of the UHS-I card, the speed of the card
+is selected.
+I have just added the enhance capability feature to support them.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+On warm boot: i.e reboot of the board.
+[    4.649073] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot
+req 50000000Hz, actual 50000000HZ div = 0)
+[    4.657555] mmc1: new high speed SDHC card at address aaaa
+[    4.663787] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
+[    4.669206]  mmcblk0: p1 p2
+
+On cold boot:: ie: power on the board.
+
+[    4.630237] mmc_host mmc1: Bus speed (slot 0) = 100000000Hz (slot
+req 100000000Hz, actual 100000000HZ div = 0)
+[    4.639820] mmc1: new ultra high speed SDR50 SDHC card at address aaaa
+[    4.646266] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
+[    4.650293] IRQ56 no longer affine to CPU7
+[    4.650581] CPU7: shutdown
+[    4.658293]  mmcblk0: p1 p2
+
+Note: Their is need to reset the PMIC
+S2MPS11_REG_L13CTRL/S2MPS11_REG_L19CTRL registers
+         to support this feature consistently on every reboot.
+
+-Anand Moon
