@@ -1,28 +1,47 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Mon, 12 Oct 2015 06:28:25 +0200
-Subject: [PATCH v4 00/26] ARM: pxa: magician: Rework HTC Magician support
-In-Reply-To: <87si5h7r2t.fsf@belgarion.home>
-References: <5609AB45.9030009@tul.cz>
- <20151006152527.GA32352@xo-6d-61-c0.localdomain> <56172F88.2060602@tul.cz>
- <87si5h7r2t.fsf@belgarion.home>
-Message-ID: <561B36E9.60006@tul.cz>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 12 Oct 2015 13:29:45 +0900
+Subject: [PATCH 1/3] ARM: dts: exynos5422-odroidxu3: use cd-gpio method to
+ detect sd-card
+In-Reply-To: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
+References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <561B3739.4040701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 11.10.2015 v 10:22 Robert Jarzmik napsal(a):
-> Petr Cvek <petr.cvek@tul.cz> writes:
+On 12.10.2015 00:46, Anand Moon wrote:
+> From: Jaehoon Chung <jh80.chung@samsung.com>
 > 
->>> Thanks (a pozdrav :-),
->>>
->>> 								Pavel
-> Hi Petr,
+> To detect sd-card use the cd-gpio method.
+> It can decrease the interrupt for detecting sd-card.
 > 
-> I'll start applying part of this serie today evening (my evening).
-> All Philipp's acked patches for a start.
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 > 
-> For the minor changes required by Philipp (comments, ...), if you just state by
-> mail that you agree I'll make them inline before applying.
+> ---
+> Changes based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v4.4-next/dt-samsung branch
+> ---
+>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> index 1af5bdc..26decbd 100644
+> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> @@ -352,8 +352,10 @@
+>  	samsung,dw-mshc-ciu-div = <3>;
+>  	samsung,dw-mshc-sdr-timing = <0 4>;
+>  	samsung,dw-mshc-ddr-timing = <0 2>;
+> +	cd-gpios = <&gpc2 2 GPIO_ACTIVE_HIGH>;
+> +	cd-inverted;
+>  	pinctrl-names = "default";
+> -	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
+> +	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
 
-Yes they are OK with me.
+Anand,
 
-Petr Cvek
+You essentially reverted here af6ad88acbd6 ("ARM: dts: Mux XMMCnDATA[0]
+pad correctly for Exynos5420 boards"). Why? There is no explanation in
+the commit message about this.
+
+Best regards,
+Krzysztof
