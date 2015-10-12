@@ -1,32 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Oct 2015 15:52:34 +0200
-Subject: [PATCH] crypto: mxs-dcp is an stmp device
-Message-ID: <6543300.PJNp8A08gY@wuerfel>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 12 Oct 2015 14:53:13 +0100
+Subject: [PATCHv2] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
+In-Reply-To: <5223992.qv9q1k7gFp@wuerfel>
+References: <1444109743-8561-1-git-send-email-manjeet.p@samsung.com>
+ <20151006103128.GN6281@e103592.cambridge.arm.com>
+ <5340366.WTVksOGb0G@wuerfel> <5223992.qv9q1k7gFp@wuerfel>
+Message-ID: <20151012135300.GA26786@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mxs-dcp driver relies on the stmp_reset_block() helper function, which
-is provided by CONFIG_STMP_DEVICE. This symbol is always set on MXS,
-but the driver can now also be built for MXC (i.MX6), which results
-in a built error if no other driver selects STMP_DEVICE:
+On Fri, Oct 09, 2015 at 10:41:43AM +0200, Arnd Bergmann wrote:
+> On Tuesday 06 October 2015 12:51:24 Arnd Bergmann wrote:
+> > 
+> > I think it makes sense to stick with the traditional definition
+> > of MINSIGSTKSZ == "the minimum amount that you will always need,
+> > add whatever you require yourself" and SIGSTKSZ == "Should be
+> > enough for a couple of function calls". If we want to be conservative
+> > in the kernel, using 8192 and 32768, to stay with the x4 ratio
+> > that everyone else uses would be my first pick, though I'm not
+> > particularly attached to those values.
+> > 
+> > 
+> 
+> On second thought, it really seems to late to make up our minds
+> about the size now that glibc has already established 5KB as the
+> minimum size. If we set it to 8KB/32KB, not just the testcase but
+> real applications would start failing when they use the 5KB
+> constant from glibc.
 
-drivers/built-in.o: In function `mxs_dcp_probe':
-vf610-ocotp.c:(.text+0x3df302): undefined reference to `stmp_reset_block'
+I agree for MINSIGSTKSZ.  We could still raise SIGSTKSZ if we think
+that will be more future-proof (SIGSTKSZ would be less than the magic
+4*MINSIGSTKSZ that most arches assume, unless SIGSTKSZ is made >=20KB).
 
-This adds the 'select', like all other stmp drivers have it.
+Those might be independent changes.  The definition of MINSIGSTKSZ
+is definitely broken right now, whereas SIGSTKSZ could be debated,
+but isn't actually broken.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: a2712e6c75f ("crypto: mxs-dcp - Allow MXS_DCP to be used on MX6SL")
-
-diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-index ab7e3b668890..2569e043317e 100644
---- a/drivers/crypto/Kconfig
-+++ b/drivers/crypto/Kconfig
-@@ -430,6 +430,7 @@ endif
- config CRYPTO_DEV_MXS_DCP
- 	tristate "Support for Freescale MXS DCP"
- 	depends on (ARCH_MXS || ARCH_MXC)
-+	select STMP_DEVICE
- 	select CRYPTO_CBC
- 	select CRYPTO_ECB
- 	select CRYPTO_AES
+Cheers
+---Dave
