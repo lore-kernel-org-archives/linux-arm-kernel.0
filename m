@@ -1,99 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Oct 2015 14:46:54 -0700
-Subject: [PATCH 00/37] ARM: dts: Fix fixed regulators enable GPIO polarity
-In-Reply-To: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <20151012214654.GE23801@atomide.com>
+From: joshc@eso.teric.us (Josh Cartwright)
+Date: Mon, 12 Oct 2015 16:54:59 -0500
+Subject: [PATCH 3/5] mtd: brcmnand: Optional DT flag to reset IPROC NAND
+ controller
+In-Reply-To: <39063E8F96E11742B35A201CC5D095B7AD8ADD@SJEXCHMB10.corp.ad.broadcom.com>
+References: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
+ <1443808606-21203-4-git-send-email-anup.patel@broadcom.com>
+ <20151004214943.GA28904@localhost>
+ <39063E8F96E11742B35A201CC5D095B7AD54C1@SJEXCHMB10.corp.ad.broadcom.com>
+ <20151006134119.GB26818@localhost> <56144A62.70300@broadcom.com>
+ <5614574C.2060701@gmail.com>
+ <39063E8F96E11742B35A201CC5D095B7AD8ADD@SJEXCHMB10.corp.ad.broadcom.com>
+Message-ID: <20151012215459.GA8843@kryptos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [151012 14:17]:
-> Hello,
-> 
-> While working on regulators, GPIOs and DT I noticed that many of our DT source
-> files incorrectly describe fixed regulators. The common error patterns are
-> 
-> - Usage of the undefined (and never parsed) enable-active-low property
-> - Usage of the enable-active-high property without specifying an enable GPIO
-> - Typos in the enabl GPIO property name (gpios instead of gpio)
-> - Mismatch between the enable-active-high property (or the lack thereof) and
->   the enable GPIO flags
-> 
-> This patch series fixes those issues in all the DT sources after locating the
-> errors using the following script.
-> 
-> ------------------------------------------------------------------------------
-> #!/bin/sh
-> 
-> echo $1
-> cat $1 | awk '
-> BEGIN {
-> 	open_drain = 0;
-> 	active_high = 0;
-> 	gpio = 0;
-> 	flags = 0;
-> }
-> 
-> match($0, /([a-zA-Z0-9 at _-]*) {/, ary) {
-> 	name = ary[1];
-> }
-> 
-> /compatible.*"regulator-fixed"/ {
-> 	found = 1;
-> }
-> 
-> /enable-active-high/ {
-> 	active_high = 1;
-> }
-> 
-> /gpio-open-drain/ {
-> 	open_drain = 1;
-> }
-> 
-> match($0, /gpio += <.* ([^ ]*)>/, ary) {
-> 	gpio = 1;
-> 	flags = ary[1];
-> 	if (flags == 0)
-> 		flags = "GPIO_ACTIVE_HIGH";
-> }
-> 
-> /}/ {
-> 	if (found) {
-> 		if (gpio) {
-> 			print "\t" name ": active high " active_high " " flags " open drain " open_drain;
-> 			if ((active_high && flags == "GPIO_ACTIVE_LOW") ||
-> 			    (!active_high && flags == "GPIO_ACTIVE_HIGH"))
-> 				print "WARNING: enable-active-high and flags do not match"
-> 		} else {
-> 			if (active_high)
-> 				print "WARNING: active high without GPIO"
-> 			if (open_drain)
-> 				print "WARNING: open drain without GPIO"
-> 		}
-> 	}
-> 
-> 	gpio = 0;
-> 	found = 0;
-> 	active_high = 0;
-> 	open_drain = 0;
-> 	flags = 0;
-> }
-> '
-> ------------------------------------------------------------------------------
-> 
-> All patches except for the ones touching omap3-beagle-xm and omap3-overo-base
-> are untested as I lack test hardware.
-> 
-> As there's no dependency between the patches touching different source files
-> the appropriate maintainers could take their share of the patches in their
-> tree. Alternatively I could send a single pull request after collecting all
-> acks but that might be more complex.
+On Wed, Oct 07, 2015 at 03:33:50AM +0000, Anup Patel wrote:
+> From: Florian Fainelli [mailto:f.fainelli at gmail.com]
+> > On 06/10/15 15:25, Scott Branden wrote:
+[..]
+> > Then instead of adding a "reset flag" to Device Tree, another approach could be
+> > to put the desired or currently configured exhaustive list of NAND timings in
+> > Device Tree, and based on that you could have this:
+> > 
+> > - the NAND controller driver finds that these timings match the current
+> > configuration, you are good to go
+> > 
+> > - the NAND controller drivers finds a difference in how current timings are
+> > configured vs. desired timings, and issues a controller reset, prior to applying
+> > new timing configuration
+>
+> To add to this ...
+>
+> The mechanism to reset is BRCM NAND controller is SOC specific so the
+> SoC independent BRCM NAND driver (i.e. brcmnand.c) does not know how
+> to reset the NAND controller.
+>
+> For iProc SoC family, the NAND controller reset is through IDM register
+> space which is only iomap'ed by iproc_nand.c.
+>
+> We might end-up having one more SoC specific callback which will be
+> Provided by iproc_nand.c to brcmnand.c.
 
-Nice clean-up. For omaps, there's an earlier patch posted by
-Javier Martinez Canillas <javier@osg.samsung.com> as "[PATCH] ARM: dts: Use
-defined GPIO constants in flags cell for OMAP2+ boards". Can you guys do some
-cross checking and let me know which combination I should appluy for omaps?
+Not that I'm familiar with these SoCs, but I did want to chime in and
+make sure you are aware of the existing reset_controller_dev
+abstraction, which is intended to solve exactly this problem.  Including
+a reset_control_get_optional() that might fit your use case.  See
+include/linux/reset{,-controller}.h.
 
-Regards,
-
-Tony
+  Josh
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151012/7129e0db/attachment.sig>
