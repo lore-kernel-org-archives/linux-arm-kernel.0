@@ -1,65 +1,37 @@
-From: neilb@suse.com (Neil Brown)
-Date: Mon, 12 Oct 2015 15:59:27 +1100
-Subject: [PATCH] md: fix 32-bit build warning
-In-Reply-To: <5304496.D8N6u074t0@wuerfel>
-References: <5304496.D8N6u074t0@wuerfel>
-Message-ID: <87fv1g1y34.fsf@notabene.neil.brown.name>
+From: neidhard.kim@lge.com (Jongsung Kim)
+Date: Mon, 12 Oct 2015 14:30:39 +0900
+Subject: [PATCH] ARM:mm: fix kmap_atomic_to_page
+In-Reply-To: <20151007090121.GC21513@n2100.arm.linux.org.uk>
+References: <1444129773-12632-1-git-send-email-chanho.min@lge.com>
+ <20151006192836.GX21513@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.20.1510062136190.1531@knanqh.ubzr> <5614979C.30100@lge.com>
+ <20151007090121.GC21513@n2100.arm.linux.org.uk>
+Message-ID: <561B457F.5090104@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+We tried to utilize a HW compressor as a zram backend. Current zram uses kmap_atomic to map a page, and the HW DMAes. So we needed to use kmap_atomic_to_page to get the page to be dma-mapped.
 
-> On 32-bit architectures, the md code produces this warning when CONFIG_LDAF
-> is set:
->
-> drivers/md/md.c: In function 'check_sb_changes':
-> drivers/md/md.c:8990:10: warning: format '%lu' expects argument of type 'long unsigned int', but argument 4 has type 'sector_t {aka long long unsigned int}' [-Wformat=]
->    pr_info("%s:%d recovery_cp changed from %lu to %lu\n", __func__,
->
-> The code was only recently introduced, and uses the wrong format string
-> for sector_t. As a workaround, this patch adds an explicit cast to 'u64'
-> so we can use the %llu format string on all architectures.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: e0212320066e ("md-cluster: Improve md_reload_sb to be less error prone")
-> Cc: Goldwyn Rodrigues <rgoldwyn@suse.com>
-> ---
->
-> I also noticed that some commmits in md/for-next including the one causing
-> the problem lack a Signed-off-by line. It might make sense to just fold this
-> patch and add the lines at the same time.
->
-> diff --git a/drivers/md/md.c b/drivers/md/md.c
-> index 7fff1e6884d6..e13f72a3b561 100644
-> --- a/drivers/md/md.c
-> +++ b/drivers/md/md.c
-> @@ -8987,9 +8987,9 @@ static void check_sb_changes(struct mddev *mddev, struct md_rdev *rdev)
->  
->  	/* recovery_cp changed */
->  	if (le64_to_cpu(sb->resync_offset) != mddev->recovery_cp) {
-> -		pr_info("%s:%d recovery_cp changed from %lu to %lu\n", __func__,
-> -				__LINE__, mddev->recovery_cp,
-> -				(unsigned long) le64_to_cpu(sb->resync_offset));
-> +		pr_info("%s:%d recovery_cp changed from %llu to %llu\n", __func__,
-> +				__LINE__, (u64)mddev->recovery_cp,
-> +				(u64) le64_to_cpu(sb->resync_offset));
->  		mddev->recovery_cp = le64_to_cpu(sb->resync_offset);
->  	}
->  
 
-Thanks, but is this really right?
-I think u64 is "unsigned long" on 64bit.
-I have always used (unsigned long long) when I want to use %llu on
-sector_t.
-
-How confident are you of using "u64" ?
-
-Thanks,
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151012/7ca58da1/attachment.sig>
+On 10/07/2015 06:01 PM, Russell King - ARM Linux wrote:
+> On Wed, Oct 07, 2015 at 12:55:08PM +0900, Jongsung Kim wrote:
+>> Recently, we made a driver utilizing kmap_atomic_to_page. Of course,
+>> it's not mainlined. People may be using it outside mainline just like us.
+> Since kmap_atomic() mappings are supposed to be short-lived, why do you
+> need it in your driver?  Don't you already have the struct page pointer
+> when setting up the kmap_atomic() mapping?
+>
+> It is invalid to setup a mapping, and leave it setup across any context
+> switching or similar.
+>
+> Also, kmap_atomic_to_page() is not exported to modules, so you can only
+> use it when built-in.
+>
+>> vmalloc has vmalloc_to_page, pkmap has kmap_to page, and fixmap has
+>> kmap_atomic_to_page. Then.. how about letting virt_to_page do them all?
+> No.  virt_to_page() is defined to only work on the lowmem mapping, and
+> that's not going to change.
+>
+> Please show the outline of your code making use of this function so we
+> can better understand your use case.
+>
