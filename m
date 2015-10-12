@@ -1,30 +1,74 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Mon, 12 Oct 2015 10:28:18 +0800
-Subject: [RFC] arm64: ioremap: add ioremap_cache macro
-Message-ID: <1444616898-5057-1-git-send-email-yalin.wang2010@gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 12 Oct 2015 10:40:57 +0800
+Subject: [PATCH 00/16] Divorcing irqdomain and device_node
+In-Reply-To: <alpine.DEB.2.11.1510112255330.6097@nanos>
+References: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
+ <alpine.DEB.2.11.1510112255330.6097@nanos>
+Message-ID: <561B1DB9.6010909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ioremap_cache macro, because some code will test if this macro
-is defined or not, and will generate a generric version if not defined,
-for example, memremap.c do like this.
+On 10/12/2015 05:01 AM, Thomas Gleixner wrote:
+> On Tue, 6 Oct 2015, Marc Zyngier wrote:
+>> [This patch series used to be called "Making the generic ACPI GSI
+>> layer irqdomain aware", but as I've radically changed my approach to
+>> this problem, I've decided to reset the counters...]
+>>
+>> The irqdomain code is not entierely ACPI friendly, as it has some
+>> built-in knowledge of the device-tree. Nothing too harmful, but enough
+>> to scare the ARM ACPI developpers which end up with their own version
+>> of the square wheel. And some of the ramifications actually run deeper
+>> than initially expected.
+>>
+>> This series adapts the irqdomain code to use 'struct fwnode_handle'
+>> instead of 'struct device_node' as the identifier for a domain
+>> (compatibility interfaces are of course added). It also introduces a
+>> generic IRQ specifier that firmware interfaces (DT or ACPI) can
+>> directly use to configure interrupts, and allow the ACPI GSI code to
+>> be plugged into this.
+>>
+>> As examples, we convert the ARM GIC ACPI support to use irqdomains as
+>> originally intended, and rework the MSI code to also move away from
+>> using device nodes when using irqdomains.
+>>
+>> Overall, this gives us a way to use irqdomains on both DT and ACPI
+>> enabled platforms, having very little changes made to the actual
+>> drivers (other than the probing infrastructure). Because we keep the
+>> flow of information between the various layers identical between ACPI
+>> and DT, we immediately benefit from the existing infrastructure.
+>>
+>> This has been test-booted on Juno, is based on 4.3-rc4, and available at:
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/irq-domain-fwnode-v1
+>>
+>> Marc Zyngier (16):
+>>    irqdomain: Use an accessor for the of_node field
+>>    irqdomain: Convert irqdomain->of_node to fwnode
+>>    irqdomain: Allow irq domain lookup by fwnode
+>>    irqdomain: Introduce a firmware-specific IRQ specifier structure
+>>    irqchip: Convert all alloc/xlate users from of_node to fwnode
+>>    irqdomain: Introduce irq_create_fwspec_mapping
+>>    irqdomain: Introduce irq_domain_create_{linear,tree}
+>>    irqdomain: Add a fwnode_handle allocator
+>>    acpi/gsi: Always perform an irq domain lookup
+>>    acpi/gsi: Add acpi_set_irq_model to initialize the GSI layer
+>>    irqchip/gic: Get rid of gic_init_bases()
+>>    irqchip/gic: Switch ACPI support to stacked domains
+>>    irqchip/gic: Kill the xlate method
+>>    acpi/gsi: Cleanup acpi_register_gsi
+>>    irqdomain: Introduce irq_domain_create_hierarchy
+>>    irqdomain/msi: Use fwnode instead of of_node
+>
+> I really like this one way better than the previous attempts and I
+> couldn't find any real issue when going through them with a fine comb.
 
-Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
----
- arch/arm64/include/asm/io.h | 1 +
- 1 file changed, 1 insertion(+)
+Fully agree, this version removes the dependency on DT for ACPI.
 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 44be1e0..d6b620c 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -172,6 +172,7 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
- #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
- #define ioremap_wt(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
- #define iounmap				__iounmap
-+#define ioremap_cache                  ioremap_cache
- 
- /*
-  * io{read,write}{16,32}be() macros
--- 
-1.9.1
+>
+> I'd like to get that into 4.4, so I have to ask for the opinion of
+> ACPI folks. Having an ack on those patches would be nice.
+
+I'm reviewing this patch set, and will have a test today.
+
+Thanks
+Hanjun
