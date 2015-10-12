@@ -1,41 +1,126 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 12 Oct 2015 15:19:24 -0700
-Subject: [PATCH 13/20] intel-iommu: switch from ioremap_cache to memremap
-In-Reply-To: <CAPcyv4h8zca3uNUH3ZoSVxrTYXr1XPD8AFrs60JzjKAu+45nog@mail.gmail.com>
-References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
- <20151009221646.32203.98367.stgit@dwillia2-desk3.jf.intel.com>
- <20151012215830.GT10641@suse.de>
- <CAPcyv4h8zca3uNUH3ZoSVxrTYXr1XPD8AFrs60JzjKAu+45nog@mail.gmail.com>
-Message-ID: <CAPcyv4i=cAT-mmhCbbv_77gdJggXxHk3jRoOg=Qm5H3tsMAK1Q@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 13 Oct 2015 00:19:20 +0200
+Subject: [PATCH 00/37] ARM: dts: Fix fixed regulators enable GPIO polarity
+In-Reply-To: <20151012214654.GE23801@atomide.com>
+References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <20151012214654.GE23801@atomide.com>
+Message-ID: <561C31E8.6000408@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 3:05 PM, Dan Williams <dan.j.williams@intel.com> wrote:
-> On Mon, Oct 12, 2015 at 2:58 PM, Joerg Roedel <jroedel@suse.de> wrote:
->> Hi Dan,
+Hello Tony,
+
+On 10/12/2015 11:46 PM, Tony Lindgren wrote:
+> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [151012 14:17]:
+>> Hello,
 >>
->> On Fri, Oct 09, 2015 at 06:16:46PM -0400, Dan Williams wrote:
->>> In preparation for deprecating ioremap_cache() convert its usage in
->>> intel-iommu to memremap.  This also eliminates the mishandling of the
->>> __iomem annotation in the implementation.
+>> While working on regulators, GPIOs and DT I noticed that many of our DT source
+>> files incorrectly describe fixed regulators. The common error patterns are
 >>
->> I appreciate the change, but in the cover letter you write the API is
->> only implemented for x86 so far? The VT-d driver is also used on ia64,
->> will it still work there with this patch?
+>> - Usage of the undefined (and never parsed) enable-active-low property
+>> - Usage of the enable-active-high property without specifying an enable GPIO
+>> - Typos in the enabl GPIO property name (gpios instead of gpio)
+>> - Mismatch between the enable-active-high property (or the lack thereof) and
+>>   the enable GPIO flags
 >>
+>> This patch series fixes those issues in all the DT sources after locating the
+>> errors using the following script.
 >>
+>> ------------------------------------------------------------------------------
+>> #!/bin/sh
+>>
+>> echo $1
+>> cat $1 | awk '
+>> BEGIN {
+>> 	open_drain = 0;
+>> 	active_high = 0;
+>> 	gpio = 0;
+>> 	flags = 0;
+>> }
+>>
+>> match($0, /([a-zA-Z0-9 at _-]*) {/, ary) {
+>> 	name = ary[1];
+>> }
+>>
+>> /compatible.*"regulator-fixed"/ {
+>> 	found = 1;
+>> }
+>>
+>> /enable-active-high/ {
+>> 	active_high = 1;
+>> }
+>>
+>> /gpio-open-drain/ {
+>> 	open_drain = 1;
+>> }
+>>
+>> match($0, /gpio += <.* ([^ ]*)>/, ary) {
+>> 	gpio = 1;
+>> 	flags = ary[1];
+>> 	if (flags == 0)
+>> 		flags = "GPIO_ACTIVE_HIGH";
+>> }
+>>
+>> /}/ {
+>> 	if (found) {
+>> 		if (gpio) {
+>> 			print "\t" name ": active high " active_high " " flags " open drain " open_drain;
+>> 			if ((active_high && flags == "GPIO_ACTIVE_LOW") ||
+>> 			    (!active_high && flags == "GPIO_ACTIVE_HIGH"))
+>> 				print "WARNING: enable-active-high and flags do not match"
+>> 		} else {
+>> 			if (active_high)
+>> 				print "WARNING: active high without GPIO"
+>> 			if (open_drain)
+>> 				print "WARNING: open drain without GPIO"
+>> 		}
+>> 	}
+>>
+>> 	gpio = 0;
+>> 	found = 0;
+>> 	active_high = 0;
+>> 	open_drain = 0;
+>> 	flags = 0;
+>> }
+>> '
+>> ------------------------------------------------------------------------------
+>>
+>> All patches except for the ones touching omap3-beagle-xm and omap3-overo-base
+>> are untested as I lack test hardware.
+>>
+>> As there's no dependency between the patches touching different source files
+>> the appropriate maintainers could take their share of the patches in their
+>> tree. Alternatively I could send a single pull request after collecting all
+>> acks but that might be more complex.
+> 
+> Nice clean-up. For omaps, there's an earlier patch posted by
+> Javier Martinez Canillas <javier@osg.samsung.com> as "[PATCH] ARM: dts: Use
+> defined GPIO constants in flags cell for OMAP2+ boards". Can you guys do some
+> cross checking and let me know which combination I should appluy for omaps?
 >
-> I did convert ia64 in the series [1]  but you're right this patch
-> can't go in independently of that conversion.  If you ack this one
-> I'll carry them in order.
->
-> [1]: https://lkml.org/lkml/2015/10/9/702
 
-Ah sorry, got ahead of myself ;-p.  You can safely take this patch
-through your tree.  The ia64 patch can happen asynchronously because
-kernel/memremap.c has:
+Since Laurent's changes for OMAP are part of a bigger series and my patch
+was only for OMAP, probably makes sense for you to pick his patches and I
+can re-spin mine on top of that.
 
-__weak void *arch_memremap(resource_size_t offset, size_t size,
-unsigned long flags)
+BTW, I posted as a single patch since the changes were trivial but maybe
+that made handling these conflicts harder and I should split the changes
+instead, since I'll resend anyways.
 
-...as a temporary fallback until the conversion is complete.
+What do you prefer? a patch per SoC family (i.e: OMAP{2,3,4,5}) or patch
+per board DTS?
+ 
+> Regards,
+> 
+> Tony
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
