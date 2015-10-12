@@ -1,137 +1,95 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 12 Oct 2015 16:38:10 +0530
-Subject: [PATCH 2/3] ARM: dts: use vmmc-supply of emmc/sd for
- exynos5422-odroidxu3
-In-Reply-To: <561B49D0.2040305@samsung.com>
-References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
- <1444578364-1384-2-git-send-email-linux.amoon@gmail.com>
- <561B3A3E.3030904@samsung.com> <561B49D0.2040305@samsung.com>
-Message-ID: <CANAwSgT=O-AVhQv4TO8ZukK15Ya++Kos_ZEjiFZWiDwNXub0mQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 12 Oct 2015 12:17:07 +0100
+Subject: [PATCH v2 1/2] ARM: cpuidle: remove cpu parameter from the
+ cpuidle_ops suspend hook
+In-Reply-To: <1444648628-24790-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1444648628-24790-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1444648628-24790-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+The suspend() hook in the cpuidle_ops struct is always called on
+the cpu entering idle, which means that the cpu parameter passed
+to the suspend hook always corresponds to the local cpu, making
+it somewhat redundant.
 
-On 12 October 2015 at 11:19, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> On 12.10.2015 13:42, Krzysztof Kozlowski wrote:
->> On 12.10.2015 00:46, Anand Moon wrote:
->>> Added support for vmmc/vqmmc-supply for emmc/sd cards.
->>> Fixed the min values for regulator ldo13_reg (VDDQ_MMC2).
->>
->> I can't see the description of a problem which is fixed. If you fix
->> something, then please describe what is wrong.
->>
->>> Added ramp-delay for LDO9(VDD33_USB3_0).
->>> Added ramp-delay for LDO13(VDDQ_MMC2).
->>> Added ramp-delay for LDO15(ETH_P3V3).
->>>
->>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
->>>
->>> ---
->>> Changes based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v4.4-next/dt-samsung branch
->>>
->>> Note:
->>> Changes need for support of UHS-I highspeed cards.
->>> changes for vqmmc-supply for emmc is not supported.
->>>
->>> [    1.831136] vdd_ldo9: ramp_delay not set
->>> [    1.843049] vdd_ldo13: ramp_delay not set
->>> [    1.850975] vdd_ldo15: ramp_delay not set
->>> [    1.862816] vdd_sd: ramp_delay not set
->>> ---
->>>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 8 +++++++-
->>>  1 file changed, 7 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->>> index 26decbd..58c06d3 100644
->>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->>> @@ -157,6 +157,7 @@
->>>                              regulator-min-microvolt = <3000000>;
->>>                              regulator-max-microvolt = <3000000>;
->>>                              regulator-always-on;
->>> +                            regulator-ramp-delay = <12000>;
->>>                      };
->>>
->>>                      ldo10_reg: LDO10 {
->>> @@ -182,9 +183,10 @@
->>>
->>>                      ldo13_reg: LDO13 {
->>>                              regulator-name = "vdd_ldo13";
->>> -                            regulator-min-microvolt = <2800000>;
->>> +                            regulator-min-microvolt = <1800000>;
->>>                              regulator-max-microvolt = <2800000>;
->>>                              regulator-always-on;
->>> +                            regulator-ramp-delay = <12000>;
->>>                      };
->>>
->>>                      ldo15_reg: LDO15 {
->>> @@ -213,6 +215,7 @@
->>>                              regulator-min-microvolt = <2800000>;
->>>                              regulator-max-microvolt = <2800000>;
->>>                              regulator-always-on;
->>> +                            regulator-ramp-delay = <12000>;
->>
->> Where did you get this value from? It looks wrong... My datasheet does
->> not have 12000 uV/uS.
->
+This patch removes the logical cpu parameter from the ARM
+cpuidle_ops.suspend hook and updates all the existing kernel
+implementations to reflect this change.
 
-> Anand,
->
-> We have actually been here:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/351601.html
->
-> That time you used 8000. I asked the same question - how did you figure
-> out the exact value.
->
-> Now we have the same question - why 12000?
->
-> It is completely fine to make a mistake (I do a lot of them) but please
-> try not to make the same mistake again.
->
-> BR,
-> Krzysztof
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Lina Iyer <lina.iyer@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/include/asm/cpuidle.h |  2 +-
+ arch/arm/kernel/cpuidle.c      |  2 +-
+ drivers/soc/qcom/spm.c         | 10 +++++-----
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
-I will focus more in the future to clamp down my mistakes to minimal.
-
->
->>
->>>                      };
->>>
->>>                      ldo24_reg: LDO24 {
->>> @@ -338,6 +341,7 @@
->>>      samsung,dw-mshc-ddr-timing = <0 2>;
->>>      samsung,dw-mshc-hs400-timing = <0 2>;
->>>      samsung,read-strobe-delay = <90>;
->>> +    vmmc-supply = <&ldo3_reg>;
->>>      pinctrl-names = "default";
->>>      pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_cd &sd0_rclk>;
->>>      bus-width = <8>;
->>> @@ -352,6 +356,8 @@
->>>      samsung,dw-mshc-ciu-div = <3>;
->>>      samsung,dw-mshc-sdr-timing = <0 4>;
->>>      samsung,dw-mshc-ddr-timing = <0 2>;
->>> +    vmmc-supply = <&ldo19_reg>;
->>> +    vqmmc-supply = <&ldo13_reg>;
->>
->> It looks wrong. LDO13 is used in one place as VQMMC and in other as
->> VMMC. How did you figure out which regulator supplies which power domain?
->>
-
-I refer Schematics diagram to XU4_MAIN_REV0.1.pdf
-
->From the PWR_PMCI_S2MPS11_LDO_CTRL document it LDO13 point to VDDQ_MMC2.
-
->> Best regards,
->> Krzysztof
->>
->>>      cd-gpios = <&gpc2 2 GPIO_ACTIVE_HIGH>;
->>>      cd-inverted;
->>>      pinctrl-names = "default";
->>>
->>
->>
->
-
--Anand Moon
+diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
+index 0f84249..3848259 100644
+--- a/arch/arm/include/asm/cpuidle.h
++++ b/arch/arm/include/asm/cpuidle.h
+@@ -30,7 +30,7 @@ static inline int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+ struct device_node;
+ 
+ struct cpuidle_ops {
+-	int (*suspend)(int cpu, unsigned long arg);
++	int (*suspend)(unsigned long arg);
+ 	int (*init)(struct device_node *, int cpu);
+ };
+ 
+diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+index 318da33..703926e 100644
+--- a/arch/arm/kernel/cpuidle.c
++++ b/arch/arm/kernel/cpuidle.c
+@@ -56,7 +56,7 @@ int arm_cpuidle_suspend(int index)
+ 	int cpu = smp_processor_id();
+ 
+ 	if (cpuidle_ops[cpu].suspend)
+-		ret = cpuidle_ops[cpu].suspend(cpu, index);
++		ret = cpuidle_ops[cpu].suspend(index);
+ 
+ 	return ret;
+ }
+diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
+index b04b05a..0ad66fa 100644
+--- a/drivers/soc/qcom/spm.c
++++ b/drivers/soc/qcom/spm.c
+@@ -116,7 +116,7 @@ static const struct spm_reg_data spm_reg_8064_cpu = {
+ 
+ static DEFINE_PER_CPU(struct spm_driver_data *, cpu_spm_drv);
+ 
+-typedef int (*idle_fn)(int);
++typedef int (*idle_fn)(void);
+ static DEFINE_PER_CPU(idle_fn*, qcom_idle_ops);
+ 
+ static inline void spm_register_write(struct spm_driver_data *drv,
+@@ -179,10 +179,10 @@ static int qcom_pm_collapse(unsigned long int unused)
+ 	return -1;
+ }
+ 
+-static int qcom_cpu_spc(int cpu)
++static int qcom_cpu_spc(void)
+ {
+ 	int ret;
+-	struct spm_driver_data *drv = per_cpu(cpu_spm_drv, cpu);
++	struct spm_driver_data *drv = __this_cpu_read(cpu_spm_drv);
+ 
+ 	spm_set_low_power_mode(drv, PM_SLEEP_MODE_SPC);
+ 	ret = cpu_suspend(0, qcom_pm_collapse);
+@@ -197,9 +197,9 @@ static int qcom_cpu_spc(int cpu)
+ 	return ret;
+ }
+ 
+-static int qcom_idle_enter(int cpu, unsigned long index)
++static int qcom_idle_enter(unsigned long index)
+ {
+-	return per_cpu(qcom_idle_ops, cpu)[index](cpu);
++	return __this_cpu_read(qcom_idle_ops)[index]();
+ }
+ 
+ static const struct of_device_id qcom_idle_state_match[] __initconst = {
+-- 
+2.5.1
