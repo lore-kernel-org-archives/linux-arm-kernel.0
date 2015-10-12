@@ -1,65 +1,111 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Tue, 13 Oct 2015 02:54:01 +0300
-Subject: [PATCH 1/5] arm: dts: lpc32xx: change include syntax to be C
- preprocessor friendly
+Date: Tue, 13 Oct 2015 02:54:03 +0300
+Subject: [PATCH 3/5] arm: dts: lpc32xx: add labels to all defined peripheral
+ nodes
 In-Reply-To: <1444694045-22000-1-git-send-email-vz@mleia.com>
 References: <1444694045-22000-1-git-send-email-vz@mleia.com>
-Message-ID: <1444694045-22000-2-git-send-email-vz@mleia.com>
+Message-ID: <1444694045-22000-4-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change replaces /include/ to #include in lpc32xx.dtsi and
-derivatives, it is required, if C preprocessor is intended to be used
-over dtsi/dts files, otherwise errors like one below are generated:
-
-  Error: ea3250.dts:15.1-9 syntax error
-  FATAL ERROR: Unable to parse input tree
+To simplify writing of dts files for all lpc32xx.dtsi users who adjust
+device node properties, add labels to all defined peripheral device
+nodes in lpc32xx.dtsi.
 
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- arch/arm/boot/dts/ea3250.dts   | 2 +-
- arch/arm/boot/dts/lpc32xx.dtsi | 2 +-
- arch/arm/boot/dts/phy3250.dts  | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/lpc32xx.dtsi | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ea3250.dts b/arch/arm/boot/dts/ea3250.dts
-index a4ba31b..121d032 100644
---- a/arch/arm/boot/dts/ea3250.dts
-+++ b/arch/arm/boot/dts/ea3250.dts
-@@ -12,7 +12,7 @@
-  */
- 
- /dts-v1/;
--/include/ "lpc32xx.dtsi"
-+#include "lpc32xx.dtsi"
- 
- / {
- 	model = "Embedded Artists LPC3250 board based on NXP LPC3250";
 diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-index 3abebb7..f35e982 100644
+index 3ef804c..dcb52cb 100644
 --- a/arch/arm/boot/dts/lpc32xx.dtsi
 +++ b/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -11,7 +11,7 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
+@@ -49,7 +49,7 @@
+ 			status = "disabled";
+ 		};
  
--/include/ "skeleton.dtsi"
-+#include "skeleton.dtsi"
+-		dma at 31000000 {
++		dma: dma at 31000000 {
+ 			compatible = "arm,pl080", "arm,primecell";
+ 			reg = <0x31000000 0x1000>;
+ 			interrupts = <0x1c 0>;
+@@ -58,21 +58,21 @@
+ 		/*
+ 		 * Enable either ohci or usbd (gadget)!
+ 		 */
+-		ohci at 31020000 {
++		ohci: ohci at 31020000 {
+ 			compatible = "nxp,ohci-nxp", "usb-ohci";
+ 			reg = <0x31020000 0x300>;
+ 			interrupts = <0x3b 0>;
+ 			status = "disabled";
+ 		};
  
- / {
- 	compatible = "nxp,lpc3220";
-diff --git a/arch/arm/boot/dts/phy3250.dts b/arch/arm/boot/dts/phy3250.dts
-index 90fdbd7..2a2d2cf 100644
---- a/arch/arm/boot/dts/phy3250.dts
-+++ b/arch/arm/boot/dts/phy3250.dts
-@@ -12,7 +12,7 @@
-  */
+-		usbd at 31020000 {
++		usbd: usbd at 31020000 {
+ 			compatible = "nxp,lpc3220-udc";
+ 			reg = <0x31020000 0x300>;
+ 			interrupts = <0x3d 0>, <0x3e 0>, <0x3c 0>, <0x3a 0>;
+ 			status = "disabled";
+ 		};
  
- /dts-v1/;
--/include/ "lpc32xx.dtsi"
-+#include "lpc32xx.dtsi"
+-		clcd at 31040000 {
++		clcd: clcd at 31040000 {
+ 			compatible = "arm,pl110", "arm,primecell";
+ 			reg = <0x31040000 0x1000>;
+ 			interrupts = <0x0e 0>;
+@@ -118,7 +118,7 @@
+ 				reg = <0x20094000 0x1000>;
+ 			};
  
- / {
- 	model = "PHYTEC phyCORE-LPC3250 board based on NXP LPC3250";
+-			sd at 20098000 {
++			sd: sd at 20098000 {
+ 				compatible = "arm,pl18x", "arm,primecell";
+ 				reg = <0x20098000 0x1000>;
+ 				interrupts = <0x0f 0>, <0x0d 0>;
+@@ -243,7 +243,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			rtc at 40024000 {
++			rtc: rtc at 40024000 {
+ 				compatible = "nxp,lpc3220-rtc";
+ 				reg = <0x40024000 0x1000>;
+ 				interrupts = <0x34 0>;
+@@ -256,7 +256,7 @@
+ 				#gpio-cells = <3>; /* bank, pin, flags */
+ 			};
+ 
+-			watchdog at 4003C000 {
++			watchdog: watchdog at 4003C000 {
+ 				compatible = "nxp,pnx4008-wdt";
+ 				reg = <0x4003C000 0x1000>;
+ 			};
+@@ -268,21 +268,21 @@
+ 			 * them
+ 			 */
+ 
+-			adc at 40048000 {
++			adc: adc at 40048000 {
+ 				compatible = "nxp,lpc3220-adc";
+ 				reg = <0x40048000 0x1000>;
+ 				interrupts = <0x27 0>;
+ 				status = "disabled";
+ 			};
+ 
+-			tsc at 40048000 {
++			tsc: tsc at 40048000 {
+ 				compatible = "nxp,lpc3220-tsc";
+ 				reg = <0x40048000 0x1000>;
+ 				interrupts = <0x27 0>;
+ 				status = "disabled";
+ 			};
+ 
+-			key at 40050000 {
++			key: key at 40050000 {
+ 				compatible = "nxp,lpc3220-key";
+ 				reg = <0x40050000 0x1000>;
+ 				interrupts = <54 0>;
 -- 
 2.1.4
