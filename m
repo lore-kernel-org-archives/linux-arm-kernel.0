@@ -1,65 +1,49 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 12 Oct 2015 10:26:56 -0500
-Subject: [PATCH v2] PCI: layerscape: Add PCIe support for LS1043a and
- LS2080a
-In-Reply-To: <5274293.94FcFfK0fd@wuerfel>
-References: <1442481219-28299-1-git-send-email-Minghuan.Lian@freescale.com>
- <20151007175725.GC27633@localhost> <5274293.94FcFfK0fd@wuerfel>
-Message-ID: <20151012152656.GB29221@localhost>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Mon, 12 Oct 2015 08:28:01 -0700
+Subject: [PATCH] scsi: advansys needs ISA dma api for ISA support
+In-Reply-To: <5081546.QjQ32dGX2L@wuerfel>
+References: <5081546.QjQ32dGX2L@wuerfel>
+Message-ID: <1444663681.2205.14.camel@HansenPartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 02:36:29PM +0200, Arnd Bergmann wrote:
-> On Wednesday 07 October 2015 12:57:25 Bjorn Helgaas wrote:
-> > > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> > > index ae873be..38fe8a8 100644
-> > > --- a/drivers/pci/host/Kconfig
-> > > +++ b/drivers/pci/host/Kconfig
-> > > @@ -105,7 +105,7 @@ config PCI_XGENE_MSI
-> > >  
-> > >  config PCI_LAYERSCAPE
-> > >       bool "Freescale Layerscape PCIe controller"
-> > > -     depends on OF && ARM
-> > > +     depends on OF && (ARM || ARM64)
-> > 
-> > It seems like there are a couple things going on here, and I wonder if
-> > you can split them out into separate patches.
-> > 
-> > 1) Making this work on ARM64 as well as on ARM.  This may be of
-> > interest for other DesignWare-based drivers, so if you split this out,
-> > maybe it would be a useful template for converting the other drivers,
-> > too.
+On Mon, 2015-10-12 at 17:10 +0200, Arnd Bergmann wrote:
+> The advansys drvier uses the request_dma function that is used on ISA
+> machines for the internal DMA controller, which causes build errors
+> on platforms that have ISA slots but do not provide the ISA DMA API:
 > 
-> The Kconfig change apparently made it into linux-next now, but it
-> doesn't actually build on arm64, because the dependency that was
-> mentioned in the cover letter [0] is not there.
-> ...
-> [0] This patch is based on v4.3-rc1 and [PATCH v9 0/6]
-> PCI: hisi: Add PCIe host support for HiSilicon SoC Hip05
-> patchset from Zhou Wang.
+> drivers/scsi/advansys.c: In function 'advansys_board_found':
+> drivers/scsi/advansys.c:11300:10: error: implicit declaration of function 'request_dma' [-Werror=implicit-function-declaration]
+> 
+> The problem now showed up in ARM randconfig builds after commit
+> 6571fb3f8b7f ("advansys: Update to version 3.5 and remove compilation
+> warning") made it possible to build on platforms that have neither
+> VIRT_TO_BUS nor ISA_DMA_API but that do have ISA.
+> 
+> This adds the missing dependency.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/drivers/scsi/Kconfig b/drivers/scsi/Kconfig
+> index d2f480b04a52..d4aa6a1a806c 100644
+> --- a/drivers/scsi/Kconfig
+> +++ b/drivers/scsi/Kconfig
+> @@ -499,6 +499,7 @@ config SCSI_ADVANSYS
+>  	tristate "AdvanSys SCSI support"
+>  	depends on SCSI
+>  	depends on ISA || EISA || PCI
+> +	depends on ISA_DMA_API || !ISA
+>  	help
+>  	  This is a driver for all SCSI host adapters manufactured by
+>  	  AdvanSys. It is documented in the kernel source in
 
-Oops, my fault.  I read that as "this patch is derived from, e.g., it
-a newer version of, the HiSilicon patchset."  But that's obviously
-a silly way to read it.  I re-did the merge without the Layerscape
-patch and repushed it to my "next" branch.
+This fix looks wrong.  the request_dma code is confined within an #ifdef
+CONFIG_ISA section but the advansys doesn't actually require an ISA DMA
+channel to function, so you're saying there are systems with ISA but
+without request_dma()?
 
-I'll work on Zhou's series, then revisit Minghuan's patch(es).  I'm
-hoping the Layerscape patch can be split up a bit, both to split out
-the ARM64 config change and to make a cleaner "LS1043a and LS2080a"
-support patch.  The current patch changes several things that are not
-obviously directly related to LS1043a and LS2080a.  It would be ideal
-to have a series of things like:
+If so I think we leave the depends alone and try to bring the board up
+in NO_ISA_DMA mode.  That means the narrowboard check should be gated by
+CONFIG_ISA_DMA_API ... do we also have to gate free_dma as well?
 
-  - add ARM64 build support (maybe just the Kconfig change)
-  - make the ls_pcie_probe() changes that are apparently generic
-    across all the LS devices
-  - add driver data to lc_pcie_of_match[] (this wouldn't change any
-    behavior at all; it would just add the ls1021_drvdata that works
-    for the already-supported devices)
-  - add ls1032_drvdata and ls2080_drvdata for the new devices
-  - add the "msi-parent" diagnostic (this seems to be basically new
-    functionality that applies to all devices, not just the new ones)
-
-That way, each individual change would be easier to review.
-
-Bjorn
+James
