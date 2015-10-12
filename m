@@ -1,72 +1,90 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 12 Oct 2015 14:48:23 +0200
-Subject: [PATCH v3 0/7] mmc: dw_mmc-rockchip: allow tuning using the clk-phase
- api
-Message-ID: <1444654110-32293-1-git-send-email-heiko@sntech.de>
+Date: Mon, 12 Oct 2015 14:48:24 +0200
+Subject: [PATCH v3 1/7] mmc: core: move ocr-bit to voltage translation into
+ separate function
+In-Reply-To: <1444654110-32293-1-git-send-email-heiko@sntech.de>
+References: <1444654110-32293-1-git-send-email-heiko@sntech.de>
+Message-ID: <1444654110-32293-2-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series resurrects and adapts some individual patches whose sum
-enable the dw_mmc hosts on Rockchip socs to tune clock phases using
-the generic phase api (rk3288 and following have this capability).
+We will shortly need the calculation of an ocr-bit to the actual
+voltage in a second place too, so move it from mmc_regulator_set_ocr
+to a common function mmc_ocrbitnum_to_vdd to make that possible.
 
-The changes to the original mmc-phase clocks are expanded by further
-findings resulting from devices being used in the field.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/mmc/core/core.c | 51 +++++++++++++++++++++++++++++++++----------------
+ 1 file changed, 35 insertions(+), 16 deletions(-)
 
-Similarly the regulator handling changes do use the brand new
-regulator_set_voltage_triplet call to allow specifying lower and upper
-limits. One possible point of discussion are the two voltage ranges
-that are tried for the 3.3V signal level. Trying to stay near vmmc
-at first and only then opening the range to the full 2.7-3.6V.
-
-This mainly circumvents a shortcoming of the regulator voltage
-setting, in that even with regulator_set_voltage_triplet the regulator
-framework will take the lowest possible voltage when the possible
-voltages are below the target voltage. While it may be ideal to solve
-this on the regulator side, I'm not seeing this appearing in the short
-term, mainly because all regulator parts (including regulator drivers)
-are keyed to selecting the lowest voltage from the range, while on the
-mmc side we know which voltages may work and trying this in two steps
-does not create to much overhead, as unsupported voltages are already
-filtered out by the regulator_is_voltage_selected calls.
-
-changes since v2:
-- use host->ios.vdd to read vmmc from instead of requiring the vmmc
-  regulator. Suggested by Ulf this makes the voltage setting still work
-  even if only the vqmmc but not the vmmc regulator is supplied.
-- add Acks from Jaehoon Chung to the dw_mmc parts
-- drop first two clock patches that already got applied to the mmc tree
-
-changes since v1:
-- address comment from Jaehoon Chung and keep this local to Rockchip
-  for the time being
-- address comments from Ulf and Doug in making it more explicit
-  that the two-step 3.3V voltage setting essentially works around
-  a limitation of regulator_set_voltage_triplet
-
-Alexandru M Stan (3):
-  mmc: dw_mmc-rockchip: dt-binding: Add tuning related things
-  mmc: dw_mmc-rockchip: MMC tuning with the clock phase framework
-  ARM: dts: rockchip: Add drive/sample clocks for rk3288 dw_mmc devices
-
-Douglas Anderson (2):
-  mmc: core: Add mmc_regulator_set_vqmmc()
-  mmc: dw_mmc: Use mmc_regulator_set_vqmmc in
-    start_signal_voltage_switch
-
-Heiko Stuebner (2):
-  mmc: core: move ocr-bit to voltage translation into separate function
-  ARM: dts: rockchip: add tuning related settings to veyron devices
-
- .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |  13 ++
- arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi         |   7 +-
- arch/arm/boot/dts/rk3288-veyron.dtsi               |   6 +
- arch/arm/boot/dts/rk3288.dtsi                      |  20 ++-
- drivers/mmc/core/core.c                            | 129 ++++++++++++++--
- drivers/mmc/host/dw_mmc-rockchip.c                 | 162 +++++++++++++++++++++
- drivers/mmc/host/dw_mmc.c                          |  17 +--
- include/linux/mmc/host.h                           |   7 +
- 8 files changed, 325 insertions(+), 36 deletions(-)
-
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 0520064..548b5e1 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -1265,6 +1265,40 @@ u32 mmc_vddrange_to_ocrmask(int vdd_min, int vdd_max)
+ }
+ EXPORT_SYMBOL(mmc_vddrange_to_ocrmask);
+ 
++/**
++ * mmc_ocrbitnum_to_vdd - Convert a OCR bit number to its voltage
++ * @vdd_bit:	OCR bit number
++ * @min_uV:	minimum voltage value (mV)
++ * @max_uV:	maximum voltage value (mV)
++ *
++ * This function returns the voltage range according to the provided OCR
++ * bit number. If conversion is not possible a negative errno value returned.
++ */
++static int mmc_ocrbitnum_to_vdd(int vdd_bit, int *min_uV, int *max_uV)
++{
++	int		tmp;
++
++	if (!vdd_bit)
++		return -EINVAL;
++
++	/*
++	 * REVISIT mmc_vddrange_to_ocrmask() may have set some
++	 * bits this regulator doesn't quite support ... don't
++	 * be too picky, most cards and regulators are OK with
++	 * a 0.1V range goof (it's a small error percentage).
++	 */
++	tmp = vdd_bit - ilog2(MMC_VDD_165_195);
++	if (tmp == 0) {
++		*min_uV = 1650 * 1000;
++		*max_uV = 1950 * 1000;
++	} else {
++		*min_uV = 1900 * 1000 + tmp * 100 * 1000;
++		*max_uV = *min_uV + 100 * 1000;
++	}
++
++	return 0;
++}
++
+ #ifdef CONFIG_OF
+ 
+ /**
+@@ -1401,22 +1435,7 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
+ 	int			min_uV, max_uV;
+ 
+ 	if (vdd_bit) {
+-		int		tmp;
+-
+-		/*
+-		 * REVISIT mmc_vddrange_to_ocrmask() may have set some
+-		 * bits this regulator doesn't quite support ... don't
+-		 * be too picky, most cards and regulators are OK with
+-		 * a 0.1V range goof (it's a small error percentage).
+-		 */
+-		tmp = vdd_bit - ilog2(MMC_VDD_165_195);
+-		if (tmp == 0) {
+-			min_uV = 1650 * 1000;
+-			max_uV = 1950 * 1000;
+-		} else {
+-			min_uV = 1900 * 1000 + tmp * 100 * 1000;
+-			max_uV = min_uV + 100 * 1000;
+-		}
++		mmc_ocrbitnum_to_vdd(vdd_bit, &min_uV, &max_uV);
+ 
+ 		result = regulator_set_voltage(supply, min_uV, max_uV);
+ 		if (result == 0 && !mmc->regulator_enabled) {
 -- 
 2.6.1
