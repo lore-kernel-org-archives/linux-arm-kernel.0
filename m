@@ -1,61 +1,61 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 12 Oct 2015 14:04:28 +0800
-Subject: [PATCH 01/16] irqdomain: Use an accessor for the of_node field
-In-Reply-To: <1444152989-31726-2-git-send-email-marc.zyngier@arm.com>
-References: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
- <1444152989-31726-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <561B4D6C.7000404@linaro.org>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Mon, 12 Oct 2015 11:56:09 +0530
+Subject: [PATCH] arm: dts: Fix audio card detection on peach boards
+Message-ID: <1444631169-19468-1-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2015 01:36 AM, Marc Zyngier wrote:
-> The struct irq_domain contains a "struct device_node *" field
-> (of_node) that is almost the only link between the irqdomain
-> and the device tree infrastructure.
->
-> In order to prepare for the removal of that field, convert all
-> users to use an accessor.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   arch/arm/mach-omap2/omap-wakeupgen.c          |  2 +-
->   arch/c6x/platforms/megamod-pic.c              |  2 +-
->   arch/mips/cavium-octeon/octeon-irq.c          |  4 ++--
->   arch/powerpc/platforms/cell/axon_msi.c        |  2 +-
->   arch/powerpc/platforms/cell/spider-pic.c      |  9 +++++---
->   arch/powerpc/platforms/pasemi/msi.c           |  6 ++++--
->   arch/powerpc/platforms/powernv/opal-irqchip.c |  2 +-
->   arch/powerpc/sysdev/ehv_pic.c                 |  3 ++-
->   arch/powerpc/sysdev/fsl_msi.c                 |  2 +-
->   arch/powerpc/sysdev/i8259.c                   |  3 ++-
->   arch/powerpc/sysdev/ipic.c                    |  3 ++-
->   arch/powerpc/sysdev/mpic.c                    |  3 ++-
->   arch/powerpc/sysdev/mpic_msi.c                |  2 +-
->   arch/powerpc/sysdev/qe_lib/qe_ic.c            |  3 ++-
->   drivers/gpio/gpio-sodaville.c                 |  2 +-
->   drivers/irqchip/exynos-combiner.c             |  2 +-
->   drivers/irqchip/irq-atmel-aic-common.c        |  2 +-
->   drivers/irqchip/irq-crossbar.c                |  4 ++--
->   drivers/irqchip/irq-gic-v2m.c                 |  2 +-
->   drivers/irqchip/irq-gic-v3-its.c              |  2 +-
->   drivers/irqchip/irq-gic-v3.c                  |  2 +-
->   drivers/irqchip/irq-gic.c                     |  2 +-
->   drivers/irqchip/irq-hip04.c                   |  2 +-
->   drivers/irqchip/irq-imx-gpcv2.c               |  2 +-
->   drivers/irqchip/irq-mtk-sysirq.c              |  2 +-
->   drivers/irqchip/irq-s3c24xx.c                 |  4 ++--
->   drivers/irqchip/irq-tegra.c                   |  4 ++--
->   drivers/irqchip/irq-vf610-mscm-ir.c           |  5 +++--
->   drivers/spmi/spmi-pmic-arb.c                  |  2 +-
->   include/linux/irqdomain.h                     |  5 +++++
->   kernel/irq/irqdomain.c                        | 30 +++++++++++++++++++--------
->   31 files changed, 74 insertions(+), 46 deletions(-)
+Since the merge of 2fad972 ("ARM: dts: Add mclk entry for Peach boards"),
+sound card detection is broken on peach boards and gives below errors:
 
-Some missing files I noticed:
-./arch/arm/mach-imx/gpc.c:	if (domain->of_node != controller)
-./arch/arm/mach-imx/gpc.c:	parent_args.np = domain->parent->of_node;
-./arch/arm/mach-exynos/suspend.c:	if (domain->of_node != controller)
-./arch/arm/mach-exynos/suspend.c:	parent_args.np = domain->parent->of_node;
+[    3.630457] max98090 7-0010: MAX98091 REVID=0x51
+[    3.634233] max98090 7-0010: use default 2.8v micbias
+[    3.640985] snow-audio sound: HiFi <-> 3830000.i2s mapping ok
+[    3.645307] max98090 7-0010: Invalid master clock frequency
+[    3.650824] snow-audio sound: ASoC: Peach-Pi-I2S-MAX98091 late_probe() failed: -22
+[    3.658914] snow-audio sound: snd_soc_register_card failed (-22)
+[    3.664366] snow-audio: probe of sound failed with error -22
 
-Thanks
-Hanjun
+This patch adds missing assigned-clocks and assigned-clock-parents for
+pmu_system_controller node which is used as "mclk" for audio codec.
+
+Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+Fixes: 2fad972 ("ARM: dts: Add mclk entry for Peach boards")
+Cc: <stable@vger.kernel.org>
+---
+ arch/arm/boot/dts/exynos5420-peach-pit.dts |    5 +++++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts  |    5 +++++
+ 2 files changed, 10 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index 8f4d76c..525a93a 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -1056,5 +1056,10 @@
+ 	timeout-sec = <32>;
+ };
+ 
++&pmu_system_controller {
++	assigned-clocks = <&pmu_system_controller 0>;
++	assigned-clock-parents =  <&clock CLK_FIN_PLL>;
++};
++
+ #include "cros-ec-keyboard.dtsi"
+ #include "cros-adc-thermistors.dtsi"
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 7d5b386..411de8f 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -1019,5 +1019,10 @@
+ 	timeout-sec = <32>;
+ };
+ 
++&pmu_system_controller {
++	assigned-clocks = <&pmu_system_controller 0>;
++	assigned-clock-parents =  <&clock CLK_FIN_PLL>;
++};
++
+ #include "cros-ec-keyboard.dtsi"
+ #include "cros-adc-thermistors.dtsi"
+-- 
+1.7.10.4
