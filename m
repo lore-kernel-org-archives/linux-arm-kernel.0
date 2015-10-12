@@ -1,10 +1,9 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 13 Oct 2015 00:13:06 +0300
-Subject: [PATCH 37/37] ARM: dts: tegra20-ventana: Fix regulator enable GPIO
- polarity
+Date: Tue, 13 Oct 2015 00:12:47 +0300
+Subject: [PATCH 18/37] ARM: dts: imx28-evk: Fix regulator enable GPIO polarity
 In-Reply-To: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
 References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1444684386-17094-38-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <1444684386-17094-19-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,26 +14,33 @@ starts making use of the flags. Fix it.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- arch/arm/boot/dts/tegra20-ventana.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/imx28-evk.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Cc: linux-tegra at vger.kernel.org
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Alexandre Courbot <gnurou@gmail.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
 
-diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
-index 04c58e9ca490..ba1fc1487c69 100644
---- a/arch/arm/boot/dts/tegra20-ventana.dts
-+++ b/arch/arm/boot/dts/tegra20-ventana.dts
-@@ -635,7 +635,7 @@
- 			regulator-name = "vdd_1v5";
- 			regulator-min-microvolt = <1500000>;
- 			regulator-max-microvolt = <1500000>;
--			gpio = <&pmic 0 GPIO_ACTIVE_HIGH>;
-+			gpio = <&pmic 0 GPIO_ACTIVE_LOW>;
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index 279249b8c3f3..17598d3bb408 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -295,7 +295,7 @@
+ 			regulator-name = "vddio-sd0";
+ 			regulator-min-microvolt = <3300000>;
+ 			regulator-max-microvolt = <3300000>;
+-			gpio = <&gpio3 28 0>;
++			gpio = <&gpio3 28 GPIO_ACTIVE_LOW>;
  		};
  
- 		regulator at 2 {
+ 		reg_fec_3v3: regulator at 2 {
+@@ -304,7 +304,7 @@
+ 			regulator-name = "fec-3v3";
+ 			regulator-min-microvolt = <3300000>;
+ 			regulator-max-microvolt = <3300000>;
+-			gpio = <&gpio2 15 0>;
++			gpio = <&gpio2 15 GPIO_ACTIVE_LOW>;
+ 		};
+ 
+ 		reg_usb0_vbus: regulator at 3 {
 -- 
 2.4.9
