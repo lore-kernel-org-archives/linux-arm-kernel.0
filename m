@@ -1,43 +1,62 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 12 Oct 2015 11:32:44 +0200
-Subject: [PATCH 2/3] dts: Updated devicetree bindings for Zynq 7000
- platform
-In-Reply-To: <1444344307-22509-3-git-send-email-moritz.fischer@ettus.com>
-References: <1444344307-22509-1-git-send-email-moritz.fischer@ettus.com>
- <1444344307-22509-3-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <561B7E3C.4060908@xilinx.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 12 Oct 2015 11:32:39 +0200
+Subject: [PATCH v3 5/5] ARM: sun5i: Add C.H.I.P DTS
+In-Reply-To: <CAGb2v652CZAqU_S-p14g2sMQfOQYu_BBMnp0MdKR2Q5Y61UHog@mail.gmail.com>
+References: <1444380177-15302-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1444380177-15302-6-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v66JnJwDLYQ40ckYp_OTrLmprYKPhXrV1ME66fEeF=Vewg@mail.gmail.com>
+ <20151011172005.GV2278@lukather>
+ <CAGb2v652CZAqU_S-p14g2sMQfOQYu_BBMnp0MdKR2Q5Y61UHog@mail.gmail.com>
+Message-ID: <20151012093239.GA2278@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2015 12:45 AM, Moritz Fischer wrote:
-> Added addtional bindings required for FPGA Manager operation
-> of the Xilinx Zynq Devc configuration interface.
+On Mon, Oct 12, 2015 at 10:20:37AM +0800, Chen-Yu Tsai wrote:
+> >> > +};
+> >> > +
+> >> > +&reg_ldo2 {
+> >> > +       regulator-min-microvolt = <2700000>;
+> >> > +       regulator-max-microvolt = <3300000>;
+> >> > +       regulator-name = "avcc";
+> >> > +       regulator-always-on;
+> >> > +};
+> >> > +
+> >> > +&reg_ldo5 {
+> >> > +       regulator-min-microvolt = <1800000>;
+> >> > +       regulator-max-microvolt = <1800000>;
+> >> > +       regulator-name = "vcc-1v8";
+> >> > +};
+> >> > +
+> >> > +&reg_usb0_vbus {
+> >> > +       pinctrl-0 = <&chip_vbus_pin>;
+> >> > +       vin-supply = <&reg_vcc5v0>;
+> >> > +       gpio = <&pio 1 10 GPIO_ACTIVE_HIGH>; /* PB10 */
+> >>
+> >>           status = "okay"; ?
+> >
+> > Ah, yes, indeed.
+> >
+> >> The rest looks good.
+> >
+> > Is that an Ack from you if I add the status ?
 > 
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> ---
->  arch/arm/boot/dts/zynq-7000.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> index dc0457e..1a5220e 100644
-> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> @@ -294,6 +294,11 @@
->  		devcfg: devcfg at f8007000 {
->  			compatible = "xlnx,zynq-devcfg-1.0";
->  			reg = <0xf8007000 0x100>;
-> +			interrupt-parent = <&intc>;
-> +			interrupts = <0 8 4>;
-> +			clocks = <&clkc 12>;
-> +			clock-names = "ref_clk";
-> +			syscon = <&slcr>;
->  		};
->  
->  		global_timer: timer at f8f00200 {
-> 
+> Yes. Thanks!
 
-This patch should go via arm-soc tree. That's why please remove it from
-this patchset.
+Great :)
 
-Thanks,
-Michal
+Applied with the extra status and your Ack.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151012/5b98cf2a/attachment-0001.sig>
