@@ -1,40 +1,85 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 12 Oct 2015 11:46:52 -0700
-Subject: [PATCH v7] clk: bcm2835: Add support for programming the audio
- domain clocks
-In-Reply-To: <1444354644-31997-1-git-send-email-eric@anholt.net>
-References: <1444354644-31997-1-git-send-email-eric@anholt.net>
-Message-ID: <20151012184652.GB26883@codeaurora.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 12 Oct 2015 21:21:46 +0200
+Subject: [Linaro-acpi] [PATCH v5 0/5] Provide better MADT subtable sanity
+ checks
+In-Reply-To: <561B5B7E.6080901@linaro.org>
+References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
+ <561B2FCA.1010504@erley.org> <561B5B7E.6080901@linaro.org>
+Message-ID: <1776686.ko2Ldkd9he@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08, Eric Anholt wrote:
-> This adds support for enabling, disabling, and setting the rate of the
-> audio domain clocks.  It will be necessary for setting the pixel clock
-> for HDMI in the VC4 driver and let us write a cpufreq driver.  It will
-> also improve compatibility with user changes to the firmware's
-> config.txt, since our previous fixed clocks are unaware of it.
+On Monday, October 12, 2015 03:04:30 PM Hanjun Guo wrote:
+> On 10/12/2015 11:58 AM, Pat Erley wrote:
+> > On 10/11/2015 08:49 PM, Hanjun Guo wrote:
+> >> On 10/12/2015 11:08 AM, Pat Erley wrote:
+> >>> On 10/05/2015 10:12 AM, Al Stone wrote:
+> >>>> On 10/05/2015 07:39 AM, Rafael J. Wysocki wrote:
+> >>>>> On Wednesday, September 30, 2015 10:10:16 AM Al Stone wrote:
+> >>>>>> On 09/30/2015 03:00 AM, Hanjun Guo wrote:
+> >>>>>>> On 2015/9/30 7:45, Al Stone wrote:
+> >>>>>>>> NB: this patch set is for use against the linux-pm bleeding edge
+> >>>>>>>> branch.
+> >>>>>>>>
+> >>>>>>
+> >>>>>> [snip...]
+> >>>>>>
+> >>>>>>>
+> >>>>>>> For this patch set,
+> >>>>>>>
+> >>>>>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >>>>>>>
+> >>>>>>> Thanks
+> >>>>>>> Hanjun
+> >>>>>>
+> >>>>>> Thanks, Hanjun!
+> >>>>>
+> >>>>> Series applied, thanks!
+> >>>>>
+> >>>>> Rafael
+> >>>>>
+> >>>>
+> >>>> Thanks, Rafael!
+> >>>>
+> >>>
+> >>> Just decided to test out linux-next (to see the new nouveau cleanups).
+> >>> This change set prevents my Lenovo W510 from booting properly.
+> >>>
+> >>> Reverting: 7494b0 "ACPI: add in a bad_madt_entry() function to
+> >>> eventually replace the macro"
+> >>>
+> >>> Gets the system booting again.  I'm attaching my dmesg from the failed
+> >>> boot, who wants the acpidump?
+> >>
+> >> [    0.000000] ACPI: undefined version for either FADT 4.0 or MADT 1
+> >> [    0.000000] ACPI: Error parsing LAPIC address override entry
+> >> [    0.000000] ACPI: Invalid BIOS MADT, disabling ACPI
+> >>
+> >> Seems the MADT revision is not right, could you dump the ACPI MADT
+> >> (APIC) table and send it out? I will take a look :)
+> >>
+> >> Thanks
+> >> Hanjun
+> >
+> > Here ya go, enjoy.  Feel free to CC me on any patches that might fix it.
 > 
-> The firmware also has support for configuring the clocks through the
-> mailbox channel, but the pixel clock setup by the firmware doesn't
-> work, and it's Raspberry Pi specific anyway.  The only conflicts we
-> should have with the firmware would be if we made firmware calls that
-> result in clock management (like opening firmware V3D or ISP access,
-> which we don't support in upstream), or on hardware over-thermal or
-> under-voltage (when the firmware would rewrite PLLB to take the ARM
-> out of overclock).  If that happens, our cached .recalc_rate() results
-> would be incorrect, but that's no worse than our current state where
-> we used fixed clocks.
+> Thanks! I think I had the right guess, the MADT revision is not right
+> for ACPI 4.0:
 > 
-> The existing fixed clocks in the code are left in place to provide
-> backwards compatibility with old device tree files.
+> [000h 0000   4]                    Signature : "APIC"    [Multiple APIC 
+> Description Table (MADT)]
+> [004h 0004   4]                 Table Length : 000000BC
+> [008h 0008   1]                     *Revision : 01*
 > 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> Tested-by: Martin Sperl <kernel@martin.sperl.org>
-> ---
+> I encountered such problem before because the table was just copied from
+> previous version, and without the update for table revision.
+> 
+> I think we may need to ignore the table revision for x86, but restrict
+> it for ARM64, I'd like Al and Rafael's suggestion before I send out a
+> patch.
 
-Applied to clk-next
+As I said before to Al, we definitely can't break systems that worked before
+the commit in question.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks,
+Rafael
