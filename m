@@ -1,48 +1,66 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 12 Oct 2015 16:28:46 +0200
-Subject: [PATCH v2 09/14] ARM: at91: pm: simply call at91_pm_init
+Date: Mon, 12 Oct 2015 16:28:45 +0200
+Subject: [PATCH v2 08/14] clk: at91: pmc: move pmc structures to C file
 In-Reply-To: <1444660131-14954-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1444660131-14954-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1444660131-14954-10-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1444660131-14954-9-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91_pm_init() doesn't return a value, as is the case for its callers,
-simply call it instead of returning its non-existent return value.
+pmc.c is now the only user of struct at91_pmc*, move their definition in
+the C file.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/pm.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/clk/at91/pmc.c | 12 ++++++++++++
+ drivers/clk/at91/pmc.h | 12 ------------
+ 2 files changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 80e277cfcc8b..5c2b60c5a2a1 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -427,7 +427,7 @@ void __init at91sam9260_pm_init(void)
- 	at91_dt_ramc();
- 	at91_pm_data.memctrl = AT91_MEMCTRL_SDRAMC;
- 	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
--	return at91_pm_init();
-+	at91_pm_init();
- }
+diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+index acc8f518b392..3aa886849304 100644
+--- a/drivers/clk/at91/pmc.c
++++ b/drivers/clk/at91/pmc.c
+@@ -29,6 +29,18 @@
  
- void __init at91sam9g45_pm_init(void)
-@@ -435,7 +435,7 @@ void __init at91sam9g45_pm_init(void)
- 	at91_dt_ramc();
- 	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP;
- 	at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
--	return at91_pm_init();
-+	at91_pm_init();
- }
+ #include "pmc.h"
  
- void __init at91sam9x5_pm_init(void)
-@@ -443,5 +443,5 @@ void __init at91sam9x5_pm_init(void)
- 	at91_dt_ramc();
- 	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
- 	at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
--	return at91_pm_init();
-+	at91_pm_init();
- }
++struct at91_pmc_caps {
++	u32 available_irqs;
++};
++
++struct at91_pmc {
++	struct regmap *regmap;
++	int virq;
++	const struct at91_pmc_caps *caps;
++	struct irq_domain *irqdomain;
++	u32 imr;
++};
++
+ void __iomem *at91_pmc_base;
+ EXPORT_SYMBOL_GPL(at91_pmc_base);
+ 
+diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
+index 3b96c53c194c..550a461c7201 100644
+--- a/drivers/clk/at91/pmc.h
++++ b/drivers/clk/at91/pmc.h
+@@ -24,18 +24,6 @@ struct clk_range {
+ 
+ #define CLK_RANGE(MIN, MAX) {.min = MIN, .max = MAX,}
+ 
+-struct at91_pmc_caps {
+-	u32 available_irqs;
+-};
+-
+-struct at91_pmc {
+-	struct regmap *regmap;
+-	int virq;
+-	const struct at91_pmc_caps *caps;
+-	struct irq_domain *irqdomain;
+-	u32 imr;
+-};
+-
+ int of_at91_get_clk_range(struct device_node *np, const char *propname,
+ 			  struct clk_range *range);
+ 
 -- 
 2.1.4
