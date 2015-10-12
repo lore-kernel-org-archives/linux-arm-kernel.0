@@ -1,47 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 12 Oct 2015 09:57:40 +0200
-Subject: [PATCH 1/9] arm64/efi: split off EFI init and runtime code for
- reuse by 32-bit ARM
-In-Reply-To: <20151010205311.GF2723@codeblueprint.co.uk>
-References: <1443719063-6832-1-git-send-email-ard.biesheuvel@linaro.org>
- <1443719063-6832-2-git-send-email-ard.biesheuvel@linaro.org>
- <20151010205311.GF2723@codeblueprint.co.uk>
-Message-ID: <CAKv+Gu8ESCXWnzz-7T9YGCn_cBT_Knx7u17P0uky31mU22j1EA@mail.gmail.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Mon, 12 Oct 2015 08:12:42 +0000
+Subject: [PATCH 6/6] watchdog: sama5d4: try to set timeout from device
+ tree first
+In-Reply-To: <20151012075001.GB3558@piout.net>
+References: <1444340074-15437-1-git-send-email-sylvain.rochet@finsecur.com>
+ <1444340074-15437-7-git-send-email-sylvain.rochet@finsecur.com>
+ <20151012075001.GB3558@piout.net>
+Message-ID: <B256D81BAE5131468A838E5D7A243641D632216B@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 October 2015 at 22:53, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> On Thu, 01 Oct, at 07:04:15PM, Ard Biesheuvel wrote:
->> This splits off the early EFI init and runtime code that
->> - discovers the EFI params and the memory map from the FDT, and installs
->>   the memblocks and config tables.
->> - prepares and installs the EFI page tables so that UEFI Runtime Services
->>   can be invoked at the virtual address installed by the stub.
->>
->> This will allow it to be reused for 32-bit ARM.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/efi.c            | 363 +-------------------
->>  drivers/firmware/efi/Makefile      |   4 +-
->>  drivers/firmware/efi/arm-init.c    | 214 ++++++++++++
->>  drivers/firmware/efi/arm-runtime.c | 191 ++++++++++
->>  4 files changed, 409 insertions(+), 363 deletions(-)
->
-> [...]
->
->> +static int uefi_debug __initdata;
->> +static int __init uefi_debug_setup(char *str)
->> +{
->> +     uefi_debug = 1;
->> +
->> +     return 0;
->> +}
->> +early_param("uefi_debug", uefi_debug_setup);
->
-> Was this hunk an unintentional reintroduction of the code Leif deleted
-> in commit a9cc0cf5701b ("arm64: Use core efi=debug instead of
-> uefi_debug command line parameter")?
->
 
-Indeed. I will get rid of it on v2
+
+> -----Original Message-----
+> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
+> Sent: 2015?10?12? 15:50
+> To: Sylvain Rochet
+> Cc: Guenter Roeck; Boris BREZILLON; linux-kernel at vger.kernel.org; Ferre,
+> Nicolas; Desroches, Ludovic; linux-arm-kernel at lists.infradead.org; Yang,
+> Wenyou; Wim Van Sebroeck
+> Subject: Re: [PATCH 6/6] watchdog: sama5d4: try to set timeout from device tree
+> first
+> 
+> Hi Sylvain,
+> 
+> The rest of the series looks good to me, one comment below:
+> 
+> On 08/10/2015 at 23:34:34 +0200, Sylvain Rochet wrote :
+> > watchdog_init_timeout function doesn't try to get the "timeout-sec" DT
+> > property if timeout_parm is not zero. This change makes this DT
+> > property working for the sama5d4 watchdog driver.
+> >
+> 
+> While I'm not sure of the feasibility, I think that the module parameter should
+> override the DT property.
+
+The patch should be right, the DT property overrides the module parameter.
+
+If the DT property is not a valid value, it uses the default value,  initialized with the module parameter at the beginning of probe.
+
+> 
+> --
+> Alexandre Belloni, Free Electrons
+> Embedded Linux, Kernel and Android engineering http://free-electrons.com
+
+Best Regards,
+Wenyou Yang
