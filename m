@@ -1,54 +1,99 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 13 Oct 2015 03:16:03 +0530
-Subject: [PATCH v2 1/4] ARM: dts: dra7: Add dt node for the sycon pcie
-In-Reply-To: <20151012212149.GZ23801@atomide.com>
-References: <1442323985-29939-1-git-send-email-kishon@ti.com>
- <1442323985-29939-2-git-send-email-kishon@ti.com>
- <20151012212149.GZ23801@atomide.com>
-Message-ID: <561C2A1B.3000201@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Oct 2015 14:46:54 -0700
+Subject: [PATCH 00/37] ARM: dts: Fix fixed regulators enable GPIO polarity
+In-Reply-To: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <20151012214654.GE23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Tuesday 13 October 2015 02:51 AM, Tony Lindgren wrote:
-> * Kishon Vijay Abraham I <kishon@ti.com> [150915 06:37]:
->> Add new device tree node for the control module register space where
->> PCIe registers are present.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  arch/arm/boot/dts/dra7.dtsi |    5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
->> index 5d65db9..0769b5d 100644
->> --- a/arch/arm/boot/dts/dra7.dtsi
->> +++ b/arch/arm/boot/dts/dra7.dtsi
->> @@ -154,6 +154,11 @@
->>  					compatible = "syscon";
->>  					reg = <0x1c04 0x0020>;
->>  				};
->> +
->> +				scm_conf_pcie: tisyscon at 1c24 {
->> +					compatible = "syscon";
->> +					reg = <0x1c24 0x0024>;
->> +				};
->>  			};
->>  
->>  			cm_core_aon: cm_core_aon at 5000 {
+* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [151012 14:17]:
+> Hello,
 > 
+> While working on regulators, GPIOs and DT I noticed that many of our DT source
+> files incorrectly describe fixed regulators. The common error patterns are
 > 
-> Why don't you just extend the existing scm_conf1 area? This is not all pcie
-> specific for scm_conf_pcie, at least for PLLEN_CONTROL, RMII_CLK_SETTING
-> and MUXSEL_32K_CLKIN.
+> - Usage of the undefined (and never parsed) enable-active-low property
+> - Usage of the enable-active-high property without specifying an enable GPIO
+> - Typos in the enabl GPIO property name (gpios instead of gpio)
+> - Mismatch between the enable-active-high property (or the lack thereof) and
+>   the enable GPIO flags
+> 
+> This patch series fixes those issues in all the DT sources after locating the
+> errors using the following script.
+> 
+> ------------------------------------------------------------------------------
+> #!/bin/sh
+> 
+> echo $1
+> cat $1 | awk '
+> BEGIN {
+> 	open_drain = 0;
+> 	active_high = 0;
+> 	gpio = 0;
+> 	flags = 0;
+> }
+> 
+> match($0, /([a-zA-Z0-9 at _-]*) {/, ary) {
+> 	name = ary[1];
+> }
+> 
+> /compatible.*"regulator-fixed"/ {
+> 	found = 1;
+> }
+> 
+> /enable-active-high/ {
+> 	active_high = 1;
+> }
+> 
+> /gpio-open-drain/ {
+> 	open_drain = 1;
+> }
+> 
+> match($0, /gpio += <.* ([^ ]*)>/, ary) {
+> 	gpio = 1;
+> 	flags = ary[1];
+> 	if (flags == 0)
+> 		flags = "GPIO_ACTIVE_HIGH";
+> }
+> 
+> /}/ {
+> 	if (found) {
+> 		if (gpio) {
+> 			print "\t" name ": active high " active_high " " flags " open drain " open_drain;
+> 			if ((active_high && flags == "GPIO_ACTIVE_LOW") ||
+> 			    (!active_high && flags == "GPIO_ACTIVE_HIGH"))
+> 				print "WARNING: enable-active-high and flags do not match"
+> 		} else {
+> 			if (active_high)
+> 				print "WARNING: active high without GPIO"
+> 			if (open_drain)
+> 				print "WARNING: open drain without GPIO"
+> 		}
+> 	}
+> 
+> 	gpio = 0;
+> 	found = 0;
+> 	active_high = 0;
+> 	open_drain = 0;
+> 	flags = 0;
+> }
+> '
+> ------------------------------------------------------------------------------
+> 
+> All patches except for the ones touching omap3-beagle-xm and omap3-overo-base
+> are untested as I lack test hardware.
+> 
+> As there's no dependency between the patches touching different source files
+> the appropriate maintainers could take their share of the patches in their
+> tree. Alternatively I could send a single pull request after collecting all
+> acks but that might be more complex.
 
-scm_conf_pcie has only PCIe registers (it starts at 0x4A003C24).
-PLLEN_CONTROL and others are at 0x4A003C14 as per
-DRA75x_DRA74x_SR1.1_NDA_TRM_vW.
+Nice clean-up. For omaps, there's an earlier patch posted by
+Javier Martinez Canillas <javier@osg.samsung.com> as "[PATCH] ARM: dts: Use
+defined GPIO constants in flags cell for OMAP2+ boards". Can you guys do some
+cross checking and let me know which combination I should appluy for omaps?
 
-Since PCIe itself has a bunch of registers for itself, thought of
-creating a separate dt node. But I can extend scm_conf1 area.
+Regards,
 
-Thanks
-Kishon
+Tony
