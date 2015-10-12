@@ -1,41 +1,51 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 12 Oct 2015 15:44:35 +0200
-Subject: [PATCH v3 1/7] mmc: core: move ocr-bit to voltage translation
- into separate function
-In-Reply-To: <201510122154.fUL0WlRf%fengguang.wu@intel.com>
-References: <201510122154.fUL0WlRf%fengguang.wu@intel.com>
-Message-ID: <1669315.MIcYHSjc3k@diego>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Oct 2015 15:44:49 +0200
+Subject: [PATCH] ARM: pxa: fix pxa3xx DFI lockup hack
+Message-ID: <5287252.pkh9x0t1Y6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Some recently added code to avoid a bug introduced a build error
+when CONFIG_PM is disabled and a macro is hidden:
 
-Am Montag, 12. Oktober 2015, 21:26:04 schrieb kbuild test robot:
-> [auto build test WARNING on rockchip/for-next -- if it's inappropriate base,
-> please suggest rules for selecting the more suitable base]
-> 
-> url:   
-> https://github.com/0day-ci/linux/commits/Heiko-Stuebner/mmc-dw_mmc-rockchip
-> -allow-tuning-using-the-clk-phase-api/20151012-205613 config:
-> x86_64-randconfig-x011-10121751 (attached as .config)
-> reproduce:
->         # save the attached .config to linux build tree
->         make ARCH=x86_64
-> 
-> All warnings (new ones prefixed by >>):
-> >> drivers/mmc/core/core.c:1277:12: warning: 'mmc_ocrbitnum_to_vdd' defined
-> >> but not used [-Wunused-function]
->     static int mmc_ocrbitnum_to_vdd(int vdd_bit, int *min_uV, int *max_uV)
->                ^
+arch/arm/mach-pxa/pxa3xx.c: In function 'pxa3xx_init':
+arch/arm/mach-pxa/pxa3xx.c:439:3: error: 'NDCR' undeclared (first use in this function)
+   NDCR = (NDCR & ~NDCR_ND_ARB_EN) | NDCR_ND_ARB_CNTL;
+   ^
 
-I'm not 100% sure I understand that warning. Is it just because we're ignoring 
-the return value in the current first user of the function? [Which is done, 
-because we already tested for the vdd_bit != 0 just before invoking 
-mmc_ocrbitnum_to_vdd .
+This moves the macro outside of the #ifdef so it can be
+referenced correctly.
 
-The second user added in the following patch then checks the return value. So 
-I guess this should stay as it is? I guess Ulf's call - maybe he wants it 
-differently anyway ;-) .
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: adf3442cc890 ("ARM: pxa: fix DFI bus lockups on startup")
+---
+We merged the patch that introduced this as a fix for 4.3, so we should
+probably add this one too.
 
-
-Heiko
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index 06005d3f2ba3..20ce2d386f17 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -42,10 +42,6 @@
+ #define PECR_IS(n)	((1 << ((n) * 2)) << 29)
+ 
+ extern void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int));
+-#ifdef CONFIG_PM
+-
+-#define ISRAM_START	0x5c000000
+-#define ISRAM_SIZE	SZ_256K
+ 
+ /*
+  * NAND NFC: DFI bus arbitration subset
+@@ -54,6 +50,11 @@ extern void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int));
+ #define NDCR_ND_ARB_EN		(1 << 12)
+ #define NDCR_ND_ARB_CNTL	(1 << 19)
+ 
++#ifdef CONFIG_PM
++
++#define ISRAM_START	0x5c000000
++#define ISRAM_SIZE	SZ_256K
++
+ static void __iomem *sram;
+ static unsigned long wakeup_src;
+ 
