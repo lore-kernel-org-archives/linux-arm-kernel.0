@@ -1,40 +1,49 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 12 Oct 2015 19:03:44 +0200
-Subject: [PATCH] ARM: pxa: fix pxa3xx DFI lockup hack
-In-Reply-To: <5287252.pkh9x0t1Y6@wuerfel> (Arnd Bergmann's message of "Mon, 12
- Oct 2015 15:44:49 +0200")
-References: <5287252.pkh9x0t1Y6@wuerfel>
-Message-ID: <878u786mtr.fsf@belgarion.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Oct 2015 18:10:18 +0100
+Subject: [PATCH RFC 1/2] dt-bindings: simplefb: Support a list of
+ regulator supply properties
+In-Reply-To: <1444669458-5588-2-git-send-email-wens@csie.org>
+References: <1444669458-5588-1-git-send-email-wens@csie.org>
+ <1444669458-5588-2-git-send-email-wens@csie.org>
+Message-ID: <20151012171018.GB3659@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Tue, Oct 13, 2015 at 01:04:17AM +0800, Chen-Yu Tsai wrote:
+> The physical display tied to the framebuffer may have regulators
+> providing power to it, such as power for LCDs or interface conversion
+> chips.
+> 
+> The number of regulators in use may vary, but the regulator supply
+> binding can not be a list. Work around this by adding a "num-supplies"
+> property to communicate the number of supplies, and a list of 0 ~ N
+> "vinN-supply" properties for the actual regulator supply.
 
-> Some recently added code to avoid a bug introduced a build error
-> when CONFIG_PM is disabled and a macro is hidden:
->
-> arch/arm/mach-pxa/pxa3xx.c: In function 'pxa3xx_init':
-> arch/arm/mach-pxa/pxa3xx.c:439:3: error: 'NDCR' undeclared (first use in this function)
->    NDCR = (NDCR & ~NDCR_ND_ARB_EN) | NDCR_ND_ARB_CNTL;
->    ^
->
-> This moves the macro outside of the #ifdef so it can be
-> referenced correctly.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: adf3442cc890 ("ARM: pxa: fix DFI bus lockups on startup")
+This is getting more complicated by the minute...
+
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
-> We merged the patch that introduced this as a fix for 4.3, so we should
-> probably add this one too.
-Oh yes, didn't see that ifdef, and all my non-regression defconfigs have
-CONFIG_PM ...
+>  .../devicetree/bindings/video/simple-framebuffer.txt       | 14 ++++++++++----
+>  1 file changed, 10 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+> index 4474ef6e0b95..0cc43e1be8b5 100644
+> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+> @@ -47,10 +47,14 @@ Required properties:
+>    - a8b8g8r8 (32-bit pixels, d[31:24]=a, d[23:16]=b, d[15:8]=g, d[7:0]=r).
+>  
+>  Optional properties:
+> -- clocks : List of clocks used by the framebuffer. Clocks listed here
+> -           are expected to already be configured correctly. The OS must
+> -           ensure these clocks are not modified or disabled while the
+> -           simple framebuffer remains active.
+> +- clocks : List of clocks used by the framebuffer.
+> +- num-supplies : The number of regulators used by the framebuffer.
+> +- vinN-supply : The N-th (from 0) regulator used by the framebuffer.
 
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+I don't see why you need num-supplies. Why not just try probing
+vin${N}-supply until such a property isn't present in the DT?
 
-So do you want to take it directly (my preferred solution) or do you want a
-proper pull request for in the -rc5 timeframe ?
-
-Cheers.
-
--- 
-Robert
+Thanks,
+Mark.
