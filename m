@@ -1,103 +1,42 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 12 Oct 2015 21:04:32 +0800
-Subject: [Linaro-acpi] [PATCH v5 0/5] Provide better MADT subtable sanity
- checks
-In-Reply-To: <561B8114.4060800@arm.com>
-References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
- <560BA4C9.7090607@huawei.com> <560C0968.6020904@redhat.com>
- <2808057.teMg2oCLf6@vostro.rjw.lan> <5612AF64.4060900@redhat.com>
- <561B2442.9050600@erley.org> <561B2DAD.5070601@linaro.org>
- <561B2FCA.1010504@erley.org> <561B5B7E.6080901@linaro.org>
- <561B8114.4060800@arm.com>
-Message-ID: <561BAFE0.9090401@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Oct 2015 15:05:27 +0200
+Subject: [PATCH] sata/mvebu: use #ifdef around suspend/resume code
+Message-ID: <5727002.l6plqmRKB3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2015 05:44 PM, Sudeep Holla wrote:
->
->
-> On 12/10/15 08:04, Hanjun Guo wrote:
->> On 10/12/2015 11:58 AM, Pat Erley wrote:
->>> On 10/11/2015 08:49 PM, Hanjun Guo wrote:
->>>> On 10/12/2015 11:08 AM, Pat Erley wrote:
->>>>> On 10/05/2015 10:12 AM, Al Stone wrote:
->>>>>> On 10/05/2015 07:39 AM, Rafael J. Wysocki wrote:
->>>>>>> On Wednesday, September 30, 2015 10:10:16 AM Al Stone wrote:
->>>>>>>> On 09/30/2015 03:00 AM, Hanjun Guo wrote:
->>>>>>>>> On 2015/9/30 7:45, Al Stone wrote:
->>>>>>>>>> NB: this patch set is for use against the linux-pm bleeding edge
->>>>>>>>>> branch.
->>>>>>>>>>
->>>>>>>>
->>>>>>>> [snip...]
->>>>>>>>
->>>>>>>>>
->>>>>>>>> For this patch set,
->>>>>>>>>
->>>>>>>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>>>>>>
->>>>>>>>> Thanks
->>>>>>>>> Hanjun
->>>>>>>>
->>>>>>>> Thanks, Hanjun!
->>>>>>>
->>>>>>> Series applied, thanks!
->>>>>>>
->>>>>>> Rafael
->>>>>>>
->>>>>>
->>>>>> Thanks, Rafael!
->>>>>>
->>>>>
->>>>> Just decided to test out linux-next (to see the new nouveau cleanups).
->>>>> This change set prevents my Lenovo W510 from booting properly.
->>>>>
->>>>> Reverting: 7494b0 "ACPI: add in a bad_madt_entry() function to
->>>>> eventually replace the macro"
->>>>>
->>>>> Gets the system booting again.  I'm attaching my dmesg from the failed
->>>>> boot, who wants the acpidump?
->>>>
->>>> [    0.000000] ACPI: undefined version for either FADT 4.0 or MADT 1
->>>> [    0.000000] ACPI: Error parsing LAPIC address override entry
->>>> [    0.000000] ACPI: Invalid BIOS MADT, disabling ACPI
->>>>
->>>> Seems the MADT revision is not right, could you dump the ACPI MADT
->>>> (APIC) table and send it out? I will take a look :)
->>>>
->>>> Thanks
->>>> Hanjun
->>>
->>> Here ya go, enjoy.  Feel free to CC me on any patches that might fix it.
->>
->> Thanks! I think I had the right guess, the MADT revision is not right
->> for ACPI 4.0:
->>
->> [000h 0000   4]                    Signature : "APIC"    [Multiple APIC
->> Description Table (MADT)]
->> [004h 0004   4]                 Table Length : 000000BC
->> [008h 0008   1]                     *Revision : 01*
->>
->> I encountered such problem before because the table was just copied from
->> previous version, and without the update for table revision.
->>
->> I think we may need to ignore the table revision for x86, but restrict
->> it for ARM64, I'd like Al and Rafael's suggestion before I send out a
->> patch.
->>
->
-> Instead of just removing the check completely on x86, IMO restrict it to
-> some newer/later version of ACPI so you can still force vendors to fix
-> their ACPI tables at-least in future.
+The newly added suspend/resume implementation for ahci_mvebu causes
+a link error when CONFIG_PM_SUSPEND is disabled:
 
-I agree.
+ERROR: "ahci_platform_suspend_host" [drivers/ata/ahci_mvebu.ko] undefined!
+ERROR: "ahci_platform_resume_host" [drivers/ata/ahci_mvebu.ko] undefined!
 
->
-> It would be good to get such sanity check in the tools used to build
-> those tables, but yes since such static tables can be built in many
-> ways, its difficult to deal it in all those tools.
+This adds the same #ifdef here that exists in the ahci_platform driver
+which defines the above functions.
 
-At least we can check that in the FWTS. :)
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: d6ecf1581488 ("ata: ahci_mvebu: add suspend/resume support")
 
-Thanks
-Hanjun
+diff --git a/drivers/ata/ahci_mvebu.c b/drivers/ata/ahci_mvebu.c
+index 8490d37aee2a..5745bcce5e77 100644
+--- a/drivers/ata/ahci_mvebu.c
++++ b/drivers/ata/ahci_mvebu.c
+@@ -62,6 +62,7 @@ static void ahci_mvebu_regret_option(struct ahci_host_priv *hpriv)
+ 	writel(0x80, hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_DATA);
+ }
+ 
++#ifdef CONFIG_PM_SUSPEND
+ static int ahci_mvebu_suspend(struct platform_device *pdev, pm_message_t state)
+ {
+ 	return ahci_platform_suspend_host(&pdev->dev);
+@@ -81,6 +82,10 @@ static int ahci_mvebu_resume(struct platform_device *pdev)
+ 
+ 	return ahci_platform_resume_host(&pdev->dev);
+ }
++#else
++#define ahci_mvebu_suspend NULL
++#define ahci_mvebu_resume NULL
++#endif
+ 
+ static const struct ata_port_info ahci_mvebu_port_info = {
+ 	.flags	   = AHCI_FLAG_COMMON,
