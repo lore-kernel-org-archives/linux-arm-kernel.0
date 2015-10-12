@@ -1,54 +1,45 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 12 Oct 2015 09:12:15 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Cleanup for v4.4
-In-Reply-To: <13543534.MsGb8OrGPX@wuerfel>
-References: <cover.1442478814.git.horms+renesas@verge.net.au>
- <5419864.uERWTbJ9BK@wuerfel>
- <CAMuHMdUkzv9BE4PDjm3Qkk87f2Lq6Bn-CNb+r3dtSWhbkN39Wg@mail.gmail.com>
- <13543534.MsGb8OrGPX@wuerfel>
-Message-ID: <CAMuHMdX8PPprPnYNfqkof9EmT7M1YHs3vtPQ1PY=RCwGdq2zhg@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 12 Oct 2015 09:15:44 +0200
+Subject: [PATCH v2] PCI: layerscape: Add PCIe support for LS1043a and
+ LS2080a
+In-Reply-To: <20151011191027.GA29221@localhost>
+References: <1442481219-28299-1-git-send-email-Minghuan.Lian@freescale.com>
+ <20151007175725.GC27633@localhost>
+ <20151011191027.GA29221@localhost>
+Message-ID: <20151012091544.7dbbe330@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Bjorn,
 
-On Tue, Oct 6, 2015 at 8:42 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 06 October 2015 17:47:37 Geert Uytterhoeven wrote:
->> On Tue, Oct 6, 2015 at 3:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Thursday 17 September 2015 17:59:33 Simon Horman wrote:
->> >> Please consider these Renesas ARM based SoC cleanup for v4.4.
->> >>
->> >>  24 files changed, 4 insertions(+), 2687 deletions(-)
->> >>
->> >> Is a pleasing diffstat if I do say so myself.
->> >>
->> >> Of particular note the last legacy board code for Renesas ARM based SoCs,
->> >> that of the bockw board, is removed in this pull request.
->> >
->> > After a long delay in response, I've merged it now into next/cleanup.
->> >
->> > So the transition is complete and you beat me with the multiplatform
->> > conversion that I have pending for the other ARMv7 platforms, nice work!
->>
->> Thanks for pulling!
->>
->> Now I can start out sending my platform data removal series...
->
-> Ok, cool.
->
-> I don't think that there is generally a need to wait before sending
-> stuff out that depends on pull requests to get merged.
+On Sun, 11 Oct 2015 14:10:27 -0500, Bjorn Helgaas wrote:
 
-Seems like several subsystem maintainers are uncomfortable with taking
-these patches even after the legacy removal has hit arm-soc/for-next...
+> > driver/of/irq.c  void of_msi_configure(struct device *dev, struct
+> > device_node *np) will bind "msi-parent" to each device if there is
+> > "msi-parent" handler. The PCIe driver do not need to do anything. If
+> > we do not check "msi-parent" here, we will have no chance to check it.
+> > The common code of 'of' and 'pci' bus driver will not complain,
+> > because the msi controller may be found by other way.
+> 
+> Hmm.   In mvebu_pcie_msi_enable() and xgene_pcie_msi_enable(), we
+> also look for "msi-parent".  If that fails, mvebu continues silently
+> and xgene complains (but only if CONFIG_PCI_MSI=y).
 
-Gr{oetje,eeting}s,
+I don't really have the context of the discussion here. But the reason
+why the mvebu pcie driver silently continues if msi-parent is missing
+is because we initially introduced the PCIe mvebu Device Tree binding
+without MSI support. When we later added MSI support thanks to the
+msi-parent property, we wanted to preserve backward compatibility with
+old DTs that didn't had the msi-parent property. Such DTs would
+continue to work, albeit without the MSI functionality obviously.
 
-                        Geert
+Other drivers that had the MSI functionality from day 1 may want to
+make such a property mandatory rather than optional.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Best regards,
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
