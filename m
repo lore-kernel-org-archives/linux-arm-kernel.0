@@ -1,31 +1,72 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Oct 2015 18:50:26 +0100
-Subject: Run armv7 32 bit userspace on aarch64
-In-Reply-To: <561BF011.80205@linaro.org>
-References: <5615A0E1.1050402@linaro.org> <56184079.1040905@linaro.org>
- <56185B98.2060400@linaro.org> <6978725.cJktLf4M1X@wuerfel>
- <561BED2C.8080008@linaro.org> <561BF011.80205@linaro.org>
-Message-ID: <20151012175026.GL16124@arm.com>
+From: jonmason@broadcom.com (Jon Mason)
+Date: Mon, 12 Oct 2015 13:52:02 -0400
+Subject: [PATCH 09/10] clk: ns2: add clock support for Broadcom Northstar
+ 2 SoC
+In-Reply-To: <20151010001915.GY26883@codeaurora.org>
+References: <1443826665-17570-1-git-send-email-jonmason@broadcom.com>
+ <1443826665-17570-10-git-send-email-jonmason@broadcom.com>
+ <20151010001915.GY26883@codeaurora.org>
+Message-ID: <20151012175202.GE20867@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 10:38:25AM -0700, Shi, Yang wrote:
-> BTW, it may be related to unaligned address.
+On Fri, Oct 09, 2015 at 05:19:15PM -0700, Stephen Boyd wrote:
+> On 10/02, Jon Mason wrote:
+> > diff --git a/drivers/clk/bcm/clk-ns2.c b/drivers/clk/bcm/clk-ns2.c
+> > new file mode 100644
+> > index 0000000..1d08281
+> > --- /dev/null
+> > +++ b/drivers/clk/bcm/clk-ns2.c
+> > @@ -0,0 +1,290 @@
+> > +/*
+> > + * Copyright (C) 2015 Broadcom Corporation
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation version 2.
+> > + *
+> > + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> > + * kind, whether express or implied; without even the implied warranty
+> > + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/err.h>
+> > +#include <linux/clk-provider.h>
+> > +#include <linux/io.h>
+> > +#include <linux/of.h>
+> > +#include <linux/clkdev.h>
 > 
-> init[1]: unhandled level 3 translation fault (11) at 0x43acfad3, esr
-> 0x92000047
-> pgd = ffff80007b8be000
-> [43acfad3] *pgd=00000000fb8c5003, *pud=00000000fb8c1003,
-> *pmd=00000000fb8c2003, *pte=0000000000000000
+> clkdev looks unused here too?
 > 
-> The userspace is trying to write to 0x43acfad3, the permission is
-> readonly.
+> > +#include <linux/of_address.h>
+> > +#include <linux/delay.h>
+> 
+> And this one?
 
-What's the instruction making the access? If it's a store-multiple, then
-we don't support that in the arm64 kernel. It would be nice if the 32-bit
-kernel had the same behaviour, but the patch seems to have stalled and
-probably doesn't apply anymore:
+Yes, already caught this when you mentioned the other file :)
 
-  http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7944/1
+> 
+> > +
+> > +#include <dt-bindings/clock/bcm-ns2.h>
+> > +#include "clk-iproc.h"
+> > +
+> > +#define reg_val(o, s, w) { .offset = o, .shift = s, .width = w, }
+> 
+> I guess we missed this one already, but this isn't a macro
+> resembling a function. Kernel style is to capitalize this sort of
+> macro.
 
-Will
+I agree, but I was following prior example in
+drivers/clk/bcm/clk-cygnus.c.  I can make the changes here and do a
+patch for that file making the necessary changes as well.  Just let me
+know your preference.
+
+Thanks,
+Jon
+
+> 
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
