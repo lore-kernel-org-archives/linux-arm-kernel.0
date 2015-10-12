@@ -1,132 +1,132 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 12 Oct 2015 14:38:31 +0200
-Subject: [PATCH 3/3] fpga manager: Adding FPGA Manager support for Xilinx
- Zynq 7000
-In-Reply-To: <561BA60C.6010106@topic.nl>
-References: <1444344307-22509-1-git-send-email-moritz.fischer@ettus.com>
- <1444344307-22509-4-git-send-email-moritz.fischer@ettus.com>
- <20151009163336.GM10631@jcartwri.amer.corp.natinst.com>
- <CAAtXAHea7GZDLez5kYas2PFQ-=KmS_on8WxFDCuvVb4Nh05a_w@mail.gmail.com>
- <561B9687.1070103@xilinx.com> <561BA60C.6010106@topic.nl>
-Message-ID: <561BA9C7.6070003@xilinx.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 12 Oct 2015 21:42:25 +0900
+Subject: [PATCH 3/3] ARM: dts: exynos5422-odroidxu3: Added UHS-I bus speed
+ support
+In-Reply-To: <CANAwSgSk0yHGvnoVoTk9MnUqjyEw1+yzH=C-1s_wxVkpGRHCEg@mail.gmail.com>
+References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
+ <1444578364-1384-3-git-send-email-linux.amoon@gmail.com>
+ <561B48B7.1040201@samsung.com>
+ <CANAwSgSk0yHGvnoVoTk9MnUqjyEw1+yzH=C-1s_wxVkpGRHCEg@mail.gmail.com>
+Message-ID: <561BAAB1.4020203@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+W dniu 12.10.2015 o 19:46, Anand Moon pisze:
+> Hi Krzysztof,
+> 
+> On 12 October 2015 at 11:14, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+>> On 12.10.2015 00:46, Anand Moon wrote:
+>>> Added support for UHS-I bus speed 50MB/s (SDR50, DDR50) 104MB/s (SDR104)
+>>
+>> This description is not entirely correct. The MMC driver already
+>> supports these UHS speeds (you did not any code) so you rather enabled
+>> it (description of bindings says "is supported").
+>>
+>> You mentioned DDR50 but I don't see respective property below.
+> Looks like I missed it, I will add this in the next patch,
+>>
+>> How do you know that these modes are really supported? I don't know. Can
+>> you convince me?
 
-On 10/12/2015 02:22 PM, Mike Looijmans wrote:
-> On 12-10-15 13:16, Michal Simek wrote:
+That part was not answered...
+
 >>
->>>>> +static int zynq_fpga_ops_write(struct fpga_manager *mgr,
->>>>> +                            const char *buf, size_t count)
->>>>> +{
->>>>> +     struct zynq_fpga_priv *priv;
->>>>> +     int err;
->>>>> +     char *kbuf;
->>>>> +     size_t i, in_count;
->>>>> +     dma_addr_t dma_addr;
->>>>> +     u32 transfer_length = 0;
->>>>> +     bool endian_swap = false;
->>>>> +
->>>>> +     in_count = count;
->>>>> +     priv = mgr->priv;
->>>>> +
->>>>> +     kbuf = dma_alloc_coherent(priv->dev, count, &dma_addr,
->>>>> GFP_KERNEL);
->>>>> +     if (!kbuf)
->>>>> +             return -ENOMEM;
->>>>> +
->>>>> +     memcpy(kbuf, buf, count);
->>>>> +
->>>>> +     /* look for the sync word */
->>>>> +     for (i = 0; i < count - 4; i++) {
->>>>> +             if (memcmp(kbuf + i, "\x66\x55\x99\xAA", 4) == 0) {
->>>>> +                     dev_dbg(priv->dev, "Found normal sync word\n");
->>>>> +                     endian_swap = false;
->>>>> +                     break;
->>>>> +             }
->>
->> This is bin format
->>
->>>>> +             if (memcmp(kbuf + i, "\xAA\x99\x55\x66", 4) == 0) {
->>>>> +                     dev_dbg(priv->dev, "Found swapped sync word\n");
->>>>> +                     endian_swap = true;
->>>>> +                     break;
->>>>> +             }
->>
->> This is bit format from header
->>
->>>>> +     }
->>>>
->>>> How much control do we have over mandating the format of firmware at
->>>> this point?  It'd be swell if we could just mandate a specific
->>>> endianness, and leave this munging to usermode.
+> 
 >>>
->>> That's a good question. Personally I do only care about one of both,
->>> but that's just because I get to decide for my targets...
->>> Opinions from the Xilinx guys?
+>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>>
+>>> ---
+>>> Changes based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v4.4-next/dt-samsung branch
+>>>
+>>> Changes Fixed the UHS-I bus speed detedtion on cold boot.
 >>
->> Don't know full history about this but in past bitstream in BIT format
->> was used. Which is header (partially decoding in u-boot for example)
->> with data.
->> On zynq native format is BIN which is format without header and data is
->> swapped.
->> This code just detects which format is used. If BIT, header is skipped
->> and data is swapped to BIN format.
+>> I don't get what is exactly fixed here. What was the error? What is the
+>> outcome of this fix? The log below is before or after?
 >>
->> Back to origin question if this is something what can be handled from
->> user space. And answer is - yes it can be handled there.
->> But based on my experience it is very useful to be able to handle BIT
->> because it is built by tools by default.
->> Also with BIN format you are loosing record what this data bitstream
->> targets. Header in BIT gives you at least some ideas.
+>> Best regards,
+>> Krzysztof
+>>
+>>>
+>>> [    2.439806] mmc_host mmc1: Bus speed (slot 0) = 100000000Hz (slot req 100000000Hz, actual 100000000HZ div = 0)
+>>> [    2.449729] mmc1: new ultra high speed SDR50 SDHC card at address aaaa
+>>> [    2.455984] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
+>>> [    2.461743]  mmcblk0: p1 p2
+>>
+>>> ---
+>>>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 4 ++++
+>>>  1 file changed, 4 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>> index 58c06d3..ba4a87b 100644
+>>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>> @@ -364,6 +364,10 @@
+>>>       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+>>>       bus-width = <4>;
+>>>       cap-sd-highspeed;
+>>> +     sd-uhs-sdr12;
+>>> +     sd-uhs-sdr25;
+>>> +     sd-uhs-sdr50;
+>>> +     sd-uhs-sdr104;
+>>>  };
+>>>
+>>>  &pinctrl_0 {
+>>>
+>>
 > 
-> People should stop using "cat" to program the FPGA and use a userspace
-> tool instead. I've already released such tools under GPL, so anyone can
-> pick up on it and extend it as required.
+> Changes were made to support Sandisk Ultra UHS-I class 10 card support.
+> OdroidXU3/XU4 board would not boot up using this card.
+> 
+> Depending on the capability of the UHS-I card, the speed of the card
+> is selected.
+> I have just added the enhance capability feature to support them.
 
-Link?
+So without these capabilities mentioned microSD card cannot be used? So
+I have a UHS-I card, that one exactly:
+http://www.samsung.com/us/support/owners/product/MB-MP32D/APC
 
-This is fpga manager based driver where "cat" won't be used.
+It works:
+[    2.628365] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot req
+50000000Hz, actual 50000000HZ div = 0)
+[    2.693296] mmc1: new high speed SDHC card at address 0001
+[    2.703867] mmcblk0: mmc1:0001 00000 29.8 GiB
+[    2.708406]  mmcblk0: p1 p2
+
+This is just HS mode.
+
+In the same time isn't UHS-I backward compatible? Your report seems
+surprising.
+
+Best regards,
+Krzysztof
 
 > 
-> The header for the "bit" format is completely ignored (you can't even
-> use it to determine if the bitstream is compatible with the current
-> device) so there's no point in carrying it around. 
-
-up2you what you want to do with it. If you work with different boards
-with different FPGAs it is at least helpful to know if X.bit target this
-or that board. Unfortunately I am not aware about any public document
-which describe what there is written.
-
-> On the zynq, doing
-> the "swap" in userspace was measurably faster than having the driver
-> handle it, and that was even without using NEON instructions for byte
-> swapping.
+> On warm boot: i.e reboot of the board.
+> [    4.649073] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot
+> req 50000000Hz, actual 50000000HZ div = 0)
+> [    4.657555] mmc1: new high speed SDHC card at address aaaa
+> [    4.663787] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
+> [    4.669206]  mmcblk0: p1 p2
 > 
-> I admit that being able to do "cat static.bit > /dev/xdevcfg" has had
-> its uses. But it's not something that belongs in mainline Linux.
-
-It is about comfort but I have really not a problem that driver will
-handle just BIN format.
-
-> Probably one of the key reasons that the "bit" format is still popular
-> is that getting the Vivado tools to create a proper "bin" that will
-> actually work on the Zynq is about as easy as nailing jelly to a tree.
-> We've been using a simple Python script to do the bit->bin conversion
-> for that reason.
-
-In vivado it is one tcl cmd. But truth is that I don't really get why
-BIN is not generated by default.
-
-> Using the "bin" format in the driver keeps it simple and singular.
-> Userspace tools can add whatever wrappers and headers they feel
-> appropriate to it, these checks don't belong in the driver since they
-> will be application specific. For example, some users would want to
-> verify that a partial bitstream actually matches the static part that's
-> currently in the FPGA.
-
-agree.
-
-Thanks,
-Michal
+> On cold boot:: ie: power on the board.
+> 
+> [    4.630237] mmc_host mmc1: Bus speed (slot 0) = 100000000Hz (slot
+> req 100000000Hz, actual 100000000HZ div = 0)
+> [    4.639820] mmc1: new ultra high speed SDR50 SDHC card at address aaaa
+> [    4.646266] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
+> [    4.650293] IRQ56 no longer affine to CPU7
+> [    4.650581] CPU7: shutdown
+> [    4.658293]  mmcblk0: p1 p2
+> 
+> Note: Their is need to reset the PMIC
+> S2MPS11_REG_L13CTRL/S2MPS11_REG_L19CTRL registers
+>          to support this feature consistently on every reboot.
+> 
+> -Anand Moon
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
