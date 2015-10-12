@@ -1,76 +1,62 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 13 Oct 2015 03:58:32 +0530
-Subject: [PATCH v6 11/17] Documentation: phy: add document for rockchip dp
- phy
-In-Reply-To: <1444492695-27241-1-git-send-email-ykk@rock-chips.com>
-References: <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
- <1444492695-27241-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <561C3410.8090600@ti.com>
+From: davidm@egauge.net (David Mosberger)
+Date: Mon, 12 Oct 2015 16:32:01 -0600
+Subject: [PATCH] spi-atmel.c: fix DMA for bits_per_word > 8
+Message-ID: <CALnQHM3WxNDV3xzJwRfGRVTMYL1mo44VbBb2YawZVUzn0CzFfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+I need the patch below to make DMA work in spi-atmel.c when bits_per_word > 8.
 
-On Saturday 10 October 2015 09:28 PM, Yakir Yang wrote:
-> This phy driver is binded with the Rockchip DisplayPort
-> driver, here are the brief properties:
-> 	edp_phy: edp-phy at ff770274 {
-> 		compatible = "rockchip,rk3288-dp-phy";
-> 		rockchip,grf = <&grf>;
-> 		clocks = <&cru SCLK_EDP_24M>;
-> 		clock-names = "24m";
-> 		#phy-cells = <0>;
-> 	};
+  --david
+-- 
+eGauge Systems LLC, http://egauge.net/, 1.877-EGAUGE1, fax 720.545.9768
 
-The commit message can simply be "Add dt binding documentation for
-rockchip display port PHY".
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 04e48e5..7bb361a 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -711,6 +711,7 @@ static void atmel_spi_next_xfer_pio(struct
+spi_master *master,
+  * Submit next transfer for DMA.
+  */
+ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
++  struct spi_message *msg,
+  struct spi_transfer *xfer,
+  u32 *plen)
+ {
+@@ -721,7 +722,7 @@ static int atmel_spi_next_xfer_dma_submit(struct
+spi_master *master,
+  struct dma_async_tx_descriptor *txdesc;
+  struct dma_slave_config slave_config;
+  dma_cookie_t cookie;
+- u32 len = *plen;
++ u32 len = *plen, bpw;
 
-Thanks
-Kishon
+  dev_vdbg(master->dev.parent, "atmel_spi_next_xfer_dma_submit\n");
 
-> 
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> ---
-> Changes in v6: None
-> Changes in v5:
-> - Split binding doc's from driver changes. (Rob)
-> - Update the rockchip,grf explain in document, and correct the clock required
->   elemets in document. (Rob & Heiko)
-> 
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
-> 
->  .../devicetree/bindings/phy/rockchip-dp-phy.txt    | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
-> new file mode 100644
-> index 0000000..505194e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
-> @@ -0,0 +1,22 @@
-> +Rockchip Soc Seroes Display Port PHY
-> +------------------------------------
-> +
-> +Required properties:
-> +- compatible : should be one of the following supported values:
-> +	 - "rockchip.rk3288-dp-phy"
-> +- clocks: from common clock binding: handle to dp clock.
-> +	of memory mapped region.
-> +- clock-names: from common clock binding:
-> +	Required elements: "24m"
-> +- rockchip,grf: phandle to the syscon managing the "general register files"
-> +- #phy-cells : from the generic PHY bindings, must be 0;
-> +
-> +Example:
-> +
-> +edp_phy: edp-phy at ff770274 {
-> +	compatible = "rockchip,rk3288-dp-phy";
-> +	rockchip,grf = <&grf>;
-> +	clocks = <&cru SCLK_EDP_24M>;
-> +	clock-names = "24m";
-> +	#phy-cells = <0>;
-> +};
-> 
+@@ -758,7 +759,11 @@ static int atmel_spi_next_xfer_dma_submit(struct
+spi_master *master,
+
+  *plen = len;
+
+- if (atmel_spi_dma_slave_config(as, &slave_config, 8))
++ bpw = xfer->bits_per_word;
++ if (!bpw)
++ bpw = msg->spi->bits_per_word;
++
++ if (atmel_spi_dma_slave_config(as, &slave_config, bpw))
+  goto err_exit;
+
+  /* Send both scatterlists */
+@@ -1316,8 +1321,8 @@ static int atmel_spi_one_transfer(struct
+spi_master *master,
+  atmel_spi_pdc_next_xfer(master, msg, xfer);
+  } else if (atmel_spi_use_dma(as, xfer)) {
+  len = as->current_remaining_bytes;
+- ret = atmel_spi_next_xfer_dma_submit(master,
+- xfer, &len);
++ ret = atmel_spi_next_xfer_dma_submit(master, msg,
++     xfer, &len);
+  if (ret) {
+  dev_err(&spi->dev,
+  "unable to use DMA, fallback to PIO\n");
