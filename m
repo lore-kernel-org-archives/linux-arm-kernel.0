@@ -1,48 +1,41 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Mon, 12 Oct 2015 08:12:42 +0000
-Subject: [PATCH 6/6] watchdog: sama5d4: try to set timeout from device
- tree first
-In-Reply-To: <20151012075001.GB3558@piout.net>
-References: <1444340074-15437-1-git-send-email-sylvain.rochet@finsecur.com>
- <1444340074-15437-7-git-send-email-sylvain.rochet@finsecur.com>
- <20151012075001.GB3558@piout.net>
-Message-ID: <B256D81BAE5131468A838E5D7A243641D632216B@penmbx01>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Mon, 12 Oct 2015 09:11:04 +0100
+Subject: [PATCH] ARM: hisilicon: DT: Drop console= and earlyprintk bootargs
+ parameter
+In-Reply-To: <9558245.SAyWiXU6Yf@wuerfel>
+References: <5617E6FC.6090304@hisilicon.com> <9558245.SAyWiXU6Yf@wuerfel>
+Message-ID: <561B6B18.1010906@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-> -----Original Message-----
-> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
-> Sent: 2015?10?12? 15:50
-> To: Sylvain Rochet
-> Cc: Guenter Roeck; Boris BREZILLON; linux-kernel at vger.kernel.org; Ferre,
-> Nicolas; Desroches, Ludovic; linux-arm-kernel at lists.infradead.org; Yang,
-> Wenyou; Wim Van Sebroeck
-> Subject: Re: [PATCH 6/6] watchdog: sama5d4: try to set timeout from device tree
-> first
-> 
-> Hi Sylvain,
-> 
-> The rest of the series looks good to me, one comment below:
-> 
-> On 08/10/2015 at 23:34:34 +0200, Sylvain Rochet wrote :
-> > watchdog_init_timeout function doesn't try to get the "timeout-sec" DT
-> > property if timeout_parm is not zero. This change makes this DT
-> > property working for the sama5d4 watchdog driver.
-> >
-> 
-> While I'm not sure of the feasibility, I think that the module parameter should
-> override the DT property.
+On 10/9/2015 7:26 PM, Arnd Bergmann wrote:
+> On Friday 09 October 2015 17:10:36 Wei Xu wrote:
+>> Replace console with stdout-path so that we don't have to put the
+>> console on the kernel command line.
+>>
+>> Remove earlyprintk to allow the kernel to boot on a system even
+>> if DEBUG_LL is configured for another system.
+>>
+>> Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
+>> Tested-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>
 
-The patch should be right, the DT property overrides the module parameter.
-
-If the DT property is not a valid value, it uses the default value,  initialized with the module parameter at the beginning of probe.
+Hi Arnd,
 
 > 
-> --
-> Alexandre Belloni, Free Electrons
-> Embedded Linux, Kernel and Android engineering http://free-electrons.com
+> Looks good to me. Do you want us to apply the patch directly, or
+> do you plan to send a pull request?
+
+Thanks!
+I will send a pull request today.
 
 Best Regards,
-Wenyou Yang
+Wei
+
+> 
+> 	Arnd
+> 
+> .
+> 
