@@ -1,23 +1,61 @@
-From: jroedel@suse.de (Joerg Roedel)
-Date: Mon, 12 Oct 2015 23:58:30 +0200
-Subject: [PATCH 13/20] intel-iommu: switch from ioremap_cache to memremap
-In-Reply-To: <20151009221646.32203.98367.stgit@dwillia2-desk3.jf.intel.com>
-References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
- <20151009221646.32203.98367.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <20151012215830.GT10641@suse.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Oct 2015 15:03:23 -0700
+Subject: [PATCH v2 1/4] ARM: dts: dra7: Add dt node for the sycon pcie
+In-Reply-To: <561C2A1B.3000201@ti.com>
+References: <1442323985-29939-1-git-send-email-kishon@ti.com>
+ <1442323985-29939-2-git-send-email-kishon@ti.com>
+ <20151012212149.GZ23801@atomide.com> <561C2A1B.3000201@ti.com>
+Message-ID: <20151012220322.GF23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
+* Kishon Vijay Abraham I <kishon@ti.com> [151012 14:50]:
+> Hi Tony,
+> 
+> On Tuesday 13 October 2015 02:51 AM, Tony Lindgren wrote:
+> > * Kishon Vijay Abraham I <kishon@ti.com> [150915 06:37]:
+> >> Add new device tree node for the control module register space where
+> >> PCIe registers are present.
+> >>
+> >> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >> ---
+> >>  arch/arm/boot/dts/dra7.dtsi |    5 +++++
+> >>  1 file changed, 5 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> >> index 5d65db9..0769b5d 100644
+> >> --- a/arch/arm/boot/dts/dra7.dtsi
+> >> +++ b/arch/arm/boot/dts/dra7.dtsi
+> >> @@ -154,6 +154,11 @@
+> >>  					compatible = "syscon";
+> >>  					reg = <0x1c04 0x0020>;
+> >>  				};
+> >> +
+> >> +				scm_conf_pcie: tisyscon at 1c24 {
+> >> +					compatible = "syscon";
+> >> +					reg = <0x1c24 0x0024>;
+> >> +				};
+> >>  			};
+> >>  
+> >>  			cm_core_aon: cm_core_aon at 5000 {
+> > 
+> > 
+> > Why don't you just extend the existing scm_conf1 area? This is not all pcie
+> > specific for scm_conf_pcie, at least for PLLEN_CONTROL, RMII_CLK_SETTING
+> > and MUXSEL_32K_CLKIN.
+> 
+> scm_conf_pcie has only PCIe registers (it starts at 0x4A003C24).
+> PLLEN_CONTROL and others are at 0x4A003C14 as per
+> DRA75x_DRA74x_SR1.1_NDA_TRM_vW.
 
-On Fri, Oct 09, 2015 at 06:16:46PM -0400, Dan Williams wrote:
-> In preparation for deprecating ioremap_cache() convert its usage in
-> intel-iommu to memremap.  This also eliminates the mishandling of the
-> __iomem annotation in the implementation.
+Oh sorry I guess I was looking at a wrong address then.
 
-I appreciate the change, but in the cover letter you write the API is
-only implemented for x86 so far? The VT-d driver is also used on ia64,
-will it still work there with this patch?
+> Since PCIe itself has a bunch of registers for itself, thought of
+> creating a separate dt node. But I can extend scm_conf1 area.
 
+Why not just ioremap them then? Do these need to be shared with
+some other driver?
 
-	Joerg
+Regards,
+
+Tony
