@@ -1,51 +1,49 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Mon, 12 Oct 2015 15:56:22 +0200
-Subject: [PATCH 6/6] watchdog: sama5d4: try to set timeout from device
- tree first
-In-Reply-To: <B256D81BAE5131468A838E5D7A243641D632216B@penmbx01>
-References: <1444340074-15437-1-git-send-email-sylvain.rochet@finsecur.com>
- <1444340074-15437-7-git-send-email-sylvain.rochet@finsecur.com>
- <20151012075001.GB3558@piout.net>
- <B256D81BAE5131468A838E5D7A243641D632216B@penmbx01>
-Message-ID: <20151012135622.GA6845@gradator.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 12 Oct 2015 14:58:55 +0100
+Subject: [PATCH] KVM: arm: use GIC support unconditionally
+In-Reply-To: <6276915.O3N4ZN0iPv@wuerfel>
+References: <6276915.O3N4ZN0iPv@wuerfel>
+Message-ID: <20151012145855.7830bb46@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wenyou,
+On Mon, 12 Oct 2015 15:22:31 +0200
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-On Mon, Oct 12, 2015 at 08:12:42AM +0000, Yang, Wenyou wrote:
-> > -----Original Message-----
-> > From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
-> > Sent: 2015?10?12? 15:50
-> > To: Sylvain Rochet
-> > Cc: Guenter Roeck; Boris BREZILLON; linux-kernel at vger.kernel.org; Ferre,
-> > Nicolas; Desroches, Ludovic; linux-arm-kernel at lists.infradead.org; Yang,
-> > Wenyou; Wim Van Sebroeck
-> > Subject: Re: [PATCH 6/6] watchdog: sama5d4: try to set timeout from device tree
-> > first
-> > 
-> > Hi Sylvain,
-> > 
-> > The rest of the series looks good to me, one comment below:
-> > 
-> > On 08/10/2015 at 23:34:34 +0200, Sylvain Rochet wrote :
-> > > watchdog_init_timeout function doesn't try to get the "timeout-sec" DT
-> > > property if timeout_parm is not zero. This change makes this DT
-> > > property working for the sama5d4 watchdog driver.
-> > >
-> > 
-> > While I'm not sure of the feasibility, I think that the module parameter should
-> > override the DT property.
+> The vgic code on ARM is built for all configurations that enable KVM,
+> but the parent_data field that it references is only present when
+> CONFIG_IRQ_DOMAIN_HIERARCHY is set:
 > 
-> The patch should be right, the DT property overrides the module 
-> parameter.
+> virt/kvm/arm/vgic.c: In function 'kvm_vgic_map_phys_irq':
+> virt/kvm/arm/vgic.c:1781:13: error: 'struct irq_data' has no member named 'parent_data'
 > 
-> If the DT property is not a valid value, it uses the default value, 
-> initialized with the module parameter at the beginning of probe.
+> This flag is implied by the GIC driver, and indeed the VGIC code only
+> makes sense if a GIC is present. This changes the CONFIG_KVM symbol
+> to always select GIC, which avoids the issue.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 662d9715840 ("arm/arm64: KVM: Kill CONFIG_KVM_ARM_{VGIC,TIMER}")
+> 
+> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+> index 210eccadb69a..356970f3b25e 100644
+> --- a/arch/arm/kvm/Kconfig
+> +++ b/arch/arm/kvm/Kconfig
+> @@ -21,6 +21,7 @@ config KVM
+>  	depends on MMU && OF
+>  	select PREEMPT_NOTIFIERS
+>  	select ANON_INODES
+> +	select ARM_GIC
+>  	select HAVE_KVM_CPU_RELAX_INTERCEPT
+>  	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
+>  	select KVM_MMIO
+> 
 
-Well, the principle of least surprise applied here means if you load the 
-module with a timeout argument, you expect the timeout argument to be 
-used and not the dt one. As such, it makes more sense to have the 
-parameter value takes precedence over the dt value.
+Looks good to me.
 
-Sylvain
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
