@@ -1,97 +1,37 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Mon, 12 Oct 2015 14:04:13 +0100
-Subject: [PATCH] ARM64: dts: vexpress: Use a symlink to
- vexpress-v2m-rs1.dtsi from arch=arm
-In-Reply-To: <1444046032-31310-1-git-send-email-ian.campbell@citrix.com>
-References: <1444046032-31310-1-git-send-email-ian.campbell@citrix.com>
-Message-ID: <1444655053.1410.540.camel@citrix.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 12 Oct 2015 22:04:32 +0900
+Subject: [PATCH v2] arm: dts: Fix audio card detection on peach boards
+In-Reply-To: <1444653438-6532-1-git-send-email-alim.akhtar@samsung.com>
+References: <1444653438-6532-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <561BAFE0.5070205@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-10-05 at 12:53 +0100, Ian Campbell wrote:
-
-Ping?
-
-> Commit 9ccd608070b6 "arm64: dts: add device tree for ARM SMM-A53x2 on
-> LogicTile Express 20MG" added a new dts file to arch/arm64 which
-> included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
-> .dtsi supplied by arch/arm.
+W dniu 12.10.2015 o 21:37, Alim Akhtar pisze:
+> Since commit 2fad972d45c4 ("ARM: dts: Add mclk entry for Peach boards"),
+> sound card detection is broken on peach boards and gives below errors:
 > 
-> Unfortunately this causes some issues for the split device tree
-> repository[0], since things get moved around there. In that context
-> the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
-> while the include is at src/arm/vexpress-v2m-rs1.dtsi.
+> [    3.630457] max98090 7-0010: MAX98091 REVID=0x51
+> [    3.634233] max98090 7-0010: use default 2.8v micbias
+> [    3.640985] snow-audio sound: HiFi <-> 3830000.i2s mapping ok
+> [    3.645307] max98090 7-0010: Invalid master clock frequency
+> [    3.650824] snow-audio sound: ASoC: Peach-Pi-I2S-MAX98091 late_probe() failed: -22
+> [    3.658914] snow-audio sound: snd_soc_register_card failed (-22)
+> [    3.664366] snow-audio: probe of sound failed with error -22
 > 
-> The sharing of the .dtsi is legitimate since the baseboard is the same
-> for various vexpress systems whatever processor they use.
+> This patch adds missing assigned-clocks and assigned-clock-parents for
+> pmu_system_controller node which is used as "mclk" for audio codec.
 > 
-> Previously I attempted to resolve this by creating a shared location
-> for such things but we have been unable to come to a consensus on
-> where that should be.
-> 
-> Instead this patch simply replaces the use of ../../ in the dts
-> /include/ with a symlink in arch/arm64/boot/dts/arm pointing to the
-> file arch/arm/boot/dts.
-> 
-> Since the split device tree repo will shortly be required to flatten
-> symlinks for other reasons this will cause the dtsi file to appear in
-> both src/arm and src/arm64 in the split repo, which is an improvement
-> on not building for arm64 now.
-> 
-> [0] https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-re
-> basing.git/
-> 
-> Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Kristina Martsenko <kristina.martsenko@arm.com>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Frank Rowand <frank.rowand@sonymobile.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: arm at kernel.org
-> Cc: linux-kbuild at vger.kernel.org
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> Fixes: 2fad972d45c4 ("ARM: dts: Add mclk entry for Peach boards")
+> Cc: <stable@vger.kernel.org>
 > ---
-> For more on flattening symlinks see
-> http://thread.gmane.org/gmane.linux.kernel.input/45646/focus=45742
-> ---
->  arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts | 2 +-
->  arch/arm64/boot/dts/arm/vexpress-v2m-rs1.dtsi        | 1 +
->  2 files changed, 2 insertions(+), 1 deletion(-)
->  create mode 120000 arch/arm64/boot/dts/arm/vexpress-v2m-rs1.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-> b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-> index 5b1d018..bb3c26d 100644
-> --- a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-> +++ b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-> @@ -186,6 +186,6 @@
->  				<0 0 41 &gic GIC_SPI 41
-> IRQ_TYPE_LEVEL_HIGH>,
->  				<0 0 42 &gic GIC_SPI 42
-> IRQ_TYPE_LEVEL_HIGH>;
->  
-> -		/include/ "../../../../arm/boot/dts/vexpress-v2m
-> -rs1.dtsi"
-> +		/include/ "vexpress-v2m-rs1.dtsi"
->  	};
->  };
-> diff --git a/arch/arm64/boot/dts/arm/vexpress-v2m-rs1.dtsi
-> b/arch/arm64/boot/dts/arm/vexpress-v2m-rs1.dtsi
-> new file mode 120000
-> index 0000000..68fd0f8
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/arm/vexpress-v2m-rs1.dtsi
-> @@ -0,0 +1 @@
-> +../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi
-> \ No newline at end of file
+> Changes since v1:
+> Addressed Krzysztof's review comments.
+
+Looks good, thanks!
+
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
