@@ -1,101 +1,69 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 12 Oct 2015 22:36:09 +0200
-Subject: [PATCH 10/16] acpi/gsi: Add acpi_set_irq_model to initialize the
- GSI layer
-In-Reply-To: <1444152989-31726-11-git-send-email-marc.zyngier@arm.com>
+Date: Mon, 12 Oct 2015 22:37:23 +0200
+Subject: [PATCH 14/16] acpi/gsi: Cleanup acpi_register_gsi
+In-Reply-To: <1444152989-31726-15-git-send-email-marc.zyngier@arm.com>
 References: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
- <1444152989-31726-11-git-send-email-marc.zyngier@arm.com>
-Message-ID: <3307806.SbgVXOQCOR@vostro.rjw.lan>
+ <1444152989-31726-15-git-send-email-marc.zyngier@arm.com>
+Message-ID: <2581687.883lDRF2TB@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 06, 2015 06:36:23 PM Marc Zyngier wrote:
-> In order to start embrassing irqdomains at the GSI level, introduce
-> a new initializer:
+On Tuesday, October 06, 2015 06:36:27 PM Marc Zyngier wrote:
+> As the only user of drivers/acpi/gsi.c is now using acpi_set_irq_model
+> to set acpi_gsi_descriptor_populate to something meaningful, we can
+> always rely on that information to be present (its absence is an error),
+> and guarantee that new interrupt controllers will use this API.
 > 
-> void acpi_set_irq_model(enum acpi_irq_model_id model,
-> 			struct fwnode_handle *fwnode);
-> 
-> where:
-> - model is the value assigned to acpi_irq_model
-> - fwnode is the identifier for the irqdomain mapping
->   GSI interrupts
-> 
-> As nobody calls this code yet, the current code is (mostly)
-> left in place.
+> Take this opportunity to cleanup acpi_register_gsi.
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
 Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-> 
-> Conflicts:
-> 	include/linux/acpi.h
 > ---
->  drivers/acpi/gsi.c   | 32 +++++++++++++++++++++++++++-----
->  include/linux/acpi.h |  3 +++
->  2 files changed, 30 insertions(+), 5 deletions(-)
+>  drivers/acpi/gsi.c | 30 ++++++++++--------------------
+>  1 file changed, 10 insertions(+), 20 deletions(-)
 > 
 > diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
-> index 2c39fe1..202a8fe 100644
+> index 202a8fe..fa4585a 100644
 > --- a/drivers/acpi/gsi.c
 > +++ b/drivers/acpi/gsi.c
-> @@ -75,12 +75,21 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
+> @@ -73,29 +73,19 @@ EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+>  int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
+>  		      int polarity)
 >  {
->  	unsigned int irq;
->  	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
-> -	struct irq_domain *d = irq_find_matching_fwnode(acpi_gsi_domain_id,
-> -							DOMAIN_BUS_ANY);
+> -	unsigned int irq;
+> -	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
+> +	struct irq_fwspec fwspec;
 >  
-> -	irq = irq_create_mapping(d, gsi);
-> -	if (!irq)
-> -		return -EINVAL;
-> +	if (acpi_gsi_domain_id) {
-> +		struct irq_fwspec fwspec;
-> +
-> +		fwspec.fwnode = acpi_gsi_domain_id;
-> +		fwspec.param[0] = gsi;
-> +		fwspec.param[1] = irq_type;
-> +		fwspec.param_count = 2;
-> +
-> +		return irq_create_fwspec_mapping(&fwspec);
-> +	} else {
-> +		irq = irq_create_mapping(NULL, gsi);
-> +		if (!irq)
-> +			return -EINVAL;
-> +	}
+> -	if (acpi_gsi_domain_id) {
+> -		struct irq_fwspec fwspec;
+> -
+> -		fwspec.fwnode = acpi_gsi_domain_id;
+> -		fwspec.param[0] = gsi;
+> -		fwspec.param[1] = irq_type;
+> -		fwspec.param_count = 2;
+> -
+> -		return irq_create_fwspec_mapping(&fwspec);
+> -	} else {
+> -		irq = irq_create_mapping(NULL, gsi);
+> -		if (!irq)
+> -			return -EINVAL;
+> +	if (WARN_ON(!acpi_gsi_domain_id)) {
+> +		pr_warn("GSI: No registered irqchip, giving up\n");
+> +		return -EINVAL;
+>  	}
 >  
->  	/* Set irq type if specified and different than the current one */
->  	if (irq_type != IRQ_TYPE_NONE &&
-> @@ -103,3 +112,16 @@ void acpi_unregister_gsi(u32 gsi)
->  	irq_dispose_mapping(irq);
+> -	/* Set irq type if specified and different than the current one */
+> -	if (irq_type != IRQ_TYPE_NONE &&
+> -		irq_type != irq_get_trigger_type(irq))
+> -		irq_set_irq_type(irq, irq_type);
+> -	return irq;
+> +	fwspec.fwnode = acpi_gsi_domain_id;
+> +	fwspec.param[0] = gsi;
+> +	fwspec.param[1] = acpi_gsi_get_irq_type(trigger, polarity);
+> +	fwspec.param_count = 2;
+> +
+> +	return irq_create_fwspec_mapping(&fwspec);
 >  }
->  EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
-> +
-> +/**
-> + * acpi_set_irq_model - Setup the GSI irqdomain information
-> + * @model: the value assigned to acpi_irq_model
-> + * @fwnode: the irq_domain identifier for mapping and looking up
-> + *          GSI interrupts
-> + */
-> +void __init acpi_set_irq_model(enum acpi_irq_model_id model,
-> +			       struct fwnode_handle *fwnode)
-> +{
-> +	acpi_irq_model = model;
-> +	acpi_gsi_domain_id = fwnode;
-> +}
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index 43856d1..d863e12 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -201,6 +201,9 @@ int acpi_register_gsi (struct device *dev, u32 gsi, int triggering, int polarity
->  int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
->  int acpi_isa_irq_to_gsi (unsigned isa_irq, u32 *gsi);
->  
-> +void acpi_set_irq_model(enum acpi_irq_model_id model,
-> +			struct fwnode_handle *fwnode);
-> +
->  #ifdef CONFIG_X86_IO_APIC
->  extern int acpi_get_override_irq(u32 gsi, int *trigger, int *polarity);
->  #else
-> 
+>  EXPORT_SYMBOL_GPL(acpi_register_gsi);
