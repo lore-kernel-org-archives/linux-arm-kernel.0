@@ -1,125 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 12 Oct 2015 22:43:30 +0200
-Subject: [PATCH v4 5/5] clk: sunxi: mod1 clock support
-In-Reply-To: <1444682610-21482-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1444682610-21482-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1444682610-21482-6-git-send-email-maxime.ripard@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Oct 2015 13:45:09 -0700
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux,atags" entry
+In-Reply-To: <201510122225.12786@pali>
+References: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
+ <20150713131902.GH26485@atomide.com>
+ <20151012201640.GQ23801@atomide.com> <201510122225.12786@pali>
+Message-ID: <20151012204509.GT23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Emilio L?pez <emilio@elopez.com.ar>
+* Pali Roh?r <pali.rohar@gmail.com> [151012 13:29]:
+> On Monday 12 October 2015 22:16:40 Tony Lindgren wrote:
+> > 
+> > Pali, any news on posting an updated series with the comments
+> > addressed in this thread? It seems that we all pretty much agree
+> > what needs to be done.
+> 
+> Tony, I'm not really sure what to do. Just wrap 4 and 5 patches into 
+> CONFIG_KEXEC? Or something more?
 
-The module 1 type of clocks consist of a gate and a mux and are used on
-the audio blocks to mux and gate the PLL2 outputs for AC97, IIS or
-SPDIF. This commit adds support for them on the sunxi clock driver.
+Well for most part your patches are fine, I think there were some
+minor comments on the series.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/clk/sunxi/Makefile       |  1 +
- drivers/clk/sunxi/clk-a10-mod1.c | 81 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 82 insertions(+)
- create mode 100644 drivers/clk/sunxi/clk-a10-mod1.c
+For the CONFIG_KEXEC dependency, we should just keep the existing
+behavior and keep /proc/atags behind CONFIG_KEXEC. That's all
+I believe :)
 
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index 70a449a419e6..cb4c299214ce 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -5,6 +5,7 @@
- obj-y += clk-sunxi.o clk-factors.o
- obj-y += clk-a10-codec.o
- obj-y += clk-a10-hosc.o
-+obj-y += clk-a10-mod1.o
- obj-y += clk-a10-pll2.o
- obj-y += clk-a20-gmac.o
- obj-y += clk-mod0.o
-diff --git a/drivers/clk/sunxi/clk-a10-mod1.c b/drivers/clk/sunxi/clk-a10-mod1.c
-new file mode 100644
-index 000000000000..099dbdab7afe
---- /dev/null
-+++ b/drivers/clk/sunxi/clk-a10-mod1.c
-@@ -0,0 +1,81 @@
-+/*
-+ * Copyright 2013 Emilio L?pez
-+ *
-+ * Emilio L?pez <emilio@elopez.com.ar>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+
-+static DEFINE_SPINLOCK(mod1_lock);
-+
-+#define SUN4I_MOD1_ENABLE	31
-+#define SUN4I_MOD1_MUX		16
-+#define SUN4I_MOD1_MUX_WIDTH	2
-+#define SUN4I_MOD1_MAX_PARENTS	4
-+
-+static void __init sun4i_mod1_clk_setup(struct device_node *node)
-+{
-+	struct clk *clk;
-+	struct clk_mux *mux;
-+	struct clk_gate *gate;
-+	const char *parents[4];
-+	const char *clk_name = node->name;
-+	void __iomem *reg;
-+	int i = 0;
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (IS_ERR(reg))
-+		return;
-+
-+	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-+	if (!mux)
-+		goto err_unmap;
-+
-+	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-+	if (!gate)
-+		goto err_free_mux;
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+	of_clk_parent_fill(node, parents, SUN4I_MOD1_MAX_PARENTS);
-+
-+	gate->reg = reg;
-+	gate->bit_idx = SUN4I_MOD1_ENABLE;
-+	gate->lock = &mod1_lock;
-+	mux->reg = reg;
-+	mux->shift = SUN4I_MOD1_MUX;
-+	mux->mask = BIT(SUN4I_MOD1_MUX_WIDTH) - 1;
-+	mux->lock = &mod1_lock;
-+
-+	clk = clk_register_composite(NULL, clk_name, parents, i,
-+				     &mux->hw, &clk_mux_ops,
-+				     NULL, NULL,
-+				     &gate->hw, &clk_gate_ops, 0);
-+	if (IS_ERR(clk))
-+		goto err_free_gate;
-+
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+
-+	return;
-+
-+err_free_gate:
-+	kfree(gate);
-+err_free_mux:
-+	kfree(mux);
-+err_unmap:
-+	iounmap(reg);
-+}
-+CLK_OF_DECLARE(sun4i_mod1, "allwinner,sun4i-a10-mod1-clk",
-+	       sun4i_mod1_clk_setup);
--- 
-2.5.3
+Regards,
+
+Tony
