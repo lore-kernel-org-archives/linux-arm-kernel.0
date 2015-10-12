@@ -1,81 +1,301 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 12 Oct 2015 15:54:59 -0400
-Subject: [Resend: PATCH v2 1/4] Documentation: dt: soc: move driver
- description to a separate document
-Message-ID: <1444679700-11451-1-git-send-email-m-karicheri2@ti.com>
+Date: Mon, 12 Oct 2015 15:56:22 -0400
+Subject: [GIT PULL 1/3] Keystone SOC driver updates for 4.4
+In-Reply-To: <561BCC93.3050307@ti.com>
+References: <1444151960-4941-1-git-send-email-ssantosh@kernel.org>
+ <5673608.IRgyBTXroY@wuerfel>
+ <3E54258959B69E4282D79E01AB1F32B704B94055@DFLE11.ent.ti.com>
+ <6169821.dc6khqc2PX@wuerfel>
+ <3E54258959B69E4282D79E01AB1F32B704B94686@DFLE11.ent.ti.com>
+ <561BCC93.3050307@ti.com>
+Message-ID: <561C1066.5000209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the DT bindings have details about the driver as well. This
-patch moves this to a separate document for knav qmss driver so that
-driver detail update can be done as needed without polluting the DT
-bindings description.
+On 10/12/2015 11:06 AM, Murali Karicheri wrote:
+> On 10/09/2015 02:54 PM, Karicheri, Muralidharan wrote:
+>>
+>>> -----Original Message-----
+>>> From: Arnd Bergmann [mailto:arnd at arndb.de]
+>>> Sent: Friday, October 09, 2015 11:21 AM
+>>> To: Karicheri, Muralidharan
+>>> Cc: Santosh Shilimkar; olof at lixom.net; arm at kernel.org; linux-arm-
+>>> kernel at lists.infradead.org; khilman at kernel.org
+>>> Subject: Re: [GIT PULL 1/3] Keystone SOC driver updates for 4.4
+>>>
+>>> On Friday 09 October 2015 15:09:56 Karicheri, Muralidharan wrote:
+>>>>> Normally, the firmware name is fixed in the driver. If the API
+>>>>> changes in order to support a new feature, the driver of course needs
+>>>>> to be aware of that, but it should not require a device tree change
+>>>>> to update the file
+>>> name.
+>>>>>
+>>>>> Conversely, if you get a new chip that needs a slightly different
+>>>>> blob but has an identical API, the driver should ideally not need
+>>>>> to be changed, but still
+>>> see  a new file name.
+>>>>>
+>>>>> The first can be done once you need it, e.g. by appending the number
+>>>>> of the API version to the file name inside of the driver, and trying
+>>>>> the highest version supported by the driver first, before falling
+>>>>> back to older version in reverse order until the oldest version
+>>>>> that is supported by the
+>>> driver.
+>>>>>
+>>>> What I gather is the firmware file name is to be part of the driver
+>>>> itself instead of adding the same to DT. This way as firmware API
+>>>> change, additional filename strings can be added and handled as
+>>>> needed. As API is not
+>>> expected to change that often, this change will be needed very rarely.
+>>>
+>>> Right.
+>>>
+>>>> But how to deal with the case where firmware blob changes, but no API
+>>>> changes which is mostly the case for keystone. For example currently
+>>>> we have 2.0.0, and 2.0.1 is available, but no API change. Probably I
+>>>> could name the file as file_2.0.x in driver and as long as there is
+>>>> no API change, one could
+>>> provide a soft link in file system to point to different minor versions.
+>>>>
+>>>> ln -s /lib/firmware/file_2.0.1 /lib/firmware/file_2.0.x
+>>>>
+>>>> In the case of qmss firmware, it will be named as
+>>>> ks2_qmss_pdsp_acc48_k2_le_1_0_0_x.bin in the driver source code as per
+>>>> the above suggestion. In the file system, there will be a soft link to
+>>> ks2_qmss_pdsp_acc48_k2_le_1_0_0_9.bin.
+>>>> ln -s /lib/firmware/ks2_qmss_pdsp_acc48_k2_le_1_0_0_9.bin
+>>>> /lib/firmware/ ks2_qmss_pdsp_acc48_k2_le_1_0_0_x.bin
+>>>>
+>>>> Is this acceptable? or do you see any issue with this approach?
+>>>
+>>> I don't know what the policy is for the linux-firmware repository. My
+>>> first thought would have
+>>> been that you only ever put the latest version into that tree and
+>>> never change the name.
+>>> Symlinks can obviously work as well, and I see some cases of this in
+>>> my /lib/firmware
+>>> directory:
+>>
+>> A quick grep under linux-firmware.git provided my some firmware names
+>> with multiple versions.
+>>
+>> ./bnx2x/bnx2x-e2-7.8.17.0.fw
+>> ./bnx2x/bnx2x-e2-7.2.16.0.fw
+>> ./bnx2x/bnx2x-e1h-7.0.29.0.fw
+>> ./bnx2x/bnx2x-e2-7.12.30.0.fw
+>> ./bnx2x/bnx2x-e2-7.2.51.0.fw
+>> ./bnx2x/bnx2x-e1h-7.8.17.0.fw
+>> ./bnx2x/bnx2x-e1h-7.2.16.0.fw
+>> ./bnx2x/bnx2x-e2-7.0.29.0.fw
+>> ./bnx2x/bnx2x-e2-7.8.2.0.fw
+>> ./bnx2x/bnx2x-e1-6.2.5.0.fw
+>> ./bnx2x/bnx2x-e1-7.8.2.0.fw
+>> ./bnx2x/bnx2x-e1h-7.8.2.0.fw
+>> ./bnx2x/bnx2x-e1-7.0.20.0.fw
+>> ./bnx2x/bnx2x-e1-7.10.51.0.fw
+>> ./bnx2x/bnx2x-e2-7.0.20.0.fw
+>> ./bnx2x/bnx2x-e1h-6.0.34.0.fw
+>> ./bnx2x/bnx2x-e1-7.8.19.0.fw
+>> ./bnx2x/bnx2x-e2-6.0.34.0.fw
+>> ./bnx2x/bnx2x-e1-7.2.51.0.fw
+>> ./bnx2x/bnx2x-e2-6.2.9.0.fw
+>> ./bnx2x/bnx2x-e1-7.8.17.0.fw
+>> ./bnx2x/bnx2x-e2-7.0.23.0.fw
+>> ./bnx2x/bnx2x-e1h-6.2.9.0.fw
+>> ./bnx2x/bnx2x-e1-7.0.29.0.fw
+>> ./bnx2x/bnx2x-e2-7.10.51.0.fw
+>> ./bnx2x/bnx2x-e1-6.0.34.0.fw
+>> ./bnx2x/bnx2x-e2-7.8.19.0.fw
+>> ./bnx2x/bnx2x-e1h-7.0.23.0.fw
+>> ./bnx2x/bnx2x-e1-7.2.16.0.fw
+>> ./bnx2x/bnx2x-e1-7.0.23.0.fw
+>> ./bnx2x/bnx2x-e1h-7.2.51.0.fw
+>> ./bnx2x/bnx2x-e1-6.2.9.0.fw
+>> ./bnx2x/bnx2x-e1h-6.2.5.0.fw
+>> ./bnx2x/bnx2x-e1h-7.8.19.0.fw
+>> ./bnx2x/bnx2x-e1h-7.12.30.0.fw
+>> ./bnx2x/bnx2x-e2-6.2.5.0.fw
+>> ./bnx2x/bnx2x-e1h-7.0.20.0.fw
+>> ./bnx2x/bnx2x-e1h-7.10.51.0.fw
+>> ./bnx2x/bnx2x-e1-7.12.30.0.fw
+>>
+>> And then
+>>
+>> ./bnx2/bnx2-rv2p-09ax-5.0.0.j10.fw
+>> ./bnx2/bnx2-rv2p-09ax-5.0.0.j3.fw
+>> ./bnx2/bnx2-rv2p-09-6.0.17.fw
+>> ./bnx2/bnx2-rv2p-06-5.0.0.j3.fw
+>> ./bnx2/bnx2-rv2p-09ax-6.0.17.fw
+>> ./bnx2/bnx2-mips-09-6.2.1.fw
+>> ./bnx2/bnx2-mips-06-6.2.1.fw
+>> ./bnx2/bnx2-mips-09-5.0.0.j3.fw
+>> ./bnx2/bnx2-rv2p-09-5.0.0.j10.fw
+>> ./bnx2/bnx2-mips-09-6.2.1b.fw
+>> ./bnx2/bnx2-mips-09-5.0.0.j9.fw
+>> ./bnx2/bnx2-mips-09-6.0.17.fw
+>> ./bnx2/bnx2-mips-09-6.2.1a.fw
+>> ./bnx2/bnx2-mips-06-6.0.15.fw
+>> ./bnx2/bnx2-mips-06-4.6.16.fw
+>> ./bnx2/bnx2-mips-06-5.0.0.j6.fw
+>> ./bnx2/bnx2-mips-09-5.0.0.j15.fw
+>> ./bnx2/bnx2-mips-09-4.6.17.fw
+>> ./bnx2/bnx2-rv2p-09-5.0.0.j3.fw
+>> ./bnx2/bnx2-mips-06-6.2.3.fw
+>> ./bnx2/bnx2-rv2p-09-4.6.15.fw
+>> ./bnx2/bnx2-mips-06-5.0.0.j3.fw
+>> ./bnx2/bnx2-rv2p-06-6.0.15.fw
+>> ./bnx2/bnx2-rv2p-06-4.6.16.fw
+>>
+>> So multiple versions are possible in the repo.
+>>
+>>>
+>>> $ find /lib/firmware/ -type l | xargs ls -l
+>>> find: `/lib/firmware/b43': Permission denied lrwxrwxrwx 1 root root
+>>> 16 Jan 31  2014
+>>> /lib/firmware/cxgb4/t4fw.bin -> t4fw-1.6.2.0.bin lrwxrwxrwx 1 root
+>>> root 18 Jan 31  2014
+>>> /lib/firmware/libertas/sd8688.bin -> ../mrvl/sd8688.bin lrwxrwxrwx 1
+>>> root root 25 Jan 31
+>>> 2014 /lib/firmware/libertas/sd8688_helper.bin ->
+>>> ../mrvl/sd8688_helper.bin lrwxrwxrwx 1
+>>> root root 10 Jan 31  2014 /lib/firmware/rt3070.bin -> rt2870.bin
+>>> lrwxrwxrwx 1 root root 10
+>>> Jan 31  2014 /lib/firmware/rt3090.bin -> rt2860.bin lrwxrwxrwx 1 root
+>>> root 17 Jan 31  2014
+>>> /lib/firmware/s2250.fw -> go7007/s2250-2.fw lrwxrwxrwx 1 root root 17
+>>> Jan 31  2014
+>>> /lib/firmware/s2250_loader.fw -> go7007/s2250-1.fw lrwxrwxrwx 1 root
+>>> root 14 Jan 31
+>>> 2014 /lib/firmware/ti-connectivity/wl1271-nvs.bin -> wl127x-nvs.bin
+>>> lrwxrwxrwx 1 root root
+>>> 14 Jan 31  2014 /lib/firmware/ti-connectivity/wl12xx-nvs.bin ->
+>>> wl127x-nvs.bin
+>>>
+>>>>> The second one basically depends on the "compatible" string of the
+>>>>> device, which identifies which device you have. The driver can then
+>>>>> look up the file name for each device it supports based on this
+>>>>> string, and by using multiple compatible strings in DT, you can
+>>>>> provide the specific version of the hardware that is used for the
+>>>>> file name without having to match that hardware name in the driver
+>>>>>
+>>>>
+>>>> This make sense.
+>>>>
+>>>>>> W.r.t to the patch for documentation update, can I send an
+>>>>>> incremental patch to the update the linux-firmware.git reference
+>>>>>> as well?
+>>>>>
+>>>>> I'd rather skip that documentation change until we have decided on
+>>>>> how to handle the firmware loading in the future.
+>>>>
+>>>> So if the above is acceptable, I will add the
+>>>> ks2_qmss_pdsp_acc48_k2_le_1_0_0_x.bin name to the Kconfig
+>>>> description as you have
+>>> proposed.
+>>>
+>>> Maybe something shorter for the symlink? I don't know what all the
+>>> parts of the name mean,
+>>> but I assume that the _1_0_0_x can go, and the _le presumably refers
+>>> to little-endian and
+>>> can be removed as well, as the kernel expects the firmware to have a
+>>> fixed endianess,
+>>> independent of how the kernel is built.
+>>
+>> A generic name I can suggest is ks2_qmss_pdsp_acc48.bin in the code.
+>> It describes, soc (ks2),
+>> sub system (qmss), pdsp (CPU running the firmware), channel
+>> configuration (acc48). Since there
+>> can be other configuration (acc32) or firmware can be on a dsp as
+>> well, this doesn't cause any
+>> conflict in the future. I will go with this name if no one has
+>> objections.
+>>
+>> In the file system, this can be a symbolic link which can point to the
+>> actual firmware which is
+>> obtained from the linux-firmware.git repo.
+>>
+>> If API change in future, then a new file name can be added at that
+>> point and driver may be modified
+>> to work with this new firmware. So this would accommodate future
+>> upgrades as well.
+>>
+>> const char *qmss_acc_firmware[] = "ks2_qmss_pdsp_acc48.bin";
+>>
+>> This can be expanded in future if API change. The driver can start
+>> searching for the firmware starting
+>> with latest to oldest. If specific firmware requires customization of
+>> the interface, this can be handled
+>> by using additional firmware specific data in a struct instead of char
+>> ptr array.
+>>
+>> In the file system, we could add a link to the real firmware file.
+>>
+>> ln -s /lib/firmware/ks2_qmss_pdsp_acc48.bin
+>> /lib/firmware/ks2_qmss_pdsp_acc48_k2_le_1_0_0_x.bin
+>>
+>> Another thing I have noticed is that some of the firmware are named as
+>> *.fw, while others are *.bin. Not sure
+>> what the difference is and both suffixes are currently in use. I just
+>> picked a bin suffix as this a binary blob for
+>> the software.
+>>
+>> W.r.t documentation, Santosh has reservation on adding firmware name
+>> to Kconfig description.
+>> IMO, a better option is to add a Documentation for driver. Currently
+>> driver design is also captured as part of the
+>> DT bindings. We could just keep the DT bindings description in the DT
+>> documentation and move the Design to
+>> Documentation/arm/keystone/qmss.txt and provide a link to refer each
+>> other. The firmware detail can be added
+>> to this. Does it work?
+>>
+> Arnd, Santosh,
+>
+> Can I go ahead and send a patch based on my last response? Here is the
+> summary of what we discussed.
+>
+> 1) Remove the firmware filename from DT to driver. Use a name
+> ks2_qmss_pdsp_acc48.bin. The idea is this can be a soft link pointing to
+> the real firmware file in file system
+> 2. For future upgrade, if there is no interface change, the user may
+> copy the new firmware to file system and rename the soft link to point
+> to the new firmware
+> 3) For future upgrade if there is a API change, add a new firmware file
+> name in the driver and adapt the driver to the new API. Also provide
+> backward compatibility to older firmware. i.e start search with new
+> firmware and if not found, go back to the older firmwares until a file
+> is found.
+> 4) Move the description of the driver design from DT document to one
+> under Documentation/arm/keystone/knav-qmss.txt. Update the this document
+> with location of acc firmware in linux-firmware.git.
+>
+> I will work on this and send an updated patch series today assuming you
+> are fine with the above changes. I would like this to be reviewed and
+> merged to v4.4 next branch ASAP.
+>
+> Thanks and regards,
+>
+> Murali
+>> Murali
+>>
+>>>
+>>>     Arnd
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+>
+Santosh, Arnd,
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- Documentation/arm/keystone/knav-qmss.txt           | 24 ++++++++++++++++++++++
- .../bindings/soc/ti/keystone-navigator-qmss.txt    | 20 ++++--------------
- 2 files changed, 28 insertions(+), 16 deletions(-)
- create mode 100644 Documentation/arm/keystone/knav-qmss.txt
+I have posted [PATCH v2 0/4] soc: ti: knav_qmss: enable accumulator 
+queue support
 
-diff --git a/Documentation/arm/keystone/knav-qmss.txt b/Documentation/arm/keystone/knav-qmss.txt
-new file mode 100644
-index 0000000..79946d1
---- /dev/null
-+++ b/Documentation/arm/keystone/knav-qmss.txt
-@@ -0,0 +1,24 @@
-+* Texas Instruments Keystone Navigator Queue Management SubSystem driver
-+
-+Driver source code path
-+  drivers/soc/ti/knav_qmss.c
-+  drivers/soc/ti/knav_qmss_acc.c
-+
-+The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
-+the main hardware sub system which forms the backbone of the Keystone
-+multi-core Navigator. QMSS consist of queue managers, packed-data structure
-+processors(PDSP), linking RAM, descriptor pools and infrastructure
-+Packet DMA.
-+The Queue Manager is a hardware module that is responsible for accelerating
-+management of the packet queues. Packets are queued/de-queued by writing or
-+reading descriptor address to a particular memory mapped location. The PDSPs
-+perform QMSS related functions like accumulation, QoS, or event management.
-+Linking RAM registers are used to link the descriptors which are stored in
-+descriptor RAM. Descriptor RAM is configurable as internal or external memory.
-+The QMSS driver manages the PDSP setups, linking RAM regions,
-+queue pool management (allocation, push, pop and notify) and descriptor
-+pool management.
-+
-+knav qmss driver provides a set of APIs to drivers to open/close qmss queues,
-+allocate descriptor pools, map the descriptors, push/pop to queues etc. For
-+details of the available APIs, please refers to include/linux/soc/ti/knav_qmss.h
-diff --git a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
-index d8e8cdb..2cecea1 100644
---- a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
-+++ b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
-@@ -1,20 +1,8 @@
--* Texas Instruments Keystone Navigator Queue Management SubSystem driver
--
--The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
--the main hardware sub system which forms the backbone of the Keystone
--multi-core Navigator. QMSS consist of queue managers, packed-data structure
--processors(PDSP), linking RAM, descriptor pools and infrastructure
--Packet DMA.
--The Queue Manager is a hardware module that is responsible for accelerating
--management of the packet queues. Packets are queued/de-queued by writing or
--reading descriptor address to a particular memory mapped location. The PDSPs
--perform QMSS related functions like accumulation, QoS, or event management.
--Linking RAM registers are used to link the descriptors which are stored in
--descriptor RAM. Descriptor RAM is configurable as internal or external memory.
--The QMSS driver manages the PDSP setups, linking RAM regions,
--queue pool management (allocation, push, pop and notify) and descriptor
--pool management.
-+* Texas Instruments Keystone Navigator (knav) Queue Management SubSystem driver
-+  DT bindings
- 
-+For details of the driver, please refer to
-+Documentation/arm/keystone/knav-qmss.txt
- 
- Required properties:
- - compatible	: Must be "ti,keystone-navigator-qmss";
+Please review and merge if looks good. This is based on what we had 
+discussed above.
+
 -- 
-1.9.1
+Murali Karicheri
+Linux Kernel, Keystone
