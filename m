@@ -1,83 +1,54 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 12 Oct 2015 15:09:50 +0800
-Subject: [PATCH 00/16] Divorcing irqdomain and device_node
-In-Reply-To: <561B1DB9.6010909@linaro.org>
-References: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
- <alpine.DEB.2.11.1510112255330.6097@nanos> <561B1DB9.6010909@linaro.org>
-Message-ID: <561B5CBE.50701@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 12 Oct 2015 09:12:15 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Cleanup for v4.4
+In-Reply-To: <13543534.MsGb8OrGPX@wuerfel>
+References: <cover.1442478814.git.horms+renesas@verge.net.au>
+ <5419864.uERWTbJ9BK@wuerfel>
+ <CAMuHMdUkzv9BE4PDjm3Qkk87f2Lq6Bn-CNb+r3dtSWhbkN39Wg@mail.gmail.com>
+ <13543534.MsGb8OrGPX@wuerfel>
+Message-ID: <CAMuHMdX8PPprPnYNfqkof9EmT7M1YHs3vtPQ1PY=RCwGdq2zhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2015 10:40 AM, Hanjun Guo wrote:
-> On 10/12/2015 05:01 AM, Thomas Gleixner wrote:
->> On Tue, 6 Oct 2015, Marc Zyngier wrote:
->>> [This patch series used to be called "Making the generic ACPI GSI
->>> layer irqdomain aware", but as I've radically changed my approach to
->>> this problem, I've decided to reset the counters...]
->>>
->>> The irqdomain code is not entierely ACPI friendly, as it has some
->>> built-in knowledge of the device-tree. Nothing too harmful, but enough
->>> to scare the ARM ACPI developpers which end up with their own version
->>> of the square wheel. And some of the ramifications actually run deeper
->>> than initially expected.
->>>
->>> This series adapts the irqdomain code to use 'struct fwnode_handle'
->>> instead of 'struct device_node' as the identifier for a domain
->>> (compatibility interfaces are of course added). It also introduces a
->>> generic IRQ specifier that firmware interfaces (DT or ACPI) can
->>> directly use to configure interrupts, and allow the ACPI GSI code to
->>> be plugged into this.
->>>
->>> As examples, we convert the ARM GIC ACPI support to use irqdomains as
->>> originally intended, and rework the MSI code to also move away from
->>> using device nodes when using irqdomains.
->>>
->>> Overall, this gives us a way to use irqdomains on both DT and ACPI
->>> enabled platforms, having very little changes made to the actual
->>> drivers (other than the probing infrastructure). Because we keep the
->>> flow of information between the various layers identical between ACPI
->>> and DT, we immediately benefit from the existing infrastructure.
->>>
->>> This has been test-booted on Juno, is based on 4.3-rc4, and available
->>> at:
->>>
->>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
->>> irq/irq-domain-fwnode-v1
+Hi Arnd,
 
-I pulled, and I found that there is v2 :)
-
->>>
->>> Marc Zyngier (16):
->>>    irqdomain: Use an accessor for the of_node field
->>>    irqdomain: Convert irqdomain->of_node to fwnode
->>>    irqdomain: Allow irq domain lookup by fwnode
->>>    irqdomain: Introduce a firmware-specific IRQ specifier structure
->>>    irqchip: Convert all alloc/xlate users from of_node to fwnode
->>>    irqdomain: Introduce irq_create_fwspec_mapping
->>>    irqdomain: Introduce irq_domain_create_{linear,tree}
->>>    irqdomain: Add a fwnode_handle allocator
->>>    acpi/gsi: Always perform an irq domain lookup
->>>    acpi/gsi: Add acpi_set_irq_model to initialize the GSI layer
->>>    irqchip/gic: Get rid of gic_init_bases()
->>>    irqchip/gic: Switch ACPI support to stacked domains
->>>    irqchip/gic: Kill the xlate method
->>>    acpi/gsi: Cleanup acpi_register_gsi
->>>    irqdomain: Introduce irq_domain_create_hierarchy
->>>    irqdomain/msi: Use fwnode instead of of_node
+On Tue, Oct 6, 2015 at 8:42 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 06 October 2015 17:47:37 Geert Uytterhoeven wrote:
+>> On Tue, Oct 6, 2015 at 3:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Thursday 17 September 2015 17:59:33 Simon Horman wrote:
+>> >> Please consider these Renesas ARM based SoC cleanup for v4.4.
+>> >>
+>> >>  24 files changed, 4 insertions(+), 2687 deletions(-)
+>> >>
+>> >> Is a pleasing diffstat if I do say so myself.
+>> >>
+>> >> Of particular note the last legacy board code for Renesas ARM based SoCs,
+>> >> that of the bockw board, is removed in this pull request.
+>> >
+>> > After a long delay in response, I've merged it now into next/cleanup.
+>> >
+>> > So the transition is complete and you beat me with the multiplatform
+>> > conversion that I have pending for the other ARMv7 platforms, nice work!
 >>
->> I really like this one way better than the previous attempts and I
->> couldn't find any real issue when going through them with a fine comb.
->
-> Fully agree, this version removes the dependency on DT for ACPI.
->
+>> Thanks for pulling!
 >>
->> I'd like to get that into 4.4, so I have to ask for the opinion of
->> ACPI folks. Having an ack on those patches would be nice.
+>> Now I can start out sending my platform data removal series...
 >
-> I'm reviewing this patch set, and will have a test today.
+> Ok, cool.
+>
+> I don't think that there is generally a need to wait before sending
+> stuff out that depends on pull requests to get merged.
 
-I'm pretty fine with this patch set (except some comments for patch 1),
-I will wait for your v2 to be sent out, then add reviews and acks.
+Seems like several subsystem maintainers are uncomfortable with taking
+these patches even after the legacy removal has hit arm-soc/for-next...
 
-Thanks
-Hanjun
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
