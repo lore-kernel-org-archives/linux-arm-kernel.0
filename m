@@ -1,43 +1,80 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 12 Oct 2015 13:53:28 -0700
-Subject: bcm2835 (Raspberry Pi) KMS driver
-In-Reply-To: <561C1A67.1060803@wwwdotorg.org>
-References: <1444426068-15817-1-git-send-email-eric@anholt.net>
- <561A587D.6020009@lategoodbye.de> <561C1A67.1060803@wwwdotorg.org>
-Message-ID: <8737xf6c6v.fsf@eliezer.anholt.net>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Mon, 12 Oct 2015 22:43:13 +0200
+Subject: [PATCH 0/3] delete unneeded of_node_put
+Message-ID: <1444682596-3065-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+Device node iterators perform an of_node_put on each iteration, so putting
+an of_node_put before going around to the next iteration results in a
+double put.
 
-> On 10/11/2015 06:39 AM, Stefan Wahren wrote:
->> Am 09.10.2015 um 23:27 schrieb Eric Anholt:
->>> This is a respin of the Raspberry Pi KMS series.  Now that we've got a
->>> real clock driver, I can actually set new video modes.  Also in this
->>> version, most of the custom DT stuff from before is gone, thanks to
->>> finding exynos's platform_driver component matching code (I have sent
->>> separate patches to drivers/base to make helpers for doing it).
->>>
->>> https://github.com/anholt/linux/tree/vc4-kms-squash-2
->>
->> I want to point out that git format-patch could prepare a nice cover
->> letter and usually the changelog should go there.
->
-> Well, I guess you could put it there, but that wouldn't remove the need 
-> to put the changelog in the individual patches too, so that reviewers 
-> don't have to switch back and forth between different messages just to 
-> find out what changed in each patch.
->
-> +1 on sending the cover letter using git format-patch/send-email 
-> thoughl; the threading here is a little odd.
+The complete semantic patch that fixes this problem is as follows
+(http://coccinelle.lip6.fr):
 
-I was using git send-email --compose.  I guess I'll play with
-format-patch --cover-letter, but it seems odd that threading would be
-any different between the two.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151012/1903f176/attachment.sig>
+// <smpl>
+@r exists@
+expression e1,e2;
+local idexpression n;
+iterator name for_each_node_by_name, for_each_node_by_type,
+for_each_compatible_node, for_each_matching_node,
+for_each_matching_node_and_match, for_each_child_of_node,
+for_each_available_child_of_node, for_each_node_with_property;
+iterator i;
+position p1,p2;
+statement S;
+@@
+
+(
+(
+for_each_node_by_name(n,e1) S
+|
+for_each_node_by_type(n,e1) S
+|
+for_each_compatible_node(n,e1,e2) S
+|
+for_each_matching_node(n,e1) S
+|
+for_each_matching_node_and_match(n,e1,e2) S
+|
+for_each_child_of_node(e1,n) S
+|
+for_each_available_child_of_node(e1,n) S
+|
+for_each_node_with_property(n,e1) S
+)
+&
+i at p1(...) {
+   ... when != of_node_get(n)
+       when any
+   of_node_put at p2(n);
+   ... when any
+}
+)
+
+@s exists@
+local idexpression r.n;
+statement S;
+position r.p1,r.p2;
+iterator i;
+@@
+
+ of_node_put at p2(n);
+ ... when any
+ i at p1(..., n, ...)
+ S
+
+@depends on s@
+local idexpression n;
+position r.p2;
+@@
+
+- of_node_put at p2(n);
+// </smpl>
+
+---
+
+ arch/arm/mach-exynos/pm_domains.c                 |    8 +++-----
+ drivers/soc/qcom/smd.c                            |    4 +---
+ drivers/video/fbdev/omap2/dss/omapdss-boot-init.c |    4 +---
+ 3 files changed, 5 insertions(+), 11 deletions(-)
