@@ -1,66 +1,76 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Mon, 12 Oct 2015 18:07:18 +0530
-Subject: [PATCH v2] arm: dts: Fix audio card detection on peach boards
-Message-ID: <1444653438-6532-1-git-send-email-alim.akhtar@samsung.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 12 Oct 2015 14:48:29 +0200
+Subject: [PATCH v3 6/7] ARM: dts: rockchip: Add drive/sample clocks for rk3288
+ dw_mmc devices
+In-Reply-To: <1444654110-32293-1-git-send-email-heiko@sntech.de>
+References: <1444654110-32293-1-git-send-email-heiko@sntech.de>
+Message-ID: <1444654110-32293-7-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 2fad972d45c4 ("ARM: dts: Add mclk entry for Peach boards"),
-sound card detection is broken on peach boards and gives below errors:
+From: Alexandru M Stan <amstan@chromium.org>
 
-[    3.630457] max98090 7-0010: MAX98091 REVID=0x51
-[    3.634233] max98090 7-0010: use default 2.8v micbias
-[    3.640985] snow-audio sound: HiFi <-> 3830000.i2s mapping ok
-[    3.645307] max98090 7-0010: Invalid master clock frequency
-[    3.650824] snow-audio sound: ASoC: Peach-Pi-I2S-MAX98091 late_probe() failed: -22
-[    3.658914] snow-audio sound: snd_soc_register_card failed (-22)
-[    3.664366] snow-audio: probe of sound failed with error -22
+The drive/sample clocks can be phase shifted.  The drive clock
+could be used in a future patch to adjust hold times.  The sample
+clock is used for tuning.
 
-This patch adds missing assigned-clocks and assigned-clock-parents for
-pmu_system_controller node which is used as "mclk" for audio codec.
-
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-Fixes: 2fad972d45c4 ("ARM: dts: Add mclk entry for Peach boards")
-Cc: <stable@vger.kernel.org>
+Signed-off-by: Alexandru M Stan <amstan@chromium.org>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
-Changes since v1:
-Addressed Krzysztof's review comments.
+ arch/arm/boot/dts/rk3288.dtsi | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
 
- arch/arm/boot/dts/exynos5420-peach-pit.dts |    5 +++++
- arch/arm/boot/dts/exynos5800-peach-pi.dts  |    5 +++++
- 2 files changed, 10 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 8f4d76c5e11c..1b95da79293c 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -915,6 +915,11 @@
- 	};
- };
- 
-+&pmu_system_controller {
-+	assigned-clocks = <&pmu_system_controller 0>;
-+	assigned-clock-parents = <&clock CLK_FIN_PLL>;
-+};
-+
- &rtc {
- 	status = "okay";
- 	clocks = <&clock CLK_RTC>, <&max77802 MAX77802_CLK_32K_AP>;
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 7d5b386b5ae6..8f40c7e549bd 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -878,6 +878,11 @@
- 	};
- };
- 
-+&pmu_system_controller {
-+	assigned-clocks = <&pmu_system_controller 0>;
-+	assigned-clock-parents = <&clock CLK_FIN_PLL>;
-+};
-+
- &rtc {
- 	status = "okay";
- 	clocks = <&clock CLK_RTC>, <&max77802 MAX77802_CLK_32K_AP>;
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 27a397f6..37c5a02 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -225,8 +225,9 @@
+ 	sdmmc: dwmmc at ff0c0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
+ 		clock-freq-min-max = <400000 150000000>;
+-		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>;
+-		clock-names = "biu", "ciu";
++		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>,
++			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
+ 		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg = <0xff0c0000 0x4000>;
+@@ -236,8 +237,9 @@
+ 	sdio0: dwmmc at ff0d0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
+ 		clock-freq-min-max = <400000 150000000>;
+-		clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>;
+-		clock-names = "biu", "ciu";
++		clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>,
++			 <&cru SCLK_SDIO0_DRV>, <&cru SCLK_SDIO0_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
+ 		interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg = <0xff0d0000 0x4000>;
+@@ -247,8 +249,9 @@
+ 	sdio1: dwmmc at ff0e0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
+ 		clock-freq-min-max = <400000 150000000>;
+-		clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>;
+-		clock-names = "biu", "ciu";
++		clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>,
++			 <&cru SCLK_SDIO1_DRV>, <&cru SCLK_SDIO1_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
+ 		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg = <0xff0e0000 0x4000>;
+@@ -258,8 +261,9 @@
+ 	emmc: dwmmc at ff0f0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
+ 		clock-freq-min-max = <400000 150000000>;
+-		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
+-		clock-names = "biu", "ciu";
++		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
++			 <&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
+ 		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg = <0xff0f0000 0x4000>;
 -- 
-1.7.10.4
+2.6.1
