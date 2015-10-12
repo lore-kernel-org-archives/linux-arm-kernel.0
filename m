@@ -1,89 +1,82 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 12 Oct 2015 18:04:54 +0200
-Subject: [PATCH] arm64: dts: mt8173: add MT8173 display PWM driver support
- node
-In-Reply-To: <1444117243-28391-1-git-send-email-yh.huang@mediatek.com>
-References: <1444117243-28391-1-git-send-email-yh.huang@mediatek.com>
-Message-ID: <561BDA26.5010203@gmail.com>
+From: rob.epping@gmail.com (Rob J. Epping)
+Date: Mon, 12 Oct 2015 18:05:04 +0200
+Subject: I/O issues with writing to mtdblock devices on kirkwood
+In-Reply-To: <CAKzmTe2f1FdjM5VZ-ju+ZQ4z0Dxk4x1ywJCfi1OX5eSaCr=51w@mail.gmail.com>
+References: <1440159857.19360.50.camel@debian.org>
+ <20150905210846.GF6040@lunn.ch>
+ <CAKzmTe0Bq8itvKoOTwZ+ZjY5pTqFYWt0-ihO4jn0qew_NYGhFg@mail.gmail.com>
+ <20151011153548.GA9808@lunn.ch>
+ <CAKzmTe2f1FdjM5VZ-ju+ZQ4z0Dxk4x1ywJCfi1OX5eSaCr=51w@mail.gmail.com>
+Message-ID: <461C493B-AD82-4044-A87F-EC22BBFB7011@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On October 12, 2015 4:29:51 PM GMT+02:00, JM <fijam@archlinux.us> wrote:
+>On Sun, Oct 11, 2015 at 5:35 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> On Sun, Oct 11, 2015 at 04:37:52PM +0200, JM wrote:
+>>> On Sat, Sep 5, 2015 at 11:08 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>>> > On Fri, Aug 21, 2015 at 01:24:17PM +0100, Ian Campbell wrote:
+>>> >> Hi kirkwood-upstream,
+>>> >>
+>>> >> We (Debian) have had a couple of reports of I/O errors running
+>Debian
+>>> >> on kirkwood, specifically it seems to relate to later kernels
+>(e.g.
+>>> >> 4.0+) and I _suspect_ (without proof) that it may be due to the
+>switch
+>>> >> from board files to the DTS based kernel, or some change implied
+>by
+>>> >> this (e.g. different SATA driver now or timeouts have changed
+>>> >> perhaps?).
+>>> >
+>>> > Hi Ian
+>>> >
+>>> > I've not reproduced this exactly, but something similar.
+>>> >
+>>> > I do a find / and in parallel a cat /dev/mtdblock3 > /dev/null
+>>> >
+>>> > While the cat is active, the find grinds to a halt. I don't get
+>any
+>>> > SATA timeouts, but that could be because /dev/mtdblock3 is small
+>>> > enough that the timers don't expire.
+>>> >
+>>> > So i will now try to track down if there is a lock getting
+>contended,
+>>> > or at least why only the cat process makes progress.
+>>> >
+>>> >    Andrew
+>>>
+>>> Is there any update on this? The bug persists with kernel 4.2.1
+>>
+>> Sorry, not had time to look.
+>>
+>> Do you have any idea when the issue started? My QNAP box got device
+>> tree support somewhere around 3.5. So i would be tempted to see if
+>> that has the issue, and then git bisect from there. Could you do the
+>> same with you hardware?
+>>
+>>      Andrew
+>
+>Thanks for the reply.
+>
+>I'm afraid my only box is 'in production' and I'd be very reluctant to
+>test older kernels there as I use fairly recent filesystem features. I
+>have a feeling this bug has been around for a long time (or perhaps is
+>even inherent to the way the mtdblock driver is written) and has only
+>been brought out of its dormancy due to some more recent changes, as I
+>remember my device momentarily freezing during flashing with Debian
+>Wheezy (kernel 3.2) (although at that time it wouldn't result in a
+>complete SATA reset). This could use an independent confirmation
+>though.
+>
+>Best regards,
+>Jan
 
+I've been on backports  for some time. AFAIR the problems started with the change to dtb/dts.
 
-On 06/10/15 09:40, YH Huang wrote:
-> Add display PWM node in mt8173-evb.dts and mt8173.dtsi.
->
-> Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> ---
->   arch/arm64/boot/dts/mediatek/mt8173-evb.dts |   13 +++++++++++++
->   arch/arm64/boot/dts/mediatek/mt8173.dtsi    |   22 ++++++++++++++++++++++
->   2 files changed, 35 insertions(+)
->
+I have a box that I can test with, but it has no console connected. Can steal the console connection from my "production" box but that is cumbersome.
 
-Applied, thanks.
-
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> index 811cb76..1b3fabd 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> @@ -92,6 +92,13 @@
->   };
->
->   &pio {
-> +	disp_pwm0_pins: disp_pwm0_pins {
-> +		pins1 {
-> +			pinmux = <MT8173_PIN_87_DISP_PWM0__FUNC_DISP_PWM0>;
-> +			output-low;
-> +		};
-> +	};
-> +
->   	mmc0_pins_default: mmc0default {
->   		pins_cmd_dat {
->   			pinmux = <MT8173_PIN_57_MSDC0_DAT0__FUNC_MSDC0_DAT0>,
-> @@ -190,6 +197,12 @@
->   	};
->   };
->
-> +&pwm0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&disp_pwm0_pins>;
-> +	status = "okay";
-> +};
-> +
->   &pwrap {
->   	pmic: mt6397 {
->   		compatible = "mediatek,mt6397";
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index 4bce167..fd01134 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -500,6 +500,28 @@
->   			clock-names = "source", "hclk";
->   			status = "disabled";
->   		};
-> +
-> +		pwm0: pwm at 1401e000 {
-> +			compatible = "mediatek,mt8173-disp-pwm",
-> +				     "mediatek,mt6595-disp-pwm";
-> +			reg = <0 0x1401e000 0 0x1000>;
-> +			#pwm-cells = <2>;
-> +			clocks = <&mmsys CLK_MM_DISP_PWM026M>,
-> +				 <&mmsys CLK_MM_DISP_PWM0MM>;
-> +			clock-names = "main", "mm";
-> +			status = "disabled";
-> +		};
-> +
-> +		pwm1: pwm at 1401f000 {
-> +			compatible = "mediatek,mt8173-disp-pwm",
-> +				     "mediatek,mt6595-disp-pwm";
-> +			reg = <0 0x1401f000 0 0x1000>;
-> +			#pwm-cells = <2>;
-> +			clocks = <&mmsys CLK_MM_DISP_PWM126M>,
-> +				 <&mmsys CLK_MM_DISP_PWM1MM>;
-> +			clock-names = "main", "mm";
-> +			status = "disabled";
-> +		};
->   	};
->   };
->
->
+GRTNX,
+RobJE
+-- 
+Sent from my mobile device. Please excuse my brevity.
