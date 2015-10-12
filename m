@@ -1,51 +1,76 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 13 Oct 2015 01:24:53 +0300
-Subject: [PATCH 37/37] ARM: dts: tegra20-ventana: Fix regulator enable
- GPIO polarity
-In-Reply-To: <561C2773.5090408@wwwdotorg.org>
-References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <1444684386-17094-38-git-send-email-laurent.pinchart@ideasonboard.com>
- <561C2773.5090408@wwwdotorg.org>
-Message-ID: <9351580.BEfKjdvstm@avalon>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 13 Oct 2015 03:58:32 +0530
+Subject: [PATCH v6 11/17] Documentation: phy: add document for rockchip dp
+ phy
+In-Reply-To: <1444492695-27241-1-git-send-email-ykk@rock-chips.com>
+References: <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
+ <1444492695-27241-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <561C3410.8090600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi,
 
-On Monday 12 October 2015 15:34:43 Stephen Warren wrote:
-> On 10/12/2015 03:13 PM, Laurent Pinchart wrote:
-> > The enable GPIO is active low,
-> 
-> It'd be good to mention a justification for that statement in the
-> patches, since the cover letter isn't going to be checked in.
-> 
-> > but is flagged as active high in the gpio
-> > property. As the gpio property flags are currently unused by the driver
-> > this doesn't cause any issue for now, but will break later if the driver
-> > starts making use of the flags. Fix it.
-> 
-> IIRC the history here was that for some bizarre reason not all GPIO
-> bindings contained an active-high/low flag and there was resistance to
-> extending them in a backwards compatible way. So the regulator binding
-> needed the separate property to represent this. For bindings that did
-> have the flag, we had to set the GPIO flag to active-high, so that if
-> anything started honoring the GPIO flags (e.g. I thikn the gpiod API
-> does today, but the legacy GPIO API doesn't), we wouldn't apply both
-> "active low indicators", and end up driving an active-high signal, and
-> breaking things.
-> 
-> So while this change is logically correct when read in isolation (and
-> for Harmony, Seaboard, and Ventana I verified that these regulators do
-> use an active-low GPIO), I worry that making it makes mistakes likely
-> later. How would we mitigate that?
+On Saturday 10 October 2015 09:28 PM, Yakir Yang wrote:
+> This phy driver is binded with the Rockchip DisplayPort
+> driver, here are the brief properties:
+> 	edp_phy: edp-phy at ff770274 {
+> 		compatible = "rockchip,rk3288-dp-phy";
+> 		rockchip,grf = <&grf>;
+> 		clocks = <&cru SCLK_EDP_24M>;
+> 		clock-names = "24m";
+> 		#phy-cells = <0>;
+> 	};
 
-That's a very good point. Is the resistance to move to the standard GPIO 
-active low/high flags still present, or is it now only history ? In other 
-words, could we aim for using GPIO flags as the primary method to specify 
-polarities, and fall back to the custom properties for backward compatibility 
-(and possibly for GPIO controllers that don't support the flags) ?
+The commit message can simply be "Add dt binding documentation for
+rockchip display port PHY".
 
--- 
-Regards,
+Thanks
+Kishon
 
-Laurent Pinchart
+> 
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> ---
+> Changes in v6: None
+> Changes in v5:
+> - Split binding doc's from driver changes. (Rob)
+> - Update the rockchip,grf explain in document, and correct the clock required
+>   elemets in document. (Rob & Heiko)
+> 
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  .../devicetree/bindings/phy/rockchip-dp-phy.txt    | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+> new file mode 100644
+> index 0000000..505194e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+> @@ -0,0 +1,22 @@
+> +Rockchip Soc Seroes Display Port PHY
+> +------------------------------------
+> +
+> +Required properties:
+> +- compatible : should be one of the following supported values:
+> +	 - "rockchip.rk3288-dp-phy"
+> +- clocks: from common clock binding: handle to dp clock.
+> +	of memory mapped region.
+> +- clock-names: from common clock binding:
+> +	Required elements: "24m"
+> +- rockchip,grf: phandle to the syscon managing the "general register files"
+> +- #phy-cells : from the generic PHY bindings, must be 0;
+> +
+> +Example:
+> +
+> +edp_phy: edp-phy at ff770274 {
+> +	compatible = "rockchip,rk3288-dp-phy";
+> +	rockchip,grf = <&grf>;
+> +	clocks = <&cru SCLK_EDP_24M>;
+> +	clock-names = "24m";
+> +	#phy-cells = <0>;
+> +};
+> 
