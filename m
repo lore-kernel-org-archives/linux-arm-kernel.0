@@ -1,47 +1,67 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 13 Oct 2015 04:17:29 +0900
-Subject: [PATCH 0/6] ARM: s3cxxxx: Use PWM lookup table
-In-Reply-To: <1444049237-29878-1-git-send-email-thierry.reding@gmail.com>
-References: <1444049237-29878-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <561C0749.6020703@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Oct 2015 21:20:17 +0200
+Subject: [PATCH] pxa: remove incorrect __init annotation on
+ pxa27x_set_pwrmode
+In-Reply-To: <87r3kz6hq9.fsf@belgarion.home>
+References: <5287252.pkh9x0t1Y6@wuerfel> <874mhw6mj1.fsf@belgarion.home>
+ <87r3kz6hq9.fsf@belgarion.home>
+Message-ID: <5395757.goqVg4VzNo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/15 21:47, Thierry Reding wrote:
-> Back when the PWM framework was introduced the concept of PWM lookup
-> tables was added to allow board code to register a table of PWM devices
-> and their association with consumers. The goal is to allow drivers to
-> use a unified method to request PWM devices. At the same time, since no
-> boards were exposing these tables, fallback code was kept in drivers to
-> allow old code to remain functional. In order to get rid of the legacy
-> fallback code, legacy users need to be updated to register PWM lookup
-> tables.
+On Monday 12 October 2015 20:53:50 Robert Jarzmik wrote:
+> Robert Jarzmik <robert.jarzmik@free.fr> writes:
 > 
-> This series converts all s3c24xx and s3c64xx boards that hook up a pwm-
-> backlight device to use the new PWM lookup tables. All patches have been
-> compile-tested, but I don't have access to any of these boards, so I
-> couldn't verify that they really work.
+> > Arnd Bergmann <arnd@arndb.de> writes:
+> >
+> >> The z2 machine calls pxa27x_set_pwrmode() in order to power off
+> >> the machine, but this function gets discarded early at boot because
+> >> it is marked __init, as pointed out by kbuild:
+> >>
+> >> WARNING: vmlinux.o(.text+0x145c4): Section mismatch in reference from the function z2_power_off() to the function .init.text:pxa27x_set_pwrmode()
+> >> The function z2_power_off() references
+> >> the function __init pxa27x_set_pwrmode().
+> >> This is often because z2_power_off lacks a __init
+> >> annotation or the annotation of pxa27x_set_pwrmode is wrong.
+> >>
+> >> This removes the __init section modifier to fix rebooting and the
+> >> build error.
+> >>
+> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >> Fixes: ba4a90a6d86a ("ARM: pxa/z2: fix building error of pxa27x_cpu_suspend() no longer available")
+> >> ---
+> >> This is a fix for an old bug, I'd just put it into 4.4
+> >>
+> >> It showed up now because section mismatches now produce errors instead
+> >> of warnings.
+> >
+> > Hi Arnd,
+> >
+> > I already have this queued for 4.4 from Thierry's patch in :
+> >   http://www.spinics.net/lists/arm-kernel/msg449414.html
+> >
+> > Yet your patch is more complete, as it deals also with the header in pxa27x.h
+> > and has the fixes tag.
+> >
+> > Now I'm wondering if I should enhance Thierry's patch with yours and keeping
+> > your signoff with your permission, or drop Thierry's one to replace by yours (I
+> > don't know if it's sane behavior to drop an already queued patch ...)
 > 
-> Thierry
+> Actually, I've rethought it over and Thierry's patch approach looks somehow more
+> appealing to me. What Thierry did is that he modified the _use_ of
+> pxa27x_set_pwrmode() to be called from a __init annonated function. While your
+> patch makes pxa27x_set_pwrmode() non __init.
 > 
-> Thierry Reding (6):
->   ARM: s3c24xx: h1940: Use PWM lookup table
->   ARM: s3c24xx: rx1950: Use PWM lookup table
->   ARM: s3c64xx: smdk6410: Use PWM lookup table
->   ARM: s3c64xx: crag6410: Use PWM lookup table
->   ARM: s3c64xx: hmt: Use PWM lookup table
->   ARM: s3c64xx: smartq: Use PWM lookup table
-> 
->  arch/arm/mach-s3c24xx/mach-h1940.c    | 10 +++++++---
->  arch/arm/mach-s3c24xx/mach-rx1950.c   |  8 ++++++--
->  arch/arm/mach-s3c64xx/dev-backlight.c |  4 ----
->  arch/arm/mach-s3c64xx/mach-crag6410.c |  9 +++++++--
->  arch/arm/mach-s3c64xx/mach-hmt.c      |  9 +++++++--
->  arch/arm/mach-s3c64xx/mach-smartq.c   |  9 +++++++--
->  arch/arm/mach-s3c64xx/mach-smdk6410.c |  8 +++++++-
->  7 files changed, 41 insertions(+), 16 deletions(-)
-> 
-Applied this whole series with Krzysztof's review tag.
+> It looks to me the powermode should be initialized once and for all in the
+> machine init code. So unless I've overseen something, I'll keep Thierry's patch.
 
-Thanks,
-Kukjin
+Ah, sorry. I should have looked at the link you sent.
+
+Thierry's patch indeed looks much nicer if that works, but I'm not entirely
+sure if it is safe or not. Only two other pxa27x machines set the PWRMODE_DEEPSLEEP
+flag, so it looks like there is a reason for some machines not to set it.
+The z2 in particular never did, except in the powerdown handler. So if it
+is unable to wake up reliably from DEEPSLEEP, that may be a reason to use
+that flag only in the poweroff function but not during normal operation.
+
+	Arnd
