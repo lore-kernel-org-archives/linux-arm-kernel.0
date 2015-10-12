@@ -1,184 +1,112 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Mon, 12 Oct 2015 10:26:04 -0700
-Subject: Run armv7 32 bit userspace on aarch64
-In-Reply-To: <6978725.cJktLf4M1X@wuerfel>
-References: <5615A0E1.1050402@linaro.org> <56184079.1040905@linaro.org>
- <56185B98.2060400@linaro.org> <6978725.cJktLf4M1X@wuerfel>
-Message-ID: <561BED2C.8080008@linaro.org>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 12 Oct 2015 18:26:51 +0100
+Subject: [PATCH v2 1/2] thermal: mediatek: Add cpu power cooling model.
+In-Reply-To: <20151007155745.GD28981@leverpostej> (Mark Rutland's message of
+ "Wed, 7 Oct 2015 16:57:45 +0100")
+References: <1444220561-26139-1-git-send-email-dawei.chien@mediatek.com>
+ <1444220561-26139-2-git-send-email-dawei.chien@mediatek.com>
+ <20151007155745.GD28981@leverpostej>
+Message-ID: <9hhoag4dmlg.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2015 2:25 PM, Arnd Bergmann wrote:
-> On Friday 09 October 2015 17:28:08 Shi, Yang wrote:
->> On 10/9/2015 3:32 PM, Shi, Yang wrote:
->>> On 10/8/2015 4:12 AM, Will Deacon wrote:
->>>> On Wed, Oct 07, 2015 at 03:46:57PM -0700, Shi, Yang wrote:
->>>>> I'm trying to run armv7 little endian userspace on qemu aarch64 with
->>>>> 4.1.x
->>>>> kernel. I was told by someone such usecase is valid and I have
->>>>> CONFIG_COMPAT
->>>>> enabled in my kernel.
->>>>>
->>>>> But, I ran into the below error. It looks the userspace application is
->>>>> trying to write a readonly page. I got the similar failure on arm vfp
->>>>> with
->>>>> Linaro images (4.1 kernel) too.
->>>>>
->>>>> Did anyone have tried it recently?
->>>>
->>>> -rc4 seems to be working fine with Debian Jessie armhf on my Juno boards.
->>>>
->>>> Do you have a good way of reproducing this with a mainline kernel?
->>>
->>> It seems a qemu's bug. I can get both ubuntu and openembedded userspace
->>> bootup on my LS2085 board with 4.1 kernel.
->>
->> Some new findings pointed me to another direction.
->>
->> I just tried to build OE userspace with gcc 5.2 (default toolchain in OE
->> now), it fails to boot up with the same error.
->>
->> Then I tried the below test on 4.1 kernel:
->>
->> Linaro OE userspace image (4.9 toolchain)       Failed
->> My OE build with 4.9.3 toolchain                Success
->> My OE build with 5.2 toolchain                  Failed
->> Ubuntu image                                    Success
+Mark Rutland <mark.rutland@arm.com> writes:
+
+> On Wed, Oct 07, 2015 at 08:22:40PM +0800, Dawei Chien wrote:
+>> From: "Dawei.Chien" <dawei.chien@mediatek.com>
+>> 
+>> This power model is base on Intelligent Power Allocation (IPA) technical,
+>> requires that the operating-points of the CPUs are registered using the
+>> kernel's opp library and the `cpufreq_frequency_table` is assigned to the
+>> `struct device` of the cpu MT8173.
+>> 
+>> Signed-off-by: Dawei.Chien <dawei.chien@mediatek.com>
+>> ---
+>> This patch is base on
+>> https://patchwork.kernel.org/patch/7034601/
+>> ---
+>>  drivers/cpufreq/mt8173-cpufreq.c |   97 +++++++++++++++++++++++++++++++++-----
+>>  1 file changed, 86 insertions(+), 11 deletions(-)
+>> 
+>> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
+>> index 49caed2..9233ec5 100644
+>> --- a/drivers/cpufreq/mt8173-cpufreq.c
+>> +++ b/drivers/cpufreq/mt8173-cpufreq.c
+>> @@ -28,7 +28,8 @@
+>>  #define MAX_VOLT_SHIFT		(200000)
+>>  #define MAX_VOLT_LIMIT		(1150000)
+>>  #define VOLT_TOL		(10000)
+>> -
+>> +#define CAPACITANCE_CA53	(263)
+>> +#define CAPACITANCE_CA57	(530)
+>>  /*
+>>   * The struct mtk_cpu_dvfs_info holds necessary information for doing CPU DVFS
+>>   * on each CPU power/clock domain of Mediatek SoCs. Each CPU cluster in
+>> @@ -51,6 +52,72 @@ struct mtk_cpu_dvfs_info {
+>>  	bool need_voltage_tracking;
+>>  };
+>>  
+>> +struct mtk_cpu_static_power {
+>> +	unsigned long voltage;
+>> +	unsigned int power;
+>> +};
+>> +
+>> +/* measured by WA program. */
+>> +static const struct mtk_cpu_static_power mtk_ca53_static_power[] = {
+>> +	{859000, 43},
+>> +	{908000, 52},
+>> +	{983000, 86},
+>> +	{1009000, 123},
+>> +	{1028000, 138},
+>> +	{1083000, 172},
+>> +	{1109000, 180},
+>> +	{1125000, 192},
+>> +};
+>> +
+>> +/* measured by WA program. */
+>> +static const struct mtk_cpu_static_power mtk_ca57_static_power[] = {
+>> +	{828000, 72},
+>> +	{867000, 90},
+>> +	{927000, 156},
+>> +	{968000, 181},
+>> +	{1007000, 298},
+>> +	{1049000, 435},
+>> +	{1089000, 533},
+>> +	{1125000, 533},
+>> +};
 >
-> Does your kernel have 64KB pages enabled? If it does, most 32-bit user space
-> won't run, except when building it with relatively new toolchains.
+> This should be described in the DT, rather than necessitating tonnes of
+> these tables in the kernel.
 
-No, I just use the default 4KB pages, but is is using 48 bits VA. The 
-below is my kernel config (kernel features section)
+The above table is a simplification that is tying the static power of a
+device to a voltage (indirectly via frequency for ease of indexing
+perhaps).
 
-#
-# Kernel Features
-#
+We should definitely look at describing the static power model in the
+device tree - but it is not entirely clear what is the best model to
+use as basis for the device tree bindings.
 
-#
-# ARM errata workarounds via the alternatives framework
-#
-CONFIG_ARM64_ERRATUM_826319=y
-CONFIG_ARM64_ERRATUM_827319=y
-CONFIG_ARM64_ERRATUM_824069=y
-CONFIG_ARM64_ERRATUM_819472=y
-CONFIG_ARM64_ERRATUM_832075=y
-CONFIG_ARM64_ERRATUM_845719=y
-CONFIG_ARM64_ERRATUM_843419=y
-CONFIG_ARM64_4K_PAGES=y
-# CONFIG_ARM64_64K_PAGES is not set
-# CONFIG_ARM64_VA_BITS_39 is not set
-CONFIG_ARM64_VA_BITS_48=y
-CONFIG_ARM64_VA_BITS=48
-# CONFIG_CPU_BIG_ENDIAN is not set
-CONFIG_SMP=y
-# CONFIG_SCHED_MC is not set
-# CONFIG_SCHED_SMT is not set
-CONFIG_NR_CPUS=8
-CONFIG_HOTPLUG_CPU=y
-# CONFIG_PREEMPT_NONE is not set
-# CONFIG_PREEMPT_VOLUNTARY is not set
-CONFIG_PREEMPT=y
-CONFIG_PREEMPT_COUNT=y
-CONFIG_HZ=100
-CONFIG_ARCH_HAS_HOLES_MEMORYMODEL=y
-CONFIG_ARCH_SPARSEMEM_ENABLE=y
-CONFIG_ARCH_SPARSEMEM_DEFAULT=y
-CONFIG_ARCH_SELECT_MEMORY_MODEL=y
-CONFIG_HAVE_ARCH_PFN_VALID=y
-CONFIG_HW_PERF_EVENTS=y
-CONFIG_SYS_SUPPORTS_HUGETLBFS=y
-CONFIG_ARCH_WANT_GENERAL_HUGETLB=y
-CONFIG_ARCH_WANT_HUGE_PMD_SHARE=y
-CONFIG_ARCH_HAS_CACHE_LINE_SIZE=y
-CONFIG_SELECT_MEMORY_MODEL=y
-CONFIG_SPARSEMEM_MANUAL=y
-CONFIG_SPARSEMEM=y
-CONFIG_HAVE_MEMORY_PRESENT=y
-CONFIG_SPARSEMEM_EXTREME=y
-CONFIG_SPARSEMEM_VMEMMAP_ENABLE=y
-CONFIG_SPARSEMEM_VMEMMAP=y
-CONFIG_HAVE_MEMBLOCK=y
-CONFIG_NO_BOOTMEM=y
-# CONFIG_HAVE_BOOTMEM_INFO_NODE is not set
-CONFIG_PAGEFLAGS_EXTENDED=y
-CONFIG_SPLIT_PTLOCK_CPUS=4
-CONFIG_COMPACTION=y
-CONFIG_MIGRATION=y
-CONFIG_PHYS_ADDR_T_64BIT=y
-CONFIG_ZONE_DMA_FLAG=1
-CONFIG_BOUNCE=y
-# CONFIG_KSM is not set
-CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
-# CONFIG_TRANSPARENT_HUGEPAGE is not set
-# CONFIG_CLEANCACHE is not set
-# CONFIG_FRONTSWAP is not set
-# CONFIG_CMA is not set
-# CONFIG_ZPOOL is not set
-# CONFIG_ZBUD is not set
-# CONFIG_ZSMALLOC is not set
-CONFIG_GENERIC_EARLY_IOREMAP=y
-# CONFIG_SECCOMP is not set
-# CONFIG_XEN is not set
-CONFIG_FORCE_MAX_ZONEORDER=11
-CONFIG_ARMV8_DEPRECATED=y
-CONFIG_SWP_EMULATION=y
-# CONFIG_CP15_BARRIER_EMULATION is not set
-# CONFIG_SETEND_EMULATION is not set
+Static power consumption depends on a few different parameters (silicon
+process, voltage, temperature, etc.). The relationship between them
+maybe non-linear and not all of these maybe significant for a given
+platform. e.g., for Juno, we are using a regression based on voltage and
+temperature which was deemed close enough (very subjective tbh).
 
-#
-# Boot options
-#
-CONFIG_CMDLINE="console=ttyAMA0"
-# CONFIG_CMDLINE_FORCE is not set
-CONFIG_EFI_STUB=y
-CONFIG_EFI=y
-CONFIG_DMI=y
+On the other hand, dynamic power consumption is somewhat simpler and I
+have patches[0][1][2] enabling it's description in device tree. Your comments
+there would be very much appreciated.
 
-#
-# Userspace binary formats
-#
-CONFIG_BINFMT_ELF=y
-CONFIG_COMPAT_BINFMT_ELF=y
-CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS=y
-CONFIG_BINFMT_SCRIPT=y
-# CONFIG_HAVE_AOUT is not set
-CONFIG_BINFMT_MISC=m
-CONFIG_COREDUMP=y
-CONFIG_COMPAT=y
-CONFIG_SYSVIPC_COMPAT=y
+As for this patch, I hope it can be moved to using the device tree when
+the bindings for static power are agreed upon. Although sub-optimal, I
+can't see any other way forward for now.
 
-
-And, I also checked my busybox build flags for both 4.9.3 and 5.2, 
-actually, they are using the same flags:
-
-arm-linux-gnueabi-gcc  -march=armv7-a -marm  -mthumb-interwork 
--mfloat-abi=softfp 
---sysroot=/home/yshi/workspace/test-4.1/qemuarma9/bitbake_build/tmp/sysroots/qemuarma9 
--Wp,-MD,archival/libarchive/.filter_accept_all.o.d   -std=gnu99 
--Iinclude -Ilibbb  -include include/autoconf.h -D_GNU_SOURCE -DNDEBUG 
--D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 
--D"BB_VER=KBUILD_STR(1.23.2)" -DBB_BT=AUTOCONF_TIMESTAMP  -Wall -Wshadow 
--Wwrite-strings -Wundef -Wstrict-prototypes -Wunused -Wunused-parameter 
--Wunused-function -Wunused-value -Wmissing-prototypes 
--Wmissing-declarations -Wno-format-security 
--Wdeclaration-after-statement -Wold-style-definition -fno-builtin-strlen 
--finline-limit=0 -fomit-frame-pointer -ffunction-sections 
--fdata-sections -fno-guess-branch-probability -funsigned-char 
--static-libgcc -falign-functions=1 -falign-jumps=1 -falign-labels=1 
--falign-loops=1 -fno-unwind-tables -fno-asynchronous-unwind-tables -Os 
--O2 -pipe -g  -O2 -pipe -g   -D"KBUILD_STR(s)=#s" 
--D"KBUILD_BASENAME=KBUILD_STR(filter_accept_all)" 
--D"KBUILD_MODNAME=KBUILD_STR(filter_accept_all)" -c -o 
-archival/libarchive/filter_accept_all.o 
-archival/libarchive/filter_accept_all.c
-
-
-Thanks,
-Yang
+[0] http://thread.gmane.org/gmane.linux.kernel/2011466/focus=130373
+[1] http://thread.gmane.org/gmane.linux.kernel/2011466/focus=2011465
+[2] http://article.gmane.org/gmane.linux.drivers.sensors/37859
 
 >
-> Try running with the default 4KB page size if that is the problem.
->
-> 	Arnd
->
+> Mark.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
