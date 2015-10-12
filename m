@@ -1,33 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Oct 2015 13:28:48 -0700
-Subject: [PATCH 12/17] ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
-In-Reply-To: <20151012202047.GR23801@atomide.com>
-References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
- <1442850433-5903-13-git-send-email-sudeep.holla@arm.com>
- <20151012202047.GR23801@atomide.com>
-Message-ID: <20151012202847.GS23801@atomide.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 12 Oct 2015 13:31:01 -0700
+Subject: [PATCH 14/20] pxa2xx-flash: switch from ioremap_cache to memremap
+In-Reply-To: <20151012175803.GL107187@google.com>
+References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
+ <20151009221651.32203.63446.stgit@dwillia2-desk3.jf.intel.com>
+ <20151012175803.GL107187@google.com>
+Message-ID: <20151012203101.GM107187@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [151012 13:27]:
-> * Sudeep Holla <sudeep.holla@arm.com> [150921 08:52]:
-> > The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
-> > be left enabled so as to allow them to work as expected during the
-> > suspend-resume cycle, but doesn't guarantee that it will wake the system
-> > from a suspended state, enable_irq_wake is recommended to be used for
-> > the wakeup.
+On Mon, Oct 12, 2015 at 10:58:03AM -0700, Brian Norris wrote:
+> You missed linux-mtd again. Please use scripts/get_maintainer.pl next
+> time to at least get the relevant mailing list(s). (The individual CC's
+> are not always necessary, but the subsystem lists definitely are.)
+
+Anyway, pushed to l2-mtd.git.
+
+Brian
+
+> On Fri, Oct 09, 2015 at 06:16:51PM -0400, Dan Williams wrote:
+> > In preparation for deprecating ioremap_cache() convert its usage in
+> > pxa2xx-flash to memremap.
 > > 
-> > This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
-> > enable_irq_wake instead.
-> 
-> Applying into omap-for-v4.4/cleanup thanks.
-
-Actually I don't think this does the right thing. The interrupts
-in the $subject patch are in the always on powerdomain, and we really
-want them to be excluded from the suspend.
-
-So not applying without further explanations.
-
-Regards,
-
-Tony
+> > Cc: David Woodhouse <dwmw2@infradead.org>
+> > Cc: Brian Norris <computersforpeace@gmail.com>
+> > [brian: also convert iounmap to memunmap]
+> > Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+> > ---
+> >  drivers/mtd/maps/pxa2xx-flash.c |    6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
+> > index 12fa75df5008..5ff6cc5b4844 100644
+> > --- a/drivers/mtd/maps/pxa2xx-flash.c
+> > +++ b/drivers/mtd/maps/pxa2xx-flash.c
+> > @@ -71,8 +71,8 @@ static int pxa2xx_flash_probe(struct platform_device *pdev)
+> >  		       info->map.name);
+> >  		return -ENOMEM;
+> >  	}
+> > -	info->map.cached =
+> > -		ioremap_cache(info->map.phys, info->map.size);
+> > +	info->map.cached = memremap(info->map.phys, info->map.size,
+> > +			MEMREMAP_WB);
+> >  	if (!info->map.cached)
+> >  		printk(KERN_WARNING "Failed to ioremap cached %s\n",
+> >  		       info->map.name);
+> > @@ -111,7 +111,7 @@ static int pxa2xx_flash_remove(struct platform_device *dev)
+> >  	map_destroy(info->mtd);
+> >  	iounmap(info->map.virt);
+> >  	if (info->map.cached)
+> > -		iounmap(info->map.cached);
+> > +		memunmap(info->map.cached);
+> >  	kfree(info);
+> >  	return 0;
+> >  }
+> > 
