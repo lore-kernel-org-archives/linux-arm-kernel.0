@@ -1,30 +1,69 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 12 Oct 2015 15:05:35 -0700
-Subject: [PATCH 13/20] intel-iommu: switch from ioremap_cache to memremap
-In-Reply-To: <20151012215830.GT10641@suse.de>
-References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
- <20151009221646.32203.98367.stgit@dwillia2-desk3.jf.intel.com>
- <20151012215830.GT10641@suse.de>
-Message-ID: <CAPcyv4h8zca3uNUH3ZoSVxrTYXr1XPD8AFrs60JzjKAu+45nog@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 13 Oct 2015 01:12:18 +0300
+Subject: [PATCH] ARM: shmobile: porter: enable internal PCI and USB PHY
+In-Reply-To: <3151312.grtDDBsSl8@wasted.cogentembedded.com>
+References: <3151312.grtDDBsSl8@wasted.cogentembedded.com>
+Message-ID: <4574604.BmF3DtBjpm@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 2:58 PM, Joerg Roedel <jroedel@suse.de> wrote:
-> Hi Dan,
->
-> On Fri, Oct 09, 2015 at 06:16:46PM -0400, Dan Williams wrote:
->> In preparation for deprecating ioremap_cache() convert its usage in
->> intel-iommu to memremap.  This also eliminates the mishandling of the
->> __iomem annotation in the implementation.
->
-> I appreciate the change, but in the cover letter you write the API is
-> only implemented for x86 so far? The VT-d driver is also used on ia64,
-> will it still work there with this patch?
->
->
+Enable  internal AHB-PCI bridges for the USB EHCI/OHCI controllers attached
+to them and also enable  USB PHY device  for the Porter board.  We have to
+enable  everything in one patch since EHCI/OHCI devices are already linked
+to the USB PHY device.
 
-I did convert ia64 in the series [1]  but you're right this patch
-can't go in independently of that conversion.  If you ack this one
-I'll carry them in order.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-[1]: https://lkml.org/lkml/2015/10/9/702
+---
+This patch is against 'renesas-devel-20151012-v4.3-rc5' tag of Simon Horman's
+'renesas.git' repo.
+
+ arch/arm/boot/dts/r8a7791-porter.dts |   28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791-porter.dts
++++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -120,6 +120,16 @@
+ 		renesas,function = "i2c2";
+ 	};
+ 
++	usb0_pins: usb0 {
++		renesas,groups = "usb0";
++		renesas,function = "usb0";
++	};
++
++	usb1_pins: usb1 {
++		renesas,groups = "usb1";
++		renesas,function = "usb1";
++	};
++
+ 	vin0_pins: vin0 {
+ 		renesas,groups = "vin0_data8", "vin0_clk";
+ 		renesas,function = "vin0";
+@@ -245,6 +255,24 @@
+ 	};
+ };
+ 
++&pci0 {
++	pinctrl-0 = <&usb0_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
++
++&pci1 {
++	pinctrl-0 = <&usb1_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
++
++&usbphy {
++	status = "okay";
++};
++
+ &pcie_bus_clk {
+ 	status = "okay";
+ };
