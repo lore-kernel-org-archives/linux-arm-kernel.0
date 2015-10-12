@@ -1,84 +1,46 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 12 Oct 2015 16:12:20 +0100
-Subject: [PATCH v2 2/2] ARM64: kernel: PSCI: move PSCI idle management
- code to drivers/firmware
-In-Reply-To: <20151012142926.GB7452@leverpostej>
-References: <1444648628-24790-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1444648628-24790-3-git-send-email-lorenzo.pieralisi@arm.com>
- <20151012142926.GB7452@leverpostej>
-Message-ID: <20151012151220.GA12925@red-moon>
+From: peda@lysator.liu.se (Peter Rosin)
+Date: Mon, 12 Oct 2015 17:13:55 +0200
+Subject: Regression: at24 eeprom writing
+In-Reply-To: <561292AC.8060408@lysator.liu.se>
+References: <560F0DB1.2020101@lysator.liu.se>
+ <561238A9.1060406@lysator.liu.se> <20151005150032.GA12137@odux.rfo.atmel.com>
+ <561292AC.8060408@lysator.liu.se>
+Message-ID: <561BCE33.2050904@lysator.liu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 2015-10-05 17:09, Peter Rosin wrote:
+> But what trouble does the i2c bus driver see? Admittedly I only
+> have a simple logic level bus viewer, and not a full-blown
+> oscilloscope, so there might be something analogue going on?
+> I don't think so though, those signals looked fine last time we
+> looked (but we obviously didn't have these issues then, and
+> didn't really look that closely). I'll see if I can recheck
+> with a real scope too.
 
-On Mon, Oct 12, 2015 at 03:29:26PM +0100, Mark Rutland wrote:
-> Hi Lorenzo,
-> 
-> On Mon, Oct 12, 2015 at 12:17:08PM +0100, Lorenzo Pieralisi wrote:
-> > ARM64 PSCI kernel interfaces that initialize idle states and implement
-> > the suspend API to enter them are generic and can be shared with the
-> > ARM architecture.
-> > 
-> > To achieve that goal, this patch moves ARM64 PSCI idle management
-> > code to drivers/firmware by creating a file that contains PSCI
-> > helper functions implementing the common kernel interface required
-> > by ARM and ARM64 to share the PSCI idle management code.
-> > 
-> > The ARM generic CPUidle implementation also requires the definition of
-> > a cpuidle_ops section entry for the kernel to initialize the CPUidle
-> > operations at boot based on the enable-method (ie ARM64 has the
-> > statically initialized cpu_ops counterparts for that purpose); therefore
-> > this patch also adds the required section entry on CONFIG_ARM for PSCI so
-> > that the kernel can initialize the PSCI CPUidle back-end when PSCI is
-> > the probed enable-method.
-> > 
-> > On ARM64 this patch provides no functional change.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Sudeep Holla <sudeep.holla@arm.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >  arch/arm64/kernel/psci.c       |  99 +-----------------------------
-> >  drivers/firmware/Makefile      |   2 +-
-> >  drivers/firmware/psci_cpuops.c | 133 +++++++++++++++++++++++++++++++++++++++++
-> 
-> Do we really need the new file, given most of this lived happily in
-> psci.c previously?
+We redid the tests with a real scope, and the signal looks nice
+and square, so it is not that.
 
-No, I thought we could separate the PSCI FW API (eg psci_cpu_suspend())
-from helper functions that are basically a kernel glue layer (but we have
-already helper functions in psci.c like psci_tos_resident_on() so..),
-if we think it is fine to keep them in the same file I can move the
-functions to psci.c.
+Speculating further on the cause of the long ACKs, I think that
+the i2c driver gets confused by an interrupt that marks the
+transfer complete, and thinks it's a NACK interrupt instead. Is that
+plausible?
 
-> > +#ifdef CONFIG_ARM
-> > +struct cpuidle_ops psci_cpuidle_ops __initdata = {
-> > +	.suspend = psci_cpu_suspend_enter,
-> > +	.init = psci_dt_cpu_init_idle,
-> > +};
-> > +
-> > +CPUIDLE_METHOD_OF_DECLARE(psci, "arm,psci", &psci_cpuidle_ops);
-> > +#endif
-> 
-> Don't these also need to be guarded for CONFIG_CPU_IDLE?
-> 
-> The definitions of cpuidle_ops and CPUIDLE_METHOD_OF_DECLARE in
-> arch/arm/include/asm/cpuidle.h depend on it.
+If the peripheral unit is such that it generates a stop automatically
+on NACKs, then this makes perfect sense. I.e. the TWI sees that the
+transfer is complete, generates an interrupt, and waits for further
+data or a stop command. Meanwhile the driver thinks it's a NACK and
+that a stop condition has already been sent to the bus, and just
+notifies the i2c consumer (the eeprom driver in this case) of the
+failure and frees up the bus for any future user.
 
-Not really, they are not guarded, the side effect of not having
-a CONFIG_CPU_IDLE guard is just a struct that is compiled in
-and freed after boot, I thought about that but I am tempted to leave
-it as is to avoid further ifdeffery, I am not fussed either way.
+This also matches what I see when I turn on some more traffic on the
+bus, that is interleaved with the eeprom traffic. AFAICT, it can be
+any command that gets chewed up by the eeprom if it is sent to the
+i2c driver during the long ACK.
 
-> Otherwise this looks fine to me.
+Are you Atmel people making any progress on this data corrupting
+regression? Is there anything else I can do to help?
 
-Great, I will prepare a v3 shortly.
-
-Thanks !
-Lorenzo
+Cheers,
+Peter
