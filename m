@@ -1,40 +1,40 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 12 Oct 2015 18:01:25 +0100
-Subject: [PATCH v2 07/22] arm64: Keep track of CPU feature registers
-In-Reply-To: <20151008150346.GK17192@e104818-lin.cambridge.arm.com>
-References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
- <1444064531-25607-8-git-send-email-suzuki.poulose@arm.com>
- <20151007171621.GD17192@e104818-lin.cambridge.arm.com>
- <56163D7F.4000003@arm.com>
- <20151008150346.GK17192@e104818-lin.cambridge.arm.com>
-Message-ID: <561BE765.1080409@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Oct 2015 10:01:42 -0700
+Subject: [PATCH] ARM: OMAP3: clock: remove un-used core dpll re-program
+ code
+In-Reply-To: <20150812105642.GW4215@atomide.com>
+References: <1437034091-18306-1-git-send-email-t-kristo@ti.com>
+ <20150812072535.GQ4215@atomide.com>
+ <20150812105642.GW4215@atomide.com>
+Message-ID: <20151012170141.GE23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/15 16:03, Catalin Marinas wrote:
-> On Thu, Oct 08, 2015 at 10:55:11AM +0100, Suzuki K. Poulose wrote:
+* Tony Lindgren <tony@atomide.com> [150812 03:59]:
+> * Tony Lindgren <tony@atomide.com> [150812 00:29]:
+> > * Tero Kristo <t-kristo@ti.com> [150716 01:10]:
+> > > Remove the OMAP3 core DPLL re-program code, and the associated SRAM
+> > > code that does the low-level programming of the DPLL divider, idling
+> > > of the SDRAM etc.
+> > > 
+> > > This code was never fully implemented in the kernel; things missing
+> > > were driver side handling of core clock changes (they need to account
+> > > for their functional clock rate being changed on-the-fly), and the whole
+> > > framework required for handling this. Thus, there is not much point
+> > > to keep carrying the low-level support code either.
+> > 
+> > OK I'm applying this into omap-for-v4.3/soc. If we ever need the code
+> > it will be in the git history.
+> 
+> Actually I'll wait on this one and apply it later on as it currently
+> adds merge conflicts into Linux next.
 
-...
->
-> So we have three types of fields in these registers:
->
-> a) features defined but not something we care about in Linux
-> b) reserved fields
-> c) features important to Linux
->
-> I guess for (a), Linux may not even care if they don't match (though we
-> need to be careful which fields we ignore). As for (b), even if they
-> differ, since we don't know the meaning at this point, I think we should
-> just ignore them. If, for example, they add a feature that Linux doesn't
-> care about, they practically fall under the (a) category.
->
-> Regarding exposing reserved CPUID fields to user, I assume we would
-> always return 0.
+Looks like this needs to be updated to apply on v4.3-rc4, can you
+please repost?
 
-Mark,
+Using v4.3-rc4 as the base for v4.4 because it contains most of the
+mmc fixes.
 
-Do you have any comments on this ? The list I have here is what you came
-up with in SANITY checks.
+Regards,
 
-Thanks
-Suzuki
+Tony
