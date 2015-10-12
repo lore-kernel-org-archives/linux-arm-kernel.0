@@ -1,48 +1,57 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 13 Oct 2015 00:13:01 +0300
-Subject: [PATCH 32/37] ARM: dts: omap3-overo-base: Fix regulator enable GPIO
- polarity
-In-Reply-To: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1444684386-17094-33-git-send-email-laurent.pinchart@ideasonboard.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 12 Oct 2015 14:20:15 -0700
+Subject: [PATCH 1/5] mtd: brcmnand: Fix pointer type-cast in
+ brcmnand_write()
+In-Reply-To: <1443808606-21203-2-git-send-email-anup.patel@broadcom.com>
+References: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
+ <1443808606-21203-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <20151012212015.GO107187@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The enable GPIO is active low, but is flagged as active high in the gpio
-property. As the gpio property flags are currently unused by the driver
-this doesn't cause any issue for now, but will break later if the driver
-starts making use of the flags. Fix it.
+On Fri, Oct 02, 2015 at 11:26:42PM +0530, Anup Patel wrote:
+> We should always type-cast pointer to "long" or "unsigned long"
+> because size of pointer is same as machine word size. This will
+> avoid pointer type-cast issues on both 32bit and 64bit systems.
+> 
+> This patch fixes pointer type-cast issue in brcmnand_write()
+> as-per above info.
+> 
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Vikram Prakash <vikramp@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> ---
+>  drivers/mtd/nand/brcmnand/brcmnand.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
+> index fddb795..4cba03d 100644
+> --- a/drivers/mtd/nand/brcmnand/brcmnand.c
+> +++ b/drivers/mtd/nand/brcmnand/brcmnand.c
+> @@ -1544,9 +1544,9 @@ static int brcmnand_write(struct mtd_info *mtd, struct nand_chip *chip,
+>  
+>  	dev_dbg(ctrl->dev, "write %llx <- %p\n", (unsigned long long)addr, buf);
+>  
+> -	if (unlikely((u32)buf & 0x03)) {
+> +	if (unlikely((unsigned long)buf & 0x03)) {
+>  		dev_warn(ctrl->dev, "unaligned buffer: %p\n", buf);
+> -		buf = (u32 *)((u32)buf & ~0x03);
+> +		buf = (u32 *)((unsigned long)buf & ~0x03);
+>  	}
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
- arch/arm/boot/dts/omap3-overo-base.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Hmm, this block isn't really good. We should probably work to remove
+this. Not sure why I left that in, actually. At a minimum, it'd probably
+good to make this noisier, so if we see this in practice, we can work to
+fix those cases.
 
-Cc: linux-omap at vger.kernel.org
-Cc: Benoit Cousson <bcousson@baylibre.com>
-Cc: Tony Lindgren <tony@atomide.com>
+But anyway, the patch is good (though 'uintptr_t' might be slightly
+better), so pushed to l2-mtd.git.
 
-diff --git a/arch/arm/boot/dts/omap3-overo-base.dtsi b/arch/arm/boot/dts/omap3-overo-base.dtsi
-index 18e1649681c1..1fa59d0e1e8a 100644
---- a/arch/arm/boot/dts/omap3-overo-base.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-base.dtsi
-@@ -65,7 +65,7 @@
- 		regulator-name = "regulator-w3cbw003c-wifi-nreset";
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
--		gpio = <&gpio1 16 GPIO_ACTIVE_HIGH>;		/* gpio_16: WiFi nReset */
-+		gpio = <&gpio1 16 GPIO_ACTIVE_LOW>;		/* gpio_16: WiFi nReset */
- 		startup-delay-us = <10000>;
- 	};
- 
-@@ -75,7 +75,7 @@
- 		regulator-name = "regulator-w3cbw003c-bt-nreset";
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
--		gpio = <&gpio6 4 GPIO_ACTIVE_HIGH>;		/* gpio_164: BT nReset */
-+		gpio = <&gpio6 4 GPIO_ACTIVE_LOW>;		/* gpio_164: BT nReset */
- 		startup-delay-us = <10000>;
- 	};
- };
--- 
-2.4.9
+Brian
+
+>  
+>  	brcmnand_wp(mtd, 0);
+> -- 
+> 1.9.1
+> 
