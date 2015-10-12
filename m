@@ -1,47 +1,38 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 13 Oct 2015 08:49:27 +0900
-Subject: [PATCH v2] arm: dts: Fix audio card detection on peach boards
-In-Reply-To: <561C0589.7010103@kernel.org>
-References: <1444653438-6532-1-git-send-email-alim.akhtar@samsung.com>
- <561BAFE0.5070205@samsung.com> <561C0589.7010103@kernel.org>
-Message-ID: <CAJKOXPf8ZoHsP16fEWaRDMxd_7HRjzupOWOgp8ng2RjsL_BBuA@mail.gmail.com>
+Date: Tue, 13 Oct 2015 08:51:49 +0900
+Subject: [PATCH] thermal: exynos: Fix register read in TMU
+Message-ID: <1444693909-17754-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-13 4:10 GMT+09:00 Kukjin Kim <kgene@kernel.org>:
-> On 10/12/15 22:04, Krzysztof Kozlowski wrote:
->> W dniu 12.10.2015 o 21:37, Alim Akhtar pisze:
->>> Since commit 2fad972d45c4 ("ARM: dts: Add mclk entry for Peach boards"),
->>> sound card detection is broken on peach boards and gives below errors:
->>>
->>> [    3.630457] max98090 7-0010: MAX98091 REVID=0x51
->>> [    3.634233] max98090 7-0010: use default 2.8v micbias
->>> [    3.640985] snow-audio sound: HiFi <-> 3830000.i2s mapping ok
->>> [    3.645307] max98090 7-0010: Invalid master clock frequency
->>> [    3.650824] snow-audio sound: ASoC: Peach-Pi-I2S-MAX98091 late_probe() failed: -22
->>> [    3.658914] snow-audio sound: snd_soc_register_card failed (-22)
->>> [    3.664366] snow-audio: probe of sound failed with error -22
->>>
->>> This patch adds missing assigned-clocks and assigned-clock-parents for
->>> pmu_system_controller node which is used as "mclk" for audio codec.
->>>
->>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->>> Fixes: 2fad972d45c4 ("ARM: dts: Add mclk entry for Peach boards")
->>> Cc: <stable@vger.kernel.org>
->>> ---
->>> Changes since v1:
->>> Addressed Krzysztof's review comments.
->>
->> Looks good, thanks!
->>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
-> Applied, thanks.
+From: Sudip Mukherjee <sudipm.mukherjee@gmail.com>
 
-I see you pulled that one and of_node_put() fix into fixes. Thanks!
-Can you apply also Sudip's fix for thermal (acked by Lukasz)? I have
-it my try but since you applied these two already it does not have
-sense any more.
+The value of emul_con was getting overwritten if the selected soc is
+SOC_ARCH_EXYNOS5260. And so as a result we were reading from the wrong
+register in the case of SOC_ARCH_EXYNOS5260.
 
-Best regards,
-Krzysztof
+Signed-off-by: Sudip Mukherjee <sudip@vectorindia.org>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+Fixes: 488c7455d74c ("thermal: exynos: Add the support for Exynos5433 TMU")
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ drivers/thermal/samsung/exynos_tmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index 0bae8cc6c23a..ca920b0ecf8f 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -932,7 +932,7 @@ static void exynos4412_tmu_set_emulation(struct exynos_tmu_data *data,
+ 
+ 	if (data->soc == SOC_ARCH_EXYNOS5260)
+ 		emul_con = EXYNOS5260_EMUL_CON;
+-	if (data->soc == SOC_ARCH_EXYNOS5433)
++	else if (data->soc == SOC_ARCH_EXYNOS5433)
+ 		emul_con = EXYNOS5433_TMU_EMUL_CON;
+ 	else if (data->soc == SOC_ARCH_EXYNOS7)
+ 		emul_con = EXYNOS7_TMU_REG_EMUL_CON;
+-- 
+1.9.1
