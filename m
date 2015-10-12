@@ -1,27 +1,38 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Mon, 12 Oct 2015 12:07:06 +0200
-Subject: [PATCH 3/6] watchdog: at91sam9: rename heartbeats into timeout
- where necessary
-In-Reply-To: <1444340074-15437-4-git-send-email-sylvain.rochet@finsecur.com>
-References: <1444340074-15437-1-git-send-email-sylvain.rochet@finsecur.com>
- <1444340074-15437-4-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <20151012100706.GA3088@gradator.net>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 12 Oct 2015 11:07:36 +0100
+Subject: [PATCH v3 2/5] PCI: Add quirk for PLDA's XpressRICH3 host bridge
+ class.
+In-Reply-To: <1444644459-2780-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1444644459-2780-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1444644459-2780-3-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 11:34:31PM +0200, Sylvain Rochet wrote:
-> 
-> @@ -344,7 +342,7 @@ static int __init at91wdt_probe(struct platform_device *pdev)
->  	wdt->wdd.parent = &pdev->dev;
->  	wdt->wdd.info = &at91_wdt_info;
->  	wdt->wdd.ops = &at91_wdt_ops;
-> -	wdt->wdd.timeout = WDT_HEARTBEAT;
-> +	wdt->wdd.timeout = wdt_timeout;
+The XpressRICH3 host bridge at power up has an unassigned class on
+some of ARM Ltd boards, add a quirk to correct that.
 
-This wasn't a good idea, if wdt_timeout is set using a module parameter 
-to a wrong value we end up using this wrong value. Setting the default 
-to a valid hardwired value and checking if the proposed value is valid 
-using watchdog_init_timeout is obviously the way to go. I will rework 
-that in v2.
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ drivers/pci/quirks.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Sylvain
+diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+index b03373f..ae24bb4 100644
+--- a/drivers/pci/quirks.c
++++ b/drivers/pci/quirks.c
+@@ -4149,3 +4149,13 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
+ 	}
+ }
+ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
++
++/*
++ * The PLDA's XpressRICH3 doesn't describe itself as a bridge. This is required
++ * for correct/normal enumeration.
++ */
++static void xr3pci_quirk_class(struct pci_dev *pdev)
++{
++	pdev->class = PCI_CLASS_BRIDGE_PCI << 8;
++}
++DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_PLDA, PCI_DEVICE_ID_XR3PCI, xr3pci_quirk_class);
+-- 
+2.6.0
