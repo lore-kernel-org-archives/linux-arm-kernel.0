@@ -1,129 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Oct 2015 15:24:25 -0700
-Subject: [PATCH 00/37] ARM: dts: Fix fixed regulators enable GPIO polarity
-In-Reply-To: <5696453.QxruGxICMQ@avalon>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 13 Oct 2015 01:24:53 +0300
+Subject: [PATCH 37/37] ARM: dts: tegra20-ventana: Fix regulator enable
+ GPIO polarity
+In-Reply-To: <561C2773.5090408@wwwdotorg.org>
 References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <20151012214654.GE23801@atomide.com>
- <561C31E8.6000408@osg.samsung.com> <5696453.QxruGxICMQ@avalon>
-Message-ID: <20151012222424.GJ23801@atomide.com>
+ <1444684386-17094-38-git-send-email-laurent.pinchart@ideasonboard.com>
+ <561C2773.5090408@wwwdotorg.org>
+Message-ID: <9351580.BEfKjdvstm@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [151012 15:26]:
-> Hi Javier,
-> 
-> On Tuesday 13 October 2015 00:19:20 Javier Martinez Canillas wrote:
-> > On 10/12/2015 11:46 PM, Tony Lindgren wrote:
-> > > * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [151012 14:17]:
-> > >> Hello,
-> > >> 
-> > >> While working on regulators, GPIOs and DT I noticed that many of our DT
-> > >> source files incorrectly describe fixed regulators. The common error
-> > >> patterns are
-> > >> 
-> > >> - Usage of the undefined (and never parsed) enable-active-low property
-> > >> - Usage of the enable-active-high property without specifying an enable
-> > >>   GPIO
-> > >> - Typos in the enabl GPIO property name (gpios instead of gpio)
-> > >> - Mismatch between the enable-active-high property (or the lack thereof)
-> > >>   and the enable GPIO flags
-> > >> 
-> > >> This patch series fixes those issues in all the DT sources after locating
-> > >> the errors using the following script.
-> > >> 
-> > >> -------------------------------------------------------------------------
-> > >> !/bin/sh
-> > >> 
-> > >> echo $1
-> > >> cat $1 | awk '
-> > >> BEGIN {
-> > >> 	open_drain = 0;
-> > >> 	active_high = 0;
-> > >> 	gpio = 0;
-> > >> 	flags = 0;
-> > >> }
-> > >> 
-> > >> match($0, /([a-zA-Z0-9 at _-]*) {/, ary) {
-> > >> 	name = ary[1];
-> > >> }
-> > >> 
-> > >> /compatible.*"regulator-fixed"/ {
-> > >> 	found = 1;
-> > >> }
-> > >> 
-> > >> /enable-active-high/ {
-> > >> 	active_high = 1;
-> > >> }
-> > >> 
-> > >> /gpio-open-drain/ {
-> > >> 	open_drain = 1;
-> > >> }
-> > >> 
-> > >> match($0, /gpio += <.* ([^ ]*)>/, ary) {
-> > >> 	gpio = 1;
-> > >> 	flags = ary[1];
-> > >> 	if (flags == 0)
-> > >> 		flags = "GPIO_ACTIVE_HIGH";
-> > >> }
-> > >> 
-> > >> /}/ {
-> > >> 	if (found) {
-> > >> 		if (gpio) {
-> > >> 			print "\t" name ": active high " active_high " " flags " open 
-> drain "
-> > >> 			open_drain;
-> > >> 			if ((active_high && flags == "GPIO_ACTIVE_LOW") ||
-> > >> 			    (!active_high && flags == "GPIO_ACTIVE_HIGH"))
-> > >> 				print "WARNING: enable-active-high and flags do not 
-> match"
-> > >> 		} else {
-> > >> 			if (active_high)
-> > >> 				print "WARNING: active high without GPIO"
-> > >> 			if (open_drain)
-> > >> 				print "WARNING: open drain without GPIO"
-> > >> 		}
-> > >> 	}
-> > >> 	
-> > >> 	gpio = 0;
-> > >> 	found = 0;
-> > >> 	active_high = 0;
-> > >> 	open_drain = 0;
-> > >> 	flags = 0;
-> > >> }
-> > >> '
-> > >> -------------------------------------------------------------------------
-> > >> 
-> > >> All patches except for the ones touching omap3-beagle-xm and
-> > >> omap3-overo-base are untested as I lack test hardware.
-> > >> 
-> > >> As there's no dependency between the patches touching different source
-> > >> files the appropriate maintainers could take their share of the patches
-> > >> in their tree. Alternatively I could send a single pull request after
-> > >> collecting all acks but that might be more complex.
-> > > 
-> > > Nice clean-up. For omaps, there's an earlier patch posted by
-> > > Javier Martinez Canillas <javier@osg.samsung.com> as "[PATCH] ARM: dts:
-> > > Use defined GPIO constants in flags cell for OMAP2+ boards". Can you guys
-> > > do some cross checking and let me know which combination I should appluy
-> > > for omaps?
-> >
-> > Since Laurent's changes for OMAP are part of a bigger series and my patch
-> > was only for OMAP, probably makes sense for you to pick his patches and I
-> > can re-spin mine on top of that.
-> > 
-> > BTW, I posted as a single patch since the changes were trivial but maybe
-> > that made handling these conflicts harder and I should split the changes
-> > instead, since I'll resend anyways.
-> > 
-> > What do you prefer? a patch per SoC family (i.e: OMAP{2,3,4,5}) or patch
-> > per board DTS?
-> 
-> My series will likely miss the next merge window as more discussion is needed. 
-> I'll thus respin the patches on top of yours, please proceed without caring 
-> about this.
+Hi Stephen,
 
-OK applying Javier's patch into omap-for-v4.4/dt then.
+On Monday 12 October 2015 15:34:43 Stephen Warren wrote:
+> On 10/12/2015 03:13 PM, Laurent Pinchart wrote:
+> > The enable GPIO is active low,
+> 
+> It'd be good to mention a justification for that statement in the
+> patches, since the cover letter isn't going to be checked in.
+> 
+> > but is flagged as active high in the gpio
+> > property. As the gpio property flags are currently unused by the driver
+> > this doesn't cause any issue for now, but will break later if the driver
+> > starts making use of the flags. Fix it.
+> 
+> IIRC the history here was that for some bizarre reason not all GPIO
+> bindings contained an active-high/low flag and there was resistance to
+> extending them in a backwards compatible way. So the regulator binding
+> needed the separate property to represent this. For bindings that did
+> have the flag, we had to set the GPIO flag to active-high, so that if
+> anything started honoring the GPIO flags (e.g. I thikn the gpiod API
+> does today, but the legacy GPIO API doesn't), we wouldn't apply both
+> "active low indicators", and end up driving an active-high signal, and
+> breaking things.
+> 
+> So while this change is logically correct when read in isolation (and
+> for Harmony, Seaboard, and Ventana I verified that these regulators do
+> use an active-low GPIO), I worry that making it makes mistakes likely
+> later. How would we mitigate that?
 
+That's a very good point. Is the resistance to move to the standard GPIO 
+active low/high flags still present, or is it now only history ? In other 
+words, could we aim for using GPIO flags as the primary method to specify 
+polarities, and fall back to the custom properties for backward compatibility 
+(and possibly for GPIO controllers that don't support the flags) ?
+
+-- 
 Regards,
 
-Tony
+Laurent Pinchart
