@@ -1,78 +1,129 @@
-From: pat-lkml@erley.org (Pat Erley)
-Date: Sun, 11 Oct 2015 20:58:02 -0700
-Subject: [Linaro-acpi] [PATCH v5 0/5] Provide better MADT subtable sanity
- checks
-In-Reply-To: <561B2DAD.5070601@linaro.org>
-References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
- <560BA4C9.7090607@huawei.com> <560C0968.6020904@redhat.com>
- <2808057.teMg2oCLf6@vostro.rjw.lan> <5612AF64.4060900@redhat.com>
- <561B2442.9050600@erley.org> <561B2DAD.5070601@linaro.org>
-Message-ID: <561B2FCA.1010504@erley.org>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Mon, 12 Oct 2015 11:59:16 +0800
+Subject: [RFC] arm: add __initbss section attribute
+Message-ID: <1444622356-8263-1-git-send-email-yalin.wang2010@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2015 08:49 PM, Hanjun Guo wrote:
-> On 10/12/2015 11:08 AM, Pat Erley wrote:
->> On 10/05/2015 10:12 AM, Al Stone wrote:
->>> On 10/05/2015 07:39 AM, Rafael J. Wysocki wrote:
->>>> On Wednesday, September 30, 2015 10:10:16 AM Al Stone wrote:
->>>>> On 09/30/2015 03:00 AM, Hanjun Guo wrote:
->>>>>> On 2015/9/30 7:45, Al Stone wrote:
->>>>>>> NB: this patch set is for use against the linux-pm bleeding edge
->>>>>>> branch.
->>>>>>>
->>>>>
->>>>> [snip...]
->>>>>
->>>>>>
->>>>>> For this patch set,
->>>>>>
->>>>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>>>
->>>>>> Thanks
->>>>>> Hanjun
->>>>>
->>>>> Thanks, Hanjun!
->>>>
->>>> Series applied, thanks!
->>>>
->>>> Rafael
->>>>
->>>
->>> Thanks, Rafael!
->>>
->>
->> Just decided to test out linux-next (to see the new nouveau cleanups).
->> This change set prevents my Lenovo W510 from booting properly.
->>
->> Reverting: 7494b0 "ACPI: add in a bad_madt_entry() function to
->> eventually replace the macro"
->>
->> Gets the system booting again.  I'm attaching my dmesg from the failed
->> boot, who wants the acpidump?
->
-> [    0.000000] ACPI: undefined version for either FADT 4.0 or MADT 1
-> [    0.000000] ACPI: Error parsing LAPIC address override entry
-> [    0.000000] ACPI: Invalid BIOS MADT, disabling ACPI
->
-> Seems the MADT revision is not right, could you dump the ACPI MADT
-> (APIC) table and send it out? I will take a look :)
->
-> Thanks
-> Hanjun
+This attribute can make init data to be into .initbss section,
+this will make the data to be NO_BITS in vmlinux, can shrink the
+Image file size, and speed up the boot up time.
 
-Here ya go, enjoy.  Feel free to CC me on any patches that might fix it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: apic.dat
-Type: application/x-ns-proxy-autoconfig
-Size: 188 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151011/cb6c665e/attachment.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: apic.dsl
-Type: text/x-dsl
-Size: 8720 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151011/cb6c665e/attachment-0001.bin>
+Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+---
+ arch/arm/kernel/vmlinux.lds.S     |  2 +-
+ arch/arm/mm/init.c                |  1 +
+ include/asm-generic/sections.h    |  1 +
+ include/asm-generic/vmlinux.lds.h | 11 ++++++++++-
+ include/linux/init.h              |  1 +
+ include/linux/mm.h                |  4 +++-
+ 6 files changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 8b60fde..ad6d740 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -330,7 +330,7 @@ SECTIONS
+ 	}
+ #endif
+ 
+-	BSS_SECTION(0, 0, 0)
++	BSS_SECTION(0, 0, 0, 0)
+ 	_end = .;
+ 
+ 	STABS_DEBUG
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 8a63b4c..50b881e 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -722,6 +722,7 @@ void free_initmem(void)
+ 	free_tcmmem();
+ 
+ 	poison_init_mem(__init_begin, __init_end - __init_begin);
++	poison_init_mem(__initbss_start, __initbss_start - __initbss_end);
+ 	if (!machine_is_integrator() && !machine_is_cintegrator())
+ 		free_initmem_default(-1);
+ }
+diff --git a/include/asm-generic/sections.h b/include/asm-generic/sections.h
+index b58fd66..a63ebe9 100644
+--- a/include/asm-generic/sections.h
++++ b/include/asm-generic/sections.h
+@@ -29,6 +29,7 @@ extern char _text[], _stext[], _etext[];
+ extern char _data[], _sdata[], _edata[];
+ extern char __bss_start[], __bss_stop[];
+ extern char __init_begin[], __init_end[];
++extern char __initbss_start[], __initbss_end[];
+ extern char _sinittext[], _einittext[];
+ extern char _end[];
+ extern char __per_cpu_load[], __per_cpu_start[], __per_cpu_end[];
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index c4bd0e2..b3db62d 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -574,6 +574,14 @@
+ 		*(COMMON)						\
+ 	}
+ 
++#define INITBSS(initbss_align)						\
++	. = ALIGN(initbss_align);					\
++	.initbss : AT(ADDR(.initbss) - LOAD_OFFSET) {			\
++		VMLINUX_SYMBOL(__initbss_start) = .;			\
++		*(.bss.init.data)					\
++		VMLINUX_SYMBOL(__initbss_end) = .;			\
++	}
++
+ /*
+  * DWARF debug sections.
+  * Symbols in the DWARF debugging sections are relative to
+@@ -831,10 +839,11 @@
+ 		INIT_RAM_FS						\
+ 	}
+ 
+-#define BSS_SECTION(sbss_align, bss_align, stop_align)			\
++#define BSS_SECTION(sbss_align, bss_align, initbss_align, stop_align)			\
+ 	. = ALIGN(sbss_align);						\
+ 	VMLINUX_SYMBOL(__bss_start) = .;				\
+ 	SBSS(sbss_align)						\
+ 	BSS(bss_align)							\
++	INITBSS(initbss_align)						\
+ 	. = ALIGN(stop_align);						\
+ 	VMLINUX_SYMBOL(__bss_stop) = .;
+diff --git a/include/linux/init.h b/include/linux/init.h
+index b449f37..f2960b2 100644
+--- a/include/linux/init.h
++++ b/include/linux/init.h
+@@ -41,6 +41,7 @@
+    discard it in modules) */
+ #define __init		__section(.init.text) __cold notrace
+ #define __initdata	__section(.init.data)
++#define __initbss	__section(.bss.init.data)
+ #define __initconst	__constsection(.init.rodata)
+ #define __exitdata	__section(.exit.data)
+ #define __exit_call	__used __section(.exitcall.exit)
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index d30eea3..1f266f7 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -21,6 +21,7 @@
+ #include <linux/resource.h>
+ #include <linux/page_ext.h>
+ #include <linux/err.h>
++#include <asm/sections.h>
+ 
+ struct mempolicy;
+ struct anon_vma;
+@@ -1722,10 +1723,11 @@ static inline void mark_page_reserved(struct page *page)
+  */
+ static inline unsigned long free_initmem_default(int poison)
+ {
+-	extern char __init_begin[], __init_end[];
+ 
+ 	return free_reserved_area(&__init_begin, &__init_end,
+ 				  poison, "unused kernel");
++	return free_reserved_area(&__initbss_start, &__initbss_end,
++				  poison, "unused kernel");
+ }
+ 
+ static inline unsigned long get_num_physpages(void)
+-- 
+1.9.1
