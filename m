@@ -1,161 +1,55 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Mon, 12 Oct 2015 16:46:55 +0800
-Subject: [RFC] arm: add __initbss section attribute
-In-Reply-To: <CAKv+Gu8rf2qsK4Q9UBxNUo0GDVO+5_SP0mXjuEfcG2WOMdpmZQ@mail.gmail.com>
-References: <1444622356-8263-1-git-send-email-yalin.wang2010@gmail.com>
- <CAKv+Gu8rf2qsK4Q9UBxNUo0GDVO+5_SP0mXjuEfcG2WOMdpmZQ@mail.gmail.com>
-Message-ID: <DA4E0A1F-A6C0-4DC3-8C15-B5C49BC4D4C3@gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 12 Oct 2015 09:57:35 +0100
+Subject: [PATCH v2 2/5] PCI: Add quirk for PLDA's XpressRICH3 host bridge
+ class.
+In-Reply-To: <7335872.olmykfZgj7@wuerfel>
+References: <1444409849-5685-1-git-send-email-Liviu.Dudau@arm.com>
+ <1444409849-5685-3-git-send-email-Liviu.Dudau@arm.com>
+ <7335872.olmykfZgj7@wuerfel>
+Message-ID: <20151012085735.GJ3394@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 09, 2015 at 08:32:07PM +0200, Arnd Bergmann wrote:
+> On Friday 09 October 2015 17:57:26 Liviu Dudau wrote:
+> > +/*
+> > + * The PLDA's XpressRICH3 doesn't describe itself as a bridge. This is required
+> > + * for correct/normal enumeration.
+> > + */
+> > +static void xr3pci_quirk_class(struct pci_dev *pdev)
+> > +{
+> > +       pdev->class = PCI_CLASS_BRIDGE_PCI << 8;
+> > +}
+> > +DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_PLDA, PCI_DEVICE_ID_XR3PCI, xr3pci_quirk_class);
+> > 
+> 
+> Are you sure that this device ID is only used for the host bridge, not
+> for related devices in endpoint mode?
 
-> On Oct 12, 2015, at 16:22, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> 
-> On 12 October 2015 at 05:59, yalin wang <yalin.wang2010@gmail.com> wrote:
->> This attribute can make init data to be into .initbss section,
->> this will make the data to be NO_BITS in vmlinux, can shrink the
->> Image file size, and speed up the boot up time.
->> 
->> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
->> ---
->> arch/arm/kernel/vmlinux.lds.S     |  2 +-
->> arch/arm/mm/init.c                |  1 +
->> include/asm-generic/sections.h    |  1 +
->> include/asm-generic/vmlinux.lds.h | 11 ++++++++++-
->> include/linux/init.h              |  1 +
->> include/linux/mm.h                |  4 +++-
->> 6 files changed, 17 insertions(+), 3 deletions(-)
->> 
->> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
->> index 8b60fde..ad6d740 100644
->> --- a/arch/arm/kernel/vmlinux.lds.S
->> +++ b/arch/arm/kernel/vmlinux.lds.S
->> @@ -330,7 +330,7 @@ SECTIONS
->>        }
->> #endif
->> 
->> -       BSS_SECTION(0, 0, 0)
->> +       BSS_SECTION(0, 0, 0, 0)
->>        _end = .;
->> 
->>        STABS_DEBUG
->> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
->> index 8a63b4c..50b881e 100644
->> --- a/arch/arm/mm/init.c
->> +++ b/arch/arm/mm/init.c
->> @@ -722,6 +722,7 @@ void free_initmem(void)
->>        free_tcmmem();
->> 
->>        poison_init_mem(__init_begin, __init_end - __init_begin);
->> +       poison_init_mem(__initbss_start, __initbss_start - __initbss_end);
->>        if (!machine_is_integrator() && !machine_is_cintegrator())
->>                free_initmem_default(-1);
->> }
->> diff --git a/include/asm-generic/sections.h b/include/asm-generic/sections.h
->> index b58fd66..a63ebe9 100644
->> --- a/include/asm-generic/sections.h
->> +++ b/include/asm-generic/sections.h
->> @@ -29,6 +29,7 @@ extern char _text[], _stext[], _etext[];
->> extern char _data[], _sdata[], _edata[];
->> extern char __bss_start[], __bss_stop[];
->> extern char __init_begin[], __init_end[];
->> +extern char __initbss_start[], __initbss_end[];
->> extern char _sinittext[], _einittext[];
->> extern char _end[];
->> extern char __per_cpu_load[], __per_cpu_start[], __per_cpu_end[];
->> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
->> index c4bd0e2..b3db62d 100644
->> --- a/include/asm-generic/vmlinux.lds.h
->> +++ b/include/asm-generic/vmlinux.lds.h
->> @@ -574,6 +574,14 @@
->>                *(COMMON)                                               \
->>        }
->> 
->> +#define INITBSS(initbss_align)                                         \
->> +       . = ALIGN(initbss_align);                                       \
->> +       .initbss : AT(ADDR(.initbss) - LOAD_OFFSET) {                   \
->> +               VMLINUX_SYMBOL(__initbss_start) = .;                    \
->> +               *(.bss.init.data)                                       \
->> +               VMLINUX_SYMBOL(__initbss_end) = .;                      \
->> +       }
->> +
->> /*
->>  * DWARF debug sections.
->>  * Symbols in the DWARF debugging sections are relative to
->> @@ -831,10 +839,11 @@
->>                INIT_RAM_FS                                             \
->>        }
->> 
->> -#define BSS_SECTION(sbss_align, bss_align, stop_align)                 \
->> +#define BSS_SECTION(sbss_align, bss_align, initbss_align, stop_align)             \
->>        . = ALIGN(sbss_align);                                          \
->>        VMLINUX_SYMBOL(__bss_start) = .;                                \
->>        SBSS(sbss_align)                                                \
->>        BSS(bss_align)                                                  \
->> +       INITBSS(initbss_align)                                          \
->>        . = ALIGN(stop_align);                                          \
->>        VMLINUX_SYMBOL(__bss_stop) = .;
->> diff --git a/include/linux/init.h b/include/linux/init.h
->> index b449f37..f2960b2 100644
->> --- a/include/linux/init.h
->> +++ b/include/linux/init.h
->> @@ -41,6 +41,7 @@
->>    discard it in modules) */
->> #define __init         __section(.init.text) __cold notrace
->> #define __initdata     __section(.init.data)
->> +#define __initbss      __section(.bss.init.data)
-> 
-> Shouldn't this be .init.bss ?
-> 
->> #define __initconst    __constsection(.init.rodata)
->> #define __exitdata     __section(.exit.data)
->> #define __exit_call    __used __section(.exitcall.exit)
->> diff --git a/include/linux/mm.h b/include/linux/mm.h
->> index d30eea3..1f266f7 100644
->> --- a/include/linux/mm.h
->> +++ b/include/linux/mm.h
->> @@ -21,6 +21,7 @@
->> #include <linux/resource.h>
->> #include <linux/page_ext.h>
->> #include <linux/err.h>
->> +#include <asm/sections.h>
->> 
->> struct mempolicy;
->> struct anon_vma;
->> @@ -1722,10 +1723,11 @@ static inline void mark_page_reserved(struct page *page)
->>  */
->> static inline unsigned long free_initmem_default(int poison)
->> {
->> -       extern char __init_begin[], __init_end[];
->> 
->>        return free_reserved_area(&__init_begin, &__init_end,
->>                                  poison, "unused kernel");
->> +       return free_reserved_area(&__initbss_start, &__initbss_end,
->> +                                 poison, "unused kernel");
-> 
-> You obviously have not tested this code, since the first return makes
-> the second unreachable.
-> 
-> So you will need to put __initbss annotations all over the tree to
-> actually populate and then free this section (after you have fixed
-> your code). Before we do that, could we have an estimate of how much
-> memory it actually frees up, especially since the zImage compression 
-> should ensure that zero initialized PROGBITS .data does not take very
-> much additional space in the first place.
-> 
-> -- 
-> Ard.
-yeah, I just compile it , not test it . because i need replace lots of __initdata variable to __initbss first .
-i don?t think zImage compression can shrink zero data in .data section , 
-in current __initdata implementation , the zero initialized data are mixed with non-zero data,
-for example:
-int a = 20 __initdata;
-int b __initdata;   // zero initialized data
-int c = 30 __initdata;
+I would hope so. The device ID has been assigned to ARM's implementation by PLDA,
+it would be logical not to be reused for anyone else's.
 
-so the zero data are not in a contineous memory area, compress will not benefit from this scenario, 
-and on some platforms like arm64 , don?t compress compress zImage , 
+> 
+> While we don't support PCIe endpoint drivers at the moment, it might
+> happen at some point and then things break when someone tries to
+> plug a machine with this ID into a Linux host.
 
-i will make a test in some time later, and send out the result to see if this method is better .
+I'm asking for confirmation inside ARM that the IDs are uniquely allocated to Juno
+and will come back when I'll get confirmation.
 
-Thanks
+Best regards,
+Liviu
+
+> 
+> 	Arnd
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
