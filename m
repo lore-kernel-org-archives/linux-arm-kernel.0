@@ -1,27 +1,107 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Mon, 12 Oct 2015 22:11:44 +0200
-Subject: [PATCH 4/4] ARM: configs: Add STM32 DMA support in STM32 defconfig
-In-Reply-To: <1444317612-818-5-git-send-email-cedric.madianga@gmail.com>
-References: <1444317612-818-1-git-send-email-cedric.madianga@gmail.com>
- <1444317612-818-5-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <561C1400.30108@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Oct 2015 13:16:40 -0700
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux,atags" entry
+In-Reply-To: <20150713131902.GH26485@atomide.com>
+References: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
+ <1436214373-12969-6-git-send-email-pali.rohar@gmail.com>
+ <20150707113213.GC7576@n2100.arm.linux.org.uk>
+ <20150707115819.GF12087@pali> <20150713131902.GH26485@atomide.com>
+Message-ID: <20151012201640.GQ23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Tony Lindgren <tony@atomide.com> [150713 06:21]:
+> * Pali Roh?r <pali.rohar@gmail.com> [150707 05:00]:
+> > On Tuesday 07 July 2015 12:32:13 Russell King - ARM Linux wrote:
+> > > On Mon, Jul 06, 2015 at 10:26:13PM +0200, Pali Roh?r wrote:
+> > > > Legacy bootloaders can pass additional information for kernel or legacy
+> > > > userspace applications. When booting DT kernel then ATAGs structure is not
+> > > > more visible after running kernel uncompress code. This patch stores full
+> > > > ATAGs structure into DT "/chosen/linux,atags" entry, so kernel can later
+> > > > reuse it and export via /proc/atags to userspace.
+> > > 
+> > > I think you need to go through your commit messages and improve them,
+> > > especially the ones with "TODO" in them.  As long as there's still things
+> > > to be done, they're obviously not ready for merging.
+> > > 
+> > 
+> > I know, in cover letter email I wrote that documentation is not ready...
+> > I send patches for review and comments (like yours). I think it is still
+> > better to send something and mark it as incomplete. It could prevent to
+> > work on something which will be again rewritten...
+> > 
+> > > Moreover, exporting the ATAGS is questionable, even _if_ there are non-
+> > > kexec programs making use of this.  The ATAGs have _never_ been exported
+> > > to userspace when kexec disabled is the kernel - it was introduced for
+> > > kexec, and has always had this:
+> > > 
+> > > config ATAGS_PROC
+> > >         bool "Export atags in procfs"
+> > >         depends on ATAGS && KEXEC
+> > >         default y
+> > > 
+> > > Now, the fact that someone decided to start using it is pretty sad,
+> > > because it means that if you disable KEXEC, userspace breaks.  That's
+> > > not a kernel regression in any shape or form, because /proc/atags has
+> > > never been there without KEXEC enabled.  That's a userspace bug, plain
+> > > and simple.
+> > > 
+> > > Given that, I'm in two minds about whether to accept the last two
+> > > patches which make this more than just "for KEXEC use to enable a KEXEC
+> > > kernel to be booted."
+> > > 
+> > > Had it been provided without the KEXEC conditional, then I don't have
+> > > a problem with these two patches.
+> > > 
+> > 
+> > I understand it. Nokia originally invented their own entries in /proc/
+> > which export needed ATAGs from kernel in human-readable form, but all
+> > those entries were non-standard and specific for Nokia's kernels.
+> > 
+> > Do you have some other idea how to provide ATAGs information created
+> > dynamically by legacy closed proprietary bootloader to userspace from DT
+> > booted kernel?
+> > 
+> > Anyway, for supporting kexec (with passing ATAGs) it is needed to have
+> > working /proc/atags file, right?
+> 
+> Yeah I think that since we already have it in /proc, we should just
+> support it. And keep it behind CONFIG_KEXEC and CONFIG_ARM_APPENDED_DTB
+> and hope we don't find other users for it.. Then reconsider the Kconfig
+> dependencies if we do find other users.
+>  
+> > > It also sets a precedent: by adding this into DT, it is creating a new
+> > > DT ABI as well, and we'll end up seeing dts files with an ATAG block
+> > > patched into them.
+> > > 
+> > > Are the ATAGs at a fixed address on the N900?
+> > 
+> > Yes, in board-rx51.c is:
+> > 
+> > .atag_offset	= 0x100
+> > 
+> > and Nokia Bootloader (proprietary) store them to that address.
+> >
+> > > Can that be handled in
+> > > some kind of legacy file for the N900 which calls save_atags() on it, so
+> > > we don't end up introducing yet more stuff that we have to maintain into
+> > > the distant future?  If not, what about copying a known working atag
+> > > structure into a legacy file for the N900?
+> >
+> > I already asked question if it is possible to read ATAGs from DT booted
+> > kernel. And somebody (do not remember who) wrote to ML, that it is not
+> > possible and it can be done in that uncompress code.
+> 
+> I guess the other option would be to keep the raw ATAG area reserved,
+> and only initialize /proc/atags from a board specific initcall.
+> But I think that would complicate the already fragile uncompress
+> relocation code even further?
 
+Pali, any news on posting an updated series with the comments addressed
+in this thread? It seems that we all pretty much agree what needs to
+be done.
 
-On 10/08/2015 05:20 PM, M'boumba Cedric Madianga wrote:
-> This patch adds STM32 DMA support in stm32_defconfig file
->
-> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-> ---
->   arch/arm/configs/stm32_defconfig | 2 ++
->   1 file changed, 2 insertions(+)
->
->
-Acked-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Regards,
 
-I will apply it to my tree as soon as the driver is accepted.
-
-Thanks,
-Maxime
+Tony
