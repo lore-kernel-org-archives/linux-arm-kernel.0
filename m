@@ -1,50 +1,36 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 Oct 2015 13:42:59 +0200
-Subject: [PATCH 4/6] regulator: core: Propagate voltage changes to supply
- regulators
-In-Reply-To: <20151002173256.GZ12635@sirena.org.uk>
-References: <1443621946-8712-1-git-send-email-s.hauer@pengutronix.de>
- <1443621946-8712-5-git-send-email-s.hauer@pengutronix.de>
- <20151002173256.GZ12635@sirena.org.uk>
-Message-ID: <20151012114259.GU7858@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Oct 2015 14:03:04 +0200
+Subject: [PATCH v8 3/6] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <20151009231540.GE16112@localhost>
+References: <1444297394-3122-1-git-send-email-lftan@altera.com>
+ <CAFiDJ58oMa6rgQe_STCiWRpdL+P22BN1=Nin_+QnLXC9RGiSzQ@mail.gmail.com>
+ <20151009231540.GE16112@localhost>
+Message-ID: <7064179.1W3LTfFPxP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Fri, Oct 02, 2015 at 06:32:56PM +0100, Mark Brown wrote:
-> On Wed, Sep 30, 2015 at 04:05:44PM +0200, Sascha Hauer wrote:
+On Friday 09 October 2015 18:15:40 Bjorn Helgaas wrote:
 > 
-> > A new min_dropout_uv field is added to struct regulator_desc. Regulators
-> > can specify the minimun dropout voltage they need for proper function
-> > here. Now when the voltage is changed on a regulator the regulator core
-> > makes sure that
+> I don't know if this should be a kernel taint, a simple warning in
+> dmesg, or what.  I guess the tainting mechanism is probably too
+> general-purpose for this, and add_taint() doesn't give any dmesg
+> indication.  We wouldn't see the taint unless the problem actually
+> caused an oops or panic.  In this case, I think I want a clue in dmesg
+> so we have a chance of seeing it even if there is no oops.  So
+> probably something like a dev_warn("non-compliant config accesses")
+> would work.
 > 
-> Can we have this interface addition as a separate patch please?  Makes
-> it easier to add to other devices.  I could've sworn I'd already done
-> that bit but obviously never got the patch mailed out.
-> 
-> One change I think we need here is only doing the propagation if either
-> the device lacks a set_voltage() operation (in which case it's just a
-> switch passing through the parent voltage)
+> You really should double-check with the hardware guys, because it's
+> pretty obvious that the PCI spec requires 1- and 2-byte config
+> accesses to work correctly.  For example, if you read/modify/write to
+> update PCI_COMMAND, you will inadvertently clear the RW1C bits in
+> PCI_STATUS.
 
-Does the lack of a set_voltage() operation automatically mean it's a
-switch passing through the parent voltage? What if the regulator is a
-fixed regulator and the output can't be controlled because there is only
-one voltage?
+Would it help to require a DT property here that flags the device
+as having a broken config space?
 
-Currently we bail out int regulator_set_voltage() when we do not have a
-set_voltage() or set_voltage_sel() operation. Instead of propagating the
-voltage change up I would keep the current behaviour and implement voltage
-propagation for switches when we need it. Then we could also introduce a
-REGULATOR_IS_SWITCH flag indicating that this is a switch and not a
-fixed voltage regulator.
+Then we could implement both in the driver, and only use the
+RMW based implementation if the firmware describes the device
+as "altera,broken-pci-config-space".
 
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
