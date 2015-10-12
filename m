@@ -1,58 +1,84 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 12 Oct 2015 09:01:02 +0200
-Subject: [Intel-gfx] [PATCH 09/20] i915: switch from acpi_os_ioremap to
- memremap
-In-Reply-To: <20151009221625.32203.74117.stgit@dwillia2-desk3.jf.intel.com>
-References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
- <20151009221625.32203.74117.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <20151012070102.GV26718@phenom.ffwll.local>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 12 Oct 2015 15:04:30 +0800
+Subject: [Linaro-acpi] [PATCH v5 0/5] Provide better MADT subtable sanity
+ checks
+In-Reply-To: <561B2FCA.1010504@erley.org>
+References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
+ <560BA4C9.7090607@huawei.com> <560C0968.6020904@redhat.com>
+ <2808057.teMg2oCLf6@vostro.rjw.lan> <5612AF64.4060900@redhat.com>
+ <561B2442.9050600@erley.org> <561B2DAD.5070601@linaro.org>
+ <561B2FCA.1010504@erley.org>
+Message-ID: <561B5B7E.6080901@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 06:16:25PM -0400, Dan Williams wrote:
-> i915 expects the OpRegion to be cached (i.e. not __iomem), so explicitly
-> map it with memremap rather than the implied cache setting of
-> acpi_os_ioremap().
-> 
-> Cc: Daniel Vetter <daniel.vetter@intel.com>
-> Cc: Jani Nikula <jani.nikula@linux.intel.com>
-> Cc: intel-gfx at lists.freedesktop.org
-> Cc: David Airlie <airlied@linux.ie>
-> Cc: dri-devel at lists.freedesktop.org
-> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+On 10/12/2015 11:58 AM, Pat Erley wrote:
+> On 10/11/2015 08:49 PM, Hanjun Guo wrote:
+>> On 10/12/2015 11:08 AM, Pat Erley wrote:
+>>> On 10/05/2015 10:12 AM, Al Stone wrote:
+>>>> On 10/05/2015 07:39 AM, Rafael J. Wysocki wrote:
+>>>>> On Wednesday, September 30, 2015 10:10:16 AM Al Stone wrote:
+>>>>>> On 09/30/2015 03:00 AM, Hanjun Guo wrote:
+>>>>>>> On 2015/9/30 7:45, Al Stone wrote:
+>>>>>>>> NB: this patch set is for use against the linux-pm bleeding edge
+>>>>>>>> branch.
+>>>>>>>>
+>>>>>>
+>>>>>> [snip...]
+>>>>>>
+>>>>>>>
+>>>>>>> For this patch set,
+>>>>>>>
+>>>>>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>>>>
+>>>>>>> Thanks
+>>>>>>> Hanjun
+>>>>>>
+>>>>>> Thanks, Hanjun!
+>>>>>
+>>>>> Series applied, thanks!
+>>>>>
+>>>>> Rafael
+>>>>>
+>>>>
+>>>> Thanks, Rafael!
+>>>>
+>>>
+>>> Just decided to test out linux-next (to see the new nouveau cleanups).
+>>> This change set prevents my Lenovo W510 from booting properly.
+>>>
+>>> Reverting: 7494b0 "ACPI: add in a bad_madt_entry() function to
+>>> eventually replace the macro"
+>>>
+>>> Gets the system booting again.  I'm attaching my dmesg from the failed
+>>> boot, who wants the acpidump?
+>>
+>> [    0.000000] ACPI: undefined version for either FADT 4.0 or MADT 1
+>> [    0.000000] ACPI: Error parsing LAPIC address override entry
+>> [    0.000000] ACPI: Invalid BIOS MADT, disabling ACPI
+>>
+>> Seems the MADT revision is not right, could you dump the ACPI MADT
+>> (APIC) table and send it out? I will take a look :)
+>>
+>> Thanks
+>> Hanjun
+>
+> Here ya go, enjoy.  Feel free to CC me on any patches that might fix it.
 
-Assuming you've run sparse over this to make sure you've caught them all,
-and with the nit below addressed this is
+Thanks! I think I had the right guess, the MADT revision is not right
+for ACPI 4.0:
 
-Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+[000h 0000   4]                    Signature : "APIC"    [Multiple APIC 
+Description Table (MADT)]
+[004h 0004   4]                 Table Length : 000000BC
+[008h 0008   1]                     *Revision : 01*
 
-Feel free to pull v2 into whatever tree you think it's suitable for (but
-you can also resend and I'll pick it up).
+I encountered such problem before because the table was just copied from
+previous version, and without the update for table revision.
 
-> diff --git a/drivers/gpu/drm/i915/intel_panel.c b/drivers/gpu/drm/i915/intel_panel.c
-> index e2ab3f6ed022..c8444d5f549f 100644
-> --- a/drivers/gpu/drm/i915/intel_panel.c
-> +++ b/drivers/gpu/drm/i915/intel_panel.c
-> @@ -387,7 +387,7 @@ intel_panel_detect(struct drm_device *dev)
->  
->  	/* Assume that the BIOS does not lie through the OpRegion... */
->  	if (!i915.panel_ignore_lid && dev_priv->opregion.lid_state) {
-> -		return ioread32(dev_priv->opregion.lid_state) & 0x1 ?
-> +		return *(dev_priv->opregion.lid_state) & 0x1 ?
+I think we may need to ignore the table revision for x86, but restrict
+it for ARM64, I'd like Al and Rafael's suggestion before I send out a
+patch.
 
-() are redundant now here.
--Daniel
-
->  			connector_status_connected :
->  			connector_status_disconnected;
->  	}
-> 
-> _______________________________________________
-> Intel-gfx mailing list
-> Intel-gfx at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/intel-gfx
-
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Thanks
+Hanjun
