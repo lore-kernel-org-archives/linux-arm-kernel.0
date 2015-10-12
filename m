@@ -1,46 +1,31 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 12 Oct 2015 21:50:28 +0800
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select HDMI audio support
-In-Reply-To: <1444654124-8248-1-git-send-email-festevam@gmail.com>
-References: <1444654124-8248-1-git-send-email-festevam@gmail.com>
-Message-ID: <20151012135028.GC18611@tiger>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 12 Oct 2015 15:51:22 +0200
+Subject: [PATCH v3 2/4] ARM: dts: sun5i: Add PWM channel 0 pinmux setting
+ for A13/A10s
+In-Reply-To: <1444557308-10892-2-git-send-email-hdegoede@redhat.com>
+References: <1444557308-10892-1-git-send-email-hdegoede@redhat.com>
+ <1444557308-10892-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151012135122.GE2278@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 09:48:44AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Sun, Oct 11, 2015 at 11:55:06AM +0200, Hans de Goede wrote:
+> Add a pinmux setting for the first pwm channel. This is often used for
+> backlight dimming on tablets.
 > 
-> Select CONFIG_DRM_DW_HDMI_AHB_AUDIO so that we have HDMI audio
-> supported by default.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Shawn,
-> 
-> Should this one go via Russell's tree, which contains the patches
-> that add HDMI audio support?
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-It's just a defconfig update, and we can wait for Russell's driver
-support hit mainline first.
+Applied, thanks!
+Maxime
 
-Shawn
-
-> 
->  arch/arm/configs/imx_v6_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index 4187f69..f5ca938 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -224,6 +224,7 @@ CONFIG_SOC_CAMERA_OV2640=y
->  CONFIG_IMX_IPUV3_CORE=y
->  CONFIG_DRM=y
->  CONFIG_DRM_PANEL_SIMPLE=y
-> +CONFIG_DRM_DW_HDMI_AHB_AUDIO=y
->  CONFIG_DRM_IMX=y
->  CONFIG_DRM_IMX_FB_HELPER=y
->  CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
-> -- 
-> 1.9.1
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151012/31e4a6a0/attachment.sig>
