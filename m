@@ -1,36 +1,72 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 12 Oct 2015 09:48:44 -0300
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select HDMI audio support
-Message-ID: <1444654124-8248-1-git-send-email-festevam@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 12 Oct 2015 14:48:23 +0200
+Subject: [PATCH v3 0/7] mmc: dw_mmc-rockchip: allow tuning using the clk-phase
+ api
+Message-ID: <1444654110-32293-1-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+This series resurrects and adapts some individual patches whose sum
+enable the dw_mmc hosts on Rockchip socs to tune clock phases using
+the generic phase api (rk3288 and following have this capability).
 
-Select CONFIG_DRM_DW_HDMI_AHB_AUDIO so that we have HDMI audio
-supported by default.
+The changes to the original mmc-phase clocks are expanded by further
+findings resulting from devices being used in the field.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Shawn,
+Similarly the regulator handling changes do use the brand new
+regulator_set_voltage_triplet call to allow specifying lower and upper
+limits. One possible point of discussion are the two voltage ranges
+that are tried for the 3.3V signal level. Trying to stay near vmmc
+at first and only then opening the range to the full 2.7-3.6V.
 
-Should this one go via Russell's tree, which contains the patches
-that add HDMI audio support?
+This mainly circumvents a shortcoming of the regulator voltage
+setting, in that even with regulator_set_voltage_triplet the regulator
+framework will take the lowest possible voltage when the possible
+voltages are below the target voltage. While it may be ideal to solve
+this on the regulator side, I'm not seeing this appearing in the short
+term, mainly because all regulator parts (including regulator drivers)
+are keyed to selecting the lowest voltage from the range, while on the
+mmc side we know which voltages may work and trying this in two steps
+does not create to much overhead, as unsupported voltages are already
+filtered out by the regulator_is_voltage_selected calls.
 
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+changes since v2:
+- use host->ios.vdd to read vmmc from instead of requiring the vmmc
+  regulator. Suggested by Ulf this makes the voltage setting still work
+  even if only the vqmmc but not the vmmc regulator is supplied.
+- add Acks from Jaehoon Chung to the dw_mmc parts
+- drop first two clock patches that already got applied to the mmc tree
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 4187f69..f5ca938 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -224,6 +224,7 @@ CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
- CONFIG_DRM_PANEL_SIMPLE=y
-+CONFIG_DRM_DW_HDMI_AHB_AUDIO=y
- CONFIG_DRM_IMX=y
- CONFIG_DRM_IMX_FB_HELPER=y
- CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
+changes since v1:
+- address comment from Jaehoon Chung and keep this local to Rockchip
+  for the time being
+- address comments from Ulf and Doug in making it more explicit
+  that the two-step 3.3V voltage setting essentially works around
+  a limitation of regulator_set_voltage_triplet
+
+Alexandru M Stan (3):
+  mmc: dw_mmc-rockchip: dt-binding: Add tuning related things
+  mmc: dw_mmc-rockchip: MMC tuning with the clock phase framework
+  ARM: dts: rockchip: Add drive/sample clocks for rk3288 dw_mmc devices
+
+Douglas Anderson (2):
+  mmc: core: Add mmc_regulator_set_vqmmc()
+  mmc: dw_mmc: Use mmc_regulator_set_vqmmc in
+    start_signal_voltage_switch
+
+Heiko Stuebner (2):
+  mmc: core: move ocr-bit to voltage translation into separate function
+  ARM: dts: rockchip: add tuning related settings to veyron devices
+
+ .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |  13 ++
+ arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi         |   7 +-
+ arch/arm/boot/dts/rk3288-veyron.dtsi               |   6 +
+ arch/arm/boot/dts/rk3288.dtsi                      |  20 ++-
+ drivers/mmc/core/core.c                            | 129 ++++++++++++++--
+ drivers/mmc/host/dw_mmc-rockchip.c                 | 162 +++++++++++++++++++++
+ drivers/mmc/host/dw_mmc.c                          |  17 +--
+ include/linux/mmc/host.h                           |   7 +
+ 8 files changed, 325 insertions(+), 36 deletions(-)
+
 -- 
-1.9.1
+2.6.1
