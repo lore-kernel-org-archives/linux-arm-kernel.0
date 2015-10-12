@@ -1,49 +1,89 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 12 Oct 2015 18:03:29 +0200
-Subject: [PATCH 1/3] clk: add flag for clocks that need to be enabled on
- rate changes
-In-Reply-To: <13378907.1JCOSf8QGs@diego>
-References: <1929669.AsgMSusdJb@phil> <20151008215840.GJ26883@codeaurora.org>
- <13378907.1JCOSf8QGs@diego>
-Message-ID: <37059102.QWiKhRxp8v@diego>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 12 Oct 2015 18:04:54 +0200
+Subject: [PATCH] arm64: dts: mt8173: add MT8173 display PWM driver support
+ node
+In-Reply-To: <1444117243-28391-1-git-send-email-yh.huang@mediatek.com>
+References: <1444117243-28391-1-git-send-email-yh.huang@mediatek.com>
+Message-ID: <561BDA26.5010203@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, 11. Oktober 2015, 12:41:09 schrieb Heiko St?bner:
-> Hi Stephen,
-> 
-> Am Donnerstag, 8. Oktober 2015, 14:58:40 schrieb Stephen Boyd:
-> > On 10/02, Heiko St?bner wrote:
-> > > Hi,
-> > > 
-> > > any comment on these 3 patches?
-> > 
-> > Dong has a similar problem, but those patches conflate this with
-> > enabling parent clocks during clk_disable_unused() which makes no
-> > sense to me. So I'm ok with the requirement that we turn clocks
-> > on to change rates, but I wonder if in this case we need to turn
-> > on the clock that's changing rates itself, or if we just need to
-> > turn on the parent and/or future parent of the clock during the
-> > rate switch. Care to elaborate on that?
-> 
-> As you can see in the follow-up patches, the fractional dividers on Rockchip
-> SoCs are quite strange in that they even need to have their _downstream_
-> mux point to them to actually accept rate changes.
-> 
-> The register value always reflects the value set by the system, but hardware
-> really only accepts it if the clock is enabled and even the downstream mux
-> selects the fractional divider as parent (they call it a auto-gating
-> feature).
-> 
-> So in the worst (and current) case, you end up with the register showing the
-> right value, but the hardware can use completely different dividers from
-> the previous setting.
-> 
-> That strange behaviour got quite deeply investigated between Rockchip and
-> Google engineers who stumbled upon this in the first place, so I'm
-> reasonably sure this is the right solution for that clock type :-) .
 
-Xing Zheng now also independently stumbled upon this issue with his rk3036 
-work. And came to the same conclusion that the gate must be enabled as well as 
-the downstream mux be set to the fractional divider for it to actually accept 
-a new setting.
+
+On 06/10/15 09:40, YH Huang wrote:
+> Add display PWM node in mt8173-evb.dts and mt8173.dtsi.
+>
+> Signed-off-by: YH Huang <yh.huang@mediatek.com>
+> ---
+>   arch/arm64/boot/dts/mediatek/mt8173-evb.dts |   13 +++++++++++++
+>   arch/arm64/boot/dts/mediatek/mt8173.dtsi    |   22 ++++++++++++++++++++++
+>   2 files changed, 35 insertions(+)
+>
+
+Applied, thanks.
+
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> index 811cb76..1b3fabd 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> @@ -92,6 +92,13 @@
+>   };
+>
+>   &pio {
+> +	disp_pwm0_pins: disp_pwm0_pins {
+> +		pins1 {
+> +			pinmux = <MT8173_PIN_87_DISP_PWM0__FUNC_DISP_PWM0>;
+> +			output-low;
+> +		};
+> +	};
+> +
+>   	mmc0_pins_default: mmc0default {
+>   		pins_cmd_dat {
+>   			pinmux = <MT8173_PIN_57_MSDC0_DAT0__FUNC_MSDC0_DAT0>,
+> @@ -190,6 +197,12 @@
+>   	};
+>   };
+>
+> +&pwm0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&disp_pwm0_pins>;
+> +	status = "okay";
+> +};
+> +
+>   &pwrap {
+>   	pmic: mt6397 {
+>   		compatible = "mediatek,mt6397";
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 4bce167..fd01134 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -500,6 +500,28 @@
+>   			clock-names = "source", "hclk";
+>   			status = "disabled";
+>   		};
+> +
+> +		pwm0: pwm at 1401e000 {
+> +			compatible = "mediatek,mt8173-disp-pwm",
+> +				     "mediatek,mt6595-disp-pwm";
+> +			reg = <0 0x1401e000 0 0x1000>;
+> +			#pwm-cells = <2>;
+> +			clocks = <&mmsys CLK_MM_DISP_PWM026M>,
+> +				 <&mmsys CLK_MM_DISP_PWM0MM>;
+> +			clock-names = "main", "mm";
+> +			status = "disabled";
+> +		};
+> +
+> +		pwm1: pwm at 1401f000 {
+> +			compatible = "mediatek,mt8173-disp-pwm",
+> +				     "mediatek,mt6595-disp-pwm";
+> +			reg = <0 0x1401f000 0 0x1000>;
+> +			#pwm-cells = <2>;
+> +			clocks = <&mmsys CLK_MM_DISP_PWM126M>,
+> +				 <&mmsys CLK_MM_DISP_PWM1MM>;
+> +			clock-names = "main", "mm";
+> +			status = "disabled";
+> +		};
+>   	};
+>   };
+>
+>
