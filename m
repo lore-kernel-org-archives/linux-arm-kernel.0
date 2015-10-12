@@ -1,71 +1,56 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 12 Oct 2015 14:48:30 +0200
-Subject: [PATCH v3 7/7] ARM: dts: rockchip: add tuning related settings to
- veyron devices
+Date: Mon, 12 Oct 2015 14:48:27 +0200
+Subject: [PATCH v3 4/7] mmc: dw_mmc-rockchip: dt-binding: Add tuning related
+ things
 In-Reply-To: <1444654110-32293-1-git-send-email-heiko@sntech.de>
 References: <1444654110-32293-1-git-send-email-heiko@sntech.de>
-Message-ID: <1444654110-32293-8-git-send-email-heiko@sntech.de>
+Message-ID: <1444654110-32293-5-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows the tuning code to run and use higher speeds on capable cards.
+From: Alexandru M Stan <amstan@chromium.org>
 
+Add ciu_drive, ciu_sample clocks and default-sample-phase. This will later
+be used by tuning code.
+
+We do not touch ciu_drive (and by extension define default-drive-phase).
+Drive phase is mostly used to define minimum hold times, while one could
+write some code to determine what phase meets the minimum hold time
+(ex 10 degrees) this will not work with the current clock phase framework
+(which floors angles, so we'll get 0 deg, and there's no way to know what
+resolution the floors happen at). We assume that the default drive angles
+set by the hardware are good enough.
+
+Signed-off-by: Alexandru M Stan <amstan@chromium.org>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
 ---
- arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi | 7 ++++++-
- arch/arm/boot/dts/rk3288-veyron.dtsi       | 6 ++++++
- 2 files changed, 12 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi b/arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi
-index b5334ec..fec076e 100644
---- a/arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi
-+++ b/arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi
-@@ -90,7 +90,7 @@
- 	regulators {
- 		vccio_sd: LDO_REG4 {
- 			regulator-name = "vccio_sd";
--			regulator-min-microvolt = <3300000>;
-+			regulator-min-microvolt = <1800000>;
- 			regulator-max-microvolt = <3300000>;
- 			regulator-state-mem {
- 				regulator-off-in-suspend;
-@@ -116,7 +116,12 @@
- 	cap-sd-highspeed;
- 	card-detect-delay = <200>;
- 	cd-gpios = <&gpio7 5 GPIO_ACTIVE_LOW>;
-+	rockchip,default-sample-phase = <90>;
- 	num-slots = <1>;
-+	sd-uhs-sdr12;
-+	sd-uhs-sdr25;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr104;
- 	vmmc-supply = <&vcc33_sd>;
- 	vqmmc-supply = <&vccio_sd>;
- };
-diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
-index 6820977..04c3d2a 100644
---- a/arch/arm/boot/dts/rk3288-veyron.dtsi
-+++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
-@@ -196,7 +196,9 @@
- 	broken-cd;
- 	bus-width = <8>;
- 	cap-mmc-highspeed;
-+	rockchip,default-sample-phase = <158>;
- 	disable-wp;
-+	mmc-hs200-1_8v;
- 	mmc-pwrseq = <&emmc_pwrseq>;
- 	non-removable;
- 	num-slots = <1>;
-@@ -413,6 +415,10 @@
- 	num-slots = <1>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sdio0_clk &sdio0_cmd &sdio0_bus4>;
-+	sd-uhs-sdr12;
-+	sd-uhs-sdr25;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr104;
- 	vmmc-supply = <&vcc33_sys>;
- 	vqmmc-supply = <&vcc18_wl>;
- };
+diff --git a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+index c327c2d..3dc13b6 100644
+--- a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
++++ b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+@@ -14,6 +14,19 @@ Required Properties:
+ 							before RK3288
+ 	- "rockchip,rk3288-dw-mshc": for Rockchip RK3288
+ 
++Optional Properties:
++* clocks: from common clock binding: if ciu_drive and ciu_sample are
++  specified in clock-names, should contain handles to these clocks.
++
++* clock-names: Apart from the clock-names described in synopsys-dw-mshc.txt
++  two more clocks "ciu-drive" and "ciu-sample" are supported. They are used
++  to control the clock phases, "ciu-sample" is required for tuning high-
++  speed modes.
++
++* rockchip,default-sample-phase: The default phase to set ciu_sample at
++  probing, low speeds or in case where all phases work at tuning time.
++  If not specified 0 deg will be used.
++
+ Example:
+ 
+ 	rkdwmmc0 at 12200000 {
 -- 
 2.6.1
