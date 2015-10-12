@@ -1,43 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 12 Oct 2015 17:49:31 +0100
-Subject: [PATCH 1/8] dt-bindings: pmic: Document Hi655x pmic driver
-In-Reply-To: <56160E22.3010703@huawei.com>
-References: <1443611111-3196-1-git-send-email-w.f@huawei.com>
- <1443611111-3196-2-git-send-email-w.f@huawei.com>
- <20150930173921.GJ15635@sirena.org.uk>
- <56160E22.3010703@huawei.com>
-Message-ID: <20151012164931.GK4238@sirena.org.uk>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 12 Oct 2015 18:01:25 +0100
+Subject: [PATCH v2 07/22] arm64: Keep track of CPU feature registers
+In-Reply-To: <20151008150346.GK17192@e104818-lin.cambridge.arm.com>
+References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+ <1444064531-25607-8-git-send-email-suzuki.poulose@arm.com>
+ <20151007171621.GD17192@e104818-lin.cambridge.arm.com>
+ <56163D7F.4000003@arm.com>
+ <20151008150346.GK17192@e104818-lin.cambridge.arm.com>
+Message-ID: <561BE765.1080409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2015 at 02:33:06PM +0800, wangfei wrote:
-> On 2015/10/1 1:39, Mark Brown wrote:
-> > On Wed, Sep 30, 2015 at 07:05:04PM +0800, Fei Wang wrote:
+On 08/10/15 16:03, Catalin Marinas wrote:
+> On Thu, Oct 08, 2015 at 10:55:11AM +0100, Suzuki K. Poulose wrote:
 
-Please fix your mail client to word wrap within paragraphs at something
-substantially less than 80 columns.  Doing this makes your messages much
-easier to read and reply to.
+...
+>
+> So we have three types of fields in these registers:
+>
+> a) features defined but not something we care about in Linux
+> b) reserved fields
+> c) features important to Linux
+>
+> I guess for (a), Linux may not even care if they don't match (though we
+> need to be careful which fields we ignore). As for (b), even if they
+> differ, since we don't know the meaning at this point, I think we should
+> just ignore them. If, for example, they add a feature that Linux doesn't
+> care about, they practically fall under the (a) category.
+>
+> Regarding exposing reserved CPUID fields to user, I assume we would
+> always return 0.
 
-> >> +                coul: coul at 1 {
-> >> +                        compatible = "hisilicon,hi655x-coul";
-> >> +                        interrupt-parent = <&pmic>;
-> >> +                        interrupts = <24 0>, <25 0>, <26 0>, <27 0>;
-> >> +                        interrupt-names = "cl_int_i", "cl_out_i", "cl_in_i", "vbat_int_i";
-> >> +                        battery_product_index = <0>;
+Mark,
 
-> > For example, the "battery_product_index" property here is undocumented.
+Do you have any comments on this ? The list I have here is what you came
+up with in SANITY checks.
 
-> now on hikey, we only enable hi655x-regulator-pmic function, and
-> regulator is child node of pmic.do i need to document regulator
-> dt-binding in this file or create a new regulator dt-binding file?
-
-Either is possible, though it is common to split the DT documentation
-into per subsystem files for ease of reference and to avoid cross tree
-merge issues.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151012/123109fb/attachment.sig>
+Thanks
+Suzuki
