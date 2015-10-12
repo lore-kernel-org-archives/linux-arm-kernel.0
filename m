@@ -1,50 +1,57 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 12 Oct 2015 19:10:10 +0200
-Subject: [PATCH] pxa: remove incorrect __init annotation on
- pxa27x_set_pwrmode
-In-Reply-To: <11408970.yetkS1BjHr@wuerfel> (Arnd Bergmann's message of "Mon,
- 12 Oct 2015 15:46:08 +0200")
-References: <5287252.pkh9x0t1Y6@wuerfel> <11408970.yetkS1BjHr@wuerfel>
-Message-ID: <874mhw6mj1.fsf@belgarion.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Oct 2015 18:21:04 +0100
+Subject: [PATCH v2 07/22] arm64: Keep track of CPU feature registers
+In-Reply-To: <561BE765.1080409@arm.com>
+References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+ <1444064531-25607-8-git-send-email-suzuki.poulose@arm.com>
+ <20151007171621.GD17192@e104818-lin.cambridge.arm.com>
+ <56163D7F.4000003@arm.com>
+ <20151008150346.GK17192@e104818-lin.cambridge.arm.com>
+ <561BE765.1080409@arm.com>
+Message-ID: <20151012172104.GC3659@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Hi,
 
-> The z2 machine calls pxa27x_set_pwrmode() in order to power off
-> the machine, but this function gets discarded early at boot because
-> it is marked __init, as pointed out by kbuild:
->
-> WARNING: vmlinux.o(.text+0x145c4): Section mismatch in reference from the function z2_power_off() to the function .init.text:pxa27x_set_pwrmode()
-> The function z2_power_off() references
-> the function __init pxa27x_set_pwrmode().
-> This is often because z2_power_off lacks a __init
-> annotation or the annotation of pxa27x_set_pwrmode is wrong.
->
-> This removes the __init section modifier to fix rebooting and the
-> build error.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: ba4a90a6d86a ("ARM: pxa/z2: fix building error of pxa27x_cpu_suspend() no longer available")
-> ---
-> This is a fix for an old bug, I'd just put it into 4.4
->
-> It showed up now because section mismatches now produce errors instead
-> of warnings.
+Thanks for the heads-up.
 
-Hi Arnd,
+On Mon, Oct 12, 2015 at 06:01:25PM +0100, Suzuki K. Poulose wrote:
+> On 08/10/15 16:03, Catalin Marinas wrote:
+> >On Thu, Oct 08, 2015 at 10:55:11AM +0100, Suzuki K. Poulose wrote:
+> 
+> ...
+> >
+> >So we have three types of fields in these registers:
+> >
+> >a) features defined but not something we care about in Linux
+> >b) reserved fields
+> >c) features important to Linux
+> >
+> >I guess for (a), Linux may not even care if they don't match (though we
+> >need to be careful which fields we ignore). As for (b), even if they
+> >differ, since we don't know the meaning at this point, I think we should
+> >just ignore them. If, for example, they add a feature that Linux doesn't
+> >care about, they practically fall under the (a) category.
+> >
+> >Regarding exposing reserved CPUID fields to user, I assume we would
+> >always return 0.
+> 
+> Mark,
+> 
+> Do you have any comments on this ? The list I have here is what you came
+> up with in SANITY checks.
 
-I already have this queued for 4.4 from Thierry's patch in :
-  http://www.spinics.net/lists/arm-kernel/msg449414.html
+My feeling was that we should play it safe with fields which are
+currently reserved (warning if they differ for now).
 
-Yet your patch is more complete, as it deals also with the header in pxa27x.h
-and has the fixes tag.
+If they turn out to be irrelevant, it's simple to backport a patch to
+ignore them, whereas if they matter we get instant visibility, which is
+the entire point of the sanity checks.
 
-Now I'm wondering if I should enhance Thierry's patch with yours and keeping
-your signoff with your permission, or drop Thierry's one to replace by yours (I
-don't know if it's sane behavior to drop an already queued patch ...)
+So I think we should warn if reserved fields differ. I'd rather have a
+few spurious warnings until kernels get updated than miss an issue that
+could have been dealt with and avoided.
 
-Cheers.
-
---
-Robert
+Thanks,
+Mark.
