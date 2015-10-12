@@ -1,43 +1,60 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Mon, 12 Oct 2015 14:51:33 -0500
-Subject: [PATCH V3 0/4] PCI: ACPI: Setting up DMA coherency for PCI device
- from _CCA attribute
-In-Reply-To: <55F0EF79.3090202@amd.com>
-References: <1440597279-11802-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <55F02331.2060001@amd.com> <8172790.rR5Ld4j83C@vostro.rjw.lan>
- <55F0EF79.3090202@amd.com>
-Message-ID: <561C0F45.8090107@amd.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 12 Oct 2015 15:54:29 -0400
+Subject: [PATCH v2 0/4] soc: ti: knav_qmss: enable accumulator queue
+ support
+In-Reply-To: <1444679211-823-1-git-send-email-m-karicheri2@ti.com>
+References: <1444679211-823-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <561C0FF5.3020907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
-
-On 9/9/15 21:48, Suthikulpanit, Suravee wrote:
-> Hi Rafael,
+On 10/12/2015 03:46 PM, Murali Karicheri wrote:
+> This patch series enable accumulator queue support for K2 SoCs. Accumulator
+> queues are a type of qmss queue that is monitored by the PDSP firmware and
+> accumulated. Host is interrupted by PDSP firmware when packets become
+> available in a ring buffer shared between the host and PDSP.
 >
-> On 9/10/2015 3:38 AM, Rafael J. Wysocki wrote:
->> On Wednesday, September 09, 2015 07:16:49 PM Suthikulpanit, Suravee
->> wrote:
->>> >Hi All,
->>> >
->>> >Are there any other concerns about this patch series?
->> I have none, but then it sort of missed the merge window.
->>
->> I can easily queue it up for the next one unless it is super-urgent,
->> but in that case I need to know why that's the case.
->>
+> There was an issue raised when merging the original patch set at
+>   (1) https://lkml.org/lkml/2015/9/4/681
+> 	[PATCH v1 1/2] soc: ti: display firmware file name as part of boot log
+>   (2) https://lkml.org/lkml/2015/9/4/680
+> 	[PATCH v1 2/2] ARM: dts: keystone: enable accumulator channels
 >
-> This is not urgent. This mainly needed to enable the ACPI PCI supports
-> for ARM64 which is still work in progress.
+> This series fixes the issues raised against above patch set. Key issues
+> addressed.
 >
-> Thanks,
-> Suravee
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 	- Remove the firmware filename from DT and add it to the driver.
+> 	  Use a name ks2_qmss_pdsp_acc48.bin. The idea is this can be a
+> 	  soft link pointing to the real firmware file in file system.
+>
+> 	- Move the description of the driver design from DT document to one
+> 	  under Documentation/arm/keystone/knav-qmss.txt. Update the this
+> 	  document with location of acc firmware available under
+> 	  linux-firmware.git.
+>
+> Additionally added accumulator queue support optional so that lack of
+> firmware in the file system will not cause other queue types not available
+> due to driver probe failure.
+>
+> Murali Karicheri (4):
+>    Documentation: dt: soc: move driver description to a separate document
+>    soc: ti: add firmware file name as part of the driver
+>    ARM: dts: keystone: enable accumulator channels
+>    soc: ti: qmss: make acc queue support optional in the driver
+>
+>   Documentation/arm/keystone/knav-qmss.txt           | 56 ++++++++++++++++++
+>   .../bindings/soc/ti/keystone-navigator-qmss.txt    | 21 ++-----
+>   arch/arm/boot/dts/k2e-netcp.dtsi                   | 23 ++++++++
+>   arch/arm/boot/dts/k2hk-netcp.dtsi                  | 24 ++++++++
+>   arch/arm/boot/dts/k2l-netcp.dtsi                   | 23 ++++++++
+>   drivers/soc/ti/knav_qmss.h                         |  3 +-
+>   drivers/soc/ti/knav_qmss_acc.c                     | 10 +++-
+>   drivers/soc/ti/knav_qmss_queue.c                   | 67 ++++++++++++++--------
+>   8 files changed, 183 insertions(+), 44 deletions(-)
+>   create mode 100644 Documentation/arm/keystone/knav-qmss.txt
+>
+Will re-send 1/4 and 4/4 since I have messed up the patch prefix.
 
-Just wondering if you are planning to queue this series up for 4.4 as well?
-
-Thank you,
-Suravee
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
