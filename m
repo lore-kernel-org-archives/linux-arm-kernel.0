@@ -1,217 +1,34 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Mon, 12 Oct 2015 23:53:04 +0900
-Subject: [PATCH v4 2/2] arm64: Expand the stack trace feature to support
- IRQ stack
-In-Reply-To: <5617CE26.10604@arm.com>
-References: <1444231692-32722-1-git-send-email-jungseoklee85@gmail.com>
- <1444231692-32722-3-git-send-email-jungseoklee85@gmail.com>
- <5617CE26.10604@arm.com>
-Message-ID: <07A53E87-C562-48D1-86DF-A373EAAA73F9@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Oct 2015 16:56:19 +0200
+Subject: [PATCH] firmware: qcom-scm: build for correct architecture level
+Message-ID: <8346311.PtPZJEII3N@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 9, 2015, at 11:24 PM, James Morse wrote:
-> Hi Jungseok,
+The ".arch_extension sec" directive is only available on ARMv6 or higher,
+so if we enable the SCM driver while building a kernel for an older CPU,
+we get a build error:
 
-Hi James,
+/tmp/ccUyhMOY.s:130: Error: selected processor does not support ARM mode `smc #0'
+/tmp/ccUyhMOY.s:216: Error: selected processor does not support ARM mode `smc #0'
+/tmp/ccUyhMOY.s:373: Error: selected processor does not support ARM mode `smc #0'
+make[4]: *** [drivers/firmware/qcom_scm-32.o] Error 1
 
-> On 07/10/15 16:28, Jungseok Lee wrote:
->> Currently, a call trace drops a process stack walk when a separate IRQ
->> stack is used. It makes a call trace information much less useful when
->> a system gets paniked in interrupt context.
-> 
-> panicked
+This changes the Makefile so we pass the ARMv7 architecture level both
+for the check and for the actual compilation of the scm driver.
 
-I will fix the typo.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
->> This patch addresses the issue with the following schemes:
->> 
->>  - Store aborted stack frame data
->>  - Decide whether another stack walk is needed or not via current sp
->>  - Loosen the frame pointer upper bound condition
-> 
-> It may be worth merging this patch with its predecessor - anyone trying to
-> bisect a problem could land between these two patches, and spend time
-> debugging the truncated call traces.
-
-It was an original intention to lead them to this patch, not the [1/2] one.
-This separation would help anyone touching the call trace feature including
-me focus on these changes apart from stack allocation, IRQ recursion check
-and thread_info management.
-
-In addition, I would like to add a clear and sufficient explanation on the
-frame pointer condition.
-
->> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
->> index 6ea82e8..e5904a1 100644
->> --- a/arch/arm64/include/asm/irq.h
->> +++ b/arch/arm64/include/asm/irq.h
->> @@ -2,13 +2,25 @@
->> #define __ASM_IRQ_H
->> 
->> #include <linux/irqchip/arm-gic-acpi.h>
->> +#include <asm/stacktrace.h>
->> 
->> #include <asm-generic/irq.h>
->> 
->> struct irq_stack {
->> 	void *stack;
->> +	struct stackframe frame;
->> };
->> 
->> +DECLARE_PER_CPU(struct irq_stack, irq_stacks);
-> 
-> Good idea, storing this in the per-cpu data makes it immune to stack
-> corruption.
-> 
-> 
->> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
->> index 407991b..5124649 100644
->> --- a/arch/arm64/kernel/stacktrace.c
->> +++ b/arch/arm64/kernel/stacktrace.c
->> @@ -43,7 +43,27 @@ int notrace unwind_frame(struct stackframe *frame)
->> 	low  = frame->sp;
->> 	high = ALIGN(low, THREAD_SIZE);
->> 
->> -	if (fp < low || fp > high - 0x18 || fp & 0xf)
->> +	/*
->> +	 * A frame pointer would reach an upper bound if a prologue of the
->> +	 * first function of call trace looks as follows:
->> +	 *
->> +	 *	stp     x29, x30, [sp,#-16]!
->> +	 *	mov     x29, sp
->> +	 *
->> +	 * Thus, the upper bound is (top of stack - 0x20) with consideration
-> 
-> The terms 'top' and 'bottom' of the stack are confusing, your 'top' appears
-> to be the highest address, which is used first, making it the bottom of the
-> stack.
-> 
-> I would try to use the terms low/est and high/est, in keeping with the
-> variable names in use here.
-
-Good idea. I'm favor of those terms.
-
->> +	 * of a 16-byte empty space in THREAD_START_SP.
->> +	 *
->> +	 * The value, 0x20, however, does not cover all cases as interrupts
->> +	 * are handled using a separate stack. That is, a call trace can start
->> +	 * from elx_irq exception vectors. The symbols could not be promoted
->> +	 * to candidates for a stack trace under the restriction, 0x20.
->> +	 *
->> +	 * The scenario is handled without complexity as 1) considering
->> +	 * (bottom of stack + THREAD_START_SP) as a dummy frame pointer, the
->> +	 * content of which is 0, and 2) allowing the case, which changes
->> +	 * the value to 0x10 from 0x20.
-> 
-> Where has 0x20 come from? The old value was 0x18.
-
-What I meant is 0x20 is the highest valid frame pointer. The comment should
-have been described more clearly.
-
-> My understanding is the highest part of the stack looks like this:
-> high        [ off-stack ]
-> high - 0x08 [ left free by THREAD_START_SP ]
-> high - 0x10 [ left free by THREAD_START_SP ]
-> high - 0x18 [#1 x30 ]
-> high - 0x20 [#1 x29 ]
-
-Clear description than mine!
-
-> So the condition 'fp > high - 0x18' prevents returning either 'left free'
-> address, or off-stack-value as a frame. Changing it to 'fp > high - 0x10'
-> allows the first half of that reserved area to be a valid stack frame.
-
-I believe my understanding is aligned with yours.
-
-Under a current condition, 'fp > high - 0x18', it is impossible to catch the
-'el1_irq' symbol. This is why I set x29 to high - 0x10 and changed the frame
-pointer condition, but the changes fail to cover perf according to your data.
-
-> This change is breaking perf using incantations [0] and [1]:
-
-I'm reviewing how perf stack trace works..
-
-> Before, with just patch 1/2:
->                  ---__do_softirq
->                     |
->                     |--92.95%-- __handle_domain_irq
->                     |          __irqentry_text_start
->                     |          el1_irq
->                     |
-> 
-> After, with both patches:
->                 ---__do_softirq
->                    |
->                    |--83.83%-- __handle_domain_irq
->                    |          __irqentry_text_start
->                    |          el1_irq
->                    |          |
->                    |          |--99.39%-- 0x400008040d00000c
->                    |           --0.61%-- [...]
->                    |
-> 
-> Changing the condition to 'fp >= high - 0x10' fixes this.
-
-'fp >= high - 0x10' drops 'el1_irq' when dump_stack() or panic() is called.
-
-> I agree it needs documenting, it is quite fiddly - I think Akashi Takahiro
-> is the expert.
-
-If possible, it would be greatly helpful.
-
-> I think unwind_frame() needs to walk the irq stack too. [2] is an example
-> of perf tracing back to userspace, (and there are patches on the list to
-> do/fix this), so we need to walk back to the start of the first stack for
-> the perf accounting to be correct.
-
-Frankly, I missed the case where perf does backtrace to userspace.
-
-IMO, this statement supports why the stack trace feature commit should be
-written independently. The [1/2] patch would be pretty stable if 64KB page
-is supported. The separation might help us concentrate on the stack trace
-feature in a generic dump stack, perf, and ftrace point of view.
-
->> +	 */
->> +	if (fp < low || fp > high - 0x10 || fp & 0xf)
->> 		return -EINVAL;
->> 
->> 	frame->sp = fp + 0x10;
->> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
->> index f93aae5..44b2f828 100644
->> --- a/arch/arm64/kernel/traps.c
->> +++ b/arch/arm64/kernel/traps.c
->> @@ -146,6 +146,8 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
->> static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
->> {
->> 	struct stackframe frame;
->> +	unsigned int cpu = smp_processor_id();
-> 
-> I wonder if there is any case where dump_backtrace() is called on another cpu?
-> 
-> Setting the cpu value from task_thread_info(tsk)->cpu would protect against
-> this.
-
-IMO, no, but your suggestion makes sense. I will update it.
-
->> +	bool in_irq = in_irq_stack(cpu);
->> 
->> 	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
->> 
->> @@ -170,6 +172,10 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
->> 	}
->> 
->> 	pr_emerg("Call trace:\n");
->> +repeat:
->> +	if (in_irq)
->> +		pr_emerg("<IRQ>\n");
-> 
-> Do we need these? 'el1_irq()' in the trace is a giveaway?
-
-I borrow this idea from x86 implementation in order to show a separate stack
-explicitly. There is no issue to remove these tags, <IRQ> and <EOI>.
-
-Great thanks!
-
-Best Regards
-Jungseok Lee
+diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
+index 2ee83474a3c1..f0066373b170 100644
+--- a/drivers/firmware/Makefile
++++ b/drivers/firmware/Makefile
+@@ -15,7 +15,7 @@ obj-$(CONFIG_FIRMWARE_MEMMAP)	+= memmap.o
+ obj-$(CONFIG_QCOM_SCM)		+= qcom_scm.o
+ obj-$(CONFIG_QCOM_SCM_64)	+= qcom_scm-64.o
+ obj-$(CONFIG_QCOM_SCM_32)	+= qcom_scm-32.o
+-CFLAGS_qcom_scm-32.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
++CFLAGS_qcom_scm-32.o :=$(call as-instr,.arch armv7-a\n.arch_extension sec,-DREQUIRES_SEC=1) -march=armv7-a
+ 
+ obj-y				+= broadcom/
+ obj-$(CONFIG_GOOGLE_FIRMWARE)	+= google/
