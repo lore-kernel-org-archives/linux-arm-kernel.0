@@ -1,61 +1,92 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 12 Oct 2015 11:49:01 +0800
-Subject: [Linaro-acpi] [PATCH v5 0/5] Provide better MADT subtable sanity
- checks
-In-Reply-To: <561B2442.9050600@erley.org>
-References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
- <560BA4C9.7090607@huawei.com> <560C0968.6020904@redhat.com>
- <2808057.teMg2oCLf6@vostro.rjw.lan> <5612AF64.4060900@redhat.com>
- <561B2442.9050600@erley.org>
-Message-ID: <561B2DAD.5070601@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 12 Oct 2015 12:51:50 +0900
+Subject: [PATCH v6 05/17] drm: bridge: analogix/dp: dynamic parse sync_pol
+ & interlace & dynamic_range
+In-Reply-To: <561B1E65.1040806@rock-chips.com>
+References: <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
+ <1444491961-26799-1-git-send-email-ykk@rock-chips.com>
+ <561B00D4.9060302@rock-chips.com> <561B0385.1070704@samsung.com>
+ <561B1E65.1040806@rock-chips.com>
+Message-ID: <561B2E56.5020102@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2015 11:08 AM, Pat Erley wrote:
-> On 10/05/2015 10:12 AM, Al Stone wrote:
->> On 10/05/2015 07:39 AM, Rafael J. Wysocki wrote:
->>> On Wednesday, September 30, 2015 10:10:16 AM Al Stone wrote:
->>>> On 09/30/2015 03:00 AM, Hanjun Guo wrote:
->>>>> On 2015/9/30 7:45, Al Stone wrote:
->>>>>> NB: this patch set is for use against the linux-pm bleeding edge
->>>>>> branch.
->>>>>>
->>>>
->>>> [snip...]
->>>>
->>>>>
->>>>> For this patch set,
->>>>>
->>>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>>
->>>>> Thanks
->>>>> Hanjun
->>>>
->>>> Thanks, Hanjun!
+On 12.10.2015 11:43, Yakir Yang wrote:
+> 
+> 
+> On 10/12/2015 08:49 AM, Krzysztof Kozlowski wrote:
+>> On 12.10.2015 09:37, Yakir Yang wrote:
+>>> Hi Krzysztof,
 >>>
->>> Series applied, thanks!
+>>> On 10/10/2015 11:46 PM, Yakir Yang wrote:
+>>>> Both hsync/vsync polarity and interlace mode can be parsed from
+>>>> drm display mode, and dynamic_range and ycbcr_coeff can be judge
+>>>> by the video code.
+>>>>
+>>>> But presumably Exynos still relies on the DT properties, so take
+>>>> good use of mode_fixup() in to achieve the compatibility hacks.
+>>>>
+>>>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>>>> ---
+>>>> Changes in v6: None
+>>> +    of_property_read_u32(dp_node, "hsync-active-high",
+>>> +                 &video->h_sync_polarity);
+>>> +    of_property_read_u32(dp_node, "vsync-active-high",
+>>> +                 &video->v_sync_polarity);
+>>> +    of_property_read_u32(dp_node, "interlaced",
+>>> +                 &video->interlaced);
+>>> +}
 >>>
->>> Rafael
 >>>
+>>> Sorry, forget to fix your previous comment here, would
+>>> remember to fix it to v7 version, wish v6 would collect
+>>> more comment/reviewed/ack.  :)
+>> Right.
 >>
->> Thanks, Rafael!
+>> You can send a v7 of only this patch.
 >>
->
-> Just decided to test out linux-next (to see the new nouveau cleanups).
-> This change set prevents my Lenovo W510 from booting properly.
->
-> Reverting: 7494b0 "ACPI: add in a bad_madt_entry() function to
-> eventually replace the macro"
->
-> Gets the system booting again.  I'm attaching my dmesg from the failed
-> boot, who wants the acpidump?
+>> In the same time I would prefer not to chain-reply next version of
+>> entire patchset to cover letter of previous version. It confuses me
+>> because v6 appears UNDER v4 so I can't really find v6. I see v4 at the
+>> top of my email list.
+> 
+> Okay, I wish this chain-reply would make people easy to find the
+> previous comments, but actually it is little mess now. I would give
+> up this way to send patchset  :)
+> 
+>> In the same time the patchset is quite big. Put the latest version (with
+>> this issue above fixed!) on some repo and link it in cover letter.
+> 
+> Yeah, it's quite big now, I would like to back the patchset to previous
+> format, like:
+> 
+> ---> [PATCH v6 00/17] Cover letter
+>   |----> [PATCH v6 01/17]
+>   |----> [PATCH ......]
+>   |----> [PATCH v6 05/17]
+>      |----> [PATCH v7 05/17]
+>   |----> [PATCH ......]
+>   |----> [PATCH v6 17/17]
+> 
+> Is it right, and can resend the v6 to fix this chain-reply issue with
+> RESEND flag ([PATCH RESEND v6 ...]) ?
+> 
+> ---> [PATCH RESEND v6 00/17] Cover letter
+>   |----> [PATCH RESEND v6 01/17]
+>   |----> [PATCH ......]
+>   |----> [PATCH RESEND v6 05/17]
+>      |----> [PATCH v7 05/17]
+>   |----> [PATCH ......]
+>   |----> [PATCH RESEND v6 17/17]
+> 
 
-[    0.000000] ACPI: undefined version for either FADT 4.0 or MADT 1
-[    0.000000] ACPI: Error parsing LAPIC address override entry
-[    0.000000] ACPI: Invalid BIOS MADT, disabling ACPI
+No, don't resend everything. I mean in this case with such big patchset
+if you want to fix one patch just send one email [PATCH v7 05/17]
+chained to proper id (cover letter or v6-05/17). Add a short note that
+this is resend of only one patch from the set.
 
-Seems the MADT revision is not right, could you dump the ACPI MADT
-(APIC) table and send it out? I will take a look :)
+Of course you can just wait for some more comments and then send v7 of
+everything.
 
-Thanks
-Hanjun
+Best regards,
+Krzysztof
