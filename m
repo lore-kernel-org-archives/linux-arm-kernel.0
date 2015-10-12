@@ -1,156 +1,53 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 12 Oct 2015 15:17:52 +0100
-Subject: [PATCH v3 12/16] KVM: arm64: handle pending bit for LPIs in ITS
- emulation
-In-Reply-To: <016d01d104c1$47a41570$d6ec4050$@samsung.com>
-References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
- <1444229726-31559-13-git-send-email-andre.przywara@arm.com>
- <016d01d104c1$47a41570$d6ec4050$@samsung.com>
-Message-ID: <561BC110.9090403@arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 12 Oct 2015 19:53:36 +0530
+Subject: [PATCH v2] dmaengine: xgene-dma: Disable memcpy operation due to
+ performance drop
+In-Reply-To: <CAFd313w3010=LN7rfrxwohM=h-9xWzK6UNtcWxn+eXtx-pNv4Q@mail.gmail.com>
+References: <1444295217-3099-1-git-send-email-rsahu@apm.com>
+ <20151009161208.GJ3609@vkoul-mobl.iind.intel.com>
+ <CAFd313w3010=LN7rfrxwohM=h-9xWzK6UNtcWxn+eXtx-pNv4Q@mail.gmail.com>
+Message-ID: <20151012142336.GA27370@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-
-On 12/10/15 08:40, Pavel Fedin wrote:
->  Hello!
+On Fri, Oct 09, 2015 at 10:08:32PM +0530, Rameshwar Sahu wrote:
+> Hi Vinod,
 > 
->> -----Original Message-----
->> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On Behalf Of Andre Przywara
->> Sent: Wednesday, October 07, 2015 5:55 PM
->> To: marc.zyngier at arm.com; christoffer.dall at linaro.org
->> Cc: eric.auger at linaro.org; p.fedin at samsung.com; kvmarm at lists.cs.columbia.edu; linux-arm-
->> kernel at lists.infradead.org; kvm at vger.kernel.org
->> Subject: [PATCH v3 12/16] KVM: arm64: handle pending bit for LPIs in ITS emulation
->>
->> As the actual LPI number in a guest can be quite high, but is mostly
->> assigned using a very sparse allocation scheme, bitmaps and arrays
->> for storing the virtual interrupt status are a waste of memory.
->> We use our equivalent of the "Interrupt Translation Table Entry"
->> (ITTE) to hold this extra status information for a virtual LPI.
->> As the normal VGIC code cannot use its fancy bitmaps to manage
->> pending interrupts, we provide a hook in the VGIC code to let the
->> ITS emulation handle the list register queueing itself.
->> LPIs are located in a separate number range (>=8192), so
->> distinguishing them is easy. With LPIs being only edge-triggered, we
->> get away with a less complex IRQ handling.
->> We extend the number of bits for storing the IRQ number in our
->> LR struct to 16 to cover the LPI numbers we support as well.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->> Changelog v2..v3:
->> - extend LR data structure to hold 16-bit wide IRQ IDs
->> - only clear pending bit if IRQ could be queued
->> - adapt __kvm_vgic_sync_hwstate() to upstream changes
->>
->>  include/kvm/arm_vgic.h      |  4 +-
->>  virt/kvm/arm/its-emul.c     | 75 ++++++++++++++++++++++++++++++++++++
->>  virt/kvm/arm/its-emul.h     |  3 ++
->>  virt/kvm/arm/vgic-v3-emul.c |  2 +
->>  virt/kvm/arm/vgic.c         | 93 +++++++++++++++++++++++++++++++--------------
->>  5 files changed, 148 insertions(+), 29 deletions(-)
->>
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index c3eb414..035911f 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -95,7 +95,7 @@ enum vgic_type {
->>  #define LR_HW			(1 << 3)
->>
->>  struct vgic_lr {
->> -	unsigned irq:10;
->> +	unsigned irq:16;
->>  	union {
->>  		unsigned hwirq:10;
->>  		unsigned source:3;
->> @@ -147,6 +147,8 @@ struct vgic_vm_ops {
->>  	int	(*init_model)(struct kvm *);
->>  	void	(*destroy_model)(struct kvm *);
->>  	int	(*map_resources)(struct kvm *, const struct vgic_params *);
->> +	bool	(*queue_lpis)(struct kvm_vcpu *);
->> +	void	(*unqueue_lpi)(struct kvm_vcpu *, int irq);
->>  };
->>
->>  struct vgic_io_device {
->> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
->> index bab8033..8349970 100644
->> --- a/virt/kvm/arm/its-emul.c
->> +++ b/virt/kvm/arm/its-emul.c
->> @@ -59,8 +59,27 @@ struct its_itte {
->>  	struct its_collection *collection;
->>  	u32 lpi;
->>  	u32 event_id;
->> +	bool enabled;
->> +	unsigned long *pending;
->>  };
->>
->> +/* To be used as an iterator this macro misses the enclosing parentheses */
->> +#define for_each_lpi(dev, itte, kvm) \
->> +	list_for_each_entry(dev, &(kvm)->arch.vgic.its.device_list, dev_list) \
->> +		list_for_each_entry(itte, &(dev)->itt, itte_list)
->> +
->> +static struct its_itte *find_itte_by_lpi(struct kvm *kvm, int lpi)
->> +{
->> +	struct its_device *device;
->> +	struct its_itte *itte;
->> +
->> +	for_each_lpi(device, itte, kvm) {
->> +		if (itte->lpi == lpi)
->> +			return itte;
->> +	}
->> +	return NULL;
->> +}
->> +
->>  #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
->>
->>  /* The distributor lock is held by the VGIC MMIO handler. */
->> @@ -154,9 +173,65 @@ static bool handle_mmio_gits_idregs(struct kvm_vcpu *vcpu,
->>  	return false;
->>  }
->>
->> +/*
->> + * Find all enabled and pending LPIs and queue them into the list
->> + * registers.
->> + * The dist lock is held by the caller.
->> + */
->> +bool vits_queue_lpis(struct kvm_vcpu *vcpu)
->> +{
->> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
->> +	struct its_device *device;
->> +	struct its_itte *itte;
->> +	bool ret = true;
->> +
->> +	if (!vgic_has_its(vcpu->kvm))
->> +		return true;
->> +	if (!its->enabled || !vcpu->kvm->arch.vgic.lpis_enabled)
->> +		return true;
->> +
->> +	spin_lock(&its->lock);
->> +	for_each_lpi(device, itte, vcpu->kvm) {
->> +		if (!itte->enabled || !test_bit(vcpu->vcpu_id, itte->pending))
->> +			continue;
->> +
->> +		if (!itte->collection)
->> +			continue;
->> +
->> +		if (itte->collection->target_addr != vcpu->vcpu_id)
->> +			continue;
->> +
->> +
->> +		if (vgic_queue_irq(vcpu, 0, itte->lpi))
->> +			__clear_bit(vcpu->vcpu_id, itte->pending);
->> +		else
->> +			ret = false;
+> On Fri, Oct 9, 2015 at 9:42 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> > On Thu, Oct 08, 2015 at 02:36:57PM +0530, Rameshwar Prasad Sahu wrote:
+> >> The DMA engine supports memory copy, RAID5 XOR, RAID6 PQ, and other
+> >> computations. But the bandwidth of the entire DMA engine is shared
+> >> among all channels. This patch re-configures operations availability
+> >> such that one can achieve maximum performance for XOR and PQ
+> >> computation by removing the memory offload operations.
+> >>
+> >> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+> >> ---
+> >>  drivers/dma/xgene-dma.c | 1 -
+> >>  1 file changed, 1 deletion(-)
+> >>
+> >> diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
+> >> index 8d57b1b..cd38022 100644
+> >> --- a/drivers/dma/xgene-dma.c
+> >> +++ b/drivers/dma/xgene-dma.c
+> >> @@ -1707,7 +1707,6 @@ static void xgene_dma_set_caps(struct xgene_dma_chan *chan,
+> >>       dma_cap_zero(dma_dev->cap_mask);
+> >>
+> >>       /* Set DMA device capability */
+> >> -     dma_cap_set(DMA_MEMCPY, dma_dev->cap_mask);
+> >>       dma_cap_set(DMA_SG, dma_dev->cap_mask);
+> >
+> > This will not work. Still clients can invoke memcpy operation. You need to
+> > remove the callback
 > 
->  Shouldn't we also have 'break' here? If vgic_queue_irq() returns false, this means we have no more
-> LRs to use, therefore it makes no sense to keep iterating.
+> Got it, instead of removing the callback registration can we keep it
+> inside the condition like..
+> 
+> if (dma_has_cap(DMA_MEMCPY, dma_dev->cap_mask))
+>             dma_dev->device_prep_dma_memcpy = xgene_dma_prep_memcpy;
 
-I consider this too much optimization at this point.
-vgic_queue_irq() just tells about the success for this interrupt, I'd
-rather not make assumptions about other IRQs (we could piggy-back those,
-for instance).
-Even if not, I'd prefer to not break abstraction here.
+But the code is dead and will not be tested and hence not maintained. I do
+not see a reason to keep dead code in kernel
 
-Cheers,
-Andre.
+-- 
+~Vinod
