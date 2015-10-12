@@ -1,157 +1,36 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 12 Oct 2015 18:32:17 +0200
-Subject: [PATCH 2/2] arm: mvebu: reorder nodes under internal-regs by
- address in RN2120 .dts file
-In-Reply-To: <20151012142324.GB30801@lunn.ch> (Andrew Lunn's message of "Mon,
- 12 Oct 2015 16:23:24 +0200")
-References: <cover.1444428035.git.arno@natisbad.org>
- <277de75473af2431849a7494ae65b57dbc9a8309.1444428035.git.arno@natisbad.org>
- <20151012142324.GB30801@lunn.ch>
-Message-ID: <87y4f8jbe6.fsf@free-electrons.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 13 Oct 2015 00:32:14 +0800
+Subject: [PATCH v4 3/4] arm64: dts: add mailbox node for Hi6220
+In-Reply-To: <1444667535-16948-1-git-send-email-leo.yan@linaro.org>
+References: <1444667535-16948-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1444667535-16948-4-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
- 
- On lun., oct. 12 2015, Andrew Lunn <andrew@lunn.ch> wrote:
+This patch add device mailbox node for Hi6220 in DT.
 
-> On Sat, Oct 10, 2015 at 12:10:39AM +0200, Arnaud Ebalard wrote:
->> 
->> This cosmetic patch reorder nodes under internal-regs by increasing
->> address order, as epxected.
->
-> expected.
->
-> Gregory, can you fix that as you commit?
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Done!
-
->
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
->
-> 	  Andrew
->
->> 
->> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
->> ---
->>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 86 +++++++++++++-------------
->>  1 file changed, 43 insertions(+), 43 deletions(-)
->> 
->> diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
->> index 85b2f87c0b8a..d72a69d97ba2 100644
->> --- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
->> +++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
->> @@ -94,54 +94,11 @@
->>  				status = "disabled";
->>  			};
->>  
->> -			/* Two rear eSATA ports */
->> -			sata at a0000 {
->> -				nr-ports = <2>;
->> -				status = "okay";
->> -			};
->> -
->> -			serial at 12000 {
->> -				status = "okay";
->> -			};
->> -
->> -			mdio {
->> -				phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
->> -					reg = <0>;
->> -				};
->> -
->> -				phy1: ethernet-phy at 1 { /* Marvell 88E1318 */
->> -					reg = <1>;
->> -				};
->> -			};
->> -
->> -			ethernet at 70000 {
->> -				status = "okay";
->> -				phy = <&phy0>;
->> -				phy-mode = "rgmii-id";
->> -			};
->> -
->> -			ethernet at 74000 {
->> -				status = "okay";
->> -				phy = <&phy1>;
->> -				phy-mode = "rgmii-id";
->> -			};
->> -
->> -			/* Front USB 2.0 port */
->> -			usb at 50000 {
->> -				status = "okay";
->> -			};
->> -
->>  			i2c at 11000 {
->>  				compatible = "marvell,mv64xxx-i2c";
->>  				clock-frequency = <400000>;
->>  				status = "okay";
->>  
->> -				isl12057: isl12057 at 68 {
->> -					compatible = "isil,isl12057";
->> -					reg = <0x68>;
->> -					isil,irq2-can-wakeup-machine;
->> -				};
->> -
->>  				/* Controller for rear fan #1 of 3 (Protechnic
->>  				 * MGT4012XB-O20, 8000RPM) near eSATA port */
->>  				g762_fan1: g762 at 3e {
->> @@ -178,6 +135,49 @@
->>  					compatible = "gmt,g751";
->>  					reg = <0x4c>;
->>  				};
->> +
->> +				isl12057: isl12057 at 68 {
->> +					compatible = "isil,isl12057";
->> +					reg = <0x68>;
->> +					isil,irq2-can-wakeup-machine;
->> +				};
->> +			};
->> +
->> +			serial at 12000 {
->> +				status = "okay";
->> +			};
->> +
->> +			/* Front USB 2.0 port */
->> +			usb at 50000 {
->> +				status = "okay";
->> +			};
->> +
->> +			mdio {
->> +				phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
->> +					reg = <0>;
->> +				};
->> +
->> +				phy1: ethernet-phy at 1 { /* Marvell 88E1318 */
->> +					reg = <1>;
->> +				};
->> +			};
->> +
->> +			ethernet at 70000 {
->> +				status = "okay";
->> +				phy = <&phy0>;
->> +				phy-mode = "rgmii-id";
->> +			};
->> +
->> +			ethernet at 74000 {
->> +				status = "okay";
->> +				phy = <&phy1>;
->> +				phy-mode = "rgmii-id";
->> +			};
->> +
->> +			/* Two rear eSATA ports */
->> +			sata at a0000 {
->> +				nr-ports = <2>;
->> +				status = "okay";
->>  			};
->>  
->>  			nand at d0000 {
->> -- 
->> 2.5.3
->> 
-
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index e83802a..76560fa 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -207,5 +207,13 @@
+ 			clocks = <&ao_ctrl 27>, <&ao_ctrl 27>;
+ 			clock-names = "apb_pclk", "apb_pclk";
+ 		};
++
++		mailbox: mailbox at f7510000 {
++			#mbox-cells = <1>;
++			compatible = "hisilicon,hi6220-mbox";
++			reg = <0x0 0xf7510000 0x0 0x1000>, /* IPC_S */
++			      <0x0 0x06dff800 0x0 0x0800>; /* Mailbox buffer */
++			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
++		};
+ 	};
+ };
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.9.1
