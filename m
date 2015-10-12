@@ -1,111 +1,137 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 12 Oct 2015 19:51:29 +0900
-Subject: [PATCH 3/3] ARM: dts: exynos5422-odroidxu3: Added UHS-I bus speed
- support
-In-Reply-To: <CANAwSgSk0yHGvnoVoTk9MnUqjyEw1+yzH=C-1s_wxVkpGRHCEg@mail.gmail.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Mon, 12 Oct 2015 16:38:10 +0530
+Subject: [PATCH 2/3] ARM: dts: use vmmc-supply of emmc/sd for
+ exynos5422-odroidxu3
+In-Reply-To: <561B49D0.2040305@samsung.com>
 References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
- <1444578364-1384-3-git-send-email-linux.amoon@gmail.com>
- <561B48B7.1040201@samsung.com>
- <CANAwSgSk0yHGvnoVoTk9MnUqjyEw1+yzH=C-1s_wxVkpGRHCEg@mail.gmail.com>
-Message-ID: <561B90B1.1090100@samsung.com>
+ <1444578364-1384-2-git-send-email-linux.amoon@gmail.com>
+ <561B3A3E.3030904@samsung.com> <561B49D0.2040305@samsung.com>
+Message-ID: <CANAwSgT=O-AVhQv4TO8ZukK15Ya++Kos_ZEjiFZWiDwNXub0mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2015 07:46 PM, Anand Moon wrote:
-> Hi Krzysztof,
-> 
-> On 12 October 2015 at 11:14, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
+Hi Krzysztof,
+
+On 12 October 2015 at 11:19, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> On 12.10.2015 13:42, Krzysztof Kozlowski wrote:
 >> On 12.10.2015 00:46, Anand Moon wrote:
->>> Added support for UHS-I bus speed 50MB/s (SDR50, DDR50) 104MB/s (SDR104)
+>>> Added support for vmmc/vqmmc-supply for emmc/sd cards.
+>>> Fixed the min values for regulator ldo13_reg (VDDQ_MMC2).
 >>
->> This description is not entirely correct. The MMC driver already
->> supports these UHS speeds (you did not any code) so you rather enabled
->> it (description of bindings says "is supported").
+>> I can't see the description of a problem which is fixed. If you fix
+>> something, then please describe what is wrong.
 >>
->> You mentioned DDR50 but I don't see respective property below.
-> Looks like I missed it, I will add this in the next patch,
->>
->> How do you know that these modes are really supported? I don't know. Can
->> you convince me?
->>
-> 
+>>> Added ramp-delay for LDO9(VDD33_USB3_0).
+>>> Added ramp-delay for LDO13(VDDQ_MMC2).
+>>> Added ramp-delay for LDO15(ETH_P3V3).
 >>>
 >>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 >>>
 >>> ---
 >>> Changes based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v4.4-next/dt-samsung branch
 >>>
->>> Changes Fixed the UHS-I bus speed detedtion on cold boot.
+>>> Note:
+>>> Changes need for support of UHS-I highspeed cards.
+>>> changes for vqmmc-supply for emmc is not supported.
+>>>
+>>> [    1.831136] vdd_ldo9: ramp_delay not set
+>>> [    1.843049] vdd_ldo13: ramp_delay not set
+>>> [    1.850975] vdd_ldo15: ramp_delay not set
+>>> [    1.862816] vdd_sd: ramp_delay not set
+>>> ---
+>>>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 8 +++++++-
+>>>  1 file changed, 7 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>> index 26decbd..58c06d3 100644
+>>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>> @@ -157,6 +157,7 @@
+>>>                              regulator-min-microvolt = <3000000>;
+>>>                              regulator-max-microvolt = <3000000>;
+>>>                              regulator-always-on;
+>>> +                            regulator-ramp-delay = <12000>;
+>>>                      };
+>>>
+>>>                      ldo10_reg: LDO10 {
+>>> @@ -182,9 +183,10 @@
+>>>
+>>>                      ldo13_reg: LDO13 {
+>>>                              regulator-name = "vdd_ldo13";
+>>> -                            regulator-min-microvolt = <2800000>;
+>>> +                            regulator-min-microvolt = <1800000>;
+>>>                              regulator-max-microvolt = <2800000>;
+>>>                              regulator-always-on;
+>>> +                            regulator-ramp-delay = <12000>;
+>>>                      };
+>>>
+>>>                      ldo15_reg: LDO15 {
+>>> @@ -213,6 +215,7 @@
+>>>                              regulator-min-microvolt = <2800000>;
+>>>                              regulator-max-microvolt = <2800000>;
+>>>                              regulator-always-on;
+>>> +                            regulator-ramp-delay = <12000>;
 >>
->> I don't get what is exactly fixed here. What was the error? What is the
->> outcome of this fix? The log below is before or after?
+>> Where did you get this value from? It looks wrong... My datasheet does
+>> not have 12000 uV/uS.
+>
+
+> Anand,
+>
+> We have actually been here:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/351601.html
+>
+> That time you used 8000. I asked the same question - how did you figure
+> out the exact value.
+>
+> Now we have the same question - why 12000?
+>
+> It is completely fine to make a mistake (I do a lot of them) but please
+> try not to make the same mistake again.
+>
+> BR,
+> Krzysztof
+
+I will focus more in the future to clamp down my mistakes to minimal.
+
+>
 >>
+>>>                      };
+>>>
+>>>                      ldo24_reg: LDO24 {
+>>> @@ -338,6 +341,7 @@
+>>>      samsung,dw-mshc-ddr-timing = <0 2>;
+>>>      samsung,dw-mshc-hs400-timing = <0 2>;
+>>>      samsung,read-strobe-delay = <90>;
+>>> +    vmmc-supply = <&ldo3_reg>;
+>>>      pinctrl-names = "default";
+>>>      pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_cd &sd0_rclk>;
+>>>      bus-width = <8>;
+>>> @@ -352,6 +356,8 @@
+>>>      samsung,dw-mshc-ciu-div = <3>;
+>>>      samsung,dw-mshc-sdr-timing = <0 4>;
+>>>      samsung,dw-mshc-ddr-timing = <0 2>;
+>>> +    vmmc-supply = <&ldo19_reg>;
+>>> +    vqmmc-supply = <&ldo13_reg>;
+>>
+>> It looks wrong. LDO13 is used in one place as VQMMC and in other as
+>> VMMC. How did you figure out which regulator supplies which power domain?
+>>
+
+I refer Schematics diagram to XU4_MAIN_REV0.1.pdf
+
+>From the PWR_PMCI_S2MPS11_LDO_CTRL document it LDO13 point to VDDQ_MMC2.
+
 >> Best regards,
 >> Krzysztof
 >>
->>>
->>> [    2.439806] mmc_host mmc1: Bus speed (slot 0) = 100000000Hz (slot req 100000000Hz, actual 100000000HZ div = 0)
->>> [    2.449729] mmc1: new ultra high speed SDR50 SDHC card at address aaaa
->>> [    2.455984] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
->>> [    2.461743]  mmcblk0: p1 p2
->>
->>> ---
->>>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 4 ++++
->>>  1 file changed, 4 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->>> index 58c06d3..ba4a87b 100644
->>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->>> @@ -364,6 +364,10 @@
->>>       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
->>>       bus-width = <4>;
->>>       cap-sd-highspeed;
->>> +     sd-uhs-sdr12;
->>> +     sd-uhs-sdr25;
->>> +     sd-uhs-sdr50;
->>> +     sd-uhs-sdr104;
->>>  };
->>>
->>>  &pinctrl_0 {
+>>>      cd-gpios = <&gpc2 2 GPIO_ACTIVE_HIGH>;
+>>>      cd-inverted;
+>>>      pinctrl-names = "default";
 >>>
 >>
-> 
-> Changes were made to support Sandisk Ultra UHS-I class 10 card support.
-> OdroidXU3/XU4 board would not boot up using this card.
-> 
-> Depending on the capability of the UHS-I card, the speed of the card
-> is selected.
-> I have just added the enhance capability feature to support them.
-> 
-> On warm boot: i.e reboot of the board.
-> [    4.649073] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot
-> req 50000000Hz, actual 50000000HZ div = 0)
-> [    4.657555] mmc1: new high speed SDHC card at address aaaa
-> [    4.663787] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
-> [    4.669206]  mmcblk0: p1 p2
-> 
-> On cold boot:: ie: power on the board.
-> 
-> [    4.630237] mmc_host mmc1: Bus speed (slot 0) = 100000000Hz (slot
-> req 100000000Hz, actual 100000000HZ div = 0)
-> [    4.639820] mmc1: new ultra high speed SDR50 SDHC card at address aaaa
-> [    4.646266] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
-> [    4.650293] IRQ56 no longer affine to CPU7
-> [    4.650581] CPU7: shutdown
-> [    4.658293]  mmcblk0: p1 p2
-> 
-> Note: Their is need to reset the PMIC
-> S2MPS11_REG_L13CTRL/S2MPS11_REG_L19CTRL registers
->          to support this feature consistently on every reboot.
+>>
+>
 
-I don't understand...why needs to reset?
-I know it needs to switch the voltage, doesn't it?
-
-Best Regards,
-Jaehoon Chung
-
-> 
-> -Anand Moon
-> 
+-Anand Moon
