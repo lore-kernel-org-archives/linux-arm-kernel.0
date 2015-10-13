@@ -1,42 +1,53 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Tue, 13 Oct 2015 11:57:18 -0700
-Subject: [PATCH] ARM: socfpga_defconfig: enable fpga manager
-In-Reply-To: <1444761002-1423-1-git-send-email-atull@opensource.altera.com>
-References: <1444761002-1423-1-git-send-email-atull@opensource.altera.com>
-Message-ID: <CAAtXAHcft8eSwXQJ6+=zTTGjrQ=Fo7OdyWeePH7w+FCNzCSm8g@mail.gmail.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Tue, 13 Oct 2015 20:57:50 +0200
+Subject: [PATCH] ARM: socfpga: dts: add fpga manager
+In-Reply-To: <1444760900-1373-1-git-send-email-atull@opensource.altera.com>
+References: <1444760900-1373-1-git-send-email-atull@opensource.altera.com>
+Message-ID: <20151013185750.GB17155@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 11:30 AM,  <atull@opensource.altera.com> wrote:
+Hi Alan!
+
+On Tue, Oct 13, 2015 at 01:28:20PM -0500, atull at opensource.altera.com wrote:
 > From: Alan Tull <atull@opensource.altera.com>
->
-> Enable fpga manager framework and low level driver for
-> socfpga in socfpga_defconfig
->
+> 
+> Add FPGA manager to device tree for SoCFPGA.
+> 
 > Signed-off-by: Alan Tull <atull@opensource.altera.com>
-Reviewed-by: Moritz Fischer <moritz.fischer@ettus.com>
 > ---
->  arch/arm/configs/socfpga_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-> index a2956c3..8128b93e 100644
-> --- a/arch/arm/configs/socfpga_defconfig
-> +++ b/arch/arm/configs/socfpga_defconfig
-> @@ -86,6 +86,8 @@ CONFIG_USB_DWC2=y
->  CONFIG_USB_DWC2_HOST=y
->  CONFIG_MMC=y
->  CONFIG_MMC_DW=y
-> +CONFIG_FPGA=y
-> +CONFIG_FPGA_MGR_SOCFPGA=y
->  CONFIG_EXT2_FS=y
->  CONFIG_EXT2_FS_XATTR=y
->  CONFIG_EXT2_FS_POSIX_ACL=y
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  arch/arm/boot/dts/socfpga.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index 314e589..e37ba11 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -834,5 +834,12 @@
+>  			compatible = "altr,sys-mgr", "syscon";
+>  			reg = <0xffd08000 0x4000>;
+>  		};
+> +
+> +		hps_0_fpgamgr: fpgamgr at 0xff706000 {
+> +			compatible = "altr,socfpga-fpga-mgr";
+> +			reg = <0xFF706000 0x1000
+> +			       0xFFB90000 0x1000>;
+> +			interrupts = <0 175 4>;
+> +		};
+>  	};
+>  };
+
+Please keep the format in line with the rest of the file:
+Hexvalues are lowercase and no 0x after the "fpgamgr@".
+I'd say "And please put the node in its proper position
+according to its address", but I see just now, that the
+dtsi is all messed up right now anyway :-(
+
+Regards,
+Steffen
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
