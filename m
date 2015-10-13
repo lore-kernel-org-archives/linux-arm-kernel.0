@@ -1,92 +1,159 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Oct 2015 12:51:31 +0100
-Subject: [PATCH v2 03/17] irqdomain: Allow irq domain lookup by fwnode
+Date: Tue, 13 Oct 2015 12:51:32 +0100
+Subject: [PATCH v2 04/17] irqdomain: Introduce a firmware-specific IRQ
+ specifier structure
 In-Reply-To: <1444737105-31573-1-git-send-email-marc.zyngier@arm.com>
 References: <1444737105-31573-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1444737105-31573-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1444737105-31573-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, our irq domains are still looked up by device node.
-Let's change this and allow a domain to be looked up using
-a fwnode_handle pointer.
+So far the closest thing to a generic IRQ specifier structure is
+of_phandle_args, which happens to be pretty OF specific (the of_node
+pointer in there is quite annoying).
 
-The existing interfaces are preserved with a couple of helpers.
+Let's introduce 'struct irq_fwspec' that can be used in place of
+of_phandle_args for OF, but also for other firmware implementations
+(that'd be ACPI). This is used together with a new 'translate' method
+that is the pendent of 'xlate'.
+
+We convert irq_create_of_mapping to use this new structure (with a
+small hack that will be removed later).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/irqdomain.h | 11 +++++++++--
- kernel/irq/irqdomain.c    | 16 +++++++---------
- 2 files changed, 16 insertions(+), 11 deletions(-)
+ include/linux/irqdomain.h | 20 ++++++++++++++++
+ kernel/irq/irqdomain.c    | 59 ++++++++++++++++++++++++++++++++++++++---------
+ 2 files changed, 68 insertions(+), 11 deletions(-)
 
 diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index 2f508f4..607c185 100644
+index 607c185..533c974 100644
 --- a/include/linux/irqdomain.h
 +++ b/include/linux/irqdomain.h
-@@ -183,10 +183,17 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
- 					 irq_hw_number_t first_hwirq,
- 					 const struct irq_domain_ops *ops,
- 					 void *host_data);
--extern struct irq_domain *irq_find_matching_host(struct device_node *node,
--						 enum irq_domain_bus_token bus_token);
-+extern struct irq_domain *irq_find_matching_fwnode(struct fwnode_handle *fwnode,
-+						   enum irq_domain_bus_token bus_token);
- extern void irq_set_default_host(struct irq_domain *host);
+@@ -46,6 +46,24 @@ struct irq_data;
+ /* Number of irqs reserved for a legacy isa controller */
+ #define NUM_ISA_INTERRUPTS	16
  
-+static inline struct irq_domain *irq_find_matching_host(struct device_node *node,
-+							enum irq_domain_bus_token bus_token)
-+{
-+	return irq_find_matching_fwnode(node ? &node->fwnode : NULL,
-+					bus_token);
-+}
++#define IRQ_DOMAIN_IRQ_SPEC_PARAMS 16
 +
- static inline struct irq_domain *irq_find_host(struct device_node *node)
- {
- 	return irq_find_matching_host(node, DOMAIN_BUS_ANY);
++/**
++ * struct irq_fwspec - generic IRQ specifier structure
++ *
++ * @fwnode:		Pointer to a firmware-specific descriptor
++ * @param_count:	Number of device-specific parameters
++ * @param:		Device-specific parameters
++ *
++ * This structure, directly modeled after of_phandle_args, is used to
++ * pass a device-specific description of an interrupt.
++ */
++struct irq_fwspec {
++	struct fwnode_handle *fwnode;
++	int param_count;
++	u32 param[IRQ_DOMAIN_IRQ_SPEC_PARAMS];
++};
++
+ /*
+  * Should several domains have the same device node, but serve
+  * different purposes (for example one domain is for PCI/MSI, and the
+@@ -92,6 +110,8 @@ struct irq_domain_ops {
+ 		     unsigned int nr_irqs);
+ 	void (*activate)(struct irq_domain *d, struct irq_data *irq_data);
+ 	void (*deactivate)(struct irq_domain *d, struct irq_data *irq_data);
++	int (*translate)(struct irq_domain *d, struct irq_fwspec *fwspec,
++			 unsigned long *out_hwirq, unsigned int *out_type);
+ #endif
+ };
+ 
 diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 1aee5c1..023ab6d 100644
+index 023ab6d..86dfd40 100644
 --- a/kernel/irq/irqdomain.c
 +++ b/kernel/irq/irqdomain.c
-@@ -191,12 +191,12 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
- EXPORT_SYMBOL_GPL(irq_domain_add_legacy);
- 
- /**
-- * irq_find_matching_host() - Locates a domain for a given device node
-- * @node: device-tree node of the interrupt controller
-+ * irq_find_matching_fwnode() - Locates a domain for a given fwnode
-+ * @fwnode: FW descriptor of the interrupt controller
-  * @bus_token: domain-specific data
-  */
--struct irq_domain *irq_find_matching_host(struct device_node *node,
--					  enum irq_domain_bus_token bus_token)
-+struct irq_domain *irq_find_matching_fwnode(struct fwnode_handle *fwnode,
-+					    enum irq_domain_bus_token bus_token)
- {
- 	struct irq_domain *h, *found = NULL;
- 	int rc;
-@@ -212,12 +212,10 @@ struct irq_domain *irq_find_matching_host(struct device_node *node,
- 	 */
- 	mutex_lock(&irq_domain_mutex);
- 	list_for_each_entry(h, &irq_domain_list, link) {
--		struct device_node *of_node;
--		of_node = irq_domain_get_of_node(h);
- 		if (h->ops->match)
--			rc = h->ops->match(h, node, bus_token);
-+			rc = h->ops->match(h, to_of_node(fwnode), bus_token);
- 		else
--			rc = ((of_node != NULL) && (of_node == node) &&
-+			rc = ((fwnode != NULL) && (h->fwnode == fwnode) &&
- 			      ((bus_token == DOMAIN_BUS_ANY) ||
- 			       (h->bus_token == bus_token)));
- 
-@@ -229,7 +227,7 @@ struct irq_domain *irq_find_matching_host(struct device_node *node,
- 	mutex_unlock(&irq_domain_mutex);
- 	return found;
+@@ -484,30 +484,67 @@ int irq_create_strict_mappings(struct irq_domain *domain, unsigned int irq_base,
  }
--EXPORT_SYMBOL_GPL(irq_find_matching_host);
-+EXPORT_SYMBOL_GPL(irq_find_matching_fwnode);
+ EXPORT_SYMBOL_GPL(irq_create_strict_mappings);
  
- /**
-  * irq_set_default_host() - Set a "default" irq domain
++static int irq_domain_translate(struct irq_domain *d,
++				struct irq_fwspec *fwspec,
++				irq_hw_number_t *hwirq, unsigned int *type)
++{
++#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
++	if (d->ops->translate)
++		return d->ops->translate(d, fwspec, hwirq, type);
++#endif
++	if (d->ops->xlate)
++		return d->ops->xlate(d, to_of_node(fwspec->fwnode),
++				     fwspec->param, fwspec->param_count,
++				     hwirq, type);
++
++	/* If domain has no translation, then we assume interrupt line */
++	*hwirq = fwspec->param[0];
++	return 0;
++}
++
++static void of_phandle_args_to_fwspec(struct of_phandle_args *irq_data,
++				      struct irq_fwspec *fwspec)
++{
++	int i;
++
++	fwspec->fwnode = irq_data->np ? &irq_data->np->fwnode : NULL;
++	fwspec->param_count = irq_data->args_count;
++
++	for (i = 0; i < irq_data->args_count; i++)
++		fwspec->param[i] = irq_data->args[i];
++}
++
+ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+ {
++	struct irq_fwspec fwspec;
+ 	struct irq_domain *domain;
+ 	irq_hw_number_t hwirq;
+ 	unsigned int type = IRQ_TYPE_NONE;
+ 	int virq;
+ 
+-	domain = irq_data->np ? irq_find_host(irq_data->np) : irq_default_domain;
++	of_phandle_args_to_fwspec(irq_data, &fwspec);
++
++	if (fwspec.fwnode)
++		domain = irq_find_matching_fwnode(fwspec.fwnode, DOMAIN_BUS_ANY);
++	else
++		domain = irq_default_domain;
++
+ 	if (!domain) {
+ 		pr_warn("no irq domain found for %s !\n",
+-			of_node_full_name(irq_data->np));
++			of_node_full_name(to_of_node(fwspec.fwnode)));
+ 		return 0;
+ 	}
+ 
+-	/* If domain has no translation, then we assume interrupt line */
+-	if (domain->ops->xlate == NULL)
+-		hwirq = irq_data->args[0];
+-	else {
+-		if (domain->ops->xlate(domain, irq_data->np, irq_data->args,
+-					irq_data->args_count, &hwirq, &type))
+-			return 0;
+-	}
++	if (irq_domain_translate(domain, &fwspec, &hwirq, &type))
++		return 0;
+ 
+ 	if (irq_domain_is_hierarchy(domain)) {
++		/* Temporary hack */
++		void *desc = &fwspec;
++#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
++		if (!domain->ops->translate)
++			desc = irq_data;
++#endif
+ 		/*
+ 		 * If we've already configured this interrupt,
+ 		 * don't do it again, or hell will break loose.
+@@ -516,7 +553,7 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+ 		if (virq)
+ 			return virq;
+ 
+-		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, irq_data);
++		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, desc);
+ 		if (virq <= 0)
+ 			return 0;
+ 	} else {
 -- 
 2.1.4
