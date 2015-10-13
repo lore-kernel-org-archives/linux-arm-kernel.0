@@ -1,33 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Oct 2015 16:32:43 +0200
-Subject: [PATCH v2 2/4] soc: ti: add firmware file name as part of the
- driver
-In-Reply-To: <1444679211-823-3-git-send-email-m-karicheri2@ti.com>
-References: <1444679211-823-1-git-send-email-m-karicheri2@ti.com>
- <1444679211-823-3-git-send-email-m-karicheri2@ti.com>
-Message-ID: <5984319.ffuyRPpBNk@wuerfel>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 13 Oct 2015 17:33:38 +0300
+Subject: [PATCH v4 3/3] arm64: dts: mt8173: Add nor flash node
+In-Reply-To: <1444729160-26433-4-git-send-email-bayi.cheng@mediatek.com>
+References: <1444729160-26433-1-git-send-email-bayi.cheng@mediatek.com>
+ <1444729160-26433-4-git-send-email-bayi.cheng@mediatek.com>
+Message-ID: <561D1642.3070105@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 October 2015 15:46:49 Murali Karicheri wrote:
-> Currently firmware file name is included in the DTS. This is not scalable
-> as user has to change the DTS if they need upgrade to a new firmware.
-> Instead, add the firmware file name in the driver itself. As long as there
-> is no API change, new firmware upgrade is easy and require no driver
-> change. User is expected to copy the firmware image to the file system
-> and add a sym link to the new firmware for doing an upgrade. Driver add
-> a array of firmware file names to search for the available firmware blobs.
-> This scheme also prepare the driver for future changes to API if ever
-> happens. In such case it is assumed that driver needs to change to
-> accommodate the new firmware and new firmware file name will get added to
-> the array.
-> 
-> Also update the DT document to remove the firmware attribute and add
-> description about firmware in the driver documentation.
-> 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> 
+Hello.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+On 10/13/2015 12:39 PM, Bayi Cheng wrote:
 
-Looks good.
+> Add Mediatek nor flash node
+>
+> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+> ---
+>   arch/arm64/boot/dts/mediatek/mt8173.dtsi | 15 +++++++++++++++
+>   1 file changed, 15 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index d18ee42..385c2e4 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -365,6 +365,21 @@
+>   			status = "disabled";
+>   		};
+>
+> +		nor_flash: spi at 1100d000 {
+
+    I don't think this is a good label name for a SPI controller.
+
+> +			compatible = "mediatek,mt8173-nor";
+> +			reg = <0 0x1100d000 0 0xe0>;
+> +			clocks = <&pericfg CLK_PERI_SPI>,
+> +				 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
+> +			clock-names = "spi", "sf";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			flash at 0 {
+> +				compatible = "jedec,spi-nor";
+> +				reg = <0>;
+> +			};
+> +		};
+> +
+>   		i2c3: i2c3 at 11010000 {
+
+    Grr, the name should be "i2c at 11010000".
+
+[...]
+
+MBR, Sergei
