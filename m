@@ -1,28 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 13 Oct 2015 11:39:30 -0700
-Subject: [PATCH 09/10] clk: ns2: add clock support for Broadcom Northstar
- 2 SoC
-In-Reply-To: <561D36A6.2080309@broadcom.com>
-References: <1443826665-17570-1-git-send-email-jonmason@broadcom.com>
- <1443826665-17570-10-git-send-email-jonmason@broadcom.com>
- <20151010003352.GA26883@codeaurora.org> <20151012181929.GG20867@broadcom.com>
- <561D36A6.2080309@broadcom.com>
-Message-ID: <561D4FE2.4020805@codeaurora.org>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 13 Oct 2015 14:15:58 -0500
+Subject: [GIT PULL] qcom defconfig for 4.4
+Message-ID: <1444763758-16224-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/2015 09:51 AM, Scott Branden wrote:
->
-> Is that really necessary at all  I think something like this work
-> instead?
->
-> -obj-$(CONFIG_ARCH_BCM)            += bcm/
-> +obj-y        += bcm/
->
->
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
-Yes that's fine too, as long as we don't add any obj-y inside bcm/Makefile
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+are available in the git repository at:
+
+  git at git.codeaurora.org:quic/kernel/agross-msm.git tags/qcom-defconfig-for-4.4
+
+for you to fetch changes up to 4e7fb93081f8f2ac9f190e8da7507956d3f3a936:
+
+  ARM: multi_v7_defconfig: Enable QCOM SMD/RPM (2015-10-08 15:59:46 -0500)
+
+----------------------------------------------------------------
+Qualcomm ARM Based defconfig Updates for v4.4
+
+* Enable QCOM SMD/RPM in multi_v7_defconfig
+* Enable QCOM SMD/RPM in qcom_defconfig
+
+----------------------------------------------------------------
+Andy Gross (2):
+      ARM: qcom_defconfig: Enable SMD-RPM regulators
+      ARM: multi_v7_defconfig: Enable QCOM SMD/RPM
+
+ arch/arm/configs/multi_v7_defconfig |    5 +++++
+ arch/arm/configs/qcom_defconfig     |    8 +++++---
+ 2 files changed, 10 insertions(+), 3 deletions(-)
