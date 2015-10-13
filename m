@@ -1,65 +1,172 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Mon, 12 Oct 2015 18:18:46 -0700
-Subject: [PATCH v3 1/3] arm64/efi: remove /chosen/linux, uefi-stub-kern-ver
- DT property
-In-Reply-To: <1444129424-8284-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1444129424-8284-1-git-send-email-ard.biesheuvel@linaro.org>
- <1444129424-8284-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAFECyb-4k_HwpBn_PHtAFNcrPkTPLDnqrb0oUOzwMWsBfa0xNA@mail.gmail.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Tue, 13 Oct 2015 09:20:01 +0800
+Subject: [PATCH v6 10/17] phy: Add driver for rockchip Display Port PHY
+In-Reply-To: <561BCB97.3030201@ti.com>
+References: <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
+ <1444492559-27181-1-git-send-email-ykk@rock-chips.com>
+ <561BCB97.3030201@ti.com>
+Message-ID: <561C5C41.7060501@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 6, 2015 at 4:03 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> With the stub to kernel interface being promoted to a proper interface
-> so that other agents than the stub can boot the kernel proper in EFI
-> mode, we can remove the linux,uefi-stub-kern-ver field, considering
-> that its original purpose was to prevent this from happening in the
-> first place.
+Hi Kishon
+
+On 10/12/2015 11:02 PM, Kishon Vijay Abraham I wrote:
+> Hi,
 >
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Acked-by: Roy Franz <roy.franz@linaro.org>
-> ---
->  Documentation/arm/uefi.txt         | 2 --
->  drivers/firmware/efi/libstub/fdt.c | 9 ---------
->  2 files changed, 11 deletions(-)
+> On Saturday 10 October 2015 09:25 PM, Yakir Yang wrote:
+>> This phy driver would control the Rockchip DisplayPort module
+>> phy clock and phy power, it is relate to analogix_dp-rockchip
+>> dp driver. If you want DP works rightly on rockchip platform,
+>> then you should select both of them.
+> Add phy driver for the Rockchip DisplayPort PHY module. This is required
+> to get DisplayPort working in Rockchip SoCs.
+
+Thanks, take point.
+
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>> ---
+>> Changes in v6: None
+>> Changes in v5:
+>> - Remove "reg" DT property, cause driver could poweron/poweroff phy via
+>>    the exist "grf" syscon already. And rename the example DT node from
+>>    "edp_phy: phy at ff770274" to "edp_phy: edp-phy" directly. (Heiko)
+>> - Add deivce_node at the front of driver, update phy_ops type from "static
+>>    struct" to "static const struct". And correct the input paramters of
+>>    devm_phy_create() interfaces. (Heiko)
+>>
+>> Changes in v4:
+>> - Add commit message, and remove the redundant rockchip_dp_phy_init()
+>>    function, move those code to probe() method. And remove driver .owner
+>>    number. (Kishon)
+>>
+>> Changes in v3:
+>> - Suggest, add rockchip dp phy driver, collect the phy clocks and
+>>    power control. (Heiko)
+>>
+>> Changes in v2: None
+>>
+>>   drivers/phy/Kconfig           |   7 ++
+>>   drivers/phy/Makefile          |   1 +
+>>   drivers/phy/phy-rockchip-dp.c | 151 ++++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 159 insertions(+)
+>>   create mode 100644 drivers/phy/phy-rockchip-dp.c
+>>
+>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>> index 47da573..8f2bc4f 100644
+>> --- a/drivers/phy/Kconfig
+>> +++ b/drivers/phy/Kconfig
+>> @@ -310,6 +310,13 @@ config PHY_ROCKCHIP_USB
+>>   	help
+>>   	  Enable this to support the Rockchip USB 2.0 PHY.
+>>   
+>> +config PHY_ROCKCHIP_DP
+>> +	tristate "Rockchip Display Port PHY Driver"
+>> +	depends on ARCH_ROCKCHIP && OF
+>> +	select GENERIC_PHY
+>> +	help
+>> +	  Enable this to support the Rockchip Display Port PHY.
+>> +
+>>   config PHY_ST_SPEAR1310_MIPHY
+>>   	tristate "ST SPEAR1310-MIPHY driver"
+>>   	select GENERIC_PHY
+>> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+>> index a5b18c1..e281f35 100644
+>> --- a/drivers/phy/Makefile
+>> +++ b/drivers/phy/Makefile
+>> @@ -34,6 +34,7 @@ phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)	+= phy-s5pv210-usb2.o
+>>   obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
+>>   obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)	+= phy-qcom-apq8064-sata.o
+>>   obj-$(CONFIG_PHY_ROCKCHIP_USB) += phy-rockchip-usb.o
+>> +obj-$(CONFIG_PHY_ROCKCHIP_DP)		+= phy-rockchip-dp.o
+>>   obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
+>>   obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
+>>   obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
+>> diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
+>> new file mode 100644
+>> index 0000000..3a2ac120
+>> --- /dev/null
+>> +++ b/drivers/phy/phy-rockchip-dp.c
+>> @@ -0,0 +1,151 @@
+>> +/*
+>> + * Rockchip DP PHY driver
+>> + *
+>> + * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
+>> + * Author: Yakir Yang <ykk@@rock-chips.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License.
+>> + */
+>> +
+>> +#include <linux/io.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/phy/phy.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/mfd/syscon.h>
+>> +#include <linux/platform_device.h>
+>> +
+>> +#define GRF_SOC_CON12                   0x0274
+>> +#define GRF_EDP_REF_CLK_SEL_INTER	BIT(4)
+>> +#define GRF_EDP_PHY_SIDDQ_WRITE_EN      BIT(21)
+>> +#define GRF_EDP_PHY_SIDDQ_ON            0
+>> +#define GRF_EDP_PHY_SIDDQ_OFF           BIT(5)
+>> +
+>> +struct rockchip_dp_phy {
+>> +	struct device  *dev;
+>> +	struct regmap  *grf;
+>> +	struct clk     *phy_24m;
+>> +};
+>> +
+>> +static int rockchip_set_phy_state(struct phy *phy, bool enable)
+>> +{
+>> +	struct rockchip_dp_phy *dp = phy_get_drvdata(phy);
+>> +	int ret;
+>> +
+>> +	if (enable) {
+>> +		ret = clk_prepare_enable(dp->phy_24m);
+>> +		if (ret < 0) {
+>> +			dev_err(dp->dev, "Can't enable clock 24m %d\n", ret);
+>> +			return ret;
+>> +		}
+>> +
+>> +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
+>> +				   GRF_EDP_PHY_SIDDQ_WRITE_EN |
+>> +				   GRF_EDP_PHY_SIDDQ_ON);
+>> +	} else {
+>> +		clk_disable_unprepare(dp->phy_24m);
+> should clk_disable come after regmap_write? It'll be symmetric to enable?
+
+I don't see there is a strict limit about this, but thanks for your point, I
+would like to change this order to:
+
+     if (enable) {
+         // Enable SIDDQ power
+         // Enable Clock
+     } else {
+         // Disable Clock
+         // Disable SIDDQ power
+     }
+
+>> +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
+>> +				   GRF_EDP_PHY_SIDDQ_WRITE_EN |
+>> +				   GRF_EDP_PHY_SIDDQ_OFF);
+> Is this syscon register used only by Display Port PHY? Better to use
+> regmap_update API?
+
+Thanks to Heiko explain, writing you actually need to set the
+write-enable bit, some kind of hardware regmap_update.
+
+
+Thanks,
+- Yakir
+
+> Thanks
+> Kishon
 >
-> diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
-> index d60030a1b909..7f1bed8872f3 100644
-> --- a/Documentation/arm/uefi.txt
-> +++ b/Documentation/arm/uefi.txt
-> @@ -58,7 +58,5 @@ linux,uefi-mmap-desc-size | 32-bit | Size in bytes of each entry in the UEFI
->  --------------------------------------------------------------------------------
->  linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
->  --------------------------------------------------------------------------------
-> -linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
-> ---------------------------------------------------------------------------------
 >
->  For verbose debug messages, specify 'uefi_debug' on the kernel command line.
-> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-> index ef5d764e2a27..b62e2f5dcab3 100644
-> --- a/drivers/firmware/efi/libstub/fdt.c
-> +++ b/drivers/firmware/efi/libstub/fdt.c
-> @@ -147,15 +147,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->         if (status)
->                 goto fdt_set_fail;
 >
-> -       /*
-> -        * Add kernel version banner so stub/kernel match can be
-> -        * verified.
-> -        */
-> -       status = fdt_setprop_string(fdt, node, "linux,uefi-stub-kern-ver",
-> -                            linux_banner);
-> -       if (status)
-> -               goto fdt_set_fail;
-> -
->         return EFI_SUCCESS;
->
->  fdt_set_fail:
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
