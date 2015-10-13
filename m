@@ -1,113 +1,299 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 13 Oct 2015 23:31:41 +0200
-Subject: [PATCH 5/5] pinctrl: berlin: fix my family name spelling
-In-Reply-To: <1444771901-24460-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1444771901-24460-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1444771901-24460-6-git-send-email-antoine.tenart@free-electrons.com>
+From: jonmason@broadcom.com (Jon Mason)
+Date: Tue, 13 Oct 2015 17:38:18 -0400
+Subject: [PATCH 1/2] ARM: dts: bcm5301x: Add BCM SVK DT files
+In-Reply-To: <56192304.1050500@hauke-m.de>
+References: <1443824564-17291-1-git-send-email-jonmason@broadcom.com>
+ <56192304.1050500@hauke-m.de>
+Message-ID: <20151013213818.GM12512@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My family name contained an accent when I submitted the
-Berlin pinctrl series in the first place. There was an
-encoding issue when the series was applied. Fix this.
+On Sat, Oct 10, 2015 at 04:39:00PM +0200, Hauke Mehrtens wrote:
+> On 10/03/2015 12:22 AM, Jon Mason wrote:
+> > Add device tree files for Broadcom Northstar based SVKs.  Since the
+> > bcm5301x.dtsi already exists, all that is necessary is the dts files to
+> > enable the UARTs (and specify the RAM size for the 4708/9).  With these
+> > files, the SVKs are able to boot to shell.
+> > 
+> > Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> > ---
+> >  arch/arm/boot/dts/Makefile       |  5 +++-
+> >  arch/arm/boot/dts/bcm94708.dts   | 52 +++++++++++++++++++++++++++++++++++
+> >  arch/arm/boot/dts/bcm94709.dts   | 52 +++++++++++++++++++++++++++++++++++
+> >  arch/arm/boot/dts/bcm953012k.dts | 59 ++++++++++++++++++++++++++++++++++++++++
+> >  4 files changed, 167 insertions(+), 1 deletion(-)
+> >  create mode 100644 arch/arm/boot/dts/bcm94708.dts
+> >  create mode 100644 arch/arm/boot/dts/bcm94709.dts
+> >  create mode 100644 arch/arm/boot/dts/bcm953012k.dts
+> > 
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index 233159d..96a1b58 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -72,7 +72,10 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+> >  	bcm47081-buffalo-wzr-900dhp.dtb \
+> >  	bcm4709-asus-rt-ac87u.dtb \
+> >  	bcm4709-buffalo-wxr-1900dhp.dtb \
+> > -	bcm4709-netgear-r8000.dtb
+> > +	bcm4709-netgear-r8000.dtb \
+> > +	bcm94708.dtb \
+> > +	bcm94709.dtb \
+> > +	bcm953012k.dtb
+> >  dtb-$(CONFIG_ARCH_BCM_63XX) += \
+> >  	bcm963138dvt.dtb
+> >  dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
+> > diff --git a/arch/arm/boot/dts/bcm94708.dts b/arch/arm/boot/dts/bcm94708.dts
+> > new file mode 100644
+> > index 0000000..57a74c6
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/bcm94708.dts
+> 
+> Currently the files are named beginning with the chip name something
+> like this should fit better the other naming schema:
+> arch/arm/boot/dts/bcm4708-brcm-bcm94708.dts
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- drivers/pinctrl/berlin/berlin-bg2.c   | 4 ++--
- drivers/pinctrl/berlin/berlin-bg2cd.c | 4 ++--
- drivers/pinctrl/berlin/berlin-bg2q.c  | 4 ++--
- drivers/pinctrl/berlin/berlin.c       | 2 +-
- drivers/pinctrl/berlin/berlin.h       | 2 +-
- 5 files changed, 8 insertions(+), 8 deletions(-)
+Sorry, I was following the namign schema that we've been using on
+other Broadcom SVKs in the Linux device tree directory.  For example,
+arch/arm/boot/dts/bcm911360_entphn.dts
+arch/arm/boot/dts/bcm911360k.dts
+arch/arm/boot/dts/bcm958300k.dts
+arch/arm/boot/dts/bcm958305k.dts
+arch/arm/boot/dts/bcm958625k.dts
+arch/arm/boot/dts/bcm963138dvt.dts
 
-diff --git a/drivers/pinctrl/berlin/berlin-bg2.c b/drivers/pinctrl/berlin/berlin-bg2.c
-index 274c5535b531..cfbf22a496ca 100644
---- a/drivers/pinctrl/berlin/berlin-bg2.c
-+++ b/drivers/pinctrl/berlin/berlin-bg2.c
-@@ -3,7 +3,7 @@
-  *
-  * Copyright (C) 2014 Marvell Technology Group Ltd.
-  *
-- * Antoine T??nart <antoine.tenart@free-electrons.com>
-+ * Antoine Tenart <antoine.tenart@free-electrons.com>
-  *
-  * This file is licensed under the terms of the GNU General Public
-  * License version 2. This program is licensed "as is" without any
-@@ -246,6 +246,6 @@ static struct platform_driver berlin2_pinctrl_driver = {
- };
- module_platform_driver(berlin2_pinctrl_driver);
+Also, this is the name we have been using internally.  So, it will
+making migrating to newer kernels much easier.
+
+> 
+> > @@ -0,0 +1,52 @@
+> > +/*
+> > + *  BSD LICENSE
+> > + *
+> > + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
+> > + *
+> > + *  Redistribution and use in source and binary forms, with or without
+> > + *  modification, are permitted provided that the following conditions
+> > + *  are met:
+> > + *
+> > + *    * Redistributions of source code must retain the above copyright
+> > + *      notice, this list of conditions and the following disclaimer.
+> > + *    * Redistributions in binary form must reproduce the above copyright
+> > + *      notice, this list of conditions and the following disclaimer in
+> > + *      the documentation and/or other materials provided with the
+> > + *      distribution.
+> > + *    * Neither the name of Broadcom Corporation nor the names of its
+> > + *      contributors may be used to endorse or promote products derived
+> > + *      from this software without specific prior written permission.
+> > + *
+> > + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> > + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> > + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> > + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> > + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> > + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> > + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> > + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> > + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> > + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> > + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +
+> > +#include "bcm5301x.dtsi"
+> > +
+> > +/ {
+> > +	model = "NorthStar SVK (BCM94708)";
+> > +	compatible = "brcm,bcm4708";
+> 
+> The compatible string should also contain this exactly board like this:
+> compatible = "brcm,bcm94708", "brcm,bcm4708";
+
+Ok 
+
+> 
+> > +
+> > +	aliases {
+> > +		serial0 = &uart0;
+> > +	};
+> > +
+> > +	chosen {
+> > +		bootargs = "console=ttyS0,115200 mem=128M";
+> 
+> Instead of using mem=128M you should add an extra node like this:
+> 
+> 	memory {
+> 		reg = <0x00000000 0x08000000>;
+> 	};
+> 
+> Does this board only has 128M of RAM? currently we restrict all of them
+> to that, but I just want to know.
+
+The 4708/9 SVKs have 128M, but the 53012 has 256M.
+
+> 
+> > +	};
+> > +};
+> > +
+> > +&uart0 {
+> > +	status = "okay";
+> > +};
+> > diff --git a/arch/arm/boot/dts/bcm94709.dts b/arch/arm/boot/dts/bcm94709.dts
+> > new file mode 100644
+> > index 0000000..bf4b6e1
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/bcm94709.dts
+> > @@ -0,0 +1,52 @@
+> > +/*
+> > + *  BSD LICENSE
+> > + *
+> > + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
+> > + *
+> > + *  Redistribution and use in source and binary forms, with or without
+> > + *  modification, are permitted provided that the following conditions
+> > + *  are met:
+> > + *
+> > + *    * Redistributions of source code must retain the above copyright
+> > + *      notice, this list of conditions and the following disclaimer.
+> > + *    * Redistributions in binary form must reproduce the above copyright
+> > + *      notice, this list of conditions and the following disclaimer in
+> > + *      the documentation and/or other materials provided with the
+> > + *      distribution.
+> > + *    * Neither the name of Broadcom Corporation nor the names of its
+> > + *      contributors may be used to endorse or promote products derived
+> > + *      from this software without specific prior written permission.
+> > + *
+> > + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> > + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> > + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> > + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> > + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> > + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> > + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> > + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> > + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> > + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> > + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +
+> > +#include "bcm5301x.dtsi"
+> > +
+> > +/ {
+> > +	model = "NorthStar SVK (BCM94709)";
+> > +	compatible = "brcm,bcm4709", "brcm,bcm4708";
+> Better this:
+> compatible = "brcm,bcm94709", "brcm,bcm4709", "brcm,bcm4708";
+
+It seems to me that this who 4708 base is kind of a misnomer.  They
+really are "Northstar".  Would it not be more accurate to change it to
+be
+compatible = "brcm,bcm4709", "brcm,ns";
+?
+
+> 
+> > +
+> > +	aliases {
+> > +		serial0 = &uart0;
+> > +	};
+> > +
+> > +	chosen {
+> > +		bootargs = "console=ttyS0,115200 mem=128M";
+> same as above.
+
+Ok
  
--MODULE_AUTHOR("Antoine T??nart <antoine.tenart@free-electrons.com>");
-+MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
- MODULE_DESCRIPTION("Marvell Berlin BG2 pinctrl driver");
- MODULE_LICENSE("GPL");
-diff --git a/drivers/pinctrl/berlin/berlin-bg2cd.c b/drivers/pinctrl/berlin/berlin-bg2cd.c
-index 0cb793a3552a..77f4f30cc686 100644
---- a/drivers/pinctrl/berlin/berlin-bg2cd.c
-+++ b/drivers/pinctrl/berlin/berlin-bg2cd.c
-@@ -3,7 +3,7 @@
-  *
-  * Copyright (C) 2014 Marvell Technology Group Ltd.
-  *
-- * Antoine T??nart <antoine.tenart@free-electrons.com>
-+ * Antoine Tenart <antoine.tenart@free-electrons.com>
-  *
-  * This file is licensed under the terms of the GNU General Public
-  * License version 2. This program is licensed "as is" without any
-@@ -189,6 +189,6 @@ static struct platform_driver berlin2cd_pinctrl_driver = {
- };
- module_platform_driver(berlin2cd_pinctrl_driver);
+> > +	};
+> > +};
+> > +
+> > +&uart0 {
+> > +	status = "okay";
+> > +};
+> > diff --git a/arch/arm/boot/dts/bcm953012k.dts b/arch/arm/boot/dts/bcm953012k.dts
+> > new file mode 100644
+> > index 0000000..1726ba0
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/bcm953012k.dts
+> > @@ -0,0 +1,59 @@
+> > +/*
+> > + *  BSD LICENSE
+> > + *
+> > + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
+> > + *
+> > + *  Redistribution and use in source and binary forms, with or without
+> > + *  modification, are permitted provided that the following conditions
+> > + *  are met:
+> > + *
+> > + *    * Redistributions of source code must retain the above copyright
+> > + *      notice, this list of conditions and the following disclaimer.
+> > + *    * Redistributions in binary form must reproduce the above copyright
+> > + *      notice, this list of conditions and the following disclaimer in
+> > + *      the documentation and/or other materials provided with the
+> > + *      distribution.
+> > + *    * Neither the name of Broadcom Corporation nor the names of its
+> > + *      contributors may be used to endorse or promote products derived
+> > + *      from this software without specific prior written permission.
+> > + *
+> > + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> > + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> > + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> > + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> > + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> > + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> > + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> > + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> > + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> > + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> > + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +
+> > +#include "bcm5301x.dtsi"
+> > +
+> > +/ {
+> > +	model = "NorthStar SVK (BCM953012K)";
+> > +	compatible = "brcm,bcm5301k", "brcm,bcm4708";
+> 
+> same as other file.
+> 
+> > +
+> > +	aliases {
+> > +		serial0 = &uart0;
+> > +		serial1 = &uart1;
+> > +	};
+> > +
+> > +	chosen {
+> > +		bootargs = "console=ttyS0,115200";
+> 
+> Why is no memory size given here at all?
+
+I'll add the 256M.
+
+> 
+> > +	};
+> > +};
+> > +
+> > +&uart0 {
+> > +	clock-frequency = <62499840>;
+> 
+> Just out of curiosity on what does this clock frequency depend? I saw
+> your patch adding a real clock driver which should make this obsolete.
  
--MODULE_AUTHOR("Antoine T??nart <antoine.tenart@free-electrons.com>");
-+MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
- MODULE_DESCRIPTION("Marvell Berlin BG2CD pinctrl driver");
- MODULE_LICENSE("GPL");
-diff --git a/drivers/pinctrl/berlin/berlin-bg2q.c b/drivers/pinctrl/berlin/berlin-bg2q.c
-index a466054a8206..66fffe6fab8d 100644
---- a/drivers/pinctrl/berlin/berlin-bg2q.c
-+++ b/drivers/pinctrl/berlin/berlin-bg2q.c
-@@ -3,7 +3,7 @@
-  *
-  * Copyright (C) 2014 Marvell Technology Group Ltd.
-  *
-- * Antoine T??nart <antoine.tenart@free-electrons.com>
-+ * Antoine Tenart <antoine.tenart@free-electrons.com>
-  *
-  * This file is licensed under the terms of the GNU General Public
-  * License version 2. This program is licensed "as is" without any
-@@ -408,6 +408,6 @@ static struct platform_driver berlin2q_pinctrl_driver = {
- };
- module_platform_driver(berlin2q_pinctrl_driver);
- 
--MODULE_AUTHOR("Antoine T??nart <antoine.tenart@free-electrons.com>");
-+MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
- MODULE_DESCRIPTION("Marvell Berlin BG2Q pinctrl driver");
- MODULE_LICENSE("GPL");
-diff --git a/drivers/pinctrl/berlin/berlin.c b/drivers/pinctrl/berlin/berlin.c
-index f49580617055..ebd6f78a6dde 100644
---- a/drivers/pinctrl/berlin/berlin.c
-+++ b/drivers/pinctrl/berlin/berlin.c
-@@ -3,7 +3,7 @@
-  *
-  * Copyright (C) 2014 Marvell Technology Group Ltd.
-  *
-- * Antoine T??nart <antoine.tenart@free-electrons.com>
-+ * Antoine Tenart <antoine.tenart@free-electrons.com>
-  *
-  * This file is licensed under the terms of the GNU General Public
-  * License version 2. This program is licensed "as is" without any
-diff --git a/drivers/pinctrl/berlin/berlin.h b/drivers/pinctrl/berlin/berlin.h
-index e1aa84145194..94495d304005 100644
---- a/drivers/pinctrl/berlin/berlin.h
-+++ b/drivers/pinctrl/berlin/berlin.h
-@@ -3,7 +3,7 @@
-  *
-  * Copyright (C) 2014 Marvell Technology Group Ltd.
-  *
-- * Antoine T??nart <antoine.tenart@free-electrons.com>
-+ * Antoine Tenart <antoine.tenart@free-electrons.com>
-  *
-  * This file is licensed under the terms of the GNU General Public
-  * License version 2. This program is licensed "as is" without any
--- 
-2.6.1
+Better to add this now, as the device tree part might be out of sync
+for a time.  Also, is it not better to make the UARTs a static clock
+and not dependent on the clk driver?
+
+Thanks,
+Jon
+
+> > +	status = "okay";
+> > +};
+> > +
+> > +&uart1 {
+> > +	clock-frequency = <62499840>;
+> > +	status = "okay";
+> > +};
+> > 
+> 
