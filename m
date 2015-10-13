@@ -1,49 +1,38 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 13 Oct 2015 13:46:54 -0500
-Subject: [PATCH] DT: ARM: pxa: Remove incorrect binding from documentation
-In-Reply-To: <1444743846-25873-1-git-send-email-jarkko.nikula@linux.intel.com>
-References: <1444743846-25873-1-git-send-email-jarkko.nikula@linux.intel.com>
-Message-ID: <CAL_Jsq++KpzwCi+7kHTEYhDJb4HkxG=s88f0oe+17ADv2GnGQQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 13 Oct 2015 19:48:29 +0100
+Subject: [PATCH v4] iommu/arm-smmu: Add support for MSI on SMMUv3
+In-Reply-To: <1444757550-24702-1-git-send-email-marc.zyngier@arm.com>
+References: <1444757550-24702-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151013184829.GH24353@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 8:44 AM, Jarkko Nikula
-<jarkko.nikula@linux.intel.com> wrote:
-> Remove "mrvl,lpss-ssp" property from documentation because LPSS SSP type is
-> for certain Intel platforms. I believe commit a6e56c28a178
-> ("ARM: pxa: ssp: add DT bindings") added it by accident by copying all
-> enum pxa_ssp_type types from include/linux/pxa2xx_ssp.h.
->
-> Please note this was removed from arch/arm/plat-pxa/ssp.c by the
-> commit b692cb83b14d ("ARM: pxa: ssp: Fix build error by removing originally
-> incorrect DT binding").
->
-> Signed-off-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+> @@ -36,5 +36,25 @@ the PCIe specification.
+>                        NOTE: this only applies to the SMMU itself, not
+>                        masters connected upstream of the SMMU.
+>  
+> +- msi-parent	    : phandles (and potential Device IDs) of MSI controllers
 
-Applied, thanks.
 
-Rob
+For correct terminology, I'd prefer to replace this line with:
 
-> ---
->  Documentation/devicetree/bindings/serial/mrvl,pxa-ssp.txt | 1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/serial/mrvl,pxa-ssp.txt b/Documentation/devicetree/bindings/serial/mrvl,pxa-ssp.txt
-> index 669b8140dd79..d10cc06c0c37 100644
-> --- a/Documentation/devicetree/bindings/serial/mrvl,pxa-ssp.txt
-> +++ b/Documentation/devicetree/bindings/serial/mrvl,pxa-ssp.txt
-> @@ -10,7 +10,6 @@ Required properties:
->                                 mvrl,pxa168-ssp
->                                 mrvl,pxa910-ssp
->                                 mrvl,ce4100-ssp
-> -                               mrvl,lpss-ssp
->
->         - reg:          The memory base
->         - dmas:         Two dma phandles, one for rx, one for tx
-> --
-> 2.6.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+- msi-parent: a list of phandle + msi-specifier pairs for MSI controllers
+
+An msi-specifier may be zero cells, per
+Documentation/devicetree/bindings/interrupt-controller/msi.txt, much
+like other *-specifiers.
+
+> +		      the SMMU can send MSIs to (instead of wired interrupts).
+> +		      See devicetree/bindings.interrupt-controller/msi.txt
+> +		      for a description of the msi-parent property.
+
+The rest of this is fine, modulo the '.' which should be a '/'. in the
+path.
+
+With those changes:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
