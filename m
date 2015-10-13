@@ -1,57 +1,163 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Tue, 13 Oct 2015 17:22:23 -0400
-Subject: [RFC 1/5] clk: iproc: define Broadcom NSP iProc clock binding
+Date: Tue, 13 Oct 2015 17:22:25 -0400
+Subject: [RFC 3/5] ARM: dts: enable clock support for BCM5301X
 In-Reply-To: <1444771347-11382-1-git-send-email-jonmason@broadcom.com>
 References: <1444771347-11382-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1444771347-11382-2-git-send-email-jonmason@broadcom.com>
+Message-ID: <1444771347-11382-4-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device tree bindings for Broadcom Northstar Plus
-architecture based clock controller
+Replace current device tree dummy clocks with real clock support for
+Broadcom Northstar SoCs.
 
 Signed-off-by: Jon Mason <jonmason@broadcom.com>
 ---
- .../bindings/clock/brcm,iproc-clocks.txt           | 30 ++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/boot/dts/bcm5301x.dtsi | 88 ++++++++++++++++++++++++++++++++---------
+ 1 file changed, 69 insertions(+), 19 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-index da8d9bb..b3c3e9d 100644
---- a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-+++ b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-@@ -130,3 +130,33 @@ These clock IDs are defined in:
-     ch3_unused mipipll          4       BCM_CYGNUS_MIPIPLL_CH3_UNUSED
-     ch4_unused mipipll          5       BCM_CYGNUS_MIPIPLL_CH4_UNUSED
-     ch5_unused mipipll          6       BCM_CYGNUS_MIPIPLL_CH5_UNUSED
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+index 6f50f67..1eca551 100644
+--- a/arch/arm/boot/dts/bcm5301x.dtsi
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -8,6 +8,7 @@
+  * Licensed under the GNU/GPL. See COPYING for details.
+  */
+ 
++#include <dt-bindings/clock/bcm-nsp.h>
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+@@ -42,41 +43,48 @@
+ 
+ 	mpcore {
+ 		compatible = "simple-bus";
+-		ranges = <0x00000000 0x19020000 0x00003000>;
++		ranges = <0x00000000 0x19000000 0x00023000>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 
+-		scu at 0000 {
++		a9pll: arm_clk at 00000 {
++			#clock-cells = <0>;
++			compatible = "brcm,nsp-armpll";
++			clocks = <&osc>;
++			reg = <0x00000 0x1000>;
++		};
 +
-+Northstar and Northstar Plus
-+------
-+PLL and leaf clock compatible strings for Northstar and Northstar Plus are:
-+ "brcm,nsp-armpll"
-+ "brcm,nsp-genpll"
-+ "brcm,nsp-lcpll0"
++		scu at 20000 {
+ 			compatible = "arm,cortex-a9-scu";
+-			reg = <0x0000 0x100>;
++			reg = <0x20000 0x100>;
+ 		};
+ 
+-		timer at 0200 {
++		timer at 20200 {
+ 			compatible = "arm,cortex-a9-global-timer";
+-			reg = <0x0200 0x100>;
++			reg = <0x20200 0x100>;
+ 			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&clk_periph>;
++			clocks = <&periph_clk>;
+ 		};
+ 
+-		local-timer at 0600 {
++		local-timer at 20600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+-			reg = <0x0600 0x100>;
++			reg = <0x20600 0x100>;
+ 			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&clk_periph>;
++			clocks = <&periph_clk>;
+ 		};
+ 
+-		gic: interrupt-controller at 1000 {
++		gic: interrupt-controller at 21000 {
+ 			compatible = "arm,cortex-a9-gic";
+ 			#interrupt-cells = <3>;
+ 			#address-cells = <0>;
+ 			interrupt-controller;
+-			reg = <0x1000 0x1000>,
+-			      <0x0100 0x100>;
++			reg = <0x21000 0x1000>,
++			      <0x20100 0x100>;
+ 		};
+ 
+-		L2: cache-controller at 2000 {
++		L2: cache-controller at 22000 {
+ 			compatible = "arm,pl310-cache";
+-			reg = <0x2000 0x1000>;
++			reg = <0x22000 0x1000>;
+ 			cache-unified;
+ 			arm,shared-override;
+ 			prefetch-data = <1>;
+@@ -94,14 +102,37 @@
+ 
+ 	clocks {
+ 		#address-cells = <1>;
+-		#size-cells = <0>;
++		#size-cells = <1>;
++		ranges;
+ 
+-		/* As long as we do not have a real clock driver us this
+-		 * fixed clock */
+-		clk_periph: periph {
++		osc: oscillator {
++			#clock-cells = <0>;
+ 			compatible = "fixed-clock";
++			clock-frequency = <25000000>;
++		};
 +
-+The following table defines the set of PLL/clock index and ID for Northstar and
-+Northstar Plus.  These clock IDs are defined in:
-+    "include/dt-bindings/clock/bcm-nsp.h"
++		iprocmed: iprocmed {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&genpll BCM_NSP_GENPLL_IPROCFAST_CLK>;
++			clock-div = <2>;
++			clock-mult = <1>;
++		};
 +
-+    Clock	Source		Index	ID
-+    ---		-----		-----	---------
-+    crystal	N/A		N/A	N/A
++		iprocslow: iprocslow {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&genpll BCM_NSP_GENPLL_IPROCFAST_CLK>;
++			clock-div = <4>;
++			clock-mult = <1>;
++		};
 +
-+    armpll	crystal		N/A	N/A
++		periph_clk: periph_clk {
+ 			#clock-cells = <0>;
+-			clock-frequency = <400000000>;
++			compatible = "fixed-factor-clock";
++			clocks = <&a9pll>;
++			clock-div = <2>;
++			clock-mult = <1>;
+ 		};
+ 	};
+ 
+@@ -178,6 +209,25 @@
+ 		};
+ 	};
+ 
++	lcpll0: lcpll0 at 1800c100 {
++		#clock-cells = <1>;
++		compatible = "brcm,nsp-lcpll0";
++		reg = <0x1800c100 0x14>;
++		clocks = <&osc>;
++		clock-output-names = "lcpll0", "pcie_phy", "sdio",
++				     "ddr_phy";
++	};
 +
-+    genpll	crystal		0	BCM_NSP_GENPLL
-+    phy		genpll		1	BCM_NSP_GENPLL_PHY_CLK
-+    ethernetclk	genpll		2	BCM_NSP_GENPLL_ENET_SW_CLK
-+    usbclk	genpll		3	BCM_NSP_GENPLL_USB_PHY_REF_CLK
-+    iprocfast	genpll		4	BCM_NSP_GENPLL_IPROCFAST_CLK
-+    sata1	genpll		5	BCM_NSP_GENPLL_SATA1_CLK
-+    sata2	genpll		6	BCM_NSP_GENPLL_SATA2_CLK
++	genpll: genpll at 1800c140 {
++		#clock-cells = <1>;
++		compatible = "brcm,nsp-genpll";
++		reg = <0x1800c140 0x24>;
++		clocks = <&osc>;
++		clock-output-names = "genpll", "phy", "ethernetclk",
++				     "usbclk", "iprocfast", "sata1",
++				     "sata2";
++	};
 +
-+    lcpll0	crystal		0	BCM_NSP_LCPLL0
-+    pcie_phy	lcpll0		1	BCM_NSP_LCPLL0_PCIE_PHY_REF_CLK
-+    sdio	lcpll0		2	BCM_NSP_LCPLL0_SDIO_CLK
-+    ddr_phy	lcpll0		3	BCM_NSP_LCPLL0_DDR_PHY_CLK
+ 	nand: nand at 18028000 {
+ 		compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1", "brcm,brcmnand";
+ 		reg = <0x18028000 0x600>, <0x1811a408 0x600>, <0x18028f00 0x20>;
 -- 
 1.9.1
