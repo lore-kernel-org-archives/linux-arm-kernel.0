@@ -1,47 +1,67 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Oct 2015 16:38:03 +0100
-Subject: [PATCH v2 00/17] Divorcing irqdomain and device_node
-In-Reply-To: <561D0BFB.4040000@linaro.org>
-References: <1444737105-31573-1-git-send-email-marc.zyngier@arm.com>
- <561D0BFB.4040000@linaro.org>
-Message-ID: <561D255B.4010007@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 13 Oct 2015 17:39:15 +0200
+Subject: [PATCH 13/15] arm64: kvm: Rewrite fake pgd handling
+In-Reply-To: <561B838C.5090008@arm.com>
+References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
+ <1442331684-28818-14-git-send-email-suzuki.poulose@arm.com>
+ <20151010145227.GB29128@cbox> <561B838C.5090008@arm.com>
+Message-ID: <20151013153915.GC21861@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/15 14:49, Hanjun Guo wrote:
-> On 10/13/2015 07:51 PM, Marc Zyngier wrote:
-
-[...]
-
->> Marc Zyngier (17):
->>    irqdomain: Use irq_domain_get_of_node() instead of direct field access
->>    irqdomain: Convert irqdomain->of_node to fwnode
->>    irqdomain: Allow irq domain lookup by fwnode
->>    irqdomain: Introduce a firmware-specific IRQ specifier structure
->>    irqchip: Convert all alloc/xlate users from of_node to fwnode
->>    irqdomain: Introduce irq_create_fwspec_mapping
->>    irqdomain: Introduce irq_domain_create_{linear,tree}
->>    irqdomain: Add a fwnode_handle allocator
->>    acpi/gsi: Always perform an irq domain lookup
->>    acpi/gsi: Add acpi_set_irq_model to initialize the GSI layer
->>    irqchip/gic: Get rid of gic_init_bases()
->>    irqchip/gic: Switch ACPI support to stacked domains
->>    irqchip/gic: Kill the xlate method
->>    acpi/gsi: Cleanup acpi_register_gsi
->>    irqdomain: Introduce irq_domain_create_hierarchy
->>    irqdomain/msi: Use fwnode instead of of_node
->>    irqdomain: Documentation updates
+On Mon, Oct 12, 2015 at 10:55:24AM +0100, Suzuki K. Poulose wrote:
+> On 10/10/15 15:52, Christoffer Dall wrote:
+> >Hi Suzuki,
 > 
-> For this patch series,
+> Hi Christoffer,
 > 
-> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Thanks for being patient enough to review the code :-) without much of
+> the comments. I now realise there needs much more documentation than
+> what I have put in already. I am taking care of this in the next
+> revision already.
 > 
-> For patch 1 to patch14,
+> >I had to refresh my mind a fair bit to be able to review this, so I
+> >thought it may be useful to just remind us all what the constraints of
+> >this whole thing is, and make sure we agree on this:
+> >
+> >1. We fix the IPA max width to 40 bits
+> >2. We don't support systems with a PARange smaller than 40 bits (do we
+> >    check this anywhere or document this anywhere?)
 > 
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> AFAIT, no we don't check it anywhere. May be we should. We could plug this
+> into my CPU feature infrastructure[1] and let the is_hype_mode_available()
+> use the info to decide if we can support 40bit IPA ?
+> 
 
-Thanks for reviewing/testing.
+If we support 40bit IPA or more, yes, I think that would be sane.  Or at
+least put a comment somewhere, perhaps in Documenation.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> >3. We always assume we are running on a system with PARange of 40 bits
+> >    and we are therefore constrained to use concatination.
+> >
+> >As an implication of (3) above, this code will attempt to allocate 256K
+> >of physically contiguous memory for each VM on the system.  That is
+> >probably ok, but I just wanted to point it out in case it raises any
+> >eyebrows for other people following this thread.
+> 
+> Right, I will document this in a comment.
+> 
+> >>level:  0       1         2         3
+> >>bits : [47] [46 - 36] [35 - 25] [24 - 14] [13 - 0]
+> >>          ^       ^     ^
+> >>          |       |     |
+> >>    host entry    |     x---- stage-2 entry
+> >>                  |
+> >>         IPA -----x
+> >
+> >Isn't the stage-2 entry using bits [39:25], because you resolve
+> >more than 11 bits on the initial level of lookup when you concatenate
+> >tables?
+> 
+> Yes, the stage-2 entry is just supposed to show the entry level (2).
+> 
+
+I don't understand, the stage-2 entry level will be at bit 39, not 35?
+
+Thanks,
+-Christoffer
