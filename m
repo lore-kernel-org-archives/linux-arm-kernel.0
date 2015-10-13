@@ -1,34 +1,154 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 13 Oct 2015 19:14:32 +0200
-Subject: [PATCH v2 0/7] arm64: relax Image placement rules
-In-Reply-To: <20151013170737.GF11573@e104818-lin.cambridge.arm.com>
-References: <1442968663-31843-1-git-send-email-ard.biesheuvel@linaro.org>
- <20151013170737.GF11573@e104818-lin.cambridge.arm.com>
-Message-ID: <FB7E26B3-A274-4A4C-851F-E14BC6CBE92B@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 13 Oct 2015 10:18:46 -0700
+Subject: [PATCH 1/3] ARM: dts: Fix WLAN regression on omap5-uevm
+Message-ID: <1444756728-11185-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Commit 99f84cae43df ("ARM: dts: add wl12xx/wl18xx bindings") added
+device tree bindings for the TI WLAN SDIO on many omap variants.
 
-> On 13 okt. 2015, at 19:07, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> 
->> On Tue, Sep 22, 2015 at 05:37:36PM -0700, Ard Biesheuvel wrote:
->> This is a followup to the "arm64: update/clarify/relax Image and FDT placement
->> rules" series I sent a while ago:
->> (http://article.gmane.org/gmane.linux.ports.arm.kernel/407148)
->> 
->> This has now been split in two series: this second series deals with the
->> physical and virtual placement of the kernel Image.
-> 
-> Quick question, to refresh my memory: if this is the second series,
-> what is the first series?
-> 
+I recall wondering how come omap5-uevm did not have the WLAN
+added and this issue has been bugging me for a while now, and
+I finally tracked it down to a bad pinmux regression, and a missing
+deferred probe handling for the 32k clock from palmas that's
+requested by twl6040.
 
-That was primarily about the FDT, and most of that work is merged in one way or the other.
+Basically 392adaf796b9 ("ARM: dts: omap5-evm: Add mcspi data")
+added pin muxing for mcspi4 that conflicts with the onboard
+WLAN. While some omap5-uevm don't have WLAN populated, the
+pins are not reused for other devices. And as the SDIO bus
+should be probed, let's try to enable WLAN by default.
 
+Let's fix the regression and add the WLAN configuration as
+done for the other boards in 99f84cae43df ("ARM: dts: add
+wl12xx/wl18xx bindings"). And let's use the new MMC pwrseq for
+the 32k clock as suggested by Javier Martinez Canillas
+<javier@dowhile0.org>.
+
+Note that without a related deferred probe fix for twl6040,
+the 32k clock is not initialized if palmas-clk is a module
+and twl6040 is built-in.
+
+Let's also use the generic "non-removable" instead of the
+legacy "ti,non-removable" property while at it.
+
+And finally, note that omap5 seems to require WAKEUP_EN for
+the WLAN GPIO interrupt.
+
+Fixes: 392adaf796b9 ("ARM: dts: omap5-evm: Add mcspi data")
+Cc: Sourav Poddar <sourav.poddar@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/omap5-uevm.dts | 66 +++++++++++++++++++++++++++++++++-------
+ 1 file changed, 55 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+index 4da9e52..f10b42f 100644
+--- a/arch/arm/boot/dts/omap5-uevm.dts
++++ b/arch/arm/boot/dts/omap5-uevm.dts
+@@ -31,6 +31,24 @@
+ 		regulator-max-microvolt = <3000000>;
+ 	};
+ 
++	mmc3_pwrseq: sdhci0_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		clocks = <&clk32kgaudio>;
++		clock-names = "ext_clock";
++	};
++
++	vmmcsdio_fixed: fixedregulator-mmcsdio {
++		compatible = "regulator-fixed";
++		regulator-name = "vmmcsdio_fixed";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		gpio = <&gpio5 12 GPIO_ACTIVE_HIGH>;	/* gpio140 WLAN_EN */
++		enable-active-high;
++		startup-delay-us = <70000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&wlan_pins>;
++	};
++
+ 	/* HS USB Host PHY on PORT 2 */
+ 	hsusb2_phy: hsusb2_phy {
+ 		compatible = "usb-nop-xceiv";
+@@ -197,12 +215,20 @@
+ 		>;
+ 	};
+ 
+-	mcspi4_pins: pinmux_mcspi4_pins {
++	mmc3_pins: pinmux_mmc3_pins {
++		pinctrl-single,pins = <
++			OMAP5_IOPAD(0x01a4, PIN_INPUT_PULLUP | MUX_MODE0) /* wlsdio_clk */
++			OMAP5_IOPAD(0x01a6, PIN_INPUT_PULLUP | MUX_MODE0) /* wlsdio_cmd */
++			OMAP5_IOPAD(0x01a8, PIN_INPUT_PULLUP | MUX_MODE0) /* wlsdio_data0 */
++			OMAP5_IOPAD(0x01aa, PIN_INPUT_PULLUP | MUX_MODE0) /* wlsdio_data1 */
++			OMAP5_IOPAD(0x01ac, PIN_INPUT_PULLUP | MUX_MODE0) /* wlsdio_data2 */
++			OMAP5_IOPAD(0x01ae, PIN_INPUT_PULLUP | MUX_MODE0) /* wlsdio_data3 */
++		>;
++	};
++
++	wlan_pins: pinmux_wlan_pins {
+ 		pinctrl-single,pins = <
+-			0x164 (PIN_INPUT | MUX_MODE1)		/*  mcspi4_clk */
+-			0x168 (PIN_INPUT | MUX_MODE1)		/*  mcspi4_simo */
+-			0x16a (PIN_INPUT | MUX_MODE1)		/*  mcspi4_somi */
+-			0x16c (PIN_INPUT | MUX_MODE1)		/*  mcspi4_cs0 */
++			OMAP5_IOPAD(0x1bc, PIN_OUTPUT | MUX_MODE6) /* mcspi1_clk.gpio5_140 */
+ 		>;
+ 	};
+ 
+@@ -276,6 +302,12 @@
+ 			0x1A (PIN_OUTPUT | MUX_MODE0) /* fref_clk1_out, USB hub clk */
+ 		>;
+ 	};
++
++	wlcore_irq_pin: pinmux_wlcore_irq_pin {
++		pinctrl-single,pins = <
++			OMAP5_IOPAD(0x040, WAKEUP_EN | PIN_INPUT_PULLUP | MUX_MODE6)	/* llia_wakereqin.gpio1_wk14 */
++		>;
++	};
+ };
+ 
+ &mmc1 {
+@@ -290,8 +322,25 @@
+ };
+ 
+ &mmc3 {
++	vmmc-supply = <&vmmcsdio_fixed>;
++	mmc-pwrseq = <&mmc3_pwrseq>;
+ 	bus-width = <4>;
+-	ti,non-removable;
++	non-removable;
++	cap-power-off-card;
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc3_pins &wlcore_irq_pin>;
++	interrupts-extended = <&gic GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH
++			       &omap5_pmx_core 0x168>;
++
++	#address-cells = <1>;
++	#size-cells = <0>;
++	wlcore: wlcore at 2 {
++		compatible = "ti,wl1271";
++		reg = <2>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <14 IRQ_TYPE_LEVEL_HIGH>;	/* gpio 14 */
++		ref-clock-frequency = <26000000>;
++	};
+ };
+ 
+ &mmc4 {
+@@ -598,11 +647,6 @@
+ 	pinctrl-0 = <&mcspi3_pins>;
+ };
+ 
+-&mcspi4 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mcspi4_pins>;
+-};
+-
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart1_pins>;
 -- 
-Ard.
-
-> Thanks.
-> 
-> -- 
-> Catalin
+2.1.4
