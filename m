@@ -1,61 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 13 Oct 2015 11:07:05 +0100
-Subject: [PATCH v2 1/3] mfd: documentation: dt: Document grounded ACOKB
- pin on S2MPS11
-In-Reply-To: <02a201d0d676$2fbe73c0$8f3b5b40$@kernel.org>
-References: <1439287746-14034-1-git-send-email-k.kozlowski.k@gmail.com>
- <1439287746-14034-2-git-send-email-k.kozlowski.k@gmail.com>
- <02a201d0d676$2fbe73c0$8f3b5b40$@kernel.org>
-Message-ID: <20151013100705.GY32409@x1>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 13 Oct 2015 11:12:40 +0100
+Subject: [PATCH v2 12/22] arm64: Delay cpu feature checks
+In-Reply-To: <20151008110840.GF17192@e104818-lin.cambridge.arm.com>
+References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
+ <1444064531-25607-13-git-send-email-suzuki.poulose@arm.com>
+ <20151008110840.GF17192@e104818-lin.cambridge.arm.com>
+Message-ID: <561CD918.7000107@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Aug 2015, Kukjin Kim wrote:
+On 08/10/15 12:08, Catalin Marinas wrote:
+> On Mon, Oct 05, 2015 at 06:02:01PM +0100, Suzuki K. Poulose wrote:
+>> +	/*
+>> +	 * second pass allows enable() invoked on active each CPU
+>> +	 * to consider interacting capabilities.
+>> +	 */
+>
+> This comment doesn't read properly.
+>
 
-> Krzysztof Kozlowski wrote:
-> > 
-> > Document a new Device Tree property 'samsung,s2mps11-acokb-ground'
-> > indicating that ACOKB pin of S2MPS11 PMIC is connected to the ground so
-> > the PMIC must manually set PWRHOLD bit in CTRL1 register to turn off the
-> > power.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
-> > Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> > Acked-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > ---
-> > 
-> > Changes since v1:
-> > 1. Split bindings documentation to separate patch (suggested by Lee).
-> > 2. Add Javier's reviewed-by and Lee's acked-by.
-> > ---
-> >  Documentation/devicetree/bindings/mfd/s2mps11.txt | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mfd/s2mps11.txt
-> > b/Documentation/devicetree/bindings/mfd/s2mps11.txt
-> > index 57a045016fca..90eaef393325 100644
-> > --- a/Documentation/devicetree/bindings/mfd/s2mps11.txt
-> > +++ b/Documentation/devicetree/bindings/mfd/s2mps11.txt
-> > @@ -15,6 +15,10 @@ Optional properties:
-> >  - interrupt-parent: Specifies the phandle of the interrupt controller to which
-> >    the interrupts from s2mps11 are delivered to.
-> >  - interrupts: Interrupt specifiers for interrupt sources.
-> > +- samsung,s2mps11-acokb-ground: Indicates that ACOKB pin of S2MPS11 PMIC is
-> > +  connected to the ground so the PMIC must manually set PWRHOLD bit in CTRL1
-> > +  register to turn off the power. Usually the ACOKB is pulled up to VBATT so
-> > +  when PWRHOLD pin goes low, the rising ACOKB will trigger power off.
-> > 
-> >  Optional nodes:
-> >  - clocks: s2mps11, s2mps13 and s5m8767 provide three(AP/CP/BT) buffered 32.768
-> 
-> Applied 1/3 and 3/3.
+Fixed locally
 
-Any chance you applied these on their own branch (which can be
-tagged)?
+>> +	/*XXX: Are we really safe to call printk here ? */
+>> +	pr_crit("FATAL: CPU%d is missing %s : %s \n",
+>> +			smp_processor_id(), cap_type, cap->desc);
+>
+> I'm not sure it's safe either, basically we haven't fully brought the
+> CPU into the system.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Btw, we already print "Booted secondary cpu" from secondary_start_kernel()
+before we trigger the notifiers. So I think it should be safe to call it
+at the moment.
+
+>
+>> +	asm volatile(
+>> +			" 1:	wfe \n\t"
+>> +			"	b 1b\n"
+>> +		    );
+>> +}
+>
+> We could add a wfi as well in the mix.
+>
+> However, if we have PSCI, we should use it to park the CPUs back into
+> firmware (via cpu_operations.cpu_die), and only use the above loop if
+> that fails.
+
+Added cpu_die() and falls back to the trap as above.
+
+
+>
+>> +/*
+>> + * Run through the enabled system capabilities and enable() it on this CPU.
+>
+> s/it/them/
+>
+
+Fixed.
+
+Thanks
+Suzuki
