@@ -1,43 +1,32 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 13 Oct 2015 23:31:38 +0200
-Subject: [PATCH 2/5] ARM: berlin: remove the pinctrl selection from the
- mach-berlin Kconfig
+Date: Tue, 13 Oct 2015 23:31:40 +0200
+Subject: [PATCH 4/5] pinctrl: berlin: Kconfig clean up
 In-Reply-To: <1444771901-24460-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1444771901-24460-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1444771901-24460-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1444771901-24460-5-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the pinctrl driver selection from the mach-berlin
-Kconfig file. This is now done in the Berlin pinctrl driver Kconfig.
+Reorder the statements under the PINCTRL_BERLIN_BG4CT config
+option to be consistent with the existing.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/mach-berlin/Kconfig | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/pinctrl/berlin/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
-index 742d53a5f7f9..344434ca366c 100644
---- a/arch/arm/mach-berlin/Kconfig
-+++ b/arch/arm/mach-berlin/Kconfig
-@@ -18,19 +18,16 @@ config MACH_BERLIN_BG2
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
- 	select HAVE_SMP
--	select PINCTRL_BERLIN_BG2
+diff --git a/drivers/pinctrl/berlin/Kconfig b/drivers/pinctrl/berlin/Kconfig
+index cf95b4d7f7e3..8fe6ad7795dc 100644
+--- a/drivers/pinctrl/berlin/Kconfig
++++ b/drivers/pinctrl/berlin/Kconfig
+@@ -21,8 +21,8 @@ config PINCTRL_BERLIN_BG2Q
+ 	select PINCTRL_BERLIN
  
- config MACH_BERLIN_BG2CD
- 	bool "Marvell Armada 1500-mini (BG2CD)"
- 	select CACHE_L2X0
- 	select HAVE_ARM_TWD if SMP
--	select PINCTRL_BERLIN_BG2CD
- 
- config MACH_BERLIN_BG2Q
- 	bool "Marvell Armada 1500 Pro (BG2-Q)"
- 	select CACHE_L2X0
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
--	select PINCTRL_BERLIN_BG2Q
+ config PINCTRL_BERLIN_BG4CT
+-	depends on OF
+ 	bool "Marvell berlin4ct pin controller driver"
++	depends on OF
+ 	select PINCTRL_BERLIN
  
  endif
 -- 
