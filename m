@@ -1,54 +1,59 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 13 Oct 2015 12:42:08 -0400
-Subject: [PATCH v2 0/4] soc: ti: knav_qmss: enable accumulator queue
- support
-In-Reply-To: <561D2F9B.7000006@oracle.com>
-References: <1444679211-823-1-git-send-email-m-karicheri2@ti.com>
- <561D0D95.1040401@ti.com> <561D2AE0.6090406@oracle.com>
- <561D2DE9.4080809@ti.com> <561D2F9B.7000006@oracle.com>
-Message-ID: <561D3460.5090109@ti.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Tue, 13 Oct 2015 09:45:30 -0700
+Subject: Run armv7 32 bit userspace on aarch64
+In-Reply-To: <20151013141759.GL21550@arm.com>
+References: <5615A0E1.1050402@linaro.org> <56184079.1040905@linaro.org>
+ <56185B98.2060400@linaro.org> <6978725.cJktLf4M1X@wuerfel>
+ <561BED2C.8080008@linaro.org> <561BF011.80205@linaro.org>
+ <20151012175026.GL16124@arm.com> <561BFEF2.2030503@linaro.org>
+ <20151013141759.GL21550@arm.com>
+Message-ID: <561D352A.6000000@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/2015 12:21 PM, santosh shilimkar wrote:
-> On 10/13/2015 9:14 AM, Murali Karicheri wrote:
->> Santosh,
->>
->> On 10/13/2015 12:01 PM, santosh shilimkar wrote:
->>> On 10/13/2015 6:56 AM, Murali Karicheri wrote:
->>>> On 10/12/2015 03:46 PM, Murali Karicheri wrote:
->>>>> This patch series enable accumulator queue support for K2 SoCs.
+On 10/13/2015 7:18 AM, Will Deacon wrote:
+> On Mon, Oct 12, 2015 at 11:41:54AM -0700, Shi, Yang wrote:
+>> On 10/12/2015 10:50 AM, Will Deacon wrote:
+>>> On Mon, Oct 12, 2015 at 10:38:25AM -0700, Shi, Yang wrote:
+>>>> BTW, it may be related to unaligned address.
+>>>>
+>>>> init[1]: unhandled level 3 translation fault (11) at 0x43acfad3, esr
+>>>> 0x92000047
+>>>> pgd = ffff80007b8be000
+>>>> [43acfad3] *pgd=00000000fb8c5003, *pud=00000000fb8c1003,
+>>>> *pmd=00000000fb8c2003, *pte=0000000000000000
+>>>>
+>>>> The userspace is trying to write to 0x43acfad3, the permission is
+>>>> readonly.
 >>>
->>>> Santosh, Arnd,
->>>>
->>>> Could you please review and let me know if there is any comment. If
->>>> looks good, could you please merge to v4.4 next branch?
->>>>
->>> Please report the series updating the comments from Arnd. Also split
->>> the series into drivers and dts updates.
-> s/report/repost
->
+>>> What's the instruction making the access? If it's a store-multiple, then
 >>
->> The cover letter already summarize this as a comment against v1 even
->> though it didn't mention Arnd's name. Is it usual to describe the
->> reviewers name in the change log? I thought we just describe the comment
->> addressed, not who has commented. Not??
+>> My aarch64 gdb just shows hex code instead of human readable assembly code.
 >>
-> I didn't mean report. sorry. Just repost the series including ack tag.
->
->> About splitting the series, it was done so since both is being pulled by
->> you. If needed, I can do the split. Let me know.
+>> It is 0xe5c02000.
 >>
-> DTS and driver changes goes to different topics so split it, please.
-Ok. No issues. I will be posting this right away.
-
-Murali
+>> I just checked the ARMv7 manual, it looks like STRB instruction, so we can
+>> rule this out.
+>>
+>> I just figured out it is caused by gcc 5.2 pre-link. It works if I disable
+>> pre-link. The pre-link issue breaks all armv7 userspace even though it is
+>> run on armv7 machines.
 >
-> Regards,
-> Santosh
+> Does that mean you could supply a simple example so I can reproduce this
+> myself, please? (e.g. if I write a hello world program in C and run it
+> with a particular set of compiler options then it won't run under a
+> 64-bit kernel but it will work under a 32-bit one).
+
+Yes, I think so. You should just need run "prelink 
+/path/to/your/elf_binary" for armv7 userspace.
+
+In my OE build, "prelink -a" was called to prelink all elf binaries.
+
+In my test it neither work under 64 bit kernel nor 32 bit one.
+
+Regards,
+Yang
+
 >
-
-
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+> Will
+>
