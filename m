@@ -1,61 +1,51 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 13 Oct 2015 11:12:40 +0100
-Subject: [PATCH v2 12/22] arm64: Delay cpu feature checks
-In-Reply-To: <20151008110840.GF17192@e104818-lin.cambridge.arm.com>
-References: <1444064531-25607-1-git-send-email-suzuki.poulose@arm.com>
- <1444064531-25607-13-git-send-email-suzuki.poulose@arm.com>
- <20151008110840.GF17192@e104818-lin.cambridge.arm.com>
-Message-ID: <561CD918.7000107@arm.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 13 Oct 2015 12:25:55 +0200
+Subject: [BUG] broken mixer after second resume from mem
+Message-ID: <561CDC33.7050103@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/15 12:08, Catalin Marinas wrote:
-> On Mon, Oct 05, 2015 at 06:02:01PM +0100, Suzuki K. Poulose wrote:
->> +	/*
->> +	 * second pass allows enable() invoked on active each CPU
->> +	 * to consider interacting capabilities.
->> +	 */
->
-> This comment doesn't read properly.
->
+Hi,
 
-Fixed locally
+have been hunting down a bug on exynos5250-snow which caused both HDMI
+and LVDS output to be broken after the second resume (with suspend to
+mem, but not to idle).
 
->> +	/*XXX: Are we really safe to call printk here ? */
->> +	pr_crit("FATAL: CPU%d is missing %s : %s \n",
->> +			smp_processor_id(), cap_type, cap->desc);
->
-> I'm not sure it's safe either, basically we haven't fully brought the
-> CPU into the system.
+What I have found is that when powering down the DISP1 power domain
+while suspending for the second time, the contents of the SRC_TOP3
+register change from 0x1110550 to 0x1110500. IIUIC, this means that
+ACLK_200_DISP1 is reparented to XXTI.
 
-Btw, we already print "Booted secondary cpu" from secondary_start_kernel()
-before we trigger the notifiers. So I think it should be safe to call it
-at the moment.
+When the CPU comes up again, that register contains 0x1110550 again, but
+it's set to 0x1110500 by the code that restores clk registers when resuming:
 
->
->> +	asm volatile(
->> +			" 1:	wfe \n\t"
->> +			"	b 1b\n"
->> +		    );
->> +}
->
-> We could add a wfi as well in the mix.
->
-> However, if we have PSCI, we should use it to park the CPUs back into
-> firmware (via cpu_operations.cpu_die), and only use the above loop if
-> that fails.
+First suspend:
 
-Added cpu_die() and falls back to the trap as above.
+exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - before
+exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - after
+exynos5250_clk_suspend: SRC_TOP3 1110550
+exynos5250_clk_resume: SRC_TOP3 1110550 - before
+exynos5250_clk_resume: SRC_TOP3 1110550 - after
+exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - before
+exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - after
 
 
->
->> +/*
->> + * Run through the enabled system capabilities and enable() it on this CPU.
->
-> s/it/them/
->
+Second suspend:
 
-Fixed.
+exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - before
+exynos_pd_power: SRC_TOP3 1110500 disp1-power-domain at 100440A0 - after
+exynos5250_clk_suspend: SRC_TOP3 1110500
+exynos5250_clk_resume: SRC_TOP3 1110550 - before
+exynos5250_clk_resume: SRC_TOP3 1110500 - after
+exynos_pd_power: SRC_TOP3 1110500 disp1-power-domain at 100440A0 - before
+exynos_pd_power: SRC_TOP3 1110500 disp1-power-domain at 100440A0 - after
 
-Thanks
-Suzuki
+
+I have no idea of why it happens on the second suspend, and also don't
+know why it doesn't happen when suspending to idle.
+
+Any ideas?
+
+Thanks,
+
+Tomeu
