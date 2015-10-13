@@ -1,43 +1,80 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 13 Oct 2015 21:48:51 +0800
-Subject: [PATCH v2 0/3] arm:irchip: IRQCHIP_DECLARE macro is now accessible
-In-Reply-To: <1444740975-31948-1-git-send-email-joel@porquet.org>
-References: <1444740975-31948-1-git-send-email-joel@porquet.org>
-Message-ID: <20151013134851.GA551@tiger>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 13 Oct 2015 21:49:47 +0800
+Subject: [PATCH v2 00/17] Divorcing irqdomain and device_node
+In-Reply-To: <1444737105-31573-1-git-send-email-marc.zyngier@arm.com>
+References: <1444737105-31573-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <561D0BFB.4040000@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 02:56:12PM +0200, Joel Porquet wrote:
-> The IRQCHIP_DECLARE macro migrated to 'include/linux/irqchip.h', making it
-> globally accessible.
-> 
-> See commit 91e20b5040c67c51aad88cf87db4305c5bd7f79d ("irqchip: Move
-> IRQCHIP_DECLARE macro to include/linux/irqchip.h").
-> 
-> This series of patches add inclusions of 'include/linux/irqchip.h' and
-> replaces uses of macro OF_DECLARE_2 with IRQCHIP_DECLARE for platforms
-> exynos, imx and omap2.
-> 
-> I had submitted a single patch a few months ago
-> (https://lkml.org/lkml/2015/7/7/1069), but it never got merged although it
-> had been acked by all the subsystem maintainers. Hopefully, splitting the
-> patch into these independent patches that can be applied separately should
-> help.
-> 
-> Jo?l
-> 
-> Joel Porquet (3):
->   arm:exynos: IRQCHIP_DECLARE macro is now accessible
->   arm:imx: IRQCHIP_DECLARE macro is now accessible
->   arm:omap2: IRQCHIP_DECLARE macro is now accessible
-> 
->  arch/arm/mach-exynos/suspend.c       | 3 ++-
->  arch/arm/mach-imx/gpc.c              | 7 ++-----
->  arch/arm/mach-omap2/omap-wakeupgen.c | 7 ++-----
->  3 files changed, 6 insertions(+), 11 deletions(-)
+On 10/13/2015 07:51 PM, Marc Zyngier wrote:
+> [This patch series used to be called "Making the generic ACPI GSI
+> layer irqdomain aware", but as I've radically changed my approach to
+> this problem, I've decided to reset the counters...]
+>
+> The irqdomain code is not entierely ACPI friendly, as it has some
+> built-in knowledge of the device-tree. Nothing too harmful, but enough
+> to scare the ARM ACPI developpers which end up with their own version
+> of the square wheel. And some of the ramifications actually run deeper
+> than initially expected.
+>
+> This series adapts the irqdomain code to use 'struct fwnode_handle'
+> instead of 'struct device_node' as the identifier for a domain
+> (compatibility interfaces are of course added). It also introduces a
+> generic IRQ specifier that firmware interfaces (DT or ACPI) can
+> directly use to configure interrupts, and allow the ACPI GSI code to
+> be plugged into this.
+>
+> As examples, we convert the ARM GIC ACPI support to use irqdomains as
+> originally intended, and rework the MSI code to also move away from
+> using device nodes when using irqdomains.
+>
+> Overall, this gives us a way to use irqdomains on both DT and ACPI
+> enabled platforms, having very little changes made to the actual
+> drivers (other than the probing infrastructure). Because we keep the
+> flow of information between the various layers identical between ACPI
+> and DT, we immediately benefit from the existing infrastructure.
+>
+> This has been test-booted on Juno, is based on 4.3-rc5 + tip/irq/core
+> (in order to avoid potential conflicts), and available at:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/irq-domain-fwnode-v2
+>
+> * From v1:
+>    - Dropped irq_domain_get_of_node() from the first patch (merged into
+>    4.3-rc5)
+>    - Fixed a few missing accessors in the first patch
+>    - Added EXPORT_SYMBOL_GPL for irq_find_matching_fwnode
+>    - Added some documentation update
+>    - Added Acks from Rafael
+>    - Rebased on top of 4.3-rc5 + tip/irq/core
+>
+> Marc Zyngier (17):
+>    irqdomain: Use irq_domain_get_of_node() instead of direct field access
+>    irqdomain: Convert irqdomain->of_node to fwnode
+>    irqdomain: Allow irq domain lookup by fwnode
+>    irqdomain: Introduce a firmware-specific IRQ specifier structure
+>    irqchip: Convert all alloc/xlate users from of_node to fwnode
+>    irqdomain: Introduce irq_create_fwspec_mapping
+>    irqdomain: Introduce irq_domain_create_{linear,tree}
+>    irqdomain: Add a fwnode_handle allocator
+>    acpi/gsi: Always perform an irq domain lookup
+>    acpi/gsi: Add acpi_set_irq_model to initialize the GSI layer
+>    irqchip/gic: Get rid of gic_init_bases()
+>    irqchip/gic: Switch ACPI support to stacked domains
+>    irqchip/gic: Kill the xlate method
+>    acpi/gsi: Cleanup acpi_register_gsi
+>    irqdomain: Introduce irq_domain_create_hierarchy
+>    irqdomain/msi: Use fwnode instead of of_node
+>    irqdomain: Documentation updates
 
-Marc sent a patch [1] doing the same thing a few days ago.
+For this patch series,
 
-Shawn
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/444136
+For patch 1 to patch14,
+
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+Thanks a lot!
+Hanjun
