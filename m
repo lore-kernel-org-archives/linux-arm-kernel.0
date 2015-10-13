@@ -1,66 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 13 Oct 2015 11:38:45 +0100
-Subject: [PATCH 2/4] mmc: dt-bindings: update Mediatek MMC bindings
-In-Reply-To: <1444729078-26585-3-git-send-email-chaotian.jing@mediatek.com>
-References: <1444729078-26585-1-git-send-email-chaotian.jing@mediatek.com>
- <1444729078-26585-3-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <20151013103845.GA4189@leverpostej>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 13 Oct 2015 13:39:07 +0300
+Subject: [PATCH v4 11/25] ARM/dmaengine: edma: Merge the two drivers under
+ drivers/dma/
+In-Reply-To: <561CC7B9.8000201@ti.com>
+References: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
+ <1443088932-21731-12-git-send-email-peter.ujfalusi@ti.com>
+ <20151012160024.GF27370@localhost> <561CC7B9.8000201@ti.com>
+Message-ID: <561CDF4B.3050208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 05:37:56PM +0800, Chaotian Jing wrote:
-> Add 400Mhz clock source for HS400 mode
+On 10/13/2015 11:58 AM, Peter Ujfalusi wrote:
+> On 10/12/2015 07:00 PM, Vinod Koul wrote:
+>> On Thu, Sep 24, 2015 at 01:01:58PM +0300, Peter Ujfalusi wrote:
+>>> Move the code out from arch/arm/common and merge it inside of the dmaengine
+>>> driver.
+>>> This change is done with as minimal change to the code as possible to avoid
+>>> any possibilities to introducing regression.
+>>
+>> Is this a pure move patch or code has been modified, if latter am
+>> disappointed that existing code style issue have not been fixed
 > 
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> index a1adfa4..745bee2 100644
-> --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> @@ -17,6 +17,11 @@ Required properties:
->  - vmmc-supply: power to the Core
->  - vqmmc-supply: power to the IO
->  
-> +Optional properties:
-> +- clocks: 400mhz clock source for HS400
-> +- clock-names: "400mhz"
+> Yes, it is mostly code move, I have done minimal changes only needed to get
+> the moved code working in the new location.
+> Patch 13 in this series will go through the file and will fix up most (I hope
+> all) of the outstanding coding style issues.
+> At this point I wanted to have as small change as possible.
 
-Is that really what the input line is called?
+But fair enough, I will resend the series with checkpatch fixes done for this
+patch.
 
-> +- hs400-ds-delay: HS400 DS delay setting
-
-What is the format of this? Where can I derive the correct value?
-
-Mark.
-
-> +
->  Examples:
->  mmc0: mmc at 11230000 {
->  	compatible = "mediatek,mt8173-mmc", "mediatek,mt8135-mmc";
-> @@ -24,9 +29,12 @@ mmc0: mmc at 11230000 {
->  	interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_LOW>;
->  	vmmc-supply = <&mt6397_vemc_3v3_reg>;
->  	vqmmc-supply = <&mt6397_vio18_reg>;
-> -	clocks = <&pericfg CLK_PERI_MSDC30_0>, <&topckgen CLK_TOP_MSDC50_0_H_SEL>;
-> -	clock-names = "source", "hclk";
-> +	clocks = <&pericfg CLK_PERI_MSDC30_0>,
-> +	         <&topckgen CLK_TOP_MSDC50_0_H_SEL>,
-> +		 <&topckgen CLK_TOP_MSDCPLL_D2> ;
-> +	clock-names = "source", "hclk", "400mhz";
->  	pinctrl-names = "default", "state_uhs";
->  	pinctrl-0 = <&mmc0_pins_default>;
->  	pinctrl-1 = <&mmc0_pins_uhs>;
-> +	hs400-ds-delay = <0x14015>;
->  };
-> -- 
-> 1.8.1.1.dirty
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+P?ter
