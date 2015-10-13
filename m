@@ -1,115 +1,48 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 13 Oct 2015 08:58:16 +0800
-Subject: [PATCH v2 4/4] arm64: dts: enable idle states for Hi6220
-In-Reply-To: <1444697896-4323-1-git-send-email-leo.yan@linaro.org>
-References: <1444697896-4323-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1444697896-4323-5-git-send-email-leo.yan@linaro.org>
+From: zhengsq@rock-chips.com (Shunqian Zheng)
+Date: Tue, 13 Oct 2015 09:01:05 +0800
+Subject: [PATCH v1 0/4] Audio Codec Driver of RK3036 SoC
+Message-ID: <1444698070-4191-1-git-send-email-zhengsq@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add cpu and cluster level's low power state for Hi6220.
+From: ZhengShunQian <zhengsq@rock-chips.com>
 
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+Base on the other seris of RK3036 clk patches, which is not landed yet,
+this patches add the RK3036 SoC codec driver.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index cdd4125..2830571 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -52,11 +52,35 @@
- 			};
- 		};
- 
-+		idle-states {
-+			entry-method = "psci";
-+
-+			CPU_SLEEP: cpu-sleep {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				arm,psci-suspend-param = <0x0010000>;
-+				entry-latency-us = <700>;
-+				exit-latency-us = <250>;
-+				min-residency-us = <1000>;
-+			};
-+
-+			CLUSTER_SLEEP: cluster-sleep {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				arm,psci-suspend-param = <0x1010000>;
-+				entry-latency-us = <1000>;
-+				exit-latency-us = <700>;
-+				min-residency-us = <2700>;
-+				wakeup-latency-us = <1500>;
-+			};
-+		};
-+
- 		cpu0: cpu at 0 {
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			device_type = "cpu";
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
- 		cpu1: cpu at 1 {
-@@ -64,6 +88,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
- 		cpu2: cpu at 2 {
-@@ -71,6 +96,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -78,6 +104,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
- 		cpu4: cpu at 100 {
-@@ -85,6 +112,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x100>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
- 		cpu5: cpu at 101 {
-@@ -92,6 +120,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x101>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
- 		cpu6: cpu at 102 {
-@@ -99,6 +128,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x102>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
- 		cpu7: cpu at 103 {
-@@ -106,6 +136,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x103>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 	};
- 
+Rockchip RK3036 SoC integrated with an Inno audio codec. It supports
+the following features:
+o. 24bit DAC
+o. Support 16? to 32? headphone output and speaker output
+o. Support Mono, Stereo channel
+o. Sampling rate of 8/12/16/24/32/44.1/48/96KHz
+
+While there are some features like dapm and s2r are still WIP,
+I would like to send these patches now and get some feedback.
+
+Thank you for your review.
+
+ZhengShunQian (4):
+  ASoC: codec: Inno codec driver for RK3036 SoC
+  ASoC: RK3036: Add binding doc of inno-rk3036 codec driver
+  ASoC: Add codec machine driver for RK3036
+  ASoC: RK3036: Add binding doc for audio machine driver
+
+ .../devicetree/bindings/sound/inno-rk3036.txt      |  20 +
+ .../devicetree/bindings/sound/rockchip-rk3036.txt  |  14 +
+ sound/soc/codecs/Kconfig                           |   4 +
+ sound/soc/codecs/Makefile                          |   2 +
+ sound/soc/codecs/inno_rk3036.c                     | 439 +++++++++++++++++++++
+ sound/soc/codecs/inno_rk3036.h                     | 308 +++++++++++++++
+ sound/soc/rockchip/Kconfig                         |  10 +
+ sound/soc/rockchip/Makefile                        |   2 +
+ sound/soc/rockchip/rockchip_rk3036.c               | 147 +++++++
+ 9 files changed, 946 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/inno-rk3036.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/rockchip-rk3036.txt
+ create mode 100644 sound/soc/codecs/inno_rk3036.c
+ create mode 100644 sound/soc/codecs/inno_rk3036.h
+ create mode 100644 sound/soc/rockchip/rockchip_rk3036.c
+
 -- 
 1.9.1
