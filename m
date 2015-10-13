@@ -1,50 +1,70 @@
-From: hare@suse.de (Hannes Reinecke)
-Date: Tue, 13 Oct 2015 07:47:28 +0200
-Subject: [PATCH] scsi: advansys needs ISA dma api for ISA support
-In-Reply-To: <5081546.QjQ32dGX2L@wuerfel>
-References: <5081546.QjQ32dGX2L@wuerfel>
-Message-ID: <561C9AF0.5000004@suse.de>
+From: hs@denx.de (Heiko Schocher)
+Date: Tue, 13 Oct 2015 07:54:15 +0200
+Subject: [PATCH] arm, omap2, sram: On HS/EMU devices,
+ only 64K internal SRAM is available.
+Message-ID: <1444715655-30077-1-git-send-email-hs@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2015 05:10 PM, Arnd Bergmann wrote:
-> The advansys drvier uses the request_dma function that is used on ISA
-> machines for the internal DMA controller, which causes build errors
-> on platforms that have ISA slots but do not provide the ISA DMA API:
-> 
-> drivers/scsi/advansys.c: In function 'advansys_board_found':
-> drivers/scsi/advansys.c:11300:10: error: implicit declaration of function 'request_dma' [-Werror=implicit-function-declaration]
-> 
-> The problem now showed up in ARM randconfig builds after commit
-> 6571fb3f8b7f ("advansys: Update to version 3.5 and remove compilation
-> warning") made it possible to build on platforms that have neither
-> VIRT_TO_BUS nor ISA_DMA_API but that do have ISA.
-> 
-> This adds the missing dependency.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/drivers/scsi/Kconfig b/drivers/scsi/Kconfig
-> index d2f480b04a52..d4aa6a1a806c 100644
-> --- a/drivers/scsi/Kconfig
-> +++ b/drivers/scsi/Kconfig
-> @@ -499,6 +499,7 @@ config SCSI_ADVANSYS
->  	tristate "AdvanSys SCSI support"
->  	depends on SCSI
->  	depends on ISA || EISA || PCI
-> +	depends on ISA_DMA_API || !ISA
->  	help
->  	  This is a driver for all SCSI host adapters manufactured by
->  	  AdvanSys. It is documented in the kernel source in
-> 
-Reviewed-by: Hannes Reinecke <hare@suse.de>
+Of this, secure content (including PPA) uses initial
+portion of the SRAM. This chunk is not (and shouldn't
+be) accessible from the public code.
 
-Cheers,
+The minimum size of this chunk (0x350) is used in this
+patch. Available size is rounded off to 63K.
 
-Hannes
+Both values would require a change if size of secure
+content grows beyond 0x350.
+
+Signed-off-by: Heiko Schocher <hs@denx.de>
+Signed-off-by: Ayoub Zaki <Ayoub.Zaki@bosch-si.com>
+---
+
+ arch/arm/mach-omap2/sram.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
+index cd488b8..2e7c00f 100644
+--- a/arch/arm/mach-omap2/sram.c
++++ b/arch/arm/mach-omap2/sram.c
+@@ -47,6 +47,28 @@
+ 
+ #define GP_DEVICE		0x300
+ 
++/**
++ * Size of chunk used by secure content in the HS/EMU devices.
++ *
++ * This size is not fixed. It depends upon the implementation of PPA.
++ * May need to be modified if the size grows.
++ */
++#define AM33XX_HS_HEADER_SIZE   0x0350
++
++/**
++ * Start of public SRAM on HS/EMU devices.
++ */
++#define AM33XX_SRAM_PA		0x40300000
++#define AM33XX_SRAM_PUB_PA	(AM33XX_SRAM_PA + AM33XX_HS_HEADER_SIZE)
++
++/**
++ * Size of public SRAM available on HS/EMU devices.
++ *
++ * This size also depends upon AM33XX_HS_HEADER_SIZE.
++ * Current value is derived from nearest round-off.
++ */
++#define AM33XX_SRAM_PUB_SIZE		0xfc00	/* 63K */
++
+ #define ROUND_DOWN(value,boundary)	((value) & (~((boundary)-1)))
+ 
+ static unsigned long omap_sram_start;
+@@ -99,6 +121,9 @@ static void __init omap_detect_sram(void)
+ 			} else {
+ 				omap_sram_size = 0x8000; /* 32K */
+ 			}
++		} else if (soc_is_am33xx()) {
++			omap_sram_start = AM33XX_SRAM_PUB_PA;
++			omap_sram_size  = AM33XX_SRAM_PUB_SIZE;
+ 		} else {
+ 			omap_sram_start = OMAP2_SRAM_PUB_PA;
+ 			omap_sram_size = 0x800; /* 2K */
 -- 
-Dr. Hannes Reinecke		               zSeries & Storage
-hare at suse.de			               +49 911 74053 688
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg
-GF: F. Imend?rffer, J. Smithard, J. Guild, D. Upmanyu, G. Norton
-HRB 21284 (AG N?rnberg)
+2.1.0
