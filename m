@@ -1,30 +1,114 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Tue, 13 Oct 2015 13:12:09 +0200
-Subject: [PATCH] ARM: dts: berlin: fix typo in chosen property
-Message-ID: <1444734729-4818-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 13 Oct 2015 13:17:57 +0200
+Subject: [PATCH v2 0/2] Enabling PSCI based idle on ARM 32-bit platforms
+In-Reply-To: <20151013104424.GA13899@red-moon>
+References: <1444648628-24790-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <561CC185.60001@linaro.org> <20151013104424.GA13899@red-moon>
+Message-ID: <561CE865.2000509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes a trivial typo in the name of the "chosen" device tree property
-for the Marvell BG2-Q DMP board.
+On 10/13/2015 12:44 PM, Lorenzo Pieralisi wrote:
+> Hi Daniel,
+>
+> On Tue, Oct 13, 2015 at 10:32:05AM +0200, Daniel Lezcano wrote:
+>>
+>> Hi Lorenzo,
+>>
+>> I would like to take this patch through my tree but it does not apply.
+>
+> That's because as I mentioned in the cover letter the series is built
+> on top of:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/firmware/psci-1.0
+>
+> Hopefully this tag will soon get pulled in arm-soc, I will respin a v3
+> anyway to add tags and fold psci_cpuops.c in psci.c, how do you want to
+> merge this then ?
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+May be you can create a branch with your modifications to be shared with 
+arm-soc and me ?
 
-diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-index 4a749e5b3b44..caeeb345c335 100644
---- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-+++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-@@ -48,7 +48,7 @@
- 		reg = <0x00000000 0x80000000>;
- 	};
- 
--	choosen {
-+	chosen {
- 		bootargs = "console=ttyS0,115200 earlyprintk";
- 	};
- 
+
+>> Mind to refresh it against linux-pm or v4.3-rc5 ?
+>>
+>>    -- Daniel
+>>
+>>
+>> On 10/12/2015 01:17 PM, Lorenzo Pieralisi wrote:
+>>> This patch series is v2 of a previous posting:
+>>>
+>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/373756.html
+>>>
+>>> v1->v2:
+>>>
+>>> - Refactored patch 1 to remove cpu parameter from cpuidle_ops
+>>>    suspend hook
+>>> - Refactored psci_cpu_init_idle to stub out dt parsing function and
+>>>    make it usable on both ARM/ARM64 with no additional changes
+>>> - Updated ARM cpuidle_ops to new interfaces
+>>> - Fixed PSCI enable method string in ARM cpuidle_ops struct
+>>>
+>>> PSCI firmware provides a kernel API that, through a standard interface,
+>>> allows to manage power states transitions in a seamless manner for
+>>> ARM and ARM64 systems.
+>>>
+>>> Current PSCI code that initializes CPUidle states on PSCI based
+>>> systems lives in arch/arm64 directory but it is not ARM64 specific
+>>> and can be shared with ARM 32-bit systems so that the generic
+>>> ARM CPUidle driver can leverage the common PSCI interface.
+>>>
+>>> This patch series moves PSCI CPUidle management code to
+>>> drivers/firmware directory so that ARM and ARM64 architecture
+>>> can actually share the code.
+>>>
+>>> It is made up of two patches:
+>>>
+>>> Patch 1 refactors ARM 32-bit generic idle implementation to remove
+>>> the cpu parameter from the cpuidle_ops suspend hook, in preparation
+>>> for a common PSCI implementation for ARM/ARM64 PSCI idle.
+>>>
+>>> Patch 2 moves ARM64 PSCI CPUidle functions implementation to
+>>> drivers/firmware so that it can be shared with ARM 32-bit platforms
+>>> code. This patch also adds a PSCI entry section on ARM 32-bit systems
+>>> so that the PSCI CPUidle back-end can be enabled when the enable-method
+>>> corresponds to PSCI.
+>>>
+>>> Patches apply on top of current patch stack to enable PSCI 1.0:
+>>>
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/firmware/psci-1.0
+>>>
+>>> Tested on Juno board (ARM64), compile tested only on ARM 32-bit systems.
+>>>
+>>> Lorenzo Pieralisi (2):
+>>>    ARM: cpuidle: remove cpu parameter from the cpuidle_ops suspend hook
+>>>    ARM64: kernel: PSCI: move PSCI idle management code to
+>>>      drivers/firmware
+>>>
+>>>   arch/arm/include/asm/cpuidle.h |   2 +-
+>>>   arch/arm/kernel/cpuidle.c      |   2 +-
+>>>   arch/arm64/kernel/psci.c       |  99 +-----------------------------
+>>>   drivers/firmware/Makefile      |   2 +-
+>>>   drivers/firmware/psci_cpuops.c | 133 +++++++++++++++++++++++++++++++++++++++++
+>>>   drivers/soc/qcom/spm.c         |  10 ++--
+>>>   include/linux/psci.h           |   3 +
+>>>   7 files changed, 146 insertions(+), 105 deletions(-)
+>>>   create mode 100644 drivers/firmware/psci_cpuops.c
+>>>
+>>
+>>
+>> --
+>>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>>
+>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+>> <http://twitter.com/#!/linaroorg> Twitter |
+>> <http://www.linaro.org/linaro-blog/> Blog
+>>
+
+
 -- 
-2.1.4
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
