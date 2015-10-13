@@ -1,44 +1,50 @@
-From: bayi.cheng@mediatek.com (Bayi Cheng)
-Date: Tue, 13 Oct 2015 17:39:20 +0800
-Subject: [PATCH v4 3/3] arm64: dts: mt8173: Add nor flash node
-In-Reply-To: <1444729160-26433-1-git-send-email-bayi.cheng@mediatek.com>
-References: <1444729160-26433-1-git-send-email-bayi.cheng@mediatek.com>
-Message-ID: <1444729160-26433-4-git-send-email-bayi.cheng@mediatek.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Tue, 13 Oct 2015 13:03:05 +0300
+Subject: [PATCH 4/5] arm: dts: lpc32xx: remove unneeded cell settings
+ from cpus
+In-Reply-To: <CAGhQ9VwBcUxZr7A57feuUNs0OcNpHn4wwmGommVg6e-B0=tsBA@mail.gmail.com>
+References: <1444694045-22000-1-git-send-email-vz@mleia.com>	<1444694045-22000-5-git-send-email-vz@mleia.com>
+ <CAGhQ9VwBcUxZr7A57feuUNs0OcNpHn4wwmGommVg6e-B0=tsBA@mail.gmail.com>
+Message-ID: <561CD6D9.1020102@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Mediatek nor flash node
+Hi Joachim,
 
-Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+On 13.10.2015 11:18, Joachim Eastwood wrote:
+> Hi Vladimir,
+> 
+> On 13 October 2015 at 01:54, Vladimir Zapolskiy <vz@mleia.com> wrote:
+>> There is no addressable devices under cpus device node, remove noisy
+>> address and size cells properties.
+>>
+>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+>> ---
+>>  arch/arm/boot/dts/lpc32xx.dtsi | 3 ---
+>>  1 file changed, 3 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
+>> index dcb52cb..929458d 100644
+>> --- a/arch/arm/boot/dts/lpc32xx.dtsi
+>> +++ b/arch/arm/boot/dts/lpc32xx.dtsi
+>> @@ -18,9 +18,6 @@
+>>         interrupt-parent = <&mic>;
+>>
+>>         cpus {
+>> -               #address-cells = <0>;
+>> -               #size-cells = <0>;
+>> -
+> 
+> According to Documentation/devicetree/bindings/arm/cpus.txt these
+> properties are required.
+> 
+> Take a look at Example 3 in the doc for it should look like on a ARM
+> 926EJ-S uniprocessor 32-bit system.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index d18ee42..385c2e4 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -365,6 +365,21 @@
- 			status = "disabled";
- 		};
- 
-+		nor_flash: spi at 1100d000 {
-+			compatible = "mediatek,mt8173-nor";
-+			reg = <0 0x1100d000 0 0xe0>;
-+			clocks = <&pericfg CLK_PERI_SPI>,
-+				 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
-+			clock-names = "spi", "sf";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			flash at 0 {
-+				compatible = "jedec,spi-nor";
-+				reg = <0>;
-+			};
-+		};
-+
- 		i2c3: i2c3 at 11010000 {
- 			compatible = "mediatek,mt8173-i2c";
- 			reg = <0 0x11010000 0 0x70>,
--- 
-1.8.1.1.dirty
+thank you for review and pointing the fact out, then according to
+documentation #address-cells must be set to 1 plus reg property in cpu
+node is missing, I'll send a fix as patch v2 4/5.
+
+--
+With best wishes,
+Vladimir
