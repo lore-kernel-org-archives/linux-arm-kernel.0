@@ -1,164 +1,202 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 13 Oct 2015 14:32:43 +0100
-Subject: [PATCH 1/2] ARM: dts: fix gpio-keys wakeup-source property
-Message-ID: <1444743164-17735-1-git-send-email-sudeep.holla@arm.com>
+Date: Tue, 13 Oct 2015 14:32:44 +0100
+Subject: [PATCH 2/2] ARM: dts: change gpio-key,wakeup property to boolean
+In-Reply-To: <1444743164-17735-1-git-send-email-sudeep.holla@arm.com>
+References: <1444743164-17735-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1444743164-17735-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The keyboard driver for GPIO buttons(gpio-keys) checks for one of the
-two boolean properties to enable gpio buttons as wakeup source:
-1. "wakeup-source" or
-2. the legacy "gpio-key,wakeup"
+Keyboard driver for GPIO buttons(gpio-keys) checks for the legacy
+"gpio-key,wakeup" boolean property to enable gpio buttons as wakeup
+source.
 
-However juno, ste-snowball and emev2-kzm9d dts file have a undetected
-"wakeup" property to indictate the wakeup source.
+Few dts files assign value "1" to gpio-key,wakeup and in one instance a
+value "0" is assigned probably assuming it won't be enabled as a wakeup
+source. Since the presence of the boolean property indicates it is
+enabled, value of "0" have no value.
 
-This patch fixes it by making use of "wakeup-source" property.
+This patch removes the property where value "0" is assigned and removes
+the value "1" in most of the other cases.
 
-Cc: Simon Horman <horms@verge.net.au>
-Cc: Magnus Damm <magnus.damm@gmail.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: linux-rockchip at lists.infradead.org
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: spear-devel at list.st.com
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm/boot/dts/emev2-kzm9d.dts             |  8 ++++----
- arch/arm/boot/dts/ste-snowball.dts            | 10 +++++-----
- arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 12 ++++++------
- 3 files changed, 15 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/rk3066a-bqcurie2.dts      | 3 +--
+ arch/arm/boot/dts/rk3066a-rayeager.dts      | 2 +-
+ arch/arm/boot/dts/rk3188-radxarock.dts      | 2 +-
+ arch/arm/boot/dts/rk3288-evb.dtsi           | 2 +-
+ arch/arm/boot/dts/rk3288-firefly.dtsi       | 2 +-
+ arch/arm/boot/dts/rk3288-popmetal.dts       | 2 +-
+ arch/arm/boot/dts/rk3288-r89.dts            | 2 +-
+ arch/arm/boot/dts/spear1310-evb.dts         | 2 +-
+ arch/arm/boot/dts/spear1340-evb.dts         | 2 +-
+ arch/arm/boot/dts/spear320-hmi.dts          | 4 ++--
+ arch/arm64/boot/dts/rockchip/rk3368-r88.dts | 2 +-
+ 11 files changed, 12 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
-index 955c24ee4a8c..8c24975e8f9d 100644
---- a/arch/arm/boot/dts/emev2-kzm9d.dts
-+++ b/arch/arm/boot/dts/emev2-kzm9d.dts
-@@ -35,28 +35,28 @@
- 
+diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+index c0273755431a..71a15772cda6 100644
+--- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
++++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+@@ -74,7 +74,7 @@
+ 			linux,code = <116>;
+ 			label = "GPIO Key Power";
+ 			linux,input-type = <1>;
+-			gpio-key,wakeup = <1>;
++			gpio-key,wakeup;
+ 			debounce-interval = <100>;
+ 		};
  		button at 1 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			label = "DSW2-1";
- 			linux,code = <KEY_1>;
- 			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+@@ -82,7 +82,6 @@
+ 			linux,code = <104>;
+ 			label = "GPIO Key Vol-";
+ 			linux,input-type = <1>;
+-			gpio-key,wakeup = <0>;
+ 			debounce-interval = <100>;
  		};
- 		button at 2 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			label = "DSW2-2";
- 			linux,code = <KEY_2>;
- 			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
- 		};
- 		button at 3 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			label = "DSW2-3";
- 			linux,code = <KEY_3>;
- 			gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
- 		};
- 		button at 4 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			label = "DSW2-4";
- 			linux,code = <KEY_4>;
- 			gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
-diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-index 32a5ccb14e7e..e80e42163883 100644
---- a/arch/arm/boot/dts/ste-snowball.dts
-+++ b/arch/arm/boot/dts/ste-snowball.dts
-@@ -47,35 +47,35 @@
+ 		/* VOL+ comes somehow thru the ADC */
+diff --git a/arch/arm/boot/dts/rk3066a-rayeager.dts b/arch/arm/boot/dts/rk3066a-rayeager.dts
+index e36383c701dc..72bf52a04506 100644
+--- a/arch/arm/boot/dts/rk3066a-rayeager.dts
++++ b/arch/arm/boot/dts/rk3066a-rayeager.dts
+@@ -65,7 +65,7 @@
+ 		#size-cells = <0>;
  
- 		button at 1 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			linux,code = <2>;
- 			label = "userpb";
- 			gpios = <&gpio1 0 0x4>;
+ 		button at 0 {
+-			gpio-key,wakeup = <1>;
++			gpio-key,wakeup;
+ 			gpios = <&gpio6 2 GPIO_ACTIVE_LOW>;
+ 			label = "GPIO Power";
+ 			linux,code = <116>;
+diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
+index d2180e5d2b05..ba6b174777e7 100644
+--- a/arch/arm/boot/dts/rk3188-radxarock.dts
++++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+@@ -63,7 +63,7 @@
+ 			linux,code = <116>;
+ 			label = "GPIO Key Power";
+ 			linux,input-type = <1>;
+-			gpio-key,wakeup = <1>;
++			gpio-key,wakeup;
+ 			debounce-interval = <100>;
  		};
- 		button at 2 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			linux,code = <3>;
- 			label = "extkb1";
- 			gpios = <&gpio4 23 0x4>;
+ 	};
+diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+index f6d2e7894b05..ab013155f04f 100644
+--- a/arch/arm/boot/dts/rk3288-evb.dtsi
++++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+@@ -103,7 +103,7 @@
+ 			linux,code = <116>;
+ 			label = "GPIO Key Power";
+ 			linux,input-type = <1>;
+-			gpio-key,wakeup = <1>;
++			gpio-key,wakeup;
+ 			debounce-interval = <100>;
  		};
- 		button at 3 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			linux,code = <4>;
- 			label = "extkb2";
- 			gpios = <&gpio4 24 0x4>;
- 		};
- 		button at 4 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			linux,code = <5>;
- 			label = "extkb3";
- 			gpios = <&gpio5 1 0x4>;
- 		};
- 		button at 5 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			linux,code = <6>;
- 			label = "extkb4";
- 			gpios = <&gpio5 2 0x4>;
-diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-index 05e461dc6c1f..a15e1fb4d192 100644
---- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-@@ -61,42 +61,42 @@
+ 	};
+diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
+index 20fa0ef0b96b..4fa2dedd0c7a 100644
+--- a/arch/arm/boot/dts/rk3288-firefly.dtsi
++++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
+@@ -67,7 +67,7 @@
+ 		#size-cells = <0>;
  
- 				button at 1 {
- 					debounce_interval = <50>;
--					wakeup = <1>;
-+					wakeup-source;
- 					linux,code = <116>;
- 					label = "POWER";
- 					gpios = <&iofpga_gpio0 0 0x4>;
- 				};
- 				button at 2 {
- 					debounce_interval = <50>;
--					wakeup = <1>;
-+					wakeup-source;
- 					linux,code = <102>;
- 					label = "HOME";
- 					gpios = <&iofpga_gpio0 1 0x4>;
- 				};
- 				button at 3 {
- 					debounce_interval = <50>;
--					wakeup = <1>;
-+					wakeup-source;
- 					linux,code = <152>;
- 					label = "RLOCK";
- 					gpios = <&iofpga_gpio0 2 0x4>;
- 				};
- 				button at 4 {
- 					debounce_interval = <50>;
--					wakeup = <1>;
-+					wakeup-source;
- 					linux,code = <115>;
- 					label = "VOL+";
- 					gpios = <&iofpga_gpio0 3 0x4>;
- 				};
- 				button at 5 {
- 					debounce_interval = <50>;
--					wakeup = <1>;
-+					wakeup-source;
- 					linux,code = <114>;
- 					label = "VOL-";
- 					gpios = <&iofpga_gpio0 4 0x4>;
- 				};
- 				button at 6 {
- 					debounce_interval = <50>;
--					wakeup = <1>;
-+					wakeup-source;
- 					linux,code = <99>;
- 					label = "NMI";
- 					gpios = <&iofpga_gpio0 5 0x4>;
+ 		button at 0 {
+-			gpio-key,wakeup = <1>;
++			gpio-key,wakeup;
+ 			gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
+ 			label = "GPIO Power";
+ 			linux,code = <116>;
+diff --git a/arch/arm/boot/dts/rk3288-popmetal.dts b/arch/arm/boot/dts/rk3288-popmetal.dts
+index f82b956ebf17..9b7f389c38e5 100644
+--- a/arch/arm/boot/dts/rk3288-popmetal.dts
++++ b/arch/arm/boot/dts/rk3288-popmetal.dts
+@@ -74,7 +74,7 @@
+ 			linux,code = <116>;
+ 			label = "GPIO Key Power";
+ 			linux,input-type = <1>;
+-			gpio-key,wakeup = <1>;
++			gpio-key,wakeup;
+ 			debounce-interval = <100>;
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/rk3288-r89.dts b/arch/arm/boot/dts/rk3288-r89.dts
+index 14b9fc73c8a4..2ee425523f5c 100644
+--- a/arch/arm/boot/dts/rk3288-r89.dts
++++ b/arch/arm/boot/dts/rk3288-r89.dts
+@@ -73,7 +73,7 @@
+ 			linux,code = <116>;
+ 			label = "GPIO Key Power";
+ 			linux,input-type = <1>;
+-			gpio-key,wakeup = <1>;
++			gpio-key,wakeup;
+ 			debounce-interval = <100>;
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/spear1310-evb.dts b/arch/arm/boot/dts/spear1310-evb.dts
+index e48857249ce7..6673d74ab0c0 100644
+--- a/arch/arm/boot/dts/spear1310-evb.dts
++++ b/arch/arm/boot/dts/spear1310-evb.dts
+@@ -161,7 +161,7 @@
+ 				linux,code = <0x100>;
+ 				gpios = <&gpio0 7 0x4>;
+ 				debounce-interval = <20>;
+-				gpio-key,wakeup = <1>;
++				gpio-key,wakeup;
+ 			};
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/spear1340-evb.dts b/arch/arm/boot/dts/spear1340-evb.dts
+index c611f5606dfe..9071344fa47c 100644
+--- a/arch/arm/boot/dts/spear1340-evb.dts
++++ b/arch/arm/boot/dts/spear1340-evb.dts
+@@ -223,7 +223,7 @@
+ 				linux,code = <0x100>;
+ 				gpios = <&gpio1 1 0x4>;
+ 				debounce-interval = <20>;
+-				gpio-key,wakeup = <1>;
++				gpio-key,wakeup;
+ 			};
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/spear320-hmi.dts b/arch/arm/boot/dts/spear320-hmi.dts
+index 0aa6fef5ce22..3c5b28c0fce4 100644
+--- a/arch/arm/boot/dts/spear320-hmi.dts
++++ b/arch/arm/boot/dts/spear320-hmi.dts
+@@ -141,7 +141,7 @@
+ 				linux,code = <0x100>;
+ 				gpios = <&stmpegpio 3 0x4>;
+ 				debounce-interval = <20>;
+-				gpio-key,wakeup = <1>;
++				gpio-key,wakeup;
+ 			};
+ 
+ 			button at 2 {
+@@ -149,7 +149,7 @@
+ 				linux,code = <0x200>;
+ 				gpios = <&stmpegpio 2 0x4>;
+ 				debounce-interval = <20>;
+-				gpio-key,wakeup = <1>;
++				gpio-key,wakeup;
+ 			};
+ 		};
+ 
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
+index 401a81231eb9..58a2829d9ea7 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
+@@ -71,7 +71,7 @@
+ 		pinctrl-0 = <&pwr_key>;
+ 
+ 		button at 0 {
+-			gpio-key,wakeup = <1>;
++			gpio-key,wakeup;
+ 			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
+ 			label = "GPIO Power";
+ 			linux,code = <116>;
 -- 
 1.9.1
