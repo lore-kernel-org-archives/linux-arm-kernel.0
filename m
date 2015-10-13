@@ -1,42 +1,58 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Tue, 13 Oct 2015 17:08:01 -0400
-Subject: [PATCH v2 3/7] clk: nsp: add clock support for Broadcom Northstar
- Plus SoC
+Date: Tue, 13 Oct 2015 17:08:05 -0400
+Subject: [PATCH v2 7/7] clk: ns2: add clock support for Broadcom Northstar 2
+ SoC
 In-Reply-To: <1444770485-11210-1-git-send-email-jonmason@broadcom.com>
 References: <1444770485-11210-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1444770485-11210-4-git-send-email-jonmason@broadcom.com>
+Message-ID: <1444770485-11210-8-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Broadcom Northstar Plus SoC is architected under the iProc
-architecture. It has the following PLLs: ARMPLL, GENPLL, LCPLL0, all
-derived from an onboard crystal.
+The Broadcom Northstar 2 SoC is architected under the iProc
+architecture. It has the following PLLs: GENPLL SCR, GENPLL SW,
+LCPLL DDR, LCPLL Ports, all derived from an onboard crystal.
 
 Signed-off-by: Jon Mason <jonmason@broadcom.com>
 ---
- drivers/clk/bcm/Makefile            |   2 +
- drivers/clk/bcm/clk-nsp.c           | 135 ++++++++++++++++++++++++++++++++++++
- include/dt-bindings/clock/bcm-nsp.h |  51 ++++++++++++++
- 3 files changed, 188 insertions(+)
- create mode 100644 drivers/clk/bcm/clk-nsp.c
- create mode 100644 include/dt-bindings/clock/bcm-nsp.h
+ drivers/clk/Makefile                |   2 +-
+ drivers/clk/bcm/Makefile            |   1 +
+ drivers/clk/bcm/clk-ns2.c           | 288 ++++++++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/bcm-ns2.h |  72 +++++++++
+ 4 files changed, 362 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/bcm/clk-ns2.c
+ create mode 100644 include/dt-bindings/clock/bcm-ns2.h
 
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index d08b3e5..6124bd3 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -47,7 +47,7 @@ obj-$(CONFIG_COMMON_CLK_WM831X)		+= clk-wm831x.o
+ obj-$(CONFIG_COMMON_CLK_XGENE)		+= clk-xgene.o
+ obj-$(CONFIG_COMMON_CLK_PWM)		+= clk-pwm.o
+ obj-$(CONFIG_COMMON_CLK_AT91)		+= at91/
+-obj-$(CONFIG_ARCH_BCM)			+= bcm/
++obj-y					+= bcm/
+ obj-$(CONFIG_ARCH_BERLIN)		+= berlin/
+ obj-$(CONFIG_ARCH_HISI)			+= hisilicon/
+ obj-$(CONFIG_ARCH_MXC)			+= imx/
 diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
-index 8a7a477..e258b28 100644
+index e258b28..2d1cbc5 100644
 --- a/drivers/clk/bcm/Makefile
 +++ b/drivers/clk/bcm/Makefile
-@@ -4,3 +4,5 @@ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm281xx.o
+@@ -3,6 +3,7 @@ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-kona-setup.o
+ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm281xx.o
  obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm21664.o
  obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-iproc-armpll.o clk-iproc-pll.o clk-iproc-asiu.o
++obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-ns2.o
  obj-$(CONFIG_ARCH_BCM_CYGNUS)	+= clk-cygnus.o
-+obj-$(CONFIG_ARCH_BCM_NSP)	+= clk-nsp.o
-+obj-$(CONFIG_ARCH_BCM_5301X)	+= clk-nsp.o
-diff --git a/drivers/clk/bcm/clk-nsp.c b/drivers/clk/bcm/clk-nsp.c
+ obj-$(CONFIG_ARCH_BCM_NSP)	+= clk-nsp.o
+ obj-$(CONFIG_ARCH_BCM_5301X)	+= clk-nsp.o
+diff --git a/drivers/clk/bcm/clk-ns2.c b/drivers/clk/bcm/clk-ns2.c
 new file mode 100644
-index 0000000..bc8ebdcd
+index 0000000..a564e92
 --- /dev/null
-+++ b/drivers/clk/bcm/clk-nsp.c
-@@ -0,0 +1,135 @@
++++ b/drivers/clk/bcm/clk-ns2.c
+@@ -0,0 +1,288 @@
 +/*
 + * Copyright (C) 2015 Broadcom Corporation
 + *
@@ -57,7 +73,7 @@ index 0000000..bc8ebdcd
 +#include <linux/of.h>
 +#include <linux/of_address.h>
 +
-+#include <dt-bindings/clock/bcm-nsp.h>
++#include <dt-bindings/clock/bcm-ns2.h>
 +#include "clk-iproc.h"
 +
 +#define REG_VAL(o, s, w) { .offset = o, .shift = s, .width = w, }
@@ -65,119 +81,272 @@ index 0000000..bc8ebdcd
 +#define AON_VAL(o, pw, ps, is) { .offset = o, .pwr_width = pw, \
 +	.pwr_shift = ps, .iso_shift = is }
 +
-+#define RESET_VAL(o, rs, prs, kis, kiw, kps, kpw, kas, kaw) { .offset = o, \
-+	.reset_shift = rs, .p_reset_shift = prs, .ki_shift = kis, \
-+	.ki_width = kiw, .kp_shift = kps, .kp_width = kpw, .ka_shift = kas, \
++#define RESET_VAL(o, rs, prs) { .offset = o, .reset_shift = rs, \
++	.p_reset_shift = prs }
++
++#define DF_VAL(o, kis, kiw, kps, kpw, kas, kaw) { .offset = o, .ki_shift = kis,\
++	.ki_width = kiw, .kp_shift = kps, .kp_width = kpw, .ka_shift = kas,    \
 +	.ka_width = kaw }
++
++#define VCO_CTRL_VAL(uo, lo) { .u_offset = uo, .l_offset = lo }
 +
 +#define ENABLE_VAL(o, es, hs, bs) { .offset = o, .enable_shift = es, \
 +	.hold_shift = hs, .bypass_shift = bs }
 +
-+static void __init nsp_armpll_init(struct device_node *node)
-+{
-+	iproc_armpll_setup(node);
-+}
-+CLK_OF_DECLARE(nsp_armpll, "brcm,nsp-armpll", nsp_armpll_init);
-+
-+static const struct iproc_pll_ctrl genpll = {
-+	.flags = IPROC_CLK_PLL_HAS_NDIV_FRAC | IPROC_CLK_EMBED_PWRCTRL,
-+	.aon = AON_VAL(0x0, 1, 12, 0),
-+	.reset = RESET_VAL(0x0, 11, 10, 4, 3, 0, 4, 7, 3),
-+	.ndiv_int = REG_VAL(0x14, 20, 10),
-+	.ndiv_frac = REG_VAL(0x14, 0, 20),
-+	.pdiv = REG_VAL(0x18, 24, 3),
-+	.status = REG_VAL(0x20, 12, 1),
++static const struct iproc_pll_ctrl genpll_scr = {
++	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_SPLIT_STAT_CTRL,
++	.aon = AON_VAL(0x0, 1, 15, 12),
++	.reset = RESET_VAL(0x4, 2, 1),
++	.dig_filter = DF_VAL(0x0, 9, 3, 5, 4, 2, 3),
++	.ndiv_int = REG_VAL(0x8, 4, 10),
++	.pdiv = REG_VAL(0x8, 0, 4),
++	.vco_ctrl = VCO_CTRL_VAL(0x10, 0xc),
++	.status = REG_VAL(0x0, 27, 1),
 +};
 +
-+static const struct iproc_clk_ctrl genpll_clk[] = {
-+	[BCM_NSP_GENPLL_PHY_CLK] = {
-+		.channel = BCM_NSP_GENPLL_PHY_CLK,
++
++static const struct iproc_clk_ctrl genpll_scr_clk[] = {
++	/* bypass_shift, the last value passed into ENABLE_VAL(), is not defined
++	 * in NS2.  However, it doesn't appear to be used anywhere, so setting
++	 * it to 0.
++	 */
++	[BCM_NS2_GENPLL_SCR_SCR_CLK] = {
++		.channel = BCM_NS2_GENPLL_SCR_SCR_CLK,
 +		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 12, 6, 18),
-+		.mdiv = REG_VAL(0x18, 16, 8),
-+	},
-+	[BCM_NSP_GENPLL_ENET_SW_CLK] = {
-+		.channel = BCM_NSP_GENPLL_ENET_SW_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 13, 7, 19),
-+		.mdiv = REG_VAL(0x18, 8, 8),
-+	},
-+	[BCM_NSP_GENPLL_USB_PHY_REF_CLK] = {
-+		.channel = BCM_NSP_GENPLL_USB_PHY_REF_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 14, 8, 20),
++		.enable = ENABLE_VAL(0x0, 18, 12, 0),
 +		.mdiv = REG_VAL(0x18, 0, 8),
 +	},
-+	[BCM_NSP_GENPLL_IPROCFAST_CLK] = {
-+		.channel = BCM_NSP_GENPLL_IPROCFAST_CLK,
++	[BCM_NS2_GENPLL_SCR_FS_CLK] = {
++		.channel = BCM_NS2_GENPLL_SCR_FS_CLK,
 +		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 15, 9, 21),
-+		.mdiv = REG_VAL(0x1c, 16, 8),
++		.enable = ENABLE_VAL(0x0, 19, 13, 0),
++		.mdiv = REG_VAL(0x18, 8, 8),
 +	},
-+	[BCM_NSP_GENPLL_SATA1_CLK] = {
-+		.channel = BCM_NSP_GENPLL_SATA1_CLK,
++	[BCM_NS2_GENPLL_SCR_AUDIO_CLK] = {
++		.channel = BCM_NS2_GENPLL_SCR_AUDIO_CLK,
 +		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 16, 10, 22),
-+		.mdiv = REG_VAL(0x1c, 8, 8),
++		.enable = ENABLE_VAL(0x0, 20, 14, 0),
++		.mdiv = REG_VAL(0x14, 0, 8),
 +	},
-+	[BCM_NSP_GENPLL_SATA2_CLK] = {
-+		.channel = BCM_NSP_GENPLL_SATA2_CLK,
++	[BCM_NS2_GENPLL_SCR_CH3_UNUSED] = {
++		.channel = BCM_NS2_GENPLL_SCR_CH3_UNUSED,
 +		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 17, 11, 23),
-+		.mdiv = REG_VAL(0x1c, 0, 8),
++		.enable = ENABLE_VAL(0x0, 21, 15, 0),
++		.mdiv = REG_VAL(0x14, 8, 8),
++	},
++	[BCM_NS2_GENPLL_SCR_CH4_UNUSED] = {
++		.channel = BCM_NS2_GENPLL_SCR_CH4_UNUSED,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 22, 16, 0),
++		.mdiv = REG_VAL(0x14, 16, 8),
++	},
++	[BCM_NS2_GENPLL_SCR_CH5_UNUSED] = {
++		.channel = BCM_NS2_GENPLL_SCR_CH5_UNUSED,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 23, 17, 0),
++		.mdiv = REG_VAL(0x14, 24, 8),
 +	},
 +};
 +
-+static void __init nsp_genpll_clk_init(struct device_node *node)
++static void __init ns2_genpll_scr_clk_init(struct device_node *node)
 +{
-+	iproc_pll_clk_setup(node, &genpll, NULL, 0, genpll_clk,
-+			    ARRAY_SIZE(genpll_clk));
++	iproc_pll_clk_setup(node, &genpll_scr, NULL, 0, genpll_scr_clk,
++			    ARRAY_SIZE(genpll_scr_clk));
 +}
-+CLK_OF_DECLARE(nsp_genpll_clk, "brcm,nsp-genpll", nsp_genpll_clk_init);
++CLK_OF_DECLARE(ns2_genpll_src_clk, "brcm,ns2-genpll-scr",
++	       ns2_genpll_scr_clk_init);
 +
-+static const struct iproc_pll_ctrl lcpll0 = {
-+	.flags = IPROC_CLK_PLL_HAS_NDIV_FRAC | IPROC_CLK_EMBED_PWRCTRL,
-+	.aon = AON_VAL(0x0, 1, 24, 0),
-+	.reset = RESET_VAL(0x0, 23, 22, 16, 3, 12, 4, 19, 4),
-+	.ndiv_int = REG_VAL(0x4, 20, 8),
-+	.ndiv_frac = REG_VAL(0x4, 0, 20),
-+	.pdiv = REG_VAL(0x4, 28, 3),
-+	.status = REG_VAL(0x10, 12, 1),
++static const struct iproc_pll_ctrl genpll_sw = {
++	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_SPLIT_STAT_CTRL,
++	.aon = AON_VAL(0x0, 2, 9, 8),
++	.reset = RESET_VAL(0x4, 2, 1),
++	.dig_filter = DF_VAL(0x0, 9, 3, 5, 4, 2, 3),
++	.ndiv_int = REG_VAL(0x8, 4, 10),
++	.pdiv = REG_VAL(0x8, 0, 4),
++	.vco_ctrl = VCO_CTRL_VAL(0x10, 0xc),
++	.status = REG_VAL(0x0, 13, 1),
 +};
 +
-+static const struct iproc_clk_ctrl lcpll0_clk[] = {
-+	[BCM_NSP_LCPLL0_PCIE_PHY_REF_CLK] = {
-+		.channel = BCM_NSP_LCPLL0_PCIE_PHY_REF_CLK,
++static const struct iproc_clk_ctrl genpll_sw_clk[] = {
++	/* bypass_shift, the last value passed into ENABLE_VAL(), is not defined
++	 * in NS2.  However, it doesn't appear to be used anywhere, so setting
++	 * it to 0.
++	 */
++	[BCM_NS2_GENPLL_SW_RPE_CLK] = {
++		.channel = BCM_NS2_GENPLL_SW_RPE_CLK,
 +		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 6, 3, 9),
-+		.mdiv = REG_VAL(0x8, 24, 8),
++		.enable = ENABLE_VAL(0x0, 18, 12, 0),
++		.mdiv = REG_VAL(0x18, 0, 8),
 +	},
-+	[BCM_NSP_LCPLL0_SDIO_CLK] = {
-+		.channel = BCM_NSP_LCPLL0_SDIO_CLK,
++	[BCM_NS2_GENPLL_SW_250_CLK] = {
++		.channel = BCM_NS2_GENPLL_SW_250_CLK,
 +		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 7, 4, 10),
-+		.mdiv = REG_VAL(0x8, 16, 8),
++		.enable = ENABLE_VAL(0x0, 19, 13, 0),
++		.mdiv = REG_VAL(0x18, 8, 8),
 +	},
-+	[BCM_NSP_LCPLL0_DDR_PHY_CLK] = {
-+		.channel = BCM_NSP_LCPLL0_DDR_PHY_CLK,
++	[BCM_NS2_GENPLL_SW_NIC_CLK] = {
++		.channel = BCM_NS2_GENPLL_SW_NIC_CLK,
 +		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 8, 5, 11),
-+		.mdiv = REG_VAL(0x8, 8, 8),
++		.enable = ENABLE_VAL(0x0, 20, 14, 0),
++		.mdiv = REG_VAL(0x14, 0, 8),
++	},
++	[BCM_NS2_GENPLL_SW_CHIMP_CLK] = {
++		.channel = BCM_NS2_GENPLL_SW_CHIMP_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 21, 15, 0),
++		.mdiv = REG_VAL(0x14, 8, 8),
++	},
++	[BCM_NS2_GENPLL_SW_PORT_CLK] = {
++		.channel = BCM_NS2_GENPLL_SW_PORT_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 22, 16, 0),
++		.mdiv = REG_VAL(0x14, 16, 8),
++	},
++	[BCM_NS2_GENPLL_SW_SDIO_CLK] = {
++		.channel = BCM_NS2_GENPLL_SW_SDIO_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 23, 17, 0),
++		.mdiv = REG_VAL(0x14, 24, 8),
 +	},
 +};
 +
-+static void __init nsp_lcpll0_clk_init(struct device_node *node)
++static void __init ns2_genpll_sw_clk_init(struct device_node *node)
 +{
-+	iproc_pll_clk_setup(node, &lcpll0, NULL, 0, lcpll0_clk,
-+			    ARRAY_SIZE(lcpll0_clk));
++	iproc_pll_clk_setup(node, &genpll_sw, NULL, 0, genpll_sw_clk,
++			    ARRAY_SIZE(genpll_sw_clk));
 +}
-+CLK_OF_DECLARE(nsp_lcpll0_clk, "brcm,nsp-lcpll0", nsp_lcpll0_clk_init);
-diff --git a/include/dt-bindings/clock/bcm-nsp.h b/include/dt-bindings/clock/bcm-nsp.h
++CLK_OF_DECLARE(ns2_genpll_sw_clk, "brcm,ns2-genpll-sw",
++	       ns2_genpll_sw_clk_init);
++
++static const struct iproc_pll_ctrl lcpll_ddr = {
++	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_SPLIT_STAT_CTRL,
++	.aon = AON_VAL(0x0, 2, 1, 0),
++	.reset = RESET_VAL(0x4, 2, 1),
++	.dig_filter = DF_VAL(0x0, 9, 3, 5, 4, 1, 4),
++	.ndiv_int = REG_VAL(0x8, 4, 10),
++	.pdiv = REG_VAL(0x8, 0, 4),
++	.vco_ctrl = VCO_CTRL_VAL(0x10, 0xc),
++	.status = REG_VAL(0x0, 0, 1),
++};
++
++static const struct iproc_clk_ctrl lcpll_ddr_clk[] = {
++	/* bypass_shift, the last value passed into ENABLE_VAL(), is not defined
++	 * in NS2.  However, it doesn't appear to be used anywhere, so setting
++	 * it to 0.
++	 */
++	[BCM_NS2_LCPLL_DDR_PCIE_SATA_USB_CLK] = {
++		.channel = BCM_NS2_LCPLL_DDR_PCIE_SATA_USB_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 18, 12, 0),
++		.mdiv = REG_VAL(0x14, 0, 8),
++	},
++	[BCM_NS2_LCPLL_DDR_DDR_CLK] = {
++		.channel = BCM_NS2_LCPLL_DDR_DDR_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 19, 13, 0),
++		.mdiv = REG_VAL(0x14, 8, 8),
++	},
++	[BCM_NS2_LCPLL_DDR_CH2_UNUSED] = {
++		.channel = BCM_NS2_LCPLL_DDR_CH2_UNUSED,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 20, 14, 0),
++		.mdiv = REG_VAL(0x10, 0, 8),
++	},
++	[BCM_NS2_LCPLL_DDR_CH3_UNUSED] = {
++		.channel = BCM_NS2_LCPLL_DDR_CH3_UNUSED,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 21, 15, 0),
++		.mdiv = REG_VAL(0x10, 8, 8),
++	},
++	[BCM_NS2_LCPLL_DDR_CH4_UNUSED] = {
++		.channel = BCM_NS2_LCPLL_DDR_CH4_UNUSED,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 22, 16, 0),
++		.mdiv = REG_VAL(0x10, 16, 8),
++	},
++	[BCM_NS2_LCPLL_DDR_CH5_UNUSED] = {
++		.channel = BCM_NS2_LCPLL_DDR_CH5_UNUSED,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 23, 17, 0),
++		.mdiv = REG_VAL(0x10, 24, 8),
++	},
++};
++
++static void __init ns2_lcpll_ddr_clk_init(struct device_node *node)
++{
++	iproc_pll_clk_setup(node, &lcpll_ddr, NULL, 0, lcpll_ddr_clk,
++			    ARRAY_SIZE(lcpll_ddr_clk));
++}
++CLK_OF_DECLARE(ns2_lcpll_ddr_clk, "brcm,ns2-lcpll-ddr",
++	       ns2_lcpll_ddr_clk_init);
++
++static const struct iproc_pll_ctrl lcpll_ports = {
++	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_SPLIT_STAT_CTRL,
++	.aon = AON_VAL(0x0, 2, 5, 4),
++	.reset = RESET_VAL(0x4, 2, 1),
++	.dig_filter = DF_VAL(0x0, 9, 3, 5, 4, 1, 4),
++	.ndiv_int = REG_VAL(0x8, 4, 10),
++	.pdiv = REG_VAL(0x8, 0, 4),
++	.vco_ctrl = VCO_CTRL_VAL(0x10, 0xc),
++	.status = REG_VAL(0x0, 0, 1),
++};
++
++static const struct iproc_clk_ctrl lcpll_ports_clk[] = {
++	/* bypass_shift, the last value passed into ENABLE_VAL(), is not defined
++	 * in NS2.  However, it doesn't appear to be used anywhere, so setting
++	 * it to 0.
++	 */
++	[BCM_NS2_LCPLL_PORTS_WAN_CLK] = {
++		.channel = BCM_NS2_LCPLL_PORTS_WAN_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 18, 12, 0),
++		.mdiv = REG_VAL(0x14, 0, 8),
++	},
++	[BCM_NS2_LCPLL_PORTS_RGMII_CLK] = {
++		.channel = BCM_NS2_LCPLL_PORTS_RGMII_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 19, 13, 0),
++		.mdiv = REG_VAL(0x14, 8, 8),
++	},
++	[BCM_NS2_LCPLL_PORTS_CH2_UNUSED] = {
++		.channel = BCM_NS2_LCPLL_PORTS_CH2_UNUSED,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 20, 14, 0),
++		.mdiv = REG_VAL(0x10, 0, 8),
++	},
++	[BCM_NS2_LCPLL_PORTS_CH3_UNUSED] = {
++		.channel = BCM_NS2_LCPLL_PORTS_CH3_UNUSED,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 21, 15, 0),
++		.mdiv = REG_VAL(0x10, 8, 8),
++	},
++	[BCM_NS2_LCPLL_PORTS_CH4_UNUSED] = {
++		.channel = BCM_NS2_LCPLL_PORTS_CH4_UNUSED,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 22, 16, 0),
++		.mdiv = REG_VAL(0x10, 16, 8),
++	},
++	[BCM_NS2_LCPLL_PORTS_CH5_UNUSED] = {
++		.channel = BCM_NS2_LCPLL_PORTS_CH5_UNUSED,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 23, 17, 0),
++		.mdiv = REG_VAL(0x10, 24, 8),
++	},
++};
++
++static void __init ns2_lcpll_ports_clk_init(struct device_node *node)
++{
++	iproc_pll_clk_setup(node, &lcpll_ports, NULL, 0, lcpll_ports_clk,
++			    ARRAY_SIZE(lcpll_ports_clk));
++}
++CLK_OF_DECLARE(ns2_lcpll_ports_clk, "brcm,ns2-lcpll-ports",
++	       ns2_lcpll_ports_clk_init);
+diff --git a/include/dt-bindings/clock/bcm-ns2.h b/include/dt-bindings/clock/bcm-ns2.h
 new file mode 100644
-index 0000000..ad5827c
+index 0000000..d99c7a2
 --- /dev/null
-+++ b/include/dt-bindings/clock/bcm-nsp.h
-@@ -0,0 +1,51 @@
++++ b/include/dt-bindings/clock/bcm-ns2.h
+@@ -0,0 +1,72 @@
 +/*
 + *  BSD LICENSE
 + *
@@ -187,15 +356,15 @@ index 0000000..ad5827c
 + *  modification, are permitted provided that the following conditions
 + *  are met:
 + *
-+ *	* Redistributions of source code must retain the above copyright
-+ *	  notice, this list of conditions and the following disclaimer.
-+ *	* Redistributions in binary form must reproduce the above copyright
-+ *	  notice, this list of conditions and the following disclaimer in
-+ *	  the documentation and/or other materials provided with the
-+ *	  distribution.
-+ *	* Neither the name of Broadcom Corporation nor the names of its
-+ *	  contributors may be used to endorse or promote products derived
-+ *	  from this software without specific prior written permission.
++ *    * Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *    * Redistributions in binary form must reproduce the above copyright
++ *      notice, this list of conditions and the following disclaimer in
++ *      the documentation and/or other materials provided with the
++ *      distribution.
++ *    * Neither the name of Broadcom Corporation nor the names of its
++ *      contributors may be used to endorse or promote products derived
++ *      from this software without specific prior written permission.
 + *
 + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
@@ -207,27 +376,48 @@ index 0000000..ad5827c
 + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 + */
 +
-+#ifndef _CLOCK_BCM_NSP_H
-+#define _CLOCK_BCM_NSP_H
++#ifndef _CLOCK_BCM_NS2_H
++#define _CLOCK_BCM_NS2_H
 +
-+/* GENPLL clock channel ID */
-+#define BCM_NSP_GENPLL			0
-+#define BCM_NSP_GENPLL_PHY_CLK		1
-+#define BCM_NSP_GENPLL_ENET_SW_CLK	2
-+#define BCM_NSP_GENPLL_USB_PHY_REF_CLK	3
-+#define BCM_NSP_GENPLL_IPROCFAST_CLK	4
-+#define BCM_NSP_GENPLL_SATA1_CLK	5
-+#define BCM_NSP_GENPLL_SATA2_CLK	6
++/* GENPLL SCR clock channel ID */
++#define BCM_NS2_GENPLL_SCR		0
++#define BCM_NS2_GENPLL_SCR_SCR_CLK	1
++#define BCM_NS2_GENPLL_SCR_FS_CLK	2
++#define BCM_NS2_GENPLL_SCR_AUDIO_CLK	3
++#define BCM_NS2_GENPLL_SCR_CH3_UNUSED	4
++#define BCM_NS2_GENPLL_SCR_CH4_UNUSED	5
++#define BCM_NS2_GENPLL_SCR_CH5_UNUSED	6
 +
-+/* LCPLL0 clock channel ID */
-+#define BCM_NSP_LCPLL0			0
-+#define BCM_NSP_LCPLL0_PCIE_PHY_REF_CLK	1
-+#define BCM_NSP_LCPLL0_SDIO_CLK		2
-+#define BCM_NSP_LCPLL0_DDR_PHY_CLK	3
++/* GENPLL SW clock channel ID */
++#define BCM_NS2_GENPLL_SW		0
++#define BCM_NS2_GENPLL_SW_RPE_CLK	1
++#define BCM_NS2_GENPLL_SW_250_CLK	2
++#define BCM_NS2_GENPLL_SW_NIC_CLK	3
++#define BCM_NS2_GENPLL_SW_CHIMP_CLK	4
++#define BCM_NS2_GENPLL_SW_PORT_CLK	5
++#define BCM_NS2_GENPLL_SW_SDIO_CLK	6
 +
-+#endif /* _CLOCK_BCM_NSP_H */
++/* LCPLL DDR clock channel ID */
++#define BCM_NS2_LCPLL_DDR		0
++#define BCM_NS2_LCPLL_DDR_PCIE_SATA_USB_CLK	1
++#define BCM_NS2_LCPLL_DDR_DDR_CLK	2
++#define BCM_NS2_LCPLL_DDR_CH2_UNUSED	3
++#define BCM_NS2_LCPLL_DDR_CH3_UNUSED	4
++#define BCM_NS2_LCPLL_DDR_CH4_UNUSED	5
++#define BCM_NS2_LCPLL_DDR_CH5_UNUSED	6
++
++/* LCPLL PORTS clock channel ID */
++#define BCM_NS2_LCPLL_PORTS		0
++#define BCM_NS2_LCPLL_PORTS_WAN_CLK	1
++#define BCM_NS2_LCPLL_PORTS_RGMII_CLK	2
++#define BCM_NS2_LCPLL_PORTS_CH2_UNUSED	3
++#define BCM_NS2_LCPLL_PORTS_CH3_UNUSED	4
++#define BCM_NS2_LCPLL_PORTS_CH4_UNUSED	5
++#define BCM_NS2_LCPLL_PORTS_CH5_UNUSED	6
++
++#endif /* _CLOCK_BCM_NS2_H */
 -- 
 1.9.1
