@@ -1,192 +1,55 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 13 Oct 2015 21:54:28 +0200
-Subject: [PATCH v2 1/3] dmaengine: virt-dma: don't always free descriptor upon
- completion
-Message-ID: <1444766070-26915-1-git-send-email-robert.jarzmik@free.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Oct 2015 22:02:48 +0200
+Subject: [PATCH] PCI: iproc: fix 32-bit build error
+In-Reply-To: <CAMAWPa_Hsuv+skzt3S6e9X_kWY=2JXAScbVEVOVTGmn81_bcFw@mail.gmail.com>
+References: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
+ <1442363962-29805-8-git-send-email-rjui@broadcom.com>
+ <CAMAWPa_Hsuv+skzt3S6e9X_kWY=2JXAScbVEVOVTGmn81_bcFw@mail.gmail.com>
+Message-ID: <11199595.GgDE2yo8AA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch attempts to enhance the case of a transfer submitted multiple
-times, and where the cost of creating the descriptors chain is not
-negligible.
+The iproc PCI driver tries to figure out whether the MMIO window has
+a valid size, but does this using a 64-bit modulo operation, which
+is not allowed on 32-bit kernels and leads to a link error:
 
-This happens with big video buffers (several megabytes, ie. several
-thousands of linked descriptors in one scatter-gather list). In these
-cases, a video driver would want to do :
- - tx = dmaengine_prep_slave_sg()
- - dma_engine_submit(tx);
- - dma_async_issue_pending()
- - wait for video completion
- - read video data (or not, skipping a frame is also possible)
- - dma_engine_submit(tx)
-   => here, the descriptors chain recalculation will take time
-   => the dma coherent allocation over and over might create holes in
-      the dma pool, which is counter-productive.
- - dma_async_issue_pending()
- - etc ...
+drivers/built-in.o: In function `iproc_pcie_setup':
+:(.text+0x4b798): undefined reference to `__aeabi_uldivmod'
 
-In order to cope with this case, virt-dma is modified to prevent freeing
-the descriptors upon completion if DMA_CTRL_REUSE flag is set in the
-transfer.
+This works around that error by using the div64_u64() function
+provided by the kernel. While this is an expensive operation,
+it is harmless because we only call it during the probing
+of the driver.
 
-This patch is a respin of the former DMA_CTRL_ACK approach, which was
-reverted due to a regression in audio drivers.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 0ab99ca8eb6c ("PCI: iproc: Fix compile warnings")
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
-Since v1: added doxygen commit to vchan_tx_desc_free
----
- drivers/dma/virt-dma.c | 46 ++++++++++++++++++++++++++++++++++++++++------
- drivers/dma/virt-dma.h | 15 ++++++++++++++-
- 2 files changed, 54 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/dma/virt-dma.c b/drivers/dma/virt-dma.c
-index 6f80432a3f0a..a35c211857dd 100644
---- a/drivers/dma/virt-dma.c
-+++ b/drivers/dma/virt-dma.c
-@@ -29,7 +29,7 @@ dma_cookie_t vchan_tx_submit(struct dma_async_tx_descriptor *tx)
- 	spin_lock_irqsave(&vc->lock, flags);
- 	cookie = dma_cookie_assign(tx);
- 
--	list_add_tail(&vd->node, &vc->desc_submitted);
-+	list_move_tail(&vd->node, &vc->desc_submitted);
- 	spin_unlock_irqrestore(&vc->lock, flags);
- 
- 	dev_dbg(vc->chan.device->dev, "vchan %p: txd %p[%x]: submitted\n",
-@@ -39,6 +39,33 @@ dma_cookie_t vchan_tx_submit(struct dma_async_tx_descriptor *tx)
- }
- EXPORT_SYMBOL_GPL(vchan_tx_submit);
- 
-+/**
-+ * vchan_tx_desc_free - free a reusable descriptor
-+ * @tx: the transfer
-+ *
-+ * This function frees a previously allocated reusable descriptor. The only
-+ * other way is to clear the DMA_CTRL_REUSE flag and submit one last time the
-+ * transfer.
-+ *
-+ * Returns 0 upon success
-+ */
-+int vchan_tx_desc_free(struct dma_async_tx_descriptor *tx)
-+{
-+	struct virt_dma_chan *vc = to_virt_chan(tx->chan);
-+	struct virt_dma_desc *vd = to_virt_desc(tx);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&vc->lock, flags);
-+	list_del(&vd->node);
-+	spin_unlock_irqrestore(&vc->lock, flags);
-+
-+	dev_dbg(vc->chan.device->dev, "vchan %p: txd %p[%x]: freeing\n",
-+		vc, vd, vd->tx.cookie);
-+	vc->desc_free(vd);
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(vchan_tx_desc_free);
-+
- struct virt_dma_desc *vchan_find_desc(struct virt_dma_chan *vc,
- 	dma_cookie_t cookie)
- {
-@@ -83,8 +110,10 @@ static void vchan_complete(unsigned long arg)
- 		cb_data = vd->tx.callback_param;
- 
- 		list_del(&vd->node);
--
--		vc->desc_free(vd);
-+		if (dmaengine_desc_test_reuse(&vd->tx))
-+			list_add(&vd->node, &vc->desc_allocated);
-+		else
-+			vc->desc_free(vd);
- 
- 		if (cb)
- 			cb(cb_data);
-@@ -96,9 +125,13 @@ void vchan_dma_desc_free_list(struct virt_dma_chan *vc, struct list_head *head)
- 	while (!list_empty(head)) {
- 		struct virt_dma_desc *vd = list_first_entry(head,
- 			struct virt_dma_desc, node);
--		list_del(&vd->node);
--		dev_dbg(vc->chan.device->dev, "txd %p: freeing\n", vd);
--		vc->desc_free(vd);
-+		if (dmaengine_desc_test_reuse(&vd->tx)) {
-+			list_move_tail(&vd->node, &vc->desc_allocated);
-+		} else {
-+			dev_dbg(vc->chan.device->dev, "txd %p: freeing\n", vd);
-+			list_del(&vd->node);
-+			vc->desc_free(vd);
-+		}
- 	}
- }
- EXPORT_SYMBOL_GPL(vchan_dma_desc_free_list);
-@@ -108,6 +141,7 @@ void vchan_init(struct virt_dma_chan *vc, struct dma_device *dmadev)
- 	dma_cookie_init(&vc->chan);
- 
- 	spin_lock_init(&vc->lock);
-+	INIT_LIST_HEAD(&vc->desc_allocated);
- 	INIT_LIST_HEAD(&vc->desc_submitted);
- 	INIT_LIST_HEAD(&vc->desc_issued);
- 	INIT_LIST_HEAD(&vc->desc_completed);
-diff --git a/drivers/dma/virt-dma.h b/drivers/dma/virt-dma.h
-index 181b95267866..a4156af93d88 100644
---- a/drivers/dma/virt-dma.h
-+++ b/drivers/dma/virt-dma.h
-@@ -29,6 +29,7 @@ struct virt_dma_chan {
- 	spinlock_t lock;
- 
- 	/* protected by vc.lock */
-+	struct list_head desc_allocated;
- 	struct list_head desc_submitted;
- 	struct list_head desc_issued;
- 	struct list_head desc_completed;
-@@ -55,10 +56,17 @@ static inline struct dma_async_tx_descriptor *vchan_tx_prep(struct virt_dma_chan
- 	struct virt_dma_desc *vd, unsigned long tx_flags)
- {
- 	extern dma_cookie_t vchan_tx_submit(struct dma_async_tx_descriptor *);
-+	extern int vchan_tx_desc_free(struct dma_async_tx_descriptor *);
-+	unsigned long flags;
- 
- 	dma_async_tx_descriptor_init(&vd->tx, &vc->chan);
- 	vd->tx.flags = tx_flags;
- 	vd->tx.tx_submit = vchan_tx_submit;
-+	vd->tx.desc_free = vchan_tx_desc_free;
-+
-+	spin_lock_irqsave(&vc->lock, flags);
-+	list_add_tail(&vd->node, &vc->desc_allocated);
-+	spin_unlock_irqrestore(&vc->lock, flags);
- 
- 	return &vd->tx;
- }
-@@ -122,7 +130,8 @@ static inline struct virt_dma_desc *vchan_next_desc(struct virt_dma_chan *vc)
- }
- 
- /**
-- * vchan_get_all_descriptors - obtain all submitted and issued descriptors
-+ * vchan_get_all_descriptors - obtain all allocated, submitted and issued
-+ *                             descriptors
-  * vc: virtual channel to get descriptors from
-  * head: list of descriptors found
+diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+index f3481ddff344..abcb4be2ee19 100644
+--- a/drivers/pci/host/pcie-iproc.c
++++ b/drivers/pci/host/pcie-iproc.c
+@@ -235,12 +235,13 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
   *
-@@ -134,6 +143,7 @@ static inline struct virt_dma_desc *vchan_next_desc(struct virt_dma_chan *vc)
- static inline void vchan_get_all_descriptors(struct virt_dma_chan *vc,
- 	struct list_head *head)
+  * axi_addr -> iproc_pcie_address -> OARR -> OMAP -> pci_address
+  */
+-static int iproc_pcie_setup_ob(struct iproc_pcie *pcie, u64 axi_addr,
++int iproc_pcie_setup_ob(struct iproc_pcie *pcie, u64 axi_addr,
+ 			       u64 pci_addr, resource_size_t size)
  {
-+	list_splice_tail_init(&vc->desc_allocated, head);
- 	list_splice_tail_init(&vc->desc_submitted, head);
- 	list_splice_tail_init(&vc->desc_issued, head);
- 	list_splice_tail_init(&vc->desc_completed, head);
-@@ -141,11 +151,14 @@ static inline void vchan_get_all_descriptors(struct virt_dma_chan *vc,
+ 	struct iproc_pcie_ob *ob = &pcie->ob;
+ 	unsigned i;
+ 	u64 max_size = (u64)ob->window_size * MAX_NUM_OB_WINDOWS;
++	u64 remainder;
  
- static inline void vchan_free_chan_resources(struct virt_dma_chan *vc)
- {
-+	struct virt_dma_desc *vd;
- 	unsigned long flags;
- 	LIST_HEAD(head);
+ 	if (size > max_size) {
+ 		dev_err(pcie->dev,
+@@ -249,7 +250,8 @@ static int iproc_pcie_setup_ob(struct iproc_pcie *pcie, u64 axi_addr,
+ 		return -EINVAL;
+ 	}
  
- 	spin_lock_irqsave(&vc->lock, flags);
- 	vchan_get_all_descriptors(vc, &head);
-+	list_for_each_entry(vd, &head, node)
-+		dmaengine_desc_clear_reuse(&vd->tx);
- 	spin_unlock_irqrestore(&vc->lock, flags);
- 
- 	vchan_dma_desc_free_list(vc, &head);
--- 
-2.1.4
+-	if (size % ob->window_size) {
++	div64_u64_rem(size, ob->window_size, &remainder);
++	if (remainder) {
+ 		dev_err(pcie->dev,
+ 			"res size %pap needs to be multiple of window size %pap\n",
+ 			&size, &ob->window_size);
