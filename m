@@ -1,172 +1,85 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue, 13 Oct 2015 09:20:01 +0800
-Subject: [PATCH v6 10/17] phy: Add driver for rockchip Display Port PHY
-In-Reply-To: <561BCB97.3030201@ti.com>
+Date: Tue, 13 Oct 2015 09:21:41 +0800
+Subject: [PATCH v6 11/17] Documentation: phy: add document for rockchip
+ dp phy
+In-Reply-To: <561C3410.8090600@ti.com>
 References: <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
- <1444492559-27181-1-git-send-email-ykk@rock-chips.com>
- <561BCB97.3030201@ti.com>
-Message-ID: <561C5C41.7060501@rock-chips.com>
+ <1444492695-27241-1-git-send-email-ykk@rock-chips.com>
+ <561C3410.8090600@ti.com>
+Message-ID: <561C5CA5.1030403@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon
+Hi Kishon,
 
-On 10/12/2015 11:02 PM, Kishon Vijay Abraham I wrote:
+On 10/13/2015 06:28 AM, Kishon Vijay Abraham I wrote:
 > Hi,
 >
-> On Saturday 10 October 2015 09:25 PM, Yakir Yang wrote:
->> This phy driver would control the Rockchip DisplayPort module
->> phy clock and phy power, it is relate to analogix_dp-rockchip
->> dp driver. If you want DP works rightly on rockchip platform,
->> then you should select both of them.
-> Add phy driver for the Rockchip DisplayPort PHY module. This is required
-> to get DisplayPort working in Rockchip SoCs.
+> On Saturday 10 October 2015 09:28 PM, Yakir Yang wrote:
+>> This phy driver is binded with the Rockchip DisplayPort
+>> driver, here are the brief properties:
+>> 	edp_phy: edp-phy at ff770274 {
+>> 		compatible = "rockchip,rk3288-dp-phy";
+>> 		rockchip,grf = <&grf>;
+>> 		clocks = <&cru SCLK_EDP_24M>;
+>> 		clock-names = "24m";
+>> 		#phy-cells = <0>;
+>> 	};
+> The commit message can simply be "Add dt binding documentation for
+> rockchip display port PHY".
 
-Thanks, take point.
+Okay, thanks.
 
+- Yakir
+
+>
+> Thanks
+> Kishon
+>
 >> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 >> ---
 >> Changes in v6: None
 >> Changes in v5:
->> - Remove "reg" DT property, cause driver could poweron/poweroff phy via
->>    the exist "grf" syscon already. And rename the example DT node from
->>    "edp_phy: phy at ff770274" to "edp_phy: edp-phy" directly. (Heiko)
->> - Add deivce_node at the front of driver, update phy_ops type from "static
->>    struct" to "static const struct". And correct the input paramters of
->>    devm_phy_create() interfaces. (Heiko)
+>> - Split binding doc's from driver changes. (Rob)
+>> - Update the rockchip,grf explain in document, and correct the clock required
+>>    elemets in document. (Rob & Heiko)
 >>
->> Changes in v4:
->> - Add commit message, and remove the redundant rockchip_dp_phy_init()
->>    function, move those code to probe() method. And remove driver .owner
->>    number. (Kishon)
->>
->> Changes in v3:
->> - Suggest, add rockchip dp phy driver, collect the phy clocks and
->>    power control. (Heiko)
->>
+>> Changes in v4: None
+>> Changes in v3: None
 >> Changes in v2: None
 >>
->>   drivers/phy/Kconfig           |   7 ++
->>   drivers/phy/Makefile          |   1 +
->>   drivers/phy/phy-rockchip-dp.c | 151 ++++++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 159 insertions(+)
->>   create mode 100644 drivers/phy/phy-rockchip-dp.c
+>>   .../devicetree/bindings/phy/rockchip-dp-phy.txt    | 22 ++++++++++++++++++++++
+>>   1 file changed, 22 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
 >>
->> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->> index 47da573..8f2bc4f 100644
->> --- a/drivers/phy/Kconfig
->> +++ b/drivers/phy/Kconfig
->> @@ -310,6 +310,13 @@ config PHY_ROCKCHIP_USB
->>   	help
->>   	  Enable this to support the Rockchip USB 2.0 PHY.
->>   
->> +config PHY_ROCKCHIP_DP
->> +	tristate "Rockchip Display Port PHY Driver"
->> +	depends on ARCH_ROCKCHIP && OF
->> +	select GENERIC_PHY
->> +	help
->> +	  Enable this to support the Rockchip Display Port PHY.
->> +
->>   config PHY_ST_SPEAR1310_MIPHY
->>   	tristate "ST SPEAR1310-MIPHY driver"
->>   	select GENERIC_PHY
->> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
->> index a5b18c1..e281f35 100644
->> --- a/drivers/phy/Makefile
->> +++ b/drivers/phy/Makefile
->> @@ -34,6 +34,7 @@ phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)	+= phy-s5pv210-usb2.o
->>   obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
->>   obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)	+= phy-qcom-apq8064-sata.o
->>   obj-$(CONFIG_PHY_ROCKCHIP_USB) += phy-rockchip-usb.o
->> +obj-$(CONFIG_PHY_ROCKCHIP_DP)		+= phy-rockchip-dp.o
->>   obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
->>   obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
->>   obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
->> diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
+>> diff --git a/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
 >> new file mode 100644
->> index 0000000..3a2ac120
+>> index 0000000..505194e
 >> --- /dev/null
->> +++ b/drivers/phy/phy-rockchip-dp.c
->> @@ -0,0 +1,151 @@
->> +/*
->> + * Rockchip DP PHY driver
->> + *
->> + * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
->> + * Author: Yakir Yang <ykk@@rock-chips.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License.
->> + */
+>> +++ b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+>> @@ -0,0 +1,22 @@
+>> +Rockchip Soc Seroes Display Port PHY
+>> +------------------------------------
 >> +
->> +#include <linux/io.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/clk.h>
->> +#include <linux/phy/phy.h>
->> +#include <linux/regmap.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/platform_device.h>
+>> +Required properties:
+>> +- compatible : should be one of the following supported values:
+>> +	 - "rockchip.rk3288-dp-phy"
+>> +- clocks: from common clock binding: handle to dp clock.
+>> +	of memory mapped region.
+>> +- clock-names: from common clock binding:
+>> +	Required elements: "24m"
+>> +- rockchip,grf: phandle to the syscon managing the "general register files"
+>> +- #phy-cells : from the generic PHY bindings, must be 0;
 >> +
->> +#define GRF_SOC_CON12                   0x0274
->> +#define GRF_EDP_REF_CLK_SEL_INTER	BIT(4)
->> +#define GRF_EDP_PHY_SIDDQ_WRITE_EN      BIT(21)
->> +#define GRF_EDP_PHY_SIDDQ_ON            0
->> +#define GRF_EDP_PHY_SIDDQ_OFF           BIT(5)
+>> +Example:
 >> +
->> +struct rockchip_dp_phy {
->> +	struct device  *dev;
->> +	struct regmap  *grf;
->> +	struct clk     *phy_24m;
+>> +edp_phy: edp-phy at ff770274 {
+>> +	compatible = "rockchip,rk3288-dp-phy";
+>> +	rockchip,grf = <&grf>;
+>> +	clocks = <&cru SCLK_EDP_24M>;
+>> +	clock-names = "24m";
+>> +	#phy-cells = <0>;
 >> +};
->> +
->> +static int rockchip_set_phy_state(struct phy *phy, bool enable)
->> +{
->> +	struct rockchip_dp_phy *dp = phy_get_drvdata(phy);
->> +	int ret;
->> +
->> +	if (enable) {
->> +		ret = clk_prepare_enable(dp->phy_24m);
->> +		if (ret < 0) {
->> +			dev_err(dp->dev, "Can't enable clock 24m %d\n", ret);
->> +			return ret;
->> +		}
->> +
->> +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
->> +				   GRF_EDP_PHY_SIDDQ_WRITE_EN |
->> +				   GRF_EDP_PHY_SIDDQ_ON);
->> +	} else {
->> +		clk_disable_unprepare(dp->phy_24m);
-> should clk_disable come after regmap_write? It'll be symmetric to enable?
-
-I don't see there is a strict limit about this, but thanks for your point, I
-would like to change this order to:
-
-     if (enable) {
-         // Enable SIDDQ power
-         // Enable Clock
-     } else {
-         // Disable Clock
-         // Disable SIDDQ power
-     }
-
->> +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
->> +				   GRF_EDP_PHY_SIDDQ_WRITE_EN |
->> +				   GRF_EDP_PHY_SIDDQ_OFF);
-> Is this syscon register used only by Display Port PHY? Better to use
-> regmap_update API?
-
-Thanks to Heiko explain, writing you actually need to set the
-write-enable bit, some kind of hardware regmap_update.
-
-
-Thanks,
-- Yakir
-
-> Thanks
-> Kishon
->
+>>
 >
 >
