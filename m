@@ -1,24 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Oct 2015 13:41:47 +0200
-Subject: [PATCH] ARM: dts: msm8974: fix typo in "disabled" property
-In-Reply-To: <1444735998-18479-1-git-send-email-michael.opdenacker@free-electrons.com>
-References: <1444735998-18479-1-git-send-email-michael.opdenacker@free-electrons.com>
-Message-ID: <5733924.HXWPKe3hJM@wuerfel>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Tue, 13 Oct 2015 13:43:55 +0200
+Subject: [PATCH] ARM: dts: imx6: phyFLEX: fix typo in "pinctrl-names"
+Message-ID: <1444736635-19893-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 October 2015 13:33:18 Michael Opdenacker wrote:
-> Replace "disable" by "disabled" in the Qualcomm MSM8974 dtsi
-> 
-> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
-> ---
->  arch/arm/boot/dts/qcom-msm8974.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Fix a typo, replacing "pinctrl-name" by "pinctrl-names"
+in the Phytec phyFLEX-i.MX6 Quad dtsi.
 
-The patch looks good, but I think you are missing some people on
-Cc. Please send this to all the qcom maintainers. I suspect you
-only have Kumar on Cc because he is listed as maintainer for dts
-files in general, but platforms specific ones should go through
-the platform maintainer trees.
+Also fix a typo in the board name
 
-	Arnd
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+index 9e6ecd99b472..24bdff26b483 100644
+--- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+@@ -12,7 +12,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+-	model = "Phytec phyFLEX-i.MX6 Ouad";
++	model = "Phytec phyFLEX-i.MX6 Quad";
+ 	compatible = "phytec,imx6q-pfla02", "fsl,imx6q";
+ 
+ 	memory {
+@@ -373,7 +373,7 @@
+ };
+ 
+ &pcie {
+-	pinctrl-name = "default";
++	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pcie>;
+ 	reset-gpio = <&gpio4 17 0>;
+ 	status = "disabled";
+-- 
+2.1.4
