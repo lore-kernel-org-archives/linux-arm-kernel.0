@@ -1,53 +1,68 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 13 Oct 2015 18:22:19 +0100
-Subject: [PATCH v3 11/24] arm64: Read system wide CPUID value
+Date: Tue, 13 Oct 2015 18:22:11 +0100
+Subject: [PATCH v3 03/24] arm64: Delay cpuinfo_store_boot_cpu
 In-Reply-To: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
 References: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1444756952-31145-12-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1444756952-31145-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an API for reading the safe CPUID value across the
-system from the new infrastructure.
+At the moment the boot CPU stores the cpuinfo much before the
+PERCPU areas are initialised by the kernel. This could be problematic
+as the non-boot CPU data structures might get copied with the data
+from the boot CPU, giving us no chance to detect if a particular CPU
+updated its cpuinfo. This patch delays the boot cpu store to
+smp_prepare_boot_cpu().
+
+Also kills the setup_processor() which no longer does meaningful
+work.
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h |    2 ++
- arch/arm64/kernel/cpufeature.c      |    9 +++++++++
- 2 files changed, 11 insertions(+)
+ arch/arm64/kernel/setup.c |   10 ++--------
+ arch/arm64/kernel/smp.c   |    1 +
+ 2 files changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index f502555..92a9440 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -144,6 +144,8 @@ void check_local_cpu_features(void);
- bool cpu_supports_mixed_endian_el0(void);
- bool system_supports_mixed_endian_el0(void);
- 
-+u64 read_system_reg(u32 id);
-+
- #endif /* __ASSEMBLY__ */
- 
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index d149c18..c217992 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -285,13 +285,6 @@ void __init setup_cpu_features(void)
  #endif
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 70f1ae0..2b44cbf 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -564,6 +564,15 @@ void update_cpu_features(int cpu,
- 	update_mixed_endian_el0_support(info);
  }
  
-+u64 read_system_reg(u32 id)
-+{
-+	struct arm64_ftr_reg *regp = get_arm64_sys_reg(id);
-+
-+	/* We shouldn't get a request for an unsupported register */
-+	BUG_ON(!regp);
-+	return regp->sys_val;
-+}
-+
- static bool
- feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
+-static void __init setup_processor(void)
+-{
+-	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
+-	sprintf(init_utsname()->machine, ELF_PLATFORM);
+-	cpuinfo_store_boot_cpu();
+-}
+-
+ static void __init setup_machine_fdt(phys_addr_t dt_phys)
  {
+ 	void *dt_virt = fixmap_remap_fdt(dt_phys);
+@@ -403,8 +396,9 @@ u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+ 
+ void __init setup_arch(char **cmdline_p)
+ {
+-	setup_processor();
++	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
+ 
++	sprintf(init_utsname()->machine, ELF_PLATFORM);
+ 	init_mm.start_code = (unsigned long) _text;
+ 	init_mm.end_code   = (unsigned long) _etext;
+ 	init_mm.end_data   = (unsigned long) _edata;
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index cb3e0d8..3b22e65 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -333,6 +333,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
+ 
+ void __init smp_prepare_boot_cpu(void)
+ {
++	cpuinfo_store_boot_cpu();
+ 	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
+ }
+ 
 -- 
 1.7.9.5
