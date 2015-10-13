@@ -1,248 +1,64 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 13 Oct 2015 18:22:24 +0100
-Subject: [PATCH v3 16/24] arm64: Cleanup HWCAP handling
+Date: Tue, 13 Oct 2015 18:22:25 +0100
+Subject: [PATCH v3 17/24] arm64: Move FP/ASIMD hwcap handling to common code
 In-Reply-To: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
 References: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1444756952-31145-17-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1444756952-31145-18-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend struct arm64_cpu_capabilities to handle the HWCAP detection
-and make use of the system wide value for the feature register.
+The FP/ASIMD is detected in fpsimd_init(), which is built-in
+unconditionally. Lets move the hwcap handling to the central place.
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h |    2 +
- arch/arm64/include/asm/hwcap.h      |    8 ++
- arch/arm64/kernel/cpufeature.c      |  161 +++++++++++++++++++----------------
- 3 files changed, 99 insertions(+), 72 deletions(-)
+ arch/arm64/kernel/cpufeature.c |    2 ++
+ arch/arm64/kernel/fpsimd.c     |   16 +++++-----------
+ 2 files changed, 7 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index bf71a8e..07f9090 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -81,6 +81,8 @@ struct arm64_cpu_capabilities {
- 			u32 sys_reg;
- 			int field_pos;
- 			int min_field_value;
-+			int hwcap_type;
-+			unsigned long hwcap;
- 		};
- 	};
- };
-diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
-index 0ad7351..400b80b 100644
---- a/arch/arm64/include/asm/hwcap.h
-+++ b/arch/arm64/include/asm/hwcap.h
-@@ -52,6 +52,14 @@
- extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
- #endif
- 
-+enum {
-+	CAP_HWCAP = 1,
-+#ifdef CONFIG_COMPAT
-+	CAP_COMPAT_HWCAP,
-+	CAP_COMPAT_HWCAP2,
-+#endif
-+};
-+
- extern unsigned long elf_hwcap;
- #endif
- #endif
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index dd58c32..a90c7d3 100644
+index a90c7d3..5a32b96 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -603,6 +603,87 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{},
- };
- 
-+#define HWCAP_CAP(reg, field, min_value, type, cap)		\
-+	{							\
-+		.desc = #cap,					\
-+		.matches = has_cpuid_feature,			\
-+		.sys_reg = reg,					\
-+		.field_pos = field,				\
-+		.min_field_value = min_value,			\
-+		.hwcap_type = type,				\
-+		.hwcap = cap,					\
-+	}
-+
-+static const struct arm64_cpu_capabilities arm64_hwcaps[] = {
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, 2, CAP_HWCAP, HWCAP_PMULL),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, 1, CAP_HWCAP, HWCAP_AES),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA1_SHIFT, 1, CAP_HWCAP, HWCAP_SHA1),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA2_SHIFT, 1, CAP_HWCAP, HWCAP_SHA2),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_CRC32_SHIFT, 1, CAP_HWCAP, HWCAP_CRC32),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_ATOMICS_SHIFT, 2, CAP_HWCAP, HWCAP_ATOMICS),
-+#ifdef CONFIG_COMPAT
-+	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 2, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_PMULL),
-+	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_AES),
-+	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_SHA1_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_SHA1),
-+	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_SHA2_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_SHA2),
-+	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_CRC32_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_CRC32),
-+#endif
-+	{},
-+};
-+
-+static void cap_set_hwcap(const struct arm64_cpu_capabilities * cap)
-+{
-+	switch(cap->hwcap_type) {
-+	case CAP_HWCAP:
-+		elf_hwcap |= cap->hwcap;
-+		break;
-+#ifdef CONFIG_COMPAT
-+	case CAP_COMPAT_HWCAP:
-+		compat_elf_hwcap |= (u32)cap->hwcap;
-+		break;
-+	case CAP_COMPAT_HWCAP2:
-+		compat_elf_hwcap2 |= (u32)cap->hwcap;
-+		break;
-+#endif
-+	default:
-+		BUG();
-+		break;
-+	}
-+}
-+
-+static bool cpus_have_hwcap(const struct arm64_cpu_capabilities *cap)
-+{
-+	bool rc;
-+
-+	switch(cap->hwcap_type) {
-+	case CAP_HWCAP:
-+		rc = (elf_hwcap & cap->hwcap) != 0;
-+		break;
-+#ifdef CONFIG_COMPAT
-+	case CAP_COMPAT_HWCAP:
-+		rc = (compat_elf_hwcap & (u32)cap->hwcap) != 0;
-+		break;
-+	case CAP_COMPAT_HWCAP2:
-+		rc = (compat_elf_hwcap2 & (u32)cap->hwcap) != 0;
-+		break;
-+#endif
-+	default:
-+		BUG();
-+		rc = false;
-+	}
-+
-+	return rc;
-+}
-+
-+void check_cpu_hwcaps(void)
-+{
-+	int i;
-+	const struct arm64_cpu_capabilities *hwcaps = arm64_hwcaps;
-+	for(i = 0; hwcaps[i].desc; i ++)
-+		if (hwcaps[i].matches(&hwcaps[i]))
-+			cap_set_hwcap(&hwcaps[i]);
-+}
-+
- void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			    const char *info)
+@@ -621,6 +621,8 @@ static const struct arm64_cpu_capabilities arm64_hwcaps[] = {
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA2_SHIFT, 1, CAP_HWCAP, HWCAP_SHA2),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_CRC32_SHIFT, 1, CAP_HWCAP, HWCAP_CRC32),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_ATOMICS_SHIFT, 2, CAP_HWCAP, HWCAP_ATOMICS),
++	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, 0, CAP_HWCAP, HWCAP_FP),
++	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, 0, CAP_HWCAP, HWCAP_ASIMD),
+ #ifdef CONFIG_COMPAT
+ 	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 2, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_PMULL),
+ 	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_AES),
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index c56956a..4c46c54 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -332,21 +332,15 @@ static inline void fpsimd_hotplug_init(void) { }
+  */
+ static int __init fpsimd_init(void)
  {
-@@ -714,6 +795,13 @@ void cpu_enable_features(void)
- 		if (caps[i].enable)
- 			caps[i].enable(NULL);
+-	u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
+-
+-	if (pfr & (0xf << 16)) {
++	if (elf_hwcap & HWCAP_FP) {
++		fpsimd_pm_init();
++		fpsimd_hotplug_init();
++	} else {
+ 		pr_notice("Floating-point is not implemented\n");
+-		return 0;
  	}
-+
-+	for(i = 0, caps = arm64_hwcaps; caps[i].desc; i++) {
-+		if (!cpus_have_hwcap(&caps[i]))
-+			continue;
-+		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i]))
-+			fail_incapable_cpu("arm64_hwcaps", &caps[i]);
-+	}
- }
+-	elf_hwcap |= HWCAP_FP;
  
- static int cpu_feature_hotplug_notify(struct notifier_block *nb,
-@@ -738,12 +826,11 @@ void check_cpu_features(void)
+-	if (pfr & (0xf << 20))
++	if (!(elf_hwcap & HWCAP_ASIMD))
+ 		pr_notice("Advanced SIMD is not implemented\n");
+-	else
+-		elf_hwcap |= HWCAP_ASIMD;
+-
+-	fpsimd_pm_init();
+-	fpsimd_hotplug_init();
  
- void __init setup_cpu_features(void)
- {
--	u64 features;
--	s64 block;
- 	u32 cwg;
- 	int cls;
- 
- 	check_cpu_features();
-+	check_cpu_hwcaps();
- 	/*
- 	 * Check for sane CTR_EL0.CWG value.
- 	 */
-@@ -755,74 +842,4 @@ void __init setup_cpu_features(void)
- 	if (L1_CACHE_BYTES < cls)
- 		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
- 			L1_CACHE_BYTES, cls);
--
--	/*
--	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
--	 * The blocks we test below represent incremental functionality
--	 * for non-negative values. Negative values are reserved.
--	 */
--	features = read_cpuid(ID_AA64ISAR0_EL1);
--	block = cpuid_feature_extract_field(features, 4);
--	if (block > 0) {
--		switch (block) {
--		default:
--		case 2:
--			elf_hwcap |= HWCAP_PMULL;
--		case 1:
--			elf_hwcap |= HWCAP_AES;
--		case 0:
--			break;
--		}
--	}
--
--	if (cpuid_feature_extract_field(features, 8) > 0)
--		elf_hwcap |= HWCAP_SHA1;
--
--	if (cpuid_feature_extract_field(features, 12) > 0)
--		elf_hwcap |= HWCAP_SHA2;
--
--	if (cpuid_feature_extract_field(features, 16) > 0)
--		elf_hwcap |= HWCAP_CRC32;
--
--	block = cpuid_feature_extract_field(features, 20);
--	if (block > 0) {
--		switch (block) {
--		default:
--		case 2:
--			elf_hwcap |= HWCAP_ATOMICS;
--		case 1:
--			/* RESERVED */
--		case 0:
--			break;
--		}
--	}
--
--#ifdef CONFIG_COMPAT
--	/*
--	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
--	 * the AArch32 32-bit execution state.
--	 */
--	features = read_cpuid(ID_ISAR5_EL1);
--	block = cpuid_feature_extract_field(features, 4);
--	if (block > 0) {
--		switch (block) {
--		default:
--		case 2:
--			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
--		case 1:
--			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
--		case 0:
--			break;
--		}
--	}
--
--	if (cpuid_feature_extract_field(features, 8) > 0)
--		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
--
--	if (cpuid_feature_extract_field(features, 12) > 0)
--		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
--
--	if (cpuid_feature_extract_field(features, 16) > 0)
--		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
--#endif
+ 	return 0;
  }
 -- 
 1.7.9.5
