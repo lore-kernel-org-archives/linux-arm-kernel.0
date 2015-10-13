@@ -1,44 +1,20 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 13 Oct 2015 22:33:44 +0200
-Subject: [PATCH v2] ARM: socfpga: dts: add fpga manager
-In-Reply-To: <alpine.DEB.2.02.1510131450480.4441@linux-builds1>
-References: <1444765139-2040-1-git-send-email-atull@opensource.altera.com>
- <alpine.DEB.2.02.1510131450480.4441@linux-builds1>
-Message-ID: <20151013203344.GE17155@pengutronix.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 13 Oct 2015 22:29:32 +0200
+Subject: [PATCH v4 21/26] ARM: pxa: magician: Add support for PXA27x UDC
+In-Reply-To: <1443877127.4186.39.camel@gmail.com> (Philipp Zabel's message of
+ "Sat, 03 Oct 2015 14:58:47 +0200")
+References: <cover.1443472089.git.petr.cvek@tul.cz> <5609B395.8040800@tul.cz>
+ <1443877127.4186.39.camel@gmail.com>
+Message-ID: <87fv1e4imr.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 02:51:28PM -0500, Dinh Nguyen wrote:
-> On Tue, 13 Oct 2015, atull at opensource.altera.com wrote:
-> 
-> > From: Alan Tull <atull@opensource.altera.com>
-> > 
-> > Add FPGA manager to device tree for SoCFPGA.
-> > 
-> > Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> > ---
-> > v2: Remove 0x after @
-> >     No caps in hex numbers
-> >     renamed hps_0_fpgamgr to fpgamgr0
-> >     move node to be in alpha order by node name
-> > ---
-> >  arch/arm/boot/dts/socfpga.dtsi | 7 +++++++
-> >  1 file changed, 7 insertions(+)
-> > 
-> 
-> Applied!
+Philipp Zabel <philipp.zabel@gmail.com> writes:
 
-What about the
+> Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
+Comments used and pushed into pxa/for-next, thanks.
 
-"Also, you need to document the "altr,socfpga-fpga-mgr"."
-
-you mentioned in v1 ???
-
-Regards,
-Steffen
+Cheers.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Robert
