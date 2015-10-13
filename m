@@ -1,100 +1,115 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 13 Oct 2015 11:17:43 -0700
-Subject: [PATCH v3 1/7] drm/vc4: Add devicetree bindings for VC4.
-In-Reply-To: <CAL_JsqKbAm1=70GaDRg1Z47A9d9FShwpWacMOjr+FE8bZuocVg@mail.gmail.com>
-References: <1444426068-15817-1-git-send-email-eric@anholt.net>
- <1444426068-15817-2-git-send-email-eric@anholt.net>
- <CAL_JsqKbAm1=70GaDRg1Z47A9d9FShwpWacMOjr+FE8bZuocVg@mail.gmail.com>
-Message-ID: <87lhb63a60.fsf@eliezer.anholt.net>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 13 Oct 2015 14:23:38 -0400
+Subject: [PATCH 3/3] ARM: keystone: dts: add PCI serdes driver bindings
+In-Reply-To: <1444759464-32299-4-git-send-email-w-kwok2@ti.com>
+References: <1444759464-32299-1-git-send-email-w-kwok2@ti.com>
+ <1444759464-32299-4-git-send-email-w-kwok2@ti.com>
+Message-ID: <561D4C2A.1060704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring <robh@kernel.org> writes:
-
-> On Fri, Oct 9, 2015 at 4:27 PM, Eric Anholt <eric@anholt.net> wrote:
->> ---
->>
->> v2: Extend the commit message, fix several nits from Stephen Warren.
->> v3: Rename the compatibility strings, clean up node names, drop the
->>     unnecessary lists of components.  Use compatibility strings for
->>     choosing CRTC HVS channel numbers.  Document the HDMI clock usage.
->>
->>  .../devicetree/bindings/gpu/brcm,bcm-vc4.txt       | 64 ++++++++++++++++++++++
+On 10/13/2015 02:04 PM, WingMan Kwok wrote:
+> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+> ---
+>   arch/arm/boot/dts/k2e.dtsi      |   24 ++++++++++++++++++++++++
+>   arch/arm/boot/dts/keystone.dtsi |   25 +++++++++++++++++++++++++
+>   2 files changed, 49 insertions(+)
 >
-> Can you put this in bindings/display/ instead? Things are moving there in 4.4.
-
-Sure.
-
->>  1 file changed, 64 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
->>
->> diff --git a/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
->> new file mode 100644
->> index 0000000..175bcde
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
->> @@ -0,0 +1,64 @@
->> +Broadcom VC4 GPU
->> +
->> +The VC4 device present on the Raspberry Pi includes a display system
->> +with HDMI output and the HVS scaler for compositing display planes.
->> +
->> +Required properties for VC4:
->> +- compatible:  Should be "brcm,bcm2835-vc4"
+> diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
+> index 675fb8e..1ba47d8 100644
+> --- a/arch/arm/boot/dts/k2e.dtsi
+> +++ b/arch/arm/boot/dts/k2e.dtsi
+> @@ -86,6 +86,18 @@
+>   			gpio,syscon-dev = <&devctrl 0x240>;
+>   		};
 >
-> reg property? interrupts? clocks?
-
-This is the subsystem node.  It has no other properties currently.
-
->> +Required properties for Pixel Valve:
->> +- compatible:  Should be one of "brcm,bcm2835-pixelvalve0",
->> +               "brcm,bcm2835-pixelvalve1", or "brcm,bcm2835-pixelvalve2"
->> +- reg:         Physical base address and length of the PV's registers
->> +- interrupts:  The interrupt number
->> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
->> +
->> +Required properties for HVS:
->> +- compatible:  Should be "brcm,bcm2835-hvs"
->> +- reg:         Physical base address and length of the HVS's registers
->> +- interrupts:  The interrupt number
->> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
->> +
->> +Required properties for HDMI
+> +		pcie1_phy: pciephy at 2326000 {
+> +			#phy-cells = <0>;
+> +			compatible = "ti,keystone-serdes-pcie";
+> +			reg = <0x02326000 0x4000>;
+> +			reg-names = "reg_serdes";
+> +			refclk-khz = <100000>;
+> +			link-rate-kbps = <5000000>;
+> +			phy-type = "pcie";
+> +			max-lanes = <2>;
+> +			status = "disabled";
+> +		};
+> +
+>   		pcie1: pcie at 21020000 {
+>   			compatible = "ti,keystone-pcie","snps,dw-pcie";
+>   			clocks = <&clkpcie1>;
+> @@ -130,6 +142,18 @@
+>   					<GIC_SPI 375 IRQ_TYPE_EDGE_RISING>,
+>   					<GIC_SPI 376 IRQ_TYPE_EDGE_RISING>;
+>   			};
+> +
+> +			/* PCIE phy */
+> +			serdeses {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				serdes at 0 {
+> +					reg = <0>;
+> +					phys = <&pcie1_phy>;
+> +					status = "disabled";
+> +				};
+> +			};
+> +
+>   		};
 >
-> Is HDMI the only output possibility? If not, then you should have OF
-> graph nodes describing the connection between HDMI block and HVS (or
-> PV?).
-
-I'm using compatible strings for the different instances of the module:
-brcm,bcm2835-pixelvalve0/1/2.  This lets the connections get wired up
-cleanly and understandably within the driver.  I spent a long time
-trying to come up with an OF graph-based implementation, and I
-eventually gave up.
-
->> +- compatible:  Should be "brcm,bcm2835-hdmi"
->> +- reg:         Physical base address and length of the two register ranges
->> +                 ("HDMI" and "HD", in that order)
->> +- interrupts:  The interrupt numbers
->> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
->> +- ddc:         phandle of the I2C controller used for DDC EDID probing
->> +- clocks:      a) hdmi: The HDMI state machine clock
->> +               b) pixel: The pixel clock.
->> +
->> +Optional properties for HDMI:
->> +- hpd-gpio:    The GPIO pin for HDMI hotplug detect (if it doesn't appear
+>   		mdio: mdio at 24200f00 {
+> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+> index 72816d6..5312319 100644
+> --- a/arch/arm/boot/dts/keystone.dtsi
+> +++ b/arch/arm/boot/dts/keystone.dtsi
+> @@ -275,6 +275,19 @@
+>   			ti,syscon-dev = <&devctrl 0x2a0>;
+>   		};
 >
-> *-gpio is deprecated, so "hpd-gpios".
+> +		pcie0_phy: pciephy at 2320000 {
+> +			#phy-cells = <0>;
+> +			compatible = "ti,keystone-serdes-pcie";
+> +			reg = <0x02320000 0x4000>;
+> +			reg-names = "reg_serdes";
+> +			refclk-khz = <100000>;
+> +			link-rate-kbps = <5000000>;
+> +			init-firmware	= "k2_pcie_serdes_init.fw";
+> +			phy-type = "pcie";
+> +			max-lanes = <2>;
+> +			status = "disabled";
+> +		};
+> +
+>   		pcie0: pcie at 21800000 {
+>   			compatible = "ti,keystone-pcie", "snps,dw-pcie";
+>   			clocks = <&clkpcie>;
+> @@ -319,6 +332,18 @@
+>   					<GIC_SPI 28 IRQ_TYPE_EDGE_RISING>,
+>   					<GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
+>   			};
+> +
+> +			/* PCIE phy */
+> +			serdeses {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				serdes at 0 {
+> +					reg = <0>;
+> +					phys = <&pcie0_phy>;
+> +					status = "disabled";
+> +				};
+> +			};
+> +
+>   		};
+>   	};
+>   };
 >
-> Really, I think this and ddc should be in hdmi-connector binding node.
-> What has been done for bindings so far is all over the map though.
+Wingman,
 
-You say hpd-gpios is deprectated, but that I should use the
-hdmi-connector binding that uses hpd-gpios.  Which one is it?  If
-hpd-gpios deprecated, what is supposed to be used instead?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151013/bf1c5efe/attachment-0001.sig>
+This should be a separate patch and remove the sane from Driver patch. 
+i.e. send 1/3 ane 2/3 in one series and 3/3 as a separate patch.
+
+Thanks
+
+Murali
+
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
