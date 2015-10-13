@@ -1,30 +1,18 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 13 Oct 2015 14:51:28 -0500
-Subject: [PATCH v2] ARM: socfpga: dts: add fpga manager
-In-Reply-To: <1444765139-2040-1-git-send-email-atull@opensource.altera.com>
-References: <1444765139-2040-1-git-send-email-atull@opensource.altera.com>
-Message-ID: <alpine.DEB.2.02.1510131450480.4441@linux-builds1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Oct 2015 21:59:15 +0200
+Subject: [PATCH v3 1/3] Documentation: dt: soc: Add description for knav
+ qmss driver
+In-Reply-To: <1444761943-726-2-git-send-email-m-karicheri2@ti.com>
+References: <1444761943-726-1-git-send-email-m-karicheri2@ti.com>
+ <1444761943-726-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <12013292.j88s2I1JOW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Oct 2015, atull at opensource.altera.com wrote:
-
-> From: Alan Tull <atull@opensource.altera.com>
+On Tuesday 13 October 2015 14:45:41 Murali Karicheri wrote:
+> Add documentation for knav qmss driver.
 > 
-> Add FPGA manager to device tree for SoCFPGA.
-> 
-> Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> ---
-> v2: Remove 0x after @
->     No caps in hex numbers
->     renamed hps_0_fpgamgr to fpgamgr0
->     move node to be in alpha order by node name
-> ---
->  arch/arm/boot/dts/socfpga.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 > 
 
-Applied!
-
-Thanks,
-Dinh
+Acked-by: Arnd Bergmann <arnd@arndb.de>
