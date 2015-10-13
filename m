@@ -1,199 +1,163 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 13 Oct 2015 11:19:27 -0700
-Subject: [PATCH v3 3/7] drm/vc4: Add KMS support for Raspberry Pi.
-In-Reply-To: <561A6BE4.9080409@lategoodbye.de>
-References: <1444426068-15817-1-git-send-email-eric@anholt.net>
- <1444426068-15817-4-git-send-email-eric@anholt.net>
- <561A6BE4.9080409@lategoodbye.de>
-Message-ID: <87io6a3a34.fsf@eliezer.anholt.net>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 13 Oct 2015 14:21:51 -0400
+Subject: [PATCH 1/4] Documentation: dt: soc: move driver description to
+ a separate document
+In-Reply-To: <CAL_JsqKSb8V0oMg_v=48T8Cg138UtfGgVt5bBOwxvNtDVeEcZA@mail.gmail.com>
+References: <1444679211-823-1-git-send-email-m-karicheri2@ti.com>
+ <1444679211-823-2-git-send-email-m-karicheri2@ti.com>
+ <CAL_Jsq+GZn0X-sxQ=oqRP7fR3bCPk5PN5CjgXzjnOxas_renzw@mail.gmail.com>
+ <561D3F41.4080803@ti.com>
+ <CAL_JsqKSb8V0oMg_v=48T8Cg138UtfGgVt5bBOwxvNtDVeEcZA@mail.gmail.com>
+Message-ID: <561D4BBF.3070507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <info@lategoodbye.de> writes:
-
-> Hi Eric,
->
-> Am 09.10.2015 um 23:27 schrieb Eric Anholt:
->> This is enough for fbcon and bringing up X using
->> xf86-video-modesetting.  It doesn't support the 3D accelerator or
->> power management yet.
+On 10/13/2015 02:01 PM, Rob Herring wrote:
+> On Tue, Oct 13, 2015 at 12:28 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+>> On 10/13/2015 10:42 AM, Rob Herring wrote:
+>>>
+>>> On Mon, Oct 12, 2015 at 2:46 PM, Murali Karicheri <m-karicheri2@ti.com>
+>>> wrote:
+>>>>
+>>>> Currently the DT bindings have details about the driver as well. This
+>>>> patch moves this to a separate document for knav qmss driver so that
+>>>> driver detail update can be done as needed without polluting the DT
+>>>> bindings description.
+>>>>
+>>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>>>> ---
+>>>>    Documentation/arm/keystone/knav-qmss.txt           | 24
+>>>> ++++++++++++++++++++++
+>>>>    .../bindings/soc/ti/keystone-navigator-qmss.txt    | 20
+>>>> ++++--------------
+>>>>    2 files changed, 28 insertions(+), 16 deletions(-)
+>>>>    create mode 100644 Documentation/arm/keystone/knav-qmss.txt
+>>>>
+>>>> diff --git a/Documentation/arm/keystone/knav-qmss.txt
+>>>> b/Documentation/arm/keystone/knav-qmss.txt
+>>>> new file mode 100644
+>>>> index 0000000..79946d1
+>>>> --- /dev/null
+>>>> +++ b/Documentation/arm/keystone/knav-qmss.txt
+>>>> @@ -0,0 +1,24 @@
+>>>> +* Texas Instruments Keystone Navigator Queue Management SubSystem driver
+>>>> +
+>>>> +Driver source code path
+>>>> +  drivers/soc/ti/knav_qmss.c
+>>>> +  drivers/soc/ti/knav_qmss_acc.c
+>>>> +
+>>>> +The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
+>>>> +the main hardware sub system which forms the backbone of the Keystone
+>>>> +multi-core Navigator. QMSS consist of queue managers, packed-data
+>>>> structure
+>>>> +processors(PDSP), linking RAM, descriptor pools and infrastructure
+>>>> +Packet DMA.
+>>>> +The Queue Manager is a hardware module that is responsible for
+>>>> accelerating
+>>>> +management of the packet queues. Packets are queued/de-queued by writing
+>>>> or
+>>>> +reading descriptor address to a particular memory mapped location. The
+>>>> PDSPs
+>>>> +perform QMSS related functions like accumulation, QoS, or event
+>>>> management.
+>>>> +Linking RAM registers are used to link the descriptors which are stored
+>>>> in
+>>>> +descriptor RAM. Descriptor RAM is configurable as internal or external
+>>>> memory.
+>>>> +The QMSS driver manages the PDSP setups, linking RAM regions,
+>>>> +queue pool management (allocation, push, pop and notify) and descriptor
+>>>> +pool management.
+>>>> +
+>>>> +knav qmss driver provides a set of APIs to drivers to open/close qmss
+>>>> queues,
+>>>> +allocate descriptor pools, map the descriptors, push/pop to queues etc.
+>>>> For
+>>>> +details of the available APIs, please refers to
+>>>> include/linux/soc/ti/knav_qmss.h
+>>>> diff --git
+>>>> a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
+>>>> b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
+>>>> index d8e8cdb..2cecea1 100644
+>>>> ---
+>>>> a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
+>>>> +++
+>>>> b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
+>>>> @@ -1,20 +1,8 @@
+>>>> -* Texas Instruments Keystone Navigator Queue Management SubSystem driver
+>>>> -
+>>>> -The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
+>>>> -the main hardware sub system which forms the backbone of the Keystone
+>>>> -multi-core Navigator. QMSS consist of queue managers, packed-data
+>>>> structure
+>>>> -processors(PDSP), linking RAM, descriptor pools and infrastructure
+>>>> -Packet DMA.
+>>>> -The Queue Manager is a hardware module that is responsible for
+>>>> accelerating
+>>>> -management of the packet queues. Packets are queued/de-queued by writing
+>>>> or
+>>>> -reading descriptor address to a particular memory mapped location. The
+>>>> PDSPs
+>>>> -perform QMSS related functions like accumulation, QoS, or event
+>>>> management.
+>>>> -Linking RAM registers are used to link the descriptors which are stored
+>>>> in
+>>>> -descriptor RAM. Descriptor RAM is configurable as internal or external
+>>>> memory.
+>>>> -The QMSS driver manages the PDSP setups, linking RAM regions,
+>>>> -queue pool management (allocation, push, pop and notify) and descriptor
+>>>> -pool management.
+>>>
+>>>
+>>> Only the last sentence seems to be about the driver and is rather
+>>> obvious (a driver manages the h/w). I would leave all this as-is
+>>> currently.
+>>>
+>>> Rob
+>>>
+>> Rob,
 >>
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
->> ---
->>
->> v2: Drop FB_HELPER select thanks to Archit's patches.  Do manual init
->>      ordering instead of using the .load hook.  Structure registration
->>      more like tegra's, but still using the typical "component" code.
->>      Drop no-op hooks for atomic_begin and mode_fixup() now that
->>      they're optional.  Drop sentinel in Makefile.  Fix minor style
->>      nits I noticed on another reread.
->>
->> v3: Use the new bcm2835 clk driver to manage pixel/HSM clocks instead
->>      of having a fixed video mode.  Use exynos-style component driver
->>      matching instead of devicetree nodes to list the component driver
->>      instances.  Rename compatibility strings to say bcm2835, and
->>      distinguish pv0/1/2.  Clean up some h/vsync code, and add in
->>      interlaced mode setup.  Fix up probe/bind error paths.  Use
->>      bitops.h macros for vc4_regs.h
->>
->>   drivers/gpu/drm/Kconfig           |   2 +
->>   drivers/gpu/drm/Makefile          |   1 +
->>   drivers/gpu/drm/vc4/Kconfig       |  13 +
->>   drivers/gpu/drm/vc4/Makefile      |  17 +
->>   drivers/gpu/drm/vc4/vc4_bo.c      |  52 +++
->>   drivers/gpu/drm/vc4/vc4_crtc.c    | 675 ++++++++++++++++++++++++++++++++++++++
->>   drivers/gpu/drm/vc4/vc4_debugfs.c |  39 +++
->>   drivers/gpu/drm/vc4/vc4_drv.c     | 284 ++++++++++++++++
->>   drivers/gpu/drm/vc4/vc4_drv.h     | 115 +++++++
->>   drivers/gpu/drm/vc4/vc4_hdmi.c    | 588 +++++++++++++++++++++++++++++++++
->>   drivers/gpu/drm/vc4/vc4_hvs.c     | 163 +++++++++
->>   drivers/gpu/drm/vc4/vc4_kms.c     |  54 +++
->>   drivers/gpu/drm/vc4/vc4_plane.c   | 320 ++++++++++++++++++
->>   drivers/gpu/drm/vc4/vc4_regs.h    | 570 ++++++++++++++++++++++++++++++++
->>   14 files changed, 2893 insertions(+)
->>   create mode 100644 drivers/gpu/drm/vc4/Kconfig
->>   create mode 100644 drivers/gpu/drm/vc4/Makefile
->>   create mode 100644 drivers/gpu/drm/vc4/vc4_bo.c
->>   create mode 100644 drivers/gpu/drm/vc4/vc4_crtc.c
->>   create mode 100644 drivers/gpu/drm/vc4/vc4_debugfs.c
->>   create mode 100644 drivers/gpu/drm/vc4/vc4_drv.c
->>   create mode 100644 drivers/gpu/drm/vc4/vc4_drv.h
->>   create mode 100644 drivers/gpu/drm/vc4/vc4_hdmi.c
->>   create mode 100644 drivers/gpu/drm/vc4/vc4_hvs.c
->>   create mode 100644 drivers/gpu/drm/vc4/vc4_kms.c
->>   create mode 100644 drivers/gpu/drm/vc4/vc4_plane.c
->>   create mode 100644 drivers/gpu/drm/vc4/vc4_regs.h
->>
->> diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
->> index 1a0a8df..c4bf9a1 100644
->> --- a/drivers/gpu/drm/Kconfig
->> +++ b/drivers/gpu/drm/Kconfig
->> @@ -264,3 +264,5 @@ source "drivers/gpu/drm/sti/Kconfig"
->>   source "drivers/gpu/drm/amd/amdkfd/Kconfig"
->>
->>   source "drivers/gpu/drm/imx/Kconfig"
->> +
->> +source "drivers/gpu/drm/vc4/Kconfig"
->> diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
->> index 45e7719..0edc9e2 100644
->> --- a/drivers/gpu/drm/Makefile
->> +++ b/drivers/gpu/drm/Makefile
->> @@ -42,6 +42,7 @@ obj-$(CONFIG_DRM_MGA)	+= mga/
->>   obj-$(CONFIG_DRM_I810)	+= i810/
->>   obj-$(CONFIG_DRM_I915)  += i915/
->>   obj-$(CONFIG_DRM_MGAG200) += mgag200/
->> +obj-$(CONFIG_DRM_VC4)  += vc4/
->>   obj-$(CONFIG_DRM_CIRRUS_QEMU) += cirrus/
->>   obj-$(CONFIG_DRM_SIS)   += sis/
->>   obj-$(CONFIG_DRM_SAVAGE)+= savage/
->> diff --git a/drivers/gpu/drm/vc4/Kconfig b/drivers/gpu/drm/vc4/Kconfig
->> new file mode 100644
->> index 0000000..e810ef7
->> --- /dev/null
->> +++ b/drivers/gpu/drm/vc4/Kconfig
->> @@ -0,0 +1,13 @@
->> +config DRM_VC4
->> +	tristate "Broadcom VC4 Graphics"
->> +	depends on ARCH_BCM2835
+>> I am taking the liberty to add your Ack based on the above. I can remove it
+>> if you disagree.
 >
-> depends on (ARCH_BCM2835 || COMPILE_TEST) ?
-
-Done.
-
->> +	depends on DRM
->> +	select DRM_KMS_HELPER
->> +	select DRM_KMS_CMA_HELPER
->> +	help
->> +	  Choose this option if you have a system that has a Broadcom
->> +	  VC4 GPU, such as the Raspberry Pi or other BCM2708/BCM2835.
->> +
->> +	  This driver requires that "avoid_warnings=2" be present in
->> +	  the config.txt for the firmware, to keep it from smashing
->> +	  our display setup.
->> + [...]
->> +static void vc4_crtc_disable(struct drm_crtc *crtc)
->> +{
->> +	struct drm_device *dev = crtc->dev;
->> +	struct vc4_dev *vc4 = to_vc4_dev(dev);
->> +	struct vc4_crtc *vc4_crtc = to_vc4_crtc(crtc);
->> +	u32 chan = vc4_crtc->channel;
->> +
->> +	require_hvs_enabled(dev);
->> +
->> +	CRTC_WRITE(PV_V_CONTROL,
->> +		   CRTC_READ(PV_V_CONTROL) & ~PV_VCONTROL_VIDEN);
->> +	while (CRTC_READ(PV_V_CONTROL) & PV_VCONTROL_VIDEN)
->> +		cpu_relax();
->> +
->> +	/* Without a wait here, we end up with a black screen. */
->> +	msleep(30);
+> No, I don't. I don't agree with moving this out of the binding. This
+> mostly sounds like a description of the h/w to me, so I'd like to keep
+> it. Most bindings are rather vague in this regard and I'd rather see
+> more description than less.
 >
-> This looks a little bit strange. First we do a busy loop without any 
-> timeout and then a fixed msleep without reason for the exact duration.
+Rob,
+
+Sorry, I got you wrong. I will undo the DT documentation change and add 
+the update for firmware to driver document.
+
+> I also agree with Arnd's comment about not pointing to kernel docs.
+
+Which comment are you talking about? I can't see his comment though 
+against 1/4. I see he has acked 2/4. Can you clarify?
+
+Do you have objections against the reference to driver documentation 
+from DT Doc? Not sure why there should be any issue with the reference. 
+But if you insists, I will remove below reference from the patch.
+
++For details of the driver, please refer to
++Documentation/arm/keystone/knav-qmss.txt
+
+So here is the summary of what I will do.
+1) Don't remove the driver description from DT document
+2) remove the reference to driver document as per 1) this becomes redundant.
+3) I will keep the driver description patch 2/4 to include the details 
+about the driver only. No change to DT,
+
+Hope this is what you would like me to do.
+
+Thanks.
+
+Murali
 >
-> Sorry for the possibly dumb questions:
+> Rob
 >
-> Is it safe to read PV_V_CONTROL exactly after writing to them? No 
-> sleeping required?
-
-Correct.  We're waiting for the value to land, so you just read until it
-does.
-
-I've pulled in a later change for doing waits with timouts.
-
-> How did you come to the 30 milli seconds?
-
-a bit more than a frame.  The comment was there to document why the
-sleep was there.  It looks like in retesting now that it's not required.
-
->> +  [...]
->> diff --git a/drivers/gpu/drm/vc4/vc4_hdmi.c b/drivers/gpu/drm/vc4/vc4_hdmi.c
->> new file mode 100644
->> index 0000000..ae37fec
->> --- /dev/null
->> +++ b/drivers/gpu/drm/vc4/vc4_hdmi.c
->> @@ -0,0 +1,588 @@
->> +/*
->> + * Copyright (C) 2015 Broadcom
->> + * Copyright (c) 2014 The Linux Foundation. All rights reserved.
->> + * Copyright (C) 2013 Red Hat
->> + * Author: Rob Clark <robdclark@gmail.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms of the GNU General Public License version 2 as published by
->> + * the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along with
->> + * this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +/**
->> + * DOC: VC4 Falcon HDMI module
->> + *
->> + * The HDMI core has a state machine and a PHY.  Most of the unit
->> + * operates off of the HSM clock from CPRMAN.  It also internally uses
->> + * the PLLH_PIX clock for the PHY.
->> + */
->> +
->> +#include "drm_atomic_helper.h"
->> +#include "drm_crtc_helper.h"
->> +#include "drm_edid.h"
->> +#include "linux/clk.h"
->> +#include "linux/component.h"
 >
-> #include "linux/i2c.h" ?
 
-Done.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151013/6a1758a9/attachment.sig>
+
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
