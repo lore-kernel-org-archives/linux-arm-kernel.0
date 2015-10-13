@@ -1,30 +1,29 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Tue, 13 Oct 2015 17:10:13 -0400
-Subject: [PATCH v2 0/10] clk: iproc: add support for BCM NS, NSP, and NS2
-In-Reply-To: <1444770485-11210-1-git-send-email-jonmason@broadcom.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Oct 2015 23:18:53 +0200
+Subject: [PATCH v2 7/7] clk: ns2: add clock support for Broadcom Northstar
+ 2 SoC
+In-Reply-To: <1444770485-11210-8-git-send-email-jonmason@broadcom.com>
 References: <1444770485-11210-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <20151013211013.GL12512@broadcom.com>
+ <1444770485-11210-8-git-send-email-jonmason@broadcom.com>
+Message-ID: <5280890.6npshDUNFZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oops, this should be 0/7 not 0/10
+On Tuesday 13 October 2015 17:08:05 Jon Mason wrote:
+> @@ -3,6 +3,7 @@ obj-$(CONFIG_CLK_BCM_KONA)      += clk-kona-setup.o
+>  obj-$(CONFIG_CLK_BCM_KONA)     += clk-bcm281xx.o
+>  obj-$(CONFIG_CLK_BCM_KONA)     += clk-bcm21664.o
+>  obj-$(CONFIG_COMMON_CLK_IPROC) += clk-iproc-armpll.o clk-iproc-pll.o clk-iproc-asiu.o
+> +obj-$(CONFIG_COMMON_CLK_IPROC) += clk-ns2.o
+>  obj-$(CONFIG_ARCH_BCM_CYGNUS)  += clk-cygnus.o
+>  obj-$(CONFIG_ARCH_BCM_NSP)     += clk-nsp.o
+>  obj-$(CONFIG_ARCH_BCM_5301X)   += clk-nsp.o
 
-On Tue, Oct 13, 2015 at 05:07:58PM -0400, Jon Mason wrote:
-> 
-> v2 - Added a patch to change the Cygnus clk macros to uppercase,
-> removed the device tree changes from the series (will send out those as
-> an RFC), and other minor changes that Stephen Boyd requested.
-> 
-> This patch series adds support for the Broadcom Northstar, Northstar
-> Plus, and Northstar 2 clocks.  Some slight modifications were necessary
-> to clk-iproc-pll to get Northstar and Northstar Plus working, due to
-> differences in register layout.  This is the reason why the first patch
-> is necessary.  Some more modifications were necessary to clk-iproc-pll
-> to get Northstar 2 working, due to differences in register layout (and
-> resulting fallout in Cygnus and NSP).  This is the reason why the sixth
-> and seventh patches are necessary.  The fifth patch is clean-up to
-> prevent accidentally forgetting to adjust for the base write errata
-> (which happened a few times, but was caught in internal review).
-> 
-> Thanks,
-> Jon
+If I understand this right, both CYGNUS and NS2 are IPROC based, but it
+looks like you now require building the clk-ns2 file for both?
+
+On a related note, I'm seeing problems when CONFIG_CYGNUS is set but
+CONFIG_COMMON_CLK_IPROC is disabled, as that currently leads to a link
+failure.
+
+	Arnd
