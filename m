@@ -1,199 +1,127 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 13 Oct 2015 22:11:42 +0200
-Subject: [PATCH] ARM: socfpga: dts: sort nodes alphabetically
-Message-ID: <1444767102-25242-1-git-send-email-s.trumtrar@pengutronix.de>
+From: w-kwok2@ti.com (Kwok, WingMan)
+Date: Tue, 13 Oct 2015 20:12:18 +0000
+Subject: [PATCH 3/3] ARM: keystone: dts: add PCI serdes driver bindings
+In-Reply-To: <561D4C2A.1060704@ti.com>
+References: <1444759464-32299-1-git-send-email-w-kwok2@ti.com>
+ <1444759464-32299-4-git-send-email-w-kwok2@ti.com> <561D4C2A.1060704@ti.com>
+Message-ID: <230CBA6E4B6B6B418E8730AC28E6FC7E042289A5@DFLE11.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sorting policy for this file is alphabetically.
-Reorder all nodes, that are out of place.
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
- arch/arm/boot/dts/socfpga.dtsi | 128 ++++++++++++++++++++---------------------
- 1 file changed, 64 insertions(+), 64 deletions(-)
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 0f50ae8e7e63..39c470e291f9 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -556,46 +556,6 @@
- 			status = "disabled";
- 		};
- 
--		i2c0: i2c at ffc04000 {
--			#address-cells = <1>;
--			#size-cells = <0>;
--			compatible = "snps,designware-i2c";
--			reg = <0xffc04000 0x1000>;
--			clocks = <&l4_sp_clk>;
--			interrupts = <0 158 0x4>;
--			status = "disabled";
--		};
--
--		i2c1: i2c at ffc05000 {
--			#address-cells = <1>;
--			#size-cells = <0>;
--			compatible = "snps,designware-i2c";
--			reg = <0xffc05000 0x1000>;
--			clocks = <&l4_sp_clk>;
--			interrupts = <0 159 0x4>;
--			status = "disabled";
--		};
--
--		i2c2: i2c at ffc06000 {
--			#address-cells = <1>;
--			#size-cells = <0>;
--			compatible = "snps,designware-i2c";
--			reg = <0xffc06000 0x1000>;
--			clocks = <&l4_sp_clk>;
--			interrupts = <0 160 0x4>;
--			status = "disabled";
--		};
--
--		i2c3: i2c at ffc07000 {
--			#address-cells = <1>;
--			#size-cells = <0>;
--			compatible = "snps,designware-i2c";
--			reg = <0xffc07000 0x1000>;
--			clocks = <&l4_sp_clk>;
--			interrupts = <0 161 0x4>;
--			status = "disabled";
--		};
--
- 		gpio0: gpio at ff708000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -656,15 +616,44 @@
- 			};
- 		};
- 
--		sdr: sdr at ffc25000 {
--			compatible = "syscon";
--			reg = <0xffc25000 0x1000>;
-+		i2c0: i2c at ffc04000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,designware-i2c";
-+			reg = <0xffc04000 0x1000>;
-+			clocks = <&l4_sp_clk>;
-+			interrupts = <0 158 0x4>;
-+			status = "disabled";
- 		};
- 
--		sdramedac {
--			compatible = "altr,sdram-edac";
--			altr,sdr-syscon = <&sdr>;
--			interrupts = <0 39 4>;
-+		i2c1: i2c at ffc05000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,designware-i2c";
-+			reg = <0xffc05000 0x1000>;
-+			clocks = <&l4_sp_clk>;
-+			interrupts = <0 159 0x4>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at ffc06000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,designware-i2c";
-+			reg = <0xffc06000 0x1000>;
-+			clocks = <&l4_sp_clk>;
-+			interrupts = <0 160 0x4>;
-+			status = "disabled";
-+		};
-+
-+		i2c3: i2c at ffc07000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,designware-i2c";
-+			reg = <0xffc07000 0x1000>;
-+			clocks = <&l4_sp_clk>;
-+			interrupts = <0 161 0x4>;
-+			status = "disabled";
- 		};
- 
- 		L2: l2-cache at fffef000 {
-@@ -695,6 +684,29 @@
- 			reg = <0xffff0000 0x10000>;
- 		};
- 
-+		rst: rstmgr at ffd05000 {
-+			#reset-cells = <1>;
-+			compatible = "altr,rst-mgr";
-+			reg = <0xffd05000 0x1000>;
-+			altr,modrst-offset = <0x10>;
-+		};
-+
-+		scu: snoop-control-unit at fffec000 {
-+			compatible = "arm,cortex-a9-scu";
-+			reg = <0xfffec000 0x100>;
-+		};
-+
-+		sdr: sdr at ffc25000 {
-+			compatible = "syscon";
-+			reg = <0xffc25000 0x1000>;
-+		};
-+
-+		sdramedac {
-+			compatible = "altr,sdram-edac";
-+			altr,sdr-syscon = <&sdr>;
-+			interrupts = <0 39 4>;
-+		};
-+
- 		spi0: spi at fff00000 {
- 			compatible = "snps,dw-apb-ssi";
- 			#address-cells = <1>;
-@@ -706,11 +718,6 @@
- 			status = "disabled";
- 		};
- 
--		scu: snoop-control-unit at fffec000 {
--			compatible = "arm,cortex-a9-scu";
--			reg = <0xfffec000 0x100>;
--		};
--
- 		spi1: spi at fff01000 {
- 			compatible = "snps,dw-apb-ssi";
- 			#address-cells = <1>;
-@@ -722,6 +729,11 @@
- 			status = "disabled";
- 		};
- 
-+		sysmgr: sysmgr at ffd08000 {
-+			compatible = "altr,sys-mgr", "syscon";
-+			reg = <0xffd08000 0x4000>;
-+		};
-+
- 		/* Local timer */
- 		timer at fffec600 {
- 			compatible = "arm,cortex-a9-twd-timer";
-@@ -786,13 +798,6 @@
- 			dma-names = "tx", "rx";
- 		};
- 
--		rst: rstmgr at ffd05000 {
--			#reset-cells = <1>;
--			compatible = "altr,rst-mgr";
--			reg = <0xffd05000 0x1000>;
--			altr,modrst-offset = <0x10>;
--		};
--
- 		usbphy0: usbphy at 0 {
- 			#phy-cells = <0>;
- 			compatible = "usb-nop-xceiv";
-@@ -836,10 +841,5 @@
- 			clocks = <&osc1>;
- 			status = "disabled";
- 		};
--
--		sysmgr: sysmgr at ffd08000 {
--			compatible = "altr,sys-mgr", "syscon";
--			reg = <0xffd08000 0x4000>;
--		};
- 	};
- };
--- 
-2.6.1
+> -----Original Message-----
+> From: Karicheri, Muralidharan
+> Sent: Tuesday, October 13, 2015 2:24 PM
+> To: Kwok, WingMan; robh+dt at kernel.org; pawel.moll at arm.com;
+> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk; galak at codeaurora.org;
+> KISHON VIJAY ABRAHAM; Quadros, Roger; bhelgaas at google.com;
+> ssantosh at kernel.org; linux at arm.linux.org.uk; devicetree at vger.kernel.org;
+> linux-kernel at vger.kernel.org; linux-pci at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 3/3] ARM: keystone: dts: add PCI serdes driver bindings
+> 
+> On 10/13/2015 02:04 PM, WingMan Kwok wrote:
+> > Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+> > ---
+> >   arch/arm/boot/dts/k2e.dtsi      |   24 ++++++++++++++++++++++++
+> >   arch/arm/boot/dts/keystone.dtsi |   25 +++++++++++++++++++++++++
+> >   2 files changed, 49 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
+> > index 675fb8e..1ba47d8 100644
+> > --- a/arch/arm/boot/dts/k2e.dtsi
+> > +++ b/arch/arm/boot/dts/k2e.dtsi
+> > @@ -86,6 +86,18 @@
+> >   			gpio,syscon-dev = <&devctrl 0x240>;
+> >   		};
+> >
+> > +		pcie1_phy: pciephy at 2326000 {
+> > +			#phy-cells = <0>;
+> > +			compatible = "ti,keystone-serdes-pcie";
+> > +			reg = <0x02326000 0x4000>;
+> > +			reg-names = "reg_serdes";
+> > +			refclk-khz = <100000>;
+> > +			link-rate-kbps = <5000000>;
+> > +			phy-type = "pcie";
+> > +			max-lanes = <2>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> >   		pcie1: pcie at 21020000 {
+> >   			compatible = "ti,keystone-pcie","snps,dw-pcie";
+> >   			clocks = <&clkpcie1>;
+> > @@ -130,6 +142,18 @@
+> >   					<GIC_SPI 375 IRQ_TYPE_EDGE_RISING>,
+> >   					<GIC_SPI 376 IRQ_TYPE_EDGE_RISING>;
+> >   			};
+> > +
+> > +			/* PCIE phy */
+> > +			serdeses {
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +				serdes at 0 {
+> > +					reg = <0>;
+> > +					phys = <&pcie1_phy>;
+> > +					status = "disabled";
+> > +				};
+> > +			};
+> > +
+> >   		};
+> >
+> >   		mdio: mdio at 24200f00 {
+> > diff --git a/arch/arm/boot/dts/keystone.dtsi
+> b/arch/arm/boot/dts/keystone.dtsi
+> > index 72816d6..5312319 100644
+> > --- a/arch/arm/boot/dts/keystone.dtsi
+> > +++ b/arch/arm/boot/dts/keystone.dtsi
+> > @@ -275,6 +275,19 @@
+> >   			ti,syscon-dev = <&devctrl 0x2a0>;
+> >   		};
+> >
+> > +		pcie0_phy: pciephy at 2320000 {
+> > +			#phy-cells = <0>;
+> > +			compatible = "ti,keystone-serdes-pcie";
+> > +			reg = <0x02320000 0x4000>;
+> > +			reg-names = "reg_serdes";
+> > +			refclk-khz = <100000>;
+> > +			link-rate-kbps = <5000000>;
+> > +			init-firmware	= "k2_pcie_serdes_init.fw";
+> > +			phy-type = "pcie";
+> > +			max-lanes = <2>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> >   		pcie0: pcie at 21800000 {
+> >   			compatible = "ti,keystone-pcie", "snps,dw-pcie";
+> >   			clocks = <&clkpcie>;
+> > @@ -319,6 +332,18 @@
+> >   					<GIC_SPI 28 IRQ_TYPE_EDGE_RISING>,
+> >   					<GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
+> >   			};
+> > +
+> > +			/* PCIE phy */
+> > +			serdeses {
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +				serdes at 0 {
+> > +					reg = <0>;
+> > +					phys = <&pcie0_phy>;
+> > +					status = "disabled";
+> > +				};
+> > +			};
+> > +
+> >   		};
+> >   	};
+> >   };
+> >
+> Wingman,
+> 
+> This should be a separate patch and remove the sane from Driver patch.
+> i.e. send 1/3 ane 2/3 in one series and 3/3 as a separate patch.
+> 
+
+will do.
+
+Thanks,
+wingMan
