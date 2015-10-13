@@ -1,224 +1,248 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 13 Oct 2015 18:22:22 +0100
-Subject: [PATCH v3 14/24] arm64: Delay cpu feature capability checks
+Date: Tue, 13 Oct 2015 18:22:24 +0100
+Subject: [PATCH v3 16/24] arm64: Cleanup HWCAP handling
 In-Reply-To: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
 References: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1444756952-31145-15-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1444756952-31145-17-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment we run through the arm64_features capability list for
-each CPU and set the capability if one of the CPU supports it. This
-could be problematic in a heterogeneous system with differing capabilities.
-Delay the CPU feature checks until all the enabled CPUs are up(i.e,
-smp_cpus_done(), so that we can make better decisions based on the
-overall system capability. Once we decide and advertise the capabilities
-the alternatives can be applied. From this state, we cannot roll back
-a feature to disabled based on the values from a new hotplugged CPU,
-due to the runtime patching and other reasons. So, for all new CPUs,
-we need to make sure that they have the established system capabilities.
-Failing which, we bring the CPU down, preventing it from turning online.
-Adds a hotplug notifier to run through the system capabilities and
-and ensure that the new hotplugged CPU has all the enabled capabilities
-and also invokes the respective enable() method on the CPU.
-
-The CPU errata checks are not delayed and is still executed per-CPU
-to detect the respective capabilities. If we ever come across a non-errata
-capability that needs to be checked on each-CPU, we could introduce them via
-a new capability table(or introduce a flag), which can be processed per CPU.
-
-Renames the check_local_cpu_features() => check_cpu_features().
-The next patch will make the feature checks use the system wide
-safe value of a feature register.
-
-NOTE: The enable() methods associated with the capability is scheduled
-on all the CPUs (which is the only use case). If we need a different type
-of 'enable()' which only needs to be run once on any CPU, we should be
-able to handle that when needed.
+Extend struct arm64_cpu_capabilities to handle the HWCAP detection
+and make use of the system wide value for the feature register.
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
-Changes since V2:
-  - Invoke cpu_die() for incapable cpu
-  - Add wfi to the trap for incapable cpu
-  - Mark the incapable cpu !present
----
- arch/arm64/include/asm/cpufeature.h |    3 +-
- arch/arm64/include/asm/processor.h  |    2 +-
- arch/arm64/kernel/cpufeature.c      |   79 ++++++++++++++++++++++++++++++++---
- arch/arm64/kernel/cpuinfo.c         |    1 -
- arch/arm64/mm/fault.c               |    2 +-
- 5 files changed, 77 insertions(+), 10 deletions(-)
+ arch/arm64/include/asm/cpufeature.h |    2 +
+ arch/arm64/include/asm/hwcap.h      |    8 ++
+ arch/arm64/kernel/cpufeature.c      |  161 +++++++++++++++++++----------------
+ 3 files changed, 99 insertions(+), 72 deletions(-)
 
 diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 5f1ba6d..4a02a18 100644
+index bf71a8e..07f9090 100644
 --- a/arch/arm64/include/asm/cpufeature.h
 +++ b/arch/arm64/include/asm/cpufeature.h
-@@ -70,7 +70,7 @@ struct arm64_cpu_capabilities {
- 	const char *desc;
- 	u16 capability;
- 	bool (*matches)(const struct arm64_cpu_capabilities *);
--	void (*enable)(void);
-+	void (*enable)(void *);
- 	union {
- 		struct {	/* To be used for erratum handling only */
- 			u32 midr_model;
-@@ -140,7 +140,6 @@ void __init setup_cpu_features(void);
- void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			    const char *info);
- void check_local_cpu_errata(void);
--void check_local_cpu_features(void);
- 
- u64 read_system_reg(u32 id);
- 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 98f3235..4acb7ca 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -186,6 +186,6 @@ static inline void spin_lock_prefetch(const void *x)
- 
+@@ -81,6 +81,8 @@ struct arm64_cpu_capabilities {
+ 			u32 sys_reg;
+ 			int field_pos;
+ 			int min_field_value;
++			int hwcap_type;
++			unsigned long hwcap;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
+index 0ad7351..400b80b 100644
+--- a/arch/arm64/include/asm/hwcap.h
++++ b/arch/arm64/include/asm/hwcap.h
+@@ -52,6 +52,14 @@
+ extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
  #endif
  
--void cpu_enable_pan(void);
-+void cpu_enable_pan(void *__unused);
- 
- #endif /* __ASM_PROCESSOR_H */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 0d1b57e..4360637 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -19,9 +19,11 @@
- #define pr_fmt(fmt) "CPU features: " fmt
- 
- #include <linux/bsearch.h>
-+#include <linux/notifier.h>
- #include <linux/types.h>
- #include <asm/cpu.h>
- #include <asm/cpufeature.h>
-+#include <asm/cpu_ops.h>
- #include <asm/processor.h>
- #include <asm/sysreg.h>
- 
-@@ -617,16 +619,82 @@ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 		cpus_set_cap(caps[i].capability);
- 	}
- 
--	/* second pass allows enable() to consider interacting capabilities */
--	for (i = 0; caps[i].desc; i++) {
--		if (cpus_have_cap(caps[i].capability) && caps[i].enable)
--			caps[i].enable();
-+	/*
-+	 * For each available capability, invokes enable() on all active CPUs
-+	 */
-+	for (i = 0; caps[i].desc; i++)
-+		if (caps[i].enable && cpus_have_cap(caps[i].capability))
-+			on_each_cpu(caps[i].enable, NULL, true);
-+}
-+
-+/*
-+ * Park the CPU which doesn't have the capability as advertised
-+ * by the system.
-+ */
-+static void fail_incapable_cpu(char *cap_type,
-+				 const struct arm64_cpu_capabilities *cap)
-+{
-+	int cpu = smp_processor_id();
-+
-+	pr_crit("CPU%d: missing %s : %s\n", cpu, cap_type, cap->desc);
-+	/* Mark this CPU absent */
-+	set_cpu_present(cpu, 0);
-+	/* Check if we can park ourselves */
-+	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
-+		cpu_ops[cpu]->cpu_die(cpu);
-+
-+	asm volatile(
-+			" 1:	wfe \n\t"
-+			"	wfi \n\t"
-+			"	b 1b\n"
-+		    );
-+}
-+
-+/*
-+ * Run through the enabled system capabilities and enable() it on this CPU.
-+ * The capabilities were decided based on the available CPUs at the boot time.
-+ * Any new CPU should match the system wide status of the capability. If the
-+ * new CPU doesn't have a capability which the system now has enabled, we
-+ * cannot do anything to fix it up and could cause unexpected failures. So
-+ * we hold the CPU in a black hole.
-+ */
-+void cpu_enable_features(void)
-+{
-+	int i;
-+	const struct arm64_cpu_capabilities *caps = arm64_features;
-+
-+	for(i = 0; caps[i].desc; i++) {
-+		if(!cpus_have_cap(caps[i].capability))
-+			continue;
-+		/*
-+		 * If the new CPU misses an advertised feature, we cannot proceed
-+		 * further, park the cpu.
-+		 */
-+		if (!caps[i].matches(&caps[i]))
-+			fail_incapable_cpu("arm64_features", &caps[i]);
-+		if (caps[i].enable)
-+			caps[i].enable(NULL);
- 	}
- }
- 
--void check_local_cpu_features(void)
-+static int cpu_feature_hotplug_notify(struct notifier_block *nb,
-+				unsigned long action, void *hcpu)
-+{
-+	if ((action & ~CPU_TASKS_FROZEN) == CPU_STARTING)
-+		cpu_enable_features();
-+	return notifier_from_errno(0);
-+}
-+
-+/* Run the notifier before initialising GIC CPU interface. */
-+static struct notifier_block cpu_feature_notifier = {
-+	.notifier_call = cpu_feature_hotplug_notify,
-+	.priority = 101,
++enum {
++	CAP_HWCAP = 1,
++#ifdef CONFIG_COMPAT
++	CAP_COMPAT_HWCAP,
++	CAP_COMPAT_HWCAP2,
++#endif
 +};
 +
-+void check_cpu_features(void)
+ extern unsigned long elf_hwcap;
+ #endif
+ #endif
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index dd58c32..a90c7d3 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -603,6 +603,87 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{},
+ };
+ 
++#define HWCAP_CAP(reg, field, min_value, type, cap)		\
++	{							\
++		.desc = #cap,					\
++		.matches = has_cpuid_feature,			\
++		.sys_reg = reg,					\
++		.field_pos = field,				\
++		.min_field_value = min_value,			\
++		.hwcap_type = type,				\
++		.hwcap = cap,					\
++	}
++
++static const struct arm64_cpu_capabilities arm64_hwcaps[] = {
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, 2, CAP_HWCAP, HWCAP_PMULL),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, 1, CAP_HWCAP, HWCAP_AES),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA1_SHIFT, 1, CAP_HWCAP, HWCAP_SHA1),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA2_SHIFT, 1, CAP_HWCAP, HWCAP_SHA2),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_CRC32_SHIFT, 1, CAP_HWCAP, HWCAP_CRC32),
++	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_ATOMICS_SHIFT, 2, CAP_HWCAP, HWCAP_ATOMICS),
++#ifdef CONFIG_COMPAT
++	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 2, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_PMULL),
++	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_AES),
++	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_SHA1_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_SHA1),
++	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_SHA2_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_SHA2),
++	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_CRC32_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_CRC32),
++#endif
++	{},
++};
++
++static void cap_set_hwcap(const struct arm64_cpu_capabilities * cap)
++{
++	switch(cap->hwcap_type) {
++	case CAP_HWCAP:
++		elf_hwcap |= cap->hwcap;
++		break;
++#ifdef CONFIG_COMPAT
++	case CAP_COMPAT_HWCAP:
++		compat_elf_hwcap |= (u32)cap->hwcap;
++		break;
++	case CAP_COMPAT_HWCAP2:
++		compat_elf_hwcap2 |= (u32)cap->hwcap;
++		break;
++#endif
++	default:
++		BUG();
++		break;
++	}
++}
++
++static bool cpus_have_hwcap(const struct arm64_cpu_capabilities *cap)
++{
++	bool rc;
++
++	switch(cap->hwcap_type) {
++	case CAP_HWCAP:
++		rc = (elf_hwcap & cap->hwcap) != 0;
++		break;
++#ifdef CONFIG_COMPAT
++	case CAP_COMPAT_HWCAP:
++		rc = (compat_elf_hwcap & (u32)cap->hwcap) != 0;
++		break;
++	case CAP_COMPAT_HWCAP2:
++		rc = (compat_elf_hwcap2 & (u32)cap->hwcap) != 0;
++		break;
++#endif
++	default:
++		BUG();
++		rc = false;
++	}
++
++	return rc;
++}
++
++void check_cpu_hwcaps(void)
++{
++	int i;
++	const struct arm64_cpu_capabilities *hwcaps = arm64_hwcaps;
++	for(i = 0; hwcaps[i].desc; i ++)
++		if (hwcaps[i].matches(&hwcaps[i]))
++			cap_set_hwcap(&hwcaps[i]);
++}
++
+ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 			    const char *info)
  {
- 	check_cpu_capabilities(arm64_features, "detected feature:");
-+	register_cpu_notifier(&cpu_feature_notifier);
+@@ -714,6 +795,13 @@ void cpu_enable_features(void)
+ 		if (caps[i].enable)
+ 			caps[i].enable(NULL);
+ 	}
++
++	for(i = 0, caps = arm64_hwcaps; caps[i].desc; i++) {
++		if (!cpus_have_hwcap(&caps[i]))
++			continue;
++		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i]))
++			fail_incapable_cpu("arm64_hwcaps", &caps[i]);
++	}
  }
  
+ static int cpu_feature_hotplug_notify(struct notifier_block *nb,
+@@ -738,12 +826,11 @@ void check_cpu_features(void)
+ 
  void __init setup_cpu_features(void)
-@@ -636,6 +704,7 @@ void __init setup_cpu_features(void)
+ {
+-	u64 features;
+-	s64 block;
  	u32 cwg;
  	int cls;
  
-+	check_cpu_features();
+ 	check_cpu_features();
++	check_cpu_hwcaps();
  	/*
  	 * Check for sane CTR_EL0.CWG value.
  	 */
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index f25869e..789fbea 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -229,7 +229,6 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
- 	cpuinfo_detect_icache_policy(info);
- 
- 	check_local_cpu_errata();
--	check_local_cpu_features();
- }
- 
- void cpuinfo_store_cpu(void)
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index aba9ead..066d5ae 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -555,7 +555,7 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
- }
- 
- #ifdef CONFIG_ARM64_PAN
--void cpu_enable_pan(void)
-+void cpu_enable_pan(void *__unused)
- {
- 	config_sctlr_el1(SCTLR_EL1_SPAN, 0);
+@@ -755,74 +842,4 @@ void __init setup_cpu_features(void)
+ 	if (L1_CACHE_BYTES < cls)
+ 		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
+ 			L1_CACHE_BYTES, cls);
+-
+-	/*
+-	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
+-	 * The blocks we test below represent incremental functionality
+-	 * for non-negative values. Negative values are reserved.
+-	 */
+-	features = read_cpuid(ID_AA64ISAR0_EL1);
+-	block = cpuid_feature_extract_field(features, 4);
+-	if (block > 0) {
+-		switch (block) {
+-		default:
+-		case 2:
+-			elf_hwcap |= HWCAP_PMULL;
+-		case 1:
+-			elf_hwcap |= HWCAP_AES;
+-		case 0:
+-			break;
+-		}
+-	}
+-
+-	if (cpuid_feature_extract_field(features, 8) > 0)
+-		elf_hwcap |= HWCAP_SHA1;
+-
+-	if (cpuid_feature_extract_field(features, 12) > 0)
+-		elf_hwcap |= HWCAP_SHA2;
+-
+-	if (cpuid_feature_extract_field(features, 16) > 0)
+-		elf_hwcap |= HWCAP_CRC32;
+-
+-	block = cpuid_feature_extract_field(features, 20);
+-	if (block > 0) {
+-		switch (block) {
+-		default:
+-		case 2:
+-			elf_hwcap |= HWCAP_ATOMICS;
+-		case 1:
+-			/* RESERVED */
+-		case 0:
+-			break;
+-		}
+-	}
+-
+-#ifdef CONFIG_COMPAT
+-	/*
+-	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
+-	 * the AArch32 32-bit execution state.
+-	 */
+-	features = read_cpuid(ID_ISAR5_EL1);
+-	block = cpuid_feature_extract_field(features, 4);
+-	if (block > 0) {
+-		switch (block) {
+-		default:
+-		case 2:
+-			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
+-		case 1:
+-			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
+-		case 0:
+-			break;
+-		}
+-	}
+-
+-	if (cpuid_feature_extract_field(features, 8) > 0)
+-		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
+-
+-	if (cpuid_feature_extract_field(features, 12) > 0)
+-		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
+-
+-	if (cpuid_feature_extract_field(features, 16) > 0)
+-		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
+-#endif
  }
 -- 
 1.7.9.5
