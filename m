@@ -1,53 +1,56 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 13 Oct 2015 09:43:45 +0100
-Subject: [Linaro-acpi] [PATCH v5 0/5] Provide better MADT subtable sanity
- checks
-In-Reply-To: <32835486.gnkKHR2R1U@vostro.rjw.lan>
-References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
- <561B5B7E.6080901@linaro.org> <561B8114.4060800@arm.com>
- <32835486.gnkKHR2R1U@vostro.rjw.lan>
-Message-ID: <561CC441.6090003@arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 13 Oct 2015 11:58:33 +0300
+Subject: [PATCH v4 11/25] ARM/dmaengine: edma: Merge the two drivers under
+ drivers/dma/
+In-Reply-To: <20151012160024.GF27370@localhost>
+References: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
+ <1443088932-21731-12-git-send-email-peter.ujfalusi@ti.com>
+ <20151012160024.GF27370@localhost>
+Message-ID: <561CC7B9.8000201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/12/2015 07:00 PM, Vinod Koul wrote:
+> On Thu, Sep 24, 2015 at 01:01:58PM +0300, Peter Ujfalusi wrote:
+>> Move the code out from arch/arm/common and merge it inside of the dmaengine
+>> driver.
+>> This change is done with as minimal change to the code as possible to avoid
+>> any possibilities to introducing regression.
+> 
+> Is this a pure move patch or code has been modified, if latter am
+> disappointed that existing code style issue have not been fixed
 
+Yes, it is mostly code move, I have done minimal changes only needed to get
+the moved code working in the new location.
+Patch 13 in this series will go through the file and will fix up most (I hope
+all) of the outstanding coding style issues.
+At this point I wanted to have as small change as possible.
 
-On 12/10/15 20:25, Rafael J. Wysocki wrote:
-> On Monday, October 12, 2015 10:44:52 AM Sudeep Holla wrote:
+>> +static inline void edma_write(struct edma_cc *ecc, int offset, int val)
+>> +{
+>> +	__raw_writel(val, ecc->base + offset);
+>> +}
+>> +static inline void edma_modify(struct edma_cc *ecc, int offset, unsigned and,
+>> +			       unsigned or)
+> 
+> This looks bad on my 80 char screen, and few more places below
+> 
+>> +{
+>> +	unsigned val = edma_read(ecc, offset);
+> 
+> checkpatch should have asked you to add empty line here, many places below
+> too
+> 
+>> +	val &= and;
+>> +	val |= or;
+>> +	edma_write(ecc, offset, val);
+>> +}
+> 
+> empty line here and few more places
+> 
+> More later :)
+> 
 
-[...]
-
->>
->> Instead of just removing the check completely on x86, IMO restrict
->> it to some newer/later version of ACPI so you can still force
->> vendors to fix their ACPI tables at-least in future.
->
-> No, we can't force vendors to fix their ACPI tables.  This is
-> completely unrealistic.
->
-
-No, I was referring to the future platforms *only*
-
-> We simly need to deal with the bugs in the ACPI tables in the
-> kernel.
->
-
-Yes sadly true for existing systems, but if we now place a check for
-ACPIv6.0 and above, we might avoid seeing such broken tables sometime in
-future once the kernel with this check in place is used for validation.
-
->> It would be good to get such sanity check in the tools used to
->> build those tables, but yes since such static tables can be built
->> in many ways, its difficult to deal it in all those tools.
->
-> As I said to Al, we need those checks in firmware test suites.
-> Having them in the kernel is OK too, but they should cause warnings
-> to be printed to the kernel log instead of causing the kernel to
-> panic.
->
-
-Agreed
 
 -- 
-Regards,
-Sudeep
+P?ter
