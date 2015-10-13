@@ -1,24 +1,143 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 13 Oct 2015 18:07:37 +0100
-Subject: [PATCH v2 0/7] arm64: relax Image placement rules
-In-Reply-To: <1442968663-31843-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1442968663-31843-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151013170737.GF11573@e104818-lin.cambridge.arm.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Tue, 13 Oct 2015 22:37:41 +0530
+Subject: [PATCH v5 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <20151013164730.GF24353@leverpostej>
+References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
+ <20150828123228.GE31748@leverpostej>
+ <CAFpQJXWzM644KsFWP9ei-k6gWgNVpBVT+UbY7NYdyfmyL=zMkw@mail.gmail.com>
+ <CAFpQJXWFx2dQ_vv0POqkOiLe3eh9Ee=Sf+2Xx_08Vp=E4g6gLQ@mail.gmail.com>
+ <20150930105331.GA10066@leverpostej>
+ <CAFpQJXVegqortRLK+g7_9p82KMYwq0hg8n3_9bJqjGHsJvngaA@mail.gmail.com>
+ <1443661547.2828.40.camel@kernel.crashing.org>
+ <CAFpQJXXKcwks0iZN+3B=U0-9uYKFpAXcZE90GCHN9WyM45Hdpw@mail.gmail.com>
+ <CAFpQJXUPWZxOWeJQnkw8E_voDoqhphH8iR-fr0xo0m3+FiL4sA@mail.gmail.com>
+ <20151013164730.GF24353@leverpostej>
+Message-ID: <CAFpQJXXZMPcT2yTvYcnPds5MUg+=EXXtzwBEwDj4TYY0g_fdjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 05:37:36PM -0700, Ard Biesheuvel wrote:
-> This is a followup to the "arm64: update/clarify/relax Image and FDT placement
-> rules" series I sent a while ago:
-> (http://article.gmane.org/gmane.linux.ports.arm.kernel/407148)
-> 
-> This has now been split in two series: this second series deals with the
-> physical and virtual placement of the kernel Image.
+On Tue, Oct 13, 2015 at 10:17 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > Hi Mark,
+>> >
+>> > i am thinking, if we could not address(or becomes complex)  these topologies
+>> > using associativity,
+>> > we should think of an alternate binding which suits existing and upcoming
+>> > arm64 platforms.
+>> > can we think of below numa binding which is inline with ACPI and will
+>> > address all sort of topologies!
+>> >
+>> > i am proposing as below,
+>> >
+>> > 1. introduce "proximity" node property. this property will be
+>> > present in dt nodes like memory, cpu, bus and devices(like associativity
+>> > property) and
+>> > will tell which numa node(proximity domain) this dt node belongs to.
+>> >
+>> > examples:
+>> >                cpu at 000 {
+>> >                         device_type = "cpu";
+>> >                         compatible = "cavium,thunder", "arm,armv8";
+>> >                         reg = <0x0 0x000>;
+>> >                         enable-method = "psci";
+>> >                         proximity = <0>;
+>> >                 };
+>> >                cpu at 001 {
+>> >                         device_type = "cpu";
+>> >                         compatible = "cavium,thunder", "arm,armv8";
+>> >                         reg = <0x0 0x001>;
+>> >                         enable-method = "psci";
+>> >                         proximity = <1>;
+>> >                 };
+>> >
+>> >        memory at 00000000 {
+>> >                 device_type = "memory";
+>> >                 reg = <0x0 0x01400000 0x3 0xFEC00000>;
+>> >                 proximity =<0>;
+>> >
+>> >         };
+>> >
+>> >         memory at 10000000000 {
+>> >                 device_type = "memory";
+>> >                 reg = <0x100 0x00400000 0x3 0xFFC00000>;
+>> >                 proximity =<1>;
+>> >         };
+>> >
+>> > pcie0 at 0x8480,00000000 {
+>> >                 compatible = "cavium,thunder-pcie";
+>> >                 device_type = "pci";
+>> >                 msi-parent = <&its>;
+>> >                 bus-range = <0 255>;
+>> >                 #size-cells = <2>;
+>> >                 #address-cells = <3>;
+>> >                 #stream-id-cells = <1>;
+>> >                 reg = <0x8480 0x00000000 0 0x10000000>;  /*Configuration
+>> > space */
+>> >                 ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000
+>> > 0x70 0x00000000>, /* mem ranges */
+>> >                          <0x03000000 0x8300 0x00000000 0x8300 0x00000000
+>> > 0x500 0x00000000>;
+>> >                proximity =<0>;
+>> >         };
+>> >
+>> >
+>> > 2. Introduce new dt node "proximity-map" which will capture the NxN numa
+>> > node distance matrix.
+>> >
+>> > for example,  4 nodes connected in mesh/ring structure as,
+>> > A(0) <connected to> B(1) <connected to> C(2) <connected to> D(3) <connected
+>> > to> A(1)
+>> >
+>> > relative distance would be,
+>> >       A -> B = 20
+>> >       B -> C  = 20
+>> >       C -> D = 20
+>> >       D -> A = 20
+>> >       A -> C = 40
+>> >       B -> D = 40
+>> >
+>> > and dt presentation for this distance matrix is :
+>> >
+>> >        proximity-map {
+>> >              node-count = <4>;
+>> >              distance-matrix = <0 0  10>,
+>> >                                 <0 1  20>,
+>> >                                 <0 2  40>,
+>> >                                 <0 3  20>,
+>> >                                 <1 0  20>,
+>> >                                 <1 1  10>,
+>> >                                 <1 2  20>,
+>> >                                 <1 3  40>,
+>> >                                 <2 0  40>,
+>> >                                 <2 1  20>,
+>> >                                 <2 2  10>,
+>> >                                 <2 3  20>,
+>> >                                 <3 0  20>,
+>> >                                 <3 1  40>,
+>> >                                 <3 2  20>,
+>> >                                 <3 3  10>;
+>> >           }
+>> >
+>> > the entries like < 0 0 > < 1 1>  < 2 2> < 3 3> can be optional and code can
+>> > put default value(local distance).
+>> > the entries like <1 0> can be optional if <0 1> and <1 0> are of same
+>> > distance.
+>> is this binding looks ok?
+>
+> This looks roughly requivalent to the ACPI SLIT, which means it's as
+> powerful, which allays my previous concerns.
+>
+>> i can implement this and submit in next version of patchset.
+>
+> Please put together (plaintext) patches.
+>
+> Then we have a sensible baseline that we can work from; it's somewhat
+> difficult for others to join the disacussion here as-is.
+thanks, will post the v6 in couple of days with implementation based
+on this binding proposal..
+>
+> Thanks,
+> Mark.
 
-Quick question, to refresh my memory: if this is the second series,
-what is the first series?
-
-Thanks.
-
--- 
-Catalin
+thanks
+Ganapat
