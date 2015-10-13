@@ -1,143 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 13 Oct 2015 15:22:40 +0100
-Subject: [PATCH v2 1/4] dt-bindings: Document the STM32 DMA bindings
-In-Reply-To: <1444744848-720-2-git-send-email-cedric.madianga@gmail.com>
-References: <1444744848-720-1-git-send-email-cedric.madianga@gmail.com>
- <1444744848-720-2-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <20151013142240.GC24353@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 13 Oct 2015 15:23:27 +0100
+Subject: [RFC] arm64: ioremap: add ioremap_cache macro
+In-Reply-To: <20151013141055.GC11573@e104818-lin.cambridge.arm.com>
+References: <1444616898-5057-1-git-send-email-yalin.wang2010@gmail.com>
+ <20151013141055.GC11573@e104818-lin.cambridge.arm.com>
+Message-ID: <20151013142326.GM21550@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 04:00:45PM +0200, M'boumba Cedric Madianga wrote:
-> This patch adds documentation of device tree bindings for the STM32 dma
-> controller.
+On Tue, Oct 13, 2015 at 03:10:55PM +0100, Catalin Marinas wrote:
+> On Mon, Oct 12, 2015 at 10:28:18AM +0800, yalin wang wrote:
+> > Add ioremap_cache macro, because some code will test if this macro
+> > is defined or not, and will generate a generric version if not defined,
+> > for example, memremap.c do like this.
+> > 
+> > Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+> > ---
+> >  arch/arm64/include/asm/io.h | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+> > index 44be1e0..d6b620c 100644
+> > --- a/arch/arm64/include/asm/io.h
+> > +++ b/arch/arm64/include/asm/io.h
+> > @@ -172,6 +172,7 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+> >  #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
+> >  #define ioremap_wt(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+> >  #define iounmap				__iounmap
+> > +#define ioremap_cache                  ioremap_cache
 > 
-> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-> ---
->  .../devicetree/bindings/dma/stm32-dma.txt          | 98 ++++++++++++++++++++++
->  1 file changed, 98 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/stm32-dma.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/stm32-dma.txt b/Documentation/devicetree/bindings/dma/stm32-dma.txt
-> new file mode 100644
-> index 0000000..9ce0d49
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/stm32-dma.txt
-> @@ -0,0 +1,98 @@
-> +* STMicroelectronics STM32 DMA controller
-> +
-> +The STM32 DMA is a general-purpose direct memory access controller capable of
-> +supporting 8 independent DMA channels. Each channel can have up to 8 requests.
-> +
-> +Required properties:
-> +- compatible: Should be "st,stm32-dma"
-> +- reg: Should contain DMA registers location and length. This should include
-> +  all of the per-channel registers.
-> +- interrupts: Should contain all of the per-channel DMA interrupts.
+> Applied. Thanks.
 
-Please specify the order they must be in.
+I'm not sure we want this. See:
 
-> +- clocks: Should contain the input clock of the DMA instance.
-> +- #dma-cells : Must be <4>. See DMA client paragraph for more details.
-> +
-> +Optional properties:
-> +- resets: Reference to a reset controller asserting the DMA controller
-> +- st,mem2mem: boolean; if defined, it indicates that the controller supports
-> +  memory-to-memory transfer
-> +
-> +Example:
-> +
-> +	dma2: dma-controller at 40026400 {
-> +		compatible = "st,stm32-dma";
-> +		reg = <0x40026400 0x400>;
-> +		interrupts = <56>,
-> +			     <57>,
-> +			     <58>,
-> +			     <59>,
-> +			     <60>,
-> +			     <68>,
-> +			     <69>,
-> +			     <70>;
-> +		clocks = <&clk_hclk>;
-> +		#dma-cells = <4>;
-> +		st,mem2mem;
-> +		resets = <&rcc 150>;
-> +	};
-> +
-> +* DMA client
-> +
-> +Required properties:
-> +- dmas: Comma separated list of dma channel requests
-> +- dma-names: Names of the aforementioned requested channels
-> +
-> +Each dmas request consists of 5 cells:
-> +1. A phandle pointing to the STM32 DMA controller
-> +2. The channel id
-> +3. The request line number
-> +4. A 32bit mask specifying the DMA channel configuration
-> + -bit 1: Direct Mode Error Interrupt
-> +	0x0: disabled
-> +	0x1: enabled
-> + -bit 2: Transfer Error Interrupt
-> +	0x0: disabled
-> +	0x1: enabled
-> + -bit 3: Half Transfer Mode Error Interrupt
-> +	0x0: disabled
-> +	0x1: enabled
-> + -bit 4: Transfer Complete Interrupt
-> +	0x0: disabled
-> +	0x1: enabled
+  https://lkml.org/lkml/2015/10/9/699
 
-Why should this be in the DT?
-
-Surely the driver should be in charge of deciding when to use these?
-
-> + -bit 9: Peripheral Increment Address
-> +	0x0: no address increment between transfers
-> +	0x1: increment address between transfers
-> + -bit 10: Memory Increment Address
-> +	0x0: no address increment between transfers
-> +	0x1: increment address between transfers
-
-These don't seem like they belong either. Surely this would depend on
-the request made, rather than being a fixed property?
-
-> + -bit 15: Peripheral Increment Offset Size
-> +	0x0: offset size is linked to the peripheral bus width
-> +	0x1: offset size is fixed to 4 (32-bit alignment)
-
-This sounds like it might belong in the DT.
-
-> + -bit 16-17: Priority level
-> +	0x0: low
-> +	0x1: medium
-> +	0x2: high
-> +	0x3: very high
-
-What do we do elsewhere in terms of describing prioritisation? It feels
-like it would be a dynamic property of the system.
-
-> +5. A 32bit mask specifying the DMA FIFO configuration
-> + -bit 0-1: Fifo threshold
-> +	0x0: 1/4 full FIFO
-> +	0x1: 1/2 full FIFO
-> +	0x2: 3/4 full FIFO
-> +	0x3:full FIFO
-
-What does this mean?
-
-> + -bit 2: Direct mode
-> +	0x0: enabled
-> +	0x1: disabled
-
-What does this mean?
-
-> + -bit 7: FIFO Error Interrupt
-> +	0x0: disabled
-> +	0x1: enabled
-
-As with the other interrupt configuration, this does not look like it
-belongs in the DT.
-
-Thanks,
-Mark.
+Will
