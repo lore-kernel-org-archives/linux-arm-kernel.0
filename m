@@ -1,72 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Oct 2015 12:51:39 +0100
-Subject: [PATCH v2 11/17] irqchip/gic: Get rid of gic_init_bases()
-In-Reply-To: <1444737105-31573-1-git-send-email-marc.zyngier@arm.com>
-References: <1444737105-31573-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1444737105-31573-12-git-send-email-marc.zyngier@arm.com>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Tue, 13 Oct 2015 13:57:39 +0200
+Subject: [PATCH] ARM: dts: msm8974: fix typo in "disabled" property
+In-Reply-To: <5733924.HXWPKe3hJM@wuerfel>
+References: <1444735998-18479-1-git-send-email-michael.opdenacker@free-electrons.com>
+ <5733924.HXWPKe3hJM@wuerfel>
+Message-ID: <561CF1B3.2010405@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since nobody is using gic_init_bases anymore outside of the GIC
-driver itself, let's do a bit of housekeeping and remove the now
-useless entry point.
+Hi Arnd,
 
-Only gic_init() is now exposed to the rest of the kernel for the
-benefit of legacy systems.
+On 10/13/2015 01:41 PM, Arnd Bergmann wrote:
+> On Tuesday 13 October 2015 13:33:18 Michael Opdenacker wrote:
+>> Replace "disable" by "disabled" in the Qualcomm MSM8974 dtsi
+>>
+>> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+>> ---
+>>  arch/arm/boot/dts/qcom-msm8974.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> The patch looks good, but I think you are missing some people on
+> Cc. Please send this to all the qcom maintainers. I suspect you
+> only have Kumar on Cc because he is listed as maintainer for dts
+> files in general, but platforms specific ones should go through
+> the platform maintainer trees.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic.c       | 8 +++-----
- include/linux/irqchip/arm-gic.h | 9 ++-------
- 2 files changed, 5 insertions(+), 12 deletions(-)
+This sounds good. Thanks for the advise and for the quick review. I'm
+resending right away...
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 9262bb9..12b2973 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1127,17 +1127,15 @@ static void __init __gic_init_bases(unsigned int gic_nr, int irq_start,
- 	gic_pm_init(gic);
- }
- 
--void __init gic_init_bases(unsigned int gic_nr, int irq_start,
--			   void __iomem *dist_base, void __iomem *cpu_base,
--			   u32 percpu_offset, struct device_node *node)
-+void __init gic_init(unsigned int gic_nr, int irq_start,
-+		     void __iomem *dist_base, void __iomem *cpu_base)
- {
- 	/*
- 	 * Non-DT/ACPI systems won't run a hypervisor, so let's not
- 	 * bother with these...
- 	 */
- 	static_key_slow_dec(&supports_deactivate);
--	__gic_init_bases(gic_nr, irq_start, dist_base, cpu_base,
--			 percpu_offset, node);
-+	__gic_init_bases(gic_nr, irq_start, dist_base, cpu_base, 0, NULL);
- }
- 
- #ifdef CONFIG_OF
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index b8901df..bae69e5 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -100,16 +100,11 @@
- 
- struct device_node;
- 
--void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
--		    u32 offset, struct device_node *);
- void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
- int gic_cpu_if_down(unsigned int gic_nr);
- 
--static inline void gic_init(unsigned int nr, int start,
--			    void __iomem *dist , void __iomem *cpu)
--{
--	gic_init_bases(nr, start, dist, cpu, 0, NULL);
--}
-+void gic_init(unsigned int nr, int start,
-+	      void __iomem *dist , void __iomem *cpu);
- 
- int gicv2m_of_init(struct device_node *node, struct irq_domain *parent);
- 
+Michael.
+
 -- 
-2.1.4
+Michael Opdenacker, CEO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
++33 484 258 098
