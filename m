@@ -1,119 +1,109 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Oct 2015 12:51:36 +0100
-Subject: [PATCH v2 08/17] irqdomain: Add a fwnode_handle allocator
+Date: Tue, 13 Oct 2015 12:51:34 +0100
+Subject: [PATCH v2 06/17] irqdomain: Introduce irq_create_fwspec_mapping
 In-Reply-To: <1444737105-31573-1-git-send-email-marc.zyngier@arm.com>
 References: <1444737105-31573-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1444737105-31573-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1444737105-31573-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to reference an irqdomain from ACPI, we need
-to be able to create an identifier, which is usually a struct
-device_node.
+Just like we have irq_create_of_mapping, irq_create_fwspec_mapping
+creates a IRQ domain mapping for an interrupt described in a
+struct irq_fwspec.
 
-This device node does't really fit the ACPI infrastructure, so
-we cunningly allocate a new structure containing a fwnode_handle,
-and return that.
+irq_create_of_mapping gets rewritten in terms of the new function,
+and the hack we introduced before gets removed (now that no stacked
+irqchip uses of_phandle_args anymore).
 
-This structure doesn't really point to a device (interrupt
-controllers are not "real" devices in Linux), but as we cannot
-really deny that they exist, we create them with a new fwnode_type
-(FWNODE_IRQCHIP).
-
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/fwnode.h    |  1 +
- include/linux/irqdomain.h |  2 ++
- kernel/irq/irqdomain.c    | 51 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 54 insertions(+)
+ include/linux/irqdomain.h |  1 +
+ kernel/irq/irqdomain.c    | 30 +++++++++++++++---------------
+ 2 files changed, 16 insertions(+), 15 deletions(-)
 
-diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
-index 0408545..37ec668 100644
---- a/include/linux/fwnode.h
-+++ b/include/linux/fwnode.h
-@@ -17,6 +17,7 @@ enum fwnode_type {
- 	FWNODE_OF,
- 	FWNODE_ACPI,
- 	FWNODE_PDATA,
-+	FWNODE_IRQCHIP,
- };
- 
- struct fwnode_handle {
 diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index 995d4c5..949caa7 100644
+index 533c974..7e7842e 100644
 --- a/include/linux/irqdomain.h
 +++ b/include/linux/irqdomain.h
-@@ -188,6 +188,8 @@ static inline struct device_node *irq_domain_get_of_node(struct irq_domain *d)
- }
+@@ -267,6 +267,7 @@ extern void irq_domain_disassociate(struct irq_domain *domain,
  
- #ifdef CONFIG_IRQ_DOMAIN
-+struct fwnode_handle *irq_domain_alloc_fwnode(void *data);
-+void irq_domain_free_fwnode(struct fwnode_handle *fwnode);
- struct irq_domain *__irq_domain_add(struct fwnode_handle *fwnode, int size,
- 				    irq_hw_number_t hwirq_max, int direct_max,
- 				    const struct irq_domain_ops *ops,
+ extern unsigned int irq_create_mapping(struct irq_domain *host,
+ 				       irq_hw_number_t hwirq);
++extern unsigned int irq_create_fwspec_mapping(struct irq_fwspec *fwspec);
+ extern void irq_dispose_mapping(unsigned int virq);
+ 
+ /**
 diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index de6d749..41151d3 100644
+index 86dfd40..b1fda6d 100644
 --- a/kernel/irq/irqdomain.c
 +++ b/kernel/irq/irqdomain.c
-@@ -27,6 +27,57 @@ static int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
- 				  irq_hw_number_t hwirq, int node);
- static void irq_domain_check_hierarchy(struct irq_domain *domain);
+@@ -514,37 +514,28 @@ static void of_phandle_args_to_fwspec(struct of_phandle_args *irq_data,
+ 		fwspec->param[i] = irq_data->args[i];
+ }
  
-+struct irqchip_fwid {
-+	struct fwnode_handle fwnode;
-+	char *name;
-+	void *data;
-+};
+-unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
++unsigned int irq_create_fwspec_mapping(struct irq_fwspec *fwspec)
+ {
+-	struct irq_fwspec fwspec;
+ 	struct irq_domain *domain;
+ 	irq_hw_number_t hwirq;
+ 	unsigned int type = IRQ_TYPE_NONE;
+ 	int virq;
+ 
+-	of_phandle_args_to_fwspec(irq_data, &fwspec);
+-
+-	if (fwspec.fwnode)
+-		domain = irq_find_matching_fwnode(fwspec.fwnode, DOMAIN_BUS_ANY);
++	if (fwspec->fwnode)
++		domain = irq_find_matching_fwnode(fwspec->fwnode, DOMAIN_BUS_ANY);
+ 	else
+ 		domain = irq_default_domain;
+ 
+ 	if (!domain) {
+ 		pr_warn("no irq domain found for %s !\n",
+-			of_node_full_name(to_of_node(fwspec.fwnode)));
++			of_node_full_name(to_of_node(fwspec->fwnode)));
+ 		return 0;
+ 	}
+ 
+-	if (irq_domain_translate(domain, &fwspec, &hwirq, &type))
++	if (irq_domain_translate(domain, fwspec, &hwirq, &type))
+ 		return 0;
+ 
+ 	if (irq_domain_is_hierarchy(domain)) {
+-		/* Temporary hack */
+-		void *desc = &fwspec;
+-#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+-		if (!domain->ops->translate)
+-			desc = irq_data;
+-#endif
+ 		/*
+ 		 * If we've already configured this interrupt,
+ 		 * don't do it again, or hell will break loose.
+@@ -553,7 +544,7 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+ 		if (virq)
+ 			return virq;
+ 
+-		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, desc);
++		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, fwspec);
+ 		if (virq <= 0)
+ 			return 0;
+ 	} else {
+@@ -569,6 +560,15 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+ 		irq_set_irq_type(virq, type);
+ 	return virq;
+ }
++EXPORT_SYMBOL_GPL(irq_create_fwspec_mapping);
 +
-+/**
-+ * irq_domain_alloc_fwnode - Allocate a fwnode_handle suitable for
-+ *                           identifying an irq domain
-+ * @data: optional user-provided data
-+ *
-+ * Allocate a struct device_node, and return a poiner to the embedded
-+ * fwnode_handle (or NULL on failure).
-+ */
-+struct fwnode_handle *irq_domain_alloc_fwnode(void *data)
++unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
 +{
-+	struct irqchip_fwid *fwid;
-+	char *name;
++	struct irq_fwspec fwspec;
 +
-+	fwid = kzalloc(sizeof(*fwid), GFP_KERNEL);
-+	name = kasprintf(GFP_KERNEL, "irqchip@%p", data);
-+
-+	if (!fwid || !name) {
-+		kfree(fwid);
-+		kfree(name);
-+		return NULL;
-+	}
-+
-+	fwid->name = name;
-+	fwid->data = data;
-+	fwid->fwnode.type = FWNODE_IRQCHIP;
-+	return &fwid->fwnode;
++	of_phandle_args_to_fwspec(irq_data, &fwspec);
++	return irq_create_fwspec_mapping(&fwspec);
 +}
-+
-+/**
-+ * irq_domain_free_fwnode - Free a non-OF-backed fwnode_handle
-+ *
-+ * Free a fwnode_handle allocated with irq_domain_alloc_fwnode.
-+ */
-+void irq_domain_free_fwnode(struct fwnode_handle *fwnode)
-+{
-+	struct irqchip_fwid *fwid;
-+
-+	if (WARN_ON(fwnode->type != FWNODE_IRQCHIP))
-+		return;
-+
-+	fwid = container_of(fwnode, struct irqchip_fwid, fwnode);
-+	kfree(fwid->name);
-+	kfree(fwid);
-+}
-+
+ EXPORT_SYMBOL_GPL(irq_create_of_mapping);
+ 
  /**
-  * __irq_domain_add() - Allocate a new irq_domain data structure
-  * @of_node: optional device-tree node of the interrupt controller
 -- 
 2.1.4
