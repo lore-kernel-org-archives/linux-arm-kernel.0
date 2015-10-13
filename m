@@ -1,60 +1,81 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 13 Oct 2015 14:01:06 +0100
-Subject: [PATCH] arm64: kasan: fix issues reported by sparse
-Message-ID: <1444741266-21335-1-git-send-email-will.deacon@arm.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 13 Oct 2015 18:43:42 +0530
+Subject: [PATCH v3 0/8] Add support for Exynos SROM Controller driver
+Message-ID: <1444742030-31892-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sparse reports some new issues introduced by the kasan patches:
+This patch set adds support for Exynos SROM controller DT based driver.
+Currently SROM register sets are used only during S2R, so driver
+basically added for taking care of S2R. It will help us in removing
+static mapping from exynos.c and other extra code handline during S2R.
 
-  arch/arm64/mm/kasan_init.c:91:13: warning: no previous prototype for
-  'kasan_early_init' [-Wmissing-prototypes] void __init kasan_early_init(void)
-             ^
-  arch/arm64/mm/kasan_init.c:91:13: warning: symbol 'kasan_early_init'
-  was not declared. Should it be static? [sparse]
+This patch set also updated exynos4 and exynos5 dtsi files for with device
+node for srom, and added binding documentation for the same.
 
-This patch resolves the problem by adding a prototype for
-kasan_early_init and marking the function as asmlinkage, since it's only
-called from head.S.
+First two patches are some minor cleanup in mach-exynos.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/kasan.h | 2 ++
- arch/arm64/mm/kasan_init.c     | 2 +-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+Patchset v1 was posted here[1]
+[1]: https://lkml.org/lkml/2015/4/29/98
+Patchset v2 was posted here[2]
+[2]: https://lkml.org/lkml/2015/8/24/125
 
-diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
-index 71dfe14acdca..2774fa384c47 100644
---- a/arch/arm64/include/asm/kasan.h
-+++ b/arch/arm64/include/asm/kasan.h
-@@ -5,6 +5,7 @@
- 
- #ifdef CONFIG_KASAN
- 
-+#include <linux/linkage.h>
- #include <asm/memory.h>
- 
- /*
-@@ -27,6 +28,7 @@
- #define KASAN_SHADOW_OFFSET     (KASAN_SHADOW_END - (1ULL << (64 - 3)))
- 
- void kasan_init(void);
-+asmlinkage void kasan_early_init(void);
- 
- #else
- static inline void kasan_init(void) { }
-diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-index b6a92f5dd568..cf038c7d9fa9 100644
---- a/arch/arm64/mm/kasan_init.c
-+++ b/arch/arm64/mm/kasan_init.c
-@@ -88,7 +88,7 @@ static void __init kasan_map_early_shadow(void)
- 	} while (pgd++, addr = next, addr != end);
- }
- 
--void __init kasan_early_init(void)
-+asmlinkage void __init kasan_early_init(void)
- {
- 	BUILD_BUG_ON(KASAN_SHADOW_OFFSET != KASAN_SHADOW_END - (1UL << 61));
- 	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_START, PGDIR_SIZE));
+This patchset, I have tested on Peach-Pi (Exynos5880) based chromebook for boot
+and S2R functionality.
+
+Changes since v2:
+ - Rebased to latest kgene tree.
+ - Addressed review comments from Krzysztof Kozlowski.
+ - Add new patch for MAINTAINER list update.
+ - Reordered patch sequence for avoiding git bisect issues.
+
+Changes since v1:
+ - Rebased to latest kgene tree.
+ - Addressed review comments from Krzysztof Kozlowski.
+ - Add two new patches for minor cleanup in exynos.c and map.h
+
+Pankaj Dubey (7):
+  ARM: EXYNOS: remove unused static mapping of CMU for exynos5
+  ARM: EXYNOS: code cleanup in map.h
+  drivers: soc: add support for exynos SROM driver
+  ARM: EXYNOS: Remove SROM related register settings from mach-exynos
+  ARM: dts: add SROM device node for exynos4
+  ARM: dts: add SROM device node for exynos5
+  Documentation: dt-bindings: add exynos-srom binding information
+
+Pankaj Dubey (8):
+  ARM: EXYNOS: remove unused static mapping of CMU for exynos5
+  ARM: EXYNOS: code cleanup in map.h
+  Documentation: dt-bindings: add exynos-srom binding information
+  ARM: dts: add SROM device node for exynos4
+  ARM: dts: add SROM device node for exynos5
+  drivers: soc: add support for exynos SROM driver
+  MAINTAINERS: add maintainers entry for drivers/soc/samsung
+  ARM: EXYNOS: Remove SROM related register settings from mach-exynos
+
+ .../bindings/arm/samsung/exynos-srom.txt           |  12 ++
+ MAINTAINERS                                        |   1 +
+ arch/arm/boot/dts/exynos4.dtsi                     |   5 +
+ arch/arm/boot/dts/exynos5.dtsi                     |   5 +
+ arch/arm/mach-exynos/Kconfig                       |   2 +
+ arch/arm/mach-exynos/exynos.c                      |  22 ---
+ arch/arm/mach-exynos/include/mach/map.h            |   8 --
+ arch/arm/mach-exynos/regs-srom.h                   |  53 -------
+ arch/arm/mach-exynos/suspend.c                     |  20 +--
+ arch/arm/plat-samsung/include/plat/map-s5p.h       |   1 -
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/samsung/Kconfig                        |  13 ++
+ drivers/soc/samsung/Makefile                       |   1 +
+ drivers/soc/samsung/exynos-srom.c                  | 153 +++++++++++++++++++++
+ drivers/soc/samsung/exynos-srom.h                  |  51 +++++++
+ 16 files changed, 247 insertions(+), 102 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+ delete mode 100644 arch/arm/mach-exynos/regs-srom.h
+ create mode 100644 drivers/soc/samsung/Kconfig
+ create mode 100644 drivers/soc/samsung/Makefile
+ create mode 100644 drivers/soc/samsung/exynos-srom.c
+ create mode 100644 drivers/soc/samsung/exynos-srom.h
+
 -- 
-2.1.4
+2.4.5
