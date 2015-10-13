@@ -1,102 +1,103 @@
-From: pat-lkml@erley.org (Pat Erley)
-Date: Mon, 12 Oct 2015 21:06:41 -0700
-Subject: [Linaro-acpi] [PATCH v5 0/5] Provide better MADT subtable sanity
- checks
-In-Reply-To: <561C1D87.8010106@linaro.org>
-References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
- <560BA4C9.7090607@huawei.com> <560C0968.6020904@redhat.com>
- <2808057.teMg2oCLf6@vostro.rjw.lan> <5612AF64.4060900@redhat.com>
- <561B2442.9050600@erley.org> <561B2DAD.5070601@linaro.org>
- <561B2FCA.1010504@erley.org> <561C1D87.8010106@linaro.org>
-Message-ID: <561C8351.3030304@erley.org>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Tue, 13 Oct 2015 09:37:08 +0530
+Subject: [PATCH 1/3] ARM: dts: exynos5422-odroidxu3: use cd-gpio method to
+ detect sd-card
+In-Reply-To: <561C6713.1070508@samsung.com>
+References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
+ <561B3739.4040701@samsung.com> <561B3A83.6090607@samsung.com>
+ <1111856990.2419183.1444661252893.JavaMail.yahoo@mail.yahoo.com>
+ <561C4C88.2040004@samsung.com> <561C6713.1070508@samsung.com>
+Message-ID: <CANAwSgR3tR+rZk+3WMc7hd=pspQgvLSWdTJaNrQvQqqdj4DSmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2015 01:52 PM, Al Stone wrote:
-> On 10/11/2015 09:58 PM, Pat Erley wrote:
->> On 10/11/2015 08:49 PM, Hanjun Guo wrote:
->>> On 10/12/2015 11:08 AM, Pat Erley wrote:
->>>> On 10/05/2015 10:12 AM, Al Stone wrote:
->>>>> On 10/05/2015 07:39 AM, Rafael J. Wysocki wrote:
->>>>>> On Wednesday, September 30, 2015 10:10:16 AM Al Stone wrote:
->>>>>>> On 09/30/2015 03:00 AM, Hanjun Guo wrote:
->>>>>>>> On 2015/9/30 7:45, Al Stone wrote:
->>>>>>>>> NB: this patch set is for use against the linux-pm bleeding edge
->>>>>>>>> branch.
->>>>>>>>>
->>>>>>>
->>>>>>> [snip...]
->>>>>>>
->>>>>>>>
->>>>>>>> For this patch set,
->>>>>>>>
->>>>>>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>>>>>
->>>>>>>> Thanks
->>>>>>>> Hanjun
->>>>>>>
->>>>>>> Thanks, Hanjun!
->>>>>>
->>>>>> Series applied, thanks!
->>>>>>
->>>>>> Rafael
->>>>>>
->>>>>
->>>>> Thanks, Rafael!
->>>>>
+Hi Jaehoon,
+
+On 13 October 2015 at 07:36, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Dear, Anand.
+>
+>
+> On 10/13/2015 09:12 AM, Krzysztof Kozlowski wrote:
+>> On 12.10.2015 23:47, Anand Moon wrote:
 >>>>
->>>> Just decided to test out linux-next (to see the new nouveau cleanups).
->>>> This change set prevents my Lenovo W510 from booting properly.
+>>>> Anand,
 >>>>
->>>> Reverting: 7494b0 "ACPI: add in a bad_madt_entry() function to
->>>> eventually replace the macro"
+>>>> You essentially reverted here af6ad88acbd6 ("ARM: dts: Mux XMMCnDATA[0]
+>>>> pad correctly for Exynos5420 boards"). Why? There is no explanation in
+>>>> the commit message about this.
+>>>
+>>> I don't remember to send the patch relevant to this. Hmm...
+>>> Well, Is this patch really signed-off by me?
+>>>
+>>> Best Regards,
+>>>
+>>> Jaehoon Chung
 >>>>
->>>> Gets the system booting again.  I'm attaching my dmesg from the failed
->>>> boot, who wants the acpidump?
+>>>> Best regards,
+>>>> Krzysztof
+>>>>
 >>>
->>> [    0.000000] ACPI: undefined version for either FADT 4.0 or MADT 1
->>> [    0.000000] ACPI: Error parsing LAPIC address override entry
->>> [    0.000000] ACPI: Invalid BIOS MADT, disabling ACPI
+>>>>
 >>>
->>> Seems the MADT revision is not right, could you dump the ACPI MADT
->>> (APIC) table and send it out? I will take a look :)
 >>>
->>> Thanks
->>> Hanjun
+>>> Some how I don't receive these mail on my email id.
+>>>
+>>> I have picked up these changes from tizen repository for OdroidXU3.
+>>> I have tested with this changes to detect UHS-I micro cd cards.
+>>> That's the reason for this email.
+>
+> It seems to make manually, right?
+> I have checked the tizen repository.
+>
+> The below is
+>
+> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> @@ -335,7 +335,9 @@
+>         samsung,dw-mshc-sdr-timing = <0 4>;
+>         samsung,dw-mshc-ddr-timing = <0 2>;
+>         pinctrl-names = "default";
+> -       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
+> +       cd-gpios = <&gpc2 2 0>;
+> +       cd-inverted;
+> +       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus1 &sd2_bus4>;
+>         bus-width = <4>;
+>         cap-sd-highspeed;
+>  };
+>
+>
+>
+> Yours
+>
+> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> @@ -352,8 +352,10 @@
+>         samsung,dw-mshc-ciu-div = <3>;
+>         samsung,dw-mshc-sdr-timing = <0 4>;
+>         samsung,dw-mshc-ddr-timing = <0 2>;
+> +       cd-gpios = <&gpc2 2 GPIO_ACTIVE_HIGH>;
+> +       cd-inverted;
+>         pinctrl-names = "default";
+> -       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
+> +       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+>
+> Did you know what differ? :)
+>
+> Best Regards,
+> Jaehoon Chung
+>
 >>
->> Here ya go, enjoy.  Feel free to CC me on any patches that might fix it.
->
-> Pat,
->
-> Would you mind sending a copy of the FADT, also, please?  The first of the
-> ACPI messages is a check of version correspondence between the FADT and MADT,
-> while the second message is from looking at just an MADT subtable.  Thanks
-> for sending the MADT out -- that helps me quite a lot in thinking this through.
->
-> BTW, whoever is providing the BIOS (Lenovo, I assume) may want to have a look
-> at these, also:
->
-> [    0.000000] ACPI BIOS Warning (bug): 32/64X length mismatch in
-> FADT/Pm1aControlBlock: 16/32 (20150818/tbfadt-623)
-> [    0.000000] ACPI BIOS Warning (bug): Invalid length for
-> FADT/Pm1aControlBlock: 32, using default 16 (20150818/tbfadt-704)
->
-> Not inherently dangerous, but definitely sloppy and mind-numbingly easy to
-> avoid, IIRC.
+>> ... and you applied it blindly without looking at actual existing
+>> contents and at previous commits.
+>>
+>> That is not how patches from different repositories should be cherry picked.
+>>
+>> Best regards,
+>> Krzysztof
+>>
+>>
 >
 
-Here ya go.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: facp.dsl
-Type: text/x-dsl
-Size: 9173 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151012/59eac2f5/attachment.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: facp.dat
-Type: application/x-ns-proxy-autoconfig
-Size: 244 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151012/59eac2f5/attachment-0001.bin>
+Looks like my changes have introduce another bug so please ignore this changes.
+
+-Anand Moon
