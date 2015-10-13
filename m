@@ -1,71 +1,31 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 13 Oct 2015 10:37:49 +0100
-Subject: [PATCH 4/4] arm64: dts: add .dts for GICv3 Foundation model
-In-Reply-To: <1444729069-27922-1-git-send-email-andre.przywara@arm.com>
-References: <1444729069-27922-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1444729069-27922-5-git-send-email-andre.przywara@arm.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Tue, 13 Oct 2015 17:37:54 +0800
+Subject: [PATCH 0/4] Add tune support of Mediatek MMC driver 
+Message-ID: <1444729078-26585-1-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARMv8 Foundation model sports a command line parameter to use
-a GICv3 emulation instead of the default GICv2 interrupt controller.
-Add a new .dts file which reuses most of the definitions of the
-existing model while just adding the required properties for the
-GICv3 node.
-This allows the public Foundation model to run with a GICv3.
+Add DT bindings for eMMC hardware reset
+Add pinctrl of data strobe pin for HS400 mode
+Modify eMMC driving settings
+Add 400mhz source clock for HS400 mode
+Add eMMC HS200/HS400 mode support
+Add SD SDR50/SDR104 mode support
+Add implement of tune funtion with CMD19/CMD21
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arch/arm64/boot/dts/arm/Makefile                |  2 +-
- arch/arm64/boot/dts/arm/foundation-v8-gicv3.dts | 30 +++++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/arm/foundation-v8-gicv3.dts
+Chaotian Jing (4):
+  mmc: core: Add DT bindings for eMMC hardware reset support
+  mmc: dt-bindings: update Mediatek MMC bindings
+  mmc: mediatek: Add tune support
+  arm64: dts: mediatek:: Add HS200/HS400/SDR50/SDR104 support
 
-diff --git a/arch/arm64/boot/dts/arm/Makefile b/arch/arm64/boot/dts/arm/Makefile
-index bb3c072..46d342d 100644
---- a/arch/arm64/boot/dts/arm/Makefile
-+++ b/arch/arm64/boot/dts/arm/Makefile
-@@ -1,4 +1,4 @@
--dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb
-+dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb foundation-v8-gicv3.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb juno-r1.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2f-1xv7-ca53x2.dtb
-diff --git a/arch/arm64/boot/dts/arm/foundation-v8-gicv3.dts b/arch/arm64/boot/dts/arm/foundation-v8-gicv3.dts
-new file mode 100644
-index 0000000..ecdbe98
---- /dev/null
-+++ b/arch/arm64/boot/dts/arm/foundation-v8-gicv3.dts
-@@ -0,0 +1,30 @@
-+/*
-+ * ARM Ltd.
-+ *
-+ * ARMv8 Foundation model DTS (GICv3 configuration)
-+ */
-+
-+#include "foundation-v8.dtsi"
-+
-+/ {
-+	gic: interrupt-controller at 2f000000 {
-+		compatible = "arm,gic-v3";
-+		#interrupt-cells = <3>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+		interrupt-controller;
-+		reg =	<0x0 0x2f000000 0x0 0x10000>,
-+			<0x0 0x2f100000 0x0 0x200000>,
-+			<0x0 0x2c000000 0x0 0x2000>,
-+			<0x0 0x2c010000 0x0 0x2000>,
-+			<0x0 0x2c02f000 0x0 0x2000>;
-+		interrupts = <1 9 0xf04>;
-+
-+		its: its at 2f020000 {
-+			compatible = "arm,gic-v3-its";
-+			msi-controller;
-+			reg = <0x0 0x2f020000 0x0 0x20000>;
-+		};
-+	};
-+};
+ Documentation/devicetree/bindings/mmc/mmc.txt    |   1 +
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt |  12 +-
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |  21 +-
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi         |   5 +-
+ drivers/mmc/core/host.c                          |   2 +
+ drivers/mmc/host/mtk-sd.c                        | 359 +++++++++++++++++++++--
+ 6 files changed, 364 insertions(+), 36 deletions(-)
+
 -- 
-2.5.1
+1.8.1.1.dirty
