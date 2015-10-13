@@ -1,44 +1,33 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 13 Oct 2015 10:36:50 +0200
-Subject: [PATCH 3/4] ARM: multi_v7_defconfig: Enable Maxim 8997 family
- drivers
-In-Reply-To: <1444699628-3774-3-git-send-email-k.kozlowski@samsung.com>
-References: <1444699628-3774-1-git-send-email-k.kozlowski@samsung.com>
- <1444699628-3774-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CABxcv=m3tjo6rX3QVTjy3YPiM8AXF=m45TLVvc4-eZK+51X-8Q@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 13 Oct 2015 10:37:41 +0200
+Subject: [PATCH 03/37] ARM: mvebu: Armada 388 GP: Remove unneeded
+ regulator property
+In-Reply-To: <1444684386-17094-4-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <1444684386-17094-4-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <20151013103741.4ba34f90@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Laurent,
 
-On Tue, Oct 13, 2015 at 3:27 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> Enable support for Maxim 8997 Multi Function Device present on Trats and
-> Origen boards by toggling on drivers: main MFD, charger, haptic motor,
-> regulator, LED and RTC.
->
-> This allows to test and usage of these boards with multi_v7 config.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+On Tue, 13 Oct 2015 00:12:32 +0300, Laurent Pinchart wrote:
+> The enable-active-high regulator property only makes sense when an
+> enable GPIO is specified. Remove it.
+> 
+> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 > ---
+>  arch/arm/boot/dts/armada-388-gp.dts | 2 --
+>  1 file changed, 2 deletions(-)
 
-[snip]
-
->  CONFIG_MFD_MAX77686=y
->  CONFIG_MFD_MAX77693=y
->  CONFIG_MFD_MAX8907=y
-> +CONFIG_MFD_MAX8997=y
-
-Only slightly related with your patch but some of the MFD driver for
-PMICs used in Exynos boards (like MAX77686) have a tristate Kconfig
-symbol while others like this one have a boolean. Do you know if there
-are any restrictions w.r.t build this as module or is just an
-arbitrary decision? I'm asking since probably we should either allow
-this to build as a module or convert the others to boolean.
-
-Patch looks good to me:
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Thanks, but this patch is no longer needed, since commit
+b5999dcbdb96570c130772ac2055a4d34ec8b3d7 actually added the reference
+to the gpio controlling the regulator.
 
 Best regards,
-Javier
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
