@@ -1,62 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Oct 2015 17:00:49 +0200
-Subject: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for HiSilicon
- SoC Hip05
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E16242C92@lhreml503-mbs>
-References: <1444445957-239522-1-git-send-email-wangzhou1@hisilicon.com>
- <6336414.HvfCQcuT3Y@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E16242C92@lhreml503-mbs>
-Message-ID: <11677087.JbqAo0FWJE@wuerfel>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 13 Oct 2015 16:42:11 +0200
+Subject: [alsa-devel] [RFC PATCH] ASoC: Modify check condition of multiple
+ bindings of components
+In-Reply-To: <1444745902.26493.2.camel@mtksdaap41>
+References: <1444743477-48819-1-git-send-email-koro.chen@mediatek.com>	
+ <561D0AA9.5080702@metafoo.de> <1444745902.26493.2.camel@mtksdaap41>
+Message-ID: <561D1843.1020007@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 October 2015 14:49:07 Gabriele Paoloni wrote:
-> > On Monday 12 October 2015 16:35:45 Bjorn Helgaas wrote:
-> > >
-> > > > +{
-> > > > +     u64 addr;
-> > > > +     struct device_node *msi_node;
-> > > > +     struct resource res;
-> > > > +     struct device_node *np = pp->dev->of_node;
-> > > > +     struct hisi_pcie *pcie = to_hisi_pcie(pp);
-> > > > +
-> > > > +     msi_node = of_parse_phandle(np, "msi-parent", 0);
-> > > > +     if (!msi_node) {
-> > > > +             dev_err(pp->dev, "failed to find msi-parent\n");
-> > > > +             return -EINVAL;
-> > > > +     }
-> > > > +     of_address_to_resource(msi_node, 0, &res);
-> > >
-> > > Does this use the "msi-parent" node in the same way as other drivers
-> > > do?  I'm sure there must be other places where we extract struct
-> > > resource information from an "msi-parent" node, but I don't see them.
-> > >
-> > > I'm trying to verify that this isn't some kind of incompatible
-> > > extension of the "msi-parent" property.  I cc'd Arnd and Rob (DT
-> > > experts).
-> > 
-> > This is not ok, what this does is that it relies on a particular
-> > implementation of the MSI controller and directly accesses its
-> > registers.
-> 
-> Hi Arnd, thanks for reviewing.
-> 
-> What we do is to retrieve the msi-parent physical address and we store it
-> in our internal PCIe register locations...
+On 10/13/2015 04:18 PM, Koro Chen wrote:
+> On Tue, 2015-10-13 at 15:44 +0200, Lars-Peter Clausen wrote:
+>> On 10/13/2015 03:37 PM, Koro Chen wrote:
+>>> The patch "ASoC: Prevent components from being bound to multiple cards"
+>>> adds check to prevent multiple cards from using the same component.
+>>> However, snd_soc_register_platform() or snd_soc_register_codec() will
+>>> also create components, and sharing the same platform by multiple cards
+>>> is then refused. This happens with a platform having multiple
+>>> independent DAIs that share the same DMA controller.
+>>>
+>>> Relax the condition by checking component->registered_as_component,
+>>> which is only true in case of snd_soc_register_component() and
+>>> will be false for components created by snd_soc_register_platform()
+>>> or snd_soc_register_codec().
+>>
+>> Binding a component to multiple cards results in internal data structure
+>> corruption, regardless of whether it is a raw component, CODEC or platform,
+>> which is why the check was added. So the proposed change wont work.
+>>
+> Thanks for your comment. Is it possible to share an example of how the
+> data structure will be corrupted? So I can study into this further.
 
-Ah, thanks for the clarification, I missed that part.
-
-> So we do not operate directly on the msi controller registers...
-> 
-> So I wonder if the current implementation is Ok to retrieve the
-> msi-parent address....
-
-Not sure. Why do you do this? Normally the PCI host does not know
-or care about the address of the MSI controller, because the messages
-are just passed up to the parent bus as DMA transfers.
-
-I don't think what you do here is safe because the 'reg' property
-of the MSI controller might point to the address that is used for
-the message directly.
-
-	Arnd
+Just look at soc_probe_component() and think about what happens if that runs
+twice for two different cards. Multiple calls to list_add() on the same
+list, controls are added multiple times, DAPM widgets are created multiple
+times, the card field will only point to the last card.
