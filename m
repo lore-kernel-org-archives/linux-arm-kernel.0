@@ -1,51 +1,59 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Tue, 13 Oct 2015 10:21:11 +0800
-Subject: [PATCH v2 0/3] Fix random hang up issue while kernel init
-In-Reply-To: <561BE09B.3040702@gmail.com>
-References: <1444209281-25536-1-git-send-email-jamesjj.liao@mediatek.com>
- <561BE09B.3040702@gmail.com>
-Message-ID: <1444702871.31890.4.camel@mtksdaap41>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 13 Oct 2015 10:22:39 +0800
+Subject: [PATCH RFC 1/2] dt-bindings: simplefb: Support a list of
+ regulator supply properties
+In-Reply-To: <20151012171018.GB3659@leverpostej>
+References: <1444669458-5588-1-git-send-email-wens@csie.org>
+ <1444669458-5588-2-git-send-email-wens@csie.org>
+ <20151012171018.GB3659@leverpostej>
+Message-ID: <CAGb2v651=uaHEQK4wpEQywgr311NSbqEvYkpsC5zSHPSFq-HHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+On Tue, Oct 13, 2015 at 1:10 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Oct 13, 2015 at 01:04:17AM +0800, Chen-Yu Tsai wrote:
+>> The physical display tied to the framebuffer may have regulators
+>> providing power to it, such as power for LCDs or interface conversion
+>> chips.
+>>
+>> The number of regulators in use may vary, but the regulator supply
+>> binding can not be a list. Work around this by adding a "num-supplies"
+>> property to communicate the number of supplies, and a list of 0 ~ N
+>> "vinN-supply" properties for the actual regulator supply.
+>
+> This is getting more complicated by the minute...
 
-On Mon, 2015-10-12 at 18:32 +0200, Matthias Brugger wrote:
-> 
-> On 07/10/15 11:14, James Liao wrote:
-> > This patch is based on v4.3-rc4, to fix system hanging up issue
-> > while disabling unused clocks.
-> >
-> > There is nothing different in mtk-scpsys.c and mt8173.dtsi from v1 [1].
-> >
-> > Changes since v1:
-> > - Rebase to v4.3-rc4.
-> > - Add a patch to change the corresponding binding document.
-> > - Add a separated patch to change the dtsi.
-> >
-> > [1] https://patchwork.kernel.org/patch/7262411/
-> >
-> > James Liao (3):
-> >    dt-bindings: soc: Add clocks for Mediatek SCPSYS unit
-> >    soc: mediatek: Fix random hang up issue while kernel init
-> >    arm64: dts: mt8173: Add clocks for SCPSYS unit
-> >
-> >   .../devicetree/bindings/soc/mediatek/scpsys.txt    | 10 ++--
-> >   arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  6 +-
-> >   drivers/soc/mediatek/mtk-scpsys.c                  | 67 ++++++++++++++--------
-> >   3 files changed, 54 insertions(+), 29 deletions(-)
-> >
-> > --
-> > 1.9.1
-> >
-> >
-> 
-> Applied. Does this fix also needs to be applied to earlier kernel versions?
+Yeah...
 
-No need, because venc and venc_lt clocks are not controlled by CCF
-before v4.2.
+I considered "backlight" and "panel" properties, but that seems to need
+more effort to parse. Regulators seemed easier.
 
+>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  .../devicetree/bindings/video/simple-framebuffer.txt       | 14 ++++++++++----
+>>  1 file changed, 10 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+>> index 4474ef6e0b95..0cc43e1be8b5 100644
+>> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+>> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+>> @@ -47,10 +47,14 @@ Required properties:
+>>    - a8b8g8r8 (32-bit pixels, d[31:24]=a, d[23:16]=b, d[15:8]=g, d[7:0]=r).
+>>
+>>  Optional properties:
+>> -- clocks : List of clocks used by the framebuffer. Clocks listed here
+>> -           are expected to already be configured correctly. The OS must
+>> -           ensure these clocks are not modified or disabled while the
+>> -           simple framebuffer remains active.
+>> +- clocks : List of clocks used by the framebuffer.
+>> +- num-supplies : The number of regulators used by the framebuffer.
+>> +- vinN-supply : The N-th (from 0) regulator used by the framebuffer.
+>
+> I don't see why you need num-supplies. Why not just try probing
+> vin${N}-supply until such a property isn't present in the DT?
 
-Best regards,
+That's doable. Though I'd add a hard limit on it. Does 16 seem reasonable?
 
-James
+Thanks
+ChenYu
