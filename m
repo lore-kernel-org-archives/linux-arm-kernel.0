@@ -1,66 +1,126 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 Oct 2015 07:53:59 -0700
-Subject: [PATCH 12/17] ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
-In-Reply-To: <561CE017.7030704@arm.com>
-References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
- <1442850433-5903-13-git-send-email-sudeep.holla@arm.com>
- <20151012202047.GR23801@atomide.com>
- <20151012202847.GS23801@atomide.com> <561CE017.7030704@arm.com>
-Message-ID: <20151013145359.GV23801@atomide.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Tue, 13 Oct 2015 07:57:52 -0700
+Subject: [PATCH RFC 1/1] irqchip/GICv2m: Add support for multiple v2m
+ frames
+In-Reply-To: <561B901E.1090300@arm.com>
+References: <1444290518-18527-1-git-send-email-dhdang@apm.com>
+ <56178483.5040404@arm.com>
+ <CADaLNDmQn7F_dEdfqhZxtqaLE9i16LpWtu2kk-yjyOUnE=E4-g@mail.gmail.com>
+ <561B901E.1090300@arm.com>
+Message-ID: <CADaLNDm4e20gGNKqDSaijq7-pwtat+2y9b3uoyxUEgXKW6irJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sudeep Holla <sudeep.holla@arm.com> [151013 03:46]:
-> 
-> 
-> On 12/10/15 21:28, Tony Lindgren wrote:
-> >* Tony Lindgren <tony@atomide.com> [151012 13:27]:
-> >>* Sudeep Holla <sudeep.holla@arm.com> [150921 08:52]:
-> >>>The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
-> >>>be left enabled so as to allow them to work as expected during the
-> >>>suspend-resume cycle, but doesn't guarantee that it will wake the system
-> >>>from a suspended state, enable_irq_wake is recommended to be used for
-> >>>the wakeup.
-> >>>
-> >>>This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
-> >>>enable_irq_wake instead.
-> >>
-> >>Applying into omap-for-v4.4/cleanup thanks.
-> >
-> >Actually I don't think this does the right thing. The interrupts
-> >in the $subject patch are in the always on powerdomain, and we really
-> 
-> Agreed
-> 
-> >want them to be excluded from the suspend.
-> >
-> 
-> OK but what's wrong with this patch. At-least the name suggest it's a
-> wakeup interrupt. And using IRQF_NO_SUSPEND for the wakeup interrupt is
-> simply wrong.
+On Mon, Oct 12, 2015 at 3:49 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 11/10/15 18:13, Duc Dang wrote:
+>> On Fri, Oct 9, 2015 at 2:10 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> Hi Duc,
+>>>
+>>> On 08/10/15 08:48, Duc Dang wrote:
+>>>> GICv2m driver currently only supports single v2m frame. This
+>>>> patch extend this driver to support multiple v2m frames. All of
+>>>> the v2m frames will be own by a single MSI domain. Each PCIe node
+>>>> can specify msi-parent as the first frame of the v2m frame list
+>>>> to be able to use all available v2m frames for MSI interrupts.
+>>>>
+>>>> This patch should be applied on top of patch
+>>>> (irqchip/GICv2m: Add workaround for APM X-Gene GICv2m erratum):
+>>>> https://lkml.org/lkml/2015/10/6/922
+>>>>
+>>>> Signed-off-by: Duc Dang <dhdang@apm.com>
+>>>> ---
+>>>>  drivers/irqchip/irq-gic-v2m.c | 221 ++++++++++++++++++++++++++++++------------
+>>>>  1 file changed, 159 insertions(+), 62 deletions(-)
+>>>>
+>>>> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+>>>> index 4c17c18..8ecaf9e 100644
+>>>> --- a/drivers/irqchip/irq-gic-v2m.c
+>>>> +++ b/drivers/irqchip/irq-gic-v2m.c
+>>>> @@ -51,13 +51,19 @@
+>>>>  #define GICV2M_NEEDS_SPI_OFFSET              0x00000001
+>>>>
+>>>>  struct v2m_data {
+>>>> -     spinlock_t msi_cnt_lock;
+>>>>       struct resource res;    /* GICv2m resource */
+>>>>       void __iomem *base;     /* GICv2m virt address */
+>>>>       u32 spi_start;          /* The SPI number that MSIs start */
+>>>>       u32 nr_spis;            /* The number of SPIs for MSIs */
+>>>> -     unsigned long *bm;      /* MSI vector bitmap */
+>>>>       u32 flags;              /* v2m flags for specific implementation */
+>>>> +     struct list_head list;  /* Link to other v2m frames */
+>>>> +};
+>>>> +
+>>>> +struct gicv2m_ctrlr {
+>>>> +     spinlock_t v2m_ctrlr_lock;      /* Lock for all v2m frames */
+>>>> +     u32 nr_vecs;                    /* Total MSI vectors */
+>>>> +     unsigned long *bm;              /* MSI vector bitmap */
+>>>> +     struct list_head v2m_frms;      /* List of v2m frames */
+>>>>  };
+>>>>
+>>>>  static void gicv2m_mask_msi_irq(struct irq_data *d)
+>>>> @@ -98,11 +104,29 @@ static int gicv2m_set_affinity(struct irq_data *irq_data,
+>>>>       return ret;
+>>>>  }
+>>>>
+>>>> +static struct v2m_data *irq_data_to_v2m_frm(struct irq_data *data,
+>>>> +                                         struct gicv2m_ctrlr *v2m_ctrlr)
+>>>> +{
+>>>> +     struct v2m_data *v2m;
+>>>> +
+>>>> +     list_for_each_entry(v2m, &v2m_ctrlr->v2m_frms, list) {
+>>>> +             if ((data->hwirq >= v2m->spi_start) &&
+>>>> +                 (data->hwirq < (v2m->spi_start + v2m->nr_spis)))
+>>>> +                     return v2m;
+>>>> +     }
+>>>> +
+>>>> +     return NULL;
+>>>> +}
+>>>> +
+>>>>  static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
+>>>>  {
+>>>> -     struct v2m_data *v2m = irq_data_get_irq_chip_data(data);
+>>>> -     phys_addr_t addr = v2m->res.start + V2M_MSI_SETSPI_NS;
+>>>> +     struct gicv2m_ctrlr *v2m_ctrlr = irq_data_get_irq_chip_data(data);
+>>>> +     struct v2m_data *v2m;
+>>>> +     phys_addr_t addr;
+>>>>
+>>>> +     v2m = irq_data_to_v2m_frm(data, v2m_ctrlr);
+>>>> +     WARN_ON(!v2m);
+>>>> +     addr = v2m->res.start + V2M_MSI_SETSPI_NS;
+>>>
+>>> At that particular point, I've stopped reading.
+>>>
+>>> Pointlessly iterating over the frames when you can store the right one
+>>> in irq_data was bad enough, but having a WARN_ON() followed by a panic
+>>> is just not acceptable. Either you warn and avoid the crash, or you just
+>>> assume that the whole thing is sane and will never be inconsistent.
+>>
+>> Yes, my bad.
+>>>
+>>> You are also changing the way this driver works, and not for the best.
+>>> I've just written something fairly similar, with the following diffstat:
+>>>
+>>>  1 file changed, 76 insertions(+), 45 deletions(-)
+>>>
+>>> The current infrastructure is sound, you just have to make use of it.
+>>>
+>>> I've pushed the following (untested) patch:
+>>>
+>>> https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/multi-v2m&id=45e35adb60087792626570ff21bb23ab0f67a6ac
+>>>
+>>> Let me know if that works for you.
+>>
+>> Yes! I try and your patch definitely works on my X-Gene 2 board.
+>
+> OK, I'll post that for review, together with your Tested-by tag.
 
-Hmm so if we have a separate always on irq controller for the wake-up events
-and we want to keep it always on and exclude it from any suspend related
-things.. Why would we not use IRQF_NO_SUSPEND on it?
-
-Above you say "The IRQF_NO_SUSPEND flag is used to identify the interrupts
-that should be left enabled so as to allow them to work as expected during
-the suspend-resume cycle..." and that's exactly what we want to do here :)
-
-For the dedicated wake-up interrupts, we have separate registers to enable
-and disable them. The $subject irq is the shared interrupt that allows
-making use of the pin specific wake-up interrupts, and for those yes we
-are using enable_irq_wake().
-
-> >So not applying without further explanations.
-> >
-> 
-> But I don't understand the real need for IRQF_NO_SUSPEND over wakeup APIs ?
-
-Because in the $subject case we just want to always keep it on and
-never suspend it. It's unrelated to the wakeup APIs at least for the
-omap related SoCs.
+Thanks a lot, Marc.
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
 
 Regards,
-
-Tony
+Duc Dang.
