@@ -1,18 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Oct 2015 21:59:15 +0200
-Subject: [PATCH v3 1/3] Documentation: dt: soc: Add description for knav
- qmss driver
-In-Reply-To: <1444761943-726-2-git-send-email-m-karicheri2@ti.com>
-References: <1444761943-726-1-git-send-email-m-karicheri2@ti.com>
- <1444761943-726-2-git-send-email-m-karicheri2@ti.com>
-Message-ID: <12013292.j88s2I1JOW@wuerfel>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 13 Oct 2015 21:54:30 +0200
+Subject: [PATCH v2 3/3] dmaengine: pxa_dma: declare transfer are reusable
+In-Reply-To: <1444766070-26915-1-git-send-email-robert.jarzmik@free.fr>
+References: <1444766070-26915-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1444766070-26915-3-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 October 2015 14:45:41 Murali Karicheri wrote:
-> Add documentation for knav qmss driver.
-> 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> 
+As this driver provides a mechanism to reuse transfers, declare it in
+its probe function.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ drivers/dma/pxa_dma.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index fc4156afa070..f2a0310ae771 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -1414,6 +1414,7 @@ static int pxad_probe(struct platform_device *op)
+ 	pdev->slave.dst_addr_widths = widths;
+ 	pdev->slave.directions = BIT(DMA_MEM_TO_DEV) | BIT(DMA_DEV_TO_MEM);
+ 	pdev->slave.residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
++	pdev->slave.descriptor_reuse = true;
+ 
+ 	pdev->slave.dev = &op->dev;
+ 	ret = pxad_init_dmadev(op, pdev, dma_channels);
+-- 
+2.1.4
