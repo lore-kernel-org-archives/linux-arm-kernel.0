@@ -1,113 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Oct 2015 08:35:09 +0100
-Subject: [PATCH 03/16] irqdomain: Allow irq domain lookup by fwnode
-In-Reply-To: <561BFC6D.6020500@amd.com>
-References: <1444152989-31726-1-git-send-email-marc.zyngier@arm.com>
- <1444152989-31726-4-git-send-email-marc.zyngier@arm.com>
- <561BFC6D.6020500@amd.com>
-Message-ID: <20151013083509.5992c223@arm.com>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Tue, 13 Oct 2015 15:47:41 +0800
+Subject: [PATCH v8 3/6] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <7064179.1W3LTfFPxP@wuerfel>
+References: <1444297394-3122-1-git-send-email-lftan@altera.com>
+ <CAFiDJ58oMa6rgQe_STCiWRpdL+P22BN1=Nin_+QnLXC9RGiSzQ@mail.gmail.com>
+ <20151009231540.GE16112@localhost> <7064179.1W3LTfFPxP@wuerfel>
+Message-ID: <CAFiDJ59=PaZ_MaHU_AZp756c-DC_BR7x6=oACntqD=jw0s6XBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Oct 2015 13:31:09 -0500
-Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> wrote:
+On Mon, Oct 12, 2015 at 8:03 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On Friday 09 October 2015 18:15:40 Bjorn Helgaas wrote:
+> >
+> > I don't know if this should be a kernel taint, a simple warning in
+> > dmesg, or what.  I guess the tainting mechanism is probably too
+> > general-purpose for this, and add_taint() doesn't give any dmesg
+> > indication.  We wouldn't see the taint unless the problem actually
+> > caused an oops or panic.  In this case, I think I want a clue in dmesg
+> > so we have a chance of seeing it even if there is no oops.  So
+> > probably something like a dev_warn("non-compliant config accesses")
+> > would work.
+> >
+> > You really should double-check with the hardware guys, because it's
+> > pretty obvious that the PCI spec requires 1- and 2-byte config
+> > accesses to work correctly.  For example, if you read/modify/write to
+> > update PCI_COMMAND, you will inadvertently clear the RW1C bits in
+> > PCI_STATUS.
+>
+> Would it help to require a DT property here that flags the device
+> as having a broken config space?
+>
+> Then we could implement both in the driver, and only use the
+> RMW based implementation if the firmware describes the device
+> as "altera,broken-pci-config-space".
+>
 
-Hi Suravee,
+I have checked the PCI/TLP specification, the address needs to be
+4-byte aligned. But, we can use "byte enable" field to update specific
+bytes.
+For example, if byte enable is 0x3 (0011b), that mean it only update
+lower 2 bytes. By doing this, we can resolve the RW1C issue here.
+I will update the driver with this in next revision.
 
-> [RESEND] Not sure if the email went out the first time.
-> 
-> Hi Marc,
-> 
-> On 10/6/15 12:36, Marc Zyngier wrote:
-> > So far, our irq domains are still looked up by device node.
-> > Let's change this and allow a domain to be looked up using
-> > a fwnode_handle pointer.
-> >
-> > The existing interfaces are preserved with a couple of helpers.
-> >
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >   include/linux/irqdomain.h | 11 +++++++++--
-> >   kernel/irq/irqdomain.c    | 14 ++++++--------
-> >   2 files changed, 15 insertions(+), 10 deletions(-)
-> >
-> > diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-> > index 2f508f4..607c185 100644
-> > --- a/include/linux/irqdomain.h
-> > +++ b/include/linux/irqdomain.h
-> > @@ -183,10 +183,17 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
-> >   					 irq_hw_number_t first_hwirq,
-> >   					 const struct irq_domain_ops *ops,
-> >   					 void *host_data);
-> > -extern struct irq_domain *irq_find_matching_host(struct device_node *node,
-> > -						 enum irq_domain_bus_token bus_token);
-> > +extern struct irq_domain *irq_find_matching_fwnode(struct fwnode_handle *fwnode,
-> > +						   enum irq_domain_bus_token bus_token);
-> >   extern void irq_set_default_host(struct irq_domain *host);
-> >
-> > +static inline struct irq_domain *irq_find_matching_host(struct device_node *node,
-> > +							enum irq_domain_bus_token bus_token)
-> > +{
-> > +	return irq_find_matching_fwnode(node ? &node->fwnode : NULL,
-> > +					bus_token);
-> > +}
-> > +
-> >   static inline struct irq_domain *irq_find_host(struct device_node *node)
-> >   {
-> >   	return irq_find_matching_host(node, DOMAIN_BUS_ANY);
-> > diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> > index 1aee5c1..10b6105 100644
-> > --- a/kernel/irq/irqdomain.c
-> > +++ b/kernel/irq/irqdomain.c
-> > @@ -191,12 +191,12 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
-> >   EXPORT_SYMBOL_GPL(irq_domain_add_legacy);
-> >
-> >   /**
-> > - * irq_find_matching_host() - Locates a domain for a given device node
-> > - * @node: device-tree node of the interrupt controller
-> > + * irq_find_matching_fwnode() - Locates a domain for a given fwnode
-> > + * @fwnode: FW descriptor of the interrupt controller
-> >    * @bus_token: domain-specific data
-> >    */
-> > -struct irq_domain *irq_find_matching_host(struct device_node *node,
-> > -					  enum irq_domain_bus_token bus_token)
-> > +struct irq_domain *irq_find_matching_fwnode(struct fwnode_handle *fwnode,
-> > +					    enum irq_domain_bus_token bus_token)
-> >   {
-> >   	struct irq_domain *h, *found = NULL;
-> >   	int rc;
-> > @@ -212,12 +212,10 @@ struct irq_domain *irq_find_matching_host(struct device_node *node,
-> >   	 */
-> >   	mutex_lock(&irq_domain_mutex);
-> >   	list_for_each_entry(h, &irq_domain_list, link) {
-> > -		struct device_node *of_node;
-> > -		of_node = irq_domain_get_of_node(h);
-> >   		if (h->ops->match)
-> > -			rc = h->ops->match(h, node, bus_token);
-> > +			rc = h->ops->match(h, to_of_node(fwnode), bus_token);
-> >   		else
-> > -			rc = ((of_node != NULL) && (of_node == node) &&
-> > +			rc = ((fwnode != NULL) && (h->fwnode == fwnode) &&
-> >   			      ((bus_token == DOMAIN_BUS_ANY) ||
-> >   			       (h->bus_token == bus_token)));
-> >
-> >
-> 
-> In the kernel/irq/irq_domain.c, shouldn't you also change the export 
-> symbol from:
-> 
->      EXPORT_SYMBOL_GPL(irq_find_matching_host);
-> 
-> to:
-> 
->      EXPORT_SYMBOL_GPL(irq_find_matching_fwnode);
-> 
-> at the end of this function as well?
+Thanks for reviewing.
 
-Well spotted! I'll update the v2 branch.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Regards
+Ley Foon
