@@ -1,202 +1,93 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 13 Oct 2015 15:38:53 +0100
-Subject: [PATCH 2/2][UPDATE] ARM: dts: replace gpio-key,
- wakeup with wakeup-source property
-In-Reply-To: <1444743164-17735-2-git-send-email-sudeep.holla@arm.com>
-References: <1444743164-17735-2-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1444747133-22671-1-git-send-email-sudeep.holla@arm.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 13 Oct 2015 09:42:12 -0500
+Subject: [PATCH 1/4] Documentation: dt: soc: move driver description to a
+ separate document
+In-Reply-To: <1444679211-823-2-git-send-email-m-karicheri2@ti.com>
+References: <1444679211-823-1-git-send-email-m-karicheri2@ti.com>
+ <1444679211-823-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <CAL_Jsq+GZn0X-sxQ=oqRP7fR3bCPk5PN5CjgXzjnOxas_renzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keyboard driver for GPIO buttons(gpio-keys) checks for the legacy
-"gpio-key,wakeup" boolean property to enable gpio buttons as wakeup
-source.
+On Mon, Oct 12, 2015 at 2:46 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+> Currently the DT bindings have details about the driver as well. This
+> patch moves this to a separate document for knav qmss driver so that
+> driver detail update can be done as needed without polluting the DT
+> bindings description.
+>
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>  Documentation/arm/keystone/knav-qmss.txt           | 24 ++++++++++++++++++++++
+>  .../bindings/soc/ti/keystone-navigator-qmss.txt    | 20 ++++--------------
+>  2 files changed, 28 insertions(+), 16 deletions(-)
+>  create mode 100644 Documentation/arm/keystone/knav-qmss.txt
+>
+> diff --git a/Documentation/arm/keystone/knav-qmss.txt b/Documentation/arm/keystone/knav-qmss.txt
+> new file mode 100644
+> index 0000000..79946d1
+> --- /dev/null
+> +++ b/Documentation/arm/keystone/knav-qmss.txt
+> @@ -0,0 +1,24 @@
+> +* Texas Instruments Keystone Navigator Queue Management SubSystem driver
+> +
+> +Driver source code path
+> +  drivers/soc/ti/knav_qmss.c
+> +  drivers/soc/ti/knav_qmss_acc.c
+> +
+> +The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
+> +the main hardware sub system which forms the backbone of the Keystone
+> +multi-core Navigator. QMSS consist of queue managers, packed-data structure
+> +processors(PDSP), linking RAM, descriptor pools and infrastructure
+> +Packet DMA.
+> +The Queue Manager is a hardware module that is responsible for accelerating
+> +management of the packet queues. Packets are queued/de-queued by writing or
+> +reading descriptor address to a particular memory mapped location. The PDSPs
+> +perform QMSS related functions like accumulation, QoS, or event management.
+> +Linking RAM registers are used to link the descriptors which are stored in
+> +descriptor RAM. Descriptor RAM is configurable as internal or external memory.
+> +The QMSS driver manages the PDSP setups, linking RAM regions,
+> +queue pool management (allocation, push, pop and notify) and descriptor
+> +pool management.
+> +
+> +knav qmss driver provides a set of APIs to drivers to open/close qmss queues,
+> +allocate descriptor pools, map the descriptors, push/pop to queues etc. For
+> +details of the available APIs, please refers to include/linux/soc/ti/knav_qmss.h
+> diff --git a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
+> index d8e8cdb..2cecea1 100644
+> --- a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
+> +++ b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
+> @@ -1,20 +1,8 @@
+> -* Texas Instruments Keystone Navigator Queue Management SubSystem driver
+> -
+> -The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
+> -the main hardware sub system which forms the backbone of the Keystone
+> -multi-core Navigator. QMSS consist of queue managers, packed-data structure
+> -processors(PDSP), linking RAM, descriptor pools and infrastructure
+> -Packet DMA.
+> -The Queue Manager is a hardware module that is responsible for accelerating
+> -management of the packet queues. Packets are queued/de-queued by writing or
+> -reading descriptor address to a particular memory mapped location. The PDSPs
+> -perform QMSS related functions like accumulation, QoS, or event management.
+> -Linking RAM registers are used to link the descriptors which are stored in
+> -descriptor RAM. Descriptor RAM is configurable as internal or external memory.
+> -The QMSS driver manages the PDSP setups, linking RAM regions,
+> -queue pool management (allocation, push, pop and notify) and descriptor
+> -pool management.
 
-Few dts files assign value "1" to gpio-key,wakeup and in one instance a
-value "0" is assigned probably assuming it won't be enabled as a wakeup
-source. Since the presence of the boolean property indicates it is
-enabled, value of "0" have no value.
+Only the last sentence seems to be about the driver and is rather
+obvious (a driver manages the h/w). I would leave all this as-is
+currently.
 
-This patch replaces the legacy "gpio-key,wakeup" with the unified
-"wakeup-source" property which inturn fixes the above mentioned issue.
+Rob
 
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: linux-rockchip at lists.infradead.org
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/boot/dts/rk3066a-bqcurie2.dts      | 3 +--
- arch/arm/boot/dts/rk3066a-rayeager.dts      | 2 +-
- arch/arm/boot/dts/rk3188-radxarock.dts      | 2 +-
- arch/arm/boot/dts/rk3288-evb.dtsi           | 2 +-
- arch/arm/boot/dts/rk3288-firefly.dtsi       | 2 +-
- arch/arm/boot/dts/rk3288-popmetal.dts       | 2 +-
- arch/arm/boot/dts/rk3288-r89.dts            | 2 +-
- arch/arm/boot/dts/spear1310-evb.dts         | 2 +-
- arch/arm/boot/dts/spear1340-evb.dts         | 2 +-
- arch/arm/boot/dts/spear320-hmi.dts          | 4 ++--
- arch/arm64/boot/dts/rockchip/rk3368-r88.dts | 2 +-
- 11 files changed, 12 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-index c0273755431a..93be8f066e6d 100644
---- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-+++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-@@ -74,7 +74,7 @@
- 			linux,code = <116>;
- 			label = "GPIO Key Power";
- 			linux,input-type = <1>;
--			gpio-key,wakeup = <1>;
-+			wakeup-source;
- 			debounce-interval = <100>;
- 		};
- 		button at 1 {
-@@ -82,7 +82,6 @@
- 			linux,code = <104>;
- 			label = "GPIO Key Vol-";
- 			linux,input-type = <1>;
--			gpio-key,wakeup = <0>;
- 			debounce-interval = <100>;
- 		};
- 		/* VOL+ comes somehow thru the ADC */
-diff --git a/arch/arm/boot/dts/rk3066a-rayeager.dts b/arch/arm/boot/dts/rk3066a-rayeager.dts
-index e36383c701dc..da1c37a721c0 100644
---- a/arch/arm/boot/dts/rk3066a-rayeager.dts
-+++ b/arch/arm/boot/dts/rk3066a-rayeager.dts
-@@ -65,7 +65,7 @@
- 		#size-cells = <0>;
- 
- 		button at 0 {
--			gpio-key,wakeup = <1>;
-+			wakeup-source;
- 			gpios = <&gpio6 2 GPIO_ACTIVE_LOW>;
- 			label = "GPIO Power";
- 			linux,code = <116>;
-diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
-index d2180e5d2b05..acd3bb940e9a 100644
---- a/arch/arm/boot/dts/rk3188-radxarock.dts
-+++ b/arch/arm/boot/dts/rk3188-radxarock.dts
-@@ -63,7 +63,7 @@
- 			linux,code = <116>;
- 			label = "GPIO Key Power";
- 			linux,input-type = <1>;
--			gpio-key,wakeup = <1>;
-+			wakeup-source;
- 			debounce-interval = <100>;
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index f6d2e7894b05..e35cebc69e87 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -103,7 +103,7 @@
- 			linux,code = <116>;
- 			label = "GPIO Key Power";
- 			linux,input-type = <1>;
--			gpio-key,wakeup = <1>;
-+			wakeup-source;
- 			debounce-interval = <100>;
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-index 20fa0ef0b96b..c5dd26139b63 100644
---- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-@@ -67,7 +67,7 @@
- 		#size-cells = <0>;
- 
- 		button at 0 {
--			gpio-key,wakeup = <1>;
-+			wakeup-source;
- 			gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
- 			label = "GPIO Power";
- 			linux,code = <116>;
-diff --git a/arch/arm/boot/dts/rk3288-popmetal.dts b/arch/arm/boot/dts/rk3288-popmetal.dts
-index f82b956ebf17..34a0b063b3ec 100644
---- a/arch/arm/boot/dts/rk3288-popmetal.dts
-+++ b/arch/arm/boot/dts/rk3288-popmetal.dts
-@@ -74,7 +74,7 @@
- 			linux,code = <116>;
- 			label = "GPIO Key Power";
- 			linux,input-type = <1>;
--			gpio-key,wakeup = <1>;
-+			wakeup-source;
- 			debounce-interval = <100>;
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/rk3288-r89.dts b/arch/arm/boot/dts/rk3288-r89.dts
-index 14b9fc73c8a4..dc2f83a38d4f 100644
---- a/arch/arm/boot/dts/rk3288-r89.dts
-+++ b/arch/arm/boot/dts/rk3288-r89.dts
-@@ -73,7 +73,7 @@
- 			linux,code = <116>;
- 			label = "GPIO Key Power";
- 			linux,input-type = <1>;
--			gpio-key,wakeup = <1>;
-+			wakeup-source;
- 			debounce-interval = <100>;
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/spear1310-evb.dts b/arch/arm/boot/dts/spear1310-evb.dts
-index e48857249ce7..84101e4eebbf 100644
---- a/arch/arm/boot/dts/spear1310-evb.dts
-+++ b/arch/arm/boot/dts/spear1310-evb.dts
-@@ -161,7 +161,7 @@
- 				linux,code = <0x100>;
- 				gpios = <&gpio0 7 0x4>;
- 				debounce-interval = <20>;
--				gpio-key,wakeup = <1>;
-+				wakeup-source;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/spear1340-evb.dts b/arch/arm/boot/dts/spear1340-evb.dts
-index c611f5606dfe..6565f3cb866f 100644
---- a/arch/arm/boot/dts/spear1340-evb.dts
-+++ b/arch/arm/boot/dts/spear1340-evb.dts
-@@ -223,7 +223,7 @@
- 				linux,code = <0x100>;
- 				gpios = <&gpio1 1 0x4>;
- 				debounce-interval = <20>;
--				gpio-key,wakeup = <1>;
-+				wakeup-source;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/spear320-hmi.dts b/arch/arm/boot/dts/spear320-hmi.dts
-index 0aa6fef5ce22..0d0da1f65f0e 100644
---- a/arch/arm/boot/dts/spear320-hmi.dts
-+++ b/arch/arm/boot/dts/spear320-hmi.dts
-@@ -141,7 +141,7 @@
- 				linux,code = <0x100>;
- 				gpios = <&stmpegpio 3 0x4>;
- 				debounce-interval = <20>;
--				gpio-key,wakeup = <1>;
-+				wakeup-source;
- 			};
- 
- 			button at 2 {
-@@ -149,7 +149,7 @@
- 				linux,code = <0x200>;
- 				gpios = <&stmpegpio 2 0x4>;
- 				debounce-interval = <20>;
--				gpio-key,wakeup = <1>;
-+				wakeup-source;
- 			};
- 		};
- 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-index 401a81231eb9..730bac3a1c0a 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-@@ -71,7 +71,7 @@
- 		pinctrl-0 = <&pwr_key>;
- 
- 		button at 0 {
--			gpio-key,wakeup = <1>;
-+			wakeup-source;
- 			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
- 			label = "GPIO Power";
- 			linux,code = <116>;
--- 
-1.9.1
+> +* Texas Instruments Keystone Navigator (knav) Queue Management SubSystem driver
+> +  DT bindings
+>
+> +For details of the driver, please refer to
+> +Documentation/arm/keystone/knav-qmss.txt
+>
+>  Required properties:
+>  - compatible   : Must be "ti,keystone-navigator-qmss";
+> --
+> 1.9.1
+>
