@@ -1,56 +1,70 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 13 Oct 2015 06:58:42 +0000
-Subject: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for HiSilicon
- SoC Hip05
-In-Reply-To: <561CA5AF.2080300@hisilicon.com>
-References: <1444445957-239522-1-git-send-email-wangzhou1@hisilicon.com>
- <1444445957-239522-5-git-send-email-wangzhou1@hisilicon.com>
- <20151012213545.GA17479@localhost> <561CA5AF.2080300@hisilicon.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E162428B1@lhreml503-mbs>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 13 Oct 2015 09:08:46 +0200
+Subject: [PATCH RFC 1/2] dt-bindings: simplefb: Support a list of
+ regulator supply properties
+In-Reply-To: <CAGb2v651=uaHEQK4wpEQywgr311NSbqEvYkpsC5zSHPSFq-HHg@mail.gmail.com>
+References: <1444669458-5588-1-git-send-email-wens@csie.org>
+ <1444669458-5588-2-git-send-email-wens@csie.org>
+ <20151012171018.GB3659@leverpostej>
+ <CAGb2v651=uaHEQK4wpEQywgr311NSbqEvYkpsC5zSHPSFq-HHg@mail.gmail.com>
+Message-ID: <561CADFE.2010609@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-> >> +
-> >> +static int __init hisi_pcie_init(void)
-> >> +{
-> >> +	return platform_driver_probe(&hisi_pcie_driver, hisi_pcie_probe);
-> >> +}
-> >> +subsys_initcall(hisi_pcie_init);
-> >
-> > Can you use module_platform_driver() or module_platform_driver_probe()
-> > here instead of the subsys_initcall()?  No, I don't really know what
-> > the difference between module_platform_driver() and
-> > module_platform_driver_probe() is, sorry :)
-> 
-> In fact, I used module_platform_driver_probe in previous version, but
-> A PCIe VGA card of HiSilicon will use Hip05 PCIe host, so we modified
-> module_platform_driver_probe to subsys_initcall which will be called
-> before module_platform_driver_probe.
-> 
-> We will upstream the driver of above PCIe VGA card soon.
-> 
-> Many thanks for your reviewing,
-> Zhou
+On 13-10-15 04:22, Chen-Yu Tsai wrote:
+> On Tue, Oct 13, 2015 at 1:10 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Tue, Oct 13, 2015 at 01:04:17AM +0800, Chen-Yu Tsai wrote:
+>>> The physical display tied to the framebuffer may have regulators
+>>> providing power to it, such as power for LCDs or interface conversion
+>>> chips.
+>>>
+>>> The number of regulators in use may vary, but the regulator supply
+>>> binding can not be a list. Work around this by adding a "num-supplies"
+>>> property to communicate the number of supplies, and a list of 0 ~ N
+>>> "vinN-supply" properties for the actual regulator supply.
+>>
+>> This is getting more complicated by the minute...
+>
+> Yeah...
+>
+> I considered "backlight" and "panel" properties, but that seems to need
+> more effort to parse. Regulators seemed easier.
+>
+>>
+>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>> ---
+>>>   .../devicetree/bindings/video/simple-framebuffer.txt       | 14 ++++++++++----
+>>>   1 file changed, 10 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+>>> index 4474ef6e0b95..0cc43e1be8b5 100644
+>>> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+>>> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+>>> @@ -47,10 +47,14 @@ Required properties:
+>>>     - a8b8g8r8 (32-bit pixels, d[31:24]=a, d[23:16]=b, d[15:8]=g, d[7:0]=r).
+>>>
+>>>   Optional properties:
+>>> -- clocks : List of clocks used by the framebuffer. Clocks listed here
+>>> -           are expected to already be configured correctly. The OS must
+>>> -           ensure these clocks are not modified or disabled while the
+>>> -           simple framebuffer remains active.
+>>> +- clocks : List of clocks used by the framebuffer.
+>>> +- num-supplies : The number of regulators used by the framebuffer.
+>>> +- vinN-supply : The N-th (from 0) regulator used by the framebuffer.
+>>
+>> I don't see why you need num-supplies. Why not just try probing
+>> vin${N}-supply until such a property isn't present in the DT?
 
-Hi Bjorn, firstly many thanks for looking at this.
++1 for this.
 
-About this last bit the reason why we use subsys_initcall() is that
-our host bridge is embedded in the SoC and as such is not hot-pluggable
-for instance see:
-http://lxr.free-electrons.com/source/Documentation/driver-model/platform.txt#L59
+> That's doable. Though I'd add a hard limit on it. Does 16 seem reasonable?
 
-Our approach is also used by Exynos:
-http://lxr.free-electrons.com/source/drivers/pci/host/pci-exynos.c#L644
+I would not add a hard limit to the binding, you can use a fixed array in
+the code to make the code simpler. I would say 8 should be sufficient, since
+the limit will only be in the code we can always bump it when we need to.
 
-Cheers
+Regards,
 
-Gab
-
-> 
-> >
-> > Bjorn
-> >
-> > .
-> >
-> 
+Hans
