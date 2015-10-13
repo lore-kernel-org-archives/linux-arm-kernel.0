@@ -1,126 +1,71 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Wed, 14 Oct 2015 00:15:54 +0900
-Subject: [PATCH v3 1/7] arm64: ftrace: adjust callsite addresses examined
- by stack tracer
-In-Reply-To: <1444298504-10392-2-git-send-email-takahiro.akashi@linaro.org>
-References: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
- <1444298504-10392-2-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <BB42EDAB-830D-4073-859A-6454E6B9EB4D@gmail.com>
+From: peda@lysator.liu.se (Peter Rosin)
+Date: Tue, 13 Oct 2015 17:19:03 +0200
+Subject: [PATCH] i2c: at91: fix write transfers by clearing pending
+ interrupt first
+In-Reply-To: <1444746104-20615-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1444746104-20615-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <561D20E7.5070405@lysator.liu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 8, 2015, at 7:01 PM, AKASHI Takahiro wrote:
+On 2015-10-13 16:21, Ludovic Desroches wrote:
+> From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> 
+> In some cases a NACK interrupt may be pending in the Status Register (SR)
+> as a result of a previous transfer. However at91_do_twi_transfer() did not
+> read the SR to clear pending interruptions before starting a new transfer.
+> Hence a NACK interrupt rose as soon as it was enabled again at the I2C
+> controller level, resulting in a wrong sequence of operations and strange
+> patterns of behaviour on the I2C bus, such as a clock stretch followed by
+> a restart of the transfer.
+> 
+> This first issue occurred with both DMA and PIO write transfers.
+> 
+> Also when a NACK error was detected during a PIO write transfer, the
+> interrupt handler used to wrongly start a new transfer by writing into the
+> Transmit Holding Register (THR). Then the I2C slave was likely to reply
+> with a second NACK.
+> 
+> This second issue is fixed in atmel_twi_interrupt() by handling the TXRDY
+> status bit only if both the TXCOMP and NACK status bits are cleared.
+> 
+> Tested with a at24 eeprom on sama5d36ek board running a linux-4.1-at91
+> kernel image. Adapted to linux-next.
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Fixes: 93563a6a71bb ("i2c: at91: fix a race condition when using the DMA controller")
+> Reported-by: Peter Rosin <peda@lysator.liu.se>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Cc: stable at vger.kernel.org #4.1
 
-Hi Akashi,
+The regression is gone with this patch (vanilla 4.2), thank you!
 
-> On arm64, no PC values returned by save_stack_trace() will match to LR
-> values saved in stack frames on a stack after the following commit:
->    commit e306dfd06fcb ("ARM64: unwind: Fix PC calculation")
-> As a result, the output from stack tracer will be messed up.
-> 
-> This patch introduces an arch-defined macro, FTRACE_STACK_FRAME_OFFSET,
-> so that check_stack() can handle this case correctly.
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
-> arch/arm64/include/asm/ftrace.h |    5 +++--
-> arch/arm64/kernel/stacktrace.c  |    7 ++++---
-> include/linux/ftrace.h          |    7 +++++++
-> kernel/trace/trace_stack.c      |    5 +++--
-> 4 files changed, 17 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
-> index c5534fa..2b43e20 100644
-> --- a/arch/arm64/include/asm/ftrace.h
-> +++ b/arch/arm64/include/asm/ftrace.h
-> @@ -13,8 +13,9 @@
-> 
-> #include <asm/insn.h>
-> 
-> -#define MCOUNT_ADDR		((unsigned long)_mcount)
-> -#define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
-> +#define MCOUNT_ADDR			((unsigned long)_mcount)
-> +#define MCOUNT_INSN_SIZE		AARCH64_INSN_SIZE
-> +#define FTRACE_STACK_FRAME_OFFSET	AARCH64_INSN_SIZE
-> 
-> #ifndef __ASSEMBLY__
-> #include <linux/compat.h>
-> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-> index 407991b..bc0689a 100644
-> --- a/arch/arm64/kernel/stacktrace.c
-> +++ b/arch/arm64/kernel/stacktrace.c
-> @@ -20,6 +20,7 @@
-> #include <linux/sched.h>
-> #include <linux/stacktrace.h>
-> 
-> +#include <asm/insn.h>
-> #include <asm/stacktrace.h>
-> 
-> /*
-> @@ -49,10 +50,10 @@ int notrace unwind_frame(struct stackframe *frame)
-> 	frame->sp = fp + 0x10;
-> 	frame->fp = *(unsigned long *)(fp);
-> 	/*
-> -	 * -4 here because we care about the PC at time of bl,
-> -	 * not where the return will go.
-> +	 * decrement PC by AARCH64_INSN_SIZE here because we care about
-> +	 * the PC at time of bl, not where the return will go.
-> 	 */
-> -	frame->pc = *(unsigned long *)(fp + 8) - 4;
-> +	frame->pc = *(unsigned long *)(fp + 8) - AARCH64_INSN_SIZE;
-> 
-> 	return 0;
-> }
-> diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
-> index 6cd8c0e..d77b195 100644
-> --- a/include/linux/ftrace.h
-> +++ b/include/linux/ftrace.h
-> @@ -263,6 +263,13 @@ static inline void ftrace_kill(void) { }
-> #endif /* CONFIG_FUNCTION_TRACER */
-> 
-> #ifdef CONFIG_STACK_TRACER
-> +/*
-> + * the offset value to add to return address from save_stack_trace()
-> + */
-> +#ifndef FTRACE_STACK_FRAME_OFFSET
-> +#define FTRACE_STACK_FRAME_OFFSET 0
-> +#endif
-> +
-> extern int stack_tracer_enabled;
-> int
-> stack_trace_sysctl(struct ctl_table *table, int write,
-> diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
-> index b746399..30521ea 100644
-> --- a/kernel/trace/trace_stack.c
-> +++ b/kernel/trace/trace_stack.c
-> @@ -105,7 +105,7 @@ check_stack(unsigned long ip, unsigned long *stack)
-> 
-> 	/* Skip over the overhead of the stack tracer itself */
-> 	for (i = 0; i < max_stack_trace.nr_entries; i++) {
-> -		if (stack_dump_trace[i] == ip)
-> +		if ((stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET) == ip)
-> 			break;
-> 	}
-> 
-> @@ -133,7 +133,8 @@ check_stack(unsigned long ip, unsigned long *stack)
-> 		for (; p < top && i < max_stack_trace.nr_entries; p++) {
-> 			if (stack_dump_trace[i] == ULONG_MAX)
-> 				break;
-> -			if (*p == stack_dump_trace[i]) {
-> +			if (*p == (stack_dump_trace[i]
-> +					+ FTRACE_STACK_FRAME_OFFSET)) {
-> 				stack_dump_trace[x] = stack_dump_trace[i++];
-> 				this_size = stack_dump_index[x++] =
-> 					(top - p) * sizeof(unsigned long);
-> -- 
+However, looking at the bus, there are two NACKs after each
+successful chunk of memory written by the eeprom driver.
 
-This change is always on my tree for IRQ stack feature development. It makes
-stack_trace prints out useful info although it can't give an accurate data.
-I believe this hunk helps to figure out max stack depth context.
+Looking at the eeprom driver, I expect this on the bus:
 
-Acked-by: Jungseok Lee <jungseoklee85@gmail.com>
+S 0x50 0x00 "hello there guys" P
+S 0x50 NACK P
+delay for at least 1 ms (since the eeprom driver has a msleep(1) call).
+S 0x50 NACK P
+delay for at least 1 ms
+...
+...
+S 0x50 NACK P
+delay for at least 1 ms
+S 0x50 0x10 "and girls\n" P
 
-Thanks!
+This is not what I observe on the bus, most of the time there is a
+second NACK immediately following the first. I suspect that it is
+the i2c bus driver that somehow confuses itself and reissues the
+command for some reason?
 
-Best Regards
-Jungseok Lee
+But this behavior has been there since the beginning, so it's probably
+orthogonal, and killing the data corrupting regression is much more
+important to me than fussing over a surplus failed transfer. Hence
+
+Tested-by: Peter Rosin <peda@lysator.liu.se>
+
+Cheers,
+Peter
