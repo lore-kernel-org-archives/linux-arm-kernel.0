@@ -1,47 +1,41 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 13 Oct 2015 09:12:56 +0900
-Subject: [PATCH 1/3] ARM: dts: exynos5422-odroidxu3: use cd-gpio method to
- detect sd-card
-In-Reply-To: <1111856990.2419183.1444661252893.JavaMail.yahoo@mail.yahoo.com>
+Date: Tue, 13 Oct 2015 09:14:38 +0900
+Subject: [PATCH 3/3] ARM: dts: exynos5422-odroidxu3: Added UHS-I bus speed
+ support
+In-Reply-To: <CANAwSgSLFviT4ZNXTYwxYs2pbrr9ozJmPMauhgRPO0556Rsr_g@mail.gmail.com>
 References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
- <561B3739.4040701@samsung.com> <561B3A83.6090607@samsung.com>
- <1111856990.2419183.1444661252893.JavaMail.yahoo@mail.yahoo.com>
-Message-ID: <561C4C88.2040004@samsung.com>
+ <1444578364-1384-3-git-send-email-linux.amoon@gmail.com>
+ <561B48B7.1040201@samsung.com>
+ <CANAwSgSLFviT4ZNXTYwxYs2pbrr9ozJmPMauhgRPO0556Rsr_g@mail.gmail.com>
+Message-ID: <561C4CEE.3050905@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.10.2015 23:47, Anand Moon wrote:
+On 13.10.2015 00:32, Anand Moon wrote:
+> Hi Krzysztof,
+> 
+> On 12 October 2015 at 11:14, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+>> On 12.10.2015 00:46, Anand Moon wrote:
+>>> Added support for UHS-I bus speed 50MB/s (SDR50, DDR50) 104MB/s (SDR104)
 >>
->> Anand,
+>> This description is not entirely correct. The MMC driver already
+>> supports these UHS speeds (you did not any code) so you rather enabled
+>> it (description of bindings says "is supported").
 >>
->> You essentially reverted here af6ad88acbd6 ("ARM: dts: Mux XMMCnDATA[0]
->> pad correctly for Exynos5420 boards"). Why? There is no explanation in
->> the commit message about this.
-> 
-> I don't remember to send the patch relevant to this. Hmm...
-> Well, Is this patch really signed-off by me?
-> 
-> Best Regards,
-> 
-> Jaehoon Chung
+>> You mentioned DDR50 but I don't see respective property below.
 >>
->> Best regards,
->> Krzysztof
->>
+>> How do you know that these modes are really supported? I don't know. Can
+>> you convince me?
 > 
->>
-> 
-> 
-> Some how I don't receive these mail on my email id.
-> 
-> I have picked up these changes from tizen repository for OdroidXU3.
-> I have tested with this changes to detect UHS-I micro cd cards.
-> That's the reason for this email. 
+> Setting this DDR50 capability give me this error. That's the reason to
+> drop this capability.
 
-... and you applied it blindly without looking at actual existing
-contents and at previous commits.
+But you mentioned it in commit message! "Added support for UHS-I ...
+(DDR50)"
 
-That is not how patches from different repositories should be cherry picked.
+In the same time dropping DDR50 is not an sufficient proof that "SDR50
+and SDR104 are really supported".
 
 Best regards,
 Krzysztof
