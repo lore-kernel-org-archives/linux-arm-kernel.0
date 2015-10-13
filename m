@@ -1,41 +1,21 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Tue, 13 Oct 2015 13:43:55 +0200
-Subject: [PATCH] ARM: dts: imx6: phyFLEX: fix typo in "pinctrl-names"
-Message-ID: <1444736635-19893-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Oct 2015 13:44:09 +0200
+Subject: [PATCH] ARM:mm: fix kmap_atomic_to_page
+In-Reply-To: <561C6734.7010509@lge.com>
+References: <1444129773-12632-1-git-send-email-chanho.min@lge.com>
+ <5778996.I0Vmityi0g@wuerfel> <561C6734.7010509@lge.com>
+Message-ID: <5510159.Ge1KiGjbaB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix a typo, replacing "pinctrl-name" by "pinctrl-names"
-in the Phytec phyFLEX-i.MX6 Quad dtsi.
+On Tuesday 13 October 2015 11:06:44 Jongsung Kim wrote:
+> On 10/12/2015 06:27 PM, Arnd Bergmann wrote:
+> > How about changing the zcomp code to pass the page pointer instead of the kernel space pointer? That would avoid having to do the kmap_atomic, which can itself be expensive on 32-bit machines and should not be needed here if you have a HW DMA engine doing the compression. Arnd 
+> 
+> Mainline zram uses lzo / lz4 library functions as backend. Using kmap_atomic and passing address look reasonable.
 
-Also fix a typo in the board name
+Yes, I know, but changing this to do the kmap_atomic in the backend
+seems better here if you are adding another backend that doesn't
+want or need the kmap_atomic.
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-index 9e6ecd99b472..24bdff26b483 100644
---- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-@@ -12,7 +12,7 @@
- #include <dt-bindings/gpio/gpio.h>
- 
- / {
--	model = "Phytec phyFLEX-i.MX6 Ouad";
-+	model = "Phytec phyFLEX-i.MX6 Quad";
- 	compatible = "phytec,imx6q-pfla02", "fsl,imx6q";
- 
- 	memory {
-@@ -373,7 +373,7 @@
- };
- 
- &pcie {
--	pinctrl-name = "default";
-+	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_pcie>;
- 	reset-gpio = <&gpio4 17 0>;
- 	status = "disabled";
--- 
-2.1.4
+	Arnd
