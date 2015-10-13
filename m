@@ -1,56 +1,72 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Tue, 13 Oct 2015 08:52:21 -0700
-Subject: [PATCH V3 2/4] ACPI/scan: Clean up acpi_check_dma
-In-Reply-To: <20150914163411.GL829@google.com>
-References: <1440597279-11802-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1440597279-11802-3-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20150914163411.GL829@google.com>
-Message-ID: <561D28B5.7030303@amd.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 13 Oct 2015 17:54:58 +0200
+Subject: [PATCH v3] arm-soc: Add support for Sigma Designs Tango4
+In-Reply-To: <CAL_JsqJ+WTBYF=sJWbkgNzL48H5AiXL4aoVV3DNiL6T_UQKQfg@mail.gmail.com>
+References: <560EAA7C.3070302@free.fr> <5124277.UR9sg1IOHT@wuerfel>
+ <560EFDB3.9010305@free.fr> <11113740.WL812ZaRcZ@wuerfel>
+ <5612A473.8030405@sigmadesigns.com> <5613EF4C.30603@sigmadesigns.com>
+ <CAL_JsqJ+WTBYF=sJWbkgNzL48H5AiXL4aoVV3DNiL6T_UQKQfg@mail.gmail.com>
+Message-ID: <561D2952.4060908@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On 09/10/2015 16:08, Rob Herring wrote:
 
-Thanks for your feedback. And sorry for late response. Some how I didn't 
-see this earlier.  Please see my comments below.
+> No memory node?
 
-On 09/14/2015 09:34 AM, Bjorn Helgaas wrote:
->> [..]
->> So, in order to simplify the function, this patch renames acpi_check_dma()
->> to acpi_check_dma_coherency() to clearly indicate the purpose of this
->> function, and only returns an integer where -1 means DMA not supported,
->> 1 means coherent DMA, and 0 means non-coherent DMA.
->
-> I think acpi_check_dma_coherency() is better, but only slightly.  It
-> still doesn't give a hint about the *sense* of the return value.  I
-> think it'd be easier to read if there were two functions, e.g.,
+"3.4 Memory node
 
-I have been going back-and-forth between the current version, and the 
-two-function-approach in the past. I can definitely go with this route 
-if you would prefer. Although, if acpi_dma_is_coherent() == 0, it would 
-be ambiguous whether DMA is not supported or non-coherent DMA is 
-supported. Then, we would need to call acpi_dma_is_supported() to find 
-out. So, that's okay with you?
+A memory device node is required for all device trees and describes
+the physical memory layout for the system. If a system has multiple
+ranges of memory, multiple memory nodes can be created, or the ranges
+can be specified in the reg property of a single memory node."
 
->> [...]
->> +
->> +	/**
->> +	 * Currently, we only support _CCA=1 (i.e. coherent_dma=1)
->> +	 * This should be equivalent to specifying dma-coherent for
->> +	 * a device in OF.
->> +	 *
->> +	 * For the case when _CCA=0 (i.e. coherent_dma=0 && cca_seen=1),
->> +	 * we have two choices:
->> +	 *   1. Do not support and disable DMA.
->
-> I know you didn't write this comment, but do we actually *disable* DMA in
-> the sense of turning off PCI bus mastering or calling an ACPI method that
-> disables DMA by this device?  I suspect we just don't set up DMA ops and
-> masks for this device.
+(This is a board property then.)
 
-Actually, I wrote this comment. When we disable DMA, we basically set 
-dma-mask=0 and do not setup DMA ops as you mentioned. We don't actually 
-mess with the hardware.
+Suppose a board provides 2 GB of RAM, spanning physaddr 0x8000_0000
+to 0xFFFF_FFFF; the memory node should be written like this?
 
-Thanks,
-Suravee
+	memory at 80000000 {
+		device_type = "memory";
+		reg = <0x80000000 0x80000000>; /* 2 GB */
+	};
+
+Does it make a difference if the 2 GB are provided by 1, 2, or even
+4 memory modules?
+
+Assume a different board only provides 1 GB using two 512 MB modules
+DIMM0: 0x8000_0000 to 0xA000_000
+DIMM1: 0xC000_0000 to 0xE000_000
+What would the memory node look like?
+(Do I have to set #address-cells=2 and #size-cells=1?)
+
+> cpus node?
+
+Is this used to document the CPU?
+I didn't see any code making use of that information.
+
+> No pl310? A9 performance mon?
+
+About the pl310, it seems my SoC is one of a few running in ARM's
+"non-secure" world (TrustZone thingy).
+
+Russell discussed this topic in:
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/441454/focus=441806
+
+AFAIU, the firmware on my platform was made to behave like OMAP's.
+I suppose this means I can copy OMAP's DT and corresponding code
+for L2 interaction.
+
+omap4_l2c310_write_sec, omap_smc1
+
+Russell mentioned .l2c_aux_mask and .l2c_aux_val
+
+$ git grep l2c_aux_ arch/arm/kernel/
+arch/arm/kernel/irq.c:      (machine_desc->l2c_aux_mask || machine_desc->l2c_aux_val)) {
+arch/arm/kernel/irq.c:          ret = l2x0_of_init(machine_desc->l2c_aux_val,
+arch/arm/kernel/irq.c:                             machine_desc->l2c_aux_mask);
+
+They seem to be used exclusively in the l2x0_of_init call.
+Are they documented somewhere?
+
+Regards.
