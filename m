@@ -1,46 +1,48 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 13 Oct 2015 12:14:33 -0400
-Subject: [PATCH v2 0/4] soc: ti: knav_qmss: enable accumulator queue
- support
-In-Reply-To: <561D2AE0.6090406@oracle.com>
-References: <1444679211-823-1-git-send-email-m-karicheri2@ti.com>
- <561D0D95.1040401@ti.com> <561D2AE0.6090406@oracle.com>
-Message-ID: <561D2DE9.4080809@ti.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Tue, 13 Oct 2015 19:20:37 +0300
+Subject: [PATCH v2 4/5] arm: dts: lpc32xx: add reg property to cpu device node
+In-Reply-To: <1444694045-22000-5-git-send-email-vz@mleia.com>
+References: <1444694045-22000-5-git-send-email-vz@mleia.com>
+Message-ID: <1444753237-6451-1-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh,
+According to device tree bindings for ARM cpus cpu node must contain a
+reg property for enumeration scheme.
 
-On 10/13/2015 12:01 PM, santosh shilimkar wrote:
-> On 10/13/2015 6:56 AM, Murali Karicheri wrote:
->> On 10/12/2015 03:46 PM, Murali Karicheri wrote:
->>> This patch series enable accumulator queue support for K2 SoCs.
->
->> Santosh, Arnd,
->>
->> Could you please review and let me know if there is any comment. If
->> looks good, could you please merge to v4.4 next branch?
->>
-> Please report the series updating the comments from Arnd. Also split
-> the series into drivers and dts updates.
+The change adds reg = <0x0> indicating that the processor does not
+have CPU identification register and updates cell settings.
 
-The cover letter already summarize this as a comment against v1 even 
-though it didn't mention Arnd's name. Is it usual to describe the 
-reviewers name in the change log? I thought we just describe the comment 
-addressed, not who has commented. Not??
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+---
+Changes from v1 to v2:
+- instead of removing address/size cells properties update them
+  in accordance to ARM CPU device tree bindings, thanks to Joachim for review
 
-About splitting the series, it was done so since both is being pulled by 
-you. If needed, I can do the split. Let me know.
+The change replaces 4/5 "arm: dts: lpc32xx: remove unneeded cell settings from cpus"
 
-Murali
+ arch/arm/boot/dts/lpc32xx.dtsi | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
->
-> Regards,
-> Santosh
->
->
-
-
+diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
+index dcb52cb..343a94f 100644
+--- a/arch/arm/boot/dts/lpc32xx.dtsi
++++ b/arch/arm/boot/dts/lpc32xx.dtsi
+@@ -18,12 +18,13 @@
+ 	interrupt-parent = <&mic>;
+ 
+ 	cpus {
+-		#address-cells = <0>;
++		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		cpu {
++		cpu at 0 {
+ 			compatible = "arm,arm926ej-s";
+ 			device_type = "cpu";
++			reg = <0x0>;
+ 		};
+ 	};
+ 
 -- 
-Murali Karicheri
-Linux Kernel, Keystone
+2.1.4
