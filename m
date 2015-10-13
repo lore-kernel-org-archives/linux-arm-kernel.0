@@ -1,48 +1,85 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 13 Oct 2015 13:35:48 +0200
-Subject: [PATCH] ARM: dts: berlin: fix typo in chosen property
-In-Reply-To: <1444734729-4818-1-git-send-email-michael.opdenacker@free-electrons.com>
-References: <1444734729-4818-1-git-send-email-michael.opdenacker@free-electrons.com>
-Message-ID: <20151013113547.GA20884@kwain>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 13 Oct 2015 19:34:13 +0800
+Subject: [PATCH v2 0/2] Enabling PSCI based idle on ARM 32-bit platforms
+In-Reply-To: <1444648628-24790-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1444648628-24790-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20151013193413.2e62bff9@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Lorenzo,
 
-On Tue, Oct 13, 2015 at 01:12:09PM +0200, Michael Opdenacker wrote:
-> This fixes a trivial typo in the name of the "chosen" device tree property
-> for the Marvell BG2-Q DMP board.
+On Mon, 12 Oct 2015 12:17:06 +0100
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+
+> This patch series is v2 of a previous posting:
 > 
-> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
-
-Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-
-Thanks!
-
-Antoine
-
-> ---
->  arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/373756.html
 > 
-> diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> index 4a749e5b3b44..caeeb345c335 100644
-> --- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> +++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> @@ -48,7 +48,7 @@
->  		reg = <0x00000000 0x80000000>;
->  	};
->  
-> -	choosen {
-> +	chosen {
->  		bootargs = "console=ttyS0,115200 earlyprintk";
->  	};
->  
-> -- 
-> 2.1.4
+> v1->v2:
 > 
+> - Refactored patch 1 to remove cpu parameter from cpuidle_ops
+>   suspend hook
+> - Refactored psci_cpu_init_idle to stub out dt parsing function and
+>   make it usable on both ARM/ARM64 with no additional changes
+> - Updated ARM cpuidle_ops to new interfaces
+> - Fixed PSCI enable method string in ARM cpuidle_ops struct
+> 
+> PSCI firmware provides a kernel API that, through a standard interface,
+> allows to manage power states transitions in a seamless manner for
+> ARM and ARM64 systems.
+> 
+> Current PSCI code that initializes CPUidle states on PSCI based
+> systems lives in arch/arm64 directory but it is not ARM64 specific
+> and can be shared with ARM 32-bit systems so that the generic
+> ARM CPUidle driver can leverage the common PSCI interface.
+> 
+> This patch series moves PSCI CPUidle management code to
+> drivers/firmware directory so that ARM and ARM64 architecture
+> can actually share the code.
+> 
+> It is made up of two patches:
+> 
+> Patch 1 refactors ARM 32-bit generic idle implementation to remove
+> the cpu parameter from the cpuidle_ops suspend hook, in preparation
+> for a common PSCI implementation for ARM/ARM64 PSCI idle.
+> 
+> Patch 2 moves ARM64 PSCI CPUidle functions implementation to
+> drivers/firmware so that it can be shared with ARM 32-bit platforms
+> code. This patch also adds a PSCI entry section on ARM 32-bit systems
+> so that the PSCI CPUidle back-end can be enabled when the enable-method
+> corresponds to PSCI.
+> 
+> Patches apply on top of current patch stack to enable PSCI 1.0:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/firmware/psci-1.0
+> 
+> Tested on Juno board (ARM64), compile tested only on ARM 32-bit systems.
+> 
+> Lorenzo Pieralisi (2):
+>   ARM: cpuidle: remove cpu parameter from the cpuidle_ops suspend hook
+>   ARM64: kernel: PSCI: move PSCI idle management code to
+>     drivers/firmware
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+I did a simple test, it works ARM 32 PSCI system
+
+So for this series except the qcom changes (I have no qcom platform), feel
+free to add 
+
+Tested-by: Jisheng Zhang <jszhang@marvell.com>
+
+I also could simple test v3 when it is out.
+
+thanks a lot for these patches!
+
+> 
+>  arch/arm/include/asm/cpuidle.h |   2 +-
+>  arch/arm/kernel/cpuidle.c      |   2 +-
+>  arch/arm64/kernel/psci.c       |  99 +-----------------------------
+>  drivers/firmware/Makefile      |   2 +-
+>  drivers/firmware/psci_cpuops.c | 133 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/soc/qcom/spm.c         |  10 ++--
+>  include/linux/psci.h           |   3 +
+>  7 files changed, 146 insertions(+), 105 deletions(-)
+>  create mode 100644 drivers/firmware/psci_cpuops.c
+> 
