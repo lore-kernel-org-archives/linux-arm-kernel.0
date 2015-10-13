@@ -1,94 +1,68 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Oct 2015 12:51:43 +0100
-Subject: [PATCH v2 15/17] irqdomain: Introduce irq_domain_create_hierarchy
+Date: Tue, 13 Oct 2015 12:51:41 +0100
+Subject: [PATCH v2 13/17] irqchip/gic: Kill the xlate method
 In-Reply-To: <1444737105-31573-1-git-send-email-marc.zyngier@arm.com>
 References: <1444737105-31573-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1444737105-31573-16-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1444737105-31573-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're about to start converting the various MSI layers to
-use fwnode_handle instead of device_node, add irq_domain_create_hierarchy
-as a directly equivalent of irq_domain_add_hierarchy (which still
-exists as a compatibility interface).
+We are now left with only two use models for the GIC driver:
+- Via a firmware interface, which mandates a hierarchical domain,
+  and the use of the 'translate' method
+- The legacy platforms, which assume irq==hwirq, hence not using
+  the 'xlate' method.
+
+The logical conclusion is that we can now nuke the 'xlate' method
+altogether.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/irqdomain.h | 17 +++++++++++++++--
- kernel/irq/irqdomain.c    | 12 ++++++------
- 2 files changed, 21 insertions(+), 8 deletions(-)
+ drivers/irqchip/irq-gic.c | 25 -------------------------
+ 1 file changed, 25 deletions(-)
 
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index 949caa7..2b3340ae 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -340,10 +340,23 @@ extern void irq_domain_set_info(struct irq_domain *domain, unsigned int virq,
- 				void *chip_data, irq_flow_handler_t handler,
- 				void *handler_data, const char *handler_name);
- #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
--extern struct irq_domain *irq_domain_add_hierarchy(struct irq_domain *parent,
-+extern struct irq_domain *irq_domain_create_hierarchy(struct irq_domain *parent,
- 			unsigned int flags, unsigned int size,
--			struct device_node *node,
-+			struct fwnode_handle *fwnode,
- 			const struct irq_domain_ops *ops, void *host_data);
-+
-+static inline struct irq_domain *irq_domain_add_hierarchy(struct irq_domain *parent,
-+					    unsigned int flags,
-+					    unsigned int size,
-+					    struct device_node *node,
-+					    const struct irq_domain_ops *ops,
-+					    void *host_data)
-+{
-+	return irq_domain_create_hierarchy(parent, flags, size,
-+					   of_node_to_fwnode(node),
-+					   ops, host_data);
-+}
-+
- extern int __irq_domain_alloc_irqs(struct irq_domain *domain, int irq_base,
- 				   unsigned int nr_irqs, int node, void *arg,
- 				   bool realloc);
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 41151d3..22aa961 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -854,11 +854,11 @@ static int irq_domain_alloc_descs(int virq, unsigned int cnt,
- 
- #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
- /**
-- * irq_domain_add_hierarchy - Add a irqdomain into the hierarchy
-+ * irq_domain_create_hierarchy - Add a irqdomain into the hierarchy
-  * @parent:	Parent irq domain to associate with the new domain
-  * @flags:	Irq domain flags associated to the domain
-  * @size:	Size of the domain. See below
-- * @node:	Optional device-tree node of the interrupt controller
-+ * @fwnode:	Optional fwnode of the interrupt controller
-  * @ops:	Pointer to the interrupt domain callbacks
-  * @host_data:	Controller private data pointer
-  *
-@@ -868,19 +868,19 @@ static int irq_domain_alloc_descs(int virq, unsigned int cnt,
-  * domain flags are set.
-  * Returns pointer to IRQ domain, or NULL on failure.
-  */
--struct irq_domain *irq_domain_add_hierarchy(struct irq_domain *parent,
-+struct irq_domain *irq_domain_create_hierarchy(struct irq_domain *parent,
- 					    unsigned int flags,
- 					    unsigned int size,
--					    struct device_node *node,
-+					    struct fwnode_handle *fwnode,
- 					    const struct irq_domain_ops *ops,
- 					    void *host_data)
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 491eacb..1d0e768 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -916,30 +916,6 @@ static void gic_irq_domain_unmap(struct irq_domain *d, unsigned int irq)
  {
- 	struct irq_domain *domain;
+ }
  
- 	if (size)
--		domain = irq_domain_add_linear(node, size, ops, host_data);
-+		domain = irq_domain_create_linear(fwnode, size, ops, host_data);
- 	else
--		domain = irq_domain_add_tree(node, ops, host_data);
-+		domain = irq_domain_create_tree(fwnode, ops, host_data);
- 	if (domain) {
- 		domain->parent = parent;
- 		domain->flags |= flags;
+-static int gic_irq_domain_xlate(struct irq_domain *d,
+-				struct device_node *controller,
+-				const u32 *intspec, unsigned int intsize,
+-				unsigned long *out_hwirq, unsigned int *out_type)
+-{
+-	unsigned long ret = 0;
+-
+-	if (irq_domain_get_of_node(d) != controller)
+-		return -EINVAL;
+-	if (intsize < 3)
+-		return -EINVAL;
+-
+-	/* Get the interrupt number and add 16 to skip over SGIs */
+-	*out_hwirq = intspec[1] + 16;
+-
+-	/* For SPIs, we need to add 16 more to get the GIC irq ID number */
+-	if (!intspec[0])
+-		*out_hwirq += 16;
+-
+-	*out_type = intspec[2] & IRQ_TYPE_SENSE_MASK;
+-
+-	return ret;
+-}
+-
+ static int gic_irq_domain_translate(struct irq_domain *d,
+ 				    struct irq_fwspec *fwspec,
+ 				    unsigned long *hwirq,
+@@ -1021,7 +997,6 @@ static const struct irq_domain_ops gic_irq_domain_hierarchy_ops = {
+ static const struct irq_domain_ops gic_irq_domain_ops = {
+ 	.map = gic_irq_domain_map,
+ 	.unmap = gic_irq_domain_unmap,
+-	.xlate = gic_irq_domain_xlate,
+ };
+ 
+ static void __init __gic_init_bases(unsigned int gic_nr, int irq_start,
 -- 
 2.1.4
