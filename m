@@ -1,70 +1,27 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 13 Oct 2015 14:18:22 -0500
-Subject: [PATCH] ARM: socfpga: dts: add fpga manager
-In-Reply-To: <20151013185750.GB17155@pengutronix.de>
-References: <1444760900-1373-1-git-send-email-atull@opensource.altera.com>
- <20151013185750.GB17155@pengutronix.de>
-Message-ID: <alpine.DEB.2.02.1510131412500.3527@linux-builds1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Oct 2015 21:28:13 +0200
+Subject: [PATCH] regulator: core: avoid unused variable warning
+In-Reply-To: <20151012154231.GE4238@sirena.org.uk>
+References: <5130320.kXvB35QoYU@wuerfel> <20151012154231.GE4238@sirena.org.uk>
+Message-ID: <6859029.WgxSIWq5Yi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Oct 2015, Steffen Trumtrar wrote:
-
-> Hi Alan!
+On Monday 12 October 2015 16:42:31 Mark Brown wrote:
+> On Fri, Oct 09, 2015 at 02:36:47PM +0200, Arnd Bergmann wrote:
 > 
-> On Tue, Oct 13, 2015 at 01:28:20PM -0500, atull at opensource.altera.com wrote:
-> > From: Alan Tull <atull@opensource.altera.com>
-> > 
-> > Add FPGA manager to device tree for SoCFPGA.
-> > 
-> > Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> > ---
-> >  arch/arm/boot/dts/socfpga.dtsi | 7 +++++++
-> >  1 file changed, 7 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> > index 314e589..e37ba11 100644
-> > --- a/arch/arm/boot/dts/socfpga.dtsi
-> > +++ b/arch/arm/boot/dts/socfpga.dtsi
-> > @@ -834,5 +834,12 @@
-> >  			compatible = "altr,sys-mgr", "syscon";
-> >  			reg = <0xffd08000 0x4000>;
-> >  		};
-> > +
-> > +		hps_0_fpgamgr: fpgamgr at 0xff706000 {
-> > +			compatible = "altr,socfpga-fpga-mgr";
-> > +			reg = <0xFF706000 0x1000
-> > +			       0xFFB90000 0x1000>;
-> > +			interrupts = <0 175 4>;
-> > +		};
-> >  	};
-> >  };
+> > The second argument of the mutex_lock_nested() helper is only
+> > evaluated if CONFIG_DEBUG_LOCK_ALLOC is set. Otherwise we
+> > get this build warning for the new regulator_lock_supply
+> > function:
 > 
-> Please keep the format in line with the rest of the file:
-> Hexvalues are lowercase and no 0x after the "fpgamgr@".
-> I'd say "And please put the node in its proper position
-> according to its address", but I see just now, that the
-> dtsi is all messed up right now anyway :-(
+> Shouldn't we have an annotation or something for this in
+> mutex_lock_nested()?  It seems like something that might come up
+> elsewhere and it's a bit of a surprise to have one of the arguments
+> there not be evaluated.
 > 
 
-How so? Patches are welcomed!
+I've found a better solution by making mutex_lock_nested an
+inline function. Will send a new patch.
 
-Please fix the "fpgamgr@" and lower case the hex values. But I would prefer the
-nodes to be in alphabetical order.
-
-Also, you need to document the "altr,socfpga-fpga-mgr".
-
-Thanks,
-Dinh
-> Regards,
-> Steffen
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
-
-BR,
-Dinh
+	Arnd
