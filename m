@@ -1,33 +1,28 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 13 Oct 2015 15:10:55 +0100
-Subject: [RFC] arm64: ioremap: add ioremap_cache macro
-In-Reply-To: <1444616898-5057-1-git-send-email-yalin.wang2010@gmail.com>
-References: <1444616898-5057-1-git-send-email-yalin.wang2010@gmail.com>
-Message-ID: <20151013141055.GC11573@e104818-lin.cambridge.arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 13 Oct 2015 22:11:19 +0800
+Subject: [PATCH 13/37] ARM: dts: exynos5250-arndale: Fix regulator enable
+ GPIO polarity
+In-Reply-To: <1444684386-17094-14-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <1444684386-17094-14-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <20151013141119.GC584@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 10:28:18AM +0800, yalin wang wrote:
-> Add ioremap_cache macro, because some code will test if this macro
-> is defined or not, and will generate a generric version if not defined,
-> for example, memremap.c do like this.
+On Tue, Oct 13, 2015 at 12:12:42AM +0300, Laurent Pinchart wrote:
+> The enable GPIO is active high, but is flagged as active low in the gpio
+> property. As the gpio property flags are currently unused by the driver
+> this doesn't cause any issue for now, but will break later if the driver
+> starts making use of the flags. Fix it.
 > 
-> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 > ---
->  arch/arm64/include/asm/io.h | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/exynos5250-arndale.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> index 44be1e0..d6b620c 100644
-> --- a/arch/arm64/include/asm/io.h
-> +++ b/arch/arm64/include/asm/io.h
-> @@ -172,6 +172,7 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
->  #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
->  #define ioremap_wt(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
->  #define iounmap				__iounmap
-> +#define ioremap_cache                  ioremap_cache
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
 
-Applied. Thanks.
+This one should be sent to Samsung folks instead.
 
--- 
-Catalin
+Shawn
