@@ -1,35 +1,294 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 13 Oct 2015 10:37:47 +0100
-Subject: [PATCH 2/4] arm64: dts: Foundation model: increate GICC region to
- allow EOImode=1
+Date: Tue, 13 Oct 2015 10:37:48 +0100
+Subject: [PATCH 3/4] arm64: dts: split Foundation model dts to put the GIC
+ separately
 In-Reply-To: <1444729069-27922-1-git-send-email-andre.przywara@arm.com>
 References: <1444729069-27922-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1444729069-27922-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <1444729069-27922-4-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent commits made the GIC driver use EOImode=1 for all GICs
-that advertise the proper GICC region size.
-To let the model benefit from the blessings of that mode, increase
-the GICC region to its actual size of 8K.
+The ARMv8 Foundation model can be run with a GICv2 or a GICv3.
+To prepare for the GICv3 version of the .dts without code duplication,
+move most of the nodes of the existing DT (except the GIC) into an
+include file and just keep that include statement and the GIC node in
+the current foundation-v8.dts.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/boot/dts/arm/foundation-v8.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/arm/foundation-v8.dts          | 223 +--------------------
+ .../arm/{foundation-v8.dts => foundation-v8.dtsi}  |  12 --
+ 2 files changed, 2 insertions(+), 233 deletions(-)
+ copy arch/arm64/boot/dts/arm/{foundation-v8.dts => foundation-v8.dtsi} (93%)
 
 diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dts b/arch/arm64/boot/dts/arm/foundation-v8.dts
-index 3c5595d..57ad9fe 100644
+index 57ad9fe..7116807 100644
 --- a/arch/arm64/boot/dts/arm/foundation-v8.dts
 +++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
-@@ -78,7 +78,7 @@
- 		#address-cells = <2>;
- 		interrupt-controller;
- 		reg = <0x0 0x2c001000 0 0x1000>,
--		      <0x0 0x2c002000 0 0x1000>,
-+		      <0x0 0x2c002000 0 0x2000>,
- 		      <0x0 0x2c004000 0 0x2000>,
+@@ -1,77 +1,12 @@
+ /*
+  * ARM Ltd.
+  *
+- * ARMv8 Foundation model DTS
++ * ARMv8 Foundation model DTS (GICv2 configuration)
+  */
+ 
+-/dts-v1/;
+-
+-/memreserve/ 0x80000000 0x00010000;
++#include "foundation-v8.dtsi"
+ 
+ / {
+-	model = "Foundation-v8A";
+-	compatible = "arm,foundation-aarch64", "arm,vexpress";
+-	interrupt-parent = <&gic>;
+-	#address-cells = <2>;
+-	#size-cells = <2>;
+-
+-	chosen { };
+-
+-	aliases {
+-		serial0 = &v2m_serial0;
+-		serial1 = &v2m_serial1;
+-		serial2 = &v2m_serial2;
+-		serial3 = &v2m_serial3;
+-	};
+-
+-	cpus {
+-		#address-cells = <2>;
+-		#size-cells = <0>;
+-
+-		cpu at 0 {
+-			device_type = "cpu";
+-			compatible = "arm,armv8";
+-			reg = <0x0 0x0>;
+-			enable-method = "spin-table";
+-			cpu-release-addr = <0x0 0x8000fff8>;
+-			next-level-cache = <&L2_0>;
+-		};
+-		cpu at 1 {
+-			device_type = "cpu";
+-			compatible = "arm,armv8";
+-			reg = <0x0 0x1>;
+-			enable-method = "spin-table";
+-			cpu-release-addr = <0x0 0x8000fff8>;
+-			next-level-cache = <&L2_0>;
+-		};
+-		cpu at 2 {
+-			device_type = "cpu";
+-			compatible = "arm,armv8";
+-			reg = <0x0 0x2>;
+-			enable-method = "spin-table";
+-			cpu-release-addr = <0x0 0x8000fff8>;
+-			next-level-cache = <&L2_0>;
+-		};
+-		cpu at 3 {
+-			device_type = "cpu";
+-			compatible = "arm,armv8";
+-			reg = <0x0 0x3>;
+-			enable-method = "spin-table";
+-			cpu-release-addr = <0x0 0x8000fff8>;
+-			next-level-cache = <&L2_0>;
+-		};
+-
+-		L2_0: l2-cache0 {
+-			compatible = "cache";
+-		};
+-	};
+-
+-	memory at 80000000 {
+-		device_type = "memory";
+-		reg = <0x00000000 0x80000000 0 0x80000000>,
+-		      <0x00000008 0x80000000 0 0x80000000>;
+-	};
+-
+ 	gic: interrupt-controller at 2c001000 {
+ 		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
+@@ -83,158 +18,4 @@
  		      <0x0 0x2c006000 0 0x2000>;
  		interrupts = <1 9 0xf04>;
+ 	};
+-
+-	timer {
+-		compatible = "arm,armv8-timer";
+-		interrupts = <1 13 0xf08>,
+-			     <1 14 0xf08>,
+-			     <1 11 0xf08>,
+-			     <1 10 0xf08>;
+-		clock-frequency = <100000000>;
+-	};
+-
+-	pmu {
+-		compatible = "arm,armv8-pmuv3";
+-		interrupts = <0 60 4>,
+-			     <0 61 4>,
+-			     <0 62 4>,
+-			     <0 63 4>;
+-	};
+-
+-	smb {
+-		compatible = "arm,vexpress,v2m-p1", "simple-bus";
+-		arm,v2m-memory-map = "rs1";
+-		#address-cells = <2>; /* SMB chipselect number and offset */
+-		#size-cells = <1>;
+-
+-		ranges = <0 0 0 0x08000000 0x04000000>,
+-			 <1 0 0 0x14000000 0x04000000>,
+-			 <2 0 0 0x18000000 0x04000000>,
+-			 <3 0 0 0x1c000000 0x04000000>,
+-			 <4 0 0 0x0c000000 0x04000000>,
+-			 <5 0 0 0x10000000 0x04000000>;
+-
+-		#interrupt-cells = <1>;
+-		interrupt-map-mask = <0 0 63>;
+-		interrupt-map = <0 0  0 &gic 0 0 0  0 4>,
+-				<0 0  1 &gic 0 0 0  1 4>,
+-				<0 0  2 &gic 0 0 0  2 4>,
+-				<0 0  3 &gic 0 0 0  3 4>,
+-				<0 0  4 &gic 0 0 0  4 4>,
+-				<0 0  5 &gic 0 0 0  5 4>,
+-				<0 0  6 &gic 0 0 0  6 4>,
+-				<0 0  7 &gic 0 0 0  7 4>,
+-				<0 0  8 &gic 0 0 0  8 4>,
+-				<0 0  9 &gic 0 0 0  9 4>,
+-				<0 0 10 &gic 0 0 0 10 4>,
+-				<0 0 11 &gic 0 0 0 11 4>,
+-				<0 0 12 &gic 0 0 0 12 4>,
+-				<0 0 13 &gic 0 0 0 13 4>,
+-				<0 0 14 &gic 0 0 0 14 4>,
+-				<0 0 15 &gic 0 0 0 15 4>,
+-				<0 0 16 &gic 0 0 0 16 4>,
+-				<0 0 17 &gic 0 0 0 17 4>,
+-				<0 0 18 &gic 0 0 0 18 4>,
+-				<0 0 19 &gic 0 0 0 19 4>,
+-				<0 0 20 &gic 0 0 0 20 4>,
+-				<0 0 21 &gic 0 0 0 21 4>,
+-				<0 0 22 &gic 0 0 0 22 4>,
+-				<0 0 23 &gic 0 0 0 23 4>,
+-				<0 0 24 &gic 0 0 0 24 4>,
+-				<0 0 25 &gic 0 0 0 25 4>,
+-				<0 0 26 &gic 0 0 0 26 4>,
+-				<0 0 27 &gic 0 0 0 27 4>,
+-				<0 0 28 &gic 0 0 0 28 4>,
+-				<0 0 29 &gic 0 0 0 29 4>,
+-				<0 0 30 &gic 0 0 0 30 4>,
+-				<0 0 31 &gic 0 0 0 31 4>,
+-				<0 0 32 &gic 0 0 0 32 4>,
+-				<0 0 33 &gic 0 0 0 33 4>,
+-				<0 0 34 &gic 0 0 0 34 4>,
+-				<0 0 35 &gic 0 0 0 35 4>,
+-				<0 0 36 &gic 0 0 0 36 4>,
+-				<0 0 37 &gic 0 0 0 37 4>,
+-				<0 0 38 &gic 0 0 0 38 4>,
+-				<0 0 39 &gic 0 0 0 39 4>,
+-				<0 0 40 &gic 0 0 0 40 4>,
+-				<0 0 41 &gic 0 0 0 41 4>,
+-				<0 0 42 &gic 0 0 0 42 4>;
+-
+-		ethernet at 2,02000000 {
+-			compatible = "smsc,lan91c111";
+-			reg = <2 0x02000000 0x10000>;
+-			interrupts = <15>;
+-		};
+-
+-		v2m_clk24mhz: clk24mhz {
+-			compatible = "fixed-clock";
+-			#clock-cells = <0>;
+-			clock-frequency = <24000000>;
+-			clock-output-names = "v2m:clk24mhz";
+-		};
+-
+-		v2m_refclk1mhz: refclk1mhz {
+-			compatible = "fixed-clock";
+-			#clock-cells = <0>;
+-			clock-frequency = <1000000>;
+-			clock-output-names = "v2m:refclk1mhz";
+-		};
+-
+-		v2m_refclk32khz: refclk32khz {
+-			compatible = "fixed-clock";
+-			#clock-cells = <0>;
+-			clock-frequency = <32768>;
+-			clock-output-names = "v2m:refclk32khz";
+-		};
+-
+-		iofpga at 3,00000000 {
+-			compatible = "arm,amba-bus", "simple-bus";
+-			#address-cells = <1>;
+-			#size-cells = <1>;
+-			ranges = <0 3 0 0x200000>;
+-
+-			v2m_sysreg: sysreg at 010000 {
+-				compatible = "arm,vexpress-sysreg";
+-				reg = <0x010000 0x1000>;
+-			};
+-
+-			v2m_serial0: uart at 090000 {
+-				compatible = "arm,pl011", "arm,primecell";
+-				reg = <0x090000 0x1000>;
+-				interrupts = <5>;
+-				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
+-				clock-names = "uartclk", "apb_pclk";
+-			};
+-
+-			v2m_serial1: uart at 0a0000 {
+-				compatible = "arm,pl011", "arm,primecell";
+-				reg = <0x0a0000 0x1000>;
+-				interrupts = <6>;
+-				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
+-				clock-names = "uartclk", "apb_pclk";
+-			};
+-
+-			v2m_serial2: uart at 0b0000 {
+-				compatible = "arm,pl011", "arm,primecell";
+-				reg = <0x0b0000 0x1000>;
+-				interrupts = <7>;
+-				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
+-				clock-names = "uartclk", "apb_pclk";
+-			};
+-
+-			v2m_serial3: uart at 0c0000 {
+-				compatible = "arm,pl011", "arm,primecell";
+-				reg = <0x0c0000 0x1000>;
+-				interrupts = <8>;
+-				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
+-				clock-names = "uartclk", "apb_pclk";
+-			};
+-
+-			virtio_block at 0130000 {
+-				compatible = "virtio,mmio";
+-				reg = <0x130000 0x200>;
+-				interrupts = <42>;
+-			};
+-		};
+-	};
+ };
+diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dts b/arch/arm64/boot/dts/arm/foundation-v8.dtsi
+similarity index 93%
+copy from arch/arm64/boot/dts/arm/foundation-v8.dts
+copy to arch/arm64/boot/dts/arm/foundation-v8.dtsi
+index 57ad9fe..9314f39 100644
+--- a/arch/arm64/boot/dts/arm/foundation-v8.dts
++++ b/arch/arm64/boot/dts/arm/foundation-v8.dtsi
+@@ -72,18 +72,6 @@
+ 		      <0x00000008 0x80000000 0 0x80000000>;
+ 	};
+ 
+-	gic: interrupt-controller at 2c001000 {
+-		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+-		#interrupt-cells = <3>;
+-		#address-cells = <2>;
+-		interrupt-controller;
+-		reg = <0x0 0x2c001000 0 0x1000>,
+-		      <0x0 0x2c002000 0 0x2000>,
+-		      <0x0 0x2c004000 0 0x2000>,
+-		      <0x0 0x2c006000 0 0x2000>;
+-		interrupts = <1 9 0xf04>;
+-	};
+-
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts = <1 13 0xf08>,
 -- 
 2.5.1
