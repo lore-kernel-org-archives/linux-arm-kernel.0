@@ -1,108 +1,111 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 13 Oct 2015 16:41:46 +0100
-Subject: [PATCH v3] iommu/arm-smmu: Add support for MSI on SMMUv3
-In-Reply-To: <1444315920-11906-1-git-send-email-marc.zyngier@arm.com>
-References: <1444315920-11906-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20151013154145.GR21550@arm.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 13 Oct 2015 11:44:21 -0400
+Subject: [PATCH 1/4] Documentation: dt: soc: move driver description to
+ a separate document
+In-Reply-To: <CAL_Jsq+GZn0X-sxQ=oqRP7fR3bCPk5PN5CjgXzjnOxas_renzw@mail.gmail.com>
+References: <1444679211-823-1-git-send-email-m-karicheri2@ti.com>
+ <1444679211-823-2-git-send-email-m-karicheri2@ti.com>
+ <CAL_Jsq+GZn0X-sxQ=oqRP7fR3bCPk5PN5CjgXzjnOxas_renzw@mail.gmail.com>
+Message-ID: <561D26D5.7060405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On 10/13/2015 10:42 AM, Rob Herring wrote:
+> On Mon, Oct 12, 2015 at 2:46 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+>> Currently the DT bindings have details about the driver as well. This
+>> patch moves this to a separate document for knav qmss driver so that
+>> driver detail update can be done as needed without polluting the DT
+>> bindings description.
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> ---
+>>   Documentation/arm/keystone/knav-qmss.txt           | 24 ++++++++++++++++++++++
+>>   .../bindings/soc/ti/keystone-navigator-qmss.txt    | 20 ++++--------------
+>>   2 files changed, 28 insertions(+), 16 deletions(-)
+>>   create mode 100644 Documentation/arm/keystone/knav-qmss.txt
+>>
+>> diff --git a/Documentation/arm/keystone/knav-qmss.txt b/Documentation/arm/keystone/knav-qmss.txt
+>> new file mode 100644
+>> index 0000000..79946d1
+>> --- /dev/null
+>> +++ b/Documentation/arm/keystone/knav-qmss.txt
+>> @@ -0,0 +1,24 @@
+>> +* Texas Instruments Keystone Navigator Queue Management SubSystem driver
+>> +
+>> +Driver source code path
+>> +  drivers/soc/ti/knav_qmss.c
+>> +  drivers/soc/ti/knav_qmss_acc.c
+>> +
+>> +The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
+>> +the main hardware sub system which forms the backbone of the Keystone
+>> +multi-core Navigator. QMSS consist of queue managers, packed-data structure
+>> +processors(PDSP), linking RAM, descriptor pools and infrastructure
+>> +Packet DMA.
+>> +The Queue Manager is a hardware module that is responsible for accelerating
+>> +management of the packet queues. Packets are queued/de-queued by writing or
+>> +reading descriptor address to a particular memory mapped location. The PDSPs
+>> +perform QMSS related functions like accumulation, QoS, or event management.
+>> +Linking RAM registers are used to link the descriptors which are stored in
+>> +descriptor RAM. Descriptor RAM is configurable as internal or external memory.
+>> +The QMSS driver manages the PDSP setups, linking RAM regions,
+>> +queue pool management (allocation, push, pop and notify) and descriptor
+>> +pool management.
+>> +
+>> +knav qmss driver provides a set of APIs to drivers to open/close qmss queues,
+>> +allocate descriptor pools, map the descriptors, push/pop to queues etc. For
+>> +details of the available APIs, please refers to include/linux/soc/ti/knav_qmss.h
+>> diff --git a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
+>> index d8e8cdb..2cecea1 100644
+>> --- a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
+>> +++ b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
+>> @@ -1,20 +1,8 @@
+>> -* Texas Instruments Keystone Navigator Queue Management SubSystem driver
+>> -
+>> -The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
+>> -the main hardware sub system which forms the backbone of the Keystone
+>> -multi-core Navigator. QMSS consist of queue managers, packed-data structure
+>> -processors(PDSP), linking RAM, descriptor pools and infrastructure
+>> -Packet DMA.
+>> -The Queue Manager is a hardware module that is responsible for accelerating
+>> -management of the packet queues. Packets are queued/de-queued by writing or
+>> -reading descriptor address to a particular memory mapped location. The PDSPs
+>> -perform QMSS related functions like accumulation, QoS, or event management.
+>> -Linking RAM registers are used to link the descriptors which are stored in
+>> -descriptor RAM. Descriptor RAM is configurable as internal or external memory.
+>> -The QMSS driver manages the PDSP setups, linking RAM regions,
+>> -queue pool management (allocation, push, pop and notify) and descriptor
+>> -pool management.
+>
+> Only the last sentence seems to be about the driver and is rather
+> obvious (a driver manages the h/w). I would leave all this as-is
+> currently.
+>
+> Rob
+>
+Rob,
 
-On Thu, Oct 08, 2015 at 03:52:00PM +0100, Marc Zyngier wrote:
-> Despite being a platform device, the SMMUv3 is capable of signaling
-> interrupts using MSIs. Hook it into the platform MSI framework and
-> enjoy faults being reported in a new and exciting way.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> * From v2:
->   - MSI indexes as an enum
->   - Fixed stupid 16bit writes instead of 32bit
->   - Added devm callback to release MSIs on teardown
->   - Moved all the MSI setup to its own function
-> 
->  drivers/iommu/arm-smmu-v3.c | 108 ++++++++++++++++++++++++++++++++++++++++----
->  1 file changed, 99 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 5b11b77..3f7f096 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -26,6 +26,7 @@
->  #include <linux/iommu.h>
->  #include <linux/iopoll.h>
->  #include <linux/module.h>
-> +#include <linux/msi.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/of_platform.h>
-> @@ -403,6 +404,12 @@ enum pri_resp {
->  	PRI_RESP_SUCC,
->  };
->  
-> +enum msi_index {
-> +	EVTQ_MSI_INDEX,
-> +	GERROR_MSI_INDEX,
-> +	PRIQ_MSI_INDEX,
-> +};
-> +
->  struct arm_smmu_cmdq_ent {
->  	/* Common fields */
->  	u8				opcode;
-> @@ -2176,6 +2183,92 @@ static int arm_smmu_write_reg_sync(struct arm_smmu_device *smmu, u32 val,
->  					  1, ARM_SMMU_POLL_TIMEOUT_US);
->  }
->  
-> +static void arm_smmu_free_msis(void *data)
-> +{
-> +	struct arm_smmu_device *smmu = data;
-> +	platform_msi_domain_free_irqs(smmu->dev);
+I promise I will fix this in my next opportunity. Also there is similar 
+clean up needed for knav dma DT documentation and Netcp documentations. 
+It is in my TODO list.
 
-So the smmu structure here is also managed by devm. What guarantees that
-it doesn't get freed before your callback is invoked?
+Thanks.
 
-Also, none of this compiles if PCI_MSI=n.
+Murali
+>> +* Texas Instruments Keystone Navigator (knav) Queue Management SubSystem driver
+>> +  DT bindings
+>>
+>> +For details of the driver, please refer to
+>> +Documentation/arm/keystone/knav-qmss.txt
+>>
+>>   Required properties:
+>>   - compatible   : Must be "ti,keystone-navigator-qmss";
+>> --
+>> 1.9.1
+>>
+>
+>
 
-> +}
-> +
-> +static void arm_smmu_write_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
-> +{
-> +	struct device *dev = msi_desc_to_dev(desc);
-> +	struct arm_smmu_device *smmu = dev_get_drvdata(dev);
-> +	phys_addr_t cfg0_offset, cfg1_offset, cfg2_offset;
-> +	phys_addr_t doorbell;
-> +
-> +	switch (desc->platform.msi_index) {
-> +	case EVTQ_MSI_INDEX:
-> +		cfg0_offset = ARM_SMMU_EVTQ_IRQ_CFG0;
-> +		cfg1_offset = ARM_SMMU_EVTQ_IRQ_CFG1;
-> +		cfg2_offset = ARM_SMMU_EVTQ_IRQ_CFG2;
-> +		break;
-> +	case GERROR_MSI_INDEX:
-> +		cfg0_offset = ARM_SMMU_GERROR_IRQ_CFG0;
-> +		cfg1_offset = ARM_SMMU_GERROR_IRQ_CFG1;
-> +		cfg2_offset = ARM_SMMU_GERROR_IRQ_CFG2;
-> +		break;
-> +	case PRIQ_MSI_INDEX:
-> +		cfg0_offset = ARM_SMMU_PRIQ_IRQ_CFG0;
-> +		cfg1_offset = ARM_SMMU_PRIQ_IRQ_CFG1;
-> +		cfg2_offset = ARM_SMMU_PRIQ_IRQ_CFG2;
-> +		break;
-> +	default:		/* Unknown */
-> +		return;
-> +	}
-> +
-> +	doorbell = (((u64)msg->address_hi) << 32) | msg->address_lo;
-> +	doorbell &= MSI_CFG0_ADDR_MASK << MSI_CFG0_ADDR_SHIFT;
-> +
-> +	writeq_relaxed(doorbell, smmu->base + cfg0_offset);
-> +	writel_relaxed(msg->data, smmu->base + cfg1_offset);
-> +	writel_relaxed(MSI_CFG2_MEMATTR_DEVICE_nGnRE,
-> +		       smmu->base + cfg2_offset);
 
-This looks like the wrong way around to me. Once we've set a non-zero
-doorbell, the hardware will switch to using MSI, so there's a potential
-race where it generates an interrupt before we've initialised the payload.
-
-Will
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
