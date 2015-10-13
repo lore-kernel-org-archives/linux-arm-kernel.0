@@ -1,128 +1,164 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 13 Oct 2015 08:26:27 -0500
-Subject: [PATCH v3 1/7] drm/vc4: Add devicetree bindings for VC4.
-In-Reply-To: <1444426068-15817-2-git-send-email-eric@anholt.net>
-References: <1444426068-15817-1-git-send-email-eric@anholt.net>
- <1444426068-15817-2-git-send-email-eric@anholt.net>
-Message-ID: <CAL_JsqKbAm1=70GaDRg1Z47A9d9FShwpWacMOjr+FE8bZuocVg@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 13 Oct 2015 14:32:43 +0100
+Subject: [PATCH 1/2] ARM: dts: fix gpio-keys wakeup-source property
+Message-ID: <1444743164-17735-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 9, 2015 at 4:27 PM, Eric Anholt <eric@anholt.net> wrote:
-> VC4 is the GPU (display and 3D) subsystem present on the 2835 and some
-> other Broadcom SoCs.
->
-> This binding follows the model of msm, imx, sti, and others, where
-> there is a subsystem node for the whole GPU, with nodes for the
+The keyboard driver for GPIO buttons(gpio-keys) checks for one of the
+two boolean properties to enable gpio buttons as wakeup source:
+1. "wakeup-source" or
+2. the legacy "gpio-key,wakeup"
 
-The subsystem node is gone now, right?
+However juno, ste-snowball and emev2-kzm9d dts file have a undetected
+"wakeup" property to indictate the wakeup source.
 
-> individual HW components within it.
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->
-> v2: Extend the commit message, fix several nits from Stephen Warren.
-> v3: Rename the compatibility strings, clean up node names, drop the
->     unnecessary lists of components.  Use compatibility strings for
->     choosing CRTC HVS channel numbers.  Document the HDMI clock usage.
->
->  .../devicetree/bindings/gpu/brcm,bcm-vc4.txt       | 64 ++++++++++++++++++++++
+This patch fixes it by making use of "wakeup-source" property.
 
-Can you put this in bindings/display/ instead? Things are moving there in 4.4.
+Cc: Simon Horman <horms@verge.net.au>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm/boot/dts/emev2-kzm9d.dts             |  8 ++++----
+ arch/arm/boot/dts/ste-snowball.dts            | 10 +++++-----
+ arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 12 ++++++------
+ 3 files changed, 15 insertions(+), 15 deletions(-)
 
-
->  1 file changed, 64 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
->
-> diff --git a/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
-> new file mode 100644
-> index 0000000..175bcde
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpu/brcm,bcm-vc4.txt
-> @@ -0,0 +1,64 @@
-> +Broadcom VC4 GPU
-> +
-> +The VC4 device present on the Raspberry Pi includes a display system
-> +with HDMI output and the HVS scaler for compositing display planes.
-> +
-> +Required properties for VC4:
-> +- compatible:  Should be "brcm,bcm2835-vc4"
-
-reg property? interrupts? clocks?
-
-> +
-> +Required properties for Pixel Valve:
-> +- compatible:  Should be one of "brcm,bcm2835-pixelvalve0",
-> +               "brcm,bcm2835-pixelvalve1", or "brcm,bcm2835-pixelvalve2"
-> +- reg:         Physical base address and length of the PV's registers
-> +- interrupts:  The interrupt number
-> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-> +
-> +Required properties for HVS:
-> +- compatible:  Should be "brcm,bcm2835-hvs"
-> +- reg:         Physical base address and length of the HVS's registers
-> +- interrupts:  The interrupt number
-> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-> +
-> +Required properties for HDMI
-
-Is HDMI the only output possibility? If not, then you should have OF
-graph nodes describing the connection between HDMI block and HVS (or
-PV?).
-
-> +- compatible:  Should be "brcm,bcm2835-hdmi"
-> +- reg:         Physical base address and length of the two register ranges
-> +                 ("HDMI" and "HD", in that order)
-> +- interrupts:  The interrupt numbers
-> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-> +- ddc:         phandle of the I2C controller used for DDC EDID probing
-> +- clocks:      a) hdmi: The HDMI state machine clock
-> +               b) pixel: The pixel clock.
-> +
-> +Optional properties for HDMI:
-> +- hpd-gpio:    The GPIO pin for HDMI hotplug detect (if it doesn't appear
-
-*-gpio is deprecated, so "hpd-gpios".
-
-Really, I think this and ddc should be in hdmi-connector binding node.
-What has been done for bindings so far is all over the map though.
-
-> +                 as an interrupt/status bit in the HDMI controller
-> +                 itself).  See bindings/pinctrl/brcm,bcm2835-gpio.txt
-> +
-> +Example:
-> +pixelvalve at 7e807000 {
-> +       compatible = "brcm,bcm2835-pixelvalve2";
-> +       reg = <0x7e807000 0x100>;
-> +       interrupts = <2 10>; /* pixelvalve */
-> +};
-> +
-> +hvs at 7e400000 {
-> +       compatible = "brcm,bcm2835-hvs";
-> +       reg = <0x7e400000 0x6000>;
-> +       interrupts = <2 1>;
-> +};
-> +
-> +hdmi: hdmi at 7e902000 {
-> +       compatible = "brcm,bcm2835-hdmi";
-> +       reg = <0x7e902000 0x600>,
-> +             <0x7e808000 0x100>;
-> +       interrupts = <2 8>, <2 9>;
-> +       ddc = <&i2c2>;
-> +       hpd-gpio = <&gpio 46 GPIO_ACTIVE_HIGH>;
-> +       clocks = <&clocks BCM2835_PLLH_PIX>,
-> +                <&clocks BCM2835_CLOCK_HSM>;
-> +       clock-names = "pixel", "hdmi";
-> +};
-> +
-> +vc4: gpu at 7e4c0000 {
-> +       compatible = "brcm,bcm2835-vc4";
-> +};
-> --
-> 2.1.4
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
+index 955c24ee4a8c..8c24975e8f9d 100644
+--- a/arch/arm/boot/dts/emev2-kzm9d.dts
++++ b/arch/arm/boot/dts/emev2-kzm9d.dts
+@@ -35,28 +35,28 @@
+ 
+ 		button at 1 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			label = "DSW2-1";
+ 			linux,code = <KEY_1>;
+ 			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+ 		};
+ 		button at 2 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			label = "DSW2-2";
+ 			linux,code = <KEY_2>;
+ 			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
+ 		};
+ 		button at 3 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			label = "DSW2-3";
+ 			linux,code = <KEY_3>;
+ 			gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
+ 		};
+ 		button at 4 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			label = "DSW2-4";
+ 			linux,code = <KEY_4>;
+ 			gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
+diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+index 32a5ccb14e7e..e80e42163883 100644
+--- a/arch/arm/boot/dts/ste-snowball.dts
++++ b/arch/arm/boot/dts/ste-snowball.dts
+@@ -47,35 +47,35 @@
+ 
+ 		button at 1 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			linux,code = <2>;
+ 			label = "userpb";
+ 			gpios = <&gpio1 0 0x4>;
+ 		};
+ 		button at 2 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			linux,code = <3>;
+ 			label = "extkb1";
+ 			gpios = <&gpio4 23 0x4>;
+ 		};
+ 		button at 3 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			linux,code = <4>;
+ 			label = "extkb2";
+ 			gpios = <&gpio4 24 0x4>;
+ 		};
+ 		button at 4 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			linux,code = <5>;
+ 			label = "extkb3";
+ 			gpios = <&gpio5 1 0x4>;
+ 		};
+ 		button at 5 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			linux,code = <6>;
+ 			label = "extkb4";
+ 			gpios = <&gpio5 2 0x4>;
+diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+index 05e461dc6c1f..a15e1fb4d192 100644
+--- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+@@ -61,42 +61,42 @@
+ 
+ 				button at 1 {
+ 					debounce_interval = <50>;
+-					wakeup = <1>;
++					wakeup-source;
+ 					linux,code = <116>;
+ 					label = "POWER";
+ 					gpios = <&iofpga_gpio0 0 0x4>;
+ 				};
+ 				button at 2 {
+ 					debounce_interval = <50>;
+-					wakeup = <1>;
++					wakeup-source;
+ 					linux,code = <102>;
+ 					label = "HOME";
+ 					gpios = <&iofpga_gpio0 1 0x4>;
+ 				};
+ 				button at 3 {
+ 					debounce_interval = <50>;
+-					wakeup = <1>;
++					wakeup-source;
+ 					linux,code = <152>;
+ 					label = "RLOCK";
+ 					gpios = <&iofpga_gpio0 2 0x4>;
+ 				};
+ 				button at 4 {
+ 					debounce_interval = <50>;
+-					wakeup = <1>;
++					wakeup-source;
+ 					linux,code = <115>;
+ 					label = "VOL+";
+ 					gpios = <&iofpga_gpio0 3 0x4>;
+ 				};
+ 				button at 5 {
+ 					debounce_interval = <50>;
+-					wakeup = <1>;
++					wakeup-source;
+ 					linux,code = <114>;
+ 					label = "VOL-";
+ 					gpios = <&iofpga_gpio0 4 0x4>;
+ 				};
+ 				button at 6 {
+ 					debounce_interval = <50>;
+-					wakeup = <1>;
++					wakeup-source;
+ 					linux,code = <99>;
+ 					label = "NMI";
+ 					gpios = <&iofpga_gpio0 5 0x4>;
+-- 
+1.9.1
