@@ -1,31 +1,29 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 13 Oct 2015 14:28:02 +0300
-Subject: [PATCH 1/3] ARM: digicolor: select pinctrl/gpio driver
-In-Reply-To: <cover.1444735169.git.baruch@tkos.co.il>
-References: <cover.1444735169.git.baruch@tkos.co.il>
-Message-ID: <0c3f348274ea14bc82c0e4f7b240be650624fb0d.1444735169.git.baruch@tkos.co.il>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Tue, 13 Oct 2015 13:33:18 +0200
+Subject: [PATCH] ARM: dts: msm8974: fix typo in "disabled" property
+Message-ID: <1444735998-18479-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/mach-digicolor/Kconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Replace "disable" by "disabled" in the Qualcomm MSM8974 dtsi
 
-diff --git a/arch/arm/mach-digicolor/Kconfig b/arch/arm/mach-digicolor/Kconfig
-index 4f36d8d2bc57..fc65b0f1db48 100644
---- a/arch/arm/mach-digicolor/Kconfig
-+++ b/arch/arm/mach-digicolor/Kconfig
-@@ -1,7 +1,10 @@
- config ARCH_DIGICOLOR
- 	bool "Conexant Digicolor SoC Support"
- 	depends on ARCH_MULTI_V7
-+	select ARCH_REQUIRE_GPIOLIB
- 	select CLKSRC_MMIO
- 	select DIGICOLOR_TIMER
- 	select GENERIC_IRQ_CHIP
- 	select MFD_SYSCON
-+	select PINCTRL
-+	select PINCTRL_DIGICOLOR
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index ab8e57250468..8c87203b6429 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -308,7 +308,7 @@
+ 		};
+ 
+ 		blsp_i2c11: i2c at f9967000 {
+-			status = "disable";
++			status = "disabled";
+ 			compatible = "qcom,i2c-qup-v2.1.1";
+ 			reg = <0xf9967000 0x1000>;
+ 			interrupts = <0 105 IRQ_TYPE_NONE>;
 -- 
-2.6.1
+2.1.4
