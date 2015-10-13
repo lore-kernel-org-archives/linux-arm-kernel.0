@@ -1,47 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Oct 2015 22:30:08 +0200
-Subject: [PATCH] mutex: make mutex_lock_nested an inline function
-Message-ID: <11282238.AHmyWliPRj@wuerfel>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Tue, 13 Oct 2015 22:33:44 +0200
+Subject: [PATCH v2] ARM: socfpga: dts: add fpga manager
+In-Reply-To: <alpine.DEB.2.02.1510131450480.4441@linux-builds1>
+References: <1444765139-2040-1-git-send-email-atull@opensource.altera.com>
+ <alpine.DEB.2.02.1510131450480.4441@linux-builds1>
+Message-ID: <20151013203344.GE17155@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The second argument of the mutex_lock_nested() helper is only
-evaluated if CONFIG_DEBUG_LOCK_ALLOC is set. Otherwise we
-get this build warning for the new regulator_lock_supply
-function:
+On Tue, Oct 13, 2015 at 02:51:28PM -0500, Dinh Nguyen wrote:
+> On Tue, 13 Oct 2015, atull at opensource.altera.com wrote:
+> 
+> > From: Alan Tull <atull@opensource.altera.com>
+> > 
+> > Add FPGA manager to device tree for SoCFPGA.
+> > 
+> > Signed-off-by: Alan Tull <atull@opensource.altera.com>
+> > ---
+> > v2: Remove 0x after @
+> >     No caps in hex numbers
+> >     renamed hps_0_fpgamgr to fpgamgr0
+> >     move node to be in alpha order by node name
+> > ---
+> >  arch/arm/boot/dts/socfpga.dtsi | 7 +++++++
+> >  1 file changed, 7 insertions(+)
+> > 
+> 
+> Applied!
 
-drivers/regulator/core.c: In function 'regulator_lock_supply':
-drivers/regulator/core.c:142:6: warning: unused variable 'i' [-Wunused-variable]
+What about the
 
-To avoid the warning, this patch changes the definition of
-mutex_lock_nested() to be static inline function rather than
-a macro, which tells gcc that the variable is potentially
-used.
+"Also, you need to document the "altr,socfpga-fpga-mgr"."
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 9f01cd4a915 ("regulator: core: introduce function to lock regulators and its supplies")
----
-Second try, this time fixing the root of the problem rather than the code
-that triggered it, as suggested by Mark Brown.
+you mentioned in v1 ???
 
-I guess this means the fix should now probably go through Ingo's sched-locking
-branch or through Andrew's mm patches. The warning currently only shows
-up in Linux-next because of Mark's regulator branch that is destined for 4.4,
-so it's not needed for 4.3 but also harmless.
+Regards,
+Steffen
 
-diff --git a/include/linux/mutex.h b/include/linux/mutex.h
-index 2cb7531e7d7a..9494dafd7a9c 100644
---- a/include/linux/mutex.h
-+++ b/include/linux/mutex.h
-@@ -158,7 +158,10 @@ extern void mutex_lock(struct mutex *lock);
- extern int __must_check mutex_lock_interruptible(struct mutex *lock);
- extern int __must_check mutex_lock_killable(struct mutex *lock);
- 
--# define mutex_lock_nested(lock, subclass) mutex_lock(lock)
-+static inline void mutex_lock_nested(struct mutex *lock, unsigned int subclass)
-+{
-+	return mutex_lock(lock);
-+}
- # define mutex_lock_interruptible_nested(lock, subclass) mutex_lock_interruptible(lock)
- # define mutex_lock_killable_nested(lock, subclass) mutex_lock_killable(lock)
- # define mutex_lock_nest_lock(lock, nest_lock) mutex_lock(lock)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
