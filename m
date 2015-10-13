@@ -1,201 +1,219 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 13 Oct 2015 21:57:09 +0200
-Subject: [PATCH v6 0/22] On-demand device probing
-In-Reply-To: <5606E120.3070305@kernel.org>
-References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
- <5606E120.3070305@kernel.org>
-Message-ID: <CAAObsKDffo935Ae3wEPVAFyqBDR+d6LKmh0ORfmYGnu2DN7YEw@mail.gmail.com>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Tue, 13 Oct 2015 12:59:04 -0700
+Subject: [PATCH] scsi: advansys needs ISA dma api for ISA support
+In-Reply-To: <15165188.ED2FR4b9SA@wuerfel>
+References: <5081546.QjQ32dGX2L@wuerfel>
+ <1444663681.2205.14.camel@HansenPartnership.com>
+ <15165188.ED2FR4b9SA@wuerfel>
+Message-ID: <1444766344.2208.41.camel@HansenPartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 September 2015 at 20:17, Rob Herring <robh@kernel.org> wrote:
-> On 09/21/2015 09:02 AM, Tomeu Vizoso wrote:
->> Hello,
->>
->> I have a problem with the panel on my Tegra Chromebook taking longer
->> than expected to be ready during boot (St?phane Marchesin reported what
->> is basically the same issue in [0]), and have looked into ordered
->> probing as a better way of solving this than moving nodes around in the
->> DT or playing with initcall levels and linking order.
->>
->> While reading the thread [1] that Alexander Holler started with his
->> series to make probing order deterministic, it occurred to me that it
->> should be possible to achieve the same by probing devices as they are
->> referenced by other devices.
->>
->> This basically reuses the information that is already implicit in the
->> probe() implementations, saving us from refactoring existing drivers or
->> adding information to DTBs.
->>
->> During review of v1 of this series Linus Walleij suggested that it
->> should be the device driver core to make sure that dependencies are
->> ready before probing a device. I gave this idea a try [2] but Mark Brown
->> pointed out to the logic duplication between the resource acquisition
->> and dependency discovery code paths (though I think it's fairly minor).
->>
->> To address that code duplication I experimented with Arnd's devm_probe
->> [3] concept of having drivers declare their dependencies instead of
->> acquiring them during probe, and while it worked [4], I don't think we
->> end up winning anything when compared to just probing devices on-demand
->> from resource getters.
->>
->> One remaining objection is to the "sprinkling" of calls to
->> of_device_probe() in the resource getters of each subsystem, but I think
->> it's the right thing to do given that the storage of resources is
->> currently subsystem-specific.
->>
->> We could avoid the above by moving resource storage into the core, but I
->> don't think there's a compelling case for that.
->>
->> I have tested this on boards with Tegra, iMX.6, Exynos, Rockchip and
->> OMAP SoCs, and these patches were enough to eliminate all the deferred
->> probes (except one in PandaBoard because omap_dma_system doesn't have a
->> firmware node as of yet).
->>
->> Have submitted a branch [5][6][7] with these patches on top of today's
->> linux-next (20150921) to kernelci.org and I don't see any issues that
->> could be caused by them.
->>
->> With this series I get the kernel to output to the panel in 0.5s,
->> instead of 2.8s.
->
-> I think we're pretty close other than some minor comments. I would like
-> to see ack's from Greg and some reviewed-bys from others. The subsystem
-> changes are minor and there has been plenty of chance to comment, so I
-> don't think acks from all subsystems are needed.
+On Mon, 2015-10-12 at 17:44 +0200, Arnd Bergmann wrote:
+> On Monday 12 October 2015 08:28:01 James Bottomley wrote:
+> > > 
+> > > diff --git a/drivers/scsi/Kconfig b/drivers/scsi/Kconfig
+> > > index d2f480b04a52..d4aa6a1a806c 100644
+> > > --- a/drivers/scsi/Kconfig
+> > > +++ b/drivers/scsi/Kconfig
+> > > @@ -499,6 +499,7 @@ config SCSI_ADVANSYS
+> > >       tristate "AdvanSys SCSI support"
+> > >       depends on SCSI
+> > >       depends on ISA || EISA || PCI
+> > > +     depends on ISA_DMA_API || !ISA
+> > >       help
+> > >         This is a driver for all SCSI host adapters manufactured by
+> > >         AdvanSys. It is documented in the kernel source in
+> > 
+> > This fix looks wrong.  the request_dma code is confined within an #ifdef
+> > CONFIG_ISA section but the advansys doesn't actually require an ISA DMA
+> > channel to function, so you're saying there are systems with ISA but
+> > without request_dma()?
+> 
+> Yes. Specifically, the ARM EBSA110 and SA1100 platforms can have some
+> PIO based ISA devices, but they have nothing close enough to an i8237
+> to support the request_dma interface.
+> 
+> > If so I think we leave the depends alone and try to bring the board up
+> > in NO_ISA_DMA mode.
+> 
+> Ok
+> 
+> >  That means the narrowboard check should be gated by
+> > CONFIG_ISA_DMA_API ... do we also have to gate free_dma as well?
+> 
+> Yes. A few more as well, as we also don't want to do inb/outb
+> instructions to a DMA controller that is not there.
+> 
+> I've compile-tested the patch below.
+> 
+> 	Arnd
+> 
+> 8<-------
+> From 67fed3da5dd65abf5e4d01d8731c5217eb823fdb Mon Sep 17 00:00:00 2001
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Sat, 10 Oct 2015 21:13:29 +0200
+> Subject: [PATCH] scsi: advansys: fix build without ISA DMA API
+> 
+> The advansys drvier uses the request_dma function that is used on ISA
+> machines for the internal DMA controller, which causes build errors
+> on platforms that have ISA slots but do not provide the ISA DMA API:
+> 
+> drivers/scsi/advansys.c: In function 'advansys_board_found':
+> drivers/scsi/advansys.c:11300:10: error: implicit declaration of function 'request_dma' [-Werror=implicit-function-declaration]
+> 
+> The problem now showed up in ARM randconfig builds after commit
+> 6571fb3f8b7f ("advansys: Update to version 3.5 and remove compilation
+> warning") made it possible to build on platforms that have neither
+> VIRT_TO_BUS nor ISA_DMA_API but that do have ISA.
+> 
+> This changes the existing #ifdefs in the driver to check for both
+> CONFIG_ISA and CONFIG_ISA_DMA_API where appropriate. It should
+> still be possible to use the driver in PIO mode with ISA when
+> DMA is not available.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/drivers/scsi/advansys.c b/drivers/scsi/advansys.c
+> index 1c1cd657c380..9f8aae40dcc8 100644
+> --- a/drivers/scsi/advansys.c
+> +++ b/drivers/scsi/advansys.c
+> @@ -2883,9 +2883,9 @@ static void asc_prt_asc_board_eeprom(struct seq_file *m, struct Scsi_Host *shost
+>  	ASC_DVC_VAR *asc_dvc_varp;
+>  	ASCEEP_CONFIG *ep;
+>  	int i;
+> -#ifdef CONFIG_ISA
+> +#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
+>  	int isa_dma_speed[] = { 10, 8, 7, 6, 5, 4, 3, 2 };
+> -#endif /* CONFIG_ISA */
+> +#endif /* ISA */
+>  	uchar serialstr[13];
+>  
+>  	asc_dvc_varp = &boardp->dvc_var.asc_dvc_var;
+> @@ -2937,13 +2937,13 @@ static void asc_prt_asc_board_eeprom(struct seq_file *m, struct Scsi_Host *shost
+>  			   (ep->init_sdtr & ADV_TID_TO_TIDMASK(i)) ? 'Y' : 'N');
+>  	seq_putc(m, '\n');
+>  
+> -#ifdef CONFIG_ISA
+> +#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
+>  	if (asc_dvc_varp->bus_type & ASC_IS_ISA) {
+>  		seq_printf(m,
+>  			   " Host ISA DMA speed:   %d MB/S\n",
+>  			   isa_dma_speed[ASC_EEP_GET_DMA_SPD(ep)]);
+>  	}
+> -#endif /* CONFIG_ISA */
+> +#endif /* ISA */
+>  }
+>  
+>  /*
+> @@ -8664,7 +8664,7 @@ static unsigned char AscGetChipVersion(PortAddr iop_base,
+>  	return AscGetChipVerNo(iop_base);
+>  }
+>  
+> -#ifdef CONFIG_ISA
+> +#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
+>  static void AscEnableIsaDma(uchar dma_channel)
+>  {
+>  	if (dma_channel < 4) {
+> @@ -8675,7 +8675,7 @@ static void AscEnableIsaDma(uchar dma_channel)
+>  		outp(0x00D4, (ushort)(dma_channel - 4));
+>  	}
+>  }
+> -#endif /* CONFIG_ISA */
+> +#endif /* ISA */
+>  
+>  static int AscStopQueueExe(PortAddr iop_base)
+>  {
+> @@ -8704,7 +8704,7 @@ static unsigned int AscGetMaxDmaCount(ushort bus_type)
+>  	return ASC_MAX_PCI_DMA_COUNT;
+>  }
+>  
+> -#ifdef CONFIG_ISA
+> +#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
+>  static ushort AscGetIsaDmaChannel(PortAddr iop_base)
+>  {
+>  	ushort channel;
+> @@ -8754,7 +8754,7 @@ static uchar AscSetIsaDmaSpeed(PortAddr iop_base, uchar speed_value)
+>  	AscSetBank(iop_base, 0);
+>  	return AscGetIsaDmaSpeed(iop_base);
+>  }
+> -#endif /* CONFIG_ISA */
+> +#endif /* ISA */
+>  
+>  static void AscInitAscDvcVar(ASC_DVC_VAR *asc_dvc)
+>  {
+> @@ -8821,16 +8821,18 @@ static void AscInitAscDvcVar(ASC_DVC_VAR *asc_dvc)
+>  	}
+>  
+>  	asc_dvc->cfg->isa_dma_speed = ASC_DEF_ISA_DMA_SPEED;
+> -#ifdef CONFIG_ISA
+> +#if defined(CONFIG_ISA)
+>  	if ((asc_dvc->bus_type & ASC_IS_ISA) != 0) {
+>  		if (chip_version >= ASC_CHIP_MIN_VER_ISA_PNP) {
+>  			AscSetChipIFC(iop_base, IFC_INIT_DEFAULT);
+>  			asc_dvc->bus_type = ASC_IS_ISAPNP;
+>  		}
+> +#if defined(CONFIG_ISA_DMA_API)
+>  		asc_dvc->cfg->isa_dma_channel =
+>  		    (uchar)AscGetIsaDmaChannel(iop_base);
+> +#endif /* ISA DMA */
+>  	}
+> -#endif /* CONFIG_ISA */
+> +#endif /* ISA */
+>  	for (i = 0; i <= ASC_MAX_TID; i++) {
+>  		asc_dvc->cur_dvc_qng[i] = 0;
+>  		asc_dvc->max_dvc_qng[i] = ASC_MAX_SCSI1_QNG;
+> @@ -9377,7 +9379,7 @@ static int AscInitSetConfig(struct pci_dev *pdev, struct Scsi_Host *shost)
+>  	    asc_dvc->cfg->chip_scsi_id) {
+>  		asc_dvc->err_code |= ASC_IERR_SET_SCSI_ID;
+>  	}
+> -#ifdef CONFIG_ISA
+> +#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
+>  	if (asc_dvc->bus_type & ASC_IS_ISA) {
+>  		AscSetIsaDmaChannel(iop_base, asc_dvc->cfg->isa_dma_channel);
+>  		AscSetIsaDmaSpeed(iop_base, asc_dvc->cfg->isa_dma_speed);
+> @@ -10986,7 +10988,11 @@ static int advansys_board_found(struct Scsi_Host *shost, unsigned int iop,
+>  		switch (asc_dvc_varp->bus_type) {
+>  #ifdef CONFIG_ISA
+>  		case ASC_IS_ISA:
+> +#if defined(CONFIG_ISA_DMA_API)
+>  			shost->unchecked_isa_dma = true;
+> +#else
+> +			shost->unchecked_isa_dma = false;
+> +#endif
+>  			share_irq = 0;
+>  			break;
+>  		case ASC_IS_VL:
+> @@ -11292,7 +11298,7 @@ static int advansys_board_found(struct Scsi_Host *shost, unsigned int iop,
+>  
+>  	/* Register DMA Channel for Narrow boards. */
+>  	shost->dma_channel = NO_ISA_DMA;	/* Default to no ISA DMA. */
+> -#ifdef CONFIG_ISA
+> +#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
+>  	if (ASC_NARROW_BOARD(boardp)) {
+>  		/* Register DMA channel for ISA bus. */
+>  		if (asc_dvc_varp->bus_type & ASC_IS_ISA) {
+> @@ -11379,7 +11385,7 @@ static int advansys_board_found(struct Scsi_Host *shost, unsigned int iop,
+>   err_free_irq:
+>  	free_irq(boardp->irq, shost);
+>   err_free_dma:
+> -#ifdef CONFIG_ISA
+> +#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
+>  	if (shost->dma_channel != NO_ISA_DMA)
+>  		free_dma(shost->dma_channel);
+>  #endif
+> @@ -11403,7 +11409,7 @@ static int advansys_release(struct Scsi_Host *shost)
+>  	ASC_DBG(1, "begin\n");
+>  	scsi_remove_host(shost);
+>  	free_irq(board->irq, shost);
+> -#ifdef CONFIG_ISA
+> +#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
+>  	if (shost->dma_channel != NO_ISA_DMA) {
+>  		ASC_DBG(1, "free_dma()\n");
+>  		free_dma(shost->dma_channel);
 
-Hi Rob,
+OK, that makes much more of a mess of the driver than I'd anticipated.
+Unless there's an actual use case for forcing the non-DMA channel on the
+relevant hardware, let's just go with the dependency based fix.
 
-I'm not sure we are going to get much more feedback by just waiting or
-resending what has been sent so many times.
-
-Did you have in mind specific people you wanted to see reviewed-bys from?
-
-Guess Greg will get to this sometime soon.
-
-Regards,
-
-Tomeu
-
-> Your branch is based on -next. Is there any dependence on something in
-> -next? I want to get this into -next soon, but need a branch not based
-> on -next. Please send me a pull request with the collected acks and
-> minor comments I have addressed.
->
-> Rob
->
->>
->> Regards,
->>
->> Tomeu
->>
->> [0] http://lists.freedesktop.org/archives/dri-devel/2014-August/066527.html
->>
->> [1] https://lkml.org/lkml/2014/5/12/452
->>
->> [2] https://lkml.org/lkml/2015/6/17/305
->>
->> [3] http://article.gmane.org/gmane.linux.ports.arm.kernel/277689
->>
->> [4] https://lkml.org/lkml/2015/7/21/441a
->>
->> [5] https://git.collabora.com/cgit/user/tomeu/linux.git/log/?h=on-demand-probes-v8
->>
->> [6] http://kernelci.org/boot/all/job/collabora/kernel/v4.3-rc2-2587-gf92b0ab33d14/
->>
->> [7] http://kernelci.org/boot/all/job/next/kernel/next-20150921
->>
->> Changes in v6:
->> - Drop bus_type.pre_probe and read the periphid in match() instead as
->>   suggested by Alan Stern.
->> - Merge changes to the regulator subsystem's locking so no references
->>   are leaked between commits.
->>
->> Changes in v5:
->> - Set the pointer to struct device also for AMBA devices
->> - Unset the pointer to struct device when the platform device is about
->>   to be unregistered
->> - Increase the reference count of the device before returning from
->>   of_find_device_by_node()
->> - Move the assignment to device_node->device for AMBA devices to another
->>   commit.
->> - Hold a reference to the struct device while it's in use in
->>   of_device_probe().
->> - Use regulator_class' klist of devices instead of regulator_list to
->>   store and lookup regulator devices.
->>
->> Changes in v4:
->> - Added bus.pre_probe callback so the probes of Primecell devices can be
->>   deferred if their device IDs cannot be yet read because of the clock
->>   driver not having probed when they are registered. Maybe this goes
->>   overboard and the matching information should be in the DT if there is
->>   one.
->> - Rename of_platform_probe to of_device_probe
->> - Use device_node.device instead of device_node.platform_dev
->> - Add Kconfig DELAY_DEVICE_PROBES to allow disabling delayed probing in
->>   machines with initcalls that depend on devices probing at a given time.
->> - Start processing deferred probes in device_initcall_sync
->> - Also defer probes of AMBA devices registered from the DT as they can
->>   also request resources.
->>
->> Changes in v3:
->> - Set and use device_node.platform_dev instead of reversing the logic to
->>   find the platform device that encloses a device node.
->> - Drop the fwnode API to probe firmware nodes and add OF-only API for
->>   now. I think this same scheme could be used for machines with ACPI,
->>   but I haven't been able to find one that had to defer its probes because
->>   of the device probe order.
->>
->> Tomeu Vizoso (22):
->>   driver core: handle -EPROBE_DEFER from bus_type.match()
->>   ARM: amba: Move reading of periphid to amba_match()
->>   of/platform: Point to struct device from device node
->>   of: add function to allow probing a device from a OF node
->>   gpio: Probe GPIO drivers on demand
->>   gpio: Probe pinctrl devices on demand
->>   regulator: core: Remove regulator_list
->>   regulator: core: Probe regulators on demand
->>   drm: Probe panels on demand
->>   drm/tegra: Probe dpaux devices on demand
->>   i2c: core: Probe i2c adapters and devices on demand
->>   pwm: Probe PWM chip devices on demand
->>   backlight: Probe backlight devices on demand
->>   usb: phy: Probe phy devices on demand
->>   clk: Probe clk providers on demand
->>   pinctrl: Probe pinctrl devices on demand
->>   phy: core: Probe phy providers on demand
->>   dma: of: Probe DMA controllers on demand
->>   power-supply: Probe power supplies on demand
->>   driver core: Allow deferring probes until late init
->>   driver core: Start processing deferred probes earlier
->>   of/platform: Defer probes of registered devices
->>
->>  drivers/amba/bus.c                  |  88 ++++++------
->>  drivers/base/Kconfig                |  18 +++
->>  drivers/base/dd.c                   |  35 ++++-
->>  drivers/clk/clk.c                   |   3 +
->>  drivers/dma/of-dma.c                |   3 +
->>  drivers/gpio/gpiolib-of.c           |   5 +
->>  drivers/gpu/drm/drm_panel.c         |   3 +
->>  drivers/gpu/drm/tegra/dpaux.c       |   3 +
->>  drivers/i2c/i2c-core.c              |   4 +
->>  drivers/of/device.c                 |  61 +++++++++
->>  drivers/of/platform.c               |  30 +++--
->>  drivers/phy/phy-core.c              |   3 +
->>  drivers/pinctrl/devicetree.c        |   3 +
->>  drivers/power/power_supply_core.c   |   3 +
->>  drivers/pwm/core.c                  |   3 +
->>  drivers/regulator/core.c            | 257 +++++++++++++++++++++++-------------
->>  drivers/usb/phy/phy.c               |   3 +
->>  drivers/video/backlight/backlight.c |   3 +
->>  include/linux/device.h              |   4 +-
->>  include/linux/of.h                  |   1 +
->>  include/linux/of_device.h           |   3 +
->>  21 files changed, 386 insertions(+), 150 deletions(-)
->>
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+James
