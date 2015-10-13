@@ -1,81 +1,66 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 13 Oct 2015 14:49:07 +0000
-Subject: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for HiSilicon
- SoC Hip05
-In-Reply-To: <6336414.HvfCQcuT3Y@wuerfel>
-References: <1444445957-239522-1-git-send-email-wangzhou1@hisilicon.com>
- <1444445957-239522-5-git-send-email-wangzhou1@hisilicon.com>
- <20151012213545.GA17479@localhost> <6336414.HvfCQcuT3Y@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E16242C92@lhreml503-mbs>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 13 Oct 2015 07:53:59 -0700
+Subject: [PATCH 12/17] ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
+In-Reply-To: <561CE017.7030704@arm.com>
+References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
+ <1442850433-5903-13-git-send-email-sudeep.holla@arm.com>
+ <20151012202047.GR23801@atomide.com>
+ <20151012202847.GS23801@atomide.com> <561CE017.7030704@arm.com>
+Message-ID: <20151013145359.GV23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Tuesday, October 13, 2015 12:12 PM
-> To: Bjorn Helgaas
-> Cc: Wangzhou (B); Bjorn Helgaas; jingoohan1 at gmail.com;
-> pratyush.anand at gmail.com; linux at arm.linux.org.uk;
-> thomas.petazzoni at free-electrons.com; Gabriele Paoloni;
-> lorenzo.pieralisi at arm.com; james.morse at arm.com; Liviu.Dudau at arm.com;
-> jason at lakedaemon.net; robh at kernel.org; gabriel.fernandez at linaro.org;
-> Minghuan.Lian at freescale.com; linux-pci at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; devicetree at vger.kernel.org; linux-
-> kernel at vger.kernel.org; zhangjukuo; qiuzhenfa; liudongdong (C);
-> qiujiang; xuwei (O); Liguozhu (Kenneth); Wangkefeng (Kevin); Rob
-> Herring
-> Subject: Re: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for
-> HiSilicon SoC Hip05
+* Sudeep Holla <sudeep.holla@arm.com> [151013 03:46]:
 > 
-> On Monday 12 October 2015 16:35:45 Bjorn Helgaas wrote:
+> 
+> On 12/10/15 21:28, Tony Lindgren wrote:
+> >* Tony Lindgren <tony@atomide.com> [151012 13:27]:
+> >>* Sudeep Holla <sudeep.holla@arm.com> [150921 08:52]:
+> >>>The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
+> >>>be left enabled so as to allow them to work as expected during the
+> >>>suspend-resume cycle, but doesn't guarantee that it will wake the system
+> >>>from a suspended state, enable_irq_wake is recommended to be used for
+> >>>the wakeup.
+> >>>
+> >>>This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
+> >>>enable_irq_wake instead.
+> >>
+> >>Applying into omap-for-v4.4/cleanup thanks.
 > >
-> > > +{
-> > > +     u64 addr;
-> > > +     struct device_node *msi_node;
-> > > +     struct resource res;
-> > > +     struct device_node *np = pp->dev->of_node;
-> > > +     struct hisi_pcie *pcie = to_hisi_pcie(pp);
-> > > +
-> > > +     msi_node = of_parse_phandle(np, "msi-parent", 0);
-> > > +     if (!msi_node) {
-> > > +             dev_err(pp->dev, "failed to find msi-parent\n");
-> > > +             return -EINVAL;
-> > > +     }
-> > > +     of_address_to_resource(msi_node, 0, &res);
+> >Actually I don't think this does the right thing. The interrupts
+> >in the $subject patch are in the always on powerdomain, and we really
+> 
+> Agreed
+> 
+> >want them to be excluded from the suspend.
 > >
-> > Does this use the "msi-parent" node in the same way as other drivers
-> > do?  I'm sure there must be other places where we extract struct
-> > resource information from an "msi-parent" node, but I don't see them.
+> 
+> OK but what's wrong with this patch. At-least the name suggest it's a
+> wakeup interrupt. And using IRQF_NO_SUSPEND for the wakeup interrupt is
+> simply wrong.
+
+Hmm so if we have a separate always on irq controller for the wake-up events
+and we want to keep it always on and exclude it from any suspend related
+things.. Why would we not use IRQF_NO_SUSPEND on it?
+
+Above you say "The IRQF_NO_SUSPEND flag is used to identify the interrupts
+that should be left enabled so as to allow them to work as expected during
+the suspend-resume cycle..." and that's exactly what we want to do here :)
+
+For the dedicated wake-up interrupts, we have separate registers to enable
+and disable them. The $subject irq is the shared interrupt that allows
+making use of the pin specific wake-up interrupts, and for those yes we
+are using enable_irq_wake().
+
+> >So not applying without further explanations.
 > >
-> > I'm trying to verify that this isn't some kind of incompatible
-> > extension of the "msi-parent" property.  I cc'd Arnd and Rob (DT
-> > experts).
 > 
-> This is not ok, what this does is that it relies on a particular
-> implementation of the MSI controller and directly accesses its
-> registers.
+> But I don't understand the real need for IRQF_NO_SUSPEND over wakeup APIs ?
 
-Hi Arnd, thanks for reviewing.
+Because in the $subject case we just want to always keep it on and
+never suspend it. It's unrelated to the wakeup APIs at least for the
+omap related SoCs.
 
-What we do is to retrieve the msi-parent physical address and we store it
-in our internal PCIe register locations...
+Regards,
 
-So we do not operate directly on the msi controller registers...
-
-So I wonder if the current implementation is Ok to retrieve the
-msi-parent address....
-
-Thanks
-
-Gab
-
-
-> 
-> Instead, it should reference only the msi irq domain and let the
-> driver for the MSI controller access the registers. Otherwise this
-> code has to be rewritten once the same PCI host code appears in
-> a machine that has a real GICv2m or GICv3.
-> 
-> 	Arnd
+Tony
