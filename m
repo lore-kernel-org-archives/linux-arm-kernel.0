@@ -1,138 +1,143 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 13 Oct 2015 16:21:41 +0200
-Subject: [PATCH] i2c: at91: fix write transfers by clearing pending interrupt
- first
-Message-ID: <1444746104-20615-1-git-send-email-ludovic.desroches@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 13 Oct 2015 15:22:40 +0100
+Subject: [PATCH v2 1/4] dt-bindings: Document the STM32 DMA bindings
+In-Reply-To: <1444744848-720-2-git-send-email-cedric.madianga@gmail.com>
+References: <1444744848-720-1-git-send-email-cedric.madianga@gmail.com>
+ <1444744848-720-2-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <20151013142240.GC24353@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+On Tue, Oct 13, 2015 at 04:00:45PM +0200, M'boumba Cedric Madianga wrote:
+> This patch adds documentation of device tree bindings for the STM32 dma
+> controller.
+> 
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> ---
+>  .../devicetree/bindings/dma/stm32-dma.txt          | 98 ++++++++++++++++++++++
+>  1 file changed, 98 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/stm32-dma.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/stm32-dma.txt b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+> new file mode 100644
+> index 0000000..9ce0d49
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+> @@ -0,0 +1,98 @@
+> +* STMicroelectronics STM32 DMA controller
+> +
+> +The STM32 DMA is a general-purpose direct memory access controller capable of
+> +supporting 8 independent DMA channels. Each channel can have up to 8 requests.
+> +
+> +Required properties:
+> +- compatible: Should be "st,stm32-dma"
+> +- reg: Should contain DMA registers location and length. This should include
+> +  all of the per-channel registers.
+> +- interrupts: Should contain all of the per-channel DMA interrupts.
 
-In some cases a NACK interrupt may be pending in the Status Register (SR)
-as a result of a previous transfer. However at91_do_twi_transfer() did not
-read the SR to clear pending interruptions before starting a new transfer.
-Hence a NACK interrupt rose as soon as it was enabled again at the I2C
-controller level, resulting in a wrong sequence of operations and strange
-patterns of behaviour on the I2C bus, such as a clock stretch followed by
-a restart of the transfer.
+Please specify the order they must be in.
 
-This first issue occurred with both DMA and PIO write transfers.
+> +- clocks: Should contain the input clock of the DMA instance.
+> +- #dma-cells : Must be <4>. See DMA client paragraph for more details.
+> +
+> +Optional properties:
+> +- resets: Reference to a reset controller asserting the DMA controller
+> +- st,mem2mem: boolean; if defined, it indicates that the controller supports
+> +  memory-to-memory transfer
+> +
+> +Example:
+> +
+> +	dma2: dma-controller at 40026400 {
+> +		compatible = "st,stm32-dma";
+> +		reg = <0x40026400 0x400>;
+> +		interrupts = <56>,
+> +			     <57>,
+> +			     <58>,
+> +			     <59>,
+> +			     <60>,
+> +			     <68>,
+> +			     <69>,
+> +			     <70>;
+> +		clocks = <&clk_hclk>;
+> +		#dma-cells = <4>;
+> +		st,mem2mem;
+> +		resets = <&rcc 150>;
+> +	};
+> +
+> +* DMA client
+> +
+> +Required properties:
+> +- dmas: Comma separated list of dma channel requests
+> +- dma-names: Names of the aforementioned requested channels
+> +
+> +Each dmas request consists of 5 cells:
+> +1. A phandle pointing to the STM32 DMA controller
+> +2. The channel id
+> +3. The request line number
+> +4. A 32bit mask specifying the DMA channel configuration
+> + -bit 1: Direct Mode Error Interrupt
+> +	0x0: disabled
+> +	0x1: enabled
+> + -bit 2: Transfer Error Interrupt
+> +	0x0: disabled
+> +	0x1: enabled
+> + -bit 3: Half Transfer Mode Error Interrupt
+> +	0x0: disabled
+> +	0x1: enabled
+> + -bit 4: Transfer Complete Interrupt
+> +	0x0: disabled
+> +	0x1: enabled
 
-Also when a NACK error was detected during a PIO write transfer, the
-interrupt handler used to wrongly start a new transfer by writing into the
-Transmit Holding Register (THR). Then the I2C slave was likely to reply
-with a second NACK.
+Why should this be in the DT?
 
-This second issue is fixed in atmel_twi_interrupt() by handling the TXRDY
-status bit only if both the TXCOMP and NACK status bits are cleared.
+Surely the driver should be in charge of deciding when to use these?
 
-Tested with a at24 eeprom on sama5d36ek board running a linux-4.1-at91
-kernel image. Adapted to linux-next.
+> + -bit 9: Peripheral Increment Address
+> +	0x0: no address increment between transfers
+> +	0x1: increment address between transfers
+> + -bit 10: Memory Increment Address
+> +	0x0: no address increment between transfers
+> +	0x1: increment address between transfers
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-Fixes: 93563a6a71bb ("i2c: at91: fix a race condition when using the DMA controller")
-Reported-by: Peter Rosin <peda@lysator.liu.se>
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Cc: stable at vger.kernel.org #4.1
----
- drivers/i2c/busses/i2c-at91.c | 58 +++++++++++++++++++++++++++++++++++++------
- 1 file changed, 50 insertions(+), 8 deletions(-)
+These don't seem like they belong either. Surely this would depend on
+the request made, rather than being a fixed property?
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index 1c758cd..94c087b 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -465,19 +465,57 @@ static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
- 
- 	if (!irqstatus)
- 		return IRQ_NONE;
--	else if (irqstatus & AT91_TWI_RXRDY)
--		at91_twi_read_next_byte(dev);
--	else if (irqstatus & AT91_TWI_TXRDY)
--		at91_twi_write_next_byte(dev);
--
--	/* catch error flags */
--	dev->transfer_status |= status;
- 
-+	/*
-+	 * When a NACK condition is detected, the I2C controller sets the NACK,
-+	 * TXCOMP and TXRDY bits all together in the Status Register (SR).
-+	 *
-+	 * 1 - Handling NACK errors with CPU write transfer.
-+	 *
-+	 * In such case, we should not write the next byte into the Transmit
-+	 * Holding Register (THR) otherwise the I2C controller would start a new
-+	 * transfer and the I2C slave is likely to reply by another NACK.
-+	 *
-+	 * 2 - Handling NACK errors with DMA write transfer.
-+	 *
-+	 * By setting the TXRDY bit in the SR, the I2C controller also triggers
-+	 * the DMA controller to write the next data into the THR. Then the
-+	 * result depends on the hardware version of the I2C controller.
-+	 *
-+	 * 2a - Without support of the Alternative Command mode.
-+	 *
-+	 * This is the worst case: the DMA controller is triggered to write the
-+	 * next data into the THR, hence starting a new transfer: the I2C slave
-+	 * is likely to reply by another NACK.
-+	 * Concurrently, this interrupt handler is likely to be called to manage
-+	 * the first NACK before the I2C controller detects the second NACK and
-+	 * sets once again the NACK bit into the SR.
-+	 * When handling the first NACK, this interrupt handler disables the I2C
-+	 * controller interruptions, especially the NACK interrupt.
-+	 * Hence, the NACK bit is pending into the SR. This is why we should
-+	 * read the SR to clear all pending interrupts at the beginning of
-+	 * at91_do_twi_transfer() before actually starting a new transfer.
-+	 *
-+	 * 2b - With support of the Alternative Command mode.
-+	 *
-+	 * When a NACK condition is detected, the I2C controller also locks the
-+	 * THR (and sets the LOCK bit in the SR): even though the DMA controller
-+	 * is triggered by the TXRDY bit to write the next data into the THR,
-+	 * this data actually won't go on the I2C bus hence a second NACK is not
-+	 * generated.
-+	 */
- 	if (irqstatus & (AT91_TWI_TXCOMP | AT91_TWI_NACK)) {
- 		at91_disable_twi_interrupts(dev);
- 		complete(&dev->cmd_complete);
-+	} else if (irqstatus & AT91_TWI_RXRDY) {
-+		at91_twi_read_next_byte(dev);
-+	} else if (irqstatus & AT91_TWI_TXRDY) {
-+		at91_twi_write_next_byte(dev);
- 	}
- 
-+	/* catch error flags */
-+	dev->transfer_status |= status;
-+
- 	return IRQ_HANDLED;
- }
- 
-@@ -487,6 +525,7 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
- 	unsigned long time_left;
- 	bool has_unre_flag = dev->pdata->has_unre_flag;
- 	bool has_alt_cmd = dev->pdata->has_alt_cmd;
-+	unsigned sr;
- 
- 	/*
- 	 * WARNING: the TXCOMP bit in the Status Register is NOT a clear on
-@@ -537,6 +576,9 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
- 	reinit_completion(&dev->cmd_complete);
- 	dev->transfer_status = 0;
- 
-+	/* Clear pending interrupts, such as NACK. */
-+	sr = at91_twi_read(dev, AT91_TWI_SR);
-+
- 	if (dev->fifo_size) {
- 		unsigned fifo_mr = at91_twi_read(dev, AT91_TWI_FMR);
- 
-@@ -558,7 +600,7 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
- 	} else if (dev->msg->flags & I2C_M_RD) {
- 		unsigned start_flags = AT91_TWI_START;
- 
--		if (at91_twi_read(dev, AT91_TWI_SR) & AT91_TWI_RXRDY) {
-+		if (sr & AT91_TWI_RXRDY) {
- 			dev_err(dev->dev, "RXRDY still set!");
- 			at91_twi_read(dev, AT91_TWI_RHR);
- 		}
--- 
-2.5.0
+> + -bit 15: Peripheral Increment Offset Size
+> +	0x0: offset size is linked to the peripheral bus width
+> +	0x1: offset size is fixed to 4 (32-bit alignment)
+
+This sounds like it might belong in the DT.
+
+> + -bit 16-17: Priority level
+> +	0x0: low
+> +	0x1: medium
+> +	0x2: high
+> +	0x3: very high
+
+What do we do elsewhere in terms of describing prioritisation? It feels
+like it would be a dynamic property of the system.
+
+> +5. A 32bit mask specifying the DMA FIFO configuration
+> + -bit 0-1: Fifo threshold
+> +	0x0: 1/4 full FIFO
+> +	0x1: 1/2 full FIFO
+> +	0x2: 3/4 full FIFO
+> +	0x3:full FIFO
+
+What does this mean?
+
+> + -bit 2: Direct mode
+> +	0x0: enabled
+> +	0x1: disabled
+
+What does this mean?
+
+> + -bit 7: FIFO Error Interrupt
+> +	0x0: disabled
+> +	0x1: enabled
+
+As with the other interrupt configuration, this does not look like it
+belongs in the DT.
+
+Thanks,
+Mark.
