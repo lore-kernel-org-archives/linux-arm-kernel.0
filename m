@@ -1,29 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Oct 2015 23:18:53 +0200
-Subject: [PATCH v2 7/7] clk: ns2: add clock support for Broadcom Northstar
- 2 SoC
-In-Reply-To: <1444770485-11210-8-git-send-email-jonmason@broadcom.com>
-References: <1444770485-11210-1-git-send-email-jonmason@broadcom.com>
- <1444770485-11210-8-git-send-email-jonmason@broadcom.com>
-Message-ID: <5280890.6npshDUNFZ@wuerfel>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 13 Oct 2015 14:21:35 -0700
+Subject: [PATCH] PCI: iproc: fix 32-bit build error
+In-Reply-To: <11199595.GgDE2yo8AA@wuerfel> (Arnd Bergmann's message of "Tue,
+ 13 Oct 2015 22:02:48 +0200")
+References: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
+ <1442363962-29805-8-git-send-email-rjui@broadcom.com>
+ <CAMAWPa_Hsuv+skzt3S6e9X_kWY=2JXAScbVEVOVTGmn81_bcFw@mail.gmail.com>
+ <11199595.GgDE2yo8AA@wuerfel>
+Message-ID: <7hwpuqcvmo.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 October 2015 17:08:05 Jon Mason wrote:
-> @@ -3,6 +3,7 @@ obj-$(CONFIG_CLK_BCM_KONA)      += clk-kona-setup.o
->  obj-$(CONFIG_CLK_BCM_KONA)     += clk-bcm281xx.o
->  obj-$(CONFIG_CLK_BCM_KONA)     += clk-bcm21664.o
->  obj-$(CONFIG_COMMON_CLK_IPROC) += clk-iproc-armpll.o clk-iproc-pll.o clk-iproc-asiu.o
-> +obj-$(CONFIG_COMMON_CLK_IPROC) += clk-ns2.o
->  obj-$(CONFIG_ARCH_BCM_CYGNUS)  += clk-cygnus.o
->  obj-$(CONFIG_ARCH_BCM_NSP)     += clk-nsp.o
->  obj-$(CONFIG_ARCH_BCM_5301X)   += clk-nsp.o
+Arnd Bergmann <arnd@arndb.de> writes:
 
-If I understand this right, both CYGNUS and NS2 are IPROC based, but it
-looks like you now require building the clk-ns2 file for both?
+> The iproc PCI driver tries to figure out whether the MMIO window has
+> a valid size, but does this using a 64-bit modulo operation, which
+> is not allowed on 32-bit kernels and leads to a link error:
+>
+> drivers/built-in.o: In function `iproc_pcie_setup':
+> :(.text+0x4b798): undefined reference to `__aeabi_uldivmod'
+>
+> This works around that error by using the div64_u64() function
+> provided by the kernel. While this is an expensive operation,
+> it is harmless because we only call it during the probing
+> of the driver.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 0ab99ca8eb6c ("PCI: iproc: Fix compile warnings")
 
-On a related note, I'm seeing problems when CONFIG_CYGNUS is set but
-CONFIG_COMMON_CLK_IPROC is disabled, as that currently leads to a link
-failure.
+Tested-by: Kevin Hilman <khilman@linaro.org>
 
-	Arnd
+Verified that this fixes the build failure on arm multi_v7_defconfig +
+CONFIG_ARM_LPAE=y on top of next-20151013.
+
+Kevin
