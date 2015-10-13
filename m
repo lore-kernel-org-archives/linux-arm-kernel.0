@@ -1,49 +1,34 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 13 Oct 2015 09:38:42 +0900
-Subject: [GIT PULL] ARM: defconfig: Exynos improvements for 4.4, 2nd pull
-Message-ID: <1444696722-25093-1-git-send-email-k.kozlowski@samsung.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 13 Oct 2015 08:58:12 +0800
+Subject: [PATCH v2 0/4] arm64: Hi6220: enable CPU idle states
+Message-ID: <1444697896-4323-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
+This patch series is to enable CPU idle states for Hi6220.
 
-This is another round of defconfig related changes for 4.4.
+Hi6220 uses PSCIv0.2 compliance interface, so directly use ARM's generic
+CPUIdle driver. Patch 1 is to reserve memory regions so make sure MCU can
+work well to handle power controlling; Patch 2/3 enable sp804 timer as
+broadcast timer during idle states; Patch 4 registers CPU power down state
+and cluster power down state.
 
-Description along with a tag.
-You can find them also on the lists with my reviewed-by.
+Changes from v1:
+* According to Sudeep's review, fix binding for idle-states
+* According to Rob's review, due timers share same clock source with apb
+  clock, so just only pass one clock phandle
 
-Best regards,
-Krzysztof
 
+Leo Yan (4):
+  arm64: dts: Reserve memory regions for hi6220
+  arm64: Kconfig: select sp804 timer for ARCH_HISI
+  arm64: dts: add sp804 timer node for Hi6220
+  arm64: dts: enable idle states for Hi6220
 
-The following changes since commit 7fa5ce4e6fcb4596761c17e124e7d1f8cf64fe96:
+ arch/arm64/Kconfig.platforms                   |  1 +
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 16 ++++++++---
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 40 ++++++++++++++++++++++++++
+ 3 files changed, 53 insertions(+), 4 deletions(-)
 
-  ARM: exynos_defconfig: Disable simplefb support (2015-09-13 19:25:39 +0900)
-
-are available in the git repository at:
-
-  https://github.com/krzk/linux.git tags/samsung-defconfig-4.4-2
-
-for you to fetch changes up to 89a0112100e74f50407d269570a02a82fd28ccb8:
-
-  ARM: multi_v7_defconfig: Enable rtl8152 ethernet driver for Odroid-XU4 (2015-10-12 12:59:50 +0900)
-
-----------------------------------------------------------------
-Defconfig changes around Exynos based boards:
-1. Change WiFi-Ex from built-in to module to fix issue with probing
-   the driver before root filesystem is available (driver needs
-   firmware).
-2. Enable Realtek RTL81t3 ethernet adapter present on Odroid-XU4
-   board.
-
-----------------------------------------------------------------
-Anand Moon (2):
-      ARM: exynos_defconfig: Enable rtl8152 ethernet driver for Odroid-XU4
-      ARM: multi_v7_defconfig: Enable rtl8152 ethernet driver for Odroid-XU4
-
-Javier Martinez Canillas (1):
-      ARM: exynos_defconfig: Enable WiFi-Ex as a module instead built-in
-
- arch/arm/configs/exynos_defconfig   | 5 +++--
- arch/arm/configs/multi_v7_defconfig | 1 +
- 2 files changed, 4 insertions(+), 2 deletions(-)
+-- 
+1.9.1
