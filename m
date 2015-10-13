@@ -1,37 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 13 Oct 2015 19:46:54 +0200
-Subject: [PATCH] ARM: ux500: modify initial levelshifter status
-Message-ID: <1444758414-4401-1-git-send-email-linus.walleij@linaro.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 13 Oct 2015 19:52:11 +0200
+Subject: [PATCH 2/2][UPDATE] ARM: dts: replace gpio-key,
+ wakeup with wakeup-source property
+In-Reply-To: <1444747133-22671-1-git-send-email-sudeep.holla@arm.com>
+References: <1444743164-17735-2-git-send-email-sudeep.holla@arm.com>
+ <1444747133-22671-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1561585.uublXABoq2@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 1d8aca9df612f5751892fb2642d72536f2f48fd0
-"ARM: ux500: fix MMC/SD card regression"
-fixed broken the level shifter: it should be default ON
-but became default OFF.
+Am Dienstag, 13. Oktober 2015, 15:38:53 schrieb Sudeep Holla:
+> Keyboard driver for GPIO buttons(gpio-keys) checks for the legacy
+> "gpio-key,wakeup" boolean property to enable gpio buttons as wakeup
+> source.
+> 
+> Few dts files assign value "1" to gpio-key,wakeup and in one instance a
+> value "0" is assigned probably assuming it won't be enabled as a wakeup
+> source. Since the presence of the boolean property indicates it is
+> enabled, value of "0" have no value.
+> 
+> This patch replaces the legacy "gpio-key,wakeup" with the unified
+> "wakeup-source" property which inturn fixes the above mentioned issue.
+> 
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: linux-rockchip at lists.infradead.org
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm/boot/dts/rk3066a-bqcurie2.dts      | 3 +--
+>  arch/arm/boot/dts/rk3066a-rayeager.dts      | 2 +-
+>  arch/arm/boot/dts/rk3188-radxarock.dts      | 2 +-
+>  arch/arm/boot/dts/rk3288-evb.dtsi           | 2 +-
+>  arch/arm/boot/dts/rk3288-firefly.dtsi       | 2 +-
+>  arch/arm/boot/dts/rk3288-popmetal.dts       | 2 +-
+>  arch/arm/boot/dts/rk3288-r89.dts            | 2 +-
+[...]
+>  arch/arm64/boot/dts/rockchip/rk3368-r88.dts | 2 +-
 
-Fixes: 1d8aca9df612 "ARM: ux500: fix MMC/SD card regression"
-Reported-and-tested-by: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: please apply this directly for fixes. I have
-no other Ux500 fixes pending for now.
----
- arch/arm/boot/dts/ste-hrefv60plus.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/ste-hrefv60plus.dtsi b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-index 810cda743b6d..9c2387b34d0c 100644
---- a/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-+++ b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-@@ -56,7 +56,7 @@
- 					/* VMMCI level-shifter enable */
- 					default_hrefv60_cfg2 {
- 						pins = "GPIO169_D22";
--						ste,config = <&gpio_out_lo>;
-+						ste,config = <&gpio_out_hi>;
- 					};
- 					/* VMMCI level-shifter voltage select */
- 					default_hrefv60_cfg3 {
--- 
-2.4.3
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
