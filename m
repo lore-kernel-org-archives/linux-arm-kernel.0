@@ -1,72 +1,62 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Wed, 14 Oct 2015 02:13:49 +0300
-Subject: [PATCH 2/5] arm: dts: lpc32xx: fix improper usage of ranges
- property
-In-Reply-To: <5493797.P10V9v7QAu@wuerfel>
-References: <1444694045-22000-1-git-send-email-vz@mleia.com>
- <7277011.vmOGiecsKn@wuerfel> <561D287C.9010400@mleia.com>
- <5493797.P10V9v7QAu@wuerfel>
-Message-ID: <561D902D.7020503@mleia.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Tue, 13 Oct 2015 18:53:28 -0500
+Subject: [PATCH V3 2/4] ACPI/scan: Clean up acpi_check_dma
+In-Reply-To: <561D28B5.7030303@amd.com>
+References: <1440597279-11802-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1440597279-11802-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20150914163411.GL829@google.com> <561D28B5.7030303@amd.com>
+Message-ID: <561D9978.9090406@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+Bjorn / Rafael,
 
-On 13.10.2015 22:36, Arnd Bergmann wrote:
-> On Tuesday 13 October 2015 18:51:24 Vladimir Zapolskiy wrote:
->> On 13.10.2015 15:44, Arnd Bergmann wrote:
->>> I don't get it. What kind of errors do you see? The existing
->>> version looks cleaner than the new one, as it only translates
->>> the MMIO areas that are actually used.
->>>
->>
->> The problem is found when I add PL175 device node to lpc32xx.dtsi and
->> expand the node in my board file. The external memory controller manages
->> up to 4 memory devices, which by means of the controller are mapped into
->> physical memory starting from address 0xe0000000.
->>
->> Below are my declarations, similar to one found in lpc18xx.dtsi.
->>
->> lpc32xx.dtsi change common for all LPC32xx boards:
->>
->> emc: emc at 31080000 {
->> 	compatible = "arm,pl175", "arm,primecell";
->> 	reg = <0x31080000 0x1000>;
->> 	clocks = <&scf LPC32XX_CLK_DDRAM>;
->> 	clock-names = "mpmcclk";
->>
->> 	#address-cells = <1>;
->> 	#size-cells = <1>;
->> 	ranges = <0 0xe0000000 0x01000000>,
->> 		 <1 0xe1000000 0x01000000>,
->> 		 <2 0xe2000000 0x01000000>,
->> 		 <3 0xe3000000 0x01000000>;
->> 	status = "disabled";
->> };
->>
-> 
-> Ok, got it.
-> 
->> Support of EMC device node will be added to lpc32xx.dtsi, when this kind
->> of problem is fixed.
-> 
-> As I see it, the problem is that you now have ranges that are not
-> for devices inside of the device but that are external. As the
-> memory-controller node needs both its own registers and the translation
-> for the external ones, we unfortunately can't just put it in the root
-> node, which would avoid the issue.
-> 
-> Instead, I would suggest adding a range for the 0xe0000000 area.
+On 10/13/2015 10:52 AM, Suravee Suthikulpanit wrote:
+>
+> On 09/14/2015 09:34 AM, Bjorn Helgaas wrote:
+>> [..]
+>> I think acpi_check_dma_coherency() is better, but only slightly.  It
+>> still doesn't give a hint about the *sense* of the return value.  I
+>> think it'd be easier to read if there were two functions, e.g.,
+>
+> I have been going back-and-forth between the current version, and the
+> two-function-approach in the past. I can definitely go with this route
+> if you would prefer. Although, if acpi_dma_is_coherent() == 0, it would
+> be ambiguous whether DMA is not supported or non-coherent DMA is
+> supported. Then, we would need to call acpi_dma_is_supported() to find
+> out. So, that's okay with you?
 
-Ok, practically it should work for my purposes, but the change must be
-done along with added EMC device node description.
+Thinking about this again, I still think having one API (which can tell 
+whether DMA is supported or not, and if so whether it is coherent or 
+non-coherent) would be the least confusing and least error prone.
 
-I'm not so confident that it is correct to add description of static
-memory banks to ahb node though, please give me a short confirmation,
-then I'll send a change for inclusion of EMC description -- the one
-above excluding clocks and clock-names properties, work on CCF is in
-progress.
+What if we would just have:
 
---
-With best wishes,
-Vladimir
+     enum dev_dma_type acpi_get_dev_dma_type(struct acpi_device *adev);
+
+where:
+     enum dev_dma_type {
+         DEV_DMA_NOT_SUPPORTED,
+         DEV_DMA_NON_COHERENT,
+         DEV_DMA_COHERENT,
+     };
+
+This would probably mean that we should modify drivers/base/property.c 
+to replace:
+     bool device_dma_is_coherent()
+to:
+     enum dev_dma_type device_get_dma_type()
+
+We used to discuss the enum approach in the past 
+(https://lkml.org/lkml/2015/8/25/868). But we only considered at the 
+ACPI level at the time. Actually, this should also reflect in the 
+property.c.
+
+At this point, only drivers/crypto/ccp/ccp-platform.c and 
+drivers/net/ethernet/amd/xgbe/xgbe-main.c are calling the 
+device_dma_is_coherent(). So, it should be easy to change this API.
+
+Please let me know your opinions, or if you have other suggestions.
+
+Thanks again,
+Suravee
