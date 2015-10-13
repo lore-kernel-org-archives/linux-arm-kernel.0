@@ -1,61 +1,312 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 13 Oct 2015 18:22:27 +0100
-Subject: [PATCH v3 19/24] arm64/kvm: Make use of the system wide safe values
+Date: Tue, 13 Oct 2015 18:22:14 +0100
+Subject: [PATCH v3 06/24] arm64: Move /proc/cpuinfo handling code
 In-Reply-To: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
 References: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1444756952-31145-20-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1444756952-31145-7-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the system wide safe value from the new API for safer
-decisions
+This patch moves the /proc/cpuinfo handling code:
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: kvmarm at lists.cs.columbia.edu
+arch/arm64/kernel/{setup.c to cpuinfo.c}
+
+No functional changes
+
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/reset.c    |    2 +-
- arch/arm64/kvm/sys_regs.c |   12 ++++++------
- 2 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm64/kernel/cpuinfo.c |  124 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/setup.c   |  123 ------------------------------------------
+ 2 files changed, 124 insertions(+), 123 deletions(-)
 
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 91cf535..f34745c 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -53,7 +53,7 @@ static bool cpu_has_32bit_el1(void)
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 8307b33..0dadb69 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -24,8 +24,11 @@
+ #include <linux/bug.h>
+ #include <linux/init.h>
+ #include <linux/kernel.h>
++#include <linux/personality.h>
+ #include <linux/preempt.h>
+ #include <linux/printk.h>
++#include <linux/seq_file.h>
++#include <linux/sched.h>
+ #include <linux/smp.h>
+ 
+ /*
+@@ -45,6 +48,127 @@ static char *icache_policy_str[] = {
+ 
+ unsigned long __icache_flags;
+ 
++static const char *hwcap_str[] = {
++	"fp",
++	"asimd",
++	"evtstrm",
++	"aes",
++	"pmull",
++	"sha1",
++	"sha2",
++	"crc32",
++	"atomics",
++	NULL
++};
++
++#ifdef CONFIG_COMPAT
++static const char *compat_hwcap_str[] = {
++	"swp",
++	"half",
++	"thumb",
++	"26bit",
++	"fastmult",
++	"fpa",
++	"vfp",
++	"edsp",
++	"java",
++	"iwmmxt",
++	"crunch",
++	"thumbee",
++	"neon",
++	"vfpv3",
++	"vfpv3d16",
++	"tls",
++	"vfpv4",
++	"idiva",
++	"idivt",
++	"vfpd32",
++	"lpae",
++	"evtstrm"
++};
++
++static const char *compat_hwcap2_str[] = {
++	"aes",
++	"pmull",
++	"sha1",
++	"sha2",
++	"crc32",
++	NULL
++};
++#endif /* CONFIG_COMPAT */
++
++static int c_show(struct seq_file *m, void *v)
++{
++	int i, j;
++
++	for_each_online_cpu(i) {
++		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
++		u32 midr = cpuinfo->reg_midr;
++
++		/*
++		 * glibc reads /proc/cpuinfo to determine the number of
++		 * online processors, looking for lines beginning with
++		 * "processor".  Give glibc what it expects.
++		 */
++		seq_printf(m, "processor\t: %d\n", i);
++
++		/*
++		 * Dump out the common processor features in a single line.
++		 * Userspace should read the hwcaps with getauxval(AT_HWCAP)
++		 * rather than attempting to parse this, but there's a body of
++		 * software which does already (at least for 32-bit).
++		 */
++		seq_puts(m, "Features\t:");
++		if (personality(current->personality) == PER_LINUX32) {
++#ifdef CONFIG_COMPAT
++			for (j = 0; compat_hwcap_str[j]; j++)
++				if (compat_elf_hwcap & (1 << j))
++					seq_printf(m, " %s", compat_hwcap_str[j]);
++
++			for (j = 0; compat_hwcap2_str[j]; j++)
++				if (compat_elf_hwcap2 & (1 << j))
++					seq_printf(m, " %s", compat_hwcap2_str[j]);
++#endif /* CONFIG_COMPAT */
++		} else {
++			for (j = 0; hwcap_str[j]; j++)
++				if (elf_hwcap & (1 << j))
++					seq_printf(m, " %s", hwcap_str[j]);
++		}
++		seq_puts(m, "\n");
++
++		seq_printf(m, "CPU implementer\t: 0x%02x\n",
++			   MIDR_IMPLEMENTOR(midr));
++		seq_printf(m, "CPU architecture: 8\n");
++		seq_printf(m, "CPU variant\t: 0x%x\n", MIDR_VARIANT(midr));
++		seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
++		seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
++	}
++
++	return 0;
++}
++
++static void *c_start(struct seq_file *m, loff_t *pos)
++{
++	return *pos < 1 ? (void *)1 : NULL;
++}
++
++static void *c_next(struct seq_file *m, void *v, loff_t *pos)
++{
++	++*pos;
++	return NULL;
++}
++
++static void c_stop(struct seq_file *m, void *v)
++{
++}
++
++const struct seq_operations cpuinfo_op = {
++	.start	= c_start,
++	.next	= c_next,
++	.stop	= c_stop,
++	.show	= c_show
++};
++
+ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
  {
- 	u64 pfr0;
+ 	unsigned int cpu = smp_processor_id();
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index ce6b967..2a75d06 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -28,7 +28,6 @@
+ #include <linux/console.h>
+ #include <linux/cache.h>
+ #include <linux/bootmem.h>
+-#include <linux/seq_file.h>
+ #include <linux/screen_info.h>
+ #include <linux/init.h>
+ #include <linux/kexec.h>
+@@ -44,7 +43,6 @@
+ #include <linux/of_fdt.h>
+ #include <linux/of_platform.h>
+ #include <linux/efi.h>
+-#include <linux/personality.h>
+ #include <linux/psci.h>
  
--	pfr0 = read_cpuid(ID_AA64PFR0_EL1);
-+	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
- 	return !!(pfr0 & 0x20);
+ #include <asm/acpi.h>
+@@ -377,124 +375,3 @@ static int __init topology_init(void)
+ 	return 0;
  }
- 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index d03d3af..87a64e8 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -693,13 +693,13 @@ static bool trap_dbgidr(struct kvm_vcpu *vcpu,
- 	if (p->is_write) {
- 		return ignore_write(vcpu, p);
- 	} else {
--		u64 dfr = read_cpuid(ID_AA64DFR0_EL1);
--		u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
--		u32 el3 = !!((pfr >> 12) & 0xf);
-+		u64 dfr = read_system_reg(SYS_ID_AA64DFR0_EL1);
-+		u64 pfr = read_system_reg(SYS_ID_AA64PFR0_EL1);
-+		u32 el3 = !!cpuid_feature_extract_field(pfr, ID_AA64PFR0_EL3_SHIFT);
- 
--		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> 20) & 0xf) << 28) |
--					  (((dfr >> 12) & 0xf) << 24) |
--					  (((dfr >> 28) & 0xf) << 20) |
-+		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> ID_AA64DFR0_WRPS_SHIFT) & 0xf) << 28) |
-+					  (((dfr >> ID_AA64DFR0_BRPS_SHIFT) & 0xf) << 24) |
-+					  (((dfr >> ID_AA64DFR0_CTX_CMPS_SHIFT) & 0xf) << 20) |
- 					  (6 << 16) | (el3 << 14) | (el3 << 12));
- 		return true;
- 	}
+ subsys_initcall(topology_init);
+-
+-static const char *hwcap_str[] = {
+-	"fp",
+-	"asimd",
+-	"evtstrm",
+-	"aes",
+-	"pmull",
+-	"sha1",
+-	"sha2",
+-	"crc32",
+-	"atomics",
+-	NULL
+-};
+-
+-#ifdef CONFIG_COMPAT
+-static const char *compat_hwcap_str[] = {
+-	"swp",
+-	"half",
+-	"thumb",
+-	"26bit",
+-	"fastmult",
+-	"fpa",
+-	"vfp",
+-	"edsp",
+-	"java",
+-	"iwmmxt",
+-	"crunch",
+-	"thumbee",
+-	"neon",
+-	"vfpv3",
+-	"vfpv3d16",
+-	"tls",
+-	"vfpv4",
+-	"idiva",
+-	"idivt",
+-	"vfpd32",
+-	"lpae",
+-	"evtstrm"
+-};
+-
+-static const char *compat_hwcap2_str[] = {
+-	"aes",
+-	"pmull",
+-	"sha1",
+-	"sha2",
+-	"crc32",
+-	NULL
+-};
+-#endif /* CONFIG_COMPAT */
+-
+-static int c_show(struct seq_file *m, void *v)
+-{
+-	int i, j;
+-
+-	for_each_online_cpu(i) {
+-		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
+-		u32 midr = cpuinfo->reg_midr;
+-
+-		/*
+-		 * glibc reads /proc/cpuinfo to determine the number of
+-		 * online processors, looking for lines beginning with
+-		 * "processor".  Give glibc what it expects.
+-		 */
+-		seq_printf(m, "processor\t: %d\n", i);
+-
+-		/*
+-		 * Dump out the common processor features in a single line.
+-		 * Userspace should read the hwcaps with getauxval(AT_HWCAP)
+-		 * rather than attempting to parse this, but there's a body of
+-		 * software which does already (at least for 32-bit).
+-		 */
+-		seq_puts(m, "Features\t:");
+-		if (personality(current->personality) == PER_LINUX32) {
+-#ifdef CONFIG_COMPAT
+-			for (j = 0; compat_hwcap_str[j]; j++)
+-				if (compat_elf_hwcap & (1 << j))
+-					seq_printf(m, " %s", compat_hwcap_str[j]);
+-
+-			for (j = 0; compat_hwcap2_str[j]; j++)
+-				if (compat_elf_hwcap2 & (1 << j))
+-					seq_printf(m, " %s", compat_hwcap2_str[j]);
+-#endif /* CONFIG_COMPAT */
+-		} else {
+-			for (j = 0; hwcap_str[j]; j++)
+-				if (elf_hwcap & (1 << j))
+-					seq_printf(m, " %s", hwcap_str[j]);
+-		}
+-		seq_puts(m, "\n");
+-
+-		seq_printf(m, "CPU implementer\t: 0x%02x\n",
+-			   MIDR_IMPLEMENTOR(midr));
+-		seq_printf(m, "CPU architecture: 8\n");
+-		seq_printf(m, "CPU variant\t: 0x%x\n", MIDR_VARIANT(midr));
+-		seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
+-		seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
+-	}
+-
+-	return 0;
+-}
+-
+-static void *c_start(struct seq_file *m, loff_t *pos)
+-{
+-	return *pos < 1 ? (void *)1 : NULL;
+-}
+-
+-static void *c_next(struct seq_file *m, void *v, loff_t *pos)
+-{
+-	++*pos;
+-	return NULL;
+-}
+-
+-static void c_stop(struct seq_file *m, void *v)
+-{
+-}
+-
+-const struct seq_operations cpuinfo_op = {
+-	.start	= c_start,
+-	.next	= c_next,
+-	.stop	= c_stop,
+-	.show	= c_show
+-};
 -- 
 1.7.9.5
