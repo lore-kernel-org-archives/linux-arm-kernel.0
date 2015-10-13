@@ -1,95 +1,15 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Tue, 13 Oct 2015 11:06:11 +0900
-Subject: [PATCH 1/3] ARM: dts: exynos5422-odroidxu3: use cd-gpio method to
- detect sd-card
-In-Reply-To: <561C4C88.2040004@samsung.com>
-References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
- <561B3739.4040701@samsung.com> <561B3A83.6090607@samsung.com>
- <1111856990.2419183.1444661252893.JavaMail.yahoo@mail.yahoo.com>
- <561C4C88.2040004@samsung.com>
-Message-ID: <561C6713.1070508@samsung.com>
+From: neidhard.kim@lge.com (Jongsung Kim)
+Date: Tue, 13 Oct 2015 11:06:44 +0900
+Subject: [PATCH] ARM:mm: fix kmap_atomic_to_page
+In-Reply-To: <5778996.I0Vmityi0g@wuerfel>
+References: <1444129773-12632-1-git-send-email-chanho.min@lge.com>
+ <20151007090121.GC21513@n2100.arm.linux.org.uk> <561B457F.5090104@lge.com>
+ <5778996.I0Vmityi0g@wuerfel>
+Message-ID: <561C6734.7010509@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear, Anand.
+On 10/12/2015 06:27 PM, Arnd Bergmann wrote:
+> How about changing the zcomp code to pass the page pointer instead of the kernel space pointer? That would avoid having to do the kmap_atomic, which can itself be expensive on 32-bit machines and should not be needed here if you have a HW DMA engine doing the compression. Arnd 
 
-
-On 10/13/2015 09:12 AM, Krzysztof Kozlowski wrote:
-> On 12.10.2015 23:47, Anand Moon wrote:
->>>
->>> Anand,
->>>
->>> You essentially reverted here af6ad88acbd6 ("ARM: dts: Mux XMMCnDATA[0]
->>> pad correctly for Exynos5420 boards"). Why? There is no explanation in
->>> the commit message about this.
->>
->> I don't remember to send the patch relevant to this. Hmm...
->> Well, Is this patch really signed-off by me?
->>
->> Best Regards,
->>
->> Jaehoon Chung
->>>
->>> Best regards,
->>> Krzysztof
->>>
->>
->>>
->>
->>
->> Some how I don't receive these mail on my email id.
->>
->> I have picked up these changes from tizen repository for OdroidXU3.
->> I have tested with this changes to detect UHS-I micro cd cards.
->> That's the reason for this email. 
-
-It seems to make manually, right?
-I have checked the tizen repository. 
-
-The below is 
-
---- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-@@ -335,7 +335,9 @@
-        samsung,dw-mshc-sdr-timing = <0 4>;
-        samsung,dw-mshc-ddr-timing = <0 2>;
-        pinctrl-names = "default";
--       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
-+       cd-gpios = <&gpc2 2 0>;
-+       cd-inverted;
-+       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus1 &sd2_bus4>;
-        bus-width = <4>;
-        cap-sd-highspeed;
- };
-
-
-
-Yours
-
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-@@ -352,8 +352,10 @@
- 	samsung,dw-mshc-ciu-div = <3>;
- 	samsung,dw-mshc-sdr-timing = <0 4>;
- 	samsung,dw-mshc-ddr-timing = <0 2>;
-+	cd-gpios = <&gpc2 2 GPIO_ACTIVE_HIGH>;
-+	cd-inverted;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
-+	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
-
-Did you know what differ? :)
-
-Best Regards,
-Jaehoon Chung
-
-> 
-> ... and you applied it blindly without looking at actual existing
-> contents and at previous commits.
-> 
-> That is not how patches from different repositories should be cherry picked.
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
+Mainline zram uses lzo / lz4 library functions as backend. Using kmap_atomic and passing address look reasonable.
