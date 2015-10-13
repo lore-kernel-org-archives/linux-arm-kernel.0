@@ -1,31 +1,49 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 13 Oct 2015 17:37:54 +0800
-Subject: [PATCH 0/4] Add tune support of Mediatek MMC driver 
-Message-ID: <1444729078-26585-1-git-send-email-chaotian.jing@mediatek.com>
+Date: Tue, 13 Oct 2015 17:37:56 +0800
+Subject: [PATCH 2/4] mmc: dt-bindings: update Mediatek MMC bindings
+In-Reply-To: <1444729078-26585-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1444729078-26585-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1444729078-26585-3-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings for eMMC hardware reset
-Add pinctrl of data strobe pin for HS400 mode
-Modify eMMC driving settings
-Add 400mhz source clock for HS400 mode
-Add eMMC HS200/HS400 mode support
-Add SD SDR50/SDR104 mode support
-Add implement of tune funtion with CMD19/CMD21
+Add 400Mhz clock source for HS400 mode
 
-Chaotian Jing (4):
-  mmc: core: Add DT bindings for eMMC hardware reset support
-  mmc: dt-bindings: update Mediatek MMC bindings
-  mmc: mediatek: Add tune support
-  arm64: dts: mediatek:: Add HS200/HS400/SDR50/SDR104 support
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+---
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
- Documentation/devicetree/bindings/mmc/mmc.txt    |   1 +
- Documentation/devicetree/bindings/mmc/mtk-sd.txt |  12 +-
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |  21 +-
- arch/arm64/boot/dts/mediatek/mt8173.dtsi         |   5 +-
- drivers/mmc/core/host.c                          |   2 +
- drivers/mmc/host/mtk-sd.c                        | 359 +++++++++++++++++++++--
- 6 files changed, 364 insertions(+), 36 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+index a1adfa4..745bee2 100644
+--- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
++++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+@@ -17,6 +17,11 @@ Required properties:
+ - vmmc-supply: power to the Core
+ - vqmmc-supply: power to the IO
+ 
++Optional properties:
++- clocks: 400mhz clock source for HS400
++- clock-names: "400mhz"
++- hs400-ds-delay: HS400 DS delay setting
++
+ Examples:
+ mmc0: mmc at 11230000 {
+ 	compatible = "mediatek,mt8173-mmc", "mediatek,mt8135-mmc";
+@@ -24,9 +29,12 @@ mmc0: mmc at 11230000 {
+ 	interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_LOW>;
+ 	vmmc-supply = <&mt6397_vemc_3v3_reg>;
+ 	vqmmc-supply = <&mt6397_vio18_reg>;
+-	clocks = <&pericfg CLK_PERI_MSDC30_0>, <&topckgen CLK_TOP_MSDC50_0_H_SEL>;
+-	clock-names = "source", "hclk";
++	clocks = <&pericfg CLK_PERI_MSDC30_0>,
++	         <&topckgen CLK_TOP_MSDC50_0_H_SEL>,
++		 <&topckgen CLK_TOP_MSDCPLL_D2> ;
++	clock-names = "source", "hclk", "400mhz";
+ 	pinctrl-names = "default", "state_uhs";
+ 	pinctrl-0 = <&mmc0_pins_default>;
+ 	pinctrl-1 = <&mmc0_pins_uhs>;
++	hs400-ds-delay = <0x14015>;
+ };
 -- 
 1.8.1.1.dirty
