@@ -1,32 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Oct 2015 13:28:18 +0200
-Subject: [RFC] arm: add __initbss section attribute
-In-Reply-To: <8004E8C3-F1EC-45C3-A995-88726B257563@gmail.com>
-References: <1444622356-8263-1-git-send-email-yalin.wang2010@gmail.com>
- <5369261.8uuGVmeUFP@wuerfel> <8004E8C3-F1EC-45C3-A995-88726B257563@gmail.com>
-Message-ID: <5171473.bOz59Zi81c@wuerfel>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 13 Oct 2015 14:28:01 +0300
+Subject: [PATCH 0/3] ARM: digicolor: add pinctrl support
+Message-ID: <cover.1444735169.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 October 2015 17:51:32 yalin wang wrote:
+Hi ARM SoC maintainers,
 
-> > 32	__earlycon_table_sentinel
-> > 200	__earlycon_of_table_sentinel
-> > 6	__irf_end
-> > 
-> > 
-> > 26398 total
-> i am curious about your scripts ,
-> could you show me ?
+This series enables the Conexant Digicolor CX92755 pinctrl driver. The driver 
+itself was merged during the v4.3 cycle in commit 38b0e5071eca (pinctrl: driver 
+for Conexant Digicolor CX92755 pin mapping)
 
-I was using some ad-hoc command line tricks, including
+Please consider for v4.4.
 
-objcopy  -j .init.data  build/multi_v7_defconfig/vmlinux   /tmp/initdata
-nm initdata  | sort -n | { read start b sym ; while read a b c ; do objdump -Dr --start-address=0x$start --stop-address=0x$a initdata > initdata.d/$sym  ; start=$a ; sym=$c  ; done }
-(some manual sorting to delete the files that have pre-initialized symbols)
-sum=0 ; nm /tmp/initdata  | sort -n | { read start b sym ; while read a b c ; do test -e ../$sym  && { echo $[0x$a - 0x$start]\      $sym  ; sum=$[$sum + $[0x$a - 0x$start]] ; } ; start=$a ; sym=$c ; done ; echo $sum;}
+Thanks,
+baruch
 
-I'm sure there are better ways to do this, and the manual step I used at
-first was faulty.
+Baruch Siach (3):
+  ARM: digicolor: select pinctrl/gpio driver
+  ARM: digicolor: add pinctrl module device node
+  ARM: digicolor: dts: add uart pin configuration
 
-	Arnd
+ arch/arm/boot/dts/cx92755.dtsi        | 7 +++++++
+ arch/arm/boot/dts/cx92755_equinox.dts | 9 +++++++++
+ arch/arm/mach-digicolor/Kconfig       | 3 +++
+ 3 files changed, 19 insertions(+)
+
+-- 
+2.6.1
