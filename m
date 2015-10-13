@@ -1,301 +1,201 @@
-From: w-kwok2@ti.com (Kwok, WingMan)
-Date: Tue, 13 Oct 2015 19:52:38 +0000
-Subject: [PATCH 1/3] phy: keystone: serdes driver for gbe 10gbe and pcie
-In-Reply-To: <20151013183327.GG24353@leverpostej>
-References: <1444759464-32299-1-git-send-email-w-kwok2@ti.com>
- <1444759464-32299-2-git-send-email-w-kwok2@ti.com>
- <20151013183327.GG24353@leverpostej>
-Message-ID: <230CBA6E4B6B6B418E8730AC28E6FC7E0422898D@DFLE11.ent.ti.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 13 Oct 2015 21:57:09 +0200
+Subject: [PATCH v6 0/22] On-demand device probing
+In-Reply-To: <5606E120.3070305@kernel.org>
+References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
+ <5606E120.3070305@kernel.org>
+Message-ID: <CAAObsKDffo935Ae3wEPVAFyqBDR+d6LKmh0ORfmYGnu2DN7YEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 26 September 2015 at 20:17, Rob Herring <robh@kernel.org> wrote:
+> On 09/21/2015 09:02 AM, Tomeu Vizoso wrote:
+>> Hello,
+>>
+>> I have a problem with the panel on my Tegra Chromebook taking longer
+>> than expected to be ready during boot (St?phane Marchesin reported what
+>> is basically the same issue in [0]), and have looked into ordered
+>> probing as a better way of solving this than moving nodes around in the
+>> DT or playing with initcall levels and linking order.
+>>
+>> While reading the thread [1] that Alexander Holler started with his
+>> series to make probing order deterministic, it occurred to me that it
+>> should be possible to achieve the same by probing devices as they are
+>> referenced by other devices.
+>>
+>> This basically reuses the information that is already implicit in the
+>> probe() implementations, saving us from refactoring existing drivers or
+>> adding information to DTBs.
+>>
+>> During review of v1 of this series Linus Walleij suggested that it
+>> should be the device driver core to make sure that dependencies are
+>> ready before probing a device. I gave this idea a try [2] but Mark Brown
+>> pointed out to the logic duplication between the resource acquisition
+>> and dependency discovery code paths (though I think it's fairly minor).
+>>
+>> To address that code duplication I experimented with Arnd's devm_probe
+>> [3] concept of having drivers declare their dependencies instead of
+>> acquiring them during probe, and while it worked [4], I don't think we
+>> end up winning anything when compared to just probing devices on-demand
+>> from resource getters.
+>>
+>> One remaining objection is to the "sprinkling" of calls to
+>> of_device_probe() in the resource getters of each subsystem, but I think
+>> it's the right thing to do given that the storage of resources is
+>> currently subsystem-specific.
+>>
+>> We could avoid the above by moving resource storage into the core, but I
+>> don't think there's a compelling case for that.
+>>
+>> I have tested this on boards with Tegra, iMX.6, Exynos, Rockchip and
+>> OMAP SoCs, and these patches were enough to eliminate all the deferred
+>> probes (except one in PandaBoard because omap_dma_system doesn't have a
+>> firmware node as of yet).
+>>
+>> Have submitted a branch [5][6][7] with these patches on top of today's
+>> linux-next (20150921) to kernelci.org and I don't see any issues that
+>> could be caused by them.
+>>
+>> With this series I get the kernel to output to the panel in 0.5s,
+>> instead of 2.8s.
+>
+> I think we're pretty close other than some minor comments. I would like
+> to see ack's from Greg and some reviewed-bys from others. The subsystem
+> changes are minor and there has been plenty of chance to comment, so I
+> don't think acks from all subsystems are needed.
 
+Hi Rob,
 
-> -----Original Message-----
-> From: Mark Rutland [mailto:mark.rutland at arm.com]
-> Sent: Tuesday, October 13, 2015 2:33 PM
-> To: Kwok, WingMan
-> Cc: robh+dt at kernel.org; pawel.moll at arm.com;
-> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; KISHON VIJAY
-> ABRAHAM; Quadros, Roger; Karicheri, Muralidharan; bhelgaas at google.com;
-> ssantosh at kernel.org; linux at arm.linux.org.uk;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
-> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/3] phy: keystone: serdes driver for gbe 10gbe
-> and pcie
-> 
-> On Tue, Oct 13, 2015 at 02:04:22PM -0400, WingMan Kwok wrote:
-> > On TI's Keystone platforms, several peripherals such as the
-> > gbe ethernet switch, 10gbe ethernet switch and PCIe controller
-> > require the use of a SerDes for converting SoC parallel data into
-> > serialized data that can be output over a high-speed electrical
-> > interface, and also converting high-speed serial input data
-> > into parallel data that can be processed by the SoC.  The
-> > SerDeses used by those peripherals, though they may be different,
-> > are largely similar in functionality and setup.
-> >
-> > This patch provides a SerDes phy driver implementation that can be
-> > used by the above mentioned peripheral drivers to configure their
-> > respective SerDeses.
-> >
-> > Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-> > ---
-> >  Documentation/devicetree/bindings/phy/ti-phy.txt |  256 +++
-> >  drivers/phy/Kconfig                              |    8 +
-> >  drivers/phy/Makefile                             |    1 +
-> >  drivers/phy/phy-keystone-serdes.c                | 2465
-> ++++++++++++++++++++++
-> >  4 files changed, 2730 insertions(+)
-> >  create mode 100644 drivers/phy/phy-keystone-serdes.c
-> >
-> > diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt
-> b/Documentation/devicetree/bindings/phy/ti-phy.txt
-> > index 9cf9446..231716e 100644
-> > --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
-> > +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
-> > @@ -115,4 +115,260 @@ sata_phy: phy at 4A096000 {
-> >  	clock-names = "sysclk", "refclk";
-> >  	syscon-pllreset = <&scm_conf 0x3fc>;
-> >  	#phy-cells = <0>;
-> > +
-> > +TI Keystone SerDes PHY
-> > +======================
-> > +
-> > +Required properties:
-> > + - compatible: should be one of
-> > +	* "ti,keystone-serdes-gbe"
-> > +	* "ti,keystone-serdes-xgbe"
-> > +	* "ti,keystone-serdes-pcie"
-> > + - reg:
-> > +	* base address and length of the SerDes register set
-> > + - reg-names:
-> > +	* "reg_serdes"
-> > +		- name of the reg SerDes register set
-> 
-> Just describe reg in terms of reg-names, and don't bother with the
-> "reg_" prefix, we know this is a reg entry:
-> 
-> - reg: a list of address and length pairs, corresponding to entires in
->   reg-names
-> 
-> - reg-names: should contain:
->   * "serdes"
-> 
-> > + - #phy-cells:
-> > +	* From the generic phy bindings, must be 0;
-> > + - max-lanes:
-> > +	* Number of lanes in SerDes.
-> 
-> Why is this not "num-lanes"? Why do you even need this?
-> 
+I'm not sure we are going to get much more feedback by just waiting or
+resending what has been sent so many times.
 
-will change to "num-lanes".
+Did you have in mind specific people you wanted to see reviewed-bys from?
 
-serdes on different peripherals have different number of
-lanes and each individual lane can be enabled or disabled.
+Guess Greg will get to this sometime soon.
 
-> > + - phy-type: should be one of
-> > +	* "sgmii"
-> > +	* "xge"
-> > +	* "pcie"
-> > +
-> > +Optional properties:
-> > + - syscon-peripheral:
-> > +	* Handle to the subsystem register region of the peripheral
-> > +	  inside which the SerDes exists.
-> > + - syscon-link:
-> > +	* Handle to the Link register region of the peripheral inside
-> > +	  which the SerDes exists.  Example: it is the PCSR register
-> > +	  region in the case of 10gbe.
-> > + - refclk-khz:
-> > +	* Reference clock rate of SerDes in kHz.
-> 
-> Surely this should be an actual clock?
-> 
+Regards,
 
-ok, this is not actually needed and will remove
+Tomeu
 
-> > + - link-rate-kbps:
-> > +	* SerDes link rate to be configured, in kbps.
-> 
-> Why does this need to be in the binding? How does one derive the
-> correct
-> value?
-> 
-
-a serdes can be configured at different link rates.  for example,
-the 10gbe serdes can be configured at 1.25G link rate to support
-1gbe on the 10gbe switch.
-
-> > + - control-rate:
-> > +	* Lane control rate
-> > +		0: full rate
-> > +		1: half rate
-> > +		2: quarter rate
-> 
-> Likewise on both points.
-
-the serdes is a generic hardware block that needs to be configured
-with the proper link-rate and lane control rate.
-
-> 
-> > + - rx-start:
-> > +	* Initial lane rx equalizer attenuation and boost configurations.
-> > +	* Must be array of 2 integers.
-> > + - rx-force:
-> > +	* Forced lane rx equalizer attenuation and boost configurations.
-> > +	* Must be array of 2 integers.
-> > + - tx-coeff:
-> > +	* Lane c1, c2, cm, attenuation and regulator outpust voltage
-> > +	  configurations.
-> > +	* Must be array of 5 integers.
-> 
-> s/outpust/output/
-> 
-
-ok.
-
-> > + - debug:
-> > +	* enable more debug messages.
-> 
-> NAK.
-> 
-> This is a driver option, and belongs on the kernel command line. It
-> does
-> not describe the hardware, and does not belong in the DT.
-> 
-
-will remove.
-
-> > +Example for Keystone K2E GBE:
-> > +-----------------------------
-> > +
-> > +gbe_serdes0: gbe_serdes at 232a000 {
-> > +	#phy-cells		= <0>;
-> > +	compatible		= "ti,keystone-serdes-gbe";
-> > +	reg			= <0x0232a000 0x2000>;
-> > +	reg-names		= "reg_serdes";
-> > +	refclk-khz		= <156250>;
-> > +	link-rate-kbps		= <1250000>;
-> > +	phy-type		= "sgmii";
-> > +	max-lanes		= <4>;
-> > +	lane0 {
-> > +		control-rate	= <2>; /* quart */
-> > +		rx-start	= <7 5>;
-> > +		rx-force	= <1 1>;
-> > +		tx-coeff	= <0 0 0 12 4>;
-> > +		       /* c1 c2 cm att vreg */
-> > +	};
-> > +	lane1 {
-> > +		control-rate	= <2>; /* quart */
-> > +		rx-start	= <7 5>;
-> > +		rx-force	= <1 1>;
-> > +		tx-coeff	= <0 0 0 12 4>;
-> > +		       /* c1 c2 cm att vreg */
-> > +	};
-> 
-> The binding didn't describe the sub-nodes, and which properties belong
-> to them.
-> 
-
-will add descriptions for lane nodes
-
-> Don't use magic names. Define a new address space, and use reg to
-> identify lanes.
-> 
-
-will update to the following
-
-lanes {
-	lane at 0 {
-		reg = <0>;
-		...
-	};
-
-	lane at 1 {
-		reg = <1>;
-		...	
-	};
-};
-
-
-> > +	if (of_find_property(np, "disable", NULL))
-> > +		lc->enable = 0;
-> > +	else
-> > +		lc->enable = 1;
-> 
-> This was not described in the binding, and uses the wrong accessor.
-> What
-> is this for?
-
-after the above mentioned update, this will become: status = "disabled/ok".
-> 
-> > +	if (of_find_property(np, "loopback", NULL))
-> > +		lc->loopback = 1;
-> > +	else
-> > +		lc->loopback = 0;
-> 
-> Likewise.
-
-will add documentation
-
-> 
-> > +	if (of_property_read_bool(np, "syscon-peripheral")) {
-> > +		sc->peripheral_regmap =
-> > +			syscon_regmap_lookup_by_phandle(np,
-> > +							"syscon-peripheral");
-> 
-> Can't you always call syscon_regmap_lookup_by_phandle, then check the
-> return value to see if the property existed?
-> 
-> You clearly know that of_property_read_bool exists, why did you not
-> use
-> it to read properties which are boolean?
-> 
-
-ok.
-
-> > +	if (of_property_read_bool(np, "syscon-link")) {
-> > +		sc->pcsr_regmap =
-> > +			syscon_regmap_lookup_by_phandle(np, "syscon-link");
-> 
-> Likewise.
-> 
-
-ok.
-
-> > +	sc->debug = of_property_read_bool(np, "debug");
-> 
-> As stated above, NAK for this property.
-> 
- 
-will remove.
-
-> > +
-> > +	if (of_find_property(np, "rx-force-enable", NULL))
-> > +		sc->rx_force_enable = 1;
-> > +	else	
-> > +		sc->rx_force_enable = 0;
-> 
-> Not in the binding, and uses the wrong accessor.
-> 
-
-ok. will update the binding and change of_find_property to
-of_property_read_bool.
-
-> > +
-> > +	for (i = 0; i < sc->lanes; i++) {
-> > +		sprintf(&name[4], "%d", i);
-> > +		lp = of_find_node_by_name(np, name);
-> > +		if (lp) {
-> > +			if (kserdes_get_lane_bindings(dev, lp, &sc->lane[i]))
-> > +				return -EINVAL;
-> > +		}
-> > +	}
-> 
-> As above, use reg, not magic names.
-
-ok.
-
-Thanks,
-WingMan
+> Your branch is based on -next. Is there any dependence on something in
+> -next? I want to get this into -next soon, but need a branch not based
+> on -next. Please send me a pull request with the collected acks and
+> minor comments I have addressed.
+>
+> Rob
+>
+>>
+>> Regards,
+>>
+>> Tomeu
+>>
+>> [0] http://lists.freedesktop.org/archives/dri-devel/2014-August/066527.html
+>>
+>> [1] https://lkml.org/lkml/2014/5/12/452
+>>
+>> [2] https://lkml.org/lkml/2015/6/17/305
+>>
+>> [3] http://article.gmane.org/gmane.linux.ports.arm.kernel/277689
+>>
+>> [4] https://lkml.org/lkml/2015/7/21/441a
+>>
+>> [5] https://git.collabora.com/cgit/user/tomeu/linux.git/log/?h=on-demand-probes-v8
+>>
+>> [6] http://kernelci.org/boot/all/job/collabora/kernel/v4.3-rc2-2587-gf92b0ab33d14/
+>>
+>> [7] http://kernelci.org/boot/all/job/next/kernel/next-20150921
+>>
+>> Changes in v6:
+>> - Drop bus_type.pre_probe and read the periphid in match() instead as
+>>   suggested by Alan Stern.
+>> - Merge changes to the regulator subsystem's locking so no references
+>>   are leaked between commits.
+>>
+>> Changes in v5:
+>> - Set the pointer to struct device also for AMBA devices
+>> - Unset the pointer to struct device when the platform device is about
+>>   to be unregistered
+>> - Increase the reference count of the device before returning from
+>>   of_find_device_by_node()
+>> - Move the assignment to device_node->device for AMBA devices to another
+>>   commit.
+>> - Hold a reference to the struct device while it's in use in
+>>   of_device_probe().
+>> - Use regulator_class' klist of devices instead of regulator_list to
+>>   store and lookup regulator devices.
+>>
+>> Changes in v4:
+>> - Added bus.pre_probe callback so the probes of Primecell devices can be
+>>   deferred if their device IDs cannot be yet read because of the clock
+>>   driver not having probed when they are registered. Maybe this goes
+>>   overboard and the matching information should be in the DT if there is
+>>   one.
+>> - Rename of_platform_probe to of_device_probe
+>> - Use device_node.device instead of device_node.platform_dev
+>> - Add Kconfig DELAY_DEVICE_PROBES to allow disabling delayed probing in
+>>   machines with initcalls that depend on devices probing at a given time.
+>> - Start processing deferred probes in device_initcall_sync
+>> - Also defer probes of AMBA devices registered from the DT as they can
+>>   also request resources.
+>>
+>> Changes in v3:
+>> - Set and use device_node.platform_dev instead of reversing the logic to
+>>   find the platform device that encloses a device node.
+>> - Drop the fwnode API to probe firmware nodes and add OF-only API for
+>>   now. I think this same scheme could be used for machines with ACPI,
+>>   but I haven't been able to find one that had to defer its probes because
+>>   of the device probe order.
+>>
+>> Tomeu Vizoso (22):
+>>   driver core: handle -EPROBE_DEFER from bus_type.match()
+>>   ARM: amba: Move reading of periphid to amba_match()
+>>   of/platform: Point to struct device from device node
+>>   of: add function to allow probing a device from a OF node
+>>   gpio: Probe GPIO drivers on demand
+>>   gpio: Probe pinctrl devices on demand
+>>   regulator: core: Remove regulator_list
+>>   regulator: core: Probe regulators on demand
+>>   drm: Probe panels on demand
+>>   drm/tegra: Probe dpaux devices on demand
+>>   i2c: core: Probe i2c adapters and devices on demand
+>>   pwm: Probe PWM chip devices on demand
+>>   backlight: Probe backlight devices on demand
+>>   usb: phy: Probe phy devices on demand
+>>   clk: Probe clk providers on demand
+>>   pinctrl: Probe pinctrl devices on demand
+>>   phy: core: Probe phy providers on demand
+>>   dma: of: Probe DMA controllers on demand
+>>   power-supply: Probe power supplies on demand
+>>   driver core: Allow deferring probes until late init
+>>   driver core: Start processing deferred probes earlier
+>>   of/platform: Defer probes of registered devices
+>>
+>>  drivers/amba/bus.c                  |  88 ++++++------
+>>  drivers/base/Kconfig                |  18 +++
+>>  drivers/base/dd.c                   |  35 ++++-
+>>  drivers/clk/clk.c                   |   3 +
+>>  drivers/dma/of-dma.c                |   3 +
+>>  drivers/gpio/gpiolib-of.c           |   5 +
+>>  drivers/gpu/drm/drm_panel.c         |   3 +
+>>  drivers/gpu/drm/tegra/dpaux.c       |   3 +
+>>  drivers/i2c/i2c-core.c              |   4 +
+>>  drivers/of/device.c                 |  61 +++++++++
+>>  drivers/of/platform.c               |  30 +++--
+>>  drivers/phy/phy-core.c              |   3 +
+>>  drivers/pinctrl/devicetree.c        |   3 +
+>>  drivers/power/power_supply_core.c   |   3 +
+>>  drivers/pwm/core.c                  |   3 +
+>>  drivers/regulator/core.c            | 257 +++++++++++++++++++++++-------------
+>>  drivers/usb/phy/phy.c               |   3 +
+>>  drivers/video/backlight/backlight.c |   3 +
+>>  include/linux/device.h              |   4 +-
+>>  include/linux/of.h                  |   1 +
+>>  include/linux/of_device.h           |   3 +
+>>  21 files changed, 386 insertions(+), 150 deletions(-)
+>>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
