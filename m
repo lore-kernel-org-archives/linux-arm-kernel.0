@@ -1,57 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Oct 2015 00:23:43 +0200
-Subject: [PATCH v2 7/7] clk: ns2: add clock support for Broadcom Northstar
- 2 SoC
-In-Reply-To: <20151013220450.GO12512@broadcom.com>
-References: <1444770485-11210-1-git-send-email-jonmason@broadcom.com>
- <5280890.6npshDUNFZ@wuerfel> <20151013220450.GO12512@broadcom.com>
-Message-ID: <6427519.eIBEvCNlle@wuerfel>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 13 Oct 2015 15:24:52 -0700
+Subject: [RFC 4/5] clk: iproc: define Broadcom NS2 iProc clock binding
+In-Reply-To: <1444771347-11382-5-git-send-email-jonmason@broadcom.com>
+References: <1444771347-11382-1-git-send-email-jonmason@broadcom.com>
+ <1444771347-11382-5-git-send-email-jonmason@broadcom.com>
+Message-ID: <561D84B4.4000002@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 October 2015 18:04:50 Jon Mason wrote:
+Same as this patch. I thought device tree binding document should go
+with the clock driver changes.
+
+Strictly speaking, device tree binding document should always go before
+the driver changes. In the binding document the DT interface is defined,
+then changes are implemented in the driver.
+
+Ray
+
+On 10/13/2015 2:22 PM, Jon Mason wrote:
+> Document the device tree bindings for Broadcom Northstar 2 architecture
+> based clock controller
 > 
-> > On a related note, I'm seeing problems when CONFIG_CYGNUS is set but
-> > CONFIG_COMMON_CLK_IPROC is disabled, as that currently leads to a link
-> > failure.
+> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> ---
+>  .../bindings/clock/brcm,iproc-clocks.txt           | 48 ++++++++++++++++++++++
+>  1 file changed, 48 insertions(+)
 > 
-> I can double check, but it should be on by default when Cygnus is
-> enabled.  If you send me the error, I'll be happy to fix it.
-
-
-The problem is not that it's off by default but that it can be
-disabled, so it breaks some 'make randconfig' builds with this
-message:
-
-drivers/built-in.o: In function `cygnus_armpll_init':
-:(.init.text+0x1d290): undefined reference to `iproc_armpll_setup'
-drivers/built-in.o: In function `cygnus_genpll_clk_init':
-:(.init.text+0x1d2c4): undefined reference to `iproc_pll_clk_setup'
-drivers/built-in.o: In function `cygnus_lcpll0_clk_init':
-:(.init.text+0x1d304): undefined reference to `iproc_pll_clk_setup'
-drivers/built-in.o: In function `cygnus_mipipll_clk_init':
-:(.init.text+0x1d344): undefined reference to `iproc_pll_clk_setup'
-drivers/built-in.o: In function `cygnus_asiu_init':
-:(.init.text+0x1d370): undefined reference to `iproc_asiu_setup'
-
-My patch fixes it by always selecting COMMON_CLK_IPROC from
-ARCH_BCM_CYGNUS. I wasn't sure whether you want COMMON_CLK_IPROC
-to still be user-selectable, so I left that in place. Normally
-I'd expect it to be a silent option though, that just gets
-implicitly enabled whenever a platform that needs it is built
-into the kernel.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 1319c3c14327..35234e563cd8 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -29,6 +29,7 @@ config ARCH_BCM_IPROC
- config ARCH_BCM_CYGNUS
- 	bool "Broadcom Cygnus Support" if ARCH_MULTI_V7
- 	select ARCH_BCM_IPROC
-+	select COMMON_CLK_IPROC
- 	help
- 	  Enable support for the Cygnus family,
- 	  which includes the following variants:
+> diff --git a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+> index b3c3e9d..ede65a5 100644
+> --- a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+> +++ b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+> @@ -160,3 +160,51 @@ Northstar Plus.  These clock IDs are defined in:
+>      pcie_phy	lcpll0		1	BCM_NSP_LCPLL0_PCIE_PHY_REF_CLK
+>      sdio	lcpll0		2	BCM_NSP_LCPLL0_SDIO_CLK
+>      ddr_phy	lcpll0		3	BCM_NSP_LCPLL0_DDR_PHY_CLK
+> +
+> +Northstar 2
+> +-----------
+> +PLL and leaf clock compatible strings for Northstar 2 are:
+> +    "brcm,ns2-genpll-scr"
+> +    "brcm,ns2-genpll-sw"
+> +    "brcm,ns2-lcpll-ddr"
+> +    "brcm,ns2-lcpll-ports"
+> +
+> +The following table defines the set of PLL/clock index and ID for Northstar 2.
+> +These clock IDs are defined in:
+> +    "include/dt-bindings/clock/bcm-ns2.h"
+> +
+> +    Clock	Source		Index	ID
+> +    ---		-----		-----	---------
+> +    crystal	N/A		N/A	N/A
+> +
+> +    genpll_scr	crystal		0	BCM_NS2_GENPLL_SCR
+> +    scr		genpll_scr	1	BCM_NS2_GENPLL_SCR_SCR_CLK
+> +    fs		genpll_scr	2	BCM_NS2_GENPLL_SCR_FS_CLK
+> +    audio_ref	genpll_scr	3	BCM_NS2_GENPLL_SCR_AUDIO_CLK
+> +    ch3_unused	genpll_scr	4	BCM_NS2_GENPLL_SCR_CH3_UNUSED
+> +    ch4_unused	genpll_scr	5	BCM_NS2_GENPLL_SCR_CH4_UNUSED
+> +    ch5_unused	genpll_scr	6	BCM_NS2_GENPLL_SCR_CH5_UNUSED
+> +
+> +    genpll_sw	crystal		0	BCM_NS2_GENPLL_SW
+> +    rpe		genpll_sw	1	BCM_NS2_GENPLL_SW_RPE_CLK
+> +    250		genpll_sw	2	BCM_NS2_GENPLL_SW_250_CLK
+> +    nic		genpll_sw	3	BCM_NS2_GENPLL_SW_NIC_CLK
+> +    chimp	genpll_sw	4	BCM_NS2_GENPLL_SW_CHIMP_CLK
+> +    port	genpll_sw	5	BCM_NS2_GENPLL_SW_PORT_CLK
+> +    sdio	genpll_sw	6	BCM_NS2_GENPLL_SW_SDIO_CLK
+> +
+> +    lcpll_ddr	crystal		0	BCM_NS2_LCPLL_DDR
+> +    pcie_sata_usb lcpll_ddr	1	BCM_NS2_LCPLL_DDR_PCIE_SATA_USB_CLK
+> +    ddr		lcpll_ddr	2	BCM_NS2_LCPLL_DDR_DDR_CLK
+> +    ch2_unused	lcpll_ddr	3	BCM_NS2_LCPLL_DDR_CH2_UNUSED
+> +    ch3_unused	lcpll_ddr	4	BCM_NS2_LCPLL_DDR_CH3_UNUSED
+> +    ch4_unused	lcpll_ddr	5	BCM_NS2_LCPLL_DDR_CH4_UNUSED
+> +    ch5_unused	lcpll_ddr	6	BCM_NS2_LCPLL_DDR_CH5_UNUSED
+> +
+> +    lcpll_ports	crystal		0	BCM_NS2_LCPLL_PORTS
+> +    wan		lcpll_ports	1	BCM_NS2_LCPLL_PORTS_WAN_CLK
+> +    rgmii	lcpll_ports	2	BCM_NS2_LCPLL_PORTS_RGMII_CLK
+> +    ch2_unused	lcpll_ports	3	BCM_NS2_LCPLL_PORTS_CH2_UNUSED
+> +    ch3_unused	lcpll_ports	4	BCM_NS2_LCPLL_PORTS_CH3_UNUSED
+> +    ch4_unused	lcpll_ports	5	BCM_NS2_LCPLL_PORTS_CH4_UNUSED
+> +    ch5_unused	lcpll_ports	6	BCM_NS2_LCPLL_PORTS_CH5_UNUSED
+> 
