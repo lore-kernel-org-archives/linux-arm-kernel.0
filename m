@@ -1,47 +1,159 @@
-From: joel@porquet.org (Joel Porquet)
-Date: Tue, 13 Oct 2015 14:56:15 +0200
-Subject: [PATCH v2 3/3] arm:omap2: IRQCHIP_DECLARE macro is now accessible
-In-Reply-To: <1444740975-31948-1-git-send-email-joel@porquet.org>
-References: <1444740975-31948-1-git-send-email-joel@porquet.org>
-Message-ID: <1444740975-31948-4-git-send-email-joel@porquet.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 13 Oct 2015 14:57:53 +0200
+Subject: Regression: at24 eeprom writing
+In-Reply-To: <561CDF2F.3090608@lysator.liu.se>
+References: <560F0DB1.2020101@lysator.liu.se>
+ <561238A9.1060406@lysator.liu.se> <20151005150032.GA12137@odux.rfo.atmel.com>
+ <561292AC.8060408@lysator.liu.se> <561BCE33.2050904@lysator.liu.se>
+ <561BDC32.2080401@atmel.com> <561CDF2F.3090608@lysator.liu.se>
+Message-ID: <561CFFD1.5@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQCHIP_DECLARE macro migrated to 'include/linux/irqchip.h', making it
-globally accessible.
+Le 13/10/2015 12:38, Peter Rosin a ?crit :
+> On 2015-10-12 18:13, Cyrille Pitchen wrote:
+>> Le 12/10/2015 17:13, Peter Rosin a ?crit :
+>>> On 2015-10-05 17:09, Peter Rosin wrote:
+>>>> But what trouble does the i2c bus driver see? Admittedly I only
+>>>> have a simple logic level bus viewer, and not a full-blown
+>>>> oscilloscope, so there might be something analogue going on?
+>>>> I don't think so though, those signals looked fine last time we
+>>>> looked (but we obviously didn't have these issues then, and
+>>>> didn't really look that closely). I'll see if I can recheck
+>>>> with a real scope too.
+>>>
+>>> We redid the tests with a real scope, and the signal looks nice
+>>> and square, so it is not that.
+>>>
+>>> Speculating further on the cause of the long ACKs, I think that
+>>> the i2c driver gets confused by an interrupt that marks the
+>>> transfer complete, and thinks it's a NACK interrupt instead. Is that
+>>> plausible?
+>>>
+>>> If the peripheral unit is such that it generates a stop automatically
+>>> on NACKs, then this makes perfect sense. I.e. the TWI sees that the
+>>> transfer is complete, generates an interrupt, and waits for further
+>>> data or a stop command. Meanwhile the driver thinks it's a NACK and
+>>> that a stop condition has already been sent to the bus, and just
+>>> notifies the i2c consumer (the eeprom driver in this case) of the
+>>> failure and frees up the bus for any future user.
+>>>
+>>> This also matches what I see when I turn on some more traffic on the
+>>> bus, that is interleaved with the eeprom traffic. AFAICT, it can be
+>>> any command that gets chewed up by the eeprom if it is sent to the
+>>> i2c driver during the long ACK.
+>>>
+>>> Are you Atmel people making any progress on this data corrupting
+>>> regression? Is there anything else I can do to help?
+>>>
+>>> Cheers,
+>>> Peter
+>>>
+>>
+>> Hi Peter,
+>>
+>> I have sent a patch to Ludovic for a first internal review before publishing to
+>> mainline. The patch should fix your issue since it fixes it on my sama5d36ek
+>> board with an at24 eeprom.
+>>
+>> More details on the reason of this bug would be provided in both the commit
+>> message and comments in the code provided by the reviewed patch but I you want
+>> an early fix just read the Status Register (AT91_TWI_SR) at the beginning of
+>> at91_do_twi_transfer(). This read clears the NACK bit in the Status Register.
+>> Then the following source code can safely enable the NACK interrupt, otherwise
+>> in some cases a pending NACK interrupt would rise immediately after the line:
+>> at91_twi_write(dev, AT91_TWI_IER, AT91_TWI_NACK);
+>> hence breaking the sequence of operations to be done because the interrupt
+>> handler would call complete() too early so wait_for_completion_timeout()
+>> also exits too early.
+>>
+>> So reading the Status Register at the beginning of at91_do_twi_transfer()
+>> should be enough to fix the issue.
+> 
+> Yes, I see no more long ACKs after that reading the Status Register there.
+> Great!
+> 
+>> Another mistake is in the interrupt handler itself, ie atmel_twi_interrupt():
+>> we should check the TWI_TXRDY status bit before calling
+>> at91_twi_write_next_byte() only if both the TWI_TXCOMP and TWI_NACK status bits
+>> are clear. Otherwise, writing a new byte into the THR tells the I2C controller
+>> to start a new transfer. Then the I2C slave, the at24 eeprom, is likely to
+>> also reply by a second NACK. Hence the NACK bit is already set into the Status
+>> Register on the next call of at91_do_twi_transfer().
+>> This is what I saw on my scope for PIO transfers.
+> 
+> I interpret this as a proposed solution for the strange double NACKs?
+> 
+> Anyway, I find it unnecessarily hard to grasp exactly what you mean
+> (wasteful policy you are apparently suffering from where it is OK to
+> publish a patch written in English, but apparently a big no-no to
+> send a diff until it passes some internal review???). I interpreted
 
-See commit 91e20b5040c67c51aad88cf87db4305c5bd7f79d ("irqchip: Move
-IRQCHIP_DECLARE macro to include/linux/irqchip.h").
+I find your remark pretty rude as I'm reading it while just at the desk
+behind me Cyrille and Ludovic are together trying hard to understand and
+fix this issue.
+They are making sure that this fix doesn't interfere with another SoC's
+IP version with any of the PIO/DMA/FIFO transfer types.
 
-This patch adds the inclusion of 'include/linux/irqchip.h' and replaces the
-use of OF_DECLARE_2 with IRQCHIP_DECLARE.
+Cyrille just wanted to keep you informed quickly as we were
+progressing... Anyone can tell you that, obviously, there is no stupid
+policy of not releasing patches @ Atmel!
 
-Signed-off-by: Joel Porquet <joel@porquet.org>
----
- arch/arm/mach-omap2/omap-wakeupgen.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+Anyway, let's keep the good debugging session progressing well with your
+valuable help...
 
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index e1d2e99..a2dc324 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -20,6 +20,7 @@
- #include <linux/init.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-+#include <linux/irqchip.h>
- #include <linux/irqdomain.h>
- #include <linux/of_address.h>
- #include <linux/platform_device.h>
-@@ -538,8 +539,4 @@ static int __init wakeupgen_init(struct device_node *node,
- 	return 0;
- }
- 
--/*
-- * We cannot use the IRQCHIP_DECLARE macro that lives in
-- * drivers/irqchip, so we're forced to roll our own. Not very nice.
-- */
--OF_DECLARE_2(irqchip, ti_wakeupgen, "ti,omap4-wugen-mpu", wakeupgen_init);
-+IRQCHIP_DECLARE(ti_wakeupgen, "ti,omap4-wugen-mpu", wakeupgen_init);
+Bye.
+
+
+> your "patch" in English as:
+> 
+>  		at91_twi_read_next_byte(dev);
+> -	else if (irqstatus & AT_TWI_TXRDY)
+> +	else if ((irqstatus & (AT91_TWI_TXCOMP | AT91_TWI_TXRDY | AT91_TWI_NACK)) == AT91_TWI_TXRDY)
+>  		at91_twi_write_next_byte(dev);
+> 
+> But still see some double NACKs. Not always though, and it doesn't wreak
+> any havoc. But it still looks strange and I can't explain them when looking
+> at what the eeprom driver requests. Does this mean that there are more
+> races present?
+> 
+> Or, did I just parse your English "patch" badly?
+> 
+>> By the way, in my case, the first NACK occurs because the at24 driver tries to
+>> perform a second write transfer too quickly and the eeprom is not ready yet,
+>> then replies with a NACK.
+> 
+> Yes, I believe this is by design. Noone wants to encode the exact delays
+> needed since they are hard to predict. So, the eeprom driver polls.
+> 
+>> However while debugging, placing debug traces in the I2C controller driver
+>> changed the timing: this small delay was enough to make the first NACK
+>> disappear because the eeprom was now ready to process the second write
+>> operation.
+> 
+> Yes, w/o NACKs everything is going smooth regardless of kernel version.
+> 
+>> For DMA transfer, you have to know that when NACK error is detected, the I2C
+>> controller sets the TWI_TXCOMP, TWI_NACK and TWI_TXRDY bits all together in
+>> the Status Register:
+>> - The TWI_NACK is cleared by reading the Status Register.
+>> - The TWI_TXRDY triggers the DMA controller to write the next byte in the THR,
+>>   which should also tell the I2C controller to start a new transfer.
+>> - The TWI_TXCOMP bit is cleared by writing into the THR: this is why the
+>>   interrupt handler may fail to detect NACK if it relies on TWI_TXCOMP.
+>>
+>> Best Regards,
+>>
+>> Cyrille
+>>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
 -- 
-2.6.1
+Nicolas Ferre
