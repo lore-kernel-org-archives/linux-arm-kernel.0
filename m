@@ -1,87 +1,73 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 13 Oct 2015 13:12:46 +0100
-Subject: [PATCH v6 0/3] arm64: IOMMU-backed DMA mapping
-In-Reply-To: <cover.1443718557.git.robin.murphy@arm.com>
-References: <cover.1443718557.git.robin.murphy@arm.com>
-Message-ID: <561CF53E.7000809@arm.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 13 Oct 2015 14:25:12 +0200
+Subject: [PATCH v7 1/7] ARM: dts: imx: imx7d-sbd remove fixed can2-3v3
+ regulator
+In-Reply-To: <CAA+hA=Tuj6xTvcPB7xFi6jghBJZAMNTkMheR8HBz8-bfBdRn8g@mail.gmail.com>
+References: <1443477401-17238-1-git-send-email-aalonso@freescale.com>
+ <CAA+hA=Tuj6xTvcPB7xFi6jghBJZAMNTkMheR8HBz8-bfBdRn8g@mail.gmail.com>
+Message-ID: <561CF828.7050609@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On 10/13/2015 02:04 PM, Dong Aisheng wrote:
+> On Tue, Sep 29, 2015 at 5:56 AM, Adrian Alonso <aalonso@freescale.com> wrote:
+>> Remove incorrect can2-3v3 fixed regulator, imx7d-sdb doesn't
+>> have a dedicated can2 fixed regulator instead it shares PERI_3V3
+>> fixed regulator (RT8070ZS) which is enabled by default (hardwired)
+>> from pmic pfuze3000 NVCC_3V3 power rail.
+>>
+>> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
+>> ---
+>> Changes for V7: New patch in series
+>>
+> 
+> It is a correct regulator here, but i have to admit that it's a bit confusing.
+> Here the regulator is an abstract regulator which is actually used to
+> control CAN
+> transceiver STBY signals, it is introduced by below patch:
+> commit b7c4114b07bbacfe0aee1d04ad1ade9e42309620
+> Author: Fabio Estevam <fabio.estevam@freescale.com>
+> Date:   Mon Jun 10 23:12:57 2013 -0300
+> 
+>     can: flexcan: Use a regulator to control the CAN transceiver
+> 
+>     Instead of using a GPIO to turn on/off the CAN transceiver, it is better to
+>     use a regulator as some systems may use a PMIC to power the CAN transceiver.
+> 
+>     Acked-by: Shawn Guo <shawn.guo@linaro.org>
+>     Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>     Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> 
+> From the commit messages, it should be likely to control the
+> transceiver external suppy,
+> not control signals, but it does do that unproper work currently.
+> 
+> Besides the unproperly handling control signals, this solution also can't handle
+> multiple CAN transceiver control signals ways.
 
-On 01/10/15 20:13, Robin Murphy wrote:
-> Hi all,
->
-> Here's the latest, and hopefully last, revision of the initial arm64
-> IOMMU dma_ops support.
->
-> There are a couple of dependencies still currently in -next and the
-> intel-iommu tree[0]: "iommu: iova: Move iova cache management to the
-> iova library" is necessary for the rename of iova_cache_get(), and
-> "iommu/iova: Avoid over-allocating when size-aligned" will be needed
-> with some IOMMU drivers to prevent unmapping errors.
->
-> Changes from v5[1]:
-> - Change __iommu_dma_unmap() from BUG to WARN when things go wrong, and
->    prevent a NULL dereference on double-free.
-> - Fix iommu_dma_map_sg() to ensure segments can never inadvertently end
->    mapped across a segment boundary. As a result, we have to lose the
->    segment-merging optimisation from before (I might revisit that if
->    there's some evidence it's really worthwhile, though).
-> - Cleaned up the platform device workarounds for config order and
->    default domains, and removed the other hacks. Demanding that the IOMMU
->    drivers assign groups, and support IOMMU_DOMAIN_DMA via the methods
->    provided, keeps things bearable, and the behaviour should now be
->    consistent across all cases.
+You can chain several transceivers together if you need to control more
+than one GPIO line.
 
-I realise there was one other point you raised which I never explicitly 
-addressed (I had to go off and do some investigation at the time) - the 
-domain detach/free in arch_teardown_dma_ops does currently get called if 
-the client device driver fails it probe (or asks to defer). This 
-prevents us leaking any of our own domains we had to create, and lets us 
-start from a clean slate if the device gets re-probed later.
+> I was trying to write a common transceiver driver to handling this issue.
+> But get interrupted by a few other FSL official works, will resume soon.
 
-Anyway, what are your thoughts on taking this for 4.4? Since the 
-dependencies are now in and we're at -rc5 already, I'm on the verge of 
-reposting a self-contained version to go through arm64, as we really 
-need to unblock all the follow-on development there (it's a shame that 
-of the people I'm aware want this, it's only me and the Mediatek/Chrome 
-guys here on the list saying so).
+Have a look at drivers/phy.
 
-Yes, there's still plenty more to do in the OF/device layer for platform 
-device infrastructure as a whole (I hope my last reply[0] helped explain 
-why it has to look so upside-down compared to the nice simple x86 PCI 
-model), but I can only do it one chunk at a time ;)
+> I would suggest keep the regulator first until the new solution got in.
 
-Thanks,
-Robin.
+Marc
 
-[0]:http://article.gmane.org/gmane.linux.kernel.iommu/10607
 
-> As a bonus, whilst the underlying of_iommu_configure() code only supports
-> platform devices at the moment, I can also say that this has now been
-> tested to work for PCI devices too, via some horrible hacks on a Juno r1.
->
-> Thanks,
-> Robin.
->
-> [0]:http://thread.gmane.org/gmane.linux.kernel.iommu/11033
-> [1]:http://thread.gmane.org/gmane.linux.kernel.iommu/10439
->
-> Robin Murphy (3):
->    iommu: Implement common IOMMU ops for DMA mapping
->    arm64: Add IOMMU dma_ops
->    arm64: Hook up IOMMU dma_ops
->
->   arch/arm64/Kconfig                   |   1 +
->   arch/arm64/include/asm/dma-mapping.h |  15 +-
->   arch/arm64/mm/dma-mapping.c          | 457 ++++++++++++++++++++++++++++++
->   drivers/iommu/Kconfig                |   7 +
->   drivers/iommu/Makefile               |   1 +
->   drivers/iommu/dma-iommu.c            | 524 +++++++++++++++++++++++++++++++++++
->   include/linux/dma-iommu.h            |  85 ++++++
->   include/linux/iommu.h                |   1 +
->   8 files changed, 1083 insertions(+), 8 deletions(-)
->   create mode 100644 drivers/iommu/dma-iommu.c
->   create mode 100644 include/linux/dma-iommu.h
->
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151013/405f4bf0/attachment.sig>
