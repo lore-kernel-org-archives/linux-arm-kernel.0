@@ -1,38 +1,31 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 13 Oct 2015 14:28:04 +0300
-Subject: [PATCH 3/3] ARM: digicolor: dts: add uart pin configuration
+Date: Tue, 13 Oct 2015 14:28:02 +0300
+Subject: [PATCH 1/3] ARM: digicolor: select pinctrl/gpio driver
 In-Reply-To: <cover.1444735169.git.baruch@tkos.co.il>
 References: <cover.1444735169.git.baruch@tkos.co.il>
-Message-ID: <2eac21b81251903d99ca97b1e9d4cd5e9ba6839a.1444735169.git.baruch@tkos.co.il>
+Message-ID: <0c3f348274ea14bc82c0e4f7b240be650624fb0d.1444735169.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- arch/arm/boot/dts/cx92755_equinox.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/mach-digicolor/Kconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/cx92755_equinox.dts b/arch/arm/boot/dts/cx92755_equinox.dts
-index 5da00806c41e..026f556c8c50 100644
---- a/arch/arm/boot/dts/cx92755_equinox.dts
-+++ b/arch/arm/boot/dts/cx92755_equinox.dts
-@@ -70,8 +70,17 @@
- 
- &uart0 {
- 	status = "okay";
-+	pinctrl-0 = <&uart0_default>;
-+	pinctrl-names = "default";
- };
- 
- &i2c {
- 	status = "okay";
- };
-+
-+&pinctrl {
-+	uart0_default: uart0_active {
-+		pins = "GP_O0", "GP_O1";
-+		function = "client_b";
-+	};
-+};
+diff --git a/arch/arm/mach-digicolor/Kconfig b/arch/arm/mach-digicolor/Kconfig
+index 4f36d8d2bc57..fc65b0f1db48 100644
+--- a/arch/arm/mach-digicolor/Kconfig
++++ b/arch/arm/mach-digicolor/Kconfig
+@@ -1,7 +1,10 @@
+ config ARCH_DIGICOLOR
+ 	bool "Conexant Digicolor SoC Support"
+ 	depends on ARCH_MULTI_V7
++	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKSRC_MMIO
+ 	select DIGICOLOR_TIMER
+ 	select GENERIC_IRQ_CHIP
+ 	select MFD_SYSCON
++	select PINCTRL
++	select PINCTRL_DIGICOLOR
 -- 
 2.6.1
