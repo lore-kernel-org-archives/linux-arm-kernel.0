@@ -1,50 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Oct 2015 11:42:19 +0100
-Subject: [PATCH 2/4] arm64: dts: Foundation model: increate GICC region
- to allow EOImode=1
-In-Reply-To: <1444729069-27922-3-git-send-email-andre.przywara@arm.com>
-References: <1444729069-27922-1-git-send-email-andre.przywara@arm.com>
- <1444729069-27922-3-git-send-email-andre.przywara@arm.com>
-Message-ID: <561CE00B.3070105@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 13 Oct 2015 11:42:31 +0100
+Subject: [PATCH 12/17] ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
+In-Reply-To: <20151012202847.GS23801@atomide.com>
+References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
+ <1442850433-5903-13-git-send-email-sudeep.holla@arm.com>
+ <20151012202047.GR23801@atomide.com> <20151012202847.GS23801@atomide.com>
+Message-ID: <561CE017.7030704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
 
-s/increate/increase size of/ in the subject line
 
-On 13/10/15 10:37, Andre Przywara wrote:
-> Recent commits made the GIC driver use EOImode=1 for all GICs
-> that advertise the proper GICC region size.
+On 12/10/15 21:28, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [151012 13:27]:
+>> * Sudeep Holla <sudeep.holla@arm.com> [150921 08:52]:
+>>> The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
+>>> be left enabled so as to allow them to work as expected during the
+>>> suspend-resume cycle, but doesn't guarantee that it will wake the system
+>>> from a suspended state, enable_irq_wake is recommended to be used for
+>>> the wakeup.
+>>>
+>>> This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
+>>> enable_irq_wake instead.
+>>
+>> Applying into omap-for-v4.4/cleanup thanks.
+>
+> Actually I don't think this does the right thing. The interrupts
+> in the $subject patch are in the always on powerdomain, and we really
 
-Well, it is not so much that the kernel uses EOImode=1, but the fact
-that the model has a GICv2 implementation, hence a 8kB GICC region.
+Agreed
 
-> To let the model benefit from the blessings of that mode, increase
-> the GICC region to its actual size of 8K.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  arch/arm64/boot/dts/arm/foundation-v8.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dts b/arch/arm64/boot/dts/arm/foundation-v8.dts
-> index 3c5595d..57ad9fe 100644
-> --- a/arch/arm64/boot/dts/arm/foundation-v8.dts
-> +++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
-> @@ -78,7 +78,7 @@
->  		#address-cells = <2>;
->  		interrupt-controller;
->  		reg = <0x0 0x2c001000 0 0x1000>,
-> -		      <0x0 0x2c002000 0 0x1000>,
-> +		      <0x0 0x2c002000 0 0x2000>,
->  		      <0x0 0x2c004000 0 0x2000>,
->  		      <0x0 0x2c006000 0 0x2000>;
->  		interrupts = <1 9 0xf04>;
-> 
+> want them to be excluded from the suspend.
+>
 
-Thanks,
+OK but what's wrong with this patch. At-least the name suggest it's a
+wakeup interrupt. And using IRQF_NO_SUSPEND for the wakeup interrupt is
+simply wrong.
 
-	M.
+> So not applying without further explanations.
+>
+
+But I don't understand the real need for IRQF_NO_SUSPEND over wakeup APIs ?
+
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Sudeep
