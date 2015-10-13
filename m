@@ -1,86 +1,87 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 13 Oct 2015 20:04:26 +0800
-Subject: [PATCH v7 1/7] ARM: dts: imx: imx7d-sbd remove fixed can2-3v3
- regulator
-In-Reply-To: <1443477401-17238-1-git-send-email-aalonso@freescale.com>
-References: <1443477401-17238-1-git-send-email-aalonso@freescale.com>
-Message-ID: <CAA+hA=Tuj6xTvcPB7xFi6jghBJZAMNTkMheR8HBz8-bfBdRn8g@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 13 Oct 2015 13:12:46 +0100
+Subject: [PATCH v6 0/3] arm64: IOMMU-backed DMA mapping
+In-Reply-To: <cover.1443718557.git.robin.murphy@arm.com>
+References: <cover.1443718557.git.robin.murphy@arm.com>
+Message-ID: <561CF53E.7000809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 29, 2015 at 5:56 AM, Adrian Alonso <aalonso@freescale.com> wrote:
-> Remove incorrect can2-3v3 fixed regulator, imx7d-sdb doesn't
-> have a dedicated can2 fixed regulator instead it shares PERI_3V3
-> fixed regulator (RT8070ZS) which is enabled by default (hardwired)
-> from pmic pfuze3000 NVCC_3V3 power rail.
+Hi Joerg,
+
+On 01/10/15 20:13, Robin Murphy wrote:
+> Hi all,
 >
-> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
-> ---
-> Changes for V7: New patch in series
+> Here's the latest, and hopefully last, revision of the initial arm64
+> IOMMU dma_ops support.
 >
-
-It is a correct regulator here, but i have to admit that it's a bit confusing.
-Here the regulator is an abstract regulator which is actually used to
-control CAN
-transceiver STBY signals, it is introduced by below patch:
-commit b7c4114b07bbacfe0aee1d04ad1ade9e42309620
-Author: Fabio Estevam <fabio.estevam@freescale.com>
-Date:   Mon Jun 10 23:12:57 2013 -0300
-
-    can: flexcan: Use a regulator to control the CAN transceiver
-
-    Instead of using a GPIO to turn on/off the CAN transceiver, it is better to
-    use a regulator as some systems may use a PMIC to power the CAN transceiver.
-
-    Acked-by: Shawn Guo <shawn.guo@linaro.org>
-    Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-    Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-
->From the commit messages, it should be likely to control the
-transceiver external suppy,
-not control signals, but it does do that unproper work currently.
-
-Besides the unproperly handling control signals, this solution also can't handle
-multiple CAN transceiver control signals ways.
-
-I was trying to write a common transceiver driver to handling this issue.
-But get interrupted by a few other FSL official works, will resume soon.
-
-I would suggest keep the regulator first until the new solution got in.
-
-Regards
-Dong Aisheng
-
->  arch/arm/boot/dts/imx7d-sdb.dts | 11 +----------
->  1 file changed, 1 insertion(+), 10 deletions(-)
+> There are a couple of dependencies still currently in -next and the
+> intel-iommu tree[0]: "iommu: iova: Move iova cache management to the
+> iova library" is necessary for the rename of iova_cache_get(), and
+> "iommu/iova: Avoid over-allocating when size-aligned" will be needed
+> with some IOMMU drivers to prevent unmapping errors.
 >
-> diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-> index 8059458..83f0053 100644
-> --- a/arch/arm/boot/dts/imx7d-sdb.dts
-> +++ b/arch/arm/boot/dts/imx7d-sdb.dts
-> @@ -78,16 +78,7 @@
->                         enable-active-high;
->                 };
+> Changes from v5[1]:
+> - Change __iommu_dma_unmap() from BUG to WARN when things go wrong, and
+>    prevent a NULL dereference on double-free.
+> - Fix iommu_dma_map_sg() to ensure segments can never inadvertently end
+>    mapped across a segment boundary. As a result, we have to lose the
+>    segment-merging optimisation from before (I might revisit that if
+>    there's some evidence it's really worthwhile, though).
+> - Cleaned up the platform device workarounds for config order and
+>    default domains, and removed the other hacks. Demanding that the IOMMU
+>    drivers assign groups, and support IOMMU_DOMAIN_DMA via the methods
+>    provided, keeps things bearable, and the behaviour should now be
+>    consistent across all cases.
+
+I realise there was one other point you raised which I never explicitly 
+addressed (I had to go off and do some investigation at the time) - the 
+domain detach/free in arch_teardown_dma_ops does currently get called if 
+the client device driver fails it probe (or asks to defer). This 
+prevents us leaking any of our own domains we had to create, and lets us 
+start from a clean slate if the device gets re-probed later.
+
+Anyway, what are your thoughts on taking this for 4.4? Since the 
+dependencies are now in and we're at -rc5 already, I'm on the verge of 
+reposting a self-contained version to go through arm64, as we really 
+need to unblock all the follow-on development there (it's a shame that 
+of the people I'm aware want this, it's only me and the Mediatek/Chrome 
+guys here on the list saying so).
+
+Yes, there's still plenty more to do in the OF/device layer for platform 
+device infrastructure as a whole (I hope my last reply[0] helped explain 
+why it has to look so upside-down compared to the nice simple x86 PCI 
+model), but I can only do it one chunk at a time ;)
+
+Thanks,
+Robin.
+
+[0]:http://article.gmane.org/gmane.linux.kernel.iommu/10607
+
+> As a bonus, whilst the underlying of_iommu_configure() code only supports
+> platform devices at the moment, I can also say that this has now been
+> tested to work for PCI devices too, via some horrible hacks on a Juno r1.
 >
-> -               reg_can2_3v3: regulator at 2 {
-> -                       compatible = "regulator-fixed";
-> -                       reg = <2>;
-> -                       regulator-name = "can2-3v3";
-> -                       regulator-min-microvolt = <3300000>;
-> -                       regulator-max-microvolt = <3300000>;
-> -                       gpio = <&gpio1 7 GPIO_ACTIVE_LOW>;
-> -               };
-> -
-> -               reg_vref_1v8: regulator at 3 {
-> +               reg_vref_1v8: regulator at 2 {
->                         compatible = "regulator-fixed";
->                         reg = <3>;
->                         regulator-name = "vref-1v8";
-> --
-> 2.1.4
+> Thanks,
+> Robin.
 >
+> [0]:http://thread.gmane.org/gmane.linux.kernel.iommu/11033
+> [1]:http://thread.gmane.org/gmane.linux.kernel.iommu/10439
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Robin Murphy (3):
+>    iommu: Implement common IOMMU ops for DMA mapping
+>    arm64: Add IOMMU dma_ops
+>    arm64: Hook up IOMMU dma_ops
+>
+>   arch/arm64/Kconfig                   |   1 +
+>   arch/arm64/include/asm/dma-mapping.h |  15 +-
+>   arch/arm64/mm/dma-mapping.c          | 457 ++++++++++++++++++++++++++++++
+>   drivers/iommu/Kconfig                |   7 +
+>   drivers/iommu/Makefile               |   1 +
+>   drivers/iommu/dma-iommu.c            | 524 +++++++++++++++++++++++++++++++++++
+>   include/linux/dma-iommu.h            |  85 ++++++
+>   include/linux/iommu.h                |   1 +
+>   8 files changed, 1083 insertions(+), 8 deletions(-)
+>   create mode 100644 drivers/iommu/dma-iommu.c
+>   create mode 100644 include/linux/dma-iommu.h
+>
