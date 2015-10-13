@@ -1,103 +1,164 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Tue, 13 Oct 2015 09:37:08 +0530
-Subject: [PATCH 1/3] ARM: dts: exynos5422-odroidxu3: use cd-gpio method to
- detect sd-card
-In-Reply-To: <561C6713.1070508@samsung.com>
-References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
- <561B3739.4040701@samsung.com> <561B3A83.6090607@samsung.com>
- <1111856990.2419183.1444661252893.JavaMail.yahoo@mail.yahoo.com>
- <561C4C88.2040004@samsung.com> <561C6713.1070508@samsung.com>
-Message-ID: <CANAwSgR3tR+rZk+3WMc7hd=pspQgvLSWdTJaNrQvQqqdj4DSmA@mail.gmail.com>
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Tue, 13 Oct 2015 07:33:15 +0200
+Subject: [PATCH 3/3] fpga manager: Adding FPGA Manager support for Xilinx
+ Zynq 7000
+In-Reply-To: <561BA9C7.6070003@xilinx.com>
+References: <1444344307-22509-1-git-send-email-moritz.fischer@ettus.com>
+ <1444344307-22509-4-git-send-email-moritz.fischer@ettus.com>
+ <20151009163336.GM10631@jcartwri.amer.corp.natinst.com>
+ <CAAtXAHea7GZDLez5kYas2PFQ-=KmS_on8WxFDCuvVb4Nh05a_w@mail.gmail.com>
+ <561B9687.1070103@xilinx.com> <561BA60C.6010106@topic.nl>
+ <561BA9C7.6070003@xilinx.com>
+Message-ID: <561C979B.6040201@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoon,
+?On 12-10-15 14:38, Michal Simek wrote:
+> Hi Mike,
+>
+> On 10/12/2015 02:22 PM, Mike Looijmans wrote:
+>> On 12-10-15 13:16, Michal Simek wrote:
+>>>
+>>>>>> +static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>>>>>> +                            const char *buf, size_t count)
+>>>>>> +{
+>>>>>> +     struct zynq_fpga_priv *priv;
+>>>>>> +     int err;
+>>>>>> +     char *kbuf;
+>>>>>> +     size_t i, in_count;
+>>>>>> +     dma_addr_t dma_addr;
+>>>>>> +     u32 transfer_length = 0;
+>>>>>> +     bool endian_swap = false;
+>>>>>> +
+>>>>>> +     in_count = count;
+>>>>>> +     priv = mgr->priv;
+>>>>>> +
+>>>>>> +     kbuf = dma_alloc_coherent(priv->dev, count, &dma_addr,
+>>>>>> GFP_KERNEL);
+>>>>>> +     if (!kbuf)
+>>>>>> +             return -ENOMEM;
+>>>>>> +
+>>>>>> +     memcpy(kbuf, buf, count);
+>>>>>> +
+>>>>>> +     /* look for the sync word */
+>>>>>> +     for (i = 0; i < count - 4; i++) {
+>>>>>> +             if (memcmp(kbuf + i, "\x66\x55\x99\xAA", 4) == 0) {
+>>>>>> +                     dev_dbg(priv->dev, "Found normal sync word\n");
+>>>>>> +                     endian_swap = false;
+>>>>>> +                     break;
+>>>>>> +             }
+>>>
+>>> This is bin format
+>>>
+>>>>>> +             if (memcmp(kbuf + i, "\xAA\x99\x55\x66", 4) == 0) {
+>>>>>> +                     dev_dbg(priv->dev, "Found swapped sync word\n");
+>>>>>> +                     endian_swap = true;
+>>>>>> +                     break;
+>>>>>> +             }
+>>>
+>>> This is bit format from header
+>>>
+>>>>>> +     }
+>>>>>
+>>>>> How much control do we have over mandating the format of firmware at
+>>>>> this point?  It'd be swell if we could just mandate a specific
+>>>>> endianness, and leave this munging to usermode.
+>>>>
+>>>> That's a good question. Personally I do only care about one of both,
+>>>> but that's just because I get to decide for my targets...
+>>>> Opinions from the Xilinx guys?
+>>>
+>>> Don't know full history about this but in past bitstream in BIT format
+>>> was used. Which is header (partially decoding in u-boot for example)
+>>> with data.
+>>> On zynq native format is BIN which is format without header and data is
+>>> swapped.
+>>> This code just detects which format is used. If BIT, header is skipped
+>>> and data is swapped to BIN format.
+>>>
+>>> Back to origin question if this is something what can be handled from
+>>> user space. And answer is - yes it can be handled there.
+>>> But based on my experience it is very useful to be able to handle BIT
+>>> because it is built by tools by default.
+>>> Also with BIN format you are loosing record what this data bitstream
+>>> targets. Header in BIT gives you at least some ideas.
+>>
+>> People should stop using "cat" to program the FPGA and use a userspace
+>> tool instead. I've already released such tools under GPL, so anyone can
+>> pick up on it and extend it as required.
+>
+> Link?
 
-On 13 October 2015 at 07:36, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Dear, Anand.
+https://github.com/topic-embedded-products/dyplo-utils/blob/master/dyploprogrammer.cpp
+https://github.com/topic-embedded-products/libdyplo/blob/master/hardware.cpp#L261
+
+Will need some work to combine into a single tool though.
+
+> This is fpga manager based driver where "cat" won't be used.
+
+Haven't looked into it yet, but I guess at some point one will have to stream 
+some data from userspace into the device, right?
+
+>> The header for the "bit" format is completely ignored (you can't even
+>> use it to determine if the bitstream is compatible with the current
+>> device) so there's no point in carrying it around.
 >
+> up2you what you want to do with it. If you work with different boards
+> with different FPGAs it is at least helpful to know if X.bit target this
+> or that board. Unfortunately I am not aware about any public document
+> which describe what there is written.
 >
-> On 10/13/2015 09:12 AM, Krzysztof Kozlowski wrote:
->> On 12.10.2015 23:47, Anand Moon wrote:
->>>>
->>>> Anand,
->>>>
->>>> You essentially reverted here af6ad88acbd6 ("ARM: dts: Mux XMMCnDATA[0]
->>>> pad correctly for Exynos5420 boards"). Why? There is no explanation in
->>>> the commit message about this.
->>>
->>> I don't remember to send the patch relevant to this. Hmm...
->>> Well, Is this patch really signed-off by me?
->>>
->>> Best Regards,
->>>
->>> Jaehoon Chung
->>>>
->>>> Best regards,
->>>> Krzysztof
->>>>
->>>
->>>>
->>>
->>>
->>> Some how I don't receive these mail on my email id.
->>>
->>> I have picked up these changes from tizen repository for OdroidXU3.
->>> I have tested with this changes to detect UHS-I micro cd cards.
->>> That's the reason for this email.
->
-> It seems to make manually, right?
-> I have checked the tizen repository.
->
-> The below is
->
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> @@ -335,7 +335,9 @@
->         samsung,dw-mshc-sdr-timing = <0 4>;
->         samsung,dw-mshc-ddr-timing = <0 2>;
->         pinctrl-names = "default";
-> -       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
-> +       cd-gpios = <&gpc2 2 0>;
-> +       cd-inverted;
-> +       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus1 &sd2_bus4>;
->         bus-width = <4>;
->         cap-sd-highspeed;
->  };
->
->
->
-> Yours
->
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> @@ -352,8 +352,10 @@
->         samsung,dw-mshc-ciu-div = <3>;
->         samsung,dw-mshc-sdr-timing = <0 4>;
->         samsung,dw-mshc-ddr-timing = <0 2>;
-> +       cd-gpios = <&gpc2 2 GPIO_ACTIVE_HIGH>;
-> +       cd-inverted;
->         pinctrl-names = "default";
-> -       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
-> +       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
->
-> Did you know what differ? :)
->
-> Best Regards,
-> Jaehoon Chung
->
+>> On the zynq, doing
+>> the "swap" in userspace was measurably faster than having the driver
+>> handle it, and that was even without using NEON instructions for byte
+>> swapping.
 >>
->> ... and you applied it blindly without looking at actual existing
->> contents and at previous commits.
->>
->> That is not how patches from different repositories should be cherry picked.
->>
->> Best regards,
->> Krzysztof
->>
->>
+>> I admit that being able to do "cat static.bit > /dev/xdevcfg" has had
+>> its uses. But it's not something that belongs in mainline Linux.
+>
+> It is about comfort but I have really not a problem that driver will
+> handle just BIN format.
+>
+>> Probably one of the key reasons that the "bit" format is still popular
+>> is that getting the Vivado tools to create a proper "bin" that will
+>> actually work on the Zynq is about as easy as nailing jelly to a tree.
+>> We've been using a simple Python script to do the bit->bin conversion
+>> for that reason.
+>
+> In vivado it is one tcl cmd. But truth is that I don't really get why
+> BIN is not generated by default.
+
+If I recall correctly, Vivado strips the "bit" header but doesn't swap the 
+bytes, so the resulting bin file won't work.
+
+
+>> Using the "bin" format in the driver keeps it simple and singular.
+>> Userspace tools can add whatever wrappers and headers they feel
+>> appropriate to it, these checks don't belong in the driver since they
+>> will be application specific. For example, some users would want to
+>> verify that a partial bitstream actually matches the static part that's
+>> currently in the FPGA.
+>
+> agree.
+>
+> Thanks,
+> Michal
+>
 >
 
-Looks like my changes have introduce another bug so please ignore this changes.
 
--Anand Moon
+
+Kind regards,
+
+Mike Looijmans
+System Expert
+
+TOPIC Embedded Products
+Eindhovenseweg 32-C, NL-5683 KH Best
+Postbus 440, NL-5680 AK Best
+Telefoon: +31 (0) 499 33 69 79
+Telefax: +31 (0) 499 33 69 70
+E-mail: mike.looijmans at topicproducts.com
+Website: www.topicproducts.com
+
+Please consider the environment before printing this e-mail
