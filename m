@@ -1,52 +1,70 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 13 Oct 2015 20:22:50 +0100
-Subject: [PATCH v1 0/2] arm64: runtime workaround for erratum #843419
-In-Reply-To: <20151013151355.GQ21550@arm.com>
-References: <1442590800-14645-1-git-send-email-ard.biesheuvel@linaro.org>
- <20151013151355.GQ21550@arm.com>
-Message-ID: <CAKv+Gu-i0j46L6dMMMtNG_7z1ufGd4bckKG9m8B1tV-Fv0rCdA@mail.gmail.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Tue, 13 Oct 2015 14:18:22 -0500
+Subject: [PATCH] ARM: socfpga: dts: add fpga manager
+In-Reply-To: <20151013185750.GB17155@pengutronix.de>
+References: <1444760900-1373-1-git-send-email-atull@opensource.altera.com>
+ <20151013185750.GB17155@pengutronix.de>
+Message-ID: <alpine.DEB.2.02.1510131412500.3527@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 October 2015 at 16:13, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Ard,
->
-> On Fri, Sep 18, 2015 at 04:39:58PM +0100, Ard Biesheuvel wrote:
->> This implements a workaround for the A53 erratum that may result in adrp
->> instructions to produce incorrect values if they appear in either of
->> the last two instruction slots of a 4 KB page.
->>
->> Instead of building modules using the large code model, this approach
->> uses veneers to call the adrp instructions at unaffected offsets, unless
->> they can be converted into adr instructions, which is even better (this
->> depends on whether the symbol is with 1 MB of the place)
->
-> As discussed at Connect, we should evaluate the performance penalty of
-> the existing workaround before making this more complicated. I tried to
-> do that today by building xfs as a module, then copying an xfs disk
-> image containing a git clone of the kernel into tmpfs, loop mounting
-> that and md5summing all of the files.
->
-> The performance eppears to be the same with and without the errata
-> workaround enabled, but I wondered if you had a better idea for a test
-> (short of writing a synthetic module)?
->
+On Tue, 13 Oct 2015, Steffen Trumtrar wrote:
 
-Good question. The AArch64 large model is essentially the 64-bit
-equivalent of the pre-v7 AArch32 approach of adr instructions combined
-with literal pools that are interspersed with the instructions in
-.text. Even though movt/movw pairs carry absolute values in their
-immediate fields (and thus can be used for any value and not just
-nearby addresses), the use of v7 movt/movw pairs can be considered the
-equivalent of the small model with its adrp/add pairs.
+> Hi Alan!
+> 
+> On Tue, Oct 13, 2015 at 01:28:20PM -0500, atull at opensource.altera.com wrote:
+> > From: Alan Tull <atull@opensource.altera.com>
+> > 
+> > Add FPGA manager to device tree for SoCFPGA.
+> > 
+> > Signed-off-by: Alan Tull <atull@opensource.altera.com>
+> > ---
+> >  arch/arm/boot/dts/socfpga.dtsi | 7 +++++++
+> >  1 file changed, 7 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> > index 314e589..e37ba11 100644
+> > --- a/arch/arm/boot/dts/socfpga.dtsi
+> > +++ b/arch/arm/boot/dts/socfpga.dtsi
+> > @@ -834,5 +834,12 @@
+> >  			compatible = "altr,sys-mgr", "syscon";
+> >  			reg = <0xffd08000 0x4000>;
+> >  		};
+> > +
+> > +		hps_0_fpgamgr: fpgamgr at 0xff706000 {
+> > +			compatible = "altr,socfpga-fpga-mgr";
+> > +			reg = <0xFF706000 0x1000
+> > +			       0xFFB90000 0x1000>;
+> > +			interrupts = <0 175 4>;
+> > +		};
+> >  	};
+> >  };
+> 
+> Please keep the format in line with the rest of the file:
+> Hexvalues are lowercase and no 0x after the "fpgamgr@".
+> I'd say "And please put the node in its proper position
+> according to its address", but I see just now, that the
+> dtsi is all messed up right now anyway :-(
+> 
 
-This means that any justification for preferring movt/movw over
-literal pools should carry over to this case, and I'd be interested if
-there is any knowledge internally at ARM regarding the use cases that
-get a significant speedup. Obviously, workloads that are sensitive to
-L1 efficiency are likely to be affected (since the literals go via the
-D-cache) but I don't have any numbers to back up the claim that the
-large model is slower in the real world.
+How so? Patches are welcomed!
 
--- 
-Ard.
+Please fix the "fpgamgr@" and lower case the hex values. But I would prefer the
+nodes to be in alphabetical order.
+
+Also, you need to document the "altr,socfpga-fpga-mgr".
+
+Thanks,
+Dinh
+> Regards,
+> Steffen
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+
+BR,
+Dinh
