@@ -1,175 +1,540 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Tue, 13 Oct 2015 17:51:32 +0800
-Subject: [RFC] arm: add __initbss section attribute
-In-Reply-To: <5369261.8uuGVmeUFP@wuerfel>
-References: <1444622356-8263-1-git-send-email-yalin.wang2010@gmail.com>
- <20151012200422.GA29175@ravnborg.org>
- <FEDC4251-5A6A-4E3C-AE36-8E5B55D9D6CF@gmail.com> <5369261.8uuGVmeUFP@wuerfel>
-Message-ID: <8004E8C3-F1EC-45C3-A995-88726B257563@gmail.com>
+From: bayi.cheng@mediatek.com (Bayi Cheng)
+Date: Tue, 13 Oct 2015 17:39:19 +0800
+Subject: [PATCH v4 2/3] mtd: mtk-nor: mtk serial flash controller driver
+In-Reply-To: <1444729160-26433-1-git-send-email-bayi.cheng@mediatek.com>
+References: <1444729160-26433-1-git-send-email-bayi.cheng@mediatek.com>
+Message-ID: <1444729160-26433-3-git-send-email-bayi.cheng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+add spi nor flash driver for mediatek controller
 
-> On Oct 13, 2015, at 17:40, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> On Tuesday 13 October 2015 15:33:10 yalin wang wrote:
->> 
->>> On Oct 13, 2015, at 04:04, Sam Ravnborg <sam@ravnborg.org> wrote:
->>> 
->>>> --- a/include/asm-generic/vmlinux.lds.h
->>>> +++ b/include/asm-generic/vmlinux.lds.h
->>>> 
->>>> -#define BSS_SECTION(sbss_align, bss_align, stop_align)			\
->>>> +#define BSS_SECTION(sbss_align, bss_align, initbss_align, stop_align)			\
->>> 
->>> A few comments:
->>> 
->>> 1) - please align the backslash at the end of the
->>>    line with the backslash above it.
->>> 2) - you need to fix all the remaining users of BSS_SECTION.
->>> 3) - do we really need the flexibility to specify an alignment (stop_align)?
->>>       If not - drop the extra argument.
->>> 
->>> 	Sam
->> i change lots of __initdata to __initbss to test it on ARM arch,
->> 
-> 
-> Ok, I found my mistake in the script I used to calculate the savings,
-> here is the correct output showing all uninitialized variables in
-> multi_v7_defconfig:
-> 
-> 4	done.44688
-> 1024	boot_command_line
-> 1024	tmp_cmdline.44689
-> 4	late_time_init
-> 4	root_mount_data
-> 4	root_fs_names
-> 4	rd_doload
-> 4	root_delay
-> 64	saved_root_name
-> 4	root_device_name
-> 4	message
-> 4	byte_count
-> 4	victim
-> 4	collected
-> 8	this_header
-> 4	state
-> 4	collect
-> 4	remains
-> 4	next_state
-> 8	header_buf
-> 8	next_header
-> 4	do_retain_initrd
-> 4	name_len
-> 4	body_len
-> 4	gid
-> 4	uid
-> 4	mtime
-> 4	wfd
-> 4	vcollected
-> 4	ino
-> 4	mode
-> 4	nlink
-> 4	major
-> 4	minor
-> 4	rdev
-> 4	symlink_buf
-> 4	name_buf
-> 64	msg_buf.29770
-> 128	head
-> 4	machine_desc
-> 4	usermem.34390
-> 4	__atags_pointer
-> 1024	cmd_line
-> 1024	default_command_line
-> 1536	atags_copy
-> 4	dma_mmu_remap_num
-> 64	dma_mmu_remap
-> 4	phys_initrd_start
-> 4024	phys_initrd_size
-> 4096	bm_pte
-> 4	ecc_mask
-> 4	initial_pmd_value
-> 4	arm_lowmem_limit
-> 24	s5p_mfc_mem
-> 28	tx_pad_name
-> 4	use_gptimer_clksrc
-> 4	omap_table_init
-> 4	mpurate
-> 4	am35xx_aes_hwmod_ocp_ifs
-> 4	am35xx_sham_hwmod_ocp_ifs
-> 4	dra72x_hwmod_ocp_ifs
-> 4	rx51_vibra_data
-> 4	num_special_pds
-> 128	special_pds
-> 4	main_extable_sort_needed
-> 4	new_log_buf_len
-> 24	opts.36513
-> 512	smap.22469
-> 512	dmap.22470
-> 64	group_map.22521
-> 64	group_cnt.22522
-> 4	pcpu_chosen_fc
-> 4	vmlist
-> 4	vm_init_off.26867
-> 4	reset_managed_pages_done
-> 116	boot_kmem_cache_node.32827
-> 116	boot_kmem_cache.32826
-> 4	dhash_entries
-> 4	ihash_entries
-> 4	mhash_entries
-> 4	mphash_entries
-> 256	nfs_root_parms
-> 1028	nfs_export_path
-> 1028	nfs_root_device
-> 4	gic_cnt
-> 4	threshold_index
-> 4096	ata_force_param_buf
-> 4	mtd_devs
-> 2432	mtd_dev_param
-> 8	m68k_probes
-> 8	isa_probes
-> 4	arch_timers_present
-> 4	dt_root_size_cells
-> 4	dt_root_addr_cells
-> 4	imx_keep_uart_clocks
-> 4	imx_uart_clocks
-> 4	mt8173_top_clk_data
-> 4	mt8173_pll_clk_data
-> 4	cpg_mode
-> 4	cpg_mode_rates
-> 4	cpg_mode_divs
-> 4	cpg_mode
-> 4	cpg_mode
-> 4	thash_entries
-> 4	uhash_entries
-> 4	ic_got_reply
-> 4	ic_first_dev
-> 4	ic_dev
-> 16	user_dev_name
-> 4	ic_dhcp_msgtype
-> 4	ic_host_name_set
-> 4	ic_dev_mtu
-> 4	ic_set_manually
-> 4	ic_enable
-> 256	vendor_class_identifier
-> 4	ic_proto_have_if
-> 4	dma_reserve
-> 4	nr_kernel_pages
-> 4	nr_all_pages
-> 196	__clk_of_table_sentinel
-> 200	__rmem_of_table_sentinel
-> 196	__clksrc_of_table_sentinel
-> 200	__iommu_of_table_sentinel
-> 8	__cpu_method_of_table_sentinel
-> 8	__cpuidle_method_of_table_sentinel
-> 196	irqchip_of_match_end
-> 32	__earlycon_table_sentinel
-> 200	__earlycon_of_table_sentinel
-> 6	__irf_end
-> 
-> 
-> 26398 total
-i am curious about your scripts ,
-could you show me ?
-Thank you !
+Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+---
+ drivers/mtd/spi-nor/Kconfig       |   7 +
+ drivers/mtd/spi-nor/Makefile      |   1 +
+ drivers/mtd/spi-nor/mtk-quadspi.c | 486 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 494 insertions(+)
+ create mode 100644 drivers/mtd/spi-nor/mtk-quadspi.c
+
+diff --git a/drivers/mtd/spi-nor/Kconfig b/drivers/mtd/spi-nor/Kconfig
+index 89bf4c1..f433890 100644
+--- a/drivers/mtd/spi-nor/Kconfig
++++ b/drivers/mtd/spi-nor/Kconfig
+@@ -7,6 +7,13 @@ menuconfig MTD_SPI_NOR
+ 
+ if MTD_SPI_NOR
+ 
++config MTD_MT81xx_NOR
++	tristate "Support SPI flash Controller MTD_MT81xx_NOR"
++	help
++	  This enables access to SPI Nor flash, using MTD_MT81XX_NOR controller.
++	  This controller does nor support generic SPI BUS, It only supports
++	  SPI NOR Flash.
++
+ config MTD_SPI_NOR_USE_4K_SECTORS
+ 	bool "Use small 4096 B erase sectors"
+ 	default y
+diff --git a/drivers/mtd/spi-nor/Makefile b/drivers/mtd/spi-nor/Makefile
+index e53333e..37c020a 100644
+--- a/drivers/mtd/spi-nor/Makefile
++++ b/drivers/mtd/spi-nor/Makefile
+@@ -1,3 +1,4 @@
++obj-$(CONFIG_MTD_MT81xx_NOR)	+= mtk-quadspi.o
+ obj-$(CONFIG_MTD_SPI_NOR)	+= spi-nor.o
+ obj-$(CONFIG_SPI_FSL_QUADSPI)	+= fsl-quadspi.o
+ obj-$(CONFIG_SPI_NXP_SPIFI)	+= nxp-spifi.o
+diff --git a/drivers/mtd/spi-nor/mtk-quadspi.c b/drivers/mtd/spi-nor/mtk-quadspi.c
+new file mode 100644
+index 0000000..c6ac366
+--- /dev/null
++++ b/drivers/mtd/spi-nor/mtk-quadspi.c
+@@ -0,0 +1,486 @@
++/*
++ * Copyright (c) 2015 MediaTek Inc.
++ * Author: Bayi Cheng <bayi.cheng@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/iopoll.h>
++#include <linux/ioport.h>
++#include <linux/math64.h>
++#include <linux/module.h>
++#include <linux/mtd/mtd.h>
++#include <linux/mutex.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_gpio.h>
++#include <linux/pinctrl/consumer.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/mtd/mtd.h>
++#include <linux/mtd/partitions.h>
++#include <linux/mtd/spi-nor.h>
++
++#define MTK_NOR_CMD_REG			0x00
++#define MTK_NOR_CNT_REG			0x04
++#define MTK_NOR_RDSR_REG		0x08
++#define MTK_NOR_RDATA_REG		0x0c
++#define MTK_NOR_RADR0_REG		0x10
++#define MTK_NOR_RADR1_REG		0x14
++#define MTK_NOR_RADR2_REG		0x18
++#define MTK_NOR_WDATA_REG		0x1c
++#define MTK_NOR_PRGDATA0_REG		0x20
++#define MTK_NOR_PRGDATA1_REG		0x24
++#define MTK_NOR_PRGDATA2_REG		0x28
++#define MTK_NOR_PRGDATA3_REG		0x2c
++#define MTK_NOR_PRGDATA4_REG		0x30
++#define MTK_NOR_PRGDATA5_REG		0x34
++#define MTK_NOR_SHREG0_REG		0x38
++#define MTK_NOR_SHREG1_REG		0x3c
++#define MTK_NOR_SHREG2_REG		0x40
++#define MTK_NOR_SHREG3_REG		0x44
++#define MTK_NOR_SHREG4_REG		0x48
++#define MTK_NOR_SHREG5_REG		0x4c
++#define MTK_NOR_SHREG6_REG		0x50
++#define MTK_NOR_SHREG7_REG		0x54
++#define MTK_NOR_SHREG8_REG		0x58
++#define MTK_NOR_SHREG9_REG		0x5c
++#define MTK_NOR_CFG1_REG		0x60
++#define MTK_NOR_CFG2_REG		0x64
++#define MTK_NOR_CFG3_REG		0x68
++#define MTK_NOR_STATUS0_REG		0x70
++#define MTK_NOR_STATUS1_REG		0x74
++#define MTK_NOR_STATUS2_REG		0x78
++#define MTK_NOR_STATUS3_REG		0x7c
++#define MTK_NOR_FLHCFG_REG		0x84
++#define MTK_NOR_TIME_REG		0x94
++#define MTK_NOR_PP_DATA_REG		0x98
++#define MTK_NOR_PREBUF_STUS_REG		0x9c
++#define MTK_NOR_DELSEL0_REG		0xa0
++#define MTK_NOR_DELSEL1_REG		0xa4
++#define MTK_NOR_INTRSTUS_REG		0xa8
++#define MTK_NOR_INTREN_REG		0xac
++#define MTK_NOR_CHKSUM_CTL_REG		0xb8
++#define MTK_NOR_CHKSUM_REG		0xbc
++#define MTK_NOR_CMD2_REG		0xc0
++#define MTK_NOR_WRPROT_REG		0xc4
++#define MTK_NOR_RADR3_REG		0xc8
++#define MTK_NOR_DUAL_REG		0xcc
++#define MTK_NOR_DELSEL2_REG		0xd0
++#define MTK_NOR_DELSEL3_REG		0xd4
++#define MTK_NOR_DELSEL4_REG		0xd8
++
++/* commands for mtk nor controller */
++#define MTK_NOR_READ_CMD		0x0
++#define MTK_NOR_RDSR_CMD		0x2
++#define MTK_NOR_PRG_CMD			0x4
++#define MTK_NOR_WR_CMD			0x10
++#define MTK_NOR_PIO_WR_CMD		0x90
++#define MTK_NOR_WRSR_CMD		0x20
++#define MTK_NOR_PIO_READ_CMD		0x81
++#define MTK_NOR_WR_BUF_ENABLE		0x1
++#define MTK_NOR_WR_BUF_DISABLE		0x0
++#define MTK_NOR_ENABLE_SF_CMD		0x30
++#define MTK_NOR_DUAD_ADDR_EN		0x8
++#define MTK_NOR_QUAD_READ_EN		0x4
++#define MTK_NOR_DUAL_ADDR_EN		0x2
++#define MTK_NOR_DUAL_READ_EN		0x1
++#define MTK_NOR_DUAL_DISABLE		0x0
++#define MTK_NOR_FAST_READ		0x1
++
++#define SFLASH_WRBUF_SIZE		128
++
++struct mt8173_nor {
++	struct mtd_info mtd;
++	struct spi_nor nor;
++	struct device *dev;
++	void __iomem *base;	/* nor flash base address */
++	struct clk *spi_clk;
++	struct clk *nor_clk;
++};
++
++static void mt8173_nor_set_read_mode(struct mt8173_nor *mt8173_nor)
++{
++	struct spi_nor *nor = &mt8173_nor->nor;
++
++	switch (nor->flash_read) {
++	case SPI_NOR_FAST:
++		writeb(SPINOR_OP_READ_FAST, mt8173_nor->base +
++		       MTK_NOR_PRGDATA3_REG);
++		writeb(MTK_NOR_FAST_READ, mt8173_nor->base +
++		       MTK_NOR_CFG1_REG);
++		break;
++	case SPI_NOR_DUAL:
++		writeb(SPINOR_OP_READ_1_1_2, mt8173_nor->base +
++		       MTK_NOR_PRGDATA3_REG);
++		writeb(MTK_NOR_DUAL_READ_EN, mt8173_nor->base +
++		       MTK_NOR_DUAL_REG);
++		break;
++	case SPI_NOR_QUAD:
++		writeb(SPINOR_OP_READ_1_1_4, mt8173_nor->base +
++		       MTK_NOR_PRGDATA3_REG);
++		writeb(MTK_NOR_QUAD_READ_EN, mt8173_nor->base +
++		       MTK_NOR_DUAL_REG);
++		break;
++	default:
++		writeb(SPINOR_OP_READ, mt8173_nor->base +
++		       MTK_NOR_PRGDATA3_REG);
++		writeb(MTK_NOR_DUAL_DISABLE, mt8173_nor->base +
++		       MTK_NOR_DUAL_REG);
++		break;
++	}
++}
++
++static int mt8173_nor_execute_cmd(struct mt8173_nor *mt8173_nor, u8 cmdval)
++{
++	int reg;
++	u8 val = cmdval & 0x1f;
++
++	writeb(cmdval, mt8173_nor->base + MTK_NOR_CMD_REG);
++	return readl_poll_timeout(mt8173_nor->base + MTK_NOR_CMD_REG, reg,
++				  !(reg & val), 100, 10000);
++}
++
++static int mt8173_nor_set_cmd(struct mt8173_nor *mt8173_nor, int addr, u8 len,
++			      u8 op)
++{
++	writeb(op, mt8173_nor->base + MTK_NOR_PRGDATA5_REG);
++	/*  send the address to nor flash
++	 *  MTK_NOR_PRGDATA5_REG is shifted first
++	 */
++	if (len > 8) {
++		writeb((addr >> 16), mt8173_nor->base + MTK_NOR_PRGDATA4_REG);
++		writeb((addr >> 8), mt8173_nor->base + MTK_NOR_PRGDATA3_REG);
++		writeb((addr), mt8173_nor->base + MTK_NOR_PRGDATA2_REG);
++	}
++	writeb(len, mt8173_nor->base + MTK_NOR_CNT_REG);
++	return mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_PRG_CMD);
++}
++
++/* cmd1 sent to nor flash, cmd2 write to nor controller */
++static int mt8173_nor_set_para(struct mt8173_nor *mt8173_nor, int cmd1,
++			       int cmd2)
++{
++	int ret;
++
++	ret = mt8173_nor_set_cmd(mt8173_nor, 0, 8, SPINOR_OP_WREN);
++	if (ret < 0)
++		return ret;
++
++	writeb(cmd1, mt8173_nor->base + MTK_NOR_PRGDATA5_REG);
++	writeb(8, mt8173_nor->base + MTK_NOR_CNT_REG);
++	return mt8173_nor_execute_cmd(mt8173_nor, cmd2);
++}
++
++static int mt8173_nor_write_buffer_enable(struct mt8173_nor *mt8173_nor)
++{
++	u8 reg;
++
++	/* the bit0 of MTK_NOR_CFG2_REG is pre-fetch buffer
++	 * 0: pre-fetch buffer use for read
++	 * 1: pre-fetch buffer use for page program
++	 */
++	writel(MTK_NOR_WR_BUF_ENABLE, mt8173_nor->base + MTK_NOR_CFG2_REG);
++	return readb_poll_timeout(mt8173_nor->base + MTK_NOR_CFG2_REG, reg,
++				  0x01 == (reg & 0x01), 100, 10000);
++}
++
++static int mt8173_nor_write_buffer_disable(struct mt8173_nor *mt8173_nor)
++{
++	u8 reg;
++
++	writel(MTK_NOR_WR_BUF_DISABLE, mt8173_nor->base + MTK_NOR_CFG2_REG);
++	return readb_poll_timeout(mt8173_nor->base + MTK_NOR_CFG2_REG, reg,
++				  MTK_NOR_WR_BUF_DISABLE == (reg & 0x1), 100,
++				  10000);
++}
++
++static int mt8173_nor_erase_sector(struct spi_nor *nor, loff_t offset)
++{
++	int ret;
++	struct mt8173_nor *mt8173_nor = nor->priv;
++
++	ret = mt8173_nor_set_cmd(mt8173_nor, 0, 8, SPINOR_OP_WREN);
++	if (ret < 0)
++		return ret;
++
++	return mt8173_nor_set_cmd(mt8173_nor, (int)offset, 32, SPINOR_OP_BE_4K);
++}
++
++static int mt8173_nor_read(struct spi_nor *nor, loff_t from, size_t length,
++			   size_t *retlen, u_char *buffer)
++{
++	int i, ret;
++	int addr = (int)from;
++	u8 *buf = (u8 *)buffer;
++	struct mt8173_nor *mt8173_nor = nor->priv;
++
++	/* set mode for fast read mode ,dual mode or quad mode */
++	mt8173_nor_set_read_mode(mt8173_nor);
++	writeb((addr >> 24), mt8173_nor->base + MTK_NOR_RADR3_REG);
++	writeb((addr >> 16), mt8173_nor->base + MTK_NOR_RADR2_REG);
++	writeb((addr >> 8), mt8173_nor->base + MTK_NOR_RADR1_REG);
++	writeb(addr, mt8173_nor->base + MTK_NOR_RADR0_REG);
++
++	for (i = 0; i < length; i++, (*retlen)++) {
++		ret = mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_PIO_READ_CMD);
++		if (ret < 0)
++			return ret;
++		buf[i] = readb(mt8173_nor->base + MTK_NOR_RDATA_REG);
++	}
++	return 0;
++}
++
++static int mt8173_nor_write_single_byte(struct mt8173_nor *mt8173_nor,
++					int addr, int length, u8 *data)
++{
++	int i, ret;
++
++	writeb((addr >> 24), mt8173_nor->base + MTK_NOR_RADR3_REG);
++	writeb((addr >> 16), mt8173_nor->base + MTK_NOR_RADR2_REG);
++	writeb((addr >> 8), mt8173_nor->base + MTK_NOR_RADR1_REG);
++	writeb(addr, mt8173_nor->base + MTK_NOR_RADR0_REG);
++
++	for (i = 0; i < length; i++) {
++		ret = mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_PIO_WR_CMD);
++		if (ret < 0)
++			return ret;
++		writeb(*data++, mt8173_nor->base + MTK_NOR_WDATA_REG);
++	}
++	return 0;
++}
++
++static int mt8173_nor_write_buffer(struct mt8173_nor *mt8173_nor, int addr,
++				   const u8 *buf)
++{
++	int i, bufidx, data;
++
++	writeb((addr >> 24), mt8173_nor->base + MTK_NOR_RADR3_REG);
++	writeb((addr >> 16), mt8173_nor->base + MTK_NOR_RADR2_REG);
++	writeb((addr >> 8), mt8173_nor->base + MTK_NOR_RADR1_REG);
++	writeb(addr, mt8173_nor->base + MTK_NOR_RADR0_REG);
++
++	bufidx = 0;
++	for (i = 0; i < SFLASH_WRBUF_SIZE; i += 4) {
++		data = buf[bufidx + 3]<<24 | buf[bufidx + 2]<<16 |
++		       buf[bufidx + 1]<<8 | buf[bufidx];
++		bufidx += 4;
++		writel(data, mt8173_nor->base + MTK_NOR_PP_DATA_REG);
++	}
++	return mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_WR_CMD);
++}
++
++static void mt8173_nor_write(struct spi_nor *nor, loff_t to, size_t len,
++			     size_t *retlen, const u_char *buf)
++{
++	int ret;
++	struct mt8173_nor *mt8173_nor = nor->priv;
++
++	ret = mt8173_nor_write_buffer_enable(mt8173_nor);
++	if (ret < 0)
++		dev_warn(mt8173_nor->dev, "write buffer enable failed!\n");
++
++	while (len >= SFLASH_WRBUF_SIZE) {
++		ret = mt8173_nor_write_buffer(mt8173_nor, to, buf);
++		if (ret < 0)
++			dev_warn(mt8173_nor->dev, "write buffer failed!\n");
++		len -= SFLASH_WRBUF_SIZE;
++		to += SFLASH_WRBUF_SIZE;
++		buf += SFLASH_WRBUF_SIZE;
++		(*retlen) += SFLASH_WRBUF_SIZE;
++	}
++	ret = mt8173_nor_write_buffer_disable(mt8173_nor);
++	if (ret < 0)
++		dev_warn(mt8173_nor->dev, "write buffer disable failed!\n");
++
++	if (len) {
++		ret = mt8173_nor_write_single_byte(mt8173_nor, to, (int)len,
++						   (u8 *)buf);
++		if (ret < 0)
++			dev_warn(mt8173_nor->dev, "write single byte failed!\n");
++		(*retlen) += len;
++	}
++}
++
++static int mt8173_nor_read_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
++{
++	int ret;
++	struct mt8173_nor *mt8173_nor = nor->priv;
++
++	/* mtk nor controller doesn't supoort SPINOR_OP_RDCR */
++	switch (opcode) {
++	case SPINOR_OP_RDID:
++		/* read JEDEC ID need 4 bytes commands */
++		ret = mt8173_nor_set_cmd(mt8173_nor, 0, 32, SPINOR_OP_RDID);
++		if (ret < 0)
++			return ret;
++
++		/* mtk nor flash controller only support 3 bytes IDs */
++		buf[2] = readb(mt8173_nor->base + MTK_NOR_SHREG0_REG);
++		buf[1] = readb(mt8173_nor->base + MTK_NOR_SHREG1_REG);
++		buf[0] = readb(mt8173_nor->base + MTK_NOR_SHREG2_REG);
++		break;
++	case SPINOR_OP_RDSR:
++		ret = mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_RDSR_CMD);
++		if (ret < 0)
++			return ret;
++		*buf = readb(mt8173_nor->base + MTK_NOR_RDSR_REG);
++		break;
++	default:
++		ret = -EINVAL;
++		break;
++	}
++	return ret;
++}
++
++static int mt8173_nor_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf,
++				int len)
++{
++	int ret;
++	struct mt8173_nor *mt8173_nor = nor->priv;
++
++	switch (opcode) {
++	case SPINOR_OP_WRSR:
++		ret = mt8173_nor_set_para(mt8173_nor, *buf,
++					  MTK_NOR_WRSR_CMD);
++		break;
++	case SPINOR_OP_CHIP_ERASE:
++		ret = mt8173_nor_set_para(mt8173_nor, opcode,
++					  MTK_NOR_PRG_CMD);
++		break;
++	case SPINOR_OP_WREN:
++		ret = mt8173_nor_set_cmd(mt8173_nor, 0, 8, opcode);
++		if (ret)
++			dev_warn(mt8173_nor->dev, "set write enable fail!\n");
++		break;
++	case SPINOR_OP_WRDI:
++		ret = mt8173_nor_set_cmd(mt8173_nor, 0, 8, opcode);
++		if (ret)
++			dev_warn(mt8173_nor->dev, "set write disable fail!\n");
++		break;
++	default:
++		dev_warn(mt8173_nor->dev, "doesn't support cmd %d\n", opcode);
++		ret = -EINVAL;
++		break;
++	}
++	return ret;
++}
++
++static int __init mtk_nor_init(struct mt8173_nor *mt8173_nor,
++			       struct mtd_part_parser_data *ppdata)
++{
++	int ret;
++	struct spi_nor *nor;
++	struct mtd_info *mtd;
++
++	writel(MTK_NOR_ENABLE_SF_CMD, mt8173_nor->base + MTK_NOR_WRPROT_REG);
++	nor = &mt8173_nor->nor;
++	mtd = &mt8173_nor->mtd;
++	nor->mtd = *mtd;
++	nor->dev = mt8173_nor->dev;
++	nor->priv = mt8173_nor;
++	mtd->priv = nor;
++
++	/* fill the hooks to spi nor */
++	nor->read = mt8173_nor_read;
++	nor->read_reg = mt8173_nor_read_reg;
++	nor->write = mt8173_nor_write;
++	nor->write_reg = mt8173_nor_write_reg;
++	nor->erase = mt8173_nor_erase_sector;
++	nor->mtd.owner = THIS_MODULE;
++	nor->mtd.name = "mtk_nor";
++	/* initialized with NULL */
++	ret = spi_nor_scan(nor, NULL, SPI_NOR_DUAL);
++	if (ret)
++		return ret;
++
++	dev_dbg(mt8173_nor->dev, "mtd->size :0x%llx!\n", mtd->size);
++	return  mtd_device_parse_register(&nor->mtd, NULL, ppdata, NULL, 0);
++}
++
++static int mtk_nor_drv_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct mtd_part_parser_data ppdata;
++	struct resource *res;
++	int ret;
++	struct mt8173_nor *mt8173_nor;
++
++	if (!pdev->dev.of_node) {
++		dev_err(&pdev->dev, "No DT found\n");
++		return -EINVAL;
++	}
++
++	mt8173_nor = devm_kzalloc(&pdev->dev, sizeof(*mt8173_nor), GFP_KERNEL);
++	if (!mt8173_nor)
++		return -ENOMEM;
++	platform_set_drvdata(pdev, mt8173_nor);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	mt8173_nor->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(mt8173_nor->base))
++		return PTR_ERR(mt8173_nor->base);
++
++	mt8173_nor->spi_clk = devm_clk_get(&pdev->dev, "spi");
++	if (IS_ERR(mt8173_nor->spi_clk)) {
++		ret = PTR_ERR(mt8173_nor->spi_clk);
++		goto nor_free;
++	}
++
++	mt8173_nor->nor_clk = devm_clk_get(&pdev->dev, "sf");
++	if (IS_ERR(mt8173_nor->nor_clk)) {
++		ret = PTR_ERR(mt8173_nor->nor_clk);
++		goto nor_free;
++	}
++
++	mt8173_nor->dev = &pdev->dev;
++	clk_prepare_enable(mt8173_nor->spi_clk);
++	clk_prepare_enable(mt8173_nor->nor_clk);
++
++	ppdata.of_node = np;
++	ret = mtk_nor_init(mt8173_nor, &ppdata);
++
++nor_free:
++	return ret;
++}
++
++static int mtk_nor_drv_remove(struct platform_device *pdev)
++{
++	struct mt8173_nor *mt8173_nor = platform_get_drvdata(pdev);
++
++	mtd_device_unregister(&mt8173_nor->mtd);
++	clk_disable_unprepare(mt8173_nor->spi_clk);
++	clk_disable_unprepare(mt8173_nor->nor_clk);
++	return 0;
++}
++
++static const struct of_device_id mtk_nor_of_ids[] = {
++	{ .compatible = "mediatek,mt8173-nor"},
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, mtk_nor_of_ids);
++
++static struct platform_driver mtk_nor_driver = {
++	.probe = mtk_nor_drv_probe,
++	.remove = mtk_nor_drv_remove,
++	.driver = {
++		.name = "mtk-nor",
++		.of_match_table = mtk_nor_of_ids,
++	},
++};
++
++module_platform_driver(mtk_nor_driver);
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("MediaTek SPI NOR Flash Driver");
+-- 
+1.8.1.1.dirty
