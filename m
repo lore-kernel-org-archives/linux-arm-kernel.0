@@ -1,64 +1,124 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 13 Oct 2015 09:56:37 -0400
-Subject: [PATCH v2 0/4] soc: ti: knav_qmss: enable accumulator queue
- support
-In-Reply-To: <1444679211-823-1-git-send-email-m-karicheri2@ti.com>
-References: <1444679211-823-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <561D0D95.1040401@ti.com>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Tue, 13 Oct 2015 16:00:45 +0200
+Subject: [PATCH v2 1/4] dt-bindings: Document the STM32 DMA bindings
+In-Reply-To: <1444744848-720-1-git-send-email-cedric.madianga@gmail.com>
+References: <1444744848-720-1-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <1444744848-720-2-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2015 03:46 PM, Murali Karicheri wrote:
-> This patch series enable accumulator queue support for K2 SoCs. Accumulator
-> queues are a type of qmss queue that is monitored by the PDSP firmware and
-> accumulated. Host is interrupted by PDSP firmware when packets become
-> available in a ring buffer shared between the host and PDSP.
->
-> There was an issue raised when merging the original patch set at
->   (1) https://lkml.org/lkml/2015/9/4/681
-> 	[PATCH v1 1/2] soc: ti: display firmware file name as part of boot log
->   (2) https://lkml.org/lkml/2015/9/4/680
-> 	[PATCH v1 2/2] ARM: dts: keystone: enable accumulator channels
->
-> This series fixes the issues raised against above patch set. Key issues
-> addressed.
->
-> 	- Remove the firmware filename from DT and add it to the driver.
-> 	  Use a name ks2_qmss_pdsp_acc48.bin. The idea is this can be a
-> 	  soft link pointing to the real firmware file in file system.
->
-> 	- Move the description of the driver design from DT document to one
-> 	  under Documentation/arm/keystone/knav-qmss.txt. Update the this
-> 	  document with location of acc firmware available under
-> 	  linux-firmware.git.
->
-> Additionally added accumulator queue support optional so that lack of
-> firmware in the file system will not cause other queue types not available
-> due to driver probe failure.
->
-> Murali Karicheri (4):
->    Documentation: dt: soc: move driver description to a separate document
->    soc: ti: add firmware file name as part of the driver
->    ARM: dts: keystone: enable accumulator channels
->    soc: ti: qmss: make acc queue support optional in the driver
->
->   Documentation/arm/keystone/knav-qmss.txt           | 56 ++++++++++++++++++
->   .../bindings/soc/ti/keystone-navigator-qmss.txt    | 21 ++-----
->   arch/arm/boot/dts/k2e-netcp.dtsi                   | 23 ++++++++
->   arch/arm/boot/dts/k2hk-netcp.dtsi                  | 24 ++++++++
->   arch/arm/boot/dts/k2l-netcp.dtsi                   | 23 ++++++++
->   drivers/soc/ti/knav_qmss.h                         |  3 +-
->   drivers/soc/ti/knav_qmss_acc.c                     | 10 +++-
->   drivers/soc/ti/knav_qmss_queue.c                   | 67 ++++++++++++++--------
->   8 files changed, 183 insertions(+), 44 deletions(-)
->   create mode 100644 Documentation/arm/keystone/knav-qmss.txt
->
-Santosh, Arnd,
+This patch adds documentation of device tree bindings for the STM32 dma
+controller.
 
-Could you please review and let me know if there is any comment. If 
-looks good, could you please merge to v4.4 next branch?
+Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+---
+ .../devicetree/bindings/dma/stm32-dma.txt          | 98 ++++++++++++++++++++++
+ 1 file changed, 98 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/stm32-dma.txt
 
-Murali
+diff --git a/Documentation/devicetree/bindings/dma/stm32-dma.txt b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+new file mode 100644
+index 0000000..9ce0d49
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+@@ -0,0 +1,98 @@
++* STMicroelectronics STM32 DMA controller
++
++The STM32 DMA is a general-purpose direct memory access controller capable of
++supporting 8 independent DMA channels. Each channel can have up to 8 requests.
++
++Required properties:
++- compatible: Should be "st,stm32-dma"
++- reg: Should contain DMA registers location and length. This should include
++  all of the per-channel registers.
++- interrupts: Should contain all of the per-channel DMA interrupts.
++- clocks: Should contain the input clock of the DMA instance.
++- #dma-cells : Must be <4>. See DMA client paragraph for more details.
++
++Optional properties:
++- resets: Reference to a reset controller asserting the DMA controller
++- st,mem2mem: boolean; if defined, it indicates that the controller supports
++  memory-to-memory transfer
++
++Example:
++
++	dma2: dma-controller at 40026400 {
++		compatible = "st,stm32-dma";
++		reg = <0x40026400 0x400>;
++		interrupts = <56>,
++			     <57>,
++			     <58>,
++			     <59>,
++			     <60>,
++			     <68>,
++			     <69>,
++			     <70>;
++		clocks = <&clk_hclk>;
++		#dma-cells = <4>;
++		st,mem2mem;
++		resets = <&rcc 150>;
++	};
++
++* DMA client
++
++Required properties:
++- dmas: Comma separated list of dma channel requests
++- dma-names: Names of the aforementioned requested channels
++
++Each dmas request consists of 5 cells:
++1. A phandle pointing to the STM32 DMA controller
++2. The channel id
++3. The request line number
++4. A 32bit mask specifying the DMA channel configuration
++ -bit 1: Direct Mode Error Interrupt
++	0x0: disabled
++	0x1: enabled
++ -bit 2: Transfer Error Interrupt
++	0x0: disabled
++	0x1: enabled
++ -bit 3: Half Transfer Mode Error Interrupt
++	0x0: disabled
++	0x1: enabled
++ -bit 4: Transfer Complete Interrupt
++	0x0: disabled
++	0x1: enabled
++ -bit 9: Peripheral Increment Address
++	0x0: no address increment between transfers
++	0x1: increment address between transfers
++ -bit 10: Memory Increment Address
++	0x0: no address increment between transfers
++	0x1: increment address between transfers
++ -bit 15: Peripheral Increment Offset Size
++	0x0: offset size is linked to the peripheral bus width
++	0x1: offset size is fixed to 4 (32-bit alignment)
++ -bit 16-17: Priority level
++	0x0: low
++	0x1: medium
++	0x2: high
++	0x3: very high
++5. A 32bit mask specifying the DMA FIFO configuration
++ -bit 0-1: Fifo threshold
++	0x0: 1/4 full FIFO
++	0x1: 1/2 full FIFO
++	0x2: 3/4 full FIFO
++	0x3:full FIFO
++ -bit 2: Direct mode
++	0x0: enabled
++	0x1: disabled
++ -bit 7: FIFO Error Interrupt
++	0x0: disabled
++	0x1: enabled
++
++Example:
++
++	usart1: serial at 40011000 {
++		compatible = "st,stm32-usart", "st,stm32-uart";
++		reg = <0x40011000 0x400>;
++		interrupts = <37>;
++		clocks = <&clk_pclk2>;
++		dmas = <&dma2 2 4 0x20610 0x3>,
++		       <&dma2 7 5 0x20610 0x3>;
++		dma-names = "rx", "tx";
++	};
 -- 
-Murali Karicheri
-Linux Kernel, Keystone
+1.9.1
