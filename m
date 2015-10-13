@@ -1,49 +1,68 @@
-From: lftan@altera.com (Ley Foon Tan)
-Date: Tue, 13 Oct 2015 15:47:41 +0800
-Subject: [PATCH v8 3/6] pci:host: Add Altera PCIe host controller driver
-In-Reply-To: <7064179.1W3LTfFPxP@wuerfel>
-References: <1444297394-3122-1-git-send-email-lftan@altera.com>
- <CAFiDJ58oMa6rgQe_STCiWRpdL+P22BN1=Nin_+QnLXC9RGiSzQ@mail.gmail.com>
- <20151009231540.GE16112@localhost> <7064179.1W3LTfFPxP@wuerfel>
-Message-ID: <CAFiDJ59=PaZ_MaHU_AZp756c-DC_BR7x6=oACntqD=jw0s6XBQ@mail.gmail.com>
+From: ijc@debian.org (Ian Campbell)
+Date: Tue, 13 Oct 2015 08:51:37 +0100
+Subject: I/O issues with writing to mtdblock devices on kirkwood
+In-Reply-To: <20151012162107.GB3242@lunn.ch>
+References: <1440159857.19360.50.camel@debian.org>
+ <20150905210846.GF6040@lunn.ch>
+ <CAKzmTe0Bq8itvKoOTwZ+ZjY5pTqFYWt0-ihO4jn0qew_NYGhFg@mail.gmail.com>
+ <20151011153548.GA9808@lunn.ch>
+ <CAKzmTe2f1FdjM5VZ-ju+ZQ4z0Dxk4x1ywJCfi1OX5eSaCr=51w@mail.gmail.com>
+ <461C493B-AD82-4044-A87F-EC22BBFB7011@gmail.com>
+ <20151012162107.GB3242@lunn.ch>
+Message-ID: <1444722697.16876.55.camel@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 8:03 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Friday 09 October 2015 18:15:40 Bjorn Helgaas wrote:
-> >
-> > I don't know if this should be a kernel taint, a simple warning in
-> > dmesg, or what.  I guess the tainting mechanism is probably too
-> > general-purpose for this, and add_taint() doesn't give any dmesg
-> > indication.  We wouldn't see the taint unless the problem actually
-> > caused an oops or panic.  In this case, I think I want a clue in dmesg
-> > so we have a chance of seeing it even if there is no oops.  So
-> > probably something like a dev_warn("non-compliant config accesses")
-> > would work.
-> >
-> > You really should double-check with the hardware guys, because it's
-> > pretty obvious that the PCI spec requires 1- and 2-byte config
-> > accesses to work correctly.  For example, if you read/modify/write to
-> > update PCI_COMMAND, you will inadvertently clear the RW1C bits in
-> > PCI_STATUS.
->
-> Would it help to require a DT property here that flags the device
-> as having a broken config space?
->
-> Then we could implement both in the driver, and only use the
-> RMW based implementation if the firmware describes the device
-> as "altera,broken-pci-config-space".
->
+On Mon, 2015-10-12 at 18:21 +0200, Andrew Lunn wrote:
+> > I've been on backports for some time. AFAIR the problems started
+> > with the change to dtb/dts.
+> 
+> Which kernel version? Can you give me a kernel version when it was
+> good and a version when it was bad?
+> 
+> For a few kernel versions it was possible to boot both DT and the old
+> setup file. It would be great to confirm it was the swap to DT, and
+> not some other kernel change at about the same time.
+> 
+> My gut feeling is that the change to DT is not the issue. But this is
+> all speculation at the moment, we need some hard evidence.
 
-I have checked the PCI/TLP specification, the address needs to be
-4-byte aligned. But, we can use "byte enable" field to update specific
-bytes.
-For example, if byte enable is 0x3 (0011b), that mean it only update
-lower 2 bytes. By doing this, we can resolve the RW1C issue here.
-I will update the driver with this in next revision.
+IIRC someone mentioned that the SATA driver which got used changed with
+boardfile vs DT? Not sure if that is true though.
 
-Thanks for reviewing.
+If anyone would like to perform the suggested experiments then flash
+-kernel in Debian currently appends a DTB for Linux >= v3.17-rc1.
+However this can be adjusted by editing /etc/flash-kernel/db and
+adding:
 
-Regards
-Ley Foon
+Machine: <...>
+DTB-Append-From: v3.16
+
+Where the Machine stanza is the one for your platform, check
+/usr/share/flash-kernel/db/all.db. You may need to repeat the Machine
+stanza to cope with board vs. dtb mode names, e.g.
+
+    Machine: QNAP TS-41x
+    Machine: QNAP TS419 family
+    DTB-Append-From: 3.17-rc1
+
+One name is from /proc/device-tree/model under DTB the other is
+/proc/cpuinfo:Hardware under board file. Under DTB the
+/proc/cpuinfo:Hardware field is generic and not useful here.
+
+You can also do just DTB-Append: Yes.
+
+In any case having fiddled with the db you need to rerun flash-kernel
+to make it take affect.
+
+I think the most profitable first test would be to boot the v3.16
+Jessie kernel in both board (default in Jessie) and DTB mode (by
+modifying /etc/flash-kernel/db as above) and see if the issue
+reproduces in both modes.
+
+Older kernel binaries can be found at 
+http://snapshot.debian.org/package/linux/, I'm not sure how far back it
+is safe to go with Debian's binaries while appending a DTB, I'd
+recommend having a serial console available if you are going to try.
+
+Ian.
