@@ -1,219 +1,54 @@
-From: drew.richardson@arm.com (Drew Richardson)
-Date: Tue, 13 Oct 2015 08:36:45 -0700
-Subject: [PATCH v5 2/2] arm: perf: Add event descriptions
-In-Reply-To: <20151012181037.GA16013@dreric01-gentoo.localdomain>
-References: <20151007182735.GA18706@dreric01-gentoo.localdomain>
- <20151009101338.GH26278@arm.com>
- <20151009165330.GA22415@dreric01-gentoo.localdomain>
- <20151012143025.GG16124@arm.com>
- <20151012181037.GA16013@dreric01-gentoo.localdomain>
-Message-ID: <20151013153644.GC18121@dreric01-gentoo.localdomain>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 13 Oct 2015 11:37:50 -0400
+Subject: [PATCH v3 1/7] arm64: ftrace: adjust callsite addresses
+ examined by stack tracer
+In-Reply-To: <1444298504-10392-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
+ <1444298504-10392-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20151013113750.0fdecd33@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add additional information about the ARM architected hardware events
-to make counters self describing. This makes the hardware PMUs easier
-to use as perf list contains possible events instead of users having
-to refer to documentation like the ARM TRMs.
+On Thu,  8 Oct 2015 19:01:38 +0900
+AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
 
-Signed-off-by: Drew Richardson <drew.richardson@arm.com>
----
- arch/arm/kernel/perf_event_v7.c | 121 ++++++++++++++++++++++++++++++++++++++++
- drivers/perf/arm_pmu.c          |   1 +
- 2 files changed, 122 insertions(+)
+>  extern int stack_tracer_enabled;
+>  int
+>  stack_trace_sysctl(struct ctl_table *table, int write,
+> diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
+> index b746399..30521ea 100644
+> --- a/kernel/trace/trace_stack.c
+> +++ b/kernel/trace/trace_stack.c
+> @@ -105,7 +105,7 @@ check_stack(unsigned long ip, unsigned long *stack)
+>  
+>  	/* Skip over the overhead of the stack tracer itself */
+>  	for (i = 0; i < max_stack_trace.nr_entries; i++) {
+> -		if (stack_dump_trace[i] == ip)
+> +		if ((stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET) == ip)
+>  			break;
+>  	}
+>  
+> @@ -133,7 +133,8 @@ check_stack(unsigned long ip, unsigned long *stack)
+>  		for (; p < top && i < max_stack_trace.nr_entries; p++) {
+>  			if (stack_dump_trace[i] == ULONG_MAX)
+>  				break;
+> -			if (*p == stack_dump_trace[i]) {
+> +			if (*p == (stack_dump_trace[i]
+> +					+ FTRACE_STACK_FRAME_OFFSET)) {
 
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index dc979724e3bb..970e1364e484 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -531,6 +531,120 @@ static const unsigned scorpion_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)] = ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
- };
- 
-+#define ARMV7_EVENT_ATTR_RESOLVE(m) #m
-+#define ARMV7_EVENT_ATTR(name, config) \
-+	PMU_EVENT_ATTR_STRING(name, armv7_event_attr_##name, \
-+			      "event=" ARMV7_EVENT_ATTR_RESOLVE(config))
-+
-+ARMV7_EVENT_ATTR(sw_incr, ARMV7_PERFCTR_PMNC_SW_INCR);
-+ARMV7_EVENT_ATTR(l1i_cache_refill, ARMV7_PERFCTR_L1_ICACHE_REFILL);
-+ARMV7_EVENT_ATTR(l1i_tlb_refill, ARMV7_PERFCTR_ITLB_REFILL);
-+ARMV7_EVENT_ATTR(l1d_cache_refill, ARMV7_PERFCTR_L1_DCACHE_REFILL);
-+ARMV7_EVENT_ATTR(l1d_cache, ARMV7_PERFCTR_L1_DCACHE_ACCESS);
-+ARMV7_EVENT_ATTR(l1d_tlb_refill, ARMV7_PERFCTR_DTLB_REFILL);
-+ARMV7_EVENT_ATTR(ld_retired, ARMV7_PERFCTR_MEM_READ);
-+ARMV7_EVENT_ATTR(st_retired, ARMV7_PERFCTR_MEM_WRITE);
-+ARMV7_EVENT_ATTR(inst_retired, ARMV7_PERFCTR_INSTR_EXECUTED);
-+ARMV7_EVENT_ATTR(exc_taken, ARMV7_PERFCTR_EXC_TAKEN);
-+ARMV7_EVENT_ATTR(exc_return, ARMV7_PERFCTR_EXC_EXECUTED);
-+ARMV7_EVENT_ATTR(cid_write_retired, ARMV7_PERFCTR_CID_WRITE);
-+ARMV7_EVENT_ATTR(pc_write_retired, ARMV7_PERFCTR_PC_WRITE);
-+ARMV7_EVENT_ATTR(br_immed_retired, ARMV7_PERFCTR_PC_IMM_BRANCH);
-+ARMV7_EVENT_ATTR(br_return_retired, ARMV7_PERFCTR_PC_PROC_RETURN);
-+ARMV7_EVENT_ATTR(unaligned_ldst_retired, ARMV7_PERFCTR_MEM_UNALIGNED_ACCESS);
-+ARMV7_EVENT_ATTR(br_mis_pred, ARMV7_PERFCTR_PC_BRANCH_MIS_PRED);
-+ARMV7_EVENT_ATTR(cpu_cycles, ARMV7_PERFCTR_CLOCK_CYCLES);
-+ARMV7_EVENT_ATTR(br_pred, ARMV7_PERFCTR_PC_BRANCH_PRED);
-+
-+static struct attribute *armv7_pmuv1_event_attrs[] = {
-+	&armv7_event_attr_sw_incr.attr.attr,
-+	&armv7_event_attr_l1i_cache_refill.attr.attr,
-+	&armv7_event_attr_l1i_tlb_refill.attr.attr,
-+	&armv7_event_attr_l1d_cache_refill.attr.attr,
-+	&armv7_event_attr_l1d_cache.attr.attr,
-+	&armv7_event_attr_l1d_tlb_refill.attr.attr,
-+	&armv7_event_attr_ld_retired.attr.attr,
-+	&armv7_event_attr_st_retired.attr.attr,
-+	&armv7_event_attr_inst_retired.attr.attr,
-+	&armv7_event_attr_exc_taken.attr.attr,
-+	&armv7_event_attr_exc_return.attr.attr,
-+	&armv7_event_attr_cid_write_retired.attr.attr,
-+	&armv7_event_attr_pc_write_retired.attr.attr,
-+	&armv7_event_attr_br_immed_retired.attr.attr,
-+	&armv7_event_attr_br_return_retired.attr.attr,
-+	&armv7_event_attr_unaligned_ldst_retired.attr.attr,
-+	&armv7_event_attr_br_mis_pred.attr.attr,
-+	&armv7_event_attr_cpu_cycles.attr.attr,
-+	&armv7_event_attr_br_pred.attr.attr,
-+	NULL
-+};
-+
-+static struct attribute_group armv7_pmuv1_events_attr_group = {
-+	.name = "events",
-+	.attrs = armv7_pmuv1_event_attrs,
-+};
-+
-+static const struct attribute_group *armv7_pmuv1_attr_groups[] = {
-+	&armv7_pmuv1_events_attr_group,
-+	NULL
-+};
-+
-+ARMV7_EVENT_ATTR(mem_access, ARMV7_PERFCTR_MEM_ACCESS);
-+ARMV7_EVENT_ATTR(l1i_cache, ARMV7_PERFCTR_L1_ICACHE_ACCESS);
-+ARMV7_EVENT_ATTR(l1d_cache_wb, ARMV7_PERFCTR_L1_DCACHE_WB);
-+ARMV7_EVENT_ATTR(l2d_cache, ARMV7_PERFCTR_L2_CACHE_ACCESS);
-+ARMV7_EVENT_ATTR(l2d_cache_refill, ARMV7_PERFCTR_L2_CACHE_REFILL);
-+ARMV7_EVENT_ATTR(l2d_cache_wb, ARMV7_PERFCTR_L2_CACHE_WB);
-+ARMV7_EVENT_ATTR(bus_access, ARMV7_PERFCTR_BUS_ACCESS);
-+ARMV7_EVENT_ATTR(memory_error, ARMV7_PERFCTR_MEM_ERROR);
-+ARMV7_EVENT_ATTR(inst_spec, ARMV7_PERFCTR_INSTR_SPEC);
-+ARMV7_EVENT_ATTR(ttbr_write_retired, ARMV7_PERFCTR_TTBR_WRITE);
-+ARMV7_EVENT_ATTR(bus_cycles, ARMV7_PERFCTR_BUS_CYCLES);
-+
-+static struct attribute *armv7_pmuv2_event_attrs[] = {
-+	&armv7_event_attr_sw_incr.attr.attr,
-+	&armv7_event_attr_l1i_cache_refill.attr.attr,
-+	&armv7_event_attr_l1i_tlb_refill.attr.attr,
-+	&armv7_event_attr_l1d_cache_refill.attr.attr,
-+	&armv7_event_attr_l1d_cache.attr.attr,
-+	&armv7_event_attr_l1d_tlb_refill.attr.attr,
-+	&armv7_event_attr_ld_retired.attr.attr,
-+	&armv7_event_attr_st_retired.attr.attr,
-+	&armv7_event_attr_inst_retired.attr.attr,
-+	&armv7_event_attr_exc_taken.attr.attr,
-+	&armv7_event_attr_exc_return.attr.attr,
-+	&armv7_event_attr_cid_write_retired.attr.attr,
-+	&armv7_event_attr_pc_write_retired.attr.attr,
-+	&armv7_event_attr_br_immed_retired.attr.attr,
-+	&armv7_event_attr_br_return_retired.attr.attr,
-+	&armv7_event_attr_unaligned_ldst_retired.attr.attr,
-+	&armv7_event_attr_br_mis_pred.attr.attr,
-+	&armv7_event_attr_cpu_cycles.attr.attr,
-+	&armv7_event_attr_br_pred.attr.attr,
-+	&armv7_event_attr_mem_access.attr.attr,
-+	&armv7_event_attr_l1i_cache.attr.attr,
-+	&armv7_event_attr_l1d_cache_wb.attr.attr,
-+	&armv7_event_attr_l2d_cache.attr.attr,
-+	&armv7_event_attr_l2d_cache_refill.attr.attr,
-+	&armv7_event_attr_l2d_cache_wb.attr.attr,
-+	&armv7_event_attr_bus_access.attr.attr,
-+	&armv7_event_attr_memory_error.attr.attr,
-+	&armv7_event_attr_inst_spec.attr.attr,
-+	&armv7_event_attr_ttbr_write_retired.attr.attr,
-+	&armv7_event_attr_bus_cycles.attr.attr,
-+	NULL
-+};
-+
-+static struct attribute_group armv7_pmuv2_events_attr_group = {
-+	.name = "events",
-+	.attrs = armv7_pmuv2_event_attrs,
-+};
-+
-+static const struct attribute_group *armv7_pmuv2_attr_groups[] = {
-+	&armv7_pmuv2_events_attr_group,
-+	NULL
-+};
-+
- /*
-  * Perf Events' indices
-  */
-@@ -1069,6 +1183,7 @@ static int armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
- 	armv7pmu_init(cpu_pmu);
- 	cpu_pmu->name		= "armv7_cortex_a8";
- 	cpu_pmu->map_event	= armv7_a8_map_event;
-+	cpu_pmu->pmu.attr_groups = armv7_pmuv1_attr_groups;
- 	return armv7_probe_num_events(cpu_pmu);
- }
- 
-@@ -1077,6 +1192,7 @@ static int armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
- 	armv7pmu_init(cpu_pmu);
- 	cpu_pmu->name		= "armv7_cortex_a9";
- 	cpu_pmu->map_event	= armv7_a9_map_event;
-+	cpu_pmu->pmu.attr_groups = armv7_pmuv1_attr_groups;
- 	return armv7_probe_num_events(cpu_pmu);
- }
- 
-@@ -1085,6 +1201,7 @@ static int armv7_a5_pmu_init(struct arm_pmu *cpu_pmu)
- 	armv7pmu_init(cpu_pmu);
- 	cpu_pmu->name		= "armv7_cortex_a5";
- 	cpu_pmu->map_event	= armv7_a5_map_event;
-+	cpu_pmu->pmu.attr_groups = armv7_pmuv1_attr_groups;
- 	return armv7_probe_num_events(cpu_pmu);
- }
- 
-@@ -1094,6 +1211,7 @@ static int armv7_a15_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->name		= "armv7_cortex_a15";
- 	cpu_pmu->map_event	= armv7_a15_map_event;
- 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
-+	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
- 	return armv7_probe_num_events(cpu_pmu);
- }
- 
-@@ -1103,6 +1221,7 @@ static int armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->name		= "armv7_cortex_a7";
- 	cpu_pmu->map_event	= armv7_a7_map_event;
- 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
-+	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
- 	return armv7_probe_num_events(cpu_pmu);
- }
- 
-@@ -1112,6 +1231,7 @@ static int armv7_a12_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->name		= "armv7_cortex_a12";
- 	cpu_pmu->map_event	= armv7_a12_map_event;
- 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
-+	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
- 	return armv7_probe_num_events(cpu_pmu);
- }
- 
-@@ -1119,6 +1239,7 @@ static int armv7_a17_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	int ret = armv7_a12_pmu_init(cpu_pmu);
- 	cpu_pmu->name = "armv7_cortex_a17";
-+	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
- 	return ret;
- }
- 
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 2365a32a595e..e933d2dd71c0 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -548,6 +548,7 @@ static void armpmu_init(struct arm_pmu *armpmu)
- 		.stop		= armpmu_stop,
- 		.read		= armpmu_read,
- 		.filter_match	= armpmu_filter_match,
-+		.attr_groups	= armpmu->pmu.attr_groups,
- 	};
- }
- 
--- 
-2.1.4
+I'm fine with the patch, but this is one of those cases that I think
+the 80 column max limit produces uglier code than just going a little
+over.
+
+Or, we can add a helper variable in both locations:
+
+	addr = stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET;
+	if (*p == addr) {
+
+gcc should be smart enough to optimize out the addr variable.
+
+-- Steve
+
+>  				stack_dump_trace[x] = stack_dump_trace[i++];
+>  				this_size = stack_dump_index[x++] =
+>  					(top - p) * sizeof(unsigned long);
