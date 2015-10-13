@@ -1,33 +1,29 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 13 Oct 2015 10:37:41 +0200
-Subject: [PATCH 03/37] ARM: mvebu: Armada 388 GP: Remove unneeded
- regulator property
-In-Reply-To: <1444684386-17094-4-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <1444684386-17094-4-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <20151013103741.4ba34f90@free-electrons.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 13 Oct 2015 10:38:36 +0200
+Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Enable Maxim 77693 LED and
+ haptic drivers
+In-Reply-To: <1444699628-3774-4-git-send-email-k.kozlowski@samsung.com>
+References: <1444699628-3774-1-git-send-email-k.kozlowski@samsung.com>
+ <1444699628-3774-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <561CC30C.1080205@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laurent,
+Hello Krzysztof,
 
-On Tue, 13 Oct 2015 00:12:32 +0300, Laurent Pinchart wrote:
-> The enable-active-high regulator property only makes sense when an
-> enable GPIO is specified. Remove it.
+On 10/13/2015 03:27 AM, Krzysztof Kozlowski wrote:
+> Enable support for:
+> 1. Haptic motor driver on Trats2 board (Maxim 77693) and Note 4 (Maxim
+>    77843);
+> 2. LED driver on Trats2 board (Maxim 77693).
 > 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  arch/arm/boot/dts/armada-388-gp.dts | 2 --
->  1 file changed, 2 deletions(-)
 
-Thanks, but this patch is no longer needed, since commit
-b5999dcbdb96570c130772ac2055a4d34ec8b3d7 actually added the reference
-to the gpio controlling the regulator.
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
 Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
