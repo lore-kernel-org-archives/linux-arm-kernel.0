@@ -1,28 +1,48 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 13 Oct 2015 12:19:53 +0100
-Subject: [PATCH v2 6/9] dmaengine: st_fdma: Add fdma suspend and resume
- callbacks.
-In-Reply-To: <20151007112346.GC4810@vkoul-mobl.iind.intel.com>
-References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
- <1441980871-24475-7-git-send-email-peter.griffin@linaro.org>
- <20151007112346.GC4810@vkoul-mobl.iind.intel.com>
-Message-ID: <20151013111953.GD30342@griffinp-ThinkPad-X1-Carbon-2nd>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Tue, 13 Oct 2015 13:24:24 +0200
+Subject: [PATCH] ARM: at91/dt: fix "disabled" property on at91rm9200
+Message-ID: <1444735464-5447-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Fix instances of "disable" instead of "disabled"
+in the at91rm9200 dtsi.
 
-On Wed, 07 Oct 2015, Vinod Koul wrote:
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ arch/arm/boot/dts/at91rm9200.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> On Fri, Sep 11, 2015 at 03:14:28PM +0100, Peter Griffin wrote:
-> > +#define ST_FDMA_PM	(&st_fdma_pm)
-> > +#else
-> > +#define ST_FDMA_PM	NULL
-> > +#endif
-> Pls use PM helpers you dont need to do this
-> 
-Could you point me at the PM helpers you are referring to?
-
-regards,
-
-Peter.
+diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+index 60edd8baebb8..6587cd59a586 100644
+--- a/arch/arm/boot/dts/at91rm9200.dtsi
++++ b/arch/arm/boot/dts/at91rm9200.dtsi
+@@ -426,7 +426,7 @@
+ 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+ 				clocks = <&ssc0_clk>;
+ 				clock-names = "pclk";
+-				status = "disable";
++				status = "disabled";
+ 			};
+ 
+ 			ssc1: ssc at fffd4000 {
+@@ -437,7 +437,7 @@
+ 				pinctrl-0 = <&pinctrl_ssc1_tx &pinctrl_ssc1_rx>;
+ 				clocks = <&ssc1_clk>;
+ 				clock-names = "pclk";
+-				status = "disable";
++				status = "disabled";
+ 			};
+ 
+ 			ssc2: ssc at fffd8000 {
+@@ -448,7 +448,7 @@
+ 				pinctrl-0 = <&pinctrl_ssc2_tx &pinctrl_ssc2_rx>;
+ 				clocks = <&ssc2_clk>;
+ 				clock-names = "pclk";
+-				status = "disable";
++				status = "disabled";
+ 			};
+ 
+ 			macb0: ethernet at fffbc000 {
+-- 
+2.1.4
