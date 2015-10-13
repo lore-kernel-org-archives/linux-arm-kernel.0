@@ -1,29 +1,53 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 13 Oct 2015 10:38:36 +0200
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Enable Maxim 77693 LED and
- haptic drivers
-In-Reply-To: <1444699628-3774-4-git-send-email-k.kozlowski@samsung.com>
-References: <1444699628-3774-1-git-send-email-k.kozlowski@samsung.com>
- <1444699628-3774-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <561CC30C.1080205@osg.samsung.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 13 Oct 2015 09:43:45 +0100
+Subject: [Linaro-acpi] [PATCH v5 0/5] Provide better MADT subtable sanity
+ checks
+In-Reply-To: <32835486.gnkKHR2R1U@vostro.rjw.lan>
+References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
+ <561B5B7E.6080901@linaro.org> <561B8114.4060800@arm.com>
+ <32835486.gnkKHR2R1U@vostro.rjw.lan>
+Message-ID: <561CC441.6090003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
 
-On 10/13/2015 03:27 AM, Krzysztof Kozlowski wrote:
-> Enable support for:
-> 1. Haptic motor driver on Trats2 board (Maxim 77693) and Note 4 (Maxim
->    77843);
-> 2. LED driver on Trats2 board (Maxim 77693).
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+On 12/10/15 20:25, Rafael J. Wysocki wrote:
+> On Monday, October 12, 2015 10:44:52 AM Sudeep Holla wrote:
 
-Best regards,
+[...]
+
+>>
+>> Instead of just removing the check completely on x86, IMO restrict
+>> it to some newer/later version of ACPI so you can still force
+>> vendors to fix their ACPI tables at-least in future.
+>
+> No, we can't force vendors to fix their ACPI tables.  This is
+> completely unrealistic.
+>
+
+No, I was referring to the future platforms *only*
+
+> We simly need to deal with the bugs in the ACPI tables in the
+> kernel.
+>
+
+Yes sadly true for existing systems, but if we now place a check for
+ACPIv6.0 and above, we might avoid seeing such broken tables sometime in
+future once the kernel with this check in place is used for validation.
+
+>> It would be good to get such sanity check in the tools used to
+>> build those tables, but yes since such static tables can be built
+>> in many ways, its difficult to deal it in all those tools.
+>
+> As I said to Al, we need those checks in firmware test suites.
+> Having them in the kernel is OK too, but they should cause warnings
+> to be printed to the kernel log instead of causing the kernel to
+> panic.
+>
+
+Agreed
+
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Regards,
+Sudeep
