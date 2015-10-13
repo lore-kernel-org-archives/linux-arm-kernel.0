@@ -1,33 +1,126 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 Oct 2015 20:46:01 +0200
-Subject: [PATCH v2 1/5] ARM: dts: sun6i: hummingbird: Fix VDD-CPU and
- VDD-GPU regulator names
-In-Reply-To: <1444488540-11263-2-git-send-email-wens@csie.org>
-References: <1444488540-11263-1-git-send-email-wens@csie.org>
- <1444488540-11263-2-git-send-email-wens@csie.org>
-Message-ID: <20151013184601.GQ2278@lukather>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 13 Oct 2015 14:45:43 -0400
+Subject: [PATCH v3 3/3] soc: ti: qmss: make acc queue support optional in the
+ driver
+In-Reply-To: <1444761943-726-1-git-send-email-m-karicheri2@ti.com>
+References: <1444761943-726-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1444761943-726-4-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 10, 2015 at 10:48:56PM +0800, Chen-Yu Tsai wrote:
-> The VDD-CPU and VDD-GPU regulators were incorrectly swapped.
-> 
-> Fixes: bab03561224ba ("ARM: dts: sun6i: hummingbird: Add AXP221 regulator
->        nodes")
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+acc channels are available only if accumulator PDSP is loaded and
+running in the SoC. As this requires firmware and user may not have
+firmware in the file system, make the accumulator queue support
+available in qmss driver optional. To use accumulator queus user needs
+to add firmware to the file system and boot up kernel.
 
-Applied, thanks!
-Maxime
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ v3: no change from v2
+ v2: new patch
+ Documentation/arm/keystone/knav-qmss.txt |  6 ++++++
+ drivers/soc/ti/knav_qmss.h               |  2 ++
+ drivers/soc/ti/knav_qmss_acc.c           | 10 ++++++++--
+ drivers/soc/ti/knav_qmss_queue.c         | 20 +++++++++++++++-----
+ 4 files changed, 31 insertions(+), 7 deletions(-)
 
+diff --git a/Documentation/arm/keystone/knav-qmss.txt b/Documentation/arm/keystone/knav-qmss.txt
+index da34a5b..fcdb9fd 100644
+--- a/Documentation/arm/keystone/knav-qmss.txt
++++ b/Documentation/arm/keystone/knav-qmss.txt
+@@ -48,3 +48,9 @@ in the file system and boot up the kernel. User would see
+  "firmware file ks2_qmss_pdsp_acc48.bin downloaded for PDSP"
+ 
+ in the boot up log if loading of firmware to PDSP is successful.
++
++Use of accumulated queues requires the firmware image to be present in the
++file system. The driver doesn't acc queues to the supported queue range if
++PDSP is not running in the SoC. The API call fails if there is a queue open
++request to an acc queue and PDSP is not running. So make sure to copy firmware
++to file system before using these queue types.
+diff --git a/drivers/soc/ti/knav_qmss.h b/drivers/soc/ti/knav_qmss.h
+index c31b8d8..6ff936c 100644
+--- a/drivers/soc/ti/knav_qmss.h
++++ b/drivers/soc/ti/knav_qmss.h
+@@ -137,6 +137,8 @@ struct knav_pdsp_info {
+ 	u32 __iomem					*iram;
+ 	u32						id;
+ 	struct list_head				list;
++	bool						loaded;
++	bool						started;
+ };
+ 
+ struct knav_qmgr_info {
+diff --git a/drivers/soc/ti/knav_qmss_acc.c b/drivers/soc/ti/knav_qmss_acc.c
+index b98fe56..d2d48f2 100644
+--- a/drivers/soc/ti/knav_qmss_acc.c
++++ b/drivers/soc/ti/knav_qmss_acc.c
+@@ -486,8 +486,8 @@ struct knav_range_ops knav_acc_range_ops = {
+  * Return 0 on success or error
+  */
+ int knav_init_acc_range(struct knav_device *kdev,
+-				struct device_node *node,
+-				struct knav_range_info *range)
++			struct device_node *node,
++			struct knav_range_info *range)
+ {
+ 	struct knav_acc_channel *acc;
+ 	struct knav_pdsp_info *pdsp;
+@@ -530,6 +530,12 @@ int knav_init_acc_range(struct knav_device *kdev,
+ 		return -EINVAL;
+ 	}
+ 
++	if (!pdsp->started) {
++		dev_err(kdev->dev, "pdsp id %d not started for range %s\n",
++			info->pdsp_id, range->name);
++		return -ENODEV;
++	}
++
+ 	info->pdsp = pdsp;
+ 	channels = range->num_queues;
+ 	if (of_get_property(node, "multi-queue", NULL)) {
+diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+index 06d9de8..f3a0b6a 100644
+--- a/drivers/soc/ti/knav_qmss_queue.c
++++ b/drivers/soc/ti/knav_qmss_queue.c
+@@ -1504,6 +1504,8 @@ static int knav_queue_stop_pdsp(struct knav_device *kdev,
+ 		dev_err(kdev->dev, "timed out on pdsp %s stop\n", pdsp->name);
+ 		return ret;
+ 	}
++	pdsp->loaded = false;
++	pdsp->started = false;
+ 	return 0;
+ }
+ 
+@@ -1592,16 +1594,24 @@ static int knav_queue_start_pdsps(struct knav_device *kdev)
+ 	int ret;
+ 
+ 	knav_queue_stop_pdsps(kdev);
+-	/* now load them all */
++	/* now load them all. We return success even if pdsp
++	 * is not loaded as acc channels are optional on having
++	 * firmware availability in the system. We set the loaded
++	 * and stated flag and when initialize the acc range, check
++	 * it and init the range only if pdsp is started.
++	 */
+ 	for_each_pdsp(kdev, pdsp) {
+ 		ret = knav_queue_load_pdsp(kdev, pdsp);
+-		if (ret < 0)
+-			return ret;
++		if (!ret)
++			pdsp->loaded = true;
+ 	}
+ 
+ 	for_each_pdsp(kdev, pdsp) {
+-		ret = knav_queue_start_pdsp(kdev, pdsp);
+-		WARN_ON(ret);
++		if (pdsp->loaded) {
++			ret = knav_queue_start_pdsp(kdev, pdsp);
++			if (!ret)
++				pdsp->started = true;
++		}
+ 	}
+ 	return 0;
+ }
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151013/9334c4a3/attachment.sig>
+1.9.1
