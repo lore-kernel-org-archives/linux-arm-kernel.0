@@ -1,40 +1,75 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 13 Oct 2015 22:09:12 +0200
-Subject: [PATCH v4 07/26] ARM: pxa: magician: Fix HTC Magician pin mux
- definitions
-In-Reply-To: <5611DD36.5030108@tul.cz> (Petr Cvek's message of "Mon, 5 Oct
- 2015 04:15:18 +0200")
-References: <cover.1443472089.git.petr.cvek@tul.cz> <5609ADF5.9070003@tul.cz>
- <1443875409.4186.20.camel@gmail.com> <5611DD36.5030108@tul.cz>
-Message-ID: <87oag24jkn.fsf@belgarion.home>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Tue, 13 Oct 2015 22:20:27 +0200
+Subject: [PATCH] ARM: socfpga: dts: add fpga manager
+In-Reply-To: <alpine.DEB.2.02.1510131412500.3527@linux-builds1>
+References: <1444760900-1373-1-git-send-email-atull@opensource.altera.com>
+ <20151013185750.GB17155@pengutronix.de>
+ <alpine.DEB.2.02.1510131412500.3527@linux-builds1>
+Message-ID: <20151013202027.GC17155@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
+On Tue, Oct 13, 2015 at 02:18:22PM -0500, Dinh Nguyen wrote:
+> On Tue, 13 Oct 2015, Steffen Trumtrar wrote:
+> 
+> > Hi Alan!
+> > 
+> > On Tue, Oct 13, 2015 at 01:28:20PM -0500, atull at opensource.altera.com wrote:
+> > > From: Alan Tull <atull@opensource.altera.com>
+> > > 
+> > > Add FPGA manager to device tree for SoCFPGA.
+> > > 
+> > > Signed-off-by: Alan Tull <atull@opensource.altera.com>
+> > > ---
+> > >  arch/arm/boot/dts/socfpga.dtsi | 7 +++++++
+> > >  1 file changed, 7 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> > > index 314e589..e37ba11 100644
+> > > --- a/arch/arm/boot/dts/socfpga.dtsi
+> > > +++ b/arch/arm/boot/dts/socfpga.dtsi
+> > > @@ -834,5 +834,12 @@
+> > >  			compatible = "altr,sys-mgr", "syscon";
+> > >  			reg = <0xffd08000 0x4000>;
+> > >  		};
+> > > +
+> > > +		hps_0_fpgamgr: fpgamgr at 0xff706000 {
+> > > +			compatible = "altr,socfpga-fpga-mgr";
+> > > +			reg = <0xFF706000 0x1000
+> > > +			       0xFFB90000 0x1000>;
+> > > +			interrupts = <0 175 4>;
+> > > +		};
+> > >  	};
+> > >  };
+> > 
+> > Please keep the format in line with the rest of the file:
+> > Hexvalues are lowercase and no 0x after the "fpgamgr@".
+> > I'd say "And please put the node in its proper position
+> > according to its address", but I see just now, that the
+> > dtsi is all messed up right now anyway :-(
+> > 
+> 
+> How so? Patches are welcomed!
 
-> Dne 3.10.2015 v 14:30 Philipp Zabel napsal(a):
->> Am Montag, den 28.09.2015, 23:15 +0200 schrieb Petr Cvek:
->>> This patch fixes a pin mux for the HTC Magician machine. Wrong and
->>> missing
->>> definitions caused a bad LCD operation and an unavailability of
->>> several
->>> peripherals.
->>>
->>> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
->> 
->> NAK on this one. Until this patch I can boot my o2 Xda mini with
->> Toppoly display and see the framebuffer kernel console output. Can we
->> split the LCD changes from the rest, I assume those are what breaks my
->> display.
->
-> I read the Toppoly datasheet and it seems, the LCD panel implements V/HSYNC,
-> while Samsung does not (and I'm sure at least one of these sync pins must be
-> GPIO for DC-DC control). A solution is probably to reconfigure the GPIO muxes by
-> detected LCD type.
+Done :-)
 
-For the time being, I'll drop this one.
+> 
+> Please fix the "fpgamgr@" and lower case the hex values. But I would prefer the
+> nodes to be in alphabetical order.
+> 
 
-Cheers.
+Ah, that explains it, I guess. I always sorted my patches by address :-)
+The thing is, now all nodes are sorted alphabetically by phandle,
+the clkmgr however seems to be ordered by address.
+
+I prefer address btw because it is a fixed hardware constant. For the
+dts files sorting via phandle is again fixed via the dtsi.
+
+Regards,
+Steffen
 
 -- 
-Robert
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
