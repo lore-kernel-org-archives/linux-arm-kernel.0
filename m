@@ -1,50 +1,72 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 Oct 2015 16:13:20 -0700
-Subject: [PATCH] ARM: OMAP2+: Fix oops with LPAE and more than 2GB of memory
-Message-ID: <1444778000-22537-1-git-send-email-tony@atomide.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Wed, 14 Oct 2015 02:13:49 +0300
+Subject: [PATCH 2/5] arm: dts: lpc32xx: fix improper usage of ranges
+ property
+In-Reply-To: <5493797.P10V9v7QAu@wuerfel>
+References: <1444694045-22000-1-git-send-email-vz@mleia.com>
+ <7277011.vmOGiecsKn@wuerfel> <561D287C.9010400@mleia.com>
+ <5493797.P10V9v7QAu@wuerfel>
+Message-ID: <561D902D.7020503@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On boards with more than 2GB of RAM booting goes wrong with things not working
-and we're getting lots of l3 warnings:
+Arnd,
 
-WARNING: CPU: 0 PID: 1 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x260/0x384()
-44000000.ocp:L3 Custom Error: MASTER MMC6 TARGET DMM1 (Idle): Data Access in User mode during Functional access
-...
-[<c044e158>] (scsi_add_host_with_dma) from [<c04705c8>] (ata_scsi_add_hosts+0x5c/0x18c)
-[<c04705c8>] (ata_scsi_add_hosts) from [<c046b13c>] (ata_host_register+0x150/0x2cc)
-[<c046b13c>] (ata_host_register) from [<c046b38c>] (ata_host_activate+0xd4/0x124)
-[<c046b38c>] (ata_host_activate) from [<c047f42c>] (ahci_host_activate+0x5c/0x194)
-[<c047f42c>] (ahci_host_activate) from [<c0480854>] (ahci_platform_init_host+0x1f0/0x3f0)
-[<c0480854>] (ahci_platform_init_host) from [<c047c9dc>] (ahci_probe+0x70/0x98)
-[<c047c9dc>] (ahci_probe) from [<c04220cc>] (platform_drv_probe+0x54/0xb4)
+On 13.10.2015 22:36, Arnd Bergmann wrote:
+> On Tuesday 13 October 2015 18:51:24 Vladimir Zapolskiy wrote:
+>> On 13.10.2015 15:44, Arnd Bergmann wrote:
+>>> I don't get it. What kind of errors do you see? The existing
+>>> version looks cleaner than the new one, as it only translates
+>>> the MMIO areas that are actually used.
+>>>
+>>
+>> The problem is found when I add PL175 device node to lpc32xx.dtsi and
+>> expand the node in my board file. The external memory controller manages
+>> up to 4 memory devices, which by means of the controller are mapped into
+>> physical memory starting from address 0xe0000000.
+>>
+>> Below are my declarations, similar to one found in lpc18xx.dtsi.
+>>
+>> lpc32xx.dtsi change common for all LPC32xx boards:
+>>
+>> emc: emc at 31080000 {
+>> 	compatible = "arm,pl175", "arm,primecell";
+>> 	reg = <0x31080000 0x1000>;
+>> 	clocks = <&scf LPC32XX_CLK_DDRAM>;
+>> 	clock-names = "mpmcclk";
+>>
+>> 	#address-cells = <1>;
+>> 	#size-cells = <1>;
+>> 	ranges = <0 0xe0000000 0x01000000>,
+>> 		 <1 0xe1000000 0x01000000>,
+>> 		 <2 0xe2000000 0x01000000>,
+>> 		 <3 0xe3000000 0x01000000>;
+>> 	status = "disabled";
+>> };
+>>
+> 
+> Ok, got it.
+> 
+>> Support of EMC device node will be added to lpc32xx.dtsi, when this kind
+>> of problem is fixed.
+> 
+> As I see it, the problem is that you now have ranges that are not
+> for devices inside of the device but that are external. As the
+> memory-controller node needs both its own registers and the translation
+> for the external ones, we unfortunately can't just put it in the root
+> node, which would avoid the issue.
+> 
+> Instead, I would suggest adding a range for the 0xe0000000 area.
 
-Let's fix the issue by enabling ZONE_DMA for LPAE.
+Ok, practically it should work for my purposes, but the change must be
+done along with added EMC device node description.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+I'm not so confident that it is correct to add description of static
+memory banks to ahb node though, please give me a short confirmation,
+then I'll send a change for inclusion of EMC description -- the one
+above excluding clocks and clock-names properties, work on CCF is in
+progress.
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index b3a0dff..33d1460 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -49,6 +49,7 @@ config SOC_OMAP5
- 	select OMAP_INTERCONNECT
- 	select OMAP_INTERCONNECT_BARRIER
- 	select PM_OPP if PM
-+	select ZONE_DMA if ARM_LPAE
- 
- config SOC_AM33XX
- 	bool "TI AM33XX"
-@@ -78,6 +79,7 @@ config SOC_DRA7XX
- 	select OMAP_INTERCONNECT
- 	select OMAP_INTERCONNECT_BARRIER
- 	select PM_OPP if PM
-+	select ZONE_DMA if ARM_LPAE
- 
- config ARCH_OMAP2PLUS
- 	bool
--- 
-2.1.4
+--
+With best wishes,
+Vladimir
