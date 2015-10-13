@@ -1,144 +1,78 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Tue, 13 Oct 2015 21:57:23 +0530
-Subject: [PATCH 3/3] ARM: dts: exynos5422-odroidxu3: Added UHS-I bus speed
- support
-In-Reply-To: <561C7DF1.6000609@samsung.com>
-References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
- <1444578364-1384-3-git-send-email-linux.amoon@gmail.com>
- <561B48B7.1040201@samsung.com>
- <CANAwSgSLFviT4ZNXTYwxYs2pbrr9ozJmPMauhgRPO0556Rsr_g@mail.gmail.com>
- <561C4CEE.3050905@samsung.com>
- <CANAwSgRJ+5O-x61K9E_AxTZWQy3jJrKF5MiLtWRdUU29CCfa-Q@mail.gmail.com>
- <561C7DF1.6000609@samsung.com>
-Message-ID: <CANAwSgRBzFqHB98wSQnQu-ggGqRT2H6wC415wULXVhPg0uw_3A@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 13 Oct 2015 10:35:15 -0600
+Subject: [PATCH 37/37] ARM: dts: tegra20-ventana: Fix regulator enable
+ GPIO polarity
+In-Reply-To: <9351580.BEfKjdvstm@avalon>
+References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <1444684386-17094-38-git-send-email-laurent.pinchart@ideasonboard.com>
+ <561C2773.5090408@wwwdotorg.org> <9351580.BEfKjdvstm@avalon>
+Message-ID: <561D32C3.6010907@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
-
-On 13 October 2015 at 09:13, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
+On 10/12/2015 04:24 PM, Laurent Pinchart wrote:
+> Hi Stephen,
 >
-> On 13.10.2015 12:08, Anand Moon wrote:
-> > Hi Krzysztof,
-> >
-> > On 13 October 2015 at 05:44, Krzysztof Kozlowski
-> > <k.kozlowski@samsung.com> wrote:
-> >> On 13.10.2015 00:32, Anand Moon wrote:
-> >>> Hi Krzysztof,
-> >>>
-> >>> On 12 October 2015 at 11:14, Krzysztof Kozlowski
-> >>> <k.kozlowski@samsung.com> wrote:
-> >>>> On 12.10.2015 00:46, Anand Moon wrote:
-> >>>>> Added support for UHS-I bus speed 50MB/s (SDR50, DDR50) 104MB/s (SDR104)
-> >>>>
-> >>>> This description is not entirely correct. The MMC driver already
-> >>>> supports these UHS speeds (you did not any code) so you rather enabled
-> >>>> it (description of bindings says "is supported").
-> >>>>
-> >>>> You mentioned DDR50 but I don't see respective property below.
-> >>>>
-> >>>> How do you know that these modes are really supported? I don't know. Can
-> >>>> you convince me?
-> >>>
-> >>> Setting this DDR50 capability give me this error. That's the reason to
-> >>> drop this capability.
-> >>
-> >> But you mentioned it in commit message! "Added support for UHS-I ...
-> >> (DDR50)"
-> >>
-> >> In the same time dropping DDR50 is not an sufficient proof that "SDR50
-> >> and SDR104 are really supported".
-> >>
-> >
-> > These changes are related to the microSD card capabilities.
-> > So SDR50 have better frequency over DDR50. On the same Sandisk card.
-> >
-> > When the card select the capability for DDR50
-> > ---------------------------------------------------
-> > [    4.001477] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot
-> > req 50000000Hz, actual 50000000HZ div = 0)
-> > [    4.001604] mmc1: new ultra high speed DDR50 SDHC card at address aaaa
-> > [    4.004505] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
-> > [    4.009179] mmcblk0: error -110 sending status command, retrying
-> > [    4.009271] mmcblk0: error -115 sending stop command, original cmd
-> > response 0x900, card status 0x900
-> > [    4.009275] mmcblk0: error -84 transferring data, sector 0, nr 8,
-> > cmd response 0x900, card status 0x0
-> > [    4.025563] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot
-> > req 400000Hz, actual 396825HZ div = 63)
-> > [    4.067770] Console: switching to colour frame buffer device 274x77
-> > [    4.098782] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot
-> > req 50000000Hz, actual 50000000HZ div = 0)
-> > [    4.099692] mmc1: tried to reset card
-> > [    4.101332]  mmcblk0: p1 p2
-> >
-> >
-> > When the card select the capability for SDR50
-> > ---------------------------------------------------------------------------------
-> > [ 2.439806] mmc_host mmc1: Bus speed (slot 0) = 100000000Hz (slot req
-> > 100000000Hz, actual 100000000HZ div = 0)
-> > [ 2.449729] mmc1: new ultra high speed SDR50 SDHC card at address aaaa
-> > [ 2.455984] mmcblk0: mmc1:aaaa SL32G 29.7 GiB
-> > [ 2.461743] mmcblk0: p1 p2
-> >
-> > Which will relate to better read/write speed.
+> On Monday 12 October 2015 15:34:43 Stephen Warren wrote:
+>> On 10/12/2015 03:13 PM, Laurent Pinchart wrote:
+>>> The enable GPIO is active low,
+>>
+>> It'd be good to mention a justification for that statement in the
+>> patches, since the cover letter isn't going to be checked in.
+>>
+>>> but is flagged as active high in the gpio
+>>> property. As the gpio property flags are currently unused by the driver
+>>> this doesn't cause any issue for now, but will break later if the driver
+>>> starts making use of the flags. Fix it.
+>>
+>> IIRC the history here was that for some bizarre reason not all GPIO
+>> bindings contained an active-high/low flag and there was resistance to
+>> extending them in a backwards compatible way. So the regulator binding
+>> needed the separate property to represent this. For bindings that did
+>> have the flag, we had to set the GPIO flag to active-high, so that if
+>> anything started honoring the GPIO flags (e.g. I thikn the gpiod API
+>> does today, but the legacy GPIO API doesn't), we wouldn't apply both
+>> "active low indicators", and end up driving an active-high signal, and
+>> breaking things.
+>>
+>> So while this change is logically correct when read in isolation (and
+>> for Harmony, Seaboard, and Ventana I verified that these regulators do
+>> use an active-low GPIO), I worry that making it makes mistakes likely
+>> later. How would we mitigate that?
 >
-> Which is not an answer to my question. To none of my previous questions.
->
+> That's a very good point. Is the resistance to move to the standard GPIO
+> active low/high flags still present, or is it now only history ?
 
-Basically UHS-I capability  (sd-uhs-sdr12, sd-uhs-sdr25, sd-uhs-sdr50,
-sd-uhs-sdr104) help tune speed supported for mmc
+This was a few years back, so I don't remember the details; it might 
+have been as simple as "some bindings don't already have GPIO flags, and 
+I'd rather get GPIO regulators implemented first before thinking about 
+fixing that" or it could have been "some bindings don't already have 
+GPIO flags, and there's ${some reason} why it's not possible to solve 
+that in a backwards-compatible fashion" (recalling that DT bindings must 
+evolve in a backwards-compatible fashion since they're an ABI). 
+Unfortunately, you'd have to read through the mailing list posts related 
+to the patches that defined the GPIO regulator bindings or added the 
+nodes to DT.
 
-I have tired to compare the speed on high speed UHS-I vs ultra high
-speed UHS-I using izone utility.
+> In other
+> words, could we aim for using GPIO flags as the primary method to specify
+> polarities, and fall back to the custom properties for backward compatibility
+> (and possibly for GPIO controllers that don't support the flags) ?
 
-[    2.572469] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot
-req 50000000Hz, actual 50000000HZ div = 0)
-[    2.572609] mmc1: new high speed SDHC card at address aaaa
+I don't think we can switch to using GPIO flags, without changing the 
+compatible values for the relevant DT nodes.
 
-      Command line used: ./iozone -L64 -S32 -azecwI -+n -r4k -r64k
--r128k -s10M -i0 -i1 -i2 -f datafile -Rb out.xls
-        Output is in kBytes/sec
-        Time Resolution = 0.000001 seconds.
-        Processor cache size set to 32 kBytes.
-        Processor cache line size set to 64 bytes.
-        File stride size set to 17 * record size.
-                                                              random
- random     bkwd    record    stride
-              kB  reclen    write  rewrite    read    reread    read
-  write     read   rewrite      read   fwrite frewrite    fread
-freread
-           10240       4     1631        0     6556        0     5538      982
-           10240      64     8828        0    18897        0    17994      303
-           10240     128     6269        0    20670        0    20128     1096
----------------------------------------------------------------------------------------------------------
-[    2.613761] mmc_host mmc1: Bus speed (slot 0) = 100000000Hz (slot
-req 100000000Hz, actual 100000000HZ div = 0)
-[    2.623573] mmc1: new ultra high speed SDR50 SDHC card at address aaaa
+For one, we'd need some way of actively marking the nodes to say whether 
+they are written to expect that the GPIO flags or the other properties 
+be used. It's not possible in all cases to determine this automatically. 
+For example, if enable-active-high it's fairly clear we should honor 
+this flag, yet if it's missing does that mean the GPIO is active-low or 
+simply that the node was written to expect that the GPIO flags be used 
+instead?
 
-        Command line used: ./iozone -L64 -S32 -azecwI -+n -r4k -r64k
--r128k -s10M -i0 -i1 -i2 -f datafile -Rb out.xls
-        Output is in kBytes/sec
-        Time Resolution = 0.000001 seconds.
-        Processor cache size set to 32 kBytes.
-        Processor cache line size set to 64 bytes.
-        File stride size set to 17 * record size.
-                                                              random
- random     bkwd    record    stride
-              kB  reclen    write  rewrite    read    reread    read
-  write     read   rewrite      read   fwrite frewrite    fread
-freread
-           10240       4     1809        0     7507        0     5233      859
-           10240      64    11622        0    31250        0    28072      516
-           10240     128     4320        0    34417        0    32509     1148
-
-My observation is that their slight increase in read/write operation.
-
-Hope I have tried to answer you query. If I am wrong please let me know.
-
--Anand Moon
-
->
-> Best regards,
-> Krzysztof
+Also, old DTs must work with new kernels (and preferably also, new DTs 
+must work with old kernels). If the GPIO flags are wrong in current DTs, 
+then we can't use them. Of course, there's an argument that the 
+backwards-compatibility constraint doesn't apply to buggy DTs, just to 
+correctly written DTs. However, if we deliberately chose to make all 
+regulator GPIO flags ACTIVE_HIGH, then the current DTs aren't buggy.
