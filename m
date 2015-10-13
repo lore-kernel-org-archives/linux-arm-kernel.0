@@ -1,93 +1,81 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 13 Oct 2015 09:42:12 -0500
-Subject: [PATCH 1/4] Documentation: dt: soc: move driver description to a
- separate document
-In-Reply-To: <1444679211-823-2-git-send-email-m-karicheri2@ti.com>
-References: <1444679211-823-1-git-send-email-m-karicheri2@ti.com>
- <1444679211-823-2-git-send-email-m-karicheri2@ti.com>
-Message-ID: <CAL_Jsq+GZn0X-sxQ=oqRP7fR3bCPk5PN5CjgXzjnOxas_renzw@mail.gmail.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Tue, 13 Oct 2015 14:49:07 +0000
+Subject: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for HiSilicon
+ SoC Hip05
+In-Reply-To: <6336414.HvfCQcuT3Y@wuerfel>
+References: <1444445957-239522-1-git-send-email-wangzhou1@hisilicon.com>
+ <1444445957-239522-5-git-send-email-wangzhou1@hisilicon.com>
+ <20151012213545.GA17479@localhost> <6336414.HvfCQcuT3Y@wuerfel>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E16242C92@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 2:46 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
-> Currently the DT bindings have details about the driver as well. This
-> patch moves this to a separate document for knav qmss driver so that
-> driver detail update can be done as needed without polluting the DT
-> bindings description.
->
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> ---
->  Documentation/arm/keystone/knav-qmss.txt           | 24 ++++++++++++++++++++++
->  .../bindings/soc/ti/keystone-navigator-qmss.txt    | 20 ++++--------------
->  2 files changed, 28 insertions(+), 16 deletions(-)
->  create mode 100644 Documentation/arm/keystone/knav-qmss.txt
->
-> diff --git a/Documentation/arm/keystone/knav-qmss.txt b/Documentation/arm/keystone/knav-qmss.txt
-> new file mode 100644
-> index 0000000..79946d1
-> --- /dev/null
-> +++ b/Documentation/arm/keystone/knav-qmss.txt
-> @@ -0,0 +1,24 @@
-> +* Texas Instruments Keystone Navigator Queue Management SubSystem driver
-> +
-> +Driver source code path
-> +  drivers/soc/ti/knav_qmss.c
-> +  drivers/soc/ti/knav_qmss_acc.c
-> +
-> +The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
-> +the main hardware sub system which forms the backbone of the Keystone
-> +multi-core Navigator. QMSS consist of queue managers, packed-data structure
-> +processors(PDSP), linking RAM, descriptor pools and infrastructure
-> +Packet DMA.
-> +The Queue Manager is a hardware module that is responsible for accelerating
-> +management of the packet queues. Packets are queued/de-queued by writing or
-> +reading descriptor address to a particular memory mapped location. The PDSPs
-> +perform QMSS related functions like accumulation, QoS, or event management.
-> +Linking RAM registers are used to link the descriptors which are stored in
-> +descriptor RAM. Descriptor RAM is configurable as internal or external memory.
-> +The QMSS driver manages the PDSP setups, linking RAM regions,
-> +queue pool management (allocation, push, pop and notify) and descriptor
-> +pool management.
-> +
-> +knav qmss driver provides a set of APIs to drivers to open/close qmss queues,
-> +allocate descriptor pools, map the descriptors, push/pop to queues etc. For
-> +details of the available APIs, please refers to include/linux/soc/ti/knav_qmss.h
-> diff --git a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
-> index d8e8cdb..2cecea1 100644
-> --- a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
-> +++ b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
-> @@ -1,20 +1,8 @@
-> -* Texas Instruments Keystone Navigator Queue Management SubSystem driver
-> -
-> -The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
-> -the main hardware sub system which forms the backbone of the Keystone
-> -multi-core Navigator. QMSS consist of queue managers, packed-data structure
-> -processors(PDSP), linking RAM, descriptor pools and infrastructure
-> -Packet DMA.
-> -The Queue Manager is a hardware module that is responsible for accelerating
-> -management of the packet queues. Packets are queued/de-queued by writing or
-> -reading descriptor address to a particular memory mapped location. The PDSPs
-> -perform QMSS related functions like accumulation, QoS, or event management.
-> -Linking RAM registers are used to link the descriptors which are stored in
-> -descriptor RAM. Descriptor RAM is configurable as internal or external memory.
-> -The QMSS driver manages the PDSP setups, linking RAM regions,
-> -queue pool management (allocation, push, pop and notify) and descriptor
-> -pool management.
 
-Only the last sentence seems to be about the driver and is rather
-obvious (a driver manages the h/w). I would leave all this as-is
-currently.
 
-Rob
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Tuesday, October 13, 2015 12:12 PM
+> To: Bjorn Helgaas
+> Cc: Wangzhou (B); Bjorn Helgaas; jingoohan1 at gmail.com;
+> pratyush.anand at gmail.com; linux at arm.linux.org.uk;
+> thomas.petazzoni at free-electrons.com; Gabriele Paoloni;
+> lorenzo.pieralisi at arm.com; james.morse at arm.com; Liviu.Dudau at arm.com;
+> jason at lakedaemon.net; robh at kernel.org; gabriel.fernandez at linaro.org;
+> Minghuan.Lian at freescale.com; linux-pci at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; devicetree at vger.kernel.org; linux-
+> kernel at vger.kernel.org; zhangjukuo; qiuzhenfa; liudongdong (C);
+> qiujiang; xuwei (O); Liguozhu (Kenneth); Wangkefeng (Kevin); Rob
+> Herring
+> Subject: Re: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for
+> HiSilicon SoC Hip05
+> 
+> On Monday 12 October 2015 16:35:45 Bjorn Helgaas wrote:
+> >
+> > > +{
+> > > +     u64 addr;
+> > > +     struct device_node *msi_node;
+> > > +     struct resource res;
+> > > +     struct device_node *np = pp->dev->of_node;
+> > > +     struct hisi_pcie *pcie = to_hisi_pcie(pp);
+> > > +
+> > > +     msi_node = of_parse_phandle(np, "msi-parent", 0);
+> > > +     if (!msi_node) {
+> > > +             dev_err(pp->dev, "failed to find msi-parent\n");
+> > > +             return -EINVAL;
+> > > +     }
+> > > +     of_address_to_resource(msi_node, 0, &res);
+> >
+> > Does this use the "msi-parent" node in the same way as other drivers
+> > do?  I'm sure there must be other places where we extract struct
+> > resource information from an "msi-parent" node, but I don't see them.
+> >
+> > I'm trying to verify that this isn't some kind of incompatible
+> > extension of the "msi-parent" property.  I cc'd Arnd and Rob (DT
+> > experts).
+> 
+> This is not ok, what this does is that it relies on a particular
+> implementation of the MSI controller and directly accesses its
+> registers.
 
-> +* Texas Instruments Keystone Navigator (knav) Queue Management SubSystem driver
-> +  DT bindings
->
-> +For details of the driver, please refer to
-> +Documentation/arm/keystone/knav-qmss.txt
->
->  Required properties:
->  - compatible   : Must be "ti,keystone-navigator-qmss";
-> --
-> 1.9.1
->
+Hi Arnd, thanks for reviewing.
+
+What we do is to retrieve the msi-parent physical address and we store it
+in our internal PCIe register locations...
+
+So we do not operate directly on the msi controller registers...
+
+So I wonder if the current implementation is Ok to retrieve the
+msi-parent address....
+
+Thanks
+
+Gab
+
+
+> 
+> Instead, it should reference only the msi irq domain and let the
+> driver for the MSI controller access the registers. Otherwise this
+> code has to be rewritten once the same PCI host code appears in
+> a machine that has a real GICv2m or GICv3.
+> 
+> 	Arnd
