@@ -1,89 +1,61 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 13 Oct 2015 09:23:30 +0800
-Subject: [Linaro-acpi] [PATCH v5 0/5] Provide better MADT subtable sanity
- checks
-In-Reply-To: <1776686.ko2Ldkd9he@vostro.rjw.lan>
-References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
- <561B2FCA.1010504@erley.org> <561B5B7E.6080901@linaro.org>
- <1776686.ko2Ldkd9he@vostro.rjw.lan>
-Message-ID: <561C5D12.1000408@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 13 Oct 2015 10:27:05 +0900
+Subject: [PATCH 1/4] ARM: exynos_defconfig: Enable Maxim 8997 family drivers
+Message-ID: <1444699628-3774-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/2015 03:21 AM, Rafael J. Wysocki wrote:
-> On Monday, October 12, 2015 03:04:30 PM Hanjun Guo wrote:
->> On 10/12/2015 11:58 AM, Pat Erley wrote:
->>> On 10/11/2015 08:49 PM, Hanjun Guo wrote:
->>>> On 10/12/2015 11:08 AM, Pat Erley wrote:
->>>>> On 10/05/2015 10:12 AM, Al Stone wrote:
->>>>>> On 10/05/2015 07:39 AM, Rafael J. Wysocki wrote:
->>>>>>> On Wednesday, September 30, 2015 10:10:16 AM Al Stone wrote:
->>>>>>>> On 09/30/2015 03:00 AM, Hanjun Guo wrote:
->>>>>>>>> On 2015/9/30 7:45, Al Stone wrote:
->>>>>>>>>> NB: this patch set is for use against the linux-pm bleeding edge
->>>>>>>>>> branch.
->>>>>>>>>>
->>>>>>>>
->>>>>>>> [snip...]
->>>>>>>>
->>>>>>>>>
->>>>>>>>> For this patch set,
->>>>>>>>>
->>>>>>>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>>>>>>
->>>>>>>>> Thanks
->>>>>>>>> Hanjun
->>>>>>>>
->>>>>>>> Thanks, Hanjun!
->>>>>>>
->>>>>>> Series applied, thanks!
->>>>>>>
->>>>>>> Rafael
->>>>>>>
->>>>>>
->>>>>> Thanks, Rafael!
->>>>>>
->>>>>
->>>>> Just decided to test out linux-next (to see the new nouveau cleanups).
->>>>> This change set prevents my Lenovo W510 from booting properly.
->>>>>
->>>>> Reverting: 7494b0 "ACPI: add in a bad_madt_entry() function to
->>>>> eventually replace the macro"
->>>>>
->>>>> Gets the system booting again.  I'm attaching my dmesg from the failed
->>>>> boot, who wants the acpidump?
->>>>
->>>> [    0.000000] ACPI: undefined version for either FADT 4.0 or MADT 1
->>>> [    0.000000] ACPI: Error parsing LAPIC address override entry
->>>> [    0.000000] ACPI: Invalid BIOS MADT, disabling ACPI
->>>>
->>>> Seems the MADT revision is not right, could you dump the ACPI MADT
->>>> (APIC) table and send it out? I will take a look :)
->>>>
->>>> Thanks
->>>> Hanjun
->>>
->>> Here ya go, enjoy.  Feel free to CC me on any patches that might fix it.
->>
->> Thanks! I think I had the right guess, the MADT revision is not right
->> for ACPI 4.0:
->>
->> [000h 0000   4]                    Signature : "APIC"    [Multiple APIC
->> Description Table (MADT)]
->> [004h 0004   4]                 Table Length : 000000BC
->> [008h 0008   1]                     *Revision : 01*
->>
->> I encountered such problem before because the table was just copied from
->> previous version, and without the update for table revision.
->>
->> I think we may need to ignore the table revision for x86, but restrict
->> it for ARM64, I'd like Al and Rafael's suggestion before I send out a
->> patch.
->
-> As I said before to Al, we definitely can't break systems that worked before
-> the commit in question.
+Enable support for Maxim 8997 Multi Functional Device present on Trats and
+Origen boards by toggling on drivers: charger, haptic motor,
+LED, RTC and extcon.
 
-Sure :)
+This allows to test and usage of these boards with exynos config.
 
-Thanks
-Hanjun
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/configs/exynos_defconfig | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 7172e96af22e..0bf9c31f4661 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -74,6 +74,8 @@ CONFIG_KEYBOARD_CROS_EC=y
+ CONFIG_MOUSE_CYAPA=y
+ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_TOUCHSCREEN_ATMEL_MXT=y
++CONFIG_INPUT_MISC=y
++CONFIG_INPUT_MAX8997_HAPTIC=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_SAMSUNG=y
+ CONFIG_SERIAL_SAMSUNG_CONSOLE=y
+@@ -95,6 +97,7 @@ CONFIG_BATTERY_MAX17040=y
+ CONFIG_BATTERY_MAX17042=y
+ CONFIG_CHARGER_MAX14577=y
+ CONFIG_CHARGER_MAX77693=y
++CONFIG_CHARGER_MAX8997=y
+ CONFIG_CHARGER_TPS65090=y
+ CONFIG_SENSORS_LM90=y
+ CONFIG_SENSORS_NTC_THERMISTOR=y
+@@ -178,9 +181,11 @@ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+ CONFIG_LEDS_PWM=y
++CONFIG_LEDS_MAX8997=y
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_MAX8997=y
+ CONFIG_RTC_DRV_MAX77686=y
+ CONFIG_RTC_DRV_MAX77802=y
+ CONFIG_RTC_DRV_S5M=y
+@@ -195,6 +200,7 @@ CONFIG_COMMON_CLK_S2MPS11=y
+ CONFIG_EXTCON=y
+ CONFIG_EXTCON_MAX14577=y
+ CONFIG_EXTCON_MAX77693=y
++CONFIG_EXTCON_MAX8997=y
+ CONFIG_IIO=y
+ CONFIG_EXYNOS_ADC=y
+ CONFIG_PWM=y
+-- 
+1.9.1
