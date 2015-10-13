@@ -1,148 +1,46 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 13 Oct 2015 12:00:36 +0100
-Subject: [PATCH v4 2/2] arm64: Expand the stack trace feature to support
- IRQ stack
-In-Reply-To: <3CAA206D-3A3A-49A9-BDAD-4206D6F9BAA8@gmail.com>
-References: <1444231692-32722-1-git-send-email-jungseoklee85@gmail.com>
- <1444231692-32722-3-git-send-email-jungseoklee85@gmail.com>
- <5617CE26.10604@arm.com> <07A53E87-C562-48D1-86DF-A373EAAA73F9@gmail.com>
- <561BE111.7@arm.com> <3CAA206D-3A3A-49A9-BDAD-4206D6F9BAA8@gmail.com>
-Message-ID: <561CE454.7080201@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Oct 2015 13:12:12 +0200
+Subject: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for HiSilicon
+ SoC Hip05
+In-Reply-To: <20151012213545.GA17479@localhost>
+References: <1444445957-239522-1-git-send-email-wangzhou1@hisilicon.com>
+ <1444445957-239522-5-git-send-email-wangzhou1@hisilicon.com>
+ <20151012213545.GA17479@localhost>
+Message-ID: <6336414.HvfCQcuT3Y@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jungseok,
-
-On 12/10/15 23:13, Jungseok Lee wrote:
-> On Oct 13, 2015, at 1:34 AM, James Morse wrote:
->> Having two kmem_caches for 16K stacks on a 64K page system may be wasteful
->> (especially for systems with few cpus)?
+On Monday 12 October 2015 16:35:45 Bjorn Helgaas wrote:
 > 
-> This would be a single concern. To address this issue, I drop the 'static'
-> keyword in thread_info_cache. Please refer to the below hunk.
-
-Its only a problem on systems with 64K pages, which don't have a multiple
-of 4 cpus. I suspect if you turn on 64K pages, you have many cores with
-plenty of memory...
-
-
->> The alternative is to defining CONFIG_ARCH_THREAD_INFO_ALLOCATOR and
->> allocate all stack memory from arch code. (Largely copied code, prevents
->> irq stacks being a different size, and nothing uses that define today!)
->>
->>
->> Thoughts?
+> > +{
+> > +     u64 addr;
+> > +     struct device_node *msi_node;
+> > +     struct resource res;
+> > +     struct device_node *np = pp->dev->of_node;
+> > +     struct hisi_pcie *pcie = to_hisi_pcie(pp);
+> > +
+> > +     msi_node = of_parse_phandle(np, "msi-parent", 0);
+> > +     if (!msi_node) {
+> > +             dev_err(pp->dev, "failed to find msi-parent\n");
+> > +             return -EINVAL;
+> > +     }
+> > +     of_address_to_resource(msi_node, 0, &res);
 > 
-> Almost same story I've been testing.
+> Does this use the "msi-parent" node in the same way as other drivers
+> do?  I'm sure there must be other places where we extract struct
+> resource information from an "msi-parent" node, but I don't see them.
 > 
-> I'm aligned with yours Regarding CONFIG_ARCH_THREAD_INFO_ALLOCATOR.
-> 
-> Another approach I've tried is the following data structure, but it's not
-> a good fit for this case due to __per_cpu_offset which is page-size aligned,
-> not thread-size.
-> 
-> struct irq_stack {
-> 	char stack[THREAD_SIZE];
-> 	char *highest;
-> } __aligned(THREAD_SIZE);
-> 
-> DEFINE_PER_CPU(struct irq_stack, irq_stacks);
+> I'm trying to verify that this isn't some kind of incompatible
+> extension of the "msi-parent" property.  I cc'd Arnd and Rob (DT
+> experts).
 
-Yes, x86 does this - but it increases the Image size by 16K, as that space
-could have some initialisation values. This isn't a problem on x86 as
-no-one uses the uncompressed image.
+This is not ok, what this does is that it relies on a particular
+implementation of the MSI controller and directly accesses its
+registers.
 
-I would avoid this approach due to the bloat!
+Instead, it should reference only the msi irq domain and let the
+driver for the MSI controller access the registers. Otherwise this
+code has to be rewritten once the same PCI host code appears in
+a machine that has a real GICv2m or GICv3.
 
-> 
-> ----8<-----
-> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-> index 6ea82e8..d3619b3 100644
-> --- a/arch/arm64/include/asm/irq.h
-> +++ b/arch/arm64/include/asm/irq.h
-> @@ -1,7 +1,9 @@
->  #ifndef __ASM_IRQ_H
->  #define __ASM_IRQ_H
->  
-> +#include <linux/gfp.h>
->  #include <linux/irqchip/arm-gic-acpi.h>
-> +#include <linux/slab.h>
->  
->  #include <asm-generic/irq.h>
->  
-> @@ -9,6 +11,21 @@ struct irq_stack {
->         void *stack;
->  };
->  
-> +#if THREAD_SIZE >= PAGE_SIZE
-> +static inline void *__alloc_irq_stack(void)
-> +{
-> +       return (void *)__get_free_pages(THREADINFO_GFP | __GFP_ZERO,
-> +                                       THREAD_SIZE_ORDER);
-> +}
-> +#else
-> +extern struct kmem_cache *thread_info_cache;
-
-If this has been made a published symbol, it should go in a header file.
-
-> +
-> +static inline void *__alloc_irq_stack(void)
-> +{
-> +       return kmem_cache_alloc(thread_info_cache, THREADINFO_GFP | __GFP_ZERO);
-> +}
-> +#endif
-> +
->  struct pt_regs;
->  
->  extern void migrate_irqs(void);
-> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-> index a6bdf4d..4e13bdd 100644
-> --- a/arch/arm64/kernel/irq.c
-> +++ b/arch/arm64/kernel/irq.c
-> @@ -50,10 +50,13 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
->         handle_arch_irq = handle_irq;
->  }
->  
-> +static char boot_irq_stack[THREAD_SIZE] __aligned(THREAD_SIZE);
-> +
->  void __init init_IRQ(void)
->  {
-> -       if (alloc_irq_stack(smp_processor_id()))
-> -               panic("Failed to allocate IRQ stack for a boot cpu");
-> +       unsigned int cpu = smp_processor_id();
-> +
-> +       per_cpu(irq_stacks, cpu).stack = boot_irq_stack + THREAD_START_SP;
->  
->         irqchip_init();
->         if (!handle_arch_irq)
-> @@ -128,7 +131,7 @@ int alloc_irq_stack(unsigned int cpu)
->         if (per_cpu(irq_stacks, cpu).stack)
->                 return 0;
->  
-> -       stack = (void *)__get_free_pages(THREADINFO_GFP, THREAD_SIZE_ORDER);
-> +       stack = __alloc_irq_stack();
->         if (!stack)
->                 return -ENOMEM;
->  
-> diff --git a/kernel/fork.c b/kernel/fork.c
-> index 2845623..9c55f86 100644
-> --- a/kernel/fork.c
-> +++ b/kernel/fork.c
-> @@ -172,7 +172,7 @@ static inline void free_thread_info(struct thread_info *ti)
->         free_kmem_pages((unsigned long)ti, THREAD_SIZE_ORDER);
->  }
->  # else
-> -static struct kmem_cache *thread_info_cache;
-> +struct kmem_cache *thread_info_cache;
->  
->  static struct thread_info *alloc_thread_info_node(struct task_struct *tsk,
->                                                   int node)
-> ----8<-----
-
-
-Looks good!
-
-
-Thanks,
-
-James
+	Arnd
