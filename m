@@ -1,423 +1,331 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Tue, 13 Oct 2015 17:08:05 -0400
-Subject: [PATCH v2 7/7] clk: ns2: add clock support for Broadcom Northstar 2
- SoC
+Date: Tue, 13 Oct 2015 17:08:04 -0400
+Subject: [PATCH v2 6/7] clk: iproc: Separate status and control variables
 In-Reply-To: <1444770485-11210-1-git-send-email-jonmason@broadcom.com>
 References: <1444770485-11210-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1444770485-11210-8-git-send-email-jonmason@broadcom.com>
+Message-ID: <1444770485-11210-7-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Broadcom Northstar 2 SoC is architected under the iProc
-architecture. It has the following PLLs: GENPLL SCR, GENPLL SW,
-LCPLL DDR, LCPLL Ports, all derived from an onboard crystal.
+Some PLLs have separate registers for Status and Control.  The means the
+pll_base needs to be split into 2 new variables, so that those PLLs can
+specify device tree registers for those independently.  Also, add a new
+driver flag to identify this presence of the split, and let the driver
+know that additional registers need to be used.
 
 Signed-off-by: Jon Mason <jonmason@broadcom.com>
 ---
- drivers/clk/Makefile                |   2 +-
- drivers/clk/bcm/Makefile            |   1 +
- drivers/clk/bcm/clk-ns2.c           | 288 ++++++++++++++++++++++++++++++++++++
- include/dt-bindings/clock/bcm-ns2.h |  72 +++++++++
- 4 files changed, 362 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/bcm/clk-ns2.c
- create mode 100644 include/dt-bindings/clock/bcm-ns2.h
+ drivers/clk/bcm/clk-iproc-pll.c | 96 ++++++++++++++++++++++++-----------------
+ drivers/clk/bcm/clk-iproc.h     |  6 +++
+ 2 files changed, 62 insertions(+), 40 deletions(-)
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index d08b3e5..6124bd3 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -47,7 +47,7 @@ obj-$(CONFIG_COMMON_CLK_WM831X)		+= clk-wm831x.o
- obj-$(CONFIG_COMMON_CLK_XGENE)		+= clk-xgene.o
- obj-$(CONFIG_COMMON_CLK_PWM)		+= clk-pwm.o
- obj-$(CONFIG_COMMON_CLK_AT91)		+= at91/
--obj-$(CONFIG_ARCH_BCM)			+= bcm/
-+obj-y					+= bcm/
- obj-$(CONFIG_ARCH_BERLIN)		+= berlin/
- obj-$(CONFIG_ARCH_HISI)			+= hisilicon/
- obj-$(CONFIG_ARCH_MXC)			+= imx/
-diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
-index e258b28..2d1cbc5 100644
---- a/drivers/clk/bcm/Makefile
-+++ b/drivers/clk/bcm/Makefile
-@@ -3,6 +3,7 @@ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-kona-setup.o
- obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm281xx.o
- obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm21664.o
- obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-iproc-armpll.o clk-iproc-pll.o clk-iproc-asiu.o
-+obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-ns2.o
- obj-$(CONFIG_ARCH_BCM_CYGNUS)	+= clk-cygnus.o
- obj-$(CONFIG_ARCH_BCM_NSP)	+= clk-nsp.o
- obj-$(CONFIG_ARCH_BCM_5301X)	+= clk-nsp.o
-diff --git a/drivers/clk/bcm/clk-ns2.c b/drivers/clk/bcm/clk-ns2.c
-new file mode 100644
-index 0000000..a564e92
---- /dev/null
-+++ b/drivers/clk/bcm/clk-ns2.c
-@@ -0,0 +1,288 @@
-+/*
-+ * Copyright (C) 2015 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
+diff --git a/drivers/clk/bcm/clk-iproc-pll.c b/drivers/clk/bcm/clk-iproc-pll.c
+index d4aab4e..f128a9d 100644
+--- a/drivers/clk/bcm/clk-iproc-pll.c
++++ b/drivers/clk/bcm/clk-iproc-pll.c
+@@ -74,7 +74,8 @@ struct iproc_clk {
+ };
+ 
+ struct iproc_pll {
+-	void __iomem *pll_base;
++	void __iomem *status_base;
++	void __iomem *control_base;
+ 	void __iomem *pwr_base;
+ 	void __iomem *asiu_base;
+ 
+@@ -127,7 +128,7 @@ static int pll_wait_for_lock(struct iproc_pll *pll)
+ 	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
+ 
+ 	for (i = 0; i < LOCK_DELAY; i++) {
+-		u32 val = readl(pll->pll_base + ctrl->status.offset);
++		u32 val = readl(pll->status_base + ctrl->status.offset);
+ 
+ 		if (val & (1 << ctrl->status.shift))
+ 			return 0;
+@@ -145,7 +146,7 @@ static void iproc_pll_write(const struct iproc_pll *pll, void __iomem *base,
+ 	writel(val, base + offset);
+ 
+ 	if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK &&
+-		     base == pll->pll_base))
++		     (base == pll->status_base || base == pll->control_base)))
+ 		val = readl(base + offset);
+ }
+ 
+@@ -161,9 +162,9 @@ static void __pll_disable(struct iproc_pll *pll)
+ 	}
+ 
+ 	if (ctrl->flags & IPROC_CLK_EMBED_PWRCTRL) {
+-		val = readl(pll->pll_base + ctrl->aon.offset);
++		val = readl(pll->control_base + ctrl->aon.offset);
+ 		val |= (bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
+-		iproc_pll_write(pll, pll->pll_base, ctrl->aon.offset, val);
++		iproc_pll_write(pll, pll->control_base, ctrl->aon.offset, val);
+ 	}
+ 
+ 	if (pll->pwr_base) {
+@@ -184,9 +185,9 @@ static int __pll_enable(struct iproc_pll *pll)
+ 	u32 val;
+ 
+ 	if (ctrl->flags & IPROC_CLK_EMBED_PWRCTRL) {
+-		val = readl(pll->pll_base + ctrl->aon.offset);
++		val = readl(pll->control_base + ctrl->aon.offset);
+ 		val &= ~(bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
+-		iproc_pll_write(pll, pll->pll_base, ctrl->aon.offset, val);
++		iproc_pll_write(pll, pll->control_base, ctrl->aon.offset, val);
+ 	}
+ 
+ 	if (pll->pwr_base) {
+@@ -213,9 +214,9 @@ static void __pll_put_in_reset(struct iproc_pll *pll)
+ 	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
+ 	const struct iproc_pll_reset_ctrl *reset = &ctrl->reset;
+ 
+-	val = readl(pll->pll_base + reset->offset);
++	val = readl(pll->control_base + reset->offset);
+ 	val &= ~(1 << reset->reset_shift | 1 << reset->p_reset_shift);
+-	iproc_pll_write(pll, pll->pll_base, reset->offset, val);
++	iproc_pll_write(pll, pll->control_base, reset->offset, val);
+ }
+ 
+ static void __pll_bring_out_reset(struct iproc_pll *pll, unsigned int kp,
+@@ -226,17 +227,17 @@ static void __pll_bring_out_reset(struct iproc_pll *pll, unsigned int kp,
+ 	const struct iproc_pll_reset_ctrl *reset = &ctrl->reset;
+ 	const struct iproc_pll_dig_filter_ctrl *dig_filter = &ctrl->dig_filter;
+ 
+-	val = readl(pll->pll_base + dig_filter->offset);
++	val = readl(pll->control_base + dig_filter->offset);
+ 	val &= ~(bit_mask(dig_filter->ki_width) << dig_filter->ki_shift |
+ 		bit_mask(dig_filter->kp_width) << dig_filter->kp_shift |
+ 		bit_mask(dig_filter->ka_width) << dig_filter->ka_shift);
+ 	val |= ki << dig_filter->ki_shift | kp << dig_filter->kp_shift |
+ 	       ka << dig_filter->ka_shift;
+-	iproc_pll_write(pll, pll->pll_base, dig_filter->offset, val);
++	iproc_pll_write(pll, pll->control_base, dig_filter->offset, val);
+ 
+-	val = readl(pll->pll_base + reset->offset);
++	val = readl(pll->control_base + reset->offset);
+ 	val |= 1 << reset->reset_shift | 1 << reset->p_reset_shift;
+-	iproc_pll_write(pll, pll->pll_base, reset->offset, val);
++	iproc_pll_write(pll, pll->control_base, reset->offset, val);
+ }
+ 
+ static int pll_set_rate(struct iproc_clk *clk, unsigned int rate_index,
+@@ -291,9 +292,9 @@ static int pll_set_rate(struct iproc_clk *clk, unsigned int rate_index,
+ 	/* put PLL in reset */
+ 	__pll_put_in_reset(pll);
+ 
+-	iproc_pll_write(pll, pll->pll_base, ctrl->vco_ctrl.u_offset, 0);
++	iproc_pll_write(pll, pll->control_base, ctrl->vco_ctrl.u_offset, 0);
+ 
+-	val = readl(pll->pll_base + ctrl->vco_ctrl.l_offset);
++	val = readl(pll->control_base + ctrl->vco_ctrl.l_offset);
+ 
+ 	if (rate >= VCO_LOW && rate < VCO_MID)
+ 		val |= (1 << PLL_VCO_LOW_SHIFT);
+@@ -303,29 +304,29 @@ static int pll_set_rate(struct iproc_clk *clk, unsigned int rate_index,
+ 	else
+ 		val |= (1 << PLL_VCO_HIGH_SHIFT);
+ 
+-	iproc_pll_write(pll, pll->pll_base, ctrl->vco_ctrl.l_offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->vco_ctrl.l_offset, val);
+ 
+ 	/* program integer part of NDIV */
+-	val = readl(pll->pll_base + ctrl->ndiv_int.offset);
++	val = readl(pll->control_base + ctrl->ndiv_int.offset);
+ 	val &= ~(bit_mask(ctrl->ndiv_int.width) << ctrl->ndiv_int.shift);
+ 	val |= vco->ndiv_int << ctrl->ndiv_int.shift;
+-	iproc_pll_write(pll, pll->pll_base, ctrl->ndiv_int.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->ndiv_int.offset, val);
+ 
+ 	/* program fractional part of NDIV */
+ 	if (ctrl->flags & IPROC_CLK_PLL_HAS_NDIV_FRAC) {
+-		val = readl(pll->pll_base + ctrl->ndiv_frac.offset);
++		val = readl(pll->control_base + ctrl->ndiv_frac.offset);
+ 		val &= ~(bit_mask(ctrl->ndiv_frac.width) <<
+ 			 ctrl->ndiv_frac.shift);
+ 		val |= vco->ndiv_frac << ctrl->ndiv_frac.shift;
+-		iproc_pll_write(pll, pll->pll_base, ctrl->ndiv_frac.offset,
++		iproc_pll_write(pll, pll->control_base, ctrl->ndiv_frac.offset,
+ 				val);
+ 	}
+ 
+ 	/* program PDIV */
+-	val = readl(pll->pll_base + ctrl->pdiv.offset);
++	val = readl(pll->control_base + ctrl->pdiv.offset);
+ 	val &= ~(bit_mask(ctrl->pdiv.width) << ctrl->pdiv.shift);
+ 	val |= vco->pdiv << ctrl->pdiv.shift;
+-	iproc_pll_write(pll, pll->pll_base, ctrl->pdiv.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->pdiv.offset, val);
+ 
+ 	__pll_bring_out_reset(pll, kp, ka, ki);
+ 
+@@ -372,7 +373,7 @@ static unsigned long iproc_pll_recalc_rate(struct clk_hw *hw,
+ 		return 0;
+ 
+ 	/* PLL needs to be locked */
+-	val = readl(pll->pll_base + ctrl->status.offset);
++	val = readl(pll->status_base + ctrl->status.offset);
+ 	if ((val & (1 << ctrl->status.shift)) == 0) {
+ 		clk->rate = 0;
+ 		return 0;
+@@ -383,13 +384,13 @@ static unsigned long iproc_pll_recalc_rate(struct clk_hw *hw,
+ 	 *
+ 	 * ((ndiv_int + ndiv_frac / 2^20) * (parent clock rate / pdiv)
+ 	 */
+-	val = readl(pll->pll_base + ctrl->ndiv_int.offset);
++	val = readl(pll->control_base + ctrl->ndiv_int.offset);
+ 	ndiv_int = (val >> ctrl->ndiv_int.shift) &
+ 		bit_mask(ctrl->ndiv_int.width);
+ 	ndiv = (u64)ndiv_int << ctrl->ndiv_int.shift;
+ 
+ 	if (ctrl->flags & IPROC_CLK_PLL_HAS_NDIV_FRAC) {
+-		val = readl(pll->pll_base + ctrl->ndiv_frac.offset);
++		val = readl(pll->control_base + ctrl->ndiv_frac.offset);
+ 		ndiv_frac = (val >> ctrl->ndiv_frac.shift) &
+ 			bit_mask(ctrl->ndiv_frac.width);
+ 
+@@ -398,7 +399,7 @@ static unsigned long iproc_pll_recalc_rate(struct clk_hw *hw,
+ 				ndiv_frac;
+ 	}
+ 
+-	val = readl(pll->pll_base + ctrl->pdiv.offset);
++	val = readl(pll->control_base + ctrl->pdiv.offset);
+ 	pdiv = (val >> ctrl->pdiv.shift) & bit_mask(ctrl->pdiv.width);
+ 
+ 	clk->rate = (ndiv * parent_rate) >> ctrl->ndiv_int.shift;
+@@ -463,14 +464,14 @@ static int iproc_clk_enable(struct clk_hw *hw)
+ 	u32 val;
+ 
+ 	/* channel enable is active low */
+-	val = readl(pll->pll_base + ctrl->enable.offset);
++	val = readl(pll->control_base + ctrl->enable.offset);
+ 	val &= ~(1 << ctrl->enable.enable_shift);
+-	iproc_pll_write(pll, pll->pll_base, ctrl->enable.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->enable.offset, val);
+ 
+ 	/* also make sure channel is not held */
+-	val = readl(pll->pll_base + ctrl->enable.offset);
++	val = readl(pll->control_base + ctrl->enable.offset);
+ 	val &= ~(1 << ctrl->enable.hold_shift);
+-	iproc_pll_write(pll, pll->pll_base, ctrl->enable.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->enable.offset, val);
+ 
+ 	return 0;
+ }
+@@ -485,9 +486,9 @@ static void iproc_clk_disable(struct clk_hw *hw)
+ 	if (ctrl->flags & IPROC_CLK_AON)
+ 		return;
+ 
+-	val = readl(pll->pll_base + ctrl->enable.offset);
++	val = readl(pll->control_base + ctrl->enable.offset);
+ 	val |= 1 << ctrl->enable.enable_shift;
+-	iproc_pll_write(pll, pll->pll_base, ctrl->enable.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->enable.offset, val);
+ }
+ 
+ static unsigned long iproc_clk_recalc_rate(struct clk_hw *hw,
+@@ -502,7 +503,7 @@ static unsigned long iproc_clk_recalc_rate(struct clk_hw *hw,
+ 	if (parent_rate == 0)
+ 		return 0;
+ 
+-	val = readl(pll->pll_base + ctrl->mdiv.offset);
++	val = readl(pll->control_base + ctrl->mdiv.offset);
+ 	mdiv = (val >> ctrl->mdiv.shift) & bit_mask(ctrl->mdiv.width);
+ 	if (mdiv == 0)
+ 		mdiv = 256;
+@@ -549,14 +550,14 @@ static int iproc_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (div > 256)
+ 		return -EINVAL;
+ 
+-	val = readl(pll->pll_base + ctrl->mdiv.offset);
++	val = readl(pll->control_base + ctrl->mdiv.offset);
+ 	if (div == 256) {
+ 		val &= ~(bit_mask(ctrl->mdiv.width) << ctrl->mdiv.shift);
+ 	} else {
+ 		val &= ~(bit_mask(ctrl->mdiv.width) << ctrl->mdiv.shift);
+ 		val |= div << ctrl->mdiv.shift;
+ 	}
+-	iproc_pll_write(pll, pll->pll_base, ctrl->mdiv.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->mdiv.offset, val);
+ 	clk->rate = parent_rate / div;
+ 
+ 	return 0;
+@@ -581,9 +582,10 @@ static void iproc_pll_sw_cfg(struct iproc_pll *pll)
+ 	if (ctrl->flags & IPROC_CLK_PLL_NEEDS_SW_CFG) {
+ 		u32 val;
+ 
+-		val = readl(pll->pll_base + ctrl->sw_ctrl.offset);
++		val = readl(pll->control_base + ctrl->sw_ctrl.offset);
+ 		val |= BIT(ctrl->sw_ctrl.shift);
+-		iproc_pll_write(pll, pll->pll_base, ctrl->sw_ctrl.offset, val);
++		iproc_pll_write(pll, pll->control_base, ctrl->sw_ctrl.offset,
++				val);
+ 	}
+ }
+ 
+@@ -618,8 +620,8 @@ void __init iproc_pll_clk_setup(struct device_node *node,
+ 	if (WARN_ON(!pll->clks))
+ 		goto err_clks;
+ 
+-	pll->pll_base = of_iomap(node, 0);
+-	if (WARN_ON(!pll->pll_base))
++	pll->control_base = of_iomap(node, 0);
++	if (WARN_ON(!pll->control_base))
+ 		goto err_pll_iomap;
+ 
+ 	/* Some SoCs do not require the pwr_base, thus failing is not fatal */
+@@ -632,6 +634,16 @@ void __init iproc_pll_clk_setup(struct device_node *node,
+ 			goto err_asiu_iomap;
+ 	}
+ 
++	if (pll_ctrl->flags & IPROC_CLK_PLL_SPLIT_STAT_CTRL) {
++		/* Some SoCs have a split status/control.  If this does not
++		 * exist, assume they are unified.
++		 */
++		pll->status_base = of_iomap(node, 2);
++		if (!pll->status_base)
++			goto err_status_iomap;
++	} else
++		pll->status_base = pll->control_base;
++
+ 	/* initialize and register the PLL itself */
+ 	pll->ctrl = pll_ctrl;
+ 
+@@ -702,6 +714,10 @@ err_clk_register:
+ 		clk_unregister(pll->clk_data.clks[i]);
+ 
+ err_pll_register:
++	if (pll->status_base != pll->control_base)
++		iounmap(pll->status_base);
++
++err_status_iomap:
+ 	if (pll->asiu_base)
+ 		iounmap(pll->asiu_base);
+ 
+@@ -709,7 +725,7 @@ err_asiu_iomap:
+ 	if (pll->pwr_base)
+ 		iounmap(pll->pwr_base);
+ 
+-	iounmap(pll->pll_base);
++	iounmap(pll->control_base);
+ 
+ err_pll_iomap:
+ 	kfree(pll->clks);
+diff --git a/drivers/clk/bcm/clk-iproc.h b/drivers/clk/bcm/clk-iproc.h
+index b71c197..8988de7 100644
+--- a/drivers/clk/bcm/clk-iproc.h
++++ b/drivers/clk/bcm/clk-iproc.h
+@@ -55,6 +55,12 @@
+ #define IPROC_CLK_EMBED_PWRCTRL BIT(5)
+ 
+ /*
++ * Some PLLs have separate registers for Status and Control.  Identify this to
++ * let the driver know if additional registers need to be used
 + */
++#define IPROC_CLK_PLL_SPLIT_STAT_CTRL BIT(6)
 +
-+#include <linux/kernel.h>
-+#include <linux/err.h>
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+
-+#include <dt-bindings/clock/bcm-ns2.h>
-+#include "clk-iproc.h"
-+
-+#define REG_VAL(o, s, w) { .offset = o, .shift = s, .width = w, }
-+
-+#define AON_VAL(o, pw, ps, is) { .offset = o, .pwr_width = pw, \
-+	.pwr_shift = ps, .iso_shift = is }
-+
-+#define RESET_VAL(o, rs, prs) { .offset = o, .reset_shift = rs, \
-+	.p_reset_shift = prs }
-+
-+#define DF_VAL(o, kis, kiw, kps, kpw, kas, kaw) { .offset = o, .ki_shift = kis,\
-+	.ki_width = kiw, .kp_shift = kps, .kp_width = kpw, .ka_shift = kas,    \
-+	.ka_width = kaw }
-+
-+#define VCO_CTRL_VAL(uo, lo) { .u_offset = uo, .l_offset = lo }
-+
-+#define ENABLE_VAL(o, es, hs, bs) { .offset = o, .enable_shift = es, \
-+	.hold_shift = hs, .bypass_shift = bs }
-+
-+static const struct iproc_pll_ctrl genpll_scr = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_SPLIT_STAT_CTRL,
-+	.aon = AON_VAL(0x0, 1, 15, 12),
-+	.reset = RESET_VAL(0x4, 2, 1),
-+	.dig_filter = DF_VAL(0x0, 9, 3, 5, 4, 2, 3),
-+	.ndiv_int = REG_VAL(0x8, 4, 10),
-+	.pdiv = REG_VAL(0x8, 0, 4),
-+	.vco_ctrl = VCO_CTRL_VAL(0x10, 0xc),
-+	.status = REG_VAL(0x0, 27, 1),
-+};
-+
-+
-+static const struct iproc_clk_ctrl genpll_scr_clk[] = {
-+	/* bypass_shift, the last value passed into ENABLE_VAL(), is not defined
-+	 * in NS2.  However, it doesn't appear to be used anywhere, so setting
-+	 * it to 0.
-+	 */
-+	[BCM_NS2_GENPLL_SCR_SCR_CLK] = {
-+		.channel = BCM_NS2_GENPLL_SCR_SCR_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 18, 12, 0),
-+		.mdiv = REG_VAL(0x18, 0, 8),
-+	},
-+	[BCM_NS2_GENPLL_SCR_FS_CLK] = {
-+		.channel = BCM_NS2_GENPLL_SCR_FS_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 19, 13, 0),
-+		.mdiv = REG_VAL(0x18, 8, 8),
-+	},
-+	[BCM_NS2_GENPLL_SCR_AUDIO_CLK] = {
-+		.channel = BCM_NS2_GENPLL_SCR_AUDIO_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 20, 14, 0),
-+		.mdiv = REG_VAL(0x14, 0, 8),
-+	},
-+	[BCM_NS2_GENPLL_SCR_CH3_UNUSED] = {
-+		.channel = BCM_NS2_GENPLL_SCR_CH3_UNUSED,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 21, 15, 0),
-+		.mdiv = REG_VAL(0x14, 8, 8),
-+	},
-+	[BCM_NS2_GENPLL_SCR_CH4_UNUSED] = {
-+		.channel = BCM_NS2_GENPLL_SCR_CH4_UNUSED,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 22, 16, 0),
-+		.mdiv = REG_VAL(0x14, 16, 8),
-+	},
-+	[BCM_NS2_GENPLL_SCR_CH5_UNUSED] = {
-+		.channel = BCM_NS2_GENPLL_SCR_CH5_UNUSED,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 23, 17, 0),
-+		.mdiv = REG_VAL(0x14, 24, 8),
-+	},
-+};
-+
-+static void __init ns2_genpll_scr_clk_init(struct device_node *node)
-+{
-+	iproc_pll_clk_setup(node, &genpll_scr, NULL, 0, genpll_scr_clk,
-+			    ARRAY_SIZE(genpll_scr_clk));
-+}
-+CLK_OF_DECLARE(ns2_genpll_src_clk, "brcm,ns2-genpll-scr",
-+	       ns2_genpll_scr_clk_init);
-+
-+static const struct iproc_pll_ctrl genpll_sw = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_SPLIT_STAT_CTRL,
-+	.aon = AON_VAL(0x0, 2, 9, 8),
-+	.reset = RESET_VAL(0x4, 2, 1),
-+	.dig_filter = DF_VAL(0x0, 9, 3, 5, 4, 2, 3),
-+	.ndiv_int = REG_VAL(0x8, 4, 10),
-+	.pdiv = REG_VAL(0x8, 0, 4),
-+	.vco_ctrl = VCO_CTRL_VAL(0x10, 0xc),
-+	.status = REG_VAL(0x0, 13, 1),
-+};
-+
-+static const struct iproc_clk_ctrl genpll_sw_clk[] = {
-+	/* bypass_shift, the last value passed into ENABLE_VAL(), is not defined
-+	 * in NS2.  However, it doesn't appear to be used anywhere, so setting
-+	 * it to 0.
-+	 */
-+	[BCM_NS2_GENPLL_SW_RPE_CLK] = {
-+		.channel = BCM_NS2_GENPLL_SW_RPE_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 18, 12, 0),
-+		.mdiv = REG_VAL(0x18, 0, 8),
-+	},
-+	[BCM_NS2_GENPLL_SW_250_CLK] = {
-+		.channel = BCM_NS2_GENPLL_SW_250_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 19, 13, 0),
-+		.mdiv = REG_VAL(0x18, 8, 8),
-+	},
-+	[BCM_NS2_GENPLL_SW_NIC_CLK] = {
-+		.channel = BCM_NS2_GENPLL_SW_NIC_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 20, 14, 0),
-+		.mdiv = REG_VAL(0x14, 0, 8),
-+	},
-+	[BCM_NS2_GENPLL_SW_CHIMP_CLK] = {
-+		.channel = BCM_NS2_GENPLL_SW_CHIMP_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 21, 15, 0),
-+		.mdiv = REG_VAL(0x14, 8, 8),
-+	},
-+	[BCM_NS2_GENPLL_SW_PORT_CLK] = {
-+		.channel = BCM_NS2_GENPLL_SW_PORT_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 22, 16, 0),
-+		.mdiv = REG_VAL(0x14, 16, 8),
-+	},
-+	[BCM_NS2_GENPLL_SW_SDIO_CLK] = {
-+		.channel = BCM_NS2_GENPLL_SW_SDIO_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 23, 17, 0),
-+		.mdiv = REG_VAL(0x14, 24, 8),
-+	},
-+};
-+
-+static void __init ns2_genpll_sw_clk_init(struct device_node *node)
-+{
-+	iproc_pll_clk_setup(node, &genpll_sw, NULL, 0, genpll_sw_clk,
-+			    ARRAY_SIZE(genpll_sw_clk));
-+}
-+CLK_OF_DECLARE(ns2_genpll_sw_clk, "brcm,ns2-genpll-sw",
-+	       ns2_genpll_sw_clk_init);
-+
-+static const struct iproc_pll_ctrl lcpll_ddr = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_SPLIT_STAT_CTRL,
-+	.aon = AON_VAL(0x0, 2, 1, 0),
-+	.reset = RESET_VAL(0x4, 2, 1),
-+	.dig_filter = DF_VAL(0x0, 9, 3, 5, 4, 1, 4),
-+	.ndiv_int = REG_VAL(0x8, 4, 10),
-+	.pdiv = REG_VAL(0x8, 0, 4),
-+	.vco_ctrl = VCO_CTRL_VAL(0x10, 0xc),
-+	.status = REG_VAL(0x0, 0, 1),
-+};
-+
-+static const struct iproc_clk_ctrl lcpll_ddr_clk[] = {
-+	/* bypass_shift, the last value passed into ENABLE_VAL(), is not defined
-+	 * in NS2.  However, it doesn't appear to be used anywhere, so setting
-+	 * it to 0.
-+	 */
-+	[BCM_NS2_LCPLL_DDR_PCIE_SATA_USB_CLK] = {
-+		.channel = BCM_NS2_LCPLL_DDR_PCIE_SATA_USB_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 18, 12, 0),
-+		.mdiv = REG_VAL(0x14, 0, 8),
-+	},
-+	[BCM_NS2_LCPLL_DDR_DDR_CLK] = {
-+		.channel = BCM_NS2_LCPLL_DDR_DDR_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 19, 13, 0),
-+		.mdiv = REG_VAL(0x14, 8, 8),
-+	},
-+	[BCM_NS2_LCPLL_DDR_CH2_UNUSED] = {
-+		.channel = BCM_NS2_LCPLL_DDR_CH2_UNUSED,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 20, 14, 0),
-+		.mdiv = REG_VAL(0x10, 0, 8),
-+	},
-+	[BCM_NS2_LCPLL_DDR_CH3_UNUSED] = {
-+		.channel = BCM_NS2_LCPLL_DDR_CH3_UNUSED,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 21, 15, 0),
-+		.mdiv = REG_VAL(0x10, 8, 8),
-+	},
-+	[BCM_NS2_LCPLL_DDR_CH4_UNUSED] = {
-+		.channel = BCM_NS2_LCPLL_DDR_CH4_UNUSED,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 22, 16, 0),
-+		.mdiv = REG_VAL(0x10, 16, 8),
-+	},
-+	[BCM_NS2_LCPLL_DDR_CH5_UNUSED] = {
-+		.channel = BCM_NS2_LCPLL_DDR_CH5_UNUSED,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 23, 17, 0),
-+		.mdiv = REG_VAL(0x10, 24, 8),
-+	},
-+};
-+
-+static void __init ns2_lcpll_ddr_clk_init(struct device_node *node)
-+{
-+	iproc_pll_clk_setup(node, &lcpll_ddr, NULL, 0, lcpll_ddr_clk,
-+			    ARRAY_SIZE(lcpll_ddr_clk));
-+}
-+CLK_OF_DECLARE(ns2_lcpll_ddr_clk, "brcm,ns2-lcpll-ddr",
-+	       ns2_lcpll_ddr_clk_init);
-+
-+static const struct iproc_pll_ctrl lcpll_ports = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_SPLIT_STAT_CTRL,
-+	.aon = AON_VAL(0x0, 2, 5, 4),
-+	.reset = RESET_VAL(0x4, 2, 1),
-+	.dig_filter = DF_VAL(0x0, 9, 3, 5, 4, 1, 4),
-+	.ndiv_int = REG_VAL(0x8, 4, 10),
-+	.pdiv = REG_VAL(0x8, 0, 4),
-+	.vco_ctrl = VCO_CTRL_VAL(0x10, 0xc),
-+	.status = REG_VAL(0x0, 0, 1),
-+};
-+
-+static const struct iproc_clk_ctrl lcpll_ports_clk[] = {
-+	/* bypass_shift, the last value passed into ENABLE_VAL(), is not defined
-+	 * in NS2.  However, it doesn't appear to be used anywhere, so setting
-+	 * it to 0.
-+	 */
-+	[BCM_NS2_LCPLL_PORTS_WAN_CLK] = {
-+		.channel = BCM_NS2_LCPLL_PORTS_WAN_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 18, 12, 0),
-+		.mdiv = REG_VAL(0x14, 0, 8),
-+	},
-+	[BCM_NS2_LCPLL_PORTS_RGMII_CLK] = {
-+		.channel = BCM_NS2_LCPLL_PORTS_RGMII_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 19, 13, 0),
-+		.mdiv = REG_VAL(0x14, 8, 8),
-+	},
-+	[BCM_NS2_LCPLL_PORTS_CH2_UNUSED] = {
-+		.channel = BCM_NS2_LCPLL_PORTS_CH2_UNUSED,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 20, 14, 0),
-+		.mdiv = REG_VAL(0x10, 0, 8),
-+	},
-+	[BCM_NS2_LCPLL_PORTS_CH3_UNUSED] = {
-+		.channel = BCM_NS2_LCPLL_PORTS_CH3_UNUSED,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 21, 15, 0),
-+		.mdiv = REG_VAL(0x10, 8, 8),
-+	},
-+	[BCM_NS2_LCPLL_PORTS_CH4_UNUSED] = {
-+		.channel = BCM_NS2_LCPLL_PORTS_CH4_UNUSED,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 22, 16, 0),
-+		.mdiv = REG_VAL(0x10, 16, 8),
-+	},
-+	[BCM_NS2_LCPLL_PORTS_CH5_UNUSED] = {
-+		.channel = BCM_NS2_LCPLL_PORTS_CH5_UNUSED,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 23, 17, 0),
-+		.mdiv = REG_VAL(0x10, 24, 8),
-+	},
-+};
-+
-+static void __init ns2_lcpll_ports_clk_init(struct device_node *node)
-+{
-+	iproc_pll_clk_setup(node, &lcpll_ports, NULL, 0, lcpll_ports_clk,
-+			    ARRAY_SIZE(lcpll_ports_clk));
-+}
-+CLK_OF_DECLARE(ns2_lcpll_ports_clk, "brcm,ns2-lcpll-ports",
-+	       ns2_lcpll_ports_clk_init);
-diff --git a/include/dt-bindings/clock/bcm-ns2.h b/include/dt-bindings/clock/bcm-ns2.h
-new file mode 100644
-index 0000000..d99c7a2
---- /dev/null
-+++ b/include/dt-bindings/clock/bcm-ns2.h
-@@ -0,0 +1,72 @@
 +/*
-+ *  BSD LICENSE
-+ *
-+ *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
-+ *
-+ *  Redistribution and use in source and binary forms, with or without
-+ *  modification, are permitted provided that the following conditions
-+ *  are met:
-+ *
-+ *    * Redistributions of source code must retain the above copyright
-+ *      notice, this list of conditions and the following disclaimer.
-+ *    * Redistributions in binary form must reproduce the above copyright
-+ *      notice, this list of conditions and the following disclaimer in
-+ *      the documentation and/or other materials provided with the
-+ *      distribution.
-+ *    * Neither the name of Broadcom Corporation nor the names of its
-+ *      contributors may be used to endorse or promote products derived
-+ *      from this software without specific prior written permission.
-+ *
-+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+#ifndef _CLOCK_BCM_NS2_H
-+#define _CLOCK_BCM_NS2_H
-+
-+/* GENPLL SCR clock channel ID */
-+#define BCM_NS2_GENPLL_SCR		0
-+#define BCM_NS2_GENPLL_SCR_SCR_CLK	1
-+#define BCM_NS2_GENPLL_SCR_FS_CLK	2
-+#define BCM_NS2_GENPLL_SCR_AUDIO_CLK	3
-+#define BCM_NS2_GENPLL_SCR_CH3_UNUSED	4
-+#define BCM_NS2_GENPLL_SCR_CH4_UNUSED	5
-+#define BCM_NS2_GENPLL_SCR_CH5_UNUSED	6
-+
-+/* GENPLL SW clock channel ID */
-+#define BCM_NS2_GENPLL_SW		0
-+#define BCM_NS2_GENPLL_SW_RPE_CLK	1
-+#define BCM_NS2_GENPLL_SW_250_CLK	2
-+#define BCM_NS2_GENPLL_SW_NIC_CLK	3
-+#define BCM_NS2_GENPLL_SW_CHIMP_CLK	4
-+#define BCM_NS2_GENPLL_SW_PORT_CLK	5
-+#define BCM_NS2_GENPLL_SW_SDIO_CLK	6
-+
-+/* LCPLL DDR clock channel ID */
-+#define BCM_NS2_LCPLL_DDR		0
-+#define BCM_NS2_LCPLL_DDR_PCIE_SATA_USB_CLK	1
-+#define BCM_NS2_LCPLL_DDR_DDR_CLK	2
-+#define BCM_NS2_LCPLL_DDR_CH2_UNUSED	3
-+#define BCM_NS2_LCPLL_DDR_CH3_UNUSED	4
-+#define BCM_NS2_LCPLL_DDR_CH4_UNUSED	5
-+#define BCM_NS2_LCPLL_DDR_CH5_UNUSED	6
-+
-+/* LCPLL PORTS clock channel ID */
-+#define BCM_NS2_LCPLL_PORTS		0
-+#define BCM_NS2_LCPLL_PORTS_WAN_CLK	1
-+#define BCM_NS2_LCPLL_PORTS_RGMII_CLK	2
-+#define BCM_NS2_LCPLL_PORTS_CH2_UNUSED	3
-+#define BCM_NS2_LCPLL_PORTS_CH3_UNUSED	4
-+#define BCM_NS2_LCPLL_PORTS_CH4_UNUSED	5
-+#define BCM_NS2_LCPLL_PORTS_CH5_UNUSED	6
-+
-+#endif /* _CLOCK_BCM_NS2_H */
+  * Parameters for VCO frequency configuration
+  *
+  * VCO frequency =
 -- 
 1.9.1
