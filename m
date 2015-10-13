@@ -1,121 +1,59 @@
-From: majun258@huawei.com (majun (F))
-Date: Tue, 13 Oct 2015 14:32:44 +0800
-Subject: [PATCH v5 1/3] initialize each mbigen device node as a interrupt
- controller.
-In-Reply-To: <alpine.DEB.2.11.1510111335150.6097@nanos>
-References: <1443605949-15396-1-git-send-email-majun258@huawei.com>
- <1443605949-15396-2-git-send-email-majun258@huawei.com>
- <alpine.DEB.2.11.1509302242220.4500@nanos> <5610D3BD.1040408@huawei.com>
- <alpine.DEB.2.11.1510091441200.6097@nanos> <5618D3EC.6050501@huawei.com>
- <20151010110942.52d34a4b@arm.com> <alpine.DEB.2.11.1510111150270.6097@nanos>
- <20151011120331.09093ffc@arm.com> <alpine.DEB.2.11.1510111335150.6097@nanos>
-Message-ID: <561CA58C.2060207@huawei.com>
+From: marek.belisko@gmail.com (Belisko Marek)
+Date: Tue, 13 Oct 2015 08:43:07 +0200
+Subject: [PATCH v3] ARM: dts: twl4030: Add iio properties for bci subnode
+In-Reply-To: <20151012235343.GA7755@earth>
+References: <1443212447-5841-1-git-send-email-marek@goldelico.com>
+ <1443212447-5841-3-git-send-email-marek@goldelico.com>
+ <20150926172936.GD22315@earth>
+ <CAAfyv36nZ3c-yw7QQHwBWk3GwY31rV3Uq2n0dz5hppn5JFhEcA@mail.gmail.com>
+ <20151012213827.GC23801@atomide.com>
+ <20151012222009.GH23801@atomide.com> <20151012235343.GA7755@earth>
+Message-ID: <CAAfyv37SFd+fq_=x9oO0KBzgcFDpyJZXCZ_QEQkFPzwTf+r9Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas:
+Hi,
 
-? 2015/10/12 0:45, Thomas Gleixner ??:
-> On Sun, 11 Oct 2015, Marc Zyngier wrote:
->> On Sun, 11 Oct 2015 11:54:49 +0200
->> Thomas Gleixner <tglx@linutronix.de> wrote:
+On Tue, Oct 13, 2015 at 1:53 AM, Sebastian Reichel <sre@kernel.org> wrote:
+> Hi,
+>
+> On Mon, Oct 12, 2015 at 03:20:10PM -0700, Tony Lindgren wrote:
+>> * Tony Lindgren <tony@atomide.com> [151012 14:43]:
+>> > * Belisko Marek <marek.belisko@gmail.com> [150926 13:02]:
+>> > > Tony sorry I forgot to add you to the recipients for this patchset.
+>> > > Can you please queue this patch. Many thanks.
+>> >
+>> > OK applying into omap-for-v4.4/dt thanks.
 >>
->>> On Sat, 10 Oct 2015, Marc Zyngier wrote:
->>>> On Sat, 10 Oct 2015 17:01:32 +0800
->>>> "majun (F)" <majun258@huawei.com> wrote:
->>>>> But there is a problem If i make the structure like you said.
->>>>>
->>>>> For example, my hardware structure likes below:
->>>>>
->>>>> uart ------> mbigen --> ITS-pMSI --> ITS --> GIC
->>>>>      virq1
->>>>>
->>>>> virq1 means the virq number allocted by irq_of_parse_and_map() function
->>>>> when system parse the uart dts node in initializing  stage.
->>>>>
->>>>> To create a ITS device, I need to call msi_domain_alloc_irqs() function
->>>>> in my mbigen alloc function.
->>>>>
->>>>> In this function, a new virq number(named as virq2 ) which different from
->>>>> virq1 is allocated.
->>>>> So, this is a big problem.
->>>>
->>>> I think I see what your problem is:
->>>> - The wired interrupt (uart -> mbigen) is allocated through DT (and
->>>>   must be available early, because of of_platform_populate),
->>>> - The MSI (mgigen -> ITS) is dynamic (and allocated much later,
->>>>   because the device model kicks in after irqchip init, and we cannot
->>>>   allocate MSIs without a device).
->>>
->>> Why do we need that wired interrupt at all? 
->>>
->>> We can make mbigen the 'msi-parent' of the device and let the
->>> msi_domain_ops::msi_prepare() callback figure out the actual wiring
->>> through device->fwnode.
+>> Actually dropping this one, it makes build fail as we don't
+>> have twl4030_madc yet.
 >>
->> That's because the device behind the mbigen can't do any MSI at all.
->> Think of a 8250 uart, for example.
->>
->> If we make the mbigen the msi-parent of the uart, then we need to teach
->> the 8250 driver to request MSIs.
-> 
-> I really do not understand why of_platform_populate cares about
-> interrupt allocations. That's outright stupid. We should care about
-> that at device probe time, i.e. at the point where the driver is
-> registered and probed if there is matching platform data. If we do it
-> in of_platform_populate then we allocate interrupts even for devices
-> which do not have a driver, i.e. we just waste memory.
-> 
-> So we better teach a couple of drivers to handle that instead of
-> inventing horrible workarounds.
-> 
->> It also means that the DT doesn't represent the HW anymore (this
->> wired interrupt actually exists).
-> 
-> I think the abstraction here is wrong. If it would be correct, then
-> PCI-MSI would be wrong. The MSI part of PCI is a MSI producer, mbigen
-> is as well. Technically MSI is not integral part of the PCI device, it
-> just happens to have it's configuration registers in the PCI
-> configuration space of the device:
-> 
->     [PCI-BUS]------[Interrupt mode selector]
->     	      	|        |
->     	      	|        |
-> 		------[Legacy irq gate]<-----
-> 		|        |                  |
-> 		|        |                  |---[Device interrupt]
-> 		|        |                  |
-> 		------[MSI unit]<------------
-> 
-> So you have a 'wire' from the device to the MSI unit, but we do not
-> care about that 'wire'. All we care about are the MSI configuration
-> registers. We find them via the PCI device which gives us the address
-> of the PCI configuration space.
-> 
-> So now in the mbigen case this looks like this:
-> 
->     [MSI-BUS] ----- [MBIGEN]<-------------------[Device interrupt]
-> 
-> Again, you have a 'wire' from the device to the MSI unit (MBIGEN) and
-> we do not care about that 'wire' either. What we care about is how we
-> find the MSI (mbigen) configuration registers for a particular
-> device. So we need a DT/ACPI entry which describes those configuration
-> registers and whatever supplementary information is required. That
-> will make the mbigen driver extremly simple.
-> 
+>> Maybe please send a separate set of dts patches for me.
+>
+> mh that's strange, twl4030-madc is there since a long time. But
+> checking the patch, it seems Marek got the phandle wrong:
+OK, thanks for letting me know. I'll send update soon. Thanks.
+>
+> $ grep -B1 "ti,twl4030-madc" arch/arm/boot/dts/twl4030.dtsi
+>         twl_madc: madc {
+>                 compatible = "ti,twl4030-madc";
+>
+> Once that is fixed, the patch should have no dependencies.
+>
+> -- Sebastian
 
-According to your suggestions, I tried to make the hardware structure likes below:
+BR,
 
-device(8250 uart) -> mbigne -> ITS-pMSI --> ITS --> GIC
+marek
 
-And  8250 uart dts node is:
+-- 
+as simple and primitive as possible
+-------------------------------------------------
+Marek Belisko - OPEN-NANDRA
+Freelance Developer
 
- 8250_uart {
-	compatible = "xxx";
-	msi-parent = < &mbigen>;
-	config_addr = <xxxxx> ; /* configuration register */
-	interrupts = <x>;
-	interrupt-parent = ?
-}
-
-My question is what's the interrupt-parent should be?
+Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+Tel: +421 915 052 184
+skype: marekwhite
+twitter: #opennandra
+web: http://open-nandra.com
