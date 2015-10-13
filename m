@@ -1,34 +1,50 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 13 Oct 2015 13:39:07 +0300
-Subject: [PATCH v4 11/25] ARM/dmaengine: edma: Merge the two drivers under
- drivers/dma/
-In-Reply-To: <561CC7B9.8000201@ti.com>
-References: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
- <1443088932-21731-12-git-send-email-peter.ujfalusi@ti.com>
- <20151012160024.GF27370@localhost> <561CC7B9.8000201@ti.com>
-Message-ID: <561CDF4B.3050208@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 13 Oct 2015 11:42:19 +0100
+Subject: [PATCH 2/4] arm64: dts: Foundation model: increate GICC region
+ to allow EOImode=1
+In-Reply-To: <1444729069-27922-3-git-send-email-andre.przywara@arm.com>
+References: <1444729069-27922-1-git-send-email-andre.przywara@arm.com>
+ <1444729069-27922-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <561CE00B.3070105@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/2015 11:58 AM, Peter Ujfalusi wrote:
-> On 10/12/2015 07:00 PM, Vinod Koul wrote:
->> On Thu, Sep 24, 2015 at 01:01:58PM +0300, Peter Ujfalusi wrote:
->>> Move the code out from arch/arm/common and merge it inside of the dmaengine
->>> driver.
->>> This change is done with as minimal change to the code as possible to avoid
->>> any possibilities to introducing regression.
->>
->> Is this a pure move patch or code has been modified, if latter am
->> disappointed that existing code style issue have not been fixed
+Hi Andre,
+
+s/increate/increase size of/ in the subject line
+
+On 13/10/15 10:37, Andre Przywara wrote:
+> Recent commits made the GIC driver use EOImode=1 for all GICs
+> that advertise the proper GICC region size.
+
+Well, it is not so much that the kernel uses EOImode=1, but the fact
+that the model has a GICv2 implementation, hence a 8kB GICC region.
+
+> To let the model benefit from the blessings of that mode, increase
+> the GICC region to its actual size of 8K.
 > 
-> Yes, it is mostly code move, I have done minimal changes only needed to get
-> the moved code working in the new location.
-> Patch 13 in this series will go through the file and will fix up most (I hope
-> all) of the outstanding coding style issues.
-> At this point I wanted to have as small change as possible.
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  arch/arm64/boot/dts/arm/foundation-v8.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dts b/arch/arm64/boot/dts/arm/foundation-v8.dts
+> index 3c5595d..57ad9fe 100644
+> --- a/arch/arm64/boot/dts/arm/foundation-v8.dts
+> +++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
+> @@ -78,7 +78,7 @@
+>  		#address-cells = <2>;
+>  		interrupt-controller;
+>  		reg = <0x0 0x2c001000 0 0x1000>,
+> -		      <0x0 0x2c002000 0 0x1000>,
+> +		      <0x0 0x2c002000 0 0x2000>,
+>  		      <0x0 0x2c004000 0 0x2000>,
+>  		      <0x0 0x2c006000 0 0x2000>;
+>  		interrupts = <1 9 0xf04>;
+> 
 
-But fair enough, I will resend the series with checkpatch fixes done for this
-patch.
+Thanks,
 
+	M.
 -- 
-P?ter
+Jazz is not dead. It just smells funny...
