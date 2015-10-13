@@ -1,62 +1,281 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 13 Oct 2015 10:35:00 -0700
-Subject: [PATCH 3/5] mtd: brcmnand: Optional DT flag to reset IPROC NAND
- controller
-In-Reply-To: <20151012215459.GA8843@kryptos>
-References: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
- <1443808606-21203-4-git-send-email-anup.patel@broadcom.com>
- <20151004214943.GA28904@localhost>
- <39063E8F96E11742B35A201CC5D095B7AD54C1@SJEXCHMB10.corp.ad.broadcom.com>
- <20151006134119.GB26818@localhost> <56144A62.70300@broadcom.com>
- <5614574C.2060701@gmail.com>
- <39063E8F96E11742B35A201CC5D095B7AD8ADD@SJEXCHMB10.corp.ad.broadcom.com>
- <20151012215459.GA8843@kryptos>
-Message-ID: <561D40C4.4030703@gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 13 Oct 2015 18:22:12 +0100
+Subject: [PATCH v3 04/24] arm64: Move cpu feature detection code
+In-Reply-To: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
+References: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1444756952-31145-5-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/15 14:54, Josh Cartwright wrote:
-> On Wed, Oct 07, 2015 at 03:33:50AM +0000, Anup Patel wrote:
->> From: Florian Fainelli [mailto:f.fainelli at gmail.com]
->>> On 06/10/15 15:25, Scott Branden wrote:
-> [..]
->>> Then instead of adding a "reset flag" to Device Tree, another approach could be
->>> to put the desired or currently configured exhaustive list of NAND timings in
->>> Device Tree, and based on that you could have this:
->>>
->>> - the NAND controller driver finds that these timings match the current
->>> configuration, you are good to go
->>>
->>> - the NAND controller drivers finds a difference in how current timings are
->>> configured vs. desired timings, and issues a controller reset, prior to applying
->>> new timing configuration
->>
->> To add to this ...
->>
->> The mechanism to reset is BRCM NAND controller is SOC specific so the
->> SoC independent BRCM NAND driver (i.e. brcmnand.c) does not know how
->> to reset the NAND controller.
->>
->> For iProc SoC family, the NAND controller reset is through IDM register
->> space which is only iomap'ed by iproc_nand.c.
->>
->> We might end-up having one more SoC specific callback which will be
->> Provided by iproc_nand.c to brcmnand.c.
-> 
-> Not that I'm familiar with these SoCs, but I did want to chime in and
-> make sure you are aware of the existing reset_controller_dev
-> abstraction, which is intended to solve exactly this problem.  Including
-> a reset_control_get_optional() that might fit your use case.  See
-> include/linux/reset{,-controller}.h.
+This patch moves the CPU feature detection code from
+ arch/arm64/kernel/{setup.c to cpufeature.c}
 
-I almost suggested that, and then looked more closely at where this
-reset register is located, and it happens to be in the NAND controller
-itself (IPROC IDM which is the iProc SHIM to the NAND controller), so
-coming up with a reset controller driver and a reset controller consumer
-for that simple use case sounds both unnecessary and complex.
+The plan is to consolidate all the CPU feature handling
+in cpufeature.c.
 
-The core of the discussion is about disguising this NAND controller
-reset as a way to preserve previously configured NAND timings, which is
-at best a hack and an unstated dependency with the firmware.
+Changes pr_fmt from "alternatives" to "cpu features"
+
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/kernel/cpufeature.c |  110 +++++++++++++++++++++++++++++++++++++++-
+ arch/arm64/kernel/setup.c      |  107 --------------------------------------
+ 2 files changed, 109 insertions(+), 108 deletions(-)
+
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 3c9aed3..e49be15 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -16,13 +16,31 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+-#define pr_fmt(fmt) "alternatives: " fmt
++#define pr_fmt(fmt) "CPU features: " fmt
+ 
+ #include <linux/types.h>
+ #include <asm/cpu.h>
+ #include <asm/cpufeature.h>
+ #include <asm/processor.h>
+ 
++unsigned long elf_hwcap __read_mostly;
++EXPORT_SYMBOL_GPL(elf_hwcap);
++
++#ifdef CONFIG_COMPAT
++#define COMPAT_ELF_HWCAP_DEFAULT	\
++				(COMPAT_HWCAP_HALF|COMPAT_HWCAP_THUMB|\
++				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
++				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
++				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
++				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV|\
++				 COMPAT_HWCAP_LPAE)
++unsigned int compat_elf_hwcap __read_mostly = COMPAT_ELF_HWCAP_DEFAULT;
++unsigned int compat_elf_hwcap2 __read_mostly;
++#endif
++
++DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
++
++
+ static bool
+ feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
+ {
+@@ -100,3 +118,93 @@ void check_local_cpu_features(void)
+ {
+ 	check_cpu_capabilities(arm64_features, "detected feature:");
+ }
++
++void __init setup_cpu_features(void)
++{
++	u64 features;
++	s64 block;
++	u32 cwg;
++	int cls;
++
++	/*
++	 * Check for sane CTR_EL0.CWG value.
++	 */
++	cwg = cache_type_cwg();
++	cls = cache_line_size();
++	if (!cwg)
++		pr_warn("No Cache Writeback Granule information, assuming cache line size %d\n",
++			cls);
++	if (L1_CACHE_BYTES < cls)
++		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
++			L1_CACHE_BYTES, cls);
++
++	/*
++	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
++	 * The blocks we test below represent incremental functionality
++	 * for non-negative values. Negative values are reserved.
++	 */
++	features = read_cpuid(ID_AA64ISAR0_EL1);
++	block = cpuid_feature_extract_field(features, 4);
++	if (block > 0) {
++		switch (block) {
++		default:
++		case 2:
++			elf_hwcap |= HWCAP_PMULL;
++		case 1:
++			elf_hwcap |= HWCAP_AES;
++		case 0:
++			break;
++		}
++	}
++
++	if (cpuid_feature_extract_field(features, 8) > 0)
++		elf_hwcap |= HWCAP_SHA1;
++
++	if (cpuid_feature_extract_field(features, 12) > 0)
++		elf_hwcap |= HWCAP_SHA2;
++
++	if (cpuid_feature_extract_field(features, 16) > 0)
++		elf_hwcap |= HWCAP_CRC32;
++
++	block = cpuid_feature_extract_field(features, 20);
++	if (block > 0) {
++		switch (block) {
++		default:
++		case 2:
++			elf_hwcap |= HWCAP_ATOMICS;
++		case 1:
++			/* RESERVED */
++		case 0:
++			break;
++		}
++	}
++
++#ifdef CONFIG_COMPAT
++	/*
++	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
++	 * the AArch32 32-bit execution state.
++	 */
++	features = read_cpuid(ID_ISAR5_EL1);
++	block = cpuid_feature_extract_field(features, 4);
++	if (block > 0) {
++		switch (block) {
++		default:
++		case 2:
++			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
++		case 1:
++			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
++		case 0:
++			break;
++		}
++	}
++
++	if (cpuid_feature_extract_field(features, 8) > 0)
++		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
++
++	if (cpuid_feature_extract_field(features, 12) > 0)
++		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
++
++	if (cpuid_feature_extract_field(features, 16) > 0)
++		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
++#endif
++}
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index c217992..ce6b967 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -64,23 +64,6 @@
+ #include <asm/efi.h>
+ #include <asm/xen/hypervisor.h>
+ 
+-unsigned long elf_hwcap __read_mostly;
+-EXPORT_SYMBOL_GPL(elf_hwcap);
+-
+-#ifdef CONFIG_COMPAT
+-#define COMPAT_ELF_HWCAP_DEFAULT	\
+-				(COMPAT_HWCAP_HALF|COMPAT_HWCAP_THUMB|\
+-				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
+-				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
+-				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
+-				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV|\
+-				 COMPAT_HWCAP_LPAE)
+-unsigned int compat_elf_hwcap __read_mostly = COMPAT_ELF_HWCAP_DEFAULT;
+-unsigned int compat_elf_hwcap2 __read_mostly;
+-#endif
+-
+-DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+-
+ phys_addr_t __fdt_pointer __initdata;
+ 
+ /*
+@@ -195,96 +178,6 @@ static void __init smp_build_mpidr_hash(void)
+ 	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
+ }
+ 
+-void __init setup_cpu_features(void)
+-{
+-	u64 features;
+-	s64 block;
+-	u32 cwg;
+-	int cls;
+-
+-	/*
+-	 * Check for sane CTR_EL0.CWG value.
+-	 */
+-	cwg = cache_type_cwg();
+-	cls = cache_line_size();
+-	if (!cwg)
+-		pr_warn("No Cache Writeback Granule information, assuming cache line size %d\n",
+-			cls);
+-	if (L1_CACHE_BYTES < cls)
+-		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
+-			L1_CACHE_BYTES, cls);
+-
+-	/*
+-	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
+-	 * The blocks we test below represent incremental functionality
+-	 * for non-negative values. Negative values are reserved.
+-	 */
+-	features = read_cpuid(ID_AA64ISAR0_EL1);
+-	block = cpuid_feature_extract_field(features, 4);
+-	if (block > 0) {
+-		switch (block) {
+-		default:
+-		case 2:
+-			elf_hwcap |= HWCAP_PMULL;
+-		case 1:
+-			elf_hwcap |= HWCAP_AES;
+-		case 0:
+-			break;
+-		}
+-	}
+-
+-	if (cpuid_feature_extract_field(features, 8) > 0)
+-		elf_hwcap |= HWCAP_SHA1;
+-
+-	if (cpuid_feature_extract_field(features, 12) > 0)
+-		elf_hwcap |= HWCAP_SHA2;
+-
+-	if (cpuid_feature_extract_field(features, 16) > 0)
+-		elf_hwcap |= HWCAP_CRC32;
+-
+-	block = cpuid_feature_extract_field(features, 20);
+-	if (block > 0) {
+-		switch (block) {
+-		default:
+-		case 2:
+-			elf_hwcap |= HWCAP_ATOMICS;
+-		case 1:
+-			/* RESERVED */
+-		case 0:
+-			break;
+-		}
+-	}
+-
+-#ifdef CONFIG_COMPAT
+-	/*
+-	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
+-	 * the AArch32 32-bit execution state.
+-	 */
+-	features = read_cpuid(ID_ISAR5_EL1);
+-	block = cpuid_feature_extract_field(features, 4);
+-	if (block > 0) {
+-		switch (block) {
+-		default:
+-		case 2:
+-			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
+-		case 1:
+-			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
+-		case 0:
+-			break;
+-		}
+-	}
+-
+-	if (cpuid_feature_extract_field(features, 8) > 0)
+-		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
+-
+-	if (cpuid_feature_extract_field(features, 12) > 0)
+-		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
+-
+-	if (cpuid_feature_extract_field(features, 16) > 0)
+-		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
+-#endif
+-}
+-
+ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ {
+ 	void *dt_virt = fixmap_remap_fdt(dt_phys);
 -- 
-Florian
+1.7.9.5
