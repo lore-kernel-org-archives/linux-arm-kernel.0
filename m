@@ -1,45 +1,88 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 13 Oct 2015 10:27:08 +0900
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Enable Maxim 77693 LED and haptic
- drivers
-In-Reply-To: <1444699628-3774-1-git-send-email-k.kozlowski@samsung.com>
-References: <1444699628-3774-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1444699628-3774-4-git-send-email-k.kozlowski@samsung.com>
+From: Minghuan.Lian@freescale.com (Lian M.H.)
+Date: Tue, 13 Oct 2015 01:37:16 +0000
+Subject: [PATCH v2] PCI: layerscape: Add PCIe support for LS1043a and
+ LS2080a
+In-Reply-To: <20151012152656.GB29221@localhost>
+References: <1442481219-28299-1-git-send-email-Minghuan.Lian@freescale.com>
+ <20151007175725.GC27633@localhost> <5274293.94FcFfK0fd@wuerfel>
+ <20151012152656.GB29221@localhost>
+Message-ID: <DM2PR0301MB06407A23952B95E2244C8831E2300@DM2PR0301MB0640.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable support for:
-1. Haptic motor driver on Trats2 board (Maxim 77693) and Note 4 (Maxim
-   77843);
-2. LED driver on Trats2 board (Maxim 77693).
+Hi Bjorn,
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Thanks for your comments
+I will split the patch.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 0b2b474649a2..fbe7d93ce5b3 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -248,6 +248,7 @@ CONFIG_TOUCHSCREEN_ST1232=m
- CONFIG_TOUCHSCREEN_STMPE=y
- CONFIG_TOUCHSCREEN_SUN4I=y
- CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_MAX77693_HAPTIC=m
- CONFIG_INPUT_MAX8997_HAPTIC=m
- CONFIG_INPUT_MPU3050=y
- CONFIG_INPUT_AXP20X_PEK=y
-@@ -570,8 +571,10 @@ CONFIG_MMC_SH_MMCIF=y
- CONFIG_MMC_SUNXI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_CLASS_FLASH=m
- CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_PWM=y
-+CONFIG_LEDS_MAX77693=m
- CONFIG_LEDS_MAX8997=m
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_TIMER=y
--- 
-1.9.1
+Thanks,
+Minghuan
+
+> -----Original Message-----
+> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> Sent: Monday, October 12, 2015 11:27 PM
+> To: Arnd Bergmann <arnd@arndb.de>
+> Cc: Lian Minghuan-B31939 <Minghuan.Lian@freescale.com>;
+> linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Zang
+> Roy-R61911 <tie-fei.zang@freescale.com>; Hu Mingkai-B21284
+> <Mingkai.Hu@freescale.com>; Yoder Stuart-B08248
+> <stuart.yoder@freescale.com>; Li Yang-Leo-R58472 <LeoLi@freescale.com>;
+> Bjorn Helgaas <bhelgaas@google.com>; Jingoo Han <jg1.han@samsung.com>;
+> Zhou Wang <wangzhou1@hisilicon.com>
+> Subject: Re: [PATCH v2] PCI: layerscape: Add PCIe support for LS1043a and
+> LS2080a
+> 
+> On Mon, Oct 12, 2015 at 02:36:29PM +0200, Arnd Bergmann wrote:
+> > On Wednesday 07 October 2015 12:57:25 Bjorn Helgaas wrote:
+> > > > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> > > > index ae873be..38fe8a8 100644
+> > > > --- a/drivers/pci/host/Kconfig
+> > > > +++ b/drivers/pci/host/Kconfig
+> > > > @@ -105,7 +105,7 @@ config PCI_XGENE_MSI
+> > > >
+> > > >  config PCI_LAYERSCAPE
+> > > >       bool "Freescale Layerscape PCIe controller"
+> > > > -     depends on OF && ARM
+> > > > +     depends on OF && (ARM || ARM64)
+> > >
+> > > It seems like there are a couple things going on here, and I wonder
+> > > if you can split them out into separate patches.
+> > >
+> > > 1) Making this work on ARM64 as well as on ARM.  This may be of
+> > > interest for other DesignWare-based drivers, so if you split this
+> > > out, maybe it would be a useful template for converting the other
+> > > drivers, too.
+> >
+> > The Kconfig change apparently made it into linux-next now, but it
+> > doesn't actually build on arm64, because the dependency that was
+> > mentioned in the cover letter [0] is not there.
+> > ...
+> > [0] This patch is based on v4.3-rc1 and [PATCH v9 0/6]
+> > PCI: hisi: Add PCIe host support for HiSilicon SoC Hip05 patchset from
+> > Zhou Wang.
+> 
+> Oops, my fault.  I read that as "this patch is derived from, e.g., it a newer
+> version of, the HiSilicon patchset."  But that's obviously a silly way to read it.
+> I re-did the merge without the Layerscape patch and repushed it to my "next"
+> branch.
+> 
+> I'll work on Zhou's series, then revisit Minghuan's patch(es).  I'm hoping the
+> Layerscape patch can be split up a bit, both to split out the ARM64 config
+> change and to make a cleaner "LS1043a and LS2080a"
+> support patch.  The current patch changes several things that are not
+> obviously directly related to LS1043a and LS2080a.  It would be ideal to have a
+> series of things like:
+> 
+>   - add ARM64 build support (maybe just the Kconfig change)
+>   - make the ls_pcie_probe() changes that are apparently generic
+>     across all the LS devices
+>   - add driver data to lc_pcie_of_match[] (this wouldn't change any
+>     behavior at all; it would just add the ls1021_drvdata that works
+>     for the already-supported devices)
+>   - add ls1032_drvdata and ls2080_drvdata for the new devices
+>   - add the "msi-parent" diagnostic (this seems to be basically new
+>     functionality that applies to all devices, not just the new ones)
+> 
+> That way, each individual change would be easier to review.
+> 
+> Bjorn
