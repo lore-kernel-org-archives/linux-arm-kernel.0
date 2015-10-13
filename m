@@ -1,29 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Oct 2015 14:52:42 +0200
-Subject: next-20151013 build: 1 failures 50 warnings (next-20151013)
-In-Reply-To: <20151013125026.GG14956@sirena.org.uk>
-References: <E1ZlxDc-0000ea-U4@optimist> <20151013125026.GG14956@sirena.org.uk>
-Message-ID: <10774670.W40zvvZu4L@wuerfel>
+From: joel@porquet.org (Joel Porquet)
+Date: Tue, 13 Oct 2015 14:56:12 +0200
+Subject: [PATCH v2 0/3] arm:irchip: IRQCHIP_DECLARE macro is now accessible
+Message-ID: <1444740975-31948-1-git-send-email-joel@porquet.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 October 2015 13:50:26 Mark Brown wrote:
-> On Tue, Oct 13, 2015 at 11:54:09AM +0100, Build bot for Mark Brown wrote:
-> 
-> Today's linux-next fails to build an ARM allmodconfig due to:
-> 
-> >       arm-allmodconfig
-> > ../drivers/firmware/broadcom/bcm47xx_nvram.c:110:30: error: macro "DIV_ROUND_UP" requires 2 arguments, but only 1 given
-> > ../drivers/firmware/broadcom/bcm47xx_nvram.c:110:4: error: 'DIV_ROUND_UP' undeclared (first use in this function)
-> 
-> triggered by f6e734a8c16229 (MIPS: BCM47xx: Move NVRAM driver to the
-> drivers/firmware/).  Presumably this works due to an implicit inclusion
-> on MIPS.
-> 
-> I've CCed a lot of people listed in the changelog of the patch, though
-> the list there appears somewhat random - apologies if this is irrelevant
-> to you.
+The IRQCHIP_DECLARE macro migrated to 'include/linux/irqchip.h', making it
+globally accessible.
 
-I've submitted a patch yesterday, see https://lkml.org/lkml/2015/10/12/303
+See commit 91e20b5040c67c51aad88cf87db4305c5bd7f79d ("irqchip: Move
+IRQCHIP_DECLARE macro to include/linux/irqchip.h").
 
-	ARnd
+This series of patches add inclusions of 'include/linux/irqchip.h' and
+replaces uses of macro OF_DECLARE_2 with IRQCHIP_DECLARE for platforms
+exynos, imx and omap2.
+
+I had submitted a single patch a few months ago
+(https://lkml.org/lkml/2015/7/7/1069), but it never got merged although it
+had been acked by all the subsystem maintainers. Hopefully, splitting the
+patch into these independent patches that can be applied separately should
+help.
+
+Jo?l
+
+Joel Porquet (3):
+  arm:exynos: IRQCHIP_DECLARE macro is now accessible
+  arm:imx: IRQCHIP_DECLARE macro is now accessible
+  arm:omap2: IRQCHIP_DECLARE macro is now accessible
+
+ arch/arm/mach-exynos/suspend.c       | 3 ++-
+ arch/arm/mach-imx/gpc.c              | 7 ++-----
+ arch/arm/mach-omap2/omap-wakeupgen.c | 7 ++-----
+ 3 files changed, 6 insertions(+), 11 deletions(-)
+
+-- 
+2.6.1
