@@ -1,38 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 13 Oct 2015 19:48:29 +0100
-Subject: [PATCH v4] iommu/arm-smmu: Add support for MSI on SMMUv3
-In-Reply-To: <1444757550-24702-1-git-send-email-marc.zyngier@arm.com>
-References: <1444757550-24702-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20151013184829.GH24353@leverpostej>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Tue, 13 Oct 2015 11:49:10 -0700
+Subject: bcm4708-smartrg-sr400ac boot failures in next-20150918+
+In-Reply-To: <561AE788.6030701@hauke-m.de>
+References: <CANMBJr5FnRQxv01CbAiSD43dGn+Ea4tjEWSsV1FywHJZYLnG_A@mail.gmail.com>
+ <560DA9B9.80404@hauke-m.de> <561AE788.6030701@hauke-m.de>
+Message-ID: <CANMBJr4H1C6CHdRXa_NL9dssYGLkpRKAPXCMOV0FsUdb8JiSXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> @@ -36,5 +36,25 @@ the PCIe specification.
->                        NOTE: this only applies to the SMMU itself, not
->                        masters connected upstream of the SMMU.
->  
-> +- msi-parent	    : phandles (and potential Device IDs) of MSI controllers
+On 11 October 2015 at 15:49, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+> Adding the arm List.
+>
+> On 10/01/2015 11:46 PM, Hauke Mehrtens wrote:
+>> On 10/01/2015 07:50 PM, Tyler Baker wrote:
+>>> Hi Hauke, Rafal,
+>>>
+>>> The kernelci.org bot has been reporting complete boot failures[1]
+>>> since next-20150918. I've bisected[2] the issue and found "ARM:
+>>> 8422/1: enable imprecise aborts during early kernel startup" is the
+>>> offending patch. Reverting this on top of -next fixes the boot issue.
+>>>
+>>> Apologies for sending this off list, but I want to make sure you can
+>>> confirm this issue before we raise it.
+>>>
+>>> Cheers,
+>>>
+>>> Tyler
+>>>
+>>> [1] http://kernelci.org/boot/bcm4708-smartrg-sr400ac/
+>>> [2] http://hastebin.com/mirunerobi.vhdl
+>>>
+>> Hi Tyler,
+>>
+>> Thanks for the info, the broken bootloader causes some problems when
+>> booting the kernel, we already had to ignore some exceptions. I will
+>> look into this at the weekend.
+>>
+>> Hauke
+>>
+> Hi,
+>
+> The commit "ARM: 8422/1: enable imprecise aborts during early kernel
+> startup" breaks bcm53xx devices with a broken boot loader, this is a
+> regression. There are probably millions of these devices shipped with
+> this boot loader called CFE.
+> For BCM53xx we install a fault handler in the init_early callback of
+> DT_MACHINE_START to ignore the faults produced by the boot loader in
+> http://lxr.free-electrons.com/source/arch/arm/mach-bcm/bcm_5301x.c#L40 ,
+> but init_early is called after local_abt_enable() gets called and this
+> causes a kernel panic because of any unhandled CPU fault. The reserve()
+> callback in DT_MACHINE_START was the only callback I could find which
+> gets called before local_abt_enable(), should I move the code which
+> installs the fault handler there?
+>
+> This is causing the problems in kernelci with linux next kernels on this
+> board: http://kernelci.org/boot/bcm4708-smartrg-sr400ac/
 
+Adding Russell, and Lucas to CC as they may be interested in this thread.
 
-For correct terminology, I'd prefer to replace this line with:
+Cheers,
 
-- msi-parent: a list of phandle + msi-specifier pairs for MSI controllers
-
-An msi-specifier may be zero cells, per
-Documentation/devicetree/bindings/interrupt-controller/msi.txt, much
-like other *-specifiers.
-
-> +		      the SMMU can send MSIs to (instead of wired interrupts).
-> +		      See devicetree/bindings.interrupt-controller/msi.txt
-> +		      for a description of the msi-parent property.
-
-The rest of this is fine, modulo the '.' which should be a '/'. in the
-path.
-
-With those changes:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
+Tyler
