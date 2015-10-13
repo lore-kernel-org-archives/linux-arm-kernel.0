@@ -1,43 +1,81 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 13 Oct 2015 16:20:11 +0100
-Subject: [RFC] arm64: ioremap: add ioremap_cache macro
-In-Reply-To: <20151013142326.GM21550@arm.com>
-References: <1444616898-5057-1-git-send-email-yalin.wang2010@gmail.com>
- <20151013141055.GC11573@e104818-lin.cambridge.arm.com>
- <20151013142326.GM21550@arm.com>
-Message-ID: <20151013152011.GE11573@e104818-lin.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 13 Oct 2015 16:20:15 +0100
+Subject: [PATCH 12/17] ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
+In-Reply-To: <20151013145359.GV23801@atomide.com>
+References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
+ <1442850433-5903-13-git-send-email-sudeep.holla@arm.com>
+ <20151012202047.GR23801@atomide.com> <20151012202847.GS23801@atomide.com>
+ <561CE017.7030704@arm.com> <20151013145359.GV23801@atomide.com>
+Message-ID: <561D212F.3050603@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 03:23:27PM +0100, Will Deacon wrote:
-> On Tue, Oct 13, 2015 at 03:10:55PM +0100, Catalin Marinas wrote:
-> > On Mon, Oct 12, 2015 at 10:28:18AM +0800, yalin wang wrote:
-> > > Add ioremap_cache macro, because some code will test if this macro
-> > > is defined or not, and will generate a generric version if not defined,
-> > > for example, memremap.c do like this.
-> > > 
-> > > Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
-> > > ---
-> > >  arch/arm64/include/asm/io.h | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> > > index 44be1e0..d6b620c 100644
-> > > --- a/arch/arm64/include/asm/io.h
-> > > +++ b/arch/arm64/include/asm/io.h
-> > > @@ -172,6 +172,7 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
-> > >  #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
-> > >  #define ioremap_wt(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
-> > >  #define iounmap				__iounmap
-> > > +#define ioremap_cache                  ioremap_cache
-> > 
-> > Applied. Thanks.
-> 
-> I'm not sure we want this. See:
-> 
->   https://lkml.org/lkml/2015/10/9/699
 
-Thanks Will and Arnd, I missed this. Patch reverted.
 
--- 
-Catalin
+On 13/10/15 15:53, Tony Lindgren wrote:
+> * Sudeep Holla <sudeep.holla@arm.com> [151013 03:46]:
+>>
+>>
+>> On 12/10/15 21:28, Tony Lindgren wrote:
+>>> * Tony Lindgren <tony@atomide.com> [151012 13:27]:
+>>>> * Sudeep Holla <sudeep.holla@arm.com> [150921 08:52]:
+>>>>> The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
+>>>>> be left enabled so as to allow them to work as expected during the
+>>>>> suspend-resume cycle, but doesn't guarantee that it will wake the system
+>>>> >from a suspended state, enable_irq_wake is recommended to be used for
+>>>>> the wakeup.
+>>>>>
+>>>>> This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
+>>>>> enable_irq_wake instead.
+>>>>
+>>>> Applying into omap-for-v4.4/cleanup thanks.
+>>>
+>>> Actually I don't think this does the right thing. The interrupts
+>>> in the $subject patch are in the always on powerdomain, and we really
+>>
+>> Agreed
+>>
+>>> want them to be excluded from the suspend.
+>>>
+>>
+>> OK but what's wrong with this patch. At-least the name suggest it's a
+>> wakeup interrupt. And using IRQF_NO_SUSPEND for the wakeup interrupt is
+>> simply wrong.
+>
+> Hmm so if we have a separate always on irq controller for the wake-up events
+> and we want to keep it always on and exclude it from any suspend related
+> things.. Why would we not use IRQF_NO_SUSPEND on it?
+>
+> Above you say "The IRQF_NO_SUSPEND flag is used to identify the interrupts
+> that should be left enabled so as to allow them to work as expected during
+> the suspend-resume cycle..." and that's exactly what we want to do here :)
+>
+
+OK if these interrupts meet that criteria to use IRQF_NO_SUSPEND, then
+it should be fine, my earlier argument was based on the assumption that
+it's just another wakeup interrupt.
+
+> For the dedicated wake-up interrupts, we have separate registers to enable
+> and disable them. The $subject irq is the shared interrupt that allows
+> making use of the pin specific wake-up interrupts, and for those yes we
+> are using enable_irq_wake().
+>
+
+If it's already take care, then fine. I am just hunting all the misuse
+of IRQF_NO_SUSPEND flag especially as wakeup source and fixing them
+
+>>> So not applying without further explanations.
+>>>
+>>
+>> But I don't understand the real need for IRQF_NO_SUSPEND over wakeup APIs ?
+>
+> Because in the $subject case we just want to always keep it on and
+> never suspend it. It's unrelated to the wakeup APIs at least for the
+> omap related SoCs.
+>
+
+OK, understood now. Thanks
+
+--
+Regards,
+Sudeep
