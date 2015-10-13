@@ -1,70 +1,61 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 13 Oct 2015 18:22:21 +0100
-Subject: [PATCH v3 13/24] arm64: Populate cpuinfo after notify_cpu_starting
+Date: Tue, 13 Oct 2015 18:22:27 +0100
+Subject: [PATCH v3 19/24] arm64/kvm: Make use of the system wide safe values
 In-Reply-To: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
 References: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1444756952-31145-14-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1444756952-31145-20-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch delays populating the cpuinfo for a new (hotplugged)
-CPU until the notifiers have executed. This will enable us to verify
-if the new (hotplugged) CPU has all the capabilities which the system
-already has. If it doesn't, we could prevent it from turning online and
-also modifying the system wide feature register status.
+Use the system wide safe value from the new API for safer
+decisions
 
-Also delays advertising that the CPU has booted until we complete
-the notifiers, when we are ready to mark it online. This would avoid
-confusing the user if the CPU fails to boot due to a missing capability.
-
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: kvmarm at lists.cs.columbia.edu
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kernel/smp.c |   15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ arch/arm64/kvm/reset.c    |    2 +-
+ arch/arm64/kvm/sys_regs.c |   12 ++++++------
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 3b22e65..4a36eb6 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -145,9 +145,6 @@ asmlinkage void secondary_start_kernel(void)
- 	cpumask_set_cpu(cpu, mm_cpumask(mm));
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 91cf535..f34745c 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -53,7 +53,7 @@ static bool cpu_has_32bit_el1(void)
+ {
+ 	u64 pfr0;
  
- 	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
--	pr_info("CPU%u: Booted secondary processor [%08x]\n",
--					 cpu, read_cpuid_id());
--
- 	/*
- 	 * TTBR0 is only used for the identity mapping at this stage. Make it
- 	 * point to zero page to avoid speculatively fetching new entries.
-@@ -163,14 +160,14 @@ asmlinkage void secondary_start_kernel(void)
- 		cpu_ops[cpu]->cpu_postboot();
+-	pfr0 = read_cpuid(ID_AA64PFR0_EL1);
++	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
+ 	return !!(pfr0 & 0x20);
+ }
  
- 	/*
--	 * Log the CPU info before it is marked online and might get read.
-+	 * Enable GIC and timers.
- 	 */
--	cpuinfo_store_cpu();
-+	notify_cpu_starting(cpu);
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index d03d3af..87a64e8 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -693,13 +693,13 @@ static bool trap_dbgidr(struct kvm_vcpu *vcpu,
+ 	if (p->is_write) {
+ 		return ignore_write(vcpu, p);
+ 	} else {
+-		u64 dfr = read_cpuid(ID_AA64DFR0_EL1);
+-		u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
+-		u32 el3 = !!((pfr >> 12) & 0xf);
++		u64 dfr = read_system_reg(SYS_ID_AA64DFR0_EL1);
++		u64 pfr = read_system_reg(SYS_ID_AA64PFR0_EL1);
++		u32 el3 = !!cpuid_feature_extract_field(pfr, ID_AA64PFR0_EL3_SHIFT);
  
- 	/*
--	 * Enable GIC and timers.
-+	 * Log the CPU info before it is marked online and might get read.
- 	 */
--	notify_cpu_starting(cpu);
-+	cpuinfo_store_cpu();
- 
- 	smp_store_cpu_info(cpu);
- 
-@@ -179,6 +176,10 @@ asmlinkage void secondary_start_kernel(void)
- 	 * the CPU migration code to notice that the CPU is online
- 	 * before we continue.
- 	 */
-+
-+	pr_info("CPU%u: Booted secondary processor [%08x]\n",
-+					 cpu, read_cpuid_id());
-+
- 	set_cpu_online(cpu, true);
- 	complete(&cpu_running);
- 
+-		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> 20) & 0xf) << 28) |
+-					  (((dfr >> 12) & 0xf) << 24) |
+-					  (((dfr >> 28) & 0xf) << 20) |
++		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> ID_AA64DFR0_WRPS_SHIFT) & 0xf) << 28) |
++					  (((dfr >> ID_AA64DFR0_BRPS_SHIFT) & 0xf) << 24) |
++					  (((dfr >> ID_AA64DFR0_CTX_CMPS_SHIFT) & 0xf) << 20) |
+ 					  (6 << 16) | (el3 << 14) | (el3 << 12));
+ 		return true;
+ 	}
 -- 
 1.7.9.5
