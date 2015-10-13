@@ -1,47 +1,32 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 13 Oct 2015 11:42:31 +0100
-Subject: [PATCH 12/17] ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
-In-Reply-To: <20151012202847.GS23801@atomide.com>
-References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
- <1442850433-5903-13-git-send-email-sudeep.holla@arm.com>
- <20151012202047.GR23801@atomide.com> <20151012202847.GS23801@atomide.com>
-Message-ID: <561CE017.7030704@arm.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 13 Oct 2015 11:43:01 +0100
+Subject: [PATCH v2 3/9] dmaengine: st_fdma:  Add STMicroelectronics FDMA
+ driver header file
+In-Reply-To: <1444118413.3579.46.camel@intel.com>
+References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
+ <1441980871-24475-4-git-send-email-peter.griffin@linaro.org>
+ <1444118413.3579.46.camel@intel.com>
+Message-ID: <20151013104301.GA30342@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Thu, 08 Oct 2015, Koul, Vinod wrote:
 
-On 12/10/15 21:28, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [151012 13:27]:
->> * Sudeep Holla <sudeep.holla@arm.com> [150921 08:52]:
->>> The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
->>> be left enabled so as to allow them to work as expected during the
->>> suspend-resume cycle, but doesn't guarantee that it will wake the system
->>> from a suspended state, enable_irq_wake is recommended to be used for
->>> the wakeup.
->>>
->>> This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
->>> enable_irq_wake instead.
->>
->> Applying into omap-for-v4.4/cleanup thanks.
->
-> Actually I don't think this does the right thing. The interrupts
-> in the $subject patch are in the always on powerdomain, and we really
+> On Fri, 2015-09-11 at 15:14 +0100, Peter Griffin wrote:
+> 
+> > +#define FDMA_ID_OFST		0x00000
+> > +#define FDMA_VER_OFST		0x00004
+> > > +
+> > +#define FDMA_EN_OFST		0x00008
+> 
+> Why cant these be BIT() to maintain consistency?
+> 
 
-Agreed
+These are actually register offsets. I'm only using the BIT
+macro for bitfields within the registers e.g. FDMA_EN_RUN
 
-> want them to be excluded from the suspend.
->
+regards,
 
-OK but what's wrong with this patch. At-least the name suggest it's a
-wakeup interrupt. And using IRQF_NO_SUSPEND for the wakeup interrupt is
-simply wrong.
-
-> So not applying without further explanations.
->
-
-But I don't understand the real need for IRQF_NO_SUSPEND over wakeup APIs ?
-
--- 
-Regards,
-Sudeep
+Peter.
