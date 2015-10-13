@@ -1,44 +1,32 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 13 Oct 2015 16:16:19 -0500
-Subject: [PATCH v2] ARM: socfpga: dts: add fpga manager
-In-Reply-To: <20151013203344.GE17155@pengutronix.de>
-References: <1444765139-2040-1-git-send-email-atull@opensource.altera.com>
- <alpine.DEB.2.02.1510131450480.4441@linux-builds1>
- <20151013203344.GE17155@pengutronix.de>
-Message-ID: <alpine.DEB.2.02.1510131615350.4441@linux-builds1>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Tue, 13 Oct 2015 14:30:51 -0700
+Subject: Aarch32 user space PC alignment exception
+Message-ID: <1444771874-22714-1-git-send-email-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Oct 2015, Steffen Trumtrar wrote:
+armv7 does not have a PC alignment exception. armv8 Aarch32
+user space however can produce a PC alignment exception. Add
+handler so the we do not dump an unexpected stack trace in
+the logs.
 
-> On Tue, Oct 13, 2015 at 02:51:28PM -0500, Dinh Nguyen wrote:
-> > On Tue, 13 Oct 2015, atull at opensource.altera.com wrote:
-> > 
-> > > From: Alan Tull <atull@opensource.altera.com>
-> > > 
-> > > Add FPGA manager to device tree for SoCFPGA.
-> > > 
-> > > Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> > > ---
-> > > v2: Remove 0x after @
-> > >     No caps in hex numbers
-> > >     renamed hps_0_fpgamgr to fpgamgr0
-> > >     move node to be in alpha order by node name
-> > > ---
-> > >  arch/arm/boot/dts/socfpga.dtsi | 7 +++++++
-> > >  1 file changed, 7 insertions(+)
-> > > 
-> > 
-> > Applied!
-> 
-> What about the
-> 
-> "Also, you need to document the "altr,socfpga-fpga-mgr"."
-> 
-> you mentioned in v1 ???
->
+Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+---
+ arch/arm64/kernel/entry.S | 2 ++
+ 1 file changed, 2 insertions(+)
 
-It was my oversight. It has already been documented. 
-
-BR,
-Dinh
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 4306c93..7ed3d75 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -430,6 +430,8 @@ el0_sync_compat:
+ 	b.eq	el0_fpsimd_acc
+ 	cmp	x24, #ESR_ELx_EC_FP_EXC32	// FP/ASIMD exception
+ 	b.eq	el0_fpsimd_exc
++	cmp	x24, #ESR_ELx_EC_PC_ALIGN	// pc alignment exception
++	b.eq	el0_sp_pc
+ 	cmp	x24, #ESR_ELx_EC_UNKNOWN	// unknown exception in EL0
+ 	b.eq	el0_undef
+ 	cmp	x24, #ESR_ELx_EC_CP15_32	// CP15 MRC/MCR trap
+-- 
+2.6.0.rc2.230.g3dd15c0
