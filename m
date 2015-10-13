@@ -1,43 +1,43 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue, 13 Oct 2015 08:44:34 -0500
-Subject: [PATCH] ARM: DRA7: hwmod: Remove elm address space from hwmod data
-Message-ID: <1444743874-4454-1-git-send-email-fcooper@ti.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 13 Oct 2015 21:48:51 +0800
+Subject: [PATCH v2 0/3] arm:irchip: IRQCHIP_DECLARE macro is now accessible
+In-Reply-To: <1444740975-31948-1-git-send-email-joel@porquet.org>
+References: <1444740975-31948-1-git-send-email-joel@porquet.org>
+Message-ID: <20151013134851.GA551@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ELM address information is provided by device tree. No longer need
-to include this information within hwmod.
+On Tue, Oct 13, 2015 at 02:56:12PM +0200, Joel Porquet wrote:
+> The IRQCHIP_DECLARE macro migrated to 'include/linux/irqchip.h', making it
+> globally accessible.
+> 
+> See commit 91e20b5040c67c51aad88cf87db4305c5bd7f79d ("irqchip: Move
+> IRQCHIP_DECLARE macro to include/linux/irqchip.h").
+> 
+> This series of patches add inclusions of 'include/linux/irqchip.h' and
+> replaces uses of macro OF_DECLARE_2 with IRQCHIP_DECLARE for platforms
+> exynos, imx and omap2.
+> 
+> I had submitted a single patch a few months ago
+> (https://lkml.org/lkml/2015/7/7/1069), but it never got merged although it
+> had been acked by all the subsystem maintainers. Hopefully, splitting the
+> patch into these independent patches that can be applied separately should
+> help.
+> 
+> Jo?l
+> 
+> Joel Porquet (3):
+>   arm:exynos: IRQCHIP_DECLARE macro is now accessible
+>   arm:imx: IRQCHIP_DECLARE macro is now accessible
+>   arm:omap2: IRQCHIP_DECLARE macro is now accessible
+> 
+>  arch/arm/mach-exynos/suspend.c       | 3 ++-
+>  arch/arm/mach-imx/gpc.c              | 7 ++-----
+>  arch/arm/mach-omap2/omap-wakeupgen.c | 7 ++-----
+>  3 files changed, 6 insertions(+), 11 deletions(-)
 
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 10 ----------
- 1 file changed, 10 deletions(-)
+Marc sent a patch [1] doing the same thing a few days ago.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 562247b..ad2cc7a 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -2566,21 +2566,11 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__hdmi = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
--static struct omap_hwmod_addr_space dra7xx_elm_addrs[] = {
--	{
--		.pa_start	= 0x48078000,
--		.pa_end		= 0x48078fff,
--		.flags		= ADDR_TYPE_RT
--	},
--	{ }
--};
--
- /* l4_per1 -> elm */
- static struct omap_hwmod_ocp_if dra7xx_l4_per1__elm = {
- 	.master		= &dra7xx_l4_per1_hwmod,
- 	.slave		= &dra7xx_elm_hwmod,
- 	.clk		= "l3_iclk_div",
--	.addr		= dra7xx_elm_addrs,
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
--- 
-2.6.1
+Shawn
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/444136
