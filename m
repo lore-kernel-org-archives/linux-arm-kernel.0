@@ -1,22 +1,21 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 Oct 2015 20:44:22 +0200
-Subject: [PATCH] ARM: dts: sun7i: Add regulator configuration for pcDuino
- v3 Nano
-In-Reply-To: <1444508121-20233-1-git-send-email-ats@offog.org>
-References: <1444508121-20233-1-git-send-email-ats@offog.org>
-Message-ID: <20151013184422.GP2278@lukather>
+Date: Tue, 13 Oct 2015 20:46:01 +0200
+Subject: [PATCH v2 1/5] ARM: dts: sun6i: hummingbird: Fix VDD-CPU and
+ VDD-GPU regulator names
+In-Reply-To: <1444488540-11263-2-git-send-email-wens@csie.org>
+References: <1444488540-11263-1-git-send-email-wens@csie.org>
+ <1444488540-11263-2-git-send-email-wens@csie.org>
+Message-ID: <20151013184601.GQ2278@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 10, 2015 at 09:15:21PM +0100, Adam Sampson wrote:
-> The power configuration on this board is the same as the pcDuino v3.
-> This will enable frequency/voltage scaling over the standard A20
-> operating points from 144 MHz to 960 MHz.
+On Sat, Oct 10, 2015 at 10:48:56PM +0800, Chen-Yu Tsai wrote:
+> The VDD-CPU and VDD-GPU regulators were incorrectly swapped.
 > 
-> Tested using cpufreq-ljt-stress-test on two pcDuino v3 Nano boards; also
-> tested successfully with voltages reduced by 0.025 V.
+> Fixes: bab03561224ba ("ARM: dts: sun6i: hummingbird: Add AXP221 regulator
+>        nodes")
 > 
-> Signed-off-by: Adam Sampson <ats@offog.org>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
 Applied, thanks!
 Maxime
@@ -31,4 +30,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151013/f685c95d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151013/9334c4a3/attachment.sig>
