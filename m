@@ -1,44 +1,49 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Tue, 13 Oct 2015 09:21:47 -0700
-Subject: [PATCH v2 0/4] soc: ti: knav_qmss: enable accumulator queue
- support
-In-Reply-To: <561D2DE9.4080809@ti.com>
-References: <1444679211-823-1-git-send-email-m-karicheri2@ti.com>
- <561D0D95.1040401@ti.com> <561D2AE0.6090406@oracle.com>
- <561D2DE9.4080809@ti.com>
-Message-ID: <561D2F9B.7000006@oracle.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Tue, 13 Oct 2015 09:24:26 -0700
+Subject: [Intel-gfx] [PATCH 09/20] i915: switch from acpi_os_ioremap to
+ memremap
+In-Reply-To: <20151013082416.GF26718@phenom.ffwll.local>
+References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
+ <20151009221625.32203.74117.stgit@dwillia2-desk3.jf.intel.com>
+ <20151012070102.GV26718@phenom.ffwll.local>
+ <1444684376.9780.5.camel@intel.com>
+ <20151013082416.GF26718@phenom.ffwll.local>
+Message-ID: <CAPcyv4i6SFziAr_O1YB7hdpPTUdXM3FEsi-3AMF9-KBLJmtT2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/2015 9:14 AM, Murali Karicheri wrote:
-> Santosh,
->
-> On 10/13/2015 12:01 PM, santosh shilimkar wrote:
->> On 10/13/2015 6:56 AM, Murali Karicheri wrote:
->>> On 10/12/2015 03:46 PM, Murali Karicheri wrote:
->>>> This patch series enable accumulator queue support for K2 SoCs.
+On Tue, Oct 13, 2015 at 1:24 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> On Mon, Oct 12, 2015 at 09:12:57PM +0000, Williams, Dan J wrote:
+>> On Mon, 2015-10-12 at 09:01 +0200, Daniel Vetter wrote:
+>> > On Fri, Oct 09, 2015 at 06:16:25PM -0400, Dan Williams wrote:
+>> > > i915 expects the OpRegion to be cached (i.e. not __iomem), so explicitly
+>> > > map it with memremap rather than the implied cache setting of
+>> > > acpi_os_ioremap().
+>> > >
+>> > > Cc: Daniel Vetter <daniel.vetter@intel.com>
+>> > > Cc: Jani Nikula <jani.nikula@linux.intel.com>
+>> > > Cc: intel-gfx at lists.freedesktop.org
+>> > > Cc: David Airlie <airlied@linux.ie>
+>> > > Cc: dri-devel at lists.freedesktop.org
+>> > > Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+>> >
+>> > Assuming you've run sparse over this to make sure you've caught them all,
+>> > and with the nit below addressed this is
+>> >
+>> > Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 >>
->>> Santosh, Arnd,
->>>
->>> Could you please review and let me know if there is any comment. If
->>> looks good, could you please merge to v4.4 next branch?
->>>
->> Please report the series updating the comments from Arnd. Also split
->> the series into drivers and dts updates.
-s/report/repost
-
+>> Indeed, re-running sparse again found a few conversions of ioread* I
+>> missed as well as moving the force casting out of validate_vbt() to
+>> find_vbt().
+>>
+>> > Feel free to pull v2 into whatever tree you think it's suitable for (but
+>> > you can also resend and I'll pick it up).
+>>
+>> Please pick up v2 below.
 >
-> The cover letter already summarize this as a comment against v1 even
-> though it didn't mention Arnd's name. Is it usual to describe the
-> reviewers name in the change log? I thought we just describe the comment
-> addressed, not who has commented. Not??
+> Queued for -next, thanks for the patch. Aside: Attached or separate mail
+> seems easier, somehow git apply-mbox can't auto-eat this for of patch.
+> -Daniel
 >
-I didn't mean report. sorry. Just repost the series including ack tag.
 
-> About splitting the series, it was done so since both is being pulled by
-> you. If needed, I can do the split. Let me know.
->
-DTS and driver changes goes to different topics so split it, please.
-
-Regards,
-Santosh
+"git am --scissors" should detect the "8<---" cut line.
