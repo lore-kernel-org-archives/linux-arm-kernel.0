@@ -1,104 +1,73 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Tue, 13 Oct 2015 08:51:52 +0530
-Subject: [PATCH 1/3] ARM: dts: exynos5422-odroidxu3: use cd-gpio method to
- detect sd-card
-In-Reply-To: <561C6713.1070508@samsung.com>
-References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
- <561B3739.4040701@samsung.com> <561B3A83.6090607@samsung.com>
- <1111856990.2419183.1444661252893.JavaMail.yahoo@mail.yahoo.com>
- <561C4C88.2040004@samsung.com> <561C6713.1070508@samsung.com>
-Message-ID: <CANAwSgQn8gb5DkLvULC26vhe+gwSD2mn1Ba7y2hPGo4ibZcLgw@mail.gmail.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Tue, 13 Oct 2015 11:34:05 +0800
+Subject: [PATCH 1/3] clk: add flag for clocks that need to be enabled
+ on rate changes
+In-Reply-To: <37059102.QWiKhRxp8v@diego>
+References: <1929669.AsgMSusdJb@phil> <20151008215840.GJ26883@codeaurora.org>
+ <13378907.1JCOSf8QGs@diego> <37059102.QWiKhRxp8v@diego>
+Message-ID: <561C7BAD.7020401@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoon Chung,
+Hi,
 
-On 13 October 2015 at 07:36, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Dear, Anand.
->
->
-> On 10/13/2015 09:12 AM, Krzysztof Kozlowski wrote:
->> On 12.10.2015 23:47, Anand Moon wrote:
+On 2015?10?13? 00:03, Heiko St?bner wrote:
+> Am Sonntag, 11. Oktober 2015, 12:41:09 schrieb Heiko St?bner:
+>> Hi Stephen,
+>>
+>> Am Donnerstag, 8. Oktober 2015, 14:58:40 schrieb Stephen Boyd:
+>>> On 10/02, Heiko St?bner wrote:
+>>>> Hi,
 >>>>
->>>> Anand,
->>>>
->>>> You essentially reverted here af6ad88acbd6 ("ARM: dts: Mux XMMCnDATA[0]
->>>> pad correctly for Exynos5420 boards"). Why? There is no explanation in
->>>> the commit message about this.
->>>
->>> I don't remember to send the patch relevant to this. Hmm...
->>> Well, Is this patch really signed-off by me?
->>>
->>> Best Regards,
->>>
->>> Jaehoon Chung
->>>>
->>>> Best regards,
->>>> Krzysztof
->>>>
->>>
->>>>
->>>
->>>
->>> Some how I don't receive these mail on my email id.
->>>
->>> I have picked up these changes from tizen repository for OdroidXU3.
->>> I have tested with this changes to detect UHS-I micro cd cards.
->>> That's the reason for this email.
->
-> It seems to make manually, right?
-> I have checked the tizen repository.
->
-> The below is
->
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> @@ -335,7 +335,9 @@
->         samsung,dw-mshc-sdr-timing = <0 4>;
->         samsung,dw-mshc-ddr-timing = <0 2>;
->         pinctrl-names = "default";
-> -       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
-> +       cd-gpios = <&gpc2 2 0>;
-> +       cd-inverted;
-> +       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus1 &sd2_bus4>;
->         bus-width = <4>;
->         cap-sd-highspeed;
->  };
->
->
->
-> Yours
->
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> @@ -352,8 +352,10 @@
->         samsung,dw-mshc-ciu-div = <3>;
->         samsung,dw-mshc-sdr-timing = <0 4>;
->         samsung,dw-mshc-ddr-timing = <0 2>;
-> +       cd-gpios = <&gpc2 2 GPIO_ACTIVE_HIGH>;
-> +       cd-inverted;
->         pinctrl-names = "default";
-> -       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
-> +       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
->
-> Did you know what differ? :)
->
+>>>> any comment on these 3 patches?
+>>> Dong has a similar problem, but those patches conflate this with
+>>> enabling parent clocks during clk_disable_unused() which makes no
+>>> sense to me. So I'm ok with the requirement that we turn clocks
+>>> on to change rates, but I wonder if in this case we need to turn
+>>> on the clock that's changing rates itself, or if we just need to
+>>> turn on the parent and/or future parent of the clock during the
+>>> rate switch. Care to elaborate on that?
+>> As you can see in the follow-up patches, the fractional dividers on Rockchip
+>> SoCs are quite strange in that they even need to have their _downstream_
+>> mux point to them to actually accept rate changes.
+>>
+>> The register value always reflects the value set by the system, but hardware
+>> really only accepts it if the clock is enabled and even the downstream mux
+>> selects the fractional divider as parent (they call it a auto-gating
+>> feature).
+>>
+>> So in the worst (and current) case, you end up with the register showing the
+>> right value, but the hardware can use completely different dividers from
+>> the previous setting.
+>>
+>> That strange behaviour got quite deeply investigated between Rockchip and
+>> Google engineers who stumbled upon this in the first place, so I'm
+>> reasonably sure this is the right solution for that clock type :-) .
+> Xing Zheng now also independently stumbled upon this issue with his rk3036
+> work. And came to the same conclusion that the gate must be enabled as well as
+> the downstream mux be set to the fractional divider for it to actually accept
+> a new setting.
+Yes, I discussed such problems with Heiko about the question:
+The RK3036 i2s frac(CRU_SEL7_CON) set value is invalid when I playback a 
+48KHz music:
+/ # io -4 0x20000060
+20000060: 01003057
+read register is 0x01003057, but the result of frac divider on the basis 
+of default 0x0bb8ea60(numerator=3000, denominator=60000, ratio=20), so 
+the out of mclk remains 594/20=29.7MHz
 
-My mistake, I will drop the changes. Sorry for the whole mess.
+I tracked the logs:
+[ 49.770322] clk_fd_set_rate: 91, name: i2s_frac, rate = 12288000, 
+parent_rate = 594000000
+[ 49.778524] clk_fd_set_rate: 107, name: i2s_frac, val = 0x01003057
+[ 49.784714] clk_fd_recalc_rate: 29, name: i2s_frac, parent_rate = 594000000
+[ 49.791707] clk_fd_recalc_rate: 47, name: i2s_frac, val = 0x01003057, m 
+= 256, n = 12375
+[ 49.799836] clk_mux_set_parent: 81, name: i2s_pre
+It seem like set i2s_frac_div then set mux is i2s_pre. I think we should 
+select the correct mux and open clock gate, then set the i2s_frac_div, 
+and I tried to do it, setting i2s_frac_div is vaild and mclk is 
+12.288MHz. Therefore, I think that select parent mux and enable gate 
+should before child node set value.
 
--Anand Moon
-
-> Best Regards,
-> Jaehoon Chung
->
->>
->> ... and you applied it blindly without looking at actual existing
->> contents and at previous commits.
->>
->> That is not how patches from different repositories should be cherry picked.
->>
->> Best regards,
->> Krzysztof
->>
->>
->
+Thanks. :)
