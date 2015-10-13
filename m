@@ -1,52 +1,37 @@
-From: a0131933@ti.com (Lokesh Vutla)
-Date: Tue, 13 Oct 2015 19:32:16 +0530
-Subject: [PATCH] ARM: DRA7: hwmod: Remove elm address space from hwmod data
-In-Reply-To: <1444743874-4454-1-git-send-email-fcooper@ti.com>
-References: <1444743874-4454-1-git-send-email-fcooper@ti.com>
-Message-ID: <561D0EE8.8050100@ti.com>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Tue, 13 Oct 2015 16:05:23 +0200
+Subject: [PATCH v2 0/4] Add support for STM32 DMA
+Message-ID: <1444745127-1105-1-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patchset adds support for the STM32 DMA controller.
+This controller provides 8 channels dedicated to managing memory access
+request from one or more peripherals.
+Each stream can have up to 8 requests in total.
 
+Changes since v1:
+- remove dmamux boolean as it is not needed
+- replace dma by DMA in Kconfig
+- add default return value in stm32_dma_get_width()
+- add defalut return value in stm32_dma_get_burst()
+- use lower case for constant hexadecimal values
 
-On Tuesday 13 October 2015 07:14 PM, Franklin S Cooper Jr wrote:
-> ELM address information is provided by device tree. No longer need
-> to include this information within hwmod.
+M'boumba Cedric Madianga (4):
+  dt-bindings: Document the STM32 DMA bindings
+  dmaengine: Add STM32 DMA driver
+  ARM: dts: Add STM32 DMA support for STM32F429 MCU
+  ARM: configs: Add STM32 DMA support in STM32 defconfig
 
-Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
+ .../devicetree/bindings/dma/stm32-dma.txt          |   98 ++
+ arch/arm/boot/dts/stm32f429.dtsi                   |   31 +
+ arch/arm/configs/stm32_defconfig                   |    2 +
+ drivers/dma/Kconfig                                |   12 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/stm32-dma.c                            | 1175 ++++++++++++++++++++
+ 6 files changed, 1319 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/stm32-dma.txt
+ create mode 100644 drivers/dma/stm32-dma.c
 
-Thanks and regards,
-Lokesh
-> 
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 10 ----------
->  1 file changed, 10 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> index 562247b..ad2cc7a 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> @@ -2566,21 +2566,11 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__hdmi = {
->  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->  };
->  
-> -static struct omap_hwmod_addr_space dra7xx_elm_addrs[] = {
-> -	{
-> -		.pa_start	= 0x48078000,
-> -		.pa_end		= 0x48078fff,
-> -		.flags		= ADDR_TYPE_RT
-> -	},
-> -	{ }
-> -};
-> -
->  /* l4_per1 -> elm */
->  static struct omap_hwmod_ocp_if dra7xx_l4_per1__elm = {
->  	.master		= &dra7xx_l4_per1_hwmod,
->  	.slave		= &dra7xx_elm_hwmod,
->  	.clk		= "l3_iclk_div",
-> -	.addr		= dra7xx_elm_addrs,
->  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->  };
->  
-> 
+-- 
+1.9.1
