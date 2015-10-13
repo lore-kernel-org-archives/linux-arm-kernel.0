@@ -1,141 +1,136 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Tue, 13 Oct 2015 18:47:25 +0200
-Subject: [PATCH] i2c: at91: fix write transfers by clearing pending
- interrupt first
-In-Reply-To: <561D20E7.5070405@lysator.liu.se>
-References: <1444746104-20615-1-git-send-email-ludovic.desroches@atmel.com>
- <561D20E7.5070405@lysator.liu.se>
-Message-ID: <561D359D.8000500@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 13 Oct 2015 17:47:31 +0100
+Subject: [PATCH v5 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <CAFpQJXUPWZxOWeJQnkw8E_voDoqhphH8iR-fr0xo0m3+FiL4sA@mail.gmail.com>
+References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
+ <20150828123228.GE31748@leverpostej>
+ <CAFpQJXWzM644KsFWP9ei-k6gWgNVpBVT+UbY7NYdyfmyL=zMkw@mail.gmail.com>
+ <CAFpQJXWFx2dQ_vv0POqkOiLe3eh9Ee=Sf+2Xx_08Vp=E4g6gLQ@mail.gmail.com>
+ <20150930105331.GA10066@leverpostej>
+ <CAFpQJXVegqortRLK+g7_9p82KMYwq0hg8n3_9bJqjGHsJvngaA@mail.gmail.com>
+ <1443661547.2828.40.camel@kernel.crashing.org>
+ <CAFpQJXXKcwks0iZN+3B=U0-9uYKFpAXcZE90GCHN9WyM45Hdpw@mail.gmail.com>
+ <CAFpQJXUPWZxOWeJQnkw8E_voDoqhphH8iR-fr0xo0m3+FiL4sA@mail.gmail.com>
+Message-ID: <20151013164730.GF24353@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 13/10/2015 17:19, Peter Rosin a ?crit :
-> On 2015-10-13 16:21, Ludovic Desroches wrote:
->> From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
->>
->> In some cases a NACK interrupt may be pending in the Status Register (SR)
->> as a result of a previous transfer. However at91_do_twi_transfer() did not
->> read the SR to clear pending interruptions before starting a new transfer.
->> Hence a NACK interrupt rose as soon as it was enabled again at the I2C
->> controller level, resulting in a wrong sequence of operations and strange
->> patterns of behaviour on the I2C bus, such as a clock stretch followed by
->> a restart of the transfer.
->>
->> This first issue occurred with both DMA and PIO write transfers.
->>
->> Also when a NACK error was detected during a PIO write transfer, the
->> interrupt handler used to wrongly start a new transfer by writing into the
->> Transmit Holding Register (THR). Then the I2C slave was likely to reply
->> with a second NACK.
->>
->> This second issue is fixed in atmel_twi_interrupt() by handling the TXRDY
->> status bit only if both the TXCOMP and NACK status bits are cleared.
->>
->> Tested with a at24 eeprom on sama5d36ek board running a linux-4.1-at91
->> kernel image. Adapted to linux-next.
->>
->> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
->> Fixes: 93563a6a71bb ("i2c: at91: fix a race condition when using the DMA controller")
->> Reported-by: Peter Rosin <peda@lysator.liu.se>
->> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->> Cc: stable at vger.kernel.org #4.1
-> 
-> The regression is gone with this patch (vanilla 4.2), thank you!
-> 
-> However, looking at the bus, there are two NACKs after each
-> successful chunk of memory written by the eeprom driver.
-> 
-> Looking at the eeprom driver, I expect this on the bus:
-> 
-> S 0x50 0x00 "hello there guys" P
-> S 0x50 NACK P
-> delay for at least 1 ms (since the eeprom driver has a msleep(1) call).
-> S 0x50 NACK P
-> delay for at least 1 ms
-> ...
-> ...
-> S 0x50 NACK P
-> delay for at least 1 ms
-> S 0x50 0x10 "and girls\n" P
-> 
-> This is not what I observe on the bus, most of the time there is a
-> second NACK immediately following the first. I suspect that it is
-> the i2c bus driver that somehow confuses itself and reissues the
-> command for some reason?
-> 
-> But this behavior has been there since the beginning, so it's probably
-> orthogonal, and killing the data corrupting regression is much more
-> important to me than fussing over a surplus failed transfer. Hence
-> 
-> Tested-by: Peter Rosin <peda@lysator.liu.se>
-> 
-> Cheers,
-> Peter
-> 
+> > Hi Mark,
+> >
+> > i am thinking, if we could not address(or becomes complex)  these topologies
+> > using associativity,
+> > we should think of an alternate binding which suits existing and upcoming
+> > arm64 platforms.
+> > can we think of below numa binding which is inline with ACPI and will
+> > address all sort of topologies!
+> >
+> > i am proposing as below,
+> >
+> > 1. introduce "proximity" node property. this property will be
+> > present in dt nodes like memory, cpu, bus and devices(like associativity
+> > property) and
+> > will tell which numa node(proximity domain) this dt node belongs to.
+> >
+> > examples:
+> >                cpu at 000 {
+> >                         device_type = "cpu";
+> >                         compatible = "cavium,thunder", "arm,armv8";
+> >                         reg = <0x0 0x000>;
+> >                         enable-method = "psci";
+> >                         proximity = <0>;
+> >                 };
+> >                cpu at 001 {
+> >                         device_type = "cpu";
+> >                         compatible = "cavium,thunder", "arm,armv8";
+> >                         reg = <0x0 0x001>;
+> >                         enable-method = "psci";
+> >                         proximity = <1>;
+> >                 };
+> >
+> >        memory at 00000000 {
+> >                 device_type = "memory";
+> >                 reg = <0x0 0x01400000 0x3 0xFEC00000>;
+> >                 proximity =<0>;
+> >
+> >         };
+> >
+> >         memory at 10000000000 {
+> >                 device_type = "memory";
+> >                 reg = <0x100 0x00400000 0x3 0xFFC00000>;
+> >                 proximity =<1>;
+> >         };
+> >
+> > pcie0 at 0x8480,00000000 {
+> >                 compatible = "cavium,thunder-pcie";
+> >                 device_type = "pci";
+> >                 msi-parent = <&its>;
+> >                 bus-range = <0 255>;
+> >                 #size-cells = <2>;
+> >                 #address-cells = <3>;
+> >                 #stream-id-cells = <1>;
+> >                 reg = <0x8480 0x00000000 0 0x10000000>;  /*Configuration
+> > space */
+> >                 ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000
+> > 0x70 0x00000000>, /* mem ranges */
+> >                          <0x03000000 0x8300 0x00000000 0x8300 0x00000000
+> > 0x500 0x00000000>;
+> >                proximity =<0>;
+> >         };
+> >
+> >
+> > 2. Introduce new dt node "proximity-map" which will capture the NxN numa
+> > node distance matrix.
+> >
+> > for example,  4 nodes connected in mesh/ring structure as,
+> > A(0) <connected to> B(1) <connected to> C(2) <connected to> D(3) <connected
+> > to> A(1)
+> >
+> > relative distance would be,
+> >       A -> B = 20
+> >       B -> C  = 20
+> >       C -> D = 20
+> >       D -> A = 20
+> >       A -> C = 40
+> >       B -> D = 40
+> >
+> > and dt presentation for this distance matrix is :
+> >
+> >        proximity-map {
+> >              node-count = <4>;
+> >              distance-matrix = <0 0  10>,
+> >                                 <0 1  20>,
+> >                                 <0 2  40>,
+> >                                 <0 3  20>,
+> >                                 <1 0  20>,
+> >                                 <1 1  10>,
+> >                                 <1 2  20>,
+> >                                 <1 3  40>,
+> >                                 <2 0  40>,
+> >                                 <2 1  20>,
+> >                                 <2 2  10>,
+> >                                 <2 3  20>,
+> >                                 <3 0  20>,
+> >                                 <3 1  40>,
+> >                                 <3 2  20>,
+> >                                 <3 3  10>;
+> >           }
+> >
+> > the entries like < 0 0 > < 1 1>  < 2 2> < 3 3> can be optional and code can
+> > put default value(local distance).
+> > the entries like <1 0> can be optional if <0 1> and <1 0> are of same
+> > distance.
+> is this binding looks ok?
 
-Hi Peter,
+This looks roughly requivalent to the ACPI SLIT, which means it's as
+powerful, which allays my previous concerns.
 
-sama5d3x and sama5d4x don't support the so called "Alternative Command mode"
-whereas sama5d2x do. The Alternative Command mode comes with a new hardware
-mechanism inside the I2C controller which locks the transmission of data on
-the I2C bus when a NACK is detected. It means that even if a data is written
-into the THR, the I2C controller doesn't push this data on the I2C bus but
-retains the data in the THR (and its associated FIFO for sama5d2x and future
-SoCs) until the driver unlocks the transmitter by writing the LOCKCLR (Lock
-Clear) bit in the Control Register. Then and only then, the transmitter outputs
-pending data again.
-This new mechanism was introduced to cope with an unwanted DMA write into the
-THR after a NACK. Indeed, as I've tried to explain in my patch, when a first
-NACK is detected, the I2C controller sets the TXCOMP, NACK and TXRDY bits
-alltogether in the Status Register. However setting the TXRDY bit also triggers
-the DMA controller to write the next data into the THR. Pitifully, WITHOUT the
-new lock mechanism, writing into the THR starts a new I2C frame. Since the
-eeprom is likely not to be ready yet, it replies by a second NACK. So you
-see on the scope two consecutive NACKs.
+> i can implement this and submit in next version of patchset.
 
-On sama5d3x and sama5d4x, which do not support this lock mechanism, you are
-likely to see a successful write transfer followed by two NACKs then a delay
-and finally a new successful write transfer. This is the case 2b:
+Please put together (plaintext) patches.
 
-1 - A successfull write transfer is completed.
-2 - The at24 driver immediately tries to perform the next write transfer...
-3 - ... but the eeprom is not ready yet and replies with a first NACK.
-4 - The I2C controller detects this NACK and sets the NACK, TXCOMP and TXRDY
-    bits in its Status Register (and interrupts the CPU).
-5 - The DMA controller is triggered by the TXRDY bit to write the next data
-    into the THR.
-6 - WITHTOUT the lock mechanism, the I2C controller starts a new frame because
-   of the write into the THR by the DMA controller...
-7 - ... but the eeprom is still not ready and replies with a second NACK.
+Then we have a sensible baseline that we can work from; it's somewhat
+difficult for others to join the disacussion here as-is.
 
-8 - starting from 4, the CPU handles the interrupt generated by the first NACK.
-    Depending on the timing, it has already masked the interrupted before the
-    second NACK. In such a case, the NACK bit is pending in the Status
-    Register. Then it reports the first NACK error to the at24 driver.
-9 - The at24 driver handles the NACK error: it sleeps for a while before
-    retrying to perform the write operation.
-10 - With the new patch, the I2C controller reads the Status Register to clear
-     pending (NACK) interrupts before actually starting this new (retried)
-     transfer.
-
-
-So if you are using DMA transfers on a sama5d3x board, you're are likely to
-see, as I did see, a valid write transfer followed by 2 NACKs, then a delay and
-finally a new write transfer.
-The 2nd NACK is not wanted but expected. Without the lock mechanism, there is
-nothing we can do at the I2C controller level. However a workaround may exist:
-inserting a small delay after a successful write transfer should give the
-eeprom enough time to be ready to process the next write so even the first NACK
-would disappear.
-This is what I saw while debugging with dev_info() traces. Those traces had the
-side effect of inserting delays hence changing the timing.
-
-As you see, we have to deal with some known hardware design quirks, which are
-fixed by the lock mechanism. Without the lock mechanism, the interrupt handler
-and the CPU are likely to come too late to cancel the DMA transfer before the
-DMA controller writes a new byte into the THR, hence generating an unwanted
-frame.
-
-Best Regards,
-
-Cyrille
+Thanks,
+Mark.
