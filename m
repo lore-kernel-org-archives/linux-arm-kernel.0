@@ -1,32 +1,32 @@
-From: atull@opensource.altera.com (atull at opensource.altera.com)
-Date: Tue, 13 Oct 2015 13:30:02 -0500
-Subject: [PATCH] ARM: socfpga_defconfig: enable fpga manager
-Message-ID: <1444761002-1423-1-git-send-email-atull@opensource.altera.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 13 Oct 2015 20:40:36 +0200
+Subject: [PATCH 1/3] ARM: dts: sun8i: Add sun8i-a23-q8-tablet.dts file
+In-Reply-To: <1444739748-26422-1-git-send-email-hdegoede@redhat.com>
+References: <1444739748-26422-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151013184036.GL2278@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alan Tull <atull@opensource.altera.com>
+On Tue, Oct 13, 2015 at 02:35:46PM +0200, Hans de Goede wrote:
+> This is a generic dts file for A23 based q8 formfactor tablets,
+> this is intended to replace both sun8i-a23-ippo-q8h-v5.dts and
+> sun8i-a23-ippo-q8h-v1.2.dts (these can be fully dropped after a
+> transition period).
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Enable fpga manager framework and low level driver for
-socfpga in socfpga_defconfig
+Applied, thanks!
 
-Signed-off-by: Alan Tull <atull@opensource.altera.com>
----
- arch/arm/configs/socfpga_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+Maxime
 
-diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-index a2956c3..8128b93e 100644
---- a/arch/arm/configs/socfpga_defconfig
-+++ b/arch/arm/configs/socfpga_defconfig
-@@ -86,6 +86,8 @@ CONFIG_USB_DWC2=y
- CONFIG_USB_DWC2_HOST=y
- CONFIG_MMC=y
- CONFIG_MMC_DW=y
-+CONFIG_FPGA=y
-+CONFIG_FPGA_MGR_SOCFPGA=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151013/89285257/attachment.sig>
