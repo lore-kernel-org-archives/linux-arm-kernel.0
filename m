@@ -1,70 +1,36 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Tue, 13 Oct 2015 07:54:15 +0200
-Subject: [PATCH] arm, omap2, sram: On HS/EMU devices,
- only 64K internal SRAM is available.
-Message-ID: <1444715655-30077-1-git-send-email-hs@denx.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 13 Oct 2015 08:19:29 +0200
+Subject: [PATCH 00/37] ARM: dts: Fix fixed regulators enable GPIO polarity
+In-Reply-To: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1444684386-17094-1-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <20151013061929.GX7858@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Of this, secure content (including PPA) uses initial
-portion of the SRAM. This chunk is not (and shouldn't
-be) accessible from the public code.
+On Tue, Oct 13, 2015 at 12:12:29AM +0300, Laurent Pinchart wrote:
+> Hello,
+> 
+> While working on regulators, GPIOs and DT I noticed that many of our DT source
+> files incorrectly describe fixed regulators. The common error patterns are
+> 
+> - Usage of the undefined (and never parsed) enable-active-low property
+> - Usage of the enable-active-high property without specifying an enable GPIO
+> - Typos in the enabl GPIO property name (gpios instead of gpio)
+> - Mismatch between the enable-active-high property (or the lack thereof) and
+>   the enable GPIO flags
+> 
+> This patch series fixes those issues in all the DT sources after locating the
+> errors using the following script.
 
-The minimum size of this chunk (0x350) is used in this
-patch. Available size is rounded off to 63K.
+Nice. For the i.MX boards:
 
-Both values would require a change if size of secure
-content grows beyond 0x350.
+Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Signed-off-by: Heiko Schocher <hs@denx.de>
-Signed-off-by: Ayoub Zaki <Ayoub.Zaki@bosch-si.com>
----
+Sascha
 
- arch/arm/mach-omap2/sram.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
-index cd488b8..2e7c00f 100644
---- a/arch/arm/mach-omap2/sram.c
-+++ b/arch/arm/mach-omap2/sram.c
-@@ -47,6 +47,28 @@
- 
- #define GP_DEVICE		0x300
- 
-+/**
-+ * Size of chunk used by secure content in the HS/EMU devices.
-+ *
-+ * This size is not fixed. It depends upon the implementation of PPA.
-+ * May need to be modified if the size grows.
-+ */
-+#define AM33XX_HS_HEADER_SIZE   0x0350
-+
-+/**
-+ * Start of public SRAM on HS/EMU devices.
-+ */
-+#define AM33XX_SRAM_PA		0x40300000
-+#define AM33XX_SRAM_PUB_PA	(AM33XX_SRAM_PA + AM33XX_HS_HEADER_SIZE)
-+
-+/**
-+ * Size of public SRAM available on HS/EMU devices.
-+ *
-+ * This size also depends upon AM33XX_HS_HEADER_SIZE.
-+ * Current value is derived from nearest round-off.
-+ */
-+#define AM33XX_SRAM_PUB_SIZE		0xfc00	/* 63K */
-+
- #define ROUND_DOWN(value,boundary)	((value) & (~((boundary)-1)))
- 
- static unsigned long omap_sram_start;
-@@ -99,6 +121,9 @@ static void __init omap_detect_sram(void)
- 			} else {
- 				omap_sram_size = 0x8000; /* 32K */
- 			}
-+		} else if (soc_is_am33xx()) {
-+			omap_sram_start = AM33XX_SRAM_PUB_PA;
-+			omap_sram_size  = AM33XX_SRAM_PUB_SIZE;
- 		} else {
- 			omap_sram_start = OMAP2_SRAM_PUB_PA;
- 			omap_sram_size = 0x800; /* 2K */
 -- 
-2.1.0
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
