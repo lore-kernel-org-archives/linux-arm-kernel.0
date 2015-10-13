@@ -1,45 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 13 Oct 2015 15:18:00 +0100
-Subject: Run armv7 32 bit userspace on aarch64
-In-Reply-To: <561BFEF2.2030503@linaro.org>
-References: <5615A0E1.1050402@linaro.org> <56184079.1040905@linaro.org>
- <56185B98.2060400@linaro.org> <6978725.cJktLf4M1X@wuerfel>
- <561BED2C.8080008@linaro.org> <561BF011.80205@linaro.org>
- <20151012175026.GL16124@arm.com> <561BFEF2.2030503@linaro.org>
-Message-ID: <20151013141759.GL21550@arm.com>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Tue, 13 Oct 2015 22:18:22 +0800
+Subject: [alsa-devel] [RFC PATCH] ASoC: Modify check condition of
+ multiple bindings of components
+In-Reply-To: <561D0AA9.5080702@metafoo.de>
+References: <1444743477-48819-1-git-send-email-koro.chen@mediatek.com>
+ <561D0AA9.5080702@metafoo.de>
+Message-ID: <1444745902.26493.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 11:41:54AM -0700, Shi, Yang wrote:
-> On 10/12/2015 10:50 AM, Will Deacon wrote:
-> >On Mon, Oct 12, 2015 at 10:38:25AM -0700, Shi, Yang wrote:
-> >>BTW, it may be related to unaligned address.
-> >>
-> >>init[1]: unhandled level 3 translation fault (11) at 0x43acfad3, esr
-> >>0x92000047
-> >>pgd = ffff80007b8be000
-> >>[43acfad3] *pgd=00000000fb8c5003, *pud=00000000fb8c1003,
-> >>*pmd=00000000fb8c2003, *pte=0000000000000000
-> >>
-> >>The userspace is trying to write to 0x43acfad3, the permission is
-> >>readonly.
-> >
-> >What's the instruction making the access? If it's a store-multiple, then
+On Tue, 2015-10-13 at 15:44 +0200, Lars-Peter Clausen wrote:
+> On 10/13/2015 03:37 PM, Koro Chen wrote:
+> > The patch "ASoC: Prevent components from being bound to multiple cards"
+> > adds check to prevent multiple cards from using the same component.
+> > However, snd_soc_register_platform() or snd_soc_register_codec() will
+> > also create components, and sharing the same platform by multiple cards
+> > is then refused. This happens with a platform having multiple
+> > independent DAIs that share the same DMA controller.
+> > 
+> > Relax the condition by checking component->registered_as_component,
+> > which is only true in case of snd_soc_register_component() and
+> > will be false for components created by snd_soc_register_platform()
+> > or snd_soc_register_codec().
 > 
-> My aarch64 gdb just shows hex code instead of human readable assembly code.
+> Binding a component to multiple cards results in internal data structure
+> corruption, regardless of whether it is a raw component, CODEC or platform,
+> which is why the check was added. So the proposed change wont work.
 > 
-> It is 0xe5c02000.
+Thanks for your comment. Is it possible to share an example of how the
+data structure will be corrupted? So I can study into this further.
+ 
+> > 
+> > Signed-off-by: Koro Chen <koro.chen@mediatek.com>
+> > ---
+> >  sound/soc/soc-core.c |    3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
+> > index 42575b0..eca169a 100644
+> > --- a/sound/soc/soc-core.c
+> > +++ b/sound/soc/soc-core.c
+> > @@ -1106,7 +1106,8 @@ static int soc_probe_component(struct snd_soc_card *card,
+> >  		return 0;
+> >  
+> >  	if (component->card) {
+> > -		if (component->card != card) {
+> > +		if (component->card != card &&
+> > +		    component->registered_as_component) {
+> >  			dev_err(component->dev,
+> >  				"Trying to bind component to card \"%s\" but is already bound to card \"%s\"\n",
+> >  				card->name, component->card->name);
+> > 
 > 
-> I just checked the ARMv7 manual, it looks like STRB instruction, so we can
-> rule this out.
-> 
-> I just figured out it is caused by gcc 5.2 pre-link. It works if I disable
-> pre-link. The pre-link issue breaks all armv7 userspace even though it is
-> run on armv7 machines.
-
-Does that mean you could supply a simple example so I can reproduce this
-myself, please? (e.g. if I write a hello world program in C and run it
-with a particular set of compiler options then it won't run under a
-64-bit kernel but it will work under a 32-bit one).
-
-Will
+> _______________________________________________
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
