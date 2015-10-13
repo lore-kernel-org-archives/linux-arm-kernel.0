@@ -1,44 +1,67 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Tue, 13 Oct 2015 18:04:50 -0400
-Subject: [PATCH v2 7/7] clk: ns2: add clock support for Broadcom
- Northstar 2 SoC
-In-Reply-To: <5280890.6npshDUNFZ@wuerfel>
-References: <1444770485-11210-1-git-send-email-jonmason@broadcom.com>
- <1444770485-11210-8-git-send-email-jonmason@broadcom.com>
- <5280890.6npshDUNFZ@wuerfel>
-Message-ID: <20151013220450.GO12512@broadcom.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 13 Oct 2015 15:17:36 -0700
+Subject: [RFC 1/5] clk: iproc: define Broadcom NSP iProc clock binding
+In-Reply-To: <1444771347-11382-2-git-send-email-jonmason@broadcom.com>
+References: <1444771347-11382-1-git-send-email-jonmason@broadcom.com>
+ <1444771347-11382-2-git-send-email-jonmason@broadcom.com>
+Message-ID: <561D8300.3040804@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 11:18:53PM +0200, Arnd Bergmann wrote:
-> On Tuesday 13 October 2015 17:08:05 Jon Mason wrote:
-> > @@ -3,6 +3,7 @@ obj-$(CONFIG_CLK_BCM_KONA)      += clk-kona-setup.o
-> >  obj-$(CONFIG_CLK_BCM_KONA)     += clk-bcm281xx.o
-> >  obj-$(CONFIG_CLK_BCM_KONA)     += clk-bcm21664.o
-> >  obj-$(CONFIG_COMMON_CLK_IPROC) += clk-iproc-armpll.o clk-iproc-pll.o clk-iproc-asiu.o
-> > +obj-$(CONFIG_COMMON_CLK_IPROC) += clk-ns2.o
-> >  obj-$(CONFIG_ARCH_BCM_CYGNUS)  += clk-cygnus.o
-> >  obj-$(CONFIG_ARCH_BCM_NSP)     += clk-nsp.o
-> >  obj-$(CONFIG_ARCH_BCM_5301X)   += clk-nsp.o
+Shouldn't the device tree binding document go with the other patch
+series since both the binding document and drivers are merged by Michael
+or Stephen?
+
+On 10/13/2015 2:22 PM, Jon Mason wrote:
+> Document the device tree bindings for Broadcom Northstar Plus
+> architecture based clock controller
 > 
-> If I understand this right, both CYGNUS and NS2 are IPROC based, but it
-> looks like you now require building the clk-ns2 file for both?
-
-There is no need for the NS2 clk code to be used by anything other
-than NS2.  There is no unique CONFIG_ identifier for NS2 in the code
-that was accepted upstream.  If I can add one for NS2, then I can
-split this off similar to Cygnus or NSP.  If not, then it has to be
-lumped in with all of iProc.  :(
-
-> On a related note, I'm seeing problems when CONFIG_CYGNUS is set but
-> CONFIG_COMMON_CLK_IPROC is disabled, as that currently leads to a link
-> failure.
-
-I can double check, but it should be on by default when Cygnus is
-enabled.  If you send me the error, I'll be happy to fix it.
-
-Thanks,
-Jon
-
+> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> ---
+>  .../bindings/clock/brcm,iproc-clocks.txt           | 30 ++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
 > 
-> 	Arnd
+> diff --git a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+> index da8d9bb..b3c3e9d 100644
+> --- a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+> +++ b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+> @@ -130,3 +130,33 @@ These clock IDs are defined in:
+>      ch3_unused mipipll          4       BCM_CYGNUS_MIPIPLL_CH3_UNUSED
+>      ch4_unused mipipll          5       BCM_CYGNUS_MIPIPLL_CH4_UNUSED
+>      ch5_unused mipipll          6       BCM_CYGNUS_MIPIPLL_CH5_UNUSED
+> +
+> +Northstar and Northstar Plus
+> +------
+> +PLL and leaf clock compatible strings for Northstar and Northstar Plus are:
+> + "brcm,nsp-armpll"
+> + "brcm,nsp-genpll"
+> + "brcm,nsp-lcpll0"
+
+So the current clock driver also supports NS? That will be nice and that
+indicates all the clock related registers/offsets are exactly the same
+between NS and NSP?
+
+> +
+> +The following table defines the set of PLL/clock index and ID for Northstar and
+> +Northstar Plus.  These clock IDs are defined in:
+> +    "include/dt-bindings/clock/bcm-nsp.h"
+> +
+> +    Clock	Source		Index	ID
+> +    ---		-----		-----	---------
+> +    crystal	N/A		N/A	N/A
+> +
+> +    armpll	crystal		N/A	N/A
+> +
+> +    genpll	crystal		0	BCM_NSP_GENPLL
+> +    phy		genpll		1	BCM_NSP_GENPLL_PHY_CLK
+> +    ethernetclk	genpll		2	BCM_NSP_GENPLL_ENET_SW_CLK
+> +    usbclk	genpll		3	BCM_NSP_GENPLL_USB_PHY_REF_CLK
+> +    iprocfast	genpll		4	BCM_NSP_GENPLL_IPROCFAST_CLK
+> +    sata1	genpll		5	BCM_NSP_GENPLL_SATA1_CLK
+> +    sata2	genpll		6	BCM_NSP_GENPLL_SATA2_CLK
+> +
+> +    lcpll0	crystal		0	BCM_NSP_LCPLL0
+> +    pcie_phy	lcpll0		1	BCM_NSP_LCPLL0_PCIE_PHY_REF_CLK
+> +    sdio	lcpll0		2	BCM_NSP_LCPLL0_SDIO_CLK
+> +    ddr_phy	lcpll0		3	BCM_NSP_LCPLL0_DDR_PHY_CLK
+> 
