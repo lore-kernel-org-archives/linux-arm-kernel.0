@@ -1,51 +1,130 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 13 Oct 2015 12:25:55 +0200
-Subject: [BUG] broken mixer after second resume from mem
-Message-ID: <561CDC33.7050103@collabora.com>
+From: peda@lysator.liu.se (Peter Rosin)
+Date: Tue, 13 Oct 2015 12:38:39 +0200
+Subject: Regression: at24 eeprom writing
+In-Reply-To: <561BDC32.2080401@atmel.com>
+References: <560F0DB1.2020101@lysator.liu.se>
+ <561238A9.1060406@lysator.liu.se> <20151005150032.GA12137@odux.rfo.atmel.com>
+ <561292AC.8060408@lysator.liu.se> <561BCE33.2050904@lysator.liu.se>
+ <561BDC32.2080401@atmel.com>
+Message-ID: <561CDF2F.3090608@lysator.liu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2015-10-12 18:13, Cyrille Pitchen wrote:
+> Le 12/10/2015 17:13, Peter Rosin a ?crit :
+>> On 2015-10-05 17:09, Peter Rosin wrote:
+>>> But what trouble does the i2c bus driver see? Admittedly I only
+>>> have a simple logic level bus viewer, and not a full-blown
+>>> oscilloscope, so there might be something analogue going on?
+>>> I don't think so though, those signals looked fine last time we
+>>> looked (but we obviously didn't have these issues then, and
+>>> didn't really look that closely). I'll see if I can recheck
+>>> with a real scope too.
+>>
+>> We redid the tests with a real scope, and the signal looks nice
+>> and square, so it is not that.
+>>
+>> Speculating further on the cause of the long ACKs, I think that
+>> the i2c driver gets confused by an interrupt that marks the
+>> transfer complete, and thinks it's a NACK interrupt instead. Is that
+>> plausible?
+>>
+>> If the peripheral unit is such that it generates a stop automatically
+>> on NACKs, then this makes perfect sense. I.e. the TWI sees that the
+>> transfer is complete, generates an interrupt, and waits for further
+>> data or a stop command. Meanwhile the driver thinks it's a NACK and
+>> that a stop condition has already been sent to the bus, and just
+>> notifies the i2c consumer (the eeprom driver in this case) of the
+>> failure and frees up the bus for any future user.
+>>
+>> This also matches what I see when I turn on some more traffic on the
+>> bus, that is interleaved with the eeprom traffic. AFAICT, it can be
+>> any command that gets chewed up by the eeprom if it is sent to the
+>> i2c driver during the long ACK.
+>>
+>> Are you Atmel people making any progress on this data corrupting
+>> regression? Is there anything else I can do to help?
+>>
+>> Cheers,
+>> Peter
+>>
+> 
+> Hi Peter,
+> 
+> I have sent a patch to Ludovic for a first internal review before publishing to
+> mainline. The patch should fix your issue since it fixes it on my sama5d36ek
+> board with an at24 eeprom.
+> 
+> More details on the reason of this bug would be provided in both the commit
+> message and comments in the code provided by the reviewed patch but I you want
+> an early fix just read the Status Register (AT91_TWI_SR) at the beginning of
+> at91_do_twi_transfer(). This read clears the NACK bit in the Status Register.
+> Then the following source code can safely enable the NACK interrupt, otherwise
+> in some cases a pending NACK interrupt would rise immediately after the line:
+> at91_twi_write(dev, AT91_TWI_IER, AT91_TWI_NACK);
+> hence breaking the sequence of operations to be done because the interrupt
+> handler would call complete() too early so wait_for_completion_timeout()
+> also exits too early.
+> 
+> So reading the Status Register at the beginning of at91_do_twi_transfer()
+> should be enough to fix the issue.
 
-have been hunting down a bug on exynos5250-snow which caused both HDMI
-and LVDS output to be broken after the second resume (with suspend to
-mem, but not to idle).
+Yes, I see no more long ACKs after that reading the Status Register there.
+Great!
 
-What I have found is that when powering down the DISP1 power domain
-while suspending for the second time, the contents of the SRC_TOP3
-register change from 0x1110550 to 0x1110500. IIUIC, this means that
-ACLK_200_DISP1 is reparented to XXTI.
+> Another mistake is in the interrupt handler itself, ie atmel_twi_interrupt():
+> we should check the TWI_TXRDY status bit before calling
+> at91_twi_write_next_byte() only if both the TWI_TXCOMP and TWI_NACK status bits
+> are clear. Otherwise, writing a new byte into the THR tells the I2C controller
+> to start a new transfer. Then the I2C slave, the at24 eeprom, is likely to
+> also reply by a second NACK. Hence the NACK bit is already set into the Status
+> Register on the next call of at91_do_twi_transfer().
+> This is what I saw on my scope for PIO transfers.
 
-When the CPU comes up again, that register contains 0x1110550 again, but
-it's set to 0x1110500 by the code that restores clk registers when resuming:
+I interpret this as a proposed solution for the strange double NACKs?
 
-First suspend:
+Anyway, I find it unnecessarily hard to grasp exactly what you mean
+(wasteful policy you are apparently suffering from where it is OK to
+publish a patch written in English, but apparently a big no-no to
+send a diff until it passes some internal review???). I interpreted
+your "patch" in English as:
 
-exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - before
-exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - after
-exynos5250_clk_suspend: SRC_TOP3 1110550
-exynos5250_clk_resume: SRC_TOP3 1110550 - before
-exynos5250_clk_resume: SRC_TOP3 1110550 - after
-exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - before
-exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - after
+ 		at91_twi_read_next_byte(dev);
+-	else if (irqstatus & AT_TWI_TXRDY)
++	else if ((irqstatus & (AT91_TWI_TXCOMP | AT91_TWI_TXRDY | AT91_TWI_NACK)) == AT91_TWI_TXRDY)
+ 		at91_twi_write_next_byte(dev);
 
+But still see some double NACKs. Not always though, and it doesn't wreak
+any havoc. But it still looks strange and I can't explain them when looking
+at what the eeprom driver requests. Does this mean that there are more
+races present?
 
-Second suspend:
+Or, did I just parse your English "patch" badly?
 
-exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - before
-exynos_pd_power: SRC_TOP3 1110500 disp1-power-domain at 100440A0 - after
-exynos5250_clk_suspend: SRC_TOP3 1110500
-exynos5250_clk_resume: SRC_TOP3 1110550 - before
-exynos5250_clk_resume: SRC_TOP3 1110500 - after
-exynos_pd_power: SRC_TOP3 1110500 disp1-power-domain at 100440A0 - before
-exynos_pd_power: SRC_TOP3 1110500 disp1-power-domain at 100440A0 - after
+> By the way, in my case, the first NACK occurs because the at24 driver tries to
+> perform a second write transfer too quickly and the eeprom is not ready yet,
+> then replies with a NACK.
 
+Yes, I believe this is by design. Noone wants to encode the exact delays
+needed since they are hard to predict. So, the eeprom driver polls.
 
-I have no idea of why it happens on the second suspend, and also don't
-know why it doesn't happen when suspending to idle.
+> However while debugging, placing debug traces in the I2C controller driver
+> changed the timing: this small delay was enough to make the first NACK
+> disappear because the eeprom was now ready to process the second write
+> operation.
 
-Any ideas?
+Yes, w/o NACKs everything is going smooth regardless of kernel version.
 
-Thanks,
-
-Tomeu
+> For DMA transfer, you have to know that when NACK error is detected, the I2C
+> controller sets the TWI_TXCOMP, TWI_NACK and TWI_TXRDY bits all together in
+> the Status Register:
+> - The TWI_NACK is cleared by reading the Status Register.
+> - The TWI_TXRDY triggers the DMA controller to write the next byte in the THR,
+>   which should also tell the I2C controller to start a new transfer.
+> - The TWI_TXCOMP bit is cleared by writing into the THR: this is why the
+>   interrupt handler may fail to detect NACK if it relies on TWI_TXCOMP.
+> 
+> Best Regards,
+> 
+> Cyrille
+> 
