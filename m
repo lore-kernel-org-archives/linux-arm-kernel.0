@@ -1,21 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 13 Oct 2015 15:19:25 +0100
-Subject: [RFC] arm64: add kc_offset_to_vaddr and kc_vaddr_to_offset macro
-In-Reply-To: <1444632779-23369-1-git-send-email-yalin.wang2010@gmail.com>
-References: <1444632779-23369-1-git-send-email-yalin.wang2010@gmail.com>
-Message-ID: <20151013141925.GD11573@e104818-lin.cambridge.arm.com>
+From: joel@porquet.org (Joel Porquet)
+Date: Tue, 13 Oct 2015 14:15:59 +0000 (UTC)
+Subject: [PATCH] ARM: Remove open-coded version of
+ =?utf-8?b?SVJRQ0hJUF9ERUNMQVJF?=
+References: <1443803057-9007-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <loom.20151013T161004-793@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 02:52:59PM +0800, yalin wang wrote:
-> This patch add kc_offset_to_vaddr() and kc_vaddr_to_offset(),
-> the default version doesn't work on arm64, because arm64 kernel address
-> is below the PAGE_OFFSET, like module address and vmemmap address are
-> all below PAGE_OFFSET address.
+Marc Zyngier <marc.zyngier <at> arm.com> writes:
+
 > 
-> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+> Now that the IRQCHIP_DECLARE macro has been moved to linux/irqchip.h,
+> it becomes possible to cleanup the open-coded versions of the same
+> macro that have been added to some private irqchips implementations.
+> 
+> Cc: Kukjin Kim <kgene <at> kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski <at> samsung.com>
+> Cc: Shawn Guo <shawnguo <at> kernel.org>
+> Cc: Sascha Hauer <kernel <at> pengutronix.de>
+> Cc: Tony Lindgren <tony <at> atomide.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier <at> arm.com>
+> ---
+>  arch/arm/mach-exynos/suspend.c       | 3 ++-
+>  arch/arm/mach-imx/gpc.c              | 8 ++------
+>  arch/arm/mach-omap2/omap-wakeupgen.c | 8 ++------
+>  3 files changed, 6 insertions(+), 13 deletions(-)
 
-Applied. Thanks.
+I had suggested the same patch a few months ago
+(https://lkml.org/lkml/2015/7/7/1069) but without success although it had
+been acked by everybody :/
+I didn't know how to have it pushed all at once...
 
--- 
-Catalin
+Suggested-by: Joel Porquet <joel@porquet.org>
+
+Thanks,
+Jo?l
