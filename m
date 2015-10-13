@@ -1,32 +1,126 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 13 Oct 2015 16:13:55 +0100
-Subject: [PATCH v1 0/2] arm64: runtime workaround for erratum #843419
-In-Reply-To: <1442590800-14645-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1442590800-14645-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151013151355.GQ21550@arm.com>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Wed, 14 Oct 2015 00:15:54 +0900
+Subject: [PATCH v3 1/7] arm64: ftrace: adjust callsite addresses examined
+ by stack tracer
+In-Reply-To: <1444298504-10392-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
+ <1444298504-10392-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <BB42EDAB-830D-4073-859A-6454E6B9EB4D@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Oct 8, 2015, at 7:01 PM, AKASHI Takahiro wrote:
 
-On Fri, Sep 18, 2015 at 04:39:58PM +0100, Ard Biesheuvel wrote:
-> This implements a workaround for the A53 erratum that may result in adrp
-> instructions to produce incorrect values if they appear in either of
-> the last two instruction slots of a 4 KB page.
+Hi Akashi,
+
+> On arm64, no PC values returned by save_stack_trace() will match to LR
+> values saved in stack frames on a stack after the following commit:
+>    commit e306dfd06fcb ("ARM64: unwind: Fix PC calculation")
+> As a result, the output from stack tracer will be messed up.
 > 
-> Instead of building modules using the large code model, this approach
-> uses veneers to call the adrp instructions at unaffected offsets, unless
-> they can be converted into adr instructions, which is even better (this
-> depends on whether the symbol is with 1 MB of the place)
+> This patch introduces an arch-defined macro, FTRACE_STACK_FRAME_OFFSET,
+> so that check_stack() can handle this case correctly.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+> arch/arm64/include/asm/ftrace.h |    5 +++--
+> arch/arm64/kernel/stacktrace.c  |    7 ++++---
+> include/linux/ftrace.h          |    7 +++++++
+> kernel/trace/trace_stack.c      |    5 +++--
+> 4 files changed, 17 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+> index c5534fa..2b43e20 100644
+> --- a/arch/arm64/include/asm/ftrace.h
+> +++ b/arch/arm64/include/asm/ftrace.h
+> @@ -13,8 +13,9 @@
+> 
+> #include <asm/insn.h>
+> 
+> -#define MCOUNT_ADDR		((unsigned long)_mcount)
+> -#define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
+> +#define MCOUNT_ADDR			((unsigned long)_mcount)
+> +#define MCOUNT_INSN_SIZE		AARCH64_INSN_SIZE
+> +#define FTRACE_STACK_FRAME_OFFSET	AARCH64_INSN_SIZE
+> 
+> #ifndef __ASSEMBLY__
+> #include <linux/compat.h>
+> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+> index 407991b..bc0689a 100644
+> --- a/arch/arm64/kernel/stacktrace.c
+> +++ b/arch/arm64/kernel/stacktrace.c
+> @@ -20,6 +20,7 @@
+> #include <linux/sched.h>
+> #include <linux/stacktrace.h>
+> 
+> +#include <asm/insn.h>
+> #include <asm/stacktrace.h>
+> 
+> /*
+> @@ -49,10 +50,10 @@ int notrace unwind_frame(struct stackframe *frame)
+> 	frame->sp = fp + 0x10;
+> 	frame->fp = *(unsigned long *)(fp);
+> 	/*
+> -	 * -4 here because we care about the PC at time of bl,
+> -	 * not where the return will go.
+> +	 * decrement PC by AARCH64_INSN_SIZE here because we care about
+> +	 * the PC at time of bl, not where the return will go.
+> 	 */
+> -	frame->pc = *(unsigned long *)(fp + 8) - 4;
+> +	frame->pc = *(unsigned long *)(fp + 8) - AARCH64_INSN_SIZE;
+> 
+> 	return 0;
+> }
+> diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
+> index 6cd8c0e..d77b195 100644
+> --- a/include/linux/ftrace.h
+> +++ b/include/linux/ftrace.h
+> @@ -263,6 +263,13 @@ static inline void ftrace_kill(void) { }
+> #endif /* CONFIG_FUNCTION_TRACER */
+> 
+> #ifdef CONFIG_STACK_TRACER
+> +/*
+> + * the offset value to add to return address from save_stack_trace()
+> + */
+> +#ifndef FTRACE_STACK_FRAME_OFFSET
+> +#define FTRACE_STACK_FRAME_OFFSET 0
+> +#endif
+> +
+> extern int stack_tracer_enabled;
+> int
+> stack_trace_sysctl(struct ctl_table *table, int write,
+> diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
+> index b746399..30521ea 100644
+> --- a/kernel/trace/trace_stack.c
+> +++ b/kernel/trace/trace_stack.c
+> @@ -105,7 +105,7 @@ check_stack(unsigned long ip, unsigned long *stack)
+> 
+> 	/* Skip over the overhead of the stack tracer itself */
+> 	for (i = 0; i < max_stack_trace.nr_entries; i++) {
+> -		if (stack_dump_trace[i] == ip)
+> +		if ((stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET) == ip)
+> 			break;
+> 	}
+> 
+> @@ -133,7 +133,8 @@ check_stack(unsigned long ip, unsigned long *stack)
+> 		for (; p < top && i < max_stack_trace.nr_entries; p++) {
+> 			if (stack_dump_trace[i] == ULONG_MAX)
+> 				break;
+> -			if (*p == stack_dump_trace[i]) {
+> +			if (*p == (stack_dump_trace[i]
+> +					+ FTRACE_STACK_FRAME_OFFSET)) {
+> 				stack_dump_trace[x] = stack_dump_trace[i++];
+> 				this_size = stack_dump_index[x++] =
+> 					(top - p) * sizeof(unsigned long);
+> -- 
 
-As discussed at Connect, we should evaluate the performance penalty of
-the existing workaround before making this more complicated. I tried to
-do that today by building xfs as a module, then copying an xfs disk
-image containing a git clone of the kernel into tmpfs, loop mounting
-that and md5summing all of the files.
+This change is always on my tree for IRQ stack feature development. It makes
+stack_trace prints out useful info although it can't give an accurate data.
+I believe this hunk helps to figure out max stack depth context.
 
-The performance eppears to be the same with and without the errata
-workaround enabled, but I wondered if you had a better idea for a test
-(short of writing a synthetic module)?
+Acked-by: Jungseok Lee <jungseoklee85@gmail.com>
 
-Will
+Thanks!
+
+Best Regards
+Jungseok Lee
