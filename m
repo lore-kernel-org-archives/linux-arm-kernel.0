@@ -1,42 +1,34 @@
-From: zhengsq@rock-chips.com (Shunqian Zheng)
-Date: Tue, 13 Oct 2015 09:01:09 +0800
-Subject: [PATCH v1 4/4] ASoC: RK3036: Add binding doc for audio machine driver
-In-Reply-To: <1444698070-4191-1-git-send-email-zhengsq@rock-chips.com>
-References: <1444698070-4191-1-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <1444698070-4191-5-git-send-email-zhengsq@rock-chips.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 13 Oct 2015 10:04:47 +0900
+Subject: [PATCH] ARM: shmobile: porter: add QSPI DT support
+In-Reply-To: <CAMuHMdWzhasOwUe8dOba_QwpMfwR-3w_obO0aszr0R4XcBa24Q@mail.gmail.com>
+References: <1738678.v21ITp1gYW@wasted.cogentembedded.com>
+ <20151012000453.GC20025@verge.net.au>
+ <CAMuHMdWzhasOwUe8dOba_QwpMfwR-3w_obO0aszr0R4XcBa24Q@mail.gmail.com>
+Message-ID: <20151013010446.GC4836@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: ZhengShunQian <zhengsq@rock-chips.com>
+On Mon, Oct 12, 2015 at 08:53:26AM +0200, Geert Uytterhoeven wrote:
+> On Mon, Oct 12, 2015 at 2:04 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> +     flash at 0 {
+> >> +             #address-cells = <1>;
+> >> +             #size-cells = <1>;
+> >> +             compatible = "spansion,s25fl512s", "jedec,spi-nor";
+> >
+> > spansion,s25fl512s is used in several dt files but it seems to be
+> > undocumented. Do we have a plan to resolve this?
+> 
+> Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt:
+> 
+> - compatible : May include a device-specific string consisting of the
+>                manufacturer and name of the chip. Bear in mind the DT binding
+>                is not Linux-only, but in case of Linux, see the "m25p_ids"
+>                table in drivers/mtd/devices/m25p80.c for the list of supported
+>                chips.
+>                Must also include "jedec,spi-nor" for any SPI NOR flash that can
+>                be identified by the JEDEC READ ID opcode (0x9F).
+> 
+> Hence it's OK.
 
-This patch add binding document for RK3036 SoC audio
-machine driver.
-
-Signed-off-by: ZhengShunQian <zhengsq@rock-chips.com>
----
- .../devicetree/bindings/sound/rockchip-rk3036.txt          | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/rockchip-rk3036.txt
-
-diff --git a/Documentation/devicetree/bindings/sound/rockchip-rk3036.txt b/Documentation/devicetree/bindings/sound/rockchip-rk3036.txt
-new file mode 100644
-index 0000000..53d5738
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/rockchip-rk3036.txt
-@@ -0,0 +1,14 @@
-+RK3036 SoC with Inno audio codec integrated
-+
-+Required properties:
-+- compatible: Should be "rockchip,rk3036-audio".
-+- rockchip,i2s-controller: The phandle of the Rockchip I2S controller.
-+- rockchip,audio-codec: The phandle of the Inno-rk3036 audio codec.
-+
-+Example:
-+
-+	sound {
-+		compatible = "rockchip,rk3036-audio";
-+		rockchip,i2s-controller = <&i2s>;
-+		rockchip,audio-codec = <&acodec>;
-+	};
--- 
-1.9.1
+Thanks, I guess checkpatch needs to learn about that rule.
