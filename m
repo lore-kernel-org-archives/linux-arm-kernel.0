@@ -1,22 +1,42 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Wed, 14 Oct 2015 11:50:38 +0300
-Subject: [PATCH v3 00/16] KVM: arm64: GICv3 ITS emulation
-In-Reply-To: <561E16EE.10707@linaro.org>
-References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
- <20151010153744.GH29128@cbox> <561BBFC1.4070200@arm.com>
- <00dc01d10501$46352810$d29f7830$@samsung.com> <561E16EE.10707@linaro.org>
-Message-ID: <00e201d1065d$6698f340$33cad9c0$@samsung.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 14 Oct 2015 09:52:58 +0100
+Subject: [PATCH v2 2/4] dmaengine: Add STM32 DMA driver
+In-Reply-To: <CAOAejn1N=dFZ3nQ_hNznJQX1-fkP3r=vdYuWY4OMH65PrW3xVg@mail.gmail.com>
+References: <1444745127-1105-1-git-send-email-cedric.madianga@gmail.com>
+ <1444745127-1105-3-git-send-email-cedric.madianga@gmail.com>
+ <561D1689.90703@linaro.org>
+ <CAOAejn1N=dFZ3nQ_hNznJQX1-fkP3r=vdYuWY4OMH65PrW3xVg@mail.gmail.com>
+Message-ID: <561E17EA.6000900@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+On 14/10/15 08:54, M'boumba Cedric Madianga wrote:
+>>> +static int stm32_dma_alloc_chan_resources(struct dma_chan *c)
+>>> +{
+>>> +       struct stm32_dma_chan *chan = to_stm32_dma_chan(c);
+>>> +       struct stm32_dma_device *dmadev = stm32_dma_chan_get_dev(chan);
+>>> +       int ret;
+>>> +
+>>> +       chan->config_init = false;
+>>> +       ret = clk_prepare_enable(dmadev->clk);
+>>> +       if (ret < 0) {
+>>> +               dev_err(chan2dev(chan), "clk_prepare_enable failed: %d\n",
+>>> ret);
+>>> +               return ret;
+>>> +       }
+>>> +
+>>> +       ret = stm32_dma_disable_chan(chan);
+>>> +
+>>> +       return ret;
+>>> +}
+>>
+>>
+>> The error path here looks like it will leak clock references.
+>
+> Sorry I didn't catch it. What does it mean ?
 
-> Currently the gsi routing applies on top of ITS emulation series. I am
-> going to rebase it soon. It can go in 4.5 with ITS emulation series.
+If stm32_dma_disable_chan() returns an error then we will not restore 
+the original the clock counts causing them to "leak".
 
- Ah, yes, of course, because it reuses API definitions. I forgot this.
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Daniel.
