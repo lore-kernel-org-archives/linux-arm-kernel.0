@@ -1,208 +1,70 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 14 Oct 2015 15:33:12 +0000
-Subject: [PATCH] VFIO: platform: AMD xgbe reset module
-Message-ID: <1444836792-2405-1-git-send-email-eric.auger@linaro.org>
+From: jonmason@broadcom.com (Jon Mason)
+Date: Wed, 14 Oct 2015 11:34:21 -0400
+Subject: [PATCH 2/2] dt-bindings: Add new boards to bcm4708 DT bindings
+In-Reply-To: <561D87BD.5030405@gmail.com>
+References: <1443824564-17291-1-git-send-email-jonmason@broadcom.com>
+ <1443824564-17291-2-git-send-email-jonmason@broadcom.com>
+ <561923BC.5040906@hauke-m.de> <20151013214051.GN12512@broadcom.com>
+ <561D87BD.5030405@gmail.com>
+Message-ID: <20151014153420.GC15160@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces a module that registers and implements a low-level
-reset function for the AMD XGBE device.
+On Tue, Oct 13, 2015 at 03:37:49PM -0700, Florian Fainelli wrote:
+> On 13/10/15 14:40, Jon Mason wrote:
+> > On Sat, Oct 10, 2015 at 04:42:04PM +0200, Hauke Mehrtens wrote:
+> >> On 10/03/2015 12:22 AM, Jon Mason wrote:
+> >>> Add the 4708, 4709, and 953012k SVKs to the the documentation for the
+> >>> Broadcom Northstar device tree bindings.
+> >>>
+> >>> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> >>> ---
+> >>>  Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt | 7 +++++++
+> >>>  1 file changed, 7 insertions(+)
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
+> >>> index 6b0f49f..bdf4c06 100644
+> >>> --- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
+> >>> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
+> >>
+> >> What should be documented in this file? This is more a question to the
+> >> guys more familiar with arm in Linux. Currently the Linux kernel only
+> >> supports brcm,bcm4708 and all goes back to that one.
+> > 
+> > I was under the impression that all boards should be added to these
+> > files.  We have been doing so for Cygnus and NSP.
+> 
+> Tracking exactly which boards are supported by the brcm,bcm4708
+> compatible string might be tedious, I tend to agree with just listing
+> the supported SoCs, and leaving the specific board compatibles to the
+> individual DTS files instead.
 
-it performs the following actions:
-- reset the PHY
-- disable auto-negotiation
-- disable & clear auto-negotiation IRQ
-- soft-reset the MAC
+Ok, I'll simply add entries for NS and 4709 to this.
 
-Those tiny pieces of code are inherited from the native xgbe driver.
+Thanks,
+Jon 
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
----
- drivers/vfio/platform/reset/Kconfig                |   7 ++
- drivers/vfio/platform/reset/Makefile               |   2 +
- .../vfio/platform/reset/vfio_platform_amdxgbe.c    | 130 +++++++++++++++++++++
- drivers/vfio/platform/vfio_platform_common.c       |   5 +
- 4 files changed, 144 insertions(+)
- create mode 100644 drivers/vfio/platform/reset/vfio_platform_amdxgbe.c
-
-diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
-index 746b96b..ed9bb28 100644
---- a/drivers/vfio/platform/reset/Kconfig
-+++ b/drivers/vfio/platform/reset/Kconfig
-@@ -5,3 +5,10 @@ config VFIO_PLATFORM_CALXEDAXGMAC_RESET
- 	  Enables the VFIO platform driver to handle reset for Calxeda xgmac
- 
- 	  If you don't know what to do here, say N.
-+config VFIO_PLATFORM_AMDXGBE_RESET
-+	tristate "VFIO support for AMD XGBE reset"
-+	depends on VFIO_PLATFORM
-+	help
-+	  Enables the VFIO platform driver to handle reset for AMD XGBE
-+
-+	  If you don't know what to do here, say N.
-diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
-index 2a486af..93f4e23 100644
---- a/drivers/vfio/platform/reset/Makefile
-+++ b/drivers/vfio/platform/reset/Makefile
-@@ -1,5 +1,7 @@
- vfio-platform-calxedaxgmac-y := vfio_platform_calxedaxgmac.o
-+vfio-platform-amdxgbe-y := vfio_platform_amdxgbe.o
- 
- ccflags-y += -Idrivers/vfio/platform
- 
- obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
-+obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
-diff --git a/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c b/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c
-new file mode 100644
-index 0000000..bd2189b
---- /dev/null
-+++ b/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c
-@@ -0,0 +1,130 @@
-+/*
-+ * VFIO platform driver specialized for AMD xgbe reset
-+ * reset code is inherited from AMD xgbe native driver
-+ *
-+ * Copyright (c) 2015 Linaro Ltd.
-+ *              www.linaro.org
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <uapi/linux/mdio.h>
-+#include <linux/delay.h>
-+
-+#include "vfio_platform_private.h"
-+
-+#define DRIVER_VERSION  "0.1"
-+#define DRIVER_AUTHOR   "Eric Auger <eric.auger@linaro.org>"
-+#define DRIVER_DESC     "Reset support for AMD xgbe vfio platform device"
-+
-+#define DMA_MR			0x3000
-+#define MAC_VR			0x0110
-+#define DMA_ISR			0x3008
-+#define MAC_ISR			0x00b0
-+#define PCS_MMD_SELECT		0xff
-+#define MDIO_AN_INT		0x8002
-+#define MDIO_AN_INTMASK		0x8001
-+
-+static unsigned int xmdio_read(void *ioaddr, unsigned int mmd,
-+			       unsigned int reg)
-+{
-+	unsigned int mmd_address, value;
-+
-+	mmd_address = (mmd << 16) | ((reg) & 0xffff);
-+	iowrite32(mmd_address >> 8, ioaddr + (PCS_MMD_SELECT << 2));
-+	value = ioread32(ioaddr + ((mmd_address & 0xff) << 2));
-+	return value;
-+}
-+
-+static void xmdio_write(void *ioaddr, unsigned int mmd,
-+			unsigned int reg, unsigned int value)
-+{
-+	unsigned int mmd_address;
-+
-+	mmd_address = (mmd << 16) | ((reg) & 0xffff);
-+	iowrite32(mmd_address >> 8, ioaddr + (PCS_MMD_SELECT << 2));
-+	iowrite32(value, ioaddr + ((mmd_address & 0xff) << 2));
-+}
-+
-+int vfio_platform_amdxgbe_reset(struct vfio_platform_device *vdev)
-+{
-+	struct vfio_platform_region xgmac_regs = vdev->regions[0];
-+	struct vfio_platform_region xpcs_regs = vdev->regions[1];
-+	u32 dma_mr_value, pcs_value, value;
-+	unsigned int count;
-+
-+	if (!xgmac_regs.ioaddr) {
-+		xgmac_regs.ioaddr =
-+			ioremap_nocache(xgmac_regs.addr, xgmac_regs.size);
-+		if (!xgmac_regs.ioaddr)
-+			return -ENOMEM;
-+	}
-+	if (!xpcs_regs.ioaddr) {
-+		xpcs_regs.ioaddr =
-+			ioremap_nocache(xpcs_regs.addr, xpcs_regs.size);
-+		if (!xpcs_regs.ioaddr)
-+			return -ENOMEM;
-+	}
-+
-+	/* reset the PHY through MDIO*/
-+	pcs_value = xmdio_read(xpcs_regs.ioaddr, MDIO_MMD_PCS, MDIO_CTRL1);
-+	pcs_value |= MDIO_CTRL1_RESET;
-+	xmdio_write(xpcs_regs.ioaddr, MDIO_MMD_PCS, MDIO_CTRL1, pcs_value);
-+
-+	count = 50;
-+	do {
-+		msleep(20);
-+		pcs_value = xmdio_read(xpcs_regs.ioaddr, MDIO_MMD_PCS,
-+					MDIO_CTRL1);
-+	} while ((pcs_value & MDIO_CTRL1_RESET) && --count);
-+
-+	if (pcs_value & MDIO_CTRL1_RESET)
-+		pr_warn("%s XGBE PHY reset timeout\n", __func__);
-+
-+	/* disable auto-negotiation */
-+	value = xmdio_read(xpcs_regs.ioaddr, MDIO_MMD_AN, MDIO_CTRL1);
-+	value &= ~MDIO_AN_CTRL1_ENABLE;
-+	xmdio_write(xpcs_regs.ioaddr, MDIO_MMD_AN, MDIO_CTRL1, value);
-+
-+	/* disable AN IRQ */
-+	xmdio_write(xpcs_regs.ioaddr, MDIO_MMD_AN, MDIO_AN_INTMASK, 0);
-+
-+	/* clear AN IRQ */
-+	xmdio_write(xpcs_regs.ioaddr, MDIO_MMD_AN, MDIO_AN_INT, 0);
-+
-+	/* MAC software reset */
-+	dma_mr_value = ioread32(xgmac_regs.ioaddr + DMA_MR);
-+	dma_mr_value |= 0x1;
-+	iowrite32(dma_mr_value, xgmac_regs.ioaddr + DMA_MR);
-+
-+	usleep_range(10, 15);
-+
-+	count = 2000;
-+	while (count-- && (ioread32(xgmac_regs.ioaddr + DMA_MR) & 1))
-+		usleep_range(500, 600);
-+
-+	if (!count)
-+		pr_warn("%s MAC SW reset failed\n", __func__);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(vfio_platform_amdxgbe_reset);
-+
-+MODULE_VERSION(DRIVER_VERSION);
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR(DRIVER_AUTHOR);
-+MODULE_DESCRIPTION(DRIVER_DESC);
-diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index e43efb5..f1c5889 100644
---- a/drivers/vfio/platform/vfio_platform_common.c
-+++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -31,6 +31,11 @@ static const struct vfio_platform_reset_combo reset_lookup_table[] = {
- 		.reset_function_name = "vfio_platform_calxedaxgmac_reset",
- 		.module_name = "vfio-platform-calxedaxgmac",
- 	},
-+	{
-+		.compat = "amd,xgbe-seattle-v1a",
-+		.reset_function_name = "vfio_platform_amdxgbe_reset",
-+		.module_name = "vfio-platform-amdxgbe",
-+	},
- };
- 
- static void vfio_platform_get_reset(struct vfio_platform_device *vdev,
--- 
-1.9.1
+> 
+> > 
+> > Thanks,
+> > Jon
+> > 
+> >>
+> >>> @@ -5,4 +5,11 @@ Boards with the BCM4708 SoC shall have the following properties:
+> >>>  
+> >>>  Required root node property:
+> >>>  
+> >>> +bcm94709
+> >>>  compatible = "brcm,bcm4708";
+> >>> +
+> >>> +bcm94709
+> >>> +compatible = "brcm,bcm4709", "brcm,bcm4708";
+> >>> +
+> >>> +bcm953012k
+> >>> +compatible = "brcm,bcm5301k", "brcm,bcm4708";
+> >>>
+> >>
+> 
+> 
+> -- 
+> Florian
