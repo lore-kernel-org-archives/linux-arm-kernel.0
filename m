@@ -1,60 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Oct 2015 11:09:18 +0100
-Subject: [PATCH 1/2] irqchip/gic-v3: Fix translation of LPIs after conversion
- to irq_fwspec
-In-Reply-To: <1444817359-15696-1-git-send-email-marc.zyngier@arm.com>
-References: <1444817359-15696-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1444817359-15696-2-git-send-email-marc.zyngier@arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 14 Oct 2015 15:50:39 +0530
+Subject: [PATCH v4 20/25] dmaengine: edma: Simplify the interrupt handling
+In-Reply-To: <1443088932-21731-21-git-send-email-peter.ujfalusi@ti.com>
+References: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
+ <1443088932-21731-21-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20151014102039.GK27370@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f833f57ff254 ("irqchip: Convert all alloc/xlate users from
-of_node to fwnode") converted the GICv3 driver to using irq_fwspec
-as part of its 'translate' method.
+On Thu, Sep 24, 2015 at 01:02:07PM +0300, Peter Ujfalusi wrote:
 
-Too bad it ended up with a copy of the GICv2 'translate' method,
-which screws up LPI translation (by not translating them at all).
+> +	if (edesc->cyclic) {
+> +		vchan_cyclic_callback(&edesc->vdesc);
+> +		spin_unlock(&echan->vchan.lock);
+> +		return;
+> +	} else if (edesc->processed == edesc->pset_nr) {
+> +		dev_dbg(dev, "Transfer completed on channel %d\n",
+> +			echan->ch_num);
 
-Restore the code in its original shape, and just change what is
-really required...
+perhaps not a great choice for a print, we would ideally want to complete
+the cookie and then print
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3.c | 22 +++++++++++++---------
- 1 file changed, 13 insertions(+), 9 deletions(-)
+> +	sh_ipr = edma_shadow0_read_array(ecc, SH_IPR, 0);
+> +	if (!sh_ipr) {
+> +		sh_ipr = edma_shadow0_read_array(ecc, SH_IPR, 1);
+> +		if (!sh_ipr)
+> +			return IRQ_NONE;
+> +		sh_ier = edma_shadow0_read_array(ecc, SH_IER, 1);
+> +		bank = 1;
+> +	} else {
+> +		sh_ier = edma_shadow0_read_array(ecc, SH_IER, 0);
+> +		bank = 0;
+> +	}
+> +
+> +	do {
+> +		u32 slot;
+> +		u32 channel;
+> +
+> +		dev_dbg(ecc->dev, "IPR%d %08x\n", bank, sh_ipr);
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 05d010b..d7be6dd 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -746,15 +746,19 @@ static int gic_irq_domain_translate(struct irq_domain *d,
- 		if (fwspec->param_count < 3)
- 			return -EINVAL;
- 
--		/* Get the interrupt number and add 16 to skip over SGIs */
--		*hwirq = fwspec->param[1] + 16;
--
--		/*
--		 * For SPIs, we need to add 16 more to get the GIC irq
--		 * ID number
--		 */
--		if (!fwspec->param[0])
--			*hwirq += 16;
-+		switch (fwspec->param[0]) {
-+		case 0:			/* SPI */
-+			*hwirq = fwspec->param[1] + 32;
-+			break;
-+		case 1:			/* PPI */
-+			*hwirq = fwspec->param[1] + 16;
-+			break;
-+		case GIC_IRQ_TYPE_LPI:	/* LPI */
-+			*hwirq = fwspec->param[1];
-+			break;
-+		default:
-+			return -EINVAL;
-+		}
- 
- 		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
- 		return 0;
+Too much debug prints...
+
+> +	edma_read_slot(ecc, echan->slot[0], &p);
+> +	/*
+> +	 * Issue later based on missed flag which will be sure
+> +	 * to happen as:
+> +	 * (1) we finished transmitting an intermediate slot and
+> +	 *     edma_execute is coming up.
+> +	 * (2) or we finished current transfer and issue will
+> +	 *     call edma_execute.
+> +	 *
+> +	 * Important note: issuing can be dangerous here and
+> +	 * lead to some nasty recursion when we are in a NULL
+> +	 * slot. So we avoid doing so and set the missed flag.
+> +	 */
+> +	if (p.a_b_cnt == 0 && p.ccnt == 0) {
+> +		dev_dbg(dev, "Error on null slot, setting miss\n");
+
+Shouldn't this be err ?
+
+> +		} else if (edma_read(ecc, EDMA_QEMR)) {
+> +			dev_dbg(ecc->dev, "QEMR %02x\n",
+> +				edma_read(ecc, EDMA_QEMR));
+> +			for (i = 0; i < 8; i++) {
+> +				if (edma_read(ecc, EDMA_QEMR) & BIT(i)) {
+> +					/* Clear the corresponding IPR bits */
+> +					edma_write(ecc, EDMA_QEMCR, BIT(i));
+> +					edma_shadow0_write(ecc, SH_QSECR,
+> +							   BIT(i));
+> +
+> +					/* NOTE:  not reported!! */
+
+what does this mean?
+
 -- 
-2.1.4
+~Vinod
