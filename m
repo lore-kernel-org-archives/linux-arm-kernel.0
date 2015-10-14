@@ -1,111 +1,88 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 14 Oct 2015 23:25:48 +0200
-Subject: [Linaro-acpi] [PATCH v5 0/5] Provide better MADT subtable sanity
- checks
-In-Reply-To: <561EB923.6010109@redhat.com>
-References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
- <561C8351.3030304@erley.org> <561EB923.6010109@redhat.com>
-Message-ID: <3556673.VbpJrNsKqP@vostro.rjw.lan>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 14 Oct 2015 15:57:16 -0500
+Subject: [GIT PULL] qcom SoC changes for 4.4
+Message-ID: <1444856236-32260-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, October 14, 2015 02:20:51 PM Al Stone wrote:
-> This is a multi-part message in MIME format.
-> --------------020400080004050109020606
-> Content-Type: text/plain; charset=utf-8
-> Content-Transfer-Encoding: 7bit
-> 
-> On 10/12/2015 10:06 PM, Pat Erley wrote:
-> > On 10/12/2015 01:52 PM, Al Stone wrote:
-> >> On 10/11/2015 09:58 PM, Pat Erley wrote:
-> >>> On 10/11/2015 08:49 PM, Hanjun Guo wrote:
-> >>>> On 10/12/2015 11:08 AM, Pat Erley wrote:
-> >>>>> On 10/05/2015 10:12 AM, Al Stone wrote:
-> >>>>>> On 10/05/2015 07:39 AM, Rafael J. Wysocki wrote:
-> >>>>>>> On Wednesday, September 30, 2015 10:10:16 AM Al Stone wrote:
-> >>>>>>>> On 09/30/2015 03:00 AM, Hanjun Guo wrote:
-> >>>>>>>>> On 2015/9/30 7:45, Al Stone wrote:
-> >>>>>>>>>> NB: this patch set is for use against the linux-pm bleeding edge
-> >>>>>>>>>> branch.
-> >>>>>>>>>>
-> >>>>>>>>
-> >>>>>>>> [snip...]
-> >>>>>>>>
-> >>>>>>>>>
-> >>>>>>>>> For this patch set,
-> >>>>>>>>>
-> >>>>>>>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >>>>>>>>>
-> >>>>>>>>> Thanks
-> >>>>>>>>> Hanjun
-> >>>>>>>>
-> >>>>>>>> Thanks, Hanjun!
-> >>>>>>>
-> >>>>>>> Series applied, thanks!
-> >>>>>>>
-> >>>>>>> Rafael
-> >>>>>>>
-> >>>>>>
-> >>>>>> Thanks, Rafael!
-> >>>>>>
-> >>>>>
-> >>>>> Just decided to test out linux-next (to see the new nouveau cleanups).
-> >>>>> This change set prevents my Lenovo W510 from booting properly.
-> >>>>>
-> >>>>> Reverting: 7494b0 "ACPI: add in a bad_madt_entry() function to
-> >>>>> eventually replace the macro"
-> >>>>>
-> >>>>> Gets the system booting again.  I'm attaching my dmesg from the failed
-> >>>>> boot, who wants the acpidump?
-> >>>>
-> >>>> [    0.000000] ACPI: undefined version for either FADT 4.0 or MADT 1
-> >>>> [    0.000000] ACPI: Error parsing LAPIC address override entry
-> >>>> [    0.000000] ACPI: Invalid BIOS MADT, disabling ACPI
-> >>>>
-> >>>> Seems the MADT revision is not right, could you dump the ACPI MADT
-> >>>> (APIC) table and send it out? I will take a look :)
-> >>>>
-> >>>> Thanks
-> >>>> Hanjun
-> >>>
-> >>> Here ya go, enjoy.  Feel free to CC me on any patches that might fix it.
-> >>
-> >> Pat,
-> >>
-> >> Would you mind sending a copy of the FADT, also, please?  The first of the
-> >> ACPI messages is a check of version correspondence between the FADT and MADT,
-> >> while the second message is from looking at just an MADT subtable.  Thanks
-> >> for sending the MADT out -- that helps me quite a lot in thinking this through.
-> >>
-> >> BTW, whoever is providing the BIOS (Lenovo, I assume) may want to have a look
-> >> at these, also:
-> >>
-> >> [    0.000000] ACPI BIOS Warning (bug): 32/64X length mismatch in
-> >> FADT/Pm1aControlBlock: 16/32 (20150818/tbfadt-623)
-> >> [    0.000000] ACPI BIOS Warning (bug): Invalid length for
-> >> FADT/Pm1aControlBlock: 32, using default 16 (20150818/tbfadt-704)
-> >>
-> >> Not inherently dangerous, but definitely sloppy and mind-numbingly easy to
-> >> avoid, IIRC.
-> >>
-> > 
-> > Here ya go.
-> 
-> Okay.  There's just a lot of weird stuff out there in ACPI-land.  I've
-> attached four minor fixes for the special cases that have been reported
-> (well, the last one is actually a fix for a typo in the spec, but just
-> the same...).
-> 
-> These should apply on top of linux-next; would you mind trying them out
-> to make sure I didn't break anything else on your laptop?  If they behave
-> as I hope they will, I think I'll have covered all the places where the
-> checking of MADT subtables needs to be be relaxed a bit.  These work for
-> me on arm64, but if they work for you and a couple of other testers, then
-> I'll send them to Rafael properly.
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
-Well, you might as well submit them properly right away, so I could pick
-them up and put them into my linux-next branch, which then might make it
-easier for some people to test them.
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 
-Thanks,
-Rafael
+are available in the git repository at:
+
+  git at git.codeaurora.org:quic/kernel/agross-msm.git tags/qcom-soc-for-4.4
+
+for you to fetch changes up to d0bfd7c9b162612de55ca2d204403b90dc278db6:
+
+  soc: qcom: smem: Move RPM message ram out of smem DT node (2015-10-14 14:51:40 -0500)
+
+----------------------------------------------------------------
+Qualcomm ARM Based SoC Updates for 4.4
+
+* Implement id_table driver matching in SMD
+* Avoid NULL pointer exception on remove of SMEM
+* Reorder SMEM/SMD configs
+* Make qcom_smem_get() return a pointer
+* Handle big endian CPUs correctly in SMEM
+* Represent SMD channel layout in structures
+* Use __iowrite32_copy() in SMD
+* Remove use of VLAIs in SMD
+* Handle big endian CPUs correctly in SMD/RPM
+* Handle big endian CPUs corretly in SMD
+* Reject sending SMD packets that are too large
+* Fix endianness issue in SCM __qcom_scm_is_call_available
+* Add missing prototype for qcom_scm_is_available()
+* Correct SMEM items for upper channels
+* Use architecture level to build SCM correctly
+* Delete unneeded of_node_put in SMD
+* Correct active/slep state flagging in SMD/RPM
+* Move RPM message ram out of SMEM DT node
+
+----------------------------------------------------------------
+Andy Gross (2):
+      firmware: qcom: scm: Add function stubs for ARM64
+      Merge tag 'qcom-fixes-for-4.3-rc1' into base-for-4.4
+
+Arnd Bergmann (1):
+      firmware: qcom-scm: build for correct architecture level
+
+Bjorn Andersson (4):
+      soc: qcom: smd: Implement id_table driver matching
+      soc: qcom: smd: Reject send of too big packets
+      soc: qcom: smd: Correct SMEM items for upper channels
+      soc: qcom: smd-rpm: Correct the active vs sleep state flagging
+
+Julia Lawall (1):
+      soc: qcom: smd: delete unneeded of_node_put
+
+Rob Clark (2):
+      qcom-scm: fix endianess issue in __qcom_scm_is_call_available
+      qcom-scm: add missing prototype for qcom_scm_is_available()
+
+Stephen Boyd (10):
+      soc: qcom: smem: Avoid NULL pointer exception on remove
+      soc: qcom: Reorder SMEM/SMD configs
+      soc: qcom: Make qcom_smem_get() return a pointer
+      soc: qcom: smem: Handle big endian CPUs
+      soc: qcom: smd: Represent channel layout in structures
+      soc: qcom: smd: Use __iowrite32_copy() instead of open-coding it
+      soc: qcom: smd: Remove use of VLAIS
+      soc: qcom: smd_rpm: Handle big endian CPUs
+      soc: qcom: smd: Handle big endian CPUs
+      soc: qcom: smem: Move RPM message ram out of smem DT node
+
+ arch/arm/boot/dts/qcom-msm8974.dtsi |   17 +-
+ drivers/firmware/Kconfig            |    8 +
+ drivers/firmware/Makefile           |    5 +-
+ drivers/firmware/qcom_scm-32.c      |    6 +-
+ drivers/firmware/qcom_scm-64.c      |   63 ++++++
+ drivers/soc/qcom/Kconfig            |   16 +-
+ drivers/soc/qcom/smd-rpm.c          |   68 ++++---
+ drivers/soc/qcom/smd.c              |  296 +++++++++++++++++-----------
+ drivers/soc/qcom/smem.c             |  368 +++++++++++++++++++----------------
+ include/linux/qcom_scm.h            |    2 +
+ include/linux/soc/qcom/smd.h        |   11 ++
+ include/linux/soc/qcom/smem.h       |    2 +-
+ 12 files changed, 525 insertions(+), 337 deletions(-)
+ create mode 100644 drivers/firmware/qcom_scm-64.c
