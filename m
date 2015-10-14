@@ -1,146 +1,173 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 14 Oct 2015 19:17:49 +0100
-Subject: [Xen-devel] [PATCH 1/3] xen/arm: Enable cpu_hotplug.c
-In-Reply-To: <182B77B3-41AD-4364-B1A0-EC161F546751@oracle.com>
-References: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
- <1444844997-27314-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <182B77B3-41AD-4364-B1A0-EC161F546751@oracle.com>
-Message-ID: <alpine.DEB.2.02.1510141916430.27957@kaball.uk.xensource.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Wed, 14 Oct 2015 20:22:54 +0200
+Subject: [PATCH V2] ARM: BCM5301X: Implement SMP support
+In-Reply-To: <561E5BB7.1080307@broadcom.com>
+References: <1424385148-15026-1-git-send-email-zajec5@gmail.com>
+ <1427030415-31721-1-git-send-email-zajec5@gmail.com>
+ <20150326120026.GF8656@n2100.arm.linux.org.uk> <561D85BF.30305@hauke-m.de>
+ <561D8A56.5090401@broadcom.com> <561E5BB7.1080307@broadcom.com>
+Message-ID: <561E9D7E.5050500@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Oct 2015, Konrad Rzeszutek Wilk wrote:
-> On October 14, 2015 1:49:55 PM EDT, Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
-> >Build cpu_hotplug for ARM and ARM64 guests.
-> >
-> >Rename arch_(un)register_cpu to xen_(un)register_cpu and provide an
-> >empty implementation on ARM and ARM64. On x86 just call
-> >arch_(un)register_cpu as we are already doing.
-> >
-> >Initialize cpu_hotplug on ARM.
+On 10/14/2015 03:42 PM, Kapil Hali wrote:
 > 
-> Have you tested this on x86? As your changes touch the generic code path.
-
-Only build-tested at this stage, because all my x86 test boxes are
-unavailable at the moment (they are being relocated). As soon as they
-come back online I will test.
-
-
-> >Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> >---
-> > arch/arm/include/asm/xen/hypervisor.h |    8 ++++++++
-> > arch/x86/include/asm/xen/hypervisor.h |    5 +++++
-> > arch/x86/xen/enlighten.c              |   15 +++++++++++++++
-> > drivers/xen/Makefile                  |    2 --
-> > drivers/xen/cpu_hotplug.c             |    6 ++++--
-> > 5 files changed, 32 insertions(+), 4 deletions(-)
-> >
-> >diff --git a/arch/arm/include/asm/xen/hypervisor.h
-> >b/arch/arm/include/asm/xen/hypervisor.h
-> >index 04ff8e7..2bc418a 100644
-> >--- a/arch/arm/include/asm/xen/hypervisor.h
-> >+++ b/arch/arm/include/asm/xen/hypervisor.h
-> >@@ -26,4 +26,12 @@ void __init xen_early_init(void);
-> > static inline void xen_early_init(void) { return; }
-> > #endif
-> > 
-> >+static inline void xen_arch_register_cpu(int num)
-> >+{
-> >+}
-> >+
-> >+static inline void xen_arch_unregister_cpu(int num)
-> >+{
-> >+}
-> >+
-> > #endif /* _ASM_ARM_XEN_HYPERVISOR_H */
-> >diff --git a/arch/x86/include/asm/xen/hypervisor.h
-> >b/arch/x86/include/asm/xen/hypervisor.h
-> >index d866959..8b2d4be 100644
-> >--- a/arch/x86/include/asm/xen/hypervisor.h
-> >+++ b/arch/x86/include/asm/xen/hypervisor.h
-> >@@ -57,4 +57,9 @@ static inline bool xen_x2apic_para_available(void)
-> > }
-> > #endif
-> > 
-> >+#ifdef CONFIG_HOTPLUG_CPU
-> >+void xen_arch_register_cpu(int num);
-> >+void xen_arch_unregister_cpu(int num);
-> >+#endif
-> >+
-> > #endif /* _ASM_X86_XEN_HYPERVISOR_H */
-> >diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
-> >index 11d6fb4..ba62d8e 100644
-> >--- a/arch/x86/xen/enlighten.c
-> >+++ b/arch/x86/xen/enlighten.c
-> >@@ -71,6 +71,7 @@
-> > #include <asm/mwait.h>
-> > #include <asm/pci_x86.h>
-> > #include <asm/pat.h>
-> >+#include <asm/cpu.h>
-> > 
-> > #ifdef CONFIG_ACPI
-> > #include <linux/acpi.h>
-> >@@ -1868,3 +1869,17 @@ const struct hypervisor_x86 x86_hyper_xen = {
-> > 	.set_cpu_features       = xen_set_cpu_features,
-> > };
-> > EXPORT_SYMBOL(x86_hyper_xen);
-> >+
-> >+#ifdef CONFIG_HOTPLUG_CPU
-> >+void xen_arch_register_cpu(int num)
-> >+{
-> >+	arch_register_cpu(num);
-> >+}
-> >+EXPORT_SYMBOL(xen_arch_register_cpu);
-> >+
-> >+void xen_arch_unregister_cpu(int num)
-> >+{
-> >+	arch_unregister_cpu(num);
-> >+}
-> >+EXPORT_SYMBOL(xen_arch_unregister_cpu);
-> >+#endif
-> >diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-> >index e293bc5..aa8a7f7 100644
-> >--- a/drivers/xen/Makefile
-> >+++ b/drivers/xen/Makefile
-> >@@ -1,6 +1,4 @@
-> >-ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
-> > obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
-> >-endif
-> > obj-$(CONFIG_X86)			+= fallback.o
-> > obj-y	+= grant-table.o features.o balloon.o manage.o preempt.o
-> > obj-y	+= events/
-> >diff --git a/drivers/xen/cpu_hotplug.c b/drivers/xen/cpu_hotplug.c
-> >index cc6513a..122b351 100644
-> >--- a/drivers/xen/cpu_hotplug.c
-> >+++ b/drivers/xen/cpu_hotplug.c
-> >@@ -11,7 +11,7 @@
-> > static void enable_hotplug_cpu(int cpu)
-> > {
-> > 	if (!cpu_present(cpu))
-> >-		arch_register_cpu(cpu);
-> >+		xen_arch_register_cpu(cpu);
-> > 
-> > 	set_cpu_present(cpu, true);
-> > }
-> >@@ -19,7 +19,7 @@ static void enable_hotplug_cpu(int cpu)
-> > static void disable_hotplug_cpu(int cpu)
-> > {
-> > 	if (cpu_present(cpu))
-> >-		arch_unregister_cpu(cpu);
-> >+		xen_arch_unregister_cpu(cpu);
-> > 
-> > 	set_cpu_present(cpu, false);
-> > }
-> >@@ -102,8 +102,10 @@ static int __init setup_vcpu_hotplug_event(void)
-> > 	static struct notifier_block xsn_cpu = {
-> > 		.notifier_call = setup_cpu_watcher };
-> > 
-> >+#ifdef CONFIG_X86
-> > 	if (!xen_pv_domain())
-> > 		return -ENODEV;
-> >+#endif
-> > 
-> > 	register_xenstore_notifier(&xsn_cpu);
-> > 
 > 
+> On 10/14/2015 4:18 AM, Ray Jui wrote:
+>> + bcm-kernel-feedback-list.
+>>
+>> Kapil, you might want to take a look at this. Not sure how this is
+>> related to your SMP patches for NSP.
+> 
+> Ray, I don't have complete/other patch sets for this change. It would
+> be good if I get those patch sets as well or complete e-mail thread. 
+> I think if we have a cleaner solutions for SMP, we can consolidate 
+> the change required for NS and NSP. I have few points to add, which 
+> are inline in this e-mail.
+
+Hi Kapil,
+
+the patch was posted on the arm mailing list:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/332690.html
+but you can also find it in OpenWrt here:
+https://dev.openwrt.org/browser/trunk/target/linux/bcm53xx/patches-4.1/131-ARM-BCM5301X-Implement-SMP-support.patch
+It looks very similar to your approach so I assume we can use the same
+SMP code for NS and NSP. I will look into your patches later on.
+
+Hauke
+
+> 
+>>
+>> On 10/13/2015 3:29 PM, Hauke Mehrtens wrote:
+>>> Hi,
+>>>
+>>> I tested this patch on my device now.
+>>>
+>>> What does the loader do before Linux gets started on the second CPU and
+>>> what is ensured?
+>>>
+>>> On 03/26/2015 01:00 PM, Russell King - ARM Linux wrote:
+>>>> On Sun, Mar 22, 2015 at 02:20:15PM +0100, Rafa? Mi?ecki wrote:
+>>>>> +/*
+>>>>> + * BCM5301X specific entry point for secondary CPUs.
+>>>>> + */
+>>>>> +ENTRY(bcm5301x_secondary_startup)
+>>>>> +	mrc	p15, 0, r0, c0, c0, 5
+>>>>> +	and	r0, r0, #15
+>>>>> +	adr	r4, 1f
+>>>>> +	ldmia	r4, {r5, r6}
+>>>>> +	sub	r4, r4, r5
+>>>>> +	add	r6, r6, r4
+>>>>> +pen:	ldr	r7, [r6]
+>>>>> +	cmp	r7, r0
+>>>>> +	bne	pen
+>>>>> +
+>>>>> +	/*
+>>>>> +	 * In case L1 cache has unpredictable contents at power-up
+>>>>> +	 * clean its contents without flushing.
+>>>>> +	 */
+>>>>> +	bl      v7_invalidate_l1
+>>>>> +
+>>>>> +	mov	r0, #0
+>>>>> +	mcr	p15, 0, r0, c7, c5, 0	/* Invalidate icache */
+>>>>> +	dsb
+>>>>> +	isb
+>>>>
+>>>> So if your I-cache contains unpredictable contents, how do you execute
+>>>> the code to this point?  Shouldn't the I-cache invalidate be the very
+>>>> first instruction you execute followed by the dsb and isb (oh, and iirc
+>>>> it ignores the value in the register).
+>>>>
+>>>> In the case where a CPU has unpredictable contents at power up, the
+>>>> ARM ARM requires that an implementation specific sequence is followed
+>>>> to initialise the caches.  I doubt that such a sequence includes testing
+>>>> a pen value.
+> 
+> Are you sure this is an issue of unpredictable L1 cache contents at
+> power-up? AFAIK, 5301X had an issue with secondary core initialization. 
+> Secondary core which waits on WFE would let it out of the pen as soon as the 
+> first spin_*lock executes. This was because of a BOOTROM bug in NS, so the
+> work around was to reset the address for the secondary processor to go back 
+> and wait for the signal from the primary core. This vector fixup is required
+> so that the secondary core doesn't start executing kernel instructions until 
+> we've patched its jump address during wakeup_secondary().
+> 
+> Also, v7 setup function should invalidate L1 cache and we should remove all
+> v7_invalidate_l1 calls in all headsmp.S in platform specific directories.
+> 
+>>>
+>>> When I remove the test for the pen value the CPU does not come up any
+>>> more, I get this log output:
+>>>
+>>> [ 0.132292] CPU: Testing write buffer coherency: ok
+>>> [ 0.137635] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+>>> [ 0.143675] Setting up static identity map for 0x82a0 - 0x82d4
+>>> [ 10.149786] CPU1: failed to boot: -38
+>>> [ 10.153651] Brought up 1 CPUs
+>>>
+>>>
+>>> This was caused just by removing the "cmp r7, r0" and "bne pen"
+>>> instructions.
+>>>
+>>> With these instructions are added it works and I get this:
+>>>
+>>> [    0.132329] CPU: Testing write buffer coherency: ok
+>>> [    0.137682] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+>>> [    0.143708] Setting up static identity map for 0x82a0 - 0x82d4
+>>> [    0.189788] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+>>> [    0.189892] Brought up 2 CPUs
+>>> [    0.198889] SMP: Total of 2 processors activated (3188.32 BogoMIPS).
+>>>
+>>> Currently this is 100% reproducible.
+>>>
+>>> Could it be that the second CPU needs some time till it is synchronised
+>>> correctly?
+>>>
+>>> I do not know if and why the cache clearing is needed, I do not have
+>>> access to the SoC documentation or the ASIC/firmware developer.
+>>>
+>>>>
+>>>>> +	sysram_base_addr = of_iomap(node, 0);
+>>>>> +	if (!sysram_base_addr) {
+>>>>> +		pr_warn("Failed to map sysram\n");
+>>>>> +		return;
+>>>>> +	}
+>>>>> +
+>>>>> +	writel(virt_to_phys(entry_point), sysram_base_addr + SOC_ROM_LUT_OFF);
+>>>>> +
+>>>>> +	dsb_sev();	/* Exit WFI */
+>>>>
+>>>> Which WFI?  This seems to imply that you have some kind of initial
+>>>> firmware.  If so, that should be taking care of the cache initialisation,
+>>>> not the kernel.
+>>>>
+>>>>> +	mb();		/* make sure write buffer is drained */
+>>>>
+>>>> writel() already ensures that.
+>>>>
+>>>>> +	/*
+>>>>> +	 * The secondary processor is waiting to be released from
+>>>>> +	 * the holding pen - release it, then wait for it to flag
+>>>>> +	 * that it has been released by resetting pen_release.
+>>>>> +	 *
+>>>>> +	 * Note that "pen_release" is the hardware CPU ID, whereas
+>>>>> +	 * "cpu" is Linux's internal ID.
+>>>>> +	 */
+>>>>> +	write_pen_release(cpu_logical_map(cpu));
+>>>>> +
+>>>>> +	 /* Send the secondary CPU SEV */
+>>>>> +	dsb_sev();
+>>>>
+>>>> If you even need any of the pen code, if you're having to send a SEV here,
+>>>> wouldn't having a WFE in the pen assembly loop above be a good idea?
+>>>>
+>>>
+>>>
+>>> I have to read more on how WFE and co works.
+>>>
+>>> Hauke
+>>>
+> 
+> Thanks,
+> Kapil
 > 
