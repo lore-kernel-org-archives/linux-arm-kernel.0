@@ -1,28 +1,33 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 14 Oct 2015 22:28:42 +0800
-Subject: [PATCH] crypto: mxs-dcp is an stmp device
-In-Reply-To: <6543300.PJNp8A08gY@wuerfel>
-References: <6543300.PJNp8A08gY@wuerfel>
-Message-ID: <20151014142842.GG17455@gondor.apana.org.au>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 14 Oct 2015 20:01:24 +0530
+Subject: [PATCH v5 00/24] dmaengine/ARM: Merge the edma drivers into one
+In-Reply-To: <1444822986-20562-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1444822986-20562-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20151014143124.GU27370@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 03:52:34PM +0200, Arnd Bergmann wrote:
-> The mxs-dcp driver relies on the stmp_reset_block() helper function, which
-> is provided by CONFIG_STMP_DEVICE. This symbol is always set on MXS,
-> but the driver can now also be built for MXC (i.MX6), which results
-> in a built error if no other driver selects STMP_DEVICE:
+On Wed, Oct 14, 2015 at 02:42:42PM +0300, Peter Ujfalusi wrote:
+> Hi,
 > 
-> drivers/built-in.o: In function `mxs_dcp_probe':
-> vf610-ocotp.c:(.text+0x3df302): undefined reference to `stmp_reset_block'
+> Cover letter:
 > 
-> This adds the 'select', like all other stmp drivers have it.
+> with this series the edma two driver setup will be changed to have only one
+> driver to support eDMA3. The legacy edma interface will be removed and eDMA can
+> only be used via dmaengine API from this point on.
+> In order to do the merge the following improvements has been done:
+> - One driver instance per eDMA:
+>  - Any number of eDMA instances are supported (both legacy and DT boot)
+> - Not relying on global variables, arrays, etc
+> - Code simplification and optimizations in several places
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: a2712e6c75f ("crypto: mxs-dcp - Allow MXS_DCP to be used on MX6SL")
+> This change will also help us to do bigger changes in the eDMA driver since,
+> since now we have only one driver to work with.
 
-Patch applied.  Thanks.
+I have applied this now. I got a conlfict on 3rd one while applying and also
+I got conflict while merging to next
+
+Pls verify all is well!
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+~Vinod
