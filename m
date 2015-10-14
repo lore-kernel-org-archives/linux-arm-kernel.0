@@ -1,53 +1,90 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Thu, 15 Oct 2015 00:07:18 +0200
-Subject: bcm4708-smartrg-sr400ac boot failures in next-20150918+
-In-Reply-To: <1444817059.13276.13.camel@pengutronix.de>
-References: <CANMBJr5FnRQxv01CbAiSD43dGn+Ea4tjEWSsV1FywHJZYLnG_A@mail.gmail.com>
- <560DA9B9.80404@hauke-m.de> <561AE788.6030701@hauke-m.de>
- <CANMBJr4H1C6CHdRXa_NL9dssYGLkpRKAPXCMOV0FsUdb8JiSXg@mail.gmail.com>
- <1444816125.13276.8.camel@pengutronix.de>
- <20151014095633.GP32532@n2100.arm.linux.org.uk>
- <1444817059.13276.13.camel@pengutronix.de>
-Message-ID: <561ED216.3070204@hauke-m.de>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 14 Oct 2015 17:10:18 -0500
+Subject: [GIT PULL] qcom dt changes for 4.4 *RESEND*
+Message-ID: <1444860618-8192-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2015 12:04 PM, Lucas Stach wrote:
-> Am Mittwoch, den 14.10.2015, 10:56 +0100 schrieb Russell King - ARM
-> Linux:
->> On Wed, Oct 14, 2015 at 11:48:45AM +0200, Lucas Stach wrote:
->>> I think we really want to keep enabling the imprecise aborts as early as
->>> possible to catch them near the spot where they did happen.
->>
->> Agreed.
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
-I was never against this patch I just wanted to point out that it caused
-a regression and we should fix it, I was just a little bit frightened to
-add some early init code into a callback which gets called before early
-init.
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 
->>> So I think the right thing to work around your broken bootloader is to
->>> install the fault handler earlier. Russell, do you have any objections
->>> to that?
->>
->> How about installing the fault handler early before enabling the imprecise
->> aborts, and have the fault handler print a complaint about the broken
->> boot loader, and have the fault handler uninstall itself after the
->> imprecise abort has been enabled?
->>
-> We might point at the bootloader a bit too often this way, as there is
-> quite a bit of kernel code running before we can enable imprecise
-> aborts. But I like the idea in general as it would allow us to drop
-> those workaround from the individual architectures and move things into
-> common code.
+are available in the git repository at:
 
-Lucas patches fixed the problem for me on a bcm4708 based device with a
-broken boot loader. I assume Lucas patches will make it into mainline
-and this issue is now solved for me.
+  git://codeaurora.org/quic/kernel/agross-msm.git tags/qcom-dt-for-4.4
 
->> If there's a pending imprecise abort, it should be delivered as soon as
->> they're unmasked.
->>
-> Right.
+for you to fetch changes up to 04edde250c3753798475f0a4dc0275dd52f707bd:
 
-Hauke
+  ARM: dts: msm8974: fix typo in "disabled" property (2015-10-13 16:40:03 -0500)
+
+----------------------------------------------------------------
+Qualcomm ARM Based Device Tree Updates for v4.4
+
+* Add DT binding document for SMEM
+* Add SMD, RPM, and Regulator nodes on MSM8974
+* Remove extra reg element from iadc device
+* Remove redunandant i2c pinctrl properties on APQ8064
+* Remove unnecessary eeprom label on IFC6410
+* Remove unnecessary eeprom label from QS600
+* Add PM8921 RTC support on APQ8064
+* Add PM8921 pwrkey support on APQ8064
+* Prefix GSBI6 uart pins on APQ8064 correctly
+* Add missing GSBI7 uart pinctrl on APQ8064
+* Add missing GSBI7 uart pinctrl on IFC6410
+* Add missing GSBI7 pinctrl uart property on QS600
+* Add pwrseq support for WLAN on IFC6410
+* Add pwrseq support for WLAN on QS600
+* Add notify led support on IFC6410
+* Add SD card detect support onQS600
+* Add #power-domain-cells property to documentation
+* Add Qualcomm SMBB binding document
+* Add PM8941 charge node
+* Fix typo in disabled property on MSM8974
+
+----------------------------------------------------------------
+Bjorn Andersson (2):
+      soc: qcom: Add device tree binding for SMEM
+      ARM: dts: msm8974: Add smd, rpm and regulator nodes
+
+Courtney Cavin (2):
+      dt-binding: power: Add Qualcomm SMBB binding
+      ARM: dts: qcom-pm8941: Add charger node
+
+Michael Opdenacker (1):
+      ARM: dts: msm8974: fix typo in "disabled" property
+
+Rajendra Nayak (1):
+      arm: dts: qcom: Add #power-domain-cells property
+
+Srinivas Kandagatla (13):
+      ARM: dts: apq8064: remove redundant i2c pinctrl properties
+      ARM: dts: ifc6410: remove unnecessary eeprom label
+      ARM: dts: qs600: remove unnecessary eeprom label
+      ARM: dts: apq8064: add pm8921 rtc
+      ARM: dts: apq8064: add pm8921 pwrkey support
+      ARM: dts: apq8064: Prefix the gsbi6 uart pins correctly
+      ARM: dts: apq8064: add missing gsbi7 uart pinctrl
+      ARM: dts: ifc6410: Add missing pinctrl to gsbi7 uart
+      ARM: dts: qs600: Add missing pinctrl property for gsbi7 uart
+      ARM: dts: ifc6410: Add pwrseq support for WLAN
+      ARM: dts: qs600: add pwrseq support to WLAN
+      ARM: dts: apq8064-ifc6410: add notify led support.
+      ARM: dts: qs600: Add SD card detect support.
+
+Stephen Boyd (1):
+      ARM: dts: qcom: Remove extra reg element from iadc device
+
+ .../devicetree/bindings/clock/qcom,gcc.txt         |    4 +
+ .../devicetree/bindings/clock/qcom,mmcc.txt        |    4 +
+ .../devicetree/bindings/power_supply/qcom_smbb.txt |  131 ++++++++++++++++++++
+ .../devicetree/bindings/soc/qcom/qcom,smem.txt     |   57 +++++++++
+ arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts        |   48 ++++++-
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts         |   60 +++++++--
+ arch/arm/boot/dts/qcom-apq8064.dtsi                |   43 ++++++-
+ arch/arm/boot/dts/qcom-apq8084.dtsi                |    1 +
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |   78 +++++++++++-
+ arch/arm/boot/dts/qcom-pm8941.dtsi                 |   24 +++-
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |    1 +
+ 11 files changed, 434 insertions(+), 17 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power_supply/qcom_smbb.txt
+ create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,smem.txt
