@@ -1,83 +1,64 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Wed, 14 Oct 2015 16:59:03 +0800
-Subject: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for HiSilicon
- SoC Hip05
-In-Reply-To: <11677087.JbqAo0FWJE@wuerfel>
-References: <1444445957-239522-1-git-send-email-wangzhou1@hisilicon.com>
- <6336414.HvfCQcuT3Y@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E16242C92@lhreml503-mbs>
- <11677087.JbqAo0FWJE@wuerfel>
-Message-ID: <561E1957.5030503@hisilicon.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 14 Oct 2015 11:00:01 +0200
+Subject: [alsa-devel] [RFC PATCH] ASoC: Modify check condition of multiple
+ bindings of components
+In-Reply-To: <1444785549.26493.12.camel@mtksdaap41>
+References: <1444743477-48819-1-git-send-email-koro.chen@mediatek.com>
+ <561D0AA9.5080702@metafoo.de> <1444745902.26493.2.camel@mtksdaap41>
+ <561D1843.1020007@metafoo.de> <1444785549.26493.12.camel@mtksdaap41>
+Message-ID: <561E1991.1050705@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/10/13 23:00, Arnd Bergmann wrote:
-> On Tuesday 13 October 2015 14:49:07 Gabriele Paoloni wrote:
->>> On Monday 12 October 2015 16:35:45 Bjorn Helgaas wrote:
+On 10/14/2015 03:19 AM, Koro Chen wrote:
+> On Tue, 2015-10-13 at 16:42 +0200, Lars-Peter Clausen wrote:
+>> On 10/13/2015 04:18 PM, Koro Chen wrote:
+>>> On Tue, 2015-10-13 at 15:44 +0200, Lars-Peter Clausen wrote:
+>>>> On 10/13/2015 03:37 PM, Koro Chen wrote:
+>>>>> The patch "ASoC: Prevent components from being bound to multiple cards"
+>>>>> adds check to prevent multiple cards from using the same component.
+>>>>> However, snd_soc_register_platform() or snd_soc_register_codec() will
+>>>>> also create components, and sharing the same platform by multiple cards
+>>>>> is then refused. This happens with a platform having multiple
+>>>>> independent DAIs that share the same DMA controller.
+>>>>>
+>>>>> Relax the condition by checking component->registered_as_component,
+>>>>> which is only true in case of snd_soc_register_component() and
+>>>>> will be false for components created by snd_soc_register_platform()
+>>>>> or snd_soc_register_codec().
 >>>>
->>>>> +{
->>>>> +     u64 addr;
->>>>> +     struct device_node *msi_node;
->>>>> +     struct resource res;
->>>>> +     struct device_node *np = pp->dev->of_node;
->>>>> +     struct hisi_pcie *pcie = to_hisi_pcie(pp);
->>>>> +
->>>>> +     msi_node = of_parse_phandle(np, "msi-parent", 0);
->>>>> +     if (!msi_node) {
->>>>> +             dev_err(pp->dev, "failed to find msi-parent\n");
->>>>> +             return -EINVAL;
->>>>> +     }
->>>>> +     of_address_to_resource(msi_node, 0, &res);
+>>>> Binding a component to multiple cards results in internal data structure
+>>>> corruption, regardless of whether it is a raw component, CODEC or platform,
+>>>> which is why the check was added. So the proposed change wont work.
 >>>>
->>>> Does this use the "msi-parent" node in the same way as other drivers
->>>> do?  I'm sure there must be other places where we extract struct
->>>> resource information from an "msi-parent" node, but I don't see them.
->>>>
->>>> I'm trying to verify that this isn't some kind of incompatible
->>>> extension of the "msi-parent" property.  I cc'd Arnd and Rob (DT
->>>> experts).
->>>
->>> This is not ok, what this does is that it relies on a particular
->>> implementation of the MSI controller and directly accesses its
->>> registers.
+>>> Thanks for your comment. Is it possible to share an example of how the
+>>> data structure will be corrupted? So I can study into this further.
 >>
->> Hi Arnd, thanks for reviewing.
+>> Just look at soc_probe_component() and think about what happens if that runs
+>> twice for two different cards. Multiple calls to list_add() on the same
+>> list, controls are added multiple times, DAPM widgets are created multiple
+>> times, the card field will only point to the last card.
 >>
->> What we do is to retrieve the msi-parent physical address and we store it
->> in our internal PCIe register locations...
-> 
-> Ah, thanks for the clarification, I missed that part.
-> 
->> So we do not operate directly on the msi controller registers...
->>
->> So I wonder if the current implementation is Ok to retrieve the
->> msi-parent address....
-> 
-> Not sure. Why do you do this? Normally the PCI host does not know
-> or care about the address of the MSI controller, because the messages
-> are just passed up to the parent bus as DMA transfers.
->
+> When multiple binding happens, soc_probe_component() just returns zero
+> without doing anything after this patch (actually it also returned zero
+> before the patch "ASoC: Prevent components from being bound to multiple
+> cards"). So the component still binds to the first card. For this case I
+> think it should be fine?
 
-Hi Arnd,
+Same answer as before more or less. There is a lot of card specific
+initialization happening in soc_probe_component(). The card field is
+initialized to the card the component is bound to, the DAPM widgets are
+created for the component in the cards DAPM graph, DAI link widgets are
+created and so on. If you bind the component to multiple cards the
+initialization will only be done for one card, the first one it was bound
+to, that doesn't make too much sense. If you look at the snd_soc_component
+data structure it should be obvious that it does not make sense to associate
+it with more than a single card.
 
-In Hip05 PCIe host, it uses GITS_TRANSLATER's address to get TLP package
-which contains MSI address and MSI data, and then combine BDF and MSI data
-to a 32 bit data which will be writen to GITS_TRANSLATER register of ITS.
+It was never intended that it is possible to bind a component to multiple
+cards. That it was possible was a bug that was overlooked and some people
+tried to do it which caused apparently random crashes later on, caused by
+the data structure corruption. This is why we added the check to catch this
+kind of mistake early and to avoid the crashes.
 
-I think maybe this is a defect of our PCIe controller.
-
-> I don't think what you do here is safe because the 'reg' property
-> of the MSI controller might point to the address that is used for
-> the message directly.
-
-I see your point, however we must get address of GITS_TRANSLATER and set it to PCIe
-host. How about adding necessary comments here?
-
-Best Regards,
-Zhou
-
->
-> 	Arnd
-> 
-> .
-> 
+- Lars
