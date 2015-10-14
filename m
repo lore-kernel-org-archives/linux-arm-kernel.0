@@ -1,80 +1,34 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Wed, 14 Oct 2015 18:01:15 +0800
-Subject: [PATCH] pwm-backlight: fix the panel power sequence
-In-Reply-To: <1442414556-32381-1-git-send-email-yh.huang@mediatek.com>
-References: <1442414556-32381-1-git-send-email-yh.huang@mediatek.com>
-Message-ID: <1444816875.31675.2.camel@mtksdaap41>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 14 Oct 2015 11:09:17 +0100
+Subject: [PATCH 0/2] More GIC updates for Linux 4.4
+Message-ID: <1444817359-15696-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Thomas,
 
-If you have any suggestion, please let me know.
-Thanks.
+Here's a couple of GIC patches that I'd like to see in 4.4:
 
-Regards,
-YH Huang
+- A fix for a (copy-paste) bug introduced by the fwnode/fwspec
+  conversion, breaking LPI translation
 
-On Wed, 2015-09-16 at 22:42 +0800, YH Huang wrote:
-> In order to match the panel power sequence, disable the enable_gpio
-> in the probe function. Also, reorder the code in the power_on and
-> power_off function to match the timing.
-> 
-> Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> ---
->  drivers/video/backlight/pwm_bl.c |   15 +++++++++------
->  1 file changed, 9 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-> index eff379b..99eca1e 100644
-> --- a/drivers/video/backlight/pwm_bl.c
-> +++ b/drivers/video/backlight/pwm_bl.c
-> @@ -54,10 +54,11 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
->  	if (err < 0)
->  		dev_err(pb->dev, "failed to enable power supply\n");
->  
-> +	pwm_enable(pb->pwm);
-> +
->  	if (pb->enable_gpio)
->  		gpiod_set_value(pb->enable_gpio, 1);
->  
-> -	pwm_enable(pb->pwm);
->  	pb->enabled = true;
->  }
->  
-> @@ -66,12 +67,12 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
->  	if (!pb->enabled)
->  		return;
->  
-> -	pwm_config(pb->pwm, 0, pb->period);
-> -	pwm_disable(pb->pwm);
-> -
->  	if (pb->enable_gpio)
->  		gpiod_set_value(pb->enable_gpio, 0);
->  
-> +	pwm_config(pb->pwm, 0, pb->period);
-> +	pwm_disable(pb->pwm);
-> +
->  	regulator_disable(pb->power_supply);
->  	pb->enabled = false;
->  }
-> @@ -241,8 +242,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
->  	pb->dev = &pdev->dev;
->  	pb->enabled = false;
->  
-> -	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
-> -						  GPIOD_OUT_HIGH);
-> +	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable");
->  	if (IS_ERR(pb->enable_gpio)) {
->  		ret = PTR_ERR(pb->enable_gpio);
->  		goto err_alloc;
-> @@ -264,6 +264,9 @@ static int pwm_backlight_probe(struct platform_device *pdev)
->  		pb->enable_gpio = gpio_to_desc(data->enable_gpio);
->  	}
->  
-> +	if (pb->enable_gpio)
-> +		gpiod_direction_output(pb->enable_gpio, 0);
-> +
->  	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
->  	if (IS_ERR(pb->power_supply)) {
->  		ret = PTR_ERR(pb->power_supply);
+- An extension to the GICv2m driver, enabling support for multiple MSI
+  frames (already posted)
+
+This is on top of tip/irq/core as of yesterday. Hopefully, this is the
+last set of GIC patches for the next merge window (yeah, right...).
+
+Thanks,
+
+	M.
+
+Marc Zyngier (2):
+  irqchip/gic-v3: Fix translation of LPIs after conversion to irq_fwspec
+  irqchip/gic-v2m: Add support for multiple MSI frames
+
+ drivers/irqchip/irq-gic-v2m.c | 124 ++++++++++++++++++++++++++----------------
+ drivers/irqchip/irq-gic-v3.c  |  22 +++++---
+ 2 files changed, 91 insertions(+), 55 deletions(-)
+
+-- 
+2.1.4
