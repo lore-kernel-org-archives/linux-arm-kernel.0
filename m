@@ -1,116 +1,75 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 14 Oct 2015 16:48:30 +0200
-Subject: [PATCH 1/4] ARM: catch pending imprecise abort on unmask
-In-Reply-To: <1444834113-18122-1-git-send-email-l.stach@pengutronix.de>
-References: <1444834113-18122-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1444834113-18122-2-git-send-email-l.stach@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Oct 2015 15:51:58 +0100
+Subject: [PATCHv3 02/11] arm64: Handle section maps for swapper/idmap
+In-Reply-To: <561E56D4.40506@arm.com>
+References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
+ <1444821634-1689-3-git-send-email-suzuki.poulose@arm.com>
+ <20151014120618.GB2150@leverpostej> <561E56D4.40506@arm.com>
+Message-ID: <20151014145158.GA4422@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Install a non-faulting handler just before unmasking imprecise aborts
-and switch back to the regular one after unmasking is done.
+> >>+/* With 4K pages, we use section maps. */
+> >>+#ifdef CONFIG_ARM64_4K_PAGES
+> >>+#define ARM64_SWAPPER_USES_SECTION_MAPS 1
+> >>+#else
+> >>+#define ARM64_SWAPPER_USES_SECTION_MAPS 0
+> >>+#endif
+> >
+> >The comment is somewhat redunant. It would be better to state why we do
+> >this for 4K and not 64K (or 16K).
+> 
+> Something like :
+> 
+> /*
+>  * ARM64 kernel is guaranteed to be loaded at 2M aligned
+>  * address (as per booting requirements). Hence we can use
+>  * section mapping with 4K (section size = 2M) and not with
+>  * 16K(section size = 32M) or 64K (section size = 512M).
+>  */
 
-This catches any pending imprecise abort that the firmware/bootloader
-may have left behind that would normally crash the kernel at that point.
-As there are apparently a lot of bootlaoders out there that do such a
-thing it makes sense to handle it in the common startup code.
+That sounds much better. I hadn't figured out why myself, so thanks for
+the explanation :)
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/arm/mm/fault.c | 15 +++++++++++++++
- arch/arm/mm/fault.h |  2 ++
- arch/arm/mm/mmu.c   | 19 ++++++++++++++++++-
- 3 files changed, 35 insertions(+), 1 deletion(-)
+However, there's one minor nit: the start of memory below the kernel is
+2M aligned, but the offset means that the kernel itself is not loaded at
+a 2M aligned address.
 
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index 0d629b8f973f..519f694ec9db 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -538,6 +538,21 @@ hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *)
- 	fsr_info[nr].name = name;
- }
- 
-+void * __init
-+swap_fault_function(int nr,
-+		    int (*fn)(unsigned long, unsigned int, struct pt_regs *))
-+{
-+	void *old_fn;
-+
-+	if (nr < 0 || nr >= ARRAY_SIZE(fsr_info))
-+		BUG();
-+
-+	old_fn = fsr_info[nr].fn;
-+	fsr_info[nr].fn = fn;
-+
-+	return old_fn;
-+}
-+
- /*
-  * Dispatch a data abort to the relevant handler.
-  */
-diff --git a/arch/arm/mm/fault.h b/arch/arm/mm/fault.h
-index cf08bdfbe0d6..2deb7494d84f 100644
---- a/arch/arm/mm/fault.h
-+++ b/arch/arm/mm/fault.h
-@@ -24,5 +24,7 @@ static inline int fsr_fs(unsigned int fsr)
- 
- void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs);
- unsigned long search_exception_table(unsigned long addr);
-+void *swap_fault_function(int nr,
-+		int (*fn)(unsigned long, unsigned int, struct pt_regs *));
- 
- #endif	/* __ARCH_ARM_FAULT_H */
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index f65a6f344b6d..78c420776f4c 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -38,6 +38,7 @@
- #include <asm/mach/pci.h>
- #include <asm/fixmap.h>
- 
-+#include "fault.h"
- #include "mm.h"
- #include "tcm.h"
- 
-@@ -1259,6 +1260,20 @@ void __init arm_mm_memblock_reserve(void)
- }
- 
- /*
-+ * Abort handler to be used only during unmasking of imprecise aborts. This
-+ * makes sure that the machine will not die if the firmware/bootloader left an
-+ * imprecise abort pending for us to trip over.
-+ */
-+static int __init early_abort_handler(unsigned long addr, unsigned int fsr,
-+				      struct pt_regs *regs)
-+{
-+	pr_warn("Hit pending imprecise external abort during first unmask, "
-+		"this is most likely caused by a firmware/bootloader bug.\n");
-+
-+	return 0;
-+}
-+
-+/*
-  * Set up the device mappings.  Since we clear out the page tables for all
-  * mappings above VMALLOC_START, except early fixmap, we might remove debug
-  * device mappings.  This means earlycon can be used to debug this function
-@@ -1269,7 +1284,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
- {
- 	struct map_desc map;
- 	unsigned long addr;
--	void *vectors;
-+	void *vectors, *saved_fault_fn;
- 
- 	/*
- 	 * Allocate the vector page early.
-@@ -1365,7 +1380,9 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
- 	flush_cache_all();
- 
- 	/* Enable asynchronous aborts */
-+	saved_fault_fn = swap_fault_function(22, early_abort_handler);
- 	local_abt_enable();
-+	swap_fault_function(22, saved_fault_fn);
- }
- 
- static void __init kmap_init(void)
--- 
-2.6.1
+So how about:
+
+/*
+ * The linear mapping and the start of memory are both 2M aligned (per
+ * the arm64 booting.txt requirements). Hence we can use section mapping
+ * with 4K (section size = 2M) but not with 16K (section size = 32M) or
+ * 64K (section size = 512M).
+ */
+
+> >>+	 * us PUD_SIZE (with SECTION maps, i.e, 4K) or PMD_SIZE (without
+> >>+	 * SECTION maps, i.e, 64K pages) memory starting from PHYS_OFFSET
+> >>+	 * (which must be aligned to 2MB as per Documentation/arm64/booting.txt).
+> >
+> >This didn't seem to get updated for 16K later in the series, unless I
+> >missed something.
+> >
+> >Perhaps drop the mention of 4K / 64K entirely here?
+> 
+> You are right, I missed it. We can drop the pagesize info entirely.
+
+Ok. Sounds good.
+
+> >>@@ -551,7 +552,7 @@ int kern_addr_valid(unsigned long addr)
+> >>  	return pfn_valid(pte_pfn(*pte));
+> >>  }
+> >>  #ifdef CONFIG_SPARSEMEM_VMEMMAP
+> >>-#ifdef CONFIG_ARM64_64K_PAGES
+> >>+#if !ARM64_SWAPPER_USES_SECTION_MAPS
+> >
+> >This leaves the comments on the #else and #endif stale. Please update
+> >those too.
+> 
+> Done.
+
+Great.
+
+Thanks,
+Mark.
