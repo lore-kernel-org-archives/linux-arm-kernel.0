@@ -1,90 +1,67 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Thu, 15 Oct 2015 09:37:19 +1100
-Subject: [linux-sunxi] [PATCH 2/6] mfd: axp20x: Split the driver into core
- and i2c bits
-In-Reply-To: <1444840342-9233-3-git-send-email-wens@csie.org>
-References: <1444840342-9233-1-git-send-email-wens@csie.org>
- <1444840342-9233-3-git-send-email-wens@csie.org>
-Message-ID: <CAGRGNgXAtuV+9+i=rRerRX6T9=i6W+dDCBJN8Jh8QS7A82r+VA@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 14 Oct 2015 15:40:04 -0700
+Subject: [PATCH 3/3] ARM: dts: exynos5422-odroidxu3: Added UHS-I bus speed
+ support
+In-Reply-To: <CAGOxZ51uPkdGmCAs2Tc8_=YvkORJKdivN47vo1ZxkGQ-MY=-oQ@mail.gmail.com>
+References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
+ <1444578364-1384-3-git-send-email-linux.amoon@gmail.com>
+ <561B48B7.1040201@samsung.com>
+ <CANAwSgSLFviT4ZNXTYwxYs2pbrr9ozJmPMauhgRPO0556Rsr_g@mail.gmail.com>
+ <561C4CEE.3050905@samsung.com>
+ <CANAwSgRJ+5O-x61K9E_AxTZWQy3jJrKF5MiLtWRdUU29CCfa-Q@mail.gmail.com>
+ <561C7DF1.6000609@samsung.com>
+ <CANAwSgRBzFqHB98wSQnQu-ggGqRT2H6wC415wULXVhPg0uw_3A@mail.gmail.com>
+ <561D9ACE.6050103@samsung.com>
+ <CAGOxZ51uPkdGmCAs2Tc8_=YvkORJKdivN47vo1ZxkGQ-MY=-oQ@mail.gmail.com>
+Message-ID: <CAD=FV=Voh6Xh_naWQTaRPP8YUS2xJh7jfA+zYbH9QdVhmyZz9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+Hi,
 
-On Thu, Oct 15, 2015 at 3:32 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> The axp20x driver assumes the device is i2c based. This is not the
-> case with later models, which use a proprietary 2 wire serial bus
-> called "Reduced Serial Bus".
+On Tue, Oct 13, 2015 at 6:06 PM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+> +Doug
+> Hello,
+> AFAIR, dw_mmc host controller does support UHS-I [1], specially SDR50
+> and SDR104 modes.
 >
-> This patch follows the example of mfd/wm831x and splits it into
-> an interface independet core, and an i2c specific glue layer.
+> [1]: http://www.spinics.net/lists/linux-mmc/msg28186.html
 >
-> The old MFD_AXP20X Kconfig symbol is kept until sub-device drivers
-> and defconfigs have migrated to the new MFD_AXP20X_CORE symbol.
->
-> Included but unused header files are removed as well.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/mfd/Kconfig                     |  18 ++++-
->  drivers/mfd/Makefile                    |   3 +-
->  drivers/mfd/{axp20x.c => axp20x-core.c} | 105 +++-----------------------
->  drivers/mfd/axp20x-i2c.c                | 127 ++++++++++++++++++++++++++++++++
->  include/linux/mfd/axp20x.h              |  33 ++++++++-
->  5 files changed, 186 insertions(+), 100 deletions(-)
->  rename drivers/mfd/{axp20x.c => axp20x-core.c} (87%)
->  create mode 100644 drivers/mfd/axp20x-i2c.c
->
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 99d63675f073..9ba3feb3f2fc 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -79,15 +79,25 @@ config MFD_BCM590XX
->         help
->           Support for the BCM590xx PMUs from Broadcom
->
-> +# Keep the old symbol until subdevice driver dependencies and defconfigs
-> +# have been updated.
->  config MFD_AXP20X
-> -       bool "X-Powers AXP20X"
-> +       bool "X-Powers AXP series PMICs"
-> +       select MFD_AXP20X_I2C
+> What I remember is, one need to set "broken-cd" property also in order
+> to make it work because of the vqmmc and vmmc connection on board. I
+> didn't find the link right now, but you can search on the web, there
+> was a long discussion about handling this.
+> Have not checked it recently, so not sure if this got broken somehow.
 
-Unless something has changed in KConfig, (and my knowledge on this is
-likely to be outdated) I don't believe this will work as I don't think
-selects don't get propagated like you expect. Have you checked that
-all possible configuration options survive make oldconfig and build
-without warnings?
+Right.  It _shouldn't_ be possible to add "vmmc/vqmmc" supplies to
+your DTS (which you do in patch 2/3) and also to use the "gpc2-2" pin
+for card detect (even if you configure it as a GPIO).  Once you add
+"vmmc/vqmmc" then Linux ought to be turning these regulators off when
+no card is plugged in.  Presumably the "vqmmc" regulator is hooked up
+to the "VDDQ_MMC2".  If you look in the user manual for 5422 you can
+see that "GPC2[2]/SD_2_CDn" has power domain "VDDQ_MMC2".  Thus you
+really shouldn't be using that pin when vqmmc is off.  I think at some
+point someone claimed that it still worked for them, but nobody could
+ever explain why.  Full discussion at
+<https://patchwork.kernel.org/patch/4763881/>
 
-Also, unless there's some compelling reason not to, it's probably a
-good idea to update the dependent drivers and defconfigs now. (or make
-this change in a gentler manner.)
+---
 
-> +
-> +config MFD_AXP20X_CORE
-> +       bool
->         select MFD_CORE
-> -       select REGMAP_I2C
->         select REGMAP_IRQ
-> +
-> +config MFD_AXP20X_I2C
-> +       bool "X-Powers AXP series I2C PMICs"
-> +       select MFD_AXP20X_CORE
-> +       select REGMAP_I2C
->         depends on I2C=y
->         help
-> -         If you say Y here you get support for the X-Powers AXP202, AXP209 and
-> -         AXP288 power management IC (PMIC).
-> +         If you say Y here you get support for the X-Powers AXP series I2C
-> +         based power management ICs (PMICs).
->           This driver include only the core APIs. You have to select individual
->           components like regulators or the PEK (Power Enable Key) under the
->           corresponding menus.
+In case it matters, comments on stuff from earlier in the thread:
 
-Thanks,
+* As people pointed out, exynos5422 certainly supports all these modes
+(including DDR50) in the SoC.
 
--- 
-Julian Calaby
+* Just because the SoC supports these modes doesn't mean that the
+boards do, which is why the SoC .dtsi doesn't include them.  Thus,
+this patch is "right" in that it changes a board-specific file.
 
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+* As Krzysztof points out this board doesn't "add" support but rather
+"enables" support.  The distinction is subtle.
+
+* You might be able to get DDR50 working, but probably better to just
+start with SDR modes.  Previously I never attempted to get DDR50 cards
+working, so possibly the software needs extra work?
+
+
+-Doug
