@@ -1,62 +1,63 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 14 Oct 2015 19:44:33 +0530
-Subject: [PATCH v2 2/4] dmaengine: Add STM32 DMA driver
-In-Reply-To: <CAOAejn3QOzrd952MztVTah4UbpNs1OabwkxhEtp15Mqz0B7LXA@mail.gmail.com>
-References: <1444745127-1105-1-git-send-email-cedric.madianga@gmail.com>
- <1444745127-1105-3-git-send-email-cedric.madianga@gmail.com>
- <20151014111615.GR27370@localhost>
- <CAOAejn3QOzrd952MztVTah4UbpNs1OabwkxhEtp15Mqz0B7LXA@mail.gmail.com>
-Message-ID: <20151014141433.GT27370@localhost>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Wed, 14 Oct 2015 09:16:41 -0500
+Subject: [PATCH v2] ARM: fix vdsomunge not to depend on glibc specific
+ byteswap.h
+In-Reply-To: <5B19AAFC-976C-4B33-A83E-229693FA7858@goldelico.com>
+References: <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
+ <B69CCAC6-FB47-4B2B-95F9-15F1BA4AD381@goldelico.com>
+ <5B19AAFC-976C-4B33-A83E-229693FA7858@goldelico.com>
+Message-ID: <561E63C9.3040702@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 03:07:16PM +0200, M'boumba Cedric Madianga wrote:
-> >> +static inline uint32_t stm32_dma_read(struct stm32_dma_device *dmadev, u32 reg)
-> >
-> > this and few other could be made more readable
-> 
-> Ok, I could replace uint32_t by u32. Is it what you expect ?
-> For others, I don't see how I could make it more readable.
-> Could you please give me more details to help me ? Thanks in advance
+On 10/14/2015 07:47 AM, H. Nikolaus Schaller wrote:
+>> diff --git a/arch/arm/vdso/vdsomunge.c b/arch/arm/vdso/vdsomunge.c
+>> index aedec81..27a9a0b 100644
+>> --- a/arch/arm/vdso/vdsomunge.c
+>> +++ b/arch/arm/vdso/vdsomunge.c
+>> @@ -45,7 +45,18 @@
+>> * it does.
+>> */
+>>
+>> -#include <byteswap.h>
+>> +#define swab16(x) \
+>> +	((unsigned short)( \
+>> +		(((unsigned short)(x) & (unsigned short)0x00ffU) << 8) | \
+>> +		(((unsigned short)(x) & (unsigned short)0xff00U) >> 8) ))
+>> +
+>> +#define swab32(x) \
+>> +	((unsigned int)( \
+>> +		(((unsigned int)(x) & (unsigned int)0x000000ffUL) << 24) | \
+>> +		(((unsigned int)(x) & (unsigned int)0x0000ff00UL) <<  8) | \
+>> +		(((unsigned int)(x) & (unsigned int)0x00ff0000UL) >>  8) | \
+>> +		(((unsigned int)(x) & (unsigned int)0xff000000UL) >> 24) ))
+>> +
+>> #include <elf.h>
+>> #include <errno.h>
+>> #include <fcntl.h>
+>> @@ -104,17 +115,17 @@ static void cleanup(void)
+>>
+>> static Elf32_Word read_elf_word(Elf32_Word word, bool swap)
+>> {
+>> -	return swap ? bswap_32(word) : word;
+>> +	return swap ? swab32(word) : word;
+>> }
+>>
+>> static Elf32_Half read_elf_half(Elf32_Half half, bool swap)
+>> {
+>> -	return swap ? bswap_16(half) : half;
+>> +	return swap ? swab16(half) : half;
+>> }
+>>
+>> static void write_elf_word(Elf32_Word val, Elf32_Word *dst, bool swap)
+>> {
+>> -	*dst = swap ? bswap_32(val) : val;
+>> +	*dst = swap ? swab32(val) : val;
+>> }
+> ping.
 
-Yes that is one and also aplitting this up so that it fits within 80chars
-while not sacrficing readablity...
+Sorry for the delay.
 
-> >> +     } else if ((status & STM32_DMA_FEI) && (sfcr & STM32_DMA_SFCR_FEIE)) {
-> >> +             dev_err(chan2dev(chan), "DMA error: received FEI event\n");
-> >> +             stm32_dma_irq_clear(chan, STM32_DMA_FEI);
-> >> +             chan->status = DMA_ERROR;
-> >> +             spin_unlock(&chan->vchan.lock);
-> >> +             return IRQ_HANDLED;
-> >
-> > this is repeat of above apart from err print!!
-> 
-> Not only for print as we also need that to define which bit to clear
-> in the IRQ status.
-> In that way we will be sure to handle each interrupt event.
-
-You can print error type based on status, or print the whole status but
-handle it same for all three cases
-
-> >> +     enum dma_status status;
-> >> +     unsigned long flags;
-> >> +     unsigned int residue;
-> >> +
-> >> +     status = dma_cookie_status(c, cookie, state);
-> >> +     if (status == DMA_COMPLETE)
-> >> +             return status;
-> >> +
-> >> +     if (!state)
-> >> +             return chan->status;
-> > why channel status and not status from dma_cookie_status()?
-> 
-> If status is different than DMA_COMPLETE it seems better to use channel status.
-> Indeed, in that way, we have the possibility to notify that there is a
-> potential error in the bus via DMA_ERROR.
-> But if I return status from dma_cookie_status(), I will always notify
-> DMA_IN_PROGRESS.
-
-No, you are supposed to return the descriptor status and not channel status!
-
--- 
-~Vinod
+This is okay but I'd prefer the swab macros to be below the #include
+lines, and it would be easier for me to deal with a patch that isn't
+whitespace-damaged.
