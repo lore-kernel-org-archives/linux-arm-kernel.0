@@ -1,88 +1,63 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 14 Oct 2015 17:10:27 -0500
-Subject: [GIT PULL] qcom SoC changes for 4.4 *RESEND*
-Message-ID: <1444860627-8258-1-git-send-email-agross@codeaurora.org>
+From: neilb@suse.com (Neil Brown)
+Date: Thu, 15 Oct 2015 09:11:28 +1100
+Subject: [PATCH] md: fix 32-bit build warning
+In-Reply-To: <11281560.gJ28rX782P@wuerfel>
+References: <5304496.D8N6u074t0@wuerfel>
+ <87fv1g1y34.fsf@notabene.neil.brown.name> <11281560.gJ28rX782P@wuerfel>
+Message-ID: <876129xfqn.fsf@notabene.neil.brown.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+Arnd Bergmann <arnd@arndb.de> writes:
 
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+> On Monday 12 October 2015 15:59:27 Neil Brown wrote:
+>> > diff --git a/drivers/md/md.c b/drivers/md/md.c
+>> > index 7fff1e6884d6..e13f72a3b561 100644
+>> > --- a/drivers/md/md.c
+>> > +++ b/drivers/md/md.c
+>> > @@ -8987,9 +8987,9 @@ static void check_sb_changes(struct mddev *mddev, struct md_rdev *rdev)
+>> >  
+>> >       /* recovery_cp changed */
+>> >       if (le64_to_cpu(sb->resync_offset) != mddev->recovery_cp) {
+>> > -             pr_info("%s:%d recovery_cp changed from %lu to %lu\n", __func__,
+>> > -                             __LINE__, mddev->recovery_cp,
+>> > -                             (unsigned long) le64_to_cpu(sb->resync_offset));
+>> > +             pr_info("%s:%d recovery_cp changed from %llu to %llu\n", __func__,
+>> > +                             __LINE__, (u64)mddev->recovery_cp,
+>> > +                             (u64) le64_to_cpu(sb->resync_offset));
+>> >               mddev->recovery_cp = le64_to_cpu(sb->resync_offset);
+>> >       }
+>> >  
+>> 
+>> Thanks, but is this really right?
+>> I think u64 is "unsigned long" on 64bit.
+>> I have always used (unsigned long long) when I want to use %llu on
+>> sector_t.
+>> 
+>> How confident are you of using "u64" ?
+>
+> Very confident ;-)
+>
+> This used to not work until some linux-2.6 version when we changed all
+> architectures to use asm-generic/int-ll64.h in the kernel, because
+> a lot of code relied on printing u64 variables using %lld.
+>
+> I tend to use u64 for things like this because it's shorter than
+> 'unsigned long long'.
+>
 
-are available in the git repository at:
+Ahh.. good to know - thanks.
 
-  git://codeaurora.org/quic/kernel/agross-msm.git tags/qcom-soc-for-4.4
+It seems that we've since removed those 'pr_info' lines, so there is
+nothing to fix any more.  I'll remember that about using "u64" though -
+using "unsigned long long" always felt so clumsy.
 
-for you to fetch changes up to d0bfd7c9b162612de55ca2d204403b90dc278db6:
-
-  soc: qcom: smem: Move RPM message ram out of smem DT node (2015-10-14 14:51:40 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM Based SoC Updates for 4.4
-
-* Implement id_table driver matching in SMD
-* Avoid NULL pointer exception on remove of SMEM
-* Reorder SMEM/SMD configs
-* Make qcom_smem_get() return a pointer
-* Handle big endian CPUs correctly in SMEM
-* Represent SMD channel layout in structures
-* Use __iowrite32_copy() in SMD
-* Remove use of VLAIs in SMD
-* Handle big endian CPUs correctly in SMD/RPM
-* Handle big endian CPUs corretly in SMD
-* Reject sending SMD packets that are too large
-* Fix endianness issue in SCM __qcom_scm_is_call_available
-* Add missing prototype for qcom_scm_is_available()
-* Correct SMEM items for upper channels
-* Use architecture level to build SCM correctly
-* Delete unneeded of_node_put in SMD
-* Correct active/slep state flagging in SMD/RPM
-* Move RPM message ram out of SMEM DT node
-
-----------------------------------------------------------------
-Andy Gross (2):
-      firmware: qcom: scm: Add function stubs for ARM64
-      Merge tag 'qcom-fixes-for-4.3-rc1' into base-for-4.4
-
-Arnd Bergmann (1):
-      firmware: qcom-scm: build for correct architecture level
-
-Bjorn Andersson (4):
-      soc: qcom: smd: Implement id_table driver matching
-      soc: qcom: smd: Reject send of too big packets
-      soc: qcom: smd: Correct SMEM items for upper channels
-      soc: qcom: smd-rpm: Correct the active vs sleep state flagging
-
-Julia Lawall (1):
-      soc: qcom: smd: delete unneeded of_node_put
-
-Rob Clark (2):
-      qcom-scm: fix endianess issue in __qcom_scm_is_call_available
-      qcom-scm: add missing prototype for qcom_scm_is_available()
-
-Stephen Boyd (10):
-      soc: qcom: smem: Avoid NULL pointer exception on remove
-      soc: qcom: Reorder SMEM/SMD configs
-      soc: qcom: Make qcom_smem_get() return a pointer
-      soc: qcom: smem: Handle big endian CPUs
-      soc: qcom: smd: Represent channel layout in structures
-      soc: qcom: smd: Use __iowrite32_copy() instead of open-coding it
-      soc: qcom: smd: Remove use of VLAIS
-      soc: qcom: smd_rpm: Handle big endian CPUs
-      soc: qcom: smd: Handle big endian CPUs
-      soc: qcom: smem: Move RPM message ram out of smem DT node
-
- arch/arm/boot/dts/qcom-msm8974.dtsi |   17 +-
- drivers/firmware/Kconfig            |    8 +
- drivers/firmware/Makefile           |    5 +-
- drivers/firmware/qcom_scm-32.c      |    6 +-
- drivers/firmware/qcom_scm-64.c      |   63 ++++++
- drivers/soc/qcom/Kconfig            |   16 +-
- drivers/soc/qcom/smd-rpm.c          |   68 ++++---
- drivers/soc/qcom/smd.c              |  296 +++++++++++++++++-----------
- drivers/soc/qcom/smem.c             |  368 +++++++++++++++++++----------------
- include/linux/qcom_scm.h            |    2 +
- include/linux/soc/qcom/smd.h        |   11 ++
- include/linux/soc/qcom/smem.h       |    2 +-
- 12 files changed, 525 insertions(+), 337 deletions(-)
- create mode 100644 drivers/firmware/qcom_scm-64.c
+Thanks,
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151015/21512430/attachment-0001.sig>
