@@ -1,46 +1,44 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 15 Oct 2015 04:22:03 +0800
-Subject: [PATCH 2/6] mfd: axp20x: Split the driver into core and i2c bits
-In-Reply-To: <1444840342-9233-3-git-send-email-wens@csie.org>
-Message-ID: <201510150455.XedREbkH%fengguang.wu@intel.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 14 Oct 2015 22:28:31 +0200
+Subject: l2c: Kernel panic in l2c310_enable() in non-secure mode
+In-Reply-To: <20151014174721.GR32532@n2100.arm.linux.org.uk>
+References: <561E6407.6000002@sigmadesigns.com>
+ <561E6B1F.1070701@sigmadesigns.com>
+ <20151014174721.GR32532@n2100.arm.linux.org.uk>
+Message-ID: <561EBAEF.8030603@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+On 14/10/2015 19:47, Russell King - ARM Linux wrote:
+> On Wed, Oct 14, 2015 at 04:47:59PM +0200, Marc Gonzalez wrote:
+>> Just to be sure, I changed set_auxcr() to a NOP. The kernel does not
+>> panic with that setup, and I can see the boot messages:
+>>
+>> [    0.000000] l2x0_of_init: FOO
+>> [    0.000000] L2C-310 enabling early BRESP for Cortex-A9
+>> [    0.000000] L2C-310: enabling full line of zeros but not enabled in Cortex-A9
+>> [    0.000000] reg=0x104 val=0x66460801
+>> [    0.000000] reg=0x100 val=0x1
+>> [    0.000000] L2C-310 I prefetch enabled, offset 1 lines
+>> [    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
+>> [    0.000000] L2C-310 cache controller enabled, 8 ways, 512 kB
+>> [    0.000000] L2C-310: CACHE_ID 0x410000c8, AUX_CTRL 0x62460801
+>>
+>> The "reg=0x%x val=0x%lx\n" lines are from tango_l2c_write_sec()
+>>
+>> It seems the firmware forgot to enable FLOZ.
+> 
+> Wrong.  Do _not_ enable FLZ in the Cortex-A9.  FLZ needs the L2 cache
+> enabled _before_ the Cortex A9.  This is not something you can do in
+> firmware/boot loader/etc.  It has to be done by the kernel when the L2
+> cache is initialised.
+> 
+> If your firmware prevents this, sorry, you can't ever use FLZ.
 
-[auto build test ERROR on next-20151013 -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+Is FLZ just a performance optimization?
 
-url:    https://github.com/0day-ci/linux/commits/Chen-Yu-Tsai/mfd-axp20x-Add-support-for-RSB-based-AXP223/20151015-004334
-config: x86_64-allmodconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+I can ask the firmware author not to enable bit 0 in L2CC AUXCTRL.
 
-All error/warnings (new ones prefixed by >>):
+Then Linux won't try to write CP15 ACTRL, IIUC.
 
-warning: (MFD_AXP20X) selects MFD_AXP20X_I2C which has unmet direct dependencies (HAS_IOMEM && I2C=y)
-   drivers/built-in.o: In function `axp20x_i2c_remove':
->> axp20x-i2c.c:(.text+0x22810b): undefined reference to `axp20x_device_remove'
-   drivers/built-in.o: In function `axp20x_i2c_probe':
->> axp20x-i2c.c:(.text+0x22827d): undefined reference to `axp20x_match_device'
->> axp20x-i2c.c:(.text+0x2282ff): undefined reference to `__devm_regmap_init_i2c'
->> axp20x-i2c.c:(.text+0x22834c): undefined reference to `axp20x_device_probe'
-   drivers/built-in.o: In function `axp20x_i2c_driver_init':
->> axp20x-i2c.c:(.init.text+0x1a8c9): undefined reference to `i2c_register_driver'
-   drivers/built-in.o: In function `axp20x_i2c_driver_exit':
->> axp20x-i2c.c:(.exit.text+0x683): undefined reference to `i2c_del_driver'
-
-sparse warnings: (new ones prefixed by >>)
-
->> drivers/iio/adc/axp288_adc.c:49:41: sparse: duplicate const 
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 50714 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151015/50431846/attachment-0001.obj>
+Regards.
