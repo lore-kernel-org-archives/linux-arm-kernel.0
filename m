@@ -1,114 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Oct 2015 16:31:17 +0100
-Subject: [PATCH v2 05/17] irqchip: Convert all alloc/xlate users from
- of_node to fwnode
-In-Reply-To: <561E7408.3050106@linaro.org>
-References: <1444737105-31573-1-git-send-email-marc.zyngier@arm.com>
- <1444737105-31573-6-git-send-email-marc.zyngier@arm.com>
- <561E7408.3050106@linaro.org>
-Message-ID: <561E7545.9070305@arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 14 Oct 2015 15:32:56 +0000
+Subject: [PATCH] VFIO: platform: clear IRQ_NOAUTOEN when de-assigning the IRQ
+Message-ID: <1444836776-2364-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/15 16:26, Tomasz Nowicki wrote:
-> Hi Marc,
-> 
-> On 13.10.2015 13:51, Marc Zyngier wrote:
->> Since we now have a generic data structure to express an
->> interrupt specifier, convert all hierarchical irqchips that
->> are OF based to use a fwnode_handle as part of their alloc
->> and xlate (which becomes translate) callbacks.
->>
->> As most of these drivers have dependencies (they exchange IRQ
->> specifiers), change them all in a single, massive patch...
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>   arch/arm/mach-exynos/suspend.c       | 55 ++++++++++++++++---------------
->>   arch/arm/mach-imx/gpc.c              | 55 ++++++++++++++++---------------
->>   arch/arm/mach-omap2/omap-wakeupgen.c | 55 ++++++++++++++++---------------
->>   drivers/irqchip/irq-crossbar.c       | 62 ++++++++++++++++++----------------
->>   drivers/irqchip/irq-gic-v2m.c        | 18 ++++++----
->>   drivers/irqchip/irq-gic-v3-its.c     | 20 ++++++-----
->>   drivers/irqchip/irq-gic-v3.c         | 49 +++++++++++++--------------
->>   drivers/irqchip/irq-gic.c            | 33 ++++++++++++++++---
->>   drivers/irqchip/irq-imx-gpcv2.c      | 64 ++++++++++++++++--------------------
->>   drivers/irqchip/irq-mtk-sysirq.c     | 49 ++++++++++++++-------------
->>   drivers/irqchip/irq-nvic.c           | 18 +++++++---
->>   drivers/irqchip/irq-tegra.c          | 55 ++++++++++++++++---------------
->>   drivers/irqchip/irq-vf610-mscm-ir.c  | 42 +++++++++++++++--------
->>   13 files changed, 323 insertions(+), 252 deletions(-)
->>
-> 
-> [...]
-> 
->>
->>   static int its_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
->> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->> index 5793880..05d010b 100644
->> --- a/drivers/irqchip/irq-gic-v3.c
->> +++ b/drivers/irqchip/irq-gic-v3.c
->> @@ -737,32 +737,30 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
->>   	return 0;
->>   }
->>
->> -static int gic_irq_domain_xlate(struct irq_domain *d,
->> -				struct device_node *controller,
->> -				const u32 *intspec, unsigned int intsize,
->> -				unsigned long *out_hwirq, unsigned int *out_type)
->> +static int gic_irq_domain_translate(struct irq_domain *d,
->> +				    struct irq_fwspec *fwspec,
->> +				    unsigned long *hwirq,
->> +				    unsigned int *type)
->>   {
->> -	if (irq_domain_get_of_node(d) != controller)
->> -		return -EINVAL;
->> -	if (intsize < 3)
->> -		return -EINVAL;
->> +	if (is_of_node(fwspec->fwnode)) {
->> +		if (fwspec->param_count < 3)
->> +			return -EINVAL;
->>
->> -	switch(intspec[0]) {
->> -	case 0:			/* SPI */
->> -		*out_hwirq = intspec[1] + 32;
->> -		break;
->> -	case 1:			/* PPI */
->> -		*out_hwirq = intspec[1] + 16;
->> -		break;
->> -	case GIC_IRQ_TYPE_LPI:	/* LPI */
->> -		*out_hwirq = intspec[1];
->> -		break;
->> -	default:
->> -		return -EINVAL;
->> +		/* Get the interrupt number and add 16 to skip over SGIs */
->> +		*hwirq = fwspec->param[1] + 16;
->> +
->> +		/*
->> +		 * For SPIs, we need to add 16 more to get the GIC irq
->> +		 * ID number
->> +		 */
->> +		if (!fwspec->param[0])
->> +			*hwirq += 16;
->> +
->> +		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
->> +		return 0;
->>   	}
->>
->> -	*out_type = intspec[2] & IRQ_TYPE_SENSE_MASK;
->> -	return 0;
->> +	return -EINVAL;
->>   }
-> 
-> What about GIC_IRQ_TYPE_LPI type? Previously we leaved interrupt line nr 
-> and now +32.
+The vfio platform driver currently sets the IRQ_NOAUTOEN before
+doing the request_irq to properly handle the user masking. However
+it does not clear it when de-assigning the IRQ. This brings issues
+when loading the native driver again which may not explicitly enable
+the IRQ. This problem was observed with xgbe driver.
 
-Please see the patch I've posted earlier that address this particular issue:
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ drivers/vfio/platform/vfio_platform_irq.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-https://lkml.org/lkml/2015/10/14/272
-
-Thanks,
-
-	M.
+diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+index 88bba57..46d4750 100644
+--- a/drivers/vfio/platform/vfio_platform_irq.c
++++ b/drivers/vfio/platform/vfio_platform_irq.c
+@@ -185,6 +185,7 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+ 	int ret;
+ 
+ 	if (irq->trigger) {
++		irq_clear_status_flags(irq->hwirq, IRQ_NOAUTOEN);
+ 		free_irq(irq->hwirq, irq);
+ 		kfree(irq->name);
+ 		eventfd_ctx_put(irq->trigger);
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
