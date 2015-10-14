@@ -1,40 +1,74 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 14 Oct 2015 11:22:36 +0530
-Subject: [PATCH] ARM: dts: am437x-gp-evm: Add wakeup interrupt source for
- pixcir_i2c_ts
-Message-ID: <1444801956-17817-1-git-send-email-vigneshr@ti.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 14 Oct 2015 14:55:15 +0900
+Subject: [BUG] broken mixer after second resume from mem
+In-Reply-To: <561CDC33.7050103@collabora.com>
+References: <561CDC33.7050103@collabora.com>
+Message-ID: <561DEE43.5040309@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On am437x-gp-evm, pixcir_i2c_ts can wakeup the system from lower power
-state via pinctrl and IO daisy chain using generic wakeirq framework.
-With commit 3fffd1283927 ("i2c: allow specifying separate wakeup
-interrupt in device tree") i2c core allows optional wakeirq to be
-specified via device tree. Add wakeup irq entry to enable pixcir_i2c_ts
-to wake the system from low power state.
+On 13.10.2015 19:25, Tomeu Vizoso wrote:
+> Hi,
+> 
+> have been hunting down a bug on exynos5250-snow which caused both HDMI
+> and LVDS output to be broken after the second resume (with suspend to
+> mem, but not to idle).
+> 
+> What I have found is that when powering down the DISP1 power domain
+> while suspending for the second time, the contents of the SRC_TOP3
+> register change from 0x1110550 to 0x1110500. IIUIC, this means that
+> ACLK_200_DISP1 is reparented to XXTI.
+> 
+> When the CPU comes up again, that register contains 0x1110550 again, but
+> it's set to 0x1110500 by the code that restores clk registers when resuming:
+> 
+> First suspend:
+> 
+> exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - before
+> exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - after
+> exynos5250_clk_suspend: SRC_TOP3 1110550
+> exynos5250_clk_resume: SRC_TOP3 1110550 - before
+> exynos5250_clk_resume: SRC_TOP3 1110550 - after
+> exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - before
+> exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - after
+> 
+> 
+> Second suspend:
+> 
+> exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - before
+> exynos_pd_power: SRC_TOP3 1110500 disp1-power-domain at 100440A0 - after
+> exynos5250_clk_suspend: SRC_TOP3 1110500
+> exynos5250_clk_resume: SRC_TOP3 1110550 - before
+> exynos5250_clk_resume: SRC_TOP3 1110500 - after
+> exynos_pd_power: SRC_TOP3 1110500 disp1-power-domain at 100440A0 - before
+> exynos_pd_power: SRC_TOP3 1110500 disp1-power-domain at 100440A0 - after
+> 
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- arch/arm/boot/dts/am437x-gp-evm.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+I am assuming you are talking about current linux-next. The actual
+reparent happens in exynos_pd_power which would indicate the exynos pd
+clock reparenting code. However the domains for Exynos5250 don't have
+any clocks set up for reparenting... which actually might be the issue.
+These clocks should be probably reparented - as it is done for other
+platforms - look at 5420 example (they are glitch-free on both of SoCs).
 
-diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-index 22038f21f228..69e93af7df0d 100644
---- a/arch/arm/boot/dts/am437x-gp-evm.dts
-+++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-@@ -581,8 +581,13 @@
- 
- 		attb-gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
- 
-+		interrupts-extended = <&gpio3 22 GPIO_ACTIVE_HIGH>,
-+				      <&am43xx_pinmux 0x264>;
-+		interrupt-names = "tsc", "wakeup";
-+
- 		touchscreen-size-x = <1024>;
- 		touchscreen-size-y = <600>;
-+		wakeup-source;
- 	};
- 
- 	ov2659 at 30 {
--- 
-2.6.1
+I've seen a such issues before. The problem is that after some time I
+tend to forget the needed workaround and solution. :)
+
+Try with reparenting necessary clocks. On other platform for some kind
+of similar issue the reset was required for the IP block - DECON
+(actually the mux could not stabilize there which can be observed in one
+of STATUS registers for mux).
+
+Let me know if explanation above is not detailed enough.
+
+> I have no idea of why it happens on the second suspend, and also don't
+> know why it doesn't happen when suspending to idle.
+
+As for the idle - domains are probably not gated so the problems just
+does not exist.
+
+BTW as this is display, you can CC some Samsung guys from DRM... they
+know a lot on these stuff. :)
+
+Best regards,
+Krzysztof
