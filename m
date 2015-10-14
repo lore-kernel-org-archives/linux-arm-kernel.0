@@ -1,36 +1,52 @@
-From: carlo@endlessm.com (Carlo Caione)
-Date: Wed, 14 Oct 2015 18:04:54 +0200
-Subject: [PATCH] ARM: meson6: DTS: Fix wrong reg mapping and IRQ numbers
-In-Reply-To: <8566547.CSeb89j3FB@wuerfel>
-References: <1443696760-8316-1-git-send-email-carlo@caione.org>
- <CAOQ7t2bAQ8RrfssFzAM6m=HGVaQDfcmmqPvmwX4wiAJig9ZVJg@mail.gmail.com>
- <8566547.CSeb89j3FB@wuerfel>
-Message-ID: <CAL9uMOHFoZqxdP6e+bb2N0t11P4tsJQHhOTZ-Ch6BA+YNwkG0g@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 14 Oct 2015 17:04:55 +0100
+Subject: [PATCH] hwrng: stm32 - Fix build with CONFIG_PM
+In-Reply-To: <1443904519-24012-1-git-send-email-daniel.thompson@linaro.org>
+References: <1443904519-24012-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1444838695-7182-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 5:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 10 October 2015 11:56:23 Carlo Caione wrote:
->> On Thu, Oct 1, 2015 at 12:52 PM, Carlo Caione <carlo@caione.org> wrote:
->> > From: Carlo Caione <carlo@endlessm.com>
->> >
->> > The DTS erronously uses the wrong reg mapping and IRQ numbers for some
->> > UART, WDT and timer nodes. Fix this.
->>
->> Hi Arnd,
->> if you have no complains could you take this into next/dt?
->>
->>
->
-> Pulled into next/dt, but please let me know if it should actually go
-> into 4.3 instead. It looks like a bugfix patch and perhaps also applies
-> to stable?
+Commit c6a97c42e399 ("hwrng: stm32 - add support for STM32 HW RNG")
+was inadequately tested (actually it was tested quite hard so
+incompetent would be a better description that inadequate) and does
+not compile on platforms with CONFIG_PM set.
 
-It is actually, thank you for the reminder. I can resubmit it with
-with stable in CC even though I'm pretty sure that ATM the number of
-people actually using this DTS is dramatically close to 0.
+Fix this.
 
-Thanks,
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
 
--- 
-Carlo Caione
+Notes:
+    Herbert: This is the diff between v2 and v3 of my STM32 HW RNG
+             patch. This is partly reassurance of what has changed
+             and also "just in case" you prefer to simply fix the
+    	 problem.
+
+ drivers/char/hw_random/stm32-rng.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
+index 7fa3656a5fc5..92a810648bd0 100644
+--- a/drivers/char/hw_random/stm32-rng.c
++++ b/drivers/char/hw_random/stm32-rng.c
+@@ -160,7 +160,7 @@ static int stm32_rng_probe(struct platform_device *ofdev)
+ #ifdef CONFIG_PM
+ static int stm32_rng_runtime_suspend(struct device *dev)
+ {
+-	struct stm32_rng_private *priv = dev_get_drvdata(pdev);
++	struct stm32_rng_private *priv = dev_get_drvdata(dev);
+
+ 	stm32_rng_cleanup(&priv->rng);
+
+@@ -169,7 +169,7 @@ static int stm32_rng_runtime_suspend(struct device *dev)
+
+ static int stm32_rng_runtime_resume(struct device *dev)
+ {
+-	struct stm32_rng_private *priv = dev_get_drvdata(pdev);
++	struct stm32_rng_private *priv = dev_get_drvdata(dev);
+
+ 	return stm32_rng_init(&priv->rng);
+ }
+--
+2.4.3
