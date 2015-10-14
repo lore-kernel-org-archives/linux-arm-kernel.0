@@ -1,112 +1,228 @@
 From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Wed, 14 Oct 2015 21:12:14 +0900
+Date: Wed, 14 Oct 2015 21:24:06 +0900
 Subject: [PATCH v4 2/2] arm64: Expand the stack trace feature to support
  IRQ stack
-In-Reply-To: <04D64B22-8EF5-400E-A7F0-1CD0AB48184D@gmail.com>
+In-Reply-To: <561E009B.3070001@linaro.org>
 References: <1444231692-32722-1-git-send-email-jungseoklee85@gmail.com>
  <1444231692-32722-3-git-send-email-jungseoklee85@gmail.com>
- <5617CE26.10604@arm.com> <07A53E87-C562-48D1-86DF-A373EAAA73F9@gmail.com>
- <561BE111.7@arm.com> <3CAA206D-3A3A-49A9-BDAD-4206D6F9BAA8@gmail.com>
- <561CE454.7080201@arm.com> <04D64B22-8EF5-400E-A7F0-1CD0AB48184D@gmail.com>
-Message-ID: <B6AB90B9-3AA9-413A-B357-137710E89C7C@gmail.com>
+ <5617CE26.10604@arm.com> <561E009B.3070001@linaro.org>
+Message-ID: <EB44D363-ACBA-48DB-B4EA-EDE1B87B99C8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 14, 2015, at 12:00 AM, Jungseok Lee wrote:
-> On Oct 13, 2015, at 8:00 PM, James Morse wrote:
+On Oct 14, 2015, at 4:13 PM, AKASHI Takahiro wrote:
+> On 10/09/2015 11:24 PM, James Morse wrote:
 >> Hi Jungseok,
-> 
-> Hi James,
-> 
->> On 12/10/15 23:13, Jungseok Lee wrote:
->>> On Oct 13, 2015, at 1:34 AM, James Morse wrote:
->>>> Having two kmem_caches for 16K stacks on a 64K page system may be wasteful
->>>> (especially for systems with few cpus)?
->>> 
->>> This would be a single concern. To address this issue, I drop the 'static'
->>> keyword in thread_info_cache. Please refer to the below hunk.
 >> 
->> Its only a problem on systems with 64K pages, which don't have a multiple
->> of 4 cpus. I suspect if you turn on 64K pages, you have many cores with
->> plenty of memory?
-> 
-> Yes, the problem 'two kmem_caches' comes from only 64K page system.
-> 
-> I don't get the statement 'which don't have a multiple of 4 cpus'.
-> Could you point out what I am missing?
-
-You're talking about sl{a|u}b allocator behavior. If so, I got what you meant.
-
-> Since I don't have platforms which have many cores and huge memory,
-> I cannot play with this series on them.
-> 
->>>> The alternative is to defining CONFIG_ARCH_THREAD_INFO_ALLOCATOR and
->>>> allocate all stack memory from arch code. (Largely copied code, prevents
->>>> irq stacks being a different size, and nothing uses that define today!)
->>>> 
->>>> 
->>>> Thoughts?
->>> 
->>> Almost same story I've been testing.
->>> 
->>> I'm aligned with yours Regarding CONFIG_ARCH_THREAD_INFO_ALLOCATOR.
->>> 
->>> Another approach I've tried is the following data structure, but it's not
->>> a good fit for this case due to __per_cpu_offset which is page-size aligned,
->>> not thread-size.
->>> 
->>> struct irq_stack {
->>> 	char stack[THREAD_SIZE];
->>> 	char *highest;
->>> } __aligned(THREAD_SIZE);
->>> 
->>> DEFINE_PER_CPU(struct irq_stack, irq_stacks);
+>> On 07/10/15 16:28, Jungseok Lee wrote:
+>>> Currently, a call trace drops a process stack walk when a separate IRQ
+>>> stack is used. It makes a call trace information much less useful when
+>>> a system gets paniked in interrupt context.
 >> 
->> Yes, x86 does this - but it increases the Image size by 16K, as that space
->> could have some initialisation values. This isn't a problem on x86 as
->> no-one uses the uncompressed image.
+>> panicked
 >> 
->> I would avoid this approach due to the bloat!
->> 
+>>> This patch addresses the issue with the following schemes:
 >>> 
->>> ----8<-----
+>>>   - Store aborted stack frame data
+>>>   - Decide whether another stack walk is needed or not via current sp
+>>>   - Loosen the frame pointer upper bound condition
+>> 
+>> It may be worth merging this patch with its predecessor - anyone trying to
+>> bisect a problem could land between these two patches, and spend time
+>> debugging the truncated call traces.
+>> 
+>> 
 >>> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
->>> index 6ea82e8..d3619b3 100644
+>>> index 6ea82e8..e5904a1 100644
 >>> --- a/arch/arm64/include/asm/irq.h
 >>> +++ b/arch/arm64/include/asm/irq.h
->>> @@ -1,7 +1,9 @@
->>> #ifndef __ASM_IRQ_H
->>> #define __ASM_IRQ_H
+>>> @@ -2,13 +2,25 @@
+>>>  #define __ASM_IRQ_H
 >>> 
->>> +#include <linux/gfp.h>
->>> #include <linux/irqchip/arm-gic-acpi.h>
->>> +#include <linux/slab.h>
+>>>  #include <linux/irqchip/arm-gic-acpi.h>
+>>> +#include <asm/stacktrace.h>
 >>> 
->>> #include <asm-generic/irq.h>
+>>>  #include <asm-generic/irq.h>
 >>> 
->>> @@ -9,6 +11,21 @@ struct irq_stack {
->>>       void *stack;
->>> };
+>>>  struct irq_stack {
+>>>  	void *stack;
+>>> +	struct stackframe frame;
+>>>  };
 >>> 
->>> +#if THREAD_SIZE >= PAGE_SIZE
->>> +static inline void *__alloc_irq_stack(void)
->>> +{
->>> +       return (void *)__get_free_pages(THREADINFO_GFP | __GFP_ZERO,
->>> +                                       THREAD_SIZE_ORDER);
->>> +}
->>> +#else
->>> +extern struct kmem_cache *thread_info_cache;
+>>> +DECLARE_PER_CPU(struct irq_stack, irq_stacks);
 >> 
->> If this has been made a published symbol, it should go in a header file.
+>> Good idea, storing this in the per-cpu data makes it immune to stack
+>> corruption.
 > 
-> Sure.
+> Is this the only reason that you have a dummy stack frame in per-cpu data?
+> By placing this frame in an interrupt stack, I think, we will be able to eliminate
+> changes in dump_stace(). and
+> 
+>> 
+>>> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+>>> index 407991b..5124649 100644
+>>> --- a/arch/arm64/kernel/stacktrace.c
+>>> +++ b/arch/arm64/kernel/stacktrace.c
+>>> @@ -43,7 +43,27 @@ int notrace unwind_frame(struct stackframe *frame)
+>>>  	low  = frame->sp;
+>>>  	high = ALIGN(low, THREAD_SIZE);
+>>> 
+>>> -	if (fp < low || fp > high - 0x18 || fp & 0xf)
+>>> +	/*
+>>> +	 * A frame pointer would reach an upper bound if a prologue of the
+>>> +	 * first function of call trace looks as follows:
+>>> +	 *
+>>> +	 *	stp     x29, x30, [sp,#-16]!
+>>> +	 *	mov     x29, sp
+>>> +	 *
+>>> +	 * Thus, the upper bound is (top of stack - 0x20) with consideration
+>> 
+>> The terms 'top' and 'bottom' of the stack are confusing, your 'top' appears
+>> to be the highest address, which is used first, making it the bottom of the
+>> stack.
+>> 
+>> I would try to use the terms low/est and high/est, in keeping with the
+>> variable names in use here.
+>> 
+>> 
+>>> +	 * of a 16-byte empty space in THREAD_START_SP.
+>>> +	 *
+>>> +	 * The value, 0x20, however, does not cover all cases as interrupts
+>>> +	 * are handled using a separate stack. That is, a call trace can start
+>>> +	 * from elx_irq exception vectors. The symbols could not be promoted
+>>> +	 * to candidates for a stack trace under the restriction, 0x20.
+>>> +	 *
+>>> +	 * The scenario is handled without complexity as 1) considering
+>>> +	 * (bottom of stack + THREAD_START_SP) as a dummy frame pointer, the
+>>> +	 * content of which is 0, and 2) allowing the case, which changes
+>>> +	 * the value to 0x10 from 0x20.
+>> 
+>> Where has 0x20 come from? The old value was 0x18.
+>> 
+>> My understanding is the highest part of the stack looks like this:
+>> high        [ off-stack ]
+>> high - 0x08 [ left free by THREAD_START_SP ]
+>> high - 0x10 [ left free by THREAD_START_SP ]
+>> high - 0x18 [#1 x30 ]
+>> high - 0x20 [#1 x29 ]
+>> 
+>> So the condition 'fp > high - 0x18' prevents returning either 'left free'
+>> address, or off-stack-value as a frame. Changing it to 'fp > high - 0x10'
+>> allows the first half of that reserved area to be a valid stack frame.
+>> 
+>> This change is breaking perf using incantations [0] and [1]:
+>> 
+>> Before, with just patch 1/2:
+>>                   ---__do_softirq
+>>                      |
+>>                      |--92.95%-- __handle_domain_irq
+>>                      |          __irqentry_text_start
+>>                      |          el1_irq
+>>                      |
+>> 
+>> After, with both patches:
+>>                  ---__do_softirq
+>>                     |
+>>                     |--83.83%-- __handle_domain_irq
+>>                     |          __irqentry_text_start
+>>                     |          el1_irq
+>>                     |          |
+>>                     |          |--99.39%-- 0x400008040d00000c
+>>                     |           --0.61%-- [...]
+>>                     |
+> 
+> This also shows that walk_stackframe() doesn't walk through a process stack.
+> Now I'm trying the following hack on top of Jungseok's patch.
+> (It doesn't traverse from an irq stack to an process stack yet. I need modify
+> unwind_frame().)
 
-I had the wrong impression that there is a room under include/linux/*.
+I've got a difference between perf and dump_backtrace() as reviewing perf call
+chain operation. Perf relies on walk_stackframe(), but dump_backtrace() does not.
+That is, a symbol is printed out *before* unwind_frame() call in case of perf.
+By contrast, dump_backtrace() records a symbol *after* unwind_frame(). I think
+perf behavior is correct since frame.pc is retrieved from a valid stack frame.
 
-IMO, this is architectural option whether arch relies on thread_info_cache or not.
-In other words, it would be clear to put this extern under arch/*/include/asm/*.
+So, the following diff is a prerequisite. It looks reasonable to remove dump_mem()
+call since frame.sp is calculated incorrectly now. If accepted, dump_backtrace()
+could utilize walk_stackframe(), which simplifies the code.
 
-Thoughts?
+----8<----
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index f93aae5..e18be43 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -103,12 +103,15 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+        set_fs(fs);
+ }
+ 
+-static void dump_backtrace_entry(unsigned long where, unsigned long stack)
++static void dump_backtrace_entry(unsigned long where)
+ {
++       /*
++        * PC has a physical address when MMU is disabled.
++        */
++       if (!kernel_text_address(where))
++               where = (unsigned long)phys_to_virt(where);
++
+        print_ip_sym(where);
+-       if (in_exception_text(where))
+-               dump_mem("", "Exception stack", stack,
+-                        stack + sizeof(struct pt_regs), false);
+ }
+ 
+ static void dump_instr(const char *lvl, struct pt_regs *regs)
+@@ -172,12 +175,17 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+        pr_emerg("Call trace:\n");
+        while (1) {
+                unsigned long where = frame.pc;
++               unsigned long stack;
+                int ret;
+ 
++               dump_backtrace_entry(where);
+                ret = unwind_frame(&frame);
+                if (ret < 0)
+                        break;
+-               dump_backtrace_entry(where, frame.sp);
++               stack = frame.sp;
++               if (in_exception_text(where))
++                       dump_mem("", "Exception stack", stack,
++                                stack + sizeof(struct pt_regs), false);
+        }
+ }
+----8<----
+
+> Thanks,
+> -Takahiro AKASHI
+> ----8<----
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 650cc05..5fbd1ea 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -185,14 +185,12 @@ alternative_endif
+> 	mov	x23, sp
+> 	and	x23, x23, #~(THREAD_SIZE - 1)
+> 	cmp	x20, x23			// check irq re-enterance
+> +	mov	x19, sp
+> 	beq	1f
+> -	str	x29, [x19, #IRQ_FRAME_FP]
+> -	str	x21, [x19, #IRQ_FRAME_SP]
+> -	str	x22, [x19, #IRQ_FRAME_PC]
+> -	mov	x29, x24
+> -1:	mov	x19, sp
+> -	csel	x23, x19, x24, eq		// x24 = top of irq stack
+> -	mov	sp, x23
+> +	mov	sp, x24				// x24 = top of irq stack
+> +	stp	x29, x22, [sp, #-32]!
+> +	mov	x29, sp
+> +1:
+> 	.endm
+> 
+> 	/*
+
+Is it possible to decide which stack is used without aborted SP information?
+In addition, I'm curious about an origin of #-32.
+
+Thanks!
 
 Best Regards
 Jungseok Lee
