@@ -1,41 +1,25 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 14 Oct 2015 14:42:55 +0300
-Subject: [PATCH v5 13/24] dmaengine: edma: Use devm_kcalloc when possible
-In-Reply-To: <1444822986-20562-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1444822986-20562-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1444822986-20562-14-git-send-email-peter.ujfalusi@ti.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 14 Oct 2015 13:47:48 +0200
+Subject: [PATCH v6 2/3] arm64: Add IOMMU dma_ops
+In-Reply-To: <80cb035144a2648a5d94eb1fec3336f17ad249f1.1443718557.git.robin.murphy@arm.com>
+References: <cover.1443718557.git.robin.murphy@arm.com>
+ <80cb035144a2648a5d94eb1fec3336f17ad249f1.1443718557.git.robin.murphy@arm.com>
+Message-ID: <20151014114748.GL27420@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When allocating a memory for number of items it is better (looks better)
-to use devm_kcalloc.
+On Thu, Oct 01, 2015 at 08:13:59PM +0100, Robin Murphy wrote:
+> Taking some inspiration from the arch/arm code, implement the
+> arch-specific side of the DMA mapping ops using the new IOMMU-DMA layer.
+> 
+> Since there is still work to do elsewhere to make DMA configuration happen
+> in a more appropriate order and properly support platform devices in the
+> IOMMU core, the device setup code unfortunately starts out carrying some
+> workarounds to ensure it works correctly in the current state of things.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  arch/arm64/mm/dma-mapping.c | 435 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 435 insertions(+)
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- drivers/dma/edma.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index d5a76c67f83f..95c10373168d 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -2055,7 +2055,7 @@ static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
- 	 * priority. So Q0 is the highest priority queue and the last queue has
- 	 * the lowest priority.
- 	 */
--	queue_priority_map = devm_kzalloc(dev, (ecc->num_tc + 1) * sizeof(s8),
-+	queue_priority_map = devm_kcalloc(dev, ecc->num_tc + 1, sizeof(s8),
- 					  GFP_KERNEL);
- 	if (!queue_priority_map)
- 		return -ENOMEM;
-@@ -2086,7 +2086,7 @@ static int edma_xbar_event_map(struct device *dev, struct edma_soc_info *pdata,
- 	u32 shift, offset, mux;
- 	int ret, i;
- 
--	xbar_chans = devm_kzalloc(dev, (nelm + 2) * sizeof(s16), GFP_KERNEL);
-+	xbar_chans = devm_kcalloc(dev, nelm + 2, sizeof(s16), GFP_KERNEL);
- 	if (!xbar_chans)
- 		return -ENOMEM;
- 
--- 
-2.6.1
+This needs an ack from the arm64 maintainers.
