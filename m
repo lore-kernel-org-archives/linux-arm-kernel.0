@@ -1,55 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 14 Oct 2015 13:36:24 +0100
-Subject: [PATCH] mutex: make mutex_lock_nested an inline function
-In-Reply-To: <20151014110717.GT17308@twins.programming.kicks-ass.net>
-References: <11282238.AHmyWliPRj@wuerfel>
- <20151013203812.GM17308@twins.programming.kicks-ass.net>
- <11817958.z9KtmeKzV7@wuerfel>
- <20151014082050.GQ17308@twins.programming.kicks-ass.net>
- <20151014102706.GR14956@sirena.org.uk>
- <20151014110717.GT17308@twins.programming.kicks-ass.net>
-Message-ID: <20151014123624.GV14956@sirena.org.uk>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 14 Oct 2015 13:41:05 +0100
+Subject: [PATCHv3 01/11] arm64: Move swapper pagetable definitions
+In-Reply-To: <20151014114247.GA2150@leverpostej>
+References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
+ <1444821634-1689-2-git-send-email-suzuki.poulose@arm.com>
+ <20151014114247.GA2150@leverpostej>
+Message-ID: <561E4D61.7000000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 01:07:17PM +0200, Peter Zijlstra wrote:
-> On Wed, Oct 14, 2015 at 11:27:06AM +0100, Mark Brown wrote:
-> > On Wed, Oct 14, 2015 at 10:20:50AM +0200, Peter Zijlstra wrote:
+On 14/10/15 12:42, Mark Rutland wrote:
+> On Wed, Oct 14, 2015 at 12:20:24PM +0100, Suzuki K. Poulose wrote:
 
-> > > Uuh, I just looked at next and saw this regulator_lock_supply()
-> > > function. How is that limited? subclass must be <8 otherwise bad things
-> > > happen.
+>>
+>> Also renames the symbols to prevent conflicts. e.g,
+>>   	BLOCK_SHIFT => SWAPPER_BLOCK_SHIFT
+>
+> This sounds sensible to be, so FWIW:
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>
+> I have a couple of minor nits below, though.
 
-> > Can we please get some more discoverable documentation of the arbitrary
-> > limits in the lockdep code? 
+>> diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
+>> new file mode 100644
+>> index 0000000..622929d
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/kernel-pgtable.h
+>> @@ -0,0 +1,65 @@
+>> +/*
+>> + * asm/kernel-pgtable.h : Kernel page table mapping
+>
+> Drop the filename from the comment. It's redundant and ends up being
+> painful when refactoring and moving things around.
+>
 
-> include/linux/lockdep.h:#define MAX_LOCKDEP_SUBCLASSES          8UL
+OK
 
-Sure, but I don't really expect to have to trawl the implementation of
-an API to find out about this sort of thing (I hadn't even been aware
-that the subclasses were required to be small positive integers, never
-mind needing to check what the limit was).  I think the main place I'd
-have expected to see it was in lockdep-design.txt or somewhere near
-that.
+>> +
+>> +
+>> +#endif
+>
+> It would be nice to have the usual comment here for what this is ending,
+> i.e.
+>
+> #endif /* __ASM_KERNEL_PGTABLE_H */
 
-> > I seem to keep seeing code that bumps into
-> > surprising limits like this and I'm not sure how I'm supposed to know
-> > about them except through finding out after the fact or trawling the
-> > code every time someone touches locking.
+Oh yes, will add it.
 
-> Not knowing what other limits you've hit, I'm not entirely sure how to
-> help out there.
-
-The other big one that came up recently was that lockdep apparently
-works out what a class is by looking at the point of allocation which
-causes a lot of problems for regmap since it makes all regmap locks look
-like a single class.  That's fixed now by explicitly allocating a class
-per regmap with some macro magic but it was a bit of a surprise.  The
-documentation doesn't make this obvious.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151014/74474f5e/attachment.sig>
+Thanks
+Suzuki
