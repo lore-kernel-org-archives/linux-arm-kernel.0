@@ -1,60 +1,85 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 14 Oct 2015 16:25:50 -0700
-Subject: [PATCH V2 0/6] gicv2m: acpi: Add ACPI support for GICv2m MSI
-Message-ID: <1444865156-9870-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Date: Wed, 14 Oct 2015 16:25:51 -0700
+Subject: [PATCH V2 1/6] pci: msi: Add support to query MSI domain for pci
+ device
+In-Reply-To: <1444865156-9870-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1444865156-9870-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1444865156-9870-2-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series has been forked from the following patch series since
-it no longer depends on the rest of the patches.
+This patch introduces an interface for irqchip to register a callback,
+to provide a way to determine appropriate MSI domain for a pci device.
 
-  [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
-  https://lkml.org/lkml/2015/7/29/234
+Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+---
+ drivers/pci/msi.c   | 30 ++++++++++++++++++++++++++++++
+ include/linux/msi.h |  7 +++++++
+ 2 files changed, 37 insertions(+)
 
-It has been ported to use the newly introduced device fwnode_handle 
-for ACPI irqdmain introduced by Marc in the following patch series:
-
-  [PATCH v2 00/17] Divorcing irqdomain and device_node
-  http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git irq/irq-domain-fwnode-v2
-
-The following git branch contains the submitted patches along with
-the pre-requsite patches (mainly for ARM64 PCI support for ACPI).
-
-  https://github.com/ssuthiku/linux.git	irq-domain-fwnode-v2-v2m-multiframe
-
-This has been tested on AMD Seattle (Overdrive) RevB system. 
-
-NOTE: I have not tested ACPI GICv2m multiframe support since
-I don't have access to such system. Any helps are appreciated.
-
-Thanks,
-Suravee
-
-Changes from V1: (https://lkml.org/lkml/2015/10/13/859)
-  - Rebase on top of Marc's patch to addng support for multiple MSI frames
-    (https://lkml.org/lkml/2015/10/14/271)
-  - Adding fwnode convenient functions (patch 3 and 4)
-
-Suravee Suthikulpanit (6):
-  pci: msi: Add support to query MSI domain for pci device
-  acpi: pci: Setup MSI domain for ACPI based pci devices
-  irqdomain: introduce is_fwnode_irqchip helper
-  irqdomain: Introduce irq_domain_get_irqchip_fwnode_name helper
-    function
-  gicv2m: Refactor to prepare for ACPI support
-  gicv2m: acpi: Introducing GICv2m ACPI support
-
- drivers/irqchip/irq-gic-v2m.c   | 151 ++++++++++++++++++++++++++++++++++------
- drivers/irqchip/irq-gic.c       |   5 +-
- drivers/pci/msi.c               |  30 ++++++++
- drivers/pci/pci-acpi.c          |  13 ++++
- drivers/pci/probe.c             |   2 +
- include/linux/irqchip/arm-gic.h |   6 ++
- include/linux/irqdomain.h       |   6 ++
- include/linux/msi.h             |   7 ++
- include/linux/pci.h             |   7 ++
- kernel/irq/irqdomain.c          |  20 +++++-
- 10 files changed, 224 insertions(+), 23 deletions(-)
-
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index ddd59fe..2c87843 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -1327,4 +1327,34 @@ struct irq_domain *pci_msi_create_default_irq_domain(struct fwnode_handle *fwnod
+ 
+ 	return domain;
+ }
++
++static struct fwnode_handle *(*pci_msi_get_fwnode_cb)(struct device *dev);
++
++/**
++ * pci_msi_register_fwnode_provider - Register callback to retrieve fwnode
++ * @fn:		The interrupt domain to retrieve
++ *
++ * This should be called by irqchip driver, which is the parent of
++ * the MSI domain to provide callback interface to query fwnode.
++ */
++void
++pci_msi_register_fwnode_provider(struct fwnode_handle *(*fn)(struct device *))
++{
++	pci_msi_get_fwnode_cb = fn;
++}
++
++/**
++ * pci_msi_get_fwnode - Query fwnode for MSI controller of the @dev
++ * @dev:	The device that we try to query MSI domain token for
++ *
++ * This is used to query MSI domain token when setting up MSI domain
++ * for a device. Returns fwnode_handle * if token found / NULL if not found
++ */
++struct fwnode_handle *pci_msi_get_fwnode(struct device *dev)
++{
++	if (pci_msi_get_fwnode_cb)
++		return pci_msi_get_fwnode_cb(dev);
++
++	return NULL;
++}
+ #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 32a24b9..ceaebf6 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -3,6 +3,7 @@
+ 
+ #include <linux/kobject.h>
+ #include <linux/list.h>
++#include <linux/fwnode.h>
+ 
+ struct msi_msg {
+ 	u32	address_lo;	/* low 32 bits of msi message address */
+@@ -294,6 +295,12 @@ irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
+ 					  struct msi_desc *desc);
+ int pci_msi_domain_check_cap(struct irq_domain *domain,
+ 			     struct msi_domain_info *info, struct device *dev);
++
++void
++pci_msi_register_fwnode_provider(struct fwnode_handle *(*fn)(struct device *));
++
++struct fwnode_handle *pci_msi_get_fwnode(struct device *dev);
++
+ #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+ 
+ #endif /* LINUX_MSI_H */
 -- 
 2.1.0
