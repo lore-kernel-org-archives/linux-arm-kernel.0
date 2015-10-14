@@ -1,83 +1,133 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 14 Oct 2015 14:21:24 +0100
-Subject: [PATCHv3 02/11] arm64: Handle section maps for swapper/idmap
-In-Reply-To: <20151014120618.GB2150@leverpostej>
-References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
- <1444821634-1689-3-git-send-email-suzuki.poulose@arm.com>
- <20151014120618.GB2150@leverpostej>
-Message-ID: <561E56D4.40506@arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 14 Oct 2015 21:21:23 +0800
+Subject: [PATCH v5 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <20151013164730.GF24353@leverpostej>
+References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
+ <20150828123228.GE31748@leverpostej>
+ <CAFpQJXWzM644KsFWP9ei-k6gWgNVpBVT+UbY7NYdyfmyL=zMkw@mail.gmail.com>
+ <CAFpQJXWFx2dQ_vv0POqkOiLe3eh9Ee=Sf+2Xx_08Vp=E4g6gLQ@mail.gmail.com>
+ <20150930105331.GA10066@leverpostej>
+ <CAFpQJXVegqortRLK+g7_9p82KMYwq0hg8n3_9bJqjGHsJvngaA@mail.gmail.com>
+ <1443661547.2828.40.camel@kernel.crashing.org>
+ <CAFpQJXXKcwks0iZN+3B=U0-9uYKFpAXcZE90GCHN9WyM45Hdpw@mail.gmail.com>
+ <CAFpQJXUPWZxOWeJQnkw8E_voDoqhphH8iR-fr0xo0m3+FiL4sA@mail.gmail.com>
+ <20151013164730.GF24353@leverpostej>
+Message-ID: <561E56D3.3030105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/15 13:06, Mark Rutland wrote:
-> On Wed, Oct 14, 2015 at 12:20:25PM +0100, Suzuki K. Poulose wrote:
->> We use section maps with 4K page size to create the swapper/idmaps.
->> So far we have used !64K or 4K checks to handle the case where we
->> use the section maps.
->> This patch adds a new symbol, ARM64_SWAPPER_USES_SECTION_MAPS, to
->> handle cases where we use section maps, instead of using the page size
->> symbols.
->>
->> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
->> ---
->>   arch/arm64/include/asm/kernel-pgtable.h |   31 ++++++++-----
->>   arch/arm64/mm/mmu.c                     |   72 ++++++++++++++-----------------
->>   2 files changed, 52 insertions(+), 51 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
->> index 622929d..5876a36 100644
->> --- a/arch/arm64/include/asm/kernel-pgtable.h
->> +++ b/arch/arm64/include/asm/kernel-pgtable.h
->> @@ -19,6 +19,13 @@
->>   #ifndef __ASM_KERNEL_PGTABLE_H
->>   #define __ASM_KERNEL_PGTABLE_H
->>
->> +/* With 4K pages, we use section maps. */
->> +#ifdef CONFIG_ARM64_4K_PAGES
->> +#define ARM64_SWAPPER_USES_SECTION_MAPS 1
->> +#else
->> +#define ARM64_SWAPPER_USES_SECTION_MAPS 0
->> +#endif
+On 10/14/2015 12:47 AM, Mark Rutland wrote:
+>>> Hi Mark,
+>>>
+>>> i am thinking, if we could not address(or becomes complex)  these topologies
+>>> using associativity,
+>>> we should think of an alternate binding which suits existing and upcoming
+>>> arm64 platforms.
+>>> can we think of below numa binding which is inline with ACPI and will
+>>> address all sort of topologies!
+>>>
+>>> i am proposing as below,
+>>>
+>>> 1. introduce "proximity" node property. this property will be
+>>> present in dt nodes like memory, cpu, bus and devices(like associativity
+>>> property) and
+>>> will tell which numa node(proximity domain) this dt node belongs to.
+>>>
+>>> examples:
+>>>                 cpu at 000 {
+>>>                          device_type = "cpu";
+>>>                          compatible = "cavium,thunder", "arm,armv8";
+>>>                          reg = <0x0 0x000>;
+>>>                          enable-method = "psci";
+>>>                          proximity = <0>;
+>>>                  };
+>>>                 cpu at 001 {
+>>>                          device_type = "cpu";
+>>>                          compatible = "cavium,thunder", "arm,armv8";
+>>>                          reg = <0x0 0x001>;
+>>>                          enable-method = "psci";
+>>>                          proximity = <1>;
+>>>                  };
+>>>
+>>>         memory at 00000000 {
+>>>                  device_type = "memory";
+>>>                  reg = <0x0 0x01400000 0x3 0xFEC00000>;
+>>>                  proximity =<0>;
+>>>
+>>>          };
+>>>
+>>>          memory at 10000000000 {
+>>>                  device_type = "memory";
+>>>                  reg = <0x100 0x00400000 0x3 0xFFC00000>;
+>>>                  proximity =<1>;
+>>>          };
+>>>
+>>> pcie0 at 0x8480,00000000 {
+>>>                  compatible = "cavium,thunder-pcie";
+>>>                  device_type = "pci";
+>>>                  msi-parent = <&its>;
+>>>                  bus-range = <0 255>;
+>>>                  #size-cells = <2>;
+>>>                  #address-cells = <3>;
+>>>                  #stream-id-cells = <1>;
+>>>                  reg = <0x8480 0x00000000 0 0x10000000>;  /*Configuration
+>>> space */
+>>>                  ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000
+>>> 0x70 0x00000000>, /* mem ranges */
+>>>                           <0x03000000 0x8300 0x00000000 0x8300 0x00000000
+>>> 0x500 0x00000000>;
+>>>                 proximity =<0>;
+>>>          };
+>>>
+>>>
+>>> 2. Introduce new dt node "proximity-map" which will capture the NxN numa
+>>> node distance matrix.
+>>>
+>>> for example,  4 nodes connected in mesh/ring structure as,
+>>> A(0) <connected to> B(1) <connected to> C(2) <connected to> D(3) <connected
+>>> to> A(1)
+>>>
+>>> relative distance would be,
+>>>        A -> B = 20
+>>>        B -> C  = 20
+>>>        C -> D = 20
+>>>        D -> A = 20
+>>>        A -> C = 40
+>>>        B -> D = 40
+>>>
+>>> and dt presentation for this distance matrix is :
+>>>
+>>>         proximity-map {
+>>>               node-count = <4>;
+>>>               distance-matrix = <0 0  10>,
+>>>                                  <0 1  20>,
+>>>                                  <0 2  40>,
+>>>                                  <0 3  20>,
+>>>                                  <1 0  20>,
+>>>                                  <1 1  10>,
+>>>                                  <1 2  20>,
+>>>                                  <1 3  40>,
+>>>                                  <2 0  40>,
+>>>                                  <2 1  20>,
+>>>                                  <2 2  10>,
+>>>                                  <2 3  20>,
+>>>                                  <3 0  20>,
+>>>                                  <3 1  40>,
+>>>                                  <3 2  20>,
+>>>                                  <3 3  10>;
+>>>            }
+>>>
+>>> the entries like < 0 0 > < 1 1>  < 2 2> < 3 3> can be optional and code can
+>>> put default value(local distance).
+>>> the entries like <1 0> can be optional if <0 1> and <1 0> are of same
+>>> distance.
+>> is this binding looks ok?
 >
-> The comment is somewhat redunant. It would be better to state why we do
-> this for 4K and not 64K (or 16K).
+> This looks roughly requivalent to the ACPI SLIT, which means it's as
+> powerful, which allays my previous concerns.
 
-Something like :
-
-/*
-  * ARM64 kernel is guaranteed to be loaded at 2M aligned
-  * address (as per booting requirements). Hence we can use
-  * section mapping with 4K (section size = 2M) and not with
-  * 16K(section size = 32M) or 64K (section size = 512M).
-  */
-
->> +	 * us PUD_SIZE (with SECTION maps, i.e, 4K) or PMD_SIZE (without
->> +	 * SECTION maps, i.e, 64K pages) memory starting from PHYS_OFFSET
->> +	 * (which must be aligned to 2MB as per Documentation/arm64/booting.txt).
->
-> This didn't seem to get updated for 16K later in the series, unless I
-> missed something.
->
-> Perhaps drop the mention of 4K / 64K entirely here?
-
-You are right, I missed it. We can drop the pagesize info entirely.
-
->
->> @@ -551,7 +552,7 @@ int kern_addr_valid(unsigned long addr)
->>   	return pfn_valid(pte_pfn(*pte));
->>   }
->>   #ifdef CONFIG_SPARSEMEM_VMEMMAP
->> -#ifdef CONFIG_ARM64_64K_PAGES
->> +#if !ARM64_SWAPPER_USES_SECTION_MAPS
->
-> This leaves the comments on the #else and #endif stale. Please update
-> those too.
-
-Done.
+Cool, I think those bindings are quite extensible and easy understood.
 
 Thanks
-Suzuki
+Hanjun
