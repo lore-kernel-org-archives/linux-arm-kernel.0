@@ -1,21 +1,38 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 14 Oct 2015 17:20:51 +0800
-Subject: [PATCH v4 3/5] clk: sunxi: pll2: Add A13 support
-In-Reply-To: <1444682610-21482-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1444682610-21482-1-git-send-email-maxime.ripard@free-electrons.com>
- <1444682610-21482-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v67wc3E-eBU3KA0jDPMHy3H2chd872QZxcm5s6AsLrh6ig@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 14 Oct 2015 12:23:26 +0300
+Subject: [PATCH v2 0/2] ARM: OMAP2+ McASP(3) support for DRA7xx family
+Message-ID: <1444814608-20908-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 4:43 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The A13, unlike the A10 and A20, doesn't use a pass-through exception for
-> the 0 value in the pre and post dividers, but increments all the values
-> written in the register by one.
->
-> Add an exception for both these cases to handle them nicely.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi Paul,
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+This is the followup series for the hwmod changes needed to get audio working
+on DRA7xx family based boards.
+The DTS patches has been applied by Tony from the original series:
+http://www.spinics.net/lists/linux-omap/msg121473.html
+
+I have addressed your comments in the hwmod data and did some research also
+regarding to the use of ahclkx as fclk in the original submission.
+It turned out that McASP _needs_ all clocks to be enabled (fclk, iclk and
+ahclkx/r) to be able to access registers. The original patch where we handled
+the ahclkx as fclk worked, because the fclk clock got enabled in the HW w/o
+any SW interaction.
+All in all, the McASP found in DRA7 needs all clocks to be enabled.
+To satisfy this I have introduced a new flag to hwmod, which means that the
+listed optional clocks need to be handled alongside with the fclk clock.
+
+Regards,
+Peter
+---
+Peter Ujfalusi (2):
+  ARM: OMAP2+: hwmod: Add hwmod flag for HWMOD_OPT_CLKS_NEEDED
+  ARM: OMAP: DRA7: hwmod: Add data for McASP3
+
+ arch/arm/mach-omap2/omap_hwmod.c          | 66 +++++++++++++++++--------------
+ arch/arm/mach-omap2/omap_hwmod.h          |  3 ++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 56 ++++++++++++++++++++++++++
+ 3 files changed, 95 insertions(+), 30 deletions(-)
+
+-- 
+2.6.1
