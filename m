@@ -1,40 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Oct 2015 22:14:11 +0200
-Subject: [PATCH] ARM: meson6: DTS: Fix wrong reg mapping and IRQ numbers
-In-Reply-To: <CAL9uMOHFoZqxdP6e+bb2N0t11P4tsJQHhOTZ-Ch6BA+YNwkG0g@mail.gmail.com>
-References: <1443696760-8316-1-git-send-email-carlo@caione.org>
- <8566547.CSeb89j3FB@wuerfel>
- <CAL9uMOHFoZqxdP6e+bb2N0t11P4tsJQHhOTZ-Ch6BA+YNwkG0g@mail.gmail.com>
-Message-ID: <8116111.hYevUcYBJJ@wuerfel>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Wed, 14 Oct 2015 22:07:21 +0200
+Subject: [PATCH 1/7] ARM: Kconfig: Introduce MACH_STM32F429 flag
+In-Reply-To: <1444853247-31114-1-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1444853247-31114-1-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1444853247-31114-2-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 October 2015 18:04:54 Carlo Caione wrote:
-> On Wed, Oct 14, 2015 at 5:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Saturday 10 October 2015 11:56:23 Carlo Caione wrote:
-> >> On Thu, Oct 1, 2015 at 12:52 PM, Carlo Caione <carlo@caione.org> wrote:
-> >> > From: Carlo Caione <carlo@endlessm.com>
-> >> >
-> >> > The DTS erronously uses the wrong reg mapping and IRQ numbers for some
-> >> > UART, WDT and timer nodes. Fix this.
-> >>
-> >> Hi Arnd,
-> >> if you have no complains could you take this into next/dt?
-> >>
-> >>
-> >
-> > Pulled into next/dt, but please let me know if it should actually go
-> > into 4.3 instead. It looks like a bugfix patch and perhaps also applies
-> > to stable?
-> 
-> It is actually, thank you for the reminder. I can resubmit it with
-> with stable in CC even though I'm pretty sure that ATM the number of
-> people actually using this DTS is dramatically close to 0.
-> 
+This patch introduces the MACH_STM32F429 to make possible to only select
+STM32F429 pinctrl driver.
 
-Ok, I've applied it to the fixes branch now, but not added the
-stable tag.
+By default, all the MACH_STM32Fxxx flags will be set with STM32 defconfig.
 
-Thanks!
+Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+---
+ arch/arm/Kconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-	Arnd
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 72ad724..bf94e54 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -988,6 +988,11 @@ config ARCH_STM32
+ 	help
+ 	  Support for STMicroelectronics STM32 processors.
+ 
++config MACH_STM32F429
++	bool "STMicrolectronics STM32F429"
++	depends on ARCH_STM32
++	default y
++
+ # Definitions to make life easier
+ config ARCH_ACORN
+ 	bool
+-- 
+1.9.1
