@@ -1,79 +1,63 @@
 From: sbranden@broadcom.com (Scott Branden)
-Date: Wed, 14 Oct 2015 12:44:24 -0700
-Subject: [PATCH 2/2] dt-bindings: Add new boards to bcm4708 DT bindings
-In-Reply-To: <20151014153420.GC15160@broadcom.com>
-References: <1443824564-17291-1-git-send-email-jonmason@broadcom.com>
- <1443824564-17291-2-git-send-email-jonmason@broadcom.com>
- <561923BC.5040906@hauke-m.de> <20151013214051.GN12512@broadcom.com>
- <561D87BD.5030405@gmail.com> <20151014153420.GC15160@broadcom.com>
-Message-ID: <561EB098.4090400@broadcom.com>
+Date: Wed, 14 Oct 2015 12:46:19 -0700
+Subject: [PATCH v2 7/7] clk: ns2: add clock support for Broadcom Northstar
+ 2 SoC
+In-Reply-To: <6427519.eIBEvCNlle@wuerfel>
+References: <1444770485-11210-1-git-send-email-jonmason@broadcom.com>
+ <5280890.6npshDUNFZ@wuerfel> <20151013220450.GO12512@broadcom.com>
+ <6427519.eIBEvCNlle@wuerfel>
+Message-ID: <561EB10B.40502@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-Yes, please only add SoC part number compatible strings, not board 
-compatible strings.
-
-On 15-10-14 08:34 AM, Jon Mason wrote:
-> On Tue, Oct 13, 2015 at 03:37:49PM -0700, Florian Fainelli wrote:
->> On 13/10/15 14:40, Jon Mason wrote:
->>> On Sat, Oct 10, 2015 at 04:42:04PM +0200, Hauke Mehrtens wrote:
->>>> On 10/03/2015 12:22 AM, Jon Mason wrote:
->>>>> Add the 4708, 4709, and 953012k SVKs to the the documentation for the
->>>>> Broadcom Northstar device tree bindings.
->>>>>
->>>>> Signed-off-by: Jon Mason <jonmason@broadcom.com>
->>>>> ---
->>>>>   Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt | 7 +++++++
->>>>>   1 file changed, 7 insertions(+)
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
->>>>> index 6b0f49f..bdf4c06 100644
->>>>> --- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
->>>>> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
->>>>
->>>> What should be documented in this file? This is more a question to the
->>>> guys more familiar with arm in Linux. Currently the Linux kernel only
->>>> supports brcm,bcm4708 and all goes back to that one.
->>>
->>> I was under the impression that all boards should be added to these
->>> files.  We have been doing so for Cygnus and NSP.
+On 15-10-13 03:23 PM, Arnd Bergmann wrote:
+> On Tuesday 13 October 2015 18:04:50 Jon Mason wrote:
 >>
->> Tracking exactly which boards are supported by the brcm,bcm4708
->> compatible string might be tedious, I tend to agree with just listing
->> the supported SoCs, and leaving the specific board compatibles to the
->> individual DTS files instead.
+>>> On a related note, I'm seeing problems when CONFIG_CYGNUS is set but
+>>> CONFIG_COMMON_CLK_IPROC is disabled, as that currently leads to a link
+>>> failure.
+>>
+>> I can double check, but it should be on by default when Cygnus is
+>> enabled.  If you send me the error, I'll be happy to fix it.
 >
-> Ok, I'll simply add entries for NS and 4709 to this.
-Good - we have only been adding SoC compatible strings for Cygnus and 
-NSP - not board compatibles.
+>
+> The problem is not that it's off by default but that it can be
+> disabled, so it breaks some 'make randconfig' builds with this
+> message:
+>
+> drivers/built-in.o: In function `cygnus_armpll_init':
+> :(.init.text+0x1d290): undefined reference to `iproc_armpll_setup'
+> drivers/built-in.o: In function `cygnus_genpll_clk_init':
+> :(.init.text+0x1d2c4): undefined reference to `iproc_pll_clk_setup'
+> drivers/built-in.o: In function `cygnus_lcpll0_clk_init':
+> :(.init.text+0x1d304): undefined reference to `iproc_pll_clk_setup'
+> drivers/built-in.o: In function `cygnus_mipipll_clk_init':
+> :(.init.text+0x1d344): undefined reference to `iproc_pll_clk_setup'
+> drivers/built-in.o: In function `cygnus_asiu_init':
+> :(.init.text+0x1d370): undefined reference to `iproc_asiu_setup'
+>
+> My patch fixes it by always selecting COMMON_CLK_IPROC from
+> ARCH_BCM_CYGNUS. I wasn't sure whether you want COMMON_CLK_IPROC
+> to still be user-selectable, so I left that in place. Normally
+> I'd expect it to be a silent option though, that just gets
+> implicitly enabled whenever a platform that needs it is built
+> into the kernel.
+COMMON_CLK_IPROC can be a silent option and selected as Arnd has done below.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Scott Branden <sbranden@broadcom.com>
 
 >
-> Thanks,
-> Jon
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index 1319c3c14327..35234e563cd8 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -29,6 +29,7 @@ config ARCH_BCM_IPROC
+>   config ARCH_BCM_CYGNUS
+>   	bool "Broadcom Cygnus Support" if ARCH_MULTI_V7
+>   	select ARCH_BCM_IPROC
+> +	select COMMON_CLK_IPROC
+>   	help
+>   	  Enable support for the Cygnus family,
+>   	  which includes the following variants:
 >
->>
->>>
->>> Thanks,
->>> Jon
->>>
->>>>
->>>>> @@ -5,4 +5,11 @@ Boards with the BCM4708 SoC shall have the following properties:
->>>>>
->>>>>   Required root node property:
->>>>>
->>>>> +bcm94709
->>>>>   compatible = "brcm,bcm4708";
->>>>> +
->>>>> +bcm94709
->>>>> +compatible = "brcm,bcm4709", "brcm,bcm4708";
->>>>> +
->>>>> +bcm953012k
->>>>> +compatible = "brcm,bcm5301k", "brcm,bcm4708";
->>>>>
->>>>
->>
->>
->> --
->> Florian
