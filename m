@@ -1,50 +1,50 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 14 Oct 2015 16:55:23 +0100
-Subject: [PATCH v3 1/3] dt-bindings: Document the STM32 HW RNG bindings
-In-Reply-To: <1444838125-3422-1-git-send-email-daniel.thompson@linaro.org>
-References: <1443904519-24012-1-git-send-email-daniel.thompson@linaro.org>
- <1444838125-3422-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1444838125-3422-2-git-send-email-daniel.thompson@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Oct 2015 17:56:27 +0200
+Subject: [PATCH] ARM64: dts: vexpress: Use a symlink to
+ vexpress-v2m-rs1.dtsi from arch=arm
+In-Reply-To: <20151012153750.GE7452@leverpostej>
+References: <1444046032-31310-1-git-send-email-ian.campbell@citrix.com>
+ <20151012153750.GE7452@leverpostej>
+Message-ID: <19050561.IRVkypnnKH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds documentation of device tree bindings for the STM32 hardware
-random number generator.
+On Monday 12 October 2015 16:37:50 Mark Rutland wrote:
+> On Mon, Oct 05, 2015 at 12:53:52PM +0100, Ian Campbell wrote:
+> > Commit 9ccd608070b6 "arm64: dts: add device tree for ARM SMM-A53x2 on
+> > LogicTile Express 20MG" added a new dts file to arch/arm64 which
+> > included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
+> > .dtsi supplied by arch/arm.
+> > 
+> > Unfortunately this causes some issues for the split device tree
+> > repository[0], since things get moved around there. In that context
+> > the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
+> > while the include is at src/arm/vexpress-v2m-rs1.dtsi.
+> > 
+> > The sharing of the .dtsi is legitimate since the baseboard is the same
+> > for various vexpress systems whatever processor they use.
+> > 
+> > Previously I attempted to resolve this by creating a shared location
+> > for such things but we have been unable to come to a consensus on
+> > where that should be.
+> > 
+> > Instead this patch simply replaces the use of ../../ in the dts
+> > /include/ with a symlink in arch/arm64/boot/dts/arm pointing to the
+> > file arch/arm/boot/dts.
+> > 
+> > Since the split device tree repo will shortly be required to flatten
+> > symlinks for other reasons this will cause the dtsi file to appear in
+> > both src/arm and src/arm64 in the split repo, which is an improvement
+> > on not building for arm64 now.
+> > 
+> > [0] https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
+> > 
+> > Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Acked-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/rng/st,stm32-rng.txt        | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/rng/st,stm32-rng.txt
 
-diff --git a/Documentation/devicetree/bindings/rng/st,stm32-rng.txt b/Documentation/devicetree/bindings/rng/st,stm32-rng.txt
-new file mode 100644
-index 000000000000..47f04176f93b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rng/st,stm32-rng.txt
-@@ -0,0 +1,21 @@
-+STMicroelectronics STM32 HW RNG
-+===============================
-+
-+The STM32 hardware random number generator is a simple fixed purpose IP and
-+is fully separated from other crypto functions.
-+
-+Required properties:
-+
-+- compatible : Should be "st,stm32-rng"
-+- reg : Should be register base and length as documented in the datasheet
-+- interrupts : The designated IRQ line for the RNG
-+- clocks : The clock needed to enable the RNG
-+
-+Example:
-+
-+	rng: rng at 50060800 {
-+		compatible = "st,stm32-rng";
-+		reg = <0x50060800 0x400>;
-+		interrupts = <80>;
-+		clocks = <&rcc 0 38>;
-+	};
--- 
-2.4.3
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> 
+
+Applied to next/dt, thanks!
+
+	Arnd
