@@ -1,53 +1,31 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 14 Oct 2015 20:11:05 +0530
-Subject: [PATCH 02/13] dmaengine: edma: Optimize memcpy operation
-In-Reply-To: <1444828344-21378-3-git-send-email-peter.ujfalusi@ti.com>
-References: <1444828344-21378-1-git-send-email-peter.ujfalusi@ti.com>
- <1444828344-21378-3-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20151014144105.GV27370@localhost>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 14 Oct 2015 16:36:28 +0200
+Subject: [PATCH] arm: pxa: raumfeld: make some variables static
+In-Reply-To: <561E2063.8030905@zonque.org> (Daniel Mack's message of "Wed, 14
+ Oct 2015 11:29:07 +0200")
+References: <1444814866-4639-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <561E2063.8030905@zonque.org>
+Message-ID: <877fmp4ivn.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 04:12:13PM +0300, Peter Ujfalusi wrote:
-> @@ -1320,41 +1317,92 @@ static struct dma_async_tx_descriptor *edma_prep_dma_memcpy(
->  	struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
->  	size_t len, unsigned long tx_flags)
->  {
-> -	int ret;
-> +	int ret, nslots;
->  	struct edma_desc *edesc;
->  	struct device *dev = chan->device->dev;
->  	struct edma_chan *echan = to_edma_chan(chan);
-> -	unsigned int width;
-> +	unsigned int width, pset_len;
->  
->  	if (unlikely(!echan || !len))
->  		return NULL;
->  
-> -	edesc = kzalloc(sizeof(*edesc) + sizeof(edesc->pset[0]), GFP_ATOMIC);
-> +	if (len < SZ_64K) {
-> +		/*
-> +		 * Transfer size less than 64K can be handled with one paRAM
-> +		 * slot. ACNT = length
-> +		 */
-> +		width = len;
-> +		pset_len = len;
-> +		nslots = 1;
-> +	} else {
-> +		/*
-> +		 * Transfer size bigger than 64K will be handled with maximum of
-> +		 * two paRAM slots.
-> +		 * slot1: ACNT = 32767, length1: (length / 32767)
-> +		 * slot2: the remaining amount of data.
-> +		 */
-> +		width = SZ_32K - 1;
-> +		pset_len = rounddown(len, width);
-> +		/* One slot is enough for lengths multiple of (SZ_32K -1) */
+Daniel Mack <daniel@zonque.org> writes:
 
-Hmm so does this mean if I have 140K transfer, it will do two 64K for 1st
-slot and 12K in second slot ?
+> On 10/14/2015 11:27 AM, Uwe Kleine-K?nig wrote:
+>> This fixes the following sparse warnings:
+>> 
+>> 	arch/arm/mach-pxa/raumfeld.c:510:24: warning: symbol 'raumfeld_w1_gpio_device' was not declared. Should it be static?
+>> 	arch/arm/mach-pxa/raumfeld.c:632:31: warning: symbol 'raumfeld_spi_platform_data' was not declared. Should it be static?
+>> 	arch/arm/mach-pxa/raumfeld.c:851:28: warning: symbol 'audio_va_initdata' was not declared. Should it be static?
+>> 	arch/arm/mach-pxa/raumfeld.c:883:28: warning: symbol 'audio_dummy_initdata' was not declared. Should it be static?
+>> 	arch/arm/mach-pxa/raumfeld.c:931:28: warning: symbol 'max8660_v6_subdev_data' was not declared. Should it be static?
+>> 
+>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>
+> Acked-by: Daniel Mack <daniel@zonque.org>
+Queued into pxa/for-next, thanks.
 
-Is there a limit on 'blocks' of 64K we can do here?
+Cheers.
 
--- 
-~Vinod
+--
+Robert
