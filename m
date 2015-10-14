@@ -1,15 +1,33 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 14 Oct 2015 17:12:48 -0500
-Subject: [GIT PULL] qcom dt changes for 4.4 *RESEND*
-In-Reply-To: <1444860622-8225-1-git-send-email-agross@codeaurora.org>
-References: <1444860622-8225-1-git-send-email-agross@codeaurora.org>
-Message-ID: <20151014221248.GB27483@qualcomm.com>
+Date: Wed, 14 Oct 2015 17:13:44 -0500
+Subject: [GIT PULL] qcom defconfig for 4.4 *RESEND*
+Message-ID: <1444860824-9440-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Incorrect subject.  Please disregard this one.
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+
+are available in the git repository at:
+
+  git://codeaurora.org/quic/kernel/agross-msm.git tags/qcom-defconfig-for-4.4
+
+for you to fetch changes up to 4e7fb93081f8f2ac9f190e8da7507956d3f3a936:
+
+  ARM: multi_v7_defconfig: Enable QCOM SMD/RPM (2015-10-08 15:59:46 -0500)
+
+----------------------------------------------------------------
+Qualcomm ARM Based defconfig Updates for v4.4
+
+* Enable QCOM SMD/RPM in multi_v7_defconfig
+* Enable QCOM SMD/RPM in qcom_defconfig
+
+----------------------------------------------------------------
+Andy Gross (2):
+      ARM: qcom_defconfig: Enable SMD-RPM regulators
+      ARM: multi_v7_defconfig: Enable QCOM SMD/RPM
+
+ arch/arm/configs/multi_v7_defconfig |    5 +++++
+ arch/arm/configs/qcom_defconfig     |    8 +++++---
+ 2 files changed, 10 insertions(+), 3 deletions(-)
