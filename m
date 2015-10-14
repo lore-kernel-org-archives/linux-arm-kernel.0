@@ -1,27 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Oct 2015 17:51:51 +0200
-Subject: [PATCH] ARM: meson6: DTS: Fix wrong reg mapping and IRQ numbers
-In-Reply-To: <CAOQ7t2bAQ8RrfssFzAM6m=HGVaQDfcmmqPvmwX4wiAJig9ZVJg@mail.gmail.com>
-References: <1443696760-8316-1-git-send-email-carlo@caione.org>
- <CAOQ7t2bAQ8RrfssFzAM6m=HGVaQDfcmmqPvmwX4wiAJig9ZVJg@mail.gmail.com>
-Message-ID: <8566547.CSeb89j3FB@wuerfel>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 14 Oct 2015 16:53:33 +0100
+Subject: [PATCHv3 10/11] arm64: Add 16K page size support
+In-Reply-To: <561E7788.6080900@arm.com>
+References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
+ <1444821634-1689-11-git-send-email-suzuki.poulose@arm.com>
+ <561E7788.6080900@arm.com>
+Message-ID: <561E7A7D.3020207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 10 October 2015 11:56:23 Carlo Caione wrote:
-> On Thu, Oct 1, 2015 at 12:52 PM, Carlo Caione <carlo@caione.org> wrote:
-> > From: Carlo Caione <carlo@endlessm.com>
-> >
-> > The DTS erronously uses the wrong reg mapping and IRQ numbers for some
-> > UART, WDT and timer nodes. Fix this.
-> 
-> Hi Arnd,
-> if you have no complains could you take this into next/dt?
-> 
-> 
+On 14/10/15 16:40, Jeremy Linton wrote:
+> On 10/14/2015 06:20 AM, Suzuki K. Poulose wrote:
+>> diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
+>> index da32354..736ed4c 100644
+>> --- a/arch/arm64/include/asm/page.h
+>> +++ b/arch/arm64/include/asm/page.h
+>> @@ -24,6 +24,9 @@
+>>   #ifdef CONFIG_ARM64_64K_PAGES
+>>   #define PAGE_SHIFT        16
+>>   #define CONT_SHIFT        5
+>> +#elif defined(CONFIG_ARM64_16K_PAGES)
+>> +#define PAGE_SHIFT        14
+>> +#define CONT_SHIFT        9
+>>   #else
+>>   #define PAGE_SHIFT        12
+>>   #define CONT_SHIFT        4
+>
+> Suzuki,
+>
+> Is CONT_SHIFT correct? I thought it should be 7? The ARM-ARM says that a contiguous 3rd level lookup is 128 entries.
+>
 
-Pulled into next/dt, but please let me know if it should actually go
-into 4.3 instead. It looks like a bugfix patch and perhaps also applies
-to stable?
+Err, you are right. I tested it with 9 and I still got contiguous
+mappings. May be because we anyway have 7 contiguous bits and the
+kernel text is read-only. I will fix that, thanks for spotting.
 
-	Arnd
+Suzuki
