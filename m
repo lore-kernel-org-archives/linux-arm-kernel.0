@@ -1,85 +1,85 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 14 Oct 2015 16:25:51 -0700
-Subject: [PATCH V2 1/6] pci: msi: Add support to query MSI domain for pci
- device
+Date: Wed, 14 Oct 2015 16:25:52 -0700
+Subject: [PATCH V2 2/6] acpi: pci: Setup MSI domain for ACPI based pci devices
 In-Reply-To: <1444865156-9870-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1444865156-9870-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1444865156-9870-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1444865156-9870-3-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces an interface for irqchip to register a callback,
-to provide a way to determine appropriate MSI domain for a pci device.
+This patch introduces pci_host_bridge_acpi_msi_domain(), which returns
+the MSI domain of the specified PCI host bridge with DOMAIN_BUS_PCI_MSI
+bus token. Then, it is assigned to pci device.
 
 Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 ---
- drivers/pci/msi.c   | 30 ++++++++++++++++++++++++++++++
- include/linux/msi.h |  7 +++++++
- 2 files changed, 37 insertions(+)
+ drivers/pci/pci-acpi.c | 13 +++++++++++++
+ drivers/pci/probe.c    |  2 ++
+ include/linux/pci.h    |  7 +++++++
+ 3 files changed, 22 insertions(+)
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index ddd59fe..2c87843 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -1327,4 +1327,34 @@ struct irq_domain *pci_msi_create_default_irq_domain(struct fwnode_handle *fwnod
+diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
+index a32ba75..0e21ef4 100644
+--- a/drivers/pci/pci-acpi.c
++++ b/drivers/pci/pci-acpi.c
+@@ -9,7 +9,9 @@
  
- 	return domain;
+ #include <linux/delay.h>
+ #include <linux/init.h>
++#include <linux/irqdomain.h>
+ #include <linux/pci.h>
++#include <linux/msi.h>
+ #include <linux/pci_hotplug.h>
+ #include <linux/module.h>
+ #include <linux/pci-aspm.h>
+@@ -689,6 +691,17 @@ static struct acpi_bus_type acpi_pci_bus = {
+ 	.cleanup = pci_acpi_cleanup,
+ };
+ 
++struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
++{
++	struct irq_domain *dom = NULL;
++	struct fwnode_handle *fwnode = pci_msi_get_fwnode(&bus->dev);
++
++	if (fwnode)
++		dom = irq_find_matching_fwnode(fwnode,
++					       DOMAIN_BUS_PCI_MSI);
++	return dom;
++}
++
+ static int __init acpi_pci_init(void)
+ {
+ 	int ret;
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 0dbc7fb..bea1840 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -671,6 +671,8 @@ static struct irq_domain *pci_host_bridge_msi_domain(struct pci_bus *bus)
+ 	 * should be called from here.
+ 	 */
+ 	d = pci_host_bridge_of_msi_domain(bus);
++	if (!d)
++		d = pci_host_bridge_acpi_msi_domain(bus);
+ 
+ 	return d;
  }
-+
-+static struct fwnode_handle *(*pci_msi_get_fwnode_cb)(struct device *dev);
-+
-+/**
-+ * pci_msi_register_fwnode_provider - Register callback to retrieve fwnode
-+ * @fn:		The interrupt domain to retrieve
-+ *
-+ * This should be called by irqchip driver, which is the parent of
-+ * the MSI domain to provide callback interface to query fwnode.
-+ */
-+void
-+pci_msi_register_fwnode_provider(struct fwnode_handle *(*fn)(struct device *))
-+{
-+	pci_msi_get_fwnode_cb = fn;
-+}
-+
-+/**
-+ * pci_msi_get_fwnode - Query fwnode for MSI controller of the @dev
-+ * @dev:	The device that we try to query MSI domain token for
-+ *
-+ * This is used to query MSI domain token when setting up MSI domain
-+ * for a device. Returns fwnode_handle * if token found / NULL if not found
-+ */
-+struct fwnode_handle *pci_msi_get_fwnode(struct device *dev)
-+{
-+	if (pci_msi_get_fwnode_cb)
-+		return pci_msi_get_fwnode_cb(dev);
-+
-+	return NULL;
-+}
- #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 32a24b9..ceaebf6 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -3,6 +3,7 @@
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index e90eb22..4a7f6a9 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1925,6 +1925,13 @@ static inline struct irq_domain *
+ pci_host_bridge_of_msi_domain(struct pci_bus *bus) { return NULL; }
+ #endif  /* CONFIG_OF */
  
- #include <linux/kobject.h>
- #include <linux/list.h>
-+#include <linux/fwnode.h>
- 
- struct msi_msg {
- 	u32	address_lo;	/* low 32 bits of msi message address */
-@@ -294,6 +295,12 @@ irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
- 					  struct msi_desc *desc);
- int pci_msi_domain_check_cap(struct irq_domain *domain,
- 			     struct msi_domain_info *info, struct device *dev);
++#ifdef CONFIG_ACPI
++struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus);
++#else
++static inline struct irq_domain *
++pci_host_bridge_acpi_msi_domain(struct pci_bus *bus) { return NULL; }
++#endif
 +
-+void
-+pci_msi_register_fwnode_provider(struct fwnode_handle *(*fn)(struct device *));
-+
-+struct fwnode_handle *pci_msi_get_fwnode(struct device *dev);
-+
- #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
- 
- #endif /* LINUX_MSI_H */
+ #ifdef CONFIG_EEH
+ static inline struct eeh_dev *pci_dev_to_eeh_dev(struct pci_dev *pdev)
+ {
 -- 
 2.1.0
