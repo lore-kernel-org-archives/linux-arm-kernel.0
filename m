@@ -1,52 +1,37 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 14 Oct 2015 17:04:55 +0100
-Subject: [PATCH] hwrng: stm32 - Fix build with CONFIG_PM
-In-Reply-To: <1443904519-24012-1-git-send-email-daniel.thompson@linaro.org>
-References: <1443904519-24012-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1444838695-7182-1-git-send-email-daniel.thompson@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 14 Oct 2015 17:12:14 +0100
+Subject: arm64 memcpy_{from|to}io and memset_io
+In-Reply-To: <CAC8NTUUgQk0CNaBj2p=38U+yyFWE6ZQkSgs1KA=MviQg3g_X=Q@mail.gmail.com>
+References: <CAC8NTUUgQk0CNaBj2p=38U+yyFWE6ZQkSgs1KA=MviQg3g_X=Q@mail.gmail.com>
+Message-ID: <20151014161213.GH4239@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit c6a97c42e399 ("hwrng: stm32 - add support for STM32 HW RNG")
-was inadequately tested (actually it was tested quite hard so
-incompetent would be a better description that inadequate) and does
-not compile on platforms with CONFIG_PM set.
+On Tue, Oct 13, 2015 at 11:12:18PM -0700, Radha Mohan wrote:
+> I see that the memcpy_{from|to}io and memset_io are not in an
+> optimized manner. I guess these are just a copy from
+> arch/arm/include/asm/io.h where there could be problem with different
+> implementations.
 
-Fix this.
+I think you may be looking at an older kernel version. In the latest
+mainline, memcpy_*io functions are more optimised in the sense that they
+use 64-bit accesses if the alignment permits.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
+> Do we still need these to be byte write ?
 
-Notes:
-    Herbert: This is the diff between v2 and v3 of my STM32 HW RNG
-             patch. This is partly reassurance of what has changed
-             and also "just in case" you prefer to simply fix the
-    	 problem.
+No but see above.
 
- drivers/char/hw_random/stm32-rng.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> Can we convert them to use a more optimized memcpy ?
 
-diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
-index 7fa3656a5fc5..92a810648bd0 100644
---- a/drivers/char/hw_random/stm32-rng.c
-+++ b/drivers/char/hw_random/stm32-rng.c
-@@ -160,7 +160,7 @@ static int stm32_rng_probe(struct platform_device *ofdev)
- #ifdef CONFIG_PM
- static int stm32_rng_runtime_suspend(struct device *dev)
- {
--	struct stm32_rng_private *priv = dev_get_drvdata(pdev);
-+	struct stm32_rng_private *priv = dev_get_drvdata(dev);
+There is a risk to converting them to something like memcpy() as the
+latter does not guarantee aligned accesses. Alignment is mandatory for
+Device memory access.
 
- 	stm32_rng_cleanup(&priv->rng);
+> We have some drivers, like framebuffer driver using these functions
+> and end up writing byte-by-byte. This causes a very poor VGA
+> performance.
 
-@@ -169,7 +169,7 @@ static int stm32_rng_runtime_suspend(struct device *dev)
+You probably have an old kernel version.
 
- static int stm32_rng_runtime_resume(struct device *dev)
- {
--	struct stm32_rng_private *priv = dev_get_drvdata(pdev);
-+	struct stm32_rng_private *priv = dev_get_drvdata(dev);
-
- 	return stm32_rng_init(&priv->rng);
- }
---
-2.4.3
+-- 
+Catalin
