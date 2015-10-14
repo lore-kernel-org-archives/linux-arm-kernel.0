@@ -1,232 +1,41 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Wed, 14 Oct 2015 21:55:28 +0900
-Subject: [PATCH v4 2/2] arm64: Expand the stack trace feature to support
- IRQ stack
-In-Reply-To: <EB44D363-ACBA-48DB-B4EA-EDE1B87B99C8@gmail.com>
-References: <1444231692-32722-1-git-send-email-jungseoklee85@gmail.com>
- <1444231692-32722-3-git-send-email-jungseoklee85@gmail.com>
- <5617CE26.10604@arm.com> <561E009B.3070001@linaro.org>
- <EB44D363-ACBA-48DB-B4EA-EDE1B87B99C8@gmail.com>
-Message-ID: <C0BCEB8B-2939-45AF-ACB4-BBE369B67699@gmail.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 14 Oct 2015 14:56:20 +0200
+Subject: [PATCH v5 0/6] MT8173 IOMMU SUPPORT
+In-Reply-To: <1444357388-30257-1-git-send-email-yong.wu@mediatek.com>
+References: <1444357388-30257-1-git-send-email-yong.wu@mediatek.com>
+Message-ID: <20151014125620.GQ27420@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 14, 2015, at 9:24 PM, Jungseok Lee wrote:
-> On Oct 14, 2015, at 4:13 PM, AKASHI Takahiro wrote:
->> On 10/09/2015 11:24 PM, James Morse wrote:
->>> Hi Jungseok,
->>> 
->>> On 07/10/15 16:28, Jungseok Lee wrote:
->>>> Currently, a call trace drops a process stack walk when a separate IRQ
->>>> stack is used. It makes a call trace information much less useful when
->>>> a system gets paniked in interrupt context.
->>> 
->>> panicked
->>> 
->>>> This patch addresses the issue with the following schemes:
->>>> 
->>>>  - Store aborted stack frame data
->>>>  - Decide whether another stack walk is needed or not via current sp
->>>>  - Loosen the frame pointer upper bound condition
->>> 
->>> It may be worth merging this patch with its predecessor - anyone trying to
->>> bisect a problem could land between these two patches, and spend time
->>> debugging the truncated call traces.
->>> 
->>> 
->>>> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
->>>> index 6ea82e8..e5904a1 100644
->>>> --- a/arch/arm64/include/asm/irq.h
->>>> +++ b/arch/arm64/include/asm/irq.h
->>>> @@ -2,13 +2,25 @@
->>>> #define __ASM_IRQ_H
->>>> 
->>>> #include <linux/irqchip/arm-gic-acpi.h>
->>>> +#include <asm/stacktrace.h>
->>>> 
->>>> #include <asm-generic/irq.h>
->>>> 
->>>> struct irq_stack {
->>>> 	void *stack;
->>>> +	struct stackframe frame;
->>>> };
->>>> 
->>>> +DECLARE_PER_CPU(struct irq_stack, irq_stacks);
->>> 
->>> Good idea, storing this in the per-cpu data makes it immune to stack
->>> corruption.
->> 
->> Is this the only reason that you have a dummy stack frame in per-cpu data?
->> By placing this frame in an interrupt stack, I think, we will be able to eliminate
->> changes in dump_stace(). and
->> 
->>> 
->>>> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
->>>> index 407991b..5124649 100644
->>>> --- a/arch/arm64/kernel/stacktrace.c
->>>> +++ b/arch/arm64/kernel/stacktrace.c
->>>> @@ -43,7 +43,27 @@ int notrace unwind_frame(struct stackframe *frame)
->>>> 	low  = frame->sp;
->>>> 	high = ALIGN(low, THREAD_SIZE);
->>>> 
->>>> -	if (fp < low || fp > high - 0x18 || fp & 0xf)
->>>> +	/*
->>>> +	 * A frame pointer would reach an upper bound if a prologue of the
->>>> +	 * first function of call trace looks as follows:
->>>> +	 *
->>>> +	 *	stp     x29, x30, [sp,#-16]!
->>>> +	 *	mov     x29, sp
->>>> +	 *
->>>> +	 * Thus, the upper bound is (top of stack - 0x20) with consideration
->>> 
->>> The terms 'top' and 'bottom' of the stack are confusing, your 'top' appears
->>> to be the highest address, which is used first, making it the bottom of the
->>> stack.
->>> 
->>> I would try to use the terms low/est and high/est, in keeping with the
->>> variable names in use here.
->>> 
->>> 
->>>> +	 * of a 16-byte empty space in THREAD_START_SP.
->>>> +	 *
->>>> +	 * The value, 0x20, however, does not cover all cases as interrupts
->>>> +	 * are handled using a separate stack. That is, a call trace can start
->>>> +	 * from elx_irq exception vectors. The symbols could not be promoted
->>>> +	 * to candidates for a stack trace under the restriction, 0x20.
->>>> +	 *
->>>> +	 * The scenario is handled without complexity as 1) considering
->>>> +	 * (bottom of stack + THREAD_START_SP) as a dummy frame pointer, the
->>>> +	 * content of which is 0, and 2) allowing the case, which changes
->>>> +	 * the value to 0x10 from 0x20.
->>> 
->>> Where has 0x20 come from? The old value was 0x18.
->>> 
->>> My understanding is the highest part of the stack looks like this:
->>> high        [ off-stack ]
->>> high - 0x08 [ left free by THREAD_START_SP ]
->>> high - 0x10 [ left free by THREAD_START_SP ]
->>> high - 0x18 [#1 x30 ]
->>> high - 0x20 [#1 x29 ]
->>> 
->>> So the condition 'fp > high - 0x18' prevents returning either 'left free'
->>> address, or off-stack-value as a frame. Changing it to 'fp > high - 0x10'
->>> allows the first half of that reserved area to be a valid stack frame.
->>> 
->>> This change is breaking perf using incantations [0] and [1]:
->>> 
->>> Before, with just patch 1/2:
->>>                  ---__do_softirq
->>>                     |
->>>                     |--92.95%-- __handle_domain_irq
->>>                     |          __irqentry_text_start
->>>                     |          el1_irq
->>>                     |
->>> 
->>> After, with both patches:
->>>                 ---__do_softirq
->>>                    |
->>>                    |--83.83%-- __handle_domain_irq
->>>                    |          __irqentry_text_start
->>>                    |          el1_irq
->>>                    |          |
->>>                    |          |--99.39%-- 0x400008040d00000c
->>>                    |           --0.61%-- [...]
->>>                    |
->> 
->> This also shows that walk_stackframe() doesn't walk through a process stack.
->> Now I'm trying the following hack on top of Jungseok's patch.
->> (It doesn't traverse from an irq stack to an process stack yet. I need modify
->> unwind_frame().)
+On Fri, Oct 09, 2015 at 10:23:02AM +0800, Yong Wu wrote:
+> Yong Wu (6):
+>   dt-bindings: iommu: Add binding for mediatek IOMMU
+>   dt-bindings: mediatek: Add smi dts binding
+>   iommu: add ARM short descriptor page table allocator
+>   memory: mediatek: Add SMI driver
+>   iommu/mediatek: Add mt8173 IOMMU driver
+>   dts: mt8173: Add iommu/smi nodes for mt8173
 > 
-> I've got a difference between perf and dump_backtrace() as reviewing perf call
-> chain operation. Perf relies on walk_stackframe(), but dump_backtrace() does not.
-> That is, a symbol is printed out *before* unwind_frame() call in case of perf.
-> By contrast, dump_backtrace() records a symbol *after* unwind_frame(). I think
-> perf behavior is correct since frame.pc is retrieved from a valid stack frame.
-> 
-> So, the following diff is a prerequisite. It looks reasonable to remove dump_mem()
-> call since frame.sp is calculated incorrectly now. If accepted, dump_backtrace()
-> could utilize walk_stackframe(), which simplifies the code.
-> 
-> ----8<----
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index f93aae5..e18be43 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -103,12 +103,15 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
->        set_fs(fs);
-> }
-> 
-> -static void dump_backtrace_entry(unsigned long where, unsigned long stack)
-> +static void dump_backtrace_entry(unsigned long where)
-> {
-> +       /*
-> +        * PC has a physical address when MMU is disabled.
-> +        */
-> +       if (!kernel_text_address(where))
-> +               where = (unsigned long)phys_to_virt(where);
-> +
->        print_ip_sym(where);
-> -       if (in_exception_text(where))
-> -               dump_mem("", "Exception stack", stack,
-> -                        stack + sizeof(struct pt_regs), false);
-> }
-> 
-> static void dump_instr(const char *lvl, struct pt_regs *regs)
-> @@ -172,12 +175,17 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
->        pr_emerg("Call trace:\n");
->        while (1) {
->                unsigned long where = frame.pc;
-> +               unsigned long stack;
->                int ret;
-> 
-> +               dump_backtrace_entry(where);
->                ret = unwind_frame(&frame);
->                if (ret < 0)
->                        break;
-> -               dump_backtrace_entry(where, frame.sp);
-> +               stack = frame.sp;
-> +               if (in_exception_text(where))
-> +                       dump_mem("", "Exception stack", stack,
-> +                                stack + sizeof(struct pt_regs), false);
->        }
-> }
-> ----8<----
-> 
->> Thanks,
->> -Takahiro AKASHI
->> ----8<----
->> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> index 650cc05..5fbd1ea 100644
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -185,14 +185,12 @@ alternative_endif
->> 	mov	x23, sp
->> 	and	x23, x23, #~(THREAD_SIZE - 1)
->> 	cmp	x20, x23			// check irq re-enterance
->> +	mov	x19, sp
->> 	beq	1f
->> -	str	x29, [x19, #IRQ_FRAME_FP]
->> -	str	x21, [x19, #IRQ_FRAME_SP]
->> -	str	x22, [x19, #IRQ_FRAME_PC]
->> -	mov	x29, x24
->> -1:	mov	x19, sp
->> -	csel	x23, x19, x24, eq		// x24 = top of irq stack
->> -	mov	sp, x23
->> +	mov	sp, x24				// x24 = top of irq stack
->> +	stp	x29, x22, [sp, #-32]!
->> +	mov	x29, sp
->> +1:
->> 	.endm
->> 
->> 	/*
-> 
-> Is it possible to decide which stack is used without aborted SP information?
+>  .../devicetree/bindings/iommu/mediatek,iommu.txt   |  61 ++
+>  .../memory-controllers/mediatek,smi-larb.txt       |  25 +
+>  .../bindings/memory-controllers/mediatek,smi.txt   |  24 +
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  81 ++
+>  drivers/iommu/Kconfig                              |  33 +
+>  drivers/iommu/Makefile                             |   2 +
+>  drivers/iommu/io-pgtable-arm-short.c               | 827 +++++++++++++++++++++
+>  drivers/iommu/io-pgtable-arm.c                     |   3 -
+>  drivers/iommu/io-pgtable.c                         |   3 +
+>  drivers/iommu/io-pgtable.h                         |  18 +-
+>  drivers/iommu/mtk_iommu.c                          | 767 +++++++++++++++++++
+>  drivers/memory/Kconfig                             |   8 +
+>  drivers/memory/Makefile                            |   1 +
+>  drivers/memory/mtk-smi.c                           | 274 +++++++
+>  include/dt-bindings/memory/mt8173-larb-port.h      | 105 +++
+>  include/soc/mediatek/smi.h                         |  60 ++
 
-We could know which stack is used via current SP, but how could we decide
-a variable 'low' in unwind_frame() when walking a process stack?
+So this contains not only IOMMU code. Are the patches dependent on each
+other or can the iommu parts be merged independently?
 
-Sorry for confusion.
 
-Best Regards
-Jungseok Lee
+
+	Joerg
