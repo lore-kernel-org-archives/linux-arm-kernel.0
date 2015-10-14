@@ -1,85 +1,35 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 14 Oct 2015 14:42:57 +0300
-Subject: [PATCH v5 15/24] dmaengine: edma: Use dev_dbg instead pr_debug
-In-Reply-To: <1444822986-20562-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1444822986-20562-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1444822986-20562-16-git-send-email-peter.ujfalusi@ti.com>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Wed, 14 Oct 2015 20:01:06 +0800
+Subject: [RFC] arm64: ioremap: add ioremap_cache macro
+In-Reply-To: <5136228.H5nKeesgmE@wuerfel>
+References: <1444616898-5057-1-git-send-email-yalin.wang2010@gmail.com>
+ <20151013152011.GE11573@e104818-lin.cambridge.arm.com>
+ <2731BCF2-D0C0-4B77-A59F-FF3AB2A725D6@gmail.com> <5136228.H5nKeesgmE@wuerfel>
+Message-ID: <05C9B1A1-91F1-48C2-A6BC-CCB1585A2B77@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have access to dev, so it is better to use the dev_dbg for debug prints.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- drivers/dma/edma.c | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index a9fe5c92451d..08f9bd0aa0b3 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -676,23 +676,23 @@ static int edma_start(struct edma_cc *ecc, unsigned channel)
- 
- 		/* EDMA channels without event association */
- 		if (test_bit(channel, ecc->edma_unused)) {
--			pr_debug("EDMA: ESR%d %08x\n", j,
--				 edma_shadow0_read_array(ecc, SH_ESR, j));
-+			dev_dbg(ecc->dev, "ESR%d %08x\n", j,
-+				edma_shadow0_read_array(ecc, SH_ESR, j));
- 			edma_shadow0_write_array(ecc, SH_ESR, j, mask);
- 			return 0;
- 		}
- 
- 		/* EDMA channel with event association */
--		pr_debug("EDMA: ER%d %08x\n", j,
--			 edma_shadow0_read_array(ecc, SH_ER, j));
-+		dev_dbg(ecc->dev, "ER%d %08x\n", j,
-+			edma_shadow0_read_array(ecc, SH_ER, j));
- 		/* Clear any pending event or error */
- 		edma_write_array(ecc, EDMA_ECR, j, mask);
- 		edma_write_array(ecc, EDMA_EMCR, j, mask);
- 		/* Clear any SER */
- 		edma_shadow0_write_array(ecc, SH_SECR, j, mask);
- 		edma_shadow0_write_array(ecc, SH_EESR, j, mask);
--		pr_debug("EDMA: EER%d %08x\n", j,
--			 edma_shadow0_read_array(ecc, SH_EER, j));
-+		dev_dbg(ecc->dev, "EER%d %08x\n", j,
-+			edma_shadow0_read_array(ecc, SH_EER, j));
- 		return 0;
- 	}
- 
-@@ -730,8 +730,8 @@ static void edma_stop(struct edma_cc *ecc, unsigned channel)
- 		/* clear possibly pending completion interrupt */
- 		edma_shadow0_write_array(ecc, SH_ICR, j, mask);
- 
--		pr_debug("EDMA: EER%d %08x\n", j,
--			 edma_shadow0_read_array(ecc, SH_EER, j));
-+		dev_dbg(ecc->dev, "EER%d %08x\n", j,
-+			edma_shadow0_read_array(ecc, SH_EER, j));
- 
- 		/* REVISIT:  consider guarding against inappropriate event
- 		 * chaining by overwriting with dummy_paramset.
-@@ -800,8 +800,8 @@ static int edma_trigger_channel(struct edma_cc *ecc, unsigned channel)
- 
- 	edma_shadow0_write_array(ecc, SH_ESR, (channel >> 5), mask);
- 
--	pr_debug("EDMA: ESR%d %08x\n", (channel >> 5),
--		 edma_shadow0_read_array(ecc, SH_ESR, (channel >> 5)));
-+	dev_dbg(ecc->dev, "ESR%d %08x\n", (channel >> 5),
-+		edma_shadow0_read_array(ecc, SH_ESR, (channel >> 5)));
- 	return 0;
- }
- 
-@@ -831,8 +831,8 @@ static void edma_clean_channel(struct edma_cc *ecc, unsigned channel)
- 		int j = (channel >> 5);
- 		unsigned int mask = BIT(channel & 0x1f);
- 
--		pr_debug("EDMA: EMR%d %08x\n", j,
--			 edma_read_array(ecc, EDMA_EMR, j));
-+		dev_dbg(ecc->dev, "EMR%d %08x\n", j,
-+			edma_read_array(ecc, EDMA_EMR, j));
- 		edma_shadow0_write_array(ecc, SH_ECR, j, mask);
- 		/* Clear the corresponding EMR bits */
- 		edma_write_array(ecc, EDMA_EMCR, j, mask);
--- 
-2.6.1
+> On Oct 14, 2015, at 16:23, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> On Wednesday 14 October 2015 10:41:26 yalin wang wrote:
+> 
+>>> On Oct 13, 2015, at 23:20, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>>>> I'm not sure we want this. See:
+>>>> 
+>>>> https://lkml.org/lkml/2015/10/9/699
+>>> 
+>>> Thanks Will and Arnd, I missed this. Patch reverted.
+>>> 
+>> i don?t understand why conflict with Dan Williams? patch.
+>> Dan Williams ?s patch also define ioremap_cache  for arch ia64  & arch sh & arch xtensa ,
+>> i see this :
+>> # git show   92281dee825f
+>> am i miss something?
+> 
+> I meant the new series, see https://lkml.org/lkml/2015/10/9/716 for the
+> patch that removes it again.
+> 
+> 	Arnd
+Got it ,
+Thanks :)
