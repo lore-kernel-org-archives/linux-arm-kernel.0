@@ -1,46 +1,51 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 14 Oct 2015 10:15:50 +0900
-Subject: [PATCH 3/3] ARM: dts: exynos5422-odroidxu3: Added UHS-I bus speed
- support
-In-Reply-To: <CAGOxZ51uPkdGmCAs2Tc8_=YvkORJKdivN47vo1ZxkGQ-MY=-oQ@mail.gmail.com>
-References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
- <1444578364-1384-3-git-send-email-linux.amoon@gmail.com>
- <561B48B7.1040201@samsung.com>
- <CANAwSgSLFviT4ZNXTYwxYs2pbrr9ozJmPMauhgRPO0556Rsr_g@mail.gmail.com>
- <561C4CEE.3050905@samsung.com>
- <CANAwSgRJ+5O-x61K9E_AxTZWQy3jJrKF5MiLtWRdUU29CCfa-Q@mail.gmail.com>
- <561C7DF1.6000609@samsung.com>
- <CANAwSgRBzFqHB98wSQnQu-ggGqRT2H6wC415wULXVhPg0uw_3A@mail.gmail.com>
- <561D9ACE.6050103@samsung.com>
- <CAGOxZ51uPkdGmCAs2Tc8_=YvkORJKdivN47vo1ZxkGQ-MY=-oQ@mail.gmail.com>
-Message-ID: <561DACC6.9040209@samsung.com>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Wed, 14 Oct 2015 09:19:09 +0800
+Subject: [alsa-devel] [RFC PATCH] ASoC: Modify check condition of
+ multiple bindings of components
+In-Reply-To: <561D1843.1020007@metafoo.de>
+References: <1444743477-48819-1-git-send-email-koro.chen@mediatek.com>
+ <561D0AA9.5080702@metafoo.de> <1444745902.26493.2.camel@mtksdaap41>
+ <561D1843.1020007@metafoo.de>
+Message-ID: <1444785549.26493.12.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.10.2015 10:06, Alim Akhtar wrote:
-> +Doug
-> Hello,
-> AFAIR, dw_mmc host controller does support UHS-I [1], specially SDR50
-> and SDR104 modes.
+On Tue, 2015-10-13 at 16:42 +0200, Lars-Peter Clausen wrote:
+> On 10/13/2015 04:18 PM, Koro Chen wrote:
+> > On Tue, 2015-10-13 at 15:44 +0200, Lars-Peter Clausen wrote:
+> >> On 10/13/2015 03:37 PM, Koro Chen wrote:
+> >>> The patch "ASoC: Prevent components from being bound to multiple cards"
+> >>> adds check to prevent multiple cards from using the same component.
+> >>> However, snd_soc_register_platform() or snd_soc_register_codec() will
+> >>> also create components, and sharing the same platform by multiple cards
+> >>> is then refused. This happens with a platform having multiple
+> >>> independent DAIs that share the same DMA controller.
+> >>>
+> >>> Relax the condition by checking component->registered_as_component,
+> >>> which is only true in case of snd_soc_register_component() and
+> >>> will be false for components created by snd_soc_register_platform()
+> >>> or snd_soc_register_codec().
+> >>
+> >> Binding a component to multiple cards results in internal data structure
+> >> corruption, regardless of whether it is a raw component, CODEC or platform,
+> >> which is why the check was added. So the proposed change wont work.
+> >>
+> > Thanks for your comment. Is it possible to share an example of how the
+> > data structure will be corrupted? So I can study into this further.
 > 
-> [1]: http://www.spinics.net/lists/linux-mmc/msg28186.html
+> Just look at soc_probe_component() and think about what happens if that runs
+> twice for two different cards. Multiple calls to list_add() on the same
+> list, controls are added multiple times, DAPM widgets are created multiple
+> times, the card field will only point to the last card.
 > 
-> What I remember is, one need to set "broken-cd" property also in order
-> to make it work because of the vqmmc and vmmc connection on board. I
-> didn't find the link right now, but you can search on the web, there
-> was a long discussion about handling this.
-> Have not checked it recently, so not sure if this got broken somehow.
+When multiple binding happens, soc_probe_component() just returns zero
+without doing anything after this patch (actually it also returned zero
+before the patch "ASoC: Prevent components from being bound to multiple
+cards"). So the component still binds to the first card. For this case I
+think it should be fine?
+
 > 
-
-Please, don't top post.
-
-I am not a SD/MMC specialist (I do not feel enough confident in its
-internals) but the datasheet for 5422 does not mention UHS. However it
-mentions "High Speed DDR Mode with 200 MHz clock rate (HS400)". This
-does not look like UHS...
-https://www.sdcard.org/developers/overview/bus_speed/
-This of course is not a definite proof that 5422 does not support UHS. I
-am just saying that I couldn't find any information that *it does*.
-
-Best regards,
-Krzysztof
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
