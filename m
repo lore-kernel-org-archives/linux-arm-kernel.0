@@ -1,82 +1,51 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Thu, 15 Oct 2015 00:27:52 +0200
-Subject: [PATCH 1/3] dt-bindings: add SMP enable-method for Broadcom NSP
-In-Reply-To: <1444844820-24290-2-git-send-email-kapilh@broadcom.com>
-References: <1444844820-24290-1-git-send-email-kapilh@broadcom.com>
- <1444844820-24290-2-git-send-email-kapilh@broadcom.com>
-Message-ID: <561ED6E8.4000208@hauke-m.de>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Wed, 14 Oct 2015 23:32:45 +0100
+Subject: [PATCH 3/3] xen/arm: don't try to re-register vcpu_info on
+ cpu_hotplug.
+In-Reply-To: <1444844997-27314-3-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
+ <1444844997-27314-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <561ED80D.9020905@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2015 07:46 PM, Kapil Hali wrote:
-> Add a compatible string "brcm,bcm-nsp-smp" for Broadcom's
-> Northstar Plus CPU to the 32-bit ARM CPU device tree binding
-> documentation file and create a new binding documentation for
-> Northstar Plus CPU pen-release mechanism.
-> 
-> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+Hi Stefano,
+
+On 14/10/2015 18:49, Stefano Stabellini wrote:
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 > ---
->  .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 36 ++++++++++++++++++++++
->  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
->  2 files changed, 37 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
-> new file mode 100644
-> index 0000000..8506da7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
-> @@ -0,0 +1,36 @@
-> +Broadcom Northstar Plus SoC CPU Enable Method
-> +---------------------------------------------
-> +This binding defines the enable method used for starting secondary
-> +CPUs in the following Broadcom SoCs:
-> +  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
-> +
-> +The enable method is specified by defining the following required
-> +properties in the "cpus" device tree node:
-> +  - enable-method = "brcm,bcm-nsp-smp";
-> +  - secondary-boot-reg = <...>;
-> +
-> +The secondary-boot-reg property is a u32 value that specifies the
-> +physical address of the register used to request the ROM holding pen
-> +code release a secondary CPU.
-> +
-> +Example:
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		enable-method = "brcm,bcm-nsp-smp";
-> +		secondary-boot-reg = <0xffff042c>;
+>   arch/arm/xen/enlighten.c |    6 ++++++
+>   1 file changed, 6 insertions(+)
+>
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index 6c09cc4..59f5421 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -93,6 +93,12 @@ static void xen_percpu_init(void)
+>   	int err;
+>   	int cpu = get_cpu();
+>
+> +	/* vcpu_info already registered, can happen with cpu-hotplug */
 
-Isn't this some offset in a SRAM? If this is a SRAM it should be handled
-like it is done in some other SoC code.
+Can you please add more comment and explain in the commit message why 
+this is necessary for cpu-hotplug?
 
+I had to look at the x86 code to fully understand that it's not possible 
+to call VCPUOP_register_vcpu_info twice because there is no hypercall to 
+remove the vcpu shared page.
+
+
+> +	if (per_cpu(xen_vcpu, cpu) != NULL) {
+> +		put_cpu();
+> +		return;
+> +	}
 > +
-> +		cpu0: cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			next-level-cache = <&L2>;
-> +			reg = <0>;
-> +		};
-> +
-> +		cpu1: cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			next-level-cache = <&L2>;
-> +			reg = <1>;
-> +		};
-> +	};
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 91e6e5c..1172d9b 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -190,6 +190,7 @@ nodes to be present and contain the properties described below.
->  			    "allwinner,sun6i-a31"
->  			    "allwinner,sun8i-a23"
->  			    "arm,psci"
-> +			    "brcm,bcm-nsp-smp"
->  			    "brcm,brahma-b15"
->  			    "marvell,armada-375-smp"
->  			    "marvell,armada-380-smp"
-> 
+>   	pr_info("Xen: initializing cpu%d\n", cpu);
+>   	vcpup = per_cpu_ptr(xen_vcpu_info, cpu);
+>
+>
+
+Regards,
+
+-- 
+Julien Grall
