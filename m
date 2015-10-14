@@ -1,141 +1,71 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 14 Oct 2015 17:25:13 +0800
-Subject: [PATCH v4 5/5] clk: sunxi: mod1 clock support
-In-Reply-To: <1444682610-21482-6-git-send-email-maxime.ripard@free-electrons.com>
-References: <1444682610-21482-1-git-send-email-maxime.ripard@free-electrons.com>
- <1444682610-21482-6-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v65joK2FBA3L4EQpYdkM6wEdXRqi_N0a0uD0Wi8yX3WLrg@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 14 Oct 2015 11:27:46 +0200
+Subject: [PATCH] arm: pxa: raumfeld: make some variables static
+Message-ID: <1444814866-4639-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 4:43 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> From: Emilio L?pez <emilio@elopez.com.ar>
->
-> The module 1 type of clocks consist of a gate and a mux and are used on
-> the audio blocks to mux and gate the PLL2 outputs for AC97, IIS or
-> SPDIF. This commit adds support for them on the sunxi clock driver.
->
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi/Makefile       |  1 +
->  drivers/clk/sunxi/clk-a10-mod1.c | 81 ++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 82 insertions(+)
->  create mode 100644 drivers/clk/sunxi/clk-a10-mod1.c
->
-> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> index 70a449a419e6..cb4c299214ce 100644
-> --- a/drivers/clk/sunxi/Makefile
-> +++ b/drivers/clk/sunxi/Makefile
-> @@ -5,6 +5,7 @@
->  obj-y += clk-sunxi.o clk-factors.o
->  obj-y += clk-a10-codec.o
->  obj-y += clk-a10-hosc.o
-> +obj-y += clk-a10-mod1.o
->  obj-y += clk-a10-pll2.o
->  obj-y += clk-a20-gmac.o
->  obj-y += clk-mod0.o
-> diff --git a/drivers/clk/sunxi/clk-a10-mod1.c b/drivers/clk/sunxi/clk-a10-mod1.c
-> new file mode 100644
-> index 000000000000..099dbdab7afe
-> --- /dev/null
-> +++ b/drivers/clk/sunxi/clk-a10-mod1.c
-> @@ -0,0 +1,81 @@
-> +/*
-> + * Copyright 2013 Emilio L?pez
-> + *
-> + * Emilio L?pez <emilio@elopez.com.ar>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/slab.h>
-> +
-> +static DEFINE_SPINLOCK(mod1_lock);
-> +
-> +#define SUN4I_MOD1_ENABLE      31
-> +#define SUN4I_MOD1_MUX         16
-> +#define SUN4I_MOD1_MUX_WIDTH   2
-> +#define SUN4I_MOD1_MAX_PARENTS 4
-> +
-> +static void __init sun4i_mod1_clk_setup(struct device_node *node)
-> +{
-> +       struct clk *clk;
-> +       struct clk_mux *mux;
-> +       struct clk_gate *gate;
-> +       const char *parents[4];
-> +       const char *clk_name = node->name;
-> +       void __iomem *reg;
-> +       int i = 0;
-> +
-> +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-> +       if (IS_ERR(reg))
-> +               return;
-> +
-> +       mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-> +       if (!mux)
-> +               goto err_unmap;
-> +
-> +       gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-> +       if (!gate)
-> +               goto err_free_mux;
-> +
-> +       of_property_read_string(node, "clock-output-names", &clk_name);
-> +       of_clk_parent_fill(node, parents, SUN4I_MOD1_MAX_PARENTS);
+This fixes the following sparse warnings:
 
-          i = of_clk_parent_fill(node, parents, SUN4I_MOD1_MAX_PARENTS); ?
+	arch/arm/mach-pxa/raumfeld.c:510:24: warning: symbol 'raumfeld_w1_gpio_device' was not declared. Should it be static?
+	arch/arm/mach-pxa/raumfeld.c:632:31: warning: symbol 'raumfeld_spi_platform_data' was not declared. Should it be static?
+	arch/arm/mach-pxa/raumfeld.c:851:28: warning: symbol 'audio_va_initdata' was not declared. Should it be static?
+	arch/arm/mach-pxa/raumfeld.c:883:28: warning: symbol 'audio_dummy_initdata' was not declared. Should it be static?
+	arch/arm/mach-pxa/raumfeld.c:931:28: warning: symbol 'max8660_v6_subdev_data' was not declared. Should it be static?
 
-Otherwise,
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-pxa/raumfeld.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-
-> +
-> +       gate->reg = reg;
-> +       gate->bit_idx = SUN4I_MOD1_ENABLE;
-> +       gate->lock = &mod1_lock;
-> +       mux->reg = reg;
-> +       mux->shift = SUN4I_MOD1_MUX;
-> +       mux->mask = BIT(SUN4I_MOD1_MUX_WIDTH) - 1;
-> +       mux->lock = &mod1_lock;
-> +
-> +       clk = clk_register_composite(NULL, clk_name, parents, i,
-> +                                    &mux->hw, &clk_mux_ops,
-> +                                    NULL, NULL,
-> +                                    &gate->hw, &clk_gate_ops, 0);
-> +       if (IS_ERR(clk))
-> +               goto err_free_gate;
-> +
-> +       of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +
-> +       return;
-> +
-> +err_free_gate:
-> +       kfree(gate);
-> +err_free_mux:
-> +       kfree(mux);
-> +err_unmap:
-> +       iounmap(reg);
-> +}
-> +CLK_OF_DECLARE(sun4i_mod1, "allwinner,sun4i-a10-mod1-clk",
-> +              sun4i_mod1_clk_setup);
-> --
-> 2.5.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
+index 88f70c37ad0d..32ee6ef5ea4f 100644
+--- a/arch/arm/mach-pxa/raumfeld.c
++++ b/arch/arm/mach-pxa/raumfeld.c
+@@ -507,7 +507,7 @@ static struct w1_gpio_platform_data w1_gpio_platform_data = {
+ 	.ext_pullup_enable_pin	= -EINVAL,
+ };
+ 
+-struct platform_device raumfeld_w1_gpio_device = {
++static struct platform_device raumfeld_w1_gpio_device = {
+ 	.name	= "w1-gpio",
+ 	.dev	= {
+ 		.platform_data = &w1_gpio_platform_data
+@@ -629,7 +629,7 @@ static void __init raumfeld_lcd_init(void)
+  * SPI devices
+  */
+ 
+-struct spi_gpio_platform_data raumfeld_spi_platform_data = {
++static struct spi_gpio_platform_data raumfeld_spi_platform_data = {
+ 	.sck		= GPIO_SPI_CLK,
+ 	.mosi		= GPIO_SPI_MOSI,
+ 	.miso		= GPIO_SPI_MISO,
+@@ -848,7 +848,7 @@ static void __init raumfeld_power_init(void)
+ static struct regulator_consumer_supply audio_va_consumer_supply =
+ 	REGULATOR_SUPPLY("va", "0-0048");
+ 
+-struct regulator_init_data audio_va_initdata = {
++static struct regulator_init_data audio_va_initdata = {
+ 	.consumer_supplies = &audio_va_consumer_supply,
+ 	.num_consumer_supplies = 1,
+ 	.constraints = {
+@@ -880,7 +880,7 @@ static struct regulator_consumer_supply audio_dummy_supplies[] = {
+ 	REGULATOR_SUPPLY("vlc", "0-0048"),
+ };
+ 
+-struct regulator_init_data audio_dummy_initdata = {
++static struct regulator_init_data audio_dummy_initdata = {
+ 	.consumer_supplies = audio_dummy_supplies,
+ 	.num_consumer_supplies = ARRAY_SIZE(audio_dummy_supplies),
+ 	.constraints = {
+@@ -928,7 +928,7 @@ static struct regulator_init_data vcc_mmc_init_data = {
+ 	.num_consumer_supplies = 1,
+ };
+ 
+-struct max8660_subdev_data max8660_v6_subdev_data = {
++static struct max8660_subdev_data max8660_v6_subdev_data = {
+ 	.id		= MAX8660_V6,
+ 	.name		= "vmmc",
+ 	.platform_data	= &vcc_mmc_init_data,
+-- 
+2.6.1
