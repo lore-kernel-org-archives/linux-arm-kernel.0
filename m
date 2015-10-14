@@ -1,36 +1,38 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Wed, 14 Oct 2015 15:17:14 +0200
-Subject: [PATCH v2 2/4] dmaengine: Add STM32 DMA driver
-In-Reply-To: <CAOAejn1N=dFZ3nQ_hNznJQX1-fkP3r=vdYuWY4OMH65PrW3xVg@mail.gmail.com>
-References: <1444745127-1105-1-git-send-email-cedric.madianga@gmail.com>
- <1444745127-1105-3-git-send-email-cedric.madianga@gmail.com>
- <561D1689.90703@linaro.org>
- <CAOAejn1N=dFZ3nQ_hNznJQX1-fkP3r=vdYuWY4OMH65PrW3xVg@mail.gmail.com>
-Message-ID: <CAOAejn2pcFSn3Hf=j6zgg6Ui6GjJZrtRch6ywByHaVLsTLMk6A@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 14 Oct 2015 15:09:35 +0200
+Subject: [PATCH 0/4] ARM: berlin: improve multi_v7_defconfig support
+In-Reply-To: <6303906.JnZ5PeFoqZ@wuerfel>
+References: <1444818844-2865-1-git-send-email-antoine.tenart@free-electrons.com>
+ <6303906.JnZ5PeFoqZ@wuerfel>
+Message-ID: <20151014130935.GD20884@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi Arnd,
 
->>> +
->>> +static int stm32_dma_remove(struct platform_device *pdev)
->>> +{
->>> +       struct stm32_dma_device *dmadev = platform_get_drvdata(pdev);
->>> +
->>> +       of_dma_controller_free(pdev->dev.of_node);
->>> +
->>> +       dma_async_device_unregister(&dmadev->ddev);
->>> +
->>> +       clk_disable_unprepare(dmadev->clk);
->>
->>
->> What is the purpose of disabling/unpreparing the clock here?
->> stm32_dma_alloc_chan_resources() and stm32_dma_free_chan_resources() should
->> pair up and the clock should already be stopped.
+On Wed, Oct 14, 2015 at 02:36:21PM +0200, Arnd Bergmann wrote:
+> On Wednesday 14 October 2015 12:34:00 Antoine Tenart wrote:
+> > 
+> > Some drivers used on a Marvell Berlin kernel were missing from
+> > multi_v7_defconfig. This series add them.
+> 
+> Adding them is great, but we try to have as much as possible
+> in loadable modules for new additions. Can you do this?
 
-stm32_dma_remove() could be called during an on-going transfer during
-module unload.
-So in that case, it seems that disabling/unpreparing the clock is needed.
+Sure, I'll do this for the Ethernet and the ADC drivers. But we already
+have the SATA and USB features built-in with multi_v7_defconfig, so I'll
+keep the two PHY drivers built-in.
 
-BR,
-Cedric
+> Having a single patch instead of four different ones is fine too,
+> by the way.
+
+And I'll put them into a single patch.
+
+Thanks,
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
