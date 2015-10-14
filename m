@@ -1,49 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 14 Oct 2015 11:36:48 +0100
-Subject: [PATCH RFC 1/2] dt-bindings: simplefb: Support a list of
- regulator supply properties
-In-Reply-To: <561CADFE.2010609@redhat.com>
-References: <1444669458-5588-1-git-send-email-wens@csie.org>
- <1444669458-5588-2-git-send-email-wens@csie.org>
- <20151012171018.GB3659@leverpostej>
- <CAGb2v651=uaHEQK4wpEQywgr311NSbqEvYkpsC5zSHPSFq-HHg@mail.gmail.com>
- <561CADFE.2010609@redhat.com>
-Message-ID: <20151014103648.GS14956@sirena.org.uk>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 14 Oct 2015 12:44:15 +0200
+Subject: [PATCH v1 0/2] Fix display on second resume on 5250-snow
+Message-ID: <1444819457-27519-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 09:08:46AM +0200, Hans de Goede wrote:
-> On 13-10-15 04:22, Chen-Yu Tsai wrote:
-> >On Tue, Oct 13, 2015 at 1:10 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >>On Tue, Oct 13, 2015 at 01:04:17AM +0800, Chen-Yu Tsai wrote:
+Hi,
 
-> >>>+- num-supplies : The number of regulators used by the framebuffer.
-> >>>+- vinN-supply : The N-th (from 0) regulator used by the framebuffer.
+as discussed in [0], currently on the second resume from memory the
+display is broken on Snow boards (ARM Samsung Series 3 Chromebook).
 
-> >>I don't see why you need num-supplies. Why not just try probing
-> >>vin${N}-supply until such a property isn't present in the DT?
+The reason is that on resume the contents of register SRC_TOP3 aren't
+what the kernel thinks they are because the HW (or FW) is doing some
+clock reparenting beneath our feet.
 
-> +1 for this.
+This series tasks the kernel to do the reparenting itself so that the HW
+state always matches the kernel's internal state.
 
-Even better would be to just enumerate all the properties on the node
-and request anything with a FOO-supply name.  That way we can keep
-using standard regulator bindings that name the supplies after their
-actual names on the device.
+Thanks,
 
-> > That's doable. Though I'd add a hard limit on it. Does 16 seem
-> > reasonable?
+Tomeu
 
-> I would not add a hard limit to the binding, you can use a fixed array in
-> the code to make the code simpler. I would say 8 should be sufficient, since
-> the limit will only be in the code we can always bump it when we need
-> to.
+[0] http://lkml.kernel.org/g/561CDC33.7050103 at collabora.com
 
-Or just dynamically allocate the array and resize as needed if it starts
-to get to be a problem.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151014/5fd830c7/attachment.sig>
+
+Tomeu Vizoso (2):
+  clk: samsung: exynos5250: Add DISP1 clocks
+  ARM: dts: exynos5250: Add clocks to DISP1 domain
+
+ arch/arm/boot/dts/exynos5250.dtsi      |  4 ++++
+ drivers/clk/samsung/clk-exynos5250.c   | 16 +++++++++++++++-
+ include/dt-bindings/clock/exynos5250.h |  4 +++-
+ 3 files changed, 22 insertions(+), 2 deletions(-)
+
+-- 
+2.5.0
