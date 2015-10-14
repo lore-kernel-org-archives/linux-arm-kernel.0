@@ -1,87 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Oct 2015 10:49:20 -0700
-Subject: [PATCH] arm, omap2, sram: On HS/EMU devices, only 64K internal
- SRAM is available.
-In-Reply-To: <1444715655-30077-1-git-send-email-hs@denx.de>
-References: <1444715655-30077-1-git-send-email-hs@denx.de>
-Message-ID: <20151014174920.GE10113@atomide.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 14 Oct 2015 18:49:38 +0100
+Subject: xen,arm: enable cpu_hotplug
+Message-ID: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Heiko Schocher <hs@denx.de> [151012 22:58]:
-> Of this, secure content (including PPA) uses initial
-> portion of the SRAM. This chunk is not (and shouldn't
-> be) accessible from the public code.
-> 
-> The minimum size of this chunk (0x350) is used in this
-> patch. Available size is rounded off to 63K.
-> 
-> Both values would require a change if size of secure
-> content grows beyond 0x350.
+Hi all,
 
-Makes sense to me. And something similar is needed at least for
-dm814x to get rid of the imprecise abort during boot with
-commit bbeb92095159 ("ARM: 8422/1: enable imprecise aborts during
-early kernel startup") applied.
-
-Is this needed as a fix to the -rc cycle, or can this wait for
-v4.4?
-
-Regards,
-
-Tony
+this small patch series enable cpu_hotplug in ARM and ARM64 guests,
+using the PV path to plug and unplug the cpus and psci to enable/disable
+them.
 
 
-> Signed-off-by: Heiko Schocher <hs@denx.de>
-> Signed-off-by: Ayoub Zaki <Ayoub.Zaki@bosch-si.com>
-> ---
-> 
->  arch/arm/mach-omap2/sram.c | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
-> index cd488b8..2e7c00f 100644
-> --- a/arch/arm/mach-omap2/sram.c
-> +++ b/arch/arm/mach-omap2/sram.c
-> @@ -47,6 +47,28 @@
->  
->  #define GP_DEVICE		0x300
->  
-> +/**
-> + * Size of chunk used by secure content in the HS/EMU devices.
-> + *
-> + * This size is not fixed. It depends upon the implementation of PPA.
-> + * May need to be modified if the size grows.
-> + */
-> +#define AM33XX_HS_HEADER_SIZE   0x0350
-> +
-> +/**
-> + * Start of public SRAM on HS/EMU devices.
-> + */
-> +#define AM33XX_SRAM_PA		0x40300000
-> +#define AM33XX_SRAM_PUB_PA	(AM33XX_SRAM_PA + AM33XX_HS_HEADER_SIZE)
-> +
-> +/**
-> + * Size of public SRAM available on HS/EMU devices.
-> + *
-> + * This size also depends upon AM33XX_HS_HEADER_SIZE.
-> + * Current value is derived from nearest round-off.
-> + */
-> +#define AM33XX_SRAM_PUB_SIZE		0xfc00	/* 63K */
-> +
->  #define ROUND_DOWN(value,boundary)	((value) & (~((boundary)-1)))
->  
->  static unsigned long omap_sram_start;
-> @@ -99,6 +121,9 @@ static void __init omap_detect_sram(void)
->  			} else {
->  				omap_sram_size = 0x8000; /* 32K */
->  			}
-> +		} else if (soc_is_am33xx()) {
-> +			omap_sram_start = AM33XX_SRAM_PUB_PA;
-> +			omap_sram_size  = AM33XX_SRAM_PUB_SIZE;
->  		} else {
->  			omap_sram_start = OMAP2_SRAM_PUB_PA;
->  			omap_sram_size = 0x800; /* 2K */
-> -- 
-> 2.1.0
-> 
+Stefano Stabellini (3):
+      xen/arm: Enable cpu_hotplug.c
+      xen, cpu_hotplug: call device_offline instead of cpu_down
+      xen/arm: don't try to re-register vcpu_info on cpu_hotplug.
+
+ arch/arm/include/asm/xen/hypervisor.h |    8 ++++++++
+ arch/arm/xen/enlighten.c              |    6 ++++++
+ arch/x86/include/asm/xen/hypervisor.h |    5 +++++
+ arch/x86/xen/enlighten.c              |   15 +++++++++++++++
+ drivers/xen/Makefile                  |    2 --
+ drivers/xen/cpu_hotplug.c             |    9 ++++++---
+ 6 files changed, 40 insertions(+), 5 deletions(-)
+
+Cheers,
+
+Stefano
