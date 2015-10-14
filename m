@@ -1,84 +1,71 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 14 Oct 2015 11:48:45 +0200
-Subject: bcm4708-smartrg-sr400ac boot failures in next-20150918+
-In-Reply-To: <CANMBJr4H1C6CHdRXa_NL9dssYGLkpRKAPXCMOV0FsUdb8JiSXg@mail.gmail.com>
-References: <CANMBJr5FnRQxv01CbAiSD43dGn+Ea4tjEWSsV1FywHJZYLnG_A@mail.gmail.com>
- <560DA9B9.80404@hauke-m.de> <561AE788.6030701@hauke-m.de>
- <CANMBJr4H1C6CHdRXa_NL9dssYGLkpRKAPXCMOV0FsUdb8JiSXg@mail.gmail.com>
-Message-ID: <1444816125.13276.8.camel@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 14 Oct 2015 10:49:07 +0100
+Subject: [PATCH v5 1/3] initialize each mbigen device node as a interrupt
+ controller.
+In-Reply-To: <alpine.DEB.2.11.1510141100280.3785@nanos>
+References: <1443605949-15396-1-git-send-email-majun258@huawei.com>
+ <1443605949-15396-2-git-send-email-majun258@huawei.com>
+ <alpine.DEB.2.11.1509302242220.4500@nanos> <5610D3BD.1040408@huawei.com>
+ <alpine.DEB.2.11.1510091441200.6097@nanos> <5618D3EC.6050501@huawei.com>
+ <20151010110942.52d34a4b@arm.com> <alpine.DEB.2.11.1510111150270.6097@nanos>
+ <20151011120331.09093ffc@arm.com> <alpine.DEB.2.11.1510111335150.6097@nanos>
+ <561E1886.2050305@arm.com> <alpine.DEB.2.11.1510141100280.3785@nanos>
+Message-ID: <561E2513.1030901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
-
-Am Dienstag, den 13.10.2015, 11:49 -0700 schrieb Tyler Baker:
-> On 11 October 2015 at 15:49, Hauke Mehrtens <hauke@hauke-m.de> wrote:
-> > Adding the arm List.
-> >
-> > On 10/01/2015 11:46 PM, Hauke Mehrtens wrote:
-> >> On 10/01/2015 07:50 PM, Tyler Baker wrote:
-> >>> Hi Hauke, Rafal,
-> >>>
-> >>> The kernelci.org bot has been reporting complete boot failures[1]
-> >>> since next-20150918. I've bisected[2] the issue and found "ARM:
-> >>> 8422/1: enable imprecise aborts during early kernel startup" is the
-> >>> offending patch. Reverting this on top of -next fixes the boot issue.
-> >>>
-> >>> Apologies for sending this off list, but I want to make sure you can
-> >>> confirm this issue before we raise it.
-> >>>
-> >>> Cheers,
-> >>>
-> >>> Tyler
-> >>>
-> >>> [1] http://kernelci.org/boot/bcm4708-smartrg-sr400ac/
-> >>> [2] http://hastebin.com/mirunerobi.vhdl
-> >>>
-> >> Hi Tyler,
-> >>
-> >> Thanks for the info, the broken bootloader causes some problems when
-> >> booting the kernel, we already had to ignore some exceptions. I will
-> >> look into this at the weekend.
-> >>
-> >> Hauke
-> >>
-> > Hi,
-> >
-> > The commit "ARM: 8422/1: enable imprecise aborts during early kernel
-> > startup" breaks bcm53xx devices with a broken boot loader, this is a
-> > regression. There are probably millions of these devices shipped with
-> > this boot loader called CFE.
-> > For BCM53xx we install a fault handler in the init_early callback of
-> > DT_MACHINE_START to ignore the faults produced by the boot loader in
-> > http://lxr.free-electrons.com/source/arch/arm/mach-bcm/bcm_5301x.c#L40 ,
-> > but init_early is called after local_abt_enable() gets called and this
-> > causes a kernel panic because of any unhandled CPU fault. The reserve()
-> > callback in DT_MACHINE_START was the only callback I could find which
-> > gets called before local_abt_enable(), should I move the code which
-> > installs the fault handler there?
-> >
-> > This is causing the problems in kernelci with linux next kernels on this
-> > board: http://kernelci.org/boot/bcm4708-smartrg-sr400ac/
+On 14/10/15 10:17, Thomas Gleixner wrote:
+> Marc,
 > 
-> Adding Russell, and Lucas to CC as they may be interested in this thread.
+> On Wed, 14 Oct 2015, Marc Zyngier wrote:
+>> To me, it feels like we're spreading the complexity across multiple
+>> layers instead of keeping it localized. It also means that next time
+>> some crazy HW dude comes up with a similar idea (and I have little doubt
+>> this will happen sooner than later), we'll have to replicate the same
+>> thing again (though we could put all that behind another abstraction layer).
+>>
+>> I would have preferred a solution where the MSI domain is allowed to be
+>> sandwiched between two non-MSI domains, and expose the top level
+>> irqchip. This means fixing the following:
+>>
+>> - Either find a way to prevent DT doing these early IRQ allocations
+>> (this could be easily done by simply not registering the irqchip), or be
+>> able to elegantly reuse them.
+> 
+> The reuse part makes me shudder. We really should not go there. It's a
+> blatant layering violation.
+> 
+>> - Add an API allowing an MSI domain to be the parent of another domain.
+>>
+>> Once we have this, we can use the platform MSI layer for the mbigen
+>> without much complexity (well, not more that any other stacked irqchip,
+>> the madness of the mbigen programming interface notwithstanding), and
+>> drivers stay untouched. It would also give us a 'standard' way to deal
+>> with the above HW dude. I'd be happy to prototype it.
+> 
+> Ok, I have a better understanding of it now.
+> 
+> I have no objections to your approach as long as it provides us a
+> clean way to use a full hierarchy without weird interfaces to reuse
+> irq descriptors etc. If you can find a way which just follows the
+> proper hierarchy design, I'm certainly not in your way.
+> 
+> OTOH, the platform msi driver is not a huge amount of code and from my
+> understanding of the hardware it looks weird to have this intermediate
+> layer. Making mbigen a direct child of ITS feels just more natural to
+> me. I'm pretty sure that this can be done without the earlier proposed
+> horrible modifications to ITS. It just should fall into place.
+> 
+> It would be really great just to have shell implementations,
+> i.e. without the mbigen specific stuff - for both models so we can
+> compare and contrast the results. That means just the interfaces and
+> the hookup to the various layers.
 
-Thanks for looping me in and sorry about the regression.
+OK, let's do that. I'll try to post something before Friday so that we
+can really evaluate what the knock-on effect is.
 
-I think we really want to keep enabling the imprecise aborts as early as
-possible to catch them near the spot where they did happen.
+Thanks,
 
-So I think the right thing to work around your broken bootloader is to
-install the fault handler earlier. Russell, do you have any objections
-to that?
-
-I think there are some other SoCs that need a similar workaround, if we
-agree to move the fault handler installation to an earlier stage I'll
-audit other places and send patches if needed, so we can fix this up
-before this commit ends up in a pull to Linus.
-
-Regards,
-Lucas
-
+	M.
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Jazz is not dead. It just smells funny...
