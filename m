@@ -1,58 +1,53 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 14 Oct 2015 09:58:46 +0300
-Subject: [PATCH] ARM: DRA7: hwmod: Remove elm address space from hwmod data
-In-Reply-To: <1444743874-4454-1-git-send-email-fcooper@ti.com>
-References: <1444743874-4454-1-git-send-email-fcooper@ti.com>
-Message-ID: <561DFD26.9090702@ti.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 14 Oct 2015 09:03:23 +0200
+Subject: [PATCH 2/3] dts: Updated devicetree bindings for Zynq 7000
+ platform
+In-Reply-To: <CAAtXAHfRt-6+Hs=DTUDg1_2vxHo213ut_DWgH8Uq2xMuRp+e_A@mail.gmail.com>
+References: <1444344307-22509-1-git-send-email-moritz.fischer@ettus.com>
+ <1444344307-22509-3-git-send-email-moritz.fischer@ettus.com>
+ <561B7E3C.4060908@xilinx.com>
+ <CAAtXAHfRt-6+Hs=DTUDg1_2vxHo213ut_DWgH8Uq2xMuRp+e_A@mail.gmail.com>
+Message-ID: <561DFE3B.80901@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/15 16:44, Franklin S Cooper Jr wrote:
-> ELM address information is provided by device tree. No longer need
-> to include this information within hwmod.
+On 10/14/2015 04:50 AM, Moritz Fischer wrote:
+> Hi Michal,
 > 
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-
-Acked-by: Roger Quadros <rogerq@ti.com>
-
-Franklin,
-
-Can you please do the same for gpmc_addr as well?
-
-And looks like elm_addr needs to be removed from
-omap_hwmod_33xx_43xx_interconnect_data.c and omap_hwmod_44xx_data.c as well, no?
-
-cheers,
--roger
-
-> ---
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 10 ----------
->  1 file changed, 10 deletions(-)
+> On Mon, Oct 12, 2015 at 2:32 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> On 10/09/2015 12:45 AM, Moritz Fischer wrote:
+>>> Added addtional bindings required for FPGA Manager operation
+>>> of the Xilinx Zynq Devc configuration interface.
+>>>
+>>> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+>>> ---
+>>>  arch/arm/boot/dts/zynq-7000.dtsi | 5 +++++
+>>>  1 file changed, 5 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+>>> index dc0457e..1a5220e 100644
+>>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+>>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+>>> @@ -294,6 +294,11 @@
+>>>               devcfg: devcfg at f8007000 {
+>>>                       compatible = "xlnx,zynq-devcfg-1.0";
+>>>                       reg = <0xf8007000 0x100>;
+>>> +                     interrupt-parent = <&intc>;
+>>> +                     interrupts = <0 8 4>;
+>>> +                     clocks = <&clkc 12>;
+>>> +                     clock-names = "ref_clk";
+>>> +                     syscon = <&slcr>;
+>>>               };
+>>>
+>>>               global_timer: timer at f8f00200 {
+>>>
+>>
+>> This patch should go via arm-soc tree. That's why please remove it from
+>> this patchset.
 > 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> index 562247b..ad2cc7a 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> @@ -2566,21 +2566,11 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__hdmi = {
->  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->  };
->  
-> -static struct omap_hwmod_addr_space dra7xx_elm_addrs[] = {
-> -	{
-> -		.pa_start	= 0x48078000,
-> -		.pa_end		= 0x48078fff,
-> -		.flags		= ADDR_TYPE_RT
-> -	},
-> -	{ }
-> -};
-> -
->  /* l4_per1 -> elm */
->  static struct omap_hwmod_ocp_if dra7xx_l4_per1__elm = {
->  	.master		= &dra7xx_l4_per1_hwmod,
->  	.slave		= &dra7xx_elm_hwmod,
->  	.clk		= "l3_iclk_div",
-> -	.addr		= dra7xx_elm_addrs,
->  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->  };
->  
-> 
+> Just to clarify, you want this as a separate patch?
+
+yes when binding is ACKed.
+
+Thanks,
+Michal
