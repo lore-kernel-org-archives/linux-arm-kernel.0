@@ -1,84 +1,75 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Wed, 14 Oct 2015 14:47:20 +0200
-Subject: [PATCH v2] ARM: fix vdsomunge not to depend on glibc specific
- byteswap.h
-In-Reply-To: <B69CCAC6-FB47-4B2B-95F9-15F1BA4AD381@goldelico.com>
-References: <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
- <B69CCAC6-FB47-4B2B-95F9-15F1BA4AD381@goldelico.com>
-Message-ID: <5B19AAFC-976C-4B33-A83E-229693FA7858@goldelico.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 14 Oct 2015 14:53:09 +0200
+Subject: [PATCH v5 5/6] iommu/mediatek: Add mt8173 IOMMU driver
+In-Reply-To: <1444357388-30257-6-git-send-email-yong.wu@mediatek.com>
+References: <1444357388-30257-1-git-send-email-yong.wu@mediatek.com>
+ <1444357388-30257-6-git-send-email-yong.wu@mediatek.com>
+Message-ID: <20151014125309.GO27420@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping.
+On Fri, Oct 09, 2015 at 10:23:07AM +0800, Yong Wu wrote:
+> +	/*
+> +	 * There is a domain for each a iommu device in normal case.
+> +	 * But MTK only has one iommu domain called the m4u domain which all
+> +	 * the multimedia HW share. Here we reserve one as the m4u domain and
+> +	 * free the others.
+> +	 *
+> +	 * And the attach_device that from __iommu_setup_dma_ops
+> +	 * will be called earlier than probe.
+> +	 */
 
-Am 03.10.2015 um 22:46 schrieb H. Nikolaus Schaller <hns@goldelico.com>:
+Okay, with this being the case, you need to put all devices behind one
+IOMMU into the same iommu-group, because the IOMMU can't really isolate
+the devices from each other.
 
-> If the host toolchain is not glibc based then the arm kernel build
-> fails with
-> 
-> HOSTCC  arch/arm/vdso/vdsomunge
-> arch/arm/vdso/vdsomunge.c:48:22: fatal error: byteswap.h: No such file or directory
-> 
-> Observed: with omap2plus_defconfig and compile on Mac OS X with arm ELF
-> cross-compiler.
-> 
-> Reason: byteswap.h is a glibc only header.
-> 
-> Solution: replace by private byte-swapping macros (taken from
-> arch/mips/boot/elf2ecoff.c)
-> 
-> Tested to compile on Mac OS X 10.9.5 host.
-> 
-> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
-> ---
-> arch/arm/vdso/vdsomunge.c | 19 +++++++++++++++----
-> 1 file changed, 15 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/vdso/vdsomunge.c b/arch/arm/vdso/vdsomunge.c
-> index aedec81..27a9a0b 100644
-> --- a/arch/arm/vdso/vdsomunge.c
-> +++ b/arch/arm/vdso/vdsomunge.c
-> @@ -45,7 +45,18 @@
-> * it does.
-> */
-> 
-> -#include <byteswap.h>
-> +#define swab16(x) \
-> +	((unsigned short)( \
-> +		(((unsigned short)(x) & (unsigned short)0x00ffU) << 8) | \
-> +		(((unsigned short)(x) & (unsigned short)0xff00U) >> 8) ))
+> +static int mtk_iommu_add_device(struct device *dev)
+> +{
+> +	struct iommu_group *group;
+> +	struct mtk_iommu_client_priv *priv;
+> +	struct mtk_iommu_domain *m4udom;
+> +	struct iommu_domain *domain;
+> +	int ret;
 > +
-> +#define swab32(x) \
-> +	((unsigned int)( \
-> +		(((unsigned int)(x) & (unsigned int)0x000000ffUL) << 24) | \
-> +		(((unsigned int)(x) & (unsigned int)0x0000ff00UL) <<  8) | \
-> +		(((unsigned int)(x) & (unsigned int)0x00ff0000UL) >>  8) | \
-> +		(((unsigned int)(x) & (unsigned int)0xff000000UL) >> 24) ))
+> +	if (!dev->archdata.iommu) /* Not a iommu client device */
+> +		return -ENODEV;
 > +
-> #include <elf.h>
-> #include <errno.h>
-> #include <fcntl.h>
-> @@ -104,17 +115,17 @@ static void cleanup(void)
-> 
-> static Elf32_Word read_elf_word(Elf32_Word word, bool swap)
-> {
-> -	return swap ? bswap_32(word) : word;
-> +	return swap ? swab32(word) : word;
-> }
-> 
-> static Elf32_Half read_elf_half(Elf32_Half half, bool swap)
-> {
-> -	return swap ? bswap_16(half) : half;
-> +	return swap ? swab16(half) : half;
-> }
-> 
-> static void write_elf_word(Elf32_Word val, Elf32_Word *dst, bool swap)
-> {
-> -	*dst = swap ? bswap_32(val) : val;
-> +	*dst = swap ? swab32(val) : val;
-> }
-> 
-> int main(int argc, char **argv)
-> -- 
-> 2.5.1
-> 
+> +	group = iommu_group_get(dev);
+> +	if (!group) {
+> +		group = iommu_group_alloc();
+> +		if (IS_ERR(group)) {
+> +			dev_err(dev, "Failed to allocate IOMMU group\n");
+> +			return PTR_ERR(group);
+> +		}
+> +	}
+> +
+> +	ret = iommu_group_add_device(group, dev);
+> +	if (ret) {
+> +		dev_err(dev, "Failed to add IOMMU group\n");
+> +		goto err_group_put;
+> +	}
+> +
+> +	domain = iommu_get_domain_for_dev(dev);
+> +	if (!domain) {
+> +		/*
+> +		 * Get the m4u iommu domain from the m4u device.
+> +		 * Attach all the client devices into the m4u domain.
+> +		 */
+> +		priv = dev->archdata.iommu;
+> +		m4udom = dev_get_drvdata(priv->m4udev);
+> +		ret = iommu_attach_group(&m4udom->domain, group);
+> +		if (ret)
+> +			dev_err(dev, "Failed to attach IOMMU group\n");
+> +	}
+> +
+> +err_group_put:
+> +	iommu_group_put(group);
+> +	return ret;
+> +}
+
+Here it looks like you are allocating one group for each device. As I
+said, all devices need to be in one group.
+
+
+
+	Joerg
