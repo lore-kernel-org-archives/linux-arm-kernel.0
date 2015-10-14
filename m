@@ -1,63 +1,52 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Wed, 14 Oct 2015 09:16:41 -0500
-Subject: [PATCH v2] ARM: fix vdsomunge not to depend on glibc specific
- byteswap.h
-In-Reply-To: <5B19AAFC-976C-4B33-A83E-229693FA7858@goldelico.com>
-References: <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
- <B69CCAC6-FB47-4B2B-95F9-15F1BA4AD381@goldelico.com>
- <5B19AAFC-976C-4B33-A83E-229693FA7858@goldelico.com>
-Message-ID: <561E63C9.3040702@mentor.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 14 Oct 2015 10:17:13 -0400
+Subject: [PATCH v4 1/3] Documentation: dt: soc: Add description for knav qmss
+ driver
+In-Reply-To: <1444832235-15263-1-git-send-email-m-karicheri2@ti.com>
+References: <1444832235-15263-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1444832235-15263-2-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2015 07:47 AM, H. Nikolaus Schaller wrote:
->> diff --git a/arch/arm/vdso/vdsomunge.c b/arch/arm/vdso/vdsomunge.c
->> index aedec81..27a9a0b 100644
->> --- a/arch/arm/vdso/vdsomunge.c
->> +++ b/arch/arm/vdso/vdsomunge.c
->> @@ -45,7 +45,18 @@
->> * it does.
->> */
->>
->> -#include <byteswap.h>
->> +#define swab16(x) \
->> +	((unsigned short)( \
->> +		(((unsigned short)(x) & (unsigned short)0x00ffU) << 8) | \
->> +		(((unsigned short)(x) & (unsigned short)0xff00U) >> 8) ))
->> +
->> +#define swab32(x) \
->> +	((unsigned int)( \
->> +		(((unsigned int)(x) & (unsigned int)0x000000ffUL) << 24) | \
->> +		(((unsigned int)(x) & (unsigned int)0x0000ff00UL) <<  8) | \
->> +		(((unsigned int)(x) & (unsigned int)0x00ff0000UL) >>  8) | \
->> +		(((unsigned int)(x) & (unsigned int)0xff000000UL) >> 24) ))
->> +
->> #include <elf.h>
->> #include <errno.h>
->> #include <fcntl.h>
->> @@ -104,17 +115,17 @@ static void cleanup(void)
->>
->> static Elf32_Word read_elf_word(Elf32_Word word, bool swap)
->> {
->> -	return swap ? bswap_32(word) : word;
->> +	return swap ? swab32(word) : word;
->> }
->>
->> static Elf32_Half read_elf_half(Elf32_Half half, bool swap)
->> {
->> -	return swap ? bswap_16(half) : half;
->> +	return swap ? swab16(half) : half;
->> }
->>
->> static void write_elf_word(Elf32_Word val, Elf32_Word *dst, bool swap)
->> {
->> -	*dst = swap ? bswap_32(val) : val;
->> +	*dst = swap ? swab32(val) : val;
->> }
-> ping.
+Add a documentation for knav qmss driver.
 
-Sorry for the delay.
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ v4: added Arnd's Acked-by
 
-This is okay but I'd prefer the swab macros to be below the #include
-lines, and it would be easier for me to deal with a patch that isn't
-whitespace-damaged.
+ Documentation/arm/keystone/knav-qmss.txt | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/arm/keystone/knav-qmss.txt
+
+diff --git a/Documentation/arm/keystone/knav-qmss.txt b/Documentation/arm/keystone/knav-qmss.txt
+new file mode 100644
+index 0000000..79946d1
+--- /dev/null
++++ b/Documentation/arm/keystone/knav-qmss.txt
+@@ -0,0 +1,24 @@
++* Texas Instruments Keystone Navigator Queue Management SubSystem driver
++
++Driver source code path
++  drivers/soc/ti/knav_qmss.c
++  drivers/soc/ti/knav_qmss_acc.c
++
++The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
++the main hardware sub system which forms the backbone of the Keystone
++multi-core Navigator. QMSS consist of queue managers, packed-data structure
++processors(PDSP), linking RAM, descriptor pools and infrastructure
++Packet DMA.
++The Queue Manager is a hardware module that is responsible for accelerating
++management of the packet queues. Packets are queued/de-queued by writing or
++reading descriptor address to a particular memory mapped location. The PDSPs
++perform QMSS related functions like accumulation, QoS, or event management.
++Linking RAM registers are used to link the descriptors which are stored in
++descriptor RAM. Descriptor RAM is configurable as internal or external memory.
++The QMSS driver manages the PDSP setups, linking RAM regions,
++queue pool management (allocation, push, pop and notify) and descriptor
++pool management.
++
++knav qmss driver provides a set of APIs to drivers to open/close qmss queues,
++allocate descriptor pools, map the descriptors, push/pop to queues etc. For
++details of the available APIs, please refers to include/linux/soc/ti/knav_qmss.h
+-- 
+1.9.1
