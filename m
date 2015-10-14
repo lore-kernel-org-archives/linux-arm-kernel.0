@@ -1,138 +1,42 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Wed, 14 Oct 2015 14:05:48 -0400
-Subject: [Xen-devel] [PATCH 1/3] xen/arm: Enable cpu_hotplug.c
-In-Reply-To: <1444844997-27314-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
- <1444844997-27314-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <182B77B3-41AD-4364-B1A0-EC161F546751@oracle.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 14 Oct 2015 19:19:44 +0100
+Subject: [PATCH v6 0/3] arm64: IOMMU-backed DMA mapping
+In-Reply-To: <20151014115013.GM27420@8bytes.org>
+References: <cover.1443718557.git.robin.murphy@arm.com>
+ <561CF53E.7000809@arm.com> <20151014115013.GM27420@8bytes.org>
+Message-ID: <561E9CC0.40701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On October 14, 2015 1:49:55 PM EDT, Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
->Build cpu_hotplug for ARM and ARM64 guests.
+On 14/10/15 12:50, joro at 8bytes.org wrote:
+> Hi Robin,
 >
->Rename arch_(un)register_cpu to xen_(un)register_cpu and provide an
->empty implementation on ARM and ARM64. On x86 just call
->arch_(un)register_cpu as we are already doing.
+> On Tue, Oct 13, 2015 at 01:12:46PM +0100, Robin Murphy wrote:
+>> Anyway, what are your thoughts on taking this for 4.4? Since the
+>> dependencies are now in and we're at -rc5 already, I'm on the verge
+>> of reposting a self-contained version to go through arm64, as we
+>> really need to unblock all the follow-on development there (it's a
+>> shame that of the people I'm aware want this, it's only me and the
+>> Mediatek/Chrome guys here on the list saying so).
 >
->Initialize cpu_hotplug on ARM.
+> I plan to take it for 4.4, given the missing ack arrives. What are your
+> plans to resolve the remaining issues, like with the probe deferral
+> patch-set?
 
-Have you tested this on x86? As your changes touch the generic code path.
+That's great, thanks. I've been keeping an eye on the on-demand probing 
+series[0], and now that things are looking promising there I'm having a 
+go at pulling it in as it lets us solve the device dependency issue in 
+an even neater way than deferral. With the rest of Laurent's patches to 
+move the OF dma_ops configuration into the probe path, I just need to 
+finish working out how to handle probe failure/deferral, and we should 
+be good to go. That's my priority for 4.5, in parallel with properly 
+wiring up the ARM SMMU driver to work nicely with this stuff.
 
->
->Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->---
-> arch/arm/include/asm/xen/hypervisor.h |    8 ++++++++
-> arch/x86/include/asm/xen/hypervisor.h |    5 +++++
-> arch/x86/xen/enlighten.c              |   15 +++++++++++++++
-> drivers/xen/Makefile                  |    2 --
-> drivers/xen/cpu_hotplug.c             |    6 ++++--
-> 5 files changed, 32 insertions(+), 4 deletions(-)
->
->diff --git a/arch/arm/include/asm/xen/hypervisor.h
->b/arch/arm/include/asm/xen/hypervisor.h
->index 04ff8e7..2bc418a 100644
->--- a/arch/arm/include/asm/xen/hypervisor.h
->+++ b/arch/arm/include/asm/xen/hypervisor.h
->@@ -26,4 +26,12 @@ void __init xen_early_init(void);
-> static inline void xen_early_init(void) { return; }
-> #endif
-> 
->+static inline void xen_arch_register_cpu(int num)
->+{
->+}
->+
->+static inline void xen_arch_unregister_cpu(int num)
->+{
->+}
->+
-> #endif /* _ASM_ARM_XEN_HYPERVISOR_H */
->diff --git a/arch/x86/include/asm/xen/hypervisor.h
->b/arch/x86/include/asm/xen/hypervisor.h
->index d866959..8b2d4be 100644
->--- a/arch/x86/include/asm/xen/hypervisor.h
->+++ b/arch/x86/include/asm/xen/hypervisor.h
->@@ -57,4 +57,9 @@ static inline bool xen_x2apic_para_available(void)
-> }
-> #endif
-> 
->+#ifdef CONFIG_HOTPLUG_CPU
->+void xen_arch_register_cpu(int num);
->+void xen_arch_unregister_cpu(int num);
->+#endif
->+
-> #endif /* _ASM_X86_XEN_HYPERVISOR_H */
->diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
->index 11d6fb4..ba62d8e 100644
->--- a/arch/x86/xen/enlighten.c
->+++ b/arch/x86/xen/enlighten.c
->@@ -71,6 +71,7 @@
-> #include <asm/mwait.h>
-> #include <asm/pci_x86.h>
-> #include <asm/pat.h>
->+#include <asm/cpu.h>
-> 
-> #ifdef CONFIG_ACPI
-> #include <linux/acpi.h>
->@@ -1868,3 +1869,17 @@ const struct hypervisor_x86 x86_hyper_xen = {
-> 	.set_cpu_features       = xen_set_cpu_features,
-> };
-> EXPORT_SYMBOL(x86_hyper_xen);
->+
->+#ifdef CONFIG_HOTPLUG_CPU
->+void xen_arch_register_cpu(int num)
->+{
->+	arch_register_cpu(num);
->+}
->+EXPORT_SYMBOL(xen_arch_register_cpu);
->+
->+void xen_arch_unregister_cpu(int num)
->+{
->+	arch_unregister_cpu(num);
->+}
->+EXPORT_SYMBOL(xen_arch_unregister_cpu);
->+#endif
->diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
->index e293bc5..aa8a7f7 100644
->--- a/drivers/xen/Makefile
->+++ b/drivers/xen/Makefile
->@@ -1,6 +1,4 @@
->-ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
-> obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
->-endif
-> obj-$(CONFIG_X86)			+= fallback.o
-> obj-y	+= grant-table.o features.o balloon.o manage.o preempt.o
-> obj-y	+= events/
->diff --git a/drivers/xen/cpu_hotplug.c b/drivers/xen/cpu_hotplug.c
->index cc6513a..122b351 100644
->--- a/drivers/xen/cpu_hotplug.c
->+++ b/drivers/xen/cpu_hotplug.c
->@@ -11,7 +11,7 @@
-> static void enable_hotplug_cpu(int cpu)
-> {
-> 	if (!cpu_present(cpu))
->-		arch_register_cpu(cpu);
->+		xen_arch_register_cpu(cpu);
-> 
-> 	set_cpu_present(cpu, true);
-> }
->@@ -19,7 +19,7 @@ static void enable_hotplug_cpu(int cpu)
-> static void disable_hotplug_cpu(int cpu)
-> {
-> 	if (cpu_present(cpu))
->-		arch_unregister_cpu(cpu);
->+		xen_arch_unregister_cpu(cpu);
-> 
-> 	set_cpu_present(cpu, false);
-> }
->@@ -102,8 +102,10 @@ static int __init setup_vcpu_hotplug_event(void)
-> 	static struct notifier_block xsn_cpu = {
-> 		.notifier_call = setup_cpu_watcher };
-> 
->+#ifdef CONFIG_X86
-> 	if (!xen_pv_domain())
-> 		return -ENODEV;
->+#endif
-> 
-> 	register_xenstore_notifier(&xsn_cpu);
-> 
+Sorting out the configuration order also gets us a lot closer to 
+handling multiple IOMMU drivers for platform devices, and moving 32-bit 
+ARM over to the common code - plus I now have some RK3288 hardware which 
+can serve to test both of those, too.
+
+Robin.
+
+[0]:http://thread.gmane.org/gmane.linux.acpi.devel/78653
