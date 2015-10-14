@@ -1,73 +1,37 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Wed, 14 Oct 2015 11:36:22 -0400
-Subject: [PATCH 1/2] ARM: dts: bcm5301x: Add BCM SVK DT files
-In-Reply-To: <561D8908.2060803@broadcom.com>
-References: <1443824564-17291-1-git-send-email-jonmason@broadcom.com>
- <56192304.1050500@hauke-m.de> <20151013213818.GM12512@broadcom.com>
- <561D8908.2060803@broadcom.com>
-Message-ID: <20151014153621.GD15160@broadcom.com>
+From: ssantosh@kernel.org (Santosh Shilimkar)
+Date: Wed, 14 Oct 2015 08:37:37 -0700
+Subject: [GIT PULL 1/2] Keystone SOC driver update for 4.4
+Message-ID: <1444837058-3525-1-git-send-email-ssantosh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 03:43:20PM -0700, Ray Jui wrote:
-> 
-> 
-> On 10/13/2015 2:38 PM, Jon Mason wrote:
-> > On Sat, Oct 10, 2015 at 04:39:00PM +0200, Hauke Mehrtens wrote:
-> >> On 10/03/2015 12:22 AM, Jon Mason wrote:
-> >>> Add device tree files for Broadcom Northstar based SVKs.  Since the
-> >>> bcm5301x.dtsi already exists, all that is necessary is the dts files to
-> >>> enable the UARTs (and specify the RAM size for the 4708/9).  With these
-> >>> files, the SVKs are able to boot to shell.
-> >>>
-> >>> Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> >>> ---
-> >>>  arch/arm/boot/dts/Makefile       |  5 +++-
-> >>>  arch/arm/boot/dts/bcm94708.dts   | 52 +++++++++++++++++++++++++++++++++++
-> >>>  arch/arm/boot/dts/bcm94709.dts   | 52 +++++++++++++++++++++++++++++++++++
-> >>>  arch/arm/boot/dts/bcm953012k.dts | 59 ++++++++++++++++++++++++++++++++++++++++
-> >>>  4 files changed, 167 insertions(+), 1 deletion(-)
-> >>>  create mode 100644 arch/arm/boot/dts/bcm94708.dts
-> >>>  create mode 100644 arch/arm/boot/dts/bcm94709.dts
-> >>>  create mode 100644 arch/arm/boot/dts/bcm953012k.dts
-> >>>
-> 
-> >>> +&uart0 {
-> >>> +	clock-frequency = <62499840>;
-> >>
-> >> Just out of curiosity on what does this clock frequency depend? I saw
-> >> your patch adding a real clock driver which should make this obsolete.
-> >  
-> > Better to add this now, as the device tree part might be out of sync
-> > for a time.
-> 
-> Sure, this can potentially be a reason to not using the real clock node
-> and just use a hardcoded clock frequency for now, until the other clock
-> change is merged, then you can submit another patch to use it.
-> 
-> Also, is it not better to make the UARTs a static clock
-> > and not dependent on the clk driver?
-> > 
-> 
-> I disagree. You should always use the real clock driver for querying the
-> clock frequency, in the case when the clock driver is available.
-> 
-> Today one can change the core clock for UART in the bootloader for
-> various reasons (and we saw that happening a lot in the past), which in
-> this case will make your kernel not seeing any console output.
-> 
-> By always querying the clock rate based on real registers instead of a
-> hardcoded value, you don't have that issue and your kernel is less
-> dependent on any changes in the bootloader.
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
-Fair enough.  This is moot until the clk driver changes get pulled in.
-This file can be changed at that time :)
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 
-Thanks,
-Jon
+are available in the git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-driver-soc_v2
 
-> 
-> > Thanks,
-> > Jon
-> > 
+for you to fetch changes up to 045016902bf7abeeb2a86fc9284c30dce228f055:
+
+  soc: ti: qmss: make acc queue support optional in the driver (2015-10-13 13:49:04 -0700)
+
+----------------------------------------------------------------
+ARM Keystone SOC driver updates for 4.4
+	Documentation and support to be able to load the PDSP
+	firmware necessary for accumulator operation.
+
+----------------------------------------------------------------
+Murali Karicheri (3):
+      Documentation: dt: soc: Add description for knav qmss driver
+      soc: ti: add firmware file name as part of the driver
+      soc: ti: qmss: make acc queue support optional in the driver
+
+ Documentation/arm/keystone/knav-qmss.txt           | 56 ++++++++++++++++++
+ .../bindings/soc/ti/keystone-navigator-qmss.txt    |  1 -
+ drivers/soc/ti/knav_qmss.h                         |  3 +-
+ drivers/soc/ti/knav_qmss_acc.c                     | 10 +++-
+ drivers/soc/ti/knav_qmss_queue.c                   | 67 ++++++++++++++--------
+ 5 files changed, 109 insertions(+), 28 deletions(-)
+ create mode 100644 Documentation/arm/keystone/knav-qmss.txt
