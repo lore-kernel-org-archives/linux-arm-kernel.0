@@ -1,71 +1,53 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 14 Oct 2015 14:04:27 +0300
-Subject: [PATCH] ARM: dts: am437x-gp-evm: Add wakeup interrupt source for
- pixcir_i2c_ts
-In-Reply-To: <561E1C89.9080508@ti.com>
-References: <1444801956-17817-1-git-send-email-vigneshr@ti.com>
- <561E165B.3000907@ti.com> <561E1C89.9080508@ti.com>
-Message-ID: <561E36BB.7000309@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 14 Oct 2015 14:05:17 +0300
+Subject: [PATCH v4 3/3] arm64: dts: mt8173: Add nor flash node
+In-Reply-To: <CAGS+omDm=74d6cw7kXwkZ_Jy-faBz7z4-vJQX9ZFVNskQqSS-w@mail.gmail.com>
+References: <1444729160-26433-1-git-send-email-bayi.cheng@mediatek.com>
+ <1444729160-26433-4-git-send-email-bayi.cheng@mediatek.com>
+ <561D1642.3070105@cogentembedded.com>
+ <CAGS+omDm=74d6cw7kXwkZ_Jy-faBz7z4-vJQX9ZFVNskQqSS-w@mail.gmail.com>
+Message-ID: <561E36ED.7090103@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vignesh,
+Hello.
 
-On 14/10/15 12:12, Vignesh R wrote:
-> 
-> 
-> On 10/14/2015 02:16 PM, Roger Quadros wrote:
-> 
->>
->> On 14/10/15 08:52, Vignesh R wrote:
->>> On am437x-gp-evm, pixcir_i2c_ts can wakeup the system from lower power
->>> state via pinctrl and IO daisy chain using generic wakeirq framework.
->>> With commit 3fffd1283927 ("i2c: allow specifying separate wakeup
->>> interrupt in device tree") i2c core allows optional wakeirq to be
->>> specified via device tree. Add wakeup irq entry to enable pixcir_i2c_ts
->>> to wake the system from low power state.
+On 10/14/2015 4:07 AM, Daniel Kurtz wrote:
+
+>>> Add Mediatek nor flash node
 >>>
->>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>>> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
 >>> ---
->>>  arch/arm/boot/dts/am437x-gp-evm.dts | 5 +++++
->>>  1 file changed, 5 insertions(+)
+>>>    arch/arm64/boot/dts/mediatek/mt8173.dtsi | 15 +++++++++++++++
+>>>    1 file changed, 15 insertions(+)
 >>>
->>> diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
->>> index 22038f21f228..69e93af7df0d 100644
->>> --- a/arch/arm/boot/dts/am437x-gp-evm.dts
->>> +++ b/arch/arm/boot/dts/am437x-gp-evm.dts
->>> @@ -581,8 +581,13 @@
->>>  
->>>  		attb-gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
->>>  
->>> +		interrupts-extended = <&gpio3 22 GPIO_ACTIVE_HIGH>,
->>> +				      <&am43xx_pinmux 0x264>;
+>>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>>> b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>>> index d18ee42..385c2e4 100644
+>>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>>> @@ -365,6 +365,21 @@
+>>>                          status = "disabled";
+>>>                  };
+>>>
+>>> +               nor_flash: spi at 1100d000 {
 >>
->> How does this work?
->>
->> interrupts-extended property must have
->> 1) interrupt parent
->> 2) interrupt number
->> 3) interrupt flags
->>
->> Your change doesn't seem to comply with those requirements.
-> 
-> AFAIU, interrupts-extended has two parts: interrupt parent phandle and
-> interrupt specifier.
-> The number of cells in interrupt specifier is determined by
-> interrupt-cells property of interrupt parent node.
+>>     I don't think this is a good label name for a SPI controller.
+>
+> You think "spi" is not a good name for SPI controller?
+> Or you mean the label "nor_flash"?
 
-Got it.
+    I think I said clearly: "label". :-)
 
-> In above case, gpio3 has interrupt-cells = 2 hence interrupt specifier
-> has interrupt number and interrupt flag field.
+> Would you prefer:
+>
+>    spi_nor_flash: spi at 1100d000
 
-But is GPIO_ACTIVE_HIGH an interrupt flag?
+    I'd prefer the "_nor_flash" part to be dropped, to be used for the real 
+flash device (if needed) which is a sub-node of this node.
 
-> But in case am43xx_pinmux node, interrupt-cells is 1 hence has no
-> interrupt flag field.
-> 
-Understood, thanks. Might be worth adding a comment as to what 0x264 means though.
+[...]
 
-cheers,
--roger
+> -Dan
+
+MBR, Sergei
