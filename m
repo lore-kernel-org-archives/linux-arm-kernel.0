@@ -1,31 +1,34 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 14 Oct 2015 16:36:28 +0200
-Subject: [PATCH] arm: pxa: raumfeld: make some variables static
-In-Reply-To: <561E2063.8030905@zonque.org> (Daniel Mack's message of "Wed, 14
- Oct 2015 11:29:07 +0200")
-References: <1444814866-4639-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <561E2063.8030905@zonque.org>
-Message-ID: <877fmp4ivn.fsf@belgarion.home>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 14 Oct 2015 20:18:14 +0530
+Subject: [PATCH 10/13] dmaengine: ti-dma-crossbar: Add support for
+ crossbar on AM33xx/AM43xx
+In-Reply-To: <1444828344-21378-11-git-send-email-peter.ujfalusi@ti.com>
+References: <1444828344-21378-1-git-send-email-peter.ujfalusi@ti.com>
+ <1444828344-21378-11-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20151014144814.GW27370@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack <daniel@zonque.org> writes:
+On Wed, Oct 14, 2015 at 04:12:21PM +0300, Peter Ujfalusi wrote:
+> The DMA event crossbar on AM33xx/AM43xx is different from the one found in
+> DRA7x family.
+> Instead of a single event crossbar it has 64 identical mux attached to each
+> eDMA event line. When the 0 event mux is selected, the default mapped event
+> is going to be routed to the corresponding eDMA event line. If different
+> mux is selected, then the selected event is going to be routed to the given
+> eDMA event.
 
-> On 10/14/2015 11:27 AM, Uwe Kleine-K?nig wrote:
->> This fixes the following sparse warnings:
->> 
->> 	arch/arm/mach-pxa/raumfeld.c:510:24: warning: symbol 'raumfeld_w1_gpio_device' was not declared. Should it be static?
->> 	arch/arm/mach-pxa/raumfeld.c:632:31: warning: symbol 'raumfeld_spi_platform_data' was not declared. Should it be static?
->> 	arch/arm/mach-pxa/raumfeld.c:851:28: warning: symbol 'audio_va_initdata' was not declared. Should it be static?
->> 	arch/arm/mach-pxa/raumfeld.c:883:28: warning: symbol 'audio_dummy_initdata' was not declared. Should it be static?
->> 	arch/arm/mach-pxa/raumfeld.c:931:28: warning: symbol 'max8660_v6_subdev_data' was not declared. Should it be static?
->> 
->> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->
-> Acked-by: Daniel Mack <daniel@zonque.org>
-Queued into pxa/for-next, thanks.
+Why is crossbar patch in edma series?
 
-Cheers.
+> +static void ti_am335x_xbar_free(struct device *dev, void *route_data)
+> +{
+> +	struct ti_am335x_xbar_data *xbar = dev_get_drvdata(dev);
+> +	struct ti_am335x_xbar_map *map = route_data;
+> +
+> +	dev_err(dev, "Unmapping XBAR event %u on channel %u\n",
+> +		map->mux_val, map->dma_line);
 
---
-Robert
+Err ?
+
+-- 
+~Vinod
