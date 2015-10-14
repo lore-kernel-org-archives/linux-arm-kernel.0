@@ -1,39 +1,37 @@
 From: B48286@freescale.com (Zhiqiang Hou)
-Date: Wed, 14 Oct 2015 19:34:54 +0800
-Subject: [PATCH V3 2/6] watchdog: Add support for Freescale Layerscape
- platforms
+Date: Wed, 14 Oct 2015 19:34:55 +0800
+Subject: [PATCH V3 3/6] Documentation: DT: Add entry for FSL LS1043ARDB board
 In-Reply-To: <1444822498-16477-1-git-send-email-B48286@freescale.com>
 References: <1444822498-16477-1-git-send-email-B48286@freescale.com>
-Message-ID: <1444822498-16477-3-git-send-email-B48286@freescale.com>
+Message-ID: <1444822498-16477-4-git-send-email-B48286@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shaohui Xie <Shaohui.Xie@freescale.com>
+From: Mingkai Hu <Mingkai.Hu@freescale.com>
 
-Modify watchdog/Kconfig file to support Layerscape platforms.
-
-Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
-Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
+Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
 Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
 ---
 V3:
  - No change.
 
- drivers/watchdog/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/fsl.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 79e1aa1..448dbaf 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -446,7 +446,7 @@ config MAX63XX_WATCHDOG
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index 34c88b0..752a685 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -131,6 +131,10 @@ Example:
+ Freescale ARMv8 based Layerscape SoC family Device Tree Bindings
+ ----------------------------------------------------------------
  
- config IMX2_WDT
- 	tristate "IMX2+ Watchdog"
--	depends on ARCH_MXC
-+	depends on ARCH_MXC || ARCH_LAYERSCAPE
- 	select REGMAP_MMIO
- 	select WATCHDOG_CORE
- 	help
++LS1043A ARMv8 based RDB Board
++Required root node properties:
++    - compatible = "fsl,ls1043a-rdb", "fsl,ls1043a";
++
+ LS2080A ARMv8 based Simulator model
+ Required root node properties:
+     - compatible = "fsl,ls2080a-simu", "fsl,ls2080a";
 -- 
 2.1.0.27.g96db324
