@@ -1,38 +1,39 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 14 Oct 2015 11:08:15 +0200
-Subject: [PATCH] mutex: make mutex_lock_nested an inline function
-In-Reply-To: <11240940.NHO2vFoJOz@wuerfel>
-References: <11282238.AHmyWliPRj@wuerfel>
- <20151014082050.GQ17308@twins.programming.kicks-ass.net>
- <20151014083707.GR11639@twins.programming.kicks-ass.net>
- <11240940.NHO2vFoJOz@wuerfel>
-Message-ID: <20151014090815.GS17308@twins.programming.kicks-ass.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Oct 2015 11:09:16 +0200
+Subject: [PATCH v9 3/6] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <CAFiDJ58Uwpv=xUXbBNQcd4FQq=fHGhtCnjTb7TKQBJ0TOxRLig@mail.gmail.com>
+References: <1444790492-4051-1-git-send-email-lftan@altera.com>
+ <6044983.WR9BTgsOaA@wuerfel>
+ <CAFiDJ58Uwpv=xUXbBNQcd4FQq=fHGhtCnjTb7TKQBJ0TOxRLig@mail.gmail.com>
+Message-ID: <5088538.zEUtS0EC0S@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 11:00:20AM +0200, Arnd Bergmann wrote:
-> On Wednesday 14 October 2015 10:37:07 Peter Zijlstra wrote:
+On Wednesday 14 October 2015 16:32:25 Ley Foon Tan wrote:
+> On Wed, Oct 14, 2015 at 4:20 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 14 October 2015 10:41:29 Ley Foon Tan wrote:
+> >> +static int altera_pcie_remove(struct platform_device *pdev)
+> >> +{
+> >> +     struct altera_pcie *pcie = platform_get_drvdata(pdev);
+> >> +
+> >> +     altera_pcie_free_irq_domain(pcie);
+> >> +     platform_set_drvdata(pdev, NULL);
+> >> +     return 0;
+> >> +}
+> >
+> > I just noticed this. Does it actually work to unload the module
+> > and tear down all the pci_dev structures in a safe way?
+> Good catch. It only can be compiled as builtin-moduley now, so we can
+> remove this _remove callback function.
 
-> > > Uuh, I just looked at next and saw this regulator_lock_supply()
-> > > function. How is that limited? subclass must be <8 otherwise bad things
-> > > happen.
-> > 
-> > Also, the function appears unused, just delete it 
-> 
-> That was my first suggestion as well when I ran into 
-> 
-> drivers/regulator/core.c:139:13: warning: 'regulator_lock_supply' defined but not used
-> 
-> but apparently this is work-in-progress and the plan is to use it
-> in 4.4 when the rest of the currently-under-review patches are merged.
+I think we should change both: make it possible to load the
+driver dynamically, and remove the altera_pcie_remove function.
 
-And here I thought we had a fairly strong rule that we should not merge
-unused code :/
+You can prevent the module from being unloaded if you also remove
+the module_platform_driver() directive and add a module_init()
+without a matching module_exit().
 
-In any case, whomever wrote that function had better first explain why
-its not broken.
+Please also add a '.suppress_bind_attrs = true,' flag in the driver
+struct to prevent manual unbinding.
 
-And I'm not too keen on making mutex_lock_nested() an inline due it
-being too easy to generate code with it. I'd much rather work around the
-occasional warning than have to deal with silent but unintended code
-spills.
+	Arnd
