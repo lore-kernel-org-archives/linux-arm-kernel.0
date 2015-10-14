@@ -1,89 +1,74 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Wed, 14 Oct 2015 16:47:59 +0200
-Subject: l2c: Kernel panic in l2c310_enable() in non-secure mode
-In-Reply-To: <561E6407.6000002@sigmadesigns.com>
-References: <561E6407.6000002@sigmadesigns.com>
-Message-ID: <561E6B1F.1070701@sigmadesigns.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 14 Oct 2015 16:48:31 +0200
+Subject: [PATCH 2/4] ARM: OMAP2+: remove custom abort handler for t410
+In-Reply-To: <1444834113-18122-1-git-send-email-l.stach@pengutronix.de>
+References: <1444834113-18122-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1444834113-18122-3-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/2015 16:17, Marc Gonzalez wrote:
+This is not needed anymore. Handling a potentially pending imprecise external
+abort left behind by the bootloader is now done in a slightly safer way inside
+the common ARM startup code.
 
-> Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP ARM
-> 
-> On my platform, Linux v4.2 running in non-secure mode panics in
-> l2c310_enable() with the pc pointing at this instruction:
-> 
-> c03390cc: ee013f30 mcr 15, 0, r3, cr1, cr0, {1}
-> 
-> which corresponds to set_auxcr IIUC.
-> 
-> static inline void set_auxcr(unsigned int val)
-> {
->   asm volatile("mcr p15, 0, %0, c1, c0, 1  @ set AUXCR" : : "r" (val));
->   isb();
-> }
-> 
-> which comes from this part in l2c310_enable:
-> 
-> 	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
-> 		set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
-> 		cpu_notifier(l2c310_cpu_enable_flz, 0);
-> 	}
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/mach-omap2/pdata-quirks.c | 29 -----------------------------
+ 1 file changed, 29 deletions(-)
 
-Just to be sure, I changed set_auxcr() to a NOP. The kernel does not
-panic with that setup, and I can see the boot messages:
-
-[    0.000000] l2x0_of_init: FOO
-[    0.000000] L2C-310 enabling early BRESP for Cortex-A9
-[    0.000000] L2C-310: enabling full line of zeros but not enabled in Cortex-A9
-[    0.000000] reg=0x104 val=0x66460801
-[    0.000000] reg=0x100 val=0x1
-[    0.000000] L2C-310 I prefetch enabled, offset 1 lines
-[    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
-[    0.000000] L2C-310 cache controller enabled, 8 ways, 512 kB
-[    0.000000] L2C-310: CACHE_ID 0x410000c8, AUX_CTRL 0x62460801
-
-The "reg=0x%x val=0x%lx\n" lines are from tango_l2c_write_sec()
-
-It seems the firmware forgot to enable FLOZ.
-
-
-> The L2C-310 documentation states:
->> When the L2C-310 AXI slave ports receive a write transaction with
->> AWUSERSx[10], it indicates that the write actually targets a whole
->> cache line and that all data of this cache line must be reset to
->> zero. The Cortex-A9 processor is likely to use this feature when a
->> CPU is executing a memset routine to initialise a particular memory
->> area. When the L2C-310 receives such a write transaction it ignores
->> the AXI attributes attached to the transaction, size, length, data,
->> and strobes for example, because the whole cache line must be reset.
->> This behavior is not compatible with the AXI protocol, it is disabled
->> by default. You can enable it by setting the Full Line of Zero Enable
->> bit of the Auxiliary Control Register, bit[0]. This behavior also
->> relies on an enable bit in the Cortex-A9 processor. You must take
->> care if you enable this feature because correct behavior relies on
->> consistent enabling in both the Cortex-A9 processor and the L2C-310.
-> 
-> 
-> According to the Cortex A9 documentation,
-> ACTLR is RO in non-secure mode if NSACR[18]=0 and RW if NSACR[18]=1
-> 
-> I suppose writing to a RO register cause the exception I see?
-> 
-> 
-> Commit 8abd259f657d5 ("l2c: provide generic hook to intercept
-> writes to secure registers") introduced a mechanism for non-secure
-> platforms to define how to write to the L2CC AUXCTRL register.
-> 
->>    When Linux is running in the non-secure world, any write to a secure
->>    L2C register will generate an abort.  Platforms normally have to call
->>    firmware to work around this.  Provide a hook for them to intercept
->>    any L2C secure register write.
-> 
-> Is there a similar mechanism for asking the firmware to write
-> to the CP15 ACTRL?
-> 
-> I suppose a work-around might be to set NSACR[18]?
-
-Regards.
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index ea56397599c2..3a2bc2a88db4 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -24,9 +24,6 @@
+ #include <linux/platform_data/iommu-omap.h>
+ #include <linux/platform_data/wkup_m3.h>
+ 
+-#include <asm/siginfo.h>
+-#include <asm/signal.h>
+-
+ #include "common.h"
+ #include "common-board-devices.h"
+ #include "dss-common.h"
+@@ -385,29 +382,6 @@ static void __init omap3_pandora_legacy_init(void)
+ }
+ #endif /* CONFIG_ARCH_OMAP3 */
+ 
+-#ifdef CONFIG_SOC_TI81XX
+-static int fault_fixed_up;
+-
+-static int t410_abort_handler(unsigned long addr, unsigned int fsr,
+-			      struct pt_regs *regs)
+-{
+-	if ((fsr == 0x406 || fsr == 0xc06) && !fault_fixed_up) {
+-		pr_warn("External imprecise Data abort at addr=%#lx, fsr=%#x ignored.\n",
+-			addr, fsr);
+-		fault_fixed_up = 1;
+-		return 0;
+-	}
+-
+-	return 1;
+-}
+-
+-static void __init t410_abort_init(void)
+-{
+-	hook_fault_code(16 + 6, t410_abort_handler, SIGBUS, BUS_OBJERR,
+-			"imprecise external abort");
+-}
+-#endif
+-
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+ static struct iommu_platform_data omap4_iommu_pdata = {
+ 	.reset_name = "mmu_cache",
+@@ -536,9 +510,6 @@ static struct pdata_init pdata_quirks[] __initdata = {
+ 	{ "openpandora,omap3-pandora-600mhz", omap3_pandora_legacy_init, },
+ 	{ "openpandora,omap3-pandora-1ghz", omap3_pandora_legacy_init, },
+ #endif
+-#ifdef CONFIG_SOC_TI81XX
+-	{ "hp,t410", t410_abort_init, },
+-#endif
+ #ifdef CONFIG_SOC_OMAP5
+ 	{ "ti,omap5-uevm", omap5_uevm_legacy_init, },
+ #endif
+-- 
+2.6.1
