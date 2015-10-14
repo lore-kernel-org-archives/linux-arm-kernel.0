@@ -1,26 +1,49 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 14 Oct 2015 11:32:48 -0700
-Subject: [PATCH v1 1/2] clk: samsung: exynos5250: Add DISP1 clocks
-In-Reply-To: <1444819457-27519-2-git-send-email-tomeu.vizoso@collabora.com>
-References: <1444819457-27519-1-git-send-email-tomeu.vizoso@collabora.com>
- <1444819457-27519-2-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20151014183248.GG26883@codeaurora.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 14 Oct 2015 21:05:43 +0200
+Subject: [PATCH] ARM: pxa: fix pxa3xx DFI lockup hack
+In-Reply-To: <5765189.ly9CxV2CMz@wuerfel> (Arnd Bergmann's message of "Wed, 14
+ Oct 2015 17:14:17 +0200")
+References: <5287252.pkh9x0t1Y6@wuerfel> <878u786mtr.fsf@belgarion.home>
+ <5765189.ly9CxV2CMz@wuerfel>
+Message-ID: <8737xd46ew.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14, Tomeu Vizoso wrote:
-> When the DISP1 power domain is powered off, there's two clocks that need
-> to be temporarily reparented to OSC, and back to their original parents
-> when the domain is powered on again.
-> 
-> We expose these two clocks in the DT bindings so that the DT node of the
-> power domain can reference them.
-> 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> ---
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> On Monday 12 October 2015 19:03:44 Robert Jarzmik wrote:
+>> Arnd Bergmann <arnd@arndb.de> writes:
+>> 
+>> > Some recently added code to avoid a bug introduced a build error
+>> > when CONFIG_PM is disabled and a macro is hidden:
+>> >
+>> > arch/arm/mach-pxa/pxa3xx.c: In function 'pxa3xx_init':
+>> > arch/arm/mach-pxa/pxa3xx.c:439:3: error: 'NDCR' undeclared (first use in this function)
+>> >    NDCR = (NDCR & ~NDCR_ND_ARB_EN) | NDCR_ND_ARB_CNTL;
+>> >    ^
+>> >
+>> > This moves the macro outside of the #ifdef so it can be
+>> > referenced correctly.
+>> >
+>> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> > Fixes: adf3442cc890 ("ARM: pxa: fix DFI bus lockups on startup")
+>> > ---
+>> > We merged the patch that introduced this as a fix for 4.3, so we should
+>> > probably add this one too.
+>> Oh yes, didn't see that ifdef, and all my non-regression defconfigs have
+>> CONFIG_PM ...
+>> 
+>> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>> 
+>> So do you want to take it directly (my preferred solution) or do you want a
+>> proper pull request for in the -rc5 timeframe ?
+>
+> Applied now.
+>
+> 	Arnd
+Thanks.
+
+Cheers.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Robert
