@@ -1,51 +1,28 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Wed, 14 Oct 2015 17:41:26 +0200
-Subject: [PATCH v2 2/4] dmaengine: Add STM32 DMA driver
-In-Reply-To: <561E7497.1050105@linaro.org>
-References: <1444745127-1105-1-git-send-email-cedric.madianga@gmail.com>
- <1444745127-1105-3-git-send-email-cedric.madianga@gmail.com>
- <561D1689.90703@linaro.org>
- <CAOAejn1N=dFZ3nQ_hNznJQX1-fkP3r=vdYuWY4OMH65PrW3xVg@mail.gmail.com>
- <CAOAejn2pcFSn3Hf=j6zgg6Ui6GjJZrtRch6ywByHaVLsTLMk6A@mail.gmail.com>
- <561E58AC.80207@linaro.org>
- <CAOAejn1XqvZDmCgGr5rmZoz2EzFUyxtmpSm0_atLr81rSJrEcw@mail.gmail.com>
- <561E658D.1070900@linaro.org>
- <CAOAejn1spB+BCRh9+jJtaKxEmaRc04nveF3rQEbT7kLMH0kOkg@mail.gmail.com>
- <561E7497.1050105@linaro.org>
-Message-ID: <CAOAejn0chZD5mgi8WrW3ow3APUHTJOYP4=G2jCZ_Po4qe9eACw@mail.gmail.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Wed, 14 Oct 2015 08:41:06 -0700
+Subject: [PATCH v4 0/3]
+In-Reply-To: <1444832235-15263-1-git-send-email-m-karicheri2@ti.com>
+References: <1444832235-15263-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <561E7792.409@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-14 17:28 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
-> On 14/10/15 16:26, M'boumba Cedric Madianga wrote:
->>
->> 2015-10-14 16:24 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
->>>
->>>
->>> Hmnnn...
->>>
->>> The dmaengine framework will WARN_ONCE() if an dmaengine is removed
->>> whilst
->>> it is active and also works hard to ensure dmaengine modules are not
->>> removed
->>> whilst there are active drivers using the framework.
->>>
->>> How do we get into this function whilst there is still an active DMA
->>> channels?
->>
->>
->> For example, when a user try "rmmod stm32-dma" in uart console.
->> It will enter in stm32_dma_remove while there is potentially still active
->> DMA.
+10/14/2015 7:17 AM, Murali Karicheri wrote:
+> This patch series enable accumulator queue support for K2 SoCs. Accumulator
+> queues are a type of qmss queue that is monitored by the PDSP firmware and
+> accumulated. Host is interrupted by PDSP firmware when packets become
+> available in a ring buffer shared between the host and PDSP.
 >
+> There was an issue raised when merging the original patch set at
+>   (1) https://lkml.org/lkml/2015/9/4/681
+> 	[PATCH v1 1/2] soc: ti: display firmware file name as part of boot log
+>   (2) https://lkml.org/lkml/2015/9/4/680
+> 	[PATCH v1 2/2] ARM: dts: keystone: enable accumulator channels
 >
-> Check dmaengine.c for yourself but I think in this case the dmaengine
-> framework will hold references to the module and prevent the remove from
-> taking place.
+> This series fixes the issues raised against v3. Maintainer, could you please
+> apply this series to v4.4 next please at your earliest opportunity.
+>
+I have picked up the series. Thanks for quick turnaround.
 
-Yes I did it.
-As far I understand, the dmaengine framework will print a warning
-message but doesn't stop removing operation if there are some active
-clients.
-
-Cedric.
+Regards,
+Santosh
