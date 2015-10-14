@@ -1,128 +1,70 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Wed, 14 Oct 2015 15:27:43 -0600
-Subject: [Linaro-acpi] [PATCH v5 0/5] Provide better MADT subtable sanity
- checks
-In-Reply-To: <3556673.VbpJrNsKqP@vostro.rjw.lan>
-References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
- <561C8351.3030304@erley.org> <561EB923.6010109@redhat.com>
- <3556673.VbpJrNsKqP@vostro.rjw.lan>
-Message-ID: <561EC8CF.3090101@redhat.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Oct 2015 14:38:58 -0700
+Subject: [GIT PULL 1/2] omap clean-up for v4.4
+Message-ID: <pull-1444855886-636599>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2015 03:25 PM, Rafael J. Wysocki wrote:
-> On Wednesday, October 14, 2015 02:20:51 PM Al Stone wrote:
->> This is a multi-part message in MIME format.
->> --------------020400080004050109020606
->> Content-Type: text/plain; charset=utf-8
->> Content-Transfer-Encoding: 7bit
->>
->> On 10/12/2015 10:06 PM, Pat Erley wrote:
->>> On 10/12/2015 01:52 PM, Al Stone wrote:
->>>> On 10/11/2015 09:58 PM, Pat Erley wrote:
->>>>> On 10/11/2015 08:49 PM, Hanjun Guo wrote:
->>>>>> On 10/12/2015 11:08 AM, Pat Erley wrote:
->>>>>>> On 10/05/2015 10:12 AM, Al Stone wrote:
->>>>>>>> On 10/05/2015 07:39 AM, Rafael J. Wysocki wrote:
->>>>>>>>> On Wednesday, September 30, 2015 10:10:16 AM Al Stone wrote:
->>>>>>>>>> On 09/30/2015 03:00 AM, Hanjun Guo wrote:
->>>>>>>>>>> On 2015/9/30 7:45, Al Stone wrote:
->>>>>>>>>>>> NB: this patch set is for use against the linux-pm bleeding edge
->>>>>>>>>>>> branch.
->>>>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>> [snip...]
->>>>>>>>>>
->>>>>>>>>>>
->>>>>>>>>>> For this patch set,
->>>>>>>>>>>
->>>>>>>>>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>>>>>>>>
->>>>>>>>>>> Thanks
->>>>>>>>>>> Hanjun
->>>>>>>>>>
->>>>>>>>>> Thanks, Hanjun!
->>>>>>>>>
->>>>>>>>> Series applied, thanks!
->>>>>>>>>
->>>>>>>>> Rafael
->>>>>>>>>
->>>>>>>>
->>>>>>>> Thanks, Rafael!
->>>>>>>>
->>>>>>>
->>>>>>> Just decided to test out linux-next (to see the new nouveau cleanups).
->>>>>>> This change set prevents my Lenovo W510 from booting properly.
->>>>>>>
->>>>>>> Reverting: 7494b0 "ACPI: add in a bad_madt_entry() function to
->>>>>>> eventually replace the macro"
->>>>>>>
->>>>>>> Gets the system booting again.  I'm attaching my dmesg from the failed
->>>>>>> boot, who wants the acpidump?
->>>>>>
->>>>>> [    0.000000] ACPI: undefined version for either FADT 4.0 or MADT 1
->>>>>> [    0.000000] ACPI: Error parsing LAPIC address override entry
->>>>>> [    0.000000] ACPI: Invalid BIOS MADT, disabling ACPI
->>>>>>
->>>>>> Seems the MADT revision is not right, could you dump the ACPI MADT
->>>>>> (APIC) table and send it out? I will take a look :)
->>>>>>
->>>>>> Thanks
->>>>>> Hanjun
->>>>>
->>>>> Here ya go, enjoy.  Feel free to CC me on any patches that might fix it.
->>>>
->>>> Pat,
->>>>
->>>> Would you mind sending a copy of the FADT, also, please?  The first of the
->>>> ACPI messages is a check of version correspondence between the FADT and MADT,
->>>> while the second message is from looking at just an MADT subtable.  Thanks
->>>> for sending the MADT out -- that helps me quite a lot in thinking this through.
->>>>
->>>> BTW, whoever is providing the BIOS (Lenovo, I assume) may want to have a look
->>>> at these, also:
->>>>
->>>> [    0.000000] ACPI BIOS Warning (bug): 32/64X length mismatch in
->>>> FADT/Pm1aControlBlock: 16/32 (20150818/tbfadt-623)
->>>> [    0.000000] ACPI BIOS Warning (bug): Invalid length for
->>>> FADT/Pm1aControlBlock: 32, using default 16 (20150818/tbfadt-704)
->>>>
->>>> Not inherently dangerous, but definitely sloppy and mind-numbingly easy to
->>>> avoid, IIRC.
->>>>
->>>
->>> Here ya go.
->>
->> Okay.  There's just a lot of weird stuff out there in ACPI-land.  I've
->> attached four minor fixes for the special cases that have been reported
->> (well, the last one is actually a fix for a typo in the spec, but just
->> the same...).
->>
->> These should apply on top of linux-next; would you mind trying them out
->> to make sure I didn't break anything else on your laptop?  If they behave
->> as I hope they will, I think I'll have covered all the places where the
->> checking of MADT subtables needs to be be relaxed a bit.  These work for
->> me on arm64, but if they work for you and a couple of other testers, then
->> I'll send them to Rafael properly.
-> 
-> Well, you might as well submit them properly right away, so I could pick
-> them up and put them into my linux-next branch, which then might make it
-> easier for some people to test them.
-> 
-> Thanks,
-> Rafael
-> 
+The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
 
-Fair enough.  I was just being overly cautious about possible further breakage.
+  Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
 
-Done.  Patch series sent to the list.
+are available in the git repository at:
 
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.4/cleanup-pt1
+
+for you to fetch changes up to d42f265a5d7a352d40fa2911666cd5236bc3ccaf:
+
+  ARM: OMAP3: clock: remove un-used core dpll re-program code (2015-10-14 12:35:27 -0700)
+
+----------------------------------------------------------------
+Clean-up for omaps for v4.4 merge window:
+
+- Remove legacy omap3 ISP code as the driver is DT only
+
+- Remove VoiceBlue board support as it's been unused over
+  10 years now
+
+- Remove unused polarity control macros for TWL
+
+- Remove two unneeded semicolons
+
+- Remove unused core dpll code for reprogramming the rates
+
+Note that this branch is against v4.3-rc4 as that contains critical
+MMC related fixes to boot with MMC working on most omaps.
+
+----------------------------------------------------------------
+Javier Martinez Canillas (2):
+      ARM: OMAP3: vc: Remove unused macros
+      ARM: OMAP2+: Remove unneeded semicolons
+
+Ladislav Michl (1):
+      ARM: OMAP1: Remove board support for VoiceBlue board
+
+Laurent Pinchart (1):
+      ARM: OMAP2+: Remove legacy OMAP3 ISP instantiation
+
+Tero Kristo (1):
+      ARM: OMAP3: clock: remove un-used core dpll re-program code
+
+ arch/arm/mach-omap1/Kconfig                        |   7 -
+ arch/arm/mach-omap1/Makefile                       |   1 -
+ arch/arm/mach-omap1/board-voiceblue.c              | 296 ------------------
+ arch/arm/mach-omap1/include/mach/board-voiceblue.h |  19 --
+ arch/arm/mach-omap2/Makefile                       |   3 -
+ arch/arm/mach-omap2/clkt34xx_dpll3m2.c             | 122 --------
+ arch/arm/mach-omap2/devices.c                      |  53 ----
+ arch/arm/mach-omap2/devices.h                      |  19 --
+ arch/arm/mach-omap2/pm44xx.c                       |   2 +-
+ arch/arm/mach-omap2/powerdomains3xxx_data.c        |   2 +-
+ arch/arm/mach-omap2/sram.c                         |  25 --
+ arch/arm/mach-omap2/sram.h                         |  14 -
+ arch/arm/mach-omap2/sram34xx.S                     | 346 ---------------------
+ arch/arm/mach-omap2/vc.c                           |   4 -
+ 14 files changed, 2 insertions(+), 911 deletions(-)
+ delete mode 100644 arch/arm/mach-omap1/board-voiceblue.c
+ delete mode 100644 arch/arm/mach-omap1/include/mach/board-voiceblue.h
+ delete mode 100644 arch/arm/mach-omap2/clkt34xx_dpll3m2.c
+ delete mode 100644 arch/arm/mach-omap2/devices.h
+ delete mode 100644 arch/arm/mach-omap2/sram34xx.S
