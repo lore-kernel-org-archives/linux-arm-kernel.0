@@ -1,60 +1,46 @@
-From: Yuantian.Tang@freescale.com (Tang Yuantian)
-Date: Wed, 14 Oct 2015 16:46:52 +0800
-Subject: [PATCH] ahci: qoriq: Fix a compiling warning
-Message-ID: <1444812412-33321-1-git-send-email-Yuantian.Tang@freescale.com>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Wed, 14 Oct 2015 10:54:35 +0200
+Subject: [PATCH v2 1/4] dt-bindings: Document the STM32 DMA bindings
+In-Reply-To: <1444745127-1105-2-git-send-email-cedric.madianga@gmail.com>
+References: <1444745127-1105-1-git-send-email-cedric.madianga@gmail.com>
+ <1444745127-1105-2-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <CAOAejn1hG34-d=Eq0SUDoay=B04sqoSNnxL++djBDrzdT0f61w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kbuild test robot reports the warnings:
-drivers/ata/ahci_qoriq.c: In function 'ahci_qoriq_hardreset':
->> include/asm-generic/io.h:163:2: warning: 'px_is' may be used
->> uninitialized in this function [-Wuninitialized]
-drivers/ata/ahci_qoriq.c:70:14: note: 'px_is' was declared here
->> include/asm-generic/io.h:163:2: warning: 'px_cmd' may be used
->> uninitialized in this function [-Wuninitialized]
-drivers/ata/ahci_qoriq.c:70:6: note: 'px_cmd' was declared here
+Hi Mark,
 
-This patch fixed it by introducing a local variable.
+> +5. A 32bit mask specifying the DMA FIFO configuration
+> + -bit 0-1: Fifo threshold
+> +       0x0: 1/4 full FIFO
+> +       0x1: 1/2 full FIFO
+> +       0x2: 3/4 full FIFO
+> +       0x3:full FIFO
+> + -bit 2: Direct mode
+> +       0x0: enabled
+> +       0x1: disabled
+> +
+Finally, I find a way to handle the above inputs outside DT.
+So, I will remove it from DT in the next version.
+Thanks.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-I found this warning again on gcc version 4.8.3 20131202.
-So this warning may not go way with newer gcc version.
-I verified Arnd's suggestion and it works.
-So please apply this patch which I sent on behalf of Arnd.
+To sum-up, the remaining information that the client will have to
+specify from DT are describing below.
+Is it ok ?
+> + -bit 9: Peripheral Increment Address
+> +       0x0: no address increment between transfers
+> +       0x1: increment address between transfers
+> + -bit 10: Memory Increment Address
+> +       0x0: no address increment between transfers
+> +       0x1: increment address between transfers
+> + -bit 15: Peripheral Increment Offset Size
+> +       0x0: offset size is linked to the peripheral bus width
+> +       0x1: offset size is fixed to 4 (32-bit alignment)
+> + -bit 16-17: Priority level
+> +       0x0: low
+> +       0x1: medium
+> +       0x2: high
+> +       0x3: very high
 
- drivers/ata/ahci_qoriq.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/ata/ahci_qoriq.c b/drivers/ata/ahci_qoriq.c
-index e5e4988..58c1a94 100644
---- a/drivers/ata/ahci_qoriq.c
-+++ b/drivers/ata/ahci_qoriq.c
-@@ -76,6 +76,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
- 	struct ata_taskfile tf;
- 	bool online;
- 	int rc;
-+	bool ls1021a_workaround = (qoriq_priv->type == AHCI_LS1021A);
- 
- 	DPRINTK("ENTER\n");
- 
-@@ -92,7 +93,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
- 	 * After the sequence is complete, software should restore the
- 	 * PxCMD and PxIS with the stored values.
- 	 */
--	if (qoriq_priv->type == AHCI_LS1021A) {
-+	if (ls1021a_workaround) {
- 		px_cmd = readl(port_mmio + PORT_CMD);
- 		px_is = readl(port_mmio + PORT_IRQ_STAT);
- 	}
-@@ -106,7 +107,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
- 				 ahci_check_ready);
- 
- 	/* restore the PxCMD and PxIS on ls1021 */
--	if (qoriq_priv->type == AHCI_LS1021A) {
-+	if (ls1021a_workaround) {
- 		px_val = readl(port_mmio + PORT_CMD);
- 		if (px_val != px_cmd)
- 			writel(px_cmd, port_mmio + PORT_CMD);
--- 
-2.1.0.27.g96db324
+BR,
+Cedric
