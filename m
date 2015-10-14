@@ -1,18 +1,18 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Oct 2015 17:12:51 +0200
-Subject: [GIT PULL] ARM: berlin: Fixes for v4.3 (round 1)
-In-Reply-To: <1444416446-3004-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1444416446-3004-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <5329787.ezZiD0czE2@wuerfel>
+Date: Wed, 14 Oct 2015 17:13:10 +0200
+Subject: [GIT PULL] ARM: imx: fixes for 4.3, 2nd round
+In-Reply-To: <20151012134541.GA18611@tiger>
+References: <20151012134541.GA18611@tiger>
+Message-ID: <6010065.Npl9nn7zOd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 October 2015 20:47:26 Sebastian Hesselbarth wrote:
-> Arnd, Kevin, Olof,
+On Monday 12 October 2015 21:45:41 Shawn Guo wrote:
+> The i.MX fixes for 4.3, 2nd round:
 > 
-> this is mach-berlin fixes for v4.3 with a patch to fix a wrong usb phy
-> compatible on BG2Q that I have missed to pick up last cycle.
-> The patch is, like the others from that patch set, tagged for -stable.
+> It includes a single fix for i.MX7D, which corrects the base address of
+> UART2 in device tree.
+> 
 
 Pulled into fixes, thanks!
 
