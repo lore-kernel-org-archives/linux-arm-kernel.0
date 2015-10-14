@@ -1,114 +1,37 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Wed, 14 Oct 2015 17:37:55 +0200
-Subject: [PATCH v2 05/17] irqchip: Convert all alloc/xlate users from
- of_node to fwnode
-In-Reply-To: <561E7545.9070305@arm.com>
-References: <1444737105-31573-1-git-send-email-marc.zyngier@arm.com>
- <1444737105-31573-6-git-send-email-marc.zyngier@arm.com>
- <561E7408.3050106@linaro.org> <561E7545.9070305@arm.com>
-Message-ID: <561E76D3.9070105@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Oct 2015 17:38:35 +0200
+Subject: [PATCH] VFIO: platform: AMD xgbe reset module
+In-Reply-To: <1444836792-2405-1-git-send-email-eric.auger@linaro.org>
+References: <1444836792-2405-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <22278785.Xzxnmu2YlU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.10.2015 17:31, Marc Zyngier wrote:
-> On 14/10/15 16:26, Tomasz Nowicki wrote:
->> Hi Marc,
->>
->> On 13.10.2015 13:51, Marc Zyngier wrote:
->>> Since we now have a generic data structure to express an
->>> interrupt specifier, convert all hierarchical irqchips that
->>> are OF based to use a fwnode_handle as part of their alloc
->>> and xlate (which becomes translate) callbacks.
->>>
->>> As most of these drivers have dependencies (they exchange IRQ
->>> specifiers), change them all in a single, massive patch...
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>    arch/arm/mach-exynos/suspend.c       | 55 ++++++++++++++++---------------
->>>    arch/arm/mach-imx/gpc.c              | 55 ++++++++++++++++---------------
->>>    arch/arm/mach-omap2/omap-wakeupgen.c | 55 ++++++++++++++++---------------
->>>    drivers/irqchip/irq-crossbar.c       | 62 ++++++++++++++++++----------------
->>>    drivers/irqchip/irq-gic-v2m.c        | 18 ++++++----
->>>    drivers/irqchip/irq-gic-v3-its.c     | 20 ++++++-----
->>>    drivers/irqchip/irq-gic-v3.c         | 49 +++++++++++++--------------
->>>    drivers/irqchip/irq-gic.c            | 33 ++++++++++++++++---
->>>    drivers/irqchip/irq-imx-gpcv2.c      | 64 ++++++++++++++++--------------------
->>>    drivers/irqchip/irq-mtk-sysirq.c     | 49 ++++++++++++++-------------
->>>    drivers/irqchip/irq-nvic.c           | 18 +++++++---
->>>    drivers/irqchip/irq-tegra.c          | 55 ++++++++++++++++---------------
->>>    drivers/irqchip/irq-vf610-mscm-ir.c  | 42 +++++++++++++++--------
->>>    13 files changed, 323 insertions(+), 252 deletions(-)
->>>
->>
->> [...]
->>
->>>
->>>    static int its_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
->>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->>> index 5793880..05d010b 100644
->>> --- a/drivers/irqchip/irq-gic-v3.c
->>> +++ b/drivers/irqchip/irq-gic-v3.c
->>> @@ -737,32 +737,30 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
->>>    	return 0;
->>>    }
->>>
->>> -static int gic_irq_domain_xlate(struct irq_domain *d,
->>> -				struct device_node *controller,
->>> -				const u32 *intspec, unsigned int intsize,
->>> -				unsigned long *out_hwirq, unsigned int *out_type)
->>> +static int gic_irq_domain_translate(struct irq_domain *d,
->>> +				    struct irq_fwspec *fwspec,
->>> +				    unsigned long *hwirq,
->>> +				    unsigned int *type)
->>>    {
->>> -	if (irq_domain_get_of_node(d) != controller)
->>> -		return -EINVAL;
->>> -	if (intsize < 3)
->>> -		return -EINVAL;
->>> +	if (is_of_node(fwspec->fwnode)) {
->>> +		if (fwspec->param_count < 3)
->>> +			return -EINVAL;
->>>
->>> -	switch(intspec[0]) {
->>> -	case 0:			/* SPI */
->>> -		*out_hwirq = intspec[1] + 32;
->>> -		break;
->>> -	case 1:			/* PPI */
->>> -		*out_hwirq = intspec[1] + 16;
->>> -		break;
->>> -	case GIC_IRQ_TYPE_LPI:	/* LPI */
->>> -		*out_hwirq = intspec[1];
->>> -		break;
->>> -	default:
->>> -		return -EINVAL;
->>> +		/* Get the interrupt number and add 16 to skip over SGIs */
->>> +		*hwirq = fwspec->param[1] + 16;
->>> +
->>> +		/*
->>> +		 * For SPIs, we need to add 16 more to get the GIC irq
->>> +		 * ID number
->>> +		 */
->>> +		if (!fwspec->param[0])
->>> +			*hwirq += 16;
->>> +
->>> +		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
->>> +		return 0;
->>>    	}
->>>
->>> -	*out_type = intspec[2] & IRQ_TYPE_SENSE_MASK;
->>> -	return 0;
->>> +	return -EINVAL;
->>>    }
->>
->> What about GIC_IRQ_TYPE_LPI type? Previously we leaved interrupt line nr
->> and now +32.
->
-> Please see the patch I've posted earlier that address this particular issue:
->
-> https://lkml.org/lkml/2015/10/14/272
->
+On Wednesday 14 October 2015 15:33:12 Eric Auger wrote:
+> --- a/drivers/vfio/platform/vfio_platform_common.c
+> +++ b/drivers/vfio/platform/vfio_platform_common.c
+> @@ -31,6 +31,11 @@ static const struct vfio_platform_reset_combo reset_lookup_table[] = {
+>                 .reset_function_name = "vfio_platform_calxedaxgmac_reset",
+>                 .module_name = "vfio-platform-calxedaxgmac",
+>         },
+> +       {
+> +               .compat = "amd,xgbe-seattle-v1a",
+> +               .reset_function_name = "vfio_platform_amdxgbe_reset",
+> +               .module_name = "vfio-platform-amdxgbe",
+> +       },
+>  };
+>  
+>  static void vfio_platform_get_reset(struct vfio_platform_device *vdev,
+> 
 
-Makes sense, thanks.
+This is causing build errors for me when CONFIG_MODULES is disabled.
 
-Tomasz
+Could this please be restructured so vfio_platform_get_reset does
+not attempt to call __symbol_get() but instead has the drivers
+register themselves properly to a subsystem?
+
+I don't see any way this could be fixed otherwise. The problem
+of course showed up with calxedaxgmac already, but I'd prefer not
+to see anything added there until the common code has been improved.
+
+	Arnd
