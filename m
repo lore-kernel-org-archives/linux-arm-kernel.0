@@ -1,38 +1,60 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Oct 2015 12:27:15 +0100
-Subject: [PATCH v2 0/2] More GIC updates for Linux 4.4
-Message-ID: <1444822037-16983-1-git-send-email-marc.zyngier@arm.com>
+Date: Wed, 14 Oct 2015 12:27:16 +0100
+Subject: [PATCH v2 1/2] irqchip/gic-v3: Fix translation of LPIs after
+ conversion to irq_fwspec
+In-Reply-To: <1444822037-16983-1-git-send-email-marc.zyngier@arm.com>
+References: <1444822037-16983-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1444822037-16983-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Commit f833f57ff254 ("irqchip: Convert all alloc/xlate users from
+of_node to fwnode") converted the GICv3 driver to using irq_fwspec
+as part of its 'translate' method.
 
-Here's a couple of GIC patches that I'd like to see in 4.4:
+Too bad it ended up with a copy of the GICv2 'translate' method,
+which screws up LPI translation (by not translating them at all).
 
-- A fix for a (copy-paste) bug introduced by the fwnode/fwspec
-  conversion, breaking LPI translation
+Restore the code in its original shape, and just change what is
+really required...
 
-- An extension to the GICv2m driver, enabling support for multiple MSI
-  frames (already posted)
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-v3.c | 22 +++++++++++++---------
+ 1 file changed, 13 insertions(+), 9 deletions(-)
 
-This is on top of tip/irq/core as of yesterday. Hopefully, this is the
-last set of GIC patches for the next merge window (and I really mean
-it this time).
-
-Thanks,
-
-	M.
-
-* From v1:
-  - Fixed the add_tree/create_tree resolution issue in the GICv2m patch
-
-Marc Zyngier (2):
-  irqchip/gic-v3: Fix translation of LPIs after conversion to irq_fwspec
-  irqchip/gic-v2m: Add support for multiple MSI frames
-
- drivers/irqchip/irq-gic-v2m.c | 124 ++++++++++++++++++++++++++----------------
- drivers/irqchip/irq-gic-v3.c  |  22 +++++---
- 2 files changed, 91 insertions(+), 55 deletions(-)
-
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 05d010b..d7be6dd 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -746,15 +746,19 @@ static int gic_irq_domain_translate(struct irq_domain *d,
+ 		if (fwspec->param_count < 3)
+ 			return -EINVAL;
+ 
+-		/* Get the interrupt number and add 16 to skip over SGIs */
+-		*hwirq = fwspec->param[1] + 16;
+-
+-		/*
+-		 * For SPIs, we need to add 16 more to get the GIC irq
+-		 * ID number
+-		 */
+-		if (!fwspec->param[0])
+-			*hwirq += 16;
++		switch (fwspec->param[0]) {
++		case 0:			/* SPI */
++			*hwirq = fwspec->param[1] + 32;
++			break;
++		case 1:			/* PPI */
++			*hwirq = fwspec->param[1] + 16;
++			break;
++		case GIC_IRQ_TYPE_LPI:	/* LPI */
++			*hwirq = fwspec->param[1];
++			break;
++		default:
++			return -EINVAL;
++		}
+ 
+ 		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
+ 		return 0;
 -- 
 2.1.4
