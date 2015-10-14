@@ -1,50 +1,49 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 14 Oct 2015 15:03:29 -0500
-Subject: [GIT PULL] qcom arm64 updates for 4.4
-Message-ID: <1444853009-20313-1-git-send-email-agross@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Oct 2015 13:03:36 -0700
+Subject: [GIT PULL] omap fixes against v4.3-rc5
+Message-ID: <20151014200336.GJ10113@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+The following changes since commit 25cb62b76430a91cc6195f902e61c2cb84ade622:
 
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+  Linux 4.3-rc5 (2015-10-11 11:09:45 -0700)
 
 are available in the git repository at:
 
-  git at git.codeaurora.org:quic/kernel/agross-msm.git tags/qcom-arm64-for-4.4
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/fixes-rc5
 
-for you to fetch changes up to 00a9e053da0b9e150b7f8fefa3c409d7e71ce48f:
+for you to fetch changes up to d8e1f5ed11a39a68da00f05000466c4f6db4456e:
 
-  arm64: dts: apq8016-sbc: enable spi buses on LS and HS (2015-10-13 21:53:03 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM64 Updates for v4.4
-
-* Add RNG device tree node
-* Add MSM8x16 serial UART1 node
-* Enable eMMC on apq8016-sbc board
-* Fix I2C pinconf sleep state function
-* Add MSM8916 I2C nodes
-* Enable I2C busses on LS and HS on APQ8016-sbc
-* Enable SPI busses on LS and HS on APQ8016-sbc
+  Documentation: ARM: List new omap MMC requirements (2015-10-12 16:23:34 -0700)
 
 ----------------------------------------------------------------
-Andy Gross (1):
-      arm64: dts: qcom: Add 8x16 Serial UART1 node
+Fixes for omap against v4.3-rc5:
 
-Georgi Djakov (1):
-      arm64: dts: qcom: Enable eMMC on apq8016-sbc board
+- Regulator fix for beagle-x15 to fix HDMI without a SD card being
+  inserted
 
-Srinivas Kandagatla (4):
-      arm64: dts: fix i2c pinconf sleep state function
-      arm64: dts: qcom: Add msm8916 I2C nodes.
-      arm64: dts: apq8016-sbc: enable i2c buses on LS and HS
-      arm64: dts: apq8016-sbc: enable spi buses on LS and HS
+- GPMC fix for showing proper timings and to allow enabling debug
+  options that somehow was unselectable earlier
 
-Stanimir Varbanov (1):
-      arm64: dts: qcom: Add RNG device tree node
+- Add minimal documentation for new MMC1 dependency on
+  REGULATOR_PBIAS as it may not be obvious for people with
+  targeted .config files
 
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi  |   30 +++++++++++
- arch/arm64/boot/dts/qcom/msm8916-pins.dtsi |   76 +++++++++++++++++++++++++++-
- arch/arm64/boot/dts/qcom/msm8916.dtsi      |   46 +++++++++++++++++
- 3 files changed, 150 insertions(+), 2 deletions(-)
+----------------------------------------------------------------
+Tomi Valkeinen (1):
+      ARM: dts: am57xx-beagle-x15: set VDD_SD to always-on
+
+Tony Lindgren (2):
+      memory: omap-gpmc: Fix unselectable debug option for GPMC
+      Documentation: ARM: List new omap MMC requirements
+
+Uwe Kleine-K?nig (1):
+      memory: omap-gpmc: dump "before" state before first modification
+
+ Documentation/arm/OMAP/README           |  7 +++++++
+ arch/arm/boot/dts/am57xx-beagle-x15.dts |  3 ++-
+ drivers/memory/Kconfig                  | 12 +++++++++---
+ drivers/memory/omap-gpmc.c              |  2 +-
+ 4 files changed, 19 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/arm/OMAP/README
