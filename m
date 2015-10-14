@@ -1,33 +1,22 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 14 Oct 2015 16:39:14 -0500
-Subject: [GIT PULL] qcom dt changes for 4.4
-In-Reply-To: <123919424.5uQgqmng2m@wuerfel>
-References: <1444773033-24532-1-git-send-email-agross@codeaurora.org>
- <6615218.6jfQD9XLIc@wuerfel> <123919424.5uQgqmng2m@wuerfel>
-Message-ID: <20151014213914.GA27483@qualcomm.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Wed, 14 Oct 2015 23:48:51 +0200
+Subject: [PATCH 4/4] ARM: BCM5301X: remove workaround imprecise abort
+ fault handler
+In-Reply-To: <1444834113-18122-5-git-send-email-l.stach@pengutronix.de>
+References: <1444834113-18122-1-git-send-email-l.stach@pengutronix.de>
+ <1444834113-18122-5-git-send-email-l.stach@pengutronix.de>
+Message-ID: <561ECDC3.3070502@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 11:11:34PM +0200, Arnd Bergmann wrote:
-> On Wednesday 14 October 2015 23:06:16 Arnd Bergmann wrote:
-> > On Tuesday 13 October 2015 16:50:33 Andy Gross wrote:
-> > > The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
-> > > 
-> > >   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   git at git.codeaurora.org:quic/kernel/agross-msm.git tags/qcom-dt-for-4.4
-> > 
-> > Permission denied.
-> > 
+On 10/14/2015 04:48 PM, Lucas Stach wrote:
+> This is not needed anymore. Handling a potentially pending imprecise external
+> abort left behind by the bootloader is now done in a slightly safer way inside
+> the common ARM startup code.
 > 
-> Same thing for all your recent pull requests, please resend all of them.
-> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
 
-Oops.  I'll fix em up and resend.  Thanks
+I tested this on my board and this fixes the problem.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Hauke
