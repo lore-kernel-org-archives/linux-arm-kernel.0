@@ -1,61 +1,61 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 14 Oct 2015 16:13:47 -0500
-Subject: [PATCHv3 08/11] arm64: Check for selected granule support
-In-Reply-To: <1444821634-1689-9-git-send-email-suzuki.poulose@arm.com>
-References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
- <1444821634-1689-9-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <561EC58B.9080408@arm.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Wed, 14 Oct 2015 23:15:09 +0200
+Subject: [PATCH 2/5] arm: dts: lpc32xx: fix improper usage of ranges
+ property
+In-Reply-To: <19392174.3eZzHlAnnT@wuerfel>
+References: <1444694045-22000-1-git-send-email-vz@mleia.com>
+ <7163229.YtgKU9kxxJ@wuerfel>
+ <CAGhQ9VzKrsAYy=xwEZPD80jaTxmqR5MJj7fXeFTK-A2JnJXPqA@mail.gmail.com>
+ <19392174.3eZzHlAnnT@wuerfel>
+Message-ID: <CAGhQ9Vw2-4QWsWoZrLFBfL49eQnc0VtWpfZoZjfoD=MDW2kD_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2015 06:20 AM, Suzuki K. Poulose wrote:
+On 14 October 2015 at 22:07, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 14 October 2015 19:23:09 Joachim Eastwood wrote:
+>> >
+>> > /ahb5 {
+>> >         ranges = <0 0x20000000 0x10000000>;
+>> >
+>> >         apb {
+>> >                 ranges = <0 0x80000 0x20000>;
+>> >         };
+>> > };
+>> > /ahb6 {
+>> >         ranges = <0 0x30000000 0x10000000>,           /* AHB registers */
+>> >                  <0x80000000 0x80000000 0x40000000>, /* EMC DYCS0/1 */
+>> >                  <0xE0000000 0xE0000000 0x04000000>; /* EMC CS0-3 */
+>> >
+>> >         memory-controller at 1080000 {
+>> >                 reg = <0x1080000 0x10000>;
+>> >         };
+>> > };
+>>
+>> Sorry for hijacking the thread, but I have related question to this.
+>>
+>> What is the advantage of using a hierarchical bus structure in dt?
+>> I thought the recommendation, at least for new device trees, was to
+>> keep it flat under a "soc"-node.
+>>
+>> If doesn't offer any advantages why not remove instead of adding the
+>> ranges property which seems to grow a bit complex now?
+>> Of course removing it would create a lot of churn because of the
+>> re-indentation but at least the end result would be simpler.
+>
+> The general recommendation is to have the DT structure resemble
+> the hardware as closely as possible. If the chip has a clear
+> hierarchy and you know it, then it's best to describe it that way.
+>
+> The reason for having a single 'soc' node in a lot of the modern
+> dtsi files is that either it's not documented, or they use AXI
+> 'buses' that are not really hierarchical but are point-to-point
+> connections.
 
-> + * Checks if the selected granule size is supported by the CPU.
-> + * If it doesn't park the CPU
+Thanks for explaining, Arnd!
 
-The problem is when you park the boot CPU.
-
-I think for EFI there is a slightly better error mechanism. This tweak 
-will print an error and return to the EFI boot manager rather than 
-hanging the machine without any notification. Now it prints:
-
-EFI stub: Booting Linux Kernel...
-EFI stub: ERROR: 16K granule not supported by this machine
-EFI stub: ERROR: Failed to relocate kernel
-FS4:\>
+In that case lpc18xx.dtsi should have had a hierarchical structure as
+well. NXP LPC user manuals usually documents the bus structure.
 
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
-  arch/arm64/kernel/efi-stub.c | 14 ++++++++++++++
-  1 file changed, 14 insertions(+)
-
-diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-index 816120e..90fb868 100644
---- a/arch/arm64/kernel/efi-stub.c
-+++ b/arch/arm64/kernel/efi-stub.c
-@@ -25,6 +25,20 @@ efi_status_t __init 
-handle_kernel_image(efi_system_table_t *sys_table_arg,
-         unsigned long kernel_size, kernel_memsize = 0;
-         unsigned long nr_pages;
-         void *old_image_addr = (void *)*image_addr;
-+       u32 aa64mmfr0_el1;
-+
-+#ifdef CONFIG_ARM64_16K_PAGES
-+       /*
-+        * check to see if this kernel image is
-+        * compatible with the current system
-+        */
-+       asm volatile("mrs %0, ID_AA64MMFR0_EL1" : "=r" (aa64mmfr0_el1));
-+       aa64mmfr0_el1 >>= ID_AA64MMFR0_TGRAN16_SHIFT;
-+       if ((aa64mmfr0_el1 & ID_AA64MMFR0_TGRAN4_ON) == 0) {
-+               pr_efi_err(sys_table_arg, "16K granule not supported by 
-this machine\n");
-+               return EFI_UNSUPPORTED;
-+       }
-+#endif
-
-         /* Relocate the image, if required. */
-         kernel_size = _edata - _text;
--- 
-2.4.3
+regards,
+Joachim Eastwood
