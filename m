@@ -1,43 +1,30 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 14 Oct 2015 12:20:28 +0100
-Subject: [PATCHv3 05/11] arm64: Handle 4 level page table for swapper
-In-Reply-To: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
-References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1444821634-1689-6-git-send-email-suzuki.poulose@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 14 Oct 2015 12:23:31 +0100
+Subject: [PATCH 0/2] More GIC updates for Linux 4.4
+In-Reply-To: <1444817359-15696-1-git-send-email-marc.zyngier@arm.com>
+References: <1444817359-15696-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <561E3B33.6000705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment, we only support maximum of 3-level page table for
-swapper. With 48bit VA, 64K has only 3 levels and 4K uses section
-mapping. Add support for 4-level page table for swapper, needed
-by 16K pages.
+On 14/10/15 11:09, Marc Zyngier wrote:
+> Hi Thomas,
+> 
+> Here's a couple of GIC patches that I'd like to see in 4.4:
+> 
+> - A fix for a (copy-paste) bug introduced by the fwnode/fwspec
+>   conversion, breaking LPI translation
+> 
+> - An extension to the GICv2m driver, enabling support for multiple MSI
+>   frames (already posted)
+> 
+> This is on top of tip/irq/core as of yesterday. Hopefully, this is the
+> last set of GIC patches for the next merge window (yeah, right...).
 
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/head.S |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+"Yeah right" indeed, I fscked-up the conflict resolution on the second
+patch. I'm resending another series, sorry for the noise (now I really
+need this holiday...).
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 149fce3..7ace955 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -271,7 +271,10 @@ ENDPROC(preserve_boot_args)
-  */
- 	.macro	create_pgd_entry, tbl, virt, tmp1, tmp2
- 	create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2
--#if SWAPPER_PGTABLE_LEVELS == 3
-+#if SWAPPER_PGTABLE_LEVELS > 3
-+	create_table_entry \tbl, \virt, PUD_SHIFT, PTRS_PER_PUD, \tmp1, \tmp2
-+#endif
-+#if SWAPPER_PGTABLE_LEVELS > 2
- 	create_table_entry \tbl, \virt, SWAPPER_TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2
- #endif
- 	.endm
+	M.
 -- 
-1.7.9.5
+Jazz is not dead. It just smells funny...
