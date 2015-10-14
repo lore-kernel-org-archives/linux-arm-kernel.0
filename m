@@ -1,39 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Oct 2015 17:14:17 +0200
-Subject: [PATCH] ARM: pxa: fix pxa3xx DFI lockup hack
-In-Reply-To: <878u786mtr.fsf@belgarion.home>
-References: <5287252.pkh9x0t1Y6@wuerfel> <878u786mtr.fsf@belgarion.home>
-Message-ID: <5765189.ly9CxV2CMz@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Oct 2015 16:14:52 +0100
+Subject: [PATCHv3 02/11] arm64: Handle section maps for swapper/idmap
+In-Reply-To: <561E6FFB.3020005@arm.com>
+References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
+ <1444821634-1689-3-git-send-email-suzuki.poulose@arm.com>
+ <20151014120618.GB2150@leverpostej> <561E56D4.40506@arm.com>
+ <20151014145158.GA4422@leverpostej> <561E6FFB.3020005@arm.com>
+Message-ID: <20151014151425.GA5041@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 October 2015 19:03:44 Robert Jarzmik wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
+On Wed, Oct 14, 2015 at 04:08:43PM +0100, Suzuki K. Poulose wrote:
+> On 14/10/15 15:51, Mark Rutland wrote:
+> >>>>+/* With 4K pages, we use section maps. */
 > 
-> > Some recently added code to avoid a bug introduced a build error
-> > when CONFIG_PM is disabled and a macro is hidden:
+> >>/*
+> >>  * ARM64 kernel is guaranteed to be loaded at 2M aligned
+> >>  * address (as per booting requirements). Hence we can use
+> >>  * section mapping with 4K (section size = 2M) and not with
+> >>  * 16K(section size = 32M) or 64K (section size = 512M).
+> >>  */
 > >
-> > arch/arm/mach-pxa/pxa3xx.c: In function 'pxa3xx_init':
-> > arch/arm/mach-pxa/pxa3xx.c:439:3: error: 'NDCR' undeclared (first use in this function)
-> >    NDCR = (NDCR & ~NDCR_ND_ARB_EN) | NDCR_ND_ARB_CNTL;
-> >    ^
+> >That sounds much better. I hadn't figured out why myself, so thanks for
+> >the explanation :)
 > >
-> > This moves the macro outside of the #ifdef so it can be
-> > referenced correctly.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: adf3442cc890 ("ARM: pxa: fix DFI bus lockups on startup")
-> > ---
-> > We merged the patch that introduced this as a fix for 4.3, so we should
-> > probably add this one too.
-> Oh yes, didn't see that ifdef, and all my non-regression defconfigs have
-> CONFIG_PM ...
+> >However, there's one minor nit: the start of memory below the kernel is
+> >2M aligned, but the offset means that the kernel itself is not loaded at
+> >a 2M aligned address.
 > 
-> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> Oh yes
 > 
-> So do you want to take it directly (my preferred solution) or do you want a
-> proper pull request for in the -rc5 timeframe ?
+> >
+> >So how about:
+> >
+> >/*
+> >  * The linear mapping and the start of memory are both 2M aligned (per
+> >  * the arm64 booting.txt requirements). Hence we can use section mapping
+> >  * with 4K (section size = 2M) but not with 16K (section size = 32M) or
+> >  * 64K (section size = 512M).
+> >  */
+> 
+> Will add this
 
-Applied now.
+Great.
 
-	Arnd
+FWIW, with the changes from this thread applied:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
