@@ -1,31 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 14 Oct 2015 15:11:20 +0100
-Subject: [PATCH] mutex: make mutex_lock_nested an inline function
-In-Reply-To: <20151014134721.GD3816@twins.programming.kicks-ass.net>
-References: <11282238.AHmyWliPRj@wuerfel>
- <20151013203812.GM17308@twins.programming.kicks-ass.net>
- <11817958.z9KtmeKzV7@wuerfel>
- <20151014082050.GQ17308@twins.programming.kicks-ass.net>
- <20151014102706.GR14956@sirena.org.uk>
- <20151014110717.GT17308@twins.programming.kicks-ass.net>
- <20151014123624.GV14956@sirena.org.uk>
- <20151014134721.GD3816@twins.programming.kicks-ass.net>
-Message-ID: <20151014141120.GX14956@sirena.org.uk>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 14 Oct 2015 16:02:50 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: improve multi_v7_defconfig support
+ for Berlin
+Message-ID: <1444831370-25688-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 03:47:21PM +0200, Peter Zijlstra wrote:
-> On Wed, Oct 14, 2015 at 01:36:24PM +0100, Mark Brown wrote:
+Some drivers used on a Marvell Berlin kernel were missing from
+multi_v7_defconfig. This series add them:
 
-> Does the below work for you?
+  * The pxa168 Ethernet driver is added as a loadable module.
+  * The Berlin ADC driver is added as a loadable module.
+  * Both the Berlin USB PHY and SATA PHY drivers are added,
+    built-in, as they are required for the already available USB
+    and SATA functionalities in multi_v7_defconfig.
 
-Yes, that's helpful thanks!
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
 
-Reviewed-by: Mark Brown <broonie@kernel.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151014/f9e33bbc/attachment.sig>
+Hi,
+
+That's actually a v2 of the series "ARM: berlin: improve multi_v7_defconfig
+support" I sent earlier. I've squashed all 4 commits into a single one and
+updated to use loadable modules when possible in this v2.
+
+Antoine
+
+ arch/arm/configs/multi_v7_defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 03deb7fb35e8..6b021368fbd5 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -207,6 +207,7 @@ CONFIG_NET_CALXEDA_XGMAC=y
+ CONFIG_IGB=y
+ CONFIG_MV643XX_ETH=y
+ CONFIG_MVNETA=y
++CONFIG_PXA168_ETH=m
+ CONFIG_KS8851=y
+ CONFIG_R8169=y
+ CONFIG_SH_ETH=y
+@@ -636,6 +637,7 @@ CONFIG_EXTCON=y
+ CONFIG_TI_AEMIF=y
+ CONFIG_IIO=y
+ CONFIG_AT91_ADC=m
++CONFIG_BERLIN2_ADC=m
+ CONFIG_EXYNOS_ADC=m
+ CONFIG_XILINX_XADC=y
+ CONFIG_AK8975=y
+@@ -651,6 +653,8 @@ CONFIG_PHY_HIX5HD2_SATA=y
+ CONFIG_PWM_STI=m
+ CONFIG_OMAP_USB2=y
+ CONFIG_TI_PIPE3=y
++CONFIG_PHY_BERLIN_USB=y
++CONFIG_PHY_BERLIN_SATA=y
+ CONFIG_PHY_MIPHY28LP=y
+ CONFIG_PHY_MIPHY365X=y
+ CONFIG_PHY_RCAR_GEN2=m
+-- 
+2.6.1
