@@ -1,61 +1,128 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed, 14 Oct 2015 23:15:09 +0200
-Subject: [PATCH 2/5] arm: dts: lpc32xx: fix improper usage of ranges
- property
-In-Reply-To: <19392174.3eZzHlAnnT@wuerfel>
-References: <1444694045-22000-1-git-send-email-vz@mleia.com>
- <7163229.YtgKU9kxxJ@wuerfel>
- <CAGhQ9VzKrsAYy=xwEZPD80jaTxmqR5MJj7fXeFTK-A2JnJXPqA@mail.gmail.com>
- <19392174.3eZzHlAnnT@wuerfel>
-Message-ID: <CAGhQ9Vw2-4QWsWoZrLFBfL49eQnc0VtWpfZoZjfoD=MDW2kD_g@mail.gmail.com>
+From: ahs3@redhat.com (Al Stone)
+Date: Wed, 14 Oct 2015 15:27:43 -0600
+Subject: [Linaro-acpi] [PATCH v5 0/5] Provide better MADT subtable sanity
+ checks
+In-Reply-To: <3556673.VbpJrNsKqP@vostro.rjw.lan>
+References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
+ <561C8351.3030304@erley.org> <561EB923.6010109@redhat.com>
+ <3556673.VbpJrNsKqP@vostro.rjw.lan>
+Message-ID: <561EC8CF.3090101@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 October 2015 at 22:07, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 14 October 2015 19:23:09 Joachim Eastwood wrote:
->> >
->> > /ahb5 {
->> >         ranges = <0 0x20000000 0x10000000>;
->> >
->> >         apb {
->> >                 ranges = <0 0x80000 0x20000>;
->> >         };
->> > };
->> > /ahb6 {
->> >         ranges = <0 0x30000000 0x10000000>,           /* AHB registers */
->> >                  <0x80000000 0x80000000 0x40000000>, /* EMC DYCS0/1 */
->> >                  <0xE0000000 0xE0000000 0x04000000>; /* EMC CS0-3 */
->> >
->> >         memory-controller at 1080000 {
->> >                 reg = <0x1080000 0x10000>;
->> >         };
->> > };
+On 10/14/2015 03:25 PM, Rafael J. Wysocki wrote:
+> On Wednesday, October 14, 2015 02:20:51 PM Al Stone wrote:
+>> This is a multi-part message in MIME format.
+>> --------------020400080004050109020606
+>> Content-Type: text/plain; charset=utf-8
+>> Content-Transfer-Encoding: 7bit
 >>
->> Sorry for hijacking the thread, but I have related question to this.
+>> On 10/12/2015 10:06 PM, Pat Erley wrote:
+>>> On 10/12/2015 01:52 PM, Al Stone wrote:
+>>>> On 10/11/2015 09:58 PM, Pat Erley wrote:
+>>>>> On 10/11/2015 08:49 PM, Hanjun Guo wrote:
+>>>>>> On 10/12/2015 11:08 AM, Pat Erley wrote:
+>>>>>>> On 10/05/2015 10:12 AM, Al Stone wrote:
+>>>>>>>> On 10/05/2015 07:39 AM, Rafael J. Wysocki wrote:
+>>>>>>>>> On Wednesday, September 30, 2015 10:10:16 AM Al Stone wrote:
+>>>>>>>>>> On 09/30/2015 03:00 AM, Hanjun Guo wrote:
+>>>>>>>>>>> On 2015/9/30 7:45, Al Stone wrote:
+>>>>>>>>>>>> NB: this patch set is for use against the linux-pm bleeding edge
+>>>>>>>>>>>> branch.
+>>>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>> [snip...]
+>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>> For this patch set,
+>>>>>>>>>>>
+>>>>>>>>>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>>>>>>>>
+>>>>>>>>>>> Thanks
+>>>>>>>>>>> Hanjun
+>>>>>>>>>>
+>>>>>>>>>> Thanks, Hanjun!
+>>>>>>>>>
+>>>>>>>>> Series applied, thanks!
+>>>>>>>>>
+>>>>>>>>> Rafael
+>>>>>>>>>
+>>>>>>>>
+>>>>>>>> Thanks, Rafael!
+>>>>>>>>
+>>>>>>>
+>>>>>>> Just decided to test out linux-next (to see the new nouveau cleanups).
+>>>>>>> This change set prevents my Lenovo W510 from booting properly.
+>>>>>>>
+>>>>>>> Reverting: 7494b0 "ACPI: add in a bad_madt_entry() function to
+>>>>>>> eventually replace the macro"
+>>>>>>>
+>>>>>>> Gets the system booting again.  I'm attaching my dmesg from the failed
+>>>>>>> boot, who wants the acpidump?
+>>>>>>
+>>>>>> [    0.000000] ACPI: undefined version for either FADT 4.0 or MADT 1
+>>>>>> [    0.000000] ACPI: Error parsing LAPIC address override entry
+>>>>>> [    0.000000] ACPI: Invalid BIOS MADT, disabling ACPI
+>>>>>>
+>>>>>> Seems the MADT revision is not right, could you dump the ACPI MADT
+>>>>>> (APIC) table and send it out? I will take a look :)
+>>>>>>
+>>>>>> Thanks
+>>>>>> Hanjun
+>>>>>
+>>>>> Here ya go, enjoy.  Feel free to CC me on any patches that might fix it.
+>>>>
+>>>> Pat,
+>>>>
+>>>> Would you mind sending a copy of the FADT, also, please?  The first of the
+>>>> ACPI messages is a check of version correspondence between the FADT and MADT,
+>>>> while the second message is from looking at just an MADT subtable.  Thanks
+>>>> for sending the MADT out -- that helps me quite a lot in thinking this through.
+>>>>
+>>>> BTW, whoever is providing the BIOS (Lenovo, I assume) may want to have a look
+>>>> at these, also:
+>>>>
+>>>> [    0.000000] ACPI BIOS Warning (bug): 32/64X length mismatch in
+>>>> FADT/Pm1aControlBlock: 16/32 (20150818/tbfadt-623)
+>>>> [    0.000000] ACPI BIOS Warning (bug): Invalid length for
+>>>> FADT/Pm1aControlBlock: 32, using default 16 (20150818/tbfadt-704)
+>>>>
+>>>> Not inherently dangerous, but definitely sloppy and mind-numbingly easy to
+>>>> avoid, IIRC.
+>>>>
+>>>
+>>> Here ya go.
 >>
->> What is the advantage of using a hierarchical bus structure in dt?
->> I thought the recommendation, at least for new device trees, was to
->> keep it flat under a "soc"-node.
+>> Okay.  There's just a lot of weird stuff out there in ACPI-land.  I've
+>> attached four minor fixes for the special cases that have been reported
+>> (well, the last one is actually a fix for a typo in the spec, but just
+>> the same...).
 >>
->> If doesn't offer any advantages why not remove instead of adding the
->> ranges property which seems to grow a bit complex now?
->> Of course removing it would create a lot of churn because of the
->> re-indentation but at least the end result would be simpler.
->
-> The general recommendation is to have the DT structure resemble
-> the hardware as closely as possible. If the chip has a clear
-> hierarchy and you know it, then it's best to describe it that way.
->
-> The reason for having a single 'soc' node in a lot of the modern
-> dtsi files is that either it's not documented, or they use AXI
-> 'buses' that are not really hierarchical but are point-to-point
-> connections.
+>> These should apply on top of linux-next; would you mind trying them out
+>> to make sure I didn't break anything else on your laptop?  If they behave
+>> as I hope they will, I think I'll have covered all the places where the
+>> checking of MADT subtables needs to be be relaxed a bit.  These work for
+>> me on arm64, but if they work for you and a couple of other testers, then
+>> I'll send them to Rafael properly.
+> 
+> Well, you might as well submit them properly right away, so I could pick
+> them up and put them into my linux-next branch, which then might make it
+> easier for some people to test them.
+> 
+> Thanks,
+> Rafael
+> 
 
-Thanks for explaining, Arnd!
+Fair enough.  I was just being overly cautious about possible further breakage.
 
-In that case lpc18xx.dtsi should have had a hierarchical structure as
-well. NXP LPC user manuals usually documents the bus structure.
+Done.  Patch series sent to the list.
 
-
-regards,
-Joachim Eastwood
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
