@@ -1,35 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Oct 2015 11:06:18 +0200
-Subject: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for HiSilicon
- SoC Hip05
-In-Reply-To: <561E1957.5030503@hisilicon.com>
-References: <1444445957-239522-1-git-send-email-wangzhou1@hisilicon.com>
- <11677087.JbqAo0FWJE@wuerfel> <561E1957.5030503@hisilicon.com>
-Message-ID: <30775300.COZ4nEMWXC@wuerfel>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 14 Oct 2015 11:08:15 +0200
+Subject: [PATCH] mutex: make mutex_lock_nested an inline function
+In-Reply-To: <11240940.NHO2vFoJOz@wuerfel>
+References: <11282238.AHmyWliPRj@wuerfel>
+ <20151014082050.GQ17308@twins.programming.kicks-ass.net>
+ <20151014083707.GR11639@twins.programming.kicks-ass.net>
+ <11240940.NHO2vFoJOz@wuerfel>
+Message-ID: <20151014090815.GS17308@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 October 2015 16:59:03 Zhou Wang wrote:
-> 
-> Hi Arnd,
-> 
-> In Hip05 PCIe host, it uses GITS_TRANSLATER's address to get TLP package
-> which contains MSI address and MSI data, and then combine BDF and MSI data
-> to a 32 bit data which will be writen to GITS_TRANSLATER register of ITS.
-> 
-> I think maybe this is a defect of our PCIe controller.
+On Wed, Oct 14, 2015 at 11:00:20AM +0200, Arnd Bergmann wrote:
+> On Wednesday 14 October 2015 10:37:07 Peter Zijlstra wrote:
 
-I'd consider it a bug in the firmware if this is not set up correctly
-before boot.
-
-> > I don't think what you do here is safe because the 'reg' property
-> > of the MSI controller might point to the address that is used for
-> > the message directly.
+> > > Uuh, I just looked at next and saw this regulator_lock_supply()
+> > > function. How is that limited? subclass must be <8 otherwise bad things
+> > > happen.
+> > 
+> > Also, the function appears unused, just delete it 
 > 
-> I see your point, however we must get address of GITS_TRANSLATER and
-> set it to PCIe host. How about adding necessary comments here?
+> That was my first suggestion as well when I ran into 
+> 
+> drivers/regulator/core.c:139:13: warning: 'regulator_lock_supply' defined but not used
+> 
+> but apparently this is work-in-progress and the plan is to use it
+> in 4.4 when the rest of the currently-under-review patches are merged.
 
-This seems to just be static setup that should be done before Linux
-is even loaded. Any reason you can't do it that way?
+And here I thought we had a fairly strong rule that we should not merge
+unused code :/
 
-	Arnd
+In any case, whomever wrote that function had better first explain why
+its not broken.
+
+And I'm not too keen on making mutex_lock_nested() an inline due it
+being too easy to generate code with it. I'd much rather work around the
+occasional warning than have to deal with silent but unintended code
+spills.
