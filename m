@@ -1,78 +1,46 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Wed, 14 Oct 2015 09:07:49 +0800
-Subject: [PATCH v4 3/3] arm64: dts: mt8173: Add nor flash node
-In-Reply-To: <561D1642.3070105@cogentembedded.com>
-References: <1444729160-26433-1-git-send-email-bayi.cheng@mediatek.com>
- <1444729160-26433-4-git-send-email-bayi.cheng@mediatek.com>
- <561D1642.3070105@cogentembedded.com>
-Message-ID: <CAGS+omDm=74d6cw7kXwkZ_Jy-faBz7z4-vJQX9ZFVNskQqSS-w@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 14 Oct 2015 10:15:50 +0900
+Subject: [PATCH 3/3] ARM: dts: exynos5422-odroidxu3: Added UHS-I bus speed
+ support
+In-Reply-To: <CAGOxZ51uPkdGmCAs2Tc8_=YvkORJKdivN47vo1ZxkGQ-MY=-oQ@mail.gmail.com>
+References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
+ <1444578364-1384-3-git-send-email-linux.amoon@gmail.com>
+ <561B48B7.1040201@samsung.com>
+ <CANAwSgSLFviT4ZNXTYwxYs2pbrr9ozJmPMauhgRPO0556Rsr_g@mail.gmail.com>
+ <561C4CEE.3050905@samsung.com>
+ <CANAwSgRJ+5O-x61K9E_AxTZWQy3jJrKF5MiLtWRdUU29CCfa-Q@mail.gmail.com>
+ <561C7DF1.6000609@samsung.com>
+ <CANAwSgRBzFqHB98wSQnQu-ggGqRT2H6wC415wULXVhPg0uw_3A@mail.gmail.com>
+ <561D9ACE.6050103@samsung.com>
+ <CAGOxZ51uPkdGmCAs2Tc8_=YvkORJKdivN47vo1ZxkGQ-MY=-oQ@mail.gmail.com>
+Message-ID: <561DACC6.9040209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei,
+On 14.10.2015 10:06, Alim Akhtar wrote:
+> +Doug
+> Hello,
+> AFAIR, dw_mmc host controller does support UHS-I [1], specially SDR50
+> and SDR104 modes.
+> 
+> [1]: http://www.spinics.net/lists/linux-mmc/msg28186.html
+> 
+> What I remember is, one need to set "broken-cd" property also in order
+> to make it work because of the vqmmc and vmmc connection on board. I
+> didn't find the link right now, but you can search on the web, there
+> was a long discussion about handling this.
+> Have not checked it recently, so not sure if this got broken somehow.
+> 
 
-On Tue, Oct 13, 2015 at 10:33 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Hello.
->
-> On 10/13/2015 12:39 PM, Bayi Cheng wrote:
->
->> Add Mediatek nor flash node
->>
->> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
->> ---
->>   arch/arm64/boot/dts/mediatek/mt8173.dtsi | 15 +++++++++++++++
->>   1 file changed, 15 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> index d18ee42..385c2e4 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> @@ -365,6 +365,21 @@
->>                         status = "disabled";
->>                 };
->>
->> +               nor_flash: spi at 1100d000 {
->
->
->    I don't think this is a good label name for a SPI controller.
+Please, don't top post.
 
-You think "spi" is not a good name for SPI controller?
-Or you mean the label "nor_flash"?
+I am not a SD/MMC specialist (I do not feel enough confident in its
+internals) but the datasheet for 5422 does not mention UHS. However it
+mentions "High Speed DDR Mode with 200 MHz clock rate (HS400)". This
+does not look like UHS...
+https://www.sdcard.org/developers/overview/bus_speed/
+This of course is not a definite proof that 5422 does not support UHS. I
+am just saying that I couldn't find any information that *it does*.
 
-Would you prefer:
-
-  spi_nor_flash: spi at 1100d000
-
-
->
->> +                       compatible = "mediatek,mt8173-nor";
->> +                       reg = <0 0x1100d000 0 0xe0>;
->> +                       clocks = <&pericfg CLK_PERI_SPI>,
->> +                                <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
->> +                       clock-names = "spi", "sf";
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +
->> +                       flash at 0 {
->> +                               compatible = "jedec,spi-nor";
->> +                               reg = <0>;
->> +                       };
->> +               };
->> +
->>                 i2c3: i2c3 at 11010000 {
->
->
->    Grr, the name should be "i2c at 11010000".
-
-Don't worry.  This is already fixed in Matthias' tree:
-  https://github.com/mbgg/linux-mediatek/commit/1ee35c05d9c67771d649f687e6f76e61e76eb779
-
--Dan
-
->
-> [...]
->
-> MBR, Sergei
->
+Best regards,
+Krzysztof
