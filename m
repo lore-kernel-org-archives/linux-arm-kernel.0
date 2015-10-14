@@ -1,40 +1,46 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 14 Oct 2015 12:44:17 +0200
-Subject: [PATCH v1 2/2] ARM: dts: exynos5250: Add clocks to DISP1 domain
-In-Reply-To: <1444819457-27519-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1444819457-27519-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1444819457-27519-3-git-send-email-tomeu.vizoso@collabora.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 14 Oct 2015 16:23:10 +0530
+Subject: [alsa-devel] [PATCH v5 06/10] dmaengine: add API for getting dma
+ controller's quirk
+In-Reply-To: <561629D6.9010702@metafoo.de>
+References: <1442187923-5736-1-git-send-email-shawn.lin@rock-chips.com>
+ <1442188139-6017-1-git-send-email-shawn.lin@rock-chips.com>
+ <20151005153746.GG13501@vkoul-mobl.iind.intel.com>
+ <56139289.7000005@rock-chips.com> <561629D6.9010702@metafoo.de>
+Message-ID: <20151014105310.GQ27370@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds to the node of the DISP1 power domain the two clocks that need to
-be reparented while the domain is powered off:
-CLK_MOUT_ACLK200_DISP1_SUB and CLK_MOUT_ACLK300_DISP1_SUB.
+On Thu, Oct 08, 2015 at 10:31:18AM +0200, Lars-Peter Clausen wrote:
+> > Basically I agree not to expose dma's quirk to slave controllers...But, the
+> > fact I mentioned on cover letter explain the reasons why I have to let slave
+> > controllers know that they are working with a broken dma. It's a dilemma
+> > that if we don't want that to be exposed(let slave controllers' driver get
+> > the info via a API), we have t add broken quirk for all of them ,here and
+> > there, which seems to be a disaster:(
+> 
+> The problem with this API is that it transports values with device specific
+> meanings over a generic API. Which is generally speaking not a good idea
+> because the consumer witch is supposed to be generic suddenly needs to know
+> which provider it is talking to.
+> 
+> A better solution in this case typically is either introduce a generic API
+> with generic values or a custom API with custom values, but don't mix the two.
+> 
+> > 
+> > I would appreciate it if you could give me some suggestions at your earliest
+> > convenience. :)
+> 
+> In this case I think the best way to handle this is not quirks, but rather
+> expose the actual maximum burst size using the DMA capabilities API. Since
+> supporting only a certain burst depth is not really a quirk. All hardware
+> has a limit for this and for some it might be larger or smaller than for
+> others and it might be the same IP core but the maximum size depends on some
+> IP core parameters. So this should be discoverable.
 
-Otherwise the state is unknown at power up and the mixer's clocks are
-all messed up.
+yes that makes more sense than adding quirks, exposing the right values
+which should be a readable property for driver will ensure it works on
+system with/without quirks
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Link: http://lkml.kernel.org/g/561CDC33.7050103 at collabora.com
----
-
- arch/arm/boot/dts/exynos5250.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index b24610ea8c2a..88b9cf5f226f 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -130,6 +130,10 @@
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x100440A0 0x20>;
- 		#power-domain-cells = <0>;
-+		clocks = <&clock CLK_FIN_PLL>,
-+			 <&clock CLK_MOUT_ACLK200_DISP1_SUB>,
-+			 <&clock CLK_MOUT_ACLK300_DISP1_SUB>;
-+		clock-names = "oscclk", "clk0", "clk1";
- 	};
- 
- 	clock: clock-controller at 10010000 {
 -- 
-2.5.0
+~Vinod
