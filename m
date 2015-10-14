@@ -1,161 +1,124 @@
-From: B48286@freescale.com (Zhiqiang Hou)
-Date: Wed, 14 Oct 2015 19:34:58 +0800
-Subject: [PATCH V3 6/6] dts/ls1043a: add LS1043ARDB board support
-In-Reply-To: <1444822498-16477-1-git-send-email-B48286@freescale.com>
-References: <1444822498-16477-1-git-send-email-B48286@freescale.com>
-Message-ID: <1444822498-16477-7-git-send-email-B48286@freescale.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Oct 2015 12:42:48 +0100
+Subject: [PATCHv3 01/11] arm64: Move swapper pagetable definitions
+In-Reply-To: <1444821634-1689-2-git-send-email-suzuki.poulose@arm.com>
+References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
+ <1444821634-1689-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151014114247.GA2150@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shaohui Xie <Shaohui.Xie@freescale.com>
+On Wed, Oct 14, 2015 at 12:20:24PM +0100, Suzuki K. Poulose wrote:
+> Move the kernel pagetable (both swapper and idmap) definitions
+> from the generic asm/page.h to a new file, asm/kernel-pgtable.h.
+> 
+> This is mostly a cosmetic change, to clean up the asm/page.h to
+> get rid of the arch specific details which are not needed by the
+> generic code.
+> 
+> Also renames the symbols to prevent conflicts. e.g,
+>  	BLOCK_SHIFT => SWAPPER_BLOCK_SHIFT
 
-Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
-Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
-Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
-Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
----
-V3:
- - No change.
+This sounds sensible to be, so FWIW:
 
-V2:
- - Remove the useless compatible "simple-bus" from cpld node.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
- arch/arm64/boot/dts/freescale/Makefile            |   2 +-
- arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 116 ++++++++++++++++++++++
- 2 files changed, 117 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+I have a couple of minor nits below, though.
 
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 57b41c7..33b1e57 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -1,4 +1,4 @@
--dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb fsl-ls2080a-rdb.dtb fsl-ls2080a-simu.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb fsl-ls2080a-rdb.dtb fsl-ls2080a-simu.dtb fsl-ls1043a-rdb.dtb
-  
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-new file mode 100644
-index 0000000..7a351e2
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-@@ -0,0 +1,116 @@
-+/*
-+ * Device Tree Include file for Freescale Layerscape-1043A family SoC.
-+ *
-+ * Copyright 2014-2015, Freescale Semiconductor
-+ *
-+ * Mingkai Hu <Mingkai.hu@freescale.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "fsl-ls1043a.dtsi"
-+
-+/ {
-+	model = "LS1043A RDB Board";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	ina220 at 40 {
-+		compatible = "ti,ina220";
-+		reg = <0x40>;
-+		shunt-resistor = <1000>;
-+	};
-+	adt7461a at 4c {
-+		compatible = "adi,adt7461";
-+		reg = <0x4c>;
-+	};
-+	eeprom at 56 {
-+		compatible = "at24,24c512";
-+		reg = <0x52>;
-+	};
-+	eeprom at 57 {
-+		compatible = "at24,24c512";
-+		reg = <0x53>;
-+	};
-+	rtc at 68 {
-+		compatible = "pericom,pt7c4338";
-+		reg = <0x68>;
-+	};
-+};
-+
-+&ifc {
-+	status = "okay";
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+	/* NOR, NAND Flashes and FPGA on board */
-+	ranges = <0x0 0x0 0x0 0x60000000 0x08000000
-+		  0x1 0x0 0x0 0x7e800000 0x00010000
-+		  0x2 0x0 0x0 0x7fb00000 0x00000100>;
-+
-+		nor at 0,0 {
-+			compatible = "cfi-flash";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x0 0x0 0x8000000>;
-+			bank-width = <2>;
-+			device-width = <1>;
-+		};
-+
-+		nand at 1,0 {
-+			compatible = "fsl,ifc-nand";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x1 0x0 0x10000>;
-+		};
-+
-+		cpld: board-control at 2,0 {
-+			compatible = "fsl,ls1043ardb-cpld";
-+			reg = <0x2 0x0 0x0000100>;
-+		};
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&duart1 {
-+	status = "okay";
-+};
--- 
-2.1.0.27.g96db324
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/kernel-pgtable.h |   65 +++++++++++++++++++++++++++++++
+>  arch/arm64/include/asm/page.h           |   18 ---------
+>  arch/arm64/kernel/head.S                |   37 ++++--------------
+>  arch/arm64/kernel/vmlinux.lds.S         |    1 +
+>  4 files changed, 74 insertions(+), 47 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/kernel-pgtable.h
+> 
+> diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
+> new file mode 100644
+> index 0000000..622929d
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/kernel-pgtable.h
+> @@ -0,0 +1,65 @@
+> +/*
+> + * asm/kernel-pgtable.h : Kernel page table mapping
+
+Drop the filename from the comment. It's redundant and ends up being
+painful when refactoring and moving things around.
+
+> + * Copyright (C) 2015 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __ASM_KERNEL_PGTABLE_H
+> +#define __ASM_KERNEL_PGTABLE_H
+> +
+> +/*
+> + * The idmap and swapper page tables need some space reserved in the kernel
+> + * image. Both require pgd, pud (4 levels only) and pmd tables to (section)
+> + * map the kernel. With the 64K page configuration, swapper and idmap need to
+> + * map to pte level. The swapper also maps the FDT (see __create_page_tables
+> + * for more information). Note that the number of ID map translation levels
+> + * could be increased on the fly if system RAM is out of reach for the default
+> + * VA range, so 3 pages are reserved in all cases.
+> + */
+> +#ifdef CONFIG_ARM64_64K_PAGES
+> +#define SWAPPER_PGTABLE_LEVELS	(CONFIG_PGTABLE_LEVELS)
+> +#else
+> +#define SWAPPER_PGTABLE_LEVELS	(CONFIG_PGTABLE_LEVELS - 1)
+> +#endif
+> +
+> +#define SWAPPER_DIR_SIZE	(SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
+> +#define IDMAP_DIR_SIZE		(3 * PAGE_SIZE)
+> +
+> +/* Initial memory map size */
+> +#ifdef CONFIG_ARM64_64K_PAGES
+> +#define SWAPPER_BLOCK_SHIFT	PAGE_SHIFT
+> +#define SWAPPER_BLOCK_SIZE	PAGE_SIZE
+> +#define SWAPPER_TABLE_SHIFT	PMD_SHIFT
+> +#else
+> +#define SWAPPER_BLOCK_SHIFT	SECTION_SHIFT
+> +#define SWAPPER_BLOCK_SIZE	SECTION_SIZE
+> +#define SWAPPER_TABLE_SHIFT	PUD_SHIFT
+> +#endif
+> +
+> +
+> +/*
+> + * Initial memory map attributes.
+> + */
+> +#define SWAPPER_PTE_FLAGS	PTE_TYPE_PAGE | PTE_AF | PTE_SHARED
+> +#define SWAPPER_PMD_FLAGS	PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S
+> +
+> +#ifdef CONFIG_ARM64_64K_PAGES
+> +#define SWAPPER_MM_MMUFLAGS	PTE_ATTRINDX(MT_NORMAL) | SWAPPER_PTE_FLAGS
+> +#else
+> +#define SWAPPER_MM_MMUFLAGS	PMD_ATTRINDX(MT_NORMAL) | SWAPPER_PMD_FLAGS
+> +#endif
+> +
+> +
+> +#endif
+
+It would be nice to have the usual comment here for what this is ending,
+i.e.
+
+#endif /* __ASM_KERNEL_PGTABLE_H */
+
+Thanks,
+Mark.
