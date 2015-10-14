@@ -1,130 +1,57 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 14 Oct 2015 09:39:00 +0100
-Subject: [PATCH v2 0/2] Enabling PSCI based idle on ARM 32-bit platforms
-In-Reply-To: <561CE865.2000509@linaro.org>
-References: <1444648628-24790-1-git-send-email-lorenzo.pieralisi@arm.com>
- <561CC185.60001@linaro.org> <20151013104424.GA13899@red-moon>
- <561CE865.2000509@linaro.org>
-Message-ID: <20151014083900.GA14523@red-moon>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 14 Oct 2015 11:46:19 +0300
+Subject: [PATCH] ARM: dts: am437x-gp-evm: Add wakeup interrupt source for
+ pixcir_i2c_ts
+In-Reply-To: <1444801956-17817-1-git-send-email-vigneshr@ti.com>
+References: <1444801956-17817-1-git-send-email-vigneshr@ti.com>
+Message-ID: <561E165B.3000907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel, Arnd,
++Dave
 
-On Tue, Oct 13, 2015 at 01:17:57PM +0200, Daniel Lezcano wrote:
-> On 10/13/2015 12:44 PM, Lorenzo Pieralisi wrote:
-> >Hi Daniel,
-> >
-> >On Tue, Oct 13, 2015 at 10:32:05AM +0200, Daniel Lezcano wrote:
-> >>
-> >>Hi Lorenzo,
-> >>
-> >>I would like to take this patch through my tree but it does not apply.
-> >
-> >That's because as I mentioned in the cover letter the series is built
-> >on top of:
-> >
-> >git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/firmware/psci-1.0
-> >
-> >Hopefully this tag will soon get pulled in arm-soc, I will respin a v3
-> >anyway to add tags and fold psci_cpuops.c in psci.c, how do you want to
-> >merge this then ?
+On 14/10/15 08:52, Vignesh R wrote:
+> On am437x-gp-evm, pixcir_i2c_ts can wakeup the system from lower power
+> state via pinctrl and IO daisy chain using generic wakeirq framework.
+> With commit 3fffd1283927 ("i2c: allow specifying separate wakeup
+> interrupt in device tree") i2c core allows optional wakeirq to be
+> specified via device tree. Add wakeup irq entry to enable pixcir_i2c_ts
+> to wake the system from low power state.
 > 
-> May be you can create a branch with your modifications to be shared
-> with arm-soc and me ?
-
-I asked Arnd to create an immutable branch containing the patches
-in my pull request below in arm-soc:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/374547.html
-
-I can then resend v3 of this series on top of it, or if you prefer I
-will send you a pull request (to a branch based on the arm-soc one with
-my patches on top) just let me know.
-
-Thanks !
-Lorenzo
-
-> >>Mind to refresh it against linux-pm or v4.3-rc5 ?
-> >>
-> >>   -- Daniel
-> >>
-> >>
-> >>On 10/12/2015 01:17 PM, Lorenzo Pieralisi wrote:
-> >>>This patch series is v2 of a previous posting:
-> >>>
-> >>>http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/373756.html
-> >>>
-> >>>v1->v2:
-> >>>
-> >>>- Refactored patch 1 to remove cpu parameter from cpuidle_ops
-> >>>   suspend hook
-> >>>- Refactored psci_cpu_init_idle to stub out dt parsing function and
-> >>>   make it usable on both ARM/ARM64 with no additional changes
-> >>>- Updated ARM cpuidle_ops to new interfaces
-> >>>- Fixed PSCI enable method string in ARM cpuidle_ops struct
-> >>>
-> >>>PSCI firmware provides a kernel API that, through a standard interface,
-> >>>allows to manage power states transitions in a seamless manner for
-> >>>ARM and ARM64 systems.
-> >>>
-> >>>Current PSCI code that initializes CPUidle states on PSCI based
-> >>>systems lives in arch/arm64 directory but it is not ARM64 specific
-> >>>and can be shared with ARM 32-bit systems so that the generic
-> >>>ARM CPUidle driver can leverage the common PSCI interface.
-> >>>
-> >>>This patch series moves PSCI CPUidle management code to
-> >>>drivers/firmware directory so that ARM and ARM64 architecture
-> >>>can actually share the code.
-> >>>
-> >>>It is made up of two patches:
-> >>>
-> >>>Patch 1 refactors ARM 32-bit generic idle implementation to remove
-> >>>the cpu parameter from the cpuidle_ops suspend hook, in preparation
-> >>>for a common PSCI implementation for ARM/ARM64 PSCI idle.
-> >>>
-> >>>Patch 2 moves ARM64 PSCI CPUidle functions implementation to
-> >>>drivers/firmware so that it can be shared with ARM 32-bit platforms
-> >>>code. This patch also adds a PSCI entry section on ARM 32-bit systems
-> >>>so that the PSCI CPUidle back-end can be enabled when the enable-method
-> >>>corresponds to PSCI.
-> >>>
-> >>>Patches apply on top of current patch stack to enable PSCI 1.0:
-> >>>
-> >>>git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/firmware/psci-1.0
-> >>>
-> >>>Tested on Juno board (ARM64), compile tested only on ARM 32-bit systems.
-> >>>
-> >>>Lorenzo Pieralisi (2):
-> >>>   ARM: cpuidle: remove cpu parameter from the cpuidle_ops suspend hook
-> >>>   ARM64: kernel: PSCI: move PSCI idle management code to
-> >>>     drivers/firmware
-> >>>
-> >>>  arch/arm/include/asm/cpuidle.h |   2 +-
-> >>>  arch/arm/kernel/cpuidle.c      |   2 +-
-> >>>  arch/arm64/kernel/psci.c       |  99 +-----------------------------
-> >>>  drivers/firmware/Makefile      |   2 +-
-> >>>  drivers/firmware/psci_cpuops.c | 133 +++++++++++++++++++++++++++++++++++++++++
-> >>>  drivers/soc/qcom/spm.c         |  10 ++--
-> >>>  include/linux/psci.h           |   3 +
-> >>>  7 files changed, 146 insertions(+), 105 deletions(-)
-> >>>  create mode 100644 drivers/firmware/psci_cpuops.c
-> >>>
-> >>
-> >>
-> >>--
-> >>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-> >>
-> >>Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> >><http://twitter.com/#!/linaroorg> Twitter |
-> >><http://www.linaro.org/linaro-blog/> Blog
-> >>
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>  arch/arm/boot/dts/am437x-gp-evm.dts | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
+> diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+> index 22038f21f228..69e93af7df0d 100644
+> --- a/arch/arm/boot/dts/am437x-gp-evm.dts
+> +++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+> @@ -581,8 +581,13 @@
+>  
+>  		attb-gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+>  
+> +		interrupts-extended = <&gpio3 22 GPIO_ACTIVE_HIGH>,
+> +				      <&am43xx_pinmux 0x264>;
+
+How does this work?
+
+interrupts-extended property must have
+1) interrupt parent
+2) interrupt number
+3) interrupt flags
+
+Your change doesn't seem to comply with those requirements.
+
+> +		interrupt-names = "tsc", "wakeup";
+> +
+>  		touchscreen-size-x = <1024>;
+>  		touchscreen-size-y = <600>;
+> +		wakeup-source;
+>  	};
+>  
+>  	ov2659 at 30 {
 > 
-> -- 
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-> 
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
-> 
+
+cheers,
+-roger
