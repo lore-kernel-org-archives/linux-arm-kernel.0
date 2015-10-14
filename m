@@ -1,77 +1,51 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 14 Oct 2015 15:50:39 +0530
-Subject: [PATCH v4 20/25] dmaengine: edma: Simplify the interrupt handling
-In-Reply-To: <1443088932-21731-21-git-send-email-peter.ujfalusi@ti.com>
-References: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
- <1443088932-21731-21-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20151014102039.GK27370@localhost>
+From: alison.wang@freescale.com (Huan Wang)
+Date: Wed, 14 Oct 2015 10:18:47 +0000
+Subject: [PATCH v4] ARM: configs: Add Freescale LS1021A defconfig
+In-Reply-To: <16038044.0DCMVgq8H3@wuerfel>
+References: <1442480614-32345-1-git-send-email-b18965@freescale.com>
+ <CAOMZO5BUvq3LydjL7cR2hAWFFUB+Cvwi+yEN5A9uG=uWEDepiA@mail.gmail.com>
+ <BN3PR0301MB0867F84A6740335770B16977FE430@BN3PR0301MB0867.namprd03.prod.outlook.com>
+ <16038044.0DCMVgq8H3@wuerfel>
+Message-ID: <BN3PR0301MB086733D602580A5A9EBF150EFE3F0@BN3PR0301MB0867.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2015 at 01:02:07PM +0300, Peter Ujfalusi wrote:
+> On Thursday 24 September 2015 07:27:10 Huan Wang wrote:
+> > > On Fri, Sep 18, 2015 at 4:38 AM, Huan Wang
+> > > <alison.wang@freescale.com>
+> > > wrote:
+> > >
+> > > > [Alison Wang] Thanks for your reply. I agreed with you about
+> > > > creating a new multi_v7_lpae_defconfig. In
+> > > > multi_v7_lpae_defconfig, I need to add the following CONFIG_XX to
+> > > > support LS1021A based on
+> > > multi_v7_defconfig.
+> > > >
+> > > > CONFIG_ARM_LPAE=y
+> > > > CONFIG_VMSPLIT_2G=y
+> > >
+> > > Is CONFIG_VMSPLIT_2G=y really needed?
+> > [Alison Wang] I tried to remove CONFIG_VMSPLIT_2G and used the default
+> > CONFIG_VMSPLIT_3G, but kernel could not boot up. It hangs at " Starting
+> kernel ... ".
+> >
+> > Any suggestion? Thanks.
+> 
+> Try enabling DEBUG_LL for your platform to get some debug output, if  you
+> still don't get any helpful messages, try also inserting
+> 
+> 	printascii(__func__);
+> 
+> statements in the early boot process to see how far you get before the hang.
+> 
+[Alison Wang] I can get to __turn_mmu_on or later, but I could not get the print
+message "Booting Linux on physical CPU 0xf00" in smp_setup_processor_id().
 
-> +	if (edesc->cyclic) {
-> +		vchan_cyclic_callback(&edesc->vdesc);
-> +		spin_unlock(&echan->vchan.lock);
-> +		return;
-> +	} else if (edesc->processed == edesc->pset_nr) {
-> +		dev_dbg(dev, "Transfer completed on channel %d\n",
-> +			echan->ch_num);
+I guess something wrong with the initial page tables in __create_page_tables,
+as for CONFIG_VMSPLIT_3G, only PAGE_OFFSET is changed from 0x80000000 to 0xC0000000.
+BTW, on our platform, TEXT_OFFSET is 0x00008000, PHYS_OFFSET is 0x80000000.
 
-perhaps not a great choice for a print, we would ideally want to complete
-the cookie and then print
+Any suggestion? Thanks.
 
-> +	sh_ipr = edma_shadow0_read_array(ecc, SH_IPR, 0);
-> +	if (!sh_ipr) {
-> +		sh_ipr = edma_shadow0_read_array(ecc, SH_IPR, 1);
-> +		if (!sh_ipr)
-> +			return IRQ_NONE;
-> +		sh_ier = edma_shadow0_read_array(ecc, SH_IER, 1);
-> +		bank = 1;
-> +	} else {
-> +		sh_ier = edma_shadow0_read_array(ecc, SH_IER, 0);
-> +		bank = 0;
-> +	}
-> +
-> +	do {
-> +		u32 slot;
-> +		u32 channel;
-> +
-> +		dev_dbg(ecc->dev, "IPR%d %08x\n", bank, sh_ipr);
-
-Too much debug prints...
-
-> +	edma_read_slot(ecc, echan->slot[0], &p);
-> +	/*
-> +	 * Issue later based on missed flag which will be sure
-> +	 * to happen as:
-> +	 * (1) we finished transmitting an intermediate slot and
-> +	 *     edma_execute is coming up.
-> +	 * (2) or we finished current transfer and issue will
-> +	 *     call edma_execute.
-> +	 *
-> +	 * Important note: issuing can be dangerous here and
-> +	 * lead to some nasty recursion when we are in a NULL
-> +	 * slot. So we avoid doing so and set the missed flag.
-> +	 */
-> +	if (p.a_b_cnt == 0 && p.ccnt == 0) {
-> +		dev_dbg(dev, "Error on null slot, setting miss\n");
-
-Shouldn't this be err ?
-
-> +		} else if (edma_read(ecc, EDMA_QEMR)) {
-> +			dev_dbg(ecc->dev, "QEMR %02x\n",
-> +				edma_read(ecc, EDMA_QEMR));
-> +			for (i = 0; i < 8; i++) {
-> +				if (edma_read(ecc, EDMA_QEMR) & BIT(i)) {
-> +					/* Clear the corresponding IPR bits */
-> +					edma_write(ecc, EDMA_QEMCR, BIT(i));
-> +					edma_shadow0_write(ecc, SH_QSECR,
-> +							   BIT(i));
-> +
-> +					/* NOTE:  not reported!! */
-
-what does this mean?
-
--- 
-~Vinod
+Best Regards,
+Alison Wang
