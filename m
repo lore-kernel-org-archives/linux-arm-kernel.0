@@ -1,52 +1,59 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 14 Oct 2015 10:17:13 -0400
-Subject: [PATCH v4 1/3] Documentation: dt: soc: Add description for knav qmss
- driver
-In-Reply-To: <1444832235-15263-1-git-send-email-m-karicheri2@ti.com>
-References: <1444832235-15263-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1444832235-15263-2-git-send-email-m-karicheri2@ti.com>
+Date: Wed, 14 Oct 2015 10:17:12 -0400
+Subject: [PATCH v4 0/3] 
+Message-ID: <1444832235-15263-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a documentation for knav qmss driver.
+This patch series enable accumulator queue support for K2 SoCs. Accumulator
+queues are a type of qmss queue that is monitored by the PDSP firmware and
+accumulated. Host is interrupted by PDSP firmware when packets become
+available in a ring buffer shared between the host and PDSP.
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- v4: added Arnd's Acked-by
+There was an issue raised when merging the original patch set at
+ (1) https://lkml.org/lkml/2015/9/4/681
+	[PATCH v1 1/2] soc: ti: display firmware file name as part of boot log
+ (2) https://lkml.org/lkml/2015/9/4/680
+	[PATCH v1 2/2] ARM: dts: keystone: enable accumulator channels
 
- Documentation/arm/keystone/knav-qmss.txt | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+This series fixes the issues raised against v3. Maintainer, could you please
+apply this series to v4.4 next please at your earliest opportunity.
+
+Change Log
+==========
+v4
+	- collected Acked-by from Arnd Bergmann against 1/3
+v3
+	- Added Arnd's Acked-by against 2/4
+	- 1/4 modified not to touch the DT documentation per Rob's comment.
+	- Removed DTS update from the series per Santosh. Will send the same
+	  as a separate patch
+v2
+	- Remove the firmware filename from DT and add it to the driver.
+	  Use a name ks2_qmss_pdsp_acc48.bin. The idea is this can be a
+	  soft link pointing to the real firmware file in file system.
+
+	- Move the description of the driver design from DT document to one
+	  under Documentation/arm/keystone/knav-qmss.txt. Update the this
+	  document with location of acc firmware available under
+	  linux-firmware.git.
+
+	- Additionally added accumulator queue support optional so that lack
+	  of firmware in the file system will not cause other queue types not
+	  available due to driver probe failure.
+
+Murali Karicheri (3):
+  Documentation: dt: soc: Add description for knav qmss driver
+  soc: ti: add firmware file name as part of the driver
+  soc: ti: qmss: make acc queue support optional in the driver
+
+ Documentation/arm/keystone/knav-qmss.txt           | 56 ++++++++++++++++++
+ .../bindings/soc/ti/keystone-navigator-qmss.txt    |  1 -
+ drivers/soc/ti/knav_qmss.h                         |  3 +-
+ drivers/soc/ti/knav_qmss_acc.c                     | 10 +++-
+ drivers/soc/ti/knav_qmss_queue.c                   | 67 ++++++++++++++--------
+ 5 files changed, 109 insertions(+), 28 deletions(-)
  create mode 100644 Documentation/arm/keystone/knav-qmss.txt
 
-diff --git a/Documentation/arm/keystone/knav-qmss.txt b/Documentation/arm/keystone/knav-qmss.txt
-new file mode 100644
-index 0000000..79946d1
---- /dev/null
-+++ b/Documentation/arm/keystone/knav-qmss.txt
-@@ -0,0 +1,24 @@
-+* Texas Instruments Keystone Navigator Queue Management SubSystem driver
-+
-+Driver source code path
-+  drivers/soc/ti/knav_qmss.c
-+  drivers/soc/ti/knav_qmss_acc.c
-+
-+The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
-+the main hardware sub system which forms the backbone of the Keystone
-+multi-core Navigator. QMSS consist of queue managers, packed-data structure
-+processors(PDSP), linking RAM, descriptor pools and infrastructure
-+Packet DMA.
-+The Queue Manager is a hardware module that is responsible for accelerating
-+management of the packet queues. Packets are queued/de-queued by writing or
-+reading descriptor address to a particular memory mapped location. The PDSPs
-+perform QMSS related functions like accumulation, QoS, or event management.
-+Linking RAM registers are used to link the descriptors which are stored in
-+descriptor RAM. Descriptor RAM is configurable as internal or external memory.
-+The QMSS driver manages the PDSP setups, linking RAM regions,
-+queue pool management (allocation, push, pop and notify) and descriptor
-+pool management.
-+
-+knav qmss driver provides a set of APIs to drivers to open/close qmss queues,
-+allocate descriptor pools, map the descriptors, push/pop to queues etc. For
-+details of the available APIs, please refers to include/linux/soc/ti/knav_qmss.h
 -- 
 1.9.1
