@@ -1,36 +1,87 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 15 Oct 2015 01:47:13 +0800
-Subject: [PATCH 3/6] mfd: axp20x: Add support for RSB based AXP223 PMIC
-In-Reply-To: <1444840342-9233-4-git-send-email-wens@csie.org>
-Message-ID: <201510150145.SeZXblZX%fengguang.wu@intel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Oct 2015 10:49:20 -0700
+Subject: [PATCH] arm, omap2, sram: On HS/EMU devices, only 64K internal
+ SRAM is available.
+In-Reply-To: <1444715655-30077-1-git-send-email-hs@denx.de>
+References: <1444715655-30077-1-git-send-email-hs@denx.de>
+Message-ID: <20151014174920.GE10113@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+* Heiko Schocher <hs@denx.de> [151012 22:58]:
+> Of this, secure content (including PPA) uses initial
+> portion of the SRAM. This chunk is not (and shouldn't
+> be) accessible from the public code.
+> 
+> The minimum size of this chunk (0x350) is used in this
+> patch. Available size is rounded off to 63K.
+> 
+> Both values would require a change if size of secure
+> content grows beyond 0x350.
 
-[auto build test ERROR on next-20151013 -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+Makes sense to me. And something similar is needed at least for
+dm814x to get rid of the imprecise abort during boot with
+commit bbeb92095159 ("ARM: 8422/1: enable imprecise aborts during
+early kernel startup") applied.
 
-url:    https://github.com/0day-ci/linux/commits/Chen-Yu-Tsai/mfd-axp20x-Add-support-for-RSB-based-AXP223/20151015-004334
-config: i386-randconfig-s1-201541 (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Is this needed as a fix to the -rc cycle, or can this wait for
+v4.4?
 
-All error/warnings (new ones prefixed by >>):
+Regards,
 
-warning: (MFD_AXP20X) selects MFD_AXP20X_RSB which has unmet direct dependencies (HAS_IOMEM && SUNXI_RSB)
-   drivers/built-in.o: In function `axp20x_sunxi_rsb_probe':
->> axp20x-rsb.c:(.text+0xe00d7): undefined reference to `__devm_regmap_init_sunxi_rsb'
-   drivers/built-in.o: In function `axp20x_sunxi_rsb_driver_init':
->> axp20x-rsb.c:(.init.text+0x81ce): undefined reference to `sunxi_rsb_driver_register'
+Tony
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 25103 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151015/b327a98a/attachment-0001.obj>
+
+> Signed-off-by: Heiko Schocher <hs@denx.de>
+> Signed-off-by: Ayoub Zaki <Ayoub.Zaki@bosch-si.com>
+> ---
+> 
+>  arch/arm/mach-omap2/sram.c | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
+> index cd488b8..2e7c00f 100644
+> --- a/arch/arm/mach-omap2/sram.c
+> +++ b/arch/arm/mach-omap2/sram.c
+> @@ -47,6 +47,28 @@
+>  
+>  #define GP_DEVICE		0x300
+>  
+> +/**
+> + * Size of chunk used by secure content in the HS/EMU devices.
+> + *
+> + * This size is not fixed. It depends upon the implementation of PPA.
+> + * May need to be modified if the size grows.
+> + */
+> +#define AM33XX_HS_HEADER_SIZE   0x0350
+> +
+> +/**
+> + * Start of public SRAM on HS/EMU devices.
+> + */
+> +#define AM33XX_SRAM_PA		0x40300000
+> +#define AM33XX_SRAM_PUB_PA	(AM33XX_SRAM_PA + AM33XX_HS_HEADER_SIZE)
+> +
+> +/**
+> + * Size of public SRAM available on HS/EMU devices.
+> + *
+> + * This size also depends upon AM33XX_HS_HEADER_SIZE.
+> + * Current value is derived from nearest round-off.
+> + */
+> +#define AM33XX_SRAM_PUB_SIZE		0xfc00	/* 63K */
+> +
+>  #define ROUND_DOWN(value,boundary)	((value) & (~((boundary)-1)))
+>  
+>  static unsigned long omap_sram_start;
+> @@ -99,6 +121,9 @@ static void __init omap_detect_sram(void)
+>  			} else {
+>  				omap_sram_size = 0x8000; /* 32K */
+>  			}
+> +		} else if (soc_is_am33xx()) {
+> +			omap_sram_start = AM33XX_SRAM_PUB_PA;
+> +			omap_sram_size  = AM33XX_SRAM_PUB_SIZE;
+>  		} else {
+>  			omap_sram_start = OMAP2_SRAM_PUB_PA;
+>  			omap_sram_size = 0x800; /* 2K */
+> -- 
+> 2.1.0
+> 
