@@ -1,45 +1,15 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 14 Oct 2015 16:08:43 +0100
-Subject: [PATCHv3 02/11] arm64: Handle section maps for swapper/idmap
-In-Reply-To: <20151014145158.GA4422@leverpostej>
-References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
- <1444821634-1689-3-git-send-email-suzuki.poulose@arm.com>
- <20151014120618.GB2150@leverpostej> <561E56D4.40506@arm.com>
- <20151014145158.GA4422@leverpostej>
-Message-ID: <561E6FFB.3020005@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Oct 2015 17:09:40 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.3
+In-Reply-To: <87si5krq1e.fsf@free-electrons.com>
+References: <87si5krq1e.fsf@free-electrons.com>
+Message-ID: <5526972.jeAXIOdWQB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/15 15:51, Mark Rutland wrote:
->>>> +/* With 4K pages, we use section maps. */
+On Friday 09 October 2015 17:59:41 Gregory CLEMENT wrote:
+>   ARM: orion: Fix DSA platform device after mvmdio conversion (2015-10-06 16:22:37 +0200)
+> 
+Pulled into fixes, thanks!
 
->> /*
->>   * ARM64 kernel is guaranteed to be loaded at 2M aligned
->>   * address (as per booting requirements). Hence we can use
->>   * section mapping with 4K (section size = 2M) and not with
->>   * 16K(section size = 32M) or 64K (section size = 512M).
->>   */
->
-> That sounds much better. I hadn't figured out why myself, so thanks for
-> the explanation :)
->
-> However, there's one minor nit: the start of memory below the kernel is
-> 2M aligned, but the offset means that the kernel itself is not loaded at
-> a 2M aligned address.
-
-Oh yes
-
->
-> So how about:
->
-> /*
->   * The linear mapping and the start of memory are both 2M aligned (per
->   * the arm64 booting.txt requirements). Hence we can use section mapping
->   * with 4K (section size = 2M) but not with 16K (section size = 32M) or
->   * 64K (section size = 512M).
->   */
-
-Will add this
-
-Thanks
-Suzuki
+	Arnd
