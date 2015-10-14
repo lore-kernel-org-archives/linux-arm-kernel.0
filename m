@@ -1,111 +1,203 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 14 Oct 2015 14:42:47 +0300
-Subject: [PATCH v5 05/24] ARM/dmaengine: edma: Move of_dma_controller_register
- to the dmaengine driver
+Date: Wed, 14 Oct 2015 14:43:05 +0300
+Subject: [PATCH v5 23/24] dmaengine: edma: Rename bitfields for slot and
+ channel usage tracking
 In-Reply-To: <1444822986-20562-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1444822986-20562-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1444822986-20562-6-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1444822986-20562-24-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the of_dma_controller is registered in the non dmaengine driver we could
-have race condition:
-the of_dma_controller has been registered, but the dmaengine driver is not
-yet probed. Drivers requesting DMA channels during this window will fail
-since we do not yet have dmaengine drivers registered.
+The names chosen for the bitfields were quite confusing and given no real
+information on what they are used for...
+
+edma_inuse -> slot_inuse: tracks the slot usage/availability
+edma_unused -> channel_unused: tracks the channel usage/availability
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/common/edma.c | 10 ----------
- drivers/dma/edma.c     | 16 ++++++++++++++++
- 2 files changed, 16 insertions(+), 10 deletions(-)
+ drivers/dma/edma.c | 51 ++++++++++++++++++++++++++-------------------------
+ 1 file changed, 26 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 7c2fe527e53b..d82fceda13a3 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -29,7 +29,6 @@
- #include <linux/dma-mapping.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
--#include <linux/of_dma.h>
- #include <linux/of_irq.h>
- #include <linux/pm_runtime.h>
- 
-@@ -1191,10 +1190,6 @@ static int edma_of_parse_dt(struct device *dev,
- 	return ret;
- }
- 
--static struct of_dma_filter_info edma_filter_info = {
--	.filter_fn = edma_filter_fn,
--};
--
- static struct edma_soc_info *edma_setup_info_from_dt(struct device *dev,
- 						      struct device_node *node)
- {
-@@ -1209,11 +1204,6 @@ static struct edma_soc_info *edma_setup_info_from_dt(struct device *dev,
- 	if (ret)
- 		return ERR_PTR(ret);
- 
--	dma_cap_set(DMA_SLAVE, edma_filter_info.dma_cap);
--	dma_cap_set(DMA_CYCLIC, edma_filter_info.dma_cap);
--	of_dma_controller_register(dev->of_node, of_dma_simple_xlate,
--				   &edma_filter_info);
--
- 	return info;
- }
- #else
 diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 19fa49d6f555..fcb4680efed7 100644
+index 4b2ccc9de0ad..8d9169b7f208 100644
 --- a/drivers/dma/edma.c
 +++ b/drivers/dma/edma.c
-@@ -25,6 +25,7 @@
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- #include <linux/of.h>
-+#include <linux/of_dma.h>
+@@ -227,16 +227,16 @@ struct edma_cc {
+ 	enum dma_event_q		default_queue;
  
- #include <linux/platform_data/edma.h>
+ 	bool				unused_chan_list_done;
+-	/* The edma_inuse bit for each PaRAM slot is clear unless the
++	/* The slot_inuse bit for each PaRAM slot is clear unless the
+ 	 * channel is in use ... by ARM or DSP, for QDMA, or whatever.
+ 	 */
+-	unsigned long *edma_inuse;
++	unsigned long *slot_inuse;
  
-@@ -987,9 +988,14 @@ static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
- 	INIT_LIST_HEAD(&dma->channels);
- }
+-	/* The edma_unused bit for each channel is clear unless
++	/* The channel_unused bit for each channel is clear unless
+ 	 * it is not being used on this platform. It uses a bit
+ 	 * of SOC-specific initialization code.
+ 	 */
+-	unsigned long *edma_unused;
++	unsigned long *channel_unused;
  
-+static struct of_dma_filter_info edma_filter_info = {
-+	.filter_fn = edma_filter_fn,
-+};
-+
- static int edma_probe(struct platform_device *pdev)
- {
- 	struct edma_cc *ecc;
-+	struct device_node *parent_node = pdev->dev.parent->of_node;
- 	int ret;
+ 	struct dma_device		dma_slave;
+ 	struct edma_chan		*slave_chans;
+@@ -452,7 +452,7 @@ static int prepare_unused_channel_list(struct device *dev, void *data)
+ 				continue;
  
- 	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-@@ -1024,6 +1030,13 @@ static int edma_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, ecc);
- 
-+	if (parent_node) {
-+		dma_cap_set(DMA_SLAVE, edma_filter_info.dma_cap);
-+		dma_cap_set(DMA_CYCLIC, edma_filter_info.dma_cap);
-+		of_dma_controller_register(parent_node, of_dma_simple_xlate,
-+					   &edma_filter_info);
-+	}
-+
- 	dev_info(&pdev->dev, "TI EDMA DMA engine driver\n");
+ 			clear_bit(EDMA_CHAN_SLOT(dma_spec.args[0]),
+-				  ecc->edma_unused);
++				  ecc->channel_unused);
+ 			of_node_put(dma_spec.np);
+ 		}
+ 		return 0;
+@@ -469,7 +469,7 @@ static int prepare_unused_channel_list(struct device *dev, void *data)
+ 		dma_req = (int)res->start;
+ 		if (dma_req >= dma_req_min && dma_req < dma_req_max)
+ 			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
+-				  ecc->edma_unused);
++				  ecc->channel_unused);
+ 	}
  
  	return 0;
-@@ -1037,7 +1050,10 @@ static int edma_remove(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct edma_cc *ecc = dev_get_drvdata(dev);
-+	struct device_node *parent_node = pdev->dev.parent->of_node;
+@@ -533,17 +533,17 @@ static int edma_alloc_slot(struct edma_cc *ecc, int slot)
+ 	if (slot < 0) {
+ 		slot = ecc->num_channels;
+ 		for (;;) {
+-			slot = find_next_zero_bit(ecc->edma_inuse,
++			slot = find_next_zero_bit(ecc->slot_inuse,
+ 						  ecc->num_slots,
+ 						  slot);
+ 			if (slot == ecc->num_slots)
+ 				return -ENOMEM;
+-			if (!test_and_set_bit(slot, ecc->edma_inuse))
++			if (!test_and_set_bit(slot, ecc->slot_inuse))
+ 				break;
+ 		}
+ 	} else if (slot < ecc->num_channels || slot >= ecc->num_slots) {
+ 		return -EINVAL;
+-	} else if (test_and_set_bit(slot, ecc->edma_inuse)) {
++	} else if (test_and_set_bit(slot, ecc->slot_inuse)) {
+ 		return -EBUSY;
+ 	}
  
-+	if (parent_node)
-+		of_dma_controller_free(parent_node);
- 	dma_async_device_unregister(&ecc->dma_slave);
- 	edma_free_slot(ecc->dummy_slot);
+@@ -559,7 +559,7 @@ static void edma_free_slot(struct edma_cc *ecc, unsigned slot)
+ 		return;
  
+ 	edma_write_slot(ecc, slot, &dummy_paramset);
+-	clear_bit(slot, ecc->edma_inuse);
++	clear_bit(slot, ecc->slot_inuse);
+ }
+ 
+ /**
+@@ -631,7 +631,7 @@ static int edma_start(struct edma_cc *ecc, unsigned channel)
+ 		unsigned int mask = BIT(channel & 0x1f);
+ 
+ 		/* EDMA channels without event association */
+-		if (test_bit(channel, ecc->edma_unused)) {
++		if (test_bit(channel, ecc->channel_unused)) {
+ 			dev_dbg(ecc->dev, "ESR%d %08x\n", j,
+ 				edma_shadow0_read_array(ecc, SH_ESR, j));
+ 			edma_shadow0_write_array(ecc, SH_ESR, j, mask);
+@@ -835,11 +835,11 @@ static int edma_alloc_channel(struct edma_cc *ecc, int channel,
+ 	if (channel < 0) {
+ 		channel = 0;
+ 		for (;;) {
+-			channel = find_next_bit(ecc->edma_unused,
++			channel = find_next_bit(ecc->channel_unused,
+ 						ecc->num_channels, channel);
+ 			if (channel == ecc->num_channels)
+ 				break;
+-			if (!test_and_set_bit(channel, ecc->edma_inuse)) {
++			if (!test_and_set_bit(channel, ecc->slot_inuse)) {
+ 				done = 1;
+ 				break;
+ 			}
+@@ -849,7 +849,7 @@ static int edma_alloc_channel(struct edma_cc *ecc, int channel,
+ 			return -ENOMEM;
+ 	} else if (channel >= ecc->num_channels) {
+ 		return -EINVAL;
+-	} else if (test_and_set_bit(channel, ecc->edma_inuse)) {
++	} else if (test_and_set_bit(channel, ecc->slot_inuse)) {
+ 		return -EBUSY;
+ 	}
+ 
+@@ -895,7 +895,7 @@ static void edma_free_channel(struct edma_cc *ecc, unsigned channel)
+ 	/* REVISIT should probably take out of shadow region 0 */
+ 
+ 	edma_write_slot(ecc, channel, &dummy_paramset);
+-	clear_bit(channel, ecc->edma_inuse);
++	clear_bit(channel, ecc->slot_inuse);
+ }
+ 
+ /* Move channel to a specific event queue */
+@@ -2137,14 +2137,15 @@ static int edma_probe(struct platform_device *pdev)
+ 	if (!ecc->slave_chans)
+ 		return -ENOMEM;
+ 
+-	ecc->edma_unused = devm_kcalloc(dev, BITS_TO_LONGS(ecc->num_channels),
+-					sizeof(unsigned long), GFP_KERNEL);
+-	if (!ecc->edma_unused)
++	ecc->channel_unused = devm_kcalloc(dev,
++					   BITS_TO_LONGS(ecc->num_channels),
++					   sizeof(unsigned long), GFP_KERNEL);
++	if (!ecc->channel_unused)
+ 		return -ENOMEM;
+ 
+-	ecc->edma_inuse = devm_kcalloc(dev, BITS_TO_LONGS(ecc->num_slots),
++	ecc->slot_inuse = devm_kcalloc(dev, BITS_TO_LONGS(ecc->num_slots),
+ 				       sizeof(unsigned long), GFP_KERNEL);
+-	if (!ecc->edma_inuse)
++	if (!ecc->slot_inuse)
+ 		return -ENOMEM;
+ 
+ 	ecc->default_queue = info->default_queue;
+@@ -2153,7 +2154,7 @@ static int edma_probe(struct platform_device *pdev)
+ 		edma_write_slot(ecc, i, &dummy_paramset);
+ 
+ 	/* Mark all channels as unused */
+-	memset(ecc->edma_unused, 0xff, sizeof(ecc->edma_unused));
++	memset(ecc->channel_unused, 0xff, sizeof(ecc->channel_unused));
+ 
+ 	if (info->rsv) {
+ 		/* Clear the reserved channels in unused list */
+@@ -2162,7 +2163,7 @@ static int edma_probe(struct platform_device *pdev)
+ 			for (i = 0; rsv_chans[i][0] != -1; i++) {
+ 				off = rsv_chans[i][0];
+ 				ln = rsv_chans[i][1];
+-				clear_bits(off, ln, ecc->edma_unused);
++				clear_bits(off, ln, ecc->channel_unused);
+ 			}
+ 		}
+ 
+@@ -2172,7 +2173,7 @@ static int edma_probe(struct platform_device *pdev)
+ 			for (i = 0; rsv_slots[i][0] != -1; i++) {
+ 				off = rsv_slots[i][0];
+ 				ln = rsv_slots[i][1];
+-				set_bits(off, ln, ecc->edma_inuse);
++				set_bits(off, ln, ecc->slot_inuse);
+ 			}
+ 		}
+ 	}
+@@ -2182,7 +2183,7 @@ static int edma_probe(struct platform_device *pdev)
+ 	if (xbar_chans) {
+ 		for (i = 0; xbar_chans[i][1] != -1; i++) {
+ 			off = xbar_chans[i][1];
+-			clear_bits(off, 1, ecc->edma_unused);
++			clear_bits(off, 1, ecc->channel_unused);
+ 		}
+ 	}
+ 
+@@ -2301,7 +2302,7 @@ static int edma_pm_resume(struct device *dev)
+ 		edma_direct_dmach_to_param_mapping(ecc);
+ 
+ 	for (i = 0; i < ecc->num_channels; i++) {
+-		if (test_bit(i, ecc->edma_inuse)) {
++		if (test_bit(i, ecc->slot_inuse)) {
+ 			/* ensure access through shadow region 0 */
+ 			edma_or_array2(ecc, EDMA_DRAE, 0, i >> 5,
+ 				       BIT(i & 0x1f));
 -- 
 2.6.1
