@@ -1,48 +1,60 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 15 Oct 2015 00:23:17 +0100
-Subject: xen,arm: enable cpu_hotplug
-In-Reply-To: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
-Message-ID: <561EE3E5.2000105@citrix.com>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Wed, 14 Oct 2015 16:25:50 -0700
+Subject: [PATCH V2 0/6] gicv2m: acpi: Add ACPI support for GICv2m MSI
+Message-ID: <1444865156-9870-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/2015 18:49, Stefano Stabellini wrote:
-> Hi all,
+This patch series has been forked from the following patch series since
+it no longer depends on the rest of the patches.
 
-Hi Stefano,
+  [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
+  https://lkml.org/lkml/2015/7/29/234
 
-> this small patch series enable cpu_hotplug in ARM and ARM64 guests,
-> using the PV path to plug and unplug the cpus and psci to enable/disable
-> them.
+It has been ported to use the newly introduced device fwnode_handle 
+for ACPI irqdmain introduced by Marc in the following patch series:
 
-That's a cool things to have on ARM!
+  [PATCH v2 00/17] Divorcing irqdomain and device_node
+  http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git irq/irq-domain-fwnode-v2
 
-I've got few questions related to CPU hotplug on Xen side.
+The following git branch contains the submitted patches along with
+the pre-requsite patches (mainly for ARM64 PCI support for ACPI).
 
-Firstly, when we create the device tree we are using max_vcpus to 
-populate the "/cpus" node. AFAIU, Linux will always start all the vCPU 
-because they are marked present. That means that it would not be 
-possible to honor vcpus="N" where N is < max_vcpus. Did I miss something?
+  https://github.com/ssuthiku/linux.git	irq-domain-fwnode-v2-v2m-multiframe
 
-My second point is related to how Xen is handling interrupt with vCPU. 
-When PSCI off is called, we will set the _VFP_down flag. This flag is 
-used in vgic_vcpu_inject_irq and when it's set the interrupt will be 
-ignored and stay active on the HW GIC forever. If the vCPU is coming 
-back online, this interrupt will never be received. AFAIU the spec, the 
-interrupt is expected to stay pending on the distributor side and will 
-be receive when the vCPU will come back or migrate to another vCPU. A 
-similar problem can happen when the vCPU is powered on again because we 
-clear all the interrupt state related to vCPU (see vgic_clear_pending_irqs).
+This has been tested on AMD Seattle (Overdrive) RevB system. 
 
-That brings me a third one related to migration (and not to this series 
-specifically). If the interrupt is edge type, it means that same 
-interrupt can come while it's still active in the LR register. If the 
-guest has to migrate the IRQ it won't happen because the interrupt is 
-already active and in the LR, so we will set the pending bit on the 
-current vCPU.
+NOTE: I have not tested ACPI GICv2m multiframe support since
+I don't have access to such system. Any helps are appreciated.
 
-Regards,
+Thanks,
+Suravee
+
+Changes from V1: (https://lkml.org/lkml/2015/10/13/859)
+  - Rebase on top of Marc's patch to addng support for multiple MSI frames
+    (https://lkml.org/lkml/2015/10/14/271)
+  - Adding fwnode convenient functions (patch 3 and 4)
+
+Suravee Suthikulpanit (6):
+  pci: msi: Add support to query MSI domain for pci device
+  acpi: pci: Setup MSI domain for ACPI based pci devices
+  irqdomain: introduce is_fwnode_irqchip helper
+  irqdomain: Introduce irq_domain_get_irqchip_fwnode_name helper
+    function
+  gicv2m: Refactor to prepare for ACPI support
+  gicv2m: acpi: Introducing GICv2m ACPI support
+
+ drivers/irqchip/irq-gic-v2m.c   | 151 ++++++++++++++++++++++++++++++++++------
+ drivers/irqchip/irq-gic.c       |   5 +-
+ drivers/pci/msi.c               |  30 ++++++++
+ drivers/pci/pci-acpi.c          |  13 ++++
+ drivers/pci/probe.c             |   2 +
+ include/linux/irqchip/arm-gic.h |   6 ++
+ include/linux/irqdomain.h       |   6 ++
+ include/linux/msi.h             |   7 ++
+ include/linux/pci.h             |   7 ++
+ kernel/irq/irqdomain.c          |  20 +++++-
+ 10 files changed, 224 insertions(+), 23 deletions(-)
 
 -- 
-Julien Grall
+2.1.0
