@@ -1,40 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 14 Oct 2015 11:27:06 +0100
-Subject: [PATCH] mutex: make mutex_lock_nested an inline function
-In-Reply-To: <20151014082050.GQ17308@twins.programming.kicks-ass.net>
-References: <11282238.AHmyWliPRj@wuerfel>
- <20151013203812.GM17308@twins.programming.kicks-ass.net>
- <11817958.z9KtmeKzV7@wuerfel>
- <20151014082050.GQ17308@twins.programming.kicks-ass.net>
-Message-ID: <20151014102706.GR14956@sirena.org.uk>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 14 Oct 2015 12:34:03 +0200
+Subject: [PATCH 3/4] ARM: multi_v7_defconfig: enable pxa168 Ethernet
+In-Reply-To: <1444818844-2865-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1444818844-2865-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1444818844-2865-4-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 10:20:50AM +0200, Peter Zijlstra wrote:
+The Marvell pxa168 ethernet controller is used on Berlin SoCs and is
+missing from multi_v7_defconfig. Enable it.
 
-> Uuh, I just looked at next and saw this regulator_lock_supply()
-> function. How is that limited? subclass must be <8 otherwise bad things
-> happen.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Can we please get some more discoverable documentation of the arbitrary
-limits in the lockdep code?  I seem to keep seeing code that bumps into
-surprising limits like this and I'm not sure how I'm supposed to know
-about them except through finding out after the fact or trawling the
-code every time someone touches locking.
-
-I would be very surprised to see a system that pushes over 8 locks,
-while there's nothing actually preventing it system design
-considerations mean that even four cascaded supplies are pretty
-unlikely so we should be fine.  Every time you add a new level of
-regulation you're both increasing the load on regulators up the chain
-(which means they need to be bigger and more expensive) and except in
-the case of a DCDC supplying an LDO (which only works to one level)
-you're going to be decreasing the efficiency of the system.  If we get
-to that point we can worry about what to do.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151014/2eaedd02/attachment.sig>
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 2f8984618236..e45f80df403c 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -207,6 +207,7 @@ CONFIG_NET_CALXEDA_XGMAC=y
+ CONFIG_IGB=y
+ CONFIG_MV643XX_ETH=y
+ CONFIG_MVNETA=y
++CONFIG_PXA168_ETH=y
+ CONFIG_KS8851=y
+ CONFIG_R8169=y
+ CONFIG_SH_ETH=y
+-- 
+2.6.1
