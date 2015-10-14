@@ -1,226 +1,81 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 14 Oct 2015 09:57:38 +0800
-Subject: [PATCH v4 2/2] usb: chipidea: imx: refine clock operations to adapt
- for all platforms
-Message-ID: <1444787859-31509-1-git-send-email-peter.chen@freescale.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Wed, 14 Oct 2015 07:38:14 +0530
+Subject: [PATCH 3/3] ARM: dts: exynos5422-odroidxu3: Added UHS-I bus speed
+ support
+In-Reply-To: <561DB577.8080808@samsung.com>
+References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
+ <1444578364-1384-3-git-send-email-linux.amoon@gmail.com>
+ <561B48B7.1040201@samsung.com>
+ <CANAwSgSLFviT4ZNXTYwxYs2pbrr9ozJmPMauhgRPO0556Rsr_g@mail.gmail.com>
+ <561C4CEE.3050905@samsung.com>
+ <CANAwSgRJ+5O-x61K9E_AxTZWQy3jJrKF5MiLtWRdUU29CCfa-Q@mail.gmail.com>
+ <561C7DF1.6000609@samsung.com>
+ <CANAwSgRBzFqHB98wSQnQu-ggGqRT2H6wC415wULXVhPg0uw_3A@mail.gmail.com>
+ <561D9ACE.6050103@samsung.com>
+ <CAGOxZ51uPkdGmCAs2Tc8_=YvkORJKdivN47vo1ZxkGQ-MY=-oQ@mail.gmail.com>
+ <561DACC6.9040209@samsung.com> <561DB290.5070903@samsung.com>
+ <561DB577.8080808@samsung.com>
+Message-ID: <CAGOxZ522ebRzrcjT3WtnP8zBWSZtvpQ5FTd9VGk8DhQ0+i7axg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some i.mx platforms need three clocks to let controller work, but
-others only need one, refine clock operation to adapt for all
-platforms, it fixes a regression found at i.mx27.
+On Wed, Oct 14, 2015 at 7:22 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> On 14.10.2015 10:40, Jaehoon Chung wrote:
+>> On 10/14/2015 10:15 AM, Krzysztof Kozlowski wrote:
+>>> On 14.10.2015 10:06, Alim Akhtar wrote:
+>>>> +Doug
+>>>> Hello,
+>>>> AFAIR, dw_mmc host controller does support UHS-I [1], specially SDR50
+>>>> and SDR104 modes.
+>>>>
+>>>> [1]: http://www.spinics.net/lists/linux-mmc/msg28186.html
+>>>>
+>>>> What I remember is, one need to set "broken-cd" property also in order
+>>>> to make it work because of the vqmmc and vmmc connection on board. I
+>>>> didn't find the link right now, but you can search on the web, there
+>>>> was a long discussion about handling this.
+>>>> Have not checked it recently, so not sure if this got broken somehow.
+>>>>
+>>>
+>>> Please, don't top post.
+>>>
+>>> I am not a SD/MMC specialist (I do not feel enough confident in its
+>>> internals) but the datasheet for 5422 does not mention UHS. However it
+>>> mentions "High Speed DDR Mode with 200 MHz clock rate (HS400)". This
+>>> does not look like UHS...
+>>
+>> You're right. It's not UHS mode. it mentions eMMC's HS400 mode.
+>> UHS and HS400 are difference mode.
+>>
+>> eMMC mode are supported
+>>
+>>> https://www.sdcard.org/developers/overview/bus_speed/
+>>> This of course is not a definite proof that 5422 does not support UHS. I
+>>> am just saying that I couldn't find any information that *it does*.
+>>
+>> Well, I think you want to know whether it supported or not.
+>> Then you can find the information at User manual.
+>> In mobile storage part of User manual, it described the overview.
+>> Mobile storage host supports these specification:
+>> - Secure Digital memory (SD memory version 3.0)
+>> - Secure Digital I/O SDIO (SDIO version 3.0)
+>> - etc...
+>>
+>> SD3.0 is supported UHS-I mode.
+>> If user manual of exynos5422 is mentioned this specification, it should be supported UHS-I mode.
+>
+> Thanks! Indeed datasheet mentions that supported SD and SDIO is version
+> 3.0 (not 3.01... which seems irrelevant because 3.0 introduced UHS-I,
+> right?).
+>
+Yes, your understanding is right. SD3.0 does includes UHS-I.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: <stable@vger.kernel.org> #v4.1+
----
- drivers/usb/chipidea/ci_hdrc_imx.c | 132 ++++++++++++++++++++++++++++++++-----
- 1 file changed, 114 insertions(+), 18 deletions(-)
+> Best regards,
+> Krzysztof
 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-index 6ccbf60..82b1dfe 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.c
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -84,6 +84,12 @@ struct ci_hdrc_imx_data {
- 	struct imx_usbmisc_data *usbmisc_data;
- 	bool supports_runtime_pm;
- 	bool in_lpm;
-+	/* SoC before i.mx6 (except imx23/imx28) needs three clks */
-+	bool need_three_clks;
-+	struct clk *clk_ipg;
-+	struct clk *clk_ahb;
-+	struct clk *clk_per;
-+	/* --------------------------------- */
- };
- 
- /* Common functions shared by usbmisc drivers */
-@@ -135,6 +141,103 @@ static struct imx_usbmisc_data *usbmisc_get_init_data(struct device *dev)
- }
- 
- /* End of common functions shared by usbmisc drivers*/
-+static int imx_get_clks(struct device *dev)
-+{
-+	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
-+	int ret = 0;
-+
-+	data->clk_ipg = devm_clk_get(dev, "ipg");
-+	if (IS_ERR(data->clk_ipg)) {
-+		/* If the platform only needs one clocks */
-+		data->clk = devm_clk_get(dev, NULL);
-+		if (IS_ERR(data->clk)) {
-+			ret = PTR_ERR(data->clk);
-+			dev_err(dev,
-+				"Failed to get clock, err=%d\n", ret);
-+			dev_err(dev,
-+				"Failed to get ipg clock, err=%d\n", ret);
-+			return ret;
-+		}
-+		return ret;
-+	}
-+
-+	data->clk_ahb = devm_clk_get(dev, "ahb");
-+	if (IS_ERR(data->clk_ahb)) {
-+		ret = PTR_ERR(data->clk_ahb);
-+		dev_err(dev,
-+			"Failed to get ahb clock, err=%d\n", ret);
-+		return ret;
-+	}
-+
-+	data->clk_per = devm_clk_get(dev, "per");
-+	if (IS_ERR(data->clk_per)) {
-+		ret = PTR_ERR(data->clk_per);
-+		dev_err(dev,
-+			"Failed to get per clock, err=%d\n", ret);
-+		return ret;
-+	}
-+
-+	data->need_three_clks = true;
-+	return ret;
-+}
-+
-+static int imx_prepare_enable_clks(struct device *dev)
-+{
-+	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
-+	int ret = 0;
-+
-+	if (data->need_three_clks) {
-+		ret = clk_prepare_enable(data->clk_ipg);
-+		if (ret) {
-+			dev_err(dev,
-+				"Failed to prepare/enable ipg clk, err=%d\n",
-+				ret);
-+			return ret;
-+		}
-+
-+		ret = clk_prepare_enable(data->clk_ahb);
-+		if (ret) {
-+			dev_err(dev,
-+				"Failed to prepare/enable ahb clk, err=%d\n",
-+				ret);
-+			clk_disable_unprepare(data->clk_ipg);
-+			return ret;
-+		}
-+
-+		ret = clk_prepare_enable(data->clk_per);
-+		if (ret) {
-+			dev_err(dev,
-+				"Failed to prepare/enable per clk, err=%d\n",
-+				ret);
-+			clk_disable_unprepare(data->clk_ahb);
-+			clk_disable_unprepare(data->clk_ipg);
-+			return ret;
-+		}
-+	} else {
-+		ret = clk_prepare_enable(data->clk);
-+		if (ret) {
-+			dev_err(dev,
-+				"Failed to prepare/enable clk, err=%d\n",
-+				ret);
-+			return ret;
-+		}
-+	}
-+
-+	return ret;
-+}
-+
-+static void imx_disable_unprepare_clks(struct device *dev)
-+{
-+	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
-+
-+	if (data->need_three_clks) {
-+		clk_disable_unprepare(data->clk_per);
-+		clk_disable_unprepare(data->clk_ipg);
-+		clk_disable_unprepare(data->clk_ahb);
-+	} else {
-+		clk_disable_unprepare(data->clk);
-+	}
-+}
- 
- static int ci_hdrc_imx_probe(struct platform_device *pdev)
- {
-@@ -153,23 +256,18 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 	if (!data)
- 		return -ENOMEM;
- 
-+	platform_set_drvdata(pdev, data);
- 	data->usbmisc_data = usbmisc_get_init_data(&pdev->dev);
- 	if (IS_ERR(data->usbmisc_data))
- 		return PTR_ERR(data->usbmisc_data);
- 
--	data->clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(data->clk)) {
--		dev_err(&pdev->dev,
--			"Failed to get clock, err=%ld\n", PTR_ERR(data->clk));
--		return PTR_ERR(data->clk);
--	}
-+	ret = imx_get_clks(&pdev->dev);
-+	if (ret)
-+		return ret;
- 
--	ret = clk_prepare_enable(data->clk);
--	if (ret) {
--		dev_err(&pdev->dev,
--			"Failed to prepare or enable clock, err=%d\n", ret);
-+	ret = imx_prepare_enable_clks(&pdev->dev);
-+	if (ret)
- 		return ret;
--	}
- 
- 	data->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
- 	if (IS_ERR(data->phy)) {
-@@ -212,8 +310,6 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 		goto disable_device;
- 	}
- 
--	platform_set_drvdata(pdev, data);
--
- 	if (data->supports_runtime_pm) {
- 		pm_runtime_set_active(&pdev->dev);
- 		pm_runtime_enable(&pdev->dev);
-@@ -226,7 +322,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- disable_device:
- 	ci_hdrc_remove_device(data->ci_pdev);
- err_clk:
--	clk_disable_unprepare(data->clk);
-+	imx_disable_unprepare_clks(&pdev->dev);
- 	return ret;
- }
- 
-@@ -240,7 +336,7 @@ static int ci_hdrc_imx_remove(struct platform_device *pdev)
- 		pm_runtime_put_noidle(&pdev->dev);
- 	}
- 	ci_hdrc_remove_device(data->ci_pdev);
--	clk_disable_unprepare(data->clk);
-+	imx_disable_unprepare_clks(&pdev->dev);
- 
- 	return 0;
- }
-@@ -252,7 +348,7 @@ static int imx_controller_suspend(struct device *dev)
- 
- 	dev_dbg(dev, "at %s\n", __func__);
- 
--	clk_disable_unprepare(data->clk);
-+	imx_disable_unprepare_clks(dev);
- 	data->in_lpm = true;
- 
- 	return 0;
-@@ -270,7 +366,7 @@ static int imx_controller_resume(struct device *dev)
- 		return 0;
- 	}
- 
--	ret = clk_prepare_enable(data->clk);
-+	ret = imx_prepare_enable_clks(dev);
- 	if (ret)
- 		return ret;
- 
-@@ -285,7 +381,7 @@ static int imx_controller_resume(struct device *dev)
- 	return 0;
- 
- clk_disable:
--	clk_disable_unprepare(data->clk);
-+	imx_disable_unprepare_clks(dev);
- 	return ret;
- }
- 
+
+
 -- 
-1.9.1
+Regards,
+Alim
