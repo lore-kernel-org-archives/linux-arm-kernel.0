@@ -1,262 +1,62 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Wed, 14 Oct 2015 15:07:16 +0200
-Subject: [PATCH v2 2/4] dmaengine: Add STM32 DMA driver
-In-Reply-To: <20151014111615.GR27370@localhost>
-References: <1444745127-1105-1-git-send-email-cedric.madianga@gmail.com>
- <1444745127-1105-3-git-send-email-cedric.madianga@gmail.com>
- <20151014111615.GR27370@localhost>
-Message-ID: <CAOAejn3QOzrd952MztVTah4UbpNs1OabwkxhEtp15Mqz0B7LXA@mail.gmail.com>
+From: fcooper@ti.com (Franklin S Cooper Jr.)
+Date: Wed, 14 Oct 2015 08:08:59 -0500
+Subject: [PATCH] ARM: DRA7: hwmod: Remove elm address space from hwmod data
+In-Reply-To: <561DFD26.9090702@ti.com>
+References: <1444743874-4454-1-git-send-email-fcooper@ti.com>
+ <561DFD26.9090702@ti.com>
+Message-ID: <561E53EB.9060207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
 
 
-2015-10-14 13:16 GMT+02:00 Vinod Koul <vinod.koul@intel.com>:
-> On Tue, Oct 13, 2015 at 04:05:25PM +0200, M'boumba Cedric Madianga wrote:
->> +#define STM32_DMA_LISR                       0x0000 /* DMA Low Int Status Reg */
->> +#define STM32_DMA_HISR                       0x0004 /* DMA High Int Status Reg */
->> +#define STM32_DMA_LIFCR                      0x0008 /* DMA Low Int Flag Clear Reg */
->> +#define STM32_DMA_HIFCR                      0x000c /* DMA High Int Flag Clear Reg */
->> +#define STM32_DMA_TCI                        BIT(5) /* Transfer Complete Interrupt */
->> +#define STM32_DMA_HTI                        BIT(4) /* Half Transfer Interrupt */
->> +#define STM32_DMA_TEI                        BIT(3) /* Transfer Error Interrupt */
->> +#define STM32_DMA_DMEI                       BIT(2) /* Direct Mode Error Interrupt */
->> +#define STM32_DMA_FEI                        BIT(0) /* FIFO Error Interrupt */
+On 10/14/2015 01:58 AM, Roger Quadros wrote:
+> On 13/10/15 16:44, Franklin S Cooper Jr wrote:
+>> ELM address information is provided by device tree. No longer need
+>> to include this information within hwmod.
+>>
+>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> Acked-by: Roger Quadros <rogerq@ti.com>
 >
-> Why not use BIT() for everything here and make it consistent
+> Franklin,
 >
-> Also where ever possible stick to 80 char limit like above you can
-
-In fact STM32_DMA_LISR, HISR, LIFCR and HIFCR are offset to access register.
-So BIT() could not be used for this purpose.
-
+> Can you please do the same for gpmc_addr as well?
 >
->> +
->> +/* DMA Stream x Configuration Register */
->> +#define STM32_DMA_SCR(x)             (0x0010 + 0x18 * (x)) /* x = 0..7 */
->> +#define STM32_DMA_SCR_REQ(n)         ((n & 0x7) << 25)
+> And looks like elm_addr needs to be removed from
+> omap_hwmod_33xx_43xx_interconnect_data.c and omap_hwmod_44xx_data.c as well, no?
+Sure I'll combine the 335x and 44x elm removal with this patch and then create a separate patch for the gpmc version.
 >
-> this and below looks ugly and hard to maintain, are you sure spec doesn't
-> have a formulae for these?
-
-We don't have any formulae in spec to handle this.
-It is clearly described that we have to access registers in that way
-to address the good channel.
-Please, see below an extract of the spec for more details:
-DMA stream x configuration register (DMA_SxCR) (x = 0..7)
-This register is used to configure the concerned stream.
-Address offset: 0x10 + 0x18 ? stream number
-
+> cheers,
+> -roger
 >
->> +static inline uint32_t stm32_dma_read(struct stm32_dma_device *dmadev, u32 reg)
->
-> this and few other could be made more readable
-
-Ok, I could replace uint32_t by u32. Is it what you expect ?
-For others, I don't see how I could make it more readable.
-Could you please give me more details to help me ? Thanks in advance
-
->
->> +static struct stm32_dma_desc *stm32_dma_alloc_desc(unsigned int num_sgs)
->> +{
->> +     return kzalloc(sizeof(struct stm32_dma_desc) +
->> +                    sizeof(struct stm32_dma_sg_req) * num_sgs, GFP_ATOMIC);
->
-> Not GFP_NOWAIT ?
-
-You're right. We could use GFP_NOWAIT instead. Thanks.
-
->
->> +static enum stm32_dma_width stm32_get_dma_width(struct stm32_dma_chan *chan,
->> +                                             enum dma_slave_buswidth width)
->> +{
->> +     switch (width) {
->> +     case DMA_SLAVE_BUSWIDTH_1_BYTE:
->> +             return STM32_DMA_BYTE;
->> +     case DMA_SLAVE_BUSWIDTH_2_BYTES:
->> +             return STM32_DMA_HALF_WORD;
->> +     case DMA_SLAVE_BUSWIDTH_4_BYTES:
->> +             return STM32_DMA_WORD;
->> +     default:
->> +             dev_warn(chan2dev(chan),
->> +                      "Dma bus width not supported, using 32bits\n");
->> +             return STM32_DMA_WORD;
->
-> pls return error here
-> Assuming wrong parameter can cause havoc of transfer, so is not advisable
-
-OK, I will fix it in the next version. Thanks for the explanation.
-
->
->> +static enum stm32_dma_burst_size stm32_get_dma_burst(
->> +             struct stm32_dma_chan *chan, u32 maxburst)
->> +{
->> +     switch (maxburst) {
->> +     case 0:
->> +     case 1:
->> +             return STM32_DMA_BURST_SINGLE;
->> +     case 4:
->> +             return STM32_DMA_BURST_INCR4;
->> +     case 8:
->> +             return STM32_DMA_BURST_INCR8;
->> +     case 16:
->> +             return STM32_DMA_BURST_INCR16;
->> +     default:
->> +             dev_warn(chan2dev(chan),
->> +                      "Dma burst size not supported, using single\n");
->> +             return STM32_DMA_BURST_SINGLE;
->
-> here too
-
-Ditto
-
->
->> +     }
->> +}
->> +
->> +static int stm32_dma_slave_config(struct dma_chan *c,
->> +                               struct dma_slave_config *config)
->> +{
->> +     struct stm32_dma_chan *chan = to_stm32_dma_chan(c);
->> +
->> +     if (chan->busy) {
->> +             dev_err(chan2dev(chan), "Configuration not allowed\n");
->> +             return -EBUSY;
->> +     }
->
-> That is false condition. This configuration should be used for next
-> descriptor prepare
-
-OK. Will be fixed in the next patch version.
-
->
->> +static int stm32_dma_disable_chan(struct stm32_dma_chan *chan)
->> +{
->> +     struct stm32_dma_device *dmadev = stm32_dma_chan_get_dev(chan);
->> +     unsigned long timeout = jiffies + msecs_to_jiffies(5000);
->> +     u32 dma_scr;
->> +
->> +     dma_scr = stm32_dma_read(dmadev, STM32_DMA_SCR(chan->id));
->> +     if (dma_scr & STM32_DMA_SCR_EN) {
->> +             dma_scr &= ~STM32_DMA_SCR_EN;
->> +             stm32_dma_write(dmadev, STM32_DMA_SCR(chan->id), dma_scr);
->> +
->> +             do {
->> +                     dma_scr = stm32_dma_read(dmadev,
->> +                                              STM32_DMA_SCR(chan->id));
->> +                     dma_scr &= STM32_DMA_SCR_EN;
->> +                     if (!dma_scr)
->> +                             break;
->
-> empty line here would improve readability
-
-OK
-
->
->> +static irqreturn_t stm32_dma_chan_irq(int irq, void *devid)
->> +{
->> +     struct stm32_dma_chan *chan = devid;
->> +     struct stm32_dma_device *dmadev = stm32_dma_chan_get_dev(chan);
->> +     u32 status, scr, sfcr;
->> +
->> +     spin_lock(&chan->vchan.lock);
->> +
->> +     status = stm32_dma_irq_status(chan);
->> +     scr = stm32_dma_read(dmadev, STM32_DMA_SCR(chan->id));
->> +     sfcr = stm32_dma_read(dmadev, STM32_DMA_SFCR(chan->id));
->> +
->> +     if ((status & STM32_DMA_HTI) && (scr & STM32_DMA_SCR_HTIE)) {
->> +             stm32_dma_irq_clear(chan, STM32_DMA_HTI);
->> +             vchan_cyclic_callback(&chan->desc->vdesc);
->> +             spin_unlock(&chan->vchan.lock);
->> +             return IRQ_HANDLED;
->
-> line here please and below
-
-OK
-
->
->> +     } else if ((status & STM32_DMA_TCI) && (scr & STM32_DMA_SCR_TCIE)) {
->> +             stm32_dma_irq_clear(chan, STM32_DMA_TCI);
->> +             stm32_dma_handle_chan_done(chan);
->> +             spin_unlock(&chan->vchan.lock);
->> +             return IRQ_HANDLED;
->> +     } else if ((status & STM32_DMA_TEI) && (scr & STM32_DMA_SCR_TEIE)) {
->> +             dev_err(chan2dev(chan), "DMA error: received TEI event\n");
->> +             stm32_dma_irq_clear(chan, STM32_DMA_TEI);
->> +             chan->status = DMA_ERROR;
->> +             spin_unlock(&chan->vchan.lock);
->> +             return IRQ_HANDLED;
->> +     } else if ((status & STM32_DMA_FEI) && (sfcr & STM32_DMA_SFCR_FEIE)) {
->> +             dev_err(chan2dev(chan), "DMA error: received FEI event\n");
->> +             stm32_dma_irq_clear(chan, STM32_DMA_FEI);
->> +             chan->status = DMA_ERROR;
->> +             spin_unlock(&chan->vchan.lock);
->> +             return IRQ_HANDLED;
->
-> this is repeat of above apart from err print!!
-
-Not only for print as we also need that to define which bit to clear
-in the IRQ status.
-In that way we will be sure to handle each interrupt event.
-
->
->> +     } else if ((status & STM32_DMA_DMEI) && (scr & STM32_DMA_SCR_DMEIE)) {
->> +             dev_err(chan2dev(chan), "DMA error: received DMEI event\n");
->> +             stm32_dma_irq_clear(chan, STM32_DMA_DMEI);
->> +             chan->status = DMA_ERROR;
->> +             spin_unlock(&chan->vchan.lock);
->> +             return IRQ_HANDLED;
->
-> same here :(
-
-Ditto
-
->
->> +static enum dma_status stm32_dma_tx_status(struct dma_chan *c,
->> +                                        dma_cookie_t cookie,
->> +                                        struct dma_tx_state *state)
->> +{
->> +     struct stm32_dma_chan *chan = to_stm32_dma_chan(c);
->> +     struct virt_dma_desc *vdesc;
->> +     enum dma_status status;
->> +     unsigned long flags;
->> +     unsigned int residue;
->> +
->> +     status = dma_cookie_status(c, cookie, state);
->> +     if (status == DMA_COMPLETE)
->> +             return status;
->> +
->> +     if (!state)
->> +             return chan->status;
-> why channel status and not status from dma_cookie_status()?
-
-If status is different than DMA_COMPLETE it seems better to use channel status.
-Indeed, in that way, we have the possibility to notify that there is a
-potential error in the bus via DMA_ERROR.
-But if I return status from dma_cookie_status(), I will always notify
-DMA_IN_PROGRESS.
-
->
->> +static int stm32_dma_remove(struct platform_device *pdev)
->> +{
->> +     struct stm32_dma_device *dmadev = platform_get_drvdata(pdev);
->> +
->> +     of_dma_controller_free(pdev->dev.of_node);
->> +
->> +     dma_async_device_unregister(&dmadev->ddev);
->> +
->> +     clk_disable_unprepare(dmadev->clk);
->
-> and your irq is enabled and you can still receive interrupts and schedule
-> tasklets :(
-
-So, I have to free interrupts and also kill tasklet from interrupt here.
-I will also disable the channel in case of ongoing transfer in  order
-to let the DMA controller in a good state.
-
-Thanks for your review :)
-
-BR,
-Cedric
+>> ---
+>>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 10 ----------
+>>  1 file changed, 10 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>> index 562247b..ad2cc7a 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>> @@ -2566,21 +2566,11 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__hdmi = {
+>>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>>  };
+>>  
+>> -static struct omap_hwmod_addr_space dra7xx_elm_addrs[] = {
+>> -	{
+>> -		.pa_start	= 0x48078000,
+>> -		.pa_end		= 0x48078fff,
+>> -		.flags		= ADDR_TYPE_RT
+>> -	},
+>> -	{ }
+>> -};
+>> -
+>>  /* l4_per1 -> elm */
+>>  static struct omap_hwmod_ocp_if dra7xx_l4_per1__elm = {
+>>  	.master		= &dra7xx_l4_per1_hwmod,
+>>  	.slave		= &dra7xx_elm_hwmod,
+>>  	.clk		= "l3_iclk_div",
+>> -	.addr		= dra7xx_elm_addrs,
+>>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>>  };
+>>  
+>>
