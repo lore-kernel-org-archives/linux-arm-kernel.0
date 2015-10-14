@@ -1,26 +1,41 @@
-From: joro@8bytes.org (joro at 8bytes.org)
-Date: Wed, 14 Oct 2015 13:50:13 +0200
-Subject: [PATCH v6 0/3] arm64: IOMMU-backed DMA mapping
-In-Reply-To: <561CF53E.7000809@arm.com>
-References: <cover.1443718557.git.robin.murphy@arm.com>
- <561CF53E.7000809@arm.com>
-Message-ID: <20151014115013.GM27420@8bytes.org>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 14 Oct 2015 14:42:55 +0300
+Subject: [PATCH v5 13/24] dmaengine: edma: Use devm_kcalloc when possible
+In-Reply-To: <1444822986-20562-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1444822986-20562-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1444822986-20562-14-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+When allocating a memory for number of items it is better (looks better)
+to use devm_kcalloc.
 
-On Tue, Oct 13, 2015 at 01:12:46PM +0100, Robin Murphy wrote:
-> Anyway, what are your thoughts on taking this for 4.4? Since the
-> dependencies are now in and we're at -rc5 already, I'm on the verge
-> of reposting a self-contained version to go through arm64, as we
-> really need to unblock all the follow-on development there (it's a
-> shame that of the people I'm aware want this, it's only me and the
-> Mediatek/Chrome guys here on the list saying so).
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ drivers/dma/edma.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-I plan to take it for 4.4, given the missing ack arrives. What are your
-plans to resolve the remaining issues, like with the probe deferral
-patch-set?
-
-
-	Joerg
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index d5a76c67f83f..95c10373168d 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -2055,7 +2055,7 @@ static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
+ 	 * priority. So Q0 is the highest priority queue and the last queue has
+ 	 * the lowest priority.
+ 	 */
+-	queue_priority_map = devm_kzalloc(dev, (ecc->num_tc + 1) * sizeof(s8),
++	queue_priority_map = devm_kcalloc(dev, ecc->num_tc + 1, sizeof(s8),
+ 					  GFP_KERNEL);
+ 	if (!queue_priority_map)
+ 		return -ENOMEM;
+@@ -2086,7 +2086,7 @@ static int edma_xbar_event_map(struct device *dev, struct edma_soc_info *pdata,
+ 	u32 shift, offset, mux;
+ 	int ret, i;
+ 
+-	xbar_chans = devm_kzalloc(dev, (nelm + 2) * sizeof(s16), GFP_KERNEL);
++	xbar_chans = devm_kcalloc(dev, nelm + 2, sizeof(s16), GFP_KERNEL);
+ 	if (!xbar_chans)
+ 		return -ENOMEM;
+ 
+-- 
+2.6.1
