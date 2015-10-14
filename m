@@ -1,36 +1,24 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 14 Oct 2015 15:02:06 +0900
-Subject: [PATCH] dt-bindings: Correct the example for Exynos power domain
- clocks
-Message-ID: <1444802526-18518-1-git-send-email-k.kozlowski@samsung.com>
+From: mohun106@gmail.com (Radha Mohan)
+Date: Tue, 13 Oct 2015 23:12:18 -0700
+Subject: arm64 memcpy_{from|to}io and memset_io
+Message-ID: <CAC8NTUUgQk0CNaBj2p=38U+yyFWE6ZQkSgs1KA=MviQg3g_X=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 29e5eea06bc1 ("ARM: EXYNOS: Get current parent clock for
-power domain on/off") the "pclkN" names of "clock-names" property is not
-parsed any more. The bindings and driver were updated but the example
-was not. Fix the example now.
+Hi,
+I see that the memcpy_{from|to}io and memset_io are not in an
+optimized manner. I guess these are just a copy from
+arch/arm/include/asm/io.h where there could be problem with different
+implementations.
+Do we still need these to be byte write ?
+Can we convert them to use a more optimized memcpy ?
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- Documentation/devicetree/bindings/arm/exynos/power_domain.txt | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+We have some drivers, like framebuffer driver using these functions
+and end up writing byte-by-byte. This causes a very poor VGA
+performance.
 
-diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-index e151057d92f0..4e947372a693 100644
---- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-+++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-@@ -43,9 +43,8 @@ Example:
- 	mfc_pd: power-domain at 10044060 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10044060 0x20>;
--		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_SW_ACLK333>,
--			<&clock CLK_MOUT_USER_ACLK333>;
--		clock-names = "oscclk", "pclk0", "clk0";
-+		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_USER_ACLK333>;
-+		clock-names = "oscclk", "clk0";
- 		#power-domain-cells = <0>;
- 	};
- 
--- 
-1.9.1
+Let me know if there are any concerns to convert these to use memcpy.
+I can send a patch.
+
+regards,
+Radha Mohan
