@@ -1,67 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Oct 2015 23:56:33 +0200
-Subject: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for HiSilicon
- SoC Hip05
-In-Reply-To: <561E23EB.7050504@hisilicon.com>
-References: <1444445957-239522-1-git-send-email-wangzhou1@hisilicon.com>
- <30775300.COZ4nEMWXC@wuerfel> <561E23EB.7050504@hisilicon.com>
-Message-ID: <5572871.GecUyqk59W@wuerfel>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Thu, 15 Oct 2015 00:07:18 +0200
+Subject: bcm4708-smartrg-sr400ac boot failures in next-20150918+
+In-Reply-To: <1444817059.13276.13.camel@pengutronix.de>
+References: <CANMBJr5FnRQxv01CbAiSD43dGn+Ea4tjEWSsV1FywHJZYLnG_A@mail.gmail.com>
+ <560DA9B9.80404@hauke-m.de> <561AE788.6030701@hauke-m.de>
+ <CANMBJr4H1C6CHdRXa_NL9dssYGLkpRKAPXCMOV0FsUdb8JiSXg@mail.gmail.com>
+ <1444816125.13276.8.camel@pengutronix.de>
+ <20151014095633.GP32532@n2100.arm.linux.org.uk>
+ <1444817059.13276.13.camel@pengutronix.de>
+Message-ID: <561ED216.3070204@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 October 2015 17:44:11 Zhou Wang wrote:
-> On 2015/10/14 17:06, Arnd Bergmann wrote:
-> > On Wednesday 14 October 2015 16:59:03 Zhou Wang wrote:
-> >>
-> >> Hi Arnd,
-> >>
-> >> In Hip05 PCIe host, it uses GITS_TRANSLATER's address to get TLP package
-> >> which contains MSI address and MSI data, and then combine BDF and MSI data
-> >> to a 32 bit data which will be writen to GITS_TRANSLATER register of ITS.
-> >>
-> >> I think maybe this is a defect of our PCIe controller.
-> > 
-> > I'd consider it a bug in the firmware if this is not set up correctly
-> > before boot.
-> > 
-> >>> I don't think what you do here is safe because the 'reg' property
-> >>> of the MSI controller might point to the address that is used for
-> >>> the message directly.
-> >>
-> >> I see your point, however we must get address of GITS_TRANSLATER and
-> >> set it to PCIe host. How about adding necessary comments here?
-> > 
-> > This seems to just be static setup that should be done before Linux
-> > is even loaded. Any reason you can't do it that way?
-> >
-> 
-> There are some ITSs in Hip05-D02 platform, in fact, we can use any of them
-> as a msi-controller,  which we can configure in dts. I am afraid that
-> hard-setting the value in BIOS would lead to restrictions in terms of flexibility,
-> as with the current implementation the same BIOS-driver can fit different
-> DTS structures.
+On 10/14/2015 12:04 PM, Lucas Stach wrote:
+> Am Mittwoch, den 14.10.2015, 10:56 +0100 schrieb Russell King - ARM
+> Linux:
+>> On Wed, Oct 14, 2015 at 11:48:45AM +0200, Lucas Stach wrote:
+>>> I think we really want to keep enabling the imprecise aborts as early as
+>>> possible to catch them near the spot where they did happen.
+>>
+>> Agreed.
 
-The dtb generally should be expected to match whatever the firmware sets up,
-so if there is one reasonable setting here, I see no problem with hardcoding
-it that way. In particular on server systems, we usually expect the firmware
-to configure almost everything in advance and just tell us how it is
-configured, while on embedded systems we can't trust the bootload and
-usually set it all up in the kernel from scratch.
+I was never against this patch I just wanted to point out that it caused
+a regression and we should fix it, I was just a little bit frightened to
+add some early init code into a callback which gets called before early
+init.
 
-What would be a reason to pick one ITS over another?
+>>> So I think the right thing to work around your broken bootloader is to
+>>> install the fault handler earlier. Russell, do you have any objections
+>>> to that?
+>>
+>> How about installing the fault handler early before enabling the imprecise
+>> aborts, and have the fault handler print a complaint about the broken
+>> boot loader, and have the fault handler uninstall itself after the
+>> imprecise abort has been enabled?
+>>
+> We might point at the bootloader a bit too often this way, as there is
+> quite a bit of kernel code running before we can enable imprecise
+> aborts. But I like the idea in general as it would allow us to drop
+> those workaround from the individual architectures and move things into
+> common code.
 
-On a related note, don't you also need to describe in DT how PCI B/D/F
-function numbers get turned into addresses in the ITS? Does that also
-require configuration in the driver? I see this code here:
+Lucas patches fixed the problem for me on a bcm4708 based device with a
+broken boot loader. I assume Lucas patches will make it into mainline
+and this issue is now solved for me.
 
+>> If there's a pending imprecise abort, it should be delivered as soon as
+>> they're unmasked.
+>>
+> Right.
 
-+       hisi_pcie_apb_writel(pcie, PCIE_MSI_ASID_ENABLE | PCIE_MSI_ASID_VALUE,
-+                            PCIE_SLV_MSI_ASID);
-+       hisi_pcie_apb_writel(pcie, PCIE_MSI_TRANS_ENABLE, PCIE_MSI_TRANS_REG);
-+       hisi_pcie_change_apb_mode(pcie, PCIE_SLV_DBI_MODE);
-
-plus all of hisi_pcie_config_context(). This looks like it will change
-the way the MSI is interpreted. This also seems like something that
-could be done in the firmware in advance, and just get reported in DT.
-
-	Arnd
+Hauke
