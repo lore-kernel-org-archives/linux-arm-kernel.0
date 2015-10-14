@@ -1,25 +1,49 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 14 Oct 2015 12:34:00 +0200
-Subject: [PATCH 0/4] ARM: berlin: improve multi_v7_defconfig support
-Message-ID: <1444818844-2865-1-git-send-email-antoine.tenart@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 14 Oct 2015 11:36:48 +0100
+Subject: [PATCH RFC 1/2] dt-bindings: simplefb: Support a list of
+ regulator supply properties
+In-Reply-To: <561CADFE.2010609@redhat.com>
+References: <1444669458-5588-1-git-send-email-wens@csie.org>
+ <1444669458-5588-2-git-send-email-wens@csie.org>
+ <20151012171018.GB3659@leverpostej>
+ <CAGb2v651=uaHEQK4wpEQywgr311NSbqEvYkpsC5zSHPSFq-HHg@mail.gmail.com>
+ <561CADFE.2010609@redhat.com>
+Message-ID: <20151014103648.GS14956@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, Oct 13, 2015 at 09:08:46AM +0200, Hans de Goede wrote:
+> On 13-10-15 04:22, Chen-Yu Tsai wrote:
+> >On Tue, Oct 13, 2015 at 1:10 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >>On Tue, Oct 13, 2015 at 01:04:17AM +0800, Chen-Yu Tsai wrote:
 
-Some drivers used on a Marvell Berlin kernel were missing from
-multi_v7_defconfig. This series add them.
+> >>>+- num-supplies : The number of regulators used by the framebuffer.
+> >>>+- vinN-supply : The N-th (from 0) regulator used by the framebuffer.
 
-Antoine
+> >>I don't see why you need num-supplies. Why not just try probing
+> >>vin${N}-supply until such a property isn't present in the DT?
 
-Antoine Tenart (4):
-  ARM: multi_v7_defconfig: enable Berlin SATA PHY
-  ARM: multi_v7_defconfig: enable Berlin USB PHY
-  ARM: multi_v7_defconfig: enable pxa168 Ethernet
-  ARM: multi_v7_defconfig: enable the Berlin ADC
+> +1 for this.
 
- arch/arm/configs/multi_v7_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+Even better would be to just enumerate all the properties on the node
+and request anything with a FOO-supply name.  That way we can keep
+using standard regulator bindings that name the supplies after their
+actual names on the device.
 
--- 
-2.6.1
+> > That's doable. Though I'd add a hard limit on it. Does 16 seem
+> > reasonable?
+
+> I would not add a hard limit to the binding, you can use a fixed array in
+> the code to make the code simpler. I would say 8 should be sufficient, since
+> the limit will only be in the code we can always bump it when we need
+> to.
+
+Or just dynamically allocate the array and resize as needed if it starts
+to get to be a problem.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151014/5fd830c7/attachment.sig>
