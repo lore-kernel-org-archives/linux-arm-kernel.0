@@ -1,57 +1,232 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Oct 2015 14:54:48 +0200
-Subject: [PATCH v4] ARM: configs: Add Freescale LS1021A defconfig
-In-Reply-To: <BN3PR0301MB086733D602580A5A9EBF150EFE3F0@BN3PR0301MB0867.namprd03.prod.outlook.com>
-References: <1442480614-32345-1-git-send-email-b18965@freescale.com>
- <16038044.0DCMVgq8H3@wuerfel>
- <BN3PR0301MB086733D602580A5A9EBF150EFE3F0@BN3PR0301MB0867.namprd03.prod.outlook.com>
-Message-ID: <5232654.e6dagm53H4@wuerfel>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Wed, 14 Oct 2015 21:55:28 +0900
+Subject: [PATCH v4 2/2] arm64: Expand the stack trace feature to support
+ IRQ stack
+In-Reply-To: <EB44D363-ACBA-48DB-B4EA-EDE1B87B99C8@gmail.com>
+References: <1444231692-32722-1-git-send-email-jungseoklee85@gmail.com>
+ <1444231692-32722-3-git-send-email-jungseoklee85@gmail.com>
+ <5617CE26.10604@arm.com> <561E009B.3070001@linaro.org>
+ <EB44D363-ACBA-48DB-B4EA-EDE1B87B99C8@gmail.com>
+Message-ID: <C0BCEB8B-2939-45AF-ACB4-BBE369B67699@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 October 2015 10:18:47 Huan Wang wrote:
-> > On Thursday 24 September 2015 07:27:10 Huan Wang wrote:
-> > > > On Fri, Sep 18, 2015 at 4:38 AM, Huan Wang
-> > > > <alison.wang@freescale.com>
-> > > > wrote:
-> > > >
-> > > > > [Alison Wang] Thanks for your reply. I agreed with you about
-> > > > > creating a new multi_v7_lpae_defconfig. In
-> > > > > multi_v7_lpae_defconfig, I need to add the following CONFIG_XX to
-> > > > > support LS1021A based on
-> > > > multi_v7_defconfig.
-> > > > >
-> > > > > CONFIG_ARM_LPAE=y
-> > > > > CONFIG_VMSPLIT_2G=y
-> > > >
-> > > > Is CONFIG_VMSPLIT_2G=y really needed?
-> > > [Alison Wang] I tried to remove CONFIG_VMSPLIT_2G and used the default
-> > > CONFIG_VMSPLIT_3G, but kernel could not boot up. It hangs at " Starting
-> > kernel ... ".
-> > >
-> > > Any suggestion? Thanks.
-> > 
-> > Try enabling DEBUG_LL for your platform to get some debug output, if  you
-> > still don't get any helpful messages, try also inserting
-> > 
-> >       printascii(__func__);
-> > 
-> > statements in the early boot process to see how far you get before the hang.
-> > 
-> [Alison Wang] I can get to __turn_mmu_on or later, but I could not get the print
-> message "Booting Linux on physical CPU 0xf00" in smp_setup_processor_id().
+On Oct 14, 2015, at 9:24 PM, Jungseok Lee wrote:
+> On Oct 14, 2015, at 4:13 PM, AKASHI Takahiro wrote:
+>> On 10/09/2015 11:24 PM, James Morse wrote:
+>>> Hi Jungseok,
+>>> 
+>>> On 07/10/15 16:28, Jungseok Lee wrote:
+>>>> Currently, a call trace drops a process stack walk when a separate IRQ
+>>>> stack is used. It makes a call trace information much less useful when
+>>>> a system gets paniked in interrupt context.
+>>> 
+>>> panicked
+>>> 
+>>>> This patch addresses the issue with the following schemes:
+>>>> 
+>>>>  - Store aborted stack frame data
+>>>>  - Decide whether another stack walk is needed or not via current sp
+>>>>  - Loosen the frame pointer upper bound condition
+>>> 
+>>> It may be worth merging this patch with its predecessor - anyone trying to
+>>> bisect a problem could land between these two patches, and spend time
+>>> debugging the truncated call traces.
+>>> 
+>>> 
+>>>> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
+>>>> index 6ea82e8..e5904a1 100644
+>>>> --- a/arch/arm64/include/asm/irq.h
+>>>> +++ b/arch/arm64/include/asm/irq.h
+>>>> @@ -2,13 +2,25 @@
+>>>> #define __ASM_IRQ_H
+>>>> 
+>>>> #include <linux/irqchip/arm-gic-acpi.h>
+>>>> +#include <asm/stacktrace.h>
+>>>> 
+>>>> #include <asm-generic/irq.h>
+>>>> 
+>>>> struct irq_stack {
+>>>> 	void *stack;
+>>>> +	struct stackframe frame;
+>>>> };
+>>>> 
+>>>> +DECLARE_PER_CPU(struct irq_stack, irq_stacks);
+>>> 
+>>> Good idea, storing this in the per-cpu data makes it immune to stack
+>>> corruption.
+>> 
+>> Is this the only reason that you have a dummy stack frame in per-cpu data?
+>> By placing this frame in an interrupt stack, I think, we will be able to eliminate
+>> changes in dump_stace(). and
+>> 
+>>> 
+>>>> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+>>>> index 407991b..5124649 100644
+>>>> --- a/arch/arm64/kernel/stacktrace.c
+>>>> +++ b/arch/arm64/kernel/stacktrace.c
+>>>> @@ -43,7 +43,27 @@ int notrace unwind_frame(struct stackframe *frame)
+>>>> 	low  = frame->sp;
+>>>> 	high = ALIGN(low, THREAD_SIZE);
+>>>> 
+>>>> -	if (fp < low || fp > high - 0x18 || fp & 0xf)
+>>>> +	/*
+>>>> +	 * A frame pointer would reach an upper bound if a prologue of the
+>>>> +	 * first function of call trace looks as follows:
+>>>> +	 *
+>>>> +	 *	stp     x29, x30, [sp,#-16]!
+>>>> +	 *	mov     x29, sp
+>>>> +	 *
+>>>> +	 * Thus, the upper bound is (top of stack - 0x20) with consideration
+>>> 
+>>> The terms 'top' and 'bottom' of the stack are confusing, your 'top' appears
+>>> to be the highest address, which is used first, making it the bottom of the
+>>> stack.
+>>> 
+>>> I would try to use the terms low/est and high/est, in keeping with the
+>>> variable names in use here.
+>>> 
+>>> 
+>>>> +	 * of a 16-byte empty space in THREAD_START_SP.
+>>>> +	 *
+>>>> +	 * The value, 0x20, however, does not cover all cases as interrupts
+>>>> +	 * are handled using a separate stack. That is, a call trace can start
+>>>> +	 * from elx_irq exception vectors. The symbols could not be promoted
+>>>> +	 * to candidates for a stack trace under the restriction, 0x20.
+>>>> +	 *
+>>>> +	 * The scenario is handled without complexity as 1) considering
+>>>> +	 * (bottom of stack + THREAD_START_SP) as a dummy frame pointer, the
+>>>> +	 * content of which is 0, and 2) allowing the case, which changes
+>>>> +	 * the value to 0x10 from 0x20.
+>>> 
+>>> Where has 0x20 come from? The old value was 0x18.
+>>> 
+>>> My understanding is the highest part of the stack looks like this:
+>>> high        [ off-stack ]
+>>> high - 0x08 [ left free by THREAD_START_SP ]
+>>> high - 0x10 [ left free by THREAD_START_SP ]
+>>> high - 0x18 [#1 x30 ]
+>>> high - 0x20 [#1 x29 ]
+>>> 
+>>> So the condition 'fp > high - 0x18' prevents returning either 'left free'
+>>> address, or off-stack-value as a frame. Changing it to 'fp > high - 0x10'
+>>> allows the first half of that reserved area to be a valid stack frame.
+>>> 
+>>> This change is breaking perf using incantations [0] and [1]:
+>>> 
+>>> Before, with just patch 1/2:
+>>>                  ---__do_softirq
+>>>                     |
+>>>                     |--92.95%-- __handle_domain_irq
+>>>                     |          __irqentry_text_start
+>>>                     |          el1_irq
+>>>                     |
+>>> 
+>>> After, with both patches:
+>>>                 ---__do_softirq
+>>>                    |
+>>>                    |--83.83%-- __handle_domain_irq
+>>>                    |          __irqentry_text_start
+>>>                    |          el1_irq
+>>>                    |          |
+>>>                    |          |--99.39%-- 0x400008040d00000c
+>>>                    |           --0.61%-- [...]
+>>>                    |
+>> 
+>> This also shows that walk_stackframe() doesn't walk through a process stack.
+>> Now I'm trying the following hack on top of Jungseok's patch.
+>> (It doesn't traverse from an irq stack to an process stack yet. I need modify
+>> unwind_frame().)
 > 
-> I guess something wrong with the initial page tables in __create_page_tables,
-> as for CONFIG_VMSPLIT_3G, only PAGE_OFFSET is changed from 0x80000000 to 0xC0000000.
-> BTW, on our platform, TEXT_OFFSET is 0x00008000, PHYS_OFFSET is 0x80000000.
+> I've got a difference between perf and dump_backtrace() as reviewing perf call
+> chain operation. Perf relies on walk_stackframe(), but dump_backtrace() does not.
+> That is, a symbol is printed out *before* unwind_frame() call in case of perf.
+> By contrast, dump_backtrace() records a symbol *after* unwind_frame(). I think
+> perf behavior is correct since frame.pc is retrieved from a valid stack frame.
 > 
-> Any suggestion? Thanks.
+> So, the following diff is a prerequisite. It looks reasonable to remove dump_mem()
+> call since frame.sp is calculated incorrectly now. If accepted, dump_backtrace()
+> could utilize walk_stackframe(), which simplifies the code.
+> 
+> ----8<----
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index f93aae5..e18be43 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -103,12 +103,15 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+>        set_fs(fs);
+> }
+> 
+> -static void dump_backtrace_entry(unsigned long where, unsigned long stack)
+> +static void dump_backtrace_entry(unsigned long where)
+> {
+> +       /*
+> +        * PC has a physical address when MMU is disabled.
+> +        */
+> +       if (!kernel_text_address(where))
+> +               where = (unsigned long)phys_to_virt(where);
+> +
+>        print_ip_sym(where);
+> -       if (in_exception_text(where))
+> -               dump_mem("", "Exception stack", stack,
+> -                        stack + sizeof(struct pt_regs), false);
+> }
+> 
+> static void dump_instr(const char *lvl, struct pt_regs *regs)
+> @@ -172,12 +175,17 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+>        pr_emerg("Call trace:\n");
+>        while (1) {
+>                unsigned long where = frame.pc;
+> +               unsigned long stack;
+>                int ret;
+> 
+> +               dump_backtrace_entry(where);
+>                ret = unwind_frame(&frame);
+>                if (ret < 0)
+>                        break;
+> -               dump_backtrace_entry(where, frame.sp);
+> +               stack = frame.sp;
+> +               if (in_exception_text(where))
+> +                       dump_mem("", "Exception stack", stack,
+> +                                stack + sizeof(struct pt_regs), false);
+>        }
+> }
+> ----8<----
+> 
+>> Thanks,
+>> -Takahiro AKASHI
+>> ----8<----
+>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> index 650cc05..5fbd1ea 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -185,14 +185,12 @@ alternative_endif
+>> 	mov	x23, sp
+>> 	and	x23, x23, #~(THREAD_SIZE - 1)
+>> 	cmp	x20, x23			// check irq re-enterance
+>> +	mov	x19, sp
+>> 	beq	1f
+>> -	str	x29, [x19, #IRQ_FRAME_FP]
+>> -	str	x21, [x19, #IRQ_FRAME_SP]
+>> -	str	x22, [x19, #IRQ_FRAME_PC]
+>> -	mov	x29, x24
+>> -1:	mov	x19, sp
+>> -	csel	x23, x19, x24, eq		// x24 = top of irq stack
+>> -	mov	sp, x23
+>> +	mov	sp, x24				// x24 = top of irq stack
+>> +	stp	x29, x22, [sp, #-32]!
+>> +	mov	x29, sp
+>> +1:
+>> 	.endm
+>> 
+>> 	/*
+> 
+> Is it possible to decide which stack is used without aborted SP information?
 
-My first guess is that there is something wrong with your debug_ll implementation,
-as that would explain why you can't get anything to the console after
-turning on page tables.
+We could know which stack is used via current SP, but how could we decide
+a variable 'low' in unwind_frame() when walking a process stack?
 
-It looks like ls1021a uses lpuart, but I can't even see an implementation for
-that in arch/arm/include/debug/. What code do you use for printing?
+Sorry for confusion.
 
-	Arnd
+Best Regards
+Jungseok Lee
