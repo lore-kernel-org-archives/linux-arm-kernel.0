@@ -1,78 +1,116 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 14 Oct 2015 16:12:15 +0300
-Subject: [PATCH 04/13] dmaengine: edma: Correct PaRAM access function names
- (_parm_ to _param_)
+Date: Wed, 14 Oct 2015 16:12:16 +0300
+Subject: [PATCH 05/13] dmaengine: edma: Merge map_dmach_to_queue into
+ assign_channel_eventq
 In-Reply-To: <1444828344-21378-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1444828344-21378-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1444828344-21378-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1444828344-21378-6-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These inline functions are designed to modify parts of the PaRAM in eDMA.
-Change the names accordingly.
+edma_assign_channel_eventq() is a wrapper around edma_map_dmach_to_queue()
+We can merge the content of the later so we will have only one function
+to be used for mapping channels to given eventq
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/dma/edma.c | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ drivers/dma/edma.c | 56 +++++++++++++++++++++---------------------------------
+ 1 file changed, 22 insertions(+), 34 deletions(-)
 
 diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index f33a297f870f..d8639a92f286 100644
+index d8639a92f286..a02f84c7c3d7 100644
 --- a/drivers/dma/edma.c
 +++ b/drivers/dma/edma.c
-@@ -349,32 +349,32 @@ static inline void edma_shadow0_write_array(struct edma_cc *ecc, int offset,
- 	edma_write(ecc, EDMA_SHADOW0 + offset + (i << 2), val);
+@@ -391,22 +391,6 @@ static inline void clear_bits(int offset, int len, unsigned long *p)
+ 		clear_bit(offset + (len - 1), p);
  }
  
--static inline unsigned int edma_parm_read(struct edma_cc *ecc, int offset,
--					  int param_no)
-+static inline unsigned int edma_param_read(struct edma_cc *ecc, int offset,
-+					   int param_no)
+-static void edma_map_dmach_to_queue(struct edma_chan *echan,
+-				    enum dma_event_q queue_no)
+-{
+-	struct edma_cc *ecc = echan->ecc;
+-	int channel = EDMA_CHAN_SLOT(echan->ch_num);
+-	int bit = (channel & 0x7) * 4;
+-
+-	/* default to low priority queue */
+-	if (queue_no == EVENTQ_DEFAULT)
+-		queue_no = ecc->default_queue;
+-
+-	queue_no &= 7;
+-	edma_modify_array(ecc, EDMA_DMAQNUM, (channel >> 3), ~(0x7 << bit),
+-			  queue_no << bit);
+-}
+-
+ static void edma_assign_priority_to_queue(struct edma_cc *ecc, int queue_no,
+ 					  int priority)
  {
- 	return edma_read(ecc, EDMA_PARM + offset + (param_no << 5));
+@@ -723,6 +707,25 @@ static void edma_clean_channel(struct edma_chan *echan)
+ 	edma_write(ecc, EDMA_CCERRCLR, BIT(16) | BIT(1) | BIT(0));
  }
  
--static inline void edma_parm_write(struct edma_cc *ecc, int offset,
--				   int param_no, unsigned val)
-+static inline void edma_param_write(struct edma_cc *ecc, int offset,
-+				    int param_no, unsigned val)
++/* Move channel to a specific event queue */
++static void edma_assign_channel_eventq(struct edma_chan *echan,
++				       enum dma_event_q eventq_no)
++{
++	struct edma_cc *ecc = echan->ecc;
++	int channel = EDMA_CHAN_SLOT(echan->ch_num);
++	int bit = (channel & 0x7) * 4;
++
++	/* default to low priority queue */
++	if (eventq_no == EVENTQ_DEFAULT)
++		eventq_no = ecc->default_queue;
++	if (eventq_no >= ecc->num_tc)
++		return;
++
++	eventq_no &= 7;
++	edma_modify_array(ecc, EDMA_DMAQNUM, (channel >> 3), ~(0x7 << bit),
++			  eventq_no << bit);
++}
++
+ static int edma_alloc_channel(struct edma_chan *echan,
+ 			      enum dma_event_q eventq_no)
  {
- 	edma_write(ecc, EDMA_PARM + offset + (param_no << 5), val);
+@@ -751,7 +754,7 @@ static int edma_alloc_channel(struct edma_chan *echan,
+ 
+ 	edma_setup_interrupt(echan, true);
+ 
+-	edma_map_dmach_to_queue(echan, eventq_no);
++	edma_assign_channel_eventq(echan, eventq_no);
+ 
+ 	return 0;
+ }
+@@ -764,21 +767,6 @@ static void edma_free_channel(struct edma_chan *echan)
+ 	edma_setup_interrupt(echan, false);
  }
  
--static inline void edma_parm_modify(struct edma_cc *ecc, int offset,
--				    int param_no, unsigned and, unsigned or)
-+static inline void edma_param_modify(struct edma_cc *ecc, int offset,
-+				     int param_no, unsigned and, unsigned or)
+-/* Move channel to a specific event queue */
+-static void edma_assign_channel_eventq(struct edma_chan *echan,
+-				       enum dma_event_q eventq_no)
+-{
+-	struct edma_cc *ecc = echan->ecc;
+-
+-	/* default to low priority queue */
+-	if (eventq_no == EVENTQ_DEFAULT)
+-		eventq_no = ecc->default_queue;
+-	if (eventq_no >= ecc->num_tc)
+-		return;
+-
+-	edma_map_dmach_to_queue(echan, eventq_no);
+-}
+-
+ static inline struct edma_cc *to_edma_cc(struct dma_device *d)
  {
- 	edma_modify(ecc, EDMA_PARM + offset + (param_no << 5), and, or);
- }
+ 	return container_of(d, struct edma_cc, dma_slave);
+@@ -2148,8 +2136,8 @@ static int edma_probe(struct platform_device *pdev)
  
--static inline void edma_parm_and(struct edma_cc *ecc, int offset, int param_no,
--				 unsigned and)
-+static inline void edma_param_and(struct edma_cc *ecc, int offset, int param_no,
-+				  unsigned and)
- {
- 	edma_and(ecc, EDMA_PARM + offset + (param_no << 5), and);
- }
- 
--static inline void edma_parm_or(struct edma_cc *ecc, int offset, int param_no,
--				unsigned or)
-+static inline void edma_param_or(struct edma_cc *ecc, int offset, int param_no,
-+				 unsigned or)
- {
- 	edma_or(ecc, EDMA_PARM + offset + (param_no << 5), or);
- }
-@@ -594,8 +594,8 @@ static void edma_link(struct edma_cc *ecc, unsigned from, unsigned to)
- 	if (from >= ecc->num_slots || to >= ecc->num_slots)
- 		return;
- 
--	edma_parm_modify(ecc, PARM_LINK_BCNTRLD, from, 0xffff0000,
--			 PARM_OFFSET(to));
-+	edma_param_modify(ecc, PARM_LINK_BCNTRLD, from, 0xffff0000,
-+			  PARM_OFFSET(to));
- }
- 
- /**
+ 	for (i = 0; i < ecc->num_channels; i++) {
+ 		/* Assign all channels to the default queue */
+-		edma_map_dmach_to_queue(&ecc->slave_chans[i],
+-					info->default_queue);
++		edma_assign_channel_eventq(&ecc->slave_chans[i],
++					   info->default_queue);
+ 		/* Set entry slot to the dummy slot */
+ 		edma_set_chmap(&ecc->slave_chans[i], ecc->dummy_slot);
+ 	}
 -- 
 2.6.1
