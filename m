@@ -1,29 +1,42 @@
 From: B48286@freescale.com (Zhiqiang Hou)
-Date: Wed, 14 Oct 2015 19:34:52 +0800
-Subject: [PATCH V3 0/6] Add LS1043A SoC support 
-Message-ID: <1444822498-16477-1-git-send-email-B48286@freescale.com>
+Date: Wed, 14 Oct 2015 19:34:53 +0800
+Subject: [PATCH V3 1/6] i2c: Add i2c support to Freescale Layerscape platforms
+In-Reply-To: <1444822498-16477-1-git-send-email-B48286@freescale.com>
+References: <1444822498-16477-1-git-send-email-B48286@freescale.com>
+Message-ID: <1444822498-16477-2-git-send-email-B48286@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchest adds support for Freescale's LS1043A SoC which is
-based on ARMv8 architecture.
+From: Shaohui Xie <Shaohui.Xie@freescale.com>
 
-Some pending patches are depended on:
-1. The LS1043A is belong to Freescale's ARMv8 Layerscape SoC family,
-so depends on the updating ARCH kconfig patch.
-https://patchwork.kernel.org/patch/7120101/
+Modify the I2C_IMX config to support to Layerscape platforms.
 
-2. The LS1043A use the new clockgen binding updated by Scott Wood,
-depends on the patchset:
-https://patchwork.kernel.org/patch/7225421/
-https://patchwork.kernel.org/patch/7225461/
-https://patchwork.kernel.org/patch/7225431/
-https://patchwork.kernel.org/patch/7225441/
-https://patchwork.kernel.org/patch/7225451/
+Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
+Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
+Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
+---
+V3:
+ - No change.
 
-[PATCH V3 1/6] i2c: Add i2c support to Freescale Layerscape platforms
-[PATCH V3 2/6] watchdog: Add support for Freescale Layerscape
-[PATCH V3 3/6] Documentation: DT: Add entry for FSL LS1043ARDB board
-[PATCH V3 4/6] arm64/ls1043a: add DTS for Freescale LS1043A SoC
-[PATCH V3 5/6] clk: qoriq: Add ls1043a support.
-[PATCH V3 6/6] dts/ls1043a: add LS1043ARDB board support
+ drivers/i2c/busses/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index 08b8617..14147ec 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -582,10 +582,10 @@ config I2C_IMG
+ 
+ config I2C_IMX
+ 	tristate "IMX I2C interface"
+-	depends on ARCH_MXC
++	depends on ARCH_MXC || ARCH_LAYERSCAPE
+ 	help
+ 	  Say Y here if you want to use the IIC bus controller on
+-	  the Freescale i.MX/MXC processors.
++	  the Freescale i.MX/MXC or Layerscape processors.
+ 
+ 	  This driver can also be built as a module.  If so, the module
+ 	  will be called i2c-imx.
+-- 
+2.1.0.27.g96db324
