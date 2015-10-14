@@ -1,124 +1,114 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Oct 2015 12:42:48 +0100
-Subject: [PATCHv3 01/11] arm64: Move swapper pagetable definitions
-In-Reply-To: <1444821634-1689-2-git-send-email-suzuki.poulose@arm.com>
-References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
- <1444821634-1689-2-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20151014114247.GA2150@leverpostej>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 14 Oct 2015 14:42:42 +0300
+Subject: [PATCH v5 00/24] dmaengine/ARM: Merge the edma drivers into one
+Message-ID: <1444822986-20562-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 12:20:24PM +0100, Suzuki K. Poulose wrote:
-> Move the kernel pagetable (both swapper and idmap) definitions
-> from the generic asm/page.h to a new file, asm/kernel-pgtable.h.
-> 
-> This is mostly a cosmetic change, to clean up the asm/page.h to
-> get rid of the arch specific details which are not needed by the
-> generic code.
-> 
-> Also renames the symbols to prevent conflicts. e.g,
->  	BLOCK_SHIFT => SWAPPER_BLOCK_SHIFT
+Hi,
 
-This sounds sensible to be, so FWIW:
+Changes since v4:
+- checkpatch errors/warnings/checks has been fixed in spot and not in a followup
+  patch.
+- Sekhar's Acked-by added to patches touching arch/arm/mach-davinci/
+- Other comments for v4 has been addressed
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Changes since v3:
+- Separated the two (patch 10/11 in v2 patch 10 in v3) patch which got squashed
+  by accident for v3
+- Added Tony's Acked-by to patch 11 (for mach-oamp2 part)
 
-I have a couple of minor nits below, though.
+Changes since v2:
+- devm_kasprintf format string fixed
+- Additional patch to enable dynamic paRAM slot usage when the channel mapping
+  is supported by the eDMA module.
+  On am335x we have 256 paRAM slots and 64 DMA channels, this means that we had
+  64 slots 'locked away' all the time. The dynamic paRAM slot logic will allow
+  us to use all 256 slots freely for any purpose.
 
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/kernel-pgtable.h |   65 +++++++++++++++++++++++++++++++
->  arch/arm64/include/asm/page.h           |   18 ---------
->  arch/arm64/kernel/head.S                |   37 ++++--------------
->  arch/arm64/kernel/vmlinux.lds.S         |    1 +
->  4 files changed, 74 insertions(+), 47 deletions(-)
->  create mode 100644 arch/arm64/include/asm/kernel-pgtable.h
-> 
-> diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
-> new file mode 100644
-> index 0000000..622929d
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/kernel-pgtable.h
-> @@ -0,0 +1,65 @@
-> +/*
-> + * asm/kernel-pgtable.h : Kernel page table mapping
+Changes since v1:
+- Convert edma platform device registration to use platform_device_register_full
+- Moved the PM callback also to the dmaengine driver - missed in v1
+- Commit message added to:
+  ARM/dmaengine: edma: Remove limitation on the number of eDMA controllers
+- New patch which reads the flag for the channel mapping support in one place
 
-Drop the filename from the comment. It's redundant and ends up being
-painful when refactoring and moving things around.
+Cover letter:
 
-> + * Copyright (C) 2015 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#ifndef __ASM_KERNEL_PGTABLE_H
-> +#define __ASM_KERNEL_PGTABLE_H
-> +
-> +/*
-> + * The idmap and swapper page tables need some space reserved in the kernel
-> + * image. Both require pgd, pud (4 levels only) and pmd tables to (section)
-> + * map the kernel. With the 64K page configuration, swapper and idmap need to
-> + * map to pte level. The swapper also maps the FDT (see __create_page_tables
-> + * for more information). Note that the number of ID map translation levels
-> + * could be increased on the fly if system RAM is out of reach for the default
-> + * VA range, so 3 pages are reserved in all cases.
-> + */
-> +#ifdef CONFIG_ARM64_64K_PAGES
-> +#define SWAPPER_PGTABLE_LEVELS	(CONFIG_PGTABLE_LEVELS)
-> +#else
-> +#define SWAPPER_PGTABLE_LEVELS	(CONFIG_PGTABLE_LEVELS - 1)
-> +#endif
-> +
-> +#define SWAPPER_DIR_SIZE	(SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
-> +#define IDMAP_DIR_SIZE		(3 * PAGE_SIZE)
-> +
-> +/* Initial memory map size */
-> +#ifdef CONFIG_ARM64_64K_PAGES
-> +#define SWAPPER_BLOCK_SHIFT	PAGE_SHIFT
-> +#define SWAPPER_BLOCK_SIZE	PAGE_SIZE
-> +#define SWAPPER_TABLE_SHIFT	PMD_SHIFT
-> +#else
-> +#define SWAPPER_BLOCK_SHIFT	SECTION_SHIFT
-> +#define SWAPPER_BLOCK_SIZE	SECTION_SIZE
-> +#define SWAPPER_TABLE_SHIFT	PUD_SHIFT
-> +#endif
-> +
-> +
-> +/*
-> + * Initial memory map attributes.
-> + */
-> +#define SWAPPER_PTE_FLAGS	PTE_TYPE_PAGE | PTE_AF | PTE_SHARED
-> +#define SWAPPER_PMD_FLAGS	PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S
-> +
-> +#ifdef CONFIG_ARM64_64K_PAGES
-> +#define SWAPPER_MM_MMUFLAGS	PTE_ATTRINDX(MT_NORMAL) | SWAPPER_PTE_FLAGS
-> +#else
-> +#define SWAPPER_MM_MMUFLAGS	PMD_ATTRINDX(MT_NORMAL) | SWAPPER_PMD_FLAGS
-> +#endif
-> +
-> +
-> +#endif
+with this series the edma two driver setup will be changed to have only one
+driver to support eDMA3. The legacy edma interface will be removed and eDMA can
+only be used via dmaengine API from this point on.
+In order to do the merge the following improvements has been done:
+- One driver instance per eDMA:
+ - Any number of eDMA instances are supported (both legacy and DT boot)
+- Not relying on global variables, arrays, etc
+- Code simplification and optimizations in several places
 
-It would be nice to have the usual comment here for what this is ending,
-i.e.
+This change will also help us to do bigger changes in the eDMA driver since,
+since now we have only one driver to work with.
 
-#endif /* __ASM_KERNEL_PGTABLE_H */
+The series has been tested on:
+da850-evm (OMAP-L138)
+- with legacy and DT boot (both eDMA0 and eDMA1 is enabled)
+- In code swapping the eDMA instances in legacy mode to make sure the second
+  instance is handled correctly.
 
-Thanks,
-Mark.
+am335x-evmsk
+- DT boot
+
+I think this series could go via the dmaengine tree. Changes are trivial under
+arch/arm/
+
+Regards,
+Peter
+---
+Peter Ujfalusi (24):
+  ARM: common: edma: Fix channel parameter for irq callbacks
+  ARM: common: edma: Remove unused functions
+  dmaengine: edma: Simplify and optimize the edma_execute path
+  ARM: davinci/common: Convert edma driver to handle one eDMA instance
+    per driver
+  ARM/dmaengine: edma: Move of_dma_controller_register to the dmaengine
+    driver
+  ARM: common: edma: Internal API to use pointer to 'struct edma'
+  ARM/dmaengine: edma: Public API to use private struct pointer
+  ARM/dmaengine: edma: Remove limitation on the number of eDMA
+    controllers
+  ARM: davinci: Use platform_device_register_full() to create pdev for
+    eDMA
+  ARM: davinci: Add dma_mask to eDMA devices
+  ARM/dmaengine: edma: Merge the two drivers under drivers/dma/
+  dmaengine: edma: Allocate memory dynamically for bitmaps and
+    structures
+  dmaengine: edma: Use devm_kcalloc when possible
+  dmaengine: edma: Cleanup regarding the use of dev around the code
+  dmaengine: edma: Use dev_dbg instead pr_debug
+  dmaengine: edma: Use the edma_write_slot instead open coded
+    memcpy_toio
+  dmaengine: edma: Print warning when linking slots from different eDMA
+  dmaengine: edma: Consolidate the comments for functions
+  dmaengine: edma: Simplify the interrupt handling
+  dmaengine: edma: Move the pending error check into helper function
+  dmaengine: edma: Simplify and optimize ccerr interrupt handler
+  dmaengine: edma: Read channel mapping support only once from HW
+  dmaengine: edma: Rename bitfields for slot and channel usage tracking
+  dmaengine: edma: Dynamic paRAM slot handling if HW supports it
+
+ arch/arm/Kconfig                      |    1 -
+ arch/arm/common/Kconfig               |    3 -
+ arch/arm/common/Makefile              |    1 -
+ arch/arm/common/edma.c                | 1876 ---------------------------------
+ arch/arm/mach-davinci/devices-da8xx.c |  122 +--
+ arch/arm/mach-davinci/dm355.c         |   40 +-
+ arch/arm/mach-davinci/dm365.c         |   25 +-
+ arch/arm/mach-davinci/dm644x.c        |   40 +-
+ arch/arm/mach-davinci/dm646x.c        |   44 +-
+ arch/arm/mach-omap2/Kconfig           |    1 -
+ drivers/dma/Kconfig                   |    1 -
+ drivers/dma/edma.c                    | 1631 ++++++++++++++++++++++++----
+ include/linux/platform_data/edma.h    |  101 --
+ 13 files changed, 1566 insertions(+), 2320 deletions(-)
+ delete mode 100644 arch/arm/common/edma.c
+
+-- 
+2.6.1
