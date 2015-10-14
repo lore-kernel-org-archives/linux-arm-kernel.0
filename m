@@ -1,48 +1,41 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Wed, 14 Oct 2015 10:57:55 +0200
-Subject: [PATCH v2 2/4] dmaengine: Add STM32 DMA driver
-In-Reply-To: <561E17EA.6000900@linaro.org>
-References: <1444745127-1105-1-git-send-email-cedric.madianga@gmail.com>
- <1444745127-1105-3-git-send-email-cedric.madianga@gmail.com>
- <561D1689.90703@linaro.org>
- <CAOAejn1N=dFZ3nQ_hNznJQX1-fkP3r=vdYuWY4OMH65PrW3xVg@mail.gmail.com>
- <561E17EA.6000900@linaro.org>
-Message-ID: <CAOAejn2SMDtDa8TmMNeTUb38aqbAQnX5bK9JuMCweV6mKNMKZQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Oct 2015 11:00:20 +0200
+Subject: [PATCH] mutex: make mutex_lock_nested an inline function
+In-Reply-To: <20151014083707.GR11639@twins.programming.kicks-ass.net>
+References: <11282238.AHmyWliPRj@wuerfel>
+ <20151014082050.GQ17308@twins.programming.kicks-ass.net>
+ <20151014083707.GR11639@twins.programming.kicks-ass.net>
+Message-ID: <11240940.NHO2vFoJOz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Wednesday 14 October 2015 10:37:07 Peter Zijlstra wrote:
+> On Wed, Oct 14, 2015 at 10:20:50AM +0200, Peter Zijlstra wrote:
+> > > > On Tue, Oct 13, 2015 at 10:30:08PM +0200, Arnd Bergmann wrote:
+> > > > > The second argument of the mutex_lock_nested() helper is only
+> > > > > evaluated if CONFIG_DEBUG_LOCK_ALLOC is set. Otherwise we
+> > > > > get this build warning for the new regulator_lock_supply
+> > > > > function:
+> > > > > 
+> > > > > drivers/regulator/core.c: In function 'regulator_lock_supply':
+> > > > > drivers/regulator/core.c:142:6: warning: unused variable 'i' [-Wunused-variable]
+> > > > > 
+> > > > > To avoid the warning, this patch changes the definition of
+> > > > > mutex_lock_nested() to be static inline function rather than
+> > > > > a macro, which tells gcc that the variable is potentially
+> > > > > used.
+> > 
+> > Uuh, I just looked at next and saw this regulator_lock_supply()
+> > function. How is that limited? subclass must be <8 otherwise bad things
+> > happen.
+> 
+> Also, the function appears unused, just delete it 
 
-2015-10-14 10:52 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
-> On 14/10/15 08:54, M'boumba Cedric Madianga wrote:
->>>>
->>>> +static int stm32_dma_alloc_chan_resources(struct dma_chan *c)
->>>> +{
->>>> +       struct stm32_dma_chan *chan = to_stm32_dma_chan(c);
->>>> +       struct stm32_dma_device *dmadev = stm32_dma_chan_get_dev(chan);
->>>> +       int ret;
->>>> +
->>>> +       chan->config_init = false;
->>>> +       ret = clk_prepare_enable(dmadev->clk);
->>>> +       if (ret < 0) {
->>>> +               dev_err(chan2dev(chan), "clk_prepare_enable failed:
->>>> %d\n",
->>>> ret);
->>>> +               return ret;
->>>> +       }
->>>> +
->>>> +       ret = stm32_dma_disable_chan(chan);
->>>> +
->>>> +       return ret;
->>>> +}
->>>
->
->
-> If stm32_dma_disable_chan() returns an error then we will not restore the
-> original the clock counts causing them to "leak".
+That was my first suggestion as well when I ran into 
 
-Ok got it. Thanks for the clarification.
-I will fix it in the next version.
+drivers/regulator/core.c:139:13: warning: 'regulator_lock_supply' defined but not used
 
-BR,
-Cedric
+but apparently this is work-in-progress and the plan is to use it
+in 4.4 when the rest of the currently-under-review patches are merged.
+
+	Arnd
