@@ -1,289 +1,162 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Wed, 14 Oct 2015 09:54:26 +0200
-Subject: [PATCH v2 2/4] dmaengine: Add STM32 DMA driver
-In-Reply-To: <561D1689.90703@linaro.org>
-References: <1444745127-1105-1-git-send-email-cedric.madianga@gmail.com>
- <1444745127-1105-3-git-send-email-cedric.madianga@gmail.com>
- <561D1689.90703@linaro.org>
-Message-ID: <CAOAejn1N=dFZ3nQ_hNznJQX1-fkP3r=vdYuWY4OMH65PrW3xVg@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 14 Oct 2015 10:07:59 +0200
+Subject: [PATCH v4 2/2] usb: chipidea: imx: refine clock operations to
+ adapt for all platforms
+In-Reply-To: <1444787859-31509-1-git-send-email-peter.chen@freescale.com>
+References: <1444787859-31509-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <561E0D5F.8030003@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On 10/14/2015 03:57 AM, Peter Chen wrote:
+> Some i.mx platforms need three clocks to let controller work, but
+> others only need one, refine clock operation to adapt for all
+> platforms, it fixes a regression found at i.mx27.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: <stable@vger.kernel.org> #v4.1+
+> ---
+>  drivers/usb/chipidea/ci_hdrc_imx.c | 132 ++++++++++++++++++++++++++++++++-----
+>  1 file changed, 114 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
+> index 6ccbf60..82b1dfe 100644
+> --- a/drivers/usb/chipidea/ci_hdrc_imx.c
+> +++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+> @@ -84,6 +84,12 @@ struct ci_hdrc_imx_data {
+>  	struct imx_usbmisc_data *usbmisc_data;
+>  	bool supports_runtime_pm;
+>  	bool in_lpm;
+> +	/* SoC before i.mx6 (except imx23/imx28) needs three clks */
+> +	bool need_three_clks;
+> +	struct clk *clk_ipg;
+> +	struct clk *clk_ahb;
+> +	struct clk *clk_per;
+> +	/* --------------------------------- */
+>  };
+>  
+>  /* Common functions shared by usbmisc drivers */
+> @@ -135,6 +141,103 @@ static struct imx_usbmisc_data *usbmisc_get_init_data(struct device *dev)
+>  }
+>  
+>  /* End of common functions shared by usbmisc drivers*/
+> +static int imx_get_clks(struct device *dev)
+> +{
+> +	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
+> +	int ret = 0;
+> +
+> +	data->clk_ipg = devm_clk_get(dev, "ipg");
+> +	if (IS_ERR(data->clk_ipg)) {
+> +		/* If the platform only needs one clocks */
+> +		data->clk = devm_clk_get(dev, NULL);
+> +		if (IS_ERR(data->clk)) {
+> +			ret = PTR_ERR(data->clk);
+> +			dev_err(dev,
+> +				"Failed to get clock, err=%d\n", ret);
+> +			dev_err(dev,
+> +				"Failed to get ipg clock, err=%d\n", ret);
 
-2015-10-13 16:34 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
-> On 13/10/15 15:05, M'boumba Cedric Madianga wrote:
->>
->> This patch adds support for the STM32 DMA controller.
->>
->> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
->> ---
->>   drivers/dma/Kconfig     |   12 +
->>   drivers/dma/Makefile    |    1 +
->>   drivers/dma/stm32-dma.c | 1175
->> +++++++++++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 1188 insertions(+)
->>   create mode 100644 drivers/dma/stm32-dma.c
->
->
->> diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
->> new file mode 100644
->> index 0000000..031bab7
->> --- /dev/null
->> +++ b/drivers/dma/stm32-dma.c
->
->
->> +enum stm32_dma_width {
->> +       STM32_DMA_BYTE,
->> +       STM32_DMA_HALF_WORD,
->> +       STM32_DMA_WORD,
->> +};
->> +
->> +enum stm32_dma_burst_size {
->> +       STM32_DMA_BURST_SINGLE,
->> +       STM32_DMA_BURST_INCR4,
->> +       STM32_DMA_BURST_INCR8,
->> +       STM32_DMA_BURST_INCR16,
->> +};
->> +
->> +enum stm32_dma_channel_id {
->> +       STM32_DMA_CHANNEL0,
->> +       STM32_DMA_CHANNEL1,
->> +       STM32_DMA_CHANNEL2,
->> +       STM32_DMA_CHANNEL3,
->> +       STM32_DMA_CHANNEL4,
->> +       STM32_DMA_CHANNEL5,
->> +       STM32_DMA_CHANNEL6,
->> +       STM32_DMA_CHANNEL7,
->> +};
->
->
-> Why have (unused) enumerations to map numeric symbols to their own natural
-> values? Using normal integers would be better.
+Nitpick, one error message should be enough.
 
-Good point. I will remove these in the next version.
-Thanks.
+> +			return ret;
+> +		}
+> +		return ret;
+> +	}
+> +
+> +	data->clk_ahb = devm_clk_get(dev, "ahb");
+> +	if (IS_ERR(data->clk_ahb)) {
+> +		ret = PTR_ERR(data->clk_ahb);
+> +		dev_err(dev,
+> +			"Failed to get ahb clock, err=%d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	data->clk_per = devm_clk_get(dev, "per");
+> +	if (IS_ERR(data->clk_per)) {
+> +		ret = PTR_ERR(data->clk_per);
+> +		dev_err(dev,
+> +			"Failed to get per clock, err=%d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	data->need_three_clks = true;
+> +	return ret;
+> +}
+> +
+> +static int imx_prepare_enable_clks(struct device *dev)
+> +{
+> +	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
+> +	int ret = 0;
+> +
+> +	if (data->need_three_clks) {
+> +		ret = clk_prepare_enable(data->clk_ipg);
+> +		if (ret) {
+> +			dev_err(dev,
+> +				"Failed to prepare/enable ipg clk, err=%d\n",
+> +				ret);
+> +			return ret;
+> +		}
+> +
+> +		ret = clk_prepare_enable(data->clk_ahb);
+> +		if (ret) {
+> +			dev_err(dev,
+> +				"Failed to prepare/enable ahb clk, err=%d\n",
+> +				ret);
+> +			clk_disable_unprepare(data->clk_ipg);
+> +			return ret;
+> +		}
+> +
+> +		ret = clk_prepare_enable(data->clk_per);
+> +		if (ret) {
+> +			dev_err(dev,
+> +				"Failed to prepare/enable per clk, err=%d\n",
+> +				ret);
+> +			clk_disable_unprepare(data->clk_ahb);
+> +			clk_disable_unprepare(data->clk_ipg);
+> +			return ret;
+> +		}
+> +	} else {
+> +		ret = clk_prepare_enable(data->clk);
+> +		if (ret) {
+> +			dev_err(dev,
+> +				"Failed to prepare/enable clk, err=%d\n",
+> +				ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static void imx_disable_unprepare_clks(struct device *dev)
+> +{
+> +	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
+> +
+> +	if (data->need_three_clks) {
+> +		clk_disable_unprepare(data->clk_per);
+> +		clk_disable_unprepare(data->clk_ipg);
+> +		clk_disable_unprepare(data->clk_ahb);
 
->
->
->> +enum stm32_dma_request_id {
->> +       STM32_DMA_REQUEST0,
->> +       STM32_DMA_REQUEST1,
->> +       STM32_DMA_REQUEST2,
->> +       STM32_DMA_REQUEST3,
->> +       STM32_DMA_REQUEST4,
->> +       STM32_DMA_REQUEST5,
->> +       STM32_DMA_REQUEST6,
->> +       STM32_DMA_REQUEST7,
->> +};
->
->
-> Ditto.
+nit: you enable in this order: ipg, ahb, per. Disabling should be inverse.
 
-As above, I will remove it in the next version. Thanks.
+> +	} else {
+> +		clk_disable_unprepare(data->clk);
+> +	}
+> +}
 
->
->
->> +static void stm32_dma_dump_reg(struct stm32_dma_chan *chan)
->> +{
->> +       struct stm32_dma_device *dmadev = stm32_dma_chan_get_dev(chan);
->> +
->> +       dev_dbg(chan2dev(chan), "SCR:   0x%08x\n",
->> +               stm32_dma_read(dmadev, STM32_DMA_SCR(chan->id)));
->> +       dev_dbg(chan2dev(chan), "NDTR:  0x%08x\n",
->> +               stm32_dma_read(dmadev, STM32_DMA_SNDTR(chan->id)));
->> +       dev_dbg(chan2dev(chan), "SPAR:  0x%08x\n",
->> +               stm32_dma_read(dmadev, STM32_DMA_SPAR(chan->id)));
->> +       dev_dbg(chan2dev(chan), "SM0AR: 0x%08x\n",
->> +               stm32_dma_read(dmadev, STM32_DMA_SM0AR(chan->id)));
->> +       dev_dbg(chan2dev(chan), "SM1AR: 0x%08x\n",
->> +               stm32_dma_read(dmadev, STM32_DMA_SM1AR(chan->id)));
->> +       dev_dbg(chan2dev(chan), "SFCR:  0x%08x\n",
->> +               stm32_dma_read(dmadev, STM32_DMA_SFCR(chan->id)));
->> +}
->
->
-> Even at dev_dbg() this looks like log spam. This debug info gets issued
-> every time we set up a transfer!
+Marc
 
-Yes, this info will be logged after each transfer.
-But it will complete other debug info print when DMADEVICES_DEBUG is set.
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
->
->
->> +static int stm32_dma_alloc_chan_resources(struct dma_chan *c)
->> +{
->> +       struct stm32_dma_chan *chan = to_stm32_dma_chan(c);
->> +       struct stm32_dma_device *dmadev = stm32_dma_chan_get_dev(chan);
->> +       int ret;
->> +
->> +       chan->config_init = false;
->> +       ret = clk_prepare_enable(dmadev->clk);
->> +       if (ret < 0) {
->> +               dev_err(chan2dev(chan), "clk_prepare_enable failed: %d\n",
->> ret);
->> +               return ret;
->> +       }
->> +
->> +       ret = stm32_dma_disable_chan(chan);
->> +
->> +       return ret;
->> +}
->
->
-> The error path here looks like it will leak clock references.
-
-Sorry I didn't catch it. What does it mean ?
-
->
->
->
->> +static int stm32_dma_probe(struct platform_device *pdev)
->> +{
->> +       struct stm32_dma_chan *chan;
->> +       struct stm32_dma_device *dmadev;
->> +       struct dma_device *dd;
->> +       const struct of_device_id *match;
->> +       unsigned int i;
->> +       struct resource *res;
->> +       int ret;
->> +
->> +       match = of_match_device(stm32_dma_of_match, &pdev->dev);
->> +       if (!match) {
->> +               dev_err(&pdev->dev, "Error: No device match found\n");
->> +               return -ENODEV;
->> +       }
->> +
->> +       dmadev = devm_kzalloc(&pdev->dev, sizeof(*dmadev), GFP_KERNEL);
->> +       if (!dmadev)
->> +               return -ENOMEM;
->> +
->> +       dd = &dmadev->ddev;
->> +
->> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +       dmadev->base = devm_ioremap_resource(&pdev->dev, res);
->> +       if (IS_ERR(dmadev->base))
->> +               return PTR_ERR(dmadev->base);
->> +
->> +       dmadev->clk = devm_clk_get(&pdev->dev, NULL);
->> +       if (IS_ERR(dmadev->clk)) {
->> +               dev_err(&pdev->dev, "Error: Missing controller clock\n");
->> +               return PTR_ERR(dmadev->clk);
->> +       }
->> +
->> +       dmadev->mem2mem = of_property_read_bool(pdev->dev.of_node,
->> +                                               "st,mem2mem");
->> +
->> +       dmadev->rst = devm_reset_control_get(&pdev->dev, NULL);
->> +       if (!IS_ERR(dmadev->rst)) {
->> +               reset_control_assert(dmadev->rst);
->> +               udelay(2);
->> +               reset_control_deassert(dmadev->rst);
->> +       }
->> +
->> +       dma_cap_set(DMA_SLAVE, dd->cap_mask);
->> +       dma_cap_set(DMA_PRIVATE, dd->cap_mask);
->> +       dma_cap_set(DMA_CYCLIC, dd->cap_mask);
->> +       dd->device_alloc_chan_resources = stm32_dma_alloc_chan_resources;
->> +       dd->device_free_chan_resources = stm32_dma_free_chan_resources;
->> +       dd->device_tx_status = stm32_dma_tx_status;
->> +       dd->device_issue_pending = stm32_dma_issue_pending;
->> +       dd->device_prep_slave_sg = stm32_dma_prep_slave_sg;
->> +       dd->device_prep_dma_cyclic = stm32_dma_prep_dma_cyclic;
->> +       dd->device_config = stm32_dma_slave_config;
->> +       dd->device_terminate_all = stm32_dma_terminate_all;
->> +       dd->src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
->> +               BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
->> +               BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
->> +       dd->dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
->> +               BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
->> +               BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
->> +       dd->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
->> +       dd->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
->> +       dd->dev = &pdev->dev;
->> +       INIT_LIST_HEAD(&dd->channels);
->> +
->> +       if (dmadev->mem2mem) {
->> +               dma_cap_set(DMA_MEMCPY, dd->cap_mask);
->> +               dd->device_prep_dma_memcpy = stm32_dma_prep_dma_memcpy;
->> +               dd->directions |= BIT(DMA_MEM_TO_MEM);
->> +       }
->> +
->> +       for (i = 0; i < STM32_DMA_MAX_CHANNELS; i++) {
->> +               chan = &dmadev->chan[i];
->> +               chan->id = i;
->> +               chan->vchan.desc_free = stm32_dma_desc_free;
->> +               vchan_init(&chan->vchan, dd);
->> +       }
->> +
->> +       ret = dma_async_device_register(dd);
->> +       if (ret)
->> +               return ret;
->> +
->> +       for (i = 0; i < STM32_DMA_MAX_CHANNELS; i++) {
->> +               chan = &dmadev->chan[i];
->> +               res = platform_get_resource(pdev, IORESOURCE_IRQ, i);
->> +               if (!res) {
->> +                       ret = -EINVAL;
->> +                       dev_err(&pdev->dev, "No irq resource for chan
->> %d\n", i);
->> +                       goto err_unregister;
->> +               }
->> +               chan->irq = res->start;
->> +               ret = devm_request_irq(&pdev->dev, chan->irq,
->> +                                      stm32_dma_chan_irq, 0,
->> +                                      dev_name(chan2dev(chan)), chan);
->> +               if (ret) {
->> +                       dev_err(&pdev->dev,
->> +                               "request_irq failed with err %d channel
->> %d\n",
->> +                               ret, i);
->> +                       goto err_unregister;
->> +               }
->> +       }
->> +
->> +       ret = of_dma_controller_register(pdev->dev.of_node,
->> +                                        stm32_dma_of_xlate, dmadev);
->> +       if (ret < 0) {
->> +               dev_err(&pdev->dev,
->> +                       "STM32 DMA DMA OF registration failed %d\n", ret);
->> +               goto err_unregister;
->> +       }
->> +
->> +       platform_set_drvdata(pdev, dmadev);
->> +
->> +       dev_info(&pdev->dev, "STM32 DMA driver registered\n");
->> +
->> +       return 0;
->> +
->> +err_unregister:
->> +       dma_async_device_unregister(dd);
->> +
->> +       return ret;
->> +}
->> +
->> +static int stm32_dma_remove(struct platform_device *pdev)
->> +{
->> +       struct stm32_dma_device *dmadev = platform_get_drvdata(pdev);
->> +
->> +       of_dma_controller_free(pdev->dev.of_node);
->> +
->> +       dma_async_device_unregister(&dmadev->ddev);
->> +
->> +       clk_disable_unprepare(dmadev->clk);
->
->
-> What is the purpose of disabling/unpreparing the clock here?
-> stm32_dma_alloc_chan_resources() and stm32_dma_free_chan_resources() should
-> pair up and the clock should already be stopped.
-
-I agree with you. I will remove it in the next version. Thanks
-
->
->
-> Daniel.
-
-Thanks for your review.
-
-BR,
-Cedric
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151014/fc7695f3/attachment-0001.sig>
