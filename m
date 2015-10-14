@@ -1,158 +1,65 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Wed, 14 Oct 2015 09:31:48 +0000
-Subject: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for HiSilicon
- SoC Hip05
-In-Reply-To: <7409042.iUdOP6FlU8@wuerfel>
-References: <1444445957-239522-1-git-send-email-wangzhou1@hisilicon.com>
- <5549505.Kpo7ci0v8h@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E162435E7@lhreml503-mbs>
- <7409042.iUdOP6FlU8@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1624367C@lhreml503-mbs>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Oct 2015 11:36:04 +0200
+Subject: [PATCH v9 3/6] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <CAFiDJ59AuXmM8vN9=ry8_UvS-paRN54CdCFw6EUMx9RV2TT3bQ@mail.gmail.com>
+References: <1444790492-4051-1-git-send-email-lftan@altera.com>
+ <5088538.zEUtS0EC0S@wuerfel>
+ <CAFiDJ59AuXmM8vN9=ry8_UvS-paRN54CdCFw6EUMx9RV2TT3bQ@mail.gmail.com>
+Message-ID: <5210459.PtmhWaT6RM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Wednesday, October 14, 2015 10:04 AM
-> To: Gabriele Paoloni
-> Cc: Wangzhou (B); Bjorn Helgaas; Bjorn Helgaas; jingoohan1 at gmail.com;
-> pratyush.anand at gmail.com; linux at arm.linux.org.uk;
-> thomas.petazzoni at free-electrons.com; lorenzo.pieralisi at arm.com;
-> james.morse at arm.com; Liviu.Dudau at arm.com; jason at lakedaemon.net;
-> robh at kernel.org; gabriel.fernandez at linaro.org;
-> Minghuan.Lian at freescale.com; linux-pci at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; devicetree at vger.kernel.org; linux-
-> kernel at vger.kernel.org; zhangjukuo; qiuzhenfa; liudongdong (C);
-> qiujiang; xuwei (O); Liguozhu (Kenneth); Wangkefeng (Kevin); Rob
-> Herring
-> Subject: Re: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for
-> HiSilicon SoC Hip05
-> 
-> On Wednesday 14 October 2015 08:34:43 Gabriele Paoloni wrote:
-> > > -----Original Message-----
-> > > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > > Sent: Tuesday, October 13, 2015 12:19 PM
-> > > To: Gabriele Paoloni
-> > > Cc: Wangzhou (B); Bjorn Helgaas; Bjorn Helgaas;
-> jingoohan1 at gmail.com;
-> > > pratyush.anand at gmail.com; linux at arm.linux.org.uk;
-> > > thomas.petazzoni at free-electrons.com; lorenzo.pieralisi at arm.com;
-> > > james.morse at arm.com; Liviu.Dudau at arm.com; jason at lakedaemon.net;
-> > > robh at kernel.org; gabriel.fernandez at linaro.org;
-> > > Minghuan.Lian at freescale.com; linux-pci at vger.kernel.org; linux-arm-
-> > > kernel at lists.infradead.org; devicetree at vger.kernel.org; linux-
-> > > kernel at vger.kernel.org; zhangjukuo; qiuzhenfa; liudongdong (C);
-> > > qiujiang; xuwei (O); Liguozhu (Kenneth); Wangkefeng (Kevin); Rob
-> > > Herring
-> > > Subject: Re: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for
-> > > HiSilicon SoC Hip05
-> > >
-> > > On Tuesday 13 October 2015 06:58:42 Gabriele Paoloni wrote:
-> > > >
-> > > > > >> +
-> > > > > >> +static int __init hisi_pcie_init(void)
-> > > > > >> +{
-> > > > > >> +      return platform_driver_probe(&hisi_pcie_driver,
-> > > hisi_pcie_probe);
-> > > > > >> +}
-> > > > > >> +subsys_initcall(hisi_pcie_init);
-> > > > > >
-> > > > > > Can you use module_platform_driver() or
-> > > module_platform_driver_probe()
-> > > > > > here instead of the subsys_initcall()?  No, I don't really
-> know
-> > > what
-> > > > > > the difference between module_platform_driver() and
-> > > > > > module_platform_driver_probe() is, sorry
-> > >
-> > > module_platform_driver_probe() will only call the probe function
-> once
-> > > (and fail in case of -EPROBE_DEFER), while module_platform_driver()
-> > > installs the platform driver in a way that the device can be bound
-> > > and unbound at any point.
-> > >
-> > > > > In fact, I used module_platform_driver_probe in previous
-> version,
-> > > but
-> > > > > A PCIe VGA card of HiSilicon will use Hip05 PCIe host, so we
-> > > modified
-> > > > > module_platform_driver_probe to subsys_initcall which will be
-> > > called
-> > > > > before module_platform_driver_probe.
-> > > > >
-> > > > > We will upstream the driver of above PCIe VGA card soon.
-> > >
-> > > I don't see a reason why a VGA driver would need the PCI host to be
-> > > probed this early, unless it is the only usable console in the
-> system.
-> > >
-> > > > Hi Bjorn, firstly many thanks for looking at this.
-> > > >
-> > > > About this last bit the reason why we use subsys_initcall() is
-> that
-> > > > our host bridge is embedded in the SoC and as such is not hot-
-> > > pluggable
-> > > > for instance see:
-> > > > http://lxr.free-electrons.com/source/Documentation/driver-
-> > > model/platform.txt#L59
-> > >
-> > > We should still be able to build the driver as a loadable module,
-> > > even if you don't do that on your own kernels.
+On Wednesday 14 October 2015 17:28:45 Ley Foon Tan wrote:
+> On Wed, Oct 14, 2015 at 5:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 14 October 2015 16:32:25 Ley Foon Tan wrote:
+> >> On Wed, Oct 14, 2015 at 4:20 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > On Wednesday 14 October 2015 10:41:29 Ley Foon Tan wrote:
+> >> >> +static int altera_pcie_remove(struct platform_device *pdev)
+> >> >> +{
+> >> >> +     struct altera_pcie *pcie = platform_get_drvdata(pdev);
+> >> >> +
+> >> >> +     altera_pcie_free_irq_domain(pcie);
+> >> >> +     platform_set_drvdata(pdev, NULL);
+> >> >> +     return 0;
+> >> >> +}
+> >> >
+> >> > I just noticed this. Does it actually work to unload the module
+> >> > and tear down all the pci_dev structures in a safe way?
+> >> Good catch. It only can be compiled as builtin-moduley now, so we can
+> >> remove this _remove callback function.
 > >
-> > Hi Arnd, I don't see the point of having loadable KOs for platform
-> > devices that are integrated into SoCs (like PCIe Host Controllers...)
-> 
-> Mainly we want as many drivers as possible to be loadable modules,
-> and there is no reason why PCI needs to be different from other
-> subsystems here.
+> > I think we should change both: make it possible to load the
+> > driver dynamically, and remove the altera_pcie_remove function.
+> This driver depends on the pci fixups to work correctly. But, fixups
+> callback functions in this driver are not being call if the driver is
+> loadable module.
 
-Ok I see now. Thanks
+Ah, I see. We should find a better way to deal with this, as we
+are getting an increasing number of host driver specific fixups.
 
-> 
-> > > This doesn't mean that it has to be module_platform_driver,
-> > > subsys_initcall
-> > > will also work in a loadable module, it just won't be as early.
-> However,
-> > > we should try to come up with a consistent approach for all PCI
-> host
-> > > drivers,
-> > > I don't see any reason for hisi to be different from the others
-> here.
+Bjorn, do you have any idea here?
+
+Could we perhaps have a helper function that lets us register
+fixups dynamically?
+
+> The linker script keeps all pci fixup callbacks in pci fixup regions
+> during kernel compile time. So, it needs to be builtin module. Do you
+> know any way we can update those fixup regions?
+
+The only method I'm aware of at the moment is move the fixups to
+drivers/pci/quirks.c and enclose them in an #ifdef if you want them
+to not appear in kernels that don't support your SoC.
+
+> > You can prevent the module from being unloaded if you also remove
+> > the module_platform_driver() directive and add a module_init()
+> > without a matching module_exit().
 > >
-> > To me it sounds more appropriate to adopt subsys_initcall() for all
-> the
-> > PCI Host Bridge controllers rather than having them as loadable
-> modules...
-> >
-> > What is your view?
-> 
-> subsys_initcall() sounds odd because it's a driver rather than a
-> subsystem,
-> but I realize that most of the other levels don't fit any better.
+> > Please also add a '.suppress_bind_attrs = true,' flag in the driver
+> > struct to prevent manual unbinding.
+> I think we don't need these if it only can work as builtin module.
 
-Yes well I was seeing for example the vgaarb 
-http://lxr.free-electrons.com/source/drivers/gpu/vga/vgaarb.c#L1357
+No, this is orthogonal, you need it either way, as built-in drivers
+can still be unbound by writing to sysfs. Try writing the device name
+to /sys/bus/platform/drivers/altera-pcie/unbind and watch it blow up ;-)
 
-That in the init is calling pci_get_subsys()
-
-So I was wondering that the PCI devices may not be registered unless
-we also init the PCI host bridge through subsys_initcall()...
-
-But then maybe is the vgaarb to be buggy...
-
-> 
-> As I said, it's not really a choice we have to make in the source code,
-> we can use subsys_initcall together with module_exit(), or we can
-> create a helper macro that is similar to module_platform_driver()
-> specifically for PCI that uses a particular initcall level.
-
-Ok got it. But I guess this needs to be thought and applied to all
-the PCI host bridge controllers...
-
-So maybe for this driver I can use module_platform_driver_probe()
-and then we can see...
-
-> 
-> 	Arnd
+	Arnd
