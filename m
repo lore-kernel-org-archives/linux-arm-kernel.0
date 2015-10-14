@@ -1,49 +1,62 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Wed, 14 Oct 2015 09:13:54 -0500
-Subject: [PATCH v2 2/2] irqchip/gic-v2m: Add support for multiple MSI
- frames
-In-Reply-To: <1444822037-16983-3-git-send-email-marc.zyngier@arm.com>
-References: <1444822037-16983-1-git-send-email-marc.zyngier@arm.com>
- <1444822037-16983-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <561E6322.6030601@amd.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 14 Oct 2015 19:44:33 +0530
+Subject: [PATCH v2 2/4] dmaengine: Add STM32 DMA driver
+In-Reply-To: <CAOAejn3QOzrd952MztVTah4UbpNs1OabwkxhEtp15Mqz0B7LXA@mail.gmail.com>
+References: <1444745127-1105-1-git-send-email-cedric.madianga@gmail.com>
+ <1444745127-1105-3-git-send-email-cedric.madianga@gmail.com>
+ <20151014111615.GR27370@localhost>
+ <CAOAejn3QOzrd952MztVTah4UbpNs1OabwkxhEtp15Mqz0B7LXA@mail.gmail.com>
+Message-ID: <20151014141433.GT27370@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Wed, Oct 14, 2015 at 03:07:16PM +0200, M'boumba Cedric Madianga wrote:
+> >> +static inline uint32_t stm32_dma_read(struct stm32_dma_device *dmadev, u32 reg)
+> >
+> > this and few other could be made more readable
+> 
+> Ok, I could replace uint32_t by u32. Is it what you expect ?
+> For others, I don't see how I could make it more readable.
+> Could you please give me more details to help me ? Thanks in advance
 
-On 10/14/2015 6:27 AM, Marc Zyngier wrote:
-> The GICv2m driver is so far limited to a single MSI frame, but
-> nothing prevents an implementation from having several of them.
->
-> This patch expands the driver to enumerate all frames, keeping
-> the first one as the canonical identifier for the MSI domains.
->
-> Tested-by: Duc Dang <dhdang@apm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   drivers/irqchip/irq-gic-v2m.c | 124 ++++++++++++++++++++++++++----------------
->   1 file changed, 78 insertions(+), 46 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-> index bf9b3c0..87f8d10 100644
-> --- a/drivers/irqchip/irq-gic-v2m.c
-> +++ b/drivers/irqchip/irq-gic-v2m.c
-> @@ -50,8 +50,12 @@
->   /* List of flags for specific v2m implementation */
->   #define GICV2M_NEEDS_SPI_OFFSET		0x00000001
->
-> +static LIST_HEAD(v2m_nodes);
-> +static DEFINE_SPINLOCK(v2m_lock);
-> +
->   struct v2m_data {
-> -	spinlock_t msi_cnt_lock;
-> +	struct list_head entry;
-> +	struct device_node *node;
+Yes that is one and also aplitting this up so that it fits within 80chars
+while not sacrficing readablity...
 
-Would it be better if we use struct fwnode_handle * here instead. I 
-noticed that later on, this is also used as of_node_to_fwnode(v2m->node) 
-in several places. Also, this would need to change anyways when we 
-introducing ACPI support (see here https://lkml.org/lkml/2015/10/13/846).
+> >> +     } else if ((status & STM32_DMA_FEI) && (sfcr & STM32_DMA_SFCR_FEIE)) {
+> >> +             dev_err(chan2dev(chan), "DMA error: received FEI event\n");
+> >> +             stm32_dma_irq_clear(chan, STM32_DMA_FEI);
+> >> +             chan->status = DMA_ERROR;
+> >> +             spin_unlock(&chan->vchan.lock);
+> >> +             return IRQ_HANDLED;
+> >
+> > this is repeat of above apart from err print!!
+> 
+> Not only for print as we also need that to define which bit to clear
+> in the IRQ status.
+> In that way we will be sure to handle each interrupt event.
 
-Thanks,
-Suravee
+You can print error type based on status, or print the whole status but
+handle it same for all three cases
+
+> >> +     enum dma_status status;
+> >> +     unsigned long flags;
+> >> +     unsigned int residue;
+> >> +
+> >> +     status = dma_cookie_status(c, cookie, state);
+> >> +     if (status == DMA_COMPLETE)
+> >> +             return status;
+> >> +
+> >> +     if (!state)
+> >> +             return chan->status;
+> > why channel status and not status from dma_cookie_status()?
+> 
+> If status is different than DMA_COMPLETE it seems better to use channel status.
+> Indeed, in that way, we have the possibility to notify that there is a
+> potential error in the bus via DMA_ERROR.
+> But if I return status from dma_cookie_status(), I will always notify
+> DMA_IN_PROGRESS.
+
+No, you are supposed to return the descriptor status and not channel status!
+
+-- 
+~Vinod
