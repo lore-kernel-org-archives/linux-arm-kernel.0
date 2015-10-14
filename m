@@ -1,75 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Oct 2015 15:51:58 +0100
-Subject: [PATCHv3 02/11] arm64: Handle section maps for swapper/idmap
-In-Reply-To: <561E56D4.40506@arm.com>
-References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
- <1444821634-1689-3-git-send-email-suzuki.poulose@arm.com>
- <20151014120618.GB2150@leverpostej> <561E56D4.40506@arm.com>
-Message-ID: <20151014145158.GA4422@leverpostej>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 14 Oct 2015 17:53:40 +0300
+Subject: [PATCH 10/13] dmaengine: ti-dma-crossbar: Add support for
+ crossbar on AM33xx/AM43xx
+In-Reply-To: <20151014144814.GW27370@localhost>
+References: <1444828344-21378-1-git-send-email-peter.ujfalusi@ti.com>
+ <1444828344-21378-11-git-send-email-peter.ujfalusi@ti.com>
+ <20151014144814.GW27370@localhost>
+Message-ID: <561E6C74.50502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>+/* With 4K pages, we use section maps. */
-> >>+#ifdef CONFIG_ARM64_4K_PAGES
-> >>+#define ARM64_SWAPPER_USES_SECTION_MAPS 1
-> >>+#else
-> >>+#define ARM64_SWAPPER_USES_SECTION_MAPS 0
-> >>+#endif
-> >
-> >The comment is somewhat redunant. It would be better to state why we do
-> >this for 4K and not 64K (or 16K).
+On 10/14/2015 05:48 PM, Vinod Koul wrote:
+> On Wed, Oct 14, 2015 at 04:12:21PM +0300, Peter Ujfalusi wrote:
+>> The DMA event crossbar on AM33xx/AM43xx is different from the one found in
+>> DRA7x family.
+>> Instead of a single event crossbar it has 64 identical mux attached to each
+>> eDMA event line. When the 0 event mux is selected, the default mapped event
+>> is going to be routed to the corresponding eDMA event line. If different
+>> mux is selected, then the selected event is going to be routed to the given
+>> eDMA event.
 > 
-> Something like :
+> Why is crossbar patch in edma series?
+
+The old eDMA binding had xbar support which is not supported by the new
+binding since it does not belong to the eDMA driver at all.
+We have couple of boards where the crossbar is in use so I included the
+crossbar support in this series.
+
+>> +static void ti_am335x_xbar_free(struct device *dev, void *route_data)
+>> +{
+>> +	struct ti_am335x_xbar_data *xbar = dev_get_drvdata(dev);
+>> +	struct ti_am335x_xbar_map *map = route_data;
+>> +
+>> +	dev_err(dev, "Unmapping XBAR event %u on channel %u\n",
+>> +		map->mux_val, map->dma_line);
 > 
-> /*
->  * ARM64 kernel is guaranteed to be loaded at 2M aligned
->  * address (as per booting requirements). Hence we can use
->  * section mapping with 4K (section size = 2M) and not with
->  * 16K(section size = 32M) or 64K (section size = 512M).
->  */
+> Err ?
 
-That sounds much better. I hadn't figured out why myself, so thanks for
-the explanation :)
+Aargh, leftover from debugging.
 
-However, there's one minor nit: the start of memory below the kernel is
-2M aligned, but the offset means that the kernel itself is not loaded at
-a 2M aligned address.
-
-So how about:
-
-/*
- * The linear mapping and the start of memory are both 2M aligned (per
- * the arm64 booting.txt requirements). Hence we can use section mapping
- * with 4K (section size = 2M) but not with 16K (section size = 32M) or
- * 64K (section size = 512M).
- */
-
-> >>+	 * us PUD_SIZE (with SECTION maps, i.e, 4K) or PMD_SIZE (without
-> >>+	 * SECTION maps, i.e, 64K pages) memory starting from PHYS_OFFSET
-> >>+	 * (which must be aligned to 2MB as per Documentation/arm64/booting.txt).
-> >
-> >This didn't seem to get updated for 16K later in the series, unless I
-> >missed something.
-> >
-> >Perhaps drop the mention of 4K / 64K entirely here?
-> 
-> You are right, I missed it. We can drop the pagesize info entirely.
-
-Ok. Sounds good.
-
-> >>@@ -551,7 +552,7 @@ int kern_addr_valid(unsigned long addr)
-> >>  	return pfn_valid(pte_pfn(*pte));
-> >>  }
-> >>  #ifdef CONFIG_SPARSEMEM_VMEMMAP
-> >>-#ifdef CONFIG_ARM64_64K_PAGES
-> >>+#if !ARM64_SWAPPER_USES_SECTION_MAPS
-> >
-> >This leaves the comments on the #else and #endif stale. Please update
-> >those too.
-> 
-> Done.
-
-Great.
-
-Thanks,
-Mark.
+-- 
+P?ter
