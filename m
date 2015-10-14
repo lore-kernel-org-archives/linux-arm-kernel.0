@@ -1,30 +1,34 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 14 Oct 2015 18:49:38 +0100
-Subject: xen,arm: enable cpu_hotplug
-Message-ID: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
+Date: Wed, 14 Oct 2015 18:49:57 +0100
+Subject: [PATCH 3/3] xen/arm: don't try to re-register vcpu_info on
+ cpu_hotplug.
+In-Reply-To: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
+Message-ID: <1444844997-27314-3-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ arch/arm/xen/enlighten.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-this small patch series enable cpu_hotplug in ARM and ARM64 guests,
-using the PV path to plug and unplug the cpus and psci to enable/disable
-them.
-
-
-Stefano Stabellini (3):
-      xen/arm: Enable cpu_hotplug.c
-      xen, cpu_hotplug: call device_offline instead of cpu_down
-      xen/arm: don't try to re-register vcpu_info on cpu_hotplug.
-
- arch/arm/include/asm/xen/hypervisor.h |    8 ++++++++
- arch/arm/xen/enlighten.c              |    6 ++++++
- arch/x86/include/asm/xen/hypervisor.h |    5 +++++
- arch/x86/xen/enlighten.c              |   15 +++++++++++++++
- drivers/xen/Makefile                  |    2 --
- drivers/xen/cpu_hotplug.c             |    9 ++++++---
- 6 files changed, 40 insertions(+), 5 deletions(-)
-
-Cheers,
-
-Stefano
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 6c09cc4..59f5421 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -93,6 +93,12 @@ static void xen_percpu_init(void)
+ 	int err;
+ 	int cpu = get_cpu();
+ 
++	/* vcpu_info already registered, can happen with cpu-hotplug */
++	if (per_cpu(xen_vcpu, cpu) != NULL) {
++		put_cpu();
++		return;
++	}
++
+ 	pr_info("Xen: initializing cpu%d\n", cpu);
+ 	vcpup = per_cpu_ptr(xen_vcpu_info, cpu);
+ 
+-- 
+1.7.9.5
