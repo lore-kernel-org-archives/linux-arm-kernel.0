@@ -1,31 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Oct 2015 15:23:57 +0200
-Subject: [PATCH 0/4] ARM: berlin: improve multi_v7_defconfig support
-In-Reply-To: <20151014130935.GD20884@kwain>
-References: <1444818844-2865-1-git-send-email-antoine.tenart@free-electrons.com>
- <6303906.JnZ5PeFoqZ@wuerfel> <20151014130935.GD20884@kwain>
-Message-ID: <12896673.C2YC2mY5Sr@wuerfel>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 14 Oct 2015 15:25:19 +0200
+Subject: [RESEND PATCH v2] pwm-backlight: Avoid backlight flicker when probed
+ from DT
+Message-ID: <1444829119-4266-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 October 2015 15:09:35 Antoine Tenart wrote:
-> Hi Arnd,
-> 
-> On Wed, Oct 14, 2015 at 02:36:21PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 14 October 2015 12:34:00 Antoine Tenart wrote:
-> > > 
-> > > Some drivers used on a Marvell Berlin kernel were missing from
-> > > multi_v7_defconfig. This series add them.
-> > 
-> > Adding them is great, but we try to have as much as possible
-> > in loadable modules for new additions. Can you do this?
-> 
-> Sure, I'll do this for the Ethernet and the ADC drivers. But we already
-> have the SATA and USB features built-in with multi_v7_defconfig, so I'll
-> keep the two PHY drivers built-in.
-> 
-> 
+If the driver is probed from the device tree, and there is a phandle
+property set on it, and the enable GPIO is already configured as output,
+and the backlight is currently disabled, keep it disabled.
+If all these conditions are met, assume there will be some other driver
+that can enable the backlight at the appropriate time.
 
-Ok, fair enough.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+Changes since v1:
+ - Also check if the regulator is enabled. If the power supply is disabled,
+   and a phandle points to it, the backlight should stay powered down.
+---
+ drivers/video/backlight/pwm_bl.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-	Arnd
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index eff379b..31afd6d 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -199,6 +199,8 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	struct backlight_properties props;
+ 	struct backlight_device *bl;
+ 	struct pwm_bl_data *pb;
++	int initial_blank = FB_BLANK_UNBLANK;
++	bool phandle;
+ 	int ret;
+ 
+ 	if (!data) {
+@@ -264,12 +266,32 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 		pb->enable_gpio = gpio_to_desc(data->enable_gpio);
+ 	}
+ 
++	phandle = of_find_property(pdev->dev.of_node, "phandle", NULL) != NULL;
++
++	if (pb->enable_gpio) {
++		/*
++		 * If the driver is probed from the device tree and there is a
++		 * phandle link pointing to the backlight node, it is safe to
++		 * assume that another driver will enable the backlight at the
++		 * appropriate time. Therefore, if it is disabled, keep it so.
++		 */
++		if (phandle &&
++		    gpiod_get_direction(pb->enable_gpio) == GPIOF_DIR_OUT &&
++		    gpiod_get_value(pb->enable_gpio) == 0)
++			initial_blank = FB_BLANK_POWERDOWN;
++		else
++			gpiod_direction_output(pb->enable_gpio, 1);
++	}
++
+ 	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
+ 	if (IS_ERR(pb->power_supply)) {
+ 		ret = PTR_ERR(pb->power_supply);
+ 		goto err_alloc;
+ 	}
+ 
++	if (phandle && !regulator_is_enabled(pb->power_supply))
++		initial_blank = FB_BLANK_POWERDOWN;
++
+ 	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
+ 	if (IS_ERR(pb->pwm)) {
+ 		ret = PTR_ERR(pb->pwm);
+@@ -321,6 +343,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	bl->props.brightness = data->dft_brightness;
++	bl->props.power = initial_blank;
+ 	backlight_update_status(bl);
+ 
+ 	platform_set_drvdata(pdev, bl);
+-- 
+2.6.1
