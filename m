@@ -1,57 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 14 Oct 2015 11:55:56 +0100
-Subject: [PATCH RFC 0/2] simplefb: Add regulator handling support
-In-Reply-To: <561CAFE8.9080506@redhat.com>
-References: <1444669458-5588-1-git-send-email-wens@csie.org>
- <561CAFE8.9080506@redhat.com>
-Message-ID: <20151014105556.GT14956@sirena.org.uk>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 14 Oct 2015 14:04:27 +0300
+Subject: [PATCH] ARM: dts: am437x-gp-evm: Add wakeup interrupt source for
+ pixcir_i2c_ts
+In-Reply-To: <561E1C89.9080508@ti.com>
+References: <1444801956-17817-1-git-send-email-vigneshr@ti.com>
+ <561E165B.3000907@ti.com> <561E1C89.9080508@ti.com>
+Message-ID: <561E36BB.7000309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 09:16:56AM +0200, Hans de Goede wrote:
-> On 12-10-15 19:04, Chen-Yu Tsai wrote:
+Vignesh,
 
-> >Now the DT bindings don't support a list of regulators directly, so
-> >I'm working around it by having a "num-supplies" property to specify
-> >the number of supply properties to check, and name the actual supplies
-> >as "vinN-supply".
+On 14/10/15 12:12, Vignesh R wrote:
+> 
+> 
+> On 10/14/2015 02:16 PM, Roger Quadros wrote:
+> 
+>>
+>> On 14/10/15 08:52, Vignesh R wrote:
+>>> On am437x-gp-evm, pixcir_i2c_ts can wakeup the system from lower power
+>>> state via pinctrl and IO daisy chain using generic wakeirq framework.
+>>> With commit 3fffd1283927 ("i2c: allow specifying separate wakeup
+>>> interrupt in device tree") i2c core allows optional wakeirq to be
+>>> specified via device tree. Add wakeup irq entry to enable pixcir_i2c_ts
+>>> to wake the system from low power state.
+>>>
+>>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>>> ---
+>>>  arch/arm/boot/dts/am437x-gp-evm.dts | 5 +++++
+>>>  1 file changed, 5 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+>>> index 22038f21f228..69e93af7df0d 100644
+>>> --- a/arch/arm/boot/dts/am437x-gp-evm.dts
+>>> +++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+>>> @@ -581,8 +581,13 @@
+>>>  
+>>>  		attb-gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+>>>  
+>>> +		interrupts-extended = <&gpio3 22 GPIO_ACTIVE_HIGH>,
+>>> +				      <&am43xx_pinmux 0x264>;
+>>
+>> How does this work?
+>>
+>> interrupts-extended property must have
+>> 1) interrupt parent
+>> 2) interrupt number
+>> 3) interrupt flags
+>>
+>> Your change doesn't seem to comply with those requirements.
+> 
+> AFAIU, interrupts-extended has two parts: interrupt parent phandle and
+> interrupt specifier.
+> The number of cells in interrupt specifier is determined by
+> interrupt-cells property of interrupt parent node.
 
-> Hmm, I can see the need for a "supplies" property with a list of regulators
-> in other use-cases (e.g. the generic mmc-pwrseq driver) too. Now as discussed
-> we can simply do vin0-supply - vinN-supply properties and be done with it,
-> but maybe we need to actually add support for a generic "supplies" property ?
+Got it.
 
-I really don't like having unnamed supplies, or supplies with names that
-don't correspond to the schematic names for the physical supplies.  It
-makes it harder to go between the DT and the schematic and encourages
-bad practice on specific chip bindings which should be done properly
-since it's harder to tell if the binding is done correctly.
+> In above case, gpio3 has interrupt-cells = 2 hence interrupt specifier
+> has interrupt number and interrupt flag field.
 
-Adding something with the pattern of parallel arrays of phandles and
-names properties that got introduced after the regulator bindings were
-done also means we need to go and update every single binding using
-regulators to document the new properties which is going to be tedious
-and require constant policing for a while.  I'm also not a big fan of
-the pattern from a legibility point of view but that's a separate thing.
+But is GPIO_ACTIVE_HIGH an interrupt flag?
 
-> And if not then maybe we need a few generic helper devm helper function which
-> takes a node, figures out how much vinN-supply properties there are and returns
-> a dynamically allocated array containing references to all the regulators, or
-> a PTR_ERR in case of err, at which point the caller is expected to fail the
-> probe so that any successfully acquired regulators are released.
+> But in case am43xx_pinmux node, interrupt-cells is 1 hence has no
+> interrupt flag field.
+> 
+Understood, thanks. Might be worth adding a comment as to what 0x264 means though.
 
-I can see it for this sort of simplefb thing but I'm not sure how we'd
-discourage drivers for specific hardware from also using the same helper
-which then makes it easy to get sloppy board DTs which I'd expect to
-lead to hassle down the road as drivers try to use their supplies and
-find that actual DTs have things that don't correspond to reality in
-them.  The nice thing about having drivers name the supplies they're
-expecting is that it makes describing the board as it really is much
-more the path of least resistance.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151014/30f6f98c/attachment.sig>
+cheers,
+-roger
