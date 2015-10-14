@@ -1,64 +1,61 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 14 Oct 2015 11:00:01 +0200
-Subject: [alsa-devel] [RFC PATCH] ASoC: Modify check condition of multiple
- bindings of components
-In-Reply-To: <1444785549.26493.12.camel@mtksdaap41>
-References: <1444743477-48819-1-git-send-email-koro.chen@mediatek.com>
- <561D0AA9.5080702@metafoo.de> <1444745902.26493.2.camel@mtksdaap41>
- <561D1843.1020007@metafoo.de> <1444785549.26493.12.camel@mtksdaap41>
-Message-ID: <561E1991.1050705@metafoo.de>
+From: vigneshr@ti.com (Vignesh R)
+Date: Wed, 14 Oct 2015 14:42:41 +0530
+Subject: [PATCH] ARM: dts: am437x-gp-evm: Add wakeup interrupt source for
+ pixcir_i2c_ts
+In-Reply-To: <561E165B.3000907@ti.com>
+References: <1444801956-17817-1-git-send-email-vigneshr@ti.com>
+ <561E165B.3000907@ti.com>
+Message-ID: <561E1C89.9080508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2015 03:19 AM, Koro Chen wrote:
-> On Tue, 2015-10-13 at 16:42 +0200, Lars-Peter Clausen wrote:
->> On 10/13/2015 04:18 PM, Koro Chen wrote:
->>> On Tue, 2015-10-13 at 15:44 +0200, Lars-Peter Clausen wrote:
->>>> On 10/13/2015 03:37 PM, Koro Chen wrote:
->>>>> The patch "ASoC: Prevent components from being bound to multiple cards"
->>>>> adds check to prevent multiple cards from using the same component.
->>>>> However, snd_soc_register_platform() or snd_soc_register_codec() will
->>>>> also create components, and sharing the same platform by multiple cards
->>>>> is then refused. This happens with a platform having multiple
->>>>> independent DAIs that share the same DMA controller.
->>>>>
->>>>> Relax the condition by checking component->registered_as_component,
->>>>> which is only true in case of snd_soc_register_component() and
->>>>> will be false for components created by snd_soc_register_platform()
->>>>> or snd_soc_register_codec().
->>>>
->>>> Binding a component to multiple cards results in internal data structure
->>>> corruption, regardless of whether it is a raw component, CODEC or platform,
->>>> which is why the check was added. So the proposed change wont work.
->>>>
->>> Thanks for your comment. Is it possible to share an example of how the
->>> data structure will be corrupted? So I can study into this further.
+
+
+On 10/14/2015 02:16 PM, Roger Quadros wrote:
+
+> 
+> On 14/10/15 08:52, Vignesh R wrote:
+>> On am437x-gp-evm, pixcir_i2c_ts can wakeup the system from lower power
+>> state via pinctrl and IO daisy chain using generic wakeirq framework.
+>> With commit 3fffd1283927 ("i2c: allow specifying separate wakeup
+>> interrupt in device tree") i2c core allows optional wakeirq to be
+>> specified via device tree. Add wakeup irq entry to enable pixcir_i2c_ts
+>> to wake the system from low power state.
 >>
->> Just look at soc_probe_component() and think about what happens if that runs
->> twice for two different cards. Multiple calls to list_add() on the same
->> list, controls are added multiple times, DAPM widgets are created multiple
->> times, the card field will only point to the last card.
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>> ---
+>>  arch/arm/boot/dts/am437x-gp-evm.dts | 5 +++++
+>>  1 file changed, 5 insertions(+)
 >>
-> When multiple binding happens, soc_probe_component() just returns zero
-> without doing anything after this patch (actually it also returned zero
-> before the patch "ASoC: Prevent components from being bound to multiple
-> cards"). So the component still binds to the first card. For this case I
-> think it should be fine?
+>> diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+>> index 22038f21f228..69e93af7df0d 100644
+>> --- a/arch/arm/boot/dts/am437x-gp-evm.dts
+>> +++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+>> @@ -581,8 +581,13 @@
+>>  
+>>  		attb-gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+>>  
+>> +		interrupts-extended = <&gpio3 22 GPIO_ACTIVE_HIGH>,
+>> +				      <&am43xx_pinmux 0x264>;
+> 
+> How does this work?
+> 
+> interrupts-extended property must have
+> 1) interrupt parent
+> 2) interrupt number
+> 3) interrupt flags
+> 
+> Your change doesn't seem to comply with those requirements.
 
-Same answer as before more or less. There is a lot of card specific
-initialization happening in soc_probe_component(). The card field is
-initialized to the card the component is bound to, the DAPM widgets are
-created for the component in the cards DAPM graph, DAI link widgets are
-created and so on. If you bind the component to multiple cards the
-initialization will only be done for one card, the first one it was bound
-to, that doesn't make too much sense. If you look at the snd_soc_component
-data structure it should be obvious that it does not make sense to associate
-it with more than a single card.
+AFAIU, interrupts-extended has two parts: interrupt parent phandle and
+interrupt specifier.
+The number of cells in interrupt specifier is determined by
+interrupt-cells property of interrupt parent node.
+In above case, gpio3 has interrupt-cells = 2 hence interrupt specifier
+has interrupt number and interrupt flag field.
+But in case am43xx_pinmux node, interrupt-cells is 1 hence has no
+interrupt flag field.
 
-It was never intended that it is possible to bind a component to multiple
-cards. That it was possible was a bug that was overlooked and some people
-tried to do it which caused apparently random crashes later on, caused by
-the data structure corruption. This is why we added the check to catch this
-kind of mistake early and to avoid the crashes.
-
-- Lars
+-- 
+Regards
+Vignesh
