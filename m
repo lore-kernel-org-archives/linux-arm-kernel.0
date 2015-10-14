@@ -1,31 +1,27 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 14 Oct 2015 22:28:22 +0800
-Subject: [PATCH 0/3] hwrng: stm32 - add support for STM32 HW RNG
-In-Reply-To: <1444638090-22886-1-git-send-email-daniel.thompson@linaro.org>
-References: <1443904519-24012-1-git-send-email-daniel.thompson@linaro.org>
- <1444638090-22886-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20151014142822.GF17455@gondor.apana.org.au>
+Date: Wed, 14 Oct 2015 22:28:42 +0800
+Subject: [PATCH] crypto: mxs-dcp is an stmp device
+In-Reply-To: <6543300.PJNp8A08gY@wuerfel>
+References: <6543300.PJNp8A08gY@wuerfel>
+Message-ID: <20151014142842.GG17455@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 09:21:27AM +0100, Daniel Thompson wrote:
-> This patchset introduces a driver for the STM32 hardware random number
-> generator.
+On Mon, Oct 12, 2015 at 03:52:34PM +0200, Arnd Bergmann wrote:
+> The mxs-dcp driver relies on the stmp_reset_block() helper function, which
+> is provided by CONFIG_STMP_DEVICE. This symbol is always set on MXS,
+> but the driver can now also be built for MXC (i.MX6), which results
+> in a built error if no other driver selects STMP_DEVICE:
 > 
-> v2:
+> drivers/built-in.o: In function `mxs_dcp_probe':
+> vf610-ocotp.c:(.text+0x3df302): undefined reference to `stmp_reset_block'
 > 
->  * Moved binding docs from .../hwrng/ to .../rng/ and renamed to match
->    convention in new directory (Rob Herring).
->  * Adopted runtime PM and auto-suspend instead of managing the clocks
->    from the read function (Linus Walleij). Increased bandwidth by ~30%.
->  * Simplified error detection in main read loop (Linus Walleij, Maxime
->    Coquelin).
->  * Only WARN_ONCE() when hardware failure mechanisms trigger (Maxime
->    Coquelin).
->  * Simplify end of probe function after cocci warning (Fengguang Wu).
->  * Switch to devm_hwrng_register.
+> This adds the 'select', like all other stmp drivers have it.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: a2712e6c75f ("crypto: mxs-dcp - Allow MXS_DCP to be used on MX6SL")
 
-All applied.  Thanks!
+Patch applied.  Thanks.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
