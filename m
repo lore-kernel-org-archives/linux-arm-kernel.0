@@ -1,63 +1,114 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Wed, 14 Oct 2015 10:30:22 -0500
-Subject: [PATCH v2 2/2] irqchip/gic-v2m: Add support for multiple MSI
- frames
-In-Reply-To: <561E7486.6000803@arm.com>
-References: <1444822037-16983-1-git-send-email-marc.zyngier@arm.com>
- <1444822037-16983-3-git-send-email-marc.zyngier@arm.com>
- <561E6322.6030601@amd.com> <561E7486.6000803@arm.com>
-Message-ID: <561E750E.8020403@amd.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 14 Oct 2015 16:31:17 +0100
+Subject: [PATCH v2 05/17] irqchip: Convert all alloc/xlate users from
+ of_node to fwnode
+In-Reply-To: <561E7408.3050106@linaro.org>
+References: <1444737105-31573-1-git-send-email-marc.zyngier@arm.com>
+ <1444737105-31573-6-git-send-email-marc.zyngier@arm.com>
+ <561E7408.3050106@linaro.org>
+Message-ID: <561E7545.9070305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2015 10:28 AM, Marc Zyngier wrote:
-> On 14/10/15 15:13, Suravee Suthikulanit wrote:
->> Hi Marc,
+On 14/10/15 16:26, Tomasz Nowicki wrote:
+> Hi Marc,
+> 
+> On 13.10.2015 13:51, Marc Zyngier wrote:
+>> Since we now have a generic data structure to express an
+>> interrupt specifier, convert all hierarchical irqchips that
+>> are OF based to use a fwnode_handle as part of their alloc
+>> and xlate (which becomes translate) callbacks.
 >>
->> On 10/14/2015 6:27 AM, Marc Zyngier wrote:
->>> The GICv2m driver is so far limited to a single MSI frame, but
->>> nothing prevents an implementation from having several of them.
->>>
->>> This patch expands the driver to enumerate all frames, keeping
->>> the first one as the canonical identifier for the MSI domains.
->>>
->>> Tested-by: Duc Dang <dhdang@apm.com>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>    drivers/irqchip/irq-gic-v2m.c | 124 ++++++++++++++++++++++++++----------------
->>>    1 file changed, 78 insertions(+), 46 deletions(-)
->>>
->>> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
->>> index bf9b3c0..87f8d10 100644
->>> --- a/drivers/irqchip/irq-gic-v2m.c
->>> +++ b/drivers/irqchip/irq-gic-v2m.c
->>> @@ -50,8 +50,12 @@
->>>    /* List of flags for specific v2m implementation */
->>>    #define GICV2M_NEEDS_SPI_OFFSET		0x00000001
->>>
->>> +static LIST_HEAD(v2m_nodes);
->>> +static DEFINE_SPINLOCK(v2m_lock);
->>> +
->>>    struct v2m_data {
->>> -	spinlock_t msi_cnt_lock;
->>> +	struct list_head entry;
->>> +	struct device_node *node;
+>> As most of these drivers have dependencies (they exchange IRQ
+>> specifiers), change them all in a single, massive patch...
 >>
->> Would it be better if we use struct fwnode_handle * here instead. I
->> noticed that later on, this is also used as of_node_to_fwnode(v2m->node)
->> in several places. Also, this would need to change anyways when we
->> introducing ACPI support (see here https://lkml.org/lkml/2015/10/13/846).
->
-> I was thinking that it would be part of your series adapting it to ACPI.
-> I don't mind either way...
->
-> Thanks,
->
-> 	M.
->
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>   arch/arm/mach-exynos/suspend.c       | 55 ++++++++++++++++---------------
+>>   arch/arm/mach-imx/gpc.c              | 55 ++++++++++++++++---------------
+>>   arch/arm/mach-omap2/omap-wakeupgen.c | 55 ++++++++++++++++---------------
+>>   drivers/irqchip/irq-crossbar.c       | 62 ++++++++++++++++++----------------
+>>   drivers/irqchip/irq-gic-v2m.c        | 18 ++++++----
+>>   drivers/irqchip/irq-gic-v3-its.c     | 20 ++++++-----
+>>   drivers/irqchip/irq-gic-v3.c         | 49 +++++++++++++--------------
+>>   drivers/irqchip/irq-gic.c            | 33 ++++++++++++++++---
+>>   drivers/irqchip/irq-imx-gpcv2.c      | 64 ++++++++++++++++--------------------
+>>   drivers/irqchip/irq-mtk-sysirq.c     | 49 ++++++++++++++-------------
+>>   drivers/irqchip/irq-nvic.c           | 18 +++++++---
+>>   drivers/irqchip/irq-tegra.c          | 55 ++++++++++++++++---------------
+>>   drivers/irqchip/irq-vf610-mscm-ir.c  | 42 +++++++++++++++--------
+>>   13 files changed, 323 insertions(+), 252 deletions(-)
+>>
+> 
+> [...]
+> 
+>>
+>>   static int its_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>> index 5793880..05d010b 100644
+>> --- a/drivers/irqchip/irq-gic-v3.c
+>> +++ b/drivers/irqchip/irq-gic-v3.c
+>> @@ -737,32 +737,30 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>>   	return 0;
+>>   }
+>>
+>> -static int gic_irq_domain_xlate(struct irq_domain *d,
+>> -				struct device_node *controller,
+>> -				const u32 *intspec, unsigned int intsize,
+>> -				unsigned long *out_hwirq, unsigned int *out_type)
+>> +static int gic_irq_domain_translate(struct irq_domain *d,
+>> +				    struct irq_fwspec *fwspec,
+>> +				    unsigned long *hwirq,
+>> +				    unsigned int *type)
+>>   {
+>> -	if (irq_domain_get_of_node(d) != controller)
+>> -		return -EINVAL;
+>> -	if (intsize < 3)
+>> -		return -EINVAL;
+>> +	if (is_of_node(fwspec->fwnode)) {
+>> +		if (fwspec->param_count < 3)
+>> +			return -EINVAL;
+>>
+>> -	switch(intspec[0]) {
+>> -	case 0:			/* SPI */
+>> -		*out_hwirq = intspec[1] + 32;
+>> -		break;
+>> -	case 1:			/* PPI */
+>> -		*out_hwirq = intspec[1] + 16;
+>> -		break;
+>> -	case GIC_IRQ_TYPE_LPI:	/* LPI */
+>> -		*out_hwirq = intspec[1];
+>> -		break;
+>> -	default:
+>> -		return -EINVAL;
+>> +		/* Get the interrupt number and add 16 to skip over SGIs */
+>> +		*hwirq = fwspec->param[1] + 16;
+>> +
+>> +		/*
+>> +		 * For SPIs, we need to add 16 more to get the GIC irq
+>> +		 * ID number
+>> +		 */
+>> +		if (!fwspec->param[0])
+>> +			*hwirq += 16;
+>> +
+>> +		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
+>> +		return 0;
+>>   	}
+>>
+>> -	*out_type = intspec[2] & IRQ_TYPE_SENSE_MASK;
+>> -	return 0;
+>> +	return -EINVAL;
+>>   }
+> 
+> What about GIC_IRQ_TYPE_LPI type? Previously we leaved interrupt line nr 
+> and now +32.
 
-Ok, I'll rebase the GICv2m ACPI support on top of this multi-frame 
-change and send out V2 If this won't be changing again any time soon.
+Please see the patch I've posted earlier that address this particular issue:
+
+https://lkml.org/lkml/2015/10/14/272
 
 Thanks,
-Suravee
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
