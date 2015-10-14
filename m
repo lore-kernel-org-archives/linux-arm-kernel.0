@@ -1,49 +1,59 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 14 Oct 2015 15:39:01 +0200
-Subject: [PATCH v4 3/3] arm64: dts: mt8173: add timer node
-In-Reply-To: <1443798319-45744-4-git-send-email-yingjoe.chen@mediatek.com>
-References: <1443798319-45744-1-git-send-email-yingjoe.chen@mediatek.com>
- <1443798319-45744-4-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <561E5AF5.5020902@gmail.com>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Wed, 14 Oct 2015 15:41:58 +0200
+Subject: [PATCH v2 2/4] dmaengine: Add STM32 DMA driver
+In-Reply-To: <561E58AC.80207@linaro.org>
+References: <1444745127-1105-1-git-send-email-cedric.madianga@gmail.com>
+ <1444745127-1105-3-git-send-email-cedric.madianga@gmail.com>
+ <561D1689.90703@linaro.org>
+ <CAOAejn1N=dFZ3nQ_hNznJQX1-fkP3r=vdYuWY4OMH65PrW3xVg@mail.gmail.com>
+ <CAOAejn2pcFSn3Hf=j6zgg6Ui6GjJZrtRch6ywByHaVLsTLMk6A@mail.gmail.com>
+ <561E58AC.80207@linaro.org>
+Message-ID: <CAOAejn1XqvZDmCgGr5rmZoz2EzFUyxtmpSm0_atLr81rSJrEcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/10/15 17:05, Yingjoe Chen wrote:
-> From: Daniel Kurtz <djkurtz@chromium.org>
+2015-10-14 15:29 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
+> On 14/10/15 14:17, M'boumba Cedric Madianga wrote:
+>>
+>> Hi Daniel,
+>>
+>>>>> +
+>>>>> +static int stm32_dma_remove(struct platform_device *pdev)
+>>>>> +{
+>>>>> +       struct stm32_dma_device *dmadev = platform_get_drvdata(pdev);
+>>>>> +
+>>>>> +       of_dma_controller_free(pdev->dev.of_node);
+>>>>> +
+>>>>> +       dma_async_device_unregister(&dmadev->ddev);
+>>>>> +
+>>>>> +       clk_disable_unprepare(dmadev->clk);
+>>>>
+>>>>
+>>>>
+>>>> What is the purpose of disabling/unpreparing the clock here?
+>>>> stm32_dma_alloc_chan_resources() and stm32_dma_free_chan_resources()
+>>>> should
+>>>> pair up and the clock should already be stopped.
+>>
+>>
+>> stm32_dma_remove() could be called during an on-going transfer during
+>> module unload.
+>> So in that case, it seems that disabling/unpreparing the clock is needed.
 >
-> Add device node to enable GPT timer.
 >
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> ---
+> Really?
+>
+> I think we need to be sure any on-going transfers are stopped.
+>
+> There are multiple reasons for this, not least the risk of executing a
+> callback that has been freed, but the one related to my point is that a
+> single clk_disable_unprepare() will remain broken because if you don't know
+> that the transfers have stopped then you don't know how many on-going
+> transfers there are.
 
-I reapplied this on v4.4-next/arm64
-
-
->   arch/arm64/boot/dts/mediatek/mt8173.dtsi | 9 +++++++++
->   1 file changed, 9 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index d18ee42..d763803 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -238,6 +238,15 @@
->   			reg = <0 0x10007000 0 0x100>;
->   		};
->
-> +		timer: timer at 10008000 {
-> +			compatible = "mediatek,mt8173-timer",
-> +				     "mediatek,mt6577-timer";
-> +			reg = <0 0x10008000 0 0x1000>;
-> +			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_LOW>;
-> +			clocks = <&infracfg CLK_INFRA_CLK_13M>,
-> +				 <&topckgen CLK_TOP_RTC_SEL>;
-> +		};
-> +
->   		pwrap: pwrap at 1000d000 {
->   			compatible = "mediatek,mt8173-pwrap";
->   			reg = <0 0x1000d000 0 0x1000>;
->
+In the next version, I am going to stop the DMA, free all interrupts
+and kill tasklet in stm32_dma_remove.
+In that way, all on-going transfers will be lost as we don't have to
+wait the end of remaining transfer in order to execute this function
+as quickly as possible.
+But even with this improvement, I think I have to disable the clock here.
