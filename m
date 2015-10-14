@@ -1,32 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 14 Oct 2015 14:35:38 +0100
-Subject: [PATCH v6 2/3] arm64: Add IOMMU dma_ops
-In-Reply-To: <80cb035144a2648a5d94eb1fec3336f17ad249f1.1443718557.git.robin.murphy@arm.com>
-References: <cover.1443718557.git.robin.murphy@arm.com>
- <80cb035144a2648a5d94eb1fec3336f17ad249f1.1443718557.git.robin.murphy@arm.com>
-Message-ID: <20151014133538.GG4239@e104818-lin.cambridge.arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 14 Oct 2015 15:38:33 +0200
+Subject: [PATCH v4 2/3] arm64: mediatek: enable MTK_TIMER
+In-Reply-To: <1443798319-45744-3-git-send-email-yingjoe.chen@mediatek.com>
+References: <1443798319-45744-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1443798319-45744-3-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <561E5AD9.1000803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 01, 2015 at 08:13:59PM +0100, Robin Murphy wrote:
-> Taking some inspiration from the arch/arm code, implement the
-> arch-specific side of the DMA mapping ops using the new IOMMU-DMA layer.
-> 
-> Since there is still work to do elsewhere to make DMA configuration happen
-> in a more appropriate order and properly support platform devices in the
-> IOMMU core, the device setup code unfortunately starts out carrying some
-> workarounds to ensure it works correctly in the current state of things.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Sorry, I reviewed this patch before but forgot to ack it, so here it is:
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+On 02/10/15 17:05, Yingjoe Chen wrote:
+> Enable MTK_TIMER for MediaTek plaform, which will be used as
+> tick broadcast device and schedule clock.
+>
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> ---
 
-(and I'm fined for the arm64 patches here to go in via the iommu tree)
+I reapplied this on v4.4-next/soc
 
-I assume part of this patch will disappear at some point when the device
-probing order is sorted.
-
--- 
-Catalin
+>   arch/arm64/Kconfig.platforms | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> index 23800a1..8176455 100644
+> --- a/arch/arm64/Kconfig.platforms
+> +++ b/arch/arm64/Kconfig.platforms
+> @@ -42,6 +42,7 @@ config ARCH_MEDIATEK
+>   	bool "Mediatek MT65xx & MT81xx ARMv8 SoC"
+>   	select ARM_GIC
+>   	select PINCTRL
+> +	select MTK_TIMER
+>   	help
+>   	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
+>
+>
