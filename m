@@ -1,40 +1,99 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 14 Oct 2015 07:42:59 -0600
-Subject: [PATCH v2 1/2] ARM: cpuidle: remove cpu parameter from the
- cpuidle_ops suspend hook
-In-Reply-To: <20151012154054.GA23364@red-moon>
-References: <1444648628-24790-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1444648628-24790-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20151012145640.GF921@linaro.org> <20151012154054.GA23364@red-moon>
-Message-ID: <20151014134259.GG921@linaro.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 14 Oct 2015 15:45:00 +0200
+Subject: [PATCH] arm64: dts: mt8173: add MT8173 display PWM driver support
+ node
+In-Reply-To: <561BDA26.5010203@gmail.com>
+References: <1444117243-28391-1-git-send-email-yh.huang@mediatek.com>
+ <561BDA26.5010203@gmail.com>
+Message-ID: <561E5C5C.2080807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12 2015 at 09:40 -0600, Lorenzo Pieralisi wrote:
->Hi Lina,
->
->On Mon, Oct 12, 2015 at 08:56:40AM -0600, Lina Iyer wrote:
->> On Mon, Oct 12 2015 at 05:16 -0600, Lorenzo Pieralisi wrote:
->> >The suspend() hook in the cpuidle_ops struct is always called on
->> >the cpu entering idle, which means that the cpu parameter passed
->> >to the suspend hook always corresponds to the local cpu, making
->> >it somewhat redundant.
->> >
->> >This patch removes the logical cpu parameter from the ARM
->> >cpuidle_ops.suspend hook and updates all the existing kernel
->> >implementations to reflect this change.
->> >
->> >Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> >Cc: Lina Iyer <lina.iyer@linaro.org>
->> >Cc: Russell King <linux@arm.linux.org.uk>
->> >Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->>
->> Reviewed-by: Lina Iyer <lina.iyer@linaro.org>
->
->Thank you very much. May I also ask you to test it please, a Tested-by
->is needed since it affects QCOM platforms I can't test on at present.
->
-Tested-by: Lina Iyer <lina.iyer@linaro.org>
 
-Thanks,
-Lina
+
+On 12/10/15 18:04, Matthias Brugger wrote:
+>
+>
+> On 06/10/15 09:40, YH Huang wrote:
+>> Add display PWM node in mt8173-evb.dts and mt8173.dtsi.
+>>
+>> Signed-off-by: YH Huang <yh.huang@mediatek.com>
+>> ---
+>>   arch/arm64/boot/dts/mediatek/mt8173-evb.dts |   13 +++++++++++++
+>>   arch/arm64/boot/dts/mediatek/mt8173.dtsi    |   22
+>> ++++++++++++++++++++++
+>>   2 files changed, 35 insertions(+)
+>>
+>
+> Applied, thanks.
+
+I reapplied this on v4.4-next/arm64
+
+>
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+>> b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+>> index 811cb76..1b3fabd 100644
+>> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+>> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+>> @@ -92,6 +92,13 @@
+>>   };
+>>
+>>   &pio {
+>> +    disp_pwm0_pins: disp_pwm0_pins {
+>> +        pins1 {
+>> +            pinmux = <MT8173_PIN_87_DISP_PWM0__FUNC_DISP_PWM0>;
+>> +            output-low;
+>> +        };
+>> +    };
+>> +
+>>       mmc0_pins_default: mmc0default {
+>>           pins_cmd_dat {
+>>               pinmux = <MT8173_PIN_57_MSDC0_DAT0__FUNC_MSDC0_DAT0>,
+>> @@ -190,6 +197,12 @@
+>>       };
+>>   };
+>>
+>> +&pwm0 {
+>> +    pinctrl-names = "default";
+>> +    pinctrl-0 = <&disp_pwm0_pins>;
+>> +    status = "okay";
+>> +};
+>> +
+>>   &pwrap {
+>>       pmic: mt6397 {
+>>           compatible = "mediatek,mt6397";
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> index 4bce167..fd01134 100644
+>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> @@ -500,6 +500,28 @@
+>>               clock-names = "source", "hclk";
+>>               status = "disabled";
+>>           };
+>> +
+>> +        pwm0: pwm at 1401e000 {
+>> +            compatible = "mediatek,mt8173-disp-pwm",
+>> +                     "mediatek,mt6595-disp-pwm";
+>> +            reg = <0 0x1401e000 0 0x1000>;
+>> +            #pwm-cells = <2>;
+>> +            clocks = <&mmsys CLK_MM_DISP_PWM026M>,
+>> +                 <&mmsys CLK_MM_DISP_PWM0MM>;
+>> +            clock-names = "main", "mm";
+>> +            status = "disabled";
+>> +        };
+>> +
+>> +        pwm1: pwm at 1401f000 {
+>> +            compatible = "mediatek,mt8173-disp-pwm",
+>> +                     "mediatek,mt6595-disp-pwm";
+>> +            reg = <0 0x1401f000 0 0x1000>;
+>> +            #pwm-cells = <2>;
+>> +            clocks = <&mmsys CLK_MM_DISP_PWM126M>,
+>> +                 <&mmsys CLK_MM_DISP_PWM1MM>;
+>> +            clock-names = "main", "mm";
+>> +            status = "disabled";
+>> +        };
+>>       };
+>>   };
+>>
+>>
