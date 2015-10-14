@@ -1,42 +1,53 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 14 Oct 2015 14:16:06 +0300
-Subject: [PATCH v4 20/25] dmaengine: edma: Simplify the interrupt handling
-In-Reply-To: <561E3883.6000705@ti.com>
-References: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
- <1443088932-21731-21-git-send-email-peter.ujfalusi@ti.com>
- <20151014102039.GK27370@localhost> <561E3883.6000705@ti.com>
-Message-ID: <561E3976.3050100@ti.com>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 14 Oct 2015 12:20:27 +0100
+Subject: [PATCHv3 04/11] arm64: Calculate size for idmap_pg_dir at compile time
+In-Reply-To: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
+References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1444821634-1689-5-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2015 02:12 PM, Peter Ujfalusi wrote:
->>> +		} else if (edma_read(ecc, EDMA_QEMR)) {
->>> +			dev_dbg(ecc->dev, "QEMR %02x\n",
->>> +				edma_read(ecc, EDMA_QEMR));
->>> +			for (i = 0; i < 8; i++) {
->>> +				if (edma_read(ecc, EDMA_QEMR) & BIT(i)) {
->>> +					/* Clear the corresponding IPR bits */
->>> +					edma_write(ecc, EDMA_QEMCR, BIT(i));
->>> +					edma_shadow0_write(ecc, SH_QSECR,
->>> +							   BIT(i));
->>> +
->>> +					/* NOTE:  not reported!! */
->>
->> what does this mean?
-> 
-> For QEMR and CCERR registers the Linux driver only acks the event, but do not
-> do anything.
-> In Linux we are not using the qDMA of the eDMA3 and there is not much we can
-> do when the CCERR happens.
-> Hrm, probably moving the CCERR print to dev_err() might be useful, but again I
-> have not seen this happen. But if it does, we need to come up with something
-> to avoid it. Basically repartition the use of Transfer Controllers, but this
-> can not be done with this stack. An upcoming series will give us ways to fine
-> tune the use of TCs.
+Now that we can calculate the number of levels required for
+mapping a va width, reserve exact number of pages that would
+be required to cover the idmap. The idmap should be able to handle
+the maximum physical address size supported.
 
-In the interrupt handler simplification patch I move the CCERR to dev_warn()
-so I leave it like this for this patch - as the function has been just moved
-down in the code to be able to call the actual handler of the events.
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/kernel-pgtable.h |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
+index 5876a36..def7168 100644
+--- a/arch/arm64/include/asm/kernel-pgtable.h
++++ b/arch/arm64/include/asm/kernel-pgtable.h
+@@ -33,16 +33,19 @@
+  * map to pte level. The swapper also maps the FDT (see __create_page_tables
+  * for more information). Note that the number of ID map translation levels
+  * could be increased on the fly if system RAM is out of reach for the default
+- * VA range, so 3 pages are reserved in all cases.
++ * VA range, so pages required to map highest possible PA are reserved in all
++ * cases.
+  */
+ #if ARM64_SWAPPER_USES_SECTION_MAPS
+ #define SWAPPER_PGTABLE_LEVELS	(CONFIG_PGTABLE_LEVELS - 1)
++#define IDMAP_PGTABLE_LEVELS	(ARM64_HW_PGTABLE_LEVELS(PHYS_MASK_SHIFT) - 1)
+ #else
+ #define SWAPPER_PGTABLE_LEVELS	(CONFIG_PGTABLE_LEVELS)
++#define IDMAP_PGTABLE_LEVELS	(ARM64_HW_PGTABLE_LEVELS(PHYS_MASK_SHIFT))
+ #endif
+ 
+ #define SWAPPER_DIR_SIZE	(SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
+-#define IDMAP_DIR_SIZE		(3 * PAGE_SIZE)
++#define IDMAP_DIR_SIZE		(IDMAP_PGTABLE_LEVELS * PAGE_SIZE)
+ 
+ /* Initial memory map size */
+ #if ARM64_SWAPPER_USES_SECTION_MAPS
 -- 
-P?ter
+1.7.9.5
