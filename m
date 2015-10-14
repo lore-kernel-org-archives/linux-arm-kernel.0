@@ -1,27 +1,84 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Oct 2015 13:43:53 +0100
-Subject: [PATCH V3 4/6] arm64/ls1043a: add DTS for Freescale LS1043A SoC
-In-Reply-To: <1444822498-16477-5-git-send-email-B48286@freescale.com>
-References: <1444822498-16477-1-git-send-email-B48286@freescale.com>
- <1444822498-16477-5-git-send-email-B48286@freescale.com>
-Message-ID: <20151014124353.GC2150@leverpostej>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Wed, 14 Oct 2015 14:47:20 +0200
+Subject: [PATCH v2] ARM: fix vdsomunge not to depend on glibc specific
+ byteswap.h
+In-Reply-To: <B69CCAC6-FB47-4B2B-95F9-15F1BA4AD381@goldelico.com>
+References: <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
+ <B69CCAC6-FB47-4B2B-95F9-15F1BA4AD381@goldelico.com>
+Message-ID: <5B19AAFC-976C-4B33-A83E-229693FA7858@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+ping.
 
-> +	pmu {
-> +		compatible = "arm,armv8-pmuv3";
-> +		interrupts = <0 106 0x4>,
-> +			     <0 107 0x4>,
-> +			     <0 95 0x4>,
-> +			     <0 97 0x4>;
-> +	};
+Am 03.10.2015 um 22:46 schrieb H. Nikolaus Schaller <hns@goldelico.com>:
 
-You should have interrupt-affinity here. See
-Documentation/devicetree/bindings/arm/pmu.txt
-
-Otherwise this looks ok.
-
-Thanks,
-Mark.
+> If the host toolchain is not glibc based then the arm kernel build
+> fails with
+> 
+> HOSTCC  arch/arm/vdso/vdsomunge
+> arch/arm/vdso/vdsomunge.c:48:22: fatal error: byteswap.h: No such file or directory
+> 
+> Observed: with omap2plus_defconfig and compile on Mac OS X with arm ELF
+> cross-compiler.
+> 
+> Reason: byteswap.h is a glibc only header.
+> 
+> Solution: replace by private byte-swapping macros (taken from
+> arch/mips/boot/elf2ecoff.c)
+> 
+> Tested to compile on Mac OS X 10.9.5 host.
+> 
+> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+> ---
+> arch/arm/vdso/vdsomunge.c | 19 +++++++++++++++----
+> 1 file changed, 15 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/vdso/vdsomunge.c b/arch/arm/vdso/vdsomunge.c
+> index aedec81..27a9a0b 100644
+> --- a/arch/arm/vdso/vdsomunge.c
+> +++ b/arch/arm/vdso/vdsomunge.c
+> @@ -45,7 +45,18 @@
+> * it does.
+> */
+> 
+> -#include <byteswap.h>
+> +#define swab16(x) \
+> +	((unsigned short)( \
+> +		(((unsigned short)(x) & (unsigned short)0x00ffU) << 8) | \
+> +		(((unsigned short)(x) & (unsigned short)0xff00U) >> 8) ))
+> +
+> +#define swab32(x) \
+> +	((unsigned int)( \
+> +		(((unsigned int)(x) & (unsigned int)0x000000ffUL) << 24) | \
+> +		(((unsigned int)(x) & (unsigned int)0x0000ff00UL) <<  8) | \
+> +		(((unsigned int)(x) & (unsigned int)0x00ff0000UL) >>  8) | \
+> +		(((unsigned int)(x) & (unsigned int)0xff000000UL) >> 24) ))
+> +
+> #include <elf.h>
+> #include <errno.h>
+> #include <fcntl.h>
+> @@ -104,17 +115,17 @@ static void cleanup(void)
+> 
+> static Elf32_Word read_elf_word(Elf32_Word word, bool swap)
+> {
+> -	return swap ? bswap_32(word) : word;
+> +	return swap ? swab32(word) : word;
+> }
+> 
+> static Elf32_Half read_elf_half(Elf32_Half half, bool swap)
+> {
+> -	return swap ? bswap_16(half) : half;
+> +	return swap ? swab16(half) : half;
+> }
+> 
+> static void write_elf_word(Elf32_Word val, Elf32_Word *dst, bool swap)
+> {
+> -	*dst = swap ? bswap_32(val) : val;
+> +	*dst = swap ? swab32(val) : val;
+> }
+> 
+> int main(int argc, char **argv)
+> -- 
+> 2.5.1
+> 
