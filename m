@@ -1,42 +1,60 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 14 Oct 2015 09:52:58 +0100
-Subject: [PATCH v2 2/4] dmaengine: Add STM32 DMA driver
-In-Reply-To: <CAOAejn1N=dFZ3nQ_hNznJQX1-fkP3r=vdYuWY4OMH65PrW3xVg@mail.gmail.com>
-References: <1444745127-1105-1-git-send-email-cedric.madianga@gmail.com>
- <1444745127-1105-3-git-send-email-cedric.madianga@gmail.com>
- <561D1689.90703@linaro.org>
- <CAOAejn1N=dFZ3nQ_hNznJQX1-fkP3r=vdYuWY4OMH65PrW3xVg@mail.gmail.com>
-Message-ID: <561E17EA.6000900@linaro.org>
+From: Yuantian.Tang@freescale.com (Tang Yuantian)
+Date: Wed, 14 Oct 2015 16:46:52 +0800
+Subject: [PATCH] ahci: qoriq: Fix a compiling warning
+Message-ID: <1444812412-33321-1-git-send-email-Yuantian.Tang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/15 08:54, M'boumba Cedric Madianga wrote:
->>> +static int stm32_dma_alloc_chan_resources(struct dma_chan *c)
->>> +{
->>> +       struct stm32_dma_chan *chan = to_stm32_dma_chan(c);
->>> +       struct stm32_dma_device *dmadev = stm32_dma_chan_get_dev(chan);
->>> +       int ret;
->>> +
->>> +       chan->config_init = false;
->>> +       ret = clk_prepare_enable(dmadev->clk);
->>> +       if (ret < 0) {
->>> +               dev_err(chan2dev(chan), "clk_prepare_enable failed: %d\n",
->>> ret);
->>> +               return ret;
->>> +       }
->>> +
->>> +       ret = stm32_dma_disable_chan(chan);
->>> +
->>> +       return ret;
->>> +}
->>
->>
->> The error path here looks like it will leak clock references.
->
-> Sorry I didn't catch it. What does it mean ?
+kbuild test robot reports the warnings:
+drivers/ata/ahci_qoriq.c: In function 'ahci_qoriq_hardreset':
+>> include/asm-generic/io.h:163:2: warning: 'px_is' may be used
+>> uninitialized in this function [-Wuninitialized]
+drivers/ata/ahci_qoriq.c:70:14: note: 'px_is' was declared here
+>> include/asm-generic/io.h:163:2: warning: 'px_cmd' may be used
+>> uninitialized in this function [-Wuninitialized]
+drivers/ata/ahci_qoriq.c:70:6: note: 'px_cmd' was declared here
 
-If stm32_dma_disable_chan() returns an error then we will not restore 
-the original the clock counts causing them to "leak".
+This patch fixed it by introducing a local variable.
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+I found this warning again on gcc version 4.8.3 20131202.
+So this warning may not go way with newer gcc version.
+I verified Arnd's suggestion and it works.
+So please apply this patch which I sent on behalf of Arnd.
 
-Daniel.
+ drivers/ata/ahci_qoriq.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/ata/ahci_qoriq.c b/drivers/ata/ahci_qoriq.c
+index e5e4988..58c1a94 100644
+--- a/drivers/ata/ahci_qoriq.c
++++ b/drivers/ata/ahci_qoriq.c
+@@ -76,6 +76,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
+ 	struct ata_taskfile tf;
+ 	bool online;
+ 	int rc;
++	bool ls1021a_workaround = (qoriq_priv->type == AHCI_LS1021A);
+ 
+ 	DPRINTK("ENTER\n");
+ 
+@@ -92,7 +93,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
+ 	 * After the sequence is complete, software should restore the
+ 	 * PxCMD and PxIS with the stored values.
+ 	 */
+-	if (qoriq_priv->type == AHCI_LS1021A) {
++	if (ls1021a_workaround) {
+ 		px_cmd = readl(port_mmio + PORT_CMD);
+ 		px_is = readl(port_mmio + PORT_IRQ_STAT);
+ 	}
+@@ -106,7 +107,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
+ 				 ahci_check_ready);
+ 
+ 	/* restore the PxCMD and PxIS on ls1021 */
+-	if (qoriq_priv->type == AHCI_LS1021A) {
++	if (ls1021a_workaround) {
+ 		px_val = readl(port_mmio + PORT_CMD);
+ 		if (px_val != px_cmd)
+ 			writel(px_cmd, port_mmio + PORT_CMD);
+-- 
+2.1.0.27.g96db324
