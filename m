@@ -1,41 +1,49 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 14 Oct 2015 17:34:49 +0100
-Subject: [PATCH v6 2/3] arm64: Add IOMMU dma_ops
-In-Reply-To: <20151014133538.GG4239@e104818-lin.cambridge.arm.com>
-References: <cover.1443718557.git.robin.murphy@arm.com>
- <80cb035144a2648a5d94eb1fec3336f17ad249f1.1443718557.git.robin.murphy@arm.com>
- <20151014133538.GG4239@e104818-lin.cambridge.arm.com>
-Message-ID: <561E8429.9060604@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 15 Oct 2015 00:32:17 +0800
+Subject: [PATCH 1/6] mfd: axp20x: Add AXP223 to list of supported PMICs in DT
+ bindings
+In-Reply-To: <1444840342-9233-1-git-send-email-wens@csie.org>
+References: <1444840342-9233-1-git-send-email-wens@csie.org>
+Message-ID: <1444840342-9233-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/15 14:35, Catalin Marinas wrote:
-> On Thu, Oct 01, 2015 at 08:13:59PM +0100, Robin Murphy wrote:
->> Taking some inspiration from the arch/arm code, implement the
->> arch-specific side of the DMA mapping ops using the new IOMMU-DMA layer.
->>
->> Since there is still work to do elsewhere to make DMA configuration happen
->> in a more appropriate order and properly support platform devices in the
->> IOMMU core, the device setup code unfortunately starts out carrying some
->> workarounds to ensure it works correctly in the current state of things.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->
-> Sorry, I reviewed this patch before but forgot to ack it, so here it is:
->
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
+It is functionally identical to AXP221; only the regulator default
+voltage/status and the external host interface are different.
 
-Thanks! Although it turns out I'm at least partly to blame there - you 
-did give a reviewed-by on v5, but I didn't add it here since I'd made 
-significant changes - I should have checked and called that out, my bad.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-> (and I'm fined for the arm64 patches here to go in via the iommu tree)
->
-> I assume part of this patch will disappear at some point when the device
-> probing order is sorted.
-
-I'll be working on that for 4.5, indeed. Getting the initialisation 
-order sorted out also stands in the way of converting 32-bit to the 
-common ops, so it's very high up my priority list.
-
-Robin.
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index a474359dd206..fd39fa54571b 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -5,11 +5,12 @@ axp152 (X-Powers)
+ axp202 (X-Powers)
+ axp209 (X-Powers)
+ axp221 (X-Powers)
++axp223 (X-Powers)
+ 
+ Required properties:
+ - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
+-	      "x-powers,axp221"
+-- reg: The I2C slave address for the AXP chip
++	      "x-powers,axp221", "x-powers,axp223"
++- reg: The I2C slave address or RSB hardware address for the AXP chip
+ - interrupt-parent: The parent interrupt controller
+ - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
+ - interrupt-controller: The PMIC has its own internal IRQs
+@@ -51,7 +52,7 @@ LDO3		: LDO		: ldo3in-supply
+ LDO4		: LDO		: ldo24in-supply	: shared supply
+ LDO5		: LDO		: ldo5in-supply
+ 
+-AXP221 regulators, type, and corresponding input supply names:
++AXP221/AXP223 regulators, type, and corresponding input supply names:
+ 
+ Regulator	  Type		  Supply Name		  Notes
+ ---------	  ----		  -----------		  -----
+-- 
+2.6.1
