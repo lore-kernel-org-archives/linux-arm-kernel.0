@@ -1,28 +1,40 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 14 Oct 2015 15:57:55 +0530
-Subject: [PATCH v4 00/25] dmaengine/ARM: Merge the edma drivers into one
-In-Reply-To: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20151014102755.GL27370@localhost>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 14 Oct 2015 11:27:06 +0100
+Subject: [PATCH] mutex: make mutex_lock_nested an inline function
+In-Reply-To: <20151014082050.GQ17308@twins.programming.kicks-ass.net>
+References: <11282238.AHmyWliPRj@wuerfel>
+ <20151013203812.GM17308@twins.programming.kicks-ass.net>
+ <11817958.z9KtmeKzV7@wuerfel>
+ <20151014082050.GQ17308@twins.programming.kicks-ass.net>
+Message-ID: <20151014102706.GR14956@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2015 at 01:01:47PM +0300, Peter Ujfalusi wrote:
-> Hi,
-> 
-> Cover letter:
-> 
-> with this series the edma two driver setup will be changed to have only one
-> driver to support eDMA3. The legacy edma interface will be removed and eDMA can
-> only be used via dmaengine API from this point on.
-> In order to do the merge the following improvements has been done:
-> - One driver instance per eDMA:
->  - Any number of eDMA instances are supported (both legacy and DT boot)
-> - Not relying on global variables, arrays, etc
-> - Code simplification and optimizations in several places
+On Wed, Oct 14, 2015 at 10:20:50AM +0200, Peter Zijlstra wrote:
 
-One question though, after this move and merge are we still left with edma
-in arm/ ?
+> Uuh, I just looked at next and saw this regulator_lock_supply()
+> function. How is that limited? subclass must be <8 otherwise bad things
+> happen.
 
--- 
-~Vinod
+Can we please get some more discoverable documentation of the arbitrary
+limits in the lockdep code?  I seem to keep seeing code that bumps into
+surprising limits like this and I'm not sure how I'm supposed to know
+about them except through finding out after the fact or trawling the
+code every time someone touches locking.
+
+I would be very surprised to see a system that pushes over 8 locks,
+while there's nothing actually preventing it system design
+considerations mean that even four cascaded supplies are pretty
+unlikely so we should be fine.  Every time you add a new level of
+regulation you're both increasing the load on regulators up the chain
+(which means they need to be bigger and more expensive) and except in
+the case of a DCDC supplying an LDO (which only works to one level)
+you're going to be decreasing the efficiency of the system.  If we get
+to that point we can worry about what to do.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151014/2eaedd02/attachment.sig>
