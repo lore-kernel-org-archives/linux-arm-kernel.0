@@ -1,7 +1,7 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 14 Oct 2015 17:10:22 -0500
-Subject: [GIT PULL] qcom dt changes for 4.4 *RESEND*
-Message-ID: <1444860622-8225-1-git-send-email-agross@codeaurora.org>
+Date: Wed, 14 Oct 2015 17:10:31 -0500
+Subject: [GIT PULL] qcom arm64 updates for 4.4 *RESEND*
+Message-ID: <1444860631-8292-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,23 +11,40 @@ The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
 are available in the git repository at:
 
-  git://codeaurora.org/quic/kernel/agross-msm.git tags/qcom-defconfig-for-4.4
+  git://codeaurora.org/quic/kernel/agross-msm.git tags/qcom-arm64-for-4.4
 
-for you to fetch changes up to 4e7fb93081f8f2ac9f190e8da7507956d3f3a936:
+for you to fetch changes up to 00a9e053da0b9e150b7f8fefa3c409d7e71ce48f:
 
-  ARM: multi_v7_defconfig: Enable QCOM SMD/RPM (2015-10-08 15:59:46 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM Based defconfig Updates for v4.4
-
-* Enable QCOM SMD/RPM in multi_v7_defconfig
-* Enable QCOM SMD/RPM in qcom_defconfig
+  arm64: dts: apq8016-sbc: enable spi buses on LS and HS (2015-10-13 21:53:03 -0500)
 
 ----------------------------------------------------------------
-Andy Gross (2):
-      ARM: qcom_defconfig: Enable SMD-RPM regulators
-      ARM: multi_v7_defconfig: Enable QCOM SMD/RPM
+Qualcomm ARM64 Updates for v4.4
 
- arch/arm/configs/multi_v7_defconfig |    5 +++++
- arch/arm/configs/qcom_defconfig     |    8 +++++---
- 2 files changed, 10 insertions(+), 3 deletions(-)
+* Add RNG device tree node
+* Add MSM8x16 serial UART1 node
+* Enable eMMC on apq8016-sbc board
+* Fix I2C pinconf sleep state function
+* Add MSM8916 I2C nodes
+* Enable I2C busses on LS and HS on APQ8016-sbc
+* Enable SPI busses on LS and HS on APQ8016-sbc
+
+----------------------------------------------------------------
+Andy Gross (1):
+      arm64: dts: qcom: Add 8x16 Serial UART1 node
+
+Georgi Djakov (1):
+      arm64: dts: qcom: Enable eMMC on apq8016-sbc board
+
+Srinivas Kandagatla (4):
+      arm64: dts: fix i2c pinconf sleep state function
+      arm64: dts: qcom: Add msm8916 I2C nodes.
+      arm64: dts: apq8016-sbc: enable i2c buses on LS and HS
+      arm64: dts: apq8016-sbc: enable spi buses on LS and HS
+
+Stanimir Varbanov (1):
+      arm64: dts: qcom: Add RNG device tree node
+
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi  |   30 +++++++++++
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi |   76 +++++++++++++++++++++++++++-
+ arch/arm64/boot/dts/qcom/msm8916.dtsi      |   46 +++++++++++++++++
+ 3 files changed, 150 insertions(+), 2 deletions(-)
