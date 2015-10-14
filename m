@@ -1,154 +1,90 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 14 Oct 2015 14:46:14 +0800
-Subject: [PATCH 1/5] media: atmel-isi: correct yuv swap according to
- different sensor outputs
-In-Reply-To: <Pine.LNX.4.64.1510041903460.26834@axis700.grange>
-References: <1442898875-7147-1-git-send-email-josh.wu@atmel.com>
- <1442898875-7147-2-git-send-email-josh.wu@atmel.com>
- <Pine.LNX.4.64.1510041751480.26834@axis700.grange>
- <Pine.LNX.4.64.1510041903460.26834@axis700.grange>
-Message-ID: <561DFA36.2070705@atmel.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 14 Oct 2015 08:50:23 +0200
+Subject: [BUG] broken mixer after second resume from mem
+In-Reply-To: <561DEE43.5040309@samsung.com>
+References: <561CDC33.7050103@collabora.com> <561DEE43.5040309@samsung.com>
+Message-ID: <CAAObsKCubVgXTCdLJOZZ3nSXZjdL3G9SjWWuVYPcxLgh5poV6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gueannadi,
-
-On 10/5/2015 1:04 AM, Guennadi Liakhovetski wrote:
-> Even simpler:
+On 14 October 2015 at 07:55, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> On 13.10.2015 19:25, Tomeu Vizoso wrote:
+>> Hi,
+>>
+>> have been hunting down a bug on exynos5250-snow which caused both HDMI
+>> and LVDS output to be broken after the second resume (with suspend to
+>> mem, but not to idle).
+>>
+>> What I have found is that when powering down the DISP1 power domain
+>> while suspending for the second time, the contents of the SRC_TOP3
+>> register change from 0x1110550 to 0x1110500. IIUIC, this means that
+>> ACLK_200_DISP1 is reparented to XXTI.
+>>
+>> When the CPU comes up again, that register contains 0x1110550 again, but
+>> it's set to 0x1110500 by the code that restores clk registers when resuming:
+>>
+>> First suspend:
+>>
+>> exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - before
+>> exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - after
+>> exynos5250_clk_suspend: SRC_TOP3 1110550
+>> exynos5250_clk_resume: SRC_TOP3 1110550 - before
+>> exynos5250_clk_resume: SRC_TOP3 1110550 - after
+>> exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - before
+>> exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - after
+>>
+>>
+>> Second suspend:
+>>
+>> exynos_pd_power: SRC_TOP3 1110550 disp1-power-domain at 100440A0 - before
+>> exynos_pd_power: SRC_TOP3 1110500 disp1-power-domain at 100440A0 - after
+>> exynos5250_clk_suspend: SRC_TOP3 1110500
+>> exynos5250_clk_resume: SRC_TOP3 1110550 - before
+>> exynos5250_clk_resume: SRC_TOP3 1110500 - after
+>> exynos_pd_power: SRC_TOP3 1110500 disp1-power-domain at 100440A0 - before
+>> exynos_pd_power: SRC_TOP3 1110500 disp1-power-domain at 100440A0 - after
+>>
 >
-> On Sun, 4 Oct 2015, Guennadi Liakhovetski wrote:
+> I am assuming you are talking about current linux-next. The actual
+> reparent happens in exynos_pd_power which would indicate the exynos pd
+> clock reparenting code. However the domains for Exynos5250 don't have
+> any clocks set up for reparenting... which actually might be the issue.
+> These clocks should be probably reparented - as it is done for other
+> platforms - look at 5420 example (they are glitch-free on both of SoCs).
 >
->> Hi Josh,
->>
->> On Tue, 22 Sep 2015, Josh Wu wrote:
->>
->>> we need to configure the YCC_SWAP bits in ISI_CFG2 according to current
->>> sensor output and Atmel ISI output format.
->>>
->>> Current there are two cases Atmel ISI supported:
->>>    1. Atmel ISI outputs YUYV format.
->>>       This case we need to setup YCC_SWAP according to sensor output
->>>       format.
->>>    2. Atmel ISI output a pass-through formats, which means no swap.
->>>       Just setup YCC_SWAP as default with no swap.
->>>
->>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->>> ---
->>>
->>>   drivers/media/platform/soc_camera/atmel-isi.c | 43 ++++++++++++++++++++-------
->>>   1 file changed, 33 insertions(+), 10 deletions(-)
->>>
->>> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
->>> index 45e304a..df64294 100644
->>> --- a/drivers/media/platform/soc_camera/atmel-isi.c
->>> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
->>> @@ -103,13 +103,41 @@ static u32 isi_readl(struct atmel_isi *isi, u32 reg)
->>>   	return readl(isi->regs + reg);
->>>   }
->>>   
->>> +static u32 setup_cfg2_yuv_swap(struct atmel_isi *isi,
->>> +		const struct soc_camera_format_xlate *xlate)
->>> +{
->> This function will be called only for the four media codes from the
->> switch-case statement below, namely for
->>
->> MEDIA_BUS_FMT_VYUY8_2X8
->> MEDIA_BUS_FMT_UYVY8_2X8
->> MEDIA_BUS_FMT_YVYU8_2X8
->> MEDIA_BUS_FMT_YUYV8_2X8
->>
->>> +	/* By default, no swap for the codec path of Atmel ISI. So codec
->>> +	* output is same as sensor's output.
->>> +	* For instance, if sensor's output is YUYV, then codec outputs YUYV.
->>> +	* And if sensor's output is UYVY, then codec outputs UYVY.
->>> +	*/
->>> +	u32 cfg2_yuv_swap = ISI_CFG2_YCC_SWAP_DEFAULT;
->> Then this ISI_CFG2_YCC_SWAP_DEFAULT will only hold for
->> MEDIA_BUS_FMT_YUYV8_2X8? Why don't you just add one more case below? Don't
->> think this initialisation is really justified.
->>
->>> +
->>> +	if (xlate->host_fmt->fourcc == V4L2_PIX_FMT_YUYV) {
->>> +		/* all convert to YUYV */
->>> +		switch (xlate->code) {
->>> +		case MEDIA_BUS_FMT_VYUY8_2X8:
->>> +			cfg2_yuv_swap = ISI_CFG2_YCC_SWAP_MODE_3;
->>> +			break;
-> Why don't you just return the result value here directly? Then you don't
-> need the variable at all
-
-yes, This sounds good. I'll take rid of the cfg2_yuv_swap variable. Thanks.
-
-Best Regards,
-Josh Wu
+> I've seen a such issues before. The problem is that after some time I
+> tend to forget the needed workaround and solution. :)
 >
->>> +		case MEDIA_BUS_FMT_UYVY8_2X8:
->>> +			cfg2_yuv_swap = ISI_CFG2_YCC_SWAP_MODE_2;
->>> +			break;
->>> +		case MEDIA_BUS_FMT_YVYU8_2X8:
->>> +			cfg2_yuv_swap = ISI_CFG2_YCC_SWAP_MODE_1;
->>> +			break;
->>> +		}
->>> +	}
->>> +
->>> +	return cfg2_yuv_swap;
->>> +}
->>> +
->>>   static void configure_geometry(struct atmel_isi *isi, u32 width,
->>> -			u32 height, u32 code)
->>> +		u32 height, const struct soc_camera_format_xlate *xlate)
->>>   {
->>>   	u32 cfg2;
->>>   
->>>   	/* According to sensor's output format to set cfg2 */
->>> -	switch (code) {
->>> +	switch (xlate->code) {
->>>   	default:
->>>   	/* Grey */
->>>   	case MEDIA_BUS_FMT_Y8_1X8:
->>> @@ -117,16 +145,11 @@ static void configure_geometry(struct atmel_isi *isi, u32 width,
->>>   		break;
->>>   	/* YUV */
->>>   	case MEDIA_BUS_FMT_VYUY8_2X8:
->>> -		cfg2 = ISI_CFG2_YCC_SWAP_MODE_3 | ISI_CFG2_COL_SPACE_YCbCr;
->>> -		break;
->>>   	case MEDIA_BUS_FMT_UYVY8_2X8:
->>> -		cfg2 = ISI_CFG2_YCC_SWAP_MODE_2 | ISI_CFG2_COL_SPACE_YCbCr;
->>> -		break;
->>>   	case MEDIA_BUS_FMT_YVYU8_2X8:
->>> -		cfg2 = ISI_CFG2_YCC_SWAP_MODE_1 | ISI_CFG2_COL_SPACE_YCbCr;
->>> -		break;
->>>   	case MEDIA_BUS_FMT_YUYV8_2X8:
->>> -		cfg2 = ISI_CFG2_YCC_SWAP_DEFAULT | ISI_CFG2_COL_SPACE_YCbCr;
->>> +		cfg2 = ISI_CFG2_COL_SPACE_YCbCr |
->>> +				setup_cfg2_yuv_swap(isi, xlate);
->>>   		break;
->>>   	/* RGB, TODO */
->>>   	}
->> I would move this switch-case completely inside setup_cfg2_yuv_swap().
->> Just do
->>
->> 	cfg2 = setup_cfg2_yuv_swap(isi, xlate);
->>
->> and handle the
->>
->>   	case MEDIA_BUS_FMT_Y8_1X8:
->>
->> in the function too. These two switch-case statements really look
->> redundant.
->>
->>> @@ -407,7 +430,7 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
->>>   	isi_writel(isi, ISI_INTDIS, (u32)~0UL);
->>>   
->>>   	configure_geometry(isi, icd->user_width, icd->user_height,
->>> -				icd->current_fmt->code);
->>> +				icd->current_fmt);
->>>   
->>>   	spin_lock_irq(&isi->lock);
->>>   	/* Clear any pending interrupt */
->>> -- 
->>> 1.9.1
->>>
->> Thanks
->> Guennadi
->>
+> Try with reparenting necessary clocks. On other platform for some kind
+> of similar issue the reset was required for the IP block - DECON
+> (actually the mux could not stabilize there which can be observed in one
+> of STATUS registers for mux).
+>
+> Let me know if explanation above is not detailed enough.
+
+Thanks for the reply, I looked at downstream and saw that two clocks
+are being reparented and that seems to fix things. Will send a patch
+later today.
+
+Regards,
+
+Tomeu
+
+>> I have no idea of why it happens on the second suspend, and also don't
+>> know why it doesn't happen when suspending to idle.
+>
+> As for the idle - domains are probably not gated so the problems just
+> does not exist.
+>
+> BTW as this is display, you can CC some Samsung guys from DRM... they
+> know a lot on these stuff. :)
+>
+> Best regards,
+> Krzysztof
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
