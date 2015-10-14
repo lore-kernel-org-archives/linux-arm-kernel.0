@@ -1,62 +1,65 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 14 Oct 2015 16:02:50 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: improve multi_v7_defconfig support
- for Berlin
-Message-ID: <1444831370-25688-1-git-send-email-antoine.tenart@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Oct 2015 16:13:39 +0200
+Subject: [PATCH 2/5] arm: dts: lpc32xx: fix improper usage of ranges
+ property
+In-Reply-To: <561E619E.9020504@mleia.com>
+References: <1444694045-22000-1-git-send-email-vz@mleia.com>
+ <7163229.YtgKU9kxxJ@wuerfel> <561E619E.9020504@mleia.com>
+Message-ID: <5357564.jvp0TcMCq9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some drivers used on a Marvell Berlin kernel were missing from
-multi_v7_defconfig. This series add them:
+On Wednesday 14 October 2015 17:07:26 Vladimir Zapolskiy wrote:
+> On 14.10.2015 16:52, Arnd Bergmann wrote:
+> > On Wednesday 14 October 2015 02:13:49 Vladimir Zapolskiy wrote:
+> >> Ok, practically it should work for my purposes, but the change must be
+> >> done along with added EMC device node description.
+> >>
+> >> I'm not so confident that it is correct to add description of static
+> >> memory banks to ahb node though, please give me a short confirmation,
+> > 
+> > The DT should reflect whichever memory ranges are accessible
+> > on the bus. I've looked up the memory map in the data sheet, and
+> > I think a reasonable representation would be
+> > 
+> > /ahb {
+> >       ranges = <0x20000000 0x20000000 0x10000000>, /* AHB port 5 */
+> >                <0x30000000 0x30000000 0x10000000>, /* AHB port 6 */
+> >                <0x40000000 0x40000000 0x10000000>, /* AHB port 7 */
+> >                <0x80000000 0x80000000 0x40000000>, /* EMC DYCS0/1 */
+> >                <0xE0000000 0xE0000000 0x04000000>; /* EMC CS0-3 */
+> > 
+> >       apb {
+> >               ranges = <0x20080000 0x20080000 0x00020000>;
+> >       };
+> > 
+> > };
+> 
+> A simpler version of this change in /ahb I successfully tested with EMC
+> yesterday:
+> 
+> -               ranges = <0x20000000 0x20000000 0x30000000>;
+> +               ranges = <0x20000000 0x20000000 0x30000000
+> +                         0xe0000000 0xe0000000 0x04000000>;
 
-  * The pxa168 Ethernet driver is added as a loadable module.
-  * The Berlin ADC driver is added as a loadable module.
-  * Both the Berlin USB PHY and SATA PHY drivers are added,
-    built-in, as they are required for the already available USB
-    and SATA functionalities in multi_v7_defconfig.
+Ok, but please write this as
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
+               ranges = <0x20000000 0x20000000 0x30000000>,
+                        <0xe0000000 0xe0000000 0x04000000>;
 
-Hi,
+The binary is identical, it's just more structured.
 
-That's actually a v2 of the series "ARM: berlin: improve multi_v7_defconfig
-support" I sent earlier. I've squashed all 4 commits into a single one and
-updated to use loadable modules when possible in this v2.
+> >> then I'll send a change for inclusion of EMC description -- the one
+> >> above excluding clocks and clock-names properties, work on CCF is in
+> >> progress.
+> > 
+> > Ah, very nice! That should get us very close to multiplatform support!
+> > I've just tried building lpc32xx without the headers to check for
+> > other issues, and ended up with the patch below to get it building.
+> > It's clearly wrong, but it highlights a number of issues.
+> 
+> Sure, I'll review the highlighted problems, thanks.
 
-Antoine
+Thanks!
 
- arch/arm/configs/multi_v7_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 03deb7fb35e8..6b021368fbd5 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -207,6 +207,7 @@ CONFIG_NET_CALXEDA_XGMAC=y
- CONFIG_IGB=y
- CONFIG_MV643XX_ETH=y
- CONFIG_MVNETA=y
-+CONFIG_PXA168_ETH=m
- CONFIG_KS8851=y
- CONFIG_R8169=y
- CONFIG_SH_ETH=y
-@@ -636,6 +637,7 @@ CONFIG_EXTCON=y
- CONFIG_TI_AEMIF=y
- CONFIG_IIO=y
- CONFIG_AT91_ADC=m
-+CONFIG_BERLIN2_ADC=m
- CONFIG_EXYNOS_ADC=m
- CONFIG_XILINX_XADC=y
- CONFIG_AK8975=y
-@@ -651,6 +653,8 @@ CONFIG_PHY_HIX5HD2_SATA=y
- CONFIG_PWM_STI=m
- CONFIG_OMAP_USB2=y
- CONFIG_TI_PIPE3=y
-+CONFIG_PHY_BERLIN_USB=y
-+CONFIG_PHY_BERLIN_SATA=y
- CONFIG_PHY_MIPHY28LP=y
- CONFIG_PHY_MIPHY365X=y
- CONFIG_PHY_RCAR_GEN2=m
--- 
-2.6.1
+	Arnd
