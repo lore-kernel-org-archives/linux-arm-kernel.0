@@ -1,49 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Oct 2015 13:03:36 -0700
-Subject: [GIT PULL] omap fixes against v4.3-rc5
-Message-ID: <20151014200336.GJ10113@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Oct 2015 22:07:06 +0200
+Subject: [PATCH 2/5] arm: dts: lpc32xx: fix improper usage of ranges
+ property
+In-Reply-To: <CAGhQ9VzKrsAYy=xwEZPD80jaTxmqR5MJj7fXeFTK-A2JnJXPqA@mail.gmail.com>
+References: <1444694045-22000-1-git-send-email-vz@mleia.com>
+ <7163229.YtgKU9kxxJ@wuerfel>
+ <CAGhQ9VzKrsAYy=xwEZPD80jaTxmqR5MJj7fXeFTK-A2JnJXPqA@mail.gmail.com>
+Message-ID: <19392174.3eZzHlAnnT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 25cb62b76430a91cc6195f902e61c2cb84ade622:
+On Wednesday 14 October 2015 19:23:09 Joachim Eastwood wrote:
+> >
+> > /ahb5 {
+> >         ranges = <0 0x20000000 0x10000000>;
+> >
+> >         apb {
+> >                 ranges = <0 0x80000 0x20000>;
+> >         };
+> > };
+> > /ahb6 {
+> >         ranges = <0 0x30000000 0x10000000>,           /* AHB registers */
+> >                  <0x80000000 0x80000000 0x40000000>, /* EMC DYCS0/1 */
+> >                  <0xE0000000 0xE0000000 0x04000000>; /* EMC CS0-3 */
+> >
+> >         memory-controller at 1080000 {
+> >                 reg = <0x1080000 0x10000>;
+> >         };
+> > };
+> 
+> Sorry for hijacking the thread, but I have related question to this.
+> 
+> What is the advantage of using a hierarchical bus structure in dt?
+> I thought the recommendation, at least for new device trees, was to
+> keep it flat under a "soc"-node.
+> 
+> If doesn't offer any advantages why not remove instead of adding the
+> ranges property which seems to grow a bit complex now?
+> Of course removing it would create a lot of churn because of the
+> re-indentation but at least the end result would be simpler.
 
-  Linux 4.3-rc5 (2015-10-11 11:09:45 -0700)
+The general recommendation is to have the DT structure resemble
+the hardware as closely as possible. If the chip has a clear
+hierarchy and you know it, then it's best to describe it that way.
 
-are available in the git repository at:
+The reason for having a single 'soc' node in a lot of the modern
+dtsi files is that either it's not documented, or they use AXI
+'buses' that are not really hierarchical but are point-to-point
+connections.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/fixes-rc5
-
-for you to fetch changes up to d8e1f5ed11a39a68da00f05000466c4f6db4456e:
-
-  Documentation: ARM: List new omap MMC requirements (2015-10-12 16:23:34 -0700)
-
-----------------------------------------------------------------
-Fixes for omap against v4.3-rc5:
-
-- Regulator fix for beagle-x15 to fix HDMI without a SD card being
-  inserted
-
-- GPMC fix for showing proper timings and to allow enabling debug
-  options that somehow was unselectable earlier
-
-- Add minimal documentation for new MMC1 dependency on
-  REGULATOR_PBIAS as it may not be obvious for people with
-  targeted .config files
-
-----------------------------------------------------------------
-Tomi Valkeinen (1):
-      ARM: dts: am57xx-beagle-x15: set VDD_SD to always-on
-
-Tony Lindgren (2):
-      memory: omap-gpmc: Fix unselectable debug option for GPMC
-      Documentation: ARM: List new omap MMC requirements
-
-Uwe Kleine-K?nig (1):
-      memory: omap-gpmc: dump "before" state before first modification
-
- Documentation/arm/OMAP/README           |  7 +++++++
- arch/arm/boot/dts/am57xx-beagle-x15.dts |  3 ++-
- drivers/memory/Kconfig                  | 12 +++++++++---
- drivers/memory/omap-gpmc.c              |  2 +-
- 4 files changed, 19 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/arm/OMAP/README
+	Arnd
