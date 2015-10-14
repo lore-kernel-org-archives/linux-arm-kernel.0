@@ -1,52 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Oct 2015 22:07:06 +0200
-Subject: [PATCH 2/5] arm: dts: lpc32xx: fix improper usage of ranges
- property
-In-Reply-To: <CAGhQ9VzKrsAYy=xwEZPD80jaTxmqR5MJj7fXeFTK-A2JnJXPqA@mail.gmail.com>
-References: <1444694045-22000-1-git-send-email-vz@mleia.com>
- <7163229.YtgKU9kxxJ@wuerfel>
- <CAGhQ9VzKrsAYy=xwEZPD80jaTxmqR5MJj7fXeFTK-A2JnJXPqA@mail.gmail.com>
-Message-ID: <19392174.3eZzHlAnnT@wuerfel>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Wed, 14 Oct 2015 22:07:20 +0200
+Subject: [PATCH 0/7] Add STM32 pinctrl/GPIO driver
+Message-ID: <1444853247-31114-1-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 October 2015 19:23:09 Joachim Eastwood wrote:
-> >
-> > /ahb5 {
-> >         ranges = <0 0x20000000 0x10000000>;
-> >
-> >         apb {
-> >                 ranges = <0 0x80000 0x20000>;
-> >         };
-> > };
-> > /ahb6 {
-> >         ranges = <0 0x30000000 0x10000000>,           /* AHB registers */
-> >                  <0x80000000 0x80000000 0x40000000>, /* EMC DYCS0/1 */
-> >                  <0xE0000000 0xE0000000 0x04000000>; /* EMC CS0-3 */
-> >
-> >         memory-controller at 1080000 {
-> >                 reg = <0x1080000 0x10000>;
-> >         };
-> > };
-> 
-> Sorry for hijacking the thread, but I have related question to this.
-> 
-> What is the advantage of using a hierarchical bus structure in dt?
-> I thought the recommendation, at least for new device trees, was to
-> keep it flat under a "soc"-node.
-> 
-> If doesn't offer any advantages why not remove instead of adding the
-> ranges property which seems to grow a bit complex now?
-> Of course removing it would create a lot of churn because of the
-> re-indentation but at least the end result would be simpler.
+Hi Linus, all,
 
-The general recommendation is to have the DT structure resemble
-the hardware as closely as possible. If the chip has a clear
-hierarchy and you know it, then it's best to describe it that way.
+As you suggested during the submission of the STM32 machine support,
+I reworked the STM32 pinctrl driver to use the standardized pin config
+bindings.
 
-The reason for having a single 'soc' node in a lot of the modern
-dtsi files is that either it's not documented, or they use AXI
-'buses' that are not really hierarchical but are point-to-point
-connections.
+The STM32 family has 16 pins per GPIO bank, and the number of bank varies
+depending on the model.
 
-	Arnd
+Pins can be multiplexed either in GPIO mode, alternate function (up to 15
+functions per pin) or analog (for ADC/DAC).
+
+Kind regards,
+Maxime
+
+Maxime Coquelin (7):
+  ARM: Kconfig: Introduce MACH_STM32F429 flag
+  includes: dt-bindings: Add STM32F429 pinctrl DT bindings
+  Documentation: dt-bindings: Document STM32 pinctrl driver DT bindings
+  pinctrl: Add support STM32 MCUs
+  ARM: mach-stm32: Select pinctrl
+  ARM: dts: Add pinctrl node to STM32F429
+  ARM: dts: Add USART1 pin config to STM32F429 boards
+
+ .../bindings/pinctrl/st,stm32-pinctrl.txt          |  113 ++
+ arch/arm/Kconfig                                   |    6 +
+ arch/arm/boot/dts/stm32429i-eval.dts               |    2 +
+ arch/arm/boot/dts/stm32f429-disco.dts              |    2 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |  110 ++
+ drivers/pinctrl/Kconfig                            |    1 +
+ drivers/pinctrl/Makefile                           |    4 +-
+ drivers/pinctrl/stm32/Kconfig                      |   16 +
+ drivers/pinctrl/stm32/Makefile                     |    5 +
+ drivers/pinctrl/stm32/pinctrl-stm32.c              |  856 +++++++++++
+ drivers/pinctrl/stm32/pinctrl-stm32.h              |   43 +
+ drivers/pinctrl/stm32/pinctrl-stm32f429.c          | 1598 ++++++++++++++++++++
+ include/dt-bindings/pinctrl/pinctrl-stm32.h        |   12 +
+ include/dt-bindings/pinctrl/stm32f429-pinfunc.h    | 1241 +++++++++++++++
+ 14 files changed, 4008 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+ create mode 100644 drivers/pinctrl/stm32/Kconfig
+ create mode 100644 drivers/pinctrl/stm32/Makefile
+ create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.c
+ create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.h
+ create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32f429.c
+ create mode 100644 include/dt-bindings/pinctrl/pinctrl-stm32.h
+ create mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
+
+-- 
+1.9.1
