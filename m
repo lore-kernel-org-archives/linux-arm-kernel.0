@@ -1,159 +1,65 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 14 Oct 2015 17:14:47 +0800
-Subject: [PATCH v4 2/2] usb: chipidea: imx: refine clock operations to
- adapt for all platforms
-In-Reply-To: <561E0D5F.8030003@pengutronix.de>
-References: <1444787859-31509-1-git-send-email-peter.chen@freescale.com>
- <561E0D5F.8030003@pengutronix.de>
-Message-ID: <20151014091446.GA16391@shlinux2>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 14 Oct 2015 11:17:58 +0200 (CEST)
+Subject: [PATCH v5 1/3] initialize each mbigen device node as a interrupt
+ controller.
+In-Reply-To: <561E1886.2050305@arm.com>
+References: <1443605949-15396-1-git-send-email-majun258@huawei.com>
+ <1443605949-15396-2-git-send-email-majun258@huawei.com>
+ <alpine.DEB.2.11.1509302242220.4500@nanos> <5610D3BD.1040408@huawei.com>
+ <alpine.DEB.2.11.1510091441200.6097@nanos> <5618D3EC.6050501@huawei.com>
+ <20151010110942.52d34a4b@arm.com> <alpine.DEB.2.11.1510111150270.6097@nanos>
+ <20151011120331.09093ffc@arm.com> <alpine.DEB.2.11.1510111335150.6097@nanos>
+ <561E1886.2050305@arm.com>
+Message-ID: <alpine.DEB.2.11.1510141100280.3785@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 10:07:59AM +0200, Marc Kleine-Budde wrote:
-> On 10/14/2015 03:57 AM, Peter Chen wrote:
-> > Some i.mx platforms need three clocks to let controller work, but
-> > others only need one, refine clock operation to adapt for all
-> > platforms, it fixes a regression found at i.mx27.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: <stable@vger.kernel.org> #v4.1+
-> > ---
-> >  drivers/usb/chipidea/ci_hdrc_imx.c | 132 ++++++++++++++++++++++++++++++++-----
-> >  1 file changed, 114 insertions(+), 18 deletions(-)
-> > 
-> > diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-> > index 6ccbf60..82b1dfe 100644
-> > --- a/drivers/usb/chipidea/ci_hdrc_imx.c
-> > +++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-> > @@ -84,6 +84,12 @@ struct ci_hdrc_imx_data {
-> >  	struct imx_usbmisc_data *usbmisc_data;
-> >  	bool supports_runtime_pm;
-> >  	bool in_lpm;
-> > +	/* SoC before i.mx6 (except imx23/imx28) needs three clks */
-> > +	bool need_three_clks;
-> > +	struct clk *clk_ipg;
-> > +	struct clk *clk_ahb;
-> > +	struct clk *clk_per;
-> > +	/* --------------------------------- */
-> >  };
-> >  
-> >  /* Common functions shared by usbmisc drivers */
-> > @@ -135,6 +141,103 @@ static struct imx_usbmisc_data *usbmisc_get_init_data(struct device *dev)
-> >  }
-> >  
-> >  /* End of common functions shared by usbmisc drivers*/
-> > +static int imx_get_clks(struct device *dev)
-> > +{
-> > +	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
-> > +	int ret = 0;
-> > +
-> > +	data->clk_ipg = devm_clk_get(dev, "ipg");
-> > +	if (IS_ERR(data->clk_ipg)) {
-> > +		/* If the platform only needs one clocks */
-> > +		data->clk = devm_clk_get(dev, NULL);
-> > +		if (IS_ERR(data->clk)) {
-> > +			ret = PTR_ERR(data->clk);
-> > +			dev_err(dev,
-> > +				"Failed to get clock, err=%d\n", ret);
-> > +			dev_err(dev,
-> > +				"Failed to get ipg clock, err=%d\n", ret);
+Marc,
+
+On Wed, 14 Oct 2015, Marc Zyngier wrote:
+> To me, it feels like we're spreading the complexity across multiple
+> layers instead of keeping it localized. It also means that next time
+> some crazy HW dude comes up with a similar idea (and I have little doubt
+> this will happen sooner than later), we'll have to replicate the same
+> thing again (though we could put all that behind another abstraction layer).
 > 
-> Nitpick, one error message should be enough.
-
-Yes, I will show both error value for clk_ipg and NULL.
-
+> I would have preferred a solution where the MSI domain is allowed to be
+> sandwiched between two non-MSI domains, and expose the top level
+> irqchip. This means fixing the following:
 > 
-> > +			return ret;
-> > +		}
-> > +		return ret;
-> > +	}
-> > +
-> > +	data->clk_ahb = devm_clk_get(dev, "ahb");
-> > +	if (IS_ERR(data->clk_ahb)) {
-> > +		ret = PTR_ERR(data->clk_ahb);
-> > +		dev_err(dev,
-> > +			"Failed to get ahb clock, err=%d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	data->clk_per = devm_clk_get(dev, "per");
-> > +	if (IS_ERR(data->clk_per)) {
-> > +		ret = PTR_ERR(data->clk_per);
-> > +		dev_err(dev,
-> > +			"Failed to get per clock, err=%d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	data->need_three_clks = true;
-> > +	return ret;
-> > +}
-> > +
-> > +static int imx_prepare_enable_clks(struct device *dev)
-> > +{
-> > +	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
-> > +	int ret = 0;
-> > +
-> > +	if (data->need_three_clks) {
-> > +		ret = clk_prepare_enable(data->clk_ipg);
-> > +		if (ret) {
-> > +			dev_err(dev,
-> > +				"Failed to prepare/enable ipg clk, err=%d\n",
-> > +				ret);
-> > +			return ret;
-> > +		}
-> > +
-> > +		ret = clk_prepare_enable(data->clk_ahb);
-> > +		if (ret) {
-> > +			dev_err(dev,
-> > +				"Failed to prepare/enable ahb clk, err=%d\n",
-> > +				ret);
-> > +			clk_disable_unprepare(data->clk_ipg);
-> > +			return ret;
-> > +		}
-> > +
-> > +		ret = clk_prepare_enable(data->clk_per);
-> > +		if (ret) {
-> > +			dev_err(dev,
-> > +				"Failed to prepare/enable per clk, err=%d\n",
-> > +				ret);
-> > +			clk_disable_unprepare(data->clk_ahb);
-> > +			clk_disable_unprepare(data->clk_ipg);
-> > +			return ret;
-> > +		}
-> > +	} else {
-> > +		ret = clk_prepare_enable(data->clk);
-> > +		if (ret) {
-> > +			dev_err(dev,
-> > +				"Failed to prepare/enable clk, err=%d\n",
-> > +				ret);
-> > +			return ret;
-> > +		}
-> > +	}
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static void imx_disable_unprepare_clks(struct device *dev)
-> > +{
-> > +	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
-> > +
-> > +	if (data->need_three_clks) {
-> > +		clk_disable_unprepare(data->clk_per);
-> > +		clk_disable_unprepare(data->clk_ipg);
-> > +		clk_disable_unprepare(data->clk_ahb);
+> - Either find a way to prevent DT doing these early IRQ allocations
+> (this could be easily done by simply not registering the irqchip), or be
+> able to elegantly reuse them.
+
+The reuse part makes me shudder. We really should not go there. It's a
+blatant layering violation.
+
+> - Add an API allowing an MSI domain to be the parent of another domain.
 > 
-> nit: you enable in this order: ipg, ahb, per. Disabling should be inverse.
+> Once we have this, we can use the platform MSI layer for the mbigen
+> without much complexity (well, not more that any other stacked irqchip,
+> the madness of the mbigen programming interface notwithstanding), and
+> drivers stay untouched. It would also give us a 'standard' way to deal
+> with the above HW dude. I'd be happy to prototype it.
 
-Will change, thanks.
+Ok, I have a better understanding of it now.
 
-> 
-> > +	} else {
-> > +		clk_disable_unprepare(data->clk);
-> > +	}
-> > +}
+I have no objections to your approach as long as it provides us a
+clean way to use a full hierarchy without weird interfaces to reuse
+irq descriptors etc. If you can find a way which just follows the
+proper hierarchy design, I'm certainly not in your way.
 
--- 
+OTOH, the platform msi driver is not a huge amount of code and from my
+understanding of the hardware it looks weird to have this intermediate
+layer. Making mbigen a direct child of ITS feels just more natural to
+me. I'm pretty sure that this can be done without the earlier proposed
+horrible modifications to ITS. It just should fall into place.
 
-Best Regards,
-Peter Chen
+It would be really great just to have shell implementations,
+i.e. without the mbigen specific stuff - for both models so we can
+compare and contrast the results. That means just the interfaces and
+the hookup to the various layers.
+
+Thanks,
+
+	tglx
