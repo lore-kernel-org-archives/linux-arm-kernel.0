@@ -1,92 +1,226 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 14 Oct 2015 09:57:25 +0800
-Subject: [PATCH v4 1/2] ARM: dts: imx27.dtsi: change the clock information for
- usb
-Message-ID: <1444787845-29933-1-git-send-email-peter.chen@freescale.com>
+Date: Wed, 14 Oct 2015 09:57:38 +0800
+Subject: [PATCH v4 2/2] usb: chipidea: imx: refine clock operations to adapt
+ for all platforms
+Message-ID: <1444787859-31509-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For imx27, it needs three clocks to let the controller work,
-the old code is wrong, and usbmisc has not included clock handling
-code any more. Without this patch, it will cause below data
-abort when accessing usbmisc registers.
-
-usbcore: registered new interface driver usb-storage
-Unhandled fault: external abort on non-linefetch (0x008) at 0xf4424600
-pgd = c0004000
-[f4424600] *pgd=10000452(bad)
-Internal error: : 8 [#1] PREEMPT ARM
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper Not tainted 4.1.0-next-20150701-dirty #3089
-Hardware name: Freescale i.MX27 (Device Tree Support)
-task: c7832b60 ti: c783e000 task.ti: c783e000
-PC is at usbmisc_imx27_init+0x4c/0xbc
-LR is at usbmisc_imx27_init+0x40/0xbc
-pc : [<c03cb5c0>]    lr : [<c03cb5b4>]    psr: 60000093
-sp : c783fe08  ip : 00000000  fp : 00000000
-r10: c0576434  r9 : 0000009c  r8 : c7a773a0
-r7 : 01000000  r6 : 60000013  r5 : c7a776f0  r4 : c7a773f0
-r3 : f4424600  r2 : 00000000  r1 : 00000001  r0 : 00000001
-Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-Control: 0005317f  Table: a0004000  DAC: 00000017
-Process swapper (pid: 1, stack limit = 0xc783e190)
-Stack: (0xc783fe08 to 0xc7840000)
+Some i.mx platforms need three clocks to let controller work, but
+others only need one, refine clock operation to adapt for all
+platforms, it fixes a regression found at i.mx27.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
-Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
 Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: <stable@vger.kernel.org> #v4.1+
 ---
- arch/arm/boot/dts/imx27.dtsi | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+ drivers/usb/chipidea/ci_hdrc_imx.c | 132 ++++++++++++++++++++++++++++++++-----
+ 1 file changed, 114 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index feb9d34..f818ea4 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -486,7 +486,10 @@
- 				compatible = "fsl,imx27-usb";
- 				reg = <0x10024000 0x200>;
- 				interrupts = <56>;
--				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
-+				clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
-+					<&clks IMX27_CLK_USB_AHB_GATE>,
-+					<&clks IMX27_CLK_USB_DIV>;
-+				clock-names = "ipg", "ahb", "per";
- 				fsl,usbmisc = <&usbmisc 0>;
- 				status = "disabled";
- 			};
-@@ -495,7 +498,10 @@
- 				compatible = "fsl,imx27-usb";
- 				reg = <0x10024200 0x200>;
- 				interrupts = <54>;
--				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
-+				clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
-+					<&clks IMX27_CLK_USB_AHB_GATE>,
-+					<&clks IMX27_CLK_USB_DIV>;
-+				clock-names = "ipg", "ahb", "per";
- 				fsl,usbmisc = <&usbmisc 1>;
- 				dr_mode = "host";
- 				status = "disabled";
-@@ -505,7 +511,10 @@
- 				compatible = "fsl,imx27-usb";
- 				reg = <0x10024400 0x200>;
- 				interrupts = <55>;
--				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
-+				clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
-+					<&clks IMX27_CLK_USB_AHB_GATE>,
-+					<&clks IMX27_CLK_USB_DIV>;
-+				clock-names = "ipg", "ahb", "per";
- 				fsl,usbmisc = <&usbmisc 2>;
- 				dr_mode = "host";
- 				status = "disabled";
-@@ -515,7 +524,6 @@
- 				#index-cells = <1>;
- 				compatible = "fsl,imx27-usbmisc";
- 				reg = <0x10024600 0x200>;
--				clocks = <&clks IMX27_CLK_USB_AHB_GATE>;
- 			};
+diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
+index 6ccbf60..82b1dfe 100644
+--- a/drivers/usb/chipidea/ci_hdrc_imx.c
++++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+@@ -84,6 +84,12 @@ struct ci_hdrc_imx_data {
+ 	struct imx_usbmisc_data *usbmisc_data;
+ 	bool supports_runtime_pm;
+ 	bool in_lpm;
++	/* SoC before i.mx6 (except imx23/imx28) needs three clks */
++	bool need_three_clks;
++	struct clk *clk_ipg;
++	struct clk *clk_ahb;
++	struct clk *clk_per;
++	/* --------------------------------- */
+ };
  
- 			sahara2: sahara at 10025000 {
+ /* Common functions shared by usbmisc drivers */
+@@ -135,6 +141,103 @@ static struct imx_usbmisc_data *usbmisc_get_init_data(struct device *dev)
+ }
+ 
+ /* End of common functions shared by usbmisc drivers*/
++static int imx_get_clks(struct device *dev)
++{
++	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
++	int ret = 0;
++
++	data->clk_ipg = devm_clk_get(dev, "ipg");
++	if (IS_ERR(data->clk_ipg)) {
++		/* If the platform only needs one clocks */
++		data->clk = devm_clk_get(dev, NULL);
++		if (IS_ERR(data->clk)) {
++			ret = PTR_ERR(data->clk);
++			dev_err(dev,
++				"Failed to get clock, err=%d\n", ret);
++			dev_err(dev,
++				"Failed to get ipg clock, err=%d\n", ret);
++			return ret;
++		}
++		return ret;
++	}
++
++	data->clk_ahb = devm_clk_get(dev, "ahb");
++	if (IS_ERR(data->clk_ahb)) {
++		ret = PTR_ERR(data->clk_ahb);
++		dev_err(dev,
++			"Failed to get ahb clock, err=%d\n", ret);
++		return ret;
++	}
++
++	data->clk_per = devm_clk_get(dev, "per");
++	if (IS_ERR(data->clk_per)) {
++		ret = PTR_ERR(data->clk_per);
++		dev_err(dev,
++			"Failed to get per clock, err=%d\n", ret);
++		return ret;
++	}
++
++	data->need_three_clks = true;
++	return ret;
++}
++
++static int imx_prepare_enable_clks(struct device *dev)
++{
++	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
++	int ret = 0;
++
++	if (data->need_three_clks) {
++		ret = clk_prepare_enable(data->clk_ipg);
++		if (ret) {
++			dev_err(dev,
++				"Failed to prepare/enable ipg clk, err=%d\n",
++				ret);
++			return ret;
++		}
++
++		ret = clk_prepare_enable(data->clk_ahb);
++		if (ret) {
++			dev_err(dev,
++				"Failed to prepare/enable ahb clk, err=%d\n",
++				ret);
++			clk_disable_unprepare(data->clk_ipg);
++			return ret;
++		}
++
++		ret = clk_prepare_enable(data->clk_per);
++		if (ret) {
++			dev_err(dev,
++				"Failed to prepare/enable per clk, err=%d\n",
++				ret);
++			clk_disable_unprepare(data->clk_ahb);
++			clk_disable_unprepare(data->clk_ipg);
++			return ret;
++		}
++	} else {
++		ret = clk_prepare_enable(data->clk);
++		if (ret) {
++			dev_err(dev,
++				"Failed to prepare/enable clk, err=%d\n",
++				ret);
++			return ret;
++		}
++	}
++
++	return ret;
++}
++
++static void imx_disable_unprepare_clks(struct device *dev)
++{
++	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
++
++	if (data->need_three_clks) {
++		clk_disable_unprepare(data->clk_per);
++		clk_disable_unprepare(data->clk_ipg);
++		clk_disable_unprepare(data->clk_ahb);
++	} else {
++		clk_disable_unprepare(data->clk);
++	}
++}
+ 
+ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ {
+@@ -153,23 +256,18 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 	if (!data)
+ 		return -ENOMEM;
+ 
++	platform_set_drvdata(pdev, data);
+ 	data->usbmisc_data = usbmisc_get_init_data(&pdev->dev);
+ 	if (IS_ERR(data->usbmisc_data))
+ 		return PTR_ERR(data->usbmisc_data);
+ 
+-	data->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(data->clk)) {
+-		dev_err(&pdev->dev,
+-			"Failed to get clock, err=%ld\n", PTR_ERR(data->clk));
+-		return PTR_ERR(data->clk);
+-	}
++	ret = imx_get_clks(&pdev->dev);
++	if (ret)
++		return ret;
+ 
+-	ret = clk_prepare_enable(data->clk);
+-	if (ret) {
+-		dev_err(&pdev->dev,
+-			"Failed to prepare or enable clock, err=%d\n", ret);
++	ret = imx_prepare_enable_clks(&pdev->dev);
++	if (ret)
+ 		return ret;
+-	}
+ 
+ 	data->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
+ 	if (IS_ERR(data->phy)) {
+@@ -212,8 +310,6 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 		goto disable_device;
+ 	}
+ 
+-	platform_set_drvdata(pdev, data);
+-
+ 	if (data->supports_runtime_pm) {
+ 		pm_runtime_set_active(&pdev->dev);
+ 		pm_runtime_enable(&pdev->dev);
+@@ -226,7 +322,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ disable_device:
+ 	ci_hdrc_remove_device(data->ci_pdev);
+ err_clk:
+-	clk_disable_unprepare(data->clk);
++	imx_disable_unprepare_clks(&pdev->dev);
+ 	return ret;
+ }
+ 
+@@ -240,7 +336,7 @@ static int ci_hdrc_imx_remove(struct platform_device *pdev)
+ 		pm_runtime_put_noidle(&pdev->dev);
+ 	}
+ 	ci_hdrc_remove_device(data->ci_pdev);
+-	clk_disable_unprepare(data->clk);
++	imx_disable_unprepare_clks(&pdev->dev);
+ 
+ 	return 0;
+ }
+@@ -252,7 +348,7 @@ static int imx_controller_suspend(struct device *dev)
+ 
+ 	dev_dbg(dev, "at %s\n", __func__);
+ 
+-	clk_disable_unprepare(data->clk);
++	imx_disable_unprepare_clks(dev);
+ 	data->in_lpm = true;
+ 
+ 	return 0;
+@@ -270,7 +366,7 @@ static int imx_controller_resume(struct device *dev)
+ 		return 0;
+ 	}
+ 
+-	ret = clk_prepare_enable(data->clk);
++	ret = imx_prepare_enable_clks(dev);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -285,7 +381,7 @@ static int imx_controller_resume(struct device *dev)
+ 	return 0;
+ 
+ clk_disable:
+-	clk_disable_unprepare(data->clk);
++	imx_disable_unprepare_clks(dev);
+ 	return ret;
+ }
+ 
 -- 
 1.9.1
