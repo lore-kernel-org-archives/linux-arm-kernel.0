@@ -1,312 +1,99 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 14 Oct 2015 17:44:13 +0800
-Subject: [PATCH v4 1/5] clk: Add a basic multiplier clock
-In-Reply-To: <1444682610-21482-2-git-send-email-maxime.ripard@free-electrons.com>
+Date: Wed, 14 Oct 2015 17:47:06 +0800
+Subject: [PATCH v4 2/5] clk: sunxi: Add a driver for the PLL2
+In-Reply-To: <1444682610-21482-3-git-send-email-maxime.ripard@free-electrons.com>
 References: <1444682610-21482-1-git-send-email-maxime.ripard@free-electrons.com>
- <1444682610-21482-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v67nkS-io_Dz53UnqCrZNay68C-ik61RFcSzvo5QCDNdCw@mail.gmail.com>
+ <1444682610-21482-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65x0M+5LibdvJvGU0TSF3+WkYDe1gdXr8F=V4-Nypt8Ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Oct 13, 2015 at 4:43 AM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> Some clocks are using a multiplier component, however, unlike their mux,
-> gate or divider counterpart, these factors don't have a basic clock
-> implementation.
+> The PLL2 on the A10 and later SoCs is the clock used for all the audio
+> related operations.
 >
-> This leads to code duplication across platforms that want to use that kind
-> of clocks, and the impossibility to use the composite clocks with such a
-> clock without defining your own rate operations.
+> This clock has a somewhat complex output tree, with three outputs (2X, 4X
+> and 8X) with a fixed divider from the base clock, and an output (1X) with a
+> post divider.
 >
-> Create such a driver in order to remove these issues, and hopefully factor
-> the implementations, reducing code size across platforms and consolidating
-> the various implementations.
+> However, we can simplify things since the 1X divider can be fixed, and we
+> end up by having a base clock not exposed to any device (or at least
+> directly, since the 4X output doesn't have any divider), and 4 fixed
+> divider clocks that will be exposed.
+>
+> This clock seems to have been introduced, at least in this form, in the
+> revision B of the A10, but we don't have any information on the clock used
+> on the revision A.
 >
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  drivers/clk/Makefile         |   1 +
->  drivers/clk/clk-multiplier.c | 181 +++++++++++++++++++++++++++++++++++++++++++
->  include/linux/clk-provider.h |  42 ++++++++++
->  3 files changed, 224 insertions(+)
->  create mode 100644 drivers/clk/clk-multiplier.c
+>  drivers/clk/sunxi/Makefile                 |   1 +
+>  drivers/clk/sunxi/clk-a10-pll2.c           | 188 +++++++++++++++++++++++++++++
+>  include/dt-bindings/clock/sun4i-a10-pll2.h |  53 ++++++++
+>  3 files changed, 242 insertions(+)
+>  create mode 100644 drivers/clk/sunxi/clk-a10-pll2.c
+>  create mode 100644 include/dt-bindings/clock/sun4i-a10-pll2.h
 >
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index d08b3e5985be..0b2101039508 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -6,6 +6,7 @@ obj-$(CONFIG_COMMON_CLK)        += clk-divider.o
->  obj-$(CONFIG_COMMON_CLK)       += clk-fixed-factor.o
->  obj-$(CONFIG_COMMON_CLK)       += clk-fixed-rate.o
->  obj-$(CONFIG_COMMON_CLK)       += clk-gate.o
-> +obj-$(CONFIG_COMMON_CLK)       += clk-multiplier.o
->  obj-$(CONFIG_COMMON_CLK)       += clk-mux.o
->  obj-$(CONFIG_COMMON_CLK)       += clk-composite.o
->  obj-$(CONFIG_COMMON_CLK)       += clk-fractional-divider.o
-> diff --git a/drivers/clk/clk-multiplier.c b/drivers/clk/clk-multiplier.c
+> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+> index f5a35b82cc1a..c658a18ba7cb 100644
+> --- a/drivers/clk/sunxi/Makefile
+> +++ b/drivers/clk/sunxi/Makefile
+> @@ -4,6 +4,7 @@
+>
+>  obj-y += clk-sunxi.o clk-factors.o
+>  obj-y += clk-a10-hosc.o
+> +obj-y += clk-a10-pll2.o
+>  obj-y += clk-a20-gmac.o
+>  obj-y += clk-mod0.o
+>  obj-y += clk-simple-gates.o
+> diff --git a/drivers/clk/sunxi/clk-a10-pll2.c b/drivers/clk/sunxi/clk-a10-pll2.c
 > new file mode 100644
-> index 000000000000..75fee96ea1ee
+> index 000000000000..b877cc6c3622
 > --- /dev/null
-> +++ b/drivers/clk/clk-multiplier.c
-> @@ -0,0 +1,181 @@
+> +++ b/drivers/clk/sunxi/clk-a10-pll2.c
+> @@ -0,0 +1,188 @@
 > +/*
-> + * Copyright (C) 2015 Maxime Ripard <maxime.ripard@free-electrons.com>
+> + * Copyright 2013 Emilio L?pez
+> + * Emilio L?pez <emilio@elopez.com.ar>
+> + *
+> + * Copyright 2015 Maxime Ripard
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
 > + *
 > + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
 > + */
 > +
-> +#include <linux/bitops.h>
 > +#include <linux/clk-provider.h>
-> +#include <linux/err.h>
-> +#include <linux/export.h>
-> +#include <linux/kernel.h>
 > +#include <linux/of.h>
+> +#include <linux/of_address.h>
 > +#include <linux/slab.h>
 > +
-> +#define to_clk_multiplier(_hw) container_of(_hw, struct clk_multiplier, hw)
+> +#include <dt-bindings/clock/sun4i-a10-pll2.h>
 > +
-> +static unsigned long __get_mult(struct clk_multiplier *mult,
-> +                               unsigned long rate,
-> +                               unsigned long parent_rate)
-> +{
-> +       if (mult->flags & CLK_MULTIPLIER_ROUND_CLOSEST)
-> +               return DIV_ROUND_CLOSEST(rate, parent_rate);
+> +#define SUN4I_PLL2_ENABLE              31
 > +
-> +       return rate / parent_rate;
-> +}
+> +#define SUN4I_PLL2_PRE_DIV_SHIFT       0
+> +#define SUN4I_PLL2_PRE_DIV_WIDTH       5
+> +#define SUN4I_PLL2_PRE_DIV_MASK                GENMASK(SUN4I_PLL2_PRE_DIV_WIDTH, 0)
 > +
-> +static unsigned long clk_multiplier_recalc_rate(struct clk_hw *hw,
-> +                                               unsigned long parent_rate)
-> +{
-> +       struct clk_multiplier *mult = to_clk_multiplier(hw);
-> +       unsigned long val;
+> +#define SUN4I_PLL2_N_SHIFT             8
+> +#define SUN4I_PLL2_N_WIDTH             7
+> +#define SUN4I_PLL2_N_MASK              GENMASK(SUN4I_PLL2_N_WIDTH, 0)
 > +
-> +       val = clk_readl(mult->reg) >> mult->shift;
-> +       val &= GENMASK(mult->width, 0);
+> +#define SUN4I_PLL2_POST_DIV_SHIFT      26
+> +#define SUN4I_PLL2_POST_DIV_WIDTH      4
+> +#define SUN4I_PLL2_POST_DIV_MASK       GENMASK(SUN4I_PLL2_POST_DIV_WIDTH, 0)
 
-GENMASK is inclusive on both ends, so you probably want
+GENMASK, like in patch 1, should be GENMASK(width - 1, 0);
 
-    GENMASK(multi->width - 1, 0);
+Sorry about the multiple replies.
 
-> +
-> +       if (!val && mult->flags & CLK_MULTIPLIER_ZERO_BYPASS)
-> +               val = 1;
-> +
-> +       return parent_rate * val;
-> +}
-> +
-> +static bool __is_best_rate(unsigned long rate, unsigned long new,
-> +                          unsigned long best, unsigned long flags)
-> +{
-> +       if (flags & CLK_MULTIPLIER_ROUND_CLOSEST)
-> +               return abs(rate - new) < abs(rate - best);
-> +
-> +       return new >= rate && new < best;
-> +}
-> +
-> +static unsigned long __bestmult(struct clk_hw *hw, unsigned long rate,
-> +                               unsigned long *best_parent_rate,
-> +                               u8 width, unsigned long flags)
-> +{
-> +       unsigned long orig_parent_rate = *best_parent_rate;
-> +       unsigned long parent_rate, current_rate, best_rate = ~0;
-> +       unsigned int i, bestmult = 0;
-> +
-> +       if (!(clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT))
-> +               return rate / *best_parent_rate;
-> +
-> +       for (i = 1; i < ((1 << width) - 1); i++) {
-> +               if (rate * i == orig_parent_rate) {
-
-This seems backwards. Doesn't rate = i * parent_rate?
-
-> +                       /*
-> +                        * This is the best case for us if we have a
-> +                        * perfect match without changing the parent
-> +                        * rate.
-> +                        */
-> +                       *best_parent_rate = orig_parent_rate;
-> +                       return i;
-> +               }
-> +
-> +               parent_rate = clk_hw_round_rate(clk_hw_get_parent(hw),
-> +                                               rate / i);
-> +               current_rate = parent_rate * i;
-> +
-> +               if (__is_best_rate(rate, current_rate, best_rate, flags)) {
-> +                       bestmult = i;
-> +                       best_rate = current_rate;
-> +                       *best_parent_rate = parent_rate;
-> +               }
-> +       }
-> +
-> +       return bestmult;
-> +}
-> +
-> +static long clk_multiplier_round_rate(struct clk_hw *hw, unsigned long rate,
-> +                                 unsigned long *parent_rate)
-> +{
-> +       struct clk_multiplier *mult = to_clk_multiplier(hw);
-> +       unsigned long factor = __bestmult(hw, rate, parent_rate,
-> +                                         mult->width, mult->flags);
-> +
-> +       return *parent_rate * factor;
-> +}
-> +
-> +static int clk_multiplier_set_rate(struct clk_hw *hw, unsigned long rate,
-> +                              unsigned long parent_rate)
-> +{
-> +       struct clk_multiplier *mult = to_clk_multiplier(hw);
-> +       unsigned long factor = __get_mult(mult, rate, parent_rate);
-> +       unsigned long flags = 0;
-> +       unsigned long val;
-> +
-> +       if (mult->lock)
-> +               spin_lock_irqsave(mult->lock, flags);
-> +       else
-> +               __acquire(mult->lock);
-> +
-> +       val = clk_readl(mult->reg);
-> +       val &= ~GENMASK(mult->width + mult->shift, mult->shift);
-
-Same here.
-
-Also, git complains about trailing whitespaces:
-
-.git/rebase-apply/patch:59: trailing whitespace.
-.git/rebase-apply/patch:65: trailing whitespace.
-.git/rebase-apply/patch:183: trailing whitespace.
-
-
-Regards
 ChenYu
-
-> +       val |= factor << mult->shift;
-> +       clk_writel(val, mult->reg);
-> +
-> +       if (mult->lock)
-> +               spin_unlock_irqrestore(mult->lock, flags);
-> +       else
-> +               __release(mult->lock);
-> +
-> +       return 0;
-> +}
-> +
-> +const struct clk_ops clk_multiplier_ops = {
-> +       .recalc_rate    = clk_multiplier_recalc_rate,
-> +       .round_rate     = clk_multiplier_round_rate,
-> +       .set_rate       = clk_multiplier_set_rate,
-> +};
-> +EXPORT_SYMBOL_GPL(clk_multiplier_ops);
-> +
-> +struct clk *clk_register_multiplier(struct device *dev, const char *name,
-> +                                   const char *parent_name,
-> +                                   unsigned long flags,
-> +                                   void __iomem *reg, u8 shift, u8 width,
-> +                                   u8 clk_mult_flags, spinlock_t *lock)
-> +{
-> +       struct clk_init_data init;
-> +       struct clk_multiplier *mult;
-> +       struct clk *clk;
-> +
-> +       mult = kmalloc(sizeof(*mult), GFP_KERNEL);
-> +       if (!mult)
-> +               return ERR_PTR(-ENOMEM);
-> +
-> +       init.name = name;
-> +       init.ops = &clk_multiplier_ops;
-> +       init.flags = flags | CLK_IS_BASIC;
-> +       init.parent_names = &parent_name;
-> +       init.num_parents = 1;
-> +
-> +       mult->reg = reg;
-> +       mult->shift = shift;
-> +       mult->width = width;
-> +       mult->flags = clk_mult_flags;
-> +       mult->lock = lock;
-> +       mult->hw.init = &init;
-> +
-> +       clk = clk_register(dev, &mult->hw);
-> +       if (IS_ERR(clk))
-> +               kfree(mult);
-> +
-> +       return clk;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_register_multiplier);
-> +
-> +void clk_unregister_multiplier(struct clk *clk)
-> +{
-> +       struct clk_multiplier *mult;
-> +       struct clk_hw *hw;
-> +
-> +       hw = __clk_get_hw(clk);
-> +       if (!hw)
-> +               return;
-> +
-> +       mult = to_clk_multiplier(hw);
-> +
-> +       clk_unregister(clk);
-> +       kfree(mult);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_unregister_multiplier);
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 3ecc07d0da77..6a7dfe33a317 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -518,6 +518,48 @@ struct clk *clk_register_fractional_divider(struct device *dev,
->                 void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
->                 u8 clk_divider_flags, spinlock_t *lock);
->
-> +/**
-> + * struct clk_multiplier - adjustable multiplier clock
-> + *
-> + * @hw:                handle between common and hardware-specific interfaces
-> + * @reg:       register containing the multiplier
-> + * @shift:     shift to the multiplier bit field
-> + * @width:     width of the multiplier bit field
-> + * @lock:      register lock
-> + *
-> + * Clock with an adjustable multiplier affecting its output frequency.
-> + * Implements .recalc_rate, .set_rate and .round_rate
-> + *
-> + * Flags:
-> + * CLK_MULTIPLIER_ZERO_BYPASS - By default, the multiplier is the value read
-> + *     from the register, with 0 being a valid value effectively
-> + *     zeroing the output clock rate. If CLK_MULTIPLIER_ZERO_BYPASS is
-> + *     set, then a null multiplier will be considered as a bypass,
-> + *     leaving the parent rate unmodified.
-> + * CLK_MULTIPLIER_ROUND_CLOSEST - Makes the best calculated divider to be
-> + *     rounded to the closest integer instead of the down one.
-> + */
-> +struct clk_multiplier {
-> +       struct clk_hw   hw;
-> +       void __iomem    *reg;
-> +       u8              shift;
-> +       u8              width;
-> +       u8              flags;
-> +       spinlock_t      *lock;
-> +};
-> +
-> +#define CLK_MULTIPLIER_ZERO_BYPASS             BIT(0)
-> +#define CLK_MULTIPLIER_ROUND_CLOSEST   BIT(1)
-> +
-> +extern const struct clk_ops clk_multiplier_ops;
-> +
-> +struct clk *clk_register_multiplier(struct device *dev, const char *name,
-> +                                   const char *parent_name,
-> +                                   unsigned long flags,
-> +                                   void __iomem *reg, u8 shift, u8 width,
-> +                                   u8 clk_mult_flags, spinlock_t *lock);
-> +void clk_unregister_multiplier(struct clk *clk);
-> +
->  /***
->   * struct clk_composite - aggregate clock of mux, divider and gate clocks
->   *
-> --
-> 2.5.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
