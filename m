@@ -1,30 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Oct 2015 22:16:45 +0200
-Subject: [PATCH v2 7/7] clk: ns2: add clock support for Broadcom Northstar
- 2 SoC
-In-Reply-To: <561EB10B.40502@broadcom.com>
-References: <1444770485-11210-1-git-send-email-jonmason@broadcom.com>
- <6427519.eIBEvCNlle@wuerfel> <561EB10B.40502@broadcom.com>
-Message-ID: <6398606.WW44dcgQDV@wuerfel>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 14 Oct 2015 21:19:56 +0100
+Subject: l2c: Kernel panic in l2c310_enable() in non-secure mode
+In-Reply-To: <20151014174503.GQ32532@n2100.arm.linux.org.uk>
+References: <561E6407.6000002@sigmadesigns.com>
+ <20151014174503.GQ32532@n2100.arm.linux.org.uk>
+Message-ID: <CAFEAcA_pNaD5c12c6D0GtLkQ_zrJx009Y5qZffmv02hirvewdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 October 2015 12:46:19 Scott Branden wrote:
-> >
-> > My patch fixes it by always selecting COMMON_CLK_IPROC from
-> > ARCH_BCM_CYGNUS. I wasn't sure whether you want COMMON_CLK_IPROC
-> > to still be user-selectable, so I left that in place. Normally
-> > I'd expect it to be a silent option though, that just gets
-> > implicitly enabled whenever a platform that needs it is built
-> > into the kernel.
-> COMMON_CLK_IPROC can be a silent option and selected as Arnd has done below.
+On 14 October 2015 at 18:45, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Oct 14, 2015 at 04:17:43PM +0200, Marc Gonzalez wrote:
+>> Hello everyone,
+>>
+>> Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP ARM
+>>
+>> On my platform, Linux v4.2 running in non-secure mode panics in
+>> l2c310_enable() with the pc pointing at this instruction:
+>>
+>> c03390cc: ee013f30 mcr 15, 0, r3, cr1, cr0, {1}
+>>
+>> which corresponds to set_auxcr IIUC.
+> ...
+>> According to the Cortex A9 documentation,
+>> ACTLR is RO in non-secure mode if NSACR[18]=0 and RW if NSACR[18]=1
+>>
+>> I suppose writing to a RO register cause the exception I see?
+>
+> It should not, the write should be ignored and no exception should be
+> raised.
 
-Ok, please do that then. If you want to apply my patch directly,
-you can remove that last paragraph from the description.
+My reading of the v7 ARM ARM ('Read-only and write-only encodings'
+under section B3.15.2) is that writes via MCR to a register defined as 'RO'
+are UNPREDICTABLE. (In v8 this is tightened up, and such write
+attempts are UNDEFINED.)
 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Scott Branden <sbranden@broadcom.com>
+More specifically for this case, the Cortex-A9 TRM description of
+NSACR.NS_SMP says that if it is zero then "A write to Auxiliary Control
+Register in Non-secure state takes an Undefined Instruction exception".
+So the behaviour Marc reports is expected if NS_SMP is 0.
 
-Thanks for taking a look!
-
-	Arnd
+thanks
+-- PMM
