@@ -1,102 +1,49 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 14 Oct 2015 23:51:41 +0100
-Subject: [PATCH 1/3] xen/arm: Enable cpu_hotplug.c
-In-Reply-To: <1444844997-27314-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
- <1444844997-27314-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <561EDC7D.1050005@citrix.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 15 Oct 2015 07:00:12 +0800
+Subject: [PATCH 3/6] mfd: axp20x: Add support for RSB based AXP223 PMIC
+In-Reply-To: <1444840342-9233-4-git-send-email-wens@csie.org>
+Message-ID: <201510150602.aCB7sfZA%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
+Hi Chen-Yu,
 
-On 14/10/2015 18:49, Stefano Stabellini wrote:
-> Build cpu_hotplug for ARM and ARM64 guests.
->
-> Rename arch_(un)register_cpu to xen_(un)register_cpu and provide an
-> empty implementation on ARM and ARM64. On x86 just call
-> arch_(un)register_cpu as we are already doing.
->
-> Initialize cpu_hotplug on ARM.
->
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> ---
->   arch/arm/include/asm/xen/hypervisor.h |    8 ++++++++
->   arch/x86/include/asm/xen/hypervisor.h |    5 +++++
->   arch/x86/xen/enlighten.c              |   15 +++++++++++++++
->   drivers/xen/Makefile                  |    2 --
->   drivers/xen/cpu_hotplug.c             |    6 ++++--
->   5 files changed, 32 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/include/asm/xen/hypervisor.h b/arch/arm/include/asm/xen/hypervisor.h
-> index 04ff8e7..2bc418a 100644
-> --- a/arch/arm/include/asm/xen/hypervisor.h
-> +++ b/arch/arm/include/asm/xen/hypervisor.h
-> @@ -26,4 +26,12 @@ void __init xen_early_init(void);
->   static inline void xen_early_init(void) { return; }
->   #endif
->
+[auto build test ERROR on next-20151013 -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
 
-I know that those helpers are empty for now. But I would prefer to see 
-them protected by (FWIW, it's what you did for x86).
+url:    https://github.com/0day-ci/linux/commits/Chen-Yu-Tsai/mfd-axp20x-Add-support-for-RSB-based-AXP223/20151015-004334
+config: x86_64-allmodconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-#ifdef CONFIG_CPU_HOTPLUG
+All errors (new ones prefixed by >>):
 
-> +static inline void xen_arch_register_cpu(int num)
-> +{
-> +}
-> +
-> +static inline void xen_arch_unregister_cpu(int num)
-> +{
-> +}
-> +
+   drivers/built-in.o: In function `axp20x_i2c_remove':
+   axp20x-i2c.c:(.text+0x22810b): undefined reference to `axp20x_device_remove'
+   drivers/built-in.o: In function `axp20x_i2c_probe':
+   axp20x-i2c.c:(.text+0x22827d): undefined reference to `axp20x_match_device'
+   axp20x-i2c.c:(.text+0x2282ff): undefined reference to `__devm_regmap_init_i2c'
+   axp20x-i2c.c:(.text+0x22834c): undefined reference to `axp20x_device_probe'
+   drivers/built-in.o: In function `axp20x_sunxi_rsb_remove':
+>> axp20x-rsb.c:(.text+0x228388): undefined reference to `axp20x_device_remove'
+   drivers/built-in.o: In function `axp20x_sunxi_rsb_probe':
+>> axp20x-rsb.c:(.text+0x22844d): undefined reference to `axp20x_match_device'
+   axp20x-rsb.c:(.text+0x2284cb): undefined reference to `__devm_regmap_init_sunxi_rsb'
+>> axp20x-rsb.c:(.text+0x228518): undefined reference to `axp20x_device_probe'
+   drivers/built-in.o: In function `axp20x_i2c_driver_init':
+   axp20x-i2c.c:(.init.text+0x1a8c9): undefined reference to `i2c_register_driver'
+   drivers/built-in.o: In function `axp20x_sunxi_rsb_driver_init':
+   axp20x-rsb.c:(.init.text+0x1a8e9): undefined reference to `sunxi_rsb_driver_register'
+   drivers/built-in.o: In function `axp20x_i2c_driver_exit':
+   axp20x-i2c.c:(.exit.text+0x683): undefined reference to `i2c_del_driver'
 
-#endif
-
->   #endif /* _ASM_ARM_XEN_HYPERVISOR_H */
-
-[...]
-
-> diff --git a/drivers/xen/cpu_hotplug.c b/drivers/xen/cpu_hotplug.c
-> index cc6513a..122b351 100644
-> --- a/drivers/xen/cpu_hotplug.c
-> +++ b/drivers/xen/cpu_hotplug.c
-> @@ -11,7 +11,7 @@
->   static void enable_hotplug_cpu(int cpu)
->   {
->   	if (!cpu_present(cpu))
-> -		arch_register_cpu(cpu);
-> +		xen_arch_register_cpu(cpu);
->
->   	set_cpu_present(cpu, true);
->   }
-> @@ -19,7 +19,7 @@ static void enable_hotplug_cpu(int cpu)
->   static void disable_hotplug_cpu(int cpu)
->   {
->   	if (cpu_present(cpu))
-> -		arch_unregister_cpu(cpu);
-> +		xen_arch_unregister_cpu(cpu);
->
->   	set_cpu_present(cpu, false);
->   }
-> @@ -102,8 +102,10 @@ static int __init setup_vcpu_hotplug_event(void)
->   	static struct notifier_block xsn_cpu = {
->   		.notifier_call = setup_cpu_watcher };
->
-> +#ifdef CONFIG_X86
->   	if (!xen_pv_domain())
->   		return -ENODEV;
-> +#endif
-
-For ARM, you need to check if it's a Xen domain. Otherwise a kernel 
-aware of Xen won't boot on baremetal.
-
->
->   	register_xenstore_notifier(&xsn_cpu);
->
->
-
-Regards,
-
--- 
-Julien Grall
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 50719 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151015/21cb6bfa/attachment-0001.obj>
