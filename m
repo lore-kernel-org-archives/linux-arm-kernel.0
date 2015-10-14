@@ -1,133 +1,76 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Wed, 14 Oct 2015 22:07:26 +0200
-Subject: [PATCH 6/7] ARM: dts: Add pinctrl node to STM32F429
-In-Reply-To: <1444853247-31114-1-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1444853247-31114-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1444853247-31114-7-git-send-email-mcoquelin.stm32@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Oct 2015 22:12:12 +0200
+Subject: [PATCH] ARM: OMAP2+: Fix oops with LPAE and more than 2GB of
+ memory
+In-Reply-To: <20151014161755.GB10113@atomide.com>
+References: <1444778000-22537-1-git-send-email-tony@atomide.com>
+ <106715675.XDtZ2nQqSM@wuerfel> <20151014161755.GB10113@atomide.com>
+Message-ID: <5121845.p5XWunbq8r@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The STM32F429 MCU has 11 GPIO banks, with 16 pins per bank.
+On Wednesday 14 October 2015 09:17:56 Tony Lindgren wrote:
+> * Arnd Bergmann <arnd@arndb.de> [151014 02:20]:
+> > On Tuesday 13 October 2015 16:13:20 Tony Lindgren wrote:
+> > > On boards with more than 2GB of RAM booting goes wrong with things not working
+> > > and we're getting lots of l3 warnings:
+> > > 
+> > > WARNING: CPU: 0 PID: 1 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x260/0x384()
+> > > 44000000.ocp:L3 Custom Error: MASTER MMC6 TARGET DMM1 (Idle): Data Access in User mode during Functional access
+> > > ...
+> > > [<c044e158>] (scsi_add_host_with_dma) from [<c04705c8>] (ata_scsi_add_hosts+0x5c/0x18c)
+> > > [<c04705c8>] (ata_scsi_add_hosts) from [<c046b13c>] (ata_host_register+0x150/0x2cc)
+> > > [<c046b13c>] (ata_host_register) from [<c046b38c>] (ata_host_activate+0xd4/0x124)
+> > > [<c046b38c>] (ata_host_activate) from [<c047f42c>] (ahci_host_activate+0x5c/0x194)
+> > > [<c047f42c>] (ahci_host_activate) from [<c0480854>] (ahci_platform_init_host+0x1f0/0x3f0)
+> > > [<c0480854>] (ahci_platform_init_host) from [<c047c9dc>] (ahci_probe+0x70/0x98)
+> > > [<c047c9dc>] (ahci_probe) from [<c04220cc>] (platform_drv_probe+0x54/0xb4)
+> > > 
+> > > Let's fix the issue by enabling ZONE_DMA for LPAE.
+> > > 
+> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > > 
+> > 
+> > I suspect this is not the correct fix, even if it works around the problem.
+> > 
+> > Am I right that the AHCI device can access the first 4GB of address space
+> > using 32-bit DMA, and that any RAM beyond 2GB is above that limit?
+> 
+> Yes the memory above 2GB is at 0x300000000. The same problem is there at least
+> with MMC too.
+> 
+> > Does the ZONE_DMA have the same size? If not, you get more bounce buffers
+> > than you want, which is bad for performance/
+> 
+> Hmm good question. I guess we should set .dma_zone_size  = SZ_2G in this
+> case then as only 2GB of RAM can directly be accessed.
 
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
----
- arch/arm/boot/dts/stm32f429.dtsi | 97 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 97 insertions(+)
+I think you need ".dma_zone_size  = SZ_4G", but I'm not completely sure
+whether this takes PHYS_OFFSET into account or not.
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index d78a481..9e6e75c 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -46,6 +46,7 @@
-  */
- 
- #include "armv7-m.dtsi"
-+#include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
- 
- / {
- 	clocks {
-@@ -168,6 +169,102 @@
- 			status = "disabled";
- 		};
- 
-+		pin-controller {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "st,stm32f429-pinctrl";
-+			ranges = <0 0x40020000 0x3000>;
-+			pins-are-numbered;
-+
-+			gpioa: gpio at 40020000 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				reg = <0x0 0x400>;
-+				clocks = <&rcc 0 256>;
-+				st,bank-name = "GPIOA";
-+			};
-+
-+			gpiob: gpio at 40020400 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				reg = <0x400 0x400>;
-+				clocks = <&rcc 0 257>;
-+				st,bank-name = "GPIOB";
-+			};
-+
-+			gpioc: gpio at 40020800 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				reg = <0x800 0x400>;
-+				clocks = <&rcc 0 258>;
-+				st,bank-name = "GPIOC";
-+			};
-+
-+			gpiod: gpio at 40020c00 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				reg = <0xc00 0x400>;
-+				clocks = <&rcc 0 259>;
-+				st,bank-name = "GPIOD";
-+			};
-+
-+			gpioe: gpio at 40021000 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				reg = <0x1000 0x400>;
-+				clocks = <&rcc 0 260>;
-+				st,bank-name = "GPIOE";
-+			};
-+
-+			gpiof: gpio at 40021400 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				reg = <0x1400 0x400>;
-+				clocks = <&rcc 0 261>;
-+				st,bank-name = "GPIOF";
-+			};
-+
-+			gpiog: gpio at 40021800 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				reg = <0x1800 0x400>;
-+				clocks = <&rcc 0 262>;
-+				st,bank-name = "GPIOG";
-+			};
-+
-+			gpioh: gpio at 40021c00 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				reg = <0x1c00 0x400>;
-+				clocks = <&rcc 0 263>;
-+				st,bank-name = "GPIOH";
-+			};
-+
-+			gpioi: gpio at 40022000 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				reg = <0x2000 0x400>;
-+				clocks = <&rcc 0 264>;
-+				st,bank-name = "GPIOI";
-+			};
-+
-+			gpioj: gpio at 40022400 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				reg = <0x2400 0x400>;
-+				clocks = <&rcc 0 265>;
-+				st,bank-name = "GPIOJ";
-+			};
-+
-+			gpiok: gpio at 40022800 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				reg = <0x2800 0x400>;
-+				clocks = <&rcc 0 266>;
-+				st,bank-name = "GPIOK";
-+			};
-+		};
-+
- 		rcc: rcc at 40023810 {
- 			#clock-cells = <2>;
- 			compatible = "st,stm32f42xx-rcc", "st,stm32-rcc";
--- 
-1.9.1
+> > Another problem here is that it only works with the SCSI and net subsystems
+> > that have a hack in there to create manual bounce buffers, but other drivers
+> > that can do DMA to high addresses will not know about this.
+> 
+> OK good to know.
+> 
+> > The right solution would be to force the use of an IOMMU, and if that not
+> > works, add support for SWIOTLB on ARM.
+> 
+> Suman might have some accelerators in mind we could use for DMA.
+> 
+> For SWIOTLB, It seems we have it for arm64 but not for arm?
+
+Correct. A number of people have run into problems with this before, but
+it has never been added to the kernel. At some point, I tried to help
+Peter Senna Tschudin get it implemented, but I think he gave up when it
+turned out that the platform he was using to test this did not need it
+after all.
+
+The reason we have it on ARM64 is that you are completely screwed there
+if you have no IOMMU but use a 32-bit DMA master, while on 32-bit platforms
+most of the time you don't have memory above 4GB, and if you do then most
+of the time you don't have any DMA masters other than network and scsi
+(including sata) on them, or you have an IOMMU for each one.
+
+	Arnd
