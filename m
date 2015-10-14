@@ -1,93 +1,22 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 14 Oct 2015 13:27:14 +0100
-Subject: [PATCH] pwm-backlight: fix the panel power sequence
-In-Reply-To: <1444816875.31675.2.camel@mtksdaap41>
-References: <1442414556-32381-1-git-send-email-yh.huang@mediatek.com>
- <1444816875.31675.2.camel@mtksdaap41>
-Message-ID: <20151014122714.GI32409@x1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Oct 2015 14:36:21 +0200
+Subject: [PATCH 0/4] ARM: berlin: improve multi_v7_defconfig support
+In-Reply-To: <1444818844-2865-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1444818844-2865-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <6303906.JnZ5PeFoqZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Oct 2015, YH Huang wrote:
-
+On Wednesday 14 October 2015 12:34:00 Antoine Tenart wrote:
 > Hi all,
 > 
-> If you have any suggestion, please let me know.
-> Thanks.
+> Some drivers used on a Marvell Berlin kernel were missing from
+> multi_v7_defconfig. This series add them.
 
-Please don't do that.
+Adding them is great, but we try to have as much as possible
+in loadable modules for new additions. Can you do this?
 
-If you think the patch has fallen through the gaps, please just RESEND
-it, like [RESEND vX] $subject.
+Having a single patch instead of four different ones is fine too,
+by the way.
 
-> On Wed, 2015-09-16 at 22:42 +0800, YH Huang wrote:
-> > In order to match the panel power sequence, disable the enable_gpio
-> > in the probe function. Also, reorder the code in the power_on and
-> > power_off function to match the timing.
-> > 
-> > Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> > ---
-> >  drivers/video/backlight/pwm_bl.c |   15 +++++++++------
-> >  1 file changed, 9 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-> > index eff379b..99eca1e 100644
-> > --- a/drivers/video/backlight/pwm_bl.c
-> > +++ b/drivers/video/backlight/pwm_bl.c
-> > @@ -54,10 +54,11 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
-> >  	if (err < 0)
-> >  		dev_err(pb->dev, "failed to enable power supply\n");
-> >  
-> > +	pwm_enable(pb->pwm);
-> > +
-> >  	if (pb->enable_gpio)
-> >  		gpiod_set_value(pb->enable_gpio, 1);
-> >  
-> > -	pwm_enable(pb->pwm);
-> >  	pb->enabled = true;
-> >  }
-> >  
-> > @@ -66,12 +67,12 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
-> >  	if (!pb->enabled)
-> >  		return;
-> >  
-> > -	pwm_config(pb->pwm, 0, pb->period);
-> > -	pwm_disable(pb->pwm);
-> > -
-> >  	if (pb->enable_gpio)
-> >  		gpiod_set_value(pb->enable_gpio, 0);
-> >  
-> > +	pwm_config(pb->pwm, 0, pb->period);
-> > +	pwm_disable(pb->pwm);
-> > +
-> >  	regulator_disable(pb->power_supply);
-> >  	pb->enabled = false;
-> >  }
-> > @@ -241,8 +242,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
-> >  	pb->dev = &pdev->dev;
-> >  	pb->enabled = false;
-> >  
-> > -	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
-> > -						  GPIOD_OUT_HIGH);
-> > +	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable");
-> >  	if (IS_ERR(pb->enable_gpio)) {
-> >  		ret = PTR_ERR(pb->enable_gpio);
-> >  		goto err_alloc;
-> > @@ -264,6 +264,9 @@ static int pwm_backlight_probe(struct platform_device *pdev)
-> >  		pb->enable_gpio = gpio_to_desc(data->enable_gpio);
-> >  	}
-> >  
-> > +	if (pb->enable_gpio)
-> > +		gpiod_direction_output(pb->enable_gpio, 0);
-> > +
-> >  	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
-> >  	if (IS_ERR(pb->power_supply)) {
-> >  		ret = PTR_ERR(pb->power_supply);
-> 
-> 
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
