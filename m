@@ -1,63 +1,50 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Wed, 14 Oct 2015 12:46:19 -0700
-Subject: [PATCH v2 7/7] clk: ns2: add clock support for Broadcom Northstar
- 2 SoC
-In-Reply-To: <6427519.eIBEvCNlle@wuerfel>
-References: <1444770485-11210-1-git-send-email-jonmason@broadcom.com>
- <5280890.6npshDUNFZ@wuerfel> <20151013220450.GO12512@broadcom.com>
- <6427519.eIBEvCNlle@wuerfel>
-Message-ID: <561EB10B.40502@broadcom.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 14 Oct 2015 15:03:29 -0500
+Subject: [GIT PULL] qcom arm64 updates for 4.4
+Message-ID: <1444853009-20313-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-10-13 03:23 PM, Arnd Bergmann wrote:
-> On Tuesday 13 October 2015 18:04:50 Jon Mason wrote:
->>
->>> On a related note, I'm seeing problems when CONFIG_CYGNUS is set but
->>> CONFIG_COMMON_CLK_IPROC is disabled, as that currently leads to a link
->>> failure.
->>
->> I can double check, but it should be on by default when Cygnus is
->> enabled.  If you send me the error, I'll be happy to fix it.
->
->
-> The problem is not that it's off by default but that it can be
-> disabled, so it breaks some 'make randconfig' builds with this
-> message:
->
-> drivers/built-in.o: In function `cygnus_armpll_init':
-> :(.init.text+0x1d290): undefined reference to `iproc_armpll_setup'
-> drivers/built-in.o: In function `cygnus_genpll_clk_init':
-> :(.init.text+0x1d2c4): undefined reference to `iproc_pll_clk_setup'
-> drivers/built-in.o: In function `cygnus_lcpll0_clk_init':
-> :(.init.text+0x1d304): undefined reference to `iproc_pll_clk_setup'
-> drivers/built-in.o: In function `cygnus_mipipll_clk_init':
-> :(.init.text+0x1d344): undefined reference to `iproc_pll_clk_setup'
-> drivers/built-in.o: In function `cygnus_asiu_init':
-> :(.init.text+0x1d370): undefined reference to `iproc_asiu_setup'
->
-> My patch fixes it by always selecting COMMON_CLK_IPROC from
-> ARCH_BCM_CYGNUS. I wasn't sure whether you want COMMON_CLK_IPROC
-> to still be user-selectable, so I left that in place. Normally
-> I'd expect it to be a silent option though, that just gets
-> implicitly enabled whenever a platform that needs it is built
-> into the kernel.
-COMMON_CLK_IPROC can be a silent option and selected as Arnd has done below.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Scott Branden <sbranden@broadcom.com>
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
->
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> index 1319c3c14327..35234e563cd8 100644
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -29,6 +29,7 @@ config ARCH_BCM_IPROC
->   config ARCH_BCM_CYGNUS
->   	bool "Broadcom Cygnus Support" if ARCH_MULTI_V7
->   	select ARCH_BCM_IPROC
-> +	select COMMON_CLK_IPROC
->   	help
->   	  Enable support for the Cygnus family,
->   	  which includes the following variants:
->
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+
+are available in the git repository at:
+
+  git at git.codeaurora.org:quic/kernel/agross-msm.git tags/qcom-arm64-for-4.4
+
+for you to fetch changes up to 00a9e053da0b9e150b7f8fefa3c409d7e71ce48f:
+
+  arm64: dts: apq8016-sbc: enable spi buses on LS and HS (2015-10-13 21:53:03 -0500)
+
+----------------------------------------------------------------
+Qualcomm ARM64 Updates for v4.4
+
+* Add RNG device tree node
+* Add MSM8x16 serial UART1 node
+* Enable eMMC on apq8016-sbc board
+* Fix I2C pinconf sleep state function
+* Add MSM8916 I2C nodes
+* Enable I2C busses on LS and HS on APQ8016-sbc
+* Enable SPI busses on LS and HS on APQ8016-sbc
+
+----------------------------------------------------------------
+Andy Gross (1):
+      arm64: dts: qcom: Add 8x16 Serial UART1 node
+
+Georgi Djakov (1):
+      arm64: dts: qcom: Enable eMMC on apq8016-sbc board
+
+Srinivas Kandagatla (4):
+      arm64: dts: fix i2c pinconf sleep state function
+      arm64: dts: qcom: Add msm8916 I2C nodes.
+      arm64: dts: apq8016-sbc: enable i2c buses on LS and HS
+      arm64: dts: apq8016-sbc: enable spi buses on LS and HS
+
+Stanimir Varbanov (1):
+      arm64: dts: qcom: Add RNG device tree node
+
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi  |   30 +++++++++++
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi |   76 +++++++++++++++++++++++++++-
+ arch/arm64/boot/dts/qcom/msm8916.dtsi      |   46 +++++++++++++++++
+ 3 files changed, 150 insertions(+), 2 deletions(-)
