@@ -1,76 +1,236 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Oct 2015 13:06:18 +0100
-Subject: [PATCHv3 02/11] arm64: Handle section maps for swapper/idmap
-In-Reply-To: <1444821634-1689-3-git-send-email-suzuki.poulose@arm.com>
-References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
- <1444821634-1689-3-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20151014120618.GB2150@leverpostej>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 14 Oct 2015 14:11:22 +0200
+Subject: [PATCH 1/3] ARM: at91/dt: sama5d2: add missing devices
+Message-ID: <1444824684-24526-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 12:20:25PM +0100, Suzuki K. Poulose wrote:
-> We use section maps with 4K page size to create the swapper/idmaps.
-> So far we have used !64K or 4K checks to handle the case where we
-> use the section maps.
-> This patch adds a new symbol, ARM64_SWAPPER_USES_SECTION_MAPS, to
-> handle cases where we use section maps, instead of using the page size
-> symbols.
-> 
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/kernel-pgtable.h |   31 ++++++++-----
->  arch/arm64/mm/mmu.c                     |   72 ++++++++++++++-----------------
->  2 files changed, 52 insertions(+), 51 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
-> index 622929d..5876a36 100644
-> --- a/arch/arm64/include/asm/kernel-pgtable.h
-> +++ b/arch/arm64/include/asm/kernel-pgtable.h
-> @@ -19,6 +19,13 @@
->  #ifndef __ASM_KERNEL_PGTABLE_H
->  #define __ASM_KERNEL_PGTABLE_H
->  
-> +/* With 4K pages, we use section maps. */
-> +#ifdef CONFIG_ARM64_4K_PAGES
-> +#define ARM64_SWAPPER_USES_SECTION_MAPS 1
-> +#else
-> +#define ARM64_SWAPPER_USES_SECTION_MAPS 0
-> +#endif
+Big update of the sama5d2.dtsi file since many patches have reached te
+mainline:
+- add generated clocks
+- enable crypto devices
+- add flexcom devices
+- add tdes device
+- add sdmmc devices
 
-The comment is somewhat redunant. It would be better to state why we do
-this for 4K and not 64K (or 16K).
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+---
+ arch/arm/boot/dts/sama5d2.dtsi | 152 ++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 150 insertions(+), 2 deletions(-)
 
-> @@ -406,14 +407,11 @@ static void __init map_mem(void)
->  	 * memory addressable from the initial direct kernel mapping.
->  	 *
->  	 * The initial direct kernel mapping, located at swapper_pg_dir, gives
-> -	 * us PUD_SIZE (4K pages) or PMD_SIZE (64K pages) memory starting from
-> -	 * PHYS_OFFSET (which must be aligned to 2MB as per
-> -	 * Documentation/arm64/booting.txt).
-> +	 * us PUD_SIZE (with SECTION maps, i.e, 4K) or PMD_SIZE (without
-> +	 * SECTION maps, i.e, 64K pages) memory starting from PHYS_OFFSET
-> +	 * (which must be aligned to 2MB as per Documentation/arm64/booting.txt).
-
-This didn't seem to get updated for 16K later in the series, unless I
-missed something.
-
-Perhaps drop the mention of 4K / 64K entirely here?
-
-> @@ -551,7 +552,7 @@ int kern_addr_valid(unsigned long addr)
->  	return pfn_valid(pte_pfn(*pte));
->  }
->  #ifdef CONFIG_SPARSEMEM_VMEMMAP
-> -#ifdef CONFIG_ARM64_64K_PAGES
-> +#if !ARM64_SWAPPER_USES_SECTION_MAPS
-
-This leaves the comments on the #else and #endif stale. Please update
-those too.
-
-Otherwise this looks good!
-
-Thanks,
-Mark.
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index cc05cde..5afccbc 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -263,6 +263,24 @@
+ 			cache-level = <2>;
+ 		};
+ 
++		sdmmc0: sdio-host at a0000000 {
++			compatible = "atmel,sama5d2-sdhci";
++			reg = <0xa0000000 0x300>;
++			interrupts = <31 IRQ_TYPE_LEVEL_HIGH 0>;
++			clocks = <&sdmmc0_hclk>, <&sdmmc0_gclk>, <&main>;
++			clock-names = "hclock", "multclk", "baseclk";
++			status = "disabled";
++		};
++
++		sdmmc1: sdio-host at b0000000 {
++			compatible = "atmel,sama5d2-sdhci";
++			reg = <0xb0000000 0x300>;
++			interrupts = <32 IRQ_TYPE_LEVEL_HIGH 0>;
++			clocks = <&sdmmc1_hclk>, <&sdmmc1_gclk>, <&main>;
++			clock-names = "hclock", "multclk", "baseclk";
++			status = "disabled";
++		};
++
+ 		apb {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -619,6 +637,18 @@
+ 						atmel,clk-output-range = <0 83000000>;
+ 					};
+ 
++					i2s0_clk: i2s0_clk {
++						#clock-cells = <0>;
++						reg = <54>;
++						atmel,clk-output-range = <0 83000000>;
++					};
++
++					i2s1_clk: i2s1_clk {
++						#clock-cells = <0>;
++						reg = <55>;
++						atmel,clk-output-range = <0 83000000>;
++					};
++
+ 					classd_clk: classd_clk {
+ 						#clock-cells = <0>;
+ 						reg = <59>;
+@@ -697,6 +727,52 @@
+ 						reg = <53>;
+ 					};
+ 				};
++
++				gck {
++					compatible = "atmel,sama5d2-clk-generated";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					interrupt-parent = <&pmc>;
++					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>;
++
++					sdmmc0_gclk: sdmmc0_gclk {
++						#clock-cells = <0>;
++						reg = <31>;
++					};
++
++					sdmmc1_gclk: sdmmc1_gclk {
++						#clock-cells = <0>;
++						reg = <32>;
++					};
++
++					tcb0_gclk: tcb0_gclk {
++						#clock-cells = <0>;
++						reg = <35>;
++						atmel,clk-output-range = <0 83000000>;
++					};
++
++					tcb1_gclk: tcb1_gclk {
++						#clock-cells = <0>;
++						reg = <36>;
++						atmel,clk-output-range = <0 83000000>;
++					};
++
++					pwm_gclk: pwm_gclk {
++						#clock-cells = <0>;
++						reg = <38>;
++						atmel,clk-output-range = <0 83000000>;
++					};
++
++					i2s0_gclk: i2s0_gclk {
++						#clock-cells = <0>;
++						reg = <54>;
++					};
++
++					i2s1_gclk: i2s1_gclk {
++						#clock-cells = <0>;
++						reg = <55>;
++					};
++				};
+ 			};
+ 
+ 			sha at f0028000 {
+@@ -709,7 +785,7 @@
+ 				dma-names = "tx";
+ 				clocks = <&sha_clk>;
+ 				clock-names = "sha_clk";
+-				status = "disabled";
++				status = "okay";
+ 			};
+ 
+ 			aes at f002c000 {
+@@ -725,7 +801,7 @@
+ 				dma-names = "tx", "rx";
+ 				clocks = <&aes_clk>;
+ 				clock-names = "aes_clk";
+-				status = "disabled";
++				status = "okay";
+ 			};
+ 
+ 			spi0: spi at f8000000 {
+@@ -820,6 +896,32 @@
+ 				status = "disabled";
+ 			};
+ 
++			flx0: flexcom at f8034000 {
++				compatible = "atmel,sama5d2-flexcom";
++				reg = <0xf8034000 0x200>;
++				clocks = <&flx0_clk>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0x0 0xf8034000 0x800>;
++				status = "disabled";
++			};
++
++			flx1: flexcom at f8038000 {
++				compatible = "atmel,sama5d2-flexcom";
++				reg = <0xf8038000 0x200>;
++				clocks = <&flx1_clk>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0x0 0xf8038000 0x800>;
++				status = "disabled";
++			};
++
++			rstc at f8048000 {
++				compatible = "atmel,sama5d3-rstc";
++				reg = <0xf8048000 0x10>;
++				clocks = <&clk32k>;
++			};
++
+ 			pit: timer at f8048030 {
+ 				compatible = "atmel,at91sam9260-pit";
+ 				reg = <0xf8048030 0x10>;
+@@ -897,6 +999,36 @@
+ 				status = "disabled";
+ 			};
+ 
++			flx2: flexcom at fc010000 {
++				compatible = "atmel,sama5d2-flexcom";
++				reg = <0xfc010000 0x200>;
++				clocks = <&flx2_clk>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0x0 0xfc010000 0x800>;
++				status = "disabled";
++			};
++
++			flx3: flexcom at fc014000 {
++				compatible = "atmel,sama5d2-flexcom";
++				reg = <0xfc014000 0x200>;
++				clocks = <&flx3_clk>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0x0 0xfc014000 0x800>;
++				status = "disabled";
++			};
++
++			flx4: flexcom at fc018000 {
++				compatible = "atmel,sama5d2-flexcom";
++				reg = <0xfc018000 0x200>;
++				clocks = <&flx4_clk>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0x0 0xfc018000 0x800>;
++				status = "disabled";
++			};
++
+ 			aic: interrupt-controller at fc020000 {
+ 				#interrupt-cells = <3>;
+ 				compatible = "atmel,sama5d2-aic";
+@@ -935,6 +1067,22 @@
+ 				#gpio-cells = <2>;
+ 				clocks = <&pioA_clk>;
+ 			};
++
++			tdes at fc044000 {
++				compatible = "atmel,at91sam9g46-tdes";
++				reg = <0xfc044000 0x100>;
++				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 0>;
++				dmas = <&dma0
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++					 AT91_XDMAC_DT_PERID(28))>,
++				       <&dma0
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++					 AT91_XDMAC_DT_PERID(29))>;
++				dma-names = "tx", "rx";
++				clocks = <&tdes_clk>;
++				clock-names = "tdes_clk";
++				status = "okay";
++			};
+ 		};
+ 	};
+ };
+-- 
+2.5.0
