@@ -1,85 +1,64 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 14 Oct 2015 16:25:52 -0700
-Subject: [PATCH V2 2/6] acpi: pci: Setup MSI domain for ACPI based pci devices
+Date: Wed, 14 Oct 2015 16:25:53 -0700
+Subject: [PATCH V2 3/6] irqdomain: introduce is_fwnode_irqchip helper
 In-Reply-To: <1444865156-9870-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1444865156-9870-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1444865156-9870-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1444865156-9870-4-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces pci_host_bridge_acpi_msi_domain(), which returns
-the MSI domain of the specified PCI host bridge with DOMAIN_BUS_PCI_MSI
-bus token. Then, it is assigned to pci device.
+Since there will be several places checking if fwnode.type
+is equal FWNODE_IRQCHIP, this patch adds a convenient function
+for this purpose.
 
 Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 ---
- drivers/pci/pci-acpi.c | 13 +++++++++++++
- drivers/pci/probe.c    |  2 ++
- include/linux/pci.h    |  7 +++++++
- 3 files changed, 22 insertions(+)
+ drivers/irqchip/irq-gic.c | 2 +-
+ include/linux/irqdomain.h | 5 +++++
+ kernel/irq/irqdomain.c    | 2 +-
+ 3 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
-index a32ba75..0e21ef4 100644
---- a/drivers/pci/pci-acpi.c
-+++ b/drivers/pci/pci-acpi.c
-@@ -9,7 +9,9 @@
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 1d0e768..6685b33 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -939,7 +939,7 @@ static int gic_irq_domain_translate(struct irq_domain *d,
+ 		return 0;
+ 	}
  
- #include <linux/delay.h>
- #include <linux/init.h>
-+#include <linux/irqdomain.h>
- #include <linux/pci.h>
-+#include <linux/msi.h>
- #include <linux/pci_hotplug.h>
- #include <linux/module.h>
- #include <linux/pci-aspm.h>
-@@ -689,6 +691,17 @@ static struct acpi_bus_type acpi_pci_bus = {
- 	.cleanup = pci_acpi_cleanup,
- };
+-	if (fwspec->fwnode->type == FWNODE_IRQCHIP) {
++	if (is_fwnode_irqchip(fwspec->fwnode)) {
+ 		if(fwspec->param_count != 2)
+ 			return -EINVAL;
  
-+struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index d5e5c5b..4950a71 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -211,6 +211,11 @@ static inline struct fwnode_handle *of_node_to_fwnode(struct device_node *node)
+ 	return node ? &node->fwnode : NULL;
+ }
+ 
++static inline bool is_fwnode_irqchip(struct fwnode_handle *fwnode)
 +{
-+	struct irq_domain *dom = NULL;
-+	struct fwnode_handle *fwnode = pci_msi_get_fwnode(&bus->dev);
-+
-+	if (fwnode)
-+		dom = irq_find_matching_fwnode(fwnode,
-+					       DOMAIN_BUS_PCI_MSI);
-+	return dom;
++	return fwnode && fwnode->type == FWNODE_IRQCHIP;
 +}
 +
- static int __init acpi_pci_init(void)
+ static inline struct irq_domain *irq_find_matching_host(struct device_node *node,
+ 							enum irq_domain_bus_token bus_token)
  {
- 	int ret;
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 0dbc7fb..bea1840 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -671,6 +671,8 @@ static struct irq_domain *pci_host_bridge_msi_domain(struct pci_bus *bus)
- 	 * should be called from here.
- 	 */
- 	d = pci_host_bridge_of_msi_domain(bus);
-+	if (!d)
-+		d = pci_host_bridge_acpi_msi_domain(bus);
- 
- 	return d;
- }
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index e90eb22..4a7f6a9 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1925,6 +1925,13 @@ static inline struct irq_domain *
- pci_host_bridge_of_msi_domain(struct pci_bus *bus) { return NULL; }
- #endif  /* CONFIG_OF */
- 
-+#ifdef CONFIG_ACPI
-+struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus);
-+#else
-+static inline struct irq_domain *
-+pci_host_bridge_acpi_msi_domain(struct pci_bus *bus) { return NULL; }
-+#endif
-+
- #ifdef CONFIG_EEH
- static inline struct eeh_dev *pci_dev_to_eeh_dev(struct pci_dev *pdev)
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 22aa961..7f34d98 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -70,7 +70,7 @@ void irq_domain_free_fwnode(struct fwnode_handle *fwnode)
  {
+ 	struct irqchip_fwid *fwid;
+ 
+-	if (WARN_ON(fwnode->type != FWNODE_IRQCHIP))
++	if (WARN_ON(!is_fwnode_irqchip(fwnode)))
+ 		return;
+ 
+ 	fwid = container_of(fwnode, struct irqchip_fwid, fwnode);
 -- 
 2.1.0
