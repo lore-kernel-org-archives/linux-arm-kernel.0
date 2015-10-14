@@ -1,43 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Oct 2015 18:03:26 +0200
-Subject: [GIT PULL] Samsung DT updates for v4.4
-In-Reply-To: <561C111F.3060704@kernel.org>
-References: <561C111F.3060704@kernel.org>
-Message-ID: <41536735.3LmBWhHMre@wuerfel>
+From: carlo@endlessm.com (Carlo Caione)
+Date: Wed, 14 Oct 2015 18:04:54 +0200
+Subject: [PATCH] ARM: meson6: DTS: Fix wrong reg mapping and IRQ numbers
+In-Reply-To: <8566547.CSeb89j3FB@wuerfel>
+References: <1443696760-8316-1-git-send-email-carlo@caione.org>
+ <CAOQ7t2bAQ8RrfssFzAM6m=HGVaQDfcmmqPvmwX4wiAJig9ZVJg@mail.gmail.com>
+ <8566547.CSeb89j3FB@wuerfel>
+Message-ID: <CAL9uMOHFoZqxdP6e+bb2N0t11P4tsJQHhOTZ-Ch6BA+YNwkG0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 October 2015 04:59:27 Kukjin Kim wrote:
-> Samsung DT updates for v4.4
-> 
-> - New board support
->   : add exynos5250-snow-rev5 DT file to support Snow Rev5+ board
->   : add exynos5422-odroidxu4 DT file to support Odroid XU4 board
->   : split exynos5422-odroidxu3-audio DT file from odroidxu3-common
-> 
-> - USE GPIO constants for flags cells for exynos boards
-> - fix cpu compatible value to 'arm926ej-s' for s3c2416
-> 
-> - add DMA support for serial ports for exynos4
-> - add suspend opp for exynos4412
-> - remove regulator-compatible usage for exynos4412-trats2
-> 
-> - enable EC vboot context support for Peach boards
-> - move display-timings node to DP for exynos5250-arndale, smdk5250 and
-> smdk5420
-> 
-> - for exynos4412-odroid/odroidu3
->   : unify voltage regulator style and
->   : remove redundant pinctrl settings
->   : add pwm-fan node and use it as a colling device
-> 
-> - for exynos5422-odroidxu3
->   : fix power off method and LEDs
-> 
-> - dt-bindings
->   : grounded AC0KB pin on S2MPS11
->   : entry how to use PWM FAN as a cooling device
+On Wed, Oct 14, 2015 at 5:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 10 October 2015 11:56:23 Carlo Caione wrote:
+>> On Thu, Oct 1, 2015 at 12:52 PM, Carlo Caione <carlo@caione.org> wrote:
+>> > From: Carlo Caione <carlo@endlessm.com>
+>> >
+>> > The DTS erronously uses the wrong reg mapping and IRQ numbers for some
+>> > UART, WDT and timer nodes. Fix this.
+>>
+>> Hi Arnd,
+>> if you have no complains could you take this into next/dt?
+>>
+>>
+>
+> Pulled into next/dt, but please let me know if it should actually go
+> into 4.3 instead. It looks like a bugfix patch and perhaps also applies
+> to stable?
 
-Pulled into next/dt, thanks!
+It is actually, thank you for the reminder. I can resubmit it with
+with stable in CC even though I'm pretty sure that ATM the number of
+people actually using this DTS is dramatically close to 0.
 
-	Arnd
+Thanks,
+
+-- 
+Carlo Caione
