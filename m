@@ -1,53 +1,46 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 14 Oct 2015 14:05:17 +0300
-Subject: [PATCH v4 3/3] arm64: dts: mt8173: Add nor flash node
-In-Reply-To: <CAGS+omDm=74d6cw7kXwkZ_Jy-faBz7z4-vJQX9ZFVNskQqSS-w@mail.gmail.com>
-References: <1444729160-26433-1-git-send-email-bayi.cheng@mediatek.com>
- <1444729160-26433-4-git-send-email-bayi.cheng@mediatek.com>
- <561D1642.3070105@cogentembedded.com>
- <CAGS+omDm=74d6cw7kXwkZ_Jy-faBz7z4-vJQX9ZFVNskQqSS-w@mail.gmail.com>
-Message-ID: <561E36ED.7090103@cogentembedded.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 14 Oct 2015 13:07:17 +0200
+Subject: [PATCH] mutex: make mutex_lock_nested an inline function
+In-Reply-To: <20151014102706.GR14956@sirena.org.uk>
+References: <11282238.AHmyWliPRj@wuerfel>
+ <20151013203812.GM17308@twins.programming.kicks-ass.net>
+ <11817958.z9KtmeKzV7@wuerfel>
+ <20151014082050.GQ17308@twins.programming.kicks-ass.net>
+ <20151014102706.GR14956@sirena.org.uk>
+Message-ID: <20151014110717.GT17308@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Oct 14, 2015 at 11:27:06AM +0100, Mark Brown wrote:
+> On Wed, Oct 14, 2015 at 10:20:50AM +0200, Peter Zijlstra wrote:
+> 
+> > Uuh, I just looked at next and saw this regulator_lock_supply()
+> > function. How is that limited? subclass must be <8 otherwise bad things
+> > happen.
+> 
+> Can we please get some more discoverable documentation of the arbitrary
+> limits in the lockdep code? 
 
-On 10/14/2015 4:07 AM, Daniel Kurtz wrote:
+include/linux/lockdep.h:#define MAX_LOCKDEP_SUBCLASSES          8UL
 
->>> Add Mediatek nor flash node
->>>
->>> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
->>> ---
->>>    arch/arm64/boot/dts/mediatek/mt8173.dtsi | 15 +++++++++++++++
->>>    1 file changed, 15 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->>> b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->>> index d18ee42..385c2e4 100644
->>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->>> @@ -365,6 +365,21 @@
->>>                          status = "disabled";
->>>                  };
->>>
->>> +               nor_flash: spi at 1100d000 {
->>
->>     I don't think this is a good label name for a SPI controller.
->
-> You think "spi" is not a good name for SPI controller?
-> Or you mean the label "nor_flash"?
+Also, it will give a runtime warn if you ever do hit that.
 
-    I think I said clearly: "label". :-)
+> I seem to keep seeing code that bumps into
+> surprising limits like this and I'm not sure how I'm supposed to know
+> about them except through finding out after the fact or trawling the
+> code every time someone touches locking.
 
-> Would you prefer:
->
->    spi_nor_flash: spi at 1100d000
+Not knowing what other limits you've hit, I'm not entirely sure how to
+help out there.
 
-    I'd prefer the "_nor_flash" part to be dropped, to be used for the real 
-flash device (if needed) which is a sub-node of this node.
+> I would be very surprised to see a system that pushes over 8 locks,
+> while there's nothing actually preventing it system design
+> considerations mean that even four cascaded supplies are pretty
+> unlikely so we should be fine.  Every time you add a new level of
+> regulation you're both increasing the load on regulators up the chain
+> (which means they need to be bigger and more expensive) and except in
+> the case of a DCDC supplying an LDO (which only works to one level)
+> you're going to be decreasing the efficiency of the system.  If we get
+> to that point we can worry about what to do.
 
-[...]
-
-> -Dan
-
-MBR, Sergei
+OK I suppose.
