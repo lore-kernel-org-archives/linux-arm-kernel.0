@@ -1,63 +1,132 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 14 Oct 2015 16:12:20 +0300
-Subject: [PATCH 09/13] dmaengine: edma: Merge the of parsing functions
+Date: Wed, 14 Oct 2015 16:12:18 +0300
+Subject: [PATCH 07/13] dmaengine: edma: Refactor the dma device and channel
+ struct initialization
 In-Reply-To: <1444828344-21378-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1444828344-21378-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1444828344-21378-10-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1444828344-21378-8-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of nesting functions just merge them since the resulting function
-is still small and readable.
+Move all code under one function to do the dma device and eDMA channel
+related setup so they are not scattered around the driver.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/dma/edma.c | 24 ++++++++----------------
- 1 file changed, 8 insertions(+), 16 deletions(-)
+ drivers/dma/edma.c | 79 +++++++++++++++++++++++++-----------------------------
+ 1 file changed, 37 insertions(+), 42 deletions(-)
 
 diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index f511684f83a2..421c4fd67235 100644
+index d064fbc47351..53188b9383a6 100644
 --- a/drivers/dma/edma.c
 +++ b/drivers/dma/edma.c
-@@ -1915,31 +1915,23 @@ static int edma_xbar_event_map(struct device *dev, struct edma_soc_info *pdata,
- 	return 0;
+@@ -1750,18 +1750,49 @@ static enum dma_status edma_tx_status(struct dma_chan *chan,
+ 	return ret;
  }
  
--static int edma_of_parse_dt(struct device *dev, struct edma_soc_info *pdata)
+-static void __init edma_chan_init(struct edma_cc *ecc, struct dma_device *dma,
+-				  struct edma_chan *echans)
++#define EDMA_DMA_BUSWIDTHS	(BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) | \
++				 BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
++				 BIT(DMA_SLAVE_BUSWIDTH_3_BYTES) | \
++				 BIT(DMA_SLAVE_BUSWIDTH_4_BYTES))
++
++static void edma_dma_init(struct edma_cc *ecc)
+ {
++	struct dma_device *ddev = &ecc->dma_slave;
+ 	int i, j;
+ 
++	dma_cap_zero(ddev->cap_mask);
++	dma_cap_set(DMA_SLAVE, ddev->cap_mask);
++	dma_cap_set(DMA_CYCLIC, ddev->cap_mask);
++	dma_cap_set(DMA_MEMCPY, ddev->cap_mask);
++
++	ddev->device_prep_slave_sg = edma_prep_slave_sg;
++	ddev->device_prep_dma_cyclic = edma_prep_dma_cyclic;
++	ddev->device_prep_dma_memcpy = edma_prep_dma_memcpy;
++	ddev->device_alloc_chan_resources = edma_alloc_chan_resources;
++	ddev->device_free_chan_resources = edma_free_chan_resources;
++	ddev->device_issue_pending = edma_issue_pending;
++	ddev->device_tx_status = edma_tx_status;
++	ddev->device_config = edma_slave_config;
++	ddev->device_pause = edma_dma_pause;
++	ddev->device_resume = edma_dma_resume;
++	ddev->device_terminate_all = edma_terminate_all;
++
++	ddev->src_addr_widths = EDMA_DMA_BUSWIDTHS;
++	ddev->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
++	ddev->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
++	ddev->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
++
++	ddev->dev = ecc->dev;
++
++	INIT_LIST_HEAD(&ddev->channels);
++
+ 	for (i = 0; i < ecc->num_channels; i++) {
+-		struct edma_chan *echan = &echans[i];
++		struct edma_chan *echan = &ecc->slave_chans[i];
+ 		echan->ch_num = EDMA_CTLR_CHAN(ecc->id, i);
+ 		echan->ecc = ecc;
+ 		echan->vchan.desc_free = edma_desc_free;
+ 
+-		vchan_init(&echan->vchan, dma);
++		vchan_init(&echan->vchan, ddev);
+ 
+ 		INIT_LIST_HEAD(&echan->node);
+ 		for (j = 0; j < EDMA_MAX_SLOTS; j++)
+@@ -1769,36 +1800,6 @@ static void __init edma_chan_init(struct edma_cc *ecc, struct dma_device *dma,
+ 	}
+ }
+ 
+-#define EDMA_DMA_BUSWIDTHS	(BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) | \
+-				 BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
+-				 BIT(DMA_SLAVE_BUSWIDTH_3_BYTES) | \
+-				 BIT(DMA_SLAVE_BUSWIDTH_4_BYTES))
+-
+-static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
+-			  struct device *dev)
 -{
--	int ret = 0;
--	struct property *prop;
--	size_t sz;
+-	dma->device_prep_slave_sg = edma_prep_slave_sg;
+-	dma->device_prep_dma_cyclic = edma_prep_dma_cyclic;
+-	dma->device_prep_dma_memcpy = edma_prep_dma_memcpy;
+-	dma->device_alloc_chan_resources = edma_alloc_chan_resources;
+-	dma->device_free_chan_resources = edma_free_chan_resources;
+-	dma->device_issue_pending = edma_issue_pending;
+-	dma->device_tx_status = edma_tx_status;
+-	dma->device_config = edma_slave_config;
+-	dma->device_pause = edma_dma_pause;
+-	dma->device_resume = edma_dma_resume;
+-	dma->device_terminate_all = edma_terminate_all;
 -
--	prop = of_find_property(dev->of_node, "ti,edma-xbar-event-map", &sz);
--	if (prop)
--		ret = edma_xbar_event_map(dev, pdata, sz);
+-	dma->src_addr_widths = EDMA_DMA_BUSWIDTHS;
+-	dma->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
+-	dma->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+-	dma->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
 -
--	return ret;
+-	dma->dev = dev;
+-
+-	INIT_LIST_HEAD(&dma->channels);
 -}
 -
- static struct edma_soc_info *edma_setup_info_from_dt(struct device *dev)
+ static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
+ 			      struct edma_cc *ecc)
  {
- 	struct edma_soc_info *info;
-+	struct property *prop;
-+	size_t sz;
- 	int ret;
+@@ -2131,14 +2132,8 @@ static int edma_probe(struct platform_device *pdev)
+ 	}
+ 	ecc->info = info;
  
- 	info = devm_kzalloc(dev, sizeof(struct edma_soc_info), GFP_KERNEL);
- 	if (!info)
- 		return ERR_PTR(-ENOMEM);
+-	dma_cap_zero(ecc->dma_slave.cap_mask);
+-	dma_cap_set(DMA_SLAVE, ecc->dma_slave.cap_mask);
+-	dma_cap_set(DMA_CYCLIC, ecc->dma_slave.cap_mask);
+-	dma_cap_set(DMA_MEMCPY, ecc->dma_slave.cap_mask);
+-
+-	edma_dma_init(ecc, &ecc->dma_slave, dev);
+-
+-	edma_chan_init(ecc, &ecc->dma_slave, ecc->slave_chans);
++	/* Init the dma device and channels */
++	edma_dma_init(ecc);
  
--	ret = edma_of_parse_dt(dev, info);
--	if (ret)
--		return ERR_PTR(ret);
-+	prop = of_find_property(dev->of_node, "ti,edma-xbar-event-map", &sz);
-+	if (prop) {
-+		ret = edma_xbar_event_map(dev, info, sz);
-+		if (ret)
-+			return ERR_PTR(ret);
-+	}
- 
- 	return info;
- }
+ 	for (i = 0; i < ecc->num_channels; i++) {
+ 		/* Assign all channels to the default queue */
 -- 
 2.6.1
