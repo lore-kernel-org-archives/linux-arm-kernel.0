@@ -1,23 +1,45 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Wed, 14 Oct 2015 10:00:23 -0500
-Subject: [PATCH] ARM: socfpga: dts: sort nodes alphabetically
-In-Reply-To: <1444767102-25242-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1444767102-25242-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <561E6E07.1060605@opensource.altera.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 14 Oct 2015 16:08:43 +0100
+Subject: [PATCHv3 02/11] arm64: Handle section maps for swapper/idmap
+In-Reply-To: <20151014145158.GA4422@leverpostej>
+References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
+ <1444821634-1689-3-git-send-email-suzuki.poulose@arm.com>
+ <20151014120618.GB2150@leverpostej> <561E56D4.40506@arm.com>
+ <20151014145158.GA4422@leverpostej>
+Message-ID: <561E6FFB.3020005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/2015 03:11 PM, Steffen Trumtrar wrote:
-> The sorting policy for this file is alphabetically.
-> Reorder all nodes, that are out of place.
-> 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
->  arch/arm/boot/dts/socfpga.dtsi | 128 ++++++++++++++++++++---------------------
->  1 file changed, 64 insertions(+), 64 deletions(-)
-> 
+On 14/10/15 15:51, Mark Rutland wrote:
+>>>> +/* With 4K pages, we use section maps. */
 
-Applied!
+>> /*
+>>   * ARM64 kernel is guaranteed to be loaded at 2M aligned
+>>   * address (as per booting requirements). Hence we can use
+>>   * section mapping with 4K (section size = 2M) and not with
+>>   * 16K(section size = 32M) or 64K (section size = 512M).
+>>   */
+>
+> That sounds much better. I hadn't figured out why myself, so thanks for
+> the explanation :)
+>
+> However, there's one minor nit: the start of memory below the kernel is
+> 2M aligned, but the offset means that the kernel itself is not loaded at
+> a 2M aligned address.
 
-Thanks,
-Dinh
+Oh yes
+
+>
+> So how about:
+>
+> /*
+>   * The linear mapping and the start of memory are both 2M aligned (per
+>   * the arm64 booting.txt requirements). Hence we can use section mapping
+>   * with 4K (section size = 2M) but not with 16K (section size = 32M) or
+>   * 64K (section size = 512M).
+>   */
+
+Will add this
+
+Thanks
+Suzuki
