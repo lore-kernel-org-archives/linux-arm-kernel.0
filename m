@@ -1,71 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 14 Oct 2015 11:27:46 +0200
-Subject: [PATCH] arm: pxa: raumfeld: make some variables static
-Message-ID: <1444814866-4639-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Wed, 14 Oct 2015 17:28:45 +0800
+Subject: [PATCH v9 3/6] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <5088538.zEUtS0EC0S@wuerfel>
+References: <1444790492-4051-1-git-send-email-lftan@altera.com>
+ <6044983.WR9BTgsOaA@wuerfel>
+ <CAFiDJ58Uwpv=xUXbBNQcd4FQq=fHGhtCnjTb7TKQBJ0TOxRLig@mail.gmail.com>
+ <5088538.zEUtS0EC0S@wuerfel>
+Message-ID: <CAFiDJ59AuXmM8vN9=ry8_UvS-paRN54CdCFw6EUMx9RV2TT3bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the following sparse warnings:
+On Wed, Oct 14, 2015 at 5:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 14 October 2015 16:32:25 Ley Foon Tan wrote:
+>> On Wed, Oct 14, 2015 at 4:20 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Wednesday 14 October 2015 10:41:29 Ley Foon Tan wrote:
+>> >> +static int altera_pcie_remove(struct platform_device *pdev)
+>> >> +{
+>> >> +     struct altera_pcie *pcie = platform_get_drvdata(pdev);
+>> >> +
+>> >> +     altera_pcie_free_irq_domain(pcie);
+>> >> +     platform_set_drvdata(pdev, NULL);
+>> >> +     return 0;
+>> >> +}
+>> >
+>> > I just noticed this. Does it actually work to unload the module
+>> > and tear down all the pci_dev structures in a safe way?
+>> Good catch. It only can be compiled as builtin-moduley now, so we can
+>> remove this _remove callback function.
+>
+> I think we should change both: make it possible to load the
+> driver dynamically, and remove the altera_pcie_remove function.
+This driver depends on the pci fixups to work correctly. But, fixups
+callback functions in this driver are not being call if the driver is
+loadable module.
+The linker script keeps all pci fixup callbacks in pci fixup regions
+during kernel compile time. So, it needs to be builtin module. Do you
+know any way we can update those fixup regions?
 
-	arch/arm/mach-pxa/raumfeld.c:510:24: warning: symbol 'raumfeld_w1_gpio_device' was not declared. Should it be static?
-	arch/arm/mach-pxa/raumfeld.c:632:31: warning: symbol 'raumfeld_spi_platform_data' was not declared. Should it be static?
-	arch/arm/mach-pxa/raumfeld.c:851:28: warning: symbol 'audio_va_initdata' was not declared. Should it be static?
-	arch/arm/mach-pxa/raumfeld.c:883:28: warning: symbol 'audio_dummy_initdata' was not declared. Should it be static?
-	arch/arm/mach-pxa/raumfeld.c:931:28: warning: symbol 'max8660_v6_subdev_data' was not declared. Should it be static?
+>
+> You can prevent the module from being unloaded if you also remove
+> the module_platform_driver() directive and add a module_init()
+> without a matching module_exit().
+>
+> Please also add a '.suppress_bind_attrs = true,' flag in the driver
+> struct to prevent manual unbinding.
+I think we don't need these if it only can work as builtin module.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-pxa/raumfeld.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Thanks for reviewing.
 
-diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-index 88f70c37ad0d..32ee6ef5ea4f 100644
---- a/arch/arm/mach-pxa/raumfeld.c
-+++ b/arch/arm/mach-pxa/raumfeld.c
-@@ -507,7 +507,7 @@ static struct w1_gpio_platform_data w1_gpio_platform_data = {
- 	.ext_pullup_enable_pin	= -EINVAL,
- };
- 
--struct platform_device raumfeld_w1_gpio_device = {
-+static struct platform_device raumfeld_w1_gpio_device = {
- 	.name	= "w1-gpio",
- 	.dev	= {
- 		.platform_data = &w1_gpio_platform_data
-@@ -629,7 +629,7 @@ static void __init raumfeld_lcd_init(void)
-  * SPI devices
-  */
- 
--struct spi_gpio_platform_data raumfeld_spi_platform_data = {
-+static struct spi_gpio_platform_data raumfeld_spi_platform_data = {
- 	.sck		= GPIO_SPI_CLK,
- 	.mosi		= GPIO_SPI_MOSI,
- 	.miso		= GPIO_SPI_MISO,
-@@ -848,7 +848,7 @@ static void __init raumfeld_power_init(void)
- static struct regulator_consumer_supply audio_va_consumer_supply =
- 	REGULATOR_SUPPLY("va", "0-0048");
- 
--struct regulator_init_data audio_va_initdata = {
-+static struct regulator_init_data audio_va_initdata = {
- 	.consumer_supplies = &audio_va_consumer_supply,
- 	.num_consumer_supplies = 1,
- 	.constraints = {
-@@ -880,7 +880,7 @@ static struct regulator_consumer_supply audio_dummy_supplies[] = {
- 	REGULATOR_SUPPLY("vlc", "0-0048"),
- };
- 
--struct regulator_init_data audio_dummy_initdata = {
-+static struct regulator_init_data audio_dummy_initdata = {
- 	.consumer_supplies = audio_dummy_supplies,
- 	.num_consumer_supplies = ARRAY_SIZE(audio_dummy_supplies),
- 	.constraints = {
-@@ -928,7 +928,7 @@ static struct regulator_init_data vcc_mmc_init_data = {
- 	.num_consumer_supplies = 1,
- };
- 
--struct max8660_subdev_data max8660_v6_subdev_data = {
-+static struct max8660_subdev_data max8660_v6_subdev_data = {
- 	.id		= MAX8660_V6,
- 	.name		= "vmmc",
- 	.platform_data	= &vcc_mmc_init_data,
--- 
-2.6.1
+Regards
+Ley Foon
