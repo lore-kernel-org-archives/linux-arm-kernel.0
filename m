@@ -1,52 +1,55 @@
-From: yalin.wang2010@gmail.com (yalin wang)
+From: lftan@altera.com (Ley Foon Tan)
 Date: Wed, 14 Oct 2015 10:41:26 +0800
-Subject: [RFC] arm64: ioremap: add ioremap_cache macro
-In-Reply-To: <20151013152011.GE11573@e104818-lin.cambridge.arm.com>
-References: <1444616898-5057-1-git-send-email-yalin.wang2010@gmail.com>
- <20151013141055.GC11573@e104818-lin.cambridge.arm.com>
- <20151013142326.GM21550@arm.com>
- <20151013152011.GE11573@e104818-lin.cambridge.arm.com>
-Message-ID: <2731BCF2-D0C0-4B77-A59F-FF3AB2A725D6@gmail.com>
+Subject: [PATCH v9 0/6] Altera PCIe host controller driver with MSI support
+Message-ID: <1444790492-4051-1-git-send-email-lftan@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This is the 9th version of patch set to add support for Altera PCIe host
+controller with MSI feature on Altera FPGA device families. This patchset
+mainly update the config read and write functions to support read/write
+specific bytes to avoid read-modify-write and minor fixes.
 
-> On Oct 13, 2015, at 23:20, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> 
-> On Tue, Oct 13, 2015 at 03:23:27PM +0100, Will Deacon wrote:
->> On Tue, Oct 13, 2015 at 03:10:55PM +0100, Catalin Marinas wrote:
->>> On Mon, Oct 12, 2015 at 10:28:18AM +0800, yalin wang wrote:
->>>> Add ioremap_cache macro, because some code will test if this macro
->>>> is defined or not, and will generate a generric version if not defined,
->>>> for example, memremap.c do like this.
->>>> 
->>>> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
->>>> ---
->>>> arch/arm64/include/asm/io.h | 1 +
->>>> 1 file changed, 1 insertion(+)
->>>> 
->>>> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
->>>> index 44be1e0..d6b620c 100644
->>>> --- a/arch/arm64/include/asm/io.h
->>>> +++ b/arch/arm64/include/asm/io.h
->>>> @@ -172,6 +172,7 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
->>>> #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
->>>> #define ioremap_wt(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
->>>> #define iounmap				__iounmap
->>>> +#define ioremap_cache                  ioremap_cache
->>> 
->>> Applied. Thanks.
->> 
->> I'm not sure we want this. See:
->> 
->>  https://lkml.org/lkml/2015/10/9/699
-> 
-> Thanks Will and Arnd, I missed this. Patch reverted.
-> 
-i don?t understand why conflict with Dan Williams? patch.
-Dan Williams ?s patch also define ioremap_cache  for arch ia64  & arch sh & arch xtensa ,
-i see this :
-# git show   92281dee825f
-am i miss something?
+This patchset is based on v4.3-rc5.
 
-Thanks
+v8->v9 changes:
+- altera-pcie-msi: fix missing mutex_unlock when error return
+- altera-pcie: update config read and write functions to support read/write
+               specific bytes
+
+History:
+-------
+[v1]: https://lkml.org/lkml/2015/7/28/395
+[v2]: https://lkml.org/lkml/2015/7/31/267
+[v3]: http://www.kernelhub.org/?msg=811940&p=2
+[v4]: https://lkml.org/lkml/2015/8/17/141
+[v5]: https://lkml.org/lkml/2015/8/25/238
+[v6]: https://lkml.org/lkml/2015/9/1/177
+[v7]: https://lkml.org/lkml/2015/9/20/193
+[v8]: http://www.kernelhub.org/?msg=853553&p=2
+
+Ley Foon Tan (6):
+  arm: add msi.h to Kbuild
+  pci: add Altera PCI vendor ID
+  pci:host: Add Altera PCIe host controller driver
+  pci: altera: Add Altera PCIe MSI driver
+  Documentation: dt-bindings: pci: altera pcie device tree binding
+  MAINTAINERS: Add Altera PCIe and MSI drivers maintainer
+
+ .../devicetree/bindings/pci/altera-pcie-msi.txt    |  28 +
+ .../devicetree/bindings/pci/altera-pcie.txt        |  49 ++
+ MAINTAINERS                                        |  16 +
+ arch/arm/include/asm/Kbuild                        |   1 +
+ drivers/pci/host/Kconfig                           |  15 +
+ drivers/pci/host/Makefile                          |   2 +
+ drivers/pci/host/pcie-altera-msi.c                 | 313 +++++++++++
+ drivers/pci/host/pcie-altera.c                     | 592 +++++++++++++++++++++
+ include/linux/pci_ids.h                            |   2 +
+ 9 files changed, 1018 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
+ create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie.txt
+ create mode 100644 drivers/pci/host/pcie-altera-msi.c
+ create mode 100644 drivers/pci/host/pcie-altera.c
+
+-- 
+1.8.2.1
