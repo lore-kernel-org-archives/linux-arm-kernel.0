@@ -1,44 +1,88 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 14 Oct 2015 22:28:31 +0200
-Subject: l2c: Kernel panic in l2c310_enable() in non-secure mode
-In-Reply-To: <20151014174721.GR32532@n2100.arm.linux.org.uk>
-References: <561E6407.6000002@sigmadesigns.com>
- <561E6B1F.1070701@sigmadesigns.com>
- <20151014174721.GR32532@n2100.arm.linux.org.uk>
-Message-ID: <561EBAEF.8030603@free.fr>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 14 Oct 2015 15:28:23 -0500
+Subject: [PATCH] ARM: OMAP2+: Fix oops with LPAE and more than 2GB of
+ memory
+In-Reply-To: <5121845.p5XWunbq8r@wuerfel>
+References: <1444778000-22537-1-git-send-email-tony@atomide.com>
+ <106715675.XDtZ2nQqSM@wuerfel> <20151014161755.GB10113@atomide.com>
+ <5121845.p5XWunbq8r@wuerfel>
+Message-ID: <561EBAE7.60907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/2015 19:47, Russell King - ARM Linux wrote:
-> On Wed, Oct 14, 2015 at 04:47:59PM +0200, Marc Gonzalez wrote:
->> Just to be sure, I changed set_auxcr() to a NOP. The kernel does not
->> panic with that setup, and I can see the boot messages:
+On 10/14/2015 03:12 PM, Arnd Bergmann wrote:
+> On Wednesday 14 October 2015 09:17:56 Tony Lindgren wrote:
+>> * Arnd Bergmann <arnd@arndb.de> [151014 02:20]:
+>>> On Tuesday 13 October 2015 16:13:20 Tony Lindgren wrote:
+>>>> On boards with more than 2GB of RAM booting goes wrong with things not working
+>>>> and we're getting lots of l3 warnings:
+>>>>
+>>>> WARNING: CPU: 0 PID: 1 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x260/0x384()
+>>>> 44000000.ocp:L3 Custom Error: MASTER MMC6 TARGET DMM1 (Idle): Data Access in User mode during Functional access
+>>>> ...
+>>>> [<c044e158>] (scsi_add_host_with_dma) from [<c04705c8>] (ata_scsi_add_hosts+0x5c/0x18c)
+>>>> [<c04705c8>] (ata_scsi_add_hosts) from [<c046b13c>] (ata_host_register+0x150/0x2cc)
+>>>> [<c046b13c>] (ata_host_register) from [<c046b38c>] (ata_host_activate+0xd4/0x124)
+>>>> [<c046b38c>] (ata_host_activate) from [<c047f42c>] (ahci_host_activate+0x5c/0x194)
+>>>> [<c047f42c>] (ahci_host_activate) from [<c0480854>] (ahci_platform_init_host+0x1f0/0x3f0)
+>>>> [<c0480854>] (ahci_platform_init_host) from [<c047c9dc>] (ahci_probe+0x70/0x98)
+>>>> [<c047c9dc>] (ahci_probe) from [<c04220cc>] (platform_drv_probe+0x54/0xb4)
+>>>>
+>>>> Let's fix the issue by enabling ZONE_DMA for LPAE.
+>>>>
+>>>> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>>>>
+>>>
+>>> I suspect this is not the correct fix, even if it works around the problem.
+>>>
+>>> Am I right that the AHCI device can access the first 4GB of address space
+>>> using 32-bit DMA, and that any RAM beyond 2GB is above that limit?
 >>
->> [    0.000000] l2x0_of_init: FOO
->> [    0.000000] L2C-310 enabling early BRESP for Cortex-A9
->> [    0.000000] L2C-310: enabling full line of zeros but not enabled in Cortex-A9
->> [    0.000000] reg=0x104 val=0x66460801
->> [    0.000000] reg=0x100 val=0x1
->> [    0.000000] L2C-310 I prefetch enabled, offset 1 lines
->> [    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
->> [    0.000000] L2C-310 cache controller enabled, 8 ways, 512 kB
->> [    0.000000] L2C-310: CACHE_ID 0x410000c8, AUX_CTRL 0x62460801
+>> Yes the memory above 2GB is at 0x300000000. The same problem is there at least
+>> with MMC too.
 >>
->> The "reg=0x%x val=0x%lx\n" lines are from tango_l2c_write_sec()
+>>> Does the ZONE_DMA have the same size? If not, you get more bounce buffers
+>>> than you want, which is bad for performance/
 >>
->> It seems the firmware forgot to enable FLOZ.
+>> Hmm good question. I guess we should set .dma_zone_size  = SZ_2G in this
+>> case then as only 2GB of RAM can directly be accessed.
 > 
-> Wrong.  Do _not_ enable FLZ in the Cortex-A9.  FLZ needs the L2 cache
-> enabled _before_ the Cortex A9.  This is not something you can do in
-> firmware/boot loader/etc.  It has to be done by the kernel when the L2
-> cache is initialised.
+> I think you need ".dma_zone_size  = SZ_4G", but I'm not completely sure
+> whether this takes PHYS_OFFSET into account or not.
 > 
-> If your firmware prevents this, sorry, you can't ever use FLZ.
+>>> Another problem here is that it only works with the SCSI and net subsystems
+>>> that have a hack in there to create manual bounce buffers, but other drivers
+>>> that can do DMA to high addresses will not know about this.
+>>
+>> OK good to know.
+>>
+>>> The right solution would be to force the use of an IOMMU, and if that not
+>>> works, add support for SWIOTLB on ARM.
+>>
+>> Suman might have some accelerators in mind we could use for DMA.
 
-Is FLZ just a performance optimization?
+Only MMUs that we have on OMAP5 are the ones for the processors on the
+SoC - MPU, DSP or the IPU (Dual-Cortex M4). There is one eDMA engine
+within the DSP subsystem that goes through the DSP MMU, but this is
+typically used by software running on DSP.
 
-I can ask the firmware author not to enable bit 0 in L2CC AUXCTRL.
+regards
+Suman
 
-Then Linux won't try to write CP15 ACTRL, IIUC.
-
-Regards.
+>>
+>> For SWIOTLB, It seems we have it for arm64 but not for arm?
+> 
+> Correct. A number of people have run into problems with this before, but
+> it has never been added to the kernel. At some point, I tried to help
+> Peter Senna Tschudin get it implemented, but I think he gave up when it
+> turned out that the platform he was using to test this did not need it
+> after all.
+> 
+> The reason we have it on ARM64 is that you are completely screwed there
+> if you have no IOMMU but use a 32-bit DMA master, while on 32-bit platforms
+> most of the time you don't have memory above 4GB, and if you do then most
+> of the time you don't have any DMA masters other than network and scsi
+> (including sata) on them, or you have an IOMMU for each one.
+> 
+> 	Arnd
+> 
