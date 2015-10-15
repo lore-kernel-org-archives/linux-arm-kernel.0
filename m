@@ -1,40 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 22:29:33 +0200
-Subject: [PATCH 1/3] ARM: digicolor: select pinctrl/gpio driver
-In-Reply-To: <0c3f348274ea14bc82c0e4f7b240be650624fb0d.1444735169.git.baruch@tkos.co.il>
-References: <cover.1444735169.git.baruch@tkos.co.il>
- <0c3f348274ea14bc82c0e4f7b240be650624fb0d.1444735169.git.baruch@tkos.co.il>
-Message-ID: <19934450.tsPWutDox2@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 15 Oct 2015 22:36:43 +0200
+Subject: [PATCH 1/6] mfd: axp20x: Add AXP223 to list of supported PMICs
+ in DT bindings
+In-Reply-To: <1444840342-9233-2-git-send-email-wens@csie.org>
+References: <1444840342-9233-1-git-send-email-wens@csie.org>
+ <1444840342-9233-2-git-send-email-wens@csie.org>
+Message-ID: <20151015203643.GF2711@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 October 2015 14:28:02 Baruch Siach wrote:
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
->  arch/arm/mach-digicolor/Kconfig | 3 +++
->  1 file changed, 3 insertions(+)
+On Thu, Oct 15, 2015 at 12:32:17AM +0800, Chen-Yu Tsai wrote:
+> The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
+> It is functionally identical to AXP221; only the regulator default
+> voltage/status and the external host interface are different.
 > 
-> diff --git a/arch/arm/mach-digicolor/Kconfig b/arch/arm/mach-digicolor/Kconfig
-> index 4f36d8d2bc57..fc65b0f1db48 100644
-> --- a/arch/arm/mach-digicolor/Kconfig
-> +++ b/arch/arm/mach-digicolor/Kconfig
-> @@ -1,7 +1,10 @@
->  config ARCH_DIGICOLOR
->  	bool "Conexant Digicolor SoC Support"
->  	depends on ARCH_MULTI_V7
-> +	select ARCH_REQUIRE_GPIOLIB
->  	select CLKSRC_MMIO
->  	select DIGICOLOR_TIMER
->  	select GENERIC_IRQ_CHIP
->  	select MFD_SYSCON
-> +	select PINCTRL
-> +	select PINCTRL_DIGICOLOR
-> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Applied to next/soc, but please add a patch description even for trivial
-patches like this in the future. A good changelog text here would explain
-why this wasn't done in the past but is necessary now.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Thanks,
+Thanks!
+Maxime
 
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151015/7464e43d/attachment.sig>
