@@ -1,33 +1,104 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Thu, 15 Oct 2015 09:39:58 +0100
-Subject: [Xen-devel] xen,arm: enable cpu_hotplug
-In-Reply-To: <561EE3E5.2000105@citrix.com>
-References: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
- <561EE3E5.2000105@citrix.com>
-Message-ID: <1444898398.1607.18.camel@citrix.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Thu, 15 Oct 2015 16:33:14 +0800
+Subject: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for HiSilicon
+ SoC Hip05
+In-Reply-To: <5572871.GecUyqk59W@wuerfel>
+References: <1444445957-239522-1-git-send-email-wangzhou1@hisilicon.com>
+ <30775300.COZ4nEMWXC@wuerfel> <561E23EB.7050504@hisilicon.com>
+ <5572871.GecUyqk59W@wuerfel>
+Message-ID: <561F64CA.7060606@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-10-15 at 00:23 +0100, Julien Grall wrote:
-> My second point is related to how Xen is handling interrupt with vCPU. 
-> When PSCI off is called, we will set the _VFP_down flag. This flag is 
-> used in vgic_vcpu_inject_irq and when it's set the interrupt will be 
-> ignored and stay active on the HW GIC forever. If the vCPU is coming 
-> back online, this interrupt will never be received. AFAIU the spec, the 
-> interrupt is expected to stay pending on the distributor side and will 
-> be receive when the vCPU will come back or migrate to another vCPU. A 
-> similar problem can happen when the vCPU is powered on again because we 
-> clear all the interrupt state related to vCPU (see
-> vgic_clear_pending_irqs).
+On 2015/10/15 5:56, Arnd Bergmann wrote:
+> On Wednesday 14 October 2015 17:44:11 Zhou Wang wrote:
+>> On 2015/10/14 17:06, Arnd Bergmann wrote:
+>>> On Wednesday 14 October 2015 16:59:03 Zhou Wang wrote:
+>>>>
+>>>> Hi Arnd,
+>>>>
+>>>> In Hip05 PCIe host, it uses GITS_TRANSLATER's address to get TLP package
+>>>> which contains MSI address and MSI data, and then combine BDF and MSI data
+>>>> to a 32 bit data which will be writen to GITS_TRANSLATER register of ITS.
+>>>>
+>>>> I think maybe this is a defect of our PCIe controller.
+>>>
+>>> I'd consider it a bug in the firmware if this is not set up correctly
+>>> before boot.
+>>>
+>>>>> I don't think what you do here is safe because the 'reg' property
+>>>>> of the MSI controller might point to the address that is used for
+>>>>> the message directly.
+>>>>
+>>>> I see your point, however we must get address of GITS_TRANSLATER and
+>>>> set it to PCIe host. How about adding necessary comments here?
+>>>
+>>> This seems to just be static setup that should be done before Linux
+>>> is even loaded. Any reason you can't do it that way?
+>>>
+>>
+>> There are some ITSs in Hip05-D02 platform, in fact, we can use any of them
+>> as a msi-controller,  which we can configure in dts. I am afraid that
+>> hard-setting the value in BIOS would lead to restrictions in terms of flexibility,
+>> as with the current implementation the same BIOS-driver can fit different
+>> DTS structures.
+> 
+> The dtb generally should be expected to match whatever the firmware sets up,
+> so if there is one reasonable setting here, I see no problem with hardcoding
+> it that way. In particular on server systems, we usually expect the firmware
+> to configure almost everything in advance and just tell us how it is
+> configured, while on embedded systems we can't trust the bootload and
+> usually set it all up in the kernel from scratch.
+>
 
-Is there also an interaction with our implementation of ITARGETSR of
-picking the lowest set bit? e.g. if an IRQ has target 0x6 (targeting CPU 1
-and CPU2) we will choose CPU 1. If CPU 1 is then unplugged, will we end up
-targeting CPU 2 or the now-offline CPU 1? In the latter case the lack of
-interrupts might be considered surprising?
+I see your point. Actually in order to support platforms without PCIe configuration
+support BIOS we planned to have a further commit once the driver was upstreamed,
+where we check if the link is already up, if not we would configure it in the kernel,
+otherwise we would return silently.
 
-Or maybe the way CPU hotplug is arranged we never end up with holes in the
-online cpu space, i.e it is not possible to take down CPU1 and leave CPU2
-up?
+Now about this patchset we can remove GITS_TRANSLATER address setting and do this
+in BIOS together with link-up setup; then in the next commit for supporting platforms
+without PCIe setup in UEFI, we can add this part back where we first check
+if the link is already up (we can assume that if BIOS has configured link-up,
+it has also setup the msi-parent address), if the link is up we skip reading
+msi-parent address.
 
-Ian.
+> What would be a reason to pick one ITS over another?
+
+In fact, we set PCIe host and ITS binding in dts. I mean that PCIe host can
+bind to any ITS nodes in system.
+
+> 
+> On a related note, don't you also need to describe in DT how PCI B/D/F
+> function numbers get turned into addresses in the ITS? Does that also
+> require configuration in the driver? I see this code here:
+
+We don't need to describe this. we need only describe the relationship between
+PCIe host and ITS, PCIe host will service PCIe devices which are connected to it.
+
+> 
+> 
+> +       hisi_pcie_apb_writel(pcie, PCIE_MSI_ASID_ENABLE | PCIE_MSI_ASID_VALUE,
+> +                            PCIE_SLV_MSI_ASID);
+> +       hisi_pcie_apb_writel(pcie, PCIE_MSI_TRANS_ENABLE, PCIE_MSI_TRANS_REG);
+> +       hisi_pcie_change_apb_mode(pcie, PCIE_SLV_DBI_MODE);
+>
+
+This code is to enable MSI support in PCIe host.
+
+> plus all of hisi_pcie_config_context(). This looks like it will change
+> the way the MSI is interpreted. This also seems like something that
+> could be done in the firmware in advance, and just get reported in DT.
+
+I think all hisi_pcie_config_context can be move to BIOS for this patchset,
+however in order to support other BIOSs which have no PCIe setup we would plan
+a future commit adding this back and working as explained above.
+
+Thanks,
+Zhou
+
+> 
+> 	Arnd
+> 
+> .
+> 
