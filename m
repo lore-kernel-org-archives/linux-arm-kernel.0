@@ -1,31 +1,22 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Oct 2015 18:20:40 +0100
-Subject: [PATCH v5 3/6] iommu: add ARM short descriptor page table
- allocator
-In-Reply-To: <20151014125419.GP27420@8bytes.org>
-References: <1444357388-30257-1-git-send-email-yong.wu@mediatek.com>
- <1444357388-30257-4-git-send-email-yong.wu@mediatek.com>
- <20151014125419.GP27420@8bytes.org>
-Message-ID: <20151015172039.GA19202@arm.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Thu, 15 Oct 2015 12:23:05 -0500
+Subject: [PATCH v2] ARM: fix vdsomunge not to depend on glibc specific
+ byteswap.h
+In-Reply-To: <585048FA-B498-4F84-AC09-642D95D7E8D9@goldelico.com>
+References: <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
+ <B69CCAC6-FB47-4B2B-95F9-15F1BA4AD381@goldelico.com>
+ <5B19AAFC-976C-4B33-A83E-229693FA7858@goldelico.com>
+ <561E63C9.3040702@mentor.com>
+ <350DE2A3-622F-4624-8AFC-D0F37CCB29EA@goldelico.com>
+ <561FDD58.1020602@mentor.com>
+ <585048FA-B498-4F84-AC09-642D95D7E8D9@goldelico.com>
+Message-ID: <561FE0F9.8010201@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 02:54:19PM +0200, Joerg Roedel wrote:
-> On Fri, Oct 09, 2015 at 10:23:05AM +0800, Yong Wu wrote:
-> > This patch is for ARM Short Descriptor Format.
-> > 
-> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> 
-> I think it would be good if Will Deacon could have a look on that.
-> 
-> Will, any comments on this patch?
+On 10/15/2015 12:16 PM, H. Nikolaus Schaller wrote:
+> Does this mean it is ok now in V3 in all cases? I have switched my patch editor
+> tool from indirect git imap-send to git send-email (which appears to be more
+> compatible).
 
-Unfortunately, I haven't found time to take a good look at this version
-(this patch usually takes the best part of a day to review properly)
-and I'm away on holiday all next week.
-
-I can review it when I'm back and have got back on top of email, but
-that probably doesn't work well with 4.4, unfortunately. Robin and/or
-Catalin may be able to review it in my absence, but it's hard work...
-
-Will
+v3 applied without issue, so yes, in that respect it is fine.
