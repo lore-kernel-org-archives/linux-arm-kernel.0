@@ -1,81 +1,38 @@
 From: sbranden@broadcom.com (Scott Branden)
-Date: Thu, 15 Oct 2015 11:35:14 -0700
-Subject: [RFC] ARM: BCM: Add SMP support for Broadcom 4708
-In-Reply-To: <20151015181409.GJ32089@broadcom.com>
-References: <1444844820-24290-1-git-send-email-kapilh@broadcom.com>
- <1444844820-24290-4-git-send-email-kapilh@broadcom.com>
- <561ED691.8080407@hauke-m.de> <20151014224003.GO15160@broadcom.com>
- <20151015154934.GD32089@broadcom.com> <20151015181409.GJ32089@broadcom.com>
-Message-ID: <561FF1E2.1010603@broadcom.com>
+Date: Thu, 15 Oct 2015 11:36:19 -0700
+Subject: [PATCH v2 7/7] clk: ns2: add clock support for Broadcom Northstar
+ 2 SoC
+In-Reply-To: <6398606.WW44dcgQDV@wuerfel>
+References: <1444770485-11210-1-git-send-email-jonmason@broadcom.com>
+ <6427519.eIBEvCNlle@wuerfel> <561EB10B.40502@broadcom.com>
+ <6398606.WW44dcgQDV@wuerfel>
+Message-ID: <561FF223.2050807@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks good.
+Jon,
 
-On 15-10-15 11:14 AM, Jon Mason wrote:
-> ARM: BCM: Add SMP support for Broadcom 4708
+Can you add this to your patchset and change COMMON_CLK_IPROC to a 
+silent option?
+
+On 15-10-14 01:16 PM, Arnd Bergmann wrote:
+> On Wednesday 14 October 2015 12:46:19 Scott Branden wrote:
+>>>
+>>> My patch fixes it by always selecting COMMON_CLK_IPROC from
+>>> ARCH_BCM_CYGNUS. I wasn't sure whether you want COMMON_CLK_IPROC
+>>> to still be user-selectable, so I left that in place. Normally
+>>> I'd expect it to be a silent option though, that just gets
+>>> implicitly enabled whenever a platform that needs it is built
+>>> into the kernel.
+>> COMMON_CLK_IPROC can be a silent option and selected as Arnd has done below.
 >
-> Add SMP support for Broadcom's 4708 SoCs.
+> Ok, please do that then. If you want to apply my patch directly,
+> you can remove that last paragraph from the description.
 >
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
-Acked-by: Scott Branden <sbranden@broadcom.com>
-> ---
->   arch/arm/boot/dts/bcm4708.dtsi | 2 ++
->   arch/arm/boot/dts/bcm94708.dts | 2 +-
->   arch/arm/mach-bcm/Kconfig      | 1 +
->   arch/arm/mach-bcm/Makefile     | 3 +++
->   4 files changed, 7 insertions(+), 1 deletion(-)
+>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Acked-by: Scott Branden <sbranden@broadcom.com>
 >
-> diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
-> index 31141e8..22a41df 100644
-> --- a/arch/arm/boot/dts/bcm4708.dtsi
-> +++ b/arch/arm/boot/dts/bcm4708.dtsi
-> @@ -15,6 +15,8 @@
->   	cpus {
->   		#address-cells = <1>;
->   		#size-cells = <0>;
-> +		enable-method = "brcm,bcm-nsp-smp";
-> +		secondary-boot-reg = <0xffff0400>;
+> Thanks for taking a look!
 >
->   		cpu at 0 {
->   			device_type = "cpu";
-> diff --git a/arch/arm/boot/dts/bcm94708.dts b/arch/arm/boot/dts/bcm94708.dts
-> index f60bb1d..49682d6 100644
-> --- a/arch/arm/boot/dts/bcm94708.dts
-> +++ b/arch/arm/boot/dts/bcm94708.dts
-> @@ -32,7 +32,7 @@
->
->   /dts-v1/;
->
-> -#include "bcm5301x.dtsi"
-> +#include "bcm4708.dtsi"
->
->   / {
->   	model = "NorthStar SVK (BCM94708)";
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> index 2e9dbb5..4fc8fa3 100644
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -54,6 +54,7 @@ config ARCH_BCM_NSP
->   config ARCH_BCM_5301X
->   	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
->   	select ARCH_BCM_IPROC
-> +	select HAVE_SMP
->   	help
->   	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
->
-> diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-> index 36a4ca30..3ca1cf1 100644
-> --- a/arch/arm/mach-bcm/Makefile
-> +++ b/arch/arm/mach-bcm/Makefile
-> @@ -43,6 +43,9 @@ obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
->
->   # BCM5301X
->   obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
-> +ifeq ($(CONFIG_ARCH_BCM_5301X),y)
-> +obj-$(CONFIG_SMP)		+= headsmp.o platsmp.o
-> +endif
->
->   # BCM63XXx
->   ifeq ($(CONFIG_ARCH_BCM_63XX),y)
+> 	Arnd
 >
