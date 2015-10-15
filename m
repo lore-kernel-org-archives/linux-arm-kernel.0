@@ -1,23 +1,34 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 14 Oct 2015 17:33:15 -0700
-Subject: [PATCH] ARM: bcm2835: add label for uart0
-In-Reply-To: <1443810675-25558-1-git-send-email-stefan.wahren@i2se.com>
-References: <1443810675-25558-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <876129ged0.fsf@eliezer.anholt.net>
+From: scottwood@freescale.com (Scott Wood)
+Date: Wed, 14 Oct 2015 19:57:01 -0500
+Subject: [PATCH V3 5/6] clk: qoriq: Add ls1043a support.
+In-Reply-To: <20151014183113.GE26883@codeaurora.org>
+References: <1444822498-16477-1-git-send-email-B48286@freescale.com>
+ <1444822498-16477-6-git-send-email-B48286@freescale.com>
+ <20151014183113.GE26883@codeaurora.org>
+Message-ID: <1444870621.5185.223.camel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+On Wed, 2015-10-14 at 11:31 -0700, Stephen Boyd wrote:
+> On 10/14, Zhiqiang Hou wrote:
+> > From: Hou Zhiqiang <B48286@freescale.com>
+> > 
+> > Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
+> > ---
+> 
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
 
-> This patch adds a label for uart0 to allow changing of uart0 pins.
->
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Could you ack my clock patchset that this depends on (if there are no 
 
-Pulled to bcm2835-dt-next with Stephen's ack.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151014/d244c220/attachment.sig>
+objections)?  Mike Turquette acked the RFC version a while back, but it's 
+
+changed a bit since then (including the new clk_get_num_parents() and 
+
+clk_get_parent_by_index() -- I CCed Russell King on that but got no 
+
+response), and got no response when I asked whether the ack was still good 
+
+for v3.
+
+-Scott
