@@ -1,30 +1,49 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 15 Oct 2015 17:01:14 +0100
-Subject: [PATCH v4 2/2] arm64: Expand the stack trace feature to support
- IRQ stack
-In-Reply-To: <179A25A2-C346-46C0-93D1-BABD4B6CB401@gmail.com>
-References: <1444231692-32722-1-git-send-email-jungseoklee85@gmail.com>
- <1444231692-32722-3-git-send-email-jungseoklee85@gmail.com>
- <5617CE26.10604@arm.com> <179A25A2-C346-46C0-93D1-BABD4B6CB401@gmail.com>
-Message-ID: <561FCDCA.1080804@arm.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 15 Oct 2015 12:02:51 -0400
+Subject: [PATCH v4 0/3]
+In-Reply-To: <561E7792.409@oracle.com>
+References: <1444832235-15263-1-git-send-email-m-karicheri2@ti.com>
+ <561E7792.409@oracle.com>
+Message-ID: <561FCE2B.8020802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/15 15:24, Jungseok Lee wrote:
-> On Oct 9, 2015, at 11:24 PM, James Morse wrote:
->> I think unwind_frame() needs to walk the irq stack too. [2] is an example
->> of perf tracing back to userspace, (and there are patches on the list to
->> do/fix this), so we need to walk back to the start of the first stack for
->> the perf accounting to be correct.
-> 
-> I plan to do re-spin this series without [PATCH 2/2] since 1) Akashi's
-> approach looks better than mine and 2) you have the perf patches for [2].
+On 10/14/2015 11:41 AM, santosh shilimkar wrote:
+> 10/14/2015 7:17 AM, Murali Karicheri wrote:
+>> This patch series enable accumulator queue support for K2 SoCs.
+>> Accumulator
+>> queues are a type of qmss queue that is monitored by the PDSP firmware
+>> and
+>> accumulated. Host is interrupted by PDSP firmware when packets become
+>> available in a ring buffer shared between the host and PDSP.
+>>
+>> There was an issue raised when merging the original patch set at
+>>   (1) https://lkml.org/lkml/2015/9/4/681
+>>     [PATCH v1 1/2] soc: ti: display firmware file name as part of boot
+>> log
+>>   (2) https://lkml.org/lkml/2015/9/4/680
+>>     [PATCH v1 2/2] ARM: dts: keystone: enable accumulator channels
+>>
+>> This series fixes the issues raised against v3. Maintainer, could you
+>> please
+>> apply this series to v4.4 next please at your earliest opportunity.
+>>
+> I have picked up the series. Thanks for quick turnaround.
 
-They aren't my patches - the ones I saw on the list were for arm:
-https://lkml.org/lkml/2015/10/1/769 - its evidently something perf
-supports, so we shouldn't make it worse...
+Thanks Santosh. Could you send this pull request for v4.4 next. We want 
+this merged to our internal release and if this is on next branch it 
+will help.
+
+Thanks
+
+Murali
+>
+> Regards,
+> Santosh
+>
+>
 
 
-Thanks!
-
-James
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
