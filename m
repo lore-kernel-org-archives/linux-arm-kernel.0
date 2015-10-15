@@ -1,38 +1,68 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Oct 2015 16:04:18 +0100
-Subject: [PATCH 0/6] iommu/arm-smmu: Updates for 4.4
-Message-ID: <1444921464-14895-1-git-send-email-will.deacon@arm.com>
+Date: Thu, 15 Oct 2015 16:04:22 +0100
+Subject: [PATCH 4/6] iommu/arm-smmu: fix error checking for ASID and VMID
+ allocation
+In-Reply-To: <1444921464-14895-1-git-send-email-will.deacon@arm.com>
+References: <1444921464-14895-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1444921464-14895-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The bitmap allocator returns an int, which is one of the standard
+negative values on failure. Rather than assigning this straight to a
+u16 (like we do for the ASID and VMID callers), which means that we
+won't detect failure correctly, use an int for the purposes of error
+checking.
 
-Here are the ARM SMMU updates I have queued for 4.4. I'm away next week,
-so I'll send a corresponding pull request shortly.
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-Will
-
---->8
-
-Fabio Estevam (1):
-  iommu/arm-smmu: Remove unneeded '0x' annotation
-
-Marc Zyngier (1):
-  iommu/arm-smmu: Add support for MSI on SMMUv3
-
-Tirumalesh Chalamarla (1):
-  iommu/arm-smmu: ThunderX mis-extends 64bit registers
-
-Will Deacon (3):
-  iommu/arm-smmu: Use drvdata instead of maintaining smmu_devices list
-  iommu/arm-smmu: fix error checking for ASID and VMID allocation
-  iommu/arm-smmu: remove redundant calculation of gr0 base address
-
- .../devicetree/bindings/iommu/arm,smmu-v3.txt      |  19 +++
- drivers/iommu/Kconfig                              |   1 +
- drivers/iommu/arm-smmu-v3.c                        | 154 +++++++++++++++------
- drivers/iommu/arm-smmu.c                           |  55 ++++----
- 4 files changed, 159 insertions(+), 70 deletions(-)
-
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 637014ab8965..970d78dcac53 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1419,7 +1419,7 @@ static int arm_smmu_domain_finalise_s1(struct arm_smmu_domain *smmu_domain,
+ 				       struct io_pgtable_cfg *pgtbl_cfg)
+ {
+ 	int ret;
+-	u16 asid;
++	int asid;
+ 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+ 	struct arm_smmu_s1_cfg *cfg = &smmu_domain->s1_cfg;
+ 
+@@ -1431,10 +1431,11 @@ static int arm_smmu_domain_finalise_s1(struct arm_smmu_domain *smmu_domain,
+ 					 &cfg->cdptr_dma, GFP_KERNEL);
+ 	if (!cfg->cdptr) {
+ 		dev_warn(smmu->dev, "failed to allocate context descriptor\n");
++		ret = -ENOMEM;
+ 		goto out_free_asid;
+ 	}
+ 
+-	cfg->cd.asid	= asid;
++	cfg->cd.asid	= (u16)asid;
+ 	cfg->cd.ttbr	= pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+ 	cfg->cd.tcr	= pgtbl_cfg->arm_lpae_s1_cfg.tcr;
+ 	cfg->cd.mair	= pgtbl_cfg->arm_lpae_s1_cfg.mair[0];
+@@ -1448,7 +1449,7 @@ out_free_asid:
+ static int arm_smmu_domain_finalise_s2(struct arm_smmu_domain *smmu_domain,
+ 				       struct io_pgtable_cfg *pgtbl_cfg)
+ {
+-	u16 vmid;
++	int vmid;
+ 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+ 	struct arm_smmu_s2_cfg *cfg = &smmu_domain->s2_cfg;
+ 
+@@ -1456,7 +1457,7 @@ static int arm_smmu_domain_finalise_s2(struct arm_smmu_domain *smmu_domain,
+ 	if (IS_ERR_VALUE(vmid))
+ 		return vmid;
+ 
+-	cfg->vmid	= vmid;
++	cfg->vmid	= (u16)vmid;
+ 	cfg->vttbr	= pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
+ 	cfg->vtcr	= pgtbl_cfg->arm_lpae_s2_cfg.vtcr;
+ 	return 0;
 -- 
 2.1.4
