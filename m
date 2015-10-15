@@ -1,50 +1,60 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Oct 2015 09:06:46 +0100
-Subject: [PATCH 5/6] ARM: shmobile: dt: Rename incorrect interrupt
- related binding
-In-Reply-To: <e5cf79d9957d958c0c5fd1cbc4eda6c48c563888.1444868660.git.horms+renesas@verge.net.au>
-References: <cover.1444868660.git.horms+renesas@verge.net.au>
- <e5cf79d9957d958c0c5fd1cbc4eda6c48c563888.1444868660.git.horms+renesas@verge.net.au>
-Message-ID: <20151015080646.GM32409@x1>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 15 Oct 2015 10:08:02 +0200
+Subject: [PATCH] VFIO: platform: AMD xgbe reset module
+In-Reply-To: <22278785.Xzxnmu2YlU@wuerfel>
+References: <1444836792-2405-1-git-send-email-eric.auger@linaro.org>
+ <22278785.Xzxnmu2YlU@wuerfel>
+Message-ID: <561F5EE2.7010405@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Oct 2015, Simon Horman wrote:
-
-> From: Lee Jones <lee.jones@linaro.org>
+Hi Arnd,
+On 10/14/2015 05:38 PM, Arnd Bergmann wrote:
+> On Wednesday 14 October 2015 15:33:12 Eric Auger wrote:
+>> --- a/drivers/vfio/platform/vfio_platform_common.c
+>> +++ b/drivers/vfio/platform/vfio_platform_common.c
+>> @@ -31,6 +31,11 @@ static const struct vfio_platform_reset_combo reset_lookup_table[] = {
+>>                 .reset_function_name = "vfio_platform_calxedaxgmac_reset",
+>>                 .module_name = "vfio-platform-calxedaxgmac",
+>>         },
+>> +       {
+>> +               .compat = "amd,xgbe-seattle-v1a",
+>> +               .reset_function_name = "vfio_platform_amdxgbe_reset",
+>> +               .module_name = "vfio-platform-amdxgbe",
+>> +       },
+>>  };
+>>  
+>>  static void vfio_platform_get_reset(struct vfio_platform_device *vdev,
+>>
 > 
-> interrupts-names => interrupt-names
+> This is causing build errors for me when CONFIG_MODULES is disabled.
+Sorry about that and thanks for reporting the issue
 > 
-> Other line changes are re-aligning.
+> Could this please be restructured so vfio_platform_get_reset does
+> not attempt to call __symbol_get() but instead has the drivers
+> register themselves properly to a subsystem?
+OK
+
+Could you elaborate about "has the drivers register themselves properly
+to a subsystem".
+
+My first proposal when coping with this problematic of being able to add
+reset plugins to the vfio-platform driver was to create new drivers per
+device requiring reset. but this was considered painful for end-users,
+who needed to be aware of the right driver to bind - and I think that
+makes sense - (https://lkml.org/lkml/2015/4/17/568) .
+
+A naive question I dare to ask, wouldn't it be acceptable to make
+vfio_platform depend on CONFIG_MODULES? Don't we disable modules for
+security purpose? In that context would we use VFIO?
+
+Best Regards
+
+Eric
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  .../bindings/memory-controllers/renesas-memory-controllers.txt      | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-
-Thanks for resending this Simon.
-
-> diff --git a/Documentation/devicetree/bindings/memory-controllers/renesas-memory-controllers.txt b/Documentation/devicetree/bindings/memory-controllers/renesas-memory-controllers.txt
-> index c64b7925cd09..9f78e6c82740 100644
-> --- a/Documentation/devicetree/bindings/memory-controllers/renesas-memory-controllers.txt
-> +++ b/Documentation/devicetree/bindings/memory-controllers/renesas-memory-controllers.txt
-> @@ -24,9 +24,9 @@ Required properties:
->  Optional properties:
->    - interrupts: Must contain a list of interrupt specifiers for memory
->  		controller interrupts, if available.
-> -  - interrupts-names: Must contain a list of interrupt names corresponding to
-> -		      the interrupts in the interrupts property, if available.
-> -		      Valid interrupt names are:
-> +  - interrupt-names: Must contain a list of interrupt names corresponding to
-> +		     the interrupts in the interrupts property, if available.
-> +		     Valid interrupt names are:
->  			- "sec" (secure interrupt)
->  			- "temp" (normal (temperature) interrupt)
->    - power-domains: Must contain a reference to the PM domain that the memory
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> I don't see any way this could be fixed otherwise. The problem
+> of course showed up with calxedaxgmac already, but I'd prefer not
+> to see anything added there until the common code has been improved.
+> 
+> 	Arnd
+> 
