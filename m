@@ -1,76 +1,87 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 15 Oct 2015 15:10:50 -0500
-Subject: [PATCH v2 3/8] PCI/MSI: Use of_msi_get_domain instead of
- open-coded "msi-parent" parsing
-In-Reply-To: <1444151043-31084-4-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 15 Oct 2015 15:11:09 -0500
+Subject: [PATCH v2 7/8] PCI: Add per-device MSI domain hook
+In-Reply-To: <1444151043-31084-8-git-send-email-marc.zyngier@arm.com>
 References: <1444151043-31084-1-git-send-email-marc.zyngier@arm.com>
- <1444151043-31084-4-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20151015201050.GC10442@localhost>
+ <1444151043-31084-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151015201109.GD10442@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 06:03:58PM +0100, Marc Zyngier wrote:
-> Now that we have a function that implements the complexity of the
-> "msi-parent" property parsing, switch to that.
+On Tue, Oct 06, 2015 at 06:04:02PM +0100, Marc Zyngier wrote:
+> So far, we have considered that the MSI domain for a device was
+> either set via the architecture-dependent pcibios implementation
+> or inherited from the host bridge.
+> 
+> As we're about to break that assumption, add pci_dev_msi_domain
+> which is the equivalent of pci_host_bridge_msi_domain, but for
+> a single device.
+> 
+> Other than moving things around a bit, this patch on its own
+> has no effect.
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
 Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
 > ---
->  drivers/pci/of.c | 13 ++++++-------
->  1 file changed, 6 insertions(+), 7 deletions(-)
+>  drivers/pci/probe.c | 35 ++++++++++++++++++++++++++++++-----
+>  1 file changed, 30 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-> index 2e99a50..e112da1 100644
-> --- a/drivers/pci/of.c
-> +++ b/drivers/pci/of.c
-> @@ -13,6 +13,7 @@
->  #include <linux/kernel.h>
->  #include <linux/pci.h>
->  #include <linux/of.h>
-> +#include <linux/of_irq.h>
->  #include <linux/of_pci.h>
->  #include "pci.h"
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 8361d27..7c333f8 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -1622,15 +1622,40 @@ static void pci_init_capabilities(struct pci_dev *dev)
+>  	pci_enable_acs(dev);
+>  }
 >  
-> @@ -64,27 +65,25 @@ struct device_node * __weak pcibios_get_phb_of_node(struct pci_bus *bus)
->  struct irq_domain *pci_host_bridge_of_msi_domain(struct pci_bus *bus)
->  {
->  #ifdef CONFIG_IRQ_DOMAIN
-> -	struct device_node *np;
->  	struct irq_domain *d;
->  
->  	if (!bus->dev.of_node)
->  		return NULL;
->  
->  	/* Start looking for a phandle to an MSI controller. */
-> -	np = of_parse_phandle(bus->dev.of_node, "msi-parent", 0);
-> +	d = of_msi_get_domain(&bus->dev, bus->dev.of_node, DOMAIN_BUS_PCI_MSI);
+> +/*
+> + * This is the equivalent of pci_host_bridge_msi_domain that acts on
+> + * devices. Firmware interfaces that can select the MSI domain on a
+> + * per-device basis should be called from here.
+> + */
+> +static struct irq_domain *pci_dev_msi_domain(struct pci_dev *dev)
+> +{
+> +	struct irq_domain *d;
+> +
+> +	/*
+> +	 * If a domain has been set through the pcibios_add_device
+> +	 * callback, then this is the one (platform code knows best).
+> +	 */
+> +	d = dev_get_msi_domain(&dev->dev);
 > +	if (d)
 > +		return d;
->  
+> +
+> +	return NULL;
+> +}
+> +
+>  static void pci_set_msi_domain(struct pci_dev *dev)
+>  {
+> +	struct irq_domain *d;
+> +
 >  	/*
->  	 * If we don't have an msi-parent property, look for a domain
->  	 * directly attached to the host bridge.
+> -	 * If no domain has been set through the pcibios_add_device
+> -	 * callback, inherit the default from the bus device.
+> +	 * If the platform or firmware interfaces cannot supply a
+> +	 * device-specific MSI domain, then inherit the default domain
+> +	 * from the host bridge itself.
 >  	 */
-> -	if (!np)
-> -		np = bus->dev.of_node;
-> -
-> -	d = irq_find_matching_host(np, DOMAIN_BUS_PCI_MSI);
-> +	d = irq_find_matching_host(bus->dev.of_node, DOMAIN_BUS_PCI_MSI);
->  	if (d)
->  		return d;
+> -	if (!dev_get_msi_domain(&dev->dev))
+> -		dev_set_msi_domain(&dev->dev,
+> -				   dev_get_msi_domain(&dev->bus->dev));
+> +	d = pci_dev_msi_domain(dev);
+> +	if (!d)
+> +		d = dev_get_msi_domain(&dev->bus->dev);
+> +
+> +	dev_set_msi_domain(&dev->dev, d);
+>  }
 >  
-> -	return irq_find_host(np);
-> +	return irq_find_host(bus->dev.of_node);
->  #else
->  	return NULL;
->  #endif
+>  void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
 > -- 
 > 2.1.4
 > 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
