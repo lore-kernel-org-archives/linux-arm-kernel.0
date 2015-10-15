@@ -1,22 +1,104 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Thu, 15 Oct 2015 12:23:05 -0500
-Subject: [PATCH v2] ARM: fix vdsomunge not to depend on glibc specific
- byteswap.h
-In-Reply-To: <585048FA-B498-4F84-AC09-642D95D7E8D9@goldelico.com>
-References: <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
- <B69CCAC6-FB47-4B2B-95F9-15F1BA4AD381@goldelico.com>
- <5B19AAFC-976C-4B33-A83E-229693FA7858@goldelico.com>
- <561E63C9.3040702@mentor.com>
- <350DE2A3-622F-4624-8AFC-D0F37CCB29EA@goldelico.com>
- <561FDD58.1020602@mentor.com>
- <585048FA-B498-4F84-AC09-642D95D7E8D9@goldelico.com>
-Message-ID: <561FE0F9.8010201@mentor.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 15 Oct 2015 17:24:35 +0000
+Subject: [PATCH RFC 4/7] genirq/msi: Make the .prepare callback reusable
+In-Reply-To: <1444923568-17413-5-git-send-email-marc.zyngier@arm.com>
+References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
+ <1444923568-17413-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1624783E@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2015 12:16 PM, H. Nikolaus Schaller wrote:
-> Does this mean it is ok now in V3 in all cases? I have switched my patch editor
-> tool from indirect git imap-send to git send-email (which appears to be more
-> compatible).
+Hi Marc
 
-v3 applied without issue, so yes, in that respect it is fine.
+It looks like this patch fails to apply to 4.3-rc5....
+
+Gab
+
+> -----Original Message-----
+> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+> owner at vger.kernel.org] On Behalf Of Marc Zyngier
+> Sent: Thursday, October 15, 2015 4:39 PM
+> To: Thomas Gleixner; Jiang Liu; Jason Cooper
+> Cc: majun (F); linux-arm-kernel at lists.infradead.org; linux-
+> pci at vger.kernel.org; linux-kernel at vger.kernel.org
+> Subject: [PATCH RFC 4/7] genirq/msi: Make the .prepare callback
+> reusable
+> 
+> The .prepare callbacks are so far only called from
+> msi_domain_alloc_irqs.
+> In order to reuse that code, split that code and create a
+> msi_domain_prepare_irqs function that the existing code can call into.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  include/linux/msi.h |  4 ++++
+>  kernel/irq/msi.c    | 20 +++++++++++++++++---
+>  2 files changed, 21 insertions(+), 3 deletions(-)
+> 
+> diff --git a/include/linux/msi.h b/include/linux/msi.h
+> index 32a24b9..5bb36a9 100644
+> --- a/include/linux/msi.h
+> +++ b/include/linux/msi.h
+> @@ -277,6 +277,10 @@ struct irq_domain
+> *platform_msi_create_irq_domain(struct fwnode_handle *fwnode,
+>  int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int
+> nvec,
+>  				   irq_write_msi_msg_t write_msi_msg);
+>  void platform_msi_domain_free_irqs(struct device *dev);
+> +
+> +/* When an MSI domain is used as an intermediate domain */
+> +int msi_domain_prepare_irqs(struct irq_domain *domain, struct device
+> *dev,
+> +			    int nvec, msi_alloc_info_t *args);
+>  #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
+> 
+>  #ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
+> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+> index 95354bb..8e6e112 100644
+> --- a/kernel/irq/msi.c
+> +++ b/kernel/irq/msi.c
+> @@ -256,6 +256,22 @@ struct irq_domain *msi_create_irq_domain(struct
+> fwnode_handle *fwnode,
+>  					   &msi_domain_ops, info);
+>  }
+> 
+> +int msi_domain_prepare_irqs(struct irq_domain *domain, struct device
+> *dev,
+> +			    int nvec, msi_alloc_info_t *arg)
+> +{
+> +	struct msi_domain_info *info = domain->host_data;
+> +	struct msi_domain_ops *ops = info->ops;
+> +	int ret;
+> +
+> +	ret = ops->msi_check(domain, info, dev);
+> +	if (ret == 0)
+> +		ret = ops->msi_prepare(domain, dev, nvec, arg);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return 0;
+> +}
+> +
+>  /**
+>   * msi_domain_alloc_irqs - Allocate interrupts from a MSI interrupt
+> domain
+>   * @domain:	The domain to allocate from
+> @@ -274,9 +290,7 @@ int msi_domain_alloc_irqs(struct irq_domain *domain,
+> struct device *dev,
+>  	struct msi_desc *desc;
+>  	int i, ret, virq = -1;
+> 
+> -	ret = ops->msi_check(domain, info, dev);
+> -	if (ret == 0)
+> -		ret = ops->msi_prepare(domain, dev, nvec, &arg);
+> +	ret = msi_domain_prepare_irqs(domain, dev, nvec, &arg);
+>  	if (ret)
+>  		return ret;
+> 
+> --
+> 2.1.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
