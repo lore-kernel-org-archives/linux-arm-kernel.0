@@ -1,135 +1,158 @@
-From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Thu, 15 Oct 2015 08:54:59 +0200
-Subject: [PATCH] arm: fix the return value of find_first{_zero}_bit
-Message-ID: <1444892115-24784-1-git-send-email-clabbe.montjoie@gmail.com>
+From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
+Date: Thu, 15 Oct 2015 12:17:40 +0530
+Subject: [PATCH v3 00/12] ARM64: Update support for FSL's LS2085A SoC
+Message-ID: <1444891672-32117-1-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building linux with W=1 on arm give me this warning;
-In file included from ../include/linux/nodemask.h:92:0,
-                 from ../include/linux/mmzone.h:16,
-                 from ../include/linux/gfp.h:5,
-                 from ../include/linux/kmod.h:22,
-                 from ../include/linux/module.h:13,
-                 from net/netfilter/xt_nat.mod.c:1:
-../include/linux/bitmap.h: In function 'bitmap_empty':
-../include/linux/bitmap.h:287:36: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
-  return find_first_bit(src, nbits) == nbits;
+This is the v3 of the patchset which updates the support for FSL's LS2085A SoC
+which is now being renamed to LS2080A (and is based on ARMv8 architecture).
 
-../include/linux/bitmap.h: In function 'bitmap_full':
-../include/linux/bitmap.h:295:41: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
-  return find_first_zero_bit(src, nbits) == nbits;
+Here is a description of what this patchset tries to achieve:
+(v2 can be viewed here: http://www.spinics.net/lists/arm-kernel/msg442910.html)
 
-The problem is that find_first{_zero}_bit() return type is unsigned long on
-majority of arch.
+  - Patch 1:
+    Freescale will be a supporting a host of ARMv8 based SoCs which
+    will be based on a similar overall SoC architecture. So, this patch
+    converts the existing infrastructure to use the generic convention
+    ARCH_LAYERSCAPE.
+    
+    	Changes since v2:
+	-----------------
+	Minor rewording of Kconfig help text.
 
-Since find_first{_zero}_bit cannot return negative value, unsigned long is
-the best return type.
+  - Patch 2:
+    Freescale is renaming the LS2085A SoC to LS2080A - this patch handles the
+    same.
+    Further details of the LS2080a based platforms can be seen here:
+    http://www.freescale.com/products/arm-processors/qoriq-arm-processors/qoriq-ls2080a-40a-multicore-communications-processors:LS2080A?fsrch=1&sr=1&pageNum=1
+    
+	Changes since v2:
+	-----------------
+	No changes
 
-After some read, it seems that find_next_bit_[lb]e/_find_next_zero_bit_[lb]e
-are also incorectly set as return int.
+  - Patch 3:
+    Adds DTS binding documentation for Freescale's LS2080A QDS and RDB boards
+    
+	Changes since v2:
+	-----------------
+	No changes
 
-This patch fix the return type of all thoses functions.
+  - Patch 4:
+    This patch moves the FSL board specific bindings out of 'powerpc/' folder
+    as the same board components can be used for ARM based SoCs as well.
+	
+	Changes since v2:
+	-----------------
+	Minor rewording of commit log. Moved 'interrupt' property to
+	optional as this is not 'Required' for Qixis FPGA controllers.
 
-Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
----
- arch/arm/include/asm/bitops.h | 22 +++++++++++-----------
- arch/arm/lib/findbit.S        |  8 ++++----
- 2 files changed, 15 insertions(+), 15 deletions(-)
+  - Patch 5:
+    Updates PCIe devicetree binding documentation for LS2080A.
+	
+	Changes since v2:
+	-----------------
+	Minor rewording of commit log.
 
-diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
-index e943e6c..868414b 100644
---- a/arch/arm/include/asm/bitops.h
-+++ b/arch/arm/include/asm/bitops.h
-@@ -159,18 +159,18 @@ extern int _test_and_change_bit(int nr, volatile unsigned long * p);
- /*
-  * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
-  */
--extern int _find_first_zero_bit_le(const void * p, unsigned size);
--extern int _find_next_zero_bit_le(const void * p, int size, int offset);
--extern int _find_first_bit_le(const unsigned long *p, unsigned size);
--extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
-+extern unsigned long _find_first_zero_bit_le(const void *p, unsigned size);
-+extern unsigned long _find_next_zero_bit_le(const void *p, int size, int offset);
-+extern unsigned long _find_first_bit_le(const unsigned long *p, unsigned size);
-+extern unsigned long _find_next_bit_le(const unsigned long *p, int size, int offset);
+  - Patch 6:
+    Updates the GPIO devicetree binding documentation for LS2080A.
+	
+	Changes since v2:
+	-----------------
+	Used fsl,qoriq-gpio compatible string for Layerscape SoCs.
+    
+  - Patch 7:
+    Updates the DWC3 USB bindings to provide reference to generic USB
+    bindings.
+	
+	Changes since v2:
+	-----------------
+	New patch
+  
+  - Patch 8:
+    Updates the support of various peripherals (PMU, SMMU, SATA, PCI, SPI)
+    present on FSL LS2080a SoC in the SoC DTSI.
+	
+	Changes since v2:
+	-----------------
+	Added device nodes under the /soc node as suggested by Rob.
+	Removed WDT node.
+
+  - Patch 9:
+    Updates the DTS LS2080a simulator platform to reflect the new
+    peripherals added in the DTSI.
+	
+	Changes since v2:
+	-----------------
+	Added serial alias
+
+  - Patch 10:
+    Remove text about writing to Free Software Foundation
+	
+	Changes since v2:
+	-----------------
+	New patch
+
+ - Patch 11:
+    Adds new DTS files for LS2080a based QDS and RDB boards.
+	
+	Changes since v2:
+	-----------------
+	Added serial alias
  
- /*
-  * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
-  */
--extern int _find_first_zero_bit_be(const void * p, unsigned size);
--extern int _find_next_zero_bit_be(const void * p, int size, int offset);
--extern int _find_first_bit_be(const unsigned long *p, unsigned size);
--extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
-+extern unsigned long _find_first_zero_bit_be(const void *p, unsigned size);
-+extern unsigned long _find_next_zero_bit_be(const void *p, int size, int offset);
-+extern unsigned long _find_first_bit_be(const unsigned long *p, unsigned size);
-+extern unsigned long _find_next_bit_be(const unsigned long *p, int size, int offset);
- 
- #ifndef CONFIG_SMP
- /*
-@@ -317,19 +317,19 @@ static inline unsigned long __ffs(unsigned long x)
- 
- #ifdef __ARMEB__
- 
--static inline int find_first_zero_bit_le(const void *p, unsigned size)
-+static inline unsigned long find_first_zero_bit_le(const void *p, unsigned size)
- {
- 	return _find_first_zero_bit_le(p, size);
- }
- #define find_first_zero_bit_le find_first_zero_bit_le
- 
--static inline int find_next_zero_bit_le(const void *p, int size, int offset)
-+static inline unsigned long find_next_zero_bit_le(const void *p, int size, int offset)
- {
- 	return _find_next_zero_bit_le(p, size, offset);
- }
- #define find_next_zero_bit_le find_next_zero_bit_le
- 
--static inline int find_next_bit_le(const void *p, int size, int offset)
-+static inline unsigned long find_next_bit_le(const void *p, int size, int offset)
- {
- 	return _find_next_bit_le(p, size, offset);
- }
-diff --git a/arch/arm/lib/findbit.S b/arch/arm/lib/findbit.S
-index 7848780..b4f6aec 100644
---- a/arch/arm/lib/findbit.S
-+++ b/arch/arm/lib/findbit.S
-@@ -19,7 +19,7 @@
- 
- /*
-  * Purpose  : Find a 'zero' bit
-- * Prototype: int find_first_zero_bit(void *addr, unsigned int maxbit);
-+ * Prototype: unsigned long find_first_zero_bit(void *addr, unsigned int maxbit);
-  */
- ENTRY(_find_first_zero_bit_le)
- 		teq	r1, #0	
-@@ -40,7 +40,7 @@ ENDPROC(_find_first_zero_bit_le)
- 
- /*
-  * Purpose  : Find next 'zero' bit
-- * Prototype: int find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
-+ * Prototype: unsigned long find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
-  */
- ENTRY(_find_next_zero_bit_le)
- 		teq	r1, #0
-@@ -60,7 +60,7 @@ ENDPROC(_find_next_zero_bit_le)
- 
- /*
-  * Purpose  : Find a 'one' bit
-- * Prototype: int find_first_bit(const unsigned long *addr, unsigned int maxbit);
-+ * Prototype: unsigned long find_first_bit(const unsigned long *addr, unsigned int maxbit);
-  */
- ENTRY(_find_first_bit_le)
- 		teq	r1, #0	
-@@ -81,7 +81,7 @@ ENDPROC(_find_first_bit_le)
- 
- /*
-  * Purpose  : Find next 'one' bit
-- * Prototype: int find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
-+ * Prototype: unsigned long find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
-  */
- ENTRY(_find_next_bit_le)
- 		teq	r1, #0
+  - Patch 12:
+    Adds build support for LS2080a QDS and RDB board DTS files.
+	
+	Changes since v2:
+	-----------------
+	No changes
+
+Rebasing details:
+-----------------
+- Rebased against linux-next git tree, branch: master
+
+- Rebased against Scott's latest v3 of QorIQ clk fixes, which can be
+  viewed here:
+  http://linux.freescale.net/patchwork/patch/59805/
+
+Bhupesh Sharma (12):
+  arm64: Use generic Layerscape SoC family naming
+  arm64: Rename FSL LS2085A SoC support code to LS2080A
+  Documentation: DT: Add entry for FSL LS2080A QDS and RDB boards
+  Documentation/dts: Move FSL board-specific bindings out of /powerpc
+  doc/bindings: Update Layerscape PCIe devicetree binding to be more
+    flexible
+  doc/bindings: Update GPIO devicetree binding documentation for
+    LS2080A
+  doc: DTS: Update DWC3 binding to provide reference to generic
+    bindings
+  dts/ls2080a: Update DTSI to add support of various peripherals
+  dts/ls2080a: Update Simulator DTS to add support of various
+    peripherals
+  dts/ls2080a: Remove text about writing to Free Software Foundation
+  dts/ls2080a: Add DTS support for LS2080a QDS & RDB boards
+  dts/Makefile: Add build support for LS2080a QDS & RDB board DTS
+
+ Documentation/devicetree/bindings/arm/fsl.txt      |   16 +-
+ .../{powerpc/fsl/board.txt => board/fsl-board.txt} |   14 +-
+ .../devicetree/bindings/gpio/gpio-mpc8xxx.txt      |    4 +-
+ .../devicetree/bindings/pci/layerscape-pci.txt     |   15 +-
+ Documentation/devicetree/bindings/usb/dwc3.txt     |    3 +-
+ arch/arm64/Kconfig.platforms                       |    6 +-
+ arch/arm64/boot/dts/freescale/Makefile             |    2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts  |  204 ++++++++
+ .../{fsl-ls2085a-simu.dts => fsl-ls2080a-rdb.dts}  |  131 ++++-
+ .../{fsl-ls2085a-simu.dts => fsl-ls2080a-simu.dts} |   69 ++-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |  504 ++++++++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi     |  163 -------
+ arch/arm64/configs/defconfig                       |    2 +-
+ 13 files changed, 929 insertions(+), 204 deletions(-)
+ rename Documentation/devicetree/bindings/{powerpc/fsl/board.txt => board/fsl-board.txt} (90%)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
+ copy arch/arm64/boot/dts/freescale/{fsl-ls2085a-simu.dts => fsl-ls2080a-rdb.dts} (51%)
+ rename arch/arm64/boot/dts/freescale/{fsl-ls2085a-simu.dts => fsl-ls2080a-simu.dts} (74%)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+ delete mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+
 -- 
-2.4.9
+1.7.9.5
