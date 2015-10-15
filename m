@@ -1,37 +1,52 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 15 Oct 2015 19:17:21 +0200
-Subject: [PATCH 1/3] mtd: nand: add NAND_NEED_SCRAMBLING option flag
-In-Reply-To: <1444929443-25537-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1444929443-25537-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1444929443-25537-2-git-send-email-boris.brezillon@free-electrons.com>
+Date: Thu, 15 Oct 2015 19:17:20 +0200
+Subject: [PATCH 0/3] mtd: nand: add preliminary support for data scramblers
+Message-ID: <1444929443-25537-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some MLC NANDs are sensible to repeated patterns and require data to be
-scrambled in order to limit the number of bitflips.
-Add a new flag to let the NAND controller know about this constraint.
+Hello,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- include/linux/mtd/nand.h | 6 ++++++
- 1 file changed, 6 insertions(+)
+This patch series aims at supporting the hardware scrambler available in
+the Allwinner NAND controller, which is required to interface with some
+unreliable MLC NANDs.
 
-diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index 5a9d1d4..19b4c6f 100644
---- a/include/linux/mtd/nand.h
-+++ b/include/linux/mtd/nand.h
-@@ -160,6 +160,12 @@ typedef enum {
- /* Device supports subpage reads */
- #define NAND_SUBPAGE_READ	0x00001000
- 
-+/*
-+ * Some MLC NANDs need data scrambling to limit bitflips caused by repeated
-+ * patterns.
-+ */
-+#define NAND_NEED_SCRAMBLING	0x00002000
-+
- /* Options valid for Samsung large page devices */
- #define NAND_SAMSUNG_LP_OPTIONS NAND_CACHEPRG
- 
+The main purpose of the scrambler is to avoid repeating patterns over
+a specific NAND block, which can be a problem for some NANDs.
+
+The approach taken in this patch is to flag all NAND requiring an external
+data scrambler so that the controller will know about this constraint and
+hopefully activate its scrambler engine (if it has one).
+
+The scrambling itself is currently tightly coupled to the ECC engine, which
+makes things easier: everything is hidden in the HW ECC engine
+implementation, but that also mean you cannot activate the scrambler
+without using the HW ECC engine (which is an unlikely case anyway).
+Another thing that is worth mentioning is that the randomizer is disabled
+when accessing the NAND in raw mode, which make NAND dumps in raw mode
+pretty much unreadable unless you have a tool to descramble the data.
+
+Also note that I previously posted an RFC [1] exposing the scrambler as a
+separate layer to decouple the ECC and scrambling management, but I don't
+think it's worth the pain until someone else comes with another scrambler
+controller and we really see the need to factorize some code.
+
+Best Regards,
+
+Boris
+
+[1]https://lkml.org/lkml/2014/4/30/721
+
+Boris Brezillon (3):
+  mtd: nand: add NAND_NEED_SCRAMBLING option flag
+  mtd: nand: add NAND_NEED_SCRAMBLING flag to the H27UCG8T2ATR-BC
+    definition
+  mtd: nand: sunxi: add randomizer support
+
+ drivers/mtd/nand/nand_ids.c   |   4 +-
+ drivers/mtd/nand/sunxi_nand.c | 274 ++++++++++++++++++++++++++++++++++++++----
+ include/linux/mtd/nand.h      |   6 +
+ 3 files changed, 258 insertions(+), 26 deletions(-)
+
 -- 
 2.1.4
