@@ -1,29 +1,38 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 15 Oct 2015 10:18:12 -0400
-Subject: [PATCH] arm64: ftrace: function_graph: dump real return addr in
- call trace
-In-Reply-To: <20151015125133.GA29301@arm.com>
-References: <1444911155-17480-1-git-send-email-huawei.libin@huawei.com>
- <6277407.jveniKQDxt@wuerfel> <20151015125133.GA29301@arm.com>
-Message-ID: <20151015101812.7cb6e917@gandalf.local.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 16:18:39 +0200
+Subject: [PATCH v3 09/12] dts/ls2080a: Update Simulator DTS to add support
+ of various peripherals
+In-Reply-To: <1444891672-32117-10-git-send-email-bhupesh.sharma@freescale.com>
+References: <1444891672-32117-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1444891672-32117-10-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <6141791.soHsjI1RN1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Oct 2015 13:51:33 +0100
-Will Deacon <will.deacon@arm.com> wrote:
+On Thursday 15 October 2015 12:17:49 Bhupesh Sharma wrote:
+> +
+> +&esdhc {
+> +       status = "disabled";
+> +};
+> +
+> +&ifc {
+> +       status = "okay";
+> +};
+> +
+> +&i2c0 {
+> +       status = "disabled";
+> +};
+> +
+> +&i2c1 {
+> +       status = "disabled";
+> +};
+> +
+> +&i2c2 {
+> +       status = "disabled";
+> +};
 
-> Is this the same old problem caused by e306dfd06fcb ("ARM64: unwind: Fix
-> PC calculation")? I've said previously that I'm happy to revert that if
-> we're the only architecture with this behaviour, but Akashi resisted
-> because there are other issues with ftrace that he was hoping to address
-> and they would resolve this too.
+The more common way to do this is to turn off all optional HW blocks in the
+.dtsi file and then overide the ones that are connected on a particular board
+by overriding the status to "ok" there.
 
-Just a reference, but this patch is pretty much exactly what x86
-currently has. I wonder if I should make that function generic for all
-archs to use.
-
-If you accept this patch, I can look at what archs do and pull out the
-common code and place it into the core code and have the archs call
-that instead.
-
--- Steve
+	Arnd
