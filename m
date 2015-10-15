@@ -1,95 +1,77 @@
 From: john.ogness@linutronix.de (John Ogness)
-Date: Thu, 15 Oct 2015 12:46:26 +0200
-Subject: [PATCH] ARM: edma: fix residue race for cyclic
-Message-ID: <87io68s931.fsf@linutronix.de>
+Date: Thu, 15 Oct 2015 12:48:05 +0200
+Subject: [PATCH] ARM: edma: special case slot limit workaround
+Message-ID: <87eggws90a.fsf@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When retrieving the residue value for cyclic transfers, the DST
-field of the active PaRAM is read. However, the AM335x Technical
-Reference Manual states:
+Currently drivers are limited to 19 slots for cyclic transfers.
+However, if the DMA burst size is the same as the period size,
+the period size can be changed to the full buffer size and
+intermediate interrupts activated. Since intermediate interrupts
+will trigger for each burst and the burst size is the same as
+the period size, the driver will get interrupts each period as
+expected. This has the benefit of allowing the functionality of
+many more slots, but only uses 2 slots.
 
-  11.3.3.6 Parameter Set Updates
-
-  After the TR is read from the PaRAM (and is in the process of
-  being submitted to the EDMA3TC), the following fields are
-  updated as needed: ... DST
-
-This means the DST is incremented even though the DMA transfer
-may not have started yet or is in progress. Thus if the reader
-of the residue accesses the DMA buffer too quickly, the CPU
-will read where data is not yet written.
-
-The CCSTAT.ACTV register is a boolean that is set if any TR is
-being processed by either the EMDA3CC or EDMA3TC. By polling
-this register it is possible to ensure that the residue value
-returned is valid for immediate processing.
+This workaround is only active if more than 19 slots are needed
+and the burst size matches the period size.
 
 Signed-off-by: John Ogness <john.ogness@linutronix.de>
 ---
- arch/arm/common/edma.c             |   17 +++++++++++++++++
- drivers/dma/edma.c                 |    8 ++++++++
- include/linux/platform_data/edma.h |    1 +
- 3 files changed, 26 insertions(+)
+ drivers/dma/edma.c |   25 ++++++++++++++++++++++---
+ 1 file changed, 22 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 873dbfc..86ce980 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -995,6 +995,23 @@ void edma_set_dest(unsigned slot, dma_addr_t dest_port,
- }
- EXPORT_SYMBOL(edma_set_dest);
- 
-+#define EDMA_CCSTAT_ACTV (1 << 4)
-+
-+/**
-+ * edma_is_actv - report if any transfer requests are active
-+ * @slot: parameter RAM slot being examined
-+ *
-+ * Returns true if any transfer requests are active on the slot
-+ */
-+bool edma_is_actv(unsigned slot)
-+{
-+	u32 ctlr = EDMA_CTLR(slot);
-+	unsigned int ccstat;
-+
-+	ccstat = edma_read(ctlr, EDMA_CCSTAT);
-+	return (ccstat & EDMA_CCSTAT_ACTV);
-+}
-+
- /**
-  * edma_get_position - returns the current transfer point
-  * @slot: parameter RAM slot being examined
 diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 3e5d4f1..493c774 100644
+index 493c774..16bd193 100644
 --- a/drivers/dma/edma.c
 +++ b/drivers/dma/edma.c
-@@ -891,6 +891,14 @@ static u32 edma_residue(struct edma_desc *edesc)
- 	pos = edma_get_position(edesc->echan->slot[0], dst);
+@@ -585,6 +585,7 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+ 	struct edma_desc *edesc;
+ 	dma_addr_t src_addr, dst_addr;
+ 	enum dma_slave_buswidth dev_width;
++	bool use_intermediate = false;
+ 	u32 burst;
+ 	int i, ret, nslots;
  
- 	/*
-+	 * "pos" may represent a transfer request that is still being
-+	 * processed by the EDMACC or EDMATC. Wait until all transfer
-+	 * requests on the active slot are finished before proceeding.
-+	 */
-+	while (edma_is_actv(edesc->echan->slot[0]))
-+		cpu_relax();
+@@ -626,8 +627,21 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+ 	 * but the synchronization is difficult to achieve with Cyclic and
+ 	 * cannot be guaranteed, so we error out early.
+ 	 */
+-	if (nslots > MAX_NR_SG)
+-		return NULL;
++	if (nslots > MAX_NR_SG) {
++		/*
++		 * If the burst and period sizes are the same, we can put
++		 * the full buffer into a single period and activate
++		 * intermediate interrupts. This will produce interrupts
++		 * after each burst, which is also after each desired period.
++		 */
++		if (burst == period_len) {
++			period_len = buf_len;
++			nslots = 2;
++			use_intermediate = true;
++		} else {
++			return NULL;
++		}
++	}
+ 
+ 	edesc = kzalloc(sizeof(*edesc) + nslots *
+ 		sizeof(edesc->pset[0]), GFP_ATOMIC);
+@@ -706,8 +720,13 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+ 		/*
+ 		 * Enable period interrupt only if it is requested
+ 		 */
+-		if (tx_flags & DMA_PREP_INTERRUPT)
++		if (tx_flags & DMA_PREP_INTERRUPT) {
+ 			edesc->pset[i].param.opt |= TCINTEN;
 +
-+	/*
- 	 * Cyclic is simple. Just subtract pset[0].addr from pos.
- 	 *
- 	 * We never update edesc->residue in the cyclic case, so we
-diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
-index bdb2710..20c50e2 100644
---- a/include/linux/platform_data/edma.h
-+++ b/include/linux/platform_data/edma.h
-@@ -130,6 +130,7 @@ void edma_set_src(unsigned slot, dma_addr_t src_port,
- 				enum address_mode mode, enum fifo_width);
- void edma_set_dest(unsigned slot, dma_addr_t dest_port,
- 				 enum address_mode mode, enum fifo_width);
-+bool edma_is_actv(unsigned slot);
- dma_addr_t edma_get_position(unsigned slot, bool dst);
- void edma_set_src_index(unsigned slot, s16 src_bidx, s16 src_cidx);
- void edma_set_dest_index(unsigned slot, s16 dest_bidx, s16 dest_cidx);
++			/* Also enable intermediate interrupts if necessary */
++			if (use_intermediate)
++				edesc->pset[i].param.opt |= ITCINTEN;
++		}
+ 	}
+ 
+ 	/* Place the cyclic channel to highest priority queue */
 -- 
 1.7.10.4
