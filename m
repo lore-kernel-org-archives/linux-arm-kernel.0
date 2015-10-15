@@ -1,88 +1,42 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Thu, 15 Oct 2015 13:25:02 +0300
-Subject: [PATCH 5/5] arm: dts: lpc32xx: add device node for the second
- pwm controller
-In-Reply-To: <CAGhQ9Vx9ghfAD0=ntsFL50+iBQDag=HHGb6=X2-AfYPtSb_-yQ@mail.gmail.com>
-References: <1444694045-22000-1-git-send-email-vz@mleia.com>	<1444694045-22000-6-git-send-email-vz@mleia.com>
- <CAGhQ9Vx9ghfAD0=ntsFL50+iBQDag=HHGb6=X2-AfYPtSb_-yQ@mail.gmail.com>
-Message-ID: <561F7EFE.5070908@mleia.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 15 Oct 2015 13:27:17 +0300
+Subject: [PATCH] ARM: shmobile: porter: add HS-USB DT support
+In-Reply-To: <20151015001818.GA25019@verge.net.au>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+ <80272771.MSjafmr6yE@wasted.cogentembedded.com>
+ <20151015001818.GA25019@verge.net.au>
+Message-ID: <561F7F85.1090306@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joachim,
+Hello.
 
-On 14.10.2015 21:04, Joachim Eastwood wrote:
-> Hi Vladimir,
-> 
-> On 13 October 2015 at 01:54, Vladimir Zapolskiy <vz@mleia.com> wrote:
->> LPC32xx SoCs have two independent PWM controllers, they have different
->> clock parents, clock gates and even slightly different controls,
->> each of these two PWM controllers has one output channel. Due to
->> almost similar controls arranged in a row it is incorrectly assumed
->> that there is one PWM controller with two channels, fix this problem
->> in lpc32xx.dtsi, which at the moment prevents separate configuration
->> of different clock parents and gates for both PWM controllers.
+On 10/15/2015 3:18 AM, Simon Horman wrote:
+
+>> Enable HS-USB device  for the Porter board, defining the GPIO that the
+>> driver should check  when probing (which is the ID output from MAX3355
+>> OTG chip).
 >>
->> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
->> ---
->>  arch/arm/boot/dts/lpc32xx.dtsi | 10 ++++++++--
->>  1 file changed, 8 insertions(+), 2 deletions(-)
+>> Note that there  will be pinctrl-related error messages if both internal
+>> PCI  and  HS-USB drivers are enabled but they should be just ignored.
 >>
->> diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
->> index 929458d..f4d2a0e 100644
->> --- a/arch/arm/boot/dts/lpc32xx.dtsi
->> +++ b/arch/arm/boot/dts/lpc32xx.dtsi
->> @@ -286,9 +286,15 @@
->>                                 status = "disabled";
->>                         };
+>> This patch is  analogous  to the commit 6f4f7156e0e6 (ARM: shmobile:
+>> henninger: enable HS-USB) as there  are no differences between the
+>> boards in this respect.
 >>
->> -                       pwm: pwm at 4005C000 {
->> +                       pwm1: pwm at 4005C000 {
->>                                 compatible = "nxp,lpc3220-pwm";
->> -                               reg = <0x4005C000 0x8>;
->> +                               reg = <0x4005C000 0x4>;
->> +                               status = "disabled";
->> +                       };
->> +
->> +                       pwm2: pwm at 4005C004 {
->> +                               compatible = "nxp,lpc3220-pwm";
->> +                               reg = <0x4005C004 0x4>;
->>                                 status = "disabled";
->>                         };
->>                 };
-> 
-> I am not really against your change, but...
-> 
-> What's wrong with a binding like the one below?
-> pwm: pwm at 0x4005c000 {
->     compatible = "nxp,lpc3220-pwm";
->     reg = <0x4005C000 0x8>;
->     clocks =<&clk CLK_PWM1, &clk CLK_PWM2>;
->     clock-names = "pwm1", "pwm2";
->     #pwm-cells = <3>;
-> };
-> 
-> With two clocks and where the first pwm-cell would select either PWM1 or PWM2.
-> 
-> Seems like the driver only handle one clock, but should be fairly easy to fix.
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
+> Thanks Sergei,
+>
+> I have queued this up for v4.5.
+>
+> I took the liberty of tweaking the changelog to address a complaint made
+> by Mr. Check Patch.
 
-I thought about it and IMHO it is a more complicated change in DTS (and
-no doubts in the driver), which hides the structure of hardware. There
-is no one PWM with two channels.
+    Which means I forgot to run it again. Sorry about that. :-<
 
-There are two independent PWMs, even control registers are different,
-PWM2 can be programmed to output the internal interrupt status, and it
-means that possibly in future I may want to describe one of the PWMs
-with a different "compatible" property.
+> ERROR: Please use git commit description style 'commit <12+ chars of sha1> ("<title line>")' - ie: 'commit 6f4f7156e0e6 ("ARM: shmobile: henninger: enable HS-USB")'
 
-> Note: with your DT change you would also need to change the driver
-> since it currently sets npwm to 2.
-> 
+    Keep forgetting about the now enforced quotes...
 
-It is done -- http://permalink.gmane.org/gmane.linux.pwm/2831
-
-Thanks for review.
-
---
-With best wishes,
-Vladimir
+MBR, Sergei
