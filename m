@@ -1,44 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 15 Oct 2015 09:34:03 +0900
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: enable HDMI output for Renesas
- RCar
-In-Reply-To: <cover.1444869086.git.horms+renesas@verge.net.au>
-References: <cover.1444869086.git.horms+renesas@verge.net.au>
-Message-ID: <fec3fb4734b4d2c33975077c250ebd4a3a9f8e34.1444869086.git.horms+renesas@verge.net.au>
+Date: Thu, 15 Oct 2015 09:34:15 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for v4.4
+Message-ID: <cover.1444868963.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Actviate HDMI output of the RCar DU (and LVDS while we are here).
-Enable the HDMI encoder chip found on Lager/Koelsch boards.
+Please consider these second round of Renesas ARM based SoC DT updates for v4.4.
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+This pull request is based on the previous round of
+such requests, tagged as renesas-dt-for-v4.4,
+which I have already sent a pull-request for.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index e682da3f9d42..a5c6ebf39b0a 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -440,6 +440,7 @@ CONFIG_VIDEO_RENESAS_VSP1=m
- CONFIG_VIDEO_ADV7180=m
- CONFIG_VIDEO_ML86V7667=m
- CONFIG_DRM=y
-+CONFIG_DRM_I2C_ADV7511=m
- # CONFIG_DRM_I2C_CH7006 is not set
- # CONFIG_DRM_I2C_SIL164 is not set
- CONFIG_DRM_NXP_PTN3460=m
-@@ -450,6 +451,8 @@ CONFIG_DRM_EXYNOS_DSI=y
- CONFIG_DRM_EXYNOS_FIMD=y
- CONFIG_DRM_EXYNOS_HDMI=y
- CONFIG_DRM_RCAR_DU=m
-+CONFIG_DRM_RCAR_HDMI=y
-+CONFIG_DRM_RCAR_LVDS=y
- CONFIG_DRM_TEGRA=y
- CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
- CONFIG_DRM_PANEL_SIMPLE=y
--- 
-2.1.4
+
+The following changes since commit 0877098d82fd1823878534b116a4a725e729701f:
+
+  ARM: shmobile: porter: add Ether DT support (2015-10-06 09:44:53 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v4.4
+
+for you to fetch changes up to 99f7445ea41c0187cd2e78bcb58cdd9e6c1756e5:
+
+  ARM: shmobile: porter: enable internal PCI and USB PHY (2015-10-13 10:00:12 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC DT Updates for v4.4
+
+* Enable the following on the porter board:
+  I2C2, PCI, PCIe, QSPI, SATA0, SDHI0/2, USB PHY and VIN0/ADV7180.
+
+----------------------------------------------------------------
+Sergei Shtylyov (7):
+      ARM: shmobile: porter: add SDHI0/2 DT support
+      ARM: shmobile: porter: enable SATA0
+      ARM: shmobile: porter: add I2C2 DT support
+      ARM: shmobile: porter: add VIN0/ADV7180 DT support
+      ARM: shmobile: porter: add QSPI DT support
+      ARM: shmobile: porter: enable PCIe
+      ARM: shmobile: porter: enable internal PCI and USB PHY
+
+ arch/arm/boot/dts/r8a7791-porter.dts | 202 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 202 insertions(+)
