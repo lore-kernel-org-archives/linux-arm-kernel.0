@@ -1,87 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 15 Oct 2015 15:48:16 +0900
-Subject: [PATCH v5 3/5] arm64: dts: r8a7795: enable EthernetAVB on Salvator-X
+Date: Thu, 15 Oct 2015 15:48:17 +0900
+Subject: [PATCH v5 4/5] arm64: dts: r8a7795: enable nfs root on Salvator-X
+ board
 In-Reply-To: <1444891698-8780-1-git-send-email-horms+renesas@verge.net.au>
 References: <1444891698-8780-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1444891698-8780-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1444891698-8780-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+As has been the practice for boards for 32bit ARM Renesas SoCs
 
-Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-[horms: minor updates]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
----
-v0 [Kazuya Mizuguchi]
+--
+v2
+* No change
 
-v1 [Simon Horman]
-* updated filename to salvator-x
-* updated patch subject
+v3
+* Added Ack
 
-v2 [Simon Horman]
-* Removed spurious update to r8a7795.dtsi introduced in v1
-* Removed unused renesas,phy property
-
-v3 [Simon Horman]
-* No change but provided PFC driver update in separate patch(set)
-
-v4 [Simon Horman]
-* As suggested by Sergei Shtylyov
-  - Removed unused phy-reset-gpio property
-
-v5
+v4, v5
 * No change
 ---
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 31 ++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index f522fda7843a..4fb120d8e7e8 100644
+index 4fb120d8e7e8..d1c2fea8bebc 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
 +++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -45,6 +45,11 @@
- 		renesas,groups = "scif2_data_a";
- 		renesas,function = "scif2";
+@@ -21,7 +21,7 @@
  	};
-+
-+	avb_pins: avb {
-+		renesas,groups = "avb_mdc";
-+		renesas,function = "avb";
-+	};
- };
  
- &scif1 {
-@@ -60,3 +65,29 @@
+ 	chosen {
+-		bootargs = "ignore_loglevel";
++		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+ 		stdout-path = &scif2;
+ 	};
  
- 	status = "okay";
- };
-+
-+&avb {
-+	pinctrl-0 = <&avb_pins>;
-+	pinctrl-names = "default";
-+	renesas,no-ether-link;
-+	phy-handle = <&phy0>;
-+	status = "okay";
-+
-+	phy0: ethernet-phy at 0 {
-+		rxc-skew-ps = <900>;
-+		rxdv-skew-ps = <0>;
-+		rxd0-skew-ps = <0>;
-+		rxd1-skew-ps = <0>;
-+		rxd2-skew-ps = <0>;
-+		rxd3-skew-ps = <0>;
-+		txc-skew-ps = <900>;
-+		txen-skew-ps = <0>;
-+		txd0-skew-ps = <0>;
-+		txd1-skew-ps = <0>;
-+		txd2-skew-ps = <0>;
-+		txd3-skew-ps = <0>;
-+		reg = <0>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
 -- 
 2.1.4
