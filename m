@@ -1,132 +1,120 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 15 Oct 2015 18:05:32 +0900
-Subject: [PATCH 1/3] ARM: dts: uniphier: change the external bus address
- mapping
+Date: Thu, 15 Oct 2015 18:05:33 +0900
+Subject: [PATCH 2/3] ARM: dts: uniphier: add ProXstream2 Vodka board support
 In-Reply-To: <1444899934-4754-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1444899934-4754-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1444899934-4754-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1444899934-4754-3-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In UniPhier SoCs before ProXstream2 and PH1-LD6b, two address spaces
- 0x00000000 - 0x0fffffff
- 0x40000000 - 0x4fffffff
-are both mapped to the external bus (also called system bus),
-so either was OK.
-
-In the newest two SoCs, the former (0x00000000 - 0x0fffffff) is
-assigned for the serial NOR interface.
-
-For the consistency, use the latter for all the SoCs.
-
-Also, fix the range properties to reflect the real address mapping,
-where the support card is located at the offset address 0x01f00000
-of CS1 of the external bus.
+Initial version of DTS for ProXstream2 Vodka board.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts  | 5 ++---
- arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts | 5 ++---
- arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts | 5 ++---
- arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts | 5 ++---
- arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts | 5 ++---
- 5 files changed, 10 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/Makefile                       |  3 +-
+ arch/arm/boot/dts/uniphier-proxstream2-vodka.dts | 79 ++++++++++++++++++++++++
+ 2 files changed, 81 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
 
-diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-index bfd3bb8..e9722a5 100644
---- a/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-@@ -74,12 +74,11 @@
- };
- 
- &extbus {
--	ranges = <0 0x00000000 0x0f000000 0x01000000
--		  1 0x00000000 0x00000000 0x08000000>;
-+	ranges = <1 0x00000000 0x42000000 0x02000000>;
- };
- 
- &support_card {
--	ranges = <0x00000000 1 0x03f00000 0x00100000>;
-+	ranges = <0x00000000 1 0x01f00000 0x00100000>;
- };
- 
- &ethsc {
-diff --git a/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
-index 3a6f1f6..1a402ed 100644
---- a/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
-@@ -76,12 +76,11 @@
- };
- 
- &extbus {
--	ranges = <0 0x00000000 0x0f000000 0x01000000
--		  1 0x00000000 0x00000000 0x08000000>;
-+	ranges = <1 0x00000000 0x42000000 0x02000000>;
- };
- 
- &support_card {
--	ranges = <0x00000000 1 0x03f00000 0x00100000>;
-+	ranges = <0x00000000 1 0x01f00000 0x00100000>;
- };
- 
- &ethsc {
-diff --git a/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
-index 69a5b7d..47e2edb 100644
---- a/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
-@@ -76,12 +76,11 @@
- };
- 
- &extbus {
--	ranges = <0 0x00000000 0x0f000000 0x01000000
--		  1 0x00000000 0x00000000 0x08000000>;
-+	ranges = <1 0x00000000 0x42000000 0x02000000>;
- };
- 
- &support_card {
--	ranges = <0x00000000 1 0x03f00000 0x00100000>;
-+	ranges = <0x00000000 1 0x01f00000 0x00100000>;
- };
- 
- &ethsc {
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts b/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
-index 1a440f8..adcbbc6 100644
---- a/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
-@@ -75,12 +75,11 @@
- };
- 
- &extbus {
--	ranges = <0 0x00000000 0x0f000000 0x01000000
--		  1 0x00000000 0x00000000 0x08000000>;
-+	ranges = <1 0x00000000 0x42000000 0x02000000>;
- };
- 
- &support_card {
--	ranges = <0x00000000 1 0x03f00000 0x00100000>;
-+	ranges = <0x00000000 1 0x01f00000 0x00100000>;
- };
- 
- &ethsc {
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts b/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
-index 955d417..bcf2e7c 100644
---- a/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
-@@ -74,12 +74,11 @@
- };
- 
- &extbus {
--	ranges = <0 0x00000000 0x0f000000 0x01000000
--		  1 0x00000000 0x00000000 0x08000000>;
-+	ranges = <1 0x00000000 0x42000000 0x02000000>;
- };
- 
- &support_card {
--	ranges = <0x00000000 1 0x03f00000 0x00100000>;
-+	ranges = <0x00000000 1 0x01f00000 0x00100000>;
- };
- 
- &ethsc {
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index bb8fa02..9232018 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -672,7 +672,8 @@ dtb-$(CONFIG_ARCH_UNIPHIER) += \
+ 	uniphier-ph1-ld6b-ref.dtb \
+ 	uniphier-ph1-pro4-ref.dtb \
+ 	uniphier-ph1-sld3-ref.dtb \
+-	uniphier-ph1-sld8-ref.dtb 
++	uniphier-ph1-sld8-ref.dtb \
++	uniphier-proxstream2-vodka.dtb
+ dtb-$(CONFIG_ARCH_VERSATILE) += \
+ 	versatile-ab.dtb \
+ 	versatile-pb.dtb
+diff --git a/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts b/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
+new file mode 100644
+index 0000000..27691f9
+--- /dev/null
++++ b/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
+@@ -0,0 +1,79 @@
++/*
++ * Device Tree Source for UniPhier ProXstream2 Vodka Board
++ *
++ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++/include/ "uniphier-proxstream2.dtsi"
++
++/ {
++	model = "UniPhier ProXstream2 Vodka Board";
++	compatible = "socionext,proxstream2-vodka", "socionext,proxstream2";
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x80000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyS2,115200";
++		stdout-path = &serial2;
++	};
++
++	aliases {
++		serial0 = &serial0;
++		serial1 = &serial1;
++		serial2 = &serial2;
++		i2c0 = &i2c0;
++		i2c4 = &i2c4;
++		i2c5 = &i2c5;
++		i2c6 = &i2c6;
++	};
++};
++
++&serial2 {
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++};
 -- 
 1.9.1
