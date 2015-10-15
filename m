@@ -1,20 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 17:18:22 +0200
-Subject: [PATCH 0/3] ARM: dts: uniphier: DTS updates for UniPhier SoCs for
- Linux 4.14-rc1
-In-Reply-To: <1444899934-4754-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1444899934-4754-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <5761824.CVseatekcx@wuerfel>
+Date: Thu, 15 Oct 2015 17:19:43 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
+ v4.4
+In-Reply-To: <cover.1444868963.git.horms+renesas@verge.net.au>
+References: <cover.1444868963.git.horms+renesas@verge.net.au>
+Message-ID: <23583033.rWmUkuYGxQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 October 2015 18:05:31 Masahiro Yamada wrote:
-> Hi Olof and Arnd,
+On Thursday 15 October 2015 09:34:15 Simon Horman wrote:
+> Please consider these second round of Renesas ARM based SoC DT updates for v4.4.
 > 
-> Please apply this series to ARM-SOC for the next merge window.
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-dt-for-v4.4,
+> which I have already sent a pull-request for.
 > 
 
-Applied the first patch, but not the other two, which look slightly wrong.
-Can you check and send them again?
+Pulled into next/dt, thanks!
 
 	Arnd
