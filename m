@@ -1,32 +1,34 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 15 Oct 2015 16:30:09 +0100
-Subject: [PATCH] ARM64: juno: add NOR flash to device tree
-In-Reply-To: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
-References: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <561FC681.2040809@arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 15 Oct 2015 17:31:16 +0200
+Subject: [PATCH 3/3] ARM: at91/defconfig: update sama5 defconfig
+In-Reply-To: <20151015132451.GD3421@piout.net>
+References: <1444824684-24526-1-git-send-email-ludovic.desroches@atmel.com>
+ <1444824684-24526-3-git-send-email-ludovic.desroches@atmel.com>
+ <20151015132451.GD3421@piout.net>
+Message-ID: <20151015153116.GE26893@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Thu, Oct 15, 2015 at 03:24:51PM +0200, Alexandre Belloni wrote:
+> Hi,
+> 
+> On 14/10/2015 at 14:11:24 +0200, Ludovic Desroches wrote :
+> > Add SAMA5D2 SoC plus Atmel flexcom and Atmel sdhci devices.
+> > 
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > ---
+> >  arch/arm/configs/sama5_defconfig | 6 +++++-
+> >  1 file changed, 5 insertions(+), 1 deletion(-)
+> > 
+> It is probably worth updating the multi_v7_defconfig too (in a separate
+> patch).
+> 
 
-On 15/10/15 11:20, Linus Walleij wrote:
-> The Juno motherboard has a NOR flash on the motherboard, enable
-> this to be accessed with the CFI flash driver. Results after
-> enabling MTD, MTD_CFI, MTD_PHYSMAP, MTD_PHYSMAP_OF,
-> MTD_CFI_INTELEXT:
->
+Maybe I have to send a whole defconfig update . I mean when you do
+savedefconfig, you have more changes. I won't send each one separately. I
+have kept changes which were in relation with the stuff I had.
 
-Just a note on this: we can't enable these when CPUIDLE is enabled as
-the firmware assumes the flash is always in read mode while Linux leaves
-NOR flash in "read id" mode after initialization.
+Or I can send a defconfig update from the savedefconfig and then add
+sama5d2, flexcom and sdhci.
 
-So until the firmware is ready to handle that, we can't enabled both
-on Juno. We had same issue even on TC2. I will follow up internally to
-see if we can fix on Juno at-least.
-
-So until then, keep an eye on this if someone complains about boot issue
-with both MTD and CPUIDLE enabled.
-
--- 
-Regards,
-Sudeep
+Ludovic
