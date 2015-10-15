@@ -1,31 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Oct 2015 16:57:21 +0200
-Subject: [PATCH 1/2] ARM: dts: fix gpio-keys wakeup-source property
-In-Reply-To: <1444743164-17735-1-git-send-email-sudeep.holla@arm.com>
-References: <1444743164-17735-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CACRpkdaH+2+XGKNhK57tTOTRSvzL4duAZN1qZ+KgH2A4wf7zeQ@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Thu, 15 Oct 2015 16:02:36 +0100
+Subject: [PATCHv3 08/11] arm64: Check for selected granule support
+In-Reply-To: <561FBC99.9090501@arm.com>
+References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
+ <1444821634-1689-9-git-send-email-suzuki.poulose@arm.com>
+ <561EC58B.9080408@arm.com> <20151015104515.GE8825@leverpostej>
+ <20151015112532.GA16125@e106634-lin.cambridge.arm.com>
+ <561FBC99.9090501@arm.com>
+Message-ID: <561FC00C.7010003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 3:32 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-
-> The keyboard driver for GPIO buttons(gpio-keys) checks for one of the
-> two boolean properties to enable gpio buttons as wakeup source:
-> 1. "wakeup-source" or
-> 2. the legacy "gpio-key,wakeup"
+On 15/10/15 15:47, Jeremy Linton wrote:
+> On 10/15/2015 06:25 AM, Suzuki K. Poulose wrote:
+>> +    /*
+>> +     * Check to see if the CPU supports the requested pagesize
+>> +     */
+>> +    asm volatile("mrs %0, ID_AA64MMFR0_EL1" : "=r" (aa64mmfr0_el1));
+>> +    aa64mmfr0_el1 >>= ID_AA64MMFR0_TGRAN_SHIFT;
+>> +    if ((aa64mmfr0_el1 & 0xf) != ID_AA64MMFR0_TGRAN_SUPPORTED) {
+>> +        pr_efi_err(sys_table_arg, PAGE_SIZE_STR" granule not supported by the CPU\n");
+>> +        return EFI_UNSUPPORTED;
+>> +    }
 >
-> However juno, ste-snowball and emev2-kzm9d dts file have a undetected
-> "wakeup" property to indictate the wakeup source.
 >
-> This patch fixes it by making use of "wakeup-source" property.
+> This is definitely an improvement over my original hack job.
 >
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> I would like to add, that I actually think this should be in a new function
+> "check_kernel_compatibility" (or whatever) that is called before handle_kernel_image.
+>
+> That is because I don't really think it belongs in handle_kernel_image which is
+>  focused on relocation.  Plus, if you add another function, you can avoid the
+> "Failed to relocate kernel" error that comes out following the granule not supported message.
+> Further, checks like this in the future will have a place to live.
+>
+> Of course you will then need a matching stubbed out function for the normal arm kernel as well.
 
-OK nice,
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Yours,
-Linus Walleij
+OK, I will drop it from this series then and can be worked as a separate patch.
+
+Thanks
+Suzuki
