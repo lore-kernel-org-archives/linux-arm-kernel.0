@@ -1,73 +1,33 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 15 Oct 2015 16:30:46 +0800
-Subject: [PATCH v4 4/5] iommu/arm-smmu: to backward compatible with probe
- non-deferral
-In-Reply-To: <1444897847-18040-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1444897847-18040-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1444897847-18040-5-git-send-email-thunder.leizhen@huawei.com>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Thu, 15 Oct 2015 09:39:58 +0100
+Subject: [Xen-devel] xen,arm: enable cpu_hotplug
+In-Reply-To: <561EE3E5.2000105@citrix.com>
+References: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
+ <561EE3E5.2000105@citrix.com>
+Message-ID: <1444898398.1607.18.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch eliminate the strong dependence on Laurent's series(to support
-probe deferral). That means, no matter whether Laurent's series upstreamed
-or not, the smmu-v3 driver will always work well.
+On Thu, 2015-10-15 at 00:23 +0100, Julien Grall wrote:
+> My second point is related to how Xen is handling interrupt with vCPU. 
+> When PSCI off is called, we will set the _VFP_down flag. This flag is 
+> used in vgic_vcpu_inject_irq and when it's set the interrupt will be 
+> ignored and stay active on the HW GIC forever. If the vCPU is coming 
+> back online, this interrupt will never be received. AFAIU the spec, the 
+> interrupt is expected to stay pending on the distributor side and will 
+> be receive when the vCPU will come back or migrate to another vCPU. A 
+> similar problem can happen when the vCPU is powered on again because we 
+> clear all the interrupt state related to vCPU (see
+> vgic_clear_pending_irqs).
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/iommu/arm-smmu-v3.c | 20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
+Is there also an interaction with our implementation of ITARGETSR of
+picking the lowest set bit? e.g. if an IRQ has target 0x6 (targeting CPU 1
+and CPU2) we will choose CPU 1. If CPU 1 is then unplugged, will we end up
+targeting CPU 2 or the now-offline CPU 1? In the latter case the lack of
+interrupts might be considered surprising?
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 021a846..66052e9 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1857,6 +1857,12 @@ static int arm_smmu_add_device(struct device *dev)
- 	struct pci_dev *pdev;
- 	struct device *root;
+Or maybe the way CPU hotplug is arranged we never end up with holes in the
+online cpu space, i.e it is not possible to take down CPU1 and leave CPU2
+up?
 
-+	if (dev->archdata.iommu == ERR_PTR(-EPROBE_DEFER)) {
-+		dev->archdata.iommu = NULL;
-+
-+		return of_iommu_configure(dev, dev->of_node) ? 0 : -ENODEV;
-+	}
-+
- 	/* only support pci devices hotplug */
- 	if (!dev_is_pci(dev))
- 		return -ENODEV;
-@@ -1930,6 +1936,11 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
- 		return -EINVAL;
-
- 	smmu = platform_get_drvdata(pdev);
-+	if (!smmu) {
-+		dev->archdata.iommu = ERR_PTR(-EPROBE_DEFER);
-+
-+		return -EPROBE_DEFER;
-+	}
-
- 	if (!dev->archdata.iommu)
- 		dev->archdata.iommu = smmu;
-@@ -2768,7 +2779,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
-
- 	/* Record our private device structure */
- 	platform_set_drvdata(pdev, smmu);
--	of_iommu_set_ops(smmu->dev->of_node, &arm_smmu_ops);
-
- 	/* Reset the device */
- 	ret = arm_smmu_device_reset(smmu);
-@@ -2840,7 +2850,13 @@ static void __exit arm_smmu_exit(void)
- subsys_initcall(arm_smmu_init);
- module_exit(arm_smmu_exit);
-
--IOMMU_OF_DECLARE(arm_smmu_v3, "arm,smmu-v3", NULL);
-+static int arm_smmu_of_iommu_init(struct device_node *np)
-+{
-+	of_iommu_set_ops(np, &arm_smmu_ops);
-+
-+	return 0;
-+}
-+IOMMU_OF_DECLARE(arm_smmu_v3, "arm,smmu-v3", arm_smmu_of_iommu_init);
-
- MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
- MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
---
-2.5.0
+Ian.
