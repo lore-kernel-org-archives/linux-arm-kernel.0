@@ -1,44 +1,42 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 15 Oct 2015 18:05:33 +0900
-Subject: [PATCH 2/3] ARM: dts: uniphier: add ProXstream2 Vodka board support
+Date: Thu, 15 Oct 2015 18:05:34 +0900
+Subject: [PATCH 3/3] ARM: dts: uniphier: add ProXstream2 Gentil board support
 In-Reply-To: <1444899934-4754-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1444899934-4754-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1444899934-4754-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1444899934-4754-4-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initial version of DTS for ProXstream2 Vodka board.
+Initial version of DTS for ProXstream2 Gentil board.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/boot/dts/Makefile                       |  3 +-
- arch/arm/boot/dts/uniphier-proxstream2-vodka.dts | 79 ++++++++++++++++++++++++
- 2 files changed, 81 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
+ arch/arm/boot/dts/Makefile                        |  1 +
+ arch/arm/boot/dts/uniphier-proxstream2-gentil.dts | 79 +++++++++++++++++++++++
+ 2 files changed, 80 insertions(+)
+ create mode 100644 arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index bb8fa02..9232018 100644
+index 9232018..2e1bc82 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -672,7 +672,8 @@ dtb-$(CONFIG_ARCH_UNIPHIER) += \
- 	uniphier-ph1-ld6b-ref.dtb \
+@@ -673,6 +673,7 @@ dtb-$(CONFIG_ARCH_UNIPHIER) += \
  	uniphier-ph1-pro4-ref.dtb \
  	uniphier-ph1-sld3-ref.dtb \
--	uniphier-ph1-sld8-ref.dtb 
-+	uniphier-ph1-sld8-ref.dtb \
-+	uniphier-proxstream2-vodka.dtb
+ 	uniphier-ph1-sld8-ref.dtb \
++	uniphier-proxstream2-gentil.dtb \
+ 	uniphier-proxstream2-vodka.dtb
  dtb-$(CONFIG_ARCH_VERSATILE) += \
  	versatile-ab.dtb \
- 	versatile-pb.dtb
-diff --git a/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts b/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
+diff --git a/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts b/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
 new file mode 100644
-index 0000000..27691f9
+index 0000000..3ea2a87
 --- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
++++ b/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
 @@ -0,0 +1,79 @@
 +/*
-+ * Device Tree Source for UniPhier ProXstream2 Vodka Board
++ * Device Tree Source for UniPhier ProXstream2 Gentil Board
 + *
 + * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
 + *
@@ -85,8 +83,8 @@ index 0000000..27691f9
 +/include/ "uniphier-proxstream2.dtsi"
 +
 +/ {
-+	model = "UniPhier ProXstream2 Vodka Board";
-+	compatible = "socionext,proxstream2-vodka", "socionext,proxstream2";
++	model = "UniPhier ProXstream2 Gentil Board";
++	compatible = "socionext,proxstream2-gentil", "socionext,proxstream2";
 +
 +	memory {
 +		device_type = "memory";
