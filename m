@@ -1,49 +1,50 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 15 Oct 2015 18:04:47 +0200
-Subject: [GIT PULL] STi DT changes for v4.4, round 2
-Message-ID: <561FCE9F.2010002@st.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Oct 2015 17:06:31 +0100
+Subject: [PATCH v2 1/3] ARM: catch pending imprecise abort on unmask
+In-Reply-To: <20151015153915.GO10113@atomide.com>
+References: <1444905142-21500-1-git-send-email-l.stach@pengutronix.de>
+ <1444905142-21500-2-git-send-email-l.stach@pengutronix.de>
+ <20151015153246.GH32536@n2100.arm.linux.org.uk>
+ <20151015153915.GO10113@atomide.com>
+Message-ID: <20151015160631.GI32536@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+On Thu, Oct 15, 2015 at 08:39:15AM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [151015 08:37]:
+> > On Thu, Oct 15, 2015 at 12:32:20PM +0200, Lucas Stach wrote:
+> > > Install a non-faulting handler just before unmasking imprecise aborts
+> > > and switch back to the regular one after unmasking is done.
+> > > 
+> > > This catches any pending imprecise abort that the firmware/bootloader
+> > > may have left behind that would normally crash the kernel at that point.
+> > > As there are apparently a lot of bootlaoders out there that do such a
+> > > thing it makes sense to handle it in the common startup code.
+> > > 
+> > > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > 
+> > Much better.  Please feel free to add it to the patch system, thanks.
+> > 
+> > I think, given that the original seems to be breaking platforms, this
+> > patch needs to go into -rc kernels, right?
+> 
+> Hmm do we still see a trace where the issue happened though with this
+> one?
 
-Please consider this second round of STi DT updates for v4.4:
+That's not the intention of this specific patch.
 
-The following changes since commit cae010a1b663a779fdbfbf625839bc07dad16428:
+This is solely to detect the bootloader induced imprecise exception,
+nothing more.  A backtrace for that won't be useful in any shape or
+form - in fact, the backtrace will be well known (it'll be from the
+site where the imprecise exceptions are unmasked.)
 
-   ARM: STi: STiH407: Enable the 2 HW Random Number Generators for 
-STiH4{07, 10} (2015-10-01 11:02:09 +0200)
+Any imprecise exception which happens after this will be handled in
+the normal way: it'll raise a kernel oops, and that will have all the
+details that a kernel oops normally has.
 
-are available in the git repository at:
+The difference is, rather than the boot loader provoking the kernel to
+oops at this point, we're able to report the event and continue on.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/sti.git 
-tags/sti-dt-for-v4.4-2
-
-for you to fetch changes up to 848dd6a87a10bd24b5a4c8b84eaba3cdd0ec7a19:
-
-   ARM: STi: DT: Add support for stih418 A9 pll (2015-10-15 13:48:16 +0200)
-
-----------------------------------------------------------------
-Highlights:
------------
-  - Use STiH418's A9 PLL
-  - Add Ethernet support to STiH407 family
-
-----------------------------------------------------------------
-Gabriel Fernandez (1):
-       ARM: STi: DT: Add support for stih418 A9 pll
-
-Maxime Coquelin (4):
-       ARM: dts: Fix RGMII pinctrl timings
-       ARM: dts: Add Ethernet node to STiH407 family
-       ARM: dts: Enable Ethernet on STi's B2120 boards
-       ARM: dts: Enable Ethernet on STi's B2199 board
-
-  arch/arm/boot/dts/stih407-b2120.dts    |  1 +
-  arch/arm/boot/dts/stih407-family.dtsi  | 27 +++++++++++++++++++++++++++
-  arch/arm/boot/dts/stih407-pinctrl.dtsi |  4 ++--
-  arch/arm/boot/dts/stih410-b2120.dts    |  1 +
-  arch/arm/boot/dts/stih418-b2199.dts    |  8 ++++++++
-  arch/arm/boot/dts/stih418-clock.dtsi   |  2 +-
-  arch/arm/boot/dts/stihxxx-b2120.dtsi   |  6 ++++++
-  7 files changed, 46 insertions(+), 3 deletions(-
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
