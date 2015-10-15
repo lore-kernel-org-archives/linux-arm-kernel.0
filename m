@@ -1,39 +1,58 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Oct 2015 09:04:06 +0100
-Subject: linux-next: manual merge of the mfd tree with the arm-soc tree
-In-Reply-To: <20151015131911.3b3a7ca8@canb.auug.org.au>
-References: <20151015131911.3b3a7ca8@canb.auug.org.au>
-Message-ID: <20151015080406.GL32409@x1>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Oct 2015 09:04:21 +0100
+Subject: [PATCH v11 8/8] MAINTAINERS: Add entry Renesas arm64 architecture
+In-Reply-To: <561F4B72.2050305@rvc.renesas.com>
+References: <1444890243-6978-1-git-send-email-horms+renesas@verge.net.au>
+ <1444890243-6978-9-git-send-email-horms+renesas@verge.net.au>
+ <561F4B72.2050305@rvc.renesas.com>
+Message-ID: <20151015080421.GV32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Oct 2015, Stephen Rothwell wrote:
+On Thu, Oct 15, 2015 at 01:45:06PM +0700, Khiem Nguyen wrote:
+> Hi Simon,
+> 
+> Thanks for your patch.
+> 
+> On 10/15/2015 1:24 PM, Simon Horman wrote:
+> >Initial Renesas arm64 architecture support will be for the R-Car H3,
+> >r8a7795, SoC and its Salvator-X board.
+> >
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> >---
+> >
+> >Changes since v10:
+> >- New Patch
+> >---
+> >  MAINTAINERS | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> >
+> >diff --git a/MAINTAINERS b/MAINTAINERS
+> >index 7ba7ab749c85..0067b7156622 100644
+> >--- a/MAINTAINERS
+> >+++ b/MAINTAINERS
+> >@@ -1392,6 +1392,16 @@ M:	Lennert Buytenhek <kernel@wantstofly.org>
+> >  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> >  S:	Maintained
+> >
+> >+ARM/RENESAS ARM64 ARCHITECTURE
+> 
+> I think you should add this near its younger brother, i.e ARM/RENESAS ARM
+> ARCHITECTURE.
 
-> Hi Lee,
-> 
-> Today's linux-next merge of the mfd tree got a conflict in:
-> 
->   Documentation/devicetree/bindings/mfd/s2mps11.txt
-> 
-> between commit:
-> 
->   6a4479f96543 ("dt-bindings: Document grounded ACOKB pin on S2MPS11")
-> 
-> from the arm-soc tree and commit:
-> 
->   db96ec728d69 ("mfd: dt-bindings: Document pulled down WRSTBI pin on S2MPS1X")
-> 
-> from the mfd tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+The file being modified has this in it:
 
-Yeah, I thought this might happen.
+  Note: For the hard of thinking, this list is meant to remain in alphabetical
+  order. If you could add yourselves to it in alphabetical order that would be
+  so much easier [Ed]
 
-Hence: http://www.spinics.net/lists/devicetree/msg97548.html.
+It's not freely orderable.
+
+There is no "ARM/RENESAS ARM ARCHITECTURE" in the file.  There is
+"ARM/SHMOBILE ARM ARCHITECTURE" though.
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
