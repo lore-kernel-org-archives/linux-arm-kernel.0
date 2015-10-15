@@ -1,72 +1,25 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 16 Oct 2015 15:30:26 +0800
-Subject: [PATCH v2 1/4] arm64: dts: Reserve memory regions for hi6220
-In-Reply-To: <1444697896-4323-2-git-send-email-leo.yan@linaro.org>
-References: <1444697896-4323-1-git-send-email-leo.yan@linaro.org>
- <1444697896-4323-2-git-send-email-leo.yan@linaro.org>
-Message-ID: <20151016073026.GF3226@leoy-linaro>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 23:10:08 +0200
+Subject: [GIT PULL] qcom arm64 updates for 4.4 *RESEND*
+In-Reply-To: <1444860631-8292-1-git-send-email-agross@codeaurora.org>
+References: <1444860631-8292-1-git-send-email-agross@codeaurora.org>
+Message-ID: <17821037.JC45KMU368@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Wednesday 14 October 2015 17:10:31 Andy Gross wrote:
+> Qualcomm ARM64 Updates for v4.4
+> 
+> * Add RNG device tree node
+> * Add MSM8x16 serial UART1 node
+> * Enable eMMC on apq8016-sbc board
+> * Fix I2C pinconf sleep state function
+> * Add MSM8916 I2C nodes
+> * Enable I2C busses on LS and HS on APQ8016-sbc
+> * Enable SPI busses on LS and HS on APQ8016-sbc
+> 
+> 
 
-On Tue, Oct 13, 2015 at 08:58:13AM +0800, Leo Yan wrote:
-> On Hi6220, below memory regions in DDR have specific purpose:
-> 
->   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
->   0x06df,f000 - 0x06df,ffff: For mailbox message data;
->   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
->   0x3e00,0000 - 0x3fff,ffff: For OP-TEE.
-> 
-> This patch reserves these memory regions in DT.
-> 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 16 ++++++++++++----
->  1 file changed, 12 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> index e36a539..e3f4cb3 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> @@ -7,9 +7,6 @@
->  
->  /dts-v1/;
->  
-> -/*Reserved 1MB memory for MCU*/
-> -/memreserve/ 0x05e00000 0x00100000;
-> -
->  #include "hi6220.dtsi"
->  
->  / {
-> @@ -24,8 +21,19 @@
->  		stdout-path = "serial0:115200n8";
->  	};
->  
-> +	/*
-> +	 * Reserve below regions from memory node:
-> +	 *
-> +	 *  - 0x05e0,0000 - 0x05ef,ffff: MCU firmware runtime using
-> +	 *  - 0x06df,f000 - 0x06df,ffff: Mailbox message data
-> +	 *  - 0x0740,f000 - 0x0740,ffff: MCU firmware section
-> +	 *  - 0x3e00,0000 - 0x3fff,ffff: OP-TEE
-> +	 */
->  	memory at 0 {
->  		device_type = "memory";
-> -		reg = <0x0 0x0 0x0 0x40000000>;
-> +		reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
-> +		      <0x00000000 0x05f00000 0x00000000 0x00eff000>,
-> +		      <0x00000000 0x06e00000 0x00000000 0x0060f000>,
-> +		      <0x00000000 0x07410000 0x00000000 0x36bf0000>;
->  	};
->  };
+Pulled into next/dt, thanks!
 
-Are you convinced by the before's patch arguments from Mark and I? i'd
-like get green light from you.
-
-Thanks,
-Leo Yan
-
-> -- 
-> 1.9.1
-> 
+	Arnd
