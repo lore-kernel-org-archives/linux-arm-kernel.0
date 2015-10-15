@@ -1,28 +1,33 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 15 Oct 2015 02:35:39 +0200
-Subject: [PATCH v2] PM / AVS: rockchip-io: Fix module autoload for OF
- platform driver
-In-Reply-To: <7hlhb8djv1.fsf@deeprootsystems.com>
-References: <1443796077-24722-1-git-send-email-luisbg@osg.samsung.com>
- <7hlhb8djv1.fsf@deeprootsystems.com>
-Message-ID: <3694102.oARWiAFOaH@vostro.rjw.lan>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 14 Oct 2015 17:14:04 -0700
+Subject: [PATCH v3 0/4] input: gpio_keys_polled: Add support for abs/rel
+ axis
+In-Reply-To: <1442928240-2452-1-git-send-email-hdegoede@redhat.com>
+References: <1442928240-2452-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151015001404.GB3673@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, October 12, 2015 11:25:54 AM Kevin Hilman wrote:
-> Luis de Bethencourt <luisbg@osg.samsung.com> writes:
+On Tue, Sep 22, 2015 at 03:23:56PM +0200, Hans de Goede wrote:
+> Hi Dmitry,
 > 
-> > This platform driver has a OF device ID table but the OF module
-> > alias information is not created so module autoloading won't work.
-> >
-> > Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
-> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> This patch-series really is 2 related series:
 > 
-> Acked-by: Kevin Hilman <khilman@linaro.org>
+> Patch 1 + 2:
 > 
-> Rafael, feel free to apply directly.
+> Support for abs/rel axis in gpio_keys_polled, the dt-bindings patch is
+> updated, the actual implementation is the same as the v2 version.
+> 
+> Patch 3 + 4:
+> 
+> Add a single header with key / btn / axis defines to be shared by input.h
+> and the dt-bindings headers, as requested by you. The first patch introduces
+> a new header for this, the second patch makes dt-bindings/input/input.h
+> use this new header. The second patch has been Acked by the devicetree
+> maintainer, and since it depends on the first one I believe that it is
+> best if this patch gets merged via your tree too.
 
-Done.
+Applied the lot, thank you.
 
-Thanks,
-Rafael
+-- 
+Dmitry
