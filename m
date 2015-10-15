@@ -1,22 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 22:39:55 +0200
-Subject: [GIT PULL][2/2] SCPI support on ARM64 Juno Development Platform
-In-Reply-To: <20151009142100.GD28928@e103737-lin.cambridge.arm.com>
-References: <20151009142100.GD28928@e103737-lin.cambridge.arm.com>
-Message-ID: <7238743.Arp92bLYl0@wuerfel>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 15 Oct 2015 15:39:56 -0500
+Subject: [PATCH v2 0/8] of: Handle multi-parent version of msi-parent &
+ msi-map
+In-Reply-To: <1444151043-31084-1-git-send-email-marc.zyngier@arm.com>
+References: <1444151043-31084-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAL_Jsq+8y=rZbpVfLEX2-chR-qy30sHozZS0ACL0hu2feDXF7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 October 2015 15:21:00 Sudeep Holla wrote:
-> SCPI support on ARM64 Juno Development Platform
-> 
->   1. SRAM, MHU mailbox and SCPI support
->   2. CPU topology using cpu-map
->   3. Clock support for all the cpus
->   4. Support for SoC sensors
-> 
-> 
+On Tue, Oct 6, 2015 at 12:03 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Now that we have a useable and documented version of msi-parent that
+> can deal with multiple parenting, we can properly handle it in the
+> kernel. This leads to a new OF helper, some rework in the PCI and
+> platform layers, as well as a small patch for the ITS driver, which is
+> the only thing in the kernel requirering this functionality so far.
+>
+> On top of that, the msi-map property also offers a new feature, which
+> is that ability to have a per-device MSI controller (instead of having
+> a global one). The last four patches enable this.
+>
+> These patches are on top of David Daney's series:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/373986.html
+>
+> (of_msi_map_rid is a dependency), and has been tested on 4.3-rc3,
+> using both platform and PCI MSI devices.
+>
+> * From the initial version
+>   - Dropped the of parsing patch
+>   - Built on top of David's series to reuse of_msi_map_rid
+>   - New per-device PCI/MSI domain assignment hook
+>   - Parse msi-map at bus probing time and populate the msi_domain field
+>
+> Marc Zyngier (8):
+>   of/irq: Add support code for multi-parent version of "msi-parent"
+>   of/irq: Use of_msi_get_domain instead of open-coded "msi-parent"
+>     parsing
+>   PCI/MSI: Use of_msi_get_domain instead of open-coded "msi-parent"
+>     parsing
+>   irqchip/gic-v3-its: Parse new version of msi-parent property
+>   of/irq: Split of_msi_map_rid to reuse msi-map lookup
+>   of/irq: Use the msi-map property to provide device-specific MSI domain
+>   PCI: Add per-device MSI domain hook
+>   PCI/MSI: Allow the MSI domain to be device-specific
 
-Merged into next/dt, thanks,
+For the series:
 
-	Arnd
+Acked-by: Rob Herring <robh@kernel.org>
+
+I'm assuming Thomas is taking this and the dependency. It is mostly DT
+code so I'm happy take it if you want.
+
+Rob
+
+>
+>  drivers/irqchip/irq-gic-v3-its-platform-msi.c |  18 ++-
+>  drivers/of/irq.c                              | 151 ++++++++++++++++++++------
+>  drivers/pci/msi.c                             |  17 +++
+>  drivers/pci/of.c                              |  13 +--
+>  drivers/pci/probe.c                           |  43 +++++++-
+>  include/linux/msi.h                           |   6 +
+>  include/linux/of_irq.h                        |  16 +++
+>  7 files changed, 214 insertions(+), 50 deletions(-)
+>
+> --
+> 2.1.4
+>
