@@ -1,42 +1,39 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 15 Oct 2015 12:22:24 -0600
-Subject: [PATCH] mtd: document linux-specific partition parser DT binding
-In-Reply-To: <20151015174709.GB108923@google.com>
-References: <1444915191-28350-1-git-send-email-linus.walleij@linaro.org>
- <20151015162210.GA4545@localhost>
- <20151015170428.GA9250@obsidianresearch.com>
- <20151015174709.GB108923@google.com>
-Message-ID: <20151015182224.GB17519@obsidianresearch.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 15 Oct 2015 11:24:19 -0700
+Subject: [PATCH] spmi-pmic-arb: support configurable number of peripherals
+In-Reply-To: <8EEAE898-347B-4CEA-BA4D-0C69897E18EB@gmail.com>
+References: <1442267672-11287-1-git-send-email-sboyd@codeaurora.org>
+ <55F77451.9070900@codeaurora.org>
+ <1442316018.15519.4.camel@mm-sol.com>
+ <20150915182728.GA11715@codeaurora.org>
+ <561EDAAC.6060800@codeaurora.org>
+ <8EEAE898-347B-4CEA-BA4D-0C69897E18EB@gmail.com>
+Message-ID: <20151015182419.GH4558@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 10:47:09AM -0700, Brian Norris wrote:
-> Hmm, I don't know. I wouldn't expect people should really be using
-> cmdlineparts as a production solution, but I'd consider it more of a
-> debugging/development option -- if I want to override the DT (which is
-> sometimes a bit harder to change) or the on-flash layout (e.g.,
-> RedBoot), then I can fiddle with the command line.
+On 10/15, Ivan T. Ivanov wrote:
+> 
+> > On Oct 15, 2015, at 1:43 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > 
+> > I have to take this back. I missed the part where some pmics are on
+> > slave id 2 or slave id 4, so this check isn't going to work. I've
+> > adjusted it to use sid % 2 instead and I'll resend these two patches,
+> > but I imagine to be more robust we're going to need to add a revid node
+> > to the DT under the SID that actually has it. Then we can search the
+> > child nodes for a revid compatible node and do the rev probing stuff.
+> 
+> Ah, yes. We don?t use revision information for now. 
+> I suppose we can just remove these reads until we need
+> this information?
+> 
 
-We don't have cmdline overrides for very much (if any?) of DT.
+True, we could just remove all the code and make it look for a
+revid node at some later time. But later would be soon because
+I'm working on patches to add the read/write/volatile regmap
+tables to this driver. I guess I'll just go all the way and do
+the revid node part.
 
-The DT is supposed to describe the hardware/boot environment, if
-overriding the partition layout is really common, then is the DT
-binding really describing the hardware at all?
-
-The partition layout is already very border line to support in DT, it
-is really very close to a software configuration which is strongly
-discouraged from DT files.
-
-I justify it as the boot loader communicating the partition scheme it
-understands to the OS, so the OS can have a hope of setting up the
-flash in a way the bootloader understands.
-
-I've never used the cmdline option, so maybe I don't see the use case,
-but it seems like a really weird desire to change the partitioning
-away from what the bootloader supports.
-
-> Any better nominations for names?
-
-bcrm-part-table-43 ?
-
-Jason
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
