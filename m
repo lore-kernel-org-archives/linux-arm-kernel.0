@@ -1,39 +1,41 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Thu, 15 Oct 2015 15:23:05 -0400
-Subject: [PATCH v2 7/7] clk: ns2: add clock support for Broadcom
- Northstar 2 SoC
-In-Reply-To: <5092107.jzBI3Aa57c@wuerfel>
-References: <1444770485-11210-1-git-send-email-jonmason@broadcom.com>
- <561FF223.2050807@broadcom.com>
- <20151015184344.GK32089@broadcom.com> <5092107.jzBI3Aa57c@wuerfel>
-Message-ID: <20151015192304.GL32089@broadcom.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 15 Oct 2015 21:22:59 +0200
+Subject: [GIT PULL] ARM: berlin: SoC changes for v4.4 (round 2)
+Message-ID: <1444936979-15901-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 08:54:34PM +0200, Arnd Bergmann wrote:
-> On Thursday 15 October 2015 14:43:45 Jon Mason wrote:
-> > On Thu, Oct 15, 2015 at 11:36:19AM -0700, Scott Branden wrote:
-> > > Jon,
-> > > 
-> > > Can you add this to your patchset and change COMMON_CLK_IPROC to a
-> > > silent option?
-> > 
-> > Sure, I'll add this (and make it silent), as well as adding the
-> > documentation patches back to this series (per Ray's suggestion), and
-> > will resend.
-> > 
-> 
-> Thanks!
-> 
-> 	Arnd
+Arnd, Kevin, Olof,
 
-I'm tweaking the patch slightly.  So, I'll remove Scott's ack and let
-him re-ack if he still likes it.
+this is the second PR for Marvell Berlin SoC changes for v4.4. Jisheng
+added cpu hotplug support by using a non-self-clearing version of the
+reset register.
 
-I moved the selection of the COMMON_CLK_IPROC to ARCH_BCM_IPROC, as
-all iProc SoCs will soon have clk drivers (and enabling it without a
-SoC driver won't hurt anything).  Also, the slient enable option is
-added.
+Please pull.
 
-Thanks,
-Jon
+Sebastian
+
+The following changes since commit e1a3e724a25761a2b2e9e0e059e33afac6409a76:
+
+  ARM: berlin: register cpufreq-dt (2015-09-21 22:57:24 +0200)
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-soc-for-4.4-2
+
+for you to fetch changes up to a7b3d5a715f489ee542e59d722281c9f16da50dc:
+
+  arm: berlin: add CPU hotplug support (2015-10-15 21:14:28 +0200)
+
+----------------------------------------------------------------
+Marvell Berlin SoC for 4.4 take 2
+- use the non-self-clearing reset register
+- add cpu hotplug support
+
+----------------------------------------------------------------
+Jisheng Zhang (2):
+      arm: berlin: use non-self-cleared reset register to reset cpu
+      arm: berlin: add CPU hotplug support
+
+ arch/arm/mach-berlin/platsmp.c | 38 +++++++++++++++++++++++++++++++++++---
+ 1 file changed, 35 insertions(+), 3 deletions(-)
