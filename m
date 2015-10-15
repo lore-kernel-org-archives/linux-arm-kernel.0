@@ -1,25 +1,18 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Oct 2015 15:24:51 +0200
-Subject: [PATCH 3/3] ARM: at91/defconfig: update sama5 defconfig
-In-Reply-To: <1444824684-24526-3-git-send-email-ludovic.desroches@atmel.com>
-References: <1444824684-24526-1-git-send-email-ludovic.desroches@atmel.com>
- <1444824684-24526-3-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20151015132451.GD3421@piout.net>
+Date: Thu, 15 Oct 2015 15:25:33 +0200
+Subject: [PATCH] ARM: at91/dt: fix "disabled" property on at91rm9200
+In-Reply-To: <1444735464-5447-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1444735464-5447-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <20151015132533.GE3421@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 14/10/2015 at 14:11:24 +0200, Ludovic Desroches wrote :
-> Add SAMA5D2 SoC plus Atmel flexcom and Atmel sdhci devices.
+On 13/10/2015 at 13:24:24 +0200, Michael Opdenacker wrote :
+> Fix instances of "disable" instead of "disabled"
+> in the at91rm9200 dtsi.
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  arch/arm/configs/sama5_defconfig | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-It is probably worth updating the multi_v7_defconfig too (in a separate
-patch).
+> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
 
 -- 
