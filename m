@@ -1,106 +1,158 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Oct 2015 15:08:47 +0200
-Subject: [PATCH 04/10] mtd: afs: refactor v1 partition parsing
+Date: Thu, 15 Oct 2015 15:08:48 +0200
+Subject: [PATCH 05/10] mtd: afs: simplify partition parsing
 In-Reply-To: <1444914533-27782-1-git-send-email-linus.walleij@linaro.org>
 References: <1444914533-27782-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1444914533-27782-5-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1444914533-27782-6-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return immediately if we are not finding a valid v1 partition
-in afs_read_footer_v1(), invert scanning logic so we continue
-to read image information on v1 if we found a footer. This is
-needed for the logic we introduce to parse v2 footers.
+This simplifies the AFS partition parsing to make the code
+more straight-forward and readable.
+
+Before this patch the code tried to calculate the memory required
+to hold the partition info by adding up the sizes of the strings
+of the names and adding that to a single memory allocation,
+indexing the name pointers in front of the struct mtd_partition
+allocations so all allocated data was in one chunk.
+
+This is overzealous. Instead use kstrdup and bail out,
+kfree():ing the memory used for MTD partitions and names alike
+on the errorpath.
+
+In the process rename the index variable from idx to i.
 
 Cc: Ryan Harkin <ryan.harkin@linaro.org>
 Cc: Liviu Dudau <liviu.dudau@arm.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/mtd/afs.c | 37 +++++++++++++++++--------------------
- 1 file changed, 17 insertions(+), 20 deletions(-)
+ drivers/mtd/afs.c | 67 ++++++++++++++++++++++++++-----------------------------
+ 1 file changed, 32 insertions(+), 35 deletions(-)
 
 diff --git a/drivers/mtd/afs.c b/drivers/mtd/afs.c
-index d09280ae12bd..a1eea50ce180 100644
+index a1eea50ce180..9e6089615f16 100644
 --- a/drivers/mtd/afs.c
 +++ b/drivers/mtd/afs.c
-@@ -87,25 +87,23 @@ afs_read_footer_v1(struct mtd_info *mtd, u_int *img_start, u_int *iis_start,
- 		return ret;
- 	}
- 
--	ret = 1;
--
- 	/*
- 	 * Does it contain the magic number?
- 	 */
- 	if (fs.signature != AFSV1_FOOTER_MAGIC)
--		ret = 0;
-+		return 0;
+@@ -166,9 +166,9 @@ static int parse_afs_partitions(struct mtd_info *mtd,
+ 				struct mtd_part_parser_data *data)
+ {
+ 	struct mtd_partition *parts;
+-	u_int mask, off, idx, sz;
++	u_int mask, off, sz;
+ 	int ret = 0;
+-	char *str;
++	int i;
  
  	/*
- 	 * Check the checksum.
+ 	 * This is the address mask; we use this to mask off out of
+@@ -181,78 +181,75 @@ static int parse_afs_partitions(struct mtd_info *mtd,
+ 	 * partition information.  We include in this the size of
+ 	 * the strings.
  	 */
- 	if (word_sum(&fs, sizeof(fs) / sizeof(u32)) != 0xffffffff)
--		ret = 0;
-+		return 0;
+-	for (idx = off = sz = 0; off < mtd->size; off += mtd->erasesize) {
+-		struct image_info_v1 iis;
++	for (i = off = sz = 0; off < mtd->size; off += mtd->erasesize) {
+ 		u_int iis_ptr, img_ptr;
  
- 	/*
- 	 * Don't touch the SIB.
- 	 */
- 	if (fs.type == 2)
--		ret = 0;
-+		return 0;
- 
- 	*iis_start = fs.image_info_base & mask;
- 	*img_start = fs.image_start & mask;
-@@ -115,16 +113,16 @@ afs_read_footer_v1(struct mtd_info *mtd, u_int *img_start, u_int *iis_start,
- 	 * be located after the footer structure.
- 	 */
- 	if (*iis_start >= ptr)
--		ret = 0;
-+		return 0;
- 
- 	/*
- 	 * Check the start of this image.  The image
- 	 * data can not be located after this block.
- 	 */
- 	if (*img_start > off)
--		ret = 0;
-+		return 0;
- 
--	return ret;
-+	return 1;
- }
- 
- static int
-@@ -190,18 +188,17 @@ static int parse_afs_partitions(struct mtd_info *mtd,
  		ret = afs_read_footer_v1(mtd, &img_ptr, &iis_ptr, off, mask);
  		if (ret < 0)
- 			break;
--		if (ret == 0)
--			continue;
--
--		ret = afs_read_iis_v1(mtd, &iis, iis_ptr);
--		if (ret < 0)
 -			break;
--		if (ret == 0)
--			continue;
++			return ret;
+ 		if (ret) {
+-			ret = afs_read_iis_v1(mtd, &iis, iis_ptr);
+-			if (ret < 0)
+-				break;
+-			if (ret == 0)
+-				continue;
 -
--		sz += sizeof(struct mtd_partition);
--		sz += strlen(iis.name) + 1;
--		idx += 1;
-+		if (ret) {
-+			ret = afs_read_iis_v1(mtd, &iis, iis_ptr);
-+			if (ret < 0)
-+				break;
-+			if (ret == 0)
-+				continue;
-+
-+			sz += sizeof(struct mtd_partition);
-+			sz += strlen(iis.name) + 1;
-+			idx += 1;
-+		}
+ 			sz += sizeof(struct mtd_partition);
+-			sz += strlen(iis.name) + 1;
+-			idx += 1;
++			i += 1;
+ 		}
  	}
  
- 	if (!sz)
+-	if (!sz)
+-		return ret;
++	if (!i)
++		return 0;
+ 
+ 	parts = kzalloc(sz, GFP_KERNEL);
+ 	if (!parts)
+ 		return -ENOMEM;
+ 
+-	str = (char *)(parts + idx);
+-
+ 	/*
+ 	 * Identify the partitions
+ 	 */
+-	for (idx = off = 0; off < mtd->size; off += mtd->erasesize) {
++	for (i = off = 0; off < mtd->size; off += mtd->erasesize) {
+ 		struct image_info_v1 iis;
+ 		u_int iis_ptr, img_ptr;
+ 
+ 		/* Read the footer. */
+ 		ret = afs_read_footer_v1(mtd, &img_ptr, &iis_ptr, off, mask);
+ 		if (ret < 0)
+-			break;
++			goto out_free_parts;
+ 		if (ret == 0)
+ 			continue;
+ 
+ 		/* Read the image info block */
+ 		ret = afs_read_iis_v1(mtd, &iis, iis_ptr);
+ 		if (ret < 0)
+-			break;
++			goto out_free_parts;
+ 		if (ret == 0)
+ 			continue;
+ 
+-		strcpy(str, iis.name);
++		parts[i].name = kstrdup(iis.name, GFP_KERNEL);
++		if (!parts[i].name) {
++			ret = -ENOMEM;
++			goto out_free_parts;
++		}
+ 
+-		parts[idx].name		= str;
+-		parts[idx].size		= (iis.length + mtd->erasesize - 1) & ~(mtd->erasesize - 1);
+-		parts[idx].offset	= img_ptr;
+-		parts[idx].mask_flags	= 0;
++		parts[i].size		= (iis.length + mtd->erasesize - 1) & ~(mtd->erasesize - 1);
++		parts[i].offset	= img_ptr;
++		parts[i].mask_flags	= 0;
+ 
+ 		printk("  mtd%d: at 0x%08x, %5lluKiB, %8u, %s\n",
+-			idx, img_ptr, parts[idx].size / 1024,
+-			iis.imageNumber, str);
+-
+-		idx += 1;
+-		str = str + strlen(iis.name) + 1;
+-	}
++			i, img_ptr, parts[i].size / 1024,
++			iis.imageNumber, parts[i].name);
+ 
+-	if (!idx) {
+-		kfree(parts);
+-		parts = NULL;
++		i += 1;
+ 	}
+ 
+ 	*pparts = parts;
+-	return idx ? idx : ret;
++	return i;
++
++out_free_parts:
++	while (i >= 0) {
++		if (parts[i].name)
++			kfree(parts[i].name);
++		i--;
++	}
++	kfree(parts);
++	*pparts = NULL;
++	return ret;
+ }
+ 
+ static struct mtd_part_parser afs_parser = {
 -- 
 2.4.3
