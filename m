@@ -1,41 +1,76 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 15 Oct 2015 21:22:59 +0200
-Subject: [GIT PULL] ARM: berlin: SoC changes for v4.4 (round 2)
-Message-ID: <1444936979-15901-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 15 Oct 2015 12:23:25 -0700
+Subject: [PATCH 08/13] clk: add ARM syscon ICST device tree bindings
+In-Reply-To: <1444916813-31024-9-git-send-email-linus.walleij@linaro.org>
+References: <1444916813-31024-1-git-send-email-linus.walleij@linaro.org>
+ <1444916813-31024-9-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20151015192325.GN4558@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Kevin, Olof,
+On 10/15, Linus Walleij wrote:
+> diff --git a/Documentation/devicetree/bindings/clock/arm-syscon-icst.txt b/Documentation/devicetree/bindings/clock/arm-syscon-icst.txt
+> new file mode 100644
+> index 000000000000..19eb3aa765c7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/arm-syscon-icst.txt
+> @@ -0,0 +1,40 @@
+> +ARM System Controller ICST clocks
+> +
+> +The ICS525 and ICS307 oscillators are produced by Integrated Devices
+> +Technology (IDT). ARM integrated these oscillators deeply into their
+> +reference designs by adding special control registers that manage such
+> +oscillators to their system controllers.
+> +
+> +The ARM system controller contains logic to serialized and initialize
 
-this is the second PR for Marvell Berlin SoC changes for v4.4. Jisheng
-added cpu hotplug support by using a non-self-clearing version of the
-reset register.
+serialize ?
 
-Please pull.
+> +an ICST clock request after a write to the 32 bit register at an offset
+> +into the system controller. Further, to even be able to alter one of
 
-Sebastian
+Furthermore?
 
-The following changes since commit e1a3e724a25761a2b2e9e0e059e33afac6409a76:
+> +these frequencies, the system controller must first be unlocked by
+> +writing a special token to another offset in the system controller.
 
-  ARM: berlin: register cpufreq-dt (2015-09-21 22:57:24 +0200)
+Sounds like a great design!
 
-are available in the git repository at:
+> +
+> +The ICST oscillator must be provided inside a system controller node.
+> +
+> +Required properties:
+> +- lock-offset: the offset address into the system controller where the
+> +  unlocking register is located
+> +- vco-offset: the offset address into the system controller where the
+> +  ICST control register is located (even 32 bit address)
 
-  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-soc-for-4.4-2
+Is there any reason why we don't use a reg property for this?
 
-for you to fetch changes up to a7b3d5a715f489ee542e59d722281c9f16da50dc:
+> +- compatible: must be one of "arm,syscon-icst525" or "arm,syscon-icst307"
+> +- #clock-cells: must be <0>
+> +- clocks: parent clock, since the ICST needs a parent clock to derive its
+> +  frequency from, this attribute is compulsory.
+> +
+> +Example:
+> +
+> +syscon: syscon at 10000000 {
+> +	compatible = "syscon";
+> +	reg = <0x10000000 0x1000>;
+> +
+> +	oscclk0: osc0 at 0c {
+> +		compatible = "arm,syscon-icst307";
+> +		#clock-cells = <0>;
+> +		lock-offset = <0x20>;
+> +		vco-offset = <0x0C>;
 
-  arm: berlin: add CPU hotplug support (2015-10-15 21:14:28 +0200)
+lowercase the C?
 
-----------------------------------------------------------------
-Marvell Berlin SoC for 4.4 take 2
-- use the non-self-clearing reset register
-- add cpu hotplug support
+> +		clocks = <&xtal24mhz>;
+> +	};
+> +	(...)
+> +};
 
-----------------------------------------------------------------
-Jisheng Zhang (2):
-      arm: berlin: use non-self-cleared reset register to reset cpu
-      arm: berlin: add CPU hotplug support
-
- arch/arm/mach-berlin/platsmp.c | 38 +++++++++++++++++++++++++++++++++++---
- 1 file changed, 35 insertions(+), 3 deletions(-)
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
