@@ -1,75 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Oct 2015 18:03:07 +0100
-Subject: [PATCH v3] ARM: fix vdsomunge not to depend on glibc specific
- byteswap.h
-In-Reply-To: <160a66a415cdb49174bc7d05b3e4dda9bba0e9d6.1444888374.git.hns@goldelico.com>
-References: <160a66a415cdb49174bc7d05b3e4dda9bba0e9d6.1444888374.git.hns@goldelico.com>
-Message-ID: <20151015170306.GF32532@n2100.arm.linux.org.uk>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 15 Oct 2015 11:04:28 -0600
+Subject: [PATCH] mtd: document linux-specific partition parser DT binding
+In-Reply-To: <20151015162210.GA4545@localhost>
+References: <1444915191-28350-1-git-send-email-linus.walleij@linaro.org>
+ <20151015162210.GA4545@localhost>
+Message-ID: <20151015170428.GA9250@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 07:52:56AM +0200, H. Nikolaus Schaller wrote:
-> If the host toolchain is not glibc based then the arm kernel build
-> fails with
-> 
->   HOSTCC  arch/arm/vdso/vdsomunge
->   arch/arm/vdso/vdsomunge.c:48:22: fatal error: byteswap.h: No such file or directory
-> 
-> Observed: with omap2plus_defconfig and compile on Mac OS X with arm ELF
-> cross-compiler.
-> 
-> Reason: byteswap.h is a glibc only header.
-> 
-> Solution: replace by private byte-swapping macros (taken from
-> arch/mips/boot/elf2ecoff.c)
-> 
-> Tested to compile on Mac OS X 10.9.5 host.
-> 
-> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
-> ---
->  arch/arm/vdso/vdsomunge.c | 19 +++++++++++++++----
->  1 file changed, 15 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/vdso/vdsomunge.c b/arch/arm/vdso/vdsomunge.c
-> index aedec81..513f9eb 100644
-> --- a/arch/arm/vdso/vdsomunge.c
-> +++ b/arch/arm/vdso/vdsomunge.c
-> @@ -45,7 +45,6 @@
->   * it does.
->   */
->  
-> -#include <byteswap.h>
->  #include <elf.h>
->  #include <errno.h>
->  #include <fcntl.h>
-> @@ -59,6 +58,18 @@
->  #include <sys/types.h>
->  #include <unistd.h>
->  
-> +#define swab16(x) \
-> +	((unsigned short)( \
-> +		(((unsigned short)(x) & (unsigned short)0x00ffU) << 8) | \
-> +		(((unsigned short)(x) & (unsigned short)0xff00U) >> 8)))
+On Thu, Oct 15, 2015 at 09:22:10AM -0700, Brian Norris wrote:
 
-		((((x) & 0x00ff) << 8) | \
-		 (((x) & 0xff00) >> 8))
+> Are you trying to use this binding, or is this just purely a mechanical
+> documentation issue? I ask, because it seems that binding never really
+> got reviewed at all, and others have recently tried to extend
+> support
 
-> +
-> +#define swab32(x) \
-> +	((unsigned int)( \
-> +		(((unsigned int)(x) & (unsigned int)0x000000ffUL) << 24) | \
-> +		(((unsigned int)(x) & (unsigned int)0x0000ff00UL) <<  8) | \
-> +		(((unsigned int)(x) & (unsigned int)0x00ff0000UL) >>  8) | \
-> +		(((unsigned int)(x) & (unsigned int)0xff000000UL) >> 24)))
+I wrote it before ARM started down the DT direction and all these
+formalities were developed.
 
-		((((x) & 0x000000ff) << 24) | \
-		 (((x) & 0x0000ff00) <<  8) | \
-		 (((x) & 0x00ff0000) >>  8) | \
-		 (((x) & 0xff000000) << 24))
+> That's not to say we can't document the old one, but I'm curious if
+> there are real users. I'd also like to encourage new users to avoid the
+> old one if we can make that feasible.
 
-We can get rid of all the casts because we know what size 'x' is in
-both cases.
+We continue to use it here, there is just no way to autodetect flash
+partition layouts. I'm not fussed about having to change to something
+else in future.
 
--- 
-FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
-according to speedtest.net.
+The reason the original patch exposed the cmdline parser is because
+that is how the internal mechanisms work - but realistically, the
+cmdline parser is a hack to get around the lack of DT partition
+description. If the DT can describe the partitions it should supersede
+and obsolete the old command line hack. IMHO
+
+> Also, if we're really going to support this, we should list exactly what
+> strings we support. And that's one of the problems with the existing
+> binding; it supports any old string Linux supports, which doesn't match
+> how we typically want to add bindings (i.e., via proposal + review).
+
+That is why it is prefixed with linux, the review of the part parser name is
+the responsibility of the MTD crew, not the DT folks.
+
+bcm47xxpart seems like a terrible name for a partition scheme. Really,
+almost any scheme can be used on any SOC, naming a partition parser
+after a SOC family makes very little sense to me..
+
+Jason
