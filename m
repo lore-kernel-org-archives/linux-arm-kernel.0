@@ -1,48 +1,41 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Thu, 15 Oct 2015 06:26:00 +0200
-Subject: [PATCH] arm, omap2, sram: On HS/EMU devices, only 64K internal
- SRAM is available.
-In-Reply-To: <20151014222022.GL10113@atomide.com>
-References: <1444715655-30077-1-git-send-email-hs@denx.de>
- <20151014174920.GE10113@atomide.com> <20151014222022.GL10113@atomide.com>
-Message-ID: <561F2AD8.6080502@denx.de>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 15 Oct 2015 10:40:05 +0530
+Subject: [PATCH v2 0/3] ARM: OMAP2+: Optimize soc_is calls
+Message-ID: <1444885808-6306-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+The series implements optimizing soc_is calls for DRA7 and AM43XX
+family of SoCs. Originally the soc_is calls for DRA7 involved parsing
+device tree nodes and some repetitive string comparisons. Optimizing
+to store the result and use the result in the subsequent calls.
 
-Am 15.10.2015 um 00:20 schrieb Tony Lindgren:
-> * Tony Lindgren <tony@atomide.com> [151014 10:56]:
->> * Heiko Schocher <hs@denx.de> [151012 22:58]:
->>> Of this, secure content (including PPA) uses initial
->>> portion of the SRAM. This chunk is not (and shouldn't
->>> be) accessible from the public code.
->>>
->>> The minimum size of this chunk (0x350) is used in this
->>> patch. Available size is rounded off to 63K.
->>>
->>> Both values would require a change if size of secure
->>> content grows beyond 0x350.
->>
->> Makes sense to me. And something similar is needed at least for
->> dm814x to get rid of the imprecise abort during boot with
->> commit bbeb92095159 ("ARM: 8422/1: enable imprecise aborts during
->> early kernel startup") applied.
->>
->> Is this needed as a fix to the -rc cycle, or can this wait for
->> v4.4?
->
-> Actually I think we may have a regression somwhere. If you look
-> at commit 8b9a2810b02e ("ARM: OMAP4+: Move SRAM data to DT")
-> this should all be handled by drivers/misc/sram.c nowadays.
->
-> So for most SoCs, we should completely skip the plat-omap/sram.c
-> code.
+The series is boot tested on am437x-gp-evm, am335x-beaglebone, dra7-evm,
+dra72-evm, omap3 beagle-xm. 
 
-Yes, correct. So it should be enough for changing the DT, thanks.
+Compile Testing:
 
-bye,
-Heiko
+** Compile tested individual: OMAP2, OMAP3, OMAP4, OMAP5, DRA7XX, AM437x,
+   AM33XX defconfig.
+** Ran Randconfig and found no errors under arch/arm/mach-omap2
+   overnight testing.
+   Source: https://github.com/felipebalbi/omap-seeds
+
+The series is on top of:
+
+https://patchwork.kernel.org/patch/7390351/
+
+
+Keerthy (3):
+  ARM: OMAP2: DRA7: Modify optimize string comparisons in soc_is calls
+  ARM: dts: AM43x-epos-evm: Add AM438x compatible string for epos
+  ARM: OMAP2: AM43XX: Modify optimize string comparisons in soc_is calls
+
+ .../devicetree/bindings/arm/omap/omap.txt          |  5 +++-
+ arch/arm/boot/dts/am43x-epos-evm.dts               |  2 +-
+ arch/arm/mach-omap2/id.c                           | 28 ++++++++++++++++++++++
+ arch/arm/mach-omap2/soc.h                          | 25 +++++++++++++++----
+ 4 files changed, 53 insertions(+), 7 deletions(-)
+
 -- 
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+1.9.1
