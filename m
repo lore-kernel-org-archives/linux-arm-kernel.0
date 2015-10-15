@@ -1,46 +1,40 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 15 Oct 2015 11:29:12 +0100
-Subject: [PATCH v4 75/79] include/uapi/xen/privcmd.h: fix compilation
- in userspace
-In-Reply-To: <1444888618-4506-76-git-send-email-mikko.rapeli@iki.fi>
-References: <1444888618-4506-1-git-send-email-mikko.rapeli@iki.fi>
- <1444888618-4506-76-git-send-email-mikko.rapeli@iki.fi>
-Message-ID: <561F7FF8.9030703@citrix.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 15 Oct 2015 12:31:22 +0200
+Subject: [PATCH v2 0/2] Fix display on second resume on 5250-snow
+Message-ID: <1444905084-22540-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/15 06:56, Mikko Rapeli wrote:
-> xen/interface/xen.h is not exported from kernel headers so remove the
-> dependency and provide needed defines for domid_t and xen_pfn_t if they
-> are not already defined by some other e.g. Xen specific headers.
-> 
-> Suggested by Andrew Cooper <andrew.cooper3@citrix.com> on lkml message
-> <5569F9C9.8000607@citrix.com>.
-> 
-> The ifdef for ARM is ugly but did not find better solutions for it.
-> 
-> Fixes userspace compilation error:
-> 
-> xen/privcmd.h:38:31: fatal error: xen/interface/xen.h: No such file or directory
-[...]
-> --- a/include/uapi/xen/privcmd.h
-> +++ b/include/uapi/xen/privcmd.h
-> @@ -35,7 +35,19 @@
->  
->  #include <linux/types.h>
->  #include <linux/compiler.h>
-> -#include <xen/interface/xen.h>
-> +
-> +/* Might be defined by Xen specific headers, but if not */
-> +#ifndef domid_t
-> +typedef __u16 domid_t;
-> +#endif /* domid_t */
+Hi,
 
-As the kbuild bot points out, this does not work since the existence of
-a typedef cannot be checked with #ifdef.
+as discussed in [0], currently on the second resume from memory the
+display is broken on Snow boards (ARM Samsung Series 3 Chromebook).
 
-I'm not really sure what problem you're trying to solve.  A user space
-program making use of this interface gets the domid_t and xen_pfn_t etc
-typedefs from the headers provided as part of the libxenctrl library.
+The reason is that on resume the contents of register SRC_TOP3 aren't
+what the kernel thinks they are because the HW (or FW) is doing some
+clock reparenting beneath our feet.
 
-David
+This series tasks the kernel to do the reparenting itself so that the HW
+state always matches the kernel's internal state.
+
+Thanks,
+
+Tomeu
+
+[0] http://lkml.kernel.org/g/561CDC33.7050103 at collabora.com
+
+Changes in v2:
+- Reuse mout_aclk200_p
+- Rename div_aclk300 as div_aclk300_disp
+
+Tomeu Vizoso (2):
+  clk: samsung: exynos5250: Add DISP1 clocks
+  ARM: dts: exynos5250: Add clocks to DISP1 domain
+
+ arch/arm/boot/dts/exynos5250.dtsi      |  4 ++++
+ drivers/clk/samsung/clk-exynos5250.c   | 14 +++++++++++++-
+ include/dt-bindings/clock/exynos5250.h |  4 +++-
+ 3 files changed, 20 insertions(+), 2 deletions(-)
+
+-- 
+2.5.0
