@@ -1,49 +1,73 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 15 Oct 2015 12:02:51 -0400
-Subject: [PATCH v4 0/3]
-In-Reply-To: <561E7792.409@oracle.com>
-References: <1444832235-15263-1-git-send-email-m-karicheri2@ti.com>
- <561E7792.409@oracle.com>
-Message-ID: <561FCE2B.8020802@ti.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 15 Oct 2015 12:04:10 -0400
+Subject: [PATCH] ahci: qoriq: Fix a compiling warning
+In-Reply-To: <15555694.OtW6JZzsoS@wuerfel>
+References: <1444812412-33321-1-git-send-email-Yuantian.Tang@freescale.com>
+ <20151015151152.GB27717@mtj.duckdns.org>
+ <15555694.OtW6JZzsoS@wuerfel>
+Message-ID: <20151015160410.GC27717@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2015 11:41 AM, santosh shilimkar wrote:
-> 10/14/2015 7:17 AM, Murali Karicheri wrote:
->> This patch series enable accumulator queue support for K2 SoCs.
->> Accumulator
->> queues are a type of qmss queue that is monitored by the PDSP firmware
->> and
->> accumulated. Host is interrupted by PDSP firmware when packets become
->> available in a ring buffer shared between the host and PDSP.
->>
->> There was an issue raised when merging the original patch set at
->>   (1) https://lkml.org/lkml/2015/9/4/681
->>     [PATCH v1 1/2] soc: ti: display firmware file name as part of boot
->> log
->>   (2) https://lkml.org/lkml/2015/9/4/680
->>     [PATCH v1 2/2] ARM: dts: keystone: enable accumulator channels
->>
->> This series fixes the issues raised against v3. Maintainer, could you
->> please
->> apply this series to v4.4 next please at your earliest opportunity.
->>
-> I have picked up the series. Thanks for quick turnaround.
+Hello,
 
-Thanks Santosh. Could you send this pull request for v4.4 next. We want 
-this merged to our internal release and if this is on next branch it 
-will help.
+I see.  I applied the following to libata/for-4.4.
 
-Thanks
+Thanks.
 
-Murali
->
-> Regards,
-> Santosh
->
->
+------ 8< ------
+>From eb351031a15c4a83b9955aadad783c6672ab8868 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 14 Oct 2015 16:46:52 +0800
+Subject: [PATCH] ahci: qoriq: Fix a compiling warning
 
+kbuild test robot reports the warnings:
+drivers/ata/ahci_qoriq.c: In function 'ahci_qoriq_hardreset':
+>> include/asm-generic/io.h:163:2: warning: 'px_is' may be used
+>> uninitialized in this function [-Wuninitialized]
+drivers/ata/ahci_qoriq.c:70:14: note: 'px_is' was declared here
+>> include/asm-generic/io.h:163:2: warning: 'px_cmd' may be used
+>> uninitialized in this function [-Wuninitialized]
+drivers/ata/ahci_qoriq.c:70:6: note: 'px_cmd' was declared here
 
+This patch fixed it by introducing a local variable.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
+Signed-off-by: Tejun Heo <tj@kernel.org>
+---
+ drivers/ata/ahci_qoriq.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/ata/ahci_qoriq.c b/drivers/ata/ahci_qoriq.c
+index e5e4988..58c1a94 100644
+--- a/drivers/ata/ahci_qoriq.c
++++ b/drivers/ata/ahci_qoriq.c
+@@ -76,6 +76,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
+ 	struct ata_taskfile tf;
+ 	bool online;
+ 	int rc;
++	bool ls1021a_workaround = (qoriq_priv->type == AHCI_LS1021A);
+ 
+ 	DPRINTK("ENTER\n");
+ 
+@@ -92,7 +93,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
+ 	 * After the sequence is complete, software should restore the
+ 	 * PxCMD and PxIS with the stored values.
+ 	 */
+-	if (qoriq_priv->type == AHCI_LS1021A) {
++	if (ls1021a_workaround) {
+ 		px_cmd = readl(port_mmio + PORT_CMD);
+ 		px_is = readl(port_mmio + PORT_IRQ_STAT);
+ 	}
+@@ -106,7 +107,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
+ 				 ahci_check_ready);
+ 
+ 	/* restore the PxCMD and PxIS on ls1021 */
+-	if (qoriq_priv->type == AHCI_LS1021A) {
++	if (ls1021a_workaround) {
+ 		px_val = readl(port_mmio + PORT_CMD);
+ 		if (px_val != px_cmd)
+ 			writel(px_cmd, port_mmio + PORT_CMD);
 -- 
-Murali Karicheri
-Linux Kernel, Keystone
+2.4.3
