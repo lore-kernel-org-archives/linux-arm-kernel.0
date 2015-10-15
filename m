@@ -1,70 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 15 Oct 2015 12:10:26 -0700
-Subject: [PATCH 07/13] clk: versatile-icst: refactor to allocate regmap
- separately
-In-Reply-To: <1444916813-31024-8-git-send-email-linus.walleij@linaro.org>
-References: <1444916813-31024-1-git-send-email-linus.walleij@linaro.org>
- <1444916813-31024-8-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20151015191026.GM4558@codeaurora.org>
+From: jcm@redhat.com (Jon Masters)
+Date: Thu, 15 Oct 2015 15:15:24 -0400
+Subject: [PATCH 00/11] ARM64 PCI hostbridge init based on ACPI
+In-Reply-To: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
+References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <561FFB4C.1000500@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15, Linus Walleij wrote:
-> @@ -174,15 +170,7 @@ struct clk *icst_clk_register(struct device *dev,
->  	init.flags = CLK_IS_ROOT;
->  	init.parent_names = (parent_name ? &parent_name : NULL);
->  	init.num_parents = (parent_name ? 1 : 0);
-> -	icst->map = regmap_init_mmio(NULL, base, &icst_regmap_conf);
-> -	if (IS_ERR(icst->map)) {
-> -		int ret;
-> -
-> -		pr_err("could not initialize ICST regmap\n");
-> -		kfree(icst);
-> -		ret = PTR_ERR(icst->map);
-> -		return ERR_PTR(ret);
+Hi Hanjun,
 
-Oh now it gets moved.
+Thanks for your hard work on ARM64 PCI host bridge/root complex so far!
 
-> -	}
-> +	icst->map = map;
->  	icst->hw.init = &init;
->  	icst->params = pclone;
->  	icst->vcoreg_off = desc->vco_offset;
-> @@ -194,4 +182,28 @@ struct clk *icst_clk_register(struct device *dev,
->  
->  	return clk;
->  }
-> +
-> +struct clk *icst_clk_register(struct device *dev,
-> +			const struct clk_icst_desc *desc,
-> +			const char *name,
-> +			const char *parent_name,
-> +			void __iomem *base)
-> +{
-> +	struct regmap_config icst_regmap_conf = {
-> +		.reg_bits = 32,
-> +		.val_bits = 32,
-> +		.reg_stride = 4,
-> +	};
-> +	struct regmap *map;
-> +
-> +	map = regmap_init_mmio(NULL, base, &icst_regmap_conf);
+On 05/26/2015 08:49 AM, Hanjun Guo wrote:
+> This patch set is introducing ARM64 PCI hostbridge init based on ACPI,
+> which based on Jiang Liu's patch set "Consolidate ACPI PCI root common
+> code into ACPI core":
+> 
+> https://lkml.org/lkml/2015/5/14/98
 
-Any reason we aren't passing dev as the first argument? Same
-comment applies to patch 6.
+The latest version (v7) of the ACPI PCI root common code consolidation
+series was posted by Gerry (Jiang Liu) yesterday:
 
-> +	if (IS_ERR(map)) {
-> +		int ret;
-> +
-> +		pr_err("could not initialize ICST regmap\n");
-> +		ret = PTR_ERR(map);
-> +		return ERR_PTR(ret);
+https://lkml.kernel.org/g/1444804182-6596-1-git-send-email-jiang.liu at linux.intel.com
 
-Use ERR_CAST(map) instead.
+This got me wondering what the status is of the ARM64 specific
+hostbridge patch series that has a dependency upon the former. Are you
+planning to wait for that series to be accepted or post a newer rebased
+version for additional review, or something else?
 
-> +	}
-> +	return icst_clk_setup(dev, desc, name, parent_name, map);
+Thanks very much in advance! :)
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Jon.
