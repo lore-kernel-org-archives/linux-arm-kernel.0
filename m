@@ -1,46 +1,83 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 15 Oct 2015 09:34:15 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for v4.4
-Message-ID: <cover.1444868963.git.horms+renesas@verge.net.au>
+From: alison.wang@freescale.com (Huan Wang)
+Date: Thu, 15 Oct 2015 02:11:57 +0000
+Subject: [PATCH v4] ARM: configs: Add Freescale LS1021A defconfig
+In-Reply-To: <5232654.e6dagm53H4@wuerfel>
+References: <1442480614-32345-1-git-send-email-b18965@freescale.com>
+ <16038044.0DCMVgq8H3@wuerfel>
+ <BN3PR0301MB086733D602580A5A9EBF150EFE3F0@BN3PR0301MB0867.namprd03.prod.outlook.com>
+ <5232654.e6dagm53H4@wuerfel>
+Message-ID: <BN3PR0301MB0867A87B64E1206B773F05EEFE3E0@BN3PR0301MB0867.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+> On Wednesday 14 October 2015 10:18:47 Huan Wang wrote:
+> > > On Thursday 24 September 2015 07:27:10 Huan Wang wrote:
+> > > > > On Fri, Sep 18, 2015 at 4:38 AM, Huan Wang
+> > > > > <alison.wang@freescale.com>
+> > > > > wrote:
+> > > > >
+> > > > > > [Alison Wang] Thanks for your reply. I agreed with you about
+> > > > > > creating a new multi_v7_lpae_defconfig. In
+> > > > > > multi_v7_lpae_defconfig, I need to add the following CONFIG_XX
+> > > > > > to support LS1021A based on
+> > > > > multi_v7_defconfig.
+> > > > > >
+> > > > > > CONFIG_ARM_LPAE=y
+> > > > > > CONFIG_VMSPLIT_2G=y
+> > > > >
+> > > > > Is CONFIG_VMSPLIT_2G=y really needed?
+> > > > [Alison Wang] I tried to remove CONFIG_VMSPLIT_2G and used the
+> > > > default CONFIG_VMSPLIT_3G, but kernel could not boot up. It hangs
+> > > > at " Starting
+> > > kernel ... ".
+> > > >
+> > > > Any suggestion? Thanks.
+> > >
+> > > Try enabling DEBUG_LL for your platform to get some debug output, if
+> > > you still don't get any helpful messages, try also inserting
+> > >
+> > >       printascii(__func__);
+> > >
+> > > statements in the early boot process to see how far you get before the
+> hang.
+> > >
+> > [Alison Wang] I can get to __turn_mmu_on or later, but I could not get
+> > the print message "Booting Linux on physical CPU 0xf00" in
+> smp_setup_processor_id().
+> >
+> > I guess something wrong with the initial page tables in
+> > __create_page_tables, as for CONFIG_VMSPLIT_3G, only PAGE_OFFSET is
+> changed from 0x80000000 to 0xC0000000.
+> > BTW, on our platform, TEXT_OFFSET is 0x00008000, PHYS_OFFSET is
+> 0x80000000.
+> >
+> > Any suggestion? Thanks.
+> 
+> My first guess is that there is something wrong with your debug_ll
+> implementation, as that would explain why you can't get anything to the
+> console after turning on page tables.
+> 
+> It looks like ls1021a uses lpuart, but I can't even see an implementation
+> for that in arch/arm/include/debug/. What code do you use for printing?
+> 
+[Alison Wang] ls1021a uses duart as the default serial port, not lpuart. So
+8250/16550 serial driver is used. Let me explain my debug process in detail.
 
-Please consider these second round of Renesas ARM based SoC DT updates for v4.4.
+When CONFIG_VMSPLIT_2G is used, I could boot up the whole kernel and get the
+print message " Booting Linux on physical CPU 0xf00" after "Starting kernel"
+as below.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-dt-for-v4.4,
-which I have already sent a pull-request for.
+Starting kernel ...
+[    0.000000] Booting Linux on physical CPU 0xf00
+.....
+
+But when CONFIG_VMSPLIT_3G is used, I couldn't get print message " Booting Linux
+on physical CPU 0xf00". It only hangs at  "Starting kernel ...".
+
+Moreover, I add some asm code in __turn_mmu_on to print some simple characters, and
+I could get the print characters when CONFIG_VMSPLIT_3G is used. So I guess there
+is something wrong with the page tables.
 
 
-The following changes since commit 0877098d82fd1823878534b116a4a725e729701f:
-
-  ARM: shmobile: porter: add Ether DT support (2015-10-06 09:44:53 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v4.4
-
-for you to fetch changes up to 99f7445ea41c0187cd2e78bcb58cdd9e6c1756e5:
-
-  ARM: shmobile: porter: enable internal PCI and USB PHY (2015-10-13 10:00:12 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC DT Updates for v4.4
-
-* Enable the following on the porter board:
-  I2C2, PCI, PCIe, QSPI, SATA0, SDHI0/2, USB PHY and VIN0/ADV7180.
-
-----------------------------------------------------------------
-Sergei Shtylyov (7):
-      ARM: shmobile: porter: add SDHI0/2 DT support
-      ARM: shmobile: porter: enable SATA0
-      ARM: shmobile: porter: add I2C2 DT support
-      ARM: shmobile: porter: add VIN0/ADV7180 DT support
-      ARM: shmobile: porter: add QSPI DT support
-      ARM: shmobile: porter: enable PCIe
-      ARM: shmobile: porter: enable internal PCI and USB PHY
-
- arch/arm/boot/dts/r8a7791-porter.dts | 202 +++++++++++++++++++++++++++++++++++
- 1 file changed, 202 insertions(+)
+Best Regards,
+Alison Wang
