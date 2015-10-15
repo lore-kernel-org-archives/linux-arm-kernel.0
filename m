@@ -1,105 +1,60 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 15 Oct 2015 15:11:35 -0500
-Subject: [PATCH v2 8/8] PCI/MSI: Allow the MSI domain to be device-specific
-In-Reply-To: <1444151043-31084-9-git-send-email-marc.zyngier@arm.com>
-References: <1444151043-31084-1-git-send-email-marc.zyngier@arm.com>
- <1444151043-31084-9-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20151015201135.GE10442@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 22:16:39 +0200
+Subject: [GIT PULL] Broadcom soc changes for v4.4 (try 2)
+In-Reply-To: <1444502429-11100-1-git-send-email-f.fainelli@gmail.com>
+References: <1443824458-20799-4-git-send-email-f.fainelli@gmail.com>
+ <1444502429-11100-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <5790163.9Q0inxP5UI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 06:04:03PM +0100, Marc Zyngier wrote:
-> So far, we've always considered that for a given PCI device, its
-> MSI controller was either set by the architecture-specific
-> pcibios hook, or simply inherited from the host bridge.
+On Saturday 10 October 2015 11:40:29 Florian Fainelli wrote:
 > 
-> This doesn't cover things like firmware-defined topologies like
-> msi-map (DT) or IORT (ACPI), which can provide information about
-> which MSI controller to use on a per-device basis.
+> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 > 
-> This patch adds the necessary hook into the MSI code to allow this
-> feature, and provides the msi-map functionnality as a first
-> implementation.
+>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> are available in the git repository at:
+> 
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.4/soc
+> 
+> for you to fetch changes up to c4a8ea9e0698945b182ba1e1063a0981b1f35139:
+> 
+>   ARM: brcmstb: Setup BIU control registers during boot (2015-10-09 13:42:18 -0700)
+> 
+> ----------------------------------------------------------------
+> This pull request contains the following Broadcom SoC platform and driver changes:
+> 
+> - Brian Norris create a drivers/soc/brcmstb/ stub as a place holder for SoC-specific
+>   code which is coming next
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+I should have been clearer with my complaint last week. I really mean both
+of Brian's patches should be removed, although I mainly talked about the
+other one. This patch goes to great length to introduce a soc_is_brcmstb()
+function, but I'd rather see this never being used anywhere.
 
-I assume somebody other than me will merge this series.
+Drivers should not have to check the compatible property of the root node
+(in some cases we do, but that is because the initial binding was broken
+and we could not change it).
 
-> ---
->  drivers/pci/msi.c   | 17 +++++++++++++++++
->  drivers/pci/probe.c |  8 ++++++++
->  include/linux/msi.h |  6 ++++++
->  3 files changed, 31 insertions(+)
+> - Florian Fainelli adds support for configuring the BCM7xxx SoCs Bus Interface Unit
+>   with their specific write-pairing setting, which must be saved and restored during
+>   system-wide suspend/resume, and consequently updates the brcmstb machine code to
+>   initialize the BIU
 > 
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index 81a2798..3daff31 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -1357,4 +1357,21 @@ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
->  
->  	return rid;
->  }
-> +
-> +/**
-> + * pci_msi_get_device_domain - Get the MSI domain for a given PCI device
-> + * @pdev:	The PCI device
-> + *
-> + * Use the firmware data to find a device-specific MSI domain
-> + * (i.e. not one that is ste as a default).
-> + *
-> + * Returns: The coresponding MSI domain or NULL if none has been found.
-> + */
-> +struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev)
-> +{
-> +	u32 rid = 0;
-> +
-> +	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
-> +	return of_msi_map_get_device_domain(&pdev->dev, rid);
-> +}
->  #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 7c333f8..f14a970 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1639,6 +1639,14 @@ static struct irq_domain *pci_dev_msi_domain(struct pci_dev *dev)
->  	if (d)
->  		return d;
->  
-> +	/*
-> +	 * Let's see if we have a firmware interface able to provide
-> +	 * the domain.
-> +	 */
-> +	d = pci_msi_get_device_domain(dev);
-> +	if (d)
-> +		return d;
-> +
->  	return NULL;
->  }
->  
-> diff --git a/include/linux/msi.h b/include/linux/msi.h
-> index 56e3b76..375be7c 100644
-> --- a/include/linux/msi.h
-> +++ b/include/linux/msi.h
-> @@ -294,6 +294,12 @@ irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
->  int pci_msi_domain_check_cap(struct irq_domain *domain,
->  			     struct msi_domain_info *info, struct device *dev);
->  u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev);
-> +struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev);
-> +#else
-> +static inline struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev)
-> +{
-> +	return NULL;
-> +}
->  #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
->  
->  #endif /* LINUX_MSI_H */
-> -- 
-> 2.1.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> - Jon Mason adds support for the Northstar Plus SoCs by introducing a custom machine
+>   descriptor matching their compatible string and setting up the PL310 L2 cache and
+>   enabling the relevant ARM errata for their Cortex-A9
+
+I've merged all of the series anyway, since it's not a big enough
+problem to make you do another iteration, and I've already pushed
+back once.
+
+Let's talk about this again when you add users of this function, so
+we can ideally come up with a better solution and remove the two files
+again.
+
+Pulled into next/soc. Thanks for your patience and for respinning
+the series so quickly!
+
+	Arnd
