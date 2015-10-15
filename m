@@ -1,34 +1,52 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 17:52:59 +0200
-Subject: linux-next: build failure after merge of the arm-soc tree
-In-Reply-To: <20151015104045.04136253@xhacker>
-References: <20151015101920.7fa592f7@canb.auug.org.au>
- <20151015104045.04136253@xhacker>
-Message-ID: <8514405.TqbzRgirza@wuerfel>
+Date: Thu, 15 Oct 2015 17:59:08 +0200
+Subject: [PATCH] ARM: tegra: Comment out gpio-ranges properties
+In-Reply-To: <1444405907-17996-1-git-send-email-thierry.reding@gmail.com>
+References: <1444405907-17996-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <5210588.IYgZy3yWn7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 October 2015 10:40:45 Jisheng Zhang wrote:
-> On Thu, 15 Oct 2015 10:19:20 +1100
-> Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+On Friday 09 October 2015 17:51:47 Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> > Hi all,
-> > 
-> > After merging the arm-soc tree, today's linux-next build (arm
-> > multi_v7_defconfig) failed like this:
-> > 
-> > arch/arm/boot/dts/berlin2q.dtsi:62.24-25 syntax error
-> > FATAL ERROR: Unable to parse input tree
+> While the addition of these properties is technically correct it unveils
+> a bug with deferred probe. The problem is that the presence of the gpio-
+> range property causes the gpio-tegra driver to defer probe (it needs the
+> pinctrl driver to be ready). That's technically correct, but it causes a
+> couple of issues:
 > 
-> I just checked, this is caused by missing the following two commits
+>   - The keyboard on Chromebooks stops working. The reason for that is
+>     that the gpio-tegra device has not registered an IRQ domain by the
+>     time the EC SPI device is registered, hence the interrupt number
+>     resolves to 0. This is technically a bug in the SPI core, since it
+>     should really resolve the interrupt at probe time and defer if the
+>     IRQ domain isn't available yet. This is similar to what's done for
+>     I2C and platform device already.
 > 
-> f72d787d9287 ("clk: berlin: move MAX_CLKS out of drivers/clk/berlin")
+>   - The gpio-tegra device deferring probe means that it is moved to the
+>     end of the dpm_list. This list defines the suspend/resume order for
+>     devices. However the core lacks a way to move all users of the
+>     gpio-tegra device to the end of the dpm_list at the same time. This
+>     in turn results in a subtle bug on Jetson TK1, where the gpio-keys
+>     device is used to expose the power key as input. The power key is a
+>     convenient way to wake the system from suspend. Interestingly, the
+>     gpio-keys device ends up getting probed at a point after gpio-tegra
+>     has been probed successfully from having been deferred earlier. As
+>     such the driver doesn't need to defer the probe itself, and hence
+>     the device isn't moved to the end of the dpm_list. This causes the
+>     gpio-tegra device to be suspended before gpio-keys, which in turn
+>     leaves gpio-keys unable to wake the system from suspend.
 > 
-> 44b2e5f96d5e ("clk: berlin: add cpuclk")
+> There are patches in the works to fix both of the above issues, but they
+> are too involved to make it into v4.3, so in the meantime let's fix the
+> regressions by commenting out the gpio-ranges properties until the fixes
+> have landed.
+> 
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+> 
 
-I've reverted 23998645f6e73 ("ARM: berlin: dts: add the cpufreq-dt
-bindings on the BG2Q") on my for-next branch for the time being, to
-get a working tree again and am waiting for a proper fixup patch
-from Sebastian now to rectify the next/dt branch.
+Applied to fixes, thanks!
 
 	Arnd
