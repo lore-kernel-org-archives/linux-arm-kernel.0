@@ -1,43 +1,50 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Thu, 15 Oct 2015 13:41:57 -0700
-Subject: [PATCH v3 04/10] clk: nsp: add clock support for Broadcom
- Northstar Plus SoC
-In-Reply-To: <1444938513-10758-5-git-send-email-jonmason@broadcom.com>
-References: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
- <1444938513-10758-5-git-send-email-jonmason@broadcom.com>
-Message-ID: <56200F95.3040902@broadcom.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 22:43:37 +0200
+Subject: [GIT PULL] ARM: berlin: CPU clock driver for v4.4 (round 1)
+In-Reply-To: <1444935864-8606-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1444934667-5451-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1444935864-8606-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <6081171.fTttdr29KV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon,
+On Thursday 15 October 2015 21:04:24 Sebastian Hesselbarth wrote:
+> this is the remaining driver changes of the broken PRs sent earlier.
+> Again, as Arnd requested this branch is based on the PR adding the
+> CPUID to the dt-binding include and drops moving the MAX_CLKS
+> define from the driver to the dt-binding include.
 
-Review below.
++clk maintainers
 
-On 15-10-15 12:48 PM, Jon Mason wrote:
-> The Broadcom Northstar Plus SoC is architected under the iProc
+I've pulled it into next/drivers now to speed things up and given
+that it has Stephen's Ack, but I'd note that now that the dependency
+is handled correctly, this could have gone the normal path through the
+clk maintainers.
 
-Based on changes in Makefile below - should this be for Northstar and 
-Northstar Plus?
+Thanks,
 
-> architecture. It has the following PLLs: ARMPLL, GENPLL, LCPLL0, all
-> derived from an onboard crystal.
->
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> ---
->   drivers/clk/bcm/Makefile            |   2 +
->   drivers/clk/bcm/clk-nsp.c           | 135 ++++++++++++++++++++++++++++++++++++
->   include/dt-bindings/clock/bcm-nsp.h |  51 ++++++++++++++
->   3 files changed, 188 insertions(+)
->   create mode 100644 drivers/clk/bcm/clk-nsp.c
->   create mode 100644 include/dt-bindings/clock/bcm-nsp.h
->
-> diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
-> index 8a7a477..e258b28 100644
-> --- a/drivers/clk/bcm/Makefile
-> +++ b/drivers/clk/bcm/Makefile
-> @@ -4,3 +4,5 @@ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm281xx.o
->   obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm21664.o
->   obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-iproc-armpll.o clk-iproc-pll.o clk-iproc-asiu.o
->   obj-$(CONFIG_ARCH_BCM_CYGNUS)	+= clk-cygnus.o
-> +obj-$(CONFIG_ARCH_BCM_NSP)	+= clk-nsp.o
-> +obj-$(CONFIG_ARCH_BCM_5301X)	+= clk-nsp.o
+	Arnd
+
+> The following changes since commit 28c039eebaaa28def9364b9a12a30192be8b4730:
+>   ARM: berlin: dts: add CLKID_CPU for BG2Q (2015-10-15 20:31:41 +0200)
+> 
+> are available in the git repository at:
+>   git://git.infradead.org/users/hesselba/linux-berlin.git
+>   tags/berlin-new-cpuclk-for-4.4-1> 
+> for you to fetch changes up to 515f1a2027006839c08c842da919abfcc3c7ae2a:
+>   clk: berlin: add cpuclk (2015-10-15 20:55:55 +0200)
+> 
+> ----------------------------------------------------------------
+> Marvell Berlin BG2Q CPU clock driver:
+> - add BG2Q CPU clock to clk driver
+> 
+> ----------------------------------------------------------------
+> 
+> Antoine Tenart (1):
+>       clk: berlin: add cpuclk
+> 
+> Sebastian Hesselbarth (1):
+>       Merge tag 'berlin-dt-cpuclk-for-4.4-1' into berlin/cpuclk
+>  
+>  drivers/clk/berlin/bg2q.c | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
