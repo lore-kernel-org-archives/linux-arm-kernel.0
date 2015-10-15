@@ -1,28 +1,36 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 15 Oct 2015 13:44:38 +0200
-Subject: [PATCH v3] i2c: s3c2410: enable RuntimePM before registering to
- the core
-In-Reply-To: <1444461874-2841-1-git-send-email-wsa@the-dreams.de>
-References: <1444461874-2841-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <20151015114438.GD1546@katana>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Thu, 15 Oct 2015 13:51:12 +0200
+Subject: [PATCH 0/4] Enable Ethernet on StiH407 family boards
+In-Reply-To: <1443714982-16251-1-git-send-email-maxime.coquelin@st.com>
+References: <1443714982-16251-1-git-send-email-maxime.coquelin@st.com>
+Message-ID: <561F9330.7030309@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 10, 2015 at 08:24:23AM +0100, Wolfram Sang wrote:
-> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> 
-> The core may register clients attached to this master which may use
-> funtionality from the master. So, RuntimePM must be enabled before, otherwise
-> this will fail. While here, move drvdata, too.
-> 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Applied to for-current, thanks!
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151015/a12f9049/attachment.sig>
+On 10/01/2015 05:56 PM, Maxime Coquelin wrote:
+> This series enables Ethernet support on STiH407 family reference design
+> boards.
+>
+> These boards use the RTL8367 Switch as PHY.
+> As it is previously configured by the bootloader, we declare it as a fixed
+> link.
+>
+> Maxime Coquelin (4):
+>    ARM: dts: Fix RGMII pinctrl timings
+>    ARM: dts: Add Ethernet node to STiH407 family
+>    ARM: dts: Enable Ethernet on STi's B2120 boards
+>    ARM: dts: Enable Ethernet on STi's B2199 board
+>
+>   arch/arm/boot/dts/stih407-b2120.dts    |  1 +
+>   arch/arm/boot/dts/stih407-family.dtsi  | 27 +++++++++++++++++++++++++++
+>   arch/arm/boot/dts/stih407-pinctrl.dtsi |  4 ++--
+>   arch/arm/boot/dts/stih410-b2120.dts    |  1 +
+>   arch/arm/boot/dts/stih418-b2199.dts    |  8 ++++++++
+>   arch/arm/boot/dts/stihxxx-b2120.dtsi   |  6 ++++++
+>   6 files changed, 45 insertions(+), 2 deletions(-)
+>
+Series applied.
+
+Maxime
