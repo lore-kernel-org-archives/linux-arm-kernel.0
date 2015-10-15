@@ -1,40 +1,96 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 15 Oct 2015 09:47:53 -0500
-Subject: [PATCHv3 08/11] arm64: Check for selected granule support
-In-Reply-To: <20151015112532.GA16125@e106634-lin.cambridge.arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Thu, 15 Oct 2015 15:48:41 +0100
+Subject: [PATCHv3 10/11] arm64: Add 16K page size support
+In-Reply-To: <20151015140646.GJ8825@leverpostej>
 References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
- <1444821634-1689-9-git-send-email-suzuki.poulose@arm.com>
- <561EC58B.9080408@arm.com> <20151015104515.GE8825@leverpostej>
- <20151015112532.GA16125@e106634-lin.cambridge.arm.com>
-Message-ID: <561FBC99.9090501@arm.com>
+ <1444821634-1689-11-git-send-email-suzuki.poulose@arm.com>
+ <20151015140646.GJ8825@leverpostej>
+Message-ID: <561FBCC9.2000106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2015 06:25 AM, Suzuki K. Poulose wrote:
-> +	/*
-> +	 * Check to see if the CPU supports the requested pagesize
-> +	 */
-> +	asm volatile("mrs %0, ID_AA64MMFR0_EL1" : "=r" (aa64mmfr0_el1));
-> +	aa64mmfr0_el1 >>= ID_AA64MMFR0_TGRAN_SHIFT;
-> +	if ((aa64mmfr0_el1 & 0xf) != ID_AA64MMFR0_TGRAN_SUPPORTED) {
-> +		pr_efi_err(sys_table_arg, PAGE_SIZE_STR" granule not supported by the CPU\n");
-> +		return EFI_UNSUPPORTED;
-> +	}
+On 15/10/15 15:06, Mark Rutland wrote:
+> Hi,
+>
+
+I have fixed all the nits locally. Thanks for pointing them out.
+
+>>   config FORCE_MAX_ZONEORDER
+>>   	int
+>>   	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
+>> +	default "12" if (ARM64_16K_PAGES && TRANSPARENT_HUGEPAGE)
+>>   	default "11"
+>
+> I'm a little lost here. How are these numbers derived?
+>
+
+I struggled to find the right value for 16K. Thanks to Steve Capper
+for the following explanation. I will add it as a comment.
+
+All allocations from the buddy allocator have to have compound order
+strictly less than MAX_ORDER. i.e, the maximum allocation size is
+(MAX_ORDER - 1) PAGES. To align with the transparent huge page size,
+we get :
+
+  (MAX_ORDER - 1) + PAGE_SHIFT = PMD_SHIFT
+
+Which gives us:
+
+MAX_ORDER = PAGE_SHIFT - 3 + PAGE_SHIFT - PAGE_SHIFT + 1
+           = PAGE_SHIFT - 2
+
+That raises an interesting question about the selection of the value
+for 4K. Shouldn't that be 10 instead of 11 ?
+
+Steve ?
+
+>> -#ifdef CONFIG_ARM64_64K_PAGES
+>> +#if	defined(CONFIG_ARM64_64K_PAGES)
+>>   #define NR_FIX_BTMAPS		4
+>> +#elif	defined (CONFIG_ARM64_16K_PAGES)
+>> +#define NR_FIX_BTMAPS		16
+>>   #else
+>>   #define NR_FIX_BTMAPS		64
+>>   #endif
+>
+> We could include <linux/sizes.h> and simplify this to:
+>
+> #define NR_FIX_BTMAPS (SZ_256K / PAGE_SIZE)
+>
+> Which works for me locally.
+
+Nice cleanup. I will pick that as a separate patch in the series.
+
+>
+>> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+>> index 5eac6a2..90c7ff2 100644
+>> --- a/arch/arm64/include/asm/thread_info.h
+>> +++ b/arch/arm64/include/asm/thread_info.h
+>> @@ -25,6 +25,8 @@
+>>
+>>   #ifdef CONFIG_ARM64_4K_PAGES
+>>   #define THREAD_SIZE_ORDER	2
+>> +#elif defined(CONFIG_ARM64_16K_PAGES)
+>> +#define THREAD_SIZE_ORDER	0
+>>   #endif
+>>   #define THREAD_SIZE		16384
+>
+> The above looks correct.
+>
+> As an open/general question, why do both THREAD_SIZE_ORDER and
+> THREAD_SIZE exist? One really should be defined in terms of the other.
+
+I think its mainly for choosing the mechanism for stack allocation. If it
+is a multiple of a page, you allocate a page. If not, uses a kmem_cache.
 
 
-This is definitely an improvement over my original hack job.
+>>   #define id_aa64mmfr0_tgran_shift	ID_AA64MMFR0_TGRAN4_SHIFT
+>>   #define id_aa64mmfr0_tgran_on		ID_AA64MMFR0_TGRAN4_ON
+>
+> I assume you'll s/ON/SUPPORTED/ per comments in another thread.
+>
 
-I would like to add, that I actually think this should be in a new 
-function "check_kernel_compatibility" (or whatever) that is called 
-before handle_kernel_image.
+Yes
 
-That is because I don't really think it belongs in handle_kernel_image 
-which is focused on relocation. Plus, if you add another function, you 
-can avoid the "Failed to relocate kernel" error that comes out following 
-the granule not supported message. Further, checks like this in the 
-future will have a place to live.
-
-Of course you will then need a matching stubbed out function for the 
-normal arm kernel as well.
-
-Thanks,
+Thanks
+Suzuki
