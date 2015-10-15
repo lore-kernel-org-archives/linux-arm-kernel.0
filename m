@@ -1,43 +1,47 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 16 Oct 2015 07:42:54 +0800
-Subject: [PATCH 00/11] ARM64 PCI hostbridge init based on ACPI
-In-Reply-To: <561FFB4C.1000500@redhat.com>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <561FFB4C.1000500@redhat.com>
-Message-ID: <562039FE.9050004@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 16 Oct 2015 08:44:52 +0900
+Subject: [PATCH v2 2/2] ARM: dts: exynos5250: Add clocks to DISP1 domain
+In-Reply-To: <1444905084-22540-3-git-send-email-tomeu.vizoso@collabora.com>
+References: <1444905084-22540-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1444905084-22540-3-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <56203A74.7040305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2015 03:15 AM, Jon Masters wrote:
-> Hi Hanjun,
->
-> Thanks for your hard work on ARM64 PCI host bridge/root complex so far!
->
-> On 05/26/2015 08:49 AM, Hanjun Guo wrote:
->> This patch set is introducing ARM64 PCI hostbridge init based on ACPI,
->> which based on Jiang Liu's patch set "Consolidate ACPI PCI root common
->> code into ACPI core":
->>
->> https://lkml.org/lkml/2015/5/14/98
->
-> The latest version (v7) of the ACPI PCI root common code consolidation
-> series was posted by Gerry (Jiang Liu) yesterday:
->
-> https://lkml.kernel.org/g/1444804182-6596-1-git-send-email-jiang.liu at linux.intel.com
->
-> This got me wondering what the status is of the ARM64 specific
-> hostbridge patch series that has a dependency upon the former. Are you
-> planning to wait for that series to be accepted or post a newer rebased
-> version for additional review, or something else?
+On 15.10.2015 19:31, Tomeu Vizoso wrote:
+> Adds to the node of the DISP1 power domain the two clocks that need to
+> be reparented while the domain is powered off:
+> CLK_MOUT_ACLK200_DISP1_SUB and CLK_MOUT_ACLK300_DISP1_SUB.
+> 
+> Otherwise the state is unknown at power up and the mixer's clocks are
+> all messed up.
+> 
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Link: http://lkml.kernel.org/g/561CDC33.7050103 at collabora.com
+> ---
+> 
+> 
+>  arch/arm/boot/dts/exynos5250.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index b24610ea8c2a..88b9cf5f226f 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -130,6 +130,10 @@
+>  		compatible = "samsung,exynos4210-pd";
+>  		reg = <0x100440A0 0x20>;
+>  		#power-domain-cells = <0>;
+> +		clocks = <&clock CLK_FIN_PLL>,
+> +			 <&clock CLK_MOUT_ACLK200_DISP1_SUB>,
+> +			 <&clock CLK_MOUT_ACLK300_DISP1_SUB>;
+> +		clock-names = "oscclk", "clk0", "clk1";
+>  	};
+>  
+>  	clock: clock-controller at 10010000 {
+> 
 
-Tomasz and Lorenzo are discussing about the PCI config based
-OperationRegions, which still have no conclusion yet, Lorenzo
-started a discussion on ASWG and hope can get some feedback.
+I reviewed it already. Any changes here since v1?
 
-Other than that, Tomasz volunteered to cleanup this patch set, I
-think we need to rebase on Jiang's v7 patchset which was accepted
-By Rafael, of course I will work with Tomasz to prepare those
-patches.
-
-Thanks
-Hanjun
+Best regards,
+Krzysztof
