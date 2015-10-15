@@ -1,24 +1,51 @@
-From: gustavo@padovan.org (Gustavo Padovan)
-Date: Fri, 16 Oct 2015 01:17:20 +0900
-Subject: [PATCH v4 05/79] exynos_drm.h: use __u64 from linux/types.h
-In-Reply-To: <1444888618-4506-6-git-send-email-mikko.rapeli@iki.fi>
-References: <1444888618-4506-1-git-send-email-mikko.rapeli@iki.fi>
- <1444888618-4506-6-git-send-email-mikko.rapeli@iki.fi>
-Message-ID: <20151015161720.GD8564@joana>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Thu, 15 Oct 2015 18:25:41 +0200
+Subject: [PATCH v3 0/5] Armada 38x SDHCI driver improvements
+Message-ID: <1444926346-29763-1-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-15 Mikko Rapeli <mikko.rapeli@iki.fi>:
+Hi,
 
-> Fixes userspace compilation error:
-> 
-> drm/exynos_drm.h:30:2: error: unknown type name ?uint64_t?
-> 
-> Signed-off-by: Mikko Rapeli <mikko.rapeli@iki.fi>
-> ---
->  include/uapi/drm/exynos_drm.h | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+Thank you for reviewing the patches. According to your remarks and some
+new ideas I prepared third patchset. I modified my HW and now I could
+check operation when using all three modes of detection (polling, gpio
+and dat3) - it all seems working fine. Any remarks will be wellcome.
 
-Reviewed-by: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
+Best regards,
+Marcin
 
-	Gustavo
+Changes:
+v1 -> v2
+* enable SW polling as card detection
+* in resume function change condition for mbus windows reconfiguration
+
+v2 -> v3
+* remove redundant print after fail of mbus_win_regs obtaining
+* add big comment on possible card detection options in armada-388-gp.dts
+* reconstruct dat3-cd support
+	- use dedicated flag in sdhci_pxa structure instead of checking
+	  property in DT
+	- instead of global SDHCI quirk add wrapper for sdhci_set_clock
+	  function in order to keep internal clock enabled
+	- prevent using pm_runtime in case of using dat3-cd
+* improve MMC_CARD bit modification - do not check Armada 38x compatible
+  string in pxav3_init_card callback, but use pxa->mbus_win_regs as a flag
+
+Marcin Wojtas (5):
+  mmc: sdhci-pxav3: enable proper resuming on Armada 38x SoC
+  mmc: sdhci-pxav3: enable usage of DAT3 pin as HW card detect
+  ARM: mvebu: set SW polling as SDHCI card detection on A388-GP
+  mmc: sdhci: add init_card callback to sdhci
+  mmc: sdhci-pxav3: enable modifying MMC_CARD bit during card
+    initialization
+
+ .../devicetree/bindings/mmc/sdhci-pxa.txt          |   5 +
+ arch/arm/boot/dts/armada-388-gp.dts                |  15 +-
+ drivers/mmc/host/sdhci-pxav3.c                     | 157 ++++++++++++++++-----
+ drivers/mmc/host/sdhci.c                           |   9 ++
+ drivers/mmc/host/sdhci.h                           |   1 +
+ 5 files changed, 149 insertions(+), 38 deletions(-)
+
+-- 
+1.8.3.1
