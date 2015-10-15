@@ -1,98 +1,41 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 15 Oct 2015 12:31:23 +0200
-Subject: [PATCH v2 1/2] clk: samsung: exynos5250: Add DISP1 clocks
+Date: Thu, 15 Oct 2015 12:31:24 +0200
+Subject: [PATCH v2 2/2] ARM: dts: exynos5250: Add clocks to DISP1 domain
 In-Reply-To: <1444905084-22540-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1444905084-22540-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1444905084-22540-2-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1444905084-22540-3-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the DISP1 power domain is powered off, there's two clocks that need
-to be temporarily reparented to OSC, and back to their original parents
-when the domain is powered on again.
+Adds to the node of the DISP1 power domain the two clocks that need to
+be reparented while the domain is powered off:
+CLK_MOUT_ACLK200_DISP1_SUB and CLK_MOUT_ACLK300_DISP1_SUB.
 
-We expose these two clocks in the DT bindings so that the DT node of the
-power domain can reference them.
+Otherwise the state is unknown at power up and the mixer's clocks are
+all messed up.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Link: http://lkml.kernel.org/g/561CDC33.7050103 at collabora.com
 ---
 
-Changes in v2:
-- Reuse mout_aclk200_p
-- Rename div_aclk300 as div_aclk300_disp
 
- drivers/clk/samsung/clk-exynos5250.c   | 14 +++++++++++++-
- include/dt-bindings/clock/exynos5250.h |  4 +++-
- 2 files changed, 16 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/exynos5250.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index 55b83c7ef878..5bebf8cb0d70 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -222,9 +222,13 @@ PNAME(mout_mpll_user_p)	= { "fin_pll", "mout_mpll" };
- PNAME(mout_bpll_user_p)	= { "fin_pll", "mout_bpll" };
- PNAME(mout_aclk166_p)	= { "mout_cpll", "mout_mpll_user" };
- PNAME(mout_aclk200_p)	= { "mout_mpll_user", "mout_bpll_user" };
-+PNAME(mout_aclk300_p)	= { "mout_aclk300_disp1_mid",
-+			    "mout_aclk300_disp1_mid1" };
- PNAME(mout_aclk400_p)	= { "mout_aclk400_g3d_mid", "mout_gpll" };
- PNAME(mout_aclk200_sub_p) = { "fin_pll", "div_aclk200" };
- PNAME(mout_aclk266_sub_p) = { "fin_pll", "div_aclk266" };
-+PNAME(mout_aclk300_sub_p) = { "fin_pll", "div_aclk300_disp" };
-+PNAME(mout_aclk300_disp1_mid1_p) = { "mout_vpll", "mout_cpll" };
- PNAME(mout_aclk333_sub_p) = { "fin_pll", "div_aclk333" };
- PNAME(mout_aclk400_isp_sub_p) = { "fin_pll", "div_aclk400_isp" };
- PNAME(mout_hdmi_p)	= { "div_hdmi_pixel", "sclk_hdmiphy" };
-@@ -303,9 +307,13 @@ static struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
- 	 */
- 	MUX(0, "mout_aclk166", mout_aclk166_p, SRC_TOP0, 8, 1),
- 	MUX(0, "mout_aclk200", mout_aclk200_p, SRC_TOP0, 12, 1),
-+	MUX(0, "mout_aclk300_disp1_mid", mout_aclk200_p, SRC_TOP0, 14, 1),
-+	MUX(0, "mout_aclk300", mout_aclk300_p, SRC_TOP0, 15, 1),
- 	MUX(0, "mout_aclk333", mout_aclk166_p, SRC_TOP0, 16, 1),
- 	MUX(0, "mout_aclk400_g3d_mid", mout_aclk200_p, SRC_TOP0, 20, 1),
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index b24610ea8c2a..88b9cf5f226f 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -130,6 +130,10 @@
+ 		compatible = "samsung,exynos4210-pd";
+ 		reg = <0x100440A0 0x20>;
+ 		#power-domain-cells = <0>;
++		clocks = <&clock CLK_FIN_PLL>,
++			 <&clock CLK_MOUT_ACLK200_DISP1_SUB>,
++			 <&clock CLK_MOUT_ACLK300_DISP1_SUB>;
++		clock-names = "oscclk", "clk0", "clk1";
+ 	};
  
-+	MUX(0, "mout_aclk300_disp1_mid1", mout_aclk300_disp1_mid1_p, SRC_TOP1,
-+		8, 1),
- 	MUX(0, "mout_aclk400_isp", mout_aclk200_p, SRC_TOP1, 24, 1),
- 	MUX(0, "mout_aclk400_g3d", mout_aclk400_p, SRC_TOP1, 28, 1),
- 
-@@ -316,7 +324,10 @@ static struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
- 	MUX(0, "mout_bpll_user", mout_bpll_user_p, SRC_TOP2, 24, 1),
- 	MUX(CLK_MOUT_GPLL, "mout_gpll", mout_gpll_p, SRC_TOP2, 28, 1),
- 
--	MUX(0, "mout_aclk200_disp1_sub", mout_aclk200_sub_p, SRC_TOP3, 4, 1),
-+	MUX(CLK_MOUT_ACLK200_DISP1_SUB, "mout_aclk200_disp1_sub",
-+		mout_aclk200_sub_p, SRC_TOP3, 4, 1),
-+	MUX(CLK_MOUT_ACLK300_DISP1_SUB, "mout_aclk300_disp1_sub",
-+		mout_aclk300_sub_p, SRC_TOP3, 6, 1),
- 	MUX(0, "mout_aclk266_gscl_sub", mout_aclk266_sub_p, SRC_TOP3, 8, 1),
- 	MUX(0, "mout_aclk_266_isp_sub", mout_aclk266_sub_p, SRC_TOP3, 16, 1),
- 	MUX(0, "mout_aclk_400_isp_sub", mout_aclk400_isp_sub_p,
-@@ -392,6 +403,7 @@ static struct samsung_div_clock exynos5250_div_clks[] __initdata = {
- 	DIV(0, "div_aclk333", "mout_aclk333", DIV_TOP0, 20, 3),
- 	DIV(0, "div_aclk400_g3d", "mout_aclk400_g3d", DIV_TOP0,
- 							24, 3),
-+	DIV(0, "div_aclk300_disp", "mout_aclk300", DIV_TOP0, 28, 3),
- 
- 	DIV(0, "div_aclk400_isp", "mout_aclk400_isp", DIV_TOP1, 20, 3),
- 	DIV(0, "div_aclk66_pre", "mout_mpll_user", DIV_TOP1, 24, 3),
-diff --git a/include/dt-bindings/clock/exynos5250.h b/include/dt-bindings/clock/exynos5250.h
-index 8183d1c237d9..15508adcdfde 100644
---- a/include/dt-bindings/clock/exynos5250.h
-+++ b/include/dt-bindings/clock/exynos5250.h
-@@ -173,8 +173,10 @@
- /* mux clocks */
- #define CLK_MOUT_HDMI		1024
- #define CLK_MOUT_GPLL		1025
-+#define CLK_MOUT_ACLK200_DISP1_SUB	1026
-+#define CLK_MOUT_ACLK300_DISP1_SUB	1027
- 
- /* must be greater than maximal clock id */
--#define CLK_NR_CLKS		1026
-+#define CLK_NR_CLKS		1028
- 
- #endif /* _DT_BINDINGS_CLOCK_EXYNOS_5250_H */
+ 	clock: clock-controller at 10010000 {
 -- 
 2.5.0
