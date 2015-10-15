@@ -1,82 +1,100 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 15 Oct 2015 16:27:26 +0200
-Subject: [PATCH 2/2] pinctrl: sunxi: Add irq pinmuxing to sun6i "r"
- pincontroller
-In-Reply-To: <1444919246-23694-1-git-send-email-hdegoede@redhat.com>
-References: <1444919246-23694-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1444919246-23694-3-git-send-email-hdegoede@redhat.com>
+From: w-kwok2@ti.com (WingMan Kwok)
+Date: Thu, 15 Oct 2015 10:27:10 -0400
+Subject: [PATCH] ARM: keystone: dts: add PCI serdes driver bindings
+Message-ID: <1444919230-30932-1-git-send-email-w-kwok2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinmuxing for external interrupt functionality through the
-sun6i "r" pincontroller.
+This patch adds the required PCI serdes bindings whcih can then be
+enabled by setting the corresponding statuses to "ok" in order to
+configure and start the PCI serdes.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+This patch depends on the updates to the Keystone PCIe host driver
+and common serdes driver patch series that is submitted separately.
+
+Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
 ---
- drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/k2e.dtsi      |   21 +++++++++++++++++++++
+ arch/arm/boot/dts/keystone.dtsi |   21 +++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c
-index 9596b0a3..88bd20f 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c
-@@ -47,45 +47,57 @@ static const struct sunxi_desc_pin sun6i_a31_r_pins[] = {
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 5),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x2, 0, 0),	/* PL_EINT0 */
- 		  SUNXI_FUNCTION(0x3, "s_jtag")),	/* MS */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 6),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x2, 0, 1),	/* PL_EINT1 */
- 		  SUNXI_FUNCTION(0x3, "s_jtag")),	/* CK */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 7),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x2, 0, 2),	/* PL_EINT2 */
- 		  SUNXI_FUNCTION(0x3, "s_jtag")),	/* DO */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 8),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x2, 0, 3),	/* PL_EINT3 */
- 		  SUNXI_FUNCTION(0x3, "s_jtag")),	/* DI */
- 	/* Hole */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 0),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out")),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x2, 1, 0),	/* PM_EINT0 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 1),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out")),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x2, 1, 1),	/* PM_EINT1 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 2),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x2, 1, 2),	/* PM_EINT2 */
- 		  SUNXI_FUNCTION(0x3, "1wire")),
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 3),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out")),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x2, 1, 3),	/* PM_EINT3 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 4),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out")),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x2, 1, 4),	/* PM_EINT4 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 5),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out")),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x2, 1, 5),	/* PM_EINT5 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 6),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out")),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x2, 1, 6),	/* PM_EINT6 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 7),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x2, 1, 7),	/* PM_EINT7 */
- 		  SUNXI_FUNCTION(0x3, "rtc")),		/* CLKO */
- };
+diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
+index 675fb8e..3b36575 100644
+--- a/arch/arm/boot/dts/k2e.dtsi
++++ b/arch/arm/boot/dts/k2e.dtsi
+@@ -86,6 +86,16 @@
+ 			gpio,syscon-dev = <&devctrl 0x240>;
+ 		};
  
++		pcie1_phy: pciephy at 2326000 {
++			#phy-cells = <0>;
++			compatible = "ti,keystone-serdes-pcie";
++			reg = <0x02326000 0x4000>;
++			reg-names = "serdes";
++			link-rate-kbps = <5000000>;
++			num-lanes = <2>;
++			status = "disabled";
++		};
++
+ 		pcie1: pcie at 21020000 {
+ 			compatible = "ti,keystone-pcie","snps,dw-pcie";
+ 			clocks = <&clkpcie1>;
+@@ -130,6 +140,17 @@
+ 					<GIC_SPI 375 IRQ_TYPE_EDGE_RISING>,
+ 					<GIC_SPI 376 IRQ_TYPE_EDGE_RISING>;
+ 			};
++
++			/* PCIE phy */
++			serdeses {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				serdes at 0 {
++					reg = <0>;
++					phys = <&pcie1_phy>;
++				};
++			};
++
+ 		};
+ 
+ 		mdio: mdio at 24200f00 {
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index 72816d6..6566cc4 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -275,6 +275,16 @@
+ 			ti,syscon-dev = <&devctrl 0x2a0>;
+ 		};
+ 
++		pcie0_phy: pciephy at 2320000 {
++			#phy-cells = <0>;
++			compatible = "ti,keystone-serdes-pcie";
++			reg = <0x02320000 0x4000>;
++			reg-names = "serdes";
++			link-rate-kbps = <5000000>;
++			num-lanes = <2>;
++			status = "disabled";
++		};
++
+ 		pcie0: pcie at 21800000 {
+ 			compatible = "ti,keystone-pcie", "snps,dw-pcie";
+ 			clocks = <&clkpcie>;
+@@ -319,6 +329,17 @@
+ 					<GIC_SPI 28 IRQ_TYPE_EDGE_RISING>,
+ 					<GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
+ 			};
++
++			/* PCIE phy */
++			serdeses {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				serdes at 0 {
++					reg = <0>;
++					phys = <&pcie0_phy>;
++				};
++			};
++
+ 		};
+ 	};
+ };
 -- 
-2.5.0
+1.7.9.5
