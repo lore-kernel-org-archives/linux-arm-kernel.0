@@ -1,83 +1,134 @@
-From: alison.wang@freescale.com (Huan Wang)
-Date: Thu, 15 Oct 2015 02:11:57 +0000
-Subject: [PATCH v4] ARM: configs: Add Freescale LS1021A defconfig
-In-Reply-To: <5232654.e6dagm53H4@wuerfel>
-References: <1442480614-32345-1-git-send-email-b18965@freescale.com>
- <16038044.0DCMVgq8H3@wuerfel>
- <BN3PR0301MB086733D602580A5A9EBF150EFE3F0@BN3PR0301MB0867.namprd03.prod.outlook.com>
- <5232654.e6dagm53H4@wuerfel>
-Message-ID: <BN3PR0301MB0867A87B64E1206B773F05EEFE3E0@BN3PR0301MB0867.namprd03.prod.outlook.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 15 Oct 2015 09:34:12 +0900
+Subject: [PATCH 1/7] ARM: shmobile: porter: add SDHI0/2 DT support
+In-Reply-To: <cover.1444868963.git.horms+renesas@verge.net.au>
+References: <cover.1444868963.git.horms+renesas@verge.net.au>
+Message-ID: <b941a5cbe10201afa937fba90d68d7af6093d3d4.1444868963.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wednesday 14 October 2015 10:18:47 Huan Wang wrote:
-> > > On Thursday 24 September 2015 07:27:10 Huan Wang wrote:
-> > > > > On Fri, Sep 18, 2015 at 4:38 AM, Huan Wang
-> > > > > <alison.wang@freescale.com>
-> > > > > wrote:
-> > > > >
-> > > > > > [Alison Wang] Thanks for your reply. I agreed with you about
-> > > > > > creating a new multi_v7_lpae_defconfig. In
-> > > > > > multi_v7_lpae_defconfig, I need to add the following CONFIG_XX
-> > > > > > to support LS1021A based on
-> > > > > multi_v7_defconfig.
-> > > > > >
-> > > > > > CONFIG_ARM_LPAE=y
-> > > > > > CONFIG_VMSPLIT_2G=y
-> > > > >
-> > > > > Is CONFIG_VMSPLIT_2G=y really needed?
-> > > > [Alison Wang] I tried to remove CONFIG_VMSPLIT_2G and used the
-> > > > default CONFIG_VMSPLIT_3G, but kernel could not boot up. It hangs
-> > > > at " Starting
-> > > kernel ... ".
-> > > >
-> > > > Any suggestion? Thanks.
-> > >
-> > > Try enabling DEBUG_LL for your platform to get some debug output, if
-> > > you still don't get any helpful messages, try also inserting
-> > >
-> > >       printascii(__func__);
-> > >
-> > > statements in the early boot process to see how far you get before the
-> hang.
-> > >
-> > [Alison Wang] I can get to __turn_mmu_on or later, but I could not get
-> > the print message "Booting Linux on physical CPU 0xf00" in
-> smp_setup_processor_id().
-> >
-> > I guess something wrong with the initial page tables in
-> > __create_page_tables, as for CONFIG_VMSPLIT_3G, only PAGE_OFFSET is
-> changed from 0x80000000 to 0xC0000000.
-> > BTW, on our platform, TEXT_OFFSET is 0x00008000, PHYS_OFFSET is
-> 0x80000000.
-> >
-> > Any suggestion? Thanks.
-> 
-> My first guess is that there is something wrong with your debug_ll
-> implementation, as that would explain why you can't get anything to the
-> console after turning on page tables.
-> 
-> It looks like ls1021a uses lpuart, but I can't even see an implementation
-> for that in arch/arm/include/debug/. What code do you use for printing?
-> 
-[Alison Wang] ls1021a uses duart as the default serial port, not lpuart. So
-8250/16550 serial driver is used. Let me explain my debug process in detail.
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-When CONFIG_VMSPLIT_2G is used, I could boot up the whole kernel and get the
-print message " Booting Linux on physical CPU 0xf00" after "Starting kernel"
-as below.
+Define the Porter board dependent part of the SDHI0/2 device nodes along
+with the  necessary  voltage regulators (note that the Vcc regulators are
+dummy -- they are required but don't actually exist on the board). Also,
+GPIOs have to be used for the CD and WP signals due to the SDHI driver
+constraints...
 
-Starting kernel ...
-[    0.000000] Booting Linux on physical CPU 0xf00
-.....
+This patch is analogous to the commit 1299df03d719 ("ARM: shmobile:
+henninger: add SDHI0/2 DT support") as there  are no differences between
+those boards in this respect.
 
-But when CONFIG_VMSPLIT_3G is used, I couldn't get print message " Booting Linux
-on physical CPU 0xf00". It only hangs at  "Starting kernel ...".
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7791-porter.dts | 76 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
 
-Moreover, I add some asm code in __turn_mmu_on to print some simple characters, and
-I could get the print characters when CONFIG_VMSPLIT_3G is used. So I guess there
-is something wrong with the page tables.
-
-
-Best Regards,
-Alison Wang
+diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
+index ca59ff861923..5bc4d23c1edb 100644
+--- a/arch/arm/boot/dts/r8a7791-porter.dts
++++ b/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -10,6 +10,7 @@
+ 
+ /dts-v1/;
+ #include "r8a7791.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "Porter";
+@@ -33,6 +34,50 @@
+ 		device_type = "memory";
+ 		reg = <2 0x00000000 0 0x40000000>;
+ 	};
++
++	vcc_sdhi0: regulator at 0 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "SDHI0 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	vccq_sdhi0: regulator at 1 {
++		compatible = "regulator-gpio";
++
++		regulator-name = "SDHI0 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio2 12 GPIO_ACTIVE_HIGH>;
++		gpios-states = <1>;
++		states = <3300000 1
++			  1800000 0>;
++	};
++
++	vcc_sdhi2: regulator at 2 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "SDHI2 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	vccq_sdhi2: regulator at 3 {
++		compatible = "regulator-gpio";
++
++		regulator-name = "SDHI2 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio2 26 GPIO_ACTIVE_HIGH>;
++		gpios-states = <1>;
++		states = <3300000 1
++			  1800000 0>;
++	};
+ };
+ 
+ &extal_clk {
+@@ -54,6 +99,16 @@
+ 		renesas,groups = "intc_irq0";
+ 		renesas,function = "intc";
+ 	};
++
++	sdhi0_pins: sd0 {
++		renesas,groups = "sdhi0_data4", "sdhi0_ctrl";
++		renesas,function = "sdhi0";
++	};
++
++	sdhi2_pins: sd2 {
++		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
++		renesas,function = "sdhi2";
++	};
+ };
+ 
+ &scif0 {
+@@ -78,3 +133,24 @@
+ 		micrel,led-mode = <1>;
+ 	};
+ };
++
++&sdhi0 {
++	pinctrl-0 = <&sdhi0_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&vcc_sdhi0>;
++	vqmmc-supply = <&vccq_sdhi0>;
++	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
++
++&sdhi2 {
++	pinctrl-0 = <&sdhi2_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&vcc_sdhi2>;
++	vqmmc-supply = <&vccq_sdhi2>;
++	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
+-- 
+2.1.4
