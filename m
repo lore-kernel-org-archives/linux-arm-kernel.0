@@ -1,60 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 22:16:39 +0200
-Subject: [GIT PULL] Broadcom soc changes for v4.4 (try 2)
-In-Reply-To: <1444502429-11100-1-git-send-email-f.fainelli@gmail.com>
-References: <1443824458-20799-4-git-send-email-f.fainelli@gmail.com>
- <1444502429-11100-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <5790163.9Q0inxP5UI@wuerfel>
+Date: Thu, 15 Oct 2015 22:21:59 +0200
+Subject: [GIT PULL] Allwinner drivers for 4.4, round 1
+In-Reply-To: <20151011162642.GA11423@lukather>
+References: <20151011162642.GA11423@lukather>
+Message-ID: <6783763.jm4ezqcpgx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 10 October 2015 11:40:29 Florian Fainelli wrote:
-> 
-> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
-> 
->   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
-> 
-> are available in the git repository at:
-> 
->   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.4/soc
-> 
-> for you to fetch changes up to c4a8ea9e0698945b182ba1e1063a0981b1f35139:
-> 
->   ARM: brcmstb: Setup BIU control registers during boot (2015-10-09 13:42:18 -0700)
-> 
+On Sunday 11 October 2015 17:26:42 Maxime Ripard wrote:
 > ----------------------------------------------------------------
-> This pull request contains the following Broadcom SoC platform and driver changes:
+> Allwinner drivers changes for 4.4
 > 
-> - Brian Norris create a drivers/soc/brcmstb/ stub as a place holder for SoC-specific
->   code which is coming next
-
-I should have been clearer with my complaint last week. I really mean both
-of Brian's patches should be removed, although I mainly talked about the
-other one. This patch goes to great length to introduce a soc_is_brcmstb()
-function, but I'd rather see this never being used anywhere.
-
-Drivers should not have to check the compatible property of the root node
-(in some cases we do, but that is because the initial binding was broken
-and we could not change it).
-
-> - Florian Fainelli adds support for configuring the BCM7xxx SoCs Bus Interface Unit
->   with their specific write-pairing setting, which must be saved and restored during
->   system-wide suspend/resume, and consequently updates the brcmstb machine code to
->   initialize the BIU
+> A new driver for the Reduced Serial Bus used in the newer Allwinner SoCs to
+> communicate with the PMIC and other devices made by Allwinner (audio codecs
+> for example)
 > 
-> - Jon Mason adds support for the Northstar Plus SoCs by introducing a custom machine
->   descriptor matching their compatible string and setting up the PL310 L2 cache and
->   enabling the relevant ARM errata for their Cortex-A9
 
-I've merged all of the series anyway, since it's not a big enough
-problem to make you do another iteration, and I've already pushed
-back once.
+Sorry for a belated complaint here. The code looks absolutely fine,
+isn't this something that should be in drivers/bus/?
 
-Let's talk about this again when you add users of this function, so
-we can ideally come up with a better solution and remove the two files
-again.
-
-Pulled into next/soc. Thanks for your patience and for respinning
-the series so quickly!
+If there is a slight chance that this might be reused on another
+soc family, that would be a better place, but even if it's Allwinner
+specific it feels cleaner that way.
 
 	Arnd
