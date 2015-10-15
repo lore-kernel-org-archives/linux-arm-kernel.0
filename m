@@ -1,177 +1,121 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 15 Oct 2015 23:41:22 +0200
-Subject: [PATCH 1/5] mmc: sdhci-pxav3: fix optional clock name
-In-Reply-To: <1444628796-5484-2-git-send-email-jszhang@marvell.com>
-References: <1444628796-5484-1-git-send-email-jszhang@marvell.com>
- <1444628796-5484-2-git-send-email-jszhang@marvell.com>
-Message-ID: <56201D82.6080106@gmail.com>
+Date: Thu, 15 Oct 2015 23:45:07 +0200
+Subject: [PATCH 5/5] pinctrl: berlin: fix my family name spelling
+In-Reply-To: <1444771901-24460-6-git-send-email-antoine.tenart@free-electrons.com>
+References: <1444771901-24460-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1444771901-24460-6-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <56201E63.4000500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.10.2015 07:46, Jisheng Zhang wrote:
-> Commit 8afdc9cca27f ("mmc: sdhci-pxav3: Get optional core clock") adds
-> additional optional clock support, but the clock names  isn't correct.
-> The current "io" clock is really the PXAv3 SDHCI IP's "core" clock
-> which is manadatory. The current "core" clock is really the IP's "axi"
-> clock which is optional.
+On 13.10.2015 23:31, Antoine Tenart wrote:
+> My family name contained an accent when I submitted the
+> Berlin pinctrl series in the first place. There was an
+> encoding issue when the series was applied. Fix this.
 >
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->   .../devicetree/bindings/mmc/sdhci-pxa.txt          |  8 ++---
->   arch/arm/boot/dts/berlin2.dtsi                     |  6 ++--
->   arch/arm/boot/dts/berlin2cd.dtsi                   |  2 +-
->   arch/arm/boot/dts/berlin2q.dtsi                    |  2 +-
->   drivers/mmc/host/sdhci-pxav3.c                     | 40 +++++++++++-----------
->   5 files changed, 29 insertions(+), 29 deletions(-)
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-Jisheng,
-
-Please split the DT changes from the driver changes.
-
-> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-> index 3d1b449..25d5ba8 100644
-> --- a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-> +++ b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-> @@ -17,9 +17,9 @@ Required properties:
->   - reg names: should be "sdhci", "mbus", "conf-sdio3". only mandatory
->     for "marvell,armada-380-sdhci"
->   - clocks: Array of clocks required for SDHCI; requires at least one for
-> -    I/O clock.
-> +    core clock.
->   - clock-names: Array of names corresponding to clocks property; shall be
-> -    "io" for I/O clock and "core" for optional core clock.
-> +    "core" for core clock and "axi" for optional axi clock.
-
-s/axi/bus/ ?
-
->   Optional properties:
->   - mrvl,clk-delay-cycles: Specify a number of cycles to delay for tuning.
-> @@ -32,7 +32,7 @@ sdhci at d4280800 {
->   	bus-width = <8>;
->   	interrupts = <27>;
->   	clocks = <&chip CLKID_SDIO1XIN>, <&chip CLKID_SDIO1>;
-> -	clock-names = "io", "core";
-> +	clock-names = "core", "axi";
-
-This will break backward compatibility, right?
-
->   	non-removable;
->   	mrvl,clk-delay-cycles = <31>;
->   };
-> @@ -45,6 +45,6 @@ sdhci at d8000 {
->   		<0x18454 0x4>;
->   	interrupts = <0 25 0x4>;
->   	clocks = <&gateclk 17>;
-> -	clock-names = "io";
-> +	clock-names = "core";
->   	mrvl,clk-delay-cycles = <0x1F>;
->   };
-[...]
-> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-> index f5edf9d..cec95f1 100644
-> --- a/drivers/mmc/host/sdhci-pxav3.c
-> +++ b/drivers/mmc/host/sdhci-pxav3.c
-> @@ -59,8 +59,8 @@
->   #define SDCE_MISC_INT_EN	(1<<1)
->
->   struct sdhci_pxa {
-> +	struct clk *clk_axi;
-
-s/clk_axi/clk_bus/g
-
->   	struct clk *clk_core;
-> -	struct clk *clk_io;
->   	u8	power_mode;
->   	void __iomem *sdio3_conf_reg;
->   };
-> @@ -381,20 +381,20 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
->   	pltfm_host = sdhci_priv(host);
->   	pltfm_host->priv = pxa;
->
-> -	pxa->clk_io = devm_clk_get(dev, "io");
-> -	if (IS_ERR(pxa->clk_io))
-> -		pxa->clk_io = devm_clk_get(dev, NULL);
-> -	if (IS_ERR(pxa->clk_io)) {
-> -		dev_err(dev, "failed to get io clock\n");
-> -		ret = PTR_ERR(pxa->clk_io);
-> +	pxa->clk_core = devm_clk_get(dev, "core");
-
-To maintain backward compatibility, we should still
-devm_clk_get(dev, "io") here - or even better, first
-probe for "io" to catch old binding semantics including
-old "core"/"bus" misnaming.
-
-If we detected old semantics, print a warning that
-firmware should be updated.
+and sorry for the non-UTF-8 mess.
 
 Sebastian
 
-> +	if (IS_ERR(pxa->clk_core))
-> +		pxa->clk_core = devm_clk_get(dev, NULL);
-> +	if (IS_ERR(pxa->clk_core)) {
-> +		dev_err(dev, "failed to get core clock\n");
-> +		ret = PTR_ERR(pxa->clk_core);
->   		goto err_clk_get;
->   	}
-> -	pltfm_host->clk = pxa->clk_io;
-> -	clk_prepare_enable(pxa->clk_io);
-> +	pltfm_host->clk = pxa->clk_core;
-> +	clk_prepare_enable(pxa->clk_core);
+> ---
+>   drivers/pinctrl/berlin/berlin-bg2.c   | 4 ++--
+>   drivers/pinctrl/berlin/berlin-bg2cd.c | 4 ++--
+>   drivers/pinctrl/berlin/berlin-bg2q.c  | 4 ++--
+>   drivers/pinctrl/berlin/berlin.c       | 2 +-
+>   drivers/pinctrl/berlin/berlin.h       | 2 +-
+>   5 files changed, 8 insertions(+), 8 deletions(-)
 >
-> -	pxa->clk_core = devm_clk_get(dev, "core");
-> -	if (!IS_ERR(pxa->clk_core))
-> -		clk_prepare_enable(pxa->clk_core);
-> +	pxa->clk_axi = devm_clk_get(dev, "axi");
-> +	if (!IS_ERR(pxa->clk_axi))
-> +		clk_prepare_enable(pxa->clk_axi);
+> diff --git a/drivers/pinctrl/berlin/berlin-bg2.c b/drivers/pinctrl/berlin/berlin-bg2.c
+> index 274c5535b531..cfbf22a496ca 100644
+> --- a/drivers/pinctrl/berlin/berlin-bg2.c
+> +++ b/drivers/pinctrl/berlin/berlin-bg2.c
+> @@ -3,7 +3,7 @@
+>    *
+>    * Copyright (C) 2014 Marvell Technology Group Ltd.
+>    *
+> - * Antoine T??nart <antoine.tenart@free-electrons.com>
+> + * Antoine Tenart <antoine.tenart@free-electrons.com>
+>    *
+>    * This file is licensed under the terms of the GNU General Public
+>    * License version 2. This program is licensed "as is" without any
+> @@ -246,6 +246,6 @@ static struct platform_driver berlin2_pinctrl_driver = {
+>   };
+>   module_platform_driver(berlin2_pinctrl_driver);
 >
->   	/* enable 1/8V DDR capable */
->   	host->mmc->caps |= MMC_CAP_1_8V_DDR;
-> @@ -475,8 +475,8 @@ err_add_host:
->   err_of_parse:
->   err_cd_req:
->   err_mbus_win:
-> -	clk_disable_unprepare(pxa->clk_io);
->   	clk_disable_unprepare(pxa->clk_core);
-> +	clk_disable_unprepare(pxa->clk_axi);
->   err_clk_get:
->   	sdhci_pltfm_free(pdev);
->   	return ret;
-> @@ -494,8 +494,8 @@ static int sdhci_pxav3_remove(struct platform_device *pdev)
+> -MODULE_AUTHOR("Antoine T??nart <antoine.tenart@free-electrons.com>");
+> +MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
+>   MODULE_DESCRIPTION("Marvell Berlin BG2 pinctrl driver");
+>   MODULE_LICENSE("GPL");
+> diff --git a/drivers/pinctrl/berlin/berlin-bg2cd.c b/drivers/pinctrl/berlin/berlin-bg2cd.c
+> index 0cb793a3552a..77f4f30cc686 100644
+> --- a/drivers/pinctrl/berlin/berlin-bg2cd.c
+> +++ b/drivers/pinctrl/berlin/berlin-bg2cd.c
+> @@ -3,7 +3,7 @@
+>    *
+>    * Copyright (C) 2014 Marvell Technology Group Ltd.
+>    *
+> - * Antoine T??nart <antoine.tenart@free-electrons.com>
+> + * Antoine Tenart <antoine.tenart@free-electrons.com>
+>    *
+>    * This file is licensed under the terms of the GNU General Public
+>    * License version 2. This program is licensed "as is" without any
+> @@ -189,6 +189,6 @@ static struct platform_driver berlin2cd_pinctrl_driver = {
+>   };
+>   module_platform_driver(berlin2cd_pinctrl_driver);
 >
->   	sdhci_remove_host(host, 1);
+> -MODULE_AUTHOR("Antoine T??nart <antoine.tenart@free-electrons.com>");
+> +MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
+>   MODULE_DESCRIPTION("Marvell Berlin BG2CD pinctrl driver");
+>   MODULE_LICENSE("GPL");
+> diff --git a/drivers/pinctrl/berlin/berlin-bg2q.c b/drivers/pinctrl/berlin/berlin-bg2q.c
+> index a466054a8206..66fffe6fab8d 100644
+> --- a/drivers/pinctrl/berlin/berlin-bg2q.c
+> +++ b/drivers/pinctrl/berlin/berlin-bg2q.c
+> @@ -3,7 +3,7 @@
+>    *
+>    * Copyright (C) 2014 Marvell Technology Group Ltd.
+>    *
+> - * Antoine T??nart <antoine.tenart@free-electrons.com>
+> + * Antoine Tenart <antoine.tenart@free-electrons.com>
+>    *
+>    * This file is licensed under the terms of the GNU General Public
+>    * License version 2. This program is licensed "as is" without any
+> @@ -408,6 +408,6 @@ static struct platform_driver berlin2q_pinctrl_driver = {
+>   };
+>   module_platform_driver(berlin2q_pinctrl_driver);
 >
-> -	clk_disable_unprepare(pxa->clk_io);
->   	clk_disable_unprepare(pxa->clk_core);
-> +	clk_disable_unprepare(pxa->clk_axi);
->
->   	sdhci_pltfm_free(pdev);
->
-> @@ -542,9 +542,9 @@ static int sdhci_pxav3_runtime_suspend(struct device *dev)
->   	if (ret)
->   		return ret;
->
-> -	clk_disable_unprepare(pxa->clk_io);
-> -	if (!IS_ERR(pxa->clk_core))
-> -		clk_disable_unprepare(pxa->clk_core);
-> +	clk_disable_unprepare(pxa->clk_core);
-> +	if (!IS_ERR(pxa->clk_axi))
-> +		clk_disable_unprepare(pxa->clk_axi);
->
->   	return 0;
->   }
-> @@ -555,9 +555,9 @@ static int sdhci_pxav3_runtime_resume(struct device *dev)
->   	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->   	struct sdhci_pxa *pxa = pltfm_host->priv;
->
-> -	clk_prepare_enable(pxa->clk_io);
-> -	if (!IS_ERR(pxa->clk_core))
-> -		clk_prepare_enable(pxa->clk_core);
-> +	clk_prepare_enable(pxa->clk_core);
-> +	if (!IS_ERR(pxa->clk_axi))
-> +		clk_prepare_enable(pxa->clk_axi);
->
->   	return sdhci_runtime_resume_host(host);
->   }
+> -MODULE_AUTHOR("Antoine T??nart <antoine.tenart@free-electrons.com>");
+> +MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
+>   MODULE_DESCRIPTION("Marvell Berlin BG2Q pinctrl driver");
+>   MODULE_LICENSE("GPL");
+> diff --git a/drivers/pinctrl/berlin/berlin.c b/drivers/pinctrl/berlin/berlin.c
+> index f49580617055..ebd6f78a6dde 100644
+> --- a/drivers/pinctrl/berlin/berlin.c
+> +++ b/drivers/pinctrl/berlin/berlin.c
+> @@ -3,7 +3,7 @@
+>    *
+>    * Copyright (C) 2014 Marvell Technology Group Ltd.
+>    *
+> - * Antoine T??nart <antoine.tenart@free-electrons.com>
+> + * Antoine Tenart <antoine.tenart@free-electrons.com>
+>    *
+>    * This file is licensed under the terms of the GNU General Public
+>    * License version 2. This program is licensed "as is" without any
+> diff --git a/drivers/pinctrl/berlin/berlin.h b/drivers/pinctrl/berlin/berlin.h
+> index e1aa84145194..94495d304005 100644
+> --- a/drivers/pinctrl/berlin/berlin.h
+> +++ b/drivers/pinctrl/berlin/berlin.h
+> @@ -3,7 +3,7 @@
+>    *
+>    * Copyright (C) 2014 Marvell Technology Group Ltd.
+>    *
+> - * Antoine T??nart <antoine.tenart@free-electrons.com>
+> + * Antoine Tenart <antoine.tenart@free-electrons.com>
+>    *
+>    * This file is licensed under the terms of the GNU General Public
+>    * License version 2. This program is licensed "as is" without any
 >
