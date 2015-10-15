@@ -1,57 +1,88 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Oct 2015 12:20:15 +0200
-Subject: [PATCH] ARM64: juno: add NOR flash to device tree
-Message-ID: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Thu, 15 Oct 2015 13:25:02 +0300
+Subject: [PATCH 5/5] arm: dts: lpc32xx: add device node for the second
+ pwm controller
+In-Reply-To: <CAGhQ9Vx9ghfAD0=ntsFL50+iBQDag=HHGb6=X2-AfYPtSb_-yQ@mail.gmail.com>
+References: <1444694045-22000-1-git-send-email-vz@mleia.com>	<1444694045-22000-6-git-send-email-vz@mleia.com>
+ <CAGhQ9Vx9ghfAD0=ntsFL50+iBQDag=HHGb6=X2-AfYPtSb_-yQ@mail.gmail.com>
+Message-ID: <561F7EFE.5070908@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Juno motherboard has a NOR flash on the motherboard, enable
-this to be accessed with the CFI flash driver. Results after
-enabling MTD, MTD_CFI, MTD_PHYSMAP, MTD_PHYSMAP_OF,
-MTD_CFI_INTELEXT:
+Hi Joachim,
 
-8000000.flash: Found 2 x16 devices at 0x0 in 32-bit bank.
-Manufacturer ID 0x000089 Chip ID 0x008919
-Intel/Sharp Extended Query Table at 0x010A
-Intel/Sharp Extended Query Table at 0x010A
-Intel/Sharp Extended Query Table at 0x010A
-Intel/Sharp Extended Query Table at 0x010A
-Intel/Sharp Extended Query Table at 0x010A
-Using buffer write method
-Using auto-unlock on power-up/resume
-cfi_cmdset_0001: Erase suspend on write enabled
-erase region 0: offset=0x0,size=0x40000,blocks=255
-erase region 1: offset=0x3fc0000,size=0x10000,blocks=4
+On 14.10.2015 21:04, Joachim Eastwood wrote:
+> Hi Vladimir,
+> 
+> On 13 October 2015 at 01:54, Vladimir Zapolskiy <vz@mleia.com> wrote:
+>> LPC32xx SoCs have two independent PWM controllers, they have different
+>> clock parents, clock gates and even slightly different controls,
+>> each of these two PWM controllers has one output channel. Due to
+>> almost similar controls arranged in a row it is incorrectly assumed
+>> that there is one PWM controller with two channels, fix this problem
+>> in lpc32xx.dtsi, which at the moment prevents separate configuration
+>> of different clock parents and gates for both PWM controllers.
+>>
+>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+>> ---
+>>  arch/arm/boot/dts/lpc32xx.dtsi | 10 ++++++++--
+>>  1 file changed, 8 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
+>> index 929458d..f4d2a0e 100644
+>> --- a/arch/arm/boot/dts/lpc32xx.dtsi
+>> +++ b/arch/arm/boot/dts/lpc32xx.dtsi
+>> @@ -286,9 +286,15 @@
+>>                                 status = "disabled";
+>>                         };
+>>
+>> -                       pwm: pwm at 4005C000 {
+>> +                       pwm1: pwm at 4005C000 {
+>>                                 compatible = "nxp,lpc3220-pwm";
+>> -                               reg = <0x4005C000 0x8>;
+>> +                               reg = <0x4005C000 0x4>;
+>> +                               status = "disabled";
+>> +                       };
+>> +
+>> +                       pwm2: pwm at 4005C004 {
+>> +                               compatible = "nxp,lpc3220-pwm";
+>> +                               reg = <0x4005C004 0x4>;
+>>                                 status = "disabled";
+>>                         };
+>>                 };
+> 
+> I am not really against your change, but...
+> 
+> What's wrong with a binding like the one below?
+> pwm: pwm at 0x4005c000 {
+>     compatible = "nxp,lpc3220-pwm";
+>     reg = <0x4005C000 0x8>;
+>     clocks =<&clk CLK_PWM1, &clk CLK_PWM2>;
+>     clock-names = "pwm1", "pwm2";
+>     #pwm-cells = <3>;
+> };
+> 
+> With two clocks and where the first pwm-cell would select either PWM1 or PWM2.
+> 
+> Seems like the driver only handle one clock, but should be fairly easy to fix.
 
-Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: please apply this directly for -next if
-people are OK with it, as I have no other Juno patches
-pending for now.
----
- arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+I thought about it and IMHO it is a more complicated change in DTS (and
+no doubts in the driver), which hides the structure of hardware. There
+is no one PWM with two channels.
 
-diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-index 637e046f0e36..c7c99a42e2e9 100644
---- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-@@ -103,6 +103,14 @@
- 				};
- 			};
- 
-+			flash at 0,00000000 {
-+				/* 2 * 32MiB NOR Flash memory mounted on CS0 */
-+				compatible = "arm,vexpress-flash", "cfi-flash";
-+				linux,part-probe = "afs";
-+				reg = <0 0x00000000 0x04000000>;
-+				bank-width = <4>;
-+			};
-+
- 			ethernet at 2,00000000 {
- 				compatible = "smsc,lan9118", "smsc,lan9115";
- 				reg = <2 0x00000000 0x10000>;
--- 
-2.4.3
+There are two independent PWMs, even control registers are different,
+PWM2 can be programmed to output the internal interrupt status, and it
+means that possibly in future I may want to describe one of the PWMs
+with a different "compatible" property.
+
+> Note: with your DT change you would also need to change the driver
+> since it currently sets npwm to 2.
+> 
+
+It is done -- http://permalink.gmane.org/gmane.linux.pwm/2831
+
+Thanks for review.
+
+--
+With best wishes,
+Vladimir
