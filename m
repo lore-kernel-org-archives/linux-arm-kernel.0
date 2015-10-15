@@ -1,58 +1,73 @@
-From: shengjiu.wang@freescale.com (Shengjiu Wang)
-Date: Thu, 15 Oct 2015 16:36:31 +0800
-Subject: [PATCH] ARM: SWP emulation: Restore original *data when failed
-In-Reply-To: <20151015082417.GX32532@n2100.arm.linux.org.uk>
-References: <1444791077-26020-1-git-send-email-shengjiu.wang@freescale.com>
- <20151015082417.GX32532@n2100.arm.linux.org.uk>
-Message-ID: <20151015083629.GA32630@shlinux2>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Thu, 15 Oct 2015 16:30:46 +0800
+Subject: [PATCH v4 4/5] iommu/arm-smmu: to backward compatible with probe
+ non-deferral
+In-Reply-To: <1444897847-18040-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1444897847-18040-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1444897847-18040-5-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 09:24:17AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Oct 14, 2015 at 10:51:17AM +0800, Shengjiu Wang wrote:
-> > __user_swpX_asm maybe failed in first STREX operation, emulate_swpX
-> > will try again, but the *data has been changed in first time. which
-> > cause the result is wrong. So need to recover the *data when failed.
-> > 
-> > Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
-> > ---
-> >  arch/arm/kernel/swp_emulate.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
-> > index 5b26e7e..c61fbf92 100644
-> > --- a/arch/arm/kernel/swp_emulate.c
-> > +++ b/arch/arm/kernel/swp_emulate.c
-> > @@ -41,6 +41,7 @@
-> >  	"1:	strex"B"	%0, %2, [%3]\n"			\
-> >  	"	cmp		%0, #0\n"			\
-> >  	"	movne		%0, %4\n"			\
-> > +	"	movne		%1, %2\n"			\
-> >  	"2:\n"							\
-> >  	"	.section	 .text.fixup,\"ax\"\n"		\
-> >  	"	.align		2\n"				\
-> 
-> I think I'd prefer this to be:
-> 
-> 	__asm__ __volatile__(					\
-> 	"0:	ldrex"B"	%2, [%3]\n"			\
-> 	"1:	strex"B"	%0, %1, [%3]\n" 		\
-> 	"	cmp		%0, #0\n"			\
-> 	"	moveq		%1, %2\n"			\
-> 	"	movne		%0, %4\n"			\
-> 
-> so that we're not loading into %1 (an in-out non-temporary) but rather
-> loading it into a temporary - and only overwriting the saved register
-> value if the swap succeeds.
-> 
-> Thanks.
+This patch eliminate the strong dependence on Laurent's series(to support
+probe deferral). That means, no matter whether Laurent's series upstreamed
+or not, the smmu-v3 driver will always work well.
 
-I am ok with your change. Need I send another patch for this change? or will
-you send it by yourself?
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 20 ++++++++++++++++++--
+ 1 file changed, 18 insertions(+), 2 deletions(-)
 
-best regards
-wang shengjiu
-> 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 021a846..66052e9 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1857,6 +1857,12 @@ static int arm_smmu_add_device(struct device *dev)
+ 	struct pci_dev *pdev;
+ 	struct device *root;
+
++	if (dev->archdata.iommu == ERR_PTR(-EPROBE_DEFER)) {
++		dev->archdata.iommu = NULL;
++
++		return of_iommu_configure(dev, dev->of_node) ? 0 : -ENODEV;
++	}
++
+ 	/* only support pci devices hotplug */
+ 	if (!dev_is_pci(dev))
+ 		return -ENODEV;
+@@ -1930,6 +1936,11 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ 		return -EINVAL;
+
+ 	smmu = platform_get_drvdata(pdev);
++	if (!smmu) {
++		dev->archdata.iommu = ERR_PTR(-EPROBE_DEFER);
++
++		return -EPROBE_DEFER;
++	}
+
+ 	if (!dev->archdata.iommu)
+ 		dev->archdata.iommu = smmu;
+@@ -2768,7 +2779,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+
+ 	/* Record our private device structure */
+ 	platform_set_drvdata(pdev, smmu);
+-	of_iommu_set_ops(smmu->dev->of_node, &arm_smmu_ops);
+
+ 	/* Reset the device */
+ 	ret = arm_smmu_device_reset(smmu);
+@@ -2840,7 +2850,13 @@ static void __exit arm_smmu_exit(void)
+ subsys_initcall(arm_smmu_init);
+ module_exit(arm_smmu_exit);
+
+-IOMMU_OF_DECLARE(arm_smmu_v3, "arm,smmu-v3", NULL);
++static int arm_smmu_of_iommu_init(struct device_node *np)
++{
++	of_iommu_set_ops(np, &arm_smmu_ops);
++
++	return 0;
++}
++IOMMU_OF_DECLARE(arm_smmu_v3, "arm,smmu-v3", arm_smmu_of_iommu_init);
+
+ MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
+ MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
+--
+2.5.0
