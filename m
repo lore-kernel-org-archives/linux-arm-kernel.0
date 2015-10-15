@@ -1,75 +1,40 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 15 Oct 2015 16:46:09 +0200
-Subject: [PATCH] VFIO: platform: AMD xgbe reset module
-In-Reply-To: <5270338.MbsQ1bGczu@wuerfel>
-References: <1444836792-2405-1-git-send-email-eric.auger@linaro.org>
- <7287273.XGFpHqQ9fN@wuerfel> <20151015121228.GA965@cbox>
- <5270338.MbsQ1bGczu@wuerfel>
-Message-ID: <561FBC31.3020900@linaro.org>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Thu, 15 Oct 2015 09:47:53 -0500
+Subject: [PATCHv3 08/11] arm64: Check for selected granule support
+In-Reply-To: <20151015112532.GA16125@e106634-lin.cambridge.arm.com>
+References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
+ <1444821634-1689-9-git-send-email-suzuki.poulose@arm.com>
+ <561EC58B.9080408@arm.com> <20151015104515.GE8825@leverpostej>
+ <20151015112532.GA16125@e106634-lin.cambridge.arm.com>
+Message-ID: <561FBC99.9090501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-On 10/15/2015 03:59 PM, Arnd Bergmann wrote:
-> On Thursday 15 October 2015 14:12:28 Christoffer Dall wrote:
->>>
->>> enum vfio_platform_op {
->>>       VFIO_PLATFORM_BIND,
->>>       VFIO_PLATFORM_UNBIND,
->>>       VFIO_PLATFORM_RESET,
->>> };
->>>
->>> struct platform_driver {
->>>         int (*probe)(struct platform_device *);
->>>         int (*remove)(struct platform_device *);
->>>       ...
->>>       int (*vfio_manage)(struct platform_device *, enum vfio_platform_op);
->>>         struct device_driver driver;
->>> };
->>>
->>> This would integrate much more closely into the platform driver framework,
->>> just like the regular vfio driver integrates into the PCI framework.
->>> Unlike PCI however, you can't just use the generic driver framework to
->>> unbind the driver, because you still need device specific code.
->>>
->> Thanks for these suggestions, really helpful.
->>
->> What I don't understand in the latter example is how VFIO knows which
->> struct platform_driver to interact with?
-> 
-> This would assume that the driver remains bound to the device, so VFIO
-> gets a pointer to the device from somewhere (as it does today) and then
-> follows the dev->driver pointer to get to the platform_driver.
-
->  
->> Also, just so I'm sure I understand correctly, VFIO_PLATFORM_UNBIND is
->> then called by VFIO before the VFIO driver unbinds from the device
->> (unbinding the platform driver from the device being a completely
->> separate thing)?
-> 
-> This is where we'd need a little more changes for this approach. Instead
-> of unbinding the device from its driver, the idea would be that the
-> driver remains bound as far as the driver model is concerned, but
-> it would be in a quiescent state where no other subsystem interacts with
-> it (i.e. it gets unregistered from networking core or whichever it uses).
-
-Currently we use the same mechanism as for PCI, ie. unbind the native
-driver and then bind VFIO platform driver in its place. Don't you think
-changing this may be a pain for user-space tools that are designed to
-work that way for PCI?
-
-My personal preference would be to start with your first proposal since
-it looks (to me) less complex and "unknown" that the 2d approach.
-
-Let's wait for Alex opinion too...
-
-Thanks again
-
-Eric
+On 10/15/2015 06:25 AM, Suzuki K. Poulose wrote:
+> +	/*
+> +	 * Check to see if the CPU supports the requested pagesize
+> +	 */
+> +	asm volatile("mrs %0, ID_AA64MMFR0_EL1" : "=r" (aa64mmfr0_el1));
+> +	aa64mmfr0_el1 >>= ID_AA64MMFR0_TGRAN_SHIFT;
+> +	if ((aa64mmfr0_el1 & 0xf) != ID_AA64MMFR0_TGRAN_SUPPORTED) {
+> +		pr_efi_err(sys_table_arg, PAGE_SIZE_STR" granule not supported by the CPU\n");
+> +		return EFI_UNSUPPORTED;
+> +	}
 
 
+This is definitely an improvement over my original hack job.
 
+I would like to add, that I actually think this should be in a new 
+function "check_kernel_compatibility" (or whatever) that is called 
+before handle_kernel_image.
 
-> 
-> 	Arnd
-> 
+That is because I don't really think it belongs in handle_kernel_image 
+which is focused on relocation. Plus, if you add another function, you 
+can avoid the "Failed to relocate kernel" error that comes out following 
+the granule not supported message. Further, checks like this in the 
+future will have a place to live.
+
+Of course you will then need a matching stubbed out function for the 
+normal arm kernel as well.
+
+Thanks,
