@@ -1,66 +1,115 @@
-From: mikko.rapeli@iki.fi (Mikko Rapeli)
-Date: Thu, 15 Oct 2015 14:18:01 +0300
-Subject: [PATCH v4 75/79] include/uapi/xen/privcmd.h: fix compilation in
- userspace
-In-Reply-To: <561F7FF8.9030703@citrix.com>
-References: <1444888618-4506-1-git-send-email-mikko.rapeli@iki.fi>
- <1444888618-4506-76-git-send-email-mikko.rapeli@iki.fi>
- <561F7FF8.9030703@citrix.com>
-Message-ID: <20151015111801.GW6104@lakka.kapsi.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 13:21:55 +0200
+Subject: [PATCH] VFIO: platform: AMD xgbe reset module
+In-Reply-To: <561F5EE2.7010405@linaro.org>
+References: <1444836792-2405-1-git-send-email-eric.auger@linaro.org>
+ <22278785.Xzxnmu2YlU@wuerfel> <561F5EE2.7010405@linaro.org>
+Message-ID: <7287273.XGFpHqQ9fN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 11:29:12AM +0100, David Vrabel wrote:
-> On 15/10/15 06:56, Mikko Rapeli wrote:
-> > xen/interface/xen.h is not exported from kernel headers so remove the
-> > dependency and provide needed defines for domid_t and xen_pfn_t if they
-> > are not already defined by some other e.g. Xen specific headers.
+On Thursday 15 October 2015 10:08:02 Eric Auger wrote:
+> Hi Arnd,
+> On 10/14/2015 05:38 PM, Arnd Bergmann wrote:
+> > On Wednesday 14 October 2015 15:33:12 Eric Auger wrote:
+> >> --- a/drivers/vfio/platform/vfio_platform_common.c
+> >> +++ b/drivers/vfio/platform/vfio_platform_common.c
+> >> @@ -31,6 +31,11 @@ static const struct vfio_platform_reset_combo reset_lookup_table[] = {
+> >>                 .reset_function_name = "vfio_platform_calxedaxgmac_reset",
+> >>                 .module_name = "vfio-platform-calxedaxgmac",
+> >>         },
+> >> +       {
+> >> +               .compat = "amd,xgbe-seattle-v1a",
+> >> +               .reset_function_name = "vfio_platform_amdxgbe_reset",
+> >> +               .module_name = "vfio-platform-amdxgbe",
+> >> +       },
+> >>  };
+> >>  
+> >>  static void vfio_platform_get_reset(struct vfio_platform_device *vdev,
+> >>
 > > 
-> > Suggested by Andrew Cooper <andrew.cooper3@citrix.com> on lkml message
-> > <5569F9C9.8000607@citrix.com>.
-> >
-> > The ifdef for ARM is ugly but did not find better solutions for it.
+> > This is causing build errors for me when CONFIG_MODULES is disabled.
+> Sorry about that and thanks for reporting the issue
 > > 
-> > Fixes userspace compilation error:
-> > 
-> > xen/privcmd.h:38:31: fatal error: xen/interface/xen.h: No such file or directory
-> [...]
-> > --- a/include/uapi/xen/privcmd.h
-> > +++ b/include/uapi/xen/privcmd.h
-> > @@ -35,7 +35,19 @@
-> >  
-> >  #include <linux/types.h>
-> >  #include <linux/compiler.h>
-> > -#include <xen/interface/xen.h>
-> > +
-> > +/* Might be defined by Xen specific headers, but if not */
-> > +#ifndef domid_t
-> > +typedef __u16 domid_t;
-> > +#endif /* domid_t */
+> > Could this please be restructured so vfio_platform_get_reset does
+> > not attempt to call __symbol_get() but instead has the drivers
+> > register themselves properly to a subsystem?
+> OK
 > 
-> As the kbuild bot points out, this does not work since the existence of
-> a typedef cannot be checked with #ifdef.
+> Could you elaborate about "has the drivers register themselves properly
+> to a subsystem".
+> 
+> My first proposal when coping with this problematic of being able to add
+> reset plugins to the vfio-platform driver was to create new drivers per
+> device requiring reset. but this was considered painful for end-users,
+> who needed to be aware of the right driver to bind - and I think that
+> makes sense - (https://lkml.org/lkml/2015/4/17/568) .
 
-Yeah, this hack doesn't cut it. Sorry. Tried to implement these changes:
-http://www.spinics.net/lists/linux-api/msg11048.html
+Having multiple drivers indeed sucks, but your current approach isn't
+that much better, as you still have two modules that are used to driver
+the same hardware.
 
-> I'm not really sure what problem you're trying to solve.  A user space
-> program making use of this interface gets the domid_t and xen_pfn_t etc
-> typedefs from the headers provided as part of the libxenctrl library.
+I would expect that the same driver that is used for the normal
+operation and that it calls a function to register itself to vfio
+by passing a structure with the device and reset function pointer.
 
-I'm trying to make sure that kernel headers in userspace compile with minimal
-dependencies which are gcc and libc.
+> A naive question I dare to ask, wouldn't it be acceptable to make
+> vfio_platform depend on CONFIG_MODULES? Don't we disable modules for
+> security purpose? In that context would we use VFIO?
 
-For me it is clear by now that many Linux API's and ABI's like Xen parts do
-not live in the uapi header files and instead there's a separate userspace
-library with needed headers and defines which have embedded copies of
-the needed API and ABI definitions, like header files.
+I think a lot of embedded systems turn off modules to save a little
+memory, speed up boot time and simplify their user space.
 
-So how could this file be changed so that it compiles in userspace without
-definitions from libxenctrl?
+Aside from that, the current method is highly unusual and looks a bit
+fragile to me, as you are relying on internals of the module loader
+code. It's also a layering violation as the generic code needs to be
+patched for each device specific module that is added, and we try
+to avoid that.
 
-I guess I could copy the needed definitions for domid_t and xen_pfn_t from
-xen/interface/xen.h of libxenctrl. That I should have done to begin with
-instead of trying to hack something on my own.
+A possible solution could be something inside the xgbe driver like
 
--Mikko
+
+static void xgbe_init_module(void)
+{
+	int ret = 0;
+
+	if (IS_ENABLED(CONFIG_AMD_XGBE_ETHERNET)
+		ret = platform_driver_register(&xgbe_driver);
+	if (ret)
+		return ret;
+
+	if (IS_ENABLED(CONFIG_VFIO_PLATFORM))
+		ret = vfio_platform_register_reset(&xgbe_of_match, xgbe_platform_reset);
+
+	return ret;	
+}
+
+This way you have exactly one driver module that gets loaded for the
+device and you can use it either with the platform_driver or through
+vfio.
+
+A nicer way that would be a little more work would be to integrate
+the reset infrastructure into 'struct platform_driver' framework,
+by adding another callback to the it for doing the interaction with
+vfio, something like
+
+enum vfio_platform_op {
+	VFIO_PLATFORM_BIND,
+	VFIO_PLATFORM_UNBIND,
+	VFIO_PLATFORM_RESET,
+};
+
+struct platform_driver {
+        int (*probe)(struct platform_device *);
+        int (*remove)(struct platform_device *);
+	...
+	int (*vfio_manage)(struct platform_device *, enum vfio_platform_op);
+        struct device_driver driver;
+};
+
+This would integrate much more closely into the platform driver framework,
+just like the regular vfio driver integrates into the PCI framework.
+Unlike PCI however, you can't just use the generic driver framework to
+unbind the driver, because you still need device specific code.
+
+	Arnd
