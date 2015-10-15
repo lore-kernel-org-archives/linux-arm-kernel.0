@@ -1,72 +1,42 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 15 Oct 2015 12:53:13 -0700
-Subject: [PATCH v3 2/5] clk: qoriq: Move chip-specific knowledge into
- driver
-In-Reply-To: <1442723397-26329-3-git-send-email-scottwood@freescale.com>
-References: <1442723397-26329-1-git-send-email-scottwood@freescale.com>
- <1442723397-26329-3-git-send-email-scottwood@freescale.com>
-Message-ID: <20151015195313.GR4558@codeaurora.org>
+Date: Thu, 15 Oct 2015 12:54:56 -0700
+Subject: [PATCH V3 5/6] clk: qoriq: Add ls1043a support.
+In-Reply-To: <1444870621.5185.223.camel@freescale.com>
+References: <1444822498-16477-1-git-send-email-B48286@freescale.com>
+ <1444822498-16477-6-git-send-email-B48286@freescale.com>
+ <20151014183113.GE26883@codeaurora.org>
+ <1444870621.5185.223.camel@freescale.com>
+Message-ID: <20151015195456.GT4558@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19, Scott Wood wrote:
-> The device tree should describe the chips (or chip-like subblocks) in
-> the system, but it generally does not describe individual registers --
-> it should identify, rather than describe, a programming interface.
+On 10/14, Scott Wood wrote:
+> On Wed, 2015-10-14 at 11:31 -0700, Stephen Boyd wrote:
+> > On 10/14, Zhiqiang Hou wrote:
+> > > From: Hou Zhiqiang <B48286@freescale.com>
+> > > 
+> > > Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
+> > > ---
+> > 
+> > Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> > 
 > 
-> This has not been the case with the QorIQ clockgen nodes.  The
-> knowledge of what each bit setting of CLKCnCSR means is encoded in
-> three places (binding, pll node, and mux node), and the last also needs
-> to know which options are valid on a particular chip.  All three of
-> these locations are considered stable ABI, making it difficult to fix
-> mistakes (of which I have found several), much less refactor the
-> abstraction to be able to address problems, limitations, or new chips.
+> Could you ack my clock patchset that this depends on (if there are no 
 > 
-> Under the current binding, a pll clock specifier of 2 means that the
-> PLL is divided by 4 -- and the driver implements this, unless there
-> happen to be four clock-output-names rather than 3, in which case it
-> interprets it as PLL divided by 3.  This does not appear in the binding
-> documentation at all.  That hack is now considered stable ABI.
+> objections)?  Mike Turquette acked the RFC version a while back, but it's 
 > 
-> The current device tree nodes contain errors, such as saying that
-> T1040 can set a core clock to PLL/4 when only PLL and PLL/2 are options.
-> The current binding also ignores some restrictions on clock selection,
-> such as p5020's requirement that if a core uses the "wrong" PLL, that
-> PLL must be clocked lower than the "correct" PLL and be at most 80% of
-> the rated CPU frequency.
+> changed a bit since then (including the new clk_get_num_parents() and 
 > 
-> Possibly because of the lack of the ability to express such nuance in
-> the binding, some valid options are omitted from the device trees, such
-> as the ability on p4080 to run cores 0-3 from PLL3 and cores 4-7 from
-> PLL1 (again, only if they are at most 80% of rated CPU frequency).
-> This omission, combined with excessive caution in the cpufreq driver
-> (addressed in a subsequent patch), means that currently on a 1500 MHz
-> p4080 with typical PLL configuration, cpufreq can lower the frequency
-> to 1200 MHz on half the CPUs and do nothing on the others.  With this
-> patchset, all CPUs can be lowered to 1200 MHz on a rev2 p4080, and on a
-> rev3 p4080 half can be lowered to 750 MHz and the other half to 600
-> MHz.
+> clk_get_parent_by_index() -- I CCed Russell King on that but got no 
 > 
-> The current binding only deals with CPU clocks.  To describe FMan in
-> the device tree, we need to describe its clock.  Some chips have
-> additional muxes that work like the CPU muxes, but are not described in
-> the device tree.  Others require inspecting the Reset Control Word to
-> determine which PLL is used.  Rather than continue to extend this mess,
-> replace it.  Have the driver bind to the chip-specific clockgen
-> compatible, and keep the detailed description of quirky chip variations
-> in the driver, where it can be easily fixed, refactored, and extended.
+> response), and got no response when I asked whether the ack was still good 
 > 
-> Older device trees will continue to work (including a workaround for
-> old ls1021a device trees that are missing compatible and reg in the
-> clockgen node, which even the old binding required).  The pll/mux
-> details in old device trees will be ignored, but "clocks" properties
-> pointing at the old nodes will still work, and be directed at the
-> corresponding new clock.
+> for v3.
 > 
-> Signed-off-by: Scott Wood <scottwood@freescale.com>
-> ---
+> 
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Done. The consumer APIs look ok too, but I'd like to see if
+Russell has any comments.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
