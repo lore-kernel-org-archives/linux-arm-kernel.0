@@ -1,38 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 16:16:57 +0200
-Subject: [PATCH v3 05/12] doc/bindings: Update Layerscape PCIe devicetree
- binding to be more flexible
-In-Reply-To: <1444891672-32117-6-git-send-email-bhupesh.sharma@freescale.com>
-References: <1444891672-32117-1-git-send-email-bhupesh.sharma@freescale.com>
- <1444891672-32117-6-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <5383901.aC2HYopUNW@wuerfel>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 15 Oct 2015 10:18:12 -0400
+Subject: [PATCH] arm64: ftrace: function_graph: dump real return addr in
+ call trace
+In-Reply-To: <20151015125133.GA29301@arm.com>
+References: <1444911155-17480-1-git-send-email-huawei.libin@huawei.com>
+ <6277407.jveniKQDxt@wuerfel> <20151015125133.GA29301@arm.com>
+Message-ID: <20151015101812.7cb6e917@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 October 2015 12:17:45 Bhupesh Sharma wrote:
-> 
-> +Note that since this controller derives its clocks from the Reset
-> +Configuration Word (RCW) which is used to describe the PLL settings at
-> +the time of chip-reset, the 'clocks' and 'clock-names' properties from
-> +'designware-pcie.txt' are optional for this controller.
+On Thu, 15 Oct 2015 13:51:33 +0100
+Will Deacon <will.deacon@arm.com> wrote:
 
-If this is an option for the dw-pcie block, should this description be
-added to the generic binding instead?
+> Is this the same old problem caused by e306dfd06fcb ("ARM64: unwind: Fix
+> PC calculation")? I've said previously that I'm happy to revert that if
+> we're the only architecture with this behaviour, but Akashi resisted
+> because there are other issues with ftrace that he was hoping to address
+> and they would resolve this too.
 
-> +Also as per the available Reference Manuals, there is no specific 'version'
-> +register available in the Freescale PCIe controller register set,
-> +which can allow determining the underlying Designware PCIe controller version
-> +information.
-> +
->  Required properties:
-> -- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie"
-> +- compatible: should contain the platform identifier such as "fsl,<soc-name>-pcie",
-> +  "snps,dw-pcie".
+Just a reference, but this patch is pretty much exactly what x86
+currently has. I wonder if I should make that function generic for all
+archs to use.
 
-You should document all the strings that will be needed here, otherwise a
-driver write does not know what to look for.
+If you accept this patch, I can look at what archs do and pull out the
+common code and place it into the core code and have the archs call
+that instead.
 
-If two chips have a 100% identical PCIe implementation, just use the string
-of the older chip for both.
-
-	Arnd
+-- Steve
