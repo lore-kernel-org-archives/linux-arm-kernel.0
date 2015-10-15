@@ -1,97 +1,76 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Thu, 15 Oct 2015 17:10:25 -0400
-Subject: [PATCH v3 08/10] clk: ns2: add clock support for Broadcom
- Northstar 2 SoC
-In-Reply-To: <562014C9.5070708@broadcom.com>
-References: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
- <1444938513-10758-9-git-send-email-jonmason@broadcom.com>
- <56200F39.1060102@broadcom.com> <562012A8.8050707@broadcom.com>
- <562014C9.5070708@broadcom.com>
-Message-ID: <20151015211025.GP32089@broadcom.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 15 Oct 2015 22:12:39 +0100
+Subject: [GIT PULL] PSCI 1.0 implementation for v4.4
+In-Reply-To: <20151005145557.GA2705@red-moon>
+References: <20151005145557.GA2705@red-moon>
+Message-ID: <20151015211239.GA4799@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 02:04:09PM -0700, Scott Branden wrote:
-> Hi Ray,
-> 
-> Comment at near end.
-> 
-> On 15-10-15 01:55 PM, Ray Jui wrote:
-> >
-> >
-> >On 10/15/2015 1:40 PM, Scott Branden wrote:
-> >>We need some sort of kconfig option to differentiate NS2 clock driver
-> >>from being pulled in all the time.
-> >>
-> >>On 15-10-15 12:48 PM, Jon Mason wrote:
-> >>>The Broadcom Northstar 2 SoC is architected under the iProc
-> >>>architecture. It has the following PLLs: GENPLL SCR, GENPLL SW,
-> >>>LCPLL DDR, LCPLL Ports, all derived from an onboard crystal.
-> >>>
-> >>>Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> >>>---
-> >>>   drivers/clk/Makefile                |   2 +-
-> >>>   drivers/clk/bcm/Makefile            |   1 +
-> >>>   drivers/clk/bcm/clk-ns2.c           | 288
-> >>>++++++++++++++++++++++++++++++++++++
-> >>>   include/dt-bindings/clock/bcm-ns2.h |  72 +++++++++
-> >>>   4 files changed, 362 insertions(+), 1 deletion(-)
-> >>>   create mode 100644 drivers/clk/bcm/clk-ns2.c
-> >>>   create mode 100644 include/dt-bindings/clock/bcm-ns2.h
-> >>>
-> >>>diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> >>>index d08b3e5..6124bd3 100644
-> >>>--- a/drivers/clk/Makefile
-> >>>+++ b/drivers/clk/Makefile
-> >>>@@ -47,7 +47,7 @@ obj-$(CONFIG_COMMON_CLK_WM831X)        += clk-wm831x.o
-> >>>   obj-$(CONFIG_COMMON_CLK_XGENE)        += clk-xgene.o
-> >>>   obj-$(CONFIG_COMMON_CLK_PWM)        += clk-pwm.o
-> >>>   obj-$(CONFIG_COMMON_CLK_AT91)        += at91/
-> >>>-obj-$(CONFIG_ARCH_BCM)            += bcm/
-> >>>+obj-y                    += bcm/
-> >>>   obj-$(CONFIG_ARCH_BERLIN)        += berlin/
-> >>>   obj-$(CONFIG_ARCH_HISI)            += hisilicon/
-> >>>   obj-$(CONFIG_ARCH_MXC)            += imx/
-> >>>diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
-> >>>index e258b28..2d1cbc5 100644
-> >>>--- a/drivers/clk/bcm/Makefile
-> >>>+++ b/drivers/clk/bcm/Makefile
-> >>>@@ -3,6 +3,7 @@ obj-$(CONFIG_CLK_BCM_KONA)    += clk-kona-setup.o
-> >>>   obj-$(CONFIG_CLK_BCM_KONA)    += clk-bcm281xx.o
-> >>>   obj-$(CONFIG_CLK_BCM_KONA)    += clk-bcm21664.o
-> >>>   obj-$(CONFIG_COMMON_CLK_IPROC)    += clk-iproc-armpll.o
-> >>>clk-iproc-pll.o clk-iproc-asiu.o
-> >>>+obj-$(CONFIG_COMMON_CLK_IPROC)    += clk-ns2.o
-> >>
-> >>NS2 code is dragged in for all IPROC SoCs.  We need a config option for
-> >>NS2 (CONFIG_ARCH_BCM_NS2) to avoid this (if Arnd allows this for ARMv8
-> >>processors... ?).
-> >>
-> >>You can see below ARMv7 processors don't have this problem.
-> >>
-> >
-> >The arm64 maintainers (Catalin, Mark, and etc.) stated they only want
-> >one ARCH options per chip family.
-> >
-> >>If not we need to add CONFIG_CLK_NS2.
-> >
-> >If using CONFIG_CLK_NS2, how is it going to be enabled/selected?
-> 
-> Since CONFIG_ARCH_BCM_NS2 isn't "allowed" to be introduced we will
-> need to create and select a CONFIG_CLK_BCM_NS2 in the defconfig
-> instead.
+Hi Arnd,
 
-Is this better than the binary becoming slightly bigger?  I thought
-the extra complexity was worse than having an unused chunk of clk code
-(and Kona is already doing the same thing above).  I believe Ray was
-in agreement with me during the internal review of this code.
+gentle ping, following the discussion:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/377269.html
+
+I would need please a branch in arm-soc with the commits in this pull
+request so that I can send the series in the thread above to Daniel on
+top of it, please consider pulling these commits.
 
 Thanks,
-Jon
+Lorenzo
 
-> >
-> >Ray
-> >
+On Mon, Oct 05, 2015 at 03:55:57PM +0100, Lorenzo Pieralisi wrote:
+> Hi Arnd, Kevin, Olof,
 > 
-> Regards,
->  Scott
+> please consider pulling the following commits for v4.4.
+> 
+> The commits update the PSCI kernel interface implementation
+> so that it becomes compliant with the PSCI v1.0 specification and
+> also provide code that enables PSCI based suspend-to-RAM
+> based on the newly introduced PSCI v1.0 System Suspend call.
+> 
+> Thanks,
+> Lorenzo
+> 
+> The following changes since commit 9ffecb10283508260936b96022d4ee43a7798b4c:
+> 
+>   Linux 4.3-rc3 (2015-09-27 07:50:08 -0400)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/firmware/psci-1.0
+> 
+> for you to fetch changes up to faf7ec4a92c0231d1079177095077c162eb9b466:
+> 
+>   drivers: firmware: psci: add system suspend support (2015-10-02 14:35:17 +0100)
+> 
+> ----------------------------------------------------------------
+> This pull request contains patches that enable PSCI 1.0 firmware
+> features for arm/arm64 platforms:
+> 
+> - Lorenzo Pieralisi adds support for the PSCI_FEATURES call, manages
+>   various 1.0 specifications updates (power state id and functions return
+>   values) and provides PSCI v1.0 DT bindings
+> - Sudeep Holla implements PSCI v1.0 system suspend support to enable PSCI
+>   based suspend-to-RAM
+> 
+> ----------------------------------------------------------------
+> Lorenzo Pieralisi (5):
+>       drivers: firmware: psci: add INVALID_ADDRESS return value
+>       drivers: firmware: psci: move power_state handling to generic code
+>       drivers: firmware: psci: add PSCI_FEATURES call
+>       drivers: firmware: psci: add extended stateid power_state support
+>       drivers: firmware: psci: add PSCI v1.0 DT bindings
+> 
+> Sudeep Holla (2):
+>       drivers: firmware: psci: define more generic PSCI_FN_NATIVE macro
+>       drivers: firmware: psci: add system suspend support
+> 
+>  Documentation/devicetree/bindings/arm/psci.txt |   6 ++
+>  arch/arm64/kernel/psci.c                       |  14 ----
+>  drivers/firmware/psci.c                        | 107 ++++++++++++++++++++++---
+>  include/linux/psci.h                           |   2 +
+>  include/uapi/linux/psci.h                      |  18 +++++
+>  5 files changed, 123 insertions(+), 24 deletions(-)
+> 
