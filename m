@@ -1,118 +1,66 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 15 Oct 2015 18:05:34 +0900
-Subject: [PATCH 3/3] ARM: dts: uniphier: add ProXstream2 Gentil board support
-In-Reply-To: <1444899934-4754-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1444899934-4754-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1444899934-4754-4-git-send-email-yamada.masahiro@socionext.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Oct 2015 10:09:27 +0100
+Subject: l2c: Kernel panic in l2c310_enable() in non-secure mode
+In-Reply-To: <561F6A52.70706@sigmadesigns.com>
+References: <561E6407.6000002@sigmadesigns.com>
+ <561E6B1F.1070701@sigmadesigns.com>
+ <CAL_Jsq+GMui-ztROeJ8zg06E+SuJ9+JSnpotHA0OcD3ZhCj4Uw@mail.gmail.com>
+ <561F6A52.70706@sigmadesigns.com>
+Message-ID: <20151015090927.GZ32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initial version of DTS for ProXstream2 Gentil board.
+On Thu, Oct 15, 2015 at 10:56:50AM +0200, Marc Gonzalez wrote:
+> On 14/10/2015 19:06, Rob Herring wrote:
+> 
+> > Yes, FLOZ has to be enabled after enabling the L2 and disabled before
+> > disabling the L2.
+> 
+> Is FLOZ merely a performance optimization?
+> 
+> Have you (or someone else) measured the impact of having it enabled vs
+> disabled?
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+FLZ is a performance optimisation.  It allows the Cortex-A9 to indicate
+to a L2 cache that an entire cache line should be zeroed, rather than
+having the Cortex A9 write each word with zero.  As this uses non-AXI
+compliant signalling, it needs to be enabled in two locations.
 
- arch/arm/boot/dts/Makefile                        |  1 +
- arch/arm/boot/dts/uniphier-proxstream2-gentil.dts | 79 +++++++++++++++++++++++
- 2 files changed, 80 insertions(+)
- create mode 100644 arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
+The enable bit in the L2 cache enables reception of this signalling.
+This will only have an effect when both the L2 FLZ enable bit _and_
+the L2 cache are both enabled, so the signalling can only be interpreted
+by an appropriately configured and enabled L2 cache controller.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 9232018..2e1bc82 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -673,6 +673,7 @@ dtb-$(CONFIG_ARCH_UNIPHIER) += \
- 	uniphier-ph1-pro4-ref.dtb \
- 	uniphier-ph1-sld3-ref.dtb \
- 	uniphier-ph1-sld8-ref.dtb \
-+	uniphier-proxstream2-gentil.dtb \
- 	uniphier-proxstream2-vodka.dtb
- dtb-$(CONFIG_ARCH_VERSATILE) += \
- 	versatile-ab.dtb \
-diff --git a/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts b/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
-new file mode 100644
-index 0000000..3ea2a87
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
-@@ -0,0 +1,79 @@
-+/*
-+ * Device Tree Source for UniPhier ProXstream2 Gentil Board
-+ *
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "uniphier-proxstream2.dtsi"
-+
-+/ {
-+	model = "UniPhier ProXstream2 Gentil Board";
-+	compatible = "socionext,proxstream2-gentil", "socionext,proxstream2";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x80000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS2,115200";
-+		stdout-path = &serial2;
-+	};
-+
-+	aliases {
-+		serial0 = &serial0;
-+		serial1 = &serial1;
-+		serial2 = &serial2;
-+		i2c0 = &i2c0;
-+		i2c4 = &i2c4;
-+		i2c5 = &i2c5;
-+		i2c6 = &i2c6;
-+	};
-+};
-+
-+&serial2 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+};
+After that, the Cortex A9 FLZ enable bit can be set to allow the CA9 to
+generate the non-standard signalling.  This enables the CA9 to generate
+the non-standard signalling, and stops it generating the individual word
+writes.
+
+Enabling the CA9 first results in the non-standard signalling being used
+but nothing on the bus can interpret it, which causes data corruption.
+
+So, performance wise it's beneficial for zero initialising memory.
+
+If you can't write to the Cortex A9 auxiliary control register, then you
+can't use this feature, and discussing the performance impact of having
+the feature disabled is irrelevant.
+
+> >> I suppose a work-around might be to set NSACR[18]?
+> > 
+> > You may find you need that anyway for control of the SMP bit if you
+> > shut off cores.
+> 
+> NSACR[18] == NSACR.NS_SMP
+> 
+> Usage constraints
+> The ACTLR is: [...] RW in Non-secure state if NSACR.NS_SMP = 1.
+> In this case all bits are Write Ignore except for the SMP bit.
+> 
+> Thus, even if my firmware sets NSACR.NS_SMP, Linux won't be able to
+> set bits 1,2,3 in ACTLR.
+
+However, at _least_ the ACTLR write won't fault.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
