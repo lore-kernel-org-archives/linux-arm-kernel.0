@@ -1,75 +1,59 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Thu, 15 Oct 2015 11:27:41 -0500
-Subject: [PATCH 2/2 v2] ARM: DRA7/335x/437x: hwmod: Remove gpmc address space
- from hwmod data
-In-Reply-To: <1444926461-16092-1-git-send-email-fcooper@ti.com>
-References: <1444926461-16092-1-git-send-email-fcooper@ti.com>
-Message-ID: <1444926461-16092-2-git-send-email-fcooper@ti.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 15 Oct 2015 12:29:41 -0400
+Subject: [PATCH v4 0/3]
+In-Reply-To: <561FD273.2040208@oracle.com>
+References: <1444832235-15263-1-git-send-email-m-karicheri2@ti.com>
+ <561E7792.409@oracle.com> <561FCE2B.8020802@ti.com>
+ <561FD273.2040208@oracle.com>
+Message-ID: <561FD475.9000807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPMC address information is provided by device tree. No longer need
-to include this information within hwmod.
+On 10/15/2015 12:21 PM, santosh shilimkar wrote:
+> On 10/15/2015 9:02 AM, Murali Karicheri wrote:
+>> On 10/14/2015 11:41 AM, santosh shilimkar wrote:
+>>> 10/14/2015 7:17 AM, Murali Karicheri wrote:
+>>>> This patch series enable accumulator queue support for K2 SoCs.
+>>>> Accumulator
+>>>> queues are a type of qmss queue that is monitored by the PDSP firmware
+>>>> and
+>>>> accumulated. Host is interrupted by PDSP firmware when packets become
+>>>> available in a ring buffer shared between the host and PDSP.
+>>>>
+>>>> There was an issue raised when merging the original patch set at
+>>>>   (1) https://lkml.org/lkml/2015/9/4/681
+>>>>     [PATCH v1 1/2] soc: ti: display firmware file name as part of boot
+>>>> log
+>>>>   (2) https://lkml.org/lkml/2015/9/4/680
+>>>>     [PATCH v1 2/2] ARM: dts: keystone: enable accumulator channels
+>>>>
+>>>> This series fixes the issues raised against v3. Maintainer, could you
+>>>> please
+>>>> apply this series to v4.4 next please at your earliest opportunity.
+>>>>
+>>> I have picked up the series. Thanks for quick turnaround.
+>>
+>> Thanks Santosh. Could you send this pull request for v4.4 next. We want
+>> this merged to our internal release and if this is on next branch it
+>> will help.
+>>
+> It should be already in linux-next and pull request was sent before I
+> replied yesterday. Its late for the merge window with usual norms
+> so lets see if it makes it.
+Santosh,
 
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
----
-Version 2 changes:
-None
+I see both driver and DTS. Thanks once again for your support
 
- arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c | 10 ----------
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c                    | 10 ----------
- 2 files changed, 20 deletions(-)
+Regards,
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
-index 9ba431c..1c210cb 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
-@@ -275,20 +275,10 @@ struct omap_hwmod_ocp_if am33xx_epwmss2__ehrpwm2 = {
- };
- 
- /* l3s cfg -> gpmc */
--static struct omap_hwmod_addr_space am33xx_gpmc_addr_space[] = {
--	{
--		.pa_start	= 0x50000000,
--		.pa_end		= 0x50000000 + SZ_8K - 1,
--		.flags		= ADDR_TYPE_RT,
--	},
--	{ }
--};
--
- struct omap_hwmod_ocp_if am33xx_l3_s__gpmc = {
- 	.master		= &am33xx_l3_s_hwmod,
- 	.slave		= &am33xx_gpmc_hwmod,
- 	.clk		= "l3s_gclk",
--	.addr		= am33xx_gpmc_addr_space,
- 	.user		= OCP_USER_MPU,
- };
- 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index ad2cc7a..7bf106a 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -2638,21 +2638,11 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per1__gpio8 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
--static struct omap_hwmod_addr_space dra7xx_gpmc_addrs[] = {
--	{
--		.pa_start	= 0x50000000,
--		.pa_end		= 0x500003ff,
--		.flags		= ADDR_TYPE_RT
--	},
--	{ }
--};
--
- /* l3_main_1 -> gpmc */
- static struct omap_hwmod_ocp_if dra7xx_l3_main_1__gpmc = {
- 	.master		= &dra7xx_l3_main_1_hwmod,
- 	.slave		= &dra7xx_gpmc_hwmod,
- 	.clk		= "l3_iclk_div",
--	.addr		= dra7xx_gpmc_addrs,
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
+Murali
+>
+> Regards,
+> Santosh
+>
+>
+
+
 -- 
-2.6.1
+Murali Karicheri
+Linux Kernel, Keystone
