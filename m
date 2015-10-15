@@ -1,36 +1,64 @@
 From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Thu, 15 Oct 2015 12:17:43 +0530
-Subject: [PATCH v3 03/12] Documentation: DT: Add entry for FSL LS2080A QDS and
- RDB boards
+Date: Thu, 15 Oct 2015 12:17:44 +0530
+Subject: [PATCH v3 04/12] Documentation/dts: Move FSL board-specific bindings
+ out of /powerpc
 In-Reply-To: <1444891672-32117-1-git-send-email-bhupesh.sharma@freescale.com>
 References: <1444891672-32117-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1444891672-32117-4-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <1444891672-32117-5-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a devicetree binding documentation for Freescale's
-LS2080A QDS and RDB boards.
+Since the same board components can be used across ARM and PPC board families,
+this patch moves the FSL board-specific bindings out of bindings/powerpci.
+
+While at it, this patch also adds the bindings for QIXIS FPGA controller
+found on FSL LS2080A boards. These boards have an on-board FPGA/CPLD
+connected to the IFC controller.
 
 Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+Signed-off-by: Jaiprakash Singh <b44839@freescale.com>
 ---
- Documentation/devicetree/bindings/arm/fsl.txt |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ .../{powerpc/fsl/board.txt => board/fsl-board.txt} |   14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
+ rename Documentation/devicetree/bindings/{powerpc/fsl/board.txt => board/fsl-board.txt} (90%)
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index 53f229a..34c88b0 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -135,3 +135,11 @@ LS2080A ARMv8 based Simulator model
- Required root node properties:
-     - compatible = "fsl,ls2080a-simu", "fsl,ls2080a";
+diff --git a/Documentation/devicetree/bindings/powerpc/fsl/board.txt b/Documentation/devicetree/bindings/board/fsl-board.txt
+similarity index 90%
+rename from Documentation/devicetree/bindings/powerpc/fsl/board.txt
+rename to Documentation/devicetree/bindings/board/fsl-board.txt
+index cff38bd..fb7b03e 100644
+--- a/Documentation/devicetree/bindings/powerpc/fsl/board.txt
++++ b/Documentation/devicetree/bindings/board/fsl-board.txt
+@@ -21,11 +21,14 @@ Example:
  
-+LS2080A ARMv8 based QDS Board
-+Required root node properties:
-+    - compatible = "fsl,ls2080a-qds", "fsl,ls2080a";
+ This is the memory-mapped registers for on board FPGA.
+ 
+-Required properities:
++Required properties:
+ - compatible: should be a board-specific string followed by a string
+   indicating the type of FPGA.  Example:
+-	"fsl,<board>-fpga", "fsl,fpga-pixis"
++	"fsl,<board>-fpga", "fsl,fpga-pixis", or
++	"fsl,<board>-fpga", "fsl,fpga-qixis"
+ - reg: should contain the address and the length of the FPGA register set.
 +
-+LS2080A ARMv8 based RDB Board
-+Required root node properties:
-+    - compatible = "fsl,ls2080a-rdb", "fsl,ls2080a";
++Optional properties:
+ - interrupt-parent: should specify phandle for the interrupt controller.
+ - interrupts: should specify event (wakeup) IRQ.
+ 
+@@ -38,6 +41,13 @@ Example (P1022DS):
+ 		 interrupts = <8 8 0 0>;
+ 	 };
+ 
++Example (LS2080A-RDB):
 +
++        cpld at 3,0 {
++                compatible = "fsl,ls2080ardb-fpga", "fsl,fpga-qixis";
++                reg = <0x3 0 0x10000>;
++        };
++
+ * Freescale BCSR GPIO banks
+ 
+ Some BCSR registers act as simple GPIO controllers, each such
 -- 
 1.7.9.5
