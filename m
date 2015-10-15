@@ -1,20 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 22:40:33 +0200
-Subject: [PATCH] ARM: configs: Enable FIXED_PHY in multi_v7 defconfig
-In-Reply-To: <1444926135-26513-1-git-send-email-maxime.coquelin@st.com>
-References: <1444926135-26513-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <5164143.2O3GLXJ4IB@wuerfel>
+Date: Thu, 15 Oct 2015 22:56:29 +0200
+Subject: [GIT PULL] ARM: berlin: SoC changes for v4.4 (round 2)
+In-Reply-To: <1444936979-15901-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1444936979-15901-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <7430500.tSWuCzyySO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 October 2015 18:22:15 Maxime Coquelin wrote:
-> CONFIG_FIXED_PHY is needed to have Ethernet working on STi boards.
+On Thursday 15 October 2015 21:22:59 Sebastian Hesselbarth wrote:
 > 
-> Select it as built-in since RootFS is accessible from NFS on these boards.
-> 
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+> this is the second PR for Marvell Berlin SoC changes for v4.4. Jisheng
+> added cpu hotplug support by using a non-self-clearing version of the
+> reset register.
 > 
 
-Applied to next/defconfig, thanks!
+Pulled into next/soc, thanks!
 
 	Arnd
