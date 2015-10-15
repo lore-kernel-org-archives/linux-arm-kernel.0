@@ -1,73 +1,49 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 15 Oct 2015 12:04:10 -0400
-Subject: [PATCH] ahci: qoriq: Fix a compiling warning
-In-Reply-To: <15555694.OtW6JZzsoS@wuerfel>
-References: <1444812412-33321-1-git-send-email-Yuantian.Tang@freescale.com>
- <20151015151152.GB27717@mtj.duckdns.org>
- <15555694.OtW6JZzsoS@wuerfel>
-Message-ID: <20151015160410.GC27717@mtj.duckdns.org>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Thu, 15 Oct 2015 18:04:47 +0200
+Subject: [GIT PULL] STi DT changes for v4.4, round 2
+Message-ID: <561FCE9F.2010002@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Olof, Arnd and Kevin,
 
-I see.  I applied the following to libata/for-4.4.
+Please consider this second round of STi DT updates for v4.4:
 
-Thanks.
+The following changes since commit cae010a1b663a779fdbfbf625839bc07dad16428:
 
------- 8< ------
->From eb351031a15c4a83b9955aadad783c6672ab8868 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 14 Oct 2015 16:46:52 +0800
-Subject: [PATCH] ahci: qoriq: Fix a compiling warning
+   ARM: STi: STiH407: Enable the 2 HW Random Number Generators for 
+STiH4{07, 10} (2015-10-01 11:02:09 +0200)
 
-kbuild test robot reports the warnings:
-drivers/ata/ahci_qoriq.c: In function 'ahci_qoriq_hardreset':
->> include/asm-generic/io.h:163:2: warning: 'px_is' may be used
->> uninitialized in this function [-Wuninitialized]
-drivers/ata/ahci_qoriq.c:70:14: note: 'px_is' was declared here
->> include/asm-generic/io.h:163:2: warning: 'px_cmd' may be used
->> uninitialized in this function [-Wuninitialized]
-drivers/ata/ahci_qoriq.c:70:6: note: 'px_cmd' was declared here
+are available in the git repository at:
 
-This patch fixed it by introducing a local variable.
+   https://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/sti.git 
+tags/sti-dt-for-v4.4-2
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
-Signed-off-by: Tejun Heo <tj@kernel.org>
----
- drivers/ata/ahci_qoriq.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+for you to fetch changes up to 848dd6a87a10bd24b5a4c8b84eaba3cdd0ec7a19:
 
-diff --git a/drivers/ata/ahci_qoriq.c b/drivers/ata/ahci_qoriq.c
-index e5e4988..58c1a94 100644
---- a/drivers/ata/ahci_qoriq.c
-+++ b/drivers/ata/ahci_qoriq.c
-@@ -76,6 +76,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
- 	struct ata_taskfile tf;
- 	bool online;
- 	int rc;
-+	bool ls1021a_workaround = (qoriq_priv->type == AHCI_LS1021A);
- 
- 	DPRINTK("ENTER\n");
- 
-@@ -92,7 +93,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
- 	 * After the sequence is complete, software should restore the
- 	 * PxCMD and PxIS with the stored values.
- 	 */
--	if (qoriq_priv->type == AHCI_LS1021A) {
-+	if (ls1021a_workaround) {
- 		px_cmd = readl(port_mmio + PORT_CMD);
- 		px_is = readl(port_mmio + PORT_IRQ_STAT);
- 	}
-@@ -106,7 +107,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
- 				 ahci_check_ready);
- 
- 	/* restore the PxCMD and PxIS on ls1021 */
--	if (qoriq_priv->type == AHCI_LS1021A) {
-+	if (ls1021a_workaround) {
- 		px_val = readl(port_mmio + PORT_CMD);
- 		if (px_val != px_cmd)
- 			writel(px_cmd, port_mmio + PORT_CMD);
--- 
-2.4.3
+   ARM: STi: DT: Add support for stih418 A9 pll (2015-10-15 13:48:16 +0200)
+
+----------------------------------------------------------------
+Highlights:
+-----------
+  - Use STiH418's A9 PLL
+  - Add Ethernet support to STiH407 family
+
+----------------------------------------------------------------
+Gabriel Fernandez (1):
+       ARM: STi: DT: Add support for stih418 A9 pll
+
+Maxime Coquelin (4):
+       ARM: dts: Fix RGMII pinctrl timings
+       ARM: dts: Add Ethernet node to STiH407 family
+       ARM: dts: Enable Ethernet on STi's B2120 boards
+       ARM: dts: Enable Ethernet on STi's B2199 board
+
+  arch/arm/boot/dts/stih407-b2120.dts    |  1 +
+  arch/arm/boot/dts/stih407-family.dtsi  | 27 +++++++++++++++++++++++++++
+  arch/arm/boot/dts/stih407-pinctrl.dtsi |  4 ++--
+  arch/arm/boot/dts/stih410-b2120.dts    |  1 +
+  arch/arm/boot/dts/stih418-b2199.dts    |  8 ++++++++
+  arch/arm/boot/dts/stih418-clock.dtsi   |  2 +-
+  arch/arm/boot/dts/stihxxx-b2120.dtsi   |  6 ++++++
+  7 files changed, 46 insertions(+), 3 deletions(-
