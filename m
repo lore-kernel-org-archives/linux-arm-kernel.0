@@ -1,50 +1,54 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 15 Oct 2015 10:58:56 +0100
-Subject: [Xen-devel] xen,arm: enable cpu_hotplug
-In-Reply-To: <561F78A4.7060507@citrix.com>
-References: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
- <561EE3E5.2000105@citrix.com> <1444898398.1607.18.camel@citrix.com>
- <561F78A4.7060507@citrix.com>
-Message-ID: <561F78E0.2070004@citrix.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Thu, 15 Oct 2015 12:00:40 +0200
+Subject: l2c: Kernel panic in l2c310_enable() in non-secure mode
+In-Reply-To: <20151014174721.GR32532@n2100.arm.linux.org.uk>
+References: <561E6407.6000002@sigmadesigns.com>
+ <561E6B1F.1070701@sigmadesigns.com>
+ <20151014174721.GR32532@n2100.arm.linux.org.uk>
+Message-ID: <561F7948.8080201@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/15 10:57, Julien Grall wrote:
-> Hi Ian,
-> 
-> On 15/10/15 09:39, Ian Campbell wrote:
->> On Thu, 2015-10-15 at 00:23 +0100, Julien Grall wrote:
->>> My second point is related to how Xen is handling interrupt with vCPU. 
->>> When PSCI off is called, we will set the _VFP_down flag. This flag is 
->>> used in vgic_vcpu_inject_irq and when it's set the interrupt will be 
->>> ignored and stay active on the HW GIC forever. If the vCPU is coming 
->>> back online, this interrupt will never be received. AFAIU the spec, the 
->>> interrupt is expected to stay pending on the distributor side and will 
->>> be receive when the vCPU will come back or migrate to another vCPU. A 
->>> similar problem can happen when the vCPU is powered on again because we 
->>> clear all the interrupt state related to vCPU (see
->>> vgic_clear_pending_irqs).
->>
->> Is there also an interaction with our implementation of ITARGETSR of
->> picking the lowest set bit? e.g. if an IRQ has target 0x6 (targeting CPU 1
->> and CPU2) we will choose CPU 1. If CPU 1 is then unplugged, will we end up
->> targeting CPU 2 or the now-offline CPU 1? In the latter case the lack of
->> interrupts might be considered surprising?
-> 
-> I though about it when I wrote the mail yesterday night.
-> 
-> From the spec section 1.4.3 (ARM IHI 0048B.b):
-> 
-> "The ARM GIC architecture does not guarantee that a 1-N interrupt is
-> presented to:
-> ? all processors listed in the target processor list
-> ? an enabled interface, where at least one interface is enabled."
-> 
-> AFAIU this paragraph, it means that there is no guarantee to receive an
-> interrupt if the target mask contain a vCPU offline.
+On 14/10/2015 19:47, Russell King - ARM Linux wrote:
 
-Hmmm I may not have been clear here. I meant that the interrupt will
-stay pending in the distributor but not received by the guest.
+> Wrong.  Do _not_ enable FLZ in the Cortex-A9.  FLZ needs the L2 cache
+> enabled _before_ the Cortex A9.  This is not something you can do in
+> firmware/boot loader/etc.  It has to be done by the kernel when the L2
+> cache is initialised.
 
--- 
-Julien Grall
+Can you tell me if the following setup is reasonable?
+
+(The important thing to note is that I do have control over the firmware.)
+
+l2c_enable and l2c_disable will hand control over to the firmware,
+which will handle the details of FLOZ:
+
+When enabling the L2, firmware will:
+A1) set L2CC_reg1_aux_control[0] to 1
+A2) enable the L2
+A3) set CP15_ACTLR bits 1,2,3 to 1
+
+When disabling the L2, firmware will:
+B1) clear CP15_ACTLR bits 1,2,3 to 0
+B2) disable the L2
+B3) clear L2CC_reg1_aux_control[0] to 0
+
+Thus, on my platform, Linux would no longer need to write CP15_ACTLR.
+
+Then I just need a platform-specific bool e.g. "firmware_handles_cp15_actlr"
+and check it where appropriate:
+
+In enable:
+	if (!firmware_handles_cp15_actlr && (aux & L310_AUX_CTRL_FULL_LINE_ZERO)) {
+		set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
+		cpu_notifier(l2c310_cpu_enable_flz, 0);
+	}
+
+In disable:
+	if (!firmware_handles_cp15_actlr && (l2x0_saved_regs.aux_ctrl & L310_AUX_CTRL_FULL_LINE_ZERO))
+		set_auxcr(get_auxcr() & ~(BIT(3) | BIT(2) | BIT(1)));
+
+
+What do you think?
+
+Regards.
