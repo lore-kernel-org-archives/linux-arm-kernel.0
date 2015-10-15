@@ -1,165 +1,92 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 15 Oct 2015 17:11:07 +0100
-Subject: [RFC PATCH 1/4] drm: Introduce generic probe function for component
- based masters.
-In-Reply-To: <1444925470-9963-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1444925470-9963-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1444925470-9963-2-git-send-email-Liviu.Dudau@arm.com>
+From: kapilh@broadcom.com (Kapil Hali)
+Date: Thu, 15 Oct 2015 21:43:32 +0530
+Subject: [PATCH 1/3] dt-bindings: add SMP enable-method for Broadcom NSP
+In-Reply-To: <561ED6E8.4000208@hauke-m.de>
+References: <1444844820-24290-1-git-send-email-kapilh@broadcom.com>
+ <1444844820-24290-2-git-send-email-kapilh@broadcom.com>
+ <561ED6E8.4000208@hauke-m.de>
+Message-ID: <561FD0AC.50403@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A lot of component based DRM drivers use a variant of the same code
-as the probe function. They bind the crtc ports in the first iteration
-and then scan through the child nodes and bind the encoders attached
-to the remote endpoints. Factor the common code into a separate
-function called drm_of_component_probe() in order to increase code
-reuse.
 
-Cc: David Airlie <airlied@linux.ie>
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
- drivers/gpu/drm/drm_of.c | 92 ++++++++++++++++++++++++++++++++++++++++++++++++
- include/drm/drm_of.h     | 12 +++++++
- 2 files changed, 104 insertions(+)
 
-diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-index be38840..cf16240 100644
---- a/drivers/gpu/drm/drm_of.c
-+++ b/drivers/gpu/drm/drm_of.c
-@@ -1,3 +1,4 @@
-+#include <linux/component.h>
- #include <linux/export.h>
- #include <linux/list.h>
- #include <linux/of_graph.h>
-@@ -61,3 +62,94 @@ uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
- 	return possible_crtcs;
- }
- EXPORT_SYMBOL(drm_of_find_possible_crtcs);
-+
-+/**
-+ * drm_of_component_probe - Generic probe function for a component based master
-+ * @dev: master device containing the OF node
-+ * @compare_of: compare function used for matching components
-+ * @master_ops: component master ops to be used
-+ *
-+ * Parse the platform device OF node and bind all the components associated
-+ * with the master. Interface ports are added before the encoders in order to
-+ * satisfy their .bind requirements
-+ * See Documentation/devicetree/bindings/graph.txt for the bindings.
-+ *
-+ * Returns zero if successful, or one of the standard error codes if it fails.
-+ */
-+int drm_of_component_probe(struct device *dev,
-+			   int (*compare_of)(struct device *, void *),
-+			   const struct component_master_ops *master_ops)
-+{
-+	struct device_node *ep, *port, *remote;
-+	struct component_match *match = NULL;
-+	int i, ret;
-+
-+	if (!dev->of_node)
-+		return -EINVAL;
-+
-+	/*
-+	 * Bind the crtc's ports first, so that drm_of_find_possible_crtcs()
-+	 * called from encoder's .bind callbacks works as expected
-+	 */
-+	for (i = 0; ; i++) {
-+		port = of_parse_phandle(dev->of_node, "ports", i);
-+		if (!port)
-+			break;
-+
-+		if (!of_device_is_available(port->parent)) {
-+			of_node_put(port);
-+			continue;
-+		}
-+
-+		component_match_add(dev, &match, compare_of, port);
-+		of_node_put(port);
-+	}
-+
-+	if (i == 0) {
-+		dev_err(dev, "missing 'ports' property\n");
-+		return -ENODEV;
-+	}
-+
-+	if (!match) {
-+		dev_err(dev, "no available port\n");
-+		return -ENODEV;
-+	}
-+
-+	/*
-+	 * For bound crtcs, bind the encoders attached to their remote endpoint
-+	 */
-+	for (i = 0; ; i++) {
-+		port = of_parse_phandle(dev->of_node, "ports", i);
-+		if (!port)
-+			break;
-+
-+		if (!of_device_is_available(port->parent)) {
-+			of_node_put(port);
-+			continue;
-+		}
-+
-+		for_each_child_of_node(port, ep) {
-+			remote = of_graph_get_remote_port_parent(ep);
-+			if (!remote || !of_device_is_available(remote)) {
-+				of_node_put(remote);
-+				continue;
-+			} else if (!of_device_is_available(remote->parent)) {
-+				dev_warn(dev, "parent device of %s is not available\n",
-+					 remote->full_name);
-+				of_node_put(remote);
-+				continue;
-+			}
-+
-+			component_match_add(dev, &match, compare_of, remote);
-+			of_node_put(remote);
-+		}
-+		of_node_put(port);
-+	}
-+
-+	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
-+	if (ret)
-+		return ret;
-+
-+	return component_master_add_with_match(dev, master_ops, match);
-+}
-+EXPORT_SYMBOL(drm_of_component_probe);
-diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
-index 2441f71..7c0c05b 100644
---- a/include/drm/drm_of.h
-+++ b/include/drm/drm_of.h
-@@ -1,18 +1,30 @@
- #ifndef __DRM_OF_H__
- #define __DRM_OF_H__
- 
-+struct component_master_ops;
-+struct device;
- struct drm_device;
- struct device_node;
- 
- #ifdef CONFIG_OF
- extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
- 					   struct device_node *port);
-+extern int drm_of_component_probe(struct device *dev,
-+				  int (*compare_of)(struct device *, void *),
-+				  const struct component_master_ops *master_ops);
- #else
- static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
- 						  struct device_node *port)
- {
- 	return 0;
- }
-+
-+static inline int drm_of_component_probe(struct device *dev,
-+					int (*compare_of)(struct device *, void *),
-+					 const struct component_master_ops *master_ops)
-+{
-+	return -EINVAL;
-+}
- #endif
- 
- #endif /* __DRM_OF_H__ */
--- 
-2.6.0
+On 10/15/2015 3:57 AM, Hauke Mehrtens wrote:
+> On 10/14/2015 07:46 PM, Kapil Hali wrote:
+>> Add a compatible string "brcm,bcm-nsp-smp" for Broadcom's
+>> Northstar Plus CPU to the 32-bit ARM CPU device tree binding
+>> documentation file and create a new binding documentation for
+>> Northstar Plus CPU pen-release mechanism.
+>>
+>> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+>> ---
+>>  .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 36 ++++++++++++++++++++++
+>>  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
+>>  2 files changed, 37 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>> new file mode 100644
+>> index 0000000..8506da7
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>> @@ -0,0 +1,36 @@
+>> +Broadcom Northstar Plus SoC CPU Enable Method
+>> +---------------------------------------------
+>> +This binding defines the enable method used for starting secondary
+>> +CPUs in the following Broadcom SoCs:
+>> +  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
+>> +
+>> +The enable method is specified by defining the following required
+>> +properties in the "cpus" device tree node:
+>> +  - enable-method = "brcm,bcm-nsp-smp";
+>> +  - secondary-boot-reg = <...>;
+>> +
+>> +The secondary-boot-reg property is a u32 value that specifies the
+>> +physical address of the register used to request the ROM holding pen
+>> +code release a secondary CPU.
+>> +
+>> +Example:
+>> +	cpus {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		enable-method = "brcm,bcm-nsp-smp";
+>> +		secondary-boot-reg = <0xffff042c>;
+> 
+> Isn't this some offset in a SRAM? If this is a SRAM it should be handled
+> like it is done in some other SoC code.
+> 
+It is an internal SKU region. Is it handled differently in rest of the 
+SoCs? What is that method?
+
+>> +
+>> +		cpu0: cpu at 0 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a9";
+>> +			next-level-cache = <&L2>;
+>> +			reg = <0>;
+>> +		};
+>> +
+>> +		cpu1: cpu at 1 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a9";
+>> +			next-level-cache = <&L2>;
+>> +			reg = <1>;
+>> +		};
+>> +	};
+>> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+>> index 91e6e5c..1172d9b 100644
+>> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+>> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+>> @@ -190,6 +190,7 @@ nodes to be present and contain the properties described below.
+>>  			    "allwinner,sun6i-a31"
+>>  			    "allwinner,sun8i-a23"
+>>  			    "arm,psci"
+>> +			    "brcm,bcm-nsp-smp"
+>>  			    "brcm,brahma-b15"
+>>  			    "marvell,armada-375-smp"
+>>  			    "marvell,armada-380-smp"
+>>
+> 
+Thanks,
+Kapil
