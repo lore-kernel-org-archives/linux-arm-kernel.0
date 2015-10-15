@@ -1,96 +1,74 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 15 Oct 2015 12:32:20 +0200
-Subject: [PATCH v2 1/3] ARM: catch pending imprecise abort on unmask
+Date: Thu, 15 Oct 2015 12:32:22 +0200
+Subject: [PATCH v2 3/3] ARM: BCM5301X: remove workaround imprecise abort fault
+ handler
 In-Reply-To: <1444905142-21500-1-git-send-email-l.stach@pengutronix.de>
 References: <1444905142-21500-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1444905142-21500-2-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1444905142-21500-4-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Install a non-faulting handler just before unmasking imprecise aborts
-and switch back to the regular one after unmasking is done.
-
-This catches any pending imprecise abort that the firmware/bootloader
-may have left behind that would normally crash the kernel at that point.
-As there are apparently a lot of bootlaoders out there that do such a
-thing it makes sense to handle it in the common startup code.
+This is not needed anymore. Handling a potentially pending imprecise external
+abort left behind by the bootloader is now done in a slightly safer way inside
+the common ARM startup code.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
 ---
-v2:
-- move temporary fault handler swapping into fault.c to hide it from
-  other parts of the kernel
-- print FSR, when warning user about bad firmware/bootloader
----
- arch/arm/mm/fault.c | 22 ++++++++++++++++++++++
- arch/arm/mm/fault.h |  1 +
- arch/arm/mm/mmu.c   |  3 ++-
- 3 files changed, 25 insertions(+), 1 deletion(-)
+ arch/arm/mach-bcm/bcm_5301x.c | 35 -----------------------------------
+ 1 file changed, 35 deletions(-)
 
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index 0d629b8f973f..daafcf121ce0 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -593,6 +593,28 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
- 	arm_notify_die("", regs, &info, ifsr, 0);
- }
+diff --git a/arch/arm/mach-bcm/bcm_5301x.c b/arch/arm/mach-bcm/bcm_5301x.c
+index 5478fe6bcce6..c8830a2b0d60 100644
+--- a/arch/arm/mach-bcm/bcm_5301x.c
++++ b/arch/arm/mach-bcm/bcm_5301x.c
+@@ -9,40 +9,6 @@
+ #include <asm/hardware/cache-l2x0.h>
  
-+/*
-+ * Abort handler to be used only during first unmasking of asynchronous aborts
-+ * on the boot CPU. This makes sure that the machine will not die if the
-+ * firmware/bootloader left an imprecise abort pending for us to trip over.
-+ */
-+static int __init early_abort_handler(unsigned long addr, unsigned int fsr,
-+				      struct pt_regs *regs)
-+{
-+	pr_warn("Hit pending asynchronous external abort (FSR=0x%08x) during "
-+		"first unmask, this is most likely caused by a "
-+		"firmware/bootloader bug.\n", fsr);
-+
-+	return 0;
-+}
-+
-+void __init early_abt_enable(void)
-+{
-+	fsr_info[22].fn = early_abort_handler;
-+	local_abt_enable();
-+	fsr_info[22].fn = do_bad;
-+}
-+
- #ifndef CONFIG_ARM_LPAE
- static int __init exceptions_init(void)
- {
-diff --git a/arch/arm/mm/fault.h b/arch/arm/mm/fault.h
-index cf08bdfbe0d6..05ec5e0df32d 100644
---- a/arch/arm/mm/fault.h
-+++ b/arch/arm/mm/fault.h
-@@ -24,5 +24,6 @@ static inline int fsr_fs(unsigned int fsr)
+ #include <asm/mach/arch.h>
+-#include <asm/siginfo.h>
+-#include <asm/signal.h>
+-
+-
+-static bool first_fault = true;
+-
+-static int bcm5301x_abort_handler(unsigned long addr, unsigned int fsr,
+-				 struct pt_regs *regs)
+-{
+-	if ((fsr == 0x1406 || fsr == 0x1c06) && first_fault) {
+-		first_fault = false;
+-
+-		/*
+-		 * These faults with codes 0x1406 (BCM4709) or 0x1c06 happens
+-		 * for no good reason, possibly left over from the CFE boot
+-		 * loader.
+-		 */
+-		pr_warn("External imprecise Data abort at addr=%#lx, fsr=%#x ignored.\n",
+-			addr, fsr);
+-
+-		/* Returning non-zero causes fault display and panic */
+-		return 0;
+-	}
+-
+-	/* Others should cause a fault */
+-	return 1;
+-}
+-
+-static void __init bcm5301x_init_early(void)
+-{
+-	/* Install our hook */
+-	hook_fault_code(16 + 6, bcm5301x_abort_handler, SIGBUS, BUS_OBJERR,
+-			"imprecise external abort");
+-}
  
- void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs);
- unsigned long search_exception_table(unsigned long addr);
-+void early_abt_enable(void);
- 
- #endif	/* __ARCH_ARM_FAULT_H */
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index f65a6f344b6d..4867f5daf82c 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -38,6 +38,7 @@
- #include <asm/mach/pci.h>
- #include <asm/fixmap.h>
- 
-+#include "fault.h"
- #include "mm.h"
- #include "tcm.h"
- 
-@@ -1365,7 +1366,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
- 	flush_cache_all();
- 
- 	/* Enable asynchronous aborts */
--	local_abt_enable();
-+	early_abt_enable();
- }
- 
- static void __init kmap_init(void)
+ static const char *const bcm5301x_dt_compat[] __initconst = {
+ 	"brcm,bcm4708",
+@@ -52,6 +18,5 @@ static const char *const bcm5301x_dt_compat[] __initconst = {
+ DT_MACHINE_START(BCM5301X, "BCM5301X")
+ 	.l2c_aux_val	= 0,
+ 	.l2c_aux_mask	= ~0,
+-	.init_early	= bcm5301x_init_early,
+ 	.dt_compat	= bcm5301x_dt_compat,
+ MACHINE_END
 -- 
 2.6.1
