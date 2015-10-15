@@ -1,86 +1,75 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 15 Oct 2015 14:05:04 +0300
-Subject: [PATCH] ARM: edma: special case slot limit workaround
-In-Reply-To: <87eggws90a.fsf@linutronix.de>
-References: <87eggws90a.fsf@linutronix.de>
-Message-ID: <561F8860.4030507@ti.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Thu, 15 Oct 2015 13:07:32 +0200
+Subject: l2c: Kernel panic in l2c310_enable() in non-secure mode
+In-Reply-To: <561F7948.8080201@sigmadesigns.com>
+References: <561E6407.6000002@sigmadesigns.com>
+ <561E6B1F.1070701@sigmadesigns.com>
+ <20151014174721.GR32532@n2100.arm.linux.org.uk>
+ <561F7948.8080201@sigmadesigns.com>
+Message-ID: <561F88F4.40401@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2015 01:48 PM, John Ogness wrote:
-> Currently drivers are limited to 19 slots for cyclic transfers.
-> However, if the DMA burst size is the same as the period size,
-> the period size can be changed to the full buffer size and
-> intermediate interrupts activated. Since intermediate interrupts
-> will trigger for each burst and the burst size is the same as
-> the period size, the driver will get interrupts each period as
-> expected. This has the benefit of allowing the functionality of
-> many more slots, but only uses 2 slots.
+On 15/10/2015 12:00, Marc Gonzalez wrote:
+
+> On 14/10/2015 19:47, Russell King - ARM Linux wrote:
 > 
-> This workaround is only active if more than 19 slots are needed
-> and the burst size matches the period size.
-
-To: Vinod
-CC: l-o, Sekhar at least
-
+>> Wrong.  Do _not_ enable FLZ in the Cortex-A9.  FLZ needs the L2 cache
+>> enabled _before_ the Cortex A9.  This is not something you can do in
+>> firmware/boot loader/etc.  It has to be done by the kernel when the L2
+>> cache is initialised.
 > 
-> Signed-off-by: John Ogness <john.ogness@linutronix.de>
-> ---
->  drivers/dma/edma.c |   25 ++++++++++++++++++++++---
->  1 file changed, 22 insertions(+), 3 deletions(-)
+> Can you tell me if the following setup is reasonable?
 > 
-> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-> index 493c774..16bd193 100644
-> --- a/drivers/dma/edma.c
-> +++ b/drivers/dma/edma.c
-> @@ -585,6 +585,7 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
->  	struct edma_desc *edesc;
->  	dma_addr_t src_addr, dst_addr;
->  	enum dma_slave_buswidth dev_width;
-> +	bool use_intermediate = false;
->  	u32 burst;
->  	int i, ret, nslots;
->  
-> @@ -626,8 +627,21 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
->  	 * but the synchronization is difficult to achieve with Cyclic and
->  	 * cannot be guaranteed, so we error out early.
->  	 */
-> -	if (nslots > MAX_NR_SG)
-> -		return NULL;
-> +	if (nslots > MAX_NR_SG) {
-> +		/*
-> +		 * If the burst and period sizes are the same, we can put
-> +		 * the full buffer into a single period and activate
-> +		 * intermediate interrupts. This will produce interrupts
-> +		 * after each burst, which is also after each desired period.
-> +		 */
-> +		if (burst == period_len) {
-> +			period_len = buf_len;
-> +			nslots = 2;
-> +			use_intermediate = true;
-> +		} else {
-> +			return NULL;
-> +		}
-> +	}
->  
->  	edesc = kzalloc(sizeof(*edesc) + nslots *
->  		sizeof(edesc->pset[0]), GFP_ATOMIC);
-> @@ -706,8 +720,13 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
->  		/*
->  		 * Enable period interrupt only if it is requested
->  		 */
-> -		if (tx_flags & DMA_PREP_INTERRUPT)
-> +		if (tx_flags & DMA_PREP_INTERRUPT) {
->  			edesc->pset[i].param.opt |= TCINTEN;
-> +
-> +			/* Also enable intermediate interrupts if necessary */
-> +			if (use_intermediate)
-> +				edesc->pset[i].param.opt |= ITCINTEN;
-> +		}
->  	}
+> (The important thing to note is that I do have control over the firmware.)
+> 
+> l2c_enable and l2c_disable will hand control over to the firmware,
+> which will handle the details of FLOZ:
+> 
+> When enabling the L2, firmware will:
+> A1) set L2CC_reg1_aux_control[0] to 1
+> A2) enable the L2
+> A3) set CP15_ACTLR bits 1,2,3 to 1
+> 
+> When disabling the L2, firmware will:
+> B1) clear CP15_ACTLR bits 1,2,3 to 0
+> B2) disable the L2
+> B3) clear L2CC_reg1_aux_control[0] to 0
+> 
+> Thus, on my platform, Linux would no longer need to write CP15_ACTLR.
+> 
+> Then I just need a platform-specific bool e.g. "firmware_handles_cp15_actlr"
+> and check it where appropriate:
+> 
+> In enable:
+> 	if (!firmware_handles_cp15_actlr && (aux & L310_AUX_CTRL_FULL_LINE_ZERO)) {
+> 		set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
+> 		cpu_notifier(l2c310_cpu_enable_flz, 0);
+> 	}
+> 
+> In disable:
+> 	if (!firmware_handles_cp15_actlr && (l2x0_saved_regs.aux_ctrl & L310_AUX_CTRL_FULL_LINE_ZERO))
+> 		set_auxcr(get_auxcr() & ~(BIT(3) | BIT(2) | BIT(1)));
+> 
+> 
+> What do you think?
 
-The workaround looks fine, but please rebase it on the latest edma code from
-linux-next.
+Come to think of it, instead of introducing this extra bool, I can
+just ask the firmware author to set NSACR.NS_SMP, which effectively
+turns the above set_auxcr() calls into NOPs. (And Rob noted that I'll
+need that bit set anyway.)
 
--- 
-P?ter
+That way, no changes are required in Linux, and everything magically
+works as expected. I'll file an internal bug report.
+
+One more question on this topic:
+
+When Linux sees L310_AUX_CTRL_FULL_LINE_ZERO set, it then enables:
+
+  bit3 = Write full line of zeros mode
+  bit2 = L1 Prefetch enable
+  bit1 = L2 Prefetch hint enable
+
+Why are the "prefetch enable" features bundled in the operation?
+
+Regards.
