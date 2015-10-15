@@ -1,397 +1,66 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Thu, 15 Oct 2015 11:49:34 -0400
-Subject: [PATCH 3/3] ARM: BCM: Add SMP support for Broadcom NSP
-In-Reply-To: <20151014224003.GO15160@broadcom.com>
-References: <1444844820-24290-1-git-send-email-kapilh@broadcom.com>
- <1444844820-24290-4-git-send-email-kapilh@broadcom.com>
- <561ED691.8080407@hauke-m.de> <20151014224003.GO15160@broadcom.com>
-Message-ID: <20151015154934.GD32089@broadcom.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 17:49:47 +0200
+Subject: [PATCH] VFIO: platform: AMD xgbe reset module
+In-Reply-To: <20151015150321.GA17484@cbox>
+References: <1444836792-2405-1-git-send-email-eric.auger@linaro.org>
+ <37917545.AP0MxbQBzK@wuerfel> <20151015150321.GA17484@cbox>
+Message-ID: <5029262.xDTo9hAOAF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 06:40:04PM -0400, Jon Mason wrote:
-> On Thu, Oct 15, 2015 at 12:26:25AM +0200, Hauke Mehrtens wrote:
-> > On 10/14/2015 07:47 PM, Kapil Hali wrote:
-> > > Add SMP support for Broadcom's Northstar Plus SoC,
-> > > cpu enable method and pen_release procedures. This
-> > > changes also consolidates iProc family's - BCM NSP
-> > > and BCM Kona, SMP handling in a common file.
-> > 
-> > This will probably also work on normal Northstar CPUs without changes.
-> 
-> I think all that needs to be changed is adding to
-> arch/arm/boot/dts/bcm4708.dts
-> 
-> +               enable-method = "brcm,bcm-nsp-smp";
-> +               secondary-boot-reg = <0xffff0400>;
-> 
-> But I have not been able to confirm that yet.
-
-I was able to confirm it on my BCM94708 SVK.  I'll send out the patch
-which enables it shortly.
-
-Thanks,
-Jon
-
-> 
-> Thanks,
-> Jon
-> 
-> > 
-> > > Northstar Plus SoC is based on ARM Cortex-A9
-> > > revision r3p0 which requires configuration for ARM
-> > > Errata 764369 for SMP. This change adds the needed
-> > > configuration option.
+On Thursday 15 October 2015 17:03:21 Christoffer Dall wrote:
+> On Thu, Oct 15, 2015 at 04:55:13PM +0200, Arnd Bergmann wrote:
+> > On Thursday 15 October 2015 16:46:09 Eric Auger wrote:
+> > > > 
+> > > > This is where we'd need a little more changes for this approach. Instead
+> > > > of unbinding the device from its driver, the idea would be that the
+> > > > driver remains bound as far as the driver model is concerned, but
+> > > > it would be in a quiescent state where no other subsystem interacts with
+> > > > it (i.e. it gets unregistered from networking core or whichever it uses).
 > > > 
-> > > Signed-off-by: Kapil Hali <kapilh@broadcom.com>
-> > > ---
-> > >  arch/arm/mach-bcm/Kconfig                   |   2 +
-> > >  arch/arm/mach-bcm/Makefile                  |   8 +-
-> > >  arch/arm/mach-bcm/bcm_nsp.h                 |  19 ++++
-> > >  arch/arm/mach-bcm/headsmp.S                 |  37 ++++++++
-> > >  arch/arm/mach-bcm/{kona_smp.c => platsmp.c} | 142 ++++++++++++++++++++++++++--
-> > >  5 files changed, 197 insertions(+), 11 deletions(-)
-> > >  create mode 100644 arch/arm/mach-bcm/bcm_nsp.h
-> > >  create mode 100644 arch/arm/mach-bcm/headsmp.S
-> > >  rename arch/arm/mach-bcm/{kona_smp.c => platsmp.c} (63%)
-> > > 
-> > > diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> > > index 1679fa4..2e9dbb5 100644
-> > > --- a/arch/arm/mach-bcm/Kconfig
-> > > +++ b/arch/arm/mach-bcm/Kconfig
-> > > @@ -40,6 +40,8 @@ config ARCH_BCM_NSP
-> > >  	select ARCH_BCM_IPROC
-> > >  	select ARM_ERRATA_754322
-> > >  	select ARM_ERRATA_775420
-> > > +	select ARM_ERRATA_764369 if SMP
-> > > +	select HAVE_SMP
-> > >  	help
-> > >  	  Support for Broadcom Northstar Plus SoC.
-> > >  	  Broadcom Northstar Plus family of SoCs are used for switching control
-> > > diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-> > > index 892261f..36a4ca30 100644
-> > > --- a/arch/arm/mach-bcm/Makefile
-> > > +++ b/arch/arm/mach-bcm/Makefile
-> > > @@ -14,7 +14,11 @@
-> > >  obj-$(CONFIG_ARCH_BCM_CYGNUS) +=  bcm_cygnus.o
-> > >  
-> > >  # Northstar Plus
-> > > -obj-$(CONFIG_ARCH_BCM_NSP) += bcm_nsp.o
-> > > +obj-$(CONFIG_ARCH_BCM_NSP)	+= bcm_nsp.o
-> > > +
-> > > +ifeq ($(CONFIG_ARCH_BCM_NSP),y)
-> > > +obj-$(CONFIG_SMP)		+= headsmp.o platsmp.o
-> > > +endif
-> > >  
-> > >  # BCM281XX
-> > >  obj-$(CONFIG_ARCH_BCM_281XX)	+= board_bcm281xx.o
-> > > @@ -23,7 +27,7 @@ obj-$(CONFIG_ARCH_BCM_281XX)	+= board_bcm281xx.o
-> > >  obj-$(CONFIG_ARCH_BCM_21664)	+= board_bcm21664.o
-> > >  
-> > >  # BCM281XX and BCM21664 SMP support
-> > > -obj-$(CONFIG_ARCH_BCM_MOBILE_SMP) += kona_smp.o
-> > > +obj-$(CONFIG_ARCH_BCM_MOBILE_SMP) += platsmp.o
-> > >  
-> > >  # BCM281XX and BCM21664 L2 cache control
-> > >  obj-$(CONFIG_ARCH_BCM_MOBILE_L2_CACHE) += kona_l2_cache.o
-> > > diff --git a/arch/arm/mach-bcm/bcm_nsp.h b/arch/arm/mach-bcm/bcm_nsp.h
-> > > new file mode 100644
-> > > index 0000000..58e1e80
-> > > --- /dev/null
-> > > +++ b/arch/arm/mach-bcm/bcm_nsp.h
-> > > @@ -0,0 +1,19 @@
-> > > +/*
-> > > + * Copyright (C) 2015 Broadcom Corporation
-> > > + *
-> > > + * This program is free software; you can redistribute it and/or
-> > > + * modify it under the terms of the GNU General Public License as
-> > > + * published by the Free Software Foundation version 2.
-> > > + *
-> > > + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> > > + * kind, whether express or implied; without even the implied warranty
-> > > + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > > + * GNU General Public License for more details.
-> > > + */
-> > > +
-> > > +#ifndef __BCM_NSP_H
-> > > +#define __BCM_NSP_H
-> > > +
-> > > +extern void nsp_secondary_startup(void);
-> > > +
-> > > +#endif /* __BCM_NSP_H */
-> > > diff --git a/arch/arm/mach-bcm/headsmp.S b/arch/arm/mach-bcm/headsmp.S
-> > > new file mode 100644
-> > > index 0000000..0da13b2
-> > > --- /dev/null
-> > > +++ b/arch/arm/mach-bcm/headsmp.S
-> > > @@ -0,0 +1,37 @@
-> > > +/*
-> > > + * Copyright (C) 2015 Broadcom Corporation
-> > > + *
-> > > + * This program is free software; you can redistribute it and/or
-> > > + * modify it under the terms of the GNU General Public License as
-> > > + * published by the Free Software Foundation version 2.
-> > > + *
-> > > + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> > > + * kind, whether express or implied; without even the implied warranty
-> > > + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > > + * GNU General Public License for more details.
-> > > + */
-> > > +
-> > > +#include <linux/linkage.h>
-> > > +
-> > > +/*
-> > > + * iProc specific entry point for secondary CPUs.  This provides
-> > > + * a "holding pen" into which all secondary cores are held until
-> > > + * we are ready for them to initialise.
-> > > + */
-> > > +ENTRY(nsp_secondary_startup)
-> > > +	mrc     p15, 0, r0, c0, c0, 5
-> > > +	and     r0, r0, #15
-> > > +	adr     r4, 1f
-> > > +	ldmia   r4, {r5, r6}
-> > > +	sub     r4, r4, r5
-> > > +	add     r6, r6, r4
-> > > +pen:	ldr     r7, [r6]
-> > > +	cmp     r7, r0
-> > > +	bne     pen
-> > > +
-> > > +	b    secondary_startup
-> > > +
-> > > +1:	.long   .
-> > > +	.long   pen_release
-> > > +
-> > > +ENDPROC(nsp_secondary_startup)
-> > > diff --git a/arch/arm/mach-bcm/kona_smp.c b/arch/arm/mach-bcm/platsmp.c
-> > > similarity index 63%
-> > > rename from arch/arm/mach-bcm/kona_smp.c
-> > > rename to arch/arm/mach-bcm/platsmp.c
-> > > index 66a0465..619030e 100644
-> > > --- a/arch/arm/mach-bcm/kona_smp.c
-> > > +++ b/arch/arm/mach-bcm/platsmp.c
-> > > @@ -1,5 +1,5 @@
-> > >  /*
-> > > - * Copyright (C) 2014 Broadcom Corporation
-> > > + * Copyright (C) 2014-2015 Broadcom Corporation
-> > >   * Copyright 2014 Linaro Limited
-> > >   *
-> > >   * This program is free software; you can redistribute it and/or
-> > > @@ -12,16 +12,23 @@
-> > >   * GNU General Public License for more details.
-> > >   */
-> > >  
-> > > -#include <linux/init.h>
-> > > +#include <linux/cpumask.h>
-> > > +#include <linux/delay.h>
-> > >  #include <linux/errno.h>
-> > > +#include <linux/init.h>
-> > >  #include <linux/io.h>
-> > > +#include <linux/jiffies.h>
-> > >  #include <linux/of.h>
-> > >  #include <linux/sched.h>
-> > > +#include <linux/smp.h>
-> > >  
-> > > +#include <asm/cacheflush.h>
-> > >  #include <asm/smp.h>
-> > >  #include <asm/smp_plat.h>
-> > >  #include <asm/smp_scu.h>
-> > >  
-> > > +#include "bcm_nsp.h"
-> > > +
-> > >  /* Size of mapped Cortex A9 SCU address space */
-> > >  #define CORTEX_A9_SCU_SIZE	0x58
-> > >  
-> > > @@ -34,6 +41,24 @@
-> > >  /* I/O address of register used to coordinate secondary core startup */
-> > >  static u32	secondary_boot;
-> > >  
-> > > +static DEFINE_SPINLOCK(boot_lock);
-> > > +
-> > > +/*
-> > > + * Write pen_release in a way that is guaranteed to be visible to all
-> > > + * observers, irrespective of whether they're taking part in coherency
-> > > + * or not.  This is necessary for the hotplug code to work reliably.
-> > > + */
-> > > +static void write_pen_release(int val)
-> > > +{
-> > > +	pen_release = val;
-> > > +	/*
-> > > +	 * Ensure write to pen_release is visible to the other cores,
-> > > +	 * here - primary core
-> > > +	 */
-> > > +	smp_wmb();
-> > > +	sync_cache_w(&pen_release);
-> > > +}
-> > > +
-> > >  /*
-> > >   * Enable the Cortex A9 Snoop Control Unit
-> > >   *
-> > > @@ -75,6 +100,51 @@ static int __init scu_a9_enable(void)
-> > >  	return 0;
-> > >  }
-> > >  
-> > > +static int nsp_write_lut(void (*secondary_startup) (void))
-> > > +{
-> > > +	void __iomem *sku_rom_lut;
-> > > +	phys_addr_t secondary_startup_phy;
-> > > +
-> > > +	if (!secondary_boot) {
-> > > +		pr_warn("required secondary boot register not specified\n");
-> > > +		return -EINVAL;
-> > > +	}
-> > > +
-> > > +	sku_rom_lut = ioremap_nocache((phys_addr_t)secondary_boot,
-> > > +						sizeof(secondary_boot));
-> > > +	if (!sku_rom_lut) {
-> > > +		pr_warn("unable to ioremap SKU-ROM LUT register\n");
-> > > +		return -ENOMEM;
-> > > +	}
-> > > +
-> > > +	secondary_startup_phy = virt_to_phys(secondary_startup);
-> > > +	BUG_ON(secondary_startup_phy > (phys_addr_t)U32_MAX);
-> > > +
-> > > +	writel_relaxed(secondary_startup_phy, sku_rom_lut);
-> > > +	/*
-> > > +	 * Ensure the write is visible to the secondary core.
-> > > +	 */
-> > > +	smp_wmb();
-> > > +
-> > > +	iounmap(sku_rom_lut);
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +
-> > > +static void nsp_secondary_init(unsigned int cpu)
-> > > +{
-> > > +	/*
-> > > +	 * Let the primary cpu know we are out of holding pen.
-> > > +	 */
-> > > +	write_pen_release(-1);
-> > > +
-> > > +	/*
-> > > +	 * Synchronise with the boot thread.
-> > > +	 */
-> > > +	spin_lock(&boot_lock);
-> > > +	spin_unlock(&boot_lock);
-> > > +}
-> > > +
-> > >  static void __init bcm_smp_prepare_cpus(unsigned int max_cpus)
-> > >  {
-> > >  	static cpumask_t only_cpu_0 = { CPU_BITS_CPU0 };
-> > > @@ -95,11 +165,11 @@ static void __init bcm_smp_prepare_cpus(unsigned int max_cpus)
-> > >  	/*
-> > >  	 * Our secondary enable method requires a "secondary-boot-reg"
-> > >  	 * property to specify a register address used to request the
-> > > -	 * ROM code boot a secondary code.  If we have any trouble
-> > > +	 * ROM code boot a secondary core.  If we have any trouble
-> > >  	 * getting this we fall back to uniprocessor mode.
-> > >  	 */
-> > >  	if (of_property_read_u32(node, OF_SECONDARY_BOOT, &secondary_boot)) {
-> > > -		pr_err("%s: missing/invalid " OF_SECONDARY_BOOT " property\n",
-> > > +		pr_warn("%s: missing/invalid " OF_SECONDARY_BOOT " property\n",
-> > >  			node->name);
-> > >  		ret = -ENOENT;		/* Arrange to disable SMP */
-> > >  		goto out;
-> > > @@ -115,7 +185,6 @@ out:
-> > >  	of_node_put(node);
-> > >  	if (ret) {
-> > >  		/* Update the CPU present map to reflect uniprocessor mode */
-> > > -		BUG_ON(ret != -ENOENT);
-> > >  		pr_warn("disabling SMP\n");
-> > >  		init_cpu_present(&only_cpu_0);
-> > >  	}
-> > > @@ -139,7 +208,7 @@ out:
-> > >   * - Wait for the secondary boot register to be re-written, which
-> > >   *   indicates the secondary core has started.
-> > >   */
-> > > -static int bcm_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> > > +static int kona_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> > >  {
-> > >  	void __iomem *boot_reg;
-> > >  	phys_addr_t boot_func;
-> > > @@ -162,7 +231,7 @@ static int bcm_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> > >  	boot_reg = ioremap_nocache((phys_addr_t)secondary_boot, sizeof(u32));
-> > >  	if (!boot_reg) {
-> > >  		pr_err("unable to map boot register for cpu %u\n", cpu_id);
-> > > -		return -ENOSYS;
-> > > +		return -ENOMEM;
-> > >  	}
-> > >  
-> > >  	/*
-> > > @@ -191,12 +260,67 @@ static int bcm_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> > >  
-> > >  	pr_err("timeout waiting for cpu %u to start\n", cpu_id);
-> > >  
-> > > -	return -ENOSYS;
-> > > +	return -ENXIO;
-> > > +}
-> > > +
-> > > +static int nsp_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> > > +{
-> > > +	unsigned long timeout;
-> > > +	int ret;
-> > > +
-> > > +	/*
-> > > +	 * After wake up, secondary core branches to the startup
-> > > +	 * address programmed at SKU ROM LUT location.
-> > > +	 */
-> > > +	ret = nsp_write_lut(nsp_secondary_startup);
-> > > +	if (ret) {
-> > > +		pr_err("unable to write startup addr to SKU ROM LUT\n");
-> > > +		goto out;
-> > > +	}
-> > > +
-> > > +	/*
-> > > +	 * The secondary processor is waiting to be released from
-> > > +	 * the holding pen - release it, then wait for it to flag
-> > > +	 * that it has been released by resetting pen_release.
-> > > +	 */
-> > > +	spin_lock(&boot_lock);
-> > > +
-> > > +	write_pen_release(cpu_logical_map(cpu));
-> > > +	/*
-> > > +	 * Send an Event to wake up the secondary core which is in
-> > > +	 * WFE state. Updated pen_release should also be visible to
-> > > +	 * the secondary core.
-> > > +	 */
-> > > +	dsb_sev();
-> > > +
-> > > +	timeout = jiffies + (1 * HZ);
-> > > +	while (time_before(jiffies, timeout)) {
-> > > +		/* Make sure loads on other CPU is visible */
-> > > +		smp_rmb();
-> > > +		if (pen_release == -1)
-> > > +			break;
-> > > +
-> > > +		udelay(10);
-> > > +	}
-> > > +
-> > > +	spin_unlock(&boot_lock);
+> > > Currently we use the same mechanism as for PCI, ie. unbind the native
+> > > driver and then bind VFIO platform driver in its place. Don't you think
+> > > changing this may be a pain for user-space tools that are designed to
+> > > work that way for PCI?
+> > >
+> > > My personal preference would be to start with your first proposal since
+> > > it looks (to me) less complex and "unknown" that the 2d approach.
 > > 
-> > Why is this boot_lock needed? As far as I understand it asserts that
-> > both CPUs leave nsp_boot_secondary() and nsp_secondary_init() at the
-> > same time.
+> > We certainly can't easily change from one approach to the other without
+> > breaking user expectations, so the decision needs to be made carefully.
 > > 
-> > > +
-> > > +	ret = pen_release != -1 ? -ENXIO : 0;
-> > > +
-> > > +out:
-> > > +	return ret;
-> > >  }
-> > >  
-> > >  static struct smp_operations bcm_smp_ops __initdata = {
-> > >  	.smp_prepare_cpus	= bcm_smp_prepare_cpus,
-> > > -	.smp_boot_secondary	= bcm_boot_secondary,
-> > > +	.smp_boot_secondary	= kona_boot_secondary,
-> > >  };
-> > >  CPU_METHOD_OF_DECLARE(bcm_smp_bcm281xx, "brcm,bcm11351-cpu-method",
-> > >  			&bcm_smp_ops);
-> > > +
-> > > +struct smp_operations nsp_smp_ops __initdata = {
-> > > +	.smp_prepare_cpus	= bcm_smp_prepare_cpus,
-> > > +	.smp_secondary_init	= nsp_secondary_init,
-> > > +	.smp_boot_secondary	= nsp_boot_secondary,
-> > > +};
-> > > +CPU_METHOD_OF_DECLARE(bcm_smp_nsp, "brcm,bcm-nsp-smp", &nsp_smp_ops);
-> > > 
+> > The main observation here is that platform devices are unlike PCI in this
+> > regard because they need extra per-device code. I have argued in the
+> > past that we should not reuse the "VFIO" name here because it's actually
+> > something else.  
+> 
+> I've adjusted to consider VFIO a general purpose framework for mapping
+> device resources into userspace/VMs, and there are certainly a lot of
+> commonality with both PCI, platform, and potentially other devices for
+> that to make sense.
+> 
+> 
+> > On the other hand, there are a lot of commonalities,
+> > we just have to make sure we don't try to force the code into one model
+> > that doesn't really work just to make it look more like PCI VFIO.
 > > 
+> 
+> But given that we now have code for platform device passthrough that
+> works in both QEMU and the kernel side and is actually useful for
+> people, is there a clear technical advantage to go back and rework thaat
+> at this point?
+> 
+> Don't get me wrong, I like the idea of having a single driver bound to a
+> platform device, and then that's it, but it just feels like that
+> discussion doesn't necessarily belong in the context of a patch that
+> 'just' seeks to add reset functionality for a specific device for VFIO?
+
+Ah, this is for qemu/kvm? If there is already upstream qemu code that
+finds it easier to use this approach, it's certainly more logical to
+deal with it in my first approach than the second.
+
+I was thinking of ODP as the primary user, and that wouldn't need
+the interface to be consistent with PCI as much, because the code
+is inherently device specific there anyway.
+
+	Arnd
