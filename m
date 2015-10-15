@@ -1,74 +1,145 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Oct 2015 16:39:25 +0100
-Subject: [PATCH RFC 4/7] genirq/msi: Make the .prepare callback reusable
-In-Reply-To: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
-References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1444923568-17413-5-git-send-email-marc.zyngier@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Oct 2015 16:41:26 +0100
+Subject: [PATCH v5 2/2] arm: perf: Add event descriptions
+In-Reply-To: <20151015152915.GH29301@arm.com>
+References: <20151007182735.GA18706@dreric01-gentoo.localdomain>
+ <20151009101338.GH26278@arm.com>
+ <20151009165330.GA22415@dreric01-gentoo.localdomain>
+ <20151012143025.GG16124@arm.com>
+ <20151012181037.GA16013@dreric01-gentoo.localdomain>
+ <20151013153644.GC18121@dreric01-gentoo.localdomain>
+ <20151015132111.GD29301@arm.com>
+ <20151015151506.GC18965@dreric01-gentoo.localdomain>
+ <20151015152915.GH29301@arm.com>
+Message-ID: <20151015154126.GL8825@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The .prepare callbacks are so far only called from msi_domain_alloc_irqs.
-In order to reuse that code, split that code and create a
-msi_domain_prepare_irqs function that the existing code can call into.
+On Thu, Oct 15, 2015 at 04:29:15PM +0100, Will Deacon wrote:
+> On Thu, Oct 15, 2015 at 08:15:06AM -0700, Drew Richardson wrote:
+> > On Thu, Oct 15, 2015 at 02:21:12PM +0100, Will Deacon wrote:
+> > > On Tue, Oct 13, 2015 at 08:36:45AM -0700, Drew Richardson wrote:
+> > > > Add additional information about the ARM architected hardware events
+> > > > to make counters self describing. This makes the hardware PMUs easier
+> > > > to use as perf list contains possible events instead of users having
+> > > > to refer to documentation like the ARM TRMs.
+> > > > 
+> > > > Signed-off-by: Drew Richardson <drew.richardson@arm.com>
+> > > > ---
+> > > >  arch/arm/kernel/perf_event_v7.c | 121 ++++++++++++++++++++++++++++++++++++++++
+> > > >  drivers/perf/arm_pmu.c          |   1 +
+> > > >  2 files changed, 122 insertions(+)
+> > > 
+> > > [...]
+> > > 
+> > > > diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> > > > index 2365a32a595e..e933d2dd71c0 100644
+> > > > --- a/drivers/perf/arm_pmu.c
+> > > > +++ b/drivers/perf/arm_pmu.c
+> > > > @@ -548,6 +548,7 @@ static void armpmu_init(struct arm_pmu *armpmu)
+> > > >  		.stop		= armpmu_stop,
+> > > >  		.read		= armpmu_read,
+> > > >  		.filter_match	= armpmu_filter_match,
+> > > > +		.attr_groups	= armpmu->pmu.attr_groups,
+> > > 
+> > > I don't understand this hunk. What's it doing?
+> > 
+> > I'm not 100% clear either on what it's doing. But without this line
+> > the attr_groups don't get passed on and I don't see them on my TC2. I
+> > debugged the issue down to this but it may not be the proper way to
+> > solve the problem.
+> 
+> Oh yuck, it's because we call armpmu_init after cpu_pmu_init and the former
+> uses struct initialisation and ends up zeroing anything set previously.
+> 
+> We should probably tidy all this up:
+> 
+>   * Remove armpmu_register and call perf_pmu_register directly from
+>     arm_pmu_device_probe instead
+> 
+>   * Call armpmu_init immediately prior to arm_cpu_init
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Assuming you mean cpu_pmu_init, how about the below?
+
+Thanks,
+Mark.
+
+---->8----
+>From f8a99a406f3dd7a272a6dee4a551436fea851f38 Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Thu, 15 Oct 2015 16:32:17 +0100
+Subject: [PATCH] drivers/perf: kill armpmu_register
+
+Nothing outside of drivers/perf/arm_pmu.c should call armpmu_register
+any more, so it no longer needs to be in include/linux/perf/arm_pmu.h.
+Additionally, by folding it in to arm_pmu_device_probe we can allow
+drivers to override struct pmu fields without getting blatted by the
+armpmu code.
+
+This patch folds armpmu_register into arm_pmu_device_probe. The logging
+to the console is moved to after the PMU is successfully registered with
+the core perf code.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Suggested-by: Will Deacon <will.deacon@arm.com>
+Cc: Drew Richardson <drew.richardson@arm.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
 ---
- include/linux/msi.h |  4 ++++
- kernel/irq/msi.c    | 20 +++++++++++++++++---
- 2 files changed, 21 insertions(+), 3 deletions(-)
+ drivers/perf/arm_pmu.c       | 14 +++++---------
+ include/linux/perf/arm_pmu.h |  2 --
+ 2 files changed, 5 insertions(+), 11 deletions(-)
 
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 32a24b9..5bb36a9 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -277,6 +277,10 @@ struct irq_domain *platform_msi_create_irq_domain(struct fwnode_handle *fwnode,
- int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
- 				   irq_write_msi_msg_t write_msi_msg);
- void platform_msi_domain_free_irqs(struct device *dev);
-+
-+/* When an MSI domain is used as an intermediate domain */
-+int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
-+			    int nvec, msi_alloc_info_t *args);
- #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
- 
- #ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
-diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-index 95354bb..8e6e112 100644
---- a/kernel/irq/msi.c
-+++ b/kernel/irq/msi.c
-@@ -256,6 +256,22 @@ struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
- 					   &msi_domain_ops, info);
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index f346960..15463cb 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -583,14 +583,6 @@ static void armpmu_init(struct arm_pmu *armpmu)
+ 	};
  }
  
-+int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
-+			    int nvec, msi_alloc_info_t *arg)
-+{
-+	struct msi_domain_info *info = domain->host_data;
-+	struct msi_domain_ops *ops = info->ops;
-+	int ret;
-+
-+	ret = ops->msi_check(domain, info, dev);
-+	if (ret == 0)
-+		ret = ops->msi_prepare(domain, dev, nvec, arg);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+
- /**
-  * msi_domain_alloc_irqs - Allocate interrupts from a MSI interrupt domain
-  * @domain:	The domain to allocate from
-@@ -274,9 +290,7 @@ int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
- 	struct msi_desc *desc;
- 	int i, ret, virq = -1;
+-int armpmu_register(struct arm_pmu *armpmu, int type)
+-{
+-	armpmu_init(armpmu);
+-	pr_info("enabled with %s PMU driver, %d counters available\n",
+-			armpmu->name, armpmu->num_events);
+-	return perf_pmu_register(&armpmu->pmu, armpmu->name, type);
+-}
+-
+ /* Set at runtime when we know what CPU type we are. */
+ static struct arm_pmu *__oprofile_cpu_pmu;
  
--	ret = ops->msi_check(domain, info, dev);
--	if (ret == 0)
--		ret = ops->msi_prepare(domain, dev, nvec, &arg);
-+	ret = msi_domain_prepare_irqs(domain, dev, nvec, &arg);
+@@ -934,14 +926,18 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 		goto out_free;
+ 	}
+ 
++	armpmu_init(pmu);
+ 	ret = cpu_pmu_init(pmu);
  	if (ret)
- 		return ret;
+ 		goto out_free;
  
+-	ret = armpmu_register(pmu, -1);
++	ret = perf_pmu_register(&pmu->pmu, pmu->name, -1);
+ 	if (ret)
+ 		goto out_destroy;
+ 
++	pr_info("enabled with %s PMU driver, %d counters available\n",
++			pmu->name, pmu->num_events);
++
+ 	return 0;
+ 
+ out_destroy:
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index bfa673b..83b5e34 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -111,8 +111,6 @@ struct arm_pmu {
+ 
+ #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
+ 
+-int armpmu_register(struct arm_pmu *armpmu, int type);
+-
+ u64 armpmu_event_update(struct perf_event *event);
+ 
+ int armpmu_event_set_period(struct perf_event *event);
 -- 
-2.1.4
+1.9.1
