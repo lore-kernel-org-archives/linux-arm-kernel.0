@@ -1,261 +1,73 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Thu, 15 Oct 2015 18:25:43 +0200
-Subject: [PATCH v3 2/5] mmc: sdhci-pxav3: enable usage of DAT3 pin as HW card
- detect
+Date: Thu, 15 Oct 2015 18:25:46 +0200
+Subject: [PATCH v3 5/5] mmc: sdhci-pxav3: enable modifying MMC_CARD bit during
+ card initialization
 In-Reply-To: <1444926346-29763-1-git-send-email-mw@semihalf.com>
 References: <1444926346-29763-1-git-send-email-mw@semihalf.com>
-Message-ID: <1444926346-29763-3-git-send-email-mw@semihalf.com>
+Message-ID: <1444926346-29763-6-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell Armada 38x SDHCI controller enable using DAT3 pin as a hardware
-card detection. According to the SD sdandard this signal can be used for
-this purpose combined with a pull-down resistor, implying inverted (active
-high) polarization of a card detect. MMC standard does not support this
-feature and does not operate with such connectivity of DAT3.
+On Marvell Armada 38x SoC's the MMC_CARD bit in SD_CE_ATA_1 register must
+be set to 0x1 when a MMC card is supposed to work in DDR mode, or when
+commands CMD11, CMD14 and CMD20 are used.
 
-When using DAT3-based detection Armada 38x SDIO IP expects its internal
-clock to be always on, which had to be ensured by:
-- Udating appropriate registers, each time controller is reset. On the
-  occasion of adding new register @0x104, register @0x100 name is modified
-  in order to the be aligned with Armada 38x documentation.
-- Leaving the clock enabled despite power-down. For this purpose a wrapper
-  for sdhci_set_clock function is added.
-- Disabling pm_runtime - during suspend both io_clock and controller's
-  bus power is switched off, hence it would prevent proper card detection.
-
-In addition to the changes above this commit adds a new property to Armada
-38x SDHCI node ('dat3-cd') with an according binding documentation update.
-'sdhci_pxa' structure is also extended with dedicated flag for checking if
-DAT3-based detection is in use.
+This commit enables the above for all MMC cards by modifying the host
+registers during card initialization. It is done by using init_card()
+callback with pxa->mbus_win_regs as a flag, which notifies if Armada 38x
+controller is in use.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 ---
- .../devicetree/bindings/mmc/sdhci-pxa.txt          |   5 ++
- drivers/mmc/host/sdhci-pxav3.c                     | 100 +++++++++++++++++----
- 2 files changed, 87 insertions(+), 18 deletions(-)
+ drivers/mmc/host/sdhci-pxav3.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-index 3d1b449..ffd6b14 100644
---- a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-+++ b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-@@ -23,6 +23,11 @@ Required properties:
- 
- Optional properties:
- - mrvl,clk-delay-cycles: Specify a number of cycles to delay for tuning.
-+- dat3-cd: use DAT3 pin as hardware card detect - option available for
-+  "marvell,armada-380-sdhci" only. The detection is supposed to work with
-+  active high polarity, which implies usage of "cd-inverted" property.
-+  Note that according to the specifications DAT3-based card detection can be
-+  used with SD cards only. MMC standard doesn't support this feature.
- 
- Example:
- 
 diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-index 54a253c0..d813233 100644
+index d813233..8742afd 100644
 --- a/drivers/mmc/host/sdhci-pxav3.c
 +++ b/drivers/mmc/host/sdhci-pxav3.c
-@@ -46,10 +46,14 @@
- #define SDCLK_DELAY_SHIFT	9
- #define SDCLK_DELAY_MASK	0x1f
- 
--#define SD_CFG_FIFO_PARAM       0x100
-+#define SD_EXTRA_PARAM_REG	0x100
- #define SDCFG_GEN_PAD_CLK_ON	(1<<6)
- #define SDCFG_GEN_PAD_CLK_CNT_MASK	0xFF
- #define SDCFG_GEN_PAD_CLK_CNT_SHIFT	24
-+#define SD_FIFO_PARAM_REG	0x104
-+#define SD_USE_DAT3		BIT(7)
-+#define SD_OVRRD_CLK_OEN	BIT(11)
-+#define SD_FORCE_CLK_ON		BIT(12)
+@@ -57,6 +57,7 @@
  
  #define SD_SPI_MODE          0x108
  #define SD_CE_ATA_1          0x10C
-@@ -64,6 +68,7 @@ struct sdhci_pxa {
- 	u8	power_mode;
- 	void __iomem *sdio3_conf_reg;
- 	void __iomem *mbus_win_regs;
-+	bool dat3_cd_enabled;
- };
++#define SDCE_MMC_CARD		BIT(28)
  
- /*
-@@ -160,13 +165,36 @@ static int armada_38x_quirks(struct platform_device *pdev,
+ #define SD_CE_ATA_2          0x10E
+ #define SDCE_MISC_INT		(1<<2)
+@@ -230,6 +231,26 @@ static void pxav3_reset(struct sdhci_host *host, u8 mask)
  	}
- 	host->caps1 &= ~(SDHCI_SUPPORT_SDR104 | SDHCI_USE_SDR50_TUNING);
- 
-+	if (of_property_read_bool(np, "dat3-cd") &&
-+	    !of_property_read_bool(np, "broken-cd"))
-+		pxa->dat3_cd_enabled = true;
-+
- 	return 0;
  }
  
-+static void pxav3_set_clock(struct sdhci_host *host, unsigned int clock)
++static void pxav3_init_card(struct sdhci_host *host, struct mmc_card *card)
 +{
 +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 +	struct sdhci_pxa *pxa = pltfm_host->priv;
-+
-+	sdhci_set_clock(host, clock);
++	u32 reg_val;
 +
 +	/*
-+	 * The interface clock enable is also used as control
-+	 * for the A38x SDIO IP, so it can't be powered down
-+	 * when using HW-based card detection.
++	 * Armada 38x SDHCI controller requires update of
++	 * MMC_CARD bit depending on inserted card type.
 +	 */
-+	if (clock == 0 && pxa->dat3_cd_enabled)
-+		sdhci_writew(host, SDHCI_CLOCK_INT_EN, SDHCI_CLOCK_CONTROL);
++	if (pxa->mbus_win_regs) {
++		reg_val = sdhci_readl(host, SD_CE_ATA_1);
++		if (mmc_card_mmc(card))
++			reg_val |= SDCE_MMC_CARD;
++		else
++			reg_val &= ~SDCE_MMC_CARD;
++		sdhci_writel(host, reg_val, SD_CE_ATA_1);
++	}
 +}
 +
- static void pxav3_reset(struct sdhci_host *host, u8 mask)
+ #define MAX_WAIT_COUNT 5
+ static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
  {
- 	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
- 	struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_pxa *pxa = pltfm_host->priv;
-+	u32 reg_val;
- 
- 	sdhci_reset(host, mask);
- 
-@@ -184,6 +212,21 @@ static void pxav3_reset(struct sdhci_host *host, u8 mask)
- 			tmp |= SDCLK_SEL;
- 			writew(tmp, host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
- 		}
-+
-+		if (pxa->dat3_cd_enabled) {
-+			reg_val = sdhci_readl(host, SD_FIFO_PARAM_REG);
-+			reg_val |= SD_USE_DAT3 | SD_OVRRD_CLK_OEN |
-+				   SD_FORCE_CLK_ON;
-+			sdhci_writel(host, reg_val, SD_FIFO_PARAM_REG);
-+
-+			/*
-+			 * For HW detection based on DAT3 pin keep internal
-+			 * clk switched on after controller reset.
-+			 */
-+			reg_val = sdhci_readl(host, SDHCI_CLOCK_CONTROL);
-+			reg_val |= SDHCI_CLOCK_INT_EN;
-+			sdhci_writel(host, reg_val, SDHCI_CLOCK_CONTROL);
-+		}
- 	}
- }
- 
-@@ -211,9 +254,9 @@ static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
- 		writew(tmp, host->ioaddr + SD_CE_ATA_2);
- 
- 		/* start sending the 74 clocks */
--		tmp = readw(host->ioaddr + SD_CFG_FIFO_PARAM);
-+		tmp = readw(host->ioaddr + SD_EXTRA_PARAM_REG);
- 		tmp |= SDCFG_GEN_PAD_CLK_ON;
--		writew(tmp, host->ioaddr + SD_CFG_FIFO_PARAM);
-+		writew(tmp, host->ioaddr + SD_EXTRA_PARAM_REG);
- 
- 		/* slowest speed is about 100KHz or 10usec per clock */
- 		udelay(740);
-@@ -298,7 +341,7 @@ static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
- }
- 
- static const struct sdhci_ops pxav3_sdhci_ops = {
--	.set_clock = sdhci_set_clock,
-+	.set_clock = pxav3_set_clock,
- 	.platform_send_init_74_clocks = pxav3_gen_init_74_clocks,
- 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+@@ -347,6 +368,7 @@ static const struct sdhci_ops pxav3_sdhci_ops = {
  	.set_bus_width = sdhci_set_bus_width,
-@@ -407,6 +450,7 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
- 		sdhci_get_of_property(pdev);
- 		pdata = pxav3_get_mmc_pdata(dev);
- 		pdev->dev.platform_data = pdata;
-+
- 	} else if (pdata) {
- 		/* on-chip device */
- 		if (pdata->flags & PXA_FLAG_CARD_PERMANENT)
-@@ -438,12 +482,15 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
- 		}
- 	}
+ 	.reset = pxav3_reset,
+ 	.set_uhs_signaling = pxav3_set_uhs_signaling,
++	.init_card = pxav3_init_card,
+ };
  
--	pm_runtime_get_noresume(&pdev->dev);
--	pm_runtime_set_active(&pdev->dev);
--	pm_runtime_set_autosuspend_delay(&pdev->dev, PXAV3_RPM_DELAY_MS);
--	pm_runtime_use_autosuspend(&pdev->dev);
--	pm_runtime_enable(&pdev->dev);
--	pm_suspend_ignore_children(&pdev->dev, 1);
-+	if (!pxa->dat3_cd_enabled) {
-+		pm_runtime_get_noresume(&pdev->dev);
-+		pm_runtime_set_active(&pdev->dev);
-+		pm_runtime_set_autosuspend_delay(&pdev->dev,
-+						 PXAV3_RPM_DELAY_MS);
-+		pm_runtime_use_autosuspend(&pdev->dev);
-+		pm_runtime_enable(&pdev->dev);
-+		pm_suspend_ignore_children(&pdev->dev, 1);
-+	}
- 
- 	ret = sdhci_add_host(host);
- 	if (ret) {
-@@ -456,13 +503,16 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
- 	if (host->mmc->pm_caps & MMC_PM_WAKE_SDIO_IRQ)
- 		device_init_wakeup(&pdev->dev, 1);
- 
--	pm_runtime_put_autosuspend(&pdev->dev);
-+	if (!pxa->dat3_cd_enabled)
-+		pm_runtime_put_autosuspend(&pdev->dev);
- 
- 	return 0;
- 
- err_add_host:
--	pm_runtime_disable(&pdev->dev);
--	pm_runtime_put_noidle(&pdev->dev);
-+	if (!pxa->dat3_cd_enabled) {
-+		pm_runtime_disable(&pdev->dev);
-+		pm_runtime_put_noidle(&pdev->dev);
-+	}
- err_of_parse:
- err_cd_req:
- err_mbus_win:
-@@ -479,9 +529,11 @@ static int sdhci_pxav3_remove(struct platform_device *pdev)
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
- 	struct sdhci_pxa *pxa = pltfm_host->priv;
- 
--	pm_runtime_get_sync(&pdev->dev);
--	pm_runtime_disable(&pdev->dev);
--	pm_runtime_put_noidle(&pdev->dev);
-+	if (!pxa->dat3_cd_enabled) {
-+		pm_runtime_get_sync(&pdev->dev);
-+		pm_runtime_disable(&pdev->dev);
-+		pm_runtime_put_noidle(&pdev->dev);
-+	}
- 
- 	sdhci_remove_host(host, 1);
- 
-@@ -498,9 +550,16 @@ static int sdhci_pxav3_suspend(struct device *dev)
- {
- 	int ret;
- 	struct sdhci_host *host = dev_get_drvdata(dev);
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_pxa *pxa = pltfm_host->priv;
-+
-+	if (!pxa->dat3_cd_enabled)
-+		pm_runtime_get_sync(dev);
- 
--	pm_runtime_get_sync(dev);
- 	ret = sdhci_suspend_host(host);
-+	if (pxa->dat3_cd_enabled)
-+		return ret;
-+
- 	pm_runtime_mark_last_busy(dev);
- 	pm_runtime_put_autosuspend(dev);
- 
-@@ -518,8 +577,13 @@ static int sdhci_pxav3_resume(struct device *dev)
- 		ret = mv_conf_mbus_windows(dev, pxa->mbus_win_regs,
- 					   mv_mbus_dram_info());
- 
--	pm_runtime_get_sync(dev);
-+	if (!pxa->dat3_cd_enabled)
-+		pm_runtime_get_sync(dev);
-+
- 	ret = sdhci_resume_host(host);
-+	if (pxa->dat3_cd_enabled)
-+		return ret;
-+
- 	pm_runtime_mark_last_busy(dev);
- 	pm_runtime_put_autosuspend(dev);
- 
+ static struct sdhci_pltfm_data sdhci_pxav3_pdata = {
 -- 
 1.8.3.1
