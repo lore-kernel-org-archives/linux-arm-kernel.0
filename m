@@ -1,99 +1,40 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 15 Oct 2015 16:59:21 +0100
-Subject: [PATCH v4 2/2] arm64: Expand the stack trace feature to support
- IRQ stack
-In-Reply-To: <B6AB90B9-3AA9-413A-B357-137710E89C7C@gmail.com>
-References: <1444231692-32722-1-git-send-email-jungseoklee85@gmail.com>
- <1444231692-32722-3-git-send-email-jungseoklee85@gmail.com>
- <5617CE26.10604@arm.com> <07A53E87-C562-48D1-86DF-A373EAAA73F9@gmail.com>
- <561BE111.7@arm.com> <3CAA206D-3A3A-49A9-BDAD-4206D6F9BAA8@gmail.com>
- <561CE454.7080201@arm.com> <04D64B22-8EF5-400E-A7F0-1CD0AB48184D@gmail.com>
- <B6AB90B9-3AA9-413A-B357-137710E89C7C@gmail.com>
-Message-ID: <561FCD59.1090600@arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 15 Oct 2015 11:00:28 -0500
+Subject: [PATCH] PCI: iproc: fix 32-bit build error
+In-Reply-To: <5204456.Kxa6kNhPYW@wuerfel>
+References: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
+ <561D6458.40504@hauke-m.de> <561D6576.2020107@broadcom.com>
+ <5204456.Kxa6kNhPYW@wuerfel>
+Message-ID: <20151015160028.GA17702@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/15 13:12, Jungseok Lee wrote:
-> On Oct 14, 2015, at 12:00 AM, Jungseok Lee wrote:
->> On Oct 13, 2015, at 8:00 PM, James Morse wrote:
->>> On 12/10/15 23:13, Jungseok Lee wrote:
->>>> On Oct 13, 2015, at 1:34 AM, James Morse wrote:
->>>>> Having two kmem_caches for 16K stacks on a 64K page system may be wasteful
->>>>> (especially for systems with few cpus)?
->>>>
->>>> This would be a single concern. To address this issue, I drop the 'static'
->>>> keyword in thread_info_cache. Please refer to the below hunk.
->>>
->>> Its only a problem on systems with 64K pages, which don't have a multiple
->>> of 4 cpus. I suspect if you turn on 64K pages, you have many cores with
->>> plenty of memory?
->>
->> Yes, the problem 'two kmem_caches' comes from only 64K page system.
->>
->> I don't get the statement 'which don't have a multiple of 4 cpus'.
->> Could you point out what I am missing?
+On Tue, Oct 13, 2015 at 11:00:31PM +0200, Arnd Bergmann wrote:
+> On Tuesday 13 October 2015 13:11:34 Ray Jui wrote:
+> > >> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+> > >> index f3481ddff344..abcb4be2ee19 100644
+> > >> --- a/drivers/pci/host/pcie-iproc.c
+> > >> +++ b/drivers/pci/host/pcie-iproc.c
+> > >> @@ -235,12 +235,13 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
+> > >>   *
+> > >>   * axi_addr -> iproc_pcie_address -> OARR -> OMAP -> pci_address
+> > >>   */
+> > >> -static int iproc_pcie_setup_ob(struct iproc_pcie *pcie, u64 axi_addr,
+> > >> +int iproc_pcie_setup_ob(struct iproc_pcie *pcie, u64 axi_addr,
+> > > 
+> > > Why are you removing the static here?
+> > > 
+> > 
+> > Yeah we should keep this function as static. The rest of this change
+> > looks good!
+> > 
 > 
-> You're talking about sl{a|u}b allocator behavior. If so, I got what you meant.
-
-Yes,
-With Nx4 cpus, the (currently) 16K irq stacks take up Nx64K - a nice
-multiple of pages, so no wasted memory.
-
-
->>> If this has been made a published symbol, it should go in a header file.
->>
->> Sure.
+> Sorry, this accidentally ended up in the patch when I marked the
+> function as global to track down how the division got called.
 > 
-> I had the wrong impression that there is a room under include/linux/*.
+> I'll send a new version.
 
-Yes, I see there isn't anywhere obvious to put it...
+Ping; I can easily fix up the static, but it'd be nice to have real acks
+from Ray and Hauke.
 
-
-> IMO, this is architectural option whether arch relies on thread_info_cache or not.
-> In other words, it would be clear to put this extern under arch/*/include/asm/*.
-
-Its up to the arch whether or not to define
-CONFIG_ARCH_THREAD_INFO_ALLOCATOR. In the case where it hasn't defined it,
-and THREAD_SIZE >= PAGE_SIZE, your change is exposing thread_info_cache on
-all architectures, so it ought go in a header file accessible to all
-architectures.
-
-Something like this, (only build-tested!):
-=========%<=========
---- a/include/linux/thread_info.h
-+++ b/include/linux/thread_info.h
-@@ -10,6 +10,8 @@
- #include <linux/types.h>
- #include <linux/bug.h>
-
-+#include <asm/page.h>
-+
- struct timespec;
- struct compat_timespec;
-
-@@ -145,6 +147,12 @@ static inline bool test_and_clear_restore_sigmask(void)
- #error "no set_restore_sigmask() provided and default one won't work"
- #endif
-
-+#ifndef CONFIG_ARCH_THREAD_INFO_ALLOCATOR
-+#if THREAD_SIZE >= PAGE_SIZE
-+extern struct kmem_cache *thread_info_cache;
-+#endif /* THREAD_SIZE >= PAGE_SIZE */
-+#endif /* CONFIG_ARCH_THREAD_INFO_ALLOCATOR */
-+
- #endif /* __KERNEL__ */
-
- #endif /* _LINUX_THREAD_INFO_H */
-=========%<=========
-Quite ugly!
-
-My concern is there could be push-back from the maintainer of
-kernel/fork.c, saying "define CONFIG_ARCH_THREAD_INFO_ALLOCATOR if the
-generic code isn't what you need", and push-back from the arm64 maintainers
-about copy-pasting that chunk into arch/arm64.... both of which are fair,
-hence my initial version created a second kmem_cache.
-
-
-Thanks,
-
-James
+Bjorn
