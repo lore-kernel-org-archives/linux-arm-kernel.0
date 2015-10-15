@@ -1,42 +1,35 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 15 Oct 2015 10:53:36 +0200
-Subject: [PATCH v6 10/10] ASoC: rockchip_i2s: modify DMA max burst to
- 1
-In-Reply-To: <1444873008-2589-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1444872865-2169-1-git-send-email-shawn.lin@rock-chips.com>
- <1444873008-2589-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <561F6990.7080809@metafoo.de>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Thu, 15 Oct 2015 10:56:50 +0200
+Subject: l2c: Kernel panic in l2c310_enable() in non-secure mode
+In-Reply-To: <CAL_Jsq+GMui-ztROeJ8zg06E+SuJ9+JSnpotHA0OcD3ZhCj4Uw@mail.gmail.com>
+References: <561E6407.6000002@sigmadesigns.com>
+ <561E6B1F.1070701@sigmadesigns.com>
+ <CAL_Jsq+GMui-ztROeJ8zg06E+SuJ9+JSnpotHA0OcD3ZhCj4Uw@mail.gmail.com>
+Message-ID: <561F6A52.70706@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2015 03:36 AM, Shawn Lin wrote:
-[...]
-> +
-> +	if (snd_dmaengine_pcm_get_caps(&pdev->dev, &dma_caps) == 0) {
-> +		if (dma_caps.max_burst > 4) {
-> +			i2s->playback_dma_data.maxburst = 4;
-> +			i2s->capture_dma_data.maxburst = 4;
-> +		} else {
-> +			i2s->playback_dma_data.maxburst = 1;
-> +			i2s->capture_dma_data.maxburst = 1;
+On 14/10/2015 19:06, Rob Herring wrote:
 
-So this is what this is all about? I though you might have to program some
-FIFO threshold registers in the peripheral itself.
+> Yes, FLOZ has to be enabled after enabling the L2 and disabled before
+> disabling the L2.
 
-But it seems all this does is to read the maximum burst length from the DMA
-controller only to tell the DMA controller that this is the maximum burst
-length it should use. That seems rather unnecessary.
+Is FLOZ merely a performance optimization?
 
-The maxburst field of the dma_data indicates the maximum burst length that
-the audio peripheral can handle. Typically this is the number of samples the
-audio FIFO can receive without overflowing after sending the DMA request
-signal. Since as the name suggests this is the maximum burst size the DMA
-controller is free to choose a burst size smaller than this when writing
-data to the peripheral.
+Have you (or someone else) measured the impact of having it enabled vs disabled?
 
-So in your case instead of introducing all these facilities to query the
-maximum burst size it should be OK to simply reduce the burst size in the
-DMA controller itself when it gets a request with a burst size larger than
-it can handle, or is there a reason why this is not possible?
+>> I suppose a work-around might be to set NSACR[18]?
+> 
+> You may find you need that anyway for control of the SMP bit if you
+> shut off cores.
 
-- Lars
+NSACR[18] == NSACR.NS_SMP
+
+Usage constraints
+The ACTLR is: [...] RW in Non-secure state if NSACR.NS_SMP = 1.
+In this case all bits are Write Ignore except for the SMP bit.
+
+Thus, even if my firmware sets NSACR.NS_SMP, Linux won't be able to
+set bits 1,2,3 in ACTLR.
+
+Regards.
