@@ -1,62 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 14:44:05 +0200
-Subject: [PATCHv3] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
-In-Reply-To: <20151015121241.GA26080@port70.net>
-References: <1444386580-10917-1-git-send-email-manjeet.p@samsung.com>
- <20151009103352.GK26278@arm.com> <20151015121241.GA26080@port70.net>
-Message-ID: <6205380.pxTZSIhjca@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Oct 2015 13:44:51 +0100
+Subject: [PATCHv3 03/11] arm64: Introduce helpers for page table levels
+In-Reply-To: <20151015113735.GB21930@cbox>
+References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
+ <1444821634-1689-4-git-send-email-suzuki.poulose@arm.com>
+ <20151015113735.GB21930@cbox>
+Message-ID: <20151015124451.GI8825@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 October 2015 14:12:41 Szabolcs Nagy wrote:
-> * Will Deacon <will.deacon@arm.com> [2015-10-09 11:33:52 +0100]:
+On Thu, Oct 15, 2015 at 01:37:35PM +0200, Christoffer Dall wrote:
+> On Wed, Oct 14, 2015 at 12:20:26PM +0100, Suzuki K. Poulose wrote:
+> > Introduce helpers for finding the number of page table
+> > levels required for a given VA width, shift for a particular
+> > page table level.
+> > 
+> > Convert the existing users to the new helpers. More users
+> > to follow.
+> > 
+> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> > 
+> > ---
+> > Changes since V2:
+> >   - Add comments around the macros
+> >   - Change ARM64_HW_PGTABLE_LEVEL_SHIFT to accept pagetable level as
+> >     described by ARM ARM
+> > ---
+> >  arch/arm64/include/asm/pgtable-hwdef.h |   25 ++++++++++++++++++++++---
+> >  1 file changed, 22 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+> > index 95c1ec0..c6194ab 100644
+> > --- a/arch/arm64/include/asm/pgtable-hwdef.h
+> > +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+> > @@ -16,13 +16,31 @@
+> >  #ifndef __ASM_PGTABLE_HWDEF_H
+> >  #define __ASM_PGTABLE_HWDEF_H
+> >  
+> > +/*
+> > + * Number of page-table levels required to address 'va_bits' wide
+> > + * address, without section mapping. We resolve the top (va_bits - PAGE_SHIFT)
+> > + * bits with (PAGE_SHIFT - 3) bits at each page table level. Hence:
+> > + *
+> > + *  levels = DIV_ROUND_UP((va_bits - PAGE_SHIFT), (PAGE_SHIFT - 3))
+> > + *
+> > + * We cannot include linux/kernel.h which defines DIV_ROUND_UP here
+> > + * due to build issues. So we use the following magic formula.
+> > + */
+> > +#define ARM64_HW_PGTABLE_LEVELS(va_bits) (((va_bits) - 4) / (PAGE_SHIFT - 3))
+> > +
+> > +/*
+> > + * Size mapped by an entry at level n
+> > + * We map PAGE_SHIFT - 3 at all levels, except the PAGE_SHIFT bits at the last level
+> > + */
+> > +#define ARM64_HW_PGTABLE_LEVEL_SHIFT(n)	((PAGE_SHIFT - 3) * (4 - (n)) + 3)
 > 
-> > On Fri, Oct 09, 2015 at 03:59:40PM +0530, Manjeet Pawar wrote:
-> > > MINSIGSTKSZ and SIGSTKSZ for ARM64 are not correctly set in latest kernel.
-> > > This patch fixes this issue.
-> > > 
-> > > This issue is reported in LTP (testcase: sigaltstack02.c).
-> > > Testcase failed when sigaltstack() called with stack size "MINSIGSTKSZ - 1"
-> > > Since in Glibc-2.22, MINSIGSTKSZ is set to 5120 but in kernel
-> > > it is set to 2048 so testcase gets failed.
-> > > 
-> > > Testcase Output:
-> > > sigaltstack02 1  TPASS  :  stgaltstack() fails, Invalid Flag value,errno:22
-> > > sigaltstack02 2  TFAIL  :  sigaltstack() returned 0, expected -1,errno:12
-> > 
-> > I'm still unable to reproduce this failure. Is this with defconfig?
-> > 
-> > > Reported Issue in Glibc Bugzilla:
-> > > Bugfix in Glibc-2.22: [Bug 16850]
-> > > https://sourceware.org/bugzilla/show_bug.cgi?id=16850
-> > > 
-> > > Signed-off-by: Akhilesh Kumar <akhilesh.k@samsung.com>
-> > > Signed-off-by: Manjeet Pawar <manjeet.p@samsung.com>
-> > > Signed-off-by: Rohit Thapliyal <r.thapliyal@samsung.com>
-> > > ---
-> > > v1 -> Changes in uapi overall header
-> > > v2 -> Changes done in arm64 headers
-> > > v3 -> Changes done in both uapi & arm64 headers
-> > > 
-> > >  arch/arm64/include/uapi/asm/signal.h |    3 +++
-> > >  include/uapi/asm-generic/signal.h    |    2 ++
-> > >  2 files changed, 5 insertions(+)
-> > 
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> > 
-> > Arnd: are you planning to take this via asm-generic, or shall I queue it
-> > on the arm64 fixes branch?
-> > 
-> 
-> i just noticed this and wanted to note that an old
-> glibc can fail on a new kernel with this patch if
-> an application uses MINSIGSTKSZ altstack.
+> I feel like I'm partially failing the interview question again, in that
+> I don't fully understand the '+ 3' in the end?
 
-Well worth noting, but I think we should consider this intentional:
+The last level handles PAGE_SHIFT bits (the bits from the VA that are
+the same in the PA). We only accounted for (PAGE_SHIFT - 3) bits at each
+level when multiplying, so we add those 3 missing bits back at the end.
 
-If an application built against an old glibc uses MINSIGSTKSZ, it
-current gets random data corruption of a segmentation fault that
-are both hard to track down, while a new kernel would result in
-more sensible error code that is easier to debug.
-
-	Arnd
+Thanks,
+Mark.
