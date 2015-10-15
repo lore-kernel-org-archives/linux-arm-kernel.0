@@ -1,102 +1,37 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Thu, 15 Oct 2015 05:57:13 +0200
-Subject: [PATCH] arm, omap2, sram: On HS/EMU devices, only 64K internal
- SRAM is available.
-In-Reply-To: <20151014174920.GE10113@atomide.com>
-References: <1444715655-30077-1-git-send-email-hs@denx.de>
- <20151014174920.GE10113@atomide.com>
-Message-ID: <561F2419.3020201@denx.de>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 15 Oct 2015 09:35:01 +0530
+Subject: [PATCH v6 09/10] snd: dmaengine-pcm: add
+ snd_dmaengine_pcm_get_caps interface
+In-Reply-To: <1444872998-2548-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1444872865-2169-1-git-send-email-shawn.lin@rock-chips.com>
+ <1444872998-2548-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <20151015040500.GB27370@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+On Thu, Oct 15, 2015 at 09:36:38AM +0800, Shawn Lin wrote:
+> +int snd_dmaengine_pcm_get_caps(struct device *dev, struct dma_slave_caps *caps)
+> +{
+> +	struct snd_soc_platform *platform;
+> +	struct dmaengine_pcm *pcm;
+> +	int ret = -ENODEV;
+> +
+> +	platform = snd_soc_lookup_platform(dev);
+> +	if (!platform)
+> +		return ret;
+> +
+> +	pcm = soc_platform_to_pcm(platform);
+> +
+> +	if (pcm->chan)
+> +		ret = dma_get_slave_caps(pcm->chan[0], caps);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_get_caps);
 
-Am 14.10.2015 um 19:49 schrieb Tony Lindgren:
-> * Heiko Schocher <hs@denx.de> [151012 22:58]:
->> Of this, secure content (including PPA) uses initial
->> portion of the SRAM. This chunk is not (and shouldn't
->> be) accessible from the public code.
->>
->> The minimum size of this chunk (0x350) is used in this
->> patch. Available size is rounded off to 63K.
->>
->> Both values would require a change if size of secure
->> content grows beyond 0x350.
->
-> Makes sense to me. And something similar is needed at least for
-> dm814x to get rid of the imprecise abort during boot with
-> commit bbeb92095159 ("ARM: 8422/1: enable imprecise aborts during
-> early kernel startup") applied.
->
-> Is this needed as a fix to the -rc cycle, or can this wait for
-> v4.4?
-
-I need it for an upcoming boards support, so 4.4 is fine for me,
-thanks!
-
-bye,
-Heiko
->
-> Regards,
->
-> Tony
->
->
->> Signed-off-by: Heiko Schocher <hs@denx.de>
->> Signed-off-by: Ayoub Zaki <Ayoub.Zaki@bosch-si.com>
->> ---
->>
->>   arch/arm/mach-omap2/sram.c | 25 +++++++++++++++++++++++++
->>   1 file changed, 25 insertions(+)
->>
->> diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
->> index cd488b8..2e7c00f 100644
->> --- a/arch/arm/mach-omap2/sram.c
->> +++ b/arch/arm/mach-omap2/sram.c
->> @@ -47,6 +47,28 @@
->>
->>   #define GP_DEVICE		0x300
->>
->> +/**
->> + * Size of chunk used by secure content in the HS/EMU devices.
->> + *
->> + * This size is not fixed. It depends upon the implementation of PPA.
->> + * May need to be modified if the size grows.
->> + */
->> +#define AM33XX_HS_HEADER_SIZE   0x0350
->> +
->> +/**
->> + * Start of public SRAM on HS/EMU devices.
->> + */
->> +#define AM33XX_SRAM_PA		0x40300000
->> +#define AM33XX_SRAM_PUB_PA	(AM33XX_SRAM_PA + AM33XX_HS_HEADER_SIZE)
->> +
->> +/**
->> + * Size of public SRAM available on HS/EMU devices.
->> + *
->> + * This size also depends upon AM33XX_HS_HEADER_SIZE.
->> + * Current value is derived from nearest round-off.
->> + */
->> +#define AM33XX_SRAM_PUB_SIZE		0xfc00	/* 63K */
->> +
->>   #define ROUND_DOWN(value,boundary)	((value) & (~((boundary)-1)))
->>
->>   static unsigned long omap_sram_start;
->> @@ -99,6 +121,9 @@ static void __init omap_detect_sram(void)
->>   			} else {
->>   				omap_sram_size = 0x8000; /* 32K */
->>   			}
->> +		} else if (soc_is_am33xx()) {
->> +			omap_sram_start = AM33XX_SRAM_PUB_PA;
->> +			omap_sram_size  = AM33XX_SRAM_PUB_SIZE;
->>   		} else {
->>   			omap_sram_start = OMAP2_SRAM_PUB_PA;
->>   			omap_sram_size = 0x800; /* 2K */
->> --
->> 2.1.0
->>
->
+I don't see the need of this wrapper if you are not going to use this inside
+common code.. Why not read this in driver, anyway you setting taht up in
+next patch
 
 -- 
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+~Vinod
