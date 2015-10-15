@@ -1,161 +1,61 @@
-From: B48286@freescale.com (Zhiqiang Hou)
-Date: Thu, 15 Oct 2015 20:13:01 +0800
-Subject: [PATCH V4 6/6] dts/ls1043a: add LS1043ARDB board support
-In-Reply-To: <1444911181-21696-1-git-send-email-B48286@freescale.com>
-References: <1444911181-21696-1-git-send-email-B48286@freescale.com>
-Message-ID: <1444911181-21696-6-git-send-email-B48286@freescale.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 15 Oct 2015 14:30:49 +0200
+Subject: [RFT PATCH 3/3] ARM: dts: Mark SDIO as non-removable in
+ exynos5250-snow-common
+In-Reply-To: <1444906530-25048-4-git-send-email-javier@osg.samsung.com>
+References: <1444906530-25048-1-git-send-email-javier@osg.samsung.com>
+ <1444906530-25048-4-git-send-email-javier@osg.samsung.com>
+Message-ID: <CAAObsKC4QSGaqwh_4Gy3C+9ty=k=LixV8oZB1-5ZreLOxqc=aQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shaohui Xie <Shaohui.Xie@freescale.com>
+On 15 October 2015 at 12:55, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> The Exynos5250 Snow Chromebooks have a Marvell WiFi SDIO chip which
+> can't neither be removed nor be detected. But the node isn't marked
+> as non-removable and instead has the broken-cd DT property.
+>
+> This causes the device to be removed when the system enters into a
+> suspend state and the following warnings is shown after a resume:
+>
+> [  181.944636] mmc2: error -2 during resume (card was removed?)
 
-Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
-Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
-Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
-Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
----
-V4: V3
- - No change.
+Hi Javier,
 
-V2:
- - Remove the useless compatible "simple-bus" from cpld node.
+isn't wifi on snow on mmc_3?
 
- arch/arm64/boot/dts/freescale/Makefile            |   2 +-
- arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 116 ++++++++++++++++++++++
- 2 files changed, 117 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+With your patch, I don't see any change, but if I do it on mmc_3
+instead, the machine fails to resume. Will try to get more info.
 
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 57b41c7..33b1e57 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -1,4 +1,4 @@
--dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb fsl-ls2080a-rdb.dtb fsl-ls2080a-simu.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb fsl-ls2080a-rdb.dtb fsl-ls2080a-simu.dtb fsl-ls1043a-rdb.dtb
-  
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-new file mode 100644
-index 0000000..7a351e2
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-@@ -0,0 +1,116 @@
-+/*
-+ * Device Tree Include file for Freescale Layerscape-1043A family SoC.
-+ *
-+ * Copyright 2014-2015, Freescale Semiconductor
-+ *
-+ * Mingkai Hu <Mingkai.hu@freescale.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "fsl-ls1043a.dtsi"
-+
-+/ {
-+	model = "LS1043A RDB Board";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	ina220 at 40 {
-+		compatible = "ti,ina220";
-+		reg = <0x40>;
-+		shunt-resistor = <1000>;
-+	};
-+	adt7461a at 4c {
-+		compatible = "adi,adt7461";
-+		reg = <0x4c>;
-+	};
-+	eeprom at 56 {
-+		compatible = "at24,24c512";
-+		reg = <0x52>;
-+	};
-+	eeprom at 57 {
-+		compatible = "at24,24c512";
-+		reg = <0x53>;
-+	};
-+	rtc at 68 {
-+		compatible = "pericom,pt7c4338";
-+		reg = <0x68>;
-+	};
-+};
-+
-+&ifc {
-+	status = "okay";
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+	/* NOR, NAND Flashes and FPGA on board */
-+	ranges = <0x0 0x0 0x0 0x60000000 0x08000000
-+		  0x1 0x0 0x0 0x7e800000 0x00010000
-+		  0x2 0x0 0x0 0x7fb00000 0x00000100>;
-+
-+		nor at 0,0 {
-+			compatible = "cfi-flash";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x0 0x0 0x8000000>;
-+			bank-width = <2>;
-+			device-width = <1>;
-+		};
-+
-+		nand at 1,0 {
-+			compatible = "fsl,ifc-nand";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x1 0x0 0x10000>;
-+		};
-+
-+		cpld: board-control at 2,0 {
-+			compatible = "fsl,ls1043ardb-cpld";
-+			reg = <0x2 0x0 0x0000100>;
-+		};
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&duart1 {
-+	status = "okay";
-+};
--- 
-2.1.0.27.g96db324
+Regards,
+
+Tomeu
+
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>
+> ---
+>
+>  arch/arm/boot/dts/exynos5250-snow-common.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+> index 0a7f408824d8..bf27957fd660 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+> @@ -520,7 +520,7 @@
+>  &mmc_0 {
+>         status = "okay";
+>         num-slots = <1>;
+> -       broken-cd;
+> +       non-removable;
+>         card-detect-delay = <200>;
+>         samsung,dw-mshc-ciu-div = <3>;
+>         samsung,dw-mshc-sdr-timing = <2 3>;
+> --
+> 2.4.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
