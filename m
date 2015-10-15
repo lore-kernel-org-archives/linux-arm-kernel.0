@@ -1,44 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Oct 2015 15:46:50 +0200
-Subject: [PATCH 10/13] soc: versatile: add support for the PB11MPCore
-In-Reply-To: <1444916813-31024-1-git-send-email-linus.walleij@linaro.org>
-References: <1444916813-31024-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1444916813-31024-11-git-send-email-linus.walleij@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 15 Oct 2015 08:47:20 -0500
+Subject: [PATCH] of/irq: export of_irq_count
+In-Reply-To: <1444905402-10510-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1444905402-10510-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <CAL_JsqJmdLQq9a4P3ZLurjcDBhnbS8LcuLdy0MyPR49DV+3dgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SoC driver needs a minor update to display the correct
-sysfs information for the PB11MPCore.
+On Thu, Oct 15, 2015 at 5:36 AM, Zhangfei Gao <zhangfei.gao@linaro.org> wrote:
+> Export of_irq_count, otherwise module build fail if of_irq_count is used
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-I wonder if I should Cc: arm at kernel.org on patches like this.
-They seem to be the default drivers/soc maintainers.
----
- drivers/soc/versatile/soc-realview.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Which module?
 
-diff --git a/drivers/soc/versatile/soc-realview.c b/drivers/soc/versatile/soc-realview.c
-index e642c4540dda..c337764de867 100644
---- a/drivers/soc/versatile/soc-realview.c
-+++ b/drivers/soc/versatile/soc-realview.c
-@@ -36,6 +36,8 @@ static const char *realview_board_str(u32 id)
- 	switch ((id >> 16) & 0xfff) {
- 	case 0x0147:
- 		return "HBI-0147";
-+	case 0x0159:
-+		return "HBI-0159";
- 	default:
- 		return "Unknown";
- 	}
-@@ -44,6 +46,8 @@ static const char *realview_board_str(u32 id)
- static const char *realview_arch_str(u32 id)
- {
- 	switch ((id >> 8) & 0xf) {
-+	case 0x04:
-+		return "AHB";
- 	case 0x05:
- 		return "Multi-layer AXI";
- 	default:
--- 
-2.4.3
+>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Signed-off-by: John Garry <john.garry@huawei.com>
+> ---
+>  drivers/of/irq.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> index 0c7f4cbe3434..0d149cc48cfe 100644
+> --- a/drivers/of/irq.c
+> +++ b/drivers/of/irq.c
+> @@ -448,6 +448,7 @@ int of_irq_count(struct device_node *dev)
+>
+>         return nr;
+>  }
+> +EXPORT_SYMBOL_GPL(of_irq_count);
+>
+>  /**
+>   * of_irq_to_resource_table - Fill in resource table with node's IRQ info
+> --
+> 1.9.1
+>
