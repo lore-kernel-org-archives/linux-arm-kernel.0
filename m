@@ -1,46 +1,63 @@
 From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Thu, 15 Oct 2015 09:35:23 +0800
-Subject: [PATCH v6 02/10] Documentation: arm-pl330: add description of arm,
- pl330-broken-no-flushp
+Date: Thu, 15 Oct 2015 09:35:54 +0800
+Subject: [PATCH v6 05/10] ARM: dts: Add arm,
+ pl330-broken-no-flushp quirk for rk3xxx platform
 In-Reply-To: <1444872865-2169-1-git-send-email-shawn.lin@rock-chips.com>
 References: <1444872865-2169-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <1444872923-2258-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <1444872954-2384-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+Pl330 integrated in rk3xxx platform doesn't support
+DMAFLUSHP function. So we add arm,pl330-broken-no-flushp quirk
+for it.
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Reviewed-by: Sonny Rao <sonnyrao@chromium.org>
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+cc: Heiko Stuebner <heiko@sntech.de>
+cc: Doug Anderson <dianders@chromium.org>
+cc: Olof Johansson <olof@lixom.net>
+
 ---
 
 Changes in v6: None
 Changes in v5: None
 Changes in v4: None
-Changes in v3:
-- add Reviewed-by: Sonny Rao <sonnyrao@chromium.org>
-
-Changes in v2:
-- add Reviewed-by: Doug Anderson <dianders@chromium.org>
-
+Changes in v3: None
+Changes in v2: None
 Changes in v1:
 - rename broken-no-flushp to "arm,pl330-broken-no-flushp" suggested
   by Krzysztof.
 
- Documentation/devicetree/bindings/dma/arm-pl330.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/rk3xxx.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/dma/arm-pl330.txt b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-index 2675658..db7e226 100644
---- a/Documentation/devicetree/bindings/dma/arm-pl330.txt
-+++ b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-@@ -15,6 +15,7 @@ Optional properties:
-     cells in the dmas property of client device.
-   - dma-channels: contains the total number of DMA channels supported by the DMAC
-   - dma-requests: contains the total number of DMA requests supported by the DMAC
-+  - arm,pl330-broken-no-flushp: quirk for avoiding to execute DMAFLUSHP
+diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
+index 4497d28..f3d419b 100644
+--- a/arch/arm/boot/dts/rk3xxx.dtsi
++++ b/arch/arm/boot/dts/rk3xxx.dtsi
+@@ -79,6 +79,7 @@
+ 			#dma-cells = <1>;
+ 			clocks = <&cru ACLK_DMA1>;
+ 			clock-names = "apb_pclk";
++			arm,pl330-broken-no-flushp;
+ 		};
  
- Example:
+ 		dmac1_ns: dma-controller at 2001c000 {
+@@ -89,6 +90,7 @@
+ 			#dma-cells = <1>;
+ 			clocks = <&cru ACLK_DMA1>;
+ 			clock-names = "apb_pclk";
++			arm,pl330-broken-no-flushp;
+ 			status = "disabled";
+ 		};
+ 
+@@ -100,6 +102,7 @@
+ 			#dma-cells = <1>;
+ 			clocks = <&cru ACLK_DMA2>;
+ 			clock-names = "apb_pclk";
++			arm,pl330-broken-no-flushp;
+ 		};
+ 	};
  
 -- 
 2.3.7
