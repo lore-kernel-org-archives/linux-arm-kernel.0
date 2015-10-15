@@ -1,27 +1,100 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Oct 2015 17:26:35 +0100
-Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
- ECAM) and ACPI code out of arch/x86/ directory
-In-Reply-To: <561FB985.8070509@linaro.org>
-References: <20150604102253.GA31773@red-moon> <5570447D.3020705@linaro.org>
- <557504A2.3060203@linaro.org> <20150608151443.GA16151@red-moon>
- <55E4340D.6050004@linaro.org> <55ED6010.3020406@linaro.org>
- <20150908150727.GF29293@red-moon> <55F0388B.1090607@linaro.org>
- <20150911112018.GA13033@red-moon> <55F6DFF6.4010807@linaro.org>
- <20151015132200.GA7621@red-moon> <561FB985.8070509@linaro.org>
-Message-ID: <561FD3BB.70501@arm.com>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Thu, 15 Oct 2015 11:27:40 -0500
+Subject: [PATCH 1/2 v2] ARM: DRA7/335x/437x/OMAP4: hwmod: Remove elm address
+ space from hwmod data
+Message-ID: <1444926461-16092-1-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/15 15:34, Tomasz Nowicki wrote:
+ELM address information is provided by device tree. No longer need
+to include this information within hwmod.
 
-> Of course your help in testing is welcomed. Also please have a look at 
-> my GICv3/ITS patches, they are important for ACPI PCI.
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+---
+Version 2 changes:
+Removing elm addr entries also for 335x,437x and omap4 hwmod
 
-Where is the dependency? ACPI/PCI should really be standalone.
+ arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c | 10 ----------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c                   | 10 ----------
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c                    | 10 ----------
+ 3 files changed, 30 deletions(-)
 
-Thanks,
-
-	M.
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
+index 8f5989d..9ba431c 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
+@@ -152,20 +152,10 @@ struct omap_hwmod_ocp_if am33xx_cpgmac0__mdio = {
+ 	.user		= OCP_USER_MPU,
+ };
+ 
+-static struct omap_hwmod_addr_space am33xx_elm_addr_space[] = {
+-	{
+-		.pa_start	= 0x48080000,
+-		.pa_end		= 0x48080000 + SZ_8K - 1,
+-		.flags		= ADDR_TYPE_RT
+-	},
+-	{ }
+-};
+-
+ struct omap_hwmod_ocp_if am33xx_l4_ls__elm = {
+ 	.master		= &am33xx_l4_ls_hwmod,
+ 	.slave		= &am33xx_elm_hwmod,
+ 	.clk		= "l4ls_gclk",
+-	.addr		= am33xx_elm_addr_space,
+ 	.user		= OCP_USER_MPU,
+ };
+ 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 43eebf2..8f13f4a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -3915,21 +3915,11 @@ static struct omap_hwmod_ocp_if omap44xx_l4_per__dss_venc = {
+ 	.user		= OCP_USER_MPU,
+ };
+ 
+-static struct omap_hwmod_addr_space omap44xx_elm_addrs[] = {
+-	{
+-		.pa_start	= 0x48078000,
+-		.pa_end		= 0x48078fff,
+-		.flags		= ADDR_TYPE_RT
+-	},
+-	{ }
+-};
+-
+ /* l4_per -> elm */
+ static struct omap_hwmod_ocp_if omap44xx_l4_per__elm = {
+ 	.master		= &omap44xx_l4_per_hwmod,
+ 	.slave		= &omap44xx_elm_hwmod,
+ 	.clk		= "l4_div_ck",
+-	.addr		= omap44xx_elm_addrs,
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index 562247b..ad2cc7a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -2566,21 +2566,11 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__hdmi = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
+-static struct omap_hwmod_addr_space dra7xx_elm_addrs[] = {
+-	{
+-		.pa_start	= 0x48078000,
+-		.pa_end		= 0x48078fff,
+-		.flags		= ADDR_TYPE_RT
+-	},
+-	{ }
+-};
+-
+ /* l4_per1 -> elm */
+ static struct omap_hwmod_ocp_if dra7xx_l4_per1__elm = {
+ 	.master		= &dra7xx_l4_per1_hwmod,
+ 	.slave		= &dra7xx_elm_hwmod,
+ 	.clk		= "l3_iclk_div",
+-	.addr		= dra7xx_elm_addrs,
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.6.1
