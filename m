@@ -1,191 +1,98 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu, 15 Oct 2015 16:05:12 +0200
-Subject: [PATCH V1 03/10] irqchip, GICv3,
- ACPI: Add redistributor support via GICC structures.
-In-Reply-To: <1444917919-21152-1-git-send-email-tn@semihalf.com>
-References: <1444917919-21152-1-git-send-email-tn@semihalf.com>
-Message-ID: <1444917919-21152-4-git-send-email-tn@semihalf.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 15 Oct 2015 07:05:51 -0700
+Subject: [PATCH] ARM: OMAP2+: Fix oops with LPAE and more than 2GB of
+ memory
+In-Reply-To: <561F5C0C.6080106@ti.com>
+References: <1444778000-22537-1-git-send-email-tony@atomide.com>
+ <561DD014.10403@ti.com> <20151014160245.GA10113@atomide.com>
+ <561F5C0C.6080106@ti.com>
+Message-ID: <20151015140551.GM10113@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On systems supporting GICv3 and above, in MADT GICC structures, the
-field of GICR Base Address holds the 64-bit physical address of the
-associated Redistributor if the GIC Redistributors are not in the
-always-on power domain, so instead of init GICR regions via GIC
-redistributor structure(s), init it with GICR base address in GICC
-structures in that case.
+* Lokesh Vutla <a0131933@ti.com> [151015 01:02]:
+> Hi Tony,
+> 
+> On Wednesday 14 October 2015 09:32 PM, Tony Lindgren wrote:
+> > * Lokesh Vutla <a0131933@ti.com> [151013 20:53]:
+> >> Hi Tony,
+> >>
+> >> On Wednesday 14 October 2015 04:43 AM, Tony Lindgren wrote:
+> >>> On boards with more than 2GB of RAM booting goes wrong with things not working
+> >>> and we're getting lots of l3 warnings:
+> >>>
+> >>> WARNING: CPU: 0 PID: 1 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x260/0x384()
+> >>> 44000000.ocp:L3 Custom Error: MASTER MMC6 TARGET DMM1 (Idle): Data Access in User mode during Functional access
+> >>> ...
+> >>> [<c044e158>] (scsi_add_host_with_dma) from [<c04705c8>] (ata_scsi_add_hosts+0x5c/0x18c)
+> >>> [<c04705c8>] (ata_scsi_add_hosts) from [<c046b13c>] (ata_host_register+0x150/0x2cc)
+> >>> [<c046b13c>] (ata_host_register) from [<c046b38c>] (ata_host_activate+0xd4/0x124)
+> >>> [<c046b38c>] (ata_host_activate) from [<c047f42c>] (ahci_host_activate+0x5c/0x194)
+> >>> [<c047f42c>] (ahci_host_activate) from [<c0480854>] (ahci_platform_init_host+0x1f0/0x3f0)
+> >>> [<c0480854>] (ahci_platform_init_host) from [<c047c9dc>] (ahci_probe+0x70/0x98)
+> >>> [<c047c9dc>] (ahci_probe) from [<c04220cc>] (platform_drv_probe+0x54/0xb4)
+> >>>
+> >>> Let's fix the issue by enabling ZONE_DMA for LPAE.
+> >>
+> >> May I know on which platform you have reproduced this?
+> > 
+> > This is on the 4GB version of isee igepv5 GEP0050-RB10
+> > 
+> > https://isee.biz/products/igep-processor-boards/igepv5-omap5432
+> > 
+> >> Just wondering what other changes you made for booting a OMAP5+ based
+> >> board with more than 2GB.
+> > 
+> > Just the minimal dts changes I posted yesterday to use shared dtsi file
+> > for omap5-uevm variants. Then boot with something like this in the kernel
+> > cmdline:
+> > 
+> > mem=2032M at 0x80000000 mem=2048M at 0x300000000
+> Is it the upper 2GB memory starts from 0x3_0000_0000? Looking at the
+> Table 4-4. "AXI Access memory map" in TRM, it tells it starts from
+> 0x2_0000_0000.(or am I missing something?)
+> 
+> Any chance you tried doing memtest for all this memory?
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
----
- drivers/irqchip/irq-gic-v3.c | 98 ++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 89 insertions(+), 9 deletions(-)
+Seems to work just fine, it's been up since I posted $subject patch., I tried
+a kernel compile on it already earlier and just started memtester 3900M which
+seems to only capable of testing 2924MB though.
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 0da887c..b27a543 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -39,6 +39,7 @@
- struct redist_region {
- 	void __iomem		*redist_base;
- 	phys_addr_t		phys_base;
-+	bool			single_redist;
- };
- 
- struct gic_chip_data {
-@@ -476,6 +477,9 @@ static int gic_populate_rdist(void)
- 				return 0;
- 			}
- 
-+			if (gic_data.redist_regions[i].single_redist)
-+				break;
-+
- 			if (gic_data.redist_stride) {
- 				ptr += gic_data.redist_stride;
- 			} else {
-@@ -989,6 +993,7 @@ IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
- #ifdef CONFIG_ACPI
- static struct redist_region *redist_regs __initdata;
- static u32 nr_redist_regions __initdata;
-+static bool single_redist;
- 
- static int __init
- gic_acpi_register_redist(phys_addr_t phys_base, u64 size)
-@@ -1003,7 +1008,8 @@ gic_acpi_register_redist(phys_addr_t phys_base, u64 size)
- 	}
- 
- 	redist_regs[count].phys_base = phys_base;
--	redist_regs[count++].redist_base = redist_base;
-+	redist_regs[count].redist_base = redist_base;
-+	redist_regs[count++].single_redist = single_redist;
- 	return 0;
- }
- 
-@@ -1017,6 +1023,48 @@ gic_acpi_parse_madt_redist(struct acpi_subtable_header *header,
- 	return gic_acpi_register_redist(redist->base_address, redist->length);
- }
- 
-+static int __init
-+gic_acpi_parse_madt_gicc(struct acpi_subtable_header *header,
-+			 const unsigned long end)
-+{
-+	struct acpi_madt_generic_interrupt *gicc;
-+	void __iomem *redist_base;
-+	u64 typer;
-+	u32 size;
-+
-+	gicc = (struct acpi_madt_generic_interrupt *)header;
-+	redist_base = ioremap(gicc->gicr_base_address, SZ_64K * 2);
-+	if (!redist_base)
-+		return -ENOMEM;
-+
-+	typer = readq_relaxed(redist_base + GICR_TYPER);
-+	/* don't map reserved page as it's buggy to access it */
-+	size = (typer & GICR_TYPER_VLPIS) ? SZ_64K * 3 : SZ_64K * 2;
-+	iounmap(redist_base);
-+	return gic_acpi_register_redist(gicc->gicr_base_address, size);
-+}
-+
-+static int __init gic_acpi_collect_gicr_base(void)
-+{
-+	acpi_tbl_entry_handler redist_parser;
-+	enum acpi_madt_type type;
-+
-+	if (single_redist) {
-+		type = ACPI_MADT_TYPE_GENERIC_INTERRUPT;
-+		redist_parser = gic_acpi_parse_madt_gicc;
-+	} else {
-+		type = ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR;
-+		redist_parser = gic_acpi_parse_madt_redist;
-+	}
-+
-+	/* Collect redistributor base addresses in GICR entries */
-+	if (acpi_table_parse_madt(type, redist_parser, 0) > 0)
-+		return 0;
-+
-+	pr_info("No valid GICR entries exist\n");
-+	return -ENODEV;
-+}
-+
- static int __init gic_acpi_match_gicr(struct acpi_subtable_header *header,
- 				  const unsigned long end)
- {
-@@ -1024,6 +1072,42 @@ static int __init gic_acpi_match_gicr(struct acpi_subtable_header *header,
- 	return 0;
- }
- 
-+static int __init gic_acpi_match_gicc(struct acpi_subtable_header *header,
-+				      const unsigned long end)
-+{
-+	struct acpi_madt_generic_interrupt *gicc =
-+				(struct acpi_madt_generic_interrupt *)header;
-+
-+	/*
-+	 * If GICC is enabled and has valid gicr base address, then it means
-+	 * GICR base is presented via GICC
-+	 */
-+	if ((gicc->flags & ACPI_MADT_ENABLED) && gicc->gicr_base_address)
-+		return 0;
-+
-+	return -ENODEV;
-+}
-+
-+static int __init gic_acpi_count_gicr_regions(void)
-+{
-+	int count;
-+
-+	/* Count how many redistributor regions we have */
-+	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
-+				      gic_acpi_match_gicr, 0);
-+	if (count > 0) {
-+		single_redist = false;
-+		return count;
-+	}
-+
-+	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
-+				      gic_acpi_match_gicc, 0);
-+	if (count > 0)
-+		single_redist = true;
-+
-+	return count;
-+}
-+
- static bool __init acpi_validate_gic_table(struct acpi_subtable_header *header,
- 					   struct acpi_probe_entry *ape)
- {
-@@ -1035,8 +1119,7 @@ static bool __init acpi_validate_gic_table(struct acpi_subtable_header *header,
- 		return false;
- 
- 	/* We need to do that exercise anyway, the sooner the better */
--	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
--				      gic_acpi_match_gicr, 0);
-+	count = gic_acpi_count_gicr_regions();
- 	if (count <= 0)
- 		return false;
- 
-@@ -1052,7 +1135,7 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
- 	struct acpi_madt_generic_distributor *dist;
- 	struct fwnode_handle *domain_handle;
- 	void __iomem *dist_base;
--	int i, err, count;
-+	int i, err;
- 
- 	/* Get distributor base address */
- 	dist = (struct acpi_madt_generic_distributor *)header;
-@@ -1075,12 +1158,9 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
- 		goto out_dist_unmap;
- 	}
- 
--	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
--				      gic_acpi_parse_madt_redist, 0);
--	if (count <= 0) {
--		err = -ENODEV;
-+	err = gic_acpi_collect_gicr_base();
-+	if (err)
- 		goto out_redist_unmap;
--	}
- 
- 	domain_handle = irq_domain_alloc_fwnode(dist_base);
- 	if (!domain_handle) {
--- 
-1.9.1
+> IIUC, It is not allowed to use the mix of L3 address mapping and MA
+> physical address mapping. TRM specifies that
+> "It is expected that the OS uses either the lower 2-GiB space and the
+> lower aliased address of emif(a) and (b), or the continuous 8-GiB space
+> and the upper aliasing of the emif(a) and (b) for all EMIF accesses."
+
+I think that depends on the chip selects that can be used. The above
+is probably for the case where all 8GB was to be used.
+
+> I tried a similar 4GB setup and observed few stuff:
+> - Need to have ARM_PV_FIXUP enabled something similar that is done in
+> Keystone inorder to shift to higher address space.[1] [2]
+
+Seems that's optional for 4GB.. But probably a must for 8GB :)
+
+> - All the peripherals other than MPU, can access only 2GB. So we need to
+> restrict the DMA and need an addresses translation. Along with this
+> patch [3] [4] are needed.
+
+Yes there's no memory accessible beyond 2GB for the DMA hardware. I'll
+post an updated patch with the 2GB limit for dma_zone_size after some
+more tests.
+
+For the dma-ranges, looks like I have not hit that one yet. Which drivers
+did you run into problems without that?
+
+Regards,
+
+Tony
+
+> [1]
+> https://git.ti.com/~lokesh/ti-linux-kernel/lokesh-ti-linux-kernel/commit/be7d2d7e18f473e6078cd7c0b25ec3c58f40736b
+> [2]
+> https://git.ti.com/~lokesh/ti-linux-kernel/lokesh-ti-linux-kernel/commit/dd0a564ee565405bec5e9f58f0c97fb6714110ac
+> [3]
+> https://git.ti.com/~lokesh/ti-linux-kernel/lokesh-ti-linux-kernel/commit/985ed401e04926cb88b23646271dc96900abc50d
+> [4]
+> https://git.ti.com/~lokesh/ti-linux-kernel/lokesh-ti-linux-kernel/commit/c1f7568c4cc6f3146b7137783bd403967aabd0d8
