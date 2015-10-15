@@ -1,65 +1,53 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 15 Oct 2015 10:48:13 +0100
-Subject: [PATCHv3 08/11] arm64: Check for selected granule support
-In-Reply-To: <561EC58B.9080408@arm.com>
-References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
- <1444821634-1689-9-git-send-email-suzuki.poulose@arm.com>
- <561EC58B.9080408@arm.com>
-Message-ID: <561F765D.8090400@arm.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Thu, 15 Oct 2015 10:57:56 +0100
+Subject: [Xen-devel] xen,arm: enable cpu_hotplug
+In-Reply-To: <1444898398.1607.18.camel@citrix.com>
+References: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
+ <561EE3E5.2000105@citrix.com> <1444898398.1607.18.camel@citrix.com>
+Message-ID: <561F78A4.7060507@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/15 22:13, Jeremy Linton wrote:
-> On 10/14/2015 06:20 AM, Suzuki K. Poulose wrote:
->
->> + * Checks if the selected granule size is supported by the CPU.
->> + * If it doesn't park the CPU
->
-> The problem is when you park the boot CPU.
->
-> I think for EFI there is a slightly better error mechanism. This tweak will print an
-> error and return to the EFI boot manager rather than hanging the machine without any
->  notification. Now it prints:
->
-> EFI stub: Booting Linux Kernel...
-> EFI stub: ERROR: 16K granule not supported by this machine
-> EFI stub: ERROR: Failed to relocate kernel
-> FS4:\>
+Hi Ian,
 
-Nice ! I will pick this up.
+On 15/10/15 09:39, Ian Campbell wrote:
+> On Thu, 2015-10-15 at 00:23 +0100, Julien Grall wrote:
+>> My second point is related to how Xen is handling interrupt with vCPU. 
+>> When PSCI off is called, we will set the _VFP_down flag. This flag is 
+>> used in vgic_vcpu_inject_irq and when it's set the interrupt will be 
+>> ignored and stay active on the HW GIC forever. If the vCPU is coming 
+>> back online, this interrupt will never be received. AFAIU the spec, the 
+>> interrupt is expected to stay pending on the distributor side and will 
+>> be receive when the vCPU will come back or migrate to another vCPU. A 
+>> similar problem can happen when the vCPU is powered on again because we 
+>> clear all the interrupt state related to vCPU (see
+>> vgic_clear_pending_irqs).
+> 
+> Is there also an interaction with our implementation of ITARGETSR of
+> picking the lowest set bit? e.g. if an IRQ has target 0x6 (targeting CPU 1
+> and CPU2) we will choose CPU 1. If CPU 1 is then unplugged, will we end up
+> targeting CPU 2 or the now-offline CPU 1? In the latter case the lack of
+> interrupts might be considered surprising?
 
->
->
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->   arch/arm64/kernel/efi-stub.c | 14 ++++++++++++++
->   1 file changed, 14 insertions(+)
->
-> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-> index 816120e..90fb868 100644
-> --- a/arch/arm64/kernel/efi-stub.c
-> +++ b/arch/arm64/kernel/efi-stub.c
-> @@ -25,6 +25,20 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
->          unsigned long kernel_size, kernel_memsize = 0;
->          unsigned long nr_pages;
->          void *old_image_addr = (void *)*image_addr;
-> +       u32 aa64mmfr0_el1;
-> +
-> +#ifdef CONFIG_ARM64_16K_PAGES
+I though about it when I wrote the mail yesterday night.
 
-I would prefer to have it on for all page sizes and not just 16K, to be on a safer side
+>From the spec section 1.4.3 (ARM IHI 0048B.b):
 
-> +       /*
-> +        * check to see if this kernel image is
-> +        * compatible with the current system
-> +        */
-> +       asm volatile("mrs %0, ID_AA64MMFR0_EL1" : "=r" (aa64mmfr0_el1));
-> +       aa64mmfr0_el1 >>= ID_AA64MMFR0_TGRAN16_SHIFT;
-> +       if ((aa64mmfr0_el1 & ID_AA64MMFR0_TGRAN4_ON) == 0) {
-> +               pr_efi_err(sys_table_arg, "16K granule not supported by this machine\n");
-> +               return EFI_UNSUPPORTED;
-> +       }
-> +#endif
+"The ARM GIC architecture does not guarantee that a 1-N interrupt is
+presented to:
+? all processors listed in the target processor list
+? an enabled interface, where at least one interface is enabled."
 
-Thanks
-Suzuki
+AFAIU this paragraph, it means that there is no guarantee to receive an
+interrupt if the target mask contain a vCPU offline.
+
+> Or maybe the way CPU hotplug is arranged we never end up with holes in the
+> online cpu space, i.e it is not possible to take down CPU1 and leave CPU2
+> up?
+
+A kernel is allowed to hotplug any vCPU.
+
+Regards,
+
+-- 
+Julien Grall
