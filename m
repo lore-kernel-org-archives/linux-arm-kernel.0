@@ -1,83 +1,46 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 15 Oct 2015 09:29:23 +0530
-Subject: [PATCH 02/13] dmaengine: edma: Optimize memcpy operation
-In-Reply-To: <561E6E7A.6080408@ti.com>
-References: <1444828344-21378-1-git-send-email-peter.ujfalusi@ti.com>
- <1444828344-21378-3-git-send-email-peter.ujfalusi@ti.com>
- <20151014144105.GV27370@localhost> <561E6E7A.6080408@ti.com>
-Message-ID: <20151015035923.GA27370@localhost>
+From: scottwood@freescale.com (Scott Wood)
+Date: Wed, 14 Oct 2015 22:56:47 -0500
+Subject: [PATCH V3 4/6] arm64/ls1043a: add DTS for Freescale LS1043A SoC
+In-Reply-To: <1444822498-16477-5-git-send-email-B48286@freescale.com>
+References: <1444822498-16477-1-git-send-email-B48286@freescale.com>
+ <1444822498-16477-5-git-send-email-B48286@freescale.com>
+Message-ID: <1444881407.5185.232.camel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 06:02:18PM +0300, Peter Ujfalusi wrote:
-> On 10/14/2015 05:41 PM, Vinod Koul wrote:
-> > On Wed, Oct 14, 2015 at 04:12:13PM +0300, Peter Ujfalusi wrote:
-> >> @@ -1320,41 +1317,92 @@ static struct dma_async_tx_descriptor *edma_prep_dma_memcpy(
-> >>  	struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
-> >>  	size_t len, unsigned long tx_flags)
-> >>  {
-> >> -	int ret;
-> >> +	int ret, nslots;
-> >>  	struct edma_desc *edesc;
-> >>  	struct device *dev = chan->device->dev;
-> >>  	struct edma_chan *echan = to_edma_chan(chan);
-> >> -	unsigned int width;
-> >> +	unsigned int width, pset_len;
-> >>  
-> >>  	if (unlikely(!echan || !len))
-> >>  		return NULL;
-> >>  
-> >> -	edesc = kzalloc(sizeof(*edesc) + sizeof(edesc->pset[0]), GFP_ATOMIC);
-> >> +	if (len < SZ_64K) {
-> >> +		/*
-> >> +		 * Transfer size less than 64K can be handled with one paRAM
-> >> +		 * slot. ACNT = length
-> >> +		 */
-> >> +		width = len;
-> >> +		pset_len = len;
-> >> +		nslots = 1;
-> >> +	} else {
-> >> +		/*
-> >> +		 * Transfer size bigger than 64K will be handled with maximum of
-> >> +		 * two paRAM slots.
-> >> +		 * slot1: ACNT = 32767, length1: (length / 32767)
-> >> +		 * slot2: the remaining amount of data.
-> >> +		 */
-> >> +		width = SZ_32K - 1;
-> >> +		pset_len = rounddown(len, width);
-> >> +		/* One slot is enough for lengths multiple of (SZ_32K -1) */
-> > 
-> > Hmm so does this mean if I have 140K transfer, it will do two 64K for 1st
-> > slot and 12K in second slot ?
+On Wed, 2015-10-14 at 19:34 +0800, Zhiqiang Hou wrote:
+> From: Mingkai Hu <Mingkai.Hu@freescale.com>
 > 
-> Not exactly. If the size is less than 64K it can be done with one 'burst' but
-> if it is bigger we need to have two sets of transfer:
-> 1. 32K blocks
-> 2. the remaining data
+> LS1043a is an SoC with 4 ARMv8 A53 cores and most other IP blocks
+> similar to LS1021a which complies to Chassis 2.1 spec.
 > 
-> so in case of 140K:
-> 4 x 32K followed by 12K
+> Following levels of DTSI/DTS files have been created for the
+> LS1043A SoC family:
+> 
+> - fsl-ls1043a.dtsi:
+>   DTS-Include file for FSL LS1043A SoC.
+> 
+> Signed-off-by: Li Yang <leoli@freescale.com>
+> Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
+> Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
+> Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
+> ---
+> V3:
+>  - Add device tree node for SATA.
+>  - Remove properity enable-method for all cpu node.
+>    Remove reserved memory region for spin-table.
+> 
+> V2:
+>  - Add secondary core boot method.
+>  - Move out the sysclk node from the clockgen node.
+>  - Correct the reg size of GICC.
+> 
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 513 
+> +++++++++++++++++++++++++
+>  1 file changed, 513 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
 
-Okay this part wasn't very clear to me, can you please add some comment
-explaining this bit
+On the ls208x device tree we were asked to put devices under a bus node, such 
+as an soc node with a simple-bus compatible.
 
-> 
-> > 
-> > Is there a limit on 'blocks' of 64K we can do here?
-> 
-> 32767 32K blocks is the limit.
-> 
-> The 64K burst is only possible if the whole transfer is less less than 64K.
-> With the ACNT counter we can transfer 64K - 1 bytes, but if this is not enough
-> we need to use the BCNT counter and for that to work the the distance between
-> the start of 'slot n' and the start of 'slot n+1' need to be less than 32K,
-> this is the reason why we have 32K 'blocks' to transfer first followed by the
-> remaining.
-
-Okay IIUC, we have option to single burst if its less that 64K using one
-slot, otherwise split to 32K chunk with 2 slots, or would it be N in that
-case
-
-Really need more documentation here :)
--- 
-~Vinod
+-Scott
