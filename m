@@ -1,48 +1,51 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 15 Oct 2015 07:25:19 -0700
-Subject: [PATCH V4 2/6] watchdog: Add support for Freescale Layerscape
- platforms
-In-Reply-To: <1444911181-21696-2-git-send-email-B48286@freescale.com>
-References: <1444911181-21696-1-git-send-email-B48286@freescale.com>
- <1444911181-21696-2-git-send-email-B48286@freescale.com>
-Message-ID: <561FB74F.5000302@roeck-us.net>
+From: w-kwok2@ti.com (WingMan Kwok)
+Date: Thu, 15 Oct 2015 10:25:43 -0400
+Subject: [PATCH v1 0/2] Common SerDes driver for TI's Keystone Platforms
+Message-ID: <1444919145-30845-1-git-send-email-w-kwok2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2015 05:12 AM, Zhiqiang Hou wrote:
-> From: Shaohui Xie <Shaohui.Xie@freescale.com>
->
-> Modify watchdog/Kconfig file to support Layerscape platforms.
->
-> Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
-> Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
-> Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
-> ---
-> This patch has been acked in V3 by Guenter Roeck [linux at roeck-us.net].
->
-Here it is again, but if there is no change, please just add the Ack
-to subsequent versions of the patch.
+On TI's Keystone platforms, several peripherals such as the
+gbe ethernet switch, 10gbe ethether switch and PCIe controller
+require the use of a SerDes for converting SoC parallel data into
+serialized data that can be output over a high-speed electrical
+interface, and also converting high-speed serial input data
+into parallel data that can be processed by the SoC.  The
+SerDeses used by those peripherals, though they may be different,
+are largely similar in functionality and setup.
 
-Acked-by: Guenter Roeck <linux@roeck-us.net>
+This patch series provides a SerDes phy driver implementation that can be
+used by the above mentioned peripheral drivers to configure their
+respective SerDeses.
 
+As an example of the using the SerDes driver, this patch series also
+updates the Keystone PCIe host driver to enable and use its SerDes block.
 
-> V4: V3 V2
->   - No change.
->
->   drivers/watchdog/Kconfig | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index 79e1aa1..448dbaf 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -446,7 +446,7 @@ config MAX63XX_WATCHDOG
->
->   config IMX2_WDT
->   	tristate "IMX2+ Watchdog"
-> -	depends on ARCH_MXC
-> +	depends on ARCH_MXC || ARCH_LAYERSCAPE
->   	select REGMAP_MMIO
->   	select WATCHDOG_CORE
->   	help
->
+References:
+[1] KeyStone II Architecture Serializer/Deserializer (SerDes) User's Guide
+    (http://www.ti.com/lit/ug/spruho3a/spruho3a.pdf)
+
+v1: 
+	- addresses the following review comments
+		1. https://lkml.org/lkml/2015/10/13/803
+		2. https://lkml.org/lkml/2015/10/14/613
+		3. https://lkml.org/lkml/2015/10/13/818
+
+	- An update to PCIe dts bindings to enable the PCIe SerDes is
+	  submitted in a separate patch.
+
+WingMan Kwok (2):
+  phy: keystone: serdes driver for gbe 10gbe and pcie
+  PCI: keystone: update to use generic keystone serdes driver
+
+ Documentation/devicetree/bindings/phy/ti-phy.txt |  278 +++
+ drivers/pci/host/pci-keystone.c                  |   54 +-
+ drivers/pci/host/pci-keystone.h                  |    2 +
+ drivers/phy/Kconfig                              |    8 +
+ drivers/phy/Makefile                             |    1 +
+ drivers/phy/phy-keystone-serdes.c                | 2373 ++++++++++++++++++++++
+ 6 files changed, 2707 insertions(+), 9 deletions(-)
+ create mode 100644 drivers/phy/phy-keystone-serdes.c
+
+-- 
+1.7.9.5
