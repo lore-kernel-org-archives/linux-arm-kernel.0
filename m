@@ -1,61 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 14:12:57 +0200
-Subject: [PATCH v4] ARM: configs: Add Freescale LS1021A defconfig
-In-Reply-To: <BN3PR0301MB0867A87B64E1206B773F05EEFE3E0@BN3PR0301MB0867.namprd03.prod.outlook.com>
-References: <1442480614-32345-1-git-send-email-b18965@freescale.com>
- <5232654.e6dagm53H4@wuerfel>
- <BN3PR0301MB0867A87B64E1206B773F05EEFE3E0@BN3PR0301MB0867.namprd03.prod.outlook.com>
-Message-ID: <5073362.oArWDzYkxD@wuerfel>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Thu, 15 Oct 2015 14:14:16 +0200
+Subject: [PATCH v3 0/4] Add support for STM32 DMA
+Message-ID: <1444911260-31993-1-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 October 2015 02:11:57 Huan Wang wrote:
-> > On Wednesday 14 October 2015 10:18:47 Huan Wang wrote:
-> > > > On Thursday 24 September 2015 07:27:10 Huan Wang wrote:
-> > > > > > On Fri, Sep 18, 2015 at 4:38 AM, Huan Wang <alison.wang@freescale.com> wrote:
-> > > > > Any suggestion? Thanks.
-> > > >
-> > > > Try enabling DEBUG_LL for your platform to get some debug output, if
-> > > > you still don't get any helpful messages, try also inserting
-> > > >
-> > > >       printascii(__func__);
-> > > >
-> > > > statements in the early boot process to see how far you get before the hang.
-> > > >
-> > 
-> [Alison Wang] ls1021a uses duart as the default serial port, not lpuart. So
-> 8250/16550 serial driver is used. Let me explain my debug process in detail.
+This patchset adds support for the STM32 DMA controller.
+This controller provides 8 channels dedicated to managing memory access
+request from one or more peripherals.
+Each stream can have up to 8 requests in total.
 
-Ah, I see.
+Changes since v2:
+- remove interrupt configuration management from DT
+- remove FIFO configuration management from DT except threshold as it is very
+  hard to handle it in the driver due to many possible combinations according
+  to burst and bus width
+- update DMA client message in DT documentation file
+- specify the order to be used to set per-channel DMA interrupts in the DT
+- remove unused enumerations for channel and request ids
+- keep as soon as possible 80 lines char for more readability
+- replace unsigned int by u32
+- return error if burst is not supported in stm32_dma_get_burst()
+- return error if bus_width is not supported in stm32_dma_get_width()
+- add FIFO configuration management inside the driver except for threshold
+- add interrupt configuration management inside the driver
+- rework stm32_dma_chan_irq() to handle error interrupt in one way
+- rework stm32_dma_set_xfer_param() to be easier to read
+- update stm32_dma_tx_status() to always return status from dma_cookie_status()
+- disable clk if we don't manage to stop the DMA channel during channel
+  resources allocation
+- set driver as built-in as DMA will be required by other built-in driver
 
-> When CONFIG_VMSPLIT_2G is used, I could boot up the whole kernel and get the
-> print message " Booting Linux on physical CPU 0xf00" after "Starting kernel"
-> as below.
-> 
-> Starting kernel ...
-> [    0.000000] Booting Linux on physical CPU 0xf00
-> .....
-> 
-> But when CONFIG_VMSPLIT_3G is used, I couldn't get print message " Booting Linux
-> on physical CPU 0xf00". It only hangs at  "Starting kernel ...".
-> 
-> Moreover, I add some asm code in __turn_mmu_on to print some simple characters, and
-> I could get the print characters when CONFIG_VMSPLIT_3G is used. So I guess there
-> is something wrong with the page tables.
+Changes since v1:
+ - remove dmamux boolean as it is not needed
+ - replace dma by DMA in Kconfig
+ - add default return value in stm32_dma_get_width()
+ - add defalut return value in stm32_dma_get_burst()
+ - use lower case for constant hexadecimal values
 
-Ok. What I was suggesting above though was to try to pinpoint exactly
-where it goes wrong. You have verified that it does not crash before
-the page tables are enabled, but that is very early. You have also shown
-that the kernel crashes before the point at which the 'Booting Linux on
-physical CPU 0xf00' message is printed to the kernel, but that is *much*
-later: setup_arch() calls parse_early_param(), which in turn sets up
-early_console_write(). This means the 'Booting Linux on physical CPU 0xf00'
-is still stuck in the log buffer and you may have crashed someone
-inbetween.
 
-If you can call printascii(), you can try to do that just after enabling
-the page tables to see if that was the problem like you suspect, or otherwise
-add more printascii() statements between __turn_mmu_on and parse_early_param()
-to pinpoint the exact code that breaks.
+M'boumba Cedric Madianga (4):
+  dt-bindings: Document the STM32 DMA bindings
+  dmaengine: Add STM32 DMA driver
+  ARM: dts: Add STM32 DMA support for STM32F429 MCU
+  ARM: configs: Add STM32 DMA support in STM32 defconfig
 
-	Arnd
+ .../devicetree/bindings/dma/stm32-dma.txt          |   82 ++
+ arch/arm/boot/dts/stm32f429.dtsi                   |   31 +
+ arch/arm/configs/stm32_defconfig                   |    2 +
+ drivers/dma/Kconfig                                |   12 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/stm32-dma.c                            | 1148 ++++++++++++++++++++
+ 6 files changed, 1276 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/stm32-dma.txt
+ create mode 100644 drivers/dma/stm32-dma.c
+
+-- 
+1.9.1
