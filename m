@@ -1,68 +1,59 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 15 Oct 2015 15:39:56 -0500
-Subject: [PATCH v2 0/8] of: Handle multi-parent version of msi-parent &
- msi-map
-In-Reply-To: <1444151043-31084-1-git-send-email-marc.zyngier@arm.com>
-References: <1444151043-31084-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAL_Jsq+8y=rZbpVfLEX2-chR-qy30sHozZS0ACL0hu2feDXF7w@mail.gmail.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Thu, 15 Oct 2015 13:40:25 -0700
+Subject: [PATCH v3 08/10] clk: ns2: add clock support for Broadcom
+ Northstar 2 SoC
+In-Reply-To: <1444938513-10758-9-git-send-email-jonmason@broadcom.com>
+References: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
+ <1444938513-10758-9-git-send-email-jonmason@broadcom.com>
+Message-ID: <56200F39.1060102@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 6, 2015 at 12:03 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Now that we have a useable and documented version of msi-parent that
-> can deal with multiple parenting, we can properly handle it in the
-> kernel. This leads to a new OF helper, some rework in the PCI and
-> platform layers, as well as a small patch for the ITS driver, which is
-> the only thing in the kernel requirering this functionality so far.
->
-> On top of that, the msi-map property also offers a new feature, which
-> is that ability to have a per-device MSI controller (instead of having
-> a global one). The last four patches enable this.
->
-> These patches are on top of David Daney's series:
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/373986.html
->
-> (of_msi_map_rid is a dependency), and has been tested on 4.3-rc3,
-> using both platform and PCI MSI devices.
->
-> * From the initial version
->   - Dropped the of parsing patch
->   - Built on top of David's series to reuse of_msi_map_rid
->   - New per-device PCI/MSI domain assignment hook
->   - Parse msi-map at bus probing time and populate the msi_domain field
->
-> Marc Zyngier (8):
->   of/irq: Add support code for multi-parent version of "msi-parent"
->   of/irq: Use of_msi_get_domain instead of open-coded "msi-parent"
->     parsing
->   PCI/MSI: Use of_msi_get_domain instead of open-coded "msi-parent"
->     parsing
->   irqchip/gic-v3-its: Parse new version of msi-parent property
->   of/irq: Split of_msi_map_rid to reuse msi-map lookup
->   of/irq: Use the msi-map property to provide device-specific MSI domain
->   PCI: Add per-device MSI domain hook
->   PCI/MSI: Allow the MSI domain to be device-specific
+We need some sort of kconfig option to differentiate NS2 clock driver 
+from being pulled in all the time.
 
-For the series:
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-I'm assuming Thomas is taking this and the dependency. It is mostly DT
-code so I'm happy take it if you want.
-
-Rob
-
+On 15-10-15 12:48 PM, Jon Mason wrote:
+> The Broadcom Northstar 2 SoC is architected under the iProc
+> architecture. It has the following PLLs: GENPLL SCR, GENPLL SW,
+> LCPLL DDR, LCPLL Ports, all derived from an onboard crystal.
 >
->  drivers/irqchip/irq-gic-v3-its-platform-msi.c |  18 ++-
->  drivers/of/irq.c                              | 151 ++++++++++++++++++++------
->  drivers/pci/msi.c                             |  17 +++
->  drivers/pci/of.c                              |  13 +--
->  drivers/pci/probe.c                           |  43 +++++++-
->  include/linux/msi.h                           |   6 +
->  include/linux/of_irq.h                        |  16 +++
->  7 files changed, 214 insertions(+), 50 deletions(-)
+> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> ---
+>   drivers/clk/Makefile                |   2 +-
+>   drivers/clk/bcm/Makefile            |   1 +
+>   drivers/clk/bcm/clk-ns2.c           | 288 ++++++++++++++++++++++++++++++++++++
+>   include/dt-bindings/clock/bcm-ns2.h |  72 +++++++++
+>   4 files changed, 362 insertions(+), 1 deletion(-)
+>   create mode 100644 drivers/clk/bcm/clk-ns2.c
+>   create mode 100644 include/dt-bindings/clock/bcm-ns2.h
 >
-> --
-> 2.1.4
->
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index d08b3e5..6124bd3 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -47,7 +47,7 @@ obj-$(CONFIG_COMMON_CLK_WM831X)		+= clk-wm831x.o
+>   obj-$(CONFIG_COMMON_CLK_XGENE)		+= clk-xgene.o
+>   obj-$(CONFIG_COMMON_CLK_PWM)		+= clk-pwm.o
+>   obj-$(CONFIG_COMMON_CLK_AT91)		+= at91/
+> -obj-$(CONFIG_ARCH_BCM)			+= bcm/
+> +obj-y					+= bcm/
+>   obj-$(CONFIG_ARCH_BERLIN)		+= berlin/
+>   obj-$(CONFIG_ARCH_HISI)			+= hisilicon/
+>   obj-$(CONFIG_ARCH_MXC)			+= imx/
+> diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
+> index e258b28..2d1cbc5 100644
+> --- a/drivers/clk/bcm/Makefile
+> +++ b/drivers/clk/bcm/Makefile
+> @@ -3,6 +3,7 @@ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-kona-setup.o
+>   obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm281xx.o
+>   obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm21664.o
+>   obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-iproc-armpll.o clk-iproc-pll.o clk-iproc-asiu.o
+> +obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-ns2.o
+
+NS2 code is dragged in for all IPROC SoCs.  We need a config option for 
+NS2 (CONFIG_ARCH_BCM_NS2) to avoid this (if Arnd allows this for ARMv8 
+processors... ?).
+
+You can see below ARMv7 processors don't have this problem.
+
+If not we need to add CONFIG_CLK_NS2.
