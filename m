@@ -1,43 +1,34 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 15 Oct 2015 21:04:24 +0200
-Subject: [GIT PULL] ARM: berlin: CPU clock driver for v4.4 (round 1)
-In-Reply-To: <1444934667-5451-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1444934667-5451-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1444935864-8606-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 15 Oct 2015 12:08:09 -0700
+Subject: [PATCH 06/13] clk: versatile-icst: convert to use regmap
+In-Reply-To: <1444916813-31024-7-git-send-email-linus.walleij@linaro.org>
+References: <1444916813-31024-1-git-send-email-linus.walleij@linaro.org>
+ <1444916813-31024-7-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20151015190809.GL4558@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Kevin, Olof,
+On 10/15, Linus Walleij wrote:
+> @@ -151,10 +174,19 @@ struct clk *icst_clk_register(struct device *dev,
+>  	init.flags = CLK_IS_ROOT;
+>  	init.parent_names = (parent_name ? &parent_name : NULL);
+>  	init.num_parents = (parent_name ? 1 : 0);
+> +	icst->map = regmap_init_mmio(NULL, base, &icst_regmap_conf);
+> +	if (IS_ERR(icst->map)) {
+> +		int ret;
+> +
+> +		pr_err("could not initialize ICST regmap\n");
+> +		kfree(icst);
+> +		ret = PTR_ERR(icst->map);
 
-this is the remaining driver changes of the broken PRs sent earlier.
-Again, as Arnd requested this branch is based on the PR adding the
-CPUID to the dt-binding include and drops moving the MAX_CLKS
-define from the driver to the dt-binding include.
+drivers/clk/versatile/clk-icst.c:183
+icst_clk_register() error: dereferencing freed memory 'icst'
+drivers/clk/versatile/clk-icst.c:184
+icst_clk_register() warn: possible memory leak of 'pclone'
 
-Please pull.
 
-The following changes since commit 28c039eebaaa28def9364b9a12a30192be8b4730:
+> +		return ERR_PTR(ret);
 
-  ARM: berlin: dts: add CLKID_CPU for BG2Q (2015-10-15 20:31:41 +0200)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-new-cpuclk-for-4.4-1
-
-for you to fetch changes up to 515f1a2027006839c08c842da919abfcc3c7ae2a:
-
-  clk: berlin: add cpuclk (2015-10-15 20:55:55 +0200)
-
-----------------------------------------------------------------
-Marvell Berlin BG2Q CPU clock driver:
-- add BG2Q CPU clock to clk driver
-
-----------------------------------------------------------------
-Antoine Tenart (1):
-      clk: berlin: add cpuclk
-
-Sebastian Hesselbarth (1):
-      Merge tag 'berlin-dt-cpuclk-for-4.4-1' into berlin/cpuclk
-
- drivers/clk/berlin/bg2q.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
