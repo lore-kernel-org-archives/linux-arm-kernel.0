@@ -1,64 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Oct 2015 13:47:56 +0100
-Subject: [PATCHv3] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
-In-Reply-To: <20151015121241.GA26080@port70.net>
-References: <1444386580-10917-1-git-send-email-manjeet.p@samsung.com>
- <20151009103352.GK26278@arm.com>
- <20151015121241.GA26080@port70.net>
-Message-ID: <20151015124756.GB27524@arm.com>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Thu, 15 Oct 2015 20:49:40 +0800
+Subject: [alsa-devel] [RFC PATCH] ASoC: Modify check condition of
+ multiple bindings of components
+In-Reply-To: <20151015121035.GE14956@sirena.org.uk>
+References: <1444743477-48819-1-git-send-email-koro.chen@mediatek.com>
+ <561D0AA9.5080702@metafoo.de> <1444745902.26493.2.camel@mtksdaap41>
+ <561D1843.1020007@metafoo.de> <1444785549.26493.12.camel@mtksdaap41>
+ <561E1991.1050705@metafoo.de> <20151015121035.GE14956@sirena.org.uk>
+Message-ID: <1444913380.26493.38.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 02:12:41PM +0200, Szabolcs Nagy wrote:
-> * Will Deacon <will.deacon@arm.com> [2015-10-09 11:33:52 +0100]:
+On Thu, 2015-10-15 at 13:10 +0100, Mark Brown wrote:
+> On Wed, Oct 14, 2015 at 11:00:01AM +0200, Lars-Peter Clausen wrote:
 > 
-> > On Fri, Oct 09, 2015 at 03:59:40PM +0530, Manjeet Pawar wrote:
-> > > MINSIGSTKSZ and SIGSTKSZ for ARM64 are not correctly set in latest kernel.
-> > > This patch fixes this issue.
-> > > 
-> > > This issue is reported in LTP (testcase: sigaltstack02.c).
-> > > Testcase failed when sigaltstack() called with stack size "MINSIGSTKSZ - 1"
-> > > Since in Glibc-2.22, MINSIGSTKSZ is set to 5120 but in kernel
-> > > it is set to 2048 so testcase gets failed.
-> > > 
-> > > Testcase Output:
-> > > sigaltstack02 1  TPASS  :  stgaltstack() fails, Invalid Flag value,errno:22
-> > > sigaltstack02 2  TFAIL  :  sigaltstack() returned 0, expected -1,errno:12
-> > 
-> > I'm still unable to reproduce this failure. Is this with defconfig?
-> > 
-> > > Reported Issue in Glibc Bugzilla:
-> > > Bugfix in Glibc-2.22: [Bug 16850]
-> > > https://sourceware.org/bugzilla/show_bug.cgi?id=16850
-> > > 
-> > > Signed-off-by: Akhilesh Kumar <akhilesh.k@samsung.com>
-> > > Signed-off-by: Manjeet Pawar <manjeet.p@samsung.com>
-> > > Signed-off-by: Rohit Thapliyal <r.thapliyal@samsung.com>
-> > > ---
-> > > v1 -> Changes in uapi overall header
-> > > v2 -> Changes done in arm64 headers
-> > > v3 -> Changes done in both uapi & arm64 headers
-> > > 
-> > >  arch/arm64/include/uapi/asm/signal.h |    3 +++
-> > >  include/uapi/asm-generic/signal.h    |    2 ++
-> > >  2 files changed, 5 insertions(+)
-> > 
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> > 
-> > Arnd: are you planning to take this via asm-generic, or shall I queue it
-> > on the arm64 fixes branch?
-> > 
+> > It was never intended that it is possible to bind a component to multiple
+> > cards. That it was possible was a bug that was overlooked and some people
+> > tried to do it which caused apparently random crashes later on, caused by
+> > the data structure corruption. This is why we added the check to catch this
+> > kind of mistake early and to avoid the crashes.
 > 
-> i just noticed this and wanted to note that an old
-> glibc can fail on a new kernel with this patch if
-> an application uses MINSIGSTKSZ altstack.
-
-I was worried about that (which was also why I didn't Cc stable on this,
-because we shouldn't pretend that glibc and the kernel are synchronised),
-but the value *is* incorrect and glibc has already been updated. In
-other words, not merging this patch is also problematic, because we're
-advertising a size that's significantly too small.
-
-Would you rather we kept the old incorrect value in the kernel headers?
-
-Will
+> This is true, but I do think it's something that we should have some
+> story on supporting for some of this hardware that has a bunch of
+> channels in one IP block that can't really interact with each other.
+> It's going to make it a lot easier for people to think about the
+> hardware and how to describe it.
+Yes, and if in some cases we must use multiple cards, it seems the only
+option left is to separate an ASoC platform driver into multiple
+drivers. It does not make sense to me since there is only one HW block.
