@@ -1,40 +1,50 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 15 Oct 2015 14:23:51 +0100
-Subject: [PATCH v3 13/24] arm64: Populate cpuinfo after notify_cpu_starting
-In-Reply-To: <20151015105438.GL4239@e104818-lin.cambridge.arm.com>
-References: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
- <1444756952-31145-14-git-send-email-suzuki.poulose@arm.com>
- <20151015105438.GL4239@e104818-lin.cambridge.arm.com>
-Message-ID: <561FA8E7.5020504@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 15:23:56 +0200
+Subject: [GIT PULL 2/3] ARM: berlin: DT changes for v4.4 (round 1)
+In-Reply-To: <561F9F24.1050801@gmail.com>
+References: <1444416494-3117-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <6053924.4novCdxIMG@wuerfel> <561F9F24.1050801@gmail.com>
+Message-ID: <5441220.dfRGQN11VB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/15 11:54, Catalin Marinas wrote:
-> On Tue, Oct 13, 2015 at 06:22:21PM +0100, Suzuki K. Poulose wrote:
->> This patch delays populating the cpuinfo for a new (hotplugged)
->> CPU until the notifiers have executed. This will enable us to verify
->> if the new (hotplugged) CPU has all the capabilities which the system
->> already has. If it doesn't, we could prevent it from turning online and
->> also modifying the system wide feature register status.
->
-> Just a question here: do we expect the notifiers to enable certain
-> features that we check later? AFAICT, the checking is done on the
-> feature registers which don't change after notifiers,
+On Thursday 15 October 2015 14:42:12 Sebastian Hesselbarth wrote:
+> On 14.10.2015 17:44, Arnd Bergmann wrote:
+> > On Friday 09 October 2015 20:48:13 Sebastian Hesselbarth wrote:
+> >> this is round 1 of Marvell Berlin DT changes for v4.4. There is
+> >> some improvement in serial aliases/stdout path, cpufreq properties,
+> >> and PWM nodes for all SoCs. The cpufreq properties depend on cpuclk
+> >> being available, therefore this branch has a dependency with the
+> >> cpuclk topic PR sent earlier.
+> >>
+> >
+> > Pulled into next/dt, thanks!
+> 
+> Hi Arnd,
+> 
+> the prerequisite cpuclk topic branch didn't make it into arm-soc causing
+> a build failure on bg2q dts files.
+> 
+> Unfortunately, cpuclk topic branch touches both, dt-includes and driver
+> code. I was hoping you could also pull the topic branch with berlin/dt.
+> 
+> I am open for suggestions how to deal with it now and in the future.
 
-No. The notifiers are registered only after we compute the cpu
-capabilities (at which point all the boot time activated CPUs are
-turned on and has updated their cpuinfo). The features won't change
-after this point throughout the lifetime of the system. So we don't want to
-run the capability check for the 'CPUs' during the normal boot up. It
-is only for the hotplug case. We compute the capability based on the
-booted CPUs from smp_cpus_done() and then apply the alternatives based
-on what we have in common. So the system can function properly with
-mismatched features from the CPUs. But if a new CPU is brought online
-with at least one missing established capability, we should fail the bring up.
+Oops, I should have checked this better. In general, you should never
+submit a branch that does not by itself build and work. Even if I had
+merged your other pull request into the next/drivers branch, I would
+still have a broken next/dt branch that I could not submit to Linus.
 
-  so we could as
-> well block the booting before any notifier is run.
->
+Can you create a pull request with just one patch that adds the
+CLKID_CPU definition so I can merge that into next/dt to get a working
+branch again?
 
-Thanks
-Suzuki
+After that, please rebase the "clk: berlin: add cpuclk" patch on top
+of this one, so we can avoid conflicting commits.
+
+Regarding the MAX_CLKS definition, please leave that out of the
+dt-bindings header, it doesn't really belong in there as it has
+no significance to the dts files and its definition apparently is
+not stable.
+
+	Arnd
