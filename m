@@ -1,57 +1,65 @@
-From: khiem.nguyen.xt@rvc.renesas.com (Khiem Nguyen)
-Date: Thu, 15 Oct 2015 15:10:00 +0700
-Subject: [PATCH v11 8/8] MAINTAINERS: Add entry Renesas arm64 architecture
-In-Reply-To: <20151015080421.GV32532@n2100.arm.linux.org.uk>
-References: <1444890243-6978-1-git-send-email-horms+renesas@verge.net.au>
- <1444890243-6978-9-git-send-email-horms+renesas@verge.net.au>
- <561F4B72.2050305@rvc.renesas.com>
- <20151015080421.GV32532@n2100.arm.linux.org.uk>
-Message-ID: <561F5F58.7010200@rvc.renesas.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Thu, 15 Oct 2015 10:11:19 +0200
+Subject: [PATCH v6 0/5] Add DT support for netxbig LEDs
+In-Reply-To: <87mvvk38kl.fsf@free-electrons.com>
+References: <1443301358-2131-1-git-send-email-simon.guinot@sequanux.org>
+ <56178C49.4070704@samsung.com> <87mvvk38kl.fsf@free-electrons.com>
+Message-ID: <561F5FA7.2040000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2015 3:04 PM, Russell King - ARM Linux wrote:
-> On Thu, Oct 15, 2015 at 01:45:06PM +0700, Khiem Nguyen wrote:
->> Hi Simon,
->>
->> Thanks for your patch.
->>
->> On 10/15/2015 1:24 PM, Simon Horman wrote:
->>> Initial Renesas arm64 architecture support will be for the R-Car H3,
->>> r8a7795, SoC and its Salvator-X board.
->>>
->>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>>
->>> ---
->>>
->>> Changes since v10:
->>> - New Patch
->>> ---
->>>   MAINTAINERS | 10 ++++++++++
->>>   1 file changed, 10 insertions(+)
->>>
->>> diff --git a/MAINTAINERS b/MAINTAINERS
->>> index 7ba7ab749c85..0067b7156622 100644
->>> --- a/MAINTAINERS
->>> +++ b/MAINTAINERS
->>> @@ -1392,6 +1392,16 @@ M:	Lennert Buytenhek <kernel@wantstofly.org>
->>>   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>>   S:	Maintained
->>>
->>> +ARM/RENESAS ARM64 ARCHITECTURE
->>
->> I think you should add this near its younger brother, i.e ARM/RENESAS ARM
->> ARCHITECTURE.
->
-> The file being modified has this in it:
->
->    Note: For the hard of thinking, this list is meant to remain in alphabetical
->    order. If you could add yourselves to it in alphabetical order that would be
->    so much easier [Ed]
->
-> It's not freely orderable.
->
-> There is no "ARM/RENESAS ARM ARCHITECTURE" in the file.  There is
-> "ARM/SHMOBILE ARM ARCHITECTURE" though.
+Hi Gregory,
 
-I see. Thanks for your explanation.
+On 10/15/2015 09:16 AM, Gregory CLEMENT wrote:
+> Hi Jacek,
+>
+>   On ven., oct. 09 2015, Jacek Anaszewski <j.anaszewski@samsung.com> wrote:
+>
+>> On 09/26/2015 11:02 PM, Simon Guinot wrote:
+>>> Hello,
+>
+> [..]
+>>>
+>>> Simon Guinot (5):
+>>>     leds: netxbig: add device tree binding
+>>>     ARM: Kirkwood: add LED DT entries for netxbig boards
+>>>     ARM: mvebu: remove static LED setup for netxbig boards
+>>>     leds: netxbig: convert to use the devm_ functions
+>>>     leds: netxbig: set led_classdev max_brightness
+>>>
+>>>    .../devicetree/bindings/gpio/netxbig-gpio-ext.txt  |  22 ++
+>>>    .../devicetree/bindings/leds/leds-netxbig.txt      |  92 ++++++
+>>>    arch/arm/boot/dts/kirkwood-net5big.dts             |  60 ++++
+>>>    arch/arm/boot/dts/kirkwood-netxbig.dtsi            |  80 +++++
+>>>    arch/arm/mach-mvebu/Kconfig                        |   7 -
+>>>    arch/arm/mach-mvebu/Makefile                       |   1 -
+>>>    arch/arm/mach-mvebu/board.h                        |  21 --
+>>>    arch/arm/mach-mvebu/kirkwood.c                     |   4 -
+>>>    arch/arm/mach-mvebu/netxbig.c                      | 191 ------------
+>>>    drivers/leds/leds-netxbig.c                        | 336 ++++++++++++++++-----
+>>>    include/dt-bindings/leds/leds-netxbig.h            |  18 ++
+>>>    .../linux/platform_data/leds-kirkwood-netxbig.h    |   1 +
+>>>    12 files changed, 531 insertions(+), 302 deletions(-)
+>>>    create mode 100644 Documentation/devicetree/bindings/gpio/netxbig-gpio-ext.txt
+>>>    create mode 100644 Documentation/devicetree/bindings/leds/leds-netxbig.txt
+>>>    delete mode 100644 arch/arm/mach-mvebu/board.h
+>>>    delete mode 100644 arch/arm/mach-mvebu/netxbig.c
+>>>    create mode 100644 include/dt-bindings/leds/leds-netxbig.h
+>>>
+>>
+>> Since no comment regarding DT bindings has appeared for a long time,
+>> I decided to merge the patch set without DT maintainer's ack, thanks.
+>
+> it is a good news that this series will be finally merged. However did
+> you also take the patches "ARM: Kirkwood: add LED DT entries for netxbig
+> boards" and "ARM: mvebu: remove static LED setup for netxbig boards" ?
+
+Yes, I did:
+
+https://git.kernel.org/cgit/linux/kernel/git/j.anaszewski/linux-leds.git/log/?h=for-next
+
+They should appear in the next issue of linux-next.
+
+-- 
+Best Regards,
+Jacek Anaszewski
