@@ -1,42 +1,76 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 15 Oct 2015 18:51:13 +0200
-Subject: [RFT PATCH v2 6/6] ARM: dts: Mark eMMC as non-removable in
- exynos5250-snow-common
-In-Reply-To: <1444927873-15140-1-git-send-email-javier@osg.samsung.com>
-References: <1444927873-15140-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1444927873-15140-7-git-send-email-javier@osg.samsung.com>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Thu, 15 Oct 2015 18:52:29 +0200
+Subject: [PATCH v2] ARM: fix vdsomunge not to depend on glibc specific
+ byteswap.h
+In-Reply-To: <20151015163712.GD32532@n2100.arm.linux.org.uk>
+References: <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
+ <B69CCAC6-FB47-4B2B-95F9-15F1BA4AD381@goldelico.com>
+ <5B19AAFC-976C-4B33-A83E-229693FA7858@goldelico.com>
+ <561E63C9.3040702@mentor.com>
+ <350DE2A3-622F-4624-8AFC-D0F37CCB29EA@goldelico.com>
+ <20151015163712.GD32532@n2100.arm.linux.org.uk>
+Message-ID: <2EC080E4-B31C-46F5-8239-FF96493DA861@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eMMC is non-removable so mark it using the non-removable DT
-property to avoid having to redetect it after a suspend/resume.
 
-Also remove the card-detect-delay property that is not needed with
-non-removable.
+Am 15.10.2015 um 18:37 schrieb Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> On Thu, Oct 15, 2015 at 07:52:38AM +0200, H. Nikolaus Schaller wrote:
+>> ERROR: space prohibited before that close parenthesis ')'
+>> #46: FILE: arch/arm/vdso/vdsomunge.c:64:
+>> +		(((unsigned short)(x) & (unsigned short)0xff00U) >> 8) ))
+> 
+> I have a pet hatred of too many parens.  I also have a hatred of idiotic
+> casts.  What about changing the above to one of:
+> 
+> 		(((x) & 0xff00) >> 8)
+> 		(((x) >> 8) & 0xff)
+> 
+>> 
+>> ERROR: space prohibited before that close parenthesis ')'
+>> #53: FILE: arch/arm/vdso/vdsomunge.c:71:
+>> +		(((unsigned int)(x) & (unsigned int)0xff000000UL) >> 24) ))
+> 
+> and one of:
+> 
+> 		(((x) & 0xff000000) >> 24)
+> 		(((x) >> 24) & 0xff)
+> 
+> ?
 
----
+Well, the semantics is sometimes the same but I think readability goes down
+because the macro becomes quite un-symmetric and for >> 8 you should
+better be sure that values are unsigned if combining with | operator.
 
-Changes since v1:
-- None, new patch.
+Of course it is questionable why the constants (with U and UL modifiers)
+are casted.
 
- arch/arm/boot/dts/exynos5250-snow-common.dtsi | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+The full macro (as copied verbatim from existing arch/mips/boot/elf2ecoff.c) is:
 
-diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
-index 1822c502a25a..5cb33ba5e296 100644
---- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
-@@ -520,8 +520,7 @@
- &mmc_0 {
- 	status = "okay";
- 	num-slots = <1>;
--	broken-cd;
--	card-detect-delay = <200>;
-+	non-removable;
- 	samsung,dw-mshc-ciu-div = <3>;
- 	samsung,dw-mshc-sdr-timing = <2 3>;
- 	samsung,dw-mshc-ddr-timing = <1 2>;
--- 
-2.4.3
++#define swab16(x) \
++	((unsigned short)( \
++		(((unsigned short)(x) & (unsigned short)0x00ffU) << 8) | \
++		(((unsigned short)(x) & (unsigned short)0xff00U) >> 8)))
++
++#define swab32(x) \
++	((unsigned int)( \
++		(((unsigned int)(x) & (unsigned int)0x000000ffUL) << 24) | \
++		(((unsigned int)(x) & (unsigned int)0x0000ff00UL) <<  8) | \
++		(((unsigned int)(x) & (unsigned int)0x00ff0000UL) >>  8) | \
++		(((unsigned int)(x) & (unsigned int)0xff000000UL) >> 24)))
++
+
+I have already submitted a V3 of this patch, so please comment that.
+
+A question is why this is not generally available for all HOSTCC based tools
+so that we could simply include some header. But since that is no kernel
+code but a tool, I think it is not really necessary to put significant efforts
+into this piece of code.
+
+This was probably the intention of the original code to simply include
+byteswap.h - then you don't even see how complex the macros are -
+but it is not a standard header.
+
+BR and thanks,
+Nikolaus Schaller
