@@ -1,96 +1,134 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 15 Oct 2015 15:48:41 +0100
-Subject: [PATCHv3 10/11] arm64: Add 16K page size support
-In-Reply-To: <20151015140646.GJ8825@leverpostej>
-References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
- <1444821634-1689-11-git-send-email-suzuki.poulose@arm.com>
- <20151015140646.GJ8825@leverpostej>
-Message-ID: <561FBCC9.2000106@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 16:51:02 +0200
+Subject: [PATCH v1 1/2] phy: keystone: serdes driver for gbe 10gbe and pcie
+In-Reply-To: <1444919145-30845-2-git-send-email-w-kwok2@ti.com>
+References: <1444919145-30845-1-git-send-email-w-kwok2@ti.com>
+ <1444919145-30845-2-git-send-email-w-kwok2@ti.com>
+Message-ID: <5192855.p6QLDWTiVi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/15 15:06, Mark Rutland wrote:
-> Hi,
->
+On Thursday 15 October 2015 10:25:44 WingMan Kwok wrote:
+> On TI's Keystone platforms, several peripherals such as the
+> gbe ethernet switch, 10gbe ethernet switch and PCIe controller
+> require the use of a SerDes for converting SoC parallel data into
+> serialized data that can be output over a high-speed electrical
+> interface, and also converting high-speed serial input data
+> into parallel data that can be processed by the SoC.  The
+> SerDeses used by those peripherals, though they may be different,
+> are largely similar in functionality and setup.
+> 
+> This patch provides a SerDes phy driver implementation that can be
+> used by the above mentioned peripheral drivers to configure their
+> respective SerDeses.
+> 
+> v1:
+> 	- see cover letter for review comments addressed.
+> 
+> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+> ---
+>  Documentation/devicetree/bindings/phy/ti-phy.txt |  278 +++
+>  drivers/phy/Kconfig                              |    8 +
+>  drivers/phy/Makefile                             |    1 +
+>  drivers/phy/phy-keystone-serdes.c                | 2373 ++++++++++++++++++++++
+>  4 files changed, 2660 insertions(+)
+>  create mode 100644 drivers/phy/phy-keystone-serdes.c
 
-I have fixed all the nits locally. Thanks for pointing them out.
+This is quite a bit of code. Are you very sure that this PHY is
+not used on any other SoC family, and that it is not licensed
+from a third party? I would hate to see multiple copies of
+this getting merged into the kernel over time, so thename should
+be chosen carefully to let the next person know when they have
+related hardware.
 
->>   config FORCE_MAX_ZONEORDER
->>   	int
->>   	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
->> +	default "12" if (ARM64_16K_PAGES && TRANSPARENT_HUGEPAGE)
->>   	default "11"
->
-> I'm a little lost here. How are these numbers derived?
->
-
-I struggled to find the right value for 16K. Thanks to Steve Capper
-for the following explanation. I will add it as a comment.
-
-All allocations from the buddy allocator have to have compound order
-strictly less than MAX_ORDER. i.e, the maximum allocation size is
-(MAX_ORDER - 1) PAGES. To align with the transparent huge page size,
-we get :
-
-  (MAX_ORDER - 1) + PAGE_SHIFT = PMD_SHIFT
-
-Which gives us:
-
-MAX_ORDER = PAGE_SHIFT - 3 + PAGE_SHIFT - PAGE_SHIFT + 1
-           = PAGE_SHIFT - 2
-
-That raises an interesting question about the selection of the value
-for 4K. Shouldn't that be 10 instead of 11 ?
-
-Steve ?
-
->> -#ifdef CONFIG_ARM64_64K_PAGES
->> +#if	defined(CONFIG_ARM64_64K_PAGES)
->>   #define NR_FIX_BTMAPS		4
->> +#elif	defined (CONFIG_ARM64_16K_PAGES)
->> +#define NR_FIX_BTMAPS		16
->>   #else
->>   #define NR_FIX_BTMAPS		64
->>   #endif
->
-> We could include <linux/sizes.h> and simplify this to:
->
-> #define NR_FIX_BTMAPS (SZ_256K / PAGE_SIZE)
->
-> Which works for me locally.
-
-Nice cleanup. I will pick that as a separate patch in the series.
-
->
->> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
->> index 5eac6a2..90c7ff2 100644
->> --- a/arch/arm64/include/asm/thread_info.h
->> +++ b/arch/arm64/include/asm/thread_info.h
->> @@ -25,6 +25,8 @@
->>
->>   #ifdef CONFIG_ARM64_4K_PAGES
->>   #define THREAD_SIZE_ORDER	2
->> +#elif defined(CONFIG_ARM64_16K_PAGES)
->> +#define THREAD_SIZE_ORDER	0
->>   #endif
->>   #define THREAD_SIZE		16384
->
-> The above looks correct.
->
-> As an open/general question, why do both THREAD_SIZE_ORDER and
-> THREAD_SIZE exist? One really should be defined in terms of the other.
-
-I think its mainly for choosing the mechanism for stack allocation. If it
-is a multiple of a page, you allocate a page. If not, uses a kmem_cache.
+> +
+> +gbe_serdes0: gbe_serdes at 232a000 {
 
 
->>   #define id_aa64mmfr0_tgran_shift	ID_AA64MMFR0_TGRAN4_SHIFT
->>   #define id_aa64mmfr0_tgran_on		ID_AA64MMFR0_TGRAN4_ON
->
-> I assume you'll s/ON/SUPPORTED/ per comments in another thread.
->
+make that phy at 232a000, the name should be one of the usual identifiers,
+not specific to the instance.
 
-Yes
+> +config PHY_TI_KEYSTONE_SERDES
+> +	tristate "TI Keystone SerDes PHY support"
+> +	depends on OF && ARCH_KEYSTONE
+> +	select GENERIC_PHY
+> +	help
+> +	  This option enables support for TI Keystone SerDes PHY found
+> +	  in peripherals GBE, 10GBE and PCIe.
+> +
 
-Thanks
-Suzuki
+(ARCH_KEYSTONE || COMPILE_TEST) ?
+
+> + * Redistributions in binary form must reproduce the above copyright
+> + * notice, this list of conditions and the following disclaimer in the
+> + * documentation and/or other materials provided with the
+> + * distribution.
+
+The current code does not do this when compiled, which might be a
+problem for distributors. Can you clarify the license?
+
+> +#define reg_rmw(addr, value, mask) \
+> +	__raw_writel(((__raw_readl(addr) & (~(mask))) | \
+> +			(value & (mask))), (addr))
+
+not endian safe, and potentially racy.
+
+> +static inline void _kserdes_reset_cdr(void __iomem *sregs, int lane)
+> +{
+> +	/* toggle signal detect */
+> +	_kserdes_force_signal_detect_low(sregs, lane);
+> +	mdelay(1);
+> +	_kserdes_force_signal_detect_high(sregs, lane);
+> +}
+
+Can you change the code so you can use msleep(1) here?
+
+> +
+> +	do {
+> +		mdelay(10);
+> +		memset(lane_down, 0, sizeof(lane_down));
+> +
+> +		link_up = _kserdes_check_link_status(dev, sregs,
+> +						     pcsr_regmap, lanes,
+> +						     lanes_enable,
+> +						     current_state, lane_down);
+> +
+> +		/* if we did not get link up then wait 100ms
+> +		 * before calling it again
+> +		 */
+> +		if (link_up)
+> +			break;
+> +
+> +		for (i = 0; i < lanes; i++) {
+> +			if ((lanes_enable & (1 << i)) && lane_down[i])
+> +				dev_dbg(dev,
+> +					"XGE: detected lane down on lane %d\n",
+> +					i);
+> +		}
+> +
+> +		if (++retries > 100)
+> +			return -ETIMEDOUT;
+> +
+> +	} while (!link_up);
+
+an more importantly here. Blocking the CPU for over one second is not good.
+
+Any use of mdelay() should have a comment explaining why you cannot use
+msleep() in that instance.
+
+> +
+> +static int __init keystone_serdes_phy_init(void)
+> +{
+> +	return platform_driver_register(&kserdes_driver);
+> +}
+> +module_init(keystone_serdes_phy_init);
+> +
+> +static void __exit keystone_serdes_phy_exit(void)
+> +{
+> +	platform_driver_unregister(&kserdes_driver);
+> +}
+> +module_exit(keystone_serdes_phy_exit);
+
+module_platform_driver()
+
+	Arnd
