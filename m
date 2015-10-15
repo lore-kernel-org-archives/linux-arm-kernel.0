@@ -1,44 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Oct 2015 17:51:06 +0100
-Subject: [PATCH v1 0/2] Common SerDes driver for TI's Keystone Platforms
-In-Reply-To: <1444919145-30845-1-git-send-email-w-kwok2@ti.com>
-References: <1444919145-30845-1-git-send-email-w-kwok2@ti.com>
-Message-ID: <20151015165105.GE32532@n2100.arm.linux.org.uk>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 15 Oct 2015 18:51:09 +0200
+Subject: [PATCH v2 2/6] ARM: dts: Mark SDIO as non-removable in
+ exynos5420-peach-pit
+In-Reply-To: <1444927873-15140-1-git-send-email-javier@osg.samsung.com>
+References: <1444927873-15140-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1444927873-15140-3-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 10:25:43AM -0400, WingMan Kwok wrote:
-> On TI's Keystone platforms, several peripherals such as the
-> gbe ethernet switch, 10gbe ethether switch and PCIe controller
-> require the use of a SerDes for converting SoC parallel data into
-> serialized data that can be output over a high-speed electrical
-> interface, and also converting high-speed serial input data
-> into parallel data that can be processed by the SoC.  The
-> SerDeses used by those peripherals, though they may be different,
-> are largely similar in functionality and setup.
+The Exynos5420 Peach Pit Chromebook has a Marvell WiFi SDIO chip which
+can't neither be removed nor be detected. But the node isn't marked
+as non-removable and instead has the broken-cd DT property.
 
-Given that serdes is not specific to TI, should this be specific to
-TI, or should there be an effort to come up with something which
-everyone who has serdes links can make use of?
+This causes the device to be removed when the system enters into a
+suspend state and the following warnings is shown after a resume:
 
-Serdes comes in multiple different forms: PCIe, 1G SGMII ethernet,
-1000base-X ethernet, 10g ethernet, SATA... I'd hate to see a
-plethora of SoC specific stuff for this.
+[  181.944636] mmc2: error -2 during resume (card was removed?)
 
-When serdes is combined with SFP cages, the situation becomes much
-more fun, because the serdes link then needs to become hotpluggable
-(SFP modules are designed to be hotplugged) which means you have to
-be able to switch between (at least) 1G SGMII and 1000base-X modes,
-and probably 10G mode as well.  There's even a SFP module that has
-a SATA connector on it, though I believe there's no standard for
-that, and it's more a hardware hack.
+Also remove the card-detect-delay property that is not needed with
+non-removable.
 
-I've been working in this area but from the Ethernet side on an
-Armada 38x based board which has a SFP cage on it, though it's
-slightly simpler there because there is no support (or I believe
-any desire) to reconfigure the serdes lanes between PCI, ethernet
-and SATA - that's all setup and initialised for us by uboot.
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
+Changes since v1:
+- Remove card-detect-delay property as well.
+
+ arch/arm/boot/dts/exynos5420-peach-pit.dts | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index 72ba6f032ed7..02e99dbafcfb 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -709,10 +709,9 @@
+ &mmc_1 {
+ 	status = "okay";
+ 	num-slots = <1>;
+-	broken-cd;
++	non-removable;
+ 	cap-sdio-irq;
+ 	keep-power-in-suspend;
+-	card-detect-delay = <200>;
+ 	clock-frequency = <400000000>;
+ 	samsung,dw-mshc-ciu-div = <1>;
+ 	samsung,dw-mshc-sdr-timing = <0 1>;
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.4.3
