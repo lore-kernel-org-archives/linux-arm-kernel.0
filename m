@@ -1,33 +1,62 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 15 Oct 2015 14:42:12 +0200
-Subject: [GIT PULL 2/3] ARM: berlin: DT changes for v4.4 (round 1)
-In-Reply-To: <6053924.4novCdxIMG@wuerfel>
-References: <1444416494-3117-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1444416494-3117-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <6053924.4novCdxIMG@wuerfel>
-Message-ID: <561F9F24.1050801@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 14:44:05 +0200
+Subject: [PATCHv3] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
+In-Reply-To: <20151015121241.GA26080@port70.net>
+References: <1444386580-10917-1-git-send-email-manjeet.p@samsung.com>
+ <20151009103352.GK26278@arm.com> <20151015121241.GA26080@port70.net>
+Message-ID: <6205380.pxTZSIhjca@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.10.2015 17:44, Arnd Bergmann wrote:
-> On Friday 09 October 2015 20:48:13 Sebastian Hesselbarth wrote:
->> this is round 1 of Marvell Berlin DT changes for v4.4. There is
->> some improvement in serial aliases/stdout path, cpufreq properties,
->> and PWM nodes for all SoCs. The cpufreq properties depend on cpuclk
->> being available, therefore this branch has a dependency with the
->> cpuclk topic PR sent earlier.
->>
->
-> Pulled into next/dt, thanks!
+On Thursday 15 October 2015 14:12:41 Szabolcs Nagy wrote:
+> * Will Deacon <will.deacon@arm.com> [2015-10-09 11:33:52 +0100]:
+> 
+> > On Fri, Oct 09, 2015 at 03:59:40PM +0530, Manjeet Pawar wrote:
+> > > MINSIGSTKSZ and SIGSTKSZ for ARM64 are not correctly set in latest kernel.
+> > > This patch fixes this issue.
+> > > 
+> > > This issue is reported in LTP (testcase: sigaltstack02.c).
+> > > Testcase failed when sigaltstack() called with stack size "MINSIGSTKSZ - 1"
+> > > Since in Glibc-2.22, MINSIGSTKSZ is set to 5120 but in kernel
+> > > it is set to 2048 so testcase gets failed.
+> > > 
+> > > Testcase Output:
+> > > sigaltstack02 1  TPASS  :  stgaltstack() fails, Invalid Flag value,errno:22
+> > > sigaltstack02 2  TFAIL  :  sigaltstack() returned 0, expected -1,errno:12
+> > 
+> > I'm still unable to reproduce this failure. Is this with defconfig?
+> > 
+> > > Reported Issue in Glibc Bugzilla:
+> > > Bugfix in Glibc-2.22: [Bug 16850]
+> > > https://sourceware.org/bugzilla/show_bug.cgi?id=16850
+> > > 
+> > > Signed-off-by: Akhilesh Kumar <akhilesh.k@samsung.com>
+> > > Signed-off-by: Manjeet Pawar <manjeet.p@samsung.com>
+> > > Signed-off-by: Rohit Thapliyal <r.thapliyal@samsung.com>
+> > > ---
+> > > v1 -> Changes in uapi overall header
+> > > v2 -> Changes done in arm64 headers
+> > > v3 -> Changes done in both uapi & arm64 headers
+> > > 
+> > >  arch/arm64/include/uapi/asm/signal.h |    3 +++
+> > >  include/uapi/asm-generic/signal.h    |    2 ++
+> > >  2 files changed, 5 insertions(+)
+> > 
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> > 
+> > Arnd: are you planning to take this via asm-generic, or shall I queue it
+> > on the arm64 fixes branch?
+> > 
+> 
+> i just noticed this and wanted to note that an old
+> glibc can fail on a new kernel with this patch if
+> an application uses MINSIGSTKSZ altstack.
 
-Hi Arnd,
+Well worth noting, but I think we should consider this intentional:
 
-the prerequisite cpuclk topic branch didn't make it into arm-soc causing
-a build failure on bg2q dts files.
+If an application built against an old glibc uses MINSIGSTKSZ, it
+current gets random data corruption of a segmentation fault that
+are both hard to track down, while a new kernel would result in
+more sensible error code that is easier to debug.
 
-Unfortunately, cpuclk topic branch touches both, dt-includes and driver
-code. I was hoping you could also pull the topic branch with berlin/dt.
-
-I am open for suggestions how to deal with it now and in the future.
-
-Sebastian
+	Arnd
