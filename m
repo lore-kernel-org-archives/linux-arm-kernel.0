@@ -1,66 +1,105 @@
-From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
-Date: Thu, 15 Oct 2015 20:11:06 +0000
-Subject: [PATCH v3 05/12] doc/bindings: Update Layerscape PCIe devicetree
- binding to be more flexible
-In-Reply-To: <5383901.aC2HYopUNW@wuerfel>
-References: <1444891672-32117-1-git-send-email-bhupesh.sharma@freescale.com>
- <1444891672-32117-6-git-send-email-bhupesh.sharma@freescale.com>
- <5383901.aC2HYopUNW@wuerfel>
-Message-ID: <BY1PR0301MB13039481CB958A3323FB03B2823E0@BY1PR0301MB1303.namprd03.prod.outlook.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 15 Oct 2015 15:11:35 -0500
+Subject: [PATCH v2 8/8] PCI/MSI: Allow the MSI domain to be device-specific
+In-Reply-To: <1444151043-31084-9-git-send-email-marc.zyngier@arm.com>
+References: <1444151043-31084-1-git-send-email-marc.zyngier@arm.com>
+ <1444151043-31084-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151015201135.GE10442@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Thursday, October 15, 2015 7:47 PM
+On Tue, Oct 06, 2015 at 06:04:03PM +0100, Marc Zyngier wrote:
+> So far, we've always considered that for a given PCI device, its
+> MSI controller was either set by the architecture-specific
+> pcibios hook, or simply inherited from the host bridge.
 > 
-> On Thursday 15 October 2015 12:17:45 Bhupesh Sharma wrote:
-> >
-> > +Note that since this controller derives its clocks from the Reset
-> > +Configuration Word (RCW) which is used to describe the PLL settings
-> > +at the time of chip-reset, the 'clocks' and 'clock-names' properties
-> > +from 'designware-pcie.txt' are optional for this controller.
+> This doesn't cover things like firmware-defined topologies like
+> msi-map (DT) or IORT (ACPI), which can provide information about
+> which MSI controller to use on a per-device basis.
 > 
-> If this is an option for the dw-pcie block, should this description be
-> added to the generic binding instead?
-
-I think this can be moved to the generic bindings for DWC3 PCIe driver. However
-I cannot vouch if the same is true for usage of this IP in other SoCs and it
-will not break existing drivers if this property is not defined in their SoC DTSI.
-
-So adding a few old ST colleagues (Pratyush, Gabriel, Fabrice), who I am sure have used this IP in ST SoCs
-for their comments as well.
-
-So the question would be - do you think it will be ok to make the clock related
-properties optional in 'designware-pcie.txt' rather than required.
-
+> This patch adds the necessary hook into the MSI code to allow this
+> feature, and provides the msi-map functionnality as a first
+> implementation.
 > 
-> > +Also as per the available Reference Manuals, there is no specific
-> 'version'
-> > +register available in the Freescale PCIe controller register set,
-> > +which can allow determining the underlying Designware PCIe controller
-> > +version information.
-> > +
-> >  Required properties:
-> > -- compatible: should contain the platform identifier such as
-> "fsl,ls1021a-pcie"
-> > +- compatible: should contain the platform identifier such as
-> > +"fsl,<soc-name>-pcie",
-> > +  "snps,dw-pcie".
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+
+I assume somebody other than me will merge this series.
+
+> ---
+>  drivers/pci/msi.c   | 17 +++++++++++++++++
+>  drivers/pci/probe.c |  8 ++++++++
+>  include/linux/msi.h |  6 ++++++
+>  3 files changed, 31 insertions(+)
 > 
-> You should document all the strings that will be needed here, otherwise a
-> driver write does not know what to look for.
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index 81a2798..3daff31 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -1357,4 +1357,21 @@ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
+>  
+>  	return rid;
+>  }
+> +
+> +/**
+> + * pci_msi_get_device_domain - Get the MSI domain for a given PCI device
+> + * @pdev:	The PCI device
+> + *
+> + * Use the firmware data to find a device-specific MSI domain
+> + * (i.e. not one that is ste as a default).
+> + *
+> + * Returns: The coresponding MSI domain or NULL if none has been found.
+> + */
+> +struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev)
+> +{
+> +	u32 rid = 0;
+> +
+> +	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
+> +	return of_msi_map_get_device_domain(&pdev->dev, rid);
+> +}
+>  #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 7c333f8..f14a970 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -1639,6 +1639,14 @@ static struct irq_domain *pci_dev_msi_domain(struct pci_dev *dev)
+>  	if (d)
+>  		return d;
+>  
+> +	/*
+> +	 * Let's see if we have a firmware interface able to provide
+> +	 * the domain.
+> +	 */
+> +	d = pci_msi_get_device_domain(dev);
+> +	if (d)
+> +		return d;
+> +
+>  	return NULL;
+>  }
+>  
+> diff --git a/include/linux/msi.h b/include/linux/msi.h
+> index 56e3b76..375be7c 100644
+> --- a/include/linux/msi.h
+> +++ b/include/linux/msi.h
+> @@ -294,6 +294,12 @@ irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
+>  int pci_msi_domain_check_cap(struct irq_domain *domain,
+>  			     struct msi_domain_info *info, struct device *dev);
+>  u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev);
+> +struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev);
+> +#else
+> +static inline struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev)
+> +{
+> +	return NULL;
+> +}
+>  #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+>  
+>  #endif /* LINUX_MSI_H */
+> -- 
+> 2.1.4
 > 
-> If two chips have a 100% identical PCIe implementation, just use the
-> string of the older chip for both.
-
-The chips are not 100% identical and there is no version information register
-available for differentiation. So, does the following seem better:
-
-+- compatible: should contain the platform identifier such as
-+"fsl,<soc-name>-pcie",
-+  "snps,dw-pcie".
-+
-+ where <soc-name> for e.g. can be ls2080a or ls1021a.
-
-Regards,
-Bhupesh
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
