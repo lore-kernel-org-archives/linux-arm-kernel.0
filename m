@@ -1,50 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 15:23:56 +0200
-Subject: [GIT PULL 2/3] ARM: berlin: DT changes for v4.4 (round 1)
-In-Reply-To: <561F9F24.1050801@gmail.com>
-References: <1444416494-3117-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <6053924.4novCdxIMG@wuerfel> <561F9F24.1050801@gmail.com>
-Message-ID: <5441220.dfRGQN11VB@wuerfel>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 15 Oct 2015 14:25:28 +0100
+Subject: [PATCH] ARM: SWP emulation: Restore original *data when failed
+In-Reply-To: <20151015130247.GB29301@arm.com>
+References: <1444791077-26020-1-git-send-email-shengjiu.wang@freescale.com>
+ <20151015082417.GX32532@n2100.arm.linux.org.uk>
+ <20151015083629.GA32630@shlinux2>
+ <20151015085700.GY32532@n2100.arm.linux.org.uk> <561F6F3B.6030607@arm.com>
+ <20151015130247.GB29301@arm.com>
+Message-ID: <561FA948.5080505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 October 2015 14:42:12 Sebastian Hesselbarth wrote:
-> On 14.10.2015 17:44, Arnd Bergmann wrote:
-> > On Friday 09 October 2015 20:48:13 Sebastian Hesselbarth wrote:
-> >> this is round 1 of Marvell Berlin DT changes for v4.4. There is
-> >> some improvement in serial aliases/stdout path, cpufreq properties,
-> >> and PWM nodes for all SoCs. The cpufreq properties depend on cpuclk
-> >> being available, therefore this branch has a dependency with the
-> >> cpuclk topic PR sent earlier.
-> >>
-> >
-> > Pulled into next/dt, thanks!
+On 15/10/15 14:02, Will Deacon wrote:
+> On Thu, Oct 15, 2015 at 10:17:47AM +0100, Vladimir Murzin wrote:
+>> We might need the same change for arm64 counterpart (see
+>> arch/arm64/kernel/armv8_deprecated.c).
 > 
-> Hi Arnd,
+> Something like below?
+
+Looks good. Should these two go to stable?
+
+Vladimir
+
 > 
-> the prerequisite cpuclk topic branch didn't make it into arm-soc causing
-> a build failure on bg2q dts files.
+> Will
 > 
-> Unfortunately, cpuclk topic branch touches both, dt-includes and driver
-> code. I was hoping you could also pull the topic branch with berlin/dt.
+>>From 63c3e83073cfac2e011adf0ed6f335275cc977a7 Mon Sep 17 00:00:00 2001
+> From: Will Deacon <will.deacon@arm.com>
+> Date: Thu, 15 Oct 2015 13:55:53 +0100
+> Subject: [PATCH] arm64: compat: fix stxr failure case in SWP emulation
 > 
-> I am open for suggestions how to deal with it now and in the future.
-
-Oops, I should have checked this better. In general, you should never
-submit a branch that does not by itself build and work. Even if I had
-merged your other pull request into the next/drivers branch, I would
-still have a broken next/dt branch that I could not submit to Linus.
-
-Can you create a pull request with just one patch that adds the
-CLKID_CPU definition so I can merge that into next/dt to get a working
-branch again?
-
-After that, please rebase the "clk: berlin: add cpuclk" patch on top
-of this one, so we can avoid conflicting commits.
-
-Regarding the MAX_CLKS definition, please leave that out of the
-dt-bindings header, it doesn't really belong in there as it has
-no significance to the dts files and its definition apparently is
-not stable.
-
-	Arnd
+> If the STXR instruction fails in the SWP emulation code, we leave *data
+> overwritten with the loaded value, therefore corrupting the data written
+> by a subsequent, successful attempt.
+> 
+> This patch re-jigs the code so that we only write back to *data once we
+> know that the update has happened.
+> 
+> Reported-by: Shengjiu Wang <shengjiu.wang@freescale.com>
+> Reported-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/armv8_deprecated.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+> index bcee7abac68e..6039d1eb5912 100644
+> --- a/arch/arm64/kernel/armv8_deprecated.c
+> +++ b/arch/arm64/kernel/armv8_deprecated.c
+> @@ -284,12 +284,12 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
+>  	__asm__ __volatile__(					\
+>  	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
+>  		    CONFIG_ARM64_PAN)				\
+> -	"	mov		%w2, %w1\n"			\
+> -	"0:	ldxr"B"		%w1, [%3]\n"			\
+> -	"1:	stxr"B"		%w0, %w2, [%3]\n"		\
+> +	"0:	ldxr"B"		%w2, [%3]\n"			\
+> +	"1:	stxr"B"		%w0, %w1, [%3]\n"		\
+>  	"	cbz		%w0, 2f\n"			\
+>  	"	mov		%w0, %w4\n"			\
+>  	"2:\n"							\
+> +	"	mov		%w1, %w2\n"			\
+>  	"	.pushsection	 .fixup,\"ax\"\n"		\
+>  	"	.align		2\n"				\
+>  	"3:	mov		%w0, %w5\n"			\
+> 
