@@ -1,231 +1,130 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Thu, 15 Oct 2015 15:48:28 -0400
-Subject: [PATCH v3 05/10] clk: iproc: Add PLL base write function
+Date: Thu, 15 Oct 2015 15:48:26 -0400
+Subject: [PATCH v3 03/10] clk: iproc: Add PWRCTRL support
 In-Reply-To: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
 References: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1444938513-10758-6-git-send-email-jonmason@broadcom.com>
+Message-ID: <1444938513-10758-4-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All writes to the PLL base address must be flushed if the
-IPROC_CLK_NEEDS_READ_BACK flag is set.  If we add a function to make the
-necessary write and reads, we can make sure that any future code which
-makes PLL base writes will do the correct thing.
+Some iProc SoC clocks use a different way to control clock power, via
+the PWRDWN bit in the PLL control register.  Since the PLL control
+register is used to access the PWRDWN bit, there is no need for the
+pwr_base when this is being used.  A new flag, IPROC_CLK_EMBED_PWRCTRL,
+has been added to identify this usage.  We can use the AON interface to
+write the values to enable/disable PWRDOWN.
 
 Signed-off-by: Jon Mason <jonmason@broadcom.com>
 ---
- drivers/clk/bcm/clk-iproc-pll.c | 80 +++++++++++++++++------------------------
- 1 file changed, 33 insertions(+), 47 deletions(-)
+ drivers/clk/bcm/clk-iproc-pll.c | 55 ++++++++++++++++++++++++++++-------------
+ drivers/clk/bcm/clk-iproc.h     |  6 +++++
+ 2 files changed, 44 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/clk/bcm/clk-iproc-pll.c b/drivers/clk/bcm/clk-iproc-pll.c
-index e029ab3..74cdd66 100644
+index 2dda4e8..e029ab3 100644
 --- a/drivers/clk/bcm/clk-iproc-pll.c
 +++ b/drivers/clk/bcm/clk-iproc-pll.c
-@@ -137,6 +137,18 @@ static int pll_wait_for_lock(struct iproc_pll *pll)
- 	return -EIO;
+@@ -148,14 +148,25 @@ static void __pll_disable(struct iproc_pll *pll)
+ 		writel(val, pll->asiu_base + ctrl->asiu.offset);
+ 	}
+ 
+-	/* latch input value so core power can be shut down */
+-	val = readl(pll->pwr_base + ctrl->aon.offset);
+-	val |= (1 << ctrl->aon.iso_shift);
+-	writel(val, pll->pwr_base + ctrl->aon.offset);
+-
+-	/* power down the core */
+-	val &= ~(bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
+-	writel(val, pll->pwr_base + ctrl->aon.offset);
++	if (ctrl->flags & IPROC_CLK_EMBED_PWRCTRL) {
++		val = readl(pll->pll_base + ctrl->aon.offset);
++		val |= (bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
++		writel(val, pll->pll_base + ctrl->aon.offset);
++
++		if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
++			readl(pll->pll_base + ctrl->aon.offset);
++	}
++
++	if (pll->pwr_base) {
++		/* latch input value so core power can be shut down */
++		val = readl(pll->pwr_base + ctrl->aon.offset);
++		val |= (1 << ctrl->aon.iso_shift);
++		writel(val, pll->pwr_base + ctrl->aon.offset);
++
++		/* power down the core */
++		val &= ~(bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
++		writel(val, pll->pwr_base + ctrl->aon.offset);
++	}
  }
  
-+static void iproc_pll_write(const struct iproc_pll *pll, void __iomem *base,
-+			    const u32 offset, u32 val)
-+{
-+	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
-+
-+	writel(val, base + offset);
-+
-+	if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK &&
-+		     base == pll->pll_base))
-+		val = readl(base + offset);
-+}
-+
- static void __pll_disable(struct iproc_pll *pll)
- {
+ static int __pll_enable(struct iproc_pll *pll)
+@@ -163,11 +174,22 @@ static int __pll_enable(struct iproc_pll *pll)
  	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
-@@ -145,27 +157,24 @@ static void __pll_disable(struct iproc_pll *pll)
- 	if (ctrl->flags & IPROC_CLK_PLL_ASIU) {
- 		val = readl(pll->asiu_base + ctrl->asiu.offset);
- 		val &= ~(1 << ctrl->asiu.en_shift);
--		writel(val, pll->asiu_base + ctrl->asiu.offset);
-+		iproc_pll_write(pll, pll->asiu_base, ctrl->asiu.offset, val);
- 	}
+ 	u32 val;
  
- 	if (ctrl->flags & IPROC_CLK_EMBED_PWRCTRL) {
- 		val = readl(pll->pll_base + ctrl->aon.offset);
- 		val |= (bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
--		writel(val, pll->pll_base + ctrl->aon.offset);
--
--		if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
--			readl(pll->pll_base + ctrl->aon.offset);
-+		iproc_pll_write(pll, pll->pll_base, ctrl->aon.offset, val);
- 	}
- 
- 	if (pll->pwr_base) {
- 		/* latch input value so core power can be shut down */
- 		val = readl(pll->pwr_base + ctrl->aon.offset);
- 		val |= (1 << ctrl->aon.iso_shift);
--		writel(val, pll->pwr_base + ctrl->aon.offset);
-+		iproc_pll_write(pll, pll->pwr_base, ctrl->aon.offset, val);
- 
- 		/* power down the core */
- 		val &= ~(bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
--		writel(val, pll->pwr_base + ctrl->aon.offset);
-+		iproc_pll_write(pll, pll->pwr_base, ctrl->aon.offset, val);
- 	}
- }
- 
-@@ -177,10 +186,7 @@ static int __pll_enable(struct iproc_pll *pll)
- 	if (ctrl->flags & IPROC_CLK_EMBED_PWRCTRL) {
- 		val = readl(pll->pll_base + ctrl->aon.offset);
- 		val &= ~(bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
--		writel(val, pll->pll_base + ctrl->aon.offset);
--
--		if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
--			readl(pll->pll_base + ctrl->aon.offset);
-+		iproc_pll_write(pll, pll->pll_base, ctrl->aon.offset, val);
- 	}
- 
- 	if (pll->pwr_base) {
-@@ -188,14 +194,14 @@ static int __pll_enable(struct iproc_pll *pll)
- 		val = readl(pll->pwr_base + ctrl->aon.offset);
- 		val |= bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift;
- 		val &= ~(1 << ctrl->aon.iso_shift);
--		writel(val, pll->pwr_base + ctrl->aon.offset);
-+		iproc_pll_write(pll, pll->pwr_base, ctrl->aon.offset, val);
- 	}
+-	/* power up the PLL and make sure it's not latched */
+-	val = readl(pll->pwr_base + ctrl->aon.offset);
+-	val |= bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift;
+-	val &= ~(1 << ctrl->aon.iso_shift);
+-	writel(val, pll->pwr_base + ctrl->aon.offset);
++	if (ctrl->flags & IPROC_CLK_EMBED_PWRCTRL) {
++		val = readl(pll->pll_base + ctrl->aon.offset);
++		val &= ~(bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
++		writel(val, pll->pll_base + ctrl->aon.offset);
++
++		if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
++			readl(pll->pll_base + ctrl->aon.offset);
++	}
++
++	if (pll->pwr_base) {
++		/* power up the PLL and make sure it's not latched */
++		val = readl(pll->pwr_base + ctrl->aon.offset);
++		val |= bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift;
++		val &= ~(1 << ctrl->aon.iso_shift);
++		writel(val, pll->pwr_base + ctrl->aon.offset);
++	}
  
  	/* certain PLLs also need to be ungated from the ASIU top level */
  	if (ctrl->flags & IPROC_CLK_PLL_ASIU) {
- 		val = readl(pll->asiu_base + ctrl->asiu.offset);
- 		val |= (1 << ctrl->asiu.en_shift);
--		writel(val, pll->asiu_base + ctrl->asiu.offset);
-+		iproc_pll_write(pll, pll->asiu_base, ctrl->asiu.offset, val);
- 	}
+@@ -610,9 +632,8 @@ void __init iproc_pll_clk_setup(struct device_node *node,
+ 	if (WARN_ON(!pll->pll_base))
+ 		goto err_pll_iomap;
  
- 	return 0;
-@@ -209,9 +215,7 @@ static void __pll_put_in_reset(struct iproc_pll *pll)
++	/* Some SoCs do not require the pwr_base, thus failing is not fatal */
+ 	pll->pwr_base = of_iomap(node, 1);
+-	if (WARN_ON(!pll->pwr_base))
+-		goto err_pwr_iomap;
  
- 	val = readl(pll->pll_base + reset->offset);
- 	val &= ~(1 << reset->reset_shift | 1 << reset->p_reset_shift);
--	writel(val, pll->pll_base + reset->offset);
--	if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
--		readl(pll->pll_base + reset->offset);
-+	iproc_pll_write(pll, pll->pll_base, reset->offset, val);
- }
+ 	/* some PLLs require gating control at the top ASIU level */
+ 	if (pll_ctrl->flags & IPROC_CLK_PLL_ASIU) {
+@@ -695,9 +716,9 @@ err_pll_register:
+ 		iounmap(pll->asiu_base);
  
- static void __pll_bring_out_reset(struct iproc_pll *pll, unsigned int kp,
-@@ -228,9 +232,7 @@ static void __pll_bring_out_reset(struct iproc_pll *pll, unsigned int kp,
- 	val |=  ki << reset->ki_shift | kp << reset->kp_shift |
- 		ka << reset->ka_shift;
- 	val |= 1 << reset->reset_shift | 1 << reset->p_reset_shift;
--	writel(val, pll->pll_base + reset->offset);
--	if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
--		readl(pll->pll_base + reset->offset);
-+	iproc_pll_write(pll, pll->pll_base, reset->offset, val);
- }
+ err_asiu_iomap:
+-	iounmap(pll->pwr_base);
++	if (pll->pwr_base)
++		iounmap(pll->pwr_base);
  
- static int pll_set_rate(struct iproc_clk *clk, unsigned int rate_index,
-@@ -285,9 +287,8 @@ static int pll_set_rate(struct iproc_clk *clk, unsigned int rate_index,
- 	/* put PLL in reset */
- 	__pll_put_in_reset(pll);
+-err_pwr_iomap:
+ 	iounmap(pll->pll_base);
  
--	writel(0, pll->pll_base + ctrl->vco_ctrl.u_offset);
--	if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
--		readl(pll->pll_base + ctrl->vco_ctrl.u_offset);
-+	iproc_pll_write(pll, pll->pll_base, ctrl->vco_ctrl.u_offset, 0);
+ err_pll_iomap:
+diff --git a/drivers/clk/bcm/clk-iproc.h b/drivers/clk/bcm/clk-iproc.h
+index d834b7a..ff7bfad 100644
+--- a/drivers/clk/bcm/clk-iproc.h
++++ b/drivers/clk/bcm/clk-iproc.h
+@@ -49,6 +49,12 @@
+ #define IPROC_CLK_PLL_NEEDS_SW_CFG BIT(4)
+ 
+ /*
++ * Some PLLs use a different way to control clock power, via the PWRDWN bit in
++ * the PLL control register
++ */
++#define IPROC_CLK_EMBED_PWRCTRL BIT(5)
 +
- 	val = readl(pll->pll_base + ctrl->vco_ctrl.l_offset);
- 
- 	if (rate >= VCO_LOW && rate < VCO_MID)
-@@ -298,17 +299,13 @@ static int pll_set_rate(struct iproc_clk *clk, unsigned int rate_index,
- 	else
- 		val |= (1 << PLL_VCO_HIGH_SHIFT);
- 
--	writel(val, pll->pll_base + ctrl->vco_ctrl.l_offset);
--	if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
--		readl(pll->pll_base + ctrl->vco_ctrl.l_offset);
-+	iproc_pll_write(pll, pll->pll_base, ctrl->vco_ctrl.l_offset, val);
- 
- 	/* program integer part of NDIV */
- 	val = readl(pll->pll_base + ctrl->ndiv_int.offset);
- 	val &= ~(bit_mask(ctrl->ndiv_int.width) << ctrl->ndiv_int.shift);
- 	val |= vco->ndiv_int << ctrl->ndiv_int.shift;
--	writel(val, pll->pll_base + ctrl->ndiv_int.offset);
--	if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
--		readl(pll->pll_base + ctrl->ndiv_int.offset);
-+	iproc_pll_write(pll, pll->pll_base, ctrl->ndiv_int.offset, val);
- 
- 	/* program fractional part of NDIV */
- 	if (ctrl->flags & IPROC_CLK_PLL_HAS_NDIV_FRAC) {
-@@ -316,18 +313,15 @@ static int pll_set_rate(struct iproc_clk *clk, unsigned int rate_index,
- 		val &= ~(bit_mask(ctrl->ndiv_frac.width) <<
- 			 ctrl->ndiv_frac.shift);
- 		val |= vco->ndiv_frac << ctrl->ndiv_frac.shift;
--		writel(val, pll->pll_base + ctrl->ndiv_frac.offset);
--		if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
--			readl(pll->pll_base + ctrl->ndiv_frac.offset);
-+		iproc_pll_write(pll, pll->pll_base, ctrl->ndiv_frac.offset,
-+				val);
- 	}
- 
- 	/* program PDIV */
- 	val = readl(pll->pll_base + ctrl->pdiv.offset);
- 	val &= ~(bit_mask(ctrl->pdiv.width) << ctrl->pdiv.shift);
- 	val |= vco->pdiv << ctrl->pdiv.shift;
--	writel(val, pll->pll_base + ctrl->pdiv.offset);
--	if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
--		readl(pll->pll_base + ctrl->pdiv.offset);
-+	iproc_pll_write(pll, pll->pll_base, ctrl->pdiv.offset, val);
- 
- 	__pll_bring_out_reset(pll, kp, ka, ki);
- 
-@@ -467,14 +461,12 @@ static int iproc_clk_enable(struct clk_hw *hw)
- 	/* channel enable is active low */
- 	val = readl(pll->pll_base + ctrl->enable.offset);
- 	val &= ~(1 << ctrl->enable.enable_shift);
--	writel(val, pll->pll_base + ctrl->enable.offset);
-+	iproc_pll_write(pll, pll->pll_base, ctrl->enable.offset, val);
- 
- 	/* also make sure channel is not held */
- 	val = readl(pll->pll_base + ctrl->enable.offset);
- 	val &= ~(1 << ctrl->enable.hold_shift);
--	writel(val, pll->pll_base + ctrl->enable.offset);
--	if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
--		readl(pll->pll_base + ctrl->enable.offset);
-+	iproc_pll_write(pll, pll->pll_base, ctrl->enable.offset, val);
- 
- 	return 0;
- }
-@@ -491,9 +483,7 @@ static void iproc_clk_disable(struct clk_hw *hw)
- 
- 	val = readl(pll->pll_base + ctrl->enable.offset);
- 	val |= 1 << ctrl->enable.enable_shift;
--	writel(val, pll->pll_base + ctrl->enable.offset);
--	if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
--		readl(pll->pll_base + ctrl->enable.offset);
-+	iproc_pll_write(pll, pll->pll_base, ctrl->enable.offset, val);
- }
- 
- static unsigned long iproc_clk_recalc_rate(struct clk_hw *hw,
-@@ -562,9 +552,7 @@ static int iproc_clk_set_rate(struct clk_hw *hw, unsigned long rate,
- 		val &= ~(bit_mask(ctrl->mdiv.width) << ctrl->mdiv.shift);
- 		val |= div << ctrl->mdiv.shift;
- 	}
--	writel(val, pll->pll_base + ctrl->mdiv.offset);
--	if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
--		readl(pll->pll_base + ctrl->mdiv.offset);
-+	iproc_pll_write(pll, pll->pll_base, ctrl->mdiv.offset, val);
- 	clk->rate = parent_rate / div;
- 
- 	return 0;
-@@ -591,9 +579,7 @@ static void iproc_pll_sw_cfg(struct iproc_pll *pll)
- 
- 		val = readl(pll->pll_base + ctrl->sw_ctrl.offset);
- 		val |= BIT(ctrl->sw_ctrl.shift);
--		writel(val, pll->pll_base + ctrl->sw_ctrl.offset);
--		if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK))
--			readl(pll->pll_base + ctrl->sw_ctrl.offset);
-+		iproc_pll_write(pll, pll->pll_base, ctrl->sw_ctrl.offset, val);
- 	}
- }
- 
++/*
+  * Parameters for VCO frequency configuration
+  *
+  * VCO frequency =
 -- 
 1.9.1
