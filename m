@@ -1,61 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Oct 2015 17:01:02 +0100
-Subject: [PATCH RFC 0/7] Adding core support for wire-MSI bridges
-In-Reply-To: <5027676.zPNVVQXaP4@wuerfel>
-References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
- <5027676.zPNVVQXaP4@wuerfel>
-Message-ID: <561FCDBE.8000407@arm.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 15 Oct 2015 12:01:04 -0400
+Subject: [PATCH v1 1/2] phy: keystone: serdes driver for gbe 10gbe and pcie
+In-Reply-To: <5192855.p6QLDWTiVi@wuerfel>
+References: <1444919145-30845-1-git-send-email-w-kwok2@ti.com>
+ <1444919145-30845-2-git-send-email-w-kwok2@ti.com>
+ <5192855.p6QLDWTiVi@wuerfel>
+Message-ID: <561FCDC0.3080109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 15/10/15 16:46, Arnd Bergmann wrote:
-> On Thursday 15 October 2015 16:39:21 Marc Zyngier wrote:
->> There seems to be a new class of interrupt controller out there whose
->> sole purpose (apart from making everybody's life a nightmare) is to
->> turn wired interrupts into MSIs.
+On 10/15/2015 10:51 AM, Arnd Bergmann wrote:
+> On Thursday 15 October 2015 10:25:44 WingMan Kwok wrote:
+>> On TI's Keystone platforms, several peripherals such as the
+>> gbe ethernet switch, 10gbe ethernet switch and PCIe controller
+>> require the use of a SerDes for converting SoC parallel data into
+>> serialized data that can be output over a high-speed electrical
+>> interface, and also converting high-speed serial input data
+>> into parallel data that can be processed by the SoC.  The
+>> SerDeses used by those peripherals, though they may be different,
+>> are largely similar in functionality and setup.
 >>
->> Instead of considering that the MSIs allocated to a device are for the
->> direct use of that device, we can turn this set of MSIs into a irq
->> domain, and use that domain to build a standard irqchip on top of
->> that.
+>> This patch provides a SerDes phy driver implementation that can be
+>> used by the above mentioned peripheral drivers to configure their
+>> respective SerDeses.
 >>
->> This requires some (slightly ugly) surgery in both the generic MSI and
->> platform MSI layers, but the amount of code is actually relatively
->> small (about +150 LoC so far).
->>
->> On top of that, we add a dummy driver for a such a bridge, hoping that
->> this will give enough information to driver authors so that they can
->> use this new feature. An even more stupid client driver is provided to
->> show the interrupt stack allocation:
-> 
-> I'm pretty sure you've thought of this before and it doesn't work, but
-> can you explain why we can't just treat this as an edge-triggered
-> nested irqchip? As long as the weird hardware can be preconfigured
-> by the bootloader, the device that is attached to it shouldn't
-> care how the interrupt ends up at the CPU.
+>> v1:
 
-"Preconfigured" is the key word. While you can do something like that if
-your hardware treats MSIs just as if they were wired interrupts
-(something like GICv2m), it becomes far more hairy if the target of MSIs
-is something like a GICv3 ITS (which is the case for HiSilicon mbigen).
+--------cut-------------------------------------------------------------
 
-The main reason is that the ITS relies on "translation tables" kept in
-memory, which the OS has to configure, and handing over pre-configured
-tables is not something I'm looking forward to doing. From a CPU point
-of view, this is akin entering the kernel with the MMU already on and no
-idmap...
+>> + * Redistributions in binary form must reproduce the above copyright
+>> + * notice, this list of conditions and the following disclaimer in the
+>> + * documentation and/or other materials provided with the
+>> + * distribution.
+>
+> The current code does not do this when compiled, which might be a
+> problem for distributors. Can you clarify the license?
+>
+Arnd,
 
-The approach taken here is to make the MSI-ness explicit at the irqchip
-level, and keep the interrupting device oblivious of that feature. Also,
-this relies on the fact that we can have one MSI per wire, meaning that
-we don't have to multiplex anything (no nested irqchip), and that we can
-rely on hierarchical domains, which simplifies the code (at least for
-the irqchip).
+Can you elaborate on this? I did a grep on the string "Redistributions 
+in binary form must reproduce the above copyright" and I could find 
+several instance of this. So I am not sure what you mean by "The current 
+code does not do this when compiled".
 
-Thanks,
-
-	M.
+Thanks
 -- 
-Jazz is not dead. It just smells funny...
+Murali Karicheri
+Linux Kernel, Keystone
