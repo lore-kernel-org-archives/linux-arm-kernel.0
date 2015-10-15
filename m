@@ -1,60 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 15 Oct 2015 09:33:54 +0900
-Subject: [PATCH 6/6] ARM: shmobile: R-Mobile: add missing of_node_put
-In-Reply-To: <cover.1444868660.git.horms+renesas@verge.net.au>
-References: <cover.1444868660.git.horms+renesas@verge.net.au>
-Message-ID: <1fd377b3fc1e071702e27b2f828e3abd8b31c74d.1444868660.git.horms+renesas@verge.net.au>
+Date: Thu, 15 Oct 2015 09:34:02 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Defconfig Updates
+ for v4.4
+Message-ID: <cover.1444869086.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <Julia.Lawall@lip6.fr>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-for_each_child_of_node performs an of_node_get on each iteration, so
-a break out of the loop requires an of_node_put.
+Please consider these second round of Renesas ARM based SoC defconfig
+updates for v4.4.
 
-The semantic patch that fixes this problem is as follows
-(http://coccinelle.lip6.fr):
+This pull request is based on the previous round of
+such requests, tagged as renesas-defconfig-for-v4.4,
+which I have already sent a pull-request for.
 
-// <smpl>
-@@
-expression root,e;
-local idexpression child;
-@@
 
- for_each_child_of_node(root, child) {
-   ... when != of_node_put(child)
-       when != e = child
-(
-   return child;
-|
-+  of_node_put(child);
-?  return ...;
-)
-   ...
- }
-// </smpl>
+The following changes since commit 0a8b0695f4c490c349ee12956d6946576c44a419:
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/pm-rmobile.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+  ARM: multi_v7_defconfig: Remove Marzen (2015-09-14 10:12:59 +0900)
 
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-index a5b96b990aea..424155b0cfe9 100644
---- a/arch/arm/mach-shmobile/pm-rmobile.c
-+++ b/arch/arm/mach-shmobile/pm-rmobile.c
-@@ -342,8 +342,10 @@ static int __init rmobile_add_pm_domains(void __iomem *base,
- 		}
- 
- 		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
--		if (!pd)
-+		if (!pd) {
-+			of_node_put(np);
- 			return -ENOMEM;
-+		}
- 
- 		pd->genpd.name = np->name;
- 		pd->base = base;
--- 
-2.1.4
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig2-for-v4.4
+
+for you to fetch changes up to fec3fb4734b4d2c33975077c250ebd4a3a9f8e34:
+
+  ARM: multi_v7_defconfig: enable HDMI output for Renesas RCar (2015-10-13 10:42:17 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Defconfig Updates for v4.4
+
+* Enable HDMI output for Renesas RCar
+
+----------------------------------------------------------------
+Wolfram Sang (2):
+      ARM: shmobile: defconfig: enable HDMI output for RCar
+      ARM: multi_v7_defconfig: enable HDMI output for Renesas RCar
+
+ arch/arm/configs/multi_v7_defconfig | 3 +++
+ arch/arm/configs/shmobile_defconfig | 3 +++
+ 2 files changed, 6 insertions(+)
