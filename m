@@ -1,48 +1,41 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Thu, 15 Oct 2015 14:43:45 -0400
-Subject: [PATCH v2 7/7] clk: ns2: add clock support for Broadcom
- Northstar 2 SoC
-In-Reply-To: <561FF223.2050807@broadcom.com>
-References: <1444770485-11210-1-git-send-email-jonmason@broadcom.com>
- <6427519.eIBEvCNlle@wuerfel> <561EB10B.40502@broadcom.com>
- <6398606.WW44dcgQDV@wuerfel> <561FF223.2050807@broadcom.com>
-Message-ID: <20151015184344.GK32089@broadcom.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 15 Oct 2015 20:44:27 +0200
+Subject: [GIT PULL] ARM: berlin: DT CPU clock fixup for v4.4
+In-Reply-To: <1444416494-3117-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1444416494-3117-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1444934667-5451-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 11:36:19AM -0700, Scott Branden wrote:
-> Jon,
-> 
-> Can you add this to your patchset and change COMMON_CLK_IPROC to a
-> silent option?
+Arnd, Kevin, Olof,
 
-Sure, I'll add this (and make it silent), as well as adding the
-documentation patches back to this series (per Ray's suggestion), and
-will resend.
+this is the single patch PR to fix the broken DT PR for Berlin
+sent earlier. As Arnd requested, this only contains a patch adding
+the missing CPUID_CLK to Berlin clock dt-binding include.
 
-Thanks,
-Jon
+Please pull.
 
-> 
-> On 15-10-14 01:16 PM, Arnd Bergmann wrote:
-> >On Wednesday 14 October 2015 12:46:19 Scott Branden wrote:
-> >>>
-> >>>My patch fixes it by always selecting COMMON_CLK_IPROC from
-> >>>ARCH_BCM_CYGNUS. I wasn't sure whether you want COMMON_CLK_IPROC
-> >>>to still be user-selectable, so I left that in place. Normally
-> >>>I'd expect it to be a silent option though, that just gets
-> >>>implicitly enabled whenever a platform that needs it is built
-> >>>into the kernel.
-> >>COMMON_CLK_IPROC can be a silent option and selected as Arnd has done below.
-> >
-> >Ok, please do that then. If you want to apply my patch directly,
-> >you can remove that last paragraph from the description.
-> >
-> >>>Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >>Acked-by: Scott Branden <sbranden@broadcom.com>
-> >
-> >Thanks for taking a look!
-> >
-> >	Arnd
-> >
-> 
+Sebastian
+
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-dt-cpuclk-for-4.4-1
+
+for you to fetch changes up to 28c039eebaaa28def9364b9a12a30192be8b4730:
+
+  ARM: berlin: dts: add CLKID_CPU for BG2Q (2015-10-15 20:31:41 +0200)
+
+----------------------------------------------------------------
+Marvell Berlin DT CPU clock for 4.4
+- add missing CLKID_CPU for Berlin BG2Q
+
+----------------------------------------------------------------
+Sebastian Hesselbarth (1):
+      ARM: berlin: dts: add CLKID_CPU for BG2Q
+
+ include/dt-bindings/clock/berlin2q.h | 1 +
+ 1 file changed, 1 insertion(+)
