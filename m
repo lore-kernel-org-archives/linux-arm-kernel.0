@@ -1,69 +1,81 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Thu, 15 Oct 2015 15:30:50 -0300
-Subject: [PATCH v3 0/4] mtd: pxa3xx_nand: rework the timing setup
-In-Reply-To: <1444893451-16610-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1444893451-16610-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <CAAEAJfBdfc-=AH0z_A8-b70LH_=GJp0qPRp0zCohqDBf8pnokQ@mail.gmail.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Thu, 15 Oct 2015 11:35:14 -0700
+Subject: [RFC] ARM: BCM: Add SMP support for Broadcom 4708
+In-Reply-To: <20151015181409.GJ32089@broadcom.com>
+References: <1444844820-24290-1-git-send-email-kapilh@broadcom.com>
+ <1444844820-24290-4-git-send-email-kapilh@broadcom.com>
+ <561ED691.8080407@hauke-m.de> <20151014224003.GO15160@broadcom.com>
+ <20151015154934.GD32089@broadcom.com> <20151015181409.GJ32089@broadcom.com>
+Message-ID: <561FF1E2.1010603@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ccing Robert as he can provide valuable test on PXA boards.
+Looks good.
 
-On 15 October 2015 at 04:17, Antoine Tenart
-<antoine.tenart@free-electrons.com> wrote:
-> Hi all,
+On 15-10-15 11:14 AM, Jon Mason wrote:
+> ARM: BCM: Add SMP support for Broadcom 4708
 >
-> Let's try one more time to get this merged.
+> Add SMP support for Broadcom's 4708 SoCs.
 >
-> Another series, introducing the Berlin nand support, depends on this.
+> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+Acked-by: Scott Branden <sbranden@broadcom.com>
+> ---
+>   arch/arm/boot/dts/bcm4708.dtsi | 2 ++
+>   arch/arm/boot/dts/bcm94708.dts | 2 +-
+>   arch/arm/mach-bcm/Kconfig      | 1 +
+>   arch/arm/mach-bcm/Makefile     | 3 +++
+>   4 files changed, 7 insertions(+), 1 deletion(-)
 >
-> This series was part of a bigger one[1], which was split into smaller
-> ones as asked by Ezequiel[2]. When we take this into account, this is
-> v8.
+> diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
+> index 31141e8..22a41df 100644
+> --- a/arch/arm/boot/dts/bcm4708.dtsi
+> +++ b/arch/arm/boot/dts/bcm4708.dtsi
+> @@ -15,6 +15,8 @@
+>   	cpus {
+>   		#address-cells = <1>;
+>   		#size-cells = <0>;
+> +		enable-method = "brcm,bcm-nsp-smp";
+> +		secondary-boot-reg = <0xffff0400>;
 >
-> The aim here is to use the nand framework to setup the timings,
-> while keeping the old in-driver way of configuration timings for
-> compatibility reasons.
+>   		cpu at 0 {
+>   			device_type = "cpu";
+> diff --git a/arch/arm/boot/dts/bcm94708.dts b/arch/arm/boot/dts/bcm94708.dts
+> index f60bb1d..49682d6 100644
+> --- a/arch/arm/boot/dts/bcm94708.dts
+> +++ b/arch/arm/boot/dts/bcm94708.dts
+> @@ -32,7 +32,7 @@
 >
-> You can find the series at:
-> https://github.com/atenart/linux.git berlin/4.3/nand-timings
+>   /dts-v1/;
 >
-> Antoine
+> -#include "bcm5301x.dtsi"
+> +#include "bcm4708.dtsi"
 >
-> Since v2:
->         - Added back the support for keep-config 16 bits devices
->         - Fixed wrong unit in a calculation
->         - Reworked the pxa3xx_nand_init_timings() logic
->         - Allowed compile test the pxa3xx driver
+>   / {
+>   	model = "NorthStar SVK (BCM94708)";
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index 2e9dbb5..4fc8fa3 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -54,6 +54,7 @@ config ARCH_BCM_NSP
+>   config ARCH_BCM_5301X
+>   	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
+>   	select ARCH_BCM_IPROC
+> +	select HAVE_SMP
+>   	help
+>   	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
 >
-> Since v1:
->         - Rebased on top of v4.2-rc1
+> diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
+> index 36a4ca30..3ca1cf1 100644
+> --- a/arch/arm/mach-bcm/Makefile
+> +++ b/arch/arm/mach-bcm/Makefile
+> @@ -43,6 +43,9 @@ obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
 >
-> Since the series was split up:
->         - Reworked the ndcr setup
->         - Removed the read_id_bytes update after device detection
+>   # BCM5301X
+>   obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
+> +ifeq ($(CONFIG_ARCH_BCM_5301X),y)
+> +obj-$(CONFIG_SMP)		+= headsmp.o platsmp.o
+> +endif
 >
-> Antoine Tenart (4):
->   mtd: nand: allow compile test of MTD_NAND_PXA3xx
->   mtd: pxa3xx_nand: add helpers to setup the timings
->   mtd: pxa3xx_nand: rework flash detection and timing setup
->   mtd: pxa3xx_nand: clean up the pxa3xx timings
+>   # BCM63XXx
+>   ifeq ($(CONFIG_ARCH_BCM_63XX),y)
 >
->  drivers/mtd/nand/Kconfig                      |   2 +-
->  drivers/mtd/nand/pxa3xx_nand.c                | 273 ++++++++++++++++----------
->  include/linux/platform_data/mtd-nand-pxa3xx.h |  11 +-
->  3 files changed, 172 insertions(+), 114 deletions(-)
->
-> --
-> 2.6.1
->
->
-> ______________________________________________________
-> Linux MTD discussion mailing list
-> http://lists.infradead.org/mailman/listinfo/linux-mtd/
-
-
-
--- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
