@@ -1,76 +1,88 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Thu, 15 Oct 2015 18:52:29 +0200
-Subject: [PATCH v2] ARM: fix vdsomunge not to depend on glibc specific
- byteswap.h
-In-Reply-To: <20151015163712.GD32532@n2100.arm.linux.org.uk>
-References: <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
- <B69CCAC6-FB47-4B2B-95F9-15F1BA4AD381@goldelico.com>
- <5B19AAFC-976C-4B33-A83E-229693FA7858@goldelico.com>
- <561E63C9.3040702@mentor.com>
- <350DE2A3-622F-4624-8AFC-D0F37CCB29EA@goldelico.com>
- <20151015163712.GD32532@n2100.arm.linux.org.uk>
-Message-ID: <2EC080E4-B31C-46F5-8239-FF96493DA861@goldelico.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Thu, 15 Oct 2015 10:53:17 -0600
+Subject: [PATCH] VFIO: platform: AMD xgbe reset module
+In-Reply-To: <561FBC31.3020900@linaro.org>
+References: <1444836792-2405-1-git-send-email-eric.auger@linaro.org>
+ <7287273.XGFpHqQ9fN@wuerfel> <20151015121228.GA965@cbox>
+ <5270338.MbsQ1bGczu@wuerfel> <561FBC31.3020900@linaro.org>
+Message-ID: <1444927997.4059.470.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2015-10-15 at 16:46 +0200, Eric Auger wrote:
+> Hi Arnd,
+> On 10/15/2015 03:59 PM, Arnd Bergmann wrote:
+> > On Thursday 15 October 2015 14:12:28 Christoffer Dall wrote:
+> >>>
+> >>> enum vfio_platform_op {
+> >>>       VFIO_PLATFORM_BIND,
+> >>>       VFIO_PLATFORM_UNBIND,
+> >>>       VFIO_PLATFORM_RESET,
+> >>> };
+> >>>
+> >>> struct platform_driver {
+> >>>         int (*probe)(struct platform_device *);
+> >>>         int (*remove)(struct platform_device *);
+> >>>       ...
+> >>>       int (*vfio_manage)(struct platform_device *, enum vfio_platform_op);
+> >>>         struct device_driver driver;
+> >>> };
+> >>>
+> >>> This would integrate much more closely into the platform driver framework,
+> >>> just like the regular vfio driver integrates into the PCI framework.
+> >>> Unlike PCI however, you can't just use the generic driver framework to
+> >>> unbind the driver, because you still need device specific code.
+> >>>
+> >> Thanks for these suggestions, really helpful.
+> >>
+> >> What I don't understand in the latter example is how VFIO knows which
+> >> struct platform_driver to interact with?
+> > 
+> > This would assume that the driver remains bound to the device, so VFIO
+> > gets a pointer to the device from somewhere (as it does today) and then
+> > follows the dev->driver pointer to get to the platform_driver.
 
-Am 15.10.2015 um 18:37 schrieb Russell King - ARM Linux <linux@arm.linux.org.uk>:
-
-> On Thu, Oct 15, 2015 at 07:52:38AM +0200, H. Nikolaus Schaller wrote:
->> ERROR: space prohibited before that close parenthesis ')'
->> #46: FILE: arch/arm/vdso/vdsomunge.c:64:
->> +		(((unsigned short)(x) & (unsigned short)0xff00U) >> 8) ))
+The complexity of managing a bi-modal driver seems like far more than a
+little bit of code duplication in a device specific reset module and
+extends into how userspace makes devices available through vfio, so I
+think it's too late for that discussion.
+  
+> >> Also, just so I'm sure I understand correctly, VFIO_PLATFORM_UNBIND is
+> >> then called by VFIO before the VFIO driver unbinds from the device
+> >> (unbinding the platform driver from the device being a completely
+> >> separate thing)?
+> > 
+> > This is where we'd need a little more changes for this approach. Instead
+> > of unbinding the device from its driver, the idea would be that the
+> > driver remains bound as far as the driver model is concerned, but
+> > it would be in a quiescent state where no other subsystem interacts with
+> > it (i.e. it gets unregistered from networking core or whichever it uses).
 > 
-> I have a pet hatred of too many parens.  I also have a hatred of idiotic
-> casts.  What about changing the above to one of:
+> Currently we use the same mechanism as for PCI, ie. unbind the native
+> driver and then bind VFIO platform driver in its place. Don't you think
+> changing this may be a pain for user-space tools that are designed to
+> work that way for PCI?
 > 
-> 		(((x) & 0xff00) >> 8)
-> 		(((x) >> 8) & 0xff)
+> My personal preference would be to start with your first proposal since
+> it looks (to me) less complex and "unknown" that the 2d approach.
 > 
->> 
->> ERROR: space prohibited before that close parenthesis ')'
->> #53: FILE: arch/arm/vdso/vdsomunge.c:71:
->> +		(((unsigned int)(x) & (unsigned int)0xff000000UL) >> 24) ))
-> 
-> and one of:
-> 
-> 		(((x) & 0xff000000) >> 24)
-> 		(((x) >> 24) & 0xff)
-> 
-> ?
+> Let's wait for Alex opinion too...
 
-Well, the semantics is sometimes the same but I think readability goes down
-because the macro becomes quite un-symmetric and for >> 8 you should
-better be sure that values are unsigned if combining with | operator.
+I thought the reason we took the approach we have now is so that we
+don't have reset code loaded into the kernel unless we have a device
+that needs it.  Therefore we don't really want to preemptively load all
+the reset drivers and have them do a registration.  The unfortunate
+side-effect of that is the platform code needs to go looking for the
+driver.  We do that via the __symbol_get() trick, which only fails
+without modules because the underscore variant isn't defined in that
+case.  I remember asking Eric previously why we're using that rather
+than symbol_get(), I've since forgotten his answer, but the fact that
+__symbol_get() is only defined for modules makes it moot, we either need
+to make symbol_get() work or define __symbol_get() for non-module
+builds.
 
-Of course it is questionable why the constants (with U and UL modifiers)
-are casted.
+Otherwise, we should probably abandon the idea of these reset functions
+being modules and build them into the vfio platform driver (which would
+still be less loaded, dead code than a bi-modal host driver).  Thanks,
 
-The full macro (as copied verbatim from existing arch/mips/boot/elf2ecoff.c) is:
-
-+#define swab16(x) \
-+	((unsigned short)( \
-+		(((unsigned short)(x) & (unsigned short)0x00ffU) << 8) | \
-+		(((unsigned short)(x) & (unsigned short)0xff00U) >> 8)))
-+
-+#define swab32(x) \
-+	((unsigned int)( \
-+		(((unsigned int)(x) & (unsigned int)0x000000ffUL) << 24) | \
-+		(((unsigned int)(x) & (unsigned int)0x0000ff00UL) <<  8) | \
-+		(((unsigned int)(x) & (unsigned int)0x00ff0000UL) >>  8) | \
-+		(((unsigned int)(x) & (unsigned int)0xff000000UL) >> 24)))
-+
-
-I have already submitted a V3 of this patch, so please comment that.
-
-A question is why this is not generally available for all HOSTCC based tools
-so that we could simply include some header. But since that is no kernel
-code but a tool, I think it is not really necessary to put significant efforts
-into this piece of code.
-
-This was probably the intention of the original code to simply include
-byteswap.h - then you don't even see how complex the macros are -
-but it is not a standard header.
-
-BR and thanks,
-Nikolaus Schaller
+Alex
