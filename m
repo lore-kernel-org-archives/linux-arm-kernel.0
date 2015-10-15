@@ -1,206 +1,123 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Thu, 15 Oct 2015 15:45:49 -0500
-Subject: [PATCH V4 4/6] arm64/ls1043a: add DTS for Freescale LS1043A SoC
-In-Reply-To: <1444911181-21696-4-git-send-email-B48286@freescale.com>
-References: <1444911181-21696-1-git-send-email-B48286@freescale.com>
- <1444911181-21696-4-git-send-email-B48286@freescale.com>
-Message-ID: <1444941949.5185.270.camel@freescale.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 15 Oct 2015 22:47:41 +0200
+Subject: [PATCH RFT] ARM: bcm2835: enable all bcm2835-relevant in defconfig
+Message-ID: <1444942061-23085-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-10-15 at 20:12 +0800, Zhiqiang Hou wrote:
-> From: Mingkai Hu <Mingkai.Hu@freescale.com>
-> 
-> LS1043a is an SoC with 4 ARMv8 A53 cores and most other IP blocks
-> similar to LS1021a which complies to Chassis 2.1 spec.
-> 
-> Following levels of DTSI/DTS files have been created for the
-> LS1043A SoC family:
-> 
-> - fsl-ls1043a.dtsi:
->   DTS-Include file for FSL LS1043A SoC.
-> 
-> Signed-off-by: Li Yang <leoli@freescale.com>
-> Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
-> Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
-> Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
-> ---
-> V4:
->  - Add soc node with simple-bus compatible.
->  - Add property interrupt-affinity for armv8 pmuv3 node.
-> 
-> V3:
->  - Add device tree node for SATA.
->  - Remove properity enable-method for all cpu node.
->    Remove reserved memory region for spin-table.
-> 
-> V2:
->  - Add secondary core boot method.
->  - Move out the sysclk node from the clockgen node.
->  - Correct the reg size of GICC.
-> 
->  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 525 
-> +++++++++++++++++++++++++
->  1 file changed, 525 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi 
-> b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> new file mode 100644
-> index 0000000..1a5bf79
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> @@ -0,0 +1,525 @@
-> +/*
-> + * Device Tree Include file for Freescale Layerscape-1043A family SoC.
-> + *
-> + * Copyright 2014-2015, Freescale Semiconductor
-> + *
-> + * Mingkai Hu <Mingkai.hu@freescale.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPLv2 or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/ {
-> +     compatible = "fsl,ls1043a";
-> +     interrupt-parent = <&gic>;
-> +     #address-cells = <2>;
-> +     #size-cells = <2>;
-> +
-> +     cpus {
-> +             #address-cells = <2>;
-> +             #size-cells = <0>;
-> +
-> +             /*
-> +              * We expect the enable-method for cpu's to be "psci", but this
-> +              * is dependent on the SoC FW, which will fill this in.
-> +              *
-> +              * Currently supported enable-method is psci v0.2
-> +              */
-> +             cpu0:  cpu at 0{
-> +                     device_type = "cpu";
-> +                     compatible = "arm,cortex-a53";
-> +                     reg = <0x0 0x0>;
-> +                     clocks = <&clockgen 1 0>;
-> +             };
-> +
-> +             cpu1:  cpu at 1{
-> +                     device_type = "cpu";
-> +                     compatible = "arm,cortex-a53";
-> +                     reg = <0x0 0x1>;
-> +                     clocks = <&clockgen 1 0>;
-> +             };
-> +
-> +             cpu2:  cpu at 2{
-> +                     device_type = "cpu";
-> +                     compatible = "arm,cortex-a53";
-> +                     reg = <0x0 0x2>;
-> +                     clocks = <&clockgen 1 0>;
-> +             };
-> +
-> +             cpu3:  cpu at 3{
-> +                     device_type = "cpu";
-> +                     compatible = "arm,cortex-a53";
-> +                     reg = <0x0 0x3>;
-> +                     clocks = <&clockgen 1 0>;
-> +             };
-> +     };
-> +
-> +      memory at 80000000{
-> +             device_type = "memory";
-> +             reg = <0x0 0x80000000 0 0x80000000>;
-> +                   /* DRAM space 1, size: 2GiB DRAM */
-> +     };
-> +
-> +     sysclk: sysclk {
-> +             compatible = "fixed-clock";
-> +             #clock-cells = <0>;
-> +             clock-frequency = <100000000>;
-> +             clock-output-names = "sysclk";
-> +     };
-> +
-> +     soc {
-> +             compatible = "simple-bus";
-> +             #address-cells = <2>;
-> +             #size-cells = <2>;
-> +             ranges;
-> +
-> +             clockgen:  clocking at 1ee1000{
-> +                     compatible = "fsl,ls1043a-clockgen";
-> +                     reg = <0x0 0x1ee1000 0x0 0x1000>;
-> +                     #clock-cells = <2>;
-> +                     clocks = <&sysclk>;
-> +             };
-> +
-> +             timer {
-> +                     compatible = "arm,armv8-timer";
-> +                     interrupts = <1 13 0x1>, /* Physical Secure PPI */
-> +                                  <1 14 0x1>, /* Physical Non-Secure PPI */
-> +                                  <1 11 0x1>, /* Virtual PPI */
-> +                                  <1 10 0x1>; /* Hypervisor PPI */
-> +             };
-> +
-> +             pmu {
-> +                     compatible = "arm,armv8-pmuv3";
-> +                     interrupts = <0 106 0x4>,
-> +                                  <0 107 0x4>,
-> +                                  <0 95 0x4>,
-> +                                  <0 97 0x4>;
-> +                     interrupt-affinity = <&cpu0>,
-> +                                          <&cpu1>,
-> +                                          <&cpu2>,
-> +                                          <&cpu3>;
-> +             };
-> +
-> +             gic:  interrupt-controller at 1400000{
-> +                     compatible = "arm,gic-400";
-> +                     #interrupt-cells = <3>;
-> +                     interrupt-controller;
-> +                     reg = <0x0 0x1401000 0 0x1000>, /* GICD */
-> +                           <0x0 0x1402000 0 0x2000>, /* GICC */
-> +                           <0x0 0x1404000 0 0x2000>, /* GICH */
-> +                           <0x0 0x1406000 0 0x2000>; /* GICV */
-> +                     interrupts = <1 9 0xf08>;
-> +             };
+Rebuild bcm2835_defconfig using "make bcm2835_defconfig;
+make savedefconfig", and add the following features:
 
-The recently posted ls2080 device tree patch puts pmu, gic, etc. under the 
-root node rather than the soc node.  Where should they go?  At least it 
-should be consistent...
+* Enable all bcm2835-relevant drivers (MBOX, WDT, DMA,
+  PWM, SND)
+* Re-enable some features to keep the current settings
+  (stackprotector, LED GPIO, LED triggers)
 
--Scott
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/configs/bcm2835_defconfig |   28 +++++++++++++++++-----------
+ 1 file changed, 17 insertions(+), 11 deletions(-)
+
+This patch is only compile-tested.
+
+diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+index 31cb073..0fda844 100644
+--- a/arch/arm/configs/bcm2835_defconfig
++++ b/arch/arm/configs/bcm2835_defconfig
+@@ -10,7 +10,6 @@ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CPUSETS=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_PERF=y
+ CONFIG_CFS_BANDWIDTH=y
+ CONFIG_RT_GROUP_SCHED=y
+@@ -18,10 +17,6 @@ CONFIG_NAMESPACES=y
+ CONFIG_SCHED_AUTOGROUP=y
+ CONFIG_RELAY=y
+ CONFIG_BLK_DEV_INITRD=y
+-CONFIG_RD_BZIP2=y
+-CONFIG_RD_LZMA=y
+-CONFIG_RD_XZ=y
+-CONFIG_RD_LZO=y
+ CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+ CONFIG_KALLSYMS_ALL=y
+ CONFIG_EMBEDDED=y
+@@ -29,6 +24,7 @@ CONFIG_EMBEDDED=y
+ CONFIG_PROFILING=y
+ CONFIG_OPROFILE=y
+ CONFIG_JUMP_LABEL=y
++CONFIG_CC_STACKPROTECTOR_REGULAR=y
+ CONFIG_ARCH_MULTI_V6=y
+ # CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_BCM=y
+@@ -38,7 +34,6 @@ CONFIG_AEABI=y
+ CONFIG_KSM=y
+ CONFIG_CLEANCACHE=y
+ CONFIG_SECCOMP=y
+-CONFIG_CC_STACKPROTECTOR=y
+ CONFIG_KEXEC=y
+ CONFIG_CRASH_DUMP=y
+ CONFIG_VFP=y
+@@ -57,7 +52,6 @@ CONFIG_DEVTMPFS_MOUNT=y
+ # CONFIG_STANDALONE is not set
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
+-CONFIG_SCSI_MULTI_LUN=y
+ CONFIG_SCSI_CONSTANTS=y
+ CONFIG_SCSI_SCAN_ASYNC=y
+ CONFIG_NETDEVICES=y
+@@ -77,17 +71,27 @@ CONFIG_SPI=y
+ CONFIG_SPI_BCM2835=y
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
++CONFIG_WATCHDOG=y
++CONFIG_BCM2835_WDT=y
+ CONFIG_FB=y
+ CONFIG_FB_SIMPLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_SOC=y
++CONFIG_SND_BCM2835_SOC_I2S=y
+ CONFIG_USB=y
+ CONFIG_USB_STORAGE=y
++CONFIG_USB_DWC2=y
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_BCM2835=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_TIMER=y
+ CONFIG_LEDS_TRIGGER_ONESHOT=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+@@ -96,17 +100,19 @@ CONFIG_LEDS_TRIGGER_GPIO=y
+ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+ CONFIG_LEDS_TRIGGER_TRANSIENT=y
+ CONFIG_LEDS_TRIGGER_CAMERA=y
++CONFIG_DMADEVICES=y
++CONFIG_DMA_BCM2835=y
+ CONFIG_STAGING=y
+-CONFIG_USB_DWC2=y
+-CONFIG_USB_DWC2_HOST=y
++CONFIG_MAILBOX=y
++CONFIG_BCM2835_MBOX=y
+ # CONFIG_IOMMU_SUPPORT is not set
++CONFIG_PWM=y
++CONFIG_PWM_BCM2835=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_POSIX_ACL=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT3_FS_POSIX_ACL=y
+-CONFIG_EXT4_FS=y
+-CONFIG_EXT4_FS_POSIX_ACL=y
+ CONFIG_FANOTIFY=y
+ CONFIG_MSDOS_FS=y
+ CONFIG_VFAT_FS=y
+-- 
+1.7.10.4
