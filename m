@@ -1,40 +1,39 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Thu, 15 Oct 2015 08:29:42 +0200
-Subject: [PATCH V2 6/6] gicv2m: acpi: Introducing GICv2m ACPI support
-In-Reply-To: <561F449E.2050803@semihalf.com>
-References: <1444865156-9870-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1444865156-9870-7-git-send-email-Suravee.Suthikulpanit@amd.com>
- <561F449E.2050803@semihalf.com>
-Message-ID: <561F47D5.6070601@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 15 Oct 2015 08:29:58 +0200
+Subject: [PATCH 3/4] mmc: mediatek: Add tune support
+In-Reply-To: <1444729078-26585-4-git-send-email-chaotian.jing@mediatek.com>
+References: <1444729078-26585-1-git-send-email-chaotian.jing@mediatek.com>
+ <1444729078-26585-4-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <20151015062958.GG7825@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.10.2015 08:15, Tomasz Nowicki wrote:
-> Hi Suravee,
->
+Hi,
 
-[...]
+On Tue, Oct 13, 2015 at 05:37:57PM +0800, Chaotian Jing wrote:
+> @@ -1260,6 +1547,16 @@ static int msdc_drv_probe(struct platform_device *pdev)
+>  		goto host_free;
+>  	}
+>  
+> +	host->src_clk_parent = clk_get_parent(host->src_clk);
+> +	host->hs400_src = devm_clk_get(&pdev->dev, "400mhz");
+> +	if (IS_ERR(host->hs400_src)) {
+> +		dev_dbg(&pdev->dev, "Cannot find 400mhz at dts!\n");
+> +	} else if (clk_set_parent(host->src_clk_parent, host->hs400_src) < 0) {
+> +		dev_err(host->dev, "Failed to set 400mhz source clock!\n");
+> +		ret = -EINVAL;
+> +		goto host_free;
+> +	}
 
-> Moreover, seems we need to add irq_domain_free_fwnode to gicv2m_teardown():
->   static void gicv2m_teardown(void)
->   {
->       struct v2m_data *v2m, *tmp;
->
->       list_for_each_entry_safe(v2m, tmp, &v2m_nodes, entry) {
-> +        struct fwnode_handle *handle = v2m->fwnode;
-> +
->           list_del(&v2m->entry);
->           kfree(v2m->bm);
->           iounmap(v2m->base);
-> -        of_node_put(to_of_node(v2m->fwnode));
-> +        if (is_of_node(handle))
-> +            of_node_put(to_of_node(handle));
-> +        else if (is_irqchip_node(handle))
-> +            irq_domain_free_fwnode(handle);
->           kfree(v2m);
->       }
->   }
->
-Sorry, I missed you already did something similar in your patch.
+This is a static setup. We have device tree bindings for doing this.
+Please look for assigned-clocks and assigned-clock-parents. Doing stuff
+like this in the driver almost certainly leads to problems because the
+next SoC will have different requirements here.
 
-Tomasz
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
