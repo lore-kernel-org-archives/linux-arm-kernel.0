@@ -1,104 +1,85 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Thu, 15 Oct 2015 16:33:14 +0800
-Subject: [PATCH v10 4/6] PCI: hisi: Add PCIe host support for HiSilicon
- SoC Hip05
-In-Reply-To: <5572871.GecUyqk59W@wuerfel>
-References: <1444445957-239522-1-git-send-email-wangzhou1@hisilicon.com>
- <30775300.COZ4nEMWXC@wuerfel> <561E23EB.7050504@hisilicon.com>
- <5572871.GecUyqk59W@wuerfel>
-Message-ID: <561F64CA.7060606@hisilicon.com>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Thu, 15 Oct 2015 16:30:42 +0800
+Subject: [PATCH v4 0/5] iommu/arm-smmu: add support for non-pci devices
+Message-ID: <1444897847-18040-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/10/15 5:56, Arnd Bergmann wrote:
-> On Wednesday 14 October 2015 17:44:11 Zhou Wang wrote:
->> On 2015/10/14 17:06, Arnd Bergmann wrote:
->>> On Wednesday 14 October 2015 16:59:03 Zhou Wang wrote:
->>>>
->>>> Hi Arnd,
->>>>
->>>> In Hip05 PCIe host, it uses GITS_TRANSLATER's address to get TLP package
->>>> which contains MSI address and MSI data, and then combine BDF and MSI data
->>>> to a 32 bit data which will be writen to GITS_TRANSLATER register of ITS.
->>>>
->>>> I think maybe this is a defect of our PCIe controller.
->>>
->>> I'd consider it a bug in the firmware if this is not set up correctly
->>> before boot.
->>>
->>>>> I don't think what you do here is safe because the 'reg' property
->>>>> of the MSI controller might point to the address that is used for
->>>>> the message directly.
->>>>
->>>> I see your point, however we must get address of GITS_TRANSLATER and
->>>> set it to PCIe host. How about adding necessary comments here?
->>>
->>> This seems to just be static setup that should be done before Linux
->>> is even loaded. Any reason you can't do it that way?
->>>
->>
->> There are some ITSs in Hip05-D02 platform, in fact, we can use any of them
->> as a msi-controller,  which we can configure in dts. I am afraid that
->> hard-setting the value in BIOS would lead to restrictions in terms of flexibility,
->> as with the current implementation the same BIOS-driver can fit different
->> DTS structures.
-> 
-> The dtb generally should be expected to match whatever the firmware sets up,
-> so if there is one reasonable setting here, I see no problem with hardcoding
-> it that way. In particular on server systems, we usually expect the firmware
-> to configure almost everything in advance and just tell us how it is
-> configured, while on embedded systems we can't trust the bootload and
-> usually set it all up in the kernel from scratch.
->
+Hi, all:
 
-I see your point. Actually in order to support platforms without PCIe configuration
-support BIOS we planned to have a further commit once the driver was upstreamed,
-where we check if the link is already up, if not we would configure it in the kernel,
-otherwise we would return silently.
+It's been a long time since my patch v3. I don't known when Laurent's
+probe-deferral series will be upstreamed? I really have no time to wait. So
+I add patch 4/5, to keep both cases(Laurent's series upstreamed or not),
+smmu-v3 can always work well.
 
-Now about this patchset we can remove GITS_TRANSLATER address setting and do this
-in BIOS together with link-up setup; then in the next commit for supporting platforms
-without PCIe setup in UEFI, we can add this part back where we first check
-if the link is already up (we can assume that if BIOS has configured link-up,
-it has also setup the msi-parent address), if the link is up we skip reading
-msi-parent address.
 
-> What would be a reason to pick one ITS over another?
+Changelog:
+v3 -> v4:
+1. base upon the lastest arm-smmu-v3.c update patchset.
+2. add patch 4/5, keep smmu-v3 can still work normally before Laurent's series upstreamed.
 
-In fact, we set PCIe host and ITS binding in dts. I mean that PCIe host can
-bind to any ITS nodes in system.
+   Describe process flow as below:
+   All: (A-->B means: function A directly or indirectly call function B)
+   [1] of_iommu_init-->arm_smmu_of_iommu_init-->of_iommu_set_ops
 
-> 
-> On a related note, don't you also need to describe in DT how PCI B/D/F
-> function numbers get turned into addresses in the ITS? Does that also
-> require configuration in the driver? I see this code here:
+   1) without Laurent's series
+   [1] of_platform_populate-->of_dma_configure-->of_iommu_configure-->.of_xlate
+   	/* time before step [2], so smmu is NULL yet */
+   	smmu = platform_get_drvdata(pdev);
+	if (!smmu) {
+		dev->archdata.iommu = ERR_PTR(-EPROBE_DEFER);
 
-We don't need to describe this. we need only describe the relationship between
-PCIe host and ITS, PCIe host will service PCIe devices which are connected to it.
+		return -EPROBE_DEFER;
+	}
+   [2] arm_smmu_device_dt_probe-->platform_set_drvdata
+   [3] call .add_device
+   	if (dev->archdata.iommu == ERR_PTR(-EPROBE_DEFER)) {
+		dev->archdata.iommu = NULL;
 
-> 
-> 
-> +       hisi_pcie_apb_writel(pcie, PCIE_MSI_ASID_ENABLE | PCIE_MSI_ASID_VALUE,
-> +                            PCIE_SLV_MSI_ASID);
-> +       hisi_pcie_apb_writel(pcie, PCIE_MSI_TRANS_ENABLE, PCIE_MSI_TRANS_REG);
-> +       hisi_pcie_change_apb_mode(pcie, PCIE_SLV_DBI_MODE);
->
+		/* scan master's "iommus" property */
+		return of_iommu_configure(dev, dev->of_node) ? 0 : -ENODEV;
+	}
+   [4] call master's probe function
 
-This code is to enable MSI support in PCIe host.
+   2) with Laurent's series
+   [1] of_platform_populate-->of_dma_configure
+   	the call of of_iommu_configure have been putted off, see [4] below
+   	so the value of dev->archdata.iommu have no change
+   [2] arm_smmu_device_dt_probe-->platform_set_drvdata
+   [3] call .add_device
+   	if (dev->archdata.iommu == ERR_PTR(-EPROBE_DEFER)) {
+		/* see [1], dev->archdata.iommu is NULL, so this branch can not be entered */
+	}
+   [4] call .of_xlate
+   [5] call master's probe function
 
-> plus all of hisi_pcie_config_context(). This looks like it will change
-> the way the MSI is interpreted. This also seems like something that
-> could be done in the firmware in advance, and just get reported in DT.
+v2 -> v3:
+1. add support for pci device hotplug, which missed in patch v2.
+2. only support #iommu-cells = <1>, add corresponding description in arm,smmu-v3.txt.
+3. add function find_smmu_by_device which extracted from find_smmu_by_node, to resolve
+   the problem mentioned by Robin Murphy in [PATCH v2 7/9].
+   Additionally:
+   +    platform_set_drvdata(pdev, smmu);       //Patch v2
+   +	dev->archdata.iommu = smmu;             //Patch v3, dev = &pdev->dev
 
-I think all hisi_pcie_config_context can be move to BIOS for this patchset,
-however in order to support other BIOSs which have no PCIe setup we would plan
-a future commit adding this back and working as explained above.
+v1 -> v2:
+update the implementation of patch 1/9 according to Will Deacon's suggestion.
+update the comment of patch 3/9 and 4/9.
+use arm_smmu_options to skip the execution of command CMD_PREFETCH_CONFIG, see patch 5/9.
+patch 6/9 is base on Laurent's series, to support probe deferral.
+patch 7/9 according to Robin Murphy's suggestion, remove global variable arm_smmu_devices, thanks.
+patch 9/9 add support for a master with multiple stream IDs.
 
-Thanks,
-Zhou
+Zhen Lei (5):
+  iommu/arm-smmu: to support probe deferral
+  iommu/arm-smmu: rename __arm_smmu_get_pci_sid
+  iommu/arm-smmu: add support for non-pci devices
+  iommu/arm-smmu: to backward compatible with probe non-deferral
+  iommu/arm-smmu: describe the limitation of #iommu-cells
 
-> 
-> 	Arnd
-> 
-> .
-> 
+ .../devicetree/bindings/iommu/arm,smmu-v3.txt      |   6 +
+ drivers/iommu/arm-smmu-v3.c                        | 166 +++++++++++++++++----
+ 2 files changed, 143 insertions(+), 29 deletions(-)
+
+--
+2.5.0
