@@ -1,55 +1,74 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Thu, 15 Oct 2015 13:59:31 -0700
-Subject: [PATCH v2 1/2] dt-bindings: Add new boards to bcm4708 DT bindings
-In-Reply-To: <5620120F.3060109@hauke-m.de>
-References: <1444860890-28649-1-git-send-email-jonmason@broadcom.com>
- <1444860890-28649-2-git-send-email-jonmason@broadcom.com>
- <5620120F.3060109@hauke-m.de>
-Message-ID: <562013B3.9070707@broadcom.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 15 Oct 2015 16:01:13 -0500
+Subject: [PATCH v2] PCI: iproc: fix 32-bit build error
+In-Reply-To: <5754881.OPA6La0Zg0@wuerfel>
+References: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
+ <20151015160028.GA17702@localhost> <561FD20F.1090004@broadcom.com>
+ <5754881.OPA6La0Zg0@wuerfel>
+Message-ID: <20151015210113.GA13636@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-10-15 01:52 PM, Hauke Mehrtens wrote:
-> On 10/15/2015 12:14 AM, Jon Mason wrote:
->> Add the 4708, 4709, and 953012k SVKs to the the documentation for the
->> Broadcom Northstar device tree bindings.
->>
->> Signed-off-by: Jon Mason <jonmason@broadcom.com>
->> ---
->>   Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt | 7 +++++++
->>   1 file changed, 7 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
->> index 6b0f49f..b9cc308 100644
->> --- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
->> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
->> @@ -5,4 +5,11 @@ Boards with the BCM4708 SoC shall have the following properties:
->>
->>   Required root node property:
->>
->> +bcm94708
-this should be bcm4708
->
-> I thought we wanted to add the SoC names here, isn't bcm94708 a board
-> the bcm4708, the SoC ion this board? I do not really care about this
-> file, has anyone found the documentation what should be listed here?
+On Thu, Oct 15, 2015 at 09:40:45PM +0200, Arnd Bergmann wrote:
+> The iproc PCI driver tries to figure out whether the MMIO window has
+> a valid size, but does this using a 64-bit modulo operation, which
+> is not allowed on 32-bit kernels and leads to a link error:
+> 
+> drivers/built-in.o: In function `iproc_pcie_setup':
+> :(.text+0x4b798): undefined reference to `__aeabi_uldivmod'
+> 
+> This works around that error by using the div64_u64() function
+> provided by the kernel. While this is an expensive operation,
+> it is harmless because we only call it during the probing
+> of the driver.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Ray Jui <rjui@broadcom.com>
+> Fixes: 0ab99ca8eb6c ("PCI: iproc: Fix compile warnings")
 
-Yes - the 9 infront indicates its some type of board.  The SoC part 
-numbers should be listed here.  The SoCs are all variants of 
-Northstar/Northstar plus family.  Some have different io, packaging, 
-speed grades, etc.
+This *looks* like it should be fixing 90e4032eeaf2 ("PCI: iproc: Add
+outbound mapping support"), not 0ab99ca8eb6c.
 
->
-> Hauke
->
->>   compatible = "brcm,bcm4708";
->> +
->> +bcm94709
-This should be bcm4709
->> +compatible = "brcm,bcm4709";
->> +
->> +bcm953012
-This should be bcm53012
->> +compatible = "brcm,bcm53012";
->>
->
+90e4032eeaf2 added the "if (size % ob->window_size)".
+
+Is this more subtle than that?
+
+> ---
+> On Thursday 15 October 2015 09:19:27 Ray Jui wrote:
+> > On 10/15/2015 9:00 AM, Bjorn Helgaas wrote:
+> > > 
+> > > Ping; I can easily fix up the static, but it'd be nice to have real acks
+> > > from Ray and Hauke.
+> 
+> 
+> Argh, I knew there was one patch from my build fixes that I needed to
+> redo, I just couldn't find it again. Thanks for the reminder.
+> 
+> 
+> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+> index f3481ddff344..9193951ae861 100644
+> --- a/drivers/pci/host/pcie-iproc.c
+> +++ b/drivers/pci/host/pcie-iproc.c
+> @@ -241,6 +241,7 @@ static int iproc_pcie_setup_ob(struct iproc_pcie *pcie, u64 axi_addr,
+>  	struct iproc_pcie_ob *ob = &pcie->ob;
+>  	unsigned i;
+>  	u64 max_size = (u64)ob->window_size * MAX_NUM_OB_WINDOWS;
+> +	u64 remainder;
+>  
+>  	if (size > max_size) {
+>  		dev_err(pcie->dev,
+> @@ -249,7 +250,8 @@ static int iproc_pcie_setup_ob(struct iproc_pcie *pcie, u64 axi_addr,
+>  		return -EINVAL;
+>  	}
+>  
+> -	if (size % ob->window_size) {
+> +	div64_u64_rem(size, ob->window_size, &remainder);
+> +	if (remainder) {
+>  		dev_err(pcie->dev,
+>  			"res size %pap needs to be multiple of window size %pap\n",
+>  			&size, &ob->window_size);
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
