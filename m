@@ -1,50 +1,47 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Thu, 15 Oct 2015 11:07:28 +0800
-Subject: [alsa-devel] [PATCH v6 09/10] snd: dmaengine-pcm: add
- snd_dmaengine_pcm_get_caps interface
-In-Reply-To: <1444872998-2548-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <201510151102.w2eXs34z%fengguang.wu@intel.com>
+Date: Thu, 15 Oct 2015 11:20:02 +0800
+Subject: [PATCH v6 10/10] ASoC: rockchip_i2s: modify DMA max burst to 1
+In-Reply-To: <1444873008-2589-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <201510151152.NmZ8Lk6V%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Yiwei,
 
-[auto build test WARNING on rockchip/for-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+[auto build test ERROR on rockchip/for-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
 
 url:    https://github.com/0day-ci/linux/commits/Shawn-Lin/Fix-broken-DMAFLUSHP-on-Rockchips-platform/20151015-094613
-reproduce: make htmldocs
+config: x86_64-allmodconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-All warnings (new ones prefixed by >>):
+All errors (new ones prefixed by >>):
 
->> sound/soc/soc-generic-dmaengine-pcm.c:475: warning: No description found for parameter 'caps'
+   sound/soc/rockchip/rockchip_i2s.c:467:13: sparse: undefined identifier 'snd_dmaengine_pcm_get_caps'
+   sound/soc/rockchip/rockchip_i2s.c:468:29: sparse: expected structure or union
+   sound/soc/rockchip/rockchip_i2s.c: In function 'rockchip_i2s_probe':
+>> sound/soc/rockchip/rockchip_i2s.c:467:6: error: implicit declaration of function 'snd_dmaengine_pcm_get_caps' [-Werror=implicit-function-declaration]
+     if (snd_dmaengine_pcm_get_caps(&pdev->dev, &dma_caps) == 0) {
+         ^
+>> sound/soc/rockchip/rockchip_i2s.c:468:15: error: request for member 'max_burst' in something not a structure or union
+      if (dma_caps.max_burst > 4) {
+                  ^
+   cc1: some warnings being treated as errors
 
-vim +/caps +475 sound/soc/soc-generic-dmaengine-pcm.c
+vim +/snd_dmaengine_pcm_get_caps +467 sound/soc/rockchip/rockchip_i2s.c
 
-   459			return;
-   460	
-   461		pcm = soc_platform_to_pcm(platform);
-   462	
-   463		snd_soc_remove_platform(platform);
-   464		dmaengine_pcm_release_chan(pcm);
-   465		kfree(pcm);
-   466	}
-   467	EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_unregister);
-   468	
-   469	
-   470	/**
-   471	 * snd_dmaengine_pcm_get_caps - Get slave dma caps based PCM device
-   472	 * @dev: Parent device the PCM was register with
-   473	 */
-   474	int snd_dmaengine_pcm_get_caps(struct device *dev, struct dma_slave_caps *caps)
- > 475	{
-   476		struct snd_soc_platform *platform;
-   477		struct dmaengine_pcm *pcm;
-   478		int ret = -ENODEV;
-   479	
-   480		platform = snd_soc_lookup_platform(dev);
-   481		if (!platform)
-   482			return ret;
-   483	
+   461		i2s->playback_dma_data.addr = res->start + I2S_TXDR;
+   462		i2s->playback_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+   463	
+   464		i2s->capture_dma_data.addr = res->start + I2S_RXDR;
+   465		i2s->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+   466	
+ > 467		if (snd_dmaengine_pcm_get_caps(&pdev->dev, &dma_caps) == 0) {
+ > 468			if (dma_caps.max_burst > 4) {
+   469				i2s->playback_dma_data.maxburst = 4;
+   470				i2s->capture_dma_data.maxburst = 4;
+   471			} else {
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -53,6 +50,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/octet-stream
-Size: 6062 bytes
+Size: 49951 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151015/4fa333bb/attachment.obj>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151015/bec4ebad/attachment-0001.obj>
