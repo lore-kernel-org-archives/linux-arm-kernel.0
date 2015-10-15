@@ -1,55 +1,47 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 15 Oct 2015 11:20:02 +0800
-Subject: [PATCH v6 10/10] ASoC: rockchip_i2s: modify DMA max burst to 1
-In-Reply-To: <1444873008-2589-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <201510151152.NmZ8Lk6V%fengguang.wu@intel.com>
+From: B48286@freescale.com (Hou Zhiqiang)
+Date: Thu, 15 Oct 2015 03:32:40 +0000
+Subject: [PATCH V3 4/6] arm64/ls1043a: add DTS for Freescale LS1043A SoC
+In-Reply-To: <20151014124353.GC2150@leverpostej>
+References: <1444822498-16477-1-git-send-email-B48286@freescale.com>
+ <1444822498-16477-5-git-send-email-B48286@freescale.com>
+ <20151014124353.GC2150@leverpostej>
+Message-ID: <CY1PR0301MB07803635FF7E642C48EDE3648B3E0@CY1PR0301MB0780.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yiwei,
 
-[auto build test ERROR on rockchip/for-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
 
-url:    https://github.com/0day-ci/linux/commits/Shawn-Lin/Fix-broken-DMAFLUSHP-on-Rockchips-platform/20151015-094613
-config: x86_64-allmodconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+> -----Original Message-----
+> From: Mark Rutland [mailto:mark.rutland at arm.com]
+> Sent: 2015?10?14? 20:44
+> To: Hou Zhiqiang-B48286
+> Cc: linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com;
+> will.deacon at arm.com; linux-i2c at vger.kernel.org; linux-
+> watchdog at vger.kernel.org; linux-doc at vger.kernel.org; linux-
+> clk at vger.kernel.org; Hu Mingkai-B21284; Xie Shaohui-B21989; Wood Scott-
+> B07421; Sharma Bhupesh-B45370; Li Yang-Leo-R58472; wsa at the-dreams.de;
+> wim at iguana.be; corbet at lwn.net; mturquette at baylibre.com;
+> sboyd at codeaurora.org; Song Wenbin-B53747
+> Subject: Re: [PATCH V3 4/6] arm64/ls1043a: add DTS for Freescale LS1043A
+> SoC
+> 
+> Hi,
+> 
+> > +	pmu {
+> > +		compatible = "arm,armv8-pmuv3";
+> > +		interrupts = <0 106 0x4>,
+> > +			     <0 107 0x4>,
+> > +			     <0 95 0x4>,
+> > +			     <0 97 0x4>;
+> > +	};
+> 
+> You should have interrupt-affinity here. See
+> Documentation/devicetree/bindings/arm/pmu.txt
+> 
+> Otherwise this looks ok.
+> 
 
-All errors (new ones prefixed by >>):
+Thanks for your correction.
 
-   sound/soc/rockchip/rockchip_i2s.c:467:13: sparse: undefined identifier 'snd_dmaengine_pcm_get_caps'
-   sound/soc/rockchip/rockchip_i2s.c:468:29: sparse: expected structure or union
-   sound/soc/rockchip/rockchip_i2s.c: In function 'rockchip_i2s_probe':
->> sound/soc/rockchip/rockchip_i2s.c:467:6: error: implicit declaration of function 'snd_dmaengine_pcm_get_caps' [-Werror=implicit-function-declaration]
-     if (snd_dmaengine_pcm_get_caps(&pdev->dev, &dma_caps) == 0) {
-         ^
->> sound/soc/rockchip/rockchip_i2s.c:468:15: error: request for member 'max_burst' in something not a structure or union
-      if (dma_caps.max_burst > 4) {
-                  ^
-   cc1: some warnings being treated as errors
-
-vim +/snd_dmaengine_pcm_get_caps +467 sound/soc/rockchip/rockchip_i2s.c
-
-   461		i2s->playback_dma_data.addr = res->start + I2S_TXDR;
-   462		i2s->playback_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-   463	
-   464		i2s->capture_dma_data.addr = res->start + I2S_RXDR;
-   465		i2s->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-   466	
- > 467		if (snd_dmaengine_pcm_get_caps(&pdev->dev, &dma_caps) == 0) {
- > 468			if (dma_caps.max_burst > 4) {
-   469				i2s->playback_dma_data.maxburst = 4;
-   470				i2s->capture_dma_data.maxburst = 4;
-   471			} else {
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 49951 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151015/bec4ebad/attachment-0001.obj>
+Thanks,
+Zhiqiang
