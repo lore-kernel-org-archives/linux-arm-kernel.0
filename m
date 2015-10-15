@@ -1,65 +1,63 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Thu, 15 Oct 2015 09:30:15 -0500
-Subject: [PATCH V2 6/6] gicv2m: acpi: Introducing GICv2m ACPI support
-In-Reply-To: <561FB238.10509@amd.com>
-References: <1444865156-9870-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1444865156-9870-7-git-send-email-Suravee.Suthikulpanit@amd.com>
- <561F449E.2050803@semihalf.com> <561FB238.10509@amd.com>
-Message-ID: <561FB877.4020106@amd.com>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Thu, 15 Oct 2015 16:34:45 +0200
+Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
+ ECAM) and ACPI code out of arch/x86/ directory
+In-Reply-To: <20151015132200.GA7621@red-moon>
+References: <20150604102253.GA31773@red-moon> <5570447D.3020705@linaro.org>
+ <557504A2.3060203@linaro.org> <20150608151443.GA16151@red-moon>
+ <55E4340D.6050004@linaro.org> <55ED6010.3020406@linaro.org>
+ <20150908150727.GF29293@red-moon> <55F0388B.1090607@linaro.org>
+ <20150911112018.GA13033@red-moon> <55F6DFF6.4010807@linaro.org>
+ <20151015132200.GA7621@red-moon>
+Message-ID: <561FB985.8070509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
-
-On 10/15/2015 9:03 AM, Suravee Suthikulanit wrote:
->>> +    if (!data)
->>> +        return NULL;
->>> +
->>> +    return data->fwnode;
->>> +}
->>> +
->>> +static int __init
->>> +acpi_parse_madt_msi(struct acpi_subtable_header *header,
->>> +            const unsigned long end)
->>> +{
->>> +    int ret;
->>> +    struct resource res;
->>> +    u32 spi_start = 0, nr_spis = 0;
->>> +    struct acpi_madt_generic_msi_frame *m;
->>> +    struct fwnode_handle *fwnode = NULL;
->>> +
->>> +    m = (struct acpi_madt_generic_msi_frame *)header;
->>> +    if (BAD_MADT_ENTRY(m, end))
->>> +        return -EINVAL;
->>> +
->>> +    res.start = m->base_address;
->>> +    res.end = m->base_address + 0x1000;
->>> +
->>> +    if (m->flags & ACPI_MADT_OVERRIDE_SPI_VALUES) {
->>> +        spi_start = m->spi_base;
->>> +        nr_spis = m->spi_count;
->>> +
->>> +        pr_info("ACPI overriding V2M MSI_TYPER (base:%u, num:%u)\n",
->>> +            spi_start, nr_spis);
->>> +    }
->>> +
->>> +    fwnode = irq_domain_alloc_fwnode((void *)m->base_address);
->>> +    if (!fwnode) {
->>> +        pr_err("Unable to allocate GICv2m domain token\n");
->>> +        return -EINVAL;
->>> +    }
->>> +
->>> +    ret = gicv2m_init_one(fwnode, spi_start, nr_spis, &res);
->> I case of error, we should call here:
->> irq_domain_free_fwnode(fwnode);
+On 15.10.2015 15:22, Lorenzo Pieralisi wrote:
+> On Mon, Sep 14, 2015 at 03:55:50PM +0100, Tomasz Nowicki wrote:
 >
-> This should have already been handled when returning from the
-> acpi_parse_madt_msi() in gicv2m_teardown() since we would need to
-> iterate through all existing MSI frame to clean up.
+> [...]
+>
+>>> Well, I still have not figured out whether on arm64 the raw accessors
+>>> required by ACPICA make sense.
+>>>
+>>> So either arm64 relies on the generic MCFG based raw read and writes
+>>> or we define the global raw read and writes as empty (ie x86 overrides
+>>> them anyway).
+>>>
+>>
+>> My concerns/ideas related to raw accessors for ARM64, please correct me
+>> at any point.
+>>
+>> ACPI spec - chapter: 19.5.96 OperationRegion (Declare Operation Region)
+>> defines PCI_Config as one of region types. Every time ASL opcode
+>> operates on corresponding PCI config space region, ASL interpreter is
+>> dispatching address space to our raw accessors, please see
+>> acpi_ex_pci_config_space_handler, acpi_ev_pci_config_region_setup calls.
+>> What is more important, such operations may happen after (yes after) bus
+>> enumeration, but always raw accessors are called at the end with the
+>> {segment, bus, dev, fn} tuple.
+>>
+>> Giving above, here are some ideas:
+>> 1. We force somehow vendors to avoid operations on PCI config regions in
+>> ASL code. PCI config region definitions still fall into Hardware Reduced
+>> profile, so new ACPICA special subset for ARM64 is need. Then raw ACPI
+>> accessors can be empty (and overridden by x86).
+>
+> I am coming back to this, I am not sure that PCI config based OperationRegions
+> fall into Hardware Reduced profile, I will finally start a thread on ASWG
+> to check that.
+>
+> Other than that, are you posting an updated version of this series soon ?
+> Let me know if you need help refactoring/testing the patches.
+>
 
-Actually, you are correct since the fwnode allocated here might not get 
-assigned to the v2m_data.fwnode and added to the v2m_nodes list yet. So, 
-we would need to call irq_domain_alloc_fwnode() here in case of error.
+I am planing to send updated version next week, but honestly next 
+version does make sense if we figure out raw accessors issue. So I will 
+clean up all around meanwhile and optionally raw accessor.
 
-Thanks,
-Suravee
+Of course your help in testing is welcomed. Also please have a look at 
+my GICv3/ITS patches, they are important for ACPI PCI.
+
+Regards,
+Tomasz
