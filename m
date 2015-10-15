@@ -1,49 +1,61 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 15 Oct 2015 15:26:17 +0200
-Subject: [alsa-devel] [RFC PATCH] ASoC: Modify check condition of multiple
- bindings of components
-In-Reply-To: <20151015121035.GE14956@sirena.org.uk>
-References: <1444743477-48819-1-git-send-email-koro.chen@mediatek.com>
- <561D0AA9.5080702@metafoo.de> <1444745902.26493.2.camel@mtksdaap41>
- <561D1843.1020007@metafoo.de> <1444785549.26493.12.camel@mtksdaap41>
- <561E1991.1050705@metafoo.de> <20151015121035.GE14956@sirena.org.uk>
-Message-ID: <561FA979.6030407@metafoo.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 15 Oct 2015 15:30:01 +0200
+Subject: [PATCHv3 03/11] arm64: Introduce helpers for page table levels
+In-Reply-To: <561FA6AE.6090707@arm.com>
+References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
+ <1444821634-1689-4-git-send-email-suzuki.poulose@arm.com>
+ <20151015113735.GB21930@cbox> <20151015124451.GI8825@leverpostej>
+ <561FA6AE.6090707@arm.com>
+Message-ID: <20151015133001.GF21930@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2015 02:10 PM, Mark Brown wrote:
-> On Wed, Oct 14, 2015 at 11:00:01AM +0200, Lars-Peter Clausen wrote:
+On Thu, Oct 15, 2015 at 02:14:22PM +0100, Suzuki K. Poulose wrote:
+> On 15/10/15 13:44, Mark Rutland wrote:
+> >On Thu, Oct 15, 2015 at 01:37:35PM +0200, Christoffer Dall wrote:
+> >>On Wed, Oct 14, 2015 at 12:20:26PM +0100, Suzuki K. Poulose wrote:
+> >>>Introduce helpers for finding the number of page table
+> >>>levels required for a given VA width, shift for a particular
+> >>>page table level.
 > 
->> It was never intended that it is possible to bind a component to multiple
->> cards. That it was possible was a bug that was overlooked and some people
->> tried to do it which caused apparently random crashes later on, caused by
->> the data structure corruption. This is why we added the check to catch this
->> kind of mistake early and to avoid the crashes.
+> >>>+/*
+> >>>+ * Size mapped by an entry at level n
+> >>>+ * We map PAGE_SHIFT - 3 at all levels, except the PAGE_SHIFT bits at the last level
+> >>>+ */
+> >>>+#define ARM64_HW_PGTABLE_LEVEL_SHIFT(n)	((PAGE_SHIFT - 3) * (4 - (n)) + 3)
+> >>
+> >>I feel like I'm partially failing the interview question again, in that
+> >>I don't fully understand the '+ 3' in the end?
+> >
+> >The last level handles PAGE_SHIFT bits (the bits from the VA that are
+> >the same in the PA). We only accounted for (PAGE_SHIFT - 3) bits at each
+> >level when multiplying, so we add those 3 missing bits back at the end.
+> >
 > 
-> This is true, but I do think it's something that we should have some
-> story on supporting for some of this hardware that has a bunch of
-> channels in one IP block that can't really interact with each other.
-> It's going to make it a lot easier for people to think about the
-> hardware and how to describe it.
+> Something like :
+> 
+> /*
+>  * Size mapped by an entry at level n
+>  * We map PAGE_SHIFT - 3 at all levels, except the last, where we map PAGE_SHIFT bits.
+>  * The maximum number of levels supported by the architecture is 4. Hence at starting
+>  * at level n, we hanve (4 - n) levels of translation. So, the total number of bits
 
-I'm not saying we shouldn't support it, just that we can't support it with
-the current code. And adding support for it will require a fair bit of
-restructuring.
+nit: s/hanve/have/
 
-If a hardware block as multiple independent channels the best approach in my
-opinion is to register multiple components (Which we can't do at the moment,
-because there can only be one component per device). From a framework point
-of view there is no difference between a single device with multiple
-independent channels and multiple independent devices with one channel each.
-Both have the same logical topology.
+>  * mapped by an entry at level n is :
+>  *
+>  *  ((4 - n) - 1) * (PAGE_SHIFT - 3) + PAGE_SHIFT
+>  *
+>  * Rearranging it a bit we get :
+>  *   (4 - n) * (PAGE_SHIFT - 3) + 3
+>  */
+> 
+> Or we could use the formula without rearranging.
+> 
+Either way, even I get it now.
 
-- Lars
+Thanks for the explanation!!
 
+Assuming some version of this goes in:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151015/467e83ef/attachment.sig>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
