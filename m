@@ -1,46 +1,35 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 15 Oct 2015 17:42:53 +0200
-Subject: [PATCH 3/3] ARM: at91/defconfig: update sama5 defconfig
-In-Reply-To: <20151015153116.GE26893@odux.rfo.atmel.com>
-References: <1444824684-24526-1-git-send-email-ludovic.desroches@atmel.com>
- <1444824684-24526-3-git-send-email-ludovic.desroches@atmel.com>
- <20151015132451.GD3421@piout.net> <20151015153116.GE26893@odux.rfo.atmel.com>
-Message-ID: <561FC97D.2040806@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 17:46:33 +0200
+Subject: [PATCH RFC 0/7] Adding core support for wire-MSI bridges
+In-Reply-To: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
+References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <5027676.zPNVVQXaP4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 15/10/2015 17:31, Ludovic Desroches a ?crit :
-> On Thu, Oct 15, 2015 at 03:24:51PM +0200, Alexandre Belloni wrote:
->> Hi,
->>
->> On 14/10/2015 at 14:11:24 +0200, Ludovic Desroches wrote :
->>> Add SAMA5D2 SoC plus Atmel flexcom and Atmel sdhci devices.
->>>
->>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->>> ---
->>>  arch/arm/configs/sama5_defconfig | 6 +++++-
->>>  1 file changed, 5 insertions(+), 1 deletion(-)
->>>
->> It is probably worth updating the multi_v7_defconfig too (in a separate
->> patch).
->>
+On Thursday 15 October 2015 16:39:21 Marc Zyngier wrote:
+> There seems to be a new class of interrupt controller out there whose
+> sole purpose (apart from making everybody's life a nightmare) is to
+> turn wired interrupts into MSIs.
 > 
-> Maybe I have to send a whole defconfig update . I mean when you do
-> savedefconfig, you have more changes. I won't send each one separately. I
-> have kept changes which were in relation with the stuff I had.
+> Instead of considering that the MSIs allocated to a device are for the
+> direct use of that device, we can turn this set of MSIs into a irq
+> domain, and use that domain to build a standard irqchip on top of
+> that.
 > 
-> Or I can send a defconfig update from the savedefconfig and then add
-> sama5d2, flexcom and sdhci.
+> This requires some (slightly ugly) surgery in both the generic MSI and
+> platform MSI layers, but the amount of code is actually relatively
+> small (about +150 LoC so far).
+> 
+> On top of that, we add a dummy driver for a such a bridge, hoping that
+> this will give enough information to driver authors so that they can
+> use this new feature. An even more stupid client driver is provided to
+> show the interrupt stack allocation:
 
-Actually you can do this for our own AT91 defconfigs.
+I'm pretty sure you've thought of this before and it doesn't work, but
+can you explain why we can't just treat this as an edge-triggered
+nested irqchip? As long as the weird hardware can be preconfigured
+by the bootloader, the device that is attached to it shouldn't
+care how the interrupt ends up at the CPU.
 
-For the multi_v7_defconfig I would recommend to simply make a patch with
-our updates and let the arm-soc maintainer merge it with their current
-one: I mean, they will manage the conflicts on this file anyway and the
-changes to this file will not be part of one or our pull-requests but a
-patch that they will handle separately: so no need to add more update
-than the strictly needed ones on our end.
-
-Bye,
--- 
-Nicolas Ferre
+	Arnd
