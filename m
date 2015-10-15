@@ -1,155 +1,80 @@
-From: drew.richardson@arm.com (Drew Richardson)
-Date: Thu, 15 Oct 2015 09:31:46 -0700
-Subject: [PATCH v5 2/2] arm: perf: Add event descriptions
-In-Reply-To: <20151015154126.GL8825@leverpostej>
-References: <20151007182735.GA18706@dreric01-gentoo.localdomain>
- <20151009101338.GH26278@arm.com>
- <20151009165330.GA22415@dreric01-gentoo.localdomain>
- <20151012143025.GG16124@arm.com>
- <20151012181037.GA16013@dreric01-gentoo.localdomain>
- <20151013153644.GC18121@dreric01-gentoo.localdomain>
- <20151015132111.GD29301@arm.com>
- <20151015151506.GC18965@dreric01-gentoo.localdomain>
- <20151015152915.GH29301@arm.com>
- <20151015154126.GL8825@leverpostej>
-Message-ID: <20151015163144.GA19108@dreric01-gentoo.localdomain>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 15 Oct 2015 18:35:47 +0200
+Subject: [PATCH] VFIO: platform: AMD xgbe reset module
+In-Reply-To: <5029262.xDTo9hAOAF@wuerfel>
+References: <1444836792-2405-1-git-send-email-eric.auger@linaro.org>
+ <37917545.AP0MxbQBzK@wuerfel> <20151015150321.GA17484@cbox>
+ <5029262.xDTo9hAOAF@wuerfel>
+Message-ID: <CAMJs5B_4WoBSVg_EuvWS3_cWEiESPB59DFoxSW4L6yVcH8gsyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 04:41:26PM +0100, Mark Rutland wrote:
-> On Thu, Oct 15, 2015 at 04:29:15PM +0100, Will Deacon wrote:
-> > On Thu, Oct 15, 2015 at 08:15:06AM -0700, Drew Richardson wrote:
-> > > On Thu, Oct 15, 2015 at 02:21:12PM +0100, Will Deacon wrote:
-> > > > On Tue, Oct 13, 2015 at 08:36:45AM -0700, Drew Richardson wrote:
-> > > > > Add additional information about the ARM architected hardware events
-> > > > > to make counters self describing. This makes the hardware PMUs easier
-> > > > > to use as perf list contains possible events instead of users having
-> > > > > to refer to documentation like the ARM TRMs.
-> > > > > 
-> > > > > Signed-off-by: Drew Richardson <drew.richardson@arm.com>
-> > > > > ---
-> > > > >  arch/arm/kernel/perf_event_v7.c | 121 ++++++++++++++++++++++++++++++++++++++++
-> > > > >  drivers/perf/arm_pmu.c          |   1 +
-> > > > >  2 files changed, 122 insertions(+)
-> > > > 
-> > > > [...]
-> > > > 
-> > > > > diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> > > > > index 2365a32a595e..e933d2dd71c0 100644
-> > > > > --- a/drivers/perf/arm_pmu.c
-> > > > > +++ b/drivers/perf/arm_pmu.c
-> > > > > @@ -548,6 +548,7 @@ static void armpmu_init(struct arm_pmu *armpmu)
-> > > > >  		.stop		= armpmu_stop,
-> > > > >  		.read		= armpmu_read,
-> > > > >  		.filter_match	= armpmu_filter_match,
-> > > > > +		.attr_groups	= armpmu->pmu.attr_groups,
-> > > > 
-> > > > I don't understand this hunk. What's it doing?
-> > > 
-> > > I'm not 100% clear either on what it's doing. But without this line
-> > > the attr_groups don't get passed on and I don't see them on my TC2. I
-> > > debugged the issue down to this but it may not be the proper way to
-> > > solve the problem.
-> > 
-> > Oh yuck, it's because we call armpmu_init after cpu_pmu_init and the former
-> > uses struct initialisation and ends up zeroing anything set previously.
-> > 
-> > We should probably tidy all this up:
-> > 
-> >   * Remove armpmu_register and call perf_pmu_register directly from
-> >     arm_pmu_device_probe instead
-> > 
-> >   * Call armpmu_init immediately prior to arm_cpu_init
-> 
-> Assuming you mean cpu_pmu_init, how about the below?
-> 
-> Thanks,
-> Mark.
-> 
-> ---->8----
-> From f8a99a406f3dd7a272a6dee4a551436fea851f38 Mon Sep 17 00:00:00 2001
-> From: Mark Rutland <mark.rutland@arm.com>
-> Date: Thu, 15 Oct 2015 16:32:17 +0100
-> Subject: [PATCH] drivers/perf: kill armpmu_register
-> 
-> Nothing outside of drivers/perf/arm_pmu.c should call armpmu_register
-> any more, so it no longer needs to be in include/linux/perf/arm_pmu.h.
-> Additionally, by folding it in to arm_pmu_device_probe we can allow
-> drivers to override struct pmu fields without getting blatted by the
-> armpmu code.
-> 
-> This patch folds armpmu_register into arm_pmu_device_probe. The logging
-> to the console is moved to after the PMU is successfully registered with
-> the core perf code.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Suggested-by: Will Deacon <will.deacon@arm.com>
-> Cc: Drew Richardson <drew.richardson@arm.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> ---
->  drivers/perf/arm_pmu.c       | 14 +++++---------
->  include/linux/perf/arm_pmu.h |  2 --
->  2 files changed, 5 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index f346960..15463cb 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -583,14 +583,6 @@ static void armpmu_init(struct arm_pmu *armpmu)
->  	};
->  }
->  
-> -int armpmu_register(struct arm_pmu *armpmu, int type)
-> -{
-> -	armpmu_init(armpmu);
-> -	pr_info("enabled with %s PMU driver, %d counters available\n",
-> -			armpmu->name, armpmu->num_events);
-> -	return perf_pmu_register(&armpmu->pmu, armpmu->name, type);
-> -}
-> -
->  /* Set at runtime when we know what CPU type we are. */
->  static struct arm_pmu *__oprofile_cpu_pmu;
->  
-> @@ -934,14 +926,18 @@ int arm_pmu_device_probe(struct platform_device *pdev,
->  		goto out_free;
->  	}
->  
-> +	armpmu_init(pmu);
->  	ret = cpu_pmu_init(pmu);
->  	if (ret)
->  		goto out_free;
->  
-> -	ret = armpmu_register(pmu, -1);
-> +	ret = perf_pmu_register(&pmu->pmu, pmu->name, -1);
->  	if (ret)
->  		goto out_destroy;
->  
-> +	pr_info("enabled with %s PMU driver, %d counters available\n",
-> +			pmu->name, pmu->num_events);
-> +
->  	return 0;
->  
->  out_destroy:
-> diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-> index bfa673b..83b5e34 100644
-> --- a/include/linux/perf/arm_pmu.h
-> +++ b/include/linux/perf/arm_pmu.h
-> @@ -111,8 +111,6 @@ struct arm_pmu {
->  
->  #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
->  
-> -int armpmu_register(struct arm_pmu *armpmu, int type);
-> -
->  u64 armpmu_event_update(struct perf_event *event);
->  
->  int armpmu_event_set_period(struct perf_event *event);
-> -- 
-> 1.9.1
-> 
+On Thu, Oct 15, 2015 at 5:49 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 15 October 2015 17:03:21 Christoffer Dall wrote:
+>> On Thu, Oct 15, 2015 at 04:55:13PM +0200, Arnd Bergmann wrote:
+>> > On Thursday 15 October 2015 16:46:09 Eric Auger wrote:
+>> > > >
+>> > > > This is where we'd need a little more changes for this approach. Instead
+>> > > > of unbinding the device from its driver, the idea would be that the
+>> > > > driver remains bound as far as the driver model is concerned, but
+>> > > > it would be in a quiescent state where no other subsystem interacts with
+>> > > > it (i.e. it gets unregistered from networking core or whichever it uses).
+>> > >
+>> > > Currently we use the same mechanism as for PCI, ie. unbind the native
+>> > > driver and then bind VFIO platform driver in its place. Don't you think
+>> > > changing this may be a pain for user-space tools that are designed to
+>> > > work that way for PCI?
+>> > >
+>> > > My personal preference would be to start with your first proposal since
+>> > > it looks (to me) less complex and "unknown" that the 2d approach.
+>> >
+>> > We certainly can't easily change from one approach to the other without
+>> > breaking user expectations, so the decision needs to be made carefully.
+>> >
+>> > The main observation here is that platform devices are unlike PCI in this
+>> > regard because they need extra per-device code. I have argued in the
+>> > past that we should not reuse the "VFIO" name here because it's actually
+>> > something else.
+>>
+>> I've adjusted to consider VFIO a general purpose framework for mapping
+>> device resources into userspace/VMs, and there are certainly a lot of
+>> commonality with both PCI, platform, and potentially other devices for
+>> that to make sense.
+>>
+>>
+>> > On the other hand, there are a lot of commonalities,
+>> > we just have to make sure we don't try to force the code into one model
+>> > that doesn't really work just to make it look more like PCI VFIO.
+>> >
+>>
+>> But given that we now have code for platform device passthrough that
+>> works in both QEMU and the kernel side and is actually useful for
+>> people, is there a clear technical advantage to go back and rework thaat
+>> at this point?
+>>
+>> Don't get me wrong, I like the idea of having a single driver bound to a
+>> platform device, and then that's it, but it just feels like that
+>> discussion doesn't necessarily belong in the context of a patch that
+>> 'just' seeks to add reset functionality for a specific device for VFIO?
+>
+> Ah, this is for qemu/kvm? If there is already upstream qemu code that
+> finds it easier to use this approach, it's certainly more logical to
+> deal with it in my first approach than the second.
 
-Unfortunately the copy of attr_groups in armpmu_init is still required
-even with this patch. The armv7_a*_pmu_init functions are obtained
-from the platform_device (assigned to init_fn) and called before
-armpmu_init.
+yes, indeed.
 
-Drew
+>
+> I was thinking of ODP as the primary user, and that wouldn't need
+> the interface to be consistent with PCI as much, because the code
+> is inherently device specific there anyway.
+>
+
+I didn't think about how this applies to ODP (haven't had time to look
+at ODP in any technical detail TBH), but it sounds like ODP could be
+adapted to use either approach.
+
+In any case we can always transition towards your 2nd approach in a
+userspace compatible way later, if we find good reasons to.
+
+Thanks,
+-Christoffer
