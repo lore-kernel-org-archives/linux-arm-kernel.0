@@ -1,39 +1,54 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 15 Oct 2015 08:29:58 +0200
-Subject: [PATCH 3/4] mmc: mediatek: Add tune support
-In-Reply-To: <1444729078-26585-4-git-send-email-chaotian.jing@mediatek.com>
-References: <1444729078-26585-1-git-send-email-chaotian.jing@mediatek.com>
- <1444729078-26585-4-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <20151015062958.GG7825@pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 15 Oct 2015 08:34:32 +0200
+Subject: [PATCH] ARM: mvebu: correct a385-db-ap compatible string
+In-Reply-To: <1444871828-1080-1-git-send-email-mw@semihalf.com> (Marcin
+ Wojtas's message of "Thu, 15 Oct 2015 03:17:08 +0200")
+References: <1444871828-1080-1-git-send-email-mw@semihalf.com>
+Message-ID: <87r3kw3aiv.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Marcin,
+ 
+ On jeu., oct. 15 2015, Marcin Wojtas <mw@semihalf.com> wrote:
 
-On Tue, Oct 13, 2015 at 05:37:57PM +0800, Chaotian Jing wrote:
-> @@ -1260,6 +1547,16 @@ static int msdc_drv_probe(struct platform_device *pdev)
->  		goto host_free;
->  	}
+> This commit enables standby support on Armada 385 DB-AP board, because the PM
+> initalization routine requires "marvell,armada380" compatible string for all
+> Armada 38x-based platforms.
+>
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+
+Applied on mvebu/fixes.
+I also aded the commit it fixes, add the stabel team in CC and also
+mention in the commit log that the compatible "marvell,armada38x" was
+wrong.
+
+Thanks,
+
+Gregory
+> ---
+>  arch/arm/boot/dts/armada-385-db-ap.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
+> index 89f5a95..4047621 100644
+> --- a/arch/arm/boot/dts/armada-385-db-ap.dts
+> +++ b/arch/arm/boot/dts/armada-385-db-ap.dts
+> @@ -46,7 +46,7 @@
 >  
-> +	host->src_clk_parent = clk_get_parent(host->src_clk);
-> +	host->hs400_src = devm_clk_get(&pdev->dev, "400mhz");
-> +	if (IS_ERR(host->hs400_src)) {
-> +		dev_dbg(&pdev->dev, "Cannot find 400mhz at dts!\n");
-> +	} else if (clk_set_parent(host->src_clk_parent, host->hs400_src) < 0) {
-> +		dev_err(host->dev, "Failed to set 400mhz source clock!\n");
-> +		ret = -EINVAL;
-> +		goto host_free;
-> +	}
-
-This is a static setup. We have device tree bindings for doing this.
-Please look for assigned-clocks and assigned-clock-parents. Doing stuff
-like this in the driver almost certainly leads to problems because the
-next SoC will have different requirements here.
-
-Sascha
+>  / {
+>  	model = "Marvell Armada 385 Access Point Development Board";
+> -	compatible = "marvell,a385-db-ap", "marvell,armada385", "marvell,armada38x";
+> +	compatible = "marvell,a385-db-ap", "marvell,armada385", "marvell,armada380";
+>  
+>  	chosen {
+>  		stdout-path = "serial1:115200n8";
+> -- 
+> 1.8.3.1
+>
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
