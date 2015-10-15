@@ -1,63 +1,74 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 15 Oct 2015 10:17:47 +0100
-Subject: [PATCH] ARM: SWP emulation: Restore original *data when failed
-In-Reply-To: <20151015085700.GY32532@n2100.arm.linux.org.uk>
-References: <1444791077-26020-1-git-send-email-shengjiu.wang@freescale.com>
- <20151015082417.GX32532@n2100.arm.linux.org.uk>
- <20151015083629.GA32630@shlinux2>
- <20151015085700.GY32532@n2100.arm.linux.org.uk>
-Message-ID: <561F6F3B.6030607@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Thu, 15 Oct 2015 10:19:13 +0100
+Subject: [PATCHv3 09/11] arm64: Add page size to the kernel image header
+In-Reply-To: <20151014172756.GJ5041@leverpostej>
+References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
+ <1444821634-1689-10-git-send-email-suzuki.poulose@arm.com>
+ <20151014172756.GJ5041@leverpostej>
+Message-ID: <561F6F91.2010707@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/15 09:57, Russell King - ARM Linux wrote:
-> On Thu, Oct 15, 2015 at 04:36:31PM +0800, Shengjiu Wang wrote:
->> On Thu, Oct 15, 2015 at 09:24:17AM +0100, Russell King - ARM Linux wrote:
->>> On Wed, Oct 14, 2015 at 10:51:17AM +0800, Shengjiu Wang wrote:
->>>> __user_swpX_asm maybe failed in first STREX operation, emulate_swpX
->>>> will try again, but the *data has been changed in first time. which
->>>> cause the result is wrong. So need to recover the *data when failed.
->>>>
->>>> Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
->>>> ---
->>>>  arch/arm/kernel/swp_emulate.c | 1 +
->>>>  1 file changed, 1 insertion(+)
->>>>
->>>> diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
->>>> index 5b26e7e..c61fbf92 100644
->>>> --- a/arch/arm/kernel/swp_emulate.c
->>>> +++ b/arch/arm/kernel/swp_emulate.c
->>>> @@ -41,6 +41,7 @@
->>>>  	"1:	strex"B"	%0, %2, [%3]\n"			\
->>>>  	"	cmp		%0, #0\n"			\
->>>>  	"	movne		%0, %4\n"			\
->>>> +	"	movne		%1, %2\n"			\
->>>>  	"2:\n"							\
->>>>  	"	.section	 .text.fixup,\"ax\"\n"		\
->>>>  	"	.align		2\n"				\
->>>
->>> I think I'd prefer this to be:
->>>
->>> 	__asm__ __volatile__(					\
->>> 	"0:	ldrex"B"	%2, [%3]\n"			\
->>> 	"1:	strex"B"	%0, %1, [%3]\n" 		\
->>> 	"	cmp		%0, #0\n"			\
->>> 	"	moveq		%1, %2\n"			\
->>> 	"	movne		%0, %4\n"			\
->>>
->>> so that we're not loading into %1 (an in-out non-temporary) but rather
->>> loading it into a temporary - and only overwriting the saved register
->>> value if the swap succeeds.
->>>
->>> Thanks.
+On 14/10/15 18:27, Mark Rutland wrote:
+> On Wed, Oct 14, 2015 at 12:20:32PM +0100, Suzuki K. Poulose wrote:
+>> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 >>
->> I am ok with your change. Need I send another patch for this change? or will
->> you send it by yourself?
-> 
-> Please send a new patch, thanks.
-> 
+>> This patch adds the page size to the arm64 kernel image header
+>> so that one can infer the PAGESIZE used by the kernel. This will
+>> be helpful to diagnose failures to boot the kernel with page size
+>> not supported by the CPU.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> ---
+>>   Documentation/arm64/booting.txt |    7 ++++++-
+>>   arch/arm64/kernel/image.h       |    5 ++++-
+>>   2 files changed, 10 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+>> index 7d9d3c2..aaf6d77 100644
+>> --- a/Documentation/arm64/booting.txt
+>> +++ b/Documentation/arm64/booting.txt
+>> @@ -104,7 +104,12 @@ Header notes:
+>>   - The flags field (introduced in v3.17) is a little-endian 64-bit field
+>>     composed as follows:
+>>     Bit 0:	Kernel endianness.  1 if BE, 0 if LE.
+>> -  Bits 1-63:	Reserved.
+>> +  Bit 1-2:	Kernel Page size.
+>> +			0 - Unspecified.
+>> +			1 - 4K
+>> +			2 - 16K
+>> +			3 - 64K
+>> +  Bits 3-63:	Reserved.
+>>
+>>   - When image_size is zero, a bootloader should attempt to keep as much
+>>     memory as possible free for use by the kernel immediately after the
+>> diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+>> index 6eb8fee..e45759e 100644
+>> --- a/arch/arm64/kernel/image.h
+>> +++ b/arch/arm64/kernel/image.h
+>> @@ -47,7 +47,10 @@
+>>   #define __HEAD_FLAG_BE	0
+>>   #endif
+>>
+>> -#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0)
+>> +#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
+>> +
+>> +#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0) |		\
+>> +			(__HEAD_FLAG_PAGE_SIZE << 1)
+>
+> I'd prefer that we also had brackets around the whole of the
+> __HEAD_FLAGS value, so we don't get caught out later on by some
+> unexpected expansion (though we are safe currently).
+>
 
-We might need the same change for arm64 counterpart (see
-arch/arm64/kernel/armv8_deprecated.c).
+Sure, will add that.
 
-Vladimir
+> With that:
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks
+Suzuki
