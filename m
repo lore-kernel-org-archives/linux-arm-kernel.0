@@ -1,56 +1,126 @@
-From: atull@opensource.altera.com (atull)
-Date: Thu, 22 Oct 2015 12:56:51 -0500
-Subject: [PATCHv2 3/3] fpga manager: Adding FPGA Manager support for
- Xilinx Zynq 7000
-In-Reply-To: <1445035350-3569-4-git-send-email-moritz.fischer@ettus.com>
-References: <1445035350-3569-1-git-send-email-moritz.fischer@ettus.com>
- <1445035350-3569-4-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <alpine.DEB.2.02.1510221247360.23148@linuxheads99>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 15 Oct 2015 23:57:30 +0200
+Subject: [PATCH V2 RFT] ARM: bcm2835: enable all bcm2835-relevant in defconfig
+Message-ID: <1444946250-23219-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Oct 2015, Moritz Fischer wrote:
+Rebuild bcm2835_defconfig using "make bcm2835_defconfig;
+make savedefconfig", and enable manually the following features:
 
-Hi Moritz,
+* all bcm2835-relevant drivers (MBOX, WDT, DMA, PWM, SND)
+* enable regular stackprotector because CONFIG_CC_STACKPROTECTOR
+  disappear
+* enable some new dependencies in order to keep LED heartbeat
+  ( CONFIG_NEW_LEDS, CONFIG_LEDS_CLASS, CONFIG_LEDS_TRIGGERS )
 
-I just noticed a problem regarding private data.  Fortunately
-it is easy to fix.  See below...
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/configs/bcm2835_defconfig |   28 +++++++++++++++++-----------
+ 1 file changed, 17 insertions(+), 11 deletions(-)
 
-> +static int zynq_fpga_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct zynq_fpga_priv *priv;
-> +	struct resource *res;
-> +	int err;
-> +
-> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	platform_set_drvdata(pdev, priv);
+This patch is only compile-tested.
 
-fpga-mgr.c uses drvdata for its struct fpga_manager, so this will
-get overwritten.  So remove this platform_set_drvdata().  priv
-is saved in struct fpga_manager during fpga_mgr_register().
+Changes in V2: clarify patch description
 
-...
-
-> +static int zynq_fpga_remove(struct platform_device *pdev)
-> +{
-
-Here you can get a pointer to priv from the fpga_manager struct:
-        struct fpga_manager *mgr = platform_get_drvdata(pdev);
-        struct zynq_fpga_priv *priv = mgr->priv;
-
-Alan
-
-> +	struct zynq_fpga_priv *priv;
-> +
-> +	fpga_mgr_unregister(&pdev->dev);
-> +
-> +	priv = platform_get_drvdata(pdev);
-> +
-> +	clk_disable_unprepare(priv->clk);
-> +
-> +	return 0;
-> +}
+diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+index 31cb073..0fda844 100644
+--- a/arch/arm/configs/bcm2835_defconfig
++++ b/arch/arm/configs/bcm2835_defconfig
+@@ -10,7 +10,6 @@ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CGROUP_DEVICE=y
+ CONFIG_CPUSETS=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_PERF=y
+ CONFIG_CFS_BANDWIDTH=y
+ CONFIG_RT_GROUP_SCHED=y
+@@ -18,10 +17,6 @@ CONFIG_NAMESPACES=y
+ CONFIG_SCHED_AUTOGROUP=y
+ CONFIG_RELAY=y
+ CONFIG_BLK_DEV_INITRD=y
+-CONFIG_RD_BZIP2=y
+-CONFIG_RD_LZMA=y
+-CONFIG_RD_XZ=y
+-CONFIG_RD_LZO=y
+ CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+ CONFIG_KALLSYMS_ALL=y
+ CONFIG_EMBEDDED=y
+@@ -29,6 +24,7 @@ CONFIG_EMBEDDED=y
+ CONFIG_PROFILING=y
+ CONFIG_OPROFILE=y
+ CONFIG_JUMP_LABEL=y
++CONFIG_CC_STACKPROTECTOR_REGULAR=y
+ CONFIG_ARCH_MULTI_V6=y
+ # CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_BCM=y
+@@ -38,7 +34,6 @@ CONFIG_AEABI=y
+ CONFIG_KSM=y
+ CONFIG_CLEANCACHE=y
+ CONFIG_SECCOMP=y
+-CONFIG_CC_STACKPROTECTOR=y
+ CONFIG_KEXEC=y
+ CONFIG_CRASH_DUMP=y
+ CONFIG_VFP=y
+@@ -57,7 +52,6 @@ CONFIG_DEVTMPFS_MOUNT=y
+ # CONFIG_STANDALONE is not set
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
+-CONFIG_SCSI_MULTI_LUN=y
+ CONFIG_SCSI_CONSTANTS=y
+ CONFIG_SCSI_SCAN_ASYNC=y
+ CONFIG_NETDEVICES=y
+@@ -77,17 +71,27 @@ CONFIG_SPI=y
+ CONFIG_SPI_BCM2835=y
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
++CONFIG_WATCHDOG=y
++CONFIG_BCM2835_WDT=y
+ CONFIG_FB=y
+ CONFIG_FB_SIMPLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_SOC=y
++CONFIG_SND_BCM2835_SOC_I2S=y
+ CONFIG_USB=y
+ CONFIG_USB_STORAGE=y
++CONFIG_USB_DWC2=y
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_BCM2835=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_TIMER=y
+ CONFIG_LEDS_TRIGGER_ONESHOT=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+@@ -96,17 +100,19 @@ CONFIG_LEDS_TRIGGER_GPIO=y
+ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+ CONFIG_LEDS_TRIGGER_TRANSIENT=y
+ CONFIG_LEDS_TRIGGER_CAMERA=y
++CONFIG_DMADEVICES=y
++CONFIG_DMA_BCM2835=y
+ CONFIG_STAGING=y
+-CONFIG_USB_DWC2=y
+-CONFIG_USB_DWC2_HOST=y
++CONFIG_MAILBOX=y
++CONFIG_BCM2835_MBOX=y
+ # CONFIG_IOMMU_SUPPORT is not set
++CONFIG_PWM=y
++CONFIG_PWM_BCM2835=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_POSIX_ACL=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT3_FS_POSIX_ACL=y
+-CONFIG_EXT4_FS=y
+-CONFIG_EXT4_FS_POSIX_ACL=y
+ CONFIG_FANOTIFY=y
+ CONFIG_MSDOS_FS=y
+ CONFIG_VFAT_FS=y
+-- 
+1.7.10.4
