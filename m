@@ -1,43 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Thu, 15 Oct 2015 09:34:02 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Defconfig Updates
- for v4.4
-Message-ID: <cover.1444869086.git.horms+renesas@verge.net.au>
+Subject: [PATCH 1/2] ARM: shmobile: defconfig: enable HDMI output for RCar
+In-Reply-To: <cover.1444869086.git.horms+renesas@verge.net.au>
+References: <cover.1444869086.git.horms+renesas@verge.net.au>
+Message-ID: <687dfe660a3eddbd40335694beb0896e26b5bbd9.1444869086.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Please consider these second round of Renesas ARM based SoC defconfig
-updates for v4.4.
+Actviate HDMI output of the RCar DU (and LVDS while we are here).
+Enable the HDMI encoder chip found on Lager/Koelsch boards.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-defconfig-for-v4.4,
-which I have already sent a pull-request for.
-
-
-The following changes since commit 0a8b0695f4c490c349ee12956d6946576c44a419:
-
-  ARM: multi_v7_defconfig: Remove Marzen (2015-09-14 10:12:59 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig2-for-v4.4
-
-for you to fetch changes up to fec3fb4734b4d2c33975077c250ebd4a3a9f8e34:
-
-  ARM: multi_v7_defconfig: enable HDMI output for Renesas RCar (2015-10-13 10:42:17 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC Defconfig Updates for v4.4
-
-* Enable HDMI output for Renesas RCar
-
-----------------------------------------------------------------
-Wolfram Sang (2):
-      ARM: shmobile: defconfig: enable HDMI output for RCar
-      ARM: multi_v7_defconfig: enable HDMI output for Renesas RCar
-
- arch/arm/configs/multi_v7_defconfig | 3 +++
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/configs/shmobile_defconfig | 3 +++
- 2 files changed, 6 insertions(+)
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 0bdeb4925be4..3aef019c0de7 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -140,7 +140,10 @@ CONFIG_VIDEO_RENESAS_VSP1=y
+ CONFIG_VIDEO_ADV7180=y
+ CONFIG_VIDEO_ML86V7667=y
+ CONFIG_DRM=y
++CONFIG_DRM_I2C_ADV7511=y
+ CONFIG_DRM_RCAR_DU=y
++CONFIG_DRM_RCAR_HDMI=y
++CONFIG_DRM_RCAR_LVDS=y
+ CONFIG_FB_SH_MOBILE_LCDC=y
+ CONFIG_FB_SH_MOBILE_MERAM=y
+ # CONFIG_LCD_CLASS_DEVICE is not set
+-- 
+2.1.4
