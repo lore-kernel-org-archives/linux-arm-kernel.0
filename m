@@ -1,33 +1,30 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 15 Oct 2015 11:11:52 -0400
-Subject: [PATCH] ahci: qoriq: Fix a compiling warning
-In-Reply-To: <1444812412-33321-1-git-send-email-Yuantian.Tang@freescale.com>
-References: <1444812412-33321-1-git-send-email-Yuantian.Tang@freescale.com>
-Message-ID: <20151015151152.GB27717@mtj.duckdns.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 17:12:07 +0200
+Subject: [PATCH RESEND] drivers/perf: arm_pmu: avoid CPU device_node
+ reference leak
+In-Reply-To: <1444657719-3801-1-git-send-email-will.deacon@arm.com>
+References: <1444657719-3801-1-git-send-email-will.deacon@arm.com>
+Message-ID: <5085234.zfhqA4e0WO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, Oct 14, 2015 at 04:46:52PM +0800, Tang Yuantian wrote:
-> kbuild test robot reports the warnings:
-> drivers/ata/ahci_qoriq.c: In function 'ahci_qoriq_hardreset':
-> >> include/asm-generic/io.h:163:2: warning: 'px_is' may be used
-> >> uninitialized in this function [-Wuninitialized]
-> drivers/ata/ahci_qoriq.c:70:14: note: 'px_is' was declared here
-> >> include/asm-generic/io.h:163:2: warning: 'px_cmd' may be used
-> >> uninitialized in this function [-Wuninitialized]
-> drivers/ata/ahci_qoriq.c:70:6: note: 'px_cmd' was declared here
+On Monday 12 October 2015 14:48:39 Will Deacon wrote:
+> of_cpu_device_node_get increments the reference count on the CPU
+> device_node, so we must take care to of_node_put once we've finished
+> with it.
 > 
-> This patch fixed it by introducing a local variable.
+> This patch fixes the perf IRQ probing code to avoid the leak.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> 
+> Arnd/Olof: Please can you take this via arm-soc? It's a non-urgent, yet
+>            simple fix and I don't have any other fixes queued for perf.
+> 
 
-Hmmm... why is the patch signed off by Arnd?  You can't sign off for
-other people.  If this was suggested by Arnd, please use
-"Suggested-by:" or "Original-patch-by:".
+Seems still appropriate for 4.3, so I've put it into the fixes branch.
+Thanks for the reminder,
 
-Thanks.
-
--- 
-tejun
+	Arnd
