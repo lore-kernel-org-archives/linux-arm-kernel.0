@@ -1,33 +1,40 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Thu, 15 Oct 2015 15:15:24 -0400
-Subject: [PATCH 00/11] ARM64 PCI hostbridge init based on ACPI
-In-Reply-To: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <561FFB4C.1000500@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 21:16:15 +0200
+Subject: [PATCH RFC 0/7] Adding core support for wire-MSI bridges
+In-Reply-To: <561FCDBE.8000407@arm.com>
+References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
+ <5027676.zPNVVQXaP4@wuerfel> <561FCDBE.8000407@arm.com>
+Message-ID: <5879538.pKBkpUOxls@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
-
-Thanks for your hard work on ARM64 PCI host bridge/root complex so far!
-
-On 05/26/2015 08:49 AM, Hanjun Guo wrote:
-> This patch set is introducing ARM64 PCI hostbridge init based on ACPI,
-> which based on Jiang Liu's patch set "Consolidate ACPI PCI root common
-> code into ACPI core":
+On Thursday 15 October 2015 17:01:02 Marc Zyngier wrote:
 > 
-> https://lkml.org/lkml/2015/5/14/98
+> "Preconfigured" is the key word. While you can do something like that if
+> your hardware treats MSIs just as if they were wired interrupts
+> (something like GICv2m), it becomes far more hairy if the target of MSIs
+> is something like a GICv3 ITS (which is the case for HiSilicon mbigen).
+> 
+> The main reason is that the ITS relies on "translation tables" kept in
+> memory, which the OS has to configure, and handing over pre-configured
+> tables is not something I'm looking forward to doing. From a CPU point
+> of view, this is akin entering the kernel with the MMU already on and no
+> idmap...
+> 
+> The approach taken here is to make the MSI-ness explicit at the irqchip
+> level, and keep the interrupting device oblivious of that feature. Also,
+> this relies on the fact that we can have one MSI per wire, meaning that
+> we don't have to multiplex anything (no nested irqchip), and that we can
+> rely on hierarchical domains, which simplifies the code (at least for
+> the irqchip).
+> 
 
-The latest version (v7) of the ACPI PCI root common code consolidation
-series was posted by Gerry (Jiang Liu) yesterday:
+Thanks, that already makes things much clearer. Just one more question:
+why can't those translation tables be configured statically by the
+irqchip driver? Is this all about being able to cut a few cycles
+in case of virtualization? I would assume that once you have gone through
+the overhead of having both an MSI and a normal interrupt line (with
+the need for serialization vs DMA), you can just as well trap to user
+space to deliver an IRQ to a guest.
 
-https://lkml.kernel.org/g/1444804182-6596-1-git-send-email-jiang.liu at linux.intel.com
-
-This got me wondering what the status is of the ARM64 specific
-hostbridge patch series that has a dependency upon the former. Are you
-planning to wait for that series to be accepted or post a newer rebased
-version for additional review, or something else?
-
-Thanks very much in advance! :)
-
-Jon.
+	Arnd
