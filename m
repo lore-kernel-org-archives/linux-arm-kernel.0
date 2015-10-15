@@ -1,82 +1,81 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 15 Oct 2015 12:55:18 +0100
-Subject: [PATCH 2/7] includes: dt-bindings: Add STM32F429 pinctrl DT
- bindings
-In-Reply-To: <CALszF6Aj3xBqVKWhyBc5ihqm_YVTq4M3bidB0W+1RvtMVZqaDw@mail.gmail.com>
-References: <1444853247-31114-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1444853247-31114-3-git-send-email-mcoquelin.stm32@gmail.com>
- <561F8AB3.9010103@linaro.org>
- <CALszF6Aj3xBqVKWhyBc5ihqm_YVTq4M3bidB0W+1RvtMVZqaDw@mail.gmail.com>
-Message-ID: <561F9426.4090808@linaro.org>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 15 Oct 2015 12:58:25 +0100
+Subject: [PATCH] ARM64: juno: add NOR flash to device tree
+In-Reply-To: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
+References: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20151015115825.GO3394@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/15 12:29, Maxime Coquelin wrote:
-> 2015-10-15 13:14 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
->> On 14/10/15 21:07, Maxime Coquelin wrote:
->>>
->>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>> ---
->>>    include/dt-bindings/pinctrl/pinctrl-stm32.h     |   12 +
->>>    include/dt-bindings/pinctrl/stm32f429-pinfunc.h | 1241
->>> +++++++++++++++++++++++
->>>    2 files changed, 1253 insertions(+)
->>>    create mode 100644 include/dt-bindings/pinctrl/pinctrl-stm32.h
->>>    create mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
->>>
->>> diff --git a/include/dt-bindings/pinctrl/pinctrl-stm32.h
->>> b/include/dt-bindings/pinctrl/pinctrl-stm32.h
->>> new file mode 100644
->>> index 0000000..a2e7222
->>> --- /dev/null
->>> +++ b/include/dt-bindings/pinctrl/pinctrl-stm32.h
->>> @@ -0,0 +1,12 @@
->>> +#ifndef _DT_BINDINGS_PINCTRL_STM32_H
->>> +#define _DT_BINDINGS_PINCTRL_STM32_H
->>> +
->>> +#define STM32_PIN_NO(x) ((x) << 8)
->>> +#define STM32_GET_PIN_NO(x) ((x) >> 8)
->>> +#define STM32_GET_PIN_FUNC(x) ((x) & 0xff)
->>> +
->>> +#define STM32_PIN_GPIO         0
->>> +#define STM32_PIN_AF(x)                ((x) + 1)
->>> +#define STM32_PIN_ANALOG       (STM32_PIN_AF(15) + 1)
->>> +
->>> +#endif /* _DT_BINDINGS_PINCTRL_STM32_H */
->>> diff --git a/include/dt-bindings/pinctrl/stm32f429-pinfunc.h
->>> b/include/dt-bindings/pinctrl/stm32f429-pinfunc.h
->>> new file mode 100644
->>> index 0000000..979e4eb
->>> --- /dev/null
->>> +++ b/include/dt-bindings/pinctrl/stm32f429-pinfunc.h
->>> @@ -0,0 +1,1241 @@
->>> +#ifndef _DT_BINDINGS_STM32F429_PINFUNC_H
->>> +#define _DT_BINDINGS_STM32F429_PINFUNC_H
->>> +
->>> +#include <dt-bindings/pinctrl/pinctrl-stm32.h>
->>> +
->>> +#define STM32F429_PA0_FUNC_GPIO (STM32_PIN_NO(0) | STM32_PIN_GPIO)
->>> +#define STM32F429_PA0_FUNC_TIM2_CH1 TIM2_ETR (STM32_PIN_NO(0) |
->>> STM32_PIN_AF(1))
->>
->>
->> For the clock driver I was advised to get rid of this sort of "heroics" and
->> expose raw numbers from the datasheet directly to DT bindings users.
->>
->> Should the same logic apply to this *huge* collection of macros?
->
-> I'm open to change, I just took example on the Mediatek implementation.
-> Advantage is that checkpatch will be more silent, drawback is that it
-> will be a little harder to understand how these values are generated.
-> If we decide to change to raw values, then the DT Bindings
-> documentation will need to be more verbose on the way these values are
-> generated.
+On Thu, Oct 15, 2015 at 12:20:15PM +0200, Linus Walleij wrote:
+> The Juno motherboard has a NOR flash on the motherboard, enable
+> this to be accessed with the CFI flash driver. Results after
+> enabling MTD, MTD_CFI, MTD_PHYSMAP, MTD_PHYSMAP_OF,
+> MTD_CFI_INTELEXT:
+> 
+> 8000000.flash: Found 2 x16 devices at 0x0 in 32-bit bank.
+> Manufacturer ID 0x000089 Chip ID 0x008919
+> Intel/Sharp Extended Query Table at 0x010A
+> Intel/Sharp Extended Query Table at 0x010A
+> Intel/Sharp Extended Query Table at 0x010A
+> Intel/Sharp Extended Query Table at 0x010A
+> Intel/Sharp Extended Query Table at 0x010A
+> Using buffer write method
+> Using auto-unlock on power-up/resume
+> cfi_cmdset_0001: Erase suspend on write enabled
+> erase region 0: offset=0x0,size=0x40000,blocks=255
+> erase region 1: offset=0x3fc0000,size=0x10000,blocks=4
+> 
+> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-To be honest I was thinking about moaning about that anyway. Its pretty 
-tough from the docs you have currently to figure out the encoding.
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-Does having header files really excuse us from documenting the bindings 
-properly? ;-)
+> ---
+> ARM SoC folks: please apply this directly for -next if
+> people are OK with it, as I have no other Juno patches
+> pending for now.
+> ---
+>  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> index 637e046f0e36..c7c99a42e2e9 100644
+> --- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> @@ -103,6 +103,14 @@
+>  				};
+>  			};
+>  
+> +			flash at 0,00000000 {
+> +				/* 2 * 32MiB NOR Flash memory mounted on CS0 */
+> +				compatible = "arm,vexpress-flash", "cfi-flash";
+> +				linux,part-probe = "afs";
+
+It would be nice if the linux,part-probe binding was documented somewhere.
+
+> +				reg = <0 0x00000000 0x04000000>;
+> +				bank-width = <4>;
+> +			};
+> +
+>  			ethernet at 2,00000000 {
+>  				compatible = "smsc,lan9118", "smsc,lan9115";
+>  				reg = <2 0x00000000 0x10000>;
+> -- 
+> 2.4.3
+> 
+
+Thanks for this,
+Liviu
 
 
-Daniel.
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
