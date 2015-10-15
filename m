@@ -1,25 +1,35 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 15 Oct 2015 10:00:37 +0800
-Subject: [PATCH] hwrng: stm32 - Fix build with CONFIG_PM
-In-Reply-To: <1444838695-7182-1-git-send-email-daniel.thompson@linaro.org>
-References: <1443904519-24012-1-git-send-email-daniel.thompson@linaro.org>
- <1444838695-7182-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20151015020037.GA22342@gondor.apana.org.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 15 Oct 2015 09:33:49 +0900
+Subject: [PATCH 1/6] ARM: shmobile: smp: Make shmobile_smp_apmu_cpu_shutdown()
+ static
+In-Reply-To: <cover.1444868660.git.horms+renesas@verge.net.au>
+References: <cover.1444868660.git.horms+renesas@verge.net.au>
+Message-ID: <54245073431df264fe4715bc7f1bf295a19c40b7.1444868660.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 05:04:55PM +0100, Daniel Thompson wrote:
-> Commit c6a97c42e399 ("hwrng: stm32 - add support for STM32 HW RNG")
-> was inadequately tested (actually it was tested quite hard so
-> incompetent would be a better description that inadequate) and does
-> not compile on platforms with CONFIG_PM set.
-> 
-> Fix this.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Patch applied.  Thanks!
+shmobile_smp_apmu_cpu_shutdown() is used inside platsmp-apmu.c only.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/platsmp-apmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
+index 4e54512bee30..bcf4cc51b926 100644
+--- a/arch/arm/mach-shmobile/platsmp-apmu.c
++++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+@@ -170,7 +170,7 @@ static inline void cpu_enter_lowpower_a15(void)
+ 	dsb();
+ }
+ 
+-void shmobile_smp_apmu_cpu_shutdown(unsigned int cpu)
++static void shmobile_smp_apmu_cpu_shutdown(unsigned int cpu)
+ {
+ 
+ 	/* Select next sleep mode using the APMU */
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.1.4
