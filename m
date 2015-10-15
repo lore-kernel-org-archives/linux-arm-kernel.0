@@ -1,51 +1,44 @@
-From: mikko.rapeli@iki.fi (Mikko Rapeli)
-Date: Thu, 15 Oct 2015 07:55:43 +0200
-Subject: [PATCH v4 05/79] exynos_drm.h: use __u64 from linux/types.h
-In-Reply-To: <1444888618-4506-1-git-send-email-mikko.rapeli@iki.fi>
-References: <1444888618-4506-1-git-send-email-mikko.rapeli@iki.fi>
-Message-ID: <1444888618-4506-6-git-send-email-mikko.rapeli@iki.fi>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 15 Oct 2015 08:11:18 +0200
+Subject: [GIT PULL] Allwinner DT changes for 4.4, round 1
+In-Reply-To: <5285301.F98BUGPMRG@wuerfel>
+References: <20151011163414.GA12938@lukather>
+ <5285301.F98BUGPMRG@wuerfel>
+Message-ID: <20151015061118.GA2711@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes userspace compilation error:
+Hi,
 
-drm/exynos_drm.h:30:2: error: unknown type name ?uint64_t?
+On Wed, Oct 14, 2015 at 05:50:28PM +0200, Arnd Bergmann wrote:
+> On Sunday 11 October 2015 17:34:14 Maxime Ripard wrote:
+> > Allwinner DT changes for 4.4
+> > 
+> > DT patches for the 4.4 merge window, most notably:
+> >   - Enable the OTG controller on more boards
+> >   - Create new DTSI for the q8's design
+> >   - Added RSB support to the A23 and A33 SoCs
+> >   - New boards: Olimex A20 EVB, Yones bs1078v2
+> > 
+> > 
+> 
+> Pulled into next/dt, thanks!
+> 
+> I suppose the C.H.I.P. support is coming in the second DT pull
+> request for 4.4?
 
-Signed-off-by: Mikko Rapeli <mikko.rapeli@iki.fi>
----
- include/uapi/drm/exynos_drm.h | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Indeed, it was not merged yet at the time I sent this one.
 
-diff --git a/include/uapi/drm/exynos_drm.h b/include/uapi/drm/exynos_drm.h
-index 5575ed1..cf431b7 100644
---- a/include/uapi/drm/exynos_drm.h
-+++ b/include/uapi/drm/exynos_drm.h
-@@ -27,7 +27,7 @@
-  *	- this handle will be set by gem module of kernel side.
-  */
- struct drm_exynos_gem_create {
--	uint64_t size;
-+	__u64 size;
- 	unsigned int flags;
- 	unsigned int handle;
- };
-@@ -44,7 +44,7 @@ struct drm_exynos_gem_create {
- struct drm_exynos_gem_info {
- 	unsigned int handle;
- 	unsigned int flags;
--	uint64_t size;
-+	__u64 size;
- };
- 
- /**
-@@ -58,7 +58,7 @@ struct drm_exynos_gem_info {
- struct drm_exynos_vidi_connection {
- 	unsigned int connection;
- 	unsigned int extensions;
--	uint64_t edid;
-+	__u64 edid;
- };
- 
- /* memory type definitions. */
+Maxime
+
 -- 
-2.5.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151015/ad8d6dff/attachment.sig>
