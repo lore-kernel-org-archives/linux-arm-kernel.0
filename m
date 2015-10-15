@@ -1,38 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 15 Oct 2015 08:39:15 -0700
-Subject: [PATCH v2 1/3] ARM: catch pending imprecise abort on unmask
-In-Reply-To: <20151015153246.GH32536@n2100.arm.linux.org.uk>
-References: <1444905142-21500-1-git-send-email-l.stach@pengutronix.de>
- <1444905142-21500-2-git-send-email-l.stach@pengutronix.de>
- <20151015153246.GH32536@n2100.arm.linux.org.uk>
-Message-ID: <20151015153915.GO10113@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Oct 2015 16:39:24 +0100
+Subject: [PATCH RFC 3/7] irqdomain: Make irq_domain_alloc_irqs_recursive
+ available
+In-Reply-To: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
+References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1444923568-17413-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [151015 08:37]:
-> On Thu, Oct 15, 2015 at 12:32:20PM +0200, Lucas Stach wrote:
-> > Install a non-faulting handler just before unmasking imprecise aborts
-> > and switch back to the regular one after unmasking is done.
-> > 
-> > This catches any pending imprecise abort that the firmware/bootloader
-> > may have left behind that would normally crash the kernel at that point.
-> > As there are apparently a lot of bootlaoders out there that do such a
-> > thing it makes sense to handle it in the common startup code.
-> > 
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> 
-> Much better.  Please feel free to add it to the patch system, thanks.
-> 
-> I think, given that the original seems to be breaking platforms, this
-> patch needs to go into -rc kernels, right?
+We are soon going to need the MSI layer to call into the domain
+allocators. Instead of open coding this, make the standard
+irq_domain_alloc_irqs_recursive function available to the MSI
+layer.
 
-Hmm do we still see a trace where the issue happened though with this
-one?
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/linux/irqdomain.h | 3 +++
+ kernel/irq/irqdomain.c    | 6 +++---
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
-What I though wes something pending from the bootloader, turned out
-to be a bogus SRAM init code that I was able to easily fix with the
-trace.
-
-Regards,
-
-Tony
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index d5e5c5b..cf96c6a 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -367,6 +367,9 @@ static inline int irq_domain_alloc_irqs(struct irq_domain *domain,
+ 	return __irq_domain_alloc_irqs(domain, -1, nr_irqs, node, arg, false);
+ }
+ 
++extern int irq_domain_alloc_irqs_recursive(struct irq_domain *domain,
++					   unsigned int irq_base,
++					   unsigned int nr_irqs, void *arg);
+ extern int irq_domain_set_hwirq_and_chip(struct irq_domain *domain,
+ 					 unsigned int virq,
+ 					 irq_hw_number_t hwirq,
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 22aa961..1c9973e 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -1125,9 +1125,9 @@ static void irq_domain_free_irqs_recursive(struct irq_domain *domain,
+ 	}
+ }
+ 
+-static int irq_domain_alloc_irqs_recursive(struct irq_domain *domain,
+-					   unsigned int irq_base,
+-					   unsigned int nr_irqs, void *arg)
++int irq_domain_alloc_irqs_recursive(struct irq_domain *domain,
++				    unsigned int irq_base,
++				    unsigned int nr_irqs, void *arg)
+ {
+ 	int ret = 0;
+ 	struct irq_domain *parent = domain->parent;
+-- 
+2.1.4
