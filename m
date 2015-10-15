@@ -1,32 +1,41 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu, 15 Oct 2015 20:51:17 +0200
-Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
- ECAM) and ACPI code out of arch/x86/ directory
-In-Reply-To: <561FD3BB.70501@arm.com>
-References: <20150604102253.GA31773@red-moon> <5570447D.3020705@linaro.org>
- <557504A2.3060203@linaro.org> <20150608151443.GA16151@red-moon>
- <55E4340D.6050004@linaro.org> <55ED6010.3020406@linaro.org>
- <20150908150727.GF29293@red-moon> <55F0388B.1090607@linaro.org>
- <20150911112018.GA13033@red-moon> <55F6DFF6.4010807@linaro.org>
- <20151015132200.GA7621@red-moon> <561FB985.8070509@linaro.org>
- <561FD3BB.70501@arm.com>
-Message-ID: <561FF5A5.1040305@semihalf.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 20:53:17 +0200
+Subject: [GIT PULL] ARM: berlin: DT CPU clock fixup for v4.4
+In-Reply-To: <1444934667-5451-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1444416494-3117-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1444934667-5451-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <5158506.pFES6Vjd9X@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thursday 15 October 2015 20:44:27 Sebastian Hesselbarth wrote:
+> Arnd, Kevin, Olof,
+> 
+> this is the single patch PR to fix the broken DT PR for Berlin
+> sent earlier. As Arnd requested, this only contains a patch adding
+> the missing CPUID_CLK to Berlin clock dt-binding include.
+> 
+> Please pull.
+> 
+> Sebastian
+> 
+> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+> 
+>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-dt-cpuclk-for-4.4-1
+> 
+> for you to fetch changes up to 28c039eebaaa28def9364b9a12a30192be8b4730:
+> 
+>   ARM: berlin: dts: add CLKID_CPU for BG2Q (2015-10-15 20:31:41 +0200)
+> 
+> ----------------------------------------------------------------
+> Marvell Berlin DT CPU clock for 4.4
+> - add missing CLKID_CPU for Berlin BG2Q
+> 
 
+Pulled into next/dt, thanks a lot for the fix!
 
-On 10/15/2015 06:26 PM, Marc Zyngier wrote:
-> On 15/10/15 15:34, Tomasz Nowicki wrote:
->
->> Of course your help in testing is welcomed. Also please have a look at
->> my GICv3/ITS patches, they are important for ACPI PCI.
->
-> Where is the dependency? ACPI/PCI should really be standalone.
->
-There are no dependencies in code. Just wanted to say that ARM64 
-machines with GICv3/ITS and PCI on board need both series to use MSI 
-with ACPI kernel. Sorry for confusion.
-
-Regards,
-Tomasz
+	Arnd
