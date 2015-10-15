@@ -1,146 +1,71 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Oct 2015 16:39:23 +0100
-Subject: [PATCH RFC 2/7] platform-msi: Factor out allocation/free of private
- data
+Date: Thu, 15 Oct 2015 16:39:26 +0100
+Subject: [PATCH RFC 5/7] genirq/msi: Add msi_domain_populate_irqs
 In-Reply-To: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
 References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1444923568-17413-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1444923568-17413-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're going to have multiple paths to allocate/free the
-platform-msi private data, factor this out into separate
-utility functions.
+To be able to allocate interrupts from the MSI layer down,
+add a new msi_domain_populate_irqs entry point.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/base/platform-msi.c | 84 ++++++++++++++++++++++++++-------------------
- 1 file changed, 48 insertions(+), 36 deletions(-)
+ include/linux/msi.h |  2 ++
+ kernel/irq/msi.c    | 27 +++++++++++++++++++++++++++
+ 2 files changed, 29 insertions(+)
 
-diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
-index 6148c78..92666cd 100644
---- a/drivers/base/platform-msi.c
-+++ b/drivers/base/platform-msi.c
-@@ -189,21 +189,11 @@ struct irq_domain *platform_msi_create_irq_domain(struct fwnode_handle *fwnode,
- 	return domain;
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 5bb36a9..e35558c 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -281,6 +281,8 @@ void platform_msi_domain_free_irqs(struct device *dev);
+ /* When an MSI domain is used as an intermediate domain */
+ int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
+ 			    int nvec, msi_alloc_info_t *args);
++int msi_domain_populate_irqs(struct irq_domain *domain, struct device *dev,
++			     int virq, int nvec, msi_alloc_info_t *args);
+ #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
+ 
+ #ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
+diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+index 8e6e112..53118e9 100644
+--- a/kernel/irq/msi.c
++++ b/kernel/irq/msi.c
+@@ -272,6 +272,33 @@ int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
+ 	return 0;
  }
  
--/**
-- * platform_msi_domain_alloc_irqs - Allocate MSI interrupts for @dev
-- * @dev:		The device for which to allocate interrupts
-- * @nvec:		The number of interrupts to allocate
-- * @write_msi_msg:	Callback to write an interrupt message for @dev
-- *
-- * Returns:
-- * Zero for success, or an error code in case of failure
-- */
--int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
--				   irq_write_msi_msg_t write_msi_msg)
-+static int platform_msi_alloc_priv_data(struct device *dev, unsigned int nvec,
-+					irq_write_msi_msg_t write_msi_msg,
-+					struct platform_msi_priv_data **data)
- {
--	struct platform_msi_priv_data *priv_data;
--	int err;
--
-+	struct platform_msi_priv_data *datap;
- 	/*
- 	 * Limit the number of interrupts to 256 per device. Should we
- 	 * need to bump this up, DEV_ID_SHIFT should be adjusted
-@@ -222,22 +212,51 @@ int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
- 	if (!list_empty(dev_to_msi_list(dev)))
- 		return -EBUSY;
- 
--	priv_data = kzalloc(sizeof(*priv_data), GFP_KERNEL);
--	if (!priv_data)
-+	datap = *data = kzalloc(sizeof(**data), GFP_KERNEL);
-+	if (!datap)
- 		return -ENOMEM;
- 
--	priv_data->devid = ida_simple_get(&platform_msi_devid_ida,
--					  0, 1 << DEV_ID_SHIFT, GFP_KERNEL);
--	if (priv_data->devid < 0) {
--		err = priv_data->devid;
--		goto out_free_data;
-+	datap->devid = ida_simple_get(&platform_msi_devid_ida,
-+				      0, 1 << DEV_ID_SHIFT, GFP_KERNEL);
-+	if (datap->devid < 0) {
-+		int err = datap->devid;
-+		kfree(*data);
-+		return err;
- 	}
- 
--	priv_data->write_msg = write_msi_msg;
-+	datap->write_msg = write_msi_msg;
++int msi_domain_populate_irqs(struct irq_domain *domain, struct device *dev,
++			     int virq, int nvec, msi_alloc_info_t *arg)
++{
++	struct msi_domain_info *info = domain->host_data;
++	struct msi_domain_ops *ops = info->ops;
++	struct msi_desc *desc;
++
++	for_each_msi_entry(desc, dev) {
++		int i, ret;
++
++		if (!(desc->irq >= virq && desc->irq < (virq + nvec)))
++			continue;
++
++		ops->set_desc(arg, desc);
++		/* Assumes the domain mutex is held! */
++		ret = irq_domain_alloc_irqs_recursive(domain, virq, nvec, arg);
++		/* FIXME: Error handling */
++		if (ret)
++			return ret;
++
++		for (i = 0; i < desc->nvec_used; i++)
++			irq_set_msi_desc_off(virq, i, desc);
++	}
 +
 +	return 0;
 +}
 +
-+static void platform_msi_free_priv_data(struct platform_msi_priv_data *data)
-+{
-+	ida_simple_remove(&platform_msi_devid_ida, data->devid);
-+	kfree(data);
-+}
-+
-+/**
-+ * platform_msi_domain_alloc_irqs - Allocate MSI interrupts for @dev
-+ * @dev:		The device for which to allocate interrupts
-+ * @nvec:		The number of interrupts to allocate
-+ * @write_msi_msg:	Callback to write an interrupt message for @dev
-+ *
-+ * Returns:
-+ * Zero for success, or an error code in case of failure
-+ */
-+int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
-+				   irq_write_msi_msg_t write_msi_msg)
-+{
-+	struct platform_msi_priv_data *priv_data;
-+	int err;
-+
-+	err = platform_msi_alloc_priv_data(dev, nvec, write_msi_msg, &priv_data);
-+	if (err)
-+		return err;
- 
- 	err = platform_msi_alloc_descs(dev, nvec, priv_data);
- 	if (err)
--		goto out_free_id;
-+		goto out_free_priv_data;
- 
- 	err = msi_domain_alloc_irqs(dev->msi_domain, dev, nvec);
- 	if (err)
-@@ -247,10 +266,8 @@ int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
- 
- out_free_desc:
- 	platform_msi_free_descs(dev, 0, nvec);
--out_free_id:
--	ida_simple_remove(&platform_msi_devid_ida, priv_data->devid);
--out_free_data:
--	kfree(priv_data);
-+out_free_priv_data:
-+	platform_msi_free_priv_data(priv_data);
- 
- 	return err;
- }
-@@ -261,16 +278,11 @@ out_free_data:
-  */
- void platform_msi_domain_free_irqs(struct device *dev)
- {
--	struct msi_desc *desc;
--
--	desc = first_msi_entry(dev);
--	if (desc) {
--		struct platform_msi_priv_data *data;
--
--		data = desc->platform.msi_priv_data;
-+	if (!list_empty(dev_to_msi_list(dev))) {
-+		struct msi_desc *desc;
- 
--		ida_simple_remove(&platform_msi_devid_ida, data->devid);
--		kfree(data);
-+		desc = first_msi_entry(dev);
-+		platform_msi_free_priv_data(desc->platform.msi_priv_data);
- 	}
- 
- 	msi_domain_free_irqs(dev->msi_domain, dev);
+ /**
+  * msi_domain_alloc_irqs - Allocate interrupts from a MSI interrupt domain
+  * @domain:	The domain to allocate from
 -- 
 2.1.4
