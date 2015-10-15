@@ -1,54 +1,43 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Thu, 15 Oct 2015 09:19:27 -0700
-Subject: [PATCH] PCI: iproc: fix 32-bit build error
-In-Reply-To: <20151015160028.GA17702@localhost>
-References: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
- <561D6458.40504@hauke-m.de> <561D6576.2020107@broadcom.com>
- <5204456.Kxa6kNhPYW@wuerfel> <20151015160028.GA17702@localhost>
-Message-ID: <561FD20F.1090004@broadcom.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Thu, 15 Oct 2015 09:21:07 -0700
+Subject: [PATCH v4 0/3]
+In-Reply-To: <561FCE2B.8020802@ti.com>
+References: <1444832235-15263-1-git-send-email-m-karicheri2@ti.com>
+ <561E7792.409@oracle.com> <561FCE2B.8020802@ti.com>
+Message-ID: <561FD273.2040208@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/15/2015 9:00 AM, Bjorn Helgaas wrote:
-> On Tue, Oct 13, 2015 at 11:00:31PM +0200, Arnd Bergmann wrote:
->> On Tuesday 13 October 2015 13:11:34 Ray Jui wrote:
->>>>> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
->>>>> index f3481ddff344..abcb4be2ee19 100644
->>>>> --- a/drivers/pci/host/pcie-iproc.c
->>>>> +++ b/drivers/pci/host/pcie-iproc.c
->>>>> @@ -235,12 +235,13 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
->>>>>   *
->>>>>   * axi_addr -> iproc_pcie_address -> OARR -> OMAP -> pci_address
->>>>>   */
->>>>> -static int iproc_pcie_setup_ob(struct iproc_pcie *pcie, u64 axi_addr,
->>>>> +int iproc_pcie_setup_ob(struct iproc_pcie *pcie, u64 axi_addr,
->>>>
->>>> Why are you removing the static here?
->>>>
+On 10/15/2015 9:02 AM, Murali Karicheri wrote:
+> On 10/14/2015 11:41 AM, santosh shilimkar wrote:
+>> 10/14/2015 7:17 AM, Murali Karicheri wrote:
+>>> This patch series enable accumulator queue support for K2 SoCs.
+>>> Accumulator
+>>> queues are a type of qmss queue that is monitored by the PDSP firmware
+>>> and
+>>> accumulated. Host is interrupted by PDSP firmware when packets become
+>>> available in a ring buffer shared between the host and PDSP.
 >>>
->>> Yeah we should keep this function as static. The rest of this change
->>> looks good!
+>>> There was an issue raised when merging the original patch set at
+>>>   (1) https://lkml.org/lkml/2015/9/4/681
+>>>     [PATCH v1 1/2] soc: ti: display firmware file name as part of boot
+>>> log
+>>>   (2) https://lkml.org/lkml/2015/9/4/680
+>>>     [PATCH v1 2/2] ARM: dts: keystone: enable accumulator channels
 >>>
->>
->> Sorry, this accidentally ended up in the patch when I marked the
->> function as global to track down how the division got called.
->>
->> I'll send a new version.
-> 
-> Ping; I can easily fix up the static, but it'd be nice to have real acks
-> from Ray and Hauke.
-> 
-> Bjorn
-> 
+>>> This series fixes the issues raised against v3. Maintainer, could you
+>>> please
+>>> apply this series to v4.4 next please at your earliest opportunity.
+>>>
+>> I have picked up the series. Thanks for quick turnaround.
+>
+> Thanks Santosh. Could you send this pull request for v4.4 next. We want
+> this merged to our internal release and if this is on next branch it
+> will help.
+>
+It should be already in linux-next and pull request was sent before I
+replied yesterday. Its late for the merge window with usual norms
+so lets see if it makes it.
 
-The current patch looks good to me except that iproc_pcie_setup_ob
-should be kept static.
-
-With static added back:
-Acked-by: Ray Jui <rjui@broadcom.com>
-
-Thanks,
-
-Ray
+Regards,
+Santosh
