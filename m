@@ -1,20 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 21:42:32 +0200
-Subject: [PATCH] ahci: qoriq: Fix a compiling warning
-In-Reply-To: <20151015160410.GC27717@mtj.duckdns.org>
-References: <1444812412-33321-1-git-send-email-Yuantian.Tang@freescale.com>
- <15555694.OtW6JZzsoS@wuerfel> <20151015160410.GC27717@mtj.duckdns.org>
-Message-ID: <5298541.bv2Tx1GVSz@wuerfel>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Thu, 15 Oct 2015 21:42:50 +0200
+Subject: [PATCH 5/7] ARM: mach-stm32: Select pinctrl
+In-Reply-To: <1444853247-31114-6-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1444853247-31114-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1444853247-31114-6-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <562001BA.5040108@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 October 2015 12:04:10 Tejun Heo wrote:
-> Hello,
-> 
-> I see.  I applied the following to libata/for-4.4.
-> 
-> 
+Hi,
 
-Thanks!
+Commenting myself before someone else does...
 
-	Arnd
+On 10/14/2015 10:07 PM, Maxime Coquelin wrote:
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> ---
+>   arch/arm/Kconfig                          | 1 +
+>   drivers/pinctrl/stm32/pinctrl-stm32f429.c | 2 +-
+>   2 files changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index bf94e54..8b1afd4 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -985,6 +985,7 @@ config ARCH_STM32
+>   	select ARMV7M_SYSTICK
+>   	select CLKSRC_STM32
+>   	select RESET_CONTROLLER
+> +	select PINCTRL
+This is not in alphabetical order...
+
+>   	help
+>   	  Support for STMicroelectronics STM32 processors.
+>
+> diff --git a/drivers/pinctrl/stm32/pinctrl-stm32f429.c b/drivers/pinctrl/stm32/pinctrl-stm32f429.c
+> index 3535037..f34016b 100644
+> --- a/drivers/pinctrl/stm32/pinctrl-stm32f429.c
+> +++ b/drivers/pinctrl/stm32/pinctrl-stm32f429.c
+> @@ -1564,7 +1564,7 @@ static const struct stm32_desc_pin stm32f429_pins[] = {
+>   	),
+>   };
+>
+> -struct stm32_pinctrl_match_data stm32f429_match_data = {
+> +static struct stm32_pinctrl_match_data stm32f429_match_data = {
+>   	.pins = stm32f429_pins,
+>   	.npins = ARRAY_SIZE(stm32f429_pins),
+>   };
+>
+
+And I didn't fixed-up in the good patch... Should go in the driver one.
+
+Will be fixed in the v2.
+
+Maxime
