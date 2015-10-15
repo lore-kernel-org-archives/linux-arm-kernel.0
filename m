@@ -1,233 +1,75 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Thu, 15 Oct 2015 15:48:27 -0400
-Subject: [PATCH v3 04/10] clk: nsp: add clock support for Broadcom Northstar
- Plus SoC
+Date: Thu, 15 Oct 2015 15:48:33 -0400
+Subject: [PATCH v3 10/10] clk: iproc: define Broadcom NS2 iProc clock binding
 In-Reply-To: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
 References: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1444938513-10758-5-git-send-email-jonmason@broadcom.com>
+Message-ID: <1444938513-10758-11-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Broadcom Northstar Plus SoC is architected under the iProc
-architecture. It has the following PLLs: ARMPLL, GENPLL, LCPLL0, all
-derived from an onboard crystal.
+Document the device tree bindings for Broadcom Northstar 2 architecture
+based clock controller
 
 Signed-off-by: Jon Mason <jonmason@broadcom.com>
 ---
- drivers/clk/bcm/Makefile            |   2 +
- drivers/clk/bcm/clk-nsp.c           | 135 ++++++++++++++++++++++++++++++++++++
- include/dt-bindings/clock/bcm-nsp.h |  51 ++++++++++++++
- 3 files changed, 188 insertions(+)
- create mode 100644 drivers/clk/bcm/clk-nsp.c
- create mode 100644 include/dt-bindings/clock/bcm-nsp.h
+ .../bindings/clock/brcm,iproc-clocks.txt           | 48 ++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
-index 8a7a477..e258b28 100644
---- a/drivers/clk/bcm/Makefile
-+++ b/drivers/clk/bcm/Makefile
-@@ -4,3 +4,5 @@ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm281xx.o
- obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm21664.o
- obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-iproc-armpll.o clk-iproc-pll.o clk-iproc-asiu.o
- obj-$(CONFIG_ARCH_BCM_CYGNUS)	+= clk-cygnus.o
-+obj-$(CONFIG_ARCH_BCM_NSP)	+= clk-nsp.o
-+obj-$(CONFIG_ARCH_BCM_5301X)	+= clk-nsp.o
-diff --git a/drivers/clk/bcm/clk-nsp.c b/drivers/clk/bcm/clk-nsp.c
-new file mode 100644
-index 0000000..bc8ebdcd
---- /dev/null
-+++ b/drivers/clk/bcm/clk-nsp.c
-@@ -0,0 +1,135 @@
-+/*
-+ * Copyright (C) 2015 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
+diff --git a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+index b3c3e9d..ede65a5 100644
+--- a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
++++ b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+@@ -160,3 +160,51 @@ Northstar Plus.  These clock IDs are defined in:
+     pcie_phy	lcpll0		1	BCM_NSP_LCPLL0_PCIE_PHY_REF_CLK
+     sdio	lcpll0		2	BCM_NSP_LCPLL0_SDIO_CLK
+     ddr_phy	lcpll0		3	BCM_NSP_LCPLL0_DDR_PHY_CLK
 +
-+#include <linux/kernel.h>
-+#include <linux/err.h>
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
++Northstar 2
++-----------
++PLL and leaf clock compatible strings for Northstar 2 are:
++    "brcm,ns2-genpll-scr"
++    "brcm,ns2-genpll-sw"
++    "brcm,ns2-lcpll-ddr"
++    "brcm,ns2-lcpll-ports"
 +
-+#include <dt-bindings/clock/bcm-nsp.h>
-+#include "clk-iproc.h"
++The following table defines the set of PLL/clock index and ID for Northstar 2.
++These clock IDs are defined in:
++    "include/dt-bindings/clock/bcm-ns2.h"
 +
-+#define REG_VAL(o, s, w) { .offset = o, .shift = s, .width = w, }
++    Clock	Source		Index	ID
++    ---		-----		-----	---------
++    crystal	N/A		N/A	N/A
 +
-+#define AON_VAL(o, pw, ps, is) { .offset = o, .pwr_width = pw, \
-+	.pwr_shift = ps, .iso_shift = is }
++    genpll_scr	crystal		0	BCM_NS2_GENPLL_SCR
++    scr		genpll_scr	1	BCM_NS2_GENPLL_SCR_SCR_CLK
++    fs		genpll_scr	2	BCM_NS2_GENPLL_SCR_FS_CLK
++    audio_ref	genpll_scr	3	BCM_NS2_GENPLL_SCR_AUDIO_CLK
++    ch3_unused	genpll_scr	4	BCM_NS2_GENPLL_SCR_CH3_UNUSED
++    ch4_unused	genpll_scr	5	BCM_NS2_GENPLL_SCR_CH4_UNUSED
++    ch5_unused	genpll_scr	6	BCM_NS2_GENPLL_SCR_CH5_UNUSED
 +
-+#define RESET_VAL(o, rs, prs, kis, kiw, kps, kpw, kas, kaw) { .offset = o, \
-+	.reset_shift = rs, .p_reset_shift = prs, .ki_shift = kis, \
-+	.ki_width = kiw, .kp_shift = kps, .kp_width = kpw, .ka_shift = kas, \
-+	.ka_width = kaw }
++    genpll_sw	crystal		0	BCM_NS2_GENPLL_SW
++    rpe		genpll_sw	1	BCM_NS2_GENPLL_SW_RPE_CLK
++    250		genpll_sw	2	BCM_NS2_GENPLL_SW_250_CLK
++    nic		genpll_sw	3	BCM_NS2_GENPLL_SW_NIC_CLK
++    chimp	genpll_sw	4	BCM_NS2_GENPLL_SW_CHIMP_CLK
++    port	genpll_sw	5	BCM_NS2_GENPLL_SW_PORT_CLK
++    sdio	genpll_sw	6	BCM_NS2_GENPLL_SW_SDIO_CLK
 +
-+#define ENABLE_VAL(o, es, hs, bs) { .offset = o, .enable_shift = es, \
-+	.hold_shift = hs, .bypass_shift = bs }
++    lcpll_ddr	crystal		0	BCM_NS2_LCPLL_DDR
++    pcie_sata_usb lcpll_ddr	1	BCM_NS2_LCPLL_DDR_PCIE_SATA_USB_CLK
++    ddr		lcpll_ddr	2	BCM_NS2_LCPLL_DDR_DDR_CLK
++    ch2_unused	lcpll_ddr	3	BCM_NS2_LCPLL_DDR_CH2_UNUSED
++    ch3_unused	lcpll_ddr	4	BCM_NS2_LCPLL_DDR_CH3_UNUSED
++    ch4_unused	lcpll_ddr	5	BCM_NS2_LCPLL_DDR_CH4_UNUSED
++    ch5_unused	lcpll_ddr	6	BCM_NS2_LCPLL_DDR_CH5_UNUSED
 +
-+static void __init nsp_armpll_init(struct device_node *node)
-+{
-+	iproc_armpll_setup(node);
-+}
-+CLK_OF_DECLARE(nsp_armpll, "brcm,nsp-armpll", nsp_armpll_init);
-+
-+static const struct iproc_pll_ctrl genpll = {
-+	.flags = IPROC_CLK_PLL_HAS_NDIV_FRAC | IPROC_CLK_EMBED_PWRCTRL,
-+	.aon = AON_VAL(0x0, 1, 12, 0),
-+	.reset = RESET_VAL(0x0, 11, 10, 4, 3, 0, 4, 7, 3),
-+	.ndiv_int = REG_VAL(0x14, 20, 10),
-+	.ndiv_frac = REG_VAL(0x14, 0, 20),
-+	.pdiv = REG_VAL(0x18, 24, 3),
-+	.status = REG_VAL(0x20, 12, 1),
-+};
-+
-+static const struct iproc_clk_ctrl genpll_clk[] = {
-+	[BCM_NSP_GENPLL_PHY_CLK] = {
-+		.channel = BCM_NSP_GENPLL_PHY_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 12, 6, 18),
-+		.mdiv = REG_VAL(0x18, 16, 8),
-+	},
-+	[BCM_NSP_GENPLL_ENET_SW_CLK] = {
-+		.channel = BCM_NSP_GENPLL_ENET_SW_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 13, 7, 19),
-+		.mdiv = REG_VAL(0x18, 8, 8),
-+	},
-+	[BCM_NSP_GENPLL_USB_PHY_REF_CLK] = {
-+		.channel = BCM_NSP_GENPLL_USB_PHY_REF_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 14, 8, 20),
-+		.mdiv = REG_VAL(0x18, 0, 8),
-+	},
-+	[BCM_NSP_GENPLL_IPROCFAST_CLK] = {
-+		.channel = BCM_NSP_GENPLL_IPROCFAST_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 15, 9, 21),
-+		.mdiv = REG_VAL(0x1c, 16, 8),
-+	},
-+	[BCM_NSP_GENPLL_SATA1_CLK] = {
-+		.channel = BCM_NSP_GENPLL_SATA1_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 16, 10, 22),
-+		.mdiv = REG_VAL(0x1c, 8, 8),
-+	},
-+	[BCM_NSP_GENPLL_SATA2_CLK] = {
-+		.channel = BCM_NSP_GENPLL_SATA2_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 17, 11, 23),
-+		.mdiv = REG_VAL(0x1c, 0, 8),
-+	},
-+};
-+
-+static void __init nsp_genpll_clk_init(struct device_node *node)
-+{
-+	iproc_pll_clk_setup(node, &genpll, NULL, 0, genpll_clk,
-+			    ARRAY_SIZE(genpll_clk));
-+}
-+CLK_OF_DECLARE(nsp_genpll_clk, "brcm,nsp-genpll", nsp_genpll_clk_init);
-+
-+static const struct iproc_pll_ctrl lcpll0 = {
-+	.flags = IPROC_CLK_PLL_HAS_NDIV_FRAC | IPROC_CLK_EMBED_PWRCTRL,
-+	.aon = AON_VAL(0x0, 1, 24, 0),
-+	.reset = RESET_VAL(0x0, 23, 22, 16, 3, 12, 4, 19, 4),
-+	.ndiv_int = REG_VAL(0x4, 20, 8),
-+	.ndiv_frac = REG_VAL(0x4, 0, 20),
-+	.pdiv = REG_VAL(0x4, 28, 3),
-+	.status = REG_VAL(0x10, 12, 1),
-+};
-+
-+static const struct iproc_clk_ctrl lcpll0_clk[] = {
-+	[BCM_NSP_LCPLL0_PCIE_PHY_REF_CLK] = {
-+		.channel = BCM_NSP_LCPLL0_PCIE_PHY_REF_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 6, 3, 9),
-+		.mdiv = REG_VAL(0x8, 24, 8),
-+	},
-+	[BCM_NSP_LCPLL0_SDIO_CLK] = {
-+		.channel = BCM_NSP_LCPLL0_SDIO_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 7, 4, 10),
-+		.mdiv = REG_VAL(0x8, 16, 8),
-+	},
-+	[BCM_NSP_LCPLL0_DDR_PHY_CLK] = {
-+		.channel = BCM_NSP_LCPLL0_DDR_PHY_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 8, 5, 11),
-+		.mdiv = REG_VAL(0x8, 8, 8),
-+	},
-+};
-+
-+static void __init nsp_lcpll0_clk_init(struct device_node *node)
-+{
-+	iproc_pll_clk_setup(node, &lcpll0, NULL, 0, lcpll0_clk,
-+			    ARRAY_SIZE(lcpll0_clk));
-+}
-+CLK_OF_DECLARE(nsp_lcpll0_clk, "brcm,nsp-lcpll0", nsp_lcpll0_clk_init);
-diff --git a/include/dt-bindings/clock/bcm-nsp.h b/include/dt-bindings/clock/bcm-nsp.h
-new file mode 100644
-index 0000000..ad5827c
---- /dev/null
-+++ b/include/dt-bindings/clock/bcm-nsp.h
-@@ -0,0 +1,51 @@
-+/*
-+ *  BSD LICENSE
-+ *
-+ *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
-+ *
-+ *  Redistribution and use in source and binary forms, with or without
-+ *  modification, are permitted provided that the following conditions
-+ *  are met:
-+ *
-+ *	* Redistributions of source code must retain the above copyright
-+ *	  notice, this list of conditions and the following disclaimer.
-+ *	* Redistributions in binary form must reproduce the above copyright
-+ *	  notice, this list of conditions and the following disclaimer in
-+ *	  the documentation and/or other materials provided with the
-+ *	  distribution.
-+ *	* Neither the name of Broadcom Corporation nor the names of its
-+ *	  contributors may be used to endorse or promote products derived
-+ *	  from this software without specific prior written permission.
-+ *
-+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+#ifndef _CLOCK_BCM_NSP_H
-+#define _CLOCK_BCM_NSP_H
-+
-+/* GENPLL clock channel ID */
-+#define BCM_NSP_GENPLL			0
-+#define BCM_NSP_GENPLL_PHY_CLK		1
-+#define BCM_NSP_GENPLL_ENET_SW_CLK	2
-+#define BCM_NSP_GENPLL_USB_PHY_REF_CLK	3
-+#define BCM_NSP_GENPLL_IPROCFAST_CLK	4
-+#define BCM_NSP_GENPLL_SATA1_CLK	5
-+#define BCM_NSP_GENPLL_SATA2_CLK	6
-+
-+/* LCPLL0 clock channel ID */
-+#define BCM_NSP_LCPLL0			0
-+#define BCM_NSP_LCPLL0_PCIE_PHY_REF_CLK	1
-+#define BCM_NSP_LCPLL0_SDIO_CLK		2
-+#define BCM_NSP_LCPLL0_DDR_PHY_CLK	3
-+
-+#endif /* _CLOCK_BCM_NSP_H */
++    lcpll_ports	crystal		0	BCM_NS2_LCPLL_PORTS
++    wan		lcpll_ports	1	BCM_NS2_LCPLL_PORTS_WAN_CLK
++    rgmii	lcpll_ports	2	BCM_NS2_LCPLL_PORTS_RGMII_CLK
++    ch2_unused	lcpll_ports	3	BCM_NS2_LCPLL_PORTS_CH2_UNUSED
++    ch3_unused	lcpll_ports	4	BCM_NS2_LCPLL_PORTS_CH3_UNUSED
++    ch4_unused	lcpll_ports	5	BCM_NS2_LCPLL_PORTS_CH4_UNUSED
++    ch5_unused	lcpll_ports	6	BCM_NS2_LCPLL_PORTS_CH5_UNUSED
 -- 
 1.9.1
