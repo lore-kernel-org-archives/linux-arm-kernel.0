@@ -1,40 +1,61 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 15 Oct 2015 11:00:28 -0500
-Subject: [PATCH] PCI: iproc: fix 32-bit build error
-In-Reply-To: <5204456.Kxa6kNhPYW@wuerfel>
-References: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
- <561D6458.40504@hauke-m.de> <561D6576.2020107@broadcom.com>
- <5204456.Kxa6kNhPYW@wuerfel>
-Message-ID: <20151015160028.GA17702@localhost>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Oct 2015 17:01:02 +0100
+Subject: [PATCH RFC 0/7] Adding core support for wire-MSI bridges
+In-Reply-To: <5027676.zPNVVQXaP4@wuerfel>
+References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
+ <5027676.zPNVVQXaP4@wuerfel>
+Message-ID: <561FCDBE.8000407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 11:00:31PM +0200, Arnd Bergmann wrote:
-> On Tuesday 13 October 2015 13:11:34 Ray Jui wrote:
-> > >> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-> > >> index f3481ddff344..abcb4be2ee19 100644
-> > >> --- a/drivers/pci/host/pcie-iproc.c
-> > >> +++ b/drivers/pci/host/pcie-iproc.c
-> > >> @@ -235,12 +235,13 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
-> > >>   *
-> > >>   * axi_addr -> iproc_pcie_address -> OARR -> OMAP -> pci_address
-> > >>   */
-> > >> -static int iproc_pcie_setup_ob(struct iproc_pcie *pcie, u64 axi_addr,
-> > >> +int iproc_pcie_setup_ob(struct iproc_pcie *pcie, u64 axi_addr,
-> > > 
-> > > Why are you removing the static here?
-> > > 
-> > 
-> > Yeah we should keep this function as static. The rest of this change
-> > looks good!
-> > 
-> 
-> Sorry, this accidentally ended up in the patch when I marked the
-> function as global to track down how the division got called.
-> 
-> I'll send a new version.
+Hi Arnd,
 
-Ping; I can easily fix up the static, but it'd be nice to have real acks
-from Ray and Hauke.
+On 15/10/15 16:46, Arnd Bergmann wrote:
+> On Thursday 15 October 2015 16:39:21 Marc Zyngier wrote:
+>> There seems to be a new class of interrupt controller out there whose
+>> sole purpose (apart from making everybody's life a nightmare) is to
+>> turn wired interrupts into MSIs.
+>>
+>> Instead of considering that the MSIs allocated to a device are for the
+>> direct use of that device, we can turn this set of MSIs into a irq
+>> domain, and use that domain to build a standard irqchip on top of
+>> that.
+>>
+>> This requires some (slightly ugly) surgery in both the generic MSI and
+>> platform MSI layers, but the amount of code is actually relatively
+>> small (about +150 LoC so far).
+>>
+>> On top of that, we add a dummy driver for a such a bridge, hoping that
+>> this will give enough information to driver authors so that they can
+>> use this new feature. An even more stupid client driver is provided to
+>> show the interrupt stack allocation:
+> 
+> I'm pretty sure you've thought of this before and it doesn't work, but
+> can you explain why we can't just treat this as an edge-triggered
+> nested irqchip? As long as the weird hardware can be preconfigured
+> by the bootloader, the device that is attached to it shouldn't
+> care how the interrupt ends up at the CPU.
 
-Bjorn
+"Preconfigured" is the key word. While you can do something like that if
+your hardware treats MSIs just as if they were wired interrupts
+(something like GICv2m), it becomes far more hairy if the target of MSIs
+is something like a GICv3 ITS (which is the case for HiSilicon mbigen).
+
+The main reason is that the ITS relies on "translation tables" kept in
+memory, which the OS has to configure, and handing over pre-configured
+tables is not something I'm looking forward to doing. From a CPU point
+of view, this is akin entering the kernel with the MMU already on and no
+idmap...
+
+The approach taken here is to make the MSI-ness explicit at the irqchip
+level, and keep the interrupting device oblivious of that feature. Also,
+this relies on the fact that we can have one MSI per wire, meaning that
+we don't have to multiplex anything (no nested irqchip), and that we can
+rely on hierarchical domains, which simplifies the code (at least for
+the irqchip).
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
