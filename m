@@ -1,43 +1,58 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 15 Oct 2015 16:02:36 +0100
-Subject: [PATCHv3 08/11] arm64: Check for selected granule support
-In-Reply-To: <561FBC99.9090501@arm.com>
-References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
- <1444821634-1689-9-git-send-email-suzuki.poulose@arm.com>
- <561EC58B.9080408@arm.com> <20151015104515.GE8825@leverpostej>
- <20151015112532.GA16125@e106634-lin.cambridge.arm.com>
- <561FBC99.9090501@arm.com>
-Message-ID: <561FC00C.7010003@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 15 Oct 2015 17:03:21 +0200
+Subject: [PATCH] VFIO: platform: AMD xgbe reset module
+In-Reply-To: <37917545.AP0MxbQBzK@wuerfel>
+References: <1444836792-2405-1-git-send-email-eric.auger@linaro.org>
+ <5270338.MbsQ1bGczu@wuerfel> <561FBC31.3020900@linaro.org>
+ <37917545.AP0MxbQBzK@wuerfel>
+Message-ID: <20151015150321.GA17484@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/15 15:47, Jeremy Linton wrote:
-> On 10/15/2015 06:25 AM, Suzuki K. Poulose wrote:
->> +    /*
->> +     * Check to see if the CPU supports the requested pagesize
->> +     */
->> +    asm volatile("mrs %0, ID_AA64MMFR0_EL1" : "=r" (aa64mmfr0_el1));
->> +    aa64mmfr0_el1 >>= ID_AA64MMFR0_TGRAN_SHIFT;
->> +    if ((aa64mmfr0_el1 & 0xf) != ID_AA64MMFR0_TGRAN_SUPPORTED) {
->> +        pr_efi_err(sys_table_arg, PAGE_SIZE_STR" granule not supported by the CPU\n");
->> +        return EFI_UNSUPPORTED;
->> +    }
->
->
-> This is definitely an improvement over my original hack job.
->
-> I would like to add, that I actually think this should be in a new function
-> "check_kernel_compatibility" (or whatever) that is called before handle_kernel_image.
->
-> That is because I don't really think it belongs in handle_kernel_image which is
->  focused on relocation.  Plus, if you add another function, you can avoid the
-> "Failed to relocate kernel" error that comes out following the granule not supported message.
-> Further, checks like this in the future will have a place to live.
->
-> Of course you will then need a matching stubbed out function for the normal arm kernel as well.
+On Thu, Oct 15, 2015 at 04:55:13PM +0200, Arnd Bergmann wrote:
+> On Thursday 15 October 2015 16:46:09 Eric Auger wrote:
+> > > 
+> > > This is where we'd need a little more changes for this approach. Instead
+> > > of unbinding the device from its driver, the idea would be that the
+> > > driver remains bound as far as the driver model is concerned, but
+> > > it would be in a quiescent state where no other subsystem interacts with
+> > > it (i.e. it gets unregistered from networking core or whichever it uses).
+> > 
+> > Currently we use the same mechanism as for PCI, ie. unbind the native
+> > driver and then bind VFIO platform driver in its place. Don't you think
+> > changing this may be a pain for user-space tools that are designed to
+> > work that way for PCI?
+> >
+> > My personal preference would be to start with your first proposal since
+> > it looks (to me) less complex and "unknown" that the 2d approach.
+> 
+> We certainly can't easily change from one approach to the other without
+> breaking user expectations, so the decision needs to be made carefully.
+> 
+> The main observation here is that platform devices are unlike PCI in this
+> regard because they need extra per-device code. I have argued in the
+> past that we should not reuse the "VFIO" name here because it's actually
+> something else.  
+
+I've adjusted to consider VFIO a general purpose framework for mapping
+device resources into userspace/VMs, and there are certainly a lot of
+commonality with both PCI, platform, and potentially other devices for
+that to make sense.
 
 
-OK, I will drop it from this series then and can be worked as a separate patch.
+> On the other hand, there are a lot of commonalities,
+> we just have to make sure we don't try to force the code into one model
+> that doesn't really work just to make it look more like PCI VFIO.
+> 
 
-Thanks
-Suzuki
+But given that we now have code for platform device passthrough that
+works in both QEMU and the kernel side and is actually useful for
+people, is there a clear technical advantage to go back and rework thaat
+at this point?
+
+Don't get me wrong, I like the idea of having a single driver bound to a
+platform device, and then that's it, but it just feels like that
+discussion doesn't necessarily belong in the context of a patch that
+'just' seeks to add reset functionality for a specific device for VFIO?
+
+-Christoffer
