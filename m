@@ -1,41 +1,41 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 15 Oct 2015 12:31:24 +0200
-Subject: [PATCH v2 2/2] ARM: dts: exynos5250: Add clocks to DISP1 domain
-In-Reply-To: <1444905084-22540-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1444905084-22540-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1444905084-22540-3-git-send-email-tomeu.vizoso@collabora.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 15 Oct 2015 12:32:19 +0200
+Subject: [PATCH v2 0/3] ARM: handle imprecise aborts from firmware in common
+ code
+Message-ID: <1444905142-21500-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds to the node of the DISP1 power domain the two clocks that need to
-be reparented while the domain is powered off:
-CLK_MOUT_ACLK200_DISP1_SUB and CLK_MOUT_ACLK300_DISP1_SUB.
+This series implements the handling of a pending imprecise abort left behind
+by the bootloader/firmware running before Linux in the common ARM startup code.
 
-Otherwise the state is unknown at power up and the mixer's clocks are
-all messed up.
+It turns pending imprecise aborts that may signal during the first unmasking
+of such aborts on the boot CPU into a non-faulting event and warns the user
+that the firmware of the machine might be buggy.
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Link: http://lkml.kernel.org/g/561CDC33.7050103 at collabora.com
----
+Handling this in the common code makes sure that we only ignore already pending
+aborts and not those that may happen later during system boot/usage. It also
+allows to remove the custom fault handler from the 3 architectures that are
+known to have bad firmware/bootloaders.
 
+V2 adapts patch 1 to suggestions from Russell and Hauke and drops former
+patch 3 (ARM: mvebu: remove the workaround imprecise abort fault handler)
+as it has already been applied.
 
- arch/arm/boot/dts/exynos5250.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+Regards,
+Lucas
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index b24610ea8c2a..88b9cf5f226f 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -130,6 +130,10 @@
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x100440A0 0x20>;
- 		#power-domain-cells = <0>;
-+		clocks = <&clock CLK_FIN_PLL>,
-+			 <&clock CLK_MOUT_ACLK200_DISP1_SUB>,
-+			 <&clock CLK_MOUT_ACLK300_DISP1_SUB>;
-+		clock-names = "oscclk", "clk0", "clk1";
- 	};
- 
- 	clock: clock-controller at 10010000 {
+Lucas Stach (3):
+  ARM: catch pending imprecise abort on unmask
+  ARM: OMAP2+: remove custom abort handler for t410
+  ARM: BCM5301X: remove workaround imprecise abort fault handler
+
+ arch/arm/mach-bcm/bcm_5301x.c      | 35 -----------------------------------
+ arch/arm/mach-omap2/pdata-quirks.c | 29 -----------------------------
+ arch/arm/mm/fault.c                | 22 ++++++++++++++++++++++
+ arch/arm/mm/fault.h                |  1 +
+ arch/arm/mm/mmu.c                  |  3 ++-
+ 5 files changed, 25 insertions(+), 65 deletions(-)
+
 -- 
-2.5.0
+2.6.1
