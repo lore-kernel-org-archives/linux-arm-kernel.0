@@ -1,54 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 17:04:50 +0200
-Subject: [PATCH] scsi: advansys needs ISA dma api for ISA support
-In-Reply-To: <561F977B.1030009@suse.de>
-References: <5081546.QjQ32dGX2L@wuerfel> <561F96B7.4050300@suse.de>
- <561F977B.1030009@suse.de>
-Message-ID: <8749889.aUxSEGWaCq@wuerfel>
+From: nsz@port70.net (Szabolcs Nagy)
+Date: Thu, 15 Oct 2015 17:10:06 +0200
+Subject: [PATCHv3] ARM64:Fix MINSIGSTKSZ and SIGSTKSZ
+In-Reply-To: <20151015124756.GB27524@arm.com>
+References: <1444386580-10917-1-git-send-email-manjeet.p@samsung.com>
+ <20151009103352.GK26278@arm.com>
+ <20151015121241.GA26080@port70.net>
+ <20151015124756.GB27524@arm.com>
+Message-ID: <20151015151006.GT10551@port70.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 October 2015 14:09:31 Hannes Reinecke wrote:
-> On 10/15/2015 02:06 PM, Hannes Reinecke wrote:
-> > On 10/12/2015 05:10 PM, Arnd Bergmann wrote:
-> >> diff --git a/drivers/scsi/Kconfig b/drivers/scsi/Kconfig
-> >> index d2f480b04a52..d4aa6a1a806c 100644
-> >> --- a/drivers/scsi/Kconfig
-> >> +++ b/drivers/scsi/Kconfig
-> >> @@ -499,6 +499,7 @@ config SCSI_ADVANSYS
-> >>      tristate "AdvanSys SCSI support"
-> >>      depends on SCSI
-> >>      depends on ISA || EISA || PCI
-> >> +    depends on ISA_DMA_API || !ISA
-> >>      help
-> >>        This is a driver for all SCSI host adapters manufactured by
-> >>        AdvanSys. It is documented in the kernel source in
-> >>
-> > Sorry to chime in again, but wouldn't this allow to build on platforms
-> > which have neither ISA_DMA_API nor ISA, like oldish sparc systems with
-> > proprietary S-BUS?
-
-No, the first dependency is still in place. It could also be written as
-
-depends on (ISA && ISA_DMA_API) || EISA || PCI
-
-which might be easier to understand. Do you want me to resubmit it like that?
-
-> > Why not ISA_DMA_API || EISA || PCI ?
-
-That would indeed make it possible to enable it on ancient systems that
-have none of ISA, EISA or PCI but still support ISA_DMA_API, e.g. for
-a floppy controller.
-
-A theoretical downside is that a system with a PCI advansys adapter
-and ISA slots but no ISA_DMA_API would not be able to build this.
-As far as I know, such a system does not exist.
-
-> Gnaa. Ignore this.
+* Will Deacon <will.deacon@arm.com> [2015-10-15 13:47:56 +0100]:
+> On Thu, Oct 15, 2015 at 02:12:41PM +0200, Szabolcs Nagy wrote:
+> > * Will Deacon <will.deacon@arm.com> [2015-10-09 11:33:52 +0100]:
+> > 
+> > > On Fri, Oct 09, 2015 at 03:59:40PM +0530, Manjeet Pawar wrote:
+> > > > MINSIGSTKSZ and SIGSTKSZ for ARM64 are not correctly set in latest kernel.
+> > > > This patch fixes this issue.
+> > > > 
+> > > > This issue is reported in LTP (testcase: sigaltstack02.c).
+> > > > Testcase failed when sigaltstack() called with stack size "MINSIGSTKSZ - 1"
+> > > > Since in Glibc-2.22, MINSIGSTKSZ is set to 5120 but in kernel
+> > > > it is set to 2048 so testcase gets failed.
+> > > > 
+> > > > Testcase Output:
+> > > > sigaltstack02 1  TPASS  :  stgaltstack() fails, Invalid Flag value,errno:22
+> > > > sigaltstack02 2  TFAIL  :  sigaltstack() returned 0, expected -1,errno:12
+> > > 
+> > > I'm still unable to reproduce this failure. Is this with defconfig?
+> > > 
+> > > > Reported Issue in Glibc Bugzilla:
+> > > > Bugfix in Glibc-2.22: [Bug 16850]
+> > > > https://sourceware.org/bugzilla/show_bug.cgi?id=16850
+> > > > 
+> > > > Signed-off-by: Akhilesh Kumar <akhilesh.k@samsung.com>
+> > > > Signed-off-by: Manjeet Pawar <manjeet.p@samsung.com>
+> > > > Signed-off-by: Rohit Thapliyal <r.thapliyal@samsung.com>
+> > > > ---
+> > > > v1 -> Changes in uapi overall header
+> > > > v2 -> Changes done in arm64 headers
+> > > > v3 -> Changes done in both uapi & arm64 headers
+> > > > 
+> > > >  arch/arm64/include/uapi/asm/signal.h |    3 +++
+> > > >  include/uapi/asm-generic/signal.h    |    2 ++
+> > > >  2 files changed, 5 insertions(+)
+> > > 
+> > > Acked-by: Will Deacon <will.deacon@arm.com>
+> > > 
+> > > Arnd: are you planning to take this via asm-generic, or shall I queue it
+> > > on the arm64 fixes branch?
+> > > 
+> > 
+> > i just noticed this and wanted to note that an old
+> > glibc can fail on a new kernel with this patch if
+> > an application uses MINSIGSTKSZ altstack.
 > 
-> Mailer got confused about which mails are more recent than others 
+> I was worried about that (which was also why I didn't Cc stable on this,
+> because we shouldn't pretend that glibc and the kernel are synchronised),
+> but the value *is* incorrect and glibc has already been updated. In
+> other words, not merging this patch is also problematic, because we're
+> advertising a size that's significantly too small.
+> 
+> Would you rather we kept the old incorrect value in the kernel headers?
+> 
 
-Just to make sure we are on the same page: James thought my second patch
-was making things too ugly and wanted to get back to this one.
+i think the change is ok and it is good that it is not yet in stable.
 
-	Arnd
+(for posix conformance only the value in libc matters though, the
+kernel definition is not visible as glibc does not use it and even
+in posix the semantics of this macro is not entirely clear so leaving
+the wrong value in kernel uapi is not that terrible.. e.g. the x86
+definition was not updated when avx extension was added, for abi
+stability i guess.  in musl libc this was set to 6K when i did the
+aarch64 port, had i used 5000 as the limit i would be upset by such
+a change, but i have nothing to complain about now..)
