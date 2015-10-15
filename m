@@ -1,18 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 22:04:47 +0200
-Subject: [GIT PULL 2/2] ARM64: berlin: SoC changes for v4.4 (round 1)
-In-Reply-To: <1444416530-3207-2-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1444416530-3207-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1444416530-3207-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <5066696.gR0nMDKbJ2@wuerfel>
+Date: Thu, 15 Oct 2015 22:07:58 +0200
+Subject: [GIT PULL 3/3] ARM: berlin: SoC changes for v4.4 (round 1)
+In-Reply-To: <1444416494-3117-3-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1444416494-3117-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1444416494-3117-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <13690298.KOO6Lk0OEb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 October 2015 20:48:50 Sebastian Hesselbarth wrote:
-> Marvell Berlin ARM64 SoC for 4.4 take 1
-> - enable ARCH_REQUIRE_GPIOLIB for DW GPIO driver
+On Friday 09 October 2015 20:48:14 Sebastian Hesselbarth wrote:
+> Arnd, Kevin, Olof,
 > 
+> this is Marvell Berlin SoC changes for v4.4. It only contains a
+> single patch to register a cpufreq-dt device that we have properties
+> for now.
+> 
+> Please pull.
+> 
+> Sebastian
+> 
+> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+> 
+>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-soc-for-4.4-1
+> 
+> for you to fetch changes up to e1a3e724a25761a2b2e9e0e059e33afac6409a76:
+> 
+>   ARM: berlin: register cpufreq-dt (2015-09-21 22:57:24 +0200)
+> 
+> ----------------------------------------------------------------
+> Marvell SoC for 4.4 take 1
+> - register cpufreq-dt device
 
-Merged into next/soc, thanks!
+I really wish we could get rid of that crap (having to register
+a device for this manually). Not your fault of course, so merged
+into next/soc.
+
+Thanks,
 
 	Arnd
