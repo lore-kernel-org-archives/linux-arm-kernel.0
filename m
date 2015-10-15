@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 15 Oct 2015 15:48:15 +0900
-Subject: [PATCH v5 2/5] arm64: dts: r8a7795: add EthernetAVB device node
+Date: Thu, 15 Oct 2015 15:48:16 +0900
+Subject: [PATCH v5 3/5] arm64: dts: r8a7795: enable EthernetAVB on Salvator-X
 In-Reply-To: <1444891698-8780-1-git-send-email-horms+renesas@verge.net.au>
 References: <1444891698-8780-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1444891698-8780-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1444891698-8780-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,84 +12,76 @@ From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
 Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
 [horms: minor updates]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 ---
 v0 [Kazuya Mizuguchi]
 
 v1 [Simon Horman]
-* moved to soc node
+* updated filename to salvator-x
 * updated patch subject
 
 v2 [Simon Horman]
-* Specify all interrupts
-* Use named interrupts
-* Rebase
-* Remove spurious whitespace change introduce in v1
+* Removed spurious update to r8a7795.dtsi introduced in v1
+* Removed unused renesas,phy property
 
 v3 [Simon Horman]
-* As suggested by Geert Uytterhoeven
-  - Add power-domains property
-* Added Ack
+* No change but provided PFC driver update in separate patch(set)
 
-v4, v5
+v4 [Simon Horman]
+* As suggested by Sergei Shtylyov
+  - Removed unused phy-reset-gpio property
+
+v5
 * No change
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 42 ++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 31 ++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 6efa49f97e07..63bc74e89fa4 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -312,6 +312,48 @@
- 			/* Empty node for now */
- 		};
- 
-+		avb: ethernet at e6800000 {
-+			compatible = "renesas,etheravb-r8a7795";
-+			reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
-+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "ch0", "ch1", "ch2", "ch3",
-+					  "ch4", "ch5", "ch6", "ch7",
-+					  "ch8", "ch9", "ch10", "ch11",
-+					  "ch12", "ch13", "ch14", "ch15",
-+					  "ch16", "ch17", "ch18", "ch19",
-+					  "ch20", "ch21", "ch22", "ch23",
-+					  "ch24";
-+			clocks = <&mstp8_clks R8A7795_CLK_ETHERAVB>;
-+			power-domains = <&cpg_clocks>;
-+			phy-mode = "rgmii-id";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+index f522fda7843a..4fb120d8e7e8 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -45,6 +45,11 @@
+ 		renesas,groups = "scif2_data_a";
+ 		renesas,function = "scif2";
+ 	};
 +
- 		dmac1: dma-controller at e7300000 {
- 			/* Empty node for now */
- 		};
++	avb_pins: avb {
++		renesas,groups = "avb_mdc";
++		renesas,function = "avb";
++	};
+ };
+ 
+ &scif1 {
+@@ -60,3 +65,29 @@
+ 
+ 	status = "okay";
+ };
++
++&avb {
++	pinctrl-0 = <&avb_pins>;
++	pinctrl-names = "default";
++	renesas,no-ether-link;
++	phy-handle = <&phy0>;
++	status = "okay";
++
++	phy0: ethernet-phy at 0 {
++		rxc-skew-ps = <900>;
++		rxdv-skew-ps = <0>;
++		rxd0-skew-ps = <0>;
++		rxd1-skew-ps = <0>;
++		rxd2-skew-ps = <0>;
++		rxd3-skew-ps = <0>;
++		txc-skew-ps = <900>;
++		txen-skew-ps = <0>;
++		txd0-skew-ps = <0>;
++		txd1-skew-ps = <0>;
++		txd2-skew-ps = <0>;
++		txd3-skew-ps = <0>;
++		reg = <0>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
 -- 
 2.1.4
