@@ -1,39 +1,69 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 15 Oct 2015 11:24:19 -0700
-Subject: [PATCH] spmi-pmic-arb: support configurable number of peripherals
-In-Reply-To: <8EEAE898-347B-4CEA-BA4D-0C69897E18EB@gmail.com>
-References: <1442267672-11287-1-git-send-email-sboyd@codeaurora.org>
- <55F77451.9070900@codeaurora.org>
- <1442316018.15519.4.camel@mm-sol.com>
- <20150915182728.GA11715@codeaurora.org>
- <561EDAAC.6060800@codeaurora.org>
- <8EEAE898-347B-4CEA-BA4D-0C69897E18EB@gmail.com>
-Message-ID: <20151015182419.GH4558@codeaurora.org>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Thu, 15 Oct 2015 15:30:50 -0300
+Subject: [PATCH v3 0/4] mtd: pxa3xx_nand: rework the timing setup
+In-Reply-To: <1444893451-16610-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1444893451-16610-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <CAAEAJfBdfc-=AH0z_A8-b70LH_=GJp0qPRp0zCohqDBf8pnokQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15, Ivan T. Ivanov wrote:
-> 
-> > On Oct 15, 2015, at 1:43 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > 
-> > I have to take this back. I missed the part where some pmics are on
-> > slave id 2 or slave id 4, so this check isn't going to work. I've
-> > adjusted it to use sid % 2 instead and I'll resend these two patches,
-> > but I imagine to be more robust we're going to need to add a revid node
-> > to the DT under the SID that actually has it. Then we can search the
-> > child nodes for a revid compatible node and do the rev probing stuff.
-> 
-> Ah, yes. We don?t use revision information for now. 
-> I suppose we can just remove these reads until we need
-> this information?
-> 
+Ccing Robert as he can provide valuable test on PXA boards.
 
-True, we could just remove all the code and make it look for a
-revid node at some later time. But later would be soon because
-I'm working on patches to add the read/write/volatile regmap
-tables to this driver. I guess I'll just go all the way and do
-the revid node part.
+On 15 October 2015 at 04:17, Antoine Tenart
+<antoine.tenart@free-electrons.com> wrote:
+> Hi all,
+>
+> Let's try one more time to get this merged.
+>
+> Another series, introducing the Berlin nand support, depends on this.
+>
+> This series was part of a bigger one[1], which was split into smaller
+> ones as asked by Ezequiel[2]. When we take this into account, this is
+> v8.
+>
+> The aim here is to use the nand framework to setup the timings,
+> while keeping the old in-driver way of configuration timings for
+> compatibility reasons.
+>
+> You can find the series at:
+> https://github.com/atenart/linux.git berlin/4.3/nand-timings
+>
+> Antoine
+>
+> Since v2:
+>         - Added back the support for keep-config 16 bits devices
+>         - Fixed wrong unit in a calculation
+>         - Reworked the pxa3xx_nand_init_timings() logic
+>         - Allowed compile test the pxa3xx driver
+>
+> Since v1:
+>         - Rebased on top of v4.2-rc1
+>
+> Since the series was split up:
+>         - Reworked the ndcr setup
+>         - Removed the read_id_bytes update after device detection
+>
+> Antoine Tenart (4):
+>   mtd: nand: allow compile test of MTD_NAND_PXA3xx
+>   mtd: pxa3xx_nand: add helpers to setup the timings
+>   mtd: pxa3xx_nand: rework flash detection and timing setup
+>   mtd: pxa3xx_nand: clean up the pxa3xx timings
+>
+>  drivers/mtd/nand/Kconfig                      |   2 +-
+>  drivers/mtd/nand/pxa3xx_nand.c                | 273 ++++++++++++++++----------
+>  include/linux/platform_data/mtd-nand-pxa3xx.h |  11 +-
+>  3 files changed, 172 insertions(+), 114 deletions(-)
+>
+> --
+> 2.6.1
+>
+>
+> ______________________________________________________
+> Linux MTD discussion mailing list
+> http://lists.infradead.org/mailman/listinfo/linux-mtd/
+
+
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
