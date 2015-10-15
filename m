@@ -1,300 +1,331 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Thu, 15 Oct 2015 15:48:25 -0400
-Subject: [PATCH v3 02/10] clk: cygnus: Convert all macros to all caps
+Date: Thu, 15 Oct 2015 15:48:30 -0400
+Subject: [PATCH v3 07/10] clk: iproc: Separate status and control variables
 In-Reply-To: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
 References: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1444938513-10758-3-git-send-email-jonmason@broadcom.com>
+Message-ID: <1444938513-10758-8-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The macros that are being used to initialize the values of the clk
-structures should be all caps.  Find and replace all of them with their
-relevant counterparts.
+Some PLLs have separate registers for Status and Control.  The means the
+pll_base needs to be split into 2 new variables, so that those PLLs can
+specify device tree registers for those independently.  Also, add a new
+driver flag to identify this presence of the split, and let the driver
+know that additional registers need to be used.
 
 Signed-off-by: Jon Mason <jonmason@broadcom.com>
 ---
- drivers/clk/bcm/clk-cygnus.c | 146 +++++++++++++++++++++----------------------
- 1 file changed, 73 insertions(+), 73 deletions(-)
+ drivers/clk/bcm/clk-iproc-pll.c | 96 ++++++++++++++++++++++++-----------------
+ drivers/clk/bcm/clk-iproc.h     |  6 +++
+ 2 files changed, 62 insertions(+), 40 deletions(-)
 
-diff --git a/drivers/clk/bcm/clk-cygnus.c b/drivers/clk/bcm/clk-cygnus.c
-index 316c603..aac82c6 100644
---- a/drivers/clk/bcm/clk-cygnus.c
-+++ b/drivers/clk/bcm/clk-cygnus.c
-@@ -23,28 +23,28 @@
- #include <dt-bindings/clock/bcm-cygnus.h>
- #include "clk-iproc.h"
- 
--#define reg_val(o, s, w) { .offset = o, .shift = s, .width = w, }
-+#define REG_VAL(o, s, w) { .offset = o, .shift = s, .width = w, }
- 
--#define aon_val(o, pw, ps, is) { .offset = o, .pwr_width = pw, \
-+#define AON_VAL(o, pw, ps, is) { .offset = o, .pwr_width = pw, \
- 	.pwr_shift = ps, .iso_shift = is }
- 
--#define sw_ctrl_val(o, s) { .offset = o, .shift = s, }
-+#define SW_CTRL_VAL(o, s) { .offset = o, .shift = s, }
- 
--#define asiu_div_val(o, es, hs, hw, ls, lw) \
-+#define ASIU_DIV_VAL(o, es, hs, hw, ls, lw) \
- 		{ .offset = o, .en_shift = es, .high_shift = hs, \
- 		.high_width = hw, .low_shift = ls, .low_width = lw }
- 
--#define reset_val(o, rs, prs, kis, kiw, kps, kpw, kas, kaw) { .offset = o, \
-+#define RESET_VAL(o, rs, prs, kis, kiw, kps, kpw, kas, kaw) { .offset = o, \
- 	.reset_shift = rs, .p_reset_shift = prs, .ki_shift = kis, \
- 	.ki_width = kiw, .kp_shift = kps, .kp_width = kpw, .ka_shift = kas, \
- 	.ka_width = kaw }
- 
--#define vco_ctrl_val(uo, lo) { .u_offset = uo, .l_offset = lo }
-+#define VCO_CTRL_VAL(uo, lo) { .u_offset = uo, .l_offset = lo }
- 
--#define enable_val(o, es, hs, bs) { .offset = o, .enable_shift = es, \
-+#define ENABLE_VAL(o, es, hs, bs) { .offset = o, .enable_shift = es, \
- 	.hold_shift = hs, .bypass_shift = bs }
- 
--#define asiu_gate_val(o, es) { .offset = o, .en_shift = es }
-+#define ASIU_GATE_VAL(o, es) { .offset = o, .en_shift = es }
- 
- static void __init cygnus_armpll_init(struct device_node *node)
- {
-@@ -55,52 +55,52 @@ CLK_OF_DECLARE(cygnus_armpll, "brcm,cygnus-armpll", cygnus_armpll_init);
- static const struct iproc_pll_ctrl genpll = {
- 	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
- 		IPROC_CLK_PLL_NEEDS_SW_CFG,
--	.aon = aon_val(0x0, 2, 1, 0),
--	.reset = reset_val(0x0, 11, 10, 4, 3, 0, 4, 7, 3),
--	.sw_ctrl = sw_ctrl_val(0x10, 31),
--	.ndiv_int = reg_val(0x10, 20, 10),
--	.ndiv_frac = reg_val(0x10, 0, 20),
--	.pdiv = reg_val(0x14, 0, 4),
--	.vco_ctrl = vco_ctrl_val(0x18, 0x1c),
--	.status = reg_val(0x28, 12, 1),
-+	.aon = AON_VAL(0x0, 2, 1, 0),
-+	.reset = RESET_VAL(0x0, 11, 10, 4, 3, 0, 4, 7, 3),
-+	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
-+	.ndiv_int = REG_VAL(0x10, 20, 10),
-+	.ndiv_frac = REG_VAL(0x10, 0, 20),
-+	.pdiv = REG_VAL(0x14, 0, 4),
-+	.vco_ctrl = VCO_CTRL_VAL(0x18, 0x1c),
-+	.status = REG_VAL(0x28, 12, 1),
+diff --git a/drivers/clk/bcm/clk-iproc-pll.c b/drivers/clk/bcm/clk-iproc-pll.c
+index d4aab4e..f128a9d 100644
+--- a/drivers/clk/bcm/clk-iproc-pll.c
++++ b/drivers/clk/bcm/clk-iproc-pll.c
+@@ -74,7 +74,8 @@ struct iproc_clk {
  };
  
- static const struct iproc_clk_ctrl genpll_clk[] = {
- 	[BCM_CYGNUS_GENPLL_AXI21_CLK] = {
- 		.channel = BCM_CYGNUS_GENPLL_AXI21_CLK,
- 		.flags = IPROC_CLK_AON,
--		.enable = enable_val(0x4, 6, 0, 12),
--		.mdiv = reg_val(0x20, 0, 8),
-+		.enable = ENABLE_VAL(0x4, 6, 0, 12),
-+		.mdiv = REG_VAL(0x20, 0, 8),
- 	},
- 	[BCM_CYGNUS_GENPLL_250MHZ_CLK] = {
- 		.channel = BCM_CYGNUS_GENPLL_250MHZ_CLK,
- 		.flags = IPROC_CLK_AON,
--		.enable = enable_val(0x4, 7, 1, 13),
--		.mdiv = reg_val(0x20, 10, 8),
-+		.enable = ENABLE_VAL(0x4, 7, 1, 13),
-+		.mdiv = REG_VAL(0x20, 10, 8),
- 	},
- 	[BCM_CYGNUS_GENPLL_IHOST_SYS_CLK] = {
- 		.channel = BCM_CYGNUS_GENPLL_IHOST_SYS_CLK,
- 		.flags = IPROC_CLK_AON,
--		.enable = enable_val(0x4, 8, 2, 14),
--		.mdiv = reg_val(0x20, 20, 8),
-+		.enable = ENABLE_VAL(0x4, 8, 2, 14),
-+		.mdiv = REG_VAL(0x20, 20, 8),
- 	},
- 	[BCM_CYGNUS_GENPLL_ENET_SW_CLK] = {
- 		.channel = BCM_CYGNUS_GENPLL_ENET_SW_CLK,
- 		.flags = IPROC_CLK_AON,
--		.enable = enable_val(0x4, 9, 3, 15),
--		.mdiv = reg_val(0x24, 0, 8),
-+		.enable = ENABLE_VAL(0x4, 9, 3, 15),
-+		.mdiv = REG_VAL(0x24, 0, 8),
- 	},
- 	[BCM_CYGNUS_GENPLL_AUDIO_125_CLK] = {
- 		.channel = BCM_CYGNUS_GENPLL_AUDIO_125_CLK,
- 		.flags = IPROC_CLK_AON,
--		.enable = enable_val(0x4, 10, 4, 16),
--		.mdiv = reg_val(0x24, 10, 8),
-+		.enable = ENABLE_VAL(0x4, 10, 4, 16),
-+		.mdiv = REG_VAL(0x24, 10, 8),
- 	},
- 	[BCM_CYGNUS_GENPLL_CAN_CLK] = {
- 		.channel = BCM_CYGNUS_GENPLL_CAN_CLK,
- 		.flags = IPROC_CLK_AON,
--		.enable = enable_val(0x4, 11, 5, 17),
--		.mdiv = reg_val(0x24, 20, 8),
-+		.enable = ENABLE_VAL(0x4, 11, 5, 17),
-+		.mdiv = REG_VAL(0x24, 20, 8),
- 	},
- };
+ struct iproc_pll {
+-	void __iomem *pll_base;
++	void __iomem *status_base;
++	void __iomem *control_base;
+ 	void __iomem *pwr_base;
+ 	void __iomem *asiu_base;
  
-@@ -113,51 +113,51 @@ CLK_OF_DECLARE(cygnus_genpll, "brcm,cygnus-genpll", cygnus_genpll_clk_init);
+@@ -127,7 +128,7 @@ static int pll_wait_for_lock(struct iproc_pll *pll)
+ 	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
  
- static const struct iproc_pll_ctrl lcpll0 = {
- 	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_NEEDS_SW_CFG,
--	.aon = aon_val(0x0, 2, 5, 4),
--	.reset = reset_val(0x0, 31, 30, 27, 3, 23, 4, 19, 4),
--	.sw_ctrl = sw_ctrl_val(0x4, 31),
--	.ndiv_int = reg_val(0x4, 16, 10),
--	.pdiv = reg_val(0x4, 26, 4),
--	.vco_ctrl = vco_ctrl_val(0x10, 0x14),
--	.status = reg_val(0x18, 12, 1),
-+	.aon = AON_VAL(0x0, 2, 5, 4),
-+	.reset = RESET_VAL(0x0, 31, 30, 27, 3, 23, 4, 19, 4),
-+	.sw_ctrl = SW_CTRL_VAL(0x4, 31),
-+	.ndiv_int = REG_VAL(0x4, 16, 10),
-+	.pdiv = REG_VAL(0x4, 26, 4),
-+	.vco_ctrl = VCO_CTRL_VAL(0x10, 0x14),
-+	.status = REG_VAL(0x18, 12, 1),
- };
+ 	for (i = 0; i < LOCK_DELAY; i++) {
+-		u32 val = readl(pll->pll_base + ctrl->status.offset);
++		u32 val = readl(pll->status_base + ctrl->status.offset);
  
- static const struct iproc_clk_ctrl lcpll0_clk[] = {
- 	[BCM_CYGNUS_LCPLL0_PCIE_PHY_REF_CLK] = {
- 		.channel = BCM_CYGNUS_LCPLL0_PCIE_PHY_REF_CLK,
- 		.flags = IPROC_CLK_AON,
--		.enable = enable_val(0x0, 7, 1, 13),
--		.mdiv = reg_val(0x8, 0, 8),
-+		.enable = ENABLE_VAL(0x0, 7, 1, 13),
-+		.mdiv = REG_VAL(0x8, 0, 8),
- 	},
- 	[BCM_CYGNUS_LCPLL0_DDR_PHY_CLK] = {
- 		.channel = BCM_CYGNUS_LCPLL0_DDR_PHY_CLK,
- 		.flags = IPROC_CLK_AON,
--		.enable = enable_val(0x0, 8, 2, 14),
--		.mdiv = reg_val(0x8, 10, 8),
-+		.enable = ENABLE_VAL(0x0, 8, 2, 14),
-+		.mdiv = REG_VAL(0x8, 10, 8),
- 	},
- 	[BCM_CYGNUS_LCPLL0_SDIO_CLK] = {
- 		.channel = BCM_CYGNUS_LCPLL0_SDIO_CLK,
- 		.flags = IPROC_CLK_AON,
--		.enable = enable_val(0x0, 9, 3, 15),
--		.mdiv = reg_val(0x8, 20, 8),
-+		.enable = ENABLE_VAL(0x0, 9, 3, 15),
-+		.mdiv = REG_VAL(0x8, 20, 8),
- 	},
- 	[BCM_CYGNUS_LCPLL0_USB_PHY_REF_CLK] = {
- 		.channel = BCM_CYGNUS_LCPLL0_USB_PHY_REF_CLK,
- 		.flags = IPROC_CLK_AON,
--		.enable = enable_val(0x0, 10, 4, 16),
--		.mdiv = reg_val(0xc, 0, 8),
-+		.enable = ENABLE_VAL(0x0, 10, 4, 16),
-+		.mdiv = REG_VAL(0xc, 0, 8),
- 	},
- 	[BCM_CYGNUS_LCPLL0_SMART_CARD_CLK] = {
- 		.channel = BCM_CYGNUS_LCPLL0_SMART_CARD_CLK,
- 		.flags = IPROC_CLK_AON,
--		.enable = enable_val(0x0, 11, 5, 17),
--		.mdiv = reg_val(0xc, 10, 8),
-+		.enable = ENABLE_VAL(0x0, 11, 5, 17),
-+		.mdiv = REG_VAL(0xc, 10, 8),
- 	},
- 	[BCM_CYGNUS_LCPLL0_CH5_UNUSED] = {
- 		.channel = BCM_CYGNUS_LCPLL0_CH5_UNUSED,
- 		.flags = IPROC_CLK_AON,
--		.enable = enable_val(0x0, 12, 6, 18),
--		.mdiv = reg_val(0xc, 20, 8),
-+		.enable = ENABLE_VAL(0x0, 12, 6, 18),
-+		.mdiv = REG_VAL(0xc, 20, 8),
- 	},
- };
+ 		if (val & (1 << ctrl->status.shift))
+ 			return 0;
+@@ -145,7 +146,7 @@ static void iproc_pll_write(const struct iproc_pll *pll, void __iomem *base,
+ 	writel(val, base + offset);
  
-@@ -189,52 +189,52 @@ static const struct iproc_pll_vco_param mipipll_vco_params[] = {
- static const struct iproc_pll_ctrl mipipll = {
- 	.flags = IPROC_CLK_PLL_ASIU | IPROC_CLK_PLL_HAS_NDIV_FRAC |
- 		 IPROC_CLK_NEEDS_READ_BACK,
--	.aon = aon_val(0x0, 4, 17, 16),
--	.asiu = asiu_gate_val(0x0, 3),
--	.reset = reset_val(0x0, 11, 10, 4, 3, 0, 4, 7, 4),
--	.ndiv_int = reg_val(0x10, 20, 10),
--	.ndiv_frac = reg_val(0x10, 0, 20),
--	.pdiv = reg_val(0x14, 0, 4),
--	.vco_ctrl = vco_ctrl_val(0x18, 0x1c),
--	.status = reg_val(0x28, 12, 1),
-+	.aon = AON_VAL(0x0, 4, 17, 16),
-+	.asiu = ASIU_GATE_VAL(0x0, 3),
-+	.reset = RESET_VAL(0x0, 11, 10, 4, 3, 0, 4, 7, 4),
-+	.ndiv_int = REG_VAL(0x10, 20, 10),
-+	.ndiv_frac = REG_VAL(0x10, 0, 20),
-+	.pdiv = REG_VAL(0x14, 0, 4),
-+	.vco_ctrl = VCO_CTRL_VAL(0x18, 0x1c),
-+	.status = REG_VAL(0x28, 12, 1),
- };
+ 	if (unlikely(ctrl->flags & IPROC_CLK_NEEDS_READ_BACK &&
+-		     base == pll->pll_base))
++		     (base == pll->status_base || base == pll->control_base)))
+ 		val = readl(base + offset);
+ }
  
- static const struct iproc_clk_ctrl mipipll_clk[] = {
- 	[BCM_CYGNUS_MIPIPLL_CH0_UNUSED] = {
- 		.channel = BCM_CYGNUS_MIPIPLL_CH0_UNUSED,
- 		.flags = IPROC_CLK_NEEDS_READ_BACK,
--		.enable = enable_val(0x4, 12, 6, 18),
--		.mdiv = reg_val(0x20, 0, 8),
-+		.enable = ENABLE_VAL(0x4, 12, 6, 18),
-+		.mdiv = REG_VAL(0x20, 0, 8),
- 	},
- 	[BCM_CYGNUS_MIPIPLL_CH1_LCD] = {
- 		.channel = BCM_CYGNUS_MIPIPLL_CH1_LCD,
- 		.flags = IPROC_CLK_NEEDS_READ_BACK,
--		.enable = enable_val(0x4, 13, 7, 19),
--		.mdiv = reg_val(0x20, 10, 8),
-+		.enable = ENABLE_VAL(0x4, 13, 7, 19),
-+		.mdiv = REG_VAL(0x20, 10, 8),
- 	},
- 	[BCM_CYGNUS_MIPIPLL_CH2_V3D] = {
- 		.channel = BCM_CYGNUS_MIPIPLL_CH2_V3D,
- 		.flags = IPROC_CLK_NEEDS_READ_BACK,
--		.enable = enable_val(0x4, 14, 8, 20),
--		.mdiv = reg_val(0x20, 20, 8),
-+		.enable = ENABLE_VAL(0x4, 14, 8, 20),
-+		.mdiv = REG_VAL(0x20, 20, 8),
- 	},
- 	[BCM_CYGNUS_MIPIPLL_CH3_UNUSED] = {
- 		.channel = BCM_CYGNUS_MIPIPLL_CH3_UNUSED,
- 		.flags = IPROC_CLK_NEEDS_READ_BACK,
--		.enable = enable_val(0x4, 15, 9, 21),
--		.mdiv = reg_val(0x24, 0, 8),
-+		.enable = ENABLE_VAL(0x4, 15, 9, 21),
-+		.mdiv = REG_VAL(0x24, 0, 8),
- 	},
- 	[BCM_CYGNUS_MIPIPLL_CH4_UNUSED] = {
- 		.channel = BCM_CYGNUS_MIPIPLL_CH4_UNUSED,
- 		.flags = IPROC_CLK_NEEDS_READ_BACK,
--		.enable = enable_val(0x4, 16, 10, 22),
--		.mdiv = reg_val(0x24, 10, 8),
-+		.enable = ENABLE_VAL(0x4, 16, 10, 22),
-+		.mdiv = REG_VAL(0x24, 10, 8),
- 	},
- 	[BCM_CYGNUS_MIPIPLL_CH5_UNUSED] = {
- 		.channel = BCM_CYGNUS_MIPIPLL_CH5_UNUSED,
- 		.flags = IPROC_CLK_NEEDS_READ_BACK,
--		.enable = enable_val(0x4, 17, 11, 23),
--		.mdiv = reg_val(0x24, 20, 8),
-+		.enable = ENABLE_VAL(0x4, 17, 11, 23),
-+		.mdiv = REG_VAL(0x24, 20, 8),
- 	},
- };
+@@ -161,9 +162,9 @@ static void __pll_disable(struct iproc_pll *pll)
+ 	}
  
-@@ -247,15 +247,15 @@ static void __init cygnus_mipipll_clk_init(struct device_node *node)
- CLK_OF_DECLARE(cygnus_mipipll, "brcm,cygnus-mipipll", cygnus_mipipll_clk_init);
+ 	if (ctrl->flags & IPROC_CLK_EMBED_PWRCTRL) {
+-		val = readl(pll->pll_base + ctrl->aon.offset);
++		val = readl(pll->control_base + ctrl->aon.offset);
+ 		val |= (bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
+-		iproc_pll_write(pll, pll->pll_base, ctrl->aon.offset, val);
++		iproc_pll_write(pll, pll->control_base, ctrl->aon.offset, val);
+ 	}
  
- static const struct iproc_asiu_div asiu_div[] = {
--	[BCM_CYGNUS_ASIU_KEYPAD_CLK] = asiu_div_val(0x0, 31, 16, 10, 0, 10),
--	[BCM_CYGNUS_ASIU_ADC_CLK] = asiu_div_val(0x4, 31, 16, 10, 0, 10),
--	[BCM_CYGNUS_ASIU_PWM_CLK] = asiu_div_val(0x8, 31, 16, 10, 0, 10),
-+	[BCM_CYGNUS_ASIU_KEYPAD_CLK] = ASIU_DIV_VAL(0x0, 31, 16, 10, 0, 10),
-+	[BCM_CYGNUS_ASIU_ADC_CLK] = ASIU_DIV_VAL(0x4, 31, 16, 10, 0, 10),
-+	[BCM_CYGNUS_ASIU_PWM_CLK] = ASIU_DIV_VAL(0x8, 31, 16, 10, 0, 10),
- };
+ 	if (pll->pwr_base) {
+@@ -184,9 +185,9 @@ static int __pll_enable(struct iproc_pll *pll)
+ 	u32 val;
  
- static const struct iproc_asiu_gate asiu_gate[] = {
--	[BCM_CYGNUS_ASIU_KEYPAD_CLK] = asiu_gate_val(0x0, 7),
--	[BCM_CYGNUS_ASIU_ADC_CLK] = asiu_gate_val(0x0, 9),
--	[BCM_CYGNUS_ASIU_PWM_CLK] = asiu_gate_val(IPROC_CLK_INVALID_OFFSET, 0),
-+	[BCM_CYGNUS_ASIU_KEYPAD_CLK] = ASIU_GATE_VAL(0x0, 7),
-+	[BCM_CYGNUS_ASIU_ADC_CLK] = ASIU_GATE_VAL(0x0, 9),
-+	[BCM_CYGNUS_ASIU_PWM_CLK] = ASIU_GATE_VAL(IPROC_CLK_INVALID_OFFSET, 0),
- };
+ 	if (ctrl->flags & IPROC_CLK_EMBED_PWRCTRL) {
+-		val = readl(pll->pll_base + ctrl->aon.offset);
++		val = readl(pll->control_base + ctrl->aon.offset);
+ 		val &= ~(bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
+-		iproc_pll_write(pll, pll->pll_base, ctrl->aon.offset, val);
++		iproc_pll_write(pll, pll->control_base, ctrl->aon.offset, val);
+ 	}
  
- static void __init cygnus_asiu_init(struct device_node *node)
+ 	if (pll->pwr_base) {
+@@ -213,9 +214,9 @@ static void __pll_put_in_reset(struct iproc_pll *pll)
+ 	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
+ 	const struct iproc_pll_reset_ctrl *reset = &ctrl->reset;
+ 
+-	val = readl(pll->pll_base + reset->offset);
++	val = readl(pll->control_base + reset->offset);
+ 	val &= ~(1 << reset->reset_shift | 1 << reset->p_reset_shift);
+-	iproc_pll_write(pll, pll->pll_base, reset->offset, val);
++	iproc_pll_write(pll, pll->control_base, reset->offset, val);
+ }
+ 
+ static void __pll_bring_out_reset(struct iproc_pll *pll, unsigned int kp,
+@@ -226,17 +227,17 @@ static void __pll_bring_out_reset(struct iproc_pll *pll, unsigned int kp,
+ 	const struct iproc_pll_reset_ctrl *reset = &ctrl->reset;
+ 	const struct iproc_pll_dig_filter_ctrl *dig_filter = &ctrl->dig_filter;
+ 
+-	val = readl(pll->pll_base + dig_filter->offset);
++	val = readl(pll->control_base + dig_filter->offset);
+ 	val &= ~(bit_mask(dig_filter->ki_width) << dig_filter->ki_shift |
+ 		bit_mask(dig_filter->kp_width) << dig_filter->kp_shift |
+ 		bit_mask(dig_filter->ka_width) << dig_filter->ka_shift);
+ 	val |= ki << dig_filter->ki_shift | kp << dig_filter->kp_shift |
+ 	       ka << dig_filter->ka_shift;
+-	iproc_pll_write(pll, pll->pll_base, dig_filter->offset, val);
++	iproc_pll_write(pll, pll->control_base, dig_filter->offset, val);
+ 
+-	val = readl(pll->pll_base + reset->offset);
++	val = readl(pll->control_base + reset->offset);
+ 	val |= 1 << reset->reset_shift | 1 << reset->p_reset_shift;
+-	iproc_pll_write(pll, pll->pll_base, reset->offset, val);
++	iproc_pll_write(pll, pll->control_base, reset->offset, val);
+ }
+ 
+ static int pll_set_rate(struct iproc_clk *clk, unsigned int rate_index,
+@@ -291,9 +292,9 @@ static int pll_set_rate(struct iproc_clk *clk, unsigned int rate_index,
+ 	/* put PLL in reset */
+ 	__pll_put_in_reset(pll);
+ 
+-	iproc_pll_write(pll, pll->pll_base, ctrl->vco_ctrl.u_offset, 0);
++	iproc_pll_write(pll, pll->control_base, ctrl->vco_ctrl.u_offset, 0);
+ 
+-	val = readl(pll->pll_base + ctrl->vco_ctrl.l_offset);
++	val = readl(pll->control_base + ctrl->vco_ctrl.l_offset);
+ 
+ 	if (rate >= VCO_LOW && rate < VCO_MID)
+ 		val |= (1 << PLL_VCO_LOW_SHIFT);
+@@ -303,29 +304,29 @@ static int pll_set_rate(struct iproc_clk *clk, unsigned int rate_index,
+ 	else
+ 		val |= (1 << PLL_VCO_HIGH_SHIFT);
+ 
+-	iproc_pll_write(pll, pll->pll_base, ctrl->vco_ctrl.l_offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->vco_ctrl.l_offset, val);
+ 
+ 	/* program integer part of NDIV */
+-	val = readl(pll->pll_base + ctrl->ndiv_int.offset);
++	val = readl(pll->control_base + ctrl->ndiv_int.offset);
+ 	val &= ~(bit_mask(ctrl->ndiv_int.width) << ctrl->ndiv_int.shift);
+ 	val |= vco->ndiv_int << ctrl->ndiv_int.shift;
+-	iproc_pll_write(pll, pll->pll_base, ctrl->ndiv_int.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->ndiv_int.offset, val);
+ 
+ 	/* program fractional part of NDIV */
+ 	if (ctrl->flags & IPROC_CLK_PLL_HAS_NDIV_FRAC) {
+-		val = readl(pll->pll_base + ctrl->ndiv_frac.offset);
++		val = readl(pll->control_base + ctrl->ndiv_frac.offset);
+ 		val &= ~(bit_mask(ctrl->ndiv_frac.width) <<
+ 			 ctrl->ndiv_frac.shift);
+ 		val |= vco->ndiv_frac << ctrl->ndiv_frac.shift;
+-		iproc_pll_write(pll, pll->pll_base, ctrl->ndiv_frac.offset,
++		iproc_pll_write(pll, pll->control_base, ctrl->ndiv_frac.offset,
+ 				val);
+ 	}
+ 
+ 	/* program PDIV */
+-	val = readl(pll->pll_base + ctrl->pdiv.offset);
++	val = readl(pll->control_base + ctrl->pdiv.offset);
+ 	val &= ~(bit_mask(ctrl->pdiv.width) << ctrl->pdiv.shift);
+ 	val |= vco->pdiv << ctrl->pdiv.shift;
+-	iproc_pll_write(pll, pll->pll_base, ctrl->pdiv.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->pdiv.offset, val);
+ 
+ 	__pll_bring_out_reset(pll, kp, ka, ki);
+ 
+@@ -372,7 +373,7 @@ static unsigned long iproc_pll_recalc_rate(struct clk_hw *hw,
+ 		return 0;
+ 
+ 	/* PLL needs to be locked */
+-	val = readl(pll->pll_base + ctrl->status.offset);
++	val = readl(pll->status_base + ctrl->status.offset);
+ 	if ((val & (1 << ctrl->status.shift)) == 0) {
+ 		clk->rate = 0;
+ 		return 0;
+@@ -383,13 +384,13 @@ static unsigned long iproc_pll_recalc_rate(struct clk_hw *hw,
+ 	 *
+ 	 * ((ndiv_int + ndiv_frac / 2^20) * (parent clock rate / pdiv)
+ 	 */
+-	val = readl(pll->pll_base + ctrl->ndiv_int.offset);
++	val = readl(pll->control_base + ctrl->ndiv_int.offset);
+ 	ndiv_int = (val >> ctrl->ndiv_int.shift) &
+ 		bit_mask(ctrl->ndiv_int.width);
+ 	ndiv = (u64)ndiv_int << ctrl->ndiv_int.shift;
+ 
+ 	if (ctrl->flags & IPROC_CLK_PLL_HAS_NDIV_FRAC) {
+-		val = readl(pll->pll_base + ctrl->ndiv_frac.offset);
++		val = readl(pll->control_base + ctrl->ndiv_frac.offset);
+ 		ndiv_frac = (val >> ctrl->ndiv_frac.shift) &
+ 			bit_mask(ctrl->ndiv_frac.width);
+ 
+@@ -398,7 +399,7 @@ static unsigned long iproc_pll_recalc_rate(struct clk_hw *hw,
+ 				ndiv_frac;
+ 	}
+ 
+-	val = readl(pll->pll_base + ctrl->pdiv.offset);
++	val = readl(pll->control_base + ctrl->pdiv.offset);
+ 	pdiv = (val >> ctrl->pdiv.shift) & bit_mask(ctrl->pdiv.width);
+ 
+ 	clk->rate = (ndiv * parent_rate) >> ctrl->ndiv_int.shift;
+@@ -463,14 +464,14 @@ static int iproc_clk_enable(struct clk_hw *hw)
+ 	u32 val;
+ 
+ 	/* channel enable is active low */
+-	val = readl(pll->pll_base + ctrl->enable.offset);
++	val = readl(pll->control_base + ctrl->enable.offset);
+ 	val &= ~(1 << ctrl->enable.enable_shift);
+-	iproc_pll_write(pll, pll->pll_base, ctrl->enable.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->enable.offset, val);
+ 
+ 	/* also make sure channel is not held */
+-	val = readl(pll->pll_base + ctrl->enable.offset);
++	val = readl(pll->control_base + ctrl->enable.offset);
+ 	val &= ~(1 << ctrl->enable.hold_shift);
+-	iproc_pll_write(pll, pll->pll_base, ctrl->enable.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->enable.offset, val);
+ 
+ 	return 0;
+ }
+@@ -485,9 +486,9 @@ static void iproc_clk_disable(struct clk_hw *hw)
+ 	if (ctrl->flags & IPROC_CLK_AON)
+ 		return;
+ 
+-	val = readl(pll->pll_base + ctrl->enable.offset);
++	val = readl(pll->control_base + ctrl->enable.offset);
+ 	val |= 1 << ctrl->enable.enable_shift;
+-	iproc_pll_write(pll, pll->pll_base, ctrl->enable.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->enable.offset, val);
+ }
+ 
+ static unsigned long iproc_clk_recalc_rate(struct clk_hw *hw,
+@@ -502,7 +503,7 @@ static unsigned long iproc_clk_recalc_rate(struct clk_hw *hw,
+ 	if (parent_rate == 0)
+ 		return 0;
+ 
+-	val = readl(pll->pll_base + ctrl->mdiv.offset);
++	val = readl(pll->control_base + ctrl->mdiv.offset);
+ 	mdiv = (val >> ctrl->mdiv.shift) & bit_mask(ctrl->mdiv.width);
+ 	if (mdiv == 0)
+ 		mdiv = 256;
+@@ -549,14 +550,14 @@ static int iproc_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (div > 256)
+ 		return -EINVAL;
+ 
+-	val = readl(pll->pll_base + ctrl->mdiv.offset);
++	val = readl(pll->control_base + ctrl->mdiv.offset);
+ 	if (div == 256) {
+ 		val &= ~(bit_mask(ctrl->mdiv.width) << ctrl->mdiv.shift);
+ 	} else {
+ 		val &= ~(bit_mask(ctrl->mdiv.width) << ctrl->mdiv.shift);
+ 		val |= div << ctrl->mdiv.shift;
+ 	}
+-	iproc_pll_write(pll, pll->pll_base, ctrl->mdiv.offset, val);
++	iproc_pll_write(pll, pll->control_base, ctrl->mdiv.offset, val);
+ 	clk->rate = parent_rate / div;
+ 
+ 	return 0;
+@@ -581,9 +582,10 @@ static void iproc_pll_sw_cfg(struct iproc_pll *pll)
+ 	if (ctrl->flags & IPROC_CLK_PLL_NEEDS_SW_CFG) {
+ 		u32 val;
+ 
+-		val = readl(pll->pll_base + ctrl->sw_ctrl.offset);
++		val = readl(pll->control_base + ctrl->sw_ctrl.offset);
+ 		val |= BIT(ctrl->sw_ctrl.shift);
+-		iproc_pll_write(pll, pll->pll_base, ctrl->sw_ctrl.offset, val);
++		iproc_pll_write(pll, pll->control_base, ctrl->sw_ctrl.offset,
++				val);
+ 	}
+ }
+ 
+@@ -618,8 +620,8 @@ void __init iproc_pll_clk_setup(struct device_node *node,
+ 	if (WARN_ON(!pll->clks))
+ 		goto err_clks;
+ 
+-	pll->pll_base = of_iomap(node, 0);
+-	if (WARN_ON(!pll->pll_base))
++	pll->control_base = of_iomap(node, 0);
++	if (WARN_ON(!pll->control_base))
+ 		goto err_pll_iomap;
+ 
+ 	/* Some SoCs do not require the pwr_base, thus failing is not fatal */
+@@ -632,6 +634,16 @@ void __init iproc_pll_clk_setup(struct device_node *node,
+ 			goto err_asiu_iomap;
+ 	}
+ 
++	if (pll_ctrl->flags & IPROC_CLK_PLL_SPLIT_STAT_CTRL) {
++		/* Some SoCs have a split status/control.  If this does not
++		 * exist, assume they are unified.
++		 */
++		pll->status_base = of_iomap(node, 2);
++		if (!pll->status_base)
++			goto err_status_iomap;
++	} else
++		pll->status_base = pll->control_base;
++
+ 	/* initialize and register the PLL itself */
+ 	pll->ctrl = pll_ctrl;
+ 
+@@ -702,6 +714,10 @@ err_clk_register:
+ 		clk_unregister(pll->clk_data.clks[i]);
+ 
+ err_pll_register:
++	if (pll->status_base != pll->control_base)
++		iounmap(pll->status_base);
++
++err_status_iomap:
+ 	if (pll->asiu_base)
+ 		iounmap(pll->asiu_base);
+ 
+@@ -709,7 +725,7 @@ err_asiu_iomap:
+ 	if (pll->pwr_base)
+ 		iounmap(pll->pwr_base);
+ 
+-	iounmap(pll->pll_base);
++	iounmap(pll->control_base);
+ 
+ err_pll_iomap:
+ 	kfree(pll->clks);
+diff --git a/drivers/clk/bcm/clk-iproc.h b/drivers/clk/bcm/clk-iproc.h
+index b71c197..8988de7 100644
+--- a/drivers/clk/bcm/clk-iproc.h
++++ b/drivers/clk/bcm/clk-iproc.h
+@@ -55,6 +55,12 @@
+ #define IPROC_CLK_EMBED_PWRCTRL BIT(5)
+ 
+ /*
++ * Some PLLs have separate registers for Status and Control.  Identify this to
++ * let the driver know if additional registers need to be used
++ */
++#define IPROC_CLK_PLL_SPLIT_STAT_CTRL BIT(6)
++
++/*
+  * Parameters for VCO frequency configuration
+  *
+  * VCO frequency =
 -- 
 1.9.1
