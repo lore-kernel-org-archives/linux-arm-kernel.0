@@ -1,38 +1,43 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 15 Oct 2015 14:59:13 -0400
-Subject: [PATCH linux-next] soc: ti: use request_firmware_direct() as acc
- firmware is optional
-Message-ID: <1444935553-19760-1-git-send-email-m-karicheri2@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 15 Oct 2015 21:04:24 +0200
+Subject: [GIT PULL] ARM: berlin: CPU clock driver for v4.4 (round 1)
+In-Reply-To: <1444934667-5451-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1444934667-5451-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1444935864-8606-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When firmware image for PDSP firmware is absent in the file system
-the kernel boot with ramfs/nfs is stuck for 60 seconds being the
-the default timeout. request_firmware_direct() is to take care of
-such optional firmware loading and hence replace the call in the
-driver with this API.
+Arnd, Kevin, Olof,
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- drivers/soc/ti/knav_qmss_queue.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+this is the remaining driver changes of the broken PRs sent earlier.
+Again, as Arnd requested this branch is based on the PR adding the
+CPUID to the dt-binding include and drops moving the MAX_CLKS
+define from the driver to the dt-binding include.
 
-diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
-index f3a0b6a..89789e2 100644
---- a/drivers/soc/ti/knav_qmss_queue.c
-+++ b/drivers/soc/ti/knav_qmss_queue.c
-@@ -1519,9 +1519,9 @@ static int knav_queue_load_pdsp(struct knav_device *kdev,
- 
- 	for (i = 0; i < ARRAY_SIZE(knav_acc_firmwares); i++) {
- 		if (knav_acc_firmwares[i]) {
--			ret = request_firmware(&fw,
--					       knav_acc_firmwares[i],
--					       kdev->dev);
-+			ret = request_firmware_direct(&fw,
-+						      knav_acc_firmwares[i],
-+						      kdev->dev);
- 			if (!ret) {
- 				found = true;
- 				break;
--- 
-1.9.1
+Please pull.
+
+The following changes since commit 28c039eebaaa28def9364b9a12a30192be8b4730:
+
+  ARM: berlin: dts: add CLKID_CPU for BG2Q (2015-10-15 20:31:41 +0200)
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-new-cpuclk-for-4.4-1
+
+for you to fetch changes up to 515f1a2027006839c08c842da919abfcc3c7ae2a:
+
+  clk: berlin: add cpuclk (2015-10-15 20:55:55 +0200)
+
+----------------------------------------------------------------
+Marvell Berlin BG2Q CPU clock driver:
+- add BG2Q CPU clock to clk driver
+
+----------------------------------------------------------------
+Antoine Tenart (1):
+      clk: berlin: add cpuclk
+
+Sebastian Hesselbarth (1):
+      Merge tag 'berlin-dt-cpuclk-for-4.4-1' into berlin/cpuclk
+
+ drivers/clk/berlin/bg2q.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
