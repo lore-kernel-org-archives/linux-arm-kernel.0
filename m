@@ -1,42 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 17:12:55 +0200
-Subject: [PATCH v2] ARM: dts: uniphier: fix IRQ number for devices on
- PH1-LD6b ref board
-In-Reply-To: <1444908725-6069-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1444908725-6069-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <5206613.F0g35kh7aj@wuerfel>
+Date: Thu, 15 Oct 2015 17:14:17 +0200
+Subject: [GIT PULL] omap fixes against v4.3-rc5
+In-Reply-To: <20151014200336.GJ10113@atomide.com>
+References: <20151014200336.GJ10113@atomide.com>
+Message-ID: <6230685.TX0FKXpebS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 October 2015 20:32:05 Masahiro Yamada wrote:
-> The IRQ signal from external devices on this board is connected to
-> the XIRQ4 pin of the SoC.  The IRQ number should be 52, not 50.
+On Wednesday 14 October 2015 13:03:36 Tony Lindgren wrote:
+> Fixes for omap against v4.3-rc5:
 > 
-> Fixes: a5e921b4771f ("ARM: dts: uniphier: add ProXstream2 and PH1-LD6b SoC/board support")
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+> - Regulator fix for beagle-x15 to fix HDMI without a SD card being
+>   inserted
 > 
-> Changes in v2:
->   - change IRQ to 52
+> - GPMC fix for showing proper timings and to allow enabling debug
+>   options that somehow was unselectable earlier
 > 
->  arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
-> index 33963ac..f80f772 100644
-> --- a/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
-> +++ b/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
-> @@ -85,7 +85,7 @@
->  };
->  
->  &ethsc {
-> -	interrupts = <0 50 4>;
-> +	interrupts = <0 52 4>;
->  };
->  
->  &serial0 {
+> - Add minimal documentation for new MMC1 dependency on
+>   REGULATOR_PBIAS as it may not be obvious for people with
+>   targeted .config files
 > 
 
-Applied to fixes, thanks!
+Pulled into fixes, thanks!
 
 	Arnd
