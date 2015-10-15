@@ -1,59 +1,65 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 15 Oct 2015 16:28:45 +0200
-Subject: [PATCH 1/3] ARM: dts: sunxi: Fix interrupt-cells for [r]pio on
- A23/A31/A33/A80
-Message-ID: <1444919327-23747-1-git-send-email-hdegoede@redhat.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Thu, 15 Oct 2015 09:30:15 -0500
+Subject: [PATCH V2 6/6] gicv2m: acpi: Introducing GICv2m ACPI support
+In-Reply-To: <561FB238.10509@amd.com>
+References: <1444865156-9870-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1444865156-9870-7-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <561F449E.2050803@semihalf.com> <561FB238.10509@amd.com>
+Message-ID: <561FB877.4020106@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the gpio interrupt bindings where changed to add a bank to the
-specifier list, the r_pio nodes of A23/A31/A33 where not updated to
-match and neither was the pio node of the A80, this fixes this.
+Hi Tomasz,
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun6i-a31.dtsi     | 2 +-
- arch/arm/boot/dts/sun8i-a23-a33.dtsi | 1 +
- arch/arm/boot/dts/sun9i-a80.dtsi     | 2 +-
- 3 files changed, 3 insertions(+), 2 deletions(-)
+On 10/15/2015 9:03 AM, Suravee Suthikulanit wrote:
+>>> +    if (!data)
+>>> +        return NULL;
+>>> +
+>>> +    return data->fwnode;
+>>> +}
+>>> +
+>>> +static int __init
+>>> +acpi_parse_madt_msi(struct acpi_subtable_header *header,
+>>> +            const unsigned long end)
+>>> +{
+>>> +    int ret;
+>>> +    struct resource res;
+>>> +    u32 spi_start = 0, nr_spis = 0;
+>>> +    struct acpi_madt_generic_msi_frame *m;
+>>> +    struct fwnode_handle *fwnode = NULL;
+>>> +
+>>> +    m = (struct acpi_madt_generic_msi_frame *)header;
+>>> +    if (BAD_MADT_ENTRY(m, end))
+>>> +        return -EINVAL;
+>>> +
+>>> +    res.start = m->base_address;
+>>> +    res.end = m->base_address + 0x1000;
+>>> +
+>>> +    if (m->flags & ACPI_MADT_OVERRIDE_SPI_VALUES) {
+>>> +        spi_start = m->spi_base;
+>>> +        nr_spis = m->spi_count;
+>>> +
+>>> +        pr_info("ACPI overriding V2M MSI_TYPER (base:%u, num:%u)\n",
+>>> +            spi_start, nr_spis);
+>>> +    }
+>>> +
+>>> +    fwnode = irq_domain_alloc_fwnode((void *)m->base_address);
+>>> +    if (!fwnode) {
+>>> +        pr_err("Unable to allocate GICv2m domain token\n");
+>>> +        return -EINVAL;
+>>> +    }
+>>> +
+>>> +    ret = gicv2m_init_one(fwnode, spi_start, nr_spis, &res);
+>> I case of error, we should call here:
+>> irq_domain_free_fwnode(fwnode);
+>
+> This should have already been handled when returning from the
+> acpi_parse_madt_msi() in gicv2m_teardown() since we would need to
+> iterate through all existing MSI frame to clean up.
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 98359f3..a97274a8 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -1102,7 +1102,7 @@
- 			resets = <&apb0_rst 0>;
- 			gpio-controller;
- 			interrupt-controller;
--			#interrupt-cells = <2>;
-+			#interrupt-cells = <3>;
- 			#size-cells = <0>;
- 			#gpio-cells = <3>;
- 
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 828aaf5..ddb9890 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -647,6 +647,7 @@
- 			resets = <&apb0_rst 0>;
- 			gpio-controller;
- 			interrupt-controller;
-+			#interrupt-cells = <3>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			#gpio-cells = <3>;
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index 5908e3d..1118bf5 100644
---- a/arch/arm/boot/dts/sun9i-a80.dtsi
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -594,7 +594,7 @@
- 			clocks = <&apb0_gates 5>;
- 			gpio-controller;
- 			interrupt-controller;
--			#interrupt-cells = <2>;
-+			#interrupt-cells = <3>;
- 			#size-cells = <0>;
- 			#gpio-cells = <3>;
- 
--- 
-2.5.0
+Actually, you are correct since the fwnode allocated here might not get 
+assigned to the v2m_data.fwnode and added to the v2m_nodes list yet. So, 
+we would need to call irq_domain_alloc_fwnode() here in case of error.
+
+Thanks,
+Suravee
