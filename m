@@ -1,39 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 17:20:38 +0200
-Subject: [PATCH] ARM64: juno: add NOR flash to device tree
-In-Reply-To: <20151015115825.GO3394@e106497-lin.cambridge.arm.com>
-References: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
- <20151015115825.GO3394@e106497-lin.cambridge.arm.com>
-Message-ID: <6996407.poki4ZurkV@wuerfel>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 15 Oct 2015 16:20:37 +0100
+Subject: [PATCH v5 2/2] arm: perf: Add event descriptions
+In-Reply-To: <20151015151506.GC18965@dreric01-gentoo.localdomain>
+References: <20151007182735.GA18706@dreric01-gentoo.localdomain>
+ <20151009101338.GH26278@arm.com>
+ <20151009165330.GA22415@dreric01-gentoo.localdomain>
+ <20151012143025.GG16124@arm.com>
+ <20151012181037.GA16013@dreric01-gentoo.localdomain>
+ <20151013153644.GC18121@dreric01-gentoo.localdomain>
+ <20151015132111.GD29301@arm.com>
+ <20151015151506.GC18965@dreric01-gentoo.localdomain>
+Message-ID: <1444922437.2220.8.camel@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 October 2015 12:58:25 Liviu Dudau wrote:
-> On Thu, Oct 15, 2015 at 12:20:15PM +0200, Linus Walleij wrote:
-> > The Juno motherboard has a NOR flash on the motherboard, enable
-> > this to be accessed with the CFI flash driver. Results after
-> > enabling MTD, MTD_CFI, MTD_PHYSMAP, MTD_PHYSMAP_OF,
-> > MTD_CFI_INTELEXT:
+On Thu, 2015-10-15 at 08:15 -0700, Drew Richardson wrote:
+> On Thu, Oct 15, 2015 at 02:21:12PM +0100, Will Deacon wrote:
+> > On Tue, Oct 13, 2015 at 08:36:45AM -0700, Drew Richardson wrote:
+> > > Add additional information about the ARM architected hardware events
+> > > to make counters self describing. This makes the hardware PMUs easier
+> > > to use as perf list contains possible events instead of users having
+> > > to refer to documentation like the ARM TRMs.
+> > > 
+> > > Signed-off-by: Drew Richardson <drew.richardson@arm.com>
+> > > ---
+> > >  arch/arm/kernel/perf_event_v7.c | 121 ++++++++++++++++++++++++++++++++++++++++
+> > >  drivers/perf/arm_pmu.c          |   1 +
+> > >  2 files changed, 122 insertions(+)
 > > 
-> > 8000000.flash: Found 2 x16 devices at 0x0 in 32-bit bank.
-> > Manufacturer ID 0x000089 Chip ID 0x008919
-> > Intel/Sharp Extended Query Table at 0x010A
-> > Intel/Sharp Extended Query Table at 0x010A
-> > Intel/Sharp Extended Query Table at 0x010A
-> > Intel/Sharp Extended Query Table at 0x010A
-> > Intel/Sharp Extended Query Table at 0x010A
-> > Using buffer write method
-> > Using auto-unlock on power-up/resume
-> > cfi_cmdset_0001: Erase suspend on write enabled
-> > erase region 0: offset=0x0,size=0x40000,blocks=255
-> > erase region 1: offset=0x3fc0000,size=0x10000,blocks=4
+> > [...]
 > > 
-> > Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > > diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> > > index 2365a32a595e..e933d2dd71c0 100644
+> > > --- a/drivers/perf/arm_pmu.c
+> > > +++ b/drivers/perf/arm_pmu.c
+> > > @@ -548,6 +548,7 @@ static void armpmu_init(struct arm_pmu *armpmu)
+> > >  		.stop		= armpmu_stop,
+> > >  		.read		= armpmu_read,
+> > >  		.filter_match	= armpmu_filter_match,
+> > > +		.attr_groups	= armpmu->pmu.attr_groups,
+> > 
+> > I don't understand this hunk. What's it doing?
 > 
-> Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> I'm not 100% clear either on what it's doing. But without this line
+> the attr_groups don't get passed on and I don't see them on my TC2. I
+> debugged the issue down to this but it may not be the proper way to
+> solve the problem.
 
-Applied to next/dt, thanks!
+The perf core creates attributes passed as pmu.attr_groups
+in /sys/bus/events/devices/<pmu>.
 
-	Arnd
+Pawel
