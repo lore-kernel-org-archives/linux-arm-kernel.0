@@ -1,33 +1,33 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 14 Oct 2015 17:14:04 -0700
-Subject: [PATCH v3 0/4] input: gpio_keys_polled: Add support for abs/rel
- axis
-In-Reply-To: <1442928240-2452-1-git-send-email-hdegoede@redhat.com>
-References: <1442928240-2452-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151015001404.GB3673@dtor-ws>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 15 Oct 2015 09:18:18 +0900
+Subject: [PATCH] ARM: shmobile: porter: add HS-USB DT support
+In-Reply-To: <80272771.MSjafmr6yE@wasted.cogentembedded.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+ <80272771.MSjafmr6yE@wasted.cogentembedded.com>
+Message-ID: <20151015001818.GA25019@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 03:23:56PM +0200, Hans de Goede wrote:
-> Hi Dmitry,
+On Wed, Oct 14, 2015 at 10:35:46PM +0300, Sergei Shtylyov wrote:
+> Enable HS-USB device  for the Porter board, defining the GPIO that the
+> driver should check  when probing (which is the ID output from MAX3355
+> OTG chip).
 > 
-> This patch-series really is 2 related series:
+> Note that there  will be pinctrl-related error messages if both internal
+> PCI  and  HS-USB drivers are enabled but they should be just ignored.
 > 
-> Patch 1 + 2:
+> This patch is  analogous  to the commit 6f4f7156e0e6 (ARM: shmobile:
+> henninger: enable HS-USB) as there  are no differences between the
+> boards in this respect.
 > 
-> Support for abs/rel axis in gpio_keys_polled, the dt-bindings patch is
-> updated, the actual implementation is the same as the v2 version.
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> Patch 3 + 4:
-> 
-> Add a single header with key / btn / axis defines to be shared by input.h
-> and the dt-bindings headers, as requested by you. The first patch introduces
-> a new header for this, the second patch makes dt-bindings/input/input.h
-> use this new header. The second patch has been Acked by the devicetree
-> maintainer, and since it depends on the first one I believe that it is
-> best if this patch gets merged via your tree too.
 
-Applied the lot, thank you.
+Thanks Sergei,
 
--- 
-Dmitry
+I have queued this up for v4.5.
+
+I took the liberty of tweaking the changelog to address a complaint made
+by Mr. Check Patch.
+
+ERROR: Please use git commit description style 'commit <12+ chars of sha1> ("<title line>")' - ie: 'commit 6f4f7156e0e6 ("ARM: shmobile: henninger: enable HS-USB")'
