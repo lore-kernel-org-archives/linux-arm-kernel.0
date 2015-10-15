@@ -1,43 +1,36 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 15 Oct 2015 12:54:56 -0700
-Subject: [PATCH V3 5/6] clk: qoriq: Add ls1043a support.
-In-Reply-To: <1444870621.5185.223.camel@freescale.com>
-References: <1444822498-16477-1-git-send-email-B48286@freescale.com>
- <1444822498-16477-6-git-send-email-B48286@freescale.com>
- <20151014183113.GE26883@codeaurora.org>
- <1444870621.5185.223.camel@freescale.com>
-Message-ID: <20151015195456.GT4558@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 21:54:46 +0200
+Subject: [GIT PULL] ARM: mvebu: cleanup for v4.4
+In-Reply-To: <87oag8rps2.fsf@free-electrons.com>
+References: <87oag8rps2.fsf@free-electrons.com>
+Message-ID: <5570056.EiIpJPnZv6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14, Scott Wood wrote:
-> On Wed, 2015-10-14 at 11:31 -0700, Stephen Boyd wrote:
-> > On 10/14, Zhiqiang Hou wrote:
-> > > From: Hou Zhiqiang <B48286@freescale.com>
-> > > 
-> > > Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
-> > > ---
-> > 
-> > Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-> > 
+On Friday 09 October 2015 18:05:17 Gregory CLEMENT wrote:
+> Hi,
 > 
-> Could you ack my clock patchset that this depends on (if there are no 
+> Here is the first pull request for cleanup for mvebu for v4.4.
 > 
-> objections)?  Mike Turquette acked the RFC version a while back, but it's 
+> Gregory
 > 
-> changed a bit since then (including the new clk_get_num_parents() and 
+> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 > 
-> clk_get_parent_by_index() -- I CCed Russell King on that but got no 
+>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 > 
-> response), and got no response when I asked whether the ack was still good 
+> are available in the git repository at:
 > 
-> for v3.
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-cleanup-4.4-1
 > 
+> for you to fetch changes up to 7ee20ff0072154d326c86223fbb88d23aa152b91:
 > 
+>   ARM: mvebu: Use a CR_C constant instead of a hard-coded one (2015-09-29 18:01:19 +0200)
+> 
+> ----------------------------------------------------------------
+> mvebu cleanup for 4.4 (part 1)
+> 
+> use the CR_C define instead of a literal value
 
-Done. The consumer APIs look ok too, but I'd like to see if
-Russell has any comments.
+Applied to next/cleanup, thanks!
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+	Arnd
