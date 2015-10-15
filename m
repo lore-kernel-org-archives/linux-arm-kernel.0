@@ -1,82 +1,83 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 15 Oct 2015 09:34:15 +0900
-Subject: [PATCH 4/7] ARM: shmobile: porter: add VIN0/ADV7180 DT support
+Date: Thu, 15 Oct 2015 09:34:16 +0900
+Subject: [PATCH 5/7] ARM: shmobile: porter: add QSPI DT support
 In-Reply-To: <cover.1444868963.git.horms+renesas@verge.net.au>
 References: <cover.1444868963.git.horms+renesas@verge.net.au>
-Message-ID: <778f2e7a7b75e643fb56151797b7d950305b48ea.1444868963.git.horms+renesas@verge.net.au>
+Message-ID: <2685a2cefe6bcd17e6b407799f41369c7dad422d.1444868963.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Define the  Porter board dependent part of the VIN0 device node.
-Add the device node for Analog Devices  ADV7180 video decoder to I2C2 bus.
-Add the necessary subnodes to interconnect VIN0 and ADV7180 devices.
+Define the Porter board dependent part of the QSPI device node.
+Add device nodes  for Spansion  S25FL512S SPI flash and the MTD partitions
+on it.
 
-This patch is  analogous to the commit 8d62f4f75320 ("ARM: shmobile:
-henninger: add VIN0/ADV7180 DT support") as there are no differences
+This patch is  mostly analogous  to the commit f59838d44835 ("ARM:
+shmobile: henninger: add QSPI DT support")  as there are no differences
 between the boards in this respect.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-porter.dts | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+ arch/arm/boot/dts/r8a7791-porter.dts | 38 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-index 03edb8424ef5..b7fa8261e02f 100644
+index b7fa8261e02f..4eebc67773d2 100644
 --- a/arch/arm/boot/dts/r8a7791-porter.dts
 +++ b/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -114,6 +114,11 @@
+@@ -110,6 +110,11 @@
+ 		renesas,function = "sdhi2";
+ 	};
+ 
++	qspi_pins: spi0 {
++		renesas,groups = "qspi_ctrl", "qspi_data4";
++		renesas,function = "qspi";
++	};
++
+ 	i2c2_pins: i2c2 {
  		renesas,groups = "i2c2";
  		renesas,function = "i2c2";
- 	};
-+
-+	vin0_pins: vin0 {
-+		renesas,groups = "vin0_data8", "vin0_clk";
-+		renesas,function = "vin0";
-+	};
- };
- 
- &scif0 {
-@@ -166,8 +171,38 @@
- 
- 	status = "okay";
- 	clock-frequency = <400000>;
-+
-+	composite-in at 20 {
-+		compatible = "adi,adv7180";
-+		reg = <0x20>;
-+		remote = <&vin0>;
-+
-+		port {
-+			adv7180: endpoint {
-+				bus-width = <8>;
-+				remote-endpoint = <&vin0ep>;
-+			};
-+		};
-+	};
- };
- 
- &sata0 {
+@@ -165,6 +170,39 @@
  	status = "okay";
  };
-+
-+/* composite video input */
-+&vin0 {
-+	status = "ok";
-+	pinctrl-0 = <&vin0_pins>;
+ 
++&qspi {
++	pinctrl-0 = <&qspi_pins>;
 +	pinctrl-names = "default";
 +
-+	port {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++	status = "okay";
 +
-+		vin0ep: endpoint {
-+			remote-endpoint = <&adv7180>;
-+			bus-width = <8>;
++	flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "spansion,s25fl512s", "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <30000000>;
++		spi-tx-bus-width = <4>;
++		spi-rx-bus-width = <4>;
++		m25p,fast-read;
++
++		partition at 0 {
++			label = "loader_prg";
++			reg = <0x00000000 0x00040000>;
++			read-only;
++		};
++		partition at 40000 {
++			label = "user_prg";
++			reg = <0x00040000 0x00400000>;
++			read-only;
++		};
++		partition at 440000 {
++			label = "flash_fs";
++			reg = <0x00440000 0x03bc0000>;
 +		};
 +	};
 +};
++
+ &i2c2 {
+ 	pinctrl-0 = <&i2c2_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.1.4
