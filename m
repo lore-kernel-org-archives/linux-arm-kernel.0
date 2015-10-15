@@ -1,47 +1,51 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 15 Oct 2015 11:04:28 -0600
-Subject: [PATCH] mtd: document linux-specific partition parser DT binding
-In-Reply-To: <20151015162210.GA4545@localhost>
-References: <1444915191-28350-1-git-send-email-linus.walleij@linaro.org>
- <20151015162210.GA4545@localhost>
-Message-ID: <20151015170428.GA9250@obsidianresearch.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Thu, 15 Oct 2015 12:07:36 -0500
+Subject: [PATCH v2] ARM: fix vdsomunge not to depend on glibc specific
+ byteswap.h
+In-Reply-To: <350DE2A3-622F-4624-8AFC-D0F37CCB29EA@goldelico.com>
+References: <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
+ <B69CCAC6-FB47-4B2B-95F9-15F1BA4AD381@goldelico.com>
+ <5B19AAFC-976C-4B33-A83E-229693FA7858@goldelico.com>
+ <561E63C9.3040702@mentor.com>
+ <350DE2A3-622F-4624-8AFC-D0F37CCB29EA@goldelico.com>
+Message-ID: <561FDD58.1020602@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 09:22:10AM -0700, Brian Norris wrote:
+On 10/15/2015 12:52 AM, H. Nikolaus Schaller wrote:
+> Am 14.10.2015 um 16:16 schrieb Nathan Lynch <nathan_lynch@mentor.com>:
+>> and it would be easier for me to deal with a patch that isn't
+>> whitespace-damaged.
+> 
+> You mean:
+> 
+> ERROR: space prohibited before that close parenthesis ')'
+> #46: FILE: arch/arm/vdso/vdsomunge.c:64:
+> +		(((unsigned short)(x) & (unsigned short)0xff00U) >> 8) ))
+> 
+> ERROR: space prohibited before that close parenthesis ')'
+> #53: FILE: arch/arm/vdso/vdsomunge.c:71:
+> +		(((unsigned int)(x) & (unsigned int)0xff000000UL) >> 24) ))
+> 
+> Well, I had copied that verbatim from arch/mips/boot/elf2ecoff.c and
+> thought that it is better readable, but it is easy to fix.
 
-> Are you trying to use this binding, or is this just purely a mechanical
-> documentation issue? I ask, because it seems that binding never really
-> got reviewed at all, and others have recently tried to extend
-> support
+That's not what I was referring to, but it is fine to fix that too.
 
-I wrote it before ARM started down the DT direction and all these
-formalities were developed.
+What I meant was that the first column of the patch body is corrupted.
+Your v2 has hunks like this (bad):
 
-> That's not to say we can't document the old one, but I'm curious if
-> there are real users. I'd also like to encourage new users to avoid the
-> old one if we can make that feasible.
+static Elf32_Word read_elf_word(Elf32_Word word, bool swap)
+{
+-	return swap ? bswap_32(word) : word;
++	return swap ? swab32(word) : word;
+}
 
-We continue to use it here, there is just no way to autodetect flash
-partition layouts. I'm not fussed about having to change to something
-else in future.
 
-The reason the original patch exposed the cmdline parser is because
-that is how the internal mechanisms work - but realistically, the
-cmdline parser is a hack to get around the lack of DT partition
-description. If the DT can describe the partitions it should supersede
-and obsolete the old command line hack. IMHO
+Your v3 has this (good):
 
-> Also, if we're really going to support this, we should list exactly what
-> strings we support. And that's one of the problems with the existing
-> binding; it supports any old string Linux supports, which doesn't match
-> how we typically want to add bindings (i.e., via proposal + review).
-
-That is why it is prefixed with linux, the review of the part parser name is
-the responsibility of the MTD crew, not the DT folks.
-
-bcm47xxpart seems like a terrible name for a partition scheme. Really,
-almost any scheme can be used on any SOC, naming a partition parser
-after a SOC family makes very little sense to me..
-
-Jason
+ static void write_elf_word(Elf32_Word val, Elf32_Word *dst, bool swap)
+ {
+-	*dst = swap ? bswap_32(val) : val;
++	*dst = swap ? swab32(val) : val;
+ }
