@@ -1,33 +1,26 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Thu, 15 Oct 2015 18:24:15 -0400
-Subject: [PATCH v3 1/2] dt-bindings: Add new SoCs to bcm4708 DT bindings
-Message-ID: <1444947856-26246-1-git-send-email-jonmason@broadcom.com>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Fri, 16 Oct 2015 09:32:38 +1100
+Subject: [linux-sunxi] [PATCH 1/3] mtd: nand: add NAND_NEED_SCRAMBLING
+ option flag
+In-Reply-To: <1444929443-25537-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1444929443-25537-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1444929443-25537-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <CAGRGNgWcCLEX=CB6_OJrK9_n3=78WN1jUb+t4iOQca6_HnFoLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the 4708, 4709, and 53012 SoCs to the the documentation for the
-Broadcom Northstar device tree bindings.
+Hi Boris,
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
----
- Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
+On Fri, Oct 16, 2015 at 4:17 AM, Boris Brezillon
+<boris.brezillon@free-electrons.com> wrote:
+> Some MLC NANDs are sensible to repeated patterns and require data to be
 
-diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
-index 6b0f49f..8608a77 100644
---- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
-+++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
-@@ -5,4 +5,11 @@ Boards with the BCM4708 SoC shall have the following properties:
- 
- Required root node property:
- 
-+bcm4708
- compatible = "brcm,bcm4708";
-+
-+bcm4709
-+compatible = "brcm,bcm4709";
-+
-+bcm53012
-+compatible = "brcm,bcm53012";
+Do you mean "sensitive" instead of "sensible"?
+
+Thanks,
+
 -- 
-1.9.1
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
