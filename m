@@ -1,128 +1,61 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 15 Oct 2015 14:12:28 +0200
-Subject: [PATCH] VFIO: platform: AMD xgbe reset module
-In-Reply-To: <7287273.XGFpHqQ9fN@wuerfel>
-References: <1444836792-2405-1-git-send-email-eric.auger@linaro.org>
- <22278785.Xzxnmu2YlU@wuerfel> <561F5EE2.7010405@linaro.org>
- <7287273.XGFpHqQ9fN@wuerfel>
-Message-ID: <20151015121228.GA965@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 14:12:57 +0200
+Subject: [PATCH v4] ARM: configs: Add Freescale LS1021A defconfig
+In-Reply-To: <BN3PR0301MB0867A87B64E1206B773F05EEFE3E0@BN3PR0301MB0867.namprd03.prod.outlook.com>
+References: <1442480614-32345-1-git-send-email-b18965@freescale.com>
+ <5232654.e6dagm53H4@wuerfel>
+ <BN3PR0301MB0867A87B64E1206B773F05EEFE3E0@BN3PR0301MB0867.namprd03.prod.outlook.com>
+Message-ID: <5073362.oArWDzYkxD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 01:21:55PM +0200, Arnd Bergmann wrote:
-> On Thursday 15 October 2015 10:08:02 Eric Auger wrote:
-> > Hi Arnd,
-> > On 10/14/2015 05:38 PM, Arnd Bergmann wrote:
-> > > On Wednesday 14 October 2015 15:33:12 Eric Auger wrote:
-> > >> --- a/drivers/vfio/platform/vfio_platform_common.c
-> > >> +++ b/drivers/vfio/platform/vfio_platform_common.c
-> > >> @@ -31,6 +31,11 @@ static const struct vfio_platform_reset_combo reset_lookup_table[] = {
-> > >>                 .reset_function_name = "vfio_platform_calxedaxgmac_reset",
-> > >>                 .module_name = "vfio-platform-calxedaxgmac",
-> > >>         },
-> > >> +       {
-> > >> +               .compat = "amd,xgbe-seattle-v1a",
-> > >> +               .reset_function_name = "vfio_platform_amdxgbe_reset",
-> > >> +               .module_name = "vfio-platform-amdxgbe",
-> > >> +       },
-> > >>  };
-> > >>  
-> > >>  static void vfio_platform_get_reset(struct vfio_platform_device *vdev,
-> > >>
-> > > 
-> > > This is causing build errors for me when CONFIG_MODULES is disabled.
-> > Sorry about that and thanks for reporting the issue
-> > > 
-> > > Could this please be restructured so vfio_platform_get_reset does
-> > > not attempt to call __symbol_get() but instead has the drivers
-> > > register themselves properly to a subsystem?
-> > OK
+On Thursday 15 October 2015 02:11:57 Huan Wang wrote:
+> > On Wednesday 14 October 2015 10:18:47 Huan Wang wrote:
+> > > > On Thursday 24 September 2015 07:27:10 Huan Wang wrote:
+> > > > > > On Fri, Sep 18, 2015 at 4:38 AM, Huan Wang <alison.wang@freescale.com> wrote:
+> > > > > Any suggestion? Thanks.
+> > > >
+> > > > Try enabling DEBUG_LL for your platform to get some debug output, if
+> > > > you still don't get any helpful messages, try also inserting
+> > > >
+> > > >       printascii(__func__);
+> > > >
+> > > > statements in the early boot process to see how far you get before the hang.
+> > > >
 > > 
-> > Could you elaborate about "has the drivers register themselves properly
-> > to a subsystem".
-> > 
-> > My first proposal when coping with this problematic of being able to add
-> > reset plugins to the vfio-platform driver was to create new drivers per
-> > device requiring reset. but this was considered painful for end-users,
-> > who needed to be aware of the right driver to bind - and I think that
-> > makes sense - (https://lkml.org/lkml/2015/4/17/568) .
-> 
-> Having multiple drivers indeed sucks, but your current approach isn't
-> that much better, as you still have two modules that are used to driver
-> the same hardware.
-> 
-> I would expect that the same driver that is used for the normal
-> operation and that it calls a function to register itself to vfio
-> by passing a structure with the device and reset function pointer.
-> 
-> > A naive question I dare to ask, wouldn't it be acceptable to make
-> > vfio_platform depend on CONFIG_MODULES? Don't we disable modules for
-> > security purpose? In that context would we use VFIO?
-> 
-> I think a lot of embedded systems turn off modules to save a little
-> memory, speed up boot time and simplify their user space.
-> 
-> Aside from that, the current method is highly unusual and looks a bit
-> fragile to me, as you are relying on internals of the module loader
-> code. It's also a layering violation as the generic code needs to be
-> patched for each device specific module that is added, and we try
-> to avoid that.
-> 
-> A possible solution could be something inside the xgbe driver like
-> 
-> 
-> static void xgbe_init_module(void)
-> {
-> 	int ret = 0;
-> 
-> 	if (IS_ENABLED(CONFIG_AMD_XGBE_ETHERNET)
-> 		ret = platform_driver_register(&xgbe_driver);
-> 	if (ret)
-> 		return ret;
-> 
-> 	if (IS_ENABLED(CONFIG_VFIO_PLATFORM))
-> 		ret = vfio_platform_register_reset(&xgbe_of_match, xgbe_platform_reset);
-> 
-> 	return ret;	
-> }
-> 
-> This way you have exactly one driver module that gets loaded for the
-> device and you can use it either with the platform_driver or through
-> vfio.
-> 
-> A nicer way that would be a little more work would be to integrate
-> the reset infrastructure into 'struct platform_driver' framework,
-> by adding another callback to the it for doing the interaction with
-> vfio, something like
-> 
-> enum vfio_platform_op {
-> 	VFIO_PLATFORM_BIND,
-> 	VFIO_PLATFORM_UNBIND,
-> 	VFIO_PLATFORM_RESET,
-> };
-> 
-> struct platform_driver {
->         int (*probe)(struct platform_device *);
->         int (*remove)(struct platform_device *);
-> 	...
-> 	int (*vfio_manage)(struct platform_device *, enum vfio_platform_op);
->         struct device_driver driver;
-> };
-> 
-> This would integrate much more closely into the platform driver framework,
-> just like the regular vfio driver integrates into the PCI framework.
-> Unlike PCI however, you can't just use the generic driver framework to
-> unbind the driver, because you still need device specific code.
-> 
-Thanks for these suggestions, really helpful.
+> [Alison Wang] ls1021a uses duart as the default serial port, not lpuart. So
+> 8250/16550 serial driver is used. Let me explain my debug process in detail.
 
-What I don't understand in the latter example is how VFIO knows which
-struct platform_driver to interact with?
+Ah, I see.
 
-Also, just so I'm sure I understand correctly, VFIO_PLATFORM_UNBIND is
-then called by VFIO before the VFIO driver unbinds from the device
-(unbinding the platform driver from the device being a completely
-separate thing)?
+> When CONFIG_VMSPLIT_2G is used, I could boot up the whole kernel and get the
+> print message " Booting Linux on physical CPU 0xf00" after "Starting kernel"
+> as below.
+> 
+> Starting kernel ...
+> [    0.000000] Booting Linux on physical CPU 0xf00
+> .....
+> 
+> But when CONFIG_VMSPLIT_3G is used, I couldn't get print message " Booting Linux
+> on physical CPU 0xf00". It only hangs at  "Starting kernel ...".
+> 
+> Moreover, I add some asm code in __turn_mmu_on to print some simple characters, and
+> I could get the print characters when CONFIG_VMSPLIT_3G is used. So I guess there
+> is something wrong with the page tables.
 
-Thanks,
--Christoffer
+Ok. What I was suggesting above though was to try to pinpoint exactly
+where it goes wrong. You have verified that it does not crash before
+the page tables are enabled, but that is very early. You have also shown
+that the kernel crashes before the point at which the 'Booting Linux on
+physical CPU 0xf00' message is printed to the kernel, but that is *much*
+later: setup_arch() calls parse_early_param(), which in turn sets up
+early_console_write(). This means the 'Booting Linux on physical CPU 0xf00'
+is still stuck in the log buffer and you may have crashed someone
+inbetween.
+
+If you can call printascii(), you can try to do that just after enabling
+the page tables to see if that was the problem like you suspect, or otherwise
+add more printascii() statements between __turn_mmu_on and parse_early_param()
+to pinpoint the exact code that breaks.
+
+	Arnd
