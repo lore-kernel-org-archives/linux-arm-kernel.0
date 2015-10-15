@@ -1,36 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 21:54:46 +0200
-Subject: [GIT PULL] ARM: mvebu: cleanup for v4.4
-In-Reply-To: <87oag8rps2.fsf@free-electrons.com>
-References: <87oag8rps2.fsf@free-electrons.com>
-Message-ID: <5570056.EiIpJPnZv6@wuerfel>
+From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
+Date: Thu, 15 Oct 2015 19:58:09 +0000
+Subject: [PATCH v3 12/12] dts/Makefile: Add build support for LS2080a QDS
+ & RDB board DTS
+In-Reply-To: <6113441.JKoMX6G60g@wuerfel>
+References: <1444891672-32117-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1444891672-32117-13-git-send-email-bhupesh.sharma@freescale.com>
+ <6113441.JKoMX6G60g@wuerfel>
+Message-ID: <BY1PR0301MB1303114E40DED290D699792A823E0@BY1PR0301MB1303.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 October 2015 18:05:17 Gregory CLEMENT wrote:
-> Hi,
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Thursday, October 15, 2015 7:50 PM
 > 
-> Here is the first pull request for cleanup for mvebu for v4.4.
+> On Thursday 15 October 2015 12:17:52 Bhupesh Sharma wrote:
+> >
+> > diff --git a/arch/arm64/boot/dts/freescale/Makefile
+> b/arch/arm64/boot/dts/freescale/Makefile
+> > index 932001a..57b41c7 100644
+> > --- a/arch/arm64/boot/dts/freescale/Makefile
+> > +++ b/arch/arm64/boot/dts/freescale/Makefile
+> > @@ -1,4 +1,4 @@
+> > -dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
+> > +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb fsl-ls2080a-
+> rdb.dtb fsl-ls2080a-simu.dtb
+> >
+> >
 > 
-> Gregory
+> Please use one line per dtb file here, for consistency with the other
+> platforms
 > 
-> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
-> 
->   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-cleanup-4.4-1
-> 
-> for you to fetch changes up to 7ee20ff0072154d326c86223fbb88d23aa152b91:
-> 
->   ARM: mvebu: Use a CR_C constant instead of a hard-coded one (2015-09-29 18:01:19 +0200)
-> 
-> ----------------------------------------------------------------
-> mvebu cleanup for 4.4 (part 1)
-> 
-> use the CR_C define instead of a literal value
 
-Applied to next/cleanup, thanks!
+Ok, will address in v4.
 
-	Arnd
+Regards,
+Bhupesh
