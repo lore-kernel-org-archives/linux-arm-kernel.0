@@ -1,186 +1,328 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Oct 2015 16:39:27 +0100
-Subject: [PATCH RFC 6/7] platform-msi: Allow creation of a MSI-based stacked
- irq domain
+Date: Thu, 15 Oct 2015 16:39:28 +0100
+Subject: [PATCH RFC 7/7] irqchip: [Example] dummy wired interrupt/MSI bridge
+ driver
 In-Reply-To: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
 References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1444923568-17413-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1444923568-17413-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We almost have all the needed bits to be able to create a irq domain
-on top of a MSI domain.
+In order to demonstrate how to put together a wire/MSI bridge,
+add a dummy driver that doesn't do anything at all, except
+for allocating interrupts.
 
-For this, we enable a few things:
-- the virq is stored in the msi_desc
-- device, msi_alloc_info and domain-specific data
-  are stored in the platform_pric_data structure
-- we introduce a new API for platform-msi:
-
-  /* Create a MSI-based domain */
-  struct irq_domain *
-  platform_msi_create_device_domain(struct device *dev,
-                                    unsigned int nvec,
-                                    irq_write_msi_msg_t write_msi_msg,
-                                    const struct irq_domain_ops *ops,
-                                    void *host_data);
-
-  /* Allocate MSIs in an MSI domain */
-  int platform_msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
-                              unsigned int nr_irqs);
-
-  /* Obtain the host data passed to platform_msi_create_device_domain */
-  void *platform_msi_get_host_data(struct irq_domain *domain);
-
-This now allows a wired irq to MSI bridge to be created.
+It comes together with an even more stupid client driver that
+allocates an interrupt and dump the hierarchy of that interrupt.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/base/platform-msi.c | 71 +++++++++++++++++++++++++++++++++++++++++++--
- include/linux/msi.h         | 10 +++++++
- 2 files changed, 79 insertions(+), 2 deletions(-)
+ drivers/irqchip/Kconfig       |   7 ++
+ drivers/irqchip/Makefile      |   1 +
+ drivers/irqchip/irq-msichip.c | 271 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 279 insertions(+)
+ create mode 100644 drivers/irqchip/irq-msichip.c
 
-diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
-index 92666cd..29e9b63 100644
---- a/drivers/base/platform-msi.c
-+++ b/drivers/base/platform-msi.c
-@@ -32,6 +32,9 @@
-  * and the callback to write the MSI message.
-  */
- struct platform_msi_priv_data {
-+	struct device		*dev;
-+	void 			*host_data;
-+	msi_alloc_info_t	arg;
- 	irq_write_msi_msg_t	write_msg;
- 	int			devid;
- };
-@@ -124,8 +127,9 @@ static void platform_msi_free_descs(struct device *dev, int base, int nvec)
- 	}
- }
- 
--static int platform_msi_alloc_descs(struct device *dev, int nvec,
--				    struct platform_msi_priv_data *data)
-+static int platform_msi_alloc_descs_with_irq(struct device *dev, int virq,
-+					     int nvec,
-+					     struct platform_msi_priv_data *data)
- 
- {
- 	struct msi_desc *desc;
-@@ -145,6 +149,7 @@ static int platform_msi_alloc_descs(struct device *dev, int nvec,
- 		desc->platform.msi_priv_data = data;
- 		desc->platform.msi_index = base + i;
- 		desc->nvec_used = 1;
-+		desc->irq = virq ? virq + i : 0;
- 
- 		list_add_tail(&desc->list, dev_to_msi_list(dev));
- 	}
-@@ -159,6 +164,13 @@ static int platform_msi_alloc_descs(struct device *dev, int nvec,
- 	return 0;
- }
- 
-+static int platform_msi_alloc_descs(struct device *dev, int nvec,
-+				    struct platform_msi_priv_data *data)
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 4d7294e..73e38e6 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -193,3 +193,10 @@ config IRQ_MXS
+ 	def_bool y if MACH_ASM9260 || ARCH_MXS
+ 	select IRQ_DOMAIN
+ 	select STMP_DEVICE
 +
++config DUMMY_MSICHIP
++	bool "Dummy irqchip on MSI"
++	depends on GENERIC_MSI_IRQ_DOMAIN
++	help
++	  Dummy stacked irqchip on top of platform MSI
++
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 177f78f..682e7dc 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -55,3 +55,4 @@ obj-$(CONFIG_RENESAS_H8S_INTC)		+= irq-renesas-h8s.o
+ obj-$(CONFIG_ARCH_SA1100)		+= irq-sa11x0.o
+ obj-$(CONFIG_INGENIC_IRQ)		+= irq-ingenic.o
+ obj-$(CONFIG_IMX_GPCV2)			+= irq-imx-gpcv2.o
++obj-$(CONFIG_DUMMY_MSICHIP)		+= irq-msichip.o
+diff --git a/drivers/irqchip/irq-msichip.c b/drivers/irqchip/irq-msichip.c
+new file mode 100644
+index 0000000..82b283b
+--- /dev/null
++++ b/drivers/irqchip/irq-msichip.c
+@@ -0,0 +1,271 @@
++/*
++ * Non-functionnal example for a wired irq <-> MSI bridge
++ *
++ * Copyright (C) 2015 ARM Limited, All Rights Reserved.
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/*
++ * DT fragment to represent the MSI bridge:
++
++	intc: msichip {
++		compatible = "dummy,msichip";
++		num-msis = 32;
++		interrupt-controller;
++		interrupt-parent = <&gic>;
++		#interrupt-cells = <0x2>;
++		msi-parent = <&its 1234>;
++	};
++
++ * DT fragment to represent the device connected to the bridge:
++
++	dummy-dev {
++		compatible = "dummy,device";
++		interrupt-parent = <intc>;
++		interrupts = <0x5 0x1>;
++	};
++
++ * When "dummy,device" gets probed, it dumps the hierarchy for the
++ * interrupt it has allocated:
++
++	dummydev dummy-dev: Allocated IRQ35
++	dummydev dummy-dev: Probing OK
++	dummydev dummy-dev: IRQ35 hwirq 5 domain msichip_domain_ops
++	dummydev dummy-dev: IRQ35 hwirq 0 domain msi_domain_ops
++	dummydev dummy-dev: IRQ35 hwirq 8192 domain its_domain_ops
++	dummydev dummy-dev: IRQ35 hwirq 8192 domain gic_irq_domain_ops
++ */
++
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqchip.h>
++#include <linux/irqdomain.h>
++#include <linux/module.h>
++#include <linux/msi.h>
++#include <linux/platform_device.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++
++static void msichip_mask(struct irq_data *data)
 +{
-+	return platform_msi_alloc_descs_with_irq(dev, 0, nvec, data);
++	/* Do something */
 +}
 +
- /**
-  * platform_msi_create_irq_domain - Create a platform MSI interrupt domain
-  * @fwnode:		Optional fwnode of the interrupt controller
-@@ -225,6 +237,7 @@ static int platform_msi_alloc_priv_data(struct device *dev, unsigned int nvec,
- 	}
- 
- 	datap->write_msg = write_msi_msg;
-+	datap->dev = dev;
- 
- 	return 0;
- }
-@@ -288,3 +301,57 @@ void platform_msi_domain_free_irqs(struct device *dev)
- 	msi_domain_free_irqs(dev->msi_domain, dev);
- 	platform_msi_free_descs(dev, 0, MAX_DEV_MSIS);
- }
-+
-+void *platform_msi_get_host_data(struct irq_domain *domain)
++static void msichip_unmask(struct irq_data *data)
 +{
-+	struct platform_msi_priv_data *data = domain->host_data;
-+	return data->host_data;
++	/* Do something */
 +}
 +
-+struct irq_domain *
-+platform_msi_create_device_domain(struct device *dev,
-+				  unsigned int nvec,
-+				  irq_write_msi_msg_t write_msi_msg,
-+				  const struct irq_domain_ops *ops,
-+				  void *host_data)
++static void msichip_eoi(struct irq_data *data)
 +{
-+	struct platform_msi_priv_data *data;
-+	struct irq_domain *domain;
-+	int err;
++	/* Do something */
++}
 +
-+	err = platform_msi_alloc_priv_data(dev, nvec, write_msi_msg, &data);
-+	if (err)
-+		return NULL;
++static int msichip_set_type(struct irq_data *data, unsigned int type)
++{
++	/* Do something */
++	return 0;
++}
 +
-+	data->host_data = host_data;
-+	domain = irq_domain_create_hierarchy(dev->msi_domain, 0, nvec,
-+					     of_node_to_fwnode(dev->of_node),
-+					     ops, data);
-+	if (!domain) {
-+		platform_msi_free_priv_data(data);
-+		return NULL;
++static int msichip_retrigger(struct irq_data *data)
++{
++	/* Do something */
++	return 0;
++}
++
++static int msichip_set_affinity(struct irq_data *data,
++				const struct cpumask *dest, bool force)
++{
++	/* Do something */
++	return 0;
++}
++
++static struct irq_chip msichip_chip = {
++	.name			= "MSICHIP",
++	.irq_mask		= msichip_mask,
++	.irq_unmask		= msichip_unmask,
++	.irq_eoi		= msichip_eoi,
++	.irq_set_type		= msichip_set_type,
++	.irq_retrigger		= msichip_retrigger,
++	.irq_set_affinity	= msichip_set_affinity,
++};
++
++static int msichip_domain_translate(struct irq_domain *d,
++				    struct irq_fwspec *fwspec,
++				    unsigned long *hwirq,
++				    unsigned int *type)
++{
++	if (is_of_node(fwspec->fwnode)) {
++		if (fwspec->param_count != 2)
++			return -EINVAL;
++
++		*hwirq = fwspec->param[0];
++		*type = fwspec->param[1] & IRQ_TYPE_SENSE_MASK;
++		return 0;
 +	}
 +
-+	/* FIXME: Add better error handling... */
-+	err = msi_domain_prepare_irqs(domain->parent, dev, nvec, &data->arg);
-+	BUG_ON(err);
-+
-+	return domain;
++	return -EINVAL;
 +}
 +
-+int platform_msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+			      unsigned int nr_irqs)
++static int msichip_domain_alloc(struct irq_domain *domain, unsigned int virq,
++				   unsigned int nr_irqs, void *arg)
 +{
-+	struct platform_msi_priv_data *data = domain->host_data;
-+	int err;
++	int i, err;
++	irq_hw_number_t hwirq;
++	unsigned int type;
++	struct irq_fwspec *fwspec = arg;
++	void *data;
 +
-+	err = platform_msi_alloc_descs_with_irq(data->dev, virq, nr_irqs, data);
++	err = msichip_domain_translate(domain, fwspec, &hwirq, &type);
 +	if (err)
 +		return err;
 +
-+	err = msi_domain_populate_irqs(domain->parent, data->dev,
-+				       virq, nr_irqs, &data->arg);
-+	/* FIXME: memory leak on error */
-+	return err;
++	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
++	if (err)
++		return err;
++
++	data = platform_msi_get_host_data(domain);
++	for (i = 0; i < nr_irqs; i++)
++		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
++					      &msichip_chip, data);
++
++	return 0;
 +}
 +
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index e35558c..594b2113 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -172,6 +172,7 @@ struct msi_controller {
- #include <asm/msi.h>
- 
- struct irq_domain;
-+struct irq_domain_ops;
- struct irq_chip;
- struct device_node;
- struct fwnode_handle;
-@@ -283,6 +284,15 @@ int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
- 			    int nvec, msi_alloc_info_t *args);
- int msi_domain_populate_irqs(struct irq_domain *domain, struct device *dev,
- 			     int virq, int nvec, msi_alloc_info_t *args);
-+struct irq_domain *
-+platform_msi_create_device_domain(struct device *dev,
-+				  unsigned int nvec,
-+				  irq_write_msi_msg_t write_msi_msg,
-+				  const struct irq_domain_ops *ops,
-+				  void *host_data);
-+int platform_msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+			      unsigned int nr_irqs);
-+void *platform_msi_get_host_data(struct irq_domain *domain);
- #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
- 
- #ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
++static const struct irq_domain_ops msichip_domain_ops = {
++	.translate	= msichip_domain_translate,
++	.alloc		= msichip_domain_alloc,
++	.free		= irq_domain_free_irqs_common,
++};
++
++struct msichip_data {
++	/* Add whatever you fancy here */
++	struct platform_device *pdev;
++};
++
++static void msichip_write_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
++{
++	/* Do the right thing */
++}
++
++static int msichip_probe(struct platform_device *pdev)
++{
++	struct irq_domain *domain;
++	struct msichip_data *msichip_data;
++	u32 num_msis;
++
++	dev_info(&pdev->dev, "Probing\n");
++	msichip_data = kzalloc(sizeof(*msichip_data), GFP_KERNEL);
++	if (!msichip_data)
++		return -ENOMEM;
++
++	msichip_data->pdev = pdev;
++
++	/* If there is no "num-msi" property, assume 64... */
++	if (of_property_read_u32(pdev->dev.of_node, "num-msis", &num_msis) < 0)
++		num_msis = 64;
++
++	dev_info(&pdev->dev, "allocating %d MSIs\n", num_msis);
++
++	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
++						   msichip_write_msi_msg,
++						   &msichip_domain_ops,
++						   msichip_data);
++
++	if (!domain){
++		kfree(msichip_data);
++		return -ENOMEM;
++	}
++
++	dev_info(&pdev->dev, "Probing OK\n");
++	return 0;
++}
++
++static const struct of_device_id msichip_of_match[] = {
++	{ .compatible = "dummy,msichip", },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, msichip_of_match);
++
++static struct platform_driver msichip_driver = {
++	.driver = {
++		.name		= "msichip",
++		.of_match_table	= msichip_of_match,
++	},
++	.probe			= msichip_probe,
++};
++/* Do not define this as an irqchip */
++module_platform_driver(msichip_driver);
++
++
++
++/* Driver for a dummy device connected to the MSI bridge */
++static irqreturn_t dummydev_handler(int irq, void *dummy)
++{
++	return IRQ_HANDLED;
++}
++
++static void dummydev_dump_hierarchy(struct device *dev, int irq)
++{
++	struct irq_data *data = irq_get_irq_data(irq);
++
++	while(data) {
++		dev_info(dev, "IRQ%d hwirq %d domain %ps\n",
++			 data->irq, (int)data->hwirq, data->domain->ops);
++		data = data->parent_data;
++	}
++}
++
++static int dummydev_probe(struct platform_device *pdev)
++{
++	int irq;
++
++	dev_info(&pdev->dev, "Probing\n");
++	irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
++	if (!irq) {
++		dev_err(&pdev->dev, "irq allocation failed, defering\n");
++		return -EPROBE_DEFER;
++	}
++
++	dev_info(&pdev->dev, "Allocated IRQ%d\n", irq);
++
++	if (request_irq(irq, dummydev_handler, 0, "dummydev", pdev))
++		return -EINVAL;
++
++	dev_info(&pdev->dev, "Probing OK\n");
++
++	dummydev_dump_hierarchy(&pdev->dev, irq);
++	return 0;
++}
++
++static const struct of_device_id dummydev_of_match[] = {
++	{ .compatible = "dummy,device", },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, dummydev_of_match);
++
++static struct platform_driver dummydev_driver = {
++	.driver = {
++		.name		= "dummydev",
++		.of_match_table	= dummydev_of_match,
++	},
++	.probe			= dummydev_probe,
++};
++
++module_platform_driver(dummydev_driver);
 -- 
 2.1.4
