@@ -1,172 +1,233 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Thu, 15 Oct 2015 15:48:29 -0400
-Subject: [PATCH v3 06/10] clk: iproc: Split off dig_filter
+Date: Thu, 15 Oct 2015 15:48:27 -0400
+Subject: [PATCH v3 04/10] clk: nsp: add clock support for Broadcom Northstar
+ Plus SoC
 In-Reply-To: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
 References: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1444938513-10758-7-git-send-email-jonmason@broadcom.com>
+Message-ID: <1444938513-10758-5-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PLL loop filter/gain can be located in a separate register on some
-SoCs.  Split these off into a separate variable, so that an offset can
-be added if necessary.  Also, make the necessary modifications to the
-Cygnus and NSP drivers for this change.
+The Broadcom Northstar Plus SoC is architected under the iProc
+architecture. It has the following PLLs: ARMPLL, GENPLL, LCPLL0, all
+derived from an onboard crystal.
 
 Signed-off-by: Jon Mason <jonmason@broadcom.com>
 ---
- drivers/clk/bcm/clk-cygnus.c    | 17 +++++++++++------
- drivers/clk/bcm/clk-iproc-pll.c | 14 +++++++++-----
- drivers/clk/bcm/clk-iproc.h     | 10 +++++++++-
- drivers/clk/bcm/clk-nsp.c       | 14 +++++++++-----
- 4 files changed, 38 insertions(+), 17 deletions(-)
+ drivers/clk/bcm/Makefile            |   2 +
+ drivers/clk/bcm/clk-nsp.c           | 135 ++++++++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/bcm-nsp.h |  51 ++++++++++++++
+ 3 files changed, 188 insertions(+)
+ create mode 100644 drivers/clk/bcm/clk-nsp.c
+ create mode 100644 include/dt-bindings/clock/bcm-nsp.h
 
-diff --git a/drivers/clk/bcm/clk-cygnus.c b/drivers/clk/bcm/clk-cygnus.c
-index aac82c6..3a228b6 100644
---- a/drivers/clk/bcm/clk-cygnus.c
-+++ b/drivers/clk/bcm/clk-cygnus.c
-@@ -34,9 +34,11 @@
- 		{ .offset = o, .en_shift = es, .high_shift = hs, \
- 		.high_width = hw, .low_shift = ls, .low_width = lw }
- 
--#define RESET_VAL(o, rs, prs, kis, kiw, kps, kpw, kas, kaw) { .offset = o, \
--	.reset_shift = rs, .p_reset_shift = prs, .ki_shift = kis, \
--	.ki_width = kiw, .kp_shift = kps, .kp_width = kpw, .ka_shift = kas, \
-+#define RESET_VAL(o, rs, prs) { .offset = o, .reset_shift = rs, \
-+	.p_reset_shift = prs }
+diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
+index 8a7a477..e258b28 100644
+--- a/drivers/clk/bcm/Makefile
++++ b/drivers/clk/bcm/Makefile
+@@ -4,3 +4,5 @@ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm281xx.o
+ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm21664.o
+ obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-iproc-armpll.o clk-iproc-pll.o clk-iproc-asiu.o
+ obj-$(CONFIG_ARCH_BCM_CYGNUS)	+= clk-cygnus.o
++obj-$(CONFIG_ARCH_BCM_NSP)	+= clk-nsp.o
++obj-$(CONFIG_ARCH_BCM_5301X)	+= clk-nsp.o
+diff --git a/drivers/clk/bcm/clk-nsp.c b/drivers/clk/bcm/clk-nsp.c
+new file mode 100644
+index 0000000..bc8ebdcd
+--- /dev/null
++++ b/drivers/clk/bcm/clk-nsp.c
+@@ -0,0 +1,135 @@
++/*
++ * Copyright (C) 2015 Broadcom Corporation
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+#define DF_VAL(o, kis, kiw, kps, kpw, kas, kaw) { .offset = o, .ki_shift = kis,\
-+	.ki_width = kiw, .kp_shift = kps, .kp_width = kpw, .ka_shift = kas,    \
- 	.ka_width = kaw }
- 
- #define VCO_CTRL_VAL(uo, lo) { .u_offset = uo, .l_offset = lo }
-@@ -56,7 +58,8 @@ static const struct iproc_pll_ctrl genpll = {
- 	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
- 		IPROC_CLK_PLL_NEEDS_SW_CFG,
- 	.aon = AON_VAL(0x0, 2, 1, 0),
--	.reset = RESET_VAL(0x0, 11, 10, 4, 3, 0, 4, 7, 3),
-+	.reset = RESET_VAL(0x0, 11, 10),
-+	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
- 	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
- 	.ndiv_int = REG_VAL(0x10, 20, 10),
- 	.ndiv_frac = REG_VAL(0x10, 0, 20),
-@@ -114,7 +117,8 @@ CLK_OF_DECLARE(cygnus_genpll, "brcm,cygnus-genpll", cygnus_genpll_clk_init);
- static const struct iproc_pll_ctrl lcpll0 = {
- 	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_NEEDS_SW_CFG,
- 	.aon = AON_VAL(0x0, 2, 5, 4),
--	.reset = RESET_VAL(0x0, 31, 30, 27, 3, 23, 4, 19, 4),
-+	.reset = RESET_VAL(0x0, 31, 30),
-+	.dig_filter = DF_VAL(0x0, 27, 3, 23, 4, 19, 4),
- 	.sw_ctrl = SW_CTRL_VAL(0x4, 31),
- 	.ndiv_int = REG_VAL(0x4, 16, 10),
- 	.pdiv = REG_VAL(0x4, 26, 4),
-@@ -191,7 +195,8 @@ static const struct iproc_pll_ctrl mipipll = {
- 		 IPROC_CLK_NEEDS_READ_BACK,
- 	.aon = AON_VAL(0x0, 4, 17, 16),
- 	.asiu = ASIU_GATE_VAL(0x0, 3),
--	.reset = RESET_VAL(0x0, 11, 10, 4, 3, 0, 4, 7, 4),
-+	.reset = RESET_VAL(0x0, 11, 10),
-+	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 4),
- 	.ndiv_int = REG_VAL(0x10, 20, 10),
- 	.ndiv_frac = REG_VAL(0x10, 0, 20),
- 	.pdiv = REG_VAL(0x14, 0, 4),
-diff --git a/drivers/clk/bcm/clk-iproc-pll.c b/drivers/clk/bcm/clk-iproc-pll.c
-index 74cdd66..d4aab4e 100644
---- a/drivers/clk/bcm/clk-iproc-pll.c
-+++ b/drivers/clk/bcm/clk-iproc-pll.c
-@@ -224,13 +224,17 @@ static void __pll_bring_out_reset(struct iproc_pll *pll, unsigned int kp,
- 	u32 val;
- 	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
- 	const struct iproc_pll_reset_ctrl *reset = &ctrl->reset;
-+	const struct iproc_pll_dig_filter_ctrl *dig_filter = &ctrl->dig_filter;
++#include <linux/kernel.h>
++#include <linux/err.h>
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
 +
-+	val = readl(pll->pll_base + dig_filter->offset);
-+	val &= ~(bit_mask(dig_filter->ki_width) << dig_filter->ki_shift |
-+		bit_mask(dig_filter->kp_width) << dig_filter->kp_shift |
-+		bit_mask(dig_filter->ka_width) << dig_filter->ka_shift);
-+	val |= ki << dig_filter->ki_shift | kp << dig_filter->kp_shift |
-+	       ka << dig_filter->ka_shift;
-+	iproc_pll_write(pll, pll->pll_base, dig_filter->offset, val);
- 
- 	val = readl(pll->pll_base + reset->offset);
--	val &= ~(bit_mask(reset->ki_width) << reset->ki_shift |
--		 bit_mask(reset->kp_width) << reset->kp_shift |
--		 bit_mask(reset->ka_width) << reset->ka_shift);
--	val |=  ki << reset->ki_shift | kp << reset->kp_shift |
--		ka << reset->ka_shift;
- 	val |= 1 << reset->reset_shift | 1 << reset->p_reset_shift;
- 	iproc_pll_write(pll, pll->pll_base, reset->offset, val);
- }
-diff --git a/drivers/clk/bcm/clk-iproc.h b/drivers/clk/bcm/clk-iproc.h
-index ff7bfad..b71c197 100644
---- a/drivers/clk/bcm/clk-iproc.h
-+++ b/drivers/clk/bcm/clk-iproc.h
-@@ -94,12 +94,19 @@ struct iproc_pll_aon_pwr_ctrl {
- };
- 
- /*
-- * Control of the PLL reset, with Ki, Kp, and Ka parameters
-+ * Control of the PLL reset
-  */
- struct iproc_pll_reset_ctrl {
- 	unsigned int offset;
- 	unsigned int reset_shift;
- 	unsigned int p_reset_shift;
++#include <dt-bindings/clock/bcm-nsp.h>
++#include "clk-iproc.h"
++
++#define REG_VAL(o, s, w) { .offset = o, .shift = s, .width = w, }
++
++#define AON_VAL(o, pw, ps, is) { .offset = o, .pwr_width = pw, \
++	.pwr_shift = ps, .iso_shift = is }
++
++#define RESET_VAL(o, rs, prs, kis, kiw, kps, kpw, kas, kaw) { .offset = o, \
++	.reset_shift = rs, .p_reset_shift = prs, .ki_shift = kis, \
++	.ki_width = kiw, .kp_shift = kps, .kp_width = kpw, .ka_shift = kas, \
++	.ka_width = kaw }
++
++#define ENABLE_VAL(o, es, hs, bs) { .offset = o, .enable_shift = es, \
++	.hold_shift = hs, .bypass_shift = bs }
++
++static void __init nsp_armpll_init(struct device_node *node)
++{
++	iproc_armpll_setup(node);
++}
++CLK_OF_DECLARE(nsp_armpll, "brcm,nsp-armpll", nsp_armpll_init);
++
++static const struct iproc_pll_ctrl genpll = {
++	.flags = IPROC_CLK_PLL_HAS_NDIV_FRAC | IPROC_CLK_EMBED_PWRCTRL,
++	.aon = AON_VAL(0x0, 1, 12, 0),
++	.reset = RESET_VAL(0x0, 11, 10, 4, 3, 0, 4, 7, 3),
++	.ndiv_int = REG_VAL(0x14, 20, 10),
++	.ndiv_frac = REG_VAL(0x14, 0, 20),
++	.pdiv = REG_VAL(0x18, 24, 3),
++	.status = REG_VAL(0x20, 12, 1),
 +};
 +
-+/*
-+ * Control of the Ki, Kp, and Ka parameters
-+ */
-+struct iproc_pll_dig_filter_ctrl {
-+	unsigned int offset;
- 	unsigned int ki_shift;
- 	unsigned int ki_width;
- 	unsigned int kp_shift;
-@@ -129,6 +136,7 @@ struct iproc_pll_ctrl {
- 	struct iproc_pll_aon_pwr_ctrl aon;
- 	struct iproc_asiu_gate asiu;
- 	struct iproc_pll_reset_ctrl reset;
-+	struct iproc_pll_dig_filter_ctrl dig_filter;
- 	struct iproc_pll_sw_ctrl sw_ctrl;
- 	struct iproc_clk_reg_op ndiv_int;
- 	struct iproc_clk_reg_op ndiv_frac;
-diff --git a/drivers/clk/bcm/clk-nsp.c b/drivers/clk/bcm/clk-nsp.c
-index bc8ebdcd..cf66f64 100644
---- a/drivers/clk/bcm/clk-nsp.c
-+++ b/drivers/clk/bcm/clk-nsp.c
-@@ -26,9 +26,11 @@
- #define AON_VAL(o, pw, ps, is) { .offset = o, .pwr_width = pw, \
- 	.pwr_shift = ps, .iso_shift = is }
- 
--#define RESET_VAL(o, rs, prs, kis, kiw, kps, kpw, kas, kaw) { .offset = o, \
--	.reset_shift = rs, .p_reset_shift = prs, .ki_shift = kis, \
--	.ki_width = kiw, .kp_shift = kps, .kp_width = kpw, .ka_shift = kas, \
-+#define RESET_VAL(o, rs, prs) { .offset = o, .reset_shift = rs, \
-+	.p_reset_shift = prs }
++static const struct iproc_clk_ctrl genpll_clk[] = {
++	[BCM_NSP_GENPLL_PHY_CLK] = {
++		.channel = BCM_NSP_GENPLL_PHY_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 12, 6, 18),
++		.mdiv = REG_VAL(0x18, 16, 8),
++	},
++	[BCM_NSP_GENPLL_ENET_SW_CLK] = {
++		.channel = BCM_NSP_GENPLL_ENET_SW_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 13, 7, 19),
++		.mdiv = REG_VAL(0x18, 8, 8),
++	},
++	[BCM_NSP_GENPLL_USB_PHY_REF_CLK] = {
++		.channel = BCM_NSP_GENPLL_USB_PHY_REF_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 14, 8, 20),
++		.mdiv = REG_VAL(0x18, 0, 8),
++	},
++	[BCM_NSP_GENPLL_IPROCFAST_CLK] = {
++		.channel = BCM_NSP_GENPLL_IPROCFAST_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 15, 9, 21),
++		.mdiv = REG_VAL(0x1c, 16, 8),
++	},
++	[BCM_NSP_GENPLL_SATA1_CLK] = {
++		.channel = BCM_NSP_GENPLL_SATA1_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 16, 10, 22),
++		.mdiv = REG_VAL(0x1c, 8, 8),
++	},
++	[BCM_NSP_GENPLL_SATA2_CLK] = {
++		.channel = BCM_NSP_GENPLL_SATA2_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 17, 11, 23),
++		.mdiv = REG_VAL(0x1c, 0, 8),
++	},
++};
 +
-+#define DF_VAL(o, kis, kiw, kps, kpw, kas, kaw) { .offset = o, .ki_shift = kis,\
-+	.ki_width = kiw, .kp_shift = kps, .kp_width = kpw, .ka_shift = kas,    \
- 	.ka_width = kaw }
- 
- #define ENABLE_VAL(o, es, hs, bs) { .offset = o, .enable_shift = es, \
-@@ -43,7 +45,8 @@ CLK_OF_DECLARE(nsp_armpll, "brcm,nsp-armpll", nsp_armpll_init);
- static const struct iproc_pll_ctrl genpll = {
- 	.flags = IPROC_CLK_PLL_HAS_NDIV_FRAC | IPROC_CLK_EMBED_PWRCTRL,
- 	.aon = AON_VAL(0x0, 1, 12, 0),
--	.reset = RESET_VAL(0x0, 11, 10, 4, 3, 0, 4, 7, 3),
-+	.reset = RESET_VAL(0x0, 11, 10),
-+	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
- 	.ndiv_int = REG_VAL(0x14, 20, 10),
- 	.ndiv_frac = REG_VAL(0x14, 0, 20),
- 	.pdiv = REG_VAL(0x18, 24, 3),
-@@ -99,7 +102,8 @@ CLK_OF_DECLARE(nsp_genpll_clk, "brcm,nsp-genpll", nsp_genpll_clk_init);
- static const struct iproc_pll_ctrl lcpll0 = {
- 	.flags = IPROC_CLK_PLL_HAS_NDIV_FRAC | IPROC_CLK_EMBED_PWRCTRL,
- 	.aon = AON_VAL(0x0, 1, 24, 0),
--	.reset = RESET_VAL(0x0, 23, 22, 16, 3, 12, 4, 19, 4),
-+	.reset = RESET_VAL(0x0, 23, 22),
-+	.dig_filter = DF_VAL(0x0, 16, 3, 12, 4, 19, 4),
- 	.ndiv_int = REG_VAL(0x4, 20, 8),
- 	.ndiv_frac = REG_VAL(0x4, 0, 20),
- 	.pdiv = REG_VAL(0x4, 28, 3),
++static void __init nsp_genpll_clk_init(struct device_node *node)
++{
++	iproc_pll_clk_setup(node, &genpll, NULL, 0, genpll_clk,
++			    ARRAY_SIZE(genpll_clk));
++}
++CLK_OF_DECLARE(nsp_genpll_clk, "brcm,nsp-genpll", nsp_genpll_clk_init);
++
++static const struct iproc_pll_ctrl lcpll0 = {
++	.flags = IPROC_CLK_PLL_HAS_NDIV_FRAC | IPROC_CLK_EMBED_PWRCTRL,
++	.aon = AON_VAL(0x0, 1, 24, 0),
++	.reset = RESET_VAL(0x0, 23, 22, 16, 3, 12, 4, 19, 4),
++	.ndiv_int = REG_VAL(0x4, 20, 8),
++	.ndiv_frac = REG_VAL(0x4, 0, 20),
++	.pdiv = REG_VAL(0x4, 28, 3),
++	.status = REG_VAL(0x10, 12, 1),
++};
++
++static const struct iproc_clk_ctrl lcpll0_clk[] = {
++	[BCM_NSP_LCPLL0_PCIE_PHY_REF_CLK] = {
++		.channel = BCM_NSP_LCPLL0_PCIE_PHY_REF_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 6, 3, 9),
++		.mdiv = REG_VAL(0x8, 24, 8),
++	},
++	[BCM_NSP_LCPLL0_SDIO_CLK] = {
++		.channel = BCM_NSP_LCPLL0_SDIO_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 7, 4, 10),
++		.mdiv = REG_VAL(0x8, 16, 8),
++	},
++	[BCM_NSP_LCPLL0_DDR_PHY_CLK] = {
++		.channel = BCM_NSP_LCPLL0_DDR_PHY_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 8, 5, 11),
++		.mdiv = REG_VAL(0x8, 8, 8),
++	},
++};
++
++static void __init nsp_lcpll0_clk_init(struct device_node *node)
++{
++	iproc_pll_clk_setup(node, &lcpll0, NULL, 0, lcpll0_clk,
++			    ARRAY_SIZE(lcpll0_clk));
++}
++CLK_OF_DECLARE(nsp_lcpll0_clk, "brcm,nsp-lcpll0", nsp_lcpll0_clk_init);
+diff --git a/include/dt-bindings/clock/bcm-nsp.h b/include/dt-bindings/clock/bcm-nsp.h
+new file mode 100644
+index 0000000..ad5827c
+--- /dev/null
++++ b/include/dt-bindings/clock/bcm-nsp.h
+@@ -0,0 +1,51 @@
++/*
++ *  BSD LICENSE
++ *
++ *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
++ *
++ *  Redistribution and use in source and binary forms, with or without
++ *  modification, are permitted provided that the following conditions
++ *  are met:
++ *
++ *	* Redistributions of source code must retain the above copyright
++ *	  notice, this list of conditions and the following disclaimer.
++ *	* Redistributions in binary form must reproduce the above copyright
++ *	  notice, this list of conditions and the following disclaimer in
++ *	  the documentation and/or other materials provided with the
++ *	  distribution.
++ *	* Neither the name of Broadcom Corporation nor the names of its
++ *	  contributors may be used to endorse or promote products derived
++ *	  from this software without specific prior written permission.
++ *
++ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#ifndef _CLOCK_BCM_NSP_H
++#define _CLOCK_BCM_NSP_H
++
++/* GENPLL clock channel ID */
++#define BCM_NSP_GENPLL			0
++#define BCM_NSP_GENPLL_PHY_CLK		1
++#define BCM_NSP_GENPLL_ENET_SW_CLK	2
++#define BCM_NSP_GENPLL_USB_PHY_REF_CLK	3
++#define BCM_NSP_GENPLL_IPROCFAST_CLK	4
++#define BCM_NSP_GENPLL_SATA1_CLK	5
++#define BCM_NSP_GENPLL_SATA2_CLK	6
++
++/* LCPLL0 clock channel ID */
++#define BCM_NSP_LCPLL0			0
++#define BCM_NSP_LCPLL0_PCIE_PHY_REF_CLK	1
++#define BCM_NSP_LCPLL0_SDIO_CLK		2
++#define BCM_NSP_LCPLL0_DDR_PHY_CLK	3
++
++#endif /* _CLOCK_BCM_NSP_H */
 -- 
 1.9.1
