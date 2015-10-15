@@ -1,71 +1,207 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 15 Oct 2015 13:40:10 +0200
-Subject: [PATCHv3 03/11] arm64: Introduce helpers for page table levels
-In-Reply-To: <561F736A.4000308@arm.com>
-References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
- <1444821634-1689-4-git-send-email-suzuki.poulose@arm.com>
- <20151014170759.GE5041@leverpostej> <561F736A.4000308@arm.com>
-Message-ID: <20151015114010.GC21930@cbox>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Thu, 15 Oct 2015 19:43:47 +0800
+Subject: [PATCH 3/4] mmc: mediatek: Add tune support
+In-Reply-To: <CAPDyKFq5fMDY3e1daCs380nPvNiZRDw9bWg8-x6C4fphBKm+Hw@mail.gmail.com>
+References: <1444729078-26585-1-git-send-email-chaotian.jing@mediatek.com>
+ <1444729078-26585-4-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFqUFRZF2M4ichgqM2SeRQbh52e5U1oFG9AExsq0SkFj9w@mail.gmail.com>
+ <1444877180.8751.15.camel@mhfsdcap03>
+ <CAPDyKFq5fMDY3e1daCs380nPvNiZRDw9bWg8-x6C4fphBKm+Hw@mail.gmail.com>
+Message-ID: <1444909427.8751.30.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 10:35:38AM +0100, Suzuki K. Poulose wrote:
-> On 14/10/15 18:07, Mark Rutland wrote:
-> >On Wed, Oct 14, 2015 at 12:20:26PM +0100, Suzuki K. Poulose wrote:
+On Thu, 2015-10-15 at 11:17 +0200, Ulf Hansson wrote:
+> [...]
 > 
-> >>+ * Number of page-table levels required to address 'va_bits' wide
-> >>+ * address, without section mapping. We resolve the top (va_bits - PAGE_SHIFT)
-> >>+ * bits with (PAGE_SHIFT - 3) bits at each page table level. Hence:
-> >>+ *
-> >>+ *  levels = DIV_ROUND_UP((va_bits - PAGE_SHIFT), (PAGE_SHIFT - 3))
-> >>+ *
-> >>+ * We cannot include linux/kernel.h which defines DIV_ROUND_UP here
-> >>+ * due to build issues. So we use the following magic formula.
-> >>+ */
-> >>+#define ARM64_HW_PGTABLE_LEVELS(va_bits) (((va_bits) - 4) / (PAGE_SHIFT - 3))
-> >
-> >I think I failed the interview question [1]. :(
-> >
-> >I read the comment to mean this was a brand-new piece of magic, as
-> >opposed to a constant-folded copy of DIV_ROUND_UP. So it seems there's
-> >still some scope for confusion, even if that only includes me.
-> >
+> >> >
+> >> >         struct clk *src_clk;    /* msdc source clock */
+> >> > +       struct clk *src_clk_parent; /* src_clk's parent */
+> >> > +       struct clk *hs400_src;  /* 400Mhz source clock */
+> >>
+> >> Hmm, so you need to control the upper level clocks. Can you elaborate
+> >> on why this is needed?
+> >>
+> > hs400 is DDR200, in our host design, if the mode is DDR(HS400), if want
+> > to get 200Mhz mmc bus clock frequency, the minimum source clock is
+> > double of the mmc bus clock, So, we need it for HS400 mode with 200Mhz
+> > bus clock.
 > 
-> Wouldn't it be better to modify the comment to say, we open coded the DIV_ROUND_UP ?
-> We could potentially end up in a conflict if somebody else does __DIV_ROUND_UP.
-> I have seen similar issues with the CPU feature series, where if I include one
-> particular header file in another, kernel build breaks without giving you a clue,
-> what caused the error. Usually due to the multiple definitions (e.g NSEC_PER_SEC)
-> and other conflicts. Given that this header file gets included with asm/page.h and
-> hence would be used included for people outside arch/arm64, I would prefer, not to
-> head there, instead update the comment, something like this :
+> Thanks for clarifying.
 > 
+> [...]
 > 
-> /*
->  * Number of page-table levels required to address 'va_bits' wide
->  * address, without section mapping. We resolve the top (va_bits - PAGE_SHIFT)
->  * bits with (PAGE_SHIFT - 3) bits at each page table level. Hence:
->  *
->  *  levels = DIV_ROUND_UP((va_bits - PAGE_SHIFT), (PAGE_SHIFT - 3))
->  *
->  * where DIV_ROUND_UP (n, d) = > ((n) + (d) - 1) / (d)
->  *
->  * We cannot include linux/kernel.h which defines DIV_ROUND_UP here
->  * due to build issues. So we open code the DIV_ROUND_UP and hence
->  * we get :
->  *  ((va_bits - PAGE_SHIFT) + (PAGE_SHIFT - 3) -1) / (PAGE_SHIFT - 3)
->  *
->  * which gets simplified as :
->  *  (((va_bits) - 4) / (PAGE_SHIFT - 3))
->  *
->  */
+>  >         flags = readl(host->base + MSDC_INTEN);
+> >> >         sdr_clr_bits(host->base + MSDC_INTEN, flags);
+> >> > -       if (ddr) { /* may need to modify later */
+> >> > -               mode = 0x2; /* ddr mode and use divisor */
+> >> > +       sdr_clr_bits(host->base + MSDC_CFG, MSDC_CFG_HS400_CK_MODE);
+> >> > +       if (timing == MMC_TIMING_UHS_DDR50 ||
+> >> > +           timing == MMC_TIMING_MMC_DDR52 ||
+> >>
+> >> So, no support for HS200?
+> >>
+> > HS200 is the same with other SDR modes, so it will be handled at else..
 > 
-> Let me know if you are happy with that ?
+> Okay, nice!
+> 
+> So, your the driver currently supports HS200, but without need for tuning!?
 > 
 
-I preferred Mark's suggestion, but I don't have the experience with
-breaking builds with kernel header includes, so I guess we'll do with
-this.
+It support and need tuning for HS200, but do not support tuning for
+HS400, that's why we fixed the hs400_ds_delay by project.
 
-Thanks for adding the comments!
--Christoffer
+> [...]
+> 
+> >> > +static struct msdc_delay_phase get_best_delay(u32 delay)
+> >> > +{
+> >> > +       int start = 0, len = 0;
+> >> > +       int start_final = 0, len_final = 0;
+> >> > +       u8 final_phase = 0xff;
+> >> > +       struct msdc_delay_phase delay_phase;
+> >> > +
+> >> > +       if (delay == 0) {
+> >> > +               pr_err("phase error: [map:%x]\n", delay);
+> >>
+> >> Please use dev_err|warn|dbg|info instead.
+> >>
+> > As you know, this function is just only parse the argument "u32 delay",
+> > it do not bind with any device.
+> 
+> You may just add a msdc_host * as a parameter to the function, that
+> would solve this.
+> 
+
+Ok, will do it.
+
+> [...]
+> 
+> >> > +static int msdc_send_tuning(struct mmc_host *host, u32 opcode, int *cmd_error)
+> >>
+> >> I think you can remove this function and use mmc_send_tuning() instead.
+> > Hmm, I also noticed that there was a mmc_send_tuning, but, I need to get
+> > the cmd_error when tune cmd response, in this case, do not care the data
+> > error.
+> 
+> Well, if you need to extend the mmc_send_tuning() API to suite your
+> needs, let's do that instead of duplicating code.
+> 
+
+OK, will extend the mmc_send_tuning, but it need change other vendor's
+MMC driver, because it already use the mmc_send_tuning()
+
+> >>
+> >> > +{
+> >> > +       struct mmc_request mrq = {NULL};
+> >> > +       struct mmc_command cmd = {0};
+> >> > +       struct mmc_data data = {0};
+> >> > +       struct scatterlist sg;
+> >> > +       struct mmc_ios *ios = &host->ios;
+> >> > +       int size, err = 0;
+> >> > +       u8 *data_buf;
+> >> > +
+> >> > +       if (ios->bus_width == MMC_BUS_WIDTH_8)
+> >> > +               size = 128;
+> >> > +       else if (ios->bus_width == MMC_BUS_WIDTH_4)
+> >> > +               size = 64;
+> >> > +       else
+> >> > +               return -EINVAL;
+> >> > +
+> >> > +       data_buf = kzalloc(size, GFP_KERNEL);
+> >> > +       if (!data_buf)
+> >> > +               return -ENOMEM;
+> >> > +
+> >> > +       mrq.cmd = &cmd;
+> >> > +       mrq.data = &data;
+> >> > +
+> >> > +       cmd.opcode = opcode;
+> >> > +       cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
+> >> > +
+> >> > +       data.blksz = size;
+> >> > +       data.blocks = 1;
+> >> > +       data.flags = MMC_DATA_READ;
+> >> > +
+> >> > +       /*
+> >> > +        * According to the tuning specs, Tuning process
+> >> > +        * is normally shorter 40 executions of CMD19,
+> >> > +        * and timeout value should be shorter than 150 ms
+> >> > +        */
+> >> > +       data.timeout_ns = 150 * NSEC_PER_MSEC;
+> >> > +
+> >> > +       data.sg = &sg;
+> >> > +       data.sg_len = 1;
+> >> > +       sg_init_one(&sg, data_buf, size);
+> >> > +
+> >> > +       mmc_wait_for_req(host, &mrq);
+> >> > +
+> >> > +       if (cmd_error)
+> >> > +               *cmd_error = cmd.error;
+> >> > +
+> >> > +       if (cmd.error) {
+> >> > +               err = cmd.error;
+> >> > +               goto out;
+> >> > +       }
+> >> > +
+> >> > +       if (data.error) {
+> >> > +               err = data.error;
+> >> > +               goto out;
+> >> > +       }
+> >> > +
+> >> > +out:
+> >> > +       kfree(data_buf);
+> >> > +       return err;
+> >> > +}
+> >> > +
+> 
+> [...]
+> 
+> >> > +       host->src_clk_parent = clk_get_parent(host->src_clk);
+> >>
+> >> Don't you need to check the return value here?
+> >>
+> > will check it.
+> >> > +       host->hs400_src = devm_clk_get(&pdev->dev, "400mhz");
+> >>
+> >> That's a really weird conid for a clock. If it's not too late to
+> >> change, please do that!
+> >>
+> >> > +       if (IS_ERR(host->hs400_src)) {
+> >> > +               dev_dbg(&pdev->dev, "Cannot find 400mhz at dts!\n");
+> >> > +       } else if (clk_set_parent(host->src_clk_parent, host->hs400_src) < 0) {
+> >> > +               dev_err(host->dev, "Failed to set 400mhz source clock!\n");
+> >> > +               ret = -EINVAL;
+> >>
+> >> I think it seems more apropriate to use the return value from
+> >> clk_set_parent() instead of inventing your own return value.
+> >>
+> > OK.
+> >> > +               goto host_free;
+> >> > +       }
+> >>
+> >> It seems like you don't need to store the src_clk_parent and the
+> >> hs400_src in the host struct, as you are only using it during
+> >> ->probe().
+> > OK,will remove the member src_clk.
+> 
+> According to your earlier clarification about the clock source and
+> clock rate. I think a more proper solution would be to use the
+> clk_set_min_rate() or clk_set_rate_range() API, instead of dealing
+> with re-parenting of the clock as above.
+> 
+> FYI, a clock provider may implement the ->determine_rate() ops to deal
+> with re-parenting to find the requested clock rate.
+> 
+
+Actually,  at first, I use the clk_set_rate(), but our CCF owner
+suggests to use clk_set_parent, because the same clock frequency, may
+have several parent clock.
+by the way, Sascha suggests to use the "assigned-clocks" and
+"assigned-clock-parents", I tried and it works, and ,will move it from
+mt8173.dtsi to mt8173-evb.dts, because customer may want use other
+parent clock in it's projects.
+Thx!
+
+> [...]
+> 
+> Kind regards
+> Uffe
