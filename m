@@ -1,62 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Oct 2015 14:02:47 +0100
-Subject: [PATCH] ARM: SWP emulation: Restore original *data when failed
-In-Reply-To: <561F6F3B.6030607@arm.com>
-References: <1444791077-26020-1-git-send-email-shengjiu.wang@freescale.com>
- <20151015082417.GX32532@n2100.arm.linux.org.uk>
- <20151015083629.GA32630@shlinux2>
- <20151015085700.GY32532@n2100.arm.linux.org.uk>
- <561F6F3B.6030607@arm.com>
-Message-ID: <20151015130247.GB29301@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Oct 2015 15:08:43 +0200
+Subject: [PATCH 00/10] ARM MTD AFS v2 partition support
+Message-ID: <1444914533-27782-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 10:17:47AM +0100, Vladimir Murzin wrote:
-> We might need the same change for arm64 counterpart (see
-> arch/arm64/kernel/armv8_deprecated.c).
+Years ago, the ARM reference platforms moved away from the footer
+format parsed by the current AFS code in MTD. As far as I can
+tell this begun with the RealView reference designs (mach-realview)
+and the new format has been used in RealView, Versatile Express
+and recently the Juno Development platform (64bit).
 
-Something like below?
+The code has not been working for newer designs for a long time.
+Proper parsing of the flash image partitions is very helpful when
+you want to replace firmware when running full Linux and none of
+the boot monitors or boot loaders.
 
-Will
+After this, AFS parsing will work on all ARM reference designs,
+or well, all I could test. I tested the Integrator/AP, RealView
+PB11MPCore and Juno Development Platform.
 
->From 63c3e83073cfac2e011adf0ed6f335275cc977a7 Mon Sep 17 00:00:00 2001
-From: Will Deacon <will.deacon@arm.com>
-Date: Thu, 15 Oct 2015 13:55:53 +0100
-Subject: [PATCH] arm64: compat: fix stxr failure case in SWP emulation
+The first 9 patches basically refactors the current code to
+make the old partition format more encapsulated, while the last
+patch adds the new v2 format.
 
-If the STXR instruction fails in the SWP emulation code, we leave *data
-overwritten with the loaded value, therefore corrupting the data written
-by a subsequent, successful attempt.
+Linus Walleij (10):
+  mtd: afs: rename structs and functions for v1
+  mtd: enable AFS selection for ARM64
+  mtd: afs: break out v1 footer magic to a define
+  mtd: afs: refactor v1 partition parsing
+  mtd: afs: simplify partition parsing
+  mtd: afs: simplify partition detection
+  mtd: factor out v1 partition parsing
+  mtd: afs: factor footer parsing into the v1 part parsing
+  mtd: afs: factor the IIS read into partition parser
+  mtd: afs: add v2 partition parsing
 
-This patch re-jigs the code so that we only write back to *data once we
-know that the update has happened.
+ drivers/mtd/Kconfig |   2 +-
+ drivers/mtd/afs.c   | 388 +++++++++++++++++++++++++++++++++++-----------------
+ 2 files changed, 263 insertions(+), 127 deletions(-)
 
-Reported-by: Shengjiu Wang <shengjiu.wang@freescale.com>
-Reported-by: Vladimir Murzin <vladimir.murzin@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/armv8_deprecated.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index bcee7abac68e..6039d1eb5912 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -284,12 +284,12 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
- 	__asm__ __volatile__(					\
- 	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
- 		    CONFIG_ARM64_PAN)				\
--	"	mov		%w2, %w1\n"			\
--	"0:	ldxr"B"		%w1, [%3]\n"			\
--	"1:	stxr"B"		%w0, %w2, [%3]\n"		\
-+	"0:	ldxr"B"		%w2, [%3]\n"			\
-+	"1:	stxr"B"		%w0, %w1, [%3]\n"		\
- 	"	cbz		%w0, 2f\n"			\
- 	"	mov		%w0, %w4\n"			\
- 	"2:\n"							\
-+	"	mov		%w1, %w2\n"			\
- 	"	.pushsection	 .fixup,\"ax\"\n"		\
- 	"	.align		2\n"				\
- 	"3:	mov		%w0, %w5\n"			\
 -- 
-2.1.4
+2.4.3
