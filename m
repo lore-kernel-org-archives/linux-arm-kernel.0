@@ -1,98 +1,107 @@
-From: mikko.rapeli@iki.fi (Mikko Rapeli)
-Date: Thu, 15 Oct 2015 14:35:31 +0300
-Subject: [PATCH v4 75/79] include/uapi/xen/privcmd.h: fix compilation in
- userspace
-In-Reply-To: <561F8CF7.9070102@citrix.com>
-References: <1444888618-4506-1-git-send-email-mikko.rapeli@iki.fi>
- <1444888618-4506-76-git-send-email-mikko.rapeli@iki.fi>
- <561F7FF8.9030703@citrix.com>
- <20151015111801.GW6104@lakka.kapsi.fi>
- <561F8CF7.9070102@citrix.com>
-Message-ID: <20151015113531.GX6104@lakka.kapsi.fi>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 15 Oct 2015 13:37:35 +0200
+Subject: [PATCHv3 03/11] arm64: Introduce helpers for page table levels
+In-Reply-To: <1444821634-1689-4-git-send-email-suzuki.poulose@arm.com>
+References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
+ <1444821634-1689-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151015113735.GB21930@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 12:24:39PM +0100, David Vrabel wrote:
-> On 15/10/15 12:18, Mikko Rapeli wrote:
-> > On Thu, Oct 15, 2015 at 11:29:12AM +0100, David Vrabel wrote:
-> >> On 15/10/15 06:56, Mikko Rapeli wrote:
-> >>> xen/interface/xen.h is not exported from kernel headers so remove the
-> >>> dependency and provide needed defines for domid_t and xen_pfn_t if they
-> >>> are not already defined by some other e.g. Xen specific headers.
-> >>>
-> >>> Suggested by Andrew Cooper <andrew.cooper3@citrix.com> on lkml message
-> >>> <5569F9C9.8000607@citrix.com>.
-> >>>
-> >>> The ifdef for ARM is ugly but did not find better solutions for it.
-> >>>
-> >>> Fixes userspace compilation error:
-> >>>
-> >>> xen/privcmd.h:38:31: fatal error: xen/interface/xen.h: No such file or directory
-> >> [...]
-> >>> --- a/include/uapi/xen/privcmd.h
-> >>> +++ b/include/uapi/xen/privcmd.h
-> >>> @@ -35,7 +35,19 @@
-> >>>  
-> >>>  #include <linux/types.h>
-> >>>  #include <linux/compiler.h>
-> >>> -#include <xen/interface/xen.h>
-> >>> +
-> >>> +/* Might be defined by Xen specific headers, but if not */
-> >>> +#ifndef domid_t
-> >>> +typedef __u16 domid_t;
-> >>> +#endif /* domid_t */
-> >>
-> >> As the kbuild bot points out, this does not work since the existence of
-> >> a typedef cannot be checked with #ifdef.
-> > 
-> > Yeah, this hack doesn't cut it. Sorry. Tried to implement these changes:
-> > http://www.spinics.net/lists/linux-api/msg11048.html
-> > 
-> >> I'm not really sure what problem you're trying to solve.  A user space
-> >> program making use of this interface gets the domid_t and xen_pfn_t etc
-> >> typedefs from the headers provided as part of the libxenctrl library.
-> > 
-> > I'm trying to make sure that kernel headers in userspace compile with minimal
-> > dependencies which are gcc and libc.
-> > 
-> > For me it is clear by now that many Linux API's and ABI's like Xen parts do
-> > not live in the uapi header files and instead there's a separate userspace
-> > library with needed headers and defines which have embedded copies of
-> > the needed API and ABI definitions, like header files.
-> > 
-> > So how could this file be changed so that it compiles in userspace without
-> > definitions from libxenctrl?
+On Wed, Oct 14, 2015 at 12:20:26PM +0100, Suzuki K. Poulose wrote:
+> Introduce helpers for finding the number of page table
+> levels required for a given VA width, shift for a particular
+> page table level.
 > 
-> I don't think anything needs to be changed.
+> Convert the existing users to the new helpers. More users
+> to follow.
 > 
-> Instead I would make your compilation check of this header dependent on
-> the existence of the xen/interface/xen.h header. Or you may exclude the
-> check of this header entirely.
-
-There are not many headers in uapi which require additional userspace
-headers to compile (I'm not saying that uapi headers represent the full
-API's/ABI's, it's clear they don't). If there are ~700 headers and just a
-single one needs an exception and additional dependencies, I would try to
-make it work without the dependency. I just need some advice and guidance
-from maintainers how to do this.
-
-Or we should start tracking these userspace library dependencies too,
-at least at linux-headers package levels in distributions. This might
-be a good idea anyway, but then we might as well move headers like this
-directly to the userspace library and out of include/uapi.
-
-Both would solve the non-compiling uapi header problem.
-
-> > I guess I could copy the needed definitions for domid_t and xen_pfn_t from
-> > xen/interface/xen.h of libxenctrl. That I should have done to begin with
-> > instead of trying to hack something on my own.
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 > 
-> I do not want definitions duplicated/copied from the hypervisor ABI
-> headers.  This causes problems when support for new architectures is
-> added (for example).
+> ---
+> Changes since V2:
+>   - Add comments around the macros
+>   - Change ARM64_HW_PGTABLE_LEVEL_SHIFT to accept pagetable level as
+>     described by ARM ARM
+> ---
+>  arch/arm64/include/asm/pgtable-hwdef.h |   25 ++++++++++++++++++++++---
+>  1 file changed, 22 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+> index 95c1ec0..c6194ab 100644
+> --- a/arch/arm64/include/asm/pgtable-hwdef.h
+> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+> @@ -16,13 +16,31 @@
+>  #ifndef __ASM_PGTABLE_HWDEF_H
+>  #define __ASM_PGTABLE_HWDEF_H
+>  
+> +/*
+> + * Number of page-table levels required to address 'va_bits' wide
+> + * address, without section mapping. We resolve the top (va_bits - PAGE_SHIFT)
+> + * bits with (PAGE_SHIFT - 3) bits at each page table level. Hence:
+> + *
+> + *  levels = DIV_ROUND_UP((va_bits - PAGE_SHIFT), (PAGE_SHIFT - 3))
+> + *
+> + * We cannot include linux/kernel.h which defines DIV_ROUND_UP here
+> + * due to build issues. So we use the following magic formula.
+> + */
+> +#define ARM64_HW_PGTABLE_LEVELS(va_bits) (((va_bits) - 4) / (PAGE_SHIFT - 3))
+> +
+> +/*
+> + * Size mapped by an entry at level n
+> + * We map PAGE_SHIFT - 3 at all levels, except the PAGE_SHIFT bits at the last level
+> + */
+> +#define ARM64_HW_PGTABLE_LEVEL_SHIFT(n)	((PAGE_SHIFT - 3) * (4 - (n)) + 3)
 
-Understood.
+I feel like I'm partially failing the interview question again, in that
+I don't fully understand the '+ 3' in the end?
 
--Mikko
+Also the comment could be expanded to explain the (4 - (n)), but I
+couldn't easily come up with good language for explaining that you have
+a maximum of 4 levels and you subtract the 'n' levels that your are not
+accounting for...
 
-> David
+That said, this still looks functionally correct to me.
+
+-Christoffer
+
+
+> +
+>  #define PTRS_PER_PTE		(1 << (PAGE_SHIFT - 3))
+>  
+>  /*
+>   * PMD_SHIFT determines the size a level 2 page table entry can map.
+>   */
+>  #if CONFIG_PGTABLE_LEVELS > 2
+> -#define PMD_SHIFT		((PAGE_SHIFT - 3) * 2 + 3)
+> +#define PMD_SHIFT		ARM64_HW_PGTABLE_LEVEL_SHIFT(2)
+>  #define PMD_SIZE		(_AC(1, UL) << PMD_SHIFT)
+>  #define PMD_MASK		(~(PMD_SIZE-1))
+>  #define PTRS_PER_PMD		PTRS_PER_PTE
+> @@ -32,7 +50,7 @@
+>   * PUD_SHIFT determines the size a level 1 page table entry can map.
+>   */
+>  #if CONFIG_PGTABLE_LEVELS > 3
+> -#define PUD_SHIFT		((PAGE_SHIFT - 3) * 3 + 3)
+> +#define PUD_SHIFT		ARM64_HW_PGTABLE_LEVEL_SHIFT(1)
+>  #define PUD_SIZE		(_AC(1, UL) << PUD_SHIFT)
+>  #define PUD_MASK		(~(PUD_SIZE-1))
+>  #define PTRS_PER_PUD		PTRS_PER_PTE
+> @@ -42,7 +60,8 @@
+>   * PGDIR_SHIFT determines the size a top-level page table entry can map
+>   * (depending on the configuration, this level can be 0, 1 or 2).
+>   */
+> -#define PGDIR_SHIFT		((PAGE_SHIFT - 3) * CONFIG_PGTABLE_LEVELS + 3)
+> +#define PGDIR_SHIFT	\
+> +		ARM64_HW_PGTABLE_LEVEL_SHIFT(4 - CONFIG_PGTABLE_LEVELS)
+>  #define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
+>  #define PGDIR_MASK		(~(PGDIR_SIZE-1))
+>  #define PTRS_PER_PGD		(1 << (VA_BITS - PGDIR_SHIFT))
+> -- 
+> 1.7.9.5
+> 
