@@ -1,111 +1,64 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 15 Oct 2015 13:55:38 +0300
-Subject: [PATCH] ARM: edma: fix residue race for cyclic
-In-Reply-To: <87io68s931.fsf@linutronix.de>
-References: <87io68s931.fsf@linutronix.de>
-Message-ID: <561F862A.7040106@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Oct 2015 11:58:20 +0100
+Subject: [PATCH v11 1/8] arm64: renesas: r8a7795: Add Renesas R8A7795 SoC
+ support
+In-Reply-To: <1444890243-6978-2-git-send-email-horms+renesas@verge.net.au>
+References: <1444890243-6978-1-git-send-email-horms+renesas@verge.net.au>
+ <1444890243-6978-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20151015105820.GF8825@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2015 01:46 PM, John Ogness wrote:
-> When retrieving the residue value for cyclic transfers, the DST
-> field of the active PaRAM is read. However, the AM335x Technical
-> Reference Manual states:
-> 
->   11.3.3.6 Parameter Set Updates
-> 
->   After the TR is read from the PaRAM (and is in the process of
->   being submitted to the EDMA3TC), the following fields are
->   updated as needed: ... DST
-> 
-> This means the DST is incremented even though the DMA transfer
-> may not have started yet or is in progress. Thus if the reader
-> of the residue accesses the DMA buffer too quickly, the CPU
-> will read where data is not yet written.
-> 
-> The CCSTAT.ACTV register is a boolean that is set if any TR is
-> being processed by either the EMDA3CC or EDMA3TC. By polling
-> this register it is possible to ensure that the residue value
-> returned is valid for immediate processing.
-> 
-> Signed-off-by: John Ogness <john.ogness@linutronix.de>
-> ---
->  arch/arm/common/edma.c             |   17 +++++++++++++++++
 
-The arch/arm/common/edma.c does not exist anymore - see linux-next.
+Hi,
 
-It is a good practice to include the maintainers for patches, like Sekhar and
-Vinod in case of eDMA/dmaengine...
+> > +		gic: interrupt-controller at 0xf1010000 {
+> +			compatible = "arm,gic-400";
+> +			#interrupt-cells = <3>;
+> +			#address-cells = <0>;
+> +			interrupt-controller;
+> +			reg = <0x0 0xf1010000 0 0x1000>,
+> +			      <0x0 0xf1020000 0 0x2000>;
+> +			interrupts = <GIC_PPI 9
+> +					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
+> +		};
 
->  drivers/dma/edma.c                 |    8 ++++++++
->  include/linux/platform_data/edma.h |    1 +
->  3 files changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> index 873dbfc..86ce980 100644
-> --- a/arch/arm/common/edma.c
-> +++ b/arch/arm/common/edma.c
-> @@ -995,6 +995,23 @@ void edma_set_dest(unsigned slot, dma_addr_t dest_port,
->  }
->  EXPORT_SYMBOL(edma_set_dest);
->  
-> +#define EDMA_CCSTAT_ACTV (1 << 4)
+No GICH and GICV?
+
+Which exception level do CPUs boot at?
+
+> +		clock {
+> +			#address-cells = <2>;
+> +			#size-cells = <2>;
+> +			#clock-cells = <1>;
+> +			ranges;
 > +
-> +/**
-> + * edma_is_actv - report if any transfer requests are active
-> + * @slot: parameter RAM slot being examined
-> + *
-> + * Returns true if any transfer requests are active on the slot
-> + */
-> +bool edma_is_actv(unsigned slot)
-> +{
-> +	u32 ctlr = EDMA_CTLR(slot);
-> +	unsigned int ccstat;
-> +
-> +	ccstat = edma_read(ctlr, EDMA_CCSTAT);
-> +	return (ccstat & EDMA_CCSTAT_ACTV);
-> +}
-> +
->  /**
->   * edma_get_position - returns the current transfer point
->   * @slot: parameter RAM slot being examined
-> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-> index 3e5d4f1..493c774 100644
-> --- a/drivers/dma/edma.c
-> +++ b/drivers/dma/edma.c
-> @@ -891,6 +891,14 @@ static u32 edma_residue(struct edma_desc *edesc)
->  	pos = edma_get_position(edesc->echan->slot[0], dst);
->  
->  	/*
-> +	 * "pos" may represent a transfer request that is still being
-> +	 * processed by the EDMACC or EDMATC. Wait until all transfer
-> +	 * requests on the active slot are finished before proceeding.
-> +	 */
-> +	while (edma_is_actv(edesc->echan->slot[0]))
-> +		cpu_relax();
+> +			cpg_clocks: cpg_clocks at e6150000 {
+> +				compatible = "renesas,r8a7795-cpg-clocks",
+> +					     "renesas,rcar-gen3-cpg-clocks";
+> +				reg = <0 0xe6150000 0 0x1000>;
+> +				clocks = <&extal_clk>;
+> +				clock-indices = <
+> +					R8A7795_CLK_MAIN R8A7795_CLK_PLL0
+> +					R8A7795_CLK_PLL1 R8A7795_CLK_PLL2
+> +					R8A7795_CLK_PLL3 R8A7795_CLK_PLL4
+> +				>;
+> +				clock-output-names = "main", "pll0", "pll1",
+> +						     "pll2", "pll3", "pll4";
+> +				#power-domain-cells = <0>;
+> +			};
+> +		};
 
-What happens if ACTV does not switch to 0? I know the chances are low, but are
-we going to spin forever here?
+This clock node makes no sense. It's not compatible with anything and
+doesn't provide clocks itself, so #clock-cells is meaningless, and
+nothing underneath it is guaranteed to be probed.
 
-> +
-> +	/*
->  	 * Cyclic is simple. Just subtract pset[0].addr from pos.
->  	 *
->  	 * We never update edesc->residue in the cyclic case, so we
-> diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
-> index bdb2710..20c50e2 100644
-> --- a/include/linux/platform_data/edma.h
-> +++ b/include/linux/platform_data/edma.h
-> @@ -130,6 +130,7 @@ void edma_set_src(unsigned slot, dma_addr_t src_port,
->  				enum address_mode mode, enum fifo_width);
->  void edma_set_dest(unsigned slot, dma_addr_t dest_port,
->  				 enum address_mode mode, enum fifo_width);
-> +bool edma_is_actv(unsigned slot);
->  dma_addr_t edma_get_position(unsigned slot, bool dst);
->  void edma_set_src_index(unsigned slot, s16 src_bidx, s16 src_cidx);
->  void edma_set_dest_index(unsigned slot, s16 dest_bidx, s16 dest_cidx);
-> 
+Please get rid of the clock node. It is a cargo-culted piece of magic
+that shouldn't exist.
 
+Also, cpg_clocks node is missing #clock-cells, given it has
+clock-output-names I assume it is itself a clock provider, and
+presumably should have #clock-cells = <1>.
 
--- 
-P?ter
+Thanks,
+Mark.
