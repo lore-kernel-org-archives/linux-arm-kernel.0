@@ -1,65 +1,75 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 15 Oct 2015 14:22:00 +0100
-Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
- ECAM) and ACPI code out of arch/x86/ directory
-In-Reply-To: <55F6DFF6.4010807@linaro.org>
-References: <20150604102253.GA31773@red-moon> <5570447D.3020705@linaro.org>
- <557504A2.3060203@linaro.org> <20150608151443.GA16151@red-moon>
- <55E4340D.6050004@linaro.org> <55ED6010.3020406@linaro.org>
- <20150908150727.GF29293@red-moon> <55F0388B.1090607@linaro.org>
- <20150911112018.GA13033@red-moon> <55F6DFF6.4010807@linaro.org>
-Message-ID: <20151015132200.GA7621@red-moon>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Thu, 15 Oct 2015 13:21:54 +0000
+Subject: [PATCH] arm64: Synchonise dump_backtrace() with perf callchain
+Message-ID: <1444915314-13649-1-git-send-email-jungseoklee85@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 03:55:50PM +0100, Tomasz Nowicki wrote:
+dump_backtrace() has its own backtrace logic unlike perf callchain which
+relies on walk_stackframe(). They behave differently when a symbol is
+recorded. Perf writes it down *before* calling unwind_frame(), but
+dump_backtrace() prints it out *after* unwind_frame(). As a result, the
+last valid symbol is not added to a list in case of dump_backtrace().
 
-[...]
+This patch catches up the last symbol as synchronising dump_backtrace()
+with perf callchain. However, the patch does not cover a case where MMU
+is disabled. That is, a physical address can be stored in stack frame,
+but it's not handled. For example, a swapper process falls into this case.
+Unlike a swapper from a secondary core, a swapper on a boot cpu, which
+starting from __mmap_switched(), can't be tracked down with a simple
+conversion, phys_to_virt(), because PC is retrieved from LR - 4, not LR.
 
-> > Well, I still have not figured out whether on arm64 the raw accessors
-> > required by ACPICA make sense.
-> >
-> > So either arm64 relies on the generic MCFG based raw read and writes
-> > or we define the global raw read and writes as empty (ie x86 overrides
-> > them anyway).
-> >
-> 
-> My concerns/ideas related to raw accessors for ARM64, please correct me 
-> at any point.
-> 
-> ACPI spec - chapter: 19.5.96 OperationRegion (Declare Operation Region)
-> defines PCI_Config as one of region types. Every time ASL opcode 
-> operates on corresponding PCI config space region, ASL interpreter is 
-> dispatching address space to our raw accessors, please see 
-> acpi_ex_pci_config_space_handler, acpi_ev_pci_config_region_setup calls. 
-> What is more important, such operations may happen after (yes after) bus 
-> enumeration, but always raw accessors are called at the end with the 
-> {segment, bus, dev, fn} tuple.
-> 
-> Giving above, here are some ideas:
-> 1. We force somehow vendors to avoid operations on PCI config regions in 
-> ASL code. PCI config region definitions still fall into Hardware Reduced 
-> profile, so new ACPICA special subset for ARM64 is need. Then raw ACPI 
-> accessors can be empty (and overridden by x86).
+It is a big tradeoff to change both head.S and unwind_frame() structure
+for a few of symbols in *.S, so this hunk does not take care of the case.
 
-I am coming back to this, I am not sure that PCI config based OperationRegions
-fall into Hardware Reduced profile, I will finally start a thread on ASWG
-to check that.
+Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: James Morse <james.morse@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
+---
+ arch/arm64/kernel/traps.c | 16 +++++++++++-----
+ 1 file changed, 11 insertions(+), 5 deletions(-)
 
-Other than that, are you posting an updated version of this series soon ?
-Let me know if you need help refactoring/testing the patches.
-
-Thanks,
-Lorenzo
-
-> 2. We provide raw accessors which translate {segment, bus, dev, fn} 
-> tuple to Linux generic accessors (this can be considered only if PCI 
-> config accesses happened after bus enumeration for HR profile, thus 
-> tuple to bus structure map is possible).
-> 4. We rely on the generic MCFG based raw read and writes.
-> 
-> Let me know your opinion.
-> 
-> Thanks,
-> Tomasz
-> 
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index f93aae5..4ddb928 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -103,12 +103,13 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+ 	set_fs(fs);
+ }
+ 
+-static void dump_backtrace_entry(unsigned long where, unsigned long stack)
++static void dump_backtrace_entry(unsigned long where)
+ {
++	/*
++	 * The highest stack frame of a swapper process stores PC in a form
++	 * of physical address, but this case is not handled.
++	 */
+ 	print_ip_sym(where);
+-	if (in_exception_text(where))
+-		dump_mem("", "Exception stack", stack,
+-			 stack + sizeof(struct pt_regs), false);
+ }
+ 
+ static void dump_instr(const char *lvl, struct pt_regs *regs)
+@@ -172,12 +173,17 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 	pr_emerg("Call trace:\n");
+ 	while (1) {
+ 		unsigned long where = frame.pc;
++		unsigned long stack;
+ 		int ret;
+ 
++		dump_backtrace_entry(where);
+ 		ret = unwind_frame(&frame);
+ 		if (ret < 0)
+ 			break;
+-		dump_backtrace_entry(where, frame.sp);
++		stack = frame.sp;
++		if (in_exception_text(where))
++			dump_mem("", "Exception stack", stack,
++				 stack + sizeof(struct pt_regs), false);
+ 	}
+ }
+ 
+-- 
+2.5.0
