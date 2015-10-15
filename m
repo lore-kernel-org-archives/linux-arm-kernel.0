@@ -1,43 +1,43 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 15 Oct 2015 12:26:26 -0700
+Date: Thu, 15 Oct 2015 12:28:32 -0700
 Subject: [PATCH 09/13] clk: versatile-icst: add device tree support
 In-Reply-To: <1444916813-31024-10-git-send-email-linus.walleij@linaro.org>
 References: <1444916813-31024-1-git-send-email-linus.walleij@linaro.org>
  <1444916813-31024-10-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20151015192626.GO4558@codeaurora.org>
+Message-ID: <20151015192832.GP4558@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/15, Linus Walleij wrote:
-> +
-> +	if (of_device_is_compatible(np, "arm,syscon-icst525"))
-> +		icst_desc.params = &icst525_params;
-> +	else if (of_device_is_compatible(np, "arm,syscon-icst307"))
-> +		icst_desc.params = &icst307_params;
+> This adds support for the ARM syscon ICST clocks to initialized
+> directly from the device tree syscon node on ARM Integrator,
+> Versatile and RealView reference designs.
+> 
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: linux-clk at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
 
-I guess if we add anymore here we should use an of_device_id
-array instead.
+Also:
 
-> +	else {
-> +		pr_info("unknown ICST clock %s\n", name);
+WARNING: please, no space before tabs
+#47: FILE: drivers/clk/versatile/clk-icst.c:221:
++^I.vd_min ^I= 8,$
 
-pr_warn? pr_err?
+WARNING: please, no space before tabs
+#48: FILE: drivers/clk/versatile/clk-icst.c:222:
++^I.vd_max ^I= 263,$
 
-> +		return;
-> +	}
-> +
-> +	/* Parent clock name is not the same as node parent */
-> +	parent_name = of_clk_get_parent_name(np, 0);
-> +
-> +	regclk = icst_clk_setup(NULL, &icst_desc, name, parent_name, map);
-> +	if (IS_ERR(regclk)) {
-> +		pr_err("error setting up syscon ICST clock %s\n", name);
-> +		return;
-> +	}
-> +	of_clk_add_provider(np, of_clk_src_simple_get, regclk);
-> +	pr_info("registered syscon ICST clock %s\n", name);
+WARNING: please, no space before tabs
+#49: FILE: drivers/clk/versatile/clk-icst.c:223:
++^I.rd_min ^I= 3,$
 
-debug print? Please remove debug noise.
+WARNING: please, no space before tabs
+#50: FILE: drivers/clk/versatile/clk-icst.c:224:
++^I.rd_max ^I= 65,$
+
+total: 0 errors, 4 warnings, 98 lines checked
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
