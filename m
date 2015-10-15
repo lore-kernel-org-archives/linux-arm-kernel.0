@@ -1,44 +1,98 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Oct 2015 22:07:58 +0200
-Subject: [GIT PULL 3/3] ARM: berlin: SoC changes for v4.4 (round 1)
-In-Reply-To: <1444416494-3117-3-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1444416494-3117-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1444416494-3117-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <13690298.KOO6Lk0OEb@wuerfel>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 15 Oct 2015 15:08:36 -0500
+Subject: [PATCH v5 3/4] PCI/MSI:  Add helper function
+ pci_msi_domain_get_msi_rid().
+In-Reply-To: <1444342250-6196-4-git-send-email-ddaney.cavm@gmail.com>
+References: <1444342250-6196-1-git-send-email-ddaney.cavm@gmail.com>
+ <1444342250-6196-4-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20151015200836.GB10442@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 October 2015 20:48:14 Sebastian Hesselbarth wrote:
-> Arnd, Kevin, Olof,
+On Thu, Oct 08, 2015 at 03:10:49PM -0700, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
 > 
-> this is Marvell Berlin SoC changes for v4.4. It only contains a
-> single patch to register a cpufreq-dt device that we have properties
-> for now.
+> Add pci_msi_domain_get_msi_rid() to return the MSI requester id (RID).
+> Initially needed by gic-v3 based systems. It will be used by follow on
+> patch to drivers/irqchip/irq-gic-v3-its-pci-msi.c
 > 
-> Please pull.
+> Initially supports mapping the RID via OF device tree.  In the future,
+> this could be extended to use ACPI _IORT tables as well.
 > 
-> Sebastian
-> 
-> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
-> 
->   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-soc-for-4.4-1
-> 
-> for you to fetch changes up to e1a3e724a25761a2b2e9e0e059e33afac6409a76:
-> 
->   ARM: berlin: register cpufreq-dt (2015-09-21 22:57:24 +0200)
-> 
-> ----------------------------------------------------------------
-> Marvell SoC for 4.4 take 1
-> - register cpufreq-dt device
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: David Daney <david.daney@cavium.com>
 
-I really wish we could get rid of that crap (having to register
-a device for this manually). Not your fault of course, so merged
-into next/soc.
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-Thanks,
+I assume Thomas will take these (or at least, somebody other than me).
 
-	Arnd
+> ---
+>  drivers/pci/msi.c   | 30 ++++++++++++++++++++++++++++++
+>  include/linux/msi.h |  1 +
+>  2 files changed, 31 insertions(+)
+> 
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index d449714..81a2798 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/io.h>
+>  #include <linux/slab.h>
+>  #include <linux/irqdomain.h>
+> +#include <linux/of_irq.h>
+>  
+>  #include "pci.h"
+>  
+> @@ -1327,4 +1328,33 @@ struct irq_domain *pci_msi_create_default_irq_domain(struct device_node *node,
+>  
+>  	return domain;
+>  }
+> +
+> +static int get_msi_id_cb(struct pci_dev *pdev, u16 alias, void *data)
+> +{
+> +	u32 *pa = data;
+> +
+> +	*pa = alias;
+> +	return 0;
+> +}
+> +/**
+> + * pci_msi_domain_get_msi_rid - Get the MSI requester id (RID)
+> + * @domain:	The interrupt domain
+> + * @pdev:	The PCI device.
+> + *
+> + * The RID for a device is formed from the alias, with a firmware
+> + * supplied mapping applied
+> + *
+> + * Returns: The RID.
+> + */
+> +u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
+> +{
+> +	u32 rid = 0;
+> +
+> +	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
+> +
+> +	if (domain->of_node)
+> +		rid = of_msi_map_rid(&pdev->dev, domain->of_node, rid);
+> +
+> +	return rid;
+> +}
+>  #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+> diff --git a/include/linux/msi.h b/include/linux/msi.h
+> index ad939d0..56e3b76 100644
+> --- a/include/linux/msi.h
+> +++ b/include/linux/msi.h
+> @@ -293,6 +293,7 @@ irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
+>  					  struct msi_desc *desc);
+>  int pci_msi_domain_check_cap(struct irq_domain *domain,
+>  			     struct msi_domain_info *info, struct device *dev);
+> +u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev);
+>  #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+>  
+>  #endif /* LINUX_MSI_H */
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
