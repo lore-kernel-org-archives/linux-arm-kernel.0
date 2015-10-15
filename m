@@ -1,33 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 15 Oct 2015 09:18:18 +0900
-Subject: [PATCH] ARM: shmobile: porter: add HS-USB DT support
-In-Reply-To: <80272771.MSjafmr6yE@wasted.cogentembedded.com>
-References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
- <80272771.MSjafmr6yE@wasted.cogentembedded.com>
-Message-ID: <20151015001818.GA25019@verge.net.au>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 14 Oct 2015 17:29:28 -0700
+Subject: [PATCH] bcm2835: Add Raspberry Pi CPU frequency control to the
+ device tree
+In-Reply-To: <1444592795-15129-1-git-send-email-lkundrak@v3.sk>
+References: <1444592795-15129-1-git-send-email-lkundrak@v3.sk>
+Message-ID: <87bnc1gejb.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 10:35:46PM +0300, Sergei Shtylyov wrote:
-> Enable HS-USB device  for the Porter board, defining the GPIO that the
-> driver should check  when probing (which is the ID output from MAX3355
-> OTG chip).
-> 
-> Note that there  will be pinctrl-related error messages if both internal
-> PCI  and  HS-USB drivers are enabled but they should be just ignored.
-> 
-> This patch is  analogous  to the commit 6f4f7156e0e6 (ARM: shmobile:
-> henninger: enable HS-USB) as there  are no differences between the
-> boards in this respect.
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
+Lubomir Rintel <lkundrak@v3.sk> writes:
 
-Thanks Sergei,
+> This adds a device tree binding for Broadcom BCM2834 CPU frequency control
+> driven via Raspberry Pi VideoCore 4 firmware interface.
+>
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Lee Jones <lee@kernel.org>
+> Cc: Eric Anholt <eric@anholt.net>
+> Cc: linux-rpi-kernel at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-pm at vger.kernel.org
+> ---
+> Depends on the RPi Firmware driver submitted on linux-rpi-kernel a while ago. 
+> Can't see it in arm-soc or linux-next yet though (?). Available in branch 
+> 'rpi-firmware' of https://github.com/anholt/linux
 
-I have queued this up for v4.5.
+Looks like the firmware driver slipped through the cracks for 4.3.  I'll
+be sending a pull request for it for 4.4.
 
-I took the liberty of tweaking the changelog to address a complaint made
-by Mr. Check Patch.
+With the cprman clock driver, we could set CPU frequency natively from
+Linux.  What we get from doing things through the VPU right now are that
+the MAX (overclock) setting can be set by the user in config.txt, and
+the VPU does some watching of thermals to decide when to throttle back
+to non-overclock.
 
-ERROR: Please use git commit description style 'commit <12+ chars of sha1> ("<title line>")' - ie: 'commit 6f4f7156e0e6 ("ARM: shmobile: henninger: enable HS-USB")'
+Unless we do native thermal control from Linux (which we don't have a
+driver for) to get equivalent protection, then I think we should
+probably go ahead with the VPU-based cpufreq control.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151014/8c285a51/attachment-0001.sig>
