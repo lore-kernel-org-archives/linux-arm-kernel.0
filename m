@@ -1,56 +1,66 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 15 Oct 2015 12:14:59 +0100
-Subject: [PATCH 2/7] includes: dt-bindings: Add STM32F429 pinctrl DT
- bindings
-In-Reply-To: <1444853247-31114-3-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1444853247-31114-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1444853247-31114-3-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <561F8AB3.9010103@linaro.org>
+From: mikko.rapeli@iki.fi (Mikko Rapeli)
+Date: Thu, 15 Oct 2015 14:18:01 +0300
+Subject: [PATCH v4 75/79] include/uapi/xen/privcmd.h: fix compilation in
+ userspace
+In-Reply-To: <561F7FF8.9030703@citrix.com>
+References: <1444888618-4506-1-git-send-email-mikko.rapeli@iki.fi>
+ <1444888618-4506-76-git-send-email-mikko.rapeli@iki.fi>
+ <561F7FF8.9030703@citrix.com>
+Message-ID: <20151015111801.GW6104@lakka.kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/15 21:07, Maxime Coquelin wrote:
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> ---
->   include/dt-bindings/pinctrl/pinctrl-stm32.h     |   12 +
->   include/dt-bindings/pinctrl/stm32f429-pinfunc.h | 1241 +++++++++++++++++++++++
->   2 files changed, 1253 insertions(+)
->   create mode 100644 include/dt-bindings/pinctrl/pinctrl-stm32.h
->   create mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
->
-> diff --git a/include/dt-bindings/pinctrl/pinctrl-stm32.h b/include/dt-bindings/pinctrl/pinctrl-stm32.h
-> new file mode 100644
-> index 0000000..a2e7222
-> --- /dev/null
-> +++ b/include/dt-bindings/pinctrl/pinctrl-stm32.h
-> @@ -0,0 +1,12 @@
-> +#ifndef _DT_BINDINGS_PINCTRL_STM32_H
-> +#define _DT_BINDINGS_PINCTRL_STM32_H
-> +
-> +#define STM32_PIN_NO(x) ((x) << 8)
-> +#define STM32_GET_PIN_NO(x) ((x) >> 8)
-> +#define STM32_GET_PIN_FUNC(x) ((x) & 0xff)
-> +
-> +#define STM32_PIN_GPIO		0
-> +#define STM32_PIN_AF(x)		((x) + 1)
-> +#define STM32_PIN_ANALOG	(STM32_PIN_AF(15) + 1)
-> +
-> +#endif /* _DT_BINDINGS_PINCTRL_STM32_H */
-> diff --git a/include/dt-bindings/pinctrl/stm32f429-pinfunc.h b/include/dt-bindings/pinctrl/stm32f429-pinfunc.h
-> new file mode 100644
-> index 0000000..979e4eb
-> --- /dev/null
-> +++ b/include/dt-bindings/pinctrl/stm32f429-pinfunc.h
-> @@ -0,0 +1,1241 @@
-> +#ifndef _DT_BINDINGS_STM32F429_PINFUNC_H
-> +#define _DT_BINDINGS_STM32F429_PINFUNC_H
-> +
-> +#include <dt-bindings/pinctrl/pinctrl-stm32.h>
-> +
-> +#define STM32F429_PA0_FUNC_GPIO (STM32_PIN_NO(0) | STM32_PIN_GPIO)
-> +#define STM32F429_PA0_FUNC_TIM2_CH1 TIM2_ETR (STM32_PIN_NO(0) | STM32_PIN_AF(1))
+On Thu, Oct 15, 2015 at 11:29:12AM +0100, David Vrabel wrote:
+> On 15/10/15 06:56, Mikko Rapeli wrote:
+> > xen/interface/xen.h is not exported from kernel headers so remove the
+> > dependency and provide needed defines for domid_t and xen_pfn_t if they
+> > are not already defined by some other e.g. Xen specific headers.
+> > 
+> > Suggested by Andrew Cooper <andrew.cooper3@citrix.com> on lkml message
+> > <5569F9C9.8000607@citrix.com>.
+> >
+> > The ifdef for ARM is ugly but did not find better solutions for it.
+> > 
+> > Fixes userspace compilation error:
+> > 
+> > xen/privcmd.h:38:31: fatal error: xen/interface/xen.h: No such file or directory
+> [...]
+> > --- a/include/uapi/xen/privcmd.h
+> > +++ b/include/uapi/xen/privcmd.h
+> > @@ -35,7 +35,19 @@
+> >  
+> >  #include <linux/types.h>
+> >  #include <linux/compiler.h>
+> > -#include <xen/interface/xen.h>
+> > +
+> > +/* Might be defined by Xen specific headers, but if not */
+> > +#ifndef domid_t
+> > +typedef __u16 domid_t;
+> > +#endif /* domid_t */
+> 
+> As the kbuild bot points out, this does not work since the existence of
+> a typedef cannot be checked with #ifdef.
 
-For the clock driver I was advised to get rid of this sort of "heroics" 
-and expose raw numbers from the datasheet directly to DT bindings users.
+Yeah, this hack doesn't cut it. Sorry. Tried to implement these changes:
+http://www.spinics.net/lists/linux-api/msg11048.html
 
-Should the same logic apply to this *huge* collection of macros?
+> I'm not really sure what problem you're trying to solve.  A user space
+> program making use of this interface gets the domid_t and xen_pfn_t etc
+> typedefs from the headers provided as part of the libxenctrl library.
+
+I'm trying to make sure that kernel headers in userspace compile with minimal
+dependencies which are gcc and libc.
+
+For me it is clear by now that many Linux API's and ABI's like Xen parts do
+not live in the uapi header files and instead there's a separate userspace
+library with needed headers and defines which have embedded copies of
+the needed API and ABI definitions, like header files.
+
+So how could this file be changed so that it compiles in userspace without
+definitions from libxenctrl?
+
+I guess I could copy the needed definitions for domid_t and xen_pfn_t from
+xen/interface/xen.h of libxenctrl. That I should have done to begin with
+instead of trying to hack something on my own.
+
+-Mikko
