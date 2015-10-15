@@ -1,87 +1,66 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 15 Oct 2015 15:11:09 -0500
-Subject: [PATCH v2 7/8] PCI: Add per-device MSI domain hook
-In-Reply-To: <1444151043-31084-8-git-send-email-marc.zyngier@arm.com>
-References: <1444151043-31084-1-git-send-email-marc.zyngier@arm.com>
- <1444151043-31084-8-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20151015201109.GD10442@localhost>
+From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
+Date: Thu, 15 Oct 2015 20:11:06 +0000
+Subject: [PATCH v3 05/12] doc/bindings: Update Layerscape PCIe devicetree
+ binding to be more flexible
+In-Reply-To: <5383901.aC2HYopUNW@wuerfel>
+References: <1444891672-32117-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1444891672-32117-6-git-send-email-bhupesh.sharma@freescale.com>
+ <5383901.aC2HYopUNW@wuerfel>
+Message-ID: <BY1PR0301MB13039481CB958A3323FB03B2823E0@BY1PR0301MB1303.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 06:04:02PM +0100, Marc Zyngier wrote:
-> So far, we have considered that the MSI domain for a device was
-> either set via the architecture-dependent pcibios implementation
-> or inherited from the host bridge.
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Thursday, October 15, 2015 7:47 PM
 > 
-> As we're about to break that assumption, add pci_dev_msi_domain
-> which is the equivalent of pci_host_bridge_msi_domain, but for
-> a single device.
+> On Thursday 15 October 2015 12:17:45 Bhupesh Sharma wrote:
+> >
+> > +Note that since this controller derives its clocks from the Reset
+> > +Configuration Word (RCW) which is used to describe the PLL settings
+> > +at the time of chip-reset, the 'clocks' and 'clock-names' properties
+> > +from 'designware-pcie.txt' are optional for this controller.
 > 
-> Other than moving things around a bit, this patch on its own
-> has no effect.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> If this is an option for the dw-pcie block, should this description be
+> added to the generic binding instead?
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+I think this can be moved to the generic bindings for DWC3 PCIe driver. However
+I cannot vouch if the same is true for usage of this IP in other SoCs and it
+will not break existing drivers if this property is not defined in their SoC DTSI.
 
-> ---
->  drivers/pci/probe.c | 35 ++++++++++++++++++++++++++++++-----
->  1 file changed, 30 insertions(+), 5 deletions(-)
+So adding a few old ST colleagues (Pratyush, Gabriel, Fabrice), who I am sure have used this IP in ST SoCs
+for their comments as well.
+
+So the question would be - do you think it will be ok to make the clock related
+properties optional in 'designware-pcie.txt' rather than required.
+
 > 
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 8361d27..7c333f8 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1622,15 +1622,40 @@ static void pci_init_capabilities(struct pci_dev *dev)
->  	pci_enable_acs(dev);
->  }
->  
-> +/*
-> + * This is the equivalent of pci_host_bridge_msi_domain that acts on
-> + * devices. Firmware interfaces that can select the MSI domain on a
-> + * per-device basis should be called from here.
-> + */
-> +static struct irq_domain *pci_dev_msi_domain(struct pci_dev *dev)
-> +{
-> +	struct irq_domain *d;
-> +
-> +	/*
-> +	 * If a domain has been set through the pcibios_add_device
-> +	 * callback, then this is the one (platform code knows best).
-> +	 */
-> +	d = dev_get_msi_domain(&dev->dev);
-> +	if (d)
-> +		return d;
-> +
-> +	return NULL;
-> +}
-> +
->  static void pci_set_msi_domain(struct pci_dev *dev)
->  {
-> +	struct irq_domain *d;
-> +
->  	/*
-> -	 * If no domain has been set through the pcibios_add_device
-> -	 * callback, inherit the default from the bus device.
-> +	 * If the platform or firmware interfaces cannot supply a
-> +	 * device-specific MSI domain, then inherit the default domain
-> +	 * from the host bridge itself.
->  	 */
-> -	if (!dev_get_msi_domain(&dev->dev))
-> -		dev_set_msi_domain(&dev->dev,
-> -				   dev_get_msi_domain(&dev->bus->dev));
-> +	d = pci_dev_msi_domain(dev);
-> +	if (!d)
-> +		d = dev_get_msi_domain(&dev->bus->dev);
-> +
-> +	dev_set_msi_domain(&dev->dev, d);
->  }
->  
->  void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
-> -- 
-> 2.1.4
+> > +Also as per the available Reference Manuals, there is no specific
+> 'version'
+> > +register available in the Freescale PCIe controller register set,
+> > +which can allow determining the underlying Designware PCIe controller
+> > +version information.
+> > +
+> >  Required properties:
+> > -- compatible: should contain the platform identifier such as
+> "fsl,ls1021a-pcie"
+> > +- compatible: should contain the platform identifier such as
+> > +"fsl,<soc-name>-pcie",
+> > +  "snps,dw-pcie".
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> You should document all the strings that will be needed here, otherwise a
+> driver write does not know what to look for.
+> 
+> If two chips have a 100% identical PCIe implementation, just use the
+> string of the older chip for both.
+
+The chips are not 100% identical and there is no version information register
+available for differentiation. So, does the following seem better:
+
++- compatible: should contain the platform identifier such as
++"fsl,<soc-name>-pcie",
++  "snps,dw-pcie".
++
++ where <soc-name> for e.g. can be ls2080a or ls1021a.
+
+Regards,
+Bhupesh
