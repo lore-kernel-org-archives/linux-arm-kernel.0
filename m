@@ -1,47 +1,35 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 16 Oct 2015 08:44:52 +0900
-Subject: [PATCH v2 2/2] ARM: dts: exynos5250: Add clocks to DISP1 domain
-In-Reply-To: <1444905084-22540-3-git-send-email-tomeu.vizoso@collabora.com>
+Date: Fri, 16 Oct 2015 08:46:27 +0900
+Subject: [PATCH v2 1/2] clk: samsung: exynos5250: Add DISP1 clocks
+In-Reply-To: <1444905084-22540-2-git-send-email-tomeu.vizoso@collabora.com>
 References: <1444905084-22540-1-git-send-email-tomeu.vizoso@collabora.com>
- <1444905084-22540-3-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <56203A74.7040305@samsung.com>
+ <1444905084-22540-2-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <56203AD3.2050905@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 15.10.2015 19:31, Tomeu Vizoso wrote:
-> Adds to the node of the DISP1 power domain the two clocks that need to
-> be reparented while the domain is powered off:
-> CLK_MOUT_ACLK200_DISP1_SUB and CLK_MOUT_ACLK300_DISP1_SUB.
+> When the DISP1 power domain is powered off, there's two clocks that need
+> to be temporarily reparented to OSC, and back to their original parents
+> when the domain is powered on again.
 > 
-> Otherwise the state is unknown at power up and the mixer's clocks are
-> all messed up.
+> We expose these two clocks in the DT bindings so that the DT node of the
+> power domain can reference them.
 > 
 > Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> Link: http://lkml.kernel.org/g/561CDC33.7050103 at collabora.com
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
 > 
+> Changes in v2:
+> - Reuse mout_aclk200_p
+> - Rename div_aclk300 as div_aclk300_disp
 > 
->  arch/arm/boot/dts/exynos5250.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index b24610ea8c2a..88b9cf5f226f 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -130,6 +130,10 @@
->  		compatible = "samsung,exynos4210-pd";
->  		reg = <0x100440A0 0x20>;
->  		#power-domain-cells = <0>;
-> +		clocks = <&clock CLK_FIN_PLL>,
-> +			 <&clock CLK_MOUT_ACLK200_DISP1_SUB>,
-> +			 <&clock CLK_MOUT_ACLK300_DISP1_SUB>;
-> +		clock-names = "oscclk", "clk0", "clk1";
->  	};
->  
->  	clock: clock-controller at 10010000 {
+>  drivers/clk/samsung/clk-exynos5250.c   | 14 +++++++++++++-
+>  include/dt-bindings/clock/exynos5250.h |  4 +++-
+>  2 files changed, 16 insertions(+), 2 deletions(-)
 > 
 
-I reviewed it already. Any changes here since v1?
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 Best regards,
 Krzysztof
