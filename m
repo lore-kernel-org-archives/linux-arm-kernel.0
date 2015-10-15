@@ -1,75 +1,40 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Thu, 15 Oct 2015 13:28:50 -0700
-Subject: [PATCH v3 01/10] ARM: cygnus: fix link failures when
- CONFIG_COMMON_CLK_IPROC is disabled
-In-Reply-To: <1444938513-10758-2-git-send-email-jonmason@broadcom.com>
-References: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
- <1444938513-10758-2-git-send-email-jonmason@broadcom.com>
-Message-ID: <56200C82.1070508@broadcom.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Oct 2015 22:29:33 +0200
+Subject: [PATCH 1/3] ARM: digicolor: select pinctrl/gpio driver
+In-Reply-To: <0c3f348274ea14bc82c0e4f7b240be650624fb0d.1444735169.git.baruch@tkos.co.il>
+References: <cover.1444735169.git.baruch@tkos.co.il>
+ <0c3f348274ea14bc82c0e4f7b240be650624fb0d.1444735169.git.baruch@tkos.co.il>
+Message-ID: <19934450.tsPWutDox2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon,
-
-One question below for others to comment on.
-
-On 15-10-15 12:48 PM, Jon Mason wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
->
-> When CONFIG_CYGNUS is set but CONFIG_COMMON_CLK_IPROC is disabled, the
-> following link failures are caused:
->
-> drivers/built-in.o: In function `cygnus_armpll_init':
-> :(.init.text+0x1d290): undefined reference to `iproc_armpll_setup'
-> drivers/built-in.o: In function `cygnus_genpll_clk_init':
-> :(.init.text+0x1d2c4): undefined reference to `iproc_pll_clk_setup'
-> drivers/built-in.o: In function `cygnus_lcpll0_clk_init':
-> :(.init.text+0x1d304): undefined reference to `iproc_pll_clk_setup'
-> drivers/built-in.o: In function `cygnus_mipipll_clk_init':
-> :(.init.text+0x1d344): undefined reference to `iproc_pll_clk_setup'
-> drivers/built-in.o: In function `cygnus_asiu_init':
-> :(.init.text+0x1d370): undefined reference to `iproc_asiu_setup'
->
-> It is fixed it by always selecting COMMON_CLK_IPROC from
-> ARCH_BCM_IPROC, and making COMMON_CLK_IPROC a silent option (thus
-> preventing it from being erroneously disabled by a user).
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+On Tuesday 13 October 2015 14:28:02 Baruch Siach wrote:
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 > ---
->   arch/arm/mach-bcm/Kconfig | 2 +-
->   drivers/clk/bcm/Kconfig   | 4 +---
->   2 files changed, 2 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> index 1319c3c..84bd265 100644
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -14,7 +14,7 @@ config ARCH_BCM_IPROC
->   	select HAVE_ARM_SCU if SMP
->   	select HAVE_ARM_TWD if SMP
->   	select ARM_GLOBAL_TIMER
-> -
-> +	select COMMON_CLK_IPROC
->   	select CLKSRC_MMIO
->   	select ARCH_REQUIRE_GPIOLIB
->   	select ARM_AMBA
-> diff --git a/drivers/clk/bcm/Kconfig b/drivers/clk/bcm/Kconfig
-> index 88febf5..46ee475 100644
-> --- a/drivers/clk/bcm/Kconfig
-> +++ b/drivers/clk/bcm/Kconfig
-> @@ -9,10 +9,8 @@ config CLK_BCM_KONA
->   	  in the BCM281xx and BCM21664 families.
->
->   config COMMON_CLK_IPROC
-> -	bool "Broadcom iProc clock support"
-> -	depends on ARCH_BCM_IPROC
-> +	bool
->   	depends on COMMON_CLK
-Should these depends on remain?  I think COMMON_CLK_IPROC won't work 
-without them.
-> -	default ARCH_BCM_IPROC
->   	help
->   	  Enable common clock framework support for Broadcom SoCs
->   	  based on the iProc architecture
->
+>  arch/arm/mach-digicolor/Kconfig | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/mach-digicolor/Kconfig b/arch/arm/mach-digicolor/Kconfig
+> index 4f36d8d2bc57..fc65b0f1db48 100644
+> --- a/arch/arm/mach-digicolor/Kconfig
+> +++ b/arch/arm/mach-digicolor/Kconfig
+> @@ -1,7 +1,10 @@
+>  config ARCH_DIGICOLOR
+>  	bool "Conexant Digicolor SoC Support"
+>  	depends on ARCH_MULTI_V7
+> +	select ARCH_REQUIRE_GPIOLIB
+>  	select CLKSRC_MMIO
+>  	select DIGICOLOR_TIMER
+>  	select GENERIC_IRQ_CHIP
+>  	select MFD_SYSCON
+> +	select PINCTRL
+> +	select PINCTRL_DIGICOLOR
+> 
+
+Applied to next/soc, but please add a patch description even for trivial
+patches like this in the future. A good changelog text here would explain
+why this wasn't done in the past but is necessary now.
+
+Thanks,
+
+	Arnd
