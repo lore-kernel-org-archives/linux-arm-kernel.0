@@ -1,104 +1,81 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 15 Oct 2015 17:24:35 +0000
-Subject: [PATCH RFC 4/7] genirq/msi: Make the .prepare callback reusable
-In-Reply-To: <1444923568-17413-5-git-send-email-marc.zyngier@arm.com>
-References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
- <1444923568-17413-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1624783E@lhreml503-mbs>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 15 Oct 2015 18:26:01 +0100
+Subject: [PATCH] arm64: Synchonise dump_backtrace() with perf callchain
+In-Reply-To: <1444915314-13649-1-git-send-email-jungseoklee85@gmail.com>
+References: <1444915314-13649-1-git-send-email-jungseoklee85@gmail.com>
+Message-ID: <20151015172600.GD19202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc
-
-It looks like this patch fails to apply to 4.3-rc5....
-
-Gab
-
-> -----Original Message-----
-> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> owner at vger.kernel.org] On Behalf Of Marc Zyngier
-> Sent: Thursday, October 15, 2015 4:39 PM
-> To: Thomas Gleixner; Jiang Liu; Jason Cooper
-> Cc: majun (F); linux-arm-kernel at lists.infradead.org; linux-
-> pci at vger.kernel.org; linux-kernel at vger.kernel.org
-> Subject: [PATCH RFC 4/7] genirq/msi: Make the .prepare callback
-> reusable
+On Thu, Oct 15, 2015 at 01:21:54PM +0000, Jungseok Lee wrote:
+> dump_backtrace() has its own backtrace logic unlike perf callchain which
+> relies on walk_stackframe(). They behave differently when a symbol is
+> recorded. Perf writes it down *before* calling unwind_frame(), but
+> dump_backtrace() prints it out *after* unwind_frame(). As a result, the
+> last valid symbol is not added to a list in case of dump_backtrace().
 > 
-> The .prepare callbacks are so far only called from
-> msi_domain_alloc_irqs.
-> In order to reuse that code, split that code and create a
-> msi_domain_prepare_irqs function that the existing code can call into.
+> This patch catches up the last symbol as synchronising dump_backtrace()
+> with perf callchain. However, the patch does not cover a case where MMU
+> is disabled. That is, a physical address can be stored in stack frame,
+> but it's not handled. For example, a swapper process falls into this case.
+> Unlike a swapper from a secondary core, a swapper on a boot cpu, which
+> starting from __mmap_switched(), can't be tracked down with a simple
+> conversion, phys_to_virt(), because PC is retrieved from LR - 4, not LR.
+
+It would be good to have an example backtrace before and after this patch
+is applied, to show what it fixes.
+
+> It is a big tradeoff to change both head.S and unwind_frame() structure
+> for a few of symbols in *.S, so this hunk does not take care of the case.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
 > ---
->  include/linux/msi.h |  4 ++++
->  kernel/irq/msi.c    | 20 +++++++++++++++++---
->  2 files changed, 21 insertions(+), 3 deletions(-)
+>  arch/arm64/kernel/traps.c | 16 +++++++++++-----
+>  1 file changed, 11 insertions(+), 5 deletions(-)
 > 
-> diff --git a/include/linux/msi.h b/include/linux/msi.h
-> index 32a24b9..5bb36a9 100644
-> --- a/include/linux/msi.h
-> +++ b/include/linux/msi.h
-> @@ -277,6 +277,10 @@ struct irq_domain
-> *platform_msi_create_irq_domain(struct fwnode_handle *fwnode,
->  int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int
-> nvec,
->  				   irq_write_msi_msg_t write_msi_msg);
->  void platform_msi_domain_free_irqs(struct device *dev);
-> +
-> +/* When an MSI domain is used as an intermediate domain */
-> +int msi_domain_prepare_irqs(struct irq_domain *domain, struct device
-> *dev,
-> +			    int nvec, msi_alloc_info_t *args);
->  #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
-> 
->  #ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
-> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-> index 95354bb..8e6e112 100644
-> --- a/kernel/irq/msi.c
-> +++ b/kernel/irq/msi.c
-> @@ -256,6 +256,22 @@ struct irq_domain *msi_create_irq_domain(struct
-> fwnode_handle *fwnode,
->  					   &msi_domain_ops, info);
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index f93aae5..4ddb928 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -103,12 +103,13 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+>  	set_fs(fs);
 >  }
-> 
-> +int msi_domain_prepare_irqs(struct irq_domain *domain, struct device
-> *dev,
-> +			    int nvec, msi_alloc_info_t *arg)
-> +{
-> +	struct msi_domain_info *info = domain->host_data;
-> +	struct msi_domain_ops *ops = info->ops;
-> +	int ret;
-> +
-> +	ret = ops->msi_check(domain, info, dev);
-> +	if (ret == 0)
-> +		ret = ops->msi_prepare(domain, dev, nvec, arg);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return 0;
-> +}
-> +
->  /**
->   * msi_domain_alloc_irqs - Allocate interrupts from a MSI interrupt
-> domain
->   * @domain:	The domain to allocate from
-> @@ -274,9 +290,7 @@ int msi_domain_alloc_irqs(struct irq_domain *domain,
-> struct device *dev,
->  	struct msi_desc *desc;
->  	int i, ret, virq = -1;
-> 
-> -	ret = ops->msi_check(domain, info, dev);
-> -	if (ret == 0)
-> -		ret = ops->msi_prepare(domain, dev, nvec, &arg);
-> +	ret = msi_domain_prepare_irqs(domain, dev, nvec, &arg);
->  	if (ret)
->  		return ret;
-> 
-> --
-> 2.1.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>  
+> -static void dump_backtrace_entry(unsigned long where, unsigned long stack)
+> +static void dump_backtrace_entry(unsigned long where)
+>  {
+> +	/*
+> +	 * The highest stack frame of a swapper process stores PC in a form
+> +	 * of physical address, but this case is not handled.
+> +	 */
+>  	print_ip_sym(where);
+> -	if (in_exception_text(where))
+> -		dump_mem("", "Exception stack", stack,
+> -			 stack + sizeof(struct pt_regs), false);
+>  }
+>  
+>  static void dump_instr(const char *lvl, struct pt_regs *regs)
+> @@ -172,12 +173,17 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+>  	pr_emerg("Call trace:\n");
+>  	while (1) {
+>  		unsigned long where = frame.pc;
+> +		unsigned long stack;
+>  		int ret;
+>  
+> +		dump_backtrace_entry(where);
+>  		ret = unwind_frame(&frame);
+>  		if (ret < 0)
+>  			break;
+> -		dump_backtrace_entry(where, frame.sp);
+> +		stack = frame.sp;
+> +		if (in_exception_text(where))
+> +			dump_mem("", "Exception stack", stack,
+> +				 stack + sizeof(struct pt_regs), false);
+
+AFAICT, the original code is all based on unwind_backtrace in
+arch/arm/kernel/unwind.c. Does that need updating too (as a separate patch)?
+
+Will
