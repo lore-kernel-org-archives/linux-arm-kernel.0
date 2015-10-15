@@ -1,65 +1,63 @@
 From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 15 Oct 2015 10:35:38 +0100
-Subject: [PATCHv3 03/11] arm64: Introduce helpers for page table levels
-In-Reply-To: <20151014170759.GE5041@leverpostej>
+Date: Thu, 15 Oct 2015 10:45:54 +0100
+Subject: [PATCHv3 08/11] arm64: Check for selected granule support
+In-Reply-To: <20151014172418.GI5041@leverpostej>
 References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
- <1444821634-1689-4-git-send-email-suzuki.poulose@arm.com>
- <20151014170759.GE5041@leverpostej>
-Message-ID: <561F736A.4000308@arm.com>
+ <1444821634-1689-9-git-send-email-suzuki.poulose@arm.com>
+ <20151014172418.GI5041@leverpostej>
+Message-ID: <561F75D2.8010301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/15 18:07, Mark Rutland wrote:
-> On Wed, Oct 14, 2015 at 12:20:26PM +0100, Suzuki K. Poulose wrote:
+On 14/10/15 18:24, Mark Rutland wrote:
 
->> + * Number of page-table levels required to address 'va_bits' wide
->> + * address, without section mapping. We resolve the top (va_bits - PAGE_SHIFT)
->> + * bits with (PAGE_SHIFT - 3) bits at each page table level. Hence:
+>> - * other registers depend on the function called upon completion
+>> + * Other registers depend on the function called upon completion.
 >> + *
->> + *  levels = DIV_ROUND_UP((va_bits - PAGE_SHIFT), (PAGE_SHIFT - 3))
->> + *
->> + * We cannot include linux/kernel.h which defines DIV_ROUND_UP here
->> + * due to build issues. So we use the following magic formula.
->> + */
->> +#define ARM64_HW_PGTABLE_LEVELS(va_bits) (((va_bits) - 4) / (PAGE_SHIFT - 3))
+>> + * Checks if the selected granule size is supported by the CPU.
+>> + * If it doesn't park the CPU
 >
-> I think I failed the interview question [1]. :(
+> Nit: "If it isn't, park the CPU."
+
+OK
+
 >
-> I read the comment to mean this was a brand-new piece of magic, as
-> opposed to a constant-folded copy of DIV_ROUND_UP. So it seems there's
-> still some scope for confusion, even if that only includes me.
+>>    */
+>> +#if	defined(CONFIG_ARM64_64K_PAGES)
+>> +
+>> +#define id_aa64mmfr0_tgran_shift	ID_AA64MMFR0_TGRAN64_SHIFT
+>> +#define id_aa64mmfr0_tgran_on		ID_AA64MMFR0_TGRAN64_ON
+>> +
+>> +#else
+>> +
+>> +#define id_aa64mmfr0_tgran_shift	ID_AA64MMFR0_TGRAN4_SHIFT
+>> +#define id_aa64mmfr0_tgran_on		ID_AA64MMFR0_TGRAN4_ON
 >
+> Any reason for not using upper-case names for the macros?
 
-Wouldn't it be better to modify the comment to say, we open coded the DIV_ROUND_UP ?
-We could potentially end up in a conflict if somebody else does __DIV_ROUND_UP.
-I have seen similar issues with the CPU feature series, where if I include one
-particular header file in another, kernel build breaks without giving you a clue,
-what caused the error. Usually due to the multiple definitions (e.g NSEC_PER_SEC)
-and other conflicts. Given that this header file gets included with asm/page.h and
-hence would be used included for people outside arch/arm64, I would prefer, not to
-head there, instead update the comment, something like this :
+Nothing in particular. I had them in upper-case in the previous version,
+changed it here ;) for absolutely no reason. I could switch it back.
 
+> Given they're local you could just call them TGRAN_SHIFT and TRGRAN_ON
+> to make the asm slightly nicer.
 
-/*
-  * Number of page-table levels required to address 'va_bits' wide
-  * address, without section mapping. We resolve the top (va_bits - PAGE_SHIFT)
-  * bits with (PAGE_SHIFT - 3) bits at each page table level. Hence:
-  *
-  *  levels = DIV_ROUND_UP((va_bits - PAGE_SHIFT), (PAGE_SHIFT - 3))
-  *
-  * where DIV_ROUND_UP (n, d) = > ((n) + (d) - 1) / (d)
-  *
-  * We cannot include linux/kernel.h which defines DIV_ROUND_UP here
-  * due to build issues. So we open code the DIV_ROUND_UP and hence
-  * we get :
-  *  ((va_bits - PAGE_SHIFT) + (PAGE_SHIFT - 3) -1) / (PAGE_SHIFT - 3)
-  *
-  * which gets simplified as :
-  *  (((va_bits) - 4) / (PAGE_SHIFT - 3))
-  *
-  */
+Given Jeremy's suggestion to add something to the EFI stub, I will retain
+the original definition with all upper-case and define it somewhere in
+a header so that we can reuse it.
 
-Let me know if you are happy with that ?
+>> +
+>> +__no_granule_support:
+>> +	wfe
+>> +	b __no_granule_support
+>> +ENDPROC(__no_granule_support)
+>
+> Other than the above, this loogs fine to me.
+>
+> In future it would be nice if we could somehow signal that these dead
+> CPUs are trapped in the kernel -- we should have some kind of canary
+> mechanism for that. That needn't block this patch, though.
 
-Thanks
+Yes, we should.
+
+Thanks for the review
 Suzuki
