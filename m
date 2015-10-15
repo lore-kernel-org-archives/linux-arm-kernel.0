@@ -1,216 +1,110 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 15 Oct 2015 11:14:31 -0500
-Subject: [PATCH v1 1/2] phy: keystone: serdes driver for gbe 10gbe and pcie
-In-Reply-To: <1444919145-30845-2-git-send-email-w-kwok2@ti.com>
-References: <1444919145-30845-1-git-send-email-w-kwok2@ti.com>
- <1444919145-30845-2-git-send-email-w-kwok2@ti.com>
-Message-ID: <CAL_JsqL+T7nCtBo9YA=tX1gi=YbvMSswbSj5Fj94uQwB9XStvA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Oct 2015 17:16:00 +0100
+Subject: [PATCH 05/13] irqchip/gic: assign irqchip dynamically
+In-Reply-To: <1444916813-31024-6-git-send-email-linus.walleij@linaro.org>
+References: <1444916813-31024-1-git-send-email-linus.walleij@linaro.org>
+ <1444916813-31024-6-git-send-email-linus.walleij@linaro.org>
+Message-ID: <561FD140.4010809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 9:25 AM, WingMan Kwok <w-kwok2@ti.com> wrote:
-> On TI's Keystone platforms, several peripherals such as the
-> gbe ethernet switch, 10gbe ethernet switch and PCIe controller
-> require the use of a SerDes for converting SoC parallel data into
-> serialized data that can be output over a high-speed electrical
-> interface, and also converting high-speed serial input data
-> into parallel data that can be processed by the SoC.  The
-> SerDeses used by those peripherals, though they may be different,
-> are largely similar in functionality and setup.
->
-> This patch provides a SerDes phy driver implementation that can be
-> used by the above mentioned peripheral drivers to configure their
-> respective SerDeses.
->
-> v1:
->         - see cover letter for review comments addressed.
->
-> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+Hi Linus,
+
+On 15/10/15 14:46, Linus Walleij wrote:
+> Instead of having the irqchip being a static struct, make it part
+> of the per-instance data so we can assign it a dynamic name. This
+> has the usable side effect of displaying the GIC with an instance
+> number as GIC0, GIC1 ... GICn in /proc/interrupts, which is helpful
+> when debugging cascaded GICs, such as on the ARM PB11MPCore.
+> 
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  Documentation/devicetree/bindings/phy/ti-phy.txt |  278 +++
->  drivers/phy/Kconfig                              |    8 +
->  drivers/phy/Makefile                             |    1 +
->  drivers/phy/phy-keystone-serdes.c                | 2373 ++++++++++++++++++++++
->  4 files changed, 2660 insertions(+)
->  create mode 100644 drivers/phy/phy-keystone-serdes.c
->
-> diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
-> index 9cf9446..4dca271 100644
-> --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
-> @@ -115,4 +115,282 @@ sata_phy: phy at 4A096000 {
->         clock-names = "sysclk", "refclk";
->         syscon-pllreset = <&scm_conf 0x3fc>;
->         #phy-cells = <0>;
+> Fellas please say what you think about this:
+> Yes / No / Linus is an idiot
+> This can be applied directly to the irqchip tree if you like
+> it, AFAIK it has no dependencies.
+> ---
+>  drivers/irqchip/irq-gic.c | 36 +++++++++++++++++++-----------------
+>  1 file changed, 19 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index bd021e1e4847..478279cf9517 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -58,6 +58,7 @@ union gic_base {
+>  };
+>  
+>  struct gic_chip_data {
+> +	struct irq_chip chip;
+>  	union gic_base dist_base;
+>  	union gic_base cpu_base;
+>  #ifdef CONFIG_CPU_PM
+> @@ -369,22 +370,6 @@ static void gic_handle_cascade_irq(struct irq_desc *desc)
+>  	chained_irq_exit(chip, desc);
+>  }
+>  
+> -static struct irq_chip gic_chip = {
+> -	.name			= "GIC",
+> -	.irq_mask		= gic_mask_irq,
+> -	.irq_unmask		= gic_unmask_irq,
+> -	.irq_eoi		= gic_eoi_irq,
+> -	.irq_set_type		= gic_set_type,
+> -#ifdef CONFIG_SMP
+> -	.irq_set_affinity	= gic_set_affinity,
+> -#endif
+> -	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
+> -	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
+> -	.flags			= IRQCHIP_SET_TYPE_MASKED |
+> -				  IRQCHIP_SKIP_SET_WAKE |
+> -				  IRQCHIP_MASK_ON_SUSPEND,
+> -};
+> -
+>  static struct irq_chip gic_eoimode1_chip = {
+>  	.name			= "GICv2",
+>  	.irq_mask		= gic_eoimode1_mask_irq,
+> @@ -880,7 +865,8 @@ void __init gic_init_physaddr(struct device_node *node)
+>  static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>  				irq_hw_number_t hw)
+>  {
+> -	struct irq_chip *chip = &gic_chip;
+> +	struct gic_chip_data *gic = d->host_data;
+> +	struct irq_chip *chip = &gic->chip;
+>  
+>  	if (static_key_true(&supports_deactivate)) {
+>  		if (d->host_data == (void *)&gic_data[0])
+> @@ -989,6 +975,22 @@ static void __init __gic_init_bases(unsigned int gic_nr, int irq_start,
+>  	BUG_ON(gic_nr >= MAX_GIC_NR);
+>  
+>  	gic = &gic_data[gic_nr];
 > +
-> +TI Keystone SerDes PHY
-> +======================
+> +	/* Initialize irq_chip */
+> +	gic->chip.name = kasprintf(GFP_KERNEL, "GIC%d", gic_nr);
+> +	gic->chip.irq_mask = gic_mask_irq;
+> +	gic->chip.irq_unmask = gic_unmask_irq;
+> +	gic->chip.irq_eoi = gic_eoi_irq;
+> +	gic->chip.irq_set_type	= gic_set_type;
+> +#ifdef CONFIG_SMP
+> +	gic->chip.irq_set_affinity = gic_set_affinity;
+> +#endif
+> +	gic->chip.irq_get_irqchip_state = gic_irq_get_irqchip_state;
+> +	gic->chip.irq_set_irqchip_state = gic_irq_set_irqchip_state;
+> +	gic->chip.flags = IRQCHIP_SET_TYPE_MASKED |
+> +		IRQCHIP_SKIP_SET_WAKE |
+> +		IRQCHIP_MASK_ON_SUSPEND;
 > +
-> +Required properties:
-> + - compatible: should be one of
-> +       * "ti,keystone-serdes-gbe"
-> +       * "ti,keystone-serdes-xgbe"
-> +       * "ti,keystone-serdes-pcie"
 
-These are different blocks or different modes of the same block? It's
-fine if the former. If the latter, then you should have a single
-compatible and then have a mode property. Perhaps phy-connection-type
-from ePAPR ethernet binding can be extended.
+How does it work when we want to use the ops from gic_eoimode1_chip? I
+don't think it breaks, but it is a bit weird.
 
+You could also replace this sequence by keeping the original structure
+and assigning it to the embedded one (I don't think you save much by
+replacing this with discreet field assignment).
 
-> + - reg:
-> +       * base address and length of the SerDes register set
-> + - reg-names:
-> +       * "serdes"
-> +               - name of the reg SerDes register set
+Thanks,
 
-reg-names is kind of pointless with only 1.
-
-> + - #phy-cells:
-> +       * From the generic phy bindings, must be 0;
-> + - num-lanes:
-> +       * Number of lanes in SerDes.
-> +
-> +Optional properties:
-> + - syscon-peripheral:
-> +       * Handle to the subsystem register region of the peripheral
-> +         inside which the SerDes exists.
-> + - syscon-link:
-> +       * Handle to the Link register region of the peripheral inside
-> +         which the SerDes exists.  Example: it is the PCSR register
-> +         region in the case of 10gbe.
-> + - rx-force-enable:
-> +       * Include this property if receiver attenuation and boost are
-> +         to be configured with specific values defined in rx-force.
-> + - link-rate-kbps:
-> +       * SerDes link rate to be configured, in kbps.
-> +
-> +
-> +For gbe and 10gbe SerDes, it is optional to represent each lane as
-> +a sub-node, which can be enabled or disabled individually using
-> +the "status" property.
-> +
-> +Required properties (lane sub-node):
-> + - reg:
-> +       * lane number
-> +
-> +Optional properties (lane sub-node):
-> + - control-rate:
-> +       * Lane control rate
-> +               0: full rate
-> +               1: half rate
-> +               2: quarter rate
-> + - rx-start:
-> +       * Initial lane rx equalizer attenuation and boost configurations.
-> +       * Must be array of 2 integers.
-> + - rx-force:
-> +       * Forced lane rx equalizer attenuation and boost configurations.
-> +       * Must be array of 2 integers.
-> + - tx-coeff:
-> +       * Lane c1, c2, cm, attenuation and regulator output voltage
-> +         configurations.
-> +       * Must be array of 5 integers.
-> + - loopback:
-> +       * Include this property to enable loopback at the SerDes
-> +         lane level.
-
-This seems overly complicated. Do you really expect these to be
-different per lane?
-
-> +
-> +Example for Keystone K2E GBE:
-> +-----------------------------
-> +
-> +gbe_serdes0: gbe_serdes at 232a000 {
-> +       #phy-cells              = <0>;
-> +       compatible              = "ti,keystone-serdes-gbe";
-> +       reg                     = <0x0232a000 0x2000>;
-> +       reg-names               = "serdes";
-> +       link-rate-kbps          = <1250000>;
-> +       num-lanes               = <4>;
-> +       lanes {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               lane at 0 {
-> +                       /*loopback;*/
-> +                       reg             = <0>;
-> +                       control-rate    = <2>; /* quart */
-> +                       rx-start        = <7 5>;
-> +                       rx-force        = <1 1>;
-> +                       tx-coeff        = <0 0 0 12 4>;
-> +                              /* c1 c2 cm att vreg */
-> +               };
-> +               lane at 1 {
-> +                       /*loopback;*/
-> +                       reg             = <1>;
-> +                       control-rate    = <2>; /* quart */
-> +                       rx-start        = <7 5>;
-> +                       rx-force        = <1 1>;
-> +                       tx-coeff        = <0 0 0 12 4>;
-> +                              /* c1 c2 cm att vreg */
-> +               };
-> +       };
-> +};
-> +
-> +gbe_serdes1: gbe_serdes at 2324000 {
-> +       #phy-cells              = <0>;
-> +       compatible              = "ti,keystone-serdes-gbe";
-> +       reg                     = <0x02324000 0x2000>;
-> +       reg-names               = "serdes";
-> +       link-rate-kbps          = <1250000>;
-> +       num-lanes               = <4>;
-
-4 lanes, but only 2 child nodes?
-
-> +       lanes {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               lane at 0 {
-> +                       /*loopback;*/
-> +                       reg             = <0>;
-> +                       control-rate    = <2>; /* quart */
-> +                       rx-start        = <7 5>;
-> +                       rx-force        = <1 1>;
-> +                       tx-coeff        = <0 0 0 12 4>;
-> +                              /* c1 c2 cm att vreg */
-> +               };
-> +               lane at 1 {
-> +                       /*loopback;*/
-> +                       reg             = <1>;
-> +                       control-rate    = <2>; /* quart */
-> +                       rx-start        = <7 5>;
-> +                       rx-force        = <1 1>;
-> +                       tx-coeff        = <0 0 0 12 4>;
-> +                              /* c1 c2 cm att vreg */
-> +               };
-> +       };
-> +};
-> +
-> +netcp: netcp at 24000000 {
-> +       ...
-> +
-> +       netcp-devices {
-> +               ...
-> +
-> +               gbe at 200000 { /* ETHSS */
-> +                       ...
-> +                       serdeses {
-> +                               #address-cells = <1>;
-> +                               #size-cells = <0>;
-> +                               serdes at 0 {
-> +                                       reg = <0>;
-> +                                       phys = <&gbe_serdes0>;
-> +                                       status = "ok";
-> +                               };
-> +                               serdes at 1 {
-> +                                       reg = <1>;
-> +                                       phys = <&gbe_serdes1>;
-> +                                       status = "ok";
-
-This is way too complex. Just do:
-
-phys = <&gbe_serdes0, &gbe_serdes1>;
-
-in the gbe node.
-
-Rob
+	M.
+-- 
+Jazz is not dead. It just smells funny...
