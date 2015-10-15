@@ -1,179 +1,76 @@
-From: w-kwok2@ti.com (Kwok, WingMan)
-Date: Thu, 15 Oct 2015 20:08:32 +0000
-Subject: [PATCH v1 1/2] phy: keystone: serdes driver for gbe 10gbe and pcie
-In-Reply-To: <5192855.p6QLDWTiVi@wuerfel>
-References: <1444919145-30845-1-git-send-email-w-kwok2@ti.com>
- <1444919145-30845-2-git-send-email-w-kwok2@ti.com>
- <5192855.p6QLDWTiVi@wuerfel>
-Message-ID: <230CBA6E4B6B6B418E8730AC28E6FC7E04228DB8@DFLE11.ent.ti.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 15 Oct 2015 15:10:50 -0500
+Subject: [PATCH v2 3/8] PCI/MSI: Use of_msi_get_domain instead of
+ open-coded "msi-parent" parsing
+In-Reply-To: <1444151043-31084-4-git-send-email-marc.zyngier@arm.com>
+References: <1444151043-31084-1-git-send-email-marc.zyngier@arm.com>
+ <1444151043-31084-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151015201050.GC10442@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Oct 06, 2015 at 06:03:58PM +0100, Marc Zyngier wrote:
+> Now that we have a function that implements the complexity of the
+> "msi-parent" property parsing, switch to that.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Thursday, October 15, 2015 10:51 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Kwok, WingMan; robh+dt at kernel.org; pawel.moll at arm.com;
-> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk; galak at codeaurora.org;
-> KISHON VIJAY ABRAHAM; Quadros, Roger; Karicheri, Muralidharan;
-> bhelgaas at google.com; ssantosh at kernel.org; linux at arm.linux.org.uk;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
-> pci at vger.kernel.org
-> Subject: Re: [PATCH v1 1/2] phy: keystone: serdes driver for gbe 10gbe and
-> pcie
-> 
-> On Thursday 15 October 2015 10:25:44 WingMan Kwok wrote:
-> > On TI's Keystone platforms, several peripherals such as the
-> > gbe ethernet switch, 10gbe ethernet switch and PCIe controller
-> > require the use of a SerDes for converting SoC parallel data into
-> > serialized data that can be output over a high-speed electrical
-> > interface, and also converting high-speed serial input data
-> > into parallel data that can be processed by the SoC.  The
-> > SerDeses used by those peripherals, though they may be different,
-> > are largely similar in functionality and setup.
-> >
-> > This patch provides a SerDes phy driver implementation that can be
-> > used by the above mentioned peripheral drivers to configure their
-> > respective SerDeses.
-> >
-> > v1:
-> > 	- see cover letter for review comments addressed.
-> >
-> > Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-> > ---
-> >  Documentation/devicetree/bindings/phy/ti-phy.txt |  278 +++
-> >  drivers/phy/Kconfig                              |    8 +
-> >  drivers/phy/Makefile                             |    1 +
-> >  drivers/phy/phy-keystone-serdes.c                | 2373
-> ++++++++++++++++++++++
-> >  4 files changed, 2660 insertions(+)
-> >  create mode 100644 drivers/phy/phy-keystone-serdes.c
-> 
-> This is quite a bit of code. Are you very sure that this PHY is
-> not used on any other SoC family, and that it is not licensed
-> from a third party? I would hate to see multiple copies of
-> this getting merged into the kernel over time, so thename should
-> be chosen carefully to let the next person know when they have
-> related hardware.
-> 
-> > +
-> > +gbe_serdes0: gbe_serdes at 232a000 {
-> 
-> 
-> make that phy at 232a000, the name should be one of the usual identifiers,
-> not specific to the instance.
-> 
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-will change to something like gbe_serdes0: phy at 232a000 {};
-
-> > +config PHY_TI_KEYSTONE_SERDES
-> > +	tristate "TI Keystone SerDes PHY support"
-> > +	depends on OF && ARCH_KEYSTONE
-> > +	select GENERIC_PHY
-> > +	help
-> > +	  This option enables support for TI Keystone SerDes PHY found
-> > +	  in peripherals GBE, 10GBE and PCIe.
-> > +
+> ---
+>  drivers/pci/of.c | 13 ++++++-------
+>  1 file changed, 6 insertions(+), 7 deletions(-)
 > 
-> (ARCH_KEYSTONE || COMPILE_TEST) ?
+> diff --git a/drivers/pci/of.c b/drivers/pci/of.c
+> index 2e99a50..e112da1 100644
+> --- a/drivers/pci/of.c
+> +++ b/drivers/pci/of.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/pci.h>
+>  #include <linux/of.h>
+> +#include <linux/of_irq.h>
+>  #include <linux/of_pci.h>
+>  #include "pci.h"
+>  
+> @@ -64,27 +65,25 @@ struct device_node * __weak pcibios_get_phb_of_node(struct pci_bus *bus)
+>  struct irq_domain *pci_host_bridge_of_msi_domain(struct pci_bus *bus)
+>  {
+>  #ifdef CONFIG_IRQ_DOMAIN
+> -	struct device_node *np;
+>  	struct irq_domain *d;
+>  
+>  	if (!bus->dev.of_node)
+>  		return NULL;
+>  
+>  	/* Start looking for a phandle to an MSI controller. */
+> -	np = of_parse_phandle(bus->dev.of_node, "msi-parent", 0);
+> +	d = of_msi_get_domain(&bus->dev, bus->dev.of_node, DOMAIN_BUS_PCI_MSI);
+> +	if (d)
+> +		return d;
+>  
+>  	/*
+>  	 * If we don't have an msi-parent property, look for a domain
+>  	 * directly attached to the host bridge.
+>  	 */
+> -	if (!np)
+> -		np = bus->dev.of_node;
+> -
+> -	d = irq_find_matching_host(np, DOMAIN_BUS_PCI_MSI);
+> +	d = irq_find_matching_host(bus->dev.of_node, DOMAIN_BUS_PCI_MSI);
+>  	if (d)
+>  		return d;
+>  
+> -	return irq_find_host(np);
+> +	return irq_find_host(bus->dev.of_node);
+>  #else
+>  	return NULL;
+>  #endif
+> -- 
+> 2.1.4
 > 
-
-will add COMPILE_TEST
-
-> > + * Redistributions in binary form must reproduce the above copyright
-> > + * notice, this list of conditions and the following disclaimer in the
-> > + * documentation and/or other materials provided with the
-> > + * distribution.
-> 
-> The current code does not do this when compiled, which might be a
-> problem for distributors. Can you clarify the license?
-> 
-
-will investigate
-
-> > +#define reg_rmw(addr, value, mask) \
-> > +	__raw_writel(((__raw_readl(addr) & (~(mask))) | \
-> > +			(value & (mask))), (addr))
-> 
-> not endian safe, and potentially racy.
-> 
-
-will change to 
-
-#define reg_rmw(addr, value, mask) \
-	writel(((readl(addr) & (~(mask))) | \
-			(value & (mask))), (addr))
-
-> > +static inline void _kserdes_reset_cdr(void __iomem *sregs, int lane)
-> > +{
-> > +	/* toggle signal detect */
-> > +	_kserdes_force_signal_detect_low(sregs, lane);
-> > +	mdelay(1);
-> > +	_kserdes_force_signal_detect_high(sregs, lane);
-> > +}
-> 
-> Can you change the code so you can use msleep(1) here?
-> 
-
-will replace delays with usleep_range()
-
-> > +
-> > +	do {
-> > +		mdelay(10);
-> > +		memset(lane_down, 0, sizeof(lane_down));
-> > +
-> > +		link_up = _kserdes_check_link_status(dev, sregs,
-> > +						     pcsr_regmap, lanes,
-> > +						     lanes_enable,
-> > +						     current_state, lane_down);
-> > +
-> > +		/* if we did not get link up then wait 100ms
-> > +		 * before calling it again
-> > +		 */
-> > +		if (link_up)
-> > +			break;
-> > +
-> > +		for (i = 0; i < lanes; i++) {
-> > +			if ((lanes_enable & (1 << i)) && lane_down[i])
-> > +				dev_dbg(dev,
-> > +					"XGE: detected lane down on lane %d\n",
-> > +					i);
-> > +		}
-> > +
-> > +		if (++retries > 100)
-> > +			return -ETIMEDOUT;
-> > +
-> > +	} while (!link_up);
-> 
-> an more importantly here. Blocking the CPU for over one second is not good.
-> 
-> Any use of mdelay() should have a comment explaining why you cannot use
-> msleep() in that instance.
-> 
-
-will replace delays with usleep_range()
-
-> > +
-> > +static int __init keystone_serdes_phy_init(void)
-> > +{
-> > +	return platform_driver_register(&kserdes_driver);
-> > +}
-> > +module_init(keystone_serdes_phy_init);
-> > +
-> > +static void __exit keystone_serdes_phy_exit(void)
-> > +{
-> > +	platform_driver_unregister(&kserdes_driver);
-> > +}
-> > +module_exit(keystone_serdes_phy_exit);
-> 
-> module_platform_driver()
-> 	
-
-will do.
-
-> 	Arnd
-
-Thanks,
-WingMan
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
