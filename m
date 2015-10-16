@@ -1,155 +1,64 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 16 Oct 2015 10:03:06 +0200
-Subject: [PATCHv3 08/11] arm64: Check for selected granule support
-In-Reply-To: <561FA311.3020802@arm.com>
-References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
- <1444821634-1689-9-git-send-email-suzuki.poulose@arm.com>
- <561EC58B.9080408@arm.com> <20151015104515.GE8825@leverpostej>
- <20151015112532.GA16125@e106634-lin.cambridge.arm.com>
- <20151015123727.GH8825@leverpostej> <561FA311.3020802@arm.com>
-Message-ID: <CAKv+Gu9=k1mu-PuLKz+gm8MWO3qvNBW7R9epa4RyLhhzTdDKQA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 16 Oct 2015 09:03:14 +0100
+Subject: [PATCH RFC 0/7] Adding core support for wire-MSI bridges
+In-Reply-To: <5879538.pKBkpUOxls@wuerfel>
+References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
+ <5027676.zPNVVQXaP4@wuerfel> <561FCDBE.8000407@arm.com>
+ <5879538.pKBkpUOxls@wuerfel>
+Message-ID: <5620AF42.4070204@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 October 2015 at 14:58, Suzuki K. Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 15/10/15 13:37, Mark Rutland wrote:
+On 15/10/15 20:16, Arnd Bergmann wrote:
+> On Thursday 15 October 2015 17:01:02 Marc Zyngier wrote:
 >>
->> On Thu, Oct 15, 2015 at 12:25:33PM +0100, Suzuki K. Poulose wrote:
->>>
->>> On Thu, Oct 15, 2015 at 11:45:15AM +0100, Mark Rutland wrote:
->>>>
->>>> On Wed, Oct 14, 2015 at 04:13:47PM -0500, Jeremy Linton wrote:
->>>>>
->>>>> On 10/14/2015 06:20 AM, Suzuki K. Poulose wrote:
->
->
->
->>>
->>> ----8>----
->>>
->>> Author: Suzuki K. Poulose <suzuki.poulose@arm.com>
->>> Date:   Wed Oct 14 11:25:16 2015 +0100
->>>
->>>      arm64: Check for selected granule support
->>>
->>>      Ensure that the selected page size is supported by the CPU(s). If it
->>> isn't
->>>      park the CPU. A check is added to the EFI stub to detect if the boot
->>> CPU
->>>      supports the page size, failing which, we fail the boot gracefully,
->>> with
->>>      an error message.
->>>
->>>      Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
->>>      [ Added a check to EFI stub ]
->>>      Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>> "Preconfigured" is the key word. While you can do something like that if
+>> your hardware treats MSIs just as if they were wired interrupts
+>> (something like GICv2m), it becomes far more hairy if the target of MSIs
+>> is something like a GICv3 ITS (which is the case for HiSilicon mbigen).
 >>
+>> The main reason is that the ITS relies on "translation tables" kept in
+>> memory, which the OS has to configure, and handing over pre-configured
+>> tables is not something I'm looking forward to doing. From a CPU point
+>> of view, this is akin entering the kernel with the MMU already on and no
+>> idmap...
 >>
->> Your sign-off should be last, given you are taking resposibility for
->> Jeremy's patch.
->
->
-> OK, I was a bit confused about how it should look like. I kept it on top
-> so that I could add [ ] for Jeremy's contribution.
->
+>> The approach taken here is to make the MSI-ness explicit at the irqchip
+>> level, and keep the interrupting device oblivious of that feature. Also,
+>> this relies on the fact that we can have one MSI per wire, meaning that
+>> we don't have to multiplex anything (no nested irqchip), and that we can
+>> rely on hierarchical domains, which simplifies the code (at least for
+>> the irqchip).
 >>
->> However, I would prefer that the EFI stub addition were a separate/later
->> patch.
->
->
-> OK, that makes sense.
->
->>
->>> diff --git a/arch/arm64/include/asm/sysreg.h
->>> b/arch/arm64/include/asm/sysreg.h
->>> index a7f3d4b..72d814c 100644
->>> --- a/arch/arm64/include/asm/sysreg.h
->>> +++ b/arch/arm64/include/asm/sysreg.h
->
->
->>> +#define ID_AA64MMFR0_TGRAN4_NI         0xf
->>> +#define ID_AA64MMFR0_TGRAN4_ON         0x0
->>> +#define ID_AA64MMFR0_TGRAN64_NI                0xf
->>> +#define ID_AA64MMFR0_TGRAN64_ON                0x0
->>> +#define ID_AA64MMFR0_TGRAN16_NI                0x0
->>> +#define ID_AA64MMFR0_TGRAN16_ON                0x1
->>
->>
->> I still don't like "ON" here -- I thought these would also be changed
->> s/ON/SUPPORTED/.
->
->
-> I know and I expected that. I have "_ON" in my 'CPU feature' series, which
-> will/can be reused here. Hence kept it _ON. I can change it everywhere to
-> _SUPPORTED, since I may need to spin another version for that.
->
->
->>>   #include <linux/efi.h>
->>>   #include <asm/efi.h>
->>> +#include <asm/sysreg.h>
->>>   #include <asm/sections.h>
->>
->>
->> Nit: include order.
->
->
-> OK
->
->>
->>>
->>> +#if defined(CONFIG_ARM64_4K_PAGES)
->>> +#define PAGE_SIZE_STR  "4K"
->>> +#elif defined(CONFIG_ARM64_64K_PAGES)
->>> +#define PAGE_SIZE_STR  "64K"
->>> +#endif
->>> +
+> 
+> Thanks, that already makes things much clearer. Just one more question:
+> why can't those translation tables be configured statically by the
+> irqchip driver? Is this all about being able to cut a few cycles
+> in case of virtualization? 
 
-4k can be dropped (since UEFI support implies support for 4k pages)
-16k is missing here
+Having a static configuration, while doable, complicates things for
+everybody else. The LPI number used by the irqchip would need to be put
+an some "exclusion list" to make sure it is not reallocated for other
+subsystems (e.g PCI). The translation tables also define the target CPU,
+which could cause interesting problems once combined with CPU hotplug if
+the ITS is not completely in control of it.
 
->>>   efi_status_t __init handle_kernel_image(efi_system_table_t
->>> *sys_table_arg,
->>>                                         unsigned long *image_addr,
->>>                                         unsigned long *image_size,
->>> @@ -25,6 +32,17 @@ efi_status_t __init
->>> handle_kernel_image(efi_system_table_t *sys_table_arg,
->>>         unsigned long kernel_size, kernel_memsize = 0;
->>>         unsigned long nr_pages;
->>>         void *old_image_addr = (void *)*image_addr;
->>> +       u64 aa64mmfr0_el1;
->>> +
->>> +       /*
->>> +        * Check to see if the CPU supports the requested pagesize
->>> +        */
+I'm not really getting your point about virtualization though.
 
-... so here you would need a #ifndef CONFIG_ARM_4K_PAGES as well.
+> I would assume that once you have gone through the overhead of having
+> both an MSI and a normal interrupt line (with the need for
+> serialization vs DMA), you can just as well trap to user space to
+> deliver an IRQ to a guest.
 
->>> +       asm volatile("mrs %0, ID_AA64MMFR0_EL1" : "=r" (aa64mmfr0_el1));
->>
->>
->> Can we not use read_cpuid() or similar here?
->
->
-> Yes, I will try that out. I didn't want to include additional header-files
-> in efi-stub.c.
->
->
->>> +       aa64mmfr0_el1 >>= ID_AA64MMFR0_TGRAN_SHIFT;
->>
->>
->> ... and can we not do the shift and mask in one go?
->>
->
->>> +       if ((aa64mmfr0_el1 & 0xf) != ID_AA64MMFR0_TGRAN_SUPPORTED) {
->>> +               pr_efi_err(sys_table_arg, PAGE_SIZE_STR" granule not
->>> supported by the CPU\n");
->>
->>
->> Nit: space before the first quote, please.
->
->
-> Will do
->
-> Thanks
-> Suzuki
->
+The whole idea behind this bridge is to move wired interrupts to the
+periphery of a SoC. I don't think virtualization was part of the
+equation, but of course I can't speak for the "geniuses" behind the idea.
+
+Or maybe I'm reading your question the wrong way, which is entirely
+possible given the lack of caffeine.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
