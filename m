@@ -1,39 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Oct 2015 22:27:29 +0200
-Subject: [PATCH] [media] sh-vou: clarify videobuf2 dependency
-Message-ID: <9667468.98avsAXYlo@wuerfel>
+Date: Fri, 16 Oct 2015 22:30:59 +0200
+Subject: [PATCH] [media] horus3a: fix horus3a_attach inline wrapper
+Message-ID: <7188906.Hi9qi0FZQC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sh-vou driver has been converted from videobuf to videobuf2, but
-the Kconfig file still lists VIDEOBUF_DMA_CONTIG as a dependency.
-Consequently we can build the driver without VIDEOBUF2_DMA_CONTIG
-and get a link error:
+The 'static inline' version of horus3a_attach() is incorrectly
+copied from another file, which results in a build error when
+CONFIG_DVB_HORUS3A is disabled:
 
-drivers/built-in.o: In function `sh_vou_probe':
-vf610-ocotp.c:(.text+0x2dbf5c): undefined reference to `vb2_dma_contig_init_ctx'
-vf610-ocotp.c:(.text+0x2dc0b4): undefined reference to `vb2_dma_contig_cleanup_ctx'
-vf610-ocotp.c:(.text+0x2dc144): undefined reference to `vb2_dma_contig_memops'
-drivers/built-in.o: In function `sh_vou_remove':
-vf610-ocotp.c:(.text+0x2dc190): undefined reference to `vb2_dma_contig_cleanup_ctx'
+In file included from /git/arm-soc/drivers/media/pci/netup_unidvb/netup_unidvb_core.c:34:0:
+media/dvb-frontends/horus3a.h:51:13: warning: 'struct cxd2820r_config' declared inside parameter list
+media/dvb-frontends/horus3a.h:51:13: warning: its scope is only this definition or declaration, which is probably not what you want
+media/pci/netup_unidvb/netup_unidvb_core.c: In function 'netup_unidvb_dvb_init':
+media/pci/netup_unidvb/netup_unidvb_core.c:417:279: warning: passing argument 1 of '__a' from incompatible pointer type [-Wincompatible-pointer-types]
+media/pci/netup_unidvb/netup_unidvb_core.c:417:279: note: expected 'const struct cxd2820r_config *' but argument is of type 'struct dvb_frontend *'
+media/pci/netup_unidvb/netup_unidvb_core.c:417:298: warning: passing argument 2 of '__a' from incompatible pointer type [-Wincompatible-pointer-types]
+media/pci/netup_unidvb/netup_unidvb_core.c:417:298: note: expected 'struct i2c_adapter *' but argument is of type 'struct horus3a_config *'
+media/pci/netup_unidvb/netup_unidvb_core.c:417:275: error: too many arguments to function '__a'
 
-This changes the dependency to VIDEOBUF2_DMA_CONTIG instead.
+This changes the code to have the correct prototype.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 57af3ad59d95 ("[media] sh-vou: convert to vb2")
+Fixes: a5d32b358254 ("[media] horus3a: Sony Horus3A DVB-S/S2 tuner driver")
 ---
-Found on ARM randconfig tests
+Found on ARM randconfig builds
 
-diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-index f88a6cfb7086..3ddf72f2d844 100644
---- a/drivers/media/platform/Kconfig
-+++ b/drivers/media/platform/Kconfig
-@@ -38,7 +38,7 @@ config VIDEO_SH_VOU
- 	depends on MEDIA_CAMERA_SUPPORT
- 	depends on VIDEO_DEV && I2C && HAS_DMA
- 	depends on ARCH_SHMOBILE || COMPILE_TEST
--	select VIDEOBUF_DMA_CONTIG
-+	select VIDEOBUF2_DMA_CONTIG
- 	help
- 	  Support for the Video Output Unit (VOU) on SuperH SoCs.
- 
+diff --git a/drivers/media/dvb-frontends/horus3a.h b/drivers/media/dvb-frontends/horus3a.h
+index b055319d532e..c1e2d1834b78 100644
+--- a/drivers/media/dvb-frontends/horus3a.h
++++ b/drivers/media/dvb-frontends/horus3a.h
+@@ -46,8 +46,8 @@ extern struct dvb_frontend *horus3a_attach(struct dvb_frontend *fe,
+ 					const struct horus3a_config *config,
+ 					struct i2c_adapter *i2c);
+ #else
+-static inline struct dvb_frontend *horus3a_attach(
+-					const struct cxd2820r_config *config,
++static inline struct dvb_frontend *horus3a_attach(struct dvb_frontend *fe,
++					const struct horus3a_config *config,
+ 					struct i2c_adapter *i2c)
+ {
+ 	printk(KERN_WARNING "%s: driver disabled by Kconfig\n", __func__);
