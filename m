@@ -1,17 +1,17 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 16 Oct 2015 16:27:33 +0200
-Subject: [PATCH v2 1/2] pinctrl: sunxi: Fix irq_of_xlate for the r_pio
- pinctrl block
-In-Reply-To: <1444981572-17235-2-git-send-email-hdegoede@redhat.com>
+Date: Fri, 16 Oct 2015 16:28:05 +0200
+Subject: [PATCH v2 2/2] pinctrl: sunxi: Add irq pinmuxing to sun6i "r"
+ pincontroller
+In-Reply-To: <1444981572-17235-3-git-send-email-hdegoede@redhat.com>
 References: <1444981572-17235-1-git-send-email-hdegoede@redhat.com>
- <1444981572-17235-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151016142733.GL2711@lukather>
+ <1444981572-17235-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151016142805.GM2711@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 09:46:11AM +0200, Hans de Goede wrote:
-> The r_pio gpio / pin controller has a pin_base of non 0, we need to
-> adjust for this before calling sunxi_pinctrl_desc_find_function_by_pin.
+On Fri, Oct 16, 2015 at 09:46:12AM +0200, Hans de Goede wrote:
+> Add pinmuxing for external interrupt functionality through the
+> sun6i "r" pincontroller.
 > 
 > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
@@ -30,4 +30,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151016/0609b168/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151016/de79d6f9/attachment.sig>
