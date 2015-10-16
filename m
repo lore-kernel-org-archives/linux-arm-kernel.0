@@ -1,49 +1,52 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Fri, 16 Oct 2015 10:31:53 +0800
-Subject: [alsa-devel] [RFC PATCH] ASoC: Modify check condition of
- multiple bindings of components
-In-Reply-To: <561FA979.6030407@metafoo.de>
-References: <1444743477-48819-1-git-send-email-koro.chen@mediatek.com>
- <561D0AA9.5080702@metafoo.de> <1444745902.26493.2.camel@mtksdaap41>
- <561D1843.1020007@metafoo.de> <1444785549.26493.12.camel@mtksdaap41>
- <561E1991.1050705@metafoo.de> <20151015121035.GE14956@sirena.org.uk>
- <561FA979.6030407@metafoo.de>
-Message-ID: <1444962713.31246.6.camel@mtksdaap41>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 16 Oct 2015 10:42:17 +0800
+Subject: [RESEND PATCH] pwm-backlight: fix the panel power sequence
+In-Reply-To: <1444959454-1516-1-git-send-email-yh.huang@mediatek.com>
+Message-ID: <201510161036.Q5q8ayZx%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-10-15 at 15:26 +0200, Lars-Peter Clausen wrote:
-> On 10/15/2015 02:10 PM, Mark Brown wrote:
-> > On Wed, Oct 14, 2015 at 11:00:01AM +0200, Lars-Peter Clausen wrote:
-> > 
-> >> It was never intended that it is possible to bind a component to multiple
-> >> cards. That it was possible was a bug that was overlooked and some people
-> >> tried to do it which caused apparently random crashes later on, caused by
-> >> the data structure corruption. This is why we added the check to catch this
-> >> kind of mistake early and to avoid the crashes.
-> > 
-> > This is true, but I do think it's something that we should have some
-> > story on supporting for some of this hardware that has a bunch of
-> > channels in one IP block that can't really interact with each other.
-> > It's going to make it a lot easier for people to think about the
-> > hardware and how to describe it.
-> 
-> I'm not saying we shouldn't support it, just that we can't support it with
-> the current code. And adding support for it will require a fair bit of
-> restructuring.
-> 
-> If a hardware block as multiple independent channels the best approach in my
-> opinion is to register multiple components (Which we can't do at the moment,
-> because there can only be one component per device). From a framework point
-Yes... I have tried to register 2 platforms in my ASoC platform driver
-but alsa considered they are the same platform since they are from the
-same device.
-> of view there is no difference between a single device with multiple
-> independent channels and multiple independent devices with one channel each.
-> Both have the same logical topology.
-> 
-Yes, but in my case there is only one HW, one set of registers, and one
-set of clocks, it should be a single device node in the device tree. 
-> - Lars
-> 
-> 
+Hi YH,
+
+[auto build test ERROR on pwm/for-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+
+url:    https://github.com/0day-ci/linux/commits/YH-Huang/pwm-backlight-fix-the-panel-power-sequence/20151016-093957
+config: i386-allmodconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+   drivers/video/backlight/pwm_bl.c: In function 'pwm_backlight_probe':
+>> drivers/video/backlight/pwm_bl.c:245:20: error: too few arguments to function 'devm_gpiod_get_optional'
+     pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable");
+                       ^
+   In file included from drivers/video/backlight/pwm_bl.c:13:0:
+   include/linux/gpio/consumer.h:80:32: note: declared here
+    struct gpio_desc *__must_check devm_gpiod_get_optional(struct device *dev,
+                                   ^
+
+vim +/devm_gpiod_get_optional +245 drivers/video/backlight/pwm_bl.c
+
+   239		pb->notify_after = data->notify_after;
+   240		pb->check_fb = data->check_fb;
+   241		pb->exit = data->exit;
+   242		pb->dev = &pdev->dev;
+   243		pb->enabled = false;
+   244	
+ > 245		pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable");
+   246		if (IS_ERR(pb->enable_gpio)) {
+   247			ret = PTR_ERR(pb->enable_gpio);
+   248			goto err_alloc;
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 51512 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151016/2b0d9788/attachment-0001.obj>
