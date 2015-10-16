@@ -1,94 +1,58 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 16 Oct 2015 13:32:47 +0100
-Subject: [PATCH v2] mailbox: Fix a couple of trivial static checker issues
-In-Reply-To: <20151016113251.GF31804@x1>
-References: <1444980091-16728-5-git-send-email-lee.jones@linaro.org>
- <201510161646.D4m1dK6L%fengguang.wu@intel.com>
- <20151016113251.GF31804@x1>
-Message-ID: <20151016123247.GG31804@x1>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Fri, 16 Oct 2015 14:33:18 +0200
+Subject: [RFT PATCH v2 6/6] ARM: dts: Mark eMMC as non-removable in
+ exynos5250-snow-common
+In-Reply-To: <1444927873-15140-7-git-send-email-javier@osg.samsung.com>
+References: <1444927873-15140-1-git-send-email-javier@osg.samsung.com>
+ <1444927873-15140-7-git-send-email-javier@osg.samsung.com>
+Message-ID: <CAAObsKCuSvwnbKmB6gskoGTkvHBrz2rqu3Qif7WHn_fDbF7_wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mailbox: Fix a couple of trivial static checker issues
+On 15 October 2015 at 18:51, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> The eMMC is non-removable so mark it using the non-removable DT
+> property to avoid having to redetect it after a suspend/resume.
+>
+> Also remove the card-detect-delay property that is not needed with
+> non-removable.
+>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-This patch deals with a few spelling, white space and type
-warnings reported by Intel's Kbuild Test Robot.
+Reviewed-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Tested-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
-Reported-by: kbuild test robot <lkp@intel.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
-v1 => v2:
+Thanks,
 
-Looks like I took the AKA in this too literally:
+Tomeu
 
-  format '%d' expects argument of type 'int',
-    but argument 3 has type 'size_t {aka long unsigned int}'
-
-After some research I found a new printk format specifier suitable for size_t.
-
- drivers/mailbox/mailbox-sti.c  |  2 +-
- drivers/mailbox/mailbox-test.c | 10 +++++-----
- 2 files changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/mailbox/mailbox-sti.c b/drivers/mailbox/mailbox-sti.c
-index f11d4e8..4835817 100644
---- a/drivers/mailbox/mailbox-sti.c
-+++ b/drivers/mailbox/mailbox-sti.c
-@@ -64,7 +64,7 @@ struct sti_mbox_device {
- };
- 
- /**
-- * STi Mailbox platform specfic configuration
-+ * STi Mailbox platform specific configuration
-  *
-  * @num_inst:	Maximum number of instances in one HW Mailbox
-  * @num_chan:	Maximum number of channel per instance
-diff --git a/drivers/mailbox/mailbox-test.c b/drivers/mailbox/mailbox-test.c
-index cac1ba2..22f2e40 100644
---- a/drivers/mailbox/mailbox-test.c
-+++ b/drivers/mailbox/mailbox-test.c
-@@ -22,7 +22,7 @@
- #define MBOX_MAX_SIG_LEN	8
- #define MBOX_MAX_MSG_LEN	128
- #define MBOX_BYTES_PER_LINE	16
--#define MBOX_HEXDUMP_LINE_LEN 	((MBOX_BYTES_PER_LINE * 4) + 2)
-+#define MBOX_HEXDUMP_LINE_LEN	((MBOX_BYTES_PER_LINE * 4) + 2)
- #define MBOX_HEXDUMP_MAX_LEN	(MBOX_HEXDUMP_LINE_LEN *		\
- 				 (MBOX_MAX_MSG_LEN / MBOX_BYTES_PER_LINE))
- 
-@@ -30,7 +30,7 @@ static struct dentry *root_debugfs_dir;
- 
- struct mbox_test_device {
- 	struct device		*dev;
--	void __iomem		*mmio;
-+	void			*mmio;
- 	struct mbox_chan	*tx_channel;
- 	struct mbox_chan	*rx_channel;
- 	char			*rx_buffer;
-@@ -53,7 +53,7 @@ static ssize_t mbox_test_signal_write(struct file *filp,
- 
- 	if (count > MBOX_MAX_SIG_LEN) {
- 		dev_err(tdev->dev,
--			"Signal length %d greater than max allowed %d\n",
-+			"Signal length %zd greater than max allowed %d\n",
- 			count, MBOX_MAX_SIG_LEN);
- 		return -EINVAL;
- 	}
-@@ -92,7 +92,7 @@ static ssize_t mbox_test_message_write(struct file *filp,
- 
- 	if (count > MBOX_MAX_MSG_LEN) {
- 		dev_err(tdev->dev,
--			"Message length %d greater than max allowed %d\n",
-+			"Message length %zd greater than max allowed %d\n",
- 			count, MBOX_MAX_MSG_LEN);
- 		return -EINVAL;
- 	}
-@@ -303,7 +303,7 @@ static int mbox_test_probe(struct platform_device *pdev)
- 	tdev->tx_channel = mbox_test_request_channel(pdev, "tx");
- 	tdev->rx_channel = mbox_test_request_channel(pdev, "rx");
- 
--	if (!tdev->tx_channel && !tdev->tx_channel)
-+	if (!tdev->tx_channel && !tdev->rx_channel)
- 		return -EPROBE_DEFER;
- 
- 	tdev->dev = &pdev->dev;
+> ---
+>
+> Changes since v1:
+> - None, new patch.
+>
+>  arch/arm/boot/dts/exynos5250-snow-common.dtsi | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+> index 1822c502a25a..5cb33ba5e296 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+> @@ -520,8 +520,7 @@
+>  &mmc_0 {
+>         status = "okay";
+>         num-slots = <1>;
+> -       broken-cd;
+> -       card-detect-delay = <200>;
+> +       non-removable;
+>         samsung,dw-mshc-ciu-div = <3>;
+>         samsung,dw-mshc-sdr-timing = <2 3>;
+>         samsung,dw-mshc-ddr-timing = <1 2>;
+> --
+> 2.4.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
