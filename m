@@ -1,49 +1,51 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 16 Oct 2015 16:33:41 +0100
-Subject: [PATCH 1/2] arm64: Workaround renaming of __GFP_WAIT
-Message-ID: <ecbbf6550654071f13d1bdc04b86dc4d69ad09b4.1445008695.git.robin.murphy@arm.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Fri, 16 Oct 2015 08:36:22 -0700
+Subject: [PATCH v2 1/4] mtd: brcmnand: Fix pointer type-cast in
+ brcmnand_write()
+In-Reply-To: <1444986537-28387-2-git-send-email-anup.patel@broadcom.com>
+References: <1444986537-28387-1-git-send-email-anup.patel@broadcom.com>
+ <1444986537-28387-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <56211976.1030401@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imminent renaming of __GFP_WAIT in the mm tree conflicts with its
-use in the new IOMMU DMA ops; introduce a temporary local version of
-its replacement to smooth over the transition.
-
-This patch should be reverted at 4.4-rc1.
-
-CC: Mel Gorman <mgorman@techsingularity.net>
-CC: Andrew Morton <akpm@linux-foundation.org>
-Reported-by: Sudeep Holla <sudeep.holla@arm.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
-
-Sudeep points out that there are pending changes in -next touching arm64
-which I hadn't spotted, which end up breaking the build when merged with
-my changes in the IOMMU tree. Catalin, would you mind acking these fixes
-so that Joerg can carry them? We should be able to send the revert through
-arm64 once the dust has settled.
+Correct me if I remember it wrong, but I thought this patch has already
+been merged by Brian?
 
 Thanks,
-Robin.
 
----
- arch/arm64/mm/dma-mapping.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Ray
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 6320361..66444df 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -546,6 +546,10 @@ static void flush_page(struct device *dev, const void *virt, phys_addr_t phys)
- 	__dma_flush_range(virt, virt + PAGE_SIZE);
- }
- 
-+#ifdef __GFP_WAIT
-+#define gfpflags_allow_blocking(gfp) ((gfp) & __GFP_WAIT)
-+#endif
-+
- static void *__iommu_alloc_attrs(struct device *dev, size_t size,
- 				 dma_addr_t *handle, gfp_t gfp,
- 				 struct dma_attrs *attrs)
--- 
-1.9.1
+On 10/16/2015 2:08 AM, Anup Patel wrote:
+> We should always type-cast pointer to "long" or "unsigned long"
+> because size of pointer is same as machine word size. This will
+> avoid pointer type-cast issues on both 32bit and 64bit systems.
+> 
+> This patch fixes pointer type-cast issue in brcmnand_write()
+> as-per above info.
+> 
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Vikram Prakash <vikramp@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> ---
+>  drivers/mtd/nand/brcmnand/brcmnand.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
+> index fddb795..4cba03d 100644
+> --- a/drivers/mtd/nand/brcmnand/brcmnand.c
+> +++ b/drivers/mtd/nand/brcmnand/brcmnand.c
+> @@ -1544,9 +1544,9 @@ static int brcmnand_write(struct mtd_info *mtd, struct nand_chip *chip,
+>  
+>  	dev_dbg(ctrl->dev, "write %llx <- %p\n", (unsigned long long)addr, buf);
+>  
+> -	if (unlikely((u32)buf & 0x03)) {
+> +	if (unlikely((unsigned long)buf & 0x03)) {
+>  		dev_warn(ctrl->dev, "unaligned buffer: %p\n", buf);
+> -		buf = (u32 *)((u32)buf & ~0x03);
+> +		buf = (u32 *)((unsigned long)buf & ~0x03);
+>  	}
+>  
+>  	brcmnand_wp(mtd, 0);
+> 
