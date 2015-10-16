@@ -1,79 +1,62 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Fri, 16 Oct 2015 18:06:15 +0100
-Subject: [PATCHv4 06/12] arm64: Clean config usages for page size
+Date: Fri, 16 Oct 2015 18:06:19 +0100
+Subject: [PATCHv4 10/12] arm64: Add page size to the kernel image header
 In-Reply-To: <1445015181-29711-1-git-send-email-suzuki.poulose@arm.com>
 References: <1445015181-29711-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445015181-29711-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445015181-29711-11-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We use !CONFIG_ARM64_64K_PAGES for CONFIG_ARM64_4K_PAGES
-(and vice versa) in code. It all worked well, so far since
-we only had two options. Now, with the introduction of 16K,
-these cases will break. This patch cleans up the code to
-use the required CONFIG symbol expression without the assumption
-that !64K => 4K (and vice versa)
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+This patch adds the page size to the arm64 kernel image header
+so that one can infer the PAGESIZE used by the kernel. This will
+be helpful to diagnose failures to boot the kernel with page size
+not supported by the CPU.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/Kconfig                   |    4 ++--
- arch/arm64/Kconfig.debug             |    2 +-
- arch/arm64/include/asm/thread_info.h |    2 +-
- 3 files changed, 4 insertions(+), 4 deletions(-)
+ Documentation/arm64/booting.txt |    7 ++++++-
+ arch/arm64/kernel/image.h       |    5 ++++-
+ 2 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 2782c11..4654c27 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -466,7 +466,7 @@ config ARCH_WANT_GENERAL_HUGETLB
- 	def_bool y
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index 7d9d3c2..aaf6d77 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -104,7 +104,12 @@ Header notes:
+ - The flags field (introduced in v3.17) is a little-endian 64-bit field
+   composed as follows:
+   Bit 0:	Kernel endianness.  1 if BE, 0 if LE.
+-  Bits 1-63:	Reserved.
++  Bit 1-2:	Kernel Page size.
++			0 - Unspecified.
++			1 - 4K
++			2 - 16K
++			3 - 64K
++  Bits 3-63:	Reserved.
  
- config ARCH_WANT_HUGE_PMD_SHARE
--	def_bool y if !ARM64_64K_PAGES
-+	def_bool y if ARM64_4K_PAGES
- 
- config HAVE_ARCH_TRANSPARENT_HUGEPAGE
- 	def_bool y
-@@ -678,7 +678,7 @@ source "fs/Kconfig.binfmt"
- 
- config COMPAT
- 	bool "Kernel support for 32-bit EL0"
--	depends on !ARM64_64K_PAGES || EXPERT
-+	depends on ARM64_4K_PAGES || EXPERT
- 	select COMPAT_BINFMT_ELF
- 	select HAVE_UID16
- 	select OLD_SIGSUSPEND3
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index d6285ef..c24d6ad 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -77,7 +77,7 @@ config DEBUG_RODATA
-           If in doubt, say Y
- 
- config DEBUG_ALIGN_RODATA
--	depends on DEBUG_RODATA && !ARM64_64K_PAGES
-+	depends on DEBUG_RODATA && ARM64_4K_PAGES
- 	bool "Align linker sections up to SECTION_SIZE"
- 	help
- 	  If this option is enabled, sections that may potentially be marked as
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 555c6de..5eac6a2 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -23,7 +23,7 @@
- 
- #include <linux/compiler.h>
- 
--#ifndef CONFIG_ARM64_64K_PAGES
-+#ifdef CONFIG_ARM64_4K_PAGES
- #define THREAD_SIZE_ORDER	2
+ - When image_size is zero, a bootloader should attempt to keep as much
+   memory as possible free for use by the kernel immediately after the
+diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+index 6eb8fee..bc2abb8 100644
+--- a/arch/arm64/kernel/image.h
++++ b/arch/arm64/kernel/image.h
+@@ -47,7 +47,10 @@
+ #define __HEAD_FLAG_BE	0
  #endif
  
+-#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0)
++#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
++
++#define __HEAD_FLAGS	((__HEAD_FLAG_BE << 0) |	\
++			 (__HEAD_FLAG_PAGE_SIZE << 1))
+ 
+ /*
+  * These will output as part of the Image header, which should be little-endian
 -- 
 1.7.9.5
