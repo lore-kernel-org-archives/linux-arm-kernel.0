@@ -1,29 +1,30 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 16 Oct 2015 12:04:04 -0700
-Subject: [PATCH] PCI: iproc: Fix company name
-Message-ID: <1445022248-12203-1-git-send-email-f.fainelli@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 16 Oct 2015 12:09:48 -0700
+Subject: [PATCH v2 1/3] ARM: OMAP2: DRA7: Modify optimize string
+ comparisons in soc_is calls
+In-Reply-To: <1444885808-6306-2-git-send-email-j-keerthy@ti.com>
+References: <1444885808-6306-1-git-send-email-j-keerthy@ti.com>
+ <1444885808-6306-2-git-send-email-j-keerthy@ti.com>
+Message-ID: <20151016190948.GB24370@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The header of pcie-iproc.c contains an obvious typo on Broadcom
-Corporation, fix that.
+* Keerthy <j-keerthy@ti.com> [151014 22:14]:
+> Currently everytime soc_is calls are made, firstly device tree nodes
+> are parsed and then string comparisons are made to determine the
+> soc version. Optimizing it to be done one time and store the result.
+> Use the stored value in all the subsequent checks for soc_is calls.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- drivers/pci/host/pcie-iproc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Let's just get rid of the of_machine_is_compatible() checks here.
 
-diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-index fe2efb141a9b..6c3d4b54858c 100644
---- a/drivers/pci/host/pcie-iproc.c
-+++ b/drivers/pci/host/pcie-iproc.c
-@@ -1,6 +1,6 @@
- /*
-  * Copyright (C) 2014 Hauke Mehrtens <hauke@hauke-m.de>
-- * Copyright (C) 2015 Broadcom Corporatcommon ion
-+ * Copyright (C) 2015 Broadcom Corporation
-  *
-  * This program is free software; you can redistribute it and/or
-  * modify it under the terms of the GNU General Public License as
--- 
-2.1.0
+When dra7xxx_check_revision we already know it's dra7, no point for
+any of the string parsing with of_machine_is_compatible(). We just
+risk things going wrong.
+
+And we already have omap_revision that gets populated based on the
+hawkeye register, so let's use that instead. Can you please update
+this patch just to use is_dra7xx() macros like the other use?
+
+Regards,
+
+Tony
