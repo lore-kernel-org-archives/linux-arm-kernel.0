@@ -1,86 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Oct 2015 22:45:39 +0200
-Subject: [PATCH] staging/wilc: fix Kconfig dependencies, second try
-Message-ID: <5446980.8Rmykv9Tt3@wuerfel>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Fri, 16 Oct 2015 23:46:29 +0300
+Subject: [PATCH] ARM: thp: fix unterminated ifdef in header file
+In-Reply-To: <5446974.UXhT00HeJk@wuerfel>
+References: <5446974.UXhT00HeJk@wuerfel>
+Message-ID: <20151016204629.GA1817@node.shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My first attempt to fix the Kconfig logic for wilc1000 was incomplete,
-as it missed the case where SPI is built-in while SDIO is modular
-and wilc1000 is configured as built-in in SPI mode (or vice versa),
-which would still lead to a link failure.
+On Fri, Oct 16, 2015 at 10:02:04PM +0200, Arnd Bergmann wrote:
+> A recent change accidentally removed one line more than it should
+> have, causing the build to fail with ARM LPAE:
+> 
+> In file included from /git/arm-soc/arch/arm/include/asm/pgtable.h:31:0,
+>                  from /git/arm-soc/include/linux/mm.h:55,
+>                  from /git/arm-soc/arch/arm/kernel/asm-offsets.c:15:
+> /git/arm-soc/arch/arm/include/asm/pgtable-3level.h:20:0: error: unterminated #ifndef
+>  #ifndef _ASM_PGTABLE_3LEVEL_H
+> 
+> This puts the line back where it was.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: f054144a1b23 ("arm, thp: remove infrastructure for handling splitting PMDs")
 
-This works around the problem by adding an intermediate Kconfig
-symbol "WILC1000_DRIVER" that controls visibility of the SDIO and
-SPI sub-drivers, so we can control the dependencies better.
+Sorry.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 9535ebc5e9cc ("staging/wilc1000: fix Kconfig dependencies")
+Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
 
-diff --git a/drivers/staging/wilc1000/Kconfig b/drivers/staging/wilc1000/Kconfig
-index 59ccecc316df..ee51b4278088 100644
---- a/drivers/staging/wilc1000/Kconfig
-+++ b/drivers/staging/wilc1000/Kconfig
-@@ -1,14 +1,16 @@
--config WILC1000
--	tristate "WILC1000 support (WiFi only)"
--	depends on !S390
-+config WILC1000_DRIVER
-+	bool "WILC1000 support (WiFi only)"
- 	depends on CFG80211 && WEXT_CORE && INET
--	depends on MMC || SPI
- 	---help---
- 	  This module only support IEEE 802.11n WiFi.
- 
-+if WILC1000_DRIVER
-+
-+config WILC1000
-+	tristate
-+
- choice
-         prompt "Memory Allocation"
--        depends on WILC1000
-         default WILC1000_PREALLOCATE_AT_LOADING_DRIVER
- 
- config WILC1000_PREALLOCATE_AT_LOADING_DRIVER
-@@ -29,12 +31,12 @@ endchoice
- 
- choice
- 	prompt "Bus Type"
--	depends on WILC1000
- 	default WILC1000_SDIO
- 
--	config WILC1000_SDIO
-+config WILC1000_SDIO
- 	bool "SDIO support"
- 	depends on MMC
-+	select WILC1000
- 	---help---
- 	  This module adds support for the SDIO interface of adapters using
- 	  WILC1000 chipset. The Atmel WILC1000 SDIO is a full speed interface.
-@@ -45,8 +47,9 @@ choice
- 	  To use this interface, pin9 (SDIO_SPI_CFG) must be grounded. Select
- 	  this if your platform is using the SDIO bus.
- 
--	config WILC1000_SPI
-+config WILC1000_SPI
- 	depends on SPI
-+	select WILC1000
- 	bool "SPI support"
- 	---help---
- 	  This module adds support for the SPI interface of adapters using
-@@ -60,7 +63,7 @@ endchoice
- 
- config WILC1000_HW_OOB_INTR
- 	bool "Use out of band interrupt"
--	depends on WILC1000 && WILC1000_SDIO
-+	depends on WILC1000_SDIO
- 	default n
- 	---help---
- 	  This option enables out-of-band interrupt support for the WILC1000
-@@ -68,3 +71,5 @@ config WILC1000_HW_OOB_INTR
- 	  mechanism for SDIO host controllers that don't support SDIO interrupt.
- 	  Select this option If the SDIO host controller in your platform
- 	  doesn't support SDIO time devision interrupt.
-+
-+endif
+-- 
+ Kirill A. Shutemov
