@@ -1,43 +1,35 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 16 Oct 2015 13:59:00 -0700
-Subject: [PATCH 2/2] arm64: Use gfpflags_allow_blocking()
-In-Reply-To: <adf855c7692b1512ab7216579468ad1eef2f25a8.1445008695.git.robin.murphy@arm.com>
-References: <ecbbf6550654071f13d1bdc04b86dc4d69ad09b4.1445008695.git.robin.murphy@arm.com>
- <adf855c7692b1512ab7216579468ad1eef2f25a8.1445008695.git.robin.murphy@arm.com>
-Message-ID: <20151016135900.bc1e10115a866a301dbb0cd8@linux-foundation.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 16 Oct 2015 16:10:05 -0500
+Subject: [PATCH] clocksource: ti-32k: make it depend on GENERIC_CLOCKSOURCE
+In-Reply-To: <201510170412.4siQMwFD%fengguang.wu@intel.com>
+References: <201510170412.4siQMwFD%fengguang.wu@intel.com>
+Message-ID: <1445029805-13736-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Oct 2015 16:33:42 +0100 Robin Murphy <robin.murphy@arm.com> wrote:
+the new ti 32k clocksource driver should depend on
+GENERIC_CLOCKSOURCE because of its reliance on
+sched_clock_register().
 
-> __GFP_WAIT is going away to live its life under a new identity; convert
-> __iommu_alloc_attrs() to the new helper function instead.
-> 
-> ...
->
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -566,7 +566,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
->  	 */
->  	gfp |= __GFP_ZERO;
->  
-> -	if (gfp & __GFP_WAIT) {
-> +	if (gfpflags_allow_blocking(gfp)) {
->  		struct page **pages;
->  		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
+Let's enable that to avoid any possible build errors
+and/or warnings on randbuilds.
 
-Seems unnecessarily elaborate.  What's wrong with
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/clocksource/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
---- a/arch/arm64/mm/dma-mapping.c~mm-page_alloc-rename-__gfp_wait-to-__gfp_reclaim-arm-fix
-+++ a/arch/arm64/mm/dma-mapping.c
-@@ -562,7 +562,7 @@ static void *__iommu_alloc_attrs(struct
- 	 */
- 	gfp |= __GFP_ZERO;
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 98b2a9b9bfad..3a1efa3fd88d 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -117,6 +117,7 @@ config CLKSRC_PISTACHIO
  
--	if (gfp & __GFP_WAIT) {
-+	if (gfp & __GFP_RECLAIM) {
- 		struct page **pages;
- 		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
- 
-
-?
+ config CLKSRC_TI_32K
+ 	bool "Texas Instruments 32.768 Hz Clocksource" if COMPILE_TEST
++	depends on GENERIC_SCHED_CLOCK
+ 	select CLKSRC_OF if OF
+ 	help
+ 	  This option enables support for Texas Instruments 32.768 Hz clocksource
+-- 
+2.5.3
