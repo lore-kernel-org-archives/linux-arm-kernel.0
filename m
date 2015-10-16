@@ -1,82 +1,21 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 16 Oct 2015 14:11:50 +0200
-Subject: [PATCH] ARM: at91/dt: sama5d4: add the macb1 node
-Message-ID: <1444997510-8841-1-git-send-email-gregory.clement@free-electrons.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 16 Oct 2015 20:13:13 +0800
+Subject: [PATCH] arm: dts: ls1021a: Add quirk for Erratum A009116
+In-Reply-To: <1444800852-19523-1-git-send-email-rajesh.bhagat@freescale.com>
+References: <1444800852-19523-1-git-send-email-rajesh.bhagat@freescale.com>
+Message-ID: <20151016121313.GF584@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The second macb is present on all sama5d4 soc. Let's add a node
-reflecting it in the device tree.
+On Wed, Oct 14, 2015 at 11:04:12AM +0530, Rajesh Bhagat wrote:
+> Add "snps,quirk-frame-length-adjustment" property to
+> USB3 node for erratum A009116. This property provides
+> value of GFLADJ_30MHZ for post silicon frame length
+> adjustment.
+> 
+> Signed-off-by: Nikhil Badola <nikhil.badola@freescale.com>
+> Signed-off-by: Rajesh Bhagat <rajesh.bhagat@freescale.com>
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/at91-vinco.dts |  5 +----
- arch/arm/boot/dts/sama5d4.dtsi   | 30 ++++++++++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 4 deletions(-)
+Changed the patch prefix to use uppercase "ARM: " and applied the patch.
 
-diff --git a/arch/arm/boot/dts/at91-vinco.dts b/arch/arm/boot/dts/at91-vinco.dts
-index b8036f5..2215e2e 100644
---- a/arch/arm/boot/dts/at91-vinco.dts
-+++ b/arch/arm/boot/dts/at91-vinco.dts
-@@ -82,10 +82,7 @@
- 		apb {
- 
- 			adc0: adc at fc034000 {
--				/* The vref depends on JP22 of EK. If connect 1-2 then use 3.3V. connect 2-3 use 3.0V */
--				atmel,adc-vref = <3300>;
--				/*atmel,adc-ts-wires = <4>;*/	/* Set up ADC touch screen */
--				status = "okay";		/* Enable ADC IIO support */
-+				status = "okay"; /* Enable ADC IIO support */
- 			};
- 
- 			mmc0: mmc at f8000000 {
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index b5ee947..6f27915 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -1188,6 +1188,19 @@
- 				clock-names = "t0_clk", "slow_clk";
- 			};
- 
-+			macb1: ethernet at fc028000 {
-+				compatible = "atmel,sama5d4-gem";
-+				reg = <0xfc028000 0x100>;
-+				interrupts = <55 IRQ_TYPE_LEVEL_HIGH 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_macb1_rmii>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				clocks = <&macb1_clk>, <&macb1_clk>;
-+				clock-names = "hclk", "pclk";
-+				status = "disabled";
-+			};
-+
- 			adc0: adc at fc034000 {
- 				compatible = "atmel,at91sam9x5-adc";
- 				reg = <0xfc034000 0x100>;
-@@ -1635,6 +1648,23 @@
- 					};
- 				};
- 
-+				macb1 {
-+					pinctrl_macb1_rmii: macb1_rmii-0 {
-+						atmel,pins =
-+							<AT91_PIOA 14 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_TX0 */
-+							 AT91_PIOA 15 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_TX1 */
-+							 AT91_PIOA 12 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_RX0 */
-+							 AT91_PIOA 13 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_RX1 */
-+							 AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_RXDV */
-+							 AT91_PIOA 11 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_RXER */
-+							 AT91_PIOA  4 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_TXEN */
-+							 AT91_PIOA  2 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_TXCK */
-+							 AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_MDC */
-+							 AT91_PIOA 23 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_MDIO */
-+							>;
-+					};
-+				};
-+
- 				mmc0 {
- 					pinctrl_mmc0_clk_cmd_dat0: mmc0_clk_cmd_dat0 {
- 						atmel,pins =
--- 
-2.1.4
+Shawn
