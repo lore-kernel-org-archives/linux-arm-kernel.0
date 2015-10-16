@@ -1,62 +1,76 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 17 Oct 2015 02:14:04 +0800
-Subject: [RFC 2/2] drm/bridge: Add I2C based driver for ps8640 bridge
-In-Reply-To: <1444997709-57293-2-git-send-email-ck.hu@mediatek.com>
-Message-ID: <201510170222.YOuOZJGv%fengguang.wu@intel.com>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Fri, 16 Oct 2015 15:45:25 -0300
+Subject: [PATCH 2/2] DT: nvmem: Add NXP LPC18xx EEPROM memory binding
+ documentation
+In-Reply-To: <CAGhQ9VzaqiUm0=vpBYKpppsTsLuhxmAKayi5N4FTXmG5dtiAhw@mail.gmail.com>
+References: <1445004426-6271-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <1445004426-6271-3-git-send-email-ariel@vanguardiasur.com.ar>
+ <CAAEAJfAAUWd9y8EBfV0irbRF_7EjxD1ycdPcNGScbs6oPxp4JQ@mail.gmail.com>
+ <CAGhQ9VzaqiUm0=vpBYKpppsTsLuhxmAKayi5N4FTXmG5dtiAhw@mail.gmail.com>
+Message-ID: <562145C5.8070507@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jitao,
+Ezequiel, Joachim, all,
 
-[auto build test ERROR on drm-exynos/exynos-drm/for-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+El 16/10/15 a las 14:09, Joachim Eastwood escribi?:
+> On 16 October 2015 at 17:41, Ezequiel Garcia
+> <ezequiel@vanguardiasur.com.ar> wrote:
+>> +DT bindings maintainers
+>>
+>> As per the documentation in
+>> Documentation/devicetree/bindings/submitting-patches.txt
+>> this binding should be patch 1/2.
 
-url:    https://github.com/0day-ci/linux/commits/CK-Hu/Dcumentation-bridge-Add-documentation-for-ps8640-DT-properties/20151016-201658
-config: s390-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=s390 
+I see. I'll modify that.
 
-All errors (new ones prefixed by >>):
+>>
+>> On 16 October 2015 at 11:07, Ariel D'Alessandro
+>> <ariel@vanguardiasur.com.ar> wrote:
+>>> Add the devicetree binding document for NXP LPC18xx EEPROM memory.
+>>>
+>>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+>>> ---
+>>>  .../devicetree/bindings/nvmem/lpc18xx_eeprom.txt   | 26 ++++++++++++++++++++++
+>>>  1 file changed, 26 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt b/Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt
+>>> new file mode 100644
+>>> index 0000000..372ff8c
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt
+>>> @@ -0,0 +1,26 @@
+>>> +* NXP LPC18xx EEPROM memory NVMEM driver
+>>> +
+>>> +Required properties:
+>>> +  - compatible: Should be "nxp,lpc1850-eeprom"
+>>
+>> Correct me if I'm wrong, but I believe not all LPC18xx/43xx devices
+>> have an EEPROM.
+>>
+>> Isn't it restricted to LPC18x7/LPC43x7 devices?
+> 
+> The EEPROM can only be found on Flash devices. Flashless devices
+> doesn't have the EEPROM.
 
-   drivers/gpu/drm/bridge/parade-ps8640.c: In function 'ps8640_prepare':
->> drivers/gpu/drm/bridge/parade-ps8640.c:178:2: error: implicit declaration of function 'gpiod_set_value' [-Werror=implicit-function-declaration]
-     gpiod_set_value(ps_bridge->gpio_pwr_n, 1);
-     ^
-   drivers/gpu/drm/bridge/parade-ps8640.c: In function 'ps8640_probe':
->> drivers/gpu/drm/bridge/parade-ps8640.c:391:2: error: implicit declaration of function 'devm_gpiod_get' [-Werror=implicit-function-declaration]
-     ps_bridge->gpio_mode_sel_n = devm_gpiod_get(&client->dev, "mode-sel",
-     ^
->> drivers/gpu/drm/bridge/parade-ps8640.c:392:11: error: 'GPIOD_OUT_HIGH' undeclared (first use in this function)
-              GPIOD_OUT_HIGH);
-              ^
-   drivers/gpu/drm/bridge/parade-ps8640.c:392:11: note: each undeclared identifier is reported only once for each function it appears in
->> drivers/gpu/drm/bridge/parade-ps8640.c:399:2: error: implicit declaration of function 'gpiod_direction_output' [-Werror=implicit-function-declaration]
-     ret = gpiod_direction_output(ps_bridge->gpio_mode_sel_n, 1);
-     ^
-   cc1: some warnings being treated as errors
+Yes, you're right. LPC1850 is wrong, sorry.
+The UM10430 (LPC18xx User Manual) says that LPC18(5|3|2|1)(7|5|3|2)
+parts have flash and that the LPC185x/3x parts with flash also include
+the 16 kB EEPROM. I'll add this info in a new set of patches v2.
 
-vim +/gpiod_set_value +178 drivers/gpu/drm/bridge/parade-ps8640.c
+> 
+> 
+>> Should the compatible be nxp,lpc1857-eeprom to avoid confusion?
+> 
+> Yes, please. The EEPROM doesn't exist on LPC1850 so please use the
+> compatibility string from Ezequiel.
 
-   172		err = regulator_enable(ps_bridge->pwr_3v3_supply);
-   173		if (err < 0) {
-   174			DRM_ERROR("failed to enable pwr_3v3_supply: %d\n", err);
-   175			return;
-   176		}
-   177	
- > 178		gpiod_set_value(ps_bridge->gpio_pwr_n, 1);
-   179		gpiod_set_value(ps_bridge->gpio_rst_n, 0);
-   180		usleep_range(500, 700);
-   181		gpiod_set_value(ps_bridge->gpio_rst_n, 1);
+OK. I'll fix this. Is there any reason for using lpc1857 instead of a
+different available one?
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 38291 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151017/e3e49f4c/attachment-0001.obj>
+Thanks!
+
+-- 
+Ariel D'Alessandro, VanguardiaSur
+www.vanguardiasur.com.ar
