@@ -1,50 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 Oct 2015 11:57:17 +0100
-Subject: [PATCH] arm64: change to use memmove in efi-stub
-In-Reply-To: <1444992367-11121-1-git-send-email-yalin.wang2010@gmail.com>
-References: <1444992367-11121-1-git-send-email-yalin.wang2010@gmail.com>
-Message-ID: <20151016105716.GB975@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 16 Oct 2015 12:13:06 +0100
+Subject: [PULL] msi-map support and msi-parent updates for 4.4
+Message-ID: <1444993986-31625-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Thomas,
 
-On Fri, Oct 16, 2015 at 06:46:07PM +0800, yalin wang wrote:
-> Change to use memmove(), in case the dest address overlap with the
-> source address.
+Here's a number of patches that introduce the msi-map DT property, and
+puts it to a good use is the MSI layer. The msi-parent property also
+gets reworked in order to cope with its sideband information
+extension.
 
-This cannot happen, and memove would not be sufficient if it did.
-
-The destination is a region returned by EFI_BOOT_SERVICES.AllocatePages,
-which can only allocate pages which were free to begin with. Therefore
-the new region cannot overlap with the stub (whose pages are not free).
-
-Were the new region to overlap with the stub, the memmove could corrupt
-the code/data in use by the stub, and things would explode shortly
-thereafter.
+Please pull!
 
 Thanks,
-Mark.
 
-> 
-> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
-> ---
->  arch/arm64/kernel/efi-stub.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-> index 816120e..b6dc44b 100644
-> --- a/arch/arm64/kernel/efi-stub.c
-> +++ b/arch/arm64/kernel/efi-stub.c
-> @@ -59,7 +59,7 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
->  			}
->  			*image_addr = *reserve_addr + TEXT_OFFSET;
->  		}
-> -		memcpy((void *)*image_addr, old_image_addr, kernel_size);
-> +		memmove((void *)*image_addr, old_image_addr, kernel_size);
->  		*reserve_size = kernel_memsize;
->  	}
->  
-> -- 
-> 1.9.1
-> 
+	M.
+
+The following changes since commit a71225e204f5ba8b41e7bb100ca37c074861d5b1:
+
+  irqchip/gic-v2m: Add support for multiple MSI frames (2015-10-15 10:18:48 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git tags/msi-map-4.4
+
+for you to fetch changes up to 8666429c8e7232dc7bd92f17134bbd9f62e20d64:
+
+  PCI/MSI: Allow the MSI domain to be device-specific (2015-10-16 11:52:25 +0100)
+
+----------------------------------------------------------------
+Support for msi-map, and msi-parent update:
+
+- New map-map property to describe the remapping of requester-ids,
+  and the routing of MSIs to controllers
+- New hooks to make MSI domains per-device if required
+- Extension of msi-parent to provide sideband information
+- Extensive documentation for both msi-map and msi-parent
+
+----------------------------------------------------------------
+David Daney (3):
+      of/irq: Add new function of_msi_map_rid()
+      PCI/MSI: Add helper function pci_msi_domain_get_msi_rid().
+      irqchip/gic-v3-its: Add handling of PCI requester id.
+
+Marc Zyngier (8):
+      of/irq: Add support code for multi-parent version of "msi-parent"
+      of/irq: Use of_msi_get_domain instead of open-coded "msi-parent" parsing
+      PCI/MSI: Use of_msi_get_domain instead of open-coded "msi-parent" parsing
+      irqchip/gic-v3-its: Parse new version of msi-parent property
+      of/irq: Split of_msi_map_rid to reuse msi-map lookup
+      of/irq: Use the msi-map property to provide device-specific MSI domain
+      PCI: Add per-device MSI domain hook
+      PCI/MSI: Allow the MSI domain to be device-specific
+
+Mark Rutland (1):
+      Docs: dt: Add PCI MSI map bindings
+
+ Documentation/devicetree/bindings/pci/pci-msi.txt | 220 ++++++++++++++++++++++
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c          |   4 +-
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c     |  18 +-
+ drivers/of/irq.c                                  | 185 +++++++++++++++++-
+ drivers/pci/msi.c                                 |  47 +++++
+ drivers/pci/of.c                                  |  13 +-
+ drivers/pci/probe.c                               |  43 ++++-
+ include/linux/msi.h                               |   7 +
+ include/linux/of_irq.h                            |  23 +++
+ 9 files changed, 532 insertions(+), 28 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/pci-msi.txt
