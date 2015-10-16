@@ -1,24 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Oct 2015 16:18:14 +0200
-Subject: [PATCH v6 7/7] arm64: dts: berlin4ct: add default pinmux for uart0
-In-Reply-To: <1444981032-4401-8-git-send-email-jszhang@marvell.com>
-References: <1444981032-4401-1-git-send-email-jszhang@marvell.com>
- <1444981032-4401-8-git-send-email-jszhang@marvell.com>
-Message-ID: <CACRpkdYUmkOB_9Rm_YXzqQDL8H7wXmptwwHeGbssQO_RK_G17w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Oct 2015 16:19:18 +0200
+Subject: [PATCH v2] scsi: advansys needs ISA dma api for ISA support
+In-Reply-To: <1445003624.2191.2.camel@HansenPartnership.com>
+References: <4351271.eUtUWpTn54@wuerfel>
+ <1445003624.2191.2.camel@HansenPartnership.com>
+Message-ID: <5461074.f3cLgYkzKJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 9:37 AM, Jisheng Zhang <jszhang@marvell.com> wrote:
+On Friday 16 October 2015 06:53:44 James Bottomley wrote:
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> > diff --git a/drivers/scsi/Kconfig b/drivers/scsi/Kconfig
+> > index d2f480b04a52..1d8b8257773d 100644
+> > --- a/drivers/scsi/Kconfig
+> > +++ b/drivers/scsi/Kconfig
+> > @@ -498,7 +498,7 @@ config SCSI_DPT_I2O
+> >  config SCSI_ADVANSYS
+> >       tristate "AdvanSys SCSI support"
+> >       depends on SCSI
+> > -     depends on ISA || EISA || PCI
+> > +     depends on (ISA && ISA_DMA_API) || EISA || PCI
+> 
+> I thought the desire was to avoid a compile failure when ISA && !
+> ISA_DMA_API?  Won't this one fail if ISA is defined with either EISA or
+> PCI and !ISA_DMA_API?
 
-> Add urt0 txd and rxd muxing setup in the dtsi because uart0 always uses
-> them to work, no other possibilities.
->
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+I thought I had it ruled out, but now I've actually found a combination:
+we can build an ARM kernel that supports two ancient machines, and one
+of them supports ISA (but not ISA_DMA_API), while the other one supports
+PCI. I had looked through several thousand randconfig builds and not
+found this combination together with advansys, but I guess that is
+because those were mostly old builds from the times when there was
+a dependency on VIRT_TO_BUS that this platform doesn't have.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Funnel this through ARM SoC.
+So screw this one and go back to the original patch.
 
-Yours,
-Linus Walleij
+	Arnd
