@@ -1,30 +1,46 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 16 Oct 2015 15:04:51 +0200
-Subject: [PATCH v2 8/8] ARM: multi_v7_defconfig: Add Atmel SDHCI device
-In-Reply-To: <1445000691-12402-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1445000691-12402-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1445000691-12402-9-git-send-email-ludovic.desroches@atmel.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 16 Oct 2015 13:07:05 +0000
+Subject: [PATCH RFC 4/7] genirq/msi: Make the .prepare callback reusable
+In-Reply-To: <561FE4CE.4090505@arm.com>
+References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
+ <1444923568-17413-5-git-send-email-marc.zyngier@arm.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1624783E@lhreml503-mbs>
+ <561FE4CE.4090505@arm.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E16248DEC@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AT91 SDHCI device has been introduced with Atmel SAMA5D2 SoC.
+> -----Original Message-----
+> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> owner at vger.kernel.org] On Behalf Of Marc Zyngier
+> Sent: Thursday, October 15, 2015 6:39 PM
+> To: Gabriele Paoloni; Thomas Gleixner; Jiang Liu; Jason Cooper
+> Cc: majun (F); linux-arm-kernel at lists.infradead.org; linux-
+> pci at vger.kernel.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH RFC 4/7] genirq/msi: Make the .prepare callback
+> reusable
+> 
+> On 15/10/15 18:24, Gabriele Paoloni wrote:
+> > Hi Marc
+> >
+> > It looks like this patch fails to apply to 4.3-rc5....
+> 
+> Which is by design. Try tip/irq/core.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Oops sorry, got it!
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 6dcc048..844e921 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -545,6 +545,7 @@ CONFIG_MMC_ARMMMCI=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_OF_ARASAN=y
-+CONFIG_MMC_SDHCI_OF_AT91=y
- CONFIG_MMC_SDHCI_ESDHC_IMX=y
- CONFIG_MMC_SDHCI_DOVE=y
- CONFIG_MMC_SDHCI_TEGRA=y
--- 
-2.5.0
+Thanks, applies ok to tip/irq/core
+
+Gab
+
+
+> 
+> 	M.
+> --
+> Jazz is not dead. It just smells funny...
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
