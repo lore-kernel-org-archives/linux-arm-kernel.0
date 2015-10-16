@@ -1,213 +1,125 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 16 Oct 2015 19:40:32 +0800
-Subject: [PATCH 1/5] mmc: sdhci-pxav3: fix optional clock name
-In-Reply-To: <56201D82.6080106@gmail.com>
-References: <1444628796-5484-1-git-send-email-jszhang@marvell.com>
- <1444628796-5484-2-git-send-email-jszhang@marvell.com>
- <56201D82.6080106@gmail.com>
-Message-ID: <20151016194032.76514a5e@xhacker>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Fri, 16 Oct 2015 11:44:34 +0000
+Subject: Need help with device tree formation
+In-Reply-To: <3760709.3HqJjr2Sog@wuerfel>
+References: <loom.20151016T121454-619@post.gmane.org>
+ <3760709.3HqJjr2Sog@wuerfel>
+Message-ID: <8520D5D51A55D047800579B0941471980169179F@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian,
 
-On Thu, 15 Oct 2015 23:41:22 +0200
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-> On 12.10.2015 07:46, Jisheng Zhang wrote:
-> > Commit 8afdc9cca27f ("mmc: sdhci-pxav3: Get optional core clock") adds
-> > additional optional clock support, but the clock names  isn't correct.
-> > The current "io" clock is really the PXAv3 SDHCI IP's "core" clock
-> > which is manadatory. The current "core" clock is really the IP's "axi"
-> > clock which is optional.
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Friday, October 16, 2015 5:04 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Bharat Kumar Gogada
+> Subject: Re: Need help with device tree formation
+>
+> On Friday 16 October 2015 11:27:15 bharat kumar gogada wrote:
+> > nwl_pcie: pcie at fd0e0000 {
+> >                         #address-cells = >;
+> >                         #size-cells = <2>;
+> >                         compatible = "xlnx,nwl-pcie-2.11";
+> >                         #interrupt-cells = <1>;
+> >                         interrupt-controller;
+> >                         msi-controller;
+> >                         device_type = "pci";
+> >                         interrupt-parent = <&gic>;
+> >                         interrupts = < 0 118 4
+> >                                        0 116 4
+> >                                        0 115 4          // MSI_1 [63...32]
+> >                                        0 114 4 >;       // MSI_0 [31...0]
+> >                         interrupt-names = "misc", "intx", "msi_1", "msi_0";
+> >                         interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+> >                         interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 116 0x4
+> >                                          0x0 0x0 0x0 0x2 &gic 0x0 116 0x4
+> >                                          0x0 0x0 0x0 0x3 &gic 0x0 116 0x4
+> >                                          0x0 0x0 0x0 0x4 &gic 0x0 116
+> > 0x4>;
+>
+> The interrupt-map looks wrong, as you point to the gic rather than &nwl_pcie
+> here. Also, you seem to have only one interrupt for all INTx, so you use an
+> all-zeroes interrupt-map-mask and only one entry here.
+>
+> >                         msi-parent = <&nwl_pcie>;
+> >                         reg = <0x0 0xfd0e0000 0x1000
+> >                                0x0 0xfd480000 0x1000
+> >                                0x0 0xE0000000 0x1000000>;
+> >                         reg-names = "breg", "pcireg", "cfg";
+> >                         ranges = <0x02000000 0x00000000 0xE1000000
+> > 0x00000000 0xE1000000 0 0x0F000000>;
 > >
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >   .../devicetree/bindings/mmc/sdhci-pxa.txt          |  8 ++---
-> >   arch/arm/boot/dts/berlin2.dtsi                     |  6 ++--
-> >   arch/arm/boot/dts/berlin2cd.dtsi                   |  2 +-
-> >   arch/arm/boot/dts/berlin2q.dtsi                    |  2 +-
-> >   drivers/mmc/host/sdhci-pxav3.c                     | 40 +++++++++++-----------
-> >   5 files changed, 29 insertions(+), 29 deletions(-)  
-> 
-> 
-> Jisheng,
-> 
-> Please split the DT changes from the driver changes.
-
-Such split will break berlin SDHC functionality, I'm not sure whether this is
-acceptable.
-
-> 
-> > diff --git a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-> > index 3d1b449..25d5ba8 100644
-> > --- a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-> > +++ b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-> > @@ -17,9 +17,9 @@ Required properties:
-> >   - reg names: should be "sdhci", "mbus", "conf-sdio3". only mandatory
-> >     for "marvell,armada-380-sdhci"
-> >   - clocks: Array of clocks required for SDHCI; requires at least one for
-> > -    I/O clock.
-> > +    core clock.
-> >   - clock-names: Array of names corresponding to clocks property; shall be
-> > -    "io" for I/O clock and "core" for optional core clock.
-> > +    "core" for core clock and "axi" for optional axi clock.  
-> 
-> s/axi/bus/ ?
-
-HW call this clk as axi, "bus" seems more generic, right?
-
-> 
-> >   Optional properties:
-> >   - mrvl,clk-delay-cycles: Specify a number of cycles to delay for tuning.
-> > @@ -32,7 +32,7 @@ sdhci at d4280800 {
-> >   	bus-width = <8>;
-> >   	interrupts = <27>;
-> >   	clocks = <&chip CLKID_SDIO1XIN>, <&chip CLKID_SDIO1>;
-> > -	clock-names = "io", "core";
-> > +	clock-names = "core", "axi";  
-> 
-> This will break backward compatibility, right?
-> 
-> >   	non-removable;
-> >   	mrvl,clk-delay-cycles = <31>;
-> >   };
-> > @@ -45,6 +45,6 @@ sdhci at d8000 {
-> >   		<0x18454 0x4>;
-> >   	interrupts = <0 25 0x4>;
-> >   	clocks = <&gateclk 17>;
-> > -	clock-names = "io";
-> > +	clock-names = "core";
-> >   	mrvl,clk-delay-cycles = <0x1F>;
-> >   };  
-> [...]
-> > diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-> > index f5edf9d..cec95f1 100644
-> > --- a/drivers/mmc/host/sdhci-pxav3.c
-> > +++ b/drivers/mmc/host/sdhci-pxav3.c
-> > @@ -59,8 +59,8 @@
-> >   #define SDCE_MISC_INT_EN	(1<<1)
+> > };
 > >
-> >   struct sdhci_pxa {
-> > +	struct clk *clk_axi;  
-> 
-> s/clk_axi/clk_bus/g
-> 
-> >   	struct clk *clk_core;
-> > -	struct clk *clk_io;
-> >   	u8	power_mode;
-> >   	void __iomem *sdio3_conf_reg;
-> >   };
-> > @@ -381,20 +381,20 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
-> >   	pltfm_host = sdhci_priv(host);
-> >   	pltfm_host->priv = pxa;
+> > I have the above device tree node in root port driver i have two
+> > separate domains one for legacy and other is MSI hierarchy domain; in
+> > both domains I'm using same node to create domain, what i observed is:
 > >
-> > -	pxa->clk_io = devm_clk_get(dev, "io");
-> > -	if (IS_ERR(pxa->clk_io))
-> > -		pxa->clk_io = devm_clk_get(dev, NULL);
-> > -	if (IS_ERR(pxa->clk_io)) {
-> > -		dev_err(dev, "failed to get io clock\n");
-> > -		ret = PTR_ERR(pxa->clk_io);
-> > +	pxa->clk_core = devm_clk_get(dev, "core");  
-> 
-> To maintain backward compatibility, we should still
+> > MSI interrupts are working only without interrupt-controller property,
+> > legacy is working with interrupt-controller property this is due to
+> > logic in  of_irq_parse_and_map_pci.
+>
+> Do you know what causes the MSI to not work when there is an interrupt-
+> controller property?
+>
+>       Arnd
 
-I just grep the kernel source, found that only mrvl berlin SoCs have two clks,
-other SoCs just have one clk and don't provide clock name. So the question
-here is whether we can break linux backward compatibility for mrvl berlin
-SoCs. I think we could for the following reason:
+I'm not exactly sure but this is what happening when I do interface up:
 
-1. rare boards outside mrvl can boot user self-built kernel, most boards should
-be protected by trust-chainloader mechanism.
+[  267.167825] tg3 0000:01:00.0 eth1: No interrupt was generated using MSI. Switching to INTx mode. Please report this failure to the PCI maintainer and include system chipset information
 
-2. mrvl berlin SoCs upgrade linux kernel and dtb at the same time
+[  267.204327] Unable to handle kernel NULL pointer dereference at virtual address 0000000c
+[  267.213116] pgd = ffffffc0366d5000
+[  267.217173] [0000000c] *pgd=000000003646f003, *pud=000000003646f003, *pmd=0000000000000000
+[  267.227273] Internal error: Oops: 96000006 [#1] SMP
+[  267.232849] Modules linked in:
+[  267.237266] CPU: 1 PID: 1419 Comm: ifconfig Not tainted 4.2.0-rc2-00001-g3dec4f4-dirty #153
+[  267.246283] Hardware name: ZynqMP EP108 (DT)
+[  267.251564] task: ffffffc039005080 ti: ffffffc036668000 task.ti: ffffffc036668000
+[  267.260846] PC is at pci_msi_domain_write_msg+0x10/0x34
+[  267.267292] LR is at msi_domain_activate+0x34/0x70
 
-what do you think?
+[  267.850610] [<ffffffc00047e16c>] pci_msi_domain_write_msg+0x10/0x34
+[  267.857996] [<ffffffc0000f78c4>] msi_domain_activate+0x30/0x70
+[  267.864914] [<ffffffc0000f653c>] irq_domain_activate_irq+0x40/0x50
+[  267.872089] [<ffffffc0000f3cb8>] irq_startup+0x34/0x90
+[  267.878169] [<ffffffc0000f2328>] __setup_irq+0x478/0x4ec
+[  267.884395] [<ffffffc0000f24fc>] request_threaded_irq+0xc8/0x17c
+[  267.891479] [<ffffffc0005668a0>] tg3_request_irq+0x94/0x178
+[  267.898132] [<ffffffc00057d518>] tg3_start+0xdf4/0xe4c
+[  267.904257] [<ffffffc00057d664>] tg3_open+0xf4/0x21c
+[  267.910369] [<ffffffc000654d88>] __dev_open+0xb0/0x120
+[  267.916514] [<ffffffc000655048>] __dev_change_flags+0x88/0x150
+[  267.923333] [<ffffffc00065512c>] dev_change_flags+0x1c/0x5c
 
-Is it better to refine patch 2, 3, 4, 5 to make use current "io","core" binding
-to clean up the clk's CLK_IGNORE_UNUSED flags? In fact, they doesn't depend
-on patch1. Could you please kindly give advice?
-
-Thanks in advance,
-Jisheng
-
+[  267.930032] [<ffffffc0006b089c>] devinet_ioctl+0x690/0x74c
+[  267.936566] [<ffffffc0006b1f18>] inet_ioctl+0x88/0xb0
+[  267.942738] [<ffffffc000638bbc>] sock_ioctl+0x20c/0x2fc
+[  267.949118] [<ffffffc0001b8fbc>] do_vfs_ioctl+0x318/0x5bc
+[  267.955538] [<ffffffc0001b92e0>] SyS_ioctl+0x80/0x98
 
 
-> devm_clk_get(dev, "io") here - or even better, first
-> probe for "io" to catch old binding semantics including
-> old "core"/"bus" misnaming.
-> 
-> If we detected old semantics, print a warning that
-> firmware should be updated.
-> 
-> Sebastian
-> 
-> > +	if (IS_ERR(pxa->clk_core))
-> > +		pxa->clk_core = devm_clk_get(dev, NULL);
-> > +	if (IS_ERR(pxa->clk_core)) {
-> > +		dev_err(dev, "failed to get core clock\n");
-> > +		ret = PTR_ERR(pxa->clk_core);
-> >   		goto err_clk_get;
-> >   	}
-> > -	pltfm_host->clk = pxa->clk_io;
-> > -	clk_prepare_enable(pxa->clk_io);
-> > +	pltfm_host->clk = pxa->clk_core;
-> > +	clk_prepare_enable(pxa->clk_core);
-> >
-> > -	pxa->clk_core = devm_clk_get(dev, "core");
-> > -	if (!IS_ERR(pxa->clk_core))
-> > -		clk_prepare_enable(pxa->clk_core);
-> > +	pxa->clk_axi = devm_clk_get(dev, "axi");
-> > +	if (!IS_ERR(pxa->clk_axi))
-> > +		clk_prepare_enable(pxa->clk_axi);
-> >
-> >   	/* enable 1/8V DDR capable */
-> >   	host->mmc->caps |= MMC_CAP_1_8V_DDR;
-> > @@ -475,8 +475,8 @@ err_add_host:
-> >   err_of_parse:
-> >   err_cd_req:
-> >   err_mbus_win:
-> > -	clk_disable_unprepare(pxa->clk_io);
-> >   	clk_disable_unprepare(pxa->clk_core);
-> > +	clk_disable_unprepare(pxa->clk_axi);
-> >   err_clk_get:
-> >   	sdhci_pltfm_free(pdev);
-> >   	return ret;
-> > @@ -494,8 +494,8 @@ static int sdhci_pxav3_remove(struct platform_device *pdev)
-> >
-> >   	sdhci_remove_host(host, 1);
-> >
-> > -	clk_disable_unprepare(pxa->clk_io);
-> >   	clk_disable_unprepare(pxa->clk_core);
-> > +	clk_disable_unprepare(pxa->clk_axi);
-> >
-> >   	sdhci_pltfm_free(pdev);
-> >
-> > @@ -542,9 +542,9 @@ static int sdhci_pxav3_runtime_suspend(struct device *dev)
-> >   	if (ret)
-> >   		return ret;
-> >
-> > -	clk_disable_unprepare(pxa->clk_io);
-> > -	if (!IS_ERR(pxa->clk_core))
-> > -		clk_disable_unprepare(pxa->clk_core);
-> > +	clk_disable_unprepare(pxa->clk_core);
-> > +	if (!IS_ERR(pxa->clk_axi))
-> > +		clk_disable_unprepare(pxa->clk_axi);
-> >
-> >   	return 0;
-> >   }
-> > @@ -555,9 +555,9 @@ static int sdhci_pxav3_runtime_resume(struct device *dev)
-> >   	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> >   	struct sdhci_pxa *pxa = pltfm_host->priv;
-> >
-> > -	clk_prepare_enable(pxa->clk_io);
-> > -	if (!IS_ERR(pxa->clk_core))
-> > -		clk_prepare_enable(pxa->clk_core);
-> > +	clk_prepare_enable(pxa->clk_core);
-> > +	if (!IS_ERR(pxa->clk_axi))
-> > +		clk_prepare_enable(pxa->clk_axi);
-> >
-> >   	return sdhci_runtime_resume_host(host);
-> >   }
-> >  
-> 
+That means it is receiving msi_desc pointer null in pci_msi_domain_write_msg
+
+This is the domain initialization code  (showing whats required)
+
+pcie->legacy_irq_domain = irq_domain_add_linear(node, 4,
+                                                 &legacy_domain_ops,
+                                                 pcie);
+
+msi->dev_domain = irq_domain_add_linear (NULL, INT_PCI_MSI_NR,
+                                                &dev_msi_domain_ops, pcie);
+
+msi->msi_chip.domain = pci_msi_create_irq_domain (node, &nwl_msi_domain_info,
+                                                                msi->dev_domain);
+
+Im using same devicetree node for for both domains registration.
+
+This is what im having I did not debug more.
+
+bharat
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
