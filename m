@@ -1,103 +1,94 @@
-From: john.ogness@linutronix.de (John Ogness)
-Date: Fri, 16 Oct 2015 14:28:50 +0200
-Subject: [PATCH v2] ARM: edma: fix residue race for cyclic
-In-Reply-To: <5620E392.8010100@ti.com> (Peter Ujfalusi's message of "Fri, 16
- Oct 2015 14:46:26 +0300")
-References: <87io68s931.fsf@linutronix.de> <561F862A.7040106@ti.com>
- <87eggvt8hi.fsf_-_@linutronix.de> <5620E392.8010100@ti.com>
-Message-ID: <876127t2t9.fsf@linutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 16 Oct 2015 13:32:47 +0100
+Subject: [PATCH v2] mailbox: Fix a couple of trivial static checker issues
+In-Reply-To: <20151016113251.GF31804@x1>
+References: <1444980091-16728-5-git-send-email-lee.jones@linaro.org>
+ <201510161646.D4m1dK6L%fengguang.wu@intel.com>
+ <20151016113251.GF31804@x1>
+Message-ID: <20151016123247.GG31804@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-10-16, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> On 10/16/2015 01:26 PM, John Ogness wrote:
->> When retrieving the residue value for cyclic transfers, the
->> SRC/DST fields of the active PaRAM are read. However, the AM335x
->> Technical Reference Manual states:
->> 
->>   11.3.3.6 Parameter Set Updates
->> 
->>   After the TR is read from the PaRAM (and is in the process
->>   of being submitted to the EDMA3TC), the following fields are
->>   updated as needed: ... SRC DST
->> 
->> This means SRC/DST is incremented even though the DMA transfer
->> may not have started yet or is in progress. Thus if the reader
->> of the residue accesses the DMA buffer too quickly, the CPU is
->> misinformed about the data that has been successfully processed.
->> 
->> The CCSTAT.ACTV register is a boolean that is set if any TR is
->> being processed by either the EMDA3CC or EDMA3TC. By polling
->> this register it is possible to ensure that the residue value
->> returned is valid for immediate processing. However, since the
->> DMA engine may be active, polling may never hit a moment where
->> no TR is being processed. To handle this, the SRC/DST is also
->> polled to see if it changes. And as a last resort, a max loop
->> count for the busy waiting exists to avoid an infinite loop.
->
-> I'm not sure what this actually going to solve, except that we are
-> going to wait for the next PaRAM parameter update.
+mailbox: Fix a couple of trivial static checker issues
 
-We are waiting until the active transfers are complete. The main wait
-condition is when ACTV is 0. When this happens, all transfers are
-definately complete. In the normal case, this is the condition that
-causes the loop exit.
+This patch deals with a few spelling, white space and type
+warnings reported by Intel's Kbuild Test Robot.
 
-> As you have already described the issue is that when you first submit
-> the transfer, the first PaRAM will be submitted to TC and at this
-> point the parameters will be updated to be prepared for the next
-> update.  This means that after we initiate the DMA the SRC/DST will be
-> updated to point to the next batch of data. Reading SRC/DST before the
-> second parameter update will always give you this. But this is also
-> true further in the line.  We never know exactly where the DMA is, we
-> only know that the DMA is somewhere in between 0x1234 - (0x1234 + data
-> until next parameter update). At the next parameter update you again
-> can not be sure where the DMA is, since it is now somewhere between
-> (0x1234 + parameter update number of data) - till the next update, and
-> so on.
->
-> In the cyclic case we use AB-sync mode, in this case the parameter update is
-> going to happen after each period if I'm not mistaken.
->
-> To achieve the same thing (waiting for the next parameter update to happen)
-> you could just poll the PaRAM's CCNT in AB-sync to see if it changing and when
-> it did you return the SRC/DST address since those will be close enough at the
-> time.
+Reported-by: kbuild test robot <lkp@intel.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+v1 => v2:
 
-Is there really a difference between polling CCNT and polling SRC/DST?
-Notice that the function does _not_ return the polled SRC/DST. The extra
-polling is only used as an additional loop exit condition in case we
-missed ACTV being 0. This condition does occur once in while (during my
-3Mbit UART tests, about once every 100000 transfers).
+Looks like I took the AKA in this too literally:
 
-> But what happens if the period size if big and the position is asked
-> just right after the parameter update? We can not know this, so we
-> spin a bit here and give up and return whatever we had in SRC/DST.
+  format '%d' expects argument of type 'int',
+    but argument 3 has type 'size_t {aka long unsigned int}'
 
-I would hope that we never enter the "give up" condition. If a transfer
-request was started, that means one burst of data is supposed to be
-ready, which means the burst transfer should execute quickly. If
-something unexpected happens (certain clocks suddenly turn off, etc),
-then we fallback to the "give up" condition and return bad data to the
-caller.
+After some research I found a new printk format specifier suitable for size_t.
 
-I was considering if dmaengine_tx_status() should somehow notify that it
-is not possible to identify the residue (i.e. we gave up waiting for the
-transfer to complete). But that really adds new semantics to the DMA
-API, which is something much bigger.
+ drivers/mailbox/mailbox-sti.c  |  2 +-
+ drivers/mailbox/mailbox-test.c | 10 +++++-----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-An alternative would be to always return a "last known residue". But
-this can really only be tracked during DMA completion interrupts and
-successful edma_residue() calls. Both of which cannot guarentee that we
-didn't miss a completed transfer. That is particularly a problem for the
-UART driver, where a call to dmaengine_tx_status() is then followed by
-PIO. That means dmaengine_tx_status() needs to return as much DMA data
-as is really available.
-
-> Not sure how to deal with this, but for sure needs more thought...
-
-This patch closes a very real and reproducable race window in the eDMA
-driver. Aside from adding busy waiting cycles it does not produce worse
-results than before. But I am open to ideas.
-
-John Ogness
+diff --git a/drivers/mailbox/mailbox-sti.c b/drivers/mailbox/mailbox-sti.c
+index f11d4e8..4835817 100644
+--- a/drivers/mailbox/mailbox-sti.c
++++ b/drivers/mailbox/mailbox-sti.c
+@@ -64,7 +64,7 @@ struct sti_mbox_device {
+ };
+ 
+ /**
+- * STi Mailbox platform specfic configuration
++ * STi Mailbox platform specific configuration
+  *
+  * @num_inst:	Maximum number of instances in one HW Mailbox
+  * @num_chan:	Maximum number of channel per instance
+diff --git a/drivers/mailbox/mailbox-test.c b/drivers/mailbox/mailbox-test.c
+index cac1ba2..22f2e40 100644
+--- a/drivers/mailbox/mailbox-test.c
++++ b/drivers/mailbox/mailbox-test.c
+@@ -22,7 +22,7 @@
+ #define MBOX_MAX_SIG_LEN	8
+ #define MBOX_MAX_MSG_LEN	128
+ #define MBOX_BYTES_PER_LINE	16
+-#define MBOX_HEXDUMP_LINE_LEN 	((MBOX_BYTES_PER_LINE * 4) + 2)
++#define MBOX_HEXDUMP_LINE_LEN	((MBOX_BYTES_PER_LINE * 4) + 2)
+ #define MBOX_HEXDUMP_MAX_LEN	(MBOX_HEXDUMP_LINE_LEN *		\
+ 				 (MBOX_MAX_MSG_LEN / MBOX_BYTES_PER_LINE))
+ 
+@@ -30,7 +30,7 @@ static struct dentry *root_debugfs_dir;
+ 
+ struct mbox_test_device {
+ 	struct device		*dev;
+-	void __iomem		*mmio;
++	void			*mmio;
+ 	struct mbox_chan	*tx_channel;
+ 	struct mbox_chan	*rx_channel;
+ 	char			*rx_buffer;
+@@ -53,7 +53,7 @@ static ssize_t mbox_test_signal_write(struct file *filp,
+ 
+ 	if (count > MBOX_MAX_SIG_LEN) {
+ 		dev_err(tdev->dev,
+-			"Signal length %d greater than max allowed %d\n",
++			"Signal length %zd greater than max allowed %d\n",
+ 			count, MBOX_MAX_SIG_LEN);
+ 		return -EINVAL;
+ 	}
+@@ -92,7 +92,7 @@ static ssize_t mbox_test_message_write(struct file *filp,
+ 
+ 	if (count > MBOX_MAX_MSG_LEN) {
+ 		dev_err(tdev->dev,
+-			"Message length %d greater than max allowed %d\n",
++			"Message length %zd greater than max allowed %d\n",
+ 			count, MBOX_MAX_MSG_LEN);
+ 		return -EINVAL;
+ 	}
+@@ -303,7 +303,7 @@ static int mbox_test_probe(struct platform_device *pdev)
+ 	tdev->tx_channel = mbox_test_request_channel(pdev, "tx");
+ 	tdev->rx_channel = mbox_test_request_channel(pdev, "rx");
+ 
+-	if (!tdev->tx_channel && !tdev->tx_channel)
++	if (!tdev->tx_channel && !tdev->rx_channel)
+ 		return -EPROBE_DEFER;
+ 
+ 	tdev->dev = &pdev->dev;
