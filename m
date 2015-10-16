@@ -1,39 +1,42 @@
-From: hare@suse.de (Hannes Reinecke)
-Date: Fri, 16 Oct 2015 14:16:06 +0200
-Subject: [PATCH v2] scsi: advansys needs ISA dma api for ISA support
-In-Reply-To: <4351271.eUtUWpTn54@wuerfel>
-References: <4351271.eUtUWpTn54@wuerfel>
-Message-ID: <5620EA86.1090100@suse.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 16 Oct 2015 14:18:01 +0200
+Subject: [PATCH] ARM: at91/dt: sama5d4: add the macb1 node
+In-Reply-To: <1444997510-8841-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1444997510-8841-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20151016121801.GP3421@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2015 02:13 PM, Arnd Bergmann wrote:
-> The advansys drvier uses the request_dma function that is used on ISA
-> machines for the internal DMA controller, which causes build errors
-> on platforms that have ISA slots but do not provide the ISA DMA API:
+On 16/10/2015 at 14:11:50 +0200, Gregory CLEMENT wrote :
+> The second macb is present on all sama5d4 soc. Let's add a node
+> reflecting it in the device tree.
 > 
-> drivers/scsi/advansys.c: In function 'advansys_board_found':
-> drivers/scsi/advansys.c:11300:10: error: implicit declaration of function 'request_dma' [-Werror=implicit-function-declaration]
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/at91-vinco.dts |  5 +----
+>  arch/arm/boot/dts/sama5d4.dtsi   | 30 ++++++++++++++++++++++++++++++
+>  2 files changed, 31 insertions(+), 4 deletions(-)
 > 
-> The problem now showed up in ARM randconfig builds after commit
-> 6571fb3f8b7f ("advansys: Update to version 3.5 and remove compilation
-> warning") made it possible to build on platforms that have neither
-> VIRT_TO_BUS nor ISA_DMA_API but that do have ISA.
-> 
-> This adds a dependency to only build the driver on ISA based machines
-> if they also support ISA_DMA_API, or if they EISA or PCI are also
-> enabled.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-Reviewed-by: Hannes Reinecke <hare@suse.de>
+> diff --git a/arch/arm/boot/dts/at91-vinco.dts b/arch/arm/boot/dts/at91-vinco.dts
+> index b8036f5..2215e2e 100644
+> --- a/arch/arm/boot/dts/at91-vinco.dts
+> +++ b/arch/arm/boot/dts/at91-vinco.dts
+> @@ -82,10 +82,7 @@
+>  		apb {
+>  
+>  			adc0: adc at fc034000 {
+> -				/* The vref depends on JP22 of EK. If connect 1-2 then use 3.3V. connect 2-3 use 3.0V */
+> -				atmel,adc-vref = <3300>;
+> -				/*atmel,adc-ts-wires = <4>;*/	/* Set up ADC touch screen */
+> -				status = "okay";		/* Enable ADC IIO support */
+> +				status = "okay"; /* Enable ADC IIO support */
+>  			};
+>  
+>  			mmc0: mmc at f8000000 {
 
-Cheers,
+This probably shouldn't be part of that patch.
 
-Hannes
 -- 
-Dr. Hannes Reinecke		               zSeries & Storage
-hare at suse.de			               +49 911 74053 688
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg
-GF: F. Imend?rffer, J. Smithard, J. Guild, D. Upmanyu, G. Norton
-HRB 21284 (AG N?rnberg)
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
