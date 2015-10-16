@@ -1,160 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Oct 2015 23:47:37 +0200
-Subject: [PATCH] xfs: fix build without xfsstats
-Message-ID: <5578984.gxbqPUmtuT@wuerfel>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 16 Oct 2015 23:54:39 +0200
+Subject: Atmel SoCs and the newly added CONFIG_DELAY_DEVICE_PROBES option
+In-Reply-To: <CAAObsKBn5DaXT3J9CG6j_f0RxJpo+WQcj-8w5xz_N64OWEYesw@mail.gmail.com>
+References: <20151016181129.GA1764@gradator.net>
+ <CAAObsKBn5DaXT3J9CG6j_f0RxJpo+WQcj-8w5xz_N64OWEYesw@mail.gmail.com>
+Message-ID: <20151016215439.GR3421@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent rework of the xfsstats interface introduced a compile error
-for the procfs-disabled case:
+On 16/10/2015 at 21:29:25 +0200, Tomeu Vizoso wrote :
+> On 16 October 2015 at 20:11, Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
+> > Hi,
+> >
+> > FYI, to save you a git bisect, the recently added
+> > CONFIG_DELAY_DEVICE_PROBES (enabled by default) breaks Atmel SoCs.
+> >
+> > For a few of quickly noticeable issues:
+> > - PM is not working:   at91_pm_sram_init: sram pool unavailable!
+> > - Watchdog is not even probed
+> > - on -ek boards the wm8904 is not probed either.
+> >
+> > Disabling CONFIG_DELAY_DEVICE_PROBES fixes all issues.
+> >
+> > Tomeu, what should I provide to help find out what's happening ?
+> 
+> Hi Sylvain, I believe I can do some testing via kernelci on those
+> boards, latest on monday.
+> 
 
-fs/built-in.o: In function `xfs_free_ag_extent':
-fs/xfs/libxfs/xfs_alloc.c:1725: undefined reference to `xfsstats'
-fs/built-in.o: In function `xfs_alloc_ag_vextent':
-fs/xfs/libxfs/xfs_alloc.c:645: undefined reference to `xfsstats'
-fs/built-in.o: In function `xfs_attr_set':
-fs/xfs/libxfs/xfs_attr.c:353: undefined reference to `xfsstats'
-fs/built-in.o: In function `xfs_attr_remove':
-fs/xfs/libxfs/xfs_attr.c:483: undefined reference to `xfsstats'
-fs/built-in.o: In function `xfs_attr_get':
-fs/xfs/libxfs/xfs_attr.c:131: undefined reference to `xfsstats'
-fs/built-in.o:fs/xfs/libxfs/xfs_bmap.c:1461: more undefined references to `xfsstats' follow
+This also probably broke PM on i.mx5 and i.mx6 (and I think socfpga)
+boards as they use the sram driver the same way. That is why sram_init
+is a postcore_initcall.
 
-This adds conditional compilation to each reference of the xfsstats
-global variable to get it to link again.
+> It will probably involve moving some initcalls, and probing more kinds
+> of devices on-demand. Sometimes the proper solution is to move code
+> from initcalls into proper drivers which can defer their probe if some
+> dependency isn't there at that point, but that's likely to be more
+> invasive than wanted at this point.
+> 
 
-An alternative approach would be to always build the statistics
-implementation even when CONFIG_PROC_FS is disabled.
+I guess that the PM code will be really difficult to move into drivers
+but I'd be happy to see that done on AT91 as this is the only thing left
+in mach-at91.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 80529c45ab66 ("xfs: pass xfsstats structures to handlers and macros")
-Fixes: ff6d6af2351c ("xfs: per-filesystem stats counter implementation")
-
----
-Found with ARM randconfig builds. You seem to have intentionally
-removed the XFS_STATS_INC etc macros and #ifdefs in ff6d6af2351c,
-so I suspect this is not what you had in mind then, but it's not
-clear what you want instead. Please regard this as a bug report
-if it looks wrong to you ;-)
-
-	Arnd
-
-diff --git a/fs/xfs/xfs_stats.h b/fs/xfs/xfs_stats.h
-index 483b0eff1988..f87ad9d12f4a 100644
---- a/fs/xfs/xfs_stats.h
-+++ b/fs/xfs/xfs_stats.h
-@@ -213,9 +213,12 @@ struct xfsstats {
- 	__uint64_t		xs_read_bytes;
- };
- 
-+extern struct xstats xfsstats;
-+
-+#ifdef CONFIG_PROC_FS
-+
- int xfs_stats_format(struct xfsstats __percpu *stats, char *buf);
- void xfs_stats_clearall(struct xfsstats __percpu *stats);
--extern struct xstats xfsstats;
- 
- #define XFS_STATS_INC(mp, v)					\
- do {								\
-@@ -235,14 +238,23 @@ do {									\
- 	per_cpu_ptr(mp->m_stats.xs_stats, current_cpu())->v += (inc);	\
- } while (0)
- 
--#if defined(CONFIG_PROC_FS)
--
- extern int xfs_init_procfs(void);
- extern void xfs_cleanup_procfs(void);
- 
--
- #else	/* !CONFIG_PROC_FS */
- 
-+static inline int xfs_stats_format(struct xfsstats __percpu *stats, char *buf)
-+{
-+	return 0;
-+}
-+static inline void xfs_stats_clearall(struct xfsstats __percpu *stats)
-+{
-+}
-+
-+#define XFS_STATS_INC(mp, v)		do { } while (0)
-+#define XFS_STATS_DEC(mp, v)		do { } while (0)
-+#define XFS_STATS_ADD(mp, v, inc)	do { } while (0)
-+
- static inline int xfs_init_procfs(void)
- {
- 	return 0;
-diff --git a/fs/xfs/xfs_super.c b/fs/xfs/xfs_super.c
-index 368c55adee9d..58a372898857 100644
---- a/fs/xfs/xfs_super.c
-+++ b/fs/xfs/xfs_super.c
-@@ -1475,10 +1475,12 @@ xfs_fs_fill_super(
- 		goto out_destroy_workqueues;
- 
- 	/* Allocate stats memory before we do operations that might use it */
--	mp->m_stats.xs_stats = alloc_percpu(struct xfsstats);
--	if (!mp->m_stats.xs_stats) {
--		error = PTR_ERR(mp->m_stats.xs_stats);
--		goto out_destroy_counters;
-+	if (IS_ENABLED(CONFIG_PROC_FS)) {
-+		mp->m_stats.xs_stats = alloc_percpu(struct xfsstats);
-+		if (!mp->m_stats.xs_stats) {
-+			error = PTR_ERR(mp->m_stats.xs_stats);
-+			goto out_destroy_counters;
-+		}
- 	}
- 
- 	error = xfs_readsb(mp, flags);
-@@ -1851,16 +1853,18 @@ init_xfs_fs(void)
- 		goto out_sysctl_unregister;
- 	}
- 
--	xfsstats.xs_kobj.kobject.kset = xfs_kset;
-+	if (IS_ENABLED(CONFIG_PROC_FS)) {
-+		xfsstats.xs_kobj.kobject.kset = xfs_kset;
- 
--	xfsstats.xs_stats = alloc_percpu(struct xfsstats);
--	if (!xfsstats.xs_stats) {
--		error = -ENOMEM;
--		goto out_kset_unregister;
-+		xfsstats.xs_stats = alloc_percpu(struct xfsstats);
-+		if (!xfsstats.xs_stats) {
-+			error = -ENOMEM;
-+			goto out_kset_unregister;
-+		}
-+		error = xfs_sysfs_init(&xfsstats.xs_kobj, &xfs_stats_ktype,
-+				       NULL, "stats");
- 	}
- 
--	error = xfs_sysfs_init(&xfsstats.xs_kobj, &xfs_stats_ktype, NULL,
--			       "stats");
- 	if (error)
- 		goto out_free_stats;
- 
-@@ -1887,9 +1891,11 @@ init_xfs_fs(void)
- 	xfs_sysfs_del(&xfs_dbg_kobj);
-  out_remove_stats_kobj:
- #endif
--	xfs_sysfs_del(&xfsstats.xs_kobj);
-+	if (IS_ENABLED(CONFIG_PROC_FS))
-+		xfs_sysfs_del(&xfsstats.xs_kobj);
-  out_free_stats:
--	free_percpu(xfsstats.xs_stats);
-+	if (IS_ENABLED(CONFIG_PROC_FS))
-+		free_percpu(xfsstats.xs_stats);
-  out_kset_unregister:
- 	kset_unregister(xfs_kset);
-  out_sysctl_unregister:
-@@ -1916,8 +1922,10 @@ exit_xfs_fs(void)
- #ifdef DEBUG
- 	xfs_sysfs_del(&xfs_dbg_kobj);
- #endif
--	xfs_sysfs_del(&xfsstats.xs_kobj);
--	free_percpu(xfsstats.xs_stats);
-+	if (IS_ENABLED(CONFIG_PROC_FS)) {
-+		xfs_sysfs_del(&xfsstats.xs_kobj);
-+		free_percpu(xfsstats.xs_stats);
-+	}
- 	kset_unregister(xfs_kset);
- 	xfs_sysctl_unregister();
- 	xfs_cleanup_procfs();
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
