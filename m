@@ -1,56 +1,124 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 16 Oct 2015 11:21:59 -0500
-Subject: [PATCH 00/11] arm: omap: timer cleanups
-Message-ID: <1445012530-14126-1-git-send-email-balbi@ti.com>
+Date: Fri, 16 Oct 2015 11:22:01 -0500
+Subject: [PATCH 02/11] arm: omap2: timer: get rid of obfuscating macros
+In-Reply-To: <1445012530-14126-1-git-send-email-balbi@ti.com>
+References: <1445012530-14126-1-git-send-email-balbi@ti.com>
+Message-ID: <1445012530-14126-3-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+those macros just make it a lot more difficult
+to grep around and actually find similarities.
 
-Here's the a series of timer cleanups (and a new 32k clocksource driver
-which is safe to apply during v4.3 merge window. We're only missing,
-now, two changes to enable TWD timer for AM437x.
+In this patch, we will simply remove them and
+replace with actual functions and later commits
+will come to further clean this up.
 
-All patches are also available in a branch which you can pull should you
-choose. Pull request below.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/mach-omap2/timer.c | 70 ++++++++++++++++++++++++++++-----------------
+ 1 file changed, 43 insertions(+), 27 deletions(-)
 
-The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
-
-  Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git for-tony
-
-for you to fetch changes up to bf4c94490aa4491cca758d633c0e641a4419c920:
-
-  arm: omap2: timer: limit hwmod usage to non-DT boots (2015-10-16 11:06:24 -0500)
-
-----------------------------------------------------------------
-Felipe Balbi (11):
-      arm: omap2: timer: always define omap4_local_timer_init
-      arm: omap2: timer: get rid of obfuscating macros
-      arm: omap2: timer: add a gptimer argument to sync32k_timer_init()
-      arm: omap2: timer: remove __omap_gptimer_init()
-      arm: omap2: timer: provide generic sync32k_timer_init function
-      arm: omap2: timer: move realtime_counter_init() around
-      arm: omap2: timer: always call clocksource_of_init() when DT
-      arm: omap2: timer: rename omap_sync32k_timer_init()
-      clocksource: add TI 32.768 Hz counter driver
-      arm: omap2+: select 32k clocksource driver
-      arm: omap2: timer: limit hwmod usage to non-DT boots
-
- arch/arm/mach-omap2/Kconfig         |   1 +
- arch/arm/mach-omap2/board-generic.c |  10 +--
- arch/arm/mach-omap2/board-ldp.c     |   2 +-
- arch/arm/mach-omap2/board-rx51.c    |   2 +-
- arch/arm/mach-omap2/common.h        |   3 +-
- arch/arm/mach-omap2/timer.c         | 162 ++++++++++++++++--------------------
- drivers/clocksource/Kconfig         |   7 ++
- drivers/clocksource/Makefile        |   1 +
- drivers/clocksource/timer-ti-32k.c  | 126 ++++++++++++++++++++++++++++
- 9 files changed, 215 insertions(+), 99 deletions(-)
- create mode 100644 drivers/clocksource/timer-ti-32k.c
-
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 548d922cb107..23e58ea6a171 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -592,53 +592,69 @@ static inline void __init realtime_counter_init(void)
+ {}
+ #endif
+ 
+-#define OMAP_SYS_GP_TIMER_INIT(name, clkev_nr, clkev_src, clkev_prop,	\
+-			       clksrc_nr, clksrc_src, clksrc_prop)	\
+-void __init omap##name##_gptimer_timer_init(void)			\
+-{									\
+-	omap_clk_init();					\
+-	omap_dmtimer_init();						\
+-	omap2_gp_clockevent_init((clkev_nr), clkev_src, clkev_prop);	\
+-	omap2_gptimer_clocksource_init((clksrc_nr), clksrc_src,		\
+-					clksrc_prop);			\
++static void __init __omap_gptimer_init(int clkev_nr, const char *clkev_src,
++		const char *clkev_prop, int clksrc_nr, const char *clksrc_src,
++		const char *clksrc_prop)
++{
++	omap_clk_init();
++	omap_dmtimer_init();
++	omap2_gp_clockevent_init(clkev_nr, clkev_src, clkev_prop);
++	omap2_gptimer_clocksource_init(clksrc_nr, clksrc_src, clksrc_prop);
+ }
+ 
+-#define OMAP_SYS_32K_TIMER_INIT(name, clkev_nr, clkev_src, clkev_prop,	\
+-				clksrc_nr, clksrc_src, clksrc_prop)	\
+-void __init omap##name##_sync32k_timer_init(void)		\
+-{									\
+-	omap_clk_init();					\
+-	omap_dmtimer_init();						\
+-	omap2_gp_clockevent_init((clkev_nr), clkev_src, clkev_prop);	\
+-	/* Enable the use of clocksource="gp_timer" kernel parameter */	\
+-	if (use_gptimer_clksrc)						\
+-		omap2_gptimer_clocksource_init((clksrc_nr), clksrc_src,	\
+-						clksrc_prop);		\
+-	else								\
+-		omap2_sync32k_clocksource_init();			\
++static void __init __omap_sync32k_timer_init(int clkev_nr, const char *clkev_src,
++		const char *clkev_prop, int clksrc_nr, const char *clksrc_src,
++		const char *clksrc_prop)
++{
++	omap_clk_init();
++	omap_dmtimer_init();
++	omap2_gp_clockevent_init(clkev_nr, clkev_src, clkev_prop);
++
++	/* Enable the use of clocksource="gp_timer" kernel parameter */
++	if (use_gptimer_clksrc)
++		omap2_gptimer_clocksource_init(clksrc_nr, clksrc_src,
++						clksrc_prop);
++	else
++		omap2_sync32k_clocksource_init();
+ }
+ 
+ #ifdef CONFIG_ARCH_OMAP2
+-OMAP_SYS_32K_TIMER_INIT(2, 1, "timer_32k_ck", "ti,timer-alwon",
++void __init omap2_sync32k_timer_init(void)
++{
++	__omap_sync32k_timer_init(1, "timer_32k_ck", "ti,timer-alwon",
+ 			2, "timer_sys_ck", NULL);
++}
+ #endif /* CONFIG_ARCH_OMAP2 */
+ 
+ #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM43XX)
+-OMAP_SYS_32K_TIMER_INIT(3, 1, "timer_32k_ck", "ti,timer-alwon",
++void __init omap3_sync32k_timer_init(void)
++{
++	__omap_sync32k_timer_init(1, "timer_32k_ck", "ti,timer-alwon",
+ 			2, "timer_sys_ck", NULL);
+-OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
++}
++
++void __init omap3_secure_sync32k_timer_init(void)
++{
++	__omap_sync32k_timer_init(12, "secure_32k_fck", "ti,timer-secure",
+ 			2, "timer_sys_ck", NULL);
++}
+ #endif /* CONFIG_ARCH_OMAP3 */
+ 
+ #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
+-OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
++void __init omap3_gptimer_timer_init(void)
++{
++	__omap_gptimer_init(2, "timer_sys_ck", NULL,
+ 		       1, "timer_sys_ck", "ti,timer-alwon");
++}
+ #endif
+ 
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
+ 	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
+-static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
++static void __init omap4_sync32k_timer_init(void)
++{
++	__omap_sync32k_timer_init(1, "timer_32k_ck", "ti,timer-alwon",
+ 			       2, "sys_clkin_ck", NULL);
++}
+ 
+ void __init omap4_local_timer_init(void)
+ {
 -- 
 2.5.3
