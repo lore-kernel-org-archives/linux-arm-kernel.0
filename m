@@ -1,122 +1,204 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 16 Oct 2015 06:46:22 +0000
-Subject: [PATCH 3/5] mtd: brcmnand: Optional DT flag to reset IPROC NAND
- controller
-In-Reply-To: <20151012212742.GQ107187@google.com>
-References: <1443808606-21203-1-git-send-email-anup.patel@broadcom.com>
- <1443808606-21203-4-git-send-email-anup.patel@broadcom.com>
- <20151004214943.GA28904@localhost>
- <39063E8F96E11742B35A201CC5D095B7AD54C1@SJEXCHMB10.corp.ad.broadcom.com>
- <20151006134119.GB26818@localhost> <56144A62.70300@broadcom.com>
- <5614574C.2060701@gmail.com>
- <39063E8F96E11742B35A201CC5D095B7AD8ADD@SJEXCHMB10.corp.ad.broadcom.com>
- <20151012212742.GQ107187@google.com>
-Message-ID: <39063E8F96E11742B35A201CC5D095B7AECD4D@SJEXCHMB10.corp.ad.broadcom.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 16 Oct 2015 14:46:23 +0800
+Subject: [linux-sunxi] Re: [PATCH 3/6] mfd: axp20x: Add support for RSB
+ based AXP223 PMIC
+In-Reply-To: <20151016064159.GG2711@lukather>
+References: <1444840342-9233-1-git-send-email-wens@csie.org>
+ <1444840342-9233-4-git-send-email-wens@csie.org>
+ <20151016064159.GG2711@lukather>
+Message-ID: <CAGb2v66B8EbTZkVrt3QT85fKCwOjL8OBWfQvcLHrLAe6NfavNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+On Fri, Oct 16, 2015 at 2:41 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Oct 15, 2015 at 12:32:19AM +0800, Chen-Yu Tsai wrote:
+>> The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
+>> It is functionally identical to AXP221; only the regulator default
+>> voltage/status and the external host interface are different.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  drivers/mfd/Kconfig        | 12 ++++++
+>>  drivers/mfd/Makefile       |  1 +
+>>  drivers/mfd/axp20x-core.c  |  2 +
+>>  drivers/mfd/axp20x-rsb.c   | 93 ++++++++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/mfd/axp20x.h |  1 +
+>>  5 files changed, 109 insertions(+)
+>>  create mode 100644 drivers/mfd/axp20x-rsb.c
+>>
+>> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+>> index 9ba3feb3f2fc..6e5edb61d42e 100644
+>> --- a/drivers/mfd/Kconfig
+>> +++ b/drivers/mfd/Kconfig
+>> @@ -84,6 +84,7 @@ config MFD_BCM590XX
+>>  config MFD_AXP20X
+>>       bool "X-Powers AXP series PMICs"
+>>       select MFD_AXP20X_I2C
+>> +     select MFD_AXP20X_RSB
+>>
+>>  config MFD_AXP20X_CORE
+>>       bool
+>> @@ -102,6 +103,17 @@ config MFD_AXP20X_I2C
+>>         components like regulators or the PEK (Power Enable Key) under the
+>>         corresponding menus.
+>>
+>> +config MFD_AXP20X_RSB
+>> +     bool "X-Powers AXP series RSB PMICs"
+>> +     select MFD_AXP20X_CORE
+>> +     depends on SUNXI_RSB=y
+>
+> Do we need that? Even if the bus is compiled as a module, the driver
+> will not be probed before that, will it?
 
-> -----Original Message-----
-> From: Brian Norris [mailto:computersforpeace at gmail.com]
-> Sent: 13 October 2015 02:58
-> To: Anup Patel
-> Cc: Florian Fainelli; Scott Branden; linux-arm-kernel at lists.infradead.org; Rob
-> Herring; Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala; Catalin Marinas;
-> Will Deacon; David Woodhouse; Ray Jui; Pramod Kumar; Vikram Prakash;
-> Sandeep Tripathy; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
-> linux-mtd at lists.infradead.org; bcm-kernel-feedback-list; Rafal Milecki
-> Subject: Re: [PATCH 3/5] mtd: brcmnand: Optional DT flag to reset IPROC NAND
-> controller
-> 
-> Hi Anup,
-> 
-> On Wed, Oct 07, 2015 at 03:33:50AM +0000, Anup Patel wrote:
-> > > -----Original Message-----
-> > > From: Florian Fainelli [mailto:f.fainelli at gmail.com]
-> > >
-> > > On 06/10/15 15:25, Scott Branden wrote:
-> > >
-> > > Then instead of adding a "reset flag" to Device Tree, another
-> > > approach could be to put the desired or currently configured
-> > > exhaustive list of NAND timings in Device Tree, and based on that you could
-> have this:
-> > >
-> > > - the NAND controller driver finds that these timings match the
-> > > current configuration, you are good to go
-> > >
-> > > - the NAND controller drivers finds a difference in how current
-> > > timings are configured vs. desired timings, and issues a controller
-> > > reset, prior to applying new timing configuration
-> >
-> > To add to this ...
-> >
-> > The mechanism to reset is BRCM NAND controller is SOC specific so the
-> > SoC independent BRCM NAND driver (i.e. brcmnand.c) does not know how
-> > to reset the NAND controller.
-> >
-> > For iProc SoC family, the NAND controller reset is through IDM
-> > register space which is only iomap'ed by iproc_nand.c.
-> >
-> > We might end-up having one more SoC specific callback which will be
-> > Provided by iproc_nand.c to brcmnand.c.
-> >
-> > >
-> > > - no timings are configured, reset the controller and use existing
-> > > auto-detection capabilities like ONFI modes
-> > >
-> > > Typically you would put the desired timings instead of the currently
-> > > configured timings though..
-> >
-> > Overall, it would good to support timing parameters through DT or ONFI
-> > but for now have we can rely on reset and auto-devid configuration.
-> 
-> I don't want to support a DT property that is only used as a workaround for the
-> right solution. That means the property may quickly become obsolete, yet we
-> have to support it forever.
-> 
-> 
-> > > >>     compatible = "brcm,iproc-nand-ns2", ...;
-> > > >>
-> > > > As described above - the option is not SoC specific.  It is system
-> > > > specific.  In some systems we may wish to reset the NAND
-> > > > controller in linux.  In some we may wish to rely on
-> > > > initialization that has already been done to speed up boot times.
-> > >
-> > > It seems to me like having this property is fine as long as you are
-> > > describing that the controller *needs* a reset to operate properly,
-> > > it does not strike me as a particularly well suited property if its
-> > > side effect and main usage is to keep or wipe-out existing NAND timings.
-> >
-> > IMHO, having SoC specific compatible string for NS2 is like saying
-> > NAND controller on NS2 is different from other iProc SoCs whereas
-> > Having optional DT flags for quirks/work-arounds (e.g. NAND controller
-> > reset) is like saying NAND controller on NS2 same as other iProc SoCs
-> > but some additional programming is required.
-> 
-> OK... so what is the reason that you have to reset the controller on NS2 and not
-> Cygnus? Is it a SoC difference (i.e., compatible string)?
-> Firmware/bootloader difference? So far, all statements have been non-specific,
-> AFAICT.
-> 
+There's a compile/link dependency on the __devm_regmap_init_sunxi_rsb().
 
-On NS2 SVK, we have 16bit NAND chip whereas on all Cygnus SVKs we mostly
-have 8bit NAND chip.
+And both drivers are bool, i.e. can't be compiled as a module. What we
+don't want is enabling MFD_AXP20X_RSB without SUNXI_RSB.
 
-The bootloader on NS2 touches NAND controller and configures it to 16bit mode.
-When we reach BRCMNAND driver probing on NS2, the BRCMNAND controller is
-already in 16bit mode so NAND READID command does not work. On Cygnus,
-we mostly have 8bit NAND chip so BRCMNAND controller is always in 8bit mode
-so we don't see any issue with NAND READID command.
+AFAIK the same goes for the I2C version.
 
-We really don't require to reset BRCNNAND controller on NS2 to get NAND
-READID command working. Instead, we can simply force 8bit mode before
-we do nand_scan_ident() for each CS. This will be a much simpler fix for all
-versions of BRCMNAND because NAND READID command will only work
-in 8bit mode irrespective to BRCMNAND version (NAND controllers from
-other vendors might also have similar issue with NAND READID command).
+>> +     help
+>> +       If you say Y here you get support for the X-Powers AXP series RSB
+>> +       based power management ICs (PMICs).
+>> +       This driver include only the core APIs. You have to select individual
+>> +       components like regulators or the PEK (Power Enable Key) under the
+>> +       corresponding menus.
+>> +
+>>  config MFD_CROS_EC
+>>       tristate "ChromeOS Embedded Controller"
+>>       select MFD_CORE
+>> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+>> index ce3ad5fd4e2f..1eb278619dd6 100644
+>> --- a/drivers/mfd/Makefile
+>> +++ b/drivers/mfd/Makefile
+>> @@ -108,6 +108,7 @@ obj-$(CONFIG_MFD_DA9052_SPI)      += da9052-spi.o
+>>  obj-$(CONFIG_MFD_DA9052_I2C) += da9052-i2c.o
+>>  obj-$(CONFIG_MFD_AXP20X_CORE)        += axp20x-core.o
+>>  obj-$(CONFIG_MFD_AXP20X_I2C) += axp20x-i2c.o
+>> +obj-$(CONFIG_MFD_AXP20X_RSB) += axp20x-rsb.o
+>>
+>>  obj-$(CONFIG_MFD_LP3943)     += lp3943.o
+>>  obj-$(CONFIG_MFD_LP8788)     += lp8788.o lp8788-irq.o
+>> diff --git a/drivers/mfd/axp20x-core.c b/drivers/mfd/axp20x-core.c
+>> index dd33548d93c4..baecccb6d400 100644
+>> --- a/drivers/mfd/axp20x-core.c
+>> +++ b/drivers/mfd/axp20x-core.c
+>> @@ -32,6 +32,7 @@ static const char * const axp20x_model_names[] = {
+>>       "AXP202",
+>>       "AXP209",
+>>       "AXP221",
+>> +     "AXP223",
+>>       "AXP288",
+>>  };
+>>
+>> @@ -575,6 +576,7 @@ int axp20x_match_device(struct axp20x_dev *axp20x, struct device *dev)
+>>               axp20x->regmap_irq_chip = &axp20x_regmap_irq_chip;
+>>               break;
+>>       case AXP221_ID:
+>> +     case AXP223_ID:
+>>               axp20x->nr_cells = ARRAY_SIZE(axp22x_cells);
+>>               axp20x->cells = axp22x_cells;
+>>               axp20x->regmap_cfg = &axp22x_regmap_config;
+>> diff --git a/drivers/mfd/axp20x-rsb.c b/drivers/mfd/axp20x-rsb.c
+>> new file mode 100644
+>> index 000000000000..5d053d177717
+>> --- /dev/null
+>> +++ b/drivers/mfd/axp20x-rsb.c
+>> @@ -0,0 +1,93 @@
+>> +/*
+>> + * axp20x-rsb.c - RSB driver for the X-Powers' Power Management ICs
+>> + *
+>> + * AXP20x typically comprises an adaptive USB-Compatible PWM charger, BUCK DC-DC
+>> + * converters, LDOs, multiple 12-bit ADCs of voltage, current and temperature
+>> + * as well as configurable GPIOs.
+>> + *
+>> + * This driver supports the RSB variants.
+>> + *
+>> + * Author: Chen-Yu Tsai <wens@csie.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/acpi.h>
+>> +#include <linux/err.h>
+>> +#include <linux/module.h>
+>> +#include <linux/mfd/axp20x.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/soc/sunxi/sunxi_rsb.h>
+>> +
+>> +static const struct of_device_id axp20x_sunxi_rsb_of_match[] = {
+>> +     { .compatible = "x-powers,axp223", .data = (void *) AXP223_ID },
+>> +     { },
+>> +};
+>> +MODULE_DEVICE_TABLE(of, axp20x_sunxi_rsb_of_match);
+>> +
+>> +static int axp20x_sunxi_rsb_match_device(struct axp20x_dev *axp20x,
+>> +                                      struct device *dev)
+>> +{
+>> +     const struct of_device_id *of_id;
+>> +
+>> +     of_id = of_match_device(axp20x_sunxi_rsb_of_match, dev);
+>> +     if (!of_id) {
+>> +             dev_err(dev, "Unable to match OF ID\n");
+>> +             return -ENODEV;
+>> +     }
+>> +     axp20x->variant = (long) of_id->data;
+>> +
+>> +     return axp20x_match_device(axp20x, dev);
+>> +}
+>> +
+>> +static int axp20x_sunxi_rsb_probe(struct sunxi_rsb_device *rdev)
+>> +{
+>> +     struct axp20x_dev *axp20x;
+>> +     int ret;
+>> +
+>> +     axp20x = devm_kzalloc(&rdev->dev, sizeof(*axp20x), GFP_KERNEL);
+>> +     if (!axp20x)
+>> +             return -ENOMEM;
+>> +
+>> +     ret = axp20x_sunxi_rsb_match_device(axp20x, &rdev->dev);
+>> +     if (ret)
+>> +             return ret;
+>> +
+>> +     axp20x->dev = &rdev->dev;
+>> +     axp20x->irq = rdev->irq;
+>> +     sunxi_rsb_device_set_drvdata(rdev, axp20x);
+>> +
+>> +     axp20x->regmap = devm_regmap_init_sunxi_rsb(rdev, axp20x->regmap_cfg);
+>> +     if (IS_ERR(axp20x->regmap)) {
+>> +             ret = PTR_ERR(axp20x->regmap);
+>> +             dev_err(&rdev->dev, "regmap init failed: %d\n", ret);
+>> +             return ret;
+>> +     }
+>> +
+>> +     return axp20x_device_probe(axp20x);
+>> +}
+>> +
+>> +static int axp20x_sunxi_rsb_remove(struct sunxi_rsb_device *rdev)
+>> +{
+>> +     struct axp20x_dev *axp20x = sunxi_rsb_device_get_drvdata(rdev);
+>> +
+>> +     return axp20x_device_remove(axp20x);
+>> +}
+>> +
+>> +static struct sunxi_rsb_driver axp20x_sunxi_rsb_driver = {
+>> +     .driver = {
+>> +             .name   = "axp20x-sunxi-rsb",
+>
+> Do we need to be that verbose in the name of the driver?
+>
+> axp20x-rsb should be enough, especially since it's also the name of
+> your file.
 
-I will send a revised patchset which will fix brcmnand_init_cs() as-per above.
+Sure.
 
-Best Regards,
-Anup
+> Looks good otherwise, thanks!
+
+Thanks!
+
+ChenYu
