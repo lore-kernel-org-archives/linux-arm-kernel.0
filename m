@@ -1,45 +1,86 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Oct 2015 22:41:31 +0200
-Subject: [PATCH] pinctrl: ssbi: fix function name typo
-Message-ID: <6327573.Mj84IgUkQi@wuerfel>
+Date: Fri, 16 Oct 2015 22:45:39 +0200
+Subject: [PATCH] staging/wilc: fix Kconfig dependencies, second try
+Message-ID: <5446980.8Rmykv9Tt3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The two newly added qcom ssbi pinctrl drivers have the same bug
-from a function name that apparently got changed in one place
-but not another, resulting in a build error when CONFIG_DEBUG_FS
-is disabled:
+My first attempt to fix the Kconfig logic for wilc1000 was incomplete,
+as it missed the case where SPI is built-in while SDIO is modular
+and wilc1000 is configured as built-in in SPI mode (or vice versa),
+which would still lead to a link failure.
 
-drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c:652:14: error: 'pm8xxx_mpp_dbg_show' undeclared here (not in a function)
-
-This fixes the two identifiers.
+This works around the problem by adding an intermediate Kconfig
+symbol "WILC1000_DRIVER" that controls visibility of the SDIO and
+SPI sub-drivers, so we can control the dependencies better.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b4c45fe974bc ("pinctrl: qcom: ssbi: Family A gpio & mpp drivers")
+Fixes: 9535ebc5e9cc ("staging/wilc1000: fix Kconfig dependencies")
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c b/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
-index e1a3721bc8e5..d809c9eaa323 100644
---- a/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
-+++ b/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
-@@ -584,7 +584,7 @@ static void pm8xxx_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
- }
+diff --git a/drivers/staging/wilc1000/Kconfig b/drivers/staging/wilc1000/Kconfig
+index 59ccecc316df..ee51b4278088 100644
+--- a/drivers/staging/wilc1000/Kconfig
++++ b/drivers/staging/wilc1000/Kconfig
+@@ -1,14 +1,16 @@
+-config WILC1000
+-	tristate "WILC1000 support (WiFi only)"
+-	depends on !S390
++config WILC1000_DRIVER
++	bool "WILC1000 support (WiFi only)"
+ 	depends on CFG80211 && WEXT_CORE && INET
+-	depends on MMC || SPI
+ 	---help---
+ 	  This module only support IEEE 802.11n WiFi.
  
- #else
--#define msm_gpio_dbg_show NULL
-+#define pm8xxx_gpio_dbg_show NULL
- #endif
++if WILC1000_DRIVER
++
++config WILC1000
++	tristate
++
+ choice
+         prompt "Memory Allocation"
+-        depends on WILC1000
+         default WILC1000_PREALLOCATE_AT_LOADING_DRIVER
  
- static struct gpio_chip pm8xxx_gpio_template = {
-diff --git a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
-index 6652b8d7f707..8982027de8e8 100644
---- a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
-+++ b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
-@@ -639,7 +639,7 @@ static void pm8xxx_mpp_dbg_show(struct seq_file *s, struct gpio_chip *chip)
- }
+ config WILC1000_PREALLOCATE_AT_LOADING_DRIVER
+@@ -29,12 +31,12 @@ endchoice
  
- #else
--#define msm_mpp_dbg_show NULL
-+#define pm8xxx_mpp_dbg_show NULL
- #endif
+ choice
+ 	prompt "Bus Type"
+-	depends on WILC1000
+ 	default WILC1000_SDIO
  
- static struct gpio_chip pm8xxx_mpp_template = {
+-	config WILC1000_SDIO
++config WILC1000_SDIO
+ 	bool "SDIO support"
+ 	depends on MMC
++	select WILC1000
+ 	---help---
+ 	  This module adds support for the SDIO interface of adapters using
+ 	  WILC1000 chipset. The Atmel WILC1000 SDIO is a full speed interface.
+@@ -45,8 +47,9 @@ choice
+ 	  To use this interface, pin9 (SDIO_SPI_CFG) must be grounded. Select
+ 	  this if your platform is using the SDIO bus.
+ 
+-	config WILC1000_SPI
++config WILC1000_SPI
+ 	depends on SPI
++	select WILC1000
+ 	bool "SPI support"
+ 	---help---
+ 	  This module adds support for the SPI interface of adapters using
+@@ -60,7 +63,7 @@ endchoice
+ 
+ config WILC1000_HW_OOB_INTR
+ 	bool "Use out of band interrupt"
+-	depends on WILC1000 && WILC1000_SDIO
++	depends on WILC1000_SDIO
+ 	default n
+ 	---help---
+ 	  This option enables out-of-band interrupt support for the WILC1000
+@@ -68,3 +71,5 @@ config WILC1000_HW_OOB_INTR
+ 	  mechanism for SDIO host controllers that don't support SDIO interrupt.
+ 	  Select this option If the SDIO host controller in your platform
+ 	  doesn't support SDIO time devision interrupt.
++
++endif
