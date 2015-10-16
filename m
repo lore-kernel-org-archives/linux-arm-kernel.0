@@ -1,68 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Oct 2015 15:26:34 +0200
-Subject: [PATCH] VFIO: platform: AMD xgbe reset module
-In-Reply-To: <5620F665.5010903@linaro.org>
-References: <1444836792-2405-1-git-send-email-eric.auger@linaro.org>
- <1444927997.4059.470.camel@redhat.com> <5620F665.5010903@linaro.org>
-Message-ID: <3768580.4oTvTNW7Bh@wuerfel>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 16 Oct 2015 15:27:14 +0200
+Subject: [PATCH 4/5] clk: berlin: bg2q: remove CLK_IGNORE_UNUSED flag for
+ sdio clk
+In-Reply-To: <20151016124705.20687.51712@quantum>
+References: <1444628796-5484-1-git-send-email-jszhang@marvell.com>
+ <1444628796-5484-5-git-send-email-jszhang@marvell.com>
+ <20151016124705.20687.51712@quantum>
+Message-ID: <5620FB32.8030705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 October 2015 15:06:45 Eric Auger wrote:
+On 16.10.2015 14:47, Michael Turquette wrote:
+> Quoting Jisheng Zhang (2015-10-11 22:46:35)
+>> Since we have added the necessary axi clk properties in dts, we can
+>> remove the "sdio" clk's CLK_IGNORE_UNUSED flag now.
+>>
+>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+>
+> Applied to clk-next.
 
->  I've since forgotten his answer, but the fact that
-> > __symbol_get() is only defined for modules makes it moot, we either need
-> > to make symbol_get() work or define __symbol_get() for non-module
-> > builds.
-> I currently don't see any solution for any of those. The only solution I
-> can see is someone registers the reset function pointer to vfio.
-> 
-> I think we could keep the existing reset modules, do the request_module
-> from VFIO, using their module name registered in the lookup table. But
-> instead of having the reset function in the look-up table we would have
-> the reset modules register their reset function pointer to VFIO. I think
-> this could work around the symbol_get issue.
-> 
-> This still leaves the layer violation argument though.
-> 
-> Assuming this works, would that be an acceptable solution, although I
-> acknowledge this does not perfectly fit into the driver model?
+Mike,
 
-I think it's possible to avoid the layering violation that way too,
-by loading the module based on the compatible string, with a module_alias.
+these two patches will break Berlin SoCs if not applied
+after the sdhci and DT changes went in. Please hold them
+back until the discussion has been settled.
 
-static void vfio_platform_get_reset(struct vfio_platform_device *vdev,
-                                    struct device *dev)
-{
-        const char *compat;
-        int (*reset)(struct vfio_platform_device *);
-        int ret, i;
-	char modname[256];
+Thanks,
+   Sebastian
 
-        ret = device_property_read_string(dev, "compatible", &compat);
-        if (ret)
-                return;
-
-	reset = vfio_platform_lookup_reset(compat);
-	if (!reset) {
-		snprintf(modname, "vfio-reset:%s", compat);
-		request_module(modname);
-		reset = vfio_platform_lookup_reset(compat);
-	}
-
-	vdev->reset = reset;
-}
-
----
-
-#define module_vfio_reset_handler(compat, reset)			\
-MODULE_ALIAS("vfio_reset" compat);					\
-static int reset ## _module_init(void)					\
-{									\
-	return vfio_reset_register(THIS_MODULE, compat, &reset);	\
-}
-
-I think that solution is good enough, as it avoids most of the
-problems with the current implementation but is a simple enough change.
-
-	Arnd
+>
+>> ---
+>>   drivers/clk/berlin/bg2q.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
+>> index 221f40c..243f421 100644
+>> --- a/drivers/clk/berlin/bg2q.c
+>> +++ b/drivers/clk/berlin/bg2q.c
+>> @@ -283,7 +283,7 @@ static const struct berlin2_gate_data bg2q_gates[] __initconst = {
+>>          { "usb2",       "perif",        13 },
+>>          { "usb3",       "perif",        14 },
+>>          { "pbridge",    "perif",        15, CLK_IGNORE_UNUSED },
+>> -       { "sdio",       "perif",        16, CLK_IGNORE_UNUSED },
+>> +       { "sdio",       "perif",        16 },
+>>          { "nfc",        "perif",        18 },
+>>          { "pcie",       "perif",        22 },
+>>   };
+>> --
+>> 2.6.1
+>>
