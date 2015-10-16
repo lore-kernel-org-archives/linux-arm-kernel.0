@@ -1,13 +1,13 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 16 Oct 2015 15:04:49 +0200
-Subject: [PATCH v2 6/8] ARM: multi_v7_defconfig: Add Atmel SAMA5D2 SoC
+Date: Fri, 16 Oct 2015 15:04:50 +0200
+Subject: [PATCH v2 7/8] ARM: multi_v7_defconfig: Add Atmel Flexcom device
 In-Reply-To: <1445000691-12402-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1445000691-12402-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1445000691-12402-7-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1445000691-12402-8-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Atmel SAMA5D2 SoC family to multi_v7 image.
+The Flexcom device has been introduced with Atmel SAMA5D2 SoC.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
@@ -15,16 +15,16 @@ Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
  1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index bf099b7..63703fa 100644
+index 63703fa..6dcc048 100644
 --- a/arch/arm/configs/multi_v7_defconfig
 +++ b/arch/arm/configs/multi_v7_defconfig
-@@ -21,6 +21,7 @@ CONFIG_MACH_ARMADA_39X=y
- CONFIG_MACH_ARMADA_XP=y
- CONFIG_MACH_DOVE=y
- CONFIG_ARCH_AT91=y
-+CONFIG_SOC_SAMA5D2=y
- CONFIG_SOC_SAMA5D3=y
- CONFIG_SOC_SAMA5D4=y
- CONFIG_ARCH_BCM=y
+@@ -389,6 +389,7 @@ CONFIG_MESON_WATCHDOG=y
+ CONFIG_DIGICOLOR_WATCHDOG=y
+ CONFIG_MFD_AS3711=y
+ CONFIG_MFD_AS3722=y
++CONFIG_MFD_ATMEL_FLEXCOM=y
+ CONFIG_MFD_BCM590XX=y
+ CONFIG_MFD_AXP20X=y
+ CONFIG_MFD_CROS_EC=y
 -- 
 2.5.0
