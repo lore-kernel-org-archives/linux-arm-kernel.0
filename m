@@ -1,60 +1,152 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 16 Oct 2015 16:22:06 +0100
-Subject: [PATCH v4 0/3] arm64: Juno: Add support for PCIe on R1 board
-Message-ID: <1445008929-32267-1-git-send-email-Liviu.Dudau@arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 16 Oct 2015 16:21:54 +0100
+Subject: [Xen-devel] [PATCH 1/3] xen/arm: Enable cpu_hotplug.c
+In-Reply-To: <alpine.DEB.2.02.1510141916430.27957@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
+ <1444844997-27314-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <182B77B3-41AD-4364-B1A0-EC161F546751@oracle.com>
+ <alpine.DEB.2.02.1510141916430.27957@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1510161621390.27957@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v4 vs v3:
- - Dropped the quirks patches as the fixup can be done in firmware.
-Changes in v3 vs v2:
- - Add Documentation files describing the DT bindings for plda,xpressrich3-axi
-   and arm,juno-r1-pcie properties.
- - Cosmetic changes in the .dts to bracket range and interrupt-map entries
-   individually.
-Changes in v2 vs v1:
- - Add plda as OF vendor prefix
- - Add more specific compatible values to the Juno R1 DT
- 
+On Wed, 14 Oct 2015, Stefano Stabellini wrote:
+> On Wed, 14 Oct 2015, Konrad Rzeszutek Wilk wrote:
+> > On October 14, 2015 1:49:55 PM EDT, Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
+> > >Build cpu_hotplug for ARM and ARM64 guests.
+> > >
+> > >Rename arch_(un)register_cpu to xen_(un)register_cpu and provide an
+> > >empty implementation on ARM and ARM64. On x86 just call
+> > >arch_(un)register_cpu as we are already doing.
+> > >
+> > >Initialize cpu_hotplug on ARM.
+> > 
+> > Have you tested this on x86? As your changes touch the generic code path.
+> 
+> Only build-tested at this stage, because all my x86 test boxes are
+> unavailable at the moment (they are being relocated). As soon as they
+> come back online I will test.
 
-Juno R1 board has a working PCIe host bridge that can be enabled and
-configured by the firmware and made use of by Linux. For UEFI, the
-Linaro releases contain firmware that configure the XpressRICH3 host
-bridge correctly. For U-Boot based setups, one needs the patchset
-posted here[1].
+Tested with a PV guest on x86 and it's fine.
 
-This patchset adds a quirk for setting the correct class to the host
-bridge device and the device tree changes that enable PCIe on Juno R1.
-We also update the defconfig to enable the generic PCI host bridge driver.
 
-The changes can also available in the git repository at:
-
-  git://linux-arm.org/linux-ld.git for-upstream/juno-pcie
-
-They are based on v4.3-rc5.
-
-Catalin, Will: This series has got Mark's ACKs for the DT changes and
-now with the quirks dropped it can be pulled into whatever arm64 -next
-branch you want to prepare. Do you want a formal pull request for this?
-
-Best regards,
-Liviu
-
-1. http://lists.denx.de/pipermail/u-boot/2015-October/229669.html
-
-Liviu Dudau (3):
-  Documentation: of: Document the bindings used by Juno R1 PCIe host bridge
-  arm64: Juno: Add support for the PCIe host bridge on Juno R1
-  arm64: defconfig: Enable PCI generic host bridge by default
-
- .../devicetree/bindings/pci/arm,juno-r1-pcie.txt     | 10 ++++++++++
- .../devicetree/bindings/pci/plda,xpressrich3-axi.txt | 12 ++++++++++++
- .../devicetree/bindings/vendor-prefixes.txt          |  1 +
- arch/arm64/boot/dts/arm/juno-r1.dts                  | 20 ++++++++++++++++++++
- arch/arm64/configs/defconfig                         |  1 +
- 5 files changed, 44 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/arm,juno-r1-pcie.txt
- create mode 100644 Documentation/devicetree/bindings/pci/plda,xpressrich3-axi.txt
-
--- 
-2.6.0
+> 
+> > >Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > >---
+> > > arch/arm/include/asm/xen/hypervisor.h |    8 ++++++++
+> > > arch/x86/include/asm/xen/hypervisor.h |    5 +++++
+> > > arch/x86/xen/enlighten.c              |   15 +++++++++++++++
+> > > drivers/xen/Makefile                  |    2 --
+> > > drivers/xen/cpu_hotplug.c             |    6 ++++--
+> > > 5 files changed, 32 insertions(+), 4 deletions(-)
+> > >
+> > >diff --git a/arch/arm/include/asm/xen/hypervisor.h
+> > >b/arch/arm/include/asm/xen/hypervisor.h
+> > >index 04ff8e7..2bc418a 100644
+> > >--- a/arch/arm/include/asm/xen/hypervisor.h
+> > >+++ b/arch/arm/include/asm/xen/hypervisor.h
+> > >@@ -26,4 +26,12 @@ void __init xen_early_init(void);
+> > > static inline void xen_early_init(void) { return; }
+> > > #endif
+> > > 
+> > >+static inline void xen_arch_register_cpu(int num)
+> > >+{
+> > >+}
+> > >+
+> > >+static inline void xen_arch_unregister_cpu(int num)
+> > >+{
+> > >+}
+> > >+
+> > > #endif /* _ASM_ARM_XEN_HYPERVISOR_H */
+> > >diff --git a/arch/x86/include/asm/xen/hypervisor.h
+> > >b/arch/x86/include/asm/xen/hypervisor.h
+> > >index d866959..8b2d4be 100644
+> > >--- a/arch/x86/include/asm/xen/hypervisor.h
+> > >+++ b/arch/x86/include/asm/xen/hypervisor.h
+> > >@@ -57,4 +57,9 @@ static inline bool xen_x2apic_para_available(void)
+> > > }
+> > > #endif
+> > > 
+> > >+#ifdef CONFIG_HOTPLUG_CPU
+> > >+void xen_arch_register_cpu(int num);
+> > >+void xen_arch_unregister_cpu(int num);
+> > >+#endif
+> > >+
+> > > #endif /* _ASM_X86_XEN_HYPERVISOR_H */
+> > >diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
+> > >index 11d6fb4..ba62d8e 100644
+> > >--- a/arch/x86/xen/enlighten.c
+> > >+++ b/arch/x86/xen/enlighten.c
+> > >@@ -71,6 +71,7 @@
+> > > #include <asm/mwait.h>
+> > > #include <asm/pci_x86.h>
+> > > #include <asm/pat.h>
+> > >+#include <asm/cpu.h>
+> > > 
+> > > #ifdef CONFIG_ACPI
+> > > #include <linux/acpi.h>
+> > >@@ -1868,3 +1869,17 @@ const struct hypervisor_x86 x86_hyper_xen = {
+> > > 	.set_cpu_features       = xen_set_cpu_features,
+> > > };
+> > > EXPORT_SYMBOL(x86_hyper_xen);
+> > >+
+> > >+#ifdef CONFIG_HOTPLUG_CPU
+> > >+void xen_arch_register_cpu(int num)
+> > >+{
+> > >+	arch_register_cpu(num);
+> > >+}
+> > >+EXPORT_SYMBOL(xen_arch_register_cpu);
+> > >+
+> > >+void xen_arch_unregister_cpu(int num)
+> > >+{
+> > >+	arch_unregister_cpu(num);
+> > >+}
+> > >+EXPORT_SYMBOL(xen_arch_unregister_cpu);
+> > >+#endif
+> > >diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+> > >index e293bc5..aa8a7f7 100644
+> > >--- a/drivers/xen/Makefile
+> > >+++ b/drivers/xen/Makefile
+> > >@@ -1,6 +1,4 @@
+> > >-ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
+> > > obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
+> > >-endif
+> > > obj-$(CONFIG_X86)			+= fallback.o
+> > > obj-y	+= grant-table.o features.o balloon.o manage.o preempt.o
+> > > obj-y	+= events/
+> > >diff --git a/drivers/xen/cpu_hotplug.c b/drivers/xen/cpu_hotplug.c
+> > >index cc6513a..122b351 100644
+> > >--- a/drivers/xen/cpu_hotplug.c
+> > >+++ b/drivers/xen/cpu_hotplug.c
+> > >@@ -11,7 +11,7 @@
+> > > static void enable_hotplug_cpu(int cpu)
+> > > {
+> > > 	if (!cpu_present(cpu))
+> > >-		arch_register_cpu(cpu);
+> > >+		xen_arch_register_cpu(cpu);
+> > > 
+> > > 	set_cpu_present(cpu, true);
+> > > }
+> > >@@ -19,7 +19,7 @@ static void enable_hotplug_cpu(int cpu)
+> > > static void disable_hotplug_cpu(int cpu)
+> > > {
+> > > 	if (cpu_present(cpu))
+> > >-		arch_unregister_cpu(cpu);
+> > >+		xen_arch_unregister_cpu(cpu);
+> > > 
+> > > 	set_cpu_present(cpu, false);
+> > > }
+> > >@@ -102,8 +102,10 @@ static int __init setup_vcpu_hotplug_event(void)
+> > > 	static struct notifier_block xsn_cpu = {
+> > > 		.notifier_call = setup_cpu_watcher };
+> > > 
+> > >+#ifdef CONFIG_X86
+> > > 	if (!xen_pv_domain())
+> > > 		return -ENODEV;
+> > >+#endif
+> > > 
+> > > 	register_xenstore_notifier(&xsn_cpu);
+> > > 
+> > 
+> > 
+> 
