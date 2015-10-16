@@ -1,17 +1,21 @@
-From: jroedel@suse.de (Joerg Roedel)
-Date: Fri, 16 Oct 2015 11:33:21 +0200
-Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.4
-In-Reply-To: <20151015161622.GI29301@arm.com>
-References: <20151015161622.GI29301@arm.com>
-Message-ID: <20151016093321.GE8217@suse.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 16 Oct 2015 11:36:59 +0200
+Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
+In-Reply-To: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
+References: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
+Message-ID: <1444988219.3541.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 05:16:22PM +0100, Will Deacon wrote:
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
-> 
-> for you to fetch changes up to 166bdbd23161160f2abcea70621adba179050bee:
+Am Freitag, den 16.10.2015, 17:17 +0800 schrieb YH Huang:
+> In order to match the panel power sequence, disable the enable_gpio
+> in the probe function. Also, reorder the code in the power_on and
+> power_off function to match the timing.
 
-Pulled, thanks Will.
+Could you also have a look at the "pwm-backlight: Avoid backlight
+flicker when probed from DT" patch?
+I think in case of a panel left enabled by the bootloader, your patch
+will disable the backlight for a short time.
+
+best regards
+Philipp
