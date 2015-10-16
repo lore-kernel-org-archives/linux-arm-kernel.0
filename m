@@ -1,18 +1,29 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 16 Oct 2015 09:41:12 -0700
-Subject: [PATCH v2 2/4] mtd: nand: Allow MTD_NAND_BRCMNAND to be selected
- for ARM64
-In-Reply-To: <5621199A.1000306@broadcom.com>
-References: <1444986537-28387-1-git-send-email-anup.patel@broadcom.com>
- <1444986537-28387-3-git-send-email-anup.patel@broadcom.com>
- <5621199A.1000306@broadcom.com>
-Message-ID: <20151016164112.GF108923@google.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 16 Oct 2015 17:40:16 +0100
+Subject: [PATCH v2 1/3] xen/arm: Enable cpu_hotplug.c
+In-Reply-To: <1445013301-12624-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1510161731510.27957@kaball.uk.xensource.com>
+ <1445013301-12624-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <56212870.107@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 08:36:58AM -0700, Ray Jui wrote:
-> This patch is the same. I thought it has already been merged by Brian?
+Hi Stefano,
 
-Right as well. I'll ignore this one.
+On 16/10/15 17:34, Stefano Stabellini wrote:
+> Build cpu_hotplug for ARM and ARM64 guests.
+> 
+> Rename arch_(un)register_cpu to xen_(un)register_cpu and provide an
+> empty implementation on ARM and ARM64. On x86 just call
+> arch_(un)register_cpu as we are already doing.
+> 
+> Initialize cpu_hotplug on ARM.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-Brian
+Reviewed-by: Julien Grall <julien.grall@citrix.com>
+
+Regards,
+
+-- 
+Julien Grall
