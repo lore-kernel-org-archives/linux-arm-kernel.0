@@ -1,71 +1,98 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 16 Oct 2015 17:02:57 +0100
-Subject: [PATCH v3 0/2] Enabling PSCI based idle on ARM 32-bit platforms
-Message-ID: <1445011379-8787-1-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Fri, 16 Oct 2015 17:02:58 +0100
+Subject: [PATCH v3 1/2] ARM: cpuidle: remove cpu parameter from the
+ cpuidle_ops suspend hook
+In-Reply-To: <1445011379-8787-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1445011379-8787-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1445011379-8787-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is v3 of a previous posting:
+The suspend() hook in the cpuidle_ops struct is always called on
+the cpu entering idle, which means that the cpu parameter passed
+to the suspend hook always corresponds to the local cpu, making
+it somewhat redundant.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376418.html
+This patch removes the logical cpu parameter from the ARM
+cpuidle_ops.suspend hook and updates all the existing kernel
+implementations to reflect this change.
 
-v2->v3
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Lina Iyer <lina.iyer@linaro.org>
+Tested-by: Lina Iyer <lina.iyer@linaro.org>
+Tested-by: Jisheng Zhang <jszhang@marvell.com> [psci]
+Cc: Lina Iyer <lina.iyer@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/include/asm/cpuidle.h |  2 +-
+ arch/arm/kernel/cpuidle.c      |  2 +-
+ drivers/soc/qcom/spm.c         | 10 +++++-----
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
-- Removed additional PSCI file, merged functions in psci.c
-- Added missing static scope to ARM psci_cpuidle_ops
-- Applied review tags
-
-v1->v2:
-
-- Refactored patch 1 to remove cpu parameter from cpuidle_ops
-  suspend hook
-- Refactored psci_cpu_init_idle to stub out dt parsing function and
-  make it usable on both ARM/ARM64 with no additional changes
-- Updated ARM cpuidle_ops to new interfaces
-
-PSCI firmware provides a kernel API that, through a standard interface,
-allows to manage power states transitions in a seamless manner for
-ARM and ARM64 systems.
-
-Current PSCI code that initializes CPUidle states on PSCI based
-systems lives in arch/arm64 directory but it is not ARM64 specific
-and can be shared with ARM 32-bit systems so that the generic
-ARM CPUidle driver can leverage the common PSCI interface.
-
-This patch series moves PSCI CPUidle management code to
-drivers/firmware directory so that ARM and ARM64 architecture
-can actually share the code.
-
-It is made up of two patches:
-
-Patch 1 refactors ARM 32-bit generic idle implementation to remove
-the cpu parameter from the cpuidle_ops suspend hook, in preparation
-for a common PSCI implementation for ARM/ARM64 PSCI idle.
-
-Patch 2 moves ARM64 PSCI CPUidle functions implementation to
-drivers/firmware so that it can be shared with ARM 32-bit platforms
-code. This patch also adds a PSCI entry section on ARM 32-bit systems
-so that the PSCI CPUidle back-end can be enabled when the enable-method
-corresponds to PSCI.
-
-Patches apply on top of current patch stack to enable PSCI 1.0:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/firmware/psci-1.0
-
-Tested on Juno board (ARM64), compile tested only on ARM 32-bit systems.
-
-Lorenzo Pieralisi (2):
-  ARM: cpuidle: remove cpu parameter from the cpuidle_ops suspend hook
-  ARM64: kernel: PSCI: move PSCI idle management code to
-    drivers/firmware
-
- arch/arm/include/asm/cpuidle.h |   2 +-
- arch/arm/kernel/cpuidle.c      |   2 +-
- arch/arm64/kernel/psci.c       |  99 +---------------------------------
- drivers/firmware/psci.c        | 119 +++++++++++++++++++++++++++++++++++++++++
- drivers/soc/qcom/spm.c         |  10 ++--
- include/linux/psci.h           |   3 ++
- 6 files changed, 131 insertions(+), 104 deletions(-)
-
+diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
+index 0f84249..3848259 100644
+--- a/arch/arm/include/asm/cpuidle.h
++++ b/arch/arm/include/asm/cpuidle.h
+@@ -30,7 +30,7 @@ static inline int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+ struct device_node;
+ 
+ struct cpuidle_ops {
+-	int (*suspend)(int cpu, unsigned long arg);
++	int (*suspend)(unsigned long arg);
+ 	int (*init)(struct device_node *, int cpu);
+ };
+ 
+diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+index 318da33..703926e 100644
+--- a/arch/arm/kernel/cpuidle.c
++++ b/arch/arm/kernel/cpuidle.c
+@@ -56,7 +56,7 @@ int arm_cpuidle_suspend(int index)
+ 	int cpu = smp_processor_id();
+ 
+ 	if (cpuidle_ops[cpu].suspend)
+-		ret = cpuidle_ops[cpu].suspend(cpu, index);
++		ret = cpuidle_ops[cpu].suspend(index);
+ 
+ 	return ret;
+ }
+diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
+index b04b05a..0ad66fa 100644
+--- a/drivers/soc/qcom/spm.c
++++ b/drivers/soc/qcom/spm.c
+@@ -116,7 +116,7 @@ static const struct spm_reg_data spm_reg_8064_cpu = {
+ 
+ static DEFINE_PER_CPU(struct spm_driver_data *, cpu_spm_drv);
+ 
+-typedef int (*idle_fn)(int);
++typedef int (*idle_fn)(void);
+ static DEFINE_PER_CPU(idle_fn*, qcom_idle_ops);
+ 
+ static inline void spm_register_write(struct spm_driver_data *drv,
+@@ -179,10 +179,10 @@ static int qcom_pm_collapse(unsigned long int unused)
+ 	return -1;
+ }
+ 
+-static int qcom_cpu_spc(int cpu)
++static int qcom_cpu_spc(void)
+ {
+ 	int ret;
+-	struct spm_driver_data *drv = per_cpu(cpu_spm_drv, cpu);
++	struct spm_driver_data *drv = __this_cpu_read(cpu_spm_drv);
+ 
+ 	spm_set_low_power_mode(drv, PM_SLEEP_MODE_SPC);
+ 	ret = cpu_suspend(0, qcom_pm_collapse);
+@@ -197,9 +197,9 @@ static int qcom_cpu_spc(int cpu)
+ 	return ret;
+ }
+ 
+-static int qcom_idle_enter(int cpu, unsigned long index)
++static int qcom_idle_enter(unsigned long index)
+ {
+-	return per_cpu(qcom_idle_ops, cpu)[index](cpu);
++	return __this_cpu_read(qcom_idle_ops)[index]();
+ }
+ 
+ static const struct of_device_id qcom_idle_state_match[] __initconst = {
 -- 
 2.5.1
