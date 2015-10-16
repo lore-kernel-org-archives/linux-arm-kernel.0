@@ -1,35 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 Oct 2015 07:49:53 -0700
-Subject: [GIT PULL 2/2] omap device tree changes for v4.4
-In-Reply-To: <17309037.Mt8pPYt4aa@wuerfel>
-References: <8058507.49AsgX8PR9@wuerfel> <20151015210425.GQ10113@atomide.com>
- <17309037.Mt8pPYt4aa@wuerfel>
-Message-ID: <20151016144953.GS10113@atomide.com>
+From: sergeimir@emcraft.com (Sergei Miroshnichenko)
+Date: Fri, 16 Oct 2015 17:51:25 +0300
+Subject: [PATCH] clk: vf610: don't stop enabled clocks in suspend
+Message-ID: <1445007085-28250-1-git-send-email-sergeimir@emcraft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [151016 02:50]:
-> On Thursday 15 October 2015 14:04:26 Tony Lindgren wrote:
-> > * Arnd Bergmann <arnd@arndb.de> [151015 13:40]:
-> > > On Wednesday 14 October 2015 14:38:59 Tony Lindgren wrote:
-> > > 
-> > > > Note that this branch is against v4.3-rc4 as that contains critical
-> > > > MMC related fixes to boot with MMC working on most omaps.
-> > > 
-> > > While we are lucky this time as I based the branch on -rc4 anyway,
-> > > a nicer way to do this would be to ensure that a fix you want
-> > > to base on is based an older -rc, and then you base your own branch
-> > > on top of that fix, to minimize the number of back-merged patches.
-> > 
-> > Sure that would be doable too at the cost of a few extra merges.
-> 
-> You can always look at our existing next/* branches to see what they are
-> based on. If we already have the commit you need (like this time), it's
-> not a problem at all to use the same base.
+Currently Vybrid Clock Gating is configured to turn off all clocks in stop
+mode, while kernel assumes them enabled unless explicitly disabled. This
+behavior prevents waking up from wakeup sources.
 
-Yeah no problem. Usually -rc2 is just fine for us in general as the
-base.
+Fix this by replacing Clock Gating Register bitmask 3 (Clock is on during
+all modes, except stop mode) with bitmask 2 (Clock is on during all modes,
+even stop mode): refer to Vybrid Reference Manual Chapter 10 "Clock
+Controller Module (CCM)".
 
-Regards,
+Tested on a VF610-based board.
 
-Tony
+Signed-off-by: Sergei Miroshnichenko <sergeimir@emcraft.com>
+---
+ drivers/clk/imx/clk-gate2.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clk/imx/clk-gate2.c b/drivers/clk/imx/clk-gate2.c
+index 8935bff..ac35d75 100644
+--- a/drivers/clk/imx/clk-gate2.c
++++ b/drivers/clk/imx/clk-gate2.c
+@@ -50,7 +50,8 @@ static int clk_gate2_enable(struct clk_hw *hw)
+ 		goto out;
+ 
+ 	reg = readl(gate->reg);
+-	reg |= 3 << gate->bit_idx;
++	reg &= ~(3 << gate->bit_idx);
++	reg |= 2 << gate->bit_idx;
+ 	writel(reg, gate->reg);
+ 
+ out:
+@@ -86,7 +87,7 @@ static int clk_gate2_reg_is_enabled(void __iomem *reg, u8 bit_idx)
+ {
+ 	u32 val = readl(reg);
+ 
+-	if (((val >> bit_idx) & 1) == 1)
++	if (((val >> bit_idx) & 3) == 2)
+ 		return 1;
+ 
+ 	return 0;
+-- 
+1.9.3
