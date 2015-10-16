@@ -1,170 +1,86 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 16 Oct 2015 15:04:45 +0200
-Subject: [PATCH v2 2/8] ARM: at91/dt: sama5d2 Xplained: add several devices
+Date: Fri, 16 Oct 2015 15:04:46 +0200
+Subject: [PATCH v2 3/8] ARM: at91/defconfig: update sama5 defconfig
 In-Reply-To: <1445000691-12402-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1445000691-12402-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1445000691-12402-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1445000691-12402-4-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add sdmmc and flexcom devices
+Trivial savedefconfig update.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 ---
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 106 ++++++++++++++++++++++++++++
- 1 file changed, 106 insertions(+)
+ arch/arm/configs/sama5_defconfig | 11 +----------
+ 1 file changed, 1 insertion(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-index dc23979..bce9597 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -45,6 +45,7 @@
- /dts-v1/;
- #include "sama5d2.dtsi"
- #include "sama5d2-pinfunc.h"
-+#include <dt-bindings/mfd/atmel-flexcom.h>
- 
- / {
- 	model = "Atmel SAMA5D2 Xplained";
-@@ -91,6 +92,22 @@
- 			status = "okay";
- 		};
- 
-+		sdmmc0: sdio-host at a0000000 {
-+			bus-width = <8>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_sdmmc0_default>;
-+			non-removable;
-+			mmc-ddr-1_8v;
-+			status = "okay";
-+		};
-+
-+		sdmmc1: sdio-host at b0000000 {
-+			bus-width = <4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_sdmmc1_default>;
-+			status = "okay"; /* conflict with qspi0 */
-+		};
-+
- 		apb {
- 			spi0: spi at f8000000 {
- 				pinctrl-names = "default";
-@@ -124,12 +141,49 @@
- 				status = "okay";
- 			};
- 
-+			flx0: flexcom at f8034000 {
-+				atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_USART>;
-+				status = "disabled"; /* conflict with ISC_D2 & ISC_D3 data pins */
-+
-+				uart5: serial at 200 {
-+					compatible = "atmel,at91sam9260-usart";
-+					reg = <0x200 0x200>;
-+					interrupts = <19 IRQ_TYPE_LEVEL_HIGH 7>;
-+					clocks = <&flx0_clk>;
-+					clock-names = "usart";
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&pinctrl_flx0_default>;
-+					atmel,fifo-size = <32>;
-+					status = "okay";
-+				};
-+			};
-+
- 			uart3: serial at fc008000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_uart3_default>;
- 				status = "okay";
- 			};
- 
-+			flx4: flexcom at fc018000 {
-+				atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_TWI>;
-+				status = "okay";
-+
-+				i2c2: i2c at 600 {
-+					compatible = "atmel,sama5d2-i2c";
-+					reg = <0x600 0x200>;
-+					interrupts = <23 IRQ_TYPE_LEVEL_HIGH 7>;
-+					dmas = <0>, <0>;
-+					dma-names = "tx", "rx";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					clocks = <&flx4_clk>;
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&pinctrl_flx4_default>;
-+					atmel,fifo-size = <16>;
-+					status = "okay";
-+				};
-+			};
-+
- 			i2c1: i2c at fc028000 {
- 				dmas = <0>, <0>;
- 				pinctrl-names = "default";
-@@ -144,6 +198,18 @@
- 			};
- 
- 			pinctrl at fc038000 {
-+				pinctrl_flx0_default: flx0_default {
-+					pinmux = <PIN_PB28__FLEXCOM0_IO0>,
-+						 <PIN_PB29__FLEXCOM0_IO1>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_flx4_default: flx4_default {
-+					pinmux = <PIN_PD12__FLEXCOM4_IO0>,
-+						 <PIN_PD13__FLEXCOM4_IO1>;
-+					bias-disable;
-+				};
-+
- 				pinctrl_i2c0_default: i2c0_default {
- 					pinmux = <PIN_PD21__TWD0>,
- 						 <PIN_PD22__TWCK0>;
-@@ -170,6 +236,46 @@
- 					bias-disable;
- 				};
- 
-+				pinctrl_sdmmc0_default: sdmmc0_default {
-+					cmd_data {
-+						pinmux = <PIN_PA1__SDMMC0_CMD>,
-+							 <PIN_PA2__SDMMC0_DAT0>,
-+							 <PIN_PA3__SDMMC0_DAT1>,
-+							 <PIN_PA4__SDMMC0_DAT2>,
-+							 <PIN_PA5__SDMMC0_DAT3>,
-+							 <PIN_PA6__SDMMC0_DAT4>,
-+							 <PIN_PA7__SDMMC0_DAT5>,
-+							 <PIN_PA8__SDMMC0_DAT6>,
-+							 <PIN_PA9__SDMMC0_DAT7>;
-+						bias-pull-up;
-+					};
-+
-+					ck_cd_rstn_vddsel {
-+						pinmux = <PIN_PA0__SDMMC0_CK>,
-+							 <PIN_PA10__SDMMC0_RSTN>,
-+							 <PIN_PA11__SDMMC0_VDDSEL>,
-+							 <PIN_PA13__SDMMC0_CD>;
-+						bias-disable;
-+					};
-+				};
-+
-+				pinctrl_sdmmc1_default: sdmmc1_default {
-+					cmd_data {
-+						pinmux = <PIN_PA28__SDMMC1_CMD>,
-+							 <PIN_PA18__SDMMC1_DAT0>,
-+							 <PIN_PA19__SDMMC1_DAT1>,
-+							 <PIN_PA20__SDMMC1_DAT2>,
-+							 <PIN_PA21__SDMMC1_DAT3>;
-+						bias-pull-up;
-+					};
-+
-+					conf-ck_cd {
-+						pinmux = <PIN_PA22__SDMMC1_CK>,
-+							 <PIN_PA30__SDMMC1_CD>;
-+						bias-disable;
-+					};
-+				};
-+
- 				pinctrl_spi0_default: spi0_default {
- 					pinmux = <PIN_PA14__SPI0_SPCK>,
- 						 <PIN_PA15__SPI0_MOSI>,
+diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+index 31eb951..3b2f686 100644
+--- a/arch/arm/configs/sama5_defconfig
++++ b/arch/arm/configs/sama5_defconfig
+@@ -10,12 +10,10 @@ CONFIG_MODULES=y
+ CONFIG_MODULE_FORCE_LOAD=y
+ CONFIG_MODULE_UNLOAD=y
+ CONFIG_MODULE_FORCE_UNLOAD=y
+-CONFIG_LBDAF=y
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_AT91=y
+-CONFIG_SOC_SAM_V7=y
+ CONFIG_SOC_SAMA5D3=y
+ CONFIG_SOC_SAMA5D4=y
+ CONFIG_AEABI=y
+@@ -25,12 +23,10 @@ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_CMDLINE="console=ttyS0,115200 initrd=0x21100000,25165824 root=/dev/ram0 rw"
+ CONFIG_KEXEC=y
+-CONFIG_AUTO_ZRELADDR=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ CONFIG_KERNEL_MODE_NEON=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+-CONFIG_PM=y
+ CONFIG_PM_DEBUG=y
+ CONFIG_PM_ADVANCED_DEBUG=y
+ CONFIG_NET=y
+@@ -47,7 +43,6 @@ CONFIG_IP_PNP_RARP=y
+ # CONFIG_INET_XFRM_MODE_BEET is not set
+ # CONFIG_INET_LRO is not set
+ # CONFIG_INET_DIAG is not set
+-CONFIG_IPV6=y
+ # CONFIG_INET6_XFRM_MODE_TRANSPORT is not set
+ # CONFIG_INET6_XFRM_MODE_TUNNEL is not set
+ # CONFIG_INET6_XFRM_MODE_BEET is not set
+@@ -123,7 +118,6 @@ CONFIG_LEGACY_PTY_COUNT=4
+ CONFIG_SERIAL_ATMEL=y
+ CONFIG_SERIAL_ATMEL_CONSOLE=y
+ CONFIG_HW_RANDOM=y
+-CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_AT91=y
+ CONFIG_I2C_GPIO=y
+@@ -142,8 +136,8 @@ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_V4L_PLATFORM_DRIVERS=y
+ CONFIG_SOC_CAMERA=y
+-CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_VIDEO_ATMEL_ISI=y
++CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_FB=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ # CONFIG_LCD_CLASS_DEVICE is not set
+@@ -207,11 +201,8 @@ CONFIG_DEBUG_MEMORY_INIT=y
+ # CONFIG_SCHED_DEBUG is not set
+ # CONFIG_FTRACE is not set
+ CONFIG_DEBUG_USER=y
+-# CONFIG_CRYPTO_ANSI_CPRNG is not set
+ CONFIG_CRYPTO_USER_API_HASH=m
+ CONFIG_CRYPTO_USER_API_SKCIPHER=m
+ CONFIG_CRYPTO_DEV_ATMEL_AES=y
+ CONFIG_CRYPTO_DEV_ATMEL_TDES=y
+ CONFIG_CRYPTO_DEV_ATMEL_SHA=y
+-CONFIG_CRC_CCITT=m
+-CONFIG_CRC_ITU_T=m
 -- 
 2.5.0
