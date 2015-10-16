@@ -1,85 +1,91 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Fri, 16 Oct 2015 09:55:35 +0800
-Subject: [PATCH RFC 0/7] Adding core support for wire-MSI bridges
-In-Reply-To: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
-References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <56205917.7090001@linux.intel.com>
+From: Yuantian.Tang@freescale.com (Yuantian Tang)
+Date: Fri, 16 Oct 2015 02:12:45 +0000
+Subject: [PATCH] ahci: qoriq: Fix a compiling warning
+In-Reply-To: <20151015160410.GC27717@mtj.duckdns.org>
+References: <1444812412-33321-1-git-send-email-Yuantian.Tang@freescale.com>
+ <20151015151152.GB27717@mtj.duckdns.org> <15555694.OtW6JZzsoS@wuerfel>
+ <20151015160410.GC27717@mtj.duckdns.org>
+Message-ID: <DM2PR03MB574F11953B0007523D7A385FA3D0@DM2PR03MB574.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/10/15 23:39, Marc Zyngier wrote:
-> There seems to be a new class of interrupt controller out there whose
-> sole purpose (apart from making everybody's life a nightmare) is to
-> turn wired interrupts into MSIs.
-> 
-> Instead of considering that the MSIs allocated to a device are for the
-> direct use of that device, we can turn this set of MSIs into a irq
-> domain, and use that domain to build a standard irqchip on top of
-> that.
-Hi Marc,
-	There's a working to enable Intel VMD storage device, which
-has the similar requirement. Basically a PCIe hierarchy is hidden
-behind a parent PCIe device, so we need to use the PCIe irqs on parent
-to de-multiple PCIe IRQs from hidden PCIe devices. Seems a chance for
-consolidation here.
-	cc Keith Busch <keith.busch@intel.com> who is the author of
-VMD device driver.
-Thanks!
-Gerry
+Thanks Tejun.
 
+Regards,
+Yuantian
+
+> -----Original Message-----
+> From: Tejun Heo [mailto:htejun at gmail.com] On Behalf Of Tejun Heo
+> Sent: Friday, October 16, 2015 12:04 AM
+> To: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-arm-kernel at lists.infradead.org; Tang Yuantian-B29983
+> <Yuantian.Tang@freescale.com>; linux-ide at vger.kernel.org; linux-
+> kernel at vger.kernel.org; hdegoede at redhat.com; fengguang.wu at intel.com
+> Subject: Re: [PATCH] ahci: qoriq: Fix a compiling warning
 > 
-> This requires some (slightly ugly) surgery in both the generic MSI and
-> platform MSI layers, but the amount of code is actually relatively
-> small (about +150 LoC so far).
+> Hello,
 > 
-> On top of that, we add a dummy driver for a such a bridge, hoping that
-> this will give enough information to driver authors so that they can
-> use this new feature. An even more stupid client driver is provided to
-> show the interrupt stack allocation:
+> I see.  I applied the following to libata/for-4.4.
 > 
->      dummydev dummy-dev: Probing
->      dummydev dummy-dev: Allocated IRQ35
->      dummydev dummy-dev: Probing OK
->      dummydev dummy-dev: IRQ35 hwirq 5 domain msichip_domain_ops
->      dummydev dummy-dev: IRQ35 hwirq 0 domain msi_domain_ops
->      dummydev dummy-dev: IRQ35 hwirq 8192 domain its_domain_ops
->      dummydev dummy-dev: IRQ35 hwirq 8192 domain gic_irq_domain_ops
+> Thanks.
 > 
-> While this seems to work, it is far from being perfect:
+> ------ 8< ------
+> From eb351031a15c4a83b9955aadad783c6672ab8868 Mon Sep 17 00:00:00
+> 2001
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Wed, 14 Oct 2015 16:46:52 +0800
+> Subject: [PATCH] ahci: qoriq: Fix a compiling warning
 > 
-> - This is a prototype: error handling is rubbish, and there could be
->   better abstractions to use.
+> kbuild test robot reports the warnings:
+> drivers/ata/ahci_qoriq.c: In function 'ahci_qoriq_hardreset':
+> >> include/asm-generic/io.h:163:2: warning: 'px_is' may be used
+> >> uninitialized in this function [-Wuninitialized]
+> drivers/ata/ahci_qoriq.c:70:14: note: 'px_is' was declared here
+> >> include/asm-generic/io.h:163:2: warning: 'px_cmd' may be used
+> >> uninitialized in this function [-Wuninitialized]
+> drivers/ata/ahci_qoriq.c:70:6: note: 'px_cmd' was declared here
 > 
-> - It relies on not declaring this bridge with IRQCHIP_DECLARE in order
->   to prevent the DT layer from allocating interrupts behind our back.
+> This patch fixed it by introducing a local variable.
 > 
-> - There is some probe ordering issues between the bridge and the wired
->   interrupt device, leading to the use of -EPROBE_DEFER.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
+> Signed-off-by: Tejun Heo <tj@kernel.org>
+> ---
+>  drivers/ata/ahci_qoriq.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
-> The last two points could be addressed directly in the OF layer, as
-> this is a generic device ordering issue (and people are already
-> working on that).
+> diff --git a/drivers/ata/ahci_qoriq.c b/drivers/ata/ahci_qoriq.c index
+> e5e4988..58c1a94 100644
+> --- a/drivers/ata/ahci_qoriq.c
+> +++ b/drivers/ata/ahci_qoriq.c
+> @@ -76,6 +76,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link,
+> unsigned int *class,
+>  	struct ata_taskfile tf;
+>  	bool online;
+>  	int rc;
+> +	bool ls1021a_workaround = (qoriq_priv->type == AHCI_LS1021A);
 > 
-> I'd welcome any comment on that approach (though I'm going to make
-> myself scarse over the next two weeks).
+>  	DPRINTK("ENTER\n");
 > 
-> Marc Zyngier (7):
->   platform-msi: Allow MSIs to be allocated in chunks
->   platform-msi: Factor out allocation/free of private data
->   irqdomain: Make irq_domain_alloc_irqs_recursive available
->   genirq/msi: Make the .prepare callback reusable
->   genirq/msi: Add msi_domain_populate_irqs
->   platform-msi: Allow creation of a MSI-based stacked irq domain
->   irqchip: [Example] dummy wired interrupt/MSI bridge driver
+> @@ -92,7 +93,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link,
+> unsigned int *class,
+>  	 * After the sequence is complete, software should restore the
+>  	 * PxCMD and PxIS with the stored values.
+>  	 */
+> -	if (qoriq_priv->type == AHCI_LS1021A) {
+> +	if (ls1021a_workaround) {
+>  		px_cmd = readl(port_mmio + PORT_CMD);
+>  		px_is = readl(port_mmio + PORT_IRQ_STAT);
+>  	}
+> @@ -106,7 +107,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link,
+> unsigned int *class,
+>  				 ahci_check_ready);
 > 
->  drivers/base/platform-msi.c   | 185 ++++++++++++++++++++--------
->  drivers/irqchip/Kconfig       |   7 ++
->  drivers/irqchip/Makefile      |   1 +
->  drivers/irqchip/irq-msichip.c | 271 ++++++++++++++++++++++++++++++++++++++++++
->  include/linux/irqdomain.h     |   3 +
->  include/linux/msi.h           |  16 +++
->  kernel/irq/irqdomain.c        |   6 +-
->  kernel/irq/msi.c              |  47 +++++++-
->  8 files changed, 481 insertions(+), 55 deletions(-)
->  create mode 100644 drivers/irqchip/irq-msichip.c
-> 
+>  	/* restore the PxCMD and PxIS on ls1021 */
+> -	if (qoriq_priv->type == AHCI_LS1021A) {
+> +	if (ls1021a_workaround) {
+>  		px_val = readl(port_mmio + PORT_CMD);
+>  		if (px_val != px_cmd)
+>  			writel(px_cmd, port_mmio + PORT_CMD);
+> --
+> 2.4.3
