@@ -1,49 +1,45 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 16 Oct 2015 23:54:39 +0200
-Subject: Atmel SoCs and the newly added CONFIG_DELAY_DEVICE_PROBES option
-In-Reply-To: <CAAObsKBn5DaXT3J9CG6j_f0RxJpo+WQcj-8w5xz_N64OWEYesw@mail.gmail.com>
-References: <20151016181129.GA1764@gradator.net>
- <CAAObsKBn5DaXT3J9CG6j_f0RxJpo+WQcj-8w5xz_N64OWEYesw@mail.gmail.com>
-Message-ID: <20151016215439.GR3421@piout.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 17 Oct 2015 00:03:38 +0200
+Subject: [PATCH] bluetooth: bpa10x: fix BT_HCIUART dependency
+Message-ID: <4199320.WWtqtXexhZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/10/2015 at 21:29:25 +0200, Tomeu Vizoso wrote :
-> On 16 October 2015 at 20:11, Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
-> > Hi,
-> >
-> > FYI, to save you a git bisect, the recently added
-> > CONFIG_DELAY_DEVICE_PROBES (enabled by default) breaks Atmel SoCs.
-> >
-> > For a few of quickly noticeable issues:
-> > - PM is not working:   at91_pm_sram_init: sram pool unavailable!
-> > - Watchdog is not even probed
-> > - on -ek boards the wm8904 is not probed either.
-> >
-> > Disabling CONFIG_DELAY_DEVICE_PROBES fixes all issues.
-> >
-> > Tomeu, what should I provide to help find out what's happening ?
-> 
-> Hi Sylvain, I believe I can do some testing via kernelci on those
-> boards, latest on monday.
-> 
+The change to bpa10x to use the h4_recv_buf helper added a dependency
+on BT_HCIUART. This was incorrectly added to Kconfig by adding a
+'select' statement, which now in turn causes build failures
+when CONFIG_TTY is not set:
 
-This also probably broke PM on i.mx5 and i.mx6 (and I think socfpga)
-boards as they use the sram driver the same way. That is why sram_init
-is a postcore_initcall.
+warning: (BT_HCIBPA10X) selects BT_HCIUART which has unmet direct dependencies (NET && BT && TTY)
+vers/built-in.o: In function `hci_uart_tty_receive':
+fpga-mgr.c:(.text+0x282824): undefined reference to `tty_unthrottle'
+drivers/built-in.o: In function `hci_uart_tty_ioctl':
+fpga-mgr.c:(.text+0x282aa0): undefined reference to `n_tty_ioctl_helper'
+drivers/built-in.o: In function `hci_uart_flush':
 
-> It will probably involve moving some initcalls, and probing more kinds
-> of devices on-demand. Sometimes the proper solution is to move code
-> from initcalls into proper drivers which can defer their probe if some
-> dependency isn't there at that point, but that's likely to be more
-> invasive than wanted at this point.
-> 
+This replaces the 'select BT_HCIUART' dependency with 'depends on', which
+does not have this kind of problem. Alternatively, one could add 'depends
+on TTY', but avoiding 'select' on user-visible options is generally the
+preferred choice as that does not introduce the potential for dependency
+loops or incomplete dependency chains.
 
-I guess that the PM code will be really difficult to move into drivers
-but I'd be happy to see that done on AT91 as this is the only thing left
-in mach-at91.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: a4a4affca68c ("Bluetooth: bpa10x: Fix missing BT_HCIUART dependency")
+Fixes: 943cc592195e ("Bluetooth: bpa10x: Use h4_recv_buf helper for frame reassembly")
+---
+Found on ARM randconfig builds
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+diff --git a/drivers/bluetooth/Kconfig b/drivers/bluetooth/Kconfig
+index fcf52fdb1ba3..ec6af1595062 100644
+--- a/drivers/bluetooth/Kconfig
++++ b/drivers/bluetooth/Kconfig
+@@ -183,8 +183,7 @@ config BT_HCIBCM203X
+ 
+ config BT_HCIBPA10X
+ 	tristate "HCI BPA10x USB driver"
+-	depends on USB
+-	select BT_HCIUART
++	depends on USB && BT_HCIUART
+ 	select BT_HCIUART_H4
+ 	help
+ 	  Bluetooth HCI BPA10x USB driver.
