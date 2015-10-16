@@ -1,41 +1,83 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Fri, 16 Oct 2015 08:36:58 -0700
-Subject: [PATCH v2 2/4] mtd: nand: Allow MTD_NAND_BRCMNAND to be selected
- for ARM64
-In-Reply-To: <1444986537-28387-3-git-send-email-anup.patel@broadcom.com>
-References: <1444986537-28387-1-git-send-email-anup.patel@broadcom.com>
- <1444986537-28387-3-git-send-email-anup.patel@broadcom.com>
-Message-ID: <5621199A.1000306@broadcom.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 16 Oct 2015 17:40:38 +0200
+Subject: [PATCH] clk: imx25: Remove osc clock from driver
+In-Reply-To: <1445009120-2582-1-git-send-email-mpa@pengutronix.de>
+References: <1445009120-2582-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1445010038.3180.18.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is the same. I thought it has already been merged by Brian?
+Am Freitag, den 16.10.2015, 17:25 +0200 schrieb Markus Pargmann:
+> The 'osc' clock is already initialized by the fixed clock defined in
+> imx25.dtsi. The imx25 clock driver tries to add this clock for a second
+> time and fails with -EEXIST:
+> 	i.MX clk 1: register failed with -17
+> 
+> As the clock is already properly setup in DT with a different driver, we
+> can completely remove the handling in the imx25 clock driver.
+> 
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-On 10/16/2015 2:08 AM, Anup Patel wrote:
-> The BRCM NAND driver can be re-used for Broadcom ARM64 SoCs hence
-> this patch updates Kconfig to allow selection of MTD_NAND_BRCMNAND
-> for ARM64.
-> 
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> Reviewed-by: Vikram Prakash <vikramp@broadcom.com>
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Pramod KUMAR <pramodku@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+I was just about to shout something about DT stability, but then noticed
+that the "fixed-clock" compatible is present since the first commit of
+the i.MX25 DTSI.
+
+No objections from me,
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+
 > ---
->  drivers/mtd/nand/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/clk/imx/clk-imx25.c | 19 +++----------------
+>  1 file changed, 3 insertions(+), 16 deletions(-)
 > 
-> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-> index 3324281..a1b5819 100644
-> --- a/drivers/mtd/nand/Kconfig
-> +++ b/drivers/mtd/nand/Kconfig
-> @@ -393,7 +393,7 @@ config MTD_NAND_GPMI_NAND
+> diff --git a/drivers/clk/imx/clk-imx25.c b/drivers/clk/imx/clk-imx25.c
+> index ec1a4c1dacf1..33b5b7b29aa0 100644
+> --- a/drivers/clk/imx/clk-imx25.c
+> +++ b/drivers/clk/imx/clk-imx25.c
+> @@ -86,13 +86,12 @@ enum mx25_clks {
 >  
->  config MTD_NAND_BRCMNAND
->  	tristate "Broadcom STB NAND controller"
-> -	depends on ARM || MIPS
-> +	depends on ARM || ARM64 || MIPS
->  	help
->  	  Enables the Broadcom NAND controller driver. The controller was
->  	  originally designed for Set-Top Box but is used on various BCM7xxx,
-> 
+>  static struct clk *clk[clk_max];
+>  
+> -static int __init __mx25_clocks_init(unsigned long osc_rate,
+> -				     void __iomem *ccm_base)
+> +static int __init __mx25_clocks_init(void __iomem *ccm_base)
+>  {
+>  	BUG_ON(!ccm_base);
+>  
+>  	clk[dummy] = imx_clk_fixed("dummy", 0);
+> -	clk[osc] = imx_clk_fixed("osc", osc_rate);
+> +	clk[osc] = NULL;
+
+Nit: clk is a static array, so no need to explicitly set this entry to
+NULL as it's already initialized that way.
+
+>  	clk[mpll] = imx_clk_pllv1(IMX_PLLV1_IMX25, "mpll", "osc", ccm(CCM_MPCTL));
+>  	clk[upll] = imx_clk_pllv1(IMX_PLLV1_IMX25, "upll", "osc", ccm(CCM_UPCTL));
+>  	clk[mpll_cpu_3_4] = imx_clk_fixed_factor("mpll_cpu_3_4", "mpll", 3, 4);
+> @@ -238,22 +237,10 @@ static int __init __mx25_clocks_init(unsigned long osc_rate,
+>  
+>  static void __init mx25_clocks_init_dt(struct device_node *np)
+>  {
+> -	struct device_node *refnp;
+> -	unsigned long osc_rate = 24000000;
+>  	void __iomem *ccm;
+>  
+> -	/* retrieve the freqency of fixed clocks from device tree */
+> -	for_each_compatible_node(refnp, NULL, "fixed-clock") {
+> -		u32 rate;
+> -		if (of_property_read_u32(refnp, "clock-frequency", &rate))
+> -			continue;
+> -
+> -		if (of_device_is_compatible(refnp, "fsl,imx-osc"))
+> -			osc_rate = rate;
+> -	}
+> -
+>  	ccm = of_iomap(np, 0);
+> -	__mx25_clocks_init(osc_rate, ccm);
+> +	__mx25_clocks_init(ccm);
+>  
+>  	clk_data.clks = clk;
+>  	clk_data.clk_num = ARRAY_SIZE(clk);
+
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
