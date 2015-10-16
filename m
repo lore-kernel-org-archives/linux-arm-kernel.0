@@ -1,80 +1,176 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 16 Oct 2015 10:58:37 -0500
-Subject: [RFC PATCH 2/3] pwm: Add PWM driver for OMAP using dual-mode
- timers
-In-Reply-To: <5620ED34.6000906@baylibre.com>
-References: <5620ED34.6000906@baylibre.com>
-Message-ID: <87h9lqls9e.fsf@saruman.tx.rr.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 16 Oct 2015 17:01:36 +0100
+Subject: [PATCH v2] ARM: dts: fix gpio-keys wakeup-source property
+Message-ID: <1445011296-29042-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The keyboard driver for GPIO buttons(gpio-keys) checks for one of the
+two boolean properties to enable gpio buttons as wakeup source:
+1. "wakeup-source" or
+2. the legacy "gpio-key,wakeup"
 
-Hi,
+However juno, ste-snowball and emev2-kzm9d dts file have a undetected
+"wakeup" property to indictate the wakeup source.
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
-> Adds support for using a OMAP dual-mode timer with PWM capability
-> as a Linux PWM device. The driver controls the timer by using the
-> dmtimer API.
->
-> Add a platform_data structure for each pwm-omap-dmtimer nodes containing
-> the dmtimers functions in order to get driver not rely on platform
-> specific functions.
->
-> Cc: Grant Erickson <marathon96@gmail.com>
-> Cc: NeilBrown <neilb@suse.de>
-> Cc: Joachim Eastwood <manabian@gmail.com>
-> Suggested-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  .../devicetree/bindings/pwm/pwm-omap-dmtimer.txt   |  18 ++
->  drivers/pwm/Kconfig                                |   9 +
->  drivers/pwm/Makefile                               |   1 +
->  drivers/pwm/pwm-omap-dmtimer.c                     | 322 +++++++++++++++++++++
->  include/linux/platform_data/pwm_omap_dmtimer.h     |  69 +++++
->  5 files changed, 419 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-omap-dmtimer.txt
->  create mode 100644 drivers/pwm/pwm-omap-dmtimer.c
->  create mode 100644 include/linux/platform_data/pwm_omap_dmtimer.h
->
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-omap-dmtimer.txt b/Documentation/devicetree/bindings/pwm/pwm-omap-dmtimer.txt
-> new file mode 100644
-> index 0000000..7f27606
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-omap-dmtimer.txt
-> @@ -0,0 +1,18 @@
-> +* OMAP PWM for dual-mode timers
-> +
-> +Required properties:
-> +- compatible: Shall contain "ti,omap-dmtimer-pwm".
-> +- ti,timers: phandle to PWM capable OMAP timer. See arm/omap/timer.txt for info
-> +  about these timers.
-> +- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
-> +  the cells format.
-> +
-> +Optiomal properties:
-> +- ti,prescaler: Should be a value between 0 and 7, see the timers datasheet
-> +
-> +Example:
-> +	pwm: omap-pwm {
-> +		compatible = "ti,omap-pwm";
-> +		ti,timers = <&timer9>;
-> +		#pwm-cells = <3>;
-> +	};
+This patch fixes it by making use of "wakeup-source" property.
 
-I wonder how far are you from a generic pwm-of-timer.c. This looks
-pretty close to that. You already have a pdata function pointers for
-pretty much everything, all you need to do is pass a timer phandle and,
-as long as the functions pointers are implemented, it should work.
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Acked-by: Simon Horman <horms@verge.net.au>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm/boot/dts/emev2-kzm9d.dts             |  8 ++++----
+ arch/arm/boot/dts/ste-snowball.dts            | 10 +++++-----
+ arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 12 ++++++------
+ 3 files changed, 15 insertions(+), 15 deletions(-)
 
-You might want to get rid of pdata altogether at some point, this should
-work as migration path.
+Hi ARM-SoC group,
 
+Please consider this as a fix for v4.3 if possible.
+
+v2->v1[1] :
+ - included all the reviewed/ack tags, also posting this fix independently
+
+Regards,
+Sudeep
+
+[1] https://lkml.org/lkml/2015/10/13/413
+
+diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
+index 955c24ee4a8c..8c24975e8f9d 100644
+--- a/arch/arm/boot/dts/emev2-kzm9d.dts
++++ b/arch/arm/boot/dts/emev2-kzm9d.dts
+@@ -35,28 +35,28 @@
+ 
+ 		button at 1 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			label = "DSW2-1";
+ 			linux,code = <KEY_1>;
+ 			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+ 		};
+ 		button at 2 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			label = "DSW2-2";
+ 			linux,code = <KEY_2>;
+ 			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
+ 		};
+ 		button at 3 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			label = "DSW2-3";
+ 			linux,code = <KEY_3>;
+ 			gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
+ 		};
+ 		button at 4 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			label = "DSW2-4";
+ 			linux,code = <KEY_4>;
+ 			gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
+diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+index 32a5ccb14e7e..e80e42163883 100644
+--- a/arch/arm/boot/dts/ste-snowball.dts
++++ b/arch/arm/boot/dts/ste-snowball.dts
+@@ -47,35 +47,35 @@
+ 
+ 		button at 1 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			linux,code = <2>;
+ 			label = "userpb";
+ 			gpios = <&gpio1 0 0x4>;
+ 		};
+ 		button at 2 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			linux,code = <3>;
+ 			label = "extkb1";
+ 			gpios = <&gpio4 23 0x4>;
+ 		};
+ 		button at 3 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			linux,code = <4>;
+ 			label = "extkb2";
+ 			gpios = <&gpio4 24 0x4>;
+ 		};
+ 		button at 4 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			linux,code = <5>;
+ 			label = "extkb3";
+ 			gpios = <&gpio5 1 0x4>;
+ 		};
+ 		button at 5 {
+ 			debounce_interval = <50>;
+-			wakeup = <1>;
++			wakeup-source;
+ 			linux,code = <6>;
+ 			label = "extkb4";
+ 			gpios = <&gpio5 2 0x4>;
+diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+index 902f14a8e85b..42153860b41f 100644
+--- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+@@ -61,42 +61,42 @@
+ 
+ 				button at 1 {
+ 					debounce_interval = <50>;
+-					wakeup = <1>;
++					wakeup-source;
+ 					linux,code = <116>;
+ 					label = "POWER";
+ 					gpios = <&iofpga_gpio0 0 0x4>;
+ 				};
+ 				button at 2 {
+ 					debounce_interval = <50>;
+-					wakeup = <1>;
++					wakeup-source;
+ 					linux,code = <102>;
+ 					label = "HOME";
+ 					gpios = <&iofpga_gpio0 1 0x4>;
+ 				};
+ 				button at 3 {
+ 					debounce_interval = <50>;
+-					wakeup = <1>;
++					wakeup-source;
+ 					linux,code = <152>;
+ 					label = "RLOCK";
+ 					gpios = <&iofpga_gpio0 2 0x4>;
+ 				};
+ 				button at 4 {
+ 					debounce_interval = <50>;
+-					wakeup = <1>;
++					wakeup-source;
+ 					linux,code = <115>;
+ 					label = "VOL+";
+ 					gpios = <&iofpga_gpio0 3 0x4>;
+ 				};
+ 				button at 5 {
+ 					debounce_interval = <50>;
+-					wakeup = <1>;
++					wakeup-source;
+ 					linux,code = <114>;
+ 					label = "VOL-";
+ 					gpios = <&iofpga_gpio0 4 0x4>;
+ 				};
+ 				button at 6 {
+ 					debounce_interval = <50>;
+-					wakeup = <1>;
++					wakeup-source;
+ 					linux,code = <99>;
+ 					label = "NMI";
+ 					gpios = <&iofpga_gpio0 5 0x4>;
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151016/bdb700b1/attachment-0001.sig>
+1.9.1
