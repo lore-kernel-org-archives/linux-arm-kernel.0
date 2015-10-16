@@ -1,85 +1,47 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Fri, 16 Oct 2015 17:07:31 +0530
-Subject: [PATCH v2 0/6] ARM: dts: Use correct CD properties for SDIO and
- eMMC in Snow and Peach
-In-Reply-To: <1444927873-15140-1-git-send-email-javier@osg.samsung.com>
-References: <1444927873-15140-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <5620E17B.9080906@samsung.com>
+From: hare@suse.de (Hannes Reinecke)
+Date: Fri, 16 Oct 2015 13:49:06 +0200
+Subject: [PATCH] scsi: advansys needs ISA dma api for ISA support
+In-Reply-To: <8749889.aUxSEGWaCq@wuerfel>
+References: <5081546.QjQ32dGX2L@wuerfel> <561F96B7.4050300@suse.de>
+ <561F977B.1030009@suse.de> <8749889.aUxSEGWaCq@wuerfel>
+Message-ID: <5620E432.1000709@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On 10/15/2015 05:04 PM, Arnd Bergmann wrote:
+> On Thursday 15 October 2015 14:09:31 Hannes Reinecke wrote:
+>> On 10/15/2015 02:06 PM, Hannes Reinecke wrote:
+>>> On 10/12/2015 05:10 PM, Arnd Bergmann wrote:
+>>>> diff --git a/drivers/scsi/Kconfig b/drivers/scsi/Kconfig
+>>>> index d2f480b04a52..d4aa6a1a806c 100644
+>>>> --- a/drivers/scsi/Kconfig
+>>>> +++ b/drivers/scsi/Kconfig
+>>>> @@ -499,6 +499,7 @@ config SCSI_ADVANSYS
+>>>>      tristate "AdvanSys SCSI support"
+>>>>      depends on SCSI
+>>>>      depends on ISA || EISA || PCI
+>>>> +    depends on ISA_DMA_API || !ISA
+>>>>      help
+>>>>        This is a driver for all SCSI host adapters manufactured by
+>>>>        AdvanSys. It is documented in the kernel source in
+>>>>
+>>> Sorry to chime in again, but wouldn't this allow to build on platforms
+>>> which have neither ISA_DMA_API nor ISA, like oldish sparc systems with
+>>> proprietary S-BUS?
+> 
+> No, the first dependency is still in place. It could also be written as
+> 
+> depends on (ISA && ISA_DMA_API) || EISA || PCI
+> 
+> which might be easier to understand. Do you want me to resubmit it like that?
+> 
+Yes, please do so.
 
-On 10/15/2015 10:21 PM, Javier Martinez Canillas wrote:
-> Hello,
->
-> The Exynos Chromebooks DTS don't use the correct card detection properties
-> since these were carried from the vendor tree that had a reason to do so.
->
-> There are two things that I noticed:
->
-> 1) The Marvell WiFi SDIO is marked as broken-cd instead of non-removable:
->
-> This causes the device to be removed when the system enters into a suspend
-> state which leads to the following warning when the system is resumed:
->
-> [  181.944636] mmc2: error -2 during resume (card was removed?)
->
-> The rationale for using broken-cd is explained in downstream commit [0] and
-> was that using the non-removable property caused issues with the mwifiex
-> driver since the reset logic called the mmc_{remove,add}_host() functions.
->
-> But the reset logic in the mwifiex mainline driver has changed and this is
-> no longer the case so it's safe to use the non-removable property AFAICT.
->
-Good to know it is fixed now. This is fixed in firmware or in the driver?
+Cheers,
 
-> 2) The eMMC node has both broken-cd and non-removable but the MMC DT binding
-> doc (Documentation/devicetree/bindings/mmc/mmc.txt) mentions that only one
-> of these card detection properties should be used.
->
-This change looks ok, will take a closer look once I am back to my work 
-station.
-
-> So this series change both the SDIO WiFi and eMMC device nodes in the Snow,
-> Peach Pi and Peach Pit boards DTS to use the non-removable property.
->
-> To test, I've cherry picked commit [1] from the vendor tree that adds a
-> debugfs entry to force a card reset and after the reset, the WiFi card still
-> works correctly:
->
-> $ echo 1 > /sys/kernel/debug/mwifiex/mlan0/reset
->
-> And also tested that both eMMC and WiFi are working correctly after a S2R.
->
-> The test were made on an Exynos5800 Peach Pi but I don't have access to a
-> Snow anymore so testing patch 3/6 and 6/6 on that board will be appreciated.
->
-> v1 of the series was [2] and this version fixes issues pointed out by Tomeu.
->
-> Changes since v1:
->   - Replace broken-cd for non-removable in the correct mmc node for Snow.
->   - Correct the card detetion properties for eMMC in Snow, Pit and Pi.
->   - Also remove the card-detect-delay property when using non-removable.
->
-> [0]: https://chromium.googlesource.com/chromiumos/third_party/kernel/+/ad348e1e2381
-> [1]: https://chromium.googlesource.com/chromiumos/third_party/kernel/+/5995363523de
-> [2]: https://lkml.org/lkml/2015/10/15/294
->
-> Best regards,
-> Javier
->
->
-> Javier Martinez Canillas (6):
->    ARM: dts: Mark SDIO as non-removable in exynos5800-peach-pi
->    ARM: dts: Mark SDIO as non-removable in exynos5420-peach-pit
->    ARM: dts: Mark SDIO as non-removable in exynos5250-snow-common
->    ARM: dts: Remove broken-cd from eMMC node in exynos5800-peach-pi
->    ARM: dts: Remove broken-cd from eMMC node in exynos5420-peach-pi
->    ARM: dts: Mark eMMC as non-removable in exynos5250-snow-common
->
->   arch/arm/boot/dts/exynos5250-snow-common.dtsi | 6 ++----
->   arch/arm/boot/dts/exynos5420-peach-pit.dts    | 5 +----
->   arch/arm/boot/dts/exynos5800-peach-pi.dts     | 5 +----
->   3 files changed, 4 insertions(+), 12 deletions(-)
->
+Hannes
+-- 
+Dr. Hannes Reinecke		      zSeries & Storage
+hare at suse.de			      +49 911 74053 688
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg
+GF: J. Hawn, J. Guild, F. Imend?rffer, HRB 16746 (AG N?rnberg)
