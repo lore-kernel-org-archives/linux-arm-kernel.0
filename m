@@ -1,118 +1,45 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 16 Oct 2015 15:06:45 +0200
-Subject: [PATCH] VFIO: platform: AMD xgbe reset module
-In-Reply-To: <1444927997.4059.470.camel@redhat.com>
-References: <1444836792-2405-1-git-send-email-eric.auger@linaro.org>
- <7287273.XGFpHqQ9fN@wuerfel> <20151015121228.GA965@cbox>
- <5270338.MbsQ1bGczu@wuerfel> <561FBC31.3020900@linaro.org>
- <1444927997.4059.470.camel@redhat.com>
-Message-ID: <5620F665.5010903@linaro.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 16 Oct 2015 08:23:44 -0500
+Subject: [PATCH v2] PCI: iproc: fix 32-bit build error
+In-Reply-To: <5482493.6eNiKO1I30@wuerfel>
+References: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
+ <5754881.OPA6La0Zg0@wuerfel> <20151015210113.GA13636@localhost>
+ <5482493.6eNiKO1I30@wuerfel>
+Message-ID: <20151016132344.GA21346@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
-On 10/15/2015 06:53 PM, Alex Williamson wrote:
-> On Thu, 2015-10-15 at 16:46 +0200, Eric Auger wrote:
->> Hi Arnd,
->> On 10/15/2015 03:59 PM, Arnd Bergmann wrote:
->>> On Thursday 15 October 2015 14:12:28 Christoffer Dall wrote:
->>>>>
->>>>> enum vfio_platform_op {
->>>>>       VFIO_PLATFORM_BIND,
->>>>>       VFIO_PLATFORM_UNBIND,
->>>>>       VFIO_PLATFORM_RESET,
->>>>> };
->>>>>
->>>>> struct platform_driver {
->>>>>         int (*probe)(struct platform_device *);
->>>>>         int (*remove)(struct platform_device *);
->>>>>       ...
->>>>>       int (*vfio_manage)(struct platform_device *, enum vfio_platform_op);
->>>>>         struct device_driver driver;
->>>>> };
->>>>>
->>>>> This would integrate much more closely into the platform driver framework,
->>>>> just like the regular vfio driver integrates into the PCI framework.
->>>>> Unlike PCI however, you can't just use the generic driver framework to
->>>>> unbind the driver, because you still need device specific code.
->>>>>
->>>> Thanks for these suggestions, really helpful.
->>>>
->>>> What I don't understand in the latter example is how VFIO knows which
->>>> struct platform_driver to interact with?
->>>
->>> This would assume that the driver remains bound to the device, so VFIO
->>> gets a pointer to the device from somewhere (as it does today) and then
->>> follows the dev->driver pointer to get to the platform_driver.
+On Fri, Oct 16, 2015 at 11:47:42AM +0200, Arnd Bergmann wrote:
+> On Thursday 15 October 2015 16:01:13 Bjorn Helgaas wrote:
+> > On Thu, Oct 15, 2015 at 09:40:45PM +0200, Arnd Bergmann wrote:
+> > > The iproc PCI driver tries to figure out whether the MMIO window has
+> > > a valid size, but does this using a 64-bit modulo operation, which
+> > > is not allowed on 32-bit kernels and leads to a link error:
+> > > 
+> > > drivers/built-in.o: In function `iproc_pcie_setup':
+> > > :(.text+0x4b798): undefined reference to `__aeabi_uldivmod'
+> > > 
+> > > This works around that error by using the div64_u64() function
+> > > provided by the kernel. While this is an expensive operation,
+> > > it is harmless because we only call it during the probing
+> > > of the driver.
+> > > 
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > Acked-by: Ray Jui <rjui@broadcom.com>
+> > > Fixes: 0ab99ca8eb6c ("PCI: iproc: Fix compile warnings")
+> > 
+> > This *looks* like it should be fixing 90e4032eeaf2 ("PCI: iproc: Add
+> > outbound mapping support"), not 0ab99ca8eb6c.
+> > 
+> > 90e4032eeaf2 added the "if (size % ob->window_size)".
+> > 
+> > Is this more subtle than that?
 > 
-> The complexity of managing a bi-modal driver seems like far more than a
-> little bit of code duplication in a device specific reset module and
-> extends into how userspace makes devices available through vfio, so I
-> think it's too late for that discussion.
->   
->>>> Also, just so I'm sure I understand correctly, VFIO_PLATFORM_UNBIND is
->>>> then called by VFIO before the VFIO driver unbinds from the device
->>>> (unbinding the platform driver from the device being a completely
->>>> separate thing)?
->>>
->>> This is where we'd need a little more changes for this approach. Instead
->>> of unbinding the device from its driver, the idea would be that the
->>> driver remains bound as far as the driver model is concerned, but
->>> it would be in a quiescent state where no other subsystem interacts with
->>> it (i.e. it gets unregistered from networking core or whichever it uses).
->>
->> Currently we use the same mechanism as for PCI, ie. unbind the native
->> driver and then bind VFIO platform driver in its place. Don't you think
->> changing this may be a pain for user-space tools that are designed to
->> work that way for PCI?
->>
->> My personal preference would be to start with your first proposal since
->> it looks (to me) less complex and "unknown" that the 2d approach.
->>
->> Let's wait for Alex opinion too...
-> 
-> I thought the reason we took the approach we have now is so that we
-> don't have reset code loaded into the kernel unless we have a device
-> that needs it.  Therefore we don't really want to preemptively load all
-> the reset drivers and have them do a registration.  The unfortunate
-> side-effect of that is the platform code needs to go looking for the
-> driver.  We do that via the __symbol_get() trick, which only fails
-> without modules because the underscore variant isn't defined in that
-> case.  I remember asking Eric previously why we're using that rather
-> than symbol_get(),
+> You are absolutely right, I must have copy-pasted the wrong entry.
+> Do you want me to resend this? I guess you can just remove the
+> line as this commit has not appeared in any release anyway.
 
-the rationale behind using __get_symbol is that the function takes a
-char * as argument while the get_symbol macro takes the very symbol. I
-needed to provide a string since this is what is stored in the lookup
-table. Unfortunately I did not see the #if CONFIG_MODULES. I Should have
-been warned about "__" and Alex doubts, sin of na?vety.
+I squashed this fix and Jon's %pap fix into Ray's original "Add outbound
+mapping support" patch and re-did the merge.  Thanks!
 
- I've since forgotten his answer, but the fact that
-> __symbol_get() is only defined for modules makes it moot, we either need
-> to make symbol_get() work or define __symbol_get() for non-module
-> builds.
-I currently don't see any solution for any of those. The only solution I
-can see is someone registers the reset function pointer to vfio.
-
-I think we could keep the existing reset modules, do the request_module
-from VFIO, using their module name registered in the lookup table. But
-instead of having the reset function in the look-up table we would have
-the reset modules register their reset function pointer to VFIO. I think
-this could work around the symbol_get issue.
-
-This still leaves the layer violation argument though.
-
-Assuming this works, would that be an acceptable solution, although I
-acknowledge this does not perfectly fit into the driver model?
-
-Best Regards
-
-Eric
-> 
-> Otherwise, we should probably abandon the idea of these reset functions
-> being modules and build them into the vfio platform driver (which would
-> still be less loaded, dead code than a bi-modal host driver).  Thanks,
-
-> 
-> Alex
-> 
+Bjorn
