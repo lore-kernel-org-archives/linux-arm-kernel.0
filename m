@@ -1,52 +1,41 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri, 16 Oct 2015 10:19:08 +0200
-Subject: [PATCH v2 2/2] ARM: dts: exynos5250: Add clocks to DISP1 domain
-In-Reply-To: <56203A74.7040305@samsung.com>
-References: <1444905084-22540-1-git-send-email-tomeu.vizoso@collabora.com>
- <1444905084-22540-3-git-send-email-tomeu.vizoso@collabora.com>
- <56203A74.7040305@samsung.com>
-Message-ID: <5620B2FC.5040004@collabora.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 16 Oct 2015 10:21:44 +0200
+Subject: [PATCH v2 1/3] ARM: catch pending imprecise abort on unmask
+In-Reply-To: <20151015153246.GH32536@n2100.arm.linux.org.uk>
+References: <1444905142-21500-1-git-send-email-l.stach@pengutronix.de>
+ <1444905142-21500-2-git-send-email-l.stach@pengutronix.de>
+ <20151015153246.GH32536@n2100.arm.linux.org.uk>
+Message-ID: <1444983704.3180.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2015 01:44 AM, Krzysztof Kozlowski wrote:
-> On 15.10.2015 19:31, Tomeu Vizoso wrote:
->> Adds to the node of the DISP1 power domain the two clocks that need to
->> be reparented while the domain is powered off:
->> CLK_MOUT_ACLK200_DISP1_SUB and CLK_MOUT_ACLK300_DISP1_SUB.
->>
->> Otherwise the state is unknown at power up and the mixer's clocks are
->> all messed up.
->>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> Link: http://lkml.kernel.org/g/561CDC33.7050103 at collabora.com
->> ---
->>
->>
->>  arch/arm/boot/dts/exynos5250.dtsi | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
->> index b24610ea8c2a..88b9cf5f226f 100644
->> --- a/arch/arm/boot/dts/exynos5250.dtsi
->> +++ b/arch/arm/boot/dts/exynos5250.dtsi
->> @@ -130,6 +130,10 @@
->>  		compatible = "samsung,exynos4210-pd";
->>  		reg = <0x100440A0 0x20>;
->>  		#power-domain-cells = <0>;
->> +		clocks = <&clock CLK_FIN_PLL>,
->> +			 <&clock CLK_MOUT_ACLK200_DISP1_SUB>,
->> +			 <&clock CLK_MOUT_ACLK300_DISP1_SUB>;
->> +		clock-names = "oscclk", "clk0", "clk1";
->>  	};
->>  
->>  	clock: clock-controller at 10010000 {
->>
+Am Donnerstag, den 15.10.2015, 16:32 +0100 schrieb Russell King - ARM
+Linux:
+> On Thu, Oct 15, 2015 at 12:32:20PM +0200, Lucas Stach wrote:
+> > Install a non-faulting handler just before unmasking imprecise aborts
+> > and switch back to the regular one after unmasking is done.
+> > 
+> > This catches any pending imprecise abort that the firmware/bootloader
+> > may have left behind that would normally crash the kernel at that point.
+> > As there are apparently a lot of bootlaoders out there that do such a
+> > thing it makes sense to handle it in the common startup code.
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 > 
-> I reviewed it already. Any changes here since v1?
+> Much better.  Please feel free to add it to the patch system, thanks.
+> 
+Do you feel like taking patches 2 and 3 through your tree too, given
+that they are already acked by the platform maintainers, or should they
+pick them up themselves?
 
-No, I just forgot to add your r-b tag, sorry about that.
+> I think, given that the original seems to be breaking platforms, this
+> patch needs to go into -rc kernels, right?
+> 
+No, the original patch is only queued for 4.4, so the regression is only
+in -next. This patch only needs to make it into your 4.4 pull request.
 
 Thanks,
-
-Tomeu
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
