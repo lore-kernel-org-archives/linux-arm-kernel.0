@@ -1,65 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 16 Oct 2015 14:21:34 +0200
-Subject: [PATCH] ARM: at91/dt: sama5d4: add the macb1 node
-Message-ID: <1444998094-9860-1-git-send-email-gregory.clement@free-electrons.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 16 Oct 2015 14:27:24 +0200
+Subject: [RFC PATCH 0/3] pwm: omap: Add PWM support using dual-mode timers
+Message-ID: <5620ED2C.1090107@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The second macb is present on all the sama5d4 SoCs. Let's add a node
-reflecting it in the device tree.
+This patch is based on an earlier patch by NeilBrown which is based on
+a older patch from Grant Erickson which provided PWM devices using
+the 'legacy' interface.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/sama5d4.dtsi | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+The pwm driver was renamed to not be confused with the OMAP4 PWM dedicated
+hardware and was cleaned with the review from Thierry Reding.
 
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index b5ee947..6f27915 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -1188,6 +1188,19 @@
- 				clock-names = "t0_clk", "slow_clk";
- 			};
- 
-+			macb1: ethernet at fc028000 {
-+				compatible = "atmel,sama5d4-gem";
-+				reg = <0xfc028000 0x100>;
-+				interrupts = <55 IRQ_TYPE_LEVEL_HIGH 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_macb1_rmii>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				clocks = <&macb1_clk>, <&macb1_clk>;
-+				clock-names = "hclk", "pclk";
-+				status = "disabled";
-+			};
-+
- 			adc0: adc at fc034000 {
- 				compatible = "atmel,at91sam9x5-adc";
- 				reg = <0xfc034000 0x100>;
-@@ -1635,6 +1648,23 @@
- 					};
- 				};
- 
-+				macb1 {
-+					pinctrl_macb1_rmii: macb1_rmii-0 {
-+						atmel,pins =
-+							<AT91_PIOA 14 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_TX0 */
-+							 AT91_PIOA 15 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_TX1 */
-+							 AT91_PIOA 12 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_RX0 */
-+							 AT91_PIOA 13 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_RX1 */
-+							 AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_RXDV */
-+							 AT91_PIOA 11 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_RXER */
-+							 AT91_PIOA  4 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_TXEN */
-+							 AT91_PIOA  2 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_TXCK */
-+							 AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_MDC */
-+							 AT91_PIOA 23 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_MDIO */
-+							>;
-+					};
-+				};
-+
- 				mmc0 {
- 					pinctrl_mmc0_clk_cmd_dat0: mmc0_clk_cmd_dat0 {
- 						atmel,pins =
+The first patch introduces a way to select to dmtimer clock source via a
+clocks binding and a dedicated function wit the legacy fallback.
+
+In order to prepare for the future form of the dmtimer (clksource or whatever)
+the first patch introduces the PWM driver with all the dmtimer calls into a
+platform data structure.
+
+The structure is then filled in plat-omap and added as auxdata for the
+ti,pwm-dmtimer-omap compatible nodes.
+
+Cc: Grant Erickson <marathon96@gmail.com>
+Cc: NeilBrown <neilb@suse.de>
+Cc: Joachim Eastwood <manabian@gmail.com>
+Suggested-by: Tony Lindgren <tony@atomide.com>
+
+Neil Armstrong (3):
+  arm: plat-omap: dmtimer: Add clock source from DT
+  pwm: Add PWM driver for OMAP using dual-mode timers
+  arm: plat-omap: Add PWM dmtimer platforma data quirks
+
+ .../devicetree/bindings/pwm/pwm-omap-dmtimer.txt   |  18 ++
+ arch/arm/mach-omap2/pdata-quirks.c                 |  23 ++
+ arch/arm/plat-omap/dmtimer.c                       |  32 +-
+ drivers/pwm/Kconfig                                |   9 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-omap-dmtimer.c                     | 322 +++++++++++++++++++++
+ include/linux/platform_data/pwm_omap_dmtimer.h     |  69 +++++
+ 7 files changed, 472 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-omap-dmtimer.txt
+ create mode 100644 drivers/pwm/pwm-omap-dmtimer.c
+ create mode 100644 include/linux/platform_data/pwm_omap_dmtimer.h
+
 -- 
-2.1.4
+1.9.1
