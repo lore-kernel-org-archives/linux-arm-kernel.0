@@ -1,32 +1,38 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Fri, 16 Oct 2015 22:02:25 +0900
-Subject: [PATCH v4 2/2] arm64: Expand the stack trace feature to support
- IRQ stack
-In-Reply-To: <561FCDCA.1080804@arm.com>
-References: <1444231692-32722-1-git-send-email-jungseoklee85@gmail.com>
- <1444231692-32722-3-git-send-email-jungseoklee85@gmail.com>
- <5617CE26.10604@arm.com> <179A25A2-C346-46C0-93D1-BABD4B6CB401@gmail.com>
- <561FCDCA.1080804@arm.com>
-Message-ID: <9A685B5F-61FA-451C-BFF4-7491E2D02AF9@gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 16 Oct 2015 15:04:43 +0200
+Subject: [PATCH v2 0/8] Enable several devices for Atmel SAMA5D2
+Message-ID: <1445000691-12402-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 16, 2015, at 1:01 AM, James Morse wrote:
-> On 15/10/15 15:24, Jungseok Lee wrote:
->> On Oct 9, 2015, at 11:24 PM, James Morse wrote:
->>> I think unwind_frame() needs to walk the irq stack too. [2] is an example
->>> of perf tracing back to userspace, (and there are patches on the list to
->>> do/fix this), so we need to walk back to the start of the first stack for
->>> the perf accounting to be correct.
->> 
->> I plan to do re-spin this series without [PATCH 2/2] since 1) Akashi's
->> approach looks better than mine and 2) you have the perf patches for [2].
-> 
-> They aren't my patches - the ones I saw on the list were for arm:
-> https://lkml.org/lkml/2015/10/1/769 - its evidently something perf
-> supports, so we shouldn't make it worse?
+Hi,
 
-Aha, thanks for the information!
+This set of patches enables several devices for the freshly introduced SAMA5D2
+SoC. dts and defconfig files are updated to enable SAMA5D2 and its new devices
+such as Flexcom and AT91 SDHCI.
 
-Best Regards
-Jungseok Lee
+Changes:
+- v2:
+  - update whole Atmel defconfigs
+  - update multi_v7_defconfig
+
+Ludovic Desroches (8):
+  ARM: at91/dt: sama5d2: add missing devices
+  ARM: at91/dt: sama5d2 Xplained: add several devices
+  ARM: at91/defconfig: update sama5 defconfig
+  ARM: at91/defconfig: update at91_dt defconfig
+  ARM: at91/defconfig: add sama5d2 and its new devices to sama5
+    defconfig
+  ARM: multi_v7_defconfig: Add Atmel SAMA5D2 SoC
+  ARM: multi_v7_defconfig: Add Atmel Flexcom device
+  ARM: multi_v7_defconfig: Add Atmel SDHCI device
+
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 106 +++++++++++++++++++
+ arch/arm/boot/dts/sama5d2.dtsi              | 152 +++++++++++++++++++++++++++-
+ arch/arm/configs/at91_dt_defconfig          |  15 ---
+ arch/arm/configs/multi_v7_defconfig         |   3 +
+ arch/arm/configs/sama5_defconfig            |  16 ++-
+ 5 files changed, 265 insertions(+), 27 deletions(-)
+
+-- 
+2.5.0
