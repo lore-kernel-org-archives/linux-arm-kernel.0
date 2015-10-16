@@ -1,69 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 16 Oct 2015 09:20:23 +0200
-Subject: [PATCH v2 5/5] ARM: dts: sun6i: Add support for Sinlinx A31s SDK
- board
-In-Reply-To: <CAGb2v65zYqYWJ5C6yFgjyYV3RPMHcXZp3+PfbB_GXByb6Mt-Rw@mail.gmail.com>
-References: <1444488540-11263-1-git-send-email-wens@csie.org>
- <1444488540-11263-6-git-send-email-wens@csie.org>
- <20151012093034.GZ2278@lukather>
- <CAGb2v65zYqYWJ5C6yFgjyYV3RPMHcXZp3+PfbB_GXByb6Mt-Rw@mail.gmail.com>
-Message-ID: <20151016072023.GK2711@lukather>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 16 Oct 2015 08:21:26 +0100
+Subject: [RESEND v4.1 0/5] Mailbox: Provide support STi based platforms
+Message-ID: <1444980091-16728-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jassi,
 
-On Mon, Oct 12, 2015 at 05:42:10PM +0800, Chen-Yu Tsai wrote:
-> On Mon, Oct 12, 2015 at 5:30 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Sat, Oct 10, 2015 at 10:49:00PM +0800, Chen-Yu Tsai wrote:
-> >> +&i2c0 {
-> >> +     /* Available on camera header */
-> >> +     pinctrl-names = "default";
-> >> +     pinctrl-0 = <&i2c0_pins_a>;
-> >> +     status = "okay";
-> >> +};
-> >> +
-> >> +&i2c1 {
-> >> +     /* Available on LCD header */
-> >> +     pinctrl-names = "default";
-> >> +     pinctrl-0 = <&i2c1_pins_a>;
-> >> +     status = "okay";
-> >> +};
-> >
-> > Are those two actually used anywhere on the board itself, or just
-> > exposed on the pin headers?
-> 
-> They are exposed as grouped headers. 1 header has all the camera
-> related stuff, like the CSI pins, and various voltage sources
-> from the PMIC. The other has the LCD pins, resistive touchpanel,
-> I2C for capacitive touchpanel, and of course voltage sources.
-> 
-> The LCD header is an FPC connector, while the camera header is
-> the common (common for sunxi devboards) 2.0mm pins. I'm not sure
-> if there is some common pinout amongst vendors, but at least
-> Sinlinx sells their own 7" LCD display w/ CTP, VGA converter,
-> and camera modules. I have both the LCD and VGA converter.
-> 
-> Note that these I2C pins have valid external pull-ups. I doubt
-> they can be easily re-purposed.
+[Resending the updated patch-set this time]
 
-Still, the policy we've had so far is that if the user can use it for
-something else (like a GPIO, which is the case here), we don't do
-enforce any default, and the user will make the right choice.
+This should be it.  Exciting times!
+  
+ST's platforms currently support a maximum of 5 Mailboxes, one for
+each of the supported co-processors situated on the platform.  Each
+Mailbox is divided up into 4 instances which consist of 32 channels.
+Messages are passed between the application and co-processors using
+shared memory areas.
+  
+Also included in the set is an example Client which should be generic
+enough to use as a testing environment for all Mailbox IPs which use
+shared memory or the API to pass messages.  With small changes, it
+should also be able to test more extravagant implementations.
+  
+v3 -> v4:
+ - More protection in MBOX_BASE() MACRO
+ - Remove unused tx-only marker
+  
+v2 => v3:
+ - Controller
+   - Shared (DT <=> Device Driver) defines removed
+   - Return actual error codes instead of NULL in xlate()
+   - Not passing 'direction' configuration via DT anymore
+     - Removed all accompanying configuration checking code
+ - Test F/W
+   - Allow Rx-only and Tx-only controllers to be tested
+   - Cater for controllers requiring pre-Tx 'signal' to be sent
+   - Supply 'wr-' message debugfs file
+     - When written to, will Tx message through Mailbox Framework
+     - When read from, will print out a hexdump of Rx'ed message
+  
+v1 => v2:
+ - New MACRO() to obtain base address for a given instance
+ - Move locking into the structure it protects
+ - Stop checking for 'ready' state when sending data
+ - Don't clear channel data (that belongs to the API)
+ - #define register offsets instead of providing via pdata
+ - Register driver with module_platform_driver()
 
-Maxime
+Lee Jones (5):
+  mailbox: dt: Supply bindings for ST's Mailbox IP
+  mailbox: Add support for ST's Mailbox IP
+  ARM: STi: stih407-family: Add nodes for Mailbox
+  mailbox: Add generic mechanism for testing Mailbox Controllers
+  ARM: STi: DT: STiH407: Enable Mailbox testing facility
+
+ .../devicetree/bindings/mailbox/sti-mailbox.txt    |  51 ++
+ arch/arm/boot/dts/stih407-family.dtsi              |  39 ++
+ drivers/mailbox/Kconfig                            |  14 +
+ drivers/mailbox/Makefile                           |   4 +
+ drivers/mailbox/mailbox-sti.c                      | 513 +++++++++++++++++++++
+ drivers/mailbox/mailbox-test.c                     | 361 +++++++++++++++
+ 6 files changed, 982 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+ create mode 100644 drivers/mailbox/mailbox-sti.c
+ create mode 100644 drivers/mailbox/mailbox-test.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151016/ed61ae31/attachment.sig>
+1.9.1
