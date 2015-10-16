@@ -1,55 +1,37 @@
-From: Minghuan.Lian@freescale.com (Minghuan Lian)
-Date: Fri, 16 Oct 2015 15:19:16 +0800
-Subject: [PATCH v4 2/6] PCI: layerscape: check PCIe controller work mode
-In-Reply-To: <1444979960-24100-1-git-send-email-Minghuan.Lian@freescale.com>
-References: <1444979960-24100-1-git-send-email-Minghuan.Lian@freescale.com>
-Message-ID: <1444979960-24100-2-git-send-email-Minghuan.Lian@freescale.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 16 Oct 2015 10:18:06 +0300
+Subject: [PATCH v2 08/14] dmaengine: edma: Do not allocate memory for
+ edma_rsv_info in case of DT boot
+In-Reply-To: <1444979892-31626-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1444979892-31626-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1444979892-31626-9-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Layerscape PCIe controller supports root complex (RC) and
-endpoint (EP) mode. The mode can be set by RCW. The patch
-will check it. If not in RC mode, the driver directly
-returns -ENODEV.
+The channel/slot reservation is not supported when booted with DT so there
+is not need to allocate memory.
 
-Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Change log
-v4: split from [PATCH v3] PCI: layerscape: Add PCIe support for LS1043a and LS2080a
+ drivers/dma/edma.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
- drivers/pci/host/pci-layerscape.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
-index 6dd44a0..5eabe92 100644
---- a/drivers/pci/host/pci-layerscape.c
-+++ b/drivers/pci/host/pci-layerscape.c
-@@ -47,6 +47,16 @@ struct ls_pcie {
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index e1b0e6864f27..c1b8bb09c221 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -1926,12 +1926,6 @@ static int edma_of_parse_dt(struct device *dev, struct edma_soc_info *pdata)
+ 	int ret = 0;
+ 	struct property *prop;
+ 	size_t sz;
+-	struct edma_rsv_info *rsv_info;
+-
+-	rsv_info = devm_kzalloc(dev, sizeof(struct edma_rsv_info), GFP_KERNEL);
+-	if (!rsv_info)
+-		return -ENOMEM;
+-	pdata->rsv = rsv_info;
  
- #define to_ls_pcie(x)	container_of(x, struct ls_pcie, pp)
- 
-+static bool ls_pcie_is_bridge(struct ls_pcie *pcie)
-+{
-+	u32 header_type;
-+
-+	header_type = ioread8(pcie->dbi + PCI_HEADER_TYPE);
-+	header_type &= 0x7f;
-+
-+	return header_type == PCI_HEADER_TYPE_BRIDGE;
-+}
-+
- static int ls_pcie_link_up(struct pcie_port *pp)
- {
- 	u32 state;
-@@ -135,6 +145,9 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
- 		return ret;
- 	pcie->index = index[1];
- 
-+	if (!ls_pcie_is_bridge(pcie))
-+		return -ENODEV;
-+
- 	ret = ls_add_pcie_port(pcie);
- 	if (ret < 0)
- 		return ret;
+ 	prop = of_find_property(dev->of_node, "ti,edma-xbar-event-map", &sz);
+ 	if (prop)
 -- 
-1.9.1
+2.6.1
