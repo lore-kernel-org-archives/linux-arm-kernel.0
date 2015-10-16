@@ -1,83 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Oct 2015 22:17:49 +0200
-Subject: [GIT PULL] qcom SoC changes for 4.4 *RESEND*
-In-Reply-To: <20151016200417.GC16437@codeaurora.org>
-References: <1444860627-8258-1-git-send-email-agross@codeaurora.org>
- <6622700.vqj78zoFs4@wuerfel> <20151016200417.GC16437@codeaurora.org>
-Message-ID: <4138617.YyHIgKfeHJ@wuerfel>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 16 Oct 2015 22:20:50 +0200
+Subject: [PATCH v6 4/7] arm64: berlin: add the pinctrl dependency for
+ Marvell Berlin SoCs
+In-Reply-To: <CACRpkdaKBZEN7j3rc9vzT_schNerqKorwckZeKuFEAugbzGBgQ@mail.gmail.com>
+References: <1444981032-4401-1-git-send-email-jszhang@marvell.com>
+ <1444981032-4401-5-git-send-email-jszhang@marvell.com>
+ <CACRpkdaKBZEN7j3rc9vzT_schNerqKorwckZeKuFEAugbzGBgQ@mail.gmail.com>
+Message-ID: <56215C22.4080705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 October 2015 13:04:17 Stephen Boyd wrote:
-> On 10/16, Arnd Bergmann wrote:
-> > On Friday 16 October 2015 09:56:30 Stephen Boyd wrote:
-> > > 
-> > > Can you share your .config? It looks like there are stubs for these, so
-> > > I'm lost how we got undefined references.
-> > > 
-> > http://pastebin.com/HtrC510p
-> > 
-> > The problem is CONFIG_HWSPINLOCK=m && CONFIG_QCOM_SMEM=y. Sorry for sending
-> > an incomplete patch description, I had not noticed those wrapper functions.
-> > 
-> > My patch fixes the issue, but does not allow you to build QCOM_SMEM without
-> > HWSPINLOCK. If we want that configuration to be valid, we need one of
-> > the two changes below:
-> > 
-> > diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
-> > index eec76141d9b9..cae0ffa19bca 100644
-> > --- a/drivers/soc/qcom/Kconfig
-> > +++ b/drivers/soc/qcom/Kconfig
-> > @@ -22,7 +22,7 @@ config QCOM_PM
-> >  config QCOM_SMEM
-> >  	tristate "Qualcomm Shared Memory Manager (SMEM)"
-> >  	depends on ARCH_QCOM
-> > -	depends on HWSPINLOCK
-> > +	depends on HWSPINLOCK && !HWSPINLOCK
-> 
-> What does this mean?
+On 16.10.2015 16:15, Linus Walleij wrote:
+> On Fri, Oct 16, 2015 at 9:37 AM, Jisheng Zhang <jszhang@marvell.com> wrote:
+>
+>> This is to add the pinctrl dependency for Marvell Berlin SoCs.
+>>
+>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+>> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Please push this through the ARM SoC tree or wherever patches
+> to this file goes. It doesn't seem to be a hard dependency to the
+> pin control patches.
 
-This is the magic way in Kconfig to express what we want ;-)
+[Added arm-soc Maintainers]
 
-It says it depends on either HWSPINLOCK being disabled (!HWSPINLOCK),
-or it depends on HWSPINLOCK. The latter implies that QCOM_SMEM cannot
-be built-in when HWSPINLOCK=m, but they are allowed to both be built-in.
+This patch is touching arch/arm64/Kconfig.platforms. The hunk is
+very small so that it may be ok that I apply and send it with
+the next PR.
 
-> Is it missing an =m?
+If the arm-soc Maintainers want to pick it up, I can resend the
+original patch with all Acked-by to arm-soc maintainer e-mail
+directly.
 
-No
-
-> >  	help
-> >  	  Say y here to enable support for the Qualcomm Shared Memory Manager.
-> >  	  The driver provides an interface to items in a heap shared among all
-> > diff --git a/include/linux/hwspinlock.h b/include/linux/hwspinlock.h
-> > index 859d673d98c8..cdfd9fd2ba11 100644
-> > --- a/include/linux/hwspinlock.h
-> > +++ b/include/linux/hwspinlock.h
-> > @@ -59,7 +59,7 @@ struct hwspinlock_pdata {
-> >  	int base_id;
-> >  };
-> >  
-> > -#if defined(CONFIG_HWSPINLOCK) || defined(CONFIG_HWSPINLOCK_MODULE)
-> > +#if IS_REACHABLE(CONFIG_HWSPINLOCK)
-> >  
-> >  int hwspin_lock_register(struct hwspinlock_device *bank, struct device *dev,
-> >  		const struct hwspinlock_ops *ops, int base_id, int num_locks);
-> > 
-> 
-> I'd prefer this patch. Is there some way to capture that
-> QCOM_SMEM must be a module if HWSPINLOCK is a module unless we're
-> doing a compile test, in which case we don't care?
-
-The problem here is that while we avoid the build error, we get the
-counterintuitive behavior that you can have the HWSPINLOCK module
-loaded but the built-in QCOM_SMEM module does not use it because
-it wasn't reachable at compile time.
-
-> I guess that would just be:
-> 
-> 	depends on HWSPINLOCK || COMPILE_TEST
-
-This would not solve the randconfig build problem.
-
-	Arnd
+Sebastian
