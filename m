@@ -1,36 +1,43 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 16 Oct 2015 14:38:53 +0530
-Subject: [PATCH v2 0/4] NAND support for Broadcom NS2 SoC
-Message-ID: <1444986537-28387-1-git-send-email-anup.patel@broadcom.com>
+Date: Fri, 16 Oct 2015 14:38:54 +0530
+Subject: [PATCH v2 1/4] mtd: brcmnand: Fix pointer type-cast in
+ brcmnand_write()
+In-Reply-To: <1444986537-28387-1-git-send-email-anup.patel@broadcom.com>
+References: <1444986537-28387-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1444986537-28387-2-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We enable NAND support for Broadcom NS2 SoC by reusing existing
-BRCMNAND driver.
+We should always type-cast pointer to "long" or "unsigned long"
+because size of pointer is same as machine word size. This will
+avoid pointer type-cast issues on both 32bit and 64bit systems.
 
-This patchset applies on-top of "arm64: Simple additions to
-NS2 DT" v1 patchset and is available in ns2_nand_v2 branch of
-https://github.com/Broadcom/arm64-linux.git.
+This patch fixes pointer type-cast issue in brcmnand_write()
+as-per above info.
 
-The patchset is tested on NS2 SVK.
+Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+Reviewed-by: Vikram Prakash <vikramp@broadcom.com>
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
+---
+ drivers/mtd/nand/brcmnand/brcmnand.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Changes since v1:
- - Dropped patch3 and patch4 because we don't need to reset
-   BRCMNAND controller for NS2.
- - Added patch to force 8bit mode before doing nand_scan_ident()
-   in brcmnand_init_cs().
-
-Anup Patel (4):
-  mtd: brcmnand: Fix pointer type-cast in brcmnand_write()
-  mtd: nand: Allow MTD_NAND_BRCMNAND to be selected for ARM64
-  mtd: brcmnand: Force 8bit mode before doing nand_scan_ident()
-  arm64: dts: Add BRCM IPROC NAND DT node for NS2
-
- arch/arm64/boot/dts/broadcom/ns2-svk.dts | 12 ++++++++++++
- arch/arm64/boot/dts/broadcom/ns2.dtsi    | 14 ++++++++++++++
- drivers/mtd/nand/Kconfig                 |  2 +-
- drivers/mtd/nand/brcmnand/brcmnand.c     | 13 +++++++++++--
- 4 files changed, 38 insertions(+), 3 deletions(-)
-
+diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
+index fddb795..4cba03d 100644
+--- a/drivers/mtd/nand/brcmnand/brcmnand.c
++++ b/drivers/mtd/nand/brcmnand/brcmnand.c
+@@ -1544,9 +1544,9 @@ static int brcmnand_write(struct mtd_info *mtd, struct nand_chip *chip,
+ 
+ 	dev_dbg(ctrl->dev, "write %llx <- %p\n", (unsigned long long)addr, buf);
+ 
+-	if (unlikely((u32)buf & 0x03)) {
++	if (unlikely((unsigned long)buf & 0x03)) {
+ 		dev_warn(ctrl->dev, "unaligned buffer: %p\n", buf);
+-		buf = (u32 *)((u32)buf & ~0x03);
++		buf = (u32 *)((unsigned long)buf & ~0x03);
+ 	}
+ 
+ 	brcmnand_wp(mtd, 0);
 -- 
 1.9.1
