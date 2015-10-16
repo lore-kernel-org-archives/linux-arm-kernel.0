@@ -1,114 +1,87 @@
-From: john.ogness@linutronix.de (John Ogness)
-Date: Fri, 16 Oct 2015 12:26:17 +0200
-Subject: [PATCH v2] ARM: edma: fix residue race for cyclic
-In-Reply-To: <561F862A.7040106@ti.com> (Peter Ujfalusi's message of "Thu, 15
- Oct 2015 13:55:38 +0300")
-References: <87io68s931.fsf@linutronix.de> <561F862A.7040106@ti.com>
-Message-ID: <87eggvt8hi.fsf_-_@linutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 Oct 2015 11:37:29 +0100
+Subject: [PATCH] ARM: SWP emulation: Restore original *data when failed
+In-Reply-To: <5620ACB8.20908@arm.com>
+References: <1444791077-26020-1-git-send-email-shengjiu.wang@freescale.com>
+ <20151015082417.GX32532@n2100.arm.linux.org.uk>
+ <20151015083629.GA32630@shlinux2>
+ <20151015085700.GY32532@n2100.arm.linux.org.uk>
+ <561F6F3B.6030607@arm.com> <20151015130247.GB29301@arm.com>
+ <561FA948.5080505@arm.com> <5620ACB8.20908@arm.com>
+Message-ID: <20151016103729.GA6613@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When retrieving the residue value for cyclic transfers, the
-SRC/DST fields of the active PaRAM are read. However, the AM335x
-Technical Reference Manual states:
+On Fri, Oct 16, 2015 at 08:52:24AM +0100, Vladimir Murzin wrote:
+> > On 15/10/15 14:02, Will Deacon wrote:
+> >> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+> >> index bcee7abac68e..6039d1eb5912 100644
+> >> --- a/arch/arm64/kernel/armv8_deprecated.c
+> >> +++ b/arch/arm64/kernel/armv8_deprecated.c
+> >> @@ -284,12 +284,12 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
+> >>  	__asm__ __volatile__(					\
+> >>  	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
+> >>  		    CONFIG_ARM64_PAN)				\
+> >> -	"	mov		%w2, %w1\n"			\
+> >> -	"0:	ldxr"B"		%w1, [%3]\n"			\
+> >> -	"1:	stxr"B"		%w0, %w2, [%3]\n"		\
+> >> +	"0:	ldxr"B"		%w2, [%3]\n"			\
+> >> +	"1:	stxr"B"		%w0, %w1, [%3]\n"		\
+> >>  	"	cbz		%w0, 2f\n"			\
+> >>  	"	mov		%w0, %w4\n"			\
+> >>  	"2:\n"							\
+> >> +	"	mov		%w1, %w2\n"			\
+> >>  	"	.pushsection	 .fixup,\"ax\"\n"		\
+> >>  	"	.align		2\n"				\
+> >>  	"3:	mov		%w0, %w5\n"			\
+> 
+> On the second thought looks like we still update *data in case stxr
+> fails (or I need more coffee).
 
-  11.3.3.6 Parameter Set Updates
+I'm on the second cup and I see the same problem. Even if stxr fails, we
+fall back through "mov %w1, %w2", so *data is always updated with the
+loaded value. Maybe something like below on top of Will's patch:
 
-  After the TR is read from the PaRAM (and is in the process
-  of being submitted to the EDMA3TC), the following fields are
-  updated as needed: ... SRC DST
-
-This means SRC/DST is incremented even though the DMA transfer
-may not have started yet or is in progress. Thus if the reader
-of the residue accesses the DMA buffer too quickly, the CPU is
-misinformed about the data that has been successfully processed.
-
-The CCSTAT.ACTV register is a boolean that is set if any TR is
-being processed by either the EMDA3CC or EDMA3TC. By polling
-this register it is possible to ensure that the residue value
-returned is valid for immediate processing. However, since the
-DMA engine may be active, polling may never hit a moment where
-no TR is being processed. To handle this, the SRC/DST is also
-polled to see if it changes. And as a last resort, a max loop
-count for the busy waiting exists to avoid an infinite loop.
-
-Signed-off-by: John Ogness <john.ogness@linutronix.de>
----
- v1-v2 changes
- . rebased for next-20151016
- . added multiple exit conditions for busy wait loop
-
- drivers/dma/edma.c |   40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 7eefbf1..8d3b3ac 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -24,6 +24,8 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/spinlock.h>
-+#include <linux/ratelimit.h>
-+#include <linux/printk.h>
- #include <linux/of.h>
- #include <linux/of_dma.h>
- #include <linux/of_irq.h>
-@@ -1785,11 +1787,24 @@ static void edma_issue_pending(struct dma_chan *chan)
- 	spin_unlock_irqrestore(&echan->vchan.lock, flags);
- }
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index 6039d1eb5912..3fab37b3bc95 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -286,10 +286,10 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
+ 		    CONFIG_ARM64_PAN)				\
+ 	"0:	ldxr"B"		%w2, [%3]\n"			\
+ 	"1:	stxr"B"		%w0, %w1, [%3]\n"		\
+-	"	cbz		%w0, 2f\n"			\
+-	"	mov		%w0, %w4\n"			\
++	"	cmp		%w0, #0\n"			\
++	"	csel		%w0, %w4, wzr, ne\n"		\
++	"	csel		%w1, %w2, %w1, eq\n"		\
+ 	"2:\n"							\
+-	"	mov		%w1, %w2\n"			\
+ 	"	.pushsection	 .fixup,\"ax\"\n"		\
+ 	"	.align		2\n"				\
+ 	"3:	mov		%w0, %w5\n"			\
+@@ -303,7 +303,7 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
+ 	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
+ 		CONFIG_ARM64_PAN)				\
+ 	: "=&r" (res), "+r" (data), "=&r" (temp)		\
+-	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
++	: "r" (addr), "r" (-EAGAIN), "i" (-EFAULT)		\
+ 	: "memory")
  
-+#define EDMA_CCSTAT_ACTV (1 << 4)
-+
-+/*
-+ * This limit exists to avoid a possible infinite loop when waiting
-+ * for confirmation that a particular transfer is completed. However,
-+ * large bursts to/from slow devices might actually require many
-+ * loops (in which case busy waiting is bad anyway). On an AM335x
-+ * transfering 48 bytes from the UART RX-FIFO, as many as 55 loops
-+ * have been seen.
-+ */
-+#define EDMA_MAX_TR_WAIT_LOOPS 10000
-+
- static u32 edma_residue(struct edma_desc *edesc)
+ #define __user_swp_asm(data, addr, res, temp) \
+@@ -342,7 +342,7 @@ static void set_segfault(struct pt_regs *regs, unsigned long addr)
+ static int emulate_swpX(unsigned int address, unsigned int *data,
+ 			unsigned int type)
  {
- 	bool dst = edesc->direction == DMA_DEV_TO_MEM;
- 	struct edma_pset *pset = edesc->pset;
- 	dma_addr_t done, pos;
-+	int loop_count = 0;
- 	int i;
+-	unsigned int res = 0;
++	unsigned int res;
  
- 	/*
-@@ -1799,6 +1814,31 @@ static u32 edma_residue(struct edma_desc *edesc)
- 	pos = edma_get_position(edesc->echan->ecc, edesc->echan->slot[0], dst);
- 
- 	/*
-+	 * "pos" may represent a transfer request that is still being
-+	 * processed by the EDMACC or EDMATC. We will busy wait until
-+	 * one of the situations occurs:
-+	 *   1. no transfer requests are active
-+	 *   2. a different transfer request is being processed
-+	 *   3. we hit the loop limit
-+	 */
-+	while (edma_read(edesc->echan->ecc, EDMA_CCSTAT) & EDMA_CCSTAT_ACTV) {
-+		/* check if a different transfer request is active */
-+		if (edma_get_position(edesc->echan->ecc,
-+				      edesc->echan->slot[0], dst) != pos) {
-+			break;
-+		}
-+
-+		loop_count++;
-+		if (loop_count == EDMA_MAX_TR_WAIT_LOOPS) {
-+			pr_debug_ratelimited("%s: possibly returning "
-+					     "invalid residue\n", __func__);
-+			break;
-+		}
-+
-+		cpu_relax();
-+	}
-+
-+	/*
- 	 * Cyclic is simple. Just subtract pset[0].addr from pos.
- 	 *
- 	 * We never update edesc->residue in the cyclic case, so we
+ 	if ((type != TYPE_SWPB) && (address & 0x3)) {
+ 		/* SWP to unaligned address not permitted */
+
+
+Since Will is away for a week, I'll wait until he's back to push this
+patch.
+
 -- 
-1.7.10.4
+Catalin
