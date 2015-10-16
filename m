@@ -1,122 +1,82 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Fri, 16 Oct 2015 12:05:04 +0000
-Subject: Need help with device tree formation
-References: <loom.20151016T121454-619@post.gmane.org>
- <3760709.3HqJjr2Sog@wuerfel>
-Message-ID: <8520D5D51A55D047800579B094147198016917C6@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 16 Oct 2015 14:11:50 +0200
+Subject: [PATCH] ARM: at91/dt: sama5d4: add the macb1 node
+Message-ID: <1444997510-8841-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The second macb is present on all sama5d4 soc. Let's add a node
+reflecting it in the device tree.
 
-> >
-> > On Friday 16 October 2015 11:27:15 bharat kumar gogada wrote:
-> > > nwl_pcie: pcie at fd0e0000 {
-> > >                         #address-cells = >;
-> > >                         #size-cells = <2>;
-> > >                         compatible = "xlnx,nwl-pcie-2.11";
-> > >                         #interrupt-cells = <1>;
-> > >                         interrupt-controller;
-> > >                         msi-controller;
-> > >                         device_type = "pci";
-> > >                         interrupt-parent = <&gic>;
-> > >                         interrupts = < 0 118 4
-> > >                                        0 116 4
-> > >                                        0 115 4          // MSI_1 [63...32]
-> > >                                        0 114 4 >;       // MSI_0 [31...0]
-> > >                         interrupt-names = "misc", "intx", "msi_1", "msi_0";
-> > >                         interrupt-map-mask = <0x0 0x0 0x0 0x7>;
-> > >                         interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 116 0x4
-> > >                                          0x0 0x0 0x0 0x2 &gic 0x0 116 0x4
-> > >                                          0x0 0x0 0x0 0x3 &gic 0x0 116 0x4
-> > >                                          0x0 0x0 0x0 0x4 &gic 0x0
-> > > 116
-> > > 0x4>;
-> >
-> > The interrupt-map looks wrong, as you point to the gic rather than
-> > &nwl_pcie here. Also, you seem to have only one interrupt for all
-> > INTx, so you use an all-zeroes interrupt-map-mask and only one entry
-> here.
-Yes I was confused with the interrupt mapping property documentation, I will correct the mapping we have all four INTx, I will change it accordingly. Thanks for pointing out.
-> >
-> > >                         msi-parent = <&nwl_pcie>;
-> > >                         reg = <0x0 0xfd0e0000 0x1000
-> > >                                0x0 0xfd480000 0x1000
-> > >                                0x0 0xE0000000 0x1000000>;
-> > >                         reg-names = "breg", "pcireg", "cfg";
-> > >                         ranges = <0x02000000 0x00000000 0xE1000000
-> > > 0x00000000 0xE1000000 0 0x0F000000>;
-> > >
-> > > };
-> > >
-> > > I have the above device tree node in root port driver i have two
-> > > separate domains one for legacy and other is MSI hierarchy domain;
-> > > in both domains I'm using same node to create domain, what i observed
-> is:
-> > >
-> > > MSI interrupts are working only without interrupt-controller
-> > > property, legacy is working with interrupt-controller property this
-> > > is due to logic in  of_irq_parse_and_map_pci.
-> >
-> > Do you know what causes the MSI to not work when there is an
-> > interrupt- controller property?
-> >
-> > 	Arnd
-> 
-> I'm not exactly sure but this is what happening when I do interface up:
-> 
-> [  267.167825] tg3 0000:01:00.0 eth1: No interrupt was generated using MSI.
-> Switching to INTx mode. Please report this failure to the PCI maintainer and
-> include system chipset information
-> 
-> [  267.204327] Unable to handle kernel NULL pointer dereference at virtual
-> address 0000000c [  267.213116] pgd = ffffffc0366d5000 [  267.217173]
-> [0000000c] *pgd=000000003646f003, *pud=000000003646f003,
-> *pmd=0000000000000000 [  267.227273] Internal error: Oops: 96000006 [#1]
-> SMP [  267.232849] Modules linked in:
-> [  267.237266] CPU: 1 PID: 1419 Comm: ifconfig Not tainted 4.2.0-rc2-00001-
-> g3dec4f4-dirty #153 [  267.246283] Hardware name: ZynqMP EP108 (DT) [
-> 267.251564] task: ffffffc039005080 ti: ffffffc036668000 task.ti: ffffffc036668000
-> [  267.260846] PC is at pci_msi_domain_write_msg+0x10/0x34
-> [  267.267292] LR is at msi_domain_activate+0x34/0x70
-> 
-> [  267.850610] [<ffffffc00047e16c>] pci_msi_domain_write_msg+0x10/0x34
-> [  267.857996] [<ffffffc0000f78c4>] msi_domain_activate+0x30/0x70 [
-> 267.864914] [<ffffffc0000f653c>] irq_domain_activate_irq+0x40/0x50 [
-> 267.872089] [<ffffffc0000f3cb8>] irq_startup+0x34/0x90 [  267.878169]
-> [<ffffffc0000f2328>] __setup_irq+0x478/0x4ec [  267.884395]
-> [<ffffffc0000f24fc>] request_threaded_irq+0xc8/0x17c [  267.891479]
-> [<ffffffc0005668a0>] tg3_request_irq+0x94/0x178 [  267.898132]
-> [<ffffffc00057d518>] tg3_start+0xdf4/0xe4c [  267.904257]
-> [<ffffffc00057d664>] tg3_open+0xf4/0x21c [  267.910369]
-> [<ffffffc000654d88>] __dev_open+0xb0/0x120 [  267.916514]
-> [<ffffffc000655048>] __dev_change_flags+0x88/0x150 [  267.923333]
-> [<ffffffc00065512c>] dev_change_flags+0x1c/0x5c
-> 
-> [  267.930032] [<ffffffc0006b089c>] devinet_ioctl+0x690/0x74c [  267.936566]
-> [<ffffffc0006b1f18>] inet_ioctl+0x88/0xb0 [  267.942738] [<ffffffc000638bbc>]
-> sock_ioctl+0x20c/0x2fc [  267.949118] [<ffffffc0001b8fbc>]
-> do_vfs_ioctl+0x318/0x5bc [  267.955538] [<ffffffc0001b92e0>]
-> SyS_ioctl+0x80/0x98
-> 
-> 
-> That means it is receiving msi_desc pointer null in
-> pci_msi_domain_write_msg
-> 
-> This is the domain initialization code  (showing whats required)
-> 
-> pcie->legacy_irq_domain = irq_domain_add_linear(node, 4,
->                                                  &legacy_domain_ops,
->                                                  pcie);
-> 
-> msi->dev_domain = irq_domain_add_linear (NULL, INT_PCI_MSI_NR,
->                                                 &dev_msi_domain_ops, pcie);
-> 
-> msi->msi_chip.domain = pci_msi_create_irq_domain (node,
-> &nwl_msi_domain_info,
->                                                                 msi->dev_domain);
-> 
-> Im using same devicetree node for for both domains registration.
-> 
-> This is what im having I did not debug more.
-> 
-> bharat
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/boot/dts/at91-vinco.dts |  5 +----
+ arch/arm/boot/dts/sama5d4.dtsi   | 30 ++++++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/at91-vinco.dts b/arch/arm/boot/dts/at91-vinco.dts
+index b8036f5..2215e2e 100644
+--- a/arch/arm/boot/dts/at91-vinco.dts
++++ b/arch/arm/boot/dts/at91-vinco.dts
+@@ -82,10 +82,7 @@
+ 		apb {
+ 
+ 			adc0: adc at fc034000 {
+-				/* The vref depends on JP22 of EK. If connect 1-2 then use 3.3V. connect 2-3 use 3.0V */
+-				atmel,adc-vref = <3300>;
+-				/*atmel,adc-ts-wires = <4>;*/	/* Set up ADC touch screen */
+-				status = "okay";		/* Enable ADC IIO support */
++				status = "okay"; /* Enable ADC IIO support */
+ 			};
+ 
+ 			mmc0: mmc at f8000000 {
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index b5ee947..6f27915 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -1188,6 +1188,19 @@
+ 				clock-names = "t0_clk", "slow_clk";
+ 			};
+ 
++			macb1: ethernet at fc028000 {
++				compatible = "atmel,sama5d4-gem";
++				reg = <0xfc028000 0x100>;
++				interrupts = <55 IRQ_TYPE_LEVEL_HIGH 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_macb1_rmii>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				clocks = <&macb1_clk>, <&macb1_clk>;
++				clock-names = "hclk", "pclk";
++				status = "disabled";
++			};
++
+ 			adc0: adc at fc034000 {
+ 				compatible = "atmel,at91sam9x5-adc";
+ 				reg = <0xfc034000 0x100>;
+@@ -1635,6 +1648,23 @@
+ 					};
+ 				};
+ 
++				macb1 {
++					pinctrl_macb1_rmii: macb1_rmii-0 {
++						atmel,pins =
++							<AT91_PIOA 14 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_TX0 */
++							 AT91_PIOA 15 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_TX1 */
++							 AT91_PIOA 12 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_RX0 */
++							 AT91_PIOA 13 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_RX1 */
++							 AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_RXDV */
++							 AT91_PIOA 11 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_RXER */
++							 AT91_PIOA  4 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_TXEN */
++							 AT91_PIOA  2 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_TXCK */
++							 AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_MDC */
++							 AT91_PIOA 23 AT91_PERIPH_B AT91_PINCTRL_NONE	/* G1_MDIO */
++							>;
++					};
++				};
++
+ 				mmc0 {
+ 					pinctrl_mmc0_clk_cmd_dat0: mmc0_clk_cmd_dat0 {
+ 						atmel,pins =
+-- 
+2.1.4
