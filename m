@@ -1,70 +1,18 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 16 Oct 2015 10:11:29 +0200
-Subject: [PATCHv3 08/11] arm64: Check for selected granule support
-In-Reply-To: <20151015151113.GK8825@leverpostej>
-References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
- <1444821634-1689-9-git-send-email-suzuki.poulose@arm.com>
- <561EC58B.9080408@arm.com> <20151015104515.GE8825@leverpostej>
- <20151015112532.GA16125@e106634-lin.cambridge.arm.com>
- <561FBC99.9090501@arm.com> <20151015151113.GK8825@leverpostej>
-Message-ID: <CAKv+Gu-4EpbR5Wr=QgaM8gCgrrUBc3eGem2_SeAz9BVAKwqm=Q@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 16 Oct 2015 10:17:24 +0200
+Subject: [PATCH] soc: rockchip: power-domain: don't try to print the clock
+ name in error case
+In-Reply-To: <1764593.eLkUiZigaK@diego>
+References: <1764593.eLkUiZigaK@diego>
+Message-ID: <49829517.ZZBFVztZIh@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 October 2015 at 17:11, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Oct 15, 2015 at 09:47:53AM -0500, Jeremy Linton wrote:
->> On 10/15/2015 06:25 AM, Suzuki K. Poulose wrote:
->> >+    /*
->> >+     * Check to see if the CPU supports the requested pagesize
->> >+     */
->> >+    asm volatile("mrs %0, ID_AA64MMFR0_EL1" : "=r" (aa64mmfr0_el1));
->> >+    aa64mmfr0_el1 >>= ID_AA64MMFR0_TGRAN_SHIFT;
->> >+    if ((aa64mmfr0_el1 & 0xf) != ID_AA64MMFR0_TGRAN_SUPPORTED) {
->> >+            pr_efi_err(sys_table_arg, PAGE_SIZE_STR" granule not supported by the CPU\n");
->> >+            return EFI_UNSUPPORTED;
->> >+    }
->>
->>
->> This is definitely an improvement over my original hack job.
->>
->> I would like to add, that I actually think this should be in a new
->> function "check_kernel_compatibility" (or whatever) that is called
->> before handle_kernel_image.
->
-> To bikeshed, perhaps efi_arch_check_system?
->
+Am Donnerstag, 15. Oktober 2015, 15:22:30 schrieb Heiko St?bner:
+> When we never got the the clock-reference, i.e. when IS_ERR(clk) is true,
+> don't try to print the clock name via %pC as this of course produces a
+> null-pointer-dereference in __clk_get_name().
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Yes, that makes sense. But before we add such a function, we should
-move all the stub C code to libstub where it will be subject to the
-new check against R_AARCH64_ABSxx relocations (which we cannot support
-in the stub).
-
->> That is because I don't really think it belongs in
->> handle_kernel_image which is focused on relocation. Plus, if you add
->> another function, you can avoid the "Failed to relocate kernel"
->> error that comes out following the granule not supported message.
->> Further, checks like this in the future will have a place to live.
->
-> I agree.
->
-> There are some other diagnostic utilities I'd like to add to the stub
-> (e.g. dumping the memory map and ID registers) that would help with
-> diagnosing boot issues. I started on those at Connect, but realised I
-> needed to first implement half of printf for those to be useful.
->
-
-Yes, printf() is sorely lacking in that context. But note that the
-memory map can already be retrieved from the UEFI shell via the
-'memmap' command.
-
->> Of course you will then need a matching stubbed out function for the
->> normal arm kernel as well.
->
-> I'm sure there are similar things we'll want to check for 32-bit (e.g.
-> LPAE support), but a stub should be fine for now.
->
-
-ARM support is not merged yet, but it is good to keep it in mind.
-
--- 
-Ard.
+applied to my drivers branch with Caesar's Reviewed-tag.
