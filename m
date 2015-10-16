@@ -1,44 +1,38 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 16 Oct 2015 17:35:00 +0100
-Subject: [PATCH v2 2/3] xen,
- cpu_hotplug: call device_offline instead of cpu_down
+Date: Fri, 16 Oct 2015 17:35:01 +0100
+Subject: [PATCH v2 3/3] xen/arm: don't try to re-register vcpu_info on
+ cpu_hotplug.
 In-Reply-To: <alpine.DEB.2.02.1510161731510.27957@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1510161731510.27957@kaball.uk.xensource.com>
-Message-ID: <1445013301-12624-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1445013301-12624-3-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When offlining a cpu, instead of cpu_down, call device_offline, which
-also takes care of updating the cpu.dev.offline field. This keeps the
-sysfs file /sys/devices/system/cpu/cpuN/online, up to date.  Also move
-the call to disable_hotplug_cpu, because it makes more sense to have it
-there.
-
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- drivers/xen/cpu_hotplug.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/xen/enlighten.c |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/xen/cpu_hotplug.c b/drivers/xen/cpu_hotplug.c
-index 43de1f5..78804b5 100644
---- a/drivers/xen/cpu_hotplug.c
-+++ b/drivers/xen/cpu_hotplug.c
-@@ -18,6 +18,8 @@ static void enable_hotplug_cpu(int cpu)
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 6c09cc4..b193811 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -93,6 +93,16 @@ static void xen_percpu_init(void)
+ 	int err;
+ 	int cpu = get_cpu();
  
- static void disable_hotplug_cpu(int cpu)
- {
-+	if (cpu_online(cpu))
-+		device_offline(get_cpu_device(cpu));
- 	if (cpu_present(cpu))
- 		xen_arch_unregister_cpu(cpu);
++	/* 
++	 * VCPUOP_register_vcpu_info cannot be called twice for the same
++	 * vcpu, so if vcpu_info is already registered, just get out. This
++	 * can happen with cpu-hotplug.
++	 */
++	if (per_cpu(xen_vcpu, cpu) != NULL) {
++		put_cpu();
++		return;
++	}
++
+ 	pr_info("Xen: initializing cpu%d\n", cpu);
+ 	vcpup = per_cpu_ptr(xen_vcpu_info, cpu);
  
-@@ -55,7 +57,6 @@ static void vcpu_hotplug(unsigned int cpu)
- 		enable_hotplug_cpu(cpu);
- 		break;
- 	case 0:
--		(void)cpu_down(cpu);
- 		disable_hotplug_cpu(cpu);
- 		break;
- 	default:
 -- 
 1.7.9.5
