@@ -1,68 +1,71 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 15 Oct 2015 18:19:47 -0700
-Subject: [PATCH v4 1/3] doc: dt: add documentation for Mediatek spi-nor
- controller
-In-Reply-To: <1444729160-26433-2-git-send-email-bayi.cheng@mediatek.com>
-References: <1444729160-26433-1-git-send-email-bayi.cheng@mediatek.com>
- <1444729160-26433-2-git-send-email-bayi.cheng@mediatek.com>
-Message-ID: <20151016011947.GA28158@localhost>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Fri, 16 Oct 2015 09:37:34 +0800
+Subject: [RESEND PATCH] pwm-backlight: fix the panel power sequence
+Message-ID: <1444959454-1516-1-git-send-email-yh.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bayi,
+In order to match the panel power sequence, disable the enable_gpio
+in the probe function. Also, reorder the code in the power_on and
+power_off function to match the timing.
 
-On Tue, Oct 13, 2015 at 05:39:18PM +0800, Bayi Cheng wrote:
-> Add device tree binding documentation for serial flash with
-> Mediatek serial flash controller
-> 
-> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
-> ---
->  .../devicetree/bindings/mtd/mtk-quadspi.txt        | 30 ++++++++++++++++++++++
->  1 file changed, 30 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> new file mode 100644
-> index 0000000..8fff0ed
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> @@ -0,0 +1,30 @@
-> +* MTD SPI nor driver for MTK MT81xx (and similar) serial flash controller
-> +
-> +Required properties:
-> +- compatible: 	  should be "mediatek,mt8173-nor";
-> +- reg: 		  physical base address and length of the controller's register
-> +- clocks: 	  the phandle of the clock needed by the nor controller
-> +- clock-names: 	  the name of the clocks
-> +		  the clocks needed "spi" and "sf". "spi" is used for spi bus,
-> +		  and "sf" is used for controller, these are the clocks witch
-> +		  hardware needs to enabling nor flash and nor flash controller.
-> +		  See Documentation/devicetree/bindings/clock/clock-bindings.txt for details.
-> +- #address-cells: should be <1>
-> +- #size-cells:	  should be <0>
-> +
-> +Example:
-> +
-> +nor_flash: spi at 1100d000 {
-> +	compatible = "mediatek,mt8173-nor";
-> +	reg = <0 0x1100d000 0 0xe0>;
-> +	clocks = <&pericfg CLK_PERI_SPI>,
-> +		 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
-> +	clock-names = "spi", "sf";
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +
-> +	flash at 0 {
+Signed-off-by: YH Huang <yh.huang@mediatek.com>
+---
+ drivers/video/backlight/pwm_bl.c |   15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-I see you've added the 'flash' node as I requested, but you didn't
-document it above, and your driver doesn't use it.
-
-Brian
-
-> +		....
-> +	};
-> +};
-> +
-> -- 
-> 1.8.1.1.dirty
-> 
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index eff379b..99eca1e 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -54,10 +54,11 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
+ 	if (err < 0)
+ 		dev_err(pb->dev, "failed to enable power supply\n");
+ 
++	pwm_enable(pb->pwm);
++
+ 	if (pb->enable_gpio)
+ 		gpiod_set_value(pb->enable_gpio, 1);
+ 
+-	pwm_enable(pb->pwm);
+ 	pb->enabled = true;
+ }
+ 
+@@ -66,12 +67,12 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
+ 	if (!pb->enabled)
+ 		return;
+ 
+-	pwm_config(pb->pwm, 0, pb->period);
+-	pwm_disable(pb->pwm);
+-
+ 	if (pb->enable_gpio)
+ 		gpiod_set_value(pb->enable_gpio, 0);
+ 
++	pwm_config(pb->pwm, 0, pb->period);
++	pwm_disable(pb->pwm);
++
+ 	regulator_disable(pb->power_supply);
+ 	pb->enabled = false;
+ }
+@@ -241,8 +242,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	pb->dev = &pdev->dev;
+ 	pb->enabled = false;
+ 
+-	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
+-						  GPIOD_OUT_HIGH);
++	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable");
+ 	if (IS_ERR(pb->enable_gpio)) {
+ 		ret = PTR_ERR(pb->enable_gpio);
+ 		goto err_alloc;
+@@ -264,6 +264,9 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 		pb->enable_gpio = gpio_to_desc(data->enable_gpio);
+ 	}
+ 
++	if (pb->enable_gpio)
++		gpiod_direction_output(pb->enable_gpio, 0);
++
+ 	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
+ 	if (IS_ERR(pb->power_supply)) {
+ 		ret = PTR_ERR(pb->power_supply);
+-- 
+1.7.9.5
