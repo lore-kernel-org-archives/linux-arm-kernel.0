@@ -1,81 +1,92 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 16 Oct 2015 10:25:41 +0200
-Subject: [PATCH v3 0/7] mmc: dw_mmc-rockchip: allow tuning using the
- clk-phase api
-In-Reply-To: <1444654110-32293-1-git-send-email-heiko@sntech.de>
-References: <1444654110-32293-1-git-send-email-heiko@sntech.de>
-Message-ID: <CAPDyKFo5jvsv+wpo4cSgetb9CfjXF6Y7DGDGRBXDSZkTnXzj-A@mail.gmail.com>
+Date: Fri, 16 Oct 2015 10:25:52 +0200
+Subject: [PATCH v3] mmc: core: Fix init_card in 52Mhz
+In-Reply-To: <1444641743-15614-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1444641743-15614-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CAPDyKFrATv2=ywT2-tCLCTgTuFeOr1odWQgsCk8-XpKjY0GnjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 October 2015 at 14:48, Heiko Stuebner <heiko@sntech.de> wrote:
-> This series resurrects and adapts some individual patches whose sum
-> enable the dw_mmc hosts on Rockchip socs to tune clock phases using
-> the generic phase api (rk3288 and following have this capability).
+On 12 October 2015 at 11:22, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> Suppose that we got a data crc error, and it triggers the mmc_reset.
+> mmc_reset will call mmc_send_status to see if HW reset was supported.
+> before issue CMD13, it will do retune, and if EMMC was in HS400 mode,
+> it will reduce frequency to 52Mhz firstly, then results in card init
+> was doing at 52Mhz.
+> The mmc_send_status was originally only done for mmc_test, should drop
+> it. And, rename the "eMMC hardware reset" to "Reset test", as we would
+> also be able to use the test for SD-cards.
 >
-> The changes to the original mmc-phase clocks are expanded by further
-> findings resulting from devices being used in the field.
->
-> Similarly the regulator handling changes do use the brand new
-> regulator_set_voltage_triplet call to allow specifying lower and upper
-> limits. One possible point of discussion are the two voltage ranges
-> that are tried for the 3.3V signal level. Trying to stay near vmmc
-> at first and only then opening the range to the full 2.7-3.6V.
->
-> This mainly circumvents a shortcoming of the regulator voltage
-> setting, in that even with regulator_set_voltage_triplet the regulator
-> framework will take the lowest possible voltage when the possible
-> voltages are below the target voltage. While it may be ideal to solve
-> this on the regulator side, I'm not seeing this appearing in the short
-> term, mainly because all regulator parts (including regulator drivers)
-> are keyed to selecting the lowest voltage from the range, while on the
-> mmc side we know which voltages may work and trying this in two steps
-> does not create to much overhead, as unsupported voltages are already
-> filtered out by the regulator_is_voltage_selected calls.
->
-> changes since v2:
-> - use host->ios.vdd to read vmmc from instead of requiring the vmmc
->   regulator. Suggested by Ulf this makes the voltage setting still work
->   even if only the vqmmc but not the vmmc regulator is supplied.
-> - add Acks from Jaehoon Chung to the dw_mmc parts
-> - drop first two clock patches that already got applied to the mmc tree
->
-> changes since v1:
-> - address comment from Jaehoon Chung and keep this local to Rockchip
->   for the time being
-> - address comments from Ulf and Doug in making it more explicit
->   that the two-step 3.3V voltage setting essentially works around
->   a limitation of regulator_set_voltage_triplet
->
-> Alexandru M Stan (3):
->   mmc: dw_mmc-rockchip: dt-binding: Add tuning related things
->   mmc: dw_mmc-rockchip: MMC tuning with the clock phase framework
->   ARM: dts: rockchip: Add drive/sample clocks for rk3288 dw_mmc devices
->
-> Douglas Anderson (2):
->   mmc: core: Add mmc_regulator_set_vqmmc()
->   mmc: dw_mmc: Use mmc_regulator_set_vqmmc in
->     start_signal_voltage_switch
->
-> Heiko Stuebner (2):
->   mmc: core: move ocr-bit to voltage translation into separate function
->   ARM: dts: rockchip: add tuning related settings to veyron devices
->
->  .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |  13 ++
->  arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi         |   7 +-
->  arch/arm/boot/dts/rk3288-veyron.dtsi               |   6 +
->  arch/arm/boot/dts/rk3288.dtsi                      |  20 ++-
->  drivers/mmc/core/core.c                            | 129 ++++++++++++++--
->  drivers/mmc/host/dw_mmc-rockchip.c                 | 162 +++++++++++++++++++++
->  drivers/mmc/host/dw_mmc.c                          |  17 +--
->  include/linux/mmc/host.h                           |   7 +
->  8 files changed, 325 insertions(+), 36 deletions(-)
->
-> --
-> 2.6.1
->
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> Suggested-by: Adrian Hunter <adrian.hunter@intel.com>
 
-Thanks, applied for next (with v3.1 of patch1)!
+Thanks, applied for fixes!
 
 Kind regards
 Uffe
+
+> ---
+>  drivers/mmc/card/mmc_test.c | 9 +++------
+>  drivers/mmc/core/mmc.c      | 7 -------
+>  2 files changed, 3 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
+> index b78cf5d..7fc9174 100644
+> --- a/drivers/mmc/card/mmc_test.c
+> +++ b/drivers/mmc/card/mmc_test.c
+> @@ -2263,15 +2263,12 @@ static int mmc_test_profile_sglen_r_nonblock_perf(struct mmc_test_card *test)
+>  /*
+>   * eMMC hardware reset.
+>   */
+> -static int mmc_test_hw_reset(struct mmc_test_card *test)
+> +static int mmc_test_reset(struct mmc_test_card *test)
+>  {
+>         struct mmc_card *card = test->card;
+>         struct mmc_host *host = card->host;
+>         int err;
+>
+> -       if (!mmc_card_mmc(card) || !mmc_can_reset(card))
+> -               return RESULT_UNSUP_CARD;
+> -
+>         err = mmc_hw_reset(host);
+>         if (!err)
+>                 return RESULT_OK;
+> @@ -2605,8 +2602,8 @@ static const struct mmc_test_case mmc_test_cases[] = {
+>         },
+>
+>         {
+> -               .name = "eMMC hardware reset",
+> -               .run = mmc_test_hw_reset,
+> +               .name = "Reset test",
+> +               .run = mmc_test_reset,
+>         },
+>  };
+>
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index e726903..f6cd995 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -1924,7 +1924,6 @@ EXPORT_SYMBOL(mmc_can_reset);
+>  static int mmc_reset(struct mmc_host *host)
+>  {
+>         struct mmc_card *card = host->card;
+> -       u32 status;
+>
+>         if (!(host->caps & MMC_CAP_HW_RESET) || !host->ops->hw_reset)
+>                 return -EOPNOTSUPP;
+> @@ -1937,12 +1936,6 @@ static int mmc_reset(struct mmc_host *host)
+>
+>         host->ops->hw_reset(host);
+>
+> -       /* If the reset has happened, then a status command will fail */
+> -       if (!mmc_send_status(card, &status)) {
+> -               mmc_host_clk_release(host);
+> -               return -ENOSYS;
+> -       }
+> -
+>         /* Set initial state and call mmc_set_ios */
+>         mmc_set_initial_state(host);
+>         mmc_host_clk_release(host);
+> --
+> 1.8.1.1.dirty
+>
