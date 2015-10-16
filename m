@@ -1,42 +1,160 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 16 Oct 2015 23:42:50 +0200
-Subject: [PATCH] [media] horus3a: fix horus3a_attach inline wrapper
-In-Reply-To: <7188906.Hi9qi0FZQC@wuerfel>
-References: <7188906.Hi9qi0FZQC@wuerfel>
-Message-ID: <CABxcv=kFNhdrGivGtk4O0gXKB7P_Uw9NYofpzNkaepVBFGjG6w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Oct 2015 23:47:37 +0200
+Subject: [PATCH] xfs: fix build without xfsstats
+Message-ID: <5578984.gxbqPUmtuT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+A recent rework of the xfsstats interface introduced a compile error
+for the procfs-disabled case:
 
-On Fri, Oct 16, 2015 at 10:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The 'static inline' version of horus3a_attach() is incorrectly
-> copied from another file, which results in a build error when
-> CONFIG_DVB_HORUS3A is disabled:
->
-> In file included from /git/arm-soc/drivers/media/pci/netup_unidvb/netup_unidvb_core.c:34:0:
-> media/dvb-frontends/horus3a.h:51:13: warning: 'struct cxd2820r_config' declared inside parameter list
-> media/dvb-frontends/horus3a.h:51:13: warning: its scope is only this definition or declaration, which is probably not what you want
-> media/pci/netup_unidvb/netup_unidvb_core.c: In function 'netup_unidvb_dvb_init':
-> media/pci/netup_unidvb/netup_unidvb_core.c:417:279: warning: passing argument 1 of '__a' from incompatible pointer type [-Wincompatible-pointer-types]
-> media/pci/netup_unidvb/netup_unidvb_core.c:417:279: note: expected 'const struct cxd2820r_config *' but argument is of type 'struct dvb_frontend *'
-> media/pci/netup_unidvb/netup_unidvb_core.c:417:298: warning: passing argument 2 of '__a' from incompatible pointer type [-Wincompatible-pointer-types]
-> media/pci/netup_unidvb/netup_unidvb_core.c:417:298: note: expected 'struct i2c_adapter *' but argument is of type 'struct horus3a_config *'
-> media/pci/netup_unidvb/netup_unidvb_core.c:417:275: error: too many arguments to function '__a'
->
-> This changes the code to have the correct prototype.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: a5d32b358254 ("[media] horus3a: Sony Horus3A DVB-S/S2 tuner driver")
-> ---
+fs/built-in.o: In function `xfs_free_ag_extent':
+fs/xfs/libxfs/xfs_alloc.c:1725: undefined reference to `xfsstats'
+fs/built-in.o: In function `xfs_alloc_ag_vextent':
+fs/xfs/libxfs/xfs_alloc.c:645: undefined reference to `xfsstats'
+fs/built-in.o: In function `xfs_attr_set':
+fs/xfs/libxfs/xfs_attr.c:353: undefined reference to `xfsstats'
+fs/built-in.o: In function `xfs_attr_remove':
+fs/xfs/libxfs/xfs_attr.c:483: undefined reference to `xfsstats'
+fs/built-in.o: In function `xfs_attr_get':
+fs/xfs/libxfs/xfs_attr.c:131: undefined reference to `xfsstats'
+fs/built-in.o:fs/xfs/libxfs/xfs_bmap.c:1461: more undefined references to `xfsstats' follow
 
-I posted the same patch a couple of weeks ago and was already picked
-by Mauro on his fixes branch [0].
+This adds conditional compilation to each reference of the xfsstats
+global variable to get it to link again.
 
-AFAIU that branch contains 4.3-rc material so I guess it will land
-into mainline soon.
+An alternative approach would be to always build the statistics
+implementation even when CONFIG_PROC_FS is disabled.
 
-[0]: http://git.linuxtv.org/cgit.cgi/media_tree.git/commit/?h=fixes&id=de5abc98bf34e06d7accd943c4057843db921f00
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 80529c45ab66 ("xfs: pass xfsstats structures to handlers and macros")
+Fixes: ff6d6af2351c ("xfs: per-filesystem stats counter implementation")
 
-Best regards,
-Javier
+---
+Found with ARM randconfig builds. You seem to have intentionally
+removed the XFS_STATS_INC etc macros and #ifdefs in ff6d6af2351c,
+so I suspect this is not what you had in mind then, but it's not
+clear what you want instead. Please regard this as a bug report
+if it looks wrong to you ;-)
+
+	Arnd
+
+diff --git a/fs/xfs/xfs_stats.h b/fs/xfs/xfs_stats.h
+index 483b0eff1988..f87ad9d12f4a 100644
+--- a/fs/xfs/xfs_stats.h
++++ b/fs/xfs/xfs_stats.h
+@@ -213,9 +213,12 @@ struct xfsstats {
+ 	__uint64_t		xs_read_bytes;
+ };
+ 
++extern struct xstats xfsstats;
++
++#ifdef CONFIG_PROC_FS
++
+ int xfs_stats_format(struct xfsstats __percpu *stats, char *buf);
+ void xfs_stats_clearall(struct xfsstats __percpu *stats);
+-extern struct xstats xfsstats;
+ 
+ #define XFS_STATS_INC(mp, v)					\
+ do {								\
+@@ -235,14 +238,23 @@ do {									\
+ 	per_cpu_ptr(mp->m_stats.xs_stats, current_cpu())->v += (inc);	\
+ } while (0)
+ 
+-#if defined(CONFIG_PROC_FS)
+-
+ extern int xfs_init_procfs(void);
+ extern void xfs_cleanup_procfs(void);
+ 
+-
+ #else	/* !CONFIG_PROC_FS */
+ 
++static inline int xfs_stats_format(struct xfsstats __percpu *stats, char *buf)
++{
++	return 0;
++}
++static inline void xfs_stats_clearall(struct xfsstats __percpu *stats)
++{
++}
++
++#define XFS_STATS_INC(mp, v)		do { } while (0)
++#define XFS_STATS_DEC(mp, v)		do { } while (0)
++#define XFS_STATS_ADD(mp, v, inc)	do { } while (0)
++
+ static inline int xfs_init_procfs(void)
+ {
+ 	return 0;
+diff --git a/fs/xfs/xfs_super.c b/fs/xfs/xfs_super.c
+index 368c55adee9d..58a372898857 100644
+--- a/fs/xfs/xfs_super.c
++++ b/fs/xfs/xfs_super.c
+@@ -1475,10 +1475,12 @@ xfs_fs_fill_super(
+ 		goto out_destroy_workqueues;
+ 
+ 	/* Allocate stats memory before we do operations that might use it */
+-	mp->m_stats.xs_stats = alloc_percpu(struct xfsstats);
+-	if (!mp->m_stats.xs_stats) {
+-		error = PTR_ERR(mp->m_stats.xs_stats);
+-		goto out_destroy_counters;
++	if (IS_ENABLED(CONFIG_PROC_FS)) {
++		mp->m_stats.xs_stats = alloc_percpu(struct xfsstats);
++		if (!mp->m_stats.xs_stats) {
++			error = PTR_ERR(mp->m_stats.xs_stats);
++			goto out_destroy_counters;
++		}
+ 	}
+ 
+ 	error = xfs_readsb(mp, flags);
+@@ -1851,16 +1853,18 @@ init_xfs_fs(void)
+ 		goto out_sysctl_unregister;
+ 	}
+ 
+-	xfsstats.xs_kobj.kobject.kset = xfs_kset;
++	if (IS_ENABLED(CONFIG_PROC_FS)) {
++		xfsstats.xs_kobj.kobject.kset = xfs_kset;
+ 
+-	xfsstats.xs_stats = alloc_percpu(struct xfsstats);
+-	if (!xfsstats.xs_stats) {
+-		error = -ENOMEM;
+-		goto out_kset_unregister;
++		xfsstats.xs_stats = alloc_percpu(struct xfsstats);
++		if (!xfsstats.xs_stats) {
++			error = -ENOMEM;
++			goto out_kset_unregister;
++		}
++		error = xfs_sysfs_init(&xfsstats.xs_kobj, &xfs_stats_ktype,
++				       NULL, "stats");
+ 	}
+ 
+-	error = xfs_sysfs_init(&xfsstats.xs_kobj, &xfs_stats_ktype, NULL,
+-			       "stats");
+ 	if (error)
+ 		goto out_free_stats;
+ 
+@@ -1887,9 +1891,11 @@ init_xfs_fs(void)
+ 	xfs_sysfs_del(&xfs_dbg_kobj);
+  out_remove_stats_kobj:
+ #endif
+-	xfs_sysfs_del(&xfsstats.xs_kobj);
++	if (IS_ENABLED(CONFIG_PROC_FS))
++		xfs_sysfs_del(&xfsstats.xs_kobj);
+  out_free_stats:
+-	free_percpu(xfsstats.xs_stats);
++	if (IS_ENABLED(CONFIG_PROC_FS))
++		free_percpu(xfsstats.xs_stats);
+  out_kset_unregister:
+ 	kset_unregister(xfs_kset);
+  out_sysctl_unregister:
+@@ -1916,8 +1922,10 @@ exit_xfs_fs(void)
+ #ifdef DEBUG
+ 	xfs_sysfs_del(&xfs_dbg_kobj);
+ #endif
+-	xfs_sysfs_del(&xfsstats.xs_kobj);
+-	free_percpu(xfsstats.xs_stats);
++	if (IS_ENABLED(CONFIG_PROC_FS)) {
++		xfs_sysfs_del(&xfsstats.xs_kobj);
++		free_percpu(xfsstats.xs_stats);
++	}
+ 	kset_unregister(xfs_kset);
+ 	xfs_sysctl_unregister();
+ 	xfs_cleanup_procfs();
