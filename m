@@ -1,65 +1,103 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Oct 2015 10:45:30 +0200
-Subject: [PATCH RFC 0/7] Adding core support for wire-MSI bridges
-In-Reply-To: <5620AF42.4070204@arm.com>
-References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
- <5879538.pKBkpUOxls@wuerfel> <5620AF42.4070204@arm.com>
-Message-ID: <4196649.VJFYrvEAp6@wuerfel>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Fri, 16 Oct 2015 16:48:01 +0800
+Subject: [PATCH v9 3/6] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <5938877.UG8VySdxoE@wuerfel>
+References: <1444790492-4051-1-git-send-email-lftan@altera.com>
+ <5210459.PtmhWaT6RM@wuerfel>
+ <CAFiDJ59ZZ5TBZJ8wauEzP3Je=DeSaGG-PWvm87dkSLfjmyRwjQ@mail.gmail.com>
+ <5938877.UG8VySdxoE@wuerfel>
+Message-ID: <CAFiDJ5-4D=OCKuy_=5s0uknzaQu9kUYbqy_nLBL4WOEZs0i3bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 October 2015 09:03:14 Marc Zyngier wrote:
-> On 15/10/15 20:16, Arnd Bergmann wrote:
-> > On Thursday 15 October 2015 17:01:02 Marc Zyngier wrote:
-> >>
-> >> "Preconfigured" is the key word. While you can do something like that if
-> >> your hardware treats MSIs just as if they were wired interrupts
-> >> (something like GICv2m), it becomes far more hairy if the target of MSIs
-> >> is something like a GICv3 ITS (which is the case for HiSilicon mbigen).
-> >>
-> >> The main reason is that the ITS relies on "translation tables" kept in
-> >> memory, which the OS has to configure, and handing over pre-configured
-> >> tables is not something I'm looking forward to doing. From a CPU point
-> >> of view, this is akin entering the kernel with the MMU already on and no
-> >> idmap...
-> >>
-> >> The approach taken here is to make the MSI-ness explicit at the irqchip
-> >> level, and keep the interrupting device oblivious of that feature. Also,
-> >> this relies on the fact that we can have one MSI per wire, meaning that
-> >> we don't have to multiplex anything (no nested irqchip), and that we can
-> >> rely on hierarchical domains, which simplifies the code (at least for
-> >> the irqchip).
-> >>
-> > 
-> > Thanks, that already makes things much clearer. Just one more question:
-> > why can't those translation tables be configured statically by the
-> > irqchip driver? Is this all about being able to cut a few cycles
-> > in case of virtualization? 
-> 
-> Having a static configuration, while doable, complicates things for
-> everybody else. The LPI number used by the irqchip would need to be put
-> an some "exclusion list" to make sure it is not reallocated for other
-> subsystems (e.g PCI). The translation tables also define the target CPU,
-> which could cause interesting problems once combined with CPU hotplug if
-> the ITS is not completely in control of it.
-> 
-> I'm not really getting your point about virtualization though.
+On Wed, Oct 14, 2015 at 9:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 14 October 2015 18:01:46 Ley Foon Tan wrote:
+>> On Wed, Oct 14, 2015 at 5:36 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Wednesday 14 October 2015 17:28:45 Ley Foon Tan wrote:
+>> >> On Wed, Oct 14, 2015 at 5:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >
+>> > Could we perhaps have a helper function that lets us register
+>> > fixups dynamically?
+>> >
+>> >> The linker script keeps all pci fixup callbacks in pci fixup regions
+>> >> during kernel compile time. So, it needs to be builtin module. Do you
+>> >> know any way we can update those fixup regions?
+>> >
+>> > The only method I'm aware of at the moment is move the fixups to
+>> > drivers/pci/quirks.c and enclose them in an #ifdef if you want them
+>> > to not appear in kernels that don't support your SoC.
+>> By looking at the drivers/pci/quirks.c, it looks like it is mainly for
+>> the pci endpoint devices.
+>> Fixups for host controller are in the driver itself.
+>>
+>
+> But if it's for the host itself, there are usually other ways to
+> do this without needing a fixup: you already have the device structure
+> present in the driver, so you should just be able to modify it there.
+Thanks for your suggestion. You are right, I have tested this can work as well.
+So, I can remove those 2 PCI_FIXUP* in the driver.
+>
+>
+> I'm looking at the code in your fixups now:
+>
+> +static void altera_pcie_retrain(struct pci_dev *dev)
+> +{
+> +       u16 linkcap, linkstat;
+> +
+> +       /*
+> +        * Set the retrain bit if the PCIe rootport support > 2.5GB/s, but
+> +        * current speed is 2.5 GB/s.
+> +        */
+> +       pcie_capability_read_word(dev, PCI_EXP_LNKCAP, &linkcap);
+> +
+> +       if ((linkcap & PCI_EXP_LNKCAP_SLS) <= PCI_EXP_LNKCAP_SLS_2_5GB)
+> +               return;
+> +
+> +       pcie_capability_read_word(dev, PCI_EXP_LNKSTA, &linkstat);
+> +       if ((linkstat & PCI_EXP_LNKSTA_CLS) == PCI_EXP_LNKSTA_CLS_2_5GB)
+> +               pcie_capability_set_word(dev, PCI_EXP_LNKCTL,
+> +                                        PCI_EXP_LNKCTL_RL);
+> +}
+> +DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_ALTERA, PCI_ANY_ID, altera_pcie_retrain);
+>
+> This looks related to the code in pci_set_bus_speed(). What is
+> missing from that code?
+This fixup is different from pci_set_bus_speed(). This fixup is to set
+the retrain bit in the LNKCTL register if the host can support higher
+speed than current speed, this is required by our hardware. But,
+pci_set_bus_speed() is just read the LNKCAP and LNKSTA registers and
+store in data structure.
 
-I think I'm mainly still confused by how MSI is implemented on
-the CPU side. Your explanation makes sense though.
+>
+> +static void altera_pcie_fixup_res(struct pci_dev *dev)
+> +{
+> +       /*
+> +        * Prevent enumeration of root port.
+> +        */
+> +       if (!dev->bus->parent && dev->devfn == 0) {
+> +               int i;
+> +
+> +               for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+> +                       dev->resource[i].start = 0;
+> +                       dev->resource[i].end   = 0;
+> +                       dev->resource[i].flags   = 0;
+> +               }
+> +       }
+> +}
+> +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ALTERA, PCI_ANY_ID,
+> +                        altera_pcie_fixup_res);
+>
+> This seems really odd, too. Why is this needed?
+> I think I've seen similar code in other host drivers, so
+> it might be time to teach the PCI core about this kind of
+> device.
+Yes, some host drivers have similar code as well. Some host controller
+have the BAR configuration enabled, but it doesn't fit to kernel
+resources. Example the BAR is 64-bit, but the processor is 32-bit. It
+will fail at the host driver probing stage.
 
-> > I would assume that once you have gone through the overhead of having
-> > both an MSI and a normal interrupt line (with the need for
-> > serialization vs DMA), you can just as well trap to user space to
-> > deliver an IRQ to a guest.
-> 
-> The whole idea behind this bridge is to move wired interrupts to the
-> periphery of a SoC. I don't think virtualization was part of the
-> equation, but of course I can't speak for the "geniuses" behind the idea.
-> 
-> Or maybe I'm reading your question the wrong way, which is entirely
-> possible given the lack of caffeine.
+pci 0000:00:00.0: BAR 0: [mem 0x00000000-0xffffffff 64bit pref] has
+bogus alignment
 
-No, I think I get it now.
-
-	Arnd
+Regards
+Ley Foon
