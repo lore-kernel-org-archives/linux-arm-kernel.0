@@ -1,27 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 16 Oct 2015 15:35:13 +0100
-Subject: [PATCH] spi: bcm2835: change initialization order and switch to
- platform_get_irq
-In-Reply-To: <1444903752-9180-1-git-send-email-kernel@martin.sperl.org>
-References: <1444903752-9180-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <20151016143513.GN14956@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 16 Oct 2015 16:43:41 +0200
+Subject: [PATCH RESEND] pinctrl: berlin: fix BG2CD field widths
+In-Reply-To: <1444164997-7746-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <CACRpkdaYGUkq-QqCtzph-aoYOzCfCgQ5JSAcNDjBeBLoZ0i_iA@mail.gmail.com>
+ <1444164997-7746-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CACRpkdYydJcG4+Pm9V6bZ908OeASeZz6RtFxqpJNmXnubgmEog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 10:09:11AM +0000, kernel at martin.sperl.org wrote:
-> From: Martin Sperl <kernel@martin.sperl.org>
-> 
-> Change the initialization order of the HW so that the interrupt
-> is only requested after the HW is initialized
-> 
-> Also the use of irq_of_parse_and_map is replaced by platform_get_irq.
+On Tue, Oct 6, 2015 at 10:56 PM, Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com> wrote:
 
-Thanks for doing this, but as I keep saying please send one change per
-patch since it makes review and applying much easier.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151016/76097aa2/attachment.sig>
+> From: Thomas Hebb <tommyhebb@gmail.com>
+>
+> The previous register layout was incorrect, many of the fields having
+> fewer bits than were needed to represent all their modes. The new layout
+> is taken from the bootloader source of a BG2CD device.
+>
+> Signed-off-by: Thomas Hebb <tommyhebb@gmail.com>
+> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Linus,
+>
+> this is the fix from Thomas rebased on v4.3-rc1.
+
+Patch applied. Strangely it applied cleanly despite all the other
+Berlin pinctrl development from Antoine and Jisheng!
+
+Yours,
+Linus Walleij
