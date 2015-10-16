@@ -1,64 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 Oct 2015 09:03:14 +0100
-Subject: [PATCH RFC 0/7] Adding core support for wire-MSI bridges
-In-Reply-To: <5879538.pKBkpUOxls@wuerfel>
-References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
- <5027676.zPNVVQXaP4@wuerfel> <561FCDBE.8000407@arm.com>
- <5879538.pKBkpUOxls@wuerfel>
-Message-ID: <5620AF42.4070204@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 16 Oct 2015 09:02:23 +0100
+Subject: [PATCH v1 0/2] Common SerDes driver for TI's Keystone Platforms
+In-Reply-To: <CAL_JsqJTjCT8D-3OryFPEF8nnaPtrai7Mvf-gJRkh60aDixx-g@mail.gmail.com>
+References: <1444919145-30845-1-git-send-email-w-kwok2@ti.com>
+ <20151015165105.GE32532@n2100.arm.linux.org.uk>
+ <CAL_JsqJTjCT8D-3OryFPEF8nnaPtrai7Mvf-gJRkh60aDixx-g@mail.gmail.com>
+Message-ID: <20151016080222.GH32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/15 20:16, Arnd Bergmann wrote:
-> On Thursday 15 October 2015 17:01:02 Marc Zyngier wrote:
->>
->> "Preconfigured" is the key word. While you can do something like that if
->> your hardware treats MSIs just as if they were wired interrupts
->> (something like GICv2m), it becomes far more hairy if the target of MSIs
->> is something like a GICv3 ITS (which is the case for HiSilicon mbigen).
->>
->> The main reason is that the ITS relies on "translation tables" kept in
->> memory, which the OS has to configure, and handing over pre-configured
->> tables is not something I'm looking forward to doing. From a CPU point
->> of view, this is akin entering the kernel with the MMU already on and no
->> idmap...
->>
->> The approach taken here is to make the MSI-ness explicit at the irqchip
->> level, and keep the interrupting device oblivious of that feature. Also,
->> this relies on the fact that we can have one MSI per wire, meaning that
->> we don't have to multiplex anything (no nested irqchip), and that we can
->> rely on hierarchical domains, which simplifies the code (at least for
->> the irqchip).
->>
+On Thu, Oct 15, 2015 at 08:00:41PM -0500, Rob Herring wrote:
+> On Thu, Oct 15, 2015 at 11:51 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Oct 15, 2015 at 10:25:43AM -0400, WingMan Kwok wrote:
+> >> On TI's Keystone platforms, several peripherals such as the
+> >> gbe ethernet switch, 10gbe ethether switch and PCIe controller
+> >> require the use of a SerDes for converting SoC parallel data into
+> >> serialized data that can be output over a high-speed electrical
+> >> interface, and also converting high-speed serial input data
+> >> into parallel data that can be processed by the SoC.  The
+> >> SerDeses used by those peripherals, though they may be different,
+> >> are largely similar in functionality and setup.
+> >
+> > Given that serdes is not specific to TI, should this be specific to
+> > TI, or should there be an effort to come up with something which
+> > everyone who has serdes links can make use of?
+> >
+> > Serdes comes in multiple different forms: PCIe, 1G SGMII ethernet,
+> > 1000base-X ethernet, 10g ethernet, SATA... I'd hate to see a
+> > plethora of SoC specific stuff for this.
 > 
-> Thanks, that already makes things much clearer. Just one more question:
-> why can't those translation tables be configured statically by the
-> irqchip driver? Is this all about being able to cut a few cycles
-> in case of virtualization? 
+> The licensed IP I've seen doesn't provide a standard register
+> interface, but just signals to the IP block. Same with PLL IP. So
+> we'll probably get to see vendors continue to differentiate on PHY
+> register design. :)
 
-Having a static configuration, while doable, complicates things for
-everybody else. The LPI number used by the irqchip would need to be put
-an some "exclusion list" to make sure it is not reallocated for other
-subsystems (e.g PCI). The translation tables also define the target CPU,
-which could cause interesting problems once combined with CPU hotplug if
-the ITS is not completely in control of it.
+So what?  Network drivers differ radically in register design, yet we
+still have a standardised interface to network drivers.
 
-I'm not really getting your point about virtualization though.
-
-> I would assume that once you have gone through the overhead of having
-> both an MSI and a normal interrupt line (with the need for
-> serialization vs DMA), you can just as well trap to user space to
-> deliver an IRQ to a guest.
-
-The whole idea behind this bridge is to move wired interrupts to the
-periphery of a SoC. I don't think virtualization was part of the
-equation, but of course I can't speak for the "geniuses" behind the idea.
-
-Or maybe I'm reading your question the wrong way, which is entirely
-possible given the lack of caffeine.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
