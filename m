@@ -1,48 +1,51 @@
-From: sergeimir@emcraft.com (Sergei Miroshnichenko)
-Date: Fri, 16 Oct 2015 17:51:25 +0300
-Subject: [PATCH] clk: vf610: don't stop enabled clocks in suspend
-Message-ID: <1445007085-28250-1-git-send-email-sergeimir@emcraft.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 16 Oct 2015 07:57:07 -0700
+Subject: [PATCH 3/3] ARM: dts: Add basic support for isee igepv5
+In-Reply-To: <CAFqH_52T8rPJp-8+Bb7Tjv-kcACU8FJGtqFWOhj02DzQ2yc7nw@mail.gmail.com>
+References: <1444756728-11185-1-git-send-email-tony@atomide.com>
+ <1444756728-11185-3-git-send-email-tony@atomide.com>
+ <CAFqH_52T8rPJp-8+Bb7Tjv-kcACU8FJGtqFWOhj02DzQ2yc7nw@mail.gmail.com>
+Message-ID: <20151016145707.GU10113@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently Vybrid Clock Gating is configured to turn off all clocks in stop
-mode, while kernel assumes them enabled unless explicitly disabled. This
-behavior prevents waking up from wakeup sources.
+* Enric Balletbo Serra <eballetbo@gmail.com> [151016 01:26]:
+> Hi Tony,
+> 
+> Many thanks for the patch
+> 
+> 2015-10-13 19:18 GMT+02:00 Tony Lindgren <tony@atomide.com>:
+> > With omap5-board-common.dtsi, we can now easily add support for various omap5
+> > board variants. Let's add minimal support for isee igepv5.
+> >
+> > So far I've tested that basic things work, such as serial, USB Ethernet, HDMI
+> > and WLAN.
+> >
+> > Note that like omap5-uevm, these boards seem to need to reserve 16MB for a
+> > trap section as in commit 03178c66d289 ("ARM: dts: omap5-evm: Update
+> > available memory to 2032 MB") and also noted in a u-boot commit at
+> > http://marc.info/?l=u-boot&m=134376852603255 and also at
+> > http://patchwork.ozlabs.org/patch/159881/.
+> >
+> > Not sure why this is not needed for omap5-cm-t54.dts, maybe because of
+> > different u-boot configuration.
+> >
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >
+> > Enric, can you please check if there are some critical pieces compared
+> > to omap5-uevm that should be updated for this patch?
+> >
+> 
+> Unfortunately I don't have the schematic and any IGEPv5 to verify your
+> patches. From a quick view I can say that it's ok but let me cc
+> Agust?, Eduard and Pau that will have access to the hardware and the
+> schematics.
 
-Fix this by replacing Clock Gating Register bitmask 3 (Clock is on during
-all modes, except stop mode) with bitmask 2 (Clock is on during all modes,
-even stop mode): refer to Vybrid Reference Manual Chapter 10 "Clock
-Controller Module (CCM)".
+OK thanks. The thing to do is check against the omap5-board-common.dtsi in
+this patch series so there's nothing unsuitable in omap5-board-common.dtsi
+that needs an override in omap5-igep0050.dts.
 
-Tested on a VF610-based board.
+Regards,
 
-Signed-off-by: Sergei Miroshnichenko <sergeimir@emcraft.com>
----
- drivers/clk/imx/clk-gate2.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/imx/clk-gate2.c b/drivers/clk/imx/clk-gate2.c
-index 8935bff..ac35d75 100644
---- a/drivers/clk/imx/clk-gate2.c
-+++ b/drivers/clk/imx/clk-gate2.c
-@@ -50,7 +50,8 @@ static int clk_gate2_enable(struct clk_hw *hw)
- 		goto out;
- 
- 	reg = readl(gate->reg);
--	reg |= 3 << gate->bit_idx;
-+	reg &= ~(3 << gate->bit_idx);
-+	reg |= 2 << gate->bit_idx;
- 	writel(reg, gate->reg);
- 
- out:
-@@ -86,7 +87,7 @@ static int clk_gate2_reg_is_enabled(void __iomem *reg, u8 bit_idx)
- {
- 	u32 val = readl(reg);
- 
--	if (((val >> bit_idx) & 1) == 1)
-+	if (((val >> bit_idx) & 3) == 2)
- 		return 1;
- 
- 	return 0;
--- 
-1.9.3
+Tony
