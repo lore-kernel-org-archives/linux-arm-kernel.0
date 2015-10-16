@@ -1,54 +1,72 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 16 Oct 2015 13:23:26 +0800
-Subject: [PATCH v4 1/4] dt-bindings: mailbox: Document Hi6220 mailbox
- driver
-In-Reply-To: <CABb+yY0S18ShH3+sBnq=mOYMY=f4BNp947cUJae4YPfR=wPGGg@mail.gmail.com>
-References: <1444667535-16948-1-git-send-email-leo.yan@linaro.org>
- <1444667535-16948-2-git-send-email-leo.yan@linaro.org>
- <CABb+yY0S18ShH3+sBnq=mOYMY=f4BNp947cUJae4YPfR=wPGGg@mail.gmail.com>
-Message-ID: <20151016052326.GA3226@leoy-linaro>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 16 Oct 2015 14:24:30 +0900
+Subject: [PATCH 2/3] ARM: dts: uniphier: add ProXstream2 Vodka board
+ support
+In-Reply-To: <63719761.5kc6F97FjG@wuerfel>
+References: <1444899934-4754-1-git-send-email-yamada.masahiro@socionext.com>
+ <1444899934-4754-3-git-send-email-yamada.masahiro@socionext.com>
+ <63719761.5kc6F97FjG@wuerfel>
+Message-ID: <CAK7LNATzgOZp542rd-92YXDxux2DrAOH_mkzk8NjimQ3afrCCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
+Hi Arnd,
 
-Thanks for review.
+2015-10-16 0:17 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Thursday 15 October 2015 18:05:33 Masahiro Yamada wrote:
+>> +       aliases {
+>> +               serial0 = &serial0;
+>> +               serial1 = &serial1;
+>> +               serial2 = &serial2;
+>> +               i2c0 = &i2c0;
+>> +               i2c4 = &i2c4;
+>> +               i2c5 = &i2c5;
+>> +               i2c6 = &i2c6;
+>>
+>
+> This looks like a typo, you probably mean
+>
+>                i2c0 = &i2c0;
+>                i2c1 = &i2c4;
+>                i2c2 = &i2c5;
+>                i2c3 = &i2c6;
+>
+> Can you re-send this?
+>
 
-On Fri, Oct 16, 2015 at 10:26:48AM +0530, Jassi Brar wrote:
-> On Mon, Oct 12, 2015 at 10:02 PM, Leo Yan <leo.yan@linaro.org> wrote:
-> 
-> > +
-> > +Mailbox Device Node:
-> > +====================
-> > +
-> > +Required properties:
-> > +--------------------
-> > +- compatible:          Shall be "hisilicon,hi6220-mbox"
-> > +- reg:                 Contains the mailbox register address range (base
-> > +                       address and length); the first item is for IPC
-> > +                       registers, the second item is shared buffer for
-> > +                       slots.
-> >
-> Is the shared-buffer a part of mailbox controller or just regular
-> memory that could be used for purposes other than mailbox also? If
-> latter, please remove it from here.
 
-The shared-buffer is part of mailbox controller, this region cannot be
-dynamically allocated for other purpose; it's hardcode by MCU firmware.
+No, it is not a typo, but intentional.
 
-> > +Mailbox client
-> > +===============
-> > +
-> > +"mboxes" and the optional "mbox-names" (please see
-> > +Documentation/devicetree/bindings/mailbox/mailbox.txt for details). Each value
-> > +of the mboxes property should contain a phandle to the mailbox controller
-> > +device node and second argument is the channel index. It must be 0 (hardware
-> > +support only one channel).
-> >
-> sorry, what must be 0?  You have MBOX_CHAN_MAX and MBOX_CHAN_NUM as 32
-> and 2 in the driver.
 
-Will fix it.
+i2c0 - i2c3 are connected to the pads of the SoC package.
+On the other hand, i2c-4 - i2c-6 are connected to
+internal devices inside the SoC package.
 
-Thanks,
-Leo Yan
+i2c-4 - i2c-6 are always connected to the same hardware
+devices and always used for the same purpose.
+
+
+My expected scenario is:
+
+[1] i2c0 - i2c3 are connected to the on-board devices
+    depending on board variants.
+    On some boards, their status is "okay" and
+    on some boards, their status is "disabled".
+
+[2] i2c4 - i2c6 are always used to communicate
+    with in-package devices.  The status is always "okay".
+
+[3] Some user-land applications may want to have access
+     through the same character devices,
+      /dev/i2c4, /dev/i2c5, /dev/i2c6
+
+
+If your way is adopted,
+the real hardware "i2c4" might be aligned to /dev/i2c1 on some boards,
+and /dev/i2c2 on others, etc.
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
