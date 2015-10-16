@@ -1,19 +1,56 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 16 Oct 2015 16:13:49 +0100
-Subject: [PATCH v3 00/24] arm64: Consolidate CPU feature handling
-In-Reply-To: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
-References: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20151016151348.GB4801@e103592.cambridge.arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 16 Oct 2015 16:22:08 +0100
+Subject: [PATCH v4 2/3] arm64: Juno: Add support for the PCIe host bridge on
+ Juno R1
+In-Reply-To: <1445008929-32267-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1445008929-32267-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1445008929-32267-3-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2015 at 06:22:08PM +0100, Suzuki K. Poulose wrote:
-> This series introduces a new infrastructure to keep track of the CPU
-> feature registers on ARMv8-A for arm64 kernel. It provides the safe value
+Juno R1 board sports a functional PCIe host bridge that is
+compliant with the SBSA standard found [1] here. With the right
+firmware that initialises the XpressRICH3 controller one can
+use the generic Host Bridge driver to use the PCIe hardware.
 
-[...]
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Please run checkpatch over the series...
+[1] http://infocenter.arm.com/help/topic/com.arm.doc.den0029a/
+---
+ arch/arm64/boot/dts/arm/juno-r1.dts | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Cheers
----Dave
+diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+index c627511..a25964d 100644
+--- a/arch/arm64/boot/dts/arm/juno-r1.dts
++++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+@@ -109,6 +109,26 @@
+ 
+ 	#include "juno-base.dtsi"
+ 
++	pcie-controller at 40000000 {
++		compatible = "arm,juno-r1-pcie", "plda,xpressrich3-axi", "pci-host-ecam-generic";
++		device_type = "pci";
++		reg = <0 0x40000000 0 0x10000000>;	/* ECAM config space */
++		bus-range = <0 255>;
++		linux,pci-domain = <0>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++		dma-coherent;
++		ranges = <0x01000000 0x00 0x5f800000 0x00 0x5f800000 0x0 0x00800000>,
++			 <0x02000000 0x00 0x50000000 0x00 0x50000000 0x0 0x08000000>,
++			 <0x42000000 0x40 0x00000000 0x40 0x00000000 0x1 0x00000000>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 7>;
++		interrupt-map = <0 0 0 1 &gic 0 0 0 136 4>,
++				<0 0 0 2 &gic 0 0 0 137 4>,
++				<0 0 0 3 &gic 0 0 0 138 4>,
++				<0 0 0 4 &gic 0 0 0 139 4>;
++		msi-parent = <&v2m_0>;
++	};
+ };
+ 
+ &memtimer {
+-- 
+2.6.0
