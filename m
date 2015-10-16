@@ -1,39 +1,39 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 16 Oct 2015 19:36:31 +0200
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.3
-Message-ID: <874mhqhg0w.fsf@free-electrons.com>
+Date: Fri, 16 Oct 2015 19:39:38 +0200
+Subject: [GIT PULL] ARM: mvebu: cleanup for v4.4 (#2)
+Message-ID: <87zizig1b9.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here is the second pull request for fixes for mvebu for v4.3.
+Here is the second pull request for cleanup for mvebu for v4.4.
 
 Gregory
 
-The following changes since commit d836ace65ee98d7079bc3c5afdbcc0e27dca20a3:
+The following changes since commit 7ee20ff0072154d326c86223fbb88d23aa152b91:
 
-  ARM: orion: Fix DSA platform device after mvmdio conversion (2015-10-06 16:22:37 +0200)
+  ARM: mvebu: Use a CR_C constant instead of a hard-coded one (2015-09-29 18:01:19 +0200)
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.3-2
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-cleanup-4.4-2
 
-for you to fetch changes up to db347f1a5304d68c68c52f19971924b1e5842f3c:
+for you to fetch changes up to ef2cdccd21513bc8fd2cf9cc2f6894d60382a4b0:
 
-  ARM: mvebu: correct a385-db-ap compatible string (2015-10-15 08:25:09 +0200)
-
-----------------------------------------------------------------
-mvebu fixes for 4.3 (part 2)
-
-Fix wrong compatible for A385 DB AP preventing using suspend
+  ARM: mvebu: remove the workaround imprecise abort fault handler (2015-10-15 09:21:42 +0200)
 
 ----------------------------------------------------------------
-Marcin Wojtas (1):
-      ARM: mvebu: correct a385-db-ap compatible string
+mvebu cleanup for 4.4 (part 2)
 
- arch/arm/boot/dts/armada-385-db-ap.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Remove code related to Armada 375 Z1 stepping no more supported in mainline
+
+----------------------------------------------------------------
+Lucas Stach (1):
+      ARM: mvebu: remove the workaround imprecise abort fault handler
+
+ arch/arm/mach-mvebu/board-v7.c | 35 -----------------------------------
+ 1 file changed, 35 deletions(-)
 -- 
 Gregory Clement, Free Electrons
 Kernel, drivers, real-time and embedded Linux
