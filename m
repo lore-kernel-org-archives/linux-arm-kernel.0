@@ -1,44 +1,43 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Fri, 16 Oct 2015 05:47:32 -0700
-Subject: [PATCH 5/5] clk: berlin: bg2: remove CLK_IGNORE_UNUSED flag for
- sdio clk
-In-Reply-To: <1444628796-5484-6-git-send-email-jszhang@marvell.com>
-References: <1444628796-5484-1-git-send-email-jszhang@marvell.com>
- <1444628796-5484-6-git-send-email-jszhang@marvell.com>
-Message-ID: <20151016124732.20687.35929@quantum>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 16 Oct 2015 13:48:03 +0100
+Subject: [PATCH] serial: amba-pl011: fix incorrect integer size in
+ pl011_fifo_to_tty()
+In-Reply-To: <1444249636-25661-1-git-send-email-timur@codeaurora.org>
+References: <1444249636-25661-1-git-send-email-timur@codeaurora.org>
+Message-ID: <20151016124733.GA4801@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jisheng Zhang (2015-10-11 22:46:36)
-> The axi clock properties already exists, so there's no need to set this
-> flag for sdio0 and sdio1 clk any more.
+On Wed, Oct 07, 2015 at 03:27:16PM -0500, Timur Tabi wrote:
+> The UART_DUMMY_DR_RX status bit is equal to (1 << 16), so a u16 is too small
+> to hold that value.  The result is that UART_DUMMY_DR_RX is never passed
+> to uart_insert_char().  This means that we're always accepting characters,
+> even when CREAD (in termios) is not set.
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-
-Applied to clk-next.
-
-Regards,
-Mike
-
+> Signed-off-by: Timur Tabi <timur@codeaurora.org>
 > ---
->  drivers/clk/berlin/bg2.c | 4 ++--
+>  drivers/tty/serial/amba-pl011.c | 4 ++--
 >  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/clk/berlin/bg2.c b/drivers/clk/berlin/bg2.c
-> index 73153fc..23e0e3b 100644
-> --- a/drivers/clk/berlin/bg2.c
-> +++ b/drivers/clk/berlin/bg2.c
-> @@ -490,8 +490,8 @@ static const struct berlin2_gate_data bg2_gates[] __initconst = {
->         { "usb0",       "perif",        11 },
->         { "usb1",       "perif",        12 },
->         { "pbridge",    "perif",        13, CLK_IGNORE_UNUSED },
-> -       { "sdio0",      "perif",        14, CLK_IGNORE_UNUSED },
-> -       { "sdio1",      "perif",        15, CLK_IGNORE_UNUSED },
-> +       { "sdio0",      "perif",        14 },
-> +       { "sdio1",      "perif",        15 },
->         { "nfc",        "perif",        17 },
->         { "smemc",      "perif",        19 },
->         { "audiohd",    "audiohd_pll",  26 },
-> -- 
-> 2.6.1
-> 
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index fd27e98..899a771 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -191,8 +191,8 @@ struct uart_amba_port {
+>   */
+>  static int pl011_fifo_to_tty(struct uart_amba_port *uap)
+>  {
+> -	u16 status, ch;
+> -	unsigned int flag, max_count = 256;
+> +	u16 status;
+> +	unsigned int ch, flag, max_count = 256;
+>  	int fifotaken = 0;
+
+FWIW,
+
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+I guess this tells us something about how often !CREAD is used...
+
+Cheers
+---Dave
