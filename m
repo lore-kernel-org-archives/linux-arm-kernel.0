@@ -1,45 +1,68 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 16 Oct 2015 08:23:44 -0500
-Subject: [PATCH v2] PCI: iproc: fix 32-bit build error
-In-Reply-To: <5482493.6eNiKO1I30@wuerfel>
-References: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
- <5754881.OPA6La0Zg0@wuerfel> <20151015210113.GA13636@localhost>
- <5482493.6eNiKO1I30@wuerfel>
-Message-ID: <20151016132344.GA21346@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Oct 2015 15:26:34 +0200
+Subject: [PATCH] VFIO: platform: AMD xgbe reset module
+In-Reply-To: <5620F665.5010903@linaro.org>
+References: <1444836792-2405-1-git-send-email-eric.auger@linaro.org>
+ <1444927997.4059.470.camel@redhat.com> <5620F665.5010903@linaro.org>
+Message-ID: <3768580.4oTvTNW7Bh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 11:47:42AM +0200, Arnd Bergmann wrote:
-> On Thursday 15 October 2015 16:01:13 Bjorn Helgaas wrote:
-> > On Thu, Oct 15, 2015 at 09:40:45PM +0200, Arnd Bergmann wrote:
-> > > The iproc PCI driver tries to figure out whether the MMIO window has
-> > > a valid size, but does this using a 64-bit modulo operation, which
-> > > is not allowed on 32-bit kernels and leads to a link error:
-> > > 
-> > > drivers/built-in.o: In function `iproc_pcie_setup':
-> > > :(.text+0x4b798): undefined reference to `__aeabi_uldivmod'
-> > > 
-> > > This works around that error by using the div64_u64() function
-> > > provided by the kernel. While this is an expensive operation,
-> > > it is harmless because we only call it during the probing
-> > > of the driver.
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > Acked-by: Ray Jui <rjui@broadcom.com>
-> > > Fixes: 0ab99ca8eb6c ("PCI: iproc: Fix compile warnings")
-> > 
-> > This *looks* like it should be fixing 90e4032eeaf2 ("PCI: iproc: Add
-> > outbound mapping support"), not 0ab99ca8eb6c.
-> > 
-> > 90e4032eeaf2 added the "if (size % ob->window_size)".
-> > 
-> > Is this more subtle than that?
+On Friday 16 October 2015 15:06:45 Eric Auger wrote:
+
+>  I've since forgotten his answer, but the fact that
+> > __symbol_get() is only defined for modules makes it moot, we either need
+> > to make symbol_get() work or define __symbol_get() for non-module
+> > builds.
+> I currently don't see any solution for any of those. The only solution I
+> can see is someone registers the reset function pointer to vfio.
 > 
-> You are absolutely right, I must have copy-pasted the wrong entry.
-> Do you want me to resend this? I guess you can just remove the
-> line as this commit has not appeared in any release anyway.
+> I think we could keep the existing reset modules, do the request_module
+> from VFIO, using their module name registered in the lookup table. But
+> instead of having the reset function in the look-up table we would have
+> the reset modules register their reset function pointer to VFIO. I think
+> this could work around the symbol_get issue.
+> 
+> This still leaves the layer violation argument though.
+> 
+> Assuming this works, would that be an acceptable solution, although I
+> acknowledge this does not perfectly fit into the driver model?
 
-I squashed this fix and Jon's %pap fix into Ray's original "Add outbound
-mapping support" patch and re-did the merge.  Thanks!
+I think it's possible to avoid the layering violation that way too,
+by loading the module based on the compatible string, with a module_alias.
 
-Bjorn
+static void vfio_platform_get_reset(struct vfio_platform_device *vdev,
+                                    struct device *dev)
+{
+        const char *compat;
+        int (*reset)(struct vfio_platform_device *);
+        int ret, i;
+	char modname[256];
+
+        ret = device_property_read_string(dev, "compatible", &compat);
+        if (ret)
+                return;
+
+	reset = vfio_platform_lookup_reset(compat);
+	if (!reset) {
+		snprintf(modname, "vfio-reset:%s", compat);
+		request_module(modname);
+		reset = vfio_platform_lookup_reset(compat);
+	}
+
+	vdev->reset = reset;
+}
+
+---
+
+#define module_vfio_reset_handler(compat, reset)			\
+MODULE_ALIAS("vfio_reset" compat);					\
+static int reset ## _module_init(void)					\
+{									\
+	return vfio_reset_register(THIS_MODULE, compat, &reset);	\
+}
+
+I think that solution is good enough, as it avoids most of the
+problems with the current implementation but is a simple enough change.
+
+	Arnd
