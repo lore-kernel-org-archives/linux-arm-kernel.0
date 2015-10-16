@@ -1,51 +1,56 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Fri, 16 Oct 2015 12:44:46 -0300
-Subject: [PATCH 0/2] Add support for NXP LPC18xx EEPROM using nvmem
-In-Reply-To: <1445004426-6271-1-git-send-email-ariel@vanguardiasur.com.ar>
-References: <1445004426-6271-1-git-send-email-ariel@vanguardiasur.com.ar>
-Message-ID: <CAAEAJfD58JMZ0veB4TVE8QfZ5OUqO7=q7Lk5wBME6+mFF=_dxg@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 16 Oct 2015 16:44:25 +0100
+Subject: [Xen-devel] xen,arm: enable cpu_hotplug
+In-Reply-To: <561F78A4.7060507@citrix.com>
+References: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
+ <561EE3E5.2000105@citrix.com> <1444898398.1607.18.camel@citrix.com>
+ <561F78A4.7060507@citrix.com>
+Message-ID: <alpine.DEB.2.02.1510161641560.27957@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 October 2015 at 11:07, Ariel D'Alessandro
-<ariel@vanguardiasur.com.ar> wrote:
-> This patch series adds support for NXP LPC18xx EEPROM memory found in
-> NXP LPC SoCs family, which includes LPC18xx/LPC43xx. Other SoCs in
+On Thu, 15 Oct 2015, Julien Grall wrote:
+> Hi Ian,
+> 
+> On 15/10/15 09:39, Ian Campbell wrote:
+> > On Thu, 2015-10-15 at 00:23 +0100, Julien Grall wrote:
+> >> My second point is related to how Xen is handling interrupt with vCPU. 
+> >> When PSCI off is called, we will set the _VFP_down flag. This flag is 
+> >> used in vgic_vcpu_inject_irq and when it's set the interrupt will be 
+> >> ignored and stay active on the HW GIC forever. If the vCPU is coming 
+> >> back online, this interrupt will never be received. AFAIU the spec, the 
+> >> interrupt is expected to stay pending on the distributor side and will 
+> >> be receive when the vCPU will come back or migrate to another vCPU. A 
+> >> similar problem can happen when the vCPU is powered on again because we 
+> >> clear all the interrupt state related to vCPU (see
+> >> vgic_clear_pending_irqs).
+> > 
+> > Is there also an interaction with our implementation of ITARGETSR of
+> > picking the lowest set bit? e.g. if an IRQ has target 0x6 (targeting CPU 1
+> > and CPU2) we will choose CPU 1. If CPU 1 is then unplugged, will we end up
+> > targeting CPU 2 or the now-offline CPU 1? In the latter case the lack of
+> > interrupts might be considered surprising?
+> 
+> I though about it when I wrote the mail yesterday night.
+> 
+> >From the spec section 1.4.3 (ARM IHI 0048B.b):
+> 
+> "The ARM GIC architecture does not guarantee that a 1-N interrupt is
+> presented to:
+> ? all processors listed in the target processor list
+> ? an enabled interface, where at least one interface is enabled."
+> 
+> AFAIU this paragraph, it means that there is no guarantee to receive an
+> interrupt if the target mask contain a vCPU offline.
 
-Is the EEPROM available on all LPC18xx/LPC43xx devices?
-IIRC, just a subset supports it.
+Ah good! Our do_psci_cpu_off implementation is OK after all :-)
 
-> that family may share the same watchdog hardware.
->
 
-s/watchdog/eeprom
+> > Or maybe the way CPU hotplug is arranged we never end up with holes in the
+> > online cpu space, i.e it is not possible to take down CPU1 and leave CPU2
+> > up?
+> 
+> A kernel is allowed to hotplug any vCPU.
 
-> This patchset is based on tag next-20151013 of the linux-next
-> repository. It has been successfully tested on a LPC4337 CIAA-NXP
-> Board.
->
-> EEPROM notes:
-> ------------
->
-> EEPROM size is 16384 bytes and it can be entirely read and
-> written/erased with 1 word (4 bytes) granularity. The last page
-> (128 bytes) contains the EEPROM initialization data and is not writable.
->
-> Erase/program time is less than 3ms. The EEPROM device requires a
-> ~1500 kHz clock (min 800 kHz, max 1600 kHz) that is generated dividing
-> the system bus clock by the division factor, contained in the divider
-> register (minus 1 encoded).
->
-> Thanks,
->
-> Ariel D'Alessandro (2):
->   nvmem: NXP LPC18xx EEPROM memory NVMEM driver
->   DT: nvmem: Add NXP LPC18xx EEPROM memory binding documentation
->
-
-Can you please add a patch for the lpc18xx_defconfig and for devicetree files?
-
-Thanks!
--- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+Yes, but xl only allowed to hot(un)plug cpus in order, look up vcpu-set
+on man xl.
