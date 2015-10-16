@@ -1,83 +1,115 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 16 Oct 2015 08:52:24 +0100
-Subject: [PATCH] ARM: SWP emulation: Restore original *data when failed
-In-Reply-To: <561FA948.5080505@arm.com>
-References: <1444791077-26020-1-git-send-email-shengjiu.wang@freescale.com>
- <20151015082417.GX32532@n2100.arm.linux.org.uk>
- <20151015083629.GA32630@shlinux2>
- <20151015085700.GY32532@n2100.arm.linux.org.uk> <561F6F3B.6030607@arm.com>
- <20151015130247.GB29301@arm.com> <561FA948.5080505@arm.com>
-Message-ID: <5620ACB8.20908@arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 16 Oct 2015 10:55:55 +0300
+Subject: [PATCH] ARM: keystone: dts: add PCI serdes driver bindings
+In-Reply-To: <1444919230-30932-1-git-send-email-w-kwok2@ti.com>
+References: <1444919230-30932-1-git-send-email-w-kwok2@ti.com>
+Message-ID: <5620AD8B.3060503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/15 14:25, Vladimir Murzin wrote:
-> On 15/10/15 14:02, Will Deacon wrote:
->> On Thu, Oct 15, 2015 at 10:17:47AM +0100, Vladimir Murzin wrote:
->>> We might need the same change for arm64 counterpart (see
->>> arch/arm64/kernel/armv8_deprecated.c).
->>
->> Something like below?
-> 
-> Looks good. Should these two go to stable?
+WingMan,
 
-On the second thought looks like we still update *data in case stxr
-fails (or I need more coffee).
+On 15/10/15 17:27, WingMan Kwok wrote:
+> This patch adds the required PCI serdes bindings whcih can then be
+> enabled by setting the corresponding statuses to "ok" in order to
+> configure and start the PCI serdes.
+> 
+> This patch depends on the updates to the Keystone PCIe host driver
+> and common serdes driver patch series that is submitted separately.
+> 
+> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+> ---
+>  arch/arm/boot/dts/k2e.dtsi      |   21 +++++++++++++++++++++
+>  arch/arm/boot/dts/keystone.dtsi |   21 +++++++++++++++++++++
+>  2 files changed, 42 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
+> index 675fb8e..3b36575 100644
+> --- a/arch/arm/boot/dts/k2e.dtsi
+> +++ b/arch/arm/boot/dts/k2e.dtsi
+> @@ -86,6 +86,16 @@
+>  			gpio,syscon-dev = <&devctrl 0x240>;
+>  		};
+>  
+> +		pcie1_phy: pciephy at 2326000 {
 
-Vladimir
+Should be
+		pcie1_phy: phy at 2326000 {
 
+> +			#phy-cells = <0>;
+> +			compatible = "ti,keystone-serdes-pcie";
+> +			reg = <0x02326000 0x4000>;
+> +			reg-names = "serdes";
+> +			link-rate-kbps = <5000000>;
+> +			num-lanes = <2>;
+> +			status = "disabled";
+> +		};
+> +
+>  		pcie1: pcie at 21020000 {
+>  			compatible = "ti,keystone-pcie","snps,dw-pcie";
+>  			clocks = <&clkpcie1>;
+> @@ -130,6 +140,17 @@
+>  					<GIC_SPI 375 IRQ_TYPE_EDGE_RISING>,
+>  					<GIC_SPI 376 IRQ_TYPE_EDGE_RISING>;
+>  			};
+> +
+> +			/* PCIE phy */
+> +			serdeses {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				serdes at 0 {
+> +					reg = <0>;
+> +					phys = <&pcie1_phy>;
+> +				};
+> +			};
+> +
+>  		};
+>  
+>  		mdio: mdio at 24200f00 {
+> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+> index 72816d6..6566cc4 100644
+> --- a/arch/arm/boot/dts/keystone.dtsi
+> +++ b/arch/arm/boot/dts/keystone.dtsi
+> @@ -275,6 +275,16 @@
+>  			ti,syscon-dev = <&devctrl 0x2a0>;
+>  		};
+>  
+> +		pcie0_phy: pciephy at 2320000 {
+
+ditto.
+
+> +			#phy-cells = <0>;
+> +			compatible = "ti,keystone-serdes-pcie";
+> +			reg = <0x02320000 0x4000>;
+> +			reg-names = "serdes";
+> +			link-rate-kbps = <5000000>;
+> +			num-lanes = <2>;
+> +			status = "disabled";
+> +		};
+> +
+>  		pcie0: pcie at 21800000 {
+>  			compatible = "ti,keystone-pcie", "snps,dw-pcie";
+>  			clocks = <&clkpcie>;
+> @@ -319,6 +329,17 @@
+>  					<GIC_SPI 28 IRQ_TYPE_EDGE_RISING>,
+>  					<GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
+>  			};
+> +
+> +			/* PCIE phy */
+> +			serdeses {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				serdes at 0 {
+> +					reg = <0>;
+> +					phys = <&pcie0_phy>;
+> +				};
+> +			};
+> +
+>  		};
+>  	};
+>  };
 > 
-> Vladimir
-> 
->>
->> Will
->>
->> >From 63c3e83073cfac2e011adf0ed6f335275cc977a7 Mon Sep 17 00:00:00 2001
->> From: Will Deacon <will.deacon@arm.com>
->> Date: Thu, 15 Oct 2015 13:55:53 +0100
->> Subject: [PATCH] arm64: compat: fix stxr failure case in SWP emulation
->>
->> If the STXR instruction fails in the SWP emulation code, we leave *data
->> overwritten with the loaded value, therefore corrupting the data written
->> by a subsequent, successful attempt.
->>
->> This patch re-jigs the code so that we only write back to *data once we
->> know that the update has happened.
->>
->> Reported-by: Shengjiu Wang <shengjiu.wang@freescale.com>
->> Reported-by: Vladimir Murzin <vladimir.murzin@arm.com>
->> Signed-off-by: Will Deacon <will.deacon@arm.com>
->> ---
->>  arch/arm64/kernel/armv8_deprecated.c | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
->> index bcee7abac68e..6039d1eb5912 100644
->> --- a/arch/arm64/kernel/armv8_deprecated.c
->> +++ b/arch/arm64/kernel/armv8_deprecated.c
->> @@ -284,12 +284,12 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
->>  	__asm__ __volatile__(					\
->>  	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
->>  		    CONFIG_ARM64_PAN)				\
->> -	"	mov		%w2, %w1\n"			\
->> -	"0:	ldxr"B"		%w1, [%3]\n"			\
->> -	"1:	stxr"B"		%w0, %w2, [%3]\n"		\
->> +	"0:	ldxr"B"		%w2, [%3]\n"			\
->> +	"1:	stxr"B"		%w0, %w1, [%3]\n"		\
->>  	"	cbz		%w0, 2f\n"			\
->>  	"	mov		%w0, %w4\n"			\
->>  	"2:\n"							\
->> +	"	mov		%w1, %w2\n"			\
->>  	"	.pushsection	 .fixup,\"ax\"\n"		\
->>  	"	.align		2\n"				\
->>  	"3:	mov		%w0, %w5\n"			\
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-> 
+
+--
+cheers,
+-roger
