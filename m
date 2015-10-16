@@ -1,65 +1,66 @@
-From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
-Date: Fri, 16 Oct 2015 15:49:01 -0300
-Subject: [PATCH 0/2] Add support for NXP LPC18xx EEPROM using nvmem
-In-Reply-To: <CAAEAJfD58JMZ0veB4TVE8QfZ5OUqO7=q7Lk5wBME6+mFF=_dxg@mail.gmail.com>
-References: <1445004426-6271-1-git-send-email-ariel@vanguardiasur.com.ar>
- <CAAEAJfD58JMZ0veB4TVE8QfZ5OUqO7=q7Lk5wBME6+mFF=_dxg@mail.gmail.com>
-Message-ID: <5621469D.2050703@vanguardiasur.com.ar>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 16 Oct 2015 19:50:48 +0100
+Subject: [PATCHv4 07/12] arm64: Simplify NR_FIX_BTMAPS calculation
+In-Reply-To: <1445015181-29711-8-git-send-email-suzuki.poulose@arm.com>
+References: <1445015181-29711-1-git-send-email-suzuki.poulose@arm.com>
+ <1445015181-29711-8-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151016185047.GG4039@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ezequiel,
-
-El 16/10/15 a las 12:44, Ezequiel Garcia escribi?:
-> On 16 October 2015 at 11:07, Ariel D'Alessandro
-> <ariel@vanguardiasur.com.ar> wrote:
->> This patch series adds support for NXP LPC18xx EEPROM memory found in
->> NXP LPC SoCs family, which includes LPC18xx/LPC43xx. Other SoCs in
+On Fri, Oct 16, 2015 at 06:06:16PM +0100, Suzuki K. Poulose wrote:
+> From: Mark Rutland <mark.rutland@arm.com>
 > 
-> Is the EEPROM available on all LPC18xx/LPC43xx devices?
-> IIRC, just a subset supports it.
+> Since NR_FIX_BTMAPS based on the fixed size of 256K, lets use
+> a formula to derive it for a given page size, rather than defining
+> for each page size.
 
-(Answered in another thread.)
+No need to respin, but I'd prefer the wording:
+
+----
+We choose NR_FIX_BTMAPS such that each slot (NR_FIX_BTMAPS * PAGE_SIZE)
+can address 256K.
+
+Use division to derive NR_FIX_BTMAPS rather than defining it for each
+page size.
+----
+
+Thanks for spinning this into a patch!
+
+Mark.
 
 > 
->> that family may share the same watchdog hardware.
->>
+> Signed-off-by:  Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by:  Suzuki K. Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/include/asm/fixmap.h |    7 ++-----
+>  1 file changed, 2 insertions(+), 5 deletions(-)
 > 
-> s/watchdog/eeprom
-
-Wow, that's what happen when copy/pasting. Will try to be more careful
-next time :)
-
+> diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+> index 8b9884c..3097045 100644
+> --- a/arch/arm64/include/asm/fixmap.h
+> +++ b/arch/arm64/include/asm/fixmap.h
+> @@ -17,6 +17,7 @@
+>  
+>  #ifndef __ASSEMBLY__
+>  #include <linux/kernel.h>
+> +#include <linux/sizes.h>
+>  #include <asm/boot.h>
+>  #include <asm/page.h>
+>  
+> @@ -55,11 +56,7 @@ enum fixed_addresses {
+>  	 * Temporary boot-time mappings, used by early_ioremap(),
+>  	 * before ioremap() is functional.
+>  	 */
+> -#ifdef CONFIG_ARM64_64K_PAGES
+> -#define NR_FIX_BTMAPS		4
+> -#else
+> -#define NR_FIX_BTMAPS		64
+> -#endif
+> +#define NR_FIX_BTMAPS		(SZ_256K / PAGE_SIZE)
+>  #define FIX_BTMAPS_SLOTS	7
+>  #define TOTAL_FIX_BTMAPS	(NR_FIX_BTMAPS * FIX_BTMAPS_SLOTS)
+>  
+> -- 
+> 1.7.9.5
 > 
->> This patchset is based on tag next-20151013 of the linux-next
->> repository. It has been successfully tested on a LPC4337 CIAA-NXP
->> Board.
->>
->> EEPROM notes:
->> ------------
->>
->> EEPROM size is 16384 bytes and it can be entirely read and
->> written/erased with 1 word (4 bytes) granularity. The last page
->> (128 bytes) contains the EEPROM initialization data and is not writable.
->>
->> Erase/program time is less than 3ms. The EEPROM device requires a
->> ~1500 kHz clock (min 800 kHz, max 1600 kHz) that is generated dividing
->> the system bus clock by the division factor, contained in the divider
->> register (minus 1 encoded).
->>
->> Thanks,
->>
->> Ariel D'Alessandro (2):
->>   nvmem: NXP LPC18xx EEPROM memory NVMEM driver
->>   DT: nvmem: Add NXP LPC18xx EEPROM memory binding documentation
->>
-> 
-> Can you please add a patch for the lpc18xx_defconfig and for devicetree files?
-
-Yes, I'll add those in next patchset v2.
-
-Thanks!
-
--- 
-Ariel D'Alessandro, VanguardiaSur
-www.vanguardiasur.com.ar
