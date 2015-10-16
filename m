@@ -1,53 +1,67 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 17 Oct 2015 08:41:33 +0900
-Subject: [PATCH v2 1/2] clk: samsung: exynos5250: Add DISP1 clocks
-In-Reply-To: <CAAObsKAjZX8XxTAFVKq4BCSZSrKG5xQPTue+z+xnJDD8QwK88Q@mail.gmail.com>
-References: <1444905084-22540-1-git-send-email-tomeu.vizoso@collabora.com>
- <1444905084-22540-2-git-send-email-tomeu.vizoso@collabora.com>
- <56203AD3.2050905@samsung.com> <20151016124935.20687.4394@quantum>
- <20151016172651.GB23912@codeaurora.org>
- <CAAObsKAjZX8XxTAFVKq4BCSZSrKG5xQPTue+z+xnJDD8QwK88Q@mail.gmail.com>
-Message-ID: <56218B2D.9040007@kernel.org>
+Date: Sat, 17 Oct 2015 08:46:28 +0900
+Subject: [PATCH v2 0/6] ARM: dts: Use correct CD properties for SDIO and
+ eMMC in Snow and Peach
+In-Reply-To: <5621002E.4080906@osg.samsung.com>
+References: <1444927873-15140-1-git-send-email-javier@osg.samsung.com>
+ <5620E17B.9080906@samsung.com> <5621002E.4080906@osg.samsung.com>
+Message-ID: <56218C54.3050206@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/15 03:56, Tomeu Vizoso wrote:
-> On 16 October 2015 at 19:26, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> On 10/16, Michael Turquette wrote:
->>> Quoting Krzysztof Kozlowski (2015-10-15 16:46:27)
->>>> On 15.10.2015 19:31, Tomeu Vizoso wrote:
->>>>> When the DISP1 power domain is powered off, there's two clocks that need
->>>>> to be temporarily reparented to OSC, and back to their original parents
->>>>> when the domain is powered on again.
->>>>>
->>>>> We expose these two clocks in the DT bindings so that the DT node of the
->>>>> power domain can reference them.
->>>>>
->>>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->>>>> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
->>>>> ---
->>>>>
->>>>> Changes in v2:
->>>>> - Reuse mout_aclk200_p
->>>>> - Rename div_aclk300 as div_aclk300_disp
->>>>>
->>>>>  drivers/clk/samsung/clk-exynos5250.c   | 14 +++++++++++++-
->>>>>  include/dt-bindings/clock/exynos5250.h |  4 +++-
->>>>>  2 files changed, 16 insertions(+), 2 deletions(-)
->>>>>
->>>>
->>>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>
->>> Applied to clk-next.
->>>
+On 10/16/15 22:48, Javier Martinez Canillas wrote:
+> Hello Alim,
+> 
+> On 10/16/2015 01:37 PM, Alim Akhtar wrote:
+>> Hi Javier,
 >>
->> I think Tomeu wanted to take this through arm-soc? Otherwise
->> we'll need to provide a stable branch for the dt header.
+>> On 10/15/2015 10:21 PM, Javier Martinez Canillas wrote:
+>>> Hello,
+>>>
+>>> The Exynos Chromebooks DTS don't use the correct card detection properties
+>>> since these were carried from the vendor tree that had a reason to do so.
+>>>
+>>> There are two things that I noticed:
+>>>
+>>> 1) The Marvell WiFi SDIO is marked as broken-cd instead of non-removable:
+>>>
+>>> This causes the device to be removed when the system enters into a suspend
+>>> state which leads to the following warning when the system is resumed:
+>>>
+>>> [  181.944636] mmc2: error -2 during resume (card was removed?)
+>>>
+>>> The rationale for using broken-cd is explained in downstream commit [0] and
+>>> was that using the non-removable property caused issues with the mwifiex
+>>> driver since the reset logic called the mmc_{remove,add}_host() functions.
+>>>
+>>> But the reset logic in the mwifiex mainline driver has changed and this is
+>>> no longer the case so it's safe to use the non-removable property AFAICT.
+>>>
+>> Good to know it is fixed now. This is fixed in firmware or in the driver?
+>>
 > 
-> Hi, Stephen is right, the second patch depends on this one.
+> The fix is only in the driver. In fact, I'm using the same firmware from
+> the ChromeOS rootfs for both the v3.8 vendor tree and mainline.
 > 
-So...how can I take 2nd patch of this series in samsung(arm-soc) tree?
-And this series shouldn't be for fixes for 4.3?...Mike how do you think?
+> So IIUC, the problem with the vendor tree was that the mwifiex SDIO driver
+> mwifiex_sdio_reset_work() function did a card reset by calling the functions
+> mmc_remove_host() and then mmc_add_host().
+> 
+> But this didn't play nice with MMC_CAP_NONREMOVABLE since mmc_rescan() just
+> returns if the flag is set so the card wouldn't be tried to be detected again.
+> 
+> After commit ("b4336a282db8 mwifiex: sdio: reset adapter using mmc_hw_reset"),
+> the card is reset by doing a power cycle so that's why "non-removable" can be
+> used now instead of "broken-cd".
+> 
+>>> 2) The eMMC node has both broken-cd and non-removable but the MMC DT binding
+>>> doc (Documentation/devicetree/bindings/mmc/mmc.txt) mentions that only one
+>>> of these card detection properties should be used.
+>>>
+>> This change looks ok, will take a closer look once I am back to my work station.
+>>
+Actually, looks good to me +1.
+Let me take this series once get the feedback from Alim.
 
 Thanks,
 Kukjin
