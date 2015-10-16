@@ -1,37 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Oct 2015 22:02:04 +0200
-Subject: [PATCH] ARM: thp: fix unterminated ifdef in header file
-Message-ID: <5446974.UXhT00HeJk@wuerfel>
+Date: Fri, 16 Oct 2015 22:03:31 +0200
+Subject: [PATCH] memcg: include linux/mm.h
+Message-ID: <14714191.7FdLxZ8X79@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent change accidentally removed one line more than it should
-have, causing the build to fail with ARM LPAE:
+A recent change to the memcg code added a call to virt_to_head_page,
+which is declared in linux/mm.h, but this is not necessarily included
+here and will cause compile errors:
 
-In file included from /git/arm-soc/arch/arm/include/asm/pgtable.h:31:0,
-                 from /git/arm-soc/include/linux/mm.h:55,
-                 from /git/arm-soc/arch/arm/kernel/asm-offsets.c:15:
-/git/arm-soc/arch/arm/include/asm/pgtable-3level.h:20:0: error: unterminated #ifndef
- #ifndef _ASM_PGTABLE_3LEVEL_H
+include/linux/memcontrol.h:841:9: error: implicit declaration of function 'virt_to_head_page' [-Werror=implicit-function-declaration]
 
-This puts the line back where it was.
+This adds an explicit include statement that gets rid of the error.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: f054144a1b23 ("arm, thp: remove infrastructure for handling splitting PMDs")
----
-I noticed this on today's linux-next. It's likely that someone else did too
-and already submitted a patch, so mine can be ignored. Otherwise please fold
-into the original patch.
+Fixes: 1ead4c071978 ("memcg: simplify and inline __mem_cgroup_from_kmem")
 
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index d42f81f13618..dc46398bc3a5 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -231,6 +231,7 @@ static inline pte_t pte_mkspecial(pte_t pte)
+diff --git a/include/linux/memcontrol.h b/include/linux/memcontrol.h
+index 47677acb4516..6d18936df7e8 100644
+--- a/include/linux/memcontrol.h
++++ b/include/linux/memcontrol.h
+@@ -27,6 +27,7 @@
+ #include <linux/vmpressure.h>
+ #include <linux/eventfd.h>
+ #include <linux/mmzone.h>
++#include <linux/mm.h>
+ #include <linux/writeback.h>
  
- #ifdef CONFIG_TRANSPARENT_HUGEPAGE
- #define pmd_trans_huge(pmd)	(pmd_val(pmd) && !pmd_table(pmd))
-+#endif
- 
- #define PMD_BIT_FUNC(fn,op) \
- static inline pmd_t pmd_##fn(pmd_t pmd) { pmd_val(pmd) op; return pmd; }
+ struct mem_cgroup;
