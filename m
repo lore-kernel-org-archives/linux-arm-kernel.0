@@ -1,52 +1,23 @@
-From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
-Date: Fri, 16 Oct 2015 11:07:06 -0300
-Subject: [PATCH 2/2] DT: nvmem: Add NXP LPC18xx EEPROM memory binding
- documentation
-In-Reply-To: <1445004426-6271-1-git-send-email-ariel@vanguardiasur.com.ar>
-References: <1445004426-6271-1-git-send-email-ariel@vanguardiasur.com.ar>
-Message-ID: <1445004426-6271-3-git-send-email-ariel@vanguardiasur.com.ar>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 16 Oct 2015 16:09:53 +0200
+Subject: [PATCH 1/5] pinctrl: berlin: select the pinctrl driver according
+ to the SoC used
+In-Reply-To: <1444771901-24460-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1444771901-24460-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1444771901-24460-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <CACRpkdZ3Vx0+WwKuuV8keqK67Mf_pD22rwqg7WMO=1X0GwZqnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the devicetree binding document for NXP LPC18xx EEPROM memory.
+On Tue, Oct 13, 2015 at 11:31 PM, Antoine Tenart
+<antoine.tenart@free-electrons.com> wrote:
 
-Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
----
- .../devicetree/bindings/nvmem/lpc18xx_eeprom.txt   | 26 ++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt
+> This patch prepares to remove the pinctrl driver selection from the
+> mach-berlin Kconfig. To do so, bool is replaced by def_bool.
+>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-diff --git a/Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt b/Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt
-new file mode 100644
-index 0000000..372ff8c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt
-@@ -0,0 +1,26 @@
-+* NXP LPC18xx EEPROM memory NVMEM driver
-+
-+Required properties:
-+  - compatible: Should be "nxp,lpc1850-eeprom"
-+  - reg: Must contain an entry with the physical base address and length
-+    for each entry in reg-names.
-+  - reg-names: Must include the following entries.
-+    - reg: EEPROM registers.
-+    - mem: EEPROM address space.
-+  - clocks: Must contain an entry for each entry in clock-names.
-+  - clock-names: Must include the following entries.
-+    - eeprom: EEPROM operating clock.
-+  - interrupts: Should contain EEPROM interrupt.
-+
-+Example:
-+
-+  eeprom: eeprom at 4000e000 {
-+    compatible = "nxp,lpc1850-eeprom";
-+    reg = <0x4000e000 0x1000>,
-+          <0x20040000 0x4000>;
-+    reg-names = "reg", "mem";
-+    clocks = <&ccu1 CLK_CPU_EEPROM>;
-+    clock-names = "eeprom";
-+    resets = <&rgu 27>;
-+    interrupts = <4>;
-+  };
--- 
-2.6.1
+Patch applied with Sebastian's ACK.
+
+Yours,
+Linus Walleij
