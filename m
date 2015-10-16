@@ -1,35 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 Oct 2015 09:48:48 +0100
-Subject: [PATCH RFC 4/7] genirq/msi: Make the .prepare callback reusable
-In-Reply-To: <56208EE0.1030604@linux.intel.com>
-References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
- <1444923568-17413-5-git-send-email-marc.zyngier@arm.com>
- <56208EE0.1030604@linux.intel.com>
-Message-ID: <5620B9F0.50203@arm.com>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Fri, 16 Oct 2015 16:49:50 +0800
+Subject: [RESEND PATCH] pwm-backlight: fix the panel power sequence
+In-Reply-To: <201510161036.Q5q8ayZx%fengguang.wu@intel.com>
+References: <201510161036.Q5q8ayZx%fengguang.wu@intel.com>
+Message-ID: <1444985390.18373.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/10/15 06:45, Jiang Liu wrote:
-> On 2015/10/15 23:39, Marc Zyngier wrote:
-> <snit>
->> +int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
->> +			    int nvec, msi_alloc_info_t *arg)
->> +{
->> +	struct msi_domain_info *info = domain->host_data;
->> +	struct msi_domain_ops *ops = info->ops;
->> +	int ret;
->> +
->> +	ret = ops->msi_check(domain, info, dev);
->> +	if (ret == 0)
->> +		ret = ops->msi_prepare(domain, dev, nvec, arg);
->> +	if (ret)
->> +		return ret;
->> +
->> +	return 0;
-> Seems a simple "return ret" is enough:)
+On Fri, 2015-10-16 at 10:42 +0800, kbuild test robot wrote:
+> Hi YH,
+> 
+> [auto build test ERROR on pwm/for-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+> 
+> url:    https://github.com/0day-ci/linux/commits/YH-Huang/pwm-backlight-fix-the-panel-power-sequence/20151016-093957
+> config: i386-allmodconfig (attached as .config)
+> reproduce:
+>         # save the attached .config to linux build tree
+>         make ARCH=i386 
+> 
+> All errors (new ones prefixed by >>):
+> 
+>    drivers/video/backlight/pwm_bl.c: In function 'pwm_backlight_probe':
+> >> drivers/video/backlight/pwm_bl.c:245:20: error: too few arguments to function 'devm_gpiod_get_optional'
+>      pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable");
+>                        ^
+>    In file included from drivers/video/backlight/pwm_bl.c:13:0:
+>    include/linux/gpio/consumer.h:80:32: note: declared here
+>     struct gpio_desc *__must_check devm_gpiod_get_optional(struct device *dev,
+>                                    ^
+> 
+> vim +/devm_gpiod_get_optional +245 drivers/video/backlight/pwm_bl.c
+> 
+>    239		pb->notify_after = data->notify_after;
+>    240		pb->check_fb = data->check_fb;
+>    241		pb->exit = data->exit;
+>    242		pb->dev = &pdev->dev;
+>    243		pb->enabled = false;
+>    244	
+>  > 245		pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable");
+>    246		if (IS_ERR(pb->enable_gpio)) {
+>    247			ret = PTR_ERR(pb->enable_gpio);
+>    248			goto err_alloc;
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 
-Ah! yes! ;-)
+Sorry, I made a mistake.
+I will send patch v2 to fix it.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+YH Huang
