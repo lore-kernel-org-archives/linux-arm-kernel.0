@@ -1,43 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Oct 2015 22:30:59 +0200
-Subject: [PATCH] [media] horus3a: fix horus3a_attach inline wrapper
-Message-ID: <7188906.Hi9qi0FZQC@wuerfel>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Fri, 16 Oct 2015 13:35:50 -0700
+Subject: [PATCH net-next 0/2] drivers: xgene: Add support RGMII TX/RX delay
+ configuration
+Message-ID: <1445027752-16982-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'static inline' version of horus3a_attach() is incorrectly
-copied from another file, which results in a build error when
-CONFIG_DVB_HORUS3A is disabled:
+This patch adds support RGMII TX/RX delay configuration.
 
-In file included from /git/arm-soc/drivers/media/pci/netup_unidvb/netup_unidvb_core.c:34:0:
-media/dvb-frontends/horus3a.h:51:13: warning: 'struct cxd2820r_config' declared inside parameter list
-media/dvb-frontends/horus3a.h:51:13: warning: its scope is only this definition or declaration, which is probably not what you want
-media/pci/netup_unidvb/netup_unidvb_core.c: In function 'netup_unidvb_dvb_init':
-media/pci/netup_unidvb/netup_unidvb_core.c:417:279: warning: passing argument 1 of '__a' from incompatible pointer type [-Wincompatible-pointer-types]
-media/pci/netup_unidvb/netup_unidvb_core.c:417:279: note: expected 'const struct cxd2820r_config *' but argument is of type 'struct dvb_frontend *'
-media/pci/netup_unidvb/netup_unidvb_core.c:417:298: warning: passing argument 2 of '__a' from incompatible pointer type [-Wincompatible-pointer-types]
-media/pci/netup_unidvb/netup_unidvb_core.c:417:298: note: expected 'struct i2c_adapter *' but argument is of type 'struct horus3a_config *'
-media/pci/netup_unidvb/netup_unidvb_core.c:417:275: error: too many arguments to function '__a'
-
-This changes the code to have the correct prototype.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: a5d32b358254 ("[media] horus3a: Sony Horus3A DVB-S/S2 tuner driver")
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 ---
-Found on ARM randconfig builds
 
-diff --git a/drivers/media/dvb-frontends/horus3a.h b/drivers/media/dvb-frontends/horus3a.h
-index b055319d532e..c1e2d1834b78 100644
---- a/drivers/media/dvb-frontends/horus3a.h
-+++ b/drivers/media/dvb-frontends/horus3a.h
-@@ -46,8 +46,8 @@ extern struct dvb_frontend *horus3a_attach(struct dvb_frontend *fe,
- 					const struct horus3a_config *config,
- 					struct i2c_adapter *i2c);
- #else
--static inline struct dvb_frontend *horus3a_attach(
--					const struct cxd2820r_config *config,
-+static inline struct dvb_frontend *horus3a_attach(struct dvb_frontend *fe,
-+					const struct horus3a_config *config,
- 					struct i2c_adapter *i2c)
- {
- 	printk(KERN_WARNING "%s: driver disabled by Kconfig\n", __func__);
+Iyappan Subramanian (2):
+  drivers: net: xgene: Add support RGMII TX/RX delay configuration
+  Documentation: dts: xgene: Add TX/RX delay field
+
+ .../devicetree/bindings/net/apm-xgene-enet.txt     | 10 +++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     |  8 +++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     |  1 +
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c   | 49 ++++++++++++++++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h   |  2 +
+ 5 files changed, 69 insertions(+), 1 deletion(-)
+
+-- 
+1.9.1
