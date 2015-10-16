@@ -1,45 +1,49 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 15 Oct 2015 21:28:20 -0500
-Subject: [GIT PULL] qcom SoC changes for 4.4 *RESEND*
-In-Reply-To: <5294153.vxTnuIq2gr@wuerfel>
-References: <1444860627-8258-1-git-send-email-agross@codeaurora.org>
- <5294153.vxTnuIq2gr@wuerfel>
-Message-ID: <20151016022820.GC23681@qualcomm.com>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Fri, 16 Oct 2015 10:31:53 +0800
+Subject: [alsa-devel] [RFC PATCH] ASoC: Modify check condition of
+ multiple bindings of components
+In-Reply-To: <561FA979.6030407@metafoo.de>
+References: <1444743477-48819-1-git-send-email-koro.chen@mediatek.com>
+ <561D0AA9.5080702@metafoo.de> <1444745902.26493.2.camel@mtksdaap41>
+ <561D1843.1020007@metafoo.de> <1444785549.26493.12.camel@mtksdaap41>
+ <561E1991.1050705@metafoo.de> <20151015121035.GE14956@sirena.org.uk>
+ <561FA979.6030407@metafoo.de>
+Message-ID: <1444962713.31246.6.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 11:05:27PM +0200, Arnd Bergmann wrote:
-> On Wednesday 14 October 2015 17:10:27 Andy Gross wrote:
-> > Qualcomm ARM Based SoC Updates for 4.4
+On Thu, 2015-10-15 at 15:26 +0200, Lars-Peter Clausen wrote:
+> On 10/15/2015 02:10 PM, Mark Brown wrote:
+> > On Wed, Oct 14, 2015 at 11:00:01AM +0200, Lars-Peter Clausen wrote:
 > > 
-> > * Implement id_table driver matching in SMD
-> > * Avoid NULL pointer exception on remove of SMEM
-> > * Reorder SMEM/SMD configs
-> > * Make qcom_smem_get() return a pointer
-> > * Handle big endian CPUs correctly in SMEM
-> > * Represent SMD channel layout in structures
-> > * Use __iowrite32_copy() in SMD
-> > * Remove use of VLAIs in SMD
-> > * Handle big endian CPUs correctly in SMD/RPM
-> > * Handle big endian CPUs corretly in SMD
-> > * Reject sending SMD packets that are too large
-> > * Fix endianness issue in SCM __qcom_scm_is_call_available
-> > * Add missing prototype for qcom_scm_is_available()
-> > * Correct SMEM items for upper channels
-> > * Use architecture level to build SCM correctly
-> > * Delete unneeded of_node_put in SMD
-> > * Correct active/slep state flagging in SMD/RPM
-> > * Move RPM message ram out of SMEM DT node
+> >> It was never intended that it is possible to bind a component to multiple
+> >> cards. That it was possible was a bug that was overlooked and some people
+> >> tried to do it which caused apparently random crashes later on, caused by
+> >> the data structure corruption. This is why we added the check to catch this
+> >> kind of mistake early and to avoid the crashes.
 > > 
+> > This is true, but I do think it's something that we should have some
+> > story on supporting for some of this hardware that has a bunch of
+> > channels in one IP block that can't really interact with each other.
+> > It's going to make it a lot easier for people to think about the
+> > hardware and how to describe it.
 > 
-> Pulled into next/drivers, but please try to make the changelogs more readable
-> in the future. No point listing each small patch here, instead say what you've
-> done overall and what the major things are. Right now, the merge commit
-> just duplicates the information like this:
-
-Fair enough.  I'll condense it next time.  Thanks for the hwspinlock fix on top.
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> I'm not saying we shouldn't support it, just that we can't support it with
+> the current code. And adding support for it will require a fair bit of
+> restructuring.
+> 
+> If a hardware block as multiple independent channels the best approach in my
+> opinion is to register multiple components (Which we can't do at the moment,
+> because there can only be one component per device). From a framework point
+Yes... I have tried to register 2 platforms in my ASoC platform driver
+but alsa considered they are the same platform since they are from the
+same device.
+> of view there is no difference between a single device with multiple
+> independent channels and multiple independent devices with one channel each.
+> Both have the same logical topology.
+> 
+Yes, but in my case there is only one HW, one set of registers, and one
+set of clocks, it should be a single device node in the device tree. 
+> - Lars
+> 
+> 
