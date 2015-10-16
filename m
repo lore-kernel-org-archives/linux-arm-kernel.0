@@ -1,46 +1,42 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 16 Oct 2015 13:07:05 +0000
-Subject: [PATCH RFC 4/7] genirq/msi: Make the .prepare callback reusable
-In-Reply-To: <561FE4CE.4090505@arm.com>
-References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
- <1444923568-17413-5-git-send-email-marc.zyngier@arm.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1624783E@lhreml503-mbs>
- <561FE4CE.4090505@arm.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E16248DEC@lhreml503-mbs>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 16 Oct 2015 15:08:39 +0200
+Subject: [RFC 1/2] Dcumentation: bridge: Add documentation for ps8640 DT
+ properties
+In-Reply-To: <1444997709-57293-1-git-send-email-ck.hu@mediatek.com>
+References: <1444997709-57293-1-git-send-email-ck.hu@mediatek.com>
+Message-ID: <1445000919.3541.11.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
-> owner at vger.kernel.org] On Behalf Of Marc Zyngier
-> Sent: Thursday, October 15, 2015 6:39 PM
-> To: Gabriele Paoloni; Thomas Gleixner; Jiang Liu; Jason Cooper
-> Cc: majun (F); linux-arm-kernel at lists.infradead.org; linux-
-> pci at vger.kernel.org; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH RFC 4/7] genirq/msi: Make the .prepare callback
-> reusable
+Hi CK,
+
+there is a typo in the subject: s/Dcumentation/Documentation/.
+
+Am Freitag, den 16.10.2015, 20:15 +0800 schrieb CK Hu:
+> From: Jitao Shi <jitao.shi@mediatek.com>
 > 
-> On 15/10/15 18:24, Gabriele Paoloni wrote:
-> > Hi Marc
-> >
-> > It looks like this patch fails to apply to 4.3-rc5....
+> Add documentation for DT properties supported by ps8640
+> DSI-eDP converter.
 > 
-> Which is by design. Try tip/irq/core.
+> Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+[...]
+> +	- ps8640-1v2-supply: OF device-tree regulator specification for 1v2.
+> +	- ps8640-3v3-supply: OF device-tree regulator specification for 3v3.
 
-Oops sorry, got it!
+The ps8640- part of the regulator supply property names is redundant.
+The PS8622 driver uses vdd12-supply as its regulator. Should we strive
+for consistency here? Or if you have access to the datasheet, how are
+these inputs called there?
 
-Thanks, applies ok to tip/irq/core
+> +
+> +Optional properties:
+> +	- video interfaces: Device node can contain video interface port
+> +			    nodes for panel according to [1].
+> +
+> +[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
 
-Gab
+It should be documented here that port at 0 is the input port and port at 1 is
+the output port.
 
-
-> 
-> 	M.
-> --
-> Jazz is not dead. It just smells funny...
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+best regards
+Philipp
