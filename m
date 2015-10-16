@@ -1,31 +1,90 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 16 Oct 2015 11:22:09 -0500
-Subject: [PATCH 10/11] arm: omap2+: select 32k clocksource driver
+Date: Fri, 16 Oct 2015 11:22:10 -0500
+Subject: [PATCH 11/11] arm: omap2: timer: limit hwmod usage to non-DT boots
 In-Reply-To: <1445012530-14126-1-git-send-email-balbi@ti.com>
 References: <1445012530-14126-1-git-send-email-balbi@ti.com>
-Message-ID: <1445012530-14126-11-git-send-email-balbi@ti.com>
+Message-ID: <1445012530-14126-12-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a 32k clocksource driver, let's
-select it for OMAP2PLUS builds.
+now that we have a working 32k clocksource driver,
+we can limit HWMOD usage to non-DT boots and rely
+on clocksource_of_init() every time we boot
+with DT.
+
+While at that, also make sure that we don't disable
+the 32-counter device so it gets probed by its driver.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-omap2/timer.c | 33 +++++++++++++--------------------
+ 1 file changed, 13 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index b3a0dff67e3f..dc793cc60965 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -96,6 +96,7 @@ config ARCH_OMAP2PLUS
- 	select SOC_BUS
- 	select TI_PRIV_EDMA
- 	select OMAP_IRQCHIP
-+	select CLKSRC_TI_32K
- 	help
- 	  Systems based on OMAP2, OMAP3, OMAP4 or OMAP5
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index d024b2bb5c4c..05c17eb2f2d9 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -183,7 +183,8 @@ static struct device_node * __init omap_get_timer_dt(const struct of_device_id *
+ 				  of_get_property(np, "ti,timer-secure", NULL)))
+ 			continue;
+ 
+-		of_add_property(np, &device_disabled);
++		if (!of_device_is_compatible(np, "ti,omap-counter32k"))
++			of_add_property(np, &device_disabled);
+ 		return np;
+ 	}
+ 
+@@ -394,7 +395,6 @@ static int __init __maybe_unused omap2_sync32k_clocksource_init(void)
+ 	int ret;
+ 	struct device_node *np = NULL;
+ 	struct omap_hwmod *oh;
+-	void __iomem *vbase;
+ 	const char *oh_name = "counter_32k";
+ 
+ 	/*
+@@ -420,18 +420,6 @@ static int __init __maybe_unused omap2_sync32k_clocksource_init(void)
+ 
+ 	omap_hwmod_setup_one(oh_name);
+ 
+-	if (np) {
+-		vbase = of_iomap(np, 0);
+-		of_node_put(np);
+-	} else {
+-		vbase = omap_hwmod_get_mpu_rt_va(oh);
+-	}
+-
+-	if (!vbase) {
+-		pr_warn("%s: failed to get counter_32k resource\n", __func__);
+-		return -ENXIO;
+-	}
+-
+ 	ret = omap_hwmod_enable(oh);
+ 	if (ret) {
+ 		pr_warn("%s: failed to enable counter_32k module (%d)\n",
+@@ -439,13 +427,18 @@ static int __init __maybe_unused omap2_sync32k_clocksource_init(void)
+ 		return ret;
+ 	}
+ 
+-	ret = omap_init_clocksource_32k(vbase);
+-	if (ret) {
+-		pr_warn("%s: failed to initialize counter_32k as a clocksource (%d)\n",
+-							__func__, ret);
+-		omap_hwmod_idle(oh);
+-	}
++	if (!of_have_populated_dt()) {
++		void __iomem *vbase;
+ 
++		vbase = omap_hwmod_get_mpu_rt_va(oh);
++
++		ret = omap_init_clocksource_32k(vbase);
++		if (ret) {
++			pr_warn("%s: failed to initialize counter_32k as a clocksource (%d)\n",
++					__func__, ret);
++			omap_hwmod_idle(oh);
++		}
++	}
+ 	return ret;
+ }
  
 -- 
 2.5.3
