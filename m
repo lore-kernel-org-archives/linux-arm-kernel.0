@@ -1,106 +1,109 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 16 Oct 2015 14:37:01 -0700 (PDT)
-Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
-In-Reply-To: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
-References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
-Message-ID: <2544073.SzFGJq3XZ1@wasted.cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Oct 2015 23:37:51 +0200
+Subject: [GIT PULL] qcom SoC changes for 4.4 *RESEND*
+In-Reply-To: <20151016212626.GD16437@codeaurora.org>
+References: <1444860627-8258-1-git-send-email-agross@codeaurora.org>
+ <4138617.YyHIgKfeHJ@wuerfel> <20151016212626.GD16437@codeaurora.org>
+Message-ID: <4453168.e21k6NYVFf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the SILK board dependent part of the SDHI1 (connected to micro-SD
-slot) device nodes along with the necessary voltage regulators.
+On Friday 16 October 2015 14:26:27 Stephen Boyd wrote:
+> On 10/16, Arnd Bergmann wrote:
+> > On Friday 16 October 2015 13:04:17 Stephen Boyd wrote:
+> > > On 10/16, Arnd Bergmann wrote:
+> > > > On Friday 16 October 2015 09:56:30 Stephen Boyd wrote:
+> > > > > 
+> > > > > Can you share your .config? It looks like there are stubs for these, so
+> > > > > I'm lost how we got undefined references.
+> > > > > 
+> > > > http://pastebin.com/HtrC510p
+> > > > 
+> > > > The problem is CONFIG_HWSPINLOCK=m && CONFIG_QCOM_SMEM=y. Sorry for sending
+> > > > an incomplete patch description, I had not noticed those wrapper functions.
+> > > > 
+> > > > My patch fixes the issue, but does not allow you to build QCOM_SMEM without
+> > > > HWSPINLOCK. If we want that configuration to be valid, we need one of
+> > > > the two changes below:
+> > > > 
+> > > > diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
+> > > > index eec76141d9b9..cae0ffa19bca 100644
+> > > > --- a/drivers/soc/qcom/Kconfig
+> > > > +++ b/drivers/soc/qcom/Kconfig
+> > > > @@ -22,7 +22,7 @@ config QCOM_PM
+> > > >  config QCOM_SMEM
+> > > >  	tristate "Qualcomm Shared Memory Manager (SMEM)"
+> > > >  	depends on ARCH_QCOM
+> > > > -	depends on HWSPINLOCK
+> > > > +	depends on HWSPINLOCK && !HWSPINLOCK
+> > > 
+> > > What does this mean?
+> > 
+> > This is the magic way in Kconfig to express what we want ;-)
+> > 
+> > It says it depends on either HWSPINLOCK being disabled (!HWSPINLOCK),
+> > or it depends on HWSPINLOCK. The latter implies that QCOM_SMEM cannot
+> > be built-in when HWSPINLOCK=m, but they are allowed to both be built-in.
+> > 
+> 
+> I think you mean OR then?
+> 
+> 	depends on HWSPINLOCK || !HWSPINLOCK
 
-Based on the original patch by Vladimir Barinov
-<vladimir.barinov@cogentembedded.com>.
+Yes, sorry about that.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> If I have HWSPINLOCK=y and try menuconfig with your patch, the
+> smem config isn't selectable. But if HWSPINLOCK=m then the smem
+> config is visible and smem can only be a module.
 
----
-This patch is against 'renesas-devel-20151015-v4.3-rc5' tag of Simon Horman's
-'renesas.git' repo.
+Ok, I have to admit that I don't even know how Kconfig interprets
+(FOO && !FOO), so that's probably the result of my typo.
 
-Changes in version 3:
-- removed the "disable-wp" property;
-- added empty line before the regulator nodes;
-- reformatted the changelog;
-- refreshed the patch.
+> > 
+> > > >  	help
+> > > >  	  Say y here to enable support for the Qualcomm Shared Memory Manager.
+> > > >  	  The driver provides an interface to items in a heap shared among all
+> > > > diff --git a/include/linux/hwspinlock.h b/include/linux/hwspinlock.h
+> > > > index 859d673d98c8..cdfd9fd2ba11 100644
+> > > > --- a/include/linux/hwspinlock.h
+> > > > +++ b/include/linux/hwspinlock.h
+> > > > @@ -59,7 +59,7 @@ struct hwspinlock_pdata {
+> > > >  	int base_id;
+> > > >  };
+> > > >  
+> > > > -#if defined(CONFIG_HWSPINLOCK) || defined(CONFIG_HWSPINLOCK_MODULE)
+> > > > +#if IS_REACHABLE(CONFIG_HWSPINLOCK)
+> > > >  
+> > > >  int hwspin_lock_register(struct hwspinlock_device *bank, struct device *dev,
+> > > >  		const struct hwspinlock_ops *ops, int base_id, int num_locks);
+> > > > 
+> > > 
+> > > I'd prefer this patch. Is there some way to capture that
+> > > QCOM_SMEM must be a module if HWSPINLOCK is a module unless we're
+> > > doing a compile test, in which case we don't care?
+> > 
+> > The problem here is that while we avoid the build error, we get the
+> > counterintuitive behavior that you can have the HWSPINLOCK module
+> > loaded but the built-in QCOM_SMEM module does not use it because
+> > it wasn't reachable at compile time.
+> > 
+> 
+> Agreed, which is why I suggested depends on HWSPINLOCK ||
+> COMPILE_TEST + the IS_REACHABLE patch. That way if hwspinlock=y,
+> smem can be y or m, if hwspinlock=m, smem can only be m, and if
+> hwspinlock=n then smem can only be y or m if it has
+> COMPILE_TEST=y. In the last case the IS_REACHABLE ifdef will "do
+> the right thing" and make it so that HWSPINLOCK symbols are
+> stubbed out if hwspinlock=m and smem=y or hwspinlock=n and
+> smem=y/m.
 
-Changes in version 2:
-- removed non-working SDHI0 stuff, renamed the patch;
-- replaced SDHI1's "wp-gpios" property with "disable-wp".
-
- arch/arm/boot/dts/r8a7794-silk.dts |   40 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7794-silk.dts
-+++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -12,6 +12,7 @@
+Ah, I see. The downside is still that other users of HWSPINLOCK
+might now accidentally build but not work if HWSPINLOCK=m.
  
- /dts-v1/;
- #include "r8a7794.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "SILK";
-@@ -39,6 +40,30 @@
- 		regulator-boot-on;
- 		regulator-always-on;
- 	};
-+
-+	vcc_sdhi1: regulator at 3 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "SDHI1 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpio = <&gpio4 26 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	vccq_sdhi1: regulator at 4 {
-+		compatible = "regulator-gpio";
-+
-+		regulator-name = "SDHI1 VccQ";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
-+		gpios-states = <1>;
-+		states = <3300000 1
-+			  1800000 0>;
-+	};
- };
- 
- &extal_clk {
-@@ -71,6 +96,11 @@
- 		renesas,function = "mmc";
- 	};
- 
-+	sdhi1_pins: sd1 {
-+		renesas,groups = "sdhi1_data4", "sdhi1_ctrl";
-+		renesas,function = "sdhi1";
-+	};
-+
- 	qspi_pins: spi0 {
- 		renesas,groups = "qspi_ctrl", "qspi_data4";
- 		renesas,function = "qspi";
-@@ -147,6 +177,16 @@
- 	status = "okay";
- };
- 
-+&sdhi1 {
-+	pinctrl-0 = <&sdhi1_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&vcc_sdhi1>;
-+	vqmmc-supply = <&vccq_sdhi1>;
-+	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
- &qspi {
- 	pinctrl-0 = <&qspi_pins>;
- 	pinctrl-names = "default";
+> I don't think we ever care about a kernel that actually runs when
+> COMPILE_TEST=y, so this seems to be ok.
+
+Right, for the QCOM_SMEM support that is clearly ok as long as you
+have the Kconfig logic there.
+
+	Arnd
