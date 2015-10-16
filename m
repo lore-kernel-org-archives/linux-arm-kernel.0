@@ -1,49 +1,34 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 Oct 2015 09:48:22 +0100
-Subject: [PATCH RFC 0/7] Adding core support for wire-MSI bridges
-In-Reply-To: <56205917.7090001@linux.intel.com>
+Date: Fri, 16 Oct 2015 09:48:48 +0100
+Subject: [PATCH RFC 4/7] genirq/msi: Make the .prepare callback reusable
+In-Reply-To: <56208EE0.1030604@linux.intel.com>
 References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
- <56205917.7090001@linux.intel.com>
-Message-ID: <5620B9D6.1010708@arm.com>
+ <1444923568-17413-5-git-send-email-marc.zyngier@arm.com>
+ <56208EE0.1030604@linux.intel.com>
+Message-ID: <5620B9F0.50203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gerry,
-
-On 16/10/15 02:55, Jiang Liu wrote:
+On 16/10/15 06:45, Jiang Liu wrote:
 > On 2015/10/15 23:39, Marc Zyngier wrote:
->> There seems to be a new class of interrupt controller out there whose
->> sole purpose (apart from making everybody's life a nightmare) is to
->> turn wired interrupts into MSIs.
->>
->> Instead of considering that the MSIs allocated to a device are for the
->> direct use of that device, we can turn this set of MSIs into a irq
->> domain, and use that domain to build a standard irqchip on top of
->> that.
-> Hi Marc,
-> 	There's a working to enable Intel VMD storage device, which
-> has the similar requirement. Basically a PCIe hierarchy is hidden
-> behind a parent PCIe device, so we need to use the PCIe irqs on parent
-> to de-multiple PCIe IRQs from hidden PCIe devices. Seems a chance for
-> consolidation here.
+> <snit>
+>> +int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
+>> +			    int nvec, msi_alloc_info_t *arg)
+>> +{
+>> +	struct msi_domain_info *info = domain->host_data;
+>> +	struct msi_domain_ops *ops = info->ops;
+>> +	int ret;
+>> +
+>> +	ret = ops->msi_check(domain, info, dev);
+>> +	if (ret == 0)
+>> +		ret = ops->msi_prepare(domain, dev, nvec, arg);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	return 0;
+> Seems a simple "return ret" is enough:)
 
-Do you know if there is a 1-1 mapping between the interrupts seen by the
-parent device and those seen by the hidden devices? Or is it a case of
-having to demultiplex the MSIs? Looks like the former, but I'd like to
-be sure.
-
-I just had a quick look at the code there:
-https://lkml.org/lkml/2015/8/27/674
-
-Is there anything more recent?
-
-> 	cc Keith Busch <keith.busch@intel.com> who is the author of
-> VMD device driver.
-
-Sure, will do when I repost this (probably in a few weeks), and assuming
-this fits the bill for Thomas and the MBIGEN folks.
-
-Thanks,
+Ah! yes! ;-)
 
 	M.
 -- 
