@@ -1,127 +1,81 @@
-From: eballetbo@gmail.com (Enric Balletbo Serra)
-Date: Fri, 16 Oct 2015 10:22:04 +0200
-Subject: [PATCH 3/3] ARM: dts: Add basic support for isee igepv5
-In-Reply-To: <1444756728-11185-3-git-send-email-tony@atomide.com>
-References: <1444756728-11185-1-git-send-email-tony@atomide.com>
- <1444756728-11185-3-git-send-email-tony@atomide.com>
-Message-ID: <CAFqH_52T8rPJp-8+Bb7Tjv-kcACU8FJGtqFWOhj02DzQ2yc7nw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 16 Oct 2015 10:25:41 +0200
+Subject: [PATCH v3 0/7] mmc: dw_mmc-rockchip: allow tuning using the
+ clk-phase api
+In-Reply-To: <1444654110-32293-1-git-send-email-heiko@sntech.de>
+References: <1444654110-32293-1-git-send-email-heiko@sntech.de>
+Message-ID: <CAPDyKFo5jvsv+wpo4cSgetb9CfjXF6Y7DGDGRBXDSZkTnXzj-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-Many thanks for the patch
-
-2015-10-13 19:18 GMT+02:00 Tony Lindgren <tony@atomide.com>:
-> With omap5-board-common.dtsi, we can now easily add support for various omap5
-> board variants. Let's add minimal support for isee igepv5.
+On 12 October 2015 at 14:48, Heiko Stuebner <heiko@sntech.de> wrote:
+> This series resurrects and adapts some individual patches whose sum
+> enable the dw_mmc hosts on Rockchip socs to tune clock phases using
+> the generic phase api (rk3288 and following have this capability).
 >
-> So far I've tested that basic things work, such as serial, USB Ethernet, HDMI
-> and WLAN.
+> The changes to the original mmc-phase clocks are expanded by further
+> findings resulting from devices being used in the field.
 >
-> Note that like omap5-uevm, these boards seem to need to reserve 16MB for a
-> trap section as in commit 03178c66d289 ("ARM: dts: omap5-evm: Update
-> available memory to 2032 MB") and also noted in a u-boot commit at
-> http://marc.info/?l=u-boot&m=134376852603255 and also at
-> http://patchwork.ozlabs.org/patch/159881/.
+> Similarly the regulator handling changes do use the brand new
+> regulator_set_voltage_triplet call to allow specifying lower and upper
+> limits. One possible point of discussion are the two voltage ranges
+> that are tried for the 3.3V signal level. Trying to stay near vmmc
+> at first and only then opening the range to the full 2.7-3.6V.
 >
-> Not sure why this is not needed for omap5-cm-t54.dts, maybe because of
-> different u-boot configuration.
+> This mainly circumvents a shortcoming of the regulator voltage
+> setting, in that even with regulator_set_voltage_triplet the regulator
+> framework will take the lowest possible voltage when the possible
+> voltages are below the target voltage. While it may be ideal to solve
+> this on the regulator side, I'm not seeing this appearing in the short
+> term, mainly because all regulator parts (including regulator drivers)
+> are keyed to selecting the lowest voltage from the range, while on the
+> mmc side we know which voltages may work and trying this in two steps
+> does not create to much overhead, as unsupported voltages are already
+> filtered out by the regulator_is_voltage_selected calls.
 >
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
+> changes since v2:
+> - use host->ios.vdd to read vmmc from instead of requiring the vmmc
+>   regulator. Suggested by Ulf this makes the voltage setting still work
+>   even if only the vqmmc but not the vmmc regulator is supplied.
+> - add Acks from Jaehoon Chung to the dw_mmc parts
+> - drop first two clock patches that already got applied to the mmc tree
 >
-> Enric, can you please check if there are some critical pieces compared
-> to omap5-uevm that should be updated for this patch?
+> changes since v1:
+> - address comment from Jaehoon Chung and keep this local to Rockchip
+>   for the time being
+> - address comments from Ulf and Doug in making it more explicit
+>   that the two-step 3.3V voltage setting essentially works around
+>   a limitation of regulator_set_voltage_triplet
 >
-
-Unfortunately I don't have the schematic and any IGEPv5 to verify your
-patches. From a quick view I can say that it's ok but let me cc
-Agust?, Eduard and Pau that will have access to the hardware and the
-schematics.
-
-Cheers,
-
-Enric
-
-> ---
->  arch/arm/boot/dts/Makefile           |  1 +
->  arch/arm/boot/dts/omap5-igep0050.dts | 54 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 55 insertions(+)
->  create mode 100644 arch/arm/boot/dts/omap5-igep0050.dts
+> Alexandru M Stan (3):
+>   mmc: dw_mmc-rockchip: dt-binding: Add tuning related things
+>   mmc: dw_mmc-rockchip: MMC tuning with the clock phase framework
+>   ARM: dts: rockchip: Add drive/sample clocks for rk3288 dw_mmc devices
 >
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index e45d771..2c12411 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -471,6 +471,7 @@ dtb-$(CONFIG_SOC_AM43XX) += \
->         am437x-gp-evm.dtb
->  dtb-$(CONFIG_SOC_OMAP5) += \
->         omap5-cm-t54.dtb \
-> +       omap5-igep0050.dtb \
->         omap5-sbc-t54.dtb \
->         omap5-uevm.dtb
->  dtb-$(CONFIG_SOC_DRA7XX) += \
-> diff --git a/arch/arm/boot/dts/omap5-igep0050.dts b/arch/arm/boot/dts/omap5-igep0050.dts
-> new file mode 100644
-> index 0000000..46ecb1d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap5-igep0050.dts
-> @@ -0,0 +1,54 @@
-> +/*
-> + * Copyright (C) 2013 ISEE 2007 SL - http://www.isee.biz/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +/dts-v1/;
-> +
-> +#include "omap5-board-common.dtsi"
-> +
-> +/ {
-> +       model = "IGEPv5";
-> +       compatible = "isee,omap5-igep0050", "ti,omap5";
-> +
-> +       memory {
-> +               device_type = "memory";
-> +               reg = <0x80000000 0x7f000000>; /* 2032 MB */
-> +       };
-> +};
-> +
-> +&hdmi {
-> +       vdda-supply = <&ldo7_reg>;
-> +};
-> +
-> +&i2c4 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&i2c4_pins>;
-> +
-> +       tca6416: tca6416 at 21 {
-> +               compatible = "ti,tca6416";
-> +               reg = <0x21>;
-> +               gpio-controller;
-> +               #gpio-cells = <2>;
-> +       };
-> +};
-> +
-> +&omap5_pmx_core {
-> +       i2c4_pins: pinmux_i2c4_pins {
-> +               pinctrl-single,pins = <
-> +                       OMAP5_IOPAD(0x0f8, PIN_INPUT | MUX_MODE0)       /* i2c4_scl */
-> +                       OMAP5_IOPAD(0x0fa, PIN_INPUT | MUX_MODE0)       /* i2c4_sda */
-> +               >;
-> +       };
-> +};
-> +
-> +&tpd12s015 {
-> +       gpios = <&tca6416 11 0>,        /* TCA6416 P01, CT_CP_HDP */
-> +               <&tca6416 12 0>,        /* TCA6416 P00, LS_OE*/
-> +               <&gpio7 1 0>,           /* 193, HPD */
-> +               <&gpio7 2 0>,           /* 194, SCL */
-> +               <&gpio7 3 0>;           /* 195, SDA */
-> +};
-> +
+> Douglas Anderson (2):
+>   mmc: core: Add mmc_regulator_set_vqmmc()
+>   mmc: dw_mmc: Use mmc_regulator_set_vqmmc in
+>     start_signal_voltage_switch
+>
+> Heiko Stuebner (2):
+>   mmc: core: move ocr-bit to voltage translation into separate function
+>   ARM: dts: rockchip: add tuning related settings to veyron devices
+>
+>  .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |  13 ++
+>  arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi         |   7 +-
+>  arch/arm/boot/dts/rk3288-veyron.dtsi               |   6 +
+>  arch/arm/boot/dts/rk3288.dtsi                      |  20 ++-
+>  drivers/mmc/core/core.c                            | 129 ++++++++++++++--
+>  drivers/mmc/host/dw_mmc-rockchip.c                 | 162 +++++++++++++++++++++
+>  drivers/mmc/host/dw_mmc.c                          |  17 +--
+>  include/linux/mmc/host.h                           |   7 +
+>  8 files changed, 325 insertions(+), 36 deletions(-)
+>
 > --
-> 2.1.4
+> 2.6.1
 >
+
+Thanks, applied for next (with v3.1 of patch1)!
+
+Kind regards
+Uffe
