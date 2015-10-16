@@ -1,44 +1,80 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Fri, 16 Oct 2015 06:53:44 -0700
-Subject: [PATCH v2] scsi: advansys needs ISA dma api for ISA support
-In-Reply-To: <4351271.eUtUWpTn54@wuerfel>
-References: <4351271.eUtUWpTn54@wuerfel>
-Message-ID: <1445003624.2191.2.camel@HansenPartnership.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 16 Oct 2015 15:56:03 +0200
+Subject: [PATCH] VFIO: platform: AMD xgbe reset module
+In-Reply-To: <3768580.4oTvTNW7Bh@wuerfel>
+References: <1444836792-2405-1-git-send-email-eric.auger@linaro.org>
+ <1444927997.4059.470.camel@redhat.com> <5620F665.5010903@linaro.org>
+ <3768580.4oTvTNW7Bh@wuerfel>
+Message-ID: <562101F3.6050601@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-10-16 at 14:13 +0200, Arnd Bergmann wrote:
-> The advansys drvier uses the request_dma function that is used on ISA
-> machines for the internal DMA controller, which causes build errors
-> on platforms that have ISA slots but do not provide the ISA DMA API:
+Hi Arnd,
+On 10/16/2015 03:26 PM, Arnd Bergmann wrote:
+> On Friday 16 October 2015 15:06:45 Eric Auger wrote:
 > 
-> drivers/scsi/advansys.c: In function 'advansys_board_found':
-> drivers/scsi/advansys.c:11300:10: error: implicit declaration of function 'request_dma' [-Werror=implicit-function-declaration]
+>>  I've since forgotten his answer, but the fact that
+>>> __symbol_get() is only defined for modules makes it moot, we either need
+>>> to make symbol_get() work or define __symbol_get() for non-module
+>>> builds.
+>> I currently don't see any solution for any of those. The only solution I
+>> can see is someone registers the reset function pointer to vfio.
+>>
+>> I think we could keep the existing reset modules, do the request_module
+>> from VFIO, using their module name registered in the lookup table. But
+>> instead of having the reset function in the look-up table we would have
+>> the reset modules register their reset function pointer to VFIO. I think
+>> this could work around the symbol_get issue.
+>>
+>> This still leaves the layer violation argument though.
+>>
+>> Assuming this works, would that be an acceptable solution, although I
+>> acknowledge this does not perfectly fit into the driver model?
 > 
-> The problem now showed up in ARM randconfig builds after commit
-> 6571fb3f8b7f ("advansys: Update to version 3.5 and remove compilation
-> warning") made it possible to build on platforms that have neither
-> VIRT_TO_BUS nor ISA_DMA_API but that do have ISA.
+> I think it's possible to avoid the layering violation that way too,
+> by loading the module based on the compatible string, with a module_alias.
 > 
-> This adds a dependency to only build the driver on ISA based machines
-> if they also support ISA_DMA_API, or if they EISA or PCI are also
-> enabled.
+> static void vfio_platform_get_reset(struct vfio_platform_device *vdev,
+>                                     struct device *dev)
+> {
+>         const char *compat;
+>         int (*reset)(struct vfio_platform_device *);
+>         int ret, i;
+> 	char modname[256];
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>         ret = device_property_read_string(dev, "compatible", &compat);
+>         if (ret)
+>                 return;
 > 
-> diff --git a/drivers/scsi/Kconfig b/drivers/scsi/Kconfig
-> index d2f480b04a52..1d8b8257773d 100644
-> --- a/drivers/scsi/Kconfig
-> +++ b/drivers/scsi/Kconfig
-> @@ -498,7 +498,7 @@ config SCSI_DPT_I2O
->  config SCSI_ADVANSYS
->  	tristate "AdvanSys SCSI support"
->  	depends on SCSI
-> -	depends on ISA || EISA || PCI
-> +	depends on (ISA && ISA_DMA_API) || EISA || PCI
+> 	reset = vfio_platform_lookup_reset(compat);
+> 	if (!reset) {
+> 		snprintf(modname, "vfio-reset:%s", compat);
+> 		request_module(modname);
+> 		reset = vfio_platform_lookup_reset(compat);
+> 	}
+> 
+> 	vdev->reset = reset;
+> }
+> 
+> ---
+> 
+> #define module_vfio_reset_handler(compat, reset)			\
+> MODULE_ALIAS("vfio_reset" compat);					\
+> static int reset ## _module_init(void)					\
+> {									\
+> 	return vfio_reset_register(THIS_MODULE, compat, &reset);	\
+> }
+> 
+> I think that solution is good enough, as it avoids most of the
+> problems with the current implementation but is a simple enough change.
 
-I thought the desire was to avoid a compile failure when ISA && !
-ISA_DMA_API?  Won't this one fail if ISA is defined with either EISA or
-PCI and !ISA_DMA_API?
+That looks a good perspective. Thanks for the hint! Let's code now ;-)
 
-James
+Best Regards
+
+Eric
+
+
+> 
+> 	Arnd
+> 
