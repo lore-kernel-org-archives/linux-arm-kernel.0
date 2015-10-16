@@ -1,37 +1,85 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 16 Oct 2015 13:31:12 +0200
-Subject: [PATCH] ARM: at91: pm: at91_pm_suspend_in_sram() must be 8-byte
- aligned
-In-Reply-To: <20151016112252.GA17165@gradator.net>
-References: <1444991945-7946-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20151016112252.GA17165@gradator.net>
-Message-ID: <5620E000.7050704@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 16 Oct 2015 12:32:51 +0100
+Subject: [PATCH] mailbox: Fix a couple of trivial static checker issues
+In-Reply-To: <201510161646.D4m1dK6L%fengguang.wu@intel.com>
+References: <1444980091-16728-5-git-send-email-lee.jones@linaro.org>
+ <201510161646.D4m1dK6L%fengguang.wu@intel.com>
+Message-ID: <20151016113251.GF31804@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 16/10/2015 13:22, Sylvain Rochet a ?crit :
-> Hi,
-> 
-> On Fri, Oct 16, 2015 at 12:39:05PM +0200, Alexandre Belloni wrote:
->> From: Patrick Doyle <pdoyle@irobot.com>
->>
->> fncpy() requires that the source and the destination are both 8-byte
->> aligned.
->>
->> Signed-off-by: Patrick Doyle <pdoyle@irobot.com>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> 
-> Additional tags:
-> 
-> Fixes: d94e688cae56 ("ARM: at91/pm: move the copying the sram function to the sram initialization phase")
-> Cc: <stable@vger.kernel.org> # 4.1+
+mailbox: Fix a couple of trivial static checker issues
 
-Absolutely: thanks Sylvain.
+This patch deals with a few spelling, white space and type
+warnings reported by Intel's Kbuild Test Robot.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Reported-by: kbuild test robot <lkp@intel.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Thank you to Patrick for having found this issue.
+---
+ drivers/mailbox/mailbox-sti.c  |  2 +-
+ drivers/mailbox/mailbox-test.c | 10 +++++-----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-Best regards,
--- 
-Nicolas Ferre
+diff --git a/drivers/mailbox/mailbox-sti.c b/drivers/mailbox/mailbox-sti.c
+index f11d4e8..4835817 100644
+--- a/drivers/mailbox/mailbox-sti.c
++++ b/drivers/mailbox/mailbox-sti.c
+@@ -64,7 +64,7 @@ struct sti_mbox_device {
+ };
+ 
+ /**
+- * STi Mailbox platform specfic configuration
++ * STi Mailbox platform specific configuration
+  *
+  * @num_inst:	Maximum number of instances in one HW Mailbox
+  * @num_chan:	Maximum number of channel per instance
+diff --git a/drivers/mailbox/mailbox-test.c b/drivers/mailbox/mailbox-test.c
+index cac1ba2..196144c 100644
+--- a/drivers/mailbox/mailbox-test.c
++++ b/drivers/mailbox/mailbox-test.c
+@@ -22,7 +22,7 @@
+ #define MBOX_MAX_SIG_LEN	8
+ #define MBOX_MAX_MSG_LEN	128
+ #define MBOX_BYTES_PER_LINE	16
+-#define MBOX_HEXDUMP_LINE_LEN 	((MBOX_BYTES_PER_LINE * 4) + 2)
++#define MBOX_HEXDUMP_LINE_LEN	((MBOX_BYTES_PER_LINE * 4) + 2)
+ #define MBOX_HEXDUMP_MAX_LEN	(MBOX_HEXDUMP_LINE_LEN *		\
+ 				 (MBOX_MAX_MSG_LEN / MBOX_BYTES_PER_LINE))
+ 
+@@ -30,7 +30,7 @@ static struct dentry *root_debugfs_dir;
+ 
+ struct mbox_test_device {
+ 	struct device		*dev;
+-	void __iomem		*mmio;
++	void			*mmio;
+ 	struct mbox_chan	*tx_channel;
+ 	struct mbox_chan	*rx_channel;
+ 	char			*rx_buffer;
+@@ -53,7 +53,7 @@ static ssize_t mbox_test_signal_write(struct file *filp,
+ 
+ 	if (count > MBOX_MAX_SIG_LEN) {
+ 		dev_err(tdev->dev,
+-			"Signal length %d greater than max allowed %d\n",
++			"Signal length %lu greater than max allowed %d\n",
+ 			count, MBOX_MAX_SIG_LEN);
+ 		return -EINVAL;
+ 	}
+@@ -92,7 +92,7 @@ static ssize_t mbox_test_message_write(struct file *filp,
+ 
+ 	if (count > MBOX_MAX_MSG_LEN) {
+ 		dev_err(tdev->dev,
+-			"Message length %d greater than max allowed %d\n",
++			"Message length %lu greater than max allowed %d\n",
+ 			count, MBOX_MAX_MSG_LEN);
+ 		return -EINVAL;
+ 	}
+@@ -303,7 +303,7 @@ static int mbox_test_probe(struct platform_device *pdev)
+ 	tdev->tx_channel = mbox_test_request_channel(pdev, "tx");
+ 	tdev->rx_channel = mbox_test_request_channel(pdev, "rx");
+ 
+-	if (!tdev->tx_channel && !tdev->tx_channel)
++	if (!tdev->tx_channel && !tdev->rx_channel)
+ 		return -EPROBE_DEFER;
+ 
+ 	tdev->dev = &pdev->dev;
