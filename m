@@ -1,42 +1,71 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 16 Oct 2015 17:01:51 +0100
-Subject: [PATCH] hwrng: exynos - Fix unbalanced PM runtime get/puts
-Message-ID: <1445011311-32142-1-git-send-email-daniel.thompson@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 16 Oct 2015 17:02:57 +0100
+Subject: [PATCH v3 0/2] Enabling PSCI based idle on ARM 32-bit platforms
+Message-ID: <1445011379-8787-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently this driver calls pm_runtime_get_sync() rampantly
-but never puts anything back. This makes it impossible for the
-device to autosuspend properly; it will remain fully active
-after the first use.
+This patch series is v3 of a previous posting:
 
-Fix in the obvious way.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376418.html
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
+v2->v3
 
-Notes:
-    Compile tested only (CONFIG_PM=y, CONFIG_HW_RANDOM_EXYNOS=m); I spotted
-    this whilst reviewing the code and don't have an exynos platform to
-    test on.
+- Removed additional PSCI file, merged functions in psci.c
+- Added missing static scope to ARM psci_cpuidle_ops
+- Applied review tags
 
- drivers/char/hw_random/exynos-rng.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+v1->v2:
 
-diff --git a/drivers/char/hw_random/exynos-rng.c b/drivers/char/hw_random/exynos-rng.c
-index dc4701fd814f..73318e2a34dd 100644
---- a/drivers/char/hw_random/exynos-rng.c
-+++ b/drivers/char/hw_random/exynos-rng.c
-@@ -95,7 +95,7 @@ static int exynos_read(struct hwrng *rng, void *buf,
- 	*data = exynos_rng_readl(exynos_rng, EXYNOS_PRNG_OUT1_OFFSET);
+- Refactored patch 1 to remove cpu parameter from cpuidle_ops
+  suspend hook
+- Refactored psci_cpu_init_idle to stub out dt parsing function and
+  make it usable on both ARM/ARM64 with no additional changes
+- Updated ARM cpuidle_ops to new interfaces
 
- 	pm_runtime_mark_last_busy(exynos_rng->dev);
--	pm_runtime_autosuspend(exynos_rng->dev);
-+	pm_runtime_put_sync_autosuspend(exynos_rng->dev);
+PSCI firmware provides a kernel API that, through a standard interface,
+allows to manage power states transitions in a seamless manner for
+ARM and ARM64 systems.
 
- 	return 4;
- }
---
-2.4.3
+Current PSCI code that initializes CPUidle states on PSCI based
+systems lives in arch/arm64 directory but it is not ARM64 specific
+and can be shared with ARM 32-bit systems so that the generic
+ARM CPUidle driver can leverage the common PSCI interface.
+
+This patch series moves PSCI CPUidle management code to
+drivers/firmware directory so that ARM and ARM64 architecture
+can actually share the code.
+
+It is made up of two patches:
+
+Patch 1 refactors ARM 32-bit generic idle implementation to remove
+the cpu parameter from the cpuidle_ops suspend hook, in preparation
+for a common PSCI implementation for ARM/ARM64 PSCI idle.
+
+Patch 2 moves ARM64 PSCI CPUidle functions implementation to
+drivers/firmware so that it can be shared with ARM 32-bit platforms
+code. This patch also adds a PSCI entry section on ARM 32-bit systems
+so that the PSCI CPUidle back-end can be enabled when the enable-method
+corresponds to PSCI.
+
+Patches apply on top of current patch stack to enable PSCI 1.0:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/firmware/psci-1.0
+
+Tested on Juno board (ARM64), compile tested only on ARM 32-bit systems.
+
+Lorenzo Pieralisi (2):
+  ARM: cpuidle: remove cpu parameter from the cpuidle_ops suspend hook
+  ARM64: kernel: PSCI: move PSCI idle management code to
+    drivers/firmware
+
+ arch/arm/include/asm/cpuidle.h |   2 +-
+ arch/arm/kernel/cpuidle.c      |   2 +-
+ arch/arm64/kernel/psci.c       |  99 +---------------------------------
+ drivers/firmware/psci.c        | 119 +++++++++++++++++++++++++++++++++++++++++
+ drivers/soc/qcom/spm.c         |  10 ++--
+ include/linux/psci.h           |   3 ++
+ 6 files changed, 131 insertions(+), 104 deletions(-)
+
+-- 
+2.5.1
