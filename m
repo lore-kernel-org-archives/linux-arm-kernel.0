@@ -1,35 +1,52 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 17 Oct 2015 00:29:55 +0200
-Subject: [PATCH] staging: iio: select IRQ_WORK for IIO_DUMMY_EVGEN
-Message-ID: <22609671.lgCfBiaFIf@wuerfel>
+Date: Sat, 17 Oct 2015 00:35:19 +0200
+Subject: [PATCH] stm: add configfs dependency
+Message-ID: <5578991.YxAbTTycJA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The iio dummy code was recently changed to use irq_work_queue, but
-that code is compiled into the kernel only if IRQ_WORK is set, so
-we can get a link error here:
+There are three new stm modules, all of which use configfs for configuration.
+If configfs is not part of the kernel, or is a loadable module while
+the stm driver is builtin, we get a link error like:
 
-drivers/built-in.o: In function `iio_evgen_poke':
-(.text+0x208a04): undefined reference to `irq_work_queue'
+drivers/built-in.o: In function `stp_policy_node_drop':
+drivers/hwtracing/stm/policy.c:232: undefined reference to `config_item_put'
+drivers/built-in.o: In function `stp_policies_make':
+drivers/hwtracing/stm/policy.c:352: undefined reference to `config_group_init_type_name'
+drivers/built-in.o: In function `stp_policy_node_make':
+drivers/hwtracing/stm/policy.c:215: undefined reference to `config_group_init_type_name'
 
-This changes the Kconfig file to match what other drivers do.
+This adds explicit Kconfig dependencies to ensure configfs is present.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: fd2bb310ca3d ("Staging: iio: Move evgen interrupt generation to irq_work")
 ---
-Found on ARM randconfig tests
+The patches are currently in Greg's char-misc tree, we should have
+this one in the same branch.
 
-diff --git a/drivers/staging/iio/Kconfig b/drivers/staging/iio/Kconfig
-index 6d5b38d69578..9d7f0004d2d7 100644
---- a/drivers/staging/iio/Kconfig
-+++ b/drivers/staging/iio/Kconfig
-@@ -18,7 +18,8 @@ source "drivers/staging/iio/resolver/Kconfig"
- source "drivers/staging/iio/trigger/Kconfig"
+diff --git a/drivers/hwtracing/stm/Kconfig b/drivers/hwtracing/stm/Kconfig
+index 5a59a28cc3da..6df294fff1eb 100644
+--- a/drivers/hwtracing/stm/Kconfig
++++ b/drivers/hwtracing/stm/Kconfig
+@@ -1,5 +1,6 @@
+ config STM
+ 	tristate "System Trace Module devices"
++	depends on CONFIGFS_FS
+ 	help
+ 	  A System Trace Module (STM) is a device exporting data in System
+ 	  Trace Protocol (STP) format as defined by MIPI STP standards.
+@@ -9,6 +10,7 @@ config STM
  
- config IIO_DUMMY_EVGEN
--       tristate
-+	tristate
-+	select IRQ_WORK
+ config STM_DUMMY
+ 	tristate "Dummy STM driver"
++	depends on CONFIGFS_FS
+ 	help
+ 	  This is a simple dummy device that pretends to be an stm device
+ 	  and discards your data. Use for stm class testing.
+@@ -17,6 +19,7 @@ config STM_DUMMY
  
- config IIO_SIMPLE_DUMMY
-        tristate "An example driver with no hardware requirements"
+ config STM_SOURCE_CONSOLE
+ 	tristate "Kernel console over STM devices"
++	depends on CONFIGFS_FS
+ 	help
+ 	  This is a kernel space trace source that sends kernel log
+ 	  messages to trace hosts over STM devices.
