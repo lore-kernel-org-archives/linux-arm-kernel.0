@@ -1,36 +1,48 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 15 Oct 2015 20:00:41 -0500
-Subject: [PATCH v1 0/2] Common SerDes driver for TI's Keystone Platforms
-In-Reply-To: <20151015165105.GE32532@n2100.arm.linux.org.uk>
-References: <1444919145-30845-1-git-send-email-w-kwok2@ti.com>
- <20151015165105.GE32532@n2100.arm.linux.org.uk>
-Message-ID: <CAL_JsqJTjCT8D-3OryFPEF8nnaPtrai7Mvf-gJRkh60aDixx-g@mail.gmail.com>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Fri, 16 Oct 2015 09:19:34 +0800
+Subject: [PATCH] soc: rockchip: power-domain: don't try to print the clock
+ name in error case
+In-Reply-To: <1764593.eLkUiZigaK@diego>
+References: <1764593.eLkUiZigaK@diego>
+Message-ID: <562050A6.7080002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 11:51 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Oct 15, 2015 at 10:25:43AM -0400, WingMan Kwok wrote:
->> On TI's Keystone platforms, several peripherals such as the
->> gbe ethernet switch, 10gbe ethether switch and PCIe controller
->> require the use of a SerDes for converting SoC parallel data into
->> serialized data that can be output over a high-speed electrical
->> interface, and also converting high-speed serial input data
->> into parallel data that can be processed by the SoC.  The
->> SerDeses used by those peripherals, though they may be different,
->> are largely similar in functionality and setup.
->
-> Given that serdes is not specific to TI, should this be specific to
-> TI, or should there be an effort to come up with something which
-> everyone who has serdes links can make use of?
->
-> Serdes comes in multiple different forms: PCIe, 1G SGMII ethernet,
-> 1000base-X ethernet, 10g ethernet, SATA... I'd hate to see a
-> plethora of SoC specific stuff for this.
+Heiko,
 
-The licensed IP I've seen doesn't provide a standard register
-interface, but just signals to the IP block. Same with PLL IP. So
-we'll probably get to see vendors continue to differentiate on PHY
-register design. :)
+Thanks to fix it.
 
-Rob
+? 2015?10?15? 21:22, Heiko St?bner ??:
+> When we never got the the clock-reference, i.e. when IS_ERR(clk) is true,
+> don't try to print the clock name via %pC as this of course produces a
+> null-pointer-dereference in __clk_get_name().
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+
+Look good to me, you can free add that.
+
+Reviewed-by: Caesar Wang <wxt@rock-chips.com>
+
+> ---
+>   drivers/soc/rockchip/pm_domains.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+> index 8268d5d..534c589 100644
+> --- a/drivers/soc/rockchip/pm_domains.c
+> +++ b/drivers/soc/rockchip/pm_domains.c
+> @@ -265,8 +265,8 @@ static int rockchip_pm_add_one_domain(struct rockchip_pmu *pmu,
+>   		if (IS_ERR(clk)) {
+>   			error = PTR_ERR(clk);
+>   			dev_err(pmu->dev,
+> -				"%s: failed to get clk %pC (index %d): %d\n",
+> -				node->name, clk, i, error);
+> +				"%s: failed to get clk at index %d: %d\n",
+> +				node->name, i, error);
+>   			goto err_out;
+>   		}
+>   
+>
+> -- 
+> Thanks,
+> Caesar
