@@ -1,28 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Oct 2015 11:45:33 +0200
-Subject: [GIT PULL 2/2] omap device tree changes for v4.4
-In-Reply-To: <20151015210425.GQ10113@atomide.com>
-References: <8058507.49AsgX8PR9@wuerfel> <20151015210425.GQ10113@atomide.com>
-Message-ID: <17309037.Mt8pPYt4aa@wuerfel>
+Date: Fri, 16 Oct 2015 11:47:42 +0200
+Subject: [PATCH v2] PCI: iproc: fix 32-bit build error
+In-Reply-To: <20151015210113.GA13636@localhost>
+References: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
+ <5754881.OPA6La0Zg0@wuerfel> <20151015210113.GA13636@localhost>
+Message-ID: <5482493.6eNiKO1I30@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 October 2015 14:04:26 Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [151015 13:40]:
-> > On Wednesday 14 October 2015 14:38:59 Tony Lindgren wrote:
+On Thursday 15 October 2015 16:01:13 Bjorn Helgaas wrote:
+> On Thu, Oct 15, 2015 at 09:40:45PM +0200, Arnd Bergmann wrote:
+> > The iproc PCI driver tries to figure out whether the MMIO window has
+> > a valid size, but does this using a 64-bit modulo operation, which
+> > is not allowed on 32-bit kernels and leads to a link error:
 > > 
-> > > Note that this branch is against v4.3-rc4 as that contains critical
-> > > MMC related fixes to boot with MMC working on most omaps.
+> > drivers/built-in.o: In function `iproc_pcie_setup':
+> > :(.text+0x4b798): undefined reference to `__aeabi_uldivmod'
 > > 
-> > While we are lucky this time as I based the branch on -rc4 anyway,
-> > a nicer way to do this would be to ensure that a fix you want
-> > to base on is based an older -rc, and then you base your own branch
-> > on top of that fix, to minimize the number of back-merged patches.
+> > This works around that error by using the div64_u64() function
+> > provided by the kernel. While this is an expensive operation,
+> > it is harmless because we only call it during the probing
+> > of the driver.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Acked-by: Ray Jui <rjui@broadcom.com>
+> > Fixes: 0ab99ca8eb6c ("PCI: iproc: Fix compile warnings")
 > 
-> Sure that would be doable too at the cost of a few extra merges.
+> This *looks* like it should be fixing 90e4032eeaf2 ("PCI: iproc: Add
+> outbound mapping support"), not 0ab99ca8eb6c.
+> 
+> 90e4032eeaf2 added the "if (size % ob->window_size)".
+> 
+> Is this more subtle than that?
+> 
+> 
 
-You can always look at our existing next/* branches to see what they are
-based on. If we already have the commit you need (like this time), it's
-not a problem at all to use the same base.
+You are absolutely right, I must have copy-pasted the wrong entry.
+Do you want me to resend this? I guess you can just remove the
+line as this commit has not appeared in any release anyway.
 
 	Arnd
