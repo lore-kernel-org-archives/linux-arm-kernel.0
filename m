@@ -1,57 +1,62 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 16 Oct 2015 17:49:35 +0100
-Subject: [PATCH v2 3/3] xen/arm: don't try to re-register vcpu_info on
- cpu_hotplug.
-In-Reply-To: <1445013301-12624-3-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1510161731510.27957@kaball.uk.xensource.com>
- <1445013301-12624-3-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <56212A9F.5070202@citrix.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Oct 2015 18:24:21 +0200
+Subject: [PATCH v2 2/4] mtd: nand: Allow MTD_NAND_BRCMNAND to be selected
+ for ARM64
+In-Reply-To: <1444986537-28387-3-git-send-email-anup.patel@broadcom.com>
+References: <1444986537-28387-1-git-send-email-anup.patel@broadcom.com>
+ <1444986537-28387-3-git-send-email-anup.patel@broadcom.com>
+Message-ID: <5673177.0QYFhMPCBq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
-
-On 16/10/15 17:35, Stefano Stabellini wrote:
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> ---
->  arch/arm/xen/enlighten.c |   10 ++++++++++
->  1 file changed, 10 insertions(+)
+On Friday 16 October 2015 14:38:55 Anup Patel wrote:
 > 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 6c09cc4..b193811 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -93,6 +93,16 @@ static void xen_percpu_init(void)
->  	int err;
->  	int cpu = get_cpu();
+> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+> index 3324281..a1b5819 100644
+> --- a/drivers/mtd/nand/Kconfig
+> +++ b/drivers/mtd/nand/Kconfig
+> @@ -393,7 +393,7 @@ config MTD_NAND_GPMI_NAND
 >  
-> +	/* 
-> +	 * VCPUOP_register_vcpu_info cannot be called twice for the same
-> +	 * vcpu, so if vcpu_info is already registered, just get out. This
-> +	 * can happen with cpu-hotplug.
-> +	 */
-> +	if (per_cpu(xen_vcpu, cpu) != NULL) {
-> +		put_cpu();
-> +		return;
-> +	}
-
-
-Not really related to this patch. By side effect this patch is also not
-calling irq_percpu_enable.
-
-Looking around, all the caller of irq_percpu_enable will call
-irq_percpu_disable when the CPU is dying. Is there any side effect to
-not doing this?
-
-Regards,
-
-
-> +
->  	pr_info("Xen: initializing cpu%d\n", cpu);
->  	vcpup = per_cpu_ptr(xen_vcpu_info, cpu);
->  
+>  config MTD_NAND_BRCMNAND
+>         tristate "Broadcom STB NAND controller"
+> -       depends on ARM || MIPS
+> +       depends on ARM || ARM64 || MIPS
+>         help
+>           Enables the Broadcom NAND controller driver. The controller was
+>           originally designed for Set-Top Box but is used on various BCM7xxx,
+> -- 
 > 
 
+I think you also need this one:
 
--- 
-Julien Grall
+8<-----------
+>From 0ab7b2d32921b3f3da15274d8c3982ba1d54660f Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Thu, 4 Jun 2015 09:25:59 +0200
+Subject: [PATCH] mtd: brcmnand depends on MTD_NAND
+
+MTD_NAND_BRCMNAND uses the generic nand functions, but is currently allowed
+to be built without CONFIG_MTD_NAND, which results in a link error:
+
+drivers/built-in.o: In function `brcmnand_remove':
+coresight-replicator.c:(.text+0x17ae6c): undefined reference to `nand_release'
+drivers/built-in.o: In function `brcmnand_probe':
+coresight-replicator.c:(.text+0x17d4b4): undefined reference to `nand_scan_ident'
+coresight-replicator.c:(.text+0x17d948): undefined reference to `nand_scan_tail'
+
+This adds an explicit Kconfig dependency.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 289664089cf3..4b7e853ce35d 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -393,6 +393,7 @@ config MTD_NAND_GPMI_NAND
+ 
+ config MTD_NAND_BRCMNAND
+ 	tristate "Broadcom STB NAND controller"
++	depends on MTD_NAND
+ 	depends on ARM || ARM64 || MIPS
+ 	help
+ 	  Enables the Broadcom NAND controller driver. The controller was
