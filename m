@@ -1,51 +1,78 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 Oct 2015 07:57:07 -0700
-Subject: [PATCH 3/3] ARM: dts: Add basic support for isee igepv5
-In-Reply-To: <CAFqH_52T8rPJp-8+Bb7Tjv-kcACU8FJGtqFWOhj02DzQ2yc7nw@mail.gmail.com>
-References: <1444756728-11185-1-git-send-email-tony@atomide.com>
- <1444756728-11185-3-git-send-email-tony@atomide.com>
- <CAFqH_52T8rPJp-8+Bb7Tjv-kcACU8FJGtqFWOhj02DzQ2yc7nw@mail.gmail.com>
-Message-ID: <20151016145707.GU10113@atomide.com>
+From: wei@redhat.com (Wei Huang)
+Date: Fri, 16 Oct 2015 10:06:35 -0500
+Subject: [PATCH v3 10/20] KVM: ARM64: Add reset and access handlers for
+ PMCCNTR register
+In-Reply-To: <1443133885-3366-11-git-send-email-shannon.zhao@linaro.org>
+References: <1443133885-3366-1-git-send-email-shannon.zhao@linaro.org>
+ <1443133885-3366-11-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <5621127B.8070704@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Enric Balletbo Serra <eballetbo@gmail.com> [151016 01:26]:
-> Hi Tony,
-> 
-> Many thanks for the patch
-> 
-> 2015-10-13 19:18 GMT+02:00 Tony Lindgren <tony@atomide.com>:
-> > With omap5-board-common.dtsi, we can now easily add support for various omap5
-> > board variants. Let's add minimal support for isee igepv5.
-> >
-> > So far I've tested that basic things work, such as serial, USB Ethernet, HDMI
-> > and WLAN.
-> >
-> > Note that like omap5-uevm, these boards seem to need to reserve 16MB for a
-> > trap section as in commit 03178c66d289 ("ARM: dts: omap5-evm: Update
-> > available memory to 2032 MB") and also noted in a u-boot commit at
-> > http://marc.info/?l=u-boot&m=134376852603255 and also at
-> > http://patchwork.ozlabs.org/patch/159881/.
-> >
-> > Not sure why this is not needed for omap5-cm-t54.dts, maybe because of
-> > different u-boot configuration.
-> >
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > ---
-> >
-> > Enric, can you please check if there are some critical pieces compared
-> > to omap5-uevm that should be updated for this patch?
-> >
-> 
-> Unfortunately I don't have the schematic and any IGEPv5 to verify your
-> patches. From a quick view I can say that it's ok but let me cc
-> Agust?, Eduard and Pau that will have access to the hardware and the
-> schematics.
 
-OK thanks. The thing to do is check against the omap5-board-common.dtsi in
-this patch series so there's nothing unsuitable in omap5-board-common.dtsi
-that needs an override in omap5-igep0050.dts.
 
-Regards,
+On 09/24/2015 05:31 PM, Shannon Zhao wrote:
+> Since the reset value of PMCCNTR is UNKNOWN, use reset_unknown for its
+> reset handler. Add a new case to emulate reading to PMCCNTR register.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 17 +++++++++++++++--
+>  1 file changed, 15 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index e7f6058..c38c2de 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -518,6 +518,12 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
+>  		}
+>  	} else {
+>  		switch (r->reg) {
+> +		case PMCCNTR_EL0: {
+> +			val = kvm_pmu_get_counter_value(vcpu,
+> +							ARMV8_MAX_COUNTERS - 1);
+> +			*vcpu_reg(vcpu, p->Rt) = val;
+> +			break;
+> +		}
+>  		case PMXEVCNTR_EL0: {
+>  			val = kvm_pmu_get_counter_value(vcpu,
+>  						vcpu_sys_reg(vcpu, PMSELR_EL0));
+> @@ -748,7 +754,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	  access_pmu_regs, reset_pmceid, PMCEID1_EL0 },
+>  	/* PMCCNTR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
+> -	  trap_raz_wi },
+> +	  access_pmu_regs, reset_unknown, PMCCNTR_EL0 },
+>  	/* PMXEVTYPER_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b001),
+>  	  access_pmu_regs, reset_unknown, PMXEVTYPER_EL0 },
+> @@ -997,6 +1003,12 @@ static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
+>  		}
+>  	} else {
+>  		switch (r->reg) {
+> +		case c9_PMCCNTR: {
+> +			val = kvm_pmu_get_counter_value(vcpu,
+> +							ARMV8_MAX_COUNTERS - 1);
 
-Tony
+PMCCNTR is for cycle counter. There is a filter register, PMCCFILTR_EL0,
+associated with it. When kvm_pmu_set_counter_event_type() is called, I
+didn't see this filter config been used in perf_event_attr when
+perf_event is created.
+
+> +			*vcpu_reg(vcpu, p->Rt) = val;
+> +			break;
+> +		}
+>  		case c9_PMXEVCNTR: {
+>  			val = kvm_pmu_get_counter_value(vcpu,
+>  						    vcpu_cp15(vcpu, c9_PMSELR));
+> @@ -1051,7 +1063,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	  reset_pmceid, c9_PMCEID0 },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmu_cp15_regs,
+>  	  reset_pmceid, c9_PMCEID1 },
+> -	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
+> +	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), access_pmu_cp15_regs,
+> +	  reset_unknown_cp15, c9_PMCCNTR },
+>  	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_cp15_regs,
+>  	  reset_unknown_cp15, c9_PMXEVTYPER },
+>  	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_cp15_regs,
+> 
