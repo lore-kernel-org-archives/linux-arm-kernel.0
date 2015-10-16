@@ -1,28 +1,47 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 16 Oct 2015 22:10:27 +0200
-Subject: [PATCH v6 7/7] arm64: dts: berlin4ct: add default pinmux for uart0
-In-Reply-To: <CACRpkdYUmkOB_9Rm_YXzqQDL8H7wXmptwwHeGbssQO_RK_G17w@mail.gmail.com>
-References: <1444981032-4401-1-git-send-email-jszhang@marvell.com>
- <1444981032-4401-8-git-send-email-jszhang@marvell.com>
- <CACRpkdYUmkOB_9Rm_YXzqQDL8H7wXmptwwHeGbssQO_RK_G17w@mail.gmail.com>
-Message-ID: <562159B3.3010902@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Oct 2015 22:10:04 +0200
+Subject: [PATCH] netfilter: fix Kconfig dependencies for nft_dup_ipv{4,6}
+Message-ID: <5041322.FiDa5XtNuO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.10.2015 16:18, Linus Walleij wrote:
-> On Fri, Oct 16, 2015 at 9:37 AM, Jisheng Zhang <jszhang@marvell.com> wrote:
->
->> Add urt0 txd and rxd muxing setup in the dtsi because uart0 always uses
->> them to work, no other possibilities.
->>
->> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
->> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Funnel this through ARM SoC.
+nft_dup_ipv4 and nft_dup_ipv6 select the respective nf_dup_ipv{4,6}
+drivers, which must not be built-in if nf_conntrack is a loadable
+module, otherwise we get a link error:
 
-Applied to berlin64/dt with Linus' Ack.
+net/built-in.o: In function `nf_dup_ipv6':
+(.text+0xdef20): undefined reference to `nf_conntrack_untracked'
 
-Thanks,
-Sebastian
+The dependency was fixed for the nf_dup_* modules recently, but this
+patch adds the same dependency to the nft_dup_* modules for
+the (hopefully) complete fix.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 6ece90f9a13e ("netfilter: fix Kconfig dependencies for nf_dup_ipv{4,6}")
+---
+found on ARM randconfig builds
+
+diff --git a/net/ipv4/netfilter/Kconfig b/net/ipv4/netfilter/Kconfig
+index a35584176535..c187c60e3e0c 100644
+--- a/net/ipv4/netfilter/Kconfig
++++ b/net/ipv4/netfilter/Kconfig
+@@ -60,6 +60,7 @@ config NFT_REJECT_IPV4
+ 
+ config NFT_DUP_IPV4
+ 	tristate "IPv4 nf_tables packet duplication support"
++	depends on !NF_CONNTRACK || NF_CONNTRACK
+ 	select NF_DUP_IPV4
+ 	help
+ 	  This module enables IPv4 packet duplication support for nf_tables.
+diff --git a/net/ipv6/netfilter/Kconfig b/net/ipv6/netfilter/Kconfig
+index f6a024e141e5..e10a04c9cdc7 100644
+--- a/net/ipv6/netfilter/Kconfig
++++ b/net/ipv6/netfilter/Kconfig
+@@ -49,6 +49,7 @@ config NFT_REJECT_IPV6
+ 
+ config NFT_DUP_IPV6
+ 	tristate "IPv6 nf_tables packet duplication support"
++	depends on !NF_CONNTRACK || NF_CONNTRACK
+ 	select NF_DUP_IPV6
+ 	help
+ 	  This module enables IPv6 packet duplication support for nf_tables.
