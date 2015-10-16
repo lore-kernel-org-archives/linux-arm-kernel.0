@@ -1,75 +1,43 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 16 Oct 2015 12:46:40 -0700
-Subject: [PATCH] clk: vf610: don't stop enabled clocks in suspend
-In-Reply-To: <1445007085-28250-1-git-send-email-sergeimir@emcraft.com>
-References: <1445007085-28250-1-git-send-email-sergeimir@emcraft.com>
-Message-ID: <95c4ad8c37f6f0a7429e8b1bdea17bb1@agner.ch>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 16 Oct 2015 14:57:30 -0500
+Subject: [PATCH] arm64: Increase the max granular size
+In-Reply-To: <1442944788-17254-1-git-send-email-rric@kernel.org>
+References: <1442944788-17254-1-git-send-email-rric@kernel.org>
+Message-ID: <CAOZdJXUiRMAguDV+HEJqPg57MyBNqEcTyaH+ya=U93NHb-pdJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Tue, Sep 22, 2015 at 12:59 PM, Robert Richter <rric@kernel.org> wrote:
+> From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+>
+> Increase the standard cacheline size to avoid having locks in the same
+> cacheline.
+>
+> Cavium's ThunderX core implements cache lines of 128 byte size. With
+> current granulare size of 64 bytes (L1_CACHE_SHIFT=6) two locks could
+> share the same cache line leading a performance degradation.
+> Increasing the size fixes that.
+>
+> Increasing the size has no negative impact to cache invalidation on
+> systems with a smaller cache line. There is an impact on memory usage,
+> but that's not too important for arm64 use cases.
+>
+> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
 
-If all peripherals which do not act as wakeup source disable clocks
-explicily, this would be the right approach. However, currently not all
-of them do, hence this patch will raise the energy consumption during
-sleep modes. The peripherals of course rely on the clock driver to
-restore the state (gates) at wake-up time, but I think that is how it
-works for most SoCs anyway.
+Acked-by: Timur Tabi <timur@codeaurora.org>
 
-In the Toradex branch I came up with a solution which allows to
-selectively define which clock should be disabled and which should be
-left on by the hardware:
-http://git.toradex.com/cgit/linux-toradex.git/commit/?h=toradex_vf_4.1-next&id=66e003c1ad2acdaa7d42e1113add7d44479392ab
+We need this patch, because on our silicon, CTR_EL0[CWG] set to 5, which
+means that setup_processor() complains with this warning:
 
-I then started to fix some peripherals so that they explicitly disable
-clock if wakeup is not enabled. I changed those clocks so they do not
-get automatically disabled:
-http://git.toradex.com/cgit/linux-toradex.git/commit/?h=toradex_vf_4.1-next&id=fc60861b91c6585740e9a502fa4008b2f4694b22
+cls = cache_line_size();
 
-I plan to upstream those changes but did not came around to put
-toghether a rebased and cleaned up patchset so far.
+if (L1_CACHE_BYTES < cls)
+    pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule
+(%d < %d)\n",
+            L1_CACHE_BYTES, cls);
 
---
-Stefan
-
-On 2015-10-16 07:51, Sergei Miroshnichenko wrote:
-> Currently Vybrid Clock Gating is configured to turn off all clocks in stop
-> mode, while kernel assumes them enabled unless explicitly disabled. This
-> behavior prevents waking up from wakeup sources.
-> 
-> Fix this by replacing Clock Gating Register bitmask 3 (Clock is on during
-> all modes, except stop mode) with bitmask 2 (Clock is on during all modes,
-> even stop mode): refer to Vybrid Reference Manual Chapter 10 "Clock
-> Controller Module (CCM)".
-> 
-> Tested on a VF610-based board.
-> 
-> Signed-off-by: Sergei Miroshnichenko <sergeimir@emcraft.com>
-> ---
->  drivers/clk/imx/clk-gate2.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/imx/clk-gate2.c b/drivers/clk/imx/clk-gate2.c
-> index 8935bff..ac35d75 100644
-> --- a/drivers/clk/imx/clk-gate2.c
-> +++ b/drivers/clk/imx/clk-gate2.c
-> @@ -50,7 +50,8 @@ static int clk_gate2_enable(struct clk_hw *hw)
->  		goto out;
->  
->  	reg = readl(gate->reg);
-> -	reg |= 3 << gate->bit_idx;
-> +	reg &= ~(3 << gate->bit_idx);
-> +	reg |= 2 << gate->bit_idx;
->  	writel(reg, gate->reg);
->  
->  out:
-> @@ -86,7 +87,7 @@ static int clk_gate2_reg_is_enabled(void __iomem
-> *reg, u8 bit_idx)
->  {
->  	u32 val = readl(reg);
->  
-> -	if (((val >> bit_idx) & 1) == 1)
-> +	if (((val >> bit_idx) & 3) == 2)
->  		return 1;
->  
->  	return 0;
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
