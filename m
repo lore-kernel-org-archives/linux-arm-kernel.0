@@ -1,60 +1,31 @@
 From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Fri, 16 Oct 2015 15:59:15 +0200
-Subject: [PATCH v4 3/4] ARM: dts: Add STM32 DMA support for STM32F429 MCU
+Date: Fri, 16 Oct 2015 15:59:16 +0200
+Subject: [PATCH v4 4/4] ARM: configs: Add STM32 DMA support in STM32 defconfig
 In-Reply-To: <1445003956-9150-1-git-send-email-cedric.madianga@gmail.com>
 References: <1445003956-9150-1-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <1445003956-9150-4-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <1445003956-9150-5-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds STM32 DMA bindings for STM32F429.
+This patch adds STM32 DMA support in stm32_defconfig file
 
 Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 ---
- arch/arm/boot/dts/stm32f429.dtsi | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ arch/arm/configs/stm32_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index d78a481..037eb29 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -174,6 +174,37 @@
- 			reg = <0x40023800 0x400>;
- 			clocks = <&clk_hse>;
- 		};
-+
-+		dma1: dma-controller at 40026000 {
-+			compatible = "st,stm32-dma";
-+			reg = <0x40026000 0x400>;
-+			interrupts = <11>,
-+				     <12>,
-+				     <13>,
-+				     <14>,
-+				     <15>,
-+				     <16>,
-+				     <17>,
-+				     <47>;
-+			clocks = <&rcc 0 21>;
-+			#dma-cells = <4>;
-+		};
-+
-+		dma2: dma-controller at 40026400 {
-+			compatible = "st,stm32-dma";
-+			reg = <0x40026400 0x400>;
-+			interrupts = <56>,
-+				     <57>,
-+				     <58>,
-+				     <59>,
-+				     <60>,
-+				     <68>,
-+				     <69>,
-+				     <70>;
-+			clocks = <&rcc 0 22>;
-+			#dma-cells = <4>;
-+			st,mem2mem;
-+		};
- 	};
- };
- 
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index 4725fab..ec52505 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -54,6 +54,8 @@ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_DMADEVICES=y
++CONFIG_STM32_DMA=y
+ # CONFIG_FILE_LOCKING is not set
+ # CONFIG_DNOTIFY is not set
+ # CONFIG_INOTIFY_USER is not set
 -- 
 1.9.1
