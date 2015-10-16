@@ -1,152 +1,66 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 16 Oct 2015 16:21:54 +0100
-Subject: [Xen-devel] [PATCH 1/3] xen/arm: Enable cpu_hotplug.c
-In-Reply-To: <alpine.DEB.2.02.1510141916430.27957@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
- <1444844997-27314-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <182B77B3-41AD-4364-B1A0-EC161F546751@oracle.com>
- <alpine.DEB.2.02.1510141916430.27957@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1510161621390.27957@kaball.uk.xensource.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 16 Oct 2015 17:25:20 +0200
+Subject: [PATCH] clk: imx25: Remove osc clock from driver
+Message-ID: <1445009120-2582-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Oct 2015, Stefano Stabellini wrote:
-> On Wed, 14 Oct 2015, Konrad Rzeszutek Wilk wrote:
-> > On October 14, 2015 1:49:55 PM EDT, Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
-> > >Build cpu_hotplug for ARM and ARM64 guests.
-> > >
-> > >Rename arch_(un)register_cpu to xen_(un)register_cpu and provide an
-> > >empty implementation on ARM and ARM64. On x86 just call
-> > >arch_(un)register_cpu as we are already doing.
-> > >
-> > >Initialize cpu_hotplug on ARM.
-> > 
-> > Have you tested this on x86? As your changes touch the generic code path.
-> 
-> Only build-tested at this stage, because all my x86 test boxes are
-> unavailable at the moment (they are being relocated). As soon as they
-> come back online I will test.
+The 'osc' clock is already initialized by the fixed clock defined in
+imx25.dtsi. The imx25 clock driver tries to add this clock for a second
+time and fails with -EEXIST:
+	i.MX clk 1: register failed with -17
 
-Tested with a PV guest on x86 and it's fine.
+As the clock is already properly setup in DT with a different driver, we
+can completely remove the handling in the imx25 clock driver.
 
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/clk/imx/clk-imx25.c | 19 +++----------------
+ 1 file changed, 3 insertions(+), 16 deletions(-)
 
-> 
-> > >Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > >---
-> > > arch/arm/include/asm/xen/hypervisor.h |    8 ++++++++
-> > > arch/x86/include/asm/xen/hypervisor.h |    5 +++++
-> > > arch/x86/xen/enlighten.c              |   15 +++++++++++++++
-> > > drivers/xen/Makefile                  |    2 --
-> > > drivers/xen/cpu_hotplug.c             |    6 ++++--
-> > > 5 files changed, 32 insertions(+), 4 deletions(-)
-> > >
-> > >diff --git a/arch/arm/include/asm/xen/hypervisor.h
-> > >b/arch/arm/include/asm/xen/hypervisor.h
-> > >index 04ff8e7..2bc418a 100644
-> > >--- a/arch/arm/include/asm/xen/hypervisor.h
-> > >+++ b/arch/arm/include/asm/xen/hypervisor.h
-> > >@@ -26,4 +26,12 @@ void __init xen_early_init(void);
-> > > static inline void xen_early_init(void) { return; }
-> > > #endif
-> > > 
-> > >+static inline void xen_arch_register_cpu(int num)
-> > >+{
-> > >+}
-> > >+
-> > >+static inline void xen_arch_unregister_cpu(int num)
-> > >+{
-> > >+}
-> > >+
-> > > #endif /* _ASM_ARM_XEN_HYPERVISOR_H */
-> > >diff --git a/arch/x86/include/asm/xen/hypervisor.h
-> > >b/arch/x86/include/asm/xen/hypervisor.h
-> > >index d866959..8b2d4be 100644
-> > >--- a/arch/x86/include/asm/xen/hypervisor.h
-> > >+++ b/arch/x86/include/asm/xen/hypervisor.h
-> > >@@ -57,4 +57,9 @@ static inline bool xen_x2apic_para_available(void)
-> > > }
-> > > #endif
-> > > 
-> > >+#ifdef CONFIG_HOTPLUG_CPU
-> > >+void xen_arch_register_cpu(int num);
-> > >+void xen_arch_unregister_cpu(int num);
-> > >+#endif
-> > >+
-> > > #endif /* _ASM_X86_XEN_HYPERVISOR_H */
-> > >diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
-> > >index 11d6fb4..ba62d8e 100644
-> > >--- a/arch/x86/xen/enlighten.c
-> > >+++ b/arch/x86/xen/enlighten.c
-> > >@@ -71,6 +71,7 @@
-> > > #include <asm/mwait.h>
-> > > #include <asm/pci_x86.h>
-> > > #include <asm/pat.h>
-> > >+#include <asm/cpu.h>
-> > > 
-> > > #ifdef CONFIG_ACPI
-> > > #include <linux/acpi.h>
-> > >@@ -1868,3 +1869,17 @@ const struct hypervisor_x86 x86_hyper_xen = {
-> > > 	.set_cpu_features       = xen_set_cpu_features,
-> > > };
-> > > EXPORT_SYMBOL(x86_hyper_xen);
-> > >+
-> > >+#ifdef CONFIG_HOTPLUG_CPU
-> > >+void xen_arch_register_cpu(int num)
-> > >+{
-> > >+	arch_register_cpu(num);
-> > >+}
-> > >+EXPORT_SYMBOL(xen_arch_register_cpu);
-> > >+
-> > >+void xen_arch_unregister_cpu(int num)
-> > >+{
-> > >+	arch_unregister_cpu(num);
-> > >+}
-> > >+EXPORT_SYMBOL(xen_arch_unregister_cpu);
-> > >+#endif
-> > >diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-> > >index e293bc5..aa8a7f7 100644
-> > >--- a/drivers/xen/Makefile
-> > >+++ b/drivers/xen/Makefile
-> > >@@ -1,6 +1,4 @@
-> > >-ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
-> > > obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
-> > >-endif
-> > > obj-$(CONFIG_X86)			+= fallback.o
-> > > obj-y	+= grant-table.o features.o balloon.o manage.o preempt.o
-> > > obj-y	+= events/
-> > >diff --git a/drivers/xen/cpu_hotplug.c b/drivers/xen/cpu_hotplug.c
-> > >index cc6513a..122b351 100644
-> > >--- a/drivers/xen/cpu_hotplug.c
-> > >+++ b/drivers/xen/cpu_hotplug.c
-> > >@@ -11,7 +11,7 @@
-> > > static void enable_hotplug_cpu(int cpu)
-> > > {
-> > > 	if (!cpu_present(cpu))
-> > >-		arch_register_cpu(cpu);
-> > >+		xen_arch_register_cpu(cpu);
-> > > 
-> > > 	set_cpu_present(cpu, true);
-> > > }
-> > >@@ -19,7 +19,7 @@ static void enable_hotplug_cpu(int cpu)
-> > > static void disable_hotplug_cpu(int cpu)
-> > > {
-> > > 	if (cpu_present(cpu))
-> > >-		arch_unregister_cpu(cpu);
-> > >+		xen_arch_unregister_cpu(cpu);
-> > > 
-> > > 	set_cpu_present(cpu, false);
-> > > }
-> > >@@ -102,8 +102,10 @@ static int __init setup_vcpu_hotplug_event(void)
-> > > 	static struct notifier_block xsn_cpu = {
-> > > 		.notifier_call = setup_cpu_watcher };
-> > > 
-> > >+#ifdef CONFIG_X86
-> > > 	if (!xen_pv_domain())
-> > > 		return -ENODEV;
-> > >+#endif
-> > > 
-> > > 	register_xenstore_notifier(&xsn_cpu);
-> > > 
-> > 
-> > 
-> 
+diff --git a/drivers/clk/imx/clk-imx25.c b/drivers/clk/imx/clk-imx25.c
+index ec1a4c1dacf1..33b5b7b29aa0 100644
+--- a/drivers/clk/imx/clk-imx25.c
++++ b/drivers/clk/imx/clk-imx25.c
+@@ -86,13 +86,12 @@ enum mx25_clks {
+ 
+ static struct clk *clk[clk_max];
+ 
+-static int __init __mx25_clocks_init(unsigned long osc_rate,
+-				     void __iomem *ccm_base)
++static int __init __mx25_clocks_init(void __iomem *ccm_base)
+ {
+ 	BUG_ON(!ccm_base);
+ 
+ 	clk[dummy] = imx_clk_fixed("dummy", 0);
+-	clk[osc] = imx_clk_fixed("osc", osc_rate);
++	clk[osc] = NULL;
+ 	clk[mpll] = imx_clk_pllv1(IMX_PLLV1_IMX25, "mpll", "osc", ccm(CCM_MPCTL));
+ 	clk[upll] = imx_clk_pllv1(IMX_PLLV1_IMX25, "upll", "osc", ccm(CCM_UPCTL));
+ 	clk[mpll_cpu_3_4] = imx_clk_fixed_factor("mpll_cpu_3_4", "mpll", 3, 4);
+@@ -238,22 +237,10 @@ static int __init __mx25_clocks_init(unsigned long osc_rate,
+ 
+ static void __init mx25_clocks_init_dt(struct device_node *np)
+ {
+-	struct device_node *refnp;
+-	unsigned long osc_rate = 24000000;
+ 	void __iomem *ccm;
+ 
+-	/* retrieve the freqency of fixed clocks from device tree */
+-	for_each_compatible_node(refnp, NULL, "fixed-clock") {
+-		u32 rate;
+-		if (of_property_read_u32(refnp, "clock-frequency", &rate))
+-			continue;
+-
+-		if (of_device_is_compatible(refnp, "fsl,imx-osc"))
+-			osc_rate = rate;
+-	}
+-
+ 	ccm = of_iomap(np, 0);
+-	__mx25_clocks_init(osc_rate, ccm);
++	__mx25_clocks_init(ccm);
+ 
+ 	clk_data.clks = clk;
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+-- 
+2.6.1
