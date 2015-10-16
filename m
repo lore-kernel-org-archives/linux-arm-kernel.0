@@ -1,30 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Oct 2015 21:39:07 +0200
-Subject: [PATCH v2 2/4] mtd: nand: Allow MTD_NAND_BRCMNAND to be selected
- for ARM64
-In-Reply-To: <56214FC3.2060002@gmail.com>
-References: <1444986537-28387-1-git-send-email-anup.patel@broadcom.com>
- <7901695.AWo8cP6Hz1@wuerfel> <56214FC3.2060002@gmail.com>
-Message-ID: <5338147.WN3k6RsNEN@wuerfel>
+From: rjui@broadcom.com (Ray Jui)
+Date: Fri, 16 Oct 2015 12:43:17 -0700
+Subject: [PATCH] PCI: iproc: Fix company name
+In-Reply-To: <1445022248-12203-1-git-send-email-f.fainelli@gmail.com>
+References: <1445022248-12203-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <56215355.4070009@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 October 2015 12:28:03 Florian Fainelli wrote:
-> > 
-> > Sorry, can't reproduce it any more. My patch is dated June 4, so it was
-> > probably broken then but got fixed since. I normally try to verify that
-> > the patches are still needed before I send them, but this time I only
-> > saw the current discussion and remembered something vague about it
-> > and sent what I had in my backlog of the randconfig-fixes series.
+
+
+On 10/16/2015 12:04 PM, Florian Fainelli wrote:
+> The header of pcie-iproc.c contains an obvious typo on Broadcom
+> Corporation, fix that.
 > 
-> It may have been a problem before this patch:
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  drivers/pci/host/pcie-iproc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> d80d942bcc8e1555a76774d20be9800cfef2d415 ("ARM: BCM: Do not select
-> CONFIG_MTD_NAND_BRCMNAND")
-> -- 
+> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+> index fe2efb141a9b..6c3d4b54858c 100644
+> --- a/drivers/pci/host/pcie-iproc.c
+> +++ b/drivers/pci/host/pcie-iproc.c
+> @@ -1,6 +1,6 @@
+>  /*
+>   * Copyright (C) 2014 Hauke Mehrtens <hauke@hauke-m.de>
+> - * Copyright (C) 2015 Broadcom Corporatcommon ion
+> + * Copyright (C) 2015 Broadcom Corporation
+>   *
+>   * This program is free software; you can redistribute it and/or
+>   * modify it under the terms of the GNU General Public License as
 > 
 
-Yes, that must have been it. So my patch was not only outdated but
-also wrong ;-)
+When I saw the subject, for a while I thought you are going to change it
+to Broadcom Limited, :)
 
-	Arnd
+Thanks for fixing this!
+
+Acked-by: Ray Jui <rjui@broadcom.com>
