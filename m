@@ -1,32 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Oct 2015 22:05:34 +0200
-Subject: [PATCH] staging: wilc1000: restore wilc_spi_dev variable
-Message-ID: <4978401.AVrDN2jmbq@wuerfel>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 16 Oct 2015 22:08:59 +0200
+Subject: [PATCH 2/5] ARM: berlin: remove the pinctrl selection from the
+ mach-berlin Kconfig
+In-Reply-To: <CACRpkdaa6sGvkZsdyc8M+nsooqUgz8g3-d1s7hET21ndBzCx7g@mail.gmail.com>
+References: <1444771901-24460-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1444771901-24460-3-git-send-email-antoine.tenart@free-electrons.com>
+ <CACRpkdaa6sGvkZsdyc8M+nsooqUgz8g3-d1s7hET21ndBzCx7g@mail.gmail.com>
+Message-ID: <5621595B.2000809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent change to wilc1000 accidentally deleted an important
-variable, so we now get a build error when the SPI mode is
-selected:
+On 16.10.2015 16:19, Linus Walleij wrote:
+> On Tue, Oct 13, 2015 at 11:31 PM, Antoine Tenart
+> <antoine.tenart@free-electrons.com> wrote:
+>
+>> This patch removes the pinctrl driver selection from the mach-berlin
+>> Kconfig file. This is now done in the Berlin pinctrl driver Kconfig.
+>>
+>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> I can't merge this patch, take it through ARM SoC with other
+> Marvell stuff.
 
-ERROR: "wilc_spi_dev" [drivers/staging/wilc1000/wilc1000.ko] undefined!
+Applied to berlin/soc with Linus' Ack.
 
-This partially reverts the broken commit to put the variable back.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 56293ff232b9 ("staging: wilc1000: linux_wlan_spi: include header")
----
-Found on ARM randconfig builds.
-
-diff --git a/drivers/staging/wilc1000/linux_wlan_spi.c b/drivers/staging/wilc1000/linux_wlan_spi.c
-index 760b72a9a6ff..039d06192d6b 100644
---- a/drivers/staging/wilc1000/linux_wlan_spi.c
-+++ b/drivers/staging/wilc1000/linux_wlan_spi.c
-@@ -41,6 +41,7 @@
- 
- static u32 SPEED = MIN_SPEED;
- 
-+struct spi_device *wilc_spi_dev;
- void linux_spi_deinit(void *vp);
- 
- static int __init wilc_bus_probe(struct spi_device *spi)
+Thanks,
+   Sebastian
