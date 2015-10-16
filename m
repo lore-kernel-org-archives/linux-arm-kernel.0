@@ -1,85 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 16 Oct 2015 12:32:51 +0100
-Subject: [PATCH] mailbox: Fix a couple of trivial static checker issues
-In-Reply-To: <201510161646.D4m1dK6L%fengguang.wu@intel.com>
-References: <1444980091-16728-5-git-send-email-lee.jones@linaro.org>
- <201510161646.D4m1dK6L%fengguang.wu@intel.com>
-Message-ID: <20151016113251.GF31804@x1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Oct 2015 13:34:26 +0200
+Subject: Need help with device tree formation
+In-Reply-To: <loom.20151016T121454-619@post.gmane.org>
+References: <loom.20151016T121454-619@post.gmane.org>
+Message-ID: <3760709.3HqJjr2Sog@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mailbox: Fix a couple of trivial static checker issues
+On Friday 16 October 2015 11:27:15 bharat kumar gogada wrote:
+> nwl_pcie: pcie at fd0e0000 {
+>                         #address-cells = >;
+>                         #size-cells = <2>;    
+>                         compatible = "xlnx,nwl-pcie-2.11";
+>                         #interrupt-cells = <1>;
+>                         interrupt-controller;  
+>                         msi-controller;
+>                         device_type = "pci";
+>                         interrupt-parent = <&gic>;
+>                         interrupts = < 0 118 4    
+>                                        0 116 4    
+>                                        0 115 4          // MSI_1 [63...32]
+>                                        0 114 4 >;       // MSI_0 [31...0]
+>                         interrupt-names = "misc", "intx", "msi_1", "msi_0";    
+>                         interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+>                         interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 116 0x4 
+>                                          0x0 0x0 0x0 0x2 &gic 0x0 116 0x4 
+>                                          0x0 0x0 0x0 0x3 &gic 0x0 116 0x4 
+>                                          0x0 0x0 0x0 0x4 &gic 0x0 116 0x4>;
 
-This patch deals with a few spelling, white space and type
-warnings reported by Intel's Kbuild Test Robot.
+The interrupt-map looks wrong, as you point to the gic rather than &nwl_pcie
+here. Also, you seem to have only one interrupt for all INTx, so you
+use an all-zeroes interrupt-map-mask and only one entry here.
 
-Reported-by: kbuild test robot <lkp@intel.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>                         msi-parent = <&nwl_pcie>;
+>                         reg = <0x0 0xfd0e0000 0x1000
+>                                0x0 0xfd480000 0x1000
+>                                0x0 0xE0000000 0x1000000>;
+>                         reg-names = "breg", "pcireg", "cfg";
+>                         ranges = <0x02000000 0x00000000 0xE1000000
+> 0x00000000 0xE1000000 0 0x0F000000>;
+>                           
+> };
+> 
+> I have the above device tree node in root port driver i have two separate
+> domains one for legacy and other is MSI hierarchy domain; in both domains
+> I'm using same node to create domain, what i observed is: 
+> 
+> MSI interrupts are working only without interrupt-controller property,
+> legacy is working with interrupt-controller property this is due to logic in
+>  of_irq_parse_and_map_pci. 
 
----
- drivers/mailbox/mailbox-sti.c  |  2 +-
- drivers/mailbox/mailbox-test.c | 10 +++++-----
- 2 files changed, 6 insertions(+), 6 deletions(-)
+Do you know what causes the MSI to not work when there is an
+interrupt-controller property?
 
-diff --git a/drivers/mailbox/mailbox-sti.c b/drivers/mailbox/mailbox-sti.c
-index f11d4e8..4835817 100644
---- a/drivers/mailbox/mailbox-sti.c
-+++ b/drivers/mailbox/mailbox-sti.c
-@@ -64,7 +64,7 @@ struct sti_mbox_device {
- };
- 
- /**
-- * STi Mailbox platform specfic configuration
-+ * STi Mailbox platform specific configuration
-  *
-  * @num_inst:	Maximum number of instances in one HW Mailbox
-  * @num_chan:	Maximum number of channel per instance
-diff --git a/drivers/mailbox/mailbox-test.c b/drivers/mailbox/mailbox-test.c
-index cac1ba2..196144c 100644
---- a/drivers/mailbox/mailbox-test.c
-+++ b/drivers/mailbox/mailbox-test.c
-@@ -22,7 +22,7 @@
- #define MBOX_MAX_SIG_LEN	8
- #define MBOX_MAX_MSG_LEN	128
- #define MBOX_BYTES_PER_LINE	16
--#define MBOX_HEXDUMP_LINE_LEN 	((MBOX_BYTES_PER_LINE * 4) + 2)
-+#define MBOX_HEXDUMP_LINE_LEN	((MBOX_BYTES_PER_LINE * 4) + 2)
- #define MBOX_HEXDUMP_MAX_LEN	(MBOX_HEXDUMP_LINE_LEN *		\
- 				 (MBOX_MAX_MSG_LEN / MBOX_BYTES_PER_LINE))
- 
-@@ -30,7 +30,7 @@ static struct dentry *root_debugfs_dir;
- 
- struct mbox_test_device {
- 	struct device		*dev;
--	void __iomem		*mmio;
-+	void			*mmio;
- 	struct mbox_chan	*tx_channel;
- 	struct mbox_chan	*rx_channel;
- 	char			*rx_buffer;
-@@ -53,7 +53,7 @@ static ssize_t mbox_test_signal_write(struct file *filp,
- 
- 	if (count > MBOX_MAX_SIG_LEN) {
- 		dev_err(tdev->dev,
--			"Signal length %d greater than max allowed %d\n",
-+			"Signal length %lu greater than max allowed %d\n",
- 			count, MBOX_MAX_SIG_LEN);
- 		return -EINVAL;
- 	}
-@@ -92,7 +92,7 @@ static ssize_t mbox_test_message_write(struct file *filp,
- 
- 	if (count > MBOX_MAX_MSG_LEN) {
- 		dev_err(tdev->dev,
--			"Message length %d greater than max allowed %d\n",
-+			"Message length %lu greater than max allowed %d\n",
- 			count, MBOX_MAX_MSG_LEN);
- 		return -EINVAL;
- 	}
-@@ -303,7 +303,7 @@ static int mbox_test_probe(struct platform_device *pdev)
- 	tdev->tx_channel = mbox_test_request_channel(pdev, "tx");
- 	tdev->rx_channel = mbox_test_request_channel(pdev, "rx");
- 
--	if (!tdev->tx_channel && !tdev->tx_channel)
-+	if (!tdev->tx_channel && !tdev->rx_channel)
- 		return -EPROBE_DEFER;
- 
- 	tdev->dev = &pdev->dev;
+	Arnd
