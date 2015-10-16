@@ -1,30 +1,27 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 16 Oct 2015 22:08:59 +0200
-Subject: [PATCH 2/5] ARM: berlin: remove the pinctrl selection from the
- mach-berlin Kconfig
-In-Reply-To: <CACRpkdaa6sGvkZsdyc8M+nsooqUgz8g3-d1s7hET21ndBzCx7g@mail.gmail.com>
-References: <1444771901-24460-1-git-send-email-antoine.tenart@free-electrons.com>
- <1444771901-24460-3-git-send-email-antoine.tenart@free-electrons.com>
- <CACRpkdaa6sGvkZsdyc8M+nsooqUgz8g3-d1s7hET21ndBzCx7g@mail.gmail.com>
-Message-ID: <5621595B.2000809@gmail.com>
+Date: Fri, 16 Oct 2015 22:10:13 +0200
+Subject: [PATCH v6 6/7] arm64: dts: berlin4ct: add the pinctrl node
+In-Reply-To: <CACRpkdY9TVxHrT-OTa1pXCnzKPGKyKkqLqQKwH0HNnfXvR4Big@mail.gmail.com>
+References: <1444981032-4401-1-git-send-email-jszhang@marvell.com>
+ <1444981032-4401-7-git-send-email-jszhang@marvell.com>
+ <CACRpkdY9TVxHrT-OTa1pXCnzKPGKyKkqLqQKwH0HNnfXvR4Big@mail.gmail.com>
+Message-ID: <562159A5.10204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.10.2015 16:19, Linus Walleij wrote:
-> On Tue, Oct 13, 2015 at 11:31 PM, Antoine Tenart
-> <antoine.tenart@free-electrons.com> wrote:
+On 16.10.2015 16:17, Linus Walleij wrote:
+> On Fri, Oct 16, 2015 at 9:37 AM, Jisheng Zhang <jszhang@marvell.com> wrote:
 >
->> This patch removes the pinctrl driver selection from the mach-berlin
->> Kconfig file. This is now done in the Berlin pinctrl driver Kconfig.
+>> Add the avio, soc, sm pinctrl nodes for Marvell berlin4ct SoC.
 >>
->> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+>> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 >
 > Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> I can't merge this patch, take it through ARM SoC with other
-> Marvell stuff.
+> Funnel this through ARM SoC.
 
-Applied to berlin/soc with Linus' Ack.
+Applied to berlin64/dt with Linus' Ack.
 
 Thanks,
    Sebastian
