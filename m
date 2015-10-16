@@ -1,49 +1,41 @@
 From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Fri, 16 Oct 2015 15:42:28 -0700
-Subject: [PATCHv2 1/3] ARM: dt: fpga: Added binding docs for Xilinx Zynq FPGA
- manager.
+Date: Fri, 16 Oct 2015 15:42:29 -0700
+Subject: [PATCHv2 2/3] ARM: zynq: dt: Updated devicetree for Zynq 7000
+ platform.
 In-Reply-To: <1445035350-3569-1-git-send-email-moritz.fischer@ettus.com>
 References: <1445035350-3569-1-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <1445035350-3569-2-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <1445035350-3569-3-git-send-email-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Added addtional nodes required for FPGA Manager operation
+of the Xilinx Zynq Devc configuration interface.
+
+Reviewed-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
 ---
 
-v2:
- - Clock names are now a required property
- - Removed interrupt-parent property
+v2: No changes
 
 ---
- .../devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt
+ arch/arm/boot/dts/zynq-7000.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt
-new file mode 100644
-index 0000000..7018aa8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt
-@@ -0,0 +1,19 @@
-+Xilinx Zynq FPGA Manager
-+
-+Required properties:
-+- compatible:		should contain "xlnx,zynq-devcfg-1.0"
-+- reg:			base address and size for memory mapped io
-+- interrupts:		interrupt for the FPGA manager device
-+- clocks:		phandle for clocks required operation
-+- clock-names:		name for the clock, should be "ref_clk"
-+- syscon:		phandle for access to SLCR registers
-+
-+Example:
-+	devcfg: devcfg at f8007000 {
-+		compatible = "xlnx,zynq-devcfg-1.0";
-+		reg = <0xf8007000 0x100>;
-+		interrupts = <0 8 4>;
-+		clocks = <&clkc 12>;
-+		clock-names = "ref_clk";
-+		syscon = <&slcr>;
-+	};
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index dc0457e..1a5220e 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -294,6 +294,11 @@
+ 		devcfg: devcfg at f8007000 {
+ 			compatible = "xlnx,zynq-devcfg-1.0";
+ 			reg = <0xf8007000 0x100>;
++			interrupt-parent = <&intc>;
++			interrupts = <0 8 4>;
++			clocks = <&clkc 12>;
++			clock-names = "ref_clk";
++			syscon = <&slcr>;
+ 		};
+ 
+ 		global_timer: timer at f8f00200 {
 -- 
 2.4.3
