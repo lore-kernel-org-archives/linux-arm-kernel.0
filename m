@@ -1,51 +1,29 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 16 Oct 2015 15:27:14 +0200
-Subject: [PATCH 4/5] clk: berlin: bg2q: remove CLK_IGNORE_UNUSED flag for
- sdio clk
-In-Reply-To: <20151016124705.20687.51712@quantum>
-References: <1444628796-5484-1-git-send-email-jszhang@marvell.com>
- <1444628796-5484-5-git-send-email-jszhang@marvell.com>
- <20151016124705.20687.51712@quantum>
-Message-ID: <5620FB32.8030705@gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 16 Oct 2015 08:27:01 -0500
+Subject: [RFC 2/2] drm/bridge: Add I2C based driver for ps8640 bridge
+In-Reply-To: <20151016130632.GE2054@leverpostej>
+References: <1444997709-57293-1-git-send-email-ck.hu@mediatek.com>
+ <1444997709-57293-2-git-send-email-ck.hu@mediatek.com>
+ <20151016130632.GE2054@leverpostej>
+Message-ID: <CAL_JsqJvmK-3+DFTHQEEjJuj6N_PCXbEGa1CVu9-yF3s+HKGfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.10.2015 14:47, Michael Turquette wrote:
-> Quoting Jisheng Zhang (2015-10-11 22:46:35)
->> Since we have added the necessary axi clk properties in dts, we can
->> remove the "sdio" clk's CLK_IGNORE_UNUSED flag now.
->>
->> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+On Fri, Oct 16, 2015 at 8:06 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> +     /* FIXME - use of_graph_get_port_by_id(np, 1) on newer kernels */
+>> +     in_ep = of_graph_get_next_endpoint(np, NULL);
 >
-> Applied to clk-next.
-
-Mike,
-
-these two patches will break Berlin SoCs if not applied
-after the sdhci and DT changes went in. Please hold them
-back until the discussion has been settled.
-
-Thanks,
-   Sebastian
-
+> Huh?
 >
->> ---
->>   drivers/clk/berlin/bg2q.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
->> index 221f40c..243f421 100644
->> --- a/drivers/clk/berlin/bg2q.c
->> +++ b/drivers/clk/berlin/bg2q.c
->> @@ -283,7 +283,7 @@ static const struct berlin2_gate_data bg2q_gates[] __initconst = {
->>          { "usb2",       "perif",        13 },
->>          { "usb3",       "perif",        14 },
->>          { "pbridge",    "perif",        15, CLK_IGNORE_UNUSED },
->> -       { "sdio",       "perif",        16, CLK_IGNORE_UNUSED },
->> +       { "sdio",       "perif",        16 },
->>          { "nfc",        "perif",        18 },
->>          { "pcie",       "perif",        22 },
->>   };
->> --
->> 2.6.1
->>
+>> +     edidp = of_get_property(np, "edid", &size);
+>
+> This property wasn't mentioned in the binding document.
+>
+> Please describe it. If it's from a more generic binding, refer to that
+> from the binding document.
+
+It should be generic, but currently documented in individual drivers.
+I also think this is not the right location in the DT for this
+property. It should be part of the panel or connector node instead.
+
+Rob
