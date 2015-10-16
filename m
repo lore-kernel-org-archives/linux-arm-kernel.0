@@ -1,43 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Oct 2015 09:02:23 +0100
-Subject: [PATCH v1 0/2] Common SerDes driver for TI's Keystone Platforms
-In-Reply-To: <CAL_JsqJTjCT8D-3OryFPEF8nnaPtrai7Mvf-gJRkh60aDixx-g@mail.gmail.com>
-References: <1444919145-30845-1-git-send-email-w-kwok2@ti.com>
- <20151015165105.GE32532@n2100.arm.linux.org.uk>
- <CAL_JsqJTjCT8D-3OryFPEF8nnaPtrai7Mvf-gJRkh60aDixx-g@mail.gmail.com>
-Message-ID: <20151016080222.GH32532@n2100.arm.linux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 16 Oct 2015 10:11:29 +0200
+Subject: [PATCHv3 08/11] arm64: Check for selected granule support
+In-Reply-To: <20151015151113.GK8825@leverpostej>
+References: <1444821634-1689-1-git-send-email-suzuki.poulose@arm.com>
+ <1444821634-1689-9-git-send-email-suzuki.poulose@arm.com>
+ <561EC58B.9080408@arm.com> <20151015104515.GE8825@leverpostej>
+ <20151015112532.GA16125@e106634-lin.cambridge.arm.com>
+ <561FBC99.9090501@arm.com> <20151015151113.GK8825@leverpostej>
+Message-ID: <CAKv+Gu-4EpbR5Wr=QgaM8gCgrrUBc3eGem2_SeAz9BVAKwqm=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 08:00:41PM -0500, Rob Herring wrote:
-> On Thu, Oct 15, 2015 at 11:51 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Thu, Oct 15, 2015 at 10:25:43AM -0400, WingMan Kwok wrote:
-> >> On TI's Keystone platforms, several peripherals such as the
-> >> gbe ethernet switch, 10gbe ethether switch and PCIe controller
-> >> require the use of a SerDes for converting SoC parallel data into
-> >> serialized data that can be output over a high-speed electrical
-> >> interface, and also converting high-speed serial input data
-> >> into parallel data that can be processed by the SoC.  The
-> >> SerDeses used by those peripherals, though they may be different,
-> >> are largely similar in functionality and setup.
-> >
-> > Given that serdes is not specific to TI, should this be specific to
-> > TI, or should there be an effort to come up with something which
-> > everyone who has serdes links can make use of?
-> >
-> > Serdes comes in multiple different forms: PCIe, 1G SGMII ethernet,
-> > 1000base-X ethernet, 10g ethernet, SATA... I'd hate to see a
-> > plethora of SoC specific stuff for this.
-> 
-> The licensed IP I've seen doesn't provide a standard register
-> interface, but just signals to the IP block. Same with PLL IP. So
-> we'll probably get to see vendors continue to differentiate on PHY
-> register design. :)
+On 15 October 2015 at 17:11, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Oct 15, 2015 at 09:47:53AM -0500, Jeremy Linton wrote:
+>> On 10/15/2015 06:25 AM, Suzuki K. Poulose wrote:
+>> >+    /*
+>> >+     * Check to see if the CPU supports the requested pagesize
+>> >+     */
+>> >+    asm volatile("mrs %0, ID_AA64MMFR0_EL1" : "=r" (aa64mmfr0_el1));
+>> >+    aa64mmfr0_el1 >>= ID_AA64MMFR0_TGRAN_SHIFT;
+>> >+    if ((aa64mmfr0_el1 & 0xf) != ID_AA64MMFR0_TGRAN_SUPPORTED) {
+>> >+            pr_efi_err(sys_table_arg, PAGE_SIZE_STR" granule not supported by the CPU\n");
+>> >+            return EFI_UNSUPPORTED;
+>> >+    }
+>>
+>>
+>> This is definitely an improvement over my original hack job.
+>>
+>> I would like to add, that I actually think this should be in a new
+>> function "check_kernel_compatibility" (or whatever) that is called
+>> before handle_kernel_image.
+>
+> To bikeshed, perhaps efi_arch_check_system?
+>
 
-So what?  Network drivers differ radically in register design, yet we
-still have a standardised interface to network drivers.
+Yes, that makes sense. But before we add such a function, we should
+move all the stub C code to libstub where it will be subject to the
+new check against R_AARCH64_ABSxx relocations (which we cannot support
+in the stub).
+
+>> That is because I don't really think it belongs in
+>> handle_kernel_image which is focused on relocation. Plus, if you add
+>> another function, you can avoid the "Failed to relocate kernel"
+>> error that comes out following the granule not supported message.
+>> Further, checks like this in the future will have a place to live.
+>
+> I agree.
+>
+> There are some other diagnostic utilities I'd like to add to the stub
+> (e.g. dumping the memory map and ID registers) that would help with
+> diagnosing boot issues. I started on those at Connect, but realised I
+> needed to first implement half of printf for those to be useful.
+>
+
+Yes, printf() is sorely lacking in that context. But note that the
+memory map can already be retrieved from the UEFI shell via the
+'memmap' command.
+
+>> Of course you will then need a matching stubbed out function for the
+>> normal arm kernel as well.
+>
+> I'm sure there are similar things we'll want to check for 32-bit (e.g.
+> LPAE support), but a stub should be fine for now.
+>
+
+ARM support is not merged yet, but it is good to keep it in mind.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Ard.
