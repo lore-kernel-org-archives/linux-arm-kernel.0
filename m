@@ -1,43 +1,35 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 16 Oct 2015 13:35:52 -0700
-Subject: [PATCH net-next 2/2] Documentation: dts: xgene: Add TX/RX delay field
-In-Reply-To: <1445027752-16982-1-git-send-email-isubramanian@apm.com>
-References: <1445027752-16982-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1445027752-16982-3-git-send-email-isubramanian@apm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Oct 2015 22:35:33 +0200
+Subject: [PATCH] [media] cobalt: add VIDEO_V4L2_SUBDEV_API dependency
+Message-ID: <25194020.Fs8hi1GXzI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
----
- Documentation/devicetree/bindings/net/apm-xgene-enet.txt | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+The cobalt driver uses various encoders that require the VIDEO_V4L2_SUBDEV_API
+code, but it does not have the dependency itself, so we get a build error
+when it's not enabled:
 
-diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-index f55aa28..5b17c13 100644
---- a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-+++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-@@ -37,6 +37,14 @@ Required properties for ethernet interfaces that have external PHY:
- 
- Optional properties:
- - status: Should be "ok" or "disabled" for enabled/disabled. Default is "ok".
-+- tx-delay: Delay value for RGMII TXD timming.
-+	    Valid values are between 0 to 7, that maps to
-+	    417, 717, 1020, 1321, 1611, 1913, 2215, 2514 ps
-+	    Default value is 4, which corresponds to 1611 ps
-+- rx-delay: Delay value for RGMII RXD timming in ps.
-+	    Valid values are between 0 to 7, that maps to
-+	    273, 589, 899, 1222, 1480, 1806, 2147, 2464 ps
-+	    Default value is 2, which corresponds to 899 ps
- 
- Example:
- 	menetclk: menetclk {
-@@ -72,5 +80,7 @@ Example:
- 
- /* Board-specific peripheral configurations */
- &menet {
-+	tx-delay = <4>;
-+	rx-delay = <2>;
-         status = "ok";
- };
--- 
-1.9.1
+warning: (VIDEO_COBALT) selects VIDEO_ADV7511 which has unmet direct dependencies (MEDIA_SUPPORT && VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API)
+warning: (VIDEO_COBALT) selects VIDEO_ADV7604 which has unmet direct dependencies (MEDIA_SUPPORT && VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API && (GPIOLIB || COMPILE_TEST))
+warning: (VIDEO_COBALT) selects VIDEO_ADV7842 which has unmet direct dependencies (MEDIA_SUPPORT && VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API)
+drivers/media/i2c/adv7604.c: In function 'adv76xx_get_format':
+drivers/media/i2c/adv7604.c:1878:9: error: implicit declaration of function 'v4l2_subdev_get_try_format' [-Werror=implicit-function-declaration]
+
+This adds an explicit dependency.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+Found on ARM randconfig builds
+
+diff --git a/drivers/media/pci/cobalt/Kconfig b/drivers/media/pci/cobalt/Kconfig
+index 1f88ccc174da..a7f750520757 100644
+--- a/drivers/media/pci/cobalt/Kconfig
++++ b/drivers/media/pci/cobalt/Kconfig
+@@ -1,6 +1,7 @@
+ config VIDEO_COBALT
+ 	tristate "Cisco Cobalt support"
+ 	depends on VIDEO_V4L2 && I2C && MEDIA_CONTROLLER
++	depends on VIDEO_V4L2_SUBDEV_API
+ 	depends on PCI_MSI && MTD_COMPLEX_MAPPINGS
+ 	depends on GPIOLIB || COMPILE_TEST
+ 	depends on SND
