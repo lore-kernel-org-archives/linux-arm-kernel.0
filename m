@@ -1,48 +1,68 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 16 Oct 2015 19:45:27 +0200
-Subject: [GIT PULL] ARM: mvebu: soc for v4.4 (#2)
-Message-ID: <87vba6g11k.fsf@free-electrons.com>
+Date: Fri, 16 Oct 2015 19:56:55 +0200
+Subject: [GIT PULL] ARM: mvebu: dt for v4.4 (#2)
+Message-ID: <87r3kug0ig.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here is the second pull request for soc for mvebu for v4.4.
+Here is the second pull request for dt for mvebu for v4.4.
 
 Gregory
 
-The following changes since commit d492cccac28493f26bb70038385a9ef4df19bdee:
+The following changes since commit 9b24a35cb59888194706825b9c5ac550b0880277:
 
-  ARM: mvebu: add support to clear shared L2 bit on Armada XP (2015-09-29 15:31:51 +0200)
+  ARM: mvebu: modify Orion and Kirkwoord crypto compatible strings (2015-10-09 17:08:02 +0200)
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.4-2
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.4-2
 
-for you to fetch changes up to 400b1b26b44f1c5de45bc01873f42c9e776e102e:
+for you to fetch changes up to 6b61f2497852b7d27e1c024d966c09defbf99948:
 
-  ARM: orion5x: use mac_pton() helper (2015-10-15 09:37:18 +0200)
-
-----------------------------------------------------------------
-mvebu soc for 4.4 (part 2)
-
-- Use mac_pton() helper in the oropn5x board instead of duplicating it
-- Add the broken-idle option allowing to boot boards with a mistake in
-  the hardware design
+  ARM: mvebu: set SW polling as SDHCI card detection on A388-GP (2015-10-16 19:17:57 +0200)
 
 ----------------------------------------------------------------
-Andy Shevchenko (1):
-      ARM: orion5x: use mac_pton() helper
+mvebu dt for 4.4 (part 2)
+
+- Add support for severals Armada-370-based Seagate NAS
+- Fix Ready NAS device tree
+- Modify SDHCI binding for A388-GP allowing using it on old and new
+  version of the board
+
+----------------------------------------------------------------
+Arnaud Ebalard (2):
+      arm: mvebu: disable unused Armada RTC on ReadyNAS 102, 104 and 2120
+      arm: mvebu: reorder nodes under internal-regs by address in RN2120 .dts file
+
+Marcin Wojtas (1):
+      ARM: mvebu: set SW polling as SDHCI card detection on A388-GP
+
+Simon Guinot (1):
+      ARM: mvebu: add DT support for Seagate Personal Cloud
 
 Vincent Donnefort (1):
-      ARM: mvebu: add broken-idle option
+      ARM: mvebu: add DT support for Seagate NAS 2 and 4-Bay
 
- .../devicetree/bindings/arm/coherency-fabric.txt   |  5 ++
- arch/arm/mach-mvebu/pmsu.c                         | 29 ++++++++++--
- arch/arm/mach-orion5x/Kconfig                      |  3 ++
- arch/arm/mach-orion5x/dns323-setup.c               | 53 ++--------------------
- arch/arm/mach-orion5x/tsx09-common.c               | 49 ++------------------
- 5 files changed, 41 insertions(+), 98 deletions(-)
+ arch/arm/boot/dts/Makefile                         |   4 +
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts     |   6 +
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts     |   6 +
+ arch/arm/boot/dts/armada-370-seagate-nas-2bay.dts  |  36 ++++
+ arch/arm/boot/dts/armada-370-seagate-nas-4bay.dts  | 133 ++++++++++++
+ arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi | 231 +++++++++++++++++++++
+ .../dts/armada-370-seagate-personal-cloud-2bay.dts |  51 +++++
+ .../boot/dts/armada-370-seagate-personal-cloud.dts |  37 ++++
+ .../dts/armada-370-seagate-personal-cloud.dtsi     | 178 ++++++++++++++++
+ arch/arm/boot/dts/armada-388-gp.dts                |  15 +-
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts     |  86 ++++----
+ 11 files changed, 742 insertions(+), 41 deletions(-)
+ create mode 100644 arch/arm/boot/dts/armada-370-seagate-nas-2bay.dts
+ create mode 100644 arch/arm/boot/dts/armada-370-seagate-nas-4bay.dts
+ create mode 100644 arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-370-seagate-personal-cloud-2bay.dts
+ create mode 100644 arch/arm/boot/dts/armada-370-seagate-personal-cloud.dts
+ create mode 100644 arch/arm/boot/dts/armada-370-seagate-personal-cloud.dtsi
 
 -- 
 Gregory Clement, Free Electrons
