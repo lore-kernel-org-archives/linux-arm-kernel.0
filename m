@@ -1,112 +1,60 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Fri, 16 Oct 2015 18:23:36 +0800
-Subject: [PATCH v11 1/6] PCI: designware: move calculation of bus addresses to
- DRA7xx
-In-Reply-To: <1444991021-109306-1-git-send-email-wangzhou1@hisilicon.com>
-References: <1444991021-109306-1-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <1444991021-109306-2-git-send-email-wangzhou1@hisilicon.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 16 Oct 2015 12:16:14 +0200
+Subject: [PATCH 3/3] mtd: nand: sunxi: add randomizer support
+In-Reply-To: <1444929443-25537-4-git-send-email-boris.brezillon@free-electrons.com>
+References: <1444929443-25537-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1444929443-25537-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20151016121614.0686ec42@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: gabriele paoloni <gabriele.paoloni@huawei.com>
+On Thu, 15 Oct 2015 19:17:23 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 
-Commit f4c55c5a3f7f ("PCI: designware: Program ATU with untranslated
-address") added the calculation of PCI BUS addresses in designware,
-storing them in new fields added in "struct pcie_port". This
-calculation is done for every designware user even if is only
-applicable to DRA7xx.
-This patch moves the calculation of the bus addresses to the DRA7xx
-driver and is needed to allow the rework of designware to use
-the new DT parsing API.
+> Add support for the randomizer engine available in Allwinner's NFC IP.
+> 
+> Randomization is useful to support modern NAND chips which are sensible to
+> repeated patterns. On such NANDs you might experience an unexpectedly high
+> number of bitflips when you repeat the same pattern all over a given NAND
+> block.
+> Randomizing input data mitigate this problem by avoiding such repeated
+> patterns.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/mtd/nand/sunxi_nand.c | 274 ++++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 250 insertions(+), 24 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+> index ef46ac6..5508ce8 100644
+> --- a/drivers/mtd/nand/sunxi_nand.c
+> +++ b/drivers/mtd/nand/sunxi_nand.c
+> @@ -60,6 +60,7 @@
+>  #define NFC_REG_ECC_ERR_CNT(x)	((0x0040 + (x)) & ~0x3)
+>  #define NFC_REG_USER_DATA(x)	(0x0050 + ((x) * 4))
+>  #define NFC_REG_SPARE_AREA	0x00A0
+> +#define NFC_REG_PAT_ID		0x00A4
+>  #define NFC_RAM0_BASE		0x0400
+>  #define NFC_RAM1_BASE		0x0800
+>  
+> @@ -225,6 +226,7 @@ struct sunxi_nand_hw_ecc {
+>   * @node:		used to store NAND chips into a list
+>   * @nand:		base NAND chip structure
+>   * @mtd:		base MTD structure
+> + * @randomize:		randomize data
+>   * @clk_rate:		clk_rate required for this NAND chip
+>   * @timing_cfg		TIMING_CFG register value for this NAND chip
+>   * @selected:		current active CS
+> @@ -235,6 +237,7 @@ struct sunxi_nand_chip {
+>  	struct list_head node;
+>  	struct nand_chip nand;
+>  	struct mtd_info mtd;
+> +	bool randomize;
 
-Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
-Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
----
- drivers/pci/host/pci-dra7xx.c      | 13 +++++++++++++
- drivers/pci/host/pcie-designware.c | 15 ++++-----------
- 2 files changed, 17 insertions(+), 11 deletions(-)
+This variable is a leftover from a previous version, I'll drop it for
+the next version.
 
-diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
-index 199e29a..ebdffa0 100644
---- a/drivers/pci/host/pci-dra7xx.c
-+++ b/drivers/pci/host/pci-dra7xx.c
-@@ -62,6 +62,7 @@
- 
- #define	PCIECTRL_DRA7XX_CONF_PHY_CS			0x010C
- #define	LINK_UP						BIT(16)
-+#define	CPU_TO_BUS_ADDR					0x0FFFFFFF
- 
- struct dra7xx_pcie {
- 	void __iomem		*base;
-@@ -151,6 +152,18 @@ static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
- static void dra7xx_pcie_host_init(struct pcie_port *pp)
- {
- 	dw_pcie_setup_rc(pp);
-+
-+	if (pp->io_mod_base)
-+		pp->io_mod_base &= CPU_TO_BUS_ADDR;
-+
-+	if (pp->mem_mod_base)
-+		pp->mem_mod_base &= CPU_TO_BUS_ADDR;
-+
-+	if (pp->cfg0_mod_base) {
-+		pp->cfg0_mod_base &= CPU_TO_BUS_ADDR;
-+		pp->cfg1_mod_base &= CPU_TO_BUS_ADDR;
-+	}
-+
- 	dra7xx_pcie_establish_link(pp);
- 	if (IS_ENABLED(CONFIG_PCI_MSI))
- 		dw_pcie_msi_init(pp);
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 52aa6e3..75338a6 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -365,14 +365,10 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	struct of_pci_range range;
- 	struct of_pci_range_parser parser;
- 	struct resource *cfg_res;
--	u32 val, na, ns;
-+	u32 val, ns;
- 	const __be32 *addrp;
- 	int i, index, ret;
- 
--	/* Find the address cell size and the number of cells in order to get
--	 * the untranslated address.
--	 */
--	of_property_read_u32(np, "#address-cells", &na);
- 	ns = of_n_size_cells(np);
- 
- 	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
-@@ -415,8 +411,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 			pp->io_base = range.cpu_addr;
- 
- 			/* Find the untranslated IO space address */
--			pp->io_mod_base = of_read_number(parser.range -
--							 parser.np + na, ns);
-+			pp->io_mod_base = range.cpu_addr;
- 		}
- 		if (restype == IORESOURCE_MEM) {
- 			of_pci_range_to_resource(&range, np, &pp->mem);
-@@ -425,8 +420,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 			pp->mem_bus_addr = range.pci_addr;
- 
- 			/* Find the untranslated MEM space address */
--			pp->mem_mod_base = of_read_number(parser.range -
--							  parser.np + na, ns);
-+			pp->mem_mod_base = range.cpu_addr;
- 		}
- 		if (restype == 0) {
- 			of_pci_range_to_resource(&range, np, &pp->cfg);
-@@ -436,8 +430,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 			pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
- 
- 			/* Find the untranslated configuration space address */
--			pp->cfg0_mod_base = of_read_number(parser.range -
--							   parser.np + na, ns);
-+			pp->cfg0_mod_base = range.cpu_addr;
- 			pp->cfg1_mod_base = pp->cfg0_mod_base +
- 					    pp->cfg0_size;
- 		}
 -- 
-1.9.1
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
