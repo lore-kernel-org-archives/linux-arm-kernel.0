@@ -1,34 +1,21 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 16 Oct 2015 16:33:01 +0200
-Subject: [PATCH 4/5] pinctrl: berlin: Kconfig clean up
-In-Reply-To: <CACRpkdbb2WG+7CXirFxc_=aWsOLQx6y7zPVR2qXgcV_c4ywZEg@mail.gmail.com>
-References: <1444771901-24460-1-git-send-email-antoine.tenart@free-electrons.com>
- <1444771901-24460-5-git-send-email-antoine.tenart@free-electrons.com>
- <CACRpkdbb2WG+7CXirFxc_=aWsOLQx6y7zPVR2qXgcV_c4ywZEg@mail.gmail.com>
-Message-ID: <20151016143301.GA7241@kwain>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 Oct 2015 15:34:53 +0100
+Subject: Aarch32 user space PC alignment exception
+In-Reply-To: <1444771874-22714-1-git-send-email-salyzyn@android.com>
+References: <1444771874-22714-1-git-send-email-salyzyn@android.com>
+Message-ID: <20151016143452.GD6613@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
-
-On Fri, Oct 16, 2015 at 04:22:35PM +0200, Linus Walleij wrote:
-> On Tue, Oct 13, 2015 at 11:31 PM, Antoine Tenart
-> <antoine.tenart@free-electrons.com> wrote:
+On Tue, Oct 13, 2015 at 02:30:51PM -0700, Mark Salyzyn wrote:
+> armv7 does not have a PC alignment exception. armv8 Aarch32
+> user space however can produce a PC alignment exception. Add
+> handler so the we do not dump an unexpected stack trace in
+> the logs.
 > 
-> > Reorder the statements under the PINCTRL_BERLIN_BG4CT config
-> > option to be consistent with the existing.
-> >
-> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> 
-> I assume this was squashed into Jisheng's patchset as mentioned
-> in the thread because it doesn't apply after I applied Jisheng's
-> v7 patches.
+> Signed-off-by: Mark Salyzyn <salyzyn@android.com>
 
-Yes, this was squashed into Jisheng's series.
-
-Antoine
+Queued for 4.4. Thanks.
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Catalin
