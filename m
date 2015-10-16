@@ -1,109 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Oct 2015 23:37:51 +0200
-Subject: [GIT PULL] qcom SoC changes for 4.4 *RESEND*
-In-Reply-To: <20151016212626.GD16437@codeaurora.org>
-References: <1444860627-8258-1-git-send-email-agross@codeaurora.org>
- <4138617.YyHIgKfeHJ@wuerfel> <20151016212626.GD16437@codeaurora.org>
-Message-ID: <4453168.e21k6NYVFf@wuerfel>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 16 Oct 2015 14:39:40 -0700
+Subject: [PATCH 01/10] clk: rockchip: Add sclk_mipidsi_24m for mipi dsi
+In-Reply-To: <1444470930-17150-2-git-send-email-zyw@rock-chips.com>
+References: <1444470930-17150-1-git-send-email-zyw@rock-chips.com>
+ <1444470930-17150-2-git-send-email-zyw@rock-chips.com>
+Message-ID: <20151016213940.GA10182@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 October 2015 14:26:27 Stephen Boyd wrote:
-> On 10/16, Arnd Bergmann wrote:
-> > On Friday 16 October 2015 13:04:17 Stephen Boyd wrote:
-> > > On 10/16, Arnd Bergmann wrote:
-> > > > On Friday 16 October 2015 09:56:30 Stephen Boyd wrote:
-> > > > > 
-> > > > > Can you share your .config? It looks like there are stubs for these, so
-> > > > > I'm lost how we got undefined references.
-> > > > > 
-> > > > http://pastebin.com/HtrC510p
-> > > > 
-> > > > The problem is CONFIG_HWSPINLOCK=m && CONFIG_QCOM_SMEM=y. Sorry for sending
-> > > > an incomplete patch description, I had not noticed those wrapper functions.
-> > > > 
-> > > > My patch fixes the issue, but does not allow you to build QCOM_SMEM without
-> > > > HWSPINLOCK. If we want that configuration to be valid, we need one of
-> > > > the two changes below:
-> > > > 
-> > > > diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
-> > > > index eec76141d9b9..cae0ffa19bca 100644
-> > > > --- a/drivers/soc/qcom/Kconfig
-> > > > +++ b/drivers/soc/qcom/Kconfig
-> > > > @@ -22,7 +22,7 @@ config QCOM_PM
-> > > >  config QCOM_SMEM
-> > > >  	tristate "Qualcomm Shared Memory Manager (SMEM)"
-> > > >  	depends on ARCH_QCOM
-> > > > -	depends on HWSPINLOCK
-> > > > +	depends on HWSPINLOCK && !HWSPINLOCK
-> > > 
-> > > What does this mean?
-> > 
-> > This is the magic way in Kconfig to express what we want ;-)
-> > 
-> > It says it depends on either HWSPINLOCK being disabled (!HWSPINLOCK),
-> > or it depends on HWSPINLOCK. The latter implies that QCOM_SMEM cannot
-> > be built-in when HWSPINLOCK=m, but they are allowed to both be built-in.
-> > 
+On 10/10, Chris Zhong wrote:
+> sclk_mipidsi_24m is the gating of mipi dsi phy.
 > 
-> I think you mean OR then?
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> ---
+
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+
 > 
-> 	depends on HWSPINLOCK || !HWSPINLOCK
-
-Yes, sorry about that.
-
-> If I have HWSPINLOCK=y and try menuconfig with your patch, the
-> smem config isn't selectable. But if HWSPINLOCK=m then the smem
-> config is visible and smem can only be a module.
-
-Ok, I have to admit that I don't even know how Kconfig interprets
-(FOO && !FOO), so that's probably the result of my typo.
-
-> > 
-> > > >  	help
-> > > >  	  Say y here to enable support for the Qualcomm Shared Memory Manager.
-> > > >  	  The driver provides an interface to items in a heap shared among all
-> > > > diff --git a/include/linux/hwspinlock.h b/include/linux/hwspinlock.h
-> > > > index 859d673d98c8..cdfd9fd2ba11 100644
-> > > > --- a/include/linux/hwspinlock.h
-> > > > +++ b/include/linux/hwspinlock.h
-> > > > @@ -59,7 +59,7 @@ struct hwspinlock_pdata {
-> > > >  	int base_id;
-> > > >  };
-> > > >  
-> > > > -#if defined(CONFIG_HWSPINLOCK) || defined(CONFIG_HWSPINLOCK_MODULE)
-> > > > +#if IS_REACHABLE(CONFIG_HWSPINLOCK)
-> > > >  
-> > > >  int hwspin_lock_register(struct hwspinlock_device *bank, struct device *dev,
-> > > >  		const struct hwspinlock_ops *ops, int base_id, int num_locks);
-> > > > 
-> > > 
-> > > I'd prefer this patch. Is there some way to capture that
-> > > QCOM_SMEM must be a module if HWSPINLOCK is a module unless we're
-> > > doing a compile test, in which case we don't care?
-> > 
-> > The problem here is that while we avoid the build error, we get the
-> > counterintuitive behavior that you can have the HWSPINLOCK module
-> > loaded but the built-in QCOM_SMEM module does not use it because
-> > it wasn't reachable at compile time.
-> > 
+>  drivers/clk/rockchip/clk-rk3288.c      | 2 +-
+>  include/dt-bindings/clock/rk3288-cru.h | 1 +
+>  2 files changed, 2 insertions(+), 1 deletion(-)
 > 
-> Agreed, which is why I suggested depends on HWSPINLOCK ||
-> COMPILE_TEST + the IS_REACHABLE patch. That way if hwspinlock=y,
-> smem can be y or m, if hwspinlock=m, smem can only be m, and if
-> hwspinlock=n then smem can only be y or m if it has
-> COMPILE_TEST=y. In the last case the IS_REACHABLE ifdef will "do
-> the right thing" and make it so that HWSPINLOCK symbols are
-> stubbed out if hwspinlock=m and smem=y or hwspinlock=n and
-> smem=y/m.
+> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+> index 9040878..c7d7ebf 100644
+> --- a/drivers/clk/rockchip/clk-rk3288.c
+> +++ b/drivers/clk/rockchip/clk-rk3288.c
+> @@ -709,7 +709,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+>  	GATE(SCLK_LCDC_PWM1, "sclk_lcdc_pwm1", "xin24m", 0, RK3288_CLKGATE_CON(13), 11, GFLAGS),
+>  	GATE(SCLK_PVTM_CORE, "sclk_pvtm_core", "xin24m", 0, RK3288_CLKGATE_CON(5), 9, GFLAGS),
+>  	GATE(SCLK_PVTM_GPU, "sclk_pvtm_gpu", "xin24m", 0, RK3288_CLKGATE_CON(5), 10, GFLAGS),
+> -	GATE(0, "sclk_mipidsi_24m", "xin24m", 0, RK3288_CLKGATE_CON(5), 15, GFLAGS),
+> +	GATE(SCLK_MIPI_24M, "sclk_mipidsi_24m", "xin24m", 0, RK3288_CLKGATE_CON(5), 15, GFLAGS),
+>  
 
-Ah, I see. The downside is still that other users of HWSPINLOCK
-might now accidentally build but not work if HWSPINLOCK=m.
- 
-> I don't think we ever care about a kernel that actually runs when
-> COMPILE_TEST=y, so this seems to be ok.
+It would have been better to make #defines for all these clocks
+even if they weren't going to be used here. Then we could have
+applied this patch directly to clk tree without having a clk tree
+to arm-soc dependency. </grumble>
 
-Right, for the QCOM_SMEM support that is clearly ok as long as you
-have the Kconfig logic there.
-
-	Arnd
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
