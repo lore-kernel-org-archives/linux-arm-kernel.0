@@ -1,44 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 16 Oct 2015 15:11:21 -0700
-Subject: [RFC 4/5] clk: iproc: define Broadcom NS2 iProc clock binding
-In-Reply-To: <561E88A7.2090808@broadcom.com>
-References: <1444771347-11382-1-git-send-email-jonmason@broadcom.com>
- <1444771347-11382-5-git-send-email-jonmason@broadcom.com>
- <561D84B4.4000002@broadcom.com>
- <20151014154410.GF15160@broadcom.com>
- <561E88A7.2090808@broadcom.com>
-Message-ID: <20151016221121.GD10182@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 17 Oct 2015 00:21:07 +0200
+Subject: [PATCH] ARM: psci-smp is built only for SMP
+Message-ID: <4561751.e2CPD6ukve@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14, Ray Jui wrote:
-> 
-> 
-> On 10/14/2015 8:44 AM, Jon Mason wrote:
-> > On Tue, Oct 13, 2015 at 03:24:52PM -0700, Ray Jui wrote:
-> >> Same as this patch. I thought device tree binding document should go
-> >> with the clock driver changes.
-> >>
-> >> Strictly speaking, device tree binding document should always go before
-> >> the driver changes. In the binding document the DT interface is defined,
-> >> then changes are implemented in the driver.
-> > 
-> > I split them off this way due to the clk maintainer not wanting to
-> > pull in any device tree changes.  Since the documentation is for the
-> > device tree enties, it makes logical sense to me that they be in the
-> > same device tree series.  If Stephen will pull these in with the clk
-> > changes, I am more than happy to have it done by him :)
-> > 
-> > Thanks,
-> > Jon
-> 
-> Yeah the clock maintainers do not pull in device tree changes like
-> *.dtsi and *.dts. But they do take changes including the binding
-> documents and clock driver changes. You can confirm with Stephen.
-> 
+The PSCI SMP implementation is built only when both CONFIG_SMP and
+CONFIG_ARM_PSCI are set, so a configuration that has the latter
+but not the former can get a link error when it tries to call
+psci_smp_available().
 
-Yes we take bindings (I know I'm replying to an old patch).
+arch/arm/mach-tegra/built-in.o: In function `tegra114_cpuidle_init':
+cpuidle-tegra114.c:(.init.text+0x52a): undefined reference to `psci_smp_available'
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+This corrects the #ifdef in the psci.h header file to match the
+Makefile conditional we have for building that function.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
+index 68ee3ce17b82..b4c6d99364f1 100644
+--- a/arch/arm/include/asm/psci.h
++++ b/arch/arm/include/asm/psci.h
+@@ -16,7 +16,7 @@
+ 
+ extern struct smp_operations psci_smp_ops;
+ 
+-#ifdef CONFIG_ARM_PSCI
++#if defined(CONFIG_SMP) && defined(CONFIG_ARM_PSCI)
+ bool psci_smp_available(void);
+ #else
+ static inline bool psci_smp_available(void) { return false; }
