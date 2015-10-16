@@ -1,112 +1,87 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 16 Oct 2015 16:23:26 +0100
-Subject: [PATCH 1/3] xen/arm: Enable cpu_hotplug.c
-In-Reply-To: <561EDC7D.1050005@citrix.com>
-References: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
- <1444844997-27314-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <561EDC7D.1050005@citrix.com>
-Message-ID: <alpine.DEB.2.02.1510161623080.27957@kaball.uk.xensource.com>
+From: wei@redhat.com (Wei Huang)
+Date: Fri, 16 Oct 2015 10:28:36 -0500
+Subject: [PATCH v3 18/20] KVM: ARM64: Reset PMU state when resetting vcpu
+In-Reply-To: <1443133885-3366-19-git-send-email-shannon.zhao@linaro.org>
+References: <1443133885-3366-1-git-send-email-shannon.zhao@linaro.org>
+ <1443133885-3366-19-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <562117A4.5010400@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Oct 2015, Julien Grall wrote:
-> Hi Stefano,
-> 
-> On 14/10/2015 18:49, Stefano Stabellini wrote:
-> > Build cpu_hotplug for ARM and ARM64 guests.
-> > 
-> > Rename arch_(un)register_cpu to xen_(un)register_cpu and provide an
-> > empty implementation on ARM and ARM64. On x86 just call
-> > arch_(un)register_cpu as we are already doing.
-> > 
-> > Initialize cpu_hotplug on ARM.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > ---
-> >   arch/arm/include/asm/xen/hypervisor.h |    8 ++++++++
-> >   arch/x86/include/asm/xen/hypervisor.h |    5 +++++
-> >   arch/x86/xen/enlighten.c              |   15 +++++++++++++++
-> >   drivers/xen/Makefile                  |    2 --
-> >   drivers/xen/cpu_hotplug.c             |    6 ++++--
-> >   5 files changed, 32 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/xen/hypervisor.h
-> > b/arch/arm/include/asm/xen/hypervisor.h
-> > index 04ff8e7..2bc418a 100644
-> > --- a/arch/arm/include/asm/xen/hypervisor.h
-> > +++ b/arch/arm/include/asm/xen/hypervisor.h
-> > @@ -26,4 +26,12 @@ void __init xen_early_init(void);
-> >   static inline void xen_early_init(void) { return; }
-> >   #endif
-> > 
-> 
-> I know that those helpers are empty for now. But I would prefer to see them
-> protected by (FWIW, it's what you did for x86).
-> 
-> #ifdef CONFIG_CPU_HOTPLUG
-
-Fair enough.
 
 
-> > +static inline void xen_arch_register_cpu(int num)
-> > +{
-> > +}
-> > +
-> > +static inline void xen_arch_unregister_cpu(int num)
-> > +{
-> > +}
-> > +
-> 
-> #endif
-> 
-> >   #endif /* _ASM_ARM_XEN_HYPERVISOR_H */
-> 
-> [...]
-> 
-> > diff --git a/drivers/xen/cpu_hotplug.c b/drivers/xen/cpu_hotplug.c
-> > index cc6513a..122b351 100644
-> > --- a/drivers/xen/cpu_hotplug.c
-> > +++ b/drivers/xen/cpu_hotplug.c
-> > @@ -11,7 +11,7 @@
-> >   static void enable_hotplug_cpu(int cpu)
-> >   {
-> >   	if (!cpu_present(cpu))
-> > -		arch_register_cpu(cpu);
-> > +		xen_arch_register_cpu(cpu);
-> > 
-> >   	set_cpu_present(cpu, true);
-> >   }
-> > @@ -19,7 +19,7 @@ static void enable_hotplug_cpu(int cpu)
-> >   static void disable_hotplug_cpu(int cpu)
-> >   {
-> >   	if (cpu_present(cpu))
-> > -		arch_unregister_cpu(cpu);
-> > +		xen_arch_unregister_cpu(cpu);
-> > 
-> >   	set_cpu_present(cpu, false);
-> >   }
-> > @@ -102,8 +102,10 @@ static int __init setup_vcpu_hotplug_event(void)
-> >   	static struct notifier_block xsn_cpu = {
-> >   		.notifier_call = setup_cpu_watcher };
-> > 
-> > +#ifdef CONFIG_X86
-> >   	if (!xen_pv_domain())
-> >   		return -ENODEV;
-> > +#endif
-> 
-> For ARM, you need to check if it's a Xen domain. Otherwise a kernel aware of
-> Xen won't boot on baremetal.
+On 09/24/2015 05:31 PM, Shannon Zhao wrote:
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-That's a good point!
+Missing commit message here.
 
-
-> > 
-> >   	register_xenstore_notifier(&xsn_cpu);
-> > 
-> > 
+> ---
+>  arch/arm64/kvm/reset.c |  3 +++
+>  include/kvm/arm_pmu.h  |  2 ++
+>  virt/kvm/arm/pmu.c     | 18 ++++++++++++++++++
+>  3 files changed, 23 insertions(+)
 > 
-> Regards,
-> 
-> -- 
-> Julien Grall
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index 91cf535..4da7f6c 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -120,6 +120,9 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+>  	/* Reset system registers */
+>  	kvm_reset_sys_regs(vcpu);
+>  
+> +	/* Reset PMU */
+> +	kvm_pmu_vcpu_reset(vcpu);
+> +
+>  	/* Reset timer */
+>  	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
+>  }
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> index 953c400..8dacfd3 100644
+> --- a/include/kvm/arm_pmu.h
+> +++ b/include/kvm/arm_pmu.h
+> @@ -38,6 +38,7 @@ struct kvm_pmu {
+>  };
+>  
+>  #ifdef CONFIG_KVM_ARM_PMU
+> +void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu);
+>  void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu);
+>  unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx);
+>  void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val);
+> @@ -46,6 +47,7 @@ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u32 val);
+>  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+>  				    u32 select_idx);
+>  #else
+> +void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu) {}
+>  void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu) {}
+>  unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
+>  {
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index ca7e849..faa2b76 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -63,6 +63,24 @@ static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, u32 select_idx)
+>  }
+>  
+>  /**
+> + * kvm_pmu_vcpu_reset - reset pmu state for cpu
+> + * @vcpu: The vcpu pointer
+> + *
+> + */
+> +void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu)
+> +{
+> +	int i;
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +
+> +	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
+> +		kvm_pmu_stop_counter(vcpu, i);
+> +		pmu->pmc[i].idx = i;
+> +		pmu->pmc[i].vcpu = vcpu;
+> +	}
+> +	pmu->irq_pending = false;
+> +}
+> +
+> +/**
+>   * kvm_pmu_sync_hwstate - sync pmu state for cpu
+>   * @vcpu: The vcpu pointer
+>   *
 > 
