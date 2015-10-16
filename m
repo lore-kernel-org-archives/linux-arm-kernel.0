@@ -1,45 +1,38 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 16 Oct 2015 15:37:12 +0800
-Subject: [PATCH v6 7/7] arm64: dts: berlin4ct: add default pinmux for uart0
-In-Reply-To: <1444981032-4401-1-git-send-email-jszhang@marvell.com>
-References: <1444981032-4401-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1444981032-4401-8-git-send-email-jszhang@marvell.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 16 Oct 2015 08:21:31 +0100
+Subject: [PATCH v4 5/5] ARM: STi: DT: STiH407: Enable Mailbox testing facility
+In-Reply-To: <1444980091-16728-1-git-send-email-lee.jones@linaro.org>
+References: <1444980091-16728-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1444980091-16728-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add urt0 txd and rxd muxing setup in the dtsi because uart0 always uses
-them to work, no other possibilities.
+This patch supplies a Client node to enable the Mailbox testing
+facility.  It will be used to send and receive messages from any
+given co-processor in order to test the STi Mailbox Controller
+driver.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/stih407-family.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-index 8e66355..a4a1876 100644
---- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-+++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-@@ -288,12 +288,19 @@
- 				clocks = <&osc>;
- 				reg-shift = <2>;
- 				status = "disabled";
-+				pinctrl-0 = <&uart0_pmux>;
-+				pinctrl-names = "default";
- 			};
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index 0e5d3ea..e6c8243 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -611,6 +611,12 @@
+ 			st,pwm-num-chan = <4>;
  		};
  
- 		system_pinctrl: pin-controller at fe2200 {
- 			compatible = "marvell,berlin4ct-system-pinctrl";
- 			reg = <0xfe2200 0xc>;
++		mailbox_test {
++			compatible = "mailbox_test";
++			mboxes = <&mailbox2 1 31>, <&mailbox0 1 31>;
++			mbox-names = "tx", "rx";
++		};
 +
-+			uart0_pmux: uart0-pmux {
-+				groups = "SM_URT0_TXD", "SM_URT0_RXD";
-+				function = "uart0";
-+			};
- 		};
- 	};
- };
+ 		mailbox0: mailbox at 0  {
+ 			compatible	= "st,stih407-mailbox";
+ 			reg		= <0x8f00000 0x1000>;
 -- 
-2.6.1
+1.9.1
