@@ -1,78 +1,85 @@
-From: wei@redhat.com (Wei Huang)
-Date: Fri, 16 Oct 2015 10:06:35 -0500
-Subject: [PATCH v3 10/20] KVM: ARM64: Add reset and access handlers for
- PMCCNTR register
-In-Reply-To: <1443133885-3366-11-git-send-email-shannon.zhao@linaro.org>
-References: <1443133885-3366-1-git-send-email-shannon.zhao@linaro.org>
- <1443133885-3366-11-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <5621127B.8070704@redhat.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 16 Oct 2015 23:09:44 +0800
+Subject: [GIT PULL] i.MX clock updates for 4.4
+Message-ID: <20151016150944.GG584@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mike, Stephen,
 
+Please consider to pull the following i.MX clock updates for 4.4.  And
+please keep it stable, as we will merge it into i.MX DT branch as a
+dependency.  Thanks.
 
-On 09/24/2015 05:31 PM, Shannon Zhao wrote:
-> Since the reset value of PMCCNTR is UNKNOWN, use reset_unknown for its
-> reset handler. Add a new case to emulate reading to PMCCNTR register.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 17 +++++++++++++++--
->  1 file changed, 15 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index e7f6058..c38c2de 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -518,6 +518,12 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
->  		}
->  	} else {
->  		switch (r->reg) {
-> +		case PMCCNTR_EL0: {
-> +			val = kvm_pmu_get_counter_value(vcpu,
-> +							ARMV8_MAX_COUNTERS - 1);
-> +			*vcpu_reg(vcpu, p->Rt) = val;
-> +			break;
-> +		}
->  		case PMXEVCNTR_EL0: {
->  			val = kvm_pmu_get_counter_value(vcpu,
->  						vcpu_sys_reg(vcpu, PMSELR_EL0));
-> @@ -748,7 +754,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	  access_pmu_regs, reset_pmceid, PMCEID1_EL0 },
->  	/* PMCCNTR_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
-> -	  trap_raz_wi },
-> +	  access_pmu_regs, reset_unknown, PMCCNTR_EL0 },
->  	/* PMXEVTYPER_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b001),
->  	  access_pmu_regs, reset_unknown, PMXEVTYPER_EL0 },
-> @@ -997,6 +1003,12 @@ static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
->  		}
->  	} else {
->  		switch (r->reg) {
-> +		case c9_PMCCNTR: {
-> +			val = kvm_pmu_get_counter_value(vcpu,
-> +							ARMV8_MAX_COUNTERS - 1);
+Shawn
 
-PMCCNTR is for cycle counter. There is a filter register, PMCCFILTR_EL0,
-associated with it. When kvm_pmu_set_counter_event_type() is called, I
-didn't see this filter config been used in perf_event_attr when
-perf_event is created.
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
-> +			*vcpu_reg(vcpu, p->Rt) = val;
-> +			break;
-> +		}
->  		case c9_PMXEVCNTR: {
->  			val = kvm_pmu_get_counter_value(vcpu,
->  						    vcpu_cp15(vcpu, c9_PMSELR));
-> @@ -1051,7 +1063,8 @@ static const struct sys_reg_desc cp15_regs[] = {
->  	  reset_pmceid, c9_PMCEID0 },
->  	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmu_cp15_regs,
->  	  reset_pmceid, c9_PMCEID1 },
-> -	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
-> +	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), access_pmu_cp15_regs,
-> +	  reset_unknown_cp15, c9_PMCCNTR },
->  	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_cp15_regs,
->  	  reset_unknown_cp15, c9_PMXEVTYPER },
->  	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_cp15_regs,
-> 
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-clk-4.4
+
+for you to fetch changes up to 84a87250ee4e4f7cf5865be9757e2ea758e5cae3:
+
+  clk: imx6: Add SPDIF_GCLK clock in clock tree (2015-10-12 21:55:59 +0800)
+
+----------------------------------------------------------------
+The i.MX clock updates for 4.4:
+ - A couple of fixes on i.MX31 and i.MX35 clock initialization functions
+   which makes mxc_timer_init() currently be called twice for DT boot.
+ - Increase i.MX6UL AXI bus clock rate to 264MHz which is the optimal
+   design target.
+ - Add a few missing clocks, ADC clock for i.MX7D, OCOTP clock for
+   Vybrid, and SPDIF_GCLK for i.MX6.
+ - A series from Lucas to fix early debug UART clock setup.  This is
+   currently a one-off fix for i.MX platform, and can be extended to
+   become a generic solution later.
+
+----------------------------------------------------------------
+Alexander Stein (2):
+      clk: imx35: Do not call mxc_timer_init twice when booting with DT
+      clk: imx31: Do not call mxc_timer_init twice when booting with DT
+
+Anson Huang (1):
+      clk: imx: increase AXI clock rate to 264MHz for i.MX6UL
+
+Haibo Chen (1):
+      clk: imx7d: add ADC root clock
+
+Lucas Stach (8):
+      clk: imx: add common logic to detect early UART usage
+      clk: imx25: retain early UART clocks during kernel init
+      clk: imx27: retain early UART clocks during kernel init
+      clk: imx31: retain early UART clocks during kernel init
+      clk: imx35: retain early UART clocks during kernel init
+      clk: imx5: retain early UART clocks during kernel init
+      clk: imx6: retain early UART clocks during kernel init
+      clk: imx7d: retain early UART clocks during kernel init
+
+Sanchayan Maity (1):
+      clk: clk-vf610: Add clock for Vybrid OCOTP controller
+
+Shengjiu Wang (1):
+      clk: imx6: Add SPDIF_GCLK clock in clock tree
+
+ drivers/clk/imx/clk-imx25.c               | 12 +++++++
+ drivers/clk/imx/clk-imx27.c               | 13 +++++++
+ drivers/clk/imx/clk-imx31.c               | 35 ++++++++++++++----
+ drivers/clk/imx/clk-imx35.c               | 59 +++++++++++++++++++------------
+ drivers/clk/imx/clk-imx51-imx53.c         | 16 +++++++++
+ drivers/clk/imx/clk-imx6q.c               | 12 ++++++-
+ drivers/clk/imx/clk-imx6sl.c              | 12 ++++++-
+ drivers/clk/imx/clk-imx6sx.c              |  9 +++++
+ drivers/clk/imx/clk-imx6ul.c              | 18 ++++++++++
+ drivers/clk/imx/clk-imx7d.c               | 14 ++++++++
+ drivers/clk/imx/clk-vf610.c               |  1 +
+ drivers/clk/imx/clk.c                     | 38 ++++++++++++++++++++
+ drivers/clk/imx/clk.h                     |  1 +
+ include/dt-bindings/clock/imx6qdl-clock.h |  3 +-
+ include/dt-bindings/clock/imx6sl-clock.h  |  3 +-
+ include/dt-bindings/clock/imx6sx-clock.h  |  3 +-
+ include/dt-bindings/clock/imx7d-clock.h   |  3 +-
+ include/dt-bindings/clock/vf610-clock.h   |  3 +-
+ 18 files changed, 219 insertions(+), 36 deletions(-)
