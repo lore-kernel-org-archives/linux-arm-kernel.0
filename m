@@ -1,600 +1,306 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Fri, 16 Oct 2015 15:42:30 -0700
-Subject: [PATCHv2 3/3] fpga manager: Adding FPGA Manager support for Xilinx
- Zynq 7000
-In-Reply-To: <1445035350-3569-1-git-send-email-moritz.fischer@ettus.com>
-References: <1445035350-3569-1-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <1445035350-3569-4-git-send-email-moritz.fischer@ettus.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Fri, 16 Oct 2015 15:51:37 -0700
+Subject: [PATCH v3 2/2] ARM: dts: bcm5301x: Add BCM SVK DT files
+In-Reply-To: <56217D5B.6050705@hauke-m.de>
+References: <1444947856-26246-1-git-send-email-jonmason@broadcom.com>
+ <1444947856-26246-2-git-send-email-jonmason@broadcom.com>
+ <56216F26.9080003@hauke-m.de> <56217C6C.4010400@broadcom.com>
+ <56217D5B.6050705@hauke-m.de>
+Message-ID: <56217F79.7080406@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds FPGA Manager support for the Xilinx Zynq chip.
-The code borrows some from the xdevcfg driver in Xilinx'
-vendor tree.
+Hi Hauke,
 
-Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
----
 
-v2:
- - Replaced locking error flag and broken completion with irq masking
-   and changed completion handling
- - Dealing with timeout cases
- - Reworked clock handling
- - Moved initialization from probe() to write_init()
- - Fixed return value of devm_request_irq() check to check for non-zero
- - Alphabetized includes ;-)
- - Changed some of the comments, to better explain what's happening
+On 15-10-16 03:42 PM, Hauke Mehrtens wrote:
+>
+>
+> On 10/17/2015 12:38 AM, Scott Branden wrote:
+>> Hi Jon,
+>>
+>> No need for the board in the compatible string.
+>
+> I think the board should be named here, so we could take some code
+> branches based on the board, if it would have bad wiring for example.
+>
+> The device tree wiki says:
+> "The first string in the list specifies the exact device that the node
+> represents"
+> http://devicetree.org/Device_Tree_Usage#Understanding_the_compatible_Property
+>
+> The exact device here is the board not the SoC.
 
----
- drivers/fpga/Kconfig     |   5 +
- drivers/fpga/Makefile    |   1 +
- drivers/fpga/zynq-fpga.c | 533 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 539 insertions(+)
- create mode 100644 drivers/fpga/zynq-fpga.c
+Thanks for link to understand this compatible string more.
 
-diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-index dfc1f1e..c9b9fdf 100644
---- a/drivers/fpga/Kconfig
-+++ b/drivers/fpga/Kconfig
-@@ -19,6 +19,11 @@ config FPGA_MGR_SOCFPGA
- 	help
- 	  FPGA manager driver support for Altera SOCFPGA.
- 
-+config FPGA_MGR_ZYNQ_FPGA
-+	tristate "Xilinx Zynq FPGA"
-+	help
-+	  FPGA manager driver support for Xilinx Zynq FPGAs.
-+
- endif # FPGA
- 
- endmenu
-diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-index ba6c5c5..8d83fc6 100644
---- a/drivers/fpga/Makefile
-+++ b/drivers/fpga/Makefile
-@@ -7,3 +7,4 @@ obj-$(CONFIG_FPGA)			+= fpga-mgr.o
- 
- # FPGA Manager Drivers
- obj-$(CONFIG_FPGA_MGR_SOCFPGA)		+= socfpga.o
-+obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
-diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
-new file mode 100644
-index 0000000..103303c
---- /dev/null
-+++ b/drivers/fpga/zynq-fpga.c
-@@ -0,0 +1,533 @@
-+/*
-+ * Copyright (c) 2011-2015 Xilinx Inc.
-+ * Copyright (c) 2015, National Instruments Corp.
-+ *
-+ * FPGA Manager Driver for Xilinx Zynq, heavily based on xdevcfg driver
-+ * in their vendor tree.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/completion.h>
-+#include <linux/delay.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/fpga/fpga-mgr.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/iopoll.h>
-+#include <linux/module.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/pm.h>
-+#include <linux/regmap.h>
-+#include <linux/string.h>
-+
-+/* Offsets into SLCR regmap */
-+
-+/* FPGA Software Reset Control */
-+#define SLCR_FPGA_RST_CTRL_OFFSET	0x240
-+/* Level Shifters Enable */
-+#define SLCR_LVL_SHFTR_EN_OFFSET	0x900
-+
-+/* Constant Definitions */
-+
-+/* Control Register */
-+#define CTRL_OFFSET			0x00
-+/* Lock Register */
-+#define LOCK_OFFSET			0x04
-+/* Interrupt Status Register */
-+#define INT_STS_OFFSET			0x0c
-+/* Interrupt Mask Register */
-+#define INT_MASK_OFFSET			0x10
-+/* Status Register */
-+#define STATUS_OFFSET			0x14
-+/* DMA Source Address Register */
-+#define DMA_SRC_ADDR_OFFSET		0x18
-+/* DMA Destination Address Reg */
-+#define DMA_DST_ADDR_OFFSET		0x1c
-+/* DMA Source Transfer Length */
-+#define DMA_SRC_LEN_OFFSET		0x20
-+/* DMA Destination Transfer */
-+#define DMA_DEST_LEN_OFFSET		0x24
-+/* Unlock Register */
-+#define UNLOCK_OFFSET			0x34
-+/* Misc. Control Register */
-+#define MCTRL_OFFSET			0x80
-+
-+/* Control Register Bit definitions */
-+
-+/* Signal to reset FPGA */
-+#define CTRL_PCFG_PROG_B_MASK		BIT(30)
-+/* Enable PCAP for PR */
-+#define CTRL_PCAP_PR_MASK		BIT(27)
-+/* Enable PCAP */
-+#define CTRL_PCAP_MODE_MASK		BIT(26)
-+
-+/* Miscellaneous Control Register bit definitions */
-+/* Internal PCAP loopback */
-+#define MCTRL_PCAP_LPBK_MASK		BIT(4)
-+
-+/* Status register bit definitions */
-+
-+/* FPGA init status */
-+#define STATUS_DMA_Q_F			BIT(31)
-+#define STATUS_PCFG_INIT_MASK		BIT(4)
-+
-+/* Interrupt Status/Mask Register Bit definitions */
-+/* DMA command done */
-+#define IXR_DMA_DONE_MASK		BIT(13)
-+/* DMA and PCAP cmd done */
-+#define IXR_D_P_DONE_MASK		BIT(12)
-+ /* FPGA programmed */
-+#define IXR_PCFG_DONE_MASK		BIT(2)
-+#define IXR_ERROR_FLAGS_MASK		0x00F0F860
-+#define IXR_ALL_MASK			0xF8F7F87F
-+
-+/* Miscellaneous constant values */
-+
-+/* Invalid DMA addr */
-+#define DMA_INVALID_ADDRESS		GENMASK(31, 0)
-+/* Used to unlock the dev */
-+#define UNLOCK_MASK			0x757bdf0d
-+/* Timeout for DMA to complete */
-+#define DMA_DONE_TIMEOUT		msecs_to_jiffies(1000)
-+/* Timeout for polling reset bits */
-+#define INIT_POLL_TIMEOUT		2500000
-+/* Delay for polling reset bits */
-+#define INIT_POLL_DELAY			20
-+
-+/* Masks for controlling stuff in SLCR */
-+/* Disable all Level shifters */
-+#define LVL_SHFTR_DISABLE_ALL_MASK	0x0
-+/* Enable Level shifters from PS to PL */
-+#define LVL_SHFTR_ENABLE_PS_TO_PL	0xa
-+/* Enable Level shifters from PL to PS */
-+#define LVL_SHFTR_ENABLE_PL_TO_PS	0xf
-+/* Enable global resets */
-+#define FPGA_RST_ALL_MASK		0xf
-+/* Disable global resets */
-+#define FPGA_RST_NONE_MASK		0x0
-+
-+struct zynq_fpga_priv {
-+	struct device *dev;
-+	int irq;
-+	struct clk *clk;
-+
-+	void __iomem *io_base;
-+	struct regmap *slcr;
-+
-+	struct completion dma_done;
-+};
-+
-+static inline void zynq_fpga_write(struct zynq_fpga_priv *priv, u32 offset,
-+				   u32 val)
-+{
-+	writel(val, priv->io_base + offset);
-+}
-+
-+static inline u32 zynq_fpga_read(const struct zynq_fpga_priv *priv,
-+				 u32 offset)
-+{
-+	return readl(priv->io_base + offset);
-+}
-+
-+#define zynq_fpga_poll_timeout(priv, addr, val, cond, sleep_us, timeout_us) \
-+	readl_poll_timeout(priv->io_base + addr, val, cond, sleep_us, \
-+			   timeout_us)
-+
-+static void zynq_fpga_mask_irqs(struct zynq_fpga_priv *priv)
-+{
-+	u32 intr_mask;
-+
-+	intr_mask = zynq_fpga_read(priv, INT_MASK_OFFSET);
-+	zynq_fpga_write(priv, INT_MASK_OFFSET,
-+			intr_mask | IXR_DMA_DONE_MASK | IXR_ERROR_FLAGS_MASK);
-+}
-+
-+static void zynq_fpga_unmask_irqs(struct zynq_fpga_priv *priv)
-+{
-+	u32 intr_mask;
-+
-+	intr_mask = zynq_fpga_read(priv, INT_MASK_OFFSET);
-+	zynq_fpga_write(priv, INT_MASK_OFFSET,
-+			intr_mask
-+			& ~(IXR_D_P_DONE_MASK | IXR_ERROR_FLAGS_MASK));
-+}
-+
-+static irqreturn_t zynq_fpga_isr(int irq, void *data)
-+{
-+	struct zynq_fpga_priv *priv = data;
-+
-+	/* disable DMA and error IRQs */
-+	zynq_fpga_mask_irqs(priv);
-+
-+	complete(&priv->dma_done);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
-+				    const char *buf, size_t count)
-+{
-+	struct zynq_fpga_priv *priv;
-+	u32 ctrl, status;
-+	int err;
-+
-+	priv = mgr->priv;
-+
-+	err = clk_enable(priv->clk);
-+	if (err)
-+		return err;
-+
-+	/* don't globally reset PL if we're doing partial reconfig */
-+	if (!(flags & FPGA_MGR_PARTIAL_RECONFIG)) {
-+		/* assert AXI interface resets */
-+		regmap_write(priv->slcr, SLCR_FPGA_RST_CTRL_OFFSET,
-+			     FPGA_RST_ALL_MASK);
-+
-+		/* disable all level shifters */
-+		regmap_write(priv->slcr, SLCR_LVL_SHFTR_EN_OFFSET,
-+			     LVL_SHFTR_DISABLE_ALL_MASK);
-+		/* enable level shifters from PS to PL */
-+		regmap_write(priv->slcr, SLCR_LVL_SHFTR_EN_OFFSET,
-+			     LVL_SHFTR_ENABLE_PS_TO_PL);
-+
-+		/* create a rising edge on PCFG_INIT. PCFG_INIT follows
-+		 * PCFG_PROG_B, so we need to poll it after setting PCFG_PROG_B
-+		 * to make sure the rising edge actually happens.
-+		 * Note: PCFG_PROG_B is low active, sequence as described in
-+		 * UG585 v1.10 page 211
-+		 */
-+		ctrl = zynq_fpga_read(priv, CTRL_OFFSET);
-+		ctrl |= CTRL_PCFG_PROG_B_MASK;
-+
-+		zynq_fpga_write(priv, CTRL_OFFSET, ctrl);
-+
-+		err = zynq_fpga_poll_timeout(priv, STATUS_OFFSET, status,
-+					     status & STATUS_PCFG_INIT_MASK,
-+					     INIT_POLL_DELAY,
-+					     INIT_POLL_TIMEOUT);
-+		if (err) {
-+			dev_err(priv->dev, "Timeout waiting for PCFG_INIT");
-+			goto out_err;
-+		}
-+
-+		ctrl = zynq_fpga_read(priv, CTRL_OFFSET);
-+		ctrl &= ~CTRL_PCFG_PROG_B_MASK;
-+
-+		zynq_fpga_write(priv, CTRL_OFFSET, ctrl);
-+
-+		err = zynq_fpga_poll_timeout(priv, STATUS_OFFSET, status,
-+					     !(status & STATUS_PCFG_INIT_MASK),
-+					     INIT_POLL_DELAY,
-+					     INIT_POLL_TIMEOUT);
-+		if (err) {
-+			dev_err(priv->dev, "Timeout waiting for !PCFG_INIT");
-+			goto out_err;
-+		}
-+
-+		ctrl = zynq_fpga_read(priv, CTRL_OFFSET);
-+		ctrl |= CTRL_PCFG_PROG_B_MASK;
-+
-+		zynq_fpga_write(priv, CTRL_OFFSET, ctrl);
-+
-+		err = zynq_fpga_poll_timeout(priv, STATUS_OFFSET, status,
-+					     status & STATUS_PCFG_INIT_MASK,
-+					     INIT_POLL_DELAY,
-+					     INIT_POLL_TIMEOUT);
-+		if (err) {
-+			dev_err(priv->dev, "Timeout waiting for PCFG_INIT");
-+			goto out_err;
-+		}
-+	}
-+
-+	/* set configuration register with following options:
-+	 * - enable PCAP interface
-+	 * - set throughput for maximum speed
-+	 * - set CPU in user mode
-+	 */
-+	ctrl = zynq_fpga_read(priv, CTRL_OFFSET);
-+	zynq_fpga_write(priv, CTRL_OFFSET,
-+			(CTRL_PCAP_PR_MASK | CTRL_PCAP_MODE_MASK | ctrl));
-+
-+	/* check that we have room in the command queue */
-+	status = zynq_fpga_read(priv, STATUS_OFFSET);
-+	if (status & STATUS_DMA_Q_F) {
-+		dev_err(priv->dev, "DMA command queue full");
-+		err = -EBUSY;
-+		goto out_err;
-+	}
-+
-+	/* ensure internal PCAP loopback is disabled */
-+	ctrl = zynq_fpga_read(priv, MCTRL_OFFSET);
-+	zynq_fpga_write(priv, MCTRL_OFFSET, (~MCTRL_PCAP_LPBK_MASK & ctrl));
-+
-+	clk_disable(priv->clk);
-+
-+	return 0;
-+
-+out_err:
-+	clk_disable(priv->clk);
-+
-+	return err;
-+}
-+
-+static int zynq_fpga_ops_write(struct fpga_manager *mgr,
-+			       const char *buf, size_t count)
-+{
-+	struct zynq_fpga_priv *priv;
-+	int err;
-+	char *kbuf;
-+	size_t i, in_count;
-+	dma_addr_t dma_addr;
-+	u32 transfer_length = 0;
-+	u32 intr_status;
-+
-+	in_count = count;
-+	priv = mgr->priv;
-+
-+	kbuf = dma_alloc_coherent(priv->dev, count, &dma_addr, GFP_KERNEL);
-+	if (!kbuf)
-+		return -ENOMEM;
-+
-+	memcpy(kbuf, buf, count);
-+
-+	/* look for the sync word */
-+	for (i = 0; i < count - 4; i++) {
-+		if (memcmp(kbuf + i, "\xAA\x99\x55\x66", 4) == 0) {
-+			dev_dbg(priv->dev, "Found swapped sync word\n");
-+			break;
-+		}
-+	}
-+
-+	/* remove the header, align the data on word boundary */
-+	if (i != count - 4) {
-+		count -= i;
-+		memmove(kbuf, kbuf + i, count);
-+	}
-+
-+	/* fixup endianness of the data */
-+	for (i = 0; i < count; i += 4) {
-+		u32 *p = (u32 *)&kbuf[i];
-+		*p = swab32(*p);
-+	}
-+
-+	/* enable clock */
-+	err = clk_enable(priv->clk);
-+	if (err)
-+		goto out_free;
-+
-+	zynq_fpga_write(priv, INT_STS_OFFSET, IXR_ALL_MASK);
-+
-+	reinit_completion(&priv->dma_done);
-+
-+	/* enable DMA and error IRQs */
-+	zynq_fpga_unmask_irqs(priv);
-+
-+	/* the +1 in the src addr is used to hold off on DMA_DONE IRQ
-+	 * until both AXI and PCAP are done ...
-+	 */
-+	zynq_fpga_write(priv, DMA_SRC_ADDR_OFFSET, (u32)(dma_addr) + 1);
-+	zynq_fpga_write(priv, DMA_DST_ADDR_OFFSET, (u32)DMA_INVALID_ADDRESS);
-+
-+	/* convert #bytes to #words */
-+	transfer_length = (count + 3) / 4;
-+
-+	zynq_fpga_write(priv, DMA_SRC_LEN_OFFSET, transfer_length);
-+	zynq_fpga_write(priv, DMA_DEST_LEN_OFFSET, 0);
-+
-+	wait_for_completion(&priv->dma_done);
-+
-+	intr_status = zynq_fpga_read(priv, INT_STS_OFFSET);
-+	zynq_fpga_write(priv, INT_STS_OFFSET, intr_status);
-+
-+	if (!((intr_status & IXR_D_P_DONE_MASK) == IXR_D_P_DONE_MASK)) {
-+		dev_err(priv->dev, "Error configuring FPGA");
-+		err = -EFAULT;
-+	}
-+
-+	clk_disable(priv->clk);
-+
-+out_free:
-+	dma_free_coherent(priv->dev, in_count, kbuf, dma_addr);
-+
-+	return err;
-+}
-+
-+static int zynq_fpga_ops_write_complete(struct fpga_manager *mgr, u32 flags)
-+{
-+	struct zynq_fpga_priv *priv = mgr->priv;
-+	int err;
-+	u32 intr_status;
-+
-+	err = clk_enable(priv->clk);
-+	if (err)
-+		return err;
-+
-+	err = zynq_fpga_poll_timeout(priv, INT_STS_OFFSET, intr_status,
-+				     intr_status & IXR_PCFG_DONE_MASK,
-+				     INIT_POLL_DELAY,
-+				     INIT_POLL_TIMEOUT);
-+
-+	clk_disable(priv->clk);
-+
-+	if (err)
-+		return err;
-+
-+	/* for the partial reconfig case we didn't touch the level shifters */
-+	if (!(flags & FPGA_MGR_PARTIAL_RECONFIG)) {
-+		/* enable level shifters from PL to PS */
-+		regmap_write(priv->slcr, SLCR_LVL_SHFTR_EN_OFFSET,
-+			     LVL_SHFTR_ENABLE_PL_TO_PS);
-+
-+		/* deassert AXI interface resets */
-+		regmap_write(priv->slcr, SLCR_FPGA_RST_CTRL_OFFSET,
-+			     FPGA_RST_NONE_MASK);
-+	}
-+
-+	return 0;
-+}
-+
-+static enum fpga_mgr_states zynq_fpga_ops_state(struct fpga_manager *mgr)
-+{
-+	int err;
-+	u32 intr_status;
-+	struct zynq_fpga_priv *priv;
-+
-+	priv = mgr->priv;
-+
-+	err = clk_enable(priv->clk);
-+	if (err)
-+		return FPGA_MGR_STATE_UNKNOWN;
-+
-+	intr_status = zynq_fpga_read(priv, INT_STS_OFFSET);
-+	clk_disable(priv->clk);
-+
-+	if (intr_status & IXR_PCFG_DONE_MASK)
-+		return FPGA_MGR_STATE_OPERATING;
-+
-+	return FPGA_MGR_STATE_UNKNOWN;
-+}
-+
-+static const struct fpga_manager_ops zynq_fpga_ops = {
-+	.state = zynq_fpga_ops_state,
-+	.write_init = zynq_fpga_ops_write_init,
-+	.write = zynq_fpga_ops_write,
-+	.write_complete = zynq_fpga_ops_write_complete,
-+};
-+
-+static int zynq_fpga_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct zynq_fpga_priv *priv;
-+	struct resource *res;
-+	int err;
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, priv);
-+	priv->dev = dev;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	priv->io_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(priv->io_base))
-+		return PTR_ERR(priv->io_base);
-+
-+	priv->slcr = syscon_regmap_lookup_by_phandle(dev->of_node,
-+		"syscon");
-+	if (IS_ERR(priv->slcr)) {
-+		dev_err(dev, "unable to get zynq-slcr regmap");
-+		return PTR_ERR(priv->slcr);
-+	}
-+
-+	init_completion(&priv->dma_done);
-+
-+	priv->irq = platform_get_irq(pdev, 0);
-+	if (priv->irq < 0) {
-+		dev_err(dev, "No IRQ available");
-+		return priv->irq;
-+	}
-+
-+	err = devm_request_irq(dev, priv->irq, zynq_fpga_isr, 0,
-+			       dev_name(dev), priv);
-+	if (err) {
-+		dev_err(dev, "unable to request IRQ");
-+		return err;
-+	}
-+
-+	priv->clk = devm_clk_get(dev, "ref_clk");
-+	if (IS_ERR(priv->clk)) {
-+		dev_err(dev, "input clock not found");
-+		return PTR_ERR(priv->clk);
-+	}
-+
-+	err = clk_prepare_enable(priv->clk);
-+	if (err) {
-+		dev_err(dev, "unable to enable clock");
-+		return err;
-+	}
-+
-+	/* unlock the device */
-+	zynq_fpga_write(priv, UNLOCK_OFFSET, UNLOCK_MASK);
-+
-+	clk_disable(priv->clk);
-+
-+	err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
-+				&zynq_fpga_ops, priv);
-+	if (err) {
-+		dev_err(dev, "unable to register FPGA manager");
-+		clk_disable_unprepare(priv->clk);
-+		return err;
-+	}
-+
-+	return 0;
-+}
-+
-+static int zynq_fpga_remove(struct platform_device *pdev)
-+{
-+	struct zynq_fpga_priv *priv;
-+
-+	fpga_mgr_unregister(&pdev->dev);
-+
-+	priv = platform_get_drvdata(pdev);
-+
-+	clk_disable_unprepare(priv->clk);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id zynq_fpga_of_match[] = {
-+	{ .compatible = "xlnx,zynq-devcfg-1.0", },
-+	{},
-+};
-+
-+MODULE_DEVICE_TABLE(of, zynq_fpga_of_match);
-+#endif
-+
-+static struct platform_driver zynq_fpga_driver = {
-+	.probe = zynq_fpga_probe,
-+	.remove = zynq_fpga_remove,
-+	.driver = {
-+		.name = "zynq_fpga_manager",
-+		.of_match_table = of_match_ptr(zynq_fpga_of_match),
-+	},
-+};
-+
-+module_platform_driver(zynq_fpga_driver);
-+
-+MODULE_AUTHOR("Moritz Fischer <moritz.fischer@ettus.com>");
-+MODULE_AUTHOR("Michal Simek <michal.simek@xilinx.com>");
-+MODULE_DESCRIPTION("Xilinx Zynq FPGA Manager");
-+MODULE_LICENSE("GPL v2");
--- 
-2.4.3
+>
+> Hauke
+>
+>>
+>> On 15-10-16 02:41 PM, Hauke Mehrtens wrote:
+>>> On 10/16/2015 12:24 AM, Jon Mason wrote:
+>>>> Add device tree files for Broadcom Northstar based SVKs.  Since the
+>>>> bcm5301x.dtsi already exists, all that is necessary is the dts files to
+>>>> enable the UARTs.  With these files, the SVKs are able to boot to shell.
+>>>>
+>>>> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+>>>
+>>> Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
+Acked-by: Scott Branden <sbranden@broadcom.com>
+
+>>>
+>>>> ---
+>>>>    arch/arm/boot/dts/Makefile       |  5 +++-
+>>>>    arch/arm/boot/dts/bcm94708.dts   | 56
+>>>> +++++++++++++++++++++++++++++++++++
+>>>>    arch/arm/boot/dts/bcm94709.dts   | 56
+>>>> +++++++++++++++++++++++++++++++++++
+>>>>    arch/arm/boot/dts/bcm953012k.dts | 63
+>>>> ++++++++++++++++++++++++++++++++++++++++
+>>>>    4 files changed, 179 insertions(+), 1 deletion(-)
+>>>>    create mode 100644 arch/arm/boot/dts/bcm94708.dts
+>>>>    create mode 100644 arch/arm/boot/dts/bcm94709.dts
+>>>>    create mode 100644 arch/arm/boot/dts/bcm953012k.dts
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>>> index 233159d..96a1b58 100644
+>>>> --- a/arch/arm/boot/dts/Makefile
+>>>> +++ b/arch/arm/boot/dts/Makefile
+>>>> @@ -72,7 +72,10 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+>>>>        bcm47081-buffalo-wzr-900dhp.dtb \
+>>>>        bcm4709-asus-rt-ac87u.dtb \
+>>>>        bcm4709-buffalo-wxr-1900dhp.dtb \
+>>>> -    bcm4709-netgear-r8000.dtb
+>>>> +    bcm4709-netgear-r8000.dtb \
+>>>> +    bcm94708.dtb \
+>>>> +    bcm94709.dtb \
+>>>> +    bcm953012k.dtb
+>>>>    dtb-$(CONFIG_ARCH_BCM_63XX) += \
+>>>>        bcm963138dvt.dtb
+>>>>    dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
+>>>> diff --git a/arch/arm/boot/dts/bcm94708.dts
+>>>> b/arch/arm/boot/dts/bcm94708.dts
+>>>> new file mode 100644
+>>>> index 0000000..49682d6
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/boot/dts/bcm94708.dts
+>>>> @@ -0,0 +1,56 @@
+>>>> +/*
+>>>> + *  BSD LICENSE
+>>>> + *
+>>>> + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
+>>>> + *
+>>>> + *  Redistribution and use in source and binary forms, with or without
+>>>> + *  modification, are permitted provided that the following conditions
+>>>> + *  are met:
+>>>> + *
+>>>> + *    * Redistributions of source code must retain the above copyright
+>>>> + *      notice, this list of conditions and the following disclaimer.
+>>>> + *    * Redistributions in binary form must reproduce the above
+>>>> copyright
+>>>> + *      notice, this list of conditions and the following disclaimer in
+>>>> + *      the documentation and/or other materials provided with the
+>>>> + *      distribution.
+>>>> + *    * Neither the name of Broadcom Corporation nor the names of its
+>>>> + *      contributors may be used to endorse or promote products derived
+>>>> + *      from this software without specific prior written permission.
+>>>> + *
+>>>> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+>>>> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+>>>> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+>>>> FITNESS FOR
+>>>> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+>>>> COPYRIGHT
+>>>> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+>>>> INCIDENTAL,
+>>>> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+>>>> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+>>>> USE,
+>>>> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+>>>> ON ANY
+>>>> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+>>>> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+>>>> THE USE
+>>>> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+>>>> DAMAGE.
+>>>> + */
+>>>> +
+>>>> +/dts-v1/;
+>>>> +
+>>>> +#include "bcm4708.dtsi"
+>>>> +
+>>>> +/ {
+>>>> +    model = "NorthStar SVK (BCM94708)";
+>>>> +    compatible = "brcm,bcm94708", "brcm,bcm4708";
+>> no need for brcm,bcm94708
+>>>> +
+>>>> +    aliases {
+>>>> +        serial0 = &uart0;
+>>>> +    };
+>>>> +
+>>>> +    chosen {
+>>>> +        bootargs = "console=ttyS0,115200";
+>>>> +    };
+>>>> +
+>>>> +    memory {
+>>>> +        reg = <0x00000000 0x08000000>;
+>>>> +    };
+>>>> +};
+>>>> +
+>>>> +&uart0 {
+>>>> +    status = "okay";
+>>>> +};
+>>>> diff --git a/arch/arm/boot/dts/bcm94709.dts
+>>>> b/arch/arm/boot/dts/bcm94709.dts
+>>>> new file mode 100644
+>>>> index 0000000..4ab19c0
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/boot/dts/bcm94709.dts
+>>>> @@ -0,0 +1,56 @@
+>>>> +/*
+>>>> + *  BSD LICENSE
+>>>> + *
+>>>> + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
+>>>> + *
+>>>> + *  Redistribution and use in source and binary forms, with or without
+>>>> + *  modification, are permitted provided that the following conditions
+>>>> + *  are met:
+>>>> + *
+>>>> + *    * Redistributions of source code must retain the above copyright
+>>>> + *      notice, this list of conditions and the following disclaimer.
+>>>> + *    * Redistributions in binary form must reproduce the above
+>>>> copyright
+>>>> + *      notice, this list of conditions and the following disclaimer in
+>>>> + *      the documentation and/or other materials provided with the
+>>>> + *      distribution.
+>>>> + *    * Neither the name of Broadcom Corporation nor the names of its
+>>>> + *      contributors may be used to endorse or promote products derived
+>>>> + *      from this software without specific prior written permission.
+>>>> + *
+>>>> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+>>>> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+>>>> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+>>>> FITNESS FOR
+>>>> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+>>>> COPYRIGHT
+>>>> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+>>>> INCIDENTAL,
+>>>> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+>>>> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+>>>> USE,
+>>>> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+>>>> ON ANY
+>>>> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+>>>> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+>>>> THE USE
+>>>> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+>>>> DAMAGE.
+>>>> + */
+>>>> +
+>>>> +/dts-v1/;
+>>>> +
+>>>> +#include "bcm4708.dtsi"
+>>>> +
+>>>> +/ {
+>>>> +    model = "NorthStar SVK (BCM94709)";
+>>>> +    compatible = "brcm,bcm94709", "brcm,bcm4709", "brcm,bcm4708";
+>> no need for brcm,bcm94709
+>>>> +
+>>>> +    aliases {
+>>>> +        serial0 = &uart0;
+>>>> +    };
+>>>> +
+>>>> +    chosen {
+>>>> +        bootargs = "console=ttyS0,115200";
+>>>> +    };
+>>>> +
+>>>> +    memory {
+>>>> +        reg = <0x00000000 0x08000000>;
+>>>> +    };
+>>>> +};
+>>>> +
+>>>> +&uart0 {
+>>>> +    status = "okay";
+>>>> +};
+>>>> diff --git a/arch/arm/boot/dts/bcm953012k.dts
+>>>> b/arch/arm/boot/dts/bcm953012k.dts
+>>>> new file mode 100644
+>>>> index 0000000..a512c45
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/boot/dts/bcm953012k.dts
+>>>> @@ -0,0 +1,63 @@
+>>>> +/*
+>>>> + *  BSD LICENSE
+>>>> + *
+>>>> + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
+>>>> + *
+>>>> + *  Redistribution and use in source and binary forms, with or without
+>>>> + *  modification, are permitted provided that the following conditions
+>>>> + *  are met:
+>>>> + *
+>>>> + *    * Redistributions of source code must retain the above copyright
+>>>> + *      notice, this list of conditions and the following disclaimer.
+>>>> + *    * Redistributions in binary form must reproduce the above
+>>>> copyright
+>>>> + *      notice, this list of conditions and the following disclaimer in
+>>>> + *      the documentation and/or other materials provided with the
+>>>> + *      distribution.
+>>>> + *    * Neither the name of Broadcom Corporation nor the names of its
+>>>> + *      contributors may be used to endorse or promote products derived
+>>>> + *      from this software without specific prior written permission.
+>>>> + *
+>>>> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+>>>> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+>>>> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+>>>> FITNESS FOR
+>>>> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+>>>> COPYRIGHT
+>>>> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+>>>> INCIDENTAL,
+>>>> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+>>>> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+>>>> USE,
+>>>> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+>>>> ON ANY
+>>>> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+>>>> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+>>>> THE USE
+>>>> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+>>>> DAMAGE.
+>>>> + */
+>>>> +
+>>>> +/dts-v1/;
+>>>> +
+>>>> +#include "bcm4708.dtsi"
+>>>> +
+>>>> +/ {
+>>>> +    model = "NorthStar SVK (BCM953012K)";
+>>>> +    compatible = "brcm,bcm953012k", "brcm,brcm53012", "brcm,bcm4708";
+>> no need for brcm,bcm953012k
+>>>> +
+>>>> +    aliases {
+>>>> +        serial0 = &uart0;
+>>>> +        serial1 = &uart1;
+>>>> +    };
+>>>> +
+>>>> +    chosen {
+>>>> +        bootargs = "console=ttyS0,115200";
+>>>> +    };
+>>>> +
+>>>> +    memory {
+>>>> +        reg = <0x00000000 0x10000000>;
+>>>> +    };
+>>>> +};
+>>>> +
+>>>> +&uart0 {
+>>>> +    clock-frequency = <62499840>;
+>>>> +    status = "okay";
+>>>> +};
+>>>> +
+>>>> +&uart1 {
+>>>> +    clock-frequency = <62499840>;
+>>>> +    status = "okay";
+>>>> +};
+>>>>
+>>>
+>>
