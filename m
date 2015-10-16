@@ -1,48 +1,68 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Fri, 16 Oct 2015 09:19:34 +0800
-Subject: [PATCH] soc: rockchip: power-domain: don't try to print the clock
- name in error case
-In-Reply-To: <1764593.eLkUiZigaK@diego>
-References: <1764593.eLkUiZigaK@diego>
-Message-ID: <562050A6.7080002@gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 15 Oct 2015 18:19:47 -0700
+Subject: [PATCH v4 1/3] doc: dt: add documentation for Mediatek spi-nor
+ controller
+In-Reply-To: <1444729160-26433-2-git-send-email-bayi.cheng@mediatek.com>
+References: <1444729160-26433-1-git-send-email-bayi.cheng@mediatek.com>
+ <1444729160-26433-2-git-send-email-bayi.cheng@mediatek.com>
+Message-ID: <20151016011947.GA28158@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+Hi Bayi,
 
-Thanks to fix it.
-
-? 2015?10?15? 21:22, Heiko St?bner ??:
-> When we never got the the clock-reference, i.e. when IS_ERR(clk) is true,
-> don't try to print the clock name via %pC as this of course produces a
-> null-pointer-dereference in __clk_get_name().
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-
-Look good to me, you can free add that.
-
-Reviewed-by: Caesar Wang <wxt@rock-chips.com>
-
+On Tue, Oct 13, 2015 at 05:39:18PM +0800, Bayi Cheng wrote:
+> Add device tree binding documentation for serial flash with
+> Mediatek serial flash controller
+> 
+> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
 > ---
->   drivers/soc/rockchip/pm_domains.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-> index 8268d5d..534c589 100644
-> --- a/drivers/soc/rockchip/pm_domains.c
-> +++ b/drivers/soc/rockchip/pm_domains.c
-> @@ -265,8 +265,8 @@ static int rockchip_pm_add_one_domain(struct rockchip_pmu *pmu,
->   		if (IS_ERR(clk)) {
->   			error = PTR_ERR(clk);
->   			dev_err(pmu->dev,
-> -				"%s: failed to get clk %pC (index %d): %d\n",
-> -				node->name, clk, i, error);
-> +				"%s: failed to get clk at index %d: %d\n",
-> +				node->name, i, error);
->   			goto err_out;
->   		}
->   
->
+>  .../devicetree/bindings/mtd/mtk-quadspi.txt        | 30 ++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> new file mode 100644
+> index 0000000..8fff0ed
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> @@ -0,0 +1,30 @@
+> +* MTD SPI nor driver for MTK MT81xx (and similar) serial flash controller
+> +
+> +Required properties:
+> +- compatible: 	  should be "mediatek,mt8173-nor";
+> +- reg: 		  physical base address and length of the controller's register
+> +- clocks: 	  the phandle of the clock needed by the nor controller
+> +- clock-names: 	  the name of the clocks
+> +		  the clocks needed "spi" and "sf". "spi" is used for spi bus,
+> +		  and "sf" is used for controller, these are the clocks witch
+> +		  hardware needs to enabling nor flash and nor flash controller.
+> +		  See Documentation/devicetree/bindings/clock/clock-bindings.txt for details.
+> +- #address-cells: should be <1>
+> +- #size-cells:	  should be <0>
+> +
+> +Example:
+> +
+> +nor_flash: spi at 1100d000 {
+> +	compatible = "mediatek,mt8173-nor";
+> +	reg = <0 0x1100d000 0 0xe0>;
+> +	clocks = <&pericfg CLK_PERI_SPI>,
+> +		 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
+> +	clock-names = "spi", "sf";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	flash at 0 {
+
+I see you've added the 'flash' node as I requested, but you didn't
+document it above, and your driver doesn't use it.
+
+Brian
+
+> +		....
+> +	};
+> +};
+> +
 > -- 
-> Thanks,
-> Caesar
+> 1.8.1.1.dirty
+> 
