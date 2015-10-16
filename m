@@ -1,33 +1,25 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 17 Oct 2015 04:49:29 +0800
-Subject: [PATCH 09/11] clocksource: add TI 32.768 Hz counter driver
-In-Reply-To: <1445012530-14126-10-git-send-email-balbi@ti.com>
-Message-ID: <201510170412.4siQMwFD%fengguang.wu@intel.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Fri, 16 Oct 2015 23:48:25 +0300
+Subject: [PATCH] memcg: include linux/mm.h
+In-Reply-To: <14714191.7FdLxZ8X79@wuerfel>
+References: <14714191.7FdLxZ8X79@wuerfel>
+Message-ID: <20151016204825.GB1817@node.shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+On Fri, Oct 16, 2015 at 10:03:31PM +0200, Arnd Bergmann wrote:
+> A recent change to the memcg code added a call to virt_to_head_page,
+> which is declared in linux/mm.h, but this is not necessarily included
+> here and will cause compile errors:
+> 
+> include/linux/memcontrol.h:841:9: error: implicit declaration of function 'virt_to_head_page' [-Werror=implicit-function-declaration]
+> 
+> This adds an explicit include statement that gets rid of the error.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 1ead4c071978 ("memcg: simplify and inline __mem_cgroup_from_kmem")
 
-[auto build test ERROR on omap/for-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+http://lkml.kernel.org/g/20151016131726.GA602 at node.shutemov.name
 
-url:    https://github.com/0day-ci/linux/commits/Felipe-Balbi/arm-omap-timer-cleanups/20151017-002649
-config: i386-allmodconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All errors (new ones prefixed by >>):
-
-   drivers/built-in.o: In function `ti_32k_timer_init':
->> timer-ti-32k.c:(.init.text+0x213a6): undefined reference to `sched_clock_register'
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 51600 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151017/da6f5f3e/attachment-0001.obj>
+-- 
+ Kirill A. Shutemov
