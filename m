@@ -1,47 +1,83 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Oct 2015 22:10:04 +0200
-Subject: [PATCH] netfilter: fix Kconfig dependencies for nft_dup_ipv{4,6}
-Message-ID: <5041322.FiDa5XtNuO@wuerfel>
+Date: Fri, 16 Oct 2015 22:17:49 +0200
+Subject: [GIT PULL] qcom SoC changes for 4.4 *RESEND*
+In-Reply-To: <20151016200417.GC16437@codeaurora.org>
+References: <1444860627-8258-1-git-send-email-agross@codeaurora.org>
+ <6622700.vqj78zoFs4@wuerfel> <20151016200417.GC16437@codeaurora.org>
+Message-ID: <4138617.YyHIgKfeHJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nft_dup_ipv4 and nft_dup_ipv6 select the respective nf_dup_ipv{4,6}
-drivers, which must not be built-in if nf_conntrack is a loadable
-module, otherwise we get a link error:
+On Friday 16 October 2015 13:04:17 Stephen Boyd wrote:
+> On 10/16, Arnd Bergmann wrote:
+> > On Friday 16 October 2015 09:56:30 Stephen Boyd wrote:
+> > > 
+> > > Can you share your .config? It looks like there are stubs for these, so
+> > > I'm lost how we got undefined references.
+> > > 
+> > http://pastebin.com/HtrC510p
+> > 
+> > The problem is CONFIG_HWSPINLOCK=m && CONFIG_QCOM_SMEM=y. Sorry for sending
+> > an incomplete patch description, I had not noticed those wrapper functions.
+> > 
+> > My patch fixes the issue, but does not allow you to build QCOM_SMEM without
+> > HWSPINLOCK. If we want that configuration to be valid, we need one of
+> > the two changes below:
+> > 
+> > diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
+> > index eec76141d9b9..cae0ffa19bca 100644
+> > --- a/drivers/soc/qcom/Kconfig
+> > +++ b/drivers/soc/qcom/Kconfig
+> > @@ -22,7 +22,7 @@ config QCOM_PM
+> >  config QCOM_SMEM
+> >  	tristate "Qualcomm Shared Memory Manager (SMEM)"
+> >  	depends on ARCH_QCOM
+> > -	depends on HWSPINLOCK
+> > +	depends on HWSPINLOCK && !HWSPINLOCK
+> 
+> What does this mean?
 
-net/built-in.o: In function `nf_dup_ipv6':
-(.text+0xdef20): undefined reference to `nf_conntrack_untracked'
+This is the magic way in Kconfig to express what we want ;-)
 
-The dependency was fixed for the nf_dup_* modules recently, but this
-patch adds the same dependency to the nft_dup_* modules for
-the (hopefully) complete fix.
+It says it depends on either HWSPINLOCK being disabled (!HWSPINLOCK),
+or it depends on HWSPINLOCK. The latter implies that QCOM_SMEM cannot
+be built-in when HWSPINLOCK=m, but they are allowed to both be built-in.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 6ece90f9a13e ("netfilter: fix Kconfig dependencies for nf_dup_ipv{4,6}")
----
-found on ARM randconfig builds
+> Is it missing an =m?
 
-diff --git a/net/ipv4/netfilter/Kconfig b/net/ipv4/netfilter/Kconfig
-index a35584176535..c187c60e3e0c 100644
---- a/net/ipv4/netfilter/Kconfig
-+++ b/net/ipv4/netfilter/Kconfig
-@@ -60,6 +60,7 @@ config NFT_REJECT_IPV4
- 
- config NFT_DUP_IPV4
- 	tristate "IPv4 nf_tables packet duplication support"
-+	depends on !NF_CONNTRACK || NF_CONNTRACK
- 	select NF_DUP_IPV4
- 	help
- 	  This module enables IPv4 packet duplication support for nf_tables.
-diff --git a/net/ipv6/netfilter/Kconfig b/net/ipv6/netfilter/Kconfig
-index f6a024e141e5..e10a04c9cdc7 100644
---- a/net/ipv6/netfilter/Kconfig
-+++ b/net/ipv6/netfilter/Kconfig
-@@ -49,6 +49,7 @@ config NFT_REJECT_IPV6
- 
- config NFT_DUP_IPV6
- 	tristate "IPv6 nf_tables packet duplication support"
-+	depends on !NF_CONNTRACK || NF_CONNTRACK
- 	select NF_DUP_IPV6
- 	help
- 	  This module enables IPv6 packet duplication support for nf_tables.
+No
+
+> >  	help
+> >  	  Say y here to enable support for the Qualcomm Shared Memory Manager.
+> >  	  The driver provides an interface to items in a heap shared among all
+> > diff --git a/include/linux/hwspinlock.h b/include/linux/hwspinlock.h
+> > index 859d673d98c8..cdfd9fd2ba11 100644
+> > --- a/include/linux/hwspinlock.h
+> > +++ b/include/linux/hwspinlock.h
+> > @@ -59,7 +59,7 @@ struct hwspinlock_pdata {
+> >  	int base_id;
+> >  };
+> >  
+> > -#if defined(CONFIG_HWSPINLOCK) || defined(CONFIG_HWSPINLOCK_MODULE)
+> > +#if IS_REACHABLE(CONFIG_HWSPINLOCK)
+> >  
+> >  int hwspin_lock_register(struct hwspinlock_device *bank, struct device *dev,
+> >  		const struct hwspinlock_ops *ops, int base_id, int num_locks);
+> > 
+> 
+> I'd prefer this patch. Is there some way to capture that
+> QCOM_SMEM must be a module if HWSPINLOCK is a module unless we're
+> doing a compile test, in which case we don't care?
+
+The problem here is that while we avoid the build error, we get the
+counterintuitive behavior that you can have the HWSPINLOCK module
+loaded but the built-in QCOM_SMEM module does not use it because
+it wasn't reachable at compile time.
+
+> I guess that would just be:
+> 
+> 	depends on HWSPINLOCK || COMPILE_TEST
+
+This would not solve the randconfig build problem.
+
+	Arnd
