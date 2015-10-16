@@ -1,73 +1,69 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Fri, 16 Oct 2015 17:17:40 +0800
-Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
-Message-ID: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Oct 2015 11:18:04 +0200
+Subject: [PATCH 2/3] ARM: dts: uniphier: add ProXstream2 Vodka board
+ support
+In-Reply-To: <CAK7LNATzgOZp542rd-92YXDxux2DrAOH_mkzk8NjimQ3afrCCg@mail.gmail.com>
+References: <1444899934-4754-1-git-send-email-yamada.masahiro@socionext.com>
+ <63719761.5kc6F97FjG@wuerfel>
+ <CAK7LNATzgOZp542rd-92YXDxux2DrAOH_mkzk8NjimQ3afrCCg@mail.gmail.com>
+Message-ID: <9943173.h49fNtDsEp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to match the panel power sequence, disable the enable_gpio
-in the probe function. Also, reorder the code in the power_on and
-power_off function to match the timing.
+On Friday 16 October 2015 14:24:30 Masahiro Yamada wrote:
+> 
+> No, it is not a typo, but intentional.
+> 
+> 
+> i2c0 - i2c3 are connected to the pads of the SoC package.
+> On the other hand, i2c-4 - i2c-6 are connected to
+> internal devices inside the SoC package.
+> 
+> i2c-4 - i2c-6 are always connected to the same hardware
+> devices and always used for the same purpose.
+> 
+> 
+> My expected scenario is:
+> 
+> [1] i2c0 - i2c3 are connected to the on-board devices
+>     depending on board variants.
+>     On some boards, their status is "okay" and
+>     on some boards, their status is "disabled".
+> 
+> [2] i2c4 - i2c6 are always used to communicate
+>     with in-package devices.  The status is always "okay".
 
-Signed-off-by: YH Huang <yh.huang@mediatek.com>
----
-Change in v2:
-Fix the build error.
----
- drivers/video/backlight/pwm_bl.c |   14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+I think you are getting confused because the data sheet uses
+the same names as the kernel, but they are really different
+things.
 
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index eff379b..d8c9c62 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -54,10 +54,11 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
- 	if (err < 0)
- 		dev_err(pb->dev, "failed to enable power supply\n");
- 
-+	pwm_enable(pb->pwm);
-+
- 	if (pb->enable_gpio)
- 		gpiod_set_value(pb->enable_gpio, 1);
- 
--	pwm_enable(pb->pwm);
- 	pb->enabled = true;
- }
- 
-@@ -66,12 +67,12 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
- 	if (!pb->enabled)
- 		return;
- 
--	pwm_config(pb->pwm, 0, pb->period);
--	pwm_disable(pb->pwm);
--
- 	if (pb->enable_gpio)
- 		gpiod_set_value(pb->enable_gpio, 0);
- 
-+	pwm_config(pb->pwm, 0, pb->period);
-+	pwm_disable(pb->pwm);
-+
- 	regulator_disable(pb->power_supply);
- 	pb->enabled = false;
- }
-@@ -242,7 +243,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 	pb->enabled = false;
- 
- 	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
--						  GPIOD_OUT_HIGH);
-+						  GPIOD_ASIS);
- 	if (IS_ERR(pb->enable_gpio)) {
- 		ret = PTR_ERR(pb->enable_gpio);
- 		goto err_alloc;
-@@ -264,6 +265,9 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 		pb->enable_gpio = gpio_to_desc(data->enable_gpio);
- 	}
- 
-+	if (pb->enable_gpio)
-+		gpiod_direction_output(pb->enable_gpio, 0);
-+
- 	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
- 	if (IS_ERR(pb->power_supply)) {
- 		ret = PTR_ERR(pb->power_supply);
--- 
-1.7.9.5
+How about boards that have i2c connectors that are labeled
+differently?
+
+We want the aliases to match whatever is written on the
+board normally, to make it easier for users.
+
+> [3] Some user-land applications may want to have access
+>      through the same character devices,
+>       /dev/i2c4, /dev/i2c5, /dev/i2c6
+
+That user space would however only work on boards with the
+same SoC, which is not a safe assumption to make. Either
+it should be specific to just one board which has a known
+set of buses, or it should be done in a way that works
+across SoC generations of families.
+
+Ideally the devices on the internal buses would have an
+in-kernel driver that exports a high-level API to avoid this
+problem. What devices are these?
+
+> If your way is adopted,
+> the real hardware "i2c4" might be aligned to /dev/i2c1 on some boards,
+> and /dev/i2c2 on others, etc.
+
+Right, I think that is how it should be. You could also make
+the chip's i2c4 always link to user space /dev/i2c0 if you
+want to keep those stable, but as I said that is still not
+a good (software) system design.
+
+	Arnd
