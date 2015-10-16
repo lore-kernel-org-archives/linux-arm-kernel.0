@@ -1,65 +1,43 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Fri, 16 Oct 2015 09:02:54 -0500
-Subject: [PATCH v4] ARM: fix vdsomunge not to depend on glibc specific
- byteswap.h
-In-Reply-To: <4436b0dbf72aa409613ec4c7407b017d085e40ac.1444977518.git.hns@goldelico.com>
-References: <4436b0dbf72aa409613ec4c7407b017d085e40ac.1444977518.git.hns@goldelico.com>
-Message-ID: <5621038E.9080406@mentor.com>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Fri, 16 Oct 2015 11:07:04 -0300
+Subject: [PATCH 0/2] Add support for NXP LPC18xx EEPROM using nvmem
+Message-ID: <1445004426-6271-1-git-send-email-ariel@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2015 01:38 AM, H. Nikolaus Schaller wrote:
-> diff --git a/arch/arm/vdso/vdsomunge.c b/arch/arm/vdso/vdsomunge.c
-> index aedec81..0cebd98 100644
-> --- a/arch/arm/vdso/vdsomunge.c
-> +++ b/arch/arm/vdso/vdsomunge.c
-> @@ -45,7 +45,6 @@
->   * it does.
->   */
->  
-> -#include <byteswap.h>
->  #include <elf.h>
->  #include <errno.h>
->  #include <fcntl.h>
-> @@ -59,6 +58,16 @@
->  #include <sys/types.h>
->  #include <unistd.h>
->  
-> +#define swab16(x) \
-> +	((((x) & 0x00ff) << 8) | \
-> +	 (((x) & 0xff00) >> 8))
-> +
-> +#define swab32(x) \
-> +	((((x) & 0x000000ff) << 24) | \
-> +	 (((x) & 0x0000ff00) <<  8) | \
-> +	 (((x) & 0x00ff0000) >>  8) | \
-> +	 (((x) & 0xff000000) << 24))
-> +
->  #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
->  #define HOST_ORDER ELFDATA2LSB
->  #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-> @@ -104,17 +113,17 @@ static void cleanup(void)
->  
->  static Elf32_Word read_elf_word(Elf32_Word word, bool swap)
->  {
-> -	return swap ? bswap_32(word) : word;
-> +	return swap ? swab32(word) : word;
->  }
->  
->  static Elf32_Half read_elf_half(Elf32_Half half, bool swap)
->  {
-> -	return swap ? bswap_16(half) : half;
-> +	return swap ? swab16(half) : half;
->  }
->  
->  static void write_elf_word(Elf32_Word val, Elf32_Word *dst, bool swap)
->  {
-> -	*dst = swap ? bswap_32(val) : val;
-> +	*dst = swap ? swab32(val) : val;
->  }
+This patch series adds support for NXP LPC18xx EEPROM memory found in
+NXP LPC SoCs family, which includes LPC18xx/LPC43xx. Other SoCs in
+that family may share the same watchdog hardware.
 
-I think this looks good now and it checks out in my local testing.
-Thanks for your persistence.
+This patchset is based on tag next-20151013 of the linux-next
+repository. It has been successfully tested on a LPC4337 CIAA-NXP
+Board.
 
-Assuming Russell has no further comments I'll put this in his patch
-system later today.
+EEPROM notes:
+------------
+
+EEPROM size is 16384 bytes and it can be entirely read and 
+written/erased with 1 word (4 bytes) granularity. The last page
+(128 bytes) contains the EEPROM initialization data and is not writable.
+
+Erase/program time is less than 3ms. The EEPROM device requires a
+~1500 kHz clock (min 800 kHz, max 1600 kHz) that is generated dividing
+the system bus clock by the division factor, contained in the divider
+register (minus 1 encoded).
+
+Thanks,
+
+Ariel D'Alessandro (2):
+  nvmem: NXP LPC18xx EEPROM memory NVMEM driver
+  DT: nvmem: Add NXP LPC18xx EEPROM memory binding documentation
+
+ .../devicetree/bindings/nvmem/lpc18xx_eeprom.txt   |  26 ++
+ drivers/nvmem/Kconfig                              |   9 +
+ drivers/nvmem/Makefile                             |   2 +
+ drivers/nvmem/lpc18xx_eeprom.c                     | 271 +++++++++++++++++++++
+ 4 files changed, 308 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt
+ create mode 100644 drivers/nvmem/lpc18xx_eeprom.c
+
+-- 
+2.6.1
