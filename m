@@ -1,33 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 17 Oct 2015 00:21:07 +0200
-Subject: [PATCH] ARM: psci-smp is built only for SMP
-Message-ID: <4561751.e2CPD6ukve@wuerfel>
+Date: Sat, 17 Oct 2015 00:29:55 +0200
+Subject: [PATCH] staging: iio: select IRQ_WORK for IIO_DUMMY_EVGEN
+Message-ID: <22609671.lgCfBiaFIf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PSCI SMP implementation is built only when both CONFIG_SMP and
-CONFIG_ARM_PSCI are set, so a configuration that has the latter
-but not the former can get a link error when it tries to call
-psci_smp_available().
+The iio dummy code was recently changed to use irq_work_queue, but
+that code is compiled into the kernel only if IRQ_WORK is set, so
+we can get a link error here:
 
-arch/arm/mach-tegra/built-in.o: In function `tegra114_cpuidle_init':
-cpuidle-tegra114.c:(.init.text+0x52a): undefined reference to `psci_smp_available'
+drivers/built-in.o: In function `iio_evgen_poke':
+(.text+0x208a04): undefined reference to `irq_work_queue'
 
-This corrects the #ifdef in the psci.h header file to match the
-Makefile conditional we have for building that function.
+This changes the Kconfig file to match what other drivers do.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: fd2bb310ca3d ("Staging: iio: Move evgen interrupt generation to irq_work")
+---
+Found on ARM randconfig tests
 
-diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-index 68ee3ce17b82..b4c6d99364f1 100644
---- a/arch/arm/include/asm/psci.h
-+++ b/arch/arm/include/asm/psci.h
-@@ -16,7 +16,7 @@
+diff --git a/drivers/staging/iio/Kconfig b/drivers/staging/iio/Kconfig
+index 6d5b38d69578..9d7f0004d2d7 100644
+--- a/drivers/staging/iio/Kconfig
++++ b/drivers/staging/iio/Kconfig
+@@ -18,7 +18,8 @@ source "drivers/staging/iio/resolver/Kconfig"
+ source "drivers/staging/iio/trigger/Kconfig"
  
- extern struct smp_operations psci_smp_ops;
+ config IIO_DUMMY_EVGEN
+-       tristate
++	tristate
++	select IRQ_WORK
  
--#ifdef CONFIG_ARM_PSCI
-+#if defined(CONFIG_SMP) && defined(CONFIG_ARM_PSCI)
- bool psci_smp_available(void);
- #else
- static inline bool psci_smp_available(void) { return false; }
+ config IIO_SIMPLE_DUMMY
+        tristate "An example driver with no hardware requirements"
