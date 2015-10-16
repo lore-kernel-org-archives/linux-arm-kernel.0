@@ -1,153 +1,65 @@
-From: andrew-ct.chen@mediatek.com (andrew-ct.chen at mediatek.com)
-Date: Fri, 16 Oct 2015 16:39:10 +0800
-Subject: [PATCH 2/3] nvmem: mediatek: Add Mediatek EFUSE driver
-In-Reply-To: <1444984751-4572-1-git-send-email-andrew-ct.chen@mediatek.com>
-References: <1444984751-4572-1-git-send-email-andrew-ct.chen@mediatek.com>
-Message-ID: <1444984751-4572-3-git-send-email-andrew-ct.chen@mediatek.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Oct 2015 10:45:30 +0200
+Subject: [PATCH RFC 0/7] Adding core support for wire-MSI bridges
+In-Reply-To: <5620AF42.4070204@arm.com>
+References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
+ <5879538.pKBkpUOxls@wuerfel> <5620AF42.4070204@arm.com>
+Message-ID: <4196649.VJFYrvEAp6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+On Friday 16 October 2015 09:03:14 Marc Zyngier wrote:
+> On 15/10/15 20:16, Arnd Bergmann wrote:
+> > On Thursday 15 October 2015 17:01:02 Marc Zyngier wrote:
+> >>
+> >> "Preconfigured" is the key word. While you can do something like that if
+> >> your hardware treats MSIs just as if they were wired interrupts
+> >> (something like GICv2m), it becomes far more hairy if the target of MSIs
+> >> is something like a GICv3 ITS (which is the case for HiSilicon mbigen).
+> >>
+> >> The main reason is that the ITS relies on "translation tables" kept in
+> >> memory, which the OS has to configure, and handing over pre-configured
+> >> tables is not something I'm looking forward to doing. From a CPU point
+> >> of view, this is akin entering the kernel with the MMU already on and no
+> >> idmap...
+> >>
+> >> The approach taken here is to make the MSI-ness explicit at the irqchip
+> >> level, and keep the interrupting device oblivious of that feature. Also,
+> >> this relies on the fact that we can have one MSI per wire, meaning that
+> >> we don't have to multiplex anything (no nested irqchip), and that we can
+> >> rely on hierarchical domains, which simplifies the code (at least for
+> >> the irqchip).
+> >>
+> > 
+> > Thanks, that already makes things much clearer. Just one more question:
+> > why can't those translation tables be configured statically by the
+> > irqchip driver? Is this all about being able to cut a few cycles
+> > in case of virtualization? 
+> 
+> Having a static configuration, while doable, complicates things for
+> everybody else. The LPI number used by the irqchip would need to be put
+> an some "exclusion list" to make sure it is not reallocated for other
+> subsystems (e.g PCI). The translation tables also define the target CPU,
+> which could cause interesting problems once combined with CPU hotplug if
+> the ITS is not completely in control of it.
+> 
+> I'm not really getting your point about virtualization though.
 
-Add Mediatek EFUSE driver to access hardware data like
-thermal sensor calibration or HDMI impedance.
+I think I'm mainly still confused by how MSI is implemented on
+the CPU side. Your explanation makes sense though.
 
-Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
----
- drivers/nvmem/Kconfig     | 11 ++++++
- drivers/nvmem/Makefile    |  1 +
- drivers/nvmem/mtk-efuse.c | 89 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 101 insertions(+)
- create mode 100644 drivers/nvmem/mtk-efuse.c
+> > I would assume that once you have gone through the overhead of having
+> > both an MSI and a normal interrupt line (with the need for
+> > serialization vs DMA), you can just as well trap to user space to
+> > deliver an IRQ to a guest.
+> 
+> The whole idea behind this bridge is to move wired interrupts to the
+> periphery of a SoC. I don't think virtualization was part of the
+> equation, but of course I can't speak for the "geniuses" behind the idea.
+> 
+> Or maybe I'm reading your question the wrong way, which is entirely
+> possible given the lack of caffeine.
 
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index 8db2978..1bd5badc 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -14,6 +14,17 @@ menuconfig NVMEM
- 
- if NVMEM
- 
-+config MTK_EFUSE
-+	tristate "Mediatek SoCs EFUSE support"
-+	depends on ARCH_MEDIATEK || COMPILE_TEST
-+	select REGMAP_MMIO
-+	help
-+	  This is a driver to access hardware related data like sensor
-+	  calibration, HDMI impedance etc.
-+
-+	  This driver can also be built as a module. If so, the module
-+	  will be called efuse-mtk.
-+
- config QCOM_QFPROM
- 	tristate "QCOM QFPROM Support"
- 	depends on ARCH_QCOM || COMPILE_TEST
-diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-index 4328b93..916b727 100644
---- a/drivers/nvmem/Makefile
-+++ b/drivers/nvmem/Makefile
-@@ -6,6 +6,7 @@ obj-$(CONFIG_NVMEM)		+= nvmem_core.o
- nvmem_core-y			:= core.o
- 
- # Devices
-+obj-$(CONFIG_MTK_EFUSE)		+= mtk-efuse.o
- obj-$(CONFIG_QCOM_QFPROM)	+= nvmem_qfprom.o
- nvmem_qfprom-y			:= qfprom.o
- obj-$(CONFIG_NVMEM_SUNXI_SID)	+= nvmem_sunxi_sid.o
-diff --git a/drivers/nvmem/mtk-efuse.c b/drivers/nvmem/mtk-efuse.c
-new file mode 100644
-index 0000000..9021c0b
---- /dev/null
-+++ b/drivers/nvmem/mtk-efuse.c
-@@ -0,0 +1,89 @@
-+/*
-+ * Copyright (c) 2015 MediaTek Inc.
-+ * Author: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/device.h>
-+#include <linux/module.h>
-+#include <linux/nvmem-provider.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+
-+static struct regmap_config mtk_regmap_config = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
-+};
-+
-+static int mtk_efuse_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	struct nvmem_device *nvmem;
-+	struct nvmem_config *econfig;
-+	struct regmap *regmap;
-+	void __iomem *base;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	econfig = devm_kzalloc(dev, sizeof(*econfig), GFP_KERNEL);
-+	if (!econfig)
-+		return -ENOMEM;
-+
-+	mtk_regmap_config.max_register = resource_size(res) - 1;
-+
-+	regmap = devm_regmap_init_mmio(dev, base, &mtk_regmap_config);
-+	if (IS_ERR(regmap)) {
-+		dev_err(dev, "regmap init failed\n");
-+		return PTR_ERR(regmap);
-+	}
-+
-+	econfig->dev = dev;
-+	econfig->owner = THIS_MODULE;
-+	nvmem = nvmem_register(econfig);
-+	if (IS_ERR(nvmem))
-+		return PTR_ERR(nvmem);
-+
-+	platform_set_drvdata(pdev, nvmem);
-+
-+	return 0;
-+}
-+
-+static int mtk_efuse_remove(struct platform_device *pdev)
-+{
-+	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
-+
-+	return nvmem_unregister(nvmem);
-+}
-+
-+static const struct of_device_id mtk_efuse_of_match[] = {
-+	{ .compatible = "mediatek,mt8135-efuse",},
-+	{ .compatible = "mediatek,mt8173-efuse",},
-+	{/* sentinel */},
-+};
-+MODULE_DEVICE_TABLE(of, mtk_efuse_of_match);
-+
-+static struct platform_driver mtk_efuse_driver = {
-+	.probe = mtk_efuse_probe,
-+	.remove = mtk_efuse_remove,
-+	.driver = {
-+		.name = "mediatek,efuse",
-+		.of_match_table = mtk_efuse_of_match,
-+	},
-+};
-+module_platform_driver(mtk_efuse_driver);
-+MODULE_AUTHOR("Andrew-CT Chen <andrew-ct.chen@mediatek.com>");
-+MODULE_DESCRIPTION("Mediatek EFUSE driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+No, I think I get it now.
+
+	Arnd
