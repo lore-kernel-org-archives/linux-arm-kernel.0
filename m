@@ -1,38 +1,39 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 16 Oct 2015 22:20:50 +0200
-Subject: [PATCH v6 4/7] arm64: berlin: add the pinctrl dependency for
- Marvell Berlin SoCs
-In-Reply-To: <CACRpkdaKBZEN7j3rc9vzT_schNerqKorwckZeKuFEAugbzGBgQ@mail.gmail.com>
-References: <1444981032-4401-1-git-send-email-jszhang@marvell.com>
- <1444981032-4401-5-git-send-email-jszhang@marvell.com>
- <CACRpkdaKBZEN7j3rc9vzT_schNerqKorwckZeKuFEAugbzGBgQ@mail.gmail.com>
-Message-ID: <56215C22.4080705@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Oct 2015 22:27:29 +0200
+Subject: [PATCH] [media] sh-vou: clarify videobuf2 dependency
+Message-ID: <9667468.98avsAXYlo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.10.2015 16:15, Linus Walleij wrote:
-> On Fri, Oct 16, 2015 at 9:37 AM, Jisheng Zhang <jszhang@marvell.com> wrote:
->
->> This is to add the pinctrl dependency for Marvell Berlin SoCs.
->>
->> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
->> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Please push this through the ARM SoC tree or wherever patches
-> to this file goes. It doesn't seem to be a hard dependency to the
-> pin control patches.
+The sh-vou driver has been converted from videobuf to videobuf2, but
+the Kconfig file still lists VIDEOBUF_DMA_CONTIG as a dependency.
+Consequently we can build the driver without VIDEOBUF2_DMA_CONTIG
+and get a link error:
 
-[Added arm-soc Maintainers]
+drivers/built-in.o: In function `sh_vou_probe':
+vf610-ocotp.c:(.text+0x2dbf5c): undefined reference to `vb2_dma_contig_init_ctx'
+vf610-ocotp.c:(.text+0x2dc0b4): undefined reference to `vb2_dma_contig_cleanup_ctx'
+vf610-ocotp.c:(.text+0x2dc144): undefined reference to `vb2_dma_contig_memops'
+drivers/built-in.o: In function `sh_vou_remove':
+vf610-ocotp.c:(.text+0x2dc190): undefined reference to `vb2_dma_contig_cleanup_ctx'
 
-This patch is touching arch/arm64/Kconfig.platforms. The hunk is
-very small so that it may be ok that I apply and send it with
-the next PR.
+This changes the dependency to VIDEOBUF2_DMA_CONTIG instead.
 
-If the arm-soc Maintainers want to pick it up, I can resend the
-original patch with all Acked-by to arm-soc maintainer e-mail
-directly.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 57af3ad59d95 ("[media] sh-vou: convert to vb2")
+---
+Found on ARM randconfig tests
 
-Sebastian
+diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+index f88a6cfb7086..3ddf72f2d844 100644
+--- a/drivers/media/platform/Kconfig
++++ b/drivers/media/platform/Kconfig
+@@ -38,7 +38,7 @@ config VIDEO_SH_VOU
+ 	depends on MEDIA_CAMERA_SUPPORT
+ 	depends on VIDEO_DEV && I2C && HAS_DMA
+ 	depends on ARCH_SHMOBILE || COMPILE_TEST
+-	select VIDEOBUF_DMA_CONTIG
++	select VIDEOBUF2_DMA_CONTIG
+ 	help
+ 	  Support for the Video Output Unit (VOU) on SuperH SoCs.
+ 
