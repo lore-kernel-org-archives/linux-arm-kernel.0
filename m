@@ -1,31 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Oct 2015 16:43:41 +0200
-Subject: [PATCH RESEND] pinctrl: berlin: fix BG2CD field widths
-In-Reply-To: <1444164997-7746-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <CACRpkdaYGUkq-QqCtzph-aoYOzCfCgQ5JSAcNDjBeBLoZ0i_iA@mail.gmail.com>
- <1444164997-7746-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CACRpkdYydJcG4+Pm9V6bZ908OeASeZz6RtFxqpJNmXnubgmEog@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 16 Oct 2015 07:49:53 -0700
+Subject: [GIT PULL 2/2] omap device tree changes for v4.4
+In-Reply-To: <17309037.Mt8pPYt4aa@wuerfel>
+References: <8058507.49AsgX8PR9@wuerfel> <20151015210425.GQ10113@atomide.com>
+ <17309037.Mt8pPYt4aa@wuerfel>
+Message-ID: <20151016144953.GS10113@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 6, 2015 at 10:56 PM, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
+* Arnd Bergmann <arnd@arndb.de> [151016 02:50]:
+> On Thursday 15 October 2015 14:04:26 Tony Lindgren wrote:
+> > * Arnd Bergmann <arnd@arndb.de> [151015 13:40]:
+> > > On Wednesday 14 October 2015 14:38:59 Tony Lindgren wrote:
+> > > 
+> > > > Note that this branch is against v4.3-rc4 as that contains critical
+> > > > MMC related fixes to boot with MMC working on most omaps.
+> > > 
+> > > While we are lucky this time as I based the branch on -rc4 anyway,
+> > > a nicer way to do this would be to ensure that a fix you want
+> > > to base on is based an older -rc, and then you base your own branch
+> > > on top of that fix, to minimize the number of back-merged patches.
+> > 
+> > Sure that would be doable too at the cost of a few extra merges.
+> 
+> You can always look at our existing next/* branches to see what they are
+> based on. If we already have the commit you need (like this time), it's
+> not a problem at all to use the same base.
 
-> From: Thomas Hebb <tommyhebb@gmail.com>
->
-> The previous register layout was incorrect, many of the fields having
-> fewer bits than were needed to represent all their modes. The new layout
-> is taken from the bootloader source of a BG2CD device.
->
-> Signed-off-by: Thomas Hebb <tommyhebb@gmail.com>
-> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Linus,
->
-> this is the fix from Thomas rebased on v4.3-rc1.
+Yeah no problem. Usually -rc2 is just fine for us in general as the
+base.
 
-Patch applied. Strangely it applied cleanly despite all the other
-Berlin pinctrl development from Antoine and Jisheng!
+Regards,
 
-Yours,
-Linus Walleij
+Tony
