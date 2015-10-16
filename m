@@ -1,83 +1,106 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 16 Oct 2015 17:40:38 +0200
-Subject: [PATCH] clk: imx25: Remove osc clock from driver
-In-Reply-To: <1445009120-2582-1-git-send-email-mpa@pengutronix.de>
-References: <1445009120-2582-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1445010038.3180.18.camel@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 16 Oct 2015 10:40:43 -0500
+Subject: [RFC PATCH 1/3] arm: plat-omap: dmtimer: Add clock source from DT
+In-Reply-To: <5620ED30.2050507@baylibre.com>
+References: <5620ED30.2050507@baylibre.com>
+Message-ID: <87k2qmlt38.fsf@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 16.10.2015, 17:25 +0200 schrieb Markus Pargmann:
-> The 'osc' clock is already initialized by the fixed clock defined in
-> imx25.dtsi. The imx25 clock driver tries to add this clock for a second
-> time and fails with -EEXIST:
-> 	i.MX clk 1: register failed with -17
-> 
-> As the clock is already properly setup in DT with a different driver, we
-> can completely remove the handling in the imx25 clock driver.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-I was just about to shout something about DT stability, but then noticed
-that the "fixed-clock" compatible is present since the first commit of
-the i.MX25 DTSI.
+Hi,
 
-No objections from me,
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-
+Neil Armstrong <narmstrong@baylibre.com> writes:
+> Add a function which sets the timer source from the clocks
+> binding on dm_timer_prepare call.
+>
+> In case the clocks property is not valid, it falls back to
+> the set_source() with 32_KHZ clock as default.
+>
+> Suggested-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > ---
->  drivers/clk/imx/clk-imx25.c | 19 +++----------------
->  1 file changed, 3 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/clk/imx/clk-imx25.c b/drivers/clk/imx/clk-imx25.c
-> index ec1a4c1dacf1..33b5b7b29aa0 100644
-> --- a/drivers/clk/imx/clk-imx25.c
-> +++ b/drivers/clk/imx/clk-imx25.c
-> @@ -86,13 +86,12 @@ enum mx25_clks {
->  
->  static struct clk *clk[clk_max];
->  
-> -static int __init __mx25_clocks_init(unsigned long osc_rate,
-> -				     void __iomem *ccm_base)
-> +static int __init __mx25_clocks_init(void __iomem *ccm_base)
->  {
->  	BUG_ON(!ccm_base);
->  
->  	clk[dummy] = imx_clk_fixed("dummy", 0);
-> -	clk[osc] = imx_clk_fixed("osc", osc_rate);
-> +	clk[osc] = NULL;
+>  arch/arm/plat-omap/dmtimer.c | 32 ++++++++++++++++++++++++++++++--
+>  1 file changed, 30 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+> index 8ca94d3..5e8aece 100644
+> --- a/arch/arm/plat-omap/dmtimer.c
+> +++ b/arch/arm/plat-omap/dmtimer.c
+> @@ -137,9 +137,33 @@ static int omap_dm_timer_reset(struct omap_dm_timer *timer)
+>  	return 0;
+>  }
+>
+> +static int omap_dm_timer_of_set_source(struct omap_dm_timer *timer)
+> +{
+> +	int ret;
+> +	struct clk *parent;
+> +
+> +	if (unlikely(!timer))
+> +		return -EINVAL;
 
-Nit: clk is a static array, so no need to explicitly set this entry to
-NULL as it's already initialized that way.
+IMO, let this crash. If this happens we have bigger problems.
 
->  	clk[mpll] = imx_clk_pllv1(IMX_PLLV1_IMX25, "mpll", "osc", ccm(CCM_MPCTL));
->  	clk[upll] = imx_clk_pllv1(IMX_PLLV1_IMX25, "upll", "osc", ccm(CCM_UPCTL));
->  	clk[mpll_cpu_3_4] = imx_clk_fixed_factor("mpll_cpu_3_4", "mpll", 3, 4);
-> @@ -238,22 +237,10 @@ static int __init __mx25_clocks_init(unsigned long osc_rate,
->  
->  static void __init mx25_clocks_init_dt(struct device_node *np)
+> +	if (IS_ERR(timer->fclk))
+> +		return -EINVAL;
+
+We bail out if we can't get fclk, this check is unnecessary.
+
+> +	parent = clk_get(&timer->pdev->dev, NULL);
+
+why NULL ? You could use something more descriptive, but no strong
+feelings.
+
+> +	if (IS_ERR(parent))
+> +		return -ENODEV;
+> +
+> +	ret = clk_set_parent(timer->fclk, parent);
+> +	if (ret < 0)
+> +		pr_err("%s: failed to set parent\n", __func__);
+> +
+> +	clk_put(parent);
+> +
+> +	return ret;
+> +}
+> +
+>  static int omap_dm_timer_prepare(struct omap_dm_timer *timer)
 >  {
-> -	struct device_node *refnp;
-> -	unsigned long osc_rate = 24000000;
->  	void __iomem *ccm;
->  
-> -	/* retrieve the freqency of fixed clocks from device tree */
-> -	for_each_compatible_node(refnp, NULL, "fixed-clock") {
-> -		u32 rate;
-> -		if (of_property_read_u32(refnp, "clock-frequency", &rate))
-> -			continue;
-> -
-> -		if (of_device_is_compatible(refnp, "fsl,imx-osc"))
-> -			osc_rate = rate;
-> -	}
-> -
->  	ccm = of_iomap(np, 0);
-> -	__mx25_clocks_init(osc_rate, ccm);
-> +	__mx25_clocks_init(ccm);
->  
->  	clk_data.clks = clk;
->  	clk_data.clk_num = ARRAY_SIZE(clk);
+> -	int rc;
+> +	int rc, ret;
+
+doesn't seem like you need this extra 'ret' variable. Just use 'rc'.
+
+> @@ -166,7 +190,11 @@ static int omap_dm_timer_prepare(struct omap_dm_timer *timer)
+>  	__omap_dm_timer_enable_posted(timer);
+>  	omap_dm_timer_disable(timer);
+>
+> -	return omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
+> +	ret = omap_dm_timer_of_set_source(timer);
+> +	if (ret < 0 && ret == -ENODEV)
+
+this < 0 check is pointless if you're going to check for equality to -ENODEV
+
+> +		return omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
+> +
+> +	return ret;
+>  }
+>
+>  static inline u32 omap_dm_timer_reserved_systimer(int id)
+> -- 
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151016/019159f9/attachment.sig>
