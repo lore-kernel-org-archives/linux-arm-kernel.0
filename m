@@ -1,53 +1,69 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 16 Oct 2015 14:38:56 +0530
-Subject: [PATCH v2 3/4] mtd: brcmnand: Force 8bit mode before doing
- nand_scan_ident()
+Date: Fri, 16 Oct 2015 14:38:57 +0530
+Subject: [PATCH v2 4/4] arm64: dts: Add BRCM IPROC NAND DT node for NS2
 In-Reply-To: <1444986537-28387-1-git-send-email-anup.patel@broadcom.com>
 References: <1444986537-28387-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1444986537-28387-4-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1444986537-28387-5-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just like other NAND controllers, the NAND READID command only works
-in 8bit mode for all versions of BRCMNAND controller.
-
-This patch forces 8bit mode for each NAND CS in brcmnand_init_cs()
-before doing nand_scan_ident() to ensure that BRCMNAND controller
-is in 8bit mode when NAND READID command is issued.
+The NAND controller on NS2 SoC is compatible with existing
+BRCM IPROC NAND driver so let's enable it in NS2 DT and
+NS2 SVK DT.
 
 Signed-off-by: Anup Patel <anup.patel@broadcom.com>
 Reviewed-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- drivers/mtd/nand/brcmnand/brcmnand.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts | 12 ++++++++++++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi    | 14 ++++++++++++++
+ 2 files changed, 26 insertions(+)
 
-diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
-index 4cba03d..0be8ef9 100644
---- a/drivers/mtd/nand/brcmnand/brcmnand.c
-+++ b/drivers/mtd/nand/brcmnand/brcmnand.c
-@@ -1888,6 +1888,7 @@ static int brcmnand_init_cs(struct brcmnand_host *host)
- 	struct mtd_info *mtd;
- 	struct nand_chip *chip;
- 	int ret;
-+	u16 cfg_offs;
- 	struct mtd_part_parser_data ppdata = { .of_node = dn };
- 
- 	ret = of_property_read_u32(dn, "reg", &host->cs);
-@@ -1930,6 +1931,14 @@ static int brcmnand_init_cs(struct brcmnand_host *host)
- 
- 	chip->controller = &ctrl->controller;
- 
-+	/*
-+	 * The bootloader might have configured 16bit mode but
-+	 * NAND READID command only works in 8bit mode. We force
-+	 * 8bit mode here to ensure that NAND READID commands works.
-+	 */
-+	cfg_offs = brcmnand_cs_offset(ctrl, host->cs, BRCMNAND_CS_CFG);
-+	nand_writereg(ctrl, cfg_offs, nand_readreg(ctrl, cfg_offs) & ~BIT(23));
+diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+index e5950d5..a754160 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
++++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+@@ -63,5 +63,17 @@
+ 		uart3: serial at 66130000 {
+ 			status = "ok";
+ 		};
 +
- 	if (nand_scan_ident(mtd, 1, NULL))
- 		return -ENXIO;
- 
++		nand: nand at 66460000 {
++			nandcs at 0 {
++				compatible = "brcm,nandcs";
++				reg = <0>;
++				nand-ecc-mode = "hw";
++				nand-ecc-strength = <8>;
++				nand-ecc-step-size = <512>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++			};
++		};
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+index f603277..9610822 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
++++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+@@ -212,5 +212,19 @@
+ 			compatible = "brcm,iproc-rng200";
+ 			reg = <0x66220000 0x28>;
+ 		};
++
++		nand: nand at 66460000 {
++			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
++			reg = <0x66460000 0x600>,
++			      <0x67015408 0x600>,
++			      <0x66460f00 0x20>;
++			reg-names = "nand", "iproc-idm", "iproc-ext";
++			interrupts = <GIC_SPI 420 IRQ_TYPE_LEVEL_HIGH>;
++
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			brcm,nand-has-wp;
++		};
+ 	};
+ };
 -- 
 1.9.1
