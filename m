@@ -1,24 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 Oct 2015 14:06:33 +0100
-Subject: [RFC 2/2] drm/bridge: Add I2C based driver for ps8640 bridge
-In-Reply-To: <1444997709-57293-2-git-send-email-ck.hu@mediatek.com>
-References: <1444997709-57293-1-git-send-email-ck.hu@mediatek.com>
- <1444997709-57293-2-git-send-email-ck.hu@mediatek.com>
-Message-ID: <20151016130632.GE2054@leverpostej>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 16 Oct 2015 15:04:49 +0200
+Subject: [PATCH v2 6/8] ARM: multi_v7_defconfig: Add Atmel SAMA5D2 SoC
+In-Reply-To: <1445000691-12402-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1445000691-12402-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1445000691-12402-7-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +	/* FIXME - use of_graph_get_port_by_id(np, 1) on newer kernels */
-> +	in_ep = of_graph_get_next_endpoint(np, NULL);
+Add Atmel SAMA5D2 SoC family to multi_v7 image.
 
-Huh?
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-> +	edidp = of_get_property(np, "edid", &size);
-
-This property wasn't mentioned in the binding document.
-
-Please describe it. If it's from a more generic binding, refer to that
-from the binding document.
-
-Thanks,
-Mark.
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index bf099b7..63703fa 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -21,6 +21,7 @@ CONFIG_MACH_ARMADA_39X=y
+ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_MACH_DOVE=y
+ CONFIG_ARCH_AT91=y
++CONFIG_SOC_SAMA5D2=y
+ CONFIG_SOC_SAMA5D3=y
+ CONFIG_SOC_SAMA5D4=y
+ CONFIG_ARCH_BCM=y
+-- 
+2.5.0
