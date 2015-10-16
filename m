@@ -1,144 +1,85 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 16 Oct 2015 14:46:26 +0300
-Subject: [PATCH v2] ARM: edma: fix residue race for cyclic
-In-Reply-To: <87eggvt8hi.fsf_-_@linutronix.de>
-References: <87io68s931.fsf@linutronix.de> <561F862A.7040106@ti.com>
- <87eggvt8hi.fsf_-_@linutronix.de>
-Message-ID: <5620E392.8010100@ti.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Fri, 16 Oct 2015 17:07:31 +0530
+Subject: [PATCH v2 0/6] ARM: dts: Use correct CD properties for SDIO and
+ eMMC in Snow and Peach
+In-Reply-To: <1444927873-15140-1-git-send-email-javier@osg.samsung.com>
+References: <1444927873-15140-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <5620E17B.9080906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2015 01:26 PM, John Ogness wrote:
-> When retrieving the residue value for cyclic transfers, the
-> SRC/DST fields of the active PaRAM are read. However, the AM335x
-> Technical Reference Manual states:
-> 
->   11.3.3.6 Parameter Set Updates
-> 
->   After the TR is read from the PaRAM (and is in the process
->   of being submitted to the EDMA3TC), the following fields are
->   updated as needed: ... SRC DST
-> 
-> This means SRC/DST is incremented even though the DMA transfer
-> may not have started yet or is in progress. Thus if the reader
-> of the residue accesses the DMA buffer too quickly, the CPU is
-> misinformed about the data that has been successfully processed.
-> 
-> The CCSTAT.ACTV register is a boolean that is set if any TR is
-> being processed by either the EMDA3CC or EDMA3TC. By polling
-> this register it is possible to ensure that the residue value
-> returned is valid for immediate processing. However, since the
-> DMA engine may be active, polling may never hit a moment where
-> no TR is being processed. To handle this, the SRC/DST is also
-> polled to see if it changes. And as a last resort, a max loop
-> count for the busy waiting exists to avoid an infinite loop.
+Hi Javier,
 
-I'm not sure what this actually going to solve, except that we are going to
-wait for the next PaRAM parameter update.
-As you have already described the issue is that when you first submit the
-transfer, the first PaRAM will be submitted to TC and at this point the
-parameters will be updated to be prepared for the next update.
-This means that after we initiate the DMA the SRC/DST will be updated to point
-to the next batch of data. Reading SRC/DST before the second parameter update
-will always give you this. But this is also true further in the line.
-We never know exactly where the DMA is, we only know that the DMA is somewhere
-in between 0x1234 - (0x1234 + data until next parameter update). At the next
-parameter update you again can not be sure where the DMA is, since it is now
-somewhere between (0x1234 + parameter update number of data) - till the next
-update, and so on.
-In the cyclic case we use AB-sync mode, in this case the parameter update is
-going to happen after each period if I'm not mistaken.
+On 10/15/2015 10:21 PM, Javier Martinez Canillas wrote:
+> Hello,
+>
+> The Exynos Chromebooks DTS don't use the correct card detection properties
+> since these were carried from the vendor tree that had a reason to do so.
+>
+> There are two things that I noticed:
+>
+> 1) The Marvell WiFi SDIO is marked as broken-cd instead of non-removable:
+>
+> This causes the device to be removed when the system enters into a suspend
+> state which leads to the following warning when the system is resumed:
+>
+> [  181.944636] mmc2: error -2 during resume (card was removed?)
+>
+> The rationale for using broken-cd is explained in downstream commit [0] and
+> was that using the non-removable property caused issues with the mwifiex
+> driver since the reset logic called the mmc_{remove,add}_host() functions.
+>
+> But the reset logic in the mwifiex mainline driver has changed and this is
+> no longer the case so it's safe to use the non-removable property AFAICT.
+>
+Good to know it is fixed now. This is fixed in firmware or in the driver?
 
-To achieve the same thing (waiting for the next parameter update to happen)
-you could just poll the PaRAM's CCNT in AB-sync to see if it changing and when
-it did you return the SRC/DST address since those will be close enough at the
-time.
+> 2) The eMMC node has both broken-cd and non-removable but the MMC DT binding
+> doc (Documentation/devicetree/bindings/mmc/mmc.txt) mentions that only one
+> of these card detection properties should be used.
+>
+This change looks ok, will take a closer look once I am back to my work 
+station.
 
-But what happens if the period size if big and the position is asked just
-right after the parameter update? We can not know this, so we spin a bit here
-and give up and return whatever we had in SRC/DST.
-
-Not sure how to deal with this, but for sure needs more thought...
-
--- 
-P?ter
-
-> Signed-off-by: John Ogness <john.ogness@linutronix.de>
-> ---
->  v1-v2 changes
->  . rebased for next-20151016
->  . added multiple exit conditions for busy wait loop
-> 
->  drivers/dma/edma.c |   40 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
-> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-> index 7eefbf1..8d3b3ac 100644
-> --- a/drivers/dma/edma.c
-> +++ b/drivers/dma/edma.c
-> @@ -24,6 +24,8 @@
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
->  #include <linux/spinlock.h>
-> +#include <linux/ratelimit.h>
-> +#include <linux/printk.h>
->  #include <linux/of.h>
->  #include <linux/of_dma.h>
->  #include <linux/of_irq.h>
-> @@ -1785,11 +1787,24 @@ static void edma_issue_pending(struct dma_chan *chan)
->  	spin_unlock_irqrestore(&echan->vchan.lock, flags);
->  }
->  
-> +#define EDMA_CCSTAT_ACTV (1 << 4)
-> +
-> +/*
-> + * This limit exists to avoid a possible infinite loop when waiting
-> + * for confirmation that a particular transfer is completed. However,
-> + * large bursts to/from slow devices might actually require many
-> + * loops (in which case busy waiting is bad anyway). On an AM335x
-> + * transfering 48 bytes from the UART RX-FIFO, as many as 55 loops
-> + * have been seen.
-> + */
-> +#define EDMA_MAX_TR_WAIT_LOOPS 10000
-> +
->  static u32 edma_residue(struct edma_desc *edesc)
->  {
->  	bool dst = edesc->direction == DMA_DEV_TO_MEM;
->  	struct edma_pset *pset = edesc->pset;
->  	dma_addr_t done, pos;
-> +	int loop_count = 0;
->  	int i;
->  
->  	/*
-> @@ -1799,6 +1814,31 @@ static u32 edma_residue(struct edma_desc *edesc)
->  	pos = edma_get_position(edesc->echan->ecc, edesc->echan->slot[0], dst);
->  
->  	/*
-> +	 * "pos" may represent a transfer request that is still being
-> +	 * processed by the EDMACC or EDMATC. We will busy wait until
-> +	 * one of the situations occurs:
-> +	 *   1. no transfer requests are active
-> +	 *   2. a different transfer request is being processed
-> +	 *   3. we hit the loop limit
-> +	 */
-> +	while (edma_read(edesc->echan->ecc, EDMA_CCSTAT) & EDMA_CCSTAT_ACTV) {
-> +		/* check if a different transfer request is active */
-> +		if (edma_get_position(edesc->echan->ecc,
-> +				      edesc->echan->slot[0], dst) != pos) {
-> +			break;
-> +		}
-> +
-> +		loop_count++;
-> +		if (loop_count == EDMA_MAX_TR_WAIT_LOOPS) {
-> +			pr_debug_ratelimited("%s: possibly returning "
-> +					     "invalid residue\n", __func__);
-> +			break;
-> +		}
-> +
-> +		cpu_relax();
-> +	}
-> +
-> +	/*
->  	 * Cyclic is simple. Just subtract pset[0].addr from pos.
->  	 *
->  	 * We never update edesc->residue in the cyclic case, so we
-> 
+> So this series change both the SDIO WiFi and eMMC device nodes in the Snow,
+> Peach Pi and Peach Pit boards DTS to use the non-removable property.
+>
+> To test, I've cherry picked commit [1] from the vendor tree that adds a
+> debugfs entry to force a card reset and after the reset, the WiFi card still
+> works correctly:
+>
+> $ echo 1 > /sys/kernel/debug/mwifiex/mlan0/reset
+>
+> And also tested that both eMMC and WiFi are working correctly after a S2R.
+>
+> The test were made on an Exynos5800 Peach Pi but I don't have access to a
+> Snow anymore so testing patch 3/6 and 6/6 on that board will be appreciated.
+>
+> v1 of the series was [2] and this version fixes issues pointed out by Tomeu.
+>
+> Changes since v1:
+>   - Replace broken-cd for non-removable in the correct mmc node for Snow.
+>   - Correct the card detetion properties for eMMC in Snow, Pit and Pi.
+>   - Also remove the card-detect-delay property when using non-removable.
+>
+> [0]: https://chromium.googlesource.com/chromiumos/third_party/kernel/+/ad348e1e2381
+> [1]: https://chromium.googlesource.com/chromiumos/third_party/kernel/+/5995363523de
+> [2]: https://lkml.org/lkml/2015/10/15/294
+>
+> Best regards,
+> Javier
+>
+>
+> Javier Martinez Canillas (6):
+>    ARM: dts: Mark SDIO as non-removable in exynos5800-peach-pi
+>    ARM: dts: Mark SDIO as non-removable in exynos5420-peach-pit
+>    ARM: dts: Mark SDIO as non-removable in exynos5250-snow-common
+>    ARM: dts: Remove broken-cd from eMMC node in exynos5800-peach-pi
+>    ARM: dts: Remove broken-cd from eMMC node in exynos5420-peach-pi
+>    ARM: dts: Mark eMMC as non-removable in exynos5250-snow-common
+>
+>   arch/arm/boot/dts/exynos5250-snow-common.dtsi | 6 ++----
+>   arch/arm/boot/dts/exynos5420-peach-pit.dts    | 5 +----
+>   arch/arm/boot/dts/exynos5800-peach-pi.dts     | 5 +----
+>   3 files changed, 4 insertions(+), 12 deletions(-)
+>
