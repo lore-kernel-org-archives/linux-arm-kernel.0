@@ -1,56 +1,80 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 16 Oct 2015 16:45:43 +0100
-Subject: xen,arm: enable cpu_hotplug
-In-Reply-To: <561EE3E5.2000105@citrix.com>
-References: <alpine.DEB.2.02.1510081443100.1179@kaball.uk.xensource.com>
- <561EE3E5.2000105@citrix.com>
-Message-ID: <alpine.DEB.2.02.1510161632040.27957@kaball.uk.xensource.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 16 Oct 2015 10:58:37 -0500
+Subject: [RFC PATCH 2/3] pwm: Add PWM driver for OMAP using dual-mode
+ timers
+In-Reply-To: <5620ED34.6000906@baylibre.com>
+References: <5620ED34.6000906@baylibre.com>
+Message-ID: <87h9lqls9e.fsf@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Oct 2015, Julien Grall wrote:
-> On 14/10/2015 18:49, Stefano Stabellini wrote:
-> > Hi all,
-> 
-> Hi Stefano,
-> 
-> > this small patch series enable cpu_hotplug in ARM and ARM64 guests,
-> > using the PV path to plug and unplug the cpus and psci to enable/disable
-> > them.
-> 
-> That's a cool things to have on ARM!
-> 
-> I've got few questions related to CPU hotplug on Xen side.
-> 
-> Firstly, when we create the device tree we are using max_vcpus to populate the
-> "/cpus" node. AFAIU, Linux will always start all the vCPU because they are
-> marked present. That means that it would not be possible to honor vcpus="N"
-> where N is < max_vcpus. Did I miss something?
 
-I think that's OK, it is the intended behaviour. See
-cpu-hotplug.c:setup_cpu_watcher in Linux, in particular the
-for_each_possible_cpu loop. The guest boots with all vcpus and turns off
-the ones which are marked as not available on xenstore.
+Hi,
 
-
-> My second point is related to how Xen is handling interrupt with vCPU. When
-> PSCI off is called, we will set the _VFP_down flag. This flag is used in
-> vgic_vcpu_inject_irq and when it's set the interrupt will be ignored and stay
-> active on the HW GIC forever. If the vCPU is coming back online, this
-> interrupt will never be received. AFAIU the spec, the interrupt is expected to
-> stay pending on the distributor side and will be receive when the vCPU will
-> come back or migrate to another vCPU. A similar problem can happen when the
-> vCPU is powered on again because we clear all the interrupt state related to
-> vCPU (see vgic_clear_pending_irqs).
+Neil Armstrong <narmstrong@baylibre.com> writes:
+> Adds support for using a OMAP dual-mode timer with PWM capability
+> as a Linux PWM device. The driver controls the timer by using the
+> dmtimer API.
 >
-> That brings me a third one related to migration (and not to this series
-> specifically). If the interrupt is edge type, it means that same interrupt can
-> come while it's still active in the LR register. If the guest has to migrate
-> the IRQ it won't happen because the interrupt is already active and in the LR,
-> so we will set the pending bit on the current vCPU.
+> Add a platform_data structure for each pwm-omap-dmtimer nodes containing
+> the dmtimers functions in order to get driver not rely on platform
+> specific functions.
+>
+> Cc: Grant Erickson <marathon96@gmail.com>
+> Cc: NeilBrown <neilb@suse.de>
+> Cc: Joachim Eastwood <manabian@gmail.com>
+> Suggested-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  .../devicetree/bindings/pwm/pwm-omap-dmtimer.txt   |  18 ++
+>  drivers/pwm/Kconfig                                |   9 +
+>  drivers/pwm/Makefile                               |   1 +
+>  drivers/pwm/pwm-omap-dmtimer.c                     | 322 +++++++++++++++++++++
+>  include/linux/platform_data/pwm_omap_dmtimer.h     |  69 +++++
+>  5 files changed, 419 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-omap-dmtimer.txt
+>  create mode 100644 drivers/pwm/pwm-omap-dmtimer.c
+>  create mode 100644 include/linux/platform_data/pwm_omap_dmtimer.h
+>
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-omap-dmtimer.txt b/Documentation/devicetree/bindings/pwm/pwm-omap-dmtimer.txt
+> new file mode 100644
+> index 0000000..7f27606
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-omap-dmtimer.txt
+> @@ -0,0 +1,18 @@
+> +* OMAP PWM for dual-mode timers
+> +
+> +Required properties:
+> +- compatible: Shall contain "ti,omap-dmtimer-pwm".
+> +- ti,timers: phandle to PWM capable OMAP timer. See arm/omap/timer.txt for info
+> +  about these timers.
+> +- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
+> +  the cells format.
+> +
+> +Optiomal properties:
+> +- ti,prescaler: Should be a value between 0 and 7, see the timers datasheet
+> +
+> +Example:
+> +	pwm: omap-pwm {
+> +		compatible = "ti,omap-pwm";
+> +		ti,timers = <&timer9>;
+> +		#pwm-cells = <3>;
+> +	};
 
-These might be valid concerns but they don't have much to do with
-hotplug: PSCI can be used to turn on/off vcpus from within the guest
-independently from cpu-hotplug. The only thing cpu-hotplug does is
-marking as present/non-present some cpus in the guest, which can be
-taken online/offline independently using psci.
+I wonder how far are you from a generic pwm-of-timer.c. This looks
+pretty close to that. You already have a pdata function pointers for
+pretty much everything, all you need to do is pass a timer phandle and,
+as long as the functions pointers are implemented, it should work.
+
+You might want to get rid of pdata altogether at some point, this should
+work as migration path.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151016/bdb700b1/attachment-0001.sig>
