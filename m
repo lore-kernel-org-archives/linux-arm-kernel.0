@@ -1,91 +1,109 @@
 From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Fri, 16 Oct 2015 21:52:21 +0900
-Subject: [PATCH] arm64: Synchonise dump_backtrace() with perf callchain
-In-Reply-To: <20151015172600.GD19202@arm.com>
-References: <1444915314-13649-1-git-send-email-jungseoklee85@gmail.com>
- <20151015172600.GD19202@arm.com>
-Message-ID: <C6DDC1F5-52AB-4834-A4D7-EAF7EA262153@gmail.com>
+Date: Fri, 16 Oct 2015 22:01:20 +0900
+Subject: [PATCH v4 2/2] arm64: Expand the stack trace feature to support
+ IRQ stack
+In-Reply-To: <561FCD59.1090600@arm.com>
+References: <1444231692-32722-1-git-send-email-jungseoklee85@gmail.com>
+ <1444231692-32722-3-git-send-email-jungseoklee85@gmail.com>
+ <5617CE26.10604@arm.com> <07A53E87-C562-48D1-86DF-A373EAAA73F9@gmail.com>
+ <561BE111.7@arm.com> <3CAA206D-3A3A-49A9-BDAD-4206D6F9BAA8@gmail.com>
+ <561CE454.7080201@arm.com> <04D64B22-8EF5-400E-A7F0-1CD0AB48184D@gmail.com>
+ <B6AB90B9-3AA9-413A-B357-137710E89C7C@gmail.com> <561FCD59.1090600@arm.com>
+Message-ID: <6E0DDC4D-9A97-4EAE-868C-B1271F02D3E0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 16, 2015, at 2:26 AM, Will Deacon wrote:
+On Oct 16, 2015, at 12:59 AM, James Morse wrote:
 
-Hi Will,
+Hi James,
 
-> On Thu, Oct 15, 2015 at 01:21:54PM +0000, Jungseok Lee wrote:
->> dump_backtrace() has its own backtrace logic unlike perf callchain which
->> relies on walk_stackframe(). They behave differently when a symbol is
->> recorded. Perf writes it down *before* calling unwind_frame(), but
->> dump_backtrace() prints it out *after* unwind_frame(). As a result, the
->> last valid symbol is not added to a list in case of dump_backtrace().
+> On 14/10/15 13:12, Jungseok Lee wrote:
+>> On Oct 14, 2015, at 12:00 AM, Jungseok Lee wrote:
+>>> On Oct 13, 2015, at 8:00 PM, James Morse wrote:
+>>>> On 12/10/15 23:13, Jungseok Lee wrote:
+>>>>> On Oct 13, 2015, at 1:34 AM, James Morse wrote:
+>>>>>> Having two kmem_caches for 16K stacks on a 64K page system may be wasteful
+>>>>>> (especially for systems with few cpus)?
+>>>>> 
+>>>>> This would be a single concern. To address this issue, I drop the 'static'
+>>>>> keyword in thread_info_cache. Please refer to the below hunk.
+>>>> 
+>>>> Its only a problem on systems with 64K pages, which don't have a multiple
+>>>> of 4 cpus. I suspect if you turn on 64K pages, you have many cores with
+>>>> plenty of memory?
+>>> 
+>>> Yes, the problem 'two kmem_caches' comes from only 64K page system.
+>>> 
+>>> I don't get the statement 'which don't have a multiple of 4 cpus'.
+>>> Could you point out what I am missing?
 >> 
->> This patch catches up the last symbol as synchronising dump_backtrace()
->> with perf callchain. However, the patch does not cover a case where MMU
->> is disabled. That is, a physical address can be stored in stack frame,
->> but it's not handled. For example, a swapper process falls into this case.
->> Unlike a swapper from a secondary core, a swapper on a boot cpu, which
->> starting from __mmap_switched(), can't be tracked down with a simple
->> conversion, phys_to_virt(), because PC is retrieved from LR - 4, not LR.
+>> You're talking about sl{a|u}b allocator behavior. If so, I got what you meant.
 > 
-> It would be good to have an example backtrace before and after this patch
-> is applied, to show what it fixes.
-
-Agreed. I will add a call trace data to the commit message.
-
->> It is a big tradeoff to change both head.S and unwind_frame() structure
->> for a few of symbols in *.S, so this hunk does not take care of the case.
->> 
->> Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> Cc: James Morse <james.morse@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
->> ---
->> arch/arm64/kernel/traps.c | 16 +++++++++++-----
->> 1 file changed, 11 insertions(+), 5 deletions(-)
->> 
->> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
->> index f93aae5..4ddb928 100644
->> --- a/arch/arm64/kernel/traps.c
->> +++ b/arch/arm64/kernel/traps.c
->> @@ -103,12 +103,13 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
->> 	set_fs(fs);
->> }
->> 
->> -static void dump_backtrace_entry(unsigned long where, unsigned long stack)
->> +static void dump_backtrace_entry(unsigned long where)
->> {
->> +	/*
->> +	 * The highest stack frame of a swapper process stores PC in a form
->> +	 * of physical address, but this case is not handled.
->> +	 */
->> 	print_ip_sym(where);
->> -	if (in_exception_text(where))
->> -		dump_mem("", "Exception stack", stack,
->> -			 stack + sizeof(struct pt_regs), false);
->> }
->> 
->> static void dump_instr(const char *lvl, struct pt_regs *regs)
->> @@ -172,12 +173,17 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
->> 	pr_emerg("Call trace:\n");
->> 	while (1) {
->> 		unsigned long where = frame.pc;
->> +		unsigned long stack;
->> 		int ret;
->> 
->> +		dump_backtrace_entry(where);
->> 		ret = unwind_frame(&frame);
->> 		if (ret < 0)
->> 			break;
->> -		dump_backtrace_entry(where, frame.sp);
->> +		stack = frame.sp;
->> +		if (in_exception_text(where))
->> +			dump_mem("", "Exception stack", stack,
->> +				 stack + sizeof(struct pt_regs), false);
+> Yes,
+> With Nx4 cpus, the (currently) 16K irq stacks take up Nx64K - a nice
+> multiple of pages, so no wasted memory.
 > 
-> AFAICT, the original code is all based on unwind_backtrace in
-> arch/arm/kernel/unwind.c. Does that need updating too (as a separate patch)?
+> 
+>>>> If this has been made a published symbol, it should go in a header file.
+>>> 
+>>> Sure.
+>> 
+>> I had the wrong impression that there is a room under include/linux/*.
+> 
+> Yes, I see there isn't anywhere obvious to put it...
+> 
+> 
+>> IMO, this is architectural option whether arch relies on thread_info_cache or not.
+>> In other words, it would be clear to put this extern under arch/*/include/asm/*.
+> 
+> Its up to the arch whether or not to define
+> CONFIG_ARCH_THREAD_INFO_ALLOCATOR. In the case where it hasn't defined it,
+> and THREAD_SIZE >= PAGE_SIZE, your change is exposing thread_info_cache on
+> all architectures, so it ought go in a header file accessible to all
+> architectures.
+> 
+> Something like this, (only build-tested!):
+> =========%<=========
+> --- a/include/linux/thread_info.h
+> +++ b/include/linux/thread_info.h
+> @@ -10,6 +10,8 @@
+> #include <linux/types.h>
+> #include <linux/bug.h>
+> 
+> +#include <asm/page.h>
+> +
 
-I think so, but I don't have any evidence from a real hardware..
+As reviewing arch codes, it seems not to cover all architecture..
+
+> struct timespec;
+> struct compat_timespec;
+> 
+> @@ -145,6 +147,12 @@ static inline bool test_and_clear_restore_sigmask(void)
+> #error "no set_restore_sigmask() provided and default one won't work"
+> #endif
+> 
+> +#ifndef CONFIG_ARCH_THREAD_INFO_ALLOCATOR
+> +#if THREAD_SIZE >= PAGE_SIZE
+> +extern struct kmem_cache *thread_info_cache;
+> +#endif /* THREAD_SIZE >= PAGE_SIZE */
+> +#endif /* CONFIG_ARCH_THREAD_INFO_ALLOCATOR */
+> +
+> #endif /* __KERNEL__ */
+> 
+> #endif /* _LINUX_THREAD_INFO_H */
+> =========%<=========
+> Quite ugly!
+> 
+> My concern is there could be push-back from the maintainer of
+> kernel/fork.c, saying "define CONFIG_ARCH_THREAD_INFO_ALLOCATOR if the
+> generic code isn't what you need", and push-back from the arm64 maintainers
+> about copy-pasting that chunk into arch/arm64.... both of which are fair,
+> hence my initial version created a second kmem_cache.
+
+Same concern. I believe now is the time to get feedbacks from maintainers.
+It will help us to decide the next step.
+
+I will do re-spin soon!
 
 Best Regards
 Jungseok Lee
