@@ -1,69 +1,73 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 16 Oct 2015 14:38:57 +0530
-Subject: [PATCH v2 4/4] arm64: dts: Add BRCM IPROC NAND DT node for NS2
-In-Reply-To: <1444986537-28387-1-git-send-email-anup.patel@broadcom.com>
-References: <1444986537-28387-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1444986537-28387-5-git-send-email-anup.patel@broadcom.com>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Fri, 16 Oct 2015 17:17:40 +0800
+Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
+Message-ID: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NAND controller on NS2 SoC is compatible with existing
-BRCM IPROC NAND driver so let's enable it in NS2 DT and
-NS2 SVK DT.
+In order to match the panel power sequence, disable the enable_gpio
+in the probe function. Also, reorder the code in the power_on and
+power_off function to match the timing.
 
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
+Signed-off-by: YH Huang <yh.huang@mediatek.com>
 ---
- arch/arm64/boot/dts/broadcom/ns2-svk.dts | 12 ++++++++++++
- arch/arm64/boot/dts/broadcom/ns2.dtsi    | 14 ++++++++++++++
- 2 files changed, 26 insertions(+)
+Change in v2:
+Fix the build error.
+---
+ drivers/video/backlight/pwm_bl.c |   14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-index e5950d5..a754160 100644
---- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-+++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-@@ -63,5 +63,17 @@
- 		uart3: serial at 66130000 {
- 			status = "ok";
- 		};
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index eff379b..d8c9c62 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -54,10 +54,11 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
+ 	if (err < 0)
+ 		dev_err(pb->dev, "failed to enable power supply\n");
+ 
++	pwm_enable(pb->pwm);
 +
-+		nand: nand at 66460000 {
-+			nandcs at 0 {
-+				compatible = "brcm,nandcs";
-+				reg = <0>;
-+				nand-ecc-mode = "hw";
-+				nand-ecc-strength = <8>;
-+				nand-ecc-step-size = <512>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index f603277..9610822 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -212,5 +212,19 @@
- 			compatible = "brcm,iproc-rng200";
- 			reg = <0x66220000 0x28>;
- 		};
+ 	if (pb->enable_gpio)
+ 		gpiod_set_value(pb->enable_gpio, 1);
+ 
+-	pwm_enable(pb->pwm);
+ 	pb->enabled = true;
+ }
+ 
+@@ -66,12 +67,12 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
+ 	if (!pb->enabled)
+ 		return;
+ 
+-	pwm_config(pb->pwm, 0, pb->period);
+-	pwm_disable(pb->pwm);
+-
+ 	if (pb->enable_gpio)
+ 		gpiod_set_value(pb->enable_gpio, 0);
+ 
++	pwm_config(pb->pwm, 0, pb->period);
++	pwm_disable(pb->pwm);
 +
-+		nand: nand at 66460000 {
-+			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
-+			reg = <0x66460000 0x600>,
-+			      <0x67015408 0x600>,
-+			      <0x66460f00 0x20>;
-+			reg-names = "nand", "iproc-idm", "iproc-ext";
-+			interrupts = <GIC_SPI 420 IRQ_TYPE_LEVEL_HIGH>;
+ 	regulator_disable(pb->power_supply);
+ 	pb->enabled = false;
+ }
+@@ -242,7 +243,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	pb->enabled = false;
+ 
+ 	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
+-						  GPIOD_OUT_HIGH);
++						  GPIOD_ASIS);
+ 	if (IS_ERR(pb->enable_gpio)) {
+ 		ret = PTR_ERR(pb->enable_gpio);
+ 		goto err_alloc;
+@@ -264,6 +265,9 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 		pb->enable_gpio = gpio_to_desc(data->enable_gpio);
+ 	}
+ 
++	if (pb->enable_gpio)
++		gpiod_direction_output(pb->enable_gpio, 0);
 +
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			brcm,nand-has-wp;
-+		};
- 	};
- };
+ 	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
+ 	if (IS_ERR(pb->power_supply)) {
+ 		ret = PTR_ERR(pb->power_supply);
 -- 
-1.9.1
+1.7.9.5
