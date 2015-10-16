@@ -1,52 +1,31 @@
 From: yh.huang@mediatek.com (YH Huang)
-Date: Fri, 16 Oct 2015 16:49:50 +0800
+Date: Fri, 16 Oct 2015 16:50:37 +0800
 Subject: [RESEND PATCH] pwm-backlight: fix the panel power sequence
-In-Reply-To: <201510161036.Q5q8ayZx%fengguang.wu@intel.com>
-References: <201510161036.Q5q8ayZx%fengguang.wu@intel.com>
-Message-ID: <1444985390.18373.2.camel@mtksdaap41>
+In-Reply-To: <20151016083616.GA7858@pengutronix.de>
+References: <1444959454-1516-1-git-send-email-yh.huang@mediatek.com>
+ <20151016083616.GA7858@pengutronix.de>
+Message-ID: <1444985437.18373.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-10-16 at 10:42 +0800, kbuild test robot wrote:
-> Hi YH,
+On Fri, 2015-10-16 at 10:36 +0200, Sascha Hauer wrote:
+> On Fri, Oct 16, 2015 at 09:37:34AM +0800, YH Huang wrote:
+> > In order to match the panel power sequence, disable the enable_gpio
+> > in the probe function. Also, reorder the code in the power_on and
+> > power_off function to match the timing.
+> > @@ -241,8 +242,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+> >  	pb->dev = &pdev->dev;
+> >  	pb->enabled = false;
+> >  
+> > -	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
+> > -						  GPIOD_OUT_HIGH);
+> > +	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable");
 > 
-> [auto build test ERROR on pwm/for-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+> Please actually test your patches. This change here won't compile.
 > 
-> url:    https://github.com/0day-ci/linux/commits/YH-Huang/pwm-backlight-fix-the-panel-power-sequence/20151016-093957
-> config: i386-allmodconfig (attached as .config)
-> reproduce:
->         # save the attached .config to linux build tree
->         make ARCH=i386 
+> Sascha
 > 
-> All errors (new ones prefixed by >>):
-> 
->    drivers/video/backlight/pwm_bl.c: In function 'pwm_backlight_probe':
-> >> drivers/video/backlight/pwm_bl.c:245:20: error: too few arguments to function 'devm_gpiod_get_optional'
->      pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable");
->                        ^
->    In file included from drivers/video/backlight/pwm_bl.c:13:0:
->    include/linux/gpio/consumer.h:80:32: note: declared here
->     struct gpio_desc *__must_check devm_gpiod_get_optional(struct device *dev,
->                                    ^
-> 
-> vim +/devm_gpiod_get_optional +245 drivers/video/backlight/pwm_bl.c
-> 
->    239		pb->notify_after = data->notify_after;
->    240		pb->check_fb = data->check_fb;
->    241		pb->exit = data->exit;
->    242		pb->dev = &pdev->dev;
->    243		pb->enabled = false;
->    244	
->  > 245		pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable");
->    246		if (IS_ERR(pb->enable_gpio)) {
->    247			ret = PTR_ERR(pb->enable_gpio);
->    248			goto err_alloc;
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 
-Sorry, I made a mistake.
 I will send patch v2 to fix it.
 
 YH Huang
