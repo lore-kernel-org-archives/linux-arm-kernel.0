@@ -1,64 +1,33 @@
-From: Minghuan.Lian@freescale.com (Minghuan Lian)
-Date: Fri, 16 Oct 2015 15:19:18 +0800
-Subject: [PATCH v4 4/6] PCI: layerscape: update ls_add_pcie_port()
-In-Reply-To: <1444979960-24100-1-git-send-email-Minghuan.Lian@freescale.com>
-References: <1444979960-24100-1-git-send-email-Minghuan.Lian@freescale.com>
-Message-ID: <1444979960-24100-4-git-send-email-Minghuan.Lian@freescale.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 16 Oct 2015 10:18:09 +0300
+Subject: [PATCH v2 11/14] dmaengine: Kconfig: edma: Select TI_DMA_CROSSBAR in
+ case of ARCH_OMAP
+In-Reply-To: <1444979892-31626-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1444979892-31626-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1444979892-31626-12-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To keep consistent with the other DesignWare-based host drivers,
-The patch updates ls_add_pcie_port().
+Since the crossbar is needed for eDMA when it is used on OMAP like
+platforms (am335x/am437x and later DRA7xx), select the crossbar to be built
+if ARCH_OMAP is set.
 
-Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Change log
-v4: split from [PATCH v3] PCI: layerscape: Add PCIe support for LS1043a and LS2080a
+ drivers/dma/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
- drivers/pci/host/pci-layerscape.c | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
-index 89b7eb8..891e504 100644
---- a/drivers/pci/host/pci-layerscape.c
-+++ b/drivers/pci/host/pci-layerscape.c
-@@ -125,15 +125,14 @@ static const struct of_device_id ls_pcie_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
- 
--static int ls_add_pcie_port(struct ls_pcie *pcie)
-+static int __init
-+ls_add_pcie_port(struct pcie_port *pp, struct platform_device *pdev)
- {
--	struct pcie_port *pp;
- 	int ret;
-+	struct ls_pcie *pcie = to_ls_pcie(pp);
- 
--	pp = &pcie->pp;
--	pp->dev = pcie->dev;
-+	pp->dev = &pdev->dev;
- 	pp->dbi_base = pcie->dbi;
--	pp->root_bus_nr = -1;
- 	pp->ops = pcie->drvdata->ops;
- 
- 	ret = dw_pcie_host_init(pp);
-@@ -160,8 +159,6 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
- 	if (!pcie)
- 		return -ENOMEM;
- 
--	pcie->dev = &pdev->dev;
--
- 	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
- 	pcie->dbi = devm_ioremap_resource(&pdev->dev, dbi_base);
- 	if (IS_ERR(pcie->dbi)) {
-@@ -174,7 +171,7 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
- 	if (!ls_pcie_is_bridge(pcie))
- 		return -ENODEV;
- 
--	ret = ls_add_pcie_port(pcie);
-+	ret = ls_add_pcie_port(&pcie->pp, pdev);
- 	if (ret < 0)
- 		return ret;
- 
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index af81a7a1b597..e6cd1a32025a 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -486,6 +486,7 @@ config TI_EDMA
+ 	depends on ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE
+ 	select DMA_ENGINE
+ 	select DMA_VIRTUAL_CHANNELS
++	select TI_DMA_CROSSBAR if ARCH_OMAP
+ 	default n
+ 	help
+ 	  Enable support for the TI EDMA controller. This DMA
 -- 
-1.9.1
+2.6.1
