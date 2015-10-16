@@ -1,30 +1,44 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 16 Oct 2015 17:33:31 +0100
-Subject: [PATCH v2] xen,arm: enable cpu_hotplug
-Message-ID: <alpine.DEB.2.02.1510161731510.27957@kaball.uk.xensource.com>
+Date: Fri, 16 Oct 2015 17:35:00 +0100
+Subject: [PATCH v2 2/3] xen,
+ cpu_hotplug: call device_offline instead of cpu_down
+In-Reply-To: <alpine.DEB.2.02.1510161731510.27957@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1510161731510.27957@kaball.uk.xensource.com>
+Message-ID: <1445013301-12624-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+When offlining a cpu, instead of cpu_down, call device_offline, which
+also takes care of updating the cpu.dev.offline field. This keeps the
+sysfs file /sys/devices/system/cpu/cpuN/online, up to date.  Also move
+the call to disable_hotplug_cpu, because it makes more sense to have it
+there.
 
-this small patch series enable cpu_hotplug in ARM and ARM64 guests,
-using the PV path to plug and unplug the cpus and psci to enable/disable
-them.
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ drivers/xen/cpu_hotplug.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-
-Stefano Stabellini (3):
-      xen/arm: Enable cpu_hotplug.c
-      xen, cpu_hotplug: call device_offline instead of cpu_down
-      xen/arm: don't try to re-register vcpu_info on cpu_hotplug.
-
- arch/arm/include/asm/xen/hypervisor.h |   10 ++++++++++
- arch/arm/xen/enlighten.c              |   10 ++++++++++
- arch/x86/include/asm/xen/hypervisor.h |    5 +++++
- arch/x86/xen/enlighten.c              |   15 +++++++++++++++
- drivers/xen/Makefile                  |    2 --
- drivers/xen/cpu_hotplug.c             |   11 ++++++++---
- 6 files changed, 48 insertions(+), 5 deletions(-)
-
-Cheers,
-
-Stefano
+diff --git a/drivers/xen/cpu_hotplug.c b/drivers/xen/cpu_hotplug.c
+index 43de1f5..78804b5 100644
+--- a/drivers/xen/cpu_hotplug.c
++++ b/drivers/xen/cpu_hotplug.c
+@@ -18,6 +18,8 @@ static void enable_hotplug_cpu(int cpu)
+ 
+ static void disable_hotplug_cpu(int cpu)
+ {
++	if (cpu_online(cpu))
++		device_offline(get_cpu_device(cpu));
+ 	if (cpu_present(cpu))
+ 		xen_arch_unregister_cpu(cpu);
+ 
+@@ -55,7 +57,6 @@ static void vcpu_hotplug(unsigned int cpu)
+ 		enable_hotplug_cpu(cpu);
+ 		break;
+ 	case 0:
+-		(void)cpu_down(cpu);
+ 		disable_hotplug_cpu(cpu);
+ 		break;
+ 	default:
+-- 
+1.7.9.5
