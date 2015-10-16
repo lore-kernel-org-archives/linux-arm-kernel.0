@@ -1,176 +1,42 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 16 Oct 2015 17:01:36 +0100
-Subject: [PATCH v2] ARM: dts: fix gpio-keys wakeup-source property
-Message-ID: <1445011296-29042-1-git-send-email-sudeep.holla@arm.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 16 Oct 2015 17:01:51 +0100
+Subject: [PATCH] hwrng: exynos - Fix unbalanced PM runtime get/puts
+Message-ID: <1445011311-32142-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The keyboard driver for GPIO buttons(gpio-keys) checks for one of the
-two boolean properties to enable gpio buttons as wakeup source:
-1. "wakeup-source" or
-2. the legacy "gpio-key,wakeup"
+Currently this driver calls pm_runtime_get_sync() rampantly
+but never puts anything back. This makes it impossible for the
+device to autosuspend properly; it will remain fully active
+after the first use.
 
-However juno, ste-snowball and emev2-kzm9d dts file have a undetected
-"wakeup" property to indictate the wakeup source.
+Fix in the obvious way.
 
-This patch fixes it by making use of "wakeup-source" property.
-
-Cc: Magnus Damm <magnus.damm@gmail.com>
-Acked-by: Simon Horman <horms@verge.net.au>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/boot/dts/emev2-kzm9d.dts             |  8 ++++----
- arch/arm/boot/dts/ste-snowball.dts            | 10 +++++-----
- arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 12 ++++++------
- 3 files changed, 15 insertions(+), 15 deletions(-)
 
-Hi ARM-SoC group,
+Notes:
+    Compile tested only (CONFIG_PM=y, CONFIG_HW_RANDOM_EXYNOS=m); I spotted
+    this whilst reviewing the code and don't have an exynos platform to
+    test on.
 
-Please consider this as a fix for v4.3 if possible.
+ drivers/char/hw_random/exynos-rng.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-v2->v1[1] :
- - included all the reviewed/ack tags, also posting this fix independently
+diff --git a/drivers/char/hw_random/exynos-rng.c b/drivers/char/hw_random/exynos-rng.c
+index dc4701fd814f..73318e2a34dd 100644
+--- a/drivers/char/hw_random/exynos-rng.c
++++ b/drivers/char/hw_random/exynos-rng.c
+@@ -95,7 +95,7 @@ static int exynos_read(struct hwrng *rng, void *buf,
+ 	*data = exynos_rng_readl(exynos_rng, EXYNOS_PRNG_OUT1_OFFSET);
 
-Regards,
-Sudeep
+ 	pm_runtime_mark_last_busy(exynos_rng->dev);
+-	pm_runtime_autosuspend(exynos_rng->dev);
++	pm_runtime_put_sync_autosuspend(exynos_rng->dev);
 
-[1] https://lkml.org/lkml/2015/10/13/413
-
-diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
-index 955c24ee4a8c..8c24975e8f9d 100644
---- a/arch/arm/boot/dts/emev2-kzm9d.dts
-+++ b/arch/arm/boot/dts/emev2-kzm9d.dts
-@@ -35,28 +35,28 @@
- 
- 		button at 1 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			label = "DSW2-1";
- 			linux,code = <KEY_1>;
- 			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
- 		};
- 		button at 2 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			label = "DSW2-2";
- 			linux,code = <KEY_2>;
- 			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
- 		};
- 		button at 3 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			label = "DSW2-3";
- 			linux,code = <KEY_3>;
- 			gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
- 		};
- 		button at 4 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			label = "DSW2-4";
- 			linux,code = <KEY_4>;
- 			gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
-diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-index 32a5ccb14e7e..e80e42163883 100644
---- a/arch/arm/boot/dts/ste-snowball.dts
-+++ b/arch/arm/boot/dts/ste-snowball.dts
-@@ -47,35 +47,35 @@
- 
- 		button at 1 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			linux,code = <2>;
- 			label = "userpb";
- 			gpios = <&gpio1 0 0x4>;
- 		};
- 		button at 2 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			linux,code = <3>;
- 			label = "extkb1";
- 			gpios = <&gpio4 23 0x4>;
- 		};
- 		button at 3 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			linux,code = <4>;
- 			label = "extkb2";
- 			gpios = <&gpio4 24 0x4>;
- 		};
- 		button at 4 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			linux,code = <5>;
- 			label = "extkb3";
- 			gpios = <&gpio5 1 0x4>;
- 		};
- 		button at 5 {
- 			debounce_interval = <50>;
--			wakeup = <1>;
-+			wakeup-source;
- 			linux,code = <6>;
- 			label = "extkb4";
- 			gpios = <&gpio5 2 0x4>;
-diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-index 902f14a8e85b..42153860b41f 100644
---- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-@@ -61,42 +61,42 @@
- 
- 				button at 1 {
- 					debounce_interval = <50>;
--					wakeup = <1>;
-+					wakeup-source;
- 					linux,code = <116>;
- 					label = "POWER";
- 					gpios = <&iofpga_gpio0 0 0x4>;
- 				};
- 				button at 2 {
- 					debounce_interval = <50>;
--					wakeup = <1>;
-+					wakeup-source;
- 					linux,code = <102>;
- 					label = "HOME";
- 					gpios = <&iofpga_gpio0 1 0x4>;
- 				};
- 				button at 3 {
- 					debounce_interval = <50>;
--					wakeup = <1>;
-+					wakeup-source;
- 					linux,code = <152>;
- 					label = "RLOCK";
- 					gpios = <&iofpga_gpio0 2 0x4>;
- 				};
- 				button at 4 {
- 					debounce_interval = <50>;
--					wakeup = <1>;
-+					wakeup-source;
- 					linux,code = <115>;
- 					label = "VOL+";
- 					gpios = <&iofpga_gpio0 3 0x4>;
- 				};
- 				button at 5 {
- 					debounce_interval = <50>;
--					wakeup = <1>;
-+					wakeup-source;
- 					linux,code = <114>;
- 					label = "VOL-";
- 					gpios = <&iofpga_gpio0 4 0x4>;
- 				};
- 				button at 6 {
- 					debounce_interval = <50>;
--					wakeup = <1>;
-+					wakeup-source;
- 					linux,code = <99>;
- 					label = "NMI";
- 					gpios = <&iofpga_gpio0 5 0x4>;
--- 
-1.9.1
+ 	return 4;
+ }
+--
+2.4.3
