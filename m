@@ -1,67 +1,43 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 17 Oct 2015 08:46:28 +0900
-Subject: [PATCH v2 0/6] ARM: dts: Use correct CD properties for SDIO and
- eMMC in Snow and Peach
-In-Reply-To: <5621002E.4080906@osg.samsung.com>
-References: <1444927873-15140-1-git-send-email-javier@osg.samsung.com>
- <5620E17B.9080906@samsung.com> <5621002E.4080906@osg.samsung.com>
-Message-ID: <56218C54.3050206@kernel.org>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Sat, 17 Oct 2015 08:49:48 +0800
+Subject: [PATCH 01/10] clk: rockchip: Add sclk_mipidsi_24m for mipi dsi
+In-Reply-To: <20151016213940.GA10182@codeaurora.org>
+References: <1444470930-17150-1-git-send-email-zyw@rock-chips.com>
+ <1444470930-17150-2-git-send-email-zyw@rock-chips.com>
+ <20151016213940.GA10182@codeaurora.org>
+Message-ID: <56219B2C.8090902@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/15 22:48, Javier Martinez Canillas wrote:
-> Hello Alim,
-> 
-> On 10/16/2015 01:37 PM, Alim Akhtar wrote:
->> Hi Javier,
->>
->> On 10/15/2015 10:21 PM, Javier Martinez Canillas wrote:
->>> Hello,
->>>
->>> The Exynos Chromebooks DTS don't use the correct card detection properties
->>> since these were carried from the vendor tree that had a reason to do so.
->>>
->>> There are two things that I noticed:
->>>
->>> 1) The Marvell WiFi SDIO is marked as broken-cd instead of non-removable:
->>>
->>> This causes the device to be removed when the system enters into a suspend
->>> state which leads to the following warning when the system is resumed:
->>>
->>> [  181.944636] mmc2: error -2 during resume (card was removed?)
->>>
->>> The rationale for using broken-cd is explained in downstream commit [0] and
->>> was that using the non-removable property caused issues with the mwifiex
->>> driver since the reset logic called the mmc_{remove,add}_host() functions.
->>>
->>> But the reset logic in the mwifiex mainline driver has changed and this is
->>> no longer the case so it's safe to use the non-removable property AFAICT.
->>>
->> Good to know it is fixed now. This is fixed in firmware or in the driver?
->>
-> 
-> The fix is only in the driver. In fact, I'm using the same firmware from
-> the ChromeOS rootfs for both the v3.8 vendor tree and mainline.
-> 
-> So IIUC, the problem with the vendor tree was that the mwifiex SDIO driver
-> mwifiex_sdio_reset_work() function did a card reset by calling the functions
-> mmc_remove_host() and then mmc_add_host().
-> 
-> But this didn't play nice with MMC_CAP_NONREMOVABLE since mmc_rescan() just
-> returns if the flag is set so the card wouldn't be tried to be detected again.
-> 
-> After commit ("b4336a282db8 mwifiex: sdio: reset adapter using mmc_hw_reset"),
-> the card is reset by doing a power cycle so that's why "non-removable" can be
-> used now instead of "broken-cd".
-> 
->>> 2) The eMMC node has both broken-cd and non-removable but the MMC DT binding
->>> doc (Documentation/devicetree/bindings/mmc/mmc.txt) mentions that only one
->>> of these card detection properties should be used.
->>>
->> This change looks ok, will take a closer look once I am back to my work station.
->>
-Actually, looks good to me +1.
-Let me take this series once get the feedback from Alim.
 
-Thanks,
-Kukjin
+
+On 10/17/2015 05:39 AM, Stephen Boyd wrote:
+> On 10/10, Chris Zhong wrote:
+>> sclk_mipidsi_24m is the gating of mipi dsi phy.
+>>
+>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>> ---
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+>
+>>   drivers/clk/rockchip/clk-rk3288.c      | 2 +-
+>>   include/dt-bindings/clock/rk3288-cru.h | 1 +
+>>   2 files changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+>> index 9040878..c7d7ebf 100644
+>> --- a/drivers/clk/rockchip/clk-rk3288.c
+>> +++ b/drivers/clk/rockchip/clk-rk3288.c
+>> @@ -709,7 +709,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+>>   	GATE(SCLK_LCDC_PWM1, "sclk_lcdc_pwm1", "xin24m", 0, RK3288_CLKGATE_CON(13), 11, GFLAGS),
+>>   	GATE(SCLK_PVTM_CORE, "sclk_pvtm_core", "xin24m", 0, RK3288_CLKGATE_CON(5), 9, GFLAGS),
+>>   	GATE(SCLK_PVTM_GPU, "sclk_pvtm_gpu", "xin24m", 0, RK3288_CLKGATE_CON(5), 10, GFLAGS),
+>> -	GATE(0, "sclk_mipidsi_24m", "xin24m", 0, RK3288_CLKGATE_CON(5), 15, GFLAGS),
+>> +	GATE(SCLK_MIPI_24M, "sclk_mipidsi_24m", "xin24m", 0, RK3288_CLKGATE_CON(5), 15, GFLAGS),
+>>   
+> It would have been better to make #defines for all these clocks
+> even if they weren't going to be used here. Then we could have
+> applied this patch directly to clk tree without having a clk tree
+> to arm-soc dependency. </grumble>
+>
+Thanks for your great suggestion, I'll defines all clocks at next 
+version patch serial
