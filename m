@@ -1,50 +1,60 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Sun, 18 Oct 2015 00:35:54 +0300
-Subject: [PATCH v2 5/8] arm: dts: ea3250/phy3250: specify phys memory offset
- for lpc32xx boards
+Date: Sun, 18 Oct 2015 00:35:55 +0300
+Subject: [PATCH v2 6/8] arm: dts: lpc32xx: add external memory controller
+ device node
 In-Reply-To: <1445117757-8073-1-git-send-email-vz@mleia.com>
 References: <1445117757-8073-1-git-send-email-vz@mleia.com>
-Message-ID: <1445117757-8073-6-git-send-email-vz@mleia.com>
+Message-ID: <1445117757-8073-7-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case if SDRAM memory region is not populated by a bootloader,
-provide this value in device trees for EA3250 and PHY3250 boards.
+The change adds a description of ARM PrimeCell PL175 memory
+controller, which is found on NXP LPC32xx SoCs.
+
+The controller supports up to 4 static memory devices mapped to
+0xE000 0000 - 0xE3FF FFFF physical memory area.
 
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
 Changes from v1 to v2:
 - none, new change
 
- arch/arm/boot/dts/ea3250.dts  | 2 +-
- arch/arm/boot/dts/phy3250.dts | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/lpc32xx.dtsi | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/ea3250.dts b/arch/arm/boot/dts/ea3250.dts
-index 121d032..392430b 100644
---- a/arch/arm/boot/dts/ea3250.dts
-+++ b/arch/arm/boot/dts/ea3250.dts
-@@ -22,7 +22,7 @@
+diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
+index be82992..a595a4b 100644
+--- a/arch/arm/boot/dts/lpc32xx.dtsi
++++ b/arch/arm/boot/dts/lpc32xx.dtsi
+@@ -32,7 +32,8 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "simple-bus";
+-		ranges = <0x20000000 0x20000000 0x30000000>;
++		ranges = <0x20000000 0x20000000 0x30000000>,
++			 <0xe0000000 0xe0000000 0x04000000>;
  
- 	memory {
- 		device_type = "memory";
--		reg = <0 0x4000000>;
-+		reg = <0x80000000 0x4000000>;
- 	};
+ 		/*
+ 		 * Enable either SLC or MLC
+@@ -86,6 +87,19 @@
+ 			interrupts = <0x1d 0>;
+ 		};
  
- 	ahb {
-diff --git a/arch/arm/boot/dts/phy3250.dts b/arch/arm/boot/dts/phy3250.dts
-index 2a2d2cf..79a20f7 100644
---- a/arch/arm/boot/dts/phy3250.dts
-+++ b/arch/arm/boot/dts/phy3250.dts
-@@ -22,7 +22,7 @@
- 
- 	memory {
- 		device_type = "memory";
--		reg = <0 0x4000000>;
-+		reg = <0x80000000 0x4000000>;
- 	};
- 
- 	ahb {
++		emc: memory-controller at 31080000 {
++			compatible = "arm,pl175", "arm,primecell";
++			reg = <0x31080000 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			ranges = <0 0xe0000000 0x01000000>,
++				 <1 0xe1000000 0x01000000>,
++				 <2 0xe2000000 0x01000000>,
++				 <3 0xe3000000 0x01000000>;
++			status = "disabled";
++		};
++
+ 		apb {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
 -- 
 2.1.4
