@@ -1,33 +1,53 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Sat, 17 Oct 2015 19:23:58 +0200
-Subject: [PATCH 9/9] ARM: config: Enable GPIO Key driver in stm32_defconfig
-In-Reply-To: <1445102638-11575-1-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1445102638-11575-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1445102638-11575-10-git-send-email-mcoquelin.stm32@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 18 Oct 2015 01:27:08 +0800
+Subject: [PATCH v6 0/2] ARM: sunxi: Add Reduced Serial Bus (RSB) controller
+ support
+Message-ID: <1445102830-21774-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
----
- arch/arm/configs/stm32_defconfig | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+Hi everyone,
 
-diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-index 92ade2e..31894ef 100644
---- a/arch/arm/configs/stm32_defconfig
-+++ b/arch/arm/configs/stm32_defconfig
-@@ -38,7 +38,11 @@ CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_FW_LOADER is not set
- # CONFIG_BLK_DEV is not set
- CONFIG_EEPROM_93CX6=y
--# CONFIG_INPUT is not set
-+# CONFIG_INPUT_LEDS is not set
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_KEYBOARD_ATKBD is not set
-+CONFIG_KEYBOARD_GPIO=y
-+# CONFIG_INPUT_MOUSE is not set
- # CONFIG_SERIO is not set
- # CONFIG_VT is not set
- # CONFIG_UNIX98_PTYS is not set
+This is v6 of the Allwinner Reduced Serial Bus driver. This version puts
+the driver under drivers/bus instead of drivers/soc/sunxi. There are no
+changes to the binding or the driver itself.
+
+The series is based on v4.3-rc1.
+
+Changes since v5:
+
+ .../bindings/{soc/sunxi/rsb.txt => bus/sunxi-rsb.txt}         |  0
+ drivers/bus/Kconfig                                           | 11 +++++++++++
+ drivers/bus/Makefile                                          |  1 +
+ drivers/{soc/sunxi/sunxi_rsb.c => bus/sunxi-rsb.c}            |  2 +-
+ drivers/soc/sunxi/Kconfig                                     | 10 ----------
+ drivers/soc/sunxi/Makefile                                    |  1 -
+ include/linux/{soc/sunxi/sunxi_rsb.h => sunxi-rsb.h}          |  0
+ 7 files changed, 13 insertions(+), 12 deletions(-)
+
+The Kconfig entry has been updated with a proper entry description, making
+it selectable. Both the entry and help text have been edited to make it
+clear this is an Allwinner specific driver. A dependency on ARCH_SUNXI is
+also added.
+
+
+Regards
+ChenYu
+
+Chen-Yu Tsai (2):
+  bus: sunxi-rsb: Add Allwinner Reduced Serial Bus (RSB) controller
+    bindings
+  bus: sunxi-rsb: Add driver for Allwinner Reduced Serial Bus
+
+ .../devicetree/bindings/bus/sunxi-rsb.txt          |  47 ++
+ drivers/bus/Kconfig                                |  11 +
+ drivers/bus/Makefile                               |   1 +
+ drivers/bus/sunxi-rsb.c                            | 783 +++++++++++++++++++++
+ include/linux/sunxi-rsb.h                          | 105 +++
+ 5 files changed, 947 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/sunxi-rsb.txt
+ create mode 100644 drivers/bus/sunxi-rsb.c
+ create mode 100644 include/linux/sunxi-rsb.h
+
 -- 
-1.9.1
+2.6.1
