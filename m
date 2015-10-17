@@ -1,27 +1,37 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Sat, 17 Oct 2015 10:11:25 -0700
-Subject: [PATCH] pinctrl: ssbi: fix function name typo
-In-Reply-To: <6327573.Mj84IgUkQi@wuerfel>
-References: <6327573.Mj84IgUkQi@wuerfel>
-Message-ID: <20151017171125.GQ24668@usrtlx11787.corpusers.net>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Sat, 17 Oct 2015 19:23:16 +0200
+Subject: [PATCH v2 1/9] ARM: Kconfig: Introduce MACH_STM32F429 flag
+In-Reply-To: <1445102604-11502-1-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1445102604-11502-1-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1445102604-11502-2-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 16 Oct 13:41 PDT 2015, Arnd Bergmann wrote:
+This patch introduces the MACH_STM32F429 to make possible to only select
+STM32F429 pinctrl driver.
 
-> The two newly added qcom ssbi pinctrl drivers have the same bug
-> from a function name that apparently got changed in one place
-> but not another, resulting in a build error when CONFIG_DEBUG_FS
-> is disabled:
-> 
-> drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c:652:14: error: 'pm8xxx_mpp_dbg_show' undeclared here (not in a function)
-> 
-> This fixes the two identifiers.
+By default, all the MACH_STM32Fxxx flags will be set with STM32 defconfig.
 
-Sorry about this Arnd.
+Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+---
+ arch/arm/Kconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Jonas Gorski found this a few days ago and Linus picked it up today, so
-it's in the pipe already.
-
-Regards,
-Bjorn
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 72ad724..bf94e54 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -988,6 +988,11 @@ config ARCH_STM32
+ 	help
+ 	  Support for STMicroelectronics STM32 processors.
+ 
++config MACH_STM32F429
++	bool "STMicrolectronics STM32F429"
++	depends on ARCH_STM32
++	default y
++
+ # Definitions to make life easier
+ config ARCH_ACORN
+ 	bool
+-- 
+1.9.1
