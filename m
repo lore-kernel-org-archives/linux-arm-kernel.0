@@ -1,47 +1,53 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 17 Oct 2015 18:47:50 +0200
-Subject: [GIT PULL 2/2] Rockchip dts32 changes for 4.4 part 2
-In-Reply-To: <4398388.V5gVWEu8o6@diego>
-References: <4398388.V5gVWEu8o6@diego>
-Message-ID: <1646281.IJhPY0x0MY@diego>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 17 Oct 2015 18:51:14 +0200
+Subject: [GIT PULL] Allwinner core changes for 4.4
+Message-ID: <20151017165114.GA15258@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Kevin, Olof,
 
-since the first pull, Sjoerd's spdif driver got accepted into ASoC, so
-this adds the spdif devicetree-nodes to the two supported Rockchip arches.
+Please pull the following tag that adds the needed code to support the
+R8 properly.
 
-If it's not to late, please pull.
+Thanks!
+Maxime
 
-Thanks
-Heiko
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
-
-The following changes since commit b63af764ca5134341aa3a2836b356a65902ea9d4:
-
-  ARM: dts: rockchip: add the support power-domain node on RK3288 SoCs (2015-10-08 22:41:11 +0200)
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.4-rockchip-dts32-2
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-core-for-4.4
 
-for you to fetch changes up to fea37552600872368a23019aef4bf8c09e0f0380:
+for you to fetch changes up to bef6229f36c1c2ddae186f4e328c2359c1dad18d:
 
-  ARM: dts: rockchip: Add SPDIF optical out on Radxa Rock2 Square (2015-10-13 10:59:18 +0200)
-
-----------------------------------------------------------------
-SPDIF device nodes for the newly added driver.
+  ARM: sunxi: Add R8 support (2015-10-17 18:47:28 +0200)
 
 ----------------------------------------------------------------
-Sjoerd Simons (4):
-      ARM: dts: rockchip: Add SPDIF transceiver for RK3188
-      ARM: dts: rockchip: Add SPDIF optical out on Radxa Rock
-      ARM: dts: rockchip: Add SPDIF transceiver for RK3288
-      ARM: dts: rockchip: Add SPDIF optical out on Radxa Rock2 Square
+Allwinner core changes for 4.4
 
- arch/arm/boot/dts/rk3188-radxarock.dts    | 19 +++++++++++++++++++
- arch/arm/boot/dts/rk3188.dtsi             | 20 ++++++++++++++++++++
- arch/arm/boot/dts/rk3288-rock2-square.dts | 18 ++++++++++++++++++
- arch/arm/boot/dts/rk3288.dtsi             | 21 +++++++++++++++++++++
- 4 files changed, 78 insertions(+)
+Add support for the Allwinner R8 SoC used in the CHIP.
+
+----------------------------------------------------------------
+Maxime Ripard (1):
+      ARM: sunxi: Add R8 support
+
+ Documentation/arm/sunxi/README                  | 2 +-
+ Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+ arch/arm/mach-sunxi/sunxi.c                     | 3 ++-
+ drivers/clk/sunxi/clk-sunxi.c                   | 1 +
+ 4 files changed, 5 insertions(+), 2 deletions(-)
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151017/7a7200c9/attachment.sig>
