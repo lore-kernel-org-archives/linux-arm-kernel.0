@@ -1,8 +1,8 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Sat, 17 Oct 2015 15:04:30 -0700
+Date: Sat, 17 Oct 2015 15:04:42 -0700
 Subject: Patch "irqchip/atmel-aic5: Use per chip mask caches in mask/unmask()"
- has been added to the 4.1-stable tree
-Message-ID: <1445119470144152@kroah.com>
+ has been added to the 4.2-stable tree
+Message-ID: <144511948227175@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,12 +11,12 @@ This is a note to let you know that I've just added the patch titled
 
     irqchip/atmel-aic5: Use per chip mask caches in mask/unmask()
 
-to the 4.1-stable tree which can be found at:
+to the 4.2-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
      irqchip-atmel-aic5-use-per-chip-mask-caches-in-mask-unmask.patch
-and it can be found in the queue-4.1 subdirectory.
+and it can be found in the queue-4.2 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
@@ -105,4 +105,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 Patches currently in stable-queue which might be from ludovic.desroches at atmel.com are
 
-queue-4.1/irqchip-atmel-aic5-use-per-chip-mask-caches-in-mask-unmask.patch
+queue-4.2/dmaengine-at_xdmac-clean-used-descriptor.patch
+queue-4.2/dmaengine-at_xdmac-change-block-increment-addressing-mode.patch
+queue-4.2/irqchip-atmel-aic5-use-per-chip-mask-caches-in-mask-unmask.patch
+queue-4.2/dmaengine-at_xdmac-fix-bug-in-prep_dma_cyclic.patch
