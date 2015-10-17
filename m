@@ -1,66 +1,36 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sat, 17 Oct 2015 17:53:50 +0900
-Subject: [PATCH v2 1/2] clk: samsung: exynos5250: Add DISP1 clocks
-In-Reply-To: <56218B2D.9040007@kernel.org>
-References: <1444905084-22540-1-git-send-email-tomeu.vizoso@collabora.com>
- <1444905084-22540-2-git-send-email-tomeu.vizoso@collabora.com>
- <56203AD3.2050905@samsung.com> <20151016124935.20687.4394@quantum>
- <20151016172651.GB23912@codeaurora.org>
- <CAAObsKAjZX8XxTAFVKq4BCSZSrKG5xQPTue+z+xnJDD8QwK88Q@mail.gmail.com>
- <56218B2D.9040007@kernel.org>
-Message-ID: <CAJKOXPf5Dnh36rrY6Vet13EHKB3gJuU0VnAfsyYnvWTx92O_GA@mail.gmail.com>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Sat, 17 Oct 2015 11:15:17 +0200
+Subject: [PATCH] bluetooth: bpa10x: fix BT_HCIUART dependency
+In-Reply-To: <4199320.WWtqtXexhZ@wuerfel>
+References: <4199320.WWtqtXexhZ@wuerfel>
+Message-ID: <A0A720F0-8950-4B1D-99A9-6A0059E8BF8B@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-17 8:41 GMT+09:00 Kukjin Kim <kgene@kernel.org>:
-> On 10/17/15 03:56, Tomeu Vizoso wrote:
->> On 16 October 2015 at 19:26, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>> On 10/16, Michael Turquette wrote:
->>>> Quoting Krzysztof Kozlowski (2015-10-15 16:46:27)
->>>>> On 15.10.2015 19:31, Tomeu Vizoso wrote:
->>>>>> When the DISP1 power domain is powered off, there's two clocks that need
->>>>>> to be temporarily reparented to OSC, and back to their original parents
->>>>>> when the domain is powered on again.
->>>>>>
->>>>>> We expose these two clocks in the DT bindings so that the DT node of the
->>>>>> power domain can reference them.
->>>>>>
->>>>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->>>>>> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
->>>>>> ---
->>>>>>
->>>>>> Changes in v2:
->>>>>> - Reuse mout_aclk200_p
->>>>>> - Rename div_aclk300 as div_aclk300_disp
->>>>>>
->>>>>>  drivers/clk/samsung/clk-exynos5250.c   | 14 +++++++++++++-
->>>>>>  include/dt-bindings/clock/exynos5250.h |  4 +++-
->>>>>>  2 files changed, 16 insertions(+), 2 deletions(-)
->>>>>>
->>>>>
->>>>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>>
->>>> Applied to clk-next.
->>>>
->>>
->>> I think Tomeu wanted to take this through arm-soc? Otherwise
->>> we'll need to provide a stable branch for the dt header.
->>
->> Hi, Stephen is right, the second patch depends on this one.
->>
-> So...how can I take 2nd patch of this series in samsung(arm-soc) tree?
-> And this series shouldn't be for fixes for 4.3?...Mike how do you think?
+Hi Arnd,
 
-Stephen acked it so I thought everything will go through samsung-soc.
+> The change to bpa10x to use the h4_recv_buf helper added a dependency
+> on BT_HCIUART. This was incorrectly added to Kconfig by adding a
+> 'select' statement, which now in turn causes build failures
+> when CONFIG_TTY is not set:
+> 
+> warning: (BT_HCIBPA10X) selects BT_HCIUART which has unmet direct dependencies (NET && BT && TTY)
+> vers/built-in.o: In function `hci_uart_tty_receive':
+> fpga-mgr.c:(.text+0x282824): undefined reference to `tty_unthrottle'
+> drivers/built-in.o: In function `hci_uart_tty_ioctl':
+> fpga-mgr.c:(.text+0x282aa0): undefined reference to `n_tty_ioctl_helper'
+> drivers/built-in.o: In function `hci_uart_flush':
+> 
+> This replaces the 'select BT_HCIUART' dependency with 'depends on', which
+> does not have this kind of problem. Alternatively, one could add 'depends
+> on TTY', but avoiding 'select' on user-visible options is generally the
+> preferred choice as that does not introduce the potential for dependency
+> loops or incomplete dependency chains.
 
-Dear Kukjin,
-Indeed this can go as fix for current cycle... but in the same time
-this does not fix any specific regression. Tomeu did not describe when
-issue happened for the first time so I assumed it was like that
-always. It's up to you.
+the intention here was to use select, but that seems to open all sorts of problems. Since I am most likely the only person that still has this device and attaches it to Linux, I am fine in going the easier path with depends on.
 
-Both patches (with Stephen's ack) are in my recent pull request but as
-usual feel free to cherry pick. I'll drop them from next branch then.
+Patch has been applied to bluetooth-next tree.
 
-Best regards,
-Krzysztof
+Regards
+
+Marcel
