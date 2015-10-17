@@ -1,96 +1,68 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 17 Oct 2015 22:30:21 +0200
-Subject: [PATCH 2/3] arm/arm64: KVM: Clear map->active on pend/active clear
+Date: Sat, 17 Oct 2015 22:30:22 +0200
+Subject: [PATCH 3/3] arm/arm64: KVM: Fix disabled distributor operation
 In-Reply-To: <1445113822-7831-1-git-send-email-christoffer.dall@linaro.org>
 References: <1445113822-7831-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1445113822-7831-3-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1445113822-7831-4-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a guest reboots or offlines/onlines CPUs, it is not uncommon for it
-to clear the pending and active states of an interrupt through the
-emulated VGIC distributor.  However, since we emulate an edge-triggered
-based on a level-triggered device, the guest expects the timer interrupt
-to hit even after clearing the pending state.
+We currently do a single update of the vgic state when the distrbutor
+enable/disable control register is accessed and then bypass updating the
+state for as long as the distributor remains disabled.
 
-We currently do not signal the VGIC when the map->active field is true,
-because it indicates that the guest has already been signalled of the
-interrupt as required.  Normally this field is set to false when the
-guest deactivates the virtual interrupt through the sync path.
+This is incorrect, because updating the state does not consider the
+distributor enable bit, and this you can end up in a situation where an
+interrupt is marked as pending on the CPU interface, but not pending on
+the distributor, which is an impossible state to be in, and triggers a
+warning.  Consider for example the following sequence of events:
 
-We also need to catch the case where the guest deactivates the interrupt
-through the emulated distributor, again allowing guests to boot even if
-the original virtual timer signal hit before the guest's GIC
-initialization sequence is run.
+1. An interrupt is marked as pending on the distributor
+   - the interrupt is also forwarded to the CPU interface
+2. The guest turns off the distributor (it's about to do a reboot)
+   - we stop updating the CPU interface state from now on
+3. The guest disables the pending interrupt
+   - we remove the pending state from the distributor, but don't touch
+     the CPU interface, see point 2.
+
+Since the distributor disable bit really means that no interrupts should
+be forwarded to the CPU interface, we modify the code to keep updating
+the internal VGIC state, but always set the CPU interface pending bits
+to zero when the distributor is disabled.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic.c | 32 +++++++++++++++++++++++++++++++-
- 1 file changed, 31 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index ea21bc2..58b1256 100644
+index 58b1256..66c6616 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -531,6 +531,34 @@ bool vgic_handle_set_pending_reg(struct kvm *kvm,
- 	return false;
- }
+@@ -1012,6 +1012,12 @@ static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
+ 	pend_percpu = vcpu->arch.vgic_cpu.pending_percpu;
+ 	pend_shared = vcpu->arch.vgic_cpu.pending_shared;
  
-+/*
-+ * If a mapped interrupt's state has been modified by the guest such that it
-+ * is no longer active or pending, without it have gone through the sync path,
-+ * then the map->active field must be cleared so the interrupt can be taken
-+ * again.
-+ */
-+static void vgic_handle_clear_mapped_irq(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	struct list_head *root;
-+	struct irq_phys_map_entry *entry;
-+	struct irq_phys_map *map;
-+
-+	rcu_read_lock();
-+
-+	/* Check for PPIs */
-+	root = &vgic_cpu->irq_phys_map_list;
-+	list_for_each_entry_rcu(entry, root, entry) {
-+		map = &entry->map;
-+
-+		if (!vgic_dist_irq_is_pending(vcpu, map->virt_irq) &&
-+		    !vgic_irq_is_active(vcpu, map->virt_irq))
-+			map->active = false;
++	if (!dist->enabled) {
++		bitmap_zero(pend_percpu, VGIC_NR_PRIVATE_IRQS);
++		bitmap_zero(pend_shared, nr_shared);
++		return 0;
 +	}
 +
-+	rcu_read_unlock();
-+}
-+
- bool vgic_handle_clear_pending_reg(struct kvm *kvm,
- 				   struct kvm_exit_mmio *mmio,
- 				   phys_addr_t offset, int vcpu_id)
-@@ -561,6 +589,7 @@ bool vgic_handle_clear_pending_reg(struct kvm *kvm,
- 					  vcpu_id, offset);
- 		vgic_reg_access(mmio, reg, offset, mode);
+ 	pending = vgic_bitmap_get_cpu_map(&dist->irq_pending, vcpu_id);
+ 	enabled = vgic_bitmap_get_cpu_map(&dist->irq_enabled, vcpu_id);
+ 	bitmap_and(pend_percpu, pending, enabled, VGIC_NR_PRIVATE_IRQS);
+@@ -1039,11 +1045,6 @@ void vgic_update_state(struct kvm *kvm)
+ 	struct kvm_vcpu *vcpu;
+ 	int c;
  
-+		vgic_handle_clear_mapped_irq(kvm_get_vcpu(kvm, vcpu_id));
- 		vgic_update_state(kvm);
- 		return true;
- 	}
-@@ -598,6 +627,7 @@ bool vgic_handle_clear_active_reg(struct kvm *kvm,
- 			ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
- 
- 	if (mmio->is_write) {
-+		vgic_handle_clear_mapped_irq(kvm_get_vcpu(kvm, vcpu_id));
- 		vgic_update_state(kvm);
- 		return true;
- 	}
-@@ -1406,7 +1436,7 @@ static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
- 		return 0;
- 
- 	map = vgic_irq_map_search(vcpu, vlr.irq);
--	BUG_ON(!map || !map->active);
-+	BUG_ON(!map);
- 
- 	ret = irq_get_irqchip_state(map->irq,
- 				    IRQCHIP_STATE_ACTIVE,
+-	if (!dist->enabled) {
+-		set_bit(0, dist->irq_pending_on_cpu);
+-		return;
+-	}
+-
+ 	kvm_for_each_vcpu(c, vcpu, kvm) {
+ 		if (compute_pending_for_cpu(vcpu))
+ 			set_bit(c, dist->irq_pending_on_cpu);
 -- 
 2.1.2.330.g565301e.dirty
