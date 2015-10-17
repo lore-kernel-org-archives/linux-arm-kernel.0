@@ -1,61 +1,179 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Sat, 17 Oct 2015 22:38:16 +0900
-Subject: [PATCH v4 2/2] arm64: Expand the stack trace feature to support
- IRQ stack
-In-Reply-To: <20151016160606.GE6613@e104818-lin.cambridge.arm.com>
-References: <1444231692-32722-3-git-send-email-jungseoklee85@gmail.com>
- <5617CE26.10604@arm.com> <07A53E87-C562-48D1-86DF-A373EAAA73F9@gmail.com>
- <561BE111.7@arm.com> <3CAA206D-3A3A-49A9-BDAD-4206D6F9BAA8@gmail.com>
- <561CE454.7080201@arm.com> <04D64B22-8EF5-400E-A7F0-1CD0AB48184D@gmail.com>
- <B6AB90B9-3AA9-413A-B357-137710E89C7C@gmail.com> <561FCD59.1090600@arm.com>
- <6E0DDC4D-9A97-4EAE-868C-B1271F02D3E0@gmail.com>
- <20151016160606.GE6613@e104818-lin.cambridge.arm.com>
-Message-ID: <3AD5938C-4109-4B95-A13B-5D45525B39FB@gmail.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Sat, 17 Oct 2015 10:57:26 -0300
+Subject: [PATCH v3 2/4] mtd: pxa3xx_nand: add helpers to setup the timings
+In-Reply-To: <1444893451-16610-3-git-send-email-antoine.tenart@free-electrons.com>
+References: <1444893451-16610-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1444893451-16610-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20151017135726.GA1578@laptop.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 17, 2015, at 1:06 AM, Catalin Marinas wrote:
+Hi Antoine,
 
-Hi Catalin,
-
-> On Fri, Oct 16, 2015 at 10:01:20PM +0900, Jungseok Lee wrote:
->> On Oct 16, 2015, at 12:59 AM, James Morse wrote:
->>> My concern is there could be push-back from the maintainer of
->>> kernel/fork.c, saying "define CONFIG_ARCH_THREAD_INFO_ALLOCATOR if the
->>> generic code isn't what you need", and push-back from the arm64 maintainers
->>> about copy-pasting that chunk into arch/arm64.... both of which are fair,
->>> hence my initial version created a second kmem_cache.
->> 
->> Same concern. I believe now is the time to get feedbacks from maintainers.
->> It will help us to decide the next step.
+On 15 Oct 09:17 AM, Antoine Tenart wrote:
+> Add helpers to setup the timings in the pxa3xx driver. These helpers
+> allow to either make use of the nand framework nand_sdr_timings or the
+> pxa3xx specific pxa3xx_nand_host, for compatibility reasons.
 > 
-> I'll push back now to avoid further doubts in changing kernel/fork.c ;).
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  drivers/mtd/nand/pxa3xx_nand.c | 135 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 135 insertions(+)
+> 
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index 740983a34626..da52f21570cf 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -393,6 +393,128 @@ static void pxa3xx_nand_set_timing(struct pxa3xx_nand_host *host,
+>  	nand_writel(info, NDTR1CS0, ndtr1);
+>  }
+>  
+> +static void pxa3xx_nand_set_sdr_timing(struct pxa3xx_nand_host *host,
+> +				       const struct nand_sdr_timings *t)
+> +{
+> +	struct pxa3xx_nand_info *info = host->info_data;
+> +	struct nand_chip *chip = &host->chip;
+> +	unsigned long nand_clk = clk_get_rate(info->clk);
+> +	uint32_t ndtr0, ndtr1;
+> +
+> +	u32 tCH_min = DIV_ROUND_UP(t->tCH_min, 1000);
+> +	u32 tCS_min = DIV_ROUND_UP(t->tCS_min, 1000);
+> +	u32 tWH_min = DIV_ROUND_UP(t->tWH_min, 1000);
+> +	u32 tWP_min = DIV_ROUND_UP(t->tWC_min - t->tWH_min, 1000);
+> +	u32 tREH_min = DIV_ROUND_UP(t->tREH_min, 1000);
+> +	u32 tRP_min = DIV_ROUND_UP(t->tRC_min - t->tREH_min, 1000);
+> +	u32 tR = chip->chip_delay * 1000;
+> +	u32 tWHR_min = DIV_ROUND_UP(t->tWHR_min, 1000);
+> +	u32 tAR_min = DIV_ROUND_UP(t->tAR_min, 1000);
+> +
+> +	/* fallback to a default value if tR = 0 */
+> +	if (!tR)
+> +		tR = 20000;
+> +
+> +	ndtr0 = NDTR0_tCH(ns2cycle(tCH_min, nand_clk)) |
+> +		NDTR0_tCS(ns2cycle(tCS_min, nand_clk)) |
+> +		NDTR0_tWH(ns2cycle(tWH_min, nand_clk)) |
+> +		NDTR0_tWP(ns2cycle(tWP_min, nand_clk)) |
+> +		NDTR0_tRH(ns2cycle(tREH_min, nand_clk)) |
+> +		NDTR0_tRP(ns2cycle(tRP_min, nand_clk));
+> +
+> +	ndtr1 = NDTR1_tR(ns2cycle(tR, nand_clk)) |
+> +		NDTR1_tWHR(ns2cycle(tWHR_min, nand_clk)) |
+> +		NDTR1_tAR(ns2cycle(tAR_min, nand_clk));
+> +
+> +	info->ndtr0cs0 = ndtr0;
+> +	info->ndtr1cs0 = ndtr1;
+> +	nand_writel(info, NDTR0CS0, ndtr0);
+> +	nand_writel(info, NDTR1CS0, ndtr1);
+> +}
+> +
+> +static int pxa3xx_nand_init_timings_compat(struct pxa3xx_nand_host *host,
+> +					   unsigned int *flash_width,
+> +					   unsigned int *dfc_width)
+> +{
+> +	struct nand_chip *chip = &host->chip;
+> +	struct pxa3xx_nand_info *info = host->info_data;
+> +	const struct pxa3xx_nand_flash *f = NULL;
+> +	int i, id, ntypes;
+> +
+> +	ntypes = ARRAY_SIZE(builtin_flash_types);
+> +
+> +	chip->cmdfunc(host->mtd, NAND_CMD_READID, 0x00, -1);
+> +
+> +	id = chip->read_byte(host->mtd);
+> +	id |= chip->read_byte(host->mtd) << 0x8;
+> +
+> +	for (i = 0; i < ntypes; i++) {
+> +		f = &builtin_flash_types[i];
+> +
+> +		if (f->chip_id == id)
+> +			break;
+> +	}
+> +
+> +	if (i == ntypes) {
+> +		dev_err(&info->pdev->dev, "Error: timings not found\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	pxa3xx_nand_set_timing(host, f->timing);
+> +
+> +	*flash_width = f->flash_width;
+> +	*dfc_width = f->dfc_width;
+> +
+> +	return 0;
+> +}
+> +
+> +static int pxa3xx_nand_init_timings_onfi(struct pxa3xx_nand_host *host,
+> +					 int mode)
+> +{
+> +	const struct nand_sdr_timings *timings;
+> +
+> +	mode = fls(mode) - 1;
+> +	if (mode < 0)
+> +		mode = 0;
+> +
+> +	timings = onfi_async_timing_mode_to_sdr_timings(mode);
+> +	if (IS_ERR(timings))
+> +		return PTR_ERR(timings);
+> +
+> +	pxa3xx_nand_set_sdr_timing(host, timings);
+> +
+> +	return 0;
+> +}
+> +
+> +static int pxa3xx_nand_init(struct pxa3xx_nand_host *host)
+> +{
+> +	struct nand_chip *chip = &host->chip;
+> +	struct pxa3xx_nand_info *info = host->info_data;
+> +	unsigned int flash_width = 0, dfc_width = 0;
+> +	int mode, err;
+> +
+> +	mode = onfi_get_async_timing_mode(chip);
+> +	if (mode == ONFI_TIMING_MODE_UNKNOWN) {
+> +		err = pxa3xx_nand_init_timings_compat(host, &flash_width,
+> +						      &dfc_width);
+> +		if (err)
+> +			return err;
+> +
+> +		if (flash_width == 16) {
+> +			info->reg_ndcr |= NDCR_DWIDTH_M;
+> +			chip->options |= NAND_BUSWIDTH_16;
+> +		}
+> +
+> +		info->reg_ndcr |= (dfc_width == 16) ? NDCR_DWIDTH_C : 0;
+> +	} else {
+> +		err = pxa3xx_nand_init_timings_onfi(host, mode);
+> +		if (err)
+> +			return err;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  /*
+>   * Set the data and OOB size, depending on the selected
+>   * spare and ECC configuration.
+> @@ -1538,6 +1660,19 @@ KEEP_CONFIG:
+>  	if (nand_scan_ident(mtd, 1, def))
+>  		return -ENODEV;
+>  
+> +	if (!pdata->keep_config) {
+> +		ret = pxa3xx_nand_init(host);
+> +		if (ret) {
+> +			dev_err(&info->pdev->dev, "Failed to init nand: %d\n",
+> +				ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	ret = pxa3xx_nand_config_flash(info);
+> +	if (ret)
+> +		return ret;
+> +
 
-Thanks a lot!
-
-> A reason to define a kmem_cache is performance for repeated allocations.
-> But here you only do it once during boot. So you could simply use
-> kmalloc() when THREAD_SIZE < PAGE_SIZE. BTW, the IRQ stack size doesn't
-> even need to be the same as THREAD_SIZE, though we could initially keep
-> them the same. But it's worth defining an IRQ_STACK_SIZE macro if we
-> ever need to change it.
-
-I will update the series using IRQ_* macro.
-
-> BTW, a static allocation (DEFINE_PER_CPU for the whole irq stack) would
-> save us from another stack address reading on the IRQ entry path. I'm
-> not sure exactly where the 16K image increase comes from but at least it
-> doesn't grow with NR_CPUS, so we can probably live with this.
-
-I've tried the approach, a static allocation using DEFINE_PER_CPU, but
-it dose not work on a top-bit comparison method (for IRQ re-entrance
-check). The top-bit idea is based on the assumption that IRQ stack is
-aligned with THREAD_SIZE. But, tpidr_el1 is PAGE_SIZE aligned. It leads
-to IRQ re-entrance failure in case of 4KB page system.
-
-IMHO, it is hard to avoid 16KB size increase for 64KB page support.
-Secondary cores can rely on slab.h, but a boot core cannot. So, IRQ
-stack for at least a boot cpu should be allocated statically.
-
-Best Regards
-Jungseok Lee
+Does this chunk belong to this patch? It wasn't here in the v2, and I believe
+it's not correct as you end up messing with the NDCR setting even if keep_config
+was passed.
+-- 
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
