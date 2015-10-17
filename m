@@ -1,28 +1,31 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Sat, 17 Oct 2015 19:23:52 +0200
-Subject: [PATCH 3/9] ARM: STM32: Select external interrupts controller
+Date: Sat, 17 Oct 2015 19:23:54 +0200
+Subject: [PATCH 5/9] Documentation: dt-bindings: Add IRQ related properties of
+ STM32 pinctrl
 In-Reply-To: <1445102638-11575-1-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1445102638-11575-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1445102638-11575-4-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1445102638-11575-6-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 ---
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 8a764ba..8ca5b2b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -986,6 +986,7 @@ config ARCH_STM32
- 	select CLKSRC_STM32
- 	select PINCTRL
- 	select RESET_CONTROLLER
-+	select STM32_EXTI
- 	help
- 	  Support for STMicroelectronics STM32 processors.
+diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+index 7b4800c..dd95bec 100644
+--- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+@@ -13,6 +13,9 @@ Required properies:
+  - #size-cells	: The value of this property must be 1
+  - ranges	: defines mapping between pin controller node (parent) to
+    gpio-bank node (children).
++ - interrupt-parent: phandle of the interrupt parent to which the external
++   GPIO interrupts are forwarded to.
++ - st,syscfg: phandle of the syscfg node used for IRQ mux selection.
+  - pins-are-numbered: Specify the subnodes are using numbered pinmux to
+    specify pins.
  
 -- 
 1.9.1
