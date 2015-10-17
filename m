@@ -1,36 +1,65 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Sat, 17 Oct 2015 11:15:17 +0200
-Subject: [PATCH] bluetooth: bpa10x: fix BT_HCIUART dependency
-In-Reply-To: <4199320.WWtqtXexhZ@wuerfel>
-References: <4199320.WWtqtXexhZ@wuerfel>
-Message-ID: <A0A720F0-8950-4B1D-99A9-6A0059E8BF8B@holtmann.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Sat, 17 Oct 2015 11:55:50 +0200
+Subject: [PATCH v2 1/2] clk: samsung: exynos5250: Add DISP1 clocks
+In-Reply-To: <CAJKOXPf5Dnh36rrY6Vet13EHKB3gJuU0VnAfsyYnvWTx92O_GA@mail.gmail.com>
+References: <1444905084-22540-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1444905084-22540-2-git-send-email-tomeu.vizoso@collabora.com>
+ <56203AD3.2050905@samsung.com> <20151016124935.20687.4394@quantum>
+ <20151016172651.GB23912@codeaurora.org>
+ <CAAObsKAjZX8XxTAFVKq4BCSZSrKG5xQPTue+z+xnJDD8QwK88Q@mail.gmail.com>
+ <56218B2D.9040007@kernel.org>
+ <CAJKOXPf5Dnh36rrY6Vet13EHKB3gJuU0VnAfsyYnvWTx92O_GA@mail.gmail.com>
+Message-ID: <56221B26.2050407@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello Krzysztof,
 
-> The change to bpa10x to use the h4_recv_buf helper added a dependency
-> on BT_HCIUART. This was incorrectly added to Kconfig by adding a
-> 'select' statement, which now in turn causes build failures
-> when CONFIG_TTY is not set:
+On 10/17/2015 10:53 AM, Krzysztof Kozlowski wrote:
+> 2015-10-17 8:41 GMT+09:00 Kukjin Kim <kgene@kernel.org>:
+
+[snip]
+
+>>>
+>> So...how can I take 2nd patch of this series in samsung(arm-soc) tree?
+>> And this series shouldn't be for fixes for 4.3?...Mike how do you think?
 > 
-> warning: (BT_HCIBPA10X) selects BT_HCIUART which has unmet direct dependencies (NET && BT && TTY)
-> vers/built-in.o: In function `hci_uart_tty_receive':
-> fpga-mgr.c:(.text+0x282824): undefined reference to `tty_unthrottle'
-> drivers/built-in.o: In function `hci_uart_tty_ioctl':
-> fpga-mgr.c:(.text+0x282aa0): undefined reference to `n_tty_ioctl_helper'
-> drivers/built-in.o: In function `hci_uart_flush':
+> Stephen acked it so I thought everything will go through samsung-soc.
 > 
-> This replaces the 'select BT_HCIUART' dependency with 'depends on', which
-> does not have this kind of problem. Alternatively, one could add 'depends
-> on TTY', but avoiding 'select' on user-visible options is generally the
-> preferred choice as that does not introduce the potential for dependency
-> loops or incomplete dependency chains.
+> Dear Kukjin,
+> Indeed this can go as fix for current cycle... but in the same time
+> this does not fix any specific regression. Tomeu did not describe when
+> issue happened for the first time so I assumed it was like that
+> always. It's up to you.
+>
 
-the intention here was to use select, but that seems to open all sorts of problems. Since I am most likely the only person that still has this device and attaches it to Linux, I am fine in going the easier path with depends on.
+Sorry for not answering about this series before but I've been in contact
+with Tomeu over IRC before he posted it and since you already added your
+Reviewed-by tag, I didn't feel the need do to it.
 
-Patch has been applied to bluetooth-next tree.
+This is a regression for 4.3 since S2R was working correctly for 4.2 in
+Snow, I tested after fixing resume with commit 6fd4899a54a5 ("irqchip:
+exynos-combiner: Save IRQ enable set on suspend") and the display was
+always enabled on resume.
 
-Regards
+I don't have access to a Snow anymore to bisect but I think the regression
+was introduced by some of the changes in 4.3 to migrate the Exynos DRM to
+Atomic Mode Settings. But probably that just exposed a latent bug and it
+was working out of luck since I had the same issue than Tomeu in Exynos5420
+and was fixed in the same way with commits:
 
-Marcel
+885601002998 ("clk: exynos5420: Add IDs for clocks used in DISP1 power domain")
+ea08de16eb1b ("ARM: dts: Add DISP1 power domain for exynos5420")
+
+> Both patches (with Stephen's ack) are in my recent pull request but as
+> usual feel free to cherry pick. I'll drop them from next branch then.
+> 
+> Best regards,
+> Krzysztof
+> --
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
