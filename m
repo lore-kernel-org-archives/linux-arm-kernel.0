@@ -1,82 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 17 Oct 2015 23:29:27 +0100
-Subject: [PATCH] pinctrl: mvebu: armada-38x: add suspend/resume support
-In-Reply-To: <1445117328-31678-1-git-send-email-mw@semihalf.com>
-References: <1445117328-31678-1-git-send-email-mw@semihalf.com>
-Message-ID: <20151017222927.GR32532@n2100.arm.linux.org.uk>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 18 Oct 2015 06:56:30 +0800
+Subject: [PATCH v3 14/24] arm64: Delay cpu feature capability checks
+In-Reply-To: <1444756952-31145-15-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <201510180642.xwPchoyX%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 17, 2015 at 11:28:48PM +0200, Marcin Wojtas wrote:
-> diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
-> index 6ec82c6..094cb48 100644
-> --- a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
-> +++ b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
-> @@ -23,6 +23,7 @@
->  #include "pinctrl-mvebu.h"
->  
->  static void __iomem *mpp_base;
-> +static u32 *mpp_saved_regs;
+Hi Suzuki,
 
-I'm not a fan of unnecessary global variables.  It adds to the bulk of
-the kernel when built-in (even though it's in .bss, it still has a cost)
-and these all add up when built-in.
+[auto build test ERROR on v4.3-rc5 -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
 
-Please make it part of the driver data allocated at probe time.
+url:    https://github.com/0day-ci/linux/commits/Suzuki-K-Poulose/arm64-Consolidate-CPU-feature-handling/20151014-013504
+config: arm64-allnoconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
->  static int armada_38x_mpp_ctrl_get(unsigned pid, unsigned long *config)
->  {
-> @@ -424,6 +425,7 @@ static int armada_38x_pinctrl_probe(struct platform_device *pdev)
->  	const struct of_device_id *match =
->  		of_match_device(armada_38x_pinctrl_of_match, &pdev->dev);
->  	struct resource *res;
-> +	int nregs;
->  
->  	if (!match)
->  		return -ENODEV;
-> @@ -441,11 +443,44 @@ static int armada_38x_pinctrl_probe(struct platform_device *pdev)
->  	soc->modes = armada_38x_mpp_modes;
->  	soc->nmodes = armada_38x_mpp_controls[0].npins;
->  
-> +	nregs = DIV_ROUND_UP(soc->nmodes, MVEBU_MPPS_PER_REG);
-> +
-> +	mpp_saved_regs = devm_kcalloc(&pdev->dev, nregs, sizeof(u32),
-> +				      GFP_KERNEL);
-> +	if (!mpp_saved_regs)
-> +		return -ENOMEM;
-> +
->  	pdev->dev.platform_data = soc;
+All errors (new ones prefixed by >>):
 
-The 'soc' is stored in platform data, not driver data, but...
+   arch/arm64/kernel/cpufeature.c: In function 'fail_incapable_cpu':
+>> arch/arm64/kernel/cpufeature.c:643:34: error: 'const struct cpu_operations' has no member named 'cpu_die'
+     if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
+                                     ^
+   arch/arm64/kernel/cpufeature.c:644:15: error: 'const struct cpu_operations' has no member named 'cpu_die'
+      cpu_ops[cpu]->cpu_die(cpu);
+                  ^
 
->  
->  	return mvebu_pinctrl_probe(pdev);
->  }
->  
-> +int armada_38x_pinctrl_suspend(struct platform_device *pdev, pm_message_t state)
-> +{
-> +	struct mvebu_pinctrl_soc_info *soc = platform_get_drvdata(pdev);
+vim +643 arch/arm64/kernel/cpufeature.c
 
-You access it through driver data.  Isn't the driver data here a
-struct mvebu_pinctrl pointer?  See platform_set_drvdata() in
-mvebu_pinctrl_probe().
+   637		int cpu = smp_processor_id();
+   638	
+   639		pr_crit("CPU%d: missing %s : %s\n", cpu, cap_type, cap->desc);
+   640		/* Mark this CPU absent */
+   641		set_cpu_present(cpu, 0);
+   642		/* Check if we can park ourselves */
+ > 643		if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
+   644			cpu_ops[cpu]->cpu_die(cpu);
+   645	
+   646		asm volatile(
 
-> +	int i, nregs;
-> +
-> +	nregs = DIV_ROUND_UP(soc->nmodes, MVEBU_MPPS_PER_REG);
-> +
-> +	for (i = 0; i < nregs; i++)
-> +		mpp_saved_regs[i] = readl(mpp_base + i * 4);
-> +
-> +	return 0;
-> +}
-> +
-> +int armada_38x_pinctrl_resume(struct platform_device *pdev)
-> +{
-> +	struct mvebu_pinctrl_soc_info *soc = platform_get_drvdata(pdev);
-
-Ditto.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 5475 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151018/279edd5f/attachment.obj>
