@@ -1,68 +1,78 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Sun, 18 Oct 2015 18:00:14 +0200
-Subject: [PATCH 3/4] vfio: platform: add compat in vfio_platform_device
+Date: Sun, 18 Oct 2015 18:00:13 +0200
+Subject: [PATCH 2/4] vfio: platform: reset: calxedaxgmac: add reset function
+ registration
 In-Reply-To: <1445184015-24414-1-git-send-email-eric.auger@linaro.org>
 References: <1445184015-24414-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1445184015-24414-4-git-send-email-eric.auger@linaro.org>
+Message-ID: <1445184015-24414-3-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's retrieve the compatibility string on probe and store it
-in the vfio_platform_device struct
+This patch adds the reset function registration/unregistration.
+Also a MODULE_ALIAS is added.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 ---
- drivers/vfio/platform/vfio_platform_common.c  | 15 ++++++++-------
- drivers/vfio/platform/vfio_platform_private.h |  1 +
- 2 files changed, 9 insertions(+), 7 deletions(-)
+ .../platform/reset/vfio_platform_calxedaxgmac.c    | 40 ++++++++++++++++++++--
+ 1 file changed, 38 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index d36afc9..31a6a8c 100644
---- a/drivers/vfio/platform/vfio_platform_common.c
-+++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -38,16 +38,11 @@ static const struct vfio_platform_reset_combo reset_lookup_table[] = {
- static void vfio_platform_get_reset(struct vfio_platform_device *vdev,
- 				    struct device *dev)
- {
--	const char *compat;
- 	int (*reset)(struct vfio_platform_device *);
--	int ret, i;
+diff --git a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+index 619dc7d..4f76b17 100644
+--- a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
++++ b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+@@ -29,8 +29,7 @@
+ #define DRIVER_VERSION  "0.1"
+ #define DRIVER_AUTHOR   "Eric Auger <eric.auger@linaro.org>"
+ #define DRIVER_DESC     "Reset support for Calxeda xgmac vfio platform device"
 -
--	ret = device_property_read_string(dev, "compatible", &compat);
--	if (ret)
--		return;
-+	int i;
+-#define CALXEDAXGMAC_COMPAT "calxeda,hb-xgmac"
++#define COMPAT		"calxeda,hb-xgmac"
  
- 	for (i = 0 ; i < ARRAY_SIZE(reset_lookup_table); i++) {
--		if (!strcmp(reset_lookup_table[i].compat, compat)) {
-+		if (!strcmp(reset_lookup_table[i].compat, vdev->compat)) {
- 			request_module(reset_lookup_table[i].module_name);
- 			reset = __symbol_get(
- 				reset_lookup_table[i].reset_function_name);
-@@ -538,6 +533,12 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
- 	struct iommu_group *group;
- 	int ret;
+ /* XGMAC Register definitions */
+ #define XGMAC_CONTROL           0x00000000      /* MAC Configuration */
+@@ -80,6 +79,43 @@ int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
+ }
+ EXPORT_SYMBOL_GPL(vfio_platform_calxedaxgmac_reset);
  
-+	ret = device_property_read_string(dev, "compatible", &vdev->compat);
-+	if (ret) {
-+		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
-+		return -EINVAL;
-+	}
++static int __init vfio_platform_calxedaxgmac_init(void)
++{
++	int (*register_reset)(struct module *, char*,
++				vfio_platform_reset_fn_t);
++	int ret;
 +
- 	if (!vdev)
- 		return -EINVAL;
- 
-diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index 17323f0..b274646 100644
---- a/drivers/vfio/platform/vfio_platform_private.h
-+++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -56,6 +56,7 @@ struct vfio_platform_device {
- 	u32				num_irqs;
- 	int				refcnt;
- 	struct mutex			igate;
-+	const char			*compat;
- 
- 	/*
- 	 * These fields should be filled by the bus specific binder
++	register_reset = symbol_get(vfio_platform_register_reset);
++	if (!register_reset)
++		return -EINVAL;
++
++	ret = register_reset(THIS_MODULE, COMPAT,
++	vfio_platform_calxedaxgmac_reset);
++
++	symbol_put(vfio_platform_register_reset);
++
++	return ret;
++}
++
++static void __exit vfio_platform_calxedaxgmac_exit(void)
++{
++	int (*unregister_reset)(char *);
++	int ret;
++
++	unregister_reset = symbol_get(vfio_platform_unregister_reset);
++	if (!unregister_reset)
++		return;
++
++	ret = unregister_reset(COMPAT);
++
++	symbol_put(vfio_platform_unregister_reset);
++}
++
++module_init(vfio_platform_calxedaxgmac_init);
++module_exit(vfio_platform_calxedaxgmac_exit);
++
++MODULE_ALIAS("vfio-reset:"  COMPAT);
++
+ MODULE_VERSION(DRIVER_VERSION);
+ MODULE_LICENSE("GPL v2");
+ MODULE_AUTHOR(DRIVER_AUTHOR);
 -- 
 1.9.1
