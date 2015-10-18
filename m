@@ -1,124 +1,51 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Sun, 18 Oct 2015 12:24:36 -0600
-Subject: [PATCH V2 19/30] coresight: etb10: implementing the setup_aux() API
+Date: Sun, 18 Oct 2015 12:24:35 -0600
+Subject: [PATCH V2 18/30] coresight: etb10: moving to local atomic operations
 In-Reply-To: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1445192687-24112-20-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1445192687-24112-19-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding an ETB10 specific auxiliary area setup operation to be
-used by the perf framework when events are initialised.
-
-Part of this operation involves modeling the mmap'ed area based
-on the specific ways a sink buffer gathers information.
+Moving to use local atomic operations to take advantage of the
+lockless implementation, something that will come handy when
+the ETB is accessed from the Perf subsystem.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etb10.c | 55 +++++++++++++++++++++++++++
- include/linux/coresight.h                     |  3 ++
- 2 files changed, 58 insertions(+)
+ drivers/hwtracing/coresight/coresight-etb10.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index ecdbe0dd4d08..7f34e7af465e 100644
+index 77d0f9c1118d..ecdbe0dd4d08 100644
 --- a/drivers/hwtracing/coresight/coresight-etb10.c
 +++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -27,6 +27,9 @@
- #include <linux/coresight.h>
- #include <linux/amba/bus.h>
- #include <linux/clk.h>
-+#include <linux/mm.h>
-+
-+#include <asm/local.h>
+@@ -84,7 +84,7 @@ struct etb_drvdata {
+ 	struct coresight_device	*csdev;
+ 	struct miscdevice	miscdev;
+ 	spinlock_t		spinlock;
+-	atomic_t		in_use;
++	local_t			in_use;
+ 	u8			*buf;
+ 	u32			buffer_depth;
+ 	bool			enable;
+@@ -281,7 +281,7 @@ static int etb_open(struct inode *inode, struct file *file)
+ 	struct etb_drvdata *drvdata = container_of(file->private_data,
+ 						   struct etb_drvdata, miscdev);
  
- #include "coresight-priv.h"
+-	if (atomic_cmpxchg(&drvdata->in_use, 0, 1))
++	if (local_cmpxchg(&drvdata->in_use, 0, 1))
+ 		return -EBUSY;
  
-@@ -64,6 +67,32 @@
- #define ETB_FRAME_SIZE_WORDS	4
+ 	dev_dbg(drvdata->dev, "%s: successfully opened\n", __func__);
+@@ -317,7 +317,7 @@ static int etb_release(struct inode *inode, struct file *file)
+ {
+ 	struct etb_drvdata *drvdata = container_of(file->private_data,
+ 						   struct etb_drvdata, miscdev);
+-	atomic_set(&drvdata->in_use, 0);
++	local_set(&drvdata->in_use, 0);
  
- /**
-+ * struct cs_buffer - keep track of a recording session' specifics
-+ * @cur:	index of the current buffer
-+ * @nr_pages:	max number of pages granted to us
-+ * @nr_bufs:	number of clustered pages
-+ * @offset:	offset within the current buffer
-+ * @size:	how much space we have for this run
-+ * @data_size:	how much we collected in this run
-+ * @head:	head of the ring buffer
-+ * @lost:	other than zero if we had a HW buffer wrap around
-+ * @snapshot:	is this run in snapshot mode
-+ * @addr:	virtual address this buffer starts at
-+ */
-+struct cs_buffers {
-+	unsigned int		cur;
-+	unsigned int		nr_pages;
-+	unsigned int		nr_bufs;
-+	unsigned long		offset;
-+	unsigned long		size;
-+	local_t			data_size;
-+	local_t			head;
-+	local_t			lost;
-+	bool			snapshot;
-+	void			*addr[0];
-+};
-+
-+/**
-  * struct etb_drvdata - specifics associated to an ETB component
-  * @base:	memory mapped base address for this component.
-  * @dev:	the device entity associated to this component.
-@@ -252,9 +281,35 @@ static void etb_disable(struct coresight_device *csdev)
- 	dev_info(drvdata->dev, "ETB disabled\n");
- }
- 
-+static void *etb_setup_aux(struct coresight_device *csdev, int cpu,
-+			   void **pages, int nr_pages, bool overwrite)
-+{
-+	int node, pg;
-+	struct cs_buffers *buf;
-+
-+	if (cpu == -1)
-+		cpu = smp_processor_id();
-+	node = cpu_to_node(cpu);
-+
-+	buf = kzalloc_node(offsetof(struct cs_buffers, addr[nr_pages]),
-+			   GFP_KERNEL, node);
-+	if (!buf)
-+		return NULL;
-+
-+	buf->snapshot = overwrite;
-+	buf->nr_pages = nr_pages;
-+
-+	/* Record information about buffers */
-+	for (pg = 0; pg < buf->nr_pages; pg++)
-+		buf->addr[pg] = pages[pg];
-+
-+	return buf;
-+}
-+
- static const struct coresight_ops_sink etb_sink_ops = {
- 	.enable		= etb_enable,
- 	.disable	= etb_disable,
-+	.setup_aux	= etb_setup_aux,
- };
- 
- static const struct coresight_ops etb_cs_ops = {
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index dd530a6d3e21..b1c25eba83b4 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -187,10 +187,13 @@ struct coresight_device {
-  * Operations available for sinks
-  * @enable:	enables the sink.
-  * @disable:	disables the sink.
-+ * @setup_aux:	initialises perf's ring buffer for trace collection.
-  */
- struct coresight_ops_sink {
- 	int (*enable)(struct coresight_device *csdev);
- 	void (*disable)(struct coresight_device *csdev);
-+	void *(*setup_aux)(struct coresight_device *csdev, int cpu,
-+			   void **pages, int nr_pages, bool overwrite);
- };
- 
- /**
+ 	dev_dbg(drvdata->dev, "%s: released\n", __func__);
+ 	return 0;
 -- 
 1.9.1
