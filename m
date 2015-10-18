@@ -1,78 +1,49 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Sun, 18 Oct 2015 22:13:28 +0200
-Subject: [PATCH] bus: imx-weim: Fix deferred probing
-Message-ID: <5623FD68.4070801@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 18 Oct 2015 23:07:38 +0200
+Subject: [RFT - PATCH v2 0/2] KVM/arm64: add fp/simd lazy switch support
+In-Reply-To: <561BDFE3.5060403@samsung.com>
+References: <1442964843-11953-1-git-send-email-m.smarduch@samsung.com>
+ <20151005154540.GJ9011@cbox> <561BDFE3.5060403@samsung.com>
+Message-ID: <20151018210738.GF7531@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_DELAY_DEVICE_PROBES being set the weim driver
-isn't loadad because module_platform_driver_probe is
-incompatible with deferred probing.
+On Mon, Oct 12, 2015 at 09:29:23AM -0700, Mario Smarduch wrote:
+> Hi Christoffer, Marc -
+>   I just threw this test your way without any explanation.
 
-Fix this by using builtin_platform_driver instead.
-Going with deferred probing also means we have to drop
-the __init annotations.
+I'm confused.  Did you send me something somewhere already?
 
-Successfully tested on a I.MX6-based system.
+> 
+> The test loops, does fp arithmetic and checks the truncated result.
+> It could be a little more dynamic have an initial run to
+> get the sum to compare against while looping, different fp
+> hardware may come up with a different sum, but truncation is
+> to 5'th decimal point.
+> 
+> The rationale is that if there is any fp/simd corruption
+> one of these runs should fail. I think most likely scenario
+> for that is a world switch in midst of fp operation. I've
+> instrumented (basically add some tracing to vcpu_put()) and
+> validated vcpu_put gets called thousands of time (for v7,v8)
+> for an over night test running two guests/host crunching
+> fp operations.
+> 
+> Other then that not sure how to really catch any problems
+> with the patches applied. Obviously this is a huge issues, if this has
+> any problems. If you or Marc have any other ideas I'd be happy
+> to enhance the test.
 
-I send the patch to linux-arm-kernel as the kernel MAINTAINERS
-file doesn't list a dedicated maintainer.
+I think it's important to run two VMs at the same time, each with some
+floating-point work, and then run some floating point on the host at the
+same time.
 
-Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
----
- drivers/bus/imx-weim.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+You can make that even more interesting by doing 32-bit guests at the
+same time as well.
 
-diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-index e98d15e..7c425d3 100644
---- a/drivers/bus/imx-weim.c
-+++ b/drivers/bus/imx-weim.c
-@@ -59,7 +59,7 @@ static const struct of_device_id weim_id_table[] = {
- };
- MODULE_DEVICE_TABLE(of, weim_id_table);
- 
--static int __init imx_weim_gpr_setup(struct platform_device *pdev)
-+static int imx_weim_gpr_setup(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
- 	struct property *prop;
-@@ -109,7 +109,7 @@ err:
- }
- 
- /* Parse and set the timing for this device. */
--static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
-+static int weim_timing_setup(struct device_node *np, void __iomem *base,
- 				    const struct imx_weim_devtype *devtype)
- {
- 	u32 cs_idx, value[devtype->cs_regs_count];
-@@ -135,7 +135,7 @@ static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
- 	return 0;
- }
- 
--static int __init weim_parse_dt(struct platform_device *pdev,
-+static int weim_parse_dt(struct platform_device *pdev,
- 				void __iomem *base)
- {
- 	const struct of_device_id *of_id = of_match_device(weim_id_table,
-@@ -172,7 +172,7 @@ static int __init weim_parse_dt(struct platform_device *pdev,
- 	return ret;
- }
- 
--static int __init weim_probe(struct platform_device *pdev)
-+static int weim_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
- 	struct clk *clk;
-@@ -209,8 +209,9 @@ static struct platform_driver weim_driver = {
- 		.name		= "imx-weim",
- 		.of_match_table	= weim_id_table,
- 	},
-+	.probe = weim_probe,
- };
--module_platform_driver_probe(weim_driver, weim_probe);
-+builtin_platform_driver(weim_driver);
- 
- MODULE_AUTHOR("Freescale Semiconductor Inc.");
- MODULE_DESCRIPTION("i.MX EIM Controller Driver");
--- 
-2.6.1
+I believe Marc was running Panranoia
+(http://www.netlib.org/paranoia/paranoia.c) to test the last lazy
+series.
+
+Thanks,
+-Christoffer
