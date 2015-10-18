@@ -1,88 +1,117 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 17 Oct 2015 18:58:40 -0700
-Subject: [PATCH 4.1 137/202] irqchip/atmel-aic5: Use per chip mask caches in
- mask/unmask()
-In-Reply-To: <20151018014901.946875729@linuxfoundation.org>
-References: <20151018014901.946875729@linuxfoundation.org>
-Message-ID: <20151018014908.153872198@linuxfoundation.org>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Sun, 18 Oct 2015 11:51:19 +0800
+Subject: [PATCH v10 3/3] arm64: dts: mediatek: add xHCI & usb phy for mt8173
+In-Reply-To: <1445140279-18121-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1445140279-18121-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1445140279-18121-4-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.1-stable review patch.  If anyone has any objections, please let me know.
+add xHCI and phy drivers for MT8173-EVB
 
-------------------
-
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
-
-commit d32dc9aa10c739363c775baf4499416b2e0dc11f upstream.
-
-When masking/unmasking interrupts, mask_cache is updated and used later
-for suspend/resume. Unfortunately, it always was the mask_cache
-associated with the first irq chip which was updated. So when performing
-resume, only irqs 0-31 could be enabled.
-
-Fixes: b1479ebb7720 ("irqchip: atmel-aic: Add atmel AIC/AIC5 drivers")
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Cc: <sasha.levin@oracle.com>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Cc: <nicolas.ferre@atmel.com>
-Cc: <alexandre.belloni@free-electrons.com>
-Cc: <boris.brezillon@free-electrons.com>
-Cc: <Wenyou.Yang@atmel.com>
-Cc: <jason@lakedaemon.net>
-Cc: <marc.zyngier@arm.com>
-Link: http://lkml.kernel.org/r/1442843173-2390-1-git-send-email-ludovic.desroches at atmel.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/irqchip/irq-atmel-aic5.c |   24 ++++++++++++++++--------
- 1 file changed, 16 insertions(+), 8 deletions(-)
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 16 +++++++++++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 42 +++++++++++++++++++++++++++++
+ 2 files changed, 58 insertions(+)
 
---- a/drivers/irqchip/irq-atmel-aic5.c
-+++ b/drivers/irqchip/irq-atmel-aic5.c
-@@ -88,28 +88,36 @@ static void aic5_mask(struct irq_data *d
- {
- 	struct irq_domain *domain = d->domain;
- 	struct irq_domain_chip_generic *dgc = domain->gc;
--	struct irq_chip_generic *gc = dgc->gc[0];
-+	struct irq_chip_generic *bgc = dgc->gc[0];
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+index 4be66ca..d039a1c 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
++++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+@@ -13,6 +13,7 @@
+  */
  
--	/* Disable interrupt on AIC5 */
--	irq_gc_lock(gc);
-+	/*
-+	 * Disable interrupt on AIC5. We always take the lock of the
-+	 * first irq chip as all chips share the same registers.
-+	 */
-+	irq_gc_lock(bgc);
- 	irq_reg_writel(gc, d->hwirq, AT91_AIC5_SSR);
- 	irq_reg_writel(gc, 1, AT91_AIC5_IDCR);
- 	gc->mask_cache &= ~d->mask;
--	irq_gc_unlock(gc);
-+	irq_gc_unlock(bgc);
- }
+ /dts-v1/;
++#include <dt-bindings/gpio/gpio.h>
+ #include "mt8173.dtsi"
  
- static void aic5_unmask(struct irq_data *d)
- {
- 	struct irq_domain *domain = d->domain;
- 	struct irq_domain_chip_generic *dgc = domain->gc;
--	struct irq_chip_generic *gc = dgc->gc[0];
-+	struct irq_chip_generic *bgc = dgc->gc[0];
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+ / {
+@@ -32,6 +33,15 @@
+ 	};
  
--	/* Enable interrupt on AIC5 */
--	irq_gc_lock(gc);
-+	/*
-+	 * Enable interrupt on AIC5. We always take the lock of the
-+	 * first irq chip as all chips share the same registers.
-+	 */
-+	irq_gc_lock(bgc);
- 	irq_reg_writel(gc, d->hwirq, AT91_AIC5_SSR);
- 	irq_reg_writel(gc, 1, AT91_AIC5_IECR);
- 	gc->mask_cache |= d->mask;
--	irq_gc_unlock(gc);
-+	irq_gc_unlock(bgc);
- }
+ 	chosen { };
++
++	usb_p1_vbus: regulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&pio 130 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
+ };
  
- static int aic5_retrigger(struct irq_data *d)
+ &i2c1 {
+@@ -390,3 +400,9 @@
+ &uart0 {
+ 	status = "okay";
+ };
++
++&usb30 {
++	vusb33-supply = <&mt6397_vusb_reg>;
++	vbus-supply = <&usb_p1_vbus>;
++	mediatek,wakeup-src = <1>;
++};
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index d18ee42..46f5f50 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -14,6 +14,7 @@
+ #include <dt-bindings/clock/mt8173-clk.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/phy/phy.h>
+ #include <dt-bindings/power/mt8173-power.h>
+ #include <dt-bindings/reset-controller/mt8173-resets.h>
+ #include "mt8173-pinfunc.h"
+@@ -487,6 +488,47 @@
+ 			clock-names = "source", "hclk";
+ 			status = "disabled";
+ 		};
++
++		usb30: usb at 11270000 {
++			compatible = "mediatek,mt8173-xhci";
++			reg = <0 0x11270000 0 0x1000>,
++			      <0 0x11280700 0 0x0100>;
++			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
++			power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
++			clocks = <&topckgen CLK_TOP_USB30_SEL>,
++				 <&pericfg CLK_PERI_USB0>,
++				 <&pericfg CLK_PERI_USB1>;
++			clock-names = "sys_ck",
++				      "wakeup_deb_p0",
++				      "wakeup_deb_p1";
++			phys = <&phy_port0 PHY_TYPE_USB3>,
++			       <&phy_port1 PHY_TYPE_USB2>;
++			mediatek,syscon-wakeup = <&pericfg>;
++			status = "okay";
++		};
++
++		u3phy: usb-phy at 11290000 {
++			compatible = "mediatek,mt8173-u3phy";
++			reg = <0 0x11290000 0 0x800>;
++			clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
++			clock-names = "u3phya_ref";
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges;
++			status = "okay";
++
++			phy_port0: port at 11290800 {
++				reg = <0 0x11290800 0 0x800>;
++				#phy-cells = <1>;
++				status = "okay";
++			};
++
++			phy_port1: port at 11291000 {
++				reg = <0 0x11291000 0 0x800>;
++				#phy-cells = <1>;
++				status = "okay";
++			};
++		};
+ 	};
+ };
+ 
+-- 
+1.8.1.1.dirty
