@@ -1,141 +1,76 @@
-From: amittomer25@gmail.com (Amit)
-Date: Sun, 18 Oct 2015 17:47:19 +0530
-Subject: [PATCH RFC] arm64/ftrace: Define a new arm64 trace clock source based
- on cntpct_el0 register.
-Message-ID: <1445170639-13943-1-git-send-email-amittomer25@gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sun, 18 Oct 2015 14:20:17 +0200
+Subject: [resend GIT PULL] ARM: mediatek: soc updates for v4.3
+Message-ID: <CABuKBeJUgmaswptkh1MdFfLyL0Yir7Umf=KQ3kW3B2A_=SU+0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Amit Singh Tomar <amittomer25@gmail.com>
+Hi Arnd and Olof,
 
-Currenty, Default trace clock("local") for host and guest is out of sync. 
-This default clock is based on cntvct_el0 register value and both host/guest
-see different values of cntvct_el0.
+Please pull the following patches.
 
-Intention here is to get a clock whose timestamps are comparable between host/guest.
-It can be achieved by using clock based on cntpct_el0 register values(host/guest
-see same value of cntpct_el0 register all the time).
+I resend this pull request, because I forgot to add the arm mailing
+list in the first place.
 
-Define a new arm64 specific trace clock using the cntpct_el0 register,
-similar to x86-tsc. It can be used to correlate trace events across
-hosts and guest that can be useful for debuging purpose.
+Thanks,
+Matthias
 
-Signed-off-by: Amit Singh Tomar <amittomer25@gmail.com>
 ---
- Documentation/trace/ftrace.txt       |  8 +++++++-
- arch/arm64/include/asm/Kbuild        |  1 -
- arch/arm64/include/asm/trace_clock.h | 21 +++++++++++++++++++++
- arch/arm64/kernel/Makefile           |  1 +
- arch/arm64/kernel/trace_clock.c      | 23 +++++++++++++++++++++++
- 5 files changed, 52 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/include/asm/trace_clock.h
- create mode 100644 arch/arm64/kernel/trace_clock.c
 
-diff --git a/Documentation/trace/ftrace.txt b/Documentation/trace/ftrace.txt
-index ef621d3..6420e32 100644
---- a/Documentation/trace/ftrace.txt
-+++ b/Documentation/trace/ftrace.txt
-@@ -323,7 +323,7 @@ of ftrace. Here is a list of some of the key files:
- 	Usual clocks for tracing:
- 
- 	  # cat trace_clock
--	  [local] global counter x86-tsc
-+	  [local] global counter x86-tsc arm64-pct
- 
- 	  local: Default clock, but may not be in sync across CPUs
- 
-@@ -351,6 +351,12 @@ of ftrace. Here is a list of some of the key files:
- 		  to correlate events across hypervisor/guest if
- 		  tb_offset is known.
- 
-+	arm64-pct: This uses ARM64 Physical Timer Count register
-+		   value. This is different from default "local"
-+		   clock which usese Virtual Timer Count register.
-+		   This is consistent across processors and can be
-+		   used to correlate events across host/guest.
-+
- 	To set a clock, simply echo the clock name into this file.
- 
- 	  echo global > trace_clock
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index 70fd9ff..8608f9e 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -50,7 +50,6 @@ generic-y += switch_to.h
- generic-y += termbits.h
- generic-y += termios.h
- generic-y += topology.h
--generic-y += trace_clock.h
- generic-y += types.h
- generic-y += unaligned.h
- generic-y += user.h
-diff --git a/arch/arm64/include/asm/trace_clock.h b/arch/arm64/include/asm/trace_clock.h
-new file mode 100644
-index 0000000..aef4ccd
---- /dev/null
-+++ b/arch/arm64/include/asm/trace_clock.h
-@@ -0,0 +1,21 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, version 2, as
-+ * published by the Free Software Foundation.
-+ *
-+ * Copyright (C) 2015 Amit Singh Tomar, amittomer25 at gmail.com
-+*/
-+
-+#ifndef _ASM_ARM_TRACE_CLOCK_H
-+#define _ASM_ARM_TRACE_CLOCK_H
-+
-+#include <linux/compiler.h>
-+#include <linux/types.h>
-+
-+extern u64 notrace trace_clock_arm64_pct(void);
-+
-+# define ARCH_TRACE_CLOCKS \
-+	{ trace_clock_arm64_pct,  "arm64-pct",  0},
-+
-+#endif  /* _ASM_ARM_TRACE_CLOCK_H */
-+
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 22dc9bc..d58f885 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -36,6 +36,7 @@ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
- arm64-obj-$(CONFIG_PCI)			+= pci.o
- arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
- arm64-obj-$(CONFIG_ACPI)		+= acpi.o
-+arm64-obj-$(CONFIG_TRACING)             += trace_clock.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/trace_clock.c b/arch/arm64/kernel/trace_clock.c
-new file mode 100644
-index 0000000..f038977
---- /dev/null
-+++ b/arch/arm64/kernel/trace_clock.c
-@@ -0,0 +1,23 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, version 2, as
-+ * published by the Free Software Foundation.
-+ *
-+ * Copyright (C) 2015 Amit Singh Tomar, amittomer25 at gmail.com
-+*/
-+
-+#include <asm/trace_clock.h>
-+
-+#define read_cnt_pct(cnt_pct) do {				\
-+	__asm__ __volatile("isb; mrs %0, cntpct_el0; isb ;"	\
-+	: "=r" (cnt_pct));					\
-+} while (0)
-+
-+u64 notrace trace_clock_arm64_pct(void)
-+{
-+	u64 cnt_pct;
-+
-+	read_cnt_pct(cnt_pct);
-+	return  cnt_pct;
-+}
-+
--- 
-1.9.1
+The following changes since commit 1f93e4a96c9109378204c147b3eec0d0e8100fde:
+
+  Linux 4.3-rc2 (2015-09-20 14:32:34 -0700)
+
+are available in the git repository at:
+
+  https://github.com/mbgg/linux-mediatek.git tags/v4.3-next-soc
+
+for you to fetch changes up to 0cda07001a9454f371b7a7edabad55d99ef91157:
+
+  ARM: mediatek: add smp bringup code (2015-10-14 15:34:44 +0200)
+
+----------------------------------------------------------------
+Do the initial setting of the pmic wrap interrupt before requesting
+the interrupt.
+This fixes the corner-case where the pmic is initialized by the bootloader, but
+not the pmic watchdog.
+
+Add support for active wakeup to the scpsys. This allows to keep the power of
+a scpsys domain  during suspend state.
+
+With version v4.3 new subsystem clocks are added to the clock dirver. In late
+init the kernel turns off all unused clocks. This can provoke a hang if
+the kernel tries to access the venc and venc_lt power domain registers.
+Add the necessary parent clocks for this power domains to
+the scpsys so that no random hang happens.
+
+The bootloader of mt6589, mt8135 and mt1827 does not turn on the arm-arch-timer.
+As there is no opensource bootloader in the near future for this architectures
+we enable the arch timer at kernel boot. We need the arch timer for SMP boot.
+
+Add support for SMP on mt6589, mt8127 and mt8135.
+
+----------------------------------------------------------------
+Eddie Huang (1):
+      soc: mediatek: add scpsys support active_wakeup
+
+Henry Chen (1):
+      soc: mediatek: Move the initial setting of pmic wrap interrupt
+before requesting irq.
+
+James Liao (1):
+      soc: mediatek: Fix random hang up issue while kernel init
+
+Matthias Brugger (1):
+      ARM: mediatek: enable gpt6 on boot up to make arch timer working
+
+Yingjoe Chen (1):
+      ARM: mediatek: add smp bringup code
+
+ arch/arm/mach-mediatek/Makefile      |   3 +
+ arch/arm/mach-mediatek/mediatek.c    |  27 +++++++
+ arch/arm/mach-mediatek/platsmp.c     | 141 +++++++++++++++++++++++++++++++++++
+ drivers/soc/mediatek/mtk-pmic-wrap.c |  10 ++-
+ drivers/soc/mediatek/mtk-scpsys.c    |  83 +++++++++++++++------
+ 5 files changed, 237 insertions(+), 27 deletions(-)
+ create mode 100644 arch/arm/mach-mediatek/platsmp.c
