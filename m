@@ -1,116 +1,169 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 18 Oct 2015 18:21:18 -0400
-Subject: [PATCH 5/5] drivers/tty/serial: make 8250/8250_mtk.c explicitly
- non-modular
-In-Reply-To: <1445206878-12455-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1445206878-12455-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1445206878-12455-6-git-send-email-paul.gortmaker@windriver.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Mon, 19 Oct 2015 00:34:18 +0200
+Subject: [RFC 3/5] ARM: dts: enable clock support for BCM5301X
+In-Reply-To: <1444771347-11382-4-git-send-email-jonmason@broadcom.com>
+References: <1444771347-11382-1-git-send-email-jonmason@broadcom.com>
+ <1444771347-11382-4-git-send-email-jonmason@broadcom.com>
+Message-ID: <56241E6A.2060406@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig currently controlling compilation of this code is:
+On 10/13/2015 11:22 PM, Jon Mason wrote:
+> Replace current device tree dummy clocks with real clock support for
+> Broadcom Northstar SoCs.
+> 
+> Signed-off-by: Jon Mason <jonmason@broadcom.com>
 
-drivers/tty/serial/8250/Kconfig:config SERIAL_8250_MT6577
-drivers/tty/serial/8250/Kconfig:        bool "Mediatek serial port support"
+The clock-frequency of the uarts should also be replaced with the
+correct clock from the clock driver.
 
-...meaning that it currently is not being built as a module by anyone.
-
-Lets remove the modular code that is essentially orphaned, so that
-when reading the driver there is no doubt it is builtin-only.
-
-We explicitly disallow a driver unbind, since that doesn't have a
-sensible use case anyway, and it allows us to drop the ".remove"
-code for non-modular drivers.
-
-Since module_platform_driver() uses the same init level priority as
-builtin_platform_driver() the init ordering remains unchanged with
-this commit.
-
-We also delete the MODULE_LICENSE tag etc. since all that information
-is already contained at the top of the file in the comments.
-
-Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
-
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.com>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
-Cc: linux-serial at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-mediatek at lists.infradead.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
- drivers/tty/serial/8250/8250_mtk.c | 35 +++++++----------------------------
- 1 file changed, 7 insertions(+), 28 deletions(-)
-
-diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
-index 78883ca64ddd..0e590b233f03 100644
---- a/drivers/tty/serial/8250/8250_mtk.c
-+++ b/drivers/tty/serial/8250/8250_mtk.c
-@@ -16,7 +16,7 @@
-  */
- #include <linux/clk.h>
- #include <linux/io.h>
--#include <linux/module.h>
-+#include <linux/init.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
-@@ -245,23 +245,6 @@ static int mtk8250_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int mtk8250_remove(struct platform_device *pdev)
--{
--	struct mtk8250_data *data = platform_get_drvdata(pdev);
--
--	pm_runtime_get_sync(&pdev->dev);
--
--	serial8250_unregister_port(data->line);
--
--	pm_runtime_disable(&pdev->dev);
--	pm_runtime_put_noidle(&pdev->dev);
--
--	if (!pm_runtime_status_suspended(&pdev->dev))
--		mtk8250_runtime_suspend(&pdev->dev);
--
--	return 0;
--}
--
- #ifdef CONFIG_PM_SLEEP
- static int mtk8250_suspend(struct device *dev)
- {
-@@ -292,18 +275,18 @@ static const struct of_device_id mtk8250_of_match[] = {
- 	{ .compatible = "mediatek,mt6577-uart" },
- 	{ /* Sentinel */ }
- };
--MODULE_DEVICE_TABLE(of, mtk8250_of_match);
- 
- static struct platform_driver mtk8250_platform_driver = {
- 	.driver = {
--		.name		= "mt6577-uart",
--		.pm		= &mtk8250_pm_ops,
--		.of_match_table	= mtk8250_of_match,
-+		.name			= "mt6577-uart",
-+		.pm			= &mtk8250_pm_ops,
-+		.of_match_table		= mtk8250_of_match,
-+		.suppress_bind_attrs	= true,
-+
- 	},
- 	.probe			= mtk8250_probe,
--	.remove			= mtk8250_remove,
- };
--module_platform_driver(mtk8250_platform_driver);
-+builtin_platform_driver(mtk8250_platform_driver);
- 
- #ifdef CONFIG_SERIAL_8250_CONSOLE
- static int __init early_mtk8250_setup(struct earlycon_device *device,
-@@ -319,7 +302,3 @@ static int __init early_mtk8250_setup(struct earlycon_device *device,
- 
- OF_EARLYCON_DECLARE(mtk8250, "mediatek,mt6577-uart", early_mtk8250_setup);
- #endif
--
--MODULE_AUTHOR("Matthias Brugger");
--MODULE_LICENSE("GPL");
--MODULE_DESCRIPTION("Mediatek 8250 serial port driver");
--- 
-2.6.1
+Hauke
+> ---
+>  arch/arm/boot/dts/bcm5301x.dtsi | 88 ++++++++++++++++++++++++++++++++---------
+>  1 file changed, 69 insertions(+), 19 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+> index 6f50f67..1eca551 100644
+> --- a/arch/arm/boot/dts/bcm5301x.dtsi
+> +++ b/arch/arm/boot/dts/bcm5301x.dtsi
+> @@ -8,6 +8,7 @@
+>   * Licensed under the GNU/GPL. See COPYING for details.
+>   */
+>  
+> +#include <dt-bindings/clock/bcm-nsp.h>
+>  #include <dt-bindings/gpio/gpio.h>
+>  #include <dt-bindings/input/input.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+> @@ -42,41 +43,48 @@
+>  
+>  	mpcore {
+>  		compatible = "simple-bus";
+> -		ranges = <0x00000000 0x19020000 0x00003000>;
+> +		ranges = <0x00000000 0x19000000 0x00023000>;
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
+>  
+> -		scu at 0000 {
+> +		a9pll: arm_clk at 00000 {
+> +			#clock-cells = <0>;
+> +			compatible = "brcm,nsp-armpll";
+> +			clocks = <&osc>;
+> +			reg = <0x00000 0x1000>;
+> +		};
+> +
+> +		scu at 20000 {
+>  			compatible = "arm,cortex-a9-scu";
+> -			reg = <0x0000 0x100>;
+> +			reg = <0x20000 0x100>;
+>  		};
+>  
+> -		timer at 0200 {
+> +		timer at 20200 {
+>  			compatible = "arm,cortex-a9-global-timer";
+> -			reg = <0x0200 0x100>;
+> +			reg = <0x20200 0x100>;
+>  			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+> -			clocks = <&clk_periph>;
+> +			clocks = <&periph_clk>;
+>  		};
+>  
+> -		local-timer at 0600 {
+> +		local-timer at 20600 {
+>  			compatible = "arm,cortex-a9-twd-timer";
+> -			reg = <0x0600 0x100>;
+> +			reg = <0x20600 0x100>;
+>  			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+> -			clocks = <&clk_periph>;
+> +			clocks = <&periph_clk>;
+>  		};
+>  
+> -		gic: interrupt-controller at 1000 {
+> +		gic: interrupt-controller at 21000 {
+>  			compatible = "arm,cortex-a9-gic";
+>  			#interrupt-cells = <3>;
+>  			#address-cells = <0>;
+>  			interrupt-controller;
+> -			reg = <0x1000 0x1000>,
+> -			      <0x0100 0x100>;
+> +			reg = <0x21000 0x1000>,
+> +			      <0x20100 0x100>;
+>  		};
+>  
+> -		L2: cache-controller at 2000 {
+> +		L2: cache-controller at 22000 {
+>  			compatible = "arm,pl310-cache";
+> -			reg = <0x2000 0x1000>;
+> +			reg = <0x22000 0x1000>;
+>  			cache-unified;
+>  			arm,shared-override;
+>  			prefetch-data = <1>;
+> @@ -94,14 +102,37 @@
+>  
+>  	clocks {
+>  		#address-cells = <1>;
+> -		#size-cells = <0>;
+> +		#size-cells = <1>;
+> +		ranges;
+>  
+> -		/* As long as we do not have a real clock driver us this
+> -		 * fixed clock */
+> -		clk_periph: periph {
+> +		osc: oscillator {
+> +			#clock-cells = <0>;
+>  			compatible = "fixed-clock";
+> +			clock-frequency = <25000000>;
+> +		};
+> +
+> +		iprocmed: iprocmed {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-factor-clock";
+> +			clocks = <&genpll BCM_NSP_GENPLL_IPROCFAST_CLK>;
+> +			clock-div = <2>;
+> +			clock-mult = <1>;
+> +		};
+> +
+> +		iprocslow: iprocslow {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-factor-clock";
+> +			clocks = <&genpll BCM_NSP_GENPLL_IPROCFAST_CLK>;
+> +			clock-div = <4>;
+> +			clock-mult = <1>;
+> +		};
+> +
+> +		periph_clk: periph_clk {
+>  			#clock-cells = <0>;
+> -			clock-frequency = <400000000>;
+> +			compatible = "fixed-factor-clock";
+> +			clocks = <&a9pll>;
+> +			clock-div = <2>;
+> +			clock-mult = <1>;
+>  		};
+>  	};
+>  
+> @@ -178,6 +209,25 @@
+>  		};
+>  	};
+>  
+> +	lcpll0: lcpll0 at 1800c100 {
+> +		#clock-cells = <1>;
+> +		compatible = "brcm,nsp-lcpll0";
+> +		reg = <0x1800c100 0x14>;
+> +		clocks = <&osc>;
+> +		clock-output-names = "lcpll0", "pcie_phy", "sdio",
+> +				     "ddr_phy";
+> +	};
+> +
+> +	genpll: genpll at 1800c140 {
+> +		#clock-cells = <1>;
+> +		compatible = "brcm,nsp-genpll";
+> +		reg = <0x1800c140 0x24>;
+> +		clocks = <&osc>;
+> +		clock-output-names = "genpll", "phy", "ethernetclk",
+> +				     "usbclk", "iprocfast", "sata1",
+> +				     "sata2";
+> +	};
+> +
+>  	nand: nand at 18028000 {
+>  		compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1", "brcm,brcmnand";
+>  		reg = <0x18028000 0x600>, <0x1811a408 0x600>, <0x18028f00 0x20>;
+> 
