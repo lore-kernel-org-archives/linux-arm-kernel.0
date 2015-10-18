@@ -1,36 +1,78 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 18 Oct 2015 22:13:52 +0200
-Subject: [PATCH] arm64: kvm: restore EL1N SP for panic
-In-Reply-To: <1444658690-8180-1-git-send-email-mark.rutland@arm.com>
-References: <1444658690-8180-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20151018201352.GD7531@cbox>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Sun, 18 Oct 2015 22:13:28 +0200
+Subject: [PATCH] bus: imx-weim: Fix deferred probing
+Message-ID: <5623FD68.4070801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 03:04:50PM +0100, Mark Rutland wrote:
-> If we panic in hyp mode, we inject a call to panic() into the EL1N host
-> kernel. If a guest context is active, we first attempt to restore the
-> minimal amount of state necessary to execute the host kernel with
-> restore_sysregs.
-> 
-> However, the SP is restored as part of restore_common_regs, and so we
-> may return to the host's panic() function with the SP of the guest. Any
-> calculations based on the SP will be bogus, and any attempt to access
-> the stack will result in recursive data aborts.
-> 
-> When running Linux as a guest, the guest's EL1N SP is like to be some
-> valid kernel address. In this case, the host kernel may use that region
-> as a stack for panic(), corrupting it in the process.
-> 
-> Avoid the problem by restoring the host SP prior to returning to the
-> host. To prevent misleading backtraces in the host, the FP is zeroed at
-> the same time. We don't need any of the other "common" registers in
-> order to panic successfully.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: <kvmarm@lists.cs.columbia.edu>
+With CONFIG_DELAY_DEVICE_PROBES being set the weim driver
+isn't loadad because module_platform_driver_probe is
+incompatible with deferred probing.
 
-Applied - thanks,
--Christoffer
+Fix this by using builtin_platform_driver instead.
+Going with deferred probing also means we have to drop
+the __init annotations.
+
+Successfully tested on a I.MX6-based system.
+
+I send the patch to linux-arm-kernel as the kernel MAINTAINERS
+file doesn't list a dedicated maintainer.
+
+Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+---
+ drivers/bus/imx-weim.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
+index e98d15e..7c425d3 100644
+--- a/drivers/bus/imx-weim.c
++++ b/drivers/bus/imx-weim.c
+@@ -59,7 +59,7 @@ static const struct of_device_id weim_id_table[] = {
+ };
+ MODULE_DEVICE_TABLE(of, weim_id_table);
+ 
+-static int __init imx_weim_gpr_setup(struct platform_device *pdev)
++static int imx_weim_gpr_setup(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct property *prop;
+@@ -109,7 +109,7 @@ err:
+ }
+ 
+ /* Parse and set the timing for this device. */
+-static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
++static int weim_timing_setup(struct device_node *np, void __iomem *base,
+ 				    const struct imx_weim_devtype *devtype)
+ {
+ 	u32 cs_idx, value[devtype->cs_regs_count];
+@@ -135,7 +135,7 @@ static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
+ 	return 0;
+ }
+ 
+-static int __init weim_parse_dt(struct platform_device *pdev,
++static int weim_parse_dt(struct platform_device *pdev,
+ 				void __iomem *base)
+ {
+ 	const struct of_device_id *of_id = of_match_device(weim_id_table,
+@@ -172,7 +172,7 @@ static int __init weim_parse_dt(struct platform_device *pdev,
+ 	return ret;
+ }
+ 
+-static int __init weim_probe(struct platform_device *pdev)
++static int weim_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res;
+ 	struct clk *clk;
+@@ -209,8 +209,9 @@ static struct platform_driver weim_driver = {
+ 		.name		= "imx-weim",
+ 		.of_match_table	= weim_id_table,
+ 	},
++	.probe = weim_probe,
+ };
+-module_platform_driver_probe(weim_driver, weim_probe);
++builtin_platform_driver(weim_driver);
+ 
+ MODULE_AUTHOR("Freescale Semiconductor Inc.");
+ MODULE_DESCRIPTION("i.MX EIM Controller Driver");
+-- 
+2.6.1
