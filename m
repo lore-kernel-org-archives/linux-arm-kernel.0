@@ -1,90 +1,99 @@
-From: joshc@ni.com (Josh Cartwright)
-Date: Sun, 18 Oct 2015 13:02:59 -0500
-Subject: [PATCHv2 3/3] fpga manager: Adding FPGA Manager support for
- Xilinx Zynq 7000
-In-Reply-To: <1445035350-3569-4-git-send-email-moritz.fischer@ettus.com>
-References: <1445035350-3569-1-git-send-email-moritz.fischer@ettus.com>
- <1445035350-3569-4-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <20151018180259.GI12756@jcartwri.amer.corp.natinst.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Sun, 18 Oct 2015 12:24:18 -0600
+Subject: [PATCH V2 01/30] coresight: etm3x: moving etm_readl/writel to header
+ file
+In-Reply-To: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1445192687-24112-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Moritz-
+Moving functions etm_readl/writel to file "coresight-etm.h"
+for access by code outside of the main ETM3x driver.
 
-On Fri, Oct 16, 2015 at 03:42:30PM -0700, Moritz Fischer wrote:
-> This commit adds FPGA Manager support for the Xilinx Zynq chip.
-> The code borrows some from the xdevcfg driver in Xilinx'
-> vendor tree.
-> 
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> ---
-> 
-> v2:
->  - Replaced locking error flag and broken completion with irq masking
->    and changed completion handling
->  - Dealing with timeout cases
->  - Reworked clock handling
->  - Moved initialization from probe() to write_init()
->  - Fixed return value of devm_request_irq() check to check for non-zero
->  - Alphabetized includes ;-)
->  - Changed some of the comments, to better explain what's happening
-[..]
-> +static int zynq_fpga_probe(struct platform_device *pdev)
-> +{
-[..]
-> +	priv->clk = devm_clk_get(dev, "ref_clk");
-> +	if (IS_ERR(priv->clk)) {
-> +		dev_err(dev, "input clock not found");
-> +		return PTR_ERR(priv->clk);
-> +	}
-> +
-> +	err = clk_prepare_enable(priv->clk);
-> +	if (err) {
-> +		dev_err(dev, "unable to enable clock");
-> +		return err;
-> +	}
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-etm.h   | 29 +++++++++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-etm3x.c | 29 ---------------------------
+ 2 files changed, 29 insertions(+), 29 deletions(-)
 
-prepare_cnt = 1, enable_cnt = 1
-
-> +
-> +	/* unlock the device */
-> +	zynq_fpga_write(priv, UNLOCK_OFFSET, UNLOCK_MASK);
-> +
-> +	clk_disable(priv->clk);
-
-prepare_cnt = 1, enable_cnt = 0
-> +
-> +	err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
-> +				&zynq_fpga_ops, priv);
-> +	if (err) {
-> +		dev_err(dev, "unable to register FPGA manager");
-> +		clk_disable_unprepare(priv->clk);
-
-prepare_cnt = 0, enable_cnt = -1 /* OOPS! */
-
-Clock management is still wonky.  I think you only want clk_unprepare here.
-
-> +		return err;
-> +	}
-> +
-
-Assuming all goes well, you'll be leaving probe() with:
-
-prepare_cnt = 1, enable_cnt = 0.
-
-> +	return 0;
-> +}
-> +
-> +static int zynq_fpga_remove(struct platform_device *pdev)
-> +{
-> +	struct zynq_fpga_priv *priv;
-> +
-> +	fpga_mgr_unregister(&pdev->dev);
-> +
-> +	priv = platform_get_drvdata(pdev);
-> +
-> +	clk_disable_unprepare(priv->clk);
-
-Which means, symmetrically, you'll only want this to be a clk_unprepare().
-
-  Josh
+diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
+index b4481eb29304..34f7db881fa7 100644
+--- a/drivers/hwtracing/coresight/coresight-etm.h
++++ b/drivers/hwtracing/coresight/coresight-etm.h
+@@ -251,4 +251,33 @@ enum etm_addr_type {
+ 	ETM_ADDR_TYPE_START,
+ 	ETM_ADDR_TYPE_STOP,
+ };
++
++static inline void etm_writel(struct etm_drvdata *drvdata,
++			      u32 val, u32 off)
++{
++	if (drvdata->use_cp14) {
++		if (etm_writel_cp14(off, val)) {
++			dev_err(drvdata->dev,
++				"invalid CP14 access to ETM reg: %#x", off);
++		}
++	} else {
++		writel_relaxed(val, drvdata->base + off);
++	}
++}
++
++static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
++{
++	u32 val;
++
++	if (drvdata->use_cp14) {
++		if (etm_readl_cp14(off, &val)) {
++			dev_err(drvdata->dev,
++				"invalid CP14 access to ETM reg: %#x", off);
++		}
++	} else {
++		val = readl_relaxed(drvdata->base + off);
++	}
++
++	return val;
++}
+ #endif
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index d630b7ece735..c1dc095c3fb0 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -42,35 +42,6 @@ module_param_named(boot_enable, boot_enable, int, S_IRUGO);
+ static int etm_count;
+ static struct etm_drvdata *etmdrvdata[NR_CPUS];
+ 
+-static inline void etm_writel(struct etm_drvdata *drvdata,
+-			      u32 val, u32 off)
+-{
+-	if (drvdata->use_cp14) {
+-		if (etm_writel_cp14(off, val)) {
+-			dev_err(drvdata->dev,
+-				"invalid CP14 access to ETM reg: %#x", off);
+-		}
+-	} else {
+-		writel_relaxed(val, drvdata->base + off);
+-	}
+-}
+-
+-static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
+-{
+-	u32 val;
+-
+-	if (drvdata->use_cp14) {
+-		if (etm_readl_cp14(off, &val)) {
+-			dev_err(drvdata->dev,
+-				"invalid CP14 access to ETM reg: %#x", off);
+-		}
+-	} else {
+-		val = readl_relaxed(drvdata->base + off);
+-	}
+-
+-	return val;
+-}
+-
+ /*
+  * Memory mapped writes to clear os lock are not supported on some processors
+  * and OS lock must be unlocked before any memory mapped access on such
+-- 
+1.9.1
