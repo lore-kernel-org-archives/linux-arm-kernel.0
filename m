@@ -1,43 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 18 Oct 2015 20:57:19 +0100
-Subject: [PATCH RFC 0/2] simplefb: Add regulator handling support
-In-Reply-To: <561E3D28.2090901@redhat.com>
-References: <1444669458-5588-1-git-send-email-wens@csie.org>
- <561CAFE8.9080506@redhat.com>
- <20151014105556.GT14956@sirena.org.uk>
- <561E3D28.2090901@redhat.com>
-Message-ID: <20151018195719.GC14956@sirena.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 18 Oct 2015 22:13:52 +0200
+Subject: [PATCH] arm64: kvm: restore EL1N SP for panic
+In-Reply-To: <1444658690-8180-1-git-send-email-mark.rutland@arm.com>
+References: <1444658690-8180-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20151018201352.GD7531@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2015 at 01:31:52PM +0200, Hans de Goede wrote:
+On Mon, Oct 12, 2015 at 03:04:50PM +0100, Mark Rutland wrote:
+> If we panic in hyp mode, we inject a call to panic() into the EL1N host
+> kernel. If a guest context is active, we first attempt to restore the
+> minimal amount of state necessary to execute the host kernel with
+> restore_sysregs.
+> 
+> However, the SP is restored as part of restore_common_regs, and so we
+> may return to the host's panic() function with the SP of the guest. Any
+> calculations based on the SP will be bogus, and any attempt to access
+> the stack will result in recursive data aborts.
+> 
+> When running Linux as a guest, the guest's EL1N SP is like to be some
+> valid kernel address. In this case, the host kernel may use that region
+> as a stack for panic(), corrupting it in the process.
+> 
+> Avoid the problem by restoring the host SP prior to returning to the
+> host. To prevent misleading backtraces in the host, the FP is zeroed at
+> the same time. We don't need any of the other "common" registers in
+> order to panic successfully.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: <kvmarm@lists.cs.columbia.edu>
 
-> I like your idea in your other mail where you suggest to actually
-> use foo-supply and bar-supply names in the simplefb node, and then have
-> some code simple iterate over all the properties and check for *-supply
-> properties, so that the proper, schematic matching names can be used.
-
-> But surely if we go this way having a helper for this so that others
-> can re-use that likely not entirely trivial code is a good idea ?
-
-Yeah.  It's trying to come up with a way to do this that is easy to
-avoid abuse that's tricky.
-
-> One user which comes to mind immediately here is the generic mmc-pwrseq
-> driver.
-
-> I agree that we need to be careful to not use a helper like this too
-> much, but I do believe it will make sense to have it in some rare cases.
-> We can put a big warning in both the header declaring it and above
-> the implementation to use it scarcely.
-
-I'd rather have something that was visible in the code, not everyone
-reads the documentation especially not subsystem maintainers reviewing
-drivers that use APIs they're not familiar with.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151018/4fcf6272/attachment.sig>
+Applied - thanks,
+-Christoffer
