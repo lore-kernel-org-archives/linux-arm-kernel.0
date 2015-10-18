@@ -1,584 +1,133 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Sun, 18 Oct 2015 12:24:47 -0600
-Subject: [PATCH V2 30/30] perf tools: adding coresight etm PMU record
- capabilities
+Date: Sun, 18 Oct 2015 12:24:28 -0600
+Subject: [PATCH V2 11/30] coresight: etm3x: implementing user/kernel mode
+ tracing
 In-Reply-To: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1445192687-24112-31-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1445192687-24112-12-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Coresight ETMs are IP blocks allowing to perform HW assisted tracing
-on a CPU core.  This patch introduce the required auxiliary API
-functions allowing the perf core to interact with a tracer.
+Adding new mode to limit tracing to kernel or user space.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- tools/perf/arch/arm/util/Build      |   2 +-
- tools/perf/arch/arm/util/auxtrace.c |  48 ++++
- tools/perf/arch/arm/util/cs_etm.c   | 444 ++++++++++++++++++++++++++++++++++++
- tools/perf/arch/arm/util/cs_etm.h   |  37 +++
- 4 files changed, 530 insertions(+), 1 deletion(-)
- create mode 100644 tools/perf/arch/arm/util/auxtrace.c
- create mode 100644 tools/perf/arch/arm/util/cs_etm.c
- create mode 100644 tools/perf/arch/arm/util/cs_etm.h
+ drivers/hwtracing/coresight/coresight-etm.h        |  9 +++-
+ .../hwtracing/coresight/coresight-etm3x-sysfs.c    |  4 ++
+ drivers/hwtracing/coresight/coresight-etm3x.c      | 60 ++++++++++++++++++++++
+ 3 files changed, 72 insertions(+), 1 deletion(-)
 
-diff --git a/tools/perf/arch/arm/util/Build b/tools/perf/arch/arm/util/Build
-index 371a3bf12297..87545604b029 100644
---- a/tools/perf/arch/arm/util/Build
-+++ b/tools/perf/arch/arm/util/Build
-@@ -3,4 +3,4 @@ libperf-$(CONFIG_DWARF) += dwarf-regs.o
- libperf-$(CONFIG_LIBUNWIND)          += unwind-libunwind.o
- libperf-$(CONFIG_LIBDW_DWARF_UNWIND) += unwind-libdw.o
+diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
+index f33aeb4e545d..ebc710df27dc 100644
+--- a/drivers/hwtracing/coresight/coresight-etm.h
++++ b/drivers/hwtracing/coresight/coresight-etm.h
+@@ -110,7 +110,12 @@
+ #define ETM_MODE_STALL		BIT(2)
+ #define ETM_MODE_TIMESTAMP	BIT(3)
+ #define ETM_MODE_CTXID		BIT(4)
+-#define ETM_MODE_ALL		0x1f
++#define ETM_MODE_EXCL_KERN	BIT(5)
++#define ETM_MODE_EXCL_USER	BIT(6)
++#define ETM_MODE_ALL		(ETM_MODE_EXCLUDE | ETM_MODE_CYCACC | \
++				 ETM_MODE_STALL | ETM_MODE_TIMESTAMP | \
++				 ETM_MODE_CTXID | ETM_MODE_EXCL_KERN | \
++				 ETM_MODE_EXCL_USER)
  
--libperf-$(CONFIG_AUXTRACE_ARM) += pmu.o
-+libperf-$(CONFIG_AUXTRACE_ARM) += pmu.o auxtrace.o cs_etm.o
-diff --git a/tools/perf/arch/arm/util/auxtrace.c b/tools/perf/arch/arm/util/auxtrace.c
-new file mode 100644
-index 000000000000..4988fdf7cb8a
---- /dev/null
-+++ b/tools/perf/arch/arm/util/auxtrace.c
-@@ -0,0 +1,48 @@
-+/*
-+ * Copyright(C) 2015 Linaro Limited. All rights reserved.
-+ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
+ #define ETM_SQR_MASK		0x3
+ #define ETM_TRACEID_MASK	0x3f
+@@ -302,5 +307,7 @@ static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
+ extern const struct attribute_group *coresight_etm_groups[];
+ int etm_get_trace_id(struct etm_drvdata *drvdata);
+ void etm_set_default(struct etm_config *config);
++void etm_config_trace_mode(struct etm_drvdata *drvdata,
++			   struct etm_config *config, u32 mode);
+ struct etm_config *get_etm_config(struct etm_drvdata *drvdata);
+ #endif
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+index bc8f04214567..1e0908c0ca6d 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+@@ -176,6 +176,10 @@ static ssize_t mode_store(struct device *dev,
+ 		config->ctrl |= ETMCR_CTXID_SIZE;
+ 	else
+ 		config->ctrl &= ~ETMCR_CTXID_SIZE;
 +
-+#include <stdbool.h>
-+#include <linux/coresight-pmu.h>
++	if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
++		etm_config_trace_mode(drvdata, config, config->mode);
 +
-+#include "../../util/auxtrace.h"
-+#include "../../util/evlist.h"
-+#include "../../util/pmu.h"
-+#include "cs_etm.h"
-+
-+struct auxtrace_record
-+*auxtrace_record__init(struct perf_evlist *evlist, int *err)
+ 	spin_unlock(&drvdata->spinlock);
+ 
+ 	return size;
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index cc0b08437419..8a133d761f6a 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -252,6 +252,66 @@ void etm_set_default(struct etm_config *config)
+ 	config->ctxid_mask = 0x0;
+ }
+ 
++void etm_config_trace_mode(struct etm_drvdata *drvdata,
++			   struct etm_config *config,
++			   u32 mode)
 +{
-+	struct perf_pmu	*cs_etm_pmu;
-+	struct perf_evsel *evsel;
-+	bool found_etm = false;
++	u32 flags;
 +
-+	cs_etm_pmu = perf_pmu__find(CORESIGHT_ETM_PMU_NAME);
++	mode &= (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER);
 +
-+	 if (evlist) {
-+		evlist__for_each(evlist, evsel) {
-+			if (cs_etm_pmu &&
-+			    evsel->attr.type == cs_etm_pmu->type)
-+				found_etm = true;
-+		}
++	/* excluding kernel AND user space doesn't make sense */
++	WARN_ON_ONCE(mode == (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER));
++
++	/* nothing to do if neither flags are set */
++	if (!(mode & ETM_MODE_EXCL_KERN) && !(mode & ETM_MODE_EXCL_USER))
++		return;
++
++	flags = (1 << 0 |	/* instruction execute*/
++		 3 << 3 |	/* ARM instruction */
++		 0 << 5 |	/* No data value comparison */
++		 0 << 7 |	/* No exact mach */
++		 0 << 8);	/* Ignore context ID */
++
++	/* No need to worry about single address comparators. */
++	config->enable_ctrl2 = 0x0;
++
++	/* Bit 0 is address range comparator 1 */
++	config->enable_ctrl1 = ETMTECR1_ADDR_COMP_1;
++
++	/* On ETMv3.5:
++	 * ETMACTRn[13,11] == Non-secure state comparison control
++	 * ETMACTRn[12,10] == Secure state comparison control
++	 *
++	 * b00 == Match in all modes in this state
++	 * b01 == Do not match in any more in this state
++	 * b10 == Match in all modes excepts user mode in this state
++	 * b11 == Match only in user mode in this state
++	 */
++
++	/* Tracing in secure mode is not supported at this time */
++	flags |= (0 << 12 | 1 << 10);
++
++	if (mode & ETM_MODE_EXCL_USER) {
++		/* exclude user, match all modes except user mode */
++		flags |= (1 << 13 | 0 << 11);
++	} else {
++		/* exclude kernel, match only in user mode */
++		flags |= (1 << 13 | 1 << 11);
 +	}
 +
-+	if (found_etm)
-+		return cs_etm_record_init(err);
-+
-+	*err = -EINVAL;
-+	return NULL;
-+}
-diff --git a/tools/perf/arch/arm/util/cs_etm.c b/tools/perf/arch/arm/util/cs_etm.c
-new file mode 100644
-index 000000000000..2e89b44dd4da
---- /dev/null
-+++ b/tools/perf/arch/arm/util/cs_etm.c
-@@ -0,0 +1,444 @@
-+/*
-+ * Copyright(C) 2015 Linaro Limited. All rights reserved.
-+ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <api/fs/fs.h>
-+#include <linux/bitops.h>
-+#include <linux/coresight-pmu.h>
-+#include <linux/kernel.h>
-+#include <linux/log2.h>
-+#include <linux/types.h>
-+
-+#include "../../perf.h"
-+#include "../../util/auxtrace.h"
-+#include "../../util/cpumap.h"
-+#include "../../util/evlist.h"
-+#include "../../util/pmu.h"
-+#include "../../util/thread_map.h"
-+#include "cs_etm.h"
-+
-+#include <stdlib.h>
-+
-+/* Also used by Intel - should go to a common header */
-+#define KiB(x) ((x) * 1024)
-+#define MiB(x) ((x) * 1024 * 1024)
-+
-+struct cs_etm_recording {
-+	struct auxtrace_record	itr;
-+	struct perf_pmu		*cs_etm_pmu;
-+	struct perf_evlist	*evlist;
-+	bool			snapshot_mode;
-+	size_t			snapshot_size;
-+};
-+
-+static int cs_etm_parse_snapshot_options(struct auxtrace_record *itr,
-+					 struct record_opts *opts,
-+					 const char *str)
-+{
-+	struct cs_etm_recording *ptr =
-+				container_of(itr, struct cs_etm_recording, itr);
-+	unsigned long long snapshot_size = 0;
-+	char *endptr;
-+
-+	if (str) {
-+		snapshot_size = strtoull(str, &endptr, 0);
-+		if (*endptr || snapshot_size > SIZE_MAX)
-+			return -1;
-+	}
-+
-+	opts->auxtrace_snapshot_mode = true;
-+	opts->auxtrace_snapshot_size = snapshot_size;
-+	ptr->snapshot_size = snapshot_size;
-+
-+	return 0;
++	/* The ETMEEVR register is already set to "hard wire A", and as
++	 * such all there is to do is setup an address comparator that spans
++	 * the entire address range and configure the state and mode bits
++	 */
++	config->addr_val[0] = (u32) 0x0;
++	config->addr_val[1] = (u32) ~0x0;
++	config->addr_acctype[0] = flags;
++	config->addr_acctype[1] = flags;
++	config->addr_type[0] = ETM_ADDR_TYPE_RANGE;
++	config->addr_type[1] = ETM_ADDR_TYPE_RANGE;
 +}
 +
-+static int cs_etm_recording_options(struct auxtrace_record *itr,
-+				    struct perf_evlist *evlist,
-+				    struct record_opts *opts)
-+{
-+	struct cs_etm_recording *ptr =
-+				container_of(itr, struct cs_etm_recording, itr);
-+	struct perf_pmu *cs_etm_pmu = ptr->cs_etm_pmu;
-+	struct perf_evsel *evsel, *cs_etm_evsel = NULL;
-+	const struct cpu_map *cpus = evlist->cpus;
-+	bool privileged = (geteuid() == 0 || perf_event_paranoid() < 0);
-+
-+	ptr->evlist = evlist;
-+	ptr->snapshot_mode = opts->auxtrace_snapshot_mode;
-+
-+	evlist__for_each(evlist, evsel) {
-+		if (evsel->attr.type == cs_etm_pmu->type) {
-+			if (cs_etm_evsel) {
-+				pr_err("There may be only one %s event\n",
-+				       CORESIGHT_ETM_PMU_NAME);
-+				return -EINVAL;
-+			}
-+			evsel->attr.freq = 0;
-+			evsel->attr.sample_period = 1;
-+			cs_etm_evsel = evsel;
-+			opts->full_auxtrace = true;
-+		}
-+	}
-+
-+	/* no need to continue if at least one event of interest was found */
-+	if (!cs_etm_evsel)
-+		return 0;
-+
-+	if (opts->use_clockid) {
-+		pr_err("Cannot use clockid (-k option) with %s\n",
-+		       CORESIGHT_ETM_PMU_NAME);
-+		return -EINVAL;
-+	}
-+
-+	/* we are in snapshot mode */
-+	if (opts->auxtrace_snapshot_mode) {
-+		/*
-+		 * No size were given to '-S' or '-m,', so go with
-+		 * the default
-+		 */
-+		if (!opts->auxtrace_snapshot_size &&
-+		    !opts->auxtrace_mmap_pages) {
-+			if (privileged) {
-+				opts->auxtrace_mmap_pages = MiB(4) / page_size;
-+			} else {
-+				opts->auxtrace_mmap_pages =
-+							KiB(128) / page_size;
-+				if (opts->mmap_pages == UINT_MAX)
-+					opts->mmap_pages = KiB(256) / page_size;
-+			}
-+		} else if (!opts->auxtrace_mmap_pages && !privileged &&
-+						opts->mmap_pages == UINT_MAX) {
-+			opts->mmap_pages = KiB(256) / page_size;
-+		}
-+
-+		/*
-+		 * '-m,xyz' was specified but no snapshot size, so make the
-+		 * snapshot size as big as the auxtrace mmap area.
-+		 */
-+		if (!opts->auxtrace_snapshot_size) {
-+			opts->auxtrace_snapshot_size =
-+				opts->auxtrace_mmap_pages * (size_t)page_size;
-+		}
-+
-+		/*
-+		 * -Sxyz was specified but no auxtrace mmap area, so make the
-+		 * auxtrace mmap area big enough to fit the requested snapshot
-+		 * size.
-+		 */
-+		if (!opts->auxtrace_mmap_pages) {
-+			size_t sz = opts->auxtrace_snapshot_size;
-+
-+			sz = round_up(sz, page_size) / page_size;
-+			opts->auxtrace_mmap_pages = roundup_pow_of_two(sz);
-+		}
-+
-+		/* Snapshost size can't be bigger than the auxtrace area */
-+		if (opts->auxtrace_snapshot_size >
-+				opts->auxtrace_mmap_pages * (size_t)page_size) {
-+			pr_err("Snapshot size %zu must not be greater than AUX area tracing mmap size %zu\n",
-+			       opts->auxtrace_snapshot_size,
-+			       opts->auxtrace_mmap_pages * (size_t)page_size);
-+			return -EINVAL;
-+		}
-+
-+		/* Something went wrong somewhere - this shouldn't happen */
-+		if (!opts->auxtrace_snapshot_size ||
-+		    !opts->auxtrace_mmap_pages) {
-+			pr_err("Failed to calculate default snapshot size and/or AUX area tracing mmap pages\n");
-+			return -EINVAL;
-+		}
-+	}
-+
-+	/* We are in full trace mode but '-m,xyz' wasn't specified */
-+	 if (opts->full_auxtrace && !opts->auxtrace_mmap_pages) {
-+		if (privileged) {
-+			opts->auxtrace_mmap_pages = MiB(4) / page_size;
-+		} else {
-+			opts->auxtrace_mmap_pages = KiB(128) / page_size;
-+			if (opts->mmap_pages == UINT_MAX)
-+				opts->mmap_pages = KiB(256) / page_size;
-+		}
-+
-+	}
-+
-+	/* Validate auxtrace_mmap_pages provided by user */
-+	if (opts->auxtrace_mmap_pages) {
-+		unsigned int max_page = (KiB(128) / page_size);
-+		size_t sz = opts->auxtrace_mmap_pages * (size_t)page_size;
-+
-+		if (!privileged &&
-+		    opts->auxtrace_mmap_pages > max_page) {
-+			opts->auxtrace_mmap_pages = max_page;
-+			pr_err("auxtrace too big, truncating to %d\n",
-+			       max_page);
-+		}
-+
-+		if (!is_power_of_2(sz)) {
-+			pr_err("Invalid mmap size for %s: must be a power of 2\n",
-+			       CORESIGHT_ETM_PMU_NAME);
-+			return -EINVAL;
-+		}
-+	}
-+
-+	if (opts->auxtrace_snapshot_mode)
-+		pr_debug2("%s snapshot size: %zu\n", CORESIGHT_ETM_PMU_NAME,
-+			  opts->auxtrace_snapshot_size);
-+
-+	if (cs_etm_evsel) {
-+		/*
-+		 * To obtain the auxtrace buffer file descriptor, the auxtrace
-+		 * event must come first.
-+		 */
-+		perf_evlist__to_front(evlist, cs_etm_evsel);
-+		/*
-+		 * In the case of per-cpu mmaps, we need the CPU on the
-+		 * AUX event.
-+		 */
-+		if (!cpu_map__empty(cpus))
-+			perf_evsel__set_sample_bit(cs_etm_evsel, CPU);
-+	}
-+
-+	/* Add dummy event to keep tracking */
-+	if (opts->full_auxtrace) {
-+		struct perf_evsel *tracking_evsel;
-+		int err;
-+
-+		err = parse_events(evlist, "dummy:u", NULL);
-+		if (err)
-+			return err;
-+
-+		tracking_evsel = perf_evlist__last(evlist);
-+		perf_evlist__set_tracking_event(evlist, tracking_evsel);
-+
-+		tracking_evsel->attr.freq = 0;
-+		tracking_evsel->attr.sample_period = 1;
-+
-+		/* In per-cpu case, always need the time of mmap events etc */
-+		if (!cpu_map__empty(cpus))
-+			perf_evsel__set_sample_bit(tracking_evsel, TIME);
-+	}
-+
-+	return 0;
-+}
-+
-+static size_t
-+cs_etm_info_priv_size(struct auxtrace_record *itr __maybe_unused,
-+		      struct perf_session *session __maybe_unused)
-+{
-+	int records;
-+	const struct cpu_map *cpus = session->evlist->cpus;
-+
-+	if (!cpu_map__empty(cpus)) {
-+		records = cpu_map__nr(cpus);
-+		goto out;
-+	}
-+
-+	set_max_cpu_num();
-+	records = cpu__max_cpu();
-+out:
-+	return records * CS_ETM_PRIV_SIZE;
-+}
-+
-+static const char *metadata[CS_ETM_PRIV_MAX] = {
-+	[CS_ETM_ETMCR]		= "etmcr",
-+	[CS_ETM_ETMCCER]	= "etmccer",
-+	[CS_ETM_ETMIDR]		= "etmidr",
-+	[CS_ETM_ETMTRACEIDR]	= "etmtraceidr",
-+};
-+
-+static int cs_etm_get_metadata(int cpu, int offset,
-+			       struct cs_etm_recording *ptr,
-+			       struct auxtrace_info_event *info)
-+{
-+	int i, ret = 0;
-+	const char *sysfs = sysfs__mountpoint();
-+
-+	if (!sysfs)
-+		return -EINVAL;
-+
-+	info->priv[offset + CS_ETM_MAGIC] = __perf_cs_etm_magic;
-+	info->priv[offset + CS_ETM_CPU] = cpu;
-+	info->priv[offset + CS_ETM_SNAPSHOT] = ptr->snapshot_mode;
-+
-+	/* get metadata from sysfs */
-+	for (i = CS_ETM_ETMCR; i < CS_ETM_PRIV_MAX && !ret; i++) {
-+		FILE *file;
-+		char path[PATH_MAX], value[128];
-+
-+		snprintf(path, PATH_MAX,
-+			 "%s" EVENT_SOURCE_DEVICE_PATH "%s/cpu%d/mgmt/%s",
-+			 sysfs, CORESIGHT_ETM_PMU_NAME, cpu, metadata[i]);
-+
-+		file = fopen(path, "r");
-+		if (!file)
-+			return -EINVAL;
-+
-+		if (fscanf(file, "%s", value) != 1)
-+			ret = -EINVAL;
-+
-+		fclose(file);
-+
-+		info->priv[offset + i] = strtol(value, NULL, 16);
-+	}
-+
-+	return 0;
-+}
-+
-+static int cs_etm_info_fill(struct auxtrace_record *itr,
-+			    struct perf_session *session,
-+			    struct auxtrace_info_event *auxtrace_info,
-+			    size_t priv_size)
-+{
-+	int i, nr_cpu, ret = 0;
-+	const struct cpu_map *cpus = session->evlist->cpus;
-+	struct cs_etm_recording *ptr =
-+			container_of(itr, struct cs_etm_recording, itr);
-+
-+	if (priv_size != cs_etm_info_priv_size(itr, session))
-+		return -EINVAL;
-+
-+	if (!session->evlist->nr_mmaps)
-+		return -EINVAL;
-+
-+	auxtrace_info->type = PERF_AUXTRACE_CS_ETM;
-+
-+	/* cpu map is not empty, we have specific CPUs to work with */
-+	if (!cpu_map__empty(cpus)) {
-+		for (i = 0; i < cpu_map__nr(cpus); i++)
-+			ret = cs_etm_get_metadata(cpus->map[i],
-+						    i * CS_ETM_PRIV_MAX,
-+						    ptr, auxtrace_info);
-+		if (ret)
-+			goto out;
-+	}
-+
-+	/* get configuration for all CPUs in the system */
-+	nr_cpu = cpu__max_cpu();
-+	for (i = 0; i < nr_cpu; i++) {
-+		ret = cs_etm_get_metadata(i, i * CS_ETM_PRIV_MAX,
-+					    ptr, auxtrace_info);
-+		if (ret)
-+			goto out;
-+	}
-+
-+out:
-+	return ret;
-+}
-+
-+static int cs_etm_find_snapshot(struct auxtrace_record *itr __maybe_unused,
-+				int idx, struct auxtrace_mmap *mm,
-+				unsigned char *data __maybe_unused,
-+				u64 *head, u64 *old)
-+{
-+	pr_debug3("%s: mmap index %d old head %zu new head %zu size %zu\n",
-+		  __func__, idx, (size_t)*old, (size_t)*head, mm->len);
-+
-+	*old = *head;
-+	*head += mm->len;
-+
-+	return 0;
-+}
-+
-+static int cs_etm_snapshot_start(struct auxtrace_record *itr)
-+{
-+	struct cs_etm_recording *ptr =
-+			container_of(itr, struct cs_etm_recording, itr);
-+	struct perf_evsel *evsel;
-+
-+	evlist__for_each(ptr->evlist, evsel) {
-+		if (evsel->attr.type == ptr->cs_etm_pmu->type)
-+			return perf_evlist__disable_event(ptr->evlist, evsel);
-+	}
-+	return -EINVAL;
-+}
-+
-+static int cs_etm_snapshot_finish(struct auxtrace_record *itr)
-+{
-+	struct cs_etm_recording *ptr =
-+			container_of(itr, struct cs_etm_recording, itr);
-+	struct perf_evsel *evsel;
-+
-+	evlist__for_each(ptr->evlist, evsel) {
-+		if (evsel->attr.type == ptr->cs_etm_pmu->type)
-+			return perf_evlist__enable_event(ptr->evlist, evsel);
-+	}
-+	return -EINVAL;
-+}
-+
-+static u64 cs_etm_reference(struct auxtrace_record *itr __maybe_unused)
-+{
-+	return (((u64) rand() <<  0) & 0x00000000FFFFFFFFull) |
-+		(((u64) rand() << 32) & 0xFFFFFFFF00000000ull);
-+}
-+
-+static void cs_etm_recording_free(struct auxtrace_record *itr)
-+{
-+	struct cs_etm_recording *ptr =
-+			container_of(itr, struct cs_etm_recording, itr);
-+	free(ptr);
-+}
-+
-+static int cs_etm_read_finish(struct auxtrace_record *itr, int idx)
-+{
-+	struct cs_etm_recording *ptr =
-+			container_of(itr, struct cs_etm_recording, itr);
-+	struct perf_evsel *evsel;
-+
-+	evlist__for_each(ptr->evlist, evsel) {
-+		if (evsel->attr.type == ptr->cs_etm_pmu->type)
-+			return perf_evlist__enable_event_idx(ptr->evlist,
-+							     evsel, idx);
-+	}
-+
-+	return -EINVAL;
-+}
-+
-+struct auxtrace_record *cs_etm_record_init(int *err)
-+{
-+	struct perf_pmu *cs_etm_pmu;
-+	struct cs_etm_recording *ptr;
-+
-+	cs_etm_pmu = perf_pmu__find(CORESIGHT_ETM_PMU_NAME);
-+
-+	if (!cs_etm_pmu) {
-+		*err = -EINVAL;
-+		goto out;
-+	}
-+
-+	ptr = zalloc(sizeof(struct cs_etm_recording));
-+	if (!ptr) {
-+		*err = -ENOMEM;
-+		goto out;
-+	}
-+
-+	ptr->cs_etm_pmu			= cs_etm_pmu;
-+	ptr->itr.parse_snapshot_options	= cs_etm_parse_snapshot_options;
-+	ptr->itr.recording_options	= cs_etm_recording_options;
-+	ptr->itr.info_priv_size		= cs_etm_info_priv_size;
-+	ptr->itr.info_fill		= cs_etm_info_fill;
-+	ptr->itr.find_snapshot		= cs_etm_find_snapshot;
-+	ptr->itr.snapshot_start		= cs_etm_snapshot_start;
-+	ptr->itr.snapshot_finish	= cs_etm_snapshot_finish;
-+	ptr->itr.reference		= cs_etm_reference;
-+	ptr->itr.free			= cs_etm_recording_free;
-+	ptr->itr.read_finish		= cs_etm_read_finish;
-+
-+	*err = 0;
-+	return &ptr->itr;
-+out:
-+	return NULL;
-+}
-diff --git a/tools/perf/arch/arm/util/cs_etm.h b/tools/perf/arch/arm/util/cs_etm.h
-new file mode 100644
-index 000000000000..b3b3f16d80e3
---- /dev/null
-+++ b/tools/perf/arch/arm/util/cs_etm.h
-@@ -0,0 +1,37 @@
-+/*
-+ * Copyright(C) 2015 Linaro Limited. All rights reserved.
-+ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef INCLUDE__PERF_CS_ETM_H__
-+#define INCLUDE__PERF_CS_ETM_H__
-+
-+enum {
-+	CS_ETM_MAGIC,
-+	CS_ETM_CPU,
-+	CS_ETM_SNAPSHOT,
-+	CS_ETM_ETMCR,
-+	CS_ETM_ETMCCER,
-+	CS_ETM_ETMIDR,
-+	CS_ETM_ETMTRACEIDR,
-+	CS_ETM_PRIV_MAX,
-+};
-+
-+static const u64 __perf_cs_etm_magic   = 0x3030303030303030ULL;
-+#define CS_ETM_PRIV_SIZE (CS_ETM_PRIV_MAX * sizeof(u64))
-+
-+struct auxtrace_record *cs_etm_record_init(int *err);
-+
-+#endif
+ static void etm_enable_hw(void *info)
+ {
+ 	int i;
 -- 
 1.9.1
