@@ -1,43 +1,39 @@
 From: joshc@ni.com (Josh Cartwright)
-Date: Sun, 18 Oct 2015 12:51:20 -0500
-Subject: [PATCHv2 1/3] ARM: dt: fpga: Added binding docs for Xilinx Zynq
- FPGA manager.
-In-Reply-To: <1445035350-3569-2-git-send-email-moritz.fischer@ettus.com>
+Date: Sun, 18 Oct 2015 12:53:24 -0500
+Subject: [PATCHv2 2/3] ARM: zynq: dt: Updated devicetree for Zynq 7000
+ platform.
+In-Reply-To: <1445035350-3569-3-git-send-email-moritz.fischer@ettus.com>
 References: <1445035350-3569-1-git-send-email-moritz.fischer@ettus.com>
- <1445035350-3569-2-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <20151018175120.GG12756@jcartwri.amer.corp.natinst.com>
+ <1445035350-3569-3-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <20151018175324.GH12756@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 03:42:28PM -0700, Moritz Fischer wrote:
+On Fri, Oct 16, 2015 at 03:42:29PM -0700, Moritz Fischer wrote:
+> Added addtional nodes required for FPGA Manager operation
+> of the Xilinx Zynq Devc configuration interface.
+> 
+> Reviewed-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 > Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
 > ---
 > 
-> v2:
->  - Clock names are now a required property
->  - Removed interrupt-parent property
+> v2: No changes
 > 
 > ---
->  .../devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt
+>  arch/arm/boot/dts/zynq-7000.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt
-> new file mode 100644
-> index 0000000..7018aa8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt
-> @@ -0,0 +1,19 @@
-> +Xilinx Zynq FPGA Manager
-> +
-> +Required properties:
-> +- compatible:		should contain "xlnx,zynq-devcfg-1.0"
-> +- reg:			base address and size for memory mapped io
-> +- interrupts:		interrupt for the FPGA manager device
-> +- clocks:		phandle for clocks required operation
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index dc0457e..1a5220e 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -294,6 +294,11 @@
+>  		devcfg: devcfg at f8007000 {
+>  			compatible = "xlnx,zynq-devcfg-1.0";
+>  			reg = <0xf8007000 0x100>;
+> +			interrupt-parent = <&intc>;
 
-Technically a "clock specifier", but other than that:
-
-Reviewed-by: Josh Cartwright <joshc@ni.com>
+You shouldn't need interrupt-parent here.  In fact, I suspect it can be
+removed from all sibling nodes as well.
 
   Josh
