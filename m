@@ -1,79 +1,141 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 18 Oct 2015 14:17:17 +0200
-Subject: [linux-sunxi] [PATCH] ARM: dts: sun7i: Enable USB DRC on pcDuino
- v3 Nano
-In-Reply-To: <1445119709-1689-1-git-send-email-ats@offog.org>
-References: <1445119709-1689-1-git-send-email-ats@offog.org>
-Message-ID: <56238DCD.1040909@redhat.com>
+From: amittomer25@gmail.com (Amit)
+Date: Sun, 18 Oct 2015 17:47:19 +0530
+Subject: [PATCH RFC] arm64/ftrace: Define a new arm64 trace clock source based
+ on cntpct_el0 register.
+Message-ID: <1445170639-13943-1-git-send-email-amittomer25@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Amit Singh Tomar <amittomer25@gmail.com>
 
-On 10/18/2015 12:08 AM, Adam Sampson wrote:
-> The OTG arrangement on the LinkSprite pcDuino v3 Nano is the same as the
-> pcDuino 1/2/3: the OTG port's 5V line is connected directly to the 5V
-> bus (it's not switchable), and the OTG port's ID pin is connected to PH4
-> on the A20.
->
-> Tested successfully in both host and device modes.
->
-> Signed-off-by: Adam Sampson <ats@offog.org>
+Currenty, Default trace clock("local") for host and guest is out of sync. 
+This default clock is based on cntvct_el0 register value and both host/guest
+see different values of cntvct_el0.
 
-Looks good: Acked-by: Hans de Goede <hdegoede@redhat.com>
+Intention here is to get a clock whose timestamps are comparable between host/guest.
+It can be achieved by using clock based on cntpct_el0 register values(host/guest
+see same value of cntpct_el0 register all the time).
 
-Regards,
+Define a new arm64 specific trace clock using the cntpct_el0 register,
+similar to x86-tsc. It can be used to correlate trace events across
+hosts and guest that can be useful for debuging purpose.
 
-Hans
+Signed-off-by: Amit Singh Tomar <amittomer25@gmail.com>
+---
+ Documentation/trace/ftrace.txt       |  8 +++++++-
+ arch/arm64/include/asm/Kbuild        |  1 -
+ arch/arm64/include/asm/trace_clock.h | 21 +++++++++++++++++++++
+ arch/arm64/kernel/Makefile           |  1 +
+ arch/arm64/kernel/trace_clock.c      | 23 +++++++++++++++++++++++
+ 5 files changed, 52 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/include/asm/trace_clock.h
+ create mode 100644 arch/arm64/kernel/trace_clock.c
 
-
-> ---
->   arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts | 19 +++++++++++++++++++
->   1 file changed, 19 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts b/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
-> index beac431..1757a6a 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts
-> @@ -142,6 +142,10 @@
->   	status = "okay";
->   };
->
-> +&otg_sram {
-> +	status = "okay";
-> +};
-> +
->   &pio {
->   	ahci_pwr_pin_pcduino3_nano: ahci_pwr_pin at 0 {
->   		allwinner,pins = "PH2";
-> @@ -157,6 +161,13 @@
->   		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->   	};
->
-> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-> +		allwinner,pins = "PH4";
-> +		allwinner,function = "gpio_in";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-> +	};
-> +
->   	usb1_vbus_pin_pcduino3_nano: usb1_vbus_pin at 0 {
->   		allwinner,pins = "PD2";
->   		allwinner,function = "gpio_out";
-> @@ -211,7 +222,15 @@
->   	status = "okay";
->   };
->
-> +&usb_otg {
-> +	dr_mode = "otg";
-> +	status = "okay";
-> +};
-> +
->   &usbphy {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&usb0_id_detect_pin>;
-> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
->   	usb1_vbus-supply = <&reg_usb1_vbus>;
->   	usb2_vbus-supply = <&reg_usb1_vbus>;
->   	status = "okay";
->
+diff --git a/Documentation/trace/ftrace.txt b/Documentation/trace/ftrace.txt
+index ef621d3..6420e32 100644
+--- a/Documentation/trace/ftrace.txt
++++ b/Documentation/trace/ftrace.txt
+@@ -323,7 +323,7 @@ of ftrace. Here is a list of some of the key files:
+ 	Usual clocks for tracing:
+ 
+ 	  # cat trace_clock
+-	  [local] global counter x86-tsc
++	  [local] global counter x86-tsc arm64-pct
+ 
+ 	  local: Default clock, but may not be in sync across CPUs
+ 
+@@ -351,6 +351,12 @@ of ftrace. Here is a list of some of the key files:
+ 		  to correlate events across hypervisor/guest if
+ 		  tb_offset is known.
+ 
++	arm64-pct: This uses ARM64 Physical Timer Count register
++		   value. This is different from default "local"
++		   clock which usese Virtual Timer Count register.
++		   This is consistent across processors and can be
++		   used to correlate events across host/guest.
++
+ 	To set a clock, simply echo the clock name into this file.
+ 
+ 	  echo global > trace_clock
+diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+index 70fd9ff..8608f9e 100644
+--- a/arch/arm64/include/asm/Kbuild
++++ b/arch/arm64/include/asm/Kbuild
+@@ -50,7 +50,6 @@ generic-y += switch_to.h
+ generic-y += termbits.h
+ generic-y += termios.h
+ generic-y += topology.h
+-generic-y += trace_clock.h
+ generic-y += types.h
+ generic-y += unaligned.h
+ generic-y += user.h
+diff --git a/arch/arm64/include/asm/trace_clock.h b/arch/arm64/include/asm/trace_clock.h
+new file mode 100644
+index 0000000..aef4ccd
+--- /dev/null
++++ b/arch/arm64/include/asm/trace_clock.h
+@@ -0,0 +1,21 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * Copyright (C) 2015 Amit Singh Tomar, amittomer25 at gmail.com
++*/
++
++#ifndef _ASM_ARM_TRACE_CLOCK_H
++#define _ASM_ARM_TRACE_CLOCK_H
++
++#include <linux/compiler.h>
++#include <linux/types.h>
++
++extern u64 notrace trace_clock_arm64_pct(void);
++
++# define ARCH_TRACE_CLOCKS \
++	{ trace_clock_arm64_pct,  "arm64-pct",  0},
++
++#endif  /* _ASM_ARM_TRACE_CLOCK_H */
++
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 22dc9bc..d58f885 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -36,6 +36,7 @@ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
+ arm64-obj-$(CONFIG_PCI)			+= pci.o
+ arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+ arm64-obj-$(CONFIG_ACPI)		+= acpi.o
++arm64-obj-$(CONFIG_TRACING)             += trace_clock.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/trace_clock.c b/arch/arm64/kernel/trace_clock.c
+new file mode 100644
+index 0000000..f038977
+--- /dev/null
++++ b/arch/arm64/kernel/trace_clock.c
+@@ -0,0 +1,23 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * Copyright (C) 2015 Amit Singh Tomar, amittomer25 at gmail.com
++*/
++
++#include <asm/trace_clock.h>
++
++#define read_cnt_pct(cnt_pct) do {				\
++	__asm__ __volatile("isb; mrs %0, cntpct_el0; isb ;"	\
++	: "=r" (cnt_pct));					\
++} while (0)
++
++u64 notrace trace_clock_arm64_pct(void)
++{
++	u64 cnt_pct;
++
++	read_cnt_pct(cnt_pct);
++	return  cnt_pct;
++}
++
+-- 
+1.9.1
