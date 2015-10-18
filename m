@@ -1,49 +1,85 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 18 Oct 2015 23:07:38 +0200
-Subject: [RFT - PATCH v2 0/2] KVM/arm64: add fp/simd lazy switch support
-In-Reply-To: <561BDFE3.5060403@samsung.com>
-References: <1442964843-11953-1-git-send-email-m.smarduch@samsung.com>
- <20151005154540.GJ9011@cbox> <561BDFE3.5060403@samsung.com>
-Message-ID: <20151018210738.GF7531@cbox>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 18 Oct 2015 23:23:54 +0200
+Subject: [PATCH 2/2] DT: nvmem: Add NXP LPC18xx EEPROM memory binding
+ documentation
+In-Reply-To: <562145C5.8070507@vanguardiasur.com.ar>
+References: <1445004426-6271-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <1445004426-6271-3-git-send-email-ariel@vanguardiasur.com.ar>
+ <CAAEAJfAAUWd9y8EBfV0irbRF_7EjxD1ycdPcNGScbs6oPxp4JQ@mail.gmail.com>
+ <CAGhQ9VzaqiUm0=vpBYKpppsTsLuhxmAKayi5N4FTXmG5dtiAhw@mail.gmail.com>
+ <562145C5.8070507@vanguardiasur.com.ar>
+Message-ID: <CAGhQ9VzbUz2+n__Y5W=HJ5FAV2Z5pMKgi-Ut662+0n2XuFR0PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2015 at 09:29:23AM -0700, Mario Smarduch wrote:
-> Hi Christoffer, Marc -
->   I just threw this test your way without any explanation.
+On 16 October 2015 at 20:45, Ariel D'Alessandro
+<ariel@vanguardiasur.com.ar> wrote:
+> Ezequiel, Joachim, all,
+>
+> El 16/10/15 a las 14:09, Joachim Eastwood escribi?:
+>> On 16 October 2015 at 17:41, Ezequiel Garcia
+>> <ezequiel@vanguardiasur.com.ar> wrote:
+>>> +DT bindings maintainers
+>>>
+>>> As per the documentation in
+>>> Documentation/devicetree/bindings/submitting-patches.txt
+>>> this binding should be patch 1/2.
+>
+> I see. I'll modify that.
+>
+>>>
+>>> On 16 October 2015 at 11:07, Ariel D'Alessandro
+>>> <ariel@vanguardiasur.com.ar> wrote:
+>>>> Add the devicetree binding document for NXP LPC18xx EEPROM memory.
+>>>>
+>>>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+>>>> ---
+>>>>  .../devicetree/bindings/nvmem/lpc18xx_eeprom.txt   | 26 ++++++++++++++++++++++
+>>>>  1 file changed, 26 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt b/Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt
+>>>> new file mode 100644
+>>>> index 0000000..372ff8c
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt
+>>>> @@ -0,0 +1,26 @@
+>>>> +* NXP LPC18xx EEPROM memory NVMEM driver
+>>>> +
+>>>> +Required properties:
+>>>> +  - compatible: Should be "nxp,lpc1850-eeprom"
+>>>
+>>> Correct me if I'm wrong, but I believe not all LPC18xx/43xx devices
+>>> have an EEPROM.
+>>>
+>>> Isn't it restricted to LPC18x7/LPC43x7 devices?
+>>
+>> The EEPROM can only be found on Flash devices. Flashless devices
+>> doesn't have the EEPROM.
+>
+> Yes, you're right. LPC1850 is wrong, sorry.
+> The UM10430 (LPC18xx User Manual) says that LPC18(5|3|2|1)(7|5|3|2)
+> parts have flash and that the LPC185x/3x parts with flash also include
+> the 16 kB EEPROM. I'll add this info in a new set of patches v2.
+>
+>>
+>>
+>>> Should the compatible be nxp,lpc1857-eeprom to avoid confusion?
+>>
+>> Yes, please. The EEPROM doesn't exist on LPC1850 so please use the
+>> compatibility string from Ezequiel.
+>
+> OK. I'll fix this. Is there any reason for using lpc1857 instead of a
+> different available one?
 
-I'm confused.  Did you send me something somewhere already?
+The lpc1850 was once chosen since it was the device that was
+applicable to most peripherals and it is the flashless "top model". So
+for peripherals found only on devices with flash use the top model
+there; lpc1857. That's the only half good reason I can give.
 
-> 
-> The test loops, does fp arithmetic and checks the truncated result.
-> It could be a little more dynamic have an initial run to
-> get the sum to compare against while looping, different fp
-> hardware may come up with a different sum, but truncation is
-> to 5'th decimal point.
-> 
-> The rationale is that if there is any fp/simd corruption
-> one of these runs should fail. I think most likely scenario
-> for that is a world switch in midst of fp operation. I've
-> instrumented (basically add some tracing to vcpu_put()) and
-> validated vcpu_put gets called thousands of time (for v7,v8)
-> for an over night test running two guests/host crunching
-> fp operations.
-> 
-> Other then that not sure how to really catch any problems
-> with the patches applied. Obviously this is a huge issues, if this has
-> any problems. If you or Marc have any other ideas I'd be happy
-> to enhance the test.
+Note that I have also started to use lpc1857 on the mtd driver for the
+internal flash that I am working on.
 
-I think it's important to run two VMs at the same time, each with some
-floating-point work, and then run some floating point on the host at the
-same time.
 
-You can make that even more interesting by doing 32-bit guests at the
-same time as well.
-
-I believe Marc was running Panranoia
-(http://www.netlib.org/paranoia/paranoia.c) to test the last lazy
-series.
-
-Thanks,
--Christoffer
+regards,
+Joachim Eastwood
