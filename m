@@ -1,135 +1,638 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Sun, 18 Oct 2015 12:24:37 -0600
-Subject: [PATCH V2 20/30] coresight: etb10: implementing buffer set/reset() API
+Date: Sun, 18 Oct 2015 12:24:39 -0600
+Subject: [PATCH V2 22/30] coresight: etm-perf: new PMU driver for ETM tracers
 In-Reply-To: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1445192687-24112-21-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1445192687-24112-23-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implementing perf related APIs to activate and terminate
-a trace session.  More specifically dealing with the sink
-buffer's internal mechanic along with perf's API to start
-and stop interactions with the ring buffers.
+Perf is a well known and used tool for performance monitoring
+and much more. A such it is an ideal condaditate for integration
+with coresight based HW tracing.
+
+This patch introduces a PMU that represent a coresight tracer to
+the Perf core.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etb10.c | 58 +++++++++++++++++++++++++++
- include/linux/coresight.h                     |  9 +++++
- 2 files changed, 67 insertions(+)
+ drivers/hwtracing/coresight/Makefile             |   3 +-
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 533 +++++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-etm-perf.h |  27 ++
+ drivers/hwtracing/coresight/coresight-etm3x.c    |   7 +
+ 4 files changed, 569 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.c
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.h
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 7f34e7af465e..ca2c4b42464d 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -28,6 +28,7 @@
- #include <linux/amba/bus.h>
- #include <linux/clk.h>
- #include <linux/mm.h>
+diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
+index 233d66cf22d3..cf8c6d689747 100644
+--- a/drivers/hwtracing/coresight/Makefile
++++ b/drivers/hwtracing/coresight/Makefile
+@@ -9,6 +9,7 @@ obj-$(CONFIG_CORESIGHT_SINK_ETBV10) += coresight-etb10.o
+ obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-funnel.o \
+ 					   coresight-replicator.o
+ obj-$(CONFIG_CORESIGHT_SOURCE_ETM3X) += coresight-etm3x.o coresight-etm-cp14.o \
+-					coresight-etm3x-sysfs.o
++					coresight-etm3x-sysfs.o \
++					coresight-etm-perf.o
+ obj-$(CONFIG_CORESIGHT_SOURCE_ETM4X) += coresight-etm4x.o
+ obj-$(CONFIG_CORESIGHT_QCOM_REPLICATOR) += coresight-replicator-qcom.o
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+new file mode 100644
+index 000000000000..dbd02277fcda
+--- /dev/null
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -0,0 +1,533 @@
++/*
++ * Copyright(C) 2015 Linaro Limited. All rights reserved.
++ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/coresight.h>
++#include <linux/cpumask.h>
++#include <linux/device.h>
++#include <linux/list.h>
++#include <linux/mm.h>
++#include <linux/module.h>
 +#include <linux/perf_event.h>
- 
- #include <asm/local.h>
- 
-@@ -306,10 +307,67 @@ static void *etb_setup_aux(struct coresight_device *csdev, int cpu,
- 	return buf;
- }
- 
-+static int etb_set_buffer(struct coresight_device *csdev,
-+			  struct perf_output_handle *handle,
-+			  void *sink_config)
++#include <linux/slab.h>
++#include <linux/types.h>
++
++#include "coresight-priv.h"
++
++#define CORESIGHT_ETM_PMU_NAME  "cs_etm"
++
++static struct pmu etm_pmu;
++static bool etm_perf_up;
++
++/**
++ * struct etm_event_data - Coresight specifics associated to an event
++ * @mask:		hold the CPU(s) this event was set for.
++ * @source_config:	per CPU tracer configuration associated to a
++ *			trace session.
++ * @sink_config:	per CPU AUX configuration associated to a
++ *			trace session.
++ * @sink:		sink associated to a CPU.
++ */
++struct etm_event_data {
++	cpumask_t mask;
++	void **source_config;
++	void **sink_config;
++	void **sink;
++};
++
++static DEFINE_PER_CPU(struct perf_output_handle, ctx_handle);
++static DEFINE_PER_CPU(struct coresight_device *, csdev_src);
++
++/* ETMCR is 'config' */
++PMU_FORMAT_ATTR(cycacc,		"config:12");
++PMU_FORMAT_ATTR(timestamp,	"config:28");
++
++static struct attribute *etm_config_formats_attr[] = {
++	&format_attr_cycacc.attr,
++	&format_attr_timestamp.attr,
++	NULL,
++};
++
++static struct attribute_group etm_pmu_format_group = {
++	.name   = "format",
++	.attrs  = etm_config_formats_attr,
++};
++
++static const struct attribute_group *etm_pmu_attr_groups[] = {
++	&etm_pmu_format_group,
++	NULL,
++};
++
++static void etm_event_read(struct perf_event *event) {}
++
++/**
++ * etm_event_build_path() - setup a path between source and sink
++ * @cpu:	The CPU the tracer is associated to.
++ * @build:	Whether the path should be setup or thorned down.
++ *
++ * Return:	The _first_ sink buffer discovered during the walkthrough.
++ */
++static struct coresight_device *etm_event_build_path(int cpu, bool build)
 +{
 +	int ret = 0;
-+	unsigned long head;
-+	struct cs_buffers *buf = sink_config;
-+	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	LIST_HEAD(path);
++	LIST_HEAD(sinks);
++	struct coresight_device *csdev_source;
++	struct coresight_device *csdev_sink = NULL;
 +
-+	/* This sink can only be used by a single session */
-+	if (local_xchg(&drvdata->in_use, 1))
-+		return -EBUSY;
++	csdev_source = per_cpu(csdev_src, cpu);
 +
-+	/* how much space do we have in this session */
-+	buf->size = handle->size;
++	if (!csdev_source)
++		return ERR_PTR(-EINVAL);
 +
-+	/* wrap head around to the amount of space we have */
-+	head = handle->head & ((buf->nr_pages << PAGE_SHIFT) - 1);
++	if (csdev_source->type != CORESIGHT_DEV_TYPE_SOURCE)
++		return ERR_PTR(-EINVAL);
 +
-+	/* find the page to write to */
-+	buf->cur = head / PAGE_SIZE;
++	if (build) {
++		ret = coresight_build_paths(csdev_source, &path, &sinks, build);
++		if (ret) {
++			dev_dbg(&csdev_source->dev,
++				"creating path(s) failed\n");
++			goto out;
++		}
 +
-+	/* and offset within that page */
-+	buf->offset = head % PAGE_SIZE;
++		/* Everything is good, record first enabled sink buffer */
++		csdev_sink = list_first_entry(&sinks,
++					      struct coresight_device, sinks);
++	} else {
++		ret = coresight_build_paths(csdev_source, &path, NULL, build);
++		if (ret)
++			dev_dbg(&csdev_source->dev,
++				"releasing path(s) failed\n");
++	}
 +
-+	local_set(&buf->head, head);
-+	local_set(&buf->data_size, 0);
++out:
++	return csdev_sink;
++}
++
++static int etm_event_pmu_start(struct perf_event *event)
++{
++	int cpu, ret;
++	cpumask_t mask;
++	struct coresight_device *csdev;
++
++	cpumask_clear(&mask);
++	if (event->cpu != -1)
++		cpumask_set_cpu(event->cpu, &mask);
++	else
++		cpumask_copy(&mask, cpu_online_mask);
++
++	for_each_cpu(cpu, &mask) {
++		csdev = per_cpu(csdev_src, cpu);
++
++		if (!source_ops(csdev)->perf_start)
++			continue;
++
++		ret = source_ops(csdev)->perf_start(csdev);
++		if (ret)
++			goto err;
++	}
++
++out:
++	return ret;
++err:
++	for_each_cpu(cpu, &mask) {
++		csdev = per_cpu(csdev_src, cpu);
++
++		if (!source_ops(csdev)->perf_stop)
++			continue;
++		source_ops(csdev)->perf_stop(csdev);
++	}
++
++	goto out;
++}
++
++static void etm_event_destroy(struct perf_event *event)
++{
++	int cpu;
++	cpumask_t mask;
++	struct coresight_device *csdev;
++
++	cpumask_clear(&mask);
++	if (event->cpu != -1)
++		cpumask_set_cpu(event->cpu, &mask);
++	else
++		cpumask_copy(&mask, cpu_online_mask);
++
++	for_each_cpu(cpu, &mask) {
++		csdev = per_cpu(csdev_src, cpu);
++		etm_event_build_path(cpu, false);
++
++		if (!source_ops(csdev)->perf_stop)
++			continue;
++		source_ops(csdev)->perf_stop(csdev);
++	}
++}
++
++static int etm_event_init(struct perf_event *event)
++{
++	int ret;
++
++	if (event->attr.type != etm_pmu.type)
++		return -ENOENT;
++
++	if (event->cpu >= nr_cpu_ids)
++		return -EINVAL;
++
++	ret = etm_event_pmu_start(event);
++	if (ret)
++		return ret;
++
++	event->destroy = etm_event_destroy;
++
++	return 0;
++}
++
++static void *alloc_event_data(int cpu)
++{
++	int size;
++	struct etm_event_data *event_data;
++	void *source_config, *sink_config, *sink;
++
++	event_data = kzalloc(sizeof(struct etm_event_data), GFP_KERNEL);
++	 if (!event_data)
++		return NULL;
++
++	if (cpu != -1)
++		size = 1;
++	else
++		size = num_online_cpus();
++
++	source_config = kcalloc(size, sizeof(void *), GFP_KERNEL);
++	if (!source_config)
++		goto source_config_err;
++
++	sink_config = kcalloc(size, sizeof(void *), GFP_KERNEL);
++	if (!sink_config)
++		goto sink_config_err;
++
++	sink = kcalloc(size, sizeof(void *), GFP_KERNEL);
++	if (!sink)
++		goto sink_err;
++
++	cpumask_clear(&event_data->mask);
++	event_data->source_config = source_config;
++	event_data->sink_config = sink_config;
++	event_data->sink = sink;
++
++out:
++	return event_data;
++
++sink_err:
++	kfree(sink_config);
++sink_config_err:
++	kfree(source_config);
++source_config_err:
++	kfree(event_data);
++	event_data = NULL;
++	goto out;
++}
++
++static void free_event_data(struct etm_event_data *event_data)
++{
++	int cpu;
++	cpumask_t *mask = &event_data->mask;
++
++	for_each_cpu(cpu, mask) {
++		kfree(event_data->source_config[cpu]);
++		kfree(event_data->sink_config[cpu]);
++		kfree(event_data->sink[cpu]);
++	}
++
++	kfree(event_data->source_config);
++	kfree(event_data->sink_config);
++	kfree(event_data->sink);
++	kfree(event_data);
++}
++
++static void *etm_setup_aux(struct perf_event *event, void **pages,
++			   int nr_pages, bool overwrite)
++{
++	int cpu;
++	cpumask_t *mask;
++	struct etm_event_data *event_data = NULL;
++	struct coresight_device *csdev;
++
++	event_data = alloc_event_data(event->cpu);
++	if (!event_data)
++		return NULL;
++
++	mask = &event_data->mask;
++
++	if (event->cpu != -1)
++		cpumask_set_cpu(event->cpu, mask);
++	else
++		cpumask_copy(mask, cpu_online_mask);
++
++	for_each_cpu(cpu, mask) {
++		struct coresight_device *sink;
++
++		csdev = per_cpu(csdev_src, cpu);
++		if (!csdev)
++			goto err;
++
++		/* Get the tracer's config from perf */
++		if (!source_ops(csdev)->perf_get_config)
++			goto err;
++
++		event_data->source_config[cpu] =
++			source_ops(csdev)->perf_get_config(csdev, event);
++
++		if (!event_data->source_config[cpu])
++			goto err;
++
++		/*
++		 * Get a handle on the sink buffer associated
++		 * with this tracer.
++		 */
++		event_data->sink[cpu] = (void *)etm_event_build_path(cpu, true);
++
++		if (!event_data->sink[cpu])
++			goto err;
++
++		sink = event_data->sink[cpu];
++
++		if (!sink_ops(sink)->setup_aux)
++			goto err;
++
++		/* Finally get the AUX specific data from the sink buffer */
++		event_data->sink_config[cpu] =
++				sink_ops(sink)->setup_aux(sink, cpu, pages,
++							  nr_pages, overwrite);
++		if (!event_data->sink_config[cpu])
++			goto err;
++	}
++
++out:
++	return event_data;
++
++err:
++	for_each_cpu(cpu, mask) {
++		etm_event_build_path(cpu, false);
++	}
++
++	free_event_data(event_data);
++	event_data = NULL;
++	goto out;
++}
++
++static void etm_free_aux(void *data)
++{
++	free_event_data(data);
++}
++
++static void etm_event_stop(struct perf_event *event, int mode)
++{
++	int cpu = smp_processor_id();
++	struct coresight_device *csdev = per_cpu(csdev_src, cpu);
++
++	if (event->hw.state == PERF_HES_STOPPED)
++		return;
++
++	if (!csdev)
++		return;
++
++	/* stop tracer */
++	if (!source_ops(csdev)->perf_disable)
++		return;
++
++	if (source_ops(csdev)->perf_disable(csdev))
++		return;
++
++	/* tell the core */
++	event->hw.state = PERF_HES_STOPPED;
++
++
++	if (mode & PERF_EF_UPDATE) {
++		struct coresight_device *sink;
++		struct perf_output_handle *handle = this_cpu_ptr(&ctx_handle);
++		struct etm_event_data *event_data = perf_get_aux(handle);
++
++		if (WARN_ON_ONCE(handle->event != event))
++			return;
++
++		if (WARN_ON_ONCE(!event_data))
++			return;
++
++		sink = event_data->sink[cpu];
++		if (WARN_ON_ONCE(!sink))
++			return;
++
++		/* update trace information */
++		if (!sink_ops(sink)->update_buffer)
++			return;
++
++		sink_ops(sink)->update_buffer(sink, handle,
++					      event_data->sink_config[cpu]);
++	}
++}
++
++static void etm_event_start(struct perf_event *event, int flags)
++{
++	int cpu = smp_processor_id();
++	struct coresight_device *csdev = per_cpu(csdev_src, cpu);
++
++	if (!csdev)
++		goto fail;
++
++	/* tell the perf core the event is alive */
++	event->hw.state = 0;
++
++	if (!source_ops(csdev)->perf_enable)
++		goto fail;
++
++	if (source_ops(csdev)->perf_enable(csdev))
++		goto fail;
++
++	return;
++
++fail:
++	event->hw.state = PERF_HES_STOPPED;
++}
++
++static void etm_event_del(struct perf_event *event, int mode)
++{
++	int cpu = smp_processor_id();
++	struct coresight_device *sink;
++	struct perf_output_handle *handle = this_cpu_ptr(&ctx_handle);
++	struct etm_event_data *event_data = perf_get_aux(handle);
++
++	if (WARN_ON_ONCE(!event_data))
++		return;
++
++	sink = event_data->sink[cpu];
++	if (!sink)
++		return;
++
++	etm_event_stop(event, PERF_EF_UPDATE);
++
++	if (!sink_ops(sink)->reset_buffer)
++		return;
++
++	sink_ops(sink)->reset_buffer(sink, handle,
++				     event_data->sink_config[cpu]);
++}
++
++static int etm_event_add(struct perf_event *event, int mode)
++{
++
++	int ret = -EBUSY, cpu = smp_processor_id();
++	struct etm_event_data *event_data;
++	struct perf_output_handle *handle = this_cpu_ptr(&ctx_handle);
++	struct hw_perf_event *hwc = &event->hw;
++	struct coresight_device *csdev = per_cpu(csdev_src, cpu);
++	struct coresight_device *sink;
++
++	if (handle->event)
++		goto out;
++
++	event_data = perf_aux_output_begin(handle, event);
++	ret = -EINVAL;
++	if (WARN_ON_ONCE(!event_data))
++		goto fail_stop;
++
++	sink = event_data->sink[cpu];
++	if (!sink)
++		goto fail_end_stop;
++
++	if (!sink_ops(sink)->set_buffer)
++		goto fail_end_stop;
++
++	ret = sink_ops(sink)->set_buffer(sink, handle,
++					 event_data->sink_config[cpu]);
++	if (ret)
++		goto fail_end_stop;
++
++	if (!source_ops(csdev)->perf_set_config) {
++		ret = -EINVAL;
++		goto fail_end_stop;
++	}
++
++	source_ops(csdev)->perf_set_config(csdev,
++					   event_data->source_config[cpu]);
++
++	if (mode & PERF_EF_START) {
++		etm_event_start(event, 0);
++		if (hwc->state & PERF_HES_STOPPED) {
++			etm_event_del(event, 0);
++			return -EBUSY;
++		}
++	}
++
++out:
++	return ret;
++
++fail_end_stop:
++	perf_aux_output_end(handle, 0, true);
++fail_stop:
++	hwc->state = PERF_HES_STOPPED;
++	goto out;
++}
++
++int etm_perf_symlink(struct coresight_device *csdev, bool link)
++{
++	char entry[sizeof("cpu9999999")];
++	int ret = 0, cpu = source_ops(csdev)->cpu_id(csdev);
++	struct device *pmu_dev = etm_pmu.dev;
++	struct device *cs_dev = &csdev->dev;
++
++	sprintf(entry, "cpu%d", cpu);
++
++	if (!etm_perf_up)
++		return -EPROBE_DEFER;
++
++	if (link) {
++		ret = sysfs_create_link(&pmu_dev->kobj, &cs_dev->kobj, entry);
++		if (ret)
++			return ret;
++		per_cpu(csdev_src, cpu) = csdev;
++	} else {
++		sysfs_remove_link(&pmu_dev->kobj, entry);
++		per_cpu(csdev_src, cpu) = NULL;
++	}
++
++	return 0;
++}
++
++static int __init etm_perf_init(void)
++{
++	int ret;
++
++	etm_pmu.capabilities	= PERF_PMU_CAP_EXCLUSIVE;
++
++	etm_pmu.attr_groups	= etm_pmu_attr_groups;
++	etm_pmu.task_ctx_nr	= perf_sw_context;
++	etm_pmu.read		= etm_event_read;
++	etm_pmu.event_init	= etm_event_init;
++	etm_pmu.setup_aux	= etm_setup_aux;
++	etm_pmu.free_aux	= etm_free_aux;
++	etm_pmu.stop		= etm_event_stop;
++	etm_pmu.start		= etm_event_start;
++	etm_pmu.del		= etm_event_del;
++	etm_pmu.add		= etm_event_add;
++
++	ret = perf_pmu_register(&etm_pmu, CORESIGHT_ETM_PMU_NAME, -1);
++	if (ret == 0)
++		etm_perf_up = true;
 +
 +	return ret;
 +}
++module_init(etm_perf_init);
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.h b/drivers/hwtracing/coresight/coresight-etm-perf.h
+new file mode 100644
+index 000000000000..4dd900f2362a
+--- /dev/null
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.h
+@@ -0,0 +1,27 @@
++/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+static void etb_reset_buffer(struct coresight_device *csdev,
-+			     struct perf_output_handle *handle,
-+			     void *sink_config)
-+{
-+	struct cs_buffers *buf = sink_config;
-+	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++#ifndef _CORESIGHT_ETM_PERF_H
++#define _CORESIGHT_ETM_PERF_H
 +
-+	if (buf) {
-+		/*
-+		 * In snapshot mode ->data_size holds the new address of the
-+		 * ring buffer's head.  The size itself is the whole address
-+		 * range since we want the latest information.
-+		 */
-+		if (buf->snapshot)
-+			handle->head = local_xchg(&buf->data_size,
-+						  buf->nr_pages << PAGE_SHIFT);
++struct coresight_device;
 +
-+		perf_aux_output_end(handle, local_xchg(&buf->data_size, 0),
-+				    local_xchg(&buf->lost, 0));
++#ifdef CONFIG_CORESIGHT
++int etm_perf_symlink(struct coresight_device *csdev, bool link);
++
++#else
++static inline int etm_perf_symlink(struct coresight_device *csdev, bool link)
++{ return -EINVAL; }
++
++#endif /* CONFIG_CORESIGHT */
++
++#endif
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index 9b4c0359ca29..7407c7ecf668 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -35,6 +35,7 @@
+ #include <asm/sections.h>
+ 
+ #include "coresight-etm.h"
++#include "coresight-etm-perf.h"
+ 
+ static int boot_enable;
+ module_param_named(boot_enable, boot_enable, int, S_IRUGO);
+@@ -850,6 +851,12 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto err_arch_supported;
+ 	}
+ 
++	ret = etm_perf_symlink(drvdata->csdev, true);
++	if (ret) {
++		coresight_unregister(drvdata->csdev);
++		goto err_arch_supported;
 +	}
 +
-+	local_set(&drvdata->in_use, 0);
-+}
-+
- static const struct coresight_ops_sink etb_sink_ops = {
- 	.enable		= etb_enable,
- 	.disable	= etb_disable,
- 	.setup_aux	= etb_setup_aux,
-+	.set_buffer	= etb_set_buffer,
-+	.reset_buffer	= etb_reset_buffer,
- };
+ 	pm_runtime_put(&adev->dev);
+ 	dev_info(dev, "%s initialized\n", (char *)id->data);
  
- static const struct coresight_ops etb_cs_ops = {
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index b1c25eba83b4..78202d5ea58a 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -15,6 +15,7 @@
- 
- #include <linux/device.h>
- #include <linux/sched.h>
-+#include <linux/perf_event.h>
- 
- /* Peripheral id registers (0xFD0-0xFEC) */
- #define CORESIGHT_PERIPHIDR4	0xfd0
-@@ -188,12 +189,20 @@ struct coresight_device {
-  * @enable:	enables the sink.
-  * @disable:	disables the sink.
-  * @setup_aux:	initialises perf's ring buffer for trace collection.
-+ * @set_buffer:	initialises buffer mechanic before a trace session.
-+ * @reset_buffer: finalises buffer mechanic after a trace session.
-  */
- struct coresight_ops_sink {
- 	int (*enable)(struct coresight_device *csdev);
- 	void (*disable)(struct coresight_device *csdev);
- 	void *(*setup_aux)(struct coresight_device *csdev, int cpu,
- 			   void **pages, int nr_pages, bool overwrite);
-+	int (*set_buffer)(struct coresight_device *csdev,
-+			  struct perf_output_handle *handle,
-+			  void *sink_config);
-+	void (*reset_buffer)(struct coresight_device *csdev,
-+			     struct perf_output_handle *handle,
-+			     void *sink_config);
- };
- 
- /**
 -- 
 1.9.1
