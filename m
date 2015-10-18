@@ -1,50 +1,203 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Sun, 18 Oct 2015 12:24:41 -0600
-Subject: [PATCH V2 24/30] perf tools: making function set_max_cpu_num() non
- static
+Date: Sun, 18 Oct 2015 12:24:40 -0600
+Subject: [PATCH V2 23/30] coresight: updating documentation to reflect
+ integration with perf
 In-Reply-To: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1445192687-24112-25-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1445192687-24112-24-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For memory allocation purpuses, code located in other places
-then util/cpumap.c may want to know how many CPUs the system has.
-
-This patch is making function set_max_cpu_num() available to
-other parts of the perf tool so that global variable
-@max_cpu_num gets the right value when referenced by cpu__max_cpu().
+Adding a new section giving information on how coresight has been
+integrated with the perf subsystem along with a general idea of how
+to control tracing from the perf tool cmd line.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- tools/perf/util/cpumap.c | 2 +-
- tools/perf/util/cpumap.h | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ Documentation/trace/coresight.txt | 138 ++++++++++++++++++++++++++++++++++----
+ 1 file changed, 124 insertions(+), 14 deletions(-)
 
-diff --git a/tools/perf/util/cpumap.c b/tools/perf/util/cpumap.c
-index 3667e2123e5b..97ef46e4a0f6 100644
---- a/tools/perf/util/cpumap.c
-+++ b/tools/perf/util/cpumap.c
-@@ -373,7 +373,7 @@ out:
- }
+diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
+index 0a5c3290e732..9515206b4b1a 100644
+--- a/Documentation/trace/coresight.txt
++++ b/Documentation/trace/coresight.txt
+@@ -20,13 +20,13 @@ Components are generally categorised as source, link and sinks and are
  
- /* Determine highest possible cpu in the system for sparse allocation */
--static void set_max_cpu_num(void)
-+void set_max_cpu_num(void)
- {
- 	const char *mnt;
- 	char path[PATH_MAX];
-diff --git a/tools/perf/util/cpumap.h b/tools/perf/util/cpumap.h
-index 0af9cecb4c51..6f7dce7dcca6 100644
---- a/tools/perf/util/cpumap.h
-+++ b/tools/perf/util/cpumap.h
-@@ -14,6 +14,7 @@ struct cpu_map {
- 	int map[];
- };
+ "Sources" generate a compressed stream representing the processor instruction
+ path based on tracing scenarios as configured by users.  From there the stream
+-flows through the coresight system (via ATB bus) using links that are connecting
+-the emanating source to a sink(s).  Sinks serve as endpoints to the coresight
++flows through the Coresight system (via ATB bus) using links that are connecting
++the emanating source to a sink(s).  Sinks serve as endpoints to the Coresight
+ implementation, either storing the compressed stream in a memory buffer or
+ creating an interface to the outside world where data can be transferred to a
+-host without fear of filling up the onboard coresight memory buffer.
++host without fear of filling up the onboard Coresight memory buffer.
  
-+void set_max_cpu_num(void);
- struct cpu_map *cpu_map__new(const char *cpu_list);
- struct cpu_map *cpu_map__dummy_new(void);
- struct cpu_map *cpu_map__read(FILE *file);
+-At typical coresight system would look like this:
++At typical Coresight system would look like this:
+ 
+   *****************************************************************
+  **************************** AMBA AXI  ****************************===||
+@@ -83,8 +83,8 @@ While on target configuration of the components is done via the APB bus,
+ all trace data are carried out-of-band on the ATB bus.  The CTM provides
+ a way to aggregate and distribute signals between CoreSight components.
+ 
+-The coresight framework provides a central point to represent, configure and
+-manage coresight devices on a platform.  This first implementation centers on
++The Coresight framework provides a central point to represent, configure and
++manage Coresight devices on a platform.  This first implementation centers on
+ the basic tracing functionality, enabling components such ETM/PTM, funnel,
+ replicator, TMC, TPIU and ETB.  Future work will enable more
+ intricate IP blocks such as STM and CTI.
+@@ -129,11 +129,11 @@ expected to be added as the solution matures.
+ Framework and implementation
+ ----------------------------
+ 
+-The coresight framework provides a central point to represent, configure and
+-manage coresight devices on a platform.  Any coresight compliant device can
++The Coresight framework provides a central point to represent, configure and
++manage Coresight devices on a platform.  Any Coresight compliant device can
+ register with the framework for as long as they use the right APIs:
+ 
+-struct coresight_device *coresight_register(struct coresight_desc *desc);
++struct Coresight_device *coresight_register(struct coresight_desc *desc);
+ void coresight_unregister(struct coresight_device *csdev);
+ 
+ The registering function is taking a "struct coresight_device *csdev" and
+@@ -193,10 +193,120 @@ the information carried in "THIS_MODULE".
+ How to use
+ ----------
+ 
+-Before trace collection can start, a coresight sink needs to be identify.
+-There is no limit on the amount of sinks (nor sources) that can be enabled at
+-any given moment.  As a generic operation, all device pertaining to the sink
+-class will have an "active" entry in sysfs:
++There is two ways to use the Coresight framework: 1) using the perf cmd line
++tool and 2) interacting directly with the Coresight devices using the sysFS
++interface.  The latter will slowly be faded out as more functionality become
++available from the perf cmd line tool but for the time being both are still
++supported.  The following sections provide details on using both methods.
++
++1) Using perf framework:
++
++Coresight tracers like ETM and PTM are represented using the Perf framework's
++Performance Monitoring Unit (PMU).  As such the perf framework takes charge of
++controlling when tracing happens based on when the process(es) of interest are
++scheduled.  When configure in a system, Coresight PMUs will be listed when
++queried by the perf command line tool:
++
++linaro at linaro-nano:~$ ./perf list pmu
++
++List of pre-defined events (to be used in -e):
++
++  cs_etm//                                           [Kernel PMU event]
++
++linaro at linaro-nano:~$
++
++Regardless of the amount ETM/PTM IP block in a system (usually equal to the
++amount of processor core), the "cs_etm" PMU will be listed only once.
++
++Before a trace can be configured and started a Coresight sink needs to be
++selected using the sysFS method (see below).  This is only temporary until
++sink selection can be made from the command line tool.
++
++linaro at linaro-nano:~$ ls /sys/bus/coresight/devices
++20010000.etb  20030000.tpiu  20040000.funnel  2201c000.ptm
++2201d000.ptm  2203c000.etm  2203d000.etm  2203e000.etm  replicator
++
++linaro at linaro-nano:~$ echo 1 > /sys/bus/coresight/devices/20010000.etb/enable_sink
++
++Once a sink has been selected configuring a Coresight PMU works the same way as
++any other PMU.  As such tracing can happen for a single CPU, a group of CPU, per
++thread or a combination of those:
++
++linaro at linaro-nano:~$ perf record -e cs_etm// --per-thread <command>
++
++linaro at linaro-nano:~$ perf record -C 0,2-3 -e cs_etm// <command>
++
++Tracing limited to user and kernel space can also be used to narrow the amount
++of collected traces:
++
++linaro at linaro-nano:~$ perf record -e cs_etm//u --per-thread <command>
++
++linaro at linaro-nano:~$ perf record -C 0,2-3 -e cs_etm//k <command>
++
++As of this writing two ETM/PTM specific options have are available: cycle
++accurate and timestamp (please refer to the Embedded Trace Macrocell reference
++manual for details on these options).  By default both are disabled but using
++the "cycacc" and "timestamp" mnemonic within the double '/' will see those
++options configure for the upcoming trace run:
++
++linaro at linaro-nano:~$ perf record -e cs_etm/cycacc/ --per-thread <command>
++
++linaro at linaro-nano:~$ perf record -C 0,2-3 -e cs_etm/cycacc,timestamp/ <command>
++
++The Coresight PMUs can be configured to work in "full trace" or "snapshot" mode.
++In full trace mode trace acquisition is enabled from beginning to end with trace
++data being recorded continuously:
++
++linaro at linaro-nano:~$ perf record -e cs_etm// dd if=/dev/random of=./test.txt bs=1k count=1000
++
++Since this can lead to a significant amount of data and because some devices are
++limited in disk space snapshot mode can be used instead.  In snapshot mode
++traces are still collected in the ring buffer but not communicated to user
++space.  The ring buffer is allowed to wrap around, providing the latest
++information before an event of interest happens.  Significant events are
++communicated by sending a USR2 signal to the user space command line tool.
++From there the tool will stop trace collection and harvest data from the ring
++buffer before re-enabling traces.  Snapshot mode can be invoked using '-S' when
++launching a trace collection:
++
++linaro at linaro-nano:~$ perf record -S -e cs_etm// dd if=/dev/random of=./test.txt bs=1k count=1000
++
++Trace data collected during trace runs ends up in the "perf.data" file.  Trace
++configuration information necessary for trace decoding is also embedded in the
++"perf.data" file.  Two new headers, 'PERF_RECORD_AUXTRACE_INFO' and
++'PERF_RECORD_AUXTRACE' have been added to the list of event types in order to
++find out where the different sections start.
++
++It is worth noting that a set of metadata information exists for each tracer
++that participated in a trace run.  As such if 5 processors have been engaged,
++5 sets of metadata will be found in the perf.data file.  This is to ensure that
++tracer decompression tools have all the information they need in order to
++process the trace data.
++
++Metadata information is collected directly from the ETM/PTM management registers
++using the sysFS interface.  Since there is no way for the perf command line
++tool to associate a CPU with a tracer, a symbolic link has been created between
++the cs_etm sysFS event directory and each Coresight tracer:
++
++linaro at linaro-nano:~$ ls /sys/bus/event_source/devices/cs_etm
++cpu0  cpu1  cpu2  cpu3  cpu4  format  perf_event_mux_interval_ms
++power  subsystem  type  uevent
++
++linaro at linaro-nano:~$ ls /sys/bus/event_source/devices/cs_etm/cpu0/mgmt/
++etmccer  etmccr  etmcr  etmidr  etmscr  etmtecr1  etmtecr2
++etmteevr  etmtraceidr  etmtssvr
++
++2) Using the sysFS interface:
++
++Most, if not all, configuration registers are made available to users via the
++sysFS interface.  Until all Coresight ETM drivers have been converted to perf,
++it will also be possible to start and stop traces from sysFS.
++
++As with the perf method described above, a Coresight sink needs to be identify
++before trace collection can commence.  Using the sysFS method _only_, there is
++no limit on the amount of sinks (nor sources) that can be enabled at
++any given moment.  As a generic operation, all devices pertaining to the sink
++class will have an "enable_sink" entry in sysfs:
+ 
+ root:/sys/bus/coresight/devices# ls
+ replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
+@@ -246,7 +356,7 @@ The file cstrace.bin can be decompressed using "ptm2human", DS-5 or Trace32.
+ 
+ Following is a DS-5 output of an experimental loop that increments a variable up
+ to a certain value.  The example is simple and yet provides a glimpse of the
+-wealth of possibilities that coresight provides.
++wealth of possibilities that Coresight provides.
+ 
+ Info                                    Tracing enabled
+ Instruction     106378866       0x8026B53C      E52DE004        false   PUSH     {lr}
 -- 
 1.9.1
