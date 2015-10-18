@@ -1,27 +1,79 @@
-From: kholmanskikh.s.s@gmail.com (Stanislav Kholmanskikh)
-Date: Sun, 18 Oct 2015 12:29:03 +0300
-Subject: [PATCH] staging: wilc1000: restore wilc_spi_dev variable
-In-Reply-To: <4978401.AVrDN2jmbq@wuerfel>
-References: <4978401.AVrDN2jmbq@wuerfel>
-Message-ID: <5623665F.40700@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 18 Oct 2015 14:01:06 +0300
+Subject: [PATCH v10 3/3] arm64: dts: mediatek: add xHCI & usb phy for
+ mt8173
+In-Reply-To: <1445140279-18121-4-git-send-email-chunfeng.yun@mediatek.com>
+References: <1445140279-18121-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1445140279-18121-4-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <56237BF2.5070809@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hello.
 
-On 16.10.2015 23:05, Arnd Bergmann wrote:
-> A recent change to wilc1000 accidentally deleted an important
-> variable, so we now get a build error when the SPI mode is
-> selected:
-> 
-> ERROR: "wilc_spi_dev" [drivers/staging/wilc1000/wilc1000.ko] undefined!
-> 
-> This partially reverts the broken commit to put the variable back.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 56293ff232b9 ("staging: wilc1000: linux_wlan_spi: include header")
-> ---
+On 10/18/2015 6:51 AM, Chunfeng Yun wrote:
 
-I'm really sorry about it, will be more careful in the future. 
+> add xHCI and phy drivers for MT8173-EVB
+>
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 
-Thank you for fixing this.
+[...]
+
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index d18ee42..46f5f50 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+[...]
+> @@ -487,6 +488,47 @@
+>   			clock-names = "source", "hclk";
+>   			status = "disabled";
+>   		};
+> +
+> +		usb30: usb at 11270000 {
+> +			compatible = "mediatek,mt8173-xhci";
+> +			reg = <0 0x11270000 0 0x1000>,
+> +			      <0 0x11280700 0 0x0100>;
+> +			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
+> +			power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
+> +			clocks = <&topckgen CLK_TOP_USB30_SEL>,
+> +				 <&pericfg CLK_PERI_USB0>,
+> +				 <&pericfg CLK_PERI_USB1>;
+> +			clock-names = "sys_ck",
+> +				      "wakeup_deb_p0",
+> +				      "wakeup_deb_p1";
+> +			phys = <&phy_port0 PHY_TYPE_USB3>,
+> +			       <&phy_port1 PHY_TYPE_USB2>;
+> +			mediatek,syscon-wakeup = <&pericfg>;
+> +			status = "okay";
+> +		};
+> +
+> +		u3phy: usb-phy at 11290000 {
+> +			compatible = "mediatek,mt8173-u3phy";
+> +			reg = <0 0x11290000 0 0x800>;
+> +			clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
+> +			clock-names = "u3phya_ref";
+> +			#address-cells = <2>;
+> +			#size-cells = <2>;
+> +			ranges;
+> +			status = "okay";
+
+    Don't you need the "power-domains" prop here as well?
+
+> +
+> +			phy_port0: port at 11290800 {
+> +				reg = <0 0x11290800 0 0x800>;
+> +				#phy-cells = <1>;
+> +				status = "okay";
+> +			};
+> +
+> +			phy_port1: port at 11291000 {
+> +				reg = <0 0x11291000 0 0x800>;
+> +				#phy-cells = <1>;
+> +				status = "okay";
+> +			};
+> +		};
+>   	};
+>   };
+>
+
+MBR, Sergei
