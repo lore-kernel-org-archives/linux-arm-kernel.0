@@ -1,165 +1,86 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Sun, 18 Oct 2015 12:24:24 -0600
-Subject: [PATCH V2 07/30] coresight: etm3x: moving etm_drvdata::enable to
- atomic field
+Date: Sun, 18 Oct 2015 12:24:26 -0600
+Subject: [PATCH V2 09/30] coresight: etm3x: changing default trace
+ configuration
 In-Reply-To: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1445192687-24112-8-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1445192687-24112-10-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving etm_drvdata::enable to an atomic type that gives the
-'state' of the tracer, i.e disabled, handled via sysFS or Perf.
-That way a tracer can't be used if it is already marshaled by
-another subsystem.
+Changing default configuration to include the entire address
+range rather than just the kernel.  That way traces are more
+inclusive and it is easier to narrow down if needed.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm.h         | 11 +++++++++--
- drivers/hwtracing/coresight/coresight-etm3x-sysfs.c |  4 ++--
- drivers/hwtracing/coresight/coresight-etm3x.c       | 21 +++++++++++++++------
- 3 files changed, 26 insertions(+), 10 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm.h   |  2 ++
+ drivers/hwtracing/coresight/coresight-etm3x.c | 29 ++++++++++++---------------
+ 2 files changed, 15 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
-index 9317510d555f..0996537ff142 100644
+index 0996537ff142..f33aeb4e545d 100644
 --- a/drivers/hwtracing/coresight/coresight-etm.h
 +++ b/drivers/hwtracing/coresight/coresight-etm.h
-@@ -13,6 +13,7 @@
- #ifndef _CORESIGHT_CORESIGHT_ETM_H
- #define _CORESIGHT_CORESIGHT_ETM_H
- 
-+#include <asm/local.h>
- #include <linux/spinlock.h>
- #include "coresight-priv.h"
- 
-@@ -214,7 +215,7 @@ struct etm_config {
-  * @port_size:	port size as reported by ETMCR bit 4-6 and 21.
-  * @arch:	ETM/PTM version number.
-  * @use_cpu14:	true if management registers need to be accessed via CP14.
-- * @enable:	is this ETM/PTM currently tracing.
-+ * @state:	this tracer's state, i.e sysFS, Perf or disabled.
-  * @sticky_enable: true if ETM base configuration has been done.
-  * @boot_enable:true if we should start tracing at boot time.
-  * @os_unlock:	true if access to management registers is allowed.
-@@ -238,7 +239,7 @@ struct etm_drvdata {
- 	int				port_size;
- 	u8				arch;
- 	bool				use_cp14;
--	bool				enable;
-+	local_t				state;
- 	bool				sticky_enable;
- 	bool				boot_enable;
- 	bool				os_unlock;
-@@ -253,6 +254,12 @@ struct etm_drvdata {
- 	struct etm_config		*config;
- };
- 
-+enum etm_state {
-+	ETM_STATE_DISABLED,
-+	ETM_STATE_SYSFS,
-+	ETM_STATE_PERF,
-+};
-+
- enum etm_addr_type {
- 	ETM_ADDR_TYPE_NONE,
- 	ETM_ADDR_TYPE_SINGLE,
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-index 410d29e2b90c..bc8f04214567 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-@@ -811,7 +811,7 @@ static ssize_t cntr_val_show(struct device *dev,
- 	if (WARN_ON_ONCE(!config))
- 		return -EINVAL;
- 
--	if (!drvdata->enable) {
-+	if (!local_read(&drvdata->state)) {
- 		spin_lock(&drvdata->spinlock);
- 		for (i = 0; i < drvdata->nr_cntr; i++)
- 			ret += sprintf(buf, "counter %d: %x\n",
-@@ -1072,7 +1072,7 @@ static ssize_t seq_curr_state_show(struct device *dev,
- 	if (WARN_ON_ONCE(!config))
- 		return -EINVAL;
- 
--	if (!drvdata->enable) {
-+	if (!local_read(&drvdata->state)) {
- 		val = config->seq_curr_state;
- 		goto out;
- 	}
+@@ -146,6 +146,7 @@
+  * @startstop_ctrl: setting for register ETMTSSCR.
+  * @enable_event: setting for register ETMTEEVR.
+  * @enable_ctrl1: setting for register ETMTECR1.
++ * @enable_ctrl2: setting for register ETMTECR2.
+  * @fifofull_level: setting for register ETMFFLR.
+  * @addr_idx:	index for the address comparator selection.
+  * @addr_val:	value for address comparator register.
+@@ -179,6 +180,7 @@ struct etm_config {
+ 	u32				startstop_ctrl;
+ 	u32				enable_event;
+ 	u32				enable_ctrl1;
++	u32				enable_ctrl2;
+ 	u32				fifofull_level;
+ 	u8				addr_idx;
+ 	u32				addr_val[ETM_MAX_ADDR_CMP];
 diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 3d7fa0b2acf9..3fe6433764d4 100644
+index e199746bba05..8bd161584f85 100644
 --- a/drivers/hwtracing/coresight/coresight-etm3x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -320,7 +320,7 @@ int etm_get_trace_id(struct etm_drvdata *drvdata)
- 	if (!drvdata)
- 		goto out;
+@@ -567,26 +567,23 @@ static void etm_init_arch_data(void *info)
  
--	if (!drvdata->enable)
-+	if (!local_read(&drvdata->state))
- 		return drvdata->traceid;
+ static void etm_init_default_data(struct etm_config *config)
+ {
+-	u32 flags = (1 << 0 | /* instruction execute*/
+-		     3 << 3 | /* ARM instruction */
+-		     0 << 5 | /* No data value comparison */
+-		     0 << 7 | /* No exact mach */
+-		     0 << 8 | /* Ignore context ID */
+-		     0 << 10); /* Security ignored */
+-
+ 	if (WARN_ON_ONCE(!config))
+ 		return;
  
- 	pm_runtime_get_sync(drvdata->dev);
-@@ -354,6 +354,12 @@ static int sysfs_etm_enable(struct coresight_device *csdev)
- 	pm_runtime_get_sync(csdev->dev.parent);
- 	spin_lock(&drvdata->spinlock);
- 
-+	if (local_cmpxchg(&drvdata->state,
-+			  ETM_STATE_DISABLED, ETM_STATE_SYSFS)) {
-+		ret = -EBUSY;
-+		goto out;
-+	}
+-	config->ctrl = (ETMCR_CYC_ACC | ETMCR_TIMESTAMP_EN);
+-	config->enable_ctrl1 = ETMTECR1_ADDR_COMP_1;
+-	config->addr_val[0] = (u32) _stext;
+-	config->addr_val[1] = (u32) _etext;
+-	config->addr_acctype[0] = flags;
+-	config->addr_acctype[1] = flags;
+-	config->addr_type[0] = ETM_ADDR_TYPE_RANGE;
+-	config->addr_type[1] = ETM_ADDR_TYPE_RANGE;
+-
+ 	etm_set_default(config);
 +
- 	/*
- 	 * Configure the ETM only if the CPU is online.  If it isn't online
- 	 * hw configuration will take place when 'CPU_STARTING' is received
-@@ -366,17 +372,20 @@ static int sysfs_etm_enable(struct coresight_device *csdev)
- 			goto err;
- 	}
- 
--	drvdata->enable = true;
- 	drvdata->sticky_enable = true;
- 
- 	spin_unlock(&drvdata->spinlock);
- 
- 	dev_info(drvdata->dev, "ETM tracing enabled\n");
- 	return 0;
--err:
-+out:
- 	spin_unlock(&drvdata->spinlock);
- 	pm_runtime_put(csdev->dev.parent);
- 	return ret;
-+
-+err:
-+	local_set(&drvdata->state, ETM_STATE_DISABLED);
-+	goto out;
++	/*
++	 * Taken verbatim from the TRM:
++	 *
++	 * To trace all memory:
++	 *  set bit [24] in register 0x009, the ETMTECR1, to 1
++	 *  set all other bits in register 0x009, the ETMTECR1, to 0
++	 *  set all bits in register 0x007, the ETMTECR2, to 0
++	 *  set register 0x008, the ETMTEEVR, to 0x6F (TRUE).
++	 */
++	config->enable_ctrl1 = BIT(24);
++	config->enable_ctrl2 = 0x0;
++	config->enable_event = ETM_HARD_WIRE_RES_A;
  }
  
- static void etm_disable_hw(void *info)
-@@ -425,7 +434,7 @@ static void sysfs_etm_disable(struct coresight_device *csdev)
- 	 * ensures that register writes occur when cpu is powered.
- 	 */
- 	smp_call_function_single(drvdata->cpu, etm_disable_hw, drvdata, 1);
--	drvdata->enable = false;
-+	local_set(&drvdata->state, ETM_STATE_DISABLED);
- 
- 	spin_unlock(&drvdata->spinlock);
- 	put_online_cpus();
-@@ -460,7 +469,7 @@ static int etm_cpu_callback(struct notifier_block *nfb, unsigned long action,
- 			etmdrvdata[cpu]->os_unlock = true;
- 		}
- 
--		if (etmdrvdata[cpu]->enable)
-+		if (local_read(&etmdrvdata[cpu]->state))
- 			etm_enable_hw(etmdrvdata[cpu]);
- 		spin_unlock(&etmdrvdata[cpu]->spinlock);
- 		break;
-@@ -473,7 +482,7 @@ static int etm_cpu_callback(struct notifier_block *nfb, unsigned long action,
- 
- 	case CPU_DYING:
- 		spin_lock(&etmdrvdata[cpu]->spinlock);
--		if (etmdrvdata[cpu]->enable)
-+		if (local_read(&etmdrvdata[cpu]->state))
- 			etm_disable_hw(etmdrvdata[cpu]);
- 		spin_unlock(&etmdrvdata[cpu]->spinlock);
- 		break;
+ static void etm_init_trace_id(struct etm_drvdata *drvdata)
 -- 
 1.9.1
