@@ -1,73 +1,43 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 18 Oct 2015 21:57:06 +0200
-Subject: [PATCH] KVM/arm: kernel low level debug suport for ARM32 virtual
- platforms
-In-Reply-To: <1445051999-24360-1-git-send-email-m.smarduch@samsung.com>
-References: <1445051999-24360-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20151018195706.GB7531@cbox>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 18 Oct 2015 20:57:19 +0100
+Subject: [PATCH RFC 0/2] simplefb: Add regulator handling support
+In-Reply-To: <561E3D28.2090901@redhat.com>
+References: <1444669458-5588-1-git-send-email-wens@csie.org>
+ <561CAFE8.9080506@redhat.com>
+ <20151014105556.GT14956@sirena.org.uk>
+ <561E3D28.2090901@redhat.com>
+Message-ID: <20151018195719.GC14956@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 08:19:59PM -0700, Mario Smarduch wrote:
-> When booting a VM using QEMU or Kvmtool there are no clear ways to 
-> enable low level debugging for these virtual platforms. some menu port 
-> choices are not supported by the virtual platforms at all. And there is no
-> help on the location of physical and virtual addresses for the ports.
-> This may lead to wrong debug port and a frozen VM with a blank screen.
-> 
-> This patch adds menu selections for QEMU and Kvmtool virtual platforms for low 
-> level kernel print debugging. Help section displays port physical and
-> virutal addresses.
-> 
-> ARM reference models use the MIDR register to run-time select UART port address 
-> (for ARCH_VEXPRESS) based on A9 or A15 part numbers. Looked for a same approach
-> but couldn't find a way to differentiate between virtual platforms, something
-> like a platform register.
-> 
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> ---
+On Wed, Oct 14, 2015 at 01:31:52PM +0200, Hans de Goede wrote:
 
-I can't think of any better way to do this and I would be happy to see
-this functionality in Linux, so:
+> I like your idea in your other mail where you suggest to actually
+> use foo-supply and bar-supply names in the simplefb node, and then have
+> some code simple iterate over all the properties and check for *-supply
+> properties, so that the proper, schematic matching names can be used.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> But surely if we go this way having a helper for this so that others
+> can re-use that likely not entirely trivial code is a good idea ?
 
->  arch/arm/Kconfig.debug | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index a2e16f9..d126bd4 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -1155,6 +1155,28 @@ choice
->  		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
->  		  devices, including VT8500, WM8505, WM8650 and WM8850.
->  
-> +	config DEBUG_VIRT_UART_QEMU
-> +		bool "Kernel low-level debugging on QEMU Virtual Platform"
-> +		depends on ARCH_VIRT
-> +		select DEBUG_UART_PL01X
-> +		help
-> +		  Say Y here if you want the debug print routines to direct
-> +		  their output to PL011 UART port on QEMU Virtual Platform.
-> +		  Appropriate address values are:
-> +			PHYS		VIRT
-> +			0x9000000	0xf8090000
-> +
-> +	config DEBUG_VIRT_UART_KVMTOOL
-> +		bool "Kernel low-level debugging on Kvmtool Virtual Platform"
-> +		depends on ARCH_VIRT
-> +		select DEBUG_UART_8250
-> +		help
-> +		  Say Y here if you want the debug print routines to direct
-> +		  their output to 8250 UART port on Kvmtool Virtual
-> +		  Platform. Appropriate address values are:
-> +			PHYS		VIRT
-> +			0x3f8		0xf80903f8
-> +
->  	config DEBUG_ICEDCC
->  		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
->  		help
-> -- 
-> 1.9.1
-> 
+Yeah.  It's trying to come up with a way to do this that is easy to
+avoid abuse that's tricky.
+
+> One user which comes to mind immediately here is the generic mmc-pwrseq
+> driver.
+
+> I agree that we need to be careful to not use a helper like this too
+> much, but I do believe it will make sense to have it in some rare cases.
+> We can put a big warning in both the header declaring it and above
+> the implementation to use it scarcely.
+
+I'd rather have something that was visible in the code, not everyone
+reads the documentation especially not subsystem maintainers reviewing
+drivers that use APIs they're not familiar with.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151018/4fcf6272/attachment.sig>
