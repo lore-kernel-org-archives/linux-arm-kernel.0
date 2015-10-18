@@ -1,53 +1,34 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 18 Oct 2015 06:56:30 +0800
-Subject: [PATCH v3 14/24] arm64: Delay cpu feature capability checks
-In-Reply-To: <1444756952-31145-15-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <201510180642.xwPchoyX%fengguang.wu@intel.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 18 Oct 2015 02:15:16 +0200
+Subject: [PATCH v2] rtc: at91rm9200: clear RTC alarm status flag prior to
+ suspending
+In-Reply-To: <1444639163-14255-1-git-send-email-wenyou.yang@atmel.com>
+References: <1444639163-14255-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20151018001516.GX3421@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+On 12/10/2015 at 16:39:23 +0800, Wenyou Yang wrote :
+> As said in the SAMA5D2 datasheet, "Prior to instructing the device
+> to enter ULP mode 1, ... and the internal sources of wake-up must
+> be cleared."
+> 
+> This patch is to clear the RTC alarm status flag prior to suspending
+> to avoid the erroneous wake-up activity, as it is often used as
+> the wake-up source for the ULP mode 1.
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
+> 
+> Changes in v2:
+>  - Add more detail commit log.
+> 
+>  drivers/rtc/rtc-at91rm9200.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+Applied, thanks.
 
-[auto build test ERROR on v4.3-rc5 -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
-
-url:    https://github.com/0day-ci/linux/commits/Suzuki-K-Poulose/arm64-Consolidate-CPU-feature-handling/20151014-013504
-config: arm64-allnoconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
-
-All errors (new ones prefixed by >>):
-
-   arch/arm64/kernel/cpufeature.c: In function 'fail_incapable_cpu':
->> arch/arm64/kernel/cpufeature.c:643:34: error: 'const struct cpu_operations' has no member named 'cpu_die'
-     if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
-                                     ^
-   arch/arm64/kernel/cpufeature.c:644:15: error: 'const struct cpu_operations' has no member named 'cpu_die'
-      cpu_ops[cpu]->cpu_die(cpu);
-                  ^
-
-vim +643 arch/arm64/kernel/cpufeature.c
-
-   637		int cpu = smp_processor_id();
-   638	
-   639		pr_crit("CPU%d: missing %s : %s\n", cpu, cap_type, cap->desc);
-   640		/* Mark this CPU absent */
-   641		set_cpu_present(cpu, 0);
-   642		/* Check if we can park ourselves */
- > 643		if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
-   644			cpu_ops[cpu]->cpu_die(cpu);
-   645	
-   646		asm volatile(
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 5475 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151018/279edd5f/attachment.obj>
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
