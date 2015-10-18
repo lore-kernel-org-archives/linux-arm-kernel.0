@@ -1,84 +1,126 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 18 Oct 2015 23:23:54 +0200
-Subject: [PATCH 2/2] DT: nvmem: Add NXP LPC18xx EEPROM memory binding
- documentation
-In-Reply-To: <562145C5.8070507@vanguardiasur.com.ar>
+Date: Sun, 18 Oct 2015 23:47:53 +0200
+Subject: [PATCH 1/2] nvmem: NXP LPC18xx EEPROM memory NVMEM driver
+In-Reply-To: <1445004426-6271-2-git-send-email-ariel@vanguardiasur.com.ar>
 References: <1445004426-6271-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1445004426-6271-3-git-send-email-ariel@vanguardiasur.com.ar>
- <CAAEAJfAAUWd9y8EBfV0irbRF_7EjxD1ycdPcNGScbs6oPxp4JQ@mail.gmail.com>
- <CAGhQ9VzaqiUm0=vpBYKpppsTsLuhxmAKayi5N4FTXmG5dtiAhw@mail.gmail.com>
- <562145C5.8070507@vanguardiasur.com.ar>
-Message-ID: <CAGhQ9VzbUz2+n__Y5W=HJ5FAV2Z5pMKgi-Ut662+0n2XuFR0PA@mail.gmail.com>
+ <1445004426-6271-2-git-send-email-ariel@vanguardiasur.com.ar>
+Message-ID: <CAGhQ9VzYbG++UQdx-Ljouc+w3Z_K0WWvNOe0HQpNZ8JnphCDCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 October 2015 at 20:45, Ariel D'Alessandro
+Hi Ariel,
+
+Thanks for working on this.
+
+On 16 October 2015 at 16:07, Ariel D'Alessandro
 <ariel@vanguardiasur.com.ar> wrote:
-> Ezequiel, Joachim, all,
->
-> El 16/10/15 a las 14:09, Joachim Eastwood escribi?:
->> On 16 October 2015 at 17:41, Ezequiel Garcia
->> <ezequiel@vanguardiasur.com.ar> wrote:
->>> +DT bindings maintainers
->>>
->>> As per the documentation in
->>> Documentation/devicetree/bindings/submitting-patches.txt
->>> this binding should be patch 1/2.
->
-> I see. I'll modify that.
->
->>>
->>> On 16 October 2015 at 11:07, Ariel D'Alessandro
->>> <ariel@vanguardiasur.com.ar> wrote:
->>>> Add the devicetree binding document for NXP LPC18xx EEPROM memory.
->>>>
->>>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
->>>> ---
->>>>  .../devicetree/bindings/nvmem/lpc18xx_eeprom.txt   | 26 ++++++++++++++++++++++
->>>>  1 file changed, 26 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt b/Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt
->>>> new file mode 100644
->>>> index 0000000..372ff8c
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/nvmem/lpc18xx_eeprom.txt
->>>> @@ -0,0 +1,26 @@
->>>> +* NXP LPC18xx EEPROM memory NVMEM driver
->>>> +
->>>> +Required properties:
->>>> +  - compatible: Should be "nxp,lpc1850-eeprom"
->>>
->>> Correct me if I'm wrong, but I believe not all LPC18xx/43xx devices
->>> have an EEPROM.
->>>
->>> Isn't it restricted to LPC18x7/LPC43x7 devices?
->>
->> The EEPROM can only be found on Flash devices. Flashless devices
->> doesn't have the EEPROM.
->
-> Yes, you're right. LPC1850 is wrong, sorry.
-> The UM10430 (LPC18xx User Manual) says that LPC18(5|3|2|1)(7|5|3|2)
-> parts have flash and that the LPC185x/3x parts with flash also include
-> the 16 kB EEPROM. I'll add this info in a new set of patches v2.
->
->>
->>
->>> Should the compatible be nxp,lpc1857-eeprom to avoid confusion?
->>
->> Yes, please. The EEPROM doesn't exist on LPC1850 so please use the
->> compatibility string from Ezequiel.
->
-> OK. I'll fix this. Is there any reason for using lpc1857 instead of a
-> different available one?
+> This commit adds support for NXP LPC18xx EEPROM memory found in NXP LPC
+> SoCs family, which includes LPC18xx/LPC43xx. Other SoCs in that family
+> may share the same watchdog hardware.
 
-The lpc1850 was once chosen since it was the device that was
-applicable to most peripherals and it is the flashless "top model". So
-for peripherals found only on devices with flash use the top model
-there; lpc1857. That's the only half good reason I can give.
+Only LPC185x/3x and LPC435x/3x/2x/1x devices have the EEPROM.
 
-Note that I have also started to use lpc1857 on the mtd driver for the
-internal flash that I am working on.
+
+> EEPROM size is 16384 bytes and it can be entirely read and
+> written/erased with 1 word (4 bytes) granularity. The last page
+> (128 bytes) contains the EEPROM initialization data and is not writable.
+>
+> Erase/program time is less than 3ms. The EEPROM device requires a
+> ~1500 kHz clock (min 800 kHz, max 1600 kHz) that is generated dividing
+> the system bus clock by the division factor, contained in the divider
+> register (minus 1 encoded).
+
+Nice description of the device.
+
+
+> +static inline void lpc18xx_eeprom_writel(struct lpc18xx_eeprom_dev *eeprom,
+> +                                        u32 reg, u32 val)
+> +{
+> +       writel(val, eeprom->reg_base + reg);
+> +}
+> +
+> +static inline u32 lpc18xx_eeprom_readl(struct lpc18xx_eeprom_dev *eeprom,
+> +                                      u32 reg)
+> +{
+> +       return readl(eeprom->reg_base + reg);
+> +}
+
+Read function seems to be unused.
+
+Are these two wrappers really useful?
+
+
+> +static int lpc18xx_eeprom_gather_write(void *context, const void *reg,
+> +                                      size_t reg_size, const void *val,
+> +                                      size_t val_size)
+> +{
+> +       struct lpc18xx_eeprom_dev *eeprom = context;
+> +       unsigned int offset = *(u32 *)reg;
+> +
+> +       /* 3 ms of erase/program time between each writing */
+> +       while (val_size) {
+> +               writel(*(u32 *)val, eeprom->mem_base + offset);
+> +               mdelay(3);
+
+That's a long mdelay. Is it possible to sleep instead?
+
+
+> +               val_size -= eeprom->val_bytes;
+> +               val += eeprom->val_bytes;
+> +               offset += eeprom->val_bytes;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int lpc18xx_eeprom_write(void *context, const void *data, size_t count)
+> +{
+> +       struct lpc18xx_eeprom_dev *eeprom = context;
+> +       unsigned int offset = eeprom->reg_bytes;
+> +
+> +       BUG_ON(count <= offset);
+
+BUG_ON seems a bit harsh. Could you return an error instead?
+
+
+> +       return lpc18xx_eeprom_gather_write(context, data, eeprom->reg_bytes,
+> +                                          data + offset, count - offset);
+> +}
+...
+> +static bool lpc18xx_eeprom_writeable_reg(struct device *dev, unsigned int reg)
+> +{
+> +       /*
+> +        * The last page contains the EEPROM initialization data and is not
+> +        * writable.
+> +        */
+> +       return (reg <= lpc18xx_regmap_config.max_register -
+> +                                               LPC18XX_EEPROM_PAGE_SIZE);
+
+Unnecessary  parenthesis.
+
+> +}
+> +
+> +static bool lpc18xx_eeprom_readable_reg(struct device *dev, unsigned int reg)
+> +{
+> +       return (reg <= lpc18xx_regmap_config.max_register);
+> +}
+
+Unnecessary  parenthesis.
+
+> +
+> +static struct nvmem_config lpc18xx_nvmem_config = {
+> +       .name = "lpc18xx-eeprom",
+> +       .owner = THIS_MODULE,
+> +};
+> +
+> +static const struct of_device_id lpc18xx_eeprom_of_match[] = {
+> +       { .compatible = "nxp,lpc1850-eeprom" },
+
+Use lpc1857 as noted in the other thread.
+
+> +       { },
+> +};
+> +MODULE_DEVICE_TABLE(of, lpc18xx_eeprom_of_match);
 
 
 regards,
