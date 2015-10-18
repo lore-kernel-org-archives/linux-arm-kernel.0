@@ -1,44 +1,102 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Sun, 18 Oct 2015 11:18:48 +0530
-Subject: [PATCH] ARM: dts: vfxxx: Fix erroneous property in esdhc0 node
-Message-ID: <4f43a337677572fbf2b2c8e27152db426e024f7a.1445146992.git.maitysanchayan@gmail.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Sun, 18 Oct 2015 10:43:42 +0200
+Subject: [PATCH] pinctrl: mvebu: armada-38x: add suspend/resume support
+In-Reply-To: <20151017222927.GR32532@n2100.arm.linux.org.uk>
+References: <1445117328-31678-1-git-send-email-mw@semihalf.com>
+ <20151017222927.GR32532@n2100.arm.linux.org.uk>
+Message-ID: <CAPv3WKed+Q3K0ky9b9AAYSymB-tE0O=57UdrgM+7Cx-X9PeVcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Something seems to have gone wrong during the merging of the device
-tree changes with the following patch
+Hi Russell,
 
-"ARM: dts: add property for maximum ADC clock frequencies"
+Thanks for pointing this. I based on pinctrl-armada-xp.c (it needs a
+fix then, too) and it worked. I must have missed, because I got proper
+registers' number and values in suspend/resume routines. As
+pinctrl-armada-xp.c needs also a small fix and in order not to
+duplicate code, how about a following solution:
+- *mpp_saved_regs and *mpp_base become members of struct mvebu_pinctrl_soc_info
+- common mvebu_pinctrl_suspend/resume functions in pinctrl-mvebu.c
+(now there will be two users AXP and A38X)
 
-The property "fsl,adck-max-frequency" instead of being applied for
-the ADC1 node got applied to the esdhc0 node. This patch fixes it.
+Please let me know what you think.
 
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
----
- arch/arm/boot/dts/vfxxx.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Best regards,
+Marcin
 
-diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index 6736bae..a64bfe1 100644
---- a/arch/arm/boot/dts/vfxxx.dtsi
-+++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -461,6 +461,8 @@
- 				clock-names = "adc";
- 				#io-channel-cells = <1>;
- 				status = "disabled";
-+				fsl,adck-max-frequency = <30000000>, <40000000>,
-+							<20000000>;
- 			};
- 
- 			esdhc0: esdhc at 400b1000 {
-@@ -472,8 +474,6 @@
- 					<&clks VF610_CLK_ESDHC0>;
- 				clock-names = "ipg", "ahb", "per";
- 				status = "disabled";
--				fsl,adck-max-frequency = <30000000>, <40000000>,
--							<20000000>;
- 			};
- 
- 			esdhc1: esdhc at 400b2000 {
--- 
-2.6.1
+
+
+2015-10-18 0:29 GMT+02:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Sat, Oct 17, 2015 at 11:28:48PM +0200, Marcin Wojtas wrote:
+>> diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+>> index 6ec82c6..094cb48 100644
+>> --- a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+>> +++ b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+>> @@ -23,6 +23,7 @@
+>>  #include "pinctrl-mvebu.h"
+>>
+>>  static void __iomem *mpp_base;
+>> +static u32 *mpp_saved_regs;
+>
+> I'm not a fan of unnecessary global variables.  It adds to the bulk of
+> the kernel when built-in (even though it's in .bss, it still has a cost)
+> and these all add up when built-in.
+>
+> Please make it part of the driver data allocated at probe time.
+>
+>>  static int armada_38x_mpp_ctrl_get(unsigned pid, unsigned long *config)
+>>  {
+>> @@ -424,6 +425,7 @@ static int armada_38x_pinctrl_probe(struct platform_device *pdev)
+>>       const struct of_device_id *match =
+>>               of_match_device(armada_38x_pinctrl_of_match, &pdev->dev);
+>>       struct resource *res;
+>> +     int nregs;
+>>
+>>       if (!match)
+>>               return -ENODEV;
+>> @@ -441,11 +443,44 @@ static int armada_38x_pinctrl_probe(struct platform_device *pdev)
+>>       soc->modes = armada_38x_mpp_modes;
+>>       soc->nmodes = armada_38x_mpp_controls[0].npins;
+>>
+>> +     nregs = DIV_ROUND_UP(soc->nmodes, MVEBU_MPPS_PER_REG);
+>> +
+>> +     mpp_saved_regs = devm_kcalloc(&pdev->dev, nregs, sizeof(u32),
+>> +                                   GFP_KERNEL);
+>> +     if (!mpp_saved_regs)
+>> +             return -ENOMEM;
+>> +
+>>       pdev->dev.platform_data = soc;
+>
+> The 'soc' is stored in platform data, not driver data, but...
+>
+>>
+>>       return mvebu_pinctrl_probe(pdev);
+>>  }
+>>
+>> +int armada_38x_pinctrl_suspend(struct platform_device *pdev, pm_message_t state)
+>> +{
+>> +     struct mvebu_pinctrl_soc_info *soc = platform_get_drvdata(pdev);
+>
+> You access it through driver data.  Isn't the driver data here a
+> struct mvebu_pinctrl pointer?  See platform_set_drvdata() in
+> mvebu_pinctrl_probe().
+>
+>> +     int i, nregs;
+>> +
+>> +     nregs = DIV_ROUND_UP(soc->nmodes, MVEBU_MPPS_PER_REG);
+>> +
+>> +     for (i = 0; i < nregs; i++)
+>> +             mpp_saved_regs[i] = readl(mpp_base + i * 4);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +int armada_38x_pinctrl_resume(struct platform_device *pdev)
+>> +{
+>> +     struct mvebu_pinctrl_soc_info *soc = platform_get_drvdata(pdev);
+>
+> Ditto.
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
