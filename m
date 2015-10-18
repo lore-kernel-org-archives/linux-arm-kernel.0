@@ -1,31 +1,29 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 18 Oct 2015 02:15:16 +0200
-Subject: [PATCH v2] rtc: at91rm9200: clear RTC alarm status flag prior to
- suspending
-In-Reply-To: <1444639163-14255-1-git-send-email-wenyou.yang@atmel.com>
-References: <1444639163-14255-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20151018001516.GX3421@piout.net>
+Date: Sun, 18 Oct 2015 02:15:50 +0200
+Subject: [PATCH] rtc: davinci: remove incorrect reference to probe function
+In-Reply-To: <5677325.oZsHpDNL2Z@wuerfel>
+References: <5677325.oZsHpDNL2Z@wuerfel>
+Message-ID: <20151018001550.GY3421@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2015 at 16:39:23 +0800, Wenyou Yang wrote :
-> As said in the SAMA5D2 datasheet, "Prior to instructing the device
-> to enter ULP mode 1, ... and the internal sources of wake-up must
-> be cleared."
+On 12/10/2015 at 15:14:05 +0200, Arnd Bergmann wrote :
+> The davinci rtc driver uses the module_platform_driver_probe()
+> helper to call the probe function and mark it as __init, but
+> it also puts a reference into its davinci_rtc_driver function.
 > 
-> This patch is to clear the RTC alarm status flag prior to suspending
-> to avoid the erroneous wake-up activity, as it is often used as
-> the wake-up source for the ULP mode 1.
+> This will crash if we ever get a deferred probe and the probe
+> function is called again after the init section has been removed.
+> kbuild warns about this:
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
+> WARNING: vmlinux.o(.data+0x1aa2b4): Section mismatch in reference from the variable davinci_rtc_driver to the function .init.text:davinci_rtc_probe()
+> The variable davinci_rtc_driver references
+> the function __init davinci_rtc_probe()
 > 
-> Changes in v2:
->  - Add more detail commit log.
+> This patch removes the .probe callback from the platform driver,
+> which avoids those problems.
 > 
->  drivers/rtc/rtc-at91rm9200.c |    2 ++
->  1 file changed, 2 insertions(+)
-> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Applied, thanks.
 
 -- 
