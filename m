@@ -1,7 +1,7 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 18 Oct 2015 14:20:17 +0200
-Subject: [resend GIT PULL] ARM: mediatek: soc updates for v4.3
-Message-ID: <CABuKBeJUgmaswptkh1MdFfLyL0Yir7Umf=KQ3kW3B2A_=SU+0A@mail.gmail.com>
+Date: Sun, 18 Oct 2015 14:21:54 +0200
+Subject: [resend GIT PULL] ARM: mediatek: dts updates for v4.3
+Message-ID: <CABuKBeJA9rYZm4keLV8TVj_X4FT4YkOcmFJqnCBL=aaQWW4N1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,54 +23,45 @@ The following changes since commit 1f93e4a96c9109378204c147b3eec0d0e8100fde:
 
 are available in the git repository at:
 
-  https://github.com/mbgg/linux-mediatek.git tags/v4.3-next-soc
+  https://github.com/mbgg/linux-mediatek.git tags/v4.3-next-dts
 
-for you to fetch changes up to 0cda07001a9454f371b7a7edabad55d99ef91157:
+for you to fetch changes up to 060646a218b357e758b3dc6bbce2865bd0aadd44:
 
-  ARM: mediatek: add smp bringup code (2015-10-14 15:34:44 +0200)
-
-----------------------------------------------------------------
-Do the initial setting of the pmic wrap interrupt before requesting
-the interrupt.
-This fixes the corner-case where the pmic is initialized by the bootloader, but
-not the pmic watchdog.
-
-Add support for active wakeup to the scpsys. This allows to keep the power of
-a scpsys domain  during suspend state.
-
-With version v4.3 new subsystem clocks are added to the clock dirver. In late
-init the kernel turns off all unused clocks. This can provoke a hang if
-the kernel tries to access the venc and venc_lt power domain registers.
-Add the necessary parent clocks for this power domains to
-the scpsys so that no random hang happens.
-
-The bootloader of mt6589, mt8135 and mt1827 does not turn on the arm-arch-timer.
-As there is no opensource bootloader in the near future for this architectures
-we enable the arch timer at kernel boot. We need the arch timer for SMP boot.
-
-Add support for SMP on mt6589, mt8127 and mt8135.
+  ARM: dts: mt8127: enable basic SMP bringup for mt8127 (2015-10-12
+19:10:38 +0200)
 
 ----------------------------------------------------------------
-Eddie Huang (1):
-      soc: mediatek: add scpsys support active_wakeup
+Delete regulator-compatible usage in mt8135-evbp1.dts.
+The regualtor-compatible binding is deprecated, instead the node name
+is used.
 
-Henry Chen (1):
-      soc: mediatek: Move the initial setting of pmic wrap interrupt
-before requesting irq.
+Mediatek timer driver supports as well mt8127, mt8135 and mt8173. Add
+these SOCs to the bindings list.
 
+Power domains venc and venc_lt need clocks two extra clocks to access
+their registers. We update the bindings documentation about this.
+
+Update SMP bindings documentation by adding support for mt6589 and mt81xx SOCs.
+
+Update mt8127.dtsi and mt8135.dtsi to enable SMP support.
+
+----------------------------------------------------------------
 James Liao (1):
-      soc: mediatek: Fix random hang up issue while kernel init
+      dt-bindings: soc: Add clocks for Mediatek SCPSYS unit
 
-Matthias Brugger (1):
-      ARM: mediatek: enable gpt6 on boot up to make arch timer working
+Javier Martinez Canillas (1):
+      ARM: dts: mt8135-evbp1: remove regulator-compatible usage
 
-Yingjoe Chen (1):
-      ARM: mediatek: add smp bringup code
+Yingjoe Chen (4):
+      dt-bindings: add more MediaTek SoC to mtk-timer binding
+      devicetree: bindings: add new SMP enable method Mediatek SoC
+      ARM: dts: mt8135: enable basic SMP bringup for mt8135
+      ARM: dts: mt8127: enable basic SMP bringup for mt8127
 
- arch/arm/mach-mediatek/Makefile      |   3 +
- arch/arm/mach-mediatek/mediatek.c    |  27 +++++++
- arch/arm/mach-mediatek/platsmp.c     | 141 +++++++++++++++++++++++++++++++++++
- drivers/soc/mediatek/mtk-pmic-wrap.c |  10 ++-
- drivers/soc/mediatek/mtk-scpsys.c    |  83 +++++++++++++++------
- 5 files changed, 237 insertions(+), 27 deletions(-)
- create mode 100644 arch/arm/mach-mediatek/platsmp.c
+ Documentation/devicetree/bindings/arm/cpus.txt     |  2 ++
+ .../devicetree/bindings/soc/mediatek/scpsys.txt    | 10 ++++----
+ .../bindings/timer/mediatek,mtk-timer.txt          |  8 ++++---
+ arch/arm/boot/dts/mt8127.dtsi                      | 27 ++++++++++++++++++++++
+ arch/arm/boot/dts/mt8135-evbp1.dts                 | 23 ------------------
+ arch/arm/boot/dts/mt8135.dtsi                      | 27 ++++++++++++++++++++++
+ 6 files changed, 67 insertions(+), 30 deletions(-)
