@@ -1,127 +1,61 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 18 Oct 2015 23:47:53 +0200
-Subject: [PATCH 1/2] nvmem: NXP LPC18xx EEPROM memory NVMEM driver
-In-Reply-To: <1445004426-6271-2-git-send-email-ariel@vanguardiasur.com.ar>
-References: <1445004426-6271-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1445004426-6271-2-git-send-email-ariel@vanguardiasur.com.ar>
-Message-ID: <CAGhQ9VzYbG++UQdx-Ljouc+w3Z_K0WWvNOe0HQpNZ8JnphCDCw@mail.gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sun, 18 Oct 2015 18:21:13 -0400
+Subject: [PATCH 0/5] drivers/tty: make more bool drivers explicitly non-modular
+Message-ID: <1445206878-12455-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ariel,
+This next set of patches to drivers/tty fixes up more drivers that would
+perhaps appear modular when looking at the code, but are controlled by
+a bool Kconfig.  We make sure they don't look modular and get rid
+of module related code in the drivers that would never be used.
 
-Thanks for working on this.
+The one common thread here for all the patches is that we also
+scrap the .remove functions which would only be used for module
+unload (impossible) and driver unbind.  For the drivers here, there
+doesn't seem to be a sensible unbind use case (vs. e.g. a multiport
+PCI ethernet driver where one port is unbound and passed through to
+a kvm guest or similar).  Hence we just explicitly disallow any
+driver unbind operations to help prevent root from doing something
+illogical to the machine that they could have done previously.
 
-On 16 October 2015 at 16:07, Ariel D'Alessandro
-<ariel@vanguardiasur.com.ar> wrote:
-> This commit adds support for NXP LPC18xx EEPROM memory found in NXP LPC
-> SoCs family, which includes LPC18xx/LPC43xx. Other SoCs in that family
-> may share the same watchdog hardware.
+We've already done this for drivers/tty/serial/mpsc.c previously.
 
-Only LPC185x/3x and LPC435x/3x/2x/1x devices have the EEPROM.
+Build tested for allmodconfig on ARM64 and powerpc for tty/tty-testing.
 
+Paul.
 
-> EEPROM size is 16384 bytes and it can be entirely read and
-> written/erased with 1 word (4 bytes) granularity. The last page
-> (128 bytes) contains the EEPROM initialization data and is not writable.
->
-> Erase/program time is less than 3ms. The EEPROM device requires a
-> ~1500 kHz clock (min 800 kHz, max 1600 kHz) that is generated dividing
-> the system bus clock by the division factor, contained in the divider
-> register (minus 1 encoded).
+---
 
-Nice description of the device.
+Cc: Andy Gross <agross@codeaurora.org>
+Cc: Anton Blanchard <anton@samba.org>
+Cc: David Brown <davidb@codeaurora.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jiri Slaby <jslaby@suse.com>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Michael Ellerman <mpe@ellerman.id.au>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-arm-msm at vger.kernel.org
+Cc: linux-mediatek at lists.infradead.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: linux-serial at vger.kernel.org
+Cc: linux-soc at vger.kernel.org
 
+Paul Gortmaker (5):
+  drivers/tty: make hvc/hvc_vio.c explicitly non-modular
+  drivers/tty: make ehv_bytechan.c explicitly non-modular
+  drivers/tty/serial: make serial/atmel_serial.c explicitly non-modular
+  drivers/tty/serial: make msm_serial.c explicitly non-modular
+  drivers/tty/serial: make 8250/8250_mtk.c explicitly non-modular
 
-> +static inline void lpc18xx_eeprom_writel(struct lpc18xx_eeprom_dev *eeprom,
-> +                                        u32 reg, u32 val)
-> +{
-> +       writel(val, eeprom->reg_base + reg);
-> +}
-> +
-> +static inline u32 lpc18xx_eeprom_readl(struct lpc18xx_eeprom_dev *eeprom,
-> +                                      u32 reg)
-> +{
-> +       return readl(eeprom->reg_base + reg);
-> +}
+ drivers/tty/ehv_bytechan.c         | 40 +++------------------------------
+ drivers/tty/hvc/hvc_vio.c          | 29 ++++--------------------
+ drivers/tty/serial/8250/8250_mtk.c | 35 ++++++-----------------------
+ drivers/tty/serial/atmel_serial.c  | 45 ++++----------------------------------
+ drivers/tty/serial/msm_serial.c    | 30 ++++---------------------
+ 5 files changed, 22 insertions(+), 157 deletions(-)
 
-Read function seems to be unused.
-
-Are these two wrappers really useful?
-
-
-> +static int lpc18xx_eeprom_gather_write(void *context, const void *reg,
-> +                                      size_t reg_size, const void *val,
-> +                                      size_t val_size)
-> +{
-> +       struct lpc18xx_eeprom_dev *eeprom = context;
-> +       unsigned int offset = *(u32 *)reg;
-> +
-> +       /* 3 ms of erase/program time between each writing */
-> +       while (val_size) {
-> +               writel(*(u32 *)val, eeprom->mem_base + offset);
-> +               mdelay(3);
-
-That's a long mdelay. Is it possible to sleep instead?
-
-
-> +               val_size -= eeprom->val_bytes;
-> +               val += eeprom->val_bytes;
-> +               offset += eeprom->val_bytes;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static int lpc18xx_eeprom_write(void *context, const void *data, size_t count)
-> +{
-> +       struct lpc18xx_eeprom_dev *eeprom = context;
-> +       unsigned int offset = eeprom->reg_bytes;
-> +
-> +       BUG_ON(count <= offset);
-
-BUG_ON seems a bit harsh. Could you return an error instead?
-
-
-> +       return lpc18xx_eeprom_gather_write(context, data, eeprom->reg_bytes,
-> +                                          data + offset, count - offset);
-> +}
-...
-> +static bool lpc18xx_eeprom_writeable_reg(struct device *dev, unsigned int reg)
-> +{
-> +       /*
-> +        * The last page contains the EEPROM initialization data and is not
-> +        * writable.
-> +        */
-> +       return (reg <= lpc18xx_regmap_config.max_register -
-> +                                               LPC18XX_EEPROM_PAGE_SIZE);
-
-Unnecessary  parenthesis.
-
-> +}
-> +
-> +static bool lpc18xx_eeprom_readable_reg(struct device *dev, unsigned int reg)
-> +{
-> +       return (reg <= lpc18xx_regmap_config.max_register);
-> +}
-
-Unnecessary  parenthesis.
-
-> +
-> +static struct nvmem_config lpc18xx_nvmem_config = {
-> +       .name = "lpc18xx-eeprom",
-> +       .owner = THIS_MODULE,
-> +};
-> +
-> +static const struct of_device_id lpc18xx_eeprom_of_match[] = {
-> +       { .compatible = "nxp,lpc1850-eeprom" },
-
-Use lpc1857 as noted in the other thread.
-
-> +       { },
-> +};
-> +MODULE_DEVICE_TABLE(of, lpc18xx_eeprom_of_match);
-
-
-regards,
-Joachim Eastwood
+-- 
+2.6.1
