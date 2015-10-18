@@ -1,9 +1,10 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 17 Oct 2015 18:58:05 -0700
-Subject: [PATCH 4.2 172/258] irqchip/gic-v3-its: Add missing cache flushes
+Date: Sat, 17 Oct 2015 18:58:04 -0700
+Subject: [PATCH 4.2 171/258] irqchip/atmel-aic5: Use per chip mask caches in
+ mask/unmask()
 In-Reply-To: <20151018014729.976101177@linuxfoundation.org>
 References: <20151018014729.976101177@linuxfoundation.org>
-Message-ID: <20151018014738.222522905@linuxfoundation.org>
+Message-ID: <20151018014738.173924430@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,50 +12,77 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 ------------------
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-commit 5a9a8915c8888b615521b17d70a4342187eae60b upstream.
+commit d32dc9aa10c739363c775baf4499416b2e0dc11f upstream.
 
-When the ITS is configured for non-cacheable transactions, make sure
-that the allocated, zeroed memory is flushed to the Point of
-Coherency, allowing the ITS to observe the zeros instead of random
-garbage (or even get its own data overwritten by zeros being evicted
-from the cache...).
+When masking/unmasking interrupts, mask_cache is updated and used later
+for suspend/resume. Unfortunately, it always was the mask_cache
+associated with the first irq chip which was updated. So when performing
+resume, only irqs 0-31 could be enabled.
 
-Fixes: 241a386c7dbb "irqchip: gicv3-its: Use non-cacheable accesses when no shareability"
-Reported-and-tested-by: Stuart Yoder <stuart.yoder@freescale.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Pavel Fedin <p.fedin@samsung.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Link: http://lkml.kernel.org/r/1442142873-20213-3-git-send-email-marc.zyngier at arm.com
+Fixes: b1479ebb7720 ("irqchip: atmel-aic: Add atmel AIC/AIC5 drivers")
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Cc: <sasha.levin@oracle.com>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Cc: <nicolas.ferre@atmel.com>
+Cc: <alexandre.belloni@free-electrons.com>
+Cc: <boris.brezillon@free-electrons.com>
+Cc: <Wenyou.Yang@atmel.com>
+Cc: <jason@lakedaemon.net>
+Cc: <marc.zyngier@arm.com>
+Link: http://lkml.kernel.org/r/1442843173-2390-1-git-send-email-ludovic.desroches at atmel.com
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- drivers/irqchip/irq-gic-v3-its.c |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/irqchip/irq-atmel-aic5.c |   24 ++++++++++++++++--------
+ 1 file changed, 16 insertions(+), 8 deletions(-)
 
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -921,8 +921,10 @@ retry_baser:
- 			 * non-cacheable as well.
- 			 */
- 			shr = tmp & GITS_BASER_SHAREABILITY_MASK;
--			if (!shr)
-+			if (!shr) {
- 				cache = GITS_BASER_nC;
-+				__flush_dcache_area(base, alloc_size);
-+			}
- 			goto retry_baser;
- 		}
+--- a/drivers/irqchip/irq-atmel-aic5.c
++++ b/drivers/irqchip/irq-atmel-aic5.c
+@@ -88,28 +88,36 @@ static void aic5_mask(struct irq_data *d
+ {
+ 	struct irq_domain *domain = d->domain;
+ 	struct irq_domain_chip_generic *dgc = domain->gc;
+-	struct irq_chip_generic *gc = dgc->gc[0];
++	struct irq_chip_generic *bgc = dgc->gc[0];
++	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
  
-@@ -1163,6 +1165,8 @@ static struct its_device *its_create_dev
- 		return NULL;
- 	}
+-	/* Disable interrupt on AIC5 */
+-	irq_gc_lock(gc);
++	/*
++	 * Disable interrupt on AIC5. We always take the lock of the
++	 * first irq chip as all chips share the same registers.
++	 */
++	irq_gc_lock(bgc);
+ 	irq_reg_writel(gc, d->hwirq, AT91_AIC5_SSR);
+ 	irq_reg_writel(gc, 1, AT91_AIC5_IDCR);
+ 	gc->mask_cache &= ~d->mask;
+-	irq_gc_unlock(gc);
++	irq_gc_unlock(bgc);
+ }
  
-+	__flush_dcache_area(itt, sz);
-+
- 	dev->its = its;
- 	dev->itt = itt;
- 	dev->nr_ites = nr_ites;
+ static void aic5_unmask(struct irq_data *d)
+ {
+ 	struct irq_domain *domain = d->domain;
+ 	struct irq_domain_chip_generic *dgc = domain->gc;
+-	struct irq_chip_generic *gc = dgc->gc[0];
++	struct irq_chip_generic *bgc = dgc->gc[0];
++	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+ 
+-	/* Enable interrupt on AIC5 */
+-	irq_gc_lock(gc);
++	/*
++	 * Enable interrupt on AIC5. We always take the lock of the
++	 * first irq chip as all chips share the same registers.
++	 */
++	irq_gc_lock(bgc);
+ 	irq_reg_writel(gc, d->hwirq, AT91_AIC5_SSR);
+ 	irq_reg_writel(gc, 1, AT91_AIC5_IECR);
+ 	gc->mask_cache |= d->mask;
+-	irq_gc_unlock(gc);
++	irq_gc_unlock(bgc);
+ }
+ 
+ static int aic5_retrigger(struct irq_data *d)
