@@ -1,126 +1,124 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Sun, 18 Oct 2015 12:24:30 -0600
-Subject: [PATCH V2 13/30] coresight: etm3x: implementing perf_enable/disable()
- API
+Date: Sun, 18 Oct 2015 12:24:36 -0600
+Subject: [PATCH V2 19/30] coresight: etb10: implementing the setup_aux() API
 In-Reply-To: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1445192687-24112-14-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1445192687-24112-20-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That way traces can be enable and disabled automatically
-from the Perf subystem using the PMU abstraction.
+Adding an ETB10 specific auxiliary area setup operation to be
+used by the perf framework when events are initialised.
+
+Part of this operation involves modeling the mmap'ed area based
+on the specific ways a sink buffer gathers information.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm3x.c | 50 ++++++++++++++++++++++++---
- include/linux/coresight.h                     |  4 +++
- 2 files changed, 50 insertions(+), 4 deletions(-)
+ drivers/hwtracing/coresight/coresight-etb10.c | 55 +++++++++++++++++++++++++++
+ include/linux/coresight.h                     |  3 ++
+ 2 files changed, 58 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 0994bf0a8334..f565554744fe 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -369,8 +369,10 @@ static void etm_enable_hw(void *info)
- 	etm_set_prog(drvdata);
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index ecdbe0dd4d08..7f34e7af465e 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -27,6 +27,9 @@
+ #include <linux/coresight.h>
+ #include <linux/amba/bus.h>
+ #include <linux/clk.h>
++#include <linux/mm.h>
++
++#include <asm/local.h>
  
- 	etmcr = etm_readl(drvdata, ETMCR);
--	etmcr &= (ETMCR_PWD_DWN | ETMCR_ETM_PRG);
-+	/* Clear setting from a previous run if need be */
-+	etmcr &= ~ETM3X_SUPPORTED_OPTIONS;
- 	etmcr |= drvdata->port_size;
-+	etmcr |= ETMCR_ETM_EN;
- 	etm_writel(drvdata, config->ctrl | etmcr, ETMCR);
- 	etm_writel(drvdata, config->trigger_event, ETMTRIGGER);
- 	etm_writel(drvdata, config->startstop_ctrl, ETMTSSCR);
-@@ -410,9 +412,6 @@ static void etm_enable_hw(void *info)
- 	/* No VMID comparator value selected */
- 	etm_writel(drvdata, 0x0, ETMVMIDCVR);
+ #include "coresight-priv.h"
  
--	/* Ensures trace output is enabled from this ETM */
--	etm_writel(drvdata, config->ctrl | ETMCR_ETM_EN | etmcr, ETMCR);
--
- 	etm_clr_prog(drvdata);
- 	CS_LOCK(drvdata->base);
+@@ -64,6 +67,32 @@
+ #define ETB_FRAME_SIZE_WORDS	4
  
-@@ -485,6 +484,47 @@ static void perf_etm_set_config(struct coresight_device *csdev, void *config)
- 	drvdata->config = config;
+ /**
++ * struct cs_buffer - keep track of a recording session' specifics
++ * @cur:	index of the current buffer
++ * @nr_pages:	max number of pages granted to us
++ * @nr_bufs:	number of clustered pages
++ * @offset:	offset within the current buffer
++ * @size:	how much space we have for this run
++ * @data_size:	how much we collected in this run
++ * @head:	head of the ring buffer
++ * @lost:	other than zero if we had a HW buffer wrap around
++ * @snapshot:	is this run in snapshot mode
++ * @addr:	virtual address this buffer starts at
++ */
++struct cs_buffers {
++	unsigned int		cur;
++	unsigned int		nr_pages;
++	unsigned int		nr_bufs;
++	unsigned long		offset;
++	unsigned long		size;
++	local_t			data_size;
++	local_t			head;
++	local_t			lost;
++	bool			snapshot;
++	void			*addr[0];
++};
++
++/**
+  * struct etb_drvdata - specifics associated to an ETB component
+  * @base:	memory mapped base address for this component.
+  * @dev:	the device entity associated to this component.
+@@ -252,9 +281,35 @@ static void etb_disable(struct coresight_device *csdev)
+ 	dev_info(drvdata->dev, "ETB disabled\n");
  }
  
-+static int perf_etm_enable(struct coresight_device *csdev)
++static void *etb_setup_aux(struct coresight_device *csdev, int cpu,
++			   void **pages, int nr_pages, bool overwrite)
 +{
-+	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	int node, pg;
++	struct cs_buffers *buf;
 +
-+	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
-+		return -EINVAL;
++	if (cpu == -1)
++		cpu = smp_processor_id();
++	node = cpu_to_node(cpu);
 +
-+	if (local_cmpxchg(&drvdata->state,
-+			  ETM_STATE_DISABLED, ETM_STATE_PERF))
-+		return -EBUSY;
++	buf = kzalloc_node(offsetof(struct cs_buffers, addr[nr_pages]),
++			   GFP_KERNEL, node);
++	if (!buf)
++		return NULL;
 +
-+	etm_enable_hw(drvdata);
++	buf->snapshot = overwrite;
++	buf->nr_pages = nr_pages;
 +
-+	return 0;
++	/* Record information about buffers */
++	for (pg = 0; pg < buf->nr_pages; pg++)
++		buf->addr[pg] = pages[pg];
++
++	return buf;
 +}
 +
-+static int perf_etm_disable(struct coresight_device *csdev)
-+{
-+	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
-+		return -EINVAL;
-+
-+	CS_UNLOCK(drvdata->base);
-+
-+	/* setting the prog bit disables tracing immediately */
-+	etm_set_prog(drvdata);
-+	/* Get ready for another session */
-+	drvdata->config = NULL;
-+	/*
-+	 * There is no way to know when the tracer will be used again so
-+	 * power down the tracer.
-+	 */
-+	etm_set_pwrdwn(drvdata);
-+	local_set(&drvdata->state, ETM_STATE_DISABLED);
-+
-+	CS_LOCK(drvdata->base);
-+
-+	return 0;
-+}
-+
- static int sysfs_etm_enable(struct coresight_device *csdev)
- {
- 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -587,6 +627,8 @@ static const struct coresight_ops_source etm_source_ops = {
- 	.trace_id		= etm_trace_id,
- 	.perf_get_config	= perf_etm_get_config,
- 	.perf_set_config	= perf_etm_set_config,
-+	.perf_enable		= perf_etm_enable,
-+	.perf_disable		= perf_etm_disable,
- 	.sysfs_enable		= sysfs_etm_enable,
- 	.sysfs_disable		= sysfs_etm_disable,
+ static const struct coresight_ops_sink etb_sink_ops = {
+ 	.enable		= etb_enable,
+ 	.disable	= etb_disable,
++	.setup_aux	= etb_setup_aux,
  };
+ 
+ static const struct coresight_ops etb_cs_ops = {
 diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index 32463da877eb..b853d722346b 100644
+index dd530a6d3e21..b1c25eba83b4 100644
 --- a/include/linux/coresight.h
 +++ b/include/linux/coresight.h
-@@ -211,6 +211,8 @@ struct coresight_ops_link {
- 			to the HW.
-  * @perf_get_config:	builds the ETM configuration after event' specifics.
-  * @perf_set_config:	associate a tracer with a configuration..
-+ * @perf_enable:	enables tracing for a source, from Perf.
-+ * @perf_disable:	disables tracing for a source, from Perf.
-  * @sysfs_enable:	enables tracing for a source, from sysFS.
-  * @sysfs_disable:	disables tracing for a source, from sysFS.
+@@ -187,10 +187,13 @@ struct coresight_device {
+  * Operations available for sinks
+  * @enable:	enables the sink.
+  * @disable:	disables the sink.
++ * @setup_aux:	initialises perf's ring buffer for trace collection.
   */
-@@ -220,6 +222,8 @@ struct coresight_ops_source {
- 	void *(*perf_get_config)(struct coresight_device *csdev,
- 				 struct perf_event *event);
- 	void (*perf_set_config)(struct coresight_device *csdev, void *config);
-+	int (*perf_enable)(struct coresight_device *csdev);
-+	int (*perf_disable)(struct coresight_device *csdev);
- 	int (*sysfs_enable)(struct coresight_device *csdev);
- 	void (*sysfs_disable)(struct coresight_device *csdev);
+ struct coresight_ops_sink {
+ 	int (*enable)(struct coresight_device *csdev);
+ 	void (*disable)(struct coresight_device *csdev);
++	void *(*setup_aux)(struct coresight_device *csdev, int cpu,
++			   void **pages, int nr_pages, bool overwrite);
  };
+ 
+ /**
 -- 
 1.9.1
