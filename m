@@ -1,37 +1,48 @@
-From: ralf@linux-mips.org (Ralf Baechle)
-Date: Mon, 19 Oct 2015 11:37:00 +0200
-Subject: [PATCH] drm/virtio: use %llu format string form atomic64_t
-In-Reply-To: <5152101.mD2bWzUJ2V@wuerfel>
-References: <5082760.FgB9zHNfte@wuerfel>
- <20151007104502.GH21513@n2100.arm.linux.org.uk>
- <6260324.3MlUEc3veg@wuerfel> <5152101.mD2bWzUJ2V@wuerfel>
-Message-ID: <20151019093700.GC2092@linux-mips.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Oct 2015 11:39:31 +0200
+Subject: [PATCH] staging/wilc: fix Kconfig dependencies, second try
+In-Reply-To: <5624A1AF.8080607@atmel.com>
+References: <5446980.8Rmykv9Tt3@wuerfel> <5624A1AF.8080607@atmel.com>
+Message-ID: <4253270.hGxaSY0VLA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2015 at 01:23:07PM +0200, Arnd Bergmann wrote:
-
-> > I haven't checked all architectures, but I assume what happens is that
-> > 64-bit ones just #define atomic64_t atomic_long_t, so they don't have
-> > to provide three sets of functions.
+On Monday 19 October 2015 16:54:23 Tony Cho wrote:
+> Hi Arnd Bergmann,
 > 
-> scratch that, I just looked at all the architectures and found that it's
-> just completely arbitrary, even within one architecture you get a mix
-> of 'long' and 'long long', plus this gem from MIPS:
+> When I apply this patch, I cannot make WILC1000 module (wilc1000.ko) because CONFIG_WILC1000 is y and also I can see some link errors for the cfg80211 APIs.
 > 
-> static __inline__ int atomic64_add_unless(atomic64_t *v, long a, long u)
-> 
-> which truncates the result to 32 bit.
+> Can you consider this patch?
 
-Eh...  The result is 0/1 so nothing is truncated.  Alpha, MIPS,
-PARISC and PowerPC are using the same prototype and x86 only differs
-in the use of inline instead __inline__.  And anyway, that function on
-MIPS is only built for CONFIG_64BIT.
+Ah, you are right. I see the same thing now and don't know what caused me
+to send the patch in an incomplete state.
 
-What's wrong on MIPS is the comment describing the function's return value
-which was changed by f24219b4e90cf70ec4a211b17fbabc725a0ddf3c (atomic: move
-atomic_add_unless to generic code) and I've queued up a patch to fix that
-since a few days.  I guess that was a cut and paste error from
-__atomic_add_unless which indeed does return the old value.
+I hope this snippet is the last missing piece:
 
-  Ralf
+diff --git a/drivers/staging/wilc1000/Kconfig b/drivers/staging/wilc1000/Kconfig
+index ee51b4278088..e3f109655be4 100644
+--- a/drivers/staging/wilc1000/Kconfig
++++ b/drivers/staging/wilc1000/Kconfig
+@@ -1,6 +1,7 @@
+ config WILC1000_DRIVER
+-	bool "WILC1000 support (WiFi only)"
++	tristate "WILC1000 support (WiFi only)"
+ 	depends on CFG80211 && WEXT_CORE && INET
++	depends on MMC || SPI
+ 	---help---
+ 	  This module only support IEEE 802.11n WiFi.
+ 
+@@ -35,7 +36,7 @@ choice
+ 
+ config WILC1000_SDIO
+ 	bool "SDIO support"
+-	depends on MMC
++	depends on MMC=y || (MMC=m && WILC1000_DRIVER=m)
+ 	select WILC1000
+ 	---help---
+ 	  This module adds support for the SDIO interface of adapters using
+
+I'll do a few hundred more randconfig builds with this on top and submit
+it once it succeeds.
+
+	Arnd
