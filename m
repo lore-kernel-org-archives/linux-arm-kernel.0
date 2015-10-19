@@ -1,62 +1,103 @@
 From: w-kwok2@ti.com (WingMan Kwok)
-Date: Mon, 19 Oct 2015 14:57:18 -0400
-Subject: [PATCH v2 0/2] Common SerDes driver for TI's Keystone Platforms
-Message-ID: <1445281040-14742-1-git-send-email-w-kwok2@ti.com>
+Date: Mon, 19 Oct 2015 14:57:20 -0400
+Subject: [PATCH v2 2/2] PCI: keystone: update to use generic keystone serdes
+ driver
+In-Reply-To: <1445281040-14742-1-git-send-email-w-kwok2@ti.com>
+References: <1445281040-14742-1-git-send-email-w-kwok2@ti.com>
+Message-ID: <1445281040-14742-3-git-send-email-w-kwok2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On TI's Keystone platforms, several peripherals such as the
-gbe ethernet switch, 10gbe ethernet switch and PCIe controller
-require the use of a SerDes for converting SoC parallel data into
-serialized data that can be output over a high-speed electrical
-interface, and also converting high-speed serial input data
-into parallel data that can be processed by the SoC.  The
-SerDeses used by those peripherals, though they may be different,
-are largely similar in functionality and setup.
+This patch updates the Keystone PCI driver to use the
+generic Keystone serdes driver for serdes initialization
+and configuration.  The generic serdes driver supports
+peripherals on Keystone platforms that require serdes.
 
-This patch series provides a SerDes phy driver implementation that can be
-used by the above mentioned peripheral drivers to configure their
-respective SerDeses.
+Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+---
+ drivers/pci/host/pci-keystone.c |   24 ++++++++++++++----------
+ drivers/pci/host/pci-keystone.h |    1 +
+ 2 files changed, 15 insertions(+), 10 deletions(-)
 
-As an example of the using the SerDes driver, this patch series also
-updates the Keystone PCIe host driver to enable and use its SerDes block.
-
-References:
-[1] KeyStone II Architecture Serializer/Deserializer (SerDes) User's Guide
-    (http://www.ti.com/lit/ug/spruho3a/spruho3a.pdf)
-
-v2:
-	- addresses the following review comments on v1:
-		1. https://lkml.org/lkml/2015/10/15/896
-			-- this does not address the question:
-			   "The current code does not do this when compiled,
-			    which might be a problem for distributors.
-			    Can you clarify the license?"
-			-- the question is still under discussion here:
-			   https://lkml.org/lkml/2015/10/19/471
-		2. https://lkml.org/lkml/2015/10/15/895
-
-v1: 
-	- addresses the following review comments
-		1. https://lkml.org/lkml/2015/10/13/803
-		2. https://lkml.org/lkml/2015/10/14/613
-		3. https://lkml.org/lkml/2015/10/13/818
-
-	- An update to PCIe dts bindings to enable the PCIe SerDes is
-	  submitted in a separate patch.
-
-WingMan Kwok (2):
-  phy: keystone: serdes driver for gbe 10gbe and pcie
-  PCI: keystone: update to use generic keystone serdes driver
-
- Documentation/devicetree/bindings/phy/ti-phy.txt |  239 +++
- drivers/pci/host/pci-keystone.c                  |   24 +-
- drivers/pci/host/pci-keystone.h                  |    1 +
- drivers/phy/Kconfig                              |    8 +
- drivers/phy/Makefile                             |    1 +
- drivers/phy/phy-keystone-serdes.c                | 2365 ++++++++++++++++++++++
- 6 files changed, 2628 insertions(+), 10 deletions(-)
- create mode 100644 drivers/phy/phy-keystone-serdes.c
-
+diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+index 0aa81bd..4cc8faa 100644
+--- a/drivers/pci/host/pci-keystone.c
++++ b/drivers/pci/host/pci-keystone.c
+@@ -335,6 +335,7 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
+ {
+ 	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
+ 
++	phy_exit(ks_pcie->serdes_phy);
+ 	clk_disable_unprepare(ks_pcie->clk);
+ 
+ 	return 0;
+@@ -342,12 +343,12 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
+ 
+ static int __init ks_pcie_probe(struct platform_device *pdev)
+ {
++	struct device_node *node = pdev->dev.of_node;
+ 	struct device *dev = &pdev->dev;
+ 	struct keystone_pcie *ks_pcie;
+ 	struct pcie_port *pp;
+ 	struct resource *res;
+ 	void __iomem *reg_p;
+-	struct phy *phy;
+ 	int ret = 0;
+ 
+ 	ks_pcie = devm_kzalloc(&pdev->dev, sizeof(*ks_pcie),
+@@ -357,14 +358,6 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+ 
+ 	pp = &ks_pcie->pp;
+ 
+-	/* initialize SerDes Phy if present */
+-	phy = devm_phy_get(dev, "pcie-phy");
+-	if (!IS_ERR_OR_NULL(phy)) {
+-		ret = phy_init(phy);
+-		if (ret < 0)
+-			return ret;
+-	}
+-
+ 	/* index 2 is to read PCI DEVICE_ID */
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+ 	reg_p = devm_ioremap_resource(dev, res);
+@@ -385,6 +378,17 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	ks_pcie->serdes_phy = devm_of_phy_get(dev, node, NULL);
++	if (IS_ERR(ks_pcie->serdes_phy)) {
++		dev_err(dev, "No %s serdes driver found: %ld\n",
++			node->name, PTR_ERR(ks_pcie->serdes_phy));
++		goto fail_clk;
++	}
++
++	ret = phy_init(ks_pcie->serdes_phy);
++	if (ret < 0)
++		goto fail_clk;
++
+ 	ret = ks_add_pcie_port(ks_pcie, pdev);
+ 	if (ret < 0)
+ 		goto fail_clk;
+@@ -392,7 +396,7 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+ 	return 0;
+ fail_clk:
+ 	clk_disable_unprepare(ks_pcie->clk);
+-
++	phy_exit(ks_pcie->serdes_phy);
+ 	return ret;
+ }
+ 
+diff --git a/drivers/pci/host/pci-keystone.h b/drivers/pci/host/pci-keystone.h
+index 478d932..1e6d122 100644
+--- a/drivers/pci/host/pci-keystone.h
++++ b/drivers/pci/host/pci-keystone.h
+@@ -33,6 +33,7 @@ struct keystone_pcie {
+ 	/* Application register space */
+ 	void __iomem		*va_app_base;
+ 	struct resource		app;
++	struct phy		*serdes_phy;
+ };
+ 
+ /* Keystone DW specific MSI controller APIs/definitions */
 -- 
 1.7.9.5
