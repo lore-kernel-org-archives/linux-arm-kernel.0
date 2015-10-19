@@ -1,61 +1,105 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Mon, 19 Oct 2015 13:10:14 +0530
-Subject: [PATCH 0/7] Switch to generic syscon regmap based drivers
-In-Reply-To: <562493BF.9080301@samsung.com>
-References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
- <562493BF.9080301@samsung.com>
-Message-ID: <56249E5E.80405@samsung.com>
+From: tony.cho@atmel.com (Tony Cho)
+Date: Mon, 19 Oct 2015 16:54:23 +0900
+Subject: [PATCH] staging/wilc: fix Kconfig dependencies, second try
+In-Reply-To: <5446980.8Rmykv9Tt3@wuerfel>
+References: <5446980.8Rmykv9Tt3@wuerfel>
+Message-ID: <5624A1AF.8080607@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd Bergmann,
+
+When I apply this patch, I cannot make WILC1000 module (wilc1000.ko) because CONFIG_WILC1000 is y and also I can see some link errors for the cfg80211 APIs.
+
+Can you consider this patch?
+
+Thanks,
+
+Tony.
 
 
-On 10/19/2015 12:24 PM, Krzysztof Kozlowski wrote:
-> On 19.10.2015 15:03, Alim Akhtar wrote:
-> ...
+On 2015? 10? 17? 05:45, Arnd Bergmann wrote:
+> My first attempt to fix the Kconfig logic for wilc1000 was incomplete,
+> as it missed the case where SPI is built-in while SDIO is modular
+> and wilc1000 is configured as built-in in SPI mode (or vice versa),
+> which would still lead to a link failure.
 >
-> Hi,
+> This works around the problem by adding an intermediate Kconfig
+> symbol "WILC1000_DRIVER" that controls visibility of the SDIO and
+> SPI sub-drivers, so we can control the dependencies better.
 >
-> I am happy to see more contributions from your side! Keep it up. :)
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 9535ebc5e9cc ("staging/wilc1000: fix Kconfig dependencies")
 >
-Thank you! will keep finding time and doing it.
-
-> However this empty space in your cover letter is the place for
-> description of the patchset. What do you want to achieve here? What kind
-> of problem are you solving? What features are you adding? Any dependencies?
+> diff --git a/drivers/staging/wilc1000/Kconfig b/drivers/staging/wilc1000/Kconfig
+> index 59ccecc316df..ee51b4278088 100644
+> --- a/drivers/staging/wilc1000/Kconfig
+> +++ b/drivers/staging/wilc1000/Kconfig
+> @@ -1,14 +1,16 @@
+> -config WILC1000
+> -	tristate "WILC1000 support (WiFi only)"
+> -	depends on !S390
+> +config WILC1000_DRIVER
+> +	bool "WILC1000 support (WiFi only)"
+>   	depends on CFG80211 && WEXT_CORE && INET
+> -	depends on MMC || SPI
+>   	---help---
+>   	  This module only support IEEE 802.11n WiFi.
+>   
+> +if WILC1000_DRIVER
+> +
+> +config WILC1000
+> +	tristate
+> +
+>   choice
+>           prompt "Memory Allocation"
+> -        depends on WILC1000
+>           default WILC1000_PREALLOCATE_AT_LOADING_DRIVER
+>   
+>   config WILC1000_PREALLOCATE_AT_LOADING_DRIVER
+> @@ -29,12 +31,12 @@ endchoice
+>   
+>   choice
+>   	prompt "Bus Type"
+> -	depends on WILC1000
+>   	default WILC1000_SDIO
+>   
+> -	config WILC1000_SDIO
+> +config WILC1000_SDIO
+>   	bool "SDIO support"
+>   	depends on MMC
+> +	select WILC1000
+>   	---help---
+>   	  This module adds support for the SDIO interface of adapters using
+>   	  WILC1000 chipset. The Atmel WILC1000 SDIO is a full speed interface.
+> @@ -45,8 +47,9 @@ choice
+>   	  To use this interface, pin9 (SDIO_SPI_CFG) must be grounded. Select
+>   	  this if your platform is using the SDIO bus.
+>   
+> -	config WILC1000_SPI
+> +config WILC1000_SPI
+>   	depends on SPI
+> +	select WILC1000
+>   	bool "SPI support"
+>   	---help---
+>   	  This module adds support for the SPI interface of adapters using
+> @@ -60,7 +63,7 @@ endchoice
+>   
+>   config WILC1000_HW_OOB_INTR
+>   	bool "Use out of band interrupt"
+> -	depends on WILC1000 && WILC1000_SDIO
+> +	depends on WILC1000_SDIO
+>   	default n
+>   	---help---
+>   	  This option enables out-of-band interrupt support for the WILC1000
+> @@ -68,3 +71,5 @@ config WILC1000_HW_OOB_INTR
+>   	  mechanism for SDIO host controllers that don't support SDIO interrupt.
+>   	  Select this option If the SDIO host controller in your platform
+>   	  doesn't support SDIO time devision interrupt.
+> +
+> +endif
 >
-Ah, my bad, I used --compose option with git-send-email and did composed 
-the message, somehow it got missed. Will take care.
-
-The motivation came when I tried to used reboot/poweroff on exynos7, and 
-since exynos7 has not added/enabled PMU and does not have access to 
-arch/arm/mach-exynos, so option are to have a reboot/restart driver or 
-we move pmu.c out of mach-exynos. I know there where some effort in past 
-to move pmu.c to drivers, but I feel that is still WIP.
-And then I came across this generic syscon regmap based driver which are 
-already in place, so just used it.
-Hope that helps.
-
-> Best regards,
-> Krzysztof
->
->> Alim Akhtar (7):
->>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos3250 SoCs
->>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos4
->>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5
->>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5410 SoC
->>    ARM: exynos_defconfig: Normalize exynos defconfig
->>    ARM: exynos_defconfig: Enable generic syscon-{reboot, poweroff}
->>      drivers
->>    ARM: EXYNOS: Remove code for restart and poweroff for exynos SoCs
->>
->>   arch/arm/boot/dts/exynos3250.dtsi |   14 ++++++++++++
->>   arch/arm/boot/dts/exynos4.dtsi    |   14 ++++++++++++
->>   arch/arm/boot/dts/exynos5.dtsi    |   14 ++++++++++++
->>   arch/arm/boot/dts/exynos5410.dtsi |   14 ++++++++++++
->>   arch/arm/configs/exynos_defconfig |   11 +++++-----
->>   arch/arm/mach-exynos/pmu.c        |   43 -------------------------------------
->>   6 files changed, 61 insertions(+), 49 deletions(-)
->>
->
->
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-wireless" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
