@@ -1,33 +1,39 @@
-From: davidm@egauge.net (David Mosberger-Tang)
-Date: Mon, 19 Oct 2015 14:54:44 -0600
-Subject: [PATCH] spi: atmel: Fix DMA-setup for transfers with more than 8 bits
- per word.
-Message-ID: <1445288084-31805-1-git-send-email-davidm@egauge.net>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Mon, 19 Oct 2015 14:18:45 -0700
+Subject: [PATCH 0/7] Switch to generic syscon regmap based drivers
+In-Reply-To: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
+References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <CAAtXAHfjdNvJtXW6e4Wm4dba9vbzhpMGJvTBXxvmya08EvHenA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA-slave configuration depends on the whether <= 8 or > 8 bits
-are transferred per word, so we need to call
-atmel_spi_dma_slave_config() with the correct value.
+On Sun, Oct 18, 2015 at 11:03 PM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
+> Alim Akhtar (7):
+>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos3250 SoCs
+>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos4
+>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5
+>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5410 SoC
+>   ARM: exynos_defconfig: Normalize exynos defconfig
+>   ARM: exynos_defconfig: Enable generic syscon-{reboot, poweroff}
+>     drivers
+>   ARM: EXYNOS: Remove code for restart and poweroff for exynos SoCs
+>
+>  arch/arm/boot/dts/exynos3250.dtsi |   14 ++++++++++++
+>  arch/arm/boot/dts/exynos4.dtsi    |   14 ++++++++++++
+>  arch/arm/boot/dts/exynos5.dtsi    |   14 ++++++++++++
+>  arch/arm/boot/dts/exynos5410.dtsi |   14 ++++++++++++
+>  arch/arm/configs/exynos_defconfig |   11 +++++-----
+>  arch/arm/mach-exynos/pmu.c        |   43 -------------------------------------
+>  6 files changed, 61 insertions(+), 49 deletions(-)
+>
+> --
+> 1.7.10.4
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Signed-off-by: David Mosberger <davidm@egauge.net>
----
- drivers/spi/spi-atmel.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Feel free to add Acked-By: Moritz Fischer <moritz.fischer@ettus.com>
+to the patches in your series
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 04e48e5..855cc56 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -758,7 +758,8 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
- 
- 	*plen = len;
- 
--	if (atmel_spi_dma_slave_config(as, &slave_config, 8))
-+	if (atmel_spi_dma_slave_config(as, &slave_config,
-+				       xfer->bits_per_word))
- 		goto err_exit;
- 
- 	/* Send both scatterlists */
--- 
-1.9.1
+Moritz
