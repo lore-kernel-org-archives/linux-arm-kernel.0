@@ -1,60 +1,112 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Mon, 19 Oct 2015 16:04:27 +0100
-Subject: [RFC PATCH v2 1/4] drm: Introduce generic probe function for
- component based masters.
-In-Reply-To: <20151019145027.GF32532@n2100.arm.linux.org.uk>
-References: <1445257313-7147-1-git-send-email-Liviu.Dudau@arm.com>
- <1445257313-7147-2-git-send-email-Liviu.Dudau@arm.com>
- <20151019122537.GZ32532@n2100.arm.linux.org.uk>
- <20151019130258.GU3394@e106497-lin.cambridge.arm.com>
- <20151019132638.GB32532@n2100.arm.linux.org.uk>
- <20151019144225.GE13786@phenom.ffwll.local>
- <20151019145027.GF32532@n2100.arm.linux.org.uk>
-Message-ID: <CACvgo53e-zFcDawbPNaOB8sQcNH-sFDmYi5sXRhp5z6T9oC2=A@mail.gmail.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 19 Oct 2015 16:03:31 +0100
+Subject: [PATCH] clocksource; armada-370: implement ARM delay timer
+Message-ID: <E1ZoByF-0002E9-9O@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 October 2015 at 15:50, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Oct 19, 2015 at 04:42:25PM +0200, Daniel Vetter wrote:
->> On Mon, Oct 19, 2015 at 02:26:38PM +0100, Russell King - ARM Linux wrote:
->> > On Mon, Oct 19, 2015 at 02:02:58PM +0100, Liviu Dudau wrote:
->> > > On Mon, Oct 19, 2015 at 01:25:37PM +0100, Russell King - ARM Linux wrote:
->> > > > Please don't move this into here, it's completely inappropriate.  Just
->> > > > because something makes use of this does not mean they only support
->> > > > 32-bit DMA.  Besides, this has nothing to do with whether or not it's
->> > > > OF-based or not.
->> > >
->> > > Understood. My thinking process was that component-based drivers are all
->> > > OF-enabled (how else do you make use of the framework?) and 32-bit DMA is
->> > > present in 2 out of 3 drivers that are converted, so it looks to be common
->> > > enough that adding it to armada would not hurt. It was all done in the name of
->> > > collecting common code in a single function.
->> >
->> > Which is an utterly crap reason.
->> >
->> > It's also not appropriate.  I'm really not sure why you think that moving
->> > this here would in any way be appropriate - from my point of view, the
->> > mere proposal is utterly insane.
->> >
->> > The "container" device does not do any DMA, so it's inappropriate for
->> > it to have DMA masks set or negotiated on it.  So, actually, no one
->> > should be setting the DMA mask for their container device.  It's wrong.
->>
->> I think (and my opinion doesn't carry as much wheight here on dri-devel
->> than intel-gfx) the above is over the top bashing of a new contributor to
->> drm who really seems trying to do right. I think that's unecessary,
->> especially since you follow up with the reasonable reply below.
->
-> It's justified because it took _two_ messages to get the point across.
-> The first one asking nicely didn't make the necessary impact.
->
-Unlike Daniel, I carry little to no weight here, yet bashing on people
-if they don't get things correct the first time is inconsiderable.
-We are people - we can misread/misinterpret things, have a headache
-and/or just a bad day. If that makes you angry/annoyed, please don't
-reply straight away, but give it a few hours/day for the emotions to
-settle.
+Implement an ARM delay timer to be used for udelay() on Armada 37x
+platforms.  This allows us to skip the delay loop calibration at boot,
+saving 180ms on the boot time of the kernel (which is around 10%).
 
-Thanks
-Emil
+It also means that udelay() will be unaffected by CPU frequency changes
+when cpufreq is enabled on these platforms.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/Kconfig                         |  1 +
+ arch/arm/plat-orion/time.c               | 13 +++++++++++++
+ drivers/clocksource/time-armada-370-xp.c | 14 ++++++++++++++
+ 3 files changed, 28 insertions(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f3dfca632a8a..194569c23271 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -10,6 +10,7 @@ config ARM
+ 	select ARCH_SUPPORTS_ATOMIC_RMW
+ 	select ARCH_USE_BUILTIN_BSWAP
+ 	select ARCH_USE_CMPXCHG_LOCKREF
++	select ARCH_WANT_FRAME_POINTERS
+ 	select ARCH_WANT_IPC_PARSE_VERSION
+ 	select BUILDTIME_EXTABLE_SORT if MMU
+ 	select CLONE_BACKWARDS
+diff --git a/arch/arm/plat-orion/time.c b/arch/arm/plat-orion/time.c
+index 8085a8aac812..ffb93db68e9c 100644
+--- a/arch/arm/plat-orion/time.c
++++ b/arch/arm/plat-orion/time.c
+@@ -18,6 +18,7 @@
+ #include <linux/irq.h>
+ #include <linux/sched_clock.h>
+ #include <plat/time.h>
++#include <asm/delay.h>
+ 
+ /*
+  * MBus bridge block registers.
+@@ -188,6 +189,15 @@ orion_time_set_base(void __iomem *_timer_base)
+ 	timer_base = _timer_base;
+ }
+ 
++static unsigned long orion_delay_timer_read(void)
++{
++	return ~readl(timer_base + TIMER0_VAL_OFF);
++}
++
++static struct delay_timer orion_delay_timer = {
++	.read_current_timer = orion_delay_timer_read,
++};
++
+ void __init
+ orion_time_init(void __iomem *_bridge_base, u32 _bridge_timer1_clr_mask,
+ 		unsigned int irq, unsigned int tclk)
+@@ -202,6 +212,9 @@ orion_time_init(void __iomem *_bridge_base, u32 _bridge_timer1_clr_mask,
+ 
+ 	ticks_per_jiffy = (tclk + HZ/2) / HZ;
+ 
++	orion_delay_timer.freq = tclk;
++	register_current_timer_delay(&orion_delay_timer);
++
+ 	/*
+ 	 * Set scale and timer for sched_clock.
+ 	 */
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index 2162796fd504..d93ec3c4f139 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -45,6 +45,8 @@
+ #include <linux/percpu.h>
+ #include <linux/syscore_ops.h>
+ 
++#include <asm/delay.h>
++
+ /*
+  * Timer block registers.
+  */
+@@ -249,6 +251,15 @@ struct syscore_ops armada_370_xp_timer_syscore_ops = {
+ 	.resume		= armada_370_xp_timer_resume,
+ };
+ 
++static unsigned long armada_370_delay_timer_read(void)
++{
++	return ~readl(timer_base + TIMER0_VAL_OFF);
++}
++
++static struct delay_timer armada_370_delay_timer = {
++	.read_current_timer = armada_370_delay_timer_read,
++};
++
+ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+ {
+ 	u32 clr = 0, set = 0;
+@@ -287,6 +298,9 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+ 		TIMER0_RELOAD_EN | enable_mask,
+ 		TIMER0_RELOAD_EN | enable_mask);
+ 
++	armada_370_delay_timer.freq = timer_clk;
++	register_current_timer_delay(&armada_370_delay_timer);
++
+ 	/*
+ 	 * Set scale and timer for sched_clock.
+ 	 */
+-- 
+2.1.0
