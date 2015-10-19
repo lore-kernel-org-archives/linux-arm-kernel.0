@@ -1,98 +1,74 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:24:49 +0100
-Subject: [PATCHv4 12/24] arm64: Refactor check_cpu_capabilities
-In-Reply-To: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
-References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445261101-22344-13-git-send-email-suzuki.poulose@arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 19 Oct 2015 14:32:55 +0100
+Subject: [RFC PATCH v2 1/4] drm: Introduce generic probe function for
+ component based masters.
+In-Reply-To: <20151019132638.GB32532@n2100.arm.linux.org.uk>
+References: <1445257313-7147-1-git-send-email-Liviu.Dudau@arm.com>
+ <1445257313-7147-2-git-send-email-Liviu.Dudau@arm.com>
+ <20151019122537.GZ32532@n2100.arm.linux.org.uk>
+ <20151019130258.GU3394@e106497-lin.cambridge.arm.com>
+ <20151019132638.GB32532@n2100.arm.linux.org.uk>
+Message-ID: <20151019133255.GV3394@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-check_cpu_capabilities runs through a given list of caps and
-checks if the system has the cap, updates the system capability
-bitmap and also runs any enable() methods associated with them.
-All of this is not quite obvious from the name 'check'. This
-patch splits the check_cpu_capabilities into two parts :
+On Mon, Oct 19, 2015 at 02:26:38PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Oct 19, 2015 at 02:02:58PM +0100, Liviu Dudau wrote:
+> > On Mon, Oct 19, 2015 at 01:25:37PM +0100, Russell King - ARM Linux wrote:
+> > > Please don't move this into here, it's completely inappropriate.  Just
+> > > because something makes use of this does not mean they only support
+> > > 32-bit DMA.  Besides, this has nothing to do with whether or not it's
+> > > OF-based or not.
+> > 
+> > Understood. My thinking process was that component-based drivers are all
+> > OF-enabled (how else do you make use of the framework?) and 32-bit DMA is
+> > present in 2 out of 3 drivers that are converted, so it looks to be common
+> > enough that adding it to armada would not hurt. It was all done in the name of
+> > collecting common code in a single function.
+> 
+> Which is an utterly crap reason.
+> 
+> It's also not appropriate.  I'm really not sure why you think that moving
+> this here would in any way be appropriate - from my point of view, the
+> mere proposal is utterly insane.
 
-1) update_cpu_capabilities
- => Runs through the given list and updates the system
-    wide capability map.
-2) enable_cpu_capabilities
- => Runs through the given list and invokes enable() (if any)
-    for the caps enabled on the system.
+The proposal is to collect similar code present in DRM drivers that act as
+component masters in one place in order to reduce code duplication. I want to
+add another DRM driver that will make use of the same code and did not see
+any reason to copy paste one of the slightly similar versions that are now
+peppered in the drivers/drm drivers.
 
-Cc: Andre Przywara <andre.przywara@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Suggested-by: Catalin Marinas <catalin.marinsa@arm.com>
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/cpufeature.h |    2 +-
- arch/arm64/kernel/cpu_errata.c      |    2 +-
- arch/arm64/kernel/cpufeature.c      |   14 +++++++++++---
- 3 files changed, 13 insertions(+), 5 deletions(-)
+Sorry for making you believe this is more than just code cleanup, but the cover
+letter clearly stated in the title the intent.
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 2797876..b2f224b 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -137,7 +137,7 @@ static inline bool id_aa64mmfr0_mixed_endian_el0(u64 mmfr0)
- 
- void __init setup_cpu_features(void);
- 
--void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-+void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			    const char *info);
- void check_local_cpu_errata(void);
- void check_local_cpu_features(void);
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 6ffd914..09eab32 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -88,5 +88,5 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 
- void check_local_cpu_errata(void)
- {
--	check_cpu_capabilities(arm64_errata, "enabling workaround for");
-+	update_cpu_capabilities(arm64_errata, "enabling workaround for");
- }
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index a90a64d..78c4cb7a 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -629,7 +629,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{},
- };
- 
--void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-+void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			    const char *info)
- {
- 	int i;
-@@ -642,8 +642,15 @@ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			pr_info("%s %s\n", info, caps[i].desc);
- 		cpus_set_cap(caps[i].capability);
- 	}
-+}
-+
-+/*
-+ * Run through the enabled capabilities and enable() it on the CPUs
-+ */
-+void enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
-+{
-+	int i;
- 
--	/* second pass allows enable() to consider interacting capabilities */
- 	for (i = 0; caps[i].desc; i++) {
- 		if (cpus_have_cap(caps[i].capability) && caps[i].enable)
- 			caps[i].enable();
-@@ -652,7 +659,8 @@ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 
- void check_local_cpu_features(void)
- {
--	check_cpu_capabilities(arm64_features, "detected feature:");
-+	update_cpu_capabilities(arm64_features, "detected feature:");
-+	enable_cpu_capabilities(arm64_features);
- }
- 
- void __init setup_cpu_features(void)
+> 
+> The "container" device does not do any DMA, so it's inappropriate for
+> it to have DMA masks set or negotiated on it.  So, actually, no one
+> should be setting the DMA mask for their container device.  It's wrong.
+> 
+> What if we have a 64-bit OF based platform wanting to use the component
+> helper, and they want to call this function?  You prevent them doing so
+> by moving this into here, because they're then forced down to 32-bit DMA.
+> Please, get rid of it, and leave this crappiness in the respective
+> drivers.
+
+OK, will do.
+
+Best regards,
+Liviu
+
+> 
+> -- 
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+> 
+
 -- 
-1.7.9.5
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
