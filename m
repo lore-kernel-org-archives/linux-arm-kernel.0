@@ -1,46 +1,38 @@
-From: mathias.nyman@intel.com (Mathias Nyman)
-Date: Mon, 19 Oct 2015 14:25:49 +0300
-Subject: [PATCH v9 4/5] xhci: mediatek: support MTK xHCI host controller
-In-Reply-To: <1445131519.17024.10.camel@mhfsdcap03>
-References: <1443495698-32233-1-git-send-email-chunfeng.yun@mediatek.com>	
- <1443495698-32233-5-git-send-email-chunfeng.yun@mediatek.com>	
- <561FBC40.7020100@linux.intel.com> <1445131519.17024.10.camel@mhfsdcap03>
-Message-ID: <5624D33D.5090807@intel.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Mon, 19 Oct 2015 12:27:49 +0100
+Subject: [PATCH] ARM64: juno: add NOR flash to device tree
+In-Reply-To: <CACRpkdaGscb_ccbGuwccsRj_b1d6xoveiiZpw1a5eXon3PxAUA@mail.gmail.com>
+References: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
+ <561FC681.2040809@arm.com>
+ <CACRpkdaSox9WKb5-dkD_zAwO9WxP6+b010p3bdxsm1LRy=WvKg@mail.gmail.com>
+ <5624C31D.3070906@arm.com> <20151019102932.GB10678@leverpostej>
+ <CACRpkdaGscb_ccbGuwccsRj_b1d6xoveiiZpw1a5eXon3PxAUA@mail.gmail.com>
+Message-ID: <20151019112749.GB10728@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>
->> So basically we are trying to use as many microframes as possible with as few packets
->> per microframe as possible.
->>
->> Did I understand this correctly?
-> Yes, you are right.
->
->> How will devices react if they expect to get 16 packets every 16th microframe,
->> but they get one packet every microframe instead?
-> I think that the synchronous endpoint must specify its period by
-> bInterval, but can't specify how data should be transfered during the
-> period by the host, and it just only receives data passively. So the
-> device can receive data correctly in the case(bInterval is 5).
->
-> quote from usb3_r1.0 section4.4.8 Isochronous Transfers:
-> "The host can request data from the device or send data to the device at
-> any time during the service interval for a particular endpoint on that
-> device"
->
+On Mon, Oct 19, 2015 at 01:19:14PM +0200, Linus Walleij wrote:
+> On Mon, Oct 19, 2015 at 12:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> 
+> > Also, for non U-Boot systems I was under the impression that the flash
+> > was effectively owned by EFI (for variable storage),
+> 
+> If it is "owned" by something it is owned by the boot monitor, neither
+> by U-Boot or (U)EFI. The boot monitor can flash "images" into
+> the flash using USB or ethernet/TFTP and it is not part of any
+> boot loader, but an autonomous flash image on the board.
+> (Actually it can replace itself.)
 
-As I understand the 4.4.8 section it just means the device can't assume a fixed
-time interval between transfers, meaning that the host can use the last microframe
-in one esit and the first microframe in the next esit, but still only use 1 microframe
-per esit.
+No.
 
-Section 8.12.6.1 describes how a 11 packet isoc transfer is allowed to be split
-to 1 burst of 11 packets, 2 burst (8 + 3),  3 burst (4+4+3) 6 bursts (2+2+2+2+2+1) or
-11 bursts of 1. These are however all within the same microframe. Splitting the
-transfer into several microframes in a esit kind of makes the whole interval concept pointless.
+This would be true for any preceding ARM devboard, but Juno's boot
+architecture is different. The thing that gives the 'Cmd>' prompt is
+running on a system microcontroller. It writes images to the system
+NOR based on the contents of images.txt in the magic USB filesystem.
 
--Mathias
+While I think you _can_ run the boot monitor on Juno, it it not part
+of the UEFI boot path, and I didn't think it was for U-Boot either?
+It certainly shouldn't be needed.
 
-
-
-  
+/
+    Leif
