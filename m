@@ -1,47 +1,75 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 19 Oct 2015 15:33:54 +0200
-Subject: [PATCH] ARM: at91/dt: add pullup on mmc2 data signals
-In-Reply-To: <1441640878-3575-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <1441640878-3575-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <5624F142.1030505@atmel.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 19 Oct 2015 15:34:31 +0200
+Subject: [PATCH 2/4] vfio: platform: reset: calxedaxgmac: add reset
+ function registration
+In-Reply-To: <4837895.vpC7yteyEu@wuerfel>
+References: <1445184015-24414-1-git-send-email-eric.auger@linaro.org>
+ <3829716.dW4OHEgDOa@wuerfel> <5624ED6A.5030408@linaro.org>
+ <4837895.vpC7yteyEu@wuerfel>
+Message-ID: <5624F167.5030206@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 07/09/2015 17:47, Sylvain Rochet a ?crit :
-> MMC data lines may be left floating if nothing is currently driving the
-> data lines, which is the case when mmc is in idle state, thus consuming
-> a useless extra amount of power. Add pullup on mmc2 data signals in the
-> same way it was previously done for mmc0 and mmc1.
+On 10/19/2015 03:25 PM, Arnd Bergmann wrote:
+> On Monday 19 October 2015 15:17:30 Eric Auger wrote:
+>> Hi Arnd,
+>> On 10/19/2015 03:04 PM, Arnd Bergmann wrote:
+>>> On Sunday 18 October 2015 18:00:13 Eric Auger wrote:
+>>>> diff --git a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+>>>> index 619dc7d..4f76b17 100644
+>>>> --- a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+>>>> +++ b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+>>>> @@ -29,8 +29,7 @@
+>>>>  #define DRIVER_VERSION  "0.1"
+>>>>  #define DRIVER_AUTHOR   "Eric Auger <eric.auger@linaro.org>"
+>>>>  #define DRIVER_DESC     "Reset support for Calxeda xgmac vfio platform device"
+>>>> -
+>>>> -#define CALXEDAXGMAC_COMPAT "calxeda,hb-xgmac"
+>>>> +#define COMPAT		"calxeda,hb-xgmac"
+>>>
+>>> Why the rename?
+>> This define was not used. Since the code is meant to be duplicated from
+>> one reset module to the other I thought it did not bring any have a
+>> specialized name
 > 
-> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Thanks Sylvain!
-
-> ---
->  arch/arm/boot/dts/sama5d3_mci2.dtsi | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> I'd say it would be clearer to remove the macro then, and pass the
+> string literal in the function call.
+OK
 > 
-> diff --git a/arch/arm/boot/dts/sama5d3_mci2.dtsi b/arch/arm/boot/dts/sama5d3_mci2.dtsi
-> index 026b252..e21099a 100644
-> --- a/arch/arm/boot/dts/sama5d3_mci2.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3_mci2.dtsi
-> @@ -24,9 +24,9 @@
->  					};
->  					pinctrl_mmc2_dat1_3: mmc2_dat1_3 {
->  						atmel,pins =
-> -							<AT91_PIOC 12 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PC12 periph A MCI2_DA1 with pullup, conflicts with TIOA1 */
-> -							 AT91_PIOC 13 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PC13 periph A MCI2_DA2 with pullup, conflicts with TIOB1 */
-> -							 AT91_PIOC 14 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PC14 periph A MCI2_DA3 with pullup, conflicts with TCLK1 */
-> +							<AT91_PIOC 12 AT91_PERIPH_A AT91_PINCTRL_PULL_UP	/* PC12 periph A MCI2_DA1 with pullup, conflicts with TIOA1 */
-> +							 AT91_PIOC 13 AT91_PERIPH_A AT91_PINCTRL_PULL_UP	/* PC13 periph A MCI2_DA2 with pullup, conflicts with TIOB1 */
-> +							 AT91_PIOC 14 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;	/* PC14 periph A MCI2_DA3 with pullup, conflicts with TCLK1 */
->  					};
->  				};
->  			};
+>>>>  /* XGMAC Register definitions */
+>>>>  #define XGMAC_CONTROL           0x00000000      /* MAC Configuration */
+>>>> @@ -80,6 +79,43 @@ int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
+>>>>  }
+>>>>  EXPORT_SYMBOL_GPL(vfio_platform_calxedaxgmac_reset);
+>>>>  
+>>>> +static int __init vfio_platform_calxedaxgmac_init(void)
+>>>> +{
+>>>> +	int (*register_reset)(struct module *, char*,
+>>>> +				vfio_platform_reset_fn_t);
+>>>> +	int ret;
+>>>> +
+>>>> +	register_reset = symbol_get(vfio_platform_register_reset);
+>>>> +	if (!register_reset)
+>>>> +		return -EINVAL;
+>>>
+>>> I don't understand what you do the symbol_get() here for.
+>>> Why not just call that function directly
+>> the function is implemented in a separate module. This is just to make
+>> sure the vfio-platform module is loaded, in case the end-user attempts
+>> to load the reset module without having this latter loaded.
 > 
+> The module loader does all this for you.
+Ah OK
+
+I will respin shortly taking into account all your comments
+
+Thanks for your time!
+
+Best Regards
+
+Eric
 
 
--- 
-Nicolas Ferre
+> 
+> 	Arnd
+> 
