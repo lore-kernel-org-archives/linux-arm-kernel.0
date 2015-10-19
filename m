@@ -1,27 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Oct 2015 15:08:50 +0200
-Subject: [PATCH 0/4] VFIO platform reset module rework
-In-Reply-To: <1445184015-24414-1-git-send-email-eric.auger@linaro.org>
-References: <1445184015-24414-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <5564303.6Ntpr32PW1@wuerfel>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 19 Oct 2015 15:09:12 +0200
+Subject: [PATCH 3/7] arm: dts: Add syscon-{reboot, poweroff} nodes for
+ exynos5
+In-Reply-To: <1445234635-3950-4-git-send-email-alim.akhtar@samsung.com>
+References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
+ <1445234635-3950-4-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <5624EB78.80703@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 18 October 2015 18:00:11 Eric Auger wrote:
-> This series fixes the current implementation by getting rid of the
-> usage of __symbol_get which caused a compilation issue with
-> CONFIG_MODULES disabled. On top of this, the usage of MODULE_ALIAS makes
-> possible to add a new reset module without being obliged to update the
-> framework. The new implementation relies on the reset module registering
-> its reset function to the vfio-platform driver.
-> 
-> The series is available at
-> 
-> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.3-rc5-rework-xgbe-v2
-> 
-> 
+Hello Alim,
 
-Looks good for the most part, just a few comments on coding style
-for patches 1 and 2.
+On 10/19/2015 08:03 AM, Alim Akhtar wrote:
+> This patch adds syscon-{reboot, poweroff} nodes to allow the
+> generic syscon-{reboot, poweroff} driver to reset/poweroff exynos5 SoCs.
+> 
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5.dtsi |   14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
+> index 110dbd4fb884..1313777618b7 100644
+> --- a/arch/arm/boot/dts/exynos5.dtsi
+> +++ b/arch/arm/boot/dts/exynos5.dtsi
+> @@ -88,6 +88,20 @@
+>  		status = "disabled";
+>  	};
+>  
+> +	poweroff: syscon-poweroff {
+> +		compatible = "syscon-poweroff";
+> +		regmap = <&pmu_system_controller>;
+> +		offset = <0x330C>;
+> +		mask = <0x5200>;
+> +	};
+> +
+> +	reboot: syscon-reboot {
+> +		compatible = "syscon-reboot";
+> +		regmap = <&pmu_system_controller>;
+> +		offset = <0x0400>;
+> +		mask = <0x1>;
+> +	};
+> +
 
-	Arnd
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
