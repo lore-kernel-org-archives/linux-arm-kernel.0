@@ -1,47 +1,56 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 19 Oct 2015 11:12:06 -0700
-Subject: [GIT PULL] SOC changes for BCM2835 for 4.4
-In-Reply-To: <87mvvkotcc.fsf@eliezer.anholt.net>
-References: <87mvvkotcc.fsf@eliezer.anholt.net>
-Message-ID: <56253276.2070901@gmail.com>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Mon, 19 Oct 2015 14:24:03 -0400
+Subject: [PATCH v3 2/3] xen, cpu_hotplug: call device_offline instead of
+ cpu_down
+In-Reply-To: <1445273735-15758-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1510191754000.27957@kaball.uk.xensource.com>
+ <1445273735-15758-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <56253543.8080007@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/15 11:54, Eric Anholt wrote:
-> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
-> 
->   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
-> 
-> are available in the git repository at:
-> 
->   http://github.com/anholt/linux tags/bcm2835-soc-for-4.4-v1
-> 
-> for you to fetch changes up to 4e3d60656a7235b6b6e86d7ef48b0394276c35b5:
-> 
->   ARM: bcm2835: Add the Raspberry Pi firmware driver (2015-10-14 15:30:06 -0700)
+On 10/19/2015 12:55 PM, Stefano Stabellini wrote:
+> When offlining a cpu, instead of cpu_down, call device_offline, which
+> also takes care of updating the cpu.dev.offline field. This keeps the
+> sysfs file /sys/devices/system/cpu/cpuN/online, up to date.  Also move
+> the call to disable_hotplug_cpu, because it makes more sense to have it
+> there.
+>
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: konrad.wilk at oracle.com
+> CC: boris.ostrovsky at oracle.com
+> CC: david.vrabel at citrix.com
+> ---
+>   drivers/xen/cpu_hotplug.c |    3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/xen/cpu_hotplug.c b/drivers/xen/cpu_hotplug.c
+> index 43de1f5..78804b5 100644
+> --- a/drivers/xen/cpu_hotplug.c
+> +++ b/drivers/xen/cpu_hotplug.c
+> @@ -18,6 +18,8 @@ static void enable_hotplug_cpu(int cpu)
+>   
+>   static void disable_hotplug_cpu(int cpu)
+>   {
+> +	if (cpu_online(cpu))
+> +		device_offline(get_cpu_device(cpu));
+>   	if (cpu_present(cpu))
+>   		xen_arch_unregister_cpu(cpu);
 
-Applied to soc/next, thanks!
+Do we want to call device_online() when plugging cpu in?
 
-> 
-> ----------------------------------------------------------------
-> This pull request contains the Raspberry Pi firmware driver, for
-> communicating with the VPU which has exclusive control of some of the
-> peripherals.
-> 
-> ----------------------------------------------------------------
-> Eric Anholt (1):
->       ARM: bcm2835: Add the Raspberry Pi firmware driver
-> 
->  drivers/firmware/Kconfig                   |   7 +
->  drivers/firmware/Makefile                  |   1 +
->  drivers/firmware/raspberrypi.c             | 260 +++++++++++++++++++++++++++++
->  include/soc/bcm2835/raspberrypi-firmware.h | 115 +++++++++++++
->  4 files changed, 383 insertions(+)
->  create mode 100644 drivers/firmware/raspberrypi.c
->  create mode 100644 include/soc/bcm2835/raspberrypi-firmware.h
-> [ signature.asc: application/pgp-signature ]
-> 
+And take sysfs lock?
 
 
--- 
-Florian
+-boris
+
+
+>   
+> @@ -55,7 +57,6 @@ static void vcpu_hotplug(unsigned int cpu)
+>   		enable_hotplug_cpu(cpu);
+>   		break;
+>   	case 0:
+> -		(void)cpu_down(cpu);
+>   		disable_hotplug_cpu(cpu);
+>   		break;
+>   	default:
