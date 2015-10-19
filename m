@@ -1,63 +1,61 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 19 Oct 2015 09:34:15 +0200
-Subject: [PATCH] drm/virtio: use %llu format string form atomic64_t
-In-Reply-To: <5152101.mD2bWzUJ2V@wuerfel>
-References: <5082760.FgB9zHNfte@wuerfel>
- <20151007104502.GH21513@n2100.arm.linux.org.uk>
- <6260324.3MlUEc3veg@wuerfel> <5152101.mD2bWzUJ2V@wuerfel>
-Message-ID: <CAMuHMdWbzEFqVctMXTWtdBn2B+guFdphQX5nXUnHPo1szQbtPg@mail.gmail.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Mon, 19 Oct 2015 13:10:14 +0530
+Subject: [PATCH 0/7] Switch to generic syscon regmap based drivers
+In-Reply-To: <562493BF.9080301@samsung.com>
+References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
+ <562493BF.9080301@samsung.com>
+Message-ID: <56249E5E.80405@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 7, 2015 at 1:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 07 October 2015 13:04:06 Arnd Bergmann wrote:
->> On Wednesday 07 October 2015 11:45:02 Russell King - ARM Linux wrote:
->> > On Wed, Oct 07, 2015 at 12:41:21PM +0200, Arnd Bergmann wrote:
->> > > The virtgpu driver prints the last_seq variable using the %ld or
->> > > %lu format string, which does not work correctly on all architectures
->> > > and causes this compiler warning on ARM:
->> > >
->> > > drivers/gpu/drm/virtio/virtgpu_fence.c: In function 'virtio_timeline_value_str':
->> > > drivers/gpu/drm/virtio/virtgpu_fence.c:64:22: warning: format '%lu' expects argument of type 'long unsigned int', but argument 4 has type 'long long int' [-Wformat=]
->> > >   snprintf(str, size, "%lu", atomic64_read(&fence->drv->last_seq));
->> > >                       ^
->> > > drivers/gpu/drm/virtio/virtgpu_debugfs.c: In function 'virtio_gpu_debugfs_irq_info':
->> > > drivers/gpu/drm/virtio/virtgpu_debugfs.c:37:16: warning: format '%ld' expects argument of type 'long int', but argument 3 has type 'long long int' [-Wformat=]
->> > >   seq_printf(m, "fence %ld %lld\n",
->> > >                 ^
->> > >
->> > > In order to avoid the warnings, this changes the format strings to %llu
->> > > and adds a cast to u64, which makes it work the same way everywhere.
->> >
->> > You have to wonder why atomic64_* functions do not use u64 types.
->> > If they're not reliant on manipulating 64-bit quantities, then what's
->> > the point of calling them atomic _64_.
+
+
+On 10/19/2015 12:24 PM, Krzysztof Kozlowski wrote:
+> On 19.10.2015 15:03, Alim Akhtar wrote:
+> ...
+>
+> Hi,
+>
+> I am happy to see more contributions from your side! Keep it up. :)
+>
+Thank you! will keep finding time and doing it.
+
+> However this empty space in your cover letter is the place for
+> description of the patchset. What do you want to achieve here? What kind
+> of problem are you solving? What features are you adding? Any dependencies?
+>
+Ah, my bad, I used --compose option with git-send-email and did composed 
+the message, somehow it got missed. Will take care.
+
+The motivation came when I tried to used reboot/poweroff on exynos7, and 
+since exynos7 has not added/enabled PMU and does not have access to 
+arch/arm/mach-exynos, so option are to have a reboot/restart driver or 
+we move pmu.c out of mach-exynos. I know there where some effort in past 
+to move pmu.c to drivers, but I feel that is still WIP.
+And then I came across this generic syscon regmap based driver which are 
+already in place, so just used it.
+Hope that helps.
+
+> Best regards,
+> Krzysztof
+>
+>> Alim Akhtar (7):
+>>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos3250 SoCs
+>>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos4
+>>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5
+>>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5410 SoC
+>>    ARM: exynos_defconfig: Normalize exynos defconfig
+>>    ARM: exynos_defconfig: Enable generic syscon-{reboot, poweroff}
+>>      drivers
+>>    ARM: EXYNOS: Remove code for restart and poweroff for exynos SoCs
 >>
->> I haven't checked all architectures, but I assume what happens is that
->> 64-bit ones just #define atomic64_t atomic_long_t, so they don't have
->> to provide three sets of functions.
+>>   arch/arm/boot/dts/exynos3250.dtsi |   14 ++++++++++++
+>>   arch/arm/boot/dts/exynos4.dtsi    |   14 ++++++++++++
+>>   arch/arm/boot/dts/exynos5.dtsi    |   14 ++++++++++++
+>>   arch/arm/boot/dts/exynos5410.dtsi |   14 ++++++++++++
+>>   arch/arm/configs/exynos_defconfig |   11 +++++-----
+>>   arch/arm/mach-exynos/pmu.c        |   43 -------------------------------------
+>>   6 files changed, 61 insertions(+), 49 deletions(-)
+>>
 >
-> scratch that, I just looked at all the architectures and found that it's
-> just completely arbitrary, even within one architecture you get a mix
-> of 'long' and 'long long', plus this gem from MIPS:
 >
-> static __inline__ int atomic64_add_unless(atomic64_t *v, long a, long u)
->
-> which truncates the result to 32 bit.
-
-Woops.
-
-See also my unanswered question in "atomic64 on 32-bit vs 64-bit (was:
-Re: Add virtio gpu driver.)", which is still valid:
-https://lkml.org/lkml/2015/6/28/18
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
