@@ -1,40 +1,31 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Mon, 19 Oct 2015 13:35:33 -0700
-Subject: [PATCHv2] fpga: zynq-fpga: Fix unbalanced clock handling
-Message-ID: <1445286933-2041-1-git-send-email-moritz.fischer@ettus.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 Oct 2015 13:38:15 -0700
+Subject: [PATCH/RESEND] ARM: Remove __ref on hotplug cpu die path
+In-Reply-To: <20151019202301.GA453@leverpostej>
+References: <1445285133-11977-1-git-send-email-sboyd@codeaurora.org>
+ <20151019202301.GA453@leverpostej>
+Message-ID: <20151019203815.GD22043@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit fixes the unbalanced clock handling, where
-a failed probe would leave the clock with an enable count of -1.
+* Mark Rutland <mark.rutland@arm.com> [151019 13:27]:
+> On Mon, Oct 19, 2015 at 01:05:33PM -0700, Stephen Boyd wrote:
+> > Now that __cpuinit has been removed, the __ref markings on these
+> > functions are useless. Remove them. This also reduces the size of
+> > the multi_v7_defconfig image:
+> > 
+> > $ size before after
+> >    text    data     bss     dec     hex filename
+> >    12683578        1470996  348904 14503478         dd4e36 before
+> >    12683274        1470996  348904 14503174         dd4d06 after
+> > 
+> > presumably because now we don't have to jump to code in the
+> > .ref.text section and/or the noinline marking is removed.
+> 
+> FWIW:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Reported-by: Josh Cartwright <joshc@ni.com>
-Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
----
- drivers/fpga/zynq-fpga.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+And if you need even more acks:
 
-diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
-index 103303c..617d382 100644
---- a/drivers/fpga/zynq-fpga.c
-+++ b/drivers/fpga/zynq-fpga.c
-@@ -487,7 +487,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
- 				&zynq_fpga_ops, priv);
- 	if (err) {
- 		dev_err(dev, "unable to register FPGA manager");
--		clk_disable_unprepare(priv->clk);
-+		clk_unprepare(priv->clk);
- 		return err;
- 	}
- 
-@@ -502,7 +502,7 @@ static int zynq_fpga_remove(struct platform_device *pdev)
- 
- 	priv = platform_get_drvdata(pdev);
- 
--	clk_disable_unprepare(priv->clk);
-+	clk_unprepare(priv->clk);
- 
- 	return 0;
- }
--- 
-2.6.1
+Acked-by: Tony Lindgren <tony@atomide.com>
