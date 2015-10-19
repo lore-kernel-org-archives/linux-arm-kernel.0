@@ -1,78 +1,58 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 19 Oct 2015 13:02:36 -0400
-Subject: [PATCH linux-next] soc: ti: use request_firmware_direct() as
- acc firmware is optional
-In-Reply-To: <56250C74.8010405@oracle.com>
-References: <1444935553-19760-1-git-send-email-m-karicheri2@ti.com>
- <5621030D.4090800@ti.com> <56250C13.708@ti.com> <56250C74.8010405@oracle.com>
-Message-ID: <5625222C.8050506@ti.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Mon, 19 Oct 2015 18:01:47 +0100
+Subject: [PATCH v3 3/3] xen/arm: don't try to re-register vcpu_info on
+ cpu_hotplug.
+In-Reply-To: <1445273735-15758-3-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1510191754000.27957@kaball.uk.xensource.com>
+ <1445273735-15758-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <562521FB.10301@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2015 11:29 AM, santosh shilimkar wrote:
-> On 10/19/2015 8:28 AM, Murali Karicheri wrote:
->> On 10/16/2015 10:00 AM, Murali Karicheri wrote:
->>> On 10/15/2015 02:59 PM, Murali Karicheri wrote:
->>>> When firmware image for PDSP firmware is absent in the file system
->>>> the kernel boot with ramfs/nfs is stuck for 60 seconds being the
->>>> the default timeout. request_firmware_direct() is to take care of
->>>> such optional firmware loading and hence replace the call in the
->>>> driver with this API.
->>>>
->>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>>> ---
->>>>   drivers/soc/ti/knav_qmss_queue.c | 6 +++---
->>>>   1 file changed, 3 insertions(+), 3 deletions(-)
->>>>
->>>> diff --git a/drivers/soc/ti/knav_qmss_queue.c
->>>> b/drivers/soc/ti/knav_qmss_queue.c
->>>> index f3a0b6a..89789e2 100644
->>>> --- a/drivers/soc/ti/knav_qmss_queue.c
->>>> +++ b/drivers/soc/ti/knav_qmss_queue.c
->>>> @@ -1519,9 +1519,9 @@ static int knav_queue_load_pdsp(struct
->>>> knav_device *kdev,
->>>>
->>>>       for (i = 0; i < ARRAY_SIZE(knav_acc_firmwares); i++) {
->>>>           if (knav_acc_firmwares[i]) {
->>>> -            ret = request_firmware(&fw,
->>>> -                           knav_acc_firmwares[i],
->>>> -                           kdev->dev);
->>>> +            ret = request_firmware_direct(&fw,
->>>> +                              knav_acc_firmwares[i],
->>>> +                              kdev->dev);
->>>>               if (!ret) {
->>>>                   found = true;
->>>>                   break;
->>>>
->>> Santosh,
->>>
->>> If this looks good, could you please send this to linux-next?  Without
->>> this, Linux boot will see a pause for about 60 seconds if qmss acc
->>> firmware is not present in the file system. So this is a must for next.
->>>
->> Santosh,
->>
->> A Gentle ping....
->>
-> Yes I have seen it but it has to wait now. I plan to send that as a fix
-> as part of 4.4-rcx fixes.
-Santosh,
+Hi Stefano,
 
-Not sure what the reason is. Can't this be sent to linux-next as should 
-be the case if something is broken on that branch AFAIK. For us, this 
-would help to merge to ti kernel based on 4.1.y if this is already part 
-of an upstream branch. Otherwise, I will have to wait merge of the qmss 
-accumulator series to ti kernel until this one is merged to upstream 
-which will block the release. So I prefer you send this one to 
-linux-next sooner than late.
+On 19/10/15 17:55, Stefano Stabellini wrote:
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index 6c09cc4..074b1a2 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -93,6 +93,17 @@ static void xen_percpu_init(void)
+>  	int err;
+>  	int cpu = get_cpu();
+>  
+> +	/* 
+> +	 * VCPUOP_register_vcpu_info cannot be called twice for the same
+> +	 * vcpu, so if vcpu_info is already registered, just get out. This
+> +	 * can happen with cpu-hotplug.
+> +	 */
+> +	if (per_cpu(xen_vcpu, cpu) != NULL) {
+> +		enable_percpu_irq(xen_events_irq, 0);
+> +		put_cpu();
+> +		return;
 
-Thanks and regards,
+I might be too picky, but this function can be reworked to avoid
+duplicating the code. Something like:
 
-Murali
->
->
+if (per_cpu(xen_vcpu, cpu) != NULL)
+  goto skip_register_vcpu;
+
+> +	}
+> +
+>  	pr_info("Xen: initializing cpu%d\n", cpu);
+>  	vcpup = per_cpu_ptr(xen_vcpu_info, cpu);
+>  
+> @@ -131,6 +142,9 @@ static int xen_cpu_notification(struct notifier_block *self,
+>  	case CPU_STARTING:
+>  		xen_percpu_init();
+>  		break;
+> +	case CPU_DYING:
+> +		disable_percpu_irq(xen_events_irq);
+> +		break;
+>  	default:
+>  		break;
+>  	}
+> 
 
 
 -- 
-Murali Karicheri
-Linux Kernel, Keystone
+Julien Grall
