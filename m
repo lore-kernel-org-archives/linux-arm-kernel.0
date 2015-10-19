@@ -1,40 +1,73 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 19 Oct 2015 14:41:35 +0200
-Subject: [PATCH v2 1/3] ARM: catch pending imprecise abort on unmask
-In-Reply-To: <20151015153246.GH32536@n2100.arm.linux.org.uk>
-References: <1444905142-21500-1-git-send-email-l.stach@pengutronix.de>
- <1444905142-21500-2-git-send-email-l.stach@pengutronix.de>
- <20151015153246.GH32536@n2100.arm.linux.org.uk>
-Message-ID: <1445258495.3174.36.camel@pengutronix.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 19 Oct 2015 13:43:13 +0100
+Subject: [PATCH 2/2] arm64: Use gfpflags_allow_blocking()
+In-Reply-To: <20151016135900.bc1e10115a866a301dbb0cd8@linux-foundation.org>
+References: <ecbbf6550654071f13d1bdc04b86dc4d69ad09b4.1445008695.git.robin.murphy@arm.com>
+ <adf855c7692b1512ab7216579468ad1eef2f25a8.1445008695.git.robin.murphy@arm.com>
+ <20151016135900.bc1e10115a866a301dbb0cd8@linux-foundation.org>
+Message-ID: <5624E561.6010107@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 15.10.2015, 16:32 +0100 schrieb Russell King - ARM
-Linux:
-> On Thu, Oct 15, 2015 at 12:32:20PM +0200, Lucas Stach wrote:
-> > Install a non-faulting handler just before unmasking imprecise aborts
-> > and switch back to the regular one after unmasking is done.
-> > 
-> > This catches any pending imprecise abort that the firmware/bootloader
-> > may have left behind that would normally crash the kernel at that point.
-> > As there are apparently a lot of bootlaoders out there that do such a
-> > thing it makes sense to handle it in the common startup code.
-> > 
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> 
-> Much better.  Please feel free to add it to the patch system, thanks.
-> 
-> I think, given that the original seems to be breaking platforms, this
-> patch needs to go into -rc kernels, right?
-> 
-Okay, this is in the patch system as patch 8447/1 now.
+Hi Andrew,
 
-As Russell hasn't said whether he would like to pick up the platform
-patches I've omitted them for now and would ask the platform maintainers
-to pick them up themselves for kernel 4.4.
+On 16/10/15 21:59, Andrew Morton wrote:
+> On Fri, 16 Oct 2015 16:33:42 +0100 Robin Murphy <robin.murphy@arm.com> wrote:
+>
+>> __GFP_WAIT is going away to live its life under a new identity; convert
+>> __iommu_alloc_attrs() to the new helper function instead.
+>>
+>> ...
+>>
+>> --- a/arch/arm64/mm/dma-mapping.c
+>> +++ b/arch/arm64/mm/dma-mapping.c
+>> @@ -566,7 +566,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+>>   	 */
+>>   	gfp |= __GFP_ZERO;
+>>
+>> -	if (gfp & __GFP_WAIT) {
+>> +	if (gfpflags_allow_blocking(gfp)) {
+>>   		struct page **pages;
+>>   		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
+>
+> Seems unnecessarily elaborate.  What's wrong with
+>
+> --- a/arch/arm64/mm/dma-mapping.c~mm-page_alloc-rename-__gfp_wait-to-__gfp_reclaim-arm-fix
+> +++ a/arch/arm64/mm/dma-mapping.c
+> @@ -562,7 +562,7 @@ static void *__iommu_alloc_attrs(struct
+>   	 */
+>   	gfp |= __GFP_ZERO;
+>
+> -	if (gfp & __GFP_WAIT) {
+> +	if (gfp & __GFP_RECLAIM) {
+>   		struct page **pages;
+>   		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
+>
+>
+> ?
 
-Regards,
-Lucas
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Well, in that case the charge of "unnecessarily elaborate" should have 
+been directed at the original patch, and the 53 other locations where 
+(flags & __GFP_WAIT) was changed as per the commit message:
+
+   "Callers that are checking if they are non-blocking should use the
+    helper gfpflags_allow_blocking() where possible."
+
+More importantly, it's also now apparently inconsistent with all the 
+other dma_alloc_coherent() implementations, which thanks to the helper 
+function are testing against __GFP_DIRECT_RECLAIM instead. As I have no 
+clear understanding of what the difference between the two flags is, and 
+how they relate to whether it's safe to call map_vm_area() or not (which 
+is what principally matters here), I'm very uncomfortable with a change 
+introducing that inconsistency.
+
+If instead of my two patches you'd prefer to carry a fix through -mm and 
+coordinate with Joerg and Linus to ensure everything gets merged in the 
+right order, that's fine by me, but either way the change needs to 
+guarantee the same behaviour as all the other instances in arch/arm and 
+arch/arm64 which return a remapped buffer (and I have to say personally 
+I much prefer having the rather inscrutable flag logic hidden behind a 
+clearly-named helper function).
+
+Thanks,
+Robin.
