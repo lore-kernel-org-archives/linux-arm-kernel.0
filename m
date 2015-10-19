@@ -1,36 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 19 Oct 2015 18:30:41 +0100
-Subject: [UPDATED] [PATCHv4 00/12] arm64: 16K translation granule support
-In-Reply-To: <1445260779-22242-1-git-send-email-suzuki.poulose@arm.com>
-References: <1445260779-22242-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20151019173040.GF11226@e104818-lin.cambridge.arm.com>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Mon, 19 Oct 2015 14:32:22 -0300
+Subject: [PATCH v2 0/4] Add support for NXP LPC18xx EEPROM using nvmem
+Message-ID: <1445275946-32653-1-git-send-email-ariel@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 02:19:26PM +0100, Suzuki K. Poulose wrote:
-> Ard Biesheuvel (1):
->   arm64: Add page size to the kernel image header
-> 
-> Mark Rutland (1):
->   arm64: Simplify NR_FIX_BTMAPS calculation
-> 
-> Suzuki K. Poulose (10):
->   arm64: Move swapper pagetable definitions
->   arm64: Handle section maps for swapper/idmap
->   arm64: Introduce helpers for page table levels
->   arm64: Calculate size for idmap_pg_dir at compile time
->   arm64: Handle 4 level page table for swapper
->   arm64: Clean config usages for page size
->   arm64: Kconfig: Fix help text about AArch32 support with 64K pages
->   arm64: Check for selected granule support
->   arm64: Add 16K page size support
->   arm64: 36 bit VA
+This patch series adds support for NXP LPC18xx EEPROM memory found in
+NXP LPC185x/3x and LPC435x/3x/2x/1x devices.
 
-Patches applied. I'm not fully convinced about the 36-bit VA yet, it
-increases the validation space and I think with little benefit (to be
-seen on real hardware). I may make it depend on EXPERT.
+This patchset is based on tag next-20151019 of the linux-next
+repository. It has been successfully tested on a LPC4337 CIAA-NXP
+Board.
 
-Thanks.
+EEPROM notes:
+------------
+
+EEPROM size is 16384 bytes and it can be entirely read and 
+written/erased with 1 word (4 bytes) granularity. The last page
+(128 bytes) contains the EEPROM initialization data and is not writable.
+
+Erase/program time is less than 3ms. The EEPROM device requires a
+~1500 kHz clock (min 800 kHz, max 1600 kHz) that is generated dividing
+the system bus clock by the division factor, contained in the divider
+register (minus 1 encoded).
+
+Changeset:
+---------
+v1 -> v2:
+* Moved dt-bindings to be the first patch.
+* Changed compatible name from lpc1850 to lpc1857 as the former doesn't have EEPROM.
+* Fix hardware description which contained SoCs models without EEPROM.
+* Disabled fast_io and changed mdelay for msleep in regmap writes.
+* Replaced BUG_ON() in write function for an -EINVAL return.
+* Add patches for defconfig and devicetree files.
+
+Thanks,
+
+Ariel D'Alessandro (4):
+  DT: nvmem: Add NXP LPC18xx EEPROM memory binding documentation
+  nvmem: NXP LPC18xx EEPROM memory NVMEM driver
+  ARM: dts: lpc18xx: add EEPROM memory node
+  ARM: configs: lpc18xx: enable EEPROM NVMEM driver
+
+ .../devicetree/bindings/nvmem/lpc1857-eeprom.txt   |  26 ++
+ arch/arm/boot/dts/lpc18xx.dtsi                     |  12 +
+ arch/arm/configs/lpc18xx_defconfig                 |   2 +
+ drivers/nvmem/Kconfig                              |   9 +
+ drivers/nvmem/Makefile                             |   2 +
+ drivers/nvmem/lpc18xx_eeprom.c                     | 266 +++++++++++++++++++++
+ 6 files changed, 317 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
+ create mode 100644 drivers/nvmem/lpc18xx_eeprom.c
 
 -- 
-Catalin
+2.6.1
