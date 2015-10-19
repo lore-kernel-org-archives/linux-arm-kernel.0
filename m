@@ -1,28 +1,32 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 10:41:07 +0100
-Subject: [PATCH v3 14/24] arm64: Delay cpu feature capability checks
-In-Reply-To: <201510180642.xwPchoyX%fengguang.wu@intel.com>
-References: <201510180642.xwPchoyX%fengguang.wu@intel.com>
-Message-ID: <5624BAB3.8050809@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Oct 2015 11:53:40 +0200
+Subject: [PATCH] staging/wilc: fix Kconfig dependencies, second try
+In-Reply-To: <4253270.hGxaSY0VLA@wuerfel>
+References: <5446980.8Rmykv9Tt3@wuerfel> <5624A1AF.8080607@atmel.com>
+ <4253270.hGxaSY0VLA@wuerfel>
+Message-ID: <4095810.4Q9e8Lc4je@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/15 23:56, kbuild test robot wrote:
-> Hi Suzuki,
->
-> [auto build test ERROR on v4.3-rc5 -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
->
-> url:    https://github.com/0day-ci/linux/commits/Suzuki-K-Poulose/arm64-Consolidate-CPU-feature-handling/20151014-013504
-> config: arm64-allnoconfig (attached as .config)
-> reproduce:
->          wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->          chmod +x ~/bin/make.cross
->          # save the attached .config to linux build tree
->          make.cross ARCH=arm64
->
-> All errors (new ones prefixed by >>):
+On Monday 19 October 2015 11:39:31 Arnd Bergmann wrote:
+> On Monday 19 October 2015 16:54:23 Tony Cho wrote:
+> > Hi Arnd Bergmann,
+> > 
+> > When I apply this patch, I cannot make WILC1000 module (wilc1000.ko) because CONFIG_WILC1000 is y and also I can see some link errors for the cfg80211 APIs.
+> > 
+> > Can you consider this patch?
+> 
+> Ah, you are right. I see the same thing now and don't know what caused me
+> to send the patch in an incomplete state.
+> 
+> I hope this snippet is the last missing piece:
+> 
 
+No, that was not it either, I'll start over to think this through.
 
-Thanks for the report, I have already fixed it for the next version.
+The real solution of course is to make it possible to load both the
+SPI and MMC front-ends at the same time and have a common base driver,
+which I might have to do, in order to clear myself of the shame of sending
+not one but two incorrect fixes for this problem ;-)
 
-Suzuki
+	Arnd
