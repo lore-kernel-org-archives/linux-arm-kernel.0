@@ -1,312 +1,282 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:24:43 +0100
-Subject: [PATCHv4 06/24] arm64: Move /proc/cpuinfo handling code
+Date: Mon, 19 Oct 2015 14:24:41 +0100
+Subject: [PATCHv4 04/24] arm64: Move cpu feature detection code
 In-Reply-To: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
 References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445261101-22344-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445261101-22344-5-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves the /proc/cpuinfo handling code:
+This patch moves the CPU feature detection code from
+ arch/arm64/kernel/{setup.c to cpufeature.c}
 
-arch/arm64/kernel/{setup.c to cpuinfo.c}
+The plan is to consolidate all the CPU feature handling
+in cpufeature.c.
 
-No functional changes
+Apart from changing pr_fmt from "alternatives" to "cpu features",
+there are no functional changes.
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpuinfo.c |  124 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/setup.c   |  123 ------------------------------------------
- 2 files changed, 124 insertions(+), 123 deletions(-)
+ arch/arm64/kernel/cpufeature.c |  110 +++++++++++++++++++++++++++++++++++++++-
+ arch/arm64/kernel/setup.c      |  107 --------------------------------------
+ 2 files changed, 109 insertions(+), 108 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 8307b33..0dadb69 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -24,8 +24,11 @@
- #include <linux/bug.h>
- #include <linux/init.h>
- #include <linux/kernel.h>
-+#include <linux/personality.h>
- #include <linux/preempt.h>
- #include <linux/printk.h>
-+#include <linux/seq_file.h>
-+#include <linux/sched.h>
- #include <linux/smp.h>
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 3c9aed3..e49be15 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -16,13 +16,31 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
- /*
-@@ -45,6 +48,127 @@ static char *icache_policy_str[] = {
+-#define pr_fmt(fmt) "alternatives: " fmt
++#define pr_fmt(fmt) "CPU features: " fmt
  
- unsigned long __icache_flags;
+ #include <linux/types.h>
+ #include <asm/cpu.h>
+ #include <asm/cpufeature.h>
+ #include <asm/processor.h>
  
-+static const char *hwcap_str[] = {
-+	"fp",
-+	"asimd",
-+	"evtstrm",
-+	"aes",
-+	"pmull",
-+	"sha1",
-+	"sha2",
-+	"crc32",
-+	"atomics",
-+	NULL
-+};
++unsigned long elf_hwcap __read_mostly;
++EXPORT_SYMBOL_GPL(elf_hwcap);
 +
 +#ifdef CONFIG_COMPAT
-+static const char *compat_hwcap_str[] = {
-+	"swp",
-+	"half",
-+	"thumb",
-+	"26bit",
-+	"fastmult",
-+	"fpa",
-+	"vfp",
-+	"edsp",
-+	"java",
-+	"iwmmxt",
-+	"crunch",
-+	"thumbee",
-+	"neon",
-+	"vfpv3",
-+	"vfpv3d16",
-+	"tls",
-+	"vfpv4",
-+	"idiva",
-+	"idivt",
-+	"vfpd32",
-+	"lpae",
-+	"evtstrm"
-+};
++#define COMPAT_ELF_HWCAP_DEFAULT	\
++				(COMPAT_HWCAP_HALF|COMPAT_HWCAP_THUMB|\
++				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
++				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
++				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
++				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV|\
++				 COMPAT_HWCAP_LPAE)
++unsigned int compat_elf_hwcap __read_mostly = COMPAT_ELF_HWCAP_DEFAULT;
++unsigned int compat_elf_hwcap2 __read_mostly;
++#endif
 +
-+static const char *compat_hwcap2_str[] = {
-+	"aes",
-+	"pmull",
-+	"sha1",
-+	"sha2",
-+	"crc32",
-+	NULL
-+};
-+#endif /* CONFIG_COMPAT */
++DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
 +
-+static int c_show(struct seq_file *m, void *v)
++
+ static bool
+ feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
+ {
+@@ -100,3 +118,93 @@ void check_local_cpu_features(void)
+ {
+ 	check_cpu_capabilities(arm64_features, "detected feature:");
+ }
++
++void __init setup_cpu_features(void)
 +{
-+	int i, j;
++	u64 features;
++	s64 block;
++	u32 cwg;
++	int cls;
 +
-+	for_each_online_cpu(i) {
-+		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
-+		u32 midr = cpuinfo->reg_midr;
++	/*
++	 * Check for sane CTR_EL0.CWG value.
++	 */
++	cwg = cache_type_cwg();
++	cls = cache_line_size();
++	if (!cwg)
++		pr_warn("No Cache Writeback Granule information, assuming cache line size %d\n",
++			cls);
++	if (L1_CACHE_BYTES < cls)
++		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
++			L1_CACHE_BYTES, cls);
 +
-+		/*
-+		 * glibc reads /proc/cpuinfo to determine the number of
-+		 * online processors, looking for lines beginning with
-+		 * "processor".  Give glibc what it expects.
-+		 */
-+		seq_printf(m, "processor\t: %d\n", i);
-+
-+		/*
-+		 * Dump out the common processor features in a single line.
-+		 * Userspace should read the hwcaps with getauxval(AT_HWCAP)
-+		 * rather than attempting to parse this, but there's a body of
-+		 * software which does already (at least for 32-bit).
-+		 */
-+		seq_puts(m, "Features\t:");
-+		if (personality(current->personality) == PER_LINUX32) {
-+#ifdef CONFIG_COMPAT
-+			for (j = 0; compat_hwcap_str[j]; j++)
-+				if (compat_elf_hwcap & (1 << j))
-+					seq_printf(m, " %s", compat_hwcap_str[j]);
-+
-+			for (j = 0; compat_hwcap2_str[j]; j++)
-+				if (compat_elf_hwcap2 & (1 << j))
-+					seq_printf(m, " %s", compat_hwcap2_str[j]);
-+#endif /* CONFIG_COMPAT */
-+		} else {
-+			for (j = 0; hwcap_str[j]; j++)
-+				if (elf_hwcap & (1 << j))
-+					seq_printf(m, " %s", hwcap_str[j]);
++	/*
++	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
++	 * The blocks we test below represent incremental functionality
++	 * for non-negative values. Negative values are reserved.
++	 */
++	features = read_cpuid(ID_AA64ISAR0_EL1);
++	block = cpuid_feature_extract_field(features, 4);
++	if (block > 0) {
++		switch (block) {
++		default:
++		case 2:
++			elf_hwcap |= HWCAP_PMULL;
++		case 1:
++			elf_hwcap |= HWCAP_AES;
++		case 0:
++			break;
 +		}
-+		seq_puts(m, "\n");
-+
-+		seq_printf(m, "CPU implementer\t: 0x%02x\n",
-+			   MIDR_IMPLEMENTOR(midr));
-+		seq_printf(m, "CPU architecture: 8\n");
-+		seq_printf(m, "CPU variant\t: 0x%x\n", MIDR_VARIANT(midr));
-+		seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
-+		seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
 +	}
 +
-+	return 0;
++	if (cpuid_feature_extract_field(features, 8) > 0)
++		elf_hwcap |= HWCAP_SHA1;
++
++	if (cpuid_feature_extract_field(features, 12) > 0)
++		elf_hwcap |= HWCAP_SHA2;
++
++	if (cpuid_feature_extract_field(features, 16) > 0)
++		elf_hwcap |= HWCAP_CRC32;
++
++	block = cpuid_feature_extract_field(features, 20);
++	if (block > 0) {
++		switch (block) {
++		default:
++		case 2:
++			elf_hwcap |= HWCAP_ATOMICS;
++		case 1:
++			/* RESERVED */
++		case 0:
++			break;
++		}
++	}
++
++#ifdef CONFIG_COMPAT
++	/*
++	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
++	 * the AArch32 32-bit execution state.
++	 */
++	features = read_cpuid(ID_ISAR5_EL1);
++	block = cpuid_feature_extract_field(features, 4);
++	if (block > 0) {
++		switch (block) {
++		default:
++		case 2:
++			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
++		case 1:
++			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
++		case 0:
++			break;
++		}
++	}
++
++	if (cpuid_feature_extract_field(features, 8) > 0)
++		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
++
++	if (cpuid_feature_extract_field(features, 12) > 0)
++		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
++
++	if (cpuid_feature_extract_field(features, 16) > 0)
++		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
++#endif
 +}
-+
-+static void *c_start(struct seq_file *m, loff_t *pos)
-+{
-+	return *pos < 1 ? (void *)1 : NULL;
-+}
-+
-+static void *c_next(struct seq_file *m, void *v, loff_t *pos)
-+{
-+	++*pos;
-+	return NULL;
-+}
-+
-+static void c_stop(struct seq_file *m, void *v)
-+{
-+}
-+
-+const struct seq_operations cpuinfo_op = {
-+	.start	= c_start,
-+	.next	= c_next,
-+	.stop	= c_stop,
-+	.show	= c_show
-+};
-+
- static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
- {
- 	unsigned int cpu = smp_processor_id();
 diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index baf0da8..556301f 100644
+index 47e0051..baf0da8 100644
 --- a/arch/arm64/kernel/setup.c
 +++ b/arch/arm64/kernel/setup.c
-@@ -28,7 +28,6 @@
- #include <linux/console.h>
- #include <linux/cache.h>
- #include <linux/bootmem.h>
--#include <linux/seq_file.h>
- #include <linux/screen_info.h>
- #include <linux/init.h>
- #include <linux/kexec.h>
-@@ -44,7 +43,6 @@
- #include <linux/of_fdt.h>
- #include <linux/of_platform.h>
- #include <linux/efi.h>
--#include <linux/personality.h>
- #include <linux/psci.h>
+@@ -65,23 +65,6 @@
+ #include <asm/efi.h>
+ #include <asm/xen/hypervisor.h>
  
- #include <asm/acpi.h>
-@@ -381,124 +379,3 @@ static int __init topology_init(void)
- 	return 0;
+-unsigned long elf_hwcap __read_mostly;
+-EXPORT_SYMBOL_GPL(elf_hwcap);
+-
+-#ifdef CONFIG_COMPAT
+-#define COMPAT_ELF_HWCAP_DEFAULT	\
+-				(COMPAT_HWCAP_HALF|COMPAT_HWCAP_THUMB|\
+-				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
+-				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
+-				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
+-				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV|\
+-				 COMPAT_HWCAP_LPAE)
+-unsigned int compat_elf_hwcap __read_mostly = COMPAT_ELF_HWCAP_DEFAULT;
+-unsigned int compat_elf_hwcap2 __read_mostly;
+-#endif
+-
+-DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+-
+ phys_addr_t __fdt_pointer __initdata;
+ 
+ /*
+@@ -196,96 +179,6 @@ static void __init smp_build_mpidr_hash(void)
+ 	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
  }
- subsys_initcall(topology_init);
--
--static const char *hwcap_str[] = {
--	"fp",
--	"asimd",
--	"evtstrm",
--	"aes",
--	"pmull",
--	"sha1",
--	"sha2",
--	"crc32",
--	"atomics",
--	NULL
--};
--
--#ifdef CONFIG_COMPAT
--static const char *compat_hwcap_str[] = {
--	"swp",
--	"half",
--	"thumb",
--	"26bit",
--	"fastmult",
--	"fpa",
--	"vfp",
--	"edsp",
--	"java",
--	"iwmmxt",
--	"crunch",
--	"thumbee",
--	"neon",
--	"vfpv3",
--	"vfpv3d16",
--	"tls",
--	"vfpv4",
--	"idiva",
--	"idivt",
--	"vfpd32",
--	"lpae",
--	"evtstrm"
--};
--
--static const char *compat_hwcap2_str[] = {
--	"aes",
--	"pmull",
--	"sha1",
--	"sha2",
--	"crc32",
--	NULL
--};
--#endif /* CONFIG_COMPAT */
--
--static int c_show(struct seq_file *m, void *v)
+ 
+-void __init setup_cpu_features(void)
 -{
--	int i, j;
+-	u64 features;
+-	s64 block;
+-	u32 cwg;
+-	int cls;
 -
--	for_each_online_cpu(i) {
--		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
--		u32 midr = cpuinfo->reg_midr;
+-	/*
+-	 * Check for sane CTR_EL0.CWG value.
+-	 */
+-	cwg = cache_type_cwg();
+-	cls = cache_line_size();
+-	if (!cwg)
+-		pr_warn("No Cache Writeback Granule information, assuming cache line size %d\n",
+-			cls);
+-	if (L1_CACHE_BYTES < cls)
+-		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
+-			L1_CACHE_BYTES, cls);
 -
--		/*
--		 * glibc reads /proc/cpuinfo to determine the number of
--		 * online processors, looking for lines beginning with
--		 * "processor".  Give glibc what it expects.
--		 */
--		seq_printf(m, "processor\t: %d\n", i);
--
--		/*
--		 * Dump out the common processor features in a single line.
--		 * Userspace should read the hwcaps with getauxval(AT_HWCAP)
--		 * rather than attempting to parse this, but there's a body of
--		 * software which does already (at least for 32-bit).
--		 */
--		seq_puts(m, "Features\t:");
--		if (personality(current->personality) == PER_LINUX32) {
--#ifdef CONFIG_COMPAT
--			for (j = 0; compat_hwcap_str[j]; j++)
--				if (compat_elf_hwcap & (1 << j))
--					seq_printf(m, " %s", compat_hwcap_str[j]);
--
--			for (j = 0; compat_hwcap2_str[j]; j++)
--				if (compat_elf_hwcap2 & (1 << j))
--					seq_printf(m, " %s", compat_hwcap2_str[j]);
--#endif /* CONFIG_COMPAT */
--		} else {
--			for (j = 0; hwcap_str[j]; j++)
--				if (elf_hwcap & (1 << j))
--					seq_printf(m, " %s", hwcap_str[j]);
+-	/*
+-	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
+-	 * The blocks we test below represent incremental functionality
+-	 * for non-negative values. Negative values are reserved.
+-	 */
+-	features = read_cpuid(ID_AA64ISAR0_EL1);
+-	block = cpuid_feature_extract_field(features, 4);
+-	if (block > 0) {
+-		switch (block) {
+-		default:
+-		case 2:
+-			elf_hwcap |= HWCAP_PMULL;
+-		case 1:
+-			elf_hwcap |= HWCAP_AES;
+-		case 0:
+-			break;
 -		}
--		seq_puts(m, "\n");
--
--		seq_printf(m, "CPU implementer\t: 0x%02x\n",
--			   MIDR_IMPLEMENTOR(midr));
--		seq_printf(m, "CPU architecture: 8\n");
--		seq_printf(m, "CPU variant\t: 0x%x\n", MIDR_VARIANT(midr));
--		seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
--		seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
 -	}
 -
--	return 0;
+-	if (cpuid_feature_extract_field(features, 8) > 0)
+-		elf_hwcap |= HWCAP_SHA1;
+-
+-	if (cpuid_feature_extract_field(features, 12) > 0)
+-		elf_hwcap |= HWCAP_SHA2;
+-
+-	if (cpuid_feature_extract_field(features, 16) > 0)
+-		elf_hwcap |= HWCAP_CRC32;
+-
+-	block = cpuid_feature_extract_field(features, 20);
+-	if (block > 0) {
+-		switch (block) {
+-		default:
+-		case 2:
+-			elf_hwcap |= HWCAP_ATOMICS;
+-		case 1:
+-			/* RESERVED */
+-		case 0:
+-			break;
+-		}
+-	}
+-
+-#ifdef CONFIG_COMPAT
+-	/*
+-	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
+-	 * the AArch32 32-bit execution state.
+-	 */
+-	features = read_cpuid(ID_ISAR5_EL1);
+-	block = cpuid_feature_extract_field(features, 4);
+-	if (block > 0) {
+-		switch (block) {
+-		default:
+-		case 2:
+-			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
+-		case 1:
+-			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
+-		case 0:
+-			break;
+-		}
+-	}
+-
+-	if (cpuid_feature_extract_field(features, 8) > 0)
+-		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
+-
+-	if (cpuid_feature_extract_field(features, 12) > 0)
+-		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
+-
+-	if (cpuid_feature_extract_field(features, 16) > 0)
+-		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
+-#endif
 -}
 -
--static void *c_start(struct seq_file *m, loff_t *pos)
--{
--	return *pos < 1 ? (void *)1 : NULL;
--}
--
--static void *c_next(struct seq_file *m, void *v, loff_t *pos)
--{
--	++*pos;
--	return NULL;
--}
--
--static void c_stop(struct seq_file *m, void *v)
--{
--}
--
--const struct seq_operations cpuinfo_op = {
--	.start	= c_start,
--	.next	= c_next,
--	.stop	= c_stop,
--	.show	= c_show
--};
+ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ {
+ 	void *dt_virt = fixmap_remap_fdt(dt_phys);
 -- 
 1.7.9.5
