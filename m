@@ -1,51 +1,42 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 19 Oct 2015 13:37:55 +0900
-Subject: [PATCH] serial: 8250_uniphier: fix dl_read and dl_write functions
-Message-ID: <1445229475-23201-1-git-send-email-yamada.masahiro@socionext.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 19 Oct 2015 13:37:40 +0900
+Subject: [PATCH 2/4] hwrng: exynos - Add timeout for waiting on init done
+In-Reply-To: <1445229462-32395-1-git-send-email-k.kozlowski@samsung.com>
+References: <1445229462-32395-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1445229462-32395-3-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The register offset must be shifted by regshift, otherwise the
-baudrate is not set.  I missed the issue probably because the
-divisor register was already set by the boot loader.
+Driver may hang waiting indefinitely for PRNG to finish its
+initialization stage. Instead of stalling return -ETIMEDOUT error.
 
-Fixes: 1a8d2903cb6a ("serial: 8250_uniphier: add UniPhier serial driver")
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
+ drivers/char/hw_random/exynos-rng.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Hi Greg,
-
-Please apply this simple fix for Linux 4.3.
-
-Thanks,
-Masahiro
-
-
- drivers/tty/serial/8250/8250_uniphier.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
-index d11621e..245edbb 100644
---- a/drivers/tty/serial/8250/8250_uniphier.c
-+++ b/drivers/tty/serial/8250/8250_uniphier.c
-@@ -115,12 +115,16 @@ static void uniphier_serial_out(struct uart_port *p, int offset, int value)
-  */
- static int uniphier_serial_dl_read(struct uart_8250_port *up)
- {
--	return readl(up->port.membase + UNIPHIER_UART_DLR);
-+	int offset = UNIPHIER_UART_DLR << up->port.regshift;
-+
-+	return readl(up->port.membase + offset);
- }
+diff --git a/drivers/char/hw_random/exynos-rng.c b/drivers/char/hw_random/exynos-rng.c
+index dc4701fd814f..dfaaaafb8ddd 100644
+--- a/drivers/char/hw_random/exynos-rng.c
++++ b/drivers/char/hw_random/exynos-rng.c
+@@ -81,14 +81,17 @@ static int exynos_read(struct hwrng *rng, void *buf,
+ 	struct exynos_rng *exynos_rng = container_of(rng,
+ 						struct exynos_rng, rng);
+ 	u32 *data = buf;
++	int retry = 100;
  
- static void uniphier_serial_dl_write(struct uart_8250_port *up, int value)
- {
--	writel(value, up->port.membase + UNIPHIER_UART_DLR);
-+	int offset = UNIPHIER_UART_DLR << up->port.regshift;
-+
-+	writel(value, up->port.membase + offset);
- }
+ 	pm_runtime_get_sync(exynos_rng->dev);
  
- static int uniphier_of_serial_setup(struct device *dev, struct uart_port *port,
+ 	exynos_rng_writel(exynos_rng, PRNG_START, 0);
+ 
+ 	while (!(exynos_rng_readl(exynos_rng,
+-			EXYNOS_PRNG_STATUS_OFFSET) & PRNG_DONE))
++			EXYNOS_PRNG_STATUS_OFFSET) & PRNG_DONE) && --retry)
+ 		cpu_relax();
++	if (!retry)
++		return -ETIMEDOUT;
+ 
+ 	exynos_rng_writel(exynos_rng, PRNG_DONE, EXYNOS_PRNG_STATUS_OFFSET);
+ 
 -- 
 1.9.1
