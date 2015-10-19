@@ -1,90 +1,49 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 19 Oct 2015 17:34:21 +0200
-Subject: [PATCH 3/3] ARM: dts: am335x-base0033: Use IOPAD pinmux macro
-In-Reply-To: <1445268861-11857-1-git-send-email-javier@osg.samsung.com>
-References: <1445268861-11857-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1445268861-11857-4-git-send-email-javier@osg.samsung.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 19 Oct 2015 23:36:18 +0800
+Subject: [PATCH V3 1/2] clk: imx6: Add SPDIF_GCLK clock in clock tree
+In-Reply-To: <20151019152807.20687.15779@quantum>
+References: <cover.1444471684.git.shengjiu.wang@freescale.com>
+ <ee897786f33c9ba67b560964a76485891f2f63a8.1444471684.git.shengjiu.wang@freescale.com>
+ <20151019152807.20687.15779@quantum>
+Message-ID: <20151019153618.GA14709@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the AM33XX pinmux IOPAD macro to define the physical address instead
-of the offset from the padconf address. It makes the DTS easier to read
-since matches the addresses listed in the Technical Reference Manual.
+Hi Mike,
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+On Mon, Oct 19, 2015 at 08:28:07AM -0700, Michael Turquette wrote:
+> Quoting Shengjiu Wang (2015-10-10 03:15:06)
+> > Correct SPDIF clock setting issue in clock tree, the SPDIF_GCLK is also
+> > one clock of SPDIF, which is missed before.
+> > 
+> > We found an issue that imx can't enter low power mode with spdif
+> > if IMX6x_CLK_SPDIF is used as the core clock of spdif. Because
+> > spdif driver will register IMX6x_CLK_SPDIF clock to regmap, regmap will do
+> > clk_prepare in init function, then IMX6x_CLK_SPDIF clock is prepared in probe,
+> > so its parent clock (PLL clock) is prepared, the prepare operation of
+> > PLL clock is to enable the clock. But I.MX needs all PLL clock is disabled,
+> > then it can enter low power mode.
+> > 
+> > So we can't use IMX6x_CLK_SPDIF as the core clock of spdif, the correct spdif
+> > core clock is SPDIF_GCLK, which share same gate bit with IMX6x_CLK_SPDIF clock.
+> > SPDIF_GCLK's parent clock is ipg clock.
+> 
+> I'm confused by this. Is there really a new clock signal to be added, or
+> this just to workaround some reference counting problems with regmap?
 
----
+I was confused by the previous version of the patch, and asked Shengjiu
+to improve the commit log, which seems still not so good.  In short, the
+patch does add a missing clock, and the missing of the clock is
+discovered by a low-power-mode issue when SPDIF driver is enabled.
 
- arch/arm/boot/dts/am335x-base0033.dts | 48 +++++++++++++++++------------------
- 1 file changed, 24 insertions(+), 24 deletions(-)
+> 
+> > 
+> > Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
+> 
+> Please Cc the linux-clk at vger.kernel.org mailing list for future clock
+> driver patches.
 
-diff --git a/arch/arm/boot/dts/am335x-base0033.dts b/arch/arm/boot/dts/am335x-base0033.dts
-index 72a9b3fc4251..58a05f7d0b7c 100644
---- a/arch/arm/boot/dts/am335x-base0033.dts
-+++ b/arch/arm/boot/dts/am335x-base0033.dts
-@@ -46,39 +46,39 @@
- &am33xx_pinmux {
- 	nxp_hdmi_pins: pinmux_nxp_hdmi_pins {
- 		pinctrl-single,pins = <
--			0x1b0 (PIN_OUTPUT | MUX_MODE3)	/* xdma_event_intr0.clkout1 */
--			0xa0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data0 */
--			0xa4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data1 */
--			0xa8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data2 */
--			0xac (PIN_OUTPUT | MUX_MODE0)	/* lcd_data3 */
--			0xb0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data4 */
--			0xb4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data5 */
--			0xb8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data6 */
--			0xbc (PIN_OUTPUT | MUX_MODE0)	/* lcd_data7 */
--			0xc0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data8 */
--			0xc4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data9 */
--			0xc8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data10 */
--			0xcc (PIN_OUTPUT | MUX_MODE0)	/* lcd_data11 */
--			0xd0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data12 */
--			0xd4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data13 */
--			0xd8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data14 */
--			0xdc (PIN_OUTPUT | MUX_MODE0)	/* lcd_data15 */
--			0xe0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_vsync */
--			0xe4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_hsync */
--			0xe8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_pclk */
--			0xec (PIN_OUTPUT | MUX_MODE0)	/* lcd_ac_bias_en */
-+			AM33XX_IOPAD(0x9b0, PIN_OUTPUT | MUX_MODE3)	/* xdma_event_intr0.clkout1 */
-+			AM33XX_IOPAD(0x8a0, PIN_OUTPUT | MUX_MODE0)	/* lcd_data0 */
-+			AM33XX_IOPAD(0x8a4, PIN_OUTPUT | MUX_MODE0)	/* lcd_data1 */
-+			AM33XX_IOPAD(0x8a8, PIN_OUTPUT | MUX_MODE0)	/* lcd_data2 */
-+			AM33XX_IOPAD(0x8ac, PIN_OUTPUT | MUX_MODE0)	/* lcd_data3 */
-+			AM33XX_IOPAD(0x8b0, PIN_OUTPUT | MUX_MODE0)	/* lcd_data4 */
-+			AM33XX_IOPAD(0x8b4, PIN_OUTPUT | MUX_MODE0)	/* lcd_data5 */
-+			AM33XX_IOPAD(0x8b8, PIN_OUTPUT | MUX_MODE0)	/* lcd_data6 */
-+			AM33XX_IOPAD(0x8bc, PIN_OUTPUT | MUX_MODE0)	/* lcd_data7 */
-+			AM33XX_IOPAD(0x8c0, PIN_OUTPUT | MUX_MODE0)	/* lcd_data8 */
-+			AM33XX_IOPAD(0x8c4, PIN_OUTPUT | MUX_MODE0)	/* lcd_data9 */
-+			AM33XX_IOPAD(0x8c8, PIN_OUTPUT | MUX_MODE0)	/* lcd_data10 */
-+			AM33XX_IOPAD(0x8cc, PIN_OUTPUT | MUX_MODE0)	/* lcd_data11 */
-+			AM33XX_IOPAD(0x8d0, PIN_OUTPUT | MUX_MODE0)	/* lcd_data12 */
-+			AM33XX_IOPAD(0x8d4, PIN_OUTPUT | MUX_MODE0)	/* lcd_data13 */
-+			AM33XX_IOPAD(0x8d8, PIN_OUTPUT | MUX_MODE0)	/* lcd_data14 */
-+			AM33XX_IOPAD(0x8dc, PIN_OUTPUT | MUX_MODE0)	/* lcd_data15 */
-+			AM33XX_IOPAD(0x8e0, PIN_OUTPUT | MUX_MODE0)	/* lcd_vsync */
-+			AM33XX_IOPAD(0x8e4, PIN_OUTPUT | MUX_MODE0)	/* lcd_hsync */
-+			AM33XX_IOPAD(0x8e8, PIN_OUTPUT | MUX_MODE0)	/* lcd_pclk */
-+			AM33XX_IOPAD(0x8ec, PIN_OUTPUT | MUX_MODE0)	/* lcd_ac_bias_en */
- 		>;
- 	};
- 	nxp_hdmi_off_pins: pinmux_nxp_hdmi_off_pins {
- 		pinctrl-single,pins = <
--			0x1b0 (PIN_OUTPUT | MUX_MODE3)	/* xdma_event_intr0.clkout1 */
-+			AM33XX_IOPAD(0x9b0, PIN_OUTPUT | MUX_MODE3)	/* xdma_event_intr0.clkout1 */
- 		>;
- 	};
- 
- 	leds_base_pins: pinmux_leds_base_pins {
- 		pinctrl-single,pins = <
--			0x54 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_a5.gpio1_21 */
--			0x88 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_csn3.gpio2_0 */
-+			AM33XX_IOPAD(0x854, PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_a5.gpio1_21 */
-+			AM33XX_IOPAD(0x888, PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_csn3.gpio2_0 */
- 		>;
- 	};
- };
--- 
-2.4.3
+Right, should have reminded him.  I will keep my eyes more closely on
+this.
+
+Shawn
