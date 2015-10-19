@@ -1,48 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Oct 2015 11:39:31 +0200
-Subject: [PATCH] staging/wilc: fix Kconfig dependencies, second try
-In-Reply-To: <5624A1AF.8080607@atmel.com>
-References: <5446980.8Rmykv9Tt3@wuerfel> <5624A1AF.8080607@atmel.com>
-Message-ID: <4253270.hGxaSY0VLA@wuerfel>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 19 Oct 2015 10:41:07 +0100
+Subject: [PATCH v3 14/24] arm64: Delay cpu feature capability checks
+In-Reply-To: <201510180642.xwPchoyX%fengguang.wu@intel.com>
+References: <201510180642.xwPchoyX%fengguang.wu@intel.com>
+Message-ID: <5624BAB3.8050809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 October 2015 16:54:23 Tony Cho wrote:
-> Hi Arnd Bergmann,
-> 
-> When I apply this patch, I cannot make WILC1000 module (wilc1000.ko) because CONFIG_WILC1000 is y and also I can see some link errors for the cfg80211 APIs.
-> 
-> Can you consider this patch?
+On 17/10/15 23:56, kbuild test robot wrote:
+> Hi Suzuki,
+>
+> [auto build test ERROR on v4.3-rc5 -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+>
+> url:    https://github.com/0day-ci/linux/commits/Suzuki-K-Poulose/arm64-Consolidate-CPU-feature-handling/20151014-013504
+> config: arm64-allnoconfig (attached as .config)
+> reproduce:
+>          wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>          chmod +x ~/bin/make.cross
+>          # save the attached .config to linux build tree
+>          make.cross ARCH=arm64
+>
+> All errors (new ones prefixed by >>):
 
-Ah, you are right. I see the same thing now and don't know what caused me
-to send the patch in an incomplete state.
 
-I hope this snippet is the last missing piece:
+Thanks for the report, I have already fixed it for the next version.
 
-diff --git a/drivers/staging/wilc1000/Kconfig b/drivers/staging/wilc1000/Kconfig
-index ee51b4278088..e3f109655be4 100644
---- a/drivers/staging/wilc1000/Kconfig
-+++ b/drivers/staging/wilc1000/Kconfig
-@@ -1,6 +1,7 @@
- config WILC1000_DRIVER
--	bool "WILC1000 support (WiFi only)"
-+	tristate "WILC1000 support (WiFi only)"
- 	depends on CFG80211 && WEXT_CORE && INET
-+	depends on MMC || SPI
- 	---help---
- 	  This module only support IEEE 802.11n WiFi.
- 
-@@ -35,7 +36,7 @@ choice
- 
- config WILC1000_SDIO
- 	bool "SDIO support"
--	depends on MMC
-+	depends on MMC=y || (MMC=m && WILC1000_DRIVER=m)
- 	select WILC1000
- 	---help---
- 	  This module adds support for the SDIO interface of adapters using
-
-I'll do a few hundred more randconfig builds with this on top and submit
-it once it succeeds.
-
-	Arnd
+Suzuki
