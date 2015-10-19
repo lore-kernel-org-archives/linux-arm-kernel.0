@@ -1,111 +1,80 @@
-From: sergeimir@emcraft.com (Sergei Miroshnichenko)
-Date: Mon, 19 Oct 2015 08:53:05 +0300
-Subject: [PATCH] clk: vf610: don't stop enabled clocks in suspend
-In-Reply-To: <95c4ad8c37f6f0a7429e8b1bdea17bb1@agner.ch>
-References: <1445007085-28250-1-git-send-email-sergeimir@emcraft.com>
- <95c4ad8c37f6f0a7429e8b1bdea17bb1@agner.ch>
-Message-ID: <56248541.3050904@emcraft.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 Oct 2015 08:02:26 +0200
+Subject: [linux-sunxi] Re: [PATCH 3/6] mfd: axp20x: Add support for RSB
+ based AXP223 PMIC
+In-Reply-To: <CAGb2v66B8EbTZkVrt3QT85fKCwOjL8OBWfQvcLHrLAe6NfavNA@mail.gmail.com>
+References: <1444840342-9233-1-git-send-email-wens@csie.org>
+ <1444840342-9233-4-git-send-email-wens@csie.org>
+ <20151016064159.GG2711@lukather>
+ <CAGb2v66B8EbTZkVrt3QT85fKCwOjL8OBWfQvcLHrLAe6NfavNA@mail.gmail.com>
+Message-ID: <20151019060226.GQ2711@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
-
-Thanks for the review!
-
-Our goal is dynamic run-time configuration of wakeup sources in
-userspace using standard sysfs API:
-
-echo enabled/disabled > /sys/class/<deviceX>/power/wakeup
-
-To implement wakeup support in drivers, the following template can be
-used in suspend()/resume() handlers:
-
-if (device_may_wakeup(...)) {
-	enable_irq_wake(...);/disable_irq_wake(...);
-} else {
-	clk_disable_unprepare(...);/clk_prepare_enable(...);
-}
-
-Next step will be declaring the rest of Vybrid clocks in
-drivers/clk/imx/clk-vf610.c (about 15 more). Those of them that aren't
-used by any driver, will be automatically turned off by kernel at
-startup (after all drivers are initialized) via clk_disable_unused().
-
-With this approach, we utilize standard mechanism of waking up used all
-over the kernel, and make it configurable even from shell scripts. We've
-tested it with uart, gpio, rtc, spi, i2c, lan and mmc (SDIO): these
-changes are also planned to be sent upstream.
-
-What do you think about this?
-
-Best regards,
-Sergei
-
-On 10/16/2015 10:46 PM, Stefan Agner wrote:
-> Hi Sergei,
+On Fri, Oct 16, 2015 at 02:46:23PM +0800, Chen-Yu Tsai wrote:
+> On Fri, Oct 16, 2015 at 2:41 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Thu, Oct 15, 2015 at 12:32:19AM +0800, Chen-Yu Tsai wrote:
+> >> The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
+> >> It is functionally identical to AXP221; only the regulator default
+> >> voltage/status and the external host interface are different.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  drivers/mfd/Kconfig        | 12 ++++++
+> >>  drivers/mfd/Makefile       |  1 +
+> >>  drivers/mfd/axp20x-core.c  |  2 +
+> >>  drivers/mfd/axp20x-rsb.c   | 93 ++++++++++++++++++++++++++++++++++++++++++++++
+> >>  include/linux/mfd/axp20x.h |  1 +
+> >>  5 files changed, 109 insertions(+)
+> >>  create mode 100644 drivers/mfd/axp20x-rsb.c
+> >>
+> >> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> >> index 9ba3feb3f2fc..6e5edb61d42e 100644
+> >> --- a/drivers/mfd/Kconfig
+> >> +++ b/drivers/mfd/Kconfig
+> >> @@ -84,6 +84,7 @@ config MFD_BCM590XX
+> >>  config MFD_AXP20X
+> >>       bool "X-Powers AXP series PMICs"
+> >>       select MFD_AXP20X_I2C
+> >> +     select MFD_AXP20X_RSB
+> >>
+> >>  config MFD_AXP20X_CORE
+> >>       bool
+> >> @@ -102,6 +103,17 @@ config MFD_AXP20X_I2C
+> >>         components like regulators or the PEK (Power Enable Key) under the
+> >>         corresponding menus.
+> >>
+> >> +config MFD_AXP20X_RSB
+> >> +     bool "X-Powers AXP series RSB PMICs"
+> >> +     select MFD_AXP20X_CORE
+> >> +     depends on SUNXI_RSB=y
+> >
+> > Do we need that? Even if the bus is compiled as a module, the driver
+> > will not be probed before that, will it?
 > 
-> If all peripherals which do not act as wakeup source disable clocks
-> explicily, this would be the right approach. However, currently not all
-> of them do, hence this patch will raise the energy consumption during
-> sleep modes. The peripherals of course rely on the clock driver to
-> restore the state (gates) at wake-up time, but I think that is how it
-> works for most SoCs anyway.
-> 
-> In the Toradex branch I came up with a solution which allows to
-> selectively define which clock should be disabled and which should be
-> left on by the hardware:
-> http://git.toradex.com/cgit/linux-toradex.git/commit/?h=toradex_vf_4.1-next&id=66e003c1ad2acdaa7d42e1113add7d44479392ab
-> 
-> I then started to fix some peripherals so that they explicitly disable
-> clock if wakeup is not enabled. I changed those clocks so they do not
-> get automatically disabled:
-> http://git.toradex.com/cgit/linux-toradex.git/commit/?h=toradex_vf_4.1-next&id=fc60861b91c6585740e9a502fa4008b2f4694b22
-> 
-> I plan to upstream those changes but did not came around to put
-> toghether a rebased and cleaned up patchset so far.
-> 
-> --
-> Stefan
-> 
-> On 2015-10-16 07:51, Sergei Miroshnichenko wrote:
->> Currently Vybrid Clock Gating is configured to turn off all clocks in stop
->> mode, while kernel assumes them enabled unless explicitly disabled. This
->> behavior prevents waking up from wakeup sources.
->>
->> Fix this by replacing Clock Gating Register bitmask 3 (Clock is on during
->> all modes, except stop mode) with bitmask 2 (Clock is on during all modes,
->> even stop mode): refer to Vybrid Reference Manual Chapter 10 "Clock
->> Controller Module (CCM)".
->>
->> Tested on a VF610-based board.
->>
->> Signed-off-by: Sergei Miroshnichenko <sergeimir@emcraft.com>
->> ---
->>  drivers/clk/imx/clk-gate2.c | 5 +++--
->>  1 file changed, 3 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/clk/imx/clk-gate2.c b/drivers/clk/imx/clk-gate2.c
->> index 8935bff..ac35d75 100644
->> --- a/drivers/clk/imx/clk-gate2.c
->> +++ b/drivers/clk/imx/clk-gate2.c
->> @@ -50,7 +50,8 @@ static int clk_gate2_enable(struct clk_hw *hw)
->>  		goto out;
->>  
->>  	reg = readl(gate->reg);
->> -	reg |= 3 << gate->bit_idx;
->> +	reg &= ~(3 << gate->bit_idx);
->> +	reg |= 2 << gate->bit_idx;
->>  	writel(reg, gate->reg);
->>  
->>  out:
->> @@ -86,7 +87,7 @@ static int clk_gate2_reg_is_enabled(void __iomem
->> *reg, u8 bit_idx)
->>  {
->>  	u32 val = readl(reg);
->>  
->> -	if (((val >> bit_idx) & 1) == 1)
->> +	if (((val >> bit_idx) & 3) == 2)
->>  		return 1;
->>  
->>  	return 0;
-> 
+> There's a compile/link dependency on the __devm_regmap_init_sunxi_rsb().
+
+If it's exported, everything should be fine, no?
+
+> And both drivers are bool, i.e. can't be compiled as a module. What we
+> don't want is enabling MFD_AXP20X_RSB without SUNXI_RSB.
+
+What would really be the issue here? The driver wouldn't be probed,
+and that's it. Or am I missing something?
+
+Maxime
+
+> AFAIK the same goes for the I2C version.
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151019/d6e861f6/attachment.sig>
