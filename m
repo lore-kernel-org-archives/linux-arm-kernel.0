@@ -1,33 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 19 Oct 2015 20:05:13 +0200
-Subject: [PATCH] ARM: dts: sun7i: Enable USB DRC on pcDuino v3 Nano
-In-Reply-To: <1445119709-1689-1-git-send-email-ats@offog.org>
-References: <1445119709-1689-1-git-send-email-ats@offog.org>
-Message-ID: <20151019180513.GW2711@lukather>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 19 Oct 2015 11:12:06 -0700
+Subject: [GIT PULL] SOC changes for BCM2835 for 4.4
+In-Reply-To: <87mvvkotcc.fsf@eliezer.anholt.net>
+References: <87mvvkotcc.fsf@eliezer.anholt.net>
+Message-ID: <56253276.2070901@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 17, 2015 at 11:08:29PM +0100, Adam Sampson wrote:
-> The OTG arrangement on the LinkSprite pcDuino v3 Nano is the same as the
-> pcDuino 1/2/3: the OTG port's 5V line is connected directly to the 5V
-> bus (it's not switchable), and the OTG port's ID pin is connected to PH4
-> on the A20.
+On 15/10/15 11:54, Eric Anholt wrote:
+> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 > 
-> Tested successfully in both host and device modes.
+>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 > 
-> Signed-off-by: Adam Sampson <ats@offog.org>
+> are available in the git repository at:
+> 
+>   http://github.com/anholt/linux tags/bcm2835-soc-for-4.4-v1
+> 
+> for you to fetch changes up to 4e3d60656a7235b6b6e86d7ef48b0394276c35b5:
+> 
+>   ARM: bcm2835: Add the Raspberry Pi firmware driver (2015-10-14 15:30:06 -0700)
 
-Applied, thanks!
-Maxime
+Applied to soc/next, thanks!
+
+> 
+> ----------------------------------------------------------------
+> This pull request contains the Raspberry Pi firmware driver, for
+> communicating with the VPU which has exclusive control of some of the
+> peripherals.
+> 
+> ----------------------------------------------------------------
+> Eric Anholt (1):
+>       ARM: bcm2835: Add the Raspberry Pi firmware driver
+> 
+>  drivers/firmware/Kconfig                   |   7 +
+>  drivers/firmware/Makefile                  |   1 +
+>  drivers/firmware/raspberrypi.c             | 260 +++++++++++++++++++++++++++++
+>  include/soc/bcm2835/raspberrypi-firmware.h | 115 +++++++++++++
+>  4 files changed, 383 insertions(+)
+>  create mode 100644 drivers/firmware/raspberrypi.c
+>  create mode 100644 include/soc/bcm2835/raspberrypi-firmware.h
+> [ signature.asc: application/pgp-signature ]
+> 
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151019/9ac4f840/attachment.sig>
+Florian
