@@ -1,114 +1,189 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Mon, 19 Oct 2015 23:38:53 +0000
-Subject: [PATCH 05/16] arm64: Add back cpu_reset routines
+Subject: [PATCH 02/16] arm64: Convert hcalls to use HVC immediate value
 In-Reply-To: <cover.1445297709.git.geoff@infradead.org>
 References: <cover.1445297709.git.geoff@infradead.org>
-Message-ID: <fe7b51091769933f7a3b1a607b712e1275fb0db0.1445297709.git.geoff@infradead.org>
+Message-ID: <55be62a0e256a37bc1007ad27e13b19dee80f512.1445297709.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 68234df4ea7939f98431aa81113fbdce10c4a84b (arm64: kill flush_cache_all())
-removed the global arm64 routines cpu_reset() and cpu_soft_restart() needed by
-the arm64 kexec and kdump support.  Add those two routines back with some minor
-simplifications in the new files cpu_reset.S, and cpu_reset.h.
+The existing arm64 hcall implementations are limited in that they only allow
+for two distinct hcalls; with the x0 register either zero or not zero.  Also,
+the API of the hyp-stub exception vector routines and the KVM exception vector
+routines differ; hyp-stub uses a non-zero value in x0 to implement
+__hyp_set_vectors, whereas KVM uses it to implement kvm_call_hyp.
+
+To allow for additional hcalls to be defined and to make the arm64 hcall API
+more consistent across exception vector routines, change the hcall
+implementations to use the 16 bit immediate value of the HVC instruction to
+specify the hcall type.
+
+Define three new preprocessor macros HVC_CALL_HYP, HVC_GET_VECTORS, and
+HVC_SET_VECTORS to be used as hcall type specifiers and convert the
+existing __hyp_get_vectors(), __hyp_set_vectors() and kvm_call_hyp() routines
+to use these new macros when executing an HVC call.  Also, change the
+corresponding hyp-stub and KVM el1_sync exception vector routines to use these
+new macros.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/kernel/cpu-reset.S | 60 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/cpu-reset.h | 18 +++++++++++++
- 2 files changed, 78 insertions(+)
- create mode 100644 arch/arm64/kernel/cpu-reset.S
- create mode 100644 arch/arm64/kernel/cpu-reset.h
+ arch/arm64/include/asm/virt.h | 27 +++++++++++++++++++++++++++
+ arch/arm64/kernel/hyp-stub.S  | 32 +++++++++++++++++++++-----------
+ arch/arm64/kvm/hyp.S          | 16 +++++++++-------
+ 3 files changed, 57 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
-new file mode 100644
-index 0000000..64d9d7c
---- /dev/null
-+++ b/arch/arm64/kernel/cpu-reset.S
-@@ -0,0 +1,60 @@
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 7a5df52..eb10368 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -18,6 +18,33 @@
+ #ifndef __ASM__VIRT_H
+ #define __ASM__VIRT_H
+ 
 +/*
-+ * cpu reset routines
-+ *
-+ * Copyright (C) 2001 Deep Blue Solutions Ltd.
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Copyright (C) 2015 Huawei Futurewei Technologies.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * The arm64 hcall implementation uses the ISS field of the ESR_EL2 register to
++ * specify the hcall type.  The exception handlers are allowed to use registers
++ * x17 and x18 in their implementation.  Any routine issuing an hcall must not
++ * expect these registers to be preserved.
 + */
 +
-+#include <linux/errno.h>
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+#include <asm/assembler.h>
-+#include <asm/cpufeature.h>
-+#include <asm/alternative.h>
-+
-+.text
-+.pushsection    .idmap.text, "ax"
-+
-+.align 5
-+
 +/*
-+ * cpu_reset(addr) - Helper for cpu_soft_restart.
-+ *
-+ * @addr: Location to jump to for soft reset.
++ * HVC_CALL_HYP - Execute a hyp routine.
 + */
 +
-+ENTRY(cpu_reset)
-+	mrs	x2, sctlr_el1
-+	bic	x2, x2, #1
-+	msr	sctlr_el1, x2			// disable the MMU
-+	isb
-+	ret	x0
-+ENDPROC(cpu_reset)
++#define HVC_CALL_HYP 0
 +
 +/*
-+ * cpu_soft_restart(cpu_reset, addr) - Perform a cpu soft reset.
-+ *
-+ * @cpu_reset: Physical address of the cpu_reset routine.
-+ * @addr: Location to jump to for soft reset, passed to cpu_reset.
++ * HVC_GET_VECTORS - Return the value of the vbar_el2 register.
 + */
 +
-+ENTRY(cpu_soft_restart)
-+	mov	x19, x0				// cpu_reset
-+	mov	x20, x1				// addr
++#define HVC_GET_VECTORS 1
 +
-+	/* Turn D-cache off */
-+	mrs	x0, sctlr_el1
-+	bic	x0, x0, #1 << 2			// clear SCTLR.C
-+	msr	sctlr_el1, x0
-+	isb
-+
-+	mov	x0, x20
-+	ret	x19
-+ENDPROC(cpu_soft_restart)
-+
-+.popsection
-diff --git a/arch/arm64/kernel/cpu-reset.h b/arch/arm64/kernel/cpu-reset.h
-new file mode 100644
-index 0000000..4e16dfe
---- /dev/null
-+++ b/arch/arm64/kernel/cpu-reset.h
-@@ -0,0 +1,18 @@
 +/*
-+ * cpu reset routines
++ * HVC_SET_VECTORS - Set the value of the vbar_el2 register.
 + *
-+ * Copyright (C) 2015 Huawei Futurewei Technologies.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * @x0: Physical address of the new vector table.
 + */
 +
-+#if !defined(_ARM64_CPU_RESET_H)
-+#define _ARM64_CPU_RESET_H
++#define HVC_SET_VECTORS 2
 +
-+void __attribute__((noreturn)) cpu_reset(unsigned long addr);
-+void __attribute__((noreturn)) cpu_soft_restart(phys_addr_t cpu_reset,
-+	unsigned long addr);
+ #define BOOT_CPU_MODE_EL1	(0xe11)
+ #define BOOT_CPU_MODE_EL2	(0xe12)
+ 
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index a272f33..017ab519 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -22,6 +22,7 @@
+ #include <linux/irqchip/arm-gic-v3.h>
+ 
+ #include <asm/assembler.h>
++#include <asm/kvm_arm.h>
+ #include <asm/ptrace.h>
+ #include <asm/virt.h>
+ 
+@@ -53,14 +54,22 @@ ENDPROC(__hyp_stub_vectors)
+ 	.align 11
+ 
+ el1_sync:
+-	mrs	x1, esr_el2
+-	lsr	x1, x1, #26
+-	cmp	x1, #0x16
++	mrs	x18, esr_el2
++	lsr	x17, x18, #ESR_ELx_EC_SHIFT
++	and	x18, x18, #ESR_ELx_ISS_MASK
 +
-+#endif
++	cmp	x17, #ESR_ELx_EC_HVC64
+ 	b.ne	2f				// Not an HVC trap
+-	cbz	x0, 1f
+-	msr	vbar_el2, x0			// Set vbar_el2
++
++	cmp	x18, #HVC_GET_VECTORS
++	b.ne	1f
++	mrs	x0, vbar_el2
+ 	b	2f
+-1:	mrs	x0, vbar_el2			// Return vbar_el2
++
++1:	cmp	x18, #HVC_SET_VECTORS
++	b.ne	2f
++	msr	vbar_el2, x0
++
+ 2:	eret
+ ENDPROC(el1_sync)
+ 
+@@ -100,11 +109,12 @@ ENDPROC(\label)
+  * initialisation entry point.
+  */
+ 
+-ENTRY(__hyp_get_vectors)
+-	mov	x0, xzr
+-	// fall through
+ ENTRY(__hyp_set_vectors)
+-	hvc	#0
++	hvc	#HVC_SET_VECTORS
+ 	ret
+-ENDPROC(__hyp_get_vectors)
+ ENDPROC(__hyp_set_vectors)
++
++ENTRY(__hyp_get_vectors)
++	hvc	#HVC_GET_VECTORS
++	ret
++ENDPROC(__hyp_get_vectors)
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index e583613..073b8bf 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -29,6 +29,7 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/memory.h>
++#include <asm/virt.h>
+ 
+ #define CPU_GP_REG_OFFSET(x)	(CPU_GP_REGS + x)
+ #define CPU_XREG_OFFSET(x)	CPU_GP_REG_OFFSET(CPU_USER_PT_REGS + 8*x)
+@@ -924,12 +925,9 @@ __hyp_panic_str:
+  * in Hyp mode (see init_hyp_mode in arch/arm/kvm/arm.c).  Return values are
+  * passed in r0 and r1.
+  *
+- * A function pointer with a value of 0 has a special meaning, and is
+- * used to implement __hyp_get_vectors in the same way as in
+- * arch/arm64/kernel/hyp_stub.S.
+  */
+ ENTRY(kvm_call_hyp)
+-	hvc	#0
++	hvc	#HVC_CALL_HYP
+ 	ret
+ ENDPROC(kvm_call_hyp)
+ 
+@@ -960,6 +958,7 @@ el1_sync:					// Guest trapped into EL2
+ 
+ 	mrs	x1, esr_el2
+ 	lsr	x2, x1, #ESR_ELx_EC_SHIFT
++	and	x0, x1, #ESR_ELx_ISS_MASK
+ 
+ 	cmp	x2, #ESR_ELx_EC_HVC64
+ 	b.ne	el1_trap
+@@ -968,15 +967,18 @@ el1_sync:					// Guest trapped into EL2
+ 	cbnz	x3, el1_trap			// called HVC
+ 
+ 	/* Here, we're pretty sure the host called HVC. */
++	mov	x18, x0
+ 	pop	x2, x3
+ 	pop	x0, x1
+ 
+-	/* Check for __hyp_get_vectors */
+-	cbnz	x0, 1f
++	cmp	x18, #HVC_GET_VECTORS
++	b.ne	1f
+ 	mrs	x0, vbar_el2
+ 	b	2f
+ 
+-1:	push	lr, xzr
++1:	/* Default to HVC_CALL_HYP. */
++
++	push	lr, xzr
+ 
+ 	/*
+ 	 * Compute the function address in EL2, and shuffle the parameters.
 -- 
 2.5.0
