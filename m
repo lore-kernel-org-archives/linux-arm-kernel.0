@@ -1,73 +1,113 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 19 Oct 2015 11:43:10 -0700
-Subject: [GIT PULL 1/2] Broadcom Device Tree changes for 4.4 (part 2)
-In-Reply-To: <1445280190-8812-1-git-send-email-f.fainelli@gmail.com>
-References: <1445280190-8812-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1445280190-8812-2-git-send-email-f.fainelli@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 Oct 2015 20:48:26 +0200
+Subject: [linux-sunxi] Re: [PATCH 3/6] mfd: axp20x: Add support for RSB
+ based AXP223 PMIC
+In-Reply-To: <CAGb2v66y9+_iemTn-AXQUPBRX=ZEQFfXgbVnwRzviDNfCSm_eQ@mail.gmail.com>
+References: <1444840342-9233-1-git-send-email-wens@csie.org>
+ <1444840342-9233-4-git-send-email-wens@csie.org>
+ <20151016064159.GG2711@lukather>
+ <CAGb2v66B8EbTZkVrt3QT85fKCwOjL8OBWfQvcLHrLAe6NfavNA@mail.gmail.com>
+ <20151019060226.GQ2711@lukather>
+ <CAGb2v66y9+_iemTn-AXQUPBRX=ZEQFfXgbVnwRzviDNfCSm_eQ@mail.gmail.com>
+Message-ID: <20151019184826.GX2711@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit eef228e3191de0b62ef5913be216f25ba6b23a4c:
+On Mon, Oct 19, 2015 at 02:20:29PM +0800, Chen-Yu Tsai wrote:
+> On Mon, Oct 19, 2015 at 2:02 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Fri, Oct 16, 2015 at 02:46:23PM +0800, Chen-Yu Tsai wrote:
+> >> On Fri, Oct 16, 2015 at 2:41 PM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > On Thu, Oct 15, 2015 at 12:32:19AM +0800, Chen-Yu Tsai wrote:
+> >> >> The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
+> >> >> It is functionally identical to AXP221; only the regulator default
+> >> >> voltage/status and the external host interface are different.
+> >> >>
+> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> >> ---
+> >> >>  drivers/mfd/Kconfig        | 12 ++++++
+> >> >>  drivers/mfd/Makefile       |  1 +
+> >> >>  drivers/mfd/axp20x-core.c  |  2 +
+> >> >>  drivers/mfd/axp20x-rsb.c   | 93 ++++++++++++++++++++++++++++++++++++++++++++++
+> >> >>  include/linux/mfd/axp20x.h |  1 +
+> >> >>  5 files changed, 109 insertions(+)
+> >> >>  create mode 100644 drivers/mfd/axp20x-rsb.c
+> >> >>
+> >> >> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> >> >> index 9ba3feb3f2fc..6e5edb61d42e 100644
+> >> >> --- a/drivers/mfd/Kconfig
+> >> >> +++ b/drivers/mfd/Kconfig
+> >> >> @@ -84,6 +84,7 @@ config MFD_BCM590XX
+> >> >>  config MFD_AXP20X
+> >> >>       bool "X-Powers AXP series PMICs"
+> >> >>       select MFD_AXP20X_I2C
+> >> >> +     select MFD_AXP20X_RSB
+> >> >>
+> >> >>  config MFD_AXP20X_CORE
+> >> >>       bool
+> >> >> @@ -102,6 +103,17 @@ config MFD_AXP20X_I2C
+> >> >>         components like regulators or the PEK (Power Enable Key) under the
+> >> >>         corresponding menus.
+> >> >>
+> >> >> +config MFD_AXP20X_RSB
+> >> >> +     bool "X-Powers AXP series RSB PMICs"
+> >> >> +     select MFD_AXP20X_CORE
+> >> >> +     depends on SUNXI_RSB=y
+> >> >
+> >> > Do we need that? Even if the bus is compiled as a module, the driver
+> >> > will not be probed before that, will it?
+> >>
+> >> There's a compile/link dependency on the __devm_regmap_init_sunxi_rsb().
+> >
+> > If it's exported, everything should be fine, no?
+> >
+> >> And both drivers are bool, i.e. can't be compiled as a module. What we
+> >> don't want is enabling MFD_AXP20X_RSB without SUNXI_RSB.
+> >
+> > What would really be the issue here? The driver wouldn't be probed,
+> > and that's it. Or am I missing something?
+> 
+> The RSB bus / slave device functions have been merged into the RSB driver
+> itself. Enabling MFD_AXP20X_RSB without enabling SUNXI_RSB means that RSB
+> bus/device related functions are not compiled, i.e. link error:
+> 
+> drivers/built-in.o: In function `axp20x_rsb_probe':
+> /home/wens/sunxi/linux/drivers/mfd/axp20x-rsb.c:64: undefined
+> reference to `__devm_regmap_init_sunxi_rsb'
+> drivers/built-in.o: In function `axp20x_rsb_driver_init':
+> /home/wens/sunxi/linux/drivers/mfd/axp20x-rsb.c:89: undefined
+> reference to `sunxi_rsb_driver_register'
+> Makefile:927: recipe for target 'vmlinux' failed
+>
+> The dependency is like "depends on I2C=y" for the I2C version.
+> 
+> If you're asking about why "=y", I guess it's because MFD_AXP20X_RSB is bool,
+> and if the depended on symbol is a tristate, which it actually is for I2c,
+> we'd want it to be compiled in, and not built as a module, or again we'd get
+> a undefined reference link error.
 
-  ARM: dts: move aliases back to .dts in Cygnus (2015-09-24 18:30:10 -0700)
+Yeah, but my point was more why not have both the RSB driver and MFD
+as a module? The part where RSB is a module and the driver is
+statically built doesn't make sense (and I don't think a depends on
+allow that), but having both make sense.
 
-are available in the git repository at:
+> Would it make sense to have SUNXI_RSB as a tristate symbol, i.e. can be built
+> as a module? I'm nore sure. For multi-platform kernels, probably? Currently it
+> isn't.
 
-  http://github.com/Broadcom/stblinux tags/arm-soc/for-4.4/devicetree-part2
+Yes, it's better for multi-platform / distro kernels.
 
-for you to fetch changes up to da6b53a6f7abc3d84260a9f0ff9849a88b44e11f:
+Maxime
 
-  ARM: bcm2835: Switch to using the new clock driver support. (2015-10-19 11:32:24 -0700)
-
-----------------------------------------------------------------
-This pull request contains the DT changes for BCM2835 in 4.4.  It
-pulls in clk/clk-bcm2835 (which Stephen Boyd has said would be stable)
-because the DT changes to enable the clock driver need the driver
-itself to be present. These changes include the following:
-
-- Eric Anholt, moves the bcm2835 clock driver under bcm/ where it belongs with
-  other Broadcom clock providers drivers, defines the binding for new clock
-  driver, adds support for programming the BCM2835 audio domain, adds the DDC I2C
-  controller to Device Tree, and finally migrates the Device Tree to use the new
-  clock driver binding
-
-- Lubomir Rintel adds support for the Raspberry Pi Model A+ and B revision 2, and
-  remove the I2S controller which is non-existent on Raspberry Pi Model B
-
-- Stefan Wahren adds an uart0 label for referencing the UART adapter
-
-----------------------------------------------------------------
-Eric Anholt (5):
-      ARM: bcm2835: Add the DDC I2C controller to the device tree.
-      clk: bcm2835: Move under bcm/ with other Broadcom SoC clk drivers.
-      clk: bcm2835: Add binding docs for the new platform clock driver.
-      clk: bcm2835: Add support for programming the audio domain clocks
-      ARM: bcm2835: Switch to using the new clock driver support.
-
-Lubomir Rintel (3):
-      ARM: bcm2835: dt: Raspberry Pi Model B had no I2S
-      ARM: bcm2835: dt: Add Raspberry Pi Model B rev2
-      ARM: bcm2835: dt: Add Raspberry Pi Model A+
-
-Stefan Wahren (1):
-      ARM: bcm2835: add label for uart0
-
- .../bindings/clock/brcm,bcm2835-cprman.txt         |   45 +
- arch/arm/boot/dts/Makefile                         |    4 +-
- arch/arm/boot/dts/bcm2835-rpi-a-plus.dts           |   30 +
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts           |   23 +
- arch/arm/boot/dts/bcm2835-rpi-b.dts                |    8 +-
- arch/arm/boot/dts/bcm2835-rpi.dtsi                 |    4 +
- arch/arm/boot/dts/bcm2835.dtsi                     |   64 +-
- drivers/clk/Makefile                               |    1 -
- drivers/clk/bcm/Makefile                           |    1 +
- drivers/clk/bcm/clk-bcm2835.c                      | 1575 ++++++++++++++++++++
- drivers/clk/clk-bcm2835.c                          |   55 -
- include/dt-bindings/clock/bcm2835.h                |   47 +
- 12 files changed, 1768 insertions(+), 89 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt
- create mode 100644 arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
- create mode 100644 arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
- create mode 100644 drivers/clk/bcm/clk-bcm2835.c
- delete mode 100644 drivers/clk/clk-bcm2835.c
- create mode 100644 include/dt-bindings/clock/bcm2835.h
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151019/f74dccae/attachment.sig>
