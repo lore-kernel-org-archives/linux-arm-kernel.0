@@ -1,65 +1,47 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:19:38 +0100
-Subject: [PATCHv4 12/12] arm64: 36 bit VA
-In-Reply-To: <1445260779-22242-1-git-send-email-suzuki.poulose@arm.com>
-References: <1445260779-22242-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445260779-22242-13-git-send-email-suzuki.poulose@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 19 Oct 2015 22:43:42 +0900
+Subject: [PATCH 3/3] ARM: dts: exynos5422-odroidxu3: Added UHS-I bus speed
+ support
+In-Reply-To: <CANAwSgSd8sHDcmGmck=Em2H5WJzVWM28cbvs9z6CFgpuTY_Juw@mail.gmail.com>
+References: <1444578364-1384-1-git-send-email-linux.amoon@gmail.com>
+ <1444578364-1384-3-git-send-email-linux.amoon@gmail.com>
+ <561B48B7.1040201@samsung.com>
+ <CANAwSgSLFviT4ZNXTYwxYs2pbrr9ozJmPMauhgRPO0556Rsr_g@mail.gmail.com>
+ <561C4CEE.3050905@samsung.com>
+ <CANAwSgRJ+5O-x61K9E_AxTZWQy3jJrKF5MiLtWRdUU29CCfa-Q@mail.gmail.com>
+ <561C7DF1.6000609@samsung.com>
+ <CANAwSgRBzFqHB98wSQnQu-ggGqRT2H6wC415wULXVhPg0uw_3A@mail.gmail.com>
+ <561D9ACE.6050103@samsung.com>
+ <CAGOxZ51uPkdGmCAs2Tc8_=YvkORJKdivN47vo1ZxkGQ-MY=-oQ@mail.gmail.com>
+ <CAD=FV=Voh6Xh_naWQTaRPP8YUS2xJh7jfA+zYbH9QdVhmyZz9A@mail.gmail.com>
+ <CANAwSgSd8sHDcmGmck=Em2H5WJzVWM28cbvs9z6CFgpuTY_Juw@mail.gmail.com>
+Message-ID: <5624F38E.8030207@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-36bit VA lets us use 2 level page tables while limiting the
-available address space to 64GB.
+W dniu 19.10.2015 o 19:11, Anand Moon pisze:
+> Hi Doug/ Krzysztof ,
+> 
+> 
+> Thanks for clarifying all the background details on the mmc changes.
+> 
+> Here is what I would conclude from the previous mail chain's.
+> 
+> 1 Drop the cd-gpios changes. pinctrl-0 changes.
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Steve Capper <steve.capper@linaro.org>
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/Kconfig |    8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+OK
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 8541664..a346671 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -170,6 +170,7 @@ config FIX_EARLYCON_MEM
- 
- config PGTABLE_LEVELS
- 	int
-+	default 2 if ARM64_16K_PAGES && ARM64_VA_BITS_36
- 	default 2 if ARM64_64K_PAGES && ARM64_VA_BITS_42
- 	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48
- 	default 3 if ARM64_4K_PAGES && ARM64_VA_BITS_39
-@@ -391,6 +392,10 @@ choice
- 	  space sizes. The level of translation table is determined by
- 	  a combination of page size and virtual address space size.
- 
-+config ARM64_VA_BITS_36
-+	bool "36-bit"
-+	depends on ARM64_16K_PAGES
-+
- config ARM64_VA_BITS_39
- 	bool "39-bit"
- 	depends on ARM64_4K_PAGES
-@@ -410,6 +415,7 @@ endchoice
- 
- config ARM64_VA_BITS
- 	int
-+	default 36 if ARM64_VA_BITS_36
- 	default 39 if ARM64_VA_BITS_39
- 	default 42 if ARM64_VA_BITS_42
- 	default 47 if ARM64_VA_BITS_47
-@@ -480,7 +486,7 @@ config ARCH_WANT_GENERAL_HUGETLB
- 	def_bool y
- 
- config ARCH_WANT_HUGE_PMD_SHARE
--	def_bool y if ARM64_4K_PAGES || ARM64_16K_PAGES
-+	def_bool y if ARM64_4K_PAGES || (ARM64_16K_PAGES && !ARM64_VA_BITS_36)
- 
- config HAVE_ARCH_TRANSPARENT_HUGEPAGE
- 	def_bool y
--- 
-1.7.9.5
+> 
+> 2 Fix the regulator changes for vmmc/vqmmc with disable of regulator-always-on;
+
+Just fix all the comments for patch 2.
+
+> 
+> 3 Drop this UHS-I changes as if now.
+> 
+> Is this ok with you.
+
+It's okay.
+
+Best regards,
+Krzysztof
