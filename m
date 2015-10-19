@@ -1,40 +1,64 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 19 Oct 2015 10:41:12 +0900
-Subject: [PATCH] hwrng: exynos - Fix unbalanced PM runtime get/puts
-In-Reply-To: <1445011311-32142-1-git-send-email-daniel.thompson@linaro.org>
-References: <1445011311-32142-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <56244A38.4040207@samsung.com>
+From: neilb@suse.de (Neil Brown)
+Date: Mon, 19 Oct 2015 12:46:55 +1100
+Subject: [RFC PATCH 0/3] pwm: omap: Add PWM support using dual-mode timers
+In-Reply-To: <5620ED2C.1090107@baylibre.com>
+References: <5620ED2C.1090107@baylibre.com>
+Message-ID: <87oafvlje8.fsf@notabene.neil.brown.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.10.2015 01:01, Daniel Thompson wrote:
-> Currently this driver calls pm_runtime_get_sync() rampantly
-> but never puts anything back. This makes it impossible for the
-> device to autosuspend properly; it will remain fully active
-> after the first use.
-> 
-> Fix in the obvious way.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
-> 
-> Notes:
->     Compile tested only (CONFIG_PM=y, CONFIG_HW_RANDOM_EXYNOS=m); I spotted
->     this whilst reviewing the code and don't have an exynos platform to
->     test on.
-> 
->  drivers/char/hw_random/exynos-rng.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-To test the patch I had to add OF support to the driver. I have these
-patches almost ready and I will send them soon. Anyway:
+> This patch is based on an earlier patch by NeilBrown which is based on
+> a older patch from Grant Erickson which provided PWM devices using
+> the 'legacy' interface.
+>
+> The pwm driver was renamed to not be confused with the OMAP4 PWM dedicated
+> hardware and was cleaned with the review from Thierry Reding.
+>
+> The first patch introduces a way to select to dmtimer clock source via a
+> clocks binding and a dedicated function wit the legacy fallback.
+>
+> In order to prepare for the future form of the dmtimer (clksource or whatever)
+> the first patch introduces the PWM driver with all the dmtimer calls into a
+> platform data structure.
+>
+> The structure is then filled in plat-omap and added as auxdata for the
+> ti,pwm-dmtimer-omap compatible nodes.
+>
+> Cc: Grant Erickson <marathon96@gmail.com>
+> Cc: NeilBrown <neilb@suse.de>
+> Cc: Joachim Eastwood <manabian@gmail.com>
+> Suggested-by: Tony Lindgren <tony@atomide.com>
+>
+> Neil Armstrong (3):
+>   arm: plat-omap: dmtimer: Add clock source from DT
+>   pwm: Add PWM driver for OMAP using dual-mode timers
+>   arm: plat-omap: Add PWM dmtimer platforma data quirks
+>
+>  .../devicetree/bindings/pwm/pwm-omap-dmtimer.txt   |  18 ++
+>  arch/arm/mach-omap2/pdata-quirks.c                 |  23 ++
+>  arch/arm/plat-omap/dmtimer.c                       |  32 +-
+>  drivers/pwm/Kconfig                                |   9 +
+>  drivers/pwm/Makefile                               |   1 +
+>  drivers/pwm/pwm-omap-dmtimer.c                     | 322 +++++++++++++++++++++
+>  include/linux/platform_data/pwm_omap_dmtimer.h     |  69 +++++
+>  7 files changed, 472 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-omap-dmtimer.txt
+>  create mode 100644 drivers/pwm/pwm-omap-dmtimer.c
+>  create mode 100644 include/linux/platform_data/pwm_omap_dmtimer.h
+>
 
-Tested on Trats2 board (Exynos4412):
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Thanks for much for doing this!
+I haven't looked and wont have a chance for a least a couple of weeks,
+but I'm very encouraged that someone is pursuing it.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
+Thanks,
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151019/d3ece4d3/attachment.sig>
