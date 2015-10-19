@@ -1,36 +1,50 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 19 Oct 2015 23:18:57 +0800
-Subject: [GIT PULL 3/3] ARM: imx: defconfig updates for 4.4
-In-Reply-To: <1445267937-2952-1-git-send-email-shawnguo@kernel.org>
-References: <1445267937-2952-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1445267937-2952-3-git-send-email-shawnguo@kernel.org>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 19 Oct 2015 16:23:46 +0100
+Subject: [RFC PATCH v3 4/4] drm/armada: Convert the probe function to the
+ generic drm_of_component_probe()
+In-Reply-To: <20151019151714.GI32532@n2100.arm.linux.org.uk>
+References: <1445267270-23126-1-git-send-email-Liviu.Dudau@arm.com>
+ <1445267270-23126-5-git-send-email-Liviu.Dudau@arm.com>
+ <20151019151714.GI32532@n2100.arm.linux.org.uk>
+Message-ID: <20151019152345.GX3394@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+On Mon, Oct 19, 2015 at 04:17:14PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Oct 19, 2015 at 04:07:50PM +0100, Liviu Dudau wrote:
+> > The armada DRM driver keeps some old platform data compatibility in the
+> > probe function that makes moving to the generic drm_of_component_probe()
+> > a bit more complicated that it should. Refactor the probe function to do
+> > the platform_data processing after the generic probe (and only if that
+> > fails). This way future cleanup can further remove support for it.
+> 
+> I'm mainly using the old code, even with DT based platforms, because it
+> needs a block of reserved memory which I haven't got around to converting
+> to DT stuff (each time I've looked into doing that, bits for dealing with
+> reserved memory nodes were missing.)
 
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+Thanks for explaining this!
 
-are available in the git repository at:
+> 
+> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.4
+And thanks for all the ACKs!
 
-for you to fetch changes up to ed1098e4738d935cef12833b08916f6f5e700652:
+Best regards,
+Liviu
 
-  ARM: imx_v6_v7_defconfig: Remove CONFIG_VMSPLIT_2G (2015-09-23 05:19:37 -0700)
+> 
+> -- 
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+> 
 
-----------------------------------------------------------------
-The i.MX defconfig updates for 4.4:
- - Enable i.MX6UL touchscreen controller support.
- - Remove CONFIG_VMSPLIT_2G option since we already enabled
-   CONFIG_HIGHMEM support.
-
-----------------------------------------------------------------
-Fabio Estevam (1):
-      ARM: imx_v6_v7_defconfig: Remove CONFIG_VMSPLIT_2G
-
-Haibo Chen (1):
-      ARM: imx_v6_v7_defconfig: enable imx6ul_tsc
-
- arch/arm/configs/imx_v6_v7_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
