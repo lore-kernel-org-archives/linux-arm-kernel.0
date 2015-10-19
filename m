@@ -1,64 +1,74 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:24:53 +0100
-Subject: [PATCHv4 16/24] arm64: Move FP/ASIMD hwcap handling to common code
+Date: Mon, 19 Oct 2015 14:24:54 +0100
+Subject: [PATCHv4 17/24] arm64/debug: Make use of the system wide safe value
 In-Reply-To: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
 References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445261101-22344-17-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445261101-22344-18-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The FP/ASIMD is detected in fpsimd_init(), which is built-in
-unconditionally. Lets move the hwcap handling to the central place.
+Use the system wide value of ID_AA64DFR0 to make safer decisions
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c |    2 ++
- arch/arm64/kernel/fpsimd.c     |   16 +++++-----------
- 2 files changed, 7 insertions(+), 11 deletions(-)
+ arch/arm64/include/asm/hw_breakpoint.h |    9 +++++++--
+ arch/arm64/kernel/debug-monitors.c     |    6 ++++--
+ 2 files changed, 11 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 73ceccc..d69af00 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -646,6 +646,8 @@ static const struct arm64_cpu_capabilities arm64_hwcaps[] = {
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA2_SHIFT, 1, CAP_HWCAP, HWCAP_SHA2),
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_CRC32_SHIFT, 1, CAP_HWCAP, HWCAP_CRC32),
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_ATOMICS_SHIFT, 2, CAP_HWCAP, HWCAP_ATOMICS),
-+	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, 0, CAP_HWCAP, HWCAP_FP),
-+	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, 0, CAP_HWCAP, HWCAP_ASIMD),
- #ifdef CONFIG_COMPAT
- 	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 2, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_PMULL),
- 	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_AES),
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index c56956a..4c46c54 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -332,21 +332,15 @@ static inline void fpsimd_hotplug_init(void) { }
-  */
- static int __init fpsimd_init(void)
+diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
+index 4c47cb2..e54415e 100644
+--- a/arch/arm64/include/asm/hw_breakpoint.h
++++ b/arch/arm64/include/asm/hw_breakpoint.h
+@@ -17,6 +17,7 @@
+ #define __ASM_HW_BREAKPOINT_H
+ 
+ #include <asm/cputype.h>
++#include <asm/cpufeature.h>
+ 
+ #ifdef __KERNEL__
+ 
+@@ -137,13 +138,17 @@ extern struct pmu perf_ops_bp;
+ /* Determine number of BRP registers available. */
+ static inline int get_num_brps(void)
  {
--	u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
--
--	if (pfr & (0xf << 16)) {
-+	if (elf_hwcap & HWCAP_FP) {
-+		fpsimd_pm_init();
-+		fpsimd_hotplug_init();
-+	} else {
- 		pr_notice("Floating-point is not implemented\n");
--		return 0;
- 	}
--	elf_hwcap |= HWCAP_FP;
- 
--	if (pfr & (0xf << 20))
-+	if (!(elf_hwcap & HWCAP_ASIMD))
- 		pr_notice("Advanced SIMD is not implemented\n");
--	else
--		elf_hwcap |= HWCAP_ASIMD;
--
--	fpsimd_pm_init();
--	fpsimd_hotplug_init();
- 
- 	return 0;
+-	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
++	return 1 +
++		cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
++						ID_AA64DFR0_BRPS_SHIFT);
  }
+ 
+ /* Determine number of WRP registers available. */
+ static inline int get_num_wrps(void)
+ {
+-	return ((read_cpuid(ID_AA64DFR0_EL1) >> 20) & 0xf) + 1;
++	return 1 +
++		cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
++						ID_AA64DFR0_WRPS_SHIFT);
+ }
+ 
+ #endif	/* __KERNEL__ */
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index cebf786..c0a2327 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -26,14 +26,16 @@
+ #include <linux/stat.h>
+ #include <linux/uaccess.h>
+ 
+-#include <asm/debug-monitors.h>
++#include <asm/cpufeature.h>
+ #include <asm/cputype.h>
++#include <asm/debug-monitors.h>
+ #include <asm/system_misc.h>
+ 
+ /* Determine debug architecture. */
+ u8 debug_monitors_arch(void)
+ {
+-	return read_cpuid(ID_AA64DFR0_EL1) & 0xf;
++	return cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
++						ID_AA64DFR0_DEBUGVER_SHIFT);
+ }
+ 
+ /*
 -- 
 1.7.9.5
