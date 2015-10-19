@@ -1,46 +1,51 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 19 Oct 2015 13:37:42 +0900
-Subject: [PATCH 4/4] hwrng: exynos - Add Device Tree support
-In-Reply-To: <1445229462-32395-1-git-send-email-k.kozlowski@samsung.com>
-References: <1445229462-32395-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1445229462-32395-5-git-send-email-k.kozlowski@samsung.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 19 Oct 2015 13:37:55 +0900
+Subject: [PATCH] serial: 8250_uniphier: fix dl_read and dl_write functions
+Message-ID: <1445229475-23201-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Device Tree support for the driver. The Pseudo Random Number
-Generator module is the same in almost all of Exynos SoCs, since
-Exynos4210 (however the tests were done only on Trats2 board with
-Exynos4412). There are some differences on newer Exynos Octa
-(Exynos542x) SoCs.
+The register offset must be shifted by regshift, otherwise the
+baudrate is not set.  I missed the issue probably because the
+divisor register was already set by the boot loader.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Fixes: 1a8d2903cb6a ("serial: 8250_uniphier: add UniPhier serial driver")
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- drivers/char/hw_random/exynos-rng.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/char/hw_random/exynos-rng.c b/drivers/char/hw_random/exynos-rng.c
-index 162adbda1b70..7077c7741dae 100644
---- a/drivers/char/hw_random/exynos-rng.c
-+++ b/drivers/char/hw_random/exynos-rng.c
-@@ -188,10 +188,19 @@ static const struct dev_pm_ops exynos_rng_pm_ops = {
- 			   exynos_rng_runtime_resume, NULL)
- };
- 
-+static const struct of_device_id exynos_rng_dt_match[] = {
-+	{
-+		.compatible = "samsung,exynos4-rng",
-+	},
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, exynos_rng_dt_match);
+Hi Greg,
+
+Please apply this simple fix for Linux 4.3.
+
+Thanks,
+Masahiro
+
+
+ drivers/tty/serial/8250/8250_uniphier.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
+index d11621e..245edbb 100644
+--- a/drivers/tty/serial/8250/8250_uniphier.c
++++ b/drivers/tty/serial/8250/8250_uniphier.c
+@@ -115,12 +115,16 @@ static void uniphier_serial_out(struct uart_port *p, int offset, int value)
+  */
+ static int uniphier_serial_dl_read(struct uart_8250_port *up)
+ {
+-	return readl(up->port.membase + UNIPHIER_UART_DLR);
++	int offset = UNIPHIER_UART_DLR << up->port.regshift;
 +
- static struct platform_driver exynos_rng_driver = {
- 	.driver		= {
- 		.name	= "exynos-rng",
- 		.pm	= &exynos_rng_pm_ops,
-+		.of_match_table = exynos_rng_dt_match,
- 	},
- 	.probe		= exynos_rng_probe,
- };
++	return readl(up->port.membase + offset);
+ }
+ 
+ static void uniphier_serial_dl_write(struct uart_8250_port *up, int value)
+ {
+-	writel(value, up->port.membase + UNIPHIER_UART_DLR);
++	int offset = UNIPHIER_UART_DLR << up->port.regshift;
++
++	writel(value, up->port.membase + offset);
+ }
+ 
+ static int uniphier_of_serial_setup(struct device *dev, struct uart_port *port,
 -- 
 1.9.1
