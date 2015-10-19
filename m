@@ -1,351 +1,251 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:24:46 +0100
-Subject: [PATCHv4 09/24] arm64: Consolidate CPU Sanity check to CPU Feature
- infrastructure
+Date: Mon, 19 Oct 2015 14:24:56 +0100
+Subject: [PATCHv4 19/24] arm64: Documentation - Expose CPU feature registers
 In-Reply-To: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
 References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445261101-22344-10-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445261101-22344-20-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch consolidates the CPU Sanity check to the new infrastructure.
+Documentation for the infrastructure to expose CPU feature
+register by emulating MRS.
 
-Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpu.h   |    3 +-
- arch/arm64/kernel/cpufeature.c |  164 ++++++++++++++++++++++++++++++++--------
- arch/arm64/kernel/cpuinfo.c    |  113 +--------------------------
- 3 files changed, 134 insertions(+), 146 deletions(-)
+ Documentation/arm64/cpu-feature-registers.txt |  225 +++++++++++++++++++++++++
+ 1 file changed, 225 insertions(+)
+ create mode 100644 Documentation/arm64/cpu-feature-registers.txt
 
-diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
-index 704c17b..b5e9cee 100644
---- a/arch/arm64/include/asm/cpu.h
-+++ b/arch/arm64/include/asm/cpu.h
-@@ -64,6 +64,7 @@ void cpuinfo_store_cpu(void);
- void __init cpuinfo_store_boot_cpu(void);
- 
- void __init init_cpu_features(struct cpuinfo_arm64 *info);
--void update_cpu_features(struct cpuinfo_arm64 *info);
-+void update_cpu_features(int cpu, struct cpuinfo_arm64 *info,
-+				 struct cpuinfo_arm64 *boot);
- 
- #endif /* __ASM_CPU_H */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 8d7abaa..aae1817 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -438,12 +438,9 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
- 	update_mixed_endian_el0_support(info);
- }
- 
--static void update_cpu_ftr_reg(u32 sys_reg, u64 new)
-+static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
- {
- 	struct arm64_ftr_bits *ftrp;
--	struct arm64_ftr_reg *reg = get_arm64_ftr_reg(sys_reg);
--
--	BUG_ON(!reg);
- 
- 	for (ftrp = reg->ftr_bits; ftrp->width; ftrp++) {
- 		s64 ftr_cur = arm64_ftr_value(ftrp, reg->sys_val);
-@@ -458,36 +455,137 @@ static void update_cpu_ftr_reg(u32 sys_reg, u64 new)
- 
- }
- 
--/* Update CPU feature register from non-boot CPU */
--void update_cpu_features(struct cpuinfo_arm64 *info)
-+static int check_update_ftr_reg(u32 sys_id, int cpu, u64 val, u64 boot)
- {
--	update_cpu_ftr_reg(SYS_CTR_EL0, info->reg_ctr);
--	update_cpu_ftr_reg(SYS_DCZID_EL0, info->reg_dczid);
--	update_cpu_ftr_reg(SYS_CNTFRQ_EL0, info->reg_cntfrq);
--	update_cpu_ftr_reg(SYS_ID_AA64DFR0_EL1, info->reg_id_aa64dfr0);
--	update_cpu_ftr_reg(SYS_ID_AA64DFR1_EL1, info->reg_id_aa64dfr1);
--	update_cpu_ftr_reg(SYS_ID_AA64ISAR0_EL1, info->reg_id_aa64isar0);
--	update_cpu_ftr_reg(SYS_ID_AA64ISAR1_EL1, info->reg_id_aa64isar1);
--	update_cpu_ftr_reg(SYS_ID_AA64MMFR0_EL1, info->reg_id_aa64mmfr0);
--	update_cpu_ftr_reg(SYS_ID_AA64MMFR1_EL1, info->reg_id_aa64mmfr1);
--	update_cpu_ftr_reg(SYS_ID_AA64PFR0_EL1, info->reg_id_aa64pfr0);
--	update_cpu_ftr_reg(SYS_ID_AA64PFR1_EL1, info->reg_id_aa64pfr1);
--	update_cpu_ftr_reg(SYS_ID_DFR0_EL1, info->reg_id_dfr0);
--	update_cpu_ftr_reg(SYS_ID_ISAR0_EL1, info->reg_id_isar0);
--	update_cpu_ftr_reg(SYS_ID_ISAR1_EL1, info->reg_id_isar1);
--	update_cpu_ftr_reg(SYS_ID_ISAR2_EL1, info->reg_id_isar2);
--	update_cpu_ftr_reg(SYS_ID_ISAR3_EL1, info->reg_id_isar3);
--	update_cpu_ftr_reg(SYS_ID_ISAR4_EL1, info->reg_id_isar4);
--	update_cpu_ftr_reg(SYS_ID_ISAR5_EL1, info->reg_id_isar5);
--	update_cpu_ftr_reg(SYS_ID_MMFR0_EL1, info->reg_id_mmfr0);
--	update_cpu_ftr_reg(SYS_ID_MMFR1_EL1, info->reg_id_mmfr1);
--	update_cpu_ftr_reg(SYS_ID_MMFR2_EL1, info->reg_id_mmfr2);
--	update_cpu_ftr_reg(SYS_ID_MMFR3_EL1, info->reg_id_mmfr3);
--	update_cpu_ftr_reg(SYS_ID_PFR0_EL1, info->reg_id_pfr0);
--	update_cpu_ftr_reg(SYS_ID_PFR1_EL1, info->reg_id_pfr1);
--	update_cpu_ftr_reg(SYS_MVFR0_EL1, info->reg_mvfr0);
--	update_cpu_ftr_reg(SYS_MVFR1_EL1, info->reg_mvfr1);
--	update_cpu_ftr_reg(SYS_MVFR2_EL1, info->reg_mvfr2);
-+	struct arm64_ftr_reg *regp = get_arm64_ftr_reg(sys_id);
+diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
+new file mode 100644
+index 0000000..41981cb
+--- /dev/null
++++ b/Documentation/arm64/cpu-feature-registers.txt
+@@ -0,0 +1,225 @@
++		ARM64 CPU Feature Registers
++		===========================
 +
-+	BUG_ON(!regp);
-+	update_cpu_ftr_reg(regp, val);
-+	if ((boot & regp->strict_mask) == (val & regp->strict_mask))
-+		return 0;
-+	pr_warn("SANITY CHECK: Unexpected variation in %s. Boot CPU: %#016llx, CPU%d: %#016llx\n",
-+			regp->name, boot, cpu, val);
-+	return 1;
-+}
++Author: Suzuki K. Poulose <suzuki.poulose@arm.com>
 +
-+/*
-+ * Update system wide CPU feature registers with the values from a
-+ * non-boot CPU. Also performs SANITY checks to make sure that there
-+ * aren't any insane variations from that of the boot CPU.
-+ */
-+void update_cpu_features(int cpu,
-+			 struct cpuinfo_arm64 *info,
-+			 struct cpuinfo_arm64 *boot)
-+{
-+	int taint = 0;
 +
-+	/*
-+	 * The kernel can handle differing I-cache policies, but otherwise
-+	 * caches should look identical. Userspace JITs will make use of
-+	 * *minLine.
-+	 */
-+	taint |= check_update_ftr_reg(SYS_CTR_EL0, cpu,
-+				      info->reg_ctr, boot->reg_ctr);
++This file describes the API for exporting the AArch64 CPU ID/feature registers
++to userspace.
 +
-+	/*
-+	 * Userspace may perform DC ZVA instructions. Mismatched block sizes
-+	 * could result in too much or too little memory being zeroed if a
-+	 * process is preempted and migrated between CPUs.
-+	 */
-+	taint |= check_update_ftr_reg(SYS_DCZID_EL0, cpu,
-+				      info->reg_dczid, boot->reg_dczid);
++1. Motivation
++---------------
 +
-+	/* If different, timekeeping will be broken (especially with KVM) */
-+	taint |= check_update_ftr_reg(SYS_CNTFRQ_EL0, cpu,
-+				      info->reg_cntfrq, boot->reg_cntfrq);
++The ARM architecture defines a set of feature registers, which describe
++the capabilities of the CPU/system. Access to these system registers is
++restricted from EL0 and there is no reliable way for an application to
++extract this information to make better decisions at runtime. There is
++limited information available to the application via ELF_HWCAPs, however
++there are some issues with their usage.
 +
-+	/*
-+	 * The kernel uses self-hosted debug features and expects CPUs to
-+	 * support identical debug features. We presently need CTX_CMPs, WRPs,
-+	 * and BRPs to be identical.
-+	 * ID_AA64DFR1 is currently RES0.
-+	 */
-+	taint |= check_update_ftr_reg(SYS_ID_AA64DFR0_EL1, cpu,
-+				      info->reg_id_aa64dfr0, boot->reg_id_aa64dfr0);
-+	taint |= check_update_ftr_reg(SYS_ID_AA64DFR1_EL1, cpu,
-+				      info->reg_id_aa64dfr1, boot->reg_id_aa64dfr1);
-+	/*
-+	 * Even in big.LITTLE, processors should be identical instruction-set
-+	 * wise.
-+	 */
-+	taint |= check_update_ftr_reg(SYS_ID_AA64ISAR0_EL1, cpu,
-+				      info->reg_id_aa64isar0, boot->reg_id_aa64isar0);
-+	taint |= check_update_ftr_reg(SYS_ID_AA64ISAR1_EL1, cpu,
-+				      info->reg_id_aa64isar1, boot->reg_id_aa64isar1);
++ a) Any change to the HWCAPs requires an update to userspace (e.g libc)
++    to detect the new changes, which can take a long time to appear in
++    distributions. Exposing the registers allows applications to get the
++    information without requiring updates to the toolchains.
 +
-+	/*
-+	 * Differing PARange support is fine as long as all peripherals and
-+	 * memory are mapped within the minimum PARange of all CPUs.
-+	 * Linux should not care about secure memory.
-+	 */
-+	taint |= check_update_ftr_reg(SYS_ID_AA64MMFR0_EL1, cpu,
-+				      info->reg_id_aa64mmfr0, boot->reg_id_aa64mmfr0);
-+	taint |= check_update_ftr_reg(SYS_ID_AA64MMFR1_EL1, cpu,
-+				      info->reg_id_aa64mmfr1, boot->reg_id_aa64mmfr1);
++ b) Access to HWCAPs is sometimes restricted (e.g prior to libc, or when ld is
++    initialised at startup time).
 +
-+	/*
-+	 * EL3 is not our concern.
-+	 * ID_AA64PFR1 is currently RES0.
-+	 */
-+	taint |= check_update_ftr_reg(SYS_ID_AA64PFR0_EL1, cpu,
-+				      info->reg_id_aa64pfr0, boot->reg_id_aa64pfr0);
-+	taint |= check_update_ftr_reg(SYS_ID_AA64PFR1_EL1, cpu,
-+				      info->reg_id_aa64pfr1, boot->reg_id_aa64pfr1);
++ c) HWCAPs cannot represent non-boolean information effectively. The
++    architecture defines a canonical format for representing features
++    in the ID registers; this is well defined and is capable of
++    representing all valid architecture variations. Exposing the ID
++    registers avoids having to come up with HWCAP representations
++    and parsing code.
 +
-+	/*
-+	 * If we have AArch32, we care about 32-bit features for compat. These
-+	 * registers should be RES0 otherwise.
-+	 */
-+	taint |= check_update_ftr_reg(SYS_ID_DFR0_EL1, cpu,
-+					info->reg_id_dfr0, boot->reg_id_dfr0);
-+	taint |= check_update_ftr_reg(SYS_ID_ISAR0_EL1, cpu,
-+					info->reg_id_isar0, boot->reg_id_isar0);
-+	taint |= check_update_ftr_reg(SYS_ID_ISAR1_EL1, cpu,
-+					info->reg_id_isar1, boot->reg_id_isar1);
-+	taint |= check_update_ftr_reg(SYS_ID_ISAR2_EL1, cpu,
-+					info->reg_id_isar2, boot->reg_id_isar2);
-+	taint |= check_update_ftr_reg(SYS_ID_ISAR3_EL1, cpu,
-+					info->reg_id_isar3, boot->reg_id_isar3);
-+	taint |= check_update_ftr_reg(SYS_ID_ISAR4_EL1, cpu,
-+					info->reg_id_isar4, boot->reg_id_isar4);
-+	taint |= check_update_ftr_reg(SYS_ID_ISAR5_EL1, cpu,
-+					info->reg_id_isar5, boot->reg_id_isar5);
 +
-+	/*
-+	 * Regardless of the value of the AuxReg field, the AIFSR, ADFSR, and
-+	 * ACTLR formats could differ across CPUs and therefore would have to
-+	 * be trapped for virtualization anyway.
-+	 */
-+	taint |= check_update_ftr_reg(SYS_ID_MMFR0_EL1, cpu,
-+					info->reg_id_mmfr0, boot->reg_id_mmfr0);
-+	taint |= check_update_ftr_reg(SYS_ID_MMFR1_EL1, cpu,
-+					info->reg_id_mmfr1, boot->reg_id_mmfr1);
-+	taint |= check_update_ftr_reg(SYS_ID_MMFR2_EL1, cpu,
-+					info->reg_id_mmfr2, boot->reg_id_mmfr2);
-+	taint |= check_update_ftr_reg(SYS_ID_MMFR3_EL1, cpu,
-+					info->reg_id_mmfr3, boot->reg_id_mmfr3);
-+	taint |= check_update_ftr_reg(SYS_ID_PFR0_EL1, cpu,
-+					info->reg_id_pfr0, boot->reg_id_pfr0);
-+	taint |= check_update_ftr_reg(SYS_ID_PFR1_EL1, cpu,
-+					info->reg_id_pfr1, boot->reg_id_pfr1);
-+	taint |= check_update_ftr_reg(SYS_MVFR0_EL1, cpu,
-+					info->reg_mvfr0, boot->reg_mvfr0);
-+	taint |= check_update_ftr_reg(SYS_MVFR1_EL1, cpu,
-+					info->reg_mvfr1, boot->reg_mvfr1);
-+	taint |= check_update_ftr_reg(SYS_MVFR2_EL1, cpu,
-+					info->reg_mvfr2, boot->reg_mvfr2);
++2. Requirements
++-----------------
 +
-+	/*
-+	 * Mismatched CPU features are a recipe for disaster. Don't even
-+	 * pretend to support them.
-+	 */
-+	WARN_TAINT_ONCE(taint, TAINT_CPU_OUT_OF_SPEC,
-+			"Unsupported CPU feature variation.\n");
- 
- 	update_mixed_endian_el0_support(info);
- }
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 857aaf0..f25869e 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -192,116 +192,6 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
- 	pr_info("Detected %s I-cache on CPU%d\n", icache_policy_str[l1ip], cpu);
- }
- 
--static int check_reg_mask(char *name, u64 mask, u64 boot, u64 cur, int cpu)
--{
--	if ((boot & mask) == (cur & mask))
--		return 0;
--
--	pr_warn("SANITY CHECK: Unexpected variation in %s. Boot CPU: %#016lx, CPU%d: %#016lx\n",
--		name, (unsigned long)boot, cpu, (unsigned long)cur);
--
--	return 1;
--}
--
--#define CHECK_MASK(field, mask, boot, cur, cpu) \
--	check_reg_mask(#field, mask, (boot)->reg_ ## field, (cur)->reg_ ## field, cpu)
--
--#define CHECK(field, boot, cur, cpu) \
--	CHECK_MASK(field, ~0ULL, boot, cur, cpu)
--
--/*
-- * Verify that CPUs don't have unexpected differences that will cause problems.
-- */
--static void cpuinfo_sanity_check(struct cpuinfo_arm64 *cur)
--{
--	unsigned int cpu = smp_processor_id();
--	struct cpuinfo_arm64 *boot = &boot_cpu_data;
--	unsigned int diff = 0;
--
--	/*
--	 * The kernel can handle differing I-cache policies, but otherwise
--	 * caches should look identical. Userspace JITs will make use of
--	 * *minLine.
--	 */
--	diff |= CHECK_MASK(ctr, 0xffff3fff, boot, cur, cpu);
--
--	/*
--	 * Userspace may perform DC ZVA instructions. Mismatched block sizes
--	 * could result in too much or too little memory being zeroed if a
--	 * process is preempted and migrated between CPUs.
--	 */
--	diff |= CHECK(dczid, boot, cur, cpu);
--
--	/* If different, timekeeping will be broken (especially with KVM) */
--	diff |= CHECK(cntfrq, boot, cur, cpu);
--
--	/*
--	 * The kernel uses self-hosted debug features and expects CPUs to
--	 * support identical debug features. We presently need CTX_CMPs, WRPs,
--	 * and BRPs to be identical.
--	 * ID_AA64DFR1 is currently RES0.
--	 */
--	diff |= CHECK(id_aa64dfr0, boot, cur, cpu);
--	diff |= CHECK(id_aa64dfr1, boot, cur, cpu);
--
--	/*
--	 * Even in big.LITTLE, processors should be identical instruction-set
--	 * wise.
--	 */
--	diff |= CHECK(id_aa64isar0, boot, cur, cpu);
--	diff |= CHECK(id_aa64isar1, boot, cur, cpu);
--
--	/*
--	 * Differing PARange support is fine as long as all peripherals and
--	 * memory are mapped within the minimum PARange of all CPUs.
--	 * Linux should not care about secure memory.
--	 * ID_AA64MMFR1 is currently RES0.
--	 */
--	diff |= CHECK_MASK(id_aa64mmfr0, 0xffffffffffff0ff0, boot, cur, cpu);
--	diff |= CHECK(id_aa64mmfr1, boot, cur, cpu);
--
--	/*
--	 * EL3 is not our concern.
--	 * ID_AA64PFR1 is currently RES0.
--	 */
--	diff |= CHECK_MASK(id_aa64pfr0, 0xffffffffffff0fff, boot, cur, cpu);
--	diff |= CHECK(id_aa64pfr1, boot, cur, cpu);
--
--	/*
--	 * If we have AArch32, we care about 32-bit features for compat. These
--	 * registers should be RES0 otherwise.
--	 */
--	diff |= CHECK(id_dfr0, boot, cur, cpu);
--	diff |= CHECK(id_isar0, boot, cur, cpu);
--	diff |= CHECK(id_isar1, boot, cur, cpu);
--	diff |= CHECK(id_isar2, boot, cur, cpu);
--	diff |= CHECK(id_isar3, boot, cur, cpu);
--	diff |= CHECK(id_isar4, boot, cur, cpu);
--	diff |= CHECK(id_isar5, boot, cur, cpu);
--	/*
--	 * Regardless of the value of the AuxReg field, the AIFSR, ADFSR, and
--	 * ACTLR formats could differ across CPUs and therefore would have to
--	 * be trapped for virtualization anyway.
--	 */
--	diff |= CHECK_MASK(id_mmfr0, 0xff0fffff, boot, cur, cpu);
--	diff |= CHECK(id_mmfr1, boot, cur, cpu);
--	diff |= CHECK(id_mmfr2, boot, cur, cpu);
--	diff |= CHECK(id_mmfr3, boot, cur, cpu);
--	diff |= CHECK(id_pfr0, boot, cur, cpu);
--	diff |= CHECK(id_pfr1, boot, cur, cpu);
--
--	diff |= CHECK(mvfr0, boot, cur, cpu);
--	diff |= CHECK(mvfr1, boot, cur, cpu);
--	diff |= CHECK(mvfr2, boot, cur, cpu);
--
--	/*
--	 * Mismatched CPU features are a recipe for disaster. Don't even
--	 * pretend to support them.
--	 */
--	WARN_TAINT_ONCE(diff, TAINT_CPU_OUT_OF_SPEC,
--			"Unsupported CPU feature variation.\n");
--}
--
- static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
- {
- 	info->reg_cntfrq = arch_timer_get_cntfrq();
-@@ -346,8 +236,7 @@ void cpuinfo_store_cpu(void)
- {
- 	struct cpuinfo_arm64 *info = this_cpu_ptr(&cpu_data);
- 	__cpuinfo_store_cpu(info);
--	cpuinfo_sanity_check(info);
--	update_cpu_features(info);
-+	update_cpu_features(smp_processor_id(), info, &boot_cpu_data);
- }
- 
- void __init cpuinfo_store_boot_cpu(void)
++ a) Safety :
++    Applications should be able to use the information provided by the
++    infrastructure to run optimally safely across the system. This has
++    greater implications on a system with heterogeneous CPUs. The
++    infrastructure exports a value that is safe across all the available
++    CPU on the system.
++
++    e.g, If at least one CPU doesn't implement CRC32 instructions, while others
++    do, we should report that the CRC32 is not implemented. Otherwise an
++    application could crash when scheduled on the CPU which doesn't support
++    CRC32.
++
++ b) Security :
++    Applications should only be able to receive information that is relevant
++    to the normal operation in userspace. Hence, some of the fields
++    are masked out and the values of the fields are set to indicate the
++    feature is 'not supported' (See the 'visible' field in the
++    table in Section 4). Also, the kernel may manipulate the fields based on what
++    it supports. e.g, If FP is not supported by the kernel, the values
++    could indicate that the FP is not available (even when the CPU provides
++    it).
++
++ c) Implementation Defined Features
++    The infrastructure doesn't expose any register which is
++    IMPLEMENTATION DEFINED as per ARMv8-A Architecture.
++
++ d) CPU Identification :
++    MIDR_EL1 is exposed to help identify the processor. On a heterogeneous
++    system, this could be racy (just like getcpu()). The process could be
++    migrated to another CPU by the time it uses the register value, unless the
++    CPU affinity is set. Hence, there is no guarantee that the value reflects the
++    processor that it is currently executing on. The REVIDR is not exposed due
++    to this constraint, as REVIDR makes sense only in conjunction with the MIDR.
++    Alternately, MIDR_EL1 and REVIDR_EL1 are exposed via sysfs at :
++	/sys/devices/system/cpu/cpu$ID/identification/
++	                                              \- midr
++	                                              \- revidr
++
++The list of supported registers and the attributes of individual
++feature bits are listed in section 4. Unless there is absolute necessity,
++we don't encourage the addition of new feature registers to the list.
++In any case, it should comply to the requirements listed above.
++
++3. Implementation
++--------------------
++
++The infrastructure is built on the emulation of the 'MRS' instruction.
++Accessing a restricted system register from an application generates an
++exception and ends up in SIGILL being delivered to the process.
++The infrastructure hooks into the exception handler and emulates the
++operation if the source belongs to the supported system register space.
++
++The infrastructure emulates only the following system register space:
++	Op0=3, Op1=0, CRn=0
++
++(See Table C5-6 'System instruction encodings for System register accesses'
++ in ARMv8 ARM, for the list of registers).
++
++
++The following rules are applied to the value returned by the infrastructure:
++
++ a) The value of an 'IMPLEMENTATION DEFINED' field is set to 0.
++ b) The value of a reserved field is populated with the reserved
++    value as defined by the architecture.
++ c) The value of a field marked as not 'visible', is set to indicate
++    the feature is missing (as defined by the architecture).
++ d) The value of a 'visible' field holds the system wide safe value
++    for the particular feature(except for MIDR_EL1, see section 4).
++    See Appendix I for more information on safe value.
++
++There are only a few registers visible to the userspace. See Section 4,
++for the list of 'visible' registers.
++
++The registers which are either reserved RAZ or IMPLEMENTAION DEFINED are
++emulated as 0.
++
++All others are emulated as having 'invisible' features.
++
++4. List of exposed registers
++-----------------------------
++
++  1) ID_AA64ISAR0_EL1 - Instruction Set Attribute Register 0
++     x--------------------------------------------------x
++     | Name                         |  bits   | visible |
++     |--------------------------------------------------|
++     | RAZ                          | [63-20] |    n    |
++     |--------------------------------------------------|
++     | CRC32                        | [19-16] |    y    |
++     |--------------------------------------------------|
++     | SHA2                         | [15-12] |    y    |
++     |--------------------------------------------------|
++     | SHA1                         | [11-8]  |    y    |
++     |--------------------------------------------------|
++     | AES                          | [7-4]   |    y    |
++     |--------------------------------------------------|
++     | RAZ                          | [3-0]   |    n    |
++     x--------------------------------------------------x
++
++  2) ID_AA64ISAR1_EL1 - Instruction Set Attribute Register 1
++     x--------------------------------------------------x
++     | Name                         |  bits   | visible |
++     |--------------------------------------------------|
++     | RAZ                          | [63-0]  |    y    |
++     x--------------------------------------------------x
++
++  3) ID_AA64PFR0_EL1 - Processor Feature Register 0
++     x--------------------------------------------------x
++     | Name                         |  bits   | visible |
++     |--------------------------------------------------|
++     | RAZ                          | [63-28] |    n    |
++     |--------------------------------------------------|
++     | GIC                          | [27-24] |    n    |
++     |--------------------------------------------------|
++     | AdvSIMD                      | [23-20] |    y    |
++     |--------------------------------------------------|
++     | FP                           | [19-16] |    y    |
++     |--------------------------------------------------|
++     | EL3                          | [15-12] |    n    |
++     |--------------------------------------------------|
++     | EL2                          | [11-8]  |    n    |
++     |--------------------------------------------------|
++     | EL1                          | [7-4]   |    n    |
++     |--------------------------------------------------|
++     | EL0                          | [3-0]   |    n    |
++     x--------------------------------------------------x
++
++  4) ID_AA64PFR1_EL1 - Processor Feature Register 1
++     x--------------------------------------------------x
++     | Name                         |  bits   | visible |
++     |--------------------------------------------------|
++     | RAZ                          | [63-0]  |    y    |
++     x--------------------------------------------------x
++
++  5) MIDR_EL1 - Main ID Register
++     x--------------------------------------------------x
++     | Name                         |  bits   | visible |
++     |--------------------------------------------------|
++     | RAZ                          | [63-32] |    n    |
++     |--------------------------------------------------|
++     | Implementer                  | [31-24] |    y    |
++     |--------------------------------------------------|
++     | Variant                      | [23-20] |    y    |
++     |--------------------------------------------------|
++     | Architecture                 | [19-16] |    y    |
++     |--------------------------------------------------|
++     | PartNum                      | [15-4]  |    y    |
++     |--------------------------------------------------|
++     | Revision                     | [3-0]   |    y    |
++     x--------------------------------------------------x
++
++   NOTE: The 'visible' fields of MIDR_EL1 will contain the value
++   as available on the CPU where it is fetched and is not a system
++   wide safe value.
++
++
++Appendix
++-----------
++
++I. CPUID feature value types
++
++   The safe value of a CPUID feature field is dependent on the implications
++   of the values assigned to it by the architecture. Based on the relationship
++   between the values, the features are classified into 3 types.
++
++	a) LOWER_SAFE - The value 'n+1' indicates, value 'n' and some
++	additional features. (where n >= 0). The smaller value (n) is
++	considered safer in this case.
++
++	b) HIGHER_SAFE - The value 'n+1' is safer than 'n' (for n>= 0).
++
++	c) EXACT - If the values of the feature don't have any relationship,
++	a predefined safe value is used.
++
++II. CPUID feature value scheme for features
++
++   For features that are not of the EXACT type as described, the following rule applies.
++   Each 4bit field is a signed value, with RAZ as the original value defined by
++   the architecture. When a feature is added or extended the field is incremented.
++   If an existing feature(whose value is 0) is removed, the value becomes negative(0xf).
++
++   e.g: 1) Value for ID_AA64PFR0:FP
++		0   - Floating Point instructions supported.
++		0xf - Floating Point instructions not supported.
++
++        2) Value for ID_AA64MMFR0:TGran16
++		0   - 16K page size not supported.
++		1   - 16K page size supported.
 -- 
 1.7.9.5
