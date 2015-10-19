@@ -1,80 +1,169 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 19 Oct 2015 08:02:26 +0200
-Subject: [linux-sunxi] Re: [PATCH 3/6] mfd: axp20x: Add support for RSB
- based AXP223 PMIC
-In-Reply-To: <CAGb2v66B8EbTZkVrt3QT85fKCwOjL8OBWfQvcLHrLAe6NfavNA@mail.gmail.com>
-References: <1444840342-9233-1-git-send-email-wens@csie.org>
- <1444840342-9233-4-git-send-email-wens@csie.org>
- <20151016064159.GG2711@lukather>
- <CAGb2v66B8EbTZkVrt3QT85fKCwOjL8OBWfQvcLHrLAe6NfavNA@mail.gmail.com>
-Message-ID: <20151019060226.GQ2711@lukather>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Mon, 19 Oct 2015 14:02:27 +0800
+Subject: [PATCH v10 2/3] xhci: mediatek: support MTK xHCI host controller
+In-Reply-To: <1445140279-18121-3-git-send-email-chunfeng.yun@mediatek.com>
+References: <1445140279-18121-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1445140279-18121-3-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1445234547.28324.17.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 02:46:23PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Oct 16, 2015 at 2:41 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Thu, Oct 15, 2015 at 12:32:19AM +0800, Chen-Yu Tsai wrote:
-> >> The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
-> >> It is functionally identical to AXP221; only the regulator default
-> >> voltage/status and the external host interface are different.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  drivers/mfd/Kconfig        | 12 ++++++
-> >>  drivers/mfd/Makefile       |  1 +
-> >>  drivers/mfd/axp20x-core.c  |  2 +
-> >>  drivers/mfd/axp20x-rsb.c   | 93 ++++++++++++++++++++++++++++++++++++++++++++++
-> >>  include/linux/mfd/axp20x.h |  1 +
-> >>  5 files changed, 109 insertions(+)
-> >>  create mode 100644 drivers/mfd/axp20x-rsb.c
-> >>
-> >> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> >> index 9ba3feb3f2fc..6e5edb61d42e 100644
-> >> --- a/drivers/mfd/Kconfig
-> >> +++ b/drivers/mfd/Kconfig
-> >> @@ -84,6 +84,7 @@ config MFD_BCM590XX
-> >>  config MFD_AXP20X
-> >>       bool "X-Powers AXP series PMICs"
-> >>       select MFD_AXP20X_I2C
-> >> +     select MFD_AXP20X_RSB
-> >>
-> >>  config MFD_AXP20X_CORE
-> >>       bool
-> >> @@ -102,6 +103,17 @@ config MFD_AXP20X_I2C
-> >>         components like regulators or the PEK (Power Enable Key) under the
-> >>         corresponding menus.
-> >>
-> >> +config MFD_AXP20X_RSB
-> >> +     bool "X-Powers AXP series RSB PMICs"
-> >> +     select MFD_AXP20X_CORE
-> >> +     depends on SUNXI_RSB=y
-> >
-> > Do we need that? Even if the bus is compiled as a module, the driver
-> > will not be probed before that, will it?
-> 
-> There's a compile/link dependency on the __devm_regmap_init_sunxi_rsb().
+On Sun, 2015-10-18 at 11:51 +0800, Chunfeng Yun wrote:
+> There some vendor quirks for MTK xhci host controller:
+> 1. It defines some extra SW scheduling parameters for HW
+>   to minimize the scheduling effort for synchronous and
+>   interrupt endpoints. The parameters are put into reseved
+>   DWs of slot context and endpoint context.
+> 2. Its IMODI unit for Interrupter Moderation register is
+>   8 times as much as that defined in xHCI spec.
+> 3. Its TDS in  Normal TRB defines a number of packets that
+>   remains to be transferred for a TD after processing all
+>   Max packets in all previous TRBs.
+...
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/iopoll.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/regmap.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/slab.h>
+> +#include <linux/usb/phy.h>
+> +#include <linux/usb/xhci_pdriver.h>
+above three header files no need anymore
 
-If it's exported, everything should be fine, no?
+> +
+> +#include "xhci.h"
+> +#include "xhci-mtk.h"
+> +
+> +/* ip_pw_ctrl0 register */
+> +#define CTRL0_IP_SW_RST	BIT(0)
+> +
+> +/* ip_pw_ctrl1 register */
+> +#define CTRL1_IP_HOST_PDN	BIT(0)
+> +
+...
+> +/* called during probe() after chip reset completes */
+> +static int xhci_mtk_setup(struct usb_hcd *hcd)
+> +{
+> +	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
+> +	int ret;
+> +
+> +	if (usb_hcd_is_primary_hcd(hcd)) {
+> +		ret = xhci_mtk_ssusb_config(mtk);
+> +		if (ret)
+> +			return ret;
+> +		ret = xhci_mtk_sch_init(mtk);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	return xhci_gen_setup(hcd, xhci_mtk_quirks);
+> +}
+> +
+> +static int xhci_mtk_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *node = dev->of_node;
+> +	struct xhci_hcd_mtk *mtk;
+> +	const struct hc_driver *driver;
+> +	struct xhci_hcd *xhci;
+> +	struct resource *res;
+> +	struct usb_hcd *hcd;
+> +	struct phy *phy;
+> +	int phy_num;
+> +	int ret = -ENODEV;
+...
+> +
+> +	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+> +		xhci->shared_hcd->can_do_streams = 1;
+> +
+> +	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+> +	if (ret)
+> +		goto put_usb3_hcd;
+> +
+> +	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
+> +	if (ret)
+> +		goto dealloc_usb2_hcd;
+> +
+> +	return 0;
+> +
+> +dealloc_usb2_hcd:
+> +	xhci_mtk_sch_exit(mtk);
+> +	usb_remove_hcd(hcd);
+> +
+> +put_usb3_hcd:
+> +	usb_put_hcd(xhci->shared_hcd);
+need call xhci_mtk_sch_exit() for some fail cases
 
-> And both drivers are bool, i.e. can't be compiled as a module. What we
-> don't want is enabling MFD_AXP20X_RSB without SUNXI_RSB.
+> +
+> +power_off_phys:
+> +	xhci_mtk_phy_power_off(mtk);
+> +	device_init_wakeup(dev, 0);
+use false instead of 0
 
-What would really be the issue here? The driver wouldn't be probed,
-and that's it. Or am I missing something?
+> +
+> +exit_phys:
+> +	xhci_mtk_phy_exit(mtk);
+> +
+> +put_usb2_hcd:
+> +	usb_put_hcd(hcd);
+> +
+> +disable_clk:
+> +	xhci_mtk_clks_disable(mtk);
+> +
+> +disable_ldos:
+> +	xhci_mtk_ldos_disable(mtk);
+> +
+> +disable_pm:
+> +	pm_runtime_put_sync(dev);
+> +	pm_runtime_disable(dev);
+> +	return ret;
+> +}
+> +
+> +static int xhci_mtk_remove(struct platform_device *dev)
+> +{
+> +	struct xhci_hcd_mtk *mtk = platform_get_drvdata(dev);
+> +	struct usb_hcd	*hcd = mtk->hcd;
+> +	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+> +
+> +	usb_remove_hcd(xhci->shared_hcd);
+> +	xhci_mtk_phy_power_off(mtk);
+> +	xhci_mtk_phy_exit(mtk);
+> +	device_init_wakeup(&dev->dev, 0);
+use false instead of 0
 
-Maxime
+I will send v11 to fix up the problems caused by my carelessness.
 
-> AFAIK the same goes for the I2C version.
+Sorry.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151019/d6e861f6/attachment.sig>
+> +
+> +	usb_remove_hcd(hcd);
+> +	usb_put_hcd(xhci->shared_hcd);
+> +	usb_put_hcd(hcd);
+> +	xhci_mtk_sch_exit(mtk);
+> +	xhci_mtk_clks_disable(mtk);
+> +	xhci_mtk_ldos_disable(mtk);
+> +	pm_runtime_put_sync(&dev->dev);
+> +	pm_runtime_disable(&dev->dev);
+> +
+> +	return 0;
+> +}
+> +
