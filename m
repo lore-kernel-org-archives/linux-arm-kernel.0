@@ -1,70 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 19 Oct 2015 12:39:05 +0100
-Subject: [PATCH] ARM64: juno: add NOR flash to device tree
-In-Reply-To: <CACRpkdaGscb_ccbGuwccsRj_b1d6xoveiiZpw1a5eXon3PxAUA@mail.gmail.com>
-References: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
- <561FC681.2040809@arm.com>
- <CACRpkdaSox9WKb5-dkD_zAwO9WxP6+b010p3bdxsm1LRy=WvKg@mail.gmail.com>
- <5624C31D.3070906@arm.com> <20151019102932.GB10678@leverpostej>
- <CACRpkdaGscb_ccbGuwccsRj_b1d6xoveiiZpw1a5eXon3PxAUA@mail.gmail.com>
-Message-ID: <20151019113904.GE10678@leverpostej>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 19 Oct 2015 13:48:13 +0200
+Subject: [RFC PATCH] ARM: exynos_defconfig: Increase
+ CONFIG_BLK_DEV_RAM_SIZE to 64K
+In-Reply-To: <1445251715-9725-1-git-send-email-alim.akhtar@samsung.com>
+References: <1445251715-9725-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <5624D87D.4090901@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 01:19:14PM +0200, Linus Walleij wrote:
-> On Mon, Oct 19, 2015 at 12:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+Hello Alim,
+
+On 10/19/2015 12:48 PM, Alim Akhtar wrote:
+> CONFIG_BLK_DEV_RAM_SIZE is currently set to 8K, which is a bit on the
+> smaller side, lets bump it up to 64K so that a bigger RAM_DISK can
+> be used with defconfig.
 > 
-> > Also, for non U-Boot systems I was under the impression that the flash
-> > was effectively owned by EFI (for variable storage),
-> 
-> If it is "owned" by something it is owned by the boot monitor, neither
-> by U-Boot or (U)EFI. The boot monitor can flash "images" into
-> the flash using USB or ethernet/TFTP and it is not part of any
-> boot loader, but an autonomous flash image on the board.
-> (Actually it can replace itself.)
-> 
-> EFI or U-Boot is one such "image", as is the kernel and the
-> other patch series I've sent (AFSv2 support) makes these
-> "images" visible to the kernel as individual MTD partitions.
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
 
-I understand this.
+I agree that 8KiB is too small and that should be bumped, I'm also
+not sure what the best size would be but 64KiB sounds reasonable
+to me. So for this patch:
 
-> This flash image format has nothing to do with UEFI or any other
-> boot loader, it has been around since the RealView platforms,
-> and has basically not changed since. (Well the forst pointer in
-> the image information structure was changed from u32 to u64).
-> 
-> My impression is that the boot monitor code is just a continous
-> evolution from reference design to reference design inside ARM.
-> It cares very little about what boot loader happens to be the
-> fashion of the day, it is also used for flashing images of Windows
-> mobile or QNX or whatever people want to run as well.
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-I'm on about _runtime_ firmware (UEFI and/or Arm Trusted Firmware), not
-the first stage firmware that's out of the way by the time the OS is
-active.
+> Every time I build exynos_defconfig, I need to manually change RAM_SIZE
+> to match my ramdisk image size. I am not sure what is the best ramdisk size
+> might be, but bumping it to 64K might be a reasonable one.
+>
 
-As I mentioned, I was under the impression that at least a portion of
-the flash was used by UEFI for variable storage, and that UEFI could
-therefore access the flash at runtime (due to runtime services calls).
+In case you are interested, I got some stats by doing grep on the ARM
+defconfigs using this [0]. Of course the sizes depends on the platform
+but just to have an idea about what sizes are more popular than others.
 
-Accessing the flash at the same time as another agent (UEFI or the
-Trusted Firmare) does not seem like a good idea, and is potentially
-unsafe (see Sudeep's example w.r.t. cpuidle).
+SIZE	COUNT
+1024	17
+8192	43
+10240	1
+16384	20
+20000	25
+32768	36
+65536	15
 
-> The "images" are very simplistic things designed to support
-> execute-in-place. New images can be added/removed by any
-> compliant software, be it EFI, U-Boot or the kernel. But the
-> format of these images is part of the hardware or rather the boot
-> monitor, nothing else.
+[0]: http://hastebin.com/buqukimede.bash
 
-This is technically true. However, my argument is not that this doesn't
-describe the hardware, but rather that this describes a piece of
-hardware which it is not safe to use unless it is known that any runtime
-firmware is not concurrently accessing it.
-
-Given that there is no mechanism to mediate access to the flash,
-allowing Linux to access it does not seem safe.
-
-Thanks,
-Mark.
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
