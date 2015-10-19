@@ -1,60 +1,59 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Mon, 19 Oct 2015 15:53:51 +0530
-Subject: [PATCH 7/7] ARM: EXYNOS: Remove code for restart and poweroff for
- exynos SoCs
-In-Reply-To: <5624BE39.7020605@osg.samsung.com>
-References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
- <1445234635-3950-8-git-send-email-alim.akhtar@samsung.com>
- <562494F8.6070003@samsung.com> <5624BE39.7020605@osg.samsung.com>
-Message-ID: <5624C4B7.30507@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 19 Oct 2015 12:39:09 +0200
+Subject: [PATCH] drm/virtio: use %llu format string form atomic64_t
+In-Reply-To: <4345582.jiHe94XBb3@wuerfel>
+References: <5082760.FgB9zHNfte@wuerfel> <5152101.mD2bWzUJ2V@wuerfel>
+ <CAMuHMdWbzEFqVctMXTWtdBn2B+guFdphQX5nXUnHPo1szQbtPg@mail.gmail.com>
+ <4345582.jiHe94XBb3@wuerfel>
+Message-ID: <CAMuHMdUcAhocNosTB+YnQ0LiPui58ph13mrDYcE15vDjRAmscQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Oct 19, 2015 at 12:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 19 October 2015 09:34:15 Geert Uytterhoeven wrote:
+>> On Wed, Oct 7, 2015 at 1:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > static __inline__ int atomic64_add_unless(atomic64_t *v, long a, long u)
+>> >
+>> > which truncates the result to 32 bit.
+>>
+>> Woops.
+>>
+>> See also my unanswered question in "atomic64 on 32-bit vs 64-bit (was:
+>> Re: Add virtio gpu driver.)", which is still valid:
+>> https://lkml.org/lkml/2015/6/28/18
+>>
+>
+> Regarding your question of
+>
+>> Instead of sprinkling casts, is there any good reason why atomic64_read()
+>> and atomic64_t aren't "long long" everywhere, cfr. u64?
+>
+>
+> I assume the answer is that some (all?) 64-bit architectures intentionally
+> return 'long' here, in order for atomic_long_read() to return 'long' on
+> all architectures, given the definitions from
+> include/asm-generic/atomic-long.h
+>
+> We would have to either change those, or we have to pick between
+> atomic_long_* or atomic64_* to have a consistent return type.
 
+I guess the main reason is this comment in include/asm-generic/atomic-long.h,
+which I hadn't noticed before:
 
-On 10/19/2015 03:26 PM, Javier Martinez Canillas wrote:
-> Hello,
->
-> On 10/19/2015 09:00 AM, Krzysztof Kozlowski wrote:
->> On 19.10.2015 15:03, Alim Akhtar wrote:
->>> Now we can use the generic syscon-{reboot/poweroff} drivers,
->>> so we don't need special handling for reboot/poweroff in
->>> exynos pmu driver. This patch remove the same.
->>>
->>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->>> ---
->>>   arch/arm/mach-exynos/pmu.c |   43 -------------------------------------------
->>>   1 file changed, 43 deletions(-)
->>
->> I think that removal of this stuff will effectively remove the
->> restart/poweroff handlers from:
->> 1. Other defconfigs, like multi_v7
->> 2. Custom configs.
->>
->
-> This will also break old DTBs that don't have a "syscon-poweroff" device
-> node that contains the necessary PMU regmap, offset and mask information.
->
->> Previously this code was always compiled in for ARCH_EXYNOS. Now it is
->> not so I am thinking about selecting necessary drivers from main exynos
->> Kconfig symbol. That could be tricky though, because "select" should be
->> used only for non-visible symbols.
->>
->> Any ideas how to solve that?
->>
->
-> Is true that select should only be used for non-visible symbols but there
-> are others user visible symbols that are selected by ARCH_EXYNOS such as
-> EXYNOS_THERMAL. So I think selecting the regmap syscon reset stuff there
-> is a sensible option.
->
-Yes, another example is MFD_SYSYCON which is selected from Kconfig.
-Also CONFIG_POWER_RESET_SYSCON is enable in arch/arm64/config/defconfig.
-So both approaches are taken here.
-will go with maintainer suggestion here.
->> Best regards,
->> Krzysztof
->>
->
-> Best regards,
->
+ * Casts for parameters are avoided for existing atomic functions in order to
+ * avoid issues with cast-as-lval under gcc 4.x and other limitations that the
+ * macros of a platform may have.
+
+Still, it's a pity, as printing atomic_64 is one more place where casts are
+needed in callers.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
