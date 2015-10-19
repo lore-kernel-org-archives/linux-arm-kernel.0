@@ -1,79 +1,46 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 19 Oct 2015 16:07:20 +0100
-Subject: [RFC PATCH v2 1/4] drm: Introduce generic probe function for
- component based masters.
-In-Reply-To: <20151019145027.GF32532@n2100.arm.linux.org.uk>
-References: <1445257313-7147-1-git-send-email-Liviu.Dudau@arm.com>
- <1445257313-7147-2-git-send-email-Liviu.Dudau@arm.com>
- <20151019122537.GZ32532@n2100.arm.linux.org.uk>
- <20151019130258.GU3394@e106497-lin.cambridge.arm.com>
- <20151019132638.GB32532@n2100.arm.linux.org.uk>
- <20151019144225.GE13786@phenom.ffwll.local>
- <20151019145027.GF32532@n2100.arm.linux.org.uk>
-Message-ID: <20151019150719.GW3394@e106497-lin.cambridge.arm.com>
+Date: Mon, 19 Oct 2015 16:07:46 +0100
+Subject: [RFC PATCH v3 0/4] drm: Cleanup probe function for component based
+ masters.
+Message-ID: <1445267270-23126-1-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 03:50:27PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Oct 19, 2015 at 04:42:25PM +0200, Daniel Vetter wrote:
-> > On Mon, Oct 19, 2015 at 02:26:38PM +0100, Russell King - ARM Linux wrote:
-> > > On Mon, Oct 19, 2015 at 02:02:58PM +0100, Liviu Dudau wrote:
-> > > > On Mon, Oct 19, 2015 at 01:25:37PM +0100, Russell King - ARM Linux wrote:
-> > > > > Please don't move this into here, it's completely inappropriate.  Just
-> > > > > because something makes use of this does not mean they only support
-> > > > > 32-bit DMA.  Besides, this has nothing to do with whether or not it's
-> > > > > OF-based or not.
-> > > > 
-> > > > Understood. My thinking process was that component-based drivers are all
-> > > > OF-enabled (how else do you make use of the framework?) and 32-bit DMA is
-> > > > present in 2 out of 3 drivers that are converted, so it looks to be common
-> > > > enough that adding it to armada would not hurt. It was all done in the name of
-> > > > collecting common code in a single function.
-> > > 
-> > > Which is an utterly crap reason.
-> > > 
-> > > It's also not appropriate.  I'm really not sure why you think that moving
-> > > this here would in any way be appropriate - from my point of view, the
-> > > mere proposal is utterly insane.
-> > > 
-> > > The "container" device does not do any DMA, so it's inappropriate for
-> > > it to have DMA masks set or negotiated on it.  So, actually, no one
-> > > should be setting the DMA mask for their container device.  It's wrong.
-> > 
-> > I think (and my opinion doesn't carry as much wheight here on dri-devel
-> > than intel-gfx) the above is over the top bashing of a new contributor to
-> > drm who really seems trying to do right. I think that's unecessary,
-> > especially since you follow up with the reasonable reply below.
-> 
-> It's justified because it took _two_ messages to get the point across.
-> The first one asking nicely didn't make the necessary impact.
+Changelog:
+v3: Removed the call to dma_set_coherent_mask() from the generic
+    drm_of_component_probe(). Also changes to shorten lines over 80 chars long.
+v2: Rebased the patchset on top of drm-next rather than Linus' latest -rc
 
-Russell, I've got your point and I have accepted it after first message. Go
-back to my initial reply and re-read it. It starts with "Understood. ...."
+A few drivers in drivers/gpu/drm are component-enabled and use quite similar
+code sequences to probe for their encoder slaves at the remote end of the ports.
+Move the code into a "generic" function and remove it from the drivers.
 
-I'm not looking for a flame war. I am more interested in knowing if you think
-that the armada code re-org makes sense or the use of -EINVAL to mean that dev->of_node
-is missing.
+The end results is that drivers get a reference count fix (imx), more thorough
+error checking (imx again) plus a decrease in the overall count of LoC.
 
-Coming to armada changes, I would also like to know if pdev->dev.platform_data is
-in use at all. If so, are there any examples where that is being setup? Because I
-think the "missing 'ports' property" message is missleading.
+I'm looking for comments and testing of the patchset (only compile tested from my
+end as I don't have access to all the devices touched by the changes). My main
+interest is in finding out if -EINVAL is the correct code to return if
+dev->of_node == NULL (handy now, as it is different from the other possible error
+codes and used in armada to trigger old platform_data support. Also looking for
+thoughts on the correctness of the patch and if it possible to co-opt more drivers
+into using the function.
 
 Best regards,
 Liviu
 
-> 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-> 
+Liviu Dudau (4):
+  drm: Introduce generic probe function for component based masters.
+  drm/imx: Convert the probe function to the generic drm_of_component_probe()
+  drm/rockchip: Convert the probe function to the generic drm_of_component_probe()
+  drm/armada: Convert the probe function to the generic drm_of_component_probe()
+
+ drivers/gpu/drm/armada/armada_drv.c         | 73 ++++++++----------------
+ drivers/gpu/drm/drm_of.c                    | 88 +++++++++++++++++++++++++++++
+ drivers/gpu/drm/imx/imx-drm-core.c          | 55 ++----------------
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 81 ++------------------------
+ include/drm/drm_of.h                        | 13 +++++
+ 5 files changed, 133 insertions(+), 177 deletions(-)
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+2.6.0
