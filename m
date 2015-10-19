@@ -1,47 +1,115 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Oct 2015 16:53:11 +0100
-Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
-In-Reply-To: <20151019154009.20687.41178@quantum>
-References: <5706174.BUsqiXljxZ@wuerfel> <20151007125735.GA8170@kroah.com>
- <20151007130324.GA4557@linux> <5308760.2G5KJFF9Pi@wuerfel>
- <20151008074828.GF4570@linux> <20151019154009.20687.41178@quantum>
-Message-ID: <20151019155310.GO32532@n2100.arm.linux.org.uk>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Mon, 19 Oct 2015 21:28:44 +0530
+Subject: [PATCH 5/7] ARM: exynos_defconfig: Normalize exynos defconfig
+In-Reply-To: <5624EF5D.7080403@osg.samsung.com>
+References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
+ <1445234635-3950-6-git-send-email-alim.akhtar@samsung.com>
+ <5624EF5D.7080403@osg.samsung.com>
+Message-ID: <CAGOxZ52bGrHo0DzjhyjGPXwX0CWUn0Oqkx-EGZY51zC5FWcAKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 08:40:09AM -0700, Michael Turquette wrote:
-> Quoting Viresh Kumar (2015-10-08 00:48:28)
-> > On 07-10-15, 21:12, Arnd Bergmann wrote:
-> > > I think it clearly makes sense to have a fixed length for each of these
-> > > members:
-> > >
-> > > either 32 bit is enough to represent all possible values, then
-> > > there is no need to make them 'long' on 64-bit architectures, or 32 bit
-> > > is not enough and then the code is broken on 32-bit architectures today
-> > > and should be fixed.
-> > 
-> > I agree.
-> > 
-> > But I am not 100% sure why it was done this way to start with.
-> > Probably this is the logic behind that:
-> > - Max clock rate supported by a u32 is ~ 4.295 GHz
+Hi Javier,
 
-The limit is actually half that when you consider clk_round_rate()
-returns a long, because clk_round_rate() needs to be able to return
-errors.
+On Mon, Oct 19, 2015 at 6:55 PM, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> Hello Alim,
+>
+> On 10/19/2015 08:03 AM, Alim Akhtar wrote:
+>> make savedefconfig result in some difference, lets normalize the
+>> defconfig.
+>>
+>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> ---
+>
+> Did you make savedefconfig against v4.3-rc6 or tot linux-next?
+>
+These are based on v4.3-rc5.
 
-The use of long and unsigned long was done in the knowledge that it'd
-restrict to 2GHz the upper limit, partially because 64-bit math on
-32-bit systems is inefficient and expensive, and I initially wanted
-people to use the thing, so it had to be lean and fast.  (If I'd
-started out with something as complex as the CCF, it would've been
-laughed out as being "far too complex" and "we don't need this").
+> I remember we had issues in the past due savedefconfig made against
+> linux-next but then some of the patches in linux-next not making it
+> to the next release. So I think it should be good to mention what's
+> the base used for this patch.
+>
+Ah, ok I didn't follow that, will check again on Linux-next as well as
+on 4.3-rc5
 
-It also started out as a way to convey clock information to drivers
-for peripherals, which commonly don't need clocks up in the GHz range,
-indeed, it was rare at that time the API was designed for peripheral
-clocks to be much above 100MHz.
+>>  arch/arm/configs/exynos_defconfig |    8 ++------
+>>  1 file changed, 2 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+>> index 1ff2bfa2e183..3349713e6c63 100644
+>> --- a/arch/arm/configs/exynos_defconfig
+>> +++ b/arch/arm/configs/exynos_defconfig
+>> @@ -99,10 +99,8 @@ CONFIG_SENSORS_LM90=y
+>>  CONFIG_SENSORS_NTC_THERMISTOR=y
+>>  CONFIG_SENSORS_PWM_FAN=y
+>>  CONFIG_SENSORS_INA2XX=y
+>> -CONFIG_THERMAL=y
+>>  CONFIG_CPU_THERMAL=y
+>>  CONFIG_THERMAL_EMULATION=y
+>> -CONFIG_EXYNOS_THERMAL=y
+>
+> I would prefer to split all the changes that removes symbols into a
+> separate patch explaining why these are not needed anymore (i.e: it
+> is selected now by symbol $foo).
+>
+Ok ..let me rebase my patches and check these config changes again....
+>>  CONFIG_WATCHDOG=y
+>>  CONFIG_S3C2410_WATCHDOG=y
+>>  CONFIG_MFD_CROS_EC=y
+>> @@ -127,14 +125,14 @@ CONFIG_REGULATOR_S2MPS11=y
+>>  CONFIG_REGULATOR_S5M8767=y
+>>  CONFIG_REGULATOR_TPS65090=y
+>>  CONFIG_DRM=y
+>> -CONFIG_DRM_NXP_PTN3460=y
+>> -CONFIG_DRM_PARADE_PS8622=y
+>>  CONFIG_DRM_EXYNOS=y
+>>  CONFIG_DRM_EXYNOS_FIMD=y
+>>  CONFIG_DRM_EXYNOS_DSI=y
+>>  CONFIG_DRM_EXYNOS_HDMI=y
+>>  CONFIG_DRM_PANEL_SIMPLE=y
+>>  CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=y
+>> +CONFIG_DRM_NXP_PTN3460=y
+>> +CONFIG_DRM_PARADE_PS8622=y
+>
+> Moving these DRM bridge symbols to match savedefconfig is ok IMHO.
+>
+>>  CONFIG_FB_SIMPLE=y
+>>  CONFIG_EXYNOS_VIDEO=y
+>>  CONFIG_EXYNOS_MIPI_DSI=y
+>> @@ -175,7 +173,6 @@ CONFIG_RTC_DRV_S5M=y
+>>  CONFIG_RTC_DRV_S3C=y
+>>  CONFIG_DMADEVICES=y
+>>  CONFIG_PL330_DMA=y
+>> -CONFIG_CHROME_PLATFORMS=y
+>>  CONFIG_CROS_EC_CHARDEV=y
+>>  CONFIG_COMMON_CLK_MAX77686=y
+>>  CONFIG_COMMON_CLK_MAX77802=y
+>> @@ -190,7 +187,6 @@ CONFIG_PWM_SAMSUNG=y
+>>  CONFIG_PHY_EXYNOS5250_SATA=y
+>>  CONFIG_EXT2_FS=y
+>>  CONFIG_EXT3_FS=y
+>> -CONFIG_EXT4_FS=y
+>>  CONFIG_MSDOS_FS=y
+>>  CONFIG_VFAT_FS=y
+>>  CONFIG_TMPFS=y
+>>
+>
+> Same comment than above, I would prefer these to be split.
+>
+> Best regards,
+> --
+> Javier Martinez Canillas
+> Open Source Group
+> Samsung Research America
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Alim
