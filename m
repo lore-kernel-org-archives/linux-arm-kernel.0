@@ -1,26 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 19 Oct 2015 16:26:41 +0100
-Subject: [PATCH 11/20] sound, skylake: switch from ioremap_cache to
- memremap
-In-Reply-To: <20151009221635.32203.30755.stgit@dwillia2-desk3.jf.intel.com>
-References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
- <20151009221635.32203.30755.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <20151019152641.GC32054@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 19 Oct 2015 16:26:54 +0100
+Subject: [PATCHv4 18/24] arm64/kvm: Make use of the system wide safe values
+In-Reply-To: <20151019133936.GF24104@cbox>
+References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
+ <1445261101-22344-19-git-send-email-suzuki.poulose@arm.com>
+ <20151019133936.GF24104@cbox>
+Message-ID: <20151019152654.GD11226@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 09, 2015 at 06:16:36PM -0400, Dan Williams wrote:
-> In preparation for deprecating ioremap_cache() convert its usage in
-> skl-nhlt to memremap.
+On Mon, Oct 19, 2015 at 03:39:36PM +0200, Christoffer Dall wrote:
+> On Mon, Oct 19, 2015 at 02:24:55PM +0100, Suzuki K. Poulose wrote:
+> > Use the system wide safe value from the new API for safer
+> > decisions
+> > 
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> > Cc: kvmarm at lists.cs.columbia.edu
+> > Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> > Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  arch/arm64/kvm/reset.c    |    2 +-
+> >  arch/arm64/kvm/sys_regs.c |   12 ++++++------
+> >  2 files changed, 7 insertions(+), 7 deletions(-)
+> 
+> I assume Catalin or Will can take this with the rest of the series
+> through the arm64 tree, right?
 
-> -void __iomem *skl_nhlt_init(struct device *dev)
-> +void *skl_nhlt_init(struct device *dev)
+Yes.
 
-Why are we loosing the annotation here?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151019/84ef4802/attachment.sig>
+-- 
+Catalin
