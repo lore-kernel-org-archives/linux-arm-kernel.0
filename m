@@ -1,137 +1,209 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Mon, 19 Oct 2015 13:57:15 +0530
-Subject: [PATCH 7/7] ARM: EXYNOS: Remove code for restart and poweroff for
- exynos SoCs
-In-Reply-To: <562494F8.6070003@samsung.com>
-References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
- <1445234635-3950-8-git-send-email-alim.akhtar@samsung.com>
- <562494F8.6070003@samsung.com>
-Message-ID: <5624A963.6000201@samsung.com>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Mon, 19 Oct 2015 16:31:05 +0800
+Subject: [PATCH v3] dmaengine: fsl-edma: add PM suspend/resume support
+Message-ID: <1445243465-7727-1-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+This add power management suspend/resume support for the fsl-edma
+driver.
 
-On 10/19/2015 12:30 PM, Krzysztof Kozlowski wrote:
-> On 19.10.2015 15:03, Alim Akhtar wrote:
->> Now we can use the generic syscon-{reboot/poweroff} drivers,
->> so we don't need special handling for reboot/poweroff in
->> exynos pmu driver. This patch remove the same.
->>
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->> ---
->>   arch/arm/mach-exynos/pmu.c |   43 -------------------------------------------
->>   1 file changed, 43 deletions(-)
->
-> I think that removal of this stuff will effectively remove the
-> restart/poweroff handlers from:
-> 1. Other defconfigs, like multi_v7
-> 2. Custom configs.
->
-Well, I did have a plan to enable it on multi_v7
-Not sure about other custom configs, if there are some, they should also 
-enable it I feel.
+eDMA acted as a basic function used by others. What it needs to do
+is the two steps below to support power management.
 
-> Previously this code was always compiled in for ARCH_EXYNOS. Now it is
-> not so I am thinking about selecting necessary drivers from main exynos
-> Kconfig symbol. That could be tricky though, because "select" should be
-> used only for non-visible symbols.
->
-Probably adding these to mach-exynos/Kconfig as a "select" will do.
+In fsl_edma_suspend_late:
+Check whether the DMA chan is idle, if it is not idle disable DMA
+request.
 
-> Any ideas how to solve that?
->
-> Best regards,
-> Krzysztof
->
->>
->> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
->> index de68938ee6aa..393c04aa727e 100644
->> --- a/arch/arm/mach-exynos/pmu.c
->> +++ b/arch/arm/mach-exynos/pmu.c
->> @@ -14,9 +14,6 @@
->>   #include <linux/of_address.h>
->>   #include <linux/platform_device.h>
->>   #include <linux/delay.h>
->> -#include <linux/notifier.h>
->> -#include <linux/reboot.h>
->> -
->>
->>   #include "exynos-pmu.h"
->>   #include "regs-pmu.h"
->> @@ -681,23 +678,6 @@ static unsigned int const exynos5420_list_disable_pmu_reg[] = {
->>   	EXYNOS5420_CMU_RESET_FSYS_SYS_PWR_REG,
->>   };
->>
->> -static void exynos_power_off(void)
->> -{
->> -	unsigned int tmp;
->> -
->> -	pr_info("Power down.\n");
->> -	tmp = pmu_raw_readl(EXYNOS_PS_HOLD_CONTROL);
->> -	tmp ^= (1 << 8);
->> -	pmu_raw_writel(tmp, EXYNOS_PS_HOLD_CONTROL);
->> -
->> -	/* Wait a little so we don't give a false warning below */
->> -	mdelay(100);
->> -
->> -	pr_err("Power down failed, please power off system manually.\n");
->> -	while (1)
->> -		;
->> -}
->> -
->>   static void exynos5420_powerdown_conf(enum sys_powerdown mode)
->>   {
->>   	u32 this_cluster;
->> @@ -875,14 +855,6 @@ static void exynos5420_pmu_init(void)
->>   	pr_info("EXYNOS5420 PMU initialized\n");
->>   }
->>
->> -static int pmu_restart_notify(struct notifier_block *this,
->> -		unsigned long code, void *unused)
->> -{
->> -	pmu_raw_writel(0x1, EXYNOS_SWRESET);
->> -
->> -	return NOTIFY_DONE;
->> -}
->> -
->>   static const struct exynos_pmu_data exynos3250_pmu_data = {
->>   	.pmu_config	= exynos3250_pmu_config,
->>   	.pmu_init	= exynos3250_pmu_init,
->> @@ -940,20 +912,11 @@ static const struct of_device_id exynos_pmu_of_device_ids[] = {
->>   	{ /*sentinel*/ },
->>   };
->>
->> -/*
->> - * Exynos PMU restart notifier, handles restart functionality
->> - */
->> -static struct notifier_block pmu_restart_handler = {
->> -	.notifier_call = pmu_restart_notify,
->> -	.priority = 128,
->> -};
->> -
->>   static int exynos_pmu_probe(struct platform_device *pdev)
->>   {
->>   	const struct of_device_id *match;
->>   	struct device *dev = &pdev->dev;
->>   	struct resource *res;
->> -	int ret;
->>
->>   	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>   	pmu_base_addr = devm_ioremap_resource(dev, res);
->> @@ -978,12 +941,6 @@ static int exynos_pmu_probe(struct platform_device *pdev)
->>
->>   	platform_set_drvdata(pdev, pmu_context);
->>
->> -	ret = register_restart_handler(&pmu_restart_handler);
->> -	if (ret)
->> -		dev_warn(dev, "can't register restart handler err=%d\n", ret);
->> -
->> -	pm_power_off = exynos_power_off;
->> -
->>   	dev_dbg(dev, "Exynos PMU Driver probe done\n");
->>   	return 0;
->>   }
->>
->
->
+In fsl_edma_resume_early:
+Enable the eDMA and wait for being used.
+
+Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+---
+ drivers/dma/fsl-edma.c | 80 ++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 77 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+index 915eec3..6e28e57 100644
+--- a/drivers/dma/fsl-edma.c
++++ b/drivers/dma/fsl-edma.c
+@@ -116,6 +116,10 @@
+ 				BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
+ 				BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) | \
+ 				BIT(DMA_SLAVE_BUSWIDTH_8_BYTES)
++enum fsl_edma_pm_state {
++	RUNNING = 0,
++	SUSPENDED,
++};
+ 
+ struct fsl_edma_hw_tcd {
+ 	__le32	saddr;
+@@ -147,6 +151,9 @@ struct fsl_edma_slave_config {
+ struct fsl_edma_chan {
+ 	struct virt_dma_chan		vchan;
+ 	enum dma_status			status;
++	enum fsl_edma_pm_state		pm_state;
++	bool				idle;
++	u32				slave_id;
+ 	struct fsl_edma_engine		*edma;
+ 	struct fsl_edma_desc		*edesc;
+ 	struct fsl_edma_slave_config	fsc;
+@@ -298,6 +305,7 @@ static int fsl_edma_terminate_all(struct dma_chan *chan)
+ 	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
+ 	fsl_edma_disable_request(fsl_chan);
+ 	fsl_chan->edesc = NULL;
++	fsl_chan->idle = true;
+ 	vchan_get_all_descriptors(&fsl_chan->vchan, &head);
+ 	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+ 	vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
+@@ -313,6 +321,7 @@ static int fsl_edma_pause(struct dma_chan *chan)
+ 	if (fsl_chan->edesc) {
+ 		fsl_edma_disable_request(fsl_chan);
+ 		fsl_chan->status = DMA_PAUSED;
++		fsl_chan->idle = true;
+ 	}
+ 	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+ 	return 0;
+@@ -327,6 +336,7 @@ static int fsl_edma_resume(struct dma_chan *chan)
+ 	if (fsl_chan->edesc) {
+ 		fsl_edma_enable_request(fsl_chan);
+ 		fsl_chan->status = DMA_IN_PROGRESS;
++		fsl_chan->idle = false;
+ 	}
+ 	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+ 	return 0;
+@@ -648,6 +658,7 @@ static void fsl_edma_xfer_desc(struct fsl_edma_chan *fsl_chan)
+ 	fsl_edma_set_tcd_regs(fsl_chan, fsl_chan->edesc->tcd[0].vtcd);
+ 	fsl_edma_enable_request(fsl_chan);
+ 	fsl_chan->status = DMA_IN_PROGRESS;
++	fsl_chan->idle = false;
+ }
+ 
+ static irqreturn_t fsl_edma_tx_handler(int irq, void *dev_id)
+@@ -676,6 +687,7 @@ static irqreturn_t fsl_edma_tx_handler(int irq, void *dev_id)
+ 				vchan_cookie_complete(&fsl_chan->edesc->vdesc);
+ 				fsl_chan->edesc = NULL;
+ 				fsl_chan->status = DMA_COMPLETE;
++				fsl_chan->idle = true;
+ 			} else {
+ 				vchan_cyclic_callback(&fsl_chan->edesc->vdesc);
+ 			}
+@@ -704,6 +716,7 @@ static irqreturn_t fsl_edma_err_handler(int irq, void *dev_id)
+ 			edma_writeb(fsl_edma, EDMA_CERR_CERR(ch),
+ 				fsl_edma->membase + EDMA_CERR);
+ 			fsl_edma->chans[ch].status = DMA_ERROR;
++			fsl_edma->chans[ch].idle = true;
+ 		}
+ 	}
+ 	return IRQ_HANDLED;
+@@ -724,6 +737,12 @@ static void fsl_edma_issue_pending(struct dma_chan *chan)
+ 
+ 	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
+ 
++	if (unlikely(fsl_chan->pm_state != RUNNING)) {
++		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
++		/* cannot submit due to suspend */
++		return;
++	}
++
+ 	if (vchan_issue_pending(&fsl_chan->vchan) && !fsl_chan->edesc)
+ 		fsl_edma_xfer_desc(fsl_chan);
+ 
+@@ -735,6 +754,7 @@ static struct dma_chan *fsl_edma_xlate(struct of_phandle_args *dma_spec,
+ {
+ 	struct fsl_edma_engine *fsl_edma = ofdma->of_dma_data;
+ 	struct dma_chan *chan, *_chan;
++	struct fsl_edma_chan *fsl_chan;
+ 	unsigned long chans_per_mux = fsl_edma->n_chans / DMAMUX_NR;
+ 
+ 	if (dma_spec->args_count != 2)
+@@ -748,8 +768,10 @@ static struct dma_chan *fsl_edma_xlate(struct of_phandle_args *dma_spec,
+ 			chan = dma_get_slave_channel(chan);
+ 			if (chan) {
+ 				chan->device->privatecnt++;
+-				fsl_edma_chan_mux(to_fsl_edma_chan(chan),
+-					dma_spec->args[1], true);
++				fsl_chan = to_fsl_edma_chan(chan);
++				fsl_chan->slave_id = dma_spec->args[1];
++				fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id,
++						true);
+ 				mutex_unlock(&fsl_edma->fsl_edma_mutex);
+ 				return chan;
+ 			}
+@@ -888,7 +910,9 @@ static int fsl_edma_probe(struct platform_device *pdev)
+ 		struct fsl_edma_chan *fsl_chan = &fsl_edma->chans[i];
+ 
+ 		fsl_chan->edma = fsl_edma;
+-
++		fsl_chan->pm_state = RUNNING;
++		fsl_chan->slave_id = 0;
++		fsl_chan->idle = true;
+ 		fsl_chan->vchan.desc_free = fsl_edma_free_desc;
+ 		vchan_init(&fsl_chan->vchan, &fsl_edma->dma_dev);
+ 
+@@ -959,6 +983,55 @@ static int fsl_edma_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int fsl_edma_suspend_late(struct device *dev)
++{
++	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
++	struct fsl_edma_chan *fsl_chan;
++	unsigned long flags;
++	int i;
++
++	for (i = 0; i < fsl_edma->n_chans; i++) {
++		fsl_chan = &fsl_edma->chans[i];
++		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
++		/* Make sure chan is idle or will force disable. */
++		if (unlikely(!fsl_chan->idle)) {
++			dev_warn(dev, "WARN: There is non-idle channel.");
++			fsl_edma_disable_request(fsl_chan);
++			fsl_edma_chan_mux(fsl_chan, 0, false);
++		}
++
++		fsl_chan->pm_state = SUSPENDED;
++		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
++	}
++
++	return 0;
++}
++
++static int fsl_edma_resume_early(struct device *dev)
++{
++	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
++	struct fsl_edma_chan *fsl_chan;
++	int i;
++
++	for (i = 0; i < fsl_edma->n_chans; i++) {
++		fsl_chan = &fsl_edma->chans[i];
++		fsl_chan->pm_state = RUNNING;
++		edma_writew(fsl_edma, 0x0, fsl_edma->membase + EDMA_TCD_CSR(i));
++		if (fsl_chan->slave_id != 0)
++			fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id, true);
++	}
++
++	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA,
++			fsl_edma->membase + EDMA_CR);
++
++	return 0;
++}
++
++static const struct dev_pm_ops fsl_edma_pm_ops = {
++	.suspend_late   = fsl_edma_suspend_late,
++	.resume_early   = fsl_edma_resume_early,
++};
++
+ static const struct of_device_id fsl_edma_dt_ids[] = {
+ 	{ .compatible = "fsl,vf610-edma", },
+ 	{ /* sentinel */ }
+@@ -969,6 +1042,7 @@ static struct platform_driver fsl_edma_driver = {
+ 	.driver		= {
+ 		.name	= "fsl-edma",
+ 		.of_match_table = fsl_edma_dt_ids,
++		.pm     = &fsl_edma_pm_ops,
+ 	},
+ 	.probe          = fsl_edma_probe,
+ 	.remove		= fsl_edma_remove,
+-- 
+2.1.0.27.g96db324
