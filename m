@@ -1,94 +1,45 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 19 Oct 2015 15:25:49 +0200
-Subject: [PATCH 5/7] ARM: exynos_defconfig: Normalize exynos defconfig
-In-Reply-To: <1445234635-3950-6-git-send-email-alim.akhtar@samsung.com>
-References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
- <1445234635-3950-6-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <5624EF5D.7080403@osg.samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Oct 2015 14:26:38 +0100
+Subject: [RFC PATCH v2 1/4] drm: Introduce generic probe function for
+ component based masters.
+In-Reply-To: <20151019130258.GU3394@e106497-lin.cambridge.arm.com>
+References: <1445257313-7147-1-git-send-email-Liviu.Dudau@arm.com>
+ <1445257313-7147-2-git-send-email-Liviu.Dudau@arm.com>
+ <20151019122537.GZ32532@n2100.arm.linux.org.uk>
+ <20151019130258.GU3394@e106497-lin.cambridge.arm.com>
+Message-ID: <20151019132638.GB32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alim,
-
-On 10/19/2015 08:03 AM, Alim Akhtar wrote:
-> make savedefconfig result in some difference, lets normalize the
-> defconfig.
+On Mon, Oct 19, 2015 at 02:02:58PM +0100, Liviu Dudau wrote:
+> On Mon, Oct 19, 2015 at 01:25:37PM +0100, Russell King - ARM Linux wrote:
+> > Please don't move this into here, it's completely inappropriate.  Just
+> > because something makes use of this does not mean they only support
+> > 32-bit DMA.  Besides, this has nothing to do with whether or not it's
+> > OF-based or not.
 > 
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> ---
+> Understood. My thinking process was that component-based drivers are all
+> OF-enabled (how else do you make use of the framework?) and 32-bit DMA is
+> present in 2 out of 3 drivers that are converted, so it looks to be common
+> enough that adding it to armada would not hurt. It was all done in the name of
+> collecting common code in a single function.
 
-Did you make savedefconfig against v4.3-rc6 or tot linux-next?
+Which is an utterly crap reason.
 
-I remember we had issues in the past due savedefconfig made against
-linux-next but then some of the patches in linux-next not making it
-to the next release. So I think it should be good to mention what's
-the base used for this patch.
+It's also not appropriate.  I'm really not sure why you think that moving
+this here would in any way be appropriate - from my point of view, the
+mere proposal is utterly insane.
 
->  arch/arm/configs/exynos_defconfig |    8 ++------
->  1 file changed, 2 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 1ff2bfa2e183..3349713e6c63 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -99,10 +99,8 @@ CONFIG_SENSORS_LM90=y
->  CONFIG_SENSORS_NTC_THERMISTOR=y
->  CONFIG_SENSORS_PWM_FAN=y
->  CONFIG_SENSORS_INA2XX=y
-> -CONFIG_THERMAL=y
->  CONFIG_CPU_THERMAL=y
->  CONFIG_THERMAL_EMULATION=y
-> -CONFIG_EXYNOS_THERMAL=y
+The "container" device does not do any DMA, so it's inappropriate for
+it to have DMA masks set or negotiated on it.  So, actually, no one
+should be setting the DMA mask for their container device.  It's wrong.
 
-I would prefer to split all the changes that removes symbols into a
-separate patch explaining why these are not needed anymore (i.e: it
-is selected now by symbol $foo).
+What if we have a 64-bit OF based platform wanting to use the component
+helper, and they want to call this function?  You prevent them doing so
+by moving this into here, because they're then forced down to 32-bit DMA.
+Please, get rid of it, and leave this crappiness in the respective
+drivers.
 
->  CONFIG_WATCHDOG=y
->  CONFIG_S3C2410_WATCHDOG=y
->  CONFIG_MFD_CROS_EC=y
-> @@ -127,14 +125,14 @@ CONFIG_REGULATOR_S2MPS11=y
->  CONFIG_REGULATOR_S5M8767=y
->  CONFIG_REGULATOR_TPS65090=y
->  CONFIG_DRM=y
-> -CONFIG_DRM_NXP_PTN3460=y
-> -CONFIG_DRM_PARADE_PS8622=y
->  CONFIG_DRM_EXYNOS=y
->  CONFIG_DRM_EXYNOS_FIMD=y
->  CONFIG_DRM_EXYNOS_DSI=y
->  CONFIG_DRM_EXYNOS_HDMI=y
->  CONFIG_DRM_PANEL_SIMPLE=y
->  CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=y
-> +CONFIG_DRM_NXP_PTN3460=y
-> +CONFIG_DRM_PARADE_PS8622=y
-
-Moving these DRM bridge symbols to match savedefconfig is ok IMHO.
-
->  CONFIG_FB_SIMPLE=y
->  CONFIG_EXYNOS_VIDEO=y
->  CONFIG_EXYNOS_MIPI_DSI=y
-> @@ -175,7 +173,6 @@ CONFIG_RTC_DRV_S5M=y
->  CONFIG_RTC_DRV_S3C=y
->  CONFIG_DMADEVICES=y
->  CONFIG_PL330_DMA=y
-> -CONFIG_CHROME_PLATFORMS=y
->  CONFIG_CROS_EC_CHARDEV=y
->  CONFIG_COMMON_CLK_MAX77686=y
->  CONFIG_COMMON_CLK_MAX77802=y
-> @@ -190,7 +187,6 @@ CONFIG_PWM_SAMSUNG=y
->  CONFIG_PHY_EXYNOS5250_SATA=y
->  CONFIG_EXT2_FS=y
->  CONFIG_EXT3_FS=y
-> -CONFIG_EXT4_FS=y
->  CONFIG_MSDOS_FS=y
->  CONFIG_VFAT_FS=y
->  CONFIG_TMPFS=y
-> 
-
-Same comment than above, I would prefer these to be split.
-
-Best regards,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
