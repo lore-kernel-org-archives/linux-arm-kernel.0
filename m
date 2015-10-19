@@ -1,159 +1,56 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 19 Oct 2015 04:03:17 +0200 (CEST)
-Subject: [PATCH 5/5] media: atmel-isi: support RGB565 output when sensor
- output YUV formats
-In-Reply-To: <561DFCE4.8090508@atmel.com>
-References: <1442898875-7147-1-git-send-email-josh.wu@atmel.com>
- <1442898875-7147-6-git-send-email-josh.wu@atmel.com>
- <Pine.LNX.4.64.1510041852470.26834@axis700.grange>
- <561DFCE4.8090508@atmel.com>
-Message-ID: <Pine.LNX.4.64.1510190357000.26684@axis700.grange>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Mon, 19 Oct 2015 10:11:55 +0800
+Subject: [PATCH] arm64: change to use memmove in efi-stub
+In-Reply-To: <20151016105716.GB975@leverpostej>
+References: <1444992367-11121-1-git-send-email-yalin.wang2010@gmail.com>
+ <20151016105716.GB975@leverpostej>
+Message-ID: <9B0C78A1-94BD-47F1-88CF-B78C3142C2DE@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+Got it ,
 
-On Wed, 14 Oct 2015, Josh Wu wrote:
-
-> Dear Guennadi,
+Thanks for your explanation .
+> On Oct 16, 2015, at 18:57, Mark Rutland <mark.rutland@arm.com> wrote:
 > 
-> Thanks for the review.
+> Hi,
 > 
-> On 10/5/2015 1:02 AM, Guennadi Liakhovetski wrote:
-> > On Tue, 22 Sep 2015, Josh Wu wrote:
-> > 
-> > > This patch enable Atmel ISI preview path to convert the YUV to RGB format.
-> > > 
-> > > Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> > > ---
-> > > 
-> > >   drivers/media/platform/soc_camera/atmel-isi.c | 38
-> > > ++++++++++++++++++++-------
-> > >   1 file changed, 29 insertions(+), 9 deletions(-)
-> > > 
-> > > diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
-> > > b/drivers/media/platform/soc_camera/atmel-isi.c
-> > > index e87d354..e33a16a 100644
-> > > --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> > > +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> > > @@ -201,13 +201,20 @@ static bool is_supported(struct soc_camera_device
-> > > *icd,
-> > >   	case V4L2_PIX_FMT_UYVY:
-> > >   	case V4L2_PIX_FMT_YVYU:
-> > >   	case V4L2_PIX_FMT_VYUY:
-> > > +	/* RGB */
-> > > +	case V4L2_PIX_FMT_RGB565:
-> > >   		return true;
-> > > -	/* RGB, TODO */
-> > >   	default:
-> > >   		return false;
-> > >   	}
-> > >   }
-> > >   +static bool is_output_rgb(const struct soc_mbus_pixelfmt *host_fmt)
-> > > +{
-> > > +	return host_fmt->fourcc == V4L2_PIX_FMT_RGB565 ||
-> > > +			host_fmt->fourcc == V4L2_PIX_FMT_RGB32;
-> > > +}
-> > > +
-> > Why not just pass fourcc to this function? Or maybe just embed it in
-> > start_streaming - it won't clutter it a lot.
+> On Fri, Oct 16, 2015 at 06:46:07PM +0800, yalin wang wrote:
+>> Change to use memmove(), in case the dest address overlap with the
+>> source address.
 > 
-> I think pass fourcc to the function is good.
-> Since configure_geometry() is hardware related, and the enable_preview_path is
-> also hardware related, so I prefer initialize enable_preview_path in
-> configure_geometry().
-
-But you don't, you do it in start_streaming() below. But actually my 
-comment was not about _where_ to do it, but whether this calculation is 
-worth a separate function. I would just perform this calculation directly 
-where you're calling it:
-
-static ... start_streaming(...)
-{
-	...
-	u32 fourcc = icd->current_fmt->host_fmt->fourcc;
-
-	isi->enable_preview_path = fourcc == V4L2_PIX_FMT_RGB565 ||
-				fourcc == V4L2_PIX_FMT_RGB32;
-
-Thanks
-Guennadi
-
-> > >   static irqreturn_t atmel_isi_handle_streaming(struct atmel_isi *isi)
-> > >   {
-> > >   	if (isi->active) {
-> > > @@ -467,6 +474,8 @@ static int start_streaming(struct vb2_queue *vq,
-> > > unsigned int count)
-> > >   	struct atmel_isi *isi = ici->priv;
-> > >   	int ret;
-> > >   +	isi->enable_preview_path = is_output_rgb(icd->current_fmt->host_fmt);
-> > > +
-> > >   	pm_runtime_get_sync(ici->v4l2_dev.dev);
-> > >     	/* Reset ISI */
-> > > @@ -688,6 +697,14 @@ static const struct soc_mbus_pixelfmt
-> > > isi_camera_formats[] = {
-> > >   		.order			= SOC_MBUS_ORDER_LE,
-> > >   		.layout			= SOC_MBUS_LAYOUT_PACKED,
-> > >   	},
-> > > +	{
-> > > +		.fourcc			= V4L2_PIX_FMT_RGB565,
-> > > +		.name			= "RGB565",
-> > > +		.bits_per_sample	= 8,
-> > > +		.packing		= SOC_MBUS_PACKING_2X8_PADHI,
-> > > +		.order			= SOC_MBUS_ORDER_LE,
-> > > +		.layout			= SOC_MBUS_LAYOUT_PACKED,
-> > > +	},
-> > >   };
-> > >     /* This will be corrected as we get more formats */
-> > > @@ -744,7 +761,7 @@ static int isi_camera_get_formats(struct
-> > > soc_camera_device *icd,
-> > >   				  struct soc_camera_format_xlate *xlate)
-> > >   {
-> > >   	struct v4l2_subdev *sd = soc_camera_to_subdev(icd);
-> > > -	int formats = 0, ret;
-> > > +	int formats = 0, ret, i, n;
-> > >   	/* sensor format */
-> > >   	struct v4l2_subdev_mbus_code_enum code = {
-> > >   		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
-> > > @@ -778,13 +795,16 @@ static int isi_camera_get_formats(struct
-> > > soc_camera_device *icd,
-> > >   	case MEDIA_BUS_FMT_VYUY8_2X8:
-> > >   	case MEDIA_BUS_FMT_YUYV8_2X8:
-> > >   	case MEDIA_BUS_FMT_YVYU8_2X8:
-> > > -		formats++;
-> > > -		if (xlate) {
-> > > -			xlate->host_fmt	= &isi_camera_formats[0];
-> > > -			xlate->code	= code.code;
-> > > -			xlate++;
-> > > -			dev_dbg(icd->parent, "Providing format %s using code
-> > > %d\n",
-> > > -				isi_camera_formats[0].name, code.code);
-> > > +		n = ARRAY_SIZE(isi_camera_formats);
-> > > +		formats += n;
-> > > +		for (i = 0; i < n; i++) {
-> > > +			if (xlate) {
-> > I'd put if outside of the loop, or just do
-> > 
-> > +		for (i = 0; xlate && i < n; i++) {
+> This cannot happen, and memove would not be sufficient if it did.
 > 
-> yes, that simpler one. I'll take it. Thanks.
+> The destination is a region returned by EFI_BOOT_SERVICES.AllocatePages,
+> which can only allocate pages which were free to begin with. Therefore
+> the new region cannot overlap with the stub (whose pages are not free).
 > 
-> Best Regards,
-> Josh Wu
-> > 
-> > 
-> > > +				xlate->host_fmt	= &isi_camera_formats[i];
-> > > +				xlate->code	= code.code;
-> > > +				dev_dbg(icd->parent, "Providing format %s
-> > > using code %d\n",
-> > > +					isi_camera_formats[0].name,
-> > > code.code);
-> > > +				xlate++;
-> > > +			}
-> > >   		}
-> > >   		break;
-> > >   	default:
-> > > -- 
-> > > 1.9.1
-> > > 
+> Were the new region to overlap with the stub, the memmove could corrupt
+> the code/data in use by the stub, and things would explode shortly
+> thereafter.
 > 
+> Thanks,
+> Mark.
+> 
+>> 
+>> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+>> ---
+>> arch/arm64/kernel/efi-stub.c | 2 +-
+>> 1 file changed, 1 insertion(+), 1 deletion(-)
+>> 
+>> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+>> index 816120e..b6dc44b 100644
+>> --- a/arch/arm64/kernel/efi-stub.c
+>> +++ b/arch/arm64/kernel/efi-stub.c
+>> @@ -59,7 +59,7 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
+>> 			}
+>> 			*image_addr = *reserve_addr + TEXT_OFFSET;
+>> 		}
+>> -		memcpy((void *)*image_addr, old_image_addr, kernel_size);
+>> +		memmove((void *)*image_addr, old_image_addr, kernel_size);
+>> 		*reserve_size = kernel_memsize;
+>> 	}
+>> 
+>> -- 
+>> 1.9.1
+>> 
