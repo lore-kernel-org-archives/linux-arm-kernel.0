@@ -1,74 +1,94 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 19 Oct 2015 15:17:30 +0200
-Subject: [PATCH 2/4] vfio: platform: reset: calxedaxgmac: add reset
- function registration
-In-Reply-To: <3829716.dW4OHEgDOa@wuerfel>
-References: <1445184015-24414-1-git-send-email-eric.auger@linaro.org>
- <1445184015-24414-3-git-send-email-eric.auger@linaro.org>
- <3829716.dW4OHEgDOa@wuerfel>
-Message-ID: <5624ED6A.5030408@linaro.org>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 19 Oct 2015 14:19:26 +0100
+Subject: [UPDATED] [PATCHv4 00/12] arm64: 16K translation granule support
+Message-ID: <1445260779-22242-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-On 10/19/2015 03:04 PM, Arnd Bergmann wrote:
-> On Sunday 18 October 2015 18:00:13 Eric Auger wrote:
->> diff --git a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
->> index 619dc7d..4f76b17 100644
->> --- a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
->> +++ b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
->> @@ -29,8 +29,7 @@
->>  #define DRIVER_VERSION  "0.1"
->>  #define DRIVER_AUTHOR   "Eric Auger <eric.auger@linaro.org>"
->>  #define DRIVER_DESC     "Reset support for Calxeda xgmac vfio platform device"
->> -
->> -#define CALXEDAXGMAC_COMPAT "calxeda,hb-xgmac"
->> +#define COMPAT		"calxeda,hb-xgmac"
-> 
-> Why the rename?
-This define was not used. Since the code is meant to be duplicated from
-one reset module to the other I thought it did not bring any have a
-specialized name
-> 
->>  /* XGMAC Register definitions */
->>  #define XGMAC_CONTROL           0x00000000      /* MAC Configuration */
->> @@ -80,6 +79,43 @@ int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
->>  }
->>  EXPORT_SYMBOL_GPL(vfio_platform_calxedaxgmac_reset);
->>  
->> +static int __init vfio_platform_calxedaxgmac_init(void)
->> +{
->> +	int (*register_reset)(struct module *, char*,
->> +				vfio_platform_reset_fn_t);
->> +	int ret;
->> +
->> +	register_reset = symbol_get(vfio_platform_register_reset);
->> +	if (!register_reset)
->> +		return -EINVAL;
-> 
-> I don't understand what you do the symbol_get() here for.
-> Why not just call that function directly
-the function is implemented in a separate module. This is just to make
-sure the vfio-platform module is loaded, in case the end-user attempts
-to load the reset module without having this latter loaded.
-> 
->> +	ret = register_reset(THIS_MODULE, COMPAT,
->> +	vfio_platform_calxedaxgmac_reset);
-> 
-> This is whitespace damaged, the second line needs to be indented
-> to the opening braces.
-ok
-> 
-> I would also suggest defining register_reset as a macro that
-> implicitly passes the THIS_MODULE argument, as other subsystems
-> do.
-ok
+This series enables the 16K page size support on Linux for arm64.
+Adds support for 48bit VA(4 level), 47bit VA(3 level) and
+36bit VA(2 level) with 16K. 16K was a late addition to the architecture
+and is not implemented by all CPUs. Added a check to ensure the
+selected granule size is supported by the CPU, failing which the CPU
+won't proceed with booting. Also the kernel page size is added to the
+kernel image header (patch from Ard).
 
-Thanks
+KVM support has been dropped from this series, as we need to rewrite the
+KVM stage-2 pagetable handling code to get rid of the fake page table
+levels (as recommended by Christoffer and Marc). So, with 16K, we cannot
+run KVM.
 
-Best Regards
+Patches 1-8	cleans up the kernel page size handling code.
+Patch 9		Adds a check to ensure the CPU supports the selected granule size.
+Patch 10		Adds the page size information to image header.
+Patches 11-12	Adds the support for 16K page size
 
-Eric
-> 
-> 	Arnd
-> 
+This series applies on top for aarch64:for-next/core with Contiguous bit
+support for kernel pagetables.
+
+The tree is also available here:
+
+        git://linux-arm.org/linux-skp.git   	16k/v4-aarch64-4.3-next
+
+
+This version remains fairly the same with v3, except for some minor changes:
+
+Changes since V3:
+  - Fix CONT_SHIFT for 16K (spotted by Jeremy Linton)
+  - More comments around the pgtable helper macros
+  - Picked up a new patch from Mark to simplify the calculation NR_FIX_BTMAPS
+  - Added description for the logic behind FORCE_MAXZONE_ORDER
+  - Addressed other review comments
+  - Added reviews/acks
+
+Changes since V2:
+  - Dropped KVM support patches
+  - Added proper comments for the page-table helper macros
+  - Change ARM64_HW_PGTABLE_LEVEL_SHIFT() to accept page table level as described
+    by ARM ARM.
+  - Added reviews/acks
+  - Added CONT_SHIFT for 16K
+
+Changes since V1:
+  - Rebase to 4.3-rc1
+  - Fix vmemmap_populate for 16K (use !ARM64_SWAPPER_USES_SECTION_MAPS)
+  - Better description for patch2 (suggested-by: Ard)
+
+Ard Biesheuvel (1):
+  arm64: Add page size to the kernel image header
+
+Mark Rutland (1):
+  arm64: Simplify NR_FIX_BTMAPS calculation
+
+Suzuki K. Poulose (10):
+  arm64: Move swapper pagetable definitions
+  arm64: Handle section maps for swapper/idmap
+  arm64: Introduce helpers for page table levels
+  arm64: Calculate size for idmap_pg_dir at compile time
+  arm64: Handle 4 level page table for swapper
+  arm64: Clean config usages for page size
+  arm64: Kconfig: Fix help text about AArch32 support with 64K pages
+  arm64: Check for selected granule support
+  arm64: Add 16K page size support
+  arm64: 36 bit VA
+
+ Documentation/arm64/booting.txt         |    7 ++-
+ arch/arm64/Kconfig                      |   54 +++++++++++++++++---
+ arch/arm64/Kconfig.debug                |    2 +-
+ arch/arm64/include/asm/fixmap.h         |    7 +--
+ arch/arm64/include/asm/kernel-pgtable.h |   83 +++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/page.h           |   21 ++------
+ arch/arm64/include/asm/pgtable-hwdef.h  |   39 +++++++++++++--
+ arch/arm64/include/asm/sysreg.h         |   23 +++++++++
+ arch/arm64/include/asm/thread_info.h    |    4 +-
+ arch/arm64/kernel/head.S                |   59 ++++++++++------------
+ arch/arm64/kernel/image.h               |    5 +-
+ arch/arm64/kernel/vmlinux.lds.S         |    1 +
+ arch/arm64/kvm/Kconfig                  |    3 ++
+ arch/arm64/mm/mmu.c                     |   74 ++++++++++++---------------
+ arch/arm64/mm/proc.S                    |    4 +-
+ 15 files changed, 274 insertions(+), 112 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kernel-pgtable.h
+
+-- 
+1.7.9.5
