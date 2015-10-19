@@ -1,39 +1,60 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 19 Oct 2015 17:08:42 +0100
-Subject: [PATCH 11/20] sound, skylake: switch from ioremap_cache to
- memremap
-In-Reply-To: <s5hk2qi3m93.wl-tiwai@suse.de>
-References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
- <20151009221635.32203.30755.stgit@dwillia2-desk3.jf.intel.com>
- <20151019152641.GC32054@sirena.org.uk>
- <s5hk2qi3m93.wl-tiwai@suse.de>
-Message-ID: <20151019160842.GF32054@sirena.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 19 Oct 2015 17:13:07 +0100
+Subject: [PATCH CFT] ARM: orion: implement ARM delay timer
+Message-ID: <E1ZoD3b-0006UD-Rp@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 05:34:48PM +0200, Takashi Iwai wrote:
-> Mark Brown wrote:
+Implement an ARM delay timer to be used for udelay() on orion legacy
+platforms.  This allows us to skip the delay loop calibration at boot.
 
-> > On Fri, Oct 09, 2015 at 06:16:36PM -0400, Dan Williams wrote:
-> > > In preparation for deprecating ioremap_cache() convert its usage in
-> > > skl-nhlt to memremap.
+It also means that udelay() will be unaffected by CPU frequency changes
+when cpufreq is enabled on these platforms.
 
-> > > -void __iomem *skl_nhlt_init(struct device *dev)
-> > > +void *skl_nhlt_init(struct device *dev)
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+This needs to be tested beyond build testing...
 
-> > Why are we loosing the annotation here?
+ arch/arm/plat-orion/time.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-> It's the exact purpose of this patchset, as far as I understand.
-> memremap() allows the driver accessing the mapped memory just like a
-> normal memory unlike ioremap().
-
-There's no mention of what the purpose of the conversion is in either
-the patch or the cover letter so it's a bit unclear, some confirmation
-would be good :(
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151019/9c29cd3b/attachment-0001.sig>
+diff --git a/arch/arm/plat-orion/time.c b/arch/arm/plat-orion/time.c
+index 8085a8aac812..ffb93db68e9c 100644
+--- a/arch/arm/plat-orion/time.c
++++ b/arch/arm/plat-orion/time.c
+@@ -18,6 +18,7 @@
+ #include <linux/irq.h>
+ #include <linux/sched_clock.h>
+ #include <plat/time.h>
++#include <asm/delay.h>
+ 
+ /*
+  * MBus bridge block registers.
+@@ -188,6 +189,15 @@ orion_time_set_base(void __iomem *_timer_base)
+ 	timer_base = _timer_base;
+ }
+ 
++static unsigned long orion_delay_timer_read(void)
++{
++	return ~readl(timer_base + TIMER0_VAL_OFF);
++}
++
++static struct delay_timer orion_delay_timer = {
++	.read_current_timer = orion_delay_timer_read,
++};
++
+ void __init
+ orion_time_init(void __iomem *_bridge_base, u32 _bridge_timer1_clr_mask,
+ 		unsigned int irq, unsigned int tclk)
+@@ -202,6 +212,9 @@ orion_time_init(void __iomem *_bridge_base, u32 _bridge_timer1_clr_mask,
+ 
+ 	ticks_per_jiffy = (tclk + HZ/2) / HZ;
+ 
++	orion_delay_timer.freq = tclk;
++	register_current_timer_delay(&orion_delay_timer);
++
+ 	/*
+ 	 * Set scale and timer for sched_clock.
+ 	 */
+-- 
+2.1.0
