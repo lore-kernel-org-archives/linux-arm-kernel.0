@@ -1,68 +1,60 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 19 Oct 2015 17:02:11 +0200
-Subject: [RFC PATCH v2 3/3] arm: plat-omap: Add PWM dmtimer platform data
- quirks
-Message-ID: <562505F3.3000508@baylibre.com>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Mon, 19 Oct 2015 16:04:27 +0100
+Subject: [RFC PATCH v2 1/4] drm: Introduce generic probe function for
+ component based masters.
+In-Reply-To: <20151019145027.GF32532@n2100.arm.linux.org.uk>
+References: <1445257313-7147-1-git-send-email-Liviu.Dudau@arm.com>
+ <1445257313-7147-2-git-send-email-Liviu.Dudau@arm.com>
+ <20151019122537.GZ32532@n2100.arm.linux.org.uk>
+ <20151019130258.GU3394@e106497-lin.cambridge.arm.com>
+ <20151019132638.GB32532@n2100.arm.linux.org.uk>
+ <20151019144225.GE13786@phenom.ffwll.local>
+ <20151019145027.GF32532@n2100.arm.linux.org.uk>
+Message-ID: <CACvgo53e-zFcDawbPNaOB8sQcNH-sFDmYi5sXRhp5z6T9oC2=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to set the currently platform dependent dmtimer
-functions pointers as platform data for the pwm-omap-dmtimer
-platform driver, add it to plat-omap auxdata_lookup table.
+On 19 October 2015 at 15:50, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Oct 19, 2015 at 04:42:25PM +0200, Daniel Vetter wrote:
+>> On Mon, Oct 19, 2015 at 02:26:38PM +0100, Russell King - ARM Linux wrote:
+>> > On Mon, Oct 19, 2015 at 02:02:58PM +0100, Liviu Dudau wrote:
+>> > > On Mon, Oct 19, 2015 at 01:25:37PM +0100, Russell King - ARM Linux wrote:
+>> > > > Please don't move this into here, it's completely inappropriate.  Just
+>> > > > because something makes use of this does not mean they only support
+>> > > > 32-bit DMA.  Besides, this has nothing to do with whether or not it's
+>> > > > OF-based or not.
+>> > >
+>> > > Understood. My thinking process was that component-based drivers are all
+>> > > OF-enabled (how else do you make use of the framework?) and 32-bit DMA is
+>> > > present in 2 out of 3 drivers that are converted, so it looks to be common
+>> > > enough that adding it to armada would not hurt. It was all done in the name of
+>> > > collecting common code in a single function.
+>> >
+>> > Which is an utterly crap reason.
+>> >
+>> > It's also not appropriate.  I'm really not sure why you think that moving
+>> > this here would in any way be appropriate - from my point of view, the
+>> > mere proposal is utterly insane.
+>> >
+>> > The "container" device does not do any DMA, so it's inappropriate for
+>> > it to have DMA masks set or negotiated on it.  So, actually, no one
+>> > should be setting the DMA mask for their container device.  It's wrong.
+>>
+>> I think (and my opinion doesn't carry as much wheight here on dri-devel
+>> than intel-gfx) the above is over the top bashing of a new contributor to
+>> drm who really seems trying to do right. I think that's unecessary,
+>> especially since you follow up with the reasonable reply below.
+>
+> It's justified because it took _two_ messages to get the point across.
+> The first one asking nicely didn't make the necessary impact.
+>
+Unlike Daniel, I carry little to no weight here, yet bashing on people
+if they don't get things correct the first time is inconsiderable.
+We are people - we can misread/misinterpret things, have a headache
+and/or just a bad day. If that makes you angry/annoyed, please don't
+reply straight away, but give it a few hours/day for the emotions to
+settle.
 
-Suggested-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm/mach-omap2/pdata-quirks.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index ea56397..647dec5 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -23,6 +23,8 @@
- #include <linux/platform_data/pinctrl-single.h>
- #include <linux/platform_data/iommu-omap.h>
- #include <linux/platform_data/wkup_m3.h>
-+#include <linux/platform_data/pwm_omap_dmtimer.h>
-+#include <plat/dmtimer.h>
-
- #include <asm/siginfo.h>
- #include <asm/signal.h>
-@@ -453,6 +455,24 @@ void omap_auxdata_legacy_init(struct device *dev)
- 	dev->platform_data = &twl_gpio_auxdata;
- }
-
-+/* Dual mode timer PWM callbacks platdata */
-+#if IS_ENABLED(CONFIG_OMAP_DM_TIMER)
-+struct pwm_omap_dmtimer_pdata pwm_dmtimer_pdata = {
-+	.request_by_node = omap_dm_timer_request_by_node,
-+	.free = omap_dm_timer_free,
-+	.enable = omap_dm_timer_enable,
-+	.disable = omap_dm_timer_disable,
-+	.get_fclk = omap_dm_timer_get_fclk,
-+	.start = omap_dm_timer_start,
-+	.stop = omap_dm_timer_stop,
-+	.set_load = omap_dm_timer_set_load,
-+	.set_match = omap_dm_timer_set_match,
-+	.set_pwm = omap_dm_timer_set_pwm,
-+	.set_prescaler = omap_dm_timer_set_prescaler,
-+	.write_counter = omap_dm_timer_write_counter,
-+};
-+#endif
-+
- /*
-  * Few boards still need auxdata populated before we populate
-  * the dev entries in of_platform_populate().
-@@ -506,6 +526,9 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,am4372-wkup-m3", 0x44d00000, "44d00000.wkup_m3",
- 		       &wkup_m3_data),
- #endif
-+#if IS_ENABLED(CONFIG_OMAP_DM_TIMER)
-+	OF_DEV_AUXDATA("ti,omap-dmtimer-pwm", 0, NULL, &pwm_dmtimer_pdata),
-+#endif
- #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
- 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
- 		       &omap4_iommu_pdata),
--- 
-1.9.1
+Thanks
+Emil
