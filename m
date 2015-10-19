@@ -1,144 +1,78 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Mon, 19 Oct 2015 13:45:34 -0600
-Subject: [PATCH 1/4] vfio: platform: add capability to register a reset
- function
-In-Reply-To: <1445184015-24414-2-git-send-email-eric.auger@linaro.org>
-References: <1445184015-24414-1-git-send-email-eric.auger@linaro.org>
- <1445184015-24414-2-git-send-email-eric.auger@linaro.org>
-Message-ID: <1445283934.4059.810.camel@redhat.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 20 Oct 2015 03:56:11 +0800
+Subject: [PATCH v2 1/2] phy: keystone: serdes driver for gbe 10gbe and pcie
+In-Reply-To: <1445281040-14742-2-git-send-email-w-kwok2@ti.com>
+Message-ID: <201510200310.ag8Bondy%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2015-10-18 at 18:00 +0200, Eric Auger wrote:
-> In preparation for subsequent changes in reset function lookup,
-> lets introduce a dynamic list of reset combos (compat string,
-> reset module, reset function). The list can be populated/voided with
-> two new functions, vfio_platform_register/unregister_reset. Those are
-> not yet used in this patch.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> ---
->  drivers/vfio/platform/vfio_platform_common.c  | 55 +++++++++++++++++++++++++++
->  drivers/vfio/platform/vfio_platform_private.h | 14 +++++++
->  2 files changed, 69 insertions(+)
-> 
-> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-> index e43efb5..d36afc9 100644
-> --- a/drivers/vfio/platform/vfio_platform_common.c
-> +++ b/drivers/vfio/platform/vfio_platform_common.c
-> @@ -23,6 +23,8 @@
->  
->  #include "vfio_platform_private.h"
->  
-> +struct list_head reset_list;
+Hi WingMan,
 
-What's the purpose of this one above?
+[auto build test ERROR on pci/next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
 
-> +LIST_HEAD(reset_list);
+url:    https://github.com/0day-ci/linux/commits/WingMan-Kwok/Common-SerDes-driver-for-TI-s-Keystone-Platforms/20151020-030259
+config: i386-allmodconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-static
+All error/warnings (new ones prefixed by >>):
 
-I think you also need a mutex protecting this list, otherwise nothing
-prevents concurrent list changes and walks.  A rw lock probably fits the
-usage model best, but I don't expect much contention if you just want to
-use a mutex.
+   drivers/phy/phy-keystone-serdes.c: In function 'kserdes_xfw_mem_init':
+>> drivers/phy/phy-keystone-serdes.c:197:31: error: 'SZ_64K' undeclared (first use in this function)
+    #define KSERDES_XFW_MEM_SIZE  SZ_64K
+                                  ^
+>> drivers/phy/phy-keystone-serdes.c:203:3: note: in expansion of macro 'KSERDES_XFW_MEM_SIZE'
+     (KSERDES_XFW_MEM_SIZE - KSERDES_XFW_CONFIG_MEM_SIZE)
+      ^
+>> drivers/phy/phy-keystone-serdes.c:1979:40: note: in expansion of macro 'KSERDES_XFW_CONFIG_START_ADDR'
+     kserdes_writel(sc->regs, MEM_ADR_REG, KSERDES_XFW_CONFIG_START_ADDR);
+                                           ^
+   drivers/phy/phy-keystone-serdes.c:197:31: note: each undeclared identifier is reported only once for each function it appears in
+    #define KSERDES_XFW_MEM_SIZE  SZ_64K
+                                  ^
+>> drivers/phy/phy-keystone-serdes.c:203:3: note: in expansion of macro 'KSERDES_XFW_MEM_SIZE'
+     (KSERDES_XFW_MEM_SIZE - KSERDES_XFW_CONFIG_MEM_SIZE)
+      ^
+>> drivers/phy/phy-keystone-serdes.c:1979:40: note: in expansion of macro 'KSERDES_XFW_CONFIG_START_ADDR'
+     kserdes_writel(sc->regs, MEM_ADR_REG, KSERDES_XFW_CONFIG_START_ADDR);
+                                           ^
+>> drivers/phy/phy-keystone-serdes.c:198:37: error: 'SZ_64' undeclared (first use in this function)
+    #define KSERDES_XFW_CONFIG_MEM_SIZE SZ_64
+                                        ^
+>> drivers/phy/phy-keystone-serdes.c:203:26: note: in expansion of macro 'KSERDES_XFW_CONFIG_MEM_SIZE'
+     (KSERDES_XFW_MEM_SIZE - KSERDES_XFW_CONFIG_MEM_SIZE)
+                             ^
+>> drivers/phy/phy-keystone-serdes.c:1979:40: note: in expansion of macro 'KSERDES_XFW_CONFIG_START_ADDR'
+     kserdes_writel(sc->regs, MEM_ADR_REG, KSERDES_XFW_CONFIG_START_ADDR);
+                                           ^
 
->  static DEFINE_MUTEX(driver_lock);
->  
->  static const struct vfio_platform_reset_combo reset_lookup_table[] = {
-> @@ -573,3 +575,56 @@ struct vfio_platform_device *vfio_platform_remove_common(struct device *dev)
->  	return vdev;
->  }
->  EXPORT_SYMBOL_GPL(vfio_platform_remove_common);
-> +
-> +int vfio_platform_register_reset(struct module *reset_owner, char *compat,
+vim +/SZ_64K +197 drivers/phy/phy-keystone-serdes.c
 
-const char *
+   191	
+   192	#define ANEG_1G_10G_OPT_MASK		GENMASK(7, 5)
+   193	
+   194	#define SERDES_REG_INDEX		0
+   195	
+   196	/* SERDES internal memory */
+ > 197	#define KSERDES_XFW_MEM_SIZE		SZ_64K
+ > 198	#define KSERDES_XFW_CONFIG_MEM_SIZE	SZ_64
+   199	#define KSERDES_XFW_NUM_PARAMS		5
+   200	
+   201	/* Last 64B of the 64KB internal mem is for parameters */
+   202	#define KSERDES_XFW_CONFIG_START_ADDR \
+ > 203		(KSERDES_XFW_MEM_SIZE - KSERDES_XFW_CONFIG_MEM_SIZE)
+   204	
+   205	#define KSERDES_XFW_PARAM_START_ADDR \
+   206		(KSERDES_XFW_MEM_SIZE - (KSERDES_XFW_NUM_PARAMS * 4))
 
-> +				 vfio_platform_reset_fn_t reset)
-> +{
-> +	struct vfio_platform_reset_node *node, *iter;
-> +	bool found = false;
-> +
-> +	list_for_each_entry(iter, &reset_list, link) {
-> +		if (!strcmp(iter->compat, compat)) {
-> +			found = true;
-> +			break;
-> +		}
-> +	}
-> +	if (found)
-> +		return -EINVAL;
-> +
-> +	node = kmalloc(sizeof(*node), GFP_KERNEL);
-> +	if (!node)
-> +		return -ENOMEM;
-> +
-> +	node->compat = kstrdup(compat, GFP_KERNEL);
-> +	if (!node->compat)
-> +		return -ENOMEM;
-
-Leaks node
-
-> +
-> +	node->owner = reset_owner;
-> +	node->reset = reset;
-> +
-> +	list_add(&node->link, &reset_list);
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(vfio_platform_register_reset);
-> +
-> +int vfio_platform_unregister_reset(char *compat)
-
-const char *
-
-> +{
-> +	struct vfio_platform_reset_node *iter;
-> +	bool found = false;
-> +
-> +	list_for_each_entry(iter, &reset_list, link) {
-> +		if (!strcmp(iter->compat, compat)) {
-> +			found = true;
-> +			break;
-> +		}
-> +	}
-> +	if (!found)
-> +		return -EINVAL;
-> +
-> +	list_del(&iter->link);
-> +	kfree(iter->compat);
-> +	kfree(iter);
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(vfio_platform_unregister_reset);
-> +
-> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-> index 1c9b3d5..17323f0 100644
-> --- a/drivers/vfio/platform/vfio_platform_private.h
-> +++ b/drivers/vfio/platform/vfio_platform_private.h
-> @@ -76,6 +76,15 @@ struct vfio_platform_reset_combo {
->  	const char *module_name;
->  };
->  
-> +typedef int (*vfio_platform_reset_fn_t)(struct vfio_platform_device *vdev);
-> +
-> +struct vfio_platform_reset_node {
-> +	struct list_head link;
-> +	char *compat;
-> +	struct module *owner;
-> +	vfio_platform_reset_fn_t reset;
-> +};
-> +
->  extern int vfio_platform_probe_common(struct vfio_platform_device *vdev,
->  				      struct device *dev);
->  extern struct vfio_platform_device *vfio_platform_remove_common
-> @@ -89,4 +98,9 @@ extern int vfio_platform_set_irqs_ioctl(struct vfio_platform_device *vdev,
->  					unsigned start, unsigned count,
->  					void *data);
->  
-> +extern int vfio_platform_register_reset(struct module *owner,
-> +					char *compat,
-> +					vfio_platform_reset_fn_t reset);
-> +extern int vfio_platform_unregister_reset(char *compat);
-> +
->  #endif /* VFIO_PLATFORM_PRIVATE_H */
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 51512 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151020/0630fd9e/attachment-0001.obj>
