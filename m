@@ -1,162 +1,74 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:00:37 +0100
-Subject: [PATCHv4 14/24] arm64/capabilities: Make use of system wide safe value
-In-Reply-To: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
-References: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445259647-21541-15-git-send-email-suzuki.poulose@arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 19 Oct 2015 15:17:30 +0200
+Subject: [PATCH 2/4] vfio: platform: reset: calxedaxgmac: add reset
+ function registration
+In-Reply-To: <3829716.dW4OHEgDOa@wuerfel>
+References: <1445184015-24414-1-git-send-email-eric.auger@linaro.org>
+ <1445184015-24414-3-git-send-email-eric.auger@linaro.org>
+ <3829716.dW4OHEgDOa@wuerfel>
+Message-ID: <5624ED6A.5030408@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can reliably read the system wide safe value for a
-feature register, use that to compute the system capability.
-This patch also replaces the 'feature-register-specific'
-methods with a generic routine to check the capability.
+Hi Arnd,
+On 10/19/2015 03:04 PM, Arnd Bergmann wrote:
+> On Sunday 18 October 2015 18:00:13 Eric Auger wrote:
+>> diff --git a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+>> index 619dc7d..4f76b17 100644
+>> --- a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+>> +++ b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+>> @@ -29,8 +29,7 @@
+>>  #define DRIVER_VERSION  "0.1"
+>>  #define DRIVER_AUTHOR   "Eric Auger <eric.auger@linaro.org>"
+>>  #define DRIVER_DESC     "Reset support for Calxeda xgmac vfio platform device"
+>> -
+>> -#define CALXEDAXGMAC_COMPAT "calxeda,hb-xgmac"
+>> +#define COMPAT		"calxeda,hb-xgmac"
+> 
+> Why the rename?
+This define was not used. Since the code is meant to be duplicated from
+one reset module to the other I thought it did not bring any have a
+specialized name
+> 
+>>  /* XGMAC Register definitions */
+>>  #define XGMAC_CONTROL           0x00000000      /* MAC Configuration */
+>> @@ -80,6 +79,43 @@ int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
+>>  }
+>>  EXPORT_SYMBOL_GPL(vfio_platform_calxedaxgmac_reset);
+>>  
+>> +static int __init vfio_platform_calxedaxgmac_init(void)
+>> +{
+>> +	int (*register_reset)(struct module *, char*,
+>> +				vfio_platform_reset_fn_t);
+>> +	int ret;
+>> +
+>> +	register_reset = symbol_get(vfio_platform_register_reset);
+>> +	if (!register_reset)
+>> +		return -EINVAL;
+> 
+> I don't understand what you do the symbol_get() here for.
+> Why not just call that function directly
+the function is implemented in a separate module. This is just to make
+sure the vfio-platform module is loaded, in case the end-user attempts
+to load the reset module without having this latter loaded.
+> 
+>> +	ret = register_reset(THIS_MODULE, COMPAT,
+>> +	vfio_platform_calxedaxgmac_reset);
+> 
+> This is whitespace damaged, the second line needs to be indented
+> to the opening braces.
+ok
+> 
+> I would also suggest defining register_reset as a macro that
+> implicitly passes the THIS_MODULE argument, as other subsystems
+> do.
+ok
 
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/cpufeature.h |    1 +
- arch/arm64/kernel/cpufeature.c      |   79 ++++++++++++++++++++++++++---------
- 2 files changed, 60 insertions(+), 20 deletions(-)
+Thanks
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index f78598b..97b4d64 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -78,6 +78,7 @@ struct arm64_cpu_capabilities {
- 		};
- 
- 		struct {	/* Feature register checking */
-+			u32 sys_reg;
- 			int field_pos;
- 			int min_field_value;
- 		};
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 375a3d8..a6a4acb 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -586,34 +586,31 @@ feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
- 	return val >= entry->min_field_value;
- }
- 
--#define __ID_FEAT_CHK(reg)						\
--static bool __maybe_unused						\
--has_##reg##_feature(const struct arm64_cpu_capabilities *entry)		\
--{									\
--	u64 val;							\
--									\
--	val = read_cpuid(reg##_el1);					\
--	return feature_matches(val, entry);				\
--}
-+static bool
-+has_cpuid_feature(const struct arm64_cpu_capabilities *entry)
-+{
-+	u64 val;
- 
--__ID_FEAT_CHK(id_aa64pfr0);
--__ID_FEAT_CHK(id_aa64mmfr1);
--__ID_FEAT_CHK(id_aa64isar0);
-+	val = read_system_reg(entry->sys_reg);
-+	return feature_matches(val, entry);
-+}
- 
- static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{
- 		.desc = "GIC system register CPU interface",
- 		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
--		.matches = has_id_aa64pfr0_feature,
--		.field_pos = 24,
-+		.matches = has_cpuid_feature,
-+		.sys_reg = SYS_ID_AA64PFR0_EL1,
-+		.field_pos = ID_AA64PFR0_GIC_SHIFT,
- 		.min_field_value = 1,
- 	},
- #ifdef CONFIG_ARM64_PAN
- 	{
- 		.desc = "Privileged Access Never",
- 		.capability = ARM64_HAS_PAN,
--		.matches = has_id_aa64mmfr1_feature,
--		.field_pos = 20,
-+		.matches = has_cpuid_feature,
-+		.sys_reg = SYS_ID_AA64MMFR1_EL1,
-+		.field_pos = ID_AA64MMFR1_PAN_SHIFT,
- 		.min_field_value = 1,
- 		.enable = cpu_enable_pan,
- 	},
-@@ -622,8 +619,9 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{
- 		.desc = "LSE atomic instructions",
- 		.capability = ARM64_HAS_LSE_ATOMICS,
--		.matches = has_id_aa64isar0_feature,
--		.field_pos = 20,
-+		.matches = has_cpuid_feature,
-+		.sys_reg = SYS_ID_AA64ISAR0_EL1,
-+		.field_pos = ID_AA64ISAR0_ATOMICS_SHIFT,
- 		.min_field_value = 2,
- 	},
- #endif /* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
-@@ -676,6 +674,47 @@ static inline void set_sys_caps_initialised(void)
- }
- 
- /*
-+ * __raw_read_system_reg() - Used by a STARTING cpu before cpuinfo is populated.
-+ */
-+static u64 __raw_read_system_reg(u32 sys_id)
-+{
-+	switch (sys_id) {
-+	case SYS_ID_PFR0_EL1:		return (u64)read_cpuid(ID_PFR0_EL1);
-+	case SYS_ID_PFR1_EL1:		return (u64)read_cpuid(ID_PFR1_EL1);
-+	case SYS_ID_DFR0_EL1:		return (u64)read_cpuid(ID_DFR0_EL1);
-+	case SYS_ID_MMFR0_EL1:		return (u64)read_cpuid(ID_MMFR0_EL1);
-+	case SYS_ID_MMFR1_EL1:		return (u64)read_cpuid(ID_MMFR1_EL1);
-+	case SYS_ID_MMFR2_EL1:		return (u64)read_cpuid(ID_MMFR2_EL1);
-+	case SYS_ID_MMFR3_EL1:		return (u64)read_cpuid(ID_MMFR3_EL1);
-+	case SYS_ID_ISAR0_EL1:		return (u64)read_cpuid(ID_ISAR0_EL1);
-+	case SYS_ID_ISAR1_EL1:		return (u64)read_cpuid(ID_ISAR1_EL1);
-+	case SYS_ID_ISAR2_EL1:		return (u64)read_cpuid(ID_ISAR2_EL1);
-+	case SYS_ID_ISAR3_EL1:		return (u64)read_cpuid(ID_ISAR3_EL1);
-+	case SYS_ID_ISAR4_EL1:		return (u64)read_cpuid(ID_ISAR4_EL1);
-+	case SYS_ID_ISAR5_EL1:		return (u64)read_cpuid(ID_ISAR4_EL1);
-+	case SYS_MVFR0_EL1:		return (u64)read_cpuid(MVFR0_EL1);
-+	case SYS_MVFR1_EL1:		return (u64)read_cpuid(MVFR1_EL1);
-+	case SYS_MVFR2_EL1:		return (u64)read_cpuid(MVFR2_EL1);
-+
-+	case SYS_ID_AA64PFR0_EL1:	return (u64)read_cpuid(ID_AA64PFR0_EL1);
-+	case SYS_ID_AA64PFR1_EL1:	return (u64)read_cpuid(ID_AA64PFR0_EL1);
-+	case SYS_ID_AA64DFR0_EL1:	return (u64)read_cpuid(ID_AA64DFR0_EL1);
-+	case SYS_ID_AA64DFR1_EL1:	return (u64)read_cpuid(ID_AA64DFR0_EL1);
-+	case SYS_ID_AA64MMFR0_EL1:	return (u64)read_cpuid(ID_AA64MMFR0_EL1);
-+	case SYS_ID_AA64MMFR1_EL1:	return (u64)read_cpuid(ID_AA64MMFR1_EL1);
-+	case SYS_ID_AA64ISAR0_EL1:	return (u64)read_cpuid(ID_AA64ISAR0_EL1);
-+	case SYS_ID_AA64ISAR1_EL1:	return (u64)read_cpuid(ID_AA64ISAR1_EL1);
-+
-+	case SYS_CNTFRQ_EL0:		return (u64)read_cpuid(CNTFRQ_EL0);
-+	case SYS_CTR_EL0:		return (u64)read_cpuid(CTR_EL0);
-+	case SYS_DCZID_EL0:		return (u64)read_cpuid(DCZID_EL0);
-+	default:
-+		BUG();
-+		return 0;
-+	}
-+}
-+
-+/*
-  * Park the CPU which doesn't have the capability as advertised
-  * by the system.
-  */
-@@ -720,13 +759,13 @@ void verify_local_cpu_capabilities(void)
- 
- 	caps = arm64_features;
- 	for (i = 0; caps[i].desc; i++) {
--		if (!cpus_have_cap(caps[i].capability))
-+		if (!cpus_have_cap(caps[i].capability) || !caps[i].sys_reg)
- 			continue;
- 		/*
- 		 * If the new CPU misses an advertised feature, we cannot proceed
- 		 * further, park the cpu.
- 		 */
--		if (!caps[i].matches(&caps[i]))
-+		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i]))
- 			fail_incapable_cpu("arm64_features", &caps[i]);
- 		if (caps[i].enable)
- 			caps[i].enable(NULL);
--- 
-1.7.9.5
+Best Regards
+
+Eric
+> 
+> 	Arnd
+> 
