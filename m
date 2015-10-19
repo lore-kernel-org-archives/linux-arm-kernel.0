@@ -1,74 +1,65 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 19 Oct 2015 11:27:30 +0100
-Subject: [PATCH v2 3/3] xen/arm: don't try to re-register vcpu_info on
- cpu_hotplug.
-In-Reply-To: <alpine.DEB.2.02.1510191109130.27957@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1510161731510.27957@kaball.uk.xensource.com>
- <1445013301-12624-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <56212A9F.5070202@citrix.com>
- <alpine.DEB.2.02.1510191109130.27957@kaball.uk.xensource.com>
-Message-ID: <5624C592.8000308@citrix.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 19 Oct 2015 11:29:32 +0100
+Subject: [PATCH] ARM64: juno: add NOR flash to device tree
+In-Reply-To: <5624C31D.3070906@arm.com>
+References: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
+ <561FC681.2040809@arm.com>
+ <CACRpkdaSox9WKb5-dkD_zAwO9WxP6+b010p3bdxsm1LRy=WvKg@mail.gmail.com>
+ <5624C31D.3070906@arm.com>
+Message-ID: <20151019102932.GB10678@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/10/15 11:10, Stefano Stabellini wrote:
-> On Fri, 16 Oct 2015, Julien Grall wrote:
->> Hi Stefano,
->>
->> On 16/10/15 17:35, Stefano Stabellini wrote:
->>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>> ---
->>>  arch/arm/xen/enlighten.c |   10 ++++++++++
->>>  1 file changed, 10 insertions(+)
->>>
->>> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
->>> index 6c09cc4..b193811 100644
->>> --- a/arch/arm/xen/enlighten.c
->>> +++ b/arch/arm/xen/enlighten.c
->>> @@ -93,6 +93,16 @@ static void xen_percpu_init(void)
->>>  	int err;
->>>  	int cpu = get_cpu();
->>>  
->>> +	/* 
->>> +	 * VCPUOP_register_vcpu_info cannot be called twice for the same
->>> +	 * vcpu, so if vcpu_info is already registered, just get out. This
->>> +	 * can happen with cpu-hotplug.
->>> +	 */
->>> +	if (per_cpu(xen_vcpu, cpu) != NULL) {
->>> +		put_cpu();
->>> +		return;
->>> +	}
->>
->>
->> Not really related to this patch. By side effect this patch is also not
->> calling irq_percpu_enable.
->>
->> Looking around, all the caller of irq_percpu_enable will call
->> irq_percpu_disable when the CPU is dying. Is there any side effect to
->> not doing this?
+On Mon, Oct 19, 2015 at 11:17:01AM +0100, Sudeep Holla wrote:
 > 
-> Given that Xen won't inject any event irqs when a cpu is offline, I
-> don't think there are any side effects.
+> 
+> On 18/10/15 10:25, Linus Walleij wrote:
+> >On Thu, Oct 15, 2015 at 5:30 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> >>Me
+> >>>  Results after
+> >>>enabling MTD, MTD_CFI, MTD_PHYSMAP, MTD_PHYSMAP_OF,
+> >>>MTD_CFI_INTELEXT:
+> >>
+> >>Just a note on this: we can't enable these when CPUIDLE is enabled as
+> >>the firmware assumes the flash is always in read mode while Linux leaves
+> >>NOR flash in "read id" mode after initialization.
+> >
+> >Sorry I'm too unfamiliar with this lingo. Can you give me some detail
+> >on what "read mode" and "read id" mode is all about?
+> >
+> 
+> OK, sorry for that I just quoted from my understanding. Here is the
+> actual one from the data sheet:
+> 
+> "The device can be in any of four read states: Read Array, Read
+>  Identifier, Read Status or Read Query. Upon power-up, or after a reset,
+>  the device defaults to Read Array. To change the read state, the
+>  appropriate read command must be written to the device..."
+> 
+> After the driver gets initialized, it usually leaves the device in Read
+> Identifier state as the last command sent is to read ID from the chip.
+> 
+> >>So until the firmware is ready to handle that, we can't enabled both
+> >>on Juno. We had same issue even on TC2. I will follow up internally to
+> >>see if we can fix on Juno at-least.
+> >
+> >Sounds like something that should be fixed for all Versatile
+> >Express that have cpuidle?
+> >
+> 
+> Correct, I just mentioned so that if you see/get any boot issue report
+> with NOR flash and CPUIdle enabled, you will have the background instead
+> of investigating the known issue again.
 
-I'm not talking about the behavior of Xen when the vCPU is down but any
-side effect in Linux (i.e not re-enabling the IRQ or else).
+Also, for non U-Boot systems I was under the impression that the flash
+was effectively owned by EFI (for variable storage), so it doesn't seem
+like a sensible idea to me to poke the flash behind its back in that
+case.
 
-All the other user of percpu IRQ is doing the call so there must be a
-reason to do it.
+Given that, I'm not sure that the flash node should be enabled by
+default in the DT.
 
-Looking more closely to the code, the GIC driver will reset the vCPU
-interface every time the vCPU is coming back online (see
-gic_secondary_init).
+Leif?
 
-Resetting the vCPU interface means all the PPIs will be disabled (see
-gic_cpu_config). As the event channel IRQ is a PPI it won't be
-re-enabled and the vCPU will never receive event channel.
-
-So you have to re-enable this interrupt unconditionally. At the same
-time, I'd like to see the irq_percpu_disable to match irq_percpu_enable
-as the other users do.
-
-Regards,
-
--- 
-Julien Grall
+Thanks,
+Mark.
