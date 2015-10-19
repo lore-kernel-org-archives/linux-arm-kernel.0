@@ -1,365 +1,266 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:24:59 +0100
-Subject: [PATCHv4 22/24] arm64: cpufeature: Track the user visible fields
+Date: Mon, 19 Oct 2015 14:24:50 +0100
+Subject: [PATCHv4 13/24] arm64: Delay cpu feature capability checks
 In-Reply-To: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
 References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445261101-22344-23-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445261101-22344-14-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Track the user visible fields of a CPU feature register.
-This will be used later for exposing the value to the userspace
-via emulation of MRS instruction. For more information, check
-the documentation :
-	Documentation/arm64/cpu-feature-registers.txt
+At the moment we run through the arm64_features capability list for
+each CPU and set the capability if one of the CPU supports it. This
+could be problematic in a heterogeneous system with differing capabilities.
+Delay the CPU feature checks until all the enabled CPUs are up(i.e,
+smp_cpus_done(), so that we can make better decisions based on the
+overall system capability. Once we decide and advertise the capabilities
+the alternatives can be applied. From this state, we cannot roll back
+a feature to disabled based on the values from a new hotplugged CPU,
+due to the runtime patching and other reasons. So, for all new CPUs,
+we need to make sure that they have the established system capabilities.
+Failing which, we bring the CPU down, preventing it from turning online.
+Once the capabilities are decided, any new CPU booting up goes through
+verification to ensure that it has all the enabled capabilities and also
+invokes the respective enable() method on the CPU.
+
+The CPU errata checks are not delayed and is still executed per-CPU
+to detect the respective capabilities. If we ever come across a non-errata
+capability that needs to be checked on each-CPU, we could introduce them via
+a new capability table(or introduce a flag), which can be processed per CPU.
+
+The next patch will make the feature checks use the system wide
+safe value of a feature register.
+
+NOTE: The enable() methods associated with the capability is scheduled
+on all the CPUs (which is the only use case at the moment). If we need
+a different type of 'enable()' which only needs to be run once on any CPU,
+we should be able to handle that when needed.
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+
 ---
- arch/arm64/include/asm/cpufeature.h |    7 ++
- arch/arm64/kernel/cpufeature.c      |  192 ++++++++++++++++++-----------------
- 2 files changed, 107 insertions(+), 92 deletions(-)
+Changes since V3:
+  - Don't use hotplug notifier, instead uses a flag to indicate when the
+    system initialises the capabilities. Added a hook to secondary_start_kernel().
+---
+ arch/arm64/include/asm/cpufeature.h |    9 +++-
+ arch/arm64/include/asm/processor.h  |    2 +-
+ arch/arm64/kernel/cpufeature.c      |   96 +++++++++++++++++++++++++++++++++--
+ arch/arm64/kernel/cpuinfo.c         |    1 -
+ arch/arm64/kernel/smp.c             |    7 +++
+ arch/arm64/mm/fault.c               |    2 +-
+ 6 files changed, 108 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index dc00813..10a265f 100644
+index b2f224b..f78598b 100644
 --- a/arch/arm64/include/asm/cpufeature.h
 +++ b/arch/arm64/include/asm/cpufeature.h
-@@ -44,9 +44,12 @@ enum ftr_type {
+@@ -70,7 +70,7 @@ struct arm64_cpu_capabilities {
+ 	const char *desc;
+ 	u16 capability;
+ 	bool (*matches)(const struct arm64_cpu_capabilities *);
+-	void (*enable)(void);
++	void (*enable)(void *);		/* Called on all active CPUs */
+ 	union {
+ 		struct {	/* To be used for erratum handling only */
+ 			u32 midr_model;
+@@ -140,7 +140,12 @@ void __init setup_cpu_features(void);
+ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 			    const char *info);
+ void check_local_cpu_errata(void);
+-void check_local_cpu_features(void);
++
++#ifdef CONFIG_HOTPLUG_CPU
++void verify_local_cpu_capabilities(void);
++#else
++static inline void verify_local_cpu_capabilities(void) {}
++#endif
  
- #define FTR_STRICT	true	/* SANITY check strict matching required */
- #define FTR_NONSTRICT	false	/* SANITY check ignored */
-+#define FTR_VISIBLE	true	/* Feature visible to user space */
-+#define FTR_HIDDEN	false	/* Feature not visible to user space */
+ u64 read_system_reg(u32 id);
  
- struct arm64_ftr_bits {
- 	bool		strict;	  /* CPU Sanity check: strict matching required ? */
-+	bool		visible;  /* visible to userspace ? */
- 	enum ftr_type	type;
- 	u8		shift;
- 	u8		width;
-@@ -55,13 +58,17 @@ struct arm64_ftr_bits {
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 98f3235..4acb7ca 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -186,6 +186,6 @@ static inline void spin_lock_prefetch(const void *x)
  
- /*
-  * @arm64_ftr_reg - Feature register
-+ * @user_mask		Bits of @sys_val visible to user space.
-  * @strict_mask 	Bits which should match across all CPUs for sanity.
-+ * @user_val		Safe value for user invisible fields.
-  * @sys_val		Safe value across the CPUs (system view)
-  */
- struct arm64_ftr_reg {
- 	u32			sys_id;
- 	const char		*name;
-+	u64			user_mask;
- 	u64			strict_mask;
-+	u64			user_val;
- 	u64			sys_val;
- 	struct arm64_ftr_bits	*ftr_bits;
- };
+ #endif
+ 
+-void cpu_enable_pan(void);
++void cpu_enable_pan(void *__unused);
+ 
+ #endif /* __ASM_PROCESSOR_H */
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index d69af00..896a821 100644
+index 78c4cb7a..375a3d8 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -44,8 +44,9 @@ unsigned int compat_elf_hwcap2 __read_mostly;
+@@ -23,6 +23,7 @@
+ #include <linux/types.h>
+ #include <asm/cpu.h>
+ #include <asm/cpufeature.h>
++#include <asm/cpu_ops.h>
+ #include <asm/processor.h>
+ #include <asm/sysreg.h>
  
- DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- 
--#define ARM64_FTR_BITS(STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
-+#define ARM64_FTR_BITS(VISIBLE, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
- 	{						\
-+		.visible = VISIBLE,			\
- 		.strict = STRICT,			\
- 		.type = TYPE,				\
- 		.shift = SHIFT,				\
-@@ -59,139 +60,139 @@ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- 	}
- 
- static struct arm64_ftr_bits ftr_id_aa64isar0[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 24, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* RAZ */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 32, 32, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 24, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* RAZ */
- 	ARM64_FTR_END,
- };
- 
- static struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64PFR0_GIC_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 32, 32, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 28, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_GIC_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
- 	/* Linux doesn't care about the EL3 */
--	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, ID_AA64PFR0_EL3_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL2_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL1_SHIFT, 4, ID_AA64PFR0_EL1_64BIT_ONLY),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL0_SHIFT, 4, ID_AA64PFR0_EL0_64BIT_ONLY),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64PFR0_EL3_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL2_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL1_SHIFT, 4, ID_AA64PFR0_EL1_64BIT_ONLY),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL0_SHIFT, 4, ID_AA64PFR0_EL0_64BIT_ONLY),
- 	ARM64_FTR_END,
- };
- 
- static struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN16_SHIFT, 4, ID_AA64MMFR0_TGRAN16_NI),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_BIGENDEL0_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 32, 32, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN16_SHIFT, 4, ID_AA64MMFR0_TGRAN16_NI),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_BIGENDEL0_SHIFT, 4, 0),
- 	/* Linux shouldn't care about secure memory */
--	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, ID_AA64MMFR0_SNSMEM_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_BIGENDEL_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64MMFR0_SNSMEM_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_BIGENDEL_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
- 	/*
- 	 * Differing PARange is fine as long as all peripherals and memory are mapped
- 	 * within the minimum PARange of all CPUs
- 	 */
--	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_PARANGE_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_PARANGE_SHIFT, 4, 0),
- 	ARM64_FTR_END,
- };
- 
- static struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_LOR_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_HPD_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_VMIDBITS_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_HADBS_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 32, 32, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_LOR_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_HPD_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_VMIDBITS_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_HADBS_SHIFT, 4, 0),
- 	ARM64_FTR_END,
- };
- 
- static struct arm64_ftr_bits ftr_ctr[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 31, 1, 1),	/* RAO */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 3, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* ERG */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 31, 1, 1),		/* RAO */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 28, 3, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* ERG */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
- 	/*
- 	 * Linux can handle differing I-cache policies. Userspace JITs will
- 	 * make use of *minLine
- 	 */
--	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, 14, 2, 0),	/* L1Ip */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 10, 0),	/* RAZ */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* IminLine */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, 14, 2, 0),		/* L1Ip */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 10, 0),		/* RAZ */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* IminLine */
- 	ARM64_FTR_END,
- };
- 
- static struct arm64_ftr_bits ftr_id_mmfr0[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 4, 0),	/* InnerShr */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 24, 4, 0),	/* FCSE */
--	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* AuxReg */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 16, 4, 0),	/* TCM */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 12, 4, 0),	/* ShareLvl */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 4, 0),	/* OuterShr */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),	/* PMSA */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* VMSA */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 28, 4, 0),	/* InnerShr */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 24, 4, 0),	/* FCSE */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* AuxReg */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 16, 4, 0),	/* TCM */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 12, 4, 0),	/* ShareLvl */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 8, 4, 0),	/* OuterShr */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 4, 0),	/* PMSA */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* VMSA */
- 	ARM64_FTR_END,
- };
- 
- static struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 32, 32, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
- 	ARM64_FTR_END,
- };
- 
- static struct arm64_ftr_bits ftr_mvfr2[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 24, 0),	/* RAZ */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* FPMisc */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),		/* SIMDMisc */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 8, 24, 0),	/* RAZ */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 4, 0),	/* FPMisc */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* SIMDMisc */
- 	ARM64_FTR_END,
- };
- 
- static struct arm64_ftr_bits ftr_dczid[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 5, 27, 0),	/* RAZ */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 1, 1),		/* DZP */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* BS */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 5, 27, 0),	/* RAZ */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 1, 1),	/* DZP */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),/* BS */
- 	ARM64_FTR_END,
- };
- 
- 
- static struct arm64_ftr_bits ftr_id_isar5[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_RDM_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 20, 4, 0),	/* RAZ */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_CRC32_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_SHA2_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_SHA1_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_AES_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_SEVL_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_RDM_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 20, 4, 0),	/* RAZ */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_CRC32_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_SHA2_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_SHA1_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_AES_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_SEVL_SHIFT, 4, 0),
- 	ARM64_FTR_END,
- };
- 
- static struct arm64_ftr_bits ftr_id_mmfr4[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 24, 0),	/* RAZ */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* ac2 */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),		/* RAZ */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 8, 24, 0),	/* RAZ */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 4, 0),	/* ac2 */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* RAZ */
- 	ARM64_FTR_END,
- };
- 
- static struct arm64_ftr_bits ftr_id_pfr0[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 16, 16, 0),	/* RAZ */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 12, 4, 0),	/* State3 */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 4, 0),		/* State2 */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* State1 */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),		/* State0 */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 16, 16, 0),	/* RAZ */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 12, 4, 0),	/* State3 */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 8, 4, 0),	/* State2 */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 4, 0),	/* State1 */
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* State0 */
- 	ARM64_FTR_END,
- };
- 
-@@ -202,29 +203,29 @@ static struct arm64_ftr_bits ftr_id_pfr0[] = {
-  * id_isar[0-4], id_mmfr[1-3], id_pfr1, mvfr[0-1]
-  */
- static struct arm64_ftr_bits ftr_generic_32bits[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 28, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 24, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 12, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 8, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 4, 4, 0),
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 28, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 24, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 12, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 8, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 4, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),
- 	ARM64_FTR_END,
- };
- 
- static struct arm64_ftr_bits ftr_generic[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 64, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 64, 0),
- 	ARM64_FTR_END,
- };
- 
- static struct arm64_ftr_bits ftr_generic32[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 32, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 32, 0),
- 	ARM64_FTR_END,
- };
- 
- static struct arm64_ftr_bits ftr_aa64raz[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 64, 0),
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, 0, 64, 0),
- 	ARM64_FTR_END,
- };
- 
-@@ -363,12 +364,13 @@ static void __init sort_ftr_regs(void)
- 
- /*
-  * Initialise the CPU feature register from Boot CPU values.
-- * Also initiliases the strict_mask for the register.
-+ * Also initiliases the strict_mask, user_mask and user_val
-+ * for the register.
-  */
- static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
- {
- 	u64 val = 0;
--	u64 strict_mask = ~0x0ULL;
-+	u64 user_mask = 0, strict_mask = ~0x0ULL;
- 	struct arm64_ftr_bits *ftrp;
- 	struct arm64_ftr_reg *reg = get_arm64_ftr_reg(sys_reg);
- 
-@@ -378,10 +380,16 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
- 		s64 ftr_new = arm64_ftr_value(ftrp, new);
- 
- 		val = arm64_ftr_set_value(ftrp, val, ftr_new);
-+		if (ftrp->visible)
-+			user_mask |= arm64_ftr_mask(ftrp);
-+		else
-+			reg->user_val = arm64_ftr_set_value(ftrp, reg->user_val,
-+								ftrp->safe_val);
- 		if (!ftrp->strict)
- 			strict_mask &= ~arm64_ftr_mask(ftrp);
- 	}
- 	reg->sys_val = val;
-+	reg->user_mask = user_mask;
- 	reg->strict_mask = strict_mask;
+@@ -645,19 +646,100 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
  }
  
+ /*
+- * Run through the enabled capabilities and enable() it on the CPUs
++ * Run through the enabled capabilities and enable() it on all active
++ * CPUs
+  */
+ void enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
+ {
+ 	int i;
+ 
++	for (i = 0; caps[i].desc; i++)
++		if (caps[i].enable && cpus_have_cap(caps[i].capability))
++			on_each_cpu(caps[i].enable, NULL, true);
++}
++
++#ifdef CONFIG_HOTPLUG_CPU
++
++/*
++ * Flag to indicate if we have computed the system wide
++ * capabilities based on the boot time active CPUs. This
++ * will be used to determine if a new booting CPU should
++ * go through the verification process to make sure that it
++ * supports the system capabilities, without using a hotplug
++ * notifier.
++ */
++bool sys_caps_initialised;
++
++static inline void set_sys_caps_initialised(void)
++{
++	sys_caps_initialised = true;
++}
++
++/*
++ * Park the CPU which doesn't have the capability as advertised
++ * by the system.
++ */
++static void fail_incapable_cpu(char *cap_type,
++				 const struct arm64_cpu_capabilities *cap)
++{
++	int cpu = smp_processor_id();
++
++	pr_crit("CPU%d: missing %s : %s\n", cpu, cap_type, cap->desc);
++	/* Mark this CPU absent */
++	set_cpu_present(cpu, 0);
++
++	/* Check if we can park ourselves */
++	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
++		cpu_ops[cpu]->cpu_die(cpu);
++	asm volatile(
++			" 1:	wfe \n\t"
++			"	wfi \n\t"
++			"	b 1b\n"
++		    );
++}
++
++/*
++ * Run through the enabled system capabilities and enable() it on this CPU.
++ * The capabilities were decided based on the available CPUs at the boot time.
++ * Any new CPU should match the system wide status of the capability. If the
++ * new CPU doesn't have a capability which the system now has enabled, we
++ * cannot do anything to fix it up and could cause unexpected failures. So
++ * we park the CPU.
++ */
++void verify_local_cpu_capabilities(void)
++{
++	int i;
++	const struct arm64_cpu_capabilities *caps;
++
++	/*
++	 * If we haven't computed the system capabilities, there is nothing
++	 * to verify.
++	 */
++	if (!sys_caps_initialised)
++		return;
++
++	caps = arm64_features;
+ 	for (i = 0; caps[i].desc; i++) {
+-		if (cpus_have_cap(caps[i].capability) && caps[i].enable)
+-			caps[i].enable();
++		if (!cpus_have_cap(caps[i].capability))
++			continue;
++		/*
++		 * If the new CPU misses an advertised feature, we cannot proceed
++		 * further, park the cpu.
++		 */
++		if (!caps[i].matches(&caps[i]))
++			fail_incapable_cpu("arm64_features", &caps[i]);
++		if (caps[i].enable)
++			caps[i].enable(NULL);
+ 	}
+ }
+ 
+-void check_local_cpu_features(void)
++#else	/* !CONFIG_HOTPLUG_CPU */
++
++static inline void set_sys_caps_initialised(void) {}
++
++#endif	/* CONFIG_HOTPLUG_CPU */
++
++static void setup_feature_capabilities(void)
+ {
+ 	update_cpu_capabilities(arm64_features, "detected feature:");
+ 	enable_cpu_capabilities(arm64_features);
+@@ -670,6 +752,12 @@ void __init setup_cpu_features(void)
+ 	u32 cwg;
+ 	int cls;
+ 
++	/* Set the CPU feature capabilies */
++	setup_feature_capabilities();
++
++	/* Advertise that we have computed the system capabilities */
++	set_sys_caps_initialised();
++
+ 	/*
+ 	 * Check for sane CTR_EL0.CWG value.
+ 	 */
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index f25869e..789fbea 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -229,7 +229,6 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
+ 	cpuinfo_detect_icache_policy(info);
+ 
+ 	check_local_cpu_errata();
+-	check_local_cpu_features();
+ }
+ 
+ void cpuinfo_store_cpu(void)
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index d1d0049..2bbdc0e 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -156,6 +156,13 @@ asmlinkage void secondary_start_kernel(void)
+ 	preempt_disable();
+ 	trace_hardirqs_off();
+ 
++	/*
++	 * If the system has established the capabilities, make sure
++	 * this CPU ticks all of those. If it doesn't, the CPU will
++	 * fail to come online.
++	 */
++	verify_local_cpu_capabilities();
++
+ 	if (cpu_ops[cpu]->cpu_postboot)
+ 		cpu_ops[cpu]->cpu_postboot();
+ 
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index aba9ead..066d5ae 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -555,7 +555,7 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+ }
+ 
+ #ifdef CONFIG_ARM64_PAN
+-void cpu_enable_pan(void)
++void cpu_enable_pan(void *__unused)
+ {
+ 	config_sctlr_el1(SCTLR_EL1_SPAN, 0);
+ }
 -- 
 1.7.9.5
