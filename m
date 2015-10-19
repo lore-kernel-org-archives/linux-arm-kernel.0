@@ -1,42 +1,52 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 19 Oct 2015 17:29:33 +0800
-Subject: [PATCH v10 3/6] pci:host: Add Altera PCIe host controller driver
-In-Reply-To: <1445242768-4423-4-git-send-email-lftan@altera.com>
-Message-ID: <201510191737.ufAp63BH%fengguang.wu@intel.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 19 Oct 2015 11:32:31 +0200
+Subject: [PATCH v3 2/4] mtd: pxa3xx_nand: add helpers to setup the timings
+In-Reply-To: <20151017135726.GA1578@laptop.cereza>
+References: <1444893451-16610-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1444893451-16610-3-git-send-email-antoine.tenart@free-electrons.com>
+ <20151017135726.GA1578@laptop.cereza>
+Message-ID: <20151019093231.GA29389@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ley,
+Ezequiel,
 
-[auto build test WARNING on pci/next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+On Sat, Oct 17, 2015 at 10:57:26AM -0300, Ezequiel Garcia wrote:
+> On 15 Oct 09:17 AM, Antoine Tenart wrote:
+> >  /*
+> >   * Set the data and OOB size, depending on the selected
+> >   * spare and ECC configuration.
+> > @@ -1538,6 +1660,19 @@ KEEP_CONFIG:
+> >  	if (nand_scan_ident(mtd, 1, def))
+> >  		return -ENODEV;
+> >  
+> > +	if (!pdata->keep_config) {
+> > +		ret = pxa3xx_nand_init(host);
+> > +		if (ret) {
+> > +			dev_err(&info->pdev->dev, "Failed to init nand: %d\n",
+> > +				ret);
+> > +			return ret;
+> > +		}
+> > +	}
+> > +
+> > +	ret = pxa3xx_nand_config_flash(info);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> 
+> Does this chunk belong to this patch? It wasn't here in the v2, and I believe
+> it's not correct as you end up messing with the NDCR setting even if keep_config
+> was passed.
 
-url:    https://github.com/0day-ci/linux/commits/Ley-Foon-Tan/arm-add-msi-h-to-Kbuild/20151019-162417
-reproduce:
-        # apt-get install sparse
-        make ARCH=x86_64 allmodconfig
-        make C=1 CF=-D__CHECK_ENDIAN__
+You're right, it should be in "[3/4] mtd: pxa3xx_nand: rework flash
+detection and timing setup". I made a mistake reworking the series...
 
+And yes, pxa3xx_nand_config_flash() should be called before
+"KEEP_CONFIG:".
 
-sparse warnings: (new ones prefixed by >>)
+Antoine
 
->> drivers/pci/host/pcie-altera.c:117:6: sparse: symbol 'altera_pcie_fixups' was not declared. Should it be static?
-   drivers/pci/host/pcie-altera.c:496:53: sparse: incorrect type in argument 2 (incompatible argument 1 (different base types))
-   drivers/pci/host/pcie-altera.c:496:53:    expected void ( *[usertype] handle )( ... )
-   drivers/pci/host/pcie-altera.c:496:53:    got void ( static [toplevel] *<noident> )( ... )
-   drivers/pci/host/pcie-altera.c: In function 'altera_pcie_parse_dt':
-   drivers/pci/host/pcie-altera.c:496:46: warning: passing argument 2 of 'irq_set_chained_handler_and_data' from incompatible pointer type [-Wincompatible-pointer-types]
-     irq_set_chained_handler_and_data(pcie->irq, altera_pcie_isr, pcie);
-                                                 ^
-   In file included from arch/x86/include/asm/hardirq.h:5:0,
-                    from include/linux/hardirq.h:8,
-                    from include/linux/interrupt.h:12,
-                    from drivers/pci/host/pcie-altera.c:17:
-   include/linux/irq.h:545:1: note: expected 'irq_flow_handler_t {aka void (*)(unsigned int,  struct irq_desc *)}' but argument is of type 'void (*)(struct irq_desc *)'
-    irq_set_chained_handler_and_data(unsigned int irq, irq_flow_handler_t handle,
-    ^
-
-Please review and possibly fold the followup patch.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
