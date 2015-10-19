@@ -1,153 +1,192 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:00:23 +0100
-Subject: [PATCHv4 00/24] arm64: Consolidate CPU feature handling
-Message-ID: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
+Date: Mon, 19 Oct 2015 14:00:28 +0100
+Subject: [PATCHv4 05/24] arm64: Move mixed endian support detection
+In-Reply-To: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
+References: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445259647-21541-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series introduces a new infrastructure to keep track of the CPU
-feature registers on ARMv8-A for arm64 kernel. It provides the safe value
-of a CPU feature register across all the CPUs on (a heterogeneous) system.
-The infrastructure checks the individual CPU feature registers as they are
-brought online (during system boot up) and udpates the status of each of
-the feature bits across the system. Once all the active CPUs are brought
-online (i.e, smp_cpus_done() ), the system can compute a reliable set of
-capabilities (arm64_features CPU capability and ELF HWCAP). This allows
-system to operate safely on CPUs with differing capabilities. Any new CPU
-brought up(hotplugged in) should have all the established capabilities,
-failing which could be disastrous. (e.g, alternative code patched in for
-a feature avaialble on the system). We add a hotplug notifier to check if
-the new CPU is missing any of the advertised capabilities and prevents it
-from turning online if it is.
+Move the mixed endian support detection code to cpufeature.c
+from cpuinfo.c. This also moves the update_cpu_features()
+used by mixed endian detection code, which will get more
+functionality.
 
-Also consolidates the users of the feature registers, (KVM, debug, CPU
-capability, ELF HWCAP, cpuinfo and CPU feature Sanity check) to make use
-of the system wide safe value of the feature to make safer decisions.
-As mentioned above, the calculation of the system CPU capabilities and
-ELF HWCAP is delayed until smp_cpus_done() and makes use of the value
-from the infrastructure. The cpu_errata capability checks still go
-through each CPU and is not impacted by this series (not delayed).
+Also moves the ID register field shifts to asm/sysreg.h,
+where all the useful definitions will end up in later patches.
 
-At the end( Patches 19-24 ) , we add a new ABI to expose the CPU feature
-registers to the user space via emulation of MRS. The system exposes only a
-limited set of feature values (See the documentation patch) from the above
-infrastructure. The feature bits that are not exposed are set to the 'safe
-value' which implies 'not supported'.
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/cpu.h        |    2 ++
+ arch/arm64/include/asm/cpufeature.h |    7 +++++++
+ arch/arm64/include/asm/cputype.h    |   15 ---------------
+ arch/arm64/include/asm/sysreg.h     |    3 +++
+ arch/arm64/kernel/cpufeature.c      |   22 ++++++++++++++++++++++
+ arch/arm64/kernel/cpuinfo.c         |   21 ---------------------
+ 6 files changed, 34 insertions(+), 36 deletions(-)
 
-Apart from the selected feature registers, we expose MIDR_EL1 (Main
-ID Register). The user should be aware that, reading MIDR_EL1 can be
-tricky on a heterogeneous system (just like getcpu()). We export the
-value of the current CPU where 'MRS' is executed. REVIDR is not exposed
-via MRS, since we cannot guarantee atomic access to both MIDR and REVIDR
-(task migration). So they both are exposed via sysfs under :
-
-	/sys/devices/system/cpu/cpu$ID/identification/
-							\- midr
-							\- revidr
-
-The ABI useful for the toolchains (e.g, gcc, dynamic linker, JIT) to make
-better runtime decisions based on what is available.
-
-The series applies on top of aarch64 for-next/core branch and
-is also available here :
-
-	git://linux-arm.org/linux-skp.git cpu-ftr/v4-aarch64-4.3-next
-
-Older versions:
-
-[1] https://lkml.org/lkml/2015/7/24/152 - RFC
-[2] https://lkml.org/lkml/2015/9/16/452 - V1
-[3] https://lkml.org/lkml/2015/10/5/517 - V2
-[4] https://lkml.org/lkml/2015/10/13/635 - V3
-
-Changes since V3:
-  - Rebased to linux-aarch64 for-next/core
-  - Get rid of cpu hotplug notifiers and blocking in the
-    notifier
-  - Refactor check_cpu_capabilities()
-  - Sort the register table at boot time
-  - Delay the message from secondary processor until it turns online
-  - Rename
-	get_arm64_sys_reg => get_arm64_ftr_reg
-	ftr_mask => arm64_ftr_mask
-
-Changes since V2:
-  - Fix build error reported by kbuild test robot
-  - Don't change the encoding for sys_reg()
-  - Fail the incapable CPU by cpu_die(), and mark it absent
-  - Fix errno for sysfs file creation for revidr/midr. (Reported by Russell King)
-  - Roll back and remove the sysfs entries if we fail to get_cpu_device()
-  - Change feature type
-  - Added another fix to use the per-cpu cpuinfo area after the
-    area is initialised
-  - Rename types and use binary search for indexing
-
-Changes since V1:
-  - Rebased to 4.3-rc4
-  - Fixed patch errors reported by Dave Martin
-  - Fixed build break with !CONFIG_PERF_EVENTS reported by Vladimir Murzin
-  - Updated documentation on the types of features
-  - Added Tested-by: James Morse for cpu capability checks
-
-Changes since RFC:
-  - Rebased to 4.3-rc1
-  - Consolidate HWCAP, capability check into the new infrastructure
-  - Add a new HWCAP 'cpuid' to announce the ABI
-  - Pulled in Steve's patch to expose midr/revidr via sysfs
-  - Changes to documentation.
-
-
-Steve Capper (1):
-  arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
-
-Suzuki K. Poulose (23):
-  arm64: Make the CPU information more clear
-  arm64: Delay ELF HWCAP initialisation until all CPUs are up
-  arm64: Delay cpuinfo_store_boot_cpu
-  arm64: Move cpu feature detection code
-  arm64: Move mixed endian support detection
-  arm64: Move /proc/cpuinfo handling code
-  arm64: Handle width of a cpuid feature
-  arm64: Keep track of CPU feature registers
-  arm64: Consolidate CPU Sanity check to CPU Feature infrastructure
-  arm64: Read system wide CPUID value
-  arm64: Cleanup mixed endian support detection
-  arm64: Refactor check_cpu_capabilities
-  arm64: Delay cpu feature capability checks
-  arm64/capabilities: Make use of system wide safe value
-  arm64/HWCAP: Use system wide safe values
-  arm64: Move FP/ASIMD hwcap handling to common code
-  arm64/debug: Make use of the system wide safe value
-  arm64/kvm: Make use of the system wide safe values
-  arm64: Documentation - Expose CPU feature registers
-  arm64: Define helper for sys_reg id manipulation
-  arm64: Add helper to decode register from instruction
-  arm64: cpufeature: Track the user visible fields
-  arm64: Expose feature registers by emulating MRS
-
- Documentation/arm64/cpu-feature-registers.txt |  225 ++++++
- arch/arm64/include/asm/cpu.h                  |    5 +
- arch/arm64/include/asm/cpufeature.h           |   96 ++-
- arch/arm64/include/asm/cputype.h              |   15 -
- arch/arm64/include/asm/hw_breakpoint.h        |    9 +-
- arch/arm64/include/asm/hwcap.h                |    8 +
- arch/arm64/include/asm/insn.h                 |    2 +
- arch/arm64/include/asm/processor.h            |    2 +-
- arch/arm64/include/asm/sysreg.h               |  162 ++++-
- arch/arm64/include/uapi/asm/hwcap.h           |    1 +
- arch/arm64/kernel/cpu_errata.c                |    2 +-
- arch/arm64/kernel/cpufeature.c                |  963 ++++++++++++++++++++++++-
- arch/arm64/kernel/cpuinfo.c                   |  324 +++++----
- arch/arm64/kernel/debug-monitors.c            |    6 +-
- arch/arm64/kernel/fpsimd.c                    |   16 +-
- arch/arm64/kernel/insn.c                      |   29 +
- arch/arm64/kernel/setup.c                     |  241 +------
- arch/arm64/kernel/smp.c                       |   12 +-
- arch/arm64/kvm/reset.c                        |    2 +-
- arch/arm64/kvm/sys_regs.c                     |   12 +-
- arch/arm64/mm/fault.c                         |    2 +-
- 21 files changed, 1684 insertions(+), 450 deletions(-)
- create mode 100644 Documentation/arm64/cpu-feature-registers.txt
-
+diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
+index 8e797b2..30db691 100644
+--- a/arch/arm64/include/asm/cpu.h
++++ b/arch/arm64/include/asm/cpu.h
+@@ -63,4 +63,6 @@ DECLARE_PER_CPU(struct cpuinfo_arm64, cpu_data);
+ void cpuinfo_store_cpu(void);
+ void __init cpuinfo_store_boot_cpu(void);
+ 
++void update_cpu_features(struct cpuinfo_arm64 *info);
++
+ #endif /* __ASM_CPU_H */
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index b7769f6..b5f313d 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -10,6 +10,7 @@
+ #define __ASM_CPUFEATURE_H
+ 
+ #include <asm/hwcap.h>
++#include <asm/sysreg.h>
+ 
+ /*
+  * In the arm64 world (as in the ARM world), elf_hwcap is used both internally
+@@ -81,6 +82,12 @@ static inline int __attribute_const__ cpuid_feature_extract_field(u64 features,
+ 	return (s64)(features << (64 - 4 - field)) >> (64 - 4);
+ }
+ 
++static inline bool id_aa64mmfr0_mixed_endian_el0(u64 mmfr0)
++{
++	return cpuid_feature_extract_field(mmfr0, ID_AA64MMFR0_BIGENDEL_SHIFT) == 0x1 ||
++		cpuid_feature_extract_field(mmfr0, ID_AA64MMFR0_BIGENDEL0_SHIFT) == 0x1;
++}
++
+ void __init setup_cpu_features(void);
+ 
+ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index ee6403d..31678b2 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -72,15 +72,6 @@
+ 
+ #define APM_CPU_PART_POTENZA	0x000
+ 
+-#define ID_AA64MMFR0_BIGENDEL0_SHIFT	16
+-#define ID_AA64MMFR0_BIGENDEL0_MASK	(0xf << ID_AA64MMFR0_BIGENDEL0_SHIFT)
+-#define ID_AA64MMFR0_BIGENDEL0(mmfr0)	\
+-	(((mmfr0) & ID_AA64MMFR0_BIGENDEL0_MASK) >> ID_AA64MMFR0_BIGENDEL0_SHIFT)
+-#define ID_AA64MMFR0_BIGEND_SHIFT	8
+-#define ID_AA64MMFR0_BIGEND_MASK	(0xf << ID_AA64MMFR0_BIGEND_SHIFT)
+-#define ID_AA64MMFR0_BIGEND(mmfr0)	\
+-	(((mmfr0) & ID_AA64MMFR0_BIGEND_MASK) >> ID_AA64MMFR0_BIGEND_SHIFT)
+-
+ #ifndef __ASSEMBLY__
+ 
+ /*
+@@ -112,12 +103,6 @@ static inline u32 __attribute_const__ read_cpuid_cachetype(void)
+ {
+ 	return read_cpuid(CTR_EL0);
+ }
+-
+-static inline bool id_aa64mmfr0_mixed_endian_el0(u64 mmfr0)
+-{
+-	return (ID_AA64MMFR0_BIGEND(mmfr0) == 0x1) ||
+-		(ID_AA64MMFR0_BIGENDEL0(mmfr0) == 0x1);
+-}
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index a7f3d4b..4246e41 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -44,6 +44,9 @@
+ #define SET_PSTATE_PAN(x) __inst_arm(0xd5000000 | REG_PSTATE_PAN_IMM |\
+ 				     (!!x)<<8 | 0x1f)
+ 
++#define ID_AA64MMFR0_BIGENDEL0_SHIFT	16
++#define ID_AA64MMFR0_BIGENDEL_SHIFT	8
++
+ #ifdef __ASSEMBLY__
+ 
+ 	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index e49be15..1ae8b24 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -22,7 +22,9 @@
+ #include <asm/cpu.h>
+ #include <asm/cpufeature.h>
+ #include <asm/processor.h>
++#include <asm/sysreg.h>
+ 
++static bool mixed_endian_el0 = true;
+ unsigned long elf_hwcap __read_mostly;
+ EXPORT_SYMBOL_GPL(elf_hwcap);
+ 
+@@ -41,6 +43,26 @@ unsigned int compat_elf_hwcap2 __read_mostly;
+ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ 
+ 
++bool cpu_supports_mixed_endian_el0(void)
++{
++	return id_aa64mmfr0_mixed_endian_el0(read_cpuid(ID_AA64MMFR0_EL1));
++}
++
++bool system_supports_mixed_endian_el0(void)
++{
++	return mixed_endian_el0;
++}
++
++static void update_mixed_endian_el0_support(struct cpuinfo_arm64 *info)
++{
++	mixed_endian_el0 &= id_aa64mmfr0_mixed_endian_el0(info->reg_id_aa64mmfr0);
++}
++
++void update_cpu_features(struct cpuinfo_arm64 *info)
++{
++	update_mixed_endian_el0_support(info);
++}
++
+ static bool
+ feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
+ {
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 75d5a86..8307b33 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -35,7 +35,6 @@
+  */
+ DEFINE_PER_CPU(struct cpuinfo_arm64, cpu_data);
+ static struct cpuinfo_arm64 boot_cpu_data;
+-static bool mixed_endian_el0 = true;
+ 
+ static char *icache_policy_str[] = {
+ 	[ICACHE_POLICY_RESERVED] = "RESERVED/UNKNOWN",
+@@ -69,26 +68,6 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
+ 	pr_info("Detected %s I-cache on CPU%d\n", icache_policy_str[l1ip], cpu);
+ }
+ 
+-bool cpu_supports_mixed_endian_el0(void)
+-{
+-	return id_aa64mmfr0_mixed_endian_el0(read_cpuid(ID_AA64MMFR0_EL1));
+-}
+-
+-bool system_supports_mixed_endian_el0(void)
+-{
+-	return mixed_endian_el0;
+-}
+-
+-static void update_mixed_endian_el0_support(struct cpuinfo_arm64 *info)
+-{
+-	mixed_endian_el0 &= id_aa64mmfr0_mixed_endian_el0(info->reg_id_aa64mmfr0);
+-}
+-
+-static void update_cpu_features(struct cpuinfo_arm64 *info)
+-{
+-	update_mixed_endian_el0_support(info);
+-}
+-
+ static int check_reg_mask(char *name, u64 mask, u64 boot, u64 cur, int cpu)
+ {
+ 	if ((boot & mask) == (cur & mask))
 -- 
 1.7.9.5
