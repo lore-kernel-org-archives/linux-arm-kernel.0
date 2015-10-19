@@ -1,27 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Oct 2015 08:46:09 -0700
-Subject: [PATCH] ARM: OMAP2+: Fix oops with LPAE and more than 2GB of
- memory
-In-Reply-To: <5624F692.5070302@ti.com>
-References: <1444778000-22537-1-git-send-email-tony@atomide.com>
- <561DD014.10403@ti.com> <20151014160245.GA10113@atomide.com>
- <561F5C0C.6080106@ti.com> <20151015140551.GM10113@atomide.com>
- <561FC2E9.9050805@ti.com> <20151016192300.GD24370@atomide.com>
- <5624F692.5070302@ti.com>
-Message-ID: <20151019154609.GA22043@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Oct 2015 16:53:11 +0100
+Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
+In-Reply-To: <20151019154009.20687.41178@quantum>
+References: <5706174.BUsqiXljxZ@wuerfel> <20151007125735.GA8170@kroah.com>
+ <20151007130324.GA4557@linux> <5308760.2G5KJFF9Pi@wuerfel>
+ <20151008074828.GF4570@linux> <20151019154009.20687.41178@quantum>
+Message-ID: <20151019155310.GO32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lokesh Vutla <a0131933@ti.com> [151019 07:03]:
-> 
-> Since there is a big hole with in the memory space, we might also need
-> to enable SPARSEMEM ?
+On Mon, Oct 19, 2015 at 08:40:09AM -0700, Michael Turquette wrote:
+> Quoting Viresh Kumar (2015-10-08 00:48:28)
+> > On 07-10-15, 21:12, Arnd Bergmann wrote:
+> > > I think it clearly makes sense to have a fixed length for each of these
+> > > members:
+> > >
+> > > either 32 bit is enough to represent all possible values, then
+> > > there is no need to make them 'long' on 64-bit architectures, or 32 bit
+> > > is not enough and then the code is broken on 32-bit architectures today
+> > > and should be fixed.
+> > 
+> > I agree.
+> > 
+> > But I am not 100% sure why it was done this way to start with.
+> > Probably this is the logic behind that:
+> > - Max clock rate supported by a u32 is ~ 4.295 GHz
 
-No from what I remember that depends on section sizes and smaller
-chunks of physical memory. For example, on the old Psions we had to
-use DISCONTIGMEM/SPARSEMEM because of four discontiguous 8MB memory
-chips.
+The limit is actually half that when you consider clk_round_rate()
+returns a long, because clk_round_rate() needs to be able to return
+errors.
 
-Regards,
+The use of long and unsigned long was done in the knowledge that it'd
+restrict to 2GHz the upper limit, partially because 64-bit math on
+32-bit systems is inefficient and expensive, and I initially wanted
+people to use the thing, so it had to be lean and fast.  (If I'd
+started out with something as complex as the CCF, it would've been
+laughed out as being "far too complex" and "we don't need this").
 
-Tony
+It also started out as a way to convey clock information to drivers
+for peripherals, which commonly don't need clocks up in the GHz range,
+indeed, it was rare at that time the API was designed for peripheral
+clocks to be much above 100MHz.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
