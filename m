@@ -1,63 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 19 Oct 2015 17:19:24 +0200
-Subject: [PATCH] clocksource; armada-370: implement ARM delay timer
-In-Reply-To: <E1ZoByF-0002E9-9O@rmk-PC.arm.linux.org.uk> (Russell King's
- message of "Mon, 19 Oct 2015 16:03:31 +0100")
-References: <E1ZoByF-0002E9-9O@rmk-PC.arm.linux.org.uk>
-Message-ID: <874mhmga2r.fsf@free-electrons.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 19 Oct 2015 23:18:55 +0800
+Subject: [GIT PULL 1/3] ARM: imx: soc updates for 4.4
+Message-ID: <1445267937-2952-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
- 
- On lun., oct. 19 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
-> Implement an ARM delay timer to be used for udelay() on Armada 37x
-> platforms.  This allows us to skip the delay loop calibration at boot,
-> saving 180ms on the boot time of the kernel (which is around 10%).
->
-> It also means that udelay() will be unaffected by CPU frequency changes
-> when cpufreq is enabled on these platforms.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/Kconfig                         |  1 +
->  arch/arm/plat-orion/time.c               | 13 +++++++++++++
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 
-You spoke only about the armada37x but you also modified the timer of
-the orion platforms.
+are available in the git repository at:
 
-Could you split your patch in two part?
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-4.4
 
-Then the arch/arm/plat-orion/time.c related part would be applied
-through the mvebu tree and the drivers/clocksource/time-armada-370-xp.c
-through the clocksource tree.
+for you to fetch changes up to 7f7308198f98700be82d123569ea59229a75d3c3:
 
+  ARM: imx: add cpufreq device for imx6ul (2015-10-12 21:47:22 +0800)
 
->  drivers/clocksource/time-armada-370-xp.c | 14 ++++++++++++++
->  3 files changed, 28 insertions(+)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index f3dfca632a8a..194569c23271 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -10,6 +10,7 @@ config ARM
->  	select ARCH_SUPPORTS_ATOMIC_RMW
->  	select ARCH_USE_BUILTIN_BSWAP
->  	select ARCH_USE_CMPXCHG_LOCKREF
-> +	select ARCH_WANT_FRAME_POINTERS
+----------------------------------------------------------------
+The i.MX SoC updates for 4.4:
+ - Enable suspend and cpufreq support for i.MX6UL
+ - Add platform level ENET initialization support for i.MX7D
 
-Is it related to this patch?
+----------------------------------------------------------------
+Anson Huang (1):
+      ARM: imx: add suspend/resume support for i.mx6ul
 
-Thanks,
+Bai Ping (1):
+      ARM: imx: add cpufreq device for imx6ul
 
-Gregory
->  	select ARCH_WANT_IPC_PARSE_VERSION
->  	select BUILDTIME_EXTABLE_SORT if MMU
->  	select CLONE_BACKWARDS
+Fugang Duan (2):
+      ARM: imx7d: add imx7d iomux-gpr field define
+      ARM: imx: add enet init for i.MX7D platform
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+ arch/arm/mach-imx/common.h                 |  1 +
+ arch/arm/mach-imx/mach-imx6ul.c            |  9 ++++
+ arch/arm/mach-imx/mach-imx7d.c             | 74 ++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/pm-imx6.c                | 46 ++++++++++++++++---
+ arch/arm/mach-imx/suspend-imx6.S           |  3 ++
+ include/linux/mfd/syscon/imx7-iomuxc-gpr.h | 47 +++++++++++++++++++
+ 6 files changed, 174 insertions(+), 6 deletions(-)
+ create mode 100644 include/linux/mfd/syscon/imx7-iomuxc-gpr.h
