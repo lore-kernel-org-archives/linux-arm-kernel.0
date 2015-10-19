@@ -1,111 +1,74 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 19 Oct 2015 18:42:16 +0200
-Subject: [PATCH 7/7] ARM: EXYNOS: Remove code for restart and poweroff for
- exynos SoCs
-In-Reply-To: <CAGOxZ53k5Nftc=YgTnow382S2mG51yiLO4RmkMM8fONBB4GnCg@mail.gmail.com>
-References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
- <1445234635-3950-8-git-send-email-alim.akhtar@samsung.com>
- <562494F8.6070003@samsung.com> <5624BE39.7020605@osg.samsung.com>
- <CAJKOXPcvKeDNwof5eyD5XjzUiZrHoyShD8gOPGo7uUxEyypQbw@mail.gmail.com>
- <5624F932.7030001@osg.samsung.com>
- <CAGOxZ53k5Nftc=YgTnow382S2mG51yiLO4RmkMM8fONBB4GnCg@mail.gmail.com>
-Message-ID: <56251D68.4000900@osg.samsung.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 19 Oct 2015 17:50:41 +0100
+Subject: [PATCH v2 3/3] xen/arm: don't try to re-register vcpu_info on
+ cpu_hotplug.
+In-Reply-To: <5624C592.8000308@citrix.com>
+References: <alpine.DEB.2.02.1510161731510.27957@kaball.uk.xensource.com>
+ <1445013301-12624-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <56212A9F.5070202@citrix.com>
+ <alpine.DEB.2.02.1510191109130.27957@kaball.uk.xensource.com>
+ <5624C592.8000308@citrix.com>
+Message-ID: <alpine.DEB.2.02.1510191725160.27957@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alim,
-
-On 10/19/2015 06:13 PM, Alim Akhtar wrote:
-> Hi Javier,
+On Mon, 19 Oct 2015, Julien Grall wrote:
+> On 19/10/15 11:10, Stefano Stabellini wrote:
+> > On Fri, 16 Oct 2015, Julien Grall wrote:
+> >> Hi Stefano,
+> >>
+> >> On 16/10/15 17:35, Stefano Stabellini wrote:
+> >>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> >>> ---
+> >>>  arch/arm/xen/enlighten.c |   10 ++++++++++
+> >>>  1 file changed, 10 insertions(+)
+> >>>
+> >>> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> >>> index 6c09cc4..b193811 100644
+> >>> --- a/arch/arm/xen/enlighten.c
+> >>> +++ b/arch/arm/xen/enlighten.c
+> >>> @@ -93,6 +93,16 @@ static void xen_percpu_init(void)
+> >>>  	int err;
+> >>>  	int cpu = get_cpu();
+> >>>  
+> >>> +	/* 
+> >>> +	 * VCPUOP_register_vcpu_info cannot be called twice for the same
+> >>> +	 * vcpu, so if vcpu_info is already registered, just get out. This
+> >>> +	 * can happen with cpu-hotplug.
+> >>> +	 */
+> >>> +	if (per_cpu(xen_vcpu, cpu) != NULL) {
+> >>> +		put_cpu();
+> >>> +		return;
+> >>> +	}
+> >>
+> >>
+> >> Not really related to this patch. By side effect this patch is also not
+> >> calling irq_percpu_enable.
+> >>
+> >> Looking around, all the caller of irq_percpu_enable will call
+> >> irq_percpu_disable when the CPU is dying. Is there any side effect to
+> >> not doing this?
+> > 
+> > Given that Xen won't inject any event irqs when a cpu is offline, I
+> > don't think there are any side effects.
 > 
-> On Mon, Oct 19, 2015 at 7:37 PM, Javier Martinez Canillas
-> <javier@osg.samsung.com> wrote:
->> Hello Krzysztof,
->>
->> On 10/19/2015 03:28 PM, Krzysztof Kozlowski wrote:
->>> 2015-10-19 18:56 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
->>>> Hello,
->>>>
->>>> On 10/19/2015 09:00 AM, Krzysztof Kozlowski wrote:
->>>>> On 19.10.2015 15:03, Alim Akhtar wrote:
->>>>>> Now we can use the generic syscon-{reboot/poweroff} drivers,
->>>>>> so we don't need special handling for reboot/poweroff in
->>>>>> exynos pmu driver. This patch remove the same.
->>>>>>
->>>>>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->>>>>> ---
->>>>>>  arch/arm/mach-exynos/pmu.c |   43 -------------------------------------------
->>>>>>  1 file changed, 43 deletions(-)
->>>>>
->>>>> I think that removal of this stuff will effectively remove the
->>>>> restart/poweroff handlers from:
->>>>> 1. Other defconfigs, like multi_v7
->>>>> 2. Custom configs.
->>>>>
->>>>
->>>> This will also break old DTBs that don't have a "syscon-poweroff" device
->>>> node that contains the necessary PMU regmap, offset and mask information.
->>>
->>> I am not sure whether this is ABI break issue. There was no compatible
->>> mentioning that "reset works" which now would be replaced. The
->>> existing PMU compatible (like samsung,exynos4412-pmu) does not mention
->>> "reset" as a feature coming with this compatible.
->>>
->>> So no ABI break.
->>>
->>>
->>
->> I deliberately didn't use the "DT ABI break" expression since as you said is
->> not part of the documented DT bindings. But what I said is that this change
->> will break old DTBs with newer kernels since reboot and power off will stop
->> working after $SUBJECT.
->>
->> I'm not a particular fan of the stable DT idea since in practice it seems to
->> do more harm than good but since that was decided, the expectation for users
->> is that booting a new kernel with an old DT should not cause any regression.
->>
->> So I think that at least a comment in the commit message is needed so if
->> there are people really using old DTs with newer kernels on Exynos boards,
->> they can know that the commit causes such an issue instead of having to
->> figure it out themselves.
->>
-> Agree, will add a comment about this in commit message.
->
+> I'm not talking about the behavior of Xen when the vCPU is down but any
+> side effect in Linux (i.e not re-enabling the IRQ or else).
+> 
+> All the other user of percpu IRQ is doing the call so there must be a
+> reason to do it.
+> 
+> Looking more closely to the code, the GIC driver will reset the vCPU
+> interface every time the vCPU is coming back online (see
+> gic_secondary_init).
+> 
+> Resetting the vCPU interface means all the PPIs will be disabled (see
+> gic_cpu_config). As the event channel IRQ is a PPI it won't be
+> re-enabled and the vCPU will never receive event channel.
+> 
+> So you have to re-enable this interrupt unconditionally. At the same
+> time, I'd like to see the irq_percpu_disable to match irq_percpu_enable
+> as the other users do.
 
-Thanks, with that comment in the commit message, feel free
-to add my Reviewed-by tag to this patch as well.
- 
->>>>
->>>>> Previously this code was always compiled in for ARCH_EXYNOS. Now it is
->>>>> not so I am thinking about selecting necessary drivers from main exynos
->>>>> Kconfig symbol. That could be tricky though, because "select" should be
->>>>> used only for non-visible symbols.
->>>>>
->>>>> Any ideas how to solve that?
->>>>>
->>>>
->>>> Is true that select should only be used for non-visible symbols but there
->>>> are others user visible symbols that are selected by ARCH_EXYNOS such as
->>>> EXYNOS_THERMAL. So I think selecting the regmap syscon reset stuff there
->>>> is a sensible option.
->>>
->>> Selecting from defconfig is not sufficient... since I do not have
->>> other idea than selecting then ovak, but Alim please check it whether
->>> it does not create circular dependencies on various configs.
->>>
->>
->> Agreed, Kconfig circular dependencies is the reason why select is avoided.
->> Fortunately now the 0-day bot analyzes even posted patches so it's possible
->> that such an issue could be found even before these patches are merged.
->>
-> ok..will select it from mach-exynos/Kconfig.
-> Thanks.
->
 
-Ok, great.
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+OK, I'll add a disable_percpu_irq call and an enable_percpu_irq call.
