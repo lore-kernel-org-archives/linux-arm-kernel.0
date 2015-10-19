@@ -1,113 +1,86 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 19 Oct 2015 14:03:16 +0900
-Subject: [PATCH 3/4] hwrng: exynos - Fix missing configuration after
- suspend to RAM
-In-Reply-To: <1445229462-32395-4-git-send-email-k.kozlowski@samsung.com>
-References: <1445229462-32395-1-git-send-email-k.kozlowski@samsung.com>
- <1445229462-32395-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56247994.5060105@samsung.com>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Mon, 19 Oct 2015 13:31:27 +0800
+Subject: [PATCH v10 3/3] arm64: dts: mediatek: add xHCI & usb phy for
+ mt8173
+In-Reply-To: <56237BF2.5070809@cogentembedded.com>
+References: <1445140279-18121-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1445140279-18121-4-git-send-email-chunfeng.yun@mediatek.com>
+ <56237BF2.5070809@cogentembedded.com>
+Message-ID: <1445232687.28324.4.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.10.2015 13:37, Krzysztof Kozlowski wrote:
-> After suspend to RAM the device stopped to work with ETIMEDOUT error:
+On Sun, 2015-10-18 at 14:01 +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> $ dd if=/dev/hwrng of=/dev/null bs=1 count=16
-> dd: reading `/dev/hwrng': Connection timed out
+> On 10/18/2015 6:51 AM, Chunfeng Yun wrote:
 > 
-> In the STATUS register the bits #5 (PRNG_DONE) and #1
-> (SEED_SETTING_DONE) were not set. Instead PRNG_ERROR (seventh bit) was
-> high.
+> > add xHCI and phy drivers for MT8173-EVB
+> >
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 > 
-> After each system suspend initialize the seed to fix the error.
+> [...]
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  drivers/char/hw_random/exynos-rng.c | 42 ++++++++++++++++++++++++++++++-------
->  1 file changed, 35 insertions(+), 7 deletions(-)
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > index d18ee42..46f5f50 100644
+> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> [...]
+> > @@ -487,6 +488,47 @@
+> >   			clock-names = "source", "hclk";
+> >   			status = "disabled";
+> >   		};
+> > +
+> > +		usb30: usb at 11270000 {
+> > +			compatible = "mediatek,mt8173-xhci";
+> > +			reg = <0 0x11270000 0 0x1000>,
+> > +			      <0 0x11280700 0 0x0100>;
+> > +			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
+> > +			power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
+> > +			clocks = <&topckgen CLK_TOP_USB30_SEL>,
+> > +				 <&pericfg CLK_PERI_USB0>,
+> > +				 <&pericfg CLK_PERI_USB1>;
+> > +			clock-names = "sys_ck",
+> > +				      "wakeup_deb_p0",
+> > +				      "wakeup_deb_p1";
+> > +			phys = <&phy_port0 PHY_TYPE_USB3>,
+> > +			       <&phy_port1 PHY_TYPE_USB2>;
+> > +			mediatek,syscon-wakeup = <&pericfg>;
+> > +			status = "okay";
+> > +		};
+> > +
+> > +		u3phy: usb-phy at 11290000 {
+> > +			compatible = "mediatek,mt8173-u3phy";
+> > +			reg = <0 0x11290000 0 0x800>;
+> > +			clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
+> > +			clock-names = "u3phya_ref";
+> > +			#address-cells = <2>;
+> > +			#size-cells = <2>;
+> > +			ranges;
+> > +			status = "okay";
 > 
+>     Don't you need the "power-domains" prop here as well?
+No, the power-domains of MAC and PHY are separated, but PHY's can't be
+operated by software.
 
-Oh, I forgot about stable.
-Fixes: b329669ea0b5 ("hwrng: exynos - Add support for Exynos random
-number generator")
-Cc: <stable@vger.kernel.org>
-
-I'll add it in respin (if there would be such).
-
-Best regards,
-Krzysztof
-
-> diff --git a/drivers/char/hw_random/exynos-rng.c b/drivers/char/hw_random/exynos-rng.c
-> index dfaaaafb8ddd..162adbda1b70 100644
-> --- a/drivers/char/hw_random/exynos-rng.c
-> +++ b/drivers/char/hw_random/exynos-rng.c
-> @@ -53,15 +53,11 @@ static void exynos_rng_writel(struct exynos_rng *rng, u32 val, u32 offset)
->  	__raw_writel(val, rng->mem + offset);
->  }
->  
-> -static int exynos_init(struct hwrng *rng)
-> +static int exynos_rng_configure(struct exynos_rng *exynos_rng)
->  {
-> -	struct exynos_rng *exynos_rng = container_of(rng,
-> -						struct exynos_rng, rng);
->  	int i;
->  	int ret = 0;
->  
-> -	pm_runtime_get_sync(exynos_rng->dev);
-> -
->  	for (i = 0 ; i < 5 ; i++)
->  		exynos_rng_writel(exynos_rng, jiffies,
->  				EXYNOS_PRNG_SEED_OFFSET + 4*i);
-> @@ -70,6 +66,17 @@ static int exynos_init(struct hwrng *rng)
->  						 & SEED_SETTING_DONE))
->  		ret = -EIO;
->  
-> +	return ret;
-> +}
-> +
-> +static int exynos_init(struct hwrng *rng)
-> +{
-> +	struct exynos_rng *exynos_rng = container_of(rng,
-> +						struct exynos_rng, rng);
-> +	int ret = 0;
-> +
-> +	pm_runtime_get_sync(exynos_rng->dev);
-> +	ret = exynos_rng_configure(exynos_rng);
->  	pm_runtime_put_noidle(exynos_rng->dev);
->  
->  	return ret;
-> @@ -155,10 +162,31 @@ static int exynos_rng_runtime_resume(struct device *dev)
->  
->  	return clk_prepare_enable(exynos_rng->clk);
->  }
-> +
-> +static int exynos_rng_suspend(struct device *dev)
-> +{
-> +	return pm_runtime_force_suspend(dev);
-> +}
-> +
-> +static int exynos_rng_resume(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct exynos_rng *exynos_rng = platform_get_drvdata(pdev);
-> +	int ret;
-> +
-> +	ret = pm_runtime_force_resume(dev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return exynos_rng_configure(exynos_rng);
-> +}
->  #endif
->  
-> -static UNIVERSAL_DEV_PM_OPS(exynos_rng_pm_ops, exynos_rng_runtime_suspend,
-> -					exynos_rng_runtime_resume, NULL);
-> +static const struct dev_pm_ops exynos_rng_pm_ops = {
-> +	SET_SYSTEM_SLEEP_PM_OPS(exynos_rng_suspend, exynos_rng_resume)
-> +	SET_RUNTIME_PM_OPS(exynos_rng_runtime_suspend,
-> +			   exynos_rng_runtime_resume, NULL)
-> +};
->  
->  static struct platform_driver exynos_rng_driver = {
->  	.driver		= {
+Thanks.
+> 
+> > +
+> > +			phy_port0: port at 11290800 {
+> > +				reg = <0 0x11290800 0 0x800>;
+> > +				#phy-cells = <1>;
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			phy_port1: port at 11291000 {
+> > +				reg = <0 0x11291000 0 0x800>;
+> > +				#phy-cells = <1>;
+> > +				status = "okay";
+> > +			};
+> > +		};
+> >   	};
+> >   };
+> >
+> 
+> MBR, Sergei
 > 
