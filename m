@@ -1,71 +1,66 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 19 Oct 2015 15:17:19 +0800
-Subject: [PATCH] arm: dts: berlin2q: remove duplicated interrupt-parent
-Message-ID: <1445239039-2262-1-git-send-email-jszhang@marvell.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 19 Oct 2015 09:23:20 +0200
+Subject: [PATCH] pinctrl: mvebu: armada-38x: add suspend/resume support
+In-Reply-To: <CAPv3WKdKea-85_0xUv218OVfhnfMvisYXh8qRNRjvmNkweSUJg@mail.gmail.com>
+References: <1445117328-31678-1-git-send-email-mw@semihalf.com>
+ <20151017222927.GR32532@n2100.arm.linux.org.uk>
+ <CAPv3WKed+Q3K0ky9b9AAYSymB-tE0O=57UdrgM+7Cx-X9PeVcA@mail.gmail.com>
+ <20151018160123.6694b4be@free-electrons.com>
+ <CAPv3WKdKea-85_0xUv218OVfhnfMvisYXh8qRNRjvmNkweSUJg@mail.gmail.com>
+Message-ID: <20151019092320.33d48dba@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default interrupt-parent has been set in the upper layer, apb at e80000
-and apb at fc0000 for example. So if the interrupt-parent isn't changed, we
-don't need to set it again. This patch removes the dumplicated
-interrupt-parent settings.
+Hello,
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 6 ------
- 1 file changed, 6 deletions(-)
+On Mon, 19 Oct 2015 08:04:49 +0200, Marcin Wojtas wrote:
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 63a4849..a3ecde5 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -293,7 +293,6 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				reg = <0x1400 0x100>;
--				interrupt-parent = <&aic>;
- 				interrupts = <4>;
- 				clocks = <&chip_clk CLKID_CFG>;
- 				pinctrl-0 = <&twsi0_pmux>;
-@@ -306,7 +305,6 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				reg = <0x1800 0x100>;
--				interrupt-parent = <&aic>;
- 				interrupts = <5>;
- 				clocks = <&chip_clk CLKID_CFG>;
- 				pinctrl-0 = <&twsi1_pmux>;
-@@ -505,7 +503,6 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				reg = <0x7000 0x100>;
--				interrupt-parent = <&sic>;
- 				interrupts = <6>;
- 				clocks = <&refclk>;
- 				pinctrl-0 = <&twsi2_pmux>;
-@@ -518,7 +515,6 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				reg = <0x8000 0x100>;
--				interrupt-parent = <&sic>;
- 				interrupts = <7>;
- 				clocks = <&refclk>;
- 				pinctrl-0 = <&twsi3_pmux>;
-@@ -529,7 +525,6 @@
- 			uart0: uart at 9000 {
- 				compatible = "snps,dw-apb-uart";
- 				reg = <0x9000 0x100>;
--				interrupt-parent = <&sic>;
- 				interrupts = <8>;
- 				clocks = <&refclk>;
- 				reg-shift = <2>;
-@@ -541,7 +536,6 @@
- 			uart1: uart at a000 {
- 				compatible = "snps,dw-apb-uart";
- 				reg = <0xa000 0x100>;
--				interrupt-parent = <&sic>;
- 				interrupts = <9>;
- 				clocks = <&refclk>;
- 				reg-shift = <2>;
+> > I don't like this. The mvebu_pinctrl_soc_info structure is meant to be
+> > a read-only structure that only describes static information giving
+> > SoC-specific details for pin-muxing. The idea is that in the event
+> > where you had multiple pinctrl in the same system, you would still have
+> > only one instance of mvebu_pinctrl_soc_info.
+> 
+> Ok, understood. What with current static globals, like mpp_base? This
+> is a problem when we consider hypothetical multi-pintrl system...
+
+The current driver is indeed not designed for multiple instances of the
+same pinctrl controller. But that's exactly what Russell is asking for.
+
+> In genereal, I think storing additional global data is not
+> starightforward, as dev->platform_data and dev->driver_data are
+> currently occupied by mvebu_pinctrl and mvebu_pinctrl_soc_info. I
+> propose the following:
+>
+> 
+> 1. Create a new structure:
+> struct mvebu_pinctrl_pm_info {
+
+This definitely shouldn't be called "pm_info", because 'base' is not PM
+related. It should be mvebu_pinctrl_state or something like that.
+
+>     void __iomem *base;
+>     static u32 *mpp_saved_regs;
+>     int nregs;
+> }
+> 
+> 2. Add new field to struct mvebu_pinctrl:
+> struct mvebu_pinctrl_pm_info *pm_info;
+
+Does not work because "mvebu_pinctrl_pm_info" cannot be a generic
+structure, it has to be a per-SoC driver structure, since the set of
+registers to save for PM reasons is different from one SoC to the
+other. Also, some SoC have only one "base" pointer, some others (like
+Dove) have multiple.
+
+So it should be the other way around: the SoC-specific driver create a
+structure, and this structure points back to the mvebu_pinctrl
+structure.
+
+Best regards,
+
+Thomas
 -- 
-2.6.1
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
