@@ -1,32 +1,94 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 19 Oct 2015 22:04:33 +0800
-Subject: [PATCH v10 3/6] pci:host: Add Altera PCIe host controller driver
-In-Reply-To: <1445242768-4423-4-git-send-email-lftan@altera.com>
-Message-ID: <201510192217.AS3g74oU%fengguang.wu@intel.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 19 Oct 2015 16:07:46 +0200
+Subject: [PATCH 7/7] ARM: EXYNOS: Remove code for restart and poweroff for
+ exynos SoCs
+In-Reply-To: <CAJKOXPcvKeDNwof5eyD5XjzUiZrHoyShD8gOPGo7uUxEyypQbw@mail.gmail.com>
+References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
+ <1445234635-3950-8-git-send-email-alim.akhtar@samsung.com>
+ <562494F8.6070003@samsung.com> <5624BE39.7020605@osg.samsung.com>
+ <CAJKOXPcvKeDNwof5eyD5XjzUiZrHoyShD8gOPGo7uUxEyypQbw@mail.gmail.com>
+Message-ID: <5624F932.7030001@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ley,
+Hello Krzysztof,
 
-[auto build test ERROR on pci/next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+On 10/19/2015 03:28 PM, Krzysztof Kozlowski wrote:
+> 2015-10-19 18:56 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
+>> Hello,
+>>
+>> On 10/19/2015 09:00 AM, Krzysztof Kozlowski wrote:
+>>> On 19.10.2015 15:03, Alim Akhtar wrote:
+>>>> Now we can use the generic syscon-{reboot/poweroff} drivers,
+>>>> so we don't need special handling for reboot/poweroff in
+>>>> exynos pmu driver. This patch remove the same.
+>>>>
+>>>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>>>> ---
+>>>>  arch/arm/mach-exynos/pmu.c |   43 -------------------------------------------
+>>>>  1 file changed, 43 deletions(-)
+>>>
+>>> I think that removal of this stuff will effectively remove the
+>>> restart/poweroff handlers from:
+>>> 1. Other defconfigs, like multi_v7
+>>> 2. Custom configs.
+>>>
+>>
+>> This will also break old DTBs that don't have a "syscon-poweroff" device
+>> node that contains the necessary PMU regmap, offset and mask information.
+> 
+> I am not sure whether this is ABI break issue. There was no compatible
+> mentioning that "reset works" which now would be replaced. The
+> existing PMU compatible (like samsung,exynos4412-pmu) does not mention
+> "reset" as a feature coming with this compatible.
+> 
+> So no ABI break.
+> 
+> 
 
-url:    https://github.com/0day-ci/linux/commits/Ley-Foon-Tan/arm-add-msi-h-to-Kbuild/20151019-162417
-config: i386-allmodconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+I deliberately didn't use the "DT ABI break" expression since as you said is
+not part of the documented DT bindings. But what I said is that this change
+will break old DTBs with newer kernels since reboot and power off will stop
+working after $SUBJECT.
 
-All errors (new ones prefixed by >>):
+I'm not a particular fan of the stable DT idea since in practice it seems to
+do more harm than good but since that was decided, the expectation for users
+is that booting a new kernel with an old DT should not cause any regression.
 
->> ERROR: "pci_fixup_irqs" undefined!
+So I think that at least a comment in the commit message is needed so if
+there are people really using old DTs with newer kernels on Exynos boards,
+they can know that the commit causes such an issue instead of having to
+figure it out themselves.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 51506 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151019/93b16dd8/attachment-0001.obj>
+>>
+>>> Previously this code was always compiled in for ARCH_EXYNOS. Now it is
+>>> not so I am thinking about selecting necessary drivers from main exynos
+>>> Kconfig symbol. That could be tricky though, because "select" should be
+>>> used only for non-visible symbols.
+>>>
+>>> Any ideas how to solve that?
+>>>
+>>
+>> Is true that select should only be used for non-visible symbols but there
+>> are others user visible symbols that are selected by ARCH_EXYNOS such as
+>> EXYNOS_THERMAL. So I think selecting the regmap syscon reset stuff there
+>> is a sensible option.
+> 
+> Selecting from defconfig is not sufficient... since I do not have
+> other idea than selecting then ovak, but Alim please check it whether
+> it does not create circular dependencies on various configs.
+>
+
+Agreed, Kconfig circular dependencies is the reason why select is avoided.
+Fortunately now the 0-day bot analyzes even posted patches so it's possible
+that such an issue could be found even before these patches are merged.
+
+> Best regards,
+> Krzysztof
+>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
