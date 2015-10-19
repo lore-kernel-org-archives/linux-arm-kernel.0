@@ -1,104 +1,51 @@
-From: w-kwok2@ti.com (Kwok, WingMan)
-Date: Mon, 19 Oct 2015 14:47:43 +0000
-Subject: [PATCH v1 1/2] phy: keystone: serdes driver for gbe 10gbe and pcie
-In-Reply-To: <6215485.RTPqreMEMX@wuerfel>
-References: <1444919145-30845-1-git-send-email-w-kwok2@ti.com>
- <5192855.p6QLDWTiVi@wuerfel> <561FCDC0.3080109@ti.com>
- <6215485.RTPqreMEMX@wuerfel>
-Message-ID: <230CBA6E4B6B6B418E8730AC28E6FC7E04229363@DFLE11.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Oct 2015 15:50:27 +0100
+Subject: [RFC PATCH v2 1/4] drm: Introduce generic probe function for
+ component based masters.
+In-Reply-To: <20151019144225.GE13786@phenom.ffwll.local>
+References: <1445257313-7147-1-git-send-email-Liviu.Dudau@arm.com>
+ <1445257313-7147-2-git-send-email-Liviu.Dudau@arm.com>
+ <20151019122537.GZ32532@n2100.arm.linux.org.uk>
+ <20151019130258.GU3394@e106497-lin.cambridge.arm.com>
+ <20151019132638.GB32532@n2100.arm.linux.org.uk>
+ <20151019144225.GE13786@phenom.ffwll.local>
+Message-ID: <20151019145027.GF32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Thursday, October 15, 2015 3:35 PM
-> To: Karicheri, Muralidharan
-> Cc: linux-arm-kernel at lists.infradead.org; Kwok, WingMan; robh+dt at kernel.org;
-> pawel.moll at arm.com; mark.rutland at arm.com; ijc+devicetree at hellion.org.uk;
-> galak at codeaurora.org; KISHON VIJAY ABRAHAM; Quadros, Roger;
-> bhelgaas at google.com; ssantosh at kernel.org; linux at arm.linux.org.uk;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
-> pci at vger.kernel.org
-> Subject: Re: [PATCH v1 1/2] phy: keystone: serdes driver for gbe 10gbe and
-> pcie
+On Mon, Oct 19, 2015 at 04:42:25PM +0200, Daniel Vetter wrote:
+> On Mon, Oct 19, 2015 at 02:26:38PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Oct 19, 2015 at 02:02:58PM +0100, Liviu Dudau wrote:
+> > > On Mon, Oct 19, 2015 at 01:25:37PM +0100, Russell King - ARM Linux wrote:
+> > > > Please don't move this into here, it's completely inappropriate.  Just
+> > > > because something makes use of this does not mean they only support
+> > > > 32-bit DMA.  Besides, this has nothing to do with whether or not it's
+> > > > OF-based or not.
+> > > 
+> > > Understood. My thinking process was that component-based drivers are all
+> > > OF-enabled (how else do you make use of the framework?) and 32-bit DMA is
+> > > present in 2 out of 3 drivers that are converted, so it looks to be common
+> > > enough that adding it to armada would not hurt. It was all done in the name of
+> > > collecting common code in a single function.
+> > 
+> > Which is an utterly crap reason.
+> > 
+> > It's also not appropriate.  I'm really not sure why you think that moving
+> > this here would in any way be appropriate - from my point of view, the
+> > mere proposal is utterly insane.
+> > 
+> > The "container" device does not do any DMA, so it's inappropriate for
+> > it to have DMA masks set or negotiated on it.  So, actually, no one
+> > should be setting the DMA mask for their container device.  It's wrong.
 > 
-> On Thursday 15 October 2015 12:01:04 Murali Karicheri wrote:
-> >
-> > >> + * Redistributions in binary form must reproduce the above copyright
-> > >> + * notice, this list of conditions and the following disclaimer in the
-> > >> + * documentation and/or other materials provided with the
-> > >> + * distribution.
-> > >
-> > > The current code does not do this when compiled, which might be a
-> > > problem for distributors. Can you clarify the license?
-> > >
-> > Arnd,
-> >
-> > Can you elaborate on this? I did a grep on the string "Redistributions
-> > in binary form must reproduce the above copyright" and I could find
-> > several instance of this. So I am not sure what you mean by "The current
-> > code does not do this when compiled".
-> 
-> You write that the binary form of the code must produce the copyright
-> notice. I don't see any code that does this. If I was looking in the
-> wrong place, let me know.
-> 
-> 	Arnd
+> I think (and my opinion doesn't carry as much wheight here on dri-devel
+> than intel-gfx) the above is over the top bashing of a new contributor to
+> drm who really seems trying to do right. I think that's unecessary,
+> especially since you follow up with the reasonable reply below.
 
-For example, we did a grep of the following 
+It's justified because it took _two_ messages to get the point across.
+The first one asking nicely didn't make the necessary impact.
 
-mypc:linux(personal/linux/serdes) $ grep -rnI "Redistributions in binary form must reproduce the above copyright" ./net/
-./net/sunrpc/auth_gss/auth_gss.c:18: *  2. Redistributions in binary form must reproduce the above copyright
-./net/sunrpc/auth_gss/gss_mech_switch.c:15: *  2. Redistributions in binary form must reproduce the above copyright
-./net/sunrpc/auth_gss/gss_krb5_mech.c:16: *  2. Redistributions in binary form must reproduce the above copyright
-./net/bluetooth/ecc.c:10: *  * Redistributions in binary form must reproduce the above copyright
-./net/bluetooth/ecc.h:10: *  * Redistributions in binary form must reproduce the above copyright
-./net/can/gw.c:12: * 2. Redistributions in binary form must reproduce the above copyright
-./net/can/af_can.c:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/can/proc.c:12: * 2. Redistributions in binary form must reproduce the above copyright
-./net/can/bcm.c:12: * 2. Redistributions in binary form must reproduce the above copyright
-./net/can/raw.c:12: * 2. Redistributions in binary form must reproduce the above copyright
-./net/can/af_can.h:10: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/discover.c:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/node.h:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/netlink_compat.c:10: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/name_distr.h:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/bearer.c:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/name_table.h:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/name_distr.c:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/addr.c:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/subscr.h:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/link.h:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/net.h:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/netlink.c:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/sysctl.c:12: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/udp_media.c:11: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/socket.h:11: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/subscr.c:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/msg.c:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/name_table.c:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/msg.h:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/core.c:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/socket.c:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/net.c:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/bcast.c:14: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/bearer.h:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/core.h:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/node.c:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/addr.h:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/ib_media.c:17: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/link.c:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/netlink.h:12: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/server.c:12: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/discover.h:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/eth_media.c:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/bcast.h:13: * 2. Redistributions in binary form must reproduce the above copyright
-./net/tipc/server.h:12: * 2. Redistributions in binary form must reproduce the above copyright
-./net/6lowpan/iphc.c:29: * 2. Redistributions in binary form must reproduce the above copyright
-./net/sched/sch_codel.c:17: * 2. Redistributions in binary form must reproduce the above copyright
-./net/ieee802154/6lowpan/core.c:27: * 2. Redistributions in binary form must reproduce the above copyright 
-
-Thanks,
-WingMan
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
