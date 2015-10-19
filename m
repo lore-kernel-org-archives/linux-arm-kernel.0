@@ -1,11 +1,11 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 19 Oct 2015 09:11:29 +0900
-Subject: [PATCH v2 4/6] ARM: dts: Remove broken-cd from eMMC node in
- exynos5800-peach-pi
-In-Reply-To: <1444927873-15140-5-git-send-email-javier@osg.samsung.com>
+Date: Mon, 19 Oct 2015 09:11:52 +0900
+Subject: [PATCH v2 5/6] ARM: dts: Remove broken-cd from eMMC node in
+ exynos5420-peach-pi
+In-Reply-To: <1444927873-15140-6-git-send-email-javier@osg.samsung.com>
 References: <1444927873-15140-1-git-send-email-javier@osg.samsung.com>
- <1444927873-15140-5-git-send-email-javier@osg.samsung.com>
-Message-ID: <56243531.2090307@samsung.com>
+ <1444927873-15140-6-git-send-email-javier@osg.samsung.com>
+Message-ID: <56243548.1070901@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,7 +25,7 @@ On 16.10.2015 01:51, Javier Martinez Canillas wrote:
 > Changes since v1:
 > - None, new patch.
 > 
->  arch/arm/boot/dts/exynos5800-peach-pi.dts | 2 --
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts | 2 --
 >  1 file changed, 2 deletions(-)
 > 
 
