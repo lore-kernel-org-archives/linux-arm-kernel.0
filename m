@@ -1,46 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 19 Oct 2015 13:19:14 +0200
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Mon, 19 Oct 2015 12:20:33 +0100
 Subject: [PATCH] ARM64: juno: add NOR flash to device tree
 In-Reply-To: <20151019102932.GB10678@leverpostej>
 References: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
  <561FC681.2040809@arm.com>
  <CACRpkdaSox9WKb5-dkD_zAwO9WxP6+b010p3bdxsm1LRy=WvKg@mail.gmail.com>
  <5624C31D.3070906@arm.com> <20151019102932.GB10678@leverpostej>
-Message-ID: <CACRpkdaGscb_ccbGuwccsRj_b1d6xoveiiZpw1a5eXon3PxAUA@mail.gmail.com>
+Message-ID: <20151019112033.GA10728@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 12:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-
+On Mon, Oct 19, 2015 at 11:29:32AM +0100, Mark Rutland wrote:
+> > Correct, I just mentioned so that if you see/get any boot issue report
+> > with NOR flash and CPUIdle enabled, you will have the background instead
+> > of investigating the known issue again.
+> 
 > Also, for non U-Boot systems I was under the impression that the flash
-> was effectively owned by EFI (for variable storage),
+> was effectively owned by EFI (for variable storage), so it doesn't seem
+> like a sensible idea to me to poke the flash behind its back in that
+> case.
+> 
+> Given that, I'm not sure that the flash node should be enabled by
+> default in the DT.
+> 
+> Leif?
 
-If it is "owned" by something it is owned by the boot monitor, neither
-by U-Boot or (U)EFI. The boot monitor can flash "images" into
-the flash using USB or ethernet/TFTP and it is not part of any
-boot loader, but an autonomous flash image on the board.
-(Actually it can replace itself.)
+Well, given that it's a NOR device (or even two), it doesn't
+necessarily have to be an all-or-nothing decision.
 
-EFI or U-Boot is one such "image", as is the kernel and the
-other patch series I've sent (AFSv2 support) makes these
-"images" visible to the kernel as individual MTD partitions.
+0x0BFC0000-0x0BFFFFFF ("erase region 1", the last 256KB) is used for
+the persistent storage. This is hard wired into the UEFI image.
 
-This flash image format has nothing to do with UEFI or any other
-boot loader, it has been around since the RealView platforms,
-and has basically not changed since. (Well the forst pointer in
-the image information structure was changed from u32 to u64).
+But the rest of the flash consists of whatever the contents of
+images.txt in the magic configuration-via-USB-filesystem says it is.
+I'm not convinced that is written to the device in AFS format.
 
-My impression is that the boot monitor code is just a continous
-evolution from reference design to reference design inside ARM.
-It cares very little about what boot loader happens to be the
-fashion of the day, it is also used for flashing images of Windows
-mobile or QNX or whatever people want to run as well.
-
-The "images" are very simplistic things designed to support
-execute-in-place. New images can be added/removed by any
-compliant software, be it EFI, U-Boot or the kernel. But the
-format of these images is part of the hardware or rather the boot
-monitor, nothing else.
-
-Yours,
-Linus Walleij
+/
+    Leif
