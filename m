@@ -1,38 +1,40 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Mon, 19 Oct 2015 17:23:13 +0530
-Subject: [RFC PATCH] ARM: exynos_defconfig: Increase
- CONFIG_BLK_DEV_RAM_SIZE to 64K
-In-Reply-To: <20151019115150.GY32532@n2100.arm.linux.org.uk>
-References: <1445251715-9725-1-git-send-email-alim.akhtar@samsung.com>
- <5624D87D.4090901@osg.samsung.com>
- <20151019115150.GY32532@n2100.arm.linux.org.uk>
-Message-ID: <5624D9A9.1030506@samsung.com>
+From: B48286@freescale.com (Zhiqiang Hou)
+Date: Mon, 19 Oct 2015 19:56:09 +0800
+Subject: [PATCH V5 1/6] i2c: Add i2c support to Freescale Layerscape platforms
+Message-ID: <1445255774-32887-1-git-send-email-B48286@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+From: Shaohui Xie <Shaohui.Xie@freescale.com>
 
-On 10/19/2015 05:21 PM, Russell King - ARM Linux wrote:
-> On Mon, Oct 19, 2015 at 01:48:13PM +0200, Javier Martinez Canillas wrote:
->> Hello Alim,
->>
->> On 10/19/2015 12:48 PM, Alim Akhtar wrote:
->>> CONFIG_BLK_DEV_RAM_SIZE is currently set to 8K, which is a bit on the
->>> smaller side, lets bump it up to 64K so that a bigger RAM_DISK can
->>> be used with defconfig.
->>>
->>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->>> ---
->>
->> I agree that 8KiB is too small and that should be bumped, I'm also
->> not sure what the best size would be but 64KiB sounds reasonable
->> to me. So for this patch:
->
-> It's _not_ 8KiB or 64KiB.
->
-> config BLK_DEV_RAM_SIZE
->          int "Default RAM disk size (kbytes)"
->
-> It's 8MiB or 64MiB - the value you place here is in units of 1024 bytes.
->
-Thanks for correcting, will correct it.
+Modify the I2C_IMX config to support to Layerscape platforms.
+
+Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
+Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
+Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
+---
+V5: V4 V3 V2
+ - No change.
+
+ drivers/i2c/busses/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index 08b8617..14147ec 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -582,10 +582,10 @@ config I2C_IMG
+ 
+ config I2C_IMX
+ 	tristate "IMX I2C interface"
+-	depends on ARCH_MXC
++	depends on ARCH_MXC || ARCH_LAYERSCAPE
+ 	help
+ 	  Say Y here if you want to use the IIC bus controller on
+-	  the Freescale i.MX/MXC processors.
++	  the Freescale i.MX/MXC or Layerscape processors.
+ 
+ 	  This driver can also be built as a module.  If so, the module
+ 	  will be called i2c-imx.
+-- 
+2.1.0.27.g96db324
