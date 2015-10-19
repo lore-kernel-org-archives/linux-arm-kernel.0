@@ -1,233 +1,136 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Mon, 19 Oct 2015 14:12:31 +0200
-Subject: [PATCH v1 3/4] ASoC: Add codec machine driver for RK3036
-In-Reply-To: <1444698070-4191-4-git-send-email-zhengsq@rock-chips.com>
-References: <1444698070-4191-1-git-send-email-zhengsq@rock-chips.com>
- <1444698070-4191-4-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <1445256751.29057.12.camel@collabora.co.uk>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 19 Oct 2015 13:21:53 +0100
+Subject: [RFC PATCH v2 4/4] drm/armada: Convert the probe function to the
+ generic drm_of_component_probe()
+In-Reply-To: <1445257313-7147-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1445257313-7147-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1445257313-7147-5-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-10-13 at 09:01 +0800, Shunqian Zheng wrote:
-> From: ZhengShunQian <zhengsq@rock-chips.com>
-> 
-> This patch add the machine driver for rk3036.
+The armada DRM driver keeps some old platform data compatibility in the
+probe function that makes moving to the generic drm_of_component_probe()
+a bit more complicated that it should. Refactor the probe function to do
+the platform_data processing after the generic probe (and only if that
+fails). This way future cleanup can further remove support for it.
 
-Does this need a machine driver? Can't the simple-card machine driver
-be used for this ? (From the looks of it that would only mean the
-clocking setup for the cpu dai would need to move into the i2s driver?)
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/gpu/drm/armada/armada_drv.c | 73 +++++++++++--------------------------
+ 1 file changed, 22 insertions(+), 51 deletions(-)
 
-
-> RK3036 SoC is integrated with Inno codec,
-> this patch should work for all RK3036 board.
-> 
-> Signed-off-by: ZhengShunQian <zhengsq@rock-chips.com>
-> ---
-> ?sound/soc/rockchip/Kconfig???????????|??10 +++
-> ?sound/soc/rockchip/Makefile??????????|???2 +
-> ?sound/soc/rockchip/rockchip_rk3036.c | 147
-> +++++++++++++++++++++++++++++++++++
-> ?3 files changed, 159 insertions(+)
-> ?create mode 100644 sound/soc/rockchip/rockchip_rk3036.c
-> 
-> diff --git a/sound/soc/rockchip/Kconfig b/sound/soc/rockchip/Kconfig
-> index 5709057..3d48bda 100644
-> --- a/sound/soc/rockchip/Kconfig
-> +++ b/sound/soc/rockchip/Kconfig
-> @@ -33,3 +33,13 @@ config SND_SOC_ROCKCHIP_RT5645
-> ?	help
-> ?	??Say Y or M here if you want to add support for SoC audio
-> on Rockchip
-> ?	??boards using the RT5645/RT5650 codec, such as Veyron.
-> +
-> +config SND_SOC_ROCKCHIP_RK3036
-> +	tristate "ASoC support for RK3036 inner codec"
-> +	depends on SND_SOC_ROCKCHIP
-> +	select SND_SOC_ROCKCHIP_I2S
-> +	help
-> +	??Say Y or M here if you want to add support for SoC audio
-> on Rockchip
-> +	??RK3036.
-> +
-> +
-> diff --git a/sound/soc/rockchip/Makefile
-> b/sound/soc/rockchip/Makefile
-> index e9ba558..9a770c8 100644
-> --- a/sound/soc/rockchip/Makefile
-> +++ b/sound/soc/rockchip/Makefile
-> @@ -4,7 +4,9 @@ snd-soc-rockchip-i2s-objs := rockchip_i2s.o
-> ?obj-$(CONFIG_SND_SOC_ROCKCHIP_I2S) += snd-soc-rockchip-i2s.o
-> ?
-> ?snd-soc-rockchip-max98090-objs := rockchip_max98090.o
-> +snd-soc-rockchip-rk3036-objs := rockchip_rk3036.o
-> ?snd-soc-rockchip-rt5645-objs := rockchip_rt5645.o
-> ?
-> ?obj-$(CONFIG_SND_SOC_ROCKCHIP_MAX98090) += snd-soc-rockchip-
-> max98090.o
-> +obj-$(CONFIG_SND_SOC_ROCKCHIP_RK3036) += snd-soc-rockchip-rk3036.o
-> ?obj-$(CONFIG_SND_SOC_ROCKCHIP_RT5645) += snd-soc-rockchip-rt5645.o
-> diff --git a/sound/soc/rockchip/rockchip_rk3036.c
-> b/sound/soc/rockchip/rockchip_rk3036.c
-> new file mode 100644
-> index 0000000..3747d90
-> --- /dev/null
-> +++ b/sound/soc/rockchip/rockchip_rk3036.c
-> @@ -0,0 +1,147 @@
-> +/*
-> + * Machine driver for rk3036 audio codec.
-> + *
-> + * Copyright (c) 2015, ROCKCHIP CORPORATION.??All rights reserved.
-> + *
-> + * Author: Zheng ShunQian<zhengsq@rock-chips.com>
-> + */
-> +
-> +#include <linux/device.h>
-> +#include <linux/of.h>
-> +#include <linux/module.h>
-> +
-> +#include <sound/soc.h>
-> +#include <sound/pcm.h>
-> +#include <sound/soc-dapm.h>
-> +
-> +static int rk3036_hw_params(struct snd_pcm_substream *substream,
-> +			????struct snd_pcm_hw_params *params)
-> +{
-> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-> +	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-> +	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-> +	unsigned int dai_fmt = rtd->dai_link->dai_fmt;
-> +	int mclk, ret;
-> +
-> +	dev_dbg(rtd->dev, "codec machine: %s\n", __func__);
-> +	/* set codec DAI configuration */
-> +	ret = snd_soc_dai_set_fmt(codec_dai, dai_fmt);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	/* set cpu DAI configuration */
-> +	ret = snd_soc_dai_set_fmt(cpu_dai, dai_fmt);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	switch (params_rate(params)) {
-> +	case 8000:
-> +	case 16000:
-> +	case 24000:
-> +	case 32000:
-> +	case 48000:
-> +		mclk = 12288000;
-> +		break;
-> +	case 44100:
-> +		mclk = 11289600;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	/*Set the system clk for codec*/
-> +	ret = snd_soc_dai_set_sysclk(codec_dai, 0, mclk,
-> SND_SOC_CLOCK_IN);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, mclk,
-> SND_SOC_CLOCK_OUT);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	return 0;
-> +}
-> +
-> +static struct snd_soc_ops rk3036_ops = {
-> +	??.hw_params = rk3036_hw_params,
-> +};
-> +
-> +static int rk30_rk3036_codec_init(struct snd_soc_pcm_runtime *rtd)
-> +{
-> +	return 0;
-> +}
-> +
-> +static struct snd_soc_dai_link rk3036_dai = {
-> +	.name = "INNO-RK3036",
-> +	.stream_name = "RK3036 CODEC PCM",
-> +	.codec_dai_name = "rk3036-codec-dai",
-> +	.init = rk30_rk3036_codec_init,
-> +	.ops = &rk3036_ops,
-> +	/* set codec as slave */
-> +	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-> +		???SND_SOC_DAIFMT_CBS_CFS,
-> +};
-> +
-> +static struct snd_soc_card rockchip_rk3036_snd_card = {
-> +	.name = "ROCKCHIP-I2S",
-> +	.dai_link = &rk3036_dai,
-> +	.num_links = 1,
-> +};
-> +
-> +static int rockchip_rk3036_audio_probe(struct platform_device *pdev)
-> +{
-> +	struct snd_soc_card *card = &rockchip_rk3036_snd_card;
-> +	struct device_node *np = pdev->dev.of_node;
-> +
-> +	platform_set_drvdata(pdev, card);
-> +	card->dev = &pdev->dev;
-> +
-> +	rk3036_dai.codec_of_node = of_parse_phandle(np,
-> +			"rockchip,audio-codec", 0);
-> +	if (!rk3036_dai.codec_of_node) {
-> +		dev_err(&pdev->dev, "Property 'rockchip,audio-codec' 
-> "
-> +			"missing or invalid\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	rk3036_dai.cpu_of_node = of_parse_phandle(np,
-> +			"rockchip,i2s-controller", 0);
-> +	if (!rk3036_dai.cpu_of_node) {
-> +		dev_err(&pdev->dev, "Property 'rockchip,i2s-
-> controller' "
-> +			"missing or invalid\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	rk3036_dai.platform_of_node = rk3036_dai.cpu_of_node;
-> +
-> +	return snd_soc_register_card(card);
-> +}
-> +
-> +static int rockchip_rk3036_audio_remove(struct platform_device
-> *pdev)
-> +{
-> +	struct snd_soc_card *card = platform_get_drvdata(pdev);
-> +
-> +	snd_soc_unregister_card(card);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id rockchip_rk3036_of_match[] = {
-> +		{ .compatible = "rockchip,rk3036-audio", },
-> +		{},
-> +};
-> +MODULE_DEVICE_TABLE(of, rockchip_rk3036_of_match);
-> +
-> +static struct platform_driver rockchip_rk3036_audio_driver = {
-> +	.driver = {
-> +		.name???= "rk3036-audio",
-> +		.owner??= THIS_MODULE,
-> +		.of_match_table =
-> of_match_ptr(rockchip_rk3036_of_match),
-> +	},
-> +	.probe??????= rockchip_rk3036_audio_probe,
-> +	.remove?????= rockchip_rk3036_audio_remove,
-> +};
-> +module_platform_driver(rockchip_rk3036_audio_driver);
-> +
-> +MODULE_AUTHOR("Rockchip Inc.");
-> +MODULE_DESCRIPTION("Rockchip RK3036 Inno codec machine ASoC
-> driver");
-> +MODULE_LICENSE("GPL");
-
+diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
+index 63d909e..25c42f3 100644
+--- a/drivers/gpu/drm/armada/armada_drv.c
++++ b/drivers/gpu/drm/armada/armada_drv.c
+@@ -11,6 +11,7 @@
+ #include <linux/of_graph.h>
+ #include <drm/drmP.h>
+ #include <drm/drm_crtc_helper.h>
++#include <drm/drm_of.h>
+ #include "armada_crtc.h"
+ #include "armada_drm.h"
+ #include "armada_gem.h"
+@@ -265,78 +266,48 @@ static void armada_add_endpoints(struct device *dev,
+ 	}
+ }
+ 
+-static int armada_drm_find_components(struct device *dev,
+-	struct component_match **match)
+-{
+-	struct device_node *port;
+-	int i;
+-
+-	if (dev->of_node) {
+-		struct device_node *np = dev->of_node;
+-
+-		for (i = 0; ; i++) {
+-			port = of_parse_phandle(np, "ports", i);
+-			if (!port)
+-				break;
+-
+-			component_match_add(dev, match, compare_of, port);
+-			of_node_put(port);
+-		}
++static const struct component_master_ops armada_master_ops = {
++	.bind = armada_drm_bind,
++	.unbind = armada_drm_unbind,
++};
+ 
+-		if (i == 0) {
+-			dev_err(dev, "missing 'ports' property\n");
+-			return -ENODEV;
+-		}
++static int armada_drm_probe(struct platform_device *pdev)
++{
++	struct component_match *match = NULL;
++	int ret;
+ 
+-		for (i = 0; ; i++) {
+-			port = of_parse_phandle(np, "ports", i);
+-			if (!port)
+-				break;
++	ret = drm_of_component_probe(&pdev->dev, compare_dev_name,
++				     &armada_master_ops);
++	if (ret != -EINVAL)
++		return ret;
+ 
+-			armada_add_endpoints(dev, match, port);
+-			of_node_put(port);
+-		}
+-	} else if (dev->platform_data) {
+-		char **devices = dev->platform_data;
++	if (pdev->dev.platform_data) {
++		char **devices = pdev->dev.platform_data;
++		struct device_node *port;
+ 		struct device *d;
++		int i;
+ 
+ 		for (i = 0; devices[i]; i++)
+-			component_match_add(dev, match, compare_dev_name,
++			component_match_add(&pdev->dev, match, compare_dev_name,
+ 					    devices[i]);
+ 
+ 		if (i == 0) {
+-			dev_err(dev, "missing 'ports' property\n");
++			dev_err(&pdev->dev, "missing 'ports' property\n");
+ 			return -ENODEV;
+ 		}
+ 
+ 		for (i = 0; devices[i]; i++) {
+ 			d = bus_find_device_by_name(&platform_bus_type, NULL,
+-					devices[i]);
++						    devices[i]);
+ 			if (d && d->of_node) {
+ 				for_each_child_of_node(d->of_node, port)
+-					armada_add_endpoints(dev, match, port);
++					armada_add_endpoints(&pdev->dev, match,
++							     port);
+ 			}
+ 			put_device(d);
+ 		}
+ 	}
+ 
+-	return 0;
+-}
+-
+-static const struct component_master_ops armada_master_ops = {
+-	.bind = armada_drm_bind,
+-	.unbind = armada_drm_unbind,
+-};
+-
+-static int armada_drm_probe(struct platform_device *pdev)
+-{
+-	struct component_match *match = NULL;
+-	int ret;
+-
+-	ret = armada_drm_find_components(&pdev->dev, &match);
+-	if (ret < 0)
+-		return ret;
+-
+ 	return component_master_add_with_match(&pdev->dev, &armada_master_ops,
+ 					       match);
+ }
 -- 
-Sjoerd Simons
-Collabora Ltd.
+2.6.0
