@@ -1,24 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 19 Oct 2015 19:02:15 +0100
-Subject: [PATCH v3] arm64: Synchronise dump_backtrace() with perf callchain
-In-Reply-To: <1445092091-12373-1-git-send-email-jungseoklee85@gmail.com>
-References: <1445092091-12373-1-git-send-email-jungseoklee85@gmail.com>
-Message-ID: <20151019180214.GH11226@e104818-lin.cambridge.arm.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Mon, 19 Oct 2015 21:02:36 +0300
+Subject: [PATCH 0/5] ARM: dts: fix cpu compatible values
+In-Reply-To: <1443202506-13732-1-git-send-email-vz@mleia.com>
+References: <1443202506-13732-1-git-send-email-vz@mleia.com>
+Message-ID: <5625303C.6090902@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 17, 2015 at 02:28:11PM +0000, Jungseok Lee wrote:
-> Note that this patch does not cover a case where MMU is disabled. The
-> last stack frame of swapper, for example, has PC in a form of physical
-> address. Unfortunately, a simple conversion using phys_to_virt() cannot
-> cover all scenarios since PC is retrieved from LR - 4, not LR. It is
-> a big tradeoff to change both head.S and unwind_frame() for only a few
-> of symbols in *.S. Thus, this hunk does not take care of the case.
+On 25.09.2015 20:35, Vladimir Zapolskiy wrote:
+> The changeset corrects severeal cpu compatible properties
+> to defined ones in Documentation/devicetree/bindings/arm/cpus.txt
+> 
+> Vladimir Zapolskiy (5):
+>   ARM: dts: i.MX31: fix cpu compatible value
+>   ARM: dts: i.MX35: fix cpu compatible value
 
-That's fine, I think we can cope with a physical address as the last
-entry in the trace.
+Ping. Two patches above are applied by Shawn, could ARM maintainers
+apply the rest? Thank you in advance.
 
-Patch queued for 4.4. Thanks.
+>   ARM: dts: S3C2416: fix cpu compatible value
+>   ARM: dts: TI-Nspire: fix cpu compatible value
+>   ARM: dts: WM8750: fix cpu compatible value
+> 
+>  arch/arm/boot/dts/imx31.dtsi   | 2 +-
+>  arch/arm/boot/dts/imx35.dtsi   | 2 +-
+>  arch/arm/boot/dts/nspire.dtsi  | 2 +-
+>  arch/arm/boot/dts/s3c2416.dtsi | 2 +-
+>  arch/arm/boot/dts/wm8750.dtsi  | 2 +-
+>  5 files changed, 5 insertions(+), 5 deletions(-)
+> 
 
--- 
-Catalin
+--
+With best wishes,
+Vladimir
