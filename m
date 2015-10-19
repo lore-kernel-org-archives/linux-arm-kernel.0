@@ -1,73 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Oct 2015 23:50:33 +0100
-Subject: [BISECTED] Nokia 770 framebuffer breakage
-In-Reply-To: <20151019222413.GG31069@blackmetal.musicnaut.iki.fi>
-References: <20151019193759.GE31069@blackmetal.musicnaut.iki.fi>
- <20151019200522.GJ32536@n2100.arm.linux.org.uk>
- <20151019222413.GG31069@blackmetal.musicnaut.iki.fi>
-Message-ID: <20151019225033.GK32536@n2100.arm.linux.org.uk>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 19 Oct 2015 16:16:53 -0700
+Subject: [PATCH v2 1/2] KVM/arm: add hooks for armv7 fp/simd lazy switch
+ support
+In-Reply-To: <20151019085332.GA24104@cbox>
+References: <1443311009-4811-1-git-send-email-m.smarduch@samsung.com>
+ <1443311009-4811-2-git-send-email-m.smarduch@samsung.com>
+ <20151019085332.GA24104@cbox>
+Message-ID: <562579E5.6040008@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 01:24:13AM +0300, Aaro Koskinen wrote:
-> On Mon, Oct 19, 2015 at 09:05:22PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Oct 19, 2015 at 10:37:59PM +0300, Aaro Koskinen wrote:
-> > > Hi,
-> > > 
-> > > Somewhere between 4.1 .. 4.3-rc6 framebuffer on Nokia 770 stopped working.
-> > > 
-> > > Bisection points to:
-> > > 
-> > > commit 2568999835d7797afce3dcc3a3f368051ffcaf1f
-> > > Author: Russell King <rmk+kernel@arm.linux.org.uk>
-> > > Date:   Mon Mar 2 15:40:29 2015 +0000
-> > > 
-> > >     clkdev: add clkdev_create() helper
-> > > 
-> > > The commit cannot be reverted cleanly from current trees, but I re-tested
-> > > that commit 2568999835d7797afce3dcc3a3f368051ffcaf1f does not work and
-> > > commit 2568999835d7797afce3dcc3a3f368051ffcaf1f^1 indeed works.
-> > 
-> > Really need more information than that, like a kernel log or something.
+
+
+On 10/19/2015 1:53 AM, Christoffer Dall wrote:
+> On Sat, Sep 26, 2015 at 04:43:28PM -0700, Mario Smarduch wrote:
+>> This patch adds vcpu fields to track lazy state, save host FPEXC, and 
+>> offsets to fields.
+>>
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>> ---
+>>  arch/arm/include/asm/kvm_host.h | 6 ++++++
+>>  arch/arm/kernel/asm-offsets.c   | 2 ++
+>>  2 files changed, 8 insertions(+)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> index dcba0fa..194a8ef 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -111,6 +111,12 @@ struct kvm_vcpu_arch {
+>>  	/* Interrupt related fields */
+>>  	u32 irq_lines;		/* IRQ and FIQ levels */
+>>  
+>> +	/* Track fp/simd lazy switch state */
+>> +	u32 vfp_lazy;
 > 
-> This is a device with normal consumer electronics mechnics so serial
-> port access is PITA. However I managed to get a boot log, see below,
-> it's from commit 2568999835d7797afce3dcc3a3f368051ffcaf1f.
-
-Hmm, that points to a driver that doesn't bother checking whether it
-successfully got any resources:
-
-        hwa742.sys_ck = clk_get(NULL, "hwa_sys_ck");
-
-        spin_lock_init(&hwa742.req_lock);
-
-        if ((r = hwa742.int_ctrl->init(fbdev, 1, req_vram)) < 0)
-                goto err1;
-
-        if ((r = hwa742.extif->init(fbdev)) < 0)
-                goto err2;
-
-        ext_clk = clk_get_rate(hwa742.sys_ck);
-
-There's no check here that clk_get() actually worked, and this will be
-why you then end up with the division by zeros.  That's someone elses
-problem though. :)
-
-> > Can you try this patch please?
+> so is this a flags field or basically a boolean?  If the latter, what is
+> does it mean when the field is true vs. false?
+Yes it's a bool will update, and clarify comments.
 > 
-> Unfortunately with the patch it dies even earlier, without any output.
-
-It shouldn't (I've been through the resulting assembly code.)  I wonder
-if this is fixing the problem, but it's now failing elsewhere instead.
-
-What happens if you change it to:
-
-	l = clkdev_create(r, alias, alias_dev_name);
-
-which should be 100% identical to how older kernels behaved - if that
-works, can you print out 'alias' and 'alias_dev_name' for every call
-to clk_add_alias() and send that please?
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>> +
+>> +	/* Save host FPEXC register to restore on vcpu put */
+>> +	u32 saved_fpexc;
+> 
+> is this only the host's state?  If so, why not name it host_fpexc?
+That's right itis host state, will change.
+> 
+> Thanks,
+> -Christoffer
+> 
+>> +
+>>  	/* Exception Information */
+>>  	struct kvm_vcpu_fault_info fault;
+>>  
+>> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+>> index 871b826..e1c3a41 100644
+>> --- a/arch/arm/kernel/asm-offsets.c
+>> +++ b/arch/arm/kernel/asm-offsets.c
+>> @@ -186,6 +186,8 @@ int main(void)
+>>    DEFINE(VCPU_CPSR,		offsetof(struct kvm_vcpu, arch.regs.usr_regs.ARM_cpsr));
+>>    DEFINE(VCPU_HCR,		offsetof(struct kvm_vcpu, arch.hcr));
+>>    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
+>> +  DEFINE(VCPU_VFP_LAZY,		offsetof(struct kvm_vcpu, arch.vfp_lazy));
+>> +  DEFINE(VCPU_VFP_FPEXC,	offsetof(struct kvm_vcpu, arch.saved_fpexc));
+>>    DEFINE(VCPU_HSR,		offsetof(struct kvm_vcpu, arch.fault.hsr));
+>>    DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.fault.hxfar));
+>>    DEFINE(VCPU_HPFAR,		offsetof(struct kvm_vcpu, arch.fault.hpfar));
+>> -- 
+>> 1.9.1
+>>
