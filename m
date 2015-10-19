@@ -1,61 +1,192 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:24:55 +0100
-Subject: [PATCHv4 18/24] arm64/kvm: Make use of the system wide safe values
+Date: Mon, 19 Oct 2015 14:24:42 +0100
+Subject: [PATCHv4 05/24] arm64: Move mixed endian support detection
 In-Reply-To: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
 References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445261101-22344-19-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445261101-22344-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the system wide safe value from the new API for safer
-decisions
+Move the mixed endian support detection code to cpufeature.c
+from cpuinfo.c. This also moves the update_cpu_features()
+used by mixed endian detection code, which will get more
+functionality.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: kvmarm at lists.cs.columbia.edu
+Also moves the ID register field shifts to asm/sysreg.h,
+where all the useful definitions will end up in later patches.
+
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/reset.c    |    2 +-
- arch/arm64/kvm/sys_regs.c |   12 ++++++------
- 2 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm64/include/asm/cpu.h        |    2 ++
+ arch/arm64/include/asm/cpufeature.h |    7 +++++++
+ arch/arm64/include/asm/cputype.h    |   15 ---------------
+ arch/arm64/include/asm/sysreg.h     |    3 +++
+ arch/arm64/kernel/cpufeature.c      |   22 ++++++++++++++++++++++
+ arch/arm64/kernel/cpuinfo.c         |   21 ---------------------
+ 6 files changed, 34 insertions(+), 36 deletions(-)
 
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 91cf535..f34745c 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -53,7 +53,7 @@ static bool cpu_has_32bit_el1(void)
- {
- 	u64 pfr0;
+diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
+index 8e797b2..30db691 100644
+--- a/arch/arm64/include/asm/cpu.h
++++ b/arch/arm64/include/asm/cpu.h
+@@ -63,4 +63,6 @@ DECLARE_PER_CPU(struct cpuinfo_arm64, cpu_data);
+ void cpuinfo_store_cpu(void);
+ void __init cpuinfo_store_boot_cpu(void);
  
--	pfr0 = read_cpuid(ID_AA64PFR0_EL1);
-+	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
- 	return !!(pfr0 & 0x20);
++void update_cpu_features(struct cpuinfo_arm64 *info);
++
+ #endif /* __ASM_CPU_H */
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index b7769f6..b5f313d 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -10,6 +10,7 @@
+ #define __ASM_CPUFEATURE_H
+ 
+ #include <asm/hwcap.h>
++#include <asm/sysreg.h>
+ 
+ /*
+  * In the arm64 world (as in the ARM world), elf_hwcap is used both internally
+@@ -81,6 +82,12 @@ static inline int __attribute_const__ cpuid_feature_extract_field(u64 features,
+ 	return (s64)(features << (64 - 4 - field)) >> (64 - 4);
  }
  
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index d03d3af..87a64e8 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -693,13 +693,13 @@ static bool trap_dbgidr(struct kvm_vcpu *vcpu,
- 	if (p->is_write) {
- 		return ignore_write(vcpu, p);
- 	} else {
--		u64 dfr = read_cpuid(ID_AA64DFR0_EL1);
--		u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
--		u32 el3 = !!((pfr >> 12) & 0xf);
-+		u64 dfr = read_system_reg(SYS_ID_AA64DFR0_EL1);
-+		u64 pfr = read_system_reg(SYS_ID_AA64PFR0_EL1);
-+		u32 el3 = !!cpuid_feature_extract_field(pfr, ID_AA64PFR0_EL3_SHIFT);
++static inline bool id_aa64mmfr0_mixed_endian_el0(u64 mmfr0)
++{
++	return cpuid_feature_extract_field(mmfr0, ID_AA64MMFR0_BIGENDEL_SHIFT) == 0x1 ||
++		cpuid_feature_extract_field(mmfr0, ID_AA64MMFR0_BIGENDEL0_SHIFT) == 0x1;
++}
++
+ void __init setup_cpu_features(void);
  
--		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> 20) & 0xf) << 28) |
--					  (((dfr >> 12) & 0xf) << 24) |
--					  (((dfr >> 28) & 0xf) << 20) |
-+		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> ID_AA64DFR0_WRPS_SHIFT) & 0xf) << 28) |
-+					  (((dfr >> ID_AA64DFR0_BRPS_SHIFT) & 0xf) << 24) |
-+					  (((dfr >> ID_AA64DFR0_CTX_CMPS_SHIFT) & 0xf) << 20) |
- 					  (6 << 16) | (el3 << 14) | (el3 << 12));
- 		return true;
- 	}
+ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index ee6403d..31678b2 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -72,15 +72,6 @@
+ 
+ #define APM_CPU_PART_POTENZA	0x000
+ 
+-#define ID_AA64MMFR0_BIGENDEL0_SHIFT	16
+-#define ID_AA64MMFR0_BIGENDEL0_MASK	(0xf << ID_AA64MMFR0_BIGENDEL0_SHIFT)
+-#define ID_AA64MMFR0_BIGENDEL0(mmfr0)	\
+-	(((mmfr0) & ID_AA64MMFR0_BIGENDEL0_MASK) >> ID_AA64MMFR0_BIGENDEL0_SHIFT)
+-#define ID_AA64MMFR0_BIGEND_SHIFT	8
+-#define ID_AA64MMFR0_BIGEND_MASK	(0xf << ID_AA64MMFR0_BIGEND_SHIFT)
+-#define ID_AA64MMFR0_BIGEND(mmfr0)	\
+-	(((mmfr0) & ID_AA64MMFR0_BIGEND_MASK) >> ID_AA64MMFR0_BIGEND_SHIFT)
+-
+ #ifndef __ASSEMBLY__
+ 
+ /*
+@@ -112,12 +103,6 @@ static inline u32 __attribute_const__ read_cpuid_cachetype(void)
+ {
+ 	return read_cpuid(CTR_EL0);
+ }
+-
+-static inline bool id_aa64mmfr0_mixed_endian_el0(u64 mmfr0)
+-{
+-	return (ID_AA64MMFR0_BIGEND(mmfr0) == 0x1) ||
+-		(ID_AA64MMFR0_BIGENDEL0(mmfr0) == 0x1);
+-}
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index a7f3d4b..4246e41 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -44,6 +44,9 @@
+ #define SET_PSTATE_PAN(x) __inst_arm(0xd5000000 | REG_PSTATE_PAN_IMM |\
+ 				     (!!x)<<8 | 0x1f)
+ 
++#define ID_AA64MMFR0_BIGENDEL0_SHIFT	16
++#define ID_AA64MMFR0_BIGENDEL_SHIFT	8
++
+ #ifdef __ASSEMBLY__
+ 
+ 	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index e49be15..1ae8b24 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -22,7 +22,9 @@
+ #include <asm/cpu.h>
+ #include <asm/cpufeature.h>
+ #include <asm/processor.h>
++#include <asm/sysreg.h>
+ 
++static bool mixed_endian_el0 = true;
+ unsigned long elf_hwcap __read_mostly;
+ EXPORT_SYMBOL_GPL(elf_hwcap);
+ 
+@@ -41,6 +43,26 @@ unsigned int compat_elf_hwcap2 __read_mostly;
+ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ 
+ 
++bool cpu_supports_mixed_endian_el0(void)
++{
++	return id_aa64mmfr0_mixed_endian_el0(read_cpuid(ID_AA64MMFR0_EL1));
++}
++
++bool system_supports_mixed_endian_el0(void)
++{
++	return mixed_endian_el0;
++}
++
++static void update_mixed_endian_el0_support(struct cpuinfo_arm64 *info)
++{
++	mixed_endian_el0 &= id_aa64mmfr0_mixed_endian_el0(info->reg_id_aa64mmfr0);
++}
++
++void update_cpu_features(struct cpuinfo_arm64 *info)
++{
++	update_mixed_endian_el0_support(info);
++}
++
+ static bool
+ feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
+ {
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 75d5a86..8307b33 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -35,7 +35,6 @@
+  */
+ DEFINE_PER_CPU(struct cpuinfo_arm64, cpu_data);
+ static struct cpuinfo_arm64 boot_cpu_data;
+-static bool mixed_endian_el0 = true;
+ 
+ static char *icache_policy_str[] = {
+ 	[ICACHE_POLICY_RESERVED] = "RESERVED/UNKNOWN",
+@@ -69,26 +68,6 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
+ 	pr_info("Detected %s I-cache on CPU%d\n", icache_policy_str[l1ip], cpu);
+ }
+ 
+-bool cpu_supports_mixed_endian_el0(void)
+-{
+-	return id_aa64mmfr0_mixed_endian_el0(read_cpuid(ID_AA64MMFR0_EL1));
+-}
+-
+-bool system_supports_mixed_endian_el0(void)
+-{
+-	return mixed_endian_el0;
+-}
+-
+-static void update_mixed_endian_el0_support(struct cpuinfo_arm64 *info)
+-{
+-	mixed_endian_el0 &= id_aa64mmfr0_mixed_endian_el0(info->reg_id_aa64mmfr0);
+-}
+-
+-static void update_cpu_features(struct cpuinfo_arm64 *info)
+-{
+-	update_mixed_endian_el0_support(info);
+-}
+-
+ static int check_reg_mask(char *name, u64 mask, u64 boot, u64 cur, int cpu)
+ {
+ 	if ((boot & mask) == (cur & mask))
 -- 
 1.7.9.5
