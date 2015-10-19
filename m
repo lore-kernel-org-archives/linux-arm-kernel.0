@@ -1,66 +1,74 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 19 Oct 2015 15:06:59 -0700
-Subject: [RFT - PATCH v2 0/2] KVM/arm64: add fp/simd lazy switch support
-In-Reply-To: <20151018210738.GF7531@cbox>
-References: <1442964843-11953-1-git-send-email-m.smarduch@samsung.com>
- <20151005154540.GJ9011@cbox> <561BDFE3.5060403@samsung.com>
- <20151018210738.GF7531@cbox>
-Message-ID: <56256983.2030506@samsung.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 20 Oct 2015 06:07:01 +0800
+Subject: [RFC PATCH v3 4/4] drm/armada: Convert the probe function to the
+ generic drm_of_component_probe()
+In-Reply-To: <1445267270-23126-5-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <201510200618.NEUoP2ho%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Liviu,
 
+[auto build test WARNING on drm/drm-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
 
-On 10/18/2015 2:07 PM, Christoffer Dall wrote:
-> On Mon, Oct 12, 2015 at 09:29:23AM -0700, Mario Smarduch wrote:
->> Hi Christoffer, Marc -
->>   I just threw this test your way without any explanation.
-> 
-> I'm confused.  Did you send me something somewhere already?
-Yes in the last patchset
+url:    https://github.com/0day-ci/linux/commits/Liviu-Dudau/drm-Introduce-generic-probe-function-for-component-based-masters/20151019-231229
+config: arm-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-https://lists.cs.columbia.edu/pipermail/kvmarm/2015-October/016698.html
+All warnings (new ones prefixed by >>):
 
-I included a simple test I put together.
+   drivers/gpu/drm/armada/armada_drv.c: In function 'armada_drm_probe':
+>> drivers/gpu/drm/armada/armada_drv.c:291:4: warning: passing argument 2 of 'component_match_add' from incompatible pointer type
+       component_match_add(&pdev->dev, match, compare_dev_name,
+       ^
+   In file included from drivers/gpu/drm/armada/armada_drv.c:9:0:
+   include/linux/component.h:36:6: note: expected 'struct component_match **' but argument is of type 'struct component_match *'
+    void component_match_add(struct device *, struct component_match **,
+         ^
+>> drivers/gpu/drm/armada/armada_drv.c:304:6: warning: passing argument 2 of 'armada_add_endpoints' from incompatible pointer type
+         armada_add_endpoints(&pdev->dev, match,
+         ^
+   drivers/gpu/drm/armada/armada_drv.c:247:13: note: expected 'struct component_match **' but argument is of type 'struct component_match *'
+    static void armada_add_endpoints(struct device *dev,
+                ^
 
-> 
->>
->> The test loops, does fp arithmetic and checks the truncated result.
->> It could be a little more dynamic have an initial run to
->> get the sum to compare against while looping, different fp
->> hardware may come up with a different sum, but truncation is
->> to 5'th decimal point.
->>
->> The rationale is that if there is any fp/simd corruption
->> one of these runs should fail. I think most likely scenario
->> for that is a world switch in midst of fp operation. I've
->> instrumented (basically add some tracing to vcpu_put()) and
->> validated vcpu_put gets called thousands of time (for v7,v8)
->> for an over night test running two guests/host crunching
->> fp operations.
->>
->> Other then that not sure how to really catch any problems
->> with the patches applied. Obviously this is a huge issues, if this has
->> any problems. If you or Marc have any other ideas I'd be happy
->> to enhance the test.
-> 
-> I think it's important to run two VMs at the same time, each with some
-> floating-point work, and then run some floating point on the host at the
-> same time.
-> 
-> You can make that even more interesting by doing 32-bit guests at the
-> same time as well.
+vim +/component_match_add +291 drivers/gpu/drm/armada/armada_drv.c
 
-Yes that's the test combination I've been running.
-> 
-> I believe Marc was running Panranoia
-> (http://www.netlib.org/paranoia/paranoia.c) to test the last lazy
-> series.
+   285			char **devices = pdev->dev.platform_data;
+   286			struct device_node *port;
+   287			struct device *d;
+   288			int i;
+   289	
+   290			for (i = 0; devices[i]; i++)
+ > 291				component_match_add(&pdev->dev, match, compare_dev_name,
+   292						    devices[i]);
+   293	
+   294			if (i == 0) {
+   295				dev_err(&pdev->dev, "missing 'ports' property\n");
+   296				return -ENODEV;
+   297			}
+   298	
+   299			for (i = 0; devices[i]; i++) {
+   300				d = bus_find_device_by_name(&platform_bus_type, NULL,
+   301							    devices[i]);
+   302				if (d && d->of_node) {
+   303					for_each_child_of_node(d->of_node, port)
+ > 304						armada_add_endpoints(&pdev->dev, match,
+   305								     port);
+   306				}
+   307				put_device(d);
 
-I'll try this test and run it for several days, see if anything shows up.
-
-Thanks.
-> 
-> Thanks,
-> -Christoffer
-> 
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 53739 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151020/28920948/attachment-0001.obj>
