@@ -1,115 +1,97 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Mon, 19 Oct 2015 21:28:44 +0530
-Subject: [PATCH 5/7] ARM: exynos_defconfig: Normalize exynos defconfig
-In-Reply-To: <5624EF5D.7080403@osg.samsung.com>
-References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
- <1445234635-3950-6-git-send-email-alim.akhtar@samsung.com>
- <5624EF5D.7080403@osg.samsung.com>
-Message-ID: <CAGOxZ52bGrHo0DzjhyjGPXwX0CWUn0Oqkx-EGZY51zC5FWcAKw@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 19 Oct 2015 18:01:38 +0200
+Subject: [PATCH] spi-atmel.c: fix DMA for bits_per_word > 8
+In-Reply-To: <CALnQHM3WxNDV3xzJwRfGRVTMYL1mo44VbBb2YawZVUzn0CzFfA@mail.gmail.com>
+References: <CALnQHM3WxNDV3xzJwRfGRVTMYL1mo44VbBb2YawZVUzn0CzFfA@mail.gmail.com>
+Message-ID: <562513E2.4090303@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+David,
 
-On Mon, Oct 19, 2015 at 6:55 PM, Javier Martinez Canillas
-<javier@osg.samsung.com> wrote:
-> Hello Alim,
->
-> On 10/19/2015 08:03 AM, Alim Akhtar wrote:
->> make savedefconfig result in some difference, lets normalize the
->> defconfig.
->>
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->> ---
->
-> Did you make savedefconfig against v4.3-rc6 or tot linux-next?
->
-These are based on v4.3-rc5.
+It seems that your email client is doing funny things with the source
+code whitespace. Anyway, I can deal with this and re-format your patch:
+no problem. For later patches I advice you to use "git format-patch"
+command.
 
-> I remember we had issues in the past due savedefconfig made against
-> linux-next but then some of the patches in linux-next not making it
-> to the next release. So I think it should be good to mention what's
-> the base used for this patch.
->
-Ah, ok I didn't follow that, will check again on Linux-next as well as
-on 4.3-rc5
+Still, see comments below...
 
->>  arch/arm/configs/exynos_defconfig |    8 ++------
->>  1 file changed, 2 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
->> index 1ff2bfa2e183..3349713e6c63 100644
->> --- a/arch/arm/configs/exynos_defconfig
->> +++ b/arch/arm/configs/exynos_defconfig
->> @@ -99,10 +99,8 @@ CONFIG_SENSORS_LM90=y
->>  CONFIG_SENSORS_NTC_THERMISTOR=y
->>  CONFIG_SENSORS_PWM_FAN=y
->>  CONFIG_SENSORS_INA2XX=y
->> -CONFIG_THERMAL=y
->>  CONFIG_CPU_THERMAL=y
->>  CONFIG_THERMAL_EMULATION=y
->> -CONFIG_EXYNOS_THERMAL=y
->
-> I would prefer to split all the changes that removes symbols into a
-> separate patch explaining why these are not needed anymore (i.e: it
-> is selected now by symbol $foo).
->
-Ok ..let me rebase my patches and check these config changes again....
->>  CONFIG_WATCHDOG=y
->>  CONFIG_S3C2410_WATCHDOG=y
->>  CONFIG_MFD_CROS_EC=y
->> @@ -127,14 +125,14 @@ CONFIG_REGULATOR_S2MPS11=y
->>  CONFIG_REGULATOR_S5M8767=y
->>  CONFIG_REGULATOR_TPS65090=y
->>  CONFIG_DRM=y
->> -CONFIG_DRM_NXP_PTN3460=y
->> -CONFIG_DRM_PARADE_PS8622=y
->>  CONFIG_DRM_EXYNOS=y
->>  CONFIG_DRM_EXYNOS_FIMD=y
->>  CONFIG_DRM_EXYNOS_DSI=y
->>  CONFIG_DRM_EXYNOS_HDMI=y
->>  CONFIG_DRM_PANEL_SIMPLE=y
->>  CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=y
->> +CONFIG_DRM_NXP_PTN3460=y
->> +CONFIG_DRM_PARADE_PS8622=y
->
-> Moving these DRM bridge symbols to match savedefconfig is ok IMHO.
->
->>  CONFIG_FB_SIMPLE=y
->>  CONFIG_EXYNOS_VIDEO=y
->>  CONFIG_EXYNOS_MIPI_DSI=y
->> @@ -175,7 +173,6 @@ CONFIG_RTC_DRV_S5M=y
->>  CONFIG_RTC_DRV_S3C=y
->>  CONFIG_DMADEVICES=y
->>  CONFIG_PL330_DMA=y
->> -CONFIG_CHROME_PLATFORMS=y
->>  CONFIG_CROS_EC_CHARDEV=y
->>  CONFIG_COMMON_CLK_MAX77686=y
->>  CONFIG_COMMON_CLK_MAX77802=y
->> @@ -190,7 +187,6 @@ CONFIG_PWM_SAMSUNG=y
->>  CONFIG_PHY_EXYNOS5250_SATA=y
->>  CONFIG_EXT2_FS=y
->>  CONFIG_EXT3_FS=y
->> -CONFIG_EXT4_FS=y
->>  CONFIG_MSDOS_FS=y
->>  CONFIG_VFAT_FS=y
->>  CONFIG_TMPFS=y
->>
->
-> Same comment than above, I would prefer these to be split.
->
-> Best regards,
-> --
-> Javier Martinez Canillas
-> Open Source Group
-> Samsung Research America
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Le 13/10/2015 00:32, David Mosberger a ?crit :
+> I need the patch below to make DMA work in spi-atmel.c when bits_per_word > 8.
 
+A little bit more explanation would be good.
 
+>   --david
 
+I would need your "Signed-off-by:" tag.
+
+> -- 
+> eGauge Systems LLC, http://egauge.net/, 1.877-EGAUGE1, fax 720.545.9768
+> 
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index 04e48e5..7bb361a 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -711,6 +711,7 @@ static void atmel_spi_next_xfer_pio(struct
+> spi_master *master,
+>   * Submit next transfer for DMA.
+>   */
+>  static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
+> +  struct spi_message *msg,
+>   struct spi_transfer *xfer,
+>   u32 *plen)
+>  {
+> @@ -721,7 +722,7 @@ static int atmel_spi_next_xfer_dma_submit(struct
+> spi_master *master,
+>   struct dma_async_tx_descriptor *txdesc;
+>   struct dma_slave_config slave_config;
+>   dma_cookie_t cookie;
+> - u32 len = *plen;
+> + u32 len = *plen, bpw;
+> 
+>   dev_vdbg(master->dev.parent, "atmel_spi_next_xfer_dma_submit\n");
+> 
+> @@ -758,7 +759,11 @@ static int atmel_spi_next_xfer_dma_submit(struct
+> spi_master *master,
+> 
+>   *plen = len;
+> 
+> - if (atmel_spi_dma_slave_config(as, &slave_config, 8))
+> + bpw = xfer->bits_per_word;
+> + if (!bpw)
+
+I assume that xfer->bits_per_word must be filled with the proper value.
+So why do you need this test and de additional assignment below? Does it
+come from a bad experience with the "xfer->bits_per_word" value being empty?
+
+> + bpw = msg->spi->bits_per_word;
+> +
+> + if (atmel_spi_dma_slave_config(as, &slave_config, bpw))
+
+I may have called bpw variable as "bits" like elsewhere in this driver:
+it's a detail though.
+
+>   goto err_exit;
+> 
+>   /* Send both scatterlists */
+> @@ -1316,8 +1321,8 @@ static int atmel_spi_one_transfer(struct
+> spi_master *master,
+>   atmel_spi_pdc_next_xfer(master, msg, xfer);
+>   } else if (atmel_spi_use_dma(as, xfer)) {
+>   len = as->current_remaining_bytes;
+> - ret = atmel_spi_next_xfer_dma_submit(master,
+> - xfer, &len);
+> + ret = atmel_spi_next_xfer_dma_submit(master, msg,
+> +     xfer, &len);
+>   if (ret) {
+>   dev_err(&spi->dev,
+>   "unable to use DMA, fallback to PIO\n");
+
+Ok, the patch seems reasonable. So, can you please answer my main
+question and give me the permission to add your "Signed-off-by:" tag or
+re-send me a more standard patch...
+
+Thanks a lot for your work on this driver David.
+Best regards,
 -- 
-Regards,
-Alim
+Nicolas Ferre
