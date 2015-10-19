@@ -1,98 +1,73 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:00:35 +0100
-Subject: [PATCHv4 12/24] arm64: Refactor check_cpu_capabilities
+Date: Mon, 19 Oct 2015 14:00:44 +0100
+Subject: [PATCHv4 21/24] arm64: Add helper to decode register from instruction
 In-Reply-To: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
 References: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445259647-21541-13-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445259647-21541-22-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-check_cpu_capabilities runs through a given list of caps and
-checks if the system has the cap, updates the system capability
-bitmap and also runs any enable() methods associated with them.
-All of this is not quite obvious from the name 'check'. This
-patch splits the check_cpu_capabilities into two parts :
+Add a helper to extract the register field from a given
+instruction.
 
-1) update_cpu_capabilities
- => Runs through the given list and updates the system
-    wide capability map.
-2) enable_cpu_capabilities
- => Runs through the given list and invokes enable() (if any)
-    for the caps enabled on the system.
-
-Cc: Andre Przywara <andre.przywara@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Suggested-by: Catalin Marinas <catalin.marinsa@arm.com>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h |    2 +-
- arch/arm64/kernel/cpu_errata.c      |    2 +-
- arch/arm64/kernel/cpufeature.c      |   14 +++++++++++---
- 3 files changed, 13 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/insn.h |    2 ++
+ arch/arm64/kernel/insn.c      |   29 +++++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 2797876..b2f224b 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -137,7 +137,7 @@ static inline bool id_aa64mmfr0_mixed_endian_el0(u64 mmfr0)
- 
- void __init setup_cpu_features(void);
- 
--void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-+void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			    const char *info);
- void check_local_cpu_errata(void);
- void check_local_cpu_features(void);
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 6ffd914..09eab32 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -88,5 +88,5 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 
- void check_local_cpu_errata(void)
- {
--	check_cpu_capabilities(arm64_errata, "enabling workaround for");
-+	update_cpu_capabilities(arm64_errata, "enabling workaround for");
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 30e50eb..6dea3bc 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -289,6 +289,8 @@ enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+ u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn);
+ u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+ 				  u32 insn, u64 imm);
++u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
++					 u32 insn);
+ u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
+ 				enum aarch64_insn_branch_type type);
+ u32 aarch64_insn_gen_comp_branch_imm(unsigned long pc, unsigned long addr,
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index f341866..4286fed 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -388,6 +388,35 @@ u32 __kprobes aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+ 	return insn;
  }
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index a90a64d..78c4cb7a 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -629,7 +629,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{},
- };
  
--void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-+void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			    const char *info)
- {
- 	int i;
-@@ -642,8 +642,15 @@ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			pr_info("%s %s\n", info, caps[i].desc);
- 		cpus_set_cap(caps[i].capability);
- 	}
++u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
++					u32 insn)
++{
++	int shift;
++
++	switch (type) {
++	case AARCH64_INSN_REGTYPE_RT:
++	case AARCH64_INSN_REGTYPE_RD:
++		shift = 0;
++		break;
++	case AARCH64_INSN_REGTYPE_RN:
++		shift = 5;
++		break;
++	case AARCH64_INSN_REGTYPE_RT2:
++	case AARCH64_INSN_REGTYPE_RA:
++		shift = 10;
++		break;
++	case AARCH64_INSN_REGTYPE_RM:
++		shift = 16;
++		break;
++	default:
++		pr_err("%s: unknown register type encoding %d\n", __func__,
++		       type);
++		return 0;
++	}
++
++	return (insn >> shift) & GENMASK(4, 0);
 +}
 +
-+/*
-+ * Run through the enabled capabilities and enable() it on the CPUs
-+ */
-+void enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
-+{
-+	int i;
- 
--	/* second pass allows enable() to consider interacting capabilities */
- 	for (i = 0; caps[i].desc; i++) {
- 		if (cpus_have_cap(caps[i].capability) && caps[i].enable)
- 			caps[i].enable();
-@@ -652,7 +659,8 @@ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 
- void check_local_cpu_features(void)
- {
--	check_cpu_capabilities(arm64_features, "detected feature:");
-+	update_cpu_capabilities(arm64_features, "detected feature:");
-+	enable_cpu_capabilities(arm64_features);
- }
- 
- void __init setup_cpu_features(void)
+ static u32 aarch64_insn_encode_register(enum aarch64_insn_register_type type,
+ 					u32 insn,
+ 					enum aarch64_insn_register reg)
 -- 
 1.7.9.5
