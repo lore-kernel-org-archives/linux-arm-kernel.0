@@ -1,32 +1,30 @@
-From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
-Date: Mon, 19 Oct 2015 14:32:26 -0300
-Subject: [PATCH v2 4/4] ARM: configs: lpc18xx: enable EEPROM NVMEM driver
-In-Reply-To: <1445275946-32653-1-git-send-email-ariel@vanguardiasur.com.ar>
-References: <1445275946-32653-1-git-send-email-ariel@vanguardiasur.com.ar>
-Message-ID: <1445275946-32653-5-git-send-email-ariel@vanguardiasur.com.ar>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 19 Oct 2015 18:40:52 +0100
+Subject: [PATCH 14/17] media: st-rc: remove misuse of IRQF_NO_SUSPEND flag
+In-Reply-To: <1442850433-5903-15-git-send-email-sudeep.holla@arm.com>
+References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
+ <1442850433-5903-15-git-send-email-sudeep.holla@arm.com>
+Message-ID: <56252B24.4000207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable NVMEM driver for NXP LPC18xx EEPROM, which can be found in
-NXP LPC185x/3x and LPC435x/3x/2x/1x devices.
+Hi,
 
-Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
----
- arch/arm/configs/lpc18xx_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+On 21/09/15 16:47, Sudeep Holla wrote:
+> The device is set as wakeup capable using proper wakeup API but the
+> driver misuses IRQF_NO_SUSPEND to set the interrupt as wakeup source
+> which is incorrect.
+>
+> This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
+> enable_irq_wake instead.
+>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+> Cc: Maxime Coquelin <maxime.coquelin@st.com>
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> Cc: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-diff --git a/arch/arm/configs/lpc18xx_defconfig b/arch/arm/configs/lpc18xx_defconfig
-index b758a80..2c7e0da 100644
---- a/arch/arm/configs/lpc18xx_defconfig
-+++ b/arch/arm/configs/lpc18xx_defconfig
-@@ -149,6 +149,8 @@ CONFIG_ARM_PL172_MPMC=y
- CONFIG_PWM=y
- CONFIG_PWM_LPC18XX_SCT=y
- CONFIG_PHY_LPC18XX_USB_OTG=y
-+CONFIG_NVMEM=y
-+CONFIG_NVMEM_LPC18XX_EEPROM=y
- CONFIG_EXT2_FS=y
- # CONFIG_FILE_LOCKING is not set
- # CONFIG_DNOTIFY is not set
+Can you pick couple of these media patches ?
+
 -- 
-2.6.1
+Regards,
+Sudeep
