@@ -1,108 +1,96 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Mon, 19 Oct 2015 11:33:55 +0530
-Subject: [PATCH 7/7] ARM: EXYNOS: Remove code for restart and poweroff for
- exynos SoCs
-In-Reply-To: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
-References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <1445234635-3950-8-git-send-email-alim.akhtar@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 19 Oct 2015 14:20:29 +0800
+Subject: [linux-sunxi] Re: [PATCH 3/6] mfd: axp20x: Add support for RSB
+ based AXP223 PMIC
+In-Reply-To: <20151019060226.GQ2711@lukather>
+References: <1444840342-9233-1-git-send-email-wens@csie.org>
+ <1444840342-9233-4-git-send-email-wens@csie.org>
+ <20151016064159.GG2711@lukather>
+ <CAGb2v66B8EbTZkVrt3QT85fKCwOjL8OBWfQvcLHrLAe6NfavNA@mail.gmail.com>
+ <20151019060226.GQ2711@lukather>
+Message-ID: <CAGb2v66y9+_iemTn-AXQUPBRX=ZEQFfXgbVnwRzviDNfCSm_eQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we can use the generic syscon-{reboot/poweroff} drivers,
-so we don't need special handling for reboot/poweroff in
-exynos pmu driver. This patch remove the same.
+On Mon, Oct 19, 2015 at 2:02 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Fri, Oct 16, 2015 at 02:46:23PM +0800, Chen-Yu Tsai wrote:
+>> On Fri, Oct 16, 2015 at 2:41 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > On Thu, Oct 15, 2015 at 12:32:19AM +0800, Chen-Yu Tsai wrote:
+>> >> The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
+>> >> It is functionally identical to AXP221; only the regulator default
+>> >> voltage/status and the external host interface are different.
+>> >>
+>> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> >> ---
+>> >>  drivers/mfd/Kconfig        | 12 ++++++
+>> >>  drivers/mfd/Makefile       |  1 +
+>> >>  drivers/mfd/axp20x-core.c  |  2 +
+>> >>  drivers/mfd/axp20x-rsb.c   | 93 ++++++++++++++++++++++++++++++++++++++++++++++
+>> >>  include/linux/mfd/axp20x.h |  1 +
+>> >>  5 files changed, 109 insertions(+)
+>> >>  create mode 100644 drivers/mfd/axp20x-rsb.c
+>> >>
+>> >> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+>> >> index 9ba3feb3f2fc..6e5edb61d42e 100644
+>> >> --- a/drivers/mfd/Kconfig
+>> >> +++ b/drivers/mfd/Kconfig
+>> >> @@ -84,6 +84,7 @@ config MFD_BCM590XX
+>> >>  config MFD_AXP20X
+>> >>       bool "X-Powers AXP series PMICs"
+>> >>       select MFD_AXP20X_I2C
+>> >> +     select MFD_AXP20X_RSB
+>> >>
+>> >>  config MFD_AXP20X_CORE
+>> >>       bool
+>> >> @@ -102,6 +103,17 @@ config MFD_AXP20X_I2C
+>> >>         components like regulators or the PEK (Power Enable Key) under the
+>> >>         corresponding menus.
+>> >>
+>> >> +config MFD_AXP20X_RSB
+>> >> +     bool "X-Powers AXP series RSB PMICs"
+>> >> +     select MFD_AXP20X_CORE
+>> >> +     depends on SUNXI_RSB=y
+>> >
+>> > Do we need that? Even if the bus is compiled as a module, the driver
+>> > will not be probed before that, will it?
+>>
+>> There's a compile/link dependency on the __devm_regmap_init_sunxi_rsb().
+>
+> If it's exported, everything should be fine, no?
+>
+>> And both drivers are bool, i.e. can't be compiled as a module. What we
+>> don't want is enabling MFD_AXP20X_RSB without SUNXI_RSB.
+>
+> What would really be the issue here? The driver wouldn't be probed,
+> and that's it. Or am I missing something?
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
----
- arch/arm/mach-exynos/pmu.c |   43 -------------------------------------------
- 1 file changed, 43 deletions(-)
+The RSB bus / slave device functions have been merged into the RSB driver
+itself. Enabling MFD_AXP20X_RSB without enabling SUNXI_RSB means that RSB
+bus/device related functions are not compiled, i.e. link error:
 
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index de68938ee6aa..393c04aa727e 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -14,9 +14,6 @@
- #include <linux/of_address.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
--#include <linux/notifier.h>
--#include <linux/reboot.h>
--
- 
- #include "exynos-pmu.h"
- #include "regs-pmu.h"
-@@ -681,23 +678,6 @@ static unsigned int const exynos5420_list_disable_pmu_reg[] = {
- 	EXYNOS5420_CMU_RESET_FSYS_SYS_PWR_REG,
- };
- 
--static void exynos_power_off(void)
--{
--	unsigned int tmp;
--
--	pr_info("Power down.\n");
--	tmp = pmu_raw_readl(EXYNOS_PS_HOLD_CONTROL);
--	tmp ^= (1 << 8);
--	pmu_raw_writel(tmp, EXYNOS_PS_HOLD_CONTROL);
--
--	/* Wait a little so we don't give a false warning below */
--	mdelay(100);
--
--	pr_err("Power down failed, please power off system manually.\n");
--	while (1)
--		;
--}
--
- static void exynos5420_powerdown_conf(enum sys_powerdown mode)
- {
- 	u32 this_cluster;
-@@ -875,14 +855,6 @@ static void exynos5420_pmu_init(void)
- 	pr_info("EXYNOS5420 PMU initialized\n");
- }
- 
--static int pmu_restart_notify(struct notifier_block *this,
--		unsigned long code, void *unused)
--{
--	pmu_raw_writel(0x1, EXYNOS_SWRESET);
--
--	return NOTIFY_DONE;
--}
--
- static const struct exynos_pmu_data exynos3250_pmu_data = {
- 	.pmu_config	= exynos3250_pmu_config,
- 	.pmu_init	= exynos3250_pmu_init,
-@@ -940,20 +912,11 @@ static const struct of_device_id exynos_pmu_of_device_ids[] = {
- 	{ /*sentinel*/ },
- };
- 
--/*
-- * Exynos PMU restart notifier, handles restart functionality
-- */
--static struct notifier_block pmu_restart_handler = {
--	.notifier_call = pmu_restart_notify,
--	.priority = 128,
--};
--
- static int exynos_pmu_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *match;
- 	struct device *dev = &pdev->dev;
- 	struct resource *res;
--	int ret;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pmu_base_addr = devm_ioremap_resource(dev, res);
-@@ -978,12 +941,6 @@ static int exynos_pmu_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, pmu_context);
- 
--	ret = register_restart_handler(&pmu_restart_handler);
--	if (ret)
--		dev_warn(dev, "can't register restart handler err=%d\n", ret);
--
--	pm_power_off = exynos_power_off;
--
- 	dev_dbg(dev, "Exynos PMU Driver probe done\n");
- 	return 0;
- }
--- 
-1.7.10.4
+drivers/built-in.o: In function `axp20x_rsb_probe':
+/home/wens/sunxi/linux/drivers/mfd/axp20x-rsb.c:64: undefined
+reference to `__devm_regmap_init_sunxi_rsb'
+drivers/built-in.o: In function `axp20x_rsb_driver_init':
+/home/wens/sunxi/linux/drivers/mfd/axp20x-rsb.c:89: undefined
+reference to `sunxi_rsb_driver_register'
+Makefile:927: recipe for target 'vmlinux' failed
+
+The dependency is like "depends on I2C=y" for the I2C version.
+
+If you're asking about why "=y", I guess it's because MFD_AXP20X_RSB is bool,
+and if the depended on symbol is a tristate, which it actually is for I2c,
+we'd want it to be compiled in, and not built as a module, or again we'd get
+a undefined reference link error.
+
+Would it make sense to have SUNXI_RSB as a tristate symbol, i.e. can be built
+as a module? I'm nore sure. For multi-platform kernels, probably? Currently it
+isn't.
+
+Hope this clears it up.
+
+
+Regards
+ChenYu
