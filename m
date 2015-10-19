@@ -1,32 +1,58 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 19 Oct 2015 16:49:41 +0800
-Subject: [PATCH 0/8] {arm|arm64}: berlin: add watchdog support
-Message-ID: <1445244589-4838-1-git-send-email-jszhang@marvell.com>
+Date: Mon, 19 Oct 2015 16:49:43 +0800
+Subject: [PATCH 2/8] arm: dts: berlin2cd: add watchdog nodes
+In-Reply-To: <1445244589-4838-1-git-send-email-jszhang@marvell.com>
+References: <1445244589-4838-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1445244589-4838-3-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In Marvell berlin SoCs, there are watchdogs which are compatible with the
-snps,dw-wdt driver. This series try to add watchdog support for them.
+The Marvell Berlin BG2CD has 3 watchdogs which are compatible with the
+snps,dw-wdt driver sit in the sysmgr domain. This patch adds the
+corresponding device tree nodes.
 
-Jisheng Zhang (8):
-  arm: dts: berlin2q: add watchdog nodes
-  arm: dts: berlin2cd: add watchdog nodes
-  arm: dts: berlin2: add watchdog nodes
-  arm64: dts: berlin4ct: add watchdog nodes
-  arm: dts: berlin: enable wdt0 on Sony NSZ-GS7
-  ARM: dts: berlin: enable wdt0 on the Google Chromecast
-  arm: dts: berlin: enable wdt0 on the Marvell BG2Q DMP
-  arm64: dts: berlin: enable wdt0 on the Marvell BG4CT STB board
+NOTE: although BG2CD doesn't have a HW sysmgr, but the sysmgr domain
+exists.
 
- arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts        |  2 ++
- arch/arm/boot/dts/berlin2.dtsi                    | 24 +++++++++++++++++++++++
- arch/arm/boot/dts/berlin2cd-google-chromecast.dts |  2 ++
- arch/arm/boot/dts/berlin2cd.dtsi                  | 24 +++++++++++++++++++++++
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts        |  4 ++++
- arch/arm/boot/dts/berlin2q.dtsi                   | 24 +++++++++++++++++++++++
- arch/arm64/boot/dts/marvell/berlin4ct-stb.dts     |  4 ++++
- arch/arm64/boot/dts/marvell/berlin4ct.dtsi        | 24 +++++++++++++++++++++++
- 8 files changed, 108 insertions(+)
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ arch/arm/boot/dts/berlin2cd.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
+diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
+index 900213d..9108180 100644
+--- a/arch/arm/boot/dts/berlin2cd.dtsi
++++ b/arch/arm/boot/dts/berlin2cd.dtsi
+@@ -376,6 +376,30 @@
+ 			ranges = <0 0xfc0000 0x10000>;
+ 			interrupt-parent = <&sic>;
+ 
++			wdt0: watchdog at 1000 {
++				compatible = "snps,dw-wdt";
++				reg = <0x1000 0x100>;
++				clocks = <&refclk>;
++				interrupts = <0>;
++				status = "disabled";
++			};
++
++			wdt1: watchdog at 2000 {
++				compatible = "snps,dw-wdt";
++				reg = <0x2000 0x100>;
++				clocks = <&refclk>;
++				interrupts = <1>;
++				status = "disabled";
++			};
++
++			wdt2: watchdog at 3000 {
++				compatible = "snps,dw-wdt";
++				reg = <0x3000 0x100>;
++				clocks = <&refclk>;
++				interrupts = <2>;
++				status = "disabled";
++			};
++
+ 			sm_gpio1: gpio at 5000 {
+ 				compatible = "snps,dw-apb-gpio";
+ 				reg = <0x5000 0x400>;
 -- 
 2.6.1
