@@ -1,92 +1,80 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 19 Oct 2015 19:58:55 +0530
-Subject: [PATCH v3 6/8] drivers: soc: add support for exynos SROM driver
-In-Reply-To: <20151013150002.GA27569@Red>
-References: <20151013150002.GA27569@Red>
-Message-ID: <CAGcde9E+DELn_-ibE5+NtsrtBFNqG=AKF8wk=Yh8YYxZbk+v3w@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 19 Oct 2015 16:40:41 +0200
+Subject: [PATCH] ARM64: juno: add NOR flash to device tree
+In-Reply-To: <20151019113904.GE10678@leverpostej>
+References: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
+ <561FC681.2040809@arm.com>
+ <CACRpkdaSox9WKb5-dkD_zAwO9WxP6+b010p3bdxsm1LRy=WvKg@mail.gmail.com>
+ <5624C31D.3070906@arm.com> <20151019102932.GB10678@leverpostej>
+ <CACRpkdaGscb_ccbGuwccsRj_b1d6xoveiiZpw1a5eXon3PxAUA@mail.gmail.com>
+ <20151019113904.GE10678@leverpostej>
+Message-ID: <CAKv+Gu9YDBN8Epa+4xH0ert6LBRgfUAdC9OENdD16oQcGHVRXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Thanks for review.
-
-On 13 October 2015 at 20:30, LABBE Corentin <clabbe.montjoie@gmail.com> wrote:
-> +static struct exynos_srom_reg_dump *exynos_srom_alloc_reg_dump(
-> +               const unsigned long *rdump,
-> +               unsigned long nr_rdump)
-> +{
-> +       struct exynos_srom_reg_dump *rd;
-> +       unsigned int i;
-> +
-> +       rd = kcalloc(nr_rdump, sizeof(*rd), GFP_KERNEL);
-> +       if (!rd)
-> +               return NULL;
-> +
-> +       for (i = 0; i < nr_rdump; ++i)
-> +               rd[i].offset = rdump[i];
-> +
-> +       return rd;
-> +}
+On 19 October 2015 at 13:39, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Oct 19, 2015 at 01:19:14PM +0200, Linus Walleij wrote:
+>> On Mon, Oct 19, 2015 at 12:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>
+>> > Also, for non U-Boot systems I was under the impression that the flash
+>> > was effectively owned by EFI (for variable storage),
+>>
+>> If it is "owned" by something it is owned by the boot monitor, neither
+>> by U-Boot or (U)EFI. The boot monitor can flash "images" into
+>> the flash using USB or ethernet/TFTP and it is not part of any
+>> boot loader, but an autonomous flash image on the board.
+>> (Actually it can replace itself.)
+>>
+>> EFI or U-Boot is one such "image", as is the kernel and the
+>> other patch series I've sent (AFSv2 support) makes these
+>> "images" visible to the kernel as individual MTD partitions.
 >
-> You do not free rd anywhere in your code.
+> I understand this.
 >
-
-OK, I missed that, corrected in v4.
-
-> +static int exynos_srom_probe(struct platform_device *pdev)
-> +{
-> +       struct device_node *np;
-> +       struct device *dev = &pdev->dev;
-> +
-> +       np = dev->of_node;
+>> This flash image format has nothing to do with UEFI or any other
+>> boot loader, it has been around since the RealView platforms,
+>> and has basically not changed since. (Well the forst pointer in
+>> the image information structure was changed from u32 to u64).
+>>
+>> My impression is that the boot monitor code is just a continous
+>> evolution from reference design to reference design inside ARM.
+>> It cares very little about what boot loader happens to be the
+>> fashion of the day, it is also used for flashing images of Windows
+>> mobile or QNX or whatever people want to run as well.
 >
-> Are you sure that dev->of_node will be always set ?
-> I see lots of driver who if (dev->of_node) {}
+> I'm on about _runtime_ firmware (UEFI and/or Arm Trusted Firmware), not
+> the first stage firmware that's out of the way by the time the OS is
+> active.
 >
-
-Taken care in v4.
-
-> +       exynos_srom_base = of_iomap(np, 0);
-> +
-> +       if (!exynos_srom_base) {
-> +               pr_err("iomap of exynos srom controller failed\n");
-> +               return -ENOMEM;
-> +       }
+> As I mentioned, I was under the impression that at least a portion of
+> the flash was used by UEFI for variable storage, and that UEFI could
+> therefore access the flash at runtime (due to runtime services calls).
 >
-> You can use dev_err(dev, "") insted of pr_err
+> Accessing the flash at the same time as another agent (UEFI or the
+> Trusted Firmare) does not seem like a good idea, and is potentially
+> unsafe (see Sudeep's example w.r.t. cpuidle).
 >
-
-Taken care in v4.
-
-> +
-> +       exynos_srom_regs = exynos_srom_alloc_reg_dump(exynos_srom_offsets,
-> +                       sizeof(exynos_srom_offsets));
-> +
-> +       if (!exynos_srom_regs) {
-> +               iounmap(exynos_srom_regs);
-> +               return -ENOMEM;
-> +       }
-> +
-> +       return 0;
-> +}
+>> The "images" are very simplistic things designed to support
+>> execute-in-place. New images can be added/removed by any
+>> compliant software, be it EFI, U-Boot or the kernel. But the
+>> format of these images is part of the hardware or rather the boot
+>> monitor, nothing else.
 >
-> Instead of using a global static exynos_srom_base/exynos_srom_regs, why you do not use platform_set_drvdata() ?
+> This is technically true. However, my argument is not that this doesn't
+> describe the hardware, but rather that this describes a piece of
+> hardware which it is not safe to use unless it is known that any runtime
+> firmware is not concurrently accessing it.
+>
+> Given that there is no mechanism to mediate access to the flash,
+> allowing Linux to access it does not seem safe.
 >
 
-OK. Taken care in v4.
+I sent some patches around about a year ago that registers UEFI
+runtime MMIO regions with /proc/iomem, which should prevent drivers
+from attaching to the same physical memory regions. With that in
+place, describing it in the DT would not be a problem, and on devices
+with multiple NOR flashes of which only one is used at runtime by
+UEFI, it would allow Linux to still access the other one.
 
-Posted v4 here
-
-https://lkml.org/lkml/2015/10/19/278
-
-Thanks,
-Pankaj Dubey
-
-> Regards
-> LABBE Corentin
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Ard.
