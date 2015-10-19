@@ -1,86 +1,48 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Mon, 19 Oct 2015 13:31:27 +0800
-Subject: [PATCH v10 3/3] arm64: dts: mediatek: add xHCI & usb phy for
- mt8173
-In-Reply-To: <56237BF2.5070809@cogentembedded.com>
-References: <1445140279-18121-1-git-send-email-chunfeng.yun@mediatek.com>
- <1445140279-18121-4-git-send-email-chunfeng.yun@mediatek.com>
- <56237BF2.5070809@cogentembedded.com>
-Message-ID: <1445232687.28324.4.camel@mhfsdcap03>
+From: pramodku@broadcom.com (Pramod Kumar)
+Date: Mon, 19 Oct 2015 11:13:07 +0530
+Subject: [PATCH 00/11] Generalized broadcom cygnus gpio driver
+Message-ID: <1445233398-27129-1-git-send-email-pramodku@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2015-10-18 at 14:01 +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 10/18/2015 6:51 AM, Chunfeng Yun wrote:
-> 
-> > add xHCI and phy drivers for MT8173-EVB
-> >
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> 
-> [...]
-> 
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > index d18ee42..46f5f50 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> [...]
-> > @@ -487,6 +488,47 @@
-> >   			clock-names = "source", "hclk";
-> >   			status = "disabled";
-> >   		};
-> > +
-> > +		usb30: usb at 11270000 {
-> > +			compatible = "mediatek,mt8173-xhci";
-> > +			reg = <0 0x11270000 0 0x1000>,
-> > +			      <0 0x11280700 0 0x0100>;
-> > +			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-> > +			power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-> > +			clocks = <&topckgen CLK_TOP_USB30_SEL>,
-> > +				 <&pericfg CLK_PERI_USB0>,
-> > +				 <&pericfg CLK_PERI_USB1>;
-> > +			clock-names = "sys_ck",
-> > +				      "wakeup_deb_p0",
-> > +				      "wakeup_deb_p1";
-> > +			phys = <&phy_port0 PHY_TYPE_USB3>,
-> > +			       <&phy_port1 PHY_TYPE_USB2>;
-> > +			mediatek,syscon-wakeup = <&pericfg>;
-> > +			status = "okay";
-> > +		};
-> > +
-> > +		u3phy: usb-phy at 11290000 {
-> > +			compatible = "mediatek,mt8173-u3phy";
-> > +			reg = <0 0x11290000 0 0x800>;
-> > +			clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
-> > +			clock-names = "u3phya_ref";
-> > +			#address-cells = <2>;
-> > +			#size-cells = <2>;
-> > +			ranges;
-> > +			status = "okay";
-> 
->     Don't you need the "power-domains" prop here as well?
-No, the power-domains of MAC and PHY are separated, but PHY's can't be
-operated by software.
+Generalized pinctrl-cygnus-gpio driver so that it could be used for all
+iProc architecture based future SoCs having same gpio pin controller.
+Generalization process made the below changes in driver-
 
-Thanks.
-> 
-> > +
-> > +			phy_port0: port at 11290800 {
-> > +				reg = <0 0x11290800 0 0x800>;
-> > +				#phy-cells = <1>;
-> > +				status = "okay";
-> > +			};
-> > +
-> > +			phy_port1: port at 11291000 {
-> > +				reg = <0 0x11291000 0 0x800>;
-> > +				#phy-cells = <1>;
-> > +				status = "okay";
-> > +			};
-> > +		};
-> >   	};
-> >   };
-> >
-> 
-> MBR, Sergei
-> 
+1. Removed pin mapping from driver and addressed this via DT through
+"gpio-ranges" property.
+2. Addressed number of pins from DT through "ngpios" property and removed
+from driver.
+3. Since all iProc based SoCs would use this driver hence renamed all
+variables/macros/functions and even file name on iproc.
+
+This patchset applies on v4.3-rc4 and is tested on cygnus SVK and could be
+find at-
+https://github.com/Broadcom/arm64-linux/tree/iproc-gpio-v1
+
+Pramod Kumar (11):
+  dt-bindings: pinctrl: Optional DT property to support pin mappings
+  pinctrl: Remove GPIO to Pinctrl pin mapping from driver
+  dts: pinctrl: Add GPIO to Pinctrl pin mapping in DT
+  dt-binding: Add new compatible string for gpio controller driver
+  dt-binding: Add ngpios property to GPIO controller node
+  dts: define ngpios property in gpio controller's node
+  pinctrl: use ngpios propety from DT
+  pinctrl: Add new compatible string to GPIO controller driver
+  gpio: Rename func/macro/var to IP-block,iproc
+  Documentation: Rename gpio controller name from cygnus to iproc
+  pinctrl: Rename gpio driver from cygnus to iproc
+
+ .../{brcm,cygnus-gpio.txt => brcm,iproc-gpio.txt}  |  25 +-
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |  56 +-
+ drivers/pinctrl/bcm/Kconfig                        |  30 +-
+ drivers/pinctrl/bcm/Makefile                       |   2 +-
+ drivers/pinctrl/bcm/pinctrl-cygnus-gpio.c          | 909 ---------------------
+ drivers/pinctrl/bcm/pinctrl-iproc-gpio.c           | 759 +++++++++++++++++
+ 6 files changed, 854 insertions(+), 927 deletions(-)
+ rename Documentation/devicetree/bindings/pinctrl/{brcm,cygnus-gpio.txt => brcm,iproc-gpio.txt} (75%)
+ delete mode 100644 drivers/pinctrl/bcm/pinctrl-cygnus-gpio.c
+ create mode 100644 drivers/pinctrl/bcm/pinctrl-iproc-gpio.c
+
+-- 
+1.9.1
