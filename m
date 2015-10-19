@@ -1,75 +1,139 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Mon, 19 Oct 2015 13:09:22 +0200
-Subject: [PATCH v3] arm-soc: Add support for Sigma Designs Tango4
-In-Reply-To: <CAL_JsqKa4trfpLY_DPsjBrfH-7SSUQMACYVW7DNN1=Pv3B4FrA@mail.gmail.com>
-References: <560EAA7C.3070302@free.fr> <5124277.UR9sg1IOHT@wuerfel>
- <560EFDB3.9010305@free.fr> <11113740.WL812ZaRcZ@wuerfel>
- <5612A473.8030405@sigmadesigns.com> <5613EF4C.30603@sigmadesigns.com>
- <CAL_JsqJ+WTBYF=sJWbkgNzL48H5AiXL4aoVV3DNiL6T_UQKQfg@mail.gmail.com>
- <561D2952.4060908@sigmadesigns.com>
- <CAL_JsqKa4trfpLY_DPsjBrfH-7SSUQMACYVW7DNN1=Pv3B4FrA@mail.gmail.com>
-Message-ID: <5624CF62.6020001@sigmadesigns.com>
+From: w-kwok2@ti.com (Kwok, WingMan)
+Date: Mon, 19 Oct 2015 11:10:04 +0000
+Subject: [PATCH] ARM: keystone: dts: add PCI serdes driver bindings
+In-Reply-To: <5620AD8B.3060503@ti.com>
+References: <1444919230-30932-1-git-send-email-w-kwok2@ti.com>
+ <5620AD8B.3060503@ti.com>
+Message-ID: <230CBA6E4B6B6B418E8730AC28E6FC7E04229107@DFLE11.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/2015 19:55, Rob Herring wrote:
-> Marc Gonzalez wrote:
->> On 09/10/2015 16:08, Rob Herring wrote:
->>
->>> No cpus node?
->>
->> Is this used to document the CPU?
->> I didn't see any code making use of that information.
+Roger,
+
+> -----Original Message-----
+> From: Quadros, Roger
+> Sent: Friday, October 16, 2015 3:56 AM
+> To: Kwok, WingMan; robh+dt at kernel.org; pawel.moll at arm.com;
+> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk; galak at codeaurora.org;
+> KISHON VIJAY ABRAHAM; Karicheri, Muralidharan; bhelgaas at google.com;
+> ssantosh at kernel.org; linux at arm.linux.org.uk; devicetree at vger.kernel.org;
+> linux-kernel at vger.kernel.org; linux-pci at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH] ARM: keystone: dts: add PCI serdes driver bindings
 > 
-> The SMP code uses it: arch/arm/kernel/devtree.c
+> WingMan,
+> 
+> On 15/10/15 17:27, WingMan Kwok wrote:
+> > This patch adds the required PCI serdes bindings whcih can then be
+> > enabled by setting the corresponding statuses to "ok" in order to
+> > configure and start the PCI serdes.
+> >
+> > This patch depends on the updates to the Keystone PCIe host driver
+> > and common serdes driver patch series that is submitted separately.
+> >
+> > Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+> > ---
+> >  arch/arm/boot/dts/k2e.dtsi      |   21 +++++++++++++++++++++
+> >  arch/arm/boot/dts/keystone.dtsi |   21 +++++++++++++++++++++
+> >  2 files changed, 42 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
+> > index 675fb8e..3b36575 100644
+> > --- a/arch/arm/boot/dts/k2e.dtsi
+> > +++ b/arch/arm/boot/dts/k2e.dtsi
+> > @@ -86,6 +86,16 @@
+> >  			gpio,syscon-dev = <&devctrl 0x240>;
+> >  		};
+> >
+> > +		pcie1_phy: pciephy at 2326000 {
+> 
+> Should be
+> 		pcie1_phy: phy at 2326000 {
+> 
 
-Now I see arm_dt_init_cpu_maps()
+will change in next version.
 
-<confused> I thought DT was used to specify things that cannot be
-dynamically discovered? Isn't it possible for the OS to discover at
-run-time how many cores and/or CPUs are present?
+> > +			#phy-cells = <0>;
+> > +			compatible = "ti,keystone-serdes-pcie";
+> > +			reg = <0x02326000 0x4000>;
+> > +			reg-names = "serdes";
+> > +			link-rate-kbps = <5000000>;
+> > +			num-lanes = <2>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> >  		pcie1: pcie at 21020000 {
+> >  			compatible = "ti,keystone-pcie","snps,dw-pcie";
+> >  			clocks = <&clkpcie1>;
+> > @@ -130,6 +140,17 @@
+> >  					<GIC_SPI 375 IRQ_TYPE_EDGE_RISING>,
+> >  					<GIC_SPI 376 IRQ_TYPE_EDGE_RISING>;
+> >  			};
+> > +
+> > +			/* PCIE phy */
+> > +			serdeses {
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +				serdes at 0 {
+> > +					reg = <0>;
+> > +					phys = <&pcie1_phy>;
+> > +				};
+> > +			};
+> > +
+> >  		};
+> >
+> >  		mdio: mdio at 24200f00 {
+> > diff --git a/arch/arm/boot/dts/keystone.dtsi
+> b/arch/arm/boot/dts/keystone.dtsi
+> > index 72816d6..6566cc4 100644
+> > --- a/arch/arm/boot/dts/keystone.dtsi
+> > +++ b/arch/arm/boot/dts/keystone.dtsi
+> > @@ -275,6 +275,16 @@
+> >  			ti,syscon-dev = <&devctrl 0x2a0>;
+> >  		};
+> >
+> > +		pcie0_phy: pciephy at 2320000 {
+> 
+> ditto.
+> 
 
-On a related topic, I have a DTS for my board, which includes the
-DTS for the architecture. However, there are single-core SoCs and
-dual-core SoCs. Where is the cpus node supposed to appear?
+will change in next version.
 
-Or should I specify in the architecture DTS the maximum number
-of cores, as in
+> > +			#phy-cells = <0>;
+> > +			compatible = "ti,keystone-serdes-pcie";
+> > +			reg = <0x02320000 0x4000>;
+> > +			reg-names = "serdes";
+> > +			link-rate-kbps = <5000000>;
+> > +			num-lanes = <2>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> >  		pcie0: pcie at 21800000 {
+> >  			compatible = "ti,keystone-pcie", "snps,dw-pcie";
+> >  			clocks = <&clkpcie>;
+> > @@ -319,6 +329,17 @@
+> >  					<GIC_SPI 28 IRQ_TYPE_EDGE_RISING>,
+> >  					<GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
+> >  			};
+> > +
+> > +			/* PCIE phy */
+> > +			serdeses {
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +				serdes at 0 {
+> > +					reg = <0>;
+> > +					phys = <&pcie0_phy>;
+> > +				};
+> > +			};
+> > +
+> >  		};
+> >  	};
+> >  };
+> >
+> 
+> --
+> cheers,
+> -roger
 
-    cpus {
-        #address-cells = <1>;
-        #size-cells = <0>;
-        cpu at 0 {
-            compatible = "arm,cortex-a9";
-            reg = <0>;
-        };
-        cpu at 1 {
-            compatible = "arm,cortex-a9";
-            reg = <1>;
-        };
-    };
-
-
->>> No pl310? A9 performance mon?
-
-Found "arm,cortex-a9-pmu" in arch/arm/kernel/perf_event_v7.c
-Are the PMU registers available from non-secure mode, or is TrustZone
-going to get in the way?
-
-
-About the cache controller, I was confused by this comment:
-	/*
-	 * Always enable non-secure access to the lockdown registers -
-	 * we write to them as part of the L2C enable sequence so they
-	 * need to be accessible.
-	 */
-	l2x0_saved_regs.aux_ctrl = aux | L310_AUX_CTRL_NS_LOCKDOWN;
-
-I see no lock() function, only unlock().
-
-But the unlock function merely writes 0 to the relevant registers,
-and 0 is the value at reset for those registers. Since nothing ever
-sets the registers to non-zero, why is the unlock needed at all?
-
-
-Regards.
+Thanks,
+WingMan
