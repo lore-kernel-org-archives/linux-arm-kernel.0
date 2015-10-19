@@ -1,126 +1,66 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 19 Oct 2015 10:08:59 +0200
-Subject: [PATCH v5 5/5] clk: sunxi: mod1 clock support
-In-Reply-To: <1445242139-20965-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1445242139-20965-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1445242139-20965-6-git-send-email-maxime.ripard@free-electrons.com>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Mon, 19 Oct 2015 10:15:39 +0200
+Subject: [PATCH] ASoC: dt-bindings: Drop unneeded properties rockchip
+ i2s/spdif bindings
+Message-ID: <1445242539-9098-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Emilio L?pez <emilio@elopez.com.ar>
+Neither the rockchip i2s nor the rockchip spdif binding support child
+devices so #address-cells and #size-cells properties aren't required.
+Remove these from the bindings.
 
-The module 1 type of clocks consist of a gate and a mux and are used on
-the audio blocks to mux and gate the PLL2 outputs for AC97, IIS or
-SPDIF. This commit adds support for them on the sunxi clock driver.
-
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 ---
- drivers/clk/sunxi/Makefile       |  1 +
- drivers/clk/sunxi/clk-a10-mod1.c | 81 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 82 insertions(+)
- create mode 100644 drivers/clk/sunxi/clk-a10-mod1.c
+This patch is on top of the ASoC tree
 
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index 70a449a419e6..cb4c299214ce 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -5,6 +5,7 @@
- obj-y += clk-sunxi.o clk-factors.o
- obj-y += clk-a10-codec.o
- obj-y += clk-a10-hosc.o
-+obj-y += clk-a10-mod1.o
- obj-y += clk-a10-pll2.o
- obj-y += clk-a20-gmac.o
- obj-y += clk-mod0.o
-diff --git a/drivers/clk/sunxi/clk-a10-mod1.c b/drivers/clk/sunxi/clk-a10-mod1.c
-new file mode 100644
-index 000000000000..e9d870de165c
---- /dev/null
-+++ b/drivers/clk/sunxi/clk-a10-mod1.c
-@@ -0,0 +1,81 @@
-+/*
-+ * Copyright 2013 Emilio L?pez
-+ *
-+ * Emilio L?pez <emilio@elopez.com.ar>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+
-+static DEFINE_SPINLOCK(mod1_lock);
-+
-+#define SUN4I_MOD1_ENABLE	31
-+#define SUN4I_MOD1_MUX		16
-+#define SUN4I_MOD1_MUX_WIDTH	2
-+#define SUN4I_MOD1_MAX_PARENTS	4
-+
-+static void __init sun4i_mod1_clk_setup(struct device_node *node)
-+{
-+	struct clk *clk;
-+	struct clk_mux *mux;
-+	struct clk_gate *gate;
-+	const char *parents[4];
-+	const char *clk_name = node->name;
-+	void __iomem *reg;
-+	int i;
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (IS_ERR(reg))
-+		return;
-+
-+	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-+	if (!mux)
-+		goto err_unmap;
-+
-+	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-+	if (!gate)
-+		goto err_free_mux;
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+	i = of_clk_parent_fill(node, parents, SUN4I_MOD1_MAX_PARENTS);
-+
-+	gate->reg = reg;
-+	gate->bit_idx = SUN4I_MOD1_ENABLE;
-+	gate->lock = &mod1_lock;
-+	mux->reg = reg;
-+	mux->shift = SUN4I_MOD1_MUX;
-+	mux->mask = BIT(SUN4I_MOD1_MUX_WIDTH) - 1;
-+	mux->lock = &mod1_lock;
-+
-+	clk = clk_register_composite(NULL, clk_name, parents, i,
-+				     &mux->hw, &clk_mux_ops,
-+				     NULL, NULL,
-+				     &gate->hw, &clk_gate_ops, 0);
-+	if (IS_ERR(clk))
-+		goto err_free_gate;
-+
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+
-+	return;
-+
-+err_free_gate:
-+	kfree(gate);
-+err_free_mux:
-+	kfree(mux);
-+err_unmap:
-+	iounmap(reg);
-+}
-+CLK_OF_DECLARE(sun4i_mod1, "allwinner,sun4i-a10-mod1-clk",
-+	       sun4i_mod1_clk_setup);
+ Documentation/devicetree/bindings/sound/rockchip-i2s.txt   | 4 ----
+ Documentation/devicetree/bindings/sound/rockchip-spdif.txt | 4 ----
+ 2 files changed, 8 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+index 9b82c20..085e0bc 100644
+--- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+@@ -12,8 +12,6 @@ Required properties:
+ - reg: physical base address of the controller and length of memory mapped
+   region.
+ - interrupts: should contain the I2S interrupt.
+-- #address-cells: should be 1.
+-- #size-cells: should be 0.
+ - dmas: DMA specifiers for tx and rx dma. See the DMA client binding,
+ 	Documentation/devicetree/bindings/dma/dma.txt
+ - dma-names: should include "tx" and "rx".
+@@ -28,8 +26,6 @@ i2s at ff890000 {
+ 	compatible = "rockchip,rk3288-i2s", "rockchip,rk3066-i2s";
+ 	reg = <0xff890000 0x10000>;
+ 	interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+-	#address-cells = <1>;
+-	#size-cells = <0>;
+ 	dmas = <&pdma1 0>, <&pdma1 1>;
+ 	dma-names = "tx", "rx";
+ 	clock-names = "i2s_hclk", "i2s_clk";
+diff --git a/Documentation/devicetree/bindings/sound/rockchip-spdif.txt b/Documentation/devicetree/bindings/sound/rockchip-spdif.txt
+index 33dd82c..e64dbde 100644
+--- a/Documentation/devicetree/bindings/sound/rockchip-spdif.txt
++++ b/Documentation/devicetree/bindings/sound/rockchip-spdif.txt
+@@ -12,8 +12,6 @@ Required properties:
+ - reg: physical base address of the controller and length of memory mapped
+   region.
+ - interrupts: should contain the SPDIF interrupt.
+-- #address-cells: should be 1.
+-- #size-cells: should be 0.
+ - dmas: DMA specifiers for tx dma. See the DMA client binding,
+   Documentation/devicetree/bindings/dma/dma.txt
+ - dma-names: should be "tx"
+@@ -33,8 +31,6 @@ spdif: spdif at 0x1011e000 {
+ 	compatible = "rockchip,rk3188-spdif", "rockchip,rk3066-spdif";
+ 	reg = <0x1011e000 0x2000>;
+ 	interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+-	#address-cells = <1>;
+-	#size-cells = <0>;
+ 	dmas = <&dmac1_s 8>;
+ 	dma-names = "tx";
+ 	clock-names = "hclk", "mclk";
 -- 
-2.5.3
+2.6.1
