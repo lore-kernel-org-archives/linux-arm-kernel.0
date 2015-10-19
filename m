@@ -1,30 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 19 Oct 2015 18:32:36 +0100
-Subject: [PATCH v3] arm-soc: Add support for Sigma Designs Tango4
-In-Reply-To: <CAL_Jsq+jthx9ffnUm-G-TV9LdxBRp3SKyhyfcVu=7kN3CuumJw@mail.gmail.com>
-References: <5124277.UR9sg1IOHT@wuerfel> <560EFDB3.9010305@free.fr>
- <11113740.WL812ZaRcZ@wuerfel> <5612A473.8030405@sigmadesigns.com>
- <5613EF4C.30603@sigmadesigns.com>
- <CAL_JsqJ+WTBYF=sJWbkgNzL48H5AiXL4aoVV3DNiL6T_UQKQfg@mail.gmail.com>
- <561D2952.4060908@sigmadesigns.com>
- <CAL_JsqKa4trfpLY_DPsjBrfH-7SSUQMACYVW7DNN1=Pv3B4FrA@mail.gmail.com>
- <5624CF62.6020001@sigmadesigns.com>
- <CAL_Jsq+jthx9ffnUm-G-TV9LdxBRp3SKyhyfcVu=7kN3CuumJw@mail.gmail.com>
-Message-ID: <20151019173235.GF29001@leverpostej>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Mon, 19 Oct 2015 14:32:23 -0300
+Subject: [PATCH v2 1/4] DT: nvmem: Add NXP LPC18xx EEPROM memory binding
+ documentation
+In-Reply-To: <1445275946-32653-1-git-send-email-ariel@vanguardiasur.com.ar>
+References: <1445275946-32653-1-git-send-email-ariel@vanguardiasur.com.ar>
+Message-ID: <1445275946-32653-2-git-send-email-ariel@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>>> No pl310? A9 performance mon?
-> >
-> > Found "arm,cortex-a9-pmu" in arch/arm/kernel/perf_event_v7.c
-> > Are the PMU registers available from non-secure mode, or is TrustZone
-> > going to get in the way?
-> 
-> I don't recall off-hand.
+Add the devicetree binding document for NXP LPC18xx EEPROM memory.
 
-Judging by the access permissions tables in c12.9 of the ARM ARM (ARM DDI
-0406C.c), they're always accessible from non-secure PL1 in the absence
-of the virtualization extensions.
+Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+---
+ .../devicetree/bindings/nvmem/lpc1857-eeprom.txt   | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
 
-Thanks,
-Mark.
+diff --git a/Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt b/Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
+new file mode 100644
+index 0000000..01cde0d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
+@@ -0,0 +1,26 @@
++* NXP LPC18xx EEPROM memory NVMEM driver
++
++Required properties:
++  - compatible: Should be "nxp,lpc1857-eeprom"
++  - reg: Must contain an entry with the physical base address and length
++    for each entry in reg-names.
++  - reg-names: Must include the following entries.
++    - reg: EEPROM registers.
++    - mem: EEPROM address space.
++  - clocks: Must contain an entry for each entry in clock-names.
++  - clock-names: Must include the following entries.
++    - eeprom: EEPROM operating clock.
++  - interrupts: Should contain EEPROM interrupt.
++
++Example:
++
++  eeprom: eeprom at 4000e000 {
++    compatible = "nxp,lpc1857-eeprom";
++    reg = <0x4000e000 0x1000>,
++          <0x20040000 0x4000>;
++    reg-names = "reg", "mem";
++    clocks = <&ccu1 CLK_CPU_EEPROM>;
++    clock-names = "eeprom";
++    resets = <&rgu 27>;
++    interrupts = <4>;
++  };
+-- 
+2.6.1
