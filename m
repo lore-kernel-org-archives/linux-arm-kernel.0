@@ -1,136 +1,128 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 19 Oct 2015 16:07:50 +0100
-Subject: [RFC PATCH v3 4/4] drm/armada: Convert the probe function to the
+Date: Mon, 19 Oct 2015 16:07:49 +0100
+Subject: [RFC PATCH v3 3/4] drm/rockchip: Convert the probe function to the
  generic drm_of_component_probe()
 In-Reply-To: <1445267270-23126-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1445267270-23126-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1445267270-23126-5-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1445267270-23126-4-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The armada DRM driver keeps some old platform data compatibility in the
-probe function that makes moving to the generic drm_of_component_probe()
-a bit more complicated that it should. Refactor the probe function to do
-the platform_data processing after the generic probe (and only if that
-fails). This way future cleanup can further remove support for it.
+Use the generic drm_of_component_probe() function to probe for components.
 
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/armada/armada_drv.c | 73 +++++++++++--------------------------
- 1 file changed, 22 insertions(+), 51 deletions(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 81 +++--------------------------
+ 1 file changed, 6 insertions(+), 75 deletions(-)
 
-diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
-index 63d909e..25c42f3 100644
---- a/drivers/gpu/drm/armada/armada_drv.c
-+++ b/drivers/gpu/drm/armada/armada_drv.c
-@@ -11,6 +11,7 @@
- #include <linux/of_graph.h>
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index f22e1e1..d26e0cc 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -19,6 +19,7 @@
  #include <drm/drmP.h>
  #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_fb_helper.h>
 +#include <drm/drm_of.h>
- #include "armada_crtc.h"
- #include "armada_drm.h"
- #include "armada_gem.h"
-@@ -265,78 +266,48 @@ static void armada_add_endpoints(struct device *dev,
- 	}
+ #include <linux/dma-mapping.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/module.h>
+@@ -418,29 +419,6 @@ static int compare_of(struct device *dev, void *data)
+ 	return dev->of_node == np;
  }
  
--static int armada_drm_find_components(struct device *dev,
--	struct component_match **match)
+-static void rockchip_add_endpoints(struct device *dev,
+-				   struct component_match **match,
+-				   struct device_node *port)
 -{
+-	struct device_node *ep, *remote;
+-
+-	for_each_child_of_node(port, ep) {
+-		remote = of_graph_get_remote_port_parent(ep);
+-		if (!remote || !of_device_is_available(remote)) {
+-			of_node_put(remote);
+-			continue;
+-		} else if (!of_device_is_available(remote->parent)) {
+-			dev_warn(dev, "parent device of %s is not available\n",
+-				 remote->full_name);
+-			of_node_put(remote);
+-			continue;
+-		}
+-
+-		component_match_add(dev, match, compare_of, remote);
+-		of_node_put(remote);
+-	}
+-}
+-
+ static int rockchip_drm_bind(struct device *dev)
+ {
+ 	struct drm_device *drm;
+@@ -483,61 +461,14 @@ static const struct component_master_ops rockchip_drm_ops = {
+ 
+ static int rockchip_drm_platform_probe(struct platform_device *pdev)
+ {
+-	struct device *dev = &pdev->dev;
+-	struct component_match *match = NULL;
+-	struct device_node *np = dev->of_node;
 -	struct device_node *port;
 -	int i;
 -
--	if (dev->of_node) {
--		struct device_node *np = dev->of_node;
+-	if (!np)
+-		return -ENODEV;
+-	/*
+-	 * Bind the crtc ports first, so that
+-	 * drm_of_find_possible_crtcs called from encoder .bind callbacks
+-	 * works as expected.
+-	 */
+-	for (i = 0;; i++) {
+-		port = of_parse_phandle(np, "ports", i);
+-		if (!port)
+-			break;
 -
--		for (i = 0; ; i++) {
--			port = of_parse_phandle(np, "ports", i);
--			if (!port)
--				break;
--
--			component_match_add(dev, match, compare_of, port);
+-		if (!of_device_is_available(port->parent)) {
 -			of_node_put(port);
+-			continue;
 -		}
-+static const struct component_master_ops armada_master_ops = {
-+	.bind = armada_drm_bind,
-+	.unbind = armada_drm_unbind,
-+};
+-
+-		component_match_add(dev, &match, compare_of, port->parent);
+-		of_node_put(port);
+-	}
++	int ret = drm_of_component_probe(&pdev->dev, compare_of,
++					 &rockchip_drm_ops);
  
--		if (i == 0) {
--			dev_err(dev, "missing 'ports' property\n");
--			return -ENODEV;
--		}
-+static int armada_drm_probe(struct platform_device *pdev)
-+{
-+	struct component_match *match = NULL;
-+	int ret;
+-	if (i == 0) {
+-		dev_err(dev, "missing 'ports' property\n");
++	/* keep compatibility with old code that was returning -ENODEV */
++	if (ret == -EINVAL)
+ 		return -ENODEV;
+-	}
  
--		for (i = 0; ; i++) {
--			port = of_parse_phandle(np, "ports", i);
--			if (!port)
--				break;
-+	ret = drm_of_component_probe(&pdev->dev, compare_dev_name,
-+				     &armada_master_ops);
-+	if (ret != -EINVAL)
-+		return ret;
- 
--			armada_add_endpoints(dev, match, port);
+-	if (!match) {
+-		dev_err(dev, "No available vop found for display-subsystem.\n");
+-		return -ENODEV;
+-	}
+-	/*
+-	 * For each bound crtc, bind the encoders attached to its
+-	 * remote endpoint.
+-	 */
+-	for (i = 0;; i++) {
+-		port = of_parse_phandle(np, "ports", i);
+-		if (!port)
+-			break;
+-
+-		if (!of_device_is_available(port->parent)) {
 -			of_node_put(port);
+-			continue;
 -		}
--	} else if (dev->platform_data) {
--		char **devices = dev->platform_data;
-+	if (pdev->dev.platform_data) {
-+		char **devices = pdev->dev.platform_data;
-+		struct device_node *port;
- 		struct device *d;
-+		int i;
- 
- 		for (i = 0; devices[i]; i++)
--			component_match_add(dev, match, compare_dev_name,
-+			component_match_add(&pdev->dev, match, compare_dev_name,
- 					    devices[i]);
- 
- 		if (i == 0) {
--			dev_err(dev, "missing 'ports' property\n");
-+			dev_err(&pdev->dev, "missing 'ports' property\n");
- 			return -ENODEV;
- 		}
- 
- 		for (i = 0; devices[i]; i++) {
- 			d = bus_find_device_by_name(&platform_bus_type, NULL,
--					devices[i]);
-+						    devices[i]);
- 			if (d && d->of_node) {
- 				for_each_child_of_node(d->of_node, port)
--					armada_add_endpoints(dev, match, port);
-+					armada_add_endpoints(&pdev->dev, match,
-+							     port);
- 			}
- 			put_device(d);
- 		}
- 	}
- 
--	return 0;
--}
 -
--static const struct component_master_ops armada_master_ops = {
--	.bind = armada_drm_bind,
--	.unbind = armada_drm_unbind,
--};
+-		rockchip_add_endpoints(dev, &match, port);
+-		of_node_put(port);
+-	}
 -
--static int armada_drm_probe(struct platform_device *pdev)
--{
--	struct component_match *match = NULL;
--	int ret;
--
--	ret = armada_drm_find_components(&pdev->dev, &match);
--	if (ret < 0)
--		return ret;
--
- 	return component_master_add_with_match(&pdev->dev, &armada_master_ops,
- 					       match);
+-	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
++	return ret;
  }
+ 
+ static int rockchip_drm_platform_remove(struct platform_device *pdev)
 -- 
 2.6.0
