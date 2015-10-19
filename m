@@ -1,34 +1,37 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 19 Oct 2015 11:32:52 +0200
-Subject: [PATCH v3 3/4] mtd: pxa3xx_nand: rework flash detection and
- timing setup
-In-Reply-To: <20151017140144.GB1578@laptop.cereza>
-References: <1444893451-16610-1-git-send-email-antoine.tenart@free-electrons.com>
- <1444893451-16610-4-git-send-email-antoine.tenart@free-electrons.com>
- <20151017140144.GB1578@laptop.cereza>
-Message-ID: <20151019093252.GB29389@kwain>
+From: ralf@linux-mips.org (Ralf Baechle)
+Date: Mon, 19 Oct 2015 11:37:00 +0200
+Subject: [PATCH] drm/virtio: use %llu format string form atomic64_t
+In-Reply-To: <5152101.mD2bWzUJ2V@wuerfel>
+References: <5082760.FgB9zHNfte@wuerfel>
+ <20151007104502.GH21513@n2100.arm.linux.org.uk>
+ <6260324.3MlUEc3veg@wuerfel> <5152101.mD2bWzUJ2V@wuerfel>
+Message-ID: <20151019093700.GC2092@linux-mips.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 17, 2015 at 11:01:44AM -0300, Ezequiel Garcia wrote:
-> On 15 Oct 09:17 AM, Antoine Tenart wrote:
-> > Rework the pxa3xx_nand driver to allow using functions exported by the
-> > nand framework to detect the flash and the timings. Then setup the
-> > timings using the helpers previously added.
-> > 
-> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> > ---
-> >  drivers/mtd/nand/pxa3xx_nand.c | 118 +++++++++--------------------------------
-> >  1 file changed, 25 insertions(+), 93 deletions(-)
-> > 
+On Wed, Oct 07, 2015 at 01:23:07PM +0200, Arnd Bergmann wrote:
+
+> > I haven't checked all architectures, but I assume what happens is that
+> > 64-bit ones just #define atomic64_t atomic_long_t, so they don't have
+> > to provide three sets of functions.
 > 
-> This patch is not applying on l2-mtd.git master. Care to rebase it?
+> scratch that, I just looked at all the architectures and found that it's
+> just completely arbitrary, even within one architecture you get a mix
+> of 'long' and 'long long', plus this gem from MIPS:
+> 
+> static __inline__ int atomic64_add_unless(atomic64_t *v, long a, long u)
+> 
+> which truncates the result to 32 bit.
 
-I'll do this for the next version.
+Eh...  The result is 0/1 so nothing is truncated.  Alpha, MIPS,
+PARISC and PowerPC are using the same prototype and x86 only differs
+in the use of inline instead __inline__.  And anyway, that function on
+MIPS is only built for CONFIG_64BIT.
 
-Antoine
+What's wrong on MIPS is the comment describing the function's return value
+which was changed by f24219b4e90cf70ec4a211b17fbabc725a0ddf3c (atomic: move
+atomic_add_unless to generic code) and I've queued up a patch to fix that
+since a few days.  I guess that was a cut and paste error from
+__atomic_add_unless which indeed does return the old value.
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+  Ralf
