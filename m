@@ -1,277 +1,134 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Mon, 19 Oct 2015 17:43:40 +0200
-Subject: [PATCH v4] arm-soc: Add support for Sigma Designs Tango4 platforms
-Message-ID: <56250FAC.2010800@sigmadesigns.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 19 Oct 2015 17:45:23 +0200
+Subject: [PATCH 2/3] arm/arm64: KVM: Clear map->active on pend/active clear
+In-Reply-To: <20151019153926.GG24104@cbox>
+References: <1445113822-7831-1-git-send-email-christoffer.dall@linaro.org>
+ <1445113822-7831-3-git-send-email-christoffer.dall@linaro.org>
+ <56250D1A.9010203@linaro.org> <20151019153926.GG24104@cbox>
+Message-ID: <56251013.9020607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support Tango4 platforms (single and dual core SoCs) built around the
-ARM Cortex-A9 MPCore.
+On 10/19/2015 05:39 PM, Christoffer Dall wrote:
+> On Mon, Oct 19, 2015 at 05:32:42PM +0200, Eric Auger wrote:
+>> Hi,
+>> On 10/17/2015 10:30 PM, Christoffer Dall wrote:
+>>> When a guest reboots or offlines/onlines CPUs, it is not uncommon for it
+>>> to clear the pending and active states of an interrupt through the
+>>> emulated VGIC distributor.  However, since we emulate an edge-triggered
+>>> based on a level-triggered device,
+>> I do not get this sentence.
+> 
+> Fair enough.  The guest expects a level-triggered timer, so it expects
+> to be able to do:
+> 
+>   disable interrupt, set timer(*), clear pending state, enable interrupt
+> 
+> and this only works because the device is level-triggered, so it should
+> hit again after clearing the pending state and the guest should see it
+> after enabling interrupts.
+> 
+> but because we have virtual edge-triggered behavior, we loose the
+> interrupt generated at (*) unless we inject it again, which we will
+> after this patch, because the actual device is level triggered, so we'll
+> sample its state in the KVM timer code contiuously and now  (after this
+> patch) notice that we have to inject the edge-triggered IRQ again.
 
-Tango4 is not to be confused with Tango3, which was built around the
-MIPS 74kf.
+That helps ;-)
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
----
-Changes in v4
-add memory node, cpus node, l2cc node
-rewrite clkgen node, as requested by clk maintainers
-not sure about pmu node
----
- arch/arm/Kconfig                          |   2 +
- arch/arm/Makefile                         |   1 +
- arch/arm/boot/dts/Makefile                |   2 +
- arch/arm/boot/dts/tango4-vantage-1172.dts |  18 ++++
- arch/arm/boot/dts/tango4.dtsi             | 134 ++++++++++++++++++++++++++++++
- arch/arm/mach-tangox/Kconfig              |  12 +++
- arch/arm/mach-tangox/Makefile             |   1 +
- arch/arm/mach-tangox/setup.c              |   7 ++
- 8 files changed, 177 insertions(+)
- create mode 100644 arch/arm/boot/dts/tango4-vantage-1172.dts
- create mode 100644 arch/arm/boot/dts/tango4.dtsi
- create mode 100644 arch/arm/mach-tangox/Kconfig
- create mode 100644 arch/arm/mach-tangox/Makefile
- create mode 100644 arch/arm/mach-tangox/setup.c
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 774dc59650c5..d8f0c31f521f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -934,6 +934,8 @@ source "arch/arm/mach-sunxi/Kconfig"
- 
- source "arch/arm/mach-prima2/Kconfig"
- 
-+source "arch/arm/mach-tangox/Kconfig"
-+
- source "arch/arm/mach-tegra/Kconfig"
- 
- source "arch/arm/mach-u300/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 7451b447cc2d..7fcb4c63cdf7 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -203,6 +203,7 @@ machine-$(CONFIG_ARCH_SOCFPGA)		+= socfpga
- machine-$(CONFIG_ARCH_STI)		+= sti
- machine-$(CONFIG_ARCH_STM32)		+= stm32
- machine-$(CONFIG_ARCH_SUNXI)		+= sunxi
-+machine-$(CONFIG_ARCH_TANGOX)		+= tangox
- machine-$(CONFIG_ARCH_TEGRA)		+= tegra
- machine-$(CONFIG_ARCH_U300)		+= u300
- machine-$(CONFIG_ARCH_U8500)		+= ux500
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 246473a244f6..2499295051d5 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -605,6 +605,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
- 	sun9i-a80-cubieboard4.dtb
-+dtb-$(CONFIG_ARCH_TANGOX) += \
-+	tango4-vantage-1172.dtb
- dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += \
- 	tegra20-harmony.dtb \
- 	tegra20-iris-512.dtb \
-diff --git a/arch/arm/boot/dts/tango4-vantage-1172.dts b/arch/arm/boot/dts/tango4-vantage-1172.dts
-new file mode 100644
-index 000000000000..00c9d7e69f80
---- /dev/null
-+++ b/arch/arm/boot/dts/tango4-vantage-1172.dts
-@@ -0,0 +1,18 @@
-+/dts-v1/;
-+
-+#include "tango4.dtsi"
-+
-+/ {
-+	model = "Sigma Designs SMP8758 Vantage-1172 dev board";
-+	compatible = "sigma,vantage-1172", "sigma,smp8758", "sigma,tango4";
-+
-+	memory at 80000000 {
-+		device_type = "memory";
-+		reg = <0x80000000 0x80000000>; /* 2 GB */
-+	};
-+};
-+
-+&eth0 {
-+	phy-connection-type = "rgmii";
-+	max-speed = <1000>;
-+};
-diff --git a/arch/arm/boot/dts/tango4.dtsi b/arch/arm/boot/dts/tango4.dtsi
-new file mode 100644
-index 000000000000..d0b5a51d36be
---- /dev/null
-+++ b/arch/arm/boot/dts/tango4.dtsi
-@@ -0,0 +1,134 @@
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "sigma,tango4";
-+
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	clocks {
-+		ranges;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		xtal: xtal {
-+			compatible = "fixed-clock";
-+			clock-frequency = <27000000>;
-+			#clock-cells = <0>;
-+		};
-+
-+		clkgen: clkgen at 10000 {
-+			compatible = "sigma,tango4-clkgen";
-+			reg = <0x10000 0x30>;
-+			clocks = <&xtal>;
-+			clock-output-names = "cpuclk", "sysclk";
-+			#clock-cells = <1>;
-+		};
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		cpu at 0 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <0>;
-+		};
-+		cpu at 1 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <1>;
-+		};
-+	};
-+
-+	gic: gic at 20001000 {
-+		compatible = "arm,cortex-a9-gic";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		reg = <0x20001000 0x1000>, <0x20000100 0x0100>;
-+	};
-+
-+	l2cc: l2-cache-controller at 20100000 {
-+		compatible = "arm,pl310-cache";
-+		reg = <0x20100000 0x1000>;
-+		cache-level = <2>;
-+		cache-unified;
-+	};
-+
-+	periphclk: periphclk {
-+		compatible = "fixed-factor-clock";
-+		clocks = <&clkgen 0>;
-+		clock-mult = <1>;
-+		clock-div  = <2>;
-+		#clock-cells = <0>;
-+	};
-+
-+	twd-timer at 20000600 {
-+		compatible = "arm,cortex-a9-twd-timer";
-+		reg = <0x20000600 0x10>;
-+		interrupts = <GIC_PPI 13 0xf04>;
-+		interrupt-parent = <&gic>;
-+		clocks = <&periphclk>;
-+		always-on;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		tick-counter at 10048 {
-+			compatible = "sigma,tick-counter";
-+			reg = <0x10048 0x4>;
-+			clocks = <&xtal>;
-+		};
-+
-+		uart: serial at 10700 {
-+			compatible = "ralink,rt2880-uart";
-+			reg = <0x10700 0x30>;
-+			clock-frequency = <7372800>;
-+			reg-shift = <2>;
-+		};
-+
-+		eth0: ethernet at 26000 {
-+			compatible = "sigma,tango-emac";
-+			reg = <0x26000 0x800>;
-+			interrupts = <38 4>;
-+			interrupt-parent = <&irq0>;
-+			mac-address = [ 00 16 e8 02 08 42 ];
-+			clocks = <&clkgen 1>;
-+		};
-+
-+		interrupt-controller at 6e000 {
-+			compatible = "sigma,tango-intc";
-+			reg = <0x6e000 0x400>;
-+			ranges = <0 0x6e000 0x400>;
-+			interrupt-parent = <&gic>;
-+			interrupt-controller;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			irq0: irq0 at 6e000 {
-+				reg = <0x000 0x100>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			irq1: irq1 at 6e100 {
-+				reg = <0x100 0x100>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			irq2: irq2 at 6e300 {
-+				reg = <0x300 0x100>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-tangox/Kconfig b/arch/arm/mach-tangox/Kconfig
-new file mode 100644
-index 000000000000..4d04952ed00f
---- /dev/null
-+++ b/arch/arm/mach-tangox/Kconfig
-@@ -0,0 +1,12 @@
-+# Tango3 was based on MIPS 74kf. Tango4 is based on ARM Cortex-A9 MPCore.
-+
-+config ARCH_TANGOX
-+	bool "Sigma Designs Tango4 (SMP87xx)" if ARCH_MULTI_V7
-+	select ARCH_HAS_HOLES_MEMORYMODEL
-+	select ARM_ERRATA_754322
-+	select ARM_ERRATA_764369 if SMP
-+	select ARM_GIC
-+	select CLKSRC_TANGO_XTAL
-+	select GENERIC_IRQ_CHIP
-+	select HAVE_ARM_SCU
-+	select HAVE_ARM_TWD
-diff --git a/arch/arm/mach-tangox/Makefile b/arch/arm/mach-tangox/Makefile
-new file mode 100644
-index 000000000000..2b9dba458932
---- /dev/null
-+++ b/arch/arm/mach-tangox/Makefile
-@@ -0,0 +1 @@
-+obj-y += setup.o
-diff --git a/arch/arm/mach-tangox/setup.c b/arch/arm/mach-tangox/setup.c
-new file mode 100644
-index 000000000000..46ae91e49f81
---- /dev/null
-+++ b/arch/arm/mach-tangox/setup.c
-@@ -0,0 +1,7 @@
-+#include <asm/mach/arch.h>
-+
-+static const char *tango_dt_compat[] = { "sigma,tango4", NULL };
-+
-+DT_MACHINE_START(TANGO_DT, "Sigma Tango DT")
-+	.dt_compat	= tango_dt_compat,
-+MACHINE_END
--- 
-2.4.5
+Eric
+> 
+> Yes, I know, we're lucky we can make it work like this.
+> 
+>>
+>> Besides that
+>> Reviewed-by: Eric Auger <eric.auger@linaro.org>
+> 
+> Thanks!
+> 
+> -Christoffer
+> 
+>>  the guest expects the timer interrupt
+>>> to hit even after clearing the pending state.
+>>>
+>>> We currently do not signal the VGIC when the map->active field is true,
+>>> because it indicates that the guest has already been signalled of the
+>>> interrupt as required.  Normally this field is set to false when the
+>>> guest deactivates the virtual interrupt through the sync path.
+>>>
+>>> We also need to catch the case where the guest deactivates the interrupt
+>>> through the emulated distributor, again allowing guests to boot even if
+>>> the original virtual timer signal hit before the guest's GIC
+>>> initialization sequence is run.
+>>>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>> ---
+>>>  virt/kvm/arm/vgic.c | 32 +++++++++++++++++++++++++++++++-
+>>>  1 file changed, 31 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>>> index ea21bc2..58b1256 100644
+>>> --- a/virt/kvm/arm/vgic.c
+>>> +++ b/virt/kvm/arm/vgic.c
+>>> @@ -531,6 +531,34 @@ bool vgic_handle_set_pending_reg(struct kvm *kvm,
+>>>  	return false;
+>>>  }
+>>>  
+>>> +/*
+>>> + * If a mapped interrupt's state has been modified by the guest such that it
+>>> + * is no longer active or pending, without it have gone through the sync path,
+>>> + * then the map->active field must be cleared so the interrupt can be taken
+>>> + * again.
+>>> + */
+>>> +static void vgic_handle_clear_mapped_irq(struct kvm_vcpu *vcpu)
+>>> +{
+>>> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>>> +	struct list_head *root;
+>>> +	struct irq_phys_map_entry *entry;
+>>> +	struct irq_phys_map *map;
+>>> +
+>>> +	rcu_read_lock();
+>>> +
+>>> +	/* Check for PPIs */
+>>> +	root = &vgic_cpu->irq_phys_map_list;
+>>> +	list_for_each_entry_rcu(entry, root, entry) {
+>>> +		map = &entry->map;
+>>> +
+>>> +		if (!vgic_dist_irq_is_pending(vcpu, map->virt_irq) &&
+>>> +		    !vgic_irq_is_active(vcpu, map->virt_irq))
+>>> +			map->active = false;
+>>> +	}
+>>> +
+>>> +	rcu_read_unlock();
+>>> +}
+>>> +
+>>>  bool vgic_handle_clear_pending_reg(struct kvm *kvm,
+>>>  				   struct kvm_exit_mmio *mmio,
+>>>  				   phys_addr_t offset, int vcpu_id)
+>>> @@ -561,6 +589,7 @@ bool vgic_handle_clear_pending_reg(struct kvm *kvm,
+>>>  					  vcpu_id, offset);
+>>>  		vgic_reg_access(mmio, reg, offset, mode);
+>>>  
+>>> +		vgic_handle_clear_mapped_irq(kvm_get_vcpu(kvm, vcpu_id));
+>>>  		vgic_update_state(kvm);
+>>>  		return true;
+>>>  	}
+>>> @@ -598,6 +627,7 @@ bool vgic_handle_clear_active_reg(struct kvm *kvm,
+>>>  			ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
+>>>  
+>>>  	if (mmio->is_write) {
+>>> +		vgic_handle_clear_mapped_irq(kvm_get_vcpu(kvm, vcpu_id));
+>>>  		vgic_update_state(kvm);
+>>>  		return true;
+>>>  	}
+>>> @@ -1406,7 +1436,7 @@ static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
+>>>  		return 0;
+>>>  
+>>>  	map = vgic_irq_map_search(vcpu, vlr.irq);
+>>> -	BUG_ON(!map || !map->active);
+>>> +	BUG_ON(!map);
+>>>  
+>>>  	ret = irq_get_irqchip_state(map->irq,
+>>>  				    IRQCHIP_STATE_ACTIVE,
+>>>
+>>
