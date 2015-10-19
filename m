@@ -1,46 +1,33 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 19 Oct 2015 14:06:17 +0200
-Subject: [RFC PATCH] ARM: exynos_defconfig: Increase
- CONFIG_BLK_DEV_RAM_SIZE to 64K
-In-Reply-To: <20151019115150.GY32532@n2100.arm.linux.org.uk>
-References: <1445251715-9725-1-git-send-email-alim.akhtar@samsung.com>
- <5624D87D.4090901@osg.samsung.com>
- <20151019115150.GY32532@n2100.arm.linux.org.uk>
-Message-ID: <5624DCB9.4000903@osg.samsung.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Mon, 19 Oct 2015 17:29:39 +0530
+Subject: [PATCH v2] ARM: exynos_defconfig: Increase CONFIG_BLK_DEV_RAM_SIZE to
+ 64MiB
+Message-ID: <1445255979-22217-1-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+CONFIG_BLK_DEV_RAM_SIZE is currently set to 8MiB, which is a bit on the
+smaller side, lets bump it up to 64MiB so that a bigger RAM_DISK can
+be used with defconfig.
 
-On 10/19/2015 01:51 PM, Russell King - ARM Linux wrote:
-> On Mon, Oct 19, 2015 at 01:48:13PM +0200, Javier Martinez Canillas wrote:
->> Hello Alim,
->>
->> On 10/19/2015 12:48 PM, Alim Akhtar wrote:
->>> CONFIG_BLK_DEV_RAM_SIZE is currently set to 8K, which is a bit on the
->>> smaller side, lets bump it up to 64K so that a bigger RAM_DISK can
->>> be used with defconfig.
->>>
->>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->>> ---
->>
->> I agree that 8KiB is too small and that should be bumped, I'm also
->> not sure what the best size would be but 64KiB sounds reasonable
->> to me. So for this patch:
-> 
-> It's _not_ 8KiB or 64KiB.
-> 
-> config BLK_DEV_RAM_SIZE
->         int "Default RAM disk size (kbytes)"
-> 
-> It's 8MiB or 64MiB - the value you place here is in units of 1024 bytes.
-> 
+Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
+ arch/arm/configs/exynos_defconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Err, right. I got confused by the patch's commit message, sorry about
-that and thanks for the clarification.
-
-Best regards,
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 1ff2bfa2e183..fa5dfa92d294 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -52,7 +52,7 @@ CONFIG_CMA_SIZE_MBYTES=64
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_CRYPTOLOOP=y
+ CONFIG_BLK_DEV_RAM=y
+-CONFIG_BLK_DEV_RAM_SIZE=8192
++CONFIG_BLK_DEV_RAM_SIZE=65536
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_CHR_DEV_SG=y
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+1.7.10.4
