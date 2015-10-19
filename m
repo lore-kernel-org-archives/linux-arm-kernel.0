@@ -1,139 +1,46 @@
-From: w-kwok2@ti.com (Kwok, WingMan)
-Date: Mon, 19 Oct 2015 11:10:04 +0000
-Subject: [PATCH] ARM: keystone: dts: add PCI serdes driver bindings
-In-Reply-To: <5620AD8B.3060503@ti.com>
-References: <1444919230-30932-1-git-send-email-w-kwok2@ti.com>
- <5620AD8B.3060503@ti.com>
-Message-ID: <230CBA6E4B6B6B418E8730AC28E6FC7E04229107@DFLE11.ent.ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 19 Oct 2015 13:19:14 +0200
+Subject: [PATCH] ARM64: juno: add NOR flash to device tree
+In-Reply-To: <20151019102932.GB10678@leverpostej>
+References: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
+ <561FC681.2040809@arm.com>
+ <CACRpkdaSox9WKb5-dkD_zAwO9WxP6+b010p3bdxsm1LRy=WvKg@mail.gmail.com>
+ <5624C31D.3070906@arm.com> <20151019102932.GB10678@leverpostej>
+Message-ID: <CACRpkdaGscb_ccbGuwccsRj_b1d6xoveiiZpw1a5eXon3PxAUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Roger,
+On Mon, Oct 19, 2015 at 12:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
 
-> -----Original Message-----
-> From: Quadros, Roger
-> Sent: Friday, October 16, 2015 3:56 AM
-> To: Kwok, WingMan; robh+dt at kernel.org; pawel.moll at arm.com;
-> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk; galak at codeaurora.org;
-> KISHON VIJAY ABRAHAM; Karicheri, Muralidharan; bhelgaas at google.com;
-> ssantosh at kernel.org; linux at arm.linux.org.uk; devicetree at vger.kernel.org;
-> linux-kernel at vger.kernel.org; linux-pci at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH] ARM: keystone: dts: add PCI serdes driver bindings
-> 
-> WingMan,
-> 
-> On 15/10/15 17:27, WingMan Kwok wrote:
-> > This patch adds the required PCI serdes bindings whcih can then be
-> > enabled by setting the corresponding statuses to "ok" in order to
-> > configure and start the PCI serdes.
-> >
-> > This patch depends on the updates to the Keystone PCIe host driver
-> > and common serdes driver patch series that is submitted separately.
-> >
-> > Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-> > ---
-> >  arch/arm/boot/dts/k2e.dtsi      |   21 +++++++++++++++++++++
-> >  arch/arm/boot/dts/keystone.dtsi |   21 +++++++++++++++++++++
-> >  2 files changed, 42 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
-> > index 675fb8e..3b36575 100644
-> > --- a/arch/arm/boot/dts/k2e.dtsi
-> > +++ b/arch/arm/boot/dts/k2e.dtsi
-> > @@ -86,6 +86,16 @@
-> >  			gpio,syscon-dev = <&devctrl 0x240>;
-> >  		};
-> >
-> > +		pcie1_phy: pciephy at 2326000 {
-> 
-> Should be
-> 		pcie1_phy: phy at 2326000 {
-> 
+> Also, for non U-Boot systems I was under the impression that the flash
+> was effectively owned by EFI (for variable storage),
 
-will change in next version.
+If it is "owned" by something it is owned by the boot monitor, neither
+by U-Boot or (U)EFI. The boot monitor can flash "images" into
+the flash using USB or ethernet/TFTP and it is not part of any
+boot loader, but an autonomous flash image on the board.
+(Actually it can replace itself.)
 
-> > +			#phy-cells = <0>;
-> > +			compatible = "ti,keystone-serdes-pcie";
-> > +			reg = <0x02326000 0x4000>;
-> > +			reg-names = "serdes";
-> > +			link-rate-kbps = <5000000>;
-> > +			num-lanes = <2>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> >  		pcie1: pcie at 21020000 {
-> >  			compatible = "ti,keystone-pcie","snps,dw-pcie";
-> >  			clocks = <&clkpcie1>;
-> > @@ -130,6 +140,17 @@
-> >  					<GIC_SPI 375 IRQ_TYPE_EDGE_RISING>,
-> >  					<GIC_SPI 376 IRQ_TYPE_EDGE_RISING>;
-> >  			};
-> > +
-> > +			/* PCIE phy */
-> > +			serdeses {
-> > +				#address-cells = <1>;
-> > +				#size-cells = <0>;
-> > +				serdes at 0 {
-> > +					reg = <0>;
-> > +					phys = <&pcie1_phy>;
-> > +				};
-> > +			};
-> > +
-> >  		};
-> >
-> >  		mdio: mdio at 24200f00 {
-> > diff --git a/arch/arm/boot/dts/keystone.dtsi
-> b/arch/arm/boot/dts/keystone.dtsi
-> > index 72816d6..6566cc4 100644
-> > --- a/arch/arm/boot/dts/keystone.dtsi
-> > +++ b/arch/arm/boot/dts/keystone.dtsi
-> > @@ -275,6 +275,16 @@
-> >  			ti,syscon-dev = <&devctrl 0x2a0>;
-> >  		};
-> >
-> > +		pcie0_phy: pciephy at 2320000 {
-> 
-> ditto.
-> 
+EFI or U-Boot is one such "image", as is the kernel and the
+other patch series I've sent (AFSv2 support) makes these
+"images" visible to the kernel as individual MTD partitions.
 
-will change in next version.
+This flash image format has nothing to do with UEFI or any other
+boot loader, it has been around since the RealView platforms,
+and has basically not changed since. (Well the forst pointer in
+the image information structure was changed from u32 to u64).
 
-> > +			#phy-cells = <0>;
-> > +			compatible = "ti,keystone-serdes-pcie";
-> > +			reg = <0x02320000 0x4000>;
-> > +			reg-names = "serdes";
-> > +			link-rate-kbps = <5000000>;
-> > +			num-lanes = <2>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> >  		pcie0: pcie at 21800000 {
-> >  			compatible = "ti,keystone-pcie", "snps,dw-pcie";
-> >  			clocks = <&clkpcie>;
-> > @@ -319,6 +329,17 @@
-> >  					<GIC_SPI 28 IRQ_TYPE_EDGE_RISING>,
-> >  					<GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
-> >  			};
-> > +
-> > +			/* PCIE phy */
-> > +			serdeses {
-> > +				#address-cells = <1>;
-> > +				#size-cells = <0>;
-> > +				serdes at 0 {
-> > +					reg = <0>;
-> > +					phys = <&pcie0_phy>;
-> > +				};
-> > +			};
-> > +
-> >  		};
-> >  	};
-> >  };
-> >
-> 
-> --
-> cheers,
-> -roger
+My impression is that the boot monitor code is just a continous
+evolution from reference design to reference design inside ARM.
+It cares very little about what boot loader happens to be the
+fashion of the day, it is also used for flashing images of Windows
+mobile or QNX or whatever people want to run as well.
 
-Thanks,
-WingMan
+The "images" are very simplistic things designed to support
+execute-in-place. New images can be added/removed by any
+compliant software, be it EFI, U-Boot or the kernel. But the
+format of these images is part of the hardware or rather the boot
+monitor, nothing else.
+
+Yours,
+Linus Walleij
