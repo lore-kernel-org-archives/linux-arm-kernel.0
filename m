@@ -1,114 +1,53 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Mon, 19 Oct 2015 21:43:33 +0530
-Subject: [PATCH 7/7] ARM: EXYNOS: Remove code for restart and poweroff for
- exynos SoCs
-In-Reply-To: <5624F932.7030001@osg.samsung.com>
-References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
- <1445234635-3950-8-git-send-email-alim.akhtar@samsung.com>
- <562494F8.6070003@samsung.com> <5624BE39.7020605@osg.samsung.com>
- <CAJKOXPcvKeDNwof5eyD5XjzUiZrHoyShD8gOPGo7uUxEyypQbw@mail.gmail.com>
- <5624F932.7030001@osg.samsung.com>
-Message-ID: <CAGOxZ53k5Nftc=YgTnow382S2mG51yiLO4RmkMM8fONBB4GnCg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 19 Oct 2015 17:18:17 +0100
+Subject: [PATCH v4 2/2] arm64: Expand the stack trace feature to support
+ IRQ stack
+In-Reply-To: <3AD5938C-4109-4B95-A13B-5D45525B39FB@gmail.com>
+References: <07A53E87-C562-48D1-86DF-A373EAAA73F9@gmail.com>
+ <561BE111.7@arm.com>
+ <3CAA206D-3A3A-49A9-BDAD-4206D6F9BAA8@gmail.com>
+ <561CE454.7080201@arm.com>
+ <04D64B22-8EF5-400E-A7F0-1CD0AB48184D@gmail.com>
+ <B6AB90B9-3AA9-413A-B357-137710E89C7C@gmail.com>
+ <561FCD59.1090600@arm.com>
+ <6E0DDC4D-9A97-4EAE-868C-B1271F02D3E0@gmail.com>
+ <20151016160606.GE6613@e104818-lin.cambridge.arm.com>
+ <3AD5938C-4109-4B95-A13B-5D45525B39FB@gmail.com>
+Message-ID: <20151019161816.GE11226@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On Sat, Oct 17, 2015 at 10:38:16PM +0900, Jungseok Lee wrote:
+> On Oct 17, 2015, at 1:06 AM, Catalin Marinas wrote:
+> > BTW, a static allocation (DEFINE_PER_CPU for the whole irq stack) would
+> > save us from another stack address reading on the IRQ entry path. I'm
+> > not sure exactly where the 16K image increase comes from but at least it
+> > doesn't grow with NR_CPUS, so we can probably live with this.
+> 
+> I've tried the approach, a static allocation using DEFINE_PER_CPU, but
+> it dose not work on a top-bit comparison method (for IRQ re-entrance
+> check). The top-bit idea is based on the assumption that IRQ stack is
+> aligned with THREAD_SIZE. But, tpidr_el1 is PAGE_SIZE aligned. It leads
+> to IRQ re-entrance failure in case of 4KB page system.
+> 
+> IMHO, it is hard to avoid 16KB size increase for 64KB page support.
+> Secondary cores can rely on slab.h, but a boot core cannot. So, IRQ
+> stack for at least a boot cpu should be allocated statically.
 
-On Mon, Oct 19, 2015 at 7:37 PM, Javier Martinez Canillas
-<javier@osg.samsung.com> wrote:
-> Hello Krzysztof,
->
-> On 10/19/2015 03:28 PM, Krzysztof Kozlowski wrote:
->> 2015-10-19 18:56 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
->>> Hello,
->>>
->>> On 10/19/2015 09:00 AM, Krzysztof Kozlowski wrote:
->>>> On 19.10.2015 15:03, Alim Akhtar wrote:
->>>>> Now we can use the generic syscon-{reboot/poweroff} drivers,
->>>>> so we don't need special handling for reboot/poweroff in
->>>>> exynos pmu driver. This patch remove the same.
->>>>>
->>>>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->>>>> ---
->>>>>  arch/arm/mach-exynos/pmu.c |   43 -------------------------------------------
->>>>>  1 file changed, 43 deletions(-)
->>>>
->>>> I think that removal of this stuff will effectively remove the
->>>> restart/poweroff handlers from:
->>>> 1. Other defconfigs, like multi_v7
->>>> 2. Custom configs.
->>>>
->>>
->>> This will also break old DTBs that don't have a "syscon-poweroff" device
->>> node that contains the necessary PMU regmap, offset and mask information.
->>
->> I am not sure whether this is ABI break issue. There was no compatible
->> mentioning that "reset works" which now would be replaced. The
->> existing PMU compatible (like samsung,exynos4412-pmu) does not mention
->> "reset" as a feature coming with this compatible.
->>
->> So no ABI break.
->>
->>
->
-> I deliberately didn't use the "DT ABI break" expression since as you said is
-> not part of the documented DT bindings. But what I said is that this change
-> will break old DTBs with newer kernels since reboot and power off will stop
-> working after $SUBJECT.
->
-> I'm not a particular fan of the stable DT idea since in practice it seems to
-> do more harm than good but since that was decided, the expectation for users
-> is that booting a new kernel with an old DT should not cause any regression.
->
-> So I think that at least a comment in the commit message is needed so if
-> there are people really using old DTs with newer kernels on Exynos boards,
-> they can know that the commit causes such an issue instead of having to
-> figure it out themselves.
->
-Agree, will add a comment about this in commit message.
+Ah, I forgot about the alignment check. The problem we have with your v5
+patch is that kmalloc() doesn't guarantee this either (see commit
+2a0b5c0d1929, "arm64: Align less than PAGE_SIZE pgds naturally", where
+we had to fix this for pgd_alloc).
 
->>>
->>>> Previously this code was always compiled in for ARCH_EXYNOS. Now it is
->>>> not so I am thinking about selecting necessary drivers from main exynos
->>>> Kconfig symbol. That could be tricky though, because "select" should be
->>>> used only for non-visible symbols.
->>>>
->>>> Any ideas how to solve that?
->>>>
->>>
->>> Is true that select should only be used for non-visible symbols but there
->>> are others user visible symbols that are selected by ARCH_EXYNOS such as
->>> EXYNOS_THERMAL. So I think selecting the regmap syscon reset stuff there
->>> is a sensible option.
->>
->> Selecting from defconfig is not sufficient... since I do not have
->> other idea than selecting then ovak, but Alim please check it whether
->> it does not create circular dependencies on various configs.
->>
->
-> Agreed, Kconfig circular dependencies is the reason why select is avoided.
-> Fortunately now the 0-day bot analyzes even posted patches so it's possible
-> that such an issue could be found even before these patches are merged.
->
-ok..will select it from mach-exynos/Kconfig.
-Thanks.
+I'm leaning more and more towards the x86 approach as I mentioned in the
+two messages below:
 
->> Best regards,
->> Krzysztof
->>
->
-> Best regards,
-> --
-> Javier Martinez Canillas
-> Open Source Group
-> Samsung Research America
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+http://article.gmane.org/gmane.linux.kernel/2041877
+http://article.gmane.org/gmane.linux.kernel/2043002
 
-
+With a per-cpu stack you can avoid another pointer read, replacing it
+with a single check for the re-entrance. But note that the update only
+happens during do_softirq_own_stack() and *not* for every IRQ taken.
 
 -- 
-Regards,
-Alim
+Catalin
