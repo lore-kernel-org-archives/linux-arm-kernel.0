@@ -1,55 +1,30 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Mon, 19 Oct 2015 23:38:53 +0000
-Subject: [PATCH 07/16] Revert "arm64: remove dead code"
+Date: Mon, 19 Oct 2015 23:38:54 +0000
+Subject: [PATCH 15/16] arm64: kdump: enable kdump in the arm64 defconfig
 In-Reply-To: <cover.1445297709.git.geoff@infradead.org>
 References: <cover.1445297709.git.geoff@infradead.org>
-Message-ID: <57fe305f3d02c8a8e1622be9e67ef58ad1414992.1445297709.git.geoff@infradead.org>
+Message-ID: <e591f2abe8ff0161076ae85d5fd821ab1130c280.1445297709.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit b08d4640a3dca68670fc5af2fe9205b395a02388.
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Add back the setup_mm_for_reboot() needed for kexec.
-
-Signed-off-by: Geoff Levand <geoff@infradead.org>
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/include/asm/mmu.h |  1 +
- arch/arm64/mm/mmu.c          | 11 +++++++++++
- 2 files changed, 12 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 0302087..79fcfb0 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -28,6 +28,7 @@ typedef struct {
- #define ASID(mm)	((mm)->context.id & 0xffff)
- 
- extern void paging_init(void);
-+extern void setup_mm_for_reboot(void);
- extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
- extern void init_mem_pgprot(void);
- extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 9211b85..8cffad9 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -461,6 +461,17 @@ void __init paging_init(void)
- }
- 
- /*
-+ * Enable the identity mapping to allow the MMU disabling.
-+ */
-+void setup_mm_for_reboot(void)
-+{
-+	cpu_set_reserved_ttbr0();
-+	flush_tlb_all();
-+	cpu_set_idmap_tcr_t0sz();
-+	cpu_switch_mm(idmap_pg_dir, &init_mm);
-+}
-+
-+/*
-  * Check whether a kernel address is valid (derived from arch/x86/).
-  */
- int kern_addr_valid(unsigned long addr)
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index c80d8a4..94ec44e 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -56,6 +56,7 @@ CONFIG_KSM=y
+ CONFIG_TRANSPARENT_HUGEPAGE=y
+ CONFIG_CMA=y
+ CONFIG_KEXEC=y
++CONFIG_CRASH_DUMP=y
+ CONFIG_CMDLINE="console=ttyAMA0"
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ CONFIG_COMPAT=y
 -- 
 2.5.0
