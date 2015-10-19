@@ -1,73 +1,88 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 19 Oct 2015 13:43:13 +0100
-Subject: [PATCH 2/2] arm64: Use gfpflags_allow_blocking()
-In-Reply-To: <20151016135900.bc1e10115a866a301dbb0cd8@linux-foundation.org>
-References: <ecbbf6550654071f13d1bdc04b86dc4d69ad09b4.1445008695.git.robin.murphy@arm.com>
- <adf855c7692b1512ab7216579468ad1eef2f25a8.1445008695.git.robin.murphy@arm.com>
- <20151016135900.bc1e10115a866a301dbb0cd8@linux-foundation.org>
-Message-ID: <5624E561.6010107@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 19 Oct 2015 14:00:25 +0100
+Subject: [PATCHv4 02/24] arm64: Delay ELF HWCAP initialisation until all CPUs
+ are up
+In-Reply-To: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
+References: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445259647-21541-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Delay the ELF HWCAP initialisation untill all the (enabled) CPUs are
+up, i.e, smp_cpus_done(). This is in preparation for detecting the
+common features across the CPUS and creating a consistent ELF HWCAP
+for the system.
 
-On 16/10/15 21:59, Andrew Morton wrote:
-> On Fri, 16 Oct 2015 16:33:42 +0100 Robin Murphy <robin.murphy@arm.com> wrote:
->
->> __GFP_WAIT is going away to live its life under a new identity; convert
->> __iommu_alloc_attrs() to the new helper function instead.
->>
->> ...
->>
->> --- a/arch/arm64/mm/dma-mapping.c
->> +++ b/arch/arm64/mm/dma-mapping.c
->> @@ -566,7 +566,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
->>   	 */
->>   	gfp |= __GFP_ZERO;
->>
->> -	if (gfp & __GFP_WAIT) {
->> +	if (gfpflags_allow_blocking(gfp)) {
->>   		struct page **pages;
->>   		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
->
-> Seems unnecessarily elaborate.  What's wrong with
->
-> --- a/arch/arm64/mm/dma-mapping.c~mm-page_alloc-rename-__gfp_wait-to-__gfp_reclaim-arm-fix
-> +++ a/arch/arm64/mm/dma-mapping.c
-> @@ -562,7 +562,7 @@ static void *__iommu_alloc_attrs(struct
->   	 */
->   	gfp |= __GFP_ZERO;
->
-> -	if (gfp & __GFP_WAIT) {
-> +	if (gfp & __GFP_RECLAIM) {
->   		struct page **pages;
->   		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
->
->
-> ?
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/cpufeature.h |    1 +
+ arch/arm64/kernel/setup.c           |   16 ++++++++--------
+ arch/arm64/kernel/smp.c             |    1 +
+ 3 files changed, 10 insertions(+), 8 deletions(-)
 
-Well, in that case the charge of "unnecessarily elaborate" should have 
-been directed at the original patch, and the 53 other locations where 
-(flags & __GFP_WAIT) was changed as per the commit message:
-
-   "Callers that are checking if they are non-blocking should use the
-    helper gfpflags_allow_blocking() where possible."
-
-More importantly, it's also now apparently inconsistent with all the 
-other dma_alloc_coherent() implementations, which thanks to the helper 
-function are testing against __GFP_DIRECT_RECLAIM instead. As I have no 
-clear understanding of what the difference between the two flags is, and 
-how they relate to whether it's safe to call map_vm_area() or not (which 
-is what principally matters here), I'm very uncomfortable with a change 
-introducing that inconsistency.
-
-If instead of my two patches you'd prefer to carry a fix through -mm and 
-coordinate with Joerg and Linus to ensure everything gets merged in the 
-right order, that's fine by me, but either way the change needs to 
-guarantee the same behaviour as all the other instances in arch/arm and 
-arch/arm64 which return a remapped buffer (and I have to say personally 
-I much prefer having the rather inscrutable flag logic hidden behind a 
-clearly-named helper function).
-
-Thanks,
-Robin.
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 1715707..b7769f6 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -81,6 +81,7 @@ static inline int __attribute_const__ cpuid_feature_extract_field(u64 features,
+ 	return (s64)(features << (64 - 4 - field)) >> (64 - 4);
+ }
+ 
++void __init setup_cpu_features(void);
+ 
+ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 			    const char *info);
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 1d503e2..4f0408e 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -196,20 +196,13 @@ static void __init smp_build_mpidr_hash(void)
+ 	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
+ }
+ 
+-static void __init setup_processor(void)
++void __init setup_cpu_features(void)
+ {
+ 	u64 features;
+ 	s64 block;
+ 	u32 cwg;
+ 	int cls;
+ 
+-	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
+-
+-	sprintf(init_utsname()->machine, ELF_PLATFORM);
+-	elf_hwcap = 0;
+-
+-	cpuinfo_store_boot_cpu();
+-
+ 	/*
+ 	 * Check for sane CTR_EL0.CWG value.
+ 	 */
+@@ -293,6 +286,13 @@ static void __init setup_processor(void)
+ #endif
+ }
+ 
++static void __init setup_processor(void)
++{
++	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
++	sprintf(init_utsname()->machine, ELF_PLATFORM);
++	cpuinfo_store_boot_cpu();
++}
++
+ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ {
+ 	void *dt_virt = fixmap_remap_fdt(dt_phys);
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index c1d044b..77763d9 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -320,6 +320,7 @@ static void __init hyp_mode_check(void)
+ void __init smp_cpus_done(unsigned int max_cpus)
+ {
+ 	pr_info("SMP: Total of %d processors activated.\n", num_online_cpus());
++	setup_cpu_features();
+ 	hyp_mode_check();
+ 	apply_alternatives_all();
+ }
+-- 
+1.7.9.5
