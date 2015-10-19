@@ -1,128 +1,162 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 19 Oct 2015 16:07:49 +0100
-Subject: [RFC PATCH v3 3/4] drm/rockchip: Convert the probe function to the
- generic drm_of_component_probe()
+Date: Mon, 19 Oct 2015 16:07:47 +0100
+Subject: [RFC PATCH v3 1/4] drm: Introduce generic probe function for
+ component based masters.
 In-Reply-To: <1445267270-23126-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1445267270-23126-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1445267270-23126-4-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1445267270-23126-2-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the generic drm_of_component_probe() function to probe for components.
+A lot of component based DRM drivers use a variant of the same code
+as the probe function. They bind the crtc ports in the first iteration
+and then scan through the child nodes and bind the encoders attached
+to the remote endpoints. Factor the common code into a separate
+function called drm_of_component_probe() in order to increase code
+reuse.
 
+Cc: David Airlie <airlied@linux.ie>
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 ---
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 81 +++--------------------------
- 1 file changed, 6 insertions(+), 75 deletions(-)
+ drivers/gpu/drm/drm_of.c | 88 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/drm/drm_of.h     | 13 +++++++
+ 2 files changed, 101 insertions(+)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index f22e1e1..d26e0cc 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -19,6 +19,7 @@
- #include <drm/drmP.h>
- #include <drm/drm_crtc_helper.h>
- #include <drm/drm_fb_helper.h>
-+#include <drm/drm_of.h>
- #include <linux/dma-mapping.h>
- #include <linux/pm_runtime.h>
- #include <linux/module.h>
-@@ -418,29 +419,6 @@ static int compare_of(struct device *dev, void *data)
- 	return dev->of_node == np;
+diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+index be38840..493c05c 100644
+--- a/drivers/gpu/drm/drm_of.c
++++ b/drivers/gpu/drm/drm_of.c
+@@ -1,3 +1,4 @@
++#include <linux/component.h>
+ #include <linux/export.h>
+ #include <linux/list.h>
+ #include <linux/of_graph.h>
+@@ -61,3 +62,90 @@ uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+ 	return possible_crtcs;
  }
+ EXPORT_SYMBOL(drm_of_find_possible_crtcs);
++
++/**
++ * drm_of_component_probe - Generic probe function for a component based master
++ * @dev: master device containing the OF node
++ * @compare_of: compare function used for matching components
++ * @master_ops: component master ops to be used
++ *
++ * Parse the platform device OF node and bind all the components associated
++ * with the master. Interface ports are added before the encoders in order to
++ * satisfy their .bind requirements
++ * See Documentation/devicetree/bindings/graph.txt for the bindings.
++ *
++ * Returns zero if successful, or one of the standard error codes if it fails.
++ */
++int drm_of_component_probe(struct device *dev,
++			   int (*compare_of)(struct device *, void *),
++			   const struct component_master_ops *m_ops)
++{
++	struct device_node *ep, *port, *remote;
++	struct component_match *match = NULL;
++	int i;
++
++	if (!dev->of_node)
++		return -EINVAL;
++
++	/*
++	 * Bind the crtc's ports first, so that drm_of_find_possible_crtcs()
++	 * called from encoder's .bind callbacks works as expected
++	 */
++	for (i = 0; ; i++) {
++		port = of_parse_phandle(dev->of_node, "ports", i);
++		if (!port)
++			break;
++
++		if (!of_device_is_available(port->parent)) {
++			of_node_put(port);
++			continue;
++		}
++
++		component_match_add(dev, &match, compare_of, port);
++		of_node_put(port);
++	}
++
++	if (i == 0) {
++		dev_err(dev, "missing 'ports' property\n");
++		return -ENODEV;
++	}
++
++	if (!match) {
++		dev_err(dev, "no available port\n");
++		return -ENODEV;
++	}
++
++	/*
++	 * For bound crtcs, bind the encoders attached to their remote endpoint
++	 */
++	for (i = 0; ; i++) {
++		port = of_parse_phandle(dev->of_node, "ports", i);
++		if (!port)
++			break;
++
++		if (!of_device_is_available(port->parent)) {
++			of_node_put(port);
++			continue;
++		}
++
++		for_each_child_of_node(port, ep) {
++			remote = of_graph_get_remote_port_parent(ep);
++			if (!remote || !of_device_is_available(remote)) {
++				of_node_put(remote);
++				continue;
++			} else if (!of_device_is_available(remote->parent)) {
++				dev_warn(dev, "parent device of %s is not available\n",
++					 remote->full_name);
++				of_node_put(remote);
++				continue;
++			}
++
++			component_match_add(dev, &match, compare_of, remote);
++			of_node_put(remote);
++		}
++		of_node_put(port);
++	}
++
++	return component_master_add_with_match(dev, m_ops, match);
++}
++EXPORT_SYMBOL(drm_of_component_probe);
+diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
+index 2441f71..8544665 100644
+--- a/include/drm/drm_of.h
++++ b/include/drm/drm_of.h
+@@ -1,18 +1,31 @@
+ #ifndef __DRM_OF_H__
+ #define __DRM_OF_H__
  
--static void rockchip_add_endpoints(struct device *dev,
--				   struct component_match **match,
--				   struct device_node *port)
--{
--	struct device_node *ep, *remote;
--
--	for_each_child_of_node(port, ep) {
--		remote = of_graph_get_remote_port_parent(ep);
--		if (!remote || !of_device_is_available(remote)) {
--			of_node_put(remote);
--			continue;
--		} else if (!of_device_is_available(remote->parent)) {
--			dev_warn(dev, "parent device of %s is not available\n",
--				 remote->full_name);
--			of_node_put(remote);
--			continue;
--		}
--
--		component_match_add(dev, match, compare_of, remote);
--		of_node_put(remote);
--	}
--}
--
- static int rockchip_drm_bind(struct device *dev)
++struct component_master_ops;
++struct device;
+ struct drm_device;
+ struct device_node;
+ 
+ #ifdef CONFIG_OF
+ extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+ 					   struct device_node *port);
++extern int drm_of_component_probe(struct device *dev,
++				  int (*compare_of)(struct device *, void *),
++				  const struct component_master_ops *m_ops);
+ #else
+ static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+ 						  struct device_node *port)
  {
- 	struct drm_device *drm;
-@@ -483,61 +461,14 @@ static const struct component_master_ops rockchip_drm_ops = {
- 
- static int rockchip_drm_platform_probe(struct platform_device *pdev)
- {
--	struct device *dev = &pdev->dev;
--	struct component_match *match = NULL;
--	struct device_node *np = dev->of_node;
--	struct device_node *port;
--	int i;
--
--	if (!np)
--		return -ENODEV;
--	/*
--	 * Bind the crtc ports first, so that
--	 * drm_of_find_possible_crtcs called from encoder .bind callbacks
--	 * works as expected.
--	 */
--	for (i = 0;; i++) {
--		port = of_parse_phandle(np, "ports", i);
--		if (!port)
--			break;
--
--		if (!of_device_is_available(port->parent)) {
--			of_node_put(port);
--			continue;
--		}
--
--		component_match_add(dev, &match, compare_of, port->parent);
--		of_node_put(port);
--	}
-+	int ret = drm_of_component_probe(&pdev->dev, compare_of,
-+					 &rockchip_drm_ops);
- 
--	if (i == 0) {
--		dev_err(dev, "missing 'ports' property\n");
-+	/* keep compatibility with old code that was returning -ENODEV */
-+	if (ret == -EINVAL)
- 		return -ENODEV;
--	}
- 
--	if (!match) {
--		dev_err(dev, "No available vop found for display-subsystem.\n");
--		return -ENODEV;
--	}
--	/*
--	 * For each bound crtc, bind the encoders attached to its
--	 * remote endpoint.
--	 */
--	for (i = 0;; i++) {
--		port = of_parse_phandle(np, "ports", i);
--		if (!port)
--			break;
--
--		if (!of_device_is_available(port->parent)) {
--			of_node_put(port);
--			continue;
--		}
--
--		rockchip_add_endpoints(dev, &match, port);
--		of_node_put(port);
--	}
--
--	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
-+	return ret;
+ 	return 0;
  }
++
++static inline int
++drm_of_component_probe(struct device *dev,
++		       int (*compare_of)(struct device *, void *),
++		       const struct component_master_ops *m_ops)
++{
++	return -EINVAL;
++}
+ #endif
  
- static int rockchip_drm_platform_remove(struct platform_device *pdev)
+ #endif /* __DRM_OF_H__ */
 -- 
 2.6.0
