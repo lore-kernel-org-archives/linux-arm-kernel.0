@@ -1,161 +1,54 @@
-From: B48286@freescale.com (Zhiqiang Hou)
-Date: Mon, 19 Oct 2015 19:56:14 +0800
-Subject: [PATCH V5 6/6] dts/ls1043a: add LS1043ARDB board support
-In-Reply-To: <1445255774-32887-1-git-send-email-B48286@freescale.com>
-References: <1445255774-32887-1-git-send-email-B48286@freescale.com>
-Message-ID: <1445255774-32887-6-git-send-email-B48286@freescale.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Mon, 19 Oct 2015 17:25:13 +0530
+Subject: [RFC PATCH] ARM: exynos_defconfig: Increase
+ CONFIG_BLK_DEV_RAM_SIZE to 64K
+In-Reply-To: <5624D87D.4090901@osg.samsung.com>
+References: <1445251715-9725-1-git-send-email-alim.akhtar@samsung.com>
+ <5624D87D.4090901@osg.samsung.com>
+Message-ID: <5624DA21.80702@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shaohui Xie <Shaohui.Xie@freescale.com>
+Hi Javier,
 
-Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
-Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
-Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
-Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
----
-V5: V4 V3
- - No change.
-
-V2:
- - Remove the useless compatible "simple-bus" from cpld node.
-
- arch/arm64/boot/dts/freescale/Makefile            |   2 +-
- arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 116 ++++++++++++++++++++++
- 2 files changed, 117 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 57b41c7..33b1e57 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -1,4 +1,4 @@
--dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb fsl-ls2080a-rdb.dtb fsl-ls2080a-simu.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb fsl-ls2080a-rdb.dtb fsl-ls2080a-simu.dtb fsl-ls1043a-rdb.dtb
-  
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-new file mode 100644
-index 0000000..7a351e2
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-@@ -0,0 +1,116 @@
-+/*
-+ * Device Tree Include file for Freescale Layerscape-1043A family SoC.
-+ *
-+ * Copyright 2014-2015, Freescale Semiconductor
-+ *
-+ * Mingkai Hu <Mingkai.hu@freescale.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "fsl-ls1043a.dtsi"
-+
-+/ {
-+	model = "LS1043A RDB Board";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	ina220 at 40 {
-+		compatible = "ti,ina220";
-+		reg = <0x40>;
-+		shunt-resistor = <1000>;
-+	};
-+	adt7461a at 4c {
-+		compatible = "adi,adt7461";
-+		reg = <0x4c>;
-+	};
-+	eeprom at 56 {
-+		compatible = "at24,24c512";
-+		reg = <0x52>;
-+	};
-+	eeprom at 57 {
-+		compatible = "at24,24c512";
-+		reg = <0x53>;
-+	};
-+	rtc at 68 {
-+		compatible = "pericom,pt7c4338";
-+		reg = <0x68>;
-+	};
-+};
-+
-+&ifc {
-+	status = "okay";
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+	/* NOR, NAND Flashes and FPGA on board */
-+	ranges = <0x0 0x0 0x0 0x60000000 0x08000000
-+		  0x1 0x0 0x0 0x7e800000 0x00010000
-+		  0x2 0x0 0x0 0x7fb00000 0x00000100>;
-+
-+		nor at 0,0 {
-+			compatible = "cfi-flash";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x0 0x0 0x8000000>;
-+			bank-width = <2>;
-+			device-width = <1>;
-+		};
-+
-+		nand at 1,0 {
-+			compatible = "fsl,ifc-nand";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x1 0x0 0x10000>;
-+		};
-+
-+		cpld: board-control at 2,0 {
-+			compatible = "fsl,ls1043ardb-cpld";
-+			reg = <0x2 0x0 0x0000100>;
-+		};
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&duart1 {
-+	status = "okay";
-+};
--- 
-2.1.0.27.g96db324
+On 10/19/2015 05:18 PM, Javier Martinez Canillas wrote:
+> Hello Alim,
+>
+> On 10/19/2015 12:48 PM, Alim Akhtar wrote:
+>> CONFIG_BLK_DEV_RAM_SIZE is currently set to 8K, which is a bit on the
+>> smaller side, lets bump it up to 64K so that a bigger RAM_DISK can
+>> be used with defconfig.
+>>
+>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> ---
+>
+> I agree that 8KiB is too small and that should be bumped, I'm also
+> not sure what the best size would be but 64KiB sounds reasonable
+> to me. So for this patch:
+>
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>
+Thanks
+>> Every time I build exynos_defconfig, I need to manually change RAM_SIZE
+>> to match my ramdisk image size. I am not sure what is the best ramdisk size
+>> might be, but bumping it to 64K might be a reasonable one.
+>>
+>
+> In case you are interested, I got some stats by doing grep on the ARM
+> defconfigs using this [0]. Of course the sizes depends on the platform
+> but just to have an idea about what sizes are more popular than others.
+>
+> SIZE	COUNT
+> 1024	17
+> 8192	43
+> 10240	1
+> 16384	20
+> 20000	25
+> 32768	36
+> 65536	15
+>
+This is informative.
+> [0]: http://hastebin.com/buqukimede.bash
+>
+> Best regards,
+>
