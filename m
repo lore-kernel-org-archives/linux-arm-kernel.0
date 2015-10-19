@@ -1,32 +1,43 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 19 Oct 2015 17:16:40 +0530
-Subject: [PATCH v4 2/8] ARM: EXYNOS: code cleanup in map.h
+Date: Mon, 19 Oct 2015 17:16:41 +0530
+Subject: [PATCH v4 3/8] Documentation: dt-bindings: add exynos-srom binding
+ information
 In-Reply-To: <1445255206-11148-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1445255206-11148-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1445255206-11148-3-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1445255206-11148-4-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unused exynos5440 uart offset macro.
+This patch adds exynos-srom binding information for SROM Controller
+driver on Exynos SoCs.
 
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Mark Rutland <mark.rutland@arm.com>
+CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/mach-exynos/include/mach/map.h | 4 ----
- 1 file changed, 4 deletions(-)
+ .../devicetree/bindings/arm/samsung/exynos-srom.txt          | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
 
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index a2acba3..86d8085 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -35,8 +35,4 @@
- #define EXYNOS4_PA_SROMC		0x12570000
- #define EXYNOS5_PA_SROMC		0x12250000
- 
--/* Compatibility UART */
--
--#define EXYNOS5440_PA_UART0		0x000B0000
--
- #endif /* __ASM_ARCH_MAP_H */
+diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+new file mode 100644
+index 0000000..33886d5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+@@ -0,0 +1,12 @@
++SAMSUNG Exynos SoCs SROM Controller driver.
++
++Required properties:
++- compatible : Should contain "samsung,exynos-srom".
++
++- reg: offset and length of the register set
++
++Example:
++	sromc at 12570000 {
++		compatible = "samsung,exynos-srom";
++		reg = <0x12570000 0x10>;
++	};
 -- 
 2.4.5
