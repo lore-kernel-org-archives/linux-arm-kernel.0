@@ -1,52 +1,53 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:24:57 +0100
-Subject: [PATCHv4 20/24] arm64: Define helper for sys_reg id manipulation
+Date: Mon, 19 Oct 2015 14:24:47 +0100
+Subject: [PATCHv4 10/24] arm64: Read system wide CPUID value
 In-Reply-To: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
 References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445261101-22344-21-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445261101-22344-11-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define helper macros to extract op0, op1, CRn, CRm & op2
-for a given sys_reg id.
+Add an API for reading the safe CPUID value across the
+system from the new infrastructure.
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/sysreg.h |   21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/cpufeature.h |    2 ++
+ arch/arm64/kernel/cpufeature.c      |    9 +++++++++
+ 2 files changed, 11 insertions(+)
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 83aceb58..22f1a88 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -32,8 +32,27 @@
-  *	[11-8]  : CRm
-  *	[7-5]   : Op2
-  */
-+#define Op0_shift	19
-+#define Op0_mask	0x3
-+#define Op1_shift	16
-+#define Op1_mask	0x7
-+#define CRn_shift	12
-+#define CRn_mask	0xf
-+#define CRm_shift	8
-+#define CRm_mask	0xf
-+#define Op2_shift	5
-+#define Op2_mask	0x7
-+
- #define sys_reg(op0, op1, crn, crm, op2) \
--	((((op0)&3)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
-+	((((op0) & Op0_mask) << Op0_shift) | \
-+	 ((op1) << Op1_shift) | ((crn) << CRn_shift) | \
-+	 ((crm) << CRm_shift) | ((op2) << Op2_shift))
-+
-+#define sys_reg_Op0(id)	(((id) >> Op0_shift) & Op0_mask)
-+#define sys_reg_Op1(id)	(((id) >> Op1_shift) & Op1_mask)
-+#define sys_reg_CRn(id)	(((id) >> CRn_shift) & CRn_mask)
-+#define sys_reg_CRm(id)	(((id) >> CRm_shift) & CRm_mask)
-+#define sys_reg_Op2(id)	(((id) >> Op2_shift) & Op2_mask)
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index af0c187..c882d46 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -144,6 +144,8 @@ void check_local_cpu_features(void);
+ bool cpu_supports_mixed_endian_el0(void);
+ bool system_supports_mixed_endian_el0(void);
  
- #define SYS_MIDR_EL1			sys_reg(3, 0, 0, 0, 0)
- #define SYS_MPIDR_EL1			sys_reg(3, 0, 0, 0, 5)
++u64 read_system_reg(u32 id);
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index aae1817..b4656ca 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -590,6 +590,15 @@ void update_cpu_features(int cpu,
+ 	update_mixed_endian_el0_support(info);
+ }
+ 
++u64 read_system_reg(u32 id)
++{
++	struct arm64_ftr_reg *regp = get_arm64_ftr_reg(id);
++
++	/* We shouldn't get a request for an unsupported register */
++	BUG_ON(!regp);
++	return regp->sys_val;
++}
++
+ static bool
+ feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
+ {
 -- 
 1.7.9.5
