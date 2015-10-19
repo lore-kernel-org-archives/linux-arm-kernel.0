@@ -1,66 +1,43 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Mon, 19 Oct 2015 10:15:39 +0200
-Subject: [PATCH] ASoC: dt-bindings: Drop unneeded properties rockchip
- i2s/spdif bindings
-Message-ID: <1445242539-9098-1-git-send-email-sjoerd.simons@collabora.co.uk>
+From: daniel.baluta@intel.com (Daniel Baluta)
+Date: Mon, 19 Oct 2015 11:16:22 +0300
+Subject: [PATCH] staging: iio: select IRQ_WORK for IIO_DUMMY_EVGEN
+In-Reply-To: <22609671.lgCfBiaFIf@wuerfel>
+References: <22609671.lgCfBiaFIf@wuerfel>
+Message-ID: <CAEnQRZDTP6Xut9hGLe4QpgdZJvumY0fESMc_aYWJ4TW3oHeUJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neither the rockchip i2s nor the rockchip spdif binding support child
-devices so #address-cells and #size-cells properties aren't required.
-Remove these from the bindings.
+On Sat, Oct 17, 2015 at 1:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The iio dummy code was recently changed to use irq_work_queue, but
+> that code is compiled into the kernel only if IRQ_WORK is set, so
+> we can get a link error here:
+>
+> drivers/built-in.o: In function `iio_evgen_poke':
+> (.text+0x208a04): undefined reference to `irq_work_queue'
+>
+> This changes the Kconfig file to match what other drivers do.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: fd2bb310ca3d ("Staging: iio: Move evgen interrupt generation to irq_work")
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
----
-This patch is on top of the ASoC tree
+Acked-by: Daniel Baluta <daniel.baluta@intel.com>
 
- Documentation/devicetree/bindings/sound/rockchip-i2s.txt   | 4 ----
- Documentation/devicetree/bindings/sound/rockchip-spdif.txt | 4 ----
- 2 files changed, 8 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
-index 9b82c20..085e0bc 100644
---- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
-@@ -12,8 +12,6 @@ Required properties:
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: should contain the I2S interrupt.
--- #address-cells: should be 1.
--- #size-cells: should be 0.
- - dmas: DMA specifiers for tx and rx dma. See the DMA client binding,
- 	Documentation/devicetree/bindings/dma/dma.txt
- - dma-names: should include "tx" and "rx".
-@@ -28,8 +26,6 @@ i2s at ff890000 {
- 	compatible = "rockchip,rk3288-i2s", "rockchip,rk3066-i2s";
- 	reg = <0xff890000 0x10000>;
- 	interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
--	#address-cells = <1>;
--	#size-cells = <0>;
- 	dmas = <&pdma1 0>, <&pdma1 1>;
- 	dma-names = "tx", "rx";
- 	clock-names = "i2s_hclk", "i2s_clk";
-diff --git a/Documentation/devicetree/bindings/sound/rockchip-spdif.txt b/Documentation/devicetree/bindings/sound/rockchip-spdif.txt
-index 33dd82c..e64dbde 100644
---- a/Documentation/devicetree/bindings/sound/rockchip-spdif.txt
-+++ b/Documentation/devicetree/bindings/sound/rockchip-spdif.txt
-@@ -12,8 +12,6 @@ Required properties:
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: should contain the SPDIF interrupt.
--- #address-cells: should be 1.
--- #size-cells: should be 0.
- - dmas: DMA specifiers for tx dma. See the DMA client binding,
-   Documentation/devicetree/bindings/dma/dma.txt
- - dma-names: should be "tx"
-@@ -33,8 +31,6 @@ spdif: spdif at 0x1011e000 {
- 	compatible = "rockchip,rk3188-spdif", "rockchip,rk3066-spdif";
- 	reg = <0x1011e000 0x2000>;
- 	interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
--	#address-cells = <1>;
--	#size-cells = <0>;
- 	dmas = <&dmac1_s 8>;
- 	dma-names = "tx";
- 	clock-names = "hclk", "mclk";
--- 
-2.6.1
+> ---
+> Found on ARM randconfig tests
+>
+> diff --git a/drivers/staging/iio/Kconfig b/drivers/staging/iio/Kconfig
+> index 6d5b38d69578..9d7f0004d2d7 100644
+> --- a/drivers/staging/iio/Kconfig
+> +++ b/drivers/staging/iio/Kconfig
+> @@ -18,7 +18,8 @@ source "drivers/staging/iio/resolver/Kconfig"
+>  source "drivers/staging/iio/trigger/Kconfig"
+>
+>  config IIO_DUMMY_EVGEN
+> -       tristate
+> +       tristate
+> +       select IRQ_WORK
+>
+>  config IIO_SIMPLE_DUMMY
+>         tristate "An example driver with no hardware requirements"
+>
+> --
