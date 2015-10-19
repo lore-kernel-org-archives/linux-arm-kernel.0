@@ -1,85 +1,28 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 19 Oct 2015 11:25:49 +0200
-Subject: [PATCH] pinctrl: mvebu: armada-38x: add suspend/resume support
-In-Reply-To: <20151019092320.33d48dba@free-electrons.com>
-References: <1445117328-31678-1-git-send-email-mw@semihalf.com>
- <20151017222927.GR32532@n2100.arm.linux.org.uk>
- <CAPv3WKed+Q3K0ky9b9AAYSymB-tE0O=57UdrgM+7Cx-X9PeVcA@mail.gmail.com>
- <20151018160123.6694b4be@free-electrons.com>
- <CAPv3WKdKea-85_0xUv218OVfhnfMvisYXh8qRNRjvmNkweSUJg@mail.gmail.com>
- <20151019092320.33d48dba@free-electrons.com>
-Message-ID: <CAPv3WKfxmwKaPA7BUffwsn8rweSShCSVaCyH4nrQcUkNk7uB2Q@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 19 Oct 2015 17:29:33 +0800
+Subject: [RFC PATCH] pci:host: altera_pcie_fixups() can be static
+In-Reply-To: <1445242768-4423-4-git-send-email-lftan@altera.com>
+References: <201510191737.ufAp63BH%fengguang.wu@intel.com>
+Message-ID: <20151019092933.GA19329@lkp-nex05>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
 
-2015-10-19 9:23 GMT+02:00 Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com>:
-> Hello,
->
-> On Mon, 19 Oct 2015 08:04:49 +0200, Marcin Wojtas wrote:
->
->> > I don't like this. The mvebu_pinctrl_soc_info structure is meant to be
->> > a read-only structure that only describes static information giving
->> > SoC-specific details for pin-muxing. The idea is that in the event
->> > where you had multiple pinctrl in the same system, you would still have
->> > only one instance of mvebu_pinctrl_soc_info.
->>
->> Ok, understood. What with current static globals, like mpp_base? This
->> is a problem when we consider hypothetical multi-pintrl system...
->
-> The current driver is indeed not designed for multiple instances of the
-> same pinctrl controller. But that's exactly what Russell is asking for.
->
+Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+---
+ pcie-altera.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-In each mvebu pinctl there are <soc>_mpp_ctrl_get/set force usage of
-global mpp_base. In order not to use it this way the functions have to
-be redesigned. IMO having an acces to pdev would be sufficient (please
-see my proposal below), but yet I don't have a clear idea, how to do
-it,
-
->> In genereal, I think storing additional global data is not
->> starightforward, as dev->platform_data and dev->driver_data are
->> currently occupied by mvebu_pinctrl and mvebu_pinctrl_soc_info. I
->> propose the following:
->>
->>
->> 1. Create a new structure:
->> struct mvebu_pinctrl_pm_info {
->
-> This definitely shouldn't be called "pm_info", because 'base' is not PM
-> related. It should be mvebu_pinctrl_state or something like that.
->
->>     void __iomem *base;
->>     static u32 *mpp_saved_regs;
->>     int nregs;
->> }
->>
->> 2. Add new field to struct mvebu_pinctrl:
->> struct mvebu_pinctrl_pm_info *pm_info;
->
-> Does not work because "mvebu_pinctrl_pm_info" cannot be a generic
-> structure, it has to be a per-SoC driver structure, since the set of
-> registers to save for PM reasons is different from one SoC to the
-> other. Also, some SoC have only one "base" pointer, some others (like
-> Dove) have multiple.
->
-> So it should be the other way around: the SoC-specific driver create a
-> structure, and this structure points back to the mvebu_pinctrl
-> structure.
->
-
-How about a following compromise:
-Instead of forcing pm_info, we can add a generic pointer to struct
-mvebu_pinctrl, e.g. void *priv; and enable passing it in a way I
-proposed before.
-
-This way each SoC-specific driver can attach whatever is needed for
-its operation. For example in A38X/AXP it would be *base,
-*mpp_saved_regs and nregs gathered in one structure, but it wouldn't
-force anything specific for other machines. As a result in A38X/AXP in
-suspend/resume routines, there would be no globals in use at all.
-
-Best regards,
-Marcin
+diff --git a/drivers/pci/host/pcie-altera.c b/drivers/pci/host/pcie-altera.c
+index b5e7bc2..45f03e3 100644
+--- a/drivers/pci/host/pcie-altera.c
++++ b/drivers/pci/host/pcie-altera.c
+@@ -114,7 +114,7 @@ static void altera_pcie_fixup_res(struct pci_dev *dev)
+ 	}
+ }
+ 
+-void altera_pcie_fixups(struct pci_bus *bus)
++static void altera_pcie_fixups(struct pci_bus *bus)
+ {
+ 	struct pci_dev *dev;
+ 
