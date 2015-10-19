@@ -1,67 +1,35 @@
 From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Mon, 19 Oct 2015 11:33:53 +0530
-Subject: [PATCH 5/7] ARM: exynos_defconfig: Normalize exynos defconfig
+Date: Mon, 19 Oct 2015 11:33:54 +0530
+Subject: [PATCH 6/7] ARM: exynos_defconfig: Enable generic syscon-{reboot,
+ poweroff} drivers
 In-Reply-To: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
 References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <1445234635-3950-6-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <1445234635-3950-7-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-make savedefconfig result in some difference, lets normalize the
-defconfig.
+Enable CONFIG_POWER_RESET_SYSCON and CONFIG_POWER_RESET_SYSCON_POWEROFF
+to allow exynos SoC to make use of generic syscon based reboot/poweroff
+drivers.
 
 Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
 ---
- arch/arm/configs/exynos_defconfig |    8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ arch/arm/configs/exynos_defconfig |    3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 1ff2bfa2e183..3349713e6c63 100644
+index 3349713e6c63..cbc2e96b76a3 100644
 --- a/arch/arm/configs/exynos_defconfig
 +++ b/arch/arm/configs/exynos_defconfig
-@@ -99,10 +99,8 @@ CONFIG_SENSORS_LM90=y
+@@ -95,6 +95,9 @@ CONFIG_BATTERY_MAX17042=y
+ CONFIG_CHARGER_MAX14577=y
+ CONFIG_CHARGER_MAX77693=y
+ CONFIG_CHARGER_TPS65090=y
++CONFIG_POWER_RESET=y
++CONFIG_POWER_RESET_SYSCON=y
++CONFIG_POWER_RESET_SYSCON_POWEROFF=y
+ CONFIG_SENSORS_LM90=y
  CONFIG_SENSORS_NTC_THERMISTOR=y
  CONFIG_SENSORS_PWM_FAN=y
- CONFIG_SENSORS_INA2XX=y
--CONFIG_THERMAL=y
- CONFIG_CPU_THERMAL=y
- CONFIG_THERMAL_EMULATION=y
--CONFIG_EXYNOS_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_S3C2410_WATCHDOG=y
- CONFIG_MFD_CROS_EC=y
-@@ -127,14 +125,14 @@ CONFIG_REGULATOR_S2MPS11=y
- CONFIG_REGULATOR_S5M8767=y
- CONFIG_REGULATOR_TPS65090=y
- CONFIG_DRM=y
--CONFIG_DRM_NXP_PTN3460=y
--CONFIG_DRM_PARADE_PS8622=y
- CONFIG_DRM_EXYNOS=y
- CONFIG_DRM_EXYNOS_FIMD=y
- CONFIG_DRM_EXYNOS_DSI=y
- CONFIG_DRM_EXYNOS_HDMI=y
- CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=y
-+CONFIG_DRM_NXP_PTN3460=y
-+CONFIG_DRM_PARADE_PS8622=y
- CONFIG_FB_SIMPLE=y
- CONFIG_EXYNOS_VIDEO=y
- CONFIG_EXYNOS_MIPI_DSI=y
-@@ -175,7 +173,6 @@ CONFIG_RTC_DRV_S5M=y
- CONFIG_RTC_DRV_S3C=y
- CONFIG_DMADEVICES=y
- CONFIG_PL330_DMA=y
--CONFIG_CHROME_PLATFORMS=y
- CONFIG_CROS_EC_CHARDEV=y
- CONFIG_COMMON_CLK_MAX77686=y
- CONFIG_COMMON_CLK_MAX77802=y
-@@ -190,7 +187,6 @@ CONFIG_PWM_SAMSUNG=y
- CONFIG_PHY_EXYNOS5250_SATA=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
--CONFIG_EXT4_FS=y
- CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
 -- 
 1.7.10.4
