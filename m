@@ -1,76 +1,114 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Mon, 19 Oct 2015 23:38:53 +0000
-Subject: [PATCH 03/16] arm64: Add new hcall HVC_CALL_FUNC
+Subject: [PATCH 05/16] arm64: Add back cpu_reset routines
 In-Reply-To: <cover.1445297709.git.geoff@infradead.org>
 References: <cover.1445297709.git.geoff@infradead.org>
-Message-ID: <f064e1c7eac5d7bfc770866fe9c751c4d1a6a2c4.1445297709.git.geoff@infradead.org>
+Message-ID: <fe7b51091769933f7a3b1a607b712e1275fb0db0.1445297709.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the new hcall HVC_CALL_FUNC that allows execution of a function at EL2.
-During CPU reset the CPU must be brought to the exception level it had on
-entry to the kernel.  The HVC_CALL_FUNC hcall will provide the mechanism
-needed for this exception level switch.
-
-To allow the HVC_CALL_FUNC exception vector to work without a stack, which is
-needed to support an hcall at CPU reset, this implementation uses register x18
-to store the link register across the caller provided function.  This dictates
-that the caller provided function must preserve the contents of register x18.
+Commit 68234df4ea7939f98431aa81113fbdce10c4a84b (arm64: kill flush_cache_all())
+removed the global arm64 routines cpu_reset() and cpu_soft_restart() needed by
+the arm64 kexec and kdump support.  Add those two routines back with some minor
+simplifications in the new files cpu_reset.S, and cpu_reset.h.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/include/asm/virt.h | 13 +++++++++++++
- arch/arm64/kernel/hyp-stub.S  | 13 ++++++++++++-
- 2 files changed, 25 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/cpu-reset.S | 60 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/cpu-reset.h | 18 +++++++++++++
+ 2 files changed, 78 insertions(+)
+ create mode 100644 arch/arm64/kernel/cpu-reset.S
+ create mode 100644 arch/arm64/kernel/cpu-reset.h
 
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index eb10368..3070096 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -45,6 +45,19 @@
- 
- #define HVC_SET_VECTORS 2
- 
+diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
+new file mode 100644
+index 0000000..64d9d7c
+--- /dev/null
++++ b/arch/arm64/kernel/cpu-reset.S
+@@ -0,0 +1,60 @@
 +/*
-+ * HVC_CALL_FUNC - Execute a function at EL2.
++ * cpu reset routines
 + *
-+ * @x0: Physical address of the function to be executed.
-+ * @x1: Passed as the first argument to the function.
-+ * @x2: Passed as the second argument to the function.
-+ * @x3: Passed as the third argument to the function.
++ * Copyright (C) 2001 Deep Blue Solutions Ltd.
++ * Copyright (C) 2012 ARM Ltd.
++ * Copyright (C) 2015 Huawei Futurewei Technologies.
 + *
-+ * The called function must preserve the contents of register x18.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
-+#define HVC_CALL_FUNC 3
++#include <linux/errno.h>
++#include <linux/linkage.h>
++#include <linux/init.h>
++#include <asm/assembler.h>
++#include <asm/cpufeature.h>
++#include <asm/alternative.h>
 +
- #define BOOT_CPU_MODE_EL1	(0xe11)
- #define BOOT_CPU_MODE_EL2	(0xe12)
- 
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index 017ab519..e8febe9 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -67,8 +67,19 @@ el1_sync:
- 	b	2f
- 
- 1:	cmp	x18, #HVC_SET_VECTORS
--	b.ne	2f
-+	b.ne	1f
- 	msr	vbar_el2, x0
-+	b	2f
++.text
++.pushsection    .idmap.text, "ax"
 +
-+1:	cmp	x18, #HVC_CALL_FUNC
-+	b.ne	2f
-+	mov	x18, lr
-+	mov	lr, x0
-+	mov	x0, x1
-+	mov	x1, x2
-+	mov	x2, x3
-+	blr	lr
-+	mov	lr, x18
- 
- 2:	eret
- ENDPROC(el1_sync)
++.align 5
++
++/*
++ * cpu_reset(addr) - Helper for cpu_soft_restart.
++ *
++ * @addr: Location to jump to for soft reset.
++ */
++
++ENTRY(cpu_reset)
++	mrs	x2, sctlr_el1
++	bic	x2, x2, #1
++	msr	sctlr_el1, x2			// disable the MMU
++	isb
++	ret	x0
++ENDPROC(cpu_reset)
++
++/*
++ * cpu_soft_restart(cpu_reset, addr) - Perform a cpu soft reset.
++ *
++ * @cpu_reset: Physical address of the cpu_reset routine.
++ * @addr: Location to jump to for soft reset, passed to cpu_reset.
++ */
++
++ENTRY(cpu_soft_restart)
++	mov	x19, x0				// cpu_reset
++	mov	x20, x1				// addr
++
++	/* Turn D-cache off */
++	mrs	x0, sctlr_el1
++	bic	x0, x0, #1 << 2			// clear SCTLR.C
++	msr	sctlr_el1, x0
++	isb
++
++	mov	x0, x20
++	ret	x19
++ENDPROC(cpu_soft_restart)
++
++.popsection
+diff --git a/arch/arm64/kernel/cpu-reset.h b/arch/arm64/kernel/cpu-reset.h
+new file mode 100644
+index 0000000..4e16dfe
+--- /dev/null
++++ b/arch/arm64/kernel/cpu-reset.h
+@@ -0,0 +1,18 @@
++/*
++ * cpu reset routines
++ *
++ * Copyright (C) 2015 Huawei Futurewei Technologies.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#if !defined(_ARM64_CPU_RESET_H)
++#define _ARM64_CPU_RESET_H
++
++void __attribute__((noreturn)) cpu_reset(unsigned long addr);
++void __attribute__((noreturn)) cpu_soft_restart(phys_addr_t cpu_reset,
++	unsigned long addr);
++
++#endif
 -- 
 2.5.0
