@@ -1,59 +1,63 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 19 Oct 2015 12:39:09 +0200
-Subject: [PATCH] drm/virtio: use %llu format string form atomic64_t
-In-Reply-To: <4345582.jiHe94XBb3@wuerfel>
-References: <5082760.FgB9zHNfte@wuerfel> <5152101.mD2bWzUJ2V@wuerfel>
- <CAMuHMdWbzEFqVctMXTWtdBn2B+guFdphQX5nXUnHPo1szQbtPg@mail.gmail.com>
- <4345582.jiHe94XBb3@wuerfel>
-Message-ID: <CAMuHMdUcAhocNosTB+YnQ0LiPui58ph13mrDYcE15vDjRAmscQ@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 19 Oct 2015 12:40:22 +0200
+Subject: [PATCH v6 0/17] Add Analogix Core Display Port Driver
+In-Reply-To: <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
+References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
+ <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <5624C896.8070108@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 12:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 19 October 2015 09:34:15 Geert Uytterhoeven wrote:
->> On Wed, Oct 7, 2015 at 1:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > static __inline__ int atomic64_add_unless(atomic64_t *v, long a, long u)
->> >
->> > which truncates the result to 32 bit.
->>
->> Woops.
->>
->> See also my unanswered question in "atomic64 on 32-bit vs 64-bit (was:
->> Re: Add virtio gpu driver.)", which is still valid:
->> https://lkml.org/lkml/2015/6/28/18
->>
->
-> Regarding your question of
->
->> Instead of sprinkling casts, is there any good reason why atomic64_read()
->> and atomic64_t aren't "long long" everywhere, cfr. u64?
->
->
-> I assume the answer is that some (all?) 64-bit architectures intentionally
-> return 'long' here, in order for atomic_long_read() to return 'long' on
-> all architectures, given the definitions from
-> include/asm-generic/atomic-long.h
->
-> We would have to either change those, or we have to pick between
-> atomic_long_* or atomic64_* to have a consistent return type.
+Hello Yakir,
 
-I guess the main reason is this comment in include/asm-generic/atomic-long.h,
-which I hadn't noticed before:
+On 10/10/2015 05:35 PM, Yakir Yang wrote:
+> 
+> Hi all,
+> 
+>    The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
+> share the same IP, so a lot of parts can be re-used. I split the common
+> code into bridge directory, then rk3288 and exynos only need to keep
+> some platform code. Cause I can't find the exact IP name of exynos dp
+> controller, so I decide to name dp core driver with "analogix" which I
+> find in rk3288 eDP TRM :)
+> 
+> But  there are still three light registers setting differents bewteen
+> exynos and rk3288.
+> 1. RK3288 have five special pll resigters which not indicata in exynos
+>    dp controller.
+> 2. The address of DP_PHY_PD(dp phy power manager register) are different
+>    between rk3288 and exynos.
+> 3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
+>    register).
+> 
+> This series have been well tested on Rockchip platform with eDP panel
+> on Jerry Chromebook and Display Port Monitor on RK3288 board and thanks
+> to Javier at Samsung help me to find a way to install mainline kernel to
+> Samsung Exynos Chromebooks, so this series also have been tested on Samsung
+> Snow and Peach Pit Chromebooks which borrowed from my friends.
+> 
+> Besides, This version was build on linux-next branch (tag next-20150918), and
+> the above test experiments also base on that tag. But I know the latest tag is
+> next-20151009, so i do rebase this series again on next-20151009, there were
+> little conflicts(exynos_dp removed the suspend/resume).
+> 
+> But after I retest this series on next-20151009, I saw kernel crashed in mmc
+> driver(dw_mci_probe failed to get regulator). So i have to disabled the MMC
+> module(after all I boot with USB device), and I can see eDP light up normally
+> in startup stage, but kernel keep crashed when it try to mount the filesystem.
+> I thought this isn't related to dp driver directly, so i choice not to debug
+> more depth.
+> 
+> That's to say if someone want to test this series, I suggest you applied this
+> series on tag-20150918, just need to fix some light conflicts with the 01 & 02
+> patches (or just email me, I can send you directly).
+> 
+> Thanks,
 
- * Casts for parameters are avoided for existing atomic functions in order to
- * avoid issues with cast-as-lval under gcc 4.x and other limitations that the
- * macros of a platform may have.
+Do you have a branch that I can use to test this series?
 
-Still, it's a pity, as printing atomic_64 is one more place where casts are
-needed in callers.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
