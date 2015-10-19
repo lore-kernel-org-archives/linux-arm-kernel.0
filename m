@@ -1,47 +1,62 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 19 Oct 2015 17:55:34 +0100
-Subject: [PATCH v3 2/3] xen,
- cpu_hotplug: call device_offline instead of cpu_down
+Date: Mon, 19 Oct 2015 17:55:35 +0100
+Subject: [PATCH v3 3/3] xen/arm: don't try to re-register vcpu_info on
+ cpu_hotplug.
 In-Reply-To: <alpine.DEB.2.02.1510191754000.27957@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1510191754000.27957@kaball.uk.xensource.com>
-Message-ID: <1445273735-15758-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1445273735-15758-3-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When offlining a cpu, instead of cpu_down, call device_offline, which
-also takes care of updating the cpu.dev.offline field. This keeps the
-sysfs file /sys/devices/system/cpu/cpuN/online, up to date.  Also move
-the call to disable_hotplug_cpu, because it makes more sense to have it
-there.
+Call disable_percpu_irq on CPU_DYING and enable_percpu_irq when the cpu
+is coming up.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-CC: konrad.wilk at oracle.com
-CC: boris.ostrovsky at oracle.com
-CC: david.vrabel at citrix.com
----
- drivers/xen/cpu_hotplug.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/xen/cpu_hotplug.c b/drivers/xen/cpu_hotplug.c
-index 43de1f5..78804b5 100644
---- a/drivers/xen/cpu_hotplug.c
-+++ b/drivers/xen/cpu_hotplug.c
-@@ -18,6 +18,8 @@ static void enable_hotplug_cpu(int cpu)
+---
+
+Changes in v3:
+- call disable_percpu_irq on CPU_DYING
+- call enable_percpu_irq even when VCPUOP_register_vcpu_info has already
+been called
+
+Changes in v2:
+- better comment
+---
+ arch/arm/xen/enlighten.c |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 6c09cc4..074b1a2 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -93,6 +93,17 @@ static void xen_percpu_init(void)
+ 	int err;
+ 	int cpu = get_cpu();
  
- static void disable_hotplug_cpu(int cpu)
- {
-+	if (cpu_online(cpu))
-+		device_offline(get_cpu_device(cpu));
- 	if (cpu_present(cpu))
- 		xen_arch_unregister_cpu(cpu);
++	/* 
++	 * VCPUOP_register_vcpu_info cannot be called twice for the same
++	 * vcpu, so if vcpu_info is already registered, just get out. This
++	 * can happen with cpu-hotplug.
++	 */
++	if (per_cpu(xen_vcpu, cpu) != NULL) {
++		enable_percpu_irq(xen_events_irq, 0);
++		put_cpu();
++		return;
++	}
++
+ 	pr_info("Xen: initializing cpu%d\n", cpu);
+ 	vcpup = per_cpu_ptr(xen_vcpu_info, cpu);
  
-@@ -55,7 +57,6 @@ static void vcpu_hotplug(unsigned int cpu)
- 		enable_hotplug_cpu(cpu);
+@@ -131,6 +142,9 @@ static int xen_cpu_notification(struct notifier_block *self,
+ 	case CPU_STARTING:
+ 		xen_percpu_init();
  		break;
- 	case 0:
--		(void)cpu_down(cpu);
- 		disable_hotplug_cpu(cpu);
- 		break;
++	case CPU_DYING:
++		disable_percpu_irq(xen_events_irq);
++		break;
  	default:
+ 		break;
+ 	}
 -- 
 1.7.10.4
