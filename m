@@ -1,252 +1,94 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:24:52 +0100
-Subject: [PATCHv4 15/24] arm64/HWCAP: Use system wide safe values
-In-Reply-To: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
-References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445261101-22344-16-git-send-email-suzuki.poulose@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 19 Oct 2015 15:25:49 +0200
+Subject: [PATCH 5/7] ARM: exynos_defconfig: Normalize exynos defconfig
+In-Reply-To: <1445234635-3950-6-git-send-email-alim.akhtar@samsung.com>
+References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
+ <1445234635-3950-6-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <5624EF5D.7080403@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend struct arm64_cpu_capabilities to handle the HWCAP detection
-and make use of the system wide value of the feature registers for
-a reliable set of HWCAPs.
+Hello Alim,
 
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/cpufeature.h |    2 +
- arch/arm64/include/asm/hwcap.h      |    8 ++
- arch/arm64/kernel/cpufeature.c      |  163 +++++++++++++++++++----------------
- 3 files changed, 101 insertions(+), 72 deletions(-)
+On 10/19/2015 08:03 AM, Alim Akhtar wrote:
+> make savedefconfig result in some difference, lets normalize the
+> defconfig.
+> 
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 97b4d64..dc00813 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -81,6 +81,8 @@ struct arm64_cpu_capabilities {
- 			u32 sys_reg;
- 			int field_pos;
- 			int min_field_value;
-+			int hwcap_type;
-+			unsigned long hwcap;
- 		};
- 	};
- };
-diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
-index 0ad7351..400b80b 100644
---- a/arch/arm64/include/asm/hwcap.h
-+++ b/arch/arm64/include/asm/hwcap.h
-@@ -52,6 +52,14 @@
- extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
- #endif
- 
-+enum {
-+	CAP_HWCAP = 1,
-+#ifdef CONFIG_COMPAT
-+	CAP_COMPAT_HWCAP,
-+	CAP_COMPAT_HWCAP2,
-+#endif
-+};
-+
- extern unsigned long elf_hwcap;
- #endif
- #endif
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index a6a4acb..73ceccc 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -628,6 +628,89 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{},
- };
- 
-+#define HWCAP_CAP(reg, field, min_value, type, cap)		\
-+	{							\
-+		.desc = #cap,					\
-+		.matches = has_cpuid_feature,			\
-+		.sys_reg = reg,					\
-+		.field_pos = field,				\
-+		.min_field_value = min_value,			\
-+		.hwcap_type = type,				\
-+		.hwcap = cap,					\
-+	}
-+
-+static const struct arm64_cpu_capabilities arm64_hwcaps[] = {
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, 2, CAP_HWCAP, HWCAP_PMULL),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, 1, CAP_HWCAP, HWCAP_AES),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA1_SHIFT, 1, CAP_HWCAP, HWCAP_SHA1),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA2_SHIFT, 1, CAP_HWCAP, HWCAP_SHA2),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_CRC32_SHIFT, 1, CAP_HWCAP, HWCAP_CRC32),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_ATOMICS_SHIFT, 2, CAP_HWCAP, HWCAP_ATOMICS),
-+#ifdef CONFIG_COMPAT
-+	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 2, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_PMULL),
-+	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_AES),
-+	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_SHA1_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_SHA1),
-+	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_SHA2_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_SHA2),
-+	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_CRC32_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_CRC32),
-+#endif
-+	{},
-+};
-+
-+static void cap_set_hwcap(const struct arm64_cpu_capabilities *cap)
-+{
-+	switch (cap->hwcap_type) {
-+	case CAP_HWCAP:
-+		elf_hwcap |= cap->hwcap;
-+		break;
-+#ifdef CONFIG_COMPAT
-+	case CAP_COMPAT_HWCAP:
-+		compat_elf_hwcap |= (u32)cap->hwcap;
-+		break;
-+	case CAP_COMPAT_HWCAP2:
-+		compat_elf_hwcap2 |= (u32)cap->hwcap;
-+		break;
-+#endif
-+	default:
-+		WARN_ON(1);
-+		break;
-+	}
-+}
-+
-+/* Check if we have a particular HWCAP enabled */
-+static bool cpus_have_hwcap(const struct arm64_cpu_capabilities *cap)
-+{
-+	bool rc;
-+
-+	switch (cap->hwcap_type) {
-+	case CAP_HWCAP:
-+		rc = (elf_hwcap & cap->hwcap) != 0;
-+		break;
-+#ifdef CONFIG_COMPAT
-+	case CAP_COMPAT_HWCAP:
-+		rc = (compat_elf_hwcap & (u32)cap->hwcap) != 0;
-+		break;
-+	case CAP_COMPAT_HWCAP2:
-+		rc = (compat_elf_hwcap2 & (u32)cap->hwcap) != 0;
-+		break;
-+#endif
-+	default:
-+		WARN_ON(1);
-+		rc = false;
-+	}
-+
-+	return rc;
-+}
-+
-+static void setup_cpu_hwcaps(void)
-+{
-+	int i;
-+	const struct arm64_cpu_capabilities *hwcaps = arm64_hwcaps;
-+
-+	for (i = 0; hwcaps[i].desc; i++)
-+		if (hwcaps[i].matches(&hwcaps[i]))
-+			cap_set_hwcap(&hwcaps[i]);
-+}
-+
- void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			    const char *info)
- {
-@@ -770,6 +853,13 @@ void verify_local_cpu_capabilities(void)
- 		if (caps[i].enable)
- 			caps[i].enable(NULL);
- 	}
-+
-+	for (i = 0, caps = arm64_hwcaps; caps[i].desc; i++) {
-+		if (!cpus_have_hwcap(&caps[i]))
-+			continue;
-+		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i]))
-+			fail_incapable_cpu("arm64_hwcaps", &caps[i]);
-+	}
- }
- 
- #else	/* !CONFIG_HOTPLUG_CPU */
-@@ -786,13 +876,12 @@ static void setup_feature_capabilities(void)
- 
- void __init setup_cpu_features(void)
- {
--	u64 features;
--	s64 block;
- 	u32 cwg;
- 	int cls;
- 
- 	/* Set the CPU feature capabilies */
- 	setup_feature_capabilities();
-+	setup_cpu_hwcaps();
- 
- 	/* Advertise that we have computed the system capabilities */
- 	set_sys_caps_initialised();
-@@ -808,74 +897,4 @@ void __init setup_cpu_features(void)
- 	if (L1_CACHE_BYTES < cls)
- 		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
- 			L1_CACHE_BYTES, cls);
--
--	/*
--	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
--	 * The blocks we test below represent incremental functionality
--	 * for non-negative values. Negative values are reserved.
--	 */
--	features = read_cpuid(ID_AA64ISAR0_EL1);
--	block = cpuid_feature_extract_field(features, 4);
--	if (block > 0) {
--		switch (block) {
--		default:
--		case 2:
--			elf_hwcap |= HWCAP_PMULL;
--		case 1:
--			elf_hwcap |= HWCAP_AES;
--		case 0:
--			break;
--		}
--	}
--
--	if (cpuid_feature_extract_field(features, 8) > 0)
--		elf_hwcap |= HWCAP_SHA1;
--
--	if (cpuid_feature_extract_field(features, 12) > 0)
--		elf_hwcap |= HWCAP_SHA2;
--
--	if (cpuid_feature_extract_field(features, 16) > 0)
--		elf_hwcap |= HWCAP_CRC32;
--
--	block = cpuid_feature_extract_field(features, 20);
--	if (block > 0) {
--		switch (block) {
--		default:
--		case 2:
--			elf_hwcap |= HWCAP_ATOMICS;
--		case 1:
--			/* RESERVED */
--		case 0:
--			break;
--		}
--	}
--
--#ifdef CONFIG_COMPAT
--	/*
--	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
--	 * the AArch32 32-bit execution state.
--	 */
--	features = read_cpuid(ID_ISAR5_EL1);
--	block = cpuid_feature_extract_field(features, 4);
--	if (block > 0) {
--		switch (block) {
--		default:
--		case 2:
--			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
--		case 1:
--			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
--		case 0:
--			break;
--		}
--	}
--
--	if (cpuid_feature_extract_field(features, 8) > 0)
--		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
--
--	if (cpuid_feature_extract_field(features, 12) > 0)
--		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
--
--	if (cpuid_feature_extract_field(features, 16) > 0)
--		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
--#endif
- }
+Did you make savedefconfig against v4.3-rc6 or tot linux-next?
+
+I remember we had issues in the past due savedefconfig made against
+linux-next but then some of the patches in linux-next not making it
+to the next release. So I think it should be good to mention what's
+the base used for this patch.
+
+>  arch/arm/configs/exynos_defconfig |    8 ++------
+>  1 file changed, 2 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 1ff2bfa2e183..3349713e6c63 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -99,10 +99,8 @@ CONFIG_SENSORS_LM90=y
+>  CONFIG_SENSORS_NTC_THERMISTOR=y
+>  CONFIG_SENSORS_PWM_FAN=y
+>  CONFIG_SENSORS_INA2XX=y
+> -CONFIG_THERMAL=y
+>  CONFIG_CPU_THERMAL=y
+>  CONFIG_THERMAL_EMULATION=y
+> -CONFIG_EXYNOS_THERMAL=y
+
+I would prefer to split all the changes that removes symbols into a
+separate patch explaining why these are not needed anymore (i.e: it
+is selected now by symbol $foo).
+
+>  CONFIG_WATCHDOG=y
+>  CONFIG_S3C2410_WATCHDOG=y
+>  CONFIG_MFD_CROS_EC=y
+> @@ -127,14 +125,14 @@ CONFIG_REGULATOR_S2MPS11=y
+>  CONFIG_REGULATOR_S5M8767=y
+>  CONFIG_REGULATOR_TPS65090=y
+>  CONFIG_DRM=y
+> -CONFIG_DRM_NXP_PTN3460=y
+> -CONFIG_DRM_PARADE_PS8622=y
+>  CONFIG_DRM_EXYNOS=y
+>  CONFIG_DRM_EXYNOS_FIMD=y
+>  CONFIG_DRM_EXYNOS_DSI=y
+>  CONFIG_DRM_EXYNOS_HDMI=y
+>  CONFIG_DRM_PANEL_SIMPLE=y
+>  CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=y
+> +CONFIG_DRM_NXP_PTN3460=y
+> +CONFIG_DRM_PARADE_PS8622=y
+
+Moving these DRM bridge symbols to match savedefconfig is ok IMHO.
+
+>  CONFIG_FB_SIMPLE=y
+>  CONFIG_EXYNOS_VIDEO=y
+>  CONFIG_EXYNOS_MIPI_DSI=y
+> @@ -175,7 +173,6 @@ CONFIG_RTC_DRV_S5M=y
+>  CONFIG_RTC_DRV_S3C=y
+>  CONFIG_DMADEVICES=y
+>  CONFIG_PL330_DMA=y
+> -CONFIG_CHROME_PLATFORMS=y
+>  CONFIG_CROS_EC_CHARDEV=y
+>  CONFIG_COMMON_CLK_MAX77686=y
+>  CONFIG_COMMON_CLK_MAX77802=y
+> @@ -190,7 +187,6 @@ CONFIG_PWM_SAMSUNG=y
+>  CONFIG_PHY_EXYNOS5250_SATA=y
+>  CONFIG_EXT2_FS=y
+>  CONFIG_EXT3_FS=y
+> -CONFIG_EXT4_FS=y
+>  CONFIG_MSDOS_FS=y
+>  CONFIG_VFAT_FS=y
+>  CONFIG_TMPFS=y
+> 
+
+Same comment than above, I would prefer these to be split.
+
+Best regards,
 -- 
-1.7.9.5
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
