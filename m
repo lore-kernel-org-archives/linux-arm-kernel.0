@@ -1,31 +1,24 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 19 Oct 2015 16:49:48 +0800
-Subject: [PATCH 7/8] arm: dts: berlin: enable wdt0 on the Marvell BG2Q DMP
-In-Reply-To: <1445244589-4838-1-git-send-email-jszhang@marvell.com>
-References: <1445244589-4838-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1445244589-4838-8-git-send-email-jszhang@marvell.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 19 Oct 2015 14:26:13 +0530
+Subject: [4/7] arm: dts: Add syscon-{reboot,
+ poweroff} nodes for exynos5410 SoC
+In-Reply-To: <1445234635-3950-5-git-send-email-alim.akhtar@samsung.com>
+References: <1445234635-3950-5-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <5624B02D.3010709@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable wdt0 on the Marvell BG2Q DMP board to make use of the watchdog
-functionality.
+On Monday 19 October 2015 11:33 AM, Alim Akhtar wrote:
+> This patch adds syscon-{reboot, poweroff} nodes to allow the
+> generic syscon-{reboot, poweroff} driver to reset/poweroff exynos5410 SoC.
+>
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>
+> ---
+> arch/arm/boot/dts/exynos5410.dtsi |   14 ++++++++++++++
+>   1 file changed, 14 insertions(+)
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 
-diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-index 0fa8f1e..e60f53a 100644
---- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-+++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-@@ -139,3 +139,7 @@
- &sata_phy {
- 	status = "okay";
- };
-+
-+&wdt0 {
-+	status = "okay";
-+};
--- 
-2.6.1
+Thanks,
+Pankaj Dubey
