@@ -1,107 +1,38 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Mon, 19 Oct 2015 23:38:53 +0000
-Subject: [PATCH 06/16] arm64: Add EL2 switch to cpu_reset
+Date: Mon, 19 Oct 2015 23:38:54 +0000
+Subject: [PATCH 16/16] arm64: kdump: relax BUG_ON() if more than one cpus are
+ still active
 In-Reply-To: <cover.1445297709.git.geoff@infradead.org>
 References: <cover.1445297709.git.geoff@infradead.org>
-Message-ID: <0e27e2e50ae3c2aa867fd5e778bd2daeb3bc6eba.1445297709.git.geoff@infradead.org>
+Message-ID: <4cf0c03d6cd1cb4826bb5df679fbcdaf80be0b1c.1445297709.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU is reset it needs to be put into the exception level it had
-when it entered the kernel. Update cpu_reset() to accept an argument
-which signals if the reset address needs to be entered at EL1 or EL2.
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Also, update the comments of cpu_reset() and cpu_soft_restart() to reflect
-this change.
-
-Signed-off-by: Geoff Levand <geoff@infradead.org>
+We should try best in case of kdump.
+So even if not all secondary cpus have shut down, we do kdump anyway.
 ---
- arch/arm64/kernel/cpu-reset.S | 22 +++++++++++++++++++---
- arch/arm64/kernel/cpu-reset.h |  4 +++-
- 2 files changed, 22 insertions(+), 4 deletions(-)
+ arch/arm64/kernel/machine_kexec.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
-index 64d9d7c..ffc9e385e 100644
---- a/arch/arm64/kernel/cpu-reset.S
-+++ b/arch/arm64/kernel/cpu-reset.S
-@@ -16,6 +16,7 @@
- #include <asm/assembler.h>
- #include <asm/cpufeature.h>
- #include <asm/alternative.h>
-+#include <asm/virt.h>
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index f315ee4..157c29b 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -139,7 +139,12 @@ void machine_kexec(struct kimage *image)
+ 	phys_addr_t reboot_code_buffer_phys;
+ 	void *reboot_code_buffer;
  
- .text
- .pushsection    .idmap.text, "ax"
-@@ -23,9 +24,14 @@
- .align 5
+-	BUG_ON(num_online_cpus() > 1);
++	if (num_online_cpus() > 1) {
++		if (in_crash_kexec)
++			pr_warn("*\n* kdump might fail because %d cpus are still online\n*\n", num_online_cpus());
++		else
++			BUG();
++	}
  
- /*
-- * cpu_reset(addr) - Helper for cpu_soft_restart.
-+ * cpu_reset(addr, el2_switch) - Helper for cpu_soft_restart.
-  *
-  * @addr: Location to jump to for soft reset.
-+ * @el2_switch: Flag to indicate a swich to EL2 is needed.
-+ *
-+ * Put the CPU into the same state as it would be if it had been reset, and
-+ * branch to what would be the reset vector. It must be executed with the
-+ * flat identity mapping.
-  */
+ 	kimage_head = image->head;
  
- ENTRY(cpu_reset)
-@@ -33,19 +39,28 @@ ENTRY(cpu_reset)
- 	bic	x2, x2, #1
- 	msr	sctlr_el1, x2			// disable the MMU
- 	isb
--	ret	x0
-+
-+	cbz	x1, 1f				// el2_switch?
-+	mov	x1, xzr
-+	mov	x2, xzr
-+	mov	x3, xzr
-+	hvc	#HVC_CALL_FUNC			// no return
-+
-+1:	ret	x0
- ENDPROC(cpu_reset)
- 
- /*
-- * cpu_soft_restart(cpu_reset, addr) - Perform a cpu soft reset.
-+ * cpu_soft_restart(cpu_reset, addr, el2_switch) - Perform a cpu soft reset.
-  *
-  * @cpu_reset: Physical address of the cpu_reset routine.
-  * @addr: Location to jump to for soft reset, passed to cpu_reset.
-+ * @el2_switch: Flag to indicate a swich to EL2 is needed, passed to cpu_reset.
-  */
- 
- ENTRY(cpu_soft_restart)
- 	mov	x19, x0				// cpu_reset
- 	mov	x20, x1				// addr
-+	mov	x21, x2				// el2_switch
- 
- 	/* Turn D-cache off */
- 	mrs	x0, sctlr_el1
-@@ -54,6 +69,7 @@ ENTRY(cpu_soft_restart)
- 	isb
- 
- 	mov	x0, x20
-+	mov	x1, x21
- 	ret	x19
- ENDPROC(cpu_soft_restart)
- 
-diff --git a/arch/arm64/kernel/cpu-reset.h b/arch/arm64/kernel/cpu-reset.h
-index 4e16dfe..ef3bba2 100644
---- a/arch/arm64/kernel/cpu-reset.h
-+++ b/arch/arm64/kernel/cpu-reset.h
-@@ -11,8 +11,10 @@
- #if !defined(_ARM64_CPU_RESET_H)
- #define _ARM64_CPU_RESET_H
- 
-+#include <asm/virt.h>
-+
- void __attribute__((noreturn)) cpu_reset(unsigned long addr);
- void __attribute__((noreturn)) cpu_soft_restart(phys_addr_t cpu_reset,
--	unsigned long addr);
-+	unsigned long addr, unsigned long el2_switch);
- 
- #endif
 -- 
 2.5.0
