@@ -1,251 +1,137 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:00:42 +0100
-Subject: [PATCHv4 19/24] arm64: Documentation - Expose CPU feature registers
-In-Reply-To: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
-References: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445259647-21541-20-git-send-email-suzuki.poulose@arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 19 Oct 2015 14:02:58 +0100
+Subject: [RFC PATCH v2 1/4] drm: Introduce generic probe function for
+ component based masters.
+In-Reply-To: <20151019122537.GZ32532@n2100.arm.linux.org.uk>
+References: <1445257313-7147-1-git-send-email-Liviu.Dudau@arm.com>
+ <1445257313-7147-2-git-send-email-Liviu.Dudau@arm.com>
+ <20151019122537.GZ32532@n2100.arm.linux.org.uk>
+Message-ID: <20151019130258.GU3394@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation for the infrastructure to expose CPU feature
-register by emulating MRS.
+On Mon, Oct 19, 2015 at 01:25:37PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Oct 19, 2015 at 01:21:50PM +0100, Liviu Dudau wrote:
+> > A lot of component based DRM drivers use a variant of the same code
+> > as the probe function. They bind the crtc ports in the first iteration
+> > and then scan through the child nodes and bind the encoders attached
+> > to the remote endpoints. Factor the common code into a separate
+> > function called drm_of_component_probe() in order to increase code
+> > reuse.
+> > 
+> > Cc: David Airlie <airlied@linux.ie>
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > ---
+> >  drivers/gpu/drm/drm_of.c | 92 ++++++++++++++++++++++++++++++++++++++++++++++++
+> >  include/drm/drm_of.h     | 12 +++++++
+> >  2 files changed, 104 insertions(+)
+> > 
+> > diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+> > index be38840..cf16240 100644
+> > --- a/drivers/gpu/drm/drm_of.c
+> > +++ b/drivers/gpu/drm/drm_of.c
+> > @@ -1,3 +1,4 @@
+> > +#include <linux/component.h>
+> >  #include <linux/export.h>
+> >  #include <linux/list.h>
+> >  #include <linux/of_graph.h>
+> > @@ -61,3 +62,94 @@ uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+> >  	return possible_crtcs;
+> >  }
+> >  EXPORT_SYMBOL(drm_of_find_possible_crtcs);
+> > +
+> > +/**
+> > + * drm_of_component_probe - Generic probe function for a component based master
+> > + * @dev: master device containing the OF node
+> > + * @compare_of: compare function used for matching components
+> > + * @master_ops: component master ops to be used
+> > + *
+> > + * Parse the platform device OF node and bind all the components associated
+> > + * with the master. Interface ports are added before the encoders in order to
+> > + * satisfy their .bind requirements
+> > + * See Documentation/devicetree/bindings/graph.txt for the bindings.
+> > + *
+> > + * Returns zero if successful, or one of the standard error codes if it fails.
+> > + */
+> > +int drm_of_component_probe(struct device *dev,
+> > +			   int (*compare_of)(struct device *, void *),
+> > +			   const struct component_master_ops *master_ops)
+> > +{
+> ...
+> > +	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
+> > +	if (ret)
+> > +		return ret;
+> 
+> Please don't move this into here, it's completely inappropriate.  Just
+> because something makes use of this does not mean they only support
+> 32-bit DMA.  Besides, this has nothing to do with whether or not it's
+> OF-based or not.
 
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
- Documentation/arm64/cpu-feature-registers.txt |  225 +++++++++++++++++++++++++
- 1 file changed, 225 insertions(+)
- create mode 100644 Documentation/arm64/cpu-feature-registers.txt
+Understood. My thinking process was that component-based drivers are all
+OF-enabled (how else do you make use of the framework?) and 32-bit DMA is
+present in 2 out of 3 drivers that are converted, so it looks to be common
+enough that adding it to armada would not hurt. It was all done in the name of
+collecting common code in a single function.
 
-diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
-new file mode 100644
-index 0000000..41981cb
---- /dev/null
-+++ b/Documentation/arm64/cpu-feature-registers.txt
-@@ -0,0 +1,225 @@
-+		ARM64 CPU Feature Registers
-+		===========================
-+
-+Author: Suzuki K. Poulose <suzuki.poulose@arm.com>
-+
-+
-+This file describes the API for exporting the AArch64 CPU ID/feature registers
-+to userspace.
-+
-+1. Motivation
-+---------------
-+
-+The ARM architecture defines a set of feature registers, which describe
-+the capabilities of the CPU/system. Access to these system registers is
-+restricted from EL0 and there is no reliable way for an application to
-+extract this information to make better decisions at runtime. There is
-+limited information available to the application via ELF_HWCAPs, however
-+there are some issues with their usage.
-+
-+ a) Any change to the HWCAPs requires an update to userspace (e.g libc)
-+    to detect the new changes, which can take a long time to appear in
-+    distributions. Exposing the registers allows applications to get the
-+    information without requiring updates to the toolchains.
-+
-+ b) Access to HWCAPs is sometimes restricted (e.g prior to libc, or when ld is
-+    initialised at startup time).
-+
-+ c) HWCAPs cannot represent non-boolean information effectively. The
-+    architecture defines a canonical format for representing features
-+    in the ID registers; this is well defined and is capable of
-+    representing all valid architecture variations. Exposing the ID
-+    registers avoids having to come up with HWCAP representations
-+    and parsing code.
-+
-+
-+2. Requirements
-+-----------------
-+
-+ a) Safety :
-+    Applications should be able to use the information provided by the
-+    infrastructure to run optimally safely across the system. This has
-+    greater implications on a system with heterogeneous CPUs. The
-+    infrastructure exports a value that is safe across all the available
-+    CPU on the system.
-+
-+    e.g, If at least one CPU doesn't implement CRC32 instructions, while others
-+    do, we should report that the CRC32 is not implemented. Otherwise an
-+    application could crash when scheduled on the CPU which doesn't support
-+    CRC32.
-+
-+ b) Security :
-+    Applications should only be able to receive information that is relevant
-+    to the normal operation in userspace. Hence, some of the fields
-+    are masked out and the values of the fields are set to indicate the
-+    feature is 'not supported' (See the 'visible' field in the
-+    table in Section 4). Also, the kernel may manipulate the fields based on what
-+    it supports. e.g, If FP is not supported by the kernel, the values
-+    could indicate that the FP is not available (even when the CPU provides
-+    it).
-+
-+ c) Implementation Defined Features
-+    The infrastructure doesn't expose any register which is
-+    IMPLEMENTATION DEFINED as per ARMv8-A Architecture.
-+
-+ d) CPU Identification :
-+    MIDR_EL1 is exposed to help identify the processor. On a heterogeneous
-+    system, this could be racy (just like getcpu()). The process could be
-+    migrated to another CPU by the time it uses the register value, unless the
-+    CPU affinity is set. Hence, there is no guarantee that the value reflects the
-+    processor that it is currently executing on. The REVIDR is not exposed due
-+    to this constraint, as REVIDR makes sense only in conjunction with the MIDR.
-+    Alternately, MIDR_EL1 and REVIDR_EL1 are exposed via sysfs at :
-+	/sys/devices/system/cpu/cpu$ID/identification/
-+	                                              \- midr
-+	                                              \- revidr
-+
-+The list of supported registers and the attributes of individual
-+feature bits are listed in section 4. Unless there is absolute necessity,
-+we don't encourage the addition of new feature registers to the list.
-+In any case, it should comply to the requirements listed above.
-+
-+3. Implementation
-+--------------------
-+
-+The infrastructure is built on the emulation of the 'MRS' instruction.
-+Accessing a restricted system register from an application generates an
-+exception and ends up in SIGILL being delivered to the process.
-+The infrastructure hooks into the exception handler and emulates the
-+operation if the source belongs to the supported system register space.
-+
-+The infrastructure emulates only the following system register space:
-+	Op0=3, Op1=0, CRn=0
-+
-+(See Table C5-6 'System instruction encodings for System register accesses'
-+ in ARMv8 ARM, for the list of registers).
-+
-+
-+The following rules are applied to the value returned by the infrastructure:
-+
-+ a) The value of an 'IMPLEMENTATION DEFINED' field is set to 0.
-+ b) The value of a reserved field is populated with the reserved
-+    value as defined by the architecture.
-+ c) The value of a field marked as not 'visible', is set to indicate
-+    the feature is missing (as defined by the architecture).
-+ d) The value of a 'visible' field holds the system wide safe value
-+    for the particular feature(except for MIDR_EL1, see section 4).
-+    See Appendix I for more information on safe value.
-+
-+There are only a few registers visible to the userspace. See Section 4,
-+for the list of 'visible' registers.
-+
-+The registers which are either reserved RAZ or IMPLEMENTAION DEFINED are
-+emulated as 0.
-+
-+All others are emulated as having 'invisible' features.
-+
-+4. List of exposed registers
-+-----------------------------
-+
-+  1) ID_AA64ISAR0_EL1 - Instruction Set Attribute Register 0
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RAZ                          | [63-20] |    n    |
-+     |--------------------------------------------------|
-+     | CRC32                        | [19-16] |    y    |
-+     |--------------------------------------------------|
-+     | SHA2                         | [15-12] |    y    |
-+     |--------------------------------------------------|
-+     | SHA1                         | [11-8]  |    y    |
-+     |--------------------------------------------------|
-+     | AES                          | [7-4]   |    y    |
-+     |--------------------------------------------------|
-+     | RAZ                          | [3-0]   |    n    |
-+     x--------------------------------------------------x
-+
-+  2) ID_AA64ISAR1_EL1 - Instruction Set Attribute Register 1
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RAZ                          | [63-0]  |    y    |
-+     x--------------------------------------------------x
-+
-+  3) ID_AA64PFR0_EL1 - Processor Feature Register 0
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RAZ                          | [63-28] |    n    |
-+     |--------------------------------------------------|
-+     | GIC                          | [27-24] |    n    |
-+     |--------------------------------------------------|
-+     | AdvSIMD                      | [23-20] |    y    |
-+     |--------------------------------------------------|
-+     | FP                           | [19-16] |    y    |
-+     |--------------------------------------------------|
-+     | EL3                          | [15-12] |    n    |
-+     |--------------------------------------------------|
-+     | EL2                          | [11-8]  |    n    |
-+     |--------------------------------------------------|
-+     | EL1                          | [7-4]   |    n    |
-+     |--------------------------------------------------|
-+     | EL0                          | [3-0]   |    n    |
-+     x--------------------------------------------------x
-+
-+  4) ID_AA64PFR1_EL1 - Processor Feature Register 1
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RAZ                          | [63-0]  |    y    |
-+     x--------------------------------------------------x
-+
-+  5) MIDR_EL1 - Main ID Register
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RAZ                          | [63-32] |    n    |
-+     |--------------------------------------------------|
-+     | Implementer                  | [31-24] |    y    |
-+     |--------------------------------------------------|
-+     | Variant                      | [23-20] |    y    |
-+     |--------------------------------------------------|
-+     | Architecture                 | [19-16] |    y    |
-+     |--------------------------------------------------|
-+     | PartNum                      | [15-4]  |    y    |
-+     |--------------------------------------------------|
-+     | Revision                     | [3-0]   |    y    |
-+     x--------------------------------------------------x
-+
-+   NOTE: The 'visible' fields of MIDR_EL1 will contain the value
-+   as available on the CPU where it is fetched and is not a system
-+   wide safe value.
-+
-+
-+Appendix
-+-----------
-+
-+I. CPUID feature value types
-+
-+   The safe value of a CPUID feature field is dependent on the implications
-+   of the values assigned to it by the architecture. Based on the relationship
-+   between the values, the features are classified into 3 types.
-+
-+	a) LOWER_SAFE - The value 'n+1' indicates, value 'n' and some
-+	additional features. (where n >= 0). The smaller value (n) is
-+	considered safer in this case.
-+
-+	b) HIGHER_SAFE - The value 'n+1' is safer than 'n' (for n>= 0).
-+
-+	c) EXACT - If the values of the feature don't have any relationship,
-+	a predefined safe value is used.
-+
-+II. CPUID feature value scheme for features
-+
-+   For features that are not of the EXACT type as described, the following rule applies.
-+   Each 4bit field is a signed value, with RAZ as the original value defined by
-+   the architecture. When a feature is added or extended the field is incremented.
-+   If an existing feature(whose value is 0) is removed, the value becomes negative(0xf).
-+
-+   e.g: 1) Value for ID_AA64PFR0:FP
-+		0   - Floating Point instructions supported.
-+		0xf - Floating Point instructions not supported.
-+
-+        2) Value for ID_AA64MMFR0:TGran16
-+		0   - 16K page size not supported.
-+		1   - 16K page size supported.
+> > +
+> > +	return component_master_add_with_match(dev, master_ops, match);
+> > +}
+> > +EXPORT_SYMBOL(drm_of_component_probe);
+> > diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
+> > index 2441f71..7c0c05b 100644
+> > --- a/include/drm/drm_of.h
+> > +++ b/include/drm/drm_of.h
+> > @@ -1,18 +1,30 @@
+> >  #ifndef __DRM_OF_H__
+> >  #define __DRM_OF_H__
+> >  
+> > +struct component_master_ops;
+> > +struct device;
+> >  struct drm_device;
+> >  struct device_node;
+> >  
+> >  #ifdef CONFIG_OF
+> >  extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+> >  					   struct device_node *port);
+> > +extern int drm_of_component_probe(struct device *dev,
+> > +				  int (*compare_of)(struct device *, void *),
+> > +				  const struct component_master_ops *master_ops);
+> >  #else
+> >  static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+> >  						  struct device_node *port)
+> >  {
+> >  	return 0;
+> >  }
+> > +
+> > +static inline int drm_of_component_probe(struct device *dev,
+> > +					int (*compare_of)(struct device *, void *),
+> > +					 const struct component_master_ops *master_ops)
+> 
+> Some of these lines will fail checkpatch.  It would be nice to avoid
+> lines longer than 80 columns.
+
+I'm torn between following the 80 columns rule, aligning parameters to the
+opening brace, keeping the return value on the same line as the function name
+and having this high res monitor that can make code more readable by going to
+86 columns. :)
+
+I will update the patch to trim down the line width, thanks for reviewing it!
+
+Best regards,
+Liviu
+
+> 
+> -- 
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+> 
+
 -- 
-1.7.9.5
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
