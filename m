@@ -1,56 +1,49 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Mon, 19 Oct 2015 10:11:55 +0800
-Subject: [PATCH] arm64: change to use memmove in efi-stub
-In-Reply-To: <20151016105716.GB975@leverpostej>
-References: <1444992367-11121-1-git-send-email-yalin.wang2010@gmail.com>
- <20151016105716.GB975@leverpostej>
-Message-ID: <9B0C78A1-94BD-47F1-88CF-B78C3142C2DE@gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Sun, 18 Oct 2015 19:24:10 -0700
+Subject: [PATCHv2 1/3] ARM: dt: fpga: Added binding docs for Xilinx Zynq
+ FPGA manager.
+In-Reply-To: <20151018175120.GG12756@jcartwri.amer.corp.natinst.com>
+References: <1445035350-3569-1-git-send-email-moritz.fischer@ettus.com>
+ <1445035350-3569-2-git-send-email-moritz.fischer@ettus.com>
+ <20151018175120.GG12756@jcartwri.amer.corp.natinst.com>
+Message-ID: <20151019022410.GG5257@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Got it ,
+On Sun, 2015-10-18 at 12:51PM -0500, Josh Cartwright wrote:
+> On Fri, Oct 16, 2015 at 03:42:28PM -0700, Moritz Fischer wrote:
+> > Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> > ---
+> > 
+> > v2:
+> >  - Clock names are now a required property
+> >  - Removed interrupt-parent property
+> > 
+> > ---
+> >  .../devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt | 19 +++++++++++++++++++
+> >  1 file changed, 19 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt
+> > new file mode 100644
+> > index 0000000..7018aa8
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/fpga/xilinx-zynq-fpga-mgr.txt
+> > @@ -0,0 +1,19 @@
+> > +Xilinx Zynq FPGA Manager
+> > +
+> > +Required properties:
+> > +- compatible:		should contain "xlnx,zynq-devcfg-1.0"
+> > +- reg:			base address and size for memory mapped io
+> > +- interrupts:		interrupt for the FPGA manager device
 
-Thanks for your explanation .
-> On Oct 16, 2015, at 18:57, Mark Rutland <mark.rutland@arm.com> wrote:
+If we are that picky, this is technically an interrupt specifier :)
+
+> > +- clocks:		phandle for clocks required operation
 > 
-> Hi,
+> Technically a "clock specifier", but other than that:
 > 
-> On Fri, Oct 16, 2015 at 06:46:07PM +0800, yalin wang wrote:
->> Change to use memmove(), in case the dest address overlap with the
->> source address.
-> 
-> This cannot happen, and memove would not be sufficient if it did.
-> 
-> The destination is a region returned by EFI_BOOT_SERVICES.AllocatePages,
-> which can only allocate pages which were free to begin with. Therefore
-> the new region cannot overlap with the stub (whose pages are not free).
-> 
-> Were the new region to overlap with the stub, the memmove could corrupt
-> the code/data in use by the stub, and things would explode shortly
-> thereafter.
-> 
-> Thanks,
-> Mark.
-> 
->> 
->> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
->> ---
->> arch/arm64/kernel/efi-stub.c | 2 +-
->> 1 file changed, 1 insertion(+), 1 deletion(-)
->> 
->> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
->> index 816120e..b6dc44b 100644
->> --- a/arch/arm64/kernel/efi-stub.c
->> +++ b/arch/arm64/kernel/efi-stub.c
->> @@ -59,7 +59,7 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
->> 			}
->> 			*image_addr = *reserve_addr + TEXT_OFFSET;
->> 		}
->> -		memcpy((void *)*image_addr, old_image_addr, kernel_size);
->> +		memmove((void *)*image_addr, old_image_addr, kernel_size);
->> 		*reserve_size = kernel_memsize;
->> 	}
->> 
->> -- 
->> 1.9.1
->> 
+> Reviewed-by: Josh Cartwright <joshc@ni.com>
+Reviewed-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+
+	S?ren
