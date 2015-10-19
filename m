@@ -1,107 +1,218 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Mon, 19 Oct 2015 23:38:54 +0000
-Subject: [PATCH 09/16] arm64/kexec: Add pr_devel output
+Date: Mon, 19 Oct 2015 23:38:53 +0000
+Subject: [PATCH 01/16] arm64: Fold proc-macros.S into assembler.h
 In-Reply-To: <cover.1445297709.git.geoff@infradead.org>
 References: <cover.1445297709.git.geoff@infradead.org>
-Message-ID: <faaf060c12a76b078d1757f4fdc53eafa337b332.1445297709.git.geoff@infradead.org>
+Message-ID: <32db18abd5b542481d60b20b06258a82ac15e2f0.1445297709.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To aid in debugging kexec problems or when adding new functionality to kexec add
-a new routine kexec_image_info() and several inline pr_devel statements.
+To allow the assembler macros defined in arch/arm64/mm/proc-macros.S to be used
+outside the mm code move the contents of proc-macros.S to asm/assembler.h.  Also,
+delete proc-macros.S, and fix up all references to proc-macros.S.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/kernel/machine_kexec.c | 63 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+ arch/arm64/include/asm/assembler.h | 48 +++++++++++++++++++++++++++-
+ arch/arm64/kernel/head.S           |  1 -
+ arch/arm64/kvm/hyp-init.S          |  1 -
+ arch/arm64/mm/cache.S              |  2 --
+ arch/arm64/mm/proc-macros.S        | 64 --------------------------------------
+ arch/arm64/mm/proc.S               |  3 --
+ 6 files changed, 47 insertions(+), 72 deletions(-)
+ delete mode 100644 arch/arm64/mm/proc-macros.S
 
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index 1fae6ae..362f719 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -28,6 +28,48 @@ extern unsigned long arm64_kexec_kimage_start_offset;
- static unsigned long kimage_head;
- static unsigned long kimage_start;
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index b51f2cc..3b46501 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -1,5 +1,5 @@
+ /*
+- * Based on arch/arm/include/asm/assembler.h
++ * Based on arch/arm/include/asm/assembler.h, arch/arm/mm/proc-macros.S
+  *
+  * Copyright (C) 1996-2000 Russell King
+  * Copyright (C) 2012 ARM Ltd.
+@@ -23,6 +23,8 @@
+ #ifndef __ASM_ASSEMBLER_H
+ #define __ASM_ASSEMBLER_H
  
-+/**
-+ * kexec_is_dtb - Helper routine to check the device tree header signature.
++#include <asm/asm-offsets.h>
++#include <asm/pgtable-hwdef.h>
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
+ 
+@@ -193,4 +195,48 @@ lr	.req	x30		// link register
+ 	str	\src, [\tmp, :lo12:\sym]
+ 	.endm
+ 
++/*
++ * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
 + */
-+static bool kexec_is_dtb(const void *dtb)
-+{
-+	__be32 magic;
++	.macro	vma_vm_mm, rd, rn
++	ldr	\rd, [\rn, #VMA_VM_MM]
++	.endm
 +
-+	return get_user(magic, (__be32 *)dtb) ? false :
-+		(be32_to_cpu(magic) == OF_DT_HEADER);
-+}
-+
-+/**
-+ * kexec_image_info - For debugging output.
++/*
++ * mmid - get context id from mm pointer (mm->context.id)
 + */
-+#define kexec_image_info(_i) _kexec_image_info(__func__, __LINE__, _i)
-+static void _kexec_image_info(const char *func, int line,
-+	const struct kimage *image)
-+{
-+	unsigned long i;
++	.macro	mmid, rd, rn
++	ldr	\rd, [\rn, #MM_CONTEXT_ID]
++	.endm
 +
-+#if !defined(DEBUG)
-+	return;
++/*
++ * dcache_line_size - get the minimum D-cache line size from the CTR register.
++ */
++	.macro	dcache_line_size, reg, tmp
++	mrs	\tmp, ctr_el0			// read CTR
++	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
++	mov	\reg, #4			// bytes per word
++	lsl	\reg, \reg, \tmp		// actual cache line size
++	.endm
++
++/*
++ * icache_line_size - get the minimum I-cache line size from the CTR register.
++ */
++	.macro	icache_line_size, reg, tmp
++	mrs	\tmp, ctr_el0			// read CTR
++	and	\tmp, \tmp, #0xf		// cache line size encoding
++	mov	\reg, #4			// bytes per word
++	lsl	\reg, \reg, \tmp		// actual cache line size
++	.endm
++
++/*
++ * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
++ */
++	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
++#ifndef CONFIG_ARM64_VA_BITS_48
++	ldr_l	\tmpreg, idmap_t0sz
++	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
 +#endif
-+	pr_devel("%s:%d:\n", func, line);
-+	pr_devel("  kexec image info:\n");
-+	pr_devel("    type:        %d\n", image->type);
-+	pr_devel("    start:       %lx\n", image->start);
-+	pr_devel("    head:        %lx\n", image->head);
-+	pr_devel("    nr_segments: %lu\n", image->nr_segments);
++	.endm
 +
-+	for (i = 0; i < image->nr_segments; i++) {
-+		pr_devel("      segment[%lu]: %016lx - %016lx, %lx bytes, %lu pages%s\n",
-+			i,
-+			image->segment[i].mem,
-+			image->segment[i].mem + image->segment[i].memsz,
-+			image->segment[i].memsz,
-+			image->segment[i].memsz /  PAGE_SIZE,
-+			(kexec_is_dtb(image->segment[i].buf) ?
-+				", dtb segment" : ""));
-+	}
-+}
-+
- void machine_kexec_cleanup(struct kimage *image)
- {
- 	/* Empty routine needed to avoid build errors. */
-@@ -41,6 +83,8 @@ void machine_kexec_cleanup(struct kimage *image)
- int machine_kexec_prepare(struct kimage *image)
- {
- 	kimage_start = image->start;
-+	kexec_image_info(image);
-+
- 	return 0;
- }
+ #endif	/* __ASM_ASSEMBLER_H */
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 90d09ed..9ad8b1f 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -31,7 +31,6 @@
+ #include <asm/cputype.h>
+ #include <asm/memory.h>
+ #include <asm/thread_info.h>
+-#include <asm/pgtable-hwdef.h>
+ #include <asm/pgtable.h>
+ #include <asm/page.h>
+ #include <asm/virt.h>
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 178ba22..2e67a48 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -20,7 +20,6 @@
+ #include <asm/assembler.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_mmu.h>
+-#include <asm/pgtable-hwdef.h>
  
-@@ -99,6 +143,25 @@ void machine_kexec(struct kimage *image)
- 	reboot_code_buffer_phys = page_to_phys(image->control_code_page);
- 	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
+ 	.text
+ 	.pushsection	.hyp.idmap.text, "ax"
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index eb48d5d..9e13cb5 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -24,8 +24,6 @@
+ #include <asm/cpufeature.h>
+ #include <asm/alternative.h>
  
-+	kexec_image_info(image);
-+
-+	pr_devel("%s:%d: control_code_page:        %p\n", __func__, __LINE__,
-+		image->control_code_page);
-+	pr_devel("%s:%d: reboot_code_buffer_phys:  %pa\n", __func__, __LINE__,
-+		&reboot_code_buffer_phys);
-+	pr_devel("%s:%d: reboot_code_buffer:       %p\n", __func__, __LINE__,
-+		reboot_code_buffer);
-+	pr_devel("%s:%d: relocate_new_kernel:      %p\n", __func__, __LINE__,
-+		arm64_relocate_new_kernel);
-+	pr_devel("%s:%d: relocate_new_kernel_size: 0x%lx(%lu) bytes\n",
-+		__func__, __LINE__, arm64_relocate_new_kernel_size,
-+		arm64_relocate_new_kernel_size);
-+
-+	pr_devel("%s:%d: kimage_head:              %lx\n", __func__, __LINE__,
-+		kimage_head);
-+	pr_devel("%s:%d: kimage_start:             %lx\n", __func__, __LINE__,
-+		kimage_start);
-+
- 	/*
- 	 * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
- 	 * after the kernel is shut down.
+-#include "proc-macros.S"
+-
+ /*
+  *	flush_icache_range(start,end)
+  *
+diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
+deleted file mode 100644
+index 4c4d93c..0000000
+--- a/arch/arm64/mm/proc-macros.S
++++ /dev/null
+@@ -1,64 +0,0 @@
+-/*
+- * Based on arch/arm/mm/proc-macros.S
+- *
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-
+-#include <asm/asm-offsets.h>
+-#include <asm/thread_info.h>
+-
+-/*
+- * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
+- */
+-	.macro	vma_vm_mm, rd, rn
+-	ldr	\rd, [\rn, #VMA_VM_MM]
+-	.endm
+-
+-/*
+- * mmid - get context id from mm pointer (mm->context.id)
+- */
+-	.macro	mmid, rd, rn
+-	ldr	\rd, [\rn, #MM_CONTEXT_ID]
+-	.endm
+-
+-/*
+- * dcache_line_size - get the minimum D-cache line size from the CTR register.
+- */
+-	.macro	dcache_line_size, reg, tmp
+-	mrs	\tmp, ctr_el0			// read CTR
+-	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
+-	mov	\reg, #4			// bytes per word
+-	lsl	\reg, \reg, \tmp		// actual cache line size
+-	.endm
+-
+-/*
+- * icache_line_size - get the minimum I-cache line size from the CTR register.
+- */
+-	.macro	icache_line_size, reg, tmp
+-	mrs	\tmp, ctr_el0			// read CTR
+-	and	\tmp, \tmp, #0xf		// cache line size encoding
+-	mov	\reg, #4			// bytes per word
+-	lsl	\reg, \reg, \tmp		// actual cache line size
+-	.endm
+-
+-/*
+- * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
+- */
+-	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
+-#ifndef CONFIG_ARM64_VA_BITS_48
+-	ldr_l	\tmpreg, idmap_t0sz
+-	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
+-#endif
+-	.endm
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index e4ee7bd..456c1c5 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -23,11 +23,8 @@
+ #include <asm/assembler.h>
+ #include <asm/asm-offsets.h>
+ #include <asm/hwcap.h>
+-#include <asm/pgtable-hwdef.h>
+ #include <asm/pgtable.h>
+ 
+-#include "proc-macros.S"
+-
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
+ #else
 -- 
 2.5.0
