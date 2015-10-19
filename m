@@ -1,31 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Oct 2015 13:38:15 -0700
-Subject: [PATCH/RESEND] ARM: Remove __ref on hotplug cpu die path
-In-Reply-To: <20151019202301.GA453@leverpostej>
-References: <1445285133-11977-1-git-send-email-sboyd@codeaurora.org>
- <20151019202301.GA453@leverpostej>
-Message-ID: <20151019203815.GD22043@atomide.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 20 Oct 2015 04:46:26 +0800
+Subject: [RFC PATCH] phy: keystone: ks2_gbe_serdes_firmwares[] can be static
+In-Reply-To: <1445281040-14742-2-git-send-email-w-kwok2@ti.com>
+References: <201510200459.7i1D4X2p%fengguang.wu@intel.com>
+Message-ID: <20151019204626.GA42156@athens>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Rutland <mark.rutland@arm.com> [151019 13:27]:
-> On Mon, Oct 19, 2015 at 01:05:33PM -0700, Stephen Boyd wrote:
-> > Now that __cpuinit has been removed, the __ref markings on these
-> > functions are useless. Remove them. This also reduces the size of
-> > the multi_v7_defconfig image:
-> > 
-> > $ size before after
-> >    text    data     bss     dec     hex filename
-> >    12683578        1470996  348904 14503478         dd4e36 before
-> >    12683274        1470996  348904 14503174         dd4d06 after
-> > 
-> > presumably because now we don't have to jump to code in the
-> > .ref.text section and/or the noinline marking is removed.
-> 
-> FWIW:
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-And if you need even more acks:
+Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+---
+ phy-keystone-serdes.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+diff --git a/drivers/phy/phy-keystone-serdes.c b/drivers/phy/phy-keystone-serdes.c
+index ee1cda7..e34201c 100644
+--- a/drivers/phy/phy-keystone-serdes.c
++++ b/drivers/phy/phy-keystone-serdes.c
+@@ -209,9 +209,9 @@
+  * Newest first. Search starts from the 0-th array entry until a firmware
+  * file is found.
+  */
+-const char *ks2_gbe_serdes_firmwares[] = {"ks2_gbe_serdes.bin"};
+-const char *ks2_xgbe_serdes_firmwares[] = {"ks2_xgbe_serdes.bin"};
+-const char *ks2_pcie_serdes_firmwares[] = {"ks2_pcie_serdes.bin"};
++static const char *ks2_gbe_serdes_firmwares[] = {"ks2_gbe_serdes.bin"};
++static const char *ks2_xgbe_serdes_firmwares[] = {"ks2_xgbe_serdes.bin"};
++static const char *ks2_pcie_serdes_firmwares[] = {"ks2_pcie_serdes.bin"};
+ 
+ /* SERDES Link Rate Kbps */
+ enum KSERDES_LINK_RATE {
+@@ -933,7 +933,7 @@ done:
+ 	return val;
+ }
+ 
+-int kserdes_get_status(struct kserdes_config *sc)
++static int kserdes_get_status(struct kserdes_config *sc)
+ {
+ 	unsigned long timeout;
+ 
+@@ -1568,7 +1568,7 @@ static void kserdes_att_boost_phy_patch(struct kserdes_config *sc)
+ 		for_each_lane(kserdes_att_boost_phyb_patch, sc);
+ }
+ 
+-int kserdes_sgmii_lanes_enable(struct kserdes_config *sc)
++static int kserdes_sgmii_lanes_enable(struct kserdes_config *sc)
+ {
+ 	int ret, i;
+ 	u32 val, lanes_enable = 0;
