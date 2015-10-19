@@ -1,127 +1,365 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 19 Oct 2015 15:14:27 +0200
-Subject: [PATCH 1/3] arm/arm64: KVM: Fix arch timer behavior for disabled
- interrupts
-In-Reply-To: <5624EB04.1090601@linaro.org>
-References: <1445113822-7831-1-git-send-email-christoffer.dall@linaro.org>
- <1445113822-7831-2-git-send-email-christoffer.dall@linaro.org>
- <5624EB04.1090601@linaro.org>
-Message-ID: <20151019131427.GD24104@cbox>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 19 Oct 2015 14:00:45 +0100
+Subject: [PATCHv4 22/24] arm64: cpufeature: Track the user visible fields
+In-Reply-To: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
+References: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445259647-21541-23-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 03:07:16PM +0200, Eric Auger wrote:
-> Hi Christoffer,
-> On 10/17/2015 10:30 PM, Christoffer Dall wrote:
-> > We have an interesting issue when the guest disables the timer interrupt
-> > on the VGIC, which happens when turning VCPUs off using PSCI, for
-> > example.
-> > 
-> > The problem is that because the guest disables the virtual interrupt at
-> > the VGIC level, we never inject interrupts to the guest and therefore
-> > never mark the interrupt as active on the physical distributor.  The
-> > host also never takes the timer interrupt (we only use the timer device
-> > to trigger a guest exit and everything else is done in software), so the
-> > interrupt does not become active through normal means.
-> > 
-> > The result is that we keep entering the guest with a programmed timer
-> > that will always fire as soon as we context switch the hardware timer
-> > state and run the guest, preventing forward progress for the VCPU.
-> > 
-> > Since the active state on the physical distributor is really part of the
-> > timer logic, it is the job of our virtual arch timer driver to manage
-> > this state.
-> > 
-> > The timer->map->active boolean field indicates whether we have signalled
-> > this interrupt to the vgic and if that interrupt is still pending or
-> > active.  As long as that is the case, the hardware doesn't have to
-> > generate physical interrupts and therefore we mark the interrupt as
-> > active on the physical distributor.
-> > 
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  virt/kvm/arm/arch_timer.c | 19 +++++++++++++++++++
-> >  virt/kvm/arm/vgic.c       | 43 +++++++++++--------------------------------
-> >  2 files changed, 30 insertions(+), 32 deletions(-)
-> > 
-> > diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> > index 48c6e1a..b9d3a32 100644
-> > --- a/virt/kvm/arm/arch_timer.c
-> > +++ b/virt/kvm/arm/arch_timer.c
-> > @@ -137,6 +137,8 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
-> >  void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
-> >  {
-> >  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> > +	bool phys_active;
-> > +	int ret;
-> >  
-> >  	/*
-> >  	 * We're about to run this vcpu again, so there is no need to
-> > @@ -151,6 +153,23 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
-> >  	 */
-> >  	if (kvm_timer_should_fire(vcpu))
-> >  		kvm_timer_inject_irq(vcpu);
-> > +
-> > +	/*
-> > +	 * We keep track of whether the edge-triggered interrupt has been
-> > +	 * signalled to the vgic/guest, and if so, we mask the interrupt and
-> > +	 * the physical distributor to prevent the timer from raising a
-> > +	 * physical interrupt whenever we run a guest, preventing forward
-> > +	 * VCPU progress.
-> In practice don't you simply mark the IRQ as active at GIC physical
-> distributor level, hence preventing the same IRQ from hitting again
+Track the user visible fields of a CPU feature register.
+This will be used later for exposing the value to the userspace
+via emulation of MRS instruction. For more information, check
+the documentation :
+	Documentation/arm64/cpu-feature-registers.txt
 
-yes, that's what I meant with my comment, I should reword to "...we mark
-the interrupt as active on the physical distributor..."
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/cpufeature.h |    7 ++
+ arch/arm64/kernel/cpufeature.c      |  192 ++++++++++++++++++-----------------
+ 2 files changed, 107 insertions(+), 92 deletions(-)
 
-> > +	 */
-> > +	if (kvm_vgic_get_phys_irq_active(timer->map))
-> > +		phys_active = true;
-> > +	else
-> > +		phys_active = false;
-> > +
-> > +	ret = irq_set_irqchip_state(timer->map->irq,
-> > +				    IRQCHIP_STATE_ACTIVE,
-> > +				    phys_active);
-> 
-> physical distributor state is set in arch timer flush. It relates to a
-> shared device behavior so I find it natural to do it there.
-> 
-> However the map->active is set in arch_timer IRQ injection and unset in
-> vgic sync. Why not doing the set in kvm_vgic_inject_mapped_irq?
-
-Because you have to set it at every entry to the guest if you run
-multiple VCPUs/VMs on this CPU or migrate this VCPU to a different CPU.
-
-> 
-> > +	WARN_ON(ret);
-> >  }
-> >  
-> >  /**
-> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> > index 596455a..ea21bc2 100644
-> > --- a/virt/kvm/arm/vgic.c
-> > +++ b/virt/kvm/arm/vgic.c
-> > @@ -1092,6 +1092,15 @@ static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
-> >  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> >  	struct vgic_lr vlr = vgic_get_lr(vcpu, lr_nr);
-> >  
-> > +	/*
-> > +	 * We must transfer the pending state back to the distributor before
-> > +	 * retiring the LR, otherwise we may loose edge-triggered interrupts.
-> > +	 */
-> > +	if (vlr.state & LR_STATE_PENDING) {
-> > +		vgic_dist_irq_set_pending(vcpu, irq);
-> > +		vlr.hwirq = 0;
-> > +	}
-> That fix applies to any edge-sensitive IRQ, ie. not especially the
-> timer's one? In the positive shouldn't you precise this in the commit
-> msg too?
-> 
-
-Probably, it could also be a separate patch.  I'll rework this.
-
-Thanks,
--Christoffer
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index dc00813..10a265f 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -44,9 +44,12 @@ enum ftr_type {
+ 
+ #define FTR_STRICT	true	/* SANITY check strict matching required */
+ #define FTR_NONSTRICT	false	/* SANITY check ignored */
++#define FTR_VISIBLE	true	/* Feature visible to user space */
++#define FTR_HIDDEN	false	/* Feature not visible to user space */
+ 
+ struct arm64_ftr_bits {
+ 	bool		strict;	  /* CPU Sanity check: strict matching required ? */
++	bool		visible;  /* visible to userspace ? */
+ 	enum ftr_type	type;
+ 	u8		shift;
+ 	u8		width;
+@@ -55,13 +58,17 @@ struct arm64_ftr_bits {
+ 
+ /*
+  * @arm64_ftr_reg - Feature register
++ * @user_mask		Bits of @sys_val visible to user space.
+  * @strict_mask 	Bits which should match across all CPUs for sanity.
++ * @user_val		Safe value for user invisible fields.
+  * @sys_val		Safe value across the CPUs (system view)
+  */
+ struct arm64_ftr_reg {
+ 	u32			sys_id;
+ 	const char		*name;
++	u64			user_mask;
+ 	u64			strict_mask;
++	u64			user_val;
+ 	u64			sys_val;
+ 	struct arm64_ftr_bits	*ftr_bits;
+ };
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index d69af00..896a821 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -44,8 +44,9 @@ unsigned int compat_elf_hwcap2 __read_mostly;
+ 
+ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ 
+-#define ARM64_FTR_BITS(STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
++#define ARM64_FTR_BITS(VISIBLE, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
+ 	{						\
++		.visible = VISIBLE,			\
+ 		.strict = STRICT,			\
+ 		.type = TYPE,				\
+ 		.shift = SHIFT,				\
+@@ -59,139 +60,139 @@ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ 	}
+ 
+ static struct arm64_ftr_bits ftr_id_aa64isar0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 24, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* RAZ */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 24, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* RAZ */
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 28, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_GIC_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
+ 	/* Linux doesn't care about the EL3 */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, ID_AA64PFR0_EL3_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL2_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL1_SHIFT, 4, ID_AA64PFR0_EL1_64BIT_ONLY),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL0_SHIFT, 4, ID_AA64PFR0_EL0_64BIT_ONLY),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64PFR0_EL3_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL2_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL1_SHIFT, 4, ID_AA64PFR0_EL1_64BIT_ONLY),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_EL0_SHIFT, 4, ID_AA64PFR0_EL0_64BIT_ONLY),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN16_SHIFT, 4, ID_AA64MMFR0_TGRAN16_NI),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_BIGENDEL0_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN16_SHIFT, 4, ID_AA64MMFR0_TGRAN16_NI),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_BIGENDEL0_SHIFT, 4, 0),
+ 	/* Linux shouldn't care about secure memory */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, ID_AA64MMFR0_SNSMEM_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_BIGENDEL_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64MMFR0_SNSMEM_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_BIGENDEL_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
+ 	/*
+ 	 * Differing PARange is fine as long as all peripherals and memory are mapped
+ 	 * within the minimum PARange of all CPUs
+ 	 */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_PARANGE_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_PARANGE_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_LOR_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_HPD_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_VMIDBITS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_HADBS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_LOR_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_HPD_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_VMIDBITS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_HADBS_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_ctr[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 31, 1, 1),	/* RAO */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 3, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* ERG */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 31, 1, 1),		/* RAO */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 28, 3, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* ERG */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
+ 	/*
+ 	 * Linux can handle differing I-cache policies. Userspace JITs will
+ 	 * make use of *minLine
+ 	 */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, 14, 2, 0),	/* L1Ip */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 10, 0),	/* RAZ */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* IminLine */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, 14, 2, 0),		/* L1Ip */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 10, 0),		/* RAZ */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* IminLine */
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_mmfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 4, 0),	/* InnerShr */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 24, 4, 0),	/* FCSE */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* AuxReg */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 16, 4, 0),	/* TCM */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 12, 4, 0),	/* ShareLvl */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 4, 0),	/* OuterShr */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),	/* PMSA */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* VMSA */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 28, 4, 0),	/* InnerShr */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 24, 4, 0),	/* FCSE */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* AuxReg */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 16, 4, 0),	/* TCM */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 12, 4, 0),	/* ShareLvl */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 8, 4, 0),	/* OuterShr */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 4, 0),	/* PMSA */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* VMSA */
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_mvfr2[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 24, 0),	/* RAZ */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* FPMisc */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),		/* SIMDMisc */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 8, 24, 0),	/* RAZ */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 4, 0),	/* FPMisc */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* SIMDMisc */
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_dczid[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 5, 27, 0),	/* RAZ */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 1, 1),		/* DZP */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* BS */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 5, 27, 0),	/* RAZ */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 1, 1),	/* DZP */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),/* BS */
+ 	ARM64_FTR_END,
+ };
+ 
+ 
+ static struct arm64_ftr_bits ftr_id_isar5[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_RDM_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 20, 4, 0),	/* RAZ */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_CRC32_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_SHA2_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_SHA1_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_AES_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_SEVL_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_RDM_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 20, 4, 0),	/* RAZ */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_CRC32_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_SHA2_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_SHA1_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_AES_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_ISAR5_SEVL_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_mmfr4[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 24, 0),	/* RAZ */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* ac2 */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),		/* RAZ */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 8, 24, 0),	/* RAZ */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 4, 0),	/* ac2 */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* RAZ */
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_pfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 16, 16, 0),	/* RAZ */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 12, 4, 0),	/* State3 */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 4, 0),		/* State2 */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* State1 */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),		/* State0 */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 16, 16, 0),	/* RAZ */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 12, 4, 0),	/* State3 */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 8, 4, 0),	/* State2 */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 4, 4, 0),	/* State1 */
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* State0 */
+ 	ARM64_FTR_END,
+ };
+ 
+@@ -202,29 +203,29 @@ static struct arm64_ftr_bits ftr_id_pfr0[] = {
+  * id_isar[0-4], id_mmfr[1-3], id_pfr1, mvfr[0-1]
+  */
+ static struct arm64_ftr_bits ftr_generic_32bits[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 28, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 24, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 12, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 8, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 4, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 28, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 24, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 12, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 8, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 4, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_generic[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 64, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 64, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_generic32[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, 0, 32, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_aa64raz[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 64, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, 0, 64, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+@@ -363,12 +364,13 @@ static void __init sort_ftr_regs(void)
+ 
+ /*
+  * Initialise the CPU feature register from Boot CPU values.
+- * Also initiliases the strict_mask for the register.
++ * Also initiliases the strict_mask, user_mask and user_val
++ * for the register.
+  */
+ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
+ {
+ 	u64 val = 0;
+-	u64 strict_mask = ~0x0ULL;
++	u64 user_mask = 0, strict_mask = ~0x0ULL;
+ 	struct arm64_ftr_bits *ftrp;
+ 	struct arm64_ftr_reg *reg = get_arm64_ftr_reg(sys_reg);
+ 
+@@ -378,10 +380,16 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
+ 		s64 ftr_new = arm64_ftr_value(ftrp, new);
+ 
+ 		val = arm64_ftr_set_value(ftrp, val, ftr_new);
++		if (ftrp->visible)
++			user_mask |= arm64_ftr_mask(ftrp);
++		else
++			reg->user_val = arm64_ftr_set_value(ftrp, reg->user_val,
++								ftrp->safe_val);
+ 		if (!ftrp->strict)
+ 			strict_mask &= ~arm64_ftr_mask(ftrp);
+ 	}
+ 	reg->sys_val = val;
++	reg->user_mask = user_mask;
+ 	reg->strict_mask = strict_mask;
+ }
+ 
+-- 
+1.7.9.5
