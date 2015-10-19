@@ -1,28 +1,65 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 19 Oct 2015 15:39:36 +0200
-Subject: [PATCHv4 18/24] arm64/kvm: Make use of the system wide safe values
-In-Reply-To: <1445261101-22344-19-git-send-email-suzuki.poulose@arm.com>
-References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
- <1445261101-22344-19-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20151019133936.GF24104@cbox>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 19 Oct 2015 14:19:38 +0100
+Subject: [PATCHv4 12/12] arm64: 36 bit VA
+In-Reply-To: <1445260779-22242-1-git-send-email-suzuki.poulose@arm.com>
+References: <1445260779-22242-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445260779-22242-13-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 02:24:55PM +0100, Suzuki K. Poulose wrote:
-> Use the system wide safe value from the new API for safer
-> decisions
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: kvmarm at lists.cs.columbia.edu
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm64/kvm/reset.c    |    2 +-
->  arch/arm64/kvm/sys_regs.c |   12 ++++++------
->  2 files changed, 7 insertions(+), 7 deletions(-)
+36bit VA lets us use 2 level page tables while limiting the
+available address space to 64GB.
 
-I assume Catalin or Will can take this with the rest of the series
-through the arm64 tree, right?
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Steve Capper <steve.capper@linaro.org>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/Kconfig |    8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
--Christoffer
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 8541664..a346671 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -170,6 +170,7 @@ config FIX_EARLYCON_MEM
+ 
+ config PGTABLE_LEVELS
+ 	int
++	default 2 if ARM64_16K_PAGES && ARM64_VA_BITS_36
+ 	default 2 if ARM64_64K_PAGES && ARM64_VA_BITS_42
+ 	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48
+ 	default 3 if ARM64_4K_PAGES && ARM64_VA_BITS_39
+@@ -391,6 +392,10 @@ choice
+ 	  space sizes. The level of translation table is determined by
+ 	  a combination of page size and virtual address space size.
+ 
++config ARM64_VA_BITS_36
++	bool "36-bit"
++	depends on ARM64_16K_PAGES
++
+ config ARM64_VA_BITS_39
+ 	bool "39-bit"
+ 	depends on ARM64_4K_PAGES
+@@ -410,6 +415,7 @@ endchoice
+ 
+ config ARM64_VA_BITS
+ 	int
++	default 36 if ARM64_VA_BITS_36
+ 	default 39 if ARM64_VA_BITS_39
+ 	default 42 if ARM64_VA_BITS_42
+ 	default 47 if ARM64_VA_BITS_47
+@@ -480,7 +486,7 @@ config ARCH_WANT_GENERAL_HUGETLB
+ 	def_bool y
+ 
+ config ARCH_WANT_HUGE_PMD_SHARE
+-	def_bool y if ARM64_4K_PAGES || ARM64_16K_PAGES
++	def_bool y if ARM64_4K_PAGES || (ARM64_16K_PAGES && !ARM64_VA_BITS_36)
+ 
+ config HAVE_ARCH_TRANSPARENT_HUGEPAGE
+ 	def_bool y
+-- 
+1.7.9.5
