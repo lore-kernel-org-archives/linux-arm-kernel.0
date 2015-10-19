@@ -1,97 +1,47 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 19 Oct 2015 18:01:38 +0200
-Subject: [PATCH] spi-atmel.c: fix DMA for bits_per_word > 8
-In-Reply-To: <CALnQHM3WxNDV3xzJwRfGRVTMYL1mo44VbBb2YawZVUzn0CzFfA@mail.gmail.com>
-References: <CALnQHM3WxNDV3xzJwRfGRVTMYL1mo44VbBb2YawZVUzn0CzFfA@mail.gmail.com>
-Message-ID: <562513E2.4090303@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 Oct 2015 09:06:07 -0700
+Subject: [PATCH v2 2/3] ARM: dts: AM43x-epos-evm: Add AM438x compatible
+ string for epos
+In-Reply-To: <1444885808-6306-3-git-send-email-j-keerthy@ti.com>
+References: <1444885808-6306-1-git-send-email-j-keerthy@ti.com>
+ <1444885808-6306-3-git-send-email-j-keerthy@ti.com>
+Message-ID: <20151019160606.GC22043@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David,
-
-It seems that your email client is doing funny things with the source
-code whitespace. Anyway, I can deal with this and re-format your patch:
-no problem. For later patches I advice you to use "git format-patch"
-command.
-
-Still, see comments below...
-
-Le 13/10/2015 00:32, David Mosberger a ?crit :
-> I need the patch below to make DMA work in spi-atmel.c when bits_per_word > 8.
-
-A little bit more explanation would be good.
-
->   --david
-
-I would need your "Signed-off-by:" tag.
-
-> -- 
-> eGauge Systems LLC, http://egauge.net/, 1.877-EGAUGE1, fax 720.545.9768
+* Keerthy <j-keerthy@ti.com> [151014 22:14]:
+> Add AM438x compatible property to identify the SoCs on epos evms.
 > 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 04e48e5..7bb361a 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -711,6 +711,7 @@ static void atmel_spi_next_xfer_pio(struct
-> spi_master *master,
->   * Submit next transfer for DMA.
->   */
->  static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
-> +  struct spi_message *msg,
->   struct spi_transfer *xfer,
->   u32 *plen)
->  {
-> @@ -721,7 +722,7 @@ static int atmel_spi_next_xfer_dma_submit(struct
-> spi_master *master,
->   struct dma_async_tx_descriptor *txdesc;
->   struct dma_slave_config slave_config;
->   dma_cookie_t cookie;
-> - u32 len = *plen;
-> + u32 len = *plen, bpw;
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
 > 
->   dev_vdbg(master->dev.parent, "atmel_spi_next_xfer_dma_submit\n");
+> Changes in v2:
 > 
-> @@ -758,7 +759,11 @@ static int atmel_spi_next_xfer_dma_submit(struct
-> spi_master *master,
+>   * Rebased to latest 4.3-rc5
 > 
->   *plen = len;
+>  Documentation/devicetree/bindings/arm/omap/omap.txt | 5 ++++-
+>  arch/arm/boot/dts/am43x-epos-evm.dts                | 2 +-
+>  2 files changed, 5 insertions(+), 2 deletions(-)
 > 
-> - if (atmel_spi_dma_slave_config(as, &slave_config, 8))
-> + bpw = xfer->bits_per_word;
-> + if (!bpw)
-
-I assume that xfer->bits_per_word must be filled with the proper value.
-So why do you need this test and de additional assignment below? Does it
-come from a bad experience with the "xfer->bits_per_word" value being empty?
-
-> + bpw = msg->spi->bits_per_word;
+> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> index 9f4e513..dc3b5f2 100644
+> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> @@ -100,6 +100,9 @@ SoCs:
+>  - AM4372
+>    compatible = "ti,am4372", "ti,am43"
+>  
+> +- AM438x
+> +  compatible = "ti,am438x", "ti,am43"
 > +
-> + if (atmel_spi_dma_slave_config(as, &slave_config, bpw))
 
-I may have called bpw variable as "bits" like elsewhere in this driver:
-it's a detail though.
+The compatible strings should not have x, this should be
+"ti,am438" instead. But my guess is that we are better off
+adding proper SoC detection to avoid needing a separate dts
+file for each SoC revision. Ideally booting with "ti,am43"
+should be enough and we can initialize the rest during
+runtime.
 
->   goto err_exit;
-> 
->   /* Send both scatterlists */
-> @@ -1316,8 +1321,8 @@ static int atmel_spi_one_transfer(struct
-> spi_master *master,
->   atmel_spi_pdc_next_xfer(master, msg, xfer);
->   } else if (atmel_spi_use_dma(as, xfer)) {
->   len = as->current_remaining_bytes;
-> - ret = atmel_spi_next_xfer_dma_submit(master,
-> - xfer, &len);
-> + ret = atmel_spi_next_xfer_dma_submit(master, msg,
-> +     xfer, &len);
->   if (ret) {
->   dev_err(&spi->dev,
->   "unable to use DMA, fallback to PIO\n");
+Regards,
 
-Ok, the patch seems reasonable. So, can you please answer my main
-question and give me the permission to add your "Signed-off-by:" tag or
-re-send me a more standard patch...
-
-Thanks a lot for your work on this driver David.
-Best regards,
--- 
-Nicolas Ferre
+Tony
