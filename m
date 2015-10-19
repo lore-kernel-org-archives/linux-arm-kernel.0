@@ -1,51 +1,80 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 19 Oct 2015 13:48:13 +0200
-Subject: [RFC PATCH] ARM: exynos_defconfig: Increase
- CONFIG_BLK_DEV_RAM_SIZE to 64K
-In-Reply-To: <1445251715-9725-1-git-send-email-alim.akhtar@samsung.com>
-References: <1445251715-9725-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <5624D87D.4090901@osg.samsung.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 19 Oct 2015 17:16:38 +0530
+Subject: [PATCH v4 0/8] Add support for Exynos SROM Controller driver
+Message-ID: <1445255206-11148-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alim,
+This patch set adds support for Exynos SROM controller DT based driver.
+Currently SROM register sets are used only during S2R, so driver
+basically added for taking care of S2R. It will help us in removing
+static mapping from exynos.c and other extra code handline during S2R.
 
-On 10/19/2015 12:48 PM, Alim Akhtar wrote:
-> CONFIG_BLK_DEV_RAM_SIZE is currently set to 8K, which is a bit on the
-> smaller side, lets bump it up to 64K so that a bigger RAM_DISK can
-> be used with defconfig.
-> 
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> ---
+This patch set also updated exynos4 and exynos5 dtsi files for with device
+node for srom, and added binding documentation for the same.
 
-I agree that 8KiB is too small and that should be bumped, I'm also
-not sure what the best size would be but 64KiB sounds reasonable
-to me. So for this patch:
+First two patches are some minor cleanup in mach-exynos.
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Patchset v1 was posted here[1]
+[1]: https://lkml.org/lkml/2015/4/29/98
+Patchset v2 was posted here[2]
+[2]: https://lkml.org/lkml/2015/8/24/125
+Patchset v3 was posted here[3]
+[3]: https://lkml.org/lkml/2015/10/13/392
 
-> Every time I build exynos_defconfig, I need to manually change RAM_SIZE
-> to match my ramdisk image size. I am not sure what is the best ramdisk size
-> might be, but bumping it to 64K might be a reasonable one.
->
+This patchset, I have tested on Peach-Pi (Exynos5880) based chromebook for boot
+and S2R functionality.
 
-In case you are interested, I got some stats by doing grep on the ARM
-defconfigs using this [0]. Of course the sizes depends on the platform
-but just to have an idea about what sizes are more popular than others.
+Changes since v3:
+ - Rebased to lastet kgene tree.
+ - Added platform data support, instead of using global variables for srom base
+ - Addressed review comments from LABBE Corentin
 
-SIZE	COUNT
-1024	17
-8192	43
-10240	1
-16384	20
-20000	25
-32768	36
-65536	15
+Changes since v2:
+ - Rebased to latest kgene tree.
+ - Addressed review comments from Krzysztof Kozlowski.
+ - Add new patch for MAINTAINER list update.
+ - Reordered patch sequence for avoiding git bisect issues.
 
-[0]: http://hastebin.com/buqukimede.bash
+Changes since v1:
+ - Rebased to latest kgene tree.
+ - Addressed review comments from Krzysztof Kozlowski.
+ - Add two new patches for minor cleanup in exynos.c and map.h
 
-Best regards,
+
+Pankaj Dubey (8):
+  ARM: EXYNOS: remove unused static mapping of CMU for exynos5
+  ARM: EXYNOS: code cleanup in map.h
+  Documentation: dt-bindings: add exynos-srom binding information
+  ARM: dts: add SROM device node for exynos4
+  ARM: dts: add SROM device node for exynos5
+  drivers: soc: add support for exynos SROM driver
+  MAINTAINERS: add maintainers entry for drivers/soc/samsung
+  ARM: EXYNOS: Remove SROM related register settings from mach-exynos
+
+ .../bindings/arm/samsung/exynos-srom.txt           |  12 ++
+ MAINTAINERS                                        |   1 +
+ arch/arm/boot/dts/exynos4.dtsi                     |   5 +
+ arch/arm/boot/dts/exynos5.dtsi                     |   5 +
+ arch/arm/mach-exynos/Kconfig                       |   2 +
+ arch/arm/mach-exynos/exynos.c                      |  22 ---
+ arch/arm/mach-exynos/include/mach/map.h            |   8 -
+ arch/arm/mach-exynos/regs-srom.h                   |  53 ------
+ arch/arm/mach-exynos/suspend.c                     |  20 +--
+ arch/arm/plat-samsung/include/plat/map-s5p.h       |   1 -
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/samsung/Kconfig                        |  13 ++
+ drivers/soc/samsung/Makefile                       |   1 +
+ drivers/soc/samsung/exynos-srom.c                  | 179 +++++++++++++++++++++
+ drivers/soc/samsung/exynos-srom.h                  |  51 ++++++
+ 16 files changed, 273 insertions(+), 102 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+ delete mode 100644 arch/arm/mach-exynos/regs-srom.h
+ create mode 100644 drivers/soc/samsung/Kconfig
+ create mode 100644 drivers/soc/samsung/Makefile
+ create mode 100644 drivers/soc/samsung/exynos-srom.c
+ create mode 100644 drivers/soc/samsung/exynos-srom.h
+
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.4.5
