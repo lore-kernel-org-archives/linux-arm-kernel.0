@@ -1,96 +1,110 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 19 Oct 2015 14:20:29 +0800
-Subject: [linux-sunxi] Re: [PATCH 3/6] mfd: axp20x: Add support for RSB
- based AXP223 PMIC
-In-Reply-To: <20151019060226.GQ2711@lukather>
-References: <1444840342-9233-1-git-send-email-wens@csie.org>
- <1444840342-9233-4-git-send-email-wens@csie.org>
- <20151016064159.GG2711@lukather>
- <CAGb2v66B8EbTZkVrt3QT85fKCwOjL8OBWfQvcLHrLAe6NfavNA@mail.gmail.com>
- <20151019060226.GQ2711@lukather>
-Message-ID: <CAGb2v66y9+_iemTn-AXQUPBRX=ZEQFfXgbVnwRzviDNfCSm_eQ@mail.gmail.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Mon, 19 Oct 2015 14:21:12 +0800
+Subject: [PATCH v11 0/3] Mediatek xHCI support
+Message-ID: <1445235675-29312-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 2:02 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Fri, Oct 16, 2015 at 02:46:23PM +0800, Chen-Yu Tsai wrote:
->> On Fri, Oct 16, 2015 at 2:41 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > On Thu, Oct 15, 2015 at 12:32:19AM +0800, Chen-Yu Tsai wrote:
->> >> The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
->> >> It is functionally identical to AXP221; only the regulator default
->> >> voltage/status and the external host interface are different.
->> >>
->> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> >> ---
->> >>  drivers/mfd/Kconfig        | 12 ++++++
->> >>  drivers/mfd/Makefile       |  1 +
->> >>  drivers/mfd/axp20x-core.c  |  2 +
->> >>  drivers/mfd/axp20x-rsb.c   | 93 ++++++++++++++++++++++++++++++++++++++++++++++
->> >>  include/linux/mfd/axp20x.h |  1 +
->> >>  5 files changed, 109 insertions(+)
->> >>  create mode 100644 drivers/mfd/axp20x-rsb.c
->> >>
->> >> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
->> >> index 9ba3feb3f2fc..6e5edb61d42e 100644
->> >> --- a/drivers/mfd/Kconfig
->> >> +++ b/drivers/mfd/Kconfig
->> >> @@ -84,6 +84,7 @@ config MFD_BCM590XX
->> >>  config MFD_AXP20X
->> >>       bool "X-Powers AXP series PMICs"
->> >>       select MFD_AXP20X_I2C
->> >> +     select MFD_AXP20X_RSB
->> >>
->> >>  config MFD_AXP20X_CORE
->> >>       bool
->> >> @@ -102,6 +103,17 @@ config MFD_AXP20X_I2C
->> >>         components like regulators or the PEK (Power Enable Key) under the
->> >>         corresponding menus.
->> >>
->> >> +config MFD_AXP20X_RSB
->> >> +     bool "X-Powers AXP series RSB PMICs"
->> >> +     select MFD_AXP20X_CORE
->> >> +     depends on SUNXI_RSB=y
->> >
->> > Do we need that? Even if the bus is compiled as a module, the driver
->> > will not be probed before that, will it?
->>
->> There's a compile/link dependency on the __devm_regmap_init_sunxi_rsb().
->
-> If it's exported, everything should be fine, no?
->
->> And both drivers are bool, i.e. can't be compiled as a module. What we
->> don't want is enabling MFD_AXP20X_RSB without SUNXI_RSB.
->
-> What would really be the issue here? The driver wouldn't be probed,
-> and that's it. Or am I missing something?
+>From 1c6e0dd39074297ebb0714c1d44a3e0dc9af466c Mon Sep 17 00:00:00 2001
+From: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Date: Mon, 19 Oct 2015 14:13:45 +0800
+Subject: [PATCH v11 0/3] Mediatek xHCI support
 
-The RSB bus / slave device functions have been merged into the RSB driver
-itself. Enabling MFD_AXP20X_RSB without enabling SUNXI_RSB means that RSB
-bus/device related functions are not compiled, i.e. link error:
+The patch supports MediaTek's xHCI controller.
 
-drivers/built-in.o: In function `axp20x_rsb_probe':
-/home/wens/sunxi/linux/drivers/mfd/axp20x-rsb.c:64: undefined
-reference to `__devm_regmap_init_sunxi_rsb'
-drivers/built-in.o: In function `axp20x_rsb_driver_init':
-/home/wens/sunxi/linux/drivers/mfd/axp20x-rsb.c:89: undefined
-reference to `sunxi_rsb_driver_register'
-Makefile:927: recipe for target 'vmlinux' failed
+There are some differences from xHCI spec:
+1. The interval is specified in 250 * 8ns increments for Interrupt Moderation
+Interval(IMODI) of the Interrupter Moderation(IMOD) register, it is 8 times as
+much as that defined in xHCI spec.
 
-The dependency is like "depends on I2C=y" for the I2C version.
+2. For the value of TD Size in Normal TRB, MTK's xHCI controller defines a
+number of packets that remain to be transferred for a TD after processing all
+Max packets in all previous TRBs,that means don't include the current TRB's,
+but in xHCI spec it includes the current ones.
 
-If you're asking about why "=y", I guess it's because MFD_AXP20X_RSB is bool,
-and if the depended on symbol is a tristate, which it actually is for I2c,
-we'd want it to be compiled in, and not built as a module, or again we'd get
-a undefined reference link error.
+3. To minimize the scheduling effort for synchronous endpoints in xHC, the MTK
+architecture defines some extra SW scheduling parameters for HW. According to
+these parameters provided by SW, the xHC can easily decide whether a
+synchronous endpoint should be scheduled in a specific uFrame. The extra SW
+scheduling parameters are put into reserved DWs in Slot and Endpoint Context.
+And a bandwidth scheduler algorithm is added to support such feature.
 
-Would it make sense to have SUNXI_RSB as a tristate symbol, i.e. can be built
-as a module? I'm nore sure. For multi-platform kernels, probably? Currently it
-isn't.
+A usb3.0 phy driver is also added which used by mt65xx SoCs platform, it
+supports two usb2.0 ports and one usb3.0 port.
 
-Hope this clears it up.
+depend on the patch for TDS calculation:
+https://patchwork.kernel.org/patch/7140041/
 
+change in v11:
+1. remove some dummy header files
+2. call xhci_mtk_sch_exit() when primary hcd register fail
+3. use false instead of 0 for the second parameter of device_init_wakeup();
 
-Regards
-ChenYu
+Change in v10:
+1. simplify clock stability checks
+2. put MTK xHCI configuration from xhci_mtk_probe() to xhci_mtk_setup()
+
+Change in v9:
+1. fix up issue of FS out-iso when use single-TT hub
+2. improve RX sensitivity
+3. remove udelay(800) called by phy_instance_power_on/off
+
+Change in v8:
+1. use struct overlay for ippc register
+2. change usb wakeup as optional feature
+3. add TDS quirk into unified TDS calculation function
+
+Change in v7:
+1. remove xHCI timing setting which only for FPGA
+2. revise xHCI scheduler algorithms
+3. replace "usb" by "USB" in xHCI binding file
+
+Change in v6:
+1. get register base address of port in probe instead of of_xlate
+2. enable clock in phy_init instead of probe
+
+Change in v5:
+1. descripte more exactly for each specifiers in xHCI binding
+2. make use of new multi-phy feature for phy driver
+
+Change in v4:
+1. descripte more exactly for each specifiers in binding file
+2. use BIT() to define a bit mask macro
+
+Change in v3:
+1. implement generic phy
+2. move opperations of IPPC and wakeup from phy driver to xHCI driver
+3. seperate quirk functions into a single C file to fix up dependence issue
+
+Change in v2:
+1. Rebase to 4.2-rc1
+2. Remove probe phy before add usb_hcd patch from this series due to 4.2-rc1
+   already fix this issue
+3. add xhci mac clocks
+4. add suspend/resume
+5. support remote wakeup
+
+Chunfeng Yun (3):
+  dt-bindings: Add a binding for Mediatek xHCI host controller
+  xhci: mediatek: support MTK xHCI host controller
+  arm64: dts: mediatek: add xHCI & usb phy for mt8173
+
+ .../devicetree/bindings/usb/mt8173-xhci.txt        |  51 ++
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  16 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  42 ++
+ drivers/usb/host/Kconfig                           |   9 +
+ drivers/usb/host/Makefile                          |   4 +
+ drivers/usb/host/xhci-mtk-sch.c                    | 415 +++++++++++
+ drivers/usb/host/xhci-mtk.c                        | 762 +++++++++++++++++++++
+ drivers/usb/host/xhci-mtk.h                        | 162 +++++
+ drivers/usb/host/xhci-ring.c                       |  16 +-
+ drivers/usb/host/xhci.c                            |  19 +-
+ drivers/usb/host/xhci.h                            |   1 +
+ 11 files changed, 1491 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+ create mode 100644 drivers/usb/host/xhci-mtk-sch.c
+ create mode 100644 drivers/usb/host/xhci-mtk.c
+ create mode 100644 drivers/usb/host/xhci-mtk.h
+
+--
+1.8.1.1.dirty
