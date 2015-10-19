@@ -1,266 +1,162 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:24:50 +0100
-Subject: [PATCHv4 13/24] arm64: Delay cpu feature capability checks
+Date: Mon, 19 Oct 2015 14:24:51 +0100
+Subject: [PATCHv4 14/24] arm64/capabilities: Make use of system wide safe value
 In-Reply-To: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
 References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445261101-22344-14-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445261101-22344-15-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment we run through the arm64_features capability list for
-each CPU and set the capability if one of the CPU supports it. This
-could be problematic in a heterogeneous system with differing capabilities.
-Delay the CPU feature checks until all the enabled CPUs are up(i.e,
-smp_cpus_done(), so that we can make better decisions based on the
-overall system capability. Once we decide and advertise the capabilities
-the alternatives can be applied. From this state, we cannot roll back
-a feature to disabled based on the values from a new hotplugged CPU,
-due to the runtime patching and other reasons. So, for all new CPUs,
-we need to make sure that they have the established system capabilities.
-Failing which, we bring the CPU down, preventing it from turning online.
-Once the capabilities are decided, any new CPU booting up goes through
-verification to ensure that it has all the enabled capabilities and also
-invokes the respective enable() method on the CPU.
-
-The CPU errata checks are not delayed and is still executed per-CPU
-to detect the respective capabilities. If we ever come across a non-errata
-capability that needs to be checked on each-CPU, we could introduce them via
-a new capability table(or introduce a flag), which can be processed per CPU.
-
-The next patch will make the feature checks use the system wide
-safe value of a feature register.
-
-NOTE: The enable() methods associated with the capability is scheduled
-on all the CPUs (which is the only use case at the moment). If we need
-a different type of 'enable()' which only needs to be run once on any CPU,
-we should be able to handle that when needed.
+Now that we can reliably read the system wide safe value for a
+feature register, use that to compute the system capability.
+This patch also replaces the 'feature-register-specific'
+methods with a generic routine to check the capability.
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-
 ---
-Changes since V3:
-  - Don't use hotplug notifier, instead uses a flag to indicate when the
-    system initialises the capabilities. Added a hook to secondary_start_kernel().
----
- arch/arm64/include/asm/cpufeature.h |    9 +++-
- arch/arm64/include/asm/processor.h  |    2 +-
- arch/arm64/kernel/cpufeature.c      |   96 +++++++++++++++++++++++++++++++++--
- arch/arm64/kernel/cpuinfo.c         |    1 -
- arch/arm64/kernel/smp.c             |    7 +++
- arch/arm64/mm/fault.c               |    2 +-
- 6 files changed, 108 insertions(+), 9 deletions(-)
+ arch/arm64/include/asm/cpufeature.h |    1 +
+ arch/arm64/kernel/cpufeature.c      |   79 ++++++++++++++++++++++++++---------
+ 2 files changed, 60 insertions(+), 20 deletions(-)
 
 diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index b2f224b..f78598b 100644
+index f78598b..97b4d64 100644
 --- a/arch/arm64/include/asm/cpufeature.h
 +++ b/arch/arm64/include/asm/cpufeature.h
-@@ -70,7 +70,7 @@ struct arm64_cpu_capabilities {
- 	const char *desc;
- 	u16 capability;
- 	bool (*matches)(const struct arm64_cpu_capabilities *);
--	void (*enable)(void);
-+	void (*enable)(void *);		/* Called on all active CPUs */
- 	union {
- 		struct {	/* To be used for erratum handling only */
- 			u32 midr_model;
-@@ -140,7 +140,12 @@ void __init setup_cpu_features(void);
- void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			    const char *info);
- void check_local_cpu_errata(void);
--void check_local_cpu_features(void);
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+void verify_local_cpu_capabilities(void);
-+#else
-+static inline void verify_local_cpu_capabilities(void) {}
-+#endif
+@@ -78,6 +78,7 @@ struct arm64_cpu_capabilities {
+ 		};
  
- u64 read_system_reg(u32 id);
- 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 98f3235..4acb7ca 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -186,6 +186,6 @@ static inline void spin_lock_prefetch(const void *x)
- 
- #endif
- 
--void cpu_enable_pan(void);
-+void cpu_enable_pan(void *__unused);
- 
- #endif /* __ASM_PROCESSOR_H */
+ 		struct {	/* Feature register checking */
++			u32 sys_reg;
+ 			int field_pos;
+ 			int min_field_value;
+ 		};
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 78c4cb7a..375a3d8 100644
+index 375a3d8..a6a4acb 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -23,6 +23,7 @@
- #include <linux/types.h>
- #include <asm/cpu.h>
- #include <asm/cpufeature.h>
-+#include <asm/cpu_ops.h>
- #include <asm/processor.h>
- #include <asm/sysreg.h>
+@@ -586,34 +586,31 @@ feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
+ 	return val >= entry->min_field_value;
+ }
  
-@@ -645,19 +646,100 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+-#define __ID_FEAT_CHK(reg)						\
+-static bool __maybe_unused						\
+-has_##reg##_feature(const struct arm64_cpu_capabilities *entry)		\
+-{									\
+-	u64 val;							\
+-									\
+-	val = read_cpuid(reg##_el1);					\
+-	return feature_matches(val, entry);				\
+-}
++static bool
++has_cpuid_feature(const struct arm64_cpu_capabilities *entry)
++{
++	u64 val;
+ 
+-__ID_FEAT_CHK(id_aa64pfr0);
+-__ID_FEAT_CHK(id_aa64mmfr1);
+-__ID_FEAT_CHK(id_aa64isar0);
++	val = read_system_reg(entry->sys_reg);
++	return feature_matches(val, entry);
++}
+ 
+ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "GIC system register CPU interface",
+ 		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+-		.matches = has_id_aa64pfr0_feature,
+-		.field_pos = 24,
++		.matches = has_cpuid_feature,
++		.sys_reg = SYS_ID_AA64PFR0_EL1,
++		.field_pos = ID_AA64PFR0_GIC_SHIFT,
+ 		.min_field_value = 1,
+ 	},
+ #ifdef CONFIG_ARM64_PAN
+ 	{
+ 		.desc = "Privileged Access Never",
+ 		.capability = ARM64_HAS_PAN,
+-		.matches = has_id_aa64mmfr1_feature,
+-		.field_pos = 20,
++		.matches = has_cpuid_feature,
++		.sys_reg = SYS_ID_AA64MMFR1_EL1,
++		.field_pos = ID_AA64MMFR1_PAN_SHIFT,
+ 		.min_field_value = 1,
+ 		.enable = cpu_enable_pan,
+ 	},
+@@ -622,8 +619,9 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "LSE atomic instructions",
+ 		.capability = ARM64_HAS_LSE_ATOMICS,
+-		.matches = has_id_aa64isar0_feature,
+-		.field_pos = 20,
++		.matches = has_cpuid_feature,
++		.sys_reg = SYS_ID_AA64ISAR0_EL1,
++		.field_pos = ID_AA64ISAR0_ATOMICS_SHIFT,
+ 		.min_field_value = 2,
+ 	},
+ #endif /* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
+@@ -676,6 +674,47 @@ static inline void set_sys_caps_initialised(void)
  }
  
  /*
-- * Run through the enabled capabilities and enable() it on the CPUs
-+ * Run through the enabled capabilities and enable() it on all active
-+ * CPUs
++ * __raw_read_system_reg() - Used by a STARTING cpu before cpuinfo is populated.
++ */
++static u64 __raw_read_system_reg(u32 sys_id)
++{
++	switch (sys_id) {
++	case SYS_ID_PFR0_EL1:		return (u64)read_cpuid(ID_PFR0_EL1);
++	case SYS_ID_PFR1_EL1:		return (u64)read_cpuid(ID_PFR1_EL1);
++	case SYS_ID_DFR0_EL1:		return (u64)read_cpuid(ID_DFR0_EL1);
++	case SYS_ID_MMFR0_EL1:		return (u64)read_cpuid(ID_MMFR0_EL1);
++	case SYS_ID_MMFR1_EL1:		return (u64)read_cpuid(ID_MMFR1_EL1);
++	case SYS_ID_MMFR2_EL1:		return (u64)read_cpuid(ID_MMFR2_EL1);
++	case SYS_ID_MMFR3_EL1:		return (u64)read_cpuid(ID_MMFR3_EL1);
++	case SYS_ID_ISAR0_EL1:		return (u64)read_cpuid(ID_ISAR0_EL1);
++	case SYS_ID_ISAR1_EL1:		return (u64)read_cpuid(ID_ISAR1_EL1);
++	case SYS_ID_ISAR2_EL1:		return (u64)read_cpuid(ID_ISAR2_EL1);
++	case SYS_ID_ISAR3_EL1:		return (u64)read_cpuid(ID_ISAR3_EL1);
++	case SYS_ID_ISAR4_EL1:		return (u64)read_cpuid(ID_ISAR4_EL1);
++	case SYS_ID_ISAR5_EL1:		return (u64)read_cpuid(ID_ISAR4_EL1);
++	case SYS_MVFR0_EL1:		return (u64)read_cpuid(MVFR0_EL1);
++	case SYS_MVFR1_EL1:		return (u64)read_cpuid(MVFR1_EL1);
++	case SYS_MVFR2_EL1:		return (u64)read_cpuid(MVFR2_EL1);
++
++	case SYS_ID_AA64PFR0_EL1:	return (u64)read_cpuid(ID_AA64PFR0_EL1);
++	case SYS_ID_AA64PFR1_EL1:	return (u64)read_cpuid(ID_AA64PFR0_EL1);
++	case SYS_ID_AA64DFR0_EL1:	return (u64)read_cpuid(ID_AA64DFR0_EL1);
++	case SYS_ID_AA64DFR1_EL1:	return (u64)read_cpuid(ID_AA64DFR0_EL1);
++	case SYS_ID_AA64MMFR0_EL1:	return (u64)read_cpuid(ID_AA64MMFR0_EL1);
++	case SYS_ID_AA64MMFR1_EL1:	return (u64)read_cpuid(ID_AA64MMFR1_EL1);
++	case SYS_ID_AA64ISAR0_EL1:	return (u64)read_cpuid(ID_AA64ISAR0_EL1);
++	case SYS_ID_AA64ISAR1_EL1:	return (u64)read_cpuid(ID_AA64ISAR1_EL1);
++
++	case SYS_CNTFRQ_EL0:		return (u64)read_cpuid(CNTFRQ_EL0);
++	case SYS_CTR_EL0:		return (u64)read_cpuid(CTR_EL0);
++	case SYS_DCZID_EL0:		return (u64)read_cpuid(DCZID_EL0);
++	default:
++		BUG();
++		return 0;
++	}
++}
++
++/*
+  * Park the CPU which doesn't have the capability as advertised
+  * by the system.
   */
- void enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
- {
- 	int i;
+@@ -720,13 +759,13 @@ void verify_local_cpu_capabilities(void)
  
-+	for (i = 0; caps[i].desc; i++)
-+		if (caps[i].enable && cpus_have_cap(caps[i].capability))
-+			on_each_cpu(caps[i].enable, NULL, true);
-+}
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+
-+/*
-+ * Flag to indicate if we have computed the system wide
-+ * capabilities based on the boot time active CPUs. This
-+ * will be used to determine if a new booting CPU should
-+ * go through the verification process to make sure that it
-+ * supports the system capabilities, without using a hotplug
-+ * notifier.
-+ */
-+bool sys_caps_initialised;
-+
-+static inline void set_sys_caps_initialised(void)
-+{
-+	sys_caps_initialised = true;
-+}
-+
-+/*
-+ * Park the CPU which doesn't have the capability as advertised
-+ * by the system.
-+ */
-+static void fail_incapable_cpu(char *cap_type,
-+				 const struct arm64_cpu_capabilities *cap)
-+{
-+	int cpu = smp_processor_id();
-+
-+	pr_crit("CPU%d: missing %s : %s\n", cpu, cap_type, cap->desc);
-+	/* Mark this CPU absent */
-+	set_cpu_present(cpu, 0);
-+
-+	/* Check if we can park ourselves */
-+	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
-+		cpu_ops[cpu]->cpu_die(cpu);
-+	asm volatile(
-+			" 1:	wfe \n\t"
-+			"	wfi \n\t"
-+			"	b 1b\n"
-+		    );
-+}
-+
-+/*
-+ * Run through the enabled system capabilities and enable() it on this CPU.
-+ * The capabilities were decided based on the available CPUs at the boot time.
-+ * Any new CPU should match the system wide status of the capability. If the
-+ * new CPU doesn't have a capability which the system now has enabled, we
-+ * cannot do anything to fix it up and could cause unexpected failures. So
-+ * we park the CPU.
-+ */
-+void verify_local_cpu_capabilities(void)
-+{
-+	int i;
-+	const struct arm64_cpu_capabilities *caps;
-+
-+	/*
-+	 * If we haven't computed the system capabilities, there is nothing
-+	 * to verify.
-+	 */
-+	if (!sys_caps_initialised)
-+		return;
-+
-+	caps = arm64_features;
+ 	caps = arm64_features;
  	for (i = 0; caps[i].desc; i++) {
--		if (cpus_have_cap(caps[i].capability) && caps[i].enable)
--			caps[i].enable();
-+		if (!cpus_have_cap(caps[i].capability))
-+			continue;
-+		/*
-+		 * If the new CPU misses an advertised feature, we cannot proceed
-+		 * further, park the cpu.
-+		 */
-+		if (!caps[i].matches(&caps[i]))
-+			fail_incapable_cpu("arm64_features", &caps[i]);
-+		if (caps[i].enable)
-+			caps[i].enable(NULL);
- 	}
- }
- 
--void check_local_cpu_features(void)
-+#else	/* !CONFIG_HOTPLUG_CPU */
-+
-+static inline void set_sys_caps_initialised(void) {}
-+
-+#endif	/* CONFIG_HOTPLUG_CPU */
-+
-+static void setup_feature_capabilities(void)
- {
- 	update_cpu_capabilities(arm64_features, "detected feature:");
- 	enable_cpu_capabilities(arm64_features);
-@@ -670,6 +752,12 @@ void __init setup_cpu_features(void)
- 	u32 cwg;
- 	int cls;
- 
-+	/* Set the CPU feature capabilies */
-+	setup_feature_capabilities();
-+
-+	/* Advertise that we have computed the system capabilities */
-+	set_sys_caps_initialised();
-+
- 	/*
- 	 * Check for sane CTR_EL0.CWG value.
- 	 */
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index f25869e..789fbea 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -229,7 +229,6 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
- 	cpuinfo_detect_icache_policy(info);
- 
- 	check_local_cpu_errata();
--	check_local_cpu_features();
- }
- 
- void cpuinfo_store_cpu(void)
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index d1d0049..2bbdc0e 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -156,6 +156,13 @@ asmlinkage void secondary_start_kernel(void)
- 	preempt_disable();
- 	trace_hardirqs_off();
- 
-+	/*
-+	 * If the system has established the capabilities, make sure
-+	 * this CPU ticks all of those. If it doesn't, the CPU will
-+	 * fail to come online.
-+	 */
-+	verify_local_cpu_capabilities();
-+
- 	if (cpu_ops[cpu]->cpu_postboot)
- 		cpu_ops[cpu]->cpu_postboot();
- 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index aba9ead..066d5ae 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -555,7 +555,7 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
- }
- 
- #ifdef CONFIG_ARM64_PAN
--void cpu_enable_pan(void)
-+void cpu_enable_pan(void *__unused)
- {
- 	config_sctlr_el1(SCTLR_EL1_SPAN, 0);
- }
+-		if (!cpus_have_cap(caps[i].capability))
++		if (!cpus_have_cap(caps[i].capability) || !caps[i].sys_reg)
+ 			continue;
+ 		/*
+ 		 * If the new CPU misses an advertised feature, we cannot proceed
+ 		 * further, park the cpu.
+ 		 */
+-		if (!caps[i].matches(&caps[i]))
++		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i]))
+ 			fail_incapable_cpu("arm64_features", &caps[i]);
+ 		if (caps[i].enable)
+ 			caps[i].enable(NULL);
 -- 
 1.7.9.5
