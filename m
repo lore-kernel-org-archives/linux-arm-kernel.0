@@ -1,66 +1,134 @@
-From: mgorman@techsingularity.net (Mel Gorman)
-Date: Mon, 19 Oct 2015 14:26:49 +0100
-Subject: [PATCH 2/2] arm64: Use gfpflags_allow_blocking()
-In-Reply-To: <5624E561.6010107@arm.com>
-References: <ecbbf6550654071f13d1bdc04b86dc4d69ad09b4.1445008695.git.robin.murphy@arm.com>
- <adf855c7692b1512ab7216579468ad1eef2f25a8.1445008695.git.robin.murphy@arm.com>
- <20151016135900.bc1e10115a866a301dbb0cd8@linux-foundation.org>
- <5624E561.6010107@arm.com>
-Message-ID: <20151019132649.GA2629@techsingularity.net>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 19 Oct 2015 15:27:42 +0200
+Subject: [PATCH 1/3] arm/arm64: KVM: Fix arch timer behavior for disabled
+ interrupts
+In-Reply-To: <20151019131427.GD24104@cbox>
+References: <1445113822-7831-1-git-send-email-christoffer.dall@linaro.org>
+ <1445113822-7831-2-git-send-email-christoffer.dall@linaro.org>
+ <5624EB04.1090601@linaro.org> <20151019131427.GD24104@cbox>
+Message-ID: <5624EFCE.2030302@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 01:43:13PM +0100, Robin Murphy wrote:
-> Hi Andrew,
+On 10/19/2015 03:14 PM, Christoffer Dall wrote:
+> On Mon, Oct 19, 2015 at 03:07:16PM +0200, Eric Auger wrote:
+>> Hi Christoffer,
+>> On 10/17/2015 10:30 PM, Christoffer Dall wrote:
+>>> We have an interesting issue when the guest disables the timer interrupt
+>>> on the VGIC, which happens when turning VCPUs off using PSCI, for
+>>> example.
+>>>
+>>> The problem is that because the guest disables the virtual interrupt at
+>>> the VGIC level, we never inject interrupts to the guest and therefore
+>>> never mark the interrupt as active on the physical distributor.  The
+>>> host also never takes the timer interrupt (we only use the timer device
+>>> to trigger a guest exit and everything else is done in software), so the
+>>> interrupt does not become active through normal means.
+>>>
+>>> The result is that we keep entering the guest with a programmed timer
+>>> that will always fire as soon as we context switch the hardware timer
+>>> state and run the guest, preventing forward progress for the VCPU.
+>>>
+>>> Since the active state on the physical distributor is really part of the
+>>> timer logic, it is the job of our virtual arch timer driver to manage
+>>> this state.
+>>>
+>>> The timer->map->active boolean field indicates whether we have signalled
+>>> this interrupt to the vgic and if that interrupt is still pending or
+>>> active.  As long as that is the case, the hardware doesn't have to
+>>> generate physical interrupts and therefore we mark the interrupt as
+>>> active on the physical distributor.
+>>>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>> ---
+>>>  virt/kvm/arm/arch_timer.c | 19 +++++++++++++++++++
+>>>  virt/kvm/arm/vgic.c       | 43 +++++++++++--------------------------------
+>>>  2 files changed, 30 insertions(+), 32 deletions(-)
+>>>
+>>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+>>> index 48c6e1a..b9d3a32 100644
+>>> --- a/virt/kvm/arm/arch_timer.c
+>>> +++ b/virt/kvm/arm/arch_timer.c
+>>> @@ -137,6 +137,8 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
+>>>  void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+>>>  {
+>>>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>>> +	bool phys_active;
+>>> +	int ret;
+>>>  
+>>>  	/*
+>>>  	 * We're about to run this vcpu again, so there is no need to
+>>> @@ -151,6 +153,23 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+>>>  	 */
+>>>  	if (kvm_timer_should_fire(vcpu))
+>>>  		kvm_timer_inject_irq(vcpu);
+>>> +
+>>> +	/*
+>>> +	 * We keep track of whether the edge-triggered interrupt has been
+>>> +	 * signalled to the vgic/guest, and if so, we mask the interrupt and
+>>> +	 * the physical distributor to prevent the timer from raising a
+>>> +	 * physical interrupt whenever we run a guest, preventing forward
+>>> +	 * VCPU progress.
+>> In practice don't you simply mark the IRQ as active at GIC physical
+>> distributor level, hence preventing the same IRQ from hitting again
 > 
-> On 16/10/15 21:59, Andrew Morton wrote:
-> >On Fri, 16 Oct 2015 16:33:42 +0100 Robin Murphy <robin.murphy@arm.com> wrote:
-> >
-> >>__GFP_WAIT is going away to live its life under a new identity; convert
-> >>__iommu_alloc_attrs() to the new helper function instead.
-> >>
-> >>...
-> >>
-> >>--- a/arch/arm64/mm/dma-mapping.c
-> >>+++ b/arch/arm64/mm/dma-mapping.c
-> >>@@ -566,7 +566,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
-> >>  	 */
-> >>  	gfp |= __GFP_ZERO;
-> >>
-> >>-	if (gfp & __GFP_WAIT) {
-> >>+	if (gfpflags_allow_blocking(gfp)) {
-> >>  		struct page **pages;
-> >>  		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
-> >
-> >Seems unnecessarily elaborate.  What's wrong with
-> >
-> >--- a/arch/arm64/mm/dma-mapping.c~mm-page_alloc-rename-__gfp_wait-to-__gfp_reclaim-arm-fix
-> >+++ a/arch/arm64/mm/dma-mapping.c
-> >@@ -562,7 +562,7 @@ static void *__iommu_alloc_attrs(struct
-> >  	 */
-> >  	gfp |= __GFP_ZERO;
-> >
-> >-	if (gfp & __GFP_WAIT) {
-> >+	if (gfp & __GFP_RECLAIM) {
-> >  		struct page **pages;
-> >  		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
-> >
-> >
-> >?
+> yes, that's what I meant with my comment, I should reword to "...we mark
+> the interrupt as active on the physical distributor..."
 > 
-> Well, in that case the charge of "unnecessarily elaborate" should have been
-> directed at the original patch, and the 53 other locations where (flags &
-> __GFP_WAIT) was changed as per the commit message:
+>>> +	 */
+>>> +	if (kvm_vgic_get_phys_irq_active(timer->map))
+>>> +		phys_active = true;
+>>> +	else
+>>> +		phys_active = false;
+>>> +
+>>> +	ret = irq_set_irqchip_state(timer->map->irq,
+>>> +				    IRQCHIP_STATE_ACTIVE,
+>>> +				    phys_active);
+>>
+>> physical distributor state is set in arch timer flush. It relates to a
+>> shared device behavior so I find it natural to do it there.
+>>
+>> However the map->active is set in arch_timer IRQ injection and unset in
+>> vgic sync. Why not doing the set in kvm_vgic_inject_mapped_irq?
 > 
->   "Callers that are checking if they are non-blocking should use the
->    helper gfpflags_allow_blocking() where possible."
-> 
+> Because you have to set it at every entry to the guest if you run
+> multiple VCPUs/VMs on this CPU or migrate this VCPU to a different CPU.
+I meant 	kvm_vgic_set_phys_irq_active(timer->map, true) call in
+kvm_timer_inject_irq? Couldn' that been done in
+kvm_vgic_inject_mapped_irq instead. Doesn't this apply to all mapped IRQs?
 
-The use of gfpflags_allows_blocking() like you originally had is actually
-preferred by me. __GFP_RECLAIM can return true when the caller only allows
-kswapd to wake which has nothing to do with blocking (currently). The
-helper was added to avoid this type of confusion.
-
--- 
-Mel Gorman
-SUSE Labs
+Eric
+> 
+>>
+>>> +	WARN_ON(ret);
+>>>  }
+>>>  
+>>>  /**
+>>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>>> index 596455a..ea21bc2 100644
+>>> --- a/virt/kvm/arm/vgic.c
+>>> +++ b/virt/kvm/arm/vgic.c
+>>> @@ -1092,6 +1092,15 @@ static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
+>>>  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>>>  	struct vgic_lr vlr = vgic_get_lr(vcpu, lr_nr);
+>>>  
+>>> +	/*
+>>> +	 * We must transfer the pending state back to the distributor before
+>>> +	 * retiring the LR, otherwise we may loose edge-triggered interrupts.
+>>> +	 */
+>>> +	if (vlr.state & LR_STATE_PENDING) {
+>>> +		vgic_dist_irq_set_pending(vcpu, irq);
+>>> +		vlr.hwirq = 0;
+>>> +	}
+>> That fix applies to any edge-sensitive IRQ, ie. not especially the
+>> timer's one? In the positive shouldn't you precise this in the commit
+>> msg too?
+>>
+> 
+> Probably, it could also be a separate patch.  I'll rework this.
+> 
+> Thanks,
+> -Christoffer
+> 
