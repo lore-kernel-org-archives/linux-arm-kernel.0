@@ -1,49 +1,50 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 19 Oct 2015 22:26:08 +0200
-Subject: [GIT PULL] at91: defconfig for 4.4 #1
-Message-ID: <20151019202608.GA32225@piout.net>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Mon, 19 Oct 2015 13:29:52 -0700
+Subject: [PATCH] fpga: zynq-fpga: Fix unbalanced clock handling
+In-Reply-To: <1445286175-1640-1-git-send-email-moritz.fischer@ettus.com>
+References: <1445286175-1640-1-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <CAAtXAHdpzhM=WSL30tJBJF=+4pho1eqaPbz0Nx51BFxgDLya7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Mon, Oct 19, 2015 at 1:22 PM, Moritz Fischer
+<moritz.fischer@ettus.com> wrote:
+> This commit fixes the unbalanced clock handling, where
+> a failed probe would leave the clock with a prepare count of -1.
 
-A defconfig update, adding sama5d2 peripherals to sama5_defconfig and
-multi_v7_defconfig
+My English is broken, and it should've said enable count, will
+resubmit ...  Sorry for the noise
+>
+> Reported-by: Josh Cartwright <joshc@ni.com>
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> ---
+>  drivers/fpga/zynq-fpga.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+> index 103303c..617d382 100644
+> --- a/drivers/fpga/zynq-fpga.c
+> +++ b/drivers/fpga/zynq-fpga.c
+> @@ -487,7 +487,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+>                                 &zynq_fpga_ops, priv);
+>         if (err) {
+>                 dev_err(dev, "unable to register FPGA manager");
+> -               clk_disable_unprepare(priv->clk);
+> +               clk_unprepare(priv->clk);
+>                 return err;
+>         }
+>
+> @@ -502,7 +502,7 @@ static int zynq_fpga_remove(struct platform_device *pdev)
+>
+>         priv = platform_get_drvdata(pdev);
+>
+> -       clk_disable_unprepare(priv->clk);
+> +       clk_unprepare(priv->clk);
+>
+>         return 0;
+>  }
+> --
+> 2.6.1
+>
 
-Thanks,
-
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
-
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-defconfig
-
-for you to fetch changes up to 4af8540f0082812e2e092f2d31dbb4d114eee968:
-
-  ARM: multi_v7_defconfig: Add Atmel SDHCI device (2015-10-19 21:52:21 +0200)
-
-----------------------------------------------------------------
-defconfig update for 4.4:
-- Add sama5d2 and its peripherals to sama5_defconfig and multi_v7_defconfig
-- Trivial savedefconfig updates to at91_dt_defconfig and sama5_defconfig
-
-----------------------------------------------------------------
-Ludovic Desroches (6):
-      ARM: at91/defconfig: update sama5 defconfig
-      ARM: at91/defconfig: update at91_dt defconfig
-      ARM: at91/defconfig: add sama5d2 and its new devices to sama5 defconfig
-      ARM: multi_v7_defconfig: Add Atmel SAMA5D2 SoC
-      ARM: multi_v7_defconfig: Add Atmel Flexcom device
-      ARM: multi_v7_defconfig: Add Atmel SDHCI device
-
- arch/arm/configs/at91_dt_defconfig  | 15 ---------------
- arch/arm/configs/multi_v7_defconfig |  3 +++
- arch/arm/configs/sama5_defconfig    | 16 ++++++----------
- 3 files changed, 9 insertions(+), 25 deletions(-)
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Moritz
