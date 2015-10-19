@@ -1,103 +1,34 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Mon, 19 Oct 2015 09:28:13 -0700
-Subject: [PATCHv2 3/3] fpga manager: Adding FPGA Manager support for
- Xilinx Zynq 7000
-In-Reply-To: <20151018180259.GI12756@jcartwri.amer.corp.natinst.com>
-References: <1445035350-3569-1-git-send-email-moritz.fischer@ettus.com>
- <1445035350-3569-4-git-send-email-moritz.fischer@ettus.com>
- <20151018180259.GI12756@jcartwri.amer.corp.natinst.com>
-Message-ID: <CAAtXAHf1nqSmcb64VYv+G5MMo59AuHTW2KXqZfo5_hp9R3bagw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 19 Oct 2015 17:34:40 +0100
+Subject: [UPDATED] [PATCHv4 00/12] arm64: 16K translation granule support
+In-Reply-To: <1445260779-22242-1-git-send-email-suzuki.poulose@arm.com>
+References: <1445260779-22242-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151019163440.GE29001@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 18, 2015 at 11:02 AM, Josh Cartwright <joshc@ni.com> wrote:
-> Hey Moritz-
->
-> On Fri, Oct 16, 2015 at 03:42:30PM -0700, Moritz Fischer wrote:
->> This commit adds FPGA Manager support for the Xilinx Zynq chip.
->> The code borrows some from the xdevcfg driver in Xilinx'
->> vendor tree.
->>
->> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
->> ---
->>
->> v2:
->>  - Replaced locking error flag and broken completion with irq masking
->>    and changed completion handling
->>  - Dealing with timeout cases
->>  - Reworked clock handling
->>  - Moved initialization from probe() to write_init()
->>  - Fixed return value of devm_request_irq() check to check for non-zero
->>  - Alphabetized includes ;-)
->>  - Changed some of the comments, to better explain what's happening
-> [..]
->> +static int zynq_fpga_probe(struct platform_device *pdev)
->> +{
-> [..]
->> +     priv->clk = devm_clk_get(dev, "ref_clk");
->> +     if (IS_ERR(priv->clk)) {
->> +             dev_err(dev, "input clock not found");
->> +             return PTR_ERR(priv->clk);
->> +     }
->> +
->> +     err = clk_prepare_enable(priv->clk);
->> +     if (err) {
->> +             dev_err(dev, "unable to enable clock");
->> +             return err;
->> +     }
->
-> prepare_cnt = 1, enable_cnt = 1
->
->> +
->> +     /* unlock the device */
->> +     zynq_fpga_write(priv, UNLOCK_OFFSET, UNLOCK_MASK);
->> +
->> +     clk_disable(priv->clk);
->
-> prepare_cnt = 1, enable_cnt = 0
->> +
->> +     err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
->> +                             &zynq_fpga_ops, priv);
->> +     if (err) {
->> +             dev_err(dev, "unable to register FPGA manager");
->> +             clk_disable_unprepare(priv->clk);
->
-> prepare_cnt = 0, enable_cnt = -1 /* OOPS! */
->
-> Clock management is still wonky.  I think you only want clk_unprepare here.
->
->> +             return err;
->> +     }
->> +
->
-> Assuming all goes well, you'll be leaving probe() with:
->
-> prepare_cnt = 1, enable_cnt = 0.
->
->> +     return 0;
->> +}
->> +
->> +static int zynq_fpga_remove(struct platform_device *pdev)
->> +{
->> +     struct zynq_fpga_priv *priv;
->> +
->> +     fpga_mgr_unregister(&pdev->dev);
->> +
->> +     priv = platform_get_drvdata(pdev);
->> +
->> +     clk_disable_unprepare(priv->clk);
->
-> Which means, symmetrically, you'll only want this to be a clk_unprepare().
->
->   Josh
+On Mon, Oct 19, 2015 at 02:19:26PM +0100, Suzuki K. Poulose wrote:
+> This series enables the 16K page size support on Linux for arm64.
+> Adds support for 48bit VA(4 level), 47bit VA(3 level) and
+> 36bit VA(2 level) with 16K. 16K was a late addition to the architecture
+> and is not implemented by all CPUs. Added a check to ensure the
+> selected granule size is supported by the CPU, failing which the CPU
+> won't proceed with booting. Also the kernel page size is added to the
+> kernel image header (patch from Ard).
+> 
+> KVM support has been dropped from this series, as we need to rewrite the
+> KVM stage-2 pagetable handling code to get rid of the fake page table
+> levels (as recommended by Christoffer and Marc). So, with 16K, we cannot
+> run KVM.
+> 
+> Patches 1-8	cleans up the kernel page size handling code.
+> Patch 9		Adds a check to ensure the CPU supports the selected granule size.
+> Patch 10		Adds the page size information to image header.
+> Patches 11-12	Adds the support for 16K page size
 
-Greg had already queued the v2 this weekend (which caught me by
-suprise). I tried to figure out if it's possible to send a v3,
-but he said to send follow up patches as he can't rebase the branch he
-merged it into.
-I will have access to hardware this afternoon, and send out follow up
-patches to fix the unbalanced clock handling.
+FWIW, for the series:
 
-Cheers,
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Moritz
+Thanks,
+Mark.
