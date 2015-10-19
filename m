@@ -1,73 +1,61 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:00:44 +0100
-Subject: [PATCHv4 21/24] arm64: Add helper to decode register from instruction
-In-Reply-To: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
-References: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445259647-21541-22-git-send-email-suzuki.poulose@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 19 Oct 2015 15:03:34 +0200
+Subject: [PATCH 1/7] arm: dts: Add syscon-{reboot, poweroff} nodes for
+ exynos3250 SoCs
+In-Reply-To: <1445234635-3950-2-git-send-email-alim.akhtar@samsung.com>
+References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
+ <1445234635-3950-2-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <5624EA26.9030909@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper to extract the register field from a given
-instruction.
+Hello Alim,
 
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/insn.h |    2 ++
- arch/arm64/kernel/insn.c      |   29 +++++++++++++++++++++++++++++
- 2 files changed, 31 insertions(+)
+On 10/19/2015 08:03 AM, Alim Akhtar wrote:
+> This patch adds syscon-{reboot, poweroff} nodes to allow the
+> generic syscon-{reboot, poweroff} driver to reset/poweroff exynos3250 SoC.
+> 
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos3250.dtsi |   14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+> index 033def482fc3..af5d9ad4c7b7 100644
+> --- a/arch/arm/boot/dts/exynos3250.dtsi
+> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+> @@ -152,6 +152,20 @@
+>  			interrupt-parent = <&gic>;
+>  		};
+>  
+> +		poweroff: syscon-poweroff {
+> +			compatible = "syscon-poweroff";
+> +			regmap = <&pmu_system_controller>;
+> +			offset = <0x330C>;
+> +			mask = <0x5200>;
+> +		};
+> +
+> +		reboot: syscon-reboot {
+> +			compatible = "syscon-reboot";
+> +			regmap = <&pmu_system_controller>;
+> +			offset = <0x0400>;
+> +			mask = <0x1>;
+> +		};
+> +
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index 30e50eb..6dea3bc 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -289,6 +289,8 @@ enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
- u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn);
- u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
- 				  u32 insn, u64 imm);
-+u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
-+					 u32 insn);
- u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
- 				enum aarch64_insn_branch_type type);
- u32 aarch64_insn_gen_comp_branch_imm(unsigned long pc, unsigned long addr,
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index f341866..4286fed 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -388,6 +388,35 @@ u32 __kprobes aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
- 	return insn;
- }
- 
-+u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
-+					u32 insn)
-+{
-+	int shift;
-+
-+	switch (type) {
-+	case AARCH64_INSN_REGTYPE_RT:
-+	case AARCH64_INSN_REGTYPE_RD:
-+		shift = 0;
-+		break;
-+	case AARCH64_INSN_REGTYPE_RN:
-+		shift = 5;
-+		break;
-+	case AARCH64_INSN_REGTYPE_RT2:
-+	case AARCH64_INSN_REGTYPE_RA:
-+		shift = 10;
-+		break;
-+	case AARCH64_INSN_REGTYPE_RM:
-+		shift = 16;
-+		break;
-+	default:
-+		pr_err("%s: unknown register type encoding %d\n", __func__,
-+		       type);
-+		return 0;
-+	}
-+
-+	return (insn >> shift) & GENMASK(4, 0);
-+}
-+
- static u32 aarch64_insn_encode_register(enum aarch64_insn_register_type type,
- 					u32 insn,
- 					enum aarch64_insn_register reg)
+I don't have a Exynos3250 manual but I guess 0x330C is also named
+PS_HOLD_CONTROL and 0x400 is SWRESET as the other Exynos SoCs.
+
+I wonder if a macro could be used instead of magic numbers or at
+least have a comment next to the offset field.
+
+The patch looks good to me though and a comment can be added as
+a follow up so:
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
 -- 
-1.7.9.5
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
