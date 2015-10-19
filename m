@@ -1,40 +1,28 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 19 Oct 2015 23:21:05 +0200
-Subject: [GIT PULL] at91: soc for 4.4 #2
-Message-ID: <20151019212105.GA6134@piout.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 19 Oct 2015 23:50:11 +0200
+Subject: [PATCH] ARM64: juno: add NOR flash to device tree
+In-Reply-To: <20151019112749.GB10728@bivouac.eciton.net>
+References: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
+ <561FC681.2040809@arm.com>
+ <CACRpkdaSox9WKb5-dkD_zAwO9WxP6+b010p3bdxsm1LRy=WvKg@mail.gmail.com>
+ <5624C31D.3070906@arm.com> <20151019102932.GB10678@leverpostej>
+ <CACRpkdaGscb_ccbGuwccsRj_b1d6xoveiiZpw1a5eXon3PxAUA@mail.gmail.com>
+ <20151019112749.GB10728@bivouac.eciton.net>
+Message-ID: <CACRpkdakQdCpbFzxb0AkHBStSWNWzTub8A72=5YPkbHTjnor0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Mon, Oct 19, 2015 at 1:27 PM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
 
-This is a great fix for PM and suspend/resume for 4.4
+> This would be true for any preceding ARM devboard, but Juno's boot
+> architecture is different. The thing that gives the 'Cmd>' prompt is
+> running on a system microcontroller. It writes images to the system
+> NOR based on the contents of images.txt in the magic USB filesystem.
 
-Thanks,
+Yeah OK I stand corrected ... I just called that thing boot monitor
+because I never saw a real name for it. It's something system-resident
+that is not the boot loader anyways, and it doesn't seem designed
+with any one particular boot architecture in mind.
 
-The following changes since commit 6f112a08c1ed717a015dae190e289d53085c1bc4:
-
-  ARM: at91: debug: use DEBUG_UART_PHYS (2015-09-21 16:31:15 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-soc2
-
-for you to fetch changes up to 5fcf8d1a0e84792b2bc44922c5d833dab96a9c1e:
-
-  ARM: at91: pm: at91_pm_suspend_in_sram() must be 8-byte aligned (2015-10-19 22:58:44 +0200)
-
-----------------------------------------------------------------
-More SoC changes for 4.4:
- - a great fix for PM/suspend/resume
-
-----------------------------------------------------------------
-Patrick Doyle (1):
-      ARM: at91: pm: at91_pm_suspend_in_sram() must be 8-byte aligned
-
- arch/arm/mach-at91/pm_suspend.S | 2 ++
- 1 file changed, 2 insertions(+)
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Yours,
+Linus Walleij
