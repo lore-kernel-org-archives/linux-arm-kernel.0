@@ -1,74 +1,52 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:24:54 +0100
-Subject: [PATCHv4 17/24] arm64/debug: Make use of the system wide safe value
+Date: Mon, 19 Oct 2015 14:24:57 +0100
+Subject: [PATCHv4 20/24] arm64: Define helper for sys_reg id manipulation
 In-Reply-To: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
 References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445261101-22344-18-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445261101-22344-21-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the system wide value of ID_AA64DFR0 to make safer decisions
+Define helper macros to extract op0, op1, CRn, CRm & op2
+for a given sys_reg id.
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/hw_breakpoint.h |    9 +++++++--
- arch/arm64/kernel/debug-monitors.c     |    6 ++++--
- 2 files changed, 11 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/sysreg.h |   21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-index 4c47cb2..e54415e 100644
---- a/arch/arm64/include/asm/hw_breakpoint.h
-+++ b/arch/arm64/include/asm/hw_breakpoint.h
-@@ -17,6 +17,7 @@
- #define __ASM_HW_BREAKPOINT_H
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 83aceb58..22f1a88 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -32,8 +32,27 @@
+  *	[11-8]  : CRm
+  *	[7-5]   : Op2
+  */
++#define Op0_shift	19
++#define Op0_mask	0x3
++#define Op1_shift	16
++#define Op1_mask	0x7
++#define CRn_shift	12
++#define CRn_mask	0xf
++#define CRm_shift	8
++#define CRm_mask	0xf
++#define Op2_shift	5
++#define Op2_mask	0x7
++
+ #define sys_reg(op0, op1, crn, crm, op2) \
+-	((((op0)&3)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
++	((((op0) & Op0_mask) << Op0_shift) | \
++	 ((op1) << Op1_shift) | ((crn) << CRn_shift) | \
++	 ((crm) << CRm_shift) | ((op2) << Op2_shift))
++
++#define sys_reg_Op0(id)	(((id) >> Op0_shift) & Op0_mask)
++#define sys_reg_Op1(id)	(((id) >> Op1_shift) & Op1_mask)
++#define sys_reg_CRn(id)	(((id) >> CRn_shift) & CRn_mask)
++#define sys_reg_CRm(id)	(((id) >> CRm_shift) & CRm_mask)
++#define sys_reg_Op2(id)	(((id) >> Op2_shift) & Op2_mask)
  
- #include <asm/cputype.h>
-+#include <asm/cpufeature.h>
- 
- #ifdef __KERNEL__
- 
-@@ -137,13 +138,17 @@ extern struct pmu perf_ops_bp;
- /* Determine number of BRP registers available. */
- static inline int get_num_brps(void)
- {
--	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
-+	return 1 +
-+		cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
-+						ID_AA64DFR0_BRPS_SHIFT);
- }
- 
- /* Determine number of WRP registers available. */
- static inline int get_num_wrps(void)
- {
--	return ((read_cpuid(ID_AA64DFR0_EL1) >> 20) & 0xf) + 1;
-+	return 1 +
-+		cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
-+						ID_AA64DFR0_WRPS_SHIFT);
- }
- 
- #endif	/* __KERNEL__ */
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index cebf786..c0a2327 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -26,14 +26,16 @@
- #include <linux/stat.h>
- #include <linux/uaccess.h>
- 
--#include <asm/debug-monitors.h>
-+#include <asm/cpufeature.h>
- #include <asm/cputype.h>
-+#include <asm/debug-monitors.h>
- #include <asm/system_misc.h>
- 
- /* Determine debug architecture. */
- u8 debug_monitors_arch(void)
- {
--	return read_cpuid(ID_AA64DFR0_EL1) & 0xf;
-+	return cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
-+						ID_AA64DFR0_DEBUGVER_SHIFT);
- }
- 
- /*
+ #define SYS_MIDR_EL1			sys_reg(3, 0, 0, 0, 0)
+ #define SYS_MPIDR_EL1			sys_reg(3, 0, 0, 0, 5)
 -- 
 1.7.9.5
