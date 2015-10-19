@@ -1,27 +1,111 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Mon, 19 Oct 2015 16:34:13 +0300
-Subject: [PATCH V2 17/30] perf: changing pmu::setup_aux() parameter to
- include event
-In-Reply-To: <1445192687-24112-18-git-send-email-mathieu.poirier@linaro.org>
-References: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
- <1445192687-24112-18-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <87oafvgey2.fsf@ashishki-desk.ger.corp.intel.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 19 Oct 2015 15:38:20 +0200
+Subject: [PATCH 1/3] arm/arm64: KVM: Fix arch timer behavior for disabled
+ interrupts
+In-Reply-To: <5624EFCE.2030302@linaro.org>
+References: <1445113822-7831-1-git-send-email-christoffer.dall@linaro.org>
+ <1445113822-7831-2-git-send-email-christoffer.dall@linaro.org>
+ <5624EB04.1090601@linaro.org> <20151019131427.GD24104@cbox>
+ <5624EFCE.2030302@linaro.org>
+Message-ID: <20151019133820.GE24104@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+On Mon, Oct 19, 2015 at 03:27:42PM +0200, Eric Auger wrote:
+> On 10/19/2015 03:14 PM, Christoffer Dall wrote:
+> > On Mon, Oct 19, 2015 at 03:07:16PM +0200, Eric Auger wrote:
+> >> Hi Christoffer,
+> >> On 10/17/2015 10:30 PM, Christoffer Dall wrote:
+> >>> We have an interesting issue when the guest disables the timer interrupt
+> >>> on the VGIC, which happens when turning VCPUs off using PSCI, for
+> >>> example.
+> >>>
+> >>> The problem is that because the guest disables the virtual interrupt at
+> >>> the VGIC level, we never inject interrupts to the guest and therefore
+> >>> never mark the interrupt as active on the physical distributor.  The
+> >>> host also never takes the timer interrupt (we only use the timer device
+> >>> to trigger a guest exit and everything else is done in software), so the
+> >>> interrupt does not become active through normal means.
+> >>>
+> >>> The result is that we keep entering the guest with a programmed timer
+> >>> that will always fire as soon as we context switch the hardware timer
+> >>> state and run the guest, preventing forward progress for the VCPU.
+> >>>
+> >>> Since the active state on the physical distributor is really part of the
+> >>> timer logic, it is the job of our virtual arch timer driver to manage
+> >>> this state.
+> >>>
+> >>> The timer->map->active boolean field indicates whether we have signalled
+> >>> this interrupt to the vgic and if that interrupt is still pending or
+> >>> active.  As long as that is the case, the hardware doesn't have to
+> >>> generate physical interrupts and therefore we mark the interrupt as
+> >>> active on the physical distributor.
+> >>>
+> >>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >>> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >>> ---
+> >>>  virt/kvm/arm/arch_timer.c | 19 +++++++++++++++++++
+> >>>  virt/kvm/arm/vgic.c       | 43 +++++++++++--------------------------------
+> >>>  2 files changed, 30 insertions(+), 32 deletions(-)
+> >>>
+> >>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> >>> index 48c6e1a..b9d3a32 100644
+> >>> --- a/virt/kvm/arm/arch_timer.c
+> >>> +++ b/virt/kvm/arm/arch_timer.c
+> >>> @@ -137,6 +137,8 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
+> >>>  void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+> >>>  {
+> >>>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> >>> +	bool phys_active;
+> >>> +	int ret;
+> >>>  
+> >>>  	/*
+> >>>  	 * We're about to run this vcpu again, so there is no need to
+> >>> @@ -151,6 +153,23 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+> >>>  	 */
+> >>>  	if (kvm_timer_should_fire(vcpu))
+> >>>  		kvm_timer_inject_irq(vcpu);
+> >>> +
+> >>> +	/*
+> >>> +	 * We keep track of whether the edge-triggered interrupt has been
+> >>> +	 * signalled to the vgic/guest, and if so, we mask the interrupt and
+> >>> +	 * the physical distributor to prevent the timer from raising a
+> >>> +	 * physical interrupt whenever we run a guest, preventing forward
+> >>> +	 * VCPU progress.
+> >> In practice don't you simply mark the IRQ as active at GIC physical
+> >> distributor level, hence preventing the same IRQ from hitting again
+> > 
+> > yes, that's what I meant with my comment, I should reword to "...we mark
+> > the interrupt as active on the physical distributor..."
+> > 
+> >>> +	 */
+> >>> +	if (kvm_vgic_get_phys_irq_active(timer->map))
+> >>> +		phys_active = true;
+> >>> +	else
+> >>> +		phys_active = false;
+> >>> +
+> >>> +	ret = irq_set_irqchip_state(timer->map->irq,
+> >>> +				    IRQCHIP_STATE_ACTIVE,
+> >>> +				    phys_active);
+> >>
+> >> physical distributor state is set in arch timer flush. It relates to a
+> >> shared device behavior so I find it natural to do it there.
+> >>
+> >> However the map->active is set in arch_timer IRQ injection and unset in
+> >> vgic sync. Why not doing the set in kvm_vgic_inject_mapped_irq?
+> > 
+> > Because you have to set it at every entry to the guest if you run
+> > multiple VCPUs/VMs on this CPU or migrate this VCPU to a different CPU.
+> I meant 	kvm_vgic_set_phys_irq_active(timer->map, true) call in
+> kvm_timer_inject_irq? Couldn' that been done in
+> kvm_vgic_inject_mapped_irq instead. Doesn't this apply to all mapped IRQs?
+> 
+I could, but that would be outside the scope of this patch, which aims
+to fix the behavior in 4.3 simply.  Unless I'm missing some sort of
+change in functionality there?
 
-> For some tracers the event carries information to be embedded
-> in the private structure returned by setup_aux().
+The map->active stuff all goes away in 4.4 when we change to
+level-triggered semantics anyway.
 
-You need to mention here what these tracers are and which bits of
-event's information they need in their setup_aux(). Right now I can look
-it up in this patchset, but when this code gets merged it will make it
-easier to understand why this change was made.
-
-Now, I understand that you're interested in event::attr in your
-setup_aux(), I have more comments on that in that other patch. :)
-
-Cheers,
---
-Alex
+-Christoffer
