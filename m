@@ -1,29 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Oct 2015 15:22:54 +0200
-Subject: [RFC PATCH] ARM: exynos_defconfig: Increase
- CONFIG_BLK_DEV_RAM_SIZE to 64K
-In-Reply-To: <1445251715-9725-1-git-send-email-alim.akhtar@samsung.com>
-References: <1445251715-9725-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <4039144.iLSv7qv3SU@wuerfel>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 19 Oct 2015 14:24:38 +0100
+Subject: [PATCHv4 01/24] arm64: Make the CPU information more clear
+In-Reply-To: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
+References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445261101-22344-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 October 2015 16:18:35 Alim Akhtar wrote:
-> Spam Status: CRM114    
-> CONFIG_BLK_DEV_RAM_SIZE is currently set to 8K, which is a bit on the
-> smaller side, lets bump it up to 64K so that a bigger RAM_DISK can
-> be used with defconfig.
-> 
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> ---
-> Every time I build exynos_defconfig, I need to manually change RAM_SIZE
-> to match my ramdisk image size. I am not sure what is the best ramdisk size
-> might be, but bumping it to 64K might be a reasonable one.
+At early boot, we print the CPU version/revision. On a heterogeneous
+system, we could have different types of CPUs. Print the CPU info for
+all active cpus. Also, the secondary CPUs prints the message only when
+they turn online.
 
-Is there still a reason to use ramdisks these days? If 8MB is not
-enough to have a useful initrd, that might mean that everyone else
-uses initramfs and you should just do the same thing?
+Also, remove the redundant 'revision' information which doesn't
+make any sense without the 'variant' field.
 
-Then we can also remove this option here.
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+Changes since V3:
+  - Delay the boot message from secondary CPUs, until they turn online
+---
+ arch/arm64/kernel/setup.c |    3 +--
+ arch/arm64/kernel/smp.c   |    3 ++-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-	Arnd
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 79df79a..1d503e2 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -203,8 +203,7 @@ static void __init setup_processor(void)
+ 	u32 cwg;
+ 	int cls;
+ 
+-	printk("CPU: AArch64 Processor [%08x] revision %d\n",
+-	       read_cpuid_id(), read_cpuid_id() & 15);
++	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
+ 
+ 	sprintf(init_utsname()->machine, ELF_PLATFORM);
+ 	elf_hwcap = 0;
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index b7a973d..c1d044b 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -144,7 +144,6 @@ asmlinkage void secondary_start_kernel(void)
+ 	current->active_mm = mm;
+ 
+ 	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
+-	printk("CPU%u: Booted secondary processor\n", cpu);
+ 
+ 	/*
+ 	 * TTBR0 is only used for the identity mapping at this stage. Make it
+@@ -177,6 +176,8 @@ asmlinkage void secondary_start_kernel(void)
+ 	 * the CPU migration code to notice that the CPU is online
+ 	 * before we continue.
+ 	 */
++	pr_info("CPU%u: Booted secondary processor [%08x]\n",
++					 cpu, read_cpuid_id());
+ 	set_cpu_online(cpu, true);
+ 	complete(&cpu_running);
+ 
+-- 
+1.7.9.5
