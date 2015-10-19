@@ -1,70 +1,60 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 19 Oct 2015 16:16:53 -0700
-Subject: [PATCH v2 1/2] KVM/arm: add hooks for armv7 fp/simd lazy switch
- support
-In-Reply-To: <20151019085332.GA24104@cbox>
-References: <1443311009-4811-1-git-send-email-m.smarduch@samsung.com>
- <1443311009-4811-2-git-send-email-m.smarduch@samsung.com>
- <20151019085332.GA24104@cbox>
-Message-ID: <562579E5.6040008@samsung.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 19 Oct 2015 16:20:05 -0700
+Subject: vmalloc_reserve with no highmem
+Message-ID: <56257AA5.1030800@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Russell, Laura,
 
+Setting vmalloc= on the kernel command-line to define the amount of
+vmalloc_reserve is not quite working when you have no highmem, as is the
+case of one my boards which has 512MB or 256M populated on a first bank
+at PA 0x0.
 
-On 10/19/2015 1:53 AM, Christoffer Dall wrote:
-> On Sat, Sep 26, 2015 at 04:43:28PM -0700, Mario Smarduch wrote:
->> This patch adds vcpu fields to track lazy state, save host FPEXC, and 
->> offsets to fields.
->>
->> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->> ---
->>  arch/arm/include/asm/kvm_host.h | 6 ++++++
->>  arch/arm/kernel/asm-offsets.c   | 2 ++
->>  2 files changed, 8 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index dcba0fa..194a8ef 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -111,6 +111,12 @@ struct kvm_vcpu_arch {
->>  	/* Interrupt related fields */
->>  	u32 irq_lines;		/* IRQ and FIQ levels */
->>  
->> +	/* Track fp/simd lazy switch state */
->> +	u32 vfp_lazy;
-> 
-> so is this a flags field or basically a boolean?  If the latter, what is
-> does it mean when the field is true vs. false?
-Yes it's a bool will update, and clarify comments.
-> 
->> +
->> +	/* Save host FPEXC register to restore on vcpu put */
->> +	u32 saved_fpexc;
-> 
-> is this only the host's state?  If so, why not name it host_fpexc?
-That's right itis host state, will change.
-> 
-> Thanks,
-> -Christoffer
-> 
->> +
->>  	/* Exception Information */
->>  	struct kvm_vcpu_fault_info fault;
->>  
->> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
->> index 871b826..e1c3a41 100644
->> --- a/arch/arm/kernel/asm-offsets.c
->> +++ b/arch/arm/kernel/asm-offsets.c
->> @@ -186,6 +186,8 @@ int main(void)
->>    DEFINE(VCPU_CPSR,		offsetof(struct kvm_vcpu, arch.regs.usr_regs.ARM_cpsr));
->>    DEFINE(VCPU_HCR,		offsetof(struct kvm_vcpu, arch.hcr));
->>    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
->> +  DEFINE(VCPU_VFP_LAZY,		offsetof(struct kvm_vcpu, arch.vfp_lazy));
->> +  DEFINE(VCPU_VFP_FPEXC,	offsetof(struct kvm_vcpu, arch.saved_fpexc));
->>    DEFINE(VCPU_HSR,		offsetof(struct kvm_vcpu, arch.fault.hsr));
->>    DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.fault.hxfar));
->>    DEFINE(VCPU_HPFAR,		offsetof(struct kvm_vcpu, arch.fault.hpfar));
->> -- 
->> 1.9.1
->>
+What happens in that case is that, despite setting vmalloc_reserve,
+therefore bumping up vmalloc_min to a higher address than high_memory,
+which is assigned __va(arm_lowmem_limit), we end-up with VMALLOC_START
+at high_memory + VMALLOC_OFFSET, which yields the amount of physical
+memory (start at PA 0x0 in my case) - VMALLOC_OFFSET.
+
+The maths look like this for this particular board (512MB)
+
+high_memory = 0x20000000 + PAGE_OFFSET = 0x20000000 + 0xC0000000 =
+0xE0000000
+vmalloc_min = 0xFF00000 - (248 * 1024 * 1024) = 0xEF800000
+
+so we end-up with VMALLOC_START = high_memory + VMALLOC_OFFSET =
+0xE0000000 + 8 * 1024* 1024 = 0xE0800000
+
+in sanity_check_meminfo(), high_memory is unconditionally assigned with
+arm_lowmem_limit's VA.
+
+The following quick and dirty patch seems to do it for me, but I am not
+confident this is remotely the correct approach here:
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 14428d2..e196ea4 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1196,7 +1211,14 @@ void __init sanity_check_meminfo(void)
+        }
+ #endif
+        meminfo.nr_banks = j;
+-       high_memory = __va(arm_lowmem_limit - 1) + 1;
++
++       if (vmalloc_limit > arm_lowmem_limit)
++               high_memory = vmalloc_min - VMALLOC_OFFSET;
++       else
++               high_memory = __va(arm_lowmem_limit - 1) + 1;
++
++       pr_info("%s: high_memory: 0x%p, arm_lowmem_limit: 0x%llx\n",
++               __func__, high_memory, arm_lowmem_limit);
+
+BTW, even when there is highmem available, setting vmalloc= on the
+command-line is off by VMALLOC_OFFSET, the way early_vmalloc() computes
+things, is that intended?
+
+Thanks!
+-- 
+Florian
