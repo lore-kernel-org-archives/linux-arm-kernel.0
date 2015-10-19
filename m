@@ -1,75 +1,27 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 19 Oct 2015 15:34:31 +0200
-Subject: [PATCH 2/4] vfio: platform: reset: calxedaxgmac: add reset
- function registration
-In-Reply-To: <4837895.vpC7yteyEu@wuerfel>
-References: <1445184015-24414-1-git-send-email-eric.auger@linaro.org>
- <3829716.dW4OHEgDOa@wuerfel> <5624ED6A.5030408@linaro.org>
- <4837895.vpC7yteyEu@wuerfel>
-Message-ID: <5624F167.5030206@linaro.org>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Mon, 19 Oct 2015 16:34:13 +0300
+Subject: [PATCH V2 17/30] perf: changing pmu::setup_aux() parameter to
+ include event
+In-Reply-To: <1445192687-24112-18-git-send-email-mathieu.poirier@linaro.org>
+References: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
+ <1445192687-24112-18-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <87oafvgey2.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2015 03:25 PM, Arnd Bergmann wrote:
-> On Monday 19 October 2015 15:17:30 Eric Auger wrote:
->> Hi Arnd,
->> On 10/19/2015 03:04 PM, Arnd Bergmann wrote:
->>> On Sunday 18 October 2015 18:00:13 Eric Auger wrote:
->>>> diff --git a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
->>>> index 619dc7d..4f76b17 100644
->>>> --- a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
->>>> +++ b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
->>>> @@ -29,8 +29,7 @@
->>>>  #define DRIVER_VERSION  "0.1"
->>>>  #define DRIVER_AUTHOR   "Eric Auger <eric.auger@linaro.org>"
->>>>  #define DRIVER_DESC     "Reset support for Calxeda xgmac vfio platform device"
->>>> -
->>>> -#define CALXEDAXGMAC_COMPAT "calxeda,hb-xgmac"
->>>> +#define COMPAT		"calxeda,hb-xgmac"
->>>
->>> Why the rename?
->> This define was not used. Since the code is meant to be duplicated from
->> one reset module to the other I thought it did not bring any have a
->> specialized name
-> 
-> I'd say it would be clearer to remove the macro then, and pass the
-> string literal in the function call.
-OK
-> 
->>>>  /* XGMAC Register definitions */
->>>>  #define XGMAC_CONTROL           0x00000000      /* MAC Configuration */
->>>> @@ -80,6 +79,43 @@ int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
->>>>  }
->>>>  EXPORT_SYMBOL_GPL(vfio_platform_calxedaxgmac_reset);
->>>>  
->>>> +static int __init vfio_platform_calxedaxgmac_init(void)
->>>> +{
->>>> +	int (*register_reset)(struct module *, char*,
->>>> +				vfio_platform_reset_fn_t);
->>>> +	int ret;
->>>> +
->>>> +	register_reset = symbol_get(vfio_platform_register_reset);
->>>> +	if (!register_reset)
->>>> +		return -EINVAL;
->>>
->>> I don't understand what you do the symbol_get() here for.
->>> Why not just call that function directly
->> the function is implemented in a separate module. This is just to make
->> sure the vfio-platform module is loaded, in case the end-user attempts
->> to load the reset module without having this latter loaded.
-> 
-> The module loader does all this for you.
-Ah OK
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 
-I will respin shortly taking into account all your comments
+> For some tracers the event carries information to be embedded
+> in the private structure returned by setup_aux().
 
-Thanks for your time!
+You need to mention here what these tracers are and which bits of
+event's information they need in their setup_aux(). Right now I can look
+it up in this patchset, but when this code gets merged it will make it
+easier to understand why this change was made.
 
-Best Regards
+Now, I understand that you're interested in event::attr in your
+setup_aux(), I have more comments on that in that other patch. :)
 
-Eric
-
-
-> 
-> 	Arnd
-> 
+Cheers,
+--
+Alex
