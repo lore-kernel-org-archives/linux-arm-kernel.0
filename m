@@ -1,64 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Oct 2015 07:50:52 -0700
-Subject: [PATCH 3/3] ARM: dts: Add basic support for isee igepv5
-In-Reply-To: <CAMVEqEkoXoE1wgT8p5BNW7TAjz5Xtcvx7gXvk7rbdQXg8bXpzg@mail.gmail.com>
-References: <1444756728-11185-1-git-send-email-tony@atomide.com>
- <1444756728-11185-3-git-send-email-tony@atomide.com>
- <CAFqH_52T8rPJp-8+Bb7Tjv-kcACU8FJGtqFWOhj02DzQ2yc7nw@mail.gmail.com>
- <20151016145707.GU10113@atomide.com>
- <CAMVEqEkoXoE1wgT8p5BNW7TAjz5Xtcvx7gXvk7rbdQXg8bXpzg@mail.gmail.com>
-Message-ID: <20151019145052.GB21839@atomide.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 19 Oct 2015 17:01:47 +0200
+Subject: [RFC PATCH v2 0/3] pwm: omap: Add PWM support using dual-mode timers
+Message-ID: <562505DB.3010402@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pau Pajuel <ppajuel@gmail.com> [151019 06:40]:
-> Hi Tony,
-> 2015-10-16 16:57 GMT+02:00 Tony Lindgren <tony@atomide.com>:
-> > >
-> > > So far I've tested that basic things work, such as serial, USB
-> > > Ethernet, HDMI and WLAN.
+This patch is based on an earlier patch by NeilBrown which is based on
+a older patch from Grant Erickson which provided PWM devices using
+the 'legacy' interface.
 
-Also mSATA works too BTW.
+The pwm driver was renamed to not be confused with the OMAP4 PWM dedicated
+hardware and was cleaned with the review from Thierry Reding.
 
-> I am testing your patch without succes. Which u-boot version are you using?
+The first patch introduces a way to select to dmtimer clock source via a
+clocks binding and a dedicated function wit the legacy fallback.
 
-I'm using the isee git tree u-boot with the following enabled in the
-omap5_igep0050.h:
+In order to prepare for the future form of the dmtimer (clksource or whatever),
+and less rely on specific bindings the first patch introduces the PWM driver
+with all the dmtimer calls into a platform data structure.
 
-#define IGEPv5_MEMORY_4G
-#define CONFIG_SUPPORT_RAW_INITRD
-#define CONFIG_ENV_IS_IN_FAT
-#define FAT_ENV_INTERFACE		"mmc"
-#define FAT_ENV_DEVICE			1
-#define FAT_ENV_PART			1
-#define FAT_ENV_FILE			"uboot.env"
-#define CONFIG_FAT_WRITE
+The structure is then filled in plat-omap and added as auxdata for the
+ti,pwm-dmtimer-omap compatible nodes.
 
-The CONFIG_SUPPORT_RAW_INITRD is needed to support raw initramfs instead of
-using mkimage on it for bootz command. I don't think these changes should
-affect booting though.
+Suggested-by: Tony Lindgren <tony@atomide.com>
 
-> Do you apply config changes into omap2plus_defconfig
+v2: fix dmtimer of clock handling, fix binding doc example
 
-Looks like I only enabled CONFIG_USB_NET_SMSC75XX.
+Neil Armstrong (3):
+  arm: plat-omap: dmtimer: Add clock source from DT
+  pwm: Add PWM driver for OMAP using dual-mode timers
+  arm: plat-omap: Add PWM dmtimer platform data quirks
 
-> Here is my setup and log: http://pastebin.com/j51ugRvK
+ .../devicetree/bindings/pwm/pwm-omap-dmtimer.txt   |  18 ++
+ arch/arm/mach-omap2/pdata-quirks.c                 |  23 ++
+ arch/arm/plat-omap/dmtimer.c                       |  31 +-
+ drivers/pwm/Kconfig                                |   9 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-omap-dmtimer.c                     | 322 +++++++++++++++++++++
+ include/linux/platform_data/pwm_omap_dmtimer.h     |  69 +++++
+ 7 files changed, 472 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-omap-dmtimer.txt
+ create mode 100644 drivers/pwm/pwm-omap-dmtimer.c
+ create mode 100644 include/linux/platform_data/pwm_omap_dmtimer.h
 
-My guess is that you need to play with initrd_high etc, try doing something
-like this in u-boot:
-
-setenv fdtaddr 80a00000
-setenv loadaddr 80c00000
-setenv rdaddr 81400000
-setenv fdt_high 8c000000
-setenv initrd_high ffffffff
-
-And see if that helps?
-
-BTW, we really need to use initramfs based booting on these for NFS to
-avoid having to compile all the USB into the kernel. Well at least for
-the mainline omap2plus_defconfig.
-
-Regards,
-
-Tony
+-- 
+1.9.1
