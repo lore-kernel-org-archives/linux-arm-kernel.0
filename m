@@ -1,30 +1,45 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Mon, 19 Oct 2015 17:34:48 +0200
-Subject: [PATCH 11/20] sound,
- skylake: switch from ioremap_cache to memremap
-In-Reply-To: <20151019152641.GC32054@sirena.org.uk>
-References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
- <20151009221635.32203.30755.stgit@dwillia2-desk3.jf.intel.com>
- <20151019152641.GC32054@sirena.org.uk>
-Message-ID: <s5hk2qi3m93.wl-tiwai@suse.de>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 19 Oct 2015 17:34:18 +0200
+Subject: [PATCH 0/3] ARM: dts: Use IOPAD pinmux for IGEP boards
+Message-ID: <1445268861-11857-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Oct 2015 17:26:41 +0200,
-Mark Brown wrote:
-> 
-> On Fri, Oct 09, 2015 at 06:16:36PM -0400, Dan Williams wrote:
-> > In preparation for deprecating ioremap_cache() convert its usage in
-> > skl-nhlt to memremap.
-> 
-> > -void __iomem *skl_nhlt_init(struct device *dev)
-> > +void *skl_nhlt_init(struct device *dev)
-> 
-> Why are we loosing the annotation here?
+Hello,
 
-It's the exact purpose of this patchset, as far as I understand.
-memremap() allows the driver accessing the mapped memory just like a
-normal memory unlike ioremap().
+This series use the IOPAD pinmux macros for the remaining IGEP boards that
+still used the register offset instead of the physical address using these
+macros so the DTS matches what is in the Technical Reference Manual.
+
+The changes are only cosmetic since they make the DTS easier to read but
+does not change functionality. I built tested and compared the binary DTB
+MD5 checksum and both matches before and after the series applied:
+
+Before
+
+d7a56205bdc54365d49d9a90dfe3fafb  am335x-base0033.dtb
+fa272fcdee65d7bf4c03bd5a6c5ec4fd  omap3-igep0020.dtb
+ba65bf74d8c6ea8e7bd8face17179e6e  omap3-igep0020-rev-f.dtb
+
+After
+
+d7a56205bdc54365d49d9a90dfe3fafb  am335x-base0033.dtb
+fa272fcdee65d7bf4c03bd5a6c5ec4fd  omap3-igep0020.dtb
+ba65bf74d8c6ea8e7bd8face17179e6e  omap3-igep0020-rev-f.dtb
+
+Best regards,
+Javier
 
 
-Takashi
+Javier Martinez Canillas (3):
+  ARM: dts: omap3-igep0020: Use IOPAD pinmux macro
+  ARM: dts: am335x-igep0033: Use IOPAD pinmux macro
+  ARM: dts: am335x-base0033: Use IOPAD pinmux macro
+
+ arch/arm/boot/dts/am335x-base0033.dts        | 48 +++++++++++------------
+ arch/arm/boot/dts/am335x-igep0033.dtsi       | 40 +++++++++----------
+ arch/arm/boot/dts/omap3-igep0020-common.dtsi | 58 ++++++++++++++--------------
+ 3 files changed, 73 insertions(+), 73 deletions(-)
+
+-- 
+2.4.3
