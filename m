@@ -1,36 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Oct 2015 12:51:51 +0100
-Subject: [RFC PATCH] ARM: exynos_defconfig: Increase
- CONFIG_BLK_DEV_RAM_SIZE to 64K
-In-Reply-To: <5624D87D.4090901@osg.samsung.com>
-References: <1445251715-9725-1-git-send-email-alim.akhtar@samsung.com>
- <5624D87D.4090901@osg.samsung.com>
-Message-ID: <20151019115150.GY32532@n2100.arm.linux.org.uk>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 19 Oct 2015 17:16:42 +0530
+Subject: [PATCH v4 4/8] ARM: dts: add SROM device node for exynos4
+In-Reply-To: <1445255206-11148-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1445255206-11148-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1445255206-11148-5-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 01:48:13PM +0200, Javier Martinez Canillas wrote:
-> Hello Alim,
-> 
-> On 10/19/2015 12:48 PM, Alim Akhtar wrote:
-> > CONFIG_BLK_DEV_RAM_SIZE is currently set to 8K, which is a bit on the
-> > smaller side, lets bump it up to 64K so that a bigger RAM_DISK can
-> > be used with defconfig.
-> > 
-> > Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> > ---
-> 
-> I agree that 8KiB is too small and that should be bumped, I'm also
-> not sure what the best size would be but 64KiB sounds reasonable
-> to me. So for this patch:
+Add device node of SROM controller for exynos4.
 
-It's _not_ 8KiB or 64KiB.
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Mark Rutland <mark.rutland@arm.com>
+CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/boot/dts/exynos4.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-config BLK_DEV_RAM_SIZE
-        int "Default RAM disk size (kbytes)"
-
-It's 8MiB or 64MiB - the value you place here is in units of 1024 bytes.
-
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 3184e10..2f31f77 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -76,6 +76,11 @@
+ 		reg = <0x10000000 0x100>;
+ 	};
+ 
++	sromc at 12570000 {
++		compatible = "samsung,exynos-srom";
++		reg = <0x12570000 0x10>;
++	};
++
+ 	mipi_phy: video-phy at 10020710 {
+ 		compatible = "samsung,s5pv210-mipi-video-phy";
+ 		#phy-cells = <1>;
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.4.5
