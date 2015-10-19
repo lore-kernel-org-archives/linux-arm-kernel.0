@@ -1,63 +1,98 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 19 Oct 2015 22:28:59 +0900
-Subject: [PATCH 7/7] ARM: EXYNOS: Remove code for restart and poweroff for
- exynos SoCs
-In-Reply-To: <5624BE39.7020605@osg.samsung.com>
-References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
- <1445234635-3950-8-git-send-email-alim.akhtar@samsung.com>
- <562494F8.6070003@samsung.com> <5624BE39.7020605@osg.samsung.com>
-Message-ID: <CAJKOXPcvKeDNwof5eyD5XjzUiZrHoyShD8gOPGo7uUxEyypQbw@mail.gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 19 Oct 2015 14:24:49 +0100
+Subject: [PATCHv4 12/24] arm64: Refactor check_cpu_capabilities
+In-Reply-To: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
+References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445261101-22344-13-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-19 18:56 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
-> Hello,
->
-> On 10/19/2015 09:00 AM, Krzysztof Kozlowski wrote:
->> On 19.10.2015 15:03, Alim Akhtar wrote:
->>> Now we can use the generic syscon-{reboot/poweroff} drivers,
->>> so we don't need special handling for reboot/poweroff in
->>> exynos pmu driver. This patch remove the same.
->>>
->>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->>> ---
->>>  arch/arm/mach-exynos/pmu.c |   43 -------------------------------------------
->>>  1 file changed, 43 deletions(-)
->>
->> I think that removal of this stuff will effectively remove the
->> restart/poweroff handlers from:
->> 1. Other defconfigs, like multi_v7
->> 2. Custom configs.
->>
->
-> This will also break old DTBs that don't have a "syscon-poweroff" device
-> node that contains the necessary PMU regmap, offset and mask information.
+check_cpu_capabilities runs through a given list of caps and
+checks if the system has the cap, updates the system capability
+bitmap and also runs any enable() methods associated with them.
+All of this is not quite obvious from the name 'check'. This
+patch splits the check_cpu_capabilities into two parts :
 
-I am not sure whether this is ABI break issue. There was no compatible
-mentioning that "reset works" which now would be replaced. The
-existing PMU compatible (like samsung,exynos4412-pmu) does not mention
-"reset" as a feature coming with this compatible.
+1) update_cpu_capabilities
+ => Runs through the given list and updates the system
+    wide capability map.
+2) enable_cpu_capabilities
+ => Runs through the given list and invokes enable() (if any)
+    for the caps enabled on the system.
 
-So no ABI break.
+Cc: Andre Przywara <andre.przywara@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Suggested-by: Catalin Marinas <catalin.marinsa@arm.com>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/cpufeature.h |    2 +-
+ arch/arm64/kernel/cpu_errata.c      |    2 +-
+ arch/arm64/kernel/cpufeature.c      |   14 +++++++++++---
+ 3 files changed, 13 insertions(+), 5 deletions(-)
 
-
->
->> Previously this code was always compiled in for ARCH_EXYNOS. Now it is
->> not so I am thinking about selecting necessary drivers from main exynos
->> Kconfig symbol. That could be tricky though, because "select" should be
->> used only for non-visible symbols.
->>
->> Any ideas how to solve that?
->>
->
-> Is true that select should only be used for non-visible symbols but there
-> are others user visible symbols that are selected by ARCH_EXYNOS such as
-> EXYNOS_THERMAL. So I think selecting the regmap syscon reset stuff there
-> is a sensible option.
-
-Selecting from defconfig is not sufficient... since I do not have
-other idea than selecting then ovak, but Alim please check it whether
-it does not create circular dependencies on various configs.
-
-Best regards,
-Krzysztof
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 2797876..b2f224b 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -137,7 +137,7 @@ static inline bool id_aa64mmfr0_mixed_endian_el0(u64 mmfr0)
+ 
+ void __init setup_cpu_features(void);
+ 
+-void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
++void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 			    const char *info);
+ void check_local_cpu_errata(void);
+ void check_local_cpu_features(void);
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 6ffd914..09eab32 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -88,5 +88,5 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 
+ void check_local_cpu_errata(void)
+ {
+-	check_cpu_capabilities(arm64_errata, "enabling workaround for");
++	update_cpu_capabilities(arm64_errata, "enabling workaround for");
+ }
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index a90a64d..78c4cb7a 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -629,7 +629,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{},
+ };
+ 
+-void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
++void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 			    const char *info)
+ {
+ 	int i;
+@@ -642,8 +642,15 @@ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 			pr_info("%s %s\n", info, caps[i].desc);
+ 		cpus_set_cap(caps[i].capability);
+ 	}
++}
++
++/*
++ * Run through the enabled capabilities and enable() it on the CPUs
++ */
++void enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
++{
++	int i;
+ 
+-	/* second pass allows enable() to consider interacting capabilities */
+ 	for (i = 0; caps[i].desc; i++) {
+ 		if (cpus_have_cap(caps[i].capability) && caps[i].enable)
+ 			caps[i].enable();
+@@ -652,7 +659,8 @@ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 
+ void check_local_cpu_features(void)
+ {
+-	check_cpu_capabilities(arm64_features, "detected feature:");
++	update_cpu_capabilities(arm64_features, "detected feature:");
++	enable_cpu_capabilities(arm64_features);
+ }
+ 
+ void __init setup_cpu_features(void)
+-- 
+1.7.9.5
