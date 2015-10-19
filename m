@@ -1,51 +1,75 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 19 Oct 2015 13:06:37 +0200
-Subject: [PATCH] ARM: imx: support edge irq trigger for gpc
-In-Reply-To: <1445274132-12253-1-git-send-email-b20788@freescale.com>
-References: <1445274132-12253-1-git-send-email-b20788@freescale.com>
-Message-ID: <1445252797.3174.29.camel@pengutronix.de>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Mon, 19 Oct 2015 13:09:22 +0200
+Subject: [PATCH v3] arm-soc: Add support for Sigma Designs Tango4
+In-Reply-To: <CAL_JsqKa4trfpLY_DPsjBrfH-7SSUQMACYVW7DNN1=Pv3B4FrA@mail.gmail.com>
+References: <560EAA7C.3070302@free.fr> <5124277.UR9sg1IOHT@wuerfel>
+ <560EFDB3.9010305@free.fr> <11113740.WL812ZaRcZ@wuerfel>
+ <5612A473.8030405@sigmadesigns.com> <5613EF4C.30603@sigmadesigns.com>
+ <CAL_JsqJ+WTBYF=sJWbkgNzL48H5AiXL4aoVV3DNiL6T_UQKQfg@mail.gmail.com>
+ <561D2952.4060908@sigmadesigns.com>
+ <CAL_JsqKa4trfpLY_DPsjBrfH-7SSUQMACYVW7DNN1=Pv3B4FrA@mail.gmail.com>
+Message-ID: <5624CF62.6020001@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 20.10.2015, 01:02 +0800 schrieb Anson Huang:
-> GPC irq domain is a child domain of GIC, now all of
-> platform irqs are inside GPC domain, during the module
-> populate, all devices irq should have correct type
-> setting in GIC, however, there is no .irq_set_type
-> callback setting in GPC, so the irq_set_type will be
-> skipped and cause edge raising type of irq work
-> abnormally after kernel boot up.
+On 13/10/2015 19:55, Rob Herring wrote:
+> Marc Gonzalez wrote:
+>> On 09/10/2015 16:08, Rob Herring wrote:
+>>
+>>> No cpus node?
+>>
+>> Is this used to document the CPU?
+>> I didn't see any code making use of that information.
 > 
-What are the symptoms of this "abnormal" working?
+> The SMP code uses it: arch/arm/kernel/devtree.c
 
-> Since GPC has no irq type, so just tell kernel to
-> use irq_chip_set_type_parent instead.
-> 
-The change itself looks good, but the description needs some work. Also
-please don't wrap the commit message too early, it makes it harder than
-necessary to read.
+Now I see arm_dt_init_cpu_maps()
 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
+<confused> I thought DT was used to specify things that cannot be
+dynamically discovered? Isn't it possible for the OS to discover at
+run-time how many cores and/or CPUs are present?
 
-I think this needs a stable annotation.
+On a related topic, I have a DTS for my board, which includes the
+DTS for the architecture. However, there are single-core SoCs and
+dual-core SoCs. Where is the cpus node supposed to appear?
 
-> ---
->  arch/arm/mach-imx/gpc.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-> index 10bf715..b3a7a74 100644
-> --- a/arch/arm/mach-imx/gpc.c
-> +++ b/arch/arm/mach-imx/gpc.c
-> @@ -176,6 +176,7 @@ static struct irq_chip imx_gpc_chip = {
->  	.irq_unmask		= imx_gpc_irq_unmask,
->  	.irq_retrigger		= irq_chip_retrigger_hierarchy,
->  	.irq_set_wake		= imx_gpc_irq_set_wake,
-> +	.irq_set_type           = irq_chip_set_type_parent,
->  #ifdef CONFIG_SMP
->  	.irq_set_affinity	= irq_chip_set_affinity_parent,
->  #endif
+Or should I specify in the architecture DTS the maximum number
+of cores, as in
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+    cpus {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        cpu at 0 {
+            compatible = "arm,cortex-a9";
+            reg = <0>;
+        };
+        cpu at 1 {
+            compatible = "arm,cortex-a9";
+            reg = <1>;
+        };
+    };
+
+
+>>> No pl310? A9 performance mon?
+
+Found "arm,cortex-a9-pmu" in arch/arm/kernel/perf_event_v7.c
+Are the PMU registers available from non-secure mode, or is TrustZone
+going to get in the way?
+
+
+About the cache controller, I was confused by this comment:
+	/*
+	 * Always enable non-secure access to the lockdown registers -
+	 * we write to them as part of the L2C enable sequence so they
+	 * need to be accessible.
+	 */
+	l2x0_saved_regs.aux_ctrl = aux | L310_AUX_CTRL_NS_LOCKDOWN;
+
+I see no lock() function, only unlock().
+
+But the unlock function merely writes 0 to the relevant registers,
+and 0 is the value at reset for those registers. Since nothing ever
+sets the registers to non-zero, why is the unlock needed at all?
+
+
+Regards.
