@@ -1,30 +1,31 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 19 Oct 2015 18:40:52 +0100
-Subject: [PATCH 14/17] media: st-rc: remove misuse of IRQF_NO_SUSPEND flag
-In-Reply-To: <1442850433-5903-15-git-send-email-sudeep.holla@arm.com>
-References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
- <1442850433-5903-15-git-send-email-sudeep.holla@arm.com>
-Message-ID: <56252B24.4000207@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 19 Oct 2015 18:43:51 +0100
+Subject: [UPDATED] [PATCHv4 00/12] arm64: 16K translation granule support
+In-Reply-To: <20151019173040.GF11226@e104818-lin.cambridge.arm.com>
+References: <1445260779-22242-1-git-send-email-suzuki.poulose@arm.com>
+ <20151019173040.GF11226@e104818-lin.cambridge.arm.com>
+Message-ID: <56252BD7.6030209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 21/09/15 16:47, Sudeep Holla wrote:
-> The device is set as wakeup capable using proper wakeup API but the
-> driver misuses IRQF_NO_SUSPEND to set the interrupt as wakeup source
-> which is incorrect.
+On 19/10/15 18:30, Catalin Marinas wrote:
+> On Mon, Oct 19, 2015 at 02:19:26PM +0100, Suzuki K. Poulose wrote:
+>> Ard Biesheuvel (1):
+>>    arm64: Add page size to the kernel image header
+>>
+>> Mark Rutland (1):
+>>    arm64: Simplify NR_FIX_BTMAPS calculation
+>>
+>> Suzuki K. Poulose (10):
 >
-> This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
-> enable_irq_wake instead.
+> Patches applied. I'm not fully convinced about the 36-bit VA yet, it
+
+Thanks.
+
+> increases the validation space and I think with little benefit (to be
+> seen on real hardware). I may make it depend on EXPERT.
 >
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
-> Cc: Maxime Coquelin <maxime.coquelin@st.com>
-> Cc: Patrice Chotard <patrice.chotard@st.com>
-> Cc: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-Can you pick couple of these media patches ?
+Makes sense. I am fine with that.
 
--- 
-Regards,
-Sudeep
+Suzuki
