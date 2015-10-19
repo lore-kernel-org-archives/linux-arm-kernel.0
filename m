@@ -1,189 +1,119 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Mon, 19 Oct 2015 23:38:53 +0000
-Subject: [PATCH 02/16] arm64: Convert hcalls to use HVC immediate value
-In-Reply-To: <cover.1445297709.git.geoff@infradead.org>
-References: <cover.1445297709.git.geoff@infradead.org>
-Message-ID: <55be62a0e256a37bc1007ad27e13b19dee80f512.1445297709.git.geoff@infradead.org>
+Subject: [PATCH 00/16] arm64 kexec kernel patches v10
+Message-ID: <cover.1445297709.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The existing arm64 hcall implementations are limited in that they only allow
-for two distinct hcalls; with the x0 register either zero or not zero.  Also,
-the API of the hyp-stub exception vector routines and the KVM exception vector
-routines differ; hyp-stub uses a non-zero value in x0 to implement
-__hyp_set_vectors, whereas KVM uses it to implement kvm_call_hyp.
+Hi All,
 
-To allow for additional hcalls to be defined and to make the arm64 hcall API
-more consistent across exception vector routines, change the hcall
-implementations to use the 16 bit immediate value of the HVC instruction to
-specify the hcall type.
+This series adds the core support for kexec re-boot and kdump on ARM64.  This
+v10 of the series combines Takahiro's kdump patches with my kexec patches.
 
-Define three new preprocessor macros HVC_CALL_HYP, HVC_GET_VECTORS, and
-HVC_SET_VECTORS to be used as hcall type specifiers and convert the
-existing __hyp_get_vectors(), __hyp_set_vectors() and kvm_call_hyp() routines
-to use these new macros when executing an HVC call.  Also, change the
-corresponding hyp-stub and KVM el1_sync exception vector routines to use these
-new macros.
+To load a second stage kernel and execute a kexec re-boot or to work with kdump
+on ARM64 systems a series of patches to kexec-tools [2], which have not yet been
+merged upstream, are needed.
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
----
- arch/arm64/include/asm/virt.h | 27 +++++++++++++++++++++++++++
- arch/arm64/kernel/hyp-stub.S  | 32 +++++++++++++++++++++-----------
- arch/arm64/kvm/hyp.S          | 16 +++++++++-------
- 3 files changed, 57 insertions(+), 18 deletions(-)
+I have tested kexec with the ARM Foundation model, and Takahiro has reported
+that kdump is working on the 96boards HiKey developer board.  Kexec on EFI
+systems works correctly.  More ACPI + kexec testing is needed.
 
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 7a5df52..eb10368 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -18,6 +18,33 @@
- #ifndef __ASM__VIRT_H
- #define __ASM__VIRT_H
- 
-+/*
-+ * The arm64 hcall implementation uses the ISS field of the ESR_EL2 register to
-+ * specify the hcall type.  The exception handlers are allowed to use registers
-+ * x17 and x18 in their implementation.  Any routine issuing an hcall must not
-+ * expect these registers to be preserved.
-+ */
-+
-+/*
-+ * HVC_CALL_HYP - Execute a hyp routine.
-+ */
-+
-+#define HVC_CALL_HYP 0
-+
-+/*
-+ * HVC_GET_VECTORS - Return the value of the vbar_el2 register.
-+ */
-+
-+#define HVC_GET_VECTORS 1
-+
-+/*
-+ * HVC_SET_VECTORS - Set the value of the vbar_el2 register.
-+ *
-+ * @x0: Physical address of the new vector table.
-+ */
-+
-+#define HVC_SET_VECTORS 2
-+
- #define BOOT_CPU_MODE_EL1	(0xe11)
- #define BOOT_CPU_MODE_EL2	(0xe12)
- 
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index a272f33..017ab519 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -22,6 +22,7 @@
- #include <linux/irqchip/arm-gic-v3.h>
- 
- #include <asm/assembler.h>
-+#include <asm/kvm_arm.h>
- #include <asm/ptrace.h>
- #include <asm/virt.h>
- 
-@@ -53,14 +54,22 @@ ENDPROC(__hyp_stub_vectors)
- 	.align 11
- 
- el1_sync:
--	mrs	x1, esr_el2
--	lsr	x1, x1, #26
--	cmp	x1, #0x16
-+	mrs	x18, esr_el2
-+	lsr	x17, x18, #ESR_ELx_EC_SHIFT
-+	and	x18, x18, #ESR_ELx_ISS_MASK
-+
-+	cmp	x17, #ESR_ELx_EC_HVC64
- 	b.ne	2f				// Not an HVC trap
--	cbz	x0, 1f
--	msr	vbar_el2, x0			// Set vbar_el2
-+
-+	cmp	x18, #HVC_GET_VECTORS
-+	b.ne	1f
-+	mrs	x0, vbar_el2
- 	b	2f
--1:	mrs	x0, vbar_el2			// Return vbar_el2
-+
-+1:	cmp	x18, #HVC_SET_VECTORS
-+	b.ne	2f
-+	msr	vbar_el2, x0
-+
- 2:	eret
- ENDPROC(el1_sync)
- 
-@@ -100,11 +109,12 @@ ENDPROC(\label)
-  * initialisation entry point.
-  */
- 
--ENTRY(__hyp_get_vectors)
--	mov	x0, xzr
--	// fall through
- ENTRY(__hyp_set_vectors)
--	hvc	#0
-+	hvc	#HVC_SET_VECTORS
- 	ret
--ENDPROC(__hyp_get_vectors)
- ENDPROC(__hyp_set_vectors)
-+
-+ENTRY(__hyp_get_vectors)
-+	hvc	#HVC_GET_VECTORS
-+	ret
-+ENDPROC(__hyp_get_vectors)
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index e583613..073b8bf 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -29,6 +29,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_mmu.h>
- #include <asm/memory.h>
-+#include <asm/virt.h>
- 
- #define CPU_GP_REG_OFFSET(x)	(CPU_GP_REGS + x)
- #define CPU_XREG_OFFSET(x)	CPU_GP_REG_OFFSET(CPU_USER_PT_REGS + 8*x)
-@@ -924,12 +925,9 @@ __hyp_panic_str:
-  * in Hyp mode (see init_hyp_mode in arch/arm/kvm/arm.c).  Return values are
-  * passed in r0 and r1.
-  *
-- * A function pointer with a value of 0 has a special meaning, and is
-- * used to implement __hyp_get_vectors in the same way as in
-- * arch/arm64/kernel/hyp_stub.S.
-  */
- ENTRY(kvm_call_hyp)
--	hvc	#0
-+	hvc	#HVC_CALL_HYP
- 	ret
- ENDPROC(kvm_call_hyp)
- 
-@@ -960,6 +958,7 @@ el1_sync:					// Guest trapped into EL2
- 
- 	mrs	x1, esr_el2
- 	lsr	x2, x1, #ESR_ELx_EC_SHIFT
-+	and	x0, x1, #ESR_ELx_ISS_MASK
- 
- 	cmp	x2, #ESR_ELx_EC_HVC64
- 	b.ne	el1_trap
-@@ -968,15 +967,18 @@ el1_sync:					// Guest trapped into EL2
- 	cbnz	x3, el1_trap			// called HVC
- 
- 	/* Here, we're pretty sure the host called HVC. */
-+	mov	x18, x0
- 	pop	x2, x3
- 	pop	x0, x1
- 
--	/* Check for __hyp_get_vectors */
--	cbnz	x0, 1f
-+	cmp	x18, #HVC_GET_VECTORS
-+	b.ne	1f
- 	mrs	x0, vbar_el2
- 	b	2f
- 
--1:	push	lr, xzr
-+1:	/* Default to HVC_CALL_HYP. */
-+
-+	push	lr, xzr
- 
- 	/*
- 	 * Compute the function address in EL2, and shuffle the parameters.
+Patch 1 here moves the macros from proc-macros.S to asm/assembler.h so that the
+dcache_line_size macro it defines can be uesd by kexec's relocate kernel
+routine.
+
+Patches 2 & 3 rework the ARM64 hcall mechanism to give the CPU reset routines
+the ability to switch exception levels from EL1 to EL2 for kernels that were
+entered in EL2.
+
+Patch 4 allows KVM to handle a CPU reset.
+
+Patches 5-7 add back the ARM64 CPU reset support that was recently removed from
+the kernel.
+
+Patches 8-10 add the actual kexec support.
+
+Patches 11-16 add kdump support.
+
+Please consider all patches for inclusion.
+
+[1]  https://git.kernel.org/cgit/linux/kernel/git/geoff/linux-kexec.git
+[2]  https://git.kernel.org/cgit/linux/kernel/git/geoff/kexec-tools.git
+
+-Geoff
+
+The following changes since commit 7379047d5585187d1288486d4627873170d0005a:
+
+  Linux 4.3-rc6 (2015-10-18 16:08:42 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/geoff/linux-kexec.git kexec-v10
+
+for you to fetch changes up to 4cf0c03d6cd1cb4826bb5df679fbcdaf80be0b1c:
+
+  arm64: kdump: relax BUG_ON() if more than one cpus are still active (2015-10-19 15:51:52 -0700)
+
+----------------------------------------------------------------
+AKASHI Takahiro (7):
+      arm64: kvm: allows kvm cpu hotplug
+      arm64: kdump: reserve memory for crash dump kernel
+      arm64: kdump: implement machine_crash_shutdown()
+      arm64: kdump: add kdump support
+      arm64: kdump: update a kernel doc
+      arm64: kdump: enable kdump in the arm64 defconfig
+      arm64: kdump: relax BUG_ON() if more than one cpus are still active
+
+Geoff Levand (9):
+      arm64: Fold proc-macros.S into assembler.h
+      arm64: Convert hcalls to use HVC immediate value
+      arm64: Add new hcall HVC_CALL_FUNC
+      arm64: Add back cpu_reset routines
+      arm64: Add EL2 switch to cpu_reset
+      Revert "arm64: remove dead code"
+      arm64/kexec: Add core kexec support
+      arm64/kexec: Add pr_devel output
+      arm64/kexec: Enable kexec in the arm64 defconfig
+
+ Documentation/kdump/kdump.txt       |  29 ++++-
+ arch/arm/include/asm/kvm_host.h     |  10 +-
+ arch/arm/include/asm/kvm_mmu.h      |   1 +
+ arch/arm/kvm/arm.c                  |  58 +++------
+ arch/arm/kvm/mmu.c                  |   5 +
+ arch/arm64/Kconfig                  |  22 ++++
+ arch/arm64/configs/defconfig        |   2 +
+ arch/arm64/include/asm/assembler.h  |  48 +++++++-
+ arch/arm64/include/asm/kexec.h      |  80 ++++++++++++
+ arch/arm64/include/asm/kvm_host.h   |  16 ++-
+ arch/arm64/include/asm/kvm_mmu.h    |   1 +
+ arch/arm64/include/asm/mmu.h        |   1 +
+ arch/arm64/include/asm/virt.h       |  49 ++++++++
+ arch/arm64/kernel/Makefile          |   3 +
+ arch/arm64/kernel/cpu-reset.S       |  76 ++++++++++++
+ arch/arm64/kernel/cpu-reset.h       |  20 +++
+ arch/arm64/kernel/crash_dump.c      |  71 +++++++++++
+ arch/arm64/kernel/head.S            |   1 -
+ arch/arm64/kernel/hyp-stub.S        |  43 +++++--
+ arch/arm64/kernel/machine_kexec.c   | 237 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/relocate_kernel.S | 163 +++++++++++++++++++++++++
+ arch/arm64/kernel/setup.c           |   7 +-
+ arch/arm64/kernel/smp.c             |  16 ++-
+ arch/arm64/kvm/hyp-init.S           |  34 +++++-
+ arch/arm64/kvm/hyp.S                |  44 +++++--
+ arch/arm64/mm/cache.S               |   2 -
+ arch/arm64/mm/init.c                |  83 +++++++++++++
+ arch/arm64/mm/mmu.c                 |  11 ++
+ arch/arm64/mm/proc-macros.S         |  64 ----------
+ arch/arm64/mm/proc.S                |   3 -
+ include/uapi/linux/kexec.h          |   1 +
+ 31 files changed, 1063 insertions(+), 138 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kexec.h
+ create mode 100644 arch/arm64/kernel/cpu-reset.S
+ create mode 100644 arch/arm64/kernel/cpu-reset.h
+ create mode 100644 arch/arm64/kernel/crash_dump.c
+ create mode 100644 arch/arm64/kernel/machine_kexec.c
+ create mode 100644 arch/arm64/kernel/relocate_kernel.S
+ delete mode 100644 arch/arm64/mm/proc-macros.S
+
 -- 
 2.5.0
