@@ -1,17 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 19 Oct 2015 09:46:28 +0900
-Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
-In-Reply-To: <56237CD5.6010609@cogentembedded.com>
-References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
- <2544073.SzFGJq3XZ1@wasted.cogentembedded.com>
- <56237CD5.6010609@cogentembedded.com>
-Message-ID: <20151019004627.GD20599@verge.net.au>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 19 Oct 2015 10:41:12 +0900
+Subject: [PATCH] hwrng: exynos - Fix unbalanced PM runtime get/puts
+In-Reply-To: <1445011311-32142-1-git-send-email-daniel.thompson@linaro.org>
+References: <1445011311-32142-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <56244A38.4040207@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 18, 2015 at 02:04:53PM +0300, Sergei Shtylyov wrote:
-> There should have been [PATCH v3] in the subject, of course.
+On 17.10.2015 01:01, Daniel Thompson wrote:
+> Currently this driver calls pm_runtime_get_sync() rampantly
+> but never puts anything back. This makes it impossible for the
+> device to autosuspend properly; it will remain fully active
+> after the first use.
+> 
+> Fix in the obvious way.
+> 
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+> 
+> Notes:
+>     Compile tested only (CONFIG_PM=y, CONFIG_HW_RANDOM_EXYNOS=m); I spotted
+>     this whilst reviewing the code and don't have an exynos platform to
+>     test on.
+> 
+>  drivers/char/hw_random/exynos-rng.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks for following up.
+To test the patch I had to add OF support to the driver. I have these
+patches almost ready and I will send them soon. Anyway:
 
-I have queued this up for v4.5.
+Tested on Trats2 board (Exynos4412):
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
