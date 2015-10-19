@@ -1,64 +1,32 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 19 Oct 2015 10:53:32 +0200
-Subject: [PATCH v2 1/2] KVM/arm: add hooks for armv7 fp/simd lazy switch
- support
-In-Reply-To: <1443311009-4811-2-git-send-email-m.smarduch@samsung.com>
-References: <1443311009-4811-1-git-send-email-m.smarduch@samsung.com>
- <1443311009-4811-2-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20151019085332.GA24104@cbox>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 19 Oct 2015 16:49:41 +0800
+Subject: [PATCH 0/8] {arm|arm64}: berlin: add watchdog support
+Message-ID: <1445244589-4838-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 26, 2015 at 04:43:28PM -0700, Mario Smarduch wrote:
-> This patch adds vcpu fields to track lazy state, save host FPEXC, and 
-> offsets to fields.
-> 
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> ---
->  arch/arm/include/asm/kvm_host.h | 6 ++++++
->  arch/arm/kernel/asm-offsets.c   | 2 ++
->  2 files changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index dcba0fa..194a8ef 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -111,6 +111,12 @@ struct kvm_vcpu_arch {
->  	/* Interrupt related fields */
->  	u32 irq_lines;		/* IRQ and FIQ levels */
->  
-> +	/* Track fp/simd lazy switch state */
-> +	u32 vfp_lazy;
+In Marvell berlin SoCs, there are watchdogs which are compatible with the
+snps,dw-wdt driver. This series try to add watchdog support for them.
 
-so is this a flags field or basically a boolean?  If the latter, what is
-does it mean when the field is true vs. false?
+Jisheng Zhang (8):
+  arm: dts: berlin2q: add watchdog nodes
+  arm: dts: berlin2cd: add watchdog nodes
+  arm: dts: berlin2: add watchdog nodes
+  arm64: dts: berlin4ct: add watchdog nodes
+  arm: dts: berlin: enable wdt0 on Sony NSZ-GS7
+  ARM: dts: berlin: enable wdt0 on the Google Chromecast
+  arm: dts: berlin: enable wdt0 on the Marvell BG2Q DMP
+  arm64: dts: berlin: enable wdt0 on the Marvell BG4CT STB board
 
-> +
-> +	/* Save host FPEXC register to restore on vcpu put */
-> +	u32 saved_fpexc;
+ arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts        |  2 ++
+ arch/arm/boot/dts/berlin2.dtsi                    | 24 +++++++++++++++++++++++
+ arch/arm/boot/dts/berlin2cd-google-chromecast.dts |  2 ++
+ arch/arm/boot/dts/berlin2cd.dtsi                  | 24 +++++++++++++++++++++++
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts        |  4 ++++
+ arch/arm/boot/dts/berlin2q.dtsi                   | 24 +++++++++++++++++++++++
+ arch/arm64/boot/dts/marvell/berlin4ct-stb.dts     |  4 ++++
+ arch/arm64/boot/dts/marvell/berlin4ct.dtsi        | 24 +++++++++++++++++++++++
+ 8 files changed, 108 insertions(+)
 
-is this only the host's state?  If so, why not name it host_fpexc?
-
-Thanks,
--Christoffer
-
-> +
->  	/* Exception Information */
->  	struct kvm_vcpu_fault_info fault;
->  
-> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-> index 871b826..e1c3a41 100644
-> --- a/arch/arm/kernel/asm-offsets.c
-> +++ b/arch/arm/kernel/asm-offsets.c
-> @@ -186,6 +186,8 @@ int main(void)
->    DEFINE(VCPU_CPSR,		offsetof(struct kvm_vcpu, arch.regs.usr_regs.ARM_cpsr));
->    DEFINE(VCPU_HCR,		offsetof(struct kvm_vcpu, arch.hcr));
->    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
-> +  DEFINE(VCPU_VFP_LAZY,		offsetof(struct kvm_vcpu, arch.vfp_lazy));
-> +  DEFINE(VCPU_VFP_FPEXC,	offsetof(struct kvm_vcpu, arch.saved_fpexc));
->    DEFINE(VCPU_HSR,		offsetof(struct kvm_vcpu, arch.fault.hsr));
->    DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.fault.hxfar));
->    DEFINE(VCPU_HPFAR,		offsetof(struct kvm_vcpu, arch.fault.hpfar));
-> -- 
-> 1.9.1
-> 
+-- 
+2.6.1
