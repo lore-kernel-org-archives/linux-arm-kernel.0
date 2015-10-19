@@ -1,61 +1,68 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 19 Oct 2015 14:00:41 +0100
-Subject: [PATCHv4 18/24] arm64/kvm: Make use of the system wide safe values
+Date: Mon, 19 Oct 2015 14:00:26 +0100
+Subject: [PATCHv4 03/24] arm64: Delay cpuinfo_store_boot_cpu
 In-Reply-To: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
 References: <1445259647-21541-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1445259647-21541-19-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1445259647-21541-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the system wide safe value from the new API for safer
-decisions
+At the moment the boot CPU stores the cpuinfo much before the
+PERCPU areas are initialised by the kernel. This could be problematic
+as the non-boot CPU data structures might get copied with the data
+from the boot CPU, giving us no chance to detect if a particular CPU
+updated its cpuinfo. This patch delays the boot cpu store to
+smp_prepare_boot_cpu().
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: kvmarm at lists.cs.columbia.edu
+Also kills the setup_processor() which no longer does meaningful
+work.
+
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/reset.c    |    2 +-
- arch/arm64/kvm/sys_regs.c |   12 ++++++------
- 2 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm64/kernel/setup.c |   10 ++--------
+ arch/arm64/kernel/smp.c   |    1 +
+ 2 files changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 91cf535..f34745c 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -53,7 +53,7 @@ static bool cpu_has_32bit_el1(void)
- {
- 	u64 pfr0;
- 
--	pfr0 = read_cpuid(ID_AA64PFR0_EL1);
-+	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
- 	return !!(pfr0 & 0x20);
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 4f0408e..47e0051 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -286,13 +286,6 @@ void __init setup_cpu_features(void)
+ #endif
  }
  
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index d03d3af..87a64e8 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -693,13 +693,13 @@ static bool trap_dbgidr(struct kvm_vcpu *vcpu,
- 	if (p->is_write) {
- 		return ignore_write(vcpu, p);
- 	} else {
--		u64 dfr = read_cpuid(ID_AA64DFR0_EL1);
--		u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
--		u32 el3 = !!((pfr >> 12) & 0xf);
-+		u64 dfr = read_system_reg(SYS_ID_AA64DFR0_EL1);
-+		u64 pfr = read_system_reg(SYS_ID_AA64PFR0_EL1);
-+		u32 el3 = !!cpuid_feature_extract_field(pfr, ID_AA64PFR0_EL3_SHIFT);
+-static void __init setup_processor(void)
+-{
+-	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
+-	sprintf(init_utsname()->machine, ELF_PLATFORM);
+-	cpuinfo_store_boot_cpu();
+-}
+-
+ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ {
+ 	void *dt_virt = fixmap_remap_fdt(dt_phys);
+@@ -404,8 +397,9 @@ u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
  
--		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> 20) & 0xf) << 28) |
--					  (((dfr >> 12) & 0xf) << 24) |
--					  (((dfr >> 28) & 0xf) << 20) |
-+		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> ID_AA64DFR0_WRPS_SHIFT) & 0xf) << 28) |
-+					  (((dfr >> ID_AA64DFR0_BRPS_SHIFT) & 0xf) << 24) |
-+					  (((dfr >> ID_AA64DFR0_CTX_CMPS_SHIFT) & 0xf) << 20) |
- 					  (6 << 16) | (el3 << 14) | (el3 << 12));
- 		return true;
- 	}
+ void __init setup_arch(char **cmdline_p)
+ {
+-	setup_processor();
++	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
+ 
++	sprintf(init_utsname()->machine, ELF_PLATFORM);
+ 	init_mm.start_code = (unsigned long) _text;
+ 	init_mm.end_code   = (unsigned long) _etext;
+ 	init_mm.end_data   = (unsigned long) _edata;
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 77763d9..d1d0049 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -327,6 +327,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
+ 
+ void __init smp_prepare_boot_cpu(void)
+ {
++	cpuinfo_store_boot_cpu();
+ 	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
+ }
+ 
 -- 
 1.7.9.5
