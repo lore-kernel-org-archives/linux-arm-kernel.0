@@ -1,29 +1,42 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Mon, 19 Oct 2015 17:55:49 +0100
-Subject: [PATCH] ARM64: Enable multi-core scheduler support by default
-Message-ID: <1445273749-16778-1-git-send-email-dietmar.eggemann@arm.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Mon, 19 Oct 2015 09:59:29 -0700
+Subject: [PATCH 11/20] sound,
+ skylake: switch from ioremap_cache to memremap
+In-Reply-To: <20151019160842.GF32054@sirena.org.uk>
+References: <20151009221537.32203.5867.stgit@dwillia2-desk3.jf.intel.com>
+ <20151009221635.32203.30755.stgit@dwillia2-desk3.jf.intel.com>
+ <20151019152641.GC32054@sirena.org.uk>
+ <s5hk2qi3m93.wl-tiwai@suse.de>
+ <20151019160842.GF32054@sirena.org.uk>
+Message-ID: <CAPcyv4jper5Byz2782MHbi-_RjDiDna4hYCHG1UBacE3YXd96A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure that the task scheduler domain hierarchy is set-up correctly
-on systems with single or multi-cluster topology.
+On Mon, Oct 19, 2015 at 9:08 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Mon, Oct 19, 2015 at 05:34:48PM +0200, Takashi Iwai wrote:
+>> Mark Brown wrote:
+>
+>> > On Fri, Oct 09, 2015 at 06:16:36PM -0400, Dan Williams wrote:
+>> > > In preparation for deprecating ioremap_cache() convert its usage in
+>> > > skl-nhlt to memremap.
+>
+>> > > -void __iomem *skl_nhlt_init(struct device *dev)
+>> > > +void *skl_nhlt_init(struct device *dev)
+>
+>> > Why are we loosing the annotation here?
+>
+>> It's the exact purpose of this patchset, as far as I understand.
+>> memremap() allows the driver accessing the mapped memory just like a
+>> normal memory unlike ioremap().
+>
+> There's no mention of what the purpose of the conversion is in either
+> the patch or the cover letter so it's a bit unclear, some confirmation
+> would be good :(
 
-Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+The cover letter linked this article which talked through the
+motivation: https://lwn.net/Articles/653585/
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 34d71dd86781..dc70d715bc38 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -51,6 +51,7 @@ CONFIG_PCI=y
- CONFIG_PCI_MSI=y
- CONFIG_PCI_XGENE=y
- CONFIG_SMP=y
-+CONFIG_SCHED_MC=y
- CONFIG_PREEMPT=y
- CONFIG_KSM=y
- CONFIG_TRANSPARENT_HUGEPAGE=y
--- 
-1.9.1
+Essentially an "__iomem" annotation on a cached mapping is
+inconsistent as __iomem indicates "may have side effects, use special
+accessors" and cached means "pre-fetching, asynchronous write-backs,
+and cpu determined i/o sizes are permissible".
