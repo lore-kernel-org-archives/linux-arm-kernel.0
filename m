@@ -1,42 +1,67 @@
-From: yao.yuan@freescale.com (Yuan Yao)
-Date: Mon, 19 Oct 2015 15:56:48 +0800
-Subject: [PATCH] arm: fix a compile error for pgtable-3level.h
-Message-ID: <1445241408-11897-1-git-send-email-yao.yuan@freescale.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 Oct 2015 10:08:54 +0200
+Subject: [PATCH v5 0/5] clk: sunxi: Add support for the Audio PLL
+Message-ID: <1445242139-20965-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the compile error:
-In file included from ./arch/arm/include/asm/pgtable.h:31:0,
-                 from include/linux/mm.h:55,
-                 from arch/arm/kernel/asm-offsets.c:15:
-./arch/arm/include/asm/pgtable-3level.h:20:0: error: unterminated #ifndef
- #ifndef _ASM_PGTABLE_3LEVEL_H
- ^
-make[1]: *** [arch/arm/kernel/asm-offsets.s] Error 1
-make: *** [prepare0] Error 2
+Hi,
 
-The
- #endif
-for
- #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-is missing.
+This serie adds support for the PLL2 aka the Audio PLL on the
+Allwinner A10 and the later SoCs.
 
-Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
----
- arch/arm/include/asm/pgtable-3level.h | 1 +
- 1 file changed, 1 insertion(+)
+This is the last part of the audio codec support, it's been around for
+quite a while now, and I expect it to be merged in 4.4.
 
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index d42f81f..dc46398 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -231,6 +231,7 @@ static inline pte_t pte_mkspecial(pte_t pte)
- 
- #ifdef CONFIG_TRANSPARENT_HUGEPAGE
- #define pmd_trans_huge(pmd)	(pmd_val(pmd) && !pmd_table(pmd))
-+#endif
- 
- #define PMD_BIT_FUNC(fn,op) \
- static inline pmd_t pmd_##fn(pmd_t pmd) { pmd_val(pmd) op; return pmd; }
+This serie is built on top of a generic clk-multiplier driver to
+handle clock that multiply their parent clock rate (mostly PLL's), in
+order to provide the driver for the PLL2 base clock, and then adds the
+drivers for the clock that derive from the Audio PLL.
+
+Thanks!
+Maxime
+
+Changes from v4:
+  - Fixed the genmask calls
+  - Fixed the number of parents registration in mod1
+  - Added Chen-Yu's Reviewed-by
+
+Changes from v3:
+  - Fixed the header issues: removed unused ones, added some others
+  - Added the __acquire / __release call when a spinlock is not defined
+
+Changes from v2:
+  - Renamed clk-factor to clk-multiplier
+  - Added an exception for the A13 clock
+
+Changes from v1:
+  - Removed a bogus of_iomap in the mod1 clock driver
+  - Wrote the clk-factor driver
+  - Converted the PLL2 clock to that driver
+
+Emilio L?pez (2):
+  clk: sunxi: codec clock support
+  clk: sunxi: mod1 clock support
+
+Maxime Ripard (3):
+  clk: Add a basic multiplier clock
+  clk: sunxi: Add a driver for the PLL2
+  clk: sunxi: pll2: Add A13 support
+
+ drivers/clk/Makefile                       |   1 +
+ drivers/clk/clk-multiplier.c               | 181 ++++++++++++++++++++++++
+ drivers/clk/sunxi/Makefile                 |   3 +
+ drivers/clk/sunxi/clk-a10-codec.c          |  44 ++++++
+ drivers/clk/sunxi/clk-a10-mod1.c           |  81 +++++++++++
+ drivers/clk/sunxi/clk-a10-pll2.c           | 216 +++++++++++++++++++++++++++++
+ include/dt-bindings/clock/sun4i-a10-pll2.h |  53 +++++++
+ include/linux/clk-provider.h               |  42 ++++++
+ 8 files changed, 621 insertions(+)
+ create mode 100644 drivers/clk/clk-multiplier.c
+ create mode 100644 drivers/clk/sunxi/clk-a10-codec.c
+ create mode 100644 drivers/clk/sunxi/clk-a10-mod1.c
+ create mode 100644 drivers/clk/sunxi/clk-a10-pll2.c
+ create mode 100644 include/dt-bindings/clock/sun4i-a10-pll2.h
+
 -- 
-2.1.0.27.g96db324
+2.5.3
