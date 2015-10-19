@@ -1,46 +1,42 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 19 Oct 2015 09:59:25 +0200
-Subject: [PATCH RFC 0/2] simplefb: Add regulator handling support
-In-Reply-To: <20151018195719.GC14956@sirena.org.uk>
-References: <1444669458-5588-1-git-send-email-wens@csie.org>
- <561CAFE8.9080506@redhat.com> <20151014105556.GT14956@sirena.org.uk>
- <561E3D28.2090901@redhat.com> <20151018195719.GC14956@sirena.org.uk>
-Message-ID: <5624A2DD.4020101@redhat.com>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Mon, 19 Oct 2015 15:56:48 +0800
+Subject: [PATCH] arm: fix a compile error for pgtable-3level.h
+Message-ID: <1445241408-11897-1-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+With the compile error:
+In file included from ./arch/arm/include/asm/pgtable.h:31:0,
+                 from include/linux/mm.h:55,
+                 from arch/arm/kernel/asm-offsets.c:15:
+./arch/arm/include/asm/pgtable-3level.h:20:0: error: unterminated #ifndef
+ #ifndef _ASM_PGTABLE_3LEVEL_H
+ ^
+make[1]: *** [arch/arm/kernel/asm-offsets.s] Error 1
+make: *** [prepare0] Error 2
 
-On 18-10-15 21:57, Mark Brown wrote:
-> On Wed, Oct 14, 2015 at 01:31:52PM +0200, Hans de Goede wrote:
->
->> I like your idea in your other mail where you suggest to actually
->> use foo-supply and bar-supply names in the simplefb node, and then have
->> some code simple iterate over all the properties and check for *-supply
->> properties, so that the proper, schematic matching names can be used.
->
->> But surely if we go this way having a helper for this so that others
->> can re-use that likely not entirely trivial code is a good idea ?
->
-> Yeah.  It's trying to come up with a way to do this that is easy to
-> avoid abuse that's tricky.
->
->> One user which comes to mind immediately here is the generic mmc-pwrseq
->> driver.
->
->> I agree that we need to be careful to not use a helper like this too
->> much, but I do believe it will make sense to have it in some rare cases.
->> We can put a big warning in both the header declaring it and above
->> the implementation to use it scarcely.
->
-> I'd rather have something that was visible in the code, not everyone
-> reads the documentation especially not subsystem maintainers reviewing
-> drivers that use APIs they're not familiar with.
+The
+ #endif
+for
+ #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+is missing.
 
-I'm afraid there is not really a good way to do this though, so a big fat
-warning in the header declaring the function is really the bets we can
-do IMHO.
+Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+---
+ arch/arm/include/asm/pgtable-3level.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-Regards,
-
-Hans
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index d42f81f..dc46398 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -231,6 +231,7 @@ static inline pte_t pte_mkspecial(pte_t pte)
+ 
+ #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+ #define pmd_trans_huge(pmd)	(pmd_val(pmd) && !pmd_table(pmd))
++#endif
+ 
+ #define PMD_BIT_FUNC(fn,op) \
+ static inline pmd_t pmd_##fn(pmd_t pmd) { pmd_val(pmd) op; return pmd; }
+-- 
+2.1.0.27.g96db324
