@@ -1,41 +1,27 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 19 Oct 2015 15:54:55 +0900
-Subject: [PATCH 0/7] Switch to generic syscon regmap based drivers
-In-Reply-To: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
-References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <562493BF.9080301@samsung.com>
+From: ricard.wanderlof@axis.com (Ricard Wanderlof)
+Date: Mon, 19 Oct 2015 08:56:51 +0200
+Subject: [alsa-devel] [PATCH v1 1/4] ASoC: codec: Inno codec driver for
+ RK3036 SoC
+In-Reply-To: <1444698070-4191-2-git-send-email-zhengsq@rock-chips.com>
+References: <1444698070-4191-1-git-send-email-zhengsq@rock-chips.com>
+ <1444698070-4191-2-git-send-email-zhengsq@rock-chips.com>
+Message-ID: <alpine.DEB.2.02.1510190855250.4075@lnxricardw1.se.axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.10.2015 15:03, Alim Akhtar wrote:
-...
 
-Hi,
+On Tue, 13 Oct 2015, Shunqian Zheng wrote:
 
-I am happy to see more contributions from your side! Keep it up. :)
+> +static const struct of_device_id rk3036_codec_of_match[] = {
+> +       { .compatible = "rk3036-codec", },
+> +       {}
+> +};
+> +MODULE_DEVICE_TABLE(of, rk3036_codec_of_match);
 
-However this empty space in your cover letter is the place for
-description of the patchset. What do you want to achieve here? What kind
-of problem are you solving? What features are you adding? Any dependencies?
+Isn't a compatible string normally in the form "rockchip,rk3036-codec" ?
 
-Best regards,
-Krzysztof
-
-> Alim Akhtar (7):
->   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos3250 SoCs
->   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos4
->   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5
->   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5410 SoC
->   ARM: exynos_defconfig: Normalize exynos defconfig
->   ARM: exynos_defconfig: Enable generic syscon-{reboot, poweroff}
->     drivers
->   ARM: EXYNOS: Remove code for restart and poweroff for exynos SoCs
-> 
->  arch/arm/boot/dts/exynos3250.dtsi |   14 ++++++++++++
->  arch/arm/boot/dts/exynos4.dtsi    |   14 ++++++++++++
->  arch/arm/boot/dts/exynos5.dtsi    |   14 ++++++++++++
->  arch/arm/boot/dts/exynos5410.dtsi |   14 ++++++++++++
->  arch/arm/configs/exynos_defconfig |   11 +++++-----
->  arch/arm/mach-exynos/pmu.c        |   43 -------------------------------------
->  6 files changed, 61 insertions(+), 49 deletions(-)
-> 
+/Ricard
+-- 
+Ricard Wolf Wanderl?f                           ricardw(at)axis.com
+Axis Communications AB, Lund, Sweden            www.axis.com
+Phone +46 46 272 2016                           Fax +46 46 13 61 30
