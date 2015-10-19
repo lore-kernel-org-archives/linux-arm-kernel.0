@@ -1,171 +1,85 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 19 Oct 2015 10:50:44 +0800
-Subject: [PATCH 5/5] media: atmel-isi: support RGB565 output when sensor
- output YUV formats
-In-Reply-To: <Pine.LNX.4.64.1510190357000.26684@axis700.grange>
-References: <1442898875-7147-1-git-send-email-josh.wu@atmel.com>
- <1442898875-7147-6-git-send-email-josh.wu@atmel.com>
- <Pine.LNX.4.64.1510041852470.26834@axis700.grange>
- <561DFCE4.8090508@atmel.com>
- <Pine.LNX.4.64.1510190357000.26684@axis700.grange>
-Message-ID: <56245A84.6070907@atmel.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Mon, 19 Oct 2015 08:34:24 +0530
+Subject: [PATCH v2 0/6] ARM: dts: Use correct CD properties for SDIO and
+ eMMC in Snow and Peach
+In-Reply-To: <1444927873-15140-1-git-send-email-javier@osg.samsung.com>
+References: <1444927873-15140-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <56245DB8.7070106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Guennadi,
+Hi Javier,
 
-On 10/19/2015 10:03 AM, Guennadi Liakhovetski wrote:
-> Hi Josh,
+On 10/15/2015 10:21 PM, Javier Martinez Canillas wrote:
+> Hello,
 >
-> On Wed, 14 Oct 2015, Josh Wu wrote:
+> The Exynos Chromebooks DTS don't use the correct card detection properties
+> since these were carried from the vendor tree that had a reason to do so.
 >
->> Dear Guennadi,
->>
->> Thanks for the review.
->>
->> On 10/5/2015 1:02 AM, Guennadi Liakhovetski wrote:
->>> On Tue, 22 Sep 2015, Josh Wu wrote:
->>>
->>>> This patch enable Atmel ISI preview path to convert the YUV to RGB format.
->>>>
->>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->>>> ---
->>>>
->>>>    drivers/media/platform/soc_camera/atmel-isi.c | 38
->>>> ++++++++++++++++++++-------
->>>>    1 file changed, 29 insertions(+), 9 deletions(-)
->>>>
->>>> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
->>>> b/drivers/media/platform/soc_camera/atmel-isi.c
->>>> index e87d354..e33a16a 100644
->>>> --- a/drivers/media/platform/soc_camera/atmel-isi.c
->>>> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
->>>> @@ -201,13 +201,20 @@ static bool is_supported(struct soc_camera_device
->>>> *icd,
->>>>    	case V4L2_PIX_FMT_UYVY:
->>>>    	case V4L2_PIX_FMT_YVYU:
->>>>    	case V4L2_PIX_FMT_VYUY:
->>>> +	/* RGB */
->>>> +	case V4L2_PIX_FMT_RGB565:
->>>>    		return true;
->>>> -	/* RGB, TODO */
->>>>    	default:
->>>>    		return false;
->>>>    	}
->>>>    }
->>>>    +static bool is_output_rgb(const struct soc_mbus_pixelfmt *host_fmt)
->>>> +{
->>>> +	return host_fmt->fourcc == V4L2_PIX_FMT_RGB565 ||
->>>> +			host_fmt->fourcc == V4L2_PIX_FMT_RGB32;
->>>> +}
->>>> +
->>> Why not just pass fourcc to this function? Or maybe just embed it in
->>> start_streaming - it won't clutter it a lot.
->> I think pass fourcc to the function is good.
->> Since configure_geometry() is hardware related, and the enable_preview_path is
->> also hardware related, so I prefer initialize enable_preview_path in
->> configure_geometry().
-> But you don't, you do it in start_streaming() below.
+> There are two things that I noticed:
+>
+> 1) The Marvell WiFi SDIO is marked as broken-cd instead of non-removable:
+>
+> This causes the device to be removed when the system enters into a suspend
+> state which leads to the following warning when the system is resumed:
+>
+> [  181.944636] mmc2: error -2 during resume (card was removed?)
+>
+> The rationale for using broken-cd is explained in downstream commit [0] and
+> was that using the non-removable property caused issues with the mwifiex
+> driver since the reset logic called the mmc_{remove,add}_host() functions.
+>
+> But the reset logic in the mwifiex mainline driver has changed and this is
+> no longer the case so it's safe to use the non-removable property AFAICT.
+>
+> 2) The eMMC node has both broken-cd and non-removable but the MMC DT binding
+> doc (Documentation/devicetree/bindings/mmc/mmc.txt) mentions that only one
+> of these card detection properties should be used.
+>
+> So this series change both the SDIO WiFi and eMMC device nodes in the Snow,
+> Peach Pi and Peach Pit boards DTS to use the non-removable property.
+>
+> To test, I've cherry picked commit [1] from the vendor tree that adds a
+> debugfs entry to force a card reset and after the reset, the WiFi card still
+> works correctly:
+>
+> $ echo 1 > /sys/kernel/debug/mwifiex/mlan0/reset
+>
+> And also tested that both eMMC and WiFi are working correctly after a S2R.
+>
+> The test were made on an Exynos5800 Peach Pi but I don't have access to a
+> Snow anymore so testing patch 3/6 and 6/6 on that board will be appreciated.
+>
+> v1 of the series was [2] and this version fixes issues pointed out by Tomeu.
+>
+> Changes since v1:
+>   - Replace broken-cd for non-removable in the correct mmc node for Snow.
+>   - Correct the card detetion properties for eMMC in Snow, Pit and Pi.
+>   - Also remove the card-detect-delay property when using non-removable.
+>
+> [0]: https://chromium.googlesource.com/chromiumos/third_party/kernel/+/ad348e1e2381
+> [1]: https://chromium.googlesource.com/chromiumos/third_party/kernel/+/5995363523de
+> [2]: https://lkml.org/lkml/2015/10/15/294
+>
+> Best regards,
+> Javier
+>
+>
+> Javier Martinez Canillas (6):
+>    ARM: dts: Mark SDIO as non-removable in exynos5800-peach-pi
+>    ARM: dts: Mark SDIO as non-removable in exynos5420-peach-pit
+>    ARM: dts: Mark SDIO as non-removable in exynos5250-snow-common
+>    ARM: dts: Remove broken-cd from eMMC node in exynos5800-peach-pi
+>    ARM: dts: Remove broken-cd from eMMC node in exynos5420-peach-pi
+>    ARM: dts: Mark eMMC as non-removable in exynos5250-snow-common
+>
+This series looks good to me, so feel free to add
+Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+and for patch 4 and 5: Tested-by: Alim Akhtar <alim.akhtar@samsung.com>
+Thanks.
 
-Right, then I'll move it to configure_geometry() in v2..
-
-> But actually my
-> comment was not about _where_ to do it, but whether this calculation is
-> worth a separate function. I would just perform this calculation directly
-> where you're calling it:
+>   arch/arm/boot/dts/exynos5250-snow-common.dtsi | 6 ++----
+>   arch/arm/boot/dts/exynos5420-peach-pit.dts    | 5 +----
+>   arch/arm/boot/dts/exynos5800-peach-pi.dts     | 5 +----
+>   3 files changed, 4 insertions(+), 12 deletions(-)
 >
-> static ... start_streaming(...)
-> {
-> 	...
-> 	u32 fourcc = icd->current_fmt->host_fmt->fourcc;
->
-> 	isi->enable_preview_path = fourcc == V4L2_PIX_FMT_RGB565 ||
-> 				fourcc == V4L2_PIX_FMT_RGB32;
-
-I thought this "function" might be called in other place, but actually 
-no one call it.
-So yes, I think there is no need to have such separated function. I'll 
-fix it in v2. Thanks.
-
-Best Regards,
-Josh Wu
-
->
-> Thanks
-> Guennadi
->
->>>>    static irqreturn_t atmel_isi_handle_streaming(struct atmel_isi *isi)
->>>>    {
->>>>    	if (isi->active) {
->>>> @@ -467,6 +474,8 @@ static int start_streaming(struct vb2_queue *vq,
->>>> unsigned int count)
->>>>    	struct atmel_isi *isi = ici->priv;
->>>>    	int ret;
->>>>    +	isi->enable_preview_path = is_output_rgb(icd->current_fmt->host_fmt);
->>>> +
->>>>    	pm_runtime_get_sync(ici->v4l2_dev.dev);
->>>>      	/* Reset ISI */
->>>> @@ -688,6 +697,14 @@ static const struct soc_mbus_pixelfmt
->>>> isi_camera_formats[] = {
->>>>    		.order			= SOC_MBUS_ORDER_LE,
->>>>    		.layout			= SOC_MBUS_LAYOUT_PACKED,
->>>>    	},
->>>> +	{
->>>> +		.fourcc			= V4L2_PIX_FMT_RGB565,
->>>> +		.name			= "RGB565",
->>>> +		.bits_per_sample	= 8,
->>>> +		.packing		= SOC_MBUS_PACKING_2X8_PADHI,
->>>> +		.order			= SOC_MBUS_ORDER_LE,
->>>> +		.layout			= SOC_MBUS_LAYOUT_PACKED,
->>>> +	},
->>>>    };
->>>>      /* This will be corrected as we get more formats */
->>>> @@ -744,7 +761,7 @@ static int isi_camera_get_formats(struct
->>>> soc_camera_device *icd,
->>>>    				  struct soc_camera_format_xlate *xlate)
->>>>    {
->>>>    	struct v4l2_subdev *sd = soc_camera_to_subdev(icd);
->>>> -	int formats = 0, ret;
->>>> +	int formats = 0, ret, i, n;
->>>>    	/* sensor format */
->>>>    	struct v4l2_subdev_mbus_code_enum code = {
->>>>    		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
->>>> @@ -778,13 +795,16 @@ static int isi_camera_get_formats(struct
->>>> soc_camera_device *icd,
->>>>    	case MEDIA_BUS_FMT_VYUY8_2X8:
->>>>    	case MEDIA_BUS_FMT_YUYV8_2X8:
->>>>    	case MEDIA_BUS_FMT_YVYU8_2X8:
->>>> -		formats++;
->>>> -		if (xlate) {
->>>> -			xlate->host_fmt	= &isi_camera_formats[0];
->>>> -			xlate->code	= code.code;
->>>> -			xlate++;
->>>> -			dev_dbg(icd->parent, "Providing format %s using code
->>>> %d\n",
->>>> -				isi_camera_formats[0].name, code.code);
->>>> +		n = ARRAY_SIZE(isi_camera_formats);
->>>> +		formats += n;
->>>> +		for (i = 0; i < n; i++) {
->>>> +			if (xlate) {
->>> I'd put if outside of the loop, or just do
->>>
->>> +		for (i = 0; xlate && i < n; i++) {
->> yes, that simpler one. I'll take it. Thanks.
->>
->> Best Regards,
->> Josh Wu
->>>
->>>> +				xlate->host_fmt	= &isi_camera_formats[i];
->>>> +				xlate->code	= code.code;
->>>> +				dev_dbg(icd->parent, "Providing format %s
->>>> using code %d\n",
->>>> +					isi_camera_formats[0].name,
->>>> code.code);
->>>> +				xlate++;
->>>> +			}
->>>>    		}
->>>>    		break;
->>>>    	default:
->>>> -- 
->>>> 1.9.1
->>>>
