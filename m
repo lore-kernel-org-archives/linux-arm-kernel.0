@@ -1,39 +1,40 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Mon, 19 Oct 2015 14:18:45 -0700
-Subject: [PATCH 0/7] Switch to generic syscon regmap based drivers
-In-Reply-To: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
-References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <CAAtXAHfjdNvJtXW6e4Wm4dba9vbzhpMGJvTBXxvmya08EvHenA@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 19 Oct 2015 23:21:05 +0200
+Subject: [GIT PULL] at91: soc for 4.4 #2
+Message-ID: <20151019212105.GA6134@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 18, 2015 at 11:03 PM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
-> Alim Akhtar (7):
->   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos3250 SoCs
->   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos4
->   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5
->   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5410 SoC
->   ARM: exynos_defconfig: Normalize exynos defconfig
->   ARM: exynos_defconfig: Enable generic syscon-{reboot, poweroff}
->     drivers
->   ARM: EXYNOS: Remove code for restart and poweroff for exynos SoCs
->
->  arch/arm/boot/dts/exynos3250.dtsi |   14 ++++++++++++
->  arch/arm/boot/dts/exynos4.dtsi    |   14 ++++++++++++
->  arch/arm/boot/dts/exynos5.dtsi    |   14 ++++++++++++
->  arch/arm/boot/dts/exynos5410.dtsi |   14 ++++++++++++
->  arch/arm/configs/exynos_defconfig |   11 +++++-----
->  arch/arm/mach-exynos/pmu.c        |   43 -------------------------------------
->  6 files changed, 61 insertions(+), 49 deletions(-)
->
-> --
-> 1.7.10.4
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Arnd, Olof, Kevin,
 
-Feel free to add Acked-By: Moritz Fischer <moritz.fischer@ettus.com>
-to the patches in your series
+This is a great fix for PM and suspend/resume for 4.4
 
-Moritz
+Thanks,
+
+The following changes since commit 6f112a08c1ed717a015dae190e289d53085c1bc4:
+
+  ARM: at91: debug: use DEBUG_UART_PHYS (2015-09-21 16:31:15 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-soc2
+
+for you to fetch changes up to 5fcf8d1a0e84792b2bc44922c5d833dab96a9c1e:
+
+  ARM: at91: pm: at91_pm_suspend_in_sram() must be 8-byte aligned (2015-10-19 22:58:44 +0200)
+
+----------------------------------------------------------------
+More SoC changes for 4.4:
+ - a great fix for PM/suspend/resume
+
+----------------------------------------------------------------
+Patrick Doyle (1):
+      ARM: at91: pm: at91_pm_suspend_in_sram() must be 8-byte aligned
+
+ arch/arm/mach-at91/pm_suspend.S | 2 ++
+ 1 file changed, 2 insertions(+)
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
