@@ -1,44 +1,36 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 19 Oct 2015 23:55:32 +0200
+Date: Mon, 19 Oct 2015 23:58:24 +0200
 Subject: [PATCH] ARM64: juno: add NOR flash to device tree
-In-Reply-To: <20151019113904.GE10678@leverpostej>
+In-Reply-To: <CAKv+Gu9YDBN8Epa+4xH0ert6LBRgfUAdC9OENdD16oQcGHVRXw@mail.gmail.com>
 References: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
  <561FC681.2040809@arm.com>
  <CACRpkdaSox9WKb5-dkD_zAwO9WxP6+b010p3bdxsm1LRy=WvKg@mail.gmail.com>
  <5624C31D.3070906@arm.com> <20151019102932.GB10678@leverpostej>
  <CACRpkdaGscb_ccbGuwccsRj_b1d6xoveiiZpw1a5eXon3PxAUA@mail.gmail.com>
  <20151019113904.GE10678@leverpostej>
-Message-ID: <CACRpkdb1XRSq3EERbiMwCnuV7Dtit2xGYRDBtQ9+odyXq6kM7A@mail.gmail.com>
+ <CAKv+Gu9YDBN8Epa+4xH0ert6LBRgfUAdC9OENdD16oQcGHVRXw@mail.gmail.com>
+Message-ID: <CACRpkdZxqPwCm2iLZ3sifRqT0Ub0cE_A-Pzd=_K5kTVf5O6LMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 1:39 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+On Mon, Oct 19, 2015 at 4:40 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
 
-> As I mentioned, I was under the impression that at least a portion of
-> the flash was used by UEFI for variable storage, and that UEFI could
-> therefore access the flash at runtime (due to runtime services calls).
+> I sent some patches around about a year ago that registers UEFI
+> runtime MMIO regions with /proc/iomem, which should prevent drivers
+> from attaching to the same physical memory regions. With that in
+> place, describing it in the DT would not be a problem, and on devices
+> with multiple NOR flashes of which only one is used at runtime by
+> UEFI, it would allow Linux to still access the other one.
 
-OK I see. But doesn't that portion of the flash live inside one of the
-AFS partitions simply?
+That is very un-kernellike I think, isn't it better that it gets defined as
+an MTD partition?
 
-If it is not then Juno has a mess of structured/unstructured flash
-layout and it should be fixed by wrapping it into an AFS partition.
+None of it should affect registering the flash in the device tree
+however, it is indeed the hardware that is there, it is a device tree.
 
-> Accessing the flash at the same time as another agent (UEFI or the
-> Trusted Firmare) does not seem like a good idea, and is potentially
-> unsafe (see Sudeep's example w.r.t. cpuidle).
+We could discuss switching MTD and/or AFS off for EFI boots,
+but it seems a bit overzealous to me.
 
-No why would anyone do that. As with all file systems and
-partitions it is possible to destroy them if you can access them,
-with great power comes great responsibility as always, I'm just
-not fond of the idea of hiding things behind the back for hackers
-"for their own good", that is not the right spirit I think.
-
-> Given that there is no mechanism to mediate access to the flash,
-> allowing Linux to access it does not seem safe.
-
-Linux does not access it, it just gives it a name and says
-"there it is". Policy regarding accessing it is another issue
-altogether. I also made the series with AFSv2 support.
-
-Linus
+Yours,
+Linus Walleij
