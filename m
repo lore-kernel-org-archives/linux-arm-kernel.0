@@ -1,48 +1,36 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue, 20 Oct 2015 17:11:00 +0800
-Subject: [PATCH 0/4] 
-Message-ID: <1445332264-6054-1-git-send-email-wxt@rock-chips.com>
+Date: Tue, 20 Oct 2015 17:11:01 +0800
+Subject: [PATCH 1/4] dt-bindings: Sync the dts to this document
+In-Reply-To: <1445332264-6054-1-git-send-email-wxt@rock-chips.com>
+References: <1445332264-6054-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1445332264-6054-2-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need the OTP pin is gpio state before resetting the TSADC controller,
-since the tshut polarity will generate a high signal.
+Add the OTP gpio state, we need switch the pin to gpio state
+before the TSADC controller is reset.
 
-Says:
-The TSHUT temperature is setting more than 80 degree, the default
-tshut polarity is HIGH.
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+---
 
-If T > 80C, the OTP output the High Signal.
-If T < 80C, the OTP output the Low Signal.
+ Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-On the moment, the TSADC controller is reset, the tshut polarity will be
-Low in a short period of time.
-
-So:
-If T < 80C, the OTP output the High Signal.
-If T > 80C, the OTP output the Low Signal.
-
-In some cases, the OTP pin is connected to the PMIC, maybe the PMIC can
-accept the reset response time to avoid this issue.
-
-In other words, the system will be always reboot if we make the OTP pin
-is connected the others IC to control the power.
-
-Tested on box board.
-
-
-
-Caesar Wang (4):
-  dt-bindings: Sync the dts to this document
-  thermal: rockchip: ensure the otp state before resetting the
-    controller
-  thermal: rockchip: change the TSHUT default state
-  ARM: dts: rockchip: Add the OTP gpio pinctrl
-
- .../bindings/thermal/rockchip-thermal.txt          |  5 ++--
- arch/arm/boot/dts/rk3288.dtsi                      |  9 ++++--
- drivers/thermal/rockchip_thermal.c                 | 34 +++++++++++++++++++++-
- 3 files changed, 43 insertions(+), 5 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+index ef802de..2587f34b 100644
+--- a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+@@ -27,8 +27,9 @@ tsadc: tsadc at ff280000 {
+ 	clock-names = "tsadc", "apb_pclk";
+ 	resets = <&cru SRST_TSADC>;
+ 	reset-names = "tsadc-apb";
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&otp_out>;
++	pinctrl-names = "default", "otp_out";
++	pinctrl-0 = <&otp_gpio>;
++	pinctrl-1 = <&otp_out>;
+ 	#thermal-sensor-cells = <1>;
+ 	rockchip,hw-tshut-temp = <95000>;
+ 	rockchip,hw-tshut-mode = <0>;
 -- 
 1.9.1
