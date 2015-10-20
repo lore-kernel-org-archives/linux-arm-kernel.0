@@ -1,29 +1,37 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 20 Oct 2015 17:22:04 +0100
-Subject: [PATCH 2/2] fixup! arm64: kvm: allows kvm cpu hotplug
-In-Reply-To: <1445327907-23274-3-git-send-email-takahiro.akashi@linaro.org>
-References: <1445327907-23274-1-git-send-email-takahiro.akashi@linaro.org>
- <1445327907-23274-3-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <56266A2C.7000005@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Oct 2015 09:26:09 -0700
+Subject: [PATCH 0/3] ARM: dts: Use IOPAD pinmux for IGEP boards
+In-Reply-To: <1445268861-11857-1-git-send-email-javier@osg.samsung.com>
+References: <1445268861-11857-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <20151020162608.GI3078@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/10/15 08:58, AKASHI Takahiro wrote:
-> Without this patch, kvm cannot start a guest when cpuidle is enabled
-> if the hardware does not retain cpu state (EL2) in idle state.
+* Javier Martinez Canillas <javier@osg.samsung.com> [151019 08:39]:
+> Hello,
 > 
-> This patch re-initailizes EL2 state at CPU_PM_EXIT by calling
-> kvm_arch_hardware_enable() if and only if kvm has been initialized
-> before CPU_PM_ENTER, that is, if any vcpus have been created.
+> This series use the IOPAD pinmux macros for the remaining IGEP boards that
+> still used the register offset instead of the physical address using these
+> macros so the DTS matches what is in the Technical Reference Manual.
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> The changes are only cosmetic since they make the DTS easier to read but
+> does not change functionality. I built tested and compared the binary DTB
+> MD5 checksum and both matches before and after the series applied:
+> 
+> Before
+> 
+> d7a56205bdc54365d49d9a90dfe3fafb  am335x-base0033.dtb
+> fa272fcdee65d7bf4c03bd5a6c5ec4fd  omap3-igep0020.dtb
+> ba65bf74d8c6ea8e7bd8face17179e6e  omap3-igep0020-rev-f.dtb
+> 
+> After
+> 
+> d7a56205bdc54365d49d9a90dfe3fafb  am335x-base0033.dtb
+> fa272fcdee65d7bf4c03bd5a6c5ec4fd  omap3-igep0020.dtb
+> ba65bf74d8c6ea8e7bd8face17179e6e  omap3-igep0020-rev-f.dtb
 
-This solves my issue with the v5 version here [0].
-Tested-By: James Morse <james.morse@arm.com>
+Good idea to test the dtb checksums :)
 
+Applying all into omap-for-v4.4/dt thanks.
 
-Thanks!
-
-James
-
-[0] https://lists.linaro.org/pipermail/linaro-kernel/2015-May/021575.html
+Tony
