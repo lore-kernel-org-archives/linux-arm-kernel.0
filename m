@@ -1,44 +1,56 @@
 From: anton.bondarenko.sama@gmail.com (Anton Bondarenko)
-Date: Wed, 21 Oct 2015 01:03:55 +0200
-Subject: [PATCH v2 1/8] spi: imx: Fix DMA transfer
-In-Reply-To: <20151008091951.GA6101@shlinux2>
+Date: Wed, 21 Oct 2015 01:08:17 +0200
+Subject: [PATCH v2 5/8] spi: imx: Add support for loopback for ECSPI
+ controllers
+In-Reply-To: <20151008092827.GB6101@shlinux2>
 References: <cover.1442923630.git.anton_bondarenko@mentor.com>
- <d61ed8cc9e13b0890e6243135c613edea1234698.1442923630.git.anton_bondarenko@mentor.com>
- <20150930082341.GB2709@shlinux2>
- <04376A3D786BD947B28569C998A374A62E280DD6@NA-MBX-02.mgc.mentorg.com>
- <20151008091951.GA6101@shlinux2>
-Message-ID: <5626C85B.2090707@gmail.com>
+ <ca96561d8010acf587a93d0f357774bf77efbe16.1442923630.git.anton_bondarenko@mentor.com>
+ <20150930084219.GE2709@shlinux2>
+ <04376A3D786BD947B28569C998A374A62E280E0F@NA-MBX-02.mgc.mentorg.com>
+ <20151008092827.GB6101@shlinux2>
+Message-ID: <5626C961.7070009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.10.2015 11:19, Robin Gong wrote:
-> On Thu, Oct 01, 2015 at 12:02:41AM +0000, Bondarenko, Anton wrote:
->>>> @@ -201,9 +202,8 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
->>>>   {
->>>>   	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
+
+
+On 08.10.2015 11:28, Robin Gong wrote:
+> On Thu, Oct 01, 2015 at 12:16:49AM +0000, Bondarenko, Anton wrote:
+>> On 30.09.2015 10:42, Robin Gong wrote:
+>>> On Fri, Sep 25, 2015 at 07:57:12PM +0200, Anton Bondarenko wrote:
+>>>> @@ -370,8 +374,12 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+>>>>   	if (config->mode & SPI_CS_HIGH)
+>>>>   		cfg |= MX51_ECSPI_CONFIG_SSBPOL(config->cs);
 >>>>
->>>> -	if (spi_imx->dma_is_inited
->>>> -	    && transfer->len > spi_imx->rx_wml * sizeof(u32)
->>>> -	    && transfer->len > spi_imx->tx_wml * sizeof(u32))
->>>> +	if (spi_imx->dma_is_inited &&
->>>> +	    (transfer->len > spi_imx->wml * sizeof(u32)))
->>> Add Sascha in the loop. I don't think "* sizeof(u32)", since even 1 byte data
->>> will consume one position of 32bit FIFO Thus if here
->>> spi_imx->wml = spi_imx_get_fifosize(spi_imx) / 2 = 32, the threshold value
->>> which judge DMA mode used or not should be 32 not 32 * 4.
->>> Of course, it will not cause any function break since both DMA and PIO can work
->>> ,but I think we'd better correct it.
->> I agree, in case of 1 byte SPI word we do not need to multiply by 4.
->> But for 16 bit and 32 bit SPI words it's necessary. This part is
->> addressed in patch 3.
->> I could remove "* sizeof(u32)" for now.
-> I still think don't need *sizeof(u32) even for 16bit and 32bit, whatever bits
-> used as one spi word(<32bits), one spi word consume one position of SPI FIFO
-> (32bit).
-Will be removed in V3 for this patch.
->>>>   		return true;
->>>>   	return false;
->>>>   }
+>>>> +	if (config->mode & SPI_LOOP)
+>>>> +		lpb |= MX51_ECSPI_LOOP;
+>>>> +
+>>>>   	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
+>>>>   	writel(cfg, spi_imx->base + MX51_ECSPI_CONFIG);
+>>>> +	writel(lpb, spi_imx->base + MX51_ECSPI_TEST);
+>>> It's better write this MX51_ECSPI_TEST only in LOOP mode.
+>> LOOP mode can be set dynamically. This mean we should be able to set and clear the flag.
+>> Currently only LOOP flag is used. I did not find any problems with writing 0 in the rest
+>> fields of TEST register.
+> Yes, I know writing 0 is harmless, but we never need to touch this register if
+> SPI_LOOP flags not set, I'd like below:
+> 	if (config->mode & SPI_LOOP) {
+> 		lpb |= MX51_ECSPI_LOOP;
+> 		writel(lgb, spi_imx->base + MX51_ECSPI_TEST);
+> 	}
+>
+Proposed code not able to clear LOOP mode in TEST register. What about 
+something like this:
+if (config->mode & SPI_LOOP)
+	lpb |= MX51_ECSPI_LOOP;
+
+if ((readl(spi_imx->base + MX51_ECSPI_TEST) & MX51_ECSPI_LOOP) != lpb)
+	writel(lpb, spi_imx->base + MX51_ECSPI_TEST);
+
+In this case driver will write TEST register only if needed.
+>>>>
+>>>>   	/*
+>>>>   	 * Wait until the changes in the configuration register CONFIGREG
 
 Regards,
 Anton
