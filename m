@@ -1,70 +1,64 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue, 20 Oct 2015 10:10:41 +0800
-Subject: [PATCH v6 0/17] Add Analogix Core Display Port Driver
-In-Reply-To: <5624C896.8070108@osg.samsung.com>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
- <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
- <5624C896.8070108@osg.samsung.com>
-Message-ID: <5625A2A1.6090907@rock-chips.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 19 Oct 2015 21:17:35 -0500
+Subject: [PATCH V3 2/4] ACPI/scan: Clean up acpi_check_dma
+In-Reply-To: <561D9978.9090406@amd.com>
+References: <1440597279-11802-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1440597279-11802-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20150914163411.GL829@google.com> <561D28B5.7030303@amd.com>
+ <561D9978.9090406@amd.com>
+Message-ID: <20151020021735.GA20869@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On Tue, Oct 13, 2015 at 06:53:28PM -0500, Suravee Suthikulanit wrote:
+> Bjorn / Rafael,
+> 
+> On 10/13/2015 10:52 AM, Suravee Suthikulpanit wrote:
+> >
+> >On 09/14/2015 09:34 AM, Bjorn Helgaas wrote:
+> >>[..]
+> >>I think acpi_check_dma_coherency() is better, but only slightly.  It
+> >>still doesn't give a hint about the *sense* of the return value.  I
+> >>think it'd be easier to read if there were two functions, e.g.,
+> >
+> >I have been going back-and-forth between the current version, and the
+> >two-function-approach in the past. I can definitely go with this route
+> >if you would prefer. Although, if acpi_dma_is_coherent() == 0, it would
+> >be ambiguous whether DMA is not supported or non-coherent DMA is
+> >supported. Then, we would need to call acpi_dma_is_supported() to find
+> >out. So, that's okay with you?
+> 
+> Thinking about this again, I still think having one API (which can
+> tell whether DMA is supported or not, and if so whether it is
+> coherent or non-coherent) would be the least confusing and least
+> error prone.
+> 
+> What if we would just have:
+> 
+>     enum dev_dma_type acpi_get_dev_dma_type(struct acpi_device *adev);
+> 
+> where:
+>     enum dev_dma_type {
+>         DEV_DMA_NOT_SUPPORTED,
+>         DEV_DMA_NON_COHERENT,
+>         DEV_DMA_COHERENT,
+>     };
+> 
+> This would probably mean that we should modify
+> drivers/base/property.c to replace:
+>     bool device_dma_is_coherent()
+> to:
+>     enum dev_dma_type device_get_dma_type()
+> 
+> We used to discuss the enum approach in the past
+> (https://lkml.org/lkml/2015/8/25/868). But we only considered at the
+> ACPI level at the time. Actually, this should also reflect in the
+> property.c.
+> 
+> At this point, only drivers/crypto/ccp/ccp-platform.c and
+> drivers/net/ethernet/amd/xgbe/xgbe-main.c are calling the
+> device_dma_is_coherent(). So, it should be easy to change this API.
 
-On 10/19/2015 06:40 PM, Javier Martinez Canillas wrote:
-> Hello Yakir,
->
-> On 10/10/2015 05:35 PM, Yakir Yang wrote:
->> Hi all,
->>
->>     The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
->> share the same IP, so a lot of parts can be re-used. I split the common
->> code into bridge directory, then rk3288 and exynos only need to keep
->> some platform code. Cause I can't find the exact IP name of exynos dp
->> controller, so I decide to name dp core driver with "analogix" which I
->> find in rk3288 eDP TRM :)
->>
->> But  there are still three light registers setting differents bewteen
->> exynos and rk3288.
->> 1. RK3288 have five special pll resigters which not indicata in exynos
->>     dp controller.
->> 2. The address of DP_PHY_PD(dp phy power manager register) are different
->>     between rk3288 and exynos.
->> 3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
->>     register).
->>
->> This series have been well tested on Rockchip platform with eDP panel
->> on Jerry Chromebook and Display Port Monitor on RK3288 board and thanks
->> to Javier at Samsung help me to find a way to install mainline kernel to
->> Samsung Exynos Chromebooks, so this series also have been tested on Samsung
->> Snow and Peach Pit Chromebooks which borrowed from my friends.
->>
->> Besides, This version was build on linux-next branch (tag next-20150918), and
->> the above test experiments also base on that tag. But I know the latest tag is
->> next-20151009, so i do rebase this series again on next-20151009, there were
->> little conflicts(exynos_dp removed the suspend/resume).
->>
->> But after I retest this series on next-20151009, I saw kernel crashed in mmc
->> driver(dw_mci_probe failed to get regulator). So i have to disabled the MMC
->> module(after all I boot with USB device), and I can see eDP light up normally
->> in startup stage, but kernel keep crashed when it try to mount the filesystem.
->> I thought this isn't related to dp driver directly, so i choice not to debug
->> more depth.
->>
->> That's to say if someone want to test this series, I suggest you applied this
->> series on tag-20150918, just need to fix some light conflicts with the 01 & 02
->> patches (or just email me, I can send you directly).
->>
->> Thanks,
-> Do you have a branch that I can use to test this series?
+OK, I'm fine with either the enum or Rafael's 0/1/-ENOTSUPP idea.
 
-Thank you for your kind assistance, I have created a tree which checkout 
-from the next-20151019. Surely there were some conflicts to applied this 
-series on that tag, but things still works for me, here is the git 
-address [https://github.com/yakir-Yang/linux/tree/analogix_dp]
-
-Best regards,
-- Yakir
-
->
-> Best regards,
+Bjorn
