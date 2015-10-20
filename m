@@ -1,50 +1,70 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 20 Oct 2015 09:20:32 +0900
-Subject: [PATCH 7/7] ARM: EXYNOS: Remove code for restart and poweroff for
- exynos SoCs
-In-Reply-To: <CAGOxZ50nH1UtRrA4nJTvYdsiydNWUvY413gY0q7tRaDFaX_T1Q@mail.gmail.com>
-References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
- <1445234635-3950-8-git-send-email-alim.akhtar@samsung.com>
- <562494F8.6070003@samsung.com> <5624BE39.7020605@osg.samsung.com>
- <CAJKOXPcvKeDNwof5eyD5XjzUiZrHoyShD8gOPGo7uUxEyypQbw@mail.gmail.com>
- <CAGOxZ50nH1UtRrA4nJTvYdsiydNWUvY413gY0q7tRaDFaX_T1Q@mail.gmail.com>
-Message-ID: <562588D0.4030404@samsung.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Tue, 20 Oct 2015 10:10:41 +0800
+Subject: [PATCH v6 0/17] Add Analogix Core Display Port Driver
+In-Reply-To: <5624C896.8070108@osg.samsung.com>
+References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
+ <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
+ <5624C896.8070108@osg.samsung.com>
+Message-ID: <5625A2A1.6090907@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.10.2015 01:06, Alim Akhtar wrote:
->>>
->>>> Previously this code was always compiled in for ARCH_EXYNOS. Now it is
->>>> not so I am thinking about selecting necessary drivers from main exynos
->>>> Kconfig symbol. That could be tricky though, because "select" should be
->>>> used only for non-visible symbols.
->>>>
->>>> Any ideas how to solve that?
->>>>
->>>
->>> Is true that select should only be used for non-visible symbols but there
->>> are others user visible symbols that are selected by ARCH_EXYNOS such as
->>> EXYNOS_THERMAL. So I think selecting the regmap syscon reset stuff there
->>> is a sensible option.
->>
->> Selecting from defconfig is not sufficient... since I do not have
->> other idea than selecting then ovak, but Alim please check it whether
->> it does not create circular dependencies on various configs.
->>
-> I checked in multi_v7_defconfig SYSCON_RESET is already enabled by
-> default. so I doubt we are going to run into any circular
-> dependencies, will check again..thanks.
+Hi Javier,
 
-The circular dependency does not happen when some defconfig selects it.
-Instead it could happen when some other Kconfig symbol selects such (and
-there are more dependencies).
+On 10/19/2015 06:40 PM, Javier Martinez Canillas wrote:
+> Hello Yakir,
+>
+> On 10/10/2015 05:35 PM, Yakir Yang wrote:
+>> Hi all,
+>>
+>>     The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
+>> share the same IP, so a lot of parts can be re-used. I split the common
+>> code into bridge directory, then rk3288 and exynos only need to keep
+>> some platform code. Cause I can't find the exact IP name of exynos dp
+>> controller, so I decide to name dp core driver with "analogix" which I
+>> find in rk3288 eDP TRM :)
+>>
+>> But  there are still three light registers setting differents bewteen
+>> exynos and rk3288.
+>> 1. RK3288 have five special pll resigters which not indicata in exynos
+>>     dp controller.
+>> 2. The address of DP_PHY_PD(dp phy power manager register) are different
+>>     between rk3288 and exynos.
+>> 3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
+>>     register).
+>>
+>> This series have been well tested on Rockchip platform with eDP panel
+>> on Jerry Chromebook and Display Port Monitor on RK3288 board and thanks
+>> to Javier at Samsung help me to find a way to install mainline kernel to
+>> Samsung Exynos Chromebooks, so this series also have been tested on Samsung
+>> Snow and Peach Pit Chromebooks which borrowed from my friends.
+>>
+>> Besides, This version was build on linux-next branch (tag next-20150918), and
+>> the above test experiments also base on that tag. But I know the latest tag is
+>> next-20151009, so i do rebase this series again on next-20151009, there were
+>> little conflicts(exynos_dp removed the suspend/resume).
+>>
+>> But after I retest this series on next-20151009, I saw kernel crashed in mmc
+>> driver(dw_mci_probe failed to get regulator). So i have to disabled the MMC
+>> module(after all I boot with USB device), and I can see eDP light up normally
+>> in startup stage, but kernel keep crashed when it try to mount the filesystem.
+>> I thought this isn't related to dp driver directly, so i choice not to debug
+>> more depth.
+>>
+>> That's to say if someone want to test this series, I suggest you applied this
+>> series on tag-20150918, just need to fix some light conflicts with the 01 & 02
+>> patches (or just email me, I can send you directly).
+>>
+>> Thanks,
+> Do you have a branch that I can use to test this series?
 
-So what I am saying here, after adding "select SYSCON_RESET" in
-mach-exynos/Kconfig, please build configs:
-1. allyes
-2. allmod,
-3. multi_v7,
-4. (and of course) exynos.
+Thank you for your kind assistance, I have created a tree which checkout 
+from the next-20151019. Surely there were some conflicts to applied this 
+series on that tag, but things still works for me, here is the git 
+address [https://github.com/yakir-Yang/linux/tree/analogix_dp]
 
 Best regards,
-Krzysztof
+- Yakir
+
+>
+> Best regards,
