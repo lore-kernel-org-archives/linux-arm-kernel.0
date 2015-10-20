@@ -1,67 +1,51 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 20 Oct 2015 11:50:14 +0200
-Subject: [PATCH v3] arm-soc: Add support for Sigma Designs Tango4
-In-Reply-To: <CAL_Jsq+jthx9ffnUm-G-TV9LdxBRp3SKyhyfcVu=7kN3CuumJw@mail.gmail.com>
-References: <560EAA7C.3070302@free.fr> <5124277.UR9sg1IOHT@wuerfel>
- <560EFDB3.9010305@free.fr> <11113740.WL812ZaRcZ@wuerfel>
- <5612A473.8030405@sigmadesigns.com> <5613EF4C.30603@sigmadesigns.com>
- <CAL_JsqJ+WTBYF=sJWbkgNzL48H5AiXL4aoVV3DNiL6T_UQKQfg@mail.gmail.com>
- <561D2952.4060908@sigmadesigns.com>
- <CAL_JsqKa4trfpLY_DPsjBrfH-7SSUQMACYVW7DNN1=Pv3B4FrA@mail.gmail.com>
- <5624CF62.6020001@sigmadesigns.com>
- <CAL_Jsq+jthx9ffnUm-G-TV9LdxBRp3SKyhyfcVu=7kN3CuumJw@mail.gmail.com>
-Message-ID: <56260E56.10403@sigmadesigns.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Tue, 20 Oct 2015 12:56:47 +0300
+Subject: [PATCH V2 20/30] coresight: etb10: implementing buffer
+ set/reset() API
+In-Reply-To: <1445192687-24112-21-git-send-email-mathieu.poirier@linaro.org>
+References: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
+ <1445192687-24112-21-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <877fmhhnhc.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/10/2015 18:39, Rob Herring wrote:
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 
-> Marc Gonzalez wrote:
->
->> About the cache controller, I was confused by this comment:
->>         /*
->>          * Always enable non-secure access to the lockdown registers -
->>          * we write to them as part of the L2C enable sequence so they
->>          * need to be accessible.
->>          */
->>         l2x0_saved_regs.aux_ctrl = aux | L310_AUX_CTRL_NS_LOCKDOWN;
->>
->> I see no lock() function, only unlock().
->>
->> But the unlock function merely writes 0 to the relevant registers,
->> and 0 is the value at reset for those registers. Since nothing ever
->> sets the registers to non-zero, why is the unlock needed at all?
-> 
-> It was because some bootloaders set those registers. Linux just wants
-> them to be all unlocked.
+> Implementing perf related APIs to activate and terminate
+> a trace session.  More specifically dealing with the sink
+> buffer's internal mechanic along with perf's API to start
+> and stop interactions with the ring buffers.
 
-I see.
+A matter of preference, but I'd say that it would be easier to review
+this part if you merged all the buffer related patches together.
 
-My problem then, is that my current firmware does not set L310_AUX_CTRL_NS_LOCKDOWN
-and does not allow updating that bit.
+> +static void etb_reset_buffer(struct coresight_device *csdev,
+> +			     struct perf_output_handle *handle,
+> +			     void *sink_config)
+> +{
+> +	struct cs_buffers *buf = sink_config;
+> +	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+> +
+> +	if (buf) {
+> +		/*
+> +		 * In snapshot mode ->data_size holds the new address of the
+> +		 * ring buffer's head.  The size itself is the whole address
+> +		 * range since we want the latest information.
+> +		 */
+> +		if (buf->snapshot)
+> +			handle->head = local_xchg(&buf->data_size,
+> +						  buf->nr_pages << PAGE_SHIFT);
 
-So when l2c_unlock() is called, Linux (running in non-secure mode)
-tries to write to read-only registers:
+Does it make sense to do this in etb_update_buffer() instead?
 
-> On reset, the Non-Secure Lockdown Enable bit is set to 0 and Lockdown
-> Registers are not permitted to be modified by non-secure accesses. In
-> that configuration, if a non-secure access tries to write to those
-> registers, the write response returns a DECERR response. This decode 
-> error results in the registers not being updated.
+> +		perf_aux_output_end(handle, local_xchg(&buf->data_size, 0),
+> +				    local_xchg(&buf->lost, 0));
 
-I suppose "a DECERR response" means Linux will oops?
+The corresponding perf_aux_output_begin() is done in etm_event_add(),
+I'd suggest that you do this in etm_event_del(),
+unconditionally. Otherwise you're risking ending up with a refcount leak
+and all sorts of horror.
 
-I see several options to work-around this problem:
-
-A) Have the firmware set L310_AUX_CTRL_NS_LOCKDOWN at boot
-
-B) Have the firmware allow Linux to set L310_AUX_CTRL_NS_LOCKDOWN
-
-C) Have a way in Linux to define .unlock as a NOP (trusting the
-firmware to NOT have locked anything)
-Perhaps adding a "no-unlock-required;" boolean property to the l2cc
-node, which would override the .unlock method?
-
-I'd like to hear suggestions on the "best" approach.
-
-Regards.
+Regards,
+--
+Alex
