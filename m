@@ -1,81 +1,61 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 20 Oct 2015 11:18:39 +0100
-Subject: [PATCH v4 0/4] drm: Cleanup probe function for component based
- masters.
-In-Reply-To: <20151020100233.GW13786@phenom.ffwll.local>
-References: <1445332995-11212-1-git-send-email-Liviu.Dudau@arm.com>
- <20151020100233.GW13786@phenom.ffwll.local>
-Message-ID: <20151020101839.GB3394@e106497-lin.cambridge.arm.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Tue, 20 Oct 2015 03:22:55 -0700
+Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
+In-Reply-To: <20151019155310.GO32532@n2100.arm.linux.org.uk>
+References: <5706174.BUsqiXljxZ@wuerfel> <20151007125735.GA8170@kroah.com>
+ <20151007130324.GA4557@linux> <5308760.2G5KJFF9Pi@wuerfel>
+ <20151008074828.GF4570@linux> <20151019154009.20687.41178@quantum>
+ <20151019155310.GO32532@n2100.arm.linux.org.uk>
+Message-ID: <20151020102255.20687.72485@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 12:02:33PM +0200, Daniel Vetter wrote:
-> On Tue, Oct 20, 2015 at 10:23:11AM +0100, Liviu Dudau wrote:
-> > Changelog:
-> > v4: Fixed a bug where the wrong pointer was sent to component_match_add() and
-> >     component_master_add_with_match() in the armada_drv.c file that was flagged
-> >     by kbuild test robot. Dropped the RFC tag and added Acked-bys received from
-> >     Russell King.
-> > v3: Removed the call to dma_set_coherent_mask() from the generic
-> >     drm_of_component_probe(). Also changes to shorten lines over 80 chars long.
-> > v2: Rebased the patchset on top of drm-next rather than Linus' latest -rc
-> > 
-> > A few drivers in drivers/gpu/drm are component-enabled and use quite similar
-> > code sequences to probe for their encoder slaves at the remote end of the ports.
-> > Move the code into a "generic" function and remove it from the drivers.
-> > 
-> > The end results is that drivers get a reference count fix (imx), more thorough
-> > error checking (imx again) plus a decrease in the overall count of LoC.
-> > 
-> > I'm looking for comments and testing of the patchset (only compile tested from my
-> > end as I don't have access to all the devices touched by the changes). My main
-> > interest is in finding out if -EINVAL is the correct code to return if
-> > dev->of_node == NULL (handy now, as it is different from the other possible error
-> > codes and used in armada to trigger old platform_data support. Also looking for
-> > thoughts on the correctness of the patch and if it possible to co-opt more drivers
-> > into using the function.
+Quoting Russell King - ARM Linux (2015-10-19 08:53:11)
+> On Mon, Oct 19, 2015 at 08:40:09AM -0700, Michael Turquette wrote:
+> > Quoting Viresh Kumar (2015-10-08 00:48:28)
+> > > On 07-10-15, 21:12, Arnd Bergmann wrote:
+> > > > I think it clearly makes sense to have a fixed length for each of these
+> > > > members:
+> > > >
+> > > > either 32 bit is enough to represent all possible values, then
+> > > > there is no need to make them 'long' on 64-bit architectures, or 32 bit
+> > > > is not enough and then the code is broken on 32-bit architectures today
+> > > > and should be fixed.
+> > > 
+> > > I agree.
+> > > 
+> > > But I am not 100% sure why it was done this way to start with.
+> > > Probably this is the logic behind that:
+> > > - Max clock rate supported by a u32 is ~ 4.295 GHz
 > 
-> Merged all four to drm-misc, thanks.
-> -Daniel
-
-Thanks!
-
-Liviu
-
+> The limit is actually half that when you consider clk_round_rate()
+> returns a long, because clk_round_rate() needs to be able to return
+> errors.
 > 
-> > 
-> > Best regards,
-> > Liviu
-> > 
-> > Liviu Dudau (4):
-> >   drm: Introduce generic probe function for component based masters.
-> >   drm/imx: Convert the probe function to the generic drm_of_component_probe()
-> >   drm/rockchip: Convert the probe function to the generic drm_of_component_probe()
-> >   drm/armada: Convert the probe function to the generic drm_of_component_probe()
-> > 
-> >  drivers/gpu/drm/armada/armada_drv.c         | 68 +++++++---------------
-> >  drivers/gpu/drm/drm_of.c                    | 88 +++++++++++++++++++++++++++++
-> >  drivers/gpu/drm/imx/imx-drm-core.c          | 55 ++----------------
-> >  drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 81 ++------------------------
-> >  include/drm/drm_of.h                        | 13 +++++
-> >  5 files changed, 130 insertions(+), 175 deletions(-)
-> > 
-> > -- 
-> > 2.6.0
-> > 
+> The use of long and unsigned long was done in the knowledge that it'd
+> restrict to 2GHz the upper limit, partially because 64-bit math on
+> 32-bit systems is inefficient and expensive, and I initially wanted
+> people to use the thing, so it had to be lean and fast.  (If I'd
+> started out with something as complex as the CCF, it would've been
+> laughed out as being "far too complex" and "we don't need this").
+> 
+> It also started out as a way to convey clock information to drivers
+> for peripherals, which commonly don't need clocks up in the GHz range,
+> indeed, it was rare at that time the API was designed for peripheral
+> clocks to be much above 100MHz.
+
+And this is still very true today. We've had a few instances where
+platforms hit the 2GHz limit on a PLL feeding a divider to a CPU, but
+the current state of things is working for the common case.
+
+The big question is whether to change it in anticipation of higher clock
+rates (somebody has to drive those THz transceivers and photonic
+interconnects!) or just wait until enough people start screaming.
+
+Regards,
+Mike
+
 > 
 > -- 
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> http://blog.ffwll.ch
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
