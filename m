@@ -1,105 +1,160 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 20 Oct 2015 09:59:19 +0100
-Subject: [PATCH v4 2/3] arm64: Juno: Add support for the PCIe host bridge
- on Juno R1
-In-Reply-To: <CAGjg+kGhTPXxYS84DTgwhHwqct2Enz_L1Cxsx+QR+tvyU6JzLQ@mail.gmail.com>
-References: <1445008929-32267-1-git-send-email-Liviu.Dudau@arm.com>
- <1445008929-32267-3-git-send-email-Liviu.Dudau@arm.com>
- <CAGjg+kGhTPXxYS84DTgwhHwqct2Enz_L1Cxsx+QR+tvyU6JzLQ@mail.gmail.com>
-Message-ID: <20151020085919.GZ3394@e106497-lin.cambridge.arm.com>
+From: majun258@huawei.com (MaJun)
+Date: Tue, 20 Oct 2015 16:41:58 +0800
+Subject: [PATCH v6 2/4] irqchip: add platform device driver for mbigen device
+In-Reply-To: <1445330520-11960-1-git-send-email-majun258@huawei.com>
+References: <1445330520-11960-1-git-send-email-majun258@huawei.com>
+Message-ID: <1445330520-11960-3-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 11:33:13AM +0800, Alex Shi wrote:
->    Is there any concern to merge the juno r1 pcie DT part into upstream?
+From: Ma Jun <majun258@huawei.com>
 
-Not that I've heard of. I've asked Catalin and Will if they need a pull request to get
-the patch into the arm64 tree but I haven't got an answer yet.
+Mbigen means Message Based Interrupt Generator(MBIGEN).
 
-Catalin, Will, are you OK with pulling this patch into arm64 and if so do you want
-me to send a different pull request or are you happy to fetch it from the git tree
+Its a kind of interrupt controller that collects
+the interrupts from external devices and generate msi interrupt.
+Mbigen is applied to reduce the number of wire connected interrupts.
 
-git://linux-arm.org/linux-ld.git for-upstream/juno-pcie.
+As the peripherals increasing, the interrupts lines needed is
+increasing much, especially on the Arm64 server SOC.
 
-Best regards,
-Liviu
+Therefore, the interrupt pin in GIC is not enough to cover so
+many peripherals.
 
->    On Fri, Oct 16, 2015 at 11:22 PM, Liviu Dudau <[1]Liviu.Dudau@arm.com> wrote:
-> 
->      Juno R1 board sports a functional PCIe host bridge that is
->      compliant with the SBSA standard found [1] here. With the right
->      firmware that initialises the XpressRICH3 controller one can
->      use the generic Host Bridge driver to use the PCIe hardware.
-> 
->      Signed-off-by: Liviu Dudau <[2]Liviu.Dudau@arm.com>
->      Acked-by: Mark Rutland <[3]mark.rutland@arm.com>
-> 
->      [1] [4]http://infocenter.arm.com/help/topic/com.arm.doc.den0029a/
->      ---
->      ?arch/arm64/boot/dts/arm/juno-r1.dts | 20 ++++++++++++++++++++
->      ?1 file changed, 20 insertions(+)
-> 
->      diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
->      index c627511..a25964d 100644
->      --- a/arch/arm64/boot/dts/arm/juno-r1.dts
->      +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
->      @@ -109,6 +109,26 @@
-> 
->      ? ? ? ? #include "juno-base.dtsi"
-> 
->      +? ? ? ?pcie-controller at 40000000 {
->      +? ? ? ? ? ? ? ?compatible = "arm,juno-r1-pcie", "plda,xpressrich3-axi", "pci-host-ecam-generic";
->      +? ? ? ? ? ? ? ?device_type = "pci";
->      +? ? ? ? ? ? ? ?reg = <0 0x40000000 0 0x10000000>;? ? ? /* ECAM config space */
->      +? ? ? ? ? ? ? ?bus-range = <0 255>;
->      +? ? ? ? ? ? ? ?linux,pci-domain = <0>;
->      +? ? ? ? ? ? ? ?#address-cells = <3>;
->      +? ? ? ? ? ? ? ?#size-cells = <2>;
->      +? ? ? ? ? ? ? ?dma-coherent;
->      +? ? ? ? ? ? ? ?ranges = <0x01000000 0x00 0x5f800000 0x00 0x5f800000 0x0 0x00800000>,
->      +? ? ? ? ? ? ? ? ? ? ? ? <0x02000000 0x00 0x50000000 0x00 0x50000000 0x0 0x08000000>,
->      +? ? ? ? ? ? ? ? ? ? ? ? <0x42000000 0x40 0x00000000 0x40 0x00000000 0x1 0x00000000>;
->      +? ? ? ? ? ? ? ?#interrupt-cells = <1>;
->      +? ? ? ? ? ? ? ?interrupt-map-mask = <0 0 0 7>;
->      +? ? ? ? ? ? ? ?interrupt-map = <0 0 0 1 &gic 0 0 0 136 4>,
->      +? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?<0 0 0 2 &gic 0 0 0 137 4>,
->      +? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?<0 0 0 3 &gic 0 0 0 138 4>,
->      +? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?<0 0 0 4 &gic 0 0 0 139 4>;
->      +? ? ? ? ? ? ? ?msi-parent = <&v2m_0>;
->      +? ? ? ?};
->      ?};
-> 
->      ?&memtimer {
->      --
->      2.6.0
-> 
->      --
->      To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->      the body of a message to [5]majordomo at vger.kernel.org
->      More majordomo info at? [6]http://vger.kernel.org/majordomo-info.html
->      Please read the FAQ at? [7]http://www.tux.org/lkml/
-> 
->    --
->    Thanks
->    ? ? Alex
-> 
-> References
-> 
->    Visible links
->    1. mailto:Liviu.Dudau at arm.com
->    2. mailto:Liviu.Dudau at arm.com
->    3. mailto:mark.rutland at arm.com
->    4. http://infocenter.arm.com/help/topic/com.arm.doc.den0029a/
->    5. mailto:majordomo at vger.kernel.org
->    6. http://vger.kernel.org/majordomo-info.html
->    7. http://www.tux.org/lkml/
+Mbigen is designed to fix this problem.
 
+Mbigen chip locates in ITS or outside of ITS.
+
+Mbigen chip hardware structure shows as below:
+
+		mbigen chip
+|---------------------|-------------------|
+mgn_node0	  mgn_node1		mgn_node2
+ |		 |-------|		|-------|------|
+dev1		dev1    dev2		dev1   dev3   dev4
+
+Each mbigen chip contains several mbigen nodes.
+
+External devices can connect to mbigen node through wire connecting way.
+
+Because a mbigen node only can support 128 interrupt maximum, depends
+on the interrupt lines number of devices, a device can connects to one
+more mbigen nodes.
+
+Also, several different devices can connect to a same mbigen node.
+
+When devices triggered interrupt,mbigen chip detects and collects
+the interrupts and generates the MBI interrupts by writing the ITS
+Translator register.
+
+To simplify mbigen driver,I used a new conception--mbigen device.
+Each mbigen device is initialized as a platform device.
+
+Mbigen device presents the parts(register, pin definition etc.) in
+mbigen chip corresponding to a peripheral device.
+
+So from software view, the structure likes below
+
+	            mbigen chip
+     |---------------------|-----------------|
+mbigen device1       mbigen device2  mbigen device3
+      |                   |                |
+     dev1                dev2             dev3
+
+Signed-off-by: Ma Jun <majun258@huawei.com>
+---
+ drivers/irqchip/irq-mbigen.c |   83 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 83 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/irqchip/irq-mbigen.c
+
+diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+new file mode 100644
+index 0000000..f18132f
+--- /dev/null
++++ b/drivers/irqchip/irq-mbigen.c
+@@ -0,0 +1,83 @@
++/*
++ * Copyright (C) 2015 Hisilicon Limited, All Rights Reserved.
++ * Author: Jun Ma <majun258@huawei.com>
++ * Author: Yun Wu <wuyun.wu@huawei.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++
++/**
++ * struct mbigen_device - holds the information of mbigen device.
++ *
++ * @pdev:		pointer to the platform device structure of mbigen chip.
++ * @base:		mapped address of this mbigen chip.
++ */
++struct mbigen_device {
++	struct platform_device	*pdev;
++	void __iomem		*base;
++};
++
++static int mbigen_device_probe(struct platform_device *pdev)
++{
++	struct mbigen_device *mgn_chip;
++
++	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
++	if (!mgn_chip)
++		return -ENOMEM;
++
++	mgn_chip->pdev = pdev;
++	mgn_chip->base = of_iomap(pdev->dev.of_node, 0);
++
++	platform_set_drvdata(pdev, mgn_chip);
++
++	return 0;
++}
++
++static int mbigen_device_remove(struct platform_device *pdev)
++{
++	struct mbigen_device *mgn_chip = platform_get_drvdata(pdev);
++
++	iounmap(mgn_chip->base);
++
++	return 0;
++}
++
++static const struct of_device_id mbigen_of_match[] = {
++	{ .compatible = "hisilicon,mbigen-v2" },
++	{ /* END */ }
++};
++MODULE_DEVICE_TABLE(of, mbigen_of_match);
++
++static struct platform_driver mbigen_platform_driver = {
++	.driver = {
++		.name		= "Hisilicon MBIGEN-V2",
++		.owner		= THIS_MODULE,
++		.of_match_table	= mbigen_of_match,
++	},
++	.probe			= mbigen_device_probe,
++	.remove			= mbigen_device_remove,
++};
++
++module_platform_driver(mbigen_platform_driver);
++
++MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
++MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
++MODULE_LICENSE("GPL");
++MODULE_DESCRIPTION("Hisilicon MBI Generator driver");
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+1.7.1
