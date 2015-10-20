@@ -1,39 +1,32 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 20 Oct 2015 18:57:44 +0200
-Subject: [PATCH] EDAC: Add AMD Seattle SoC EDAC
-In-Reply-To: <56266F7E.6030404@amd.com>
-References: <1445282597-18999-1-git-send-email-brijeshkumar.singh@amd.com>
- <20151019205236.GB453@leverpostej> <56266F7E.6030404@amd.com>
-Message-ID: <20151020165744.GE31130@pd.tnic>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 20 Oct 2015 10:19:25 -0700
+Subject: [PATCH 08/16] arm64/kexec: Add core kexec support
+In-Reply-To: <20151020085620.GC31893@dhcppc13.redhat.com>
+References: <cover.1445297709.git.geoff@infradead.org>
+ <a1c2a702f127d9dade1f9af8ab13decb2ef1c0da.1445297709.git.geoff@infradead.org>
+ <20151020085620.GC31893@dhcppc13.redhat.com>
+Message-ID: <1445361565.30908.68.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 11:44:46AM -0500, Brijesh Singh wrote:
-> > This second property doesn't describe the hardware in any way. It should
-> > be runtime-configurable and dpesn't belong in the DT.
-> > 
-> > Regardless, the binding is wrong. This is in no way specific to AMD
-> > Seattle, and per the code is actually used to imply the presence of a
-> > Cortex-A57 feature. No reference to AMD Seattle belongs in the DT
-> > binding (with the exception of the example, perhaps), nor in the driver.
-> > 
-> > NAK while this pretends to be something that it isn't. At minimum, you
-> > need to correctly describe the feature you are trying to add support
-> > for.
-> > 
-> I will remove AMD specific string in compatibility field and make the poll-delay-msec optional. Will also expose this as module parameter as you suggested below.
+Hi,
 
-Btw, how much of this is implementing generic A57 functionality?
+On Tue, 2015-10-20 at 14:26 +0530, Pratyush Anand wrote:
+> On 19/10/2015:11:38:53 PM, Geoff Levand wrote:
+> > +static void soft_restart(unsigned long addr)
+> > +{
+> > +> > 	> > setup_mm_for_reboot();
+> > +> > 	> > cpu_soft_restart(virt_to_phys(cpu_reset), addr,
+> > +> > 	> > 	> > is_hyp_mode_available());
+> 
+> So now we do not flush cache for any memory region. Shouldn't we still flush
+> at least kernel and purgatory segments. 
 
-If a lot, can we make this a generic a57_edac driver so that multiple
-vendors can use it?
+Relevant pages of the kexec list are flushed in the code following the comment
+'Invalidate dest page to PoC' of the arm64_relocate_new_kernel routine:
 
-How fast and how ugly can something like that become?
+ The dcache is turned off
+ The page is invalidated to PoC
+ The new page is written
 
-Thanks.
-
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
+-Geoff
