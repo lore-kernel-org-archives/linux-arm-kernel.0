@@ -1,33 +1,41 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Tue, 20 Oct 2015 09:33:49 +0300
-Subject: [PATCH v4 6/8] drivers: soc: add support for exynos SROM driver
-In-Reply-To: <5625C07D.4030706@samsung.com>
-References: <1445255206-11148-1-git-send-email-pankaj.dubey@samsung.com>
- <1445255206-11148-7-git-send-email-pankaj.dubey@samsung.com>
- <56258683.7070204@samsung.com> <5625B92C.10505@samsung.com>
- <5625C07D.4030706@samsung.com>
-Message-ID: <014301d10b01$488873f0$d9995bd0$@samsung.com>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Tue, 20 Oct 2015 14:34:29 +0800
+Subject: [PATCH v3 0/2] Add basic support for Mediatek MT2701 SoC
+Message-ID: <1445322871-14134-1-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+MT2701 is a SoC based on 32bit ARMv7 architecture. It contains 4 CA7 cores.
+MT2701 share many HW IP with MT65xx series. This patchset was tested
+on MT2701 evaluation board, and boot to shell ok.
 
-> AFAIR Fedin was talking about missing functionality, not about adding
-> the contribution by himself. So he might add it or he might not. I did
-> not receive any commitments from him.
+This series contains document bindings, device tree including
+interrupt, uart, timer and wdt.
 
- I am waiting for the driver to be integrated, because i see it's constantly redesigned. Then i'll post my patches. By the way, they
-will be useful only if pin controller driver for 5410 is accepted upstream, several authors have done it but i still didn't see it
-in upstream.
- Pin controller is needed in order to configure multi-functional pins correctly.
+Change in v3:
+1. Add the compatible string to arch/arm/mach-mediatek/mediatek.c
 
-> The driver should be "proper" for
-> the time being (which could mean !PM dependency). If there is a need,
-> then the dependency will be removed.
+Change in v2:
+1. Use one tab in stead of spaces in front of "mediatek,mt2701-sysirq" (mediatek,sysirq.txt)
+2. Sorting the compatible SoC and add back mt6595 since accidently deleted in previous version (mtk-uart.txt)
+3. Correct the mt2701-timer from mt6589-timer since the mistake in previous version (mediatek,mtk-timer.txt)
 
- I can do it later if you prefer.
+Erin Lo (2):
+  Document: DT: Add bindings for mediatek MT2701 SoC Platform
+  ARM: dts: mediatek: add MT2701 basic support
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+ Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
+ .../bindings/arm/mediatek/mediatek,sysirq.txt      |   1 +
+ .../devicetree/bindings/serial/mtk-uart.txt        |  14 +-
+ .../bindings/timer/mediatek,mtk-timer.txt          |   5 +-
+ .../devicetree/bindings/watchdog/mtk-wdt.txt       |   6 +-
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/mt2701-evb.dts                   |  29 ++++
+ arch/arm/boot/dts/mt2701.dtsi                      | 146 +++++++++++++++++++++
+ arch/arm/mach-mediatek/mediatek.c                  |   1 +
+ 9 files changed, 197 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/boot/dts/mt2701-evb.dts
+ create mode 100644 arch/arm/boot/dts/mt2701.dtsi
+
+--
+1.9.1
