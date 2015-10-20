@@ -1,58 +1,36 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 20 Oct 2015 18:19:01 +0200
-Subject: [GIT PULL 0/6] A handful of fixes for KVM/ARM for v4.3-rc7
-Message-ID: <1445357947-6022-1-git-send-email-christoffer.dall@linaro.org>
+Date: Tue, 20 Oct 2015 18:19:03 +0200
+Subject: [GIT PULL 2/6] KVM: arm/arm64: Fix memory leak if timer
+ initialization fails
+In-Reply-To: <1445357947-6022-1-git-send-email-christoffer.dall@linaro.org>
+References: <1445357947-6022-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1445357947-6022-3-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo,
+From: Pavel Fedin <p.fedin@samsung.com>
 
-The following changes since commit 920552b213e3dc832a874b4e7ba29ecddbab31bc:
+Jump to correct label and free kvm_host_cpu_state
 
-  KVM: disable halt_poll_ns as default for s390x (2015-09-25 10:31:30 +0200)
+Reviewed-by: Wei Huang <wei@redhat.com>
+Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm/kvm/arm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.3-rc7
-
-for you to fetch changes up to 0d997491f814c87310a6ad7be30a9049c7150489:
-
-  arm/arm64: KVM: Fix disabled distributor operation (2015-10-20 18:09:13 +0200)
-
-Sorry for sending these relatively late, but we had a situation where we
-found one breakage in the timer implementation changes merged for 4.3,
-then fixing that issue revealed another bug, and then that happened
-again, and now we have something that looks stable.
-
-Description of the fixes is in the tag and quoted below.
-
-Thanks,
--Christoffer
-
-----------------------------------------------------------------
-A late round of KVM/ARM fixes for v4.3-rc7, fixing:
- - A bug where level-triggered interrupts lowered from userspace
-   are still routed to the guest
- - A memory leak an a failed initialization path
- - A build error under certain configurations
- - Several timer bugs introduced with moving the timer to the active
-   state handling instead of the masking trick.
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      KVM: arm: use GIC support unconditionally
-
-Christoffer Dall (3):
-      arm/arm64: KVM: Fix arch timer behavior for disabled interrupts
-      arm/arm64: KVM: Clear map->active on pend/active clear
-      arm/arm64: KVM: Fix disabled distributor operation
-
-Pavel Fedin (2):
-      KVM: arm/arm64: Do not inject spurious interrupts
-      KVM: arm/arm64: Fix memory leak if timer initialization fails
-
- arch/arm/kvm/Kconfig      |  1 +
- arch/arm/kvm/arm.c        |  2 +-
- virt/kvm/arm/arch_timer.c | 19 ++++++++++
- virt/kvm/arm/vgic.c       | 95 +++++++++++++++++++++++++++--------------------
- 4 files changed, 76 insertions(+), 41 deletions(-)
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index dc017ad..78b2869 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -1080,7 +1080,7 @@ static int init_hyp_mode(void)
+ 	 */
+ 	err = kvm_timer_hyp_init();
+ 	if (err)
+-		goto out_free_mappings;
++		goto out_free_context;
+ 
+ #ifndef CONFIG_HOTPLUG_CPU
+ 	free_boot_hyp_pgd();
+-- 
+2.1.2.330.g565301e.dirty
