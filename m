@@ -1,32 +1,34 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue, 20 Oct 2015 16:50:05 -0500
-Subject: [PATCH 1/5] ARM: Keystone: Enable PINCTRL for Keystone ARCH
-Message-ID: <1445377809-12516-1-git-send-email-fcooper@ti.com>
+Date: Tue, 20 Oct 2015 16:50:06 -0500
+Subject: [PATCH 2/5] mmc: omap_hsmmc: Enable omap_hsmmc for Keystone 2
+In-Reply-To: <1445377809-12516-1-git-send-email-fcooper@ti.com>
+References: <1445377809-12516-1-git-send-email-fcooper@ti.com>
+Message-ID: <1445377809-12516-2-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Franklin Cooper <fcooper@ti.com>
+From: Lokesh Vutla <lokeshvutla@ti.com>
 
-Unlike other Keystone 2 devices, newer Keystone 2 SOCs may utilize
-pinmuxing which requires PINCTRL to be enabled. Therefore, enable
-PINCTRL for all Keystone 2 devices.
+Enable omap_hsmmc for Keystone 2 architecture which reuses the HSMMC
+IP found on OMAP platforms.
 
 Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 ---
- arch/arm/mach-keystone/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/mmc/host/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-index ea955f6db..7a432ee 100644
---- a/arch/arm/mach-keystone/Kconfig
-+++ b/arch/arm/mach-keystone/Kconfig
-@@ -11,6 +11,7 @@ config ARCH_KEYSTONE
- 	select ZONE_DMA if ARM_LPAE
- 	select MIGHT_HAVE_PCI
- 	select PCI_DOMAINS if PCI
-+	select PINCTRL
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index 8a1e349..2ccec71 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -366,7 +366,7 @@ config MMC_OMAP
+ config MMC_OMAP_HS
+ 	tristate "TI OMAP High Speed Multimedia Card Interface support"
+ 	depends on HAS_DMA
+-	depends on ARCH_OMAP2PLUS || COMPILE_TEST
++	depends on ARCH_OMAP2PLUS || ARCH_KEYSTONE || COMPILE_TEST
  	help
- 	  Support for boards based on the Texas Instruments Keystone family of
- 	  SoCs.
+ 	  This selects the TI OMAP High Speed Multimedia card Interface.
+ 	  If you have an omap2plus board with a Multimedia Card slot,
 -- 
 2.6.1
