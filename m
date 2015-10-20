@@ -1,41 +1,48 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 20 Oct 2015 13:15:11 +0200
-Subject: [PATCHv2 2/3] ARM: zynq: dt: Updated devicetree for Zynq 7000
- platform.
-In-Reply-To: <20151019182416.GL12756@jcartwri.amer.corp.natinst.com>
-References: <1445035350-3569-1-git-send-email-moritz.fischer@ettus.com>
- <1445035350-3569-3-git-send-email-moritz.fischer@ettus.com>
- <20151018175324.GH12756@jcartwri.amer.corp.natinst.com>
- <5624F985.8050905@xilinx.com>
- <20151019182416.GL12756@jcartwri.amer.corp.natinst.com>
-Message-ID: <5626223F.6040008@xilinx.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 20 Oct 2015 12:20:26 +0100
+Subject: [PATCH] ARM64: juno: add NOR flash to device tree
+In-Reply-To: <CACRpkdb1XRSq3EERbiMwCnuV7Dtit2xGYRDBtQ9+odyXq6kM7A@mail.gmail.com>
+References: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
+ <561FC681.2040809@arm.com>
+ <CACRpkdaSox9WKb5-dkD_zAwO9WxP6+b010p3bdxsm1LRy=WvKg@mail.gmail.com>
+ <5624C31D.3070906@arm.com> <20151019102932.GB10678@leverpostej>
+ <CACRpkdaGscb_ccbGuwccsRj_b1d6xoveiiZpw1a5eXon3PxAUA@mail.gmail.com>
+ <20151019113904.GE10678@leverpostej>
+ <CACRpkdb1XRSq3EERbiMwCnuV7Dtit2xGYRDBtQ9+odyXq6kM7A@mail.gmail.com>
+Message-ID: <20151020112026.GF10728@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2015 08:24 PM, Josh Cartwright wrote:
-> On Mon, Oct 19, 2015 at 04:09:09PM +0200, Michal Simek wrote:
->> On 10/18/2015 07:53 PM, Josh Cartwright wrote:
->>> On Fri, Oct 16, 2015 at 03:42:29PM -0700, Moritz Fischer wrote:
-> [..]
->>>> @@ -294,6 +294,11 @@
->>>>  		devcfg: devcfg at f8007000 {
->>>>  			compatible = "xlnx,zynq-devcfg-1.0";
->>>>  			reg = <0xf8007000 0x100>;
->>>> +			interrupt-parent = <&intc>;
->>>
->>> You shouldn't need interrupt-parent here.  In fact, I suspect it can be
->>> removed from all sibling nodes as well.
->>
->> Correct. But I tend to do it vice-versa. To remove it from amba node and
->> keep it in every IP here. The reason is simple to let everybody know
->> that setting up right interrupt controller is something what they have
->> to care. If you have more interrupt controllers in the system it can be
->> messy.
+On Mon, Oct 19, 2015 at 11:55:32PM +0200, Linus Walleij wrote:
+> > As I mentioned, I was under the impression that at least a portion of
+> > the flash was used by UEFI for variable storage, and that UEFI could
+> > therefore access the flash at runtime (due to runtime services calls).
 > 
-> If you like that, then you'd like the interrupt-extended properly even
-> better (I think).
+> OK I see. But doesn't that portion of the flash live inside one of the
+> AFS partitions simply?
 
-yep. That works for me too.
+Are you saying that you see AFS partitions matching the entries in
+your platform's SITE1/HBI0262?/images.txt?
 
-Thanks,
-Michal
+If that is the case, then certainly that is a reasonable mechanism to
+make use of. However, the log in your commit message didn't show
+any partitions being detected. And you should have at least a bl0.bin,
+bl1.bin, fip.bin and hdlcdclk.dat in there.
+
+> No why would anyone do that. As with all file systems and
+> partitions it is possible to destroy them if you can access them,
+> with great power comes great responsibility as always, I'm just
+> not fond of the idea of hiding things behind the back for hackers
+> "for their own good", that is not the right spirit I think.
+
+If it is actually possible to describe this properly to the kernel, I
+agree. But, due to the somewhat hyper-flexible boot architecture of
+Juno, we may end up with different boards of the same revision having
+different "safe" regions.
+
+And if the regions are detected, we still need to have a protective
+entry for the UEFI persistent data region added to future Juno firmare
+releases.
+
+/
+    Leif
