@@ -1,92 +1,49 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 20 Oct 2015 17:13:06 +0800
-Subject: [PATCH v2 4/9] mmc: mediatek: change the argument "ddr" to "timing"
+Date: Tue, 20 Oct 2015 17:13:04 +0800
+Subject: [PATCH v2 2/9] mmc: dt-bindings: update Mediatek MMC bindings
 In-Reply-To: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
 References: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1445332391-30530-5-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1445332391-30530-3-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-use the ios->timing directly is better
-It can reflect current timing and do settings by timing
+Add 400Mhz clock source for HS400 mode
 
 Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 ---
- drivers/mmc/host/mtk-sd.c | 20 ++++++++------------
- 1 file changed, 8 insertions(+), 12 deletions(-)
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index 8b3e15d..c877ded 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -297,7 +297,7 @@ struct msdc_host {
- 	u32 mclk;		/* mmc subsystem clock frequency */
- 	u32 src_clk_freq;	/* source clock frequency */
- 	u32 sclk;		/* SD/MS bus clock frequency */
--	bool ddr;
-+	unsigned char timing;
- 	bool vqmmc_enabled;
- 	struct msdc_save_para save_para; /* used when gate HCLK */
+diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+index a1adfa4..0120c7f 100644
+--- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
++++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+@@ -17,6 +17,11 @@ Required properties:
+ - vmmc-supply: power to the Core
+ - vqmmc-supply: power to the IO
+ 
++Optional properties:
++- assigned-clocks: PLL of the source clock
++- assigned-clock-parents: parent of source clock, used for HS400 mode to get 400Mhz source clock
++- hs400-ds-delay: HS400 DS delay setting
++
+ Examples:
+ mmc0: mmc at 11230000 {
+ 	compatible = "mediatek,mt8173-mmc", "mediatek,mt8135-mmc";
+@@ -24,9 +29,13 @@ mmc0: mmc at 11230000 {
+ 	interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_LOW>;
+ 	vmmc-supply = <&mt6397_vemc_3v3_reg>;
+ 	vqmmc-supply = <&mt6397_vio18_reg>;
+-	clocks = <&pericfg CLK_PERI_MSDC30_0>, <&topckgen CLK_TOP_MSDC50_0_H_SEL>;
++	clocks = <&pericfg CLK_PERI_MSDC30_0>,
++	         <&topckgen CLK_TOP_MSDC50_0_H_SEL>;
+ 	clock-names = "source", "hclk";
+ 	pinctrl-names = "default", "state_uhs";
+ 	pinctrl-0 = <&mmc0_pins_default>;
+ 	pinctrl-1 = <&mmc0_pins_uhs>;
++	assigned-clocks = <&topckgen CLK_TOP_MSDC50_0_SEL>;
++	assigned-clock-parents = <&topckgen CLK_TOP_MSDCPLL_D2>;
++	hs400-ds-delay = <0x14015>;
  };
-@@ -488,7 +488,7 @@ static void msdc_ungate_clock(struct msdc_host *host)
- 		cpu_relax();
- }
- 
--static void msdc_set_mclk(struct msdc_host *host, int ddr, u32 hz)
-+static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
- {
- 	u32 mode;
- 	u32 flags;
-@@ -504,7 +504,8 @@ static void msdc_set_mclk(struct msdc_host *host, int ddr, u32 hz)
- 
- 	flags = readl(host->base + MSDC_INTEN);
- 	sdr_clr_bits(host->base + MSDC_INTEN, flags);
--	if (ddr) { /* may need to modify later */
-+	if (timing == MMC_TIMING_UHS_DDR50 ||
-+	    timing == MMC_TIMING_MMC_DDR52) {
- 		mode = 0x2; /* ddr mode and use divisor */
- 		if (hz >= (host->src_clk_freq >> 2)) {
- 			div = 0; /* mean div = 1/4 */
-@@ -535,12 +536,12 @@ static void msdc_set_mclk(struct msdc_host *host, int ddr, u32 hz)
- 		cpu_relax();
- 	host->sclk = sclk;
- 	host->mclk = hz;
--	host->ddr = ddr;
-+	host->timing = timing;
- 	/* need because clk changed. */
- 	msdc_set_timeout(host, host->timeout_ns, host->timeout_clks);
- 	sdr_set_bits(host->base + MSDC_INTEN, flags);
- 
--	dev_dbg(host->dev, "sclk: %d, ddr: %d\n", host->sclk, ddr);
-+	dev_dbg(host->dev, "sclk: %d, timing: %d\n", host->sclk, timing);
- }
- 
- static inline u32 msdc_cmd_find_resp(struct msdc_host *host,
-@@ -1158,14 +1159,9 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- {
- 	struct msdc_host *host = mmc_priv(mmc);
- 	int ret;
--	u32 ddr = 0;
- 
- 	pm_runtime_get_sync(host->dev);
- 
--	if (ios->timing == MMC_TIMING_UHS_DDR50 ||
--	    ios->timing == MMC_TIMING_MMC_DDR52)
--		ddr = 1;
--
- 	msdc_set_buswidth(host, ios->bus_width);
- 
- 	/* Suspend/Resume will do power off/on */
-@@ -1202,8 +1198,8 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		break;
- 	}
- 
--	if (host->mclk != ios->clock || host->ddr != ddr)
--		msdc_set_mclk(host, ddr, ios->clock);
-+	if (host->mclk != ios->clock || host->timing != ios->timing)
-+		msdc_set_mclk(host, ios->timing, ios->clock);
- 
- end:
- 	pm_runtime_mark_last_busy(host->dev);
 -- 
 1.8.1.1.dirty
