@@ -1,55 +1,87 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Tue, 20 Oct 2015 08:55:38 -0400
-Subject: [PATCH v3 2/3] xen, cpu_hotplug: call device_offline instead of
- cpu_down
-In-Reply-To: <alpine.DEB.2.02.1510201104120.27957@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1510191754000.27957@kaball.uk.xensource.com>
- <1445273735-15758-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <56253543.8080007@oracle.com>
- <alpine.DEB.2.02.1510201104120.27957@kaball.uk.xensource.com>
-Message-ID: <562639CA.2010104@oracle.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Tue, 20 Oct 2015 12:56:33 +0000
+Subject: [PATCHv2] ARM: dts: use vmmc-supply of emmc/sd for
+ exynos5422-odroidxu3
+Message-ID: <1445345793-5189-1-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2015 06:28 AM, Stefano Stabellini wrote:
-> On Mon, 19 Oct 2015, Boris Ostrovsky wrote:
->> On 10/19/2015 12:55 PM, Stefano Stabellini wrote:
->>> When offlining a cpu, instead of cpu_down, call device_offline, which
->>> also takes care of updating the cpu.dev.offline field. This keeps the
->>> sysfs file /sys/devices/system/cpu/cpuN/online, up to date.  Also move
->>> the call to disable_hotplug_cpu, because it makes more sense to have it
->>> there.
->>>
->>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>> CC: konrad.wilk at oracle.com
->>> CC: boris.ostrovsky at oracle.com
->>> CC: david.vrabel at citrix.com
->>> ---
->>>    drivers/xen/cpu_hotplug.c |    3 ++-
->>>    1 file changed, 2 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/xen/cpu_hotplug.c b/drivers/xen/cpu_hotplug.c
->>> index 43de1f5..78804b5 100644
->>> --- a/drivers/xen/cpu_hotplug.c
->>> +++ b/drivers/xen/cpu_hotplug.c
->>> @@ -18,6 +18,8 @@ static void enable_hotplug_cpu(int cpu)
->>>      static void disable_hotplug_cpu(int cpu)
->>>    {
->>> +	if (cpu_online(cpu))
->>> +		device_offline(get_cpu_device(cpu));
->>>    	if (cpu_present(cpu))
->>>    		xen_arch_unregister_cpu(cpu);
->> Do we want to call device_online() when plugging cpu in?
-> I don't know: that would automatically bring the cpu online after the
-> user hot-plugs it. Is it what we want? Current one would have to manually:
->
-> echo 1 > /sys/devices/system/cpu/cpu1/online
->
-> I thought that was the expected behaviour?
+Changes need for host controller to detect UHS-I highspeed cards.
+Changes in VDDQ_MMC2 voltage range help scale
+the required voltage to detect and load the microSD cards.
 
-Right, we should keep onlining as an explicit operation. I think it's 
-worth mentioning in the commit message why we don't call device_online() 
-while using device_offline(), which is its complement.
+Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+---
+Changes based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v4.4-next/dt-samsung branch
 
+Changes:
+Drop the ranp_delay for LDO9.
 
--boris
+Thanks to : Krzysztof, Doug Anderson, Jaehoon Chung for helping
+me out figure out the mmc core requirement.
+
+Also drop the previous changes:
+use cd-gpio method to detect sd-card.
+Added UHS-I bus speed support.
+
+[    4.713553] random: nonblocking pool is initialized
+[    4.718423] 14530000.hdmi supply hdmi-en not found, using dummy regulator
+[    4.726206] exynos-drm exynos-drm: bound 14400000.fimd (ops fimd_component_ops)
+[    4.732555] exynos-drm exynos-drm: bound 14450000.mixer (ops mixer_component_ops)
+[    4.740180] exynos-drm exynos-drm: bound 14530000.hdmi (ops hdmi_component_ops)
+[    4.746936] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+[    4.753428] [drm] No driver support for vblank timestamp query.
+[    4.940794] Console: switching to colour frame buffer device 274x77
+[    4.995344] exynos-drm exynos-drm: fb0:  frame buffer device
+[    5.024573] [drm] Initialized exynos 1.0.0 20110530 on minor 0
+[    5.031164] exynos-dwc3 usb at 12000000: no suspend clk specified
+[    5.054571] usb 2-1: new full-speed USB device number 2 using exynos-ohci
+[    5.159527] dwmmc_exynos 12220000.mmc: Busy; trying anyway
+[    5.163705] mmc_host mmc1: Timeout sending command (cmd 0x202000 arg 0x0 status 0x0)
+---
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+index 1af5bdc..a4be3e0 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+@@ -182,9 +182,10 @@
+ 
+ 			ldo13_reg: LDO13 {
+ 				regulator-name = "vdd_ldo13";
+-				regulator-min-microvolt = <2800000>;
++				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <2800000>;
+ 				regulator-always-on;
++				regulator-ramp-delay = <12000>;
+ 			};
+ 
+ 			ldo15_reg: LDO15 {
+@@ -213,6 +214,7 @@
+ 				regulator-min-microvolt = <2800000>;
+ 				regulator-max-microvolt = <2800000>;
+ 				regulator-always-on;
++				regulator-ramp-delay = <12000>;
+ 			};
+ 
+ 			ldo24_reg: LDO24 {
+@@ -338,6 +340,7 @@
+ 	samsung,dw-mshc-ddr-timing = <0 2>;
+ 	samsung,dw-mshc-hs400-timing = <0 2>;
+ 	samsung,read-strobe-delay = <90>;
++	vmmc-supply = <&ldo3_reg>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_cd &sd0_rclk>;
+ 	bus-width = <8>;
+@@ -355,6 +358,8 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
+ 	bus-width = <4>;
++	vmmc-supply = <&ldo19_reg>;
++	vqmmc-supply = <&ldo13_reg>;
+ 	cap-sd-highspeed;
+ };
+ 
+-- 
+2.1.4
