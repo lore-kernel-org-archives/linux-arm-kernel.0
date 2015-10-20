@@ -1,103 +1,118 @@
-From: m.reichl@fivetechno.de (Markus Reichl)
-Date: Tue, 20 Oct 2015 19:23:49 +0200
-Subject: [PATCH v2 0/6] Switch to generic syscon regmap based drivers
-In-Reply-To: <CAGOxZ51_JPy51htzD_M_=qaPVUexkVhoA2ANLS2-rpK3QDT=8A@mail.gmail.com>
-References: <1445333085-22837-1-git-send-email-alim.akhtar@samsung.com>
- <CAGOxZ50G-ttivhVjbozUisA0HXcFz7bvRUuPR67xR88TTCa_wQ@mail.gmail.com>
- <CAGOxZ51_JPy51htzD_M_=qaPVUexkVhoA2ANLS2-rpK3QDT=8A@mail.gmail.com>
-Message-ID: <1606098.olLAyTIhB3@dell2.five-lan.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 20 Oct 2015 18:25:40 +0100
+Subject: [PATCH] EDAC: Add AMD Seattle SoC EDAC
+In-Reply-To: <56266F7E.6030404@amd.com>
+References: <1445282597-18999-1-git-send-email-brijeshkumar.singh@amd.com>
+ <20151019205236.GB453@leverpostej> <56266F7E.6030404@amd.com>
+Message-ID: <20151020172539.GB4943@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 20. Oktober 2015, 21:22:05 schrieb Alim Akhtar:
-> On Tue, Oct 20, 2015 at 9:17 PM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
-> > Hi Markus,
-> >
-> > On Tue, Oct 20, 2015 at 8:29 PM, Markus Reichl <m.reichl@fivetechno.de> wrote:
-> >> Am 20.10.2015 um 11:24 schrieb Alim Akhtar:
-> >>> Now we have a nice way to reboot/poweroff system using a generic
-> >>> syscon regmap based drivers, this series moves exynos SoCs to
-> >>> make use of the same.
-> >>>
-> >>> Changes since v1:
-> >>> * Added a comment about the register information
-> >>> * Droped defconfig changes as disscussed
-> >>> * Collected various Reviewed-by, Tested-by and Acked-by tags
-> >>> * Added SYSCON-{RESET, POWEROFF} to select from Kconfig
-> >>>
-> >>> Alim Akhtar (6):
-> >>>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos3250 SoCs
-> >>>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos4
-> >>>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5
-> >>>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5410 SoC
-> >>>   ARM: exynos: select POWER_RESET_SYSCON and
-> >>>     POWER_RESET_SYSCON_POWEROFF
-> >>>   ARM: EXYNOS: Remove code for restart and poweroff for exynos SoCs
-> >>>
-> >>>  arch/arm/boot/dts/exynos3250.dtsi |   14 ++++++++++++
-> >>>  arch/arm/boot/dts/exynos4.dtsi    |   14 ++++++++++++
-> >>>  arch/arm/boot/dts/exynos5.dtsi    |   14 ++++++++++++
-> >>>  arch/arm/boot/dts/exynos5410.dtsi |   14 ++++++++++++
-> >>>  arch/arm/mach-exynos/Kconfig      |    3 +++
-> >>>  arch/arm/mach-exynos/pmu.c        |   43 -------------------------------------
-> >>>  6 files changed, 59 insertions(+), 43 deletions(-)
-> >>>
-> >>
-> >> Hi Alim,
-> >>
-> >> I have installed your patch set above with git am on top of
-> >> 4.3.0-rc6-00108-gce1fad2 torvalds/linux of today
-> >> with make exynos_defconfig on Odroid U3.
-> >>
-> > which exynos soc Odroid U3 uses?
-> >
-> OK, I can see its uses exynos4412 and exynos4412-odroidu3.dts does
-> include exynos4.dtsi,
-> so these should have worked.
+On Tue, Oct 20, 2015 at 11:44:46AM -0500, Brijesh Singh wrote:
+> Hi Mark,
 > 
-> >> "halt -p" worked (power 0.0W).
-> >> "reboot" got stuck at 0.5W.
-> >>
-> > reboot stuck mean system does not reboot any more?
-
-It freezes when going for reboot.
-Have to power off/on to boot again.
-
-Btw I use an mmc, not an sd-card.
-No other HW connected, just LAN-cable.
-Bootloader is u-boot v2015.10.
-
-> > As far as I can see there in __no__ functional changes that my patch introduce.
-> > So ideally it should have work. My patches are based on the top on
-> > vanilla v4.3-rc5.
-> > (25cb62b Linux 4.3-rc5), can you check at this commit?
-
-Will try tomorrow.
-
-> >
-> > Will check with the commit mentioned by you tomorrow.
-> >
-> >>
-> >> Without your patch set reboot worked.
-> >>
-> >>
-> >> Thanks,
-> >> --
-> >> Markus Reichl
-> >> --
-> >> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> >> the body of a message to majordomo at vger.kernel.org
-> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >
-> >
-> >
-> > --
-> > Regards,
-> > Alim
+> Thanks for review. 
 > 
+> -Brijesh
 > 
+> On 10/19/2015 03:52 PM, Mark Rutland wrote:
+> > Hi,
+> > 
+> > Please Cc the devicetree list (devicetree at vger.kernel.org) when sending
+> > binding patches. I see you've added the people from the MAINTAINERS
+> > entry; the list should also be Cc'd.
+> > 
+> Noted.
+> > On Mon, Oct 19, 2015 at 02:23:17PM -0500, Brijesh Singh wrote:
+> >> Add support for the AMD Seattle SoC EDAC driver.
+> >>
+> >> Signed-off-by: Brijesh Singh <brijeshkumar.singh@amd.com>
+> >> ---
+> >>  .../devicetree/bindings/edac/amd-seattle-edac.txt  |  15 +
+> >>  drivers/edac/Kconfig                               |   6 +
+> >>  drivers/edac/Makefile                              |   1 +
+> >>  drivers/edac/seattle_edac.c                        | 306 +++++++++++++++++++++
+> >>  4 files changed, 328 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/edac/amd-seattle-edac.txt
+> >>  create mode 100644 drivers/edac/seattle_edac.c
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/edac/amd-seattle-edac.txt b/Documentation/devicetree/bindings/edac/amd-seattle-edac.txt
+> >> new file mode 100644
+> >> index 0000000..a0354e8
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/edac/amd-seattle-edac.txt
+> >> @@ -0,0 +1,15 @@
+> >> +* AMD Seattle SoC EDAC node
+> >> +
+> >> +EDAC node is defined to describe on-chip error detection and reporting.
+> >> +
+> >> +Required properties:
+> >> +- compatible: Should be "amd,arm-seattle-edac"
+> >> +- poll-delay-msec: Indicates how often the edac check callback should be called.
+> >> +  Time in msec.
+> > 
+> > This second property doesn't describe the hardware in any way. It should
+> > be runtime-configurable and dpesn't belong in the DT.
+> > 
+> > Regardless, the binding is wrong. This is in no way specific to AMD
+> > Seattle, and per the code is actually used to imply the presence of a
+> > Cortex-A57 feature. No reference to AMD Seattle belongs in the DT
+> > binding (with the exception of the example, perhaps), nor in the driver.
+> > 
+> > NAK while this pretends to be something that it isn't. At minimum, you
+> > need to correctly describe the feature you are trying to add support
+> > for.
+> > 
+> I will remove AMD specific string in compatibility field and make the
+> poll-delay-msec optional. Will also expose this as module parameter as
+> you suggested below.
+
+I don't think it should be optional; I don't think it should be there at
+all.
+
+I'm not sure if we even need a DT binding if we can derive the presence
+of the feature from the MIDR.
+
+> >> + * The driver polls CPUMERRSR_EL1 and L2MERRSR_EL1 registers to logs the 
+> > 
+> > These are IMPLEMENTATION DEFINED registers which are specific to
+> > Cortex-A57, and I note that L2MERRSR_EL1 changed in r1p0.
+> > 
+> > Which revisions of Cortex-A57 does this work with?
+> > 
+> I have tested my code on r1p2.
 > 
-> 
+> > Generally we avoid touching IMPLEMENTATION DEFINED registers as they may
+> > not exist in some configurations or revisions, and could trap or undef.
+> > Is it always safe to access these registers (in current revisions of
+> > Cortex-A57)?
+> > 
+> So far I have not ran into any trap error, was able to read/write
+> registers from EL1 all the times. I looked at TRM but could not find
+> reference that it would fail. As per doc the register should be
+> available at all EL's except EL0.
+
+Ok.
+
+> >> + * non-fatal errors. Whereas the single bit and double bit ECC erros are 
+> >> + * handled by firmware.
+> > 
+> > I had expected this would be all be left for firmware, given that this
+> > feature may change in any revision of the CPU.
+> > 
+> > What precisely does the AMD Seattle firmware do for double-bit ECC
+> > errors, and how is it triggered?
+> > 
+> The error handling firmware is work in progress. I believe the
+> approach is: Configure the platform to trigger a firmware handler when
+> the error occurs, trusted firmware will receive the fatal error
+> interrupt and take the action and will generate APEI objects; if error
+> requires a SoC warm reset then it will communicate with SCP to warm
+> reset the SoC. The SCP firmware will then need to provide the ACPI
+> BERT error logging information back when the A57 restarts. 
+
+Can signalling of single-bit errors not happen in the same way via APEI?
+Or is APEI handled fatally?
+
 Thanks,
---
-Markus
+Mark.
