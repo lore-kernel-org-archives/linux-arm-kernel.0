@@ -1,66 +1,25 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 20 Oct 2015 11:28:24 +0100
-Subject: [PATCH v3 2/3] xen, cpu_hotplug: call device_offline instead of
- cpu_down
-In-Reply-To: <56253543.8080007@oracle.com>
-References: <alpine.DEB.2.02.1510191754000.27957@kaball.uk.xensource.com>
- <1445273735-15758-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <56253543.8080007@oracle.com>
-Message-ID: <alpine.DEB.2.02.1510201104120.27957@kaball.uk.xensource.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 20 Oct 2015 12:29:12 +0200
+Subject: [PATCH v2 0/6] Switch to generic syscon regmap based drivers
+In-Reply-To: <1445333085-22837-1-git-send-email-alim.akhtar@samsung.com>
+References: <1445333085-22837-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <56261778.8060400@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Oct 2015, Boris Ostrovsky wrote:
-> On 10/19/2015 12:55 PM, Stefano Stabellini wrote:
-> > When offlining a cpu, instead of cpu_down, call device_offline, which
-> > also takes care of updating the cpu.dev.offline field. This keeps the
-> > sysfs file /sys/devices/system/cpu/cpuN/online, up to date.  Also move
-> > the call to disable_hotplug_cpu, because it makes more sense to have it
-> > there.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > CC: konrad.wilk at oracle.com
-> > CC: boris.ostrovsky at oracle.com
-> > CC: david.vrabel at citrix.com
-> > ---
-> >   drivers/xen/cpu_hotplug.c |    3 ++-
-> >   1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/xen/cpu_hotplug.c b/drivers/xen/cpu_hotplug.c
-> > index 43de1f5..78804b5 100644
-> > --- a/drivers/xen/cpu_hotplug.c
-> > +++ b/drivers/xen/cpu_hotplug.c
-> > @@ -18,6 +18,8 @@ static void enable_hotplug_cpu(int cpu)
-> >     static void disable_hotplug_cpu(int cpu)
-> >   {
-> > +	if (cpu_online(cpu))
-> > +		device_offline(get_cpu_device(cpu));
-> >   	if (cpu_present(cpu))
-> >   		xen_arch_unregister_cpu(cpu);
+Hello Alim,
+
+On 10/20/2015 11:24 AM, Alim Akhtar wrote:
+> Now we have a nice way to reboot/poweroff system using a generic
+> syscon regmap based drivers, this series moves exynos SoCs to
+> make use of the same.
 > 
-> Do we want to call device_online() when plugging cpu in?
 
-I don't know: that would automatically bring the cpu online after the
-user hot-plugs it. Is it what we want? Current one would have to manually:
+I tested this series on an Exynos5800 Peach Pi and an Exynos5422 Odroid XU.
+Reboot and poweroff are working correctly on both boards with these patches.
 
-echo 1 > /sys/devices/system/cpu/cpu1/online
-
-I thought that was the expected behaviour?
-
-
-> And take sysfs lock?
- 
-I think you are right: we need to protect the device_offline (and
-device_online if we add it) with lock_device_hotplug and
-unlock_device_hotplug. Thanks!
- 
-
-> >   @@ -55,7 +57,6 @@ static void vcpu_hotplug(unsigned int cpu)
-> >   		enable_hotplug_cpu(cpu);
-> >   		break;
-> >   	case 0:
-> > -		(void)cpu_down(cpu);
-> >   		disable_hotplug_cpu(cpu);
-> >   		break;
-> >   	default:
-> 
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
