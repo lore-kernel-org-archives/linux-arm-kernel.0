@@ -1,163 +1,64 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 20 Oct 2015 10:23:12 +0100
-Subject: [PATCH v4 1/4] drm: Introduce generic probe function for component
- based masters.
-In-Reply-To: <1445332995-11212-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1445332995-11212-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1445332995-11212-2-git-send-email-Liviu.Dudau@arm.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Tue, 20 Oct 2015 09:25:05 +0000
+Subject: [PATCH v2 4/4] arm64: dts: Add BRCM IPROC NAND DT node for NS2
+In-Reply-To: <562603F7.7000202@arm.com>
+References: <1444986537-28387-1-git-send-email-anup.patel@broadcom.com>
+ <1444986537-28387-5-git-send-email-anup.patel@broadcom.com>
+ <562603F7.7000202@arm.com>
+Message-ID: <39063E8F96E11742B35A201CC5D095B7AF39AD@SJEXCHMB10.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A lot of component based DRM drivers use a variant of the same code
-as the probe function. They bind the crtc ports in the first iteration
-and then scan through the child nodes and bind the encoders attached
-to the remote endpoints. Factor the common code into a separate
-function called drm_of_component_probe() in order to increase code
-reuse.
 
-Cc: David Airlie <airlied@linux.ie>
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/gpu/drm/drm_of.c | 88 ++++++++++++++++++++++++++++++++++++++++++++++++
- include/drm/drm_of.h     | 13 +++++++
- 2 files changed, 101 insertions(+)
 
-diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-index be38840..493c05c 100644
---- a/drivers/gpu/drm/drm_of.c
-+++ b/drivers/gpu/drm/drm_of.c
-@@ -1,3 +1,4 @@
-+#include <linux/component.h>
- #include <linux/export.h>
- #include <linux/list.h>
- #include <linux/of_graph.h>
-@@ -61,3 +62,90 @@ uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
- 	return possible_crtcs;
- }
- EXPORT_SYMBOL(drm_of_find_possible_crtcs);
-+
-+/**
-+ * drm_of_component_probe - Generic probe function for a component based master
-+ * @dev: master device containing the OF node
-+ * @compare_of: compare function used for matching components
-+ * @master_ops: component master ops to be used
-+ *
-+ * Parse the platform device OF node and bind all the components associated
-+ * with the master. Interface ports are added before the encoders in order to
-+ * satisfy their .bind requirements
-+ * See Documentation/devicetree/bindings/graph.txt for the bindings.
-+ *
-+ * Returns zero if successful, or one of the standard error codes if it fails.
-+ */
-+int drm_of_component_probe(struct device *dev,
-+			   int (*compare_of)(struct device *, void *),
-+			   const struct component_master_ops *m_ops)
-+{
-+	struct device_node *ep, *port, *remote;
-+	struct component_match *match = NULL;
-+	int i;
-+
-+	if (!dev->of_node)
-+		return -EINVAL;
-+
-+	/*
-+	 * Bind the crtc's ports first, so that drm_of_find_possible_crtcs()
-+	 * called from encoder's .bind callbacks works as expected
-+	 */
-+	for (i = 0; ; i++) {
-+		port = of_parse_phandle(dev->of_node, "ports", i);
-+		if (!port)
-+			break;
-+
-+		if (!of_device_is_available(port->parent)) {
-+			of_node_put(port);
-+			continue;
-+		}
-+
-+		component_match_add(dev, &match, compare_of, port);
-+		of_node_put(port);
-+	}
-+
-+	if (i == 0) {
-+		dev_err(dev, "missing 'ports' property\n");
-+		return -ENODEV;
-+	}
-+
-+	if (!match) {
-+		dev_err(dev, "no available port\n");
-+		return -ENODEV;
-+	}
-+
-+	/*
-+	 * For bound crtcs, bind the encoders attached to their remote endpoint
-+	 */
-+	for (i = 0; ; i++) {
-+		port = of_parse_phandle(dev->of_node, "ports", i);
-+		if (!port)
-+			break;
-+
-+		if (!of_device_is_available(port->parent)) {
-+			of_node_put(port);
-+			continue;
-+		}
-+
-+		for_each_child_of_node(port, ep) {
-+			remote = of_graph_get_remote_port_parent(ep);
-+			if (!remote || !of_device_is_available(remote)) {
-+				of_node_put(remote);
-+				continue;
-+			} else if (!of_device_is_available(remote->parent)) {
-+				dev_warn(dev, "parent device of %s is not available\n",
-+					 remote->full_name);
-+				of_node_put(remote);
-+				continue;
-+			}
-+
-+			component_match_add(dev, &match, compare_of, remote);
-+			of_node_put(remote);
-+		}
-+		of_node_put(port);
-+	}
-+
-+	return component_master_add_with_match(dev, m_ops, match);
-+}
-+EXPORT_SYMBOL(drm_of_component_probe);
-diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
-index 2441f71..8544665 100644
---- a/include/drm/drm_of.h
-+++ b/include/drm/drm_of.h
-@@ -1,18 +1,31 @@
- #ifndef __DRM_OF_H__
- #define __DRM_OF_H__
- 
-+struct component_master_ops;
-+struct device;
- struct drm_device;
- struct device_node;
- 
- #ifdef CONFIG_OF
- extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
- 					   struct device_node *port);
-+extern int drm_of_component_probe(struct device *dev,
-+				  int (*compare_of)(struct device *, void *),
-+				  const struct component_master_ops *m_ops);
- #else
- static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
- 						  struct device_node *port)
- {
- 	return 0;
- }
-+
-+static inline int
-+drm_of_component_probe(struct device *dev,
-+		       int (*compare_of)(struct device *, void *),
-+		       const struct component_master_ops *m_ops)
-+{
-+	return -EINVAL;
-+}
- #endif
- 
- #endif /* __DRM_OF_H__ */
--- 
-2.6.0
+> -----Original Message-----
+> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> Sent: 20 October 2015 14:36
+> To: Anup Patel
+> Cc: David Woodhouse; Brian Norris; linux-mtd at lists.infradead.org; Sudeep
+> Holla; Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala; Catalin
+> Marinas; Will Deacon; Ray Jui; Scott Branden; Florian Fainelli; Pramod Kumar;
+> Vikram Prakash; Sandeep Tripathy; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; bcm-kernel-
+> feedback-list
+> Subject: Re: [PATCH v2 4/4] arm64: dts: Add BRCM IPROC NAND DT node for
+> NS2
+> 
+> 
+> 
+> On 16/10/15 10:08, Anup Patel wrote:
+> > The NAND controller on NS2 SoC is compatible with existing BRCM IPROC
+> > NAND driver so let's enable it in NS2 DT and
+> > NS2 SVK DT.
+> >
+> > Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> > Reviewed-by: Ray Jui <rjui@broadcom.com>
+> > Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> > ---
+> >   arch/arm64/boot/dts/broadcom/ns2-svk.dts | 12 ++++++++++++
+> >   arch/arm64/boot/dts/broadcom/ns2.dtsi    | 14 ++++++++++++++
+> >   2 files changed, 26 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+> > b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+> > index e5950d5..a754160 100644
+> > --- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+> > +++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+> > @@ -63,5 +63,17 @@
+> >   		uart3: serial at 66130000 {
+> >   			status = "ok";
+> >   		};
+> 
+> Better to change even the above reference, see below.
+> 
+> > +
+> > +		nand: nand at 66460000 {
+> 
+> In most of the cases where such static overlays are done, I have seen the labels
+> being used to refer back the node. Using the complete node name again is kind
+> of inviting trouble as even minor typo results in creation of another node.
+
+Thanks for pointing. I will use label here for both uart3 and nand.
+
+Regards,
+Anup
