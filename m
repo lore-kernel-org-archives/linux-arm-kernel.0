@@ -1,59 +1,46 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 20 Oct 2015 17:13:05 +0800
-Subject: [PATCH v2 3/9] mmc: mediatek: make cmd_ints_mask to const
+Date: Tue, 20 Oct 2015 17:13:03 +0800
+Subject: [PATCH v2 1/9] mmc: core: Add DT bindings for eMMC hardware reset
+ support
 In-Reply-To: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
 References: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1445332391-30530-4-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1445332391-30530-2-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cmd_ints_mask and data_ints_mask are constant value,
-so make it to const
+Sometime only need set MMC_CAP_HW_RESET for one of MMC hosts,
+So set it in device tree is better.
 
 Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 ---
- drivers/mmc/host/mtk-sd.c | 15 ++++++---------
- 1 file changed, 6 insertions(+), 9 deletions(-)
+ Documentation/devicetree/bindings/mmc/mmc.txt | 1 +
+ drivers/mmc/core/host.c                       | 2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index b2e89d3..8b3e15d 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -353,7 +353,10 @@ static void msdc_reset_hw(struct msdc_host *host)
- static void msdc_cmd_next(struct msdc_host *host,
- 		struct mmc_request *mrq, struct mmc_command *cmd);
- 
--static u32 data_ints_mask = MSDC_INTEN_XFER_COMPL | MSDC_INTEN_DATTMO |
-+static const u32 cmd_ints_mask = MSDC_INTEN_CMDRDY | MSDC_INTEN_RSPCRCERR |
-+			MSDC_INTEN_CMDTMO | MSDC_INTEN_ACMDRDY |
-+			MSDC_INTEN_ACMDCRCERR | MSDC_INTEN_ACMDTMO;
-+static const u32 data_ints_mask = MSDC_INTEN_XFER_COMPL | MSDC_INTEN_DATTMO |
- 			MSDC_INTEN_DATCRCERR | MSDC_INTEN_DMA_BDCSERR |
- 			MSDC_INTEN_DMA_GPDCSERR | MSDC_INTEN_DMA_PROTECT;
- 
-@@ -725,10 +728,7 @@ static bool msdc_cmd_done(struct msdc_host *host, int events,
- 	if (done)
- 		return true;
- 
--	sdr_clr_bits(host->base + MSDC_INTEN, MSDC_INTEN_CMDRDY |
--			MSDC_INTEN_RSPCRCERR | MSDC_INTEN_CMDTMO |
--			MSDC_INTEN_ACMDRDY | MSDC_INTEN_ACMDCRCERR |
--			MSDC_INTEN_ACMDTMO);
-+	sdr_clr_bits(host->base + MSDC_INTEN, cmd_ints_mask);
- 
- 	if (cmd->flags & MMC_RSP_PRESENT) {
- 		if (cmd->flags & MMC_RSP_136) {
-@@ -818,10 +818,7 @@ static void msdc_start_command(struct msdc_host *host,
- 	rawcmd = msdc_cmd_prepare_raw_cmd(host, mrq, cmd);
- 	mod_delayed_work(system_wq, &host->req_timeout, DAT_TIMEOUT);
- 
--	sdr_set_bits(host->base + MSDC_INTEN, MSDC_INTEN_CMDRDY |
--			MSDC_INTEN_RSPCRCERR | MSDC_INTEN_CMDTMO |
--			MSDC_INTEN_ACMDRDY | MSDC_INTEN_ACMDCRCERR |
--			MSDC_INTEN_ACMDTMO);
-+	sdr_set_bits(host->base + MSDC_INTEN, cmd_ints_mask);
- 	writel(cmd->arg, host->base + SDC_ARG);
- 	writel(rawcmd, host->base + SDC_CMD);
- }
+diff --git a/Documentation/devicetree/bindings/mmc/mmc.txt b/Documentation/devicetree/bindings/mmc/mmc.txt
+index 0384fc3..f693baf 100644
+--- a/Documentation/devicetree/bindings/mmc/mmc.txt
++++ b/Documentation/devicetree/bindings/mmc/mmc.txt
+@@ -37,6 +37,7 @@ Optional properties:
+ - sd-uhs-sdr104: SD UHS SDR104 speed is supported
+ - sd-uhs-ddr50: SD UHS DDR50 speed is supported
+ - cap-power-off-card: powering off the card is safe
++- cap-mmc-hw-reset: eMMC hardware reset is supported
+ - cap-sdio-irq: enable SDIO IRQ signalling on this interface
+ - full-pwr-cycle: full power cycle of the card is supported
+ - mmc-ddr-1_8v: eMMC high-speed DDR mode(1.8V I/O) is supported
+diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+index abd933b..04fdc2f 100644
+--- a/drivers/mmc/core/host.c
++++ b/drivers/mmc/core/host.c
+@@ -507,6 +507,8 @@ int mmc_of_parse(struct mmc_host *host)
+ 		host->caps |= MMC_CAP_UHS_DDR50;
+ 	if (of_property_read_bool(np, "cap-power-off-card"))
+ 		host->caps |= MMC_CAP_POWER_OFF_CARD;
++	if (of_property_read_bool(np, "cap-mmc-hw-reset"))
++		host->caps |= MMC_CAP_HW_RESET;
+ 	if (of_property_read_bool(np, "cap-sdio-irq"))
+ 		host->caps |= MMC_CAP_SDIO_IRQ;
+ 	if (of_property_read_bool(np, "full-pwr-cycle"))
 -- 
 1.8.1.1.dirty
