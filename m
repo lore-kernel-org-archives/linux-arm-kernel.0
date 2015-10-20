@@ -1,82 +1,196 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue, 20 Oct 2015 19:40:32 +0800
-Subject: [PATCH v6 0/17] Add Analogix Core Display Port Driver
-In-Reply-To: <56260E06.2040902@osg.samsung.com>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
- <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
- <5624C896.8070108@osg.samsung.com> <5625A2A1.6090907@rock-chips.com>
- <56260E06.2040902@osg.samsung.com>
-Message-ID: <56262830.4030201@rock-chips.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 20 Oct 2015 13:56:58 +0200
+Subject: [PATCH] cpufreq: imx6: rework getting clocks and regulators
+Message-ID: <1445342218-12895-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+Use devm_* functions for getting clocks and regulators. This simplfifies
+the error path. Also return the error from the failing call instead of
+collating all regulator and clock errors to -ENOENT. With this the
+driver can properly handle -EPROBE_DEFER. Handling deferred probing
+becomes necessary once the SoC internal regulators get supplies. While
+the SoC internal regulators are registered early in architecture code,
+the supplies may be regular I2C devices which may be probed after the
+cpufreq driver.
 
-On 10/20/2015 05:48 PM, Javier Martinez Canillas wrote:
-> Hello Yakir,
->
-> On 10/20/2015 04:10 AM, Yakir Yang wrote:
->> Hi Javier,
->>
->> On 10/19/2015 06:40 PM, Javier Martinez Canillas wrote:
->>> Hello Yakir,
->>>
->>> On 10/10/2015 05:35 PM, Yakir Yang wrote:
->>>> Hi all,
->>>>
->>>>      The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
->>>> share the same IP, so a lot of parts can be re-used. I split the common
->>>> code into bridge directory, then rk3288 and exynos only need to keep
->>>> some platform code. Cause I can't find the exact IP name of exynos dp
->>>> controller, so I decide to name dp core driver with "analogix" which I
->>>> find in rk3288 eDP TRM :)
->>>>
->>>> But  there are still three light registers setting differents bewteen
->>>> exynos and rk3288.
->>>> 1. RK3288 have five special pll resigters which not indicata in exynos
->>>>      dp controller.
->>>> 2. The address of DP_PHY_PD(dp phy power manager register) are different
->>>>      between rk3288 and exynos.
->>>> 3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
->>>>      register).
->>>>
->>>> This series have been well tested on Rockchip platform with eDP panel
->>>> on Jerry Chromebook and Display Port Monitor on RK3288 board and thanks
->>>> to Javier at Samsung help me to find a way to install mainline kernel to
->>>> Samsung Exynos Chromebooks, so this series also have been tested on Samsung
->>>> Snow and Peach Pit Chromebooks which borrowed from my friends.
->>>>
->>>> Besides, This version was build on linux-next branch (tag next-20150918), and
->>>> the above test experiments also base on that tag. But I know the latest tag is
->>>> next-20151009, so i do rebase this series again on next-20151009, there were
->>>> little conflicts(exynos_dp removed the suspend/resume).
->>>>
->>>> But after I retest this series on next-20151009, I saw kernel crashed in mmc
->>>> driver(dw_mci_probe failed to get regulator). So i have to disabled the MMC
->>>> module(after all I boot with USB device), and I can see eDP light up normally
->>>> in startup stage, but kernel keep crashed when it try to mount the filesystem.
->>>> I thought this isn't related to dp driver directly, so i choice not to debug
->>>> more depth.
->>>>
->>>> That's to say if someone want to test this series, I suggest you applied this
->>>> series on tag-20150918, just need to fix some light conflicts with the 01 & 02
->>>> patches (or just email me, I can send you directly).
->>>>
->>>> Thanks,
->>> Do you have a branch that I can use to test this series?
->> Thank you for your kind assistance, I have created a tree which checkout from the next-20151019. Surely there were some conflicts to applied this series on that tag, but things still works for me, here is the git address [https://github.com/yakir-Yang/linux/tree/analogix_dp]
->>
-> I tested your branch on an Exynos5800 Peach Pi Chromebook and display is
-> working on boot. I also tested DPMS and S2R and things are still working
-> so for the whole series feel free to add:
->
-> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/cpufreq/imx6q-cpufreq.c | 125 ++++++++++++++++++++--------------------
+ 1 file changed, 63 insertions(+), 62 deletions(-)
 
-Thanks a lot    ;)
-
-- Yakir
-
->> Best regards,
->> - Yakir
->>
-> Best regards,
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index ef1fa81..f48f90a 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -176,6 +176,56 @@ static struct cpufreq_driver imx6q_cpufreq_driver = {
+ 	.attr = cpufreq_generic_attr,
+ };
+ 
++static int imx6q_cpufreq_get_clocks(struct platform_device *pdev)
++{
++	arm_clk = devm_clk_get(cpu_dev, "arm");
++	if (IS_ERR(arm_clk))
++		return PTR_ERR(arm_clk);
++
++	pll1_sys_clk = devm_clk_get(cpu_dev, "pll1_sys");
++	if (IS_ERR(pll1_sys_clk))
++		return PTR_ERR(pll1_sys_clk);
++
++	pll1_sw_clk = devm_clk_get(cpu_dev, "pll1_sw");
++	if (IS_ERR(pll1_sw_clk))
++		return PTR_ERR(pll1_sw_clk);
++
++	step_clk = devm_clk_get(cpu_dev, "step");
++	if (IS_ERR(step_clk))
++		return PTR_ERR(step_clk);
++
++	pll2_pfd2_396m_clk = devm_clk_get(cpu_dev, "pll2_pfd2_396m");
++	if (IS_ERR(pll2_pfd2_396m_clk))
++		return PTR_ERR(pll2_pfd2_396m_clk);
++
++	if (of_machine_is_compatible("fsl,imx6ul")) {
++		pll2_bus_clk = devm_clk_get(cpu_dev, "pll2_bus");
++		if (IS_ERR(pll2_bus_clk))
++			return PTR_ERR(pll2_bus_clk);
++
++		secondary_sel_clk = devm_clk_get(cpu_dev, "secondary_sel");
++		if (IS_ERR(secondary_sel_clk))
++			return PTR_ERR(secondary_sel_clk);
++	}
++
++	return 0;
++}
++
++static int imx6q_cpufreq_get_regulators(struct platform_device *pdev)
++{
++	arm_reg = devm_regulator_get(cpu_dev, "arm");
++	if (IS_ERR(arm_reg))
++		return PTR_ERR(arm_reg);
++
++	pu_reg = devm_regulator_get_optional(cpu_dev, "pu");
++
++	soc_reg = devm_regulator_get(cpu_dev, "soc");
++	if (IS_ERR(soc_reg))
++		return PTR_ERR(soc_reg);
++
++	return 0;
++}
++
+ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np;
+@@ -198,35 +248,18 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 		return -ENOENT;
+ 	}
+ 
+-	arm_clk = clk_get(cpu_dev, "arm");
+-	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
+-	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
+-	step_clk = clk_get(cpu_dev, "step");
+-	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
+-	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
+-	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
+-		dev_err(cpu_dev, "failed to get clocks\n");
+-		ret = -ENOENT;
+-		goto put_clk;
+-	}
+-
+-	if (of_machine_is_compatible("fsl,imx6ul")) {
+-		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
+-		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
+-		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
+-			dev_err(cpu_dev, "failed to get clocks specific to imx6ul\n");
+-			ret = -ENOENT;
+-			goto put_clk;
+-		}
++	ret = imx6q_cpufreq_get_clocks(pdev);
++	if (ret) {
++		dev_err(cpu_dev, "getting clocks failed with %d\n", ret);
++		goto put_node;
+ 	}
+ 
+-	arm_reg = regulator_get(cpu_dev, "arm");
+-	pu_reg = regulator_get_optional(cpu_dev, "pu");
+-	soc_reg = regulator_get(cpu_dev, "soc");
+-	if (IS_ERR(arm_reg) || IS_ERR(soc_reg)) {
+-		dev_err(cpu_dev, "failed to get regulators\n");
+-		ret = -ENOENT;
+-		goto put_reg;
++	ret = imx6q_cpufreq_get_regulators(pdev);
++	if (ret) {
++		if (ret != -EPROBE_DEFER)
++			dev_err(cpu_dev, "getting regulators failed with %d\n",
++					ret);
++		goto put_node;
+ 	}
+ 
+ 	/*
+@@ -239,7 +272,7 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 		ret = dev_pm_opp_of_add_table(cpu_dev);
+ 		if (ret < 0) {
+ 			dev_err(cpu_dev, "failed to init OPP table: %d\n", ret);
+-			goto put_reg;
++			goto put_node;
+ 		}
+ 
+ 		/* Because we have added the OPPs here, we must free them */
+@@ -256,7 +289,7 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
+ 	if (ret) {
+ 		dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
+-		goto put_reg;
++		goto out_free_opp;
+ 	}
+ 
+ 	/* Make imx6_soc_volt array's size same as arm opp number */
+@@ -347,28 +380,7 @@ free_freq_table:
+ out_free_opp:
+ 	if (free_opp)
+ 		dev_pm_opp_of_remove_table(cpu_dev);
+-put_reg:
+-	if (!IS_ERR(arm_reg))
+-		regulator_put(arm_reg);
+-	if (!IS_ERR(pu_reg))
+-		regulator_put(pu_reg);
+-	if (!IS_ERR(soc_reg))
+-		regulator_put(soc_reg);
+-put_clk:
+-	if (!IS_ERR(arm_clk))
+-		clk_put(arm_clk);
+-	if (!IS_ERR(pll1_sys_clk))
+-		clk_put(pll1_sys_clk);
+-	if (!IS_ERR(pll1_sw_clk))
+-		clk_put(pll1_sw_clk);
+-	if (!IS_ERR(step_clk))
+-		clk_put(step_clk);
+-	if (!IS_ERR(pll2_pfd2_396m_clk))
+-		clk_put(pll2_pfd2_396m_clk);
+-	if (!IS_ERR(pll2_bus_clk))
+-		clk_put(pll2_bus_clk);
+-	if (!IS_ERR(secondary_sel_clk))
+-		clk_put(secondary_sel_clk);
++put_node:
+ 	of_node_put(np);
+ 	return ret;
+ }
+@@ -379,17 +391,6 @@ static int imx6q_cpufreq_remove(struct platform_device *pdev)
+ 	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
+ 	if (free_opp)
+ 		dev_pm_opp_of_remove_table(cpu_dev);
+-	regulator_put(arm_reg);
+-	if (!IS_ERR(pu_reg))
+-		regulator_put(pu_reg);
+-	regulator_put(soc_reg);
+-	clk_put(arm_clk);
+-	clk_put(pll1_sys_clk);
+-	clk_put(pll1_sw_clk);
+-	clk_put(step_clk);
+-	clk_put(pll2_pfd2_396m_clk);
+-	clk_put(pll2_bus_clk);
+-	clk_put(secondary_sel_clk);
+ 
+ 	return 0;
+ }
+-- 
+2.6.1
