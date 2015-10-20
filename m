@@ -1,33 +1,45 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 20 Oct 2015 16:02:39 +0800
-Subject: [PATCH 6/7] clocksource: digicolor: don't trace
- digicolor_timer_sched_read()
-In-Reply-To: <1445328160-402-1-git-send-email-jszhang@marvell.com>
-References: <1445328160-402-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1445328160-402-7-git-send-email-jszhang@marvell.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 20 Oct 2015 10:11:30 +0200
+Subject: Using CONFIG_ARM_APPENDED_DTB with multiple device trees
+In-Reply-To: <20151020040445.GA4478@lunn.ch>
+References: <fce90e91fe3c452b80bcd2113f267003@svr-chch-ex1.atlnz.lc>
+ <20151020040445.GA4478@lunn.ch>
+Message-ID: <15278051.o7VntWNuSM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should not trace digicolor_timer_sched_read() function, add notrace
-attribute to this function.
+On Tuesday 20 October 2015 06:04:45 Andrew Lunn wrote:
+> On Tue, Oct 20, 2015 at 03:27:15AM +0000, Chris Packham wrote:
+> > Hi,
+> > 
+> > We currently have several boards based around the 88f6281 (kirkwood) ARM 
+> > CPU.
+> > 
+> > The boards all share a kernel image (currently 3.16 based but we're in 
+> > the process of moving to 4.3). We use the machine id (and some other 
+> > eeprom type information) to distinguish the boards.
+> > 
+> > We'd like to move to a device tree based model but we're restricted in 
+> > that updating the bootloaders to a DT-aware u-boot is impractical. 
+> > CONFIG_ARM_APPENDED_DTB allows us to append a device tree but we still 
+> > need to account for the differences between the boards.
+> 
+> Hi Chris
+> 
+> You might want to look at what Debian does. When installing the
+> kernel, it appends the correct DT blob depending on what the current
+> running kernel is, to the new kernel image before writing it to the
+> boot medium.
+> 
+> Another option is the pxa-impedance-matcher.
+> 
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/clocksource/timer-digicolor.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Right, pxa-impedance-matcher is indeed meant to solve this. We intentionally
+do not support CONFIG_ARM_APPENDED_DTB with multiple DT files so we get
+people to eventually update their boot loaders to a version that
+understands DT.
 
-diff --git a/drivers/clocksource/timer-digicolor.c b/drivers/clocksource/timer-digicolor.c
-index e73947f0f..a536eeb 100644
---- a/drivers/clocksource/timer-digicolor.c
-+++ b/drivers/clocksource/timer-digicolor.c
-@@ -143,7 +143,7 @@ static irqreturn_t digicolor_timer_interrupt(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
--static u64 digicolor_timer_sched_read(void)
-+static u64 notrace digicolor_timer_sched_read(void)
- {
- 	return ~readl(dc_timer_dev.base + COUNT(TIMER_B));
- }
--- 
-2.6.1
+For modern systems, the part of the boot loader that knows about the
+machine ID also knows about the DT.
+
+	Arnd
