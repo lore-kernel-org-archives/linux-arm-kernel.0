@@ -1,62 +1,107 @@
-From: brijeshkumar.singh@amd.com (Brijesh Singh)
-Date: Tue, 20 Oct 2015 14:16:01 -0500
-Subject: [PATCH] EDAC: Add AMD Seattle SoC EDAC
-In-Reply-To: <20151020174144.GD4943@leverpostej>
-References: <1445282597-18999-1-git-send-email-brijeshkumar.singh@amd.com>
- <20151019205236.GB453@leverpostej> <56266F7E.6030404@amd.com>
- <20151020165744.GE31130@pd.tnic> <20151020172654.GC4943@leverpostej>
- <20151020173639.GH31130@pd.tnic> <20151020174144.GD4943@leverpostej>
-Message-ID: <562692F1.1030209@amd.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 20 Oct 2015 12:17:59 -0700
+Subject: vmalloc_reserve with no highmem
+In-Reply-To: <56268D82.7030504@redhat.com>
+References: <56257AA5.1030800@gmail.com> <56268D82.7030504@redhat.com>
+Message-ID: <56269367.2000304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/20/2015 12:41 PM, Mark Rutland wrote:
-> On Tue, Oct 20, 2015 at 07:36:39PM +0200, Borislav Petkov wrote:
->> On Tue, Oct 20, 2015 at 06:26:55PM +0100, Mark Rutland wrote:
->>>> Btw, how much of this is implementing generic A57 functionality?
->>>
->>> The driver is entirely A57 generic.
->>>
->>>> If a lot, can we make this a generic a57_edac driver so that multiple
->>>> vendors can use it?
->>>
->>> Yes.
+On 20/10/15 11:52, Laura Abbott wrote:
+> On 10/19/2015 04:20 PM, Florian Fainelli wrote:
+>> Hi Russell, Laura,
 >>
->> Ok, cool.
+>> Setting vmalloc= on the kernel command-line to define the amount of
+>> vmalloc_reserve is not quite working when you have no highmem, as is the
+>> case of one my boards which has 512MB or 256M populated on a first bank
+>> at PA 0x0.
 >>
->>>> How fast and how ugly can something like that become?
->>>
->>> Not sure I follow.
+>> What happens in that case is that, despite setting vmalloc_reserve,
+>> therefore bumping up vmalloc_min to a higher address than high_memory,
+>> which is assigned __va(arm_lowmem_limit), we end-up with VMALLOC_START
+>> at high_memory + VMALLOC_OFFSET, which yields the amount of physical
+>> memory (start at PA 0x0 in my case) - VMALLOC_OFFSET.
 >>
->> In the sense that some vendor might require just a little bit different
->> handling or maybe wants to read some vendor-specific registers in
->> addition to the architectural ones.
+>> The maths look like this for this particular board (512MB)
 >>
->> Then we'll start adding vendor-specific hacks to that generic driver.
->> And therefore the question how fast and how ugly such hacks would
->> become.
+>> high_memory = 0x20000000 + PAGE_OFFSET = 0x20000000 + 0xC0000000 =
+>> 0xE0000000
+>> vmalloc_min = 0xFF00000 - (248 * 1024 * 1024) = 0xEF800000
 >>
->> I guess we'll worry about that when we get there...
+>> so we end-up with VMALLOC_START = high_memory + VMALLOC_OFFSET =
+>> 0xE0000000 + 8 * 1024* 1024 = 0xE0800000
 >>
->> So Brijesh, if you only need generic, architectural functionality,
->> please call it arm64_edac or so and let's add it so that other arm64
->> vendors can use it too.
+>> in sanity_check_meminfo(), high_memory is unconditionally assigned with
+>> arm_lowmem_limit's VA.
+>>
+>> The following quick and dirty patch seems to do it for me, but I am not
+>> confident this is remotely the correct approach here:
+>>
+>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>> index 14428d2..e196ea4 100644
+>> --- a/arch/arm/mm/mmu.c
+>> +++ b/arch/arm/mm/mmu.c
+>> @@ -1196,7 +1211,14 @@ void __init sanity_check_meminfo(void)
+>>          }
+>>   #endif
+>>          meminfo.nr_banks = j;
+>> -       high_memory = __va(arm_lowmem_limit - 1) + 1;
+>> +
+>> +       if (vmalloc_limit > arm_lowmem_limit)
+>> +               high_memory = vmalloc_min - VMALLOC_OFFSET;
+>> +       else
+>> +               high_memory = __va(arm_lowmem_limit - 1) + 1;
+>> +
+>> +       pr_info("%s: high_memory: 0x%p, arm_lowmem_limit: 0x%llx\n",
+>> +               __func__, high_memory, arm_lowmem_limit);
+>>
+>> BTW, even when there is highmem available, setting vmalloc= on the
+>> command-line is off by VMALLOC_OFFSET, the way early_vmalloc() computes
+>> things, is that intended?
+>>
+>> Thanks!
+>>
 > 
-> Please note that this is specific to Cortex-A57, not ARMv8 or aarch64.
-> 
-> It is an IMPLEMENTATION DEFINED feature as implemented by Cortex-A57,
-> which by definition is not implemented by other CPUs. It is not provided
-> by the ARM architecture.
-> 
-> So this cannot be arm64_edac, but could potentially be cortex_a57_edac.
-> 
+> Which baseline are you testing off of? Meminfo was removed
+> a while ago so I'm not sure where the meminfo.nr_banks context is
+> coming from.
 
-Yes code is generic to Cortex A57 and naming it cortex_a57_edac sounds good.
+This is 3.14, but I can forward port and test the change on 4.3-rcX as
+well where this is still relevant.
 
-Also I will follow your suggestion and remove DT binding and use MIDR. 
-
-> Thanks,
-> Mark.
 > 
+> This is how arm currently defines VMALLOC ranges
+> 
+> #define VMALLOC_OFFSET          (8*1024*1024)
+> #define VMALLOC_START           (((unsigned long)high_memory +
+> VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
+> #define VMALLOC_END             0xff000000UL
+> 
+> VMALLOC_START is based off of the value of high_memory. high_memory
+> is supposed to be the limit of the kernel direct mapped ram region so
+> setting it to something above that is asking for trouble.
+
+You're right, that does not seem right.
+
+> It seems like this is
+> working as intended. You'd have to decouple VMALLOC_START and
+> high_memory to make this work properly.
+
+That does not sound that trivial, but I can probably tinker with
+something locally which is not keyed of high_memory for now.
+
+> 
+> Having a vmalloc_start be greater than the end of direct mapped RAM seems a
+> little unusual. This would be leaving a hole in the virtual space. Is this
+> what you are intending or is there another use case for adjusting the
+> vmalloc space as you described?
+
+The intended use case is something like you have 512MB of physical
+memory, you want to give 248MB of this for vmalloc and no more, and the
+remainder to a statically carved out region, used for non Linux-managed
+allocations.
+
+Do we agree though, that if you are setting vmalloc on the command-line
+we should be reserving the amount that is being indicated?
+-- 
+Florian
