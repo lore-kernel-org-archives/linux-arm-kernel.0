@@ -1,606 +1,233 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 20 Oct 2015 13:16:24 +0100
-Subject: [PATCH v2] arm64: Add support for PTE contiguous bit.
-In-Reply-To: <1445285349-13242-1-git-send-email-dwoods@ezchip.com>
-References: <1445285349-13242-1-git-send-email-dwoods@ezchip.com>
-Message-ID: <20151020121622.GA24598@linaro.org>
+From: majun258@huawei.com (MaJun)
+Date: Tue, 20 Oct 2015 20:10:31 +0800
+Subject: [PATCH RESEND v6 3/4] irqchip:create irq domain for each mbigen device
+In-Reply-To: <1445343032-8032-1-git-send-email-majun258@huawei.com>
+References: <1445343032-8032-1-git-send-email-majun258@huawei.com>
+Message-ID: <1445343032-8032-4-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 04:09:09PM -0400, David Woods wrote:
-> The arm64 MMU supports a Contiguous bit which is a hint that the TTE
-> is one of a set of contiguous entries which can be cached in a single
-> TLB entry.  Supporting this bit adds new intermediate huge page sizes.
-> 
-> The set of huge page sizes available depends on the base page size.
-> Without using contiguous pages the huge page sizes are as follows.
-> 
->  4KB:   2MB  1GB
-> 64KB: 512MB
-> 
-> With a 4KB granule, the contiguous bit groups together sets of 16 pages
-> and with a 64KB granule it groups sets of 32 pages.  This enables two new
-> huge page sizes in each case, so that the full set of available sizes
-> is as follows.
-> 
->  4KB:  64KB   2MB  32MB  1GB
-> 64KB:   2MB 512MB  16GB
-> 
-> If a 16KB granule is used then the contiguous bit groups 128 pages
-> at the PTE level and 32 pages at the PMD level.
-> 
-> If the base page size is set to 64KB then 2MB pages are enabled by
-> default.  It is possible in the future to make 2MB the default huge
-> page size for both 4KB and 64KB granules.
+From: Ma Jun <majun258@huawei.com>
 
-Thank you for the V2 David,
-I have some comments below.
+For peripheral devices which connect to mbigen,mbigen is a interrupt
+controller. So, we create irq domain for each mbigen device and add
+mbigen irq domain into irq hierarchy structure.
 
-I would recommend running the next version of this series through
-the libhugetlbfs test suite, as that may pick up a few things too.
+Signed-off-by: Ma Jun <majun258@huawei.com>
+---
+ drivers/irqchip/irq-mbigen.c |  165 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 165 insertions(+), 0 deletions(-)
 
-Cheers,
+diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+index f18132f..3a20b25 100644
+--- a/drivers/irqchip/irq-mbigen.c
++++ b/drivers/irqchip/irq-mbigen.c
+@@ -16,27 +16,177 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/interrupt.h>
++#include <linux/irqchip.h>
+ #include <linux/module.h>
++#include <linux/msi.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ 
++/* Interrupt numbers per mbigen node supported */
++#define IRQS_PER_MBIGEN_NODE		128
++
++/* 16 irqs (Pin0-pin15) are reserved for each mbigen chip */
++#define RESERVED_IRQ_PER_MBIGEN_CHIP	16
++
++/**
++ * In mbigen vector register
++ * bit[21:12]:	event id value
++ * bit[11:0]:	device id
++ */
++#define IRQ_EVENT_ID_SHIFT		12
++#define IRQ_EVENT_ID_MASK		0x3ff
++
++/* register range of each mbigen node */
++#define MBIGEN_NODE_OFFSET		0x1000
++
++/* offset of vector register in mbigen node */
++#define REG_MBIGEN_VEC_OFFSET		0x200
++
+ /**
+  * struct mbigen_device - holds the information of mbigen device.
+  *
+  * @pdev:		pointer to the platform device structure of mbigen chip.
+  * @base:		mapped address of this mbigen chip.
++ * @domain:		pointer to the irq domain
+  */
+ struct mbigen_device {
+ 	struct platform_device	*pdev;
+ 	void __iomem		*base;
++	struct irq_domain	*domain;
++};
++
++/**
++ * struct mbigen_irq_data - private data of each irq
++ *
++ * @base:		mapped address of mbigen chip
++ * @reg_vec:		addr offset of interrupt vector register.
++ */
++struct mbigen_irq_data {
++	void __iomem		*base;
++	unsigned int		reg_vec;
++};
++
++static inline int get_mbigen_vec_reg(u32 nid, u32 offset)
++{
++	return (offset * 4) + nid * MBIGEN_NODE_OFFSET
++			+ REG_MBIGEN_VEC_OFFSET;
++}
++
++
++static struct irq_chip mbigen_irq_chip = {
++	.name =			"mbigen-v2",
++	.irq_mask =		irq_chip_mask_parent,
++	.irq_unmask =		irq_chip_unmask_parent,
++	.irq_eoi =		mbigen_eoi_irq,
++	.irq_set_type =		mbigen_set_type,
++	.irq_set_affinity =	irq_chip_set_affinity_parent,
++};
++
++static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
++{
++	struct mbigen_irq_data *mgn_irq_data = irq_get_chip_data(desc->irq);
++	u32 val;
++
++	val = readl_relaxed(mgn_irq_data->reg_vec + mgn_irq_data->base);
++
++	val &= ~(IRQ_EVENT_ID_MASK << IRQ_EVENT_ID_SHIFT);
++	val |= (msg->data << IRQ_EVENT_ID_SHIFT);
++
++	writel_relaxed(val, mgn_irq_data->reg_vec + mgn_irq_data->base);
++}
++
++static struct mbigen_irq_data *set_mbigen_irq_data(int hwirq)
++{
++	struct mbigen_irq_data *datap;
++	unsigned int nid, pin_offset;
++
++	datap = kzalloc(sizeof(*datap), GFP_KERNEL);
++	if (!datap)
++		return NULL;
++
++	/* get the mbigen node number */
++	nid = (hwirq - RESERVED_IRQ_PER_MBIGEN_CHIP) / IRQS_PER_MBIGEN_NODE + 1;
++
++	pin_offset = (hwirq - RESERVED_IRQ_PER_MBIGEN_CHIP)
++					% IRQS_PER_MBIGEN_NODE;
++
++	datap->reg_vec = get_mbigen_vec_reg(nid, pin_offset);
++
++	return datap;
++}
++
++static int mbigen_domain_translate(struct irq_domain *d,
++				    struct irq_fwspec *fwspec,
++				    unsigned long *hwirq,
++				    unsigned int *type)
++{
++	if (is_of_node(fwspec->fwnode)) {
++		if (fwspec->param_count != 2)
++			return -EINVAL;
++
++		*hwirq = fwspec->param[0];
++		*type = fwspec->param[1] & IRQ_TYPE_SENSE_MASK;
++
++		return 0;
++	}
++	return -EINVAL;
++}
++
++static int mbigen_irq_domain_alloc(struct irq_domain *domain,
++					unsigned int virq,
++					unsigned int nr_irqs,
++					void *args)
++{
++	struct irq_fwspec *fwspec = args;
++	irq_hw_number_t hwirq = fwspec->param[0];
++	struct mbigen_device *mgn_chip;
++	struct mbigen_irq_data *mgn_irq_data;
++	int i, err;
++
++	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
++	if (err)
++		return err;
++
++	/* set related information of this irq */
++	mgn_irq_data = set_mbigen_irq_data(hwirq);
++	if (!mgn_irq_data)
++		return err;
++
++	mgn_chip = platform_msi_get_host_data(domain);
++	mgn_irq_data->base = mgn_chip->base;
++
++	for (i = 0; i < nr_irqs; i++)
++		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
++				      &mbigen_irq_chip, mgn_irq_data);
++
++	return 0;
++}
++
++static void mbigen_domain_free(struct irq_domain *domain, unsigned int virq,
++			       unsigned int nr_irqs)
++{
++	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
++	struct mbigen_irq_data *mgn_irq_data = irq_data_get_irq_chip_data(d);
++
++	kfree(mgn_irq_data);
++	irq_domain_free_irqs_common(domain, virq, nr_irqs);
++}
++
++static struct irq_domain_ops mbigen_domain_ops = {
++	.translate	= mbigen_domain_translate,
++	.alloc		= mbigen_irq_domain_alloc,
++	.free		= mbigen_domain_free,
+ };
+ 
+ static int mbigen_device_probe(struct platform_device *pdev)
+ {
+ 	struct mbigen_device *mgn_chip;
++	struct irq_domain *domain;
++	u32 num_msis;
+ 
+ 	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
+ 	if (!mgn_chip)
+@@ -45,6 +195,20 @@ static int mbigen_device_probe(struct platform_device *pdev)
+ 	mgn_chip->pdev = pdev;
+ 	mgn_chip->base = of_iomap(pdev->dev.of_node, 0);
+ 
++	/* If there is no "num-msi" property, assume 64... */
++	if (of_property_read_u32(pdev->dev.of_node, "num-msis", &num_msis) < 0)
++		num_msis = 64;
++
++	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
++							mbigen_write_msg,
++							&mbigen_domain_ops,
++							mgn_chip);
++
++	if (!domain)
++		return -ENOMEM;
++
++	mgn_chip->domain = domain;
++
+ 	platform_set_drvdata(pdev, mgn_chip);
+ 
+ 	return 0;
+@@ -54,6 +218,7 @@ static int mbigen_device_remove(struct platform_device *pdev)
+ {
+ 	struct mbigen_device *mgn_chip = platform_get_drvdata(pdev);
+ 
++	irq_domain_remove(mgn_chip->domain);
+ 	iounmap(mgn_chip->base);
+ 
+ 	return 0;
 -- 
-Steve
-
-> 
-> Signed-off-by: David Woods <dwoods@ezchip.com>
-> Reviewed-by: Chris Metcalf <cmetcalf@ezchip.com>
-> ---
->  arch/arm64/Kconfig                     |   3 -
->  arch/arm64/include/asm/hugetlb.h       |  30 ++---
->  arch/arm64/include/asm/pgtable-hwdef.h |  20 ++++
->  arch/arm64/include/asm/pgtable.h       |  33 +++++-
->  arch/arm64/mm/hugetlbpage.c            | 211 ++++++++++++++++++++++++++++++++-
->  5 files changed, 272 insertions(+), 25 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 07d1811..3aa151d 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -464,9 +464,6 @@ config HW_PERF_EVENTS
->  config SYS_SUPPORTS_HUGETLBFS
->  	def_bool y
->  
-> -config ARCH_WANT_GENERAL_HUGETLB
-> -	def_bool y
-> -
->  config ARCH_WANT_HUGE_PMD_SHARE
->  	def_bool y if !ARM64_64K_PAGES
->  
-> diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
-> index bb4052e..2b153a9 100644
-> --- a/arch/arm64/include/asm/hugetlb.h
-> +++ b/arch/arm64/include/asm/hugetlb.h
-> @@ -26,12 +26,6 @@ static inline pte_t huge_ptep_get(pte_t *ptep)
->  	return *ptep;
->  }
->  
-> -static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
-> -				   pte_t *ptep, pte_t pte)
-> -{
-> -	set_pte_at(mm, addr, ptep, pte);
-> -}
-> -
->  static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
->  					 unsigned long addr, pte_t *ptep)
->  {
-> @@ -44,19 +38,6 @@ static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
->  	ptep_set_wrprotect(mm, addr, ptep);
->  }
->  
-> -static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
-> -					    unsigned long addr, pte_t *ptep)
-> -{
-> -	return ptep_get_and_clear(mm, addr, ptep);
-> -}
-> -
-> -static inline int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-> -					     unsigned long addr, pte_t *ptep,
-> -					     pte_t pte, int dirty)
-> -{
-> -	return ptep_set_access_flags(vma, addr, ptep, pte, dirty);
-> -}
-> -
->  static inline void hugetlb_free_pgd_range(struct mmu_gather *tlb,
->  					  unsigned long addr, unsigned long end,
->  					  unsigned long floor,
-> @@ -97,4 +78,15 @@ static inline void arch_clear_hugepage_flags(struct page *page)
->  	clear_bit(PG_dcache_clean, &page->flags);
->  }
->  
-> +extern pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
-> +				struct page *page, int writable);
-> +#define arch_make_huge_pte arch_make_huge_pte
-> +extern void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
-> +			    pte_t *ptep, pte_t pte);
-> +extern int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-> +				      unsigned long addr, pte_t *ptep,
-> +				      pte_t pte, int dirty);
-> +extern pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
-> +				     unsigned long addr, pte_t *ptep);
-> +
->  #endif /* __ASM_HUGETLB_H */
-> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-> index 24154b0..1b921a5 100644
-> --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> @@ -55,6 +55,24 @@
->  #define SECTION_MASK		(~(SECTION_SIZE-1))
->  
->  /*
-> + * Contiguous page definitions.
-> + */
-> +#ifdef CONFIG_ARM64_64K_PAGES
-> +#define CONT_PTE_SHIFT		5
-> +#define CONT_PMD_SHIFT		5
-> +#else
-> +#define CONT_PTE_SHIFT		4
-> +#define CONT_PMD_SHIFT		4
-> +#endif
-> +
-> +#define CONT_PTES		(1 << CONT_PTE_SHIFT)
-> +#define CONT_PTE_SIZE		(CONT_PTES * PAGE_SIZE)
-> +#define CONT_PTE_MASK		(~(CONT_PTE_SIZE - 1))
-> +#define CONT_PMDS		(1 << CONT_PMD_SHIFT)
-> +#define CONT_PMD_SIZE		(CONT_PMDS * PMD_SIZE)
-> +#define CONT_PMD_MASK		(~(CONT_PMD_SIZE - 1))
-> +
-> +/*
->   * Hardware page table definitions.
->   *
->   * Level 1 descriptor (PUD).
-> @@ -83,6 +101,7 @@
->  #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
->  #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
->  #define PMD_SECT_NG		(_AT(pmdval_t, 1) << 11)
-> +#define PMD_SECT_CONT		(_AT(pmdval_t, 1) << 52)
->  #define PMD_SECT_PXN		(_AT(pmdval_t, 1) << 53)
->  #define PMD_SECT_UXN		(_AT(pmdval_t, 1) << 54)
->  
-> @@ -105,6 +124,7 @@
->  #define PTE_AF			(_AT(pteval_t, 1) << 10)	/* Access Flag */
->  #define PTE_NG			(_AT(pteval_t, 1) << 11)	/* nG */
->  #define PTE_DBM			(_AT(pteval_t, 1) << 51)	/* Dirty Bit Management */
-> +#define PTE_CONT		(_AT(pteval_t, 1) << 52)	/* Contiguous */
->  #define PTE_PXN			(_AT(pteval_t, 1) << 53)	/* Privileged XN */
->  #define PTE_UXN			(_AT(pteval_t, 1) << 54)	/* User XN */
->  
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 26b0666..cf079a1 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -140,6 +140,7 @@ extern struct page *empty_zero_page;
->  #define pte_special(pte)	(!!(pte_val(pte) & PTE_SPECIAL))
->  #define pte_write(pte)		(!!(pte_val(pte) & PTE_WRITE))
->  #define pte_exec(pte)		(!(pte_val(pte) & PTE_UXN))
-> +#define pte_cont(pte)		(!!(pte_val(pte) & PTE_CONT))
->  
->  #ifdef CONFIG_ARM64_HW_AFDBM
->  #define pte_hw_dirty(pte)	(pte_write(pte) && !(pte_val(pte) & PTE_RDONLY))
-> @@ -202,6 +203,18 @@ static inline pte_t pte_mkspecial(pte_t pte)
->  	return set_pte_bit(pte, __pgprot(PTE_SPECIAL));
->  }
->  
-> +static inline pte_t pte_mkcont(pte_t pte)
-> +{
-> +	pte = set_pte_bit(pte, __pgprot(PTE_CONT));
-> +	return set_pte_bit(pte, __pgprot(PTE_TYPE_PAGE));
-> +	return pte;
-
-The second return should be removed.
-
-> +}
-> +
-> +static inline pmd_t pmd_mkcont(pmd_t pmd)
-> +{
-> +	return __pmd(pmd_val(pmd) | PMD_SECT_CONT);
-> +}
-> +
->  static inline void set_pte(pte_t *ptep, pte_t pte)
->  {
->  	*ptep = pte;
-> @@ -271,7 +284,7 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
->  /*
->   * Hugetlb definitions.
->   */
-> -#define HUGE_MAX_HSTATE		2
-> +#define HUGE_MAX_HSTATE		((2 * CONFIG_PGTABLE_LEVELS) - 1)
-
-Not sure about this definition. I would just go with the maximum possible
-which is for a 4KB granule:
-1 x 1GB pud
-1 x 2MB pmd
-16 x 2MB pmds
-16 x 4KB ptes
-
-So 4 for now?
-
-
->  #define HPAGE_SHIFT		PMD_SHIFT
->  #define HPAGE_SIZE		(_AC(1, UL) << HPAGE_SHIFT)
->  #define HPAGE_MASK		(~(HPAGE_SIZE - 1))
-> @@ -496,7 +509,7 @@ static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
->  static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
->  {
->  	const pteval_t mask = PTE_USER | PTE_PXN | PTE_UXN | PTE_RDONLY |
-> -			      PTE_PROT_NONE | PTE_VALID | PTE_WRITE;
-> +			      PTE_PROT_NONE | PTE_VALID | PTE_WRITE | PTE_CONT;
-
-Why has PTE_CONT been added to the pte_modify mask? This will allow
-functions such as mprotect to remove the PTE_CONT bit.
-
->  	/* preserve the hardware dirty information */
->  	if (pte_hw_dirty(pte))
->  		pte = pte_mkdirty(pte);
-> @@ -509,6 +522,22 @@ static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
->  	return pte_pmd(pte_modify(pmd_pte(pmd), newprot));
->  }
->  
-> +static inline pte_t pte_modify_pfn(pte_t pte, unsigned long newpfn)
-> +{
-> +	const pteval_t mask = PHYS_MASK & PAGE_MASK;
-> +
-> +	pte_val(pte) = pfn_pte(newpfn, (pte_val(pte) & ~mask));
-> +	return pte;
-> +}
-> +
-> +static inline pmd_t pmd_modify_pfn(pmd_t pmd, unsigned long newpfn)
-> +{
-> +	const pmdval_t mask = PHYS_MASK & PAGE_MASK;
-> +
-> +	pmd = pfn_pmd(newpfn, (pmd_val(pmd) & ~mask));
-> +	return pmd;
-> +}
-
-pte_modify_pfn and pmd_modify_pfn aren't referenced anywhere in the
-patch so should be removed.
-
-> +
->  #ifdef CONFIG_ARM64_HW_AFDBM
->  /*
->   * Atomic pte/pmd modifications.
-> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> index 383b03f..20fd34c 100644
-> --- a/arch/arm64/mm/hugetlbpage.c
-> +++ b/arch/arm64/mm/hugetlbpage.c
-> @@ -41,6 +41,201 @@ int pud_huge(pud_t pud)
->  #endif
->  }
->  
-> +static int find_num_contig(struct mm_struct *mm, unsigned long addr,
-> +			   pte_t *ptep, pte_t pte, size_t *pgsize)
-> +{
-> +	pgd_t *pgd = pgd_offset(mm, addr);
-> +	pud_t *pud;
-> +	pmd_t *pmd;
-> +
-> +	if (!pte_cont(pte))
-> +		return 1;
-> +
-> +	pud = pud_offset(pgd, addr);
-> +	pmd = pmd_offset(pud, addr);
-
-We need to check for pgd_present and pud_present as we walk.
-I would be tempted to VM_BUG_ON if they are in an unexpected state.
-
-> +	if ((pte_t *)pmd == ptep) {
-> +		*pgsize = PMD_SIZE;
-> +		return CONT_PMDS;
-> +	}
-
-I would check for pmd_present and VM_BUG_ON if it wasn't in an expected
-state.
-
-> +	*pgsize = PAGE_SIZE;
-> +	return CONT_PTES;
-> +}
-
-Another approach would be something like:
-
-struct vm_area_struct *vma = find_vma(mm, addr);
-struct hstate *h = hstate_vma(vma);
-size_t size = hpage_size(h);
-
-But I think looking at the page table entries like you've done (with
-some checking) may be a little better as it can supply some more robust
-debugging with DEBUG_VM selected (and it doesn't need to find_vma).
-
-
-> +
-> +extern void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
-> +			    pte_t *ptep, pte_t pte)
-
-We don't need this extern.
-
-> +{
-> +	size_t pgsize;
-> +	int ncontig = find_num_contig(mm, addr, ptep, pte, &pgsize);
-> +
-> +	if (ncontig == 1) {
-> +		set_pte_at(mm, addr, ptep, pte);
-
-We can return early here and avoid a level of indentation below.
-
-> +	} else {
-> +		int i;
-> +		unsigned long pfn = pte_pfn(pte);
-> +		pgprot_t hugeprot =
-> +			__pgprot(pte_val(pfn_pte(pfn, 0) ^ pte_val(pte)));
-> +		for (i = 0; i < ncontig; i++) {
-> +			pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
-> +				 pfn_pte(pfn, hugeprot));
-> +			set_pte_at(mm, addr, ptep, pfn_pte(pfn, hugeprot));
-> +			ptep++;
-> +			pfn += pgsize / PAGE_SIZE;
-
-nit: pgsize >> PAGE_SHIFT
-
-> +			addr += pgsize;
-> +		}
-> +	}
-> +}
-
-I see... so the contiguous pte and pmd cases are folded together.
-The pgsize variable name could be changed, perhaps something like blocksize?
-(I am terrible at picking names though :-)).
-
-> +
-> +pte_t *huge_pte_alloc(struct mm_struct *mm,
-> +		      unsigned long addr, unsigned long sz)
-> +{
-> +	pgd_t *pgd;
-> +	pud_t *pud;
-> +	pte_t *pte = NULL;
-> +
-> +	pr_debug("%s: addr:0x%lx sz:0x%lx\n", __func__, addr, sz);
-> +	pgd = pgd_offset(mm, addr);
-> +	pud = pud_alloc(mm, pgd, addr);
-
-Probably better to simplify the levels of indentation with:
-	if (!pud)
-		return NULL;
-(or goto out before your pr_debug)
-
-> +	if (pud) {
-
-Perhaps better to do something with switch(sz) below?
-
-> +		if (sz == PUD_SIZE) {
-> +			pte = (pte_t *)pud;
-> +		} else if (sz == (PAGE_SIZE * CONT_PTES)) {
-> +			pmd_t *pmd = pmd_alloc(mm, pud, addr);
-> +
-> +			WARN_ON(addr & (sz - 1));
-> +			pte = pte_alloc_map(mm, NULL, pmd, addr);
-> +		} else if (sz == PMD_SIZE) {
-> +#ifdef CONFIG_ARCH_WANT_HUGE_PMD_SHARE
-> +			if (pud_none(*pud))
-> +				pte = huge_pmd_share(mm, addr, pud);
-> +			else
-> +#endif
-
-This can be simplified to something like:
-
-if (IS_ENABLED(CONFIG_ARCH_WANT_HUGE_PMD_SHARE)
-	&& pud_none(*pud))
-else
-
-So we can remove the preprocessor macros.
-
-> +				pte = (pte_t *)pmd_alloc(mm, pud, addr);
-> +		} else if (sz == (PMD_SIZE * CONT_PMDS)) {
-> +			pmd_t *pmd;
-> +
-> +			pmd = pmd_alloc(mm, pud, addr);
-> +			WARN_ON(addr & (sz - 1));
-> +			return (pte_t *)pmd;
-> +		}
-> +	}
-> +
-> +	pr_debug("%s: addr:0x%lx sz:0x%lx ret pte=%p/0x%llx\n", __func__, addr,
-> +	       sz, pte, pte_val(*pte));
-> +	return pte;
-> +}
-> +
-> +pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
-> +{
-> +	pgd_t *pgd;
-> +	pud_t *pud;
-> +	pmd_t *pmd = NULL;
-> +	pte_t *pte = NULL;
-> +
-> +	pgd = pgd_offset(mm, addr);
-> +	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
-> +	if (pgd_present(*pgd)) {
-
-Again drop a level of indentation with:
-if (!pgd_present(*pgd))
-	return NULL;
-
-Similarly for pud_present and pmd_present.
-
-> +		pud = pud_offset(pgd, addr);
-> +		if (pud_present(*pud)) {
-> +			if (pud_huge(*pud))
-> +				return (pte_t *)pud;
-> +			pmd = pmd_offset(pud, addr);
-> +			if (pmd_present(*pmd)) {
-> +				if (pte_cont(pmd_pte(*pmd))) {
-> +					pmd = pmd_offset(
-> +						pud, (addr & CONT_PMD_MASK));
-> +					return (pte_t *)pmd;
-> +				}
-> +				if (pmd_huge(*pmd))
-> +					return (pte_t *)pmd;
-> +				pte = pte_offset_kernel(pmd, addr);
-> +				if (pte_present(*pte) && pte_cont(*pte)) {
-> +					pte = pte_offset_kernel(
-> +						pmd, (addr & CONT_PTE_MASK));
-> +				}
-> +				return pte;
-> +			}
-> +		}
-> +	}
-> +	return (pte_t *) NULL;
-> +}
-> +
-> +pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
-> +			 struct page *page, int writable)
-> +{
-> +	size_t pagesize = huge_page_size(hstate_vma(vma));
-> +
-
-I would go for switch(pagesize) here.
-
-> +	if (pagesize == CONT_PTE_SIZE) {
-> +		entry = pte_mkcont(entry);
-> +	} else if (pagesize == CONT_PMD_SIZE) {
-> +		entry = pmd_pte(pmd_mkcont(pte_pmd(entry)));
-> +	} else if (pagesize != PUD_SIZE && pagesize != PMD_SIZE) {
-> +		pr_warn("%s: unrecognized huge page size 0x%lx\n",
-> +		       __func__, pagesize);
-> +	}
-> +	return entry;
-> +}
-> +
-> +extern pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
-> +				     unsigned long addr, pte_t *ptep)
-> +{
-> +	pte_t pte = {0};
-
-nit: Do we need an initial value for pte?
-
-> +
-> +	if (pte_cont(*ptep)) {
-> +		int ncontig, i;
-> +		size_t pgsize;
-> +		pte_t *cpte;
-> +		bool is_dirty = false;
-> +
-> +		cpte = huge_pte_offset(mm, addr);
-> +		ncontig = find_num_contig(mm, addr, cpte,
-> +					  pte_val(*cpte), &pgsize);
-> +		/* save the 1st pte to return */
-> +		pte = ptep_get_and_clear(mm, addr, cpte);
-> +		for (i = 1; i < ncontig; ++i) {
-> +			if (pte_dirty(ptep_get_and_clear(mm, addr, ++cpte)))
-> +				is_dirty = true;
-> +		}
-
-Nice, we are keeping track of the dirty state. This looks to me like
-it *should* work well with the dirty bit management patch that Catalin
-introduced:
-2f4b829 arm64: Add support for hardware updates of the access and dirty pte bits
-
-Because ptep_get_and_clear will atomically get and clear the pte with
-respect to the hardware dirty bit management thus we don't lose any
-dirty information. huge_pte_dirty is then called on the extracted pte
-by core code.
-
-For a contiguous set of ptes/pmds the individual entry will be dirtied
-by DBM rather than the complete set so it's good to check them all for
-dirty when going through a get and clear.
-
-Technically we don't need to track dirty if CONFIG_ARM64_HW_AFDBM is
-not defined as the core code will fault and modify the entire set of
-ptes otherwise.
-
-I would be tempted to keep this code as is, but add a comment that
-tracking the dirty variable here helps for when we switch on
-CONFIG_ARM64_HW_AFDBM.
-
-> +		if (is_dirty)
-> +			return pte_mkdirty(pte);
-> +		else
-> +			return pte;
-> +	} else {
-> +		return ptep_get_and_clear(mm, addr, ptep);
-> +	}
-> +}
-> +
-> +int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-> +			       unsigned long addr, pte_t *ptep,
-> +			       pte_t pte, int dirty)
-> +{
-> +	pte_t *cpte;
-> +
-> +	if (pte_cont(pte)) {
-> +		int ncontig, i, changed = 0;
-> +		size_t pgsize = 0;
-> +		unsigned long pfn = pte_pfn(pte);
-> +		/* Select all bits except the pfn */
-> +		pgprot_t hugeprot =
-> +			__pgprot(pte_val(pfn_pte(pfn, 0) ^ pte_val(pte)));
-> +
-> +		cpte = huge_pte_offset(vma->vm_mm, addr);
-> +		pfn = pte_pfn(*cpte);
-> +		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
-> +					  pte_val(*cpte), &pgsize);
-> +		for (i = 0; i < ncontig; ++i, ++cpte) {
-> +			changed = ptep_set_access_flags(vma, addr, cpte,
-> +							pfn_pte(pfn,
-> +								hugeprot),
-> +							dirty);
-> +			pfn += pgsize / PAGE_SIZE;
-
-nit: pgsize >> PAGE_SHIFT
-
-> +		}
-
-Similar thing here, we are folding the cont pte and pmd logic together,
-probably best go for something like blocksize instead of pgsize.
-
-> +		return changed;
-> +	} else {
-> +		return ptep_set_access_flags(vma, addr, ptep, pte, dirty);
-> +	}
-> +}
-> +
-> +
->  static __init int setup_hugepagesz(char *opt)
->  {
->  	unsigned long ps = memparse(opt, &opt);
-> @@ -48,10 +243,24 @@ static __init int setup_hugepagesz(char *opt)
->  		hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
-
-Again switch statement here I think would be clearer.
-
->  	} else if (ps == PUD_SIZE) {
->  		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
-> +	} else if (ps == (PAGE_SIZE * CONT_PTES)) {
-> +		hugetlb_add_hstate(CONT_PTE_SHIFT);
-> +	} else if (ps == (PMD_SIZE * CONT_PMDS)) {
-> +		hugetlb_add_hstate((PMD_SHIFT + CONT_PMD_SHIFT) - PAGE_SHIFT);
->  	} else {
-> -		pr_err("hugepagesz: Unsupported page size %lu M\n", ps >> 20);
-> +		pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
->  		return 0;
->  	}
->  	return 1;
->  }
->  __setup("hugepagesz=", setup_hugepagesz);
-> +
-> +#ifdef CONFIG_ARM64_64K_PAGES
-> +static __init int add_default_hugepagesz(void)
-> +{
-> +	if (size_to_hstate(CONT_PTES * PAGE_SIZE) == NULL)
-> +		hugetlb_add_hstate(CONT_PMD_SHIFT);
-> +	return 0;
-> +}
-> +arch_initcall(add_default_hugepagesz);
-> +#endif
-Why is this initcall defined? Was it for testing?
-
-I think we are missing a few functions:
-huge_ptep_set_access_flags
-huge_ptep_set_wrprotect
-huge_ptep_clear_flush
-
-These functions need to loop through the contiguous set of ptes
-or pmds. They should call into the ptep_ equivalents as they will
-then work with the DBM patch.
-
-> -- 
-> 2.1.2
-> 
+1.7.1
