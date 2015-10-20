@@ -1,338 +1,933 @@
 From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
-Date: Tue, 20 Oct 2015 16:15:30 +0530
-Subject: [PATCH v6 3/4] arm64/arm, numa,
- dt: adding numa dt binding implementation for arm64 platforms
+Date: Tue, 20 Oct 2015 16:15:31 +0530
+Subject: [PATCH v6 4/4] arm64, dt,
+ thunderx: Add initial dts for Cavium Thunderx in 2 node topology.
 In-Reply-To: <1445337931-11344-1-git-send-email-gkulkarni@caviumnetworks.com>
 References: <1445337931-11344-1-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <1445337931-11344-4-git-send-email-gkulkarni@caviumnetworks.com>
+Message-ID: <1445337931-11344-5-git-send-email-gkulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding numa dt binding support for arm64 based platforms.
-dt node parsing for numa topology is done using device property
-proximity and device node distance-map.
+Adding dt file for Cavium's Thunderx dual socket platform.
 
-Reviewed-by: Robert Richter <rrichter@cavium.com>
 Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
 ---
- arch/arm64/Kconfig            |  10 ++
- arch/arm64/include/asm/numa.h |  10 ++
- arch/arm64/kernel/Makefile    |   1 +
- arch/arm64/kernel/of_numa.c   | 221 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/smp.c       |   1 +
- arch/arm64/mm/numa.c          |  10 +-
- 6 files changed, 252 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/kernel/of_numa.c
+ arch/arm64/boot/dts/cavium/Makefile             |   2 +-
+ arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts  |  82 +++
+ arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi | 806 ++++++++++++++++++++++++
+ 3 files changed, 889 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts
+ create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0f9cdc7..6cf8d20 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -426,6 +426,16 @@ config NUMA
- 	  local memory controller of the CPU and add some more
- 	  NUMA awareness to the kernel.
+diff --git a/arch/arm64/boot/dts/cavium/Makefile b/arch/arm64/boot/dts/cavium/Makefile
+index e34f89d..7fe7067 100644
+--- a/arch/arm64/boot/dts/cavium/Makefile
++++ b/arch/arm64/boot/dts/cavium/Makefile
+@@ -1,4 +1,4 @@
+-dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
++dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb thunder-88xx-2n.dtb
  
-+config OF_NUMA
-+	bool "Device Tree NUMA support"
-+	depends on NUMA
-+	depends on OF
-+	default y
-+	help
-+	  Enable Device Tree NUMA support.
-+	  This enables the numa mapping of cpu, memory, io and
-+	  inter node distances using dt bindings.
-+
- config NODES_SHIFT
- 	int "Maximum NUMA Nodes (as a power of 2)"
- 	range 1 10
-diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
-index cadbd24..322da78 100644
---- a/arch/arm64/include/asm/numa.h
-+++ b/arch/arm64/include/asm/numa.h
-@@ -60,4 +60,14 @@ void numa_store_cpu_info(unsigned int cpu);
- static inline void numa_store_cpu_info(unsigned int cpu)		{ }
- static inline void arm64_numa_init(void)		{ }
- #endif	/* CONFIG_NUMA */
-+
-+struct device_node;
-+#ifdef CONFIG_OF_NUMA
-+int __init arm64_of_numa_init(void);
-+void __init of_numa_set_node_info(unsigned int cpu,
-+		u64 hwid, struct device_node *dn);
-+#else
-+static inline void of_numa_set_node_info(unsigned int cpu, u64 hwid,
-+		struct device_node *dn) { }
-+#endif
- #endif	/* _ASM_NUMA_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 22dc9bc..ad1fd72 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -36,6 +36,7 @@ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
- arm64-obj-$(CONFIG_PCI)			+= pci.o
- arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
- arm64-obj-$(CONFIG_ACPI)		+= acpi.o
-+arm64-obj-$(CONFIG_OF_NUMA)		+= of_numa.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/of_numa.c b/arch/arm64/kernel/of_numa.c
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts b/arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts
 new file mode 100644
-index 0000000..0a6b2cf
+index 0000000..4bde994
 --- /dev/null
-+++ b/arch/arm64/kernel/of_numa.c
-@@ -0,0 +1,221 @@
++++ b/arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts
+@@ -0,0 +1,82 @@
 +/*
-+ * OF NUMA Parsing support.
++ * Cavium Thunder DTS file - Thunder board description
 + *
-+ * Copyright (C) 2015 Cavium Inc.
-+ * Author: Ganapatrao Kulkarni <gkulkarni@cavium.com>
++ * Copyright (C) 2014, Cavium Inc.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
 + *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this library; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#include <linux/memblock.h>
-+#include <linux/ctype.h>
-+#include <linux/module.h>
-+#include <linux/nodemask.h>
-+#include <linux/of.h>
-+#include <linux/of_fdt.h>
-+#include <asm/smp_plat.h>
++/dts-v1/;
 +
-+/* define default numa node to 0 */
-+#define DEFAULT_NODE 0
++/include/ "thunder-88xx-2n.dtsi"
 +
-+/* Returns nid in the range [0..MAX_NUMNODES-1],
-+ * or NUMA_NO_NODE if no valid proximity entry found
-+ * or DEFAULT_NODE if no proximity entry exists
++/ {
++	model = "Cavium ThunderX CN88XX board";
++	compatible = "cavium,thunder-88xx";
++
++	aliases {
++		serial0 = &uaa0;
++		serial1 = &uaa1;
++	};
++
++	memory at 00000000 {
++		device_type = "memory";
++		reg = <0x0 0x01400000 0x3 0xFEC00000>;
++		/* socket 0 */
++		proximity = <0>;
++	};
++
++	memory at 10000000000 {
++		device_type = "memory";
++		reg = <0x100 0x00400000 0x3 0xFFC00000>;
++		 /* socket 1 */
++		proximity = <1>;
++	};
++
++	distance-map {
++		distance-matrix = <0 0  10>,
++				  <0 1  20>,
++				  <1 1  10>;
++	};
++};
+diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi b/arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi
+new file mode 100644
+index 0000000..959a65a
+--- /dev/null
++++ b/arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi
+@@ -0,0 +1,806 @@
++/*
++ * Cavium Thunder DTS file - Thunder SoC description
++ *
++ * Copyright (C) 2014, Cavium Inc.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this library; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
-+static int proximity_to_nid(const __be32 *proximity, int length)
-+{
-+	int nid;
 +
-+	if (!proximity)
-+		return DEFAULT_NODE;
++/ {
++	compatible = "cavium,thunder-88xx";
++	interrupt-parent = <&gic0>;
++	#address-cells = <2>;
++	#size-cells = <2>;
 +
-+	if (length != sizeof(*proximity)) {
-+		pr_warn("NUMA: Invalid proximity length %d found.\n", length);
-+		return NUMA_NO_NODE;
-+	}
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
 +
-+	nid = of_read_number(proximity, 1);
-+	if (nid >= MAX_NUMNODES) {
-+		pr_warn("NUMA: Invalid numa node %d found.\n", nid);
-+		return NUMA_NO_NODE;
-+	}
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
 +
-+	return nid;
-+}
++		cpu at 000 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x000>;
++			enable-method = "psci";
++			/* socket 0 */
++			proximity = <0>;
++		};
++		cpu at 001 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x001>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 002 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x002>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 003 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x003>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 004 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x004>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 005 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x005>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 006 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x006>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 007 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x007>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 008 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x008>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 009 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x009>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 00a {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x00a>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 00b {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x00b>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 00c {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x00c>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 00d {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x00d>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 00e {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x00e>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 00f {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x00f>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 100 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x100>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 101 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x101>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 102 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x102>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 103 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x103>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 104 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x104>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 105 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x105>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 106 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x106>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 107 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x107>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 108 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x108>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 109 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x109>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 10a {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10a>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 10b {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10b>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 10c {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10c>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 10d {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10d>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 10e {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10e>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 10f {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10f>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 200 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x200>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 201 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x201>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 202 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x202>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 203 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x203>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 204 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x204>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 205 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x205>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 206 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x206>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 207 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x207>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 208 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x208>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 209 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x209>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 20a {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x20a>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 20b {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x20b>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 20c {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x20c>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 20d {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x20d>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 20e {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x20e>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 20f {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x20f>;
++			enable-method = "psci";
++			proximity = <0>;
++		};
++		cpu at 10000 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10000>;
++			enable-method = "psci";
++			/* socket 1 */
++			proximity = <1>;
++		};
++		cpu at 10001 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10001>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10002 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10002>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10003 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10003>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10004 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10004>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10005 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10005>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10006 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10006>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10007 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10007>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10008 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10008>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10009 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10009>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1000a {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1000a>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1000b {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1000b>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1000c {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1000c>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1000d {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1000d>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1000e {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1000e>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1000f {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1000f>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10100 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10100>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10101 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10101>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10102 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10102>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10103 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10103>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10104 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10104>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10105 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10105>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10106 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10106>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10107 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10107>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10108 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10108>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10109 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10109>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1010a {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1010a>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1010b {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1010b>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1010c {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1010c>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1010d {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1010d>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1010e {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1010e>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1010f {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1010f>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10200 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10200>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10201 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10201>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10202 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10202>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10203 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10203>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10204 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10204>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10205 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10205>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10206 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10206>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10207 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10207>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10208 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10208>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 10209 {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x10209>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1020a {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1020a>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1020b {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1020b>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1020c {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1020c>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1020d {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1020d>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1020e {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1020e>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++		cpu at 1020f {
++			device_type = "cpu";
++			compatible = "cavium,thunder", "arm,armv8";
++			reg = <0x0 0x1020f>;
++			enable-method = "psci";
++			proximity = <1>;
++		};
++	};
 +
-+/* Must hold reference to node during call */
-+static int of_get_proximity(struct device_node *device)
-+{
-+	int length;
-+	const __be32 *proximity;
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <1 13 0xff01>,
++		             <1 14 0xff01>,
++		             <1 11 0xff01>,
++		             <1 10 0xff01>;
++	};
 +
-+	proximity = of_get_property(device, "proximity", &length);
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
 +
-+	return proximity_to_nid(proximity, length);
-+}
++		refclk50mhz: refclk50mhz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <50000000>;
++			clock-output-names = "refclk50mhz";
++		};
 +
-+static int early_init_of_get_proximity(unsigned long node)
-+{
-+	int length;
-+	const __be32 *proximity;
++		gic0: interrupt-controller at 8010,00000000 {
++			compatible = "arm,gic-v3";
++			#interrupt-cells = <3>;
++			#address-cells = <2>;
++			#size-cells = <2>;
++			#redistributor-regions = <2>;
++			ranges;
++			interrupt-controller;
++			reg = <0x8010 0x00000000 0x0 0x010000>, /* GICD */
++			      <0x8010 0x80000000 0x0 0x600000>, /* GICR Node 0 */
++			      <0x9010 0x80000000 0x0 0x600000>; /* GICR Node 1 */
++			interrupts = <1 9 0xf04>;
 +
-+	proximity = of_get_flat_dt_prop(node, "proximity", &length);
++			its: gic-its at 8010,00020000 {
++				compatible = "arm,gic-v3-its";
++				msi-controller;
++				reg = <0x8010 0x20000 0x0 0x200000>;
++				proximity = <0>;
++			};
 +
-+	return proximity_to_nid(proximity, length);
-+}
++			its1: gic-its at 9010,00020000 {
++				compatible = "arm,gic-v3-its";
++				msi-controller;
++				reg = <0x9010 0x20000 0x0 0x200000>;
++				proximity = <1>;
++			};
++		};
 +
-+/* Walk the device tree upwards, looking for a proximity node */
-+int of_node_to_nid(struct device_node *device)
-+{
-+	struct device_node *parent;
-+	int nid = NUMA_NO_NODE;
++		uaa0: serial at 87e0,24000000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x87e0 0x24000000 0x0 0x1000>;
++			interrupts = <1 21 4>;
++			clocks = <&refclk50mhz>;
++			clock-names = "apb_pclk";
++		};
 +
-+	of_node_get(device);
-+	while (device) {
-+		const __be32 *proximity;
-+		int length;
-+
-+		proximity = of_get_property(device, "proximity", &length);
-+		if (proximity) {
-+			nid = proximity_to_nid(proximity, length);
-+			break;
-+		}
-+
-+		parent = device;
-+		device = of_get_parent(parent);
-+		of_node_put(parent);
-+	}
-+	of_node_put(device);
-+
-+	return nid;
-+}
-+
-+void __init of_numa_set_node_info(unsigned int cpu,
-+		u64 hwid, struct device_node *device)
-+{
-+	int nid = DEFAULT_NODE;
-+
-+	if (device)
-+		nid = of_get_proximity(device);
-+
-+	node_cpu_hwid[cpu].node_id = nid;
-+	node_cpu_hwid[cpu].cpu_hwid = hwid;
-+	node_set(nid, numa_nodes_parsed);
-+}
-+
-+static int __init early_init_parse_memory_node(unsigned long node)
-+{
-+	const __be32 *reg, *endp;
-+	int length;
-+	int nid;
-+
-+	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
-+
-+	/* We are scanning "memory" nodes only */
-+	if (type == NULL)
-+		return 0;
-+	else if (strcmp(type, "memory") != 0)
-+		return 0;
-+
-+	nid = early_init_of_get_proximity(node);
-+
-+	if (nid == NUMA_NO_NODE)
-+		return -EINVAL;
-+
-+	reg = of_get_flat_dt_prop(node, "reg", &length);
-+	endp = reg + (length / sizeof(__be32));
-+
-+	while ((endp - reg) >= (dt_root_addr_cells + dt_root_size_cells)) {
-+		u64 base, size;
-+		struct memblock_region *mblk;
-+
-+		base = dt_mem_next_cell(dt_root_addr_cells, &reg);
-+		size = dt_mem_next_cell(dt_root_size_cells, &reg);
-+		pr_debug("NUMA-DT:  base = %llx , node = %u\n",
-+				base, nid);
-+
-+		for_each_memblock(memory, mblk) {
-+			if (mblk->base == base) {
-+				node_set(nid, numa_nodes_parsed);
-+				numa_add_memblk(nid, mblk->base, mblk->size);
-+				break;
-+			}
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int early_init_parse_distance_map(unsigned long node, const char *uname)
-+{
-+	const __be32 *prop_dist_matrix;
-+	int length = 0, i, matrix_count;
-+	int nr_size_cells = OF_ROOT_NODE_SIZE_CELLS_DEFAULT;
-+
-+	if (strcmp(uname, "distance-map") != 0)
-+		return 0;
-+
-+	prop_dist_matrix =
-+		of_get_flat_dt_prop(node, "distance-matrix", &length);
-+
-+	if (!length) {
-+		pr_err("NUMA: failed to parse distance-matrix\n");
-+		return  -ENODEV;
-+	}
-+
-+	matrix_count = ((length / sizeof(__be32)) / (3 * nr_size_cells));
-+
-+	if ((matrix_count * sizeof(__be32) * 3 * nr_size_cells) !=  length) {
-+		pr_warn("NUMA: invalid distance-matrix length %d\n", length);
-+		return -EINVAL;
-+	}
-+
-+	for (i = 0; i < matrix_count; i++) {
-+		u32 nodea, nodeb, distance;
-+
-+		nodea = dt_mem_next_cell(nr_size_cells, &prop_dist_matrix);
-+		nodeb = dt_mem_next_cell(nr_size_cells, &prop_dist_matrix);
-+		distance = dt_mem_next_cell(nr_size_cells, &prop_dist_matrix);
-+		numa_set_distance(nodea, nodeb, distance);
-+		pr_debug("NUMA-DT:  distance[node%d -> node%d] = %d\n",
-+				nodea, nodeb, distance);
-+
-+		/* Set default distance of node B->A same as A->B */
-+		if (nodeb > nodea)
-+			numa_set_distance(nodeb, nodea, distance);
-+	}
-+
-+	return 0;
-+}
-+
-+/**
-+ * early_init_of_scan_numa_map - parse memory node and map nid to memory range.
-+ */
-+int __init early_init_of_scan_numa_map(unsigned long node, const char *uname,
-+				     int depth, void *data)
-+{
-+	int ret;
-+
-+	ret = early_init_parse_memory_node(node);
-+
-+	if (!ret)
-+		ret = early_init_parse_distance_map(node, uname);
-+
-+	return ret;
-+}
-+
-+/* DT node mapping is done already early_init_of_scan_memory */
-+int __init arm64_of_numa_init(void)
-+{
-+	return of_scan_flat_dt(early_init_of_scan_numa_map, NULL);
-+}
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 985ee04..a9d7f93 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -516,6 +516,7 @@ void __init of_parse_and_init_cpus(void)
- 
- 		pr_debug("cpu logical map 0x%llx\n", hwid);
- 		cpu_logical_map(cpu_count) = hwid;
-+		of_numa_set_node_info(cpu_count, hwid, dn);
- next:
- 		cpu_count++;
- 	}
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index 4dd7436..ab01551 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -527,5 +527,13 @@ static int __init dummy_numa_init(void)
-  */
- void __init arm64_numa_init(void)
- {
--	numa_init(dummy_numa_init);
-+	int ret = -ENODEV;
-+
-+#ifdef CONFIG_OF_NUMA
-+	if (!numa_off)
-+		ret = numa_init(arm64_of_numa_init);
-+#endif
-+
-+	if (ret)
-+		numa_init(dummy_numa_init);
- }
++		uaa1: serial at 87e0,25000000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x87e0 0x25000000 0x0 0x1000>;
++			interrupts = <1 22 4>;
++			clocks = <&refclk50mhz>;
++			clock-names = "apb_pclk";
++		};
++	};
++};
 -- 
 1.8.1.4
