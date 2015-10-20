@@ -1,57 +1,58 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 20 Oct 2015 18:19:02 +0200
-Subject: [GIT PULL 1/6] KVM: arm/arm64: Do not inject spurious interrupts
-In-Reply-To: <1445357947-6022-1-git-send-email-christoffer.dall@linaro.org>
-References: <1445357947-6022-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1445357947-6022-2-git-send-email-christoffer.dall@linaro.org>
+Date: Tue, 20 Oct 2015 18:19:01 +0200
+Subject: [GIT PULL 0/6] A handful of fixes for KVM/ARM for v4.3-rc7
+Message-ID: <1445357947-6022-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pavel Fedin <p.fedin@samsung.com>
+Hi Paolo,
 
-When lowering a level-triggered line from userspace, we forgot to lower
-the pending bit on the emulated CPU interface and we also did not
-re-compute the pending_on_cpu bitmap for the CPU affected by the change.
+The following changes since commit 920552b213e3dc832a874b4e7ba29ecddbab31bc:
 
-Update vgic_update_irq_pending() to fix the two issues above and also
-raise a warning in vgic_quue_irq_to_lr if we encounter an interrupt
-pending on a CPU which is neither marked active nor pending.
+  KVM: disable halt_poll_ns as default for s390x (2015-09-25 10:31:30 +0200)
 
-  [ Commit text reworked completely - Christoffer ]
+are available in the git repository at:
 
-Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/vgic.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.3-rc7
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 6bd1c9b..596455a 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1132,7 +1132,8 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
- 		kvm_debug("Set active, clear distributor: 0x%x\n", vlr.state);
- 		vgic_irq_clear_active(vcpu, irq);
- 		vgic_update_state(vcpu->kvm);
--	} else if (vgic_dist_irq_is_pending(vcpu, irq)) {
-+	} else {
-+		WARN_ON(!vgic_dist_irq_is_pending(vcpu, irq));
- 		vlr.state |= LR_STATE_PENDING;
- 		kvm_debug("Set pending: 0x%x\n", vlr.state);
- 	}
-@@ -1607,8 +1608,12 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
- 	} else {
- 		if (level_triggered) {
- 			vgic_dist_irq_clear_level(vcpu, irq_num);
--			if (!vgic_dist_irq_soft_pend(vcpu, irq_num))
-+			if (!vgic_dist_irq_soft_pend(vcpu, irq_num)) {
- 				vgic_dist_irq_clear_pending(vcpu, irq_num);
-+				vgic_cpu_irq_clear(vcpu, irq_num);
-+				if (!compute_pending_for_cpu(vcpu))
-+					clear_bit(cpuid, dist->irq_pending_on_cpu);
-+			}
- 		}
- 
- 		ret = false;
--- 
-2.1.2.330.g565301e.dirty
+for you to fetch changes up to 0d997491f814c87310a6ad7be30a9049c7150489:
+
+  arm/arm64: KVM: Fix disabled distributor operation (2015-10-20 18:09:13 +0200)
+
+Sorry for sending these relatively late, but we had a situation where we
+found one breakage in the timer implementation changes merged for 4.3,
+then fixing that issue revealed another bug, and then that happened
+again, and now we have something that looks stable.
+
+Description of the fixes is in the tag and quoted below.
+
+Thanks,
+-Christoffer
+
+----------------------------------------------------------------
+A late round of KVM/ARM fixes for v4.3-rc7, fixing:
+ - A bug where level-triggered interrupts lowered from userspace
+   are still routed to the guest
+ - A memory leak an a failed initialization path
+ - A build error under certain configurations
+ - Several timer bugs introduced with moving the timer to the active
+   state handling instead of the masking trick.
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      KVM: arm: use GIC support unconditionally
+
+Christoffer Dall (3):
+      arm/arm64: KVM: Fix arch timer behavior for disabled interrupts
+      arm/arm64: KVM: Clear map->active on pend/active clear
+      arm/arm64: KVM: Fix disabled distributor operation
+
+Pavel Fedin (2):
+      KVM: arm/arm64: Do not inject spurious interrupts
+      KVM: arm/arm64: Fix memory leak if timer initialization fails
+
+ arch/arm/kvm/Kconfig      |  1 +
+ arch/arm/kvm/arm.c        |  2 +-
+ virt/kvm/arm/arch_timer.c | 19 ++++++++++
+ virt/kvm/arm/vgic.c       | 95 +++++++++++++++++++++++++++--------------------
+ 4 files changed, 76 insertions(+), 41 deletions(-)
