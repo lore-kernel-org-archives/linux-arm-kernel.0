@@ -1,57 +1,42 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 20 Oct 2015 17:52:58 +0200
-Subject: [PATCH V5 1/6] i2c: Add i2c support to Freescale Layerscape
- platforms
-In-Reply-To: <1445255774-32887-1-git-send-email-B48286@freescale.com>
-References: <1445255774-32887-1-git-send-email-B48286@freescale.com>
-Message-ID: <20151020155258.GM5379@katana>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 20 Oct 2015 23:54:56 +0800
+Subject: [RFC PATCH] net:hns: hns_aev2_toggle_ring_irq() can be static
+In-Reply-To: <1445353278-130498-2-git-send-email-salil.mehta@huawei.com>
+References: <201510202306.WYUMdngA%fengguang.wu@intel.com>
+Message-ID: <20151020155456.GA96665@xian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 07:56:09PM +0800, Zhiqiang Hou wrote:
-> From: Shaohui Xie <Shaohui.Xie@freescale.com>
-> 
-> Modify the I2C_IMX config to support to Layerscape platforms.
-> 
-> Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
-> Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
-> Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
 
-Three signed offs for a simple Kconfig change? And the person doing
-the patch has no signed off?? That looks wrong. Maybe the above signed
-offs should be acked by?
+Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+---
+ hns_ae_adapt.c |    2 +-
+ hns_enet.c     |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-> ---
-> V5: V4 V3 V2
->  - No change.
-> 
->  drivers/i2c/busses/Kconfig | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> index 08b8617..14147ec 100644
-> --- a/drivers/i2c/busses/Kconfig
-> +++ b/drivers/i2c/busses/Kconfig
-> @@ -582,10 +582,10 @@ config I2C_IMG
->  
->  config I2C_IMX
->  	tristate "IMX I2C interface"
-> -	depends on ARCH_MXC
-> +	depends on ARCH_MXC || ARCH_LAYERSCAPE
->  	help
->  	  Say Y here if you want to use the IIC bus controller on
-> -	  the Freescale i.MX/MXC processors.
-> +	  the Freescale i.MX/MXC or Layerscape processors.
->  
->  	  This driver can also be built as a module.  If so, the module
->  	  will be called i2c-imx.
-> -- 
-> 2.1.0.27.g96db324
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151020/6472d8cb/attachment.sig>
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
+index c3d64ce..bf277c7 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
+@@ -337,7 +337,7 @@ void hns_ae_toggle_ring_irq(struct hnae_ring *ring, u32 mask)
+ 	hns_rcb_int_ctrl_hw(ring->q, flag, mask);
+ }
+ 
+-void hns_aev2_toggle_ring_irq(struct hnae_ring *ring, u32 mask)
++static void hns_aev2_toggle_ring_irq(struct hnae_ring *ring, u32 mask)
+ {
+ 	u32 flag;
+ 
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+index 7d996a4..33061f1 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+@@ -995,7 +995,7 @@ static void hns_nic_ring_close(struct net_device *netdev, int idx)
+ 	napi_disable(&priv->ring_data[idx].napi);
+ }
+ 
+-void hns_set_irq_affinity(struct hns_nic_priv *priv)
++static void hns_set_irq_affinity(struct hns_nic_priv *priv)
+ {
+ 	struct hnae_handle *h = priv->ae_handle;
+ 	struct hns_nic_ring_data *rd;
