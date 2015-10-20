@@ -1,36 +1,43 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 20 Oct 2015 17:10:52 +0200
-Subject: [PATCH 0/5] drivers/tty: make more bool drivers explicitly
- non-modular
-In-Reply-To: <1445206878-12455-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1445206878-12455-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <20151020151052.GI3421@piout.net>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 20 Oct 2015 11:11:17 -0400
+Subject: [PATCH v1 1/2] phy: keystone: serdes driver for gbe 10gbe and pcie
+In-Reply-To: <4661946.mPHVFLWuan@wuerfel>
+References: <1444919145-30845-1-git-send-email-w-kwok2@ti.com>
+ <230CBA6E4B6B6B418E8730AC28E6FC7E04229363@DFLE11.ent.ti.com>
+ <56253B91.5040807@ti.com> <4661946.mPHVFLWuan@wuerfel>
+Message-ID: <56265995.5000800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/10/2015 at 18:21:13 -0400, Paul Gortmaker wrote :
-> The one common thread here for all the patches is that we also
-> scrap the .remove functions which would only be used for module
-> unload (impossible) and driver unbind.  For the drivers here, there
-> doesn't seem to be a sensible unbind use case (vs. e.g. a multiport
-> PCI ethernet driver where one port is unbound and passed through to
-> a kvm guest or similar).  Hence we just explicitly disallow any
-> driver unbind operations to help prevent root from doing something
-> illogical to the machine that they could have done previously.
-> 
-> We've already done this for drivers/tty/serial/mpsc.c previously.
-> 
-> Build tested for allmodconfig on ARM64 and powerpc for tty/tty-testing.
-> 
-
-So, how does this actually build test atmel_serial?
-
-A proper solution would be to actually make it a tristate and allow
-building as a module. I think it currently fails because of
-console_initcall() but that is certainly fixable.
-
+On 10/20/2015 04:24 AM, Arnd Bergmann wrote:
+> On Monday 19 October 2015 14:50:57 Murali Karicheri wrote:
+>> Arnd, by your statement 'I don't see any code that does this' do you
+>> expect a piece of code that embed the license in the binary image? If
+>> so, that seems weired to me.
+>>
+>> Many of the drivers including this patch has the following statement in
+>> the license that is additional company specific license such as BSD that
+>> is applicable.
+>>
+>> ==== Cut and pasted from drivers/crypto/fcrypt.c =======================
+>>    * 2. Redistributions in binary form must reproduce the above copyright
+>>    *    notice, this list of conditions and the following disclaimer in the
+>>    *    documentation and/or other materials provided with the distribution.
+>> =========================================================================
+>> I read this as if the source is compiled and distributed as a binary
+>> either a kernel module ko file or as part of the kernel binary, this
+>> term must apply. Usually this is part of documentation that goes with
+>> the product AFAIK.
+>
+> Sorry, my fault. This is indeed the standard BSD license, and
+> I misread this as having to produce the copyright statement
+> from the binary itself. Please ignore whatever I said on the
+> subject.
+>
+> 	Arnd
+>
+Thanks Arnd for the clarification.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Murali Karicheri
+Linux Kernel, Keystone
