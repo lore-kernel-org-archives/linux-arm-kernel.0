@@ -1,34 +1,94 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 20 Oct 2015 22:16:01 +0200
-Subject: [PATCH 2/2] mtd: nand: sunxi: avoid retrieving data before ECC pass
-In-Reply-To: <1445372161-6529-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1445372161-6529-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1445372161-6529-2-git-send-email-boris.brezillon@free-electrons.com>
+From: cmetcalf@ezchip.com (Chris Metcalf)
+Date: Tue, 20 Oct 2015 16:36:08 -0400
+Subject: [PATCH v8 10/14] arch/arm64: adopt prepare_exit_to_usermode() model
+ from x86
+In-Reply-To: <1445373372-6567-1-git-send-email-cmetcalf@ezchip.com>
+References: <1445373372-6567-1-git-send-email-cmetcalf@ezchip.com>
+Message-ID: <1445373372-6567-11-git-send-email-cmetcalf@ezchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The in-band data are copied twice: before ECC correction and after the
-ECC engine has fixed all the fixable bitflips.
-Drop the useless memcpy_fromio operation by passing a NULL pointer when
-calling sunxi_nfc_read_buf().
+This change is a prerequisite change for TASK_ISOLATION but also
+stands on its own for readability and maintainability.  The existing
+arm64 do_notify_resume() is called in a loop from assembly on
+the slow path; this change moves the loop into C code as well.
+For the x86 version see commit c5c46f59e4e7 ("x86/entry: Add new,
+comprehensible entry and exit handlers written in C").
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Chris Metcalf <cmetcalf@ezchip.com>
 ---
- drivers/mtd/nand/sunxi_nand.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kernel/entry.S  |  6 +++---
+ arch/arm64/kernel/signal.c | 32 ++++++++++++++++++++++----------
+ 2 files changed, 25 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index 96f7370..8247118 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -586,7 +586,7 @@ static int sunxi_nfc_hw_ecc_read_chunk(struct mtd_info *mtd,
- 	if (*cur_off != data_off)
- 		nand->cmdfunc(mtd, NAND_CMD_RNDOUT, data_off, -1);
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 4306c937b1ff..6fcbf8ea307b 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -628,9 +628,8 @@ work_pending:
+ 	mov	x0, sp				// 'regs'
+ 	tst	x2, #PSR_MODE_MASK		// user mode regs?
+ 	b.ne	no_work_pending			// returning to kernel
+-	enable_irq				// enable interrupts for do_notify_resume()
+-	bl	do_notify_resume
+-	b	ret_to_user
++	bl	prepare_exit_to_usermode
++	b	no_user_work_pending
+ work_resched:
+ 	bl	schedule
  
--	sunxi_nfc_read_buf(mtd, data, ecc->size);
-+	sunxi_nfc_read_buf(mtd, NULL, ecc->size);
+@@ -642,6 +641,7 @@ ret_to_user:
+ 	ldr	x1, [tsk, #TI_FLAGS]
+ 	and	x2, x1, #_TIF_WORK_MASK
+ 	cbnz	x2, work_pending
++no_user_work_pending:
+ 	enable_step_tsk x1, x2
+ no_work_pending:
+ 	kernel_exit 0
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index e18c48cb6db1..fde59c1139a9 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -399,18 +399,30 @@ static void do_signal(struct pt_regs *regs)
+ 	restore_saved_sigmask();
+ }
  
- 	if (data_off + ecc->size != oob_off)
- 		nand->cmdfunc(mtd, NAND_CMD_RNDOUT, oob_off, -1);
+-asmlinkage void do_notify_resume(struct pt_regs *regs,
+-				 unsigned int thread_flags)
++asmlinkage void prepare_exit_to_usermode(struct pt_regs *regs,
++					 unsigned int thread_flags)
+ {
+-	if (thread_flags & _TIF_SIGPENDING)
+-		do_signal(regs);
++	do {
++		local_irq_enable();
+ 
+-	if (thread_flags & _TIF_NOTIFY_RESUME) {
+-		clear_thread_flag(TIF_NOTIFY_RESUME);
+-		tracehook_notify_resume(regs);
+-	}
++		if (thread_flags & _TIF_NEED_RESCHED)
++			schedule();
++
++		if (thread_flags & _TIF_SIGPENDING)
++			do_signal(regs);
++
++		if (thread_flags & _TIF_NOTIFY_RESUME) {
++			clear_thread_flag(TIF_NOTIFY_RESUME);
++			tracehook_notify_resume(regs);
++		}
++
++		if (thread_flags & _TIF_FOREIGN_FPSTATE)
++			fpsimd_restore_current_state();
++
++		local_irq_disable();
+ 
+-	if (thread_flags & _TIF_FOREIGN_FPSTATE)
+-		fpsimd_restore_current_state();
++		thread_flags = READ_ONCE(current_thread_info()->flags) &
++			_TIF_WORK_MASK;
+ 
++	} while (thread_flags);
+ }
 -- 
-2.1.4
+2.1.2
