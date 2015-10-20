@@ -1,231 +1,122 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 20 Oct 2015 11:05:44 +0100
-Subject: [PATCH v5] arm64: Introduce IRQ stack
-In-Reply-To: <1445092053-12319-1-git-send-email-jungseoklee85@gmail.com>
-References: <1445092053-12319-1-git-send-email-jungseoklee85@gmail.com>
-Message-ID: <562611F8.2000309@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Oct 2015 11:09:09 +0100
+Subject: [PATCH v4 1/4] drm: Introduce generic probe function for
+ component based masters.
+In-Reply-To: <CACvgo51szQz9iu55mP+Qz+VCzjB-20K169MpX6_71ppcnGHXzg@mail.gmail.com>
+References: <1445332995-11212-1-git-send-email-Liviu.Dudau@arm.com>
+ <1445332995-11212-2-git-send-email-Liviu.Dudau@arm.com>
+ <CACvgo51szQz9iu55mP+Qz+VCzjB-20K169MpX6_71ppcnGHXzg@mail.gmail.com>
+Message-ID: <20151020100909.GW32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jungseok,
-
-On 17/10/15 15:27, Jungseok Lee wrote:
-> Currently, kernel context and interrupts are handled using a single
-> kernel stack navigated by sp_el1. This forces a system to use 16KB
-> stack, not 8KB one. This restriction makes low memory platforms
-> suffer from memory pressure accompanied by performance degradation.
+On Tue, Oct 20, 2015 at 11:00:55AM +0100, Emil Velikov wrote:
+> Hi Liviu,
 > 
-> This patch addresses the issue as introducing a separate percpu IRQ
-> stack to handle both hard and soft interrupts with two ground rules:
-> 
->   - Utilize sp_el0 in EL1 context, which is not used currently
->   - Do not complicate current_thread_info calculation
-> 
-> It is a core concept to directly retrieve struct thread_info from
-> sp_el0. This approach helps to prevent text section size from being
-> increased largely as removing masking operation using THREAD_SIZE
-> in tons of places.
+> On 20 October 2015 at 10:23, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > A lot of component based DRM drivers use a variant of the same code
+> > as the probe function. They bind the crtc ports in the first iteration
+> > and then scan through the child nodes and bind the encoders attached
+> > to the remote endpoints. Factor the common code into a separate
+> > function called drm_of_component_probe() in order to increase code
+> > reuse.
+> >
+> > Cc: David Airlie <airlied@linux.ie>
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  drivers/gpu/drm/drm_of.c | 88 ++++++++++++++++++++++++++++++++++++++++++++++++
+> >  include/drm/drm_of.h     | 13 +++++++
+> >  2 files changed, 101 insertions(+)
+> >
+> > diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+> > index be38840..493c05c 100644
+> > --- a/drivers/gpu/drm/drm_of.c
+> > +++ b/drivers/gpu/drm/drm_of.c
+> > @@ -1,3 +1,4 @@
+> > +#include <linux/component.h>
+> >  #include <linux/export.h>
+> >  #include <linux/list.h>
+> >  #include <linux/of_graph.h>
+> > @@ -61,3 +62,90 @@ uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+> >         return possible_crtcs;
+> >  }
+> >  EXPORT_SYMBOL(drm_of_find_possible_crtcs);
+> > +
+> > +/**
+> > + * drm_of_component_probe - Generic probe function for a component based master
+> > + * @dev: master device containing the OF node
+> > + * @compare_of: compare function used for matching components
+> > + * @master_ops: component master ops to be used
+> > + *
+> > + * Parse the platform device OF node and bind all the components associated
+> > + * with the master. Interface ports are added before the encoders in order to
+> > + * satisfy their .bind requirements
+> > + * See Documentation/devicetree/bindings/graph.txt for the bindings.
+> > + *
+> > + * Returns zero if successful, or one of the standard error codes if it fails.
+> > + */
+> > +int drm_of_component_probe(struct device *dev,
+> > +                          int (*compare_of)(struct device *, void *),
+> > +                          const struct component_master_ops *m_ops)
+> > +{
+> > +       struct device_node *ep, *port, *remote;
+> > +       struct component_match *match = NULL;
+> > +       int i;
+> > +
+> > +       if (!dev->of_node)
+> > +               return -EINVAL;
+> > +
+> > +       /*
+> > +        * Bind the crtc's ports first, so that drm_of_find_possible_crtcs()
+> > +        * called from encoder's .bind callbacks works as expected
+> > +        */
+> > +       for (i = 0; ; i++) {
+> > +               port = of_parse_phandle(dev->of_node, "ports", i);
+> > +               if (!port)
+> > +                       break;
+> > +
+> > +               if (!of_device_is_available(port->parent)) {
+> > +                       of_node_put(port);
+> > +                       continue;
+> > +               }
+> > +
+> > +               component_match_add(dev, &match, compare_of, port);
+> > +               of_node_put(port);
+> > +       }
+> > +
+> > +       if (i == 0) {
+> > +               dev_err(dev, "missing 'ports' property\n");
+> > +               return -ENODEV;
+> > +       }
+> > +
+> > +       if (!match) {
+> > +               dev_err(dev, "no available port\n");
+> > +               return -ENODEV;
+> > +       }
+> > +
+> > +       /*
+> > +        * For bound crtcs, bind the encoders attached to their remote endpoint
+> > +        */
+> > +       for (i = 0; ; i++) {
+> > +               port = of_parse_phandle(dev->of_node, "ports", i);
+> > +               if (!port)
+> > +                       break;
+> > +
+> > +               if (!of_device_is_available(port->parent)) {
+> > +                       of_node_put(port);
+> > +                       continue;
+> > +               }
+> > +
+> Of the three drivers converted only the rockchip one has the above
+> of_device_is_available() hunk. Based on the handling in previous loop
+> I'm not entirely sure if it's needed, but if so shouldn't one mention
+> the difference when converting the respective drivers ?
 
-I was worried we could end up in schedule() while on the irq stack. This
-can't happen, just to save anyone else the trip down the rabbit-hole:
+Yes, it should've been there, otherwise we'll end up binding encoders
+which are connected to a CRTC which has been disabled - and that means
+the DRM driver won't come up.
 
-Q> If TIF_NEED_RESCHED is set, and we have multiple calls to el1_irq() on
-the same stack - will the most-recent one to exit call el1_preempt() ->
-preempt_schedule_irq()?
-
-A> No, because the code to check if TIF_NEED_RESCHED is set, also checks
-preempt_count is zero, and __do_softirq() increases by softirq_offset (via
-__local_bh_disable_ip()) before re-enabling interrupts, so there is no
-'gap' in recursive use of the irq_stack where preempt_count can be zero.
-
-
-> ---
-> I've used Cc', not Tested-by tag, from James, since there is a gap
-> between v4 and v5.
-
-Re-tested, with both 4K and 64K pages.
-Tested-By: James Morse <james.morse@arm.com>
-
-I also need to test this on top of Akashi Takahiros's series - in isolation
-this patch only lets perf/dump_stack() unwind as far as el1_irq(). (It
-would be good to note that dependency in this comments/changelog section -
-so that they get merged in the right order!)
-
-
-> 
-> Changes since v4:
-> - Supported 64KB page system
-> - Introduced IRQ_STACK_* macro, per Catalin 
-> - Rebased on top of for-next/core
-> 
-> Changes since v3:
-> - Expanded stack trace to support IRQ stack
-> - Added more comments
-> 
-> Changes since v2:
-> - Optmised current_thread_info function as removing masking operation
->   and volatile keyword, per James and Catalin
-> - Reworked irq re-enterance check logic using top-bit comparison of
->   stacks, per James
-> - Added sp_el0 update in cpu_resume, per James
-> - Selected HAVE_IRQ_EXIT_ON_IRQ_STACK to expose this feature explicitly
-> - Added a Tested-by tag from James
-> - Added comments on sp_el0 as a helper messeage
-> 
-> Changes since v1:
-> - Rebased on top of v4.3-rc1
-> - Removed Kconfig about IRQ stack, per James
-> - Used PERCPU for IRQ stack, per James
-> - Tried to allocate IRQ stack when CPU is about to start up, per James
-> - Moved sp_el0 update into kernel_entry macro, per James
-> - Dropped S_SP removal patch, per Mark and James
-> 
->  arch/arm64/Kconfig                   |  1 +
->  arch/arm64/include/asm/irq.h         | 27 ++++++++++
->  arch/arm64/include/asm/thread_info.h | 10 +++-
->  arch/arm64/kernel/entry.S            | 42 ++++++++++++++--
->  arch/arm64/kernel/head.S             |  5 ++
->  arch/arm64/kernel/irq.c              | 24 +++++++++
->  arch/arm64/kernel/sleep.S            |  3 ++
->  arch/arm64/kernel/smp.c              | 13 ++++-
->  8 files changed, 116 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-> index 0916929..2755b2f 100644
-> --- a/arch/arm64/include/asm/irq.h
-> +++ b/arch/arm64/include/asm/irq.h
-> @@ -1,14 +1,40 @@
->  #ifndef __ASM_IRQ_H
->  #define __ASM_IRQ_H
->  
-> +#ifndef CONFIG_ARM64_64K_PAGES
-> +#define IRQ_STACK_SIZE_ORDER	2
-> +#endif
-> +
-> +#define IRQ_STACK_SIZE		16384
-> +#define IRQ_STACK_START_SP	(IRQ_STACK_SIZE - 16)
-
-If the plan is to have the irq stack the same size, it would be good to use
-one definition in the other - just to make it obvious. e.g.
-#define IRQ_STACK_SIZE	THREAD_SIZE
-
-Are these used in assembly code? If not, they could go after the ifndef
-__ASSEMBLY__.
-
-
-> +
-> +#ifndef __ASSEMBLY__
-> +
-> +#include <linux/gfp.h>
->  #include <linux/irqchip/arm-gic-acpi.h>
-> +#include <linux/slab.h>
->  
->  #include <asm-generic/irq.h>
->  
-> +#if IRQ_STACK_SIZE >= PAGE_SIZE
-> +static inline void *__alloc_irq_stack(void)
-> +{
-> +       return (void *)__get_free_pages(THREADINFO_GFP | __GFP_ZERO,
-> +                                       IRQ_STACK_SIZE_ORDER);
-
-Need to include linux/thread_info.h for THREADINFO_GFP, and linux/gfp.h for
-__GFP_ZERO, although, depending on CONFIG_DEBUG_STACK_USAGE THREADINFO_GFP
-includes __GFP_ZERO....
-
-
-> +}
-> +#else
-> +static inline void *__alloc_irq_stack(void)
-> +{
-> +       return kmalloc(IRQ_STACK_SIZE, THREADINFO_GFP | __GFP_ZERO);
-> +}
-> +#endif
-> +
-
-Why are these in the header file? They are only used in kernel/irq.c...
-
-
->  struct pt_regs;
->  
->  extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
->  
-> +extern int alloc_irq_stack(unsigned int cpu);
-> +
->  static inline void acpi_irq_init(void)
->  {
->  	/*
-> @@ -21,3 +47,4 @@ static inline void acpi_irq_init(void)
->  #define acpi_irq_init acpi_irq_init
->  
->  #endif
-> +#endif
-
-[SNIP]
-
-> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-> index 9f17ec0..13fe8f4 100644
-> --- a/arch/arm64/kernel/irq.c
-> +++ b/arch/arm64/kernel/irq.c
-> @@ -30,6 +30,8 @@
->  
->  unsigned long irq_err_count;
->  
-> +DEFINE_PER_CPU(void *, irq_stacks);
-> +
->  int arch_show_interrupts(struct seq_file *p, int prec)
->  {
->  	show_ipi_list(p, prec);
-> @@ -47,9 +49,31 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
->  	handle_arch_irq = handle_irq;
->  }
->  
-> +static char boot_irq_stack[IRQ_STACK_SIZE] __aligned(IRQ_STACK_SIZE);
-
-Is kmalloc() not available this early? Regardless:
-As Catalin is happy with the Image size increase [0], this could become
-something like:
-> DEFINE_PER_CPU(union thread_union, irq_stack);
-Which will remove the need to __alloc_irq_stack()s.
-
-(It looks like the size-increase is lost in the size-reduction due to
-smaller code in current_thread_info()! The old version I wrote didn't have
-this, so it stuck-out a lot more.)
-
-
-> +
->  void __init init_IRQ(void)
->  {
-> +	unsigned int cpu = smp_processor_id();
-> +
-> +	per_cpu(irq_stacks, cpu) = boot_irq_stack + IRQ_STACK_START_SP;
-> +
->  	irqchip_init();
->  	if (!handle_arch_irq)
->  		panic("No interrupt controller found.");
->  }
-> +
-> +int alloc_irq_stack(unsigned int cpu)
-> +{
-> +	void *stack;
-> +
-> +	if (per_cpu(irq_stacks, cpu))
-> +		return 0;
-> +
-> +	stack = __alloc_irq_stack();
-> +	if (!stack)
-> +		return -ENOMEM;
-> +
-> +	per_cpu(irq_stacks, cpu) = stack + IRQ_STACK_START_SP;
-> +
-> +	return 0;
-> +}
-
-
-
-Thanks!
-
-
-James
-
-
-[0] https://lkml.org/lkml/2015/10/16/634
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
