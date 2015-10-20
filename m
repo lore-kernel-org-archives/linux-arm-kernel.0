@@ -1,77 +1,82 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Tue, 20 Oct 2015 14:37:58 +0300
-Subject: [PATCH V2 19/30] coresight: etb10: implementing the setup_aux()
- API
-In-Reply-To: <1445192687-24112-20-git-send-email-mathieu.poirier@linaro.org>
-References: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
- <1445192687-24112-20-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <874mhlhisp.fsf@ashishki-desk.ger.corp.intel.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Tue, 20 Oct 2015 19:40:32 +0800
+Subject: [PATCH v6 0/17] Add Analogix Core Display Port Driver
+In-Reply-To: <56260E06.2040902@osg.samsung.com>
+References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
+ <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
+ <5624C896.8070108@osg.samsung.com> <5625A2A1.6090907@rock-chips.com>
+ <56260E06.2040902@osg.samsung.com>
+Message-ID: <56262830.4030201@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+Hi Javier,
 
->  /**
-> + * struct cs_buffer - keep track of a recording session' specifics
-> + * @cur:	index of the current buffer
-> + * @nr_pages:	max number of pages granted to us
-> + * @nr_bufs:	number of clustered pages
-> + * @offset:	offset within the current buffer
-> + * @size:	how much space we have for this run
-> + * @data_size:	how much we collected in this run
-> + * @head:	head of the ring buffer
-> + * @lost:	other than zero if we had a HW buffer wrap around
-> + * @snapshot:	is this run in snapshot mode
-> + * @addr:	virtual address this buffer starts at
-> + */
-> +struct cs_buffers {
-> +	unsigned int		cur;
-> +	unsigned int		nr_pages;
-> +	unsigned int		nr_bufs;
+On 10/20/2015 05:48 PM, Javier Martinez Canillas wrote:
+> Hello Yakir,
+>
+> On 10/20/2015 04:10 AM, Yakir Yang wrote:
+>> Hi Javier,
+>>
+>> On 10/19/2015 06:40 PM, Javier Martinez Canillas wrote:
+>>> Hello Yakir,
+>>>
+>>> On 10/10/2015 05:35 PM, Yakir Yang wrote:
+>>>> Hi all,
+>>>>
+>>>>      The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
+>>>> share the same IP, so a lot of parts can be re-used. I split the common
+>>>> code into bridge directory, then rk3288 and exynos only need to keep
+>>>> some platform code. Cause I can't find the exact IP name of exynos dp
+>>>> controller, so I decide to name dp core driver with "analogix" which I
+>>>> find in rk3288 eDP TRM :)
+>>>>
+>>>> But  there are still three light registers setting differents bewteen
+>>>> exynos and rk3288.
+>>>> 1. RK3288 have five special pll resigters which not indicata in exynos
+>>>>      dp controller.
+>>>> 2. The address of DP_PHY_PD(dp phy power manager register) are different
+>>>>      between rk3288 and exynos.
+>>>> 3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
+>>>>      register).
+>>>>
+>>>> This series have been well tested on Rockchip platform with eDP panel
+>>>> on Jerry Chromebook and Display Port Monitor on RK3288 board and thanks
+>>>> to Javier at Samsung help me to find a way to install mainline kernel to
+>>>> Samsung Exynos Chromebooks, so this series also have been tested on Samsung
+>>>> Snow and Peach Pit Chromebooks which borrowed from my friends.
+>>>>
+>>>> Besides, This version was build on linux-next branch (tag next-20150918), and
+>>>> the above test experiments also base on that tag. But I know the latest tag is
+>>>> next-20151009, so i do rebase this series again on next-20151009, there were
+>>>> little conflicts(exynos_dp removed the suspend/resume).
+>>>>
+>>>> But after I retest this series on next-20151009, I saw kernel crashed in mmc
+>>>> driver(dw_mci_probe failed to get regulator). So i have to disabled the MMC
+>>>> module(after all I boot with USB device), and I can see eDP light up normally
+>>>> in startup stage, but kernel keep crashed when it try to mount the filesystem.
+>>>> I thought this isn't related to dp driver directly, so i choice not to debug
+>>>> more depth.
+>>>>
+>>>> That's to say if someone want to test this series, I suggest you applied this
+>>>> series on tag-20150918, just need to fix some light conflicts with the 01 & 02
+>>>> patches (or just email me, I can send you directly).
+>>>>
+>>>> Thanks,
+>>> Do you have a branch that I can use to test this series?
+>> Thank you for your kind assistance, I have created a tree which checkout from the next-20151019. Surely there were some conflicts to applied this series on that tag, but things still works for me, here is the git address [https://github.com/yakir-Yang/linux/tree/analogix_dp]
+>>
+> I tested your branch on an Exynos5800 Peach Pi Chromebook and display is
+> working on boot. I also tested DPMS and S2R and things are still working
+> so for the whole series feel free to add:
+>
+> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-This one is not really used.
+Thanks a lot    ;)
 
-> +	unsigned long		offset;
-> +	unsigned long		size;
+- Yakir
 
-And this one seems to be only set in one place.
-
-> +	local_t			data_size;
-> +	local_t			head;
-
-And so is this one.
-
-> +	local_t			lost;
-> +	bool			snapshot;
-> +	void			*addr[0];
-
-And this one seems to be a copy of what perf's ring buffer gives us.
-
-> +static void *etb_setup_aux(struct coresight_device *csdev, int cpu,
-> +			   void **pages, int nr_pages, bool overwrite)
-> +{
-> +	int node, pg;
-> +	struct cs_buffers *buf;
-> +
-> +	if (cpu == -1)
-> +		cpu = smp_processor_id();
-> +	node = cpu_to_node(cpu);
-> +
-> +	buf = kzalloc_node(offsetof(struct cs_buffers, addr[nr_pages]),
-> +			   GFP_KERNEL, node);
-> +	if (!buf)
-> +		return NULL;
-> +
-> +	buf->snapshot = overwrite;
-> +	buf->nr_pages = nr_pages;
-> +
-> +	/* Record information about buffers */
-> +	for (pg = 0; pg < buf->nr_pages; pg++)
-> +		buf->addr[pg] = pages[pg];
-
-Yes, buf::addr is a copy of @pages. You could save some space by just
-saving @pages, it's going to be around until pmu::free_aux().
-
-Regards,
---
-Alex
+>> Best regards,
+>> - Yakir
+>>
+> Best regards,
