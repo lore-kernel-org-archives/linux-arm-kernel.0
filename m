@@ -1,29 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 20 Oct 2015 11:27:26 +0100
-Subject: [PATCH] spi: atmel: Fix DMA-setup for transfers with more than 8
- bits per word.
-In-Reply-To: <562615E1.4030407@atmel.com>
-References: <1445288084-31805-1-git-send-email-davidm@egauge.net>
- <562615E1.4030407@atmel.com>
-Message-ID: <20151020102726.GX32054@sirena.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 20 Oct 2015 11:28:24 +0100
+Subject: [PATCH v3 2/3] xen, cpu_hotplug: call device_offline instead of
+ cpu_down
+In-Reply-To: <56253543.8080007@oracle.com>
+References: <alpine.DEB.2.02.1510191754000.27957@kaball.uk.xensource.com>
+ <1445273735-15758-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <56253543.8080007@oracle.com>
+Message-ID: <alpine.DEB.2.02.1510201104120.27957@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 12:22:25PM +0200, Nicolas Ferre wrote:
+On Mon, 19 Oct 2015, Boris Ostrovsky wrote:
+> On 10/19/2015 12:55 PM, Stefano Stabellini wrote:
+> > When offlining a cpu, instead of cpu_down, call device_offline, which
+> > also takes care of updating the cpu.dev.offline field. This keeps the
+> > sysfs file /sys/devices/system/cpu/cpuN/online, up to date.  Also move
+> > the call to disable_hotplug_cpu, because it makes more sense to have it
+> > there.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > CC: konrad.wilk at oracle.com
+> > CC: boris.ostrovsky at oracle.com
+> > CC: david.vrabel at citrix.com
+> > ---
+> >   drivers/xen/cpu_hotplug.c |    3 ++-
+> >   1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/xen/cpu_hotplug.c b/drivers/xen/cpu_hotplug.c
+> > index 43de1f5..78804b5 100644
+> > --- a/drivers/xen/cpu_hotplug.c
+> > +++ b/drivers/xen/cpu_hotplug.c
+> > @@ -18,6 +18,8 @@ static void enable_hotplug_cpu(int cpu)
+> >     static void disable_hotplug_cpu(int cpu)
+> >   {
+> > +	if (cpu_online(cpu))
+> > +		device_offline(get_cpu_device(cpu));
+> >   	if (cpu_present(cpu))
+> >   		xen_arch_unregister_cpu(cpu);
+> 
+> Do we want to call device_online() when plugging cpu in?
 
-> Thanks for having rewritten this patch! It's much more simple like this ;-)
+I don't know: that would automatically bring the cpu online after the
+user hot-plugs it. Is it what we want? Current one would have to manually:
 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+echo 1 > /sys/devices/system/cpu/cpu1/online
 
-> For Mark, here is the patchwork entry which can be handy:
-> https://patchwork.kernel.org/patch/7439931/
+I thought that was the expected behaviour?
 
-No, please submit the patch via e-mail as covered in SubmittingPatches
-and as I said yesterday.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151020/c11a2ef5/attachment.sig>
+
+> And take sysfs lock?
+ 
+I think you are right: we need to protect the device_offline (and
+device_online if we add it) with lock_device_hotplug and
+unlock_device_hotplug. Thanks!
+ 
+
+> >   @@ -55,7 +57,6 @@ static void vcpu_hotplug(unsigned int cpu)
+> >   		enable_hotplug_cpu(cpu);
+> >   		break;
+> >   	case 0:
+> > -		(void)cpu_down(cpu);
+> >   		disable_hotplug_cpu(cpu);
+> >   		break;
+> >   	default:
+> 
