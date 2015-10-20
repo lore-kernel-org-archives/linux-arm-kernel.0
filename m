@@ -1,111 +1,119 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Tue, 20 Oct 2015 22:26:29 +0900
-Subject: [PATCH v2 1/2] arm64: revamp unwind_frame for interrupt stack
-In-Reply-To: <1445328019-23330-2-git-send-email-takahiro.akashi@linaro.org>
-References: <1445328019-23330-1-git-send-email-takahiro.akashi@linaro.org>
- <1445328019-23330-2-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <C2B4628F-F984-416C-A358-7FDE8DCD553F@gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 20 Oct 2015 15:27:02 +0200
+Subject: [PATCH] i2c: at91: fix write transfers by clearing pending
+ interrupt first
+In-Reply-To: <5624CA9F.5080309@lysator.liu.se>
+References: <1444746104-20615-1-git-send-email-ludovic.desroches@atmel.com>
+ <561D20E7.5070405@lysator.liu.se> <561D359D.8000500@atmel.com>
+ <561D46FE.4090801@lysator.liu.se>
+ <20151014054321.GA20049@odux.rfo.atmel.com>
+ <56203B0E.1030104@lysator.liu.se> <5620BE9A.10302@lysator.liu.se>
+ <20151019085136.GK26893@odux.rfo.atmel.com>
+ <5624CA9F.5080309@lysator.liu.se>
+Message-ID: <20151020132702.GA25824@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 20, 2015, at 5:00 PM, AKASHI Takahiro wrote:
-> This patch allows unwind_frame() to traverse from interrupt stack
-> to process stack correctly by having a dummy stack frame for irq
-> exception entry created at its prologue.
+On Mon, Oct 19, 2015 at 12:49:03PM +0200, Peter Rosin wrote:
+> On 2015-10-19 10:51, Ludovic Desroches wrote:
+> > Hi Peter,
+> > 
+> > On Fri, Oct 16, 2015 at 11:08:42AM +0200, Peter Rosin wrote:
+> >> On 2015-10-16 01:47, Peter Rosin wrote:
+> >>> On 2015-10-14 07:43, Ludovic Desroches wrote:
+> >>>> On Tue, Oct 13, 2015 at 08:01:34PM +0200, Peter Rosin wrote:
+> >>>>> On 2015-10-13 18:47, Cyrille Pitchen wrote:
+> >>>>>> Le 13/10/2015 17:19, Peter Rosin a ?crit :
+> >>>>>>> On 2015-10-13 16:21, Ludovic Desroches wrote:
+> > 
+> > [...]
+> > 
+> >>> I have started to get this when I run with this patch:
+> >>>
+> >>> [   73.310000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>> [  198.200000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>> [  509.880000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>> [  615.750000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>> [  617.750000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>> [ 1766.640000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>> [ 2035.380000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>> [ 2227.190000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>> [ 2313.100000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>>
+> >>> My USB serial dongle was hung which was why I didn't notice until just now.
+> >>>
+> >>> This is probably not when communication with the eeprom though, and certainly not
+> >>> writing to it, but perhpaps when polling the temperature (using the jc42 driver).
+> >>> I'll investigate further in the morning to see if I can pinpoint it.
+> >>
+> >> Yep, it's the jc42 accesses that triggers this (to the same chip as the
+> >> eeprom, but a different block of transistors I suppose).
+> >>
+> >> Looking at the i2c bus, the accesses normally go like this:
+> >>
+> >> [0.000000] S 0x18 W 0x05 S 0x18 R 0xc1 0xbe NACK P
+> >> [0.000521] S 0x18 W 0x04 S 0x18 R 0x00 0x00 NACK P
+> >> [0.001024] S 0x18 W 0x03 S 0x18 R 0x00 0x00 NACK P
+> >> [0.001524] S 0x18 W 0x02 S 0x18 R 0x00 0x00 NACK P
+> >> [0.196991] S 0x18 W 0x05 S 0x18 R 0xc1 0xbe NACK P
+> >> [0.197514] S 0x18 W 0x04 S 0x18 R 0x00 0x00 NACK P
+> >> [0.198019] S 0x18 W 0x03 S 0x18 R 0x00 0x00 NACK P
+> >> [0.198520] S 0x18 W 0x02 S 0x18 R 0x00 0x00 NACK P
+> >>
+> >> I.e. chunks of four transfers every ~200 ms (I removed the 1Hz rate
+> >> limiter in the jc42 driver to get more frequent incidents).
+> >>
+> >> But when the diagnostic (RXRDY still set!) is output it continues
+> >> with this:
+> >>
+> >> [0.399755] S 0x18 W 0x05 S 0x18 R 0xc1 0xbe NACK P
+> >> [0.404998] S 0x18 W 0x04 S 0x18 R 0x00 0x00 NACK P
+> >> [0.405508] S 0x18 W 0x03 S 0x18 R 0x00 0x00 NACK P
+> >> [0.406008] S 0x18 W 0x02 S 0x18 R 0x00 0x00 NACK P
+> >>
+> >> Notice the ~5 ms delay (about the time it should take to output
+> >> the diagnostic at 115200 baud) after the access to register 0x05
+> >> at 0.399755.
+> >>
+> >> This is the only thing that I can observe on the bus, so it appears
+> >> to be harmless.
+> >>
+> >> It appears that the i2c access at 0.399755 finds the TWI
+> >> registers in an odd state, but nothing from the access at
+> >> 0.198520 appears to have gone wrong. Is this a race? Anyway,
+> >> the diagnostic is pretty frequent and annoying. printk_once?
+> > 
+> > I'll try to reproduce it on my side. The only issue you have is having
+> > the message about RXRDY? I mean no issue with i2c transfers?
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
-> arch/arm64/kernel/entry.S      |   22 ++++++++++++++++++++--
-> arch/arm64/kernel/stacktrace.c |   14 +++++++++++++-
-> 2 files changed, 33 insertions(+), 3 deletions(-)
+> Exactly, the only issue is the message, the bus looks good and transfers
+> work as they should AFAICT.
+> > It is not the possible bug we had in mind, this bug will prevent the
+> > master device to release the i2c bus. It will stop the transfer but
+> > without sending a stop on the bus.
 > 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index c8e0bcf..779f807 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -186,8 +186,26 @@ alternative_endif
-> 	and	x23, x23, #~(IRQ_STACK_SIZE - 1)
-> 	cmp	x20, x23			// check irq re-enterance
-> 	mov	x19, sp
-> -	csel	x23, x19, x24, eq		// x24 = top of irq stack
-> -	mov	sp, x23
-> +	beq	1f
-> +	mov	sp, x24				// x24 = top of irq stack
-> +	stp	x29, x19, [sp, #-16]!		// for sanity check
-> +	stp	x29, x22, [sp, #-16]!		// dummy stack frame
-> +	mov	x29, sp
-> +1:
-> +	/*
-> +	 * Layout of interrupt stack after this macro is invoked:
-> +	 *
-> +	 *     |                |
-> +	 *-0x20+----------------+ <= dummy stack frame
-> +	 *     |      fp        |    : fp on process stack
-> +	 *-0x18+----------------+
-> +	 *     |      lr        |    : return address
-> +	 *-0x10+----------------+
-> +	 *     |    fp (copy)   |    : for sanity check
-> +	 * -0x8+----------------+
-> +	 *     |      sp        |    : sp on process stack
-> +	 *  0x0+----------------+
-> +	 */
-> 	.endm
+> Agreed, this is not about the extra frame caused by the spurious write
+> to the THR register. This is something else.
 > 
-> 	/*
-> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-> index 407991b..03611a1 100644
-> --- a/arch/arm64/kernel/stacktrace.c
-> +++ b/arch/arm64/kernel/stacktrace.c
-> @@ -43,12 +43,24 @@ int notrace unwind_frame(struct stackframe *frame)
-> 	low  = frame->sp;
-> 	high = ALIGN(low, THREAD_SIZE);
-> 
-> -	if (fp < low || fp > high - 0x18 || fp & 0xf)
-> +	if (fp < low || fp > high - 0x20 || fp & 0xf)
-> 		return -EINVAL;
-> 
-> 	frame->sp = fp + 0x10;
-> 	frame->fp = *(unsigned long *)(fp);
-> 	/*
-> +	 * check whether we are going to walk trough from interrupt stack
-> +	 * to process stack
-> +	 * If the previous frame is the initial (dummy) stack frame on
-> +	 * interrupt stack, frame->sp now points to just below the frame
-> +	 * (dummy frame + 0x10).
-> +	 * See entry.S
-> +	 */
-> +#define STACK_LOW(addr) round_down((addr), THREAD_SIZE)
-> +	if ((STACK_LOW(frame->sp) != STACK_LOW(frame->fp)) &&
-> +			(frame->fp == *(unsigned long *)frame->sp))
-> +		frame->sp = *((unsigned long *)(frame->sp + 8));
-> +	/*
-> 	 * -4 here because we care about the PC at time of bl,
-> 	 * not where the return will go.
-> 	 */
-> -- 
-> 1.7.9.5
+> One suspicion is that the driver gets an unexpected irq from its own
+> NACK (the one that it puts out to end the read) and races with the
+> expected interrupt at TXCOMP?
+>
 
-How about folding the following hunk into this patch?
-The comment would be helpful for people to follow this code.
+I have discussed with the designer of this IP. So the NACK flag is only
+used for 'real' nack not protocol ones.
 
-----8<----
+Concerning the read issue, it have attached a patch (apply it on top of
+Cyrille's patch). Could you have a try? I have reproduced your issue only one
+time so it's hard for me to tell if it works well or not.
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index f1303c5..0ff7db3 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -122,7 +122,8 @@
-         * x21 - aborted SP
-         * x22 - aborted PC
-         * x23 - aborted PSTATE
--       */
-+        * x29 - aborted FP
-+        */
-        .endm
- 
-        .macro  kernel_exit, el
+Regards
 
-----8<----
-
-Best Regards
-Jungseok Lee
+Ludovic
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: i2c_at91_fix_rx_issue.patch
+Type: text/x-diff
+Size: 1645 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151020/3883b6da/attachment.bin>
