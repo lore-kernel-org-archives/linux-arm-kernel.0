@@ -1,30 +1,33 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 20 Oct 2015 16:02:33 +0800
-Subject: [PATCH 0/7] clocksource: add missing notrace attribute
-Message-ID: <1445328160-402-1-git-send-email-jszhang@marvell.com>
+Date: Tue, 20 Oct 2015 16:02:39 +0800
+Subject: [PATCH 6/7] clocksource: digicolor: don't trace
+ digicolor_timer_sched_read()
+In-Reply-To: <1445328160-402-1-git-send-email-jszhang@marvell.com>
+References: <1445328160-402-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1445328160-402-7-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocksource drivers sched_clock implementation either miss notrace
-attribute or call wasn't notrace function. This series try to fix them.
+We should not trace digicolor_timer_sched_read() function, add notrace
+attribute to this function.
 
-Jisheng Zhang (7):
-  clocksource: arm_global_timer: fix ftrace
-  clocksource: samsung_pwm_timer: fix ftrace
-  clocksource: pistachio: fix ftrace
-  clocksource: prima2: fix ftrace
-  clocksource: vf_pit_timer: don't trace pit_read_sched_clock()
-  clocksource: digicolor: don't trace digicolor_timer_sched_read()
-  clocksource: fsl_ftm_timer: don't trace ftm_read_sched_clock
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/clocksource/timer-digicolor.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- drivers/clocksource/arm_global_timer.c  | 9 +++++++--
- drivers/clocksource/fsl_ftm_timer.c     | 2 +-
- drivers/clocksource/samsung_pwm_timer.c | 2 +-
- drivers/clocksource/time-pistachio.c    | 3 ++-
- drivers/clocksource/timer-digicolor.c   | 2 +-
- drivers/clocksource/timer-prima2.c      | 2 +-
- drivers/clocksource/vf_pit_timer.c      | 2 +-
- 7 files changed, 14 insertions(+), 8 deletions(-)
-
+diff --git a/drivers/clocksource/timer-digicolor.c b/drivers/clocksource/timer-digicolor.c
+index e73947f0f..a536eeb 100644
+--- a/drivers/clocksource/timer-digicolor.c
++++ b/drivers/clocksource/timer-digicolor.c
+@@ -143,7 +143,7 @@ static irqreturn_t digicolor_timer_interrupt(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static u64 digicolor_timer_sched_read(void)
++static u64 notrace digicolor_timer_sched_read(void)
+ {
+ 	return ~readl(dc_timer_dev.base + COUNT(TIMER_B));
+ }
 -- 
 2.6.1
