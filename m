@@ -1,37 +1,73 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 20 Oct 2015 12:42:26 +0200
-Subject: [PATCH v4 11/22] i2c: core: Probe i2c adapters and devices on
- demand
-In-Reply-To: <1441628627-5143-12-git-send-email-tomeu.vizoso@collabora.com>
-References: <1441628627-5143-1-git-send-email-tomeu.vizoso@collabora.com>
- <1441628627-5143-12-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20151020104226.GA3654@katana>
+From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
+Date: Tue, 20 Oct 2015 16:15:27 +0530
+Subject: [PATCH v6 0/4] arm64, numa: Add numa support for arm64 platforms
+Message-ID: <1445337931-11344-1-git-send-email-gkulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 07, 2015 at 02:23:36PM +0200, Tomeu Vizoso wrote:
-> When looking up an i2c adapter or device through its OF node, probe it
-> if it hasn't already.
-> 
-> The goal is to reduce deferred probes to a minimum, as it makes it very
-> cumbersome to find out why a device failed to probe, and can introduce
-> very big delays in when a critical device is probed.
-> 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+v6:
+	- defined and implemented the numa dt binding using
+	node property proximity and device node distance-map.
+	- renamed dt_numa to of_numa
 
-If the I2C part stays that simple and the core part of the series is
-accepted, then:
+v5:
+        - created base verion of numa.c which creates dummy numa without using dt
+          on single socket platforms. Then added patches for dt support.
+        - Incorporated review comments from Hanjun Guo.
 
-Acked-by: Wolfram Sang <wsa@the-dreams.de>
+v4:
+done changes as per Arnd review comments.
 
-Thanks,
+v3:
+Added changes to support numa on arm64 based platforms.
+Tested these patches on cavium's multinode(2 node topology) platform.
+In this patchset, defined and implemented dt bindings for numa mapping
+for core and memory using device node property arm,associativity.
 
-   Wolfram
+v2:
+Defined and implemented numa map for memory, cores to node and
+proximity distance matrix of nodes.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151020/b805aad5/attachment-0001.sig>
+v1:
+Initial patchset to support numa on arm64 platforms.
+
+Note:
+        1. This patchset is tested for numa with dt on
+           thunderx single socket and dual socket boards.
+        2. Numa DT booting needs the dt memory nodes, which are deleted in current efi-stub,
+        hence to try numa with dt, you need to rebase with ard's patchset.
+        http://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-uefi-early-fdt-handling
+
+Ganapatrao Kulkarni (4):
+  arm64, numa: adding numa support for arm64 platforms.
+  Documentation, dt, arm64/arm: dt bindings for numa.
+  arm64/arm, numa, dt: adding numa dt binding implementation for arm64
+    platforms
+  arm64, dt, thunderx: Add initial dts for Cavium Thunderx in 2 node
+    topology.
+
+ Documentation/devicetree/bindings/arm/numa.txt  | 275 ++++++++
+ arch/arm64/Kconfig                              |  35 +
+ arch/arm64/boot/dts/cavium/Makefile             |   2 +-
+ arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts  |  82 +++
+ arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi | 806 ++++++++++++++++++++++++
+ arch/arm64/include/asm/mmzone.h                 |  17 +
+ arch/arm64/include/asm/numa.h                   |  73 +++
+ arch/arm64/kernel/Makefile                      |   1 +
+ arch/arm64/kernel/of_numa.c                     | 221 +++++++
+ arch/arm64/kernel/setup.c                       |   9 +
+ arch/arm64/kernel/smp.c                         |   3 +
+ arch/arm64/mm/Makefile                          |   1 +
+ arch/arm64/mm/init.c                            |  31 +-
+ arch/arm64/mm/numa.c                            | 539 ++++++++++++++++
+ 14 files changed, 2090 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
+ create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts
+ create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi
+ create mode 100644 arch/arm64/include/asm/mmzone.h
+ create mode 100644 arch/arm64/include/asm/numa.h
+ create mode 100644 arch/arm64/kernel/of_numa.c
+ create mode 100644 arch/arm64/mm/numa.c
+
+-- 
+1.8.1.4
