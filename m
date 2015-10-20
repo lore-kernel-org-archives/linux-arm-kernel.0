@@ -1,24 +1,72 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 20 Oct 2015 07:36:46 +0000 (UTC)
-Subject: [PATCH 1/2 v2] ARM: DRA7/335x/437x/OMAP4: hwmod: Remove elm
- address space from hwmod data
-In-Reply-To: <5620AC79.7010802@ti.com>
-References: <1444926461-16092-1-git-send-email-fcooper@ti.com>
- <5620AC79.7010802@ti.com>
-Message-ID: <alpine.DEB.2.02.1510200736380.28048@utopia.booyaka.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 20 Oct 2015 09:36:44 +0200
+Subject: [PATCH v6 0/5] clk: sunxi: Add support for the Audio PLL
+Message-ID: <1445326609-6314-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Oct 2015, Roger Quadros wrote:
+Hi,
 
-> On 15/10/15 19:27, Franklin S Cooper Jr wrote:
-> > ELM address information is provided by device tree. No longer need
-> > to include this information within hwmod.
-> > 
-> > Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> 
-> Acked-by: Roger Quadros <rogerq@ti.com>
+This serie adds support for the PLL2 aka the Audio PLL on the
+Allwinner A10 and the later SoCs.
 
-Thanks, queued.
+This is the last part of the audio codec support, it's been around for
+quite a while now, and I expect it to be merged in 4.4.
 
-- Paul
+This serie is built on top of a generic clk-multiplier driver to
+handle clock that multiply their parent clock rate (mostly PLL's), in
+order to provide the driver for the PLL2 base clock, and then adds the
+drivers for the clock that derive from the Audio PLL.
+
+Thanks!
+Maxime
+
+Changes from v5:
+  - Fixed the multiplier calculation
+  - Added Chen-Yu tags
+
+Changes from v4:
+  - Fixed the genmask calls
+  - Fixed the number of parents registration in mod1
+  - Added Chen-Yu's Reviewed-by
+
+Changes from v3:
+  - Fixed the header issues: removed unused ones, added some others
+  - Added the __acquire / __release call when a spinlock is not
+    defined
+
+Changes from v2:
+  - Renamed clk-factor to clk-multiplier
+  - Added an exception for the A13 clock
+
+Changes from v1:
+  - Removed a bogus of_iomap in the mod1 clock driver
+  - Wrote the clk-factor driver
+  - Converted the PLL2 clock to that driver
+
+Emilio L?pez (2):
+  clk: sunxi: codec clock support
+  clk: sunxi: mod1 clock support
+
+Maxime Ripard (3):
+  clk: Add a basic multiplier clock
+  clk: sunxi: Add a driver for the PLL2
+  clk: sunxi: pll2: Add A13 support
+
+ drivers/clk/Makefile                       |   1 +
+ drivers/clk/clk-multiplier.c               | 181 ++++++++++++++++++++++++
+ drivers/clk/sunxi/Makefile                 |   3 +
+ drivers/clk/sunxi/clk-a10-codec.c          |  44 ++++++
+ drivers/clk/sunxi/clk-a10-mod1.c           |  81 +++++++++++
+ drivers/clk/sunxi/clk-a10-pll2.c           | 216 +++++++++++++++++++++++++++++
+ include/dt-bindings/clock/sun4i-a10-pll2.h |  53 +++++++
+ include/linux/clk-provider.h               |  42 ++++++
+ 8 files changed, 621 insertions(+)
+ create mode 100644 drivers/clk/clk-multiplier.c
+ create mode 100644 drivers/clk/sunxi/clk-a10-codec.c
+ create mode 100644 drivers/clk/sunxi/clk-a10-mod1.c
+ create mode 100644 drivers/clk/sunxi/clk-a10-pll2.c
+ create mode 100644 include/dt-bindings/clock/sun4i-a10-pll2.h
+
+-- 
+2.6.2
