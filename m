@@ -1,46 +1,60 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 20 Oct 2015 17:13:03 +0800
-Subject: [PATCH v2 1/9] mmc: core: Add DT bindings for eMMC hardware reset
- support
+Date: Tue, 20 Oct 2015 17:13:07 +0800
+Subject: [PATCH v2 5/9] mmc: mediatek: fix got GPD checksum error interrupt
+ when data transfer
 In-Reply-To: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
 References: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1445332391-30530-2-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1445332391-30530-6-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometime only need set MMC_CAP_HW_RESET for one of MMC hosts,
-So set it in device tree is better.
+Even if we only use one gpd, we need alloc 2 gpd and make
+the gpd->next pointer to the second gpd, or may get gpd checksum
+error, this was checked by hardware
 
 Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 ---
- Documentation/devicetree/bindings/mmc/mmc.txt | 1 +
- drivers/mmc/core/host.c                       | 2 ++
- 2 files changed, 3 insertions(+)
+ drivers/mmc/host/mtk-sd.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/mmc.txt b/Documentation/devicetree/bindings/mmc/mmc.txt
-index 0384fc3..f693baf 100644
---- a/Documentation/devicetree/bindings/mmc/mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/mmc.txt
-@@ -37,6 +37,7 @@ Optional properties:
- - sd-uhs-sdr104: SD UHS SDR104 speed is supported
- - sd-uhs-ddr50: SD UHS DDR50 speed is supported
- - cap-power-off-card: powering off the card is safe
-+- cap-mmc-hw-reset: eMMC hardware reset is supported
- - cap-sdio-irq: enable SDIO IRQ signalling on this interface
- - full-pwr-cycle: full power cycle of the card is supported
- - mmc-ddr-1_8v: eMMC high-speed DDR mode(1.8V I/O) is supported
-diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-index abd933b..04fdc2f 100644
---- a/drivers/mmc/core/host.c
-+++ b/drivers/mmc/core/host.c
-@@ -507,6 +507,8 @@ int mmc_of_parse(struct mmc_host *host)
- 		host->caps |= MMC_CAP_UHS_DDR50;
- 	if (of_property_read_bool(np, "cap-power-off-card"))
- 		host->caps |= MMC_CAP_POWER_OFF_CARD;
-+	if (of_property_read_bool(np, "cap-mmc-hw-reset"))
-+		host->caps |= MMC_CAP_HW_RESET;
- 	if (of_property_read_bool(np, "cap-sdio-irq"))
- 		host->caps |= MMC_CAP_SDIO_IRQ;
- 	if (of_property_read_bool(np, "full-pwr-cycle"))
+diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+index c877ded..3858163 100644
+--- a/drivers/mmc/host/mtk-sd.c
++++ b/drivers/mmc/host/mtk-sd.c
+@@ -1145,11 +1145,14 @@ static void msdc_init_gpd_bd(struct msdc_host *host, struct msdc_dma *dma)
+ 	struct mt_bdma_desc *bd = dma->bd;
+ 	int i;
+ 
+-	memset(gpd, 0, sizeof(struct mt_gpdma_desc));
++	memset(gpd, 0, sizeof(struct mt_gpdma_desc) * 2);
+ 
+ 	gpd->gpd_info = GPDMA_DESC_BDP; /* hwo, cs, bd pointer */
+ 	gpd->ptr = (u32)dma->bd_addr; /* physical address */
+-
++	/* gpd->next is must set for desc DMA
++	 * That's why must alloc 2 gpd structure.
++	 */
++	gpd->next = (u32)dma->gpd_addr + sizeof(struct mt_gpdma_desc);
+ 	memset(bd, 0, sizeof(struct mt_bdma_desc) * MAX_BD_NUM);
+ 	for (i = 0; i < (MAX_BD_NUM - 1); i++)
+ 		bd[i].next = (u32)dma->bd_addr + sizeof(*bd) * (i + 1);
+@@ -1306,7 +1309,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
+ 
+ 	host->timeout_clks = 3 * 1048576;
+ 	host->dma.gpd = dma_alloc_coherent(&pdev->dev,
+-				sizeof(struct mt_gpdma_desc),
++				2 * sizeof(struct mt_gpdma_desc),
+ 				&host->dma.gpd_addr, GFP_KERNEL);
+ 	host->dma.bd = dma_alloc_coherent(&pdev->dev,
+ 				MAX_BD_NUM * sizeof(struct mt_bdma_desc),
+@@ -1347,7 +1350,7 @@ release:
+ release_mem:
+ 	if (host->dma.gpd)
+ 		dma_free_coherent(&pdev->dev,
+-			sizeof(struct mt_gpdma_desc),
++			2 * sizeof(struct mt_gpdma_desc),
+ 			host->dma.gpd, host->dma.gpd_addr);
+ 	if (host->dma.bd)
+ 		dma_free_coherent(&pdev->dev,
 -- 
 1.8.1.1.dirty
