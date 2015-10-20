@@ -1,77 +1,33 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Tue, 20 Oct 2015 14:29:14 +0800
-Subject: [PATCH v9 4/5] xhci: mediatek: support MTK xHCI host controller
-In-Reply-To: <5624D33D.5090807@intel.com>
-References: <1443495698-32233-1-git-send-email-chunfeng.yun@mediatek.com>
- <1443495698-32233-5-git-send-email-chunfeng.yun@mediatek.com>
- <561FBC40.7020100@linux.intel.com> <1445131519.17024.10.camel@mhfsdcap03>
- <5624D33D.5090807@intel.com>
-Message-ID: <1445322554.4858.12.camel@mhfsdcap03>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Tue, 20 Oct 2015 09:33:49 +0300
+Subject: [PATCH v4 6/8] drivers: soc: add support for exynos SROM driver
+In-Reply-To: <5625C07D.4030706@samsung.com>
+References: <1445255206-11148-1-git-send-email-pankaj.dubey@samsung.com>
+ <1445255206-11148-7-git-send-email-pankaj.dubey@samsung.com>
+ <56258683.7070204@samsung.com> <5625B92C.10505@samsung.com>
+ <5625C07D.4030706@samsung.com>
+Message-ID: <014301d10b01$488873f0$d9995bd0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
-On Mon, 2015-10-19 at 14:25 +0300, Mathias Nyman wrote:
-> >>
-> >> So basically we are trying to use as many microframes as possible with as few packets
-> >> per microframe as possible.
-> >>
-> >> Did I understand this correctly?
-> > Yes, you are right.
-> >
-> >> How will devices react if they expect to get 16 packets every 16th microframe,
-> >> but they get one packet every microframe instead?
-> > I think that the synchronous endpoint must specify its period by
-> > bInterval, but can't specify how data should be transfered during the
-> > period by the host, and it just only receives data passively. So the
-> > device can receive data correctly in the case(bInterval is 5).
-> >
-> > quote from usb3_r1.0 section4.4.8 Isochronous Transfers:
-> > "The host can request data from the device or send data to the device at
-> > any time during the service interval for a particular endpoint on that
-> > device"
-> >
-> 
-> As I understand the 4.4.8 section it just means the device can't assume a fixed
-> time interval between transfers, meaning that the host can use the last microframe
-> in one esit and the first microframe in the next esit, but still only use 1 microframe
-> per esit.
-> 
-> Section 8.12.6.1 describes how a 11 packet isoc transfer is allowed to be split
-> to 1 burst of 11 packets, 2 burst (8 + 3),  3 burst (4+4+3) 6 bursts (2+2+2+2+2+1) or
-> 11 bursts of 1. These are however all within the same microframe. Splitting the
-> transfer into several microframes in a esit kind of makes the whole interval concept pointless.
-> 
-It doesn't say that the packets should be transfered within the same
-microframe (bus interval), as I understand it means service interval;
+ Hello!
 
-The direct prove resides in figure 8-56/8-57.
+> AFAIR Fedin was talking about missing functionality, not about adding
+> the contribution by himself. So he might add it or he might not. I did
+> not receive any commitments from him.
 
-Term: 
-1. BI, bus interval, a 125 us period that establishes the internal
-boundary of service interval, aka uframe;
-2. SSI, Support Smart Isochronous;
-3. DBI, Data in this Bus Interval is done;
-4. NBI, Numbers of Bus Interval;
+ I am waiting for the driver to be integrated, because i see it's constantly redesigned. Then i'll post my patches. By the way, they
+will be useful only if pin controller driver for 5410 is accepted upstream, several authors have done it but i still didn't see it
+in upstream.
+ Pin controller is needed in order to configure multi-functional pins correctly.
 
-As the figure shows, the service interval = 8 BI, that host distribute 2
-packets @1st uframe, keep U1/U2 state for the next 3uframe, then
-transmit 4 packets @4th uframe, and the remaining 3 packet in the last
-frame.
+> The driver should be "proper" for
+> the time being (which could mean !PM dependency). If there is a need,
+> then the dependency will be removed.
 
-Please notice that this just is an example illustrated by spec, but we
-can derive the conclusion that the distribution of packet in a service
-interval is completely decided by host, and can split isoc transfers
-across multiple uframes.
+ I can do it later if you prefer.
 
-PS: as you can see, MTK implementation of schedule algorithms is an
-implementation of Smart Isochronous of which the smart side resides in
-software.
-
-
-> -Mathias
-> 
-> 
-> 
->   
-> 
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
