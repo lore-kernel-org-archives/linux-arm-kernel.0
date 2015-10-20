@@ -1,220 +1,183 @@
 From: majun258@huawei.com (MaJun)
-Date: Tue, 20 Oct 2015 16:41:59 +0800
-Subject: [PATCH v6 3/4] irqchip:create irq domain for each mbigen device
+Date: Tue, 20 Oct 2015 16:42:00 +0800
+Subject: [PATCH v6 4/4] irqchip:implement the mbigen irq chip operation
+ functions
 In-Reply-To: <1445330520-11960-1-git-send-email-majun258@huawei.com>
 References: <1445330520-11960-1-git-send-email-majun258@huawei.com>
-Message-ID: <1445330520-11960-4-git-send-email-majun258@huawei.com>
+Message-ID: <1445330520-11960-5-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ma Jun <majun258@huawei.com>
 
-For peripheral devices which connect to mbigen,mbigen is a interrupt
-controller. So, we create irq domain for each mbigen device and add
-mbigen irq domain into irq hierarchy structure.
+Add the interrupt controller chip operation functions of mbigen chip.
 
 Signed-off-by: Ma Jun <majun258@huawei.com>
 ---
- drivers/irqchip/irq-mbigen.c |  152 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 152 insertions(+), 0 deletions(-)
+ drivers/irqchip/irq-mbigen.c |  100 +++++++++++++++++++++++++++++++++++++++--
+ 1 files changed, 95 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-index f18132f..211b3c8 100644
+index 211b3c8..dbda7bc 100644
 --- a/drivers/irqchip/irq-mbigen.c
 +++ b/drivers/irqchip/irq-mbigen.c
-@@ -16,27 +16,164 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+@@ -45,6 +45,21 @@
  
-+#include <linux/interrupt.h>
-+#include <linux/irqchip.h>
- #include <linux/module.h>
-+#include <linux/msi.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- 
-+/* Interrupt numbers per mbigen node supported */
-+#define IRQS_PER_MBIGEN_NODE		128
-+
-+/* 16 irqs (Pin0-pin15) are reserved for each mbigen chip */
-+#define RESERVED_IRQ_PER_MBIGEN_CHIP	16
+ /* offset of vector register in mbigen node */
+ #define REG_MBIGEN_VEC_OFFSET		0x200
 +
 +/**
-+ * In mbigen vector register
-+ * bit[21:12]:	event id value
-+ * bit[11:0]:	device id
++ * offset of clear register in mbigen node
++ * This register is used to clear the status
++ * of interrupt
 + */
-+#define IRQ_EVENT_ID_SHIFT		12
-+#define IRQ_EVENT_ID_MASK		0x3ff
++#define REG_MBIGEN_CLEAR_OFFSET		0xa00
 +
-+/* register range of each mbigen node */
-+#define MBIGEN_NODE_OFFSET		0x1000
++/**
++ * offset of interrupt type register
++ * This register is used to configure interrupt
++ * trigger type
++ */
++#define REG_MBIGEN_TYPE_OFFSET		0x0
 +
-+/* offset of vector register in mbigen node */
-+#define REG_MBIGEN_VEC_OFFSET		0x200
  /**
   * struct mbigen_device - holds the information of mbigen device.
   *
-  * @pdev:		pointer to the platform device structure of mbigen chip.
-  * @base:		mapped address of this mbigen chip.
-+ * @domain:		pointer to the irq domain
+@@ -62,11 +77,19 @@ struct mbigen_device {
+  * struct mbigen_irq_data - private data of each irq
+  *
+  * @base:		mapped address of mbigen chip
++ * @pin_offset:		local pin offset of interrupt.
+  * @reg_vec:		addr offset of interrupt vector register.
++ * @reg_type:		addr offset of interrupt trigger type register.
++ * @reg_clear:		addr offset of interrupt clear register.
++ * @type:		interrupt trigger type.
   */
- struct mbigen_device {
- 	struct platform_device	*pdev;
+ struct mbigen_irq_data {
  	void __iomem		*base;
-+	struct irq_domain	*domain;
-+};
-+
-+/**
-+ * struct mbigen_irq_data - private data of each irq
-+ *
-+ * @base:		mapped address of mbigen chip
-+ * @reg_vec:		addr offset of interrupt vector register.
-+ */
-+struct mbigen_irq_data {
-+	void __iomem		*base;
-+	unsigned int		reg_vec;
-+};
-+
-+static inline int get_mbigen_vec_reg(u32 nid, u32 offset)
++	unsigned int		pin_offset;
+ 	unsigned int		reg_vec;
++	unsigned int		reg_type;
++	unsigned int		reg_clear;
++	unsigned int		type;
+ };
+ 
+ static inline int get_mbigen_vec_reg(u32 nid, u32 offset)
+@@ -75,6 +98,61 @@ static inline int get_mbigen_vec_reg(u32 nid, u32 offset)
+ 			+ REG_MBIGEN_VEC_OFFSET;
+ }
+ 
++static int get_mbigen_type_reg(u32 nid, u32 offset)
 +{
-+	return (offset * 4) + nid * MBIGEN_NODE_OFFSET
-+			+ REG_MBIGEN_VEC_OFFSET;
++	int ofst;
++
++	ofst = offset / 32 * 4;
++	return ofst + nid * MBIGEN_NODE_OFFSET
++		+ REG_MBIGEN_TYPE_OFFSET;
 +}
 +
-+static struct irq_chip mbigen_irq_chip = {
-+	.name =			"mbigen-v2",
-+	.irq_mask =		irq_chip_mask_parent,
-+	.irq_unmask =		irq_chip_unmask_parent,
-+	.irq_eoi =		mbigen_eoi_irq,
-+	.irq_set_type =		mbigen_set_type,
-+	.irq_set_affinity =	irq_chip_set_affinity_parent,
-+};
-+
-+static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
++static int get_mbigen_clear_reg(u32 nid, u32 offset)
 +{
-+	struct mbigen_irq_data *mgn_irq_data = irq_get_chip_data(desc->irq);
-+	u32 val;
++	int ofst;
 +
-+	val = readl_relaxed(mgn_irq_data->reg_vec + mgn_irq_data->base);
-+
-+	val &= ~(IRQ_EVENT_ID_MASK << IRQ_EVENT_ID_SHIFT);
-+	val |= (msg->data << IRQ_EVENT_ID_SHIFT);
-+
-+	writel_relaxed(val, mgn_irq_data->reg_vec + mgn_irq_data->base);
++	ofst = offset / 32 * 4;
++	return ofst + nid * MBIGEN_NODE_OFFSET
++		+ REG_MBIGEN_CLEAR_OFFSET;
 +}
 +
-+static struct mbigen_irq_data *set_mbigen_irq_data(int hwirq)
++static void mbigen_eoi_irq(struct irq_data *data)
 +{
-+	struct mbigen_irq_data *datap;
-+	unsigned int nid, pin_offset;
++	struct mbigen_irq_data *mgn_irq_data = irq_data_get_irq_chip_data(data);
++	u32 mask;
 +
-+	datap = kzalloc(sizeof(*datap), GFP_KERNEL);
-+	if (!datap)
-+		return NULL;
-+
-+	/* get the mbigen node number */
-+	nid = (hwirq - RESERVED_IRQ_PER_MBIGEN_CHIP) / IRQS_PER_MBIGEN_NODE + 1;
-+
-+	pin_offset = (hwirq - RESERVED_IRQ_PER_MBIGEN_CHIP)
-+					% IRQS_PER_MBIGEN_NODE;
-+
-+	datap->reg_vec = get_mbigen_vec_reg(nid, pin_offset);
-+	return datap;
-+}
-+
-+static int mbigen_domain_translate(struct irq_domain *d,
-+				    struct irq_fwspec *fwspec,
-+				    unsigned long *hwirq,
-+				    unsigned int *type)
-+{
-+	if (is_of_node(fwspec->fwnode)) {
-+		if (fwspec->param_count != 2)
-+			return -EINVAL;
-+
-+		*hwirq = fwspec->param[0];
-+		*type = fwspec->param[1] & IRQ_TYPE_SENSE_MASK;
-+
-+		return 0;
++	/* only level triggered interrupt need to clear status */
++	if (mgn_irq_data->type == IRQ_TYPE_LEVEL_HIGH) {
++		mask = 1 << (mgn_irq_data->pin_offset % 32);
++		writel_relaxed(mask, mgn_irq_data->reg_clear + mgn_irq_data->base);
 +	}
-+	return -EINVAL;
++
++	irq_chip_eoi_parent(data);
 +}
 +
-+static int mbigen_irq_domain_alloc(struct irq_domain *domain,
-+					unsigned int virq,
-+					unsigned int nr_irqs,
-+					void *args)
++static int mbigen_set_type(struct irq_data *d, unsigned int type)
 +{
-+	struct irq_fwspec *fwspec = args;
-+	irq_hw_number_t hwirq = fwspec->param[0];
-+	struct mbigen_device *mgn_chip;
-+	struct mbigen_irq_data *mgn_irq_data;
-+	int i, err;
++	struct mbigen_irq_data *mgn_irq_data = irq_data_get_irq_chip_data(d);
++	u32 mask;
++	int val;
 +
-+	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
-+	if (err)
-+		return err;
++	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
++		return -EINVAL;
 +
-+	/* set related information of this irq */
-+	mgn_irq_data = set_mbigen_irq_data(hwirq);
-+	if (!mgn_irq_data)
-+		return err;
++	mask = 1 << (mgn_irq_data->pin_offset % 32);
 +
-+	mgn_chip = platform_msi_get_host_data(domain);
-+	mgn_irq_data->base = mgn_chip->base;
++	val = readl_relaxed(mgn_irq_data->reg_type + mgn_irq_data->base);
 +
-+	for (i = 0; i < nr_irqs; i++)
-+		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
-+				      &mbigen_irq_chip, mgn_irq_data);
++	if (type == IRQ_TYPE_LEVEL_HIGH)
++		val |= mask;
++	else if (type == IRQ_TYPE_EDGE_RISING)
++		val &= ~mask;
++
++	writel_relaxed(val, mgn_irq_data->reg_type + mgn_irq_data->base);
 +
 +	return 0;
 +}
 +
-+static struct irq_domain_ops mbigen_domain_ops = {
-+	.translate	= mbigen_domain_translate,
-+	.alloc		= mbigen_irq_domain_alloc,
-+	.free		= irq_domain_free_irqs_common,
- };
+ static struct irq_chip mbigen_irq_chip = {
+ 	.name =			"mbigen-v2",
+ 	.irq_mask =		irq_chip_mask_parent,
+@@ -97,10 +175,11 @@ static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
+ 	writel_relaxed(val, mgn_irq_data->reg_vec + mgn_irq_data->base);
+ }
  
- static int mbigen_device_probe(struct platform_device *pdev)
+-static struct mbigen_irq_data *set_mbigen_irq_data(int hwirq)
++static struct mbigen_irq_data *set_mbigen_irq_data(int hwirq,
++						unsigned int type)
  {
+ 	struct mbigen_irq_data *datap;
+-	unsigned int nid, pin_offset;
++	unsigned int nid;
+ 
+ 	datap = kzalloc(sizeof(*datap), GFP_KERNEL);
+ 	if (!datap)
+@@ -109,10 +188,20 @@ static struct mbigen_irq_data *set_mbigen_irq_data(int hwirq)
+ 	/* get the mbigen node number */
+ 	nid = (hwirq - RESERVED_IRQ_PER_MBIGEN_CHIP) / IRQS_PER_MBIGEN_NODE + 1;
+ 
+-	pin_offset = (hwirq - RESERVED_IRQ_PER_MBIGEN_CHIP)
++	datap->pin_offset = (hwirq - RESERVED_IRQ_PER_MBIGEN_CHIP)
+ 					% IRQS_PER_MBIGEN_NODE;
+ 
+-	datap->reg_vec = get_mbigen_vec_reg(nid, pin_offset);
++	datap->reg_type = get_mbigen_type_reg(nid, datap->pin_offset);
++	datap->reg_vec = get_mbigen_vec_reg(nid, datap->pin_offset);
++
++	/* no clear register for edge triggered interrupt */
++	if (type == IRQ_TYPE_EDGE_RISING)
++		datap->reg_clear = 0;
++	else
++		datap->reg_clear = get_mbigen_clear_reg(nid,
++					datap->pin_offset);
++
++	datap->type = type;
+ 	return datap;
+ }
+ 
+@@ -140,6 +229,7 @@ static int mbigen_irq_domain_alloc(struct irq_domain *domain,
+ {
+ 	struct irq_fwspec *fwspec = args;
+ 	irq_hw_number_t hwirq = fwspec->param[0];
++	unsigned int type = fwspec->param[1];
  	struct mbigen_device *mgn_chip;
-+	struct irq_domain *domain;
-+	u32 num_msis;
+ 	struct mbigen_irq_data *mgn_irq_data;
+ 	int i, err;
+@@ -149,7 +239,7 @@ static int mbigen_irq_domain_alloc(struct irq_domain *domain,
+ 		return err;
  
- 	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
- 	if (!mgn_chip)
-@@ -45,6 +182,20 @@ static int mbigen_device_probe(struct platform_device *pdev)
- 	mgn_chip->pdev = pdev;
- 	mgn_chip->base = of_iomap(pdev->dev.of_node, 0);
+ 	/* set related information of this irq */
+-	mgn_irq_data = set_mbigen_irq_data(hwirq);
++	mgn_irq_data = set_mbigen_irq_data(hwirq, type);
+ 	if (!mgn_irq_data)
+ 		return err;
  
-+	/* If there is no "num-msi" property, assume 64... */
-+	if (of_property_read_u32(pdev->dev.of_node, "num-msis", &num_msis) < 0)
-+		num_msis = 64;
-+
-+	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
-+							mbigen_write_msg,
-+							&mbigen_domain_ops,
-+							mgn_chip);
-+
-+	if (!domain)
-+		return -ENOMEM;
-+
-+	mgn_chip->domain = domain;
-+
- 	platform_set_drvdata(pdev, mgn_chip);
- 
- 	return 0;
-@@ -54,6 +205,7 @@ static int mbigen_device_remove(struct platform_device *pdev)
- {
- 	struct mbigen_device *mgn_chip = platform_get_drvdata(pdev);
- 
-+	irq_domain_remove(mgn_chip->domain);
- 	iounmap(mgn_chip->base);
- 
- 	return 0;
 -- 
 1.7.1
