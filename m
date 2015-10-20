@@ -1,66 +1,48 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Tue, 20 Oct 2015 14:30:02 +0530
-Subject: [PATCH 1/7] arm: dts: Add syscon-{reboot,
- poweroff} nodes for exynos3250 SoCs
-In-Reply-To: <5624EA26.9030909@osg.samsung.com>
-References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
- <1445234635-3950-2-git-send-email-alim.akhtar@samsung.com>
- <5624EA26.9030909@osg.samsung.com>
-Message-ID: <56260292.2040902@samsung.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Tue, 20 Oct 2015 17:11:00 +0800
+Subject: [PATCH 0/4] 
+Message-ID: <1445332264-6054-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+We need the OTP pin is gpio state before resetting the TSADC controller,
+since the tshut polarity will generate a high signal.
 
-On 10/19/2015 06:33 PM, Javier Martinez Canillas wrote:
-> Hello Alim,
->
-> On 10/19/2015 08:03 AM, Alim Akhtar wrote:
->> This patch adds syscon-{reboot, poweroff} nodes to allow the
->> generic syscon-{reboot, poweroff} driver to reset/poweroff exynos3250 SoC.
->>
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->> ---
->>   arch/arm/boot/dts/exynos3250.dtsi |   14 ++++++++++++++
->>   1 file changed, 14 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
->> index 033def482fc3..af5d9ad4c7b7 100644
->> --- a/arch/arm/boot/dts/exynos3250.dtsi
->> +++ b/arch/arm/boot/dts/exynos3250.dtsi
->> @@ -152,6 +152,20 @@
->>   			interrupt-parent = <&gic>;
->>   		};
->>
->> +		poweroff: syscon-poweroff {
->> +			compatible = "syscon-poweroff";
->> +			regmap = <&pmu_system_controller>;
->> +			offset = <0x330C>;
->> +			mask = <0x5200>;
->> +		};
->> +
->> +		reboot: syscon-reboot {
->> +			compatible = "syscon-reboot";
->> +			regmap = <&pmu_system_controller>;
->> +			offset = <0x0400>;
->> +			mask = <0x1>;
->> +		};
->> +
->
-> I don't have a Exynos3250 manual but I guess 0x330C is also named
-> PS_HOLD_CONTROL and 0x400 is SWRESET as the other Exynos SoCs.
->
-> I wonder if a macro could be used instead of magic numbers or at
-> least have a comment next to the offset field.
->
-> The patch looks good to me though and a comment can be added as
-> a follow up so:
->
-Will add a comment about register offset next to it.
+Says:
+The TSHUT temperature is setting more than 80 degree, the default
+tshut polarity is HIGH.
 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
->
-Thanks!
+If T > 80C, the OTP output the High Signal.
+If T < 80C, the OTP output the Low Signal.
 
-> Best regards,
->
+On the moment, the TSADC controller is reset, the tshut polarity will be
+Low in a short period of time.
+
+So:
+If T < 80C, the OTP output the High Signal.
+If T > 80C, the OTP output the Low Signal.
+
+In some cases, the OTP pin is connected to the PMIC, maybe the PMIC can
+accept the reset response time to avoid this issue.
+
+In other words, the system will be always reboot if we make the OTP pin
+is connected the others IC to control the power.
+
+Tested on box board.
+
+
+
+Caesar Wang (4):
+  dt-bindings: Sync the dts to this document
+  thermal: rockchip: ensure the otp state before resetting the
+    controller
+  thermal: rockchip: change the TSHUT default state
+  ARM: dts: rockchip: Add the OTP gpio pinctrl
+
+ .../bindings/thermal/rockchip-thermal.txt          |  5 ++--
+ arch/arm/boot/dts/rk3288.dtsi                      |  9 ++++--
+ drivers/thermal/rockchip_thermal.c                 | 34 +++++++++++++++++++++-
+ 3 files changed, 43 insertions(+), 5 deletions(-)
+
+-- 
+1.9.1
