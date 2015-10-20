@@ -1,21 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Oct 2015 09:21:42 -0700
-Subject: [PATCH v2] ARM: dts: am437x-gp-evm: Add wakeup interrupt source
- for pixcir_i2c_ts
-In-Reply-To: <1444830865-30899-1-git-send-email-vigneshr@ti.com>
-References: <1444830865-30899-1-git-send-email-vigneshr@ti.com>
-Message-ID: <20151020162141.GG3078@atomide.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 20 Oct 2015 17:22:04 +0100
+Subject: [PATCH 2/2] fixup! arm64: kvm: allows kvm cpu hotplug
+In-Reply-To: <1445327907-23274-3-git-send-email-takahiro.akashi@linaro.org>
+References: <1445327907-23274-1-git-send-email-takahiro.akashi@linaro.org>
+ <1445327907-23274-3-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <56266A2C.7000005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vignesh R <vigneshr@ti.com> [151014 06:59]:
-> On am437x-gp-evm, pixcir_i2c_ts can wakeup the system from low power
-> state via pinctrl and IO daisy chain using generic wakeirq framework.
-> With commit 3fffd1283927 ("i2c: allow specifying separate wakeup
-> interrupt in device tree") i2c core allows optional wakeirq to be
-> specified via device tree. Add wakeup irq entry to enable pixcir_i2c_ts
-> to wake the system from low power state.
+On 20/10/15 08:58, AKASHI Takahiro wrote:
+> Without this patch, kvm cannot start a guest when cpuidle is enabled
+> if the hardware does not retain cpu state (EL2) in idle state.
+> 
+> This patch re-initailizes EL2 state at CPU_PM_EXIT by calling
+> kvm_arch_hardware_enable() if and only if kvm has been initialized
+> before CPU_PM_ENTER, that is, if any vcpus have been created.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Applying into omap-for-v4.4/dt thanks.
+This solves my issue with the v5 version here [0].
+Tested-By: James Morse <james.morse@arm.com>
 
-Tony
+
+Thanks!
+
+James
+
+[0] https://lists.linaro.org/pipermail/linaro-kernel/2015-May/021575.html
