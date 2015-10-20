@@ -1,137 +1,73 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 20 Oct 2015 11:18:16 +0100
-Subject: [PATCH v4 1/4] drm: Introduce generic probe function for
- component based masters.
-In-Reply-To: <20151020100909.GW32532@n2100.arm.linux.org.uk>
+Date: Tue, 20 Oct 2015 11:18:39 +0100
+Subject: [PATCH v4 0/4] drm: Cleanup probe function for component based
+ masters.
+In-Reply-To: <20151020100233.GW13786@phenom.ffwll.local>
 References: <1445332995-11212-1-git-send-email-Liviu.Dudau@arm.com>
- <1445332995-11212-2-git-send-email-Liviu.Dudau@arm.com>
- <CACvgo51szQz9iu55mP+Qz+VCzjB-20K169MpX6_71ppcnGHXzg@mail.gmail.com>
- <20151020100909.GW32532@n2100.arm.linux.org.uk>
-Message-ID: <20151020101816.GA3394@e106497-lin.cambridge.arm.com>
+ <20151020100233.GW13786@phenom.ffwll.local>
+Message-ID: <20151020101839.GB3394@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 11:09:09AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Oct 20, 2015 at 11:00:55AM +0100, Emil Velikov wrote:
-> > Hi Liviu,
+On Tue, Oct 20, 2015 at 12:02:33PM +0200, Daniel Vetter wrote:
+> On Tue, Oct 20, 2015 at 10:23:11AM +0100, Liviu Dudau wrote:
+> > Changelog:
+> > v4: Fixed a bug where the wrong pointer was sent to component_match_add() and
+> >     component_master_add_with_match() in the armada_drv.c file that was flagged
+> >     by kbuild test robot. Dropped the RFC tag and added Acked-bys received from
+> >     Russell King.
+> > v3: Removed the call to dma_set_coherent_mask() from the generic
+> >     drm_of_component_probe(). Also changes to shorten lines over 80 chars long.
+> > v2: Rebased the patchset on top of drm-next rather than Linus' latest -rc
 > > 
-> > On 20 October 2015 at 10:23, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > > A lot of component based DRM drivers use a variant of the same code
-> > > as the probe function. They bind the crtc ports in the first iteration
-> > > and then scan through the child nodes and bind the encoders attached
-> > > to the remote endpoints. Factor the common code into a separate
-> > > function called drm_of_component_probe() in order to increase code
-> > > reuse.
-> > >
-> > > Cc: David Airlie <airlied@linux.ie>
-> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > > Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > > ---
-> > >  drivers/gpu/drm/drm_of.c | 88 ++++++++++++++++++++++++++++++++++++++++++++++++
-> > >  include/drm/drm_of.h     | 13 +++++++
-> > >  2 files changed, 101 insertions(+)
-> > >
-> > > diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-> > > index be38840..493c05c 100644
-> > > --- a/drivers/gpu/drm/drm_of.c
-> > > +++ b/drivers/gpu/drm/drm_of.c
-> > > @@ -1,3 +1,4 @@
-> > > +#include <linux/component.h>
-> > >  #include <linux/export.h>
-> > >  #include <linux/list.h>
-> > >  #include <linux/of_graph.h>
-> > > @@ -61,3 +62,90 @@ uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-> > >         return possible_crtcs;
-> > >  }
-> > >  EXPORT_SYMBOL(drm_of_find_possible_crtcs);
-> > > +
-> > > +/**
-> > > + * drm_of_component_probe - Generic probe function for a component based master
-> > > + * @dev: master device containing the OF node
-> > > + * @compare_of: compare function used for matching components
-> > > + * @master_ops: component master ops to be used
-> > > + *
-> > > + * Parse the platform device OF node and bind all the components associated
-> > > + * with the master. Interface ports are added before the encoders in order to
-> > > + * satisfy their .bind requirements
-> > > + * See Documentation/devicetree/bindings/graph.txt for the bindings.
-> > > + *
-> > > + * Returns zero if successful, or one of the standard error codes if it fails.
-> > > + */
-> > > +int drm_of_component_probe(struct device *dev,
-> > > +                          int (*compare_of)(struct device *, void *),
-> > > +                          const struct component_master_ops *m_ops)
-> > > +{
-> > > +       struct device_node *ep, *port, *remote;
-> > > +       struct component_match *match = NULL;
-> > > +       int i;
-> > > +
-> > > +       if (!dev->of_node)
-> > > +               return -EINVAL;
-> > > +
-> > > +       /*
-> > > +        * Bind the crtc's ports first, so that drm_of_find_possible_crtcs()
-> > > +        * called from encoder's .bind callbacks works as expected
-> > > +        */
-> > > +       for (i = 0; ; i++) {
-> > > +               port = of_parse_phandle(dev->of_node, "ports", i);
-> > > +               if (!port)
-> > > +                       break;
-> > > +
-> > > +               if (!of_device_is_available(port->parent)) {
-> > > +                       of_node_put(port);
-> > > +                       continue;
-> > > +               }
-> > > +
-> > > +               component_match_add(dev, &match, compare_of, port);
-> > > +               of_node_put(port);
-> > > +       }
-> > > +
-> > > +       if (i == 0) {
-> > > +               dev_err(dev, "missing 'ports' property\n");
-> > > +               return -ENODEV;
-> > > +       }
-> > > +
-> > > +       if (!match) {
-> > > +               dev_err(dev, "no available port\n");
-> > > +               return -ENODEV;
-> > > +       }
-> > > +
-> > > +       /*
-> > > +        * For bound crtcs, bind the encoders attached to their remote endpoint
-> > > +        */
-> > > +       for (i = 0; ; i++) {
-> > > +               port = of_parse_phandle(dev->of_node, "ports", i);
-> > > +               if (!port)
-> > > +                       break;
-> > > +
-> > > +               if (!of_device_is_available(port->parent)) {
-> > > +                       of_node_put(port);
-> > > +                       continue;
-> > > +               }
-> > > +
-> > Of the three drivers converted only the rockchip one has the above
-> > of_device_is_available() hunk. Based on the handling in previous loop
-> > I'm not entirely sure if it's needed, but if so shouldn't one mention
-> > the difference when converting the respective drivers ?
+> > A few drivers in drivers/gpu/drm are component-enabled and use quite similar
+> > code sequences to probe for their encoder slaves at the remote end of the ports.
+> > Move the code into a "generic" function and remove it from the drivers.
+> > 
+> > The end results is that drivers get a reference count fix (imx), more thorough
+> > error checking (imx again) plus a decrease in the overall count of LoC.
+> > 
+> > I'm looking for comments and testing of the patchset (only compile tested from my
+> > end as I don't have access to all the devices touched by the changes). My main
+> > interest is in finding out if -EINVAL is the correct code to return if
+> > dev->of_node == NULL (handy now, as it is different from the other possible error
+> > codes and used in armada to trigger old platform_data support. Also looking for
+> > thoughts on the correctness of the patch and if it possible to co-opt more drivers
+> > into using the function.
 > 
-> Yes, it should've been there, otherwise we'll end up binding encoders
-> which are connected to a CRTC which has been disabled - and that means
-> the DRM driver won't come up.
+> Merged all four to drm-misc, thanks.
+> -Daniel
 
-That's my understanding as well. As mentioned in the cover letter, the generic
-function tries to gather together the best practice and be more complete than
-the individual versions found in the drivers. So you get additional checks
-that should've been in there in the first place if it were not for the code
-being spread out.
+Thanks!
 
-Best regards,
 Liviu
 
 > 
+> > 
+> > Best regards,
+> > Liviu
+> > 
+> > Liviu Dudau (4):
+> >   drm: Introduce generic probe function for component based masters.
+> >   drm/imx: Convert the probe function to the generic drm_of_component_probe()
+> >   drm/rockchip: Convert the probe function to the generic drm_of_component_probe()
+> >   drm/armada: Convert the probe function to the generic drm_of_component_probe()
+> > 
+> >  drivers/gpu/drm/armada/armada_drv.c         | 68 +++++++---------------
+> >  drivers/gpu/drm/drm_of.c                    | 88 +++++++++++++++++++++++++++++
+> >  drivers/gpu/drm/imx/imx-drm-core.c          | 55 ++----------------
+> >  drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 81 ++------------------------
+> >  include/drm/drm_of.h                        | 13 +++++
+> >  5 files changed, 130 insertions(+), 175 deletions(-)
+> > 
+> > -- 
+> > 2.6.0
+> > 
+> 
 > -- 
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+> Daniel Vetter
+> Software Engineer, Intel Corporation
+> http://blog.ffwll.ch
 > 
 
 -- 
