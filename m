@@ -1,35 +1,37 @@
-From: luisbg@osg.samsung.com (Luis de Bethencourt)
-Date: Tue, 20 Oct 2015 15:16:30 +0100
-Subject: [RESEND PATCH 4/4] i2c: stu300: Fix module autoload for OF platform
- driver
-In-Reply-To: <1445350590-25911-1-git-send-email-luisbg@osg.samsung.com>
-References: <1445350590-25911-1-git-send-email-luisbg@osg.samsung.com>
-Message-ID: <1445350590-25911-5-git-send-email-luisbg@osg.samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Oct 2015 15:17:36 +0100
+Subject: [PATCH 0/5] Fix regression introduced by set_irq_flags() removal
+In-Reply-To: <20151020160828.497fcc80@free-electrons.com>
+References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20151020140427.GE3953@io.lakedaemon.net>
+ <20151020160828.497fcc80@free-electrons.com>
+Message-ID: <20151020141736.GX32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Luis de Bethencourt <luis@debethencourt.com>
+On Tue, Oct 20, 2015 at 04:08:28PM +0200, Thomas Petazzoni wrote:
+> As discussed on IRC, another simpler (code line wise) solution is to
+> simply clear the IRQ_NOAUTOEN flag in the irq-armada-370-xp, which
+> brings us back to what set_irq_flags() was doing, without actually
+> reverting Rob's patch.
+> 
+> However, relying on IRQ_NOAUTOEN being cleared doesn't seem like the
+> right long term solution, which is why I implemented what I believe is
+> a (hopefully) better long term solution.
 
-This platform driver has a OF device ID table but the OF module
-alias information is not created so module autoloading won't work.
+However, this is rather worrying.  NOAUTOEN is supposed to avoid enabling
+the interrupt when the interrupt is claimed.
 
-Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/i2c/busses/i2c-stu300.c | 1 +
- 1 file changed, 1 insertion(+)
+If, as a result of Rob's patch, we now have a load of IRQs which are
+marked with NOAUTOEN which weren't, that's quite a large regression -
+possibly one which hasn't been properly found (not everyone tests -rc
+kernels) and we may be better to revert Rob's patch to avoid lots of
+breakge being reported when 4.3 is released.
 
-diff --git a/drivers/i2c/busses/i2c-stu300.c b/drivers/i2c/busses/i2c-stu300.c
-index 4885da9..460c134 100644
---- a/drivers/i2c/busses/i2c-stu300.c
-+++ b/drivers/i2c/busses/i2c-stu300.c
-@@ -977,6 +977,7 @@ static const struct of_device_id stu300_dt_match[] = {
- 	{ .compatible = "st,ddci2c" },
- 	{},
- };
-+MODULE_DEVICE_TABLE(of, stu300_dt_match);
- 
- static struct platform_driver stu300_i2c_driver = {
- 	.driver = {
+I think Rob's patches need another review in light of this, to determine
+how much breakage there is here, and a decision how to proceed made on
+that basis.
+
 -- 
-2.5.3
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
