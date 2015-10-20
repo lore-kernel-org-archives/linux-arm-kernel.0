@@ -1,309 +1,127 @@
-From: brijeshkumar.singh@amd.com (Brijesh Singh)
-Date: Tue, 20 Oct 2015 16:26:49 -0500
-Subject: [PATCH] EDAC: Add AMD Seattle SoC EDAC
-In-Reply-To: <5625A528.1040803@huawei.com>
-References: <1445282597-18999-1-git-send-email-brijeshkumar.singh@amd.com>
- <5625A528.1040803@huawei.com>
-Message-ID: <5626B199.4050209@amd.com>
+From: kamal@canonical.com (Kamal Mostafa)
+Date: Tue, 20 Oct 2015 14:37:01 -0700
+Subject: [PATCH 3.19.y-ckt 080/156] pinctrl: at91: fix null pointer dereference
+In-Reply-To: <1445377097-9921-1-git-send-email-kamal@canonical.com>
+References: <1445377097-9921-1-git-send-email-kamal@canonical.com>
+Message-ID: <1445377097-9921-81-git-send-email-kamal@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+3.19.8-ckt8 -stable review patch.  If anyone has any objections, please let me know.
 
-Hi Hanjun,
+------------------
 
-Thanks for review.
+From: David Dueck <davidcdueck@googlemail.com>
 
--Brijesh 
-On 10/19/2015 09:21 PM, Hanjun Guo wrote:
-> Hi Brijesh,
-> 
-> On 2015/10/20 3:23, Brijesh Singh wrote:
->> Add support for the AMD Seattle SoC EDAC driver.
->>
->> Signed-off-by: Brijesh Singh <brijeshkumar.singh@amd.com>
->> ---
->>  .../devicetree/bindings/edac/amd-seattle-edac.txt  |  15 +
->>  drivers/edac/Kconfig                               |   6 +
->>  drivers/edac/Makefile                              |   1 +
->>  drivers/edac/seattle_edac.c                        | 306 +++++++++++++++++++++
->>  4 files changed, 328 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/edac/amd-seattle-edac.txt
->>  create mode 100644 drivers/edac/seattle_edac.c
->>
->>
-> [...]
->> +config EDAC_SEATTLE
->> +	tristate "AMD Seattle EDAC"
->> +	depends on EDAC_MM_EDAC && ARCH_SEATTLE
->> +	help
->> +	  Support for error detection and correction on the
->> +	  AMD Seattle SOC.
->>  endif # EDAC
->> diff --git a/drivers/edac/Makefile b/drivers/edac/Makefile
->> index ae3c5f3..9e4f3ef 100644
->> --- a/drivers/edac/Makefile
->> +++ b/drivers/edac/Makefile
->> @@ -68,3 +68,4 @@ obj-$(CONFIG_EDAC_OCTEON_PCI)		+= octeon_edac-pci.o
->>  obj-$(CONFIG_EDAC_ALTERA_MC)		+= altera_edac.o
->>  obj-$(CONFIG_EDAC_SYNOPSYS)		+= synopsys_edac.o
->>  obj-$(CONFIG_EDAC_XGENE)		+= xgene_edac.o
->> +obj-$(CONFIG_EDAC_SEATTLE)		+= seattle_edac.o
->> diff --git a/drivers/edac/seattle_edac.c b/drivers/edac/seattle_edac.c
->> new file mode 100644
->> index 0000000..78101aa
->> --- /dev/null
->> +++ b/drivers/edac/seattle_edac.c
->> @@ -0,0 +1,306 @@
->> +/*
->> + * AMD Seattle EDAC
->> + *
->> + * Copyright (c) 2015, Advanced Micro Devices
->> + * Author: Brijesh Singh <brijeshkumar.singh@amd.com>
->> + *
->> + * The driver polls CPUMERRSR_EL1 and L2MERRSR_EL1 registers to logs the 
->> + * non-fatal errors. Whereas the single bit and double bit ECC erros are 
->> + * handled by firmware.
->> + *
->> + * This program is free software; you can redistribute  it and/or modify it
->> + * under  the terms of  the GNU General  Public License as published by the
->> + * Free Software Foundation;  either version 2 of the  License, or (at your
->> + * option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/module.h>
->> +#include <linux/of_device.h>
->> +#include <linux/platform_device.h>
->> +
->> +#include "edac_core.h"
->> +
->> +#define EDAC_MOD_STR             "seattle_edac"
->> +
->> +#define CPUMERRSR_EL1_INDEX(x)   ((x) & 0x1ffff)
->> +#define CPUMERRSR_EL1_BANK(x)    (((x) >> 18) & 0x1f)
->> +#define CPUMERRSR_EL1_RAMID(x)   (((x) >> 24) & 0x7f)
->> +#define CPUMERRSR_EL1_VALID(x)   ((x) & (1 << 31))
->> +#define CPUMERRSR_EL1_REPEAT(x)  (((x) >> 32) & 0x7f)
->> +#define CPUMERRSR_EL1_OTHER(x)   (((x) >> 40) & 0xff)
->> +#define CPUMERRSR_EL1_FATAL(x)   ((x) & (1UL << 63))
->> +
->> +#define L2MERRSR_EL1_INDEX(x)    ((x) & 0x1ffff)
->> +#define L2MERRSR_EL1_CPUID(x)    (((x) >> 18) & 0xf)
->> +#define L2MERRSR_EL1_RAMID(x)    (((x) >> 24) & 0x7f)
->> +#define L2MERRSR_EL1_VALID(x)    ((x) & (1 << 31))
->> +#define L2MERRSR_EL1_REPEAT(x)   (((x) >> 32) & 0xff)
->> +#define L2MERRSR_EL1_OTHER(x)    (((x) >> 40) & 0xff)
->> +#define L2MERRSR_EL1_FATAL(x)    ((x) & (1UL << 63))
->> +
->> +struct seattle_edac {
->> +	struct edac_device_ctl_info *edac_ctl;
->> +};
->> +
->> +static inline u64 read_cpumerrsr_el1(void)
->> +{
->> +	u64 val;
->> +
->> +	asm volatile("mrs %0, s3_1_c15_c2_2" : "=r" (val));
->> +	return val;
->> +}
->> +
->> +static inline void write_cpumerrsr_el1(u64 val)
->> +{
->> +	asm volatile("msr s3_1_c15_c2_2, %0" :: "r" (val));
->> +}
->> +
->> +static inline u64 read_l2merrsr_el1(void)
->> +{
->> +	u64 val;
->> +
->> +	asm volatile("mrs %0, s3_1_c15_c2_3" : "=r" (val));
->> +	return val;
->> +}
->> +
->> +static inline void write_l2merrsr_el1(u64 val)
->> +{
->> +	asm volatile("msr s3_1_c15_c2_3, %0" :: "r" (val));
->> +}
->> +
->> +static void check_l2merrsr_el1_error(struct edac_device_ctl_info *edac_ctl)
->> +{
->> +	int fatal;
->> +	int cpuid;
->> +	u64 val = read_l2merrsr_el1();
->> +
->> +	if (!L2MERRSR_EL1_VALID(val))
->> +		return;
->> +
->> +	fatal = L2MERRSR_EL1_FATAL(val);
->> +	cpuid = L2MERRSR_EL1_CPUID(val);
->> +	edac_printk(KERN_CRIT, EDAC_MOD_STR,
->> +		    "CPU%d detected %s error on L2 (L2MERRSR=%#llx)!\n",
->> +		    smp_processor_id(), fatal ? "fatal" : "non-fatal", val);
->> +
->> +	switch (L2MERRSR_EL1_RAMID(val)) {
->> +	case 0x10:
->> +		edac_printk(KERN_CRIT, EDAC_MOD_STR,
->> +			    "L2 Tag RAM cpu %d way %d\n", cpuid / 2, cpuid % 2);
->> +		break;
->> +	case 0x11:
->> +		edac_printk(KERN_CRIT, EDAC_MOD_STR,
->> +			    "L2 Data RAM cpu %d way %d\n", cpuid / 2, cpuid % 2);
->> +		break;
->> +	case 0x12:
->> +		edac_printk(KERN_CRIT, EDAC_MOD_STR,
->> +			    "L2 Snoop tag RAM cpu %d way %d\n",
->> +			    cpuid / 2, cpuid % 2);
->> +		break;
->> +	case 0x14:
->> +		edac_printk(KERN_CRIT, EDAC_MOD_STR,
->> +			    "L2 Dirty RAM cpu %d way %d\n",
->> +			    cpuid / 2, cpuid % 2);
->> +		break;
->> +	case 0x18:
->> +		edac_printk(KERN_CRIT, EDAC_MOD_STR,
->> +			    "L2 inclusion RAM cpu %d way %d\n",
->> +			    cpuid / 2, cpuid % 2);
->> +		break;
->> +	default:
->> +		edac_printk(KERN_CRIT, EDAC_MOD_STR,
->> +			    "unknown RAMID cpuid %d\n", cpuid);
->> +		break;
->> +	}
->> +
->> +	edac_printk(KERN_CRIT, EDAC_MOD_STR, "Repeated error count: %d\n",
->> +		    (int)L2MERRSR_EL1_REPEAT(val));
->> +	edac_printk(KERN_CRIT, EDAC_MOD_STR, "Other error count: %d\n",
->> +		    (int)L2MERRSR_EL1_OTHER(val));
->> +	if (fatal)
->> +		edac_device_handle_ue(edac_ctl, smp_processor_id(), 1,
->> +				      edac_ctl->name);
->> +	else
->> +		edac_device_handle_ce(edac_ctl, smp_processor_id(), 1,
->> +				      edac_ctl->name);
->> +	write_l2merrsr_el1(0);
->> +}
->> +
->> +static void check_cpumerrsr_el1_error(struct edac_device_ctl_info *edac_ctl)
->> +{
->> +	int fatal;
->> +	int bank;
->> +	u64 val = read_cpumerrsr_el1();
->> +
->> +	if (!CPUMERRSR_EL1_VALID(val))
->> +		return;
->> +
->> +	bank = CPUMERRSR_EL1_BANK(val);
->> +	fatal = CPUMERRSR_EL1_FATAL(val);
->> +	edac_printk(KERN_CRIT, EDAC_MOD_STR,
->> +		    "CPU%d detected %s error on L1 (CPUMERRSR=%#llx)!\n",
->> +		    smp_processor_id(), fatal ? "fatal" : "non-fatal", val);
->> +
->> +	switch (CPUMERRSR_EL1_RAMID(val)) {
->> +	case 0x0:
->> +		edac_printk(KERN_CRIT, EDAC_MOD_STR,
->> +			    "L1-I Tag RAM bank %d\n", bank);
->> +		break;
->> +	case 0x1:
->> +		edac_printk(KERN_CRIT, EDAC_MOD_STR,
->> +			    "L1-I Data RAM bank %d\n", bank);
->> +		break;
->> +	case 0x8:
->> +		edac_printk(KERN_CRIT, EDAC_MOD_STR,
->> +			    "L1-D Tag RAM bank %d\n", bank);
->> +		break;
->> +	case 0x9:
->> +		edac_printk(KERN_CRIT, EDAC_MOD_STR,
->> +			    "L1-D Data RAM bank %d\n", bank);
->> +		break;
->> +	case 0x18:
->> +		edac_printk(KERN_CRIT, EDAC_MOD_STR,
->> +			    "L2 TLB RAM bank %d\n", bank);
->> +		break;
->> +	default:
->> +		edac_printk(KERN_CRIT, EDAC_MOD_STR,
->> +			    "unknown ramid %d bank %d\n",
->> +			    (int)CPUMERRSR_EL1_RAMID(val), bank);
->> +		break;
->> +	}
->> +
->> +	edac_printk(KERN_CRIT, EDAC_MOD_STR, "Repeated error count: %d\n",
->> +		    (int)CPUMERRSR_EL1_REPEAT(val));
->> +	edac_printk(KERN_CRIT, EDAC_MOD_STR, "Other error count: %d\n",
->> +		    (int)CPUMERRSR_EL1_OTHER(val));
->> +	if (fatal)
->> +		edac_device_handle_ue(edac_ctl, smp_processor_id(), 1,
->> +				      edac_ctl->name);
->> +	else
->> +		edac_device_handle_ce(edac_ctl, smp_processor_id(), 1,
->> +				      edac_ctl->name);
->> +	write_cpumerrsr_el1(0);
->> +}
-> 
-> The codes above are common for all A57 architectures, other A57 SoCs will use the same
-> code for L1/L2 caches error report, can we put those codes in common place and reused
-> for all A57 architectures?
-> 
-Code is generic to A57 and I will follow Mark Rutland suggestion to make it cortex_a57_edac. If you have something else in mind then please let me know.
+commit 1ab36387ea4face01aac3560b396b1e2ce07c4ff upstream.
 
->> +
->> +static void cpu_check_errors(void *args)
->> +{
->> +	struct edac_device_ctl_info *edev_ctl = args;
->> +
->> +	check_cpumerrsr_el1_error(edev_ctl);
->> +	check_l2merrsr_el1_error(edev_ctl);
->> +}
->> +
->> +static void edac_check_errors(struct edac_device_ctl_info *edev_ctl)
->> +{
->> +	int cpu;
->> +
->> +	/* read L1 and L2 memory error syndrome register on possible CPU's */
->> +	for_each_possible_cpu(cpu)
->> +		smp_call_function_single(cpu, cpu_check_errors, edev_ctl, 0);
-> 
-> Seems that error syndrome registers for L2 cache are cluster lever (each cluster share the
-> L2 cache, you can refer to ARM doc: DDI0488D, Cortex-A57 Technical Reference Manual),
-> so for L2 cache, we need to check the error at cluster lever not the cpu core lever.
-> 
-Yes L1 seems to be CPU specific and L2 is shared in a cluster. So I am thinking of making the following changes in this function.
+Not all gpio banks are necessarily enabled, in the current code this can
+lead to null pointer dereferences.
 
-static void edac_check_errors(struct edac_device_ctl_info *edev_ctl)
-{
-        int cpu;
-        struct cpumask cluster_mask, old_mask;
+[   51.130000] Unable to handle kernel NULL pointer dereference at virtual address 00000058
+[   51.130000] pgd = dee04000
+[   51.130000] [00000058] *pgd=3f66d831, *pte=00000000, *ppte=00000000
+[   51.140000] Internal error: Oops: 17 [#1] ARM
+[   51.140000] Modules linked in:
+[   51.140000] CPU: 0 PID: 1664 Comm: cat Not tainted 4.1.1+ #6
+[   51.140000] Hardware name: Atmel SAMA5
+[   51.140000] task: df6dd880 ti: dec60000 task.ti: dec60000
+[   51.140000] PC is at at91_pinconf_get+0xb4/0x200
+[   51.140000] LR is at at91_pinconf_get+0xb4/0x200
+[   51.140000] pc : [<c01e71a0>]    lr : [<c01e71a0>]    psr: 600f0013
+sp : dec61e48  ip : 600f0013  fp : df522538
+[   51.140000] r10: df52250c  r9 : 00000058  r8 : 00000068
+[   51.140000] r7 : 00000000  r6 : df53c910  r5 : 00000000  r4 : dec61e7c
+[   51.140000] r3 : 00000000  r2 : c06746d4  r1 : 00000000  r0 : 00000003
+[   51.140000] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+[   51.140000] Control: 10c53c7d  Table: 3ee04059  DAC: 00000015
+[   51.140000] Process cat (pid: 1664, stack limit = 0xdec60208)
+[   51.140000] Stack: (0xdec61e48 to 0xdec62000)
+[   51.140000] 1e40:                   00000358 00000000 df522500 ded15f80 c05a9d08 ded15f80
+[   51.140000] 1e60: 0000048c 00000061 df522500 ded15f80 c05a9d08 c01e7304 ded15f80 00000000
+[   51.140000] 1e80: c01e6008 00000060 0000048c c01e6034 c01e5f6c ded15f80 dec61ec0 00000000
+[   51.140000] 1ea0: 00020000 ded6f280 dec61f80 00000001 00000001 c00ae0b8 b6e80000 ded15fb0
+[   51.140000] 1ec0: 00000000 00000000 df4bc974 00000055 00000800 ded6f280 b6e80000 ded6f280
+[   51.140000] 1ee0: ded6f280 00020000 b6e80000 00000000 00020000 c0090dec c0671e1c dec61fb0
+[   51.140000] 1f00: b6f8b510 00000001 00004201 c000924c 00000000 00000003 00000003 00000000
+[   51.140000] 1f20: df4bc940 00022000 00000022 c066e188 b6e7f000 c00836f4 000b6e7f ded6f280
+[   51.140000] 1f40: ded6f280 b6e80000 dec61f80 ded6f280 00020000 c0091508 00000000 00000003
+[   51.140000] 1f60: 00022000 00000000 00000000 ded6f280 ded6f280 00020000 b6e80000 c0091d9c
+[   51.140000] 1f80: 00000000 00000000 ffffffff 00020000 00020000 b6e80000 00000003 c000f124
+[   51.140000] 1fa0: dec60000 c000efa0 00020000 00020000 00000003 b6e80000 00020000 000271c4
+[   51.140000] 1fc0: 00020000 00020000 b6e80000 00000003 7fffe000 00000000 00000000 00020000
+[   51.140000] 1fe0: 00000000 bef50b64 00013835 b6f29c76 400f0030 00000003 00000000 00000000
+[   51.140000] [<c01e71a0>] (at91_pinconf_get) from [<c01e7304>] (at91_pinconf_dbg_show+0x18/0x2c0)
+[   51.140000] [<c01e7304>] (at91_pinconf_dbg_show) from [<c01e6034>] (pinconf_pins_show+0xc8/0xf8)
+[   51.140000] [<c01e6034>] (pinconf_pins_show) from [<c00ae0b8>] (seq_read+0x1a0/0x464)
+[   51.140000] [<c00ae0b8>] (seq_read) from [<c0090dec>] (__vfs_read+0x20/0xd0)
+[   51.140000] [<c0090dec>] (__vfs_read) from [<c0091508>] (vfs_read+0x7c/0x108)
+[   51.140000] [<c0091508>] (vfs_read) from [<c0091d9c>] (SyS_read+0x40/0x94)
+[   51.140000] [<c0091d9c>] (SyS_read) from [<c000efa0>] (ret_fast_syscall+0x0/0x3c)
+[   51.140000] Code: eb010ec2 e30a0d08 e34c005a eb0ae5a7 (e5993000)
+[   51.150000] ---[ end trace fb3c370da3ea4794 ]---
 
-        cpumask_clear(&cluster_mask);
-        cpumask_clear(&old_mask);
+Fixes: a0b957f306fa ("pinctrl: at91: allow to have disabled gpio bank")
+Signed-off-by: David Dueck <davidcdueck@googlemail.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Kamal Mostafa <kamal@canonical.com>
+---
+ drivers/pinctrl/pinctrl-at91.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-        for_each_possible_cpu(cpu) {
-                smp_call_function_single(cpu, check_cpumerrsr_el1_error, 
-                                         edev_ctl, 0); 
-                cpumask_copy(&cluster_mask, topology_core_cpumask(cpu));
-                if (cpumask_equal(&cluster_mask, &old_mask))
-                        continue;
-                cpumask_copy(&old_mask, &cluster_mask);
-                smp_call_function_any(&cluster_mask, check_l2merrsr_el1_error,
-                                      edev_ctl, 0); 
-        }   
-}
-
-Read L1 on each CPU and L2 once in a cluster. Does this address your feedback ?
-
-> Thanks
-> Hanjun
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index f4cd0b9..5a9b886 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -320,6 +320,9 @@ static const struct pinctrl_ops at91_pctrl_ops = {
+ static void __iomem *pin_to_controller(struct at91_pinctrl *info,
+ 				 unsigned int bank)
+ {
++	if (!gpio_chips[bank])
++		return NULL;
++
+ 	return gpio_chips[bank]->regbase;
+ }
+ 
+@@ -729,6 +732,10 @@ static int at91_pmx_set(struct pinctrl_dev *pctldev, unsigned selector,
+ 		pin = &pins_conf[i];
+ 		at91_pin_dbg(info->dev, pin);
+ 		pio = pin_to_controller(info, pin->bank);
++
++		if (!pio)
++			continue;
++
+ 		mask = pin_to_mask(pin->pin);
+ 		at91_mux_disable_interrupt(pio, mask);
+ 		switch (pin->mux) {
+@@ -848,6 +855,10 @@ static int at91_pinconf_get(struct pinctrl_dev *pctldev,
+ 	*config = 0;
+ 	dev_dbg(info->dev, "%s:%d, pin_id=%d", __func__, __LINE__, pin_id);
+ 	pio = pin_to_controller(info, pin_to_bank(pin_id));
++
++	if (!pio)
++		return -EINVAL;
++
+ 	pin = pin_id % MAX_NB_GPIO_PER_BANK;
+ 
+ 	if (at91_mux_get_multidrive(pio, pin))
+@@ -889,6 +900,10 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
+ 			"%s:%d, pin_id=%d, config=0x%lx",
+ 			__func__, __LINE__, pin_id, config);
+ 		pio = pin_to_controller(info, pin_to_bank(pin_id));
++
++		if (!pio)
++			return -EINVAL;
++
+ 		pin = pin_id % MAX_NB_GPIO_PER_BANK;
+ 		mask = pin_to_mask(pin);
+ 
+-- 
+1.9.1
