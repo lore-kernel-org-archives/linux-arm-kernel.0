@@ -1,71 +1,38 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 20 Oct 2015 17:25:09 +0900
-Subject: [PATCH] pinctrl: uniphier: set input-enable before pin-muxing
-Message-ID: <1445329509-6252-1-git-send-email-yamada.masahiro@socionext.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 20 Oct 2015 17:27:58 +0900
+Subject: [PATCH v4 6/8] drivers: soc: add support for exynos SROM driver
+In-Reply-To: <021201d10b0f$b273bf00$175b3d00$@samsung.com>
+References: <1445255206-11148-1-git-send-email-pankaj.dubey@samsung.com>
+ <1445255206-11148-7-git-send-email-pankaj.dubey@samsung.com>
+ <56258683.7070204@samsung.com> <5625B92C.10505@samsung.com>
+ <5625C07D.4030706@samsung.com> <014301d10b01$488873f0$d9995bd0$@samsung.com>
+ <5625E3B9.8040707@samsung.com> <021201d10b0f$b273bf00$175b3d00$@samsung.com>
+Message-ID: <5625FB0E.2000109@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While IECTRL is disabled, input signals are pulled-down internally.
-If pin-muxing is set up first, glitch signals (Low to High transition)
-might be input to hardware blocks.
+On 20.10.2015 17:17, Pavel Fedin wrote:
+>  Hello!
+> 
+>>>  Pin controller is needed in order to configure multi-functional pins correctly.
+>>
+>> Are there any obstacles for upstreaming it?
+> 
+>  I don't know. The last post on this topic is from March, 2015:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html. Patch 0003 has been acked-by, and nothing more since
+> that.
+>  Actually, only 0002 and 0003 of this series are needed for the pin controller. 0001 has been accepted
+> (27284129522e7e2a5b89e80bd44ea3345f79c9e8).
 
-Bad case scenario:
-[1] The hardware block is already running before pinctrl is handled.
-   (the reset is de-asserted by default or by a firmware, for example)
-[2] The pin-muxing is set up.  The input signals to hardware block
-    are pulled-down by the chip-internal biasing.
-[3] The pins are input-enabled.  The signals from the board reach the
-    hardware block.
+I see that all objections were solved and I already reviewed all of the
+patches. This was sent before I started collecting patches as
+co-maintainer so all it is needed now is to rebase and resend with
+collected tags.
 
-Actually, one invalid character is input to the UART blocks for such
-SoCs as PH1-LD4, PH1-sLD8, where UART devices start to run at the
-power on reset.
+I'll try to find them in my archives and apply.
 
-To avoid such problems, pins should be input-enabled before muxing.
+Really, if you have anything waiting then just resend/ping. Things
+changed since May this year :) .
 
-Fixes: 6e9088920258 ("pinctrl: UniPhier: add UniPhier pinctrl core support")
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Reported-by: Dai Okamura <okamura.dai@socionext.com>
----
-
-Hi Linus,
-
-If it is not too late, please apply this fix for Linux 4.3.
-
-Thanks,
-Masahiro
-
-
- drivers/pinctrl/uniphier/pinctrl-uniphier-core.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-index 918f3b6..589872c 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-@@ -539,6 +539,12 @@ static int uniphier_pmx_set_one_mux(struct pinctrl_dev *pctldev, unsigned pin,
- 	unsigned reg, reg_end, shift, mask;
- 	int ret;
- 
-+	/* some pins need input-enabling */
-+	ret = uniphier_conf_pin_input_enable(pctldev,
-+					     &pctldev->desc->pins[pin], 1);
-+	if (ret)
-+		return ret;
-+
- 	reg = UNIPHIER_PINCTRL_PINMUX_BASE + pin * mux_bits / 32 * reg_stride;
- 	reg_end = reg + reg_stride;
- 	shift = pin * mux_bits % 32;
-@@ -563,9 +569,7 @@ static int uniphier_pmx_set_one_mux(struct pinctrl_dev *pctldev, unsigned pin,
- 			return ret;
- 	}
- 
--	/* some pins need input-enabling */
--	return uniphier_conf_pin_input_enable(pctldev,
--					      &pctldev->desc->pins[pin], 1);
-+	return 0;
- }
- 
- static int uniphier_pmx_set_mux(struct pinctrl_dev *pctldev,
--- 
-1.9.1
+Best regards,
+Krzysztof
