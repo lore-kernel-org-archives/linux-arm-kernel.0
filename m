@@ -1,78 +1,66 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 20 Oct 2015 11:08:44 +0200
-Subject: [PATCH 3/3] arm/arm64: KVM: Fix disabled distributor operation
-In-Reply-To: <1445113822-7831-4-git-send-email-christoffer.dall@linaro.org>
-References: <1445113822-7831-1-git-send-email-christoffer.dall@linaro.org>
- <1445113822-7831-4-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <5626049C.3000005@linaro.org>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Tue, 20 Oct 2015 14:30:02 +0530
+Subject: [PATCH 1/7] arm: dts: Add syscon-{reboot,
+ poweroff} nodes for exynos3250 SoCs
+In-Reply-To: <5624EA26.9030909@osg.samsung.com>
+References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
+ <1445234635-3950-2-git-send-email-alim.akhtar@samsung.com>
+ <5624EA26.9030909@osg.samsung.com>
+Message-ID: <56260292.2040902@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-On 10/17/2015 10:30 PM, Christoffer Dall wrote:
-> We currently do a single update of the vgic state when the distrbutor
-distributor
-> enable/disable control register is accessed and then bypass updating the
-> state for as long as the distributor remains disabled.
-> 
-> This is incorrect, because updating the state does not consider the
-> distributor enable bit, and this you can end up in a situation where an
-> interrupt is marked as pending on the CPU interface, but not pending on
-> the distributor, which is an impossible state to be in, and triggers a
-> warning.  Consider for example the following sequence of events:
-> 
-> 1. An interrupt is marked as pending on the distributor
->    - the interrupt is also forwarded to the CPU interface
-> 2. The guest turns off the distributor (it's about to do a reboot)
->    - we stop updating the CPU interface state from now on
-> 3. The guest disables the pending interrupt
->    - we remove the pending state from the distributor, but don't touch
->      the CPU interface, see point 2.
-> 
-> Since the distributor disable bit really means that no interrupts should
-> be forwarded to the CPU interface, we modify the code to keep updating
-> the internal VGIC state, but always set the CPU interface pending bits
-> to zero when the distributor is disabled.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/vgic.c | 11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 58b1256..66c6616 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1012,6 +1012,12 @@ static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
->  	pend_percpu = vcpu->arch.vgic_cpu.pending_percpu;
->  	pend_shared = vcpu->arch.vgic_cpu.pending_shared;
->  
-> +	if (!dist->enabled) {
-> +		bitmap_zero(pend_percpu, VGIC_NR_PRIVATE_IRQS);
-> +		bitmap_zero(pend_shared, nr_shared);
-> +		return 0;
-> +	}
-> +
->  	pending = vgic_bitmap_get_cpu_map(&dist->irq_pending, vcpu_id);
->  	enabled = vgic_bitmap_get_cpu_map(&dist->irq_enabled, vcpu_id);
->  	bitmap_and(pend_percpu, pending, enabled, VGIC_NR_PRIVATE_IRQS);
-> @@ -1039,11 +1045,6 @@ void vgic_update_state(struct kvm *kvm)
->  	struct kvm_vcpu *vcpu;
->  	int c;
->  
-> -	if (!dist->enabled) {
-> -		set_bit(0, dist->irq_pending_on_cpu);
-> -		return;
-I am confused. Don't you want to clear the whole bitmap?
+Hi Javier,
 
-Shouldn't we also handle interrupts programmed in the LR. Spec says any
-ack should return a spurious ID. Is it what is going to happen with the
-current implementation?
+On 10/19/2015 06:33 PM, Javier Martinez Canillas wrote:
+> Hello Alim,
+>
+> On 10/19/2015 08:03 AM, Alim Akhtar wrote:
+>> This patch adds syscon-{reboot, poweroff} nodes to allow the
+>> generic syscon-{reboot, poweroff} driver to reset/poweroff exynos3250 SoC.
+>>
+>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> ---
+>>   arch/arm/boot/dts/exynos3250.dtsi |   14 ++++++++++++++
+>>   1 file changed, 14 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+>> index 033def482fc3..af5d9ad4c7b7 100644
+>> --- a/arch/arm/boot/dts/exynos3250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+>> @@ -152,6 +152,20 @@
+>>   			interrupt-parent = <&gic>;
+>>   		};
+>>
+>> +		poweroff: syscon-poweroff {
+>> +			compatible = "syscon-poweroff";
+>> +			regmap = <&pmu_system_controller>;
+>> +			offset = <0x330C>;
+>> +			mask = <0x5200>;
+>> +		};
+>> +
+>> +		reboot: syscon-reboot {
+>> +			compatible = "syscon-reboot";
+>> +			regmap = <&pmu_system_controller>;
+>> +			offset = <0x0400>;
+>> +			mask = <0x1>;
+>> +		};
+>> +
+>
+> I don't have a Exynos3250 manual but I guess 0x330C is also named
+> PS_HOLD_CONTROL and 0x400 is SWRESET as the other Exynos SoCs.
+>
+> I wonder if a macro could be used instead of magic numbers or at
+> least have a comment next to the offset field.
+>
+> The patch looks good to me though and a comment can be added as
+> a follow up so:
+>
+Will add a comment about register offset next to it.
 
-Eric
-> -	}
-> -
->  	kvm_for_each_vcpu(c, vcpu, kvm) {
->  		if (compute_pending_for_cpu(vcpu))
->  			set_bit(c, dist->irq_pending_on_cpu);
-> 
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>
+Thanks!
+
+> Best regards,
+>
