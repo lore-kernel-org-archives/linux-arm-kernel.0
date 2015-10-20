@@ -1,82 +1,104 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Oct 2015 15:23:50 +0200
-Subject: [PATCH 0/5] Fix regression introduced by set_irq_flags() removal
-Message-ID: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 20 Oct 2015 15:23:51 +0200
+Subject: [PATCH 1/5] kernel: irq: implement is_enabled_percpu_irq()
+In-Reply-To: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1445347435-2333-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas, Jason, Marc, Rob,
+Certain interrupt controller drivers have a register set that does not
+make it easy to save/restore the mask of enabled/disabled interrupts
+at suspend/resume time. At resume time, such drivers rely on the core
+kernel irq subsystem to tell whether such or such interrupt is enabled
+or not, in order to restore the proper state in the interrupt
+controller register.
 
-In commit d17cab4451df ("irqchip: Kill off set_irq_flags usage"), Rob
-Herring modified the irqchip drivers to not use the ARM-specific
-set_irq_flags() and instead rely on various functions provided by the
-core irq subsystem.
+While the irqd_irq_disabled() provides the relevant information for
+global interrupts, there is no similar function to query the
+enabled/disabled state of a per-CPU interrupt.
 
-While his commit was supposed to have no functional effect, it in fact
-does have one effect: the IRQ_NOAUTOEN flag used to be *cleared* for
-all interrupts and it is now *set* by default.
+Therefore, this commit complements the
+enable_percpu_irq/disable_percpu_irq API with an
+is_enabled_percpu_irq() function.
 
-Thanks to this flag being *cleared* by default, the irq-armada-370-xp
-was able to properly re-enable per-CPU interrupts at resume time. Now
-that this flag is *set*, the irqd_irq_disabled() function no longer
-indicates that such per-CPU interrupts are enabled (and in fact a
-CPU-global flag to tell whether a per-CPU is enabled or not is
-silly). Due to this, our local timer per-CPU interrupt is no longer
-re-enabled at resume time on Armada XP, on the boot CPU, which causes
-a hang at resume time.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ include/linux/interrupt.h |  1 +
+ kernel/irq/chip.c         |  5 +++++
+ kernel/irq/internals.h    |  1 +
+ kernel/irq/manage.c       | 19 +++++++++++++++++++
+ 4 files changed, 26 insertions(+)
 
-This is a regression between 4.2 (where suspend/resume works fine) and
-4.3-rc (where suspend/resume is broken). Reverting d17cab4451df1 on
-top of 4.3-rc makes the problem go away (of course you also need to
-revert eb811129ed9ea so that set_irq_flags is re-introduced).
-
-The minimal fix would be to clear the IRQ_NOAUTOEN flag so that we get
-back to the original situation. However, this does not really seem
-like the right fix.
-
-Instead, this patch series proposes to add an is_enabled_percpu_irq()
-function to the core irq subsystem, which is then used by the
-irq-armada-370-xp to find out if such or such per-CPU interrupt should
-be re-enabled at resume time on the boot CPU.
-
-The organization of the patch series is as follows:
-
- - PATCH 1 introduces the is_enabled_percpu_irq() function.
-
- - PATCH 2 does a minor refactoring of armada_xp_mpic_secondary_init()
-   to prepare the following patch.
-
- - PATCH 3 changes the irq-armada-370-xp driver to use the
-   is_enabled_percpu_irq() to re-enable the per-CPU interrupts on the
-   boot CPU at resume time, and also modifies the secondary CPU
-   notifier to re-enable per-CPU interrupts if needed.
-
- - PATCH 4 and 5 are further cleanups/improvements to the
-   irq-armada-370-xp, which are not needed to fix the problem.
-
-Since this is fixing a regression introduced between 4.2 and 4.3-rc,
-it would be great if patches 1 to 3 could be merged in 4.3. The last
-two patches are only cosmetic, so merging them for 4.4 is of course
-the way to go.
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (5):
-  kernel: irq: implement is_enabled_percpu_irq()
-  irqchip: armada-370-xp: prepare additions to
-    armada_xp_mpic_secondary_init()
-  irqchip: armada-370-xp: re-enable per-CPU interrupts at resume time
-  irqchip: armada-370-xp: re-order register definitions
-  irqchip: armada-370-xp: document the overall driver logic
-
- drivers/irqchip/irq-armada-370-xp.c | 151 +++++++++++++++++++++++++++++++-----
- include/linux/interrupt.h           |   1 +
- kernel/irq/chip.c                   |   5 ++
- kernel/irq/internals.h              |   1 +
- kernel/irq/manage.c                 |  19 +++++
- 5 files changed, 158 insertions(+), 19 deletions(-)
-
+diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+index be7e75c..5ea9be5 100644
+--- a/include/linux/interrupt.h
++++ b/include/linux/interrupt.h
+@@ -193,6 +193,7 @@ extern void disable_irq(unsigned int irq);
+ extern void disable_percpu_irq(unsigned int irq);
+ extern void enable_irq(unsigned int irq);
+ extern void enable_percpu_irq(unsigned int irq, unsigned int type);
++extern bool is_enabled_percpu_irq(unsigned int irq);
+ extern void irq_wake_thread(unsigned int irq, void *dev_id);
+ 
+ /* The following three functions are for the core kernel use only. */
+diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+index e28169d..ebc00fc 100644
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -246,6 +246,11 @@ void irq_percpu_enable(struct irq_desc *desc, unsigned int cpu)
+ 	cpumask_set_cpu(cpu, desc->percpu_enabled);
+ }
+ 
++bool irq_percpu_is_enabled(struct irq_desc *desc, unsigned int cpu)
++{
++	return cpumask_test_cpu(cpu, desc->percpu_enabled);
++}
++
+ void irq_percpu_disable(struct irq_desc *desc, unsigned int cpu)
+ {
+ 	if (desc->irq_data.chip->irq_disable)
+diff --git a/kernel/irq/internals.h b/kernel/irq/internals.h
+index 5ef0c2d..37de1c5 100644
+--- a/kernel/irq/internals.h
++++ b/kernel/irq/internals.h
+@@ -68,6 +68,7 @@ extern void irq_shutdown(struct irq_desc *desc);
+ extern void irq_enable(struct irq_desc *desc);
+ extern void irq_disable(struct irq_desc *desc);
+ extern void irq_percpu_enable(struct irq_desc *desc, unsigned int cpu);
++extern bool irq_percpu_is_enabled(struct irq_desc *desc, unsigned int cpu);
+ extern void irq_percpu_disable(struct irq_desc *desc, unsigned int cpu);
+ extern void mask_irq(struct irq_desc *desc);
+ extern void unmask_irq(struct irq_desc *desc);
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index f9a59f6..d4afe65 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -1666,6 +1666,25 @@ out:
+ }
+ EXPORT_SYMBOL_GPL(enable_percpu_irq);
+ 
++bool is_enabled_percpu_irq(unsigned int irq)
++{
++	unsigned int cpu = smp_processor_id();
++	unsigned long flags;
++	struct irq_desc *desc =
++		irq_get_desc_lock(irq, &flags, IRQ_GET_DESC_CHECK_PERCPU);
++	bool is_enabled;
++
++	if (!desc)
++		return false;
++
++	is_enabled = irq_percpu_is_enabled(desc, cpu);
++
++	irq_put_desc_unlock(desc, flags);
++
++	return is_enabled;
++}
++EXPORT_SYMBOL_GPL(is_enabled_percpu_irq);
++
+ void disable_percpu_irq(unsigned int irq)
+ {
+ 	unsigned int cpu = smp_processor_id();
 -- 
 2.6.2
