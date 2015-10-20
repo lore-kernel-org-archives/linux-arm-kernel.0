@@ -1,68 +1,31 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 20 Oct 2015 16:58:27 +0900
-Subject: [PATCH 2/2] fixup! arm64: kvm: allows kvm cpu hotplug
-In-Reply-To: <1445327907-23274-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1445327907-23274-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1445327907-23274-3-git-send-email-takahiro.akashi@linaro.org>
+Date: Tue, 20 Oct 2015 17:00:17 +0900
+Subject: [PATCH v2 0/2] arm64: unwind_frame for interrupt stack
+Message-ID: <1445328019-23330-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this patch, kvm cannot start a guest when cpuidle is enabled
-if the hardware does not retain cpu state (EL2) in idle state.
+Jungseok is going to introduce a dedicated interrupt stack[1] for arm64.
+This patch is my second proposal to support interrupt stack in
+unwind_frame() and address an issue I mentioned in [2].
 
-This patch re-initailizes EL2 state at CPU_PM_EXIT by calling
-kvm_arch_hardware_enable() if and only if kvm has been initialized
-before CPU_PM_ENTER, that is, if any vcpus have been created.
+Patch[3] is also a prerequisite.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm/kvm/arm.c |   25 +++++++++++++++++++++----
- 1 file changed, 21 insertions(+), 4 deletions(-)
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378699.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/377723.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378700.html
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 0871809..fbff638 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -60,6 +60,8 @@ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
- static u8 kvm_next_vmid;
- static DEFINE_SPINLOCK(kvm_vmid_lock);
- 
-+static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
-+
- static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
- {
- 	BUG_ON(preemptible());
-@@ -955,12 +957,27 @@ static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
- 				    unsigned long cmd,
- 				    void *v)
- {
--	if (cmd == CPU_PM_EXIT && kvm_arm_get_running_vcpu()) {
--		kvm_arch_hardware_enable();
-+	switch (cmd) {
-+	case CPU_PM_ENTER:
-+		if (__hyp_get_vectors() != hyp_default_vectors)
-+			__this_cpu_write(kvm_arm_hardware_enabled, 1);
-+		else
-+			__this_cpu_write(kvm_arm_hardware_enabled, 0);
-+		/*
-+		 * don't call kvm_arch_hardware_disable() in case of
-+		 * CPU_PM_ENTER because it does't actually save any state.
-+		 */
-+
-+		return NOTIFY_OK;
-+	case CPU_PM_EXIT:
-+		if (__this_cpu_read(kvm_arm_hardware_enabled))
-+			kvm_arch_hardware_enable();
-+
- 		return NOTIFY_OK;
--	}
- 
--	return NOTIFY_DONE;
-+	default:
-+		return NOTIFY_DONE;
-+	}
- }
- 
- static struct notifier_block hyp_init_cpu_pm_nb = {
+AKASHI Takahiro (2):
+  arm64: revamp unwind_frame for interrupt stack
+  arm64: fix dump_backtrace() to show correct pt_regs at interrupt
+
+ arch/arm64/include/asm/exception.h |    7 +++----
+ arch/arm64/include/asm/traps.h     |    7 -------
+ arch/arm64/kernel/entry.S          |   22 ++++++++++++++++++++--
+ arch/arm64/kernel/stacktrace.c     |   14 +++++++++++++-
+ arch/arm64/kernel/traps.c          |    9 +++++++--
+ arch/arm64/kernel/vmlinux.lds.S    |    7 +++++++
+ 6 files changed, 50 insertions(+), 16 deletions(-)
+
 -- 
 1.7.9.5
