@@ -1,128 +1,90 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 20 Oct 2015 10:23:14 +0100
-Subject: [PATCH v4 3/4] drm/rockchip: Convert the probe function to the
- generic drm_of_component_probe()
+Date: Tue, 20 Oct 2015 10:23:13 +0100
+Subject: [PATCH v4 2/4] drm/imx: Convert the probe function to the generic
+ drm_of_component_probe()
 In-Reply-To: <1445332995-11212-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1445332995-11212-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1445332995-11212-4-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1445332995-11212-3-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the generic drm_of_component_probe() function to probe for components.
+The generic function is functionally equivalent to the driver's
+imx_drm_platform_probe(). Use the generic function and reduce the
+overall code size.
 
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 81 +++--------------------------
- 1 file changed, 6 insertions(+), 75 deletions(-)
+ drivers/gpu/drm/imx/imx-drm-core.c | 55 +++-----------------------------------
+ 1 file changed, 4 insertions(+), 51 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index f22e1e1..d26e0cc 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -19,6 +19,7 @@
- #include <drm/drmP.h>
- #include <drm/drm_crtc_helper.h>
- #include <drm/drm_fb_helper.h>
-+#include <drm/drm_of.h>
- #include <linux/dma-mapping.h>
- #include <linux/pm_runtime.h>
- #include <linux/module.h>
-@@ -418,29 +419,6 @@ static int compare_of(struct device *dev, void *data)
- 	return dev->of_node == np;
- }
+diff --git a/drivers/gpu/drm/imx/imx-drm-core.c b/drivers/gpu/drm/imx/imx-drm-core.c
+index de00a6c..64f16ea 100644
+--- a/drivers/gpu/drm/imx/imx-drm-core.c
++++ b/drivers/gpu/drm/imx/imx-drm-core.c
+@@ -531,59 +531,12 @@ static const struct component_master_ops imx_drm_ops = {
  
--static void rockchip_add_endpoints(struct device *dev,
--				   struct component_match **match,
--				   struct device_node *port)
--{
--	struct device_node *ep, *remote;
--
--	for_each_child_of_node(port, ep) {
--		remote = of_graph_get_remote_port_parent(ep);
--		if (!remote || !of_device_is_available(remote)) {
--			of_node_put(remote);
--			continue;
--		} else if (!of_device_is_available(remote->parent)) {
--			dev_warn(dev, "parent device of %s is not available\n",
--				 remote->full_name);
--			of_node_put(remote);
--			continue;
--		}
--
--		component_match_add(dev, match, compare_of, remote);
--		of_node_put(remote);
--	}
--}
--
- static int rockchip_drm_bind(struct device *dev)
+ static int imx_drm_platform_probe(struct platform_device *pdev)
  {
- 	struct drm_device *drm;
-@@ -483,61 +461,14 @@ static const struct component_master_ops rockchip_drm_ops = {
- 
- static int rockchip_drm_platform_probe(struct platform_device *pdev)
- {
--	struct device *dev = &pdev->dev;
+-	struct device_node *ep, *port, *remote;
 -	struct component_match *match = NULL;
--	struct device_node *np = dev->of_node;
--	struct device_node *port;
+-	int ret;
 -	int i;
 -
--	if (!np)
--		return -ENODEV;
 -	/*
--	 * Bind the crtc ports first, so that
--	 * drm_of_find_possible_crtcs called from encoder .bind callbacks
+-	 * Bind the IPU display interface ports first, so that
+-	 * imx_drm_encoder_parse_of called from encoder .bind callbacks
 -	 * works as expected.
 -	 */
--	for (i = 0;; i++) {
--		port = of_parse_phandle(np, "ports", i);
+-	for (i = 0; ; i++) {
+-		port = of_parse_phandle(pdev->dev.of_node, "ports", i);
 -		if (!port)
 -			break;
 -
--		if (!of_device_is_available(port->parent)) {
--			of_node_put(port);
--			continue;
--		}
--
--		component_match_add(dev, &match, compare_of, port->parent);
--		of_node_put(port);
+-		component_match_add(&pdev->dev, &match, compare_of, port);
 -	}
-+	int ret = drm_of_component_probe(&pdev->dev, compare_of,
-+					 &rockchip_drm_ops);
++	int ret = drm_of_component_probe(&pdev->dev, compare_of, &imx_drm_ops);
  
 -	if (i == 0) {
--		dev_err(dev, "missing 'ports' property\n");
-+	/* keep compatibility with old code that was returning -ENODEV */
-+	if (ret == -EINVAL)
- 		return -ENODEV;
--	}
- 
--	if (!match) {
--		dev_err(dev, "No available vop found for display-subsystem.\n");
+-		dev_err(&pdev->dev, "missing 'ports' property\n");
 -		return -ENODEV;
 -	}
--	/*
--	 * For each bound crtc, bind the encoders attached to its
--	 * remote endpoint.
--	 */
--	for (i = 0;; i++) {
--		port = of_parse_phandle(np, "ports", i);
++	if (!ret)
++		ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+ 
+-	/* Then bind all encoders */
+-	for (i = 0; ; i++) {
+-		port = of_parse_phandle(pdev->dev.of_node, "ports", i);
 -		if (!port)
 -			break;
 -
--		if (!of_device_is_available(port->parent)) {
--			of_node_put(port);
--			continue;
--		}
+-		for_each_child_of_node(port, ep) {
+-			remote = of_graph_get_remote_port_parent(ep);
+-			if (!remote || !of_device_is_available(remote)) {
+-				of_node_put(remote);
+-				continue;
+-			} else if (!of_device_is_available(remote->parent)) {
+-				dev_warn(&pdev->dev, "parent device of %s is not available\n",
+-					 remote->full_name);
+-				of_node_put(remote);
+-				continue;
+-			}
 -
--		rockchip_add_endpoints(dev, &match, port);
+-			component_match_add(&pdev->dev, &match, compare_of,
+-					    remote);
+-			of_node_put(remote);
+-		}
 -		of_node_put(port);
 -	}
 -
--	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
+-	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+-	if (ret)
+-		return ret;
+-
+-	return component_master_add_with_match(&pdev->dev, &imx_drm_ops, match);
 +	return ret;
  }
  
- static int rockchip_drm_platform_remove(struct platform_device *pdev)
+ static int imx_drm_platform_remove(struct platform_device *pdev)
 -- 
 2.6.0
