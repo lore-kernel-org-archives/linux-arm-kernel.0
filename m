@@ -1,23 +1,31 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 20 Oct 2015 09:00:38 +0900
-Subject: [PATCH] arm64: dts: Add reboot node for exynos7
-In-Reply-To: <1445248683-28403-1-git-send-email-alim.akhtar@samsung.com>
-References: <1445248683-28403-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <56258426.6090909@samsung.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Mon, 19 Oct 2015 17:01:58 -0700
+Subject: [PATCH] fpga: zynq-fpga: Replacing BIT with BIN format
+Message-ID: <1445299319-14921-1-git-send-email-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.10.2015 18:58, Alim Akhtar wrote:
-> This patch add syscon-reboot node to reboot exynos7 based SoCs.
-> 
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> ---
->  arch/arm64/boot/dts/exynos/exynos7.dtsi |    7 +++++++
->  1 file changed, 7 insertions(+)
+Hi all,
 
-Looks good, thanks!
+as discussed, here a patch that removes the byteswapping
+code, leaving format conversion to userland.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+However I added a crude check to bail out early if the sync word
+isn't found in the firmware file, to avoid kicking the hardware
+unneccesary.
 
-Best regards,
-Krzysztof
+This change requires people to use the appropriate Xilinx tools to
+generate the (byteswapped) .bin files.
+
+Cheers,
+
+    Moritz
+
+Moritz Fischer (1):
+  fpga: zynq-fpga: Change fw format to handle bin instead of bit.
+
+ drivers/fpga/zynq-fpga.c | 23 ++++++++++-------------
+ 1 file changed, 10 insertions(+), 13 deletions(-)
+
+-- 
+2.6.1
