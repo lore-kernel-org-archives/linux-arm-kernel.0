@@ -1,81 +1,67 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 20 Oct 2015 11:48:54 +0200
-Subject: [PATCH v6 0/17] Add Analogix Core Display Port Driver
-In-Reply-To: <5625A2A1.6090907@rock-chips.com>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
- <1444491357-26095-1-git-send-email-ykk@rock-chips.com>
- <5624C896.8070108@osg.samsung.com> <5625A2A1.6090907@rock-chips.com>
-Message-ID: <56260E06.2040902@osg.samsung.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 20 Oct 2015 11:50:14 +0200
+Subject: [PATCH v3] arm-soc: Add support for Sigma Designs Tango4
+In-Reply-To: <CAL_Jsq+jthx9ffnUm-G-TV9LdxBRp3SKyhyfcVu=7kN3CuumJw@mail.gmail.com>
+References: <560EAA7C.3070302@free.fr> <5124277.UR9sg1IOHT@wuerfel>
+ <560EFDB3.9010305@free.fr> <11113740.WL812ZaRcZ@wuerfel>
+ <5612A473.8030405@sigmadesigns.com> <5613EF4C.30603@sigmadesigns.com>
+ <CAL_JsqJ+WTBYF=sJWbkgNzL48H5AiXL4aoVV3DNiL6T_UQKQfg@mail.gmail.com>
+ <561D2952.4060908@sigmadesigns.com>
+ <CAL_JsqKa4trfpLY_DPsjBrfH-7SSUQMACYVW7DNN1=Pv3B4FrA@mail.gmail.com>
+ <5624CF62.6020001@sigmadesigns.com>
+ <CAL_Jsq+jthx9ffnUm-G-TV9LdxBRp3SKyhyfcVu=7kN3CuumJw@mail.gmail.com>
+Message-ID: <56260E56.10403@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Yakir,
+On 19/10/2015 18:39, Rob Herring wrote:
 
-On 10/20/2015 04:10 AM, Yakir Yang wrote:
-> Hi Javier,
-> 
-> On 10/19/2015 06:40 PM, Javier Martinez Canillas wrote:
->> Hello Yakir,
->>
->> On 10/10/2015 05:35 PM, Yakir Yang wrote:
->>> Hi all,
->>>
->>>     The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
->>> share the same IP, so a lot of parts can be re-used. I split the common
->>> code into bridge directory, then rk3288 and exynos only need to keep
->>> some platform code. Cause I can't find the exact IP name of exynos dp
->>> controller, so I decide to name dp core driver with "analogix" which I
->>> find in rk3288 eDP TRM :)
->>>
->>> But  there are still three light registers setting differents bewteen
->>> exynos and rk3288.
->>> 1. RK3288 have five special pll resigters which not indicata in exynos
->>>     dp controller.
->>> 2. The address of DP_PHY_PD(dp phy power manager register) are different
->>>     between rk3288 and exynos.
->>> 3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
->>>     register).
->>>
->>> This series have been well tested on Rockchip platform with eDP panel
->>> on Jerry Chromebook and Display Port Monitor on RK3288 board and thanks
->>> to Javier at Samsung help me to find a way to install mainline kernel to
->>> Samsung Exynos Chromebooks, so this series also have been tested on Samsung
->>> Snow and Peach Pit Chromebooks which borrowed from my friends.
->>>
->>> Besides, This version was build on linux-next branch (tag next-20150918), and
->>> the above test experiments also base on that tag. But I know the latest tag is
->>> next-20151009, so i do rebase this series again on next-20151009, there were
->>> little conflicts(exynos_dp removed the suspend/resume).
->>>
->>> But after I retest this series on next-20151009, I saw kernel crashed in mmc
->>> driver(dw_mci_probe failed to get regulator). So i have to disabled the MMC
->>> module(after all I boot with USB device), and I can see eDP light up normally
->>> in startup stage, but kernel keep crashed when it try to mount the filesystem.
->>> I thought this isn't related to dp driver directly, so i choice not to debug
->>> more depth.
->>>
->>> That's to say if someone want to test this series, I suggest you applied this
->>> series on tag-20150918, just need to fix some light conflicts with the 01 & 02
->>> patches (or just email me, I can send you directly).
->>>
->>> Thanks,
->> Do you have a branch that I can use to test this series?
-> 
-> Thank you for your kind assistance, I have created a tree which checkout from the next-20151019. Surely there were some conflicts to applied this series on that tag, but things still works for me, here is the git address [https://github.com/yakir-Yang/linux/tree/analogix_dp]
+> Marc Gonzalez wrote:
 >
-
-I tested your branch on an Exynos5800 Peach Pi Chromebook and display is
-working on boot. I also tested DPMS and S2R and things are still working
-so for the whole series feel free to add:
-
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-> Best regards,
-> - Yakir
+>> About the cache controller, I was confused by this comment:
+>>         /*
+>>          * Always enable non-secure access to the lockdown registers -
+>>          * we write to them as part of the L2C enable sequence so they
+>>          * need to be accessible.
+>>          */
+>>         l2x0_saved_regs.aux_ctrl = aux | L310_AUX_CTRL_NS_LOCKDOWN;
+>>
+>> I see no lock() function, only unlock().
+>>
+>> But the unlock function merely writes 0 to the relevant registers,
+>> and 0 is the value at reset for those registers. Since nothing ever
+>> sets the registers to non-zero, why is the unlock needed at all?
 > 
+> It was because some bootloaders set those registers. Linux just wants
+> them to be all unlocked.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+I see.
+
+My problem then, is that my current firmware does not set L310_AUX_CTRL_NS_LOCKDOWN
+and does not allow updating that bit.
+
+So when l2c_unlock() is called, Linux (running in non-secure mode)
+tries to write to read-only registers:
+
+> On reset, the Non-Secure Lockdown Enable bit is set to 0 and Lockdown
+> Registers are not permitted to be modified by non-secure accesses. In
+> that configuration, if a non-secure access tries to write to those
+> registers, the write response returns a DECERR response. This decode 
+> error results in the registers not being updated.
+
+I suppose "a DECERR response" means Linux will oops?
+
+I see several options to work-around this problem:
+
+A) Have the firmware set L310_AUX_CTRL_NS_LOCKDOWN at boot
+
+B) Have the firmware allow Linux to set L310_AUX_CTRL_NS_LOCKDOWN
+
+C) Have a way in Linux to define .unlock as a NOP (trusting the
+firmware to NOT have locked anything)
+Perhaps adding a "no-unlock-required;" boolean property to the l2cc
+node, which would override the .unlock method?
+
+I'd like to hear suggestions on the "best" approach.
+
+Regards.
