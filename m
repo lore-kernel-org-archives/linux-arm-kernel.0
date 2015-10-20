@@ -1,38 +1,52 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 20 Oct 2015 11:12:53 +0200
-Subject: [PATCH resend] net: sun4i-emac: Properly free resources on probe
- failure and remove
-In-Reply-To: <1445330544-6968-2-git-send-email-hdegoede@redhat.com>
-References: <1445330544-6968-1-git-send-email-hdegoede@redhat.com>
- <1445330544-6968-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151020091253.GB2711@lukather>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Tue, 20 Oct 2015 17:13:02 +0800
+Subject: [PATCH v2 0/9] Add tune support of Mediatek MMC driver
+Message-ID: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 10:42:24AM +0200, Hans de Goede wrote:
-> Fix sun4i-emac not releasing the following resources:
-> -iomapped memory not released on probe-failure nor on remove
-> -clock not getting disabled on probe-failure nor on remove
-> -sram not being released on remove
-> 
-> And while at it also add error checking to the clk_prepare_enable call
-> done on probe.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Change in v2:
+Drop the 400mhz and use assigned-clock-parents to instead
+Split the original tune patch to several independent patches
+Re-write the mmc_send_tuning()
+Fix GPD checksum error
+Move the HS400 setting to ops->prepare_hs400_tuning()	
+Modify SD driving settings
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Change in v1:
+Add DT bindings for eMMC hardware reset
+Add pinctrl of data strobe pin for HS400 mode
+Modify eMMC driving settings
+Add 400mhz source clock for HS400 mode
+Add eMMC HS200/HS400 mode support
+Add SD SDR50/SDR104 mode support
+Add implement of tune function with CMD19/CMD21
 
-Thanks!
-Maxime
+Chaotian Jing (9):
+  mmc: core: Add DT bindings for eMMC hardware reset support
+  mmc: dt-bindings: update Mediatek MMC bindings
+  mmc: mediatek: make cmd_ints_mask to const
+  mmc: mediatek: change the argument "ddr" to "timing"
+  mmc: mediatek: fix got GPD checksum error interrupt when data transfer
+  mmc: mediatek: add implement of ops->hw_reset()
+  mmc: mmc: extend the mmc_send_tuning()
+  mmc: mediatek: add HS400 support
+  arm64: dts: mediatek: add HS200/HS400/SDR50/SDR104 support
+
+ Documentation/devicetree/bindings/mmc/mmc.txt    |   1 +
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt |  11 +-
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |  27 ++-
+ drivers/mmc/core/host.c                          |   2 +
+ drivers/mmc/core/mmc_ops.c                       |   8 +-
+ drivers/mmc/host/dw_mmc-exynos.c                 |   4 +-
+ drivers/mmc/host/dw_mmc.c                        |   2 +-
+ drivers/mmc/host/dw_mmc.h                        |   2 +-
+ drivers/mmc/host/mtk-sd.c                        | 296 ++++++++++++++++++++---
+ drivers/mmc/host/sdhci-esdhc-imx.c               |   6 +-
+ drivers/mmc/host/sdhci-msm.c                     |   2 +-
+ drivers/mmc/host/sdhci-sirf.c                    |   2 +-
+ include/linux/mmc/core.h                         |   2 +-
+ 13 files changed, 314 insertions(+), 51 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151020/b0583523/attachment.sig>
+1.8.1.1.dirty
