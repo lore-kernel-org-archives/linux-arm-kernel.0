@@ -1,24 +1,38 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 20 Oct 2015 20:58:20 +0300
-Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
-In-Reply-To: <20151019004627.GD20599@verge.net.au>
-References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
- <2544073.SzFGJq3XZ1@wasted.cogentembedded.com>
- <56237CD5.6010609@cogentembedded.com> <20151019004627.GD20599@verge.net.au>
-Message-ID: <562680BC.9070100@cogentembedded.com>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Tue, 20 Oct 2015 20:05:10 +0200
+Subject: [PATCH] crypto: sun4i-ss: add missing statesize
+Message-ID: <1445364310-4277-1-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+sun4i-ss implementaton of md5/sha1 is via ahash algorithms.
+A recent change make impossible to load them without giving statesize.
+This patch specifiy statesize for sha1 and md5.
 
-On 10/19/2015 03:46 AM, Simon Horman wrote:
+Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+---
+ drivers/crypto/sunxi-ss/sun4i-ss-core.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
->> There should have been [PATCH v3] in the subject, of course.
->
-> Thanks for following up.
->
-> I have queued this up for v4.5.
-
-    Again, not seeing anything new today from renesas.git...
-
-MBR, Sergei
+diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+index eab6fe2..107cd2a 100644
+--- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
++++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+@@ -39,6 +39,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
+ 		.import = sun4i_hash_import_md5,
+ 		.halg = {
+ 			.digestsize = MD5_DIGEST_SIZE,
++			.statesize = sizeof(struct md5_state),
+ 			.base = {
+ 				.cra_name = "md5",
+ 				.cra_driver_name = "md5-sun4i-ss",
+@@ -66,6 +67,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
+ 		.import = sun4i_hash_import_sha1,
+ 		.halg = {
+ 			.digestsize = SHA1_DIGEST_SIZE,
++			.statesize = sizeof(struct sha1_state),
+ 			.base = {
+ 				.cra_name = "sha1",
+ 				.cra_driver_name = "sha1-sun4i-ss",
+-- 
+2.4.10
