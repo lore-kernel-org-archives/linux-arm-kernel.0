@@ -1,102 +1,75 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 20 Oct 2015 18:32:36 +0200
-Subject: [PATCH v2 3/9] includes: dt-bindings: Add STM32F429 pinctrl DT
- bindings
-In-Reply-To: <56261239.5030007@linaro.org>
-References: <1445102604-11502-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1445102604-11502-4-git-send-email-mcoquelin.stm32@gmail.com>
- <56261239.5030007@linaro.org>
-Message-ID: <CALszF6DQ2G_Fzhk_SP+A0i_Z4mg9etdf1NcfQS3cPpB0zNot-w@mail.gmail.com>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Tue, 20 Oct 2015 09:34:24 -0700
+Subject: [RFC][PATCH 1/2] WIP: Devicetree bindings for Ion
+In-Reply-To: <1c6ea0362f5336d9bc8acbfbd7ceae06@mail.ncrmnt.org>
+ (andrew@ncrmnt.org's message of "Tue, 13 Oct 2015 11:14:23 +0300")
+References: <1444164433-9107-1-git-send-email-labbott@fedoraproject.org>
+ <1444164433-9107-2-git-send-email-labbott@fedoraproject.org>
+ <CAL_JsqJ+i3zC7UJ3BcdtOhdmQd8YnRC7bs3D2Ei5JD-4-C+A0g@mail.gmail.com>
+ <vnkwh9lwlymo.fsf@codeaurora.org>
+ <1c6ea0362f5336d9bc8acbfbd7ceae06@mail.ncrmnt.org>
+Message-ID: <vnkw8u6xts6n.fsf@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-20 12:06 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
-> On 17/10/15 18:23, Maxime Coquelin wrote:
+On Tue, Oct 13 2015 at 11:14:23 AM, Andrew <andrew@ncrmnt.org> wrote:
+> On 2015-10-12 21:39, Mitchel Humpherys wrote:
+>> On Tue, Oct 06 2015 at 05:35:41 PM, Rob Herring <robherring2@gmail.com>
+>> wrote:
+>>> On Tue, Oct 6, 2015 at 3:47 PM, Laura Abbott <labbott@fedoraproject.org>
+>>> wrote:
 >>
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> ---
->>   include/dt-bindings/pinctrl/pinctrl-stm32.h     |   12 +
->>   include/dt-bindings/pinctrl/stm32f429-pinfunc.h | 1241
->> +++++++++++++++++++++++
->>   2 files changed, 1253 insertions(+)
->>   create mode 100644 include/dt-bindings/pinctrl/pinctrl-stm32.h
->>   create mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
+>> [...]
 >>
->> diff --git a/include/dt-bindings/pinctrl/pinctrl-stm32.h
->> b/include/dt-bindings/pinctrl/pinctrl-stm32.h
->> new file mode 100644
->> index 0000000..a2e7222
->> --- /dev/null
->> +++ b/include/dt-bindings/pinctrl/pinctrl-stm32.h
->> @@ -0,0 +1,12 @@
->> +#ifndef _DT_BINDINGS_PINCTRL_STM32_H
->> +#define _DT_BINDINGS_PINCTRL_STM32_H
->> +
->> +#define STM32_PIN_NO(x) ((x) << 8)
->> +#define STM32_GET_PIN_NO(x) ((x) >> 8)
->> +#define STM32_GET_PIN_FUNC(x) ((x) & 0xff)
->> +
->> +#define STM32_PIN_GPIO         0
->> +#define STM32_PIN_AF(x)                ((x) + 1)
->> +#define STM32_PIN_ANALOG       (STM32_PIN_AF(15) + 1)
->> +
->> +#endif /* _DT_BINDINGS_PINCTRL_STM32_H */
->> diff --git a/include/dt-bindings/pinctrl/stm32f429-pinfunc.h
->> b/include/dt-bindings/pinctrl/stm32f429-pinfunc.h
->> new file mode 100644
->> index 0000000..9dd5fd0
->> --- /dev/null
->> +++ b/include/dt-bindings/pinctrl/stm32f429-pinfunc.h
->> @@ -0,0 +1,1241 @@
->> +#ifndef _DT_BINDINGS_STM32F429_PINFUNC_H
->> +#define _DT_BINDINGS_STM32F429_PINFUNC_H
->> +
->> +#include <dt-bindings/pinctrl/pinctrl-stm32.h>
->> +
->> +#define STM32F429_PA0_FUNC_GPIO 0x0
->> +#define STM32F429_PA0_FUNC_TIM2_CH1_TIM2_ETR 0x2
+>>>> +Example:
+>>>> +
+>>>> +       ion {
+>>>> +               compatbile = "linux,ion";
+>>>> +               #address-cells = <1>;
+>>>> +               #size-cells = <0>;
+>>>> +
+>>>> +               ion-system-heap {
+>>>> +                       linux,ion-heap-id = <0>;
+>>>> +                       linux,ion-heap-type = <ION_SYSTEM_HEAP_TYPE>;
+>>>> +                       linux,ion-heap-name = "system";
+>>>
+>>> How does this vary across platforms? Is all of this being pushed down
+>>> to DT, because there is no coordination of this at the kernel ABI
+>>> level across platforms. In other words, why can't heap 0 be hardcoded
+>>> as system heap in the driver. It seems to me any 1 of these 3
+>>> properties could be used to derive the other 2.
+>>
+>> The heap-id<->heap-type mapping isn't necessarily 1:1.  As Laura
+>> indicated elsewhere on this thread, a given heap might need to be
+>> contiguous on one platform but not on another.  In that case you just
+>> swap out the heap-type here and there's no need for userspace to change.
+>>
+>> The heap-name, OTOH, could be derived from the heap-id, which is what we
+>> hackishly do here [1] and here[2].
 >
+> By the way, since we agreed that heap id and heap type mappings
+> are not 1:1 - we have a problem with the current API.
 >
-> Did you expand these out after my feedback (instead of things like:
-> STM32_PIN_NO(0) | STM32_PIN_AF(1) )?
-Yes.
+> In userspace we currently have this:
+>
+> int ion_alloc(int fd, size_t len, size_t align, unsigned int heap_mask,
+>               unsigned int flags, ion_user_handle_t *handle);
+>
+> We do not specify here what TYPE of heap we want the allocation to come
+> from.
+> This may lead to very unpleasant stuff when porting from one platfrom to
+> another.
 
->
-> If so I must have been somewhat unclear.
-Most likely I didn't understood what you meant!
+What "unpleasant stuff" are you referring to, exactly?  Abstracting the
+heap type away from userspace has actually made our lives easier since
+userspace doesn't need to know anything about the properties of the
+underlying platform.  It just asks for a buffer from the "camera" heap,
+for example.  On some platforms that's contiguous, on others it's not.
 
->
-> I suggesting that, like with the clock driver, there is no need to the
-> STM32F429_PAXX_FUNC_YYY macros at all.
->
-> Given the way you can enumerate pin config options in stm32f429.dtsi then I
-> think stm32f429.dtsi is the only file that will ever include this header? If
-> so then why not just plug the values directly into the pinmux fields. Its
-> not duplicative and is easier to map back to data sheets.
->
-> ~~~
-> #define PIN_NO(x) ...
-> #define PIN_AF(x) ...
->
-> usart1_pins_a: usart1 at 0 {
->                                 pins1 {
->                                         pinmux = PIN_NO(9) | PIN_AF(7);
->                                         bias-disable;
->                                         drive-push-pull;
->                                         slew-rate = <0>;
->                                 };
->                                 ...
->                         };
-> ~~~
 
-The advantage with the defines is that you can see easily which pin we
-are talking about.
-Moreover, the defines are generated from the datasheet, so it is
-painless to generate them.
-And it will be consistent with Mediatek implementation, on which I
-heavily inspired.
+-Mitch
 
-Linus, what is your view?
-
-Thanks,
-Maxime
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
