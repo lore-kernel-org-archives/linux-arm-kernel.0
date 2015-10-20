@@ -1,97 +1,102 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 20 Oct 2015 09:29:39 -0700
-Subject: [PATCH v6 1/5] clk: Add a basic multiplier clock
-In-Reply-To: <20151020144047.GA10947@lukather>
-References: <1445326609-6314-1-git-send-email-maxime.ripard@free-electrons.com>
- <1445326609-6314-2-git-send-email-maxime.ripard@free-electrons.com>
- <20151020134343.20687.16333@quantum> <20151020144047.GA10947@lukather>
-Message-ID: <20151020162939.20687.32769@quantum>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 20 Oct 2015 18:32:36 +0200
+Subject: [PATCH v2 3/9] includes: dt-bindings: Add STM32F429 pinctrl DT
+ bindings
+In-Reply-To: <56261239.5030007@linaro.org>
+References: <1445102604-11502-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1445102604-11502-4-git-send-email-mcoquelin.stm32@gmail.com>
+ <56261239.5030007@linaro.org>
+Message-ID: <CALszF6DQ2G_Fzhk_SP+A0i_Z4mg9etdf1NcfQS3cPpB0zNot-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2015-10-20 07:40:47)
-> Hi Mike,
-> 
-> On Tue, Oct 20, 2015 at 06:43:43AM -0700, Michael Turquette wrote:
-> > Hi Maxime,
-> > 
-> > Quoting Maxime Ripard (2015-10-20 00:36:45)
-> > > +struct clk *clk_register_multiplier(struct device *dev, const char *name,
-> > > +                                   const char *parent_name,
-> > > +                                   unsigned long flags,
-> > > +                                   void __iomem *reg, u8 shift, u8 width,
-> > > +                                   u8 clk_mult_flags, spinlock_t *lock)
-> > > +{
-> > 
-> > Patch looks good in general. However this is a good opportunity to stop
-> > the madness around the registration functions in these basic clock
-> > types.
-> > 
-> > clk_register is really all that we need since we've had struct
-> > clk_init_data for a while. Initializing a multiplier should be as simple
-> > as:
-> > 
-> >       struct clk_multiplier clk_foo = {
-> >               .hw.init = &(struct clk_init_data){
-> >                       .name = "foo",
-> >                       .parent_names = (const char *[]){
-> >                               "bar",
-> >                       },
-> >                       .num_parents = 1;
-> >                       .ops = &clk_multiplier_ops,
-> >               },
-> >               .reg = 0xd34db33f,
-> >               .shift = 1,
-> >               .width = 2,
-> >       };
-> > 
-> >       clk_register(dev, &clk_foo.hw);
-> > 
-> > This is nice since it turns these basic clocks into even more of a
-> > library and less of a poor mans driver.
-> > 
-> > (I really hope the above works. I did not test it)
-> > 
-> > Is it possible you can convert to using this method, and if it is
-> > correct for you then just remove clk_multiplier_register altogether? (In
-> > fact you might not use the registration function at all since you use
-> > the composite clock...)
-> 
-> This chunk of code has been here since v2, which has been first posted
-> in May, two and half kernel releases ago.
-> 
-> In the meantime, we had a full-blown DMA driver and a quite unusual
-> ASoC driver merged. For some reason, this is the only piece of the
-> audio support that is missing for us, while at the same time it's the
-> most trivial.
-> 
-> If that's the only issue you have with this patch, I'm fine with
-> sending a subsequent patch this week. But I'd be really unhappy with
-> sending yet another version for a single change, while you had 5
-> monthes to review it, and we discussed it several times on IRC and
-> face to face.
+2015-10-20 12:06 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
+> On 17/10/15 18:23, Maxime Coquelin wrote:
+>>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> ---
+>>   include/dt-bindings/pinctrl/pinctrl-stm32.h     |   12 +
+>>   include/dt-bindings/pinctrl/stm32f429-pinfunc.h | 1241
+>> +++++++++++++++++++++++
+>>   2 files changed, 1253 insertions(+)
+>>   create mode 100644 include/dt-bindings/pinctrl/pinctrl-stm32.h
+>>   create mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
+>>
+>> diff --git a/include/dt-bindings/pinctrl/pinctrl-stm32.h
+>> b/include/dt-bindings/pinctrl/pinctrl-stm32.h
+>> new file mode 100644
+>> index 0000000..a2e7222
+>> --- /dev/null
+>> +++ b/include/dt-bindings/pinctrl/pinctrl-stm32.h
+>> @@ -0,0 +1,12 @@
+>> +#ifndef _DT_BINDINGS_PINCTRL_STM32_H
+>> +#define _DT_BINDINGS_PINCTRL_STM32_H
+>> +
+>> +#define STM32_PIN_NO(x) ((x) << 8)
+>> +#define STM32_GET_PIN_NO(x) ((x) >> 8)
+>> +#define STM32_GET_PIN_FUNC(x) ((x) & 0xff)
+>> +
+>> +#define STM32_PIN_GPIO         0
+>> +#define STM32_PIN_AF(x)                ((x) + 1)
+>> +#define STM32_PIN_ANALOG       (STM32_PIN_AF(15) + 1)
+>> +
+>> +#endif /* _DT_BINDINGS_PINCTRL_STM32_H */
+>> diff --git a/include/dt-bindings/pinctrl/stm32f429-pinfunc.h
+>> b/include/dt-bindings/pinctrl/stm32f429-pinfunc.h
+>> new file mode 100644
+>> index 0000000..9dd5fd0
+>> --- /dev/null
+>> +++ b/include/dt-bindings/pinctrl/stm32f429-pinfunc.h
+>> @@ -0,0 +1,1241 @@
+>> +#ifndef _DT_BINDINGS_STM32F429_PINFUNC_H
+>> +#define _DT_BINDINGS_STM32F429_PINFUNC_H
+>> +
+>> +#include <dt-bindings/pinctrl/pinctrl-stm32.h>
+>> +
+>> +#define STM32F429_PA0_FUNC_GPIO 0x0
+>> +#define STM32F429_PA0_FUNC_TIM2_CH1_TIM2_ETR 0x2
+>
+>
+> Did you expand these out after my feedback (instead of things like:
+> STM32_PIN_NO(0) | STM32_PIN_AF(1) )?
+Yes.
 
-The change can go in later. It's not a prerequisite. I had a feeling
-you'd be grumpy about me asking but I thought I'd try anyways. I won't
-even ask if you got sign-off from Jim on whether this works for his
-platforms ;-)
+>
+> If so I must have been somewhat unclear.
+Most likely I didn't understood what you meant!
 
-The copy/paste nature of these basic clock types really sucks and it is
-one of many reasons that I am hesitant to accept them and slow to merge
-them...
+>
+> I suggesting that, like with the clock driver, there is no need to the
+> STM32F429_PAXX_FUNC_YYY macros at all.
+>
+> Given the way you can enumerate pin config options in stm32f429.dtsi then I
+> think stm32f429.dtsi is the only file that will ever include this header? If
+> so then why not just plug the values directly into the pinmux fields. Its
+> not duplicative and is easier to map back to data sheets.
+>
+> ~~~
+> #define PIN_NO(x) ...
+> #define PIN_AF(x) ...
+>
+> usart1_pins_a: usart1 at 0 {
+>                                 pins1 {
+>                                         pinmux = PIN_NO(9) | PIN_AF(7);
+>                                         bias-disable;
+>                                         drive-push-pull;
+>                                         slew-rate = <0>;
+>                                 };
+>                                 ...
+>                         };
+> ~~~
 
-Anyways it seems that you are not using the registration function at all
-so I might just follow up with a patch to remove it.
+The advantage with the defines is that you can see easily which pin we
+are talking about.
+Moreover, the defines are generated from the datasheet, so it is
+painless to generate them.
+And it will be consistent with Mediatek implementation, on which I
+heavily inspired.
 
-I can pick these 5 patches directly, or do you plan to send a PR?
+Linus, what is your view?
 
-Regards,
-Mike
-
-> 
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+Thanks,
+Maxime
