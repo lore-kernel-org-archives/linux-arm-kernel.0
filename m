@@ -1,21 +1,37 @@
-From: oliver+list@schinagl.nl (Olliver Schinagl)
-Date: Wed, 21 Oct 2015 01:05:00 +0300
-Subject: [linux-sunxi] [PATCH] i2c: mv64xxx: The n clockdiv factor is
- 0 based on sunxi SoCs
-In-Reply-To: <20151020155821.GN5379@katana>
-References: <1443365828-8956-1-git-send-email-hdegoede@redhat.com>
- <560813CF.4000807@schinagl.nl> <20150929120943.GP7104@lukather>
- <560D80CF.6050500@schinagl.nl> <20151020155821.GN5379@katana>
-Message-ID: <5626BA8C.3070906@schinagl.nl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Oct 2015 00:42:23 +0200
+Subject: [PATCH] staging/wilc: fix Kconfig dependencies, second try
+In-Reply-To: <4095810.4Q9e8Lc4je@wuerfel>
+References: <5446980.8Rmykv9Tt3@wuerfel> <4253270.hGxaSY0VLA@wuerfel>
+ <4095810.4Q9e8Lc4je@wuerfel>
+Message-ID: <4126905.7rHMRoCZhU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I shamefully admit I have not. My plate is very full at the moment, but 
-I will make room for this upcoming weekend as I have a few other patches 
-to test aswell. Sorry for the delay!
+On Monday 19 October 2015 11:53:40 Arnd Bergmann wrote:
+> On Monday 19 October 2015 11:39:31 Arnd Bergmann wrote:
+> > On Monday 19 October 2015 16:54:23 Tony Cho wrote:
+> > > Hi Arnd Bergmann,
+> > > 
+> > > When I apply this patch, I cannot make WILC1000 module (wilc1000.ko) because CONFIG_WILC1000 is y and also I can see some link errors for the cfg80211 APIs.
+> > > 
+> > > Can you consider this patch?
+> > 
+> > Ah, you are right. I see the same thing now and don't know what caused me
+> > to send the patch in an incomplete state.
+> > 
+> > I hope this snippet is the last missing piece:
+> > 
+> 
+> No, that was not it either, I'll start over to think this through.
+> 
+> The real solution of course is to make it possible to load both the
+> SPI and MMC front-ends at the same time and have a common base driver,
+> which I might have to do, in order to clear myself of the shame of sending
+> not one but two incorrect fixes for this problem 
 
-On 20-10-15 18:58, Wolfram Sang wrote:
->> WIth Hans having figured it out and fixing it, I'll absolutly will take a
->> nother look and check with a scope if it all works out now.
-> Have you done this already? /me is always looking for Tested-by: tags :)
->
+I spent too much time on it now, but I have a series that should fix
+this part for real and let you build both drivers into the kernel
+(or as modules) in a single configuration.
+
+	Arnd
