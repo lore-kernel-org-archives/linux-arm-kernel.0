@@ -1,32 +1,50 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 20 Oct 2015 09:13:46 +0900
-Subject: [PATCH v4 8/8] ARM: EXYNOS: Remove SROM related register settings
- from mach-exynos
-In-Reply-To: <1445255206-11148-9-git-send-email-pankaj.dubey@samsung.com>
-References: <1445255206-11148-1-git-send-email-pankaj.dubey@samsung.com>
- <1445255206-11148-9-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <5625873A.6020900@samsung.com>
+Date: Tue, 20 Oct 2015 09:20:32 +0900
+Subject: [PATCH 7/7] ARM: EXYNOS: Remove code for restart and poweroff for
+ exynos SoCs
+In-Reply-To: <CAGOxZ50nH1UtRrA4nJTvYdsiydNWUvY413gY0q7tRaDFaX_T1Q@mail.gmail.com>
+References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
+ <1445234635-3950-8-git-send-email-alim.akhtar@samsung.com>
+ <562494F8.6070003@samsung.com> <5624BE39.7020605@osg.samsung.com>
+ <CAJKOXPcvKeDNwof5eyD5XjzUiZrHoyShD8gOPGo7uUxEyypQbw@mail.gmail.com>
+ <CAGOxZ50nH1UtRrA4nJTvYdsiydNWUvY413gY0q7tRaDFaX_T1Q@mail.gmail.com>
+Message-ID: <562588D0.4030404@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.10.2015 20:46, Pankaj Dubey wrote:
-> As now we have dedicated driver for SROM controller, it will take care
-> of saving register banks during S2R so we can safely remove these
-> settings from mach-exynos.
-> 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/mach-exynos/Kconfig                 |  2 ++
->  arch/arm/mach-exynos/exynos.c                | 17 ---------
->  arch/arm/mach-exynos/include/mach/map.h      |  3 --
->  arch/arm/mach-exynos/regs-srom.h             | 53 ----------------------------
->  arch/arm/mach-exynos/suspend.c               | 20 ++---------
->  arch/arm/plat-samsung/include/plat/map-s5p.h |  1 -
->  6 files changed, 4 insertions(+), 92 deletions(-)
->  delete mode 100644 arch/arm/mach-exynos/regs-srom.h
-> 
+On 20.10.2015 01:06, Alim Akhtar wrote:
+>>>
+>>>> Previously this code was always compiled in for ARCH_EXYNOS. Now it is
+>>>> not so I am thinking about selecting necessary drivers from main exynos
+>>>> Kconfig symbol. That could be tricky though, because "select" should be
+>>>> used only for non-visible symbols.
+>>>>
+>>>> Any ideas how to solve that?
+>>>>
+>>>
+>>> Is true that select should only be used for non-visible symbols but there
+>>> are others user visible symbols that are selected by ARCH_EXYNOS such as
+>>> EXYNOS_THERMAL. So I think selecting the regmap syscon reset stuff there
+>>> is a sensible option.
+>>
+>> Selecting from defconfig is not sufficient... since I do not have
+>> other idea than selecting then ovak, but Alim please check it whether
+>> it does not create circular dependencies on various configs.
+>>
+> I checked in multi_v7_defconfig SYSCON_RESET is already enabled by
+> default. so I doubt we are going to run into any circular
+> dependencies, will check again..thanks.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+The circular dependency does not happen when some defconfig selects it.
+Instead it could happen when some other Kconfig symbol selects such (and
+there are more dependencies).
+
+So what I am saying here, after adding "select SYSCON_RESET" in
+mach-exynos/Kconfig, please build configs:
+1. allyes
+2. allmod,
+3. multi_v7,
+4. (and of course) exynos.
 
 Best regards,
 Krzysztof
