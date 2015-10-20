@@ -1,52 +1,49 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Oct 2015 15:17:23 +0200
-Subject: [PATCH] cpufreq: imx6: rework getting clocks and regulators
-In-Reply-To: <CAFSsGVtHaDkXDmnV4-X5z-2y48GM_erSWAYK-6bxR3wv4wHybg@mail.gmail.com>
-References: <1445342218-12895-1-git-send-email-s.hauer@pengutronix.de>
- <1445344018.3716.16.camel@pengutronix.de>
- <20151020124731.GS14476@pengutronix.de>
- <CAFSsGVtHaDkXDmnV4-X5z-2y48GM_erSWAYK-6bxR3wv4wHybg@mail.gmail.com>
-Message-ID: <20151020131723.GT14476@pengutronix.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 20 Oct 2015 15:17:35 +0200
+Subject: [GIT PULL 1/4] clk: tegra: Changes for v4.4-rc1
+Message-ID: <1445347058-8834-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 02:56:51PM +0200, Heiner Kallweit wrote:
-> On Tue, Oct 20, 2015 at 2:47 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Tue, Oct 20, 2015 at 02:26:58PM +0200, Lucas Stach wrote:
-> >> Am Dienstag, den 20.10.2015, 13:56 +0200 schrieb Sascha Hauer:
-> >> > Use devm_* functions for getting clocks and regulators. This simplfifies
-> >> > the error path. Also return the error from the failing call instead of
-> >> > collating all regulator and clock errors to -ENOENT. With this the
-> >> > driver can properly handle -EPROBE_DEFER. Handling deferred probing
-> >> > becomes necessary once the SoC internal regulators get supplies. While
-> >> > the SoC internal regulators are registered early in architecture code,
-> >> > the supplies may be regular I2C devices which may be probed after the
-> >> > cpufreq driver.
-> >> >
-> >> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> >>
-> >> NACK
-> >>
-> >> This has come up several times before, maybe we should get a comment in
-> >> the code.
-> >
-> > Indeed, yes. This would help not wasting developing time.
-> >
-> > Anyway, the driver needs to handle -EPROBE_DEFER properly, if not with
-> > devm_ then without it.
-> >
-> About two days ago I sent two patches fixing this. Meanwhile Viresh
-> accepted them
-> so they should show up in the next kernel very soon.
+Hi Mike, Stephen,
 
-Thanks for the hint, just found the patches in the archives.
-Unfortunately your patches do not work properly, but I'll reply to your
-patch.
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
-Sascha
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.4-clk
+
+for you to fetch changes up to 88d909bedf4df7285d6e8d8730425df0d163512e:
+
+  clk: tegra: Modify tegra_audio_clk_init to accept more plls (2015-10-20 13:56:55 +0200)
+
+----------------------------------------------------------------
+clk: tegra: Changes for v4.4-rc1
+
+This contains a patch that allows the DFLL to use clock rates higher
+than 2^31-1 Hz by using the ->determine_rate() operation instead of the
+->round_rate() operation. Other than that there's a couple of cleanups
+in preparation for Tegra210 support.
+
+----------------------------------------------------------------
+Mikko Perttunen (1):
+      clk: tegra: Unlock top rates for Tegra124 DFLL clock
+
+Rhyland Klein (2):
+      clk: tegra: Fix comments for structure definitions
+      clk: tegra: Modify tegra_audio_clk_init to accept more plls
+
+Thierry Reding (2):
+      clk: tegra: dfll: Monitor code is DEBUG_FS only
+      clk: tegra: Update struct tegra_clk_pll_params kerneldoc
+
+ drivers/clk/tegra/clk-dfll.c        | 114 ++++++++++++++++++------------------
+ drivers/clk/tegra/clk-tegra-audio.c |  25 +++++---
+ drivers/clk/tegra/clk-tegra114.c    |   8 ++-
+ drivers/clk/tegra/clk-tegra124.c    |   8 ++-
+ drivers/clk/tegra/clk-tegra30.c     |   8 ++-
+ drivers/clk/tegra/clk.h             | 106 +++++++++++++++++++++------------
+ drivers/clk/tegra/cvb.c             |   7 ---
+ 7 files changed, 163 insertions(+), 113 deletions(-)
