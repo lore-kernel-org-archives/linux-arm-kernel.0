@@ -1,50 +1,128 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 20 Oct 2015 10:23:11 +0100
-Subject: [PATCH v4 0/4] drm: Cleanup probe function for component based
- masters.
-Message-ID: <1445332995-11212-1-git-send-email-Liviu.Dudau@arm.com>
+Date: Tue, 20 Oct 2015 10:23:14 +0100
+Subject: [PATCH v4 3/4] drm/rockchip: Convert the probe function to the
+ generic drm_of_component_probe()
+In-Reply-To: <1445332995-11212-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1445332995-11212-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1445332995-11212-4-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changelog:
-v4: Fixed a bug where the wrong pointer was sent to component_match_add() and
-    component_master_add_with_match() in the armada_drv.c file that was flagged
-    by kbuild test robot. Dropped the RFC tag and added Acked-bys received from
-    Russell King.
-v3: Removed the call to dma_set_coherent_mask() from the generic
-    drm_of_component_probe(). Also changes to shorten lines over 80 chars long.
-v2: Rebased the patchset on top of drm-next rather than Linus' latest -rc
+Use the generic drm_of_component_probe() function to probe for components.
 
-A few drivers in drivers/gpu/drm are component-enabled and use quite similar
-code sequences to probe for their encoder slaves at the remote end of the ports.
-Move the code into a "generic" function and remove it from the drivers.
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 81 +++--------------------------
+ 1 file changed, 6 insertions(+), 75 deletions(-)
 
-The end results is that drivers get a reference count fix (imx), more thorough
-error checking (imx again) plus a decrease in the overall count of LoC.
-
-I'm looking for comments and testing of the patchset (only compile tested from my
-end as I don't have access to all the devices touched by the changes). My main
-interest is in finding out if -EINVAL is the correct code to return if
-dev->of_node == NULL (handy now, as it is different from the other possible error
-codes and used in armada to trigger old platform_data support. Also looking for
-thoughts on the correctness of the patch and if it possible to co-opt more drivers
-into using the function.
-
-Best regards,
-Liviu
-
-Liviu Dudau (4):
-  drm: Introduce generic probe function for component based masters.
-  drm/imx: Convert the probe function to the generic drm_of_component_probe()
-  drm/rockchip: Convert the probe function to the generic drm_of_component_probe()
-  drm/armada: Convert the probe function to the generic drm_of_component_probe()
-
- drivers/gpu/drm/armada/armada_drv.c         | 68 +++++++---------------
- drivers/gpu/drm/drm_of.c                    | 88 +++++++++++++++++++++++++++++
- drivers/gpu/drm/imx/imx-drm-core.c          | 55 ++----------------
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 81 ++------------------------
- include/drm/drm_of.h                        | 13 +++++
- 5 files changed, 130 insertions(+), 175 deletions(-)
-
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index f22e1e1..d26e0cc 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -19,6 +19,7 @@
+ #include <drm/drmP.h>
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_fb_helper.h>
++#include <drm/drm_of.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/module.h>
+@@ -418,29 +419,6 @@ static int compare_of(struct device *dev, void *data)
+ 	return dev->of_node == np;
+ }
+ 
+-static void rockchip_add_endpoints(struct device *dev,
+-				   struct component_match **match,
+-				   struct device_node *port)
+-{
+-	struct device_node *ep, *remote;
+-
+-	for_each_child_of_node(port, ep) {
+-		remote = of_graph_get_remote_port_parent(ep);
+-		if (!remote || !of_device_is_available(remote)) {
+-			of_node_put(remote);
+-			continue;
+-		} else if (!of_device_is_available(remote->parent)) {
+-			dev_warn(dev, "parent device of %s is not available\n",
+-				 remote->full_name);
+-			of_node_put(remote);
+-			continue;
+-		}
+-
+-		component_match_add(dev, match, compare_of, remote);
+-		of_node_put(remote);
+-	}
+-}
+-
+ static int rockchip_drm_bind(struct device *dev)
+ {
+ 	struct drm_device *drm;
+@@ -483,61 +461,14 @@ static const struct component_master_ops rockchip_drm_ops = {
+ 
+ static int rockchip_drm_platform_probe(struct platform_device *pdev)
+ {
+-	struct device *dev = &pdev->dev;
+-	struct component_match *match = NULL;
+-	struct device_node *np = dev->of_node;
+-	struct device_node *port;
+-	int i;
+-
+-	if (!np)
+-		return -ENODEV;
+-	/*
+-	 * Bind the crtc ports first, so that
+-	 * drm_of_find_possible_crtcs called from encoder .bind callbacks
+-	 * works as expected.
+-	 */
+-	for (i = 0;; i++) {
+-		port = of_parse_phandle(np, "ports", i);
+-		if (!port)
+-			break;
+-
+-		if (!of_device_is_available(port->parent)) {
+-			of_node_put(port);
+-			continue;
+-		}
+-
+-		component_match_add(dev, &match, compare_of, port->parent);
+-		of_node_put(port);
+-	}
++	int ret = drm_of_component_probe(&pdev->dev, compare_of,
++					 &rockchip_drm_ops);
+ 
+-	if (i == 0) {
+-		dev_err(dev, "missing 'ports' property\n");
++	/* keep compatibility with old code that was returning -ENODEV */
++	if (ret == -EINVAL)
+ 		return -ENODEV;
+-	}
+ 
+-	if (!match) {
+-		dev_err(dev, "No available vop found for display-subsystem.\n");
+-		return -ENODEV;
+-	}
+-	/*
+-	 * For each bound crtc, bind the encoders attached to its
+-	 * remote endpoint.
+-	 */
+-	for (i = 0;; i++) {
+-		port = of_parse_phandle(np, "ports", i);
+-		if (!port)
+-			break;
+-
+-		if (!of_device_is_available(port->parent)) {
+-			of_node_put(port);
+-			continue;
+-		}
+-
+-		rockchip_add_endpoints(dev, &match, port);
+-		of_node_put(port);
+-	}
+-
+-	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
++	return ret;
+ }
+ 
+ static int rockchip_drm_platform_remove(struct platform_device *pdev)
 -- 
 2.6.0
