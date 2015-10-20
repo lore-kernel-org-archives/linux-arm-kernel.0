@@ -1,22 +1,39 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 20 Oct 2015 04:17:20 -0700 (PDT)
-Subject: [PATCH resend 0/1] net: sun4i-emac: Properly free resources on
- probe failure
-In-Reply-To: <1445330544-6968-1-git-send-email-hdegoede@redhat.com>
-References: <1445330544-6968-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151020.041720.1990087005815931941.davem@davemloft.net>
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Tue, 20 Oct 2015 13:06:12 +0200
+Subject: [PATCH] fpga: zynq-fpga: Change fw format to handle bin instead
+ of bit.
+In-Reply-To: <5625E5C4.7090803@topic.nl>
+References: <1445299319-14921-1-git-send-email-moritz.fischer@ettus.com>
+ <1445299319-14921-2-git-send-email-moritz.fischer@ettus.com>
+ <5625E5C4.7090803@topic.nl>
+Message-ID: <56262024.8050206@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hans de Goede <hdegoede@redhat.com>
-Date: Tue, 20 Oct 2015 10:42:23 +0200
-> 
-> IIRC you said you would pick this up, but I'm not seeing it in
-> net-next, hence this resend.
+?Sorry for having sent that out about three times, I was cleverly being fooled 
+into believing the mail didn't get delivered.
 
-If it's not in my tree, and it's not active on patchwork, you really
-have to resend your patches.
+I also want to apologize for adding yet another message to that list. I'm 
+sorry, it won't happen again.
 
-Asking me to dig into submissions made some time in the past doesn't
-really work, sorry.
- 
+On 20-10-15 08:57, Mike Looijmans wrote:
+...
+
+
+Kind regards,
+
+Mike Looijmans
+System Expert
+
+TOPIC Embedded Products
+Eindhovenseweg 32-C, NL-5683 KH Best
+Postbus 440, NL-5680 AK Best
+Telefoon: +31 (0) 499 33 69 79
+Telefax: +31 (0) 499 33 69 70
+E-mail: mike.looijmans at topicproducts.com
+Website: www.topicproducts.com
+
+Please consider the environment before printing this e-mail
+
+Visit us at : Aerospace Electrical Systems Expo Europe which will be held from 17.11.2015 till 19.11.2015, Findorffstrasse 101 Bremen, Germany, Hall 5, stand number C65
+http://www.aesexpo.eu
