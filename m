@@ -1,49 +1,43 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 20 Oct 2015 14:45:32 +0530
-Subject: [PATCH v5 1/8] ARM: EXYNOS: remove unused static mapping of CMU for
- exynos5
+Date: Tue, 20 Oct 2015 14:45:34 +0530
+Subject: [PATCH v5 3/8] Documentation: dt-bindings: add exynos-srom binding
+ information
 In-Reply-To: <1445332540-12814-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1445332540-12814-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1445332540-12814-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1445332540-12814-4-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unused static mapping of exynos5 CMU and related code.
+This patch adds exynos-srom binding information for SROM Controller
+driver on Exynos SoCs.
 
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Mark Rutland <mark.rutland@arm.com>
+CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/mach-exynos/exynos.c           | 5 -----
- arch/arm/mach-exynos/include/mach/map.h | 1 -
- 2 files changed, 6 deletions(-)
+ .../devicetree/bindings/arm/samsung/exynos-srom.txt          | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 1c47aee..524aa6f 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -70,11 +70,6 @@ static struct map_desc exynos5_iodesc[] __initdata = {
- 		.pfn		= __phys_to_pfn(EXYNOS5_PA_SROMC),
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)S5P_VA_CMU,
--		.pfn		= __phys_to_pfn(EXYNOS5_PA_CMU),
--		.length		= 144 * SZ_1K,
--		.type		= MT_DEVICE,
- 	},
- };
- 
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index de3ae59..a2acba3 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -25,7 +25,6 @@
- #define EXYNOS_PA_CHIPID		0x10000000
- 
- #define EXYNOS4_PA_CMU			0x10030000
--#define EXYNOS5_PA_CMU			0x10010000
- 
- #define EXYNOS4_PA_DMC0			0x10400000
- #define EXYNOS4_PA_DMC1			0x10410000
+diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+new file mode 100644
+index 0000000..33886d5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+@@ -0,0 +1,12 @@
++SAMSUNG Exynos SoCs SROM Controller driver.
++
++Required properties:
++- compatible : Should contain "samsung,exynos-srom".
++
++- reg: offset and length of the register set
++
++Example:
++	sromc at 12570000 {
++		compatible = "samsung,exynos-srom";
++		reg = <0x12570000 0x10>;
++	};
 -- 
 2.4.5
