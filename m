@@ -1,104 +1,135 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Oct 2015 15:23:51 +0200
-Subject: [PATCH 1/5] kernel: irq: implement is_enabled_percpu_irq()
+Date: Tue, 20 Oct 2015 15:23:53 +0200
+Subject: [PATCH 3/5] irqchip: armada-370-xp: re-enable per-CPU interrupts at
+ resume time
 In-Reply-To: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1445347435-2333-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1445347435-2333-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain interrupt controller drivers have a register set that does not
-make it easy to save/restore the mask of enabled/disabled interrupts
-at suspend/resume time. At resume time, such drivers rely on the core
-kernel irq subsystem to tell whether such or such interrupt is enabled
-or not, in order to restore the proper state in the interrupt
-controller register.
+Commit d17cab4451df1 ("irqchip: Kill off set_irq_flags usage") changed
+the code of armada_370_xp_mpic_irq_map() from using set_irq_flags() to
+irq_set_probe().
 
-While the irqd_irq_disabled() provides the relevant information for
-global interrupts, there is no similar function to query the
-enabled/disabled state of a per-CPU interrupt.
+While the commit log seems to imply that there are no functional
+changes, there are indeed functional changes introduced by this
+commit: the IRQ_NOAUTOEN flag is no longer cleared. This functional
+change causes a regression on Armada XP, which no longer works
+properly after suspend/resume because per-CPU interrupts remain
+disabled.
 
-Therefore, this commit complements the
-enable_percpu_irq/disable_percpu_irq API with an
-is_enabled_percpu_irq() function.
+Due to how the hardware registers work, the irq-armada-370-xp cannot
+simply save/restore a bunch of registers at suspend/resume to make
+sure that the interrupts remain in the same state after
+resuming. Therefore, it relies on the kernel to say whether the
+interrupt is disabled or not, using the irqd_irq_disabled()
+function. This was all working fine while the IRQ_NOAUTOEN flag was
+cleared.
+
+With the change introduced by Rob Herring in d17cab4451df1, the
+IRQ_NOAUTOEN flag is now set for all interrupts. irqd_irq_disabled()
+returns false for per-CPU interrupts, and therefore our per-CPU
+interrupts are no longer re-enabled after resume.
+
+This commit fixes that by using irqd_irq_disabled() only for global
+interrupts, and using the newly introduced is_enabled_percpu_irq() for
+per-CPU interrupts.
+
+Also, it fixes a related problems that per-CPU interrupts were only
+re-enabled on the boot CPU and not other CPUs. Until now this wasn't a
+problem since on this platform, only the local timers are using
+per-CPU interrupts and the local timers of secondary CPUs are turned
+off/on during CPU hotplug before suspend, after after resume. However,
+in Linux 4.4, we will also be using per-CPU interrupts for the network
+controller, so we need to properly restore the per-CPU interrupts on
+secondary CPUs as well.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- include/linux/interrupt.h |  1 +
- kernel/irq/chip.c         |  5 +++++
- kernel/irq/internals.h    |  1 +
- kernel/irq/manage.c       | 19 +++++++++++++++++++
- 4 files changed, 26 insertions(+)
+ drivers/irqchip/irq-armada-370-xp.c | 45 ++++++++++++++++++++++++++++++++-----
+ 1 file changed, 39 insertions(+), 6 deletions(-)
 
-diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-index be7e75c..5ea9be5 100644
---- a/include/linux/interrupt.h
-+++ b/include/linux/interrupt.h
-@@ -193,6 +193,7 @@ extern void disable_irq(unsigned int irq);
- extern void disable_percpu_irq(unsigned int irq);
- extern void enable_irq(unsigned int irq);
- extern void enable_percpu_irq(unsigned int irq, unsigned int type);
-+extern bool is_enabled_percpu_irq(unsigned int irq);
- extern void irq_wake_thread(unsigned int irq, void *dev_id);
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index f5afe81..106ac4c 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -311,7 +311,6 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
+ 		irq_set_percpu_devid(virq);
+ 		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
+ 					handle_percpu_devid_irq);
+-
+ 	} else {
+ 		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
+ 					handle_level_irq);
+@@ -377,12 +376,35 @@ static void armada_mpic_send_doorbell(const struct cpumask *mask,
+ static int armada_xp_mpic_secondary_init(struct notifier_block *nfb,
+ 					 unsigned long action, void *hcpu)
+ {
++	unsigned int nirqs, irq;
++
+ 	if (action != CPU_STARTING && action != CPU_STARTING_FROZEN)
+ 		return NOTIFY_OK;
  
- /* The following three functions are for the core kernel use only. */
-diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-index e28169d..ebc00fc 100644
---- a/kernel/irq/chip.c
-+++ b/kernel/irq/chip.c
-@@ -246,6 +246,11 @@ void irq_percpu_enable(struct irq_desc *desc, unsigned int cpu)
- 	cpumask_set_cpu(cpu, desc->percpu_enabled);
+ 	armada_xp_mpic_perf_init();
+ 	armada_xp_mpic_smp_cpu_init();
+ 
++	/* Re-enable per-CPU interrupts that were enabled before suspend */
++	nirqs = (readl(main_int_base + ARMADA_370_XP_INT_CONTROL) >> 2) & 0x3ff;
++	for (irq = 0; irq < nirqs; irq++) {
++		struct irq_data *data;
++		int virq;
++
++		virq = irq_linear_revmap(armada_370_xp_mpic_domain, irq);
++		if (virq == 0)
++			continue;
++
++		data = irq_get_irq_data(virq);
++
++		if (irq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
++			continue;
++
++		if (!is_enabled_percpu_irq(virq))
++			continue;
++
++		armada_370_xp_irq_unmask(data);
++	}
++
+ 	return NOTIFY_OK;
  }
  
-+bool irq_percpu_is_enabled(struct irq_desc *desc, unsigned int cpu)
-+{
-+	return cpumask_test_cpu(cpu, desc->percpu_enabled);
-+}
-+
- void irq_percpu_disable(struct irq_desc *desc, unsigned int cpu)
- {
- 	if (desc->irq_data.chip->irq_disable)
-diff --git a/kernel/irq/internals.h b/kernel/irq/internals.h
-index 5ef0c2d..37de1c5 100644
---- a/kernel/irq/internals.h
-+++ b/kernel/irq/internals.h
-@@ -68,6 +68,7 @@ extern void irq_shutdown(struct irq_desc *desc);
- extern void irq_enable(struct irq_desc *desc);
- extern void irq_disable(struct irq_desc *desc);
- extern void irq_percpu_enable(struct irq_desc *desc, unsigned int cpu);
-+extern bool irq_percpu_is_enabled(struct irq_desc *desc, unsigned int cpu);
- extern void irq_percpu_disable(struct irq_desc *desc, unsigned int cpu);
- extern void mask_irq(struct irq_desc *desc);
- extern void unmask_irq(struct irq_desc *desc);
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index f9a59f6..d4afe65 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -1666,6 +1666,25 @@ out:
- }
- EXPORT_SYMBOL_GPL(enable_percpu_irq);
+@@ -550,16 +572,27 @@ static void armada_370_xp_mpic_resume(void)
+ 		if (virq == 0)
+ 			continue;
  
-+bool is_enabled_percpu_irq(unsigned int irq)
-+{
-+	unsigned int cpu = smp_processor_id();
-+	unsigned long flags;
-+	struct irq_desc *desc =
-+		irq_get_desc_lock(irq, &flags, IRQ_GET_DESC_CHECK_PERCPU);
-+	bool is_enabled;
+-		if (irq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
++		data = irq_get_irq_data(virq);
 +
-+	if (!desc)
-+		return false;
-+
-+	is_enabled = irq_percpu_is_enabled(desc, cpu);
-+
-+	irq_put_desc_unlock(desc, flags);
-+
-+	return is_enabled;
-+}
-+EXPORT_SYMBOL_GPL(is_enabled_percpu_irq);
-+
- void disable_percpu_irq(unsigned int irq)
- {
- 	unsigned int cpu = smp_processor_id();
++		if (irq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ) {
++			/* Non per-CPU interrupts */
+ 			writel(irq, per_cpu_int_base +
+ 			       ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
+-		else
++			if (!irqd_irq_disabled(data))
++				armada_370_xp_irq_unmask(data);
++		} else {
++			/* Per-CPU interrupts */
+ 			writel(irq, main_int_base +
+ 			       ARMADA_370_XP_INT_SET_ENABLE_OFFS);
+ 
+-		data = irq_get_irq_data(virq);
+-		if (!irqd_irq_disabled(data))
+-			armada_370_xp_irq_unmask(data);
++			/*
++			 * Re-enable on the current CPU,
++			 * armada_xp_mpic_secondary_init() will take
++			 * care of secondary CPUs when they come up.
++			 */
++			if (is_enabled_percpu_irq(virq))
++				armada_370_xp_irq_unmask(data);
++		}
+ 	}
+ 
+ 	/* Reconfigure doorbells for IPIs and MSIs */
 -- 
 2.6.2
