@@ -1,28 +1,33 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 20 Oct 2015 19:16:43 +0800
-Subject: [PATCH v2 0/4] berlin sdhci clock clean up
-Message-ID: <1445339807-2351-1-git-send-email-jszhang@marvell.com>
+Date: Tue, 20 Oct 2015 19:16:46 +0800
+Subject: [PATCH v2 3/4] clk: berlin: bg2q: remove CLK_IGNORE_UNUSED flag for
+ sdio clk
+In-Reply-To: <1445339807-2351-1-git-send-email-jszhang@marvell.com>
+References: <1445339807-2351-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1445339807-2351-4-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add or fix the optional clock property, then remove the CLK_IGNORE_UNUSED
-flag for sdio clk(s).
+Since we have added the necessary two clks' properties in dts, we can
+remove the "sdio" clk's CLK_IGNORE_UNUSED flag now.
 
-Since v1:
-  - remove the "mmc: sdhci-pxav3: fix optional clock name" patch to not
-    block the clock clean up patches, will send another separate patch 
-    after talking with HW people.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/clk/berlin/bg2q.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Jisheng Zhang (4):
-  ARM: dts: berlin: correct BG2Q's sdhci2 2nd clock
-  ARM: dts: berlin: add 2nd clock for BG2Q sdhci0 and sdhci1
-  clk: berlin: bg2q: remove CLK_IGNORE_UNUSED flag for sdio clk
-  clk: berlin: bg2: remove CLK_IGNORE_UNUSED flag for sdio clk
-
- arch/arm/boot/dts/berlin2q.dtsi | 8 +++++---
- drivers/clk/berlin/bg2.c        | 4 ++--
- drivers/clk/berlin/bg2q.c       | 2 +-
- 3 files changed, 8 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
+index 221f40c..243f421 100644
+--- a/drivers/clk/berlin/bg2q.c
++++ b/drivers/clk/berlin/bg2q.c
+@@ -283,7 +283,7 @@ static const struct berlin2_gate_data bg2q_gates[] __initconst = {
+ 	{ "usb2",	"perif",	13 },
+ 	{ "usb3",	"perif",	14 },
+ 	{ "pbridge",	"perif",	15, CLK_IGNORE_UNUSED },
+-	{ "sdio",	"perif",	16, CLK_IGNORE_UNUSED },
++	{ "sdio",	"perif",	16 },
+ 	{ "nfc",	"perif",	18 },
+ 	{ "pcie",	"perif",	22 },
+ };
 -- 
 2.6.1
