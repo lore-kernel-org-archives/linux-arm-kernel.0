@@ -1,41 +1,30 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 19 Oct 2015 21:52:37 -0700
-Subject: [PATCH 1/2] ARM: ux500: add an SMP enablement type and move cpu
- nodes
-In-Reply-To: <1438586801-30115-1-git-send-email-linus.walleij@linaro.org>
-References: <1438586801-30115-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAMAWPa_nVyyhXfBm3HvPyVGpodJe_dfM0kX0kO+rPtO9mfkG=w@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 20 Oct 2015 14:06:31 +0900
+Subject: [PATCH] MAINTAINERS: Remove link to oss.renesas.com which is closed
+Message-ID: <1445317591-23245-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+There doesn't seem much value in keeping this link listed
+in the MAINTAINERS file any more.
 
-On Mon, Aug 3, 2015 at 12:26 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> The "cpus" node cannot be inside the "soc" node, while this
-> works for the CoreSight blocks, the early boot code will look
-> for "cpus" directly under the root node, so this is a hard
-> convention. So move the CPU nodes.
->
-> Augment the "reg" property to match what is actually in the
-> hardware: 0x300 and 0x301 respectively.
->
-> Then add an SMP enablement type to be used by the SMP init
-> code, "ste,dbx500-smp".
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Hi ARM SoC people: please apply this as a fix for v4.2
-> as it is prerequisite for 2/2 which is a more proper fix
-> for the secondary CPU boot regression addressed by the
-> fixed remappings patch.
+Cc: Khiem Nguyen <khiem.nguyen.xt@rvc.renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ MAINTAINERS | 1 -
+ 1 file changed, 1 deletion(-)
 
-kernelci.org has had the ste-snowall failing in v4.2 stable[1] for
-awhile, so I finally bisected[2] it down to this patch, which is in
-mainline in the form of commit bf64dd262eaa (ARM: ux500: add an SMP
-enablement type and move cpu nodes).  I confirmed that reverting that
-commit on top of v4.2 gets the snowball booting again.
-
-Kevin
-
-[1] http://kernelci.org/boot/all/job/stable/kernel/v4.2.3/
-[2] https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/102/console
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 19fea49a18fd..b1ecb7ed625d 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1483,7 +1483,6 @@ ARM/SHMOBILE ARM ARCHITECTURE
+ M:	Simon Horman <horms@verge.net.au>
+ M:	Magnus Damm <magnus.damm@gmail.com>
+ L:	linux-sh at vger.kernel.org
+-W:	http://oss.renesas.com
+ Q:	http://patchwork.kernel.org/project/linux-sh/list/
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git next
+ S:	Supported
+-- 
+2.1.4
