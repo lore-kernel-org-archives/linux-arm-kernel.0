@@ -1,36 +1,49 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Tue, 20 Oct 2015 17:20:47 +0900
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 20 Oct 2015 13:51:15 +0530
 Subject: [PATCH v4 6/8] drivers: soc: add support for exynos SROM driver
-In-Reply-To: <014301d10b01$488873f0$d9995bd0$@samsung.com>
+In-Reply-To: <5625E3B9.8040707@samsung.com>
 References: <1445255206-11148-1-git-send-email-pankaj.dubey@samsung.com>
  <1445255206-11148-7-git-send-email-pankaj.dubey@samsung.com>
  <56258683.7070204@samsung.com> <5625B92C.10505@samsung.com>
  <5625C07D.4030706@samsung.com> <014301d10b01$488873f0$d9995bd0$@samsung.com>
-Message-ID: <20151020082047.GA923@samsunx.samsung>
+ <5625E3B9.8040707@samsung.com>
+Message-ID: <5625F97B.50605@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On Tuesday 20 October 2015 12:18 PM, Krzysztof Kozlowski wrote:
+> On 20.10.2015 15:33, Pavel Fedin wrote:
+>>   Hello!
+>>
+>>> AFAIR Fedin was talking about missing functionality, not about adding
+>>> the contribution by himself. So he might add it or he might not. I did
+>>> not receive any commitments from him.
+>>
+>>   I am waiting for the driver to be integrated, because i see it's constantly redesigned. Then i'll post my patches.
+>
+> That means you will extend the driver? Great! So from my point of view
+> it is fine.
+>
+> Dear Pankaj,
+>
+> With the fix of unneeded NULL assignments:
+>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>
 
-> > AFAIR Fedin was talking about missing functionality, not about adding
-> > the contribution by himself. So he might add it or he might not. I did
-> > not receive any commitments from him.
-> 
->  I am waiting for the driver to be integrated, because i see it's constantly redesigned. Then i'll post my patches. By the way, they
-> will be useful only if pin controller driver for 5410 is accepted upstream, several authors have done it but i still didn't see it
-> in upstream.
->  Pin controller is needed in order to configure multi-functional pins correctly.
-> 
-> > The driver should be "proper" for
-> > the time being (which could mean !PM dependency). If there is a need,
-> > then the dependency will be removed.
-> 
->  I can do it later if you prefer.
+Thanks. Will update v5 soon with suggested modification.
 
-can we add the "depends on ... && PM" now, later, once
-you'll extend it, you remove it again?
-
-Personally I'd prefer this way rather than having a driver that 
-does nothing in case of !PM.
-
-Andi
+Thanks,
+Pankaj Dubey
+>
+>> By the way, they
+>> will be useful only if pin controller driver for 5410 is accepted upstream, several authors have done it but i still didn't see it
+>> in upstream.
+>>   Pin controller is needed in order to configure multi-functional pins correctly.
+>
+> Are there any obstacles for upstreaming it?
+>
+> Best regards,
+> Krzysztof
+>
+>
