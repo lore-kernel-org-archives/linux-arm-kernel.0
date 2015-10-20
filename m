@@ -1,61 +1,49 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 20 Oct 2015 03:22:55 -0700
-Subject: [PATCH] PM / OPP: fix debugfs files for 64-bit
-In-Reply-To: <20151019155310.GO32532@n2100.arm.linux.org.uk>
-References: <5706174.BUsqiXljxZ@wuerfel> <20151007125735.GA8170@kroah.com>
- <20151007130324.GA4557@linux> <5308760.2G5KJFF9Pi@wuerfel>
- <20151008074828.GF4570@linux> <20151019154009.20687.41178@quantum>
- <20151019155310.GO32532@n2100.arm.linux.org.uk>
-Message-ID: <20151020102255.20687.72485@quantum>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 20 Oct 2015 12:22:25 +0200
+Subject: [PATCH] spi: atmel: Fix DMA-setup for transfers with more than 8
+ bits per word.
+In-Reply-To: <1445288084-31805-1-git-send-email-davidm@egauge.net>
+References: <1445288084-31805-1-git-send-email-davidm@egauge.net>
+Message-ID: <562615E1.4030407@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Russell King - ARM Linux (2015-10-19 08:53:11)
-> On Mon, Oct 19, 2015 at 08:40:09AM -0700, Michael Turquette wrote:
-> > Quoting Viresh Kumar (2015-10-08 00:48:28)
-> > > On 07-10-15, 21:12, Arnd Bergmann wrote:
-> > > > I think it clearly makes sense to have a fixed length for each of these
-> > > > members:
-> > > >
-> > > > either 32 bit is enough to represent all possible values, then
-> > > > there is no need to make them 'long' on 64-bit architectures, or 32 bit
-> > > > is not enough and then the code is broken on 32-bit architectures today
-> > > > and should be fixed.
-> > > 
-> > > I agree.
-> > > 
-> > > But I am not 100% sure why it was done this way to start with.
-> > > Probably this is the logic behind that:
-> > > - Max clock rate supported by a u32 is ~ 4.295 GHz
+Le 19/10/2015 22:54, David Mosberger-Tang a ?crit :
+> The DMA-slave configuration depends on the whether <= 8 or > 8 bits
+> are transferred per word, so we need to call
+> atmel_spi_dma_slave_config() with the correct value.
 > 
-> The limit is actually half that when you consider clk_round_rate()
-> returns a long, because clk_round_rate() needs to be able to return
-> errors.
+> Signed-off-by: David Mosberger <davidm@egauge.net>
+
+Thanks for having rewritten this patch! It's much more simple like this ;-)
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+For Mark, here is the patchwork entry which can be handy:
+https://patchwork.kernel.org/patch/7439931/
+
+Best regards,
+
+> ---
+>  drivers/spi/spi-atmel.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> The use of long and unsigned long was done in the knowledge that it'd
-> restrict to 2GHz the upper limit, partially because 64-bit math on
-> 32-bit systems is inefficient and expensive, and I initially wanted
-> people to use the thing, so it had to be lean and fast.  (If I'd
-> started out with something as complex as the CCF, it would've been
-> laughed out as being "far too complex" and "we don't need this").
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index 04e48e5..855cc56 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -758,7 +758,8 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
+>  
+>  	*plen = len;
+>  
+> -	if (atmel_spi_dma_slave_config(as, &slave_config, 8))
+> +	if (atmel_spi_dma_slave_config(as, &slave_config,
+> +				       xfer->bits_per_word))
+>  		goto err_exit;
+>  
+>  	/* Send both scatterlists */
 > 
-> It also started out as a way to convey clock information to drivers
-> for peripherals, which commonly don't need clocks up in the GHz range,
-> indeed, it was rare at that time the API was designed for peripheral
-> clocks to be much above 100MHz.
 
-And this is still very true today. We've had a few instances where
-platforms hit the 2GHz limit on a PLL feeding a divider to a CPU, but
-the current state of things is working for the common case.
 
-The big question is whether to change it in anticipation of higher clock
-rates (somebody has to drive those THz transceivers and photonic
-interconnects!) or just wait until enough people start screaming.
-
-Regards,
-Mike
-
-> 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+-- 
+Nicolas Ferre
