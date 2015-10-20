@@ -1,160 +1,76 @@
-From: majun258@huawei.com (MaJun)
-Date: Tue, 20 Oct 2015 16:41:58 +0800
-Subject: [PATCH v6 2/4] irqchip: add platform device driver for mbigen device
-In-Reply-To: <1445330520-11960-1-git-send-email-majun258@huawei.com>
-References: <1445330520-11960-1-git-send-email-majun258@huawei.com>
-Message-ID: <1445330520-11960-3-git-send-email-majun258@huawei.com>
+From: puck.chen@hisilicon.com (Chen Feng)
+Date: Tue, 20 Oct 2015 16:45:22 +0800
+Subject: [PATCH V2 1/3] Documentation for system mmu in hi6220 platform.
+Message-ID: <1445330724-129401-1-git-send-email-puck.chen@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ma Jun <majun258@huawei.com>
+docs: iommu: Documentation for smmu in hi6220 SoC.
 
-Mbigen means Message Based Interrupt Generator(MBIGEN).
-
-Its a kind of interrupt controller that collects
-the interrupts from external devices and generate msi interrupt.
-Mbigen is applied to reduce the number of wire connected interrupts.
-
-As the peripherals increasing, the interrupts lines needed is
-increasing much, especially on the Arm64 server SOC.
-
-Therefore, the interrupt pin in GIC is not enough to cover so
-many peripherals.
-
-Mbigen is designed to fix this problem.
-
-Mbigen chip locates in ITS or outside of ITS.
-
-Mbigen chip hardware structure shows as below:
-
-		mbigen chip
-|---------------------|-------------------|
-mgn_node0	  mgn_node1		mgn_node2
- |		 |-------|		|-------|------|
-dev1		dev1    dev2		dev1   dev3   dev4
-
-Each mbigen chip contains several mbigen nodes.
-
-External devices can connect to mbigen node through wire connecting way.
-
-Because a mbigen node only can support 128 interrupt maximum, depends
-on the interrupt lines number of devices, a device can connects to one
-more mbigen nodes.
-
-Also, several different devices can connect to a same mbigen node.
-
-When devices triggered interrupt,mbigen chip detects and collects
-the interrupts and generates the MBI interrupts by writing the ITS
-Translator register.
-
-To simplify mbigen driver,I used a new conception--mbigen device.
-Each mbigen device is initialized as a platform device.
-
-Mbigen device presents the parts(register, pin definition etc.) in
-mbigen chip corresponding to a peripheral device.
-
-So from software view, the structure likes below
-
-	            mbigen chip
-     |---------------------|-----------------|
-mbigen device1       mbigen device2  mbigen device3
-      |                   |                |
-     dev1                dev2             dev3
-
-Signed-off-by: Ma Jun <majun258@huawei.com>
+Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
+Signed-off-by: Yu Dongbin <yudongbin@hisilicon.com>
 ---
- drivers/irqchip/irq-mbigen.c |   83 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 83 insertions(+), 0 deletions(-)
- create mode 100644 drivers/irqchip/irq-mbigen.c
+ .../bindings/iommu/hisi,hi6220-iommu.txt           | 52 ++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iommu/hisi,hi6220-iommu.txt
 
-diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+diff --git a/Documentation/devicetree/bindings/iommu/hisi,hi6220-iommu.txt b/Documentation/devicetree/bindings/iommu/hisi,hi6220-iommu.txt
 new file mode 100644
-index 0000000..f18132f
+index 0000000..93e0701
 --- /dev/null
-+++ b/drivers/irqchip/irq-mbigen.c
-@@ -0,0 +1,83 @@
-+/*
-+ * Copyright (C) 2015 Hisilicon Limited, All Rights Reserved.
-+ * Author: Jun Ma <majun258@huawei.com>
-+ * Author: Yun Wu <wuyun.wu@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
++++ b/Documentation/devicetree/bindings/iommu/hisi,hi6220-iommu.txt
+@@ -0,0 +1,52 @@
++Hi6220 SoC SMMU Device Driver devicetree document
++=======================================================================
++The Architecture of SMMU on Hi6220 SoC:
 +
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
++   +------------------------------------------------------------------+
++   |                                                                  |
++   |         +---------+  +--------+  +-------------+   +-------+     |
++   |         |   ADE   |  |  ISP   |  |  V/J codec  |   |  G3D  |     |
++   |         +----|----+  +---|----+  +------|------+   +---|---|     |
++   |              |           |              |              |         |
++   |     ---------v-----------v--------------v--------------v-----    |
++   |                           Media Bus                              |
++   |     --------------------------------|---------------|--------    |
++   |                                     |               |            |
++   |                                 +---v---------------v--------+   |
++   |                                 |            SMMU            |   |
++   |                                 +----------|---------|-------+   |
++   |                                            |         |           |
++   +--------------------------------------------|---------|-----------+
++                                                |         |
++                                   +------------v---------v-----------+
++                                   |              DDRC                |
++                                   +----------------------------------+
 +
-+/**
-+ * struct mbigen_device - holds the information of mbigen device.
-+ *
-+ * @pdev:		pointer to the platform device structure of mbigen chip.
-+ * @base:		mapped address of this mbigen chip.
-+ */
-+struct mbigen_device {
-+	struct platform_device	*pdev;
-+	void __iomem		*base;
-+};
++Note:
++The media system shared the same smmu IP. to access DDR memory. And all
++media IP used the same page table.
 +
-+static int mbigen_device_probe(struct platform_device *pdev)
-+{
-+	struct mbigen_device *mgn_chip;
++Below binding describes the system mmu for media system in hi6220 platform
 +
-+	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
-+	if (!mgn_chip)
-+		return -ENOMEM;
++Required properties:
++- compatible: Should be "hisilicon,hi6220-smmu" example:
++		compatible = "hisilicon,hi6220-smmu";
++- reg: A tuple of base address and size of System MMU registers.
++- interrupts: An interrupt specifier for interrupt signal of System MMU.
++- clocks: The clock used for smmu IP.
++- clock-names: The name to enable clock with clock framework.
++- #iommu-cells: The iommu-cells should be 1 for muti-master to use.
 +
-+	mgn_chip->pdev = pdev;
-+	mgn_chip->base = of_iomap(pdev->dev.of_node, 0);
-+
-+	platform_set_drvdata(pdev, mgn_chip);
-+
-+	return 0;
-+}
-+
-+static int mbigen_device_remove(struct platform_device *pdev)
-+{
-+	struct mbigen_device *mgn_chip = platform_get_drvdata(pdev);
-+
-+	iounmap(mgn_chip->base);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id mbigen_of_match[] = {
-+	{ .compatible = "hisilicon,mbigen-v2" },
-+	{ /* END */ }
-+};
-+MODULE_DEVICE_TABLE(of, mbigen_of_match);
-+
-+static struct platform_driver mbigen_platform_driver = {
-+	.driver = {
-+		.name		= "Hisilicon MBIGEN-V2",
-+		.owner		= THIS_MODULE,
-+		.of_match_table	= mbigen_of_match,
-+	},
-+	.probe			= mbigen_device_probe,
-+	.remove			= mbigen_device_remove,
-+};
-+
-+module_platform_driver(mbigen_platform_driver);
-+
-+MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
-+MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
-+MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("Hisilicon MBI Generator driver");
++Examples:
++	smmu at f4210000 {
++		compatible = "hisilicon,hi6220-smmu";
++		reg = <0x0 0xf4210000 0x0 0x1000>;
++		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&sys_ctrl HI6220_MMU_CLK>,
++		         <&media_ctrl HI6220_MED_MMU>,
++		         <&sys_ctrl HI6220_MEDIA_PLL_SRC>;
++		clock-names = "smmu_clk",
++			      "media_sc_clk",
++			      "smmu_peri_clk";
++		#iommu-cells = <1>;
++	};
 -- 
-1.7.1
+1.9.1
