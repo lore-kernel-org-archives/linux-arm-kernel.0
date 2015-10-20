@@ -1,79 +1,55 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Tue, 20 Oct 2015 07:53:27 -0500
-Subject: [PATCH V3 2/4] ACPI/scan: Clean up acpi_check_dma
-In-Reply-To: <20151020021735.GA20869@localhost>
-References: <1440597279-11802-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1440597279-11802-3-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20150914163411.GL829@google.com> <561D28B5.7030303@amd.com>
- <561D9978.9090406@amd.com> <20151020021735.GA20869@localhost>
-Message-ID: <56263947.2090805@amd.com>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Tue, 20 Oct 2015 08:55:38 -0400
+Subject: [PATCH v3 2/3] xen, cpu_hotplug: call device_offline instead of
+ cpu_down
+In-Reply-To: <alpine.DEB.2.02.1510201104120.27957@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1510191754000.27957@kaball.uk.xensource.com>
+ <1445273735-15758-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <56253543.8080007@oracle.com>
+ <alpine.DEB.2.02.1510201104120.27957@kaball.uk.xensource.com>
+Message-ID: <562639CA.2010104@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn/Rafael,
-
-Let me redo the patch with enum then. At least, that's more clear to 
-everyone.
-
-Thanks,
-
-Suravee
-
-On 10/19/15 21:17, Bjorn Helgaas wrote:
-> On Tue, Oct 13, 2015 at 06:53:28PM -0500, Suravee Suthikulanit wrote:
->> Bjorn / Rafael,
->>
->> On 10/13/2015 10:52 AM, Suravee Suthikulpanit wrote:
+On 10/20/2015 06:28 AM, Stefano Stabellini wrote:
+> On Mon, 19 Oct 2015, Boris Ostrovsky wrote:
+>> On 10/19/2015 12:55 PM, Stefano Stabellini wrote:
+>>> When offlining a cpu, instead of cpu_down, call device_offline, which
+>>> also takes care of updating the cpu.dev.offline field. This keeps the
+>>> sysfs file /sys/devices/system/cpu/cpuN/online, up to date.  Also move
+>>> the call to disable_hotplug_cpu, because it makes more sense to have it
+>>> there.
 >>>
->>> On 09/14/2015 09:34 AM, Bjorn Helgaas wrote:
->>>> [..]
->>>> I think acpi_check_dma_coherency() is better, but only slightly.  It
->>>> still doesn't give a hint about the *sense* of the return value.  I
->>>> think it'd be easier to read if there were two functions, e.g.,
+>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>>> CC: konrad.wilk at oracle.com
+>>> CC: boris.ostrovsky at oracle.com
+>>> CC: david.vrabel at citrix.com
+>>> ---
+>>>    drivers/xen/cpu_hotplug.c |    3 ++-
+>>>    1 file changed, 2 insertions(+), 1 deletion(-)
 >>>
->>> I have been going back-and-forth between the current version, and the
->>> two-function-approach in the past. I can definitely go with this route
->>> if you would prefer. Although, if acpi_dma_is_coherent() == 0, it would
->>> be ambiguous whether DMA is not supported or non-coherent DMA is
->>> supported. Then, we would need to call acpi_dma_is_supported() to find
->>> out. So, that's okay with you?
->>
->> Thinking about this again, I still think having one API (which can
->> tell whether DMA is supported or not, and if so whether it is
->> coherent or non-coherent) would be the least confusing and least
->> error prone.
->>
->> What if we would just have:
->>
->>      enum dev_dma_type acpi_get_dev_dma_type(struct acpi_device *adev);
->>
->> where:
->>      enum dev_dma_type {
->>          DEV_DMA_NOT_SUPPORTED,
->>          DEV_DMA_NON_COHERENT,
->>          DEV_DMA_COHERENT,
->>      };
->>
->> This would probably mean that we should modify
->> drivers/base/property.c to replace:
->>      bool device_dma_is_coherent()
->> to:
->>      enum dev_dma_type device_get_dma_type()
->>
->> We used to discuss the enum approach in the past
->> (https://lkml.org/lkml/2015/8/25/868). But we only considered at the
->> ACPI level at the time. Actually, this should also reflect in the
->> property.c.
->>
->> At this point, only drivers/crypto/ccp/ccp-platform.c and
->> drivers/net/ethernet/amd/xgbe/xgbe-main.c are calling the
->> device_dma_is_coherent(). So, it should be easy to change this API.
+>>> diff --git a/drivers/xen/cpu_hotplug.c b/drivers/xen/cpu_hotplug.c
+>>> index 43de1f5..78804b5 100644
+>>> --- a/drivers/xen/cpu_hotplug.c
+>>> +++ b/drivers/xen/cpu_hotplug.c
+>>> @@ -18,6 +18,8 @@ static void enable_hotplug_cpu(int cpu)
+>>>      static void disable_hotplug_cpu(int cpu)
+>>>    {
+>>> +	if (cpu_online(cpu))
+>>> +		device_offline(get_cpu_device(cpu));
+>>>    	if (cpu_present(cpu))
+>>>    		xen_arch_unregister_cpu(cpu);
+>> Do we want to call device_online() when plugging cpu in?
+> I don't know: that would automatically bring the cpu online after the
+> user hot-plugs it. Is it what we want? Current one would have to manually:
 >
-> OK, I'm fine with either the enum or Rafael's 0/1/-ENOTSUPP idea.
+> echo 1 > /sys/devices/system/cpu/cpu1/online
 >
-> Bjorn
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+> I thought that was the expected behaviour?
+
+Right, we should keep onlining as an explicit operation. I think it's 
+worth mentioning in the commit message why we don't call device_online() 
+while using device_offline(), which is its complement.
+
+
+-boris
