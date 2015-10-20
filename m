@@ -1,34 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Oct 2015 09:01:03 -0700
-Subject: [PATCH 3/3] ARM: dts: Add basic support for isee igepv5
-In-Reply-To: <CAMVEqEmDoQvnVfQXF9QvtyjPe2RRGe1wf=6=VifGPcSOKLcnbg@mail.gmail.com>
-References: <1444756728-11185-1-git-send-email-tony@atomide.com>
- <1444756728-11185-3-git-send-email-tony@atomide.com>
- <CAFqH_52T8rPJp-8+Bb7Tjv-kcACU8FJGtqFWOhj02DzQ2yc7nw@mail.gmail.com>
- <20151016145707.GU10113@atomide.com>
- <CAMVEqEkoXoE1wgT8p5BNW7TAjz5Xtcvx7gXvk7rbdQXg8bXpzg@mail.gmail.com>
- <20151019145052.GB21839@atomide.com>
- <CAMVEqEmDoQvnVfQXF9QvtyjPe2RRGe1wf=6=VifGPcSOKLcnbg@mail.gmail.com>
-Message-ID: <20151020160103.GC3078@atomide.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 20 Oct 2015 09:01:38 -0700
+Subject: [PATCH 3/4] thermal: rockchip: change the TSHUT default state
+In-Reply-To: <1445332264-6054-4-git-send-email-wxt@rock-chips.com>
+References: <1445332264-6054-1-git-send-email-wxt@rock-chips.com>
+ <1445332264-6054-4-git-send-email-wxt@rock-chips.com>
+Message-ID: <CAD=FV=Vo1Wf6opTc5jQjm-nXd=BCJxeggipPj4ER9Ehutxs_6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pau Pajuel <ppajuel@gmail.com> [151020 03:34]:
-> 2015-10-19 16:50 GMT+02:00 Tony Lindgren <tony@atomide.com>:
-> >
-> > My guess is that you need to play with initrd_high etc, try doing something
-> > like this in u-boot:
-> >
-> > setenv fdtaddr 80a00000
-> > setenv loadaddr 80c00000
-> > setenv rdaddr 81400000
-> > setenv fdt_high 8c000000
-> > setenv initrd_high ffffffff
->
-> Setting the above environment variables works for me
+Caesar,
 
-OK good to hear. Applying this series into omap-for-v4.4/dt then.
+On Tue, Oct 20, 2015 at 2:11 AM, Caesar Wang <wxt@rock-chips.com> wrote:
+> As the TRM says, the TSHUT default state is high active.
+> In general, the TSHUT state can get from the dts. Otherwise
+> it gets the state from this.
 
-Thanks,
+Can you point at where the TRM says that the default state is high active?
 
-Tony
+With the manual I have, I look at TSADC_AUTO_CON and I look at the
+description of "Bit 8".  It says that "tshut polarity" is 0 for low
+active and 1 for high active.  It then said that the Reset Value is 0.
+
+...the "Reset Value" in tables like this is notoriously unreliable, so
+I can totally believe that it's wrong.  If you can point me at the
+part of the TRM that says that TSHUT is high active by default then I
+can confirm that for you.  ;)
+
+
+-Doug
