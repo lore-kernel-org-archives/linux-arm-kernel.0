@@ -1,35 +1,32 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 20 Oct 2015 21:37:03 +0900
-Subject: [PATCH v5 6/8] drivers: soc: add support for exynos SROM driver
-In-Reply-To: <1445332540-12814-7-git-send-email-pankaj.dubey@samsung.com>
-References: <1445332540-12814-1-git-send-email-pankaj.dubey@samsung.com>
- <1445332540-12814-7-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <5626356F.4030805@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 20 Oct 2015 14:37:26 +0200
+Subject: [PATCH v3] regulator: Propagate voltage changes to supply regulators
+Message-ID: <1445344649-9559-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 20.10.2015 o 18:15, Pankaj Dubey pisze:
-> This patch adds Exynos SROM controller driver which will handle
-> save restore of SROM registers during S2R.
-> 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  drivers/soc/Kconfig               |   1 +
->  drivers/soc/Makefile              |   1 +
->  drivers/soc/samsung/Kconfig       |  13 +++
->  drivers/soc/samsung/Makefile      |   1 +
->  drivers/soc/samsung/exynos-srom.c | 175 ++++++++++++++++++++++++++++++++++++++
->  drivers/soc/samsung/exynos-srom.h |  51 +++++++++++
->  6 files changed, 242 insertions(+)
->  create mode 100644 drivers/soc/samsung/Kconfig
->  create mode 100644 drivers/soc/samsung/Makefile
->  create mode 100644 drivers/soc/samsung/exynos-srom.c
->  create mode 100644 drivers/soc/samsung/exynos-srom.h
-> 
+Until now changing the voltage of a regulator only ever effected the
+regulator itself, but never its supplies. It's a common pattern though
+to put LDO regulators behind switching regulators. The switching
+regulators efficiently drop the input voltage but have a high ripple on
+their output. The output is then cleaned up by the LDOs. For higher
+energy efficiency the voltage drop at the LDOs should be minimized. This
+series adds support for such a scenario. Another case voltage
+propagation is useful is simple switches which are abstracted as
+regulators. These can now offer voltage settings to their consumers
+which are transparently passed to the switches supply.
 
-Looks good to me, thanks:
+Please review, any input welcome.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Changes since v2:
+- Skip already applied patches
+- create regulator_map_voltage() and use it in favour of
+  regulator_get_voltage_floor()
 
-Best regards,
-Krzysztof
+Changes since RFC (v1):
+- split into more patches
+- Only do voltage propagation when we have a supply and either a minimum
+  dropout voltage is specified or the regulator is a switch (lacks a
+  get_voltage operation)
+
+Sascha
