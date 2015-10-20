@@ -1,88 +1,92 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 20 Oct 2015 09:36:48 +0200
-Subject: [PATCH v6 4/5] clk: sunxi: codec clock support
+Date: Tue, 20 Oct 2015 09:36:47 +0200
+Subject: [PATCH v6 3/5] clk: sunxi: pll2: Add A13 support
 In-Reply-To: <1445326609-6314-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1445326609-6314-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1445326609-6314-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1445326609-6314-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Emilio L?pez <emilio@elopez.com.ar>
+The A13, unlike the A10 and A20, doesn't use a pass-through exception for
+the 0 value in the pre and post dividers, but increments all the values
+written in the register by one.
 
-The codec clock on sun4i, sun5i and sun7i is a simple gate with PLL2 as
-parent. Add a driver for such a clock.
+Add an exception for both these cases to handle them nicely.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi/Makefile        |  1 +
- drivers/clk/sunxi/clk-a10-codec.c | 44 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 45 insertions(+)
- create mode 100644 drivers/clk/sunxi/clk-a10-codec.c
+ drivers/clk/sunxi/clk-a10-pll2.c | 38 +++++++++++++++++++++++++++++++++-----
+ 1 file changed, 33 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index c658a18ba7cb..70a449a419e6 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -3,6 +3,7 @@
- #
+diff --git a/drivers/clk/sunxi/clk-a10-pll2.c b/drivers/clk/sunxi/clk-a10-pll2.c
+index a57742a8576d..5484c31ec568 100644
+--- a/drivers/clk/sunxi/clk-a10-pll2.c
++++ b/drivers/clk/sunxi/clk-a10-pll2.c
+@@ -41,9 +41,15 @@
  
- obj-y += clk-sunxi.o clk-factors.o
-+obj-y += clk-a10-codec.o
- obj-y += clk-a10-hosc.o
- obj-y += clk-a10-pll2.o
- obj-y += clk-a20-gmac.o
-diff --git a/drivers/clk/sunxi/clk-a10-codec.c b/drivers/clk/sunxi/clk-a10-codec.c
-new file mode 100644
-index 000000000000..ac321d6a0df5
---- /dev/null
-+++ b/drivers/clk/sunxi/clk-a10-codec.c
-@@ -0,0 +1,44 @@
-+/*
-+ * Copyright 2013 Emilio L?pez
-+ *
-+ * Emilio L?pez <emilio@elopez.com.ar>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
+ #define SUN4I_PLL2_OUTPUTS		4
+ 
++struct sun4i_pll2_data {
++	u32	post_div_offset;
++	u32	pre_div_flags;
++};
 +
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
+ static DEFINE_SPINLOCK(sun4i_a10_pll2_lock);
+ 
+-static void __init sun4i_pll2_setup(struct device_node *node)
++static void __init sun4i_pll2_setup(struct device_node *node,
++				    struct sun4i_pll2_data *data)
+ {
+ 	const char *clk_name = node->name, *parent;
+ 	struct clk **clks, *base_clk, *prediv_clk;
+@@ -70,8 +76,7 @@ static void __init sun4i_pll2_setup(struct device_node *node)
+ 					  parent, 0, reg,
+ 					  SUN4I_PLL2_PRE_DIV_SHIFT,
+ 					  SUN4I_PLL2_PRE_DIV_WIDTH,
+-					  CLK_DIVIDER_ONE_BASED |
+-					  CLK_DIVIDER_ALLOW_ZERO,
++					  data->pre_div_flags,
+ 					  &sun4i_a10_pll2_lock);
+ 	if (!prediv_clk) {
+ 		pr_err("Couldn't register the prediv clock\n");
+@@ -122,7 +127,7 @@ static void __init sun4i_pll2_setup(struct device_node *node)
+ 	 */
+ 	val = readl(reg);
+ 	val &= ~(SUN4I_PLL2_POST_DIV_MASK << SUN4I_PLL2_POST_DIV_SHIFT);
+-	val |= SUN4I_PLL2_POST_DIV_VALUE << SUN4I_PLL2_POST_DIV_SHIFT;
++	val |= (SUN4I_PLL2_POST_DIV_VALUE - data->post_div_offset) << SUN4I_PLL2_POST_DIV_SHIFT;
+ 	writel(val, reg);
+ 
+ 	of_property_read_string_index(node, "clock-output-names",
+@@ -185,4 +190,27 @@ err_free_data:
+ err_unmap:
+ 	iounmap(reg);
+ }
+-CLK_OF_DECLARE(sun4i_pll2, "allwinner,sun4i-a10-pll2-clk", sun4i_pll2_setup);
 +
-+#define SUN4I_CODEC_GATE	31
++static struct sun4i_pll2_data sun4i_a10_pll2_data = {
++	.pre_div_flags	= CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO,
++};
 +
-+static void __init sun4i_codec_clk_setup(struct device_node *node)
++static void __init sun4i_a10_pll2_setup(struct device_node *node)
 +{
-+	struct clk *clk;
-+	const char *clk_name = node->name, *parent_name;
-+	void __iomem *reg;
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (IS_ERR(reg))
-+		return;
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+	parent_name = of_clk_get_parent_name(node, 0);
-+
-+	clk = clk_register_gate(NULL, clk_name, parent_name,
-+				CLK_SET_RATE_PARENT, reg,
-+				SUN4I_CODEC_GATE, 0, NULL);
-+
-+	if (!IS_ERR(clk))
-+		of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	sun4i_pll2_setup(node, &sun4i_a10_pll2_data);
 +}
-+CLK_OF_DECLARE(sun4i_codec, "allwinner,sun4i-a10-codec-clk",
-+	       sun4i_codec_clk_setup);
++
++CLK_OF_DECLARE(sun4i_a10_pll2, "allwinner,sun4i-a10-pll2-clk",
++	       sun4i_a10_pll2_setup);
++
++static struct sun4i_pll2_data sun5i_a13_pll2_data = {
++	.post_div_offset	= 1,
++};
++
++static void __init sun5i_a13_pll2_setup(struct device_node *node)
++{
++	sun4i_pll2_setup(node, &sun5i_a13_pll2_data);
++}
++
++CLK_OF_DECLARE(sun5i_a13_pll2, "allwinner,sun5i-a13-pll2-clk",
++	       sun5i_a13_pll2_setup);
 -- 
 2.6.2
