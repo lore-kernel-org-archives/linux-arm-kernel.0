@@ -1,80 +1,45 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Tue, 20 Oct 2015 08:57:08 +0200
-Subject: [PATCH] fpga: zynq-fpga: Change fw format to handle bin instead
- of bit.
-In-Reply-To: <1445299319-14921-2-git-send-email-moritz.fischer@ettus.com>
-References: <1445299319-14921-1-git-send-email-moritz.fischer@ettus.com>
- <1445299319-14921-2-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <5625E5C4.7090803@topic.nl>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 20 Oct 2015 14:58:37 +0800
+Subject: [PATCH v5 0/2] usb: change clock information for chipidea
+Message-ID: <1445324319-19063-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20-10-15 02:01, Moritz Fischer wrote:
-> This gets rid of the code to strip away the header and byteswap.
->
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> ---
->   drivers/fpga/zynq-fpga.c | 23 ++++++++++-------------
->   1 file changed, 10 insertions(+), 13 deletions(-)
->
-> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
-> index 617d382..916c551 100644
-> --- a/drivers/fpga/zynq-fpga.c
-> +++ b/drivers/fpga/zynq-fpga.c
-> @@ -104,6 +104,8 @@
->   #define INIT_POLL_TIMEOUT		2500000
->   /* Delay for polling reset bits */
->   #define INIT_POLL_DELAY			20
-> +/* Sync sequence for firmware */
-> +#define SYNC_SEQUENCE			"\x66\x55\x99\xAA"
->
->   /* Masks for controlling stuff in SLCR */
->   /* Disable all Level shifters */
-> @@ -301,24 +303,19 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
->
->   	memcpy(kbuf, buf, count);
->
-> -	/* look for the sync word */
-> +	/* look for the sync sequence */
->   	for (i = 0; i < count - 4; i++) {
-> -		if (memcmp(kbuf + i, "\xAA\x99\x55\x66", 4) == 0) {
-> -			dev_dbg(priv->dev, "Found swapped sync word\n");
-> +		if (memcmp(kbuf + i, SYNC_SEQUENCE, 4) == 0) {
-> +			dev_dbg(priv->dev, "Found sync sequence");
->   			break;
->   		}
->   	}
+This patch set changes usb clock information for legacy i.mx platforms.
+At these platforms, they needs three clocks to let controller work.
 
-Regarding this check, and judging from the code, I'd say that any file with a 
-non word-aligned sync word is broken. So you could speed this up considerably 
-by walking through the array word-by-word instread of byte-by-byte.
+Fabio, would you please help to test again, I am sorry to let you
+test again.
 
-Checking the whole 4MB buffer from beginning to end doesn't make it really 
-efficient either, if you're going to visit all that memory in case the stream 
-is invalid, you might as well send it to the hardware, I wouldn't be surprised 
-if that even takes less effort than going through it byte-by-byte.
+Changes for v5:
+- Using one line code for two devm_clk_get error message
+- disable clocks should be inverse with enable clocks
 
-I for one would rather see this check removed, the hardware handles it just 
-fine and also catches more likely errors (e.g. sending a 7030 bitstream to a 
-7015 chip is something that the driver cannot catch anyway, but the hardware 
-detects that error just fine).
+Changes for v4:
+- Following Rob Herring suggestion, if the platforms can get
+clock using their dev_id, then, they are legacy platforms which
+need three clocks to let controller work. If the dev_id is NULL,
+then it only needs one clock.
+- Only includes bug fix patches in this set, for new changes, will
+through the next-tree.
 
-> -	/* remove the header, align the data on word boundary */
-> -	if (i != count - 4) {
-> -		count -= i;
-> -		memmove(kbuf, kbuf + i, count);
-> -	}
-> -
-> -	/* fixup endianness of the data */
-> -	for (i = 0; i < count; i += 4) {
-> -		u32 *p = (u32 *)&kbuf[i];
-> -		*p = swab32(*p);
-> +	/* if we detect something obviously broken, bail ... */
-> +	if ((count - 4) == i) {
-> +		dev_err(priv->dev, "No sync sequence found, invalid bitstream.");
-> +		err = -EINVAL;
-> +		goto out_free;
->   	}
->
->   	/* enable clock */
->
+Changes for v3:
+- Delete property "needs-three-clocks", and using of_device_id->data
+  to differentiate platforms
+- change <stable@vger.kernel.org> #v3.19+ to <stable@vger.kernel.org> #v4.1+
+
+Changes for v2:
+- Add imx25 & imx27 dts change
+- Add Fabio's tested-by and Cc: <stable@vger.kernel.org> #v3.19+
+- Some typo and commit description
+
+Peter Chen (2):
+  ARM: dts: imx27.dtsi: change the clock information for usb
+  usb: chipidea: imx: refine clock operations to adapt for all platforms
+
+ arch/arm/boot/dts/imx27.dtsi       |  16 +++--
+ drivers/usb/chipidea/ci_hdrc_imx.c | 131 ++++++++++++++++++++++++++++++++-----
+ 2 files changed, 125 insertions(+), 22 deletions(-)
+
+-- 
+1.9.1
