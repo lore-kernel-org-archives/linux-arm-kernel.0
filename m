@@ -1,244 +1,62 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 20 Oct 2015 13:15:51 -0600
-Subject: [PATCH V2 22/30] coresight: etm-perf: new PMU driver for ETM
- tracers
-In-Reply-To: <87a8rdhoiq.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
- <1445192687-24112-23-git-send-email-mathieu.poirier@linaro.org>
- <87a8rdhoiq.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CANLsYky7pytCD=AZAaPy9Jqc4_EFu+_NV=noLBTgwXNyYydi-Q@mail.gmail.com>
+From: brijeshkumar.singh@amd.com (Brijesh Singh)
+Date: Tue, 20 Oct 2015 14:16:01 -0500
+Subject: [PATCH] EDAC: Add AMD Seattle SoC EDAC
+In-Reply-To: <20151020174144.GD4943@leverpostej>
+References: <1445282597-18999-1-git-send-email-brijeshkumar.singh@amd.com>
+ <20151019205236.GB453@leverpostej> <56266F7E.6030404@amd.com>
+ <20151020165744.GE31130@pd.tnic> <20151020172654.GC4943@leverpostej>
+ <20151020173639.GH31130@pd.tnic> <20151020174144.GD4943@leverpostej>
+Message-ID: <562692F1.1030209@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 October 2015 at 03:34, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
->
->> +static void *etm_setup_aux(struct perf_event *event, void **pages,
->> +                        int nr_pages, bool overwrite)
->> +{
->> +     int cpu;
->> +     cpumask_t *mask;
->> +     struct etm_event_data *event_data = NULL;
->> +     struct coresight_device *csdev;
->> +
->> +     event_data = alloc_event_data(event->cpu);
->> +     if (!event_data)
->> +             return NULL;
->> +
->> +     mask = &event_data->mask;
->> +
->> +     if (event->cpu != -1)
->> +             cpumask_set_cpu(event->cpu, mask);
->> +     else
->> +             cpumask_copy(mask, cpu_online_mask);
->> +
->> +     for_each_cpu(cpu, mask) {
->> +             struct coresight_device *sink;
->> +
->> +             csdev = per_cpu(csdev_src, cpu);
->> +             if (!csdev)
->> +                     goto err;
->> +
->> +             /* Get the tracer's config from perf */
->> +             if (!source_ops(csdev)->perf_get_config)
->> +                     goto err;
->> +
->> +             event_data->source_config[cpu] =
->> +                     source_ops(csdev)->perf_get_config(csdev, event);
->> +
->> +             if (!event_data->source_config[cpu])
->> +                     goto err;
->> +
->> +             /*
->> +              * Get a handle on the sink buffer associated
->> +              * with this tracer.
->> +              */
->> +             event_data->sink[cpu] = (void *)etm_event_build_path(cpu, true);
->
-> There are several problems here. What is created/allocated during
-> setup_aux(), has to be undone in free_aux(), however, the effect of
-> build_path() will only be undone in the event::destroy() path. So if the
-> user unmaps the aux buffer and then maps it again, we'll go ahead and
-> try to build the path again. (Btw, coresight_build_paths() and other
-> non-static functions and especially exported ones are really lacking
-> documentation at the moment).
->
-> It really looks like this has to be done in pmu::add(), so that the
-> source<=>sink connection exists only while the event is scheduled and
-> otherwise other events are free to connect their sources to these
-> sinks. And at pmu::del() the connection has to be torn down. This way we
-> can have a sensible multisession support. That is, provided my
-> understanding of the coresight driver architecture is correct.
->
-> Also, you won't have to configure things on multiple cpus for cpu==-1 if
-> you keep the source<=>sink connection only between pmu::add() and
-> pmu::del(), as an event can only be scheduled on one cpu at a time,
-> which should make things simpler.
 
-I am well aware of all this...  Currently the process of building a
-path is too heavy to be done at context switch time.  To be efficient
-the components of a path would have to be kept in a linked list that
-is then enabled/disabled when the time comes.  I've been meaning to do
-something better for a while now.  This might be the perfect time to
-address the problem.
 
-Thanks for reviewing the patch set,
-Mathieu
+On 10/20/2015 12:41 PM, Mark Rutland wrote:
+> On Tue, Oct 20, 2015 at 07:36:39PM +0200, Borislav Petkov wrote:
+>> On Tue, Oct 20, 2015 at 06:26:55PM +0100, Mark Rutland wrote:
+>>>> Btw, how much of this is implementing generic A57 functionality?
+>>>
+>>> The driver is entirely A57 generic.
+>>>
+>>>> If a lot, can we make this a generic a57_edac driver so that multiple
+>>>> vendors can use it?
+>>>
+>>> Yes.
+>>
+>> Ok, cool.
+>>
+>>>> How fast and how ugly can something like that become?
+>>>
+>>> Not sure I follow.
+>>
+>> In the sense that some vendor might require just a little bit different
+>> handling or maybe wants to read some vendor-specific registers in
+>> addition to the architectural ones.
+>>
+>> Then we'll start adding vendor-specific hacks to that generic driver.
+>> And therefore the question how fast and how ugly such hacks would
+>> become.
+>>
+>> I guess we'll worry about that when we get there...
+>>
+>> So Brijesh, if you only need generic, architectural functionality,
+>> please call it arm64_edac or so and let's add it so that other arm64
+>> vendors can use it too.
+> 
+> Please note that this is specific to Cortex-A57, not ARMv8 or aarch64.
+> 
+> It is an IMPLEMENTATION DEFINED feature as implemented by Cortex-A57,
+> which by definition is not implemented by other CPUs. It is not provided
+> by the ARM architecture.
+> 
+> So this cannot be arm64_edac, but could potentially be cortex_a57_edac.
+> 
 
->
->> +
->> +             if (!event_data->sink[cpu])
->> +                     goto err;
->> +
->> +             sink = event_data->sink[cpu];
->> +
->> +             if (!sink_ops(sink)->setup_aux)
->> +                     goto err;
->> +
->> +             /* Finally get the AUX specific data from the sink buffer */
->> +             event_data->sink_config[cpu] =
->> +                             sink_ops(sink)->setup_aux(sink, cpu, pages,
->> +                                                       nr_pages, overwrite);
->
-> Now this is a sensible thing to do. I understand that you'll have to
-> know which sink you're using so that you can pick the right sink_ops and
-> build an appropriate configuration, but perhaps it also makes sense to
-> release it once you got the sink_config.
->
->> +static void etm_event_stop(struct perf_event *event, int mode)
->> +{
->> +     int cpu = smp_processor_id();
->> +     struct coresight_device *csdev = per_cpu(csdev_src, cpu);
->> +
->> +     if (event->hw.state == PERF_HES_STOPPED)
->> +             return;
->> +
->> +     if (!csdev)
->> +             return;
->> +
->> +     /* stop tracer */
->> +     if (!source_ops(csdev)->perf_disable)
->> +             return;
->
-> This really shouldn't happen. It makes sense to make sure that we have
-> all the callbacks that we rely on in pmu::event_init() or pmu::add() and
-> refuse to start if we don't, but at this point we really shouldn't end
-> up in a situation where we suddenly don't have one of the callbacks.
->
->> +     if (source_ops(csdev)->perf_disable(csdev))
->> +             return;
->
-> This has a similar problem. I'd say that this callback should not be
-> able to fail and return anything other than success.
->
->> +     /* tell the core */
->> +     event->hw.state = PERF_HES_STOPPED;
->> +
->> +
->> +     if (mode & PERF_EF_UPDATE) {
->> +             struct coresight_device *sink;
->> +             struct perf_output_handle *handle = this_cpu_ptr(&ctx_handle);
->> +             struct etm_event_data *event_data = perf_get_aux(handle);
->> +
->> +             if (WARN_ON_ONCE(handle->event != event))
->> +                     return;
->> +
->> +             if (WARN_ON_ONCE(!event_data))
->> +                     return;
->> +
->> +             sink = event_data->sink[cpu];
->> +             if (WARN_ON_ONCE(!sink))
->> +                     return;
->> +
->> +             /* update trace information */
->> +             if (!sink_ops(sink)->update_buffer)
->> +                     return;
->> +
->> +             sink_ops(sink)->update_buffer(sink, handle,
->> +                                           event_data->sink_config[cpu]);
->> +     }
->> +}
->> +
->> +static void etm_event_start(struct perf_event *event, int flags)
->> +{
->> +     int cpu = smp_processor_id();
->> +     struct coresight_device *csdev = per_cpu(csdev_src, cpu);
->> +
->> +     if (!csdev)
->> +             goto fail;
->> +
->> +     /* tell the perf core the event is alive */
->> +     event->hw.state = 0;
->> +
->> +     if (!source_ops(csdev)->perf_enable)
->> +             goto fail;
->
-> Same here.
->
->> +
->> +     if (source_ops(csdev)->perf_enable(csdev))
->> +             goto fail;
->
-> This may fail, I suppose.
->
->> +
->> +     return;
->> +
->> +fail:
->> +     event->hw.state = PERF_HES_STOPPED;
->> +}
->> +
->> +static void etm_event_del(struct perf_event *event, int mode)
->> +{
->> +     int cpu = smp_processor_id();
->> +     struct coresight_device *sink;
->> +     struct perf_output_handle *handle = this_cpu_ptr(&ctx_handle);
->> +     struct etm_event_data *event_data = perf_get_aux(handle);
->> +
->> +     if (WARN_ON_ONCE(!event_data))
->> +             return;
->> +
->> +     sink = event_data->sink[cpu];
->> +     if (!sink)
->> +             return;
->
-> This also shouldn't be able to prevent us from stopping the event.
->
->> +
->> +     etm_event_stop(event, PERF_EF_UPDATE);
->> +
->> +     if (!sink_ops(sink)->reset_buffer)
->> +             return;
->> +
->> +     sink_ops(sink)->reset_buffer(sink, handle,
->> +                                  event_data->sink_config[cpu]);
->> +}
->> +
->> +static int etm_event_add(struct perf_event *event, int mode)
->> +{
->> +
->> +     int ret = -EBUSY, cpu = smp_processor_id();
->> +     struct etm_event_data *event_data;
->> +     struct perf_output_handle *handle = this_cpu_ptr(&ctx_handle);
->> +     struct hw_perf_event *hwc = &event->hw;
->> +     struct coresight_device *csdev = per_cpu(csdev_src, cpu);
->> +     struct coresight_device *sink;
->> +
->> +     if (handle->event)
->> +             goto out;
->> +
->> +     event_data = perf_aux_output_begin(handle, event);
->> +     ret = -EINVAL;
->> +     if (WARN_ON_ONCE(!event_data))
->> +             goto fail_stop;
->> +
->> +     sink = event_data->sink[cpu];
->
-> So if you're able to fetch the sink right here and release it in
-> _del(). Of course, this being a hot path and an atomic context needs to
-> be taken into account.
->
-> Regards,
-> --
-> Alex
+Yes code is generic to Cortex A57 and naming it cortex_a57_edac sounds good.
+
+Also I will follow your suggestion and remove DT binding and use MIDR. 
+
+> Thanks,
+> Mark.
+> 
