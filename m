@@ -1,74 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Oct 2015 12:35:02 -0700
-Subject: [GIT PULL] omap dts changes for v4.4 merge window, part 2
-Message-ID: <20151020193501.GN3078@atomide.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 20 Oct 2015 21:30:03 +0200
+Subject: [PATCH v3 0/4] mtd: pxa3xx_nand: rework the timing setup
+In-Reply-To: <20151016063815.GB21506@kwain> (Antoine Tenart's message of "Fri,
+ 16 Oct 2015 08:38:15 +0200")
+References: <1444893451-16610-1-git-send-email-antoine.tenart@free-electrons.com>
+ <CAAEAJfBdfc-=AH0z_A8-b70LH_=GJp0qPRp0zCohqDBf8pnokQ@mail.gmail.com>
+ <20151016063815.GB21506@kwain>
+Message-ID: <87zizdxrr8.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit be146412501bc2ed49183637605da97f47125696:
+Antoine Tenart <antoine.tenart@free-electrons.com> writes:
 
-  ARM: dts: omap3-igep: Use OMAP3_CORE1_IOPAD pinmux macro (2015-10-14 12:28:13 -0700)
+> Hi Ezequiel,
+>
+> On Thu, Oct 15, 2015 at 03:30:50PM -0300, Ezequiel Garcia wrote:
+>> Ccing Robert as he can provide valuable test on PXA boards.
+>
+> Sorry for this, I tried to cc Robert but forgot when sending my
+> series...
+Maybe for v4.
+I appreciate even more git tree I can pull from, it eases my test procedure a
+lot.
 
-are available in the git repository at:
+Cheers.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.4/dt-pt2
-
-for you to fetch changes up to e9a267702d32fc8e71abe5f172d2924bad86e52f:
-
-  ARM: dts: am335x-base0033: Use IOPAD pinmux macro (2015-10-20 09:28:04 -0700)
-
-----------------------------------------------------------------
-Few more omap dts changes for v4.4 merge window, mostly to fix and clean
-up some omap5 issues to allow adding other omap5 boards. Also some other
-fixes and clean-up:
-
-- Fix SDIO WLAN for omap5 that's been broken for a while. As further
-  patches are still needed for wl18xx, no need for stable on this one.
-
-- Move most of omap5 support into omap5-board-common.dtsi as most omap5
-  boards seem to share the same basic set of devices.
-
-- Add minimal IGEPv5 support using based on omap5-board-common.dtsi
-
-- Remove now unneedes gpio hogging for dra72-evm
-
-- Update Javier Martinez Canillas email address
-
-- Change earlier IGEP boards to use IOPAD pinmux macros
-
-----------------------------------------------------------------
-Javier Martinez Canillas (4):
-      ARM: dts: Update Javier Martinez Canillas's email
-      ARM: dts: omap3-igep0020: Use IOPAD pinmux macro
-      ARM: dts: am335x-igep0033: Use IOPAD pinmux macro
-      ARM: dts: am335x-base0033: Use IOPAD pinmux macro
-
-Mugunthan V N (1):
-      ARM: dts: dra72-evm: remove cpsw gpio hogging and add mode-gpios
-
-Tony Lindgren (3):
-      ARM: dts: Fix WLAN regression on omap5-uevm
-      ARM: dts: Move most of omap5-uevm.dts to omap5-board-common.dtsi
-      ARM: dts: Add basic support for isee igepv5
-
-Vignesh R (1):
-      ARM: dts: am437x-gp-evm: Add wakeup interrupt source for pixcir_i2c_ts
-
- arch/arm/boot/dts/Makefile                   |   1 +
- arch/arm/boot/dts/am335x-base0033.dts        |  48 +-
- arch/arm/boot/dts/am335x-igep0033.dtsi       |  40 +-
- arch/arm/boot/dts/am437x-gp-evm.dts          |   9 +
- arch/arm/boot/dts/dra72-evm.dts              |   7 +-
- arch/arm/boot/dts/omap3-igep.dtsi            |   2 +-
- arch/arm/boot/dts/omap3-igep0020-common.dtsi |  60 +--
- arch/arm/boot/dts/omap3-igep0020-rev-f.dts   |   2 +-
- arch/arm/boot/dts/omap3-igep0020.dts         |   2 +-
- arch/arm/boot/dts/omap3-igep0030-common.dtsi |   2 +-
- arch/arm/boot/dts/omap3-igep0030-rev-g.dts   |   2 +-
- arch/arm/boot/dts/omap3-igep0030.dts         |   2 +-
- arch/arm/boot/dts/omap5-board-common.dtsi    | 655 +++++++++++++++++++++++++++
- arch/arm/boot/dts/omap5-igep0050.dts         |  54 +++
- arch/arm/boot/dts/omap5-uevm.dts             | 618 +------------------------
- 15 files changed, 814 insertions(+), 690 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap5-board-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap5-igep0050.dts
+-- 
+Robert
