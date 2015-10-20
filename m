@@ -1,62 +1,29 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 20 Oct 2015 16:11:12 +0800
-Subject: [RFC PATCH] clocksource: dw_apb_timer_of: support timer-based delay
-Message-ID: <1445328672-581-1-git-send-email-jszhang@marvell.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Tue, 20 Oct 2015 11:17:00 +0300
+Subject: [PATCH v4 6/8] drivers: soc: add support for exynos SROM driver
+In-Reply-To: <5625E3B9.8040707@samsung.com>
+References: <1445255206-11148-1-git-send-email-pankaj.dubey@samsung.com>
+ <1445255206-11148-7-git-send-email-pankaj.dubey@samsung.com>
+ <56258683.7070204@samsung.com> <5625B92C.10505@samsung.com>
+ <5625C07D.4030706@samsung.com> <014301d10b01$488873f0$d9995bd0$@samsung.com>
+ <5625E3B9.8040707@samsung.com>
+Message-ID: <021201d10b0f$b273bf00$175b3d00$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement an ARM delay timer to be used for udelay(). This allows us to
-skip the delay loop calibration at boot on Marvell BG2, BG2Q, BG2CD
-platforms. And after this patch, udelay() will be unaffected by CPU
-frequency changes.
+ Hello!
 
-But, this driver is not only used on ARM platforms, so I dunno how to
-handle other platforms which don't have the register_current_timer_delay
-That's the reason I mark this patch as RFC.
+> >  Pin controller is needed in order to configure multi-functional pins correctly.
+> 
+> Are there any obstacles for upstreaming it?
 
-Any suggestions are appreciated.
+ I don't know. The last post on this topic is from March, 2015:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html. Patch 0003 has been acked-by, and nothing more since
+that.
+ Actually, only 0002 and 0003 of this series are needed for the pin controller. 0001 has been accepted
+(27284129522e7e2a5b89e80bd44ea3345f79c9e8).
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/clocksource/dw_apb_timer_of.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
-index a19a3f6..09dbf9c 100644
---- a/drivers/clocksource/dw_apb_timer_of.c
-+++ b/drivers/clocksource/dw_apb_timer_of.c
-@@ -16,6 +16,7 @@
-  * You should have received a copy of the GNU General Public License
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
-+#include <linux/delay.h>
- #include <linux/dw_apb_timer.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-@@ -130,6 +131,15 @@ static void __init init_sched_clock(void)
- 	sched_clock_register(read_sched_clock, 32, sched_rate);
- }
- 
-+static unsigned long dw_apb_delay_timer_read(void)
-+{
-+	return ~readl_relaxed(sched_io_base);
-+}
-+
-+static struct delay_timer dw_apb_delay_timer = {
-+	.read_current_timer = dw_apb_delay_timer_read,
-+};
-+
- static int num_called;
- static void __init dw_apb_timer_init(struct device_node *timer)
- {
-@@ -142,6 +152,8 @@ static void __init dw_apb_timer_init(struct device_node *timer)
- 		pr_debug("%s: found clocksource timer\n", __func__);
- 		add_clocksource(timer);
- 		init_sched_clock();
-+		dw_apb_delay_timer.freq = sched_rate;
-+		register_current_timer_delay(&dw_apb_delay_timer);
- 		break;
- 	default:
- 		break;
--- 
-2.6.1
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
