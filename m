@@ -1,40 +1,77 @@
-From: richard.weinberger@gmail.com (Richard Weinberger)
-Date: Tue, 20 Oct 2015 09:20:10 +0200
-Subject: [PATCH 2/3] mtd: nand: add NAND_NEED_SCRAMBLING flag to the
- H27UCG8T2ATR-BC definition
-In-Reply-To: <1444929443-25537-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1444929443-25537-1-git-send-email-boris.brezillon@free-electrons.com>
- <1444929443-25537-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <CAFLxGvx_3ZWMqimh36t1uCSAqbHnD5ZU=vQBMsDHzs6qPxUExQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 20 Oct 2015 09:21:49 +0200
+Subject: [RFT - PATCH v2 0/2] KVM/arm64: add fp/simd lazy switch support
+In-Reply-To: <56256983.2030506@samsung.com>
+References: <1442964843-11953-1-git-send-email-m.smarduch@samsung.com>
+ <20151005154540.GJ9011@cbox> <561BDFE3.5060403@samsung.com>
+ <20151018210738.GF7531@cbox> <56256983.2030506@samsung.com>
+Message-ID: <20151020072149.GA9457@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 7:17 PM, Boris Brezillon
-<boris.brezillon@free-electrons.com> wrote:
-> The H27UCG8T2ATR-BC requires an external data scrambler. Reflect this
-> constraint in the nand_flash_ids definition.
->
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  drivers/mtd/nand/nand_ids.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mtd/nand/nand_ids.c b/drivers/mtd/nand/nand_ids.c
-> index a8804a3..ccc05f5 100644
-> --- a/drivers/mtd/nand/nand_ids.c
-> +++ b/drivers/mtd/nand/nand_ids.c
-> @@ -50,8 +50,8 @@ struct nand_flash_dev nand_flash_ids[] = {
->                   SZ_16K, SZ_8K, SZ_4M, 0, 6, 1280, NAND_ECC_INFO(40, SZ_1K) },
->         {"H27UCG8T2ATR-BC 64G 3.3V 8-bit",
->                 { .id = {0xad, 0xde, 0x94, 0xda, 0x74, 0xc4} },
-> -                 SZ_8K, SZ_8K, SZ_2M, 0, 6, 640, NAND_ECC_INFO(40, SZ_1K),
-> -                 4 },
-> +                 SZ_8K, SZ_8K, SZ_2M, NAND_NEED_SCRAMBLING, 6, 640,
-> +                 NAND_ECC_INFO(40, SZ_1K), 4 },
+On Mon, Oct 19, 2015 at 03:06:59PM -0700, Mario Smarduch wrote:
+> 
+> 
+> On 10/18/2015 2:07 PM, Christoffer Dall wrote:
+> > On Mon, Oct 12, 2015 at 09:29:23AM -0700, Mario Smarduch wrote:
+> >> Hi Christoffer, Marc -
+> >>   I just threw this test your way without any explanation.
+> > 
+> > I'm confused.  Did you send me something somewhere already?
+> Yes in the last patchset
+> 
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2015-October/016698.html
+> 
+> I included a simple test I put together.
+> 
 
-Would it make sense to print a warning if a NAND which needs scrambling
-is used on a NFC which does not support this feature?
+Sorry, I missed that change in the cover letter.
 
--- 
+> > 
+> >>
+> >> The test loops, does fp arithmetic and checks the truncated result.
+> >> It could be a little more dynamic have an initial run to
+> >> get the sum to compare against while looping, different fp
+> >> hardware may come up with a different sum, but truncation is
+> >> to 5'th decimal point.
+> >>
+> >> The rationale is that if there is any fp/simd corruption
+> >> one of these runs should fail. I think most likely scenario
+> >> for that is a world switch in midst of fp operation. I've
+> >> instrumented (basically add some tracing to vcpu_put()) and
+> >> validated vcpu_put gets called thousands of time (for v7,v8)
+> >> for an over night test running two guests/host crunching
+> >> fp operations.
+> >>
+> >> Other then that not sure how to really catch any problems
+> >> with the patches applied. Obviously this is a huge issues, if this has
+> >> any problems. If you or Marc have any other ideas I'd be happy
+> >> to enhance the test.
+> > 
+> > I think it's important to run two VMs at the same time, each with some
+> > floating-point work, and then run some floating point on the host at the
+> > same time.
+> > 
+> > You can make that even more interesting by doing 32-bit guests at the
+> > same time as well.
+> 
+> Yes that's the test combination I've been running.
+
+ok, cool, then I trust these patches.
+
+> > 
+> > I believe Marc was running Panranoia
+> > (http://www.netlib.org/paranoia/paranoia.c) to test the last lazy
+> > series.
+> 
+> I'll try this test and run it for several days, see if anything shows up.
+> 
+
+I actually don't know what it does, i.e. if it just uses the FP hardware
+or if it actually checks the results produced.
+
+Several days may be unnecessary, but if your machine has nothing else to
+do, then why not.
+
 Thanks,
-//richard
+-Christoffer
