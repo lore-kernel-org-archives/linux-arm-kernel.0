@@ -1,83 +1,60 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 20 Oct 2015 10:42:24 +0200
-Subject: [PATCH resend] net: sun4i-emac: Properly free resources on probe
- failure and remove
-In-Reply-To: <1445330544-6968-1-git-send-email-hdegoede@redhat.com>
-References: <1445330544-6968-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1445330544-6968-2-git-send-email-hdegoede@redhat.com>
+From: majun258@huawei.com (MaJun)
+Date: Tue, 20 Oct 2015 16:41:56 +0800
+Subject: [PATCH v6 0/4] irqchip:support mbigen interrupt controller
+Message-ID: <1445330520-11960-1-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix sun4i-emac not releasing the following resources:
--iomapped memory not released on probe-failure nor on remove
--clock not getting disabled on probe-failure nor on remove
--sram not being released on remove
+From: Ma Jun <majun258@huawei.com>
 
-And while at it also add error checking to the clk_prepare_enable call
-done on probe.
+This patch set adds the driver of mbigen and binding document for Hisilicon
+Mbigen chips.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/net/ethernet/allwinner/sun4i-emac.c | 20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
+Compared with previous version, this version changed much.
 
-diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
-index 48ce83e..8d50314 100644
---- a/drivers/net/ethernet/allwinner/sun4i-emac.c
-+++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
-@@ -847,21 +847,25 @@ static int emac_probe(struct platform_device *pdev)
- 	if (ndev->irq == -ENXIO) {
- 		netdev_err(ndev, "No irq resource\n");
- 		ret = ndev->irq;
--		goto out;
-+		goto out_iounmap;
- 	}
- 
- 	db->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(db->clk)) {
- 		ret = PTR_ERR(db->clk);
--		goto out;
-+		goto out_iounmap;
- 	}
- 
--	clk_prepare_enable(db->clk);
-+	ret = clk_prepare_enable(db->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Error couldn't enable clock (%d)\n", ret);
-+		goto out_iounmap;
-+	}
- 
- 	ret = sunxi_sram_claim(&pdev->dev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Error couldn't map SRAM to device\n");
--		goto out;
-+		goto out_clk_disable_unprepare;
- 	}
- 
- 	db->phy_node = of_parse_phandle(np, "phy", 0);
-@@ -910,6 +914,10 @@ static int emac_probe(struct platform_device *pdev)
- 
- out_release_sram:
- 	sunxi_sram_release(&pdev->dev);
-+out_clk_disable_unprepare:
-+	clk_disable_unprepare(db->clk);
-+out_iounmap:
-+	iounmap(db->membase);
- out:
- 	dev_err(db->dev, "not found (%d).\n", ret);
- 
-@@ -921,8 +929,12 @@ out:
- static int emac_remove(struct platform_device *pdev)
- {
- 	struct net_device *ndev = platform_get_drvdata(pdev);
-+	struct emac_board_info *db = netdev_priv(ndev);
- 
- 	unregister_netdev(ndev);
-+	sunxi_sram_release(&pdev->dev);
-+	clk_disable_unprepare(db->clk);
-+	iounmap(db->membase);
- 	free_netdev(ndev);
- 
- 	dev_dbg(&pdev->dev, "released and freed device\n");
--- 
-2.5.0
+Because during the time between V3 and V4 of my patch, there are two
+related patches were committed by Mr.Marc Zyngier and Mr. Mark Rutland.
+
+First, Mr. Marc Zyngier changed MSI frame and added supporting for
+platform MSI.
+
+https://lkml.org/lkml/2015/7/28/552
+
+Second, Mr.Mark Rutland changed Generic PCI MSI + IOMMU topology bindings
+
+https://lkml.org/lkml/2015/7/23/558 
+
+After V5 patch posted, Mr.Marc Zyngier posted a new patch set
+"Adding core support for wire-MSI bridges"
+
+https://lkml.org/lkml/2015/10/15/545
+
+So, mbigen v6 patch is based on this new patch even though this patch is
+still under review.
+
+Changes in v6:
+--- Re-based mbigen driver on kernel 4.3.0-rc5 and Marc's new patch
+--- Change the mbigen chip node definition(dts).
+--- Change the interrupt cells definition(dts).
+Changes in v5:
+--- Split mbigen driver patch into 2 smaller patches.
+--- Change mbigen chip and mbigen device initialzing sequence.
+--- Initializing mbigen device instead of mbigen chip as interrupt controller
+--- Remove mbigen node from driver to make this driver more easily read.
+--- Change the mbigen chip node definition(dts).
+--- Change the interrupt cells definition(dts).
+Changes in v4:
+--- Re-based mbigen driver on kernel 4.2.0-rc2 and Marc's patch
+--- Changed the binding document based on Mark's patch.
+
+Ma Jun (4):
+  dt-binding:Documents of the mbigen bindings
+  irqchip: add platform device driver for mbigen device
+  irqchip:create irq domain for each mbigen device
+  irqchip:implement the mbigen irq chip operation functions
+
+ Documentation/devicetree/bindings/arm/mbigen.txt |   63 +++++
+ drivers/irqchip/irq-mbigen.c                     |  325 ++++++++++++++++++++++
+ 2 files changed, 388 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
+ create mode 100644 drivers/irqchip/irq-mbigen.c
