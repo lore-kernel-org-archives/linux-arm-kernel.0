@@ -1,38 +1,83 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 20 Oct 2015 17:27:58 +0900
-Subject: [PATCH v4 6/8] drivers: soc: add support for exynos SROM driver
-In-Reply-To: <021201d10b0f$b273bf00$175b3d00$@samsung.com>
-References: <1445255206-11148-1-git-send-email-pankaj.dubey@samsung.com>
- <1445255206-11148-7-git-send-email-pankaj.dubey@samsung.com>
- <56258683.7070204@samsung.com> <5625B92C.10505@samsung.com>
- <5625C07D.4030706@samsung.com> <014301d10b01$488873f0$d9995bd0$@samsung.com>
- <5625E3B9.8040707@samsung.com> <021201d10b0f$b273bf00$175b3d00$@samsung.com>
-Message-ID: <5625FB0E.2000109@samsung.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Tue, 20 Oct 2015 01:33:54 -0700
+Subject: [PATCH] fpga: zynq-fpga: Change fw format to handle bin instead
+ of bit.
+In-Reply-To: <5625D02A.3060904@topic.nl>
+References: <1445299319-14921-1-git-send-email-moritz.fischer@ettus.com>
+ <1445299319-14921-2-git-send-email-moritz.fischer@ettus.com>
+ <5625D02A.3060904@topic.nl>
+Message-ID: <CAAtXAHewY=B5oBBZR1KECo-QqpXH0zxNVO44F7f4AUOZxmFvKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.10.2015 17:17, Pavel Fedin wrote:
->  Hello!
-> 
->>>  Pin controller is needed in order to configure multi-functional pins correctly.
+Hi Mike,
+
+On Mon, Oct 19, 2015 at 10:24 PM, Mike Looijmans
+<mike.looijmans@topic.nl> wrote:
+> On 20-10-15 02:01, Moritz Fischer wrote:
 >>
->> Are there any obstacles for upstreaming it?
-> 
->  I don't know. The last post on this topic is from March, 2015:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html. Patch 0003 has been acked-by, and nothing more since
-> that.
->  Actually, only 0002 and 0003 of this series are needed for the pin controller. 0001 has been accepted
-> (27284129522e7e2a5b89e80bd44ea3345f79c9e8).
+>> This gets rid of the code to strip away the header and byteswap.
+>>
+>> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+>> ---
+>>   drivers/fpga/zynq-fpga.c | 23 ++++++++++-------------
+>>   1 file changed, 10 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+>> index 617d382..916c551 100644
+>> --- a/drivers/fpga/zynq-fpga.c
+>> +++ b/drivers/fpga/zynq-fpga.c
+>> @@ -104,6 +104,8 @@
+>>   #define INIT_POLL_TIMEOUT             2500000
+>>   /* Delay for polling reset bits */
+>>   #define INIT_POLL_DELAY                       20
+>> +/* Sync sequence for firmware */
+>> +#define SYNC_SEQUENCE                  "\x66\x55\x99\xAA"
+>>
+>>   /* Masks for controlling stuff in SLCR */
+>>   /* Disable all Level shifters */
+>> @@ -301,24 +303,19 @@ static int zynq_fpga_ops_write(struct fpga_manager
+>> *mgr,
+>>
+>>         memcpy(kbuf, buf, count);
+>>
+>> -       /* look for the sync word */
+>> +       /* look for the sync sequence */
+>>         for (i = 0; i < count - 4; i++) {
+>> -               if (memcmp(kbuf + i, "\xAA\x99\x55\x66", 4) == 0) {
+>> -                       dev_dbg(priv->dev, "Found swapped sync word\n");
+>> +               if (memcmp(kbuf + i, SYNC_SEQUENCE, 4) == 0) {
+>> +                       dev_dbg(priv->dev, "Found sync sequence");
+>>                         break;
+>>                 }
+>>         }
+>
+>
+> Regarding this check, and judging from the code, I'd say that any file with
+> a non word-aligned sync word is broken. So you could speed this up
+> considerably by walking through the array word-by-word instread of
+> byte-by-byte.
 
-I see that all objections were solved and I already reviewed all of the
-patches. This was sent before I started collecting patches as
-co-maintainer so all it is needed now is to rebase and resend with
-collected tags.
+True.
+>
+> Checking the whole 4MB buffer from beginning to end doesn't make it really
+> efficient either, if you're going to visit all that memory in case the
+> stream is invalid, you might as well send it to the hardware, I wouldn't be
+> surprised if that even takes less effort than going through it byte-by-byte.
 
-I'll try to find them in my archives and apply.
+You raised a good point here. I was hesitant to put in the additional check,
+in my tests the reloading took no noticeable time, which was good enough for my
+application, so I figured rather be more 'defensive'. Probably overly defensive,
+as the reloading entity would have to check for success in either case before
+attempting to use the FPGA afterwards.
 
-Really, if you have anything waiting then just resend/ping. Things
-changed since May this year :) .
+> I for one would rather see this check removed, the hardware handles it just
+> fine and also catches more likely errors (e.g. sending a 7030 bitstream to a
+> 7015 chip is something that the driver cannot catch anyway, but the hardware
+> detects that error just fine).
 
-Best regards,
-Krzysztof
+Fair enough. I'll remove it for v2, makes the code even easier :-)
+
+Thanks for the feedback,
+
+Moritz
