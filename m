@@ -1,46 +1,33 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 20 Oct 2015 19:14:28 +0300
-Subject: [BISECTED] Nokia 770 framebuffer breakage
-In-Reply-To: <20151020160524.GN32536@n2100.arm.linux.org.uk>
-References: <20151019193759.GE31069@blackmetal.musicnaut.iki.fi>
- <20151019200522.GJ32536@n2100.arm.linux.org.uk>
- <20151019222413.GG31069@blackmetal.musicnaut.iki.fi>
- <20151019225033.GK32536@n2100.arm.linux.org.uk>
- <20151020085003.GA16268@blackmetal.musicnaut.iki.fi>
- <20151020090700.GL32536@n2100.arm.linux.org.uk>
- <20151020160524.GN32536@n2100.arm.linux.org.uk>
-Message-ID: <20151020161428.GB16268@blackmetal.musicnaut.iki.fi>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 20 Oct 2015 18:18:04 +0200
+Subject: [RESEND PATCH 0/4] i2c: Fix module autoload for OF platform
+ drivers
+In-Reply-To: <1445350590-25911-1-git-send-email-luisbg@osg.samsung.com>
+References: <1445350590-25911-1-git-send-email-luisbg@osg.samsung.com>
+Message-ID: <20151020161802.GP5379@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Oct 20, 2015 at 05:05:24PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Oct 20, 2015 at 10:07:00AM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Oct 20, 2015 at 11:50:03AM +0300, Aaro Koskinen wrote:
-> > > On Mon, Oct 19, 2015 at 11:50:33PM +0100, Russell King - ARM Linux wrote:
-> > > > It shouldn't (I've been through the resulting assembly code.)  I wonder
-> > > > if this is fixing the problem, but it's now failing elsewhere instead.
-> > > > 
-> > > > What happens if you change it to:
-> > > > 
-> > > > 	l = clkdev_create(r, alias, alias_dev_name);
-> > > > 
-> > > > which should be 100% identical to how older kernels behaved
-> > > 
-> > > Ok, this and the earlier patch works on top of
-> > > 2568999835d7797afce3dcc3a3f368051ffcaf1f, but not on 4.2 or newer - so
-> > > it fixes the clk_add_alias issue, and newer kernels have other issues...
-> > 
-> > Thanks, so this fixes the regression you were seeing with the above
-> > mentioned commit, so I'll get that into mainline and stable kernels.
-> > 
-> > Can I add a tested-by tag for it please?
+On Tue, Oct 20, 2015 at 03:16:26PM +0100, Luis de Bethencourt wrote:
+> Hello,
 > 
-> Also make that reported-by as well.
+> This is a resend of this patch series. It was posted on September 17. [0]
 > 
-> I'll hold the patch back pending a reply...
+> These patches add the missing MODULE_DEVICE_TABLE() for OF to export
+> the information so modules have the correct aliases built-in and
+> autoloading works correctly.
+> 
+> A longer explanation by Javier Canillas can be found here:
+> https://lkml.org/lkml/2015/7/30/519
+> 
+> The 4th patch of the series is Acked-by Linus Walleij.
 
-Yes, both or either are fine.
+Applied to for-next, thanks!
 
-A.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151020/88299910/attachment.sig>
