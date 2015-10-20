@@ -1,93 +1,55 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 20 Oct 2015 17:13:11 +0800
-Subject: [PATCH v2 9/9] arm64: dts: mediatek: add HS200/HS400/SDR50/SDR104
- support
-In-Reply-To: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1445332391-30530-10-git-send-email-chaotian.jing@mediatek.com>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Tue, 20 Oct 2015 17:15:11 +0800
+Subject: [PATCH 0/4] Add the OTP gpio pinctrl to fix the TSHUT issue
+In-Reply-To: <1445332264-6054-1-git-send-email-wxt@rock-chips.com>
+References: <1445332264-6054-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <5626061F.6010402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add HS200/HS400 support for eMMC
-add SDR50/SDR104 support for SD
+The subject is deleted by my finger.
 
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 27 ++++++++++++++++++++-------
- 1 file changed, 20 insertions(+), 7 deletions(-)
+? 2015?10?20? 17:11, Caesar Wang ??:
+> We need the OTP pin is gpio state before resetting the TSADC controller,
+> since the tshut polarity will generate a high signal.
+>
+> Says:
+> The TSHUT temperature is setting more than 80 degree, the default
+> tshut polarity is HIGH.
+>
+> If T > 80C, the OTP output the High Signal.
+> If T < 80C, the OTP output the Low Signal.
+>
+> On the moment, the TSADC controller is reset, the tshut polarity will be
+> Low in a short period of time.
+>
+> So:
+> If T < 80C, the OTP output the High Signal.
+> If T > 80C, the OTP output the Low Signal.
+>
+> In some cases, the OTP pin is connected to the PMIC, maybe the PMIC can
+> accept the reset response time to avoid this issue.
+>
+> In other words, the system will be always reboot if we make the OTP pin
+> is connected the others IC to control the power.
+>
+> Tested on box board.
+>
+>
+>
+> Caesar Wang (4):
+>    dt-bindings: Sync the dts to this document
+>    thermal: rockchip: ensure the otp state before resetting the
+>      controller
+>    thermal: rockchip: change the TSHUT default state
+>    ARM: dts: rockchip: Add the OTP gpio pinctrl
+>
+>   .../bindings/thermal/rockchip-thermal.txt          |  5 ++--
+>   arch/arm/boot/dts/rk3288.dtsi                      |  9 ++++--
+>   drivers/thermal/rockchip_thermal.c                 | 34 +++++++++++++++++++++-
+>   3 files changed, 43 insertions(+), 5 deletions(-)
+>
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-index 4be66ca..a061221 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-@@ -70,10 +70,16 @@
- 	pinctrl-0 = <&mmc0_pins_default>;
- 	pinctrl-1 = <&mmc0_pins_uhs>;
- 	bus-width = <8>;
--	max-frequency = <50000000>;
-+	max-frequency = <200000000>;
- 	cap-mmc-highspeed;
-+	mmc-hs200-1_8v;
-+	mmc-hs400-1_8v;
-+	cap-mmc-hw-reset;
-+	hs400-ds-delay = <0x14015>;
- 	vmmc-supply = <&mt6397_vemc_3v3_reg>;
- 	vqmmc-supply = <&mt6397_vio18_reg>;
-+	assigned-clocks = <&topckgen CLK_TOP_MSDC50_0_SEL>;
-+	assigned-clock-parents = <&topckgen CLK_TOP_MSDCPLL_D2>;
- 	non-removable;
- };
- 
-@@ -83,9 +89,10 @@
- 	pinctrl-0 = <&mmc1_pins_default>;
- 	pinctrl-1 = <&mmc1_pins_uhs>;
- 	bus-width = <4>;
--	max-frequency = <50000000>;
-+	max-frequency = <200000000>;
- 	cap-sd-highspeed;
--	sd-uhs-sdr25;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr104;
- 	cd-gpios = <&pio 132 0>;
- 	vmmc-supply = <&mt6397_vmch_reg>;
- 	vqmmc-supply = <&mt6397_vmc_reg>;
-@@ -154,13 +161,19 @@
- 				 <MT8173_PIN_64_MSDC0_DAT7__FUNC_MSDC0_DAT7>,
- 				 <MT8173_PIN_66_MSDC0_CMD__FUNC_MSDC0_CMD>;
- 			input-enable;
--			drive-strength = <MTK_DRIVE_2mA>;
-+			drive-strength = <MTK_DRIVE_4mA>;
- 			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
- 		};
- 
- 		pins_clk {
- 			pinmux = <MT8173_PIN_65_MSDC0_CLK__FUNC_MSDC0_CLK>;
--			drive-strength = <MTK_DRIVE_2mA>;
-+			drive-strength = <MTK_DRIVE_4mA>;
-+			bias-pull-down = <MTK_PUPD_SET_R1R0_01>;
-+		};
-+
-+		pins_ds {
-+			pinmux = <MT8173_PIN_67_MSDC0_DSL__FUNC_MSDC0_DSL>;
-+			drive-strength = <MTK_DRIVE_6mA>;
- 			bias-pull-down = <MTK_PUPD_SET_R1R0_01>;
- 		};
- 
-@@ -178,13 +191,13 @@
- 				 <MT8173_PIN_76_MSDC1_DAT3__FUNC_MSDC1_DAT3>,
- 				 <MT8173_PIN_78_MSDC1_CMD__FUNC_MSDC1_CMD>;
- 			input-enable;
--			drive-strength = <MTK_DRIVE_4mA>;
-+			drive-strength = <MTK_DRIVE_6mA>;
- 			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
- 		};
- 
- 		pins_clk {
- 			pinmux = <MT8173_PIN_77_MSDC1_CLK__FUNC_MSDC1_CLK>;
--			drive-strength = <MTK_DRIVE_4mA>;
-+			drive-strength = <MTK_DRIVE_8mA>;
- 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
- 		};
- 	};
 -- 
-1.8.1.1.dirty
+Thanks,
+Caesar
