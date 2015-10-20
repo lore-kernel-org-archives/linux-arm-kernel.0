@@ -1,69 +1,71 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 20 Oct 2015 10:40:43 -0600
-Subject: [PATCH V2 19/30] coresight: etb10: implementing the setup_aux()
- API
-In-Reply-To: <87lhazgegt.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1445192687-24112-1-git-send-email-mathieu.poirier@linaro.org>
- <1445192687-24112-20-git-send-email-mathieu.poirier@linaro.org>
- <87lhazgegt.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CANLsYkwUvyhBy=kEahtFvvmsh8Zsb+rpD4cgeUKXLcBMgyxa1A@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 20 Oct 2015 18:41:02 +0200
+Subject: [PATCH v2 0/9] Add tune support of Mediatek MMC driver
+In-Reply-To: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CAPDyKFrTrR5U7QoXpiWj29bUD5SEp4ccbx8qNs9HF0cYxuqdBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 October 2015 at 07:44, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+On 20 October 2015 at 11:13, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> Change in v2:
+> Drop the 400mhz and use assigned-clock-parents to instead
+> Split the original tune patch to several independent patches
+> Re-write the mmc_send_tuning()
+> Fix GPD checksum error
+> Move the HS400 setting to ops->prepare_hs400_tuning()
+> Modify SD driving settings
 >
->> Adding an ETB10 specific auxiliary area setup operation to be
->> used by the perf framework when events are initialised.
->>
->> Part of this operation involves modeling the mmap'ed area based
->> on the specific ways a sink buffer gathers information.
+> Change in v1:
+> Add DT bindings for eMMC hardware reset
+> Add pinctrl of data strobe pin for HS400 mode
+> Modify eMMC driving settings
+> Add 400mhz source clock for HS400 mode
+> Add eMMC HS200/HS400 mode support
+> Add SD SDR50/SDR104 mode support
+> Add implement of tune function with CMD19/CMD21
 >
-> It really doesn't seem to be ETB10 specific at all. When you add more
-> sinks, you'll probably end up copying this code every time.
-
-That will depend on how that specific sinks work, but indeed, it is
-pretty generic.
-
+> Chaotian Jing (9):
+>   mmc: core: Add DT bindings for eMMC hardware reset support
+>   mmc: dt-bindings: update Mediatek MMC bindings
+>   mmc: mediatek: make cmd_ints_mask to const
+>   mmc: mediatek: change the argument "ddr" to "timing"
+>   mmc: mediatek: fix got GPD checksum error interrupt when data transfer
+>   mmc: mediatek: add implement of ops->hw_reset()
+>   mmc: mmc: extend the mmc_send_tuning()
+>   mmc: mediatek: add HS400 support
+>   arm64: dts: mediatek: add HS200/HS400/SDR50/SDR104 support
 >
-> Furthermore,
+>  Documentation/devicetree/bindings/mmc/mmc.txt    |   1 +
+>  Documentation/devicetree/bindings/mmc/mtk-sd.txt |  11 +-
+>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |  27 ++-
+>  drivers/mmc/core/host.c                          |   2 +
+>  drivers/mmc/core/mmc_ops.c                       |   8 +-
+>  drivers/mmc/host/dw_mmc-exynos.c                 |   4 +-
+>  drivers/mmc/host/dw_mmc.c                        |   2 +-
+>  drivers/mmc/host/dw_mmc.h                        |   2 +-
+>  drivers/mmc/host/mtk-sd.c                        | 296 ++++++++++++++++++++---
+>  drivers/mmc/host/sdhci-esdhc-imx.c               |   6 +-
+>  drivers/mmc/host/sdhci-msm.c                     |   2 +-
+>  drivers/mmc/host/sdhci-sirf.c                    |   2 +-
+>  include/linux/mmc/core.h                         |   2 +-
+>  13 files changed, 314 insertions(+), 51 deletions(-)
 >
->> +static void *etb_setup_aux(struct coresight_device *csdev, int cpu,
->> +                        void **pages, int nr_pages, bool overwrite)
->> +{
->> +     int node, pg;
->> +     struct cs_buffers *buf;
->> +
->> +     if (cpu == -1)
->> +             cpu = smp_processor_id();
->> +     node = cpu_to_node(cpu);
->> +
->> +     buf = kzalloc_node(offsetof(struct cs_buffers, addr[nr_pages]),
->> +                        GFP_KERNEL, node);
->> +     if (!buf)
->> +             return NULL;
->> +
->> +     buf->snapshot = overwrite;
->> +     buf->nr_pages = nr_pages;
->> +
->> +     /* Record information about buffers */
->> +     for (pg = 0; pg < buf->nr_pages; pg++)
->> +             buf->addr[pg] = pages[pg];
->> +
->> +     return buf;
->> +}
->> +
->
-> this one is so generic that I'm tempted to move this into perf's
-> ring_buffer code, because by the looks of it we'll need it pretty much
-> in every setup_aux().
-
-It is tempting but I suggest we wait to see what kind of trend we get
-before moving ahead with this.  There is always opportunity for
-further consolidation should the need arise.
-
->
-> Regards,
 > --
-> Alex
+> 1.8.1.1.dirty
+
+I have reviewed the patches, I think they overall looks good! Some
+comments though.
+
+You need to split patch 9, the DT parts enabling hw reset shall go in
+separately.
+
+Regarding the hw-reset changes in patch1, patch6 and patch9, I believe
+I requested you to separate the HW reset changes from $subject
+patchset as they are unrelated, please do this.
+
+Running checkpatch, it gave me warnings and errors for patch 8.
+Patch7 didn't apply to my next branch.
+
+Kind regards
+Uffe
