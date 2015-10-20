@@ -1,90 +1,163 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 20 Oct 2015 10:23:13 +0100
-Subject: [PATCH v4 2/4] drm/imx: Convert the probe function to the generic
- drm_of_component_probe()
+Date: Tue, 20 Oct 2015 10:23:12 +0100
+Subject: [PATCH v4 1/4] drm: Introduce generic probe function for component
+ based masters.
 In-Reply-To: <1445332995-11212-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1445332995-11212-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1445332995-11212-3-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1445332995-11212-2-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic function is functionally equivalent to the driver's
-imx_drm_platform_probe(). Use the generic function and reduce the
-overall code size.
+A lot of component based DRM drivers use a variant of the same code
+as the probe function. They bind the crtc ports in the first iteration
+and then scan through the child nodes and bind the encoders attached
+to the remote endpoints. Factor the common code into a separate
+function called drm_of_component_probe() in order to increase code
+reuse.
 
+Cc: David Airlie <airlied@linux.ie>
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/imx/imx-drm-core.c | 55 +++-----------------------------------
- 1 file changed, 4 insertions(+), 51 deletions(-)
+ drivers/gpu/drm/drm_of.c | 88 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/drm/drm_of.h     | 13 +++++++
+ 2 files changed, 101 insertions(+)
 
-diff --git a/drivers/gpu/drm/imx/imx-drm-core.c b/drivers/gpu/drm/imx/imx-drm-core.c
-index de00a6c..64f16ea 100644
---- a/drivers/gpu/drm/imx/imx-drm-core.c
-+++ b/drivers/gpu/drm/imx/imx-drm-core.c
-@@ -531,59 +531,12 @@ static const struct component_master_ops imx_drm_ops = {
- 
- static int imx_drm_platform_probe(struct platform_device *pdev)
- {
--	struct device_node *ep, *port, *remote;
--	struct component_match *match = NULL;
--	int ret;
--	int i;
--
--	/*
--	 * Bind the IPU display interface ports first, so that
--	 * imx_drm_encoder_parse_of called from encoder .bind callbacks
--	 * works as expected.
--	 */
--	for (i = 0; ; i++) {
--		port = of_parse_phandle(pdev->dev.of_node, "ports", i);
--		if (!port)
--			break;
--
--		component_match_add(&pdev->dev, &match, compare_of, port);
--	}
-+	int ret = drm_of_component_probe(&pdev->dev, compare_of, &imx_drm_ops);
- 
--	if (i == 0) {
--		dev_err(&pdev->dev, "missing 'ports' property\n");
--		return -ENODEV;
--	}
-+	if (!ret)
-+		ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
- 
--	/* Then bind all encoders */
--	for (i = 0; ; i++) {
--		port = of_parse_phandle(pdev->dev.of_node, "ports", i);
--		if (!port)
--			break;
--
--		for_each_child_of_node(port, ep) {
--			remote = of_graph_get_remote_port_parent(ep);
--			if (!remote || !of_device_is_available(remote)) {
--				of_node_put(remote);
--				continue;
--			} else if (!of_device_is_available(remote->parent)) {
--				dev_warn(&pdev->dev, "parent device of %s is not available\n",
--					 remote->full_name);
--				of_node_put(remote);
--				continue;
--			}
--
--			component_match_add(&pdev->dev, &match, compare_of,
--					    remote);
--			of_node_put(remote);
--		}
--		of_node_put(port);
--	}
--
--	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
--	if (ret)
--		return ret;
--
--	return component_master_add_with_match(&pdev->dev, &imx_drm_ops, match);
-+	return ret;
+diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+index be38840..493c05c 100644
+--- a/drivers/gpu/drm/drm_of.c
++++ b/drivers/gpu/drm/drm_of.c
+@@ -1,3 +1,4 @@
++#include <linux/component.h>
+ #include <linux/export.h>
+ #include <linux/list.h>
+ #include <linux/of_graph.h>
+@@ -61,3 +62,90 @@ uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+ 	return possible_crtcs;
  }
+ EXPORT_SYMBOL(drm_of_find_possible_crtcs);
++
++/**
++ * drm_of_component_probe - Generic probe function for a component based master
++ * @dev: master device containing the OF node
++ * @compare_of: compare function used for matching components
++ * @master_ops: component master ops to be used
++ *
++ * Parse the platform device OF node and bind all the components associated
++ * with the master. Interface ports are added before the encoders in order to
++ * satisfy their .bind requirements
++ * See Documentation/devicetree/bindings/graph.txt for the bindings.
++ *
++ * Returns zero if successful, or one of the standard error codes if it fails.
++ */
++int drm_of_component_probe(struct device *dev,
++			   int (*compare_of)(struct device *, void *),
++			   const struct component_master_ops *m_ops)
++{
++	struct device_node *ep, *port, *remote;
++	struct component_match *match = NULL;
++	int i;
++
++	if (!dev->of_node)
++		return -EINVAL;
++
++	/*
++	 * Bind the crtc's ports first, so that drm_of_find_possible_crtcs()
++	 * called from encoder's .bind callbacks works as expected
++	 */
++	for (i = 0; ; i++) {
++		port = of_parse_phandle(dev->of_node, "ports", i);
++		if (!port)
++			break;
++
++		if (!of_device_is_available(port->parent)) {
++			of_node_put(port);
++			continue;
++		}
++
++		component_match_add(dev, &match, compare_of, port);
++		of_node_put(port);
++	}
++
++	if (i == 0) {
++		dev_err(dev, "missing 'ports' property\n");
++		return -ENODEV;
++	}
++
++	if (!match) {
++		dev_err(dev, "no available port\n");
++		return -ENODEV;
++	}
++
++	/*
++	 * For bound crtcs, bind the encoders attached to their remote endpoint
++	 */
++	for (i = 0; ; i++) {
++		port = of_parse_phandle(dev->of_node, "ports", i);
++		if (!port)
++			break;
++
++		if (!of_device_is_available(port->parent)) {
++			of_node_put(port);
++			continue;
++		}
++
++		for_each_child_of_node(port, ep) {
++			remote = of_graph_get_remote_port_parent(ep);
++			if (!remote || !of_device_is_available(remote)) {
++				of_node_put(remote);
++				continue;
++			} else if (!of_device_is_available(remote->parent)) {
++				dev_warn(dev, "parent device of %s is not available\n",
++					 remote->full_name);
++				of_node_put(remote);
++				continue;
++			}
++
++			component_match_add(dev, &match, compare_of, remote);
++			of_node_put(remote);
++		}
++		of_node_put(port);
++	}
++
++	return component_master_add_with_match(dev, m_ops, match);
++}
++EXPORT_SYMBOL(drm_of_component_probe);
+diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
+index 2441f71..8544665 100644
+--- a/include/drm/drm_of.h
++++ b/include/drm/drm_of.h
+@@ -1,18 +1,31 @@
+ #ifndef __DRM_OF_H__
+ #define __DRM_OF_H__
  
- static int imx_drm_platform_remove(struct platform_device *pdev)
++struct component_master_ops;
++struct device;
+ struct drm_device;
+ struct device_node;
+ 
+ #ifdef CONFIG_OF
+ extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+ 					   struct device_node *port);
++extern int drm_of_component_probe(struct device *dev,
++				  int (*compare_of)(struct device *, void *),
++				  const struct component_master_ops *m_ops);
+ #else
+ static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+ 						  struct device_node *port)
+ {
+ 	return 0;
+ }
++
++static inline int
++drm_of_component_probe(struct device *dev,
++		       int (*compare_of)(struct device *, void *),
++		       const struct component_master_ops *m_ops)
++{
++	return -EINVAL;
++}
+ #endif
+ 
+ #endif /* __DRM_OF_H__ */
 -- 
 2.6.0
