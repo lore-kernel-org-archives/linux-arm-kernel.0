@@ -1,47 +1,45 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 20 Oct 2015 10:05:59 +0100
-Subject: [PATCH v2 4/4] arm64: dts: Add BRCM IPROC NAND DT node for NS2
-In-Reply-To: <1444986537-28387-5-git-send-email-anup.patel@broadcom.com>
-References: <1444986537-28387-1-git-send-email-anup.patel@broadcom.com>
- <1444986537-28387-5-git-send-email-anup.patel@broadcom.com>
-Message-ID: <562603F7.7000202@arm.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Tue, 20 Oct 2015 14:26:39 +0530
+Subject: [PATCH 0/7] Switch to generic syscon regmap based drivers
+In-Reply-To: <CAAtXAHfjdNvJtXW6e4Wm4dba9vbzhpMGJvTBXxvmya08EvHenA@mail.gmail.com>
+References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
+ <CAAtXAHfjdNvJtXW6e4Wm4dba9vbzhpMGJvTBXxvmya08EvHenA@mail.gmail.com>
+Message-ID: <562601C7.8070705@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Moritz,
 
-
-On 16/10/15 10:08, Anup Patel wrote:
-> The NAND controller on NS2 SoC is compatible with existing
-> BRCM IPROC NAND driver so let's enable it in NS2 DT and
-> NS2 SVK DT.
+On 10/20/2015 02:48 AM, Moritz Fischer wrote:
+> On Sun, Oct 18, 2015 at 11:03 PM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
+>> Alim Akhtar (7):
+>>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos3250 SoCs
+>>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos4
+>>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5
+>>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5410 SoC
+>>    ARM: exynos_defconfig: Normalize exynos defconfig
+>>    ARM: exynos_defconfig: Enable generic syscon-{reboot, poweroff}
+>>      drivers
+>>    ARM: EXYNOS: Remove code for restart and poweroff for exynos SoCs
+>>
+>>   arch/arm/boot/dts/exynos3250.dtsi |   14 ++++++++++++
+>>   arch/arm/boot/dts/exynos4.dtsi    |   14 ++++++++++++
+>>   arch/arm/boot/dts/exynos5.dtsi    |   14 ++++++++++++
+>>   arch/arm/boot/dts/exynos5410.dtsi |   14 ++++++++++++
+>>   arch/arm/configs/exynos_defconfig |   11 +++++-----
+>>   arch/arm/mach-exynos/pmu.c        |   43 -------------------------------------
+>>   6 files changed, 61 insertions(+), 49 deletions(-)
+>>
+>> --
+>> 1.7.10.4
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> ---
->   arch/arm64/boot/dts/broadcom/ns2-svk.dts | 12 ++++++++++++
->   arch/arm64/boot/dts/broadcom/ns2.dtsi    | 14 ++++++++++++++
->   2 files changed, 26 insertions(+)
+> Feel free to add Acked-By: Moritz Fischer <moritz.fischer@ettus.com>
+> to the patches in your series
 >
-> diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-> index e5950d5..a754160 100644
-> --- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-> +++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-> @@ -63,5 +63,17 @@
->   		uart3: serial at 66130000 {
->   			status = "ok";
->   		};
-
-Better to change even the above reference, see below.
-
-> +
-> +		nand: nand at 66460000 {
-
-In most of the cases where such static overlays are done, I have seen
-the labels being used to refer back the node. Using the complete node
-name again is kind of inviting trouble as even minor typo results in
-creation of another node.
-
--- 
-Regards,
-Sudeep
+Thanks!
+> Moritz
+>
