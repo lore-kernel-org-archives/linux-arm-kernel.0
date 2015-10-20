@@ -1,52 +1,59 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 20 Oct 2015 17:13:02 +0800
-Subject: [PATCH v2 0/9] Add tune support of Mediatek MMC driver
-Message-ID: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
+Date: Tue, 20 Oct 2015 17:13:05 +0800
+Subject: [PATCH v2 3/9] mmc: mediatek: make cmd_ints_mask to const
+In-Reply-To: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1445332391-30530-4-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change in v2:
-Drop the 400mhz and use assigned-clock-parents to instead
-Split the original tune patch to several independent patches
-Re-write the mmc_send_tuning()
-Fix GPD checksum error
-Move the HS400 setting to ops->prepare_hs400_tuning()	
-Modify SD driving settings
+cmd_ints_mask and data_ints_mask are constant value,
+so make it to const
 
-Change in v1:
-Add DT bindings for eMMC hardware reset
-Add pinctrl of data strobe pin for HS400 mode
-Modify eMMC driving settings
-Add 400mhz source clock for HS400 mode
-Add eMMC HS200/HS400 mode support
-Add SD SDR50/SDR104 mode support
-Add implement of tune function with CMD19/CMD21
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+---
+ drivers/mmc/host/mtk-sd.c | 15 ++++++---------
+ 1 file changed, 6 insertions(+), 9 deletions(-)
 
-Chaotian Jing (9):
-  mmc: core: Add DT bindings for eMMC hardware reset support
-  mmc: dt-bindings: update Mediatek MMC bindings
-  mmc: mediatek: make cmd_ints_mask to const
-  mmc: mediatek: change the argument "ddr" to "timing"
-  mmc: mediatek: fix got GPD checksum error interrupt when data transfer
-  mmc: mediatek: add implement of ops->hw_reset()
-  mmc: mmc: extend the mmc_send_tuning()
-  mmc: mediatek: add HS400 support
-  arm64: dts: mediatek: add HS200/HS400/SDR50/SDR104 support
-
- Documentation/devicetree/bindings/mmc/mmc.txt    |   1 +
- Documentation/devicetree/bindings/mmc/mtk-sd.txt |  11 +-
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |  27 ++-
- drivers/mmc/core/host.c                          |   2 +
- drivers/mmc/core/mmc_ops.c                       |   8 +-
- drivers/mmc/host/dw_mmc-exynos.c                 |   4 +-
- drivers/mmc/host/dw_mmc.c                        |   2 +-
- drivers/mmc/host/dw_mmc.h                        |   2 +-
- drivers/mmc/host/mtk-sd.c                        | 296 ++++++++++++++++++++---
- drivers/mmc/host/sdhci-esdhc-imx.c               |   6 +-
- drivers/mmc/host/sdhci-msm.c                     |   2 +-
- drivers/mmc/host/sdhci-sirf.c                    |   2 +-
- include/linux/mmc/core.h                         |   2 +-
- 13 files changed, 314 insertions(+), 51 deletions(-)
-
+diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+index b2e89d3..8b3e15d 100644
+--- a/drivers/mmc/host/mtk-sd.c
++++ b/drivers/mmc/host/mtk-sd.c
+@@ -353,7 +353,10 @@ static void msdc_reset_hw(struct msdc_host *host)
+ static void msdc_cmd_next(struct msdc_host *host,
+ 		struct mmc_request *mrq, struct mmc_command *cmd);
+ 
+-static u32 data_ints_mask = MSDC_INTEN_XFER_COMPL | MSDC_INTEN_DATTMO |
++static const u32 cmd_ints_mask = MSDC_INTEN_CMDRDY | MSDC_INTEN_RSPCRCERR |
++			MSDC_INTEN_CMDTMO | MSDC_INTEN_ACMDRDY |
++			MSDC_INTEN_ACMDCRCERR | MSDC_INTEN_ACMDTMO;
++static const u32 data_ints_mask = MSDC_INTEN_XFER_COMPL | MSDC_INTEN_DATTMO |
+ 			MSDC_INTEN_DATCRCERR | MSDC_INTEN_DMA_BDCSERR |
+ 			MSDC_INTEN_DMA_GPDCSERR | MSDC_INTEN_DMA_PROTECT;
+ 
+@@ -725,10 +728,7 @@ static bool msdc_cmd_done(struct msdc_host *host, int events,
+ 	if (done)
+ 		return true;
+ 
+-	sdr_clr_bits(host->base + MSDC_INTEN, MSDC_INTEN_CMDRDY |
+-			MSDC_INTEN_RSPCRCERR | MSDC_INTEN_CMDTMO |
+-			MSDC_INTEN_ACMDRDY | MSDC_INTEN_ACMDCRCERR |
+-			MSDC_INTEN_ACMDTMO);
++	sdr_clr_bits(host->base + MSDC_INTEN, cmd_ints_mask);
+ 
+ 	if (cmd->flags & MMC_RSP_PRESENT) {
+ 		if (cmd->flags & MMC_RSP_136) {
+@@ -818,10 +818,7 @@ static void msdc_start_command(struct msdc_host *host,
+ 	rawcmd = msdc_cmd_prepare_raw_cmd(host, mrq, cmd);
+ 	mod_delayed_work(system_wq, &host->req_timeout, DAT_TIMEOUT);
+ 
+-	sdr_set_bits(host->base + MSDC_INTEN, MSDC_INTEN_CMDRDY |
+-			MSDC_INTEN_RSPCRCERR | MSDC_INTEN_CMDTMO |
+-			MSDC_INTEN_ACMDRDY | MSDC_INTEN_ACMDCRCERR |
+-			MSDC_INTEN_ACMDTMO);
++	sdr_set_bits(host->base + MSDC_INTEN, cmd_ints_mask);
+ 	writel(cmd->arg, host->base + SDC_ARG);
+ 	writel(rawcmd, host->base + SDC_CMD);
+ }
 -- 
 1.8.1.1.dirty
