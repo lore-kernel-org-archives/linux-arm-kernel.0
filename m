@@ -1,58 +1,29 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 20 Oct 2015 03:23:54 -0700
-Subject: [PATCH V3 1/2] clk: imx6: Add SPDIF_GCLK clock in clock tree
-In-Reply-To: <20151019153618.GA14709@tiger>
-References: <cover.1444471684.git.shengjiu.wang@freescale.com>
- <ee897786f33c9ba67b560964a76485891f2f63a8.1444471684.git.shengjiu.wang@freescale.com>
- <20151019152807.20687.15779@quantum> <20151019153618.GA14709@tiger>
-Message-ID: <20151020102354.20687.97671@quantum>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 20 Oct 2015 11:27:26 +0100
+Subject: [PATCH] spi: atmel: Fix DMA-setup for transfers with more than 8
+ bits per word.
+In-Reply-To: <562615E1.4030407@atmel.com>
+References: <1445288084-31805-1-git-send-email-davidm@egauge.net>
+ <562615E1.4030407@atmel.com>
+Message-ID: <20151020102726.GX32054@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Tue, Oct 20, 2015 at 12:22:25PM +0200, Nicolas Ferre wrote:
 
-Quoting Shawn Guo (2015-10-19 08:36:18)
-> Hi Mike,
-> 
-> On Mon, Oct 19, 2015 at 08:28:07AM -0700, Michael Turquette wrote:
-> > Quoting Shengjiu Wang (2015-10-10 03:15:06)
-> > > Correct SPDIF clock setting issue in clock tree, the SPDIF_GCLK is also
-> > > one clock of SPDIF, which is missed before.
-> > > 
-> > > We found an issue that imx can't enter low power mode with spdif
-> > > if IMX6x_CLK_SPDIF is used as the core clock of spdif. Because
-> > > spdif driver will register IMX6x_CLK_SPDIF clock to regmap, regmap will do
-> > > clk_prepare in init function, then IMX6x_CLK_SPDIF clock is prepared in probe,
-> > > so its parent clock (PLL clock) is prepared, the prepare operation of
-> > > PLL clock is to enable the clock. But I.MX needs all PLL clock is disabled,
-> > > then it can enter low power mode.
-> > > 
-> > > So we can't use IMX6x_CLK_SPDIF as the core clock of spdif, the correct spdif
-> > > core clock is SPDIF_GCLK, which share same gate bit with IMX6x_CLK_SPDIF clock.
-> > > SPDIF_GCLK's parent clock is ipg clock.
-> > 
-> > I'm confused by this. Is there really a new clock signal to be added, or
-> > this just to workaround some reference counting problems with regmap?
-> 
-> I was confused by the previous version of the patch, and asked Shengjiu
-> to improve the commit log, which seems still not so good.  In short, the
-> patch does add a missing clock, and the missing of the clock is
-> discovered by a low-power-mode issue when SPDIF driver is enabled.
+> Thanks for having rewritten this patch! It's much more simple like this ;-)
 
-Thank you for the explanation. Sounds good to me.
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Regards,
-Mike
+> For Mark, here is the patchwork entry which can be handy:
+> https://patchwork.kernel.org/patch/7439931/
 
-> 
-> > 
-> > > 
-> > > Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
-> > 
-> > Please Cc the linux-clk at vger.kernel.org mailing list for future clock
-> > driver patches.
-> 
-> Right, should have reminded him.  I will keep my eyes more closely on
-> this.
-> 
-> Shawn
+No, please submit the patch via e-mail as covered in SubmittingPatches
+and as I said yesterday.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151020/c11a2ef5/attachment.sig>
