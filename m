@@ -1,34 +1,29 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue, 20 Oct 2015 16:50:06 -0500
-Subject: [PATCH 2/5] mmc: omap_hsmmc: Enable omap_hsmmc for Keystone 2
+Date: Tue, 20 Oct 2015 16:50:07 -0500
+Subject: [PATCH 3/5] ARM: keystone: defconfig: Enable PINCTRL SINGLE for
+ Keystone 2
 In-Reply-To: <1445377809-12516-1-git-send-email-fcooper@ti.com>
 References: <1445377809-12516-1-git-send-email-fcooper@ti.com>
-Message-ID: <1445377809-12516-2-git-send-email-fcooper@ti.com>
+Message-ID: <1445377809-12516-3-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lokesh Vutla <lokeshvutla@ti.com>
-
-Enable omap_hsmmc for Keystone 2 architecture which reuses the HSMMC
-IP found on OMAP platforms.
+Newer Keystone 2 devices utilize pinmuxing. Enable PINCTRL SINGLE
+which is used to handle pinmuxing.
 
 Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 ---
- drivers/mmc/host/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/configs/keystone_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 8a1e349..2ccec71 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -366,7 +366,7 @@ config MMC_OMAP
- config MMC_OMAP_HS
- 	tristate "TI OMAP High Speed Multimedia Card Interface support"
- 	depends on HAS_DMA
--	depends on ARCH_OMAP2PLUS || COMPILE_TEST
-+	depends on ARCH_OMAP2PLUS || ARCH_KEYSTONE || COMPILE_TEST
- 	help
- 	  This selects the TI OMAP High Speed Multimedia card Interface.
- 	  If you have an omap2plus board with a Multimedia Card slot,
+diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
+index 95ce128..e0e0365 100644
+--- a/arch/arm/configs/keystone_defconfig
++++ b/arch/arm/configs/keystone_defconfig
+@@ -208,3 +208,4 @@ CONFIG_GPIO_SYSCON=y
+ CONFIG_TI_DAVINCI_MDIO=y
+ CONFIG_MARVELL_PHY=y
+ CONFIG_DEVTMPFS=y
++CONFIG_PINCTRL_SINGLE=y
 -- 
 2.6.1
