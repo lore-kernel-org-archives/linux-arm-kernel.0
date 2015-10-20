@@ -1,79 +1,40 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 20 Oct 2015 12:32:04 -0700
-Subject: vmalloc_reserve with no highmem
-In-Reply-To: <20151020192554.GZ32532@n2100.arm.linux.org.uk>
-References: <56257AA5.1030800@gmail.com> <56268D82.7030504@redhat.com>
- <56269367.2000304@gmail.com> <20151020192554.GZ32532@n2100.arm.linux.org.uk>
-Message-ID: <562696B4.7060600@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Oct 2015 12:34:01 -0700
+Subject: [GIT PULL] two omap fixes for v4.3-rc cycle
+Message-ID: <20151020193401.GM3078@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/10/15 12:25, Russell King - ARM Linux wrote:
-> On Tue, Oct 20, 2015 at 12:17:59PM -0700, Florian Fainelli wrote:
->> On 20/10/15 11:52, Laura Abbott wrote:
->>> On 10/19/2015 04:20 PM, Florian Fainelli wrote:
->>>> Hi Russell, Laura,
->>>>
->>>> Setting vmalloc= on the kernel command-line to define the amount of
->>>> vmalloc_reserve is not quite working when you have no highmem, as is the
->>>> case of one my boards which has 512MB or 256M populated on a first bank
->>>> at PA 0x0.
->>>>
->>>> What happens in that case is that, despite setting vmalloc_reserve,
->>>> therefore bumping up vmalloc_min to a higher address than high_memory,
->>>> which is assigned __va(arm_lowmem_limit), we end-up with VMALLOC_START
->>>> at high_memory + VMALLOC_OFFSET, which yields the amount of physical
->>>> memory (start at PA 0x0 in my case) - VMALLOC_OFFSET.
->>>>
->>>> The maths look like this for this particular board (512MB)
->>>>
->>>> high_memory = 0x20000000 + PAGE_OFFSET = 0x20000000 + 0xC0000000 =
->>>> 0xE0000000
->>>> vmalloc_min = 0xFF00000 - (248 * 1024 * 1024) = 0xEF800000
->>>>
->>>> so we end-up with VMALLOC_START = high_memory + VMALLOC_OFFSET =
->>>> 0xE0000000 + 8 * 1024* 1024 = 0xE0800000
-> 
-> Correct, high_memory will be 0xe0000000, which will set VMALLOC_START
-> to 0xe0800000, and you'll have lots of vmalloc space available.  That's
-> intentional.
-> 
-> vmalloc= sets the _minimum_ vmalloc space that's available, not the
-> absolute amount of space.
+The following changes since commit d8e1f5ed11a39a68da00f05000466c4f6db4456e:
 
-I think we need to update Documentation/kernel-parameters.txt then:
+  Documentation: ARM: List new omap MMC requirements (2015-10-12 16:23:34 -0700)
 
-"""
-        vmalloc=nn[KMG] [KNL,BOOT] Forces the vmalloc area to have an exact
-                        size of <nn>. This can be used to increase the
-                        minimum size (128MB on x86). It can also be used to
-                        decrease the size and leave more room for directly
-                        mapped kernel RAM.
-"""
+are available in the git repository at:
 
-this makes me understand I should get the absolute value I specified.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/fixes-rc6
 
-> 
->>> #define VMALLOC_OFFSET          (8*1024*1024)
->>> #define VMALLOC_START           (((unsigned long)high_memory +
->>> VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
->>> #define VMALLOC_END             0xff000000UL
->>>
->>> VMALLOC_START is based off of the value of high_memory. high_memory
->>> is supposed to be the limit of the kernel direct mapped ram region so
->>> setting it to something above that is asking for trouble.
->>
->> You're right, that does not seem right.
-> 
-> That's correct.  high_memory is the last address of mapped lowmem.
-> We then have an 8MB space.  The quote above is correct.
-> 
-> I don't see what the problem is.
+for you to fetch changes up to 57df5380853460bc66b59a46273ce113c923d39c:
 
-Might just be documentation vs. actual results displayed by the "Kernel
-virtual memory layout". A similar "issue" exists if you specify vmalloc=
-on the command-line and you get a result which is offset by VMALLOC_OFFSET.
+  ARM: OMAP2+: Fix imprecise external abort caused by bogus SRAM init (2015-10-19 08:55:46 -0700)
 
-I will do a better homework and go back to thinking about this.
--- 
-Florian
+----------------------------------------------------------------
+Fixes for omaps for v4.3-rc cycle:
+
+- Fix oops with LPAE and moew than 2GB of memory by enabling
+  ZONE_DMA for LPAE. Probably no need for stable on this one as we
+  only recently ran into this with the mainline kernel
+
+- Fix imprecise external abort caused by bogus SRAM init. This affects
+  dm814x recently merged, so no need for stable on this one AFAIK
+
+----------------------------------------------------------------
+Tony Lindgren (2):
+      ARM: OMAP2+: Fix oops with LPAE and more than 2GB of memory
+      ARM: OMAP2+: Fix imprecise external abort caused by bogus SRAM init
+
+ arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts |  2 +-
+ arch/arm/boot/dts/omap3-evm-37xx.dts              |  2 +-
+ arch/arm/mach-omap2/Kconfig                       |  2 ++
+ arch/arm/mach-omap2/board-generic.c               | 10 ++++++++++
+ arch/arm/mach-omap2/pdata-quirks.c                |  9 ++++++++-
+ 5 files changed, 22 insertions(+), 3 deletions(-)
