@@ -1,81 +1,59 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 20 Oct 2015 15:55:21 +0200
-Subject: [PATCH 4/5] irqchip: armada-370-xp: re-order register definitions
-In-Reply-To: <1445347435-2333-5-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Tue, 20 Oct 2015 15:23:54 +0200")
-References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1445347435-2333-5-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87r3kpejau.fsf@free-electrons.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 20 Oct 2015 22:56:46 +0900
+Subject: [PATCH 0/7] Switch to generic syscon regmap based drivers
+In-Reply-To: <56264505.3090405@fivetechno.de>
+References: <1445234635-3950-1-git-send-email-alim.akhtar@samsung.com>
+ <56264505.3090405@fivetechno.de>
+Message-ID: <CAJKOXPd74=CuUP_ue=ZqPFX6HbMu9qBCTYtNU+KZ1X4Dvs2ZGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On mar., oct. 20 2015, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-
-> In order to clarify to which register base the various register
-> definitions apply, this commit re-orders them, and adds a comment that
-> clearly indicate which registers are relative to "main_int_base" and
-> which registers are relative to "per_cpu_int_base".
+2015-10-20 22:43 GMT+09:00 Markus Reichl <m.reichl@fivetechno.de>:
+> Am 19.10.2015 um 08:03 schrieb Alim Akhtar:
+>> Alim Akhtar (7):
+>>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos3250 SoCs
+>>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos4
+>>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5
+>>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5410 SoC
+>>   ARM: exynos_defconfig: Normalize exynos defconfig
+>>   ARM: exynos_defconfig: Enable generic syscon-{reboot, poweroff}
+>>     drivers
+>>   ARM: EXYNOS: Remove code for restart and poweroff for exynos SoCs
+>>
+>>  arch/arm/boot/dts/exynos3250.dtsi |   14 ++++++++++++
+>>  arch/arm/boot/dts/exynos4.dtsi    |   14 ++++++++++++
+>>  arch/arm/boot/dts/exynos5.dtsi    |   14 ++++++++++++
+>>  arch/arm/boot/dts/exynos5410.dtsi |   14 ++++++++++++
+>>  arch/arm/configs/exynos_defconfig |   11 +++++-----
+>>  arch/arm/mach-exynos/pmu.c        |   43 -------------------------------------
+>>  6 files changed, 61 insertions(+), 49 deletions(-)
+>>
+> Hi,
 >
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
-
-> ---
->  drivers/irqchip/irq-armada-370-xp.c | 21 ++++++++++-----------
->  1 file changed, 10 insertions(+), 11 deletions(-)
+> I have tested this patch on my Odroid U3 and U3+ using 4.3.0-rc6 from
+> Tobias' repo at https://github.com/tobiasjakobi/linux-odroid/tree/odroid-4.3.y
 >
-> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-> index 106ac4c..888add6 100644
-> --- a/drivers/irqchip/irq-armada-370-xp.c
-> +++ b/drivers/irqchip/irq-armada-370-xp.c
-> @@ -34,25 +34,24 @@
->  #include <asm/smp_plat.h>
->  #include <asm/mach/irq.h>
->  
-> -/* Interrupt Controller Registers Map */
-> -#define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
-> -#define ARMADA_370_XP_INT_CLEAR_MASK_OFFS	(0x4C)
-> -#define ARMADA_370_XP_INT_FABRIC_MASK_OFFS	(0x54)
-> -#define ARMADA_370_XP_INT_CAUSE_PERF(cpu)	(1 << cpu)
-> -
-> +/* Registers relative to main_int_base */
->  #define ARMADA_370_XP_INT_CONTROL		(0x00)
-> +#define ARMADA_370_XP_SW_TRIG_INT_OFFS		(0x04)
->  #define ARMADA_370_XP_INT_SET_ENABLE_OFFS	(0x30)
->  #define ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS	(0x34)
->  #define ARMADA_370_XP_INT_SOURCE_CTL(irq)	(0x100 + irq*4)
->  #define ARMADA_370_XP_INT_SOURCE_CPU_MASK	0xF
->  #define ARMADA_370_XP_INT_IRQ_FIQ_MASK(cpuid)	((BIT(0) | BIT(8)) << cpuid)
->  
-> -#define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
-> +/* Registers relative to per_cpu_int_base */
-> +#define ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS	(0x08)
-> +#define ARMADA_370_XP_IN_DRBEL_MSK_OFFS		(0x0c)
->  #define ARMADA_375_PPI_CAUSE			(0x10)
-> -
-> -#define ARMADA_370_XP_SW_TRIG_INT_OFFS           (0x4)
-> -#define ARMADA_370_XP_IN_DRBEL_MSK_OFFS          (0xc)
-> -#define ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS        (0x8)
-> +#define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
-> +#define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
-> +#define ARMADA_370_XP_INT_CLEAR_MASK_OFFS	(0x4C)
-> +#define ARMADA_370_XP_INT_FABRIC_MASK_OFFS	(0x54)
-> +#define ARMADA_370_XP_INT_CAUSE_PERF(cpu)	(1 << cpu)
->  
->  #define ARMADA_370_XP_MAX_PER_CPU_IRQS		(28)
->  
-> -- 
-> 2.6.2
+> and his debug config:
+> https://raw.githubusercontent.com/tobiasjakobi/odroid-environment/master/sourcecode/system/vanilla-4.3-debug.conf
 >
+> halt -p works (power goes down to 0W)
+>
+> reboot does not work, stuck at 0.5W, right after
+> "systemd-shutdown[1]: rebooting".
+>
+> reboot did work with 4.3.0-rc3 from above repo (without Alim's patch).
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Hi Markus,
+
+You replied to v1 so I assume you tested v1. Please test latest version: v2.
+
+Mentioned Tobias' repo does not look like vanilla 4.3.0-rc6. Because
+of that it may contain additional patches which can fix something...
+or break something (like the reboot).
+Please test it on latest mainline release or some recent linux-next.
+
+In my case I tested it on linux-next on Oroid XU3 and tomorrow I will
+give it a try on Trats2.
+
+Best regards,
+Krzysztof
