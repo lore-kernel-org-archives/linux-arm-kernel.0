@@ -1,113 +1,112 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 20 Oct 2015 12:04:45 +0800
-Subject: [linux-sunxi] Re: [PATCH 3/6] mfd: axp20x: Add support for RSB
- based AXP223 PMIC
-In-Reply-To: <20151019184826.GX2711@lukather>
-References: <1444840342-9233-1-git-send-email-wens@csie.org>
- <1444840342-9233-4-git-send-email-wens@csie.org>
- <20151016064159.GG2711@lukather>
- <CAGb2v66B8EbTZkVrt3QT85fKCwOjL8OBWfQvcLHrLAe6NfavNA@mail.gmail.com>
- <20151019060226.GQ2711@lukather>
- <CAGb2v66y9+_iemTn-AXQUPBRX=ZEQFfXgbVnwRzviDNfCSm_eQ@mail.gmail.com>
- <20151019184826.GX2711@lukather>
-Message-ID: <CAGb2v65dzWWTzcJsg1jvqfXOLZNYJmRbdNO=RY5eeExX9oxLow@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 20 Oct 2015 13:18:05 +0900
+Subject: [PATCH v4 6/8] drivers: soc: add support for exynos SROM driver
+In-Reply-To: <5625B92C.10505@samsung.com>
+References: <1445255206-11148-1-git-send-email-pankaj.dubey@samsung.com>
+ <1445255206-11148-7-git-send-email-pankaj.dubey@samsung.com>
+ <56258683.7070204@samsung.com> <5625B92C.10505@samsung.com>
+Message-ID: <5625C07D.4030706@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 2:48 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Mon, Oct 19, 2015 at 02:20:29PM +0800, Chen-Yu Tsai wrote:
->> On Mon, Oct 19, 2015 at 2:02 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > On Fri, Oct 16, 2015 at 02:46:23PM +0800, Chen-Yu Tsai wrote:
->> >> On Fri, Oct 16, 2015 at 2:41 PM, Maxime Ripard
->> >> <maxime.ripard@free-electrons.com> wrote:
->> >> > On Thu, Oct 15, 2015 at 12:32:19AM +0800, Chen-Yu Tsai wrote:
->> >> >> The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
->> >> >> It is functionally identical to AXP221; only the regulator default
->> >> >> voltage/status and the external host interface are different.
->> >> >>
->> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> >> >> ---
->> >> >>  drivers/mfd/Kconfig        | 12 ++++++
->> >> >>  drivers/mfd/Makefile       |  1 +
->> >> >>  drivers/mfd/axp20x-core.c  |  2 +
->> >> >>  drivers/mfd/axp20x-rsb.c   | 93 ++++++++++++++++++++++++++++++++++++++++++++++
->> >> >>  include/linux/mfd/axp20x.h |  1 +
->> >> >>  5 files changed, 109 insertions(+)
->> >> >>  create mode 100644 drivers/mfd/axp20x-rsb.c
->> >> >>
->> >> >> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
->> >> >> index 9ba3feb3f2fc..6e5edb61d42e 100644
->> >> >> --- a/drivers/mfd/Kconfig
->> >> >> +++ b/drivers/mfd/Kconfig
->> >> >> @@ -84,6 +84,7 @@ config MFD_BCM590XX
->> >> >>  config MFD_AXP20X
->> >> >>       bool "X-Powers AXP series PMICs"
->> >> >>       select MFD_AXP20X_I2C
->> >> >> +     select MFD_AXP20X_RSB
->> >> >>
->> >> >>  config MFD_AXP20X_CORE
->> >> >>       bool
->> >> >> @@ -102,6 +103,17 @@ config MFD_AXP20X_I2C
->> >> >>         components like regulators or the PEK (Power Enable Key) under the
->> >> >>         corresponding menus.
->> >> >>
->> >> >> +config MFD_AXP20X_RSB
->> >> >> +     bool "X-Powers AXP series RSB PMICs"
->> >> >> +     select MFD_AXP20X_CORE
->> >> >> +     depends on SUNXI_RSB=y
->> >> >
->> >> > Do we need that? Even if the bus is compiled as a module, the driver
->> >> > will not be probed before that, will it?
->> >>
->> >> There's a compile/link dependency on the __devm_regmap_init_sunxi_rsb().
->> >
->> > If it's exported, everything should be fine, no?
->> >
->> >> And both drivers are bool, i.e. can't be compiled as a module. What we
->> >> don't want is enabling MFD_AXP20X_RSB without SUNXI_RSB.
->> >
->> > What would really be the issue here? The driver wouldn't be probed,
->> > and that's it. Or am I missing something?
+On 20.10.2015 12:46, Pankaj Dubey wrote:
+> Hi Krzysztof,
+> 
+> On Tuesday 20 October 2015 05:40 AM, Krzysztof Kozlowski wrote:
+>> On 19.10.2015 20:46, Pankaj Dubey wrote:
+>>> This patch adds Exynos SROM controller driver which will handle
+>>> save restore of SROM registers during S2R.
+>>>
+>>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>>> ---
+>>>   drivers/soc/Kconfig               |   1 +
+>>>   drivers/soc/Makefile              |   1 +
+>>>   drivers/soc/samsung/Kconfig       |  13 +++
+>>>   drivers/soc/samsung/Makefile      |   1 +
+>>>   drivers/soc/samsung/exynos-srom.c | 179
+>>> ++++++++++++++++++++++++++++++++++++++
+>>>   drivers/soc/samsung/exynos-srom.h |  51 +++++++++++
+>>>   6 files changed, 246 insertions(+)
+>>>   create mode 100644 drivers/soc/samsung/Kconfig
+>>>   create mode 100644 drivers/soc/samsung/Makefile
+>>>   create mode 100644 drivers/soc/samsung/exynos-srom.c
+>>>   create mode 100644 drivers/soc/samsung/exynos-srom.h
+>>>
+>>> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+>>> index 96ddecb..69107c9 100644
+>>> --- a/drivers/soc/Kconfig
+>>> +++ b/drivers/soc/Kconfig
+>>> @@ -2,6 +2,7 @@ menu "SOC (System On Chip) specific Drivers"
+>>>
+>>>   source "drivers/soc/mediatek/Kconfig"
+>>>   source "drivers/soc/qcom/Kconfig"
+>>> +source "drivers/soc/samsung/Kconfig"
+>>>   source "drivers/soc/sunxi/Kconfig"
+>>>   source "drivers/soc/ti/Kconfig"
+>>>   source "drivers/soc/versatile/Kconfig"
+>>> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+>>> index 0b12d77..a623616 100644
+>>> --- a/drivers/soc/Makefile
+>>> +++ b/drivers/soc/Makefile
+>>> @@ -5,6 +5,7 @@
+>>>   obj-$(CONFIG_MACH_DOVE)        += dove/
+>>>   obj-$(CONFIG_ARCH_MEDIATEK)    += mediatek/
+>>>   obj-$(CONFIG_ARCH_QCOM)        += qcom/
+>>> +obj-$(CONFIG_SOC_SAMSUNG)    += samsung/
+>>>   obj-$(CONFIG_ARCH_SUNXI)    += sunxi/
+>>>   obj-$(CONFIG_ARCH_TEGRA)    += tegra/
+>>>   obj-$(CONFIG_SOC_TI)        += ti/
+>>> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
+>>> new file mode 100644
+>>> index 0000000..ea4bc2a
+>>> --- /dev/null
+>>> +++ b/drivers/soc/samsung/Kconfig
+>>> @@ -0,0 +1,13 @@
+>>> +#
+>>> +# SAMSUNG SoC drivers
+>>> +#
+>>> +menu "Samsung SOC driver support"
+>>> +
+>>> +config SOC_SAMSUNG
+>>> +    bool
+>>> +
+>>> +config EXYNOS_SROM
+>>> +    bool
+>>> +    depends on ARM && ARCH_EXYNOS
 >>
->> The RSB bus / slave device functions have been merged into the RSB driver
->> itself. Enabling MFD_AXP20X_RSB without enabling SUNXI_RSB means that RSB
->> bus/device related functions are not compiled, i.e. link error:
+>> When !PM then the driver will... do nothing, right? So maybe make it
+>> depending on PM so tiny configs would benefit?
 >>
->> drivers/built-in.o: In function `axp20x_rsb_probe':
->> /home/wens/sunxi/linux/drivers/mfd/axp20x-rsb.c:64: undefined
->> reference to `__devm_regmap_init_sunxi_rsb'
->> drivers/built-in.o: In function `axp20x_rsb_driver_init':
->> /home/wens/sunxi/linux/drivers/mfd/axp20x-rsb.c:89: undefined
->> reference to `sunxi_rsb_driver_register'
->> Makefile:927: recipe for target 'vmlinux' failed
+> 
+> Yes. Currently driver will do nothing if !PM. But as we know Fedin, has
+> a plan to extend this driver for auxiliary H/W IP hooked to SROM. So in
+> that case this dependency will not be valid as those functionality may
+> not be dependent on PM, and we may need to remove it later. So I feel
+> better not to add it at first place itself.
+
+AFAIR Fedin was talking about missing functionality, not about adding
+the contribution by himself. So he might add it or he might not. I did
+not receive any commitments from him. The driver should be "proper" for
+the time being (which could mean !PM dependency). If there is a need,
+then the dependency will be removed.
+
+> 
+>>> +static int exynos_srom_remove(struct platform_device *pdev)
+>>> +{
+>>> +    struct exynos_srom *srom = platform_get_drvdata(pdev);
+>>> +
+>>> +    kfree(srom->reg_offset);
+>>> +    iounmap(srom->reg_base);
+>>> +    srom->reg_base = NULL;
+>>> +    srom->reg_offset = NULL;
 >>
->> The dependency is like "depends on I2C=y" for the I2C version.
+>> There is no need anymore for these two NULL-s. It made sense only in
+>> previous code when these were global variables. At this point the device
+>> callbacks cannot be accessed so NULL-ifying does not change anything.
 >>
->> If you're asking about why "=y", I guess it's because MFD_AXP20X_RSB is bool,
->> and if the depended on symbol is a tristate, which it actually is for I2c,
->> we'd want it to be compiled in, and not built as a module, or again we'd get
->> a undefined reference link error.
->
-> Yeah, but my point was more why not have both the RSB driver and MFD
-> as a module? The part where RSB is a module and the driver is
-> statically built doesn't make sense (and I don't think a depends on
-> allow that), but having both make sense.
+> 
+> Agreed. Will update.
+> 
 
-Ok. I have no problem with building them as modules. I was just following
-what the original driver did.
-
-It seems half the mfd driver can be built as modules, while the other
-half can only be built-in. I don't know what the criteria is here.
-
->> Would it make sense to have SUNXI_RSB as a tristate symbol, i.e. can be built
->> as a module? I'm nore sure. For multi-platform kernels, probably? Currently it
->> isn't.
->
-> Yes, it's better for multi-platform / distro kernels.
-
-I guess I'll do a follow up patch for sunxi-rsb?
-
-Regards
-ChenYu
+Thanks,
+Krzysztof
