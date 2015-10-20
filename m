@@ -1,49 +1,36 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 20 Oct 2015 13:51:15 +0530
-Subject: [PATCH v4 6/8] drivers: soc: add support for exynos SROM driver
-In-Reply-To: <5625E3B9.8040707@samsung.com>
-References: <1445255206-11148-1-git-send-email-pankaj.dubey@samsung.com>
- <1445255206-11148-7-git-send-email-pankaj.dubey@samsung.com>
- <56258683.7070204@samsung.com> <5625B92C.10505@samsung.com>
- <5625C07D.4030706@samsung.com> <014301d10b01$488873f0$d9995bd0$@samsung.com>
- <5625E3B9.8040707@samsung.com>
-Message-ID: <5625F97B.50605@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 20 Oct 2015 10:24:18 +0200
+Subject: [PATCH v1 1/2] phy: keystone: serdes driver for gbe 10gbe and pcie
+In-Reply-To: <56253B91.5040807@ti.com>
+References: <1444919145-30845-1-git-send-email-w-kwok2@ti.com>
+ <230CBA6E4B6B6B418E8730AC28E6FC7E04229363@DFLE11.ent.ti.com>
+ <56253B91.5040807@ti.com>
+Message-ID: <4661946.mPHVFLWuan@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 October 2015 12:18 PM, Krzysztof Kozlowski wrote:
-> On 20.10.2015 15:33, Pavel Fedin wrote:
->>   Hello!
->>
->>> AFAIR Fedin was talking about missing functionality, not about adding
->>> the contribution by himself. So he might add it or he might not. I did
->>> not receive any commitments from him.
->>
->>   I am waiting for the driver to be integrated, because i see it's constantly redesigned. Then i'll post my patches.
->
-> That means you will extend the driver? Great! So from my point of view
-> it is fine.
->
-> Dear Pankaj,
->
-> With the fix of unneeded NULL assignments:
->
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->
+On Monday 19 October 2015 14:50:57 Murali Karicheri wrote:
+> Arnd, by your statement 'I don't see any code that does this' do you 
+> expect a piece of code that embed the license in the binary image? If 
+> so, that seems weired to me.
+> 
+> Many of the drivers including this patch has the following statement in 
+> the license that is additional company specific license such as BSD that 
+> is applicable.
+> 
+> ==== Cut and pasted from drivers/crypto/fcrypt.c =======================
+>   * 2. Redistributions in binary form must reproduce the above copyright
+>   *    notice, this list of conditions and the following disclaimer in the
+>   *    documentation and/or other materials provided with the distribution.
+> =========================================================================
+> I read this as if the source is compiled and distributed as a binary 
+> either a kernel module ko file or as part of the kernel binary, this 
+> term must apply. Usually this is part of documentation that goes with 
+> the product AFAIK.
 
-Thanks. Will update v5 soon with suggested modification.
+Sorry, my fault. This is indeed the standard BSD license, and
+I misread this as having to produce the copyright statement
+from the binary itself. Please ignore whatever I said on the
+subject.
 
-Thanks,
-Pankaj Dubey
->
->> By the way, they
->> will be useful only if pin controller driver for 5410 is accepted upstream, several authors have done it but i still didn't see it
->> in upstream.
->>   Pin controller is needed in order to configure multi-functional pins correctly.
->
-> Are there any obstacles for upstreaming it?
->
-> Best regards,
-> Krzysztof
->
->
+	Arnd
