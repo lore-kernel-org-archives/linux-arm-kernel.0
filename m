@@ -1,76 +1,68 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Oct 2015 09:18:43 -0700
-Subject: [PATCH v3 0/3] soc: ti: Introduce wkup_m3_ipc driver
-In-Reply-To: <1442967294-23837-1-git-send-email-d-gerlach@ti.com>
-References: <1442967294-23837-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <20151020161843.GE3078@atomide.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 20 Oct 2015 18:19:07 +0200
+Subject: [GIT PULL 6/6] arm/arm64: KVM: Fix disabled distributor operation
+In-Reply-To: <1445357947-6022-1-git-send-email-christoffer.dall@linaro.org>
+References: <1445357947-6022-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1445357947-6022-7-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+We currently do a single update of the vgic state when the distributor
+enable/disable control register is accessed and then bypass updating the
+state for as long as the distributor remains disabled.
 
-* Dave Gerlach <d-gerlach@ti.com> [150922 17:20]:
-> Hi,
-> This series is version 3 of the code to introduce a wkup_m3_ipc driver
-> to handle communication between the MPU and Cortex M3 present on TI AM335x
-> and AM437x SoCs. v2 of this series can be found at [1]. Only patch 3
-> has been changed based on a request from Tony and a few cleanups:
-> 
-> - Rather than exporting all of the functionality of the driver, added
->   wkup_m3_ipc_get and wkup_m3_ipc_put to allow users to just get a handle
->   containing an ops structure for use.
-> 
-> - Changed all ops (previously exported functions) to take pointer to
->   struct wkup_m3_ipc as an argument now that user code will get this
->   from wkup_m3_ipc_get.
-> 
-> - General cleanup to probe function
-> 
-> - Added MODULE_DEVICE_TABLE so driver can probe automatically.
-> 
-> The series containing the DT nodes can be found here [2]. The actual dt
-> nodes for wkup_m3_ipc (last two patches) have been merged but discussion
-> is still open for the ti,mbox-send-noirq flag patches and depends on the
-> comments provided for the omap-mailbox change presented in patch 1 of
-> this series.
-> 
-> A full branch containing all necessary PM code for both am335x and am437x
-> has been pushed here [3] to provide a big picture view of the plan for
-> this series.
-> 
-> This driver relies on the firmware at [4] in the next-upstream branch
-> being present in /lib/firmware in the rootfs or built in to the kernel.
+This is incorrect, because updating the state does not consider the
+distributor enable bit, and this you can end up in a situation where an
+interrupt is marked as pending on the CPU interface, but not pending on
+the distributor, which is an impossible state to be in, and triggers a
+warning.  Consider for example the following sequence of events:
 
-Anybody got comments on this one? Should I pick up this series or
-what's the plan?
+1. An interrupt is marked as pending on the distributor
+   - the interrupt is also forwarded to the CPU interface
+2. The guest turns off the distributor (it's about to do a reboot)
+   - we stop updating the CPU interface state from now on
+3. The guest disables the pending interrupt
+   - we remove the pending state from the distributor, but don't touch
+     the CPU interface, see point 2.
 
-Regards,
+Since the distributor disable bit really means that no interrupts should
+be forwarded to the CPU interface, we modify the code to keep updating
+the internal VGIC state, but always set the CPU interface pending bits
+to zero when the distributor is disabled.
 
-Tony
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/vgic.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-
-> [1] https://lkml.org/lkml/2015/7/17/797
-> [2] https://lkml.org/lkml/2015/7/17/813
-> [3] https://github.com/dgerlach/linux-pm/tree/pm-v4.3-rc1-amx3-suspend
-> [4] https://git.ti.com/ti-cm3-pm-firmware
-> 
-> Dave Gerlach (3):
->   mailbox/omap: Add ti,mbox-send-noirq quirk to fix AM33xx CPU Idle
->   Documentation: dt: add bindings for TI Wakeup M3 IPC device
->   soc: ti: Add wkup_m3_ipc driver
-> 
->  .../devicetree/bindings/mailbox/omap-mailbox.txt   |   8 +
->  .../devicetree/bindings/soc/ti/wkup_m3_ipc.txt     |  57 +++
->  drivers/mailbox/omap-mailbox.c                     |  49 +-
->  drivers/soc/ti/Kconfig                             |  10 +
->  drivers/soc/ti/Makefile                            |   1 +
->  drivers/soc/ti/wkup_m3_ipc.c                       | 508 +++++++++++++++++++++
->  include/linux/wkup_m3_ipc.h                        |  55 +++
->  7 files changed, 684 insertions(+), 4 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
->  create mode 100644 drivers/soc/ti/wkup_m3_ipc.c
->  create mode 100644 include/linux/wkup_m3_ipc.h
-> 
-> -- 
-> 2.4.6
-> 
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 58b1256..66c6616 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1012,6 +1012,12 @@ static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
+ 	pend_percpu = vcpu->arch.vgic_cpu.pending_percpu;
+ 	pend_shared = vcpu->arch.vgic_cpu.pending_shared;
+ 
++	if (!dist->enabled) {
++		bitmap_zero(pend_percpu, VGIC_NR_PRIVATE_IRQS);
++		bitmap_zero(pend_shared, nr_shared);
++		return 0;
++	}
++
+ 	pending = vgic_bitmap_get_cpu_map(&dist->irq_pending, vcpu_id);
+ 	enabled = vgic_bitmap_get_cpu_map(&dist->irq_enabled, vcpu_id);
+ 	bitmap_and(pend_percpu, pending, enabled, VGIC_NR_PRIVATE_IRQS);
+@@ -1039,11 +1045,6 @@ void vgic_update_state(struct kvm *kvm)
+ 	struct kvm_vcpu *vcpu;
+ 	int c;
+ 
+-	if (!dist->enabled) {
+-		set_bit(0, dist->irq_pending_on_cpu);
+-		return;
+-	}
+-
+ 	kvm_for_each_vcpu(c, vcpu, kvm) {
+ 		if (compute_pending_for_cpu(vcpu))
+ 			set_bit(c, dist->irq_pending_on_cpu);
+-- 
+2.1.2.330.g565301e.dirty
