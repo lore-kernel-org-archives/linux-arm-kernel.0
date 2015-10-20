@@ -1,49 +1,55 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 20 Oct 2015 17:13:04 +0800
-Subject: [PATCH v2 2/9] mmc: dt-bindings: update Mediatek MMC bindings
+Date: Tue, 20 Oct 2015 17:13:08 +0800
+Subject: [PATCH v2 6/9] mmc: mediatek: add implement of ops->hw_reset()
 In-Reply-To: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
 References: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1445332391-30530-3-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1445332391-30530-7-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 400Mhz clock source for HS400 mode
+add implement of ops->hw_reset() for eMMC
 
 Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
----
- Documentation/devicetree/bindings/mmc/mtk-sd.txt | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-index a1adfa4..0120c7f 100644
---- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-+++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-@@ -17,6 +17,11 @@ Required properties:
- - vmmc-supply: power to the Core
- - vqmmc-supply: power to the IO
+---
+ drivers/mmc/host/mtk-sd.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+index 3858163..5627644 100644
+--- a/drivers/mmc/host/mtk-sd.c
++++ b/drivers/mmc/host/mtk-sd.c
+@@ -64,6 +64,7 @@
+ #define SDC_RESP2        0x48
+ #define SDC_RESP3        0x4c
+ #define SDC_BLK_NUM      0x50
++#define EMMC_IOCON       0x7c
+ #define SDC_ACMD_RESP    0x80
+ #define MSDC_DMA_SA      0x90
+ #define MSDC_DMA_CTRL    0x98
+@@ -1209,6 +1210,15 @@ end:
+ 	pm_runtime_put_autosuspend(host->dev);
+ }
  
-+Optional properties:
-+- assigned-clocks: PLL of the source clock
-+- assigned-clock-parents: parent of source clock, used for HS400 mode to get 400Mhz source clock
-+- hs400-ds-delay: HS400 DS delay setting
++static void msdc_hw_reset(struct mmc_host *mmc)
++{
++	struct msdc_host *host = mmc_priv(mmc);
 +
- Examples:
- mmc0: mmc at 11230000 {
- 	compatible = "mediatek,mt8173-mmc", "mediatek,mt8135-mmc";
-@@ -24,9 +29,13 @@ mmc0: mmc at 11230000 {
- 	interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_LOW>;
- 	vmmc-supply = <&mt6397_vemc_3v3_reg>;
- 	vqmmc-supply = <&mt6397_vio18_reg>;
--	clocks = <&pericfg CLK_PERI_MSDC30_0>, <&topckgen CLK_TOP_MSDC50_0_H_SEL>;
-+	clocks = <&pericfg CLK_PERI_MSDC30_0>,
-+	         <&topckgen CLK_TOP_MSDC50_0_H_SEL>;
- 	clock-names = "source", "hclk";
- 	pinctrl-names = "default", "state_uhs";
- 	pinctrl-0 = <&mmc0_pins_default>;
- 	pinctrl-1 = <&mmc0_pins_uhs>;
-+	assigned-clocks = <&topckgen CLK_TOP_MSDC50_0_SEL>;
-+	assigned-clock-parents = <&topckgen CLK_TOP_MSDCPLL_D2>;
-+	hs400-ds-delay = <0x14015>;
++	sdr_set_bits(host->base + EMMC_IOCON, 1);
++	udelay(10); /* 10us is enough */
++	sdr_clr_bits(host->base + EMMC_IOCON, 1);
++}
++
+ static struct mmc_host_ops mt_msdc_ops = {
+ 	.post_req = msdc_post_req,
+ 	.pre_req = msdc_pre_req,
+@@ -1216,6 +1226,7 @@ static struct mmc_host_ops mt_msdc_ops = {
+ 	.set_ios = msdc_ops_set_ios,
+ 	.start_signal_voltage_switch = msdc_ops_switch_volt,
+ 	.card_busy = msdc_card_busy,
++	.hw_reset = msdc_hw_reset,
  };
+ 
+ static int msdc_drv_probe(struct platform_device *pdev)
 -- 
 1.8.1.1.dirty
