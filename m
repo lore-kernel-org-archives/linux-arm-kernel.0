@@ -1,38 +1,31 @@
-From: Anson.Huang@freescale.com (Anson Huang)
-Date: Tue, 20 Oct 2015 18:44:19 +0800
-Subject: [PATCH V2] ARM: imx: add platform irq type setting in gpc
-Message-ID: <1445337859-19111-1-git-send-email-Anson.Huang@freescale.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Tue, 20 Oct 2015 03:27:15 +0000
+Subject: Using CONFIG_ARM_APPENDED_DTB with multiple device trees
+Message-ID: <fce90e91fe3c452b80bcd2113f267003@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anson Huang <b20788@freescale.com>
+Hi,
 
-GPC irq domain is a child domain of GIC, now all of platform irqs
-are inside GPC domain, during the module populate, all devices irq
-should have correct type setting in GIC, however, there is no
-.irq_set_type callback setting in GPC, so the irq_set_type will be
-skipped and cause all irqs' type in /proc/interrupt are "edge" which
-mismatch with irq type setting in dtb file. Since GPC has no irq
-type setting, so just tell kernel to use irq_chip_set_type_parent.
+We currently have several boards based around the 88f6281 (kirkwood) ARM 
+CPU.
 
-Signed-off-by: Anson Huang <Anson.Huang@freescale.com>
----
-change from V1:
-	improve commit message.
- arch/arm/mach-imx/gpc.c | 1 +
- 1 file changed, 1 insertion(+)
+The boards all share a kernel image (currently 3.16 based but we're in 
+the process of moving to 4.3). We use the machine id (and some other 
+eeprom type information) to distinguish the boards.
 
-diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-index 10bf715..b3a7a74 100644
---- a/arch/arm/mach-imx/gpc.c
-+++ b/arch/arm/mach-imx/gpc.c
-@@ -176,6 +176,7 @@ static struct irq_chip imx_gpc_chip = {
- 	.irq_unmask		= imx_gpc_irq_unmask,
- 	.irq_retrigger		= irq_chip_retrigger_hierarchy,
- 	.irq_set_wake		= imx_gpc_irq_set_wake,
-+	.irq_set_type           = irq_chip_set_type_parent,
- #ifdef CONFIG_SMP
- 	.irq_set_affinity	= irq_chip_set_affinity_parent,
- #endif
--- 
-1.9.1
+We'd like to move to a device tree based model but we're restricted in 
+that updating the bootloaders to a DT-aware u-boot is impractical. 
+CONFIG_ARM_APPENDED_DTB allows us to append a device tree but we still 
+need to account for the differences between the boards.
+
+Is it possible to append several device trees and have the correct one 
+selected based on mach-id? One alternative would be to have a lowest 
+common denominator device tree and platform_data style initializations 
+for the rest (which would kind of defeat the purpose of having a device 
+tree). Or we could have a superset device tree with the nodes disabled 
+and install fixups to enable them based on mach-id. Has anyone faced a 
+similar situation?
+
+Thanks,
+Chris
