@@ -1,109 +1,437 @@
-From: richard.weinberger@gmail.com (Richard Weinberger)
-Date: Tue, 20 Oct 2015 20:56:46 +0200
-Subject: [PATCH 3/3] mtd: nand: sunxi: add randomizer support
-In-Reply-To: <1444929443-25537-4-git-send-email-boris.brezillon@free-electrons.com>
-References: <1444929443-25537-1-git-send-email-boris.brezillon@free-electrons.com>
- <1444929443-25537-4-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <CAFLxGvxzvbD4UaL+_Nz_B0e-CTbZ0dkFSOHU1-a_8mbvwbAMCA@mail.gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 20 Oct 2015 11:57:39 -0700
+Subject: [PATCH v10.1 04/16] arm64: kvm: allows kvm cpu hotplug
+In-Reply-To: <2bffc2f8ecec7b696231f451e580ab683e6936b9.1445297709.git.geoff@infradead.org>
+References: <cover.1445297709.git.geoff@infradead.org>
+ <2bffc2f8ecec7b696231f451e580ab683e6936b9.1445297709.git.geoff@infradead.org>
+Message-ID: <1445367459.30908.82.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 7:17 PM, Boris Brezillon
-<boris.brezillon@free-electrons.com> wrote:
-> +static const u16 sunxi_nfc_randomizer_page_seeds[] = {
-> +       0x2b75, 0x0bd0, 0x5ca3, 0x62d1, 0x1c93, 0x07e9, 0x2162, 0x3a72,
-> +       0x0d67, 0x67f9, 0x1be7, 0x077d, 0x032f, 0x0dac, 0x2716, 0x2436,
-> +       0x7922, 0x1510, 0x3860, 0x5287, 0x480f, 0x4252, 0x1789, 0x5a2d,
-> +       0x2a49, 0x5e10, 0x437f, 0x4b4e, 0x2f45, 0x216e, 0x5cb7, 0x7130,
-> +       0x2a3f, 0x60e4, 0x4dc9, 0x0ef0, 0x0f52, 0x1bb9, 0x6211, 0x7a56,
-> +       0x226d, 0x4ea7, 0x6f36, 0x3692, 0x38bf, 0x0c62, 0x05eb, 0x4c55,
-> +       0x60f4, 0x728c, 0x3b6f, 0x2037, 0x7f69, 0x0936, 0x651a, 0x4ceb,
-> +       0x6218, 0x79f3, 0x383f, 0x18d9, 0x4f05, 0x5c82, 0x2912, 0x6f17,
-> +       0x6856, 0x5938, 0x1007, 0x61ab, 0x3e7f, 0x57c2, 0x542f, 0x4f62,
-> +       0x7454, 0x2eac, 0x7739, 0x42d4, 0x2f90, 0x435a, 0x2e52, 0x2064,
-> +       0x637c, 0x66ad, 0x2c90, 0x0bad, 0x759c, 0x0029, 0x0986, 0x7126,
-> +       0x1ca7, 0x1605, 0x386a, 0x27f5, 0x1380, 0x6d75, 0x24c3, 0x0f8e,
-> +       0x2b7a, 0x1418, 0x1fd1, 0x7dc1, 0x2d8e, 0x43af, 0x2267, 0x7da3,
-> +       0x4e3d, 0x1338, 0x50db, 0x454d, 0x764d, 0x40a3, 0x42e6, 0x262b,
-> +       0x2d2e, 0x1aea, 0x2e17, 0x173d, 0x3a6e, 0x71bf, 0x25f9, 0x0a5d,
-> +       0x7c57, 0x0fbe, 0x46ce, 0x4939, 0x6b17, 0x37bb, 0x3e91, 0x76db,
-> +};
-> +
-> +static const u16 sunxi_nfc_randomizer_ecc512_seeds[] = {
-> +       0x227b, 0x5baa, 0x15ef, 0x5b13, 0x75b8, 0x04f7, 0x4b5e, 0x4db8,
-> +       0x4f31, 0x669a, 0x20af, 0x5b91, 0x1d6d, 0x286a, 0x5e98, 0x07f1,
-> +       0x44b2, 0x0288, 0x3996, 0x7a98, 0x76cc, 0x705a, 0x21c9, 0x5be5,
-> +       0x23b8, 0x7133, 0x5514, 0x6f0b, 0x7528, 0x5e5b, 0x2ae1, 0x37b6,
-> +       0x0d19, 0x1525, 0x2f87, 0x0025, 0x0107, 0x7012, 0x0b4f, 0x12e1,
-> +       0x4e29, 0x6a5e, 0x744a, 0x0032, 0x61c3, 0x1463, 0x3cd4, 0x5636,
-> +       0x5928, 0x57bf, 0x3ce1, 0x6c35, 0x4167, 0x58cc, 0x7e7f, 0x4ecd,
-> +       0x05c9, 0x3063, 0x01ab, 0x194f, 0x6b7c, 0x6575, 0x29f5, 0x04d0,
-> +       0x1e53, 0x4d18, 0x2f12, 0x21c4, 0x3379, 0x12ba, 0x660a, 0x6150,
-> +       0x2f0e, 0x7339, 0x3bd6, 0x5ab0, 0x72fa, 0x568d, 0x5bf6, 0x410d,
-> +       0x1e35, 0x2971, 0x3389, 0x420c, 0x5985, 0x169c, 0x6cb3, 0x3139,
-> +       0x52ac, 0x1475, 0x6611, 0x47df, 0x2c0b, 0x14dd, 0x1839, 0x0853,
-> +       0x667f, 0x245f, 0x3d7e, 0x5eb1, 0x13d1, 0x4945, 0x11ae, 0x4f1e,
-> +       0x19bc, 0x7e72, 0x1206, 0x3a64, 0x6c27, 0x1d33, 0x3726, 0x37db,
-> +       0x6ba3, 0x1dfb, 0x7041, 0x66b5, 0x14b0, 0x13da, 0x5378, 0x0696,
-> +       0x7887, 0x5c44, 0x4a7e, 0x2888, 0x0794, 0x567f, 0x57bb, 0x0ac0,
-> +};
-> +
-> +static const u16 sunxi_nfc_randomizer_ecc1024_seeds[] = {
-> +       0x48a6, 0x595e, 0x42c7, 0x63a7, 0x329c, 0x250d, 0x2306, 0x2324,
-> +       0x4c68, 0x5f64, 0x2656, 0x3a4e, 0x1da6, 0x6b01, 0x775d, 0x2efc,
-> +       0x3afa, 0x07cc, 0x378e, 0x6e39, 0x64cf, 0x00ce, 0x042b, 0x2d6e,
-> +       0x092a, 0x66b7, 0x45cb, 0x5dd8, 0x1ef9, 0x7600, 0x3dcc, 0x2bfa,
-> +       0x0796, 0x4d1c, 0x1cf5, 0x0399, 0x62d3, 0x56fc, 0x33cb, 0x2c74,
-> +       0x26b2, 0x79f7, 0x4f87, 0x6d96, 0x6fec, 0x777b, 0x7dae, 0x2523,
-> +       0x0115, 0x0b1c, 0x323a, 0x6438, 0x7ebd, 0x7a81, 0x0739, 0x1df7,
-> +       0x1d4f, 0x6e1f, 0x0fa4, 0x3f79, 0x18bd, 0x1255, 0x43b1, 0x1f15,
-> +       0x2446, 0x5b56, 0x2b13, 0x79ae, 0x3ce6, 0x674a, 0x7301, 0x1288,
-> +       0x721b, 0x3892, 0x0618, 0x0a05, 0x791e, 0x265b, 0x3062, 0x0914,
-> +       0x46ea, 0x50da, 0x38ad, 0x20e7, 0x04e2, 0x3696, 0x4ed2, 0x0d70,
-> +       0x5585, 0x71f4, 0x080b, 0x2e22, 0x28eb, 0x6f80, 0x5109, 0x2bb0,
-> +       0x0ca1, 0x2159, 0x1a8a, 0x61c1, 0x38b2, 0x59ae, 0x1937, 0x1076,
-> +       0x6a33, 0x7abc, 0x4630, 0x4b37, 0x11b4, 0x4d1b, 0x079f, 0x7e51,
-> +       0x40e8, 0x7b41, 0x7bc4, 0x037a, 0x3a2b, 0x0fb5, 0x7a06, 0x6401,
-> +       0x6792, 0x7fab, 0x7bcd, 0x1ac6, 0x1d51, 0x1b91, 0x781f, 0x5776,
-> +};
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Can you please outline which constants and functions are taken as-is from
-the Allwinner BSP?
+The current kvm implementation on arm64 does cpu-specific initialization
+at system boot, and has no way to gracefully shutdown a core in terms of
+kvm. This prevents, especially, kexec from rebooting the system on a boot
+core in EL2.
 
-> +static u16 sunxi_nfc_randomizer_step(u16 state, int count)
-> +{
-> +       state &= 0x7fff;
-> +       while (count--)
-> +               state = ((state >> 1) |
-> +                        ((((state >> 0) ^ (state >> 1)) & 1) << 14)) & 0x7fff;
+This patch adds a cpu tear-down function and also puts an existing cpu-init
+code into a separate function, kvm_arch_hardware_disable() and
+kvm_arch_hardware_enable() respectively.
+We don't need arm64-specific cpu hotplug hook any more.
 
-As discussed on IRC, state >> 0 is state again.
+Since this patch modifies common part of code between arm and arm64, one
+stub definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
+compiling errors.
 
-> +
-> +       return state;
-> +}
-> +
-> +static u16 sunxi_nfc_randomizer_state(struct mtd_info *mtd, int page, bool ecc)
-> +{
-> +       const u16 *seeds = sunxi_nfc_randomizer_page_seeds;
-> +       int mod = mtd->erasesize / mtd->writesize;
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+V10.1: Fixed: kvm cannot start a guest when cpuidle is enabled
+if the hardware does not retain cpu state (EL2) in idle state.
 
-IIRC mtd.h has a helper for such divisions.
+This patch re-initailizes EL2 state at CPU_PM_EXIT by calling
+kvm_arch_hardware_enable() if and only if kvm has been initialized
+before CPU_PM_ENTER, that is, if any vcpus have been created.
 
-> +       sunxi_nfc_randomizer_enable(mtd);
->         writel(NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ECC_OP,
->                nfc->regs + NFC_REG_CMD);
-> +       sunxi_nfc_randomizer_disable(mtd);
->
->         ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
->         if (ret)
->                 return ret;
->
-> +       *cur_off = oob_off + ecc->bytes + 4;
 
-Hmmm, why do we need this here?
-At the end of this function you do it again.
+ arch/arm/include/asm/kvm_host.h   | 10 ++++-
+ arch/arm/include/asm/kvm_mmu.h    |  1 +
+ arch/arm/kvm/arm.c                | 79 ++++++++++++++++++---------------------
+ arch/arm/kvm/mmu.c                |  5 +++
+ arch/arm64/include/asm/kvm_host.h | 16 +++++++-
+ arch/arm64/include/asm/kvm_mmu.h  |  1 +
+ arch/arm64/include/asm/virt.h     |  9 +++++
+ arch/arm64/kvm/hyp-init.S         | 33 ++++++++++++++++
+ arch/arm64/kvm/hyp.S              | 32 ++++++++++++++--
+ 9 files changed, 138 insertions(+), 48 deletions(-)
 
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index c4072d9..4c6a38c 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -211,6 +211,15 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+ 	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+ }
+ 
++static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
++					phys_addr_t phys_idmap_start)
++{
++	/*
++	 * TODO
++	 * kvm_call_reset(boot_pgd_ptr, phys_idmap_start);
++	 */
++}
++
+ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+ {
+ 	return 0;
+@@ -223,7 +232,6 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+ 
+ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+ 
+-static inline void kvm_arch_hardware_disable(void) {}
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 405aa18..dc6fadf 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -66,6 +66,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
+ phys_addr_t kvm_mmu_get_httbr(void);
+ phys_addr_t kvm_mmu_get_boot_httbr(void);
+ phys_addr_t kvm_get_idmap_vector(void);
++phys_addr_t kvm_get_idmap_start(void);
+ int kvm_mmu_init(void);
+ void kvm_clear_hyp_idmap(void);
+ 
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index dc017ad..fbff638 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -16,7 +16,6 @@
+  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+  */
+ 
+-#include <linux/cpu.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/errno.h>
+ #include <linux/err.h>
+@@ -61,6 +60,8 @@ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
+ static u8 kvm_next_vmid;
+ static DEFINE_SPINLOCK(kvm_vmid_lock);
+ 
++static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
++
+ static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+ {
+ 	BUG_ON(preemptible());
+@@ -85,11 +86,6 @@ struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void)
+ 	return &kvm_arm_running_vcpu;
+ }
+ 
+-int kvm_arch_hardware_enable(void)
+-{
+-	return 0;
+-}
+-
+ int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
+ {
+ 	return kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE;
+@@ -915,7 +911,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
+ 	}
+ }
+ 
+-static void cpu_init_hyp_mode(void *dummy)
++int kvm_arch_hardware_enable(void)
+ {
+ 	phys_addr_t boot_pgd_ptr;
+ 	phys_addr_t pgd_ptr;
+@@ -923,6 +919,9 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	unsigned long stack_page;
+ 	unsigned long vector_ptr;
+ 
++	if (__hyp_get_vectors() != hyp_default_vectors)
++		return 0;
++
+ 	/* Switch from the HYP stub to our own HYP init vector */
+ 	__hyp_set_vectors(kvm_get_idmap_vector());
+ 
+@@ -935,38 +934,50 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
+ 
+ 	kvm_arm_init_debug();
++
++	return 0;
+ }
+ 
+-static int hyp_init_cpu_notify(struct notifier_block *self,
+-			       unsigned long action, void *cpu)
++void kvm_arch_hardware_disable(void)
+ {
+-	switch (action) {
+-	case CPU_STARTING:
+-	case CPU_STARTING_FROZEN:
+-		if (__hyp_get_vectors() == hyp_default_vectors)
+-			cpu_init_hyp_mode(NULL);
+-		break;
+-	}
++	phys_addr_t boot_pgd_ptr;
++	phys_addr_t phys_idmap_start;
+ 
+-	return NOTIFY_OK;
+-}
++	if (__hyp_get_vectors() == hyp_default_vectors)
++		return;
+ 
+-static struct notifier_block hyp_init_cpu_nb = {
+-	.notifier_call = hyp_init_cpu_notify,
+-};
++	boot_pgd_ptr = kvm_mmu_get_boot_httbr();
++	phys_idmap_start = kvm_get_idmap_start();
++
++	__cpu_reset_hyp_mode(boot_pgd_ptr, phys_idmap_start);
++}
+ 
+ #ifdef CONFIG_CPU_PM
+ static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
+ 				    unsigned long cmd,
+ 				    void *v)
+ {
+-	if (cmd == CPU_PM_EXIT &&
+-	    __hyp_get_vectors() == hyp_default_vectors) {
+-		cpu_init_hyp_mode(NULL);
++	switch (cmd) {
++	case CPU_PM_ENTER:
++		if (__hyp_get_vectors() != hyp_default_vectors)
++			__this_cpu_write(kvm_arm_hardware_enabled, 1);
++		else
++			__this_cpu_write(kvm_arm_hardware_enabled, 0);
++		/*
++		 * don't call kvm_arch_hardware_disable() in case of
++		 * CPU_PM_ENTER because it does't actually save any state.
++		 */
++
++		return NOTIFY_OK;
++	case CPU_PM_EXIT:
++		if (__this_cpu_read(kvm_arm_hardware_enabled))
++			kvm_arch_hardware_enable();
++
+ 		return NOTIFY_OK;
+-	}
+ 
+-	return NOTIFY_DONE;
++	default:
++		return NOTIFY_DONE;
++	}
+ }
+ 
+ static struct notifier_block hyp_init_cpu_pm_nb = {
+@@ -1064,11 +1075,6 @@ static int init_hyp_mode(void)
+ 	}
+ 
+ 	/*
+-	 * Execute the init code on each CPU.
+-	 */
+-	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
+-
+-	/*
+ 	 * Init HYP view of VGIC
+ 	 */
+ 	err = kvm_vgic_hyp_init();
+@@ -1142,26 +1148,15 @@ int kvm_arch_init(void *opaque)
+ 		}
+ 	}
+ 
+-	cpu_notifier_register_begin();
+-
+ 	err = init_hyp_mode();
+ 	if (err)
+ 		goto out_err;
+ 
+-	err = __register_cpu_notifier(&hyp_init_cpu_nb);
+-	if (err) {
+-		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
+-		goto out_err;
+-	}
+-
+-	cpu_notifier_register_done();
+-
+ 	hyp_cpu_pm_init();
+ 
+ 	kvm_coproc_table_init();
+ 	return 0;
+ out_err:
+-	cpu_notifier_register_done();
+ 	return err;
+ }
+ 
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 6984342..69b4a33 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -1644,6 +1644,11 @@ phys_addr_t kvm_get_idmap_vector(void)
+ 	return hyp_idmap_vector;
+ }
+ 
++phys_addr_t kvm_get_idmap_start(void)
++{
++	return hyp_idmap_start;
++}
++
+ int kvm_mmu_init(void)
+ {
+ 	int err;
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index ed03968..e86421a 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -220,6 +220,7 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+ struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
+ 
+ u64 kvm_call_hyp(void *hypfn, ...);
++void kvm_call_reset(phys_addr_t boot_pgd_ptr, phys_addr_t phys_idmap_start);
+ void force_vm_exit(const cpumask_t *mask);
+ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+ 
+@@ -244,7 +245,20 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+ 		     hyp_stack_ptr, vector_ptr);
+ }
+ 
+-static inline void kvm_arch_hardware_disable(void) {}
++static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
++					phys_addr_t phys_idmap_start)
++{
++	/*
++	 * Call reset code, and switch back to stub hyp vectors.
++	 */
++	kvm_call_reset(boot_pgd_ptr, phys_idmap_start);
++}
++
++struct vgic_sr_vectors {
++	void	*save_vgic;
++	void	*restore_vgic;
++};
++
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 6150567..ff5a087 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -98,6 +98,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
+ phys_addr_t kvm_mmu_get_httbr(void);
+ phys_addr_t kvm_mmu_get_boot_httbr(void);
+ phys_addr_t kvm_get_idmap_vector(void);
++phys_addr_t kvm_get_idmap_start(void);
+ int kvm_mmu_init(void);
+ void kvm_clear_hyp_idmap(void);
+ 
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 3070096..bca79f9 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -58,9 +58,18 @@
+ 
+ #define HVC_CALL_FUNC 3
+ 
++/*
++ * HVC_RESET_CPU - Reset cpu in EL2 to initial state.
++ *
++ * @x0: entry address in trampoline code in va
++ * @x1: identical mapping page table in pa
++ */
++
+ #define BOOT_CPU_MODE_EL1	(0xe11)
+ #define BOOT_CPU_MODE_EL2	(0xe12)
+ 
++#define HVC_RESET_CPU 4
++
+ #ifndef __ASSEMBLY__
+ 
+ /*
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 2e67a48..1925163 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -139,6 +139,39 @@ merged:
+ 	eret
+ ENDPROC(__kvm_hyp_init)
+ 
++	/*
++	 * x0: HYP boot pgd
++	 * x1: HYP phys_idmap_start
++	 */
++ENTRY(__kvm_hyp_reset)
++	/* We're in trampoline code in VA, switch back to boot page tables */
++	msr	ttbr0_el2, x0
++	isb
++
++	/* Invalidate the old TLBs */
++	tlbi	alle2
++	dsb	sy
++
++	/* Branch into PA space */
++	adr	x0, 1f
++	bfi	x1, x0, #0, #PAGE_SHIFT
++	br	x1
++
++	/* We're now in idmap, disable MMU */
++1:	mrs	x0, sctlr_el2
++	ldr	x1, =SCTLR_EL2_FLAGS
++	bic	x0, x0, x1		// Clear SCTL_M and etc
++	msr	sctlr_el2, x0
++	isb
++
++	/* Install stub vectors */
++	adrp	x0, __hyp_stub_vectors
++	add	x0, x0, #:lo12:__hyp_stub_vectors
++	msr	vbar_el2, x0
++
++	eret
++ENDPROC(__kvm_hyp_reset)
++
+ 	.ltorg
+ 
+ 	.popsection
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 073b8bf..c9804ac 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -931,6 +931,11 @@ ENTRY(kvm_call_hyp)
+ 	ret
+ ENDPROC(kvm_call_hyp)
+ 
++ENTRY(kvm_call_reset)
++	hvc	#HVC_RESET_CPU
++	ret
++ENDPROC(kvm_call_reset)
++
+ .macro invalid_vector	label, target
+ 	.align	2
+ \label:
+@@ -974,10 +979,27 @@ el1_sync:					// Guest trapped into EL2
+ 	cmp	x18, #HVC_GET_VECTORS
+ 	b.ne	1f
+ 	mrs	x0, vbar_el2
+-	b	2f
+-
+-1:	/* Default to HVC_CALL_HYP. */
++	b	do_eret
+ 
++	/* jump into trampoline code */
++1:	cmp	x18, #HVC_RESET_CPU
++	b.ne	2f
++	/*
++	 * Entry point is:
++	 *	TRAMPOLINE_VA
++	 *	+ (__kvm_hyp_reset - (__hyp_idmap_text_start & PAGE_MASK))
++	 */
++	adrp	x2, __kvm_hyp_reset
++	add	x2, x2, #:lo12:__kvm_hyp_reset
++	adrp	x3, __hyp_idmap_text_start
++	add	x3, x3, #:lo12:__hyp_idmap_text_start
++	and	x3, x3, PAGE_MASK
++	sub	x2, x2, x3
++	ldr	x3, =TRAMPOLINE_VA
++	add	x2, x2, x3
++	br	x2				// no return
++
++2:	/* Default to HVC_CALL_HYP. */
+ 	push	lr, xzr
+ 
+ 	/*
+@@ -991,7 +1013,9 @@ el1_sync:					// Guest trapped into EL2
+ 	blr	lr
+ 
+ 	pop	lr, xzr
+-2:	eret
++
++do_eret:
++	eret
+ 
+ el1_trap:
+ 	/*
 -- 
-Thanks,
-//richard
+2.5.0
