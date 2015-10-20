@@ -1,122 +1,145 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Oct 2015 11:09:09 +0100
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 20 Oct 2015 11:18:16 +0100
 Subject: [PATCH v4 1/4] drm: Introduce generic probe function for
  component based masters.
-In-Reply-To: <CACvgo51szQz9iu55mP+Qz+VCzjB-20K169MpX6_71ppcnGHXzg@mail.gmail.com>
+In-Reply-To: <20151020100909.GW32532@n2100.arm.linux.org.uk>
 References: <1445332995-11212-1-git-send-email-Liviu.Dudau@arm.com>
  <1445332995-11212-2-git-send-email-Liviu.Dudau@arm.com>
  <CACvgo51szQz9iu55mP+Qz+VCzjB-20K169MpX6_71ppcnGHXzg@mail.gmail.com>
-Message-ID: <20151020100909.GW32532@n2100.arm.linux.org.uk>
+ <20151020100909.GW32532@n2100.arm.linux.org.uk>
+Message-ID: <20151020101816.GA3394@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 11:00:55AM +0100, Emil Velikov wrote:
-> Hi Liviu,
+On Tue, Oct 20, 2015 at 11:09:09AM +0100, Russell King - ARM Linux wrote:
+> On Tue, Oct 20, 2015 at 11:00:55AM +0100, Emil Velikov wrote:
+> > Hi Liviu,
+> > 
+> > On 20 October 2015 at 10:23, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > > A lot of component based DRM drivers use a variant of the same code
+> > > as the probe function. They bind the crtc ports in the first iteration
+> > > and then scan through the child nodes and bind the encoders attached
+> > > to the remote endpoints. Factor the common code into a separate
+> > > function called drm_of_component_probe() in order to increase code
+> > > reuse.
+> > >
+> > > Cc: David Airlie <airlied@linux.ie>
+> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > > Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > ---
+> > >  drivers/gpu/drm/drm_of.c | 88 ++++++++++++++++++++++++++++++++++++++++++++++++
+> > >  include/drm/drm_of.h     | 13 +++++++
+> > >  2 files changed, 101 insertions(+)
+> > >
+> > > diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+> > > index be38840..493c05c 100644
+> > > --- a/drivers/gpu/drm/drm_of.c
+> > > +++ b/drivers/gpu/drm/drm_of.c
+> > > @@ -1,3 +1,4 @@
+> > > +#include <linux/component.h>
+> > >  #include <linux/export.h>
+> > >  #include <linux/list.h>
+> > >  #include <linux/of_graph.h>
+> > > @@ -61,3 +62,90 @@ uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+> > >         return possible_crtcs;
+> > >  }
+> > >  EXPORT_SYMBOL(drm_of_find_possible_crtcs);
+> > > +
+> > > +/**
+> > > + * drm_of_component_probe - Generic probe function for a component based master
+> > > + * @dev: master device containing the OF node
+> > > + * @compare_of: compare function used for matching components
+> > > + * @master_ops: component master ops to be used
+> > > + *
+> > > + * Parse the platform device OF node and bind all the components associated
+> > > + * with the master. Interface ports are added before the encoders in order to
+> > > + * satisfy their .bind requirements
+> > > + * See Documentation/devicetree/bindings/graph.txt for the bindings.
+> > > + *
+> > > + * Returns zero if successful, or one of the standard error codes if it fails.
+> > > + */
+> > > +int drm_of_component_probe(struct device *dev,
+> > > +                          int (*compare_of)(struct device *, void *),
+> > > +                          const struct component_master_ops *m_ops)
+> > > +{
+> > > +       struct device_node *ep, *port, *remote;
+> > > +       struct component_match *match = NULL;
+> > > +       int i;
+> > > +
+> > > +       if (!dev->of_node)
+> > > +               return -EINVAL;
+> > > +
+> > > +       /*
+> > > +        * Bind the crtc's ports first, so that drm_of_find_possible_crtcs()
+> > > +        * called from encoder's .bind callbacks works as expected
+> > > +        */
+> > > +       for (i = 0; ; i++) {
+> > > +               port = of_parse_phandle(dev->of_node, "ports", i);
+> > > +               if (!port)
+> > > +                       break;
+> > > +
+> > > +               if (!of_device_is_available(port->parent)) {
+> > > +                       of_node_put(port);
+> > > +                       continue;
+> > > +               }
+> > > +
+> > > +               component_match_add(dev, &match, compare_of, port);
+> > > +               of_node_put(port);
+> > > +       }
+> > > +
+> > > +       if (i == 0) {
+> > > +               dev_err(dev, "missing 'ports' property\n");
+> > > +               return -ENODEV;
+> > > +       }
+> > > +
+> > > +       if (!match) {
+> > > +               dev_err(dev, "no available port\n");
+> > > +               return -ENODEV;
+> > > +       }
+> > > +
+> > > +       /*
+> > > +        * For bound crtcs, bind the encoders attached to their remote endpoint
+> > > +        */
+> > > +       for (i = 0; ; i++) {
+> > > +               port = of_parse_phandle(dev->of_node, "ports", i);
+> > > +               if (!port)
+> > > +                       break;
+> > > +
+> > > +               if (!of_device_is_available(port->parent)) {
+> > > +                       of_node_put(port);
+> > > +                       continue;
+> > > +               }
+> > > +
+> > Of the three drivers converted only the rockchip one has the above
+> > of_device_is_available() hunk. Based on the handling in previous loop
+> > I'm not entirely sure if it's needed, but if so shouldn't one mention
+> > the difference when converting the respective drivers ?
 > 
-> On 20 October 2015 at 10:23, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > A lot of component based DRM drivers use a variant of the same code
-> > as the probe function. They bind the crtc ports in the first iteration
-> > and then scan through the child nodes and bind the encoders attached
-> > to the remote endpoints. Factor the common code into a separate
-> > function called drm_of_component_probe() in order to increase code
-> > reuse.
-> >
-> > Cc: David Airlie <airlied@linux.ie>
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  drivers/gpu/drm/drm_of.c | 88 ++++++++++++++++++++++++++++++++++++++++++++++++
-> >  include/drm/drm_of.h     | 13 +++++++
-> >  2 files changed, 101 insertions(+)
-> >
-> > diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-> > index be38840..493c05c 100644
-> > --- a/drivers/gpu/drm/drm_of.c
-> > +++ b/drivers/gpu/drm/drm_of.c
-> > @@ -1,3 +1,4 @@
-> > +#include <linux/component.h>
-> >  #include <linux/export.h>
-> >  #include <linux/list.h>
-> >  #include <linux/of_graph.h>
-> > @@ -61,3 +62,90 @@ uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-> >         return possible_crtcs;
-> >  }
-> >  EXPORT_SYMBOL(drm_of_find_possible_crtcs);
-> > +
-> > +/**
-> > + * drm_of_component_probe - Generic probe function for a component based master
-> > + * @dev: master device containing the OF node
-> > + * @compare_of: compare function used for matching components
-> > + * @master_ops: component master ops to be used
-> > + *
-> > + * Parse the platform device OF node and bind all the components associated
-> > + * with the master. Interface ports are added before the encoders in order to
-> > + * satisfy their .bind requirements
-> > + * See Documentation/devicetree/bindings/graph.txt for the bindings.
-> > + *
-> > + * Returns zero if successful, or one of the standard error codes if it fails.
-> > + */
-> > +int drm_of_component_probe(struct device *dev,
-> > +                          int (*compare_of)(struct device *, void *),
-> > +                          const struct component_master_ops *m_ops)
-> > +{
-> > +       struct device_node *ep, *port, *remote;
-> > +       struct component_match *match = NULL;
-> > +       int i;
-> > +
-> > +       if (!dev->of_node)
-> > +               return -EINVAL;
-> > +
-> > +       /*
-> > +        * Bind the crtc's ports first, so that drm_of_find_possible_crtcs()
-> > +        * called from encoder's .bind callbacks works as expected
-> > +        */
-> > +       for (i = 0; ; i++) {
-> > +               port = of_parse_phandle(dev->of_node, "ports", i);
-> > +               if (!port)
-> > +                       break;
-> > +
-> > +               if (!of_device_is_available(port->parent)) {
-> > +                       of_node_put(port);
-> > +                       continue;
-> > +               }
-> > +
-> > +               component_match_add(dev, &match, compare_of, port);
-> > +               of_node_put(port);
-> > +       }
-> > +
-> > +       if (i == 0) {
-> > +               dev_err(dev, "missing 'ports' property\n");
-> > +               return -ENODEV;
-> > +       }
-> > +
-> > +       if (!match) {
-> > +               dev_err(dev, "no available port\n");
-> > +               return -ENODEV;
-> > +       }
-> > +
-> > +       /*
-> > +        * For bound crtcs, bind the encoders attached to their remote endpoint
-> > +        */
-> > +       for (i = 0; ; i++) {
-> > +               port = of_parse_phandle(dev->of_node, "ports", i);
-> > +               if (!port)
-> > +                       break;
-> > +
-> > +               if (!of_device_is_available(port->parent)) {
-> > +                       of_node_put(port);
-> > +                       continue;
-> > +               }
-> > +
-> Of the three drivers converted only the rockchip one has the above
-> of_device_is_available() hunk. Based on the handling in previous loop
-> I'm not entirely sure if it's needed, but if so shouldn't one mention
-> the difference when converting the respective drivers ?
+> Yes, it should've been there, otherwise we'll end up binding encoders
+> which are connected to a CRTC which has been disabled - and that means
+> the DRM driver won't come up.
 
-Yes, it should've been there, otherwise we'll end up binding encoders
-which are connected to a CRTC which has been disabled - and that means
-the DRM driver won't come up.
+That's my understanding as well. As mentioned in the cover letter, the generic
+function tries to gather together the best practice and be more complete than
+the individual versions found in the drivers. So you get additional checks
+that should've been in there in the first place if it were not for the code
+being spread out.
+
+Best regards,
+Liviu
+
+> 
+> -- 
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+> 
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
