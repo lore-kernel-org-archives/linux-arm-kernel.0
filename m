@@ -1,69 +1,69 @@
-From: brijeshkumar.singh@amd.com (Brijesh Singh)
-Date: Wed, 21 Oct 2015 11:22:24 -0500
-Subject: [PATCH] EDAC: Add AMD Seattle SoC EDAC
-In-Reply-To: <5627627A.9010906@arm.com>
-References: <1445282597-18999-1-git-send-email-brijeshkumar.singh@amd.com>
- <20151019205236.GB453@leverpostej> <56266F7E.6030404@amd.com>
- <20151020165744.GE31130@pd.tnic> <20151020172654.GC4943@leverpostej>
- <20151020173639.GH31130@pd.tnic> <5626F09F.4050107@huawei.com>
- <20151021093536.GA3575@pd.tnic> <5627627A.9010906@arm.com>
-Message-ID: <5627BBC0.2000008@amd.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Wed, 21 Oct 2015 12:26:36 -0400
+Subject: Which is better to specify console, "console= " or "stdout-path" ?
+In-Reply-To: <CAK7LNAQ_+_9K-y7bmpdGwcH2u4uqJhJhON1Ew4OvzSSa-amyvw@mail.gmail.com>
+References: <CAK7LNAS9uBJ1cVmGBKae3W0tk8Siu1yeXOaeN6Kz11cksMqtsg@mail.gmail.com>
+ <562753A6.3070107@arm.com> <56278911.9050704@hurleysoftware.com>
+ <CAK7LNAQ_+_9K-y7bmpdGwcH2u4uqJhJhON1Ew4OvzSSa-amyvw@mail.gmail.com>
+Message-ID: <5627BCBC.5040701@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/21/2015 05:01 AM, Andre Przywara wrote:
-> Hi,
+On 10/21/2015 11:38 AM, Masahiro Yamada wrote:
+> Hi Peter.
 > 
-> On 21/10/15 10:35, Borislav Petkov wrote:
->> On Wed, Oct 21, 2015 at 09:55:43AM +0800, Hanjun Guo wrote:
->>> So I think the meaning of those error register is the same, but the way
->>> of handle it may different from SoCs, for single bit error:
+> 2015-10-21 21:46 GMT+09:00 Peter Hurley <peter@hurleysoftware.com>:
+>> On 10/21/2015 04:58 AM, Sudeep Holla wrote:
+>>> On 21/10/15 06:09, Masahiro Yamada wrote:
+>>>> I think there exist two ways to specify the console port and baudrate.
+>>>>
+>>>>
+>>>> [1] Specify console in bootargs
+>>>>
+>>>>    chosen {
+>>>>          bootargs = "console=ttyS0,115200";
+>>>>    };
+>>>>
+>>>>
+>>>> [2] Specify stdout-path
+>>>>
+>>>>     chosen {
+>>>>           stdout-path = "serial0:115200n8";
 >>>
->>>  - SoC may trigger a interrupt;
->>>  - SoC may just keep silent so we need to scan the registers using poll
->>>    mechanism.
->>>
->>> For Double bit error:
->>>   - SoC may also keep silent
->>>   - Trigger a interrupt
->>>   - Trigger a SEI (system error)
->>>
->>> Any suggestion to cover those cases?
+>>> This will work for even early/boot console, so this is better than
+>>> option [1]
 >>
->> Well, I guess we can implement all those and have them configurable
->> in the sense that a single driver loads, it has all functionality and
->> dependent on the vendor detection, it does only what the vendor wants
->> like trigger an interrupt or remain silent or ...
+>> Be aware that options specified via /chosen/stdout-path are
+>> currently ignored by earlycon. There were some hiccups getting the
+>> initial support upstream; when 4.4 hits mainline, I'll resubmit
+>> my series that implements the of_serial i/o properties and
+>> options passthrough to earlycon setup.
 > 
-> I guess the firmware (running in EL3) will take precedence over this
-> driver anyway, so we could just optimistically implement all errors, as
-> the driver will just never see errors that are handled in firmware (?)
-> In case of a critical error for instance I expect the firmware to never
-> return to EL1.
 > 
->>
->> Btw, in talking about this with Andre last night, he had the suggestion
->> that this functionality is also in other implementations besides A57 so
->> maybe the driver should be called arm_cortex_edac...
+> As I said in another thread ("serial: earlycon: allow to specify
+> uartclk in earlycon kernel-parameter"),
+> stdout-path can pass dev->baud, but not port->uartclk.
+
+That's true but I'm not seeing in that thread where you wrote that?
+My replies there were specific to uartclk on the kernel command line,
+which isn't necessary if the bootloader has already initialized the
+uart.
+
+> It is usually specified "clocks" phandle, but
+> clk is not ready at the point of earlycon.
 > 
-> Yeah, so looking at the A-72 and the A-53 TRM I see those registers to
-> be there as well. The A-72 and the A-57 versions look identical to me,
-> the A-53 version is only slightly different, but apparently still
-> compatible.
-> So I'd suggest to let this driver load on detecting all three MIDRs.
-> Should later revisions of any of those parts change the register
-> meaning, we could add a blacklist or specific MIDR detection.
-> 
-> But let's just not assume the worst in the first place ;-)
-> 
-Ok. Will make it generic cortex_arm64_edac. Will check MIDR and call appropriate CPUMERRSR_EL1 and L2MERRSR_EL1. Since I don't have A53 and A72 hence my testing will be limited to Cortex A57.
-> Cheers,
-> Andre.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+> It seems impossible to set up the baudrate even if the options are passed.
+
+It's difficult to understand what you're trying to do when I can't
+see the code you're referring to.  For example, I only recently
+understood that you're talking about a earlycon implementation
+that you're working on and not the 8250 earlycon itself.
+
+If you look at other non-8250 earlycons, you'll see they all ignore
+the baud rate, on the assumption the bootloader already set it up.
+
+The 8250 earlycon is a little different because legacy platforms
+do not initialize the uart.
+
+Regards,
+Peter Hurley
