@@ -1,37 +1,73 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 21 Oct 2015 11:52:43 -0400
-Subject: [PATCH RFC] arm64/ftrace: Define a new arm64 trace clock source
- based on cntpct_el0 register.
-In-Reply-To: <CABHD4K_DmujOCEF=2R4ecJ7uH4yZ6QZAqBFFXpbGTh6i_xFqvA@mail.gmail.com>
-References: <1445170639-13943-1-git-send-email-amittomer25@gmail.com>
- <20151021094404.0e3114f9@gandalf.local.home>
- <CABHD4K_DmujOCEF=2R4ecJ7uH4yZ6QZAqBFFXpbGTh6i_xFqvA@mail.gmail.com>
-Message-ID: <20151021115243.0d6d603f@gandalf.local.home>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Wed, 21 Oct 2015 08:52:03 -0700
+Subject: [PATCH V4 0/8] PCI: ACPI: Setting up DMA coherency for PCI device
+ from _CCA attribute
+Message-ID: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Oct 2015 21:07:04 +0530
-Amit Tomer <amittomer25@gmail.com> wrote:
+This patch series adds support to setup DMA coherency for PCI device using
+the ACPI _CCA attribute. According to the ACPI spec, the _CCA attribute
+is required for ARM64. Therefore, this patch is a pre-req for ACPI PCI
+support for ARM64 which is currently in development.  Also, this should
+not affect other architectures that does not define 
+CONFIG_ACPI_CCA_REQUIRED, since the default value is coherent.
 
-> Thank you for looking into it and providing your comments.
-> 
-> 
-> >> +       [local] global counter x86-tsc arm64-pct
-> >
-> > You don't need to update this line. You can't have both x86-tsc and
-> > arm64-pct at the same time.
-> 
->   Ok, I understand. But is there a nice way to put it, something like
-> x86-tsc/arm64-pct/... ?
+In the process, this series also introduces enum dev_dma_attr and a set
+of APIs to query device DMA attribute. These APIs replace the obsolete
+device_dma_is_coherent(), and acpi_check_dma().
 
-No, it's just an example. No need to update it.
+I have also included a patch from Jeremy posted here:
+    http://www.spinics.net/lists/linux-usb/msg128582.html
 
-> 
-> > Why is this a define and not a static inline?
-> 
-> There is no specific reason to it . I would change it to static inline.
+This patch series  has been tested on AMD Seattle RevB platform.
+The git tree containing tested code and pre-req patches are posted here:
 
-Please do. static inline is preferred over defines. We only use defines
-when a static inline wont work for the needed operation.
+    http://github.com/ssuthiku/linux.git pci-cca-v4
 
--- Steve
+Changes from V3: (https://lkml.org/lkml/2015/8/26/389)
+    * Clean up suggested by Bjorn
+    * Introduce enum dev_dma_attr
+    * Replace device_dma_is_coherent() and acpi_check_dma() with
+      new APIs.
+
+Changes from V2: (https://lkml.org/lkml/2015/8/25/549)
+    * Return -ENOSUPP instead of -1 (per Rafael's suggestion)
+    * Add WARN() when fail to setup DMA for PCI device when booting
+      ACPI (per Arnd's suggestion)
+    * Added Acked-by from Rob.
+    * Minor clean up
+
+Changes from V1: (https://lkml.org/lkml/2015/8/13/182)
+    * Include patch 1 from Jeremy to enable support for _CCA=0
+    * Clean up acpi_check_dma() per Bjorn suggestions
+    * Split the original V1 patch into two patches (patch 3 and 4)
+
+Jeremy Linton (1):
+  Honor ACPI _CCA attribute setting
+
+Suravee Suthikulpanit (7):
+  device property: Introducing enum dev_dma_attr
+  acpi: Adding DMA Attribute APIs for ACPI Device
+  device property: Adding DMA Attribute APIs for Generic Devices
+  device property: acpi: Make use of the new DMA Attribute APIs
+  device property: acpi: Remove unused DMA APIs
+  PCI: OF: Move of_pci_dma_configure() to pci_dma_configure()
+  PCI: ACPI: Add support for PCI device DMA coherency
+
+ drivers/acpi/acpi_platform.c              |  7 +++++-
+ drivers/acpi/glue.c                       |  8 +++---
+ drivers/acpi/scan.c                       | 42 +++++++++++++++++++++++++++++++
+ drivers/base/property.c                   | 32 +++++++++++++++++------
+ drivers/crypto/ccp/ccp-platform.c         |  9 ++++++-
+ drivers/net/ethernet/amd/xgbe/xgbe-main.c |  9 ++++++-
+ drivers/of/of_pci.c                       | 20 ---------------
+ drivers/pci/probe.c                       | 36 ++++++++++++++++++++++++--
+ include/acpi/acpi_bus.h                   | 36 +++-----------------------
+ include/linux/acpi.h                      |  7 +++++-
+ include/linux/of_pci.h                    |  3 ---
+ include/linux/property.h                  | 10 +++++++-
+ 12 files changed, 145 insertions(+), 74 deletions(-)
+
+-- 
+2.1.0
