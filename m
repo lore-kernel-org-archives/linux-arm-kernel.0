@@ -1,10 +1,10 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 21 Oct 2015 16:15:28 -0700
-Subject: [PATCH 3/5] clk: imx27: add missing of_node_put
-In-Reply-To: <1445460100-26727-4-git-send-email-Julia.Lawall@lip6.fr>
+Date: Wed, 21 Oct 2015 16:15:46 -0700
+Subject: [PATCH 4/5] clk: imx31: add missing of_node_put
+In-Reply-To: <1445460100-26727-5-git-send-email-Julia.Lawall@lip6.fr>
 References: <1445460100-26727-1-git-send-email-Julia.Lawall@lip6.fr>
- <1445460100-26727-4-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20151021231528.GJ19782@codeaurora.org>
+ <1445460100-26727-5-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20151021231546.GK19782@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
