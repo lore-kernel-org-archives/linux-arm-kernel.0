@@ -1,48 +1,29 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 21 Oct 2015 13:54:21 +0100
-Subject: Which is better to specify console, "console= " or "stdout-path" ?
-In-Reply-To: <56278911.9050704@hurleysoftware.com>
-References: <CAK7LNAS9uBJ1cVmGBKae3W0tk8Siu1yeXOaeN6Kz11cksMqtsg@mail.gmail.com>
- <562753A6.3070107@arm.com> <56278911.9050704@hurleysoftware.com>
-Message-ID: <56278AFD.8000505@arm.com>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Wed, 21 Oct 2015 08:56:12 -0400
+Subject: [PATCH v4 2/3] xen, cpu_hotplug: call device_offline instead of
+ cpu_down
+In-Reply-To: <1445428430-21567-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1510211251370.27957@kaball.uk.xensource.com>
+ <1445428430-21567-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <56278B6C.7090608@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 21/10/15 13:46, Peter Hurley wrote:
-> On 10/21/2015 04:58 AM, Sudeep Holla wrote:
->> On 21/10/15 06:09, Masahiro Yamada wrote:
->>> I think there exist two ways to specify the console port and baudrate.
->>>
->>>
->>> [1] Specify console in bootargs
->>>
->>>     chosen {
->>>           bootargs = "console=ttyS0,115200";
->>>     };
->>>
->>>
->>> [2] Specify stdout-path
->>>
->>>      chosen {
->>>            stdout-path = "serial0:115200n8";
->>
->> This will work for even early/boot console, so this is better than
->> option [1]
+On 10/21/2015 07:53 AM, Stefano Stabellini wrote:
+> When offlining a cpu, instead of cpu_down, call device_offline, which
+> also takes care of updating the cpu.dev.offline field. This keeps the
+> sysfs file /sys/devices/system/cpu/cpuN/online, up to date.  Also move
+> the call to disable_hotplug_cpu, because it makes more sense to have it
+> there.
 >
-> Be aware that options specified via /chosen/stdout-path are
-> currently ignored by earlycon. There were some hiccups getting the
-> initial support upstream; when 4.4 hits mainline, I'll resubmit
-> my series that implements the of_serial i/o properties and
-> options passthrough to earlycon setup.
+> We don't call device_online at cpu-hotplug time, because that would
+> immediately take the cpu online, while we want to retain the current
+> behaviour: the user needs to explicitly enable the cpu after it has
+> been hotplugged.
 >
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: konrad.wilk at oracle.com
+> CC: boris.ostrovsky at oracle.com
+> CC: david.vrabel at citrix.com
 
-Yes I am aware of that. IIUC it's in -next now and works fine for me.
-But having stdout-path in the DTS won't hinder normal console in anyway.
-So I prefer it even without the patch you are referring(to support early
-console parsing stdout-path)
-
--- 
-Regards,
-Sudeep
+Reviewed-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
