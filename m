@@ -1,42 +1,85 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 21 Oct 2015 16:23:41 +0100
-Subject: [PATCH v2] ARM: dts: fix gpio-keys wakeup-source property
-In-Reply-To: <1445011296-29042-1-git-send-email-sudeep.holla@arm.com>
-References: <1445011296-29042-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <5627ADFD.4050003@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 21 Oct 2015 16:26:42 +0100
+Subject: [PATCH] arm64: kernel: fix tcr_el1.t0sz restore on systems with
+ extended idmap
+Message-ID: <1445441202-21484-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Commit dd006da21646 ("arm64: mm: increase VA range of identity map")
+introduced a mechanism to extend the virtual memory map range
+to support arm64 systems with system RAM located at very high offset,
+where the identity mapping used to enable/disable the MMU requires
+additional translation levels to map the physical memory at an equal
+virtual offset.
 
-On 16/10/15 17:01, Sudeep Holla wrote:
-> The keyboard driver for GPIO buttons(gpio-keys) checks for one of the
-> two boolean properties to enable gpio buttons as wakeup source:
-> 1. "wakeup-source" or
-> 2. the legacy "gpio-key,wakeup"
->
-> However juno, ste-snowball and emev2-kzm9d dts file have a undetected
-> "wakeup" property to indictate the wakeup source.
->
-> This patch fixes it by making use of "wakeup-source" property.
->
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Acked-by: Simon Horman <horms@verge.net.au>
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->   arch/arm/boot/dts/emev2-kzm9d.dts             |  8 ++++----
->   arch/arm/boot/dts/ste-snowball.dts            | 10 +++++-----
->   arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 12 ++++++------
->   3 files changed, 15 insertions(+), 15 deletions(-)
->
-> Hi ARM-SoC group,
->
-> Please consider this as a fix for v4.3 if possible.
->
+The kernel detects at boot time the tcr_el1.t0sz value required by the
+identity mapping and sets-up the tcr_el1.t0sz register field accordingly,
+any time the identity map is required in the kernel (ie when enabling the
+MMU).
 
-Can you include this for v4.3 fixes please ?
+After enabling the MMU, in the cold boot path the kernel resets the
+tcr_el1.t0sz to its default value (ie the actual configuration value for
+the system virtual address space) so that after enabling the MMU the
+memory space translated by ttbr0_el1 is restored as expected.
 
+Commit dd006da21646 ("arm64: mm: increase VA range of identity map")
+also added code to set-up the tcr_el1.t0sz value when the kernel resumes
+from low-power states with the MMU off through cpu_resume() in order to
+effectively use the identity mapping to enable the MMU but failed to add
+the code required to restore the tcr_el1.t0sz to its default value, when
+the core returns to the kernel with the MMU enabled, so that the kernel
+might end up running with tcr_el1.t0sz value set-up for the identity
+mapping which can be lower than the value required by the actual virtual
+address space, resulting in an erroneous set-up.
+
+This patchs adds code in the resume path that restores the tcr_el1.t0sz
+default value upon core resume, mirroring this way the cold boot path
+behaviour therefore fixing the issue.
+
+Fixes: 95322526ef62 ("arm64: kernel: cpu_{suspend/resume} implementation")
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/kernel/suspend.c | 22 +++++++++++++---------
+ 1 file changed, 13 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+index 8297d50..44ca414 100644
+--- a/arch/arm64/kernel/suspend.c
++++ b/arch/arm64/kernel/suspend.c
+@@ -80,17 +80,21 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 	if (ret == 0) {
+ 		/*
+ 		 * We are resuming from reset with TTBR0_EL1 set to the
+-		 * idmap to enable the MMU; restore the active_mm mappings in
+-		 * TTBR0_EL1 unless the active_mm == &init_mm, in which case
+-		 * the thread entered cpu_suspend with TTBR0_EL1 set to
+-		 * reserved TTBR0 page tables and should be restored as such.
++		 * idmap to enable the MMU; set the TTBR0 to the reserved
++		 * page tables to prevent speculative TLB allocations, flush
++		 * the local tlb and set the default tcr_el1.t0sz so that
++		 * the TTBR0 address space set-up is properly restored.
++		 * If the current active_mm != &init_mm we entered cpu_suspend
++		 * with mappings in TTBR0 that must be restored, so we switch
++		 * them back to complete the address space configuration
++		 * restoration before returning.
+ 		 */
+-		if (mm == &init_mm)
+-			cpu_set_reserved_ttbr0();
+-		else
+-			cpu_switch_mm(mm->pgd, mm);
+-
++		cpu_set_reserved_ttbr0();
+ 		flush_tlb_all();
++		cpu_set_default_tcr_t0sz();
++
++		if (mm != &init_mm)
++			cpu_switch_mm(mm->pgd, mm);
+ 
+ 		/*
+ 		 * Restore per-cpu offset before any kernel
 -- 
-Regards,
-Sudeep
+2.5.1
