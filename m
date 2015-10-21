@@ -1,44 +1,21 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Wed, 21 Oct 2015 15:24:41 -0400
-Subject: console vs earlycon ?
-In-Reply-To: <3890353.0icCv0Zeuq@wuerfel>
-References: <CAK7LNARem16fTim8Ds_y8ezMusz_aRtv6c59KoxyC0rLV-RBWw@mail.gmail.com>
- <4963882.HSXu6hF7zO@wuerfel> <5627AFFF.6060900@hurleysoftware.com>
- <3890353.0icCv0Zeuq@wuerfel>
-Message-ID: <5627E679.1050207@hurleysoftware.com>
+From: sowmini.varadhan@oracle.com (Sowmini Varadhan)
+Date: Wed, 21 Oct 2015 15:56:40 -0400
+Subject: [PATCH] iommu-common: fix return type of iommu_tbl_range_alloc()
+In-Reply-To: <CAMuHMdXGM0ynDSv-_MdZptXeqJ=sU7=LChmihSCoqanVTUpWXQ@mail.gmail.com>
+References: <55FBD36C.5070301@arm.com>
+ <1442567375-6963-1-git-send-email-andre.przywara@arm.com>
+ <CAMuHMdXGM0ynDSv-_MdZptXeqJ=sU7=LChmihSCoqanVTUpWXQ@mail.gmail.com>
+Message-ID: <20151021195640.GC14667@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2015 03:00 PM, Arnd Bergmann wrote:
-> On Wednesday 21 October 2015 11:32:15 Peter Hurley wrote:
->> On 10/21/2015 10:13 AM, Arnd Bergmann wrote:
->>> On Wednesday 21 October 2015 09:53:47 Peter Hurley wrote:
->>>> I'm assuming the issue with trying to get console_init() working
->>>> is because the dummy color console causes the earlycon to be disabled?
->>>
->>> I don't think so.
->>>
->>> My line of thinking was more about usability: earlycon requires that
->>> you edit the kernel command line at the moment, while console_init()
->>> doesn't require any user interaction and just uses the stdout-path.
->>>
->>> I guess we could enable earlycon using a Kconfig symbol if we want
->>> to, or make it a per-architecture decision whether it's enabled even
->>> in the absence of the command line flag.
->>
->> Ah, I see. You want to start the stdout-path console at console_init()
->> time.
+On (10/21/15 21:12), Geert Uytterhoeven wrote:
 > 
-> Yes, I see this as a tradeoff: we want the console to be as early as
-> possible in order to report boot-time errors to the user, but not so early
-> to require hacks that can cause problems themselves. earlycon has to
-> do some scary stuff and is relatively recent, while the hacks
-> necessary for console_init() are much older and better tested.
+> Does this function really need to return DMA_ERROR_CODE in case of
+> failure?
 
-I assume you mean the hacks necessary to get _earlycon_ working at
-console_init() time, because the hacks necessary to get non-8250
-serial consoles working at console_init() would be extensive and
-brand new.
+fwiw, this came up very early in code review:
 
-Regards,
-Peter Hurley
+  http://marc.info/?l=linux-sparc&m=142613044704833&w=2
+
+--Sowmini
