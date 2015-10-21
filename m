@@ -1,40 +1,42 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 21 Oct 2015 10:18:17 -0500
-Subject: [PATCH v1 1/2] dt-bindings: Sync the dts to this document
-In-Reply-To: <1445395380-5365-2-git-send-email-wxt@rock-chips.com>
-References: <1445395380-5365-1-git-send-email-wxt@rock-chips.com>
- <1445395380-5365-2-git-send-email-wxt@rock-chips.com>
-Message-ID: <CAL_JsqJ6ZRjZbtc7dqo-g=CzO+H_FWcRqs2gBGH2HMBBM1xU3g@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 21 Oct 2015 16:23:41 +0100
+Subject: [PATCH v2] ARM: dts: fix gpio-keys wakeup-source property
+In-Reply-To: <1445011296-29042-1-git-send-email-sudeep.holla@arm.com>
+References: <1445011296-29042-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <5627ADFD.4050003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 9:42 PM, Caesar Wang <wxt@rock-chips.com> wrote:
-> Add the OTP gpio state, we need switch the pin to gpio state
-> before the TSADC controller is reset.
+Hi Arnd,
+
+On 16/10/15 17:01, Sudeep Holla wrote:
+> The keyboard driver for GPIO buttons(gpio-keys) checks for one of the
+> two boolean properties to enable gpio buttons as wakeup source:
+> 1. "wakeup-source" or
+> 2. the legacy "gpio-key,wakeup"
 >
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> However juno, ste-snowball and emev2-kzm9d dts file have a undetected
+> "wakeup" property to indictate the wakeup source.
+>
+> This patch fixes it by making use of "wakeup-source" property.
+>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Acked-by: Simon Horman <horms@verge.net.au>
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 > ---
+>   arch/arm/boot/dts/emev2-kzm9d.dts             |  8 ++++----
+>   arch/arm/boot/dts/ste-snowball.dts            | 10 +++++-----
+>   arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 12 ++++++------
+>   3 files changed, 15 insertions(+), 15 deletions(-)
 >
-> Changes in v1:
->   - As the Doug comments, add the 'init' property to sync document.
+> Hi ARM-SoC group,
 >
->  Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+> Please consider this as a fix for v4.3 if possible.
 >
-> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-> index ef802de..28e84f7 100644
-> --- a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-> @@ -27,8 +27,9 @@ tsadc: tsadc at ff280000 {
->         clock-names = "tsadc", "apb_pclk";
->         resets = <&cru SRST_TSADC>;
->         reset-names = "tsadc-apb";
-> -       pinctrl-names = "default";
-> -       pinctrl-0 = <&otp_out>;
-> +       pinctrl-names = "init", "default";
-> +       pinctrl-0 = <&otp_gpio>;
-> +       pinctrl-1 = <&otp_out>;
 
-Are these optional or required? They only appear in the example.
+Can you include this for v4.3 fixes please ?
 
-Rob
+-- 
+Regards,
+Sudeep
