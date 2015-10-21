@@ -1,190 +1,67 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Wed, 21 Oct 2015 18:34:08 +0800
-Subject: [PATCH v4 3/6] iommu: add ARM short descriptor page table
- allocator.
-In-Reply-To: <20151009181929.GU26278@arm.com>
-References: <1438597279-2937-1-git-send-email-yong.wu@mediatek.com>
- <1438597279-2937-4-git-send-email-yong.wu@mediatek.com>
- <20150916155824.GM28771@arm.com> <1442501662.8145.151.camel@mhfsdcap03>
- <1442931167.17514.39.camel@mhfsdcap03> <20151009155750.GS26278@arm.com>
- <5617FC5F.60505@arm.com> <20151009181929.GU26278@arm.com>
-Message-ID: <1445423648.27202.52.camel@mhfsdcap03>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Oct 2015 12:36:45 +0200
+Subject: console vs earlycon ?
+In-Reply-To: <CAK7LNATniscPQ_vLMg91PWbMVSdoXtJYGL9nicsn49=ULQ-oAw@mail.gmail.com>
+References: <CAK7LNARem16fTim8Ds_y8ezMusz_aRtv6c59KoxyC0rLV-RBWw@mail.gmail.com>
+ <14202684.GgqlkWAZA0@wuerfel>
+ <CAK7LNATniscPQ_vLMg91PWbMVSdoXtJYGL9nicsn49=ULQ-oAw@mail.gmail.com>
+Message-ID: <5490682.zH2vAEO2id@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-10-09 at 19:19 +0100, Will Deacon wrote:
-> On Fri, Oct 09, 2015 at 06:41:51PM +0100, Robin Murphy wrote:
-> > On 09/10/15 16:57, Will Deacon wrote:
-> > >On Tue, Sep 22, 2015 at 03:12:47PM +0100, Yong Wu wrote:
-> > >>      I would like to show you a problem I met, The recursion here may
-> > >>lead to stack overflow while we test FHD video decode.
-> > >>
-> > >>     From the log, I get the internal variable in the error case: the
-> > >>"size" is 0x100000, the "iova" is 0xfea00000, but at that time the
-> > >>"blk_size" is 0x1000 as it was the map of small-page. so it enter the
-> > >>recursion here.
-> > >>
-> > >>     After check the unmap flow, there is only a iommu_unmap in
-> > >>__iommu_dma_unmap, and it won't check the physical address align in
-> > >>iommu_unmap.
-> > >
-> > >That sounds like a bug in __iommu_dma_unmap. Robin?
-> > 
-> > Isn't it just cf27ec930be9 again wearing different trousers? All I do is
-> > call iommu_unmap with the same total size that was mapped originally.
+On Wednesday 21 October 2015 18:30:05 Masahiro Yamada wrote:
+> >
+> >> I am trying to implement OF_EARLYCON_DECLARE() for that.
+> >>
+> >> I was just wondering if console_initcall() should work as well.
+> >>
+> >>
+> >> As I said, I noticed the console_initcall() in 8250_core.c
+> >> only works on very limited platforms.
+> >
+> > It works with all those that use of_serial.c, right?
 > 
-> I don't think it's the same as that issue, which was to do with installing
-> block mappings over the top of an existing table entry. The problem here
-> seems to be that we don't walk the page table properly on unmap.
+> I doubt it.
 > 
-> The long descriptor code has:
 > 
-> 	/* If the size matches this level, we're in the right place */
-> 	if (size == blk_size) {
-> 		__arm_lpae_set_pte(ptep, 0, &data->iop.cfg);
+> I have a board with a pure 8250-compat device working.
+> (  compatible = "ns16550a")
+> It uses of_serial.c, of course.
 > 
-> 		if (!iopte_leaf(pte, lvl)) {
-> 			/* Also flush any partial walks */
-> 			tlb->tlb_add_flush(iova, size, false, cookie);
-> 			tlb->tlb_sync(cookie);
-> 			ptep = iopte_deref(pte, data);
-> 			__arm_lpae_free_pgtable(data, lvl + 1, ptep);
-> 		} else {
-> 			tlb->tlb_add_flush(iova, size, true, cookie);
-> 		}
 > 
-> 		return size;
-> 	} else if (iopte_leaf(pte, lvl)) {
-> 		/*
-> 		 * Insert a table at the next level to map the old region,
-> 		 * minus the part we want to unmap
-> 		 */
-> 		return arm_lpae_split_blk_unmap(data, iova, size,
-> 						iopte_prot(pte), lvl, ptep,
-> 						blk_size);
-> 	}
-> 
-> why doesn't something similar work for short descriptors?
-> 
-> Will
+> As far as I tested, it would never enable the console at console_init().
 
-Hi Will,
+Ok, that sounds like a bug. Peter and others have changed that code
+a lot in the last year. I wonder if this has never worked then or
+if it has regressed.
 
-   There are some different between long and short descriptor, I can not
-use it directly.
+> The console is enabled when the UART driver is probed.
+> (or earlycon if "earlycon" is specified in the kernel-parameter.)
 
-1. Long descriptor control the blk_size with 3 levels easily whose 
-lvl1 is 4KB, lvl2 is 2MB and lvl3 is 1GB in stage 1. It have 3 levels
-pagetable, then it use 3 levels block_size here. It is ok.
+Got it. Let me know if you think this interpretation is correct:
 
-But I don't use the "level" in short descriptor. At the beginning of
-designing short, I planned to use 4 levels whose lvl1 is 4KB, lvl2 is
-64KB, lvl3 is 1MB, lvl4 is 16MB in short descriptor. then the code may
-be more similar with long descriptor. But there is only 2 levels
-pagetable in short. if we use 4 levels here, It may lead to
-misunderstand. so I don't use the "level" and list the four case in map
-and unmap.
-(If you think short-descriptor could use 4 level like above, I can try
-it.)
+* univ8250_console_match() looks for the earlycon argument format like
+  "console=uart[8250],io|mmio|mmio32,<addr>[,<options>]", and that
+  would work, but we don't want to have to pass all that data when
+  the information should already be there.
 
-2. Following the unmap in long, if it's not a leaf, we free the
-pagetable, then we can delete do-while. I have tested this:
+* univ8250_console_setup() looks for ports that have been added by
+  one of several other methods (including earlycon) already, but
+  we don't do that on ARM without earlycon being enabled.
+
+* arch/powerpc/kernel/legacy_serial.c does everything we need, but
+  does not live in architecture independent code and does a few
+  things that we probably don't need or want there. It relies
+  on scanning the device tree for known UART device nodes before
+  the platform devices are added.
+
+* for console_initcall() to do the right thing, we want both the
+  ttyS devices to get added early for console=ttyS1 to work, as well
+  as having the preferred console work based on the stdout-property.
+
+* we parse the /chosen/stdout-path property in drivers/of/base and
+  store the device node pointer in the global 'of_stdout' variable,
+  but do not use it until the uart is added by the tty driver
+  and calls of_console_check() to add the default console device.
  
-//===========================
-static int arm_short_unmap(struct io_pgtable_ops *ops,
-			   unsigned long iova,
-			   size_t size)
-{
-	struct arm_short_io_pgtable *data = io_pgtable_ops_to_data(ops);
-	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-	void *cookie = data->iop.cookie;
-	arm_short_iopte *pgd, *pte = NULL;
-	arm_short_iopte pgd_tmp, pte_tmp = 0;
-	unsigned int blk_size = 0, blk_base;
-	bool empty = false, split = false;
-	int i;
-
-	blk_size = arm_short_iova_to_blk_size(ops, iova);
-	if (WARN_ON(!blk_size))
-		return 0;
-
-	blk_base = iova & ~(blk_size - 1);
-	pgd = (arm_short_iopte *)data->pgd + ARM_SHORT_PGD_IDX(blk_base);
-
-	if (size == SZ_1M || size == SZ_16M) {/* section or supersection */
-		for (i = 0; i < size/SZ_1M; i++, pgd++, blk_base += SZ_1M) {
-			pgd_tmp = *pgd;
-			__arm_short_set_pte(pgd, 0, 1, cfg);
-
-			cfg->tlb->tlb_add_flush(blk_base, SZ_1M, true, cookie);
-			cfg->tlb->tlb_sync(cookie);
-
-			/* Lvl2 pgtable should be freed while current is pgtable */
-			if (ARM_SHORT_PGD_TYPE_IS_PGTABLE(pgd_tmp))
-				__arm_short_free_pgtable(
-					ARM_SHORT_GET_PGTABLE_VA(pgd_tmp),
-					ARM_SHORT_BYTES_PER_PTE, false, cfg);
-
-			/* Split is needed while unmap 1M in supersection */
-			if (size == SZ_1M && blk_size == SZ_16M)
-				split = true;
-		}
-	} else if (size == SZ_4K || size == SZ_64K) {/* page or large page */
-		pgd_tmp = *pgd;
-
-		/* Unmap the current node */
-		if (blk_size == SZ_4K || blk_size == SZ_64K) {
-			pte = arm_short_get_pte_in_pgd(*pgd, blk_base);
-			pte_tmp = *pte;
-			__arm_short_set_pte(
-				pte, 0, max_t(size_t, size, blk_size) / SZ_4K, cfg);
-
-			empty = __arm_short_pgtable_empty(pgd);
-			if (empty)
-				__arm_short_set_pte(pgd, 0, 1, cfg);
-		} else if (blk_size == SZ_1M || blk_size == SZ_16M) {
-			__arm_short_set_pte(pgd, 0, blk_size / SZ_1M, cfg);
-		}
-
-		cfg->tlb->tlb_add_flush(blk_size, size, true, cookie);
-		cfg->tlb->tlb_sync(cookie);
-
-		if (empty)/* Free lvl2 pgtable */
-			__arm_short_free_pgtable(
-					ARM_SHORT_GET_PGTABLE_VA(pgd_tmp),
-					ARM_SHORT_BYTES_PER_PTE, false, cfg);
-
-		if (blk_size > size)
-			split = true;
-
-	} else {
-		return 0;/* Unmapped size */
-	}
-
-	if (split)/* Split while blk_size > size */
-		return arm_short_split_blk_unmap(
-				ops, iova, size, blk_size,
-				ARM_SHORT_PGD_GET_PROT(pgd_tmp),
-				ARM_SHORT_PTE_GET_PROT_LARGE(pte_tmp));
-
-	return size;
-}
-//===========================
-This look also not good. The do-while in our v5 maybe better than this
-one. what's your opinion?
-
-3. (Also add Joerg)There is a line in iommu_map:
-size_t pgsize = iommu_pgsize(domain, iova | paddr, size);
-
-   And there is a line in iommu_unmap:
-size_t pgsize = iommu_pgsize(domain, iova, size - unmapped);
-
-   Is it possible to change like this:
-phys_addr_t paddr = domain->ops->iova_to_phys(domain, iova);
-size_t pgsize = iommu_pgsize(domain, iova | paddr, size - unmapped);
-
-   If we add physical address align check in iommu_unmap, then it may be
-simpler in the unmap flow.
-   I think iommu_map&iommu_unmap both should be atmoic map/unmap,
-iommu_map check the physical address, Why iommu_unmap don't check the
-physical address?
+	Arnd
