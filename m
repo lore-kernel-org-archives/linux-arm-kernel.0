@@ -1,47 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 21 Oct 2015 16:29:00 +0200
-Subject: [linux-sunxi] [PATCH v2 1/1] dts: sun6i: yones toptech bs1078
- v2: Add AXP221 support to dts
-In-Reply-To: <CAGb2v65S9R=sLVRBdUKFUDXCbEFJWF9Sp8Yw__+Q6ncpgPp7kg@mail.gmail.com>
-References: <1445191673-8869-1-git-send-email-lyu@micile.com>
- <CAGb2v65S9R=sLVRBdUKFUDXCbEFJWF9Sp8Yw__+Q6ncpgPp7kg@mail.gmail.com>
-Message-ID: <20151021142900.GD10947@lukather>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 21 Oct 2015 14:41:10 +0000
+Subject: [PATCH] irqchip: irq-armada-370-xp: fix regression by clearing
+ IRQ_NOAUTOEN
+In-Reply-To: <1445435295-19956-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <alpine.DEB.2.11.1510202121590.8159@nanos>
+ <1445435295-19956-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20151021144110.GH3953@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+Hey Thomas-i, Thomases, :)
 
-On Mon, Oct 19, 2015 at 05:59:20PM +0800, Chen-Yu Tsai wrote:
-> > +/* Voltage source for I2C pullup resistors for I2C Bus 0 */
-> > +&reg_dldo3 {
-> > +       regulator-always-on;
-> > +       regulator-min-microvolt = <2800000>;
-> > +       regulator-max-microvolt = <2800000>;
-> > +       regulator-name = "vcc-csi";
+On Wed, Oct 21, 2015 at 03:48:15PM +0200, Thomas Petazzoni wrote:
+> Commit d17cab4451df1 ("irqchip: Kill off set_irq_flags usage") changed
+> the code of armada_370_xp_mpic_irq_map() from using set_irq_flags() to
+> irq_set_probe().
 > 
-> This should probably be named "vddio-csi".
+> While the commit log seems to imply that there are no functional
+> changes, there are indeed functional changes introduced by this
+> commit: the IRQ_NOAUTOEN flag is no longer cleared. This functional
+> change causes a regression on Armada XP, which no longer works
+> properly after suspend/resume because per-CPU interrupts remain
+> disabled.
 > 
-> I think Maxime and Hans were still debating whether the camera VDDIO
-> regulator should be defined independently as "always-on", instead of
-> having the I2C subsystem do some kind of power sequencing.
+> Due to how the hardware registers work, the irq-armada-370-xp cannot
+> simply save/restore a bunch of registers at suspend/resume to make
+> sure that the interrupts remain in the same state after
+> resuming. Therefore, it relies on the kernel to say whether the
+> interrupt is disabled or not, using the irqd_irq_disabled()
+> function. This was all working fine while the IRQ_NOAUTOEN flag was
+> cleared.
 > 
-> I wonder if the power domain stuff would work for this.
+> With the change introduced by Rob Herring in d17cab4451df1, the
+> IRQ_NOAUTOEN flag is now set for all interrupts. irqd_irq_disabled()
+> returns false for per-CPU interrupts, and therefore our per-CPU
+> interrupts are no longer re-enabled after resume.
+> 
+> This commit works around this problem by clearing again the
+> IRQ_NOAUTOEN flags, so that we are back to the situation we had before
+> commit d17cab4451df1. This work around is proposed as a minimal fix
+> for the problem, while a better long-term solution is being worked on.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+> Here is the one-line minimal change that tglx said would be more
+> acceptable to have in 4.3.
+> ---
+>  drivers/irqchip/irq-armada-370-xp.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-Probably not, power domains are more targeted for in-SoC supplies
-(like when you can gate the power controler by controler).
+Applied to irqchip/urgent with minor tweaking of the subject line.  I
+trust at this point it's ok to pull in -rc2.
 
-This is for external signals.
+thx,
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151021/6a75fa3c/attachment.sig>
+Jason.
