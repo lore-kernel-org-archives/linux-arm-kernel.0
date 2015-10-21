@@ -1,87 +1,42 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 21 Oct 2015 11:10:13 +0100
-Subject: [PATCH 16/19] ARM: dts: s5pv210: replace legacy *,
- wakeup property with wakeup-source
-In-Reply-To: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
-References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1445422216-29375-17-git-send-email-sudeep.holla@arm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 21 Oct 2015 18:08:56 +0800
+Subject: [PATCH v2 3/4] clk: berlin: bg2q: remove CLK_IGNORE_UNUSED flag
+ for sdio clk
+In-Reply-To: <20151021095454.20687.98330@quantum>
+References: <1445339807-2351-1-git-send-email-jszhang@marvell.com>
+ <1445339807-2351-4-git-send-email-jszhang@marvell.com>
+ <20151021093039.20687.88701@quantum>	<20151021095454.20687.98330@quantum>
+Message-ID: <20151021180856.217e11ea@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Though the keyboard and other driver will continue to support the legacy
-"gpio-key,wakeup", "linux,input-wakeup" boolean property to enable the
-wakeup source, "wakeup-source" is the new standard binding.
+Dear Michael,
 
-This patch replaces all the legacy wakeup properties with the unified
-"wakeup-source" property in order to avoid any futher copy-paste
-duplication.
+On Wed, 21 Oct 2015 02:54:54 -0700
+Michael Turquette <mturquette@baylibre.com> wrote:
 
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: linux-samsung-soc at vger.kernel.org
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/boot/dts/s5pv210-aquila.dts   | 4 ++--
- arch/arm/boot/dts/s5pv210-goni.dts     | 4 ++--
- arch/arm/boot/dts/s5pv210-smdkv210.dts | 2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
+> Quoting Michael Turquette (2015-10-21 02:30:39)
+> > Quoting Jisheng Zhang (2015-10-20 04:16:46)  
+> > > Since we have added the necessary two clks' properties in dts, we can
+> > > remove the "sdio" clk's CLK_IGNORE_UNUSED flag now.
+> > > 
+> > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>  
+> > 
+> > Applied to clk-next.  
+> 
+> So the sdhci change was dropped from v2. Do you want me to Ack these
+> instead so you can send them all together?
 
-diff --git a/arch/arm/boot/dts/s5pv210-aquila.dts b/arch/arm/boot/dts/s5pv210-aquila.dts
-index f00cea7aca2f..72f162e7040b 100644
---- a/arch/arm/boot/dts/s5pv210-aquila.dts
-+++ b/arch/arm/boot/dts/s5pv210-aquila.dts
-@@ -257,7 +257,7 @@
- 			linux,code = <KEY_POWER>;
- 			label = "power";
- 			debounce-interval = <1>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- };
-@@ -268,7 +268,7 @@
- 
- &keypad {
- 	linux,input-no-autorepeat;
--	linux,input-wakeup;
-+	wakeup-source;
- 	samsung,keypad-num-rows = <3>;
- 	samsung,keypad-num-columns = <3>;
- 	pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/s5pv210-goni.dts b/arch/arm/boot/dts/s5pv210-goni.dts
-index a3d4643b202e..f4d0a023c31c 100644
---- a/arch/arm/boot/dts/s5pv210-goni.dts
-+++ b/arch/arm/boot/dts/s5pv210-goni.dts
-@@ -239,7 +239,7 @@
- 			linux,code = <KEY_POWER>;
- 			label = "power";
- 			debounce-interval = <1>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- };
-@@ -250,7 +250,7 @@
- 
- &keypad {
- 	linux,input-no-autorepeat;
--	linux,input-wakeup;
-+	wakeup-source;
- 	samsung,keypad-num-rows = <3>;
- 	samsung,keypad-num-columns = <3>;
- 	pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/s5pv210-smdkv210.dts b/arch/arm/boot/dts/s5pv210-smdkv210.dts
-index da7d210df670..54fcc3fc82e2 100644
---- a/arch/arm/boot/dts/s5pv210-smdkv210.dts
-+++ b/arch/arm/boot/dts/s5pv210-smdkv210.dts
-@@ -59,7 +59,7 @@
- 
- &keypad {
- 	linux,input-no-autorepeat;
--	linux,input-wakeup;
-+	wakeup-source;
- 	samsung,keypad-num-rows = <8>;
- 	samsung,keypad-num-columns = <8>;
- 	pinctrl-names = "default";
--- 
-1.9.1
+I'll send another patch to for the sdhci change. it doesn't matter even the
+sdhci change delay a merge window because no functionality changes in the
+sdhci commit.
+
+It's better we firstly take these clk clean ups because it saves power a bit
+and clean up the CLK_IGNORE_UNUSED flag.
+
+Hi Sebastian,
+
+What do you think?
+
+Thanks,
+Jisheng
