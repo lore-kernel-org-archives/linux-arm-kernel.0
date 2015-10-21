@@ -1,36 +1,37 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Tue, 20 Oct 2015 18:28:09 -0700
-Subject: [PATCH 5/5] ARM: keystone: defconfig: Enable CAN support
-In-Reply-To: <1445377809-12516-5-git-send-email-fcooper@ti.com>
-References: <1445377809-12516-1-git-send-email-fcooper@ti.com>
- <1445377809-12516-5-git-send-email-fcooper@ti.com>
-Message-ID: <5626EA29.7050608@oracle.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 21 Oct 2015 10:30:50 +0900
+Subject: [PATCH 1/2] dt-bindings: Consolidate Exynos SoC bindings under Samsung
+ directory
+Message-ID: <1445391051-3727-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2015 2:50 PM, Franklin S Cooper Jr wrote:
-> Newer Keystone 2 devices support CAN. Enable CAN support as modules.
->
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> ---
-Again. Please shown me the usecases before adding config
-option. DTS nodes have to be there.
+Exynos SoC Device Tree bindings are spread over arm/exynos/ and
+arm/samsung/ directories. There is no need for that separation and it
+actually confuses. Put everything under arm/samsung/.
 
->   arch/arm/configs/keystone_defconfig | 3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
-> index ed3e83e..e9bd825 100644
-> --- a/arch/arm/configs/keystone_defconfig
-> +++ b/arch/arm/configs/keystone_defconfig
-> @@ -137,6 +137,9 @@ CONFIG_I2C_DAVINCI=y
->   CONFIG_SPI=y
->   CONFIG_SPI_DAVINCI=y
->   CONFIG_SPI_SPIDEV=y
-> +CONFIG_CAN=m
-> +CONFIG_CAN_C_CAN=m
-> +CONFIG_CAN_C_CAN_PLATFORM=m
->   CONFIG_MMC=y
->   CONFIG_MMC_OMAP_HS=y
->   # CONFIG_HWMON is not set
->
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+---
+ .../devicetree/bindings/arm/{exynos => samsung}/power_domain.txt          | 0
+ Documentation/devicetree/bindings/arm/{ => samsung}/samsung-boards.txt    | 0
+ Documentation/devicetree/bindings/arm/{exynos => samsung}/smp-sysram.txt  | 0
+ 3 files changed, 0 insertions(+), 0 deletions(-)
+ rename Documentation/devicetree/bindings/arm/{exynos => samsung}/power_domain.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => samsung}/samsung-boards.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{exynos => samsung}/smp-sysram.txt (100%)
+
+diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/samsung/power_domain.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+rename to Documentation/devicetree/bindings/arm/samsung/power_domain.txt
+diff --git a/Documentation/devicetree/bindings/arm/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/samsung-boards.txt
+rename to Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+diff --git a/Documentation/devicetree/bindings/arm/exynos/smp-sysram.txt b/Documentation/devicetree/bindings/arm/samsung/smp-sysram.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/exynos/smp-sysram.txt
+rename to Documentation/devicetree/bindings/arm/samsung/smp-sysram.txt
+-- 
+1.9.1
