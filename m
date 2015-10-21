@@ -1,31 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Oct 2015 00:54:28 +0200
-Subject: console vs earlycon ?
-In-Reply-To: <5627E679.1050207@hurleysoftware.com>
-References: <CAK7LNARem16fTim8Ds_y8ezMusz_aRtv6c59KoxyC0rLV-RBWw@mail.gmail.com>
- <3890353.0icCv0Zeuq@wuerfel> <5627E679.1050207@hurleysoftware.com>
-Message-ID: <4134303.BAT7dSJRN3@wuerfel>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 21 Oct 2015 17:55:07 -0500
+Subject: [PATCH v3 1/2] phy: keystone: serdes driver for gbe 10gbe and pcie
+In-Reply-To: <1445432201-16007-2-git-send-email-w-kwok2@ti.com>
+References: <1445432201-16007-1-git-send-email-w-kwok2@ti.com>
+ <1445432201-16007-2-git-send-email-w-kwok2@ti.com>
+Message-ID: <CAL_JsqKSteJnz53YuBbgR1K9GWQDddkaqFo1aVxd8RsDam5jSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 October 2015 15:24:41 Peter Hurley wrote:
-> On 10/21/2015 03:00 PM, Arnd Bergmann wrote:
+On Wed, Oct 21, 2015 at 7:56 AM, WingMan Kwok <w-kwok2@ti.com> wrote:
+> On TI's Keystone platforms, several peripherals such as the
+> gbe ethernet switch, 10gbe ethernet switch and PCIe controller
+> require the use of a SerDes for converting SoC parallel data into
+> serialized data that can be output over a high-speed electrical
+> interface, and also converting high-speed serial input data
+> into parallel data that can be processed by the SoC.  The
+> SerDeses used by those peripherals, though they may be different,
+> are largely similar in functionality and setup.
+>
+> This patch provides a SerDes phy driver implementation that can be
+> used by the above mentioned peripheral drivers to configure their
+> respective SerDeses.
+>
+> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+> ---
+>  Documentation/devicetree/bindings/phy/ti-phy.txt |  239 +++
 
-> > Yes, I see this as a tradeoff: we want the console to be as early as
-> > possible in order to report boot-time errors to the user, but not so early
-> > to require hacks that can cause problems themselves. earlycon has to
-> > do some scary stuff and is relatively recent, while the hacks
-> > necessary for console_init() are much older and better tested.
-> 
-> I assume you mean the hacks necessary to get _earlycon_ working at
-> console_init() time, because the hacks necessary to get non-8250
-> serial consoles working at console_init() would be extensive and
-> brand new.
-> 
+For the binding:
 
-No, I was just being slow and assumed that the 51 drivers that come with
-a console_initcall() do something in there to actually start the console,
-but you are right that most of them don't actually do that. They just
-call register_console() and wait for the device to show up later.
+Acked-by: Rob Herring <robh@kernel.org>
 
-	Arnd
+
+One other comment:
+
+> +       if (of_device_is_compatible(np, "ti,keystone-serdes-gbe")) {
+> +               sc->phy_type = KSERDES_PHY_SGMII;
+> +       } else if (of_device_is_compatible(np, "ti,keystone-serdes-xgbe")) {
+> +               sc->phy_type = KSERDES_PHY_XGE;
+> +       } else if (of_device_is_compatible(np, "ti,keystone-serdes-pcie")) {
+> +               sc->phy_type = KSERDES_PHY_PCIE;
+> +       } else {
+> +               dev_err(dev, "unknown phy type\n");
+> +               return -EINVAL;
+> +       }
+
+Use the match data to set the type:
+
+> +static const struct of_device_id kserdes_of_match[] = {
+> +       { .compatible = "ti,keystone-serdes-gbe" },
+> +       { .compatible = "ti,keystone-serdes-pcie" },
+> +       { .compatible = "ti,keystone-serdes-xgbe" },
+> +       { },
+> +};
+> +MODULE_DEVICE_TABLE(of, kserdes_of_match);
+
+Rob
