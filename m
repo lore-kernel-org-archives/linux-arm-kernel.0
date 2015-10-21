@@ -1,37 +1,74 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 21 Oct 2015 15:58:44 +0200
-Subject: [GIT PULL 3/6] KVM: arm: use GIC support unconditionally
-In-Reply-To: <9140096.cYCnE2rDUr@wuerfel>
-References: <1445357947-6022-1-git-send-email-christoffer.dall@linaro.org>
- <1445357947-6022-4-git-send-email-christoffer.dall@linaro.org>
- <672714208.55851501.1445370665940.JavaMail.zimbra@zmail13.collab.prod.int.phx2.redhat.com>
- <9140096.cYCnE2rDUr@wuerfel>
-Message-ID: <20151021135844.GB13488@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Oct 2015 16:13:08 +0200
+Subject: console vs earlycon ?
+In-Reply-To: <562798EB.7060202@hurleysoftware.com>
+References: <CAK7LNARem16fTim8Ds_y8ezMusz_aRtv6c59KoxyC0rLV-RBWw@mail.gmail.com>
+ <5490682.zH2vAEO2id@wuerfel> <562798EB.7060202@hurleysoftware.com>
+Message-ID: <4963882.HSXu6hF7zO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2015 at 03:45:20PM +0200, Arnd Bergmann wrote:
-> On Tuesday 20 October 2015 15:51:05 Paolo Bonzini wrote:
-> > Should this be "select" or "depends on"? Not a blocker, can always be fixed in 4.4.
+On Wednesday 21 October 2015 09:53:47 Peter Hurley wrote:
+> On 10/21/2015 06:36 AM, Arnd Bergmann wrote:
+> > On Wednesday 21 October 2015 18:30:05 Masahiro Yamada wrote:
+> >>>
+> >>>> I am trying to implement OF_EARLYCON_DECLARE() for that.
+> >>>>
+> >>>> I was just wondering if console_initcall() should work as well.
+> >>>>
+> >>>>
+> >>>> As I said, I noticed the console_initcall() in 8250_core.c
+> >>>> only works on very limited platforms.
+> >>>
+> >>> It works with all those that use of_serial.c, right?
+> >>
+> >> I doubt it.
+> >>
+> >>
+> >> I have a board with a pure 8250-compat device working.
+> >> (  compatible = "ns16550a")
+> >> It uses of_serial.c, of course.
+> >>
+> >>
+> >> As far as I tested, it would never enable the console at console_init().
+> > 
+> > Ok, that sounds like a bug. Peter and others have changed that code
+> > a lot in the last year. I wonder if this has never worked then or
+> > if it has regressed.
 > 
-> We have lots of 'select ARM_GIC' in the tree for platforms that use one, using
-> 'depends on' will limit KVM support to being available only if at least one
-> of them is being used.
+> No, not a bug. console_init() is only for legacy platforms, not for
+> probed drivers.
+
+Ah, I had no idea we were moving in this direction. So I guess the idea
+is not to add another for_each_compatible_node() loop when we already have
+two places (earlycon and tty) in the code that do this?
+
+> > * arch/powerpc/kernel/legacy_serial.c does everything we need, but
+> >   does not live in architecture independent code and does a few
+> >   things that we probably don't need or want there. It relies
+> >   on scanning the device tree for known UART device nodes before
+> >   the platform devices are added.
+> > 
+> > * for console_initcall() to do the right thing, we want both the
+> >   ttyS devices to get added early for console=ttyS1 to work, as well
+> >   as having the preferred console work based on the stdout-property.
+> > 
+> > * we parse the /chosen/stdout-path property in drivers/of/base and
+> >   store the device node pointer in the global 'of_stdout' variable,
+> >   but do not use it until the uart is added by the tty driver
+> >   and calls of_console_check() to add the default console device.
 > 
-> The only platform I can think of that uses ARMv7ve without actually having
-> a GIC is BCM2836 (Raspberry Pi 2). Can we actually run KVM on a platform
-> like that? If so, 'depends on' might be better, otherwise let's stay with
-> 'select'.
+> I'm assuming the issue with trying to get console_init() working
+> is because the dummy color console causes the earlycon to be disabled?
 
-Yes you can, just without the VGIC and the timer - you have to emulate
-that in userspace.  Samsung also has a broken platform where they
-integrated things incorrectly, so you cannot use the VGIC, but that
-platform support is out of tree, so I can't see if it uses the GIC in
-general or not.
+I don't think so.
 
-I'm a bit confused why using 'depends on' in this case helps anythign?
+My line of thinking was more about usability: earlycon requires that
+you edit the kernel command line at the moment, while console_init()
+doesn't require any user interaction and just uses the stdout-path.
 
-(I know, I suck at dealing with the config system)
+I guess we could enable earlycon using a Kconfig symbol if we want
+to, or make it a per-architecture decision whether it's enabled even
+in the absence of the command line flag.
 
-Thanks,
--Christoffer
+	Arnd
