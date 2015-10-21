@@ -1,46 +1,89 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 21 Oct 2015 10:14:37 +0530
-Subject: [PATCH v3 1/3] mailbox/omap: Add ti, mbox-send-noirq quirk to fix
- AM33xx CPU Idle
-In-Reply-To: <1442967294-23837-2-git-send-email-d-gerlach@ti.com>
-References: <1442967294-23837-1-git-send-email-d-gerlach@ti.com>
- <1442967294-23837-2-git-send-email-d-gerlach@ti.com>
-Message-ID: <CABb+yY0rCGCj=vkNXP1c9zonX+snBxdKFeQ4JCo2aKb-h6JhCw@mail.gmail.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Tue, 20 Oct 2015 21:57:46 -0700
+Subject: [PATCH 3/7] ARM: dts: qcom: msm8974-honami: Introduce gpio-keys
+In-Reply-To: <1445403470-17434-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1445403470-17434-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1445403470-17434-3-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 5:44 AM, Dave Gerlach <d-gerlach@ti.com> wrote:
-> The mailbox framework controls the transmission queue and requires
-> either its controller implementations or clients to run the state
-> machine for the Tx queue. The OMAP mailbox controller uses a Tx-ready
-> interrupt as the equivalent of a Tx-done interrupt to run this Tx
-> queue state-machine.
->
-> The WkupM3 processor on AM33xx and AM43xx SoCs is used to offload
-> certain PM tasks, like doing the necessary operations for Device
-> PM suspend/resume or for entering lower c-states during cpuidle.
->
-> The CPUIdle on AM33xx requires the messages to be sent without
-> having to trigger the Tx-ready interrupts, as the interrupt
-> would immediately terminate the CPUIdle operation. Support for
-> this has been added by introducing a DT quirk, "ti,mbox-send-noirq"
-> and using it to modify the normal OMAP mailbox controller behavior
-> on the sub-mailboxes used to communicate with the WkupM3 remote
-> processor. This also requires the wkup_m3_ipc driver to adjust
-> its mailbox usage logic to run the Tx state machine.
->
-Probably Suman already updated you on what was discussed about this
-patch at Connect-SFO. My suggestion was to drive TX poll-based (I
-know, I know...) because the "interrupt-driven" is just an impression,
-it is not really. You get the interrupt as soon as you enable it
-because it is the "FIFO not-full" interrupt which is always because
-there is always space left after writing to the fifo. The cons are
-that it buffers messages hidden from the client while abusing the irq.
-If you guys could break away from the "interrupt-driven" illusion and
-use polling which it actually is, everything falls into place and you
-avoid the "ti,mbox-send-noirq" quirk.
+Introduce a gpio-keys node defining the physical keys of the Honami and
+the associated pinctrl state.
 
-  Anyways I am OK too, if you guys want to fix it with a platform
-specific quirk. Let me know I'll pick this patch.
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
+ .../boot/dts/qcom-msm8974-sony-xperia-honami.dts   | 45 ++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-Cheers!
+diff --git a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
+index 5768c97bb124..8c0753a32b20 100644
+--- a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
++++ b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
+@@ -2,6 +2,7 @@
+ #include "qcom-pm8841.dtsi"
+ #include "qcom-pm8941.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
+ #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
+ 
+ / {
+@@ -16,6 +17,42 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	gpio-keys {
++		compatible = "gpio-keys";
++		input-name = "gpio-keys";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&gpio_keys_pin_a>;
++
++		volume-down {
++			label = "volume_down";
++			gpios = <&pm8941_gpios 2 GPIO_ACTIVE_LOW>;
++			linux,input-type = <1>;
++			linux,code = <KEY_VOLUMEDOWN>;
++		};
++
++		camera-snapshot {
++			label = "camera_snapshot";
++			gpios = <&pm8941_gpios 3 GPIO_ACTIVE_LOW>;
++			linux,input-type = <1>;
++			linux,code = <KEY_CAMERA>;
++		};
++
++		camera-focus {
++			label = "camera_focus";
++			gpios = <&pm8941_gpios 4 GPIO_ACTIVE_LOW>;
++			linux,input-type = <1>;
++			linux,code = <KEY_CAMERA_FOCUS>;
++		};
++
++		volume-up {
++			label = "volume_up";
++			gpios = <&pm8941_gpios 5 GPIO_ACTIVE_LOW>;
++			linux,input-type = <1>;
++			linux,code = <KEY_VOLUMEUP>;
++		};
++	};
++
+ 	memory at 0 {
+ 		reg = <0 0x40000000>, <0x40000000 0x40000000>;
+ 		device_type = "memory";
+@@ -275,6 +312,14 @@
+ 				pins = "gpio21";
+ 				function = "normal";
+ 			};
++
++			gpio_keys_pin_a: gpio-keys-active {
++				pins = "gpio2", "gpio3", "gpio4", "gpio5";
++				function = "normal";
++
++				bias-pull-up;
++				power-source = <PM8941_GPIO_S3>;
++			};
+ 		};
+ 
+ 		coincell at 2800 {
+-- 
+2.4.2
