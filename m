@@ -1,30 +1,79 @@
-From: iain@mcfarlanes.me (Iain McFarlane)
-Date: Wed, 21 Oct 2015 22:31:45 +0100
-Subject: I/O issues with writing to mtdblock devices on kirkwood
-In-Reply-To: <CAKzmTe2Z2hOTuHYcXx9HUjJbri1Tm9qwye-rxxsWNxrsjGqp+w@mail.gmail.com>
-References: <1444722697.16876.55.camel@debian.org>
- <5626B4DC.8000407@mcfarlanes.me> <5627F4E8.3030907@mcfarlanes.me>
- <1445461864.32735.21.camel@debian.org> <5628022A.9050707@mcfarlanes.me>
- <CAKzmTe2Z2hOTuHYcXx9HUjJbri1Tm9qwye-rxxsWNxrsjGqp+w@mail.gmail.com>
-Message-ID: <56280441.1010007@mcfarlanes.me>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 21 Oct 2015 16:34:16 -0500
+Subject: [PATCH v4 6/6] PCI: layerscape: add ls_pcie_msi_host_init
+In-Reply-To: <1444979960-24100-6-git-send-email-Minghuan.Lian@freescale.com>
+References: <1444979960-24100-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1444979960-24100-6-git-send-email-Minghuan.Lian@freescale.com>
+Message-ID: <20151021213416.GJ1583@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/10/15 22:28, JM wrote:
-> On Wed, Oct 21, 2015 at 11:22 PM, Iain McFarlane <iain@mcfarlanes.me> wrote:
->> On a different note anyone know why udev would not be running modprobe?
->> Every time I reboot this box I have to the reload any of the modules not
->> specified in the initrd even things like mvmdio to get the network working.
->>
-> If you see something like ' kmod_search_moddep() could not open moddep
-> file' in your logs, you need to run depmod -a manually.
->
-> I've had it happen once for not entirely clear reasons, but probably
-> related to the interrupted kernel package installation.
->
-> HTH,
-> Jan
->
-> PS Now we have Ian, Iain and Jan posting in this thread.
->
-I tried that but no luck - any other ideas?
+Hi Minghuan,
+
+On Fri, Oct 16, 2015 at 03:19:20PM +0800, Minghuan Lian wrote:
+> Layerscape PCIe has its own MSI implementation. The patch registers
+> ls_pcie_msi_host_init() to avoid using Designware's MSI.
+> 
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> ---
+> Change log
+> v4: split from [PATCH v3] PCI: layerscape: Add PCIe support for LS1043a and LS2080a
+> 
+>  drivers/pci/host/pci-layerscape.c | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+> index c53692a..8fac6c8 100644
+> --- a/drivers/pci/host/pci-layerscape.c
+> +++ b/drivers/pci/host/pci-layerscape.c
+> @@ -150,14 +150,31 @@ static void ls_pcie_host_init(struct pcie_port *pp)
+>  	iowrite32(0, pcie->dbi + PCIE_DBI_RO_WR_EN);
+>  }
+>  
+> +static int ls_pcie_msi_host_init(struct pcie_port *pp,
+> +				 struct msi_controller *chip)
+> +{
+> +	struct device_node *msi_node;
+> +	struct device_node *np = pp->dev->of_node;
+> +
+> +	msi_node = of_parse_phandle(np, "msi-parent", 0);
+> +	if (!msi_node) {
+> +		dev_err(pp->dev, "failed to find msi-parent\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	return 0;
+
+I don't see how this can be right.  I think it's OK if you want to enforce
+the presence of "msi-parent", but the other implementations of
+.msi_host_init (ks_dw_pcie_msi_host_init() and the default implementation
+in dw_pcie_host_init()) both set pp->irq_domain and call
+irq_create_mapping().
+
+You don't do either of those, so I don't see how MSIs can work, because I
+assume the generic DesignWare code will depend on pp->irq_domain.  If
+you're planning to add more Layerscape-specific MSI support later, I think
+you should wait and include this patch with that work.
+
+> +}
+> +
+>  static struct pcie_host_ops ls1021_pcie_host_ops = {
+>  	.link_up = ls1021_pcie_link_up,
+>  	.host_init = ls1021_pcie_host_init,
+> +	.msi_host_init = ls_pcie_msi_host_init,
+>  };
+>  
+>  static struct pcie_host_ops ls_pcie_host_ops = {
+>  	.link_up = ls_pcie_link_up,
+>  	.host_init = ls_pcie_host_init,
+> +	.msi_host_init = ls_pcie_msi_host_init,
+>  };
+>  
+>  static struct ls_pcie_drvdata ls1021_drvdata = {
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
