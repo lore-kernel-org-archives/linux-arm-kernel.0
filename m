@@ -1,116 +1,83 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 21 Oct 2015 08:52:06 -0700
-Subject: [PATCH V4 3/8] acpi: Adding DMA Attribute APIs for ACPI Device
+Date: Wed, 21 Oct 2015 08:52:07 -0700
+Subject: [PATCH V4 4/8] device property: Adding DMA Attribute APIs for Generic
+ Devices
 In-Reply-To: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1445442731-28819-4-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1445442731-28819-5-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding acpi_get_dma_attr() to query DMA attributes of ACPI devices.
-It returns the enum dev_dma_attr, which communicates DMA information
-more clearly. This API replaces the acpi_check_dma(), which will be
-removed in subsequent patch.
+The function device_dma_is_coherent() does not sufficiently
+communicate device DMA attributes. Instead, this patch introduces
+device_get_dma_attr(), which returns enum dev_dma_attr.
+It replaces the acpi_check_dma(), which will be removed in
+subsequent patch.
 
-This patch also provides a convenient function, acpi_dma_supported(),
-to check DMA support of the specified ACPI device.
+This also provides a convenient function, device_dma_supported(),
+to check DMA support of the specified device.
 
 Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
 CC: Rafael J. Wysocki <rjw@rjwysocki.net>
 ---
- drivers/acpi/scan.c     | 42 ++++++++++++++++++++++++++++++++++++++++++
- include/acpi/acpi_bus.h |  3 +++
- include/linux/acpi.h    | 10 ++++++++++
- 3 files changed, 55 insertions(+)
+ drivers/base/property.c  | 29 +++++++++++++++++++++++++++++
+ include/linux/property.h |  4 ++++
+ 2 files changed, 33 insertions(+)
 
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index 01136b8..3be213e 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -1328,6 +1328,48 @@ void acpi_free_pnp_ids(struct acpi_device_pnp *pnp)
- 	kfree(pnp->unique_id);
+diff --git a/drivers/base/property.c b/drivers/base/property.c
+index 2d75366..baac186 100644
+--- a/drivers/base/property.c
++++ b/drivers/base/property.c
+@@ -547,6 +547,35 @@ bool device_dma_is_coherent(struct device *dev)
  }
+ EXPORT_SYMBOL_GPL(device_dma_is_coherent);
  
-+/**
-+ * acpi_dma_supported - Check DMA support for the specified device.
-+ * @adev: The pointer to acpi device
-+ *
-+ * Return false if DMA is not supported. Otherwise, return true
-+ */
-+bool acpi_dma_supported(struct acpi_device *adev)
++bool device_dma_supported(struct device *dev)
 +{
-+	if (!adev)
-+		return false;
-+
-+	if (adev->flags.cca_seen)
++	/* For DT, this is always supported.
++	 * For ACPI, this depends on CCA, which
++	 * is determined by the acpi_dma_supported().
++	 */
++	if (IS_ENABLED(CONFIG_OF) && dev->of_node)
 +		return true;
 +
-+	/*
-+	* Per ACPI 6.0 sec 6.2.17, assume devices can do cache-coherent
-+	* DMA on "Intel platforms".  Presumably that includes all x86 and
-+	* ia64, and other arches will set CONFIG_ACPI_CCA_REQUIRED=y.
-+	*/
-+	if (!IS_ENABLED(CONFIG_ACPI_CCA_REQUIRED))
-+		return true;
-+
-+	return false;
++	return acpi_dma_supported(ACPI_COMPANION(dev));
 +}
++EXPORT_SYMBOL_GPL(device_dma_supported);
 +
-+/**
-+ * acpi_get_dma_attr - Check the supported DMA attr for the specified device.
-+ * @adev: The pointer to acpi device
-+ *
-+ * Return enum dev_dma_attr.
-+ */
-+enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
++enum dev_dma_attr device_get_dma_attr(struct device *dev)
 +{
-+	if (!acpi_dma_supported(adev))
-+		return DEV_DMA_NOT_SUPPORTED;
++	enum dev_dma_attr attr = DEV_DMA_NOT_SUPPORTED;
 +
-+	if (adev->flags.coherent_dma)
-+		return DEV_DMA_COHERENT;
-+	else
-+		return DEV_DMA_NON_COHERENT;
++	if (IS_ENABLED(CONFIG_OF) && dev->of_node) {
++		if (of_dma_is_coherent(dev->of_node))
++			attr = DEV_DMA_COHERENT;
++		else
++			attr = DEV_DMA_NON_COHERENT;
++	} else
++		attr = acpi_get_dma_attr(ACPI_COMPANION(dev));
++
++	return attr;
 +}
++EXPORT_SYMBOL_GPL(device_get_dma_attr);
 +
- static void acpi_init_coherency(struct acpi_device *adev)
- {
- 	unsigned long long cca = 0;
-diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
-index 5a42204..13417d0 100644
---- a/include/acpi/acpi_bus.h
-+++ b/include/acpi/acpi_bus.h
-@@ -567,6 +567,9 @@ struct acpi_pci_root {
+ /**
+  * device_get_phy_mode - Get phy mode for given device
+  * @dev:	Pointer to the given device
+diff --git a/include/linux/property.h b/include/linux/property.h
+index 522c1bf..bde8de3 100644
+--- a/include/linux/property.h
++++ b/include/linux/property.h
+@@ -172,6 +172,10 @@ void device_add_property_set(struct device *dev, struct property_set *pset);
  
- /* helper */
+ bool device_dma_is_coherent(struct device *dev);
  
-+bool acpi_dma_supported(struct acpi_device *adev);
-+enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev);
++bool device_dma_supported(struct device *dev);
 +
- struct acpi_device *acpi_find_child_device(struct acpi_device *parent,
- 					   u64 address, bool check_children);
- int acpi_is_root_bridge(acpi_handle);
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index dd39202..c47892c 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -569,6 +569,16 @@ static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
- 	return false;
- }
- 
-+static inline bool acpi_dma_supported(struct acpi_device *adev)
-+{
-+	return false;
-+}
++enum dev_dma_attr device_get_dma_attr(struct device *dev);
 +
-+static inline enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
-+{
-+	return DEV_DMA_NOT_SUPPORTED;
-+}
-+
- #define ACPI_PTR(_ptr)	(NULL)
+ int device_get_phy_mode(struct device *dev);
  
- #endif	/* !CONFIG_ACPI */
+ void *device_get_mac_address(struct device *dev, char *addr, int alen);
 -- 
 2.1.0
