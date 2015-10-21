@@ -1,94 +1,80 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 21 Oct 2015 11:10:06 +0100
-Subject: [PATCH 09/19] ARM: dts: am335x: replace gpio-key,
+Date: Wed, 21 Oct 2015 11:10:05 +0100
+Subject: [PATCH 08/19] ARM: dts: spear: replace gpio-key,
  wakeup with wakeup-source property
 In-Reply-To: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
 References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1445422216-29375-10-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1445422216-29375-9-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
-check for/support the legacy "gpio-key,wakeup" boolean property to
-enable gpio buttons as wakeup source, "wakeup-source" is the new
-standard binding.
+Keyboard driver for GPIO buttons(gpio-keys) checks for the legacy
+"gpio-key,wakeup" boolean property to enable gpio buttons as wakeup
+source.
+
+Few dts files assign value "1" to gpio-key,wakeup which is incorrect.
+Since the presence of the boolean property indicates it is enabled,
+value of "0" or "1" have no significance.
 
 This patch replaces the legacy "gpio-key,wakeup" with the unified
-"wakeup-source" property in order to avoid any futher copy-paste
-duplication.
+"wakeup-source" property which inturn fixes the above mentioned issue.
 
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: linux-omap at vger.kernel.org
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm/boot/dts/am335x-evm.dts    | 4 ++--
- arch/arm/boot/dts/am335x-evmsk.dts  | 2 +-
- arch/arm/boot/dts/am335x-pepper.dts | 6 +++---
- 3 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/spear1310-evb.dts | 2 +-
+ arch/arm/boot/dts/spear1340-evb.dts | 2 +-
+ arch/arm/boot/dts/spear320-hmi.dts  | 4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 1942a5c8132d..a6e398a213ec 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -83,14 +83,14 @@
- 			label = "volume-up";
- 			linux,code = <115>;
- 			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
--			gpio-key,wakeup;
-+			wakeup-source;
+diff --git a/arch/arm/boot/dts/spear1310-evb.dts b/arch/arm/boot/dts/spear1310-evb.dts
+index e48857249ce7..84101e4eebbf 100644
+--- a/arch/arm/boot/dts/spear1310-evb.dts
++++ b/arch/arm/boot/dts/spear1310-evb.dts
+@@ -161,7 +161,7 @@
+ 				linux,code = <0x100>;
+ 				gpios = <&gpio0 7 0x4>;
+ 				debounce-interval = <20>;
+-				gpio-key,wakeup = <1>;
++				wakeup-source;
+ 			};
  		};
  
- 		switch at 10 {
- 			label = "volume-down";
- 			linux,code = <114>;
- 			gpios = <&gpio0 3 GPIO_ACTIVE_LOW>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index 315bb02c9920..6b57baaa2bb0 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -123,7 +123,7 @@
- 			label = "button2";
- 			linux,code = <0x102>;
- 			gpios = <&gpio0 30 GPIO_ACTIVE_HIGH>;
--			gpio-key,wakeup;
-+			wakeup-source;
+diff --git a/arch/arm/boot/dts/spear1340-evb.dts b/arch/arm/boot/dts/spear1340-evb.dts
+index c611f5606dfe..6565f3cb866f 100644
+--- a/arch/arm/boot/dts/spear1340-evb.dts
++++ b/arch/arm/boot/dts/spear1340-evb.dts
+@@ -223,7 +223,7 @@
+ 				linux,code = <0x100>;
+ 				gpios = <&gpio1 1 0x4>;
+ 				debounce-interval = <20>;
+-				gpio-key,wakeup = <1>;
++				wakeup-source;
+ 			};
  		};
  
- 		switch at 4 {
-diff --git a/arch/arm/boot/dts/am335x-pepper.dts b/arch/arm/boot/dts/am335x-pepper.dts
-index 7106114c7464..5107dbb07a7d 100644
---- a/arch/arm/boot/dts/am335x-pepper.dts
-+++ b/arch/arm/boot/dts/am335x-pepper.dts
-@@ -627,21 +627,21 @@
- 		label = "home";
- 		linux,code = <KEY_HOME>;
- 		gpios = <&gpio1 22 GPIO_ACTIVE_LOW>;
--		gpio-key,wakeup;
-+		wakeup-source;
- 	};
+diff --git a/arch/arm/boot/dts/spear320-hmi.dts b/arch/arm/boot/dts/spear320-hmi.dts
+index 0aa6fef5ce22..0d0da1f65f0e 100644
+--- a/arch/arm/boot/dts/spear320-hmi.dts
++++ b/arch/arm/boot/dts/spear320-hmi.dts
+@@ -141,7 +141,7 @@
+ 				linux,code = <0x100>;
+ 				gpios = <&stmpegpio 3 0x4>;
+ 				debounce-interval = <20>;
+-				gpio-key,wakeup = <1>;
++				wakeup-source;
+ 			};
  
- 	button at 1 {
- 		label = "menu";
- 		linux,code = <KEY_MENU>;
- 		gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;
--		gpio-key,wakeup;
-+		wakeup-source;
- 	};
- 
- 	buttons at 2 {
- 		label = "power";
- 		linux,code = <KEY_POWER>;
- 		gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
--		gpio-key,wakeup;
-+		wakeup-source;
- 	};
- };
+ 			button at 2 {
+@@ -149,7 +149,7 @@
+ 				linux,code = <0x200>;
+ 				gpios = <&stmpegpio 2 0x4>;
+ 				debounce-interval = <20>;
+-				gpio-key,wakeup = <1>;
++				wakeup-source;
+ 			};
+ 		};
  
 -- 
 1.9.1
