@@ -1,125 +1,41 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Wed, 21 Oct 2015 20:32:47 +0900
-Subject: [PATCH v2 2/2] arm64: fix dump_backtrace() to show correct
- pt_regs at interrupt
-In-Reply-To: <1445328019-23330-3-git-send-email-takahiro.akashi@linaro.org>
-References: <1445328019-23330-1-git-send-email-takahiro.akashi@linaro.org>
- <1445328019-23330-3-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <465BAA45-CF32-4131-9EC6-7A7C463693A5@gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 21 Oct 2015 20:36:26 +0900
+Subject: [PATCH 0/4] ARM: dts: uniphier: DTS updates for UniPhier SoCs for
+ Linux 4.14-rc1 (2nd try)
+Message-ID: <1445427390-22750-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 20, 2015, at 5:00 PM, AKASHI Takahiro wrote:
+Hi Arnd,
 
-Hi Akashi,
+I dropped I2C aliases.
+(I want this policy to be consistent for all the uniphier DTS files.
+2/4 deletes them from existing DTS files too.)
 
-> Adding an extra dummy stack frame for interrupt has one side-effect that
-> dump_backtrace() shows inccorect data of struct pt_regs at
-> "Exception stack ..." because we are still on an interrupt stack when
-> dump_backtrace() encounters an interrupt handler's frame.
-> 
-> This patch reuses __in_irqentry_text() macro, which was added by
->  commit 9a5ad7d0e3e1 ("arm64: Add __exception_irq_entry definition for
->                        function graph"),
-> and allows dump_backtrace() to recognize an interrupt handler's
-> frame and fetch a correct pointer (sp) to struct pt_regs on an process
-> stack.
+Please pull this series for the next merge window.
 
-A concern is the way __irq_entry and IRQENTRY_TEXT are implemented. As
-you know well, they are bound to only function graph tracer. IMHO, it
-would be better to factor them out generically and then utilize them
-in arch and ftrace side. However, other hackers, ARM64 maintainers
-or Arnd Bergmann, would leave more valuable comments than me ;)
+Thanks,
+Masahiro
 
-Other than that, the approach is straightforwrd.
 
-> One of drawbacks in this approach is that we will sometimes see
-> __irqentry_text_start and gic_handle_irq interchangeably, especially,
-> when "perf report --call-graph" shows stack traces because both symbols
-> has the same address.
-> (Please note that this can happen even without this patch if
-> CONFIG_FUNCTION_GRAPH_TRACER is enabled.)
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
-> arch/arm64/include/asm/exception.h |    7 +++----
-> arch/arm64/include/asm/traps.h     |    7 -------
-> arch/arm64/kernel/traps.c          |    9 +++++++--
-> arch/arm64/kernel/vmlinux.lds.S    |    7 +++++++
-> 4 files changed, 17 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/exception.h b/arch/arm64/include/asm/exception.h
-> index 6cb7e1a..8415005 100644
-> --- a/arch/arm64/include/asm/exception.h
-> +++ b/arch/arm64/include/asm/exception.h
-> @@ -21,10 +21,9 @@
-> #include <linux/ftrace.h>
 
-This can be dropped.
+Masahiro Yamada (4):
+  ARM: dts: uniphier: use stdout-path instead of console
+  ARM: dts: uniphier: delete i2c aliases
+  ARM: dts: uniphier: add ProXstream2 Gentil board support
+  ARM: dts: uniphier: add ProXstream2 Vodka board support
 
-> #define __exception	__attribute__((section(".exception.text")))
-> -#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> +/* We always need this definition for dump_backtrace */
-> +#undef __irq_entry
-> +#define __irq_entry	__attribute__((__section__(".irqentry.text")))
-> #define __exception_irq_entry	__irq_entry
-> -#else
-> -#define __exception_irq_entry	__exception
-> -#endif
-> 
-> #endif	/* __ASM_EXCEPTION_H */
-> diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
-> index 0cc2f29..8f05d3b 100644
-> --- a/arch/arm64/include/asm/traps.h
-> +++ b/arch/arm64/include/asm/traps.h
-> @@ -34,7 +34,6 @@ struct undef_hook {
-> void register_undef_hook(struct undef_hook *hook);
-> void unregister_undef_hook(struct undef_hook *hook);
-> 
-> -#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> static inline int __in_irqentry_text(unsigned long ptr)
-> {
-> 	extern char __irqentry_text_start[];
-> @@ -43,12 +42,6 @@ static inline int __in_irqentry_text(unsigned long ptr)
-> 	return ptr >= (unsigned long)&__irqentry_text_start &&
-> 	       ptr < (unsigned long)&__irqentry_text_end;
-> }
-> -#else
-> -static inline int __in_irqentry_text(unsigned long ptr)
-> -{
-> -	return 0;
-> -}
-> -#endif
-> 
-> static inline int in_exception_text(unsigned long ptr)
-> {
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index e9b9b53..8fc3d4b 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -179,10 +179,15 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
-> 		ret = unwind_frame(&frame);
-> 		if (ret < 0)
-> 			break;
-> -		stack = frame.sp;
-> -		if (in_exception_text(where))
-> +		if (__in_irqentry_text(where)) {
-> +			stack = *(unsigned long *)(frame.fp + 0x18);
-> +			dump_mem("", "Interrupt stack", stack,
-> +				 stack + sizeof(struct pt_regs), false);
+ arch/arm/boot/dts/Makefile                        |  4 +-
+ arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts        |  7 +--
+ arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts       | 10 +--
+ arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts       |  9 +--
+ arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts       |  8 +--
+ arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts       |  7 +--
+ arch/arm/boot/dts/uniphier-proxstream2-gentil.dts | 74 +++++++++++++++++++++++
+ arch/arm/boot/dts/uniphier-proxstream2-vodka.dts  | 74 +++++++++++++++++++++++
+ 8 files changed, 156 insertions(+), 37 deletions(-)
+ create mode 100644 arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
+ create mode 100644 arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
 
-According to entry.S in case of \el == 1, the stack, might look as follows.
-
-    ----------- <- High address (x21)
-    |         |
-    |         |
-    | pt_regs |
-    |         |
-    |         |
-    ----------- <- Low address
-
-So, I think 'bottom' is stack-sizeof(struct pt_regs) and 'top' is stack.
-Am I missing here?
-
-Best Regards
-Jungseok Lee
+-- 
+1.9.1
