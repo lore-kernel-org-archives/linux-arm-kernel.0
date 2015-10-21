@@ -1,50 +1,91 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 21 Oct 2015 10:07:59 +0100
-Subject: [PATCH v3 2/2] ARM: dts: bcm5301x: Add BCM SVK DT files
-In-Reply-To: <1444947856-26246-2-git-send-email-jonmason@broadcom.com>
-References: <1444947856-26246-1-git-send-email-jonmason@broadcom.com>
- <1444947856-26246-2-git-send-email-jonmason@broadcom.com>
-Message-ID: <562755EF.5000803@arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 21 Oct 2015 18:09:33 +0900
+Subject: console vs earlycon ?
+In-Reply-To: <5490668.HV7UIzY6eu@wuerfel>
+References: <CAK7LNARem16fTim8Ds_y8ezMusz_aRtv6c59KoxyC0rLV-RBWw@mail.gmail.com>
+ <5490668.HV7UIzY6eu@wuerfel>
+Message-ID: <CAK7LNASkAsi59dtmrVX2MjNqgTAiGJ8rrtV3VqO2FJ0JaHzfpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd,
 
 
-On 15/10/15 23:24, Jon Mason wrote:
-> Add device tree files for Broadcom Northstar based SVKs.  Since the
-> bcm5301x.dtsi already exists, all that is necessary is the dts files to
-> enable the UARTs.  With these files, the SVKs are able to boot to shell.
+2015-10-21 17:57 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 21 October 2015 17:21:07 Masahiro Yamada wrote:
+>> Hi.
+>>
+>>
+>>
+>>
+>> I think there are three places where console could be enabled.
+>>
+>> [1] earlycon
+>>
+>> Each driver entry is declared with
+>> EARLYCON_DECLARE()  or OF_EARLYCON_DECLARE()
+>>
+>>
+>>
+>> [2] console_init()
+>>
+>> Each entry is declared with  console_initcall()
+>>
+>>
+>>
+>> [3]  when driver is probed
+>> The console is usually enabled at this point
+>> unless some special treatment is done.
+>>
+>>
+>>
+>>
+>> My question is about [2].
+>>
+>> I am using 8250-ish UART device.
+>>
+>>
+>> I noticed univ8250_console_match() and univ8250_console_setup()
+>> always fail at the point of [2] unless early_serial_setup() has been
+>> called in advance;
+>> however, it looks like early_serial_setup() is only used for old platforms.
+>>
+>> So, console cannot be enabled at [2] for modern platforms.
+>>
+>>
+>> My questions are:
+>>
+>>  -  Given that earlycon can be now available for major architectures such ARM,
+>>      [2] will be deprecated at some point in the future?
+>>
+>>  - I am implementing  earlycon  for my own UART driver.
+>>    Is it meaningless to implement  console_initcall()  as well as earlycon?
 >
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> I would still do both. We don't enable earlycon by default at the moment,
+> and I'd say things should remain working with just console_initcall().
+>
+> How closely related to 8250 is your hardware? If it's not all that different,
+> you should probably reuse the existing driver.
 
-[..]
 
-> diff --git a/arch/arm/boot/dts/bcm94708.dts b/arch/arm/boot/dts/bcm94708.dts
-> new file mode 100644
-> index 0000000..49682d6
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm94708.dts
-> @@ -0,0 +1,56 @@
+Very close.
+It is already in the mainline.
 
-[..]
+drivers/tty/serial/8250/8250_uniphier.c
 
-> +/dts-v1/;
-> +
-> +#include "bcm4708.dtsi"
-> +
-> +/ {
-> +	model = "NorthStar SVK (BCM94708)";
-> +	compatible = "brcm,bcm94708", "brcm,bcm4708";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200";
+The core parts are shared with 8250_core.c
 
-You can set stdout-path instead which even works for earlycon
+
+I am trying to implement OF_EARLYCON_DECLARE() for that.
+
+I was just wondering if console_initcall() should work as well.
+
+
+As I said, I noticed the console_initcall() in 8250_core.c
+only works on very limited platforms.
+
+
 
 -- 
-Regards,
-Sudeep
+Best Regards
+Masahiro Yamada
