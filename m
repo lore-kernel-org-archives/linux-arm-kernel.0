@@ -1,54 +1,35 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 21 Oct 2015 10:45:18 +0200
-Subject: [PATCH] MAINTAINERS: ARM: EXYNOS: Add documentation and
- dt-bindings
-In-Reply-To: <1445391203-3819-1-git-send-email-k.kozlowski@samsung.com>
-References: <1445391203-3819-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <5627509E.6090503@osg.samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Oct 2015 10:47:16 +0200
+Subject: [PATCH] fixup! mm: simplify reclaim path for MADV_FREE
+In-Reply-To: <56273fe6.c8afc20a.628d8.ffff9ed8@mx.google.com>
+References: <56273fe6.c8afc20a.628d8.ffff9ed8@mx.google.com>
+Message-ID: <5799761.gmbM76C6JW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-Patch looks good to me, I've only one comment.
-
-On 10/21/2015 03:33 AM, Krzysztof Kozlowski wrote:
-> Extend the Samsung Exynos maintainer entry to match SoC documentation
-> and SoC dt-bindings directories. Without that some files, like
-> bindings/arm/samsung/pmu.txt, are not matched by existing patterns.
+On Wednesday 21 October 2015 00:33:58 kernelci. org bot wrote:
+> lpc18xx_defconfig (arm) ? FAIL, 55 errors, 18 warnings, 0 section mismatches
 > 
-> This also may serve as a hint where new documentation and bindings (not
-> matching specific subsystem) should be put.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> ---
->  MAINTAINERS | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index b556aad90930..cad7b6b628b2 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1459,6 +1459,8 @@ F:	drivers/*/*s3c2410*
->  F:	drivers/*/*/*s3c2410*
->  F:	drivers/spi/spi-s3c*
->  F:	sound/soc/samsung/*
-> +F:	Documentation/arm/Samsung/
+> Errors:
+>     include/linux/rmap.h:274:1: error: expected declaration specifiers or '...' before '{' token
+>     include/linux/uaccess.h:88:13: error: storage class specified for parameter '__probe_kernel_read'
+>     include/linux/uaccess.h:99:53: error: storage class specified for parameter 'probe_kernel_write'
 
-That there is also a Documentation/arm/Samsung-S3C24XX/ so
-I think this should be Documentation/arm/Samsung*/ instead.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: e4f28388eb72 ("mm: simplify reclaim path for MADV_FREE")
+---
+Please fold into the original patch if you don't already have this.
 
-> +F:	Documentation/devicetree/bindings/arm/samsung/
->  N:	exynos
->  
->  ARM/SAMSUNG MOBILE MACHINE SUPPORT
-> 
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+diff --git a/include/linux/rmap.h b/include/linux/rmap.h
+index 978f65066fd5..853f4f3c6742 100644
+--- a/include/linux/rmap.h
++++ b/include/linux/rmap.h
+@@ -270,7 +270,7 @@ int rmap_walk(struct page *page, struct rmap_walk_control *rwc);
+ 
+ static inline int page_referenced(struct page *page, int is_locked,
+ 				  struct mem_cgroup *memcg,
+-				  unsigned long *vm_flags,
++				  unsigned long *vm_flags)
+ {
+ 	*vm_flags = 0;
+ 	return 0;
