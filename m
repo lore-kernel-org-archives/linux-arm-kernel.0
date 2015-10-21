@@ -1,42 +1,25 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Wed, 21 Oct 2015 21:16:31 +0900
-Subject: [PATCH v2 1/2] arm64: revamp unwind_frame for interrupt stack
-In-Reply-To: <B71E493E-1AAC-4BEF-93CF-2039FE5629B4@gmail.com>
-References: <1445328019-23330-1-git-send-email-takahiro.akashi@linaro.org>
- <1445328019-23330-2-git-send-email-takahiro.akashi@linaro.org>
- <C2B4628F-F984-416C-A358-7FDE8DCD553F@gmail.com>
- <562732FC.7010306@linaro.org>
- <B71E493E-1AAC-4BEF-93CF-2039FE5629B4@gmail.com>
-Message-ID: <DC09270D-6A7A-4FE3-A99C-CE84F1F64697@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 21 Oct 2015 13:28:43 +0100
+Subject: [PATCH] ASoC: dt-bindings: Drop unneeded properties rockchip
+ i2s/spdif bindings
+In-Reply-To: <1445242539-9098-1-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1445242539-9098-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <20151021122843.GD8232@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 21, 2015, at 9:14 PM, Jungseok Lee wrote:
+On Mon, Oct 19, 2015 at 10:15:39AM +0200, Sjoerd Simons wrote:
+> Neither the rockchip i2s nor the rockchip spdif binding support child
+> devices so #address-cells and #size-cells properties aren't required.
+> Remove these from the bindings.
+> 
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-Whoops!
-
-> [Only Akashi and James]
-> 
-> On Oct 21, 2015, at 3:38 PM, AKASHI Takahiro wrote:
-> 
-> Hi Akashi and James,
-> 
-> Am I the only person who have experienced kernel panic with this series?
-> I have observed NULL pointer kernel panic with the following two ways.
-> 
-> - $ sudo echo c > /proc/sysrq-trigger
-> - perf record -e mem:[address of do_softirq]:x -ag -- sleep 2
-> 
-> The kernel panic is triggered when the last stack frame of swapper is unwound.
-> At that time, the value of fp, low, high is 0, 0, 0, respectively.
-> 
-> My tree includes "Synchronise dump_backtrace() with perf call chain" patch
-> which is queued into for-next/core.
-> 
-> Best Regards
-> Jungseok Lee
-
-Really sorry for the noise.. It won't happen again..
-
-Best Regards
-Jungseok Lee
+Please use subject lines matching the style for the subsystem!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151021/e1f4def2/attachment-0001.sig>
