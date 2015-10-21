@@ -1,33 +1,44 @@
-From: housel@acm.org (Peter S. Housel)
-Date: Tue, 20 Oct 2015 16:41:00 -0700
-Subject: [PATCH 2/2] ARM: dts: imx: Add EIM configuration for i.MX6sl
-In-Reply-To: <1445384460-34108-1-git-send-email-housel@acm.org>
-References: <1445384460-34108-1-git-send-email-housel@acm.org>
-Message-ID: <1445384460-34108-3-git-send-email-housel@acm.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 21 Oct 2015 09:08:53 +0900
+Subject: [PATCH v2 0/6] Switch to generic syscon regmap based drivers
+In-Reply-To: <1445333085-22837-1-git-send-email-alim.akhtar@samsung.com>
+References: <1445333085-22837-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <5626D795.5090500@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the WEIM on the i.MX6sl.
+On 20.10.2015 18:24, Alim Akhtar wrote:
+> Now we have a nice way to reboot/poweroff system using a generic
+> syscon regmap based drivers, this series moves exynos SoCs to
+> make use of the same.
+> 
+> Changes since v1:
+> * Added a comment about the register information
+> * Droped defconfig changes as disscussed
+> * Collected various Reviewed-by, Tested-by and Acked-by tags
+> * Added SYSCON-{RESET, POWEROFF} to select from Kconfig
+> 
+> Alim Akhtar (6):
+>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos3250 SoCs
+>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos4
+>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5
+>   arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5410 SoC
+>   ARM: exynos: select POWER_RESET_SYSCON and
+>     POWER_RESET_SYSCON_POWEROFF
+>   ARM: EXYNOS: Remove code for restart and poweroff for exynos SoCs
+> 
+>  arch/arm/boot/dts/exynos3250.dtsi |   14 ++++++++++++
+>  arch/arm/boot/dts/exynos4.dtsi    |   14 ++++++++++++
+>  arch/arm/boot/dts/exynos5.dtsi    |   14 ++++++++++++
+>  arch/arm/boot/dts/exynos5410.dtsi |   14 ++++++++++++
+>  arch/arm/mach-exynos/Kconfig      |    3 +++
+>  arch/arm/mach-exynos/pmu.c        |   43 -------------------------------------
+>  6 files changed, 59 insertions(+), 43 deletions(-)
+> 
 
-Signed-off-by: Peter S. Housel <housel@acm.org>
----
- arch/arm/boot/dts/imx6sl.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+Entire patchset tested on Odroid XU3-Lite and Trats2 boards:
 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index d8ba99f..bc206ae 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -837,8 +837,10 @@
- 			};
- 
- 			weim: weim at 021b8000 {
-+				compatible = "fsl,imx6sl-weim", "fsl,imx6q-weim";
- 				reg = <0x021b8000 0x4000>;
- 				interrupts = <0 14 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SL_CLK_EIM_SLOW>;
- 			};
- 
- 			ocotp: ocotp at 021bc000 {
--- 
-2.6.0
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
