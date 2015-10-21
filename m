@@ -1,42 +1,54 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 21 Oct 2015 17:44:10 +0200
-Subject: pmu: armv7_a9_pmu_init() fails with -ENXIO
-In-Reply-To: <5627A0DB.5030304@arm.com>
-References: <56278C91.8050605@free.fr> <56279753.5000107@free.fr>
- <5627A0DB.5030304@arm.com>
-Message-ID: <5627B2CA.4030005@free.fr>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Wed, 21 Oct 2015 23:45:13 +0800
+Subject: [PATCH v1 1/2] dt-bindings: Sync the dts to this document
+In-Reply-To: <CAL_JsqJ6ZRjZbtc7dqo-g=CzO+H_FWcRqs2gBGH2HMBBM1xU3g@mail.gmail.com>
+References: <1445395380-5365-1-git-send-email-wxt@rock-chips.com>
+ <1445395380-5365-2-git-send-email-wxt@rock-chips.com>
+ <CAL_JsqJ6ZRjZbtc7dqo-g=CzO+H_FWcRqs2gBGH2HMBBM1xU3g@mail.gmail.com>
+Message-ID: <5627B309.9080309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/10/2015 16:27, Sudeep Holla wrote:
+Hi Rob,
 
-> On 21/10/15 14:46, Mason wrote:
-> 
->> I also looked more closely at of_pmu_irq_cfg()
+? 2015?10?21? 23:18, Rob Herring ??:
+> On Tue, Oct 20, 2015 at 9:42 PM, Caesar Wang <wxt@rock-chips.com> wrote:
+>> Add the OTP gpio state, we need switch the pin to gpio state
+>> before the TSADC controller is reset.
 >>
->> platform_get_irq(pdev, 0); returns -6
-> 
-> Won't it return here ?
-> Though you must first check why is that returning error.
-> 
->          irq = platform_get_irq(pdev, 0);
->          if (irq >= 0 && irq_is_percpu(irq))
->                  return 0;
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>> ---
+>>
+>> Changes in v1:
+>>    - As the Doug comments, add the 'init' property to sync document.
+>>
+>>   Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 5 +++--
+>>   1 file changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>> index ef802de..28e84f7 100644
+>> --- a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>> @@ -27,8 +27,9 @@ tsadc: tsadc at ff280000 {
+>>          clock-names = "tsadc", "apb_pclk";
+>>          resets = <&cru SRST_TSADC>;
+>>          reset-names = "tsadc-apb";
+>> -       pinctrl-names = "default";
+>> -       pinctrl-0 = <&otp_out>;
+>> +       pinctrl-names = "init", "default";
+>> +       pinctrl-0 = <&otp_gpio>;
+>> +       pinctrl-1 = <&otp_out>;
+> Are these optional or required? They only appear in the example.
 
-Thanks for prodding me in the right direction.
-platform_get_irq() was failing because I hadn't properly defined
-the node's interrupt-parent...
+Yep,
+These are required for TSADC.
 
-I've added
-  interrupt-parent = <&gic>;
-at the root of my DT, and things now work as expected.
-(Haven't tested actually using the counters yet.)
+I?m assumed that's right,
+I think we don't need to introduce the pinctrl in this document.
 
-[    0.090058] irq=212 irqs=e7603400 pdev->num_resources=2
-[    0.090091] hw perfevents: Failed to parse /pmu/interrupt-affinity[0]
-[    0.090103] armv7_a9_pmu_init: ret=0
-[    0.090145] hw perfevents: enabled with armv7_cortex_a9 PMU driver, 7 counters available
-
-Thanks again.
-
-Regards.
+> Rob
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
