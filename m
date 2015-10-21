@@ -1,96 +1,100 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Wed, 21 Oct 2015 09:41:09 +0800
-Subject: [PATCH 2/4] thermal: rockchip: ensure the otp state before
- resetting the controller
-In-Reply-To: <CAD=FV=WHvwNGdRZ4Yjwk0zB00o2gFHXLfbAYHai1kM_oBAR4_g@mail.gmail.com>
-References: <1445332264-6054-1-git-send-email-wxt@rock-chips.com>
- <1445332264-6054-3-git-send-email-wxt@rock-chips.com>
- <CAD=FV=WHvwNGdRZ4Yjwk0zB00o2gFHXLfbAYHai1kM_oBAR4_g@mail.gmail.com>
-Message-ID: <5626ED35.3010403@gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 21 Oct 2015 09:45:17 +0800
+Subject: [PATCH] EDAC: Add AMD Seattle SoC EDAC
+In-Reply-To: <20151020172539.GB4943@leverpostej>
+References: <1445282597-18999-1-git-send-email-brijeshkumar.singh@amd.com>
+ <20151019205236.GB453@leverpostej> <56266F7E.6030404@amd.com>
+ <20151020172539.GB4943@leverpostej>
+Message-ID: <5626EE2D.8090506@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug,
-
-? 2015?10?20? 23:52, Doug Anderson ??:
-> Caesar,
->
-> On Tue, Oct 20, 2015 at 2:11 AM, Caesar Wang <wxt@rock-chips.com> wrote:
->> We need the OTP pin is gpio state before resetting the TSADC controller,
->> since the tshut polarity will generate a high signal.
+On 2015/10/21 1:25, Mark Rutland wrote:
+> On Tue, Oct 20, 2015 at 11:44:46AM -0500, Brijesh Singh wrote:
+>> Hi Mark,
 >>
->> Says:
->> The TSHUT temperature is setting more than 80 degree, the default tshut
->> polarity is high.
+>> Thanks for review. 
 >>
->> If T > 80C, the OTP output the High Signal.
->> If T < 80C, the OTP output the Low Signal.
+>> -Brijesh
 >>
->> On the moment, the TSADC controller is reset, the tshut polarity will be
->> low in a short period of time.
->> So:
+>> On 10/19/2015 03:52 PM, Mark Rutland wrote:
+>>> Hi,
+>>>
+>>> Please Cc the devicetree list (devicetree at vger.kernel.org) when sending
+>>> binding patches. I see you've added the people from the MAINTAINERS
+>>> entry; the list should also be Cc'd.
+>>>
+>> Noted.
+>>> On Mon, Oct 19, 2015 at 02:23:17PM -0500, Brijesh Singh wrote:
+>>>> Add support for the AMD Seattle SoC EDAC driver.
+>>>>
+>>>> Signed-off-by: Brijesh Singh <brijeshkumar.singh@amd.com>
+>>>> ---
+>>>>  .../devicetree/bindings/edac/amd-seattle-edac.txt  |  15 +
+>>>>  drivers/edac/Kconfig                               |   6 +
+>>>>  drivers/edac/Makefile                              |   1 +
+>>>>  drivers/edac/seattle_edac.c                        | 306 +++++++++++++++++++++
+>>>>  4 files changed, 328 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/edac/amd-seattle-edac.txt
+>>>>  create mode 100644 drivers/edac/seattle_edac.c
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/edac/amd-seattle-edac.txt b/Documentation/devicetree/bindings/edac/amd-seattle-edac.txt
+>>>> new file mode 100644
+>>>> index 0000000..a0354e8
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/edac/amd-seattle-edac.txt
+>>>> @@ -0,0 +1,15 @@
+>>>> +* AMD Seattle SoC EDAC node
+>>>> +
+>>>> +EDAC node is defined to describe on-chip error detection and reporting.
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible: Should be "amd,arm-seattle-edac"
+>>>> +- poll-delay-msec: Indicates how often the edac check callback should be called.
+>>>> +  Time in msec.
+>>> This second property doesn't describe the hardware in any way. It should
+>>> be runtime-configurable and dpesn't belong in the DT.
+>>>
+>>> Regardless, the binding is wrong. This is in no way specific to AMD
+>>> Seattle, and per the code is actually used to imply the presence of a
+>>> Cortex-A57 feature. No reference to AMD Seattle belongs in the DT
+>>> binding (with the exception of the example, perhaps), nor in the driver.
+>>>
+>>> NAK while this pretends to be something that it isn't. At minimum, you
+>>> need to correctly describe the feature you are trying to add support
+>>> for.
+>>>
+>> I will remove AMD specific string in compatibility field and make the
+>> poll-delay-msec optional. Will also expose this as module parameter as
+>> you suggested below.
+> I don't think it should be optional; I don't think it should be there at
+> all.
+>
+> I'm not sure if we even need a DT binding if we can derive the presence
+> of the feature from the MIDR.
+>
+>>>> + * The driver polls CPUMERRSR_EL1 and L2MERRSR_EL1 registers to logs the 
+>>> These are IMPLEMENTATION DEFINED registers which are specific to
+>>> Cortex-A57, and I note that L2MERRSR_EL1 changed in r1p0.
+>>>
+>>> Which revisions of Cortex-A57 does this work with?
+>>>
+>> I have tested my code on r1p2.
 >>
->> If T < 80C, the OTP output the High Signal.
->> If T > 80C, the OTP output the Low Signal.
->>
->> In some cases, the OTP pin is connected to the PMIC, maybe the PMIC can
->> accept the reset response time to avoid this issue.
->> In other words, the system will be always reboot if we make the OTP pin
->> is connected the others IC to control the power.
->>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> ---
->>
->>   drivers/thermal/rockchip_thermal.c | 32 ++++++++++++++++++++++++++++++++
->>   1 file changed, 32 insertions(+)
-> I think you could do this with no code changes to the thermal driver
-> if we simply convince Linus W. to apply a change that I posted up just
-> about a year ago.  See:
->
-> https://patchwork.kernel.org/patch/5055741/
->
-> In v1 of that patch at <https://patchwork.kernel.org/patch/5049041/>
-> Linus said he liked it "A lot" and was willing to merge it with Greg
-> KH's Ack and with a small comment fix.  I obtained the Ack and fixed
-> the comment, but then the patch didn't end up being needed for me and
-> so I never bumped it and it got lost...
->
-> Maybe you could re-test that patch?  It looks like it has a merge
-> conflict with current linuxnext but it looks trivial to resolve.  You
-> could re-post my patch or I could repost it and you could add your
-> Tested-by.
->
-> You'd still want to have a bindings change to describe "init", but at
-> least you shouldn't need any code changes.
+>>> Generally we avoid touching IMPLEMENTATION DEFINED registers as they may
+>>> not exist in some configurations or revisions, and could trap or undef.
+>>> Is it always safe to access these registers (in current revisions of
+>>> Cortex-A57)?
+>>>
+>> So far I have not ran into any trap error, was able to read/write
+>> registers from EL1 all the times. I looked at TRM but could not find
+>> reference that it would fail. As per doc the register should be
+>> available at all EL's except EL0.
+> Ok.
 
-Okay, https://patchwork.kernel.org/patch/5055741/ that's working for me.
-Fell free add my  test tag if you resend the patch. (Tested-by: Caesar 
-Wang <wxt@rock-chips.com>)
+This also works on Hisilicon D02 board. but the mechanism to handle the error
+is a little bit different, on D02, it use poll mechanism to scan the single bit ECC error
+just as Seattle, but D02 will trigger SEI when double bit ECC error happened.
 
-
-1634ed8 FROMLIST: drivers/pinctrl: Add the concept of an "init" state
-15158f8 FROMLIST: ARM: dts: rockchip: Add the OTP gpio pinctrl
-e7d3b88 FROMLIST: thermal: rockchip: change the TSHUT default state
-184b154 FROMLIST: thermal: rockchip: ensure the otp state before 
-resetting the controller
-9edbe15 FROMLIST: dt-bindings: Sync the dts to this document
-
-Meanwhile, I change the dts as follows.
-
--               pinctrl-names = "default", "otp_out";
-+               pinctrl-names = "init", "default";
-                 pinctrl-0 = <&otp_gpio>;
-                 pinctrl-1 = <&otp_out>;
-
->
-> -Doug
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
-
-
--- 
-Thanks,
-Caesar
+Thanks
+Hanjun
