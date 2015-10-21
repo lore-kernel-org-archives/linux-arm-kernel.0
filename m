@@ -1,110 +1,234 @@
-From: jenskuske@gmail.com (Jens Kuske)
-Date: Wed, 21 Oct 2015 18:13:22 +0200
-Subject: [PATCH 1/6] clk: sunxi: Let divs clocks read the base factor clock
- name from devicetree
-In-Reply-To: <1445444007-4260-1-git-send-email-jenskuske@gmail.com>
-References: <1445444007-4260-1-git-send-email-jenskuske@gmail.com>
-Message-ID: <1445444007-4260-2-git-send-email-jenskuske@gmail.com>
+From: lyu@micile.com (Lawrence Yu)
+Date: Wed, 21 Oct 2015 09:15:29 -0700
+Subject: [linux-sunxi] [PATCH v2 1/1] dts: sun6i: yones toptech bs1078 v2:
+ Add AXP221 support to dts
+In-Reply-To: <CAGb2v65S9R=sLVRBdUKFUDXCbEFJWF9Sp8Yw__+Q6ncpgPp7kg@mail.gmail.com>
+References: <1445191673-8869-1-git-send-email-lyu@micile.com>
+ <CAGb2v65S9R=sLVRBdUKFUDXCbEFJWF9Sp8Yw__+Q6ncpgPp7kg@mail.gmail.com>
+Message-ID: <CAN0iSBp9vypyPnrwmSRQnB33kk84NZ=_1QAf4YYFtSA9R0CoTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the sunxi clock driver gets the name for the base factor clock
-of divs clocks from the name field in factors_data. This prevents reusing
-of the factor clock for clocks with same properties, but different name.
+On Mon, Oct 19, 2015 at 2:59 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Mon, Oct 19, 2015 at 2:07 AM, Lawrence Yu <lyu@micile.com> wrote:
+>> Enable the axp221 PMIC chip in the dts file.
+>>
+>> Allows board to power off correctly from the poweroff command
+>>
+>> This board requires dc1sw to be enabled in order to provide a power source
+>> for the 5V DCDC converter that powers USB2 and the LCD backlight
+>>
+>> This board uses dldo1 for 3.3V wifi power
+>>
+>> This board requires dldo3 to be enabled at 2.8V in order to provide voltage
+>> to the pullup resistors for the i2c0 bus.
+>>
+>> ---
+>>
+>> Changes since v1
+>>
+>> - Use axp22x.dtsi to standardize the register names
+>> - Change wifi power regulator to dldo1 instead of incorrect aldo1
+>> - Remove unnecessary gpio pin PH27 for wifi power, since this board uses
+>>   the axp221 chip to control power to the wifi chip.
+>>
+>> Signed-off-by: Lawrence Yu <lyu@micile.com>
+>> ---
+>>  .../dts/sun6i-a31s-yones-toptech-bs1078-v2.dts     | 98 +++++++++++++++++++---
+>>  1 file changed, 88 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts b/arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts
+>> index b199020..98d0a83 100644
+>> --- a/arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts
+>> +++ b/arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts
+>> @@ -113,22 +113,100 @@
+>>         allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>>  };
+>>
+>> -&reg_usb1_vbus {
+>> -       gpio = <&pio 7 27 GPIO_ACTIVE_HIGH>;
+>> +&uart0 {
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&uart0_pins_a>;
+>>         status = "okay";
+>>  };
+>>
+>> -&usb1_vbus_pin_a {
+>> -       allwinner,pins = "PH27";
+>> +&p2wi {
+>> +       status = "okay";
+>> +
+>> +       axp22x: pmic at 68 {
+>> +               compatible = "x-powers,axp221";
+>> +               reg = <0x68>;
+>> +               interrupt-parent = <&nmi_intc>;
+>> +               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+>> +       };
+>>  };
+>>
+>> -&usbphy {
+>> -       usb1_vbus-supply = <&reg_usb1_vbus>;
+>> -       status = "okay";
+>> +#include "axp22x.dtsi"
+>> +
+>> +&axp22x {
+>> +       regulators {
+>> +               /* Used by LCD backlight and USB2 */
+>> +               reg_dc1sw: dc1sw {
+>> +                       regulator-name = "dc1sw";
+>> +                       regulator-min-microvolt = <3000000>;
+>> +                       regulator-max-microvolt = <3000000>;
+>> +                       regulator-name = "vcc-dc1sw";
+>
+> I would use "vcc-lcd-usb2". Or just "vcc-lcd" if it proves it has nothing
+> to do with USB. Plus there's 2 "regulator-name" entries here.
+>
 
-This commit makes the divs setup function try to get a name from
-clock-output-names in the devicetree. It also removes the name field where
-possible and merges the sun4i PLL5 and PLL6 clocks.
+I will remove the extra regulator-name (not sure how I did not see
+that) and use "vcc-lcd-usb2" as the regulator name.  I have an
+explanation as to why I believe dc1sw also controls power to usb2
+below.
 
-Signed-off-by: Jens Kuske <jenskuske@gmail.com>
----
- drivers/clk/sunxi/clk-sunxi.c | 39 ++++++++++++++++++++++++++++-----------
- 1 file changed, 28 insertions(+), 11 deletions(-)
+>> +               };
+>> +       };
+>>  };
+>>
+>> -&uart0 {
+>> -       pinctrl-names = "default";
+>> -       pinctrl-0 = <&uart0_pins_a>;
+>> +&reg_aldo3 {
+>> +       regulator-always-on;
+>> +       regulator-min-microvolt = <2700000>;
+>> +       regulator-max-microvolt = <3300000>;
+>> +       regulator-name = "avcc";
+>> +};
+>> +
+>> +&reg_dc5ldo {
+>> +       regulator-min-microvolt = <700000>;
+>> +       regulator-max-microvolt = <1320000>;
+>> +       regulator-name = "vdd-cpus";
+>> +};
+>> +
+>> +&reg_dcdc1 {
+>> +       regulator-always-on;
+>> +       regulator-min-microvolt = <3000000>;
+>> +       regulator-max-microvolt = <3000000>;
+>> +       regulator-name = "vcc-3v0";
+>> +};
+>> +
+>> +&reg_dcdc2 {
+>> +       regulator-min-microvolt = <700000>;
+>> +       regulator-max-microvolt = <1320000>;
+>> +       regulator-name = "vdd-gpu";
+>> +};
+>> +
+>> +&reg_dcdc3 {
+>> +       regulator-always-on;
+>> +       regulator-min-microvolt = <700000>;
+>> +       regulator-max-microvolt = <1320000>;
+>> +       regulator-name = "vdd-cpu";
+>> +};
+>> +
+>> +&reg_dcdc4 {
+>> +       regulator-always-on;
+>> +       regulator-min-microvolt = <700000>;
+>> +       regulator-max-microvolt = <1320000>;
+>> +       regulator-name = "vdd-sys-dll";
+>> +};
+>> +
+>> +&reg_dcdc5 {
+>> +       regulator-always-on;
+>> +       regulator-min-microvolt = <1500000>;
+>> +       regulator-max-microvolt = <1500000>;
+>> +       regulator-name = "vcc-dram";
+>> +};
+>> +
+>> +&reg_dldo1 {
+>> +       regulator-min-microvolt = <3300000>;
+>> +       regulator-max-microvolt = <3300000>;
+>> +       regulator-name = "vcc-wifi";
+>> +};
+>> +
+>> +/* Voltage source for I2C pullup resistors for I2C Bus 0 */
+>> +&reg_dldo3 {
+>> +       regulator-always-on;
+>> +       regulator-min-microvolt = <2800000>;
+>> +       regulator-max-microvolt = <2800000>;
+>> +       regulator-name = "vcc-csi";
+>
+> This should probably be named "vddio-csi".
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 9c79af0c..7c4aee0 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -704,21 +704,12 @@ static const struct factors_data sun4i_pll5_data __initconst = {
- 	.enable = 31,
- 	.table = &sun4i_pll5_config,
- 	.getter = sun4i_get_pll5_factors,
--	.name = "pll5",
--};
--
--static const struct factors_data sun4i_pll6_data __initconst = {
--	.enable = 31,
--	.table = &sun4i_pll5_config,
--	.getter = sun4i_get_pll5_factors,
--	.name = "pll6",
- };
- 
- static const struct factors_data sun6i_a31_pll6_data __initconst = {
- 	.enable = 31,
- 	.table = &sun6i_a31_pll6_config,
- 	.getter = sun6i_a31_get_pll6_factors,
--	.name = "pll6x2",
- };
- 
- static const struct factors_data sun5i_a13_ahb_data __initconst = {
-@@ -902,6 +893,7 @@ struct gates_data {
- 
- #define SUNXI_DIVS_MAX_QTY	4
- #define SUNXI_DIVISOR_WIDTH	2
-+#define SUNXI_DIVS_BASE_NAME_MAX_LEN	8
- 
- struct divs_data {
- 	const struct factors_data *factors; /* data for the factor clock */
-@@ -941,7 +933,7 @@ static const struct divs_data pll5_divs_data __initconst = {
- };
- 
- static const struct divs_data pll6_divs_data __initconst = {
--	.factors = &sun4i_pll6_data,
-+	.factors = &sun4i_pll5_data,
- 	.ndivs = 4,
- 	.div = {
- 		{ .shift = 0, .table = pll6_sata_tbl, .gate = 14 }, /* M, SATA */
-@@ -983,6 +975,8 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
- 	struct clk_gate *gate = NULL;
- 	struct clk_fixed_factor *fix_factor;
- 	struct clk_divider *divider;
-+	struct factors_data factors = *data->factors;
-+	char base_name[SUNXI_DIVS_BASE_NAME_MAX_LEN];
- 	void __iomem *reg;
- 	int ndivs = SUNXI_DIVS_MAX_QTY, i = 0;
- 	int flags, clkflags;
-@@ -991,8 +985,31 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
- 	if (data->ndivs)
- 		ndivs = data->ndivs;
- 
-+	/* Try to find a name for base factor clock */
-+	for (i = 0; i < ndivs; i++) {
-+		if (data->div[i].self) {
-+			of_property_read_string_index(node, "clock-output-names",
-+						      i, &factors.name);
-+			break;
-+		}
-+	}
-+	/* If we don't have a .self clk use the first output-name up to '_' */
-+	if (factors.name == NULL) {
-+		of_property_read_string_index(node, "clock-output-names",
-+						      0, &clk_name);
-+
-+		for (i = 0; i < SUNXI_DIVS_BASE_NAME_MAX_LEN - 1 &&
-+						clk_name[i] != '_' &&
-+						clk_name[i] != '\0'; i++) {
-+			base_name[i] = clk_name[i];
-+		}
-+
-+		base_name[i] = '\0';
-+		factors.name = base_name;
-+	}
-+
- 	/* Set up factor clock that we will be dividing */
--	pclk = sunxi_factors_clk_setup(node, data->factors);
-+	pclk = sunxi_factors_clk_setup(node, &factors);
- 	parent = __clk_get_name(pclk);
- 
- 	reg = of_iomap(node, 0);
--- 
-2.6.1
+I will change the name of the regulator to "vddio-csi".  I did not
+realize that dldo3 was connected to the io vdd of the cameras until
+you pointed it out, the A31 reference schematic also verifies this.
+
+>
+> I think Maxime and Hans were still debating whether the camera VDDIO
+> regulator should be defined independently as "always-on", instead of
+> having the I2C subsystem do some kind of power sequencing.
+>
+
+I propose to remove the regulator-always-on from dldo3 for now to
+match Maxime and Hans' resolution for the protab2-ips9 tablet which
+has similar behavior.  i2c0 is not defined yet for this board so not
+turning on dldo3 should not cause any loss of functionality.
+
+> I wonder if the power domain stuff would work for this.
+
+I defer to Maxime's response about power domain since I have no
+knowledge or experience pertaining to power domains.
+
+>
+>> +};
+>> +
+>> +&usbphy {
+>> +       usb1_vbus-supply = <&reg_dldo1>;
+>> +       usb2_vbus-supply = <&reg_dc1sw>;
+>
+> This looks weird, though I cannot say it is impossible. There is likely
+> a boost regulator after this so the output is proper 5V for USB.
+>
+
+I believe that you are correct that there is a boost regulator to make
+5V for the USB2.  The power input and/or enable line to the boost
+regulator appears to be connected to the output of dc1sw since if I
+set dc1sw to regulator-always-on or as the usb2_vbus-supply, the USB2
+will provide power to devices plugged into the USB port (LEDs on the
+device light up).  If I do not, then devices attached to USB2 do not
+appear to receive any power.
+
+Enabling or disabling dc1sw also determines whether the LCD backlight
+turns on or not.  From my testing the backlight enable line is
+connected to gpio PA25 so it seems most likely that the input of the
+boost regulator for the LCD backlight is the output of dc1sw.
+
+If there is a more conventional way to have dc1sw enabled for the
+USB2, I can make the change to do that.
+
+> Also, we only have the FEX file for v1 of this board in sunxi-boards.
+> Would it be possible for you to extract and submit it?
+>
+
+I have the fex file extracted and I will submit a separate patch with
+the fex file to sunxi-boards.
+
+> Having the FEX file makes reviewing the dts without schematics slightly
+> easier.
+>
+> Thanks
+> ChenYu
+>
+>>         status = "okay";
+>>  };
+>> --
+>> 2.5.3
+>>
+>> --
+>> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
