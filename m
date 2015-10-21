@@ -1,41 +1,121 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 21 Oct 2015 14:32:42 +0800
-Subject: [PATCH v3 07/20] KVM: ARM64: PMU: Add perf event map and introduce
- perf event creating function
-In-Reply-To: <56209467.3010800@redhat.com>
-References: <1443133885-3366-1-git-send-email-shannon.zhao@linaro.org>
- <1443133885-3366-8-git-send-email-shannon.zhao@linaro.org>
- <56209467.3010800@redhat.com>
-Message-ID: <5627318A.8090905@huawei.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 21 Oct 2015 15:38:52 +0900
+Subject: [PATCH v2 1/2] arm64: revamp unwind_frame for interrupt stack
+In-Reply-To: <C2B4628F-F984-416C-A358-7FDE8DCD553F@gmail.com>
+References: <1445328019-23330-1-git-send-email-takahiro.akashi@linaro.org>
+ <1445328019-23330-2-git-send-email-takahiro.akashi@linaro.org>
+ <C2B4628F-F984-416C-A358-7FDE8DCD553F@gmail.com>
+Message-ID: <562732FC.7010306@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/20/2015 10:26 PM, Jungseok Lee wrote:
+> On Oct 20, 2015, at 5:00 PM, AKASHI Takahiro wrote:
+>> This patch allows unwind_frame() to traverse from interrupt stack
+>> to process stack correctly by having a dummy stack frame for irq
+>> exception entry created at its prologue.
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>> arch/arm64/kernel/entry.S      |   22 ++++++++++++++++++++--
+>> arch/arm64/kernel/stacktrace.c |   14 +++++++++++++-
+>> 2 files changed, 33 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> index c8e0bcf..779f807 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -186,8 +186,26 @@ alternative_endif
+>> 	and	x23, x23, #~(IRQ_STACK_SIZE - 1)
+>> 	cmp	x20, x23			// check irq re-enterance
+>> 	mov	x19, sp
+>> -	csel	x23, x19, x24, eq		// x24 = top of irq stack
+>> -	mov	sp, x23
+>> +	beq	1f
+>> +	mov	sp, x24				// x24 = top of irq stack
+>> +	stp	x29, x19, [sp, #-16]!		// for sanity check
+>> +	stp	x29, x22, [sp, #-16]!		// dummy stack frame
+>> +	mov	x29, sp
+>> +1:
+>> +	/*
+>> +	 * Layout of interrupt stack after this macro is invoked:
+>> +	 *
+>> +	 *     |                |
+>> +	 *-0x20+----------------+ <= dummy stack frame
+>> +	 *     |      fp        |    : fp on process stack
+>> +	 *-0x18+----------------+
+>> +	 *     |      lr        |    : return address
+>> +	 *-0x10+----------------+
+>> +	 *     |    fp (copy)   |    : for sanity check
+>> +	 * -0x8+----------------+
+>> +	 *     |      sp        |    : sp on process stack
+>> +	 *  0x0+----------------+
+>> +	 */
+>> 	.endm
+>>
+>> 	/*
+>> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+>> index 407991b..03611a1 100644
+>> --- a/arch/arm64/kernel/stacktrace.c
+>> +++ b/arch/arm64/kernel/stacktrace.c
+>> @@ -43,12 +43,24 @@ int notrace unwind_frame(struct stackframe *frame)
+>> 	low  = frame->sp;
+>> 	high = ALIGN(low, THREAD_SIZE);
+>>
+>> -	if (fp < low || fp > high - 0x18 || fp & 0xf)
+>> +	if (fp < low || fp > high - 0x20 || fp & 0xf)
+>> 		return -EINVAL;
+>>
+>> 	frame->sp = fp + 0x10;
+>> 	frame->fp = *(unsigned long *)(fp);
+>> 	/*
+>> +	 * check whether we are going to walk trough from interrupt stack
+>> +	 * to process stack
+>> +	 * If the previous frame is the initial (dummy) stack frame on
+>> +	 * interrupt stack, frame->sp now points to just below the frame
+>> +	 * (dummy frame + 0x10).
+>> +	 * See entry.S
+>> +	 */
+>> +#define STACK_LOW(addr) round_down((addr), THREAD_SIZE)
+>> +	if ((STACK_LOW(frame->sp) != STACK_LOW(frame->fp)) &&
+>> +			(frame->fp == *(unsigned long *)frame->sp))
+>> +		frame->sp = *((unsigned long *)(frame->sp + 8));
+>> +	/*
+>> 	 * -4 here because we care about the PC at time of bl,
+>> 	 * not where the return will go.
+>> 	 */
+>> --
+>> 1.7.9.5
+>
+> How about folding the following hunk into this patch?
+> The comment would be helpful for people to follow this code.
 
+Thanks.
+A frame pointer(x29) is a frame pointer, and I'm not sure that the comment is
+very useful.
+But it's much better than "fp on process stack" in my ascii-art.
 
-On 2015/10/16 14:08, Wei Huang wrote:
->> +/**
->> > + * kvm_pmu_get_counter_value - get PMU counter value
->> > + * @vcpu: The vcpu pointer
->> > + * @select_idx: The counter index
->> > + */
->> > +unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
->> > +{
->> > +	u64 enabled, running;
->> > +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
->> > +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
->> > +	u64 counter;
->> > +
->> > +	if (!vcpu_mode_is_32bit(vcpu))
->> > +		counter = vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + select_idx);
-> The select_idx is from PMSELR_EL0. According to PMUv3 spec, PMSELR_EL0
-> is the register that "selects the current event counter PMEVCNTR<x> or
-> the cycle counter, CCNT". The code here always reads the counter value
-> from PMEVCNTR. It doesn't read the value from cycle counter when
-> select_idx=0b11111. We might waste some perf counter resources here.
-> 
-No, it does read the value from the cycle counter. When
-select_idx=0b11111, PMEVCNTR0_EL0 + select_idx = PMCCNTR_EL0( See patch
-03/20).
+-Takahiro AKASHI
 
--- 
-Shannon
+> ----8<----
+>
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index f1303c5..0ff7db3 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -122,7 +122,8 @@
+>           * x21 - aborted SP
+>           * x22 - aborted PC
+>           * x23 - aborted PSTATE
+> -       */
+> +        * x29 - aborted FP
+> +        */
+>          .endm
+>
+>          .macro  kernel_exit, el
+>
+> ----8<----
+>
+> Best Regards
+> Jungseok Lee
+>
