@@ -1,30 +1,23 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 21 Oct 2015 10:39:13 +0200
-Subject: [PATCH 2/2] dt-bindings: EXYNOS: Document compatibles from other
- vendors
-In-Reply-To: <1445391051-3727-2-git-send-email-k.kozlowski@samsung.com>
-References: <1445391051-3727-1-git-send-email-k.kozlowski@samsung.com>
- <1445391051-3727-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56274F31.5040705@osg.samsung.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 21 Oct 2015 09:44:38 +0100
+Subject: [PATCHv4 02/24] arm64: Delay ELF HWCAP initialisation until all
+ CPUs are up
+In-Reply-To: <1445261101-22344-3-git-send-email-suzuki.poulose@arm.com>
+References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
+ <1445261101-22344-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151021084434.GD4801@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On Mon, Oct 19, 2015 at 02:24:39PM +0100, Suzuki K. Poulose wrote:
+> Delay the ELF HWCAP initialisation untill all the (enabled) CPUs are
 
-On 10/21/2015 03:30 AM, Krzysztof Kozlowski wrote:
-> Document compatibles used on other Exynos-based boards (non-Samsung):
-> FriendlyARM, Google, Hardkernel and Insignal.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: Hakjoo Kim <ruppi.kim@hardkernel.com>
-> ---
+nit: untill
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+No need to fix this unless you respin the series for some other
+reason.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+[...]
+
+Cheers
+---Dave
