@@ -1,57 +1,43 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 21 Oct 2015 17:55:07 -0500
-Subject: [PATCH v3 1/2] phy: keystone: serdes driver for gbe 10gbe and pcie
-In-Reply-To: <1445432201-16007-2-git-send-email-w-kwok2@ti.com>
-References: <1445432201-16007-1-git-send-email-w-kwok2@ti.com>
- <1445432201-16007-2-git-send-email-w-kwok2@ti.com>
-Message-ID: <CAL_JsqKSteJnz53YuBbgR1K9GWQDddkaqFo1aVxd8RsDam5jSw@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 22 Oct 2015 02:04:41 +0300
+Subject: [PATCH 1/2] ARM: shmobile: r8a7790: fix "gpio-ranges" props
+In-Reply-To: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
+References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
+Message-ID: <14605037.EZjgJcsdsk@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2015 at 7:56 AM, WingMan Kwok <w-kwok2@ti.com> wrote:
-> On TI's Keystone platforms, several peripherals such as the
-> gbe ethernet switch, 10gbe ethernet switch and PCIe controller
-> require the use of a SerDes for converting SoC parallel data into
-> serialized data that can be output over a high-speed electrical
-> interface, and also converting high-speed serial input data
-> into parallel data that can be processed by the SoC.  The
-> SerDeses used by those peripherals, though they may be different,
-> are largely similar in functionality and setup.
->
-> This patch provides a SerDes phy driver implementation that can be
-> used by the above mentioned peripheral drivers to configure their
-> respective SerDeses.
->
-> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-> ---
->  Documentation/devicetree/bindings/phy/ti-phy.txt |  239 +++
+On R8A7790, GPIO banks 1 and 2 are missing  pins 30 and 31.  Correct the
+"gpio-ranges" properties of the corresponding device nodes.
 
-For the binding:
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
+---
+This patch is against the 'renesas-devel-20151019-v4.3-rc6' of Simon Horman's
+'renesas.git' repo.
 
+ arch/arm/boot/dts/r8a7790.dtsi |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-One other comment:
-
-> +       if (of_device_is_compatible(np, "ti,keystone-serdes-gbe")) {
-> +               sc->phy_type = KSERDES_PHY_SGMII;
-> +       } else if (of_device_is_compatible(np, "ti,keystone-serdes-xgbe")) {
-> +               sc->phy_type = KSERDES_PHY_XGE;
-> +       } else if (of_device_is_compatible(np, "ti,keystone-serdes-pcie")) {
-> +               sc->phy_type = KSERDES_PHY_PCIE;
-> +       } else {
-> +               dev_err(dev, "unknown phy type\n");
-> +               return -EINVAL;
-> +       }
-
-Use the match data to set the type:
-
-> +static const struct of_device_id kserdes_of_match[] = {
-> +       { .compatible = "ti,keystone-serdes-gbe" },
-> +       { .compatible = "ti,keystone-serdes-pcie" },
-> +       { .compatible = "ti,keystone-serdes-xgbe" },
-> +       { },
-> +};
-> +MODULE_DEVICE_TABLE(of, kserdes_of_match);
-
-Rob
+Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
++++ renesas/arch/arm/boot/dts/r8a7790.dtsi
+@@ -143,7 +143,7 @@
+ 		interrupts = <0 5 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+-		gpio-ranges = <&pfc 0 32 32>;
++		gpio-ranges = <&pfc 0 32 30>;
+ 		#interrupt-cells = <2>;
+ 		interrupt-controller;
+ 		clocks = <&mstp9_clks R8A7790_CLK_GPIO1>;
+@@ -156,7 +156,7 @@
+ 		interrupts = <0 6 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+-		gpio-ranges = <&pfc 0 64 32>;
++		gpio-ranges = <&pfc 0 64 30>;
+ 		#interrupt-cells = <2>;
+ 		interrupt-controller;
+ 		clocks = <&mstp9_clks R8A7790_CLK_GPIO2>;
