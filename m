@@ -1,47 +1,38 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 20 Oct 2015 21:57:49 -0700
-Subject: [PATCH 6/7] ARM: dts: qcom: msm8974-honami: Specify charging
- parameters
-In-Reply-To: <1445403470-17434-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1445403470-17434-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <1445403470-17434-6-git-send-email-bjorn.andersson@sonymobile.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Wed, 21 Oct 2015 10:26:56 +0530
+Subject: [RFC PATCH] ARM: exynos_defconfig: Increase
+ CONFIG_BLK_DEV_RAM_SIZE to 64K
+In-Reply-To: <4039144.iLSv7qv3SU@wuerfel>
+References: <1445251715-9725-1-git-send-email-alim.akhtar@samsung.com>
+ <4039144.iLSv7qv3SU@wuerfel>
+Message-ID: <56271B18.7030000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
----
+Hi Arnd
 
-Echoing a reasonable limit into [1] is required as there's currently no
-way for this value to be propagated from the USB stack to the charging
-driver.  Otherwise the block will pull maximum 100mA off USB, which is
-not enough to actually charge the running platform.
-
-[1] /sys/class/power_supply/smbb-usbin/charge_control_limit
-
- arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-index 113cc18ee2f5..1cf455fff3c2 100644
---- a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-+++ b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-@@ -371,6 +371,17 @@
- 
- &spmi_bus {
- 	pm8941 at 0 {
-+		charger at 1000 {
-+			qcom,fast-charge-safe-current = <1500000>;
-+			qcom,fast-charge-current-limit = <1500000>;
-+			qcom,dc-current-limit = <1800000>;
-+			qcom,fast-charge-safe-voltage = <4400000>;
-+			qcom,fast-charge-high-threshold-voltage = <4350000>;
-+			qcom,fast-charge-low-threshold-voltage = <3400000>;
-+			qcom,auto-recharge-threshold-voltage = <4200000>;
-+			qcom,minimum-input-voltage = <4300000>;
-+		};
-+
- 		gpios at c000 {
- 			boost_bypass_n_pin: boost-bypass {
- 				pins = "gpio21";
--- 
-2.4.2
+On 10/19/2015 06:52 PM, Arnd Bergmann wrote:
+> On Monday 19 October 2015 16:18:35 Alim Akhtar wrote:
+>> Spam Status: CRM114
+>> CONFIG_BLK_DEV_RAM_SIZE is currently set to 8K, which is a bit on the
+>> smaller side, lets bump it up to 64K so that a bigger RAM_DISK can
+>> be used with defconfig.
+>>
+>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> ---
+>> Every time I build exynos_defconfig, I need to manually change RAM_SIZE
+>> to match my ramdisk image size. I am not sure what is the best ramdisk size
+>> might be, but bumping it to 64K might be a reasonable one.
+>
+> Is there still a reason to use ramdisks these days? If 8MB is not
+> enough to have a useful initrd, that might mean that everyone else
+> uses initramfs and you should just do the same thing?
+>
+There is not specific reason to still use ramdisks, but I feel till we 
+remove this config, lets modify it to be used by few like me.
+I am ok with either way.
+Thanks
+> Then we can also remove this option here.
+>
+> 	Arnd
+>
