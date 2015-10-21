@@ -1,29 +1,72 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Wed, 21 Oct 2015 08:56:12 -0400
-Subject: [PATCH v4 2/3] xen, cpu_hotplug: call device_offline instead of
- cpu_down
-In-Reply-To: <1445428430-21567-2-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1510211251370.27957@kaball.uk.xensource.com>
- <1445428430-21567-2-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <56278B6C.7090608@oracle.com>
+From: w-kwok2@ti.com (WingMan Kwok)
+Date: Wed, 21 Oct 2015 08:56:39 -0400
+Subject: [PATCH v3 0/2] Common SerDes driver for TI's Keystone Platforms
+Message-ID: <1445432201-16007-1-git-send-email-w-kwok2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2015 07:53 AM, Stefano Stabellini wrote:
-> When offlining a cpu, instead of cpu_down, call device_offline, which
-> also takes care of updating the cpu.dev.offline field. This keeps the
-> sysfs file /sys/devices/system/cpu/cpuN/online, up to date.  Also move
-> the call to disable_hotplug_cpu, because it makes more sense to have it
-> there.
->
-> We don't call device_online at cpu-hotplug time, because that would
-> immediately take the cpu online, while we want to retain the current
-> behaviour: the user needs to explicitly enable the cpu after it has
-> been hotplugged.
->
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> CC: konrad.wilk at oracle.com
-> CC: boris.ostrovsky at oracle.com
-> CC: david.vrabel at citrix.com
+On TI's Keystone platforms, several peripherals such as the
+gbe ethernet switch, 10gbe ethernet switch and PCIe controller
+require the use of a SerDes for converting SoC parallel data into
+serialized data that can be output over a high-speed electrical
+interface, and also converting high-speed serial input data
+into parallel data that can be processed by the SoC.  The
+SerDeses used by those peripherals, though they may be different,
+are largely similar in functionality and setup.
 
-Reviewed-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+This patch series provides a SerDes phy driver implementation that can be
+used by the above mentioned peripheral drivers to configure their
+respective SerDeses.
+
+As an example of the using the SerDes driver, this patch series also
+updates the Keystone PCIe host driver to enable and use its SerDes block.
+
+References:
+[1] KeyStone II Architecture Serializer/Deserializer (SerDes) User's Guide
+    (http://www.ti.com/lit/ug/spruho3a/spruho3a.pdf)
+
+v3:
+	- addresses the following review comments
+		1. https://lkml.org/lkml/2015/10/19/756
+			-- included sizes.h
+		2. https://lkml.org/lkml/2015/10/19/781
+			-- updated base on Fengguang Wu's suggestions.
+		3. https://lkml.org/lkml/2015/10/15/896
+			-- clarified here https://lkml.org/lkml/2015/10/20/512
+			-- nothing to do.
+
+v2:
+	- addresses the following review comments on v1:
+		1. https://lkml.org/lkml/2015/10/15/896
+			-- this does not address the question:
+			   "The current code does not do this when compiled,
+			    which might be a problem for distributors.
+			    Can you clarify the license?"
+			-- the question is still under discussion here:
+			   https://lkml.org/lkml/2015/10/19/471
+		2. https://lkml.org/lkml/2015/10/15/895
+
+v1: 
+	- addresses the following review comments
+		1. https://lkml.org/lkml/2015/10/13/803
+		2. https://lkml.org/lkml/2015/10/14/613
+		3. https://lkml.org/lkml/2015/10/13/818
+
+	- An update to PCIe dts bindings to enable the PCIe SerDes is
+	  submitted in a separate patch.
+
+WingMan Kwok (2):
+  phy: keystone: serdes driver for gbe 10gbe and pcie
+  PCI: keystone: update to use generic keystone serdes driver
+
+ Documentation/devicetree/bindings/phy/ti-phy.txt |  239 +++
+ drivers/pci/host/pci-keystone.c                  |   24 +-
+ drivers/pci/host/pci-keystone.h                  |    1 +
+ drivers/phy/Kconfig                              |    8 +
+ drivers/phy/Makefile                             |    1 +
+ drivers/phy/phy-keystone-serdes.c                | 2366 ++++++++++++++++++++++
+ 6 files changed, 2629 insertions(+), 10 deletions(-)
+ create mode 100644 drivers/phy/phy-keystone-serdes.c
+
+-- 
+1.7.9.5
