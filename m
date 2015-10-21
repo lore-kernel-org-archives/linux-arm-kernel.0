@@ -1,54 +1,68 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Wed, 21 Oct 2015 23:45:13 +0800
-Subject: [PATCH v1 1/2] dt-bindings: Sync the dts to this document
-In-Reply-To: <CAL_JsqJ6ZRjZbtc7dqo-g=CzO+H_FWcRqs2gBGH2HMBBM1xU3g@mail.gmail.com>
-References: <1445395380-5365-1-git-send-email-wxt@rock-chips.com>
- <1445395380-5365-2-git-send-email-wxt@rock-chips.com>
- <CAL_JsqJ6ZRjZbtc7dqo-g=CzO+H_FWcRqs2gBGH2HMBBM1xU3g@mail.gmail.com>
-Message-ID: <5627B309.9080309@gmail.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Wed, 21 Oct 2015 17:47:35 +0200
+Subject: [GIT PULL 0/6] A handful of fixes for KVM/ARM for v4.3-rc7
+In-Reply-To: <1445357947-6022-1-git-send-email-christoffer.dall@linaro.org>
+References: <1445357947-6022-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <5627B397.9060001@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
 
-? 2015?10?21? 23:18, Rob Herring ??:
-> On Tue, Oct 20, 2015 at 9:42 PM, Caesar Wang <wxt@rock-chips.com> wrote:
->> Add the OTP gpio state, we need switch the pin to gpio state
->> before the TSADC controller is reset.
->>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> ---
->>
->> Changes in v1:
->>    - As the Doug comments, add the 'init' property to sync document.
->>
->>   Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 5 +++--
->>   1 file changed, 3 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
->> index ef802de..28e84f7 100644
->> --- a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
->> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
->> @@ -27,8 +27,9 @@ tsadc: tsadc at ff280000 {
->>          clock-names = "tsadc", "apb_pclk";
->>          resets = <&cru SRST_TSADC>;
->>          reset-names = "tsadc-apb";
->> -       pinctrl-names = "default";
->> -       pinctrl-0 = <&otp_out>;
->> +       pinctrl-names = "init", "default";
->> +       pinctrl-0 = <&otp_gpio>;
->> +       pinctrl-1 = <&otp_out>;
-> Are these optional or required? They only appear in the example.
 
-Yep,
-These are required for TSADC.
+On 20/10/2015 18:19, Christoffer Dall wrote:
+> Hi Paolo,
+> 
+> The following changes since commit 920552b213e3dc832a874b4e7ba29ecddbab31bc:
+> 
+>   KVM: disable halt_poll_ns as default for s390x (2015-09-25 10:31:30 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.3-rc7
+> 
+> for you to fetch changes up to 0d997491f814c87310a6ad7be30a9049c7150489:
+> 
+>   arm/arm64: KVM: Fix disabled distributor operation (2015-10-20 18:09:13 +0200)
+> 
+> Sorry for sending these relatively late, but we had a situation where we
+> found one breakage in the timer implementation changes merged for 4.3,
+> then fixing that issue revealed another bug, and then that happened
+> again, and now we have something that looks stable.
+> 
+> Description of the fixes is in the tag and quoted below.
+> 
+> Thanks,
+> -Christoffer
+> 
+> ----------------------------------------------------------------
+> A late round of KVM/ARM fixes for v4.3-rc7, fixing:
+>  - A bug where level-triggered interrupts lowered from userspace
+>    are still routed to the guest
+>  - A memory leak an a failed initialization path
+>  - A build error under certain configurations
+>  - Several timer bugs introduced with moving the timer to the active
+>    state handling instead of the masking trick.
+> 
+> ----------------------------------------------------------------
+> Arnd Bergmann (1):
+>       KVM: arm: use GIC support unconditionally
+> 
+> Christoffer Dall (3):
+>       arm/arm64: KVM: Fix arch timer behavior for disabled interrupts
+>       arm/arm64: KVM: Clear map->active on pend/active clear
+>       arm/arm64: KVM: Fix disabled distributor operation
+> 
+> Pavel Fedin (2):
+>       KVM: arm/arm64: Do not inject spurious interrupts
+>       KVM: arm/arm64: Fix memory leak if timer initialization fails
+> 
+>  arch/arm/kvm/Kconfig      |  1 +
+>  arch/arm/kvm/arm.c        |  2 +-
+>  virt/kvm/arm/arch_timer.c | 19 ++++++++++
+>  virt/kvm/arm/vgic.c       | 95 +++++++++++++++++++++++++++--------------------
+>  4 files changed, 76 insertions(+), 41 deletions(-)
+> 
 
-I?m assumed that's right,
-I think we don't need to introduce the pinctrl in this document.
+Pulled, thanks.  I'll send the fixes to Linus tomorrow.
 
-> Rob
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+Paolo
