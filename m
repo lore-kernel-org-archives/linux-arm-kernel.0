@@ -1,100 +1,55 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 21 Oct 2015 09:45:17 +0800
+Date: Wed, 21 Oct 2015 09:55:43 +0800
 Subject: [PATCH] EDAC: Add AMD Seattle SoC EDAC
-In-Reply-To: <20151020172539.GB4943@leverpostej>
+In-Reply-To: <20151020173639.GH31130@pd.tnic>
 References: <1445282597-18999-1-git-send-email-brijeshkumar.singh@amd.com>
  <20151019205236.GB453@leverpostej> <56266F7E.6030404@amd.com>
- <20151020172539.GB4943@leverpostej>
-Message-ID: <5626EE2D.8090506@huawei.com>
+ <20151020165744.GE31130@pd.tnic> <20151020172654.GC4943@leverpostej>
+ <20151020173639.GH31130@pd.tnic>
+Message-ID: <5626F09F.4050107@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/10/21 1:25, Mark Rutland wrote:
-> On Tue, Oct 20, 2015 at 11:44:46AM -0500, Brijesh Singh wrote:
->> Hi Mark,
->>
->> Thanks for review. 
->>
->> -Brijesh
->>
->> On 10/19/2015 03:52 PM, Mark Rutland wrote:
->>> Hi,
->>>
->>> Please Cc the devicetree list (devicetree at vger.kernel.org) when sending
->>> binding patches. I see you've added the people from the MAINTAINERS
->>> entry; the list should also be Cc'd.
->>>
->> Noted.
->>> On Mon, Oct 19, 2015 at 02:23:17PM -0500, Brijesh Singh wrote:
->>>> Add support for the AMD Seattle SoC EDAC driver.
->>>>
->>>> Signed-off-by: Brijesh Singh <brijeshkumar.singh@amd.com>
->>>> ---
->>>>  .../devicetree/bindings/edac/amd-seattle-edac.txt  |  15 +
->>>>  drivers/edac/Kconfig                               |   6 +
->>>>  drivers/edac/Makefile                              |   1 +
->>>>  drivers/edac/seattle_edac.c                        | 306 +++++++++++++++++++++
->>>>  4 files changed, 328 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/edac/amd-seattle-edac.txt
->>>>  create mode 100644 drivers/edac/seattle_edac.c
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/edac/amd-seattle-edac.txt b/Documentation/devicetree/bindings/edac/amd-seattle-edac.txt
->>>> new file mode 100644
->>>> index 0000000..a0354e8
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/edac/amd-seattle-edac.txt
->>>> @@ -0,0 +1,15 @@
->>>> +* AMD Seattle SoC EDAC node
->>>> +
->>>> +EDAC node is defined to describe on-chip error detection and reporting.
->>>> +
->>>> +Required properties:
->>>> +- compatible: Should be "amd,arm-seattle-edac"
->>>> +- poll-delay-msec: Indicates how often the edac check callback should be called.
->>>> +  Time in msec.
->>> This second property doesn't describe the hardware in any way. It should
->>> be runtime-configurable and dpesn't belong in the DT.
->>>
->>> Regardless, the binding is wrong. This is in no way specific to AMD
->>> Seattle, and per the code is actually used to imply the presence of a
->>> Cortex-A57 feature. No reference to AMD Seattle belongs in the DT
->>> binding (with the exception of the example, perhaps), nor in the driver.
->>>
->>> NAK while this pretends to be something that it isn't. At minimum, you
->>> need to correctly describe the feature you are trying to add support
->>> for.
->>>
->> I will remove AMD specific string in compatibility field and make the
->> poll-delay-msec optional. Will also expose this as module parameter as
->> you suggested below.
-> I don't think it should be optional; I don't think it should be there at
-> all.
->
-> I'm not sure if we even need a DT binding if we can derive the presence
-> of the feature from the MIDR.
->
->>>> + * The driver polls CPUMERRSR_EL1 and L2MERRSR_EL1 registers to logs the 
->>> These are IMPLEMENTATION DEFINED registers which are specific to
->>> Cortex-A57, and I note that L2MERRSR_EL1 changed in r1p0.
->>>
->>> Which revisions of Cortex-A57 does this work with?
->>>
->> I have tested my code on r1p2.
->>
->>> Generally we avoid touching IMPLEMENTATION DEFINED registers as they may
->>> not exist in some configurations or revisions, and could trap or undef.
->>> Is it always safe to access these registers (in current revisions of
->>> Cortex-A57)?
->>>
->> So far I have not ran into any trap error, was able to read/write
->> registers from EL1 all the times. I looked at TRM but could not find
->> reference that it would fail. As per doc the register should be
->> available at all EL's except EL0.
-> Ok.
+Hi Boris, Mark,
 
-This also works on Hisilicon D02 board. but the mechanism to handle the error
-is a little bit different, on D02, it use poll mechanism to scan the single bit ECC error
-just as Seattle, but D02 will trigger SEI when double bit ECC error happened.
+On 2015/10/21 1:36, Borislav Petkov wrote:
+> On Tue, Oct 20, 2015 at 06:26:55PM +0100, Mark Rutland wrote:
+>>> Btw, how much of this is implementing generic A57 functionality?
+>> The driver is entirely A57 generic.
+>>
+>>> If a lot, can we make this a generic a57_edac driver so that multiple
+>>> vendors can use it?
+>> Yes.
+> Ok, cool.
+>
+>>> How fast and how ugly can something like that become?
+>> Not sure I follow.
+> In the sense that some vendor might require just a little bit different
+> handling or maybe wants to read some vendor-specific registers in
+> addition to the architectural ones.
+
+Yes, you are right and foresight :)
+
+>
+> Then we'll start adding vendor-specific hacks to that generic driver.
+> And therefore the question how fast and how ugly such hacks would
+> become.
+>
+> I guess we'll worry about that when we get there...
+
+So I think the meaning of those error register is the same, but the way
+of handle it may different from SoCs, for single bit error:
+
+ - SoC may trigger a interrupt;
+ - SoC may just keep silent so we need to scan the registers using poll
+   mechanism.
+
+For Double bit error:
+  - SoC may also keep silent
+  - Trigger a interrupt
+  - Trigger a SEI (system error)
+
+Any suggestion to cover those cases?
 
 Thanks
 Hanjun
