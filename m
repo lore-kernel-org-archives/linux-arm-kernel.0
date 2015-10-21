@@ -1,100 +1,89 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Wed, 21 Oct 2015 11:32:15 -0400
-Subject: console vs earlycon ?
-In-Reply-To: <4963882.HSXu6hF7zO@wuerfel>
-References: <CAK7LNARem16fTim8Ds_y8ezMusz_aRtv6c59KoxyC0rLV-RBWw@mail.gmail.com>
- <5490682.zH2vAEO2id@wuerfel> <562798EB.7060202@hurleysoftware.com>
- <4963882.HSXu6hF7zO@wuerfel>
-Message-ID: <5627AFFF.6060900@hurleysoftware.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 21 Oct 2015 17:34:10 +0200
+Subject: [PATCH v10 0/4] Allow USB devices to remain runtime-suspended when
+ sleeping
+Message-ID: <1445441654-31778-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2015 10:13 AM, Arnd Bergmann wrote:
-> On Wednesday 21 October 2015 09:53:47 Peter Hurley wrote:
->> On 10/21/2015 06:36 AM, Arnd Bergmann wrote:
->>> On Wednesday 21 October 2015 18:30:05 Masahiro Yamada wrote:
->>>>>
->>>>>> I am trying to implement OF_EARLYCON_DECLARE() for that.
->>>>>>
->>>>>> I was just wondering if console_initcall() should work as well.
->>>>>>
->>>>>>
->>>>>> As I said, I noticed the console_initcall() in 8250_core.c
->>>>>> only works on very limited platforms.
->>>>>
->>>>> It works with all those that use of_serial.c, right?
->>>>
->>>> I doubt it.
->>>>
->>>>
->>>> I have a board with a pure 8250-compat device working.
->>>> (  compatible = "ns16550a")
->>>> It uses of_serial.c, of course.
->>>>
->>>>
->>>> As far as I tested, it would never enable the console at console_init().
->>>
->>> Ok, that sounds like a bug. Peter and others have changed that code
->>> a lot in the last year. I wonder if this has never worked then or
->>> if it has regressed.
->>
->> No, not a bug. console_init() is only for legacy platforms, not for
->> probed drivers.
-> 
-> Ah, I had no idea we were moving in this direction.
+Hi,
 
-I would not say this was a conscious design decision, but rather an
-outcome of getting-something-working-without-breaking-existing-usage.
+this is v10 of an attempt to make it easier for devices to remain in
+runtime PM when the system goes to sleep, mainly to reduce the time
+spent resuming devices.
 
-My main focus with earlycon/console has been to try to reduce and
-generalize the existing code.
+For this, we interpret the absence of all PM callback implementations as
+it being safe to do direct_complete, so their ancestors aren't prevented
+from remaining runtime-suspended.
 
-> So I guess the idea
-> is not to add another for_each_compatible_node() loop when we already have
-> two places (earlycon and tty) in the code that do this?
+Additionally, the prepare() callback of USB devices will return 1 if
+runtime PM is enabled and the current wakeup settings are correct.
 
-I wouldn't want to do that just because, but rather only to enable some
-functionality that doesn't work now.
+With these changes, a uvcvideo device (for example) stays in runtime
+suspend when the system goes to sleep and is left in that state when the
+system resumes, not delaying it unnecessarily.
 
-FWIW, console_init() is basically a hack. The dummy color console
-registration is a good example of the gymnastics made necessary by
-console_init().
+Thanks,
 
-OTOH, I don't like the reverse-linkage that exists now between
-serial core and OF (ie., of_console_check()). And now ACPI wants to
-recapitulate that design. :/
+Tomeu
 
+Changes in v10:
+- Remove superfluous call to pm_runtime_enabled() as suggested by Alan
 
->>> * arch/powerpc/kernel/legacy_serial.c does everything we need, but
->>>   does not live in architecture independent code and does a few
->>>   things that we probably don't need or want there. It relies
->>>   on scanning the device tree for known UART device nodes before
->>>   the platform devices are added.
->>>
->>> * for console_initcall() to do the right thing, we want both the
->>>   ttyS devices to get added early for console=ttyS1 to work, as well
->>>   as having the preferred console work based on the stdout-property.
->>>
->>> * we parse the /chosen/stdout-path property in drivers/of/base and
->>>   store the device node pointer in the global 'of_stdout' variable,
->>>   but do not use it until the uart is added by the tty driver
->>>   and calls of_console_check() to add the default console device.
->>
->> I'm assuming the issue with trying to get console_init() working
->> is because the dummy color console causes the earlycon to be disabled?
-> 
-> I don't think so.
-> 
-> My line of thinking was more about usability: earlycon requires that
-> you edit the kernel command line at the moment, while console_init()
-> doesn't require any user interaction and just uses the stdout-path.
-> 
-> I guess we could enable earlycon using a Kconfig symbol if we want
-> to, or make it a per-architecture decision whether it's enabled even
-> in the absence of the command line flag.
+Changes in v9:
+- Add docs noting the need for the device lock to be held before calling
+  device_is_bound()
+- Add docs noting the need for the device lock to be held before calling
+  dev_pm_domain_set()
+- Move to CONFIG_PM_SLEEP as suggested by Rafael and Ulf.
+- Rename from device_check_pm_callbacks to device_pm_check_callbacks to
+  follow with the naming convention of existing API.
+- Re-add calling to device_pm_check_callbacks from device registration
+  and when updating the PM domain of a device.
 
-Ah, I see. You want to start the stdout-path console at console_init()
-time.
+Changes in v8:
+- Add device_is_bound()
+- Add dev_pm_domain_set() and update code to use it
+- Move no_pm_callbacks field into CONFIG_PM_SLEEP
+- Call device_check_pm_callbacks only after a device is bound or unbound
 
-Regards,
-Peter Hurley
+Changes in v7:
+- Reduce indentation by adding a label in device_prepare()
+
+Changes in v6:
+- Add stub for !CONFIG_PM.
+- Move implementation of device_check_pm_callbacks to power/main.c as it
+  doesn't belong to CONFIG_PM_SLEEP.
+- Take dev->power.lock before modifying flag.
+
+Changes in v5:
+- Check for all dev_pm_ops instances associated to a device, updating a
+  no_pm_callbacks flag at the times when that could change.
+
+Tomeu Vizoso (4):
+  device core: add device_is_bound()
+  PM / Domains: add setter for dev.pm_domain
+  PM / sleep: Go direct_complete if driver has no callbacks
+  USB / PM: Allow USB devices to remain runtime-suspended when sleeping
+
+ arch/arm/mach-omap2/omap_device.c |  7 ++++---
+ drivers/acpi/acpi_lpss.c          |  5 +++--
+ drivers/acpi/device_pm.c          |  5 +++--
+ drivers/base/dd.c                 | 21 +++++++++++++++++++--
+ drivers/base/power/clock_ops.c    |  5 +++--
+ drivers/base/power/common.c       | 24 ++++++++++++++++++++++++
+ drivers/base/power/domain.c       |  6 ++++--
+ drivers/base/power/main.c         | 35 +++++++++++++++++++++++++++++++++++
+ drivers/base/power/power.h        |  3 +++
+ drivers/gpu/vga/vga_switcheroo.c  | 10 +++++-----
+ drivers/misc/mei/pci-me.c         |  5 +++--
+ drivers/misc/mei/pci-txe.c        |  5 +++--
+ drivers/usb/core/port.c           |  6 ++++++
+ drivers/usb/core/usb.c            |  8 +++++++-
+ include/linux/device.h            |  2 ++
+ include/linux/pm.h                |  1 +
+ include/linux/pm_domain.h         |  3 +++
+ 17 files changed, 128 insertions(+), 23 deletions(-)
+
+-- 
+2.5.0
