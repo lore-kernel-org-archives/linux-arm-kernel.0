@@ -1,153 +1,94 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 21 Oct 2015 09:44:04 -0400
-Subject: [PATCH RFC] arm64/ftrace: Define a new arm64 trace clock source
- based on cntpct_el0 register.
-In-Reply-To: <1445170639-13943-1-git-send-email-amittomer25@gmail.com>
-References: <1445170639-13943-1-git-send-email-amittomer25@gmail.com>
-Message-ID: <20151021094404.0e3114f9@gandalf.local.home>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 21 Oct 2015 15:44:04 +0200
+Subject: [PATCH v2 2/2] i2c: at91: manage unexpected RXRDY flag when starting
+ a transfer
+In-Reply-To: <1445435048-25889-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1445435048-25889-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1445435048-25889-2-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 18 Oct 2015 17:47:19 +0530
-Amit <amittomer25@gmail.com> wrote:
+In some cases, we could start a new i2c transfer with the RXRDY flag
+set. It is not a clean state and it leads to print annoying error
+messages even if there no real issue. The cause is only having garbage
+data in the Receive Holding Register because of a weird behavior of the
+RXRDY flag.
 
-> From: Amit Singh Tomar <amittomer25@gmail.com>
-> 
-> Currenty, Default trace clock("local") for host and guest is out of sync. 
-> This default clock is based on cntvct_el0 register value and both host/guest
-> see different values of cntvct_el0.
-> 
-> Intention here is to get a clock whose timestamps are comparable between host/guest.
-> It can be achieved by using clock based on cntpct_el0 register values(host/guest
-> see same value of cntpct_el0 register all the time).
-> 
-> Define a new arm64 specific trace clock using the cntpct_el0 register,
-> similar to x86-tsc. It can be used to correlate trace events across
-> hosts and guest that can be useful for debuging purpose.
-> 
-> Signed-off-by: Amit Singh Tomar <amittomer25@gmail.com>
-> ---
->  Documentation/trace/ftrace.txt       |  8 +++++++-
->  arch/arm64/include/asm/Kbuild        |  1 -
->  arch/arm64/include/asm/trace_clock.h | 21 +++++++++++++++++++++
->  arch/arm64/kernel/Makefile           |  1 +
->  arch/arm64/kernel/trace_clock.c      | 23 +++++++++++++++++++++++
->  5 files changed, 52 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm64/include/asm/trace_clock.h
->  create mode 100644 arch/arm64/kernel/trace_clock.c
-> 
-> diff --git a/Documentation/trace/ftrace.txt b/Documentation/trace/ftrace.txt
-> index ef621d3..6420e32 100644
-> --- a/Documentation/trace/ftrace.txt
-> +++ b/Documentation/trace/ftrace.txt
-> @@ -323,7 +323,7 @@ of ftrace. Here is a list of some of the key files:
->  	Usual clocks for tracing:
->  
->  	  # cat trace_clock
-> -	  [local] global counter x86-tsc
-> +	  [local] global counter x86-tsc arm64-pct
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Fixes: 93563a6a71bb ("i2c: at91: fix a race condition when using the DMA
+controller")
+Reported-by: Peter Rosin <peda@lysator.liu.se>
+Tested-by: Peter Rosin <peda@lysator.liu.se>
+Cc: stable at vger.kernel.org #4.1
+---
+ drivers/i2c/busses/i2c-at91.c | 33 +++++++++++++++++++++++++--------
+ 1 file changed, 25 insertions(+), 8 deletions(-)
 
-You don't need to update this line. You can't have both x86-tsc and
-arm64-pct at the same time.
-
->  
->  	  local: Default clock, but may not be in sync across CPUs
->  
-> @@ -351,6 +351,12 @@ of ftrace. Here is a list of some of the key files:
->  		  to correlate events across hypervisor/guest if
->  		  tb_offset is known.
->  
-> +	arm64-pct: This uses ARM64 Physical Timer Count register
-> +		   value. This is different from default "local"
-> +		   clock which usese Virtual Timer Count register.
-> +		   This is consistent across processors and can be
-> +		   used to correlate events across host/guest.
-> +
->  	To set a clock, simply echo the clock name into this file.
->  
->  	  echo global > trace_clock
-> diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-> index 70fd9ff..8608f9e 100644
-> --- a/arch/arm64/include/asm/Kbuild
-> +++ b/arch/arm64/include/asm/Kbuild
-> @@ -50,7 +50,6 @@ generic-y += switch_to.h
->  generic-y += termbits.h
->  generic-y += termios.h
->  generic-y += topology.h
-> -generic-y += trace_clock.h
->  generic-y += types.h
->  generic-y += unaligned.h
->  generic-y += user.h
-> diff --git a/arch/arm64/include/asm/trace_clock.h b/arch/arm64/include/asm/trace_clock.h
-> new file mode 100644
-> index 0000000..aef4ccd
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/trace_clock.h
-> @@ -0,0 +1,21 @@
-> +/*
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License, version 2, as
-> + * published by the Free Software Foundation.
-> + *
-> + * Copyright (C) 2015 Amit Singh Tomar, amittomer25 at gmail.com
-> +*/
-> +
-> +#ifndef _ASM_ARM_TRACE_CLOCK_H
-> +#define _ASM_ARM_TRACE_CLOCK_H
-> +
-> +#include <linux/compiler.h>
-> +#include <linux/types.h>
-> +
-> +extern u64 notrace trace_clock_arm64_pct(void);
-> +
-> +# define ARCH_TRACE_CLOCKS \
-> +	{ trace_clock_arm64_pct,  "arm64-pct",  0},
-> +
-> +#endif  /* _ASM_ARM_TRACE_CLOCK_H */
-> +
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 22dc9bc..d58f885 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -36,6 +36,7 @@ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
->  arm64-obj-$(CONFIG_PCI)			+= pci.o
->  arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
->  arm64-obj-$(CONFIG_ACPI)		+= acpi.o
-> +arm64-obj-$(CONFIG_TRACING)             += trace_clock.o
->  
->  obj-y					+= $(arm64-obj-y) vdso/
->  obj-m					+= $(arm64-obj-m)
-> diff --git a/arch/arm64/kernel/trace_clock.c b/arch/arm64/kernel/trace_clock.c
-> new file mode 100644
-> index 0000000..f038977
-> --- /dev/null
-> +++ b/arch/arm64/kernel/trace_clock.c
-> @@ -0,0 +1,23 @@
-> +/*
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License, version 2, as
-> + * published by the Free Software Foundation.
-> + *
-> + * Copyright (C) 2015 Amit Singh Tomar, amittomer25 at gmail.com
-> +*/
-> +
-> +#include <asm/trace_clock.h>
-> +
-> +#define read_cnt_pct(cnt_pct) do {				\
-> +	__asm__ __volatile("isb; mrs %0, cntpct_el0; isb ;"	\
-> +	: "=r" (cnt_pct));					\
-> +} while (0)
-
-Why is this a define and not a static inline?
-
--- Steve
-
-> +
-> +u64 notrace trace_clock_arm64_pct(void)
-> +{
-> +	u64 cnt_pct;
-> +
-> +	read_cnt_pct(cnt_pct);
-> +	return  cnt_pct;
-> +}
-> +
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index 94c087b..bac0016 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -347,8 +347,14 @@ error:
+ 
+ static void at91_twi_read_next_byte(struct at91_twi_dev *dev)
+ {
+-	if (!dev->buf_len)
++	/*
++	 * If we are in this case, it means there is garbage data in RHR, so
++	 * delete them.
++	 */
++	if (!dev->buf_len) {
++		at91_twi_read(dev, AT91_TWI_RHR);
+ 		return;
++	}
+ 
+ 	/* 8bit read works with and without FIFO */
+ 	*dev->buf = readb_relaxed(dev->base + AT91_TWI_RHR);
+@@ -465,6 +471,24 @@ static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
+ 
+ 	if (!irqstatus)
+ 		return IRQ_NONE;
++	/*
++	 * In reception, the behavior of the twi device (before sama5d2) is
++	 * weird. There is some magic about RXRDY flag! When a data has been
++	 * almost received, the reception of a new one is anticipated if there
++	 * is no stop command to send. That is the reason why ask for sending
++	 * the stop command not on the last data but on the second last one.
++	 *
++	 * Unfortunately, we could still have the RXRDY flag set even if the
++	 * transfer is done and we have read the last data. It might happen
++	 * when the i2c slave device sends too quickly data after receiving the
++	 * ack from the master. The data has been almost received before having
++	 * the order to send stop. In this case, sending the stop command could
++	 * cause a RXRDY interrupt with a TXCOMP one. It is better to manage
++	 * the RXRDY interrupt first in order to not keep garbage data in the
++	 * Receive Holding Register for the next transfer.
++	 */
++	if (irqstatus & AT91_TWI_RXRDY)
++		at91_twi_read_next_byte(dev);
+ 
+ 	/*
+ 	 * When a NACK condition is detected, the I2C controller sets the NACK,
+@@ -507,8 +531,6 @@ static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
+ 	if (irqstatus & (AT91_TWI_TXCOMP | AT91_TWI_NACK)) {
+ 		at91_disable_twi_interrupts(dev);
+ 		complete(&dev->cmd_complete);
+-	} else if (irqstatus & AT91_TWI_RXRDY) {
+-		at91_twi_read_next_byte(dev);
+ 	} else if (irqstatus & AT91_TWI_TXRDY) {
+ 		at91_twi_write_next_byte(dev);
+ 	}
+@@ -600,11 +622,6 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
+ 	} else if (dev->msg->flags & I2C_M_RD) {
+ 		unsigned start_flags = AT91_TWI_START;
+ 
+-		if (sr & AT91_TWI_RXRDY) {
+-			dev_err(dev->dev, "RXRDY still set!");
+-			at91_twi_read(dev, AT91_TWI_RHR);
+-		}
+-
+ 		/* if only one byte is to be read, immediately stop transfer */
+ 		if (!has_alt_cmd && dev->buf_len <= 1 &&
+ 		    !(dev->msg->flags & I2C_M_RECV_LEN))
+-- 
+2.5.0
