@@ -1,44 +1,34 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 21 Oct 2015 16:17:12 -0700
-Subject: [PATCH 5/5] clk: scpi: add missing of_node_put
-In-Reply-To: <1445460100-26727-6-git-send-email-Julia.Lawall@lip6.fr>
-References: <1445460100-26727-1-git-send-email-Julia.Lawall@lip6.fr>
- <1445460100-26727-6-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20151021231712.GL19782@codeaurora.org>
+Date: Wed, 21 Oct 2015 16:25:16 -0700
+Subject: [GIT PULL] Allwinner clock changes for 4.4
+In-Reply-To: <20151021195856.GA5155@lukather>
+References: <20151021195856.GA5155@lukather>
+Message-ID: <20151021232516.GM19782@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21, Julia Lawall wrote:
-> for_each_available_child_of_node performs an of_node_get on each iteration,
-> so a break out of the loop requires an of_node_put.
+On 10/21, Maxime Ripard wrote:
+> Hi Mike, Stephen,
 > 
-> The semantic patch that fixes this problem is as follows
-> (http://coccinelle.lip6.fr):
+> Please pull the following patches for the next merge window.
 > 
-> // <smpl>
-> @@
-> expression root,e;
-> local idexpression child;
-> @@
+> Thanks!
+> Maxime
 > 
->  for_each_available_child_of_node(root, child) {
->    ... when != of_node_put(child)
->        when != e = child
-> (
->    return child;
-> |
-> +  of_node_put(child);
-> ?  return ...;
-> )
->    ...
->  }
-> // </smpl>
+> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 > 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 > 
-> ---
+> are available in the git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clocks-for-4.4
+> 
+> for you to fetch changes up to 9b038bc58ad2658c76fd8b50bb333dfd4454573c:
+> 
+>   clk: sunxi: mod1 clock support (2015-10-21 21:51:29 +0200)
+> 
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Thanks. Pulled.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
