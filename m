@@ -1,25 +1,153 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 21 Oct 2015 13:28:43 +0100
-Subject: [PATCH] ASoC: dt-bindings: Drop unneeded properties rockchip
- i2s/spdif bindings
-In-Reply-To: <1445242539-9098-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1445242539-9098-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <20151021122843.GD8232@sirena.org.uk>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 21 Oct 2015 14:37:40 +0200
+Subject: [PATCH] i2c: at91: fix write transfers by clearing pending
+ interrupt first
+In-Reply-To: <562741F0.7030506@lysator.liu.se>
+References: <561D359D.8000500@atmel.com> <561D46FE.4090801@lysator.liu.se>
+ <20151014054321.GA20049@odux.rfo.atmel.com>
+ <56203B0E.1030104@lysator.liu.se> <5620BE9A.10302@lysator.liu.se>
+ <20151019085136.GK26893@odux.rfo.atmel.com>
+ <5624CA9F.5080309@lysator.liu.se>
+ <20151020132702.GA25824@odux.rfo.atmel.com>
+ <56273D06.4010600@lysator.liu.se> <562741F0.7030506@lysator.liu.se>
+Message-ID: <20151021123740.GE25824@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 10:15:39AM +0200, Sjoerd Simons wrote:
-> Neither the rockchip i2s nor the rockchip spdif binding support child
-> devices so #address-cells and #size-cells properties aren't required.
-> Remove these from the bindings.
+On Wed, Oct 21, 2015 at 09:42:40AM +0200, Peter Rosin wrote:
+> On 2015-10-21 09:21, Peter Rosin wrote:
+> > On 2015-10-20 15:27, Ludovic Desroches wrote:
+> >> On Mon, Oct 19, 2015 at 12:49:03PM +0200, Peter Rosin wrote:
+> >>> On 2015-10-19 10:51, Ludovic Desroches wrote:
+> >>>> Hi Peter,
+> >>>>
+> >>>> On Fri, Oct 16, 2015 at 11:08:42AM +0200, Peter Rosin wrote:
+> >>>>> On 2015-10-16 01:47, Peter Rosin wrote:
+> >>>>>> On 2015-10-14 07:43, Ludovic Desroches wrote:
+> >>>>>>> On Tue, Oct 13, 2015 at 08:01:34PM +0200, Peter Rosin wrote:
+> >>>>>>>> On 2015-10-13 18:47, Cyrille Pitchen wrote:
+> >>>>>>>>> Le 13/10/2015 17:19, Peter Rosin a ?crit :
+> >>>>>>>>>> On 2015-10-13 16:21, Ludovic Desroches wrote:
+> >>>>
+> >>>> [...]
+> >>>>
+> >>>>>> I have started to get this when I run with this patch:
+> >>>>>>
+> >>>>>> [   73.310000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>>>>> [  198.200000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>>>>> [  509.880000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>>>>> [  615.750000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>>>>> [  617.750000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>>>>> [ 1766.640000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>>>>> [ 2035.380000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>>>>> [ 2227.190000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>>>>> [ 2313.100000] at91_i2c f0014000.i2c: RXRDY still set!
+> >>>>>>
+> >>>>>> My USB serial dongle was hung which was why I didn't notice until just now.
+> >>>>>>
+> >>>>>> This is probably not when communication with the eeprom though, and certainly not
+> >>>>>> writing to it, but perhpaps when polling the temperature (using the jc42 driver).
+> >>>>>> I'll investigate further in the morning to see if I can pinpoint it.
+> >>>>>
+> >>>>> Yep, it's the jc42 accesses that triggers this (to the same chip as the
+> >>>>> eeprom, but a different block of transistors I suppose).
+> >>>>>
+> >>>>> Looking at the i2c bus, the accesses normally go like this:
+> >>>>>
+> >>>>> [0.000000] S 0x18 W 0x05 S 0x18 R 0xc1 0xbe NACK P
+> >>>>> [0.000521] S 0x18 W 0x04 S 0x18 R 0x00 0x00 NACK P
+> >>>>> [0.001024] S 0x18 W 0x03 S 0x18 R 0x00 0x00 NACK P
+> >>>>> [0.001524] S 0x18 W 0x02 S 0x18 R 0x00 0x00 NACK P
+> >>>>> [0.196991] S 0x18 W 0x05 S 0x18 R 0xc1 0xbe NACK P
+> >>>>> [0.197514] S 0x18 W 0x04 S 0x18 R 0x00 0x00 NACK P
+> >>>>> [0.198019] S 0x18 W 0x03 S 0x18 R 0x00 0x00 NACK P
+> >>>>> [0.198520] S 0x18 W 0x02 S 0x18 R 0x00 0x00 NACK P
+> >>>>>
+> >>>>> I.e. chunks of four transfers every ~200 ms (I removed the 1Hz rate
+> >>>>> limiter in the jc42 driver to get more frequent incidents).
+> >>>>>
+> >>>>> But when the diagnostic (RXRDY still set!) is output it continues
+> >>>>> with this:
+> >>>>>
+> >>>>> [0.399755] S 0x18 W 0x05 S 0x18 R 0xc1 0xbe NACK P
+> >>>>> [0.404998] S 0x18 W 0x04 S 0x18 R 0x00 0x00 NACK P
+> >>>>> [0.405508] S 0x18 W 0x03 S 0x18 R 0x00 0x00 NACK P
+> >>>>> [0.406008] S 0x18 W 0x02 S 0x18 R 0x00 0x00 NACK P
+> >>>>>
+> >>>>> Notice the ~5 ms delay (about the time it should take to output
+> >>>>> the diagnostic at 115200 baud) after the access to register 0x05
+> >>>>> at 0.399755.
+> >>>>>
+> >>>>> This is the only thing that I can observe on the bus, so it appears
+> >>>>> to be harmless.
+> >>>>>
+> >>>>> It appears that the i2c access at 0.399755 finds the TWI
+> >>>>> registers in an odd state, but nothing from the access at
+> >>>>> 0.198520 appears to have gone wrong. Is this a race? Anyway,
+> >>>>> the diagnostic is pretty frequent and annoying. printk_once?
+> >>>>
+> >>>> I'll try to reproduce it on my side. The only issue you have is having
+> >>>> the message about RXRDY? I mean no issue with i2c transfers?
+> >>>
+> >>> Exactly, the only issue is the message, the bus looks good and transfers
+> >>> work as they should AFAICT.
+> >>>> It is not the possible bug we had in mind, this bug will prevent the
+> >>>> master device to release the i2c bus. It will stop the transfer but
+> >>>> without sending a stop on the bus.
+> >>>
+> >>> Agreed, this is not about the extra frame caused by the spurious write
+> >>> to the THR register. This is something else.
+> >>>
+> >>> One suspicion is that the driver gets an unexpected irq from its own
+> >>> NACK (the one that it puts out to end the read) and races with the
+> >>> expected interrupt at TXCOMP?
+> >>>
+> >>
+> >> I have discussed with the designer of this IP. So the NACK flag is only
+> >> used for 'real' nack not protocol ones.
+> >>
+> >> Concerning the read issue, it have attached a patch (apply it on top of
+> >> Cyrille's patch). Could you have a try? I have reproduced your issue only one
+> >> time so it's hard for me to tell if it works well or not.
+> > 
+> > Since you removed the dev_err call, I don't really know if the underlying
+> > issue is solved or not (if there ever was any).
+> > 
+> > Reading RHR in the if at the top of at91_twi_read_next_byte() never happens
+> > for me (I added a witness and left it running overnight), so that
+> > seems like an unrelated change.
 > 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> Ahhh, now I see. Why is it that I have to hit send before I start to realize
+> things? You have moved the RHR read from at91_do_twi_transfer()...
+> 
+> > Checking RXRDY before TXCOMP|NACK seems about equal, but what do I know?
+> 
+> ...and there is no else before the TXCOMP|NACK, so I added a witness inside the
+> if (...RXRDY) that triggers if TXCOM|NACK is also set. That witness fires at
+> about the same rate as the "RXRDY still set" message did before. For thrills I
+> readded the if (sr & AT91_TWI_RXRDY) check in at91_do_twi_transfer() but that
+> test is no longer firing.
+> 
+> So, yes, this is a good fix...
+> 
 
-Please use subject lines matching the style for the subsystem!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151021/e1f4def2/attachment-0001.sig>
+Great thanks for your feedback, I will send it with Cyrille's one.
+
+> > But the "problem" is gone of course, no flood of messages, but I can't tell
+> > if this is just papering over or a fix.
+> 
+> ...and you can scratch that comment.
+
+The twi device has a weird behavior (solved on SAMA5D2) when it concerns
+reception. It sounds as when I have almost received a byte, I will do
+internal stuff to prepare the reception of a new byte. If I have
+received the order to send a stop command, this internal stuff should
+not be done and everything goes well. But if the order is received too
+late, the twi device may think it's still receiving data and set the
+RXRDY flag. For that reason we don't set the stop order on the last data
+but on the second last data. Unfortunately, it seems we still have bad
+timing in some cases.
+
+Regards
+
+Ludovic
