@@ -1,35 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Oct 2015 11:16:46 +0200
-Subject: [PATCH] i2c: designware: fix platform driver probe rename
-Message-ID: <4006973.dp9o3gm8C4@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 21 Oct 2015 10:18:33 +0100
+Subject: [PATCHv4 02/24] arm64: Delay ELF HWCAP initialisation until all
+ CPUs are up
+In-Reply-To: <20151021084434.GD4801@e103592.cambridge.arm.com>
+References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
+ <1445261101-22344-3-git-send-email-suzuki.poulose@arm.com>
+ <20151021084434.GD4801@e103592.cambridge.arm.com>
+Message-ID: <20151021091833.GM11226@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A function rename was incomplete and missed the !CONFIG_PM
-case:
+On Wed, Oct 21, 2015 at 09:44:38AM +0100, Dave P Martin wrote:
+> On Mon, Oct 19, 2015 at 02:24:39PM +0100, Suzuki K. Poulose wrote:
+> > Delay the ELF HWCAP initialisation untill all the (enabled) CPUs are
+> 
+> nit: untill
+> 
+> No need to fix this unless you respin the series for some other
+> reason.
 
-i2c-designware-platdrv.c:340:13: error: 'dw_i2c_plat_prepare' undeclared here (not in a function)
-i2c-designware-platdrv.c:341:14: error: 'dw_i2c_plat_complete' undeclared here (not in a function)
+I fixed some spelling errors when I applied the patches. This is one of
+them (though I may have missed others). I haven't pushed the patches out
+yet, so there is time for some more tweaking.
 
-This renames the macros accordingly.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 6ad6fde3970c ("i2c: designware: Rename platform driver probe and PM functions")
----
-Found on ARM randconfig builds
-
-diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index f6b252a8ffd1..eb55760ccd9f 100644
---- a/drivers/i2c/busses/i2c-designware-platdrv.c
-+++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -307,8 +307,8 @@ static void dw_i2c_plat_complete(struct device *dev)
- 		pm_request_resume(dev);
- }
- #else
--#define dw_i2c_prepare	NULL
--#define dw_i2c_complete	NULL
-+#define dw_i2c_plat_prepare	NULL
-+#define dw_i2c_plat_complete	NULL
- #endif
- 
- #ifdef CONFIG_PM
+-- 
+Catalin
