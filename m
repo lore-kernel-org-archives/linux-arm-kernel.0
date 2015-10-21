@@ -1,193 +1,113 @@
-From: majun258@huawei.com (MaJun)
-Date: Wed, 21 Oct 2015 14:04:30 +0800
-Subject: [PATCH v7 2/4] irqchip: add platform device driver for mbigen device
-In-Reply-To: <1445407472-6120-1-git-send-email-majun258@huawei.com>
-References: <1445407472-6120-1-git-send-email-majun258@huawei.com>
-Message-ID: <1445407472-6120-3-git-send-email-majun258@huawei.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Wed, 21 Oct 2015 11:39:32 +0530
+Subject: [PATCH v2 0/6] Switch to generic syscon regmap based drivers
+In-Reply-To: <1606098.olLAyTIhB3@dell2.five-lan.de>
+References: <1445333085-22837-1-git-send-email-alim.akhtar@samsung.com>
+ <CAGOxZ50G-ttivhVjbozUisA0HXcFz7bvRUuPR67xR88TTCa_wQ@mail.gmail.com>
+ <CAGOxZ51_JPy51htzD_M_=qaPVUexkVhoA2ANLS2-rpK3QDT=8A@mail.gmail.com>
+ <1606098.olLAyTIhB3@dell2.five-lan.de>
+Message-ID: <56272C1C.8040007@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ma Jun <majun258@huawei.com>
 
-Mbigen means Message Based Interrupt Generator(MBIGEN).
 
-Its a kind of interrupt controller that collects
-the interrupts from external devices and generate msi interrupt.
-Mbigen is applied to reduce the number of wire connected interrupts.
+On 10/20/2015 10:53 PM, Markus Reichl wrote:
+> Am Dienstag, 20. Oktober 2015, 21:22:05 schrieb Alim Akhtar:
+>> On Tue, Oct 20, 2015 at 9:17 PM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+>>> Hi Markus,
+>>>
+>>> On Tue, Oct 20, 2015 at 8:29 PM, Markus Reichl <m.reichl@fivetechno.de> wrote:
+>>>> Am 20.10.2015 um 11:24 schrieb Alim Akhtar:
+>>>>> Now we have a nice way to reboot/poweroff system using a generic
+>>>>> syscon regmap based drivers, this series moves exynos SoCs to
+>>>>> make use of the same.
+>>>>>
+>>>>> Changes since v1:
+>>>>> * Added a comment about the register information
+>>>>> * Droped defconfig changes as disscussed
+>>>>> * Collected various Reviewed-by, Tested-by and Acked-by tags
+>>>>> * Added SYSCON-{RESET, POWEROFF} to select from Kconfig
+>>>>>
+>>>>> Alim Akhtar (6):
+>>>>>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos3250 SoCs
+>>>>>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos4
+>>>>>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5
+>>>>>    arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5410 SoC
+>>>>>    ARM: exynos: select POWER_RESET_SYSCON and
+>>>>>      POWER_RESET_SYSCON_POWEROFF
+>>>>>    ARM: EXYNOS: Remove code for restart and poweroff for exynos SoCs
+>>>>>
+>>>>>   arch/arm/boot/dts/exynos3250.dtsi |   14 ++++++++++++
+>>>>>   arch/arm/boot/dts/exynos4.dtsi    |   14 ++++++++++++
+>>>>>   arch/arm/boot/dts/exynos5.dtsi    |   14 ++++++++++++
+>>>>>   arch/arm/boot/dts/exynos5410.dtsi |   14 ++++++++++++
+>>>>>   arch/arm/mach-exynos/Kconfig      |    3 +++
+>>>>>   arch/arm/mach-exynos/pmu.c        |   43 -------------------------------------
+>>>>>   6 files changed, 59 insertions(+), 43 deletions(-)
+>>>>>
+>>>>
+>>>> Hi Alim,
+>>>>
+>>>> I have installed your patch set above with git am on top of
+>>>> 4.3.0-rc6-00108-gce1fad2 torvalds/linux of today
+>>>> with make exynos_defconfig on Odroid U3.
+>>>>
+>>> which exynos soc Odroid U3 uses?
+>>>
+>> OK, I can see its uses exynos4412 and exynos4412-odroidu3.dts does
+>> include exynos4.dtsi,
+>> so these should have worked.
+>>
+>>>> "halt -p" worked (power 0.0W).
+>>>> "reboot" got stuck at 0.5W.
+>>>>
+>>> reboot stuck mean system does not reboot any more?
+>
+> It freezes when going for reboot.
+> Have to power off/on to boot again.
+>
+> Btw I use an mmc, not an sd-card.
+> No other HW connected, just LAN-cable.
+> Bootloader is u-boot v2015.10.
+> o
+Have checked on 4.3.0-rc6-00006-gd03c139e7e77, still works on peach boards.
+Sorry I don't have Odroid U3 with me, may be Javier or Krzysztof might 
+help here to check whats wrong. To me its looks more of a board specific 
+issue for now.
 
-As the peripherals increasing, the interrupts lines needed is
-increasing much, especially on the Arm64 server SOC.
-
-Therefore, the interrupt pin in GIC is not enough to cover so
-many peripherals.
-
-Mbigen is designed to fix this problem.
-
-Mbigen chip locates in ITS or outside of ITS.
-
-Mbigen chip hardware structure shows as below:
-
-		mbigen chip
-|---------------------|-------------------|
-mgn_node0	  mgn_node1		mgn_node2
- |		 |-------|		|-------|------|
-dev1		dev1    dev2		dev1   dev3   dev4
-
-Each mbigen chip contains several mbigen nodes.
-
-External devices can connect to mbigen node through wire connecting way.
-
-Because a mbigen node only can support 128 interrupt maximum, depends
-on the interrupt lines number of devices, a device can connects to one
-more mbigen nodes.
-
-Also, several different devices can connect to a same mbigen node.
-
-When devices triggered interrupt,mbigen chip detects and collects
-the interrupts and generates the MBI interrupts by writing the ITS
-Translator register.
-
-To simplify mbigen driver,I used a new conception--mbigen device.
-Each mbigen device is initialized as a platform device.
-
-Mbigen device presents the parts(register, pin definition etc.) in
-mbigen chip corresponding to a peripheral device.
-
-So from software view, the structure likes below
-
-	            mbigen chip
-     |---------------------|-----------------|
-mbigen device1       mbigen device2  mbigen device3
-      |                   |                |
-     dev1                dev2             dev3
-
-Signed-off-by: Ma Jun <majun258@huawei.com>
----
- drivers/irqchip/Kconfig      |    8 ++++
- drivers/irqchip/Makefile     |    1 +
- drivers/irqchip/irq-mbigen.c |   83 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 92 insertions(+), 0 deletions(-)
- create mode 100644 drivers/irqchip/irq-mbigen.c
-
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 4d7294e..b205e15 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -27,6 +27,14 @@ config ARM_GIC_V3_ITS
- 	bool
- 	select PCI_MSI_IRQ_DOMAIN
- 
-+config HISILICON_IRQ_MBIGEN
-+	bool "Support mbigen interrupt controller"
-+	default n
-+	depends on ARM_GIC_V3 && ARM_GIC_V3_ITS && GENERIC_MSI_IRQ_DOMAIN
-+	help
-+	 Enable the mbigen interrupt controller used on
-+	 Hisilicon platform.
-+
- config ARM_NVIC
- 	bool
- 	select IRQ_DOMAIN
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 177f78f..cd76b11 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -24,6 +24,7 @@ obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
- obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
- obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
- obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
-+obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
- obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
- obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
- obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
-diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-new file mode 100644
-index 0000000..f18132f
---- /dev/null
-+++ b/drivers/irqchip/irq-mbigen.c
-@@ -0,0 +1,83 @@
-+/*
-+ * Copyright (C) 2015 Hisilicon Limited, All Rights Reserved.
-+ * Author: Jun Ma <majun258@huawei.com>
-+ * Author: Yun Wu <wuyun.wu@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+
-+/**
-+ * struct mbigen_device - holds the information of mbigen device.
-+ *
-+ * @pdev:		pointer to the platform device structure of mbigen chip.
-+ * @base:		mapped address of this mbigen chip.
-+ */
-+struct mbigen_device {
-+	struct platform_device	*pdev;
-+	void __iomem		*base;
-+};
-+
-+static int mbigen_device_probe(struct platform_device *pdev)
-+{
-+	struct mbigen_device *mgn_chip;
-+
-+	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
-+	if (!mgn_chip)
-+		return -ENOMEM;
-+
-+	mgn_chip->pdev = pdev;
-+	mgn_chip->base = of_iomap(pdev->dev.of_node, 0);
-+
-+	platform_set_drvdata(pdev, mgn_chip);
-+
-+	return 0;
-+}
-+
-+static int mbigen_device_remove(struct platform_device *pdev)
-+{
-+	struct mbigen_device *mgn_chip = platform_get_drvdata(pdev);
-+
-+	iounmap(mgn_chip->base);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id mbigen_of_match[] = {
-+	{ .compatible = "hisilicon,mbigen-v2" },
-+	{ /* END */ }
-+};
-+MODULE_DEVICE_TABLE(of, mbigen_of_match);
-+
-+static struct platform_driver mbigen_platform_driver = {
-+	.driver = {
-+		.name		= "Hisilicon MBIGEN-V2",
-+		.owner		= THIS_MODULE,
-+		.of_match_table	= mbigen_of_match,
-+	},
-+	.probe			= mbigen_device_probe,
-+	.remove			= mbigen_device_remove,
-+};
-+
-+module_platform_driver(mbigen_platform_driver);
-+
-+MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
-+MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
-+MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("Hisilicon MBI Generator driver");
--- 
-1.7.1
+>>> As far as I can see there in __no__ functional changes that my patch introduce.
+>>> So ideally it should have work. My patches are based on the top on
+>>> vanilla v4.3-rc5.
+>>> (25cb62b Linux 4.3-rc5), can you check at this commit?
+>
+> Will try tomorrow.
+>
+>>>
+>>> Will check with the commit mentioned by you tomorrow.
+>>>
+>>>>
+>>>> Without your patch set reboot worked.
+>>>>
+>>>>
+>>>> Thanks,
+>>>> --
+>>>> Markus Reichl
+>>>> --
+>>>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>>>> the body of a message to majordomo at vger.kernel.org
+>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>
+>>>
+>>>
+>>> --
+>>> Regards,
+>>> Alim
+>>
+>>
+>>
+>>
+> Thanks,
+> --
+> Markus
+>
