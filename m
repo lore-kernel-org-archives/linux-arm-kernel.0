@@ -1,35 +1,44 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 21 Oct 2015 21:23:52 +0200
-Subject: [PATCH 0/6] ARM: sunxi: Introduce Allwinner H3 support
-In-Reply-To: <1445444007-4260-1-git-send-email-jenskuske@gmail.com>
-References: <1445444007-4260-1-git-send-email-jenskuske@gmail.com>
-Message-ID: <5627E648.3090408@redhat.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Wed, 21 Oct 2015 15:24:41 -0400
+Subject: console vs earlycon ?
+In-Reply-To: <3890353.0icCv0Zeuq@wuerfel>
+References: <CAK7LNARem16fTim8Ds_y8ezMusz_aRtv6c59KoxyC0rLV-RBWw@mail.gmail.com>
+ <4963882.HSXu6hF7zO@wuerfel> <5627AFFF.6060900@hurleysoftware.com>
+ <3890353.0icCv0Zeuq@wuerfel>
+Message-ID: <5627E679.1050207@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/21/2015 03:00 PM, Arnd Bergmann wrote:
+> On Wednesday 21 October 2015 11:32:15 Peter Hurley wrote:
+>> On 10/21/2015 10:13 AM, Arnd Bergmann wrote:
+>>> On Wednesday 21 October 2015 09:53:47 Peter Hurley wrote:
+>>>> I'm assuming the issue with trying to get console_init() working
+>>>> is because the dummy color console causes the earlycon to be disabled?
+>>>
+>>> I don't think so.
+>>>
+>>> My line of thinking was more about usability: earlycon requires that
+>>> you edit the kernel command line at the moment, while console_init()
+>>> doesn't require any user interaction and just uses the stdout-path.
+>>>
+>>> I guess we could enable earlycon using a Kconfig symbol if we want
+>>> to, or make it a per-architecture decision whether it's enabled even
+>>> in the absence of the command line flag.
+>>
+>> Ah, I see. You want to start the stdout-path console at console_init()
+>> time.
+> 
+> Yes, I see this as a tradeoff: we want the console to be as early as
+> possible in order to report boot-time errors to the user, but not so early
+> to require hacks that can cause problems themselves. earlycon has to
+> do some scary stuff and is relatively recent, while the hacks
+> necessary for console_init() are much older and better tested.
 
-On 21-10-15 18:13, Jens Kuske wrote:
-> Hi everyone,
->
-> This is v3 of my patch series introducing basic kernel support for Allwinner's
-> H3 SoC. It mainly adds basic clocks and pinctrl. It also adds interrupts,
-> timers, watchdog, RTC, dmaengine, MMC and UARTs, which are mostly compatible
-> to those in earlier SoCs like A23 and A31, and can simply be reused.
->
-> These patches are based on Maxime's sunxi/for-next branch from
-> git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git
-
-p.s.
-
-For the next version you will want to base these on the sunxi-next branch of:
-
-https://github.com/linux-sunxi/linux-sunxi.git
-
-There is at least a conflict with the pio driver due to the addition of
-the a83 pio driver which mripard/linux/sunxi/for-next does not have, where
-as linux-sunxi/sunxi-next does have that merged in.
+I assume you mean the hacks necessary to get _earlycon_ working at
+console_init() time, because the hacks necessary to get non-8250
+serial consoles working at console_init() would be extensive and
+brand new.
 
 Regards,
-
-Hans
+Peter Hurley
