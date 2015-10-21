@@ -1,134 +1,88 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 21 Oct 2015 17:49:12 +0900
-Subject: [PATCH 2/3] ARM: dts: uniphier: add ProXstream2 Vodka board
- support
-In-Reply-To: <CAK7LNARJhpz0AmLDL9j5c20cnv=+7CGiJMgGHhreJEd0rG3zSw@mail.gmail.com>
-References: <1444899934-4754-1-git-send-email-yamada.masahiro@socionext.com>
- <63719761.5kc6F97FjG@wuerfel>
- <CAK7LNATzgOZp542rd-92YXDxux2DrAOH_mkzk8NjimQ3afrCCg@mail.gmail.com>
- <9943173.h49fNtDsEp@wuerfel>
- <CAK7LNARJhpz0AmLDL9j5c20cnv=+7CGiJMgGHhreJEd0rG3zSw@mail.gmail.com>
-Message-ID: <CAK7LNAQG-aqu0khSMZYLqd0P_Oz4MPuQccTMb0nYeR5JthnKhA@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 21 Oct 2015 10:50:09 +0200
+Subject: [GIT PULL] at91: dt for 4.4 #2
+In-Reply-To: <20151019193158.GA20739@piout.net>
+References: <20151019193158.GA20739@piout.net>
+Message-ID: <20151021085009.GM3421@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi,
 
+Actually, this built on my machine because one of the headers was left
+unversionned in my tree. The last patch depends on the MFD tree, I'm not
+sure how you want to handle that. I can as well drop the last patch and
+resend a PR.
 
-2015-10-16 18:50 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Hi Arnd,
->
-> 2015-10-16 18:18 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
->> On Friday 16 October 2015 14:24:30 Masahiro Yamada wrote:
->>>
->>> No, it is not a typo, but intentional.
->>>
->>>
->>> i2c0 - i2c3 are connected to the pads of the SoC package.
->>> On the other hand, i2c-4 - i2c-6 are connected to
->>> internal devices inside the SoC package.
->>>
->>> i2c-4 - i2c-6 are always connected to the same hardware
->>> devices and always used for the same purpose.
->>>
->>>
->>> My expected scenario is:
->>>
->>> [1] i2c0 - i2c3 are connected to the on-board devices
->>>     depending on board variants.
->>>     On some boards, their status is "okay" and
->>>     on some boards, their status is "disabled".
->>>
->>> [2] i2c4 - i2c6 are always used to communicate
->>>     with in-package devices.  The status is always "okay".
->>
->> I think you are getting confused because the data sheet uses
->> the same names as the kernel, but they are really different
->> things.
->>
->> How about boards that have i2c connectors that are labeled
->> differently?
->
->
-> I guess it would rarely happen as it is confusing.
->
-> The board connectors are generally named
-> correspondingly to the hardware block ID in the SoC.
->
->
->
->> We want the aliases to match whatever is written on the
->> board normally, to make it easier for users.
->>
->>> [3] Some user-land applications may want to have access
->>>      through the same character devices,
->>>       /dev/i2c4, /dev/i2c5, /dev/i2c6
->>
->> That user space would however only work on boards with the
->> same SoC, which is not a safe assumption to make.
->
-> Right.
->
->> Either
->> it should be specific to just one board which has a known
->> set of buses, or it should be done in a way that works
->> across SoC generations of families.
->>
->> Ideally the devices on the internal buses would have an
->> in-kernel driver that exports a high-level API to avoid this
->> problem. What devices are these?
->
-> HDMI transmitter, TV signal demodulator, etc.
->
->
->
->>> If your way is adopted,
->>> the real hardware "i2c4" might be aligned to /dev/i2c1 on some boards,
->>> and /dev/i2c2 on others, etc.
->>
->> Right, I think that is how it should be. You could also make
->> the chip's i2c4 always link to user space /dev/i2c0 if you
->> want to keep those stable, but as I said that is still not
->> a good (software) system design.
->>
->
-> Right.  In-kernel drivers can handle it nicely.
->
-> Also, we can write a device tree that specifies device connection
-> hierarchy like follows.
-> The device names will appear under /sys/ directory and user-land
-> applications can check them.
->
-> &i2c4 {
->         demodulator {
->                  compatible = "...";
->
->         };
-> };
->
-> &i2c6 {
->          hdmi_tx {
->
->                    compatible = "...";
->          };
-> }
->
->
-> I understand that I2C bus number assumption is avoidable,
-> but I am still not fully convinced.
->
-> Matching /dev/i2c* and the real hardware block ID (this is written in
-> the SoC spec book)
-> makes things clearer, I think.
->
-
-
-Anyway, this version is unacceptable, right?
-
-
-
-
+On 19/10/2015 at 21:31:58 +0200, Alexandre Belloni wrote :
+> Arnd, Olof, Kevin,
+> 
+> A few more DT changes for AT91.
+> Small fixes and huge addition to the sama5d2 and its evaluation board.
+> There may be a simple add/add conflict with Linus Walleij pinctrl tree
+> that should be an issue.
+> 
+> Thanks, best regards,
+> 
+> The following changes since commit a9b672a636a599cc052afcb6837e3177dc53c143:
+> 
+>   ARM: at91/dt: sama5d2 Xplained: add device pin muxing (2015-09-23 16:26:47 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-dt2
+> 
+> for you to fetch changes up to 0bddbefb9e731a6090350508f139b9ac3590303c:
+> 
+>   ARM: at91/dt: sama5d2 Xplained: add several devices (2015-10-19 21:22:32 +0200)
+> 
+> ----------------------------------------------------------------
+> Second batch of DT changes for 4.4:
+> - some DT fixes: pullups, disabled property
+> - the PMC is now a syscon
+> - great improvement of sama5d2 support
+> 
+> ----------------------------------------------------------------
+> Alexandre Belloni (1):
+>       ARM: at91/dt: use syscon for PMC
+> 
+> Gregory CLEMENT (1):
+>       ARM: at91/dt: sama5d4: add the macb1 node
+> 
+> Ludovic Desroches (2):
+>       ARM: at91/dt: sama5d2: add missing devices
+>       ARM: at91/dt: sama5d2 Xplained: add several devices
+> 
+> Michael Opdenacker (1):
+>       ARM: at91/dt: fix "disabled" property on at91rm9200
+> 
+> Sylvain Rochet (1):
+>       ARM: at91/dt: add pullup on mmc2 data signals
+> 
+> Wenyou Yang (1):
+>       ARM: at91/dt: sama5d2_xplained: add regulator nodes
+> 
+>  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 163 ++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/at91rm9200.dtsi           |   8 +-
+>  arch/arm/boot/dts/at91sam9260.dtsi          |   2 +-
+>  arch/arm/boot/dts/at91sam9261.dtsi          |   2 +-
+>  arch/arm/boot/dts/at91sam9263.dtsi          |   2 +-
+>  arch/arm/boot/dts/at91sam9g45.dtsi          |   2 +-
+>  arch/arm/boot/dts/at91sam9n12.dtsi          |   2 +-
+>  arch/arm/boot/dts/at91sam9rl.dtsi           |   2 +-
+>  arch/arm/boot/dts/at91sam9x5.dtsi           |   2 +-
+>  arch/arm/boot/dts/sama5d2.dtsi              | 154 +++++++++++++++++++++++++-
+>  arch/arm/boot/dts/sama5d3.dtsi              |   2 +-
+>  arch/arm/boot/dts/sama5d3_mci2.dtsi         |   6 +-
+>  arch/arm/boot/dts/sama5d4.dtsi              |  32 +++++-
+>  13 files changed, 360 insertions(+), 19 deletions(-)
+> 
+> -- 
+> Alexandre Belloni, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
 
 -- 
-Best Regards
-Masahiro Yamada
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
