@@ -1,31 +1,25 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 21 Oct 2015 16:40:02 -0700
-Subject: [PATCH v3 01/10] ARM: cygnus: fix link failures when
- CONFIG_COMMON_CLK_IPROC is disabled
-In-Reply-To: <1444938513-10758-2-git-send-email-jonmason@broadcom.com>
-References: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
- <1444938513-10758-2-git-send-email-jonmason@broadcom.com>
-Message-ID: <20151021234002.GN19782@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 Oct 2015 16:41:34 -0700
+Subject: MUSB peripheral DMA regression caused by driver core runtime PM change
+Message-ID: <20151021234134.GQ3078@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15, Jon Mason wrote:
-> diff --git a/drivers/clk/bcm/Kconfig b/drivers/clk/bcm/Kconfig
-> index 88febf5..46ee475 100644
-> --- a/drivers/clk/bcm/Kconfig
-> +++ b/drivers/clk/bcm/Kconfig
-> @@ -9,10 +9,8 @@ config CLK_BCM_KONA
->  	  in the BCM281xx and BCM21664 families.
->  
->  config COMMON_CLK_IPROC
-> -	bool "Broadcom iProc clock support"
-> -	depends on ARCH_BCM_IPROC
+Hi all,
 
-Another patch added COMPILE_TEST here, so I've removed
-COMPILE_TEST now.
+I noticed a regresssino in v4.3-rc series to day with MUSB gadgets
+and DMA. Doing a git bisect between v4.2..v4.3-rc1 on it pointed to:
 
-Applied to clk-next.
+ddef08dd00f5 ("Driver core: wakeup the parent device before trying probe")
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+With the commit above reverted things work fine with DMA and USB gadgets.
+
+This is on omap3 with CONFIG_USB_INVENTRA_DMA selected. Selecting
+CONFIG_MUSB_PIO_ONLY still works even without reverting ddef08dd00f5.
+
+Anybody got ideas what might be wrong? Some wrong runtime PM usage
+under drivers/usb/musb?
+
+Regards,
+
+Tony
