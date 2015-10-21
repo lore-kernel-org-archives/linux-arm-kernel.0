@@ -1,42 +1,73 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 21 Oct 2015 15:39:15 +0900
-Subject: [PATCH 2/2] ARM: dts: change the compatible from exynos5250 to
- exynos3250
-In-Reply-To: <1445409555-1684-1-git-send-email-jh80.chung@samsung.com>
-References: <1445409555-1684-1-git-send-email-jh80.chung@samsung.com>
-Message-ID: <1445409555-1684-2-git-send-email-jh80.chung@samsung.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 21 Oct 2015 08:46:21 +0200
+Subject: [PATCHv2] fpga: zynq-fpga: Change fw format to handle bin instead
+ of bit.
+In-Reply-To: <1445361596-12024-2-git-send-email-moritz.fischer@ettus.com>
+References: <1445361596-12024-1-git-send-email-moritz.fischer@ettus.com>
+ <1445361596-12024-2-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <562734BD.2000909@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To use more excatly, change compatible from exynos5250 to exynos3250.
-Exynos3250 and exnos5250 are some difference.
+On 10/20/2015 07:19 PM, Moritz Fischer wrote:
+> This gets rid of the code to strip away the header and byteswap,
+> as well as the check for the sync word.
+> 
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> ---
+> v2:
+>  - Removed early exit path in case synq seq is not found
+> ---
+>  drivers/fpga/zynq-fpga.c | 24 ++----------------------
+>  1 file changed, 2 insertions(+), 22 deletions(-)
+> 
+> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+> index 617d382..31db550 100644
+> --- a/drivers/fpga/zynq-fpga.c
+> +++ b/drivers/fpga/zynq-fpga.c
+> @@ -287,9 +287,9 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>  	struct zynq_fpga_priv *priv;
+>  	int err;
+>  	char *kbuf;
+> -	size_t i, in_count;
+> +	size_t in_count;
+>  	dma_addr_t dma_addr;
+> -	u32 transfer_length = 0;
+> +	u32 transfer_length;
+>  	u32 intr_status;
+>  
+>  	in_count = count;
+> @@ -301,26 +301,6 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>  
+>  	memcpy(kbuf, buf, count);
+>  
+> -	/* look for the sync word */
+> -	for (i = 0; i < count - 4; i++) {
+> -		if (memcmp(kbuf + i, "\xAA\x99\x55\x66", 4) == 0) {
+> -			dev_dbg(priv->dev, "Found swapped sync word\n");
+> -			break;
+> -		}
+> -	}
+> -
+> -	/* remove the header, align the data on word boundary */
+> -	if (i != count - 4) {
+> -		count -= i;
+> -		memmove(kbuf, kbuf + i, count);
+> -	}
+> -
+> -	/* fixup endianness of the data */
+> -	for (i = 0; i < count; i += 4) {
+> -		u32 *p = (u32 *)&kbuf[i];
+> -		*p = swab32(*p);
+> -	}
+> -
+>  	/* enable clock */
+>  	err = clk_enable(priv->clk);
+>  	if (err)
+> 
 
-Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
----
- arch/arm/boot/dts/exynos3250.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Looks good.
+Acked-by: Michal Simek <michal.simek@xilinx.com>
 
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index 033def4..05ed242 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -333,7 +333,7 @@
- 		};
- 
- 		mshc_0: mshc at 12510000 {
--			compatible = "samsung,exynos5250-dw-mshc";
-+			compatible = "samsung,exynos3250-dw-mshc";
- 			reg = <0x12510000 0x1000>;
- 			interrupts = <0 142 0>;
- 			clocks = <&cmu CLK_SDMMC0>, <&cmu CLK_SCLK_MMC0>;
-@@ -345,7 +345,7 @@
- 		};
- 
- 		mshc_1: mshc at 12520000 {
--			compatible = "samsung,exynos5250-dw-mshc";
-+			compatible = "samsung,exynos3250-dw-mshc";
- 			reg = <0x12520000 0x1000>;
- 			interrupts = <0 143 0>;
- 			clocks = <&cmu CLK_SDMMC1>, <&cmu CLK_SCLK_MMC1>;
--- 
-1.9.1
+Thanks,
+Michal
