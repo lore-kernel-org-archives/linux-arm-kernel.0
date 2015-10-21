@@ -1,60 +1,57 @@
-From: majun258@huawei.com (majun (F))
-Date: Wed, 21 Oct 2015 13:57:02 +0800
-Subject: [PATCH RESEND v6 3/4] irqchip:create irq domain for each mbigen
- device
-In-Reply-To: <201510210208.Hkd8XMxI%fengguang.wu@intel.com>
-References: <201510210208.Hkd8XMxI%fengguang.wu@intel.com>
-Message-ID: <5627292E.6050708@huawei.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 21 Oct 2015 13:59:00 +0800
+Subject: [PATCH RFC v2 1/2] dt-bindings: simplefb: Support a list of regulator
+ supply properties
+In-Reply-To: <1445407141-16459-1-git-send-email-wens@csie.org>
+References: <1445407141-16459-1-git-send-email-wens@csie.org>
+Message-ID: <1445407141-16459-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The physical display tied to the framebuffer may have regulators
+providing power to it, such as power for LCDs or interface conversion
+chips.
 
+The number of regulators in use may vary, but the regulator supply
+binding can not be a list. Work around this by adding a "num-supplies"
+property to communicate the number of supplies, and a list of 0 ~ N
+"vinN-supply" properties for the actual regulator supply.
 
-? 2015/10/21 2:43, kbuild test robot ??:
-> Hi Ma,
-> 
-> [auto build test ERROR on tip/irq/core -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
-> 
-> url:    https://github.com/0day-ci/linux/commits/MaJun/irqchip-support-mbigen-interrupt-controller/20151020-202450
-> config: arm64-allyesconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm64 
-> 
-> All error/warnings (new ones prefixed by >>):
-> 
->    drivers/irqchip/irq-mbigen.c:84:14: error: 'mbigen_eoi_irq' undeclared here (not in a function)
->      .irq_eoi =  mbigen_eoi_irq,
->                  ^
->    drivers/irqchip/irq-mbigen.c:85:19: error: 'mbigen_set_type' undeclared here (not in a function)
->      .irq_set_type =  mbigen_set_type,
->                       ^
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ .../devicetree/bindings/video/simple-framebuffer.txt        | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
-I'll fix this error in v7
-
->    drivers/irqchip/irq-mbigen.c: In function 'mbigen_irq_domain_alloc':
->>> drivers/irqchip/irq-mbigen.c:150:2: error: implicit declaration of function 'platform_msi_domain_alloc' [-Werror=implicit-function-declaration]
->      err = platform_msi_domain_alloc(domain, virq, nr_irqs);
->      ^
->>> drivers/irqchip/irq-mbigen.c:159:2: error: implicit declaration of function 'platform_msi_get_host_data' [-Werror=implicit-function-declaration]
->      mgn_chip = platform_msi_get_host_data(domain);
->      ^
->>> drivers/irqchip/irq-mbigen.c:159:11: warning: assignment makes pointer from integer without a cast
->      mgn_chip = platform_msi_get_host_data(domain);
->               ^
->    drivers/irqchip/irq-mbigen.c: In function 'mbigen_device_probe':
->>> drivers/irqchip/irq-mbigen.c:202:2: error: implicit declaration of function 'platform_msi_create_device_domain' [-Werror=implicit-function-declaration]
->      domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
->      ^
->    drivers/irqchip/irq-mbigen.c:202:9: warning: assignment makes pointer from integer without a cast
->      domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
-
-My patch based on Marc's patch
-https://lkml.org/lkml/2015/10/15/545
-
-So, please apply this patch first.
-
-Thanks!
-Ma Jun
+diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+index 4474ef6e0b95..8c9e9f515c87 100644
+--- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
++++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+@@ -47,10 +47,14 @@ Required properties:
+   - a8b8g8r8 (32-bit pixels, d[31:24]=a, d[23:16]=b, d[15:8]=g, d[7:0]=r).
+ 
+ Optional properties:
+-- clocks : List of clocks used by the framebuffer. Clocks listed here
+-           are expected to already be configured correctly. The OS must
+-           ensure these clocks are not modified or disabled while the
+-           simple framebuffer remains active.
++- clocks : List of clocks used by the framebuffer.
++- *-supply : Any number of regulators used by the framebuffer. These should
++	     be named according to the names in the device's design.
++
++  The above resources are expected to already be configured correctly.
++  The OS must ensure they are not modified or disabled while the simple
++  framebuffer remains active.
++
+ - display : phandle pointing to the primary display hardware node
+ 
+ Example:
+@@ -68,6 +72,7 @@ chosen {
+ 		stride = <(1600 * 2)>;
+ 		format = "r5g6b5";
+ 		clocks = <&ahb_gates 36>, <&ahb_gates 43>, <&ahb_gates 44>;
++		lcd-supply = <&reg_dc1sw>;
+ 		display = <&lcdc0>;
+ 	};
+ 	stdout-path = "display0";
+-- 
+2.6.1
