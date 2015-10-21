@@ -1,35 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Oct 2015 10:47:16 +0200
-Subject: [PATCH] fixup! mm: simplify reclaim path for MADV_FREE
-In-Reply-To: <56273fe6.c8afc20a.628d8.ffff9ed8@mx.google.com>
-References: <56273fe6.c8afc20a.628d8.ffff9ed8@mx.google.com>
-Message-ID: <5799761.gmbM76C6JW@wuerfel>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 21 Oct 2015 09:48:22 +0100
+Subject: [PATCHv4 08/24] arm64: Keep track of CPU feature registers
+In-Reply-To: <1445261101-22344-9-git-send-email-suzuki.poulose@arm.com>
+References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
+ <1445261101-22344-9-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151021084821.GE4801@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 October 2015 00:33:58 kernelci. org bot wrote:
-> lpc18xx_defconfig (arm) ? FAIL, 55 errors, 18 warnings, 0 section mismatches
-> 
-> Errors:
->     include/linux/rmap.h:274:1: error: expected declaration specifiers or '...' before '{' token
->     include/linux/uaccess.h:88:13: error: storage class specified for parameter '__probe_kernel_read'
->     include/linux/uaccess.h:99:53: error: storage class specified for parameter 'probe_kernel_write'
+On Mon, Oct 19, 2015 at 02:24:45PM +0100, Suzuki K. Poulose wrote:
+> This patch adds an infrastructure to keep track of the CPU feature
+> registers on the system. For each register, the infrastructure keeps
+> track of the system wide safe value of the feature bits. Also, tracks
+> the which fields of a register should be matched strictly across all
+> the CPUs on the system for the SANITY check infrastructure.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: e4f28388eb72 ("mm: simplify reclaim path for MADV_FREE")
----
-Please fold into the original patch if you don't already have this.
+[...]
 
-diff --git a/include/linux/rmap.h b/include/linux/rmap.h
-index 978f65066fd5..853f4f3c6742 100644
---- a/include/linux/rmap.h
-+++ b/include/linux/rmap.h
-@@ -270,7 +270,7 @@ int rmap_walk(struct page *page, struct rmap_walk_control *rwc);
- 
- static inline int page_referenced(struct page *page, int is_locked,
- 				  struct mem_cgroup *memcg,
--				  unsigned long *vm_flags,
-+				  unsigned long *vm_flags)
- {
- 	*vm_flags = 0;
- 	return 0;
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index 85507fe..af0c187 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -35,6 +35,37 @@
+>  
+>  #include <linux/kernel.h>
+>  
+> +/* CPU feature register tracking */
+> +enum ftr_type {
+> +	FTR_EXACT,	/* Use a predefined safe value */
+> +	FTR_LOWER_SAFE,	/* Smaller value is safe */
+> +	FTR_HIGHER_SAFE,/* Bigger value is safe */
+> +};
+> +
+> +#define FTR_STRICT	true	/* SANITY check strict matching required */
+> +#define FTR_NONSTRICT	false	/* SANITY check ignored */
+> +
+> +struct arm64_ftr_bits {
+> +	bool		strict;	  /* CPU Sanity check: strict matching required ? */
+> +	enum ftr_type	type;
+> +	u8		shift;
+> +	u8		width;
+> +	s64		safe_val; /* safe value for discrete features */
+> +};
+> +
+> +/*
+> + * @arm64_ftr_reg - Feature register
+> + * @strict_mask 	Bits which should match across all CPUs for sanity.
+
+nit: ^ whitespace, no need to fix unless respinning the series
+
+> + * @sys_val		Safe value across the CPUs (system view)
+> + */
+> +struct arm64_ftr_reg {
+
+[...]
+
+Cheers
+---Dave
