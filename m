@@ -1,60 +1,31 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 21 Oct 2015 17:21:07 +0900
-Subject: console vs earlycon ?
-Message-ID: <CAK7LNARem16fTim8Ds_y8ezMusz_aRtv6c59KoxyC0rLV-RBWw@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 21 Oct 2015 10:29:01 +0200
+Subject: [PATCH v4 2/5] mtd: nand: allow compile test of MTD_NAND_PXA3xx
+In-Reply-To: <1445416144-9194-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1445416144-9194-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1445416144-9194-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+Allow compile test of the MTD_NAND_PXA3xx nand driver.
 
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ drivers/mtd/nand/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-
-I think there are three places where console could be enabled.
-
-[1] earlycon
-
-Each driver entry is declared with
-EARLYCON_DECLARE()  or OF_EARLYCON_DECLARE()
-
-
-
-[2] console_init()
-
-Each entry is declared with  console_initcall()
-
-
-
-[3]  when driver is probed
-The console is usually enabled at this point
-unless some special treatment is done.
-
-
-
-
-My question is about [2].
-
-I am using 8250-ish UART device.
-
-
-I noticed univ8250_console_match() and univ8250_console_setup()
-always fail at the point of [2] unless early_serial_setup() has been
-called in advance;
-however, it looks like early_serial_setup() is only used for old platforms.
-
-So, console cannot be enabled at [2] for modern platforms.
-
-
-My questions are:
-
- -  Given that earlycon can be now available for major architectures such ARM,
-     [2] will be deprecated at some point in the future?
-
- - I am implementing  earlycon  for my own UART driver.
-   Is it meaningless to implement  console_initcall()  as well as earlycon?
-
-
-
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 289664089cf3..554aff7b2f8b 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -329,7 +329,7 @@ config MTD_NAND_ATMEL
+ 
+ config MTD_NAND_PXA3xx
+ 	tristate "NAND support on PXA3xx and Armada 370/XP"
+-	depends on PXA3xx || ARCH_MMP || PLAT_ORION
++	depends on PXA3xx || ARCH_MMP || PLAT_ORION || COMPILE_TEST
+ 	help
+ 	  This enables the driver for the NAND flash device found on
+ 	  PXA3xx processors (NFCv1) and also on Armada 370/XP (NFCv2).
 -- 
-Best Regards
-Masahiro Yamada
+2.6.2
