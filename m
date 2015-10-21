@@ -1,81 +1,70 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Wed, 21 Oct 2015 23:56:13 +0900
-Subject: [PATCH v5] arm64: Introduce IRQ stack
-In-Reply-To: <56266606.1080909@arm.com>
-References: <1445092053-12319-1-git-send-email-jungseoklee85@gmail.com>
- <562611F8.2000309@arm.com> <FF5479FA-9D0C-4E17-874F-2F390F2885EB@gmail.com>
- <56266606.1080909@arm.com>
-Message-ID: <C846BEE1-8E5C-4F66-B506-9C457CDDD31E@gmail.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Wed, 21 Oct 2015 20:26:07 +0530
+Subject: [PATCH v2 0/6] Switch to generic syscon regmap based drivers
+In-Reply-To: <562791D4.3050105@osg.samsung.com>
+References: <1445333085-22837-1-git-send-email-alim.akhtar@samsung.com>
+ <CAGOxZ50G-ttivhVjbozUisA0HXcFz7bvRUuPR67xR88TTCa_wQ@mail.gmail.com>
+ <CAGOxZ51_JPy51htzD_M_=qaPVUexkVhoA2ANLS2-rpK3QDT=8A@mail.gmail.com>
+ <1606098.olLAyTIhB3@dell2.five-lan.de> <56272C1C.8040007@samsung.com>
+ <562765F3.9010306@osg.samsung.com> <56276C87.6040509@samsung.com>
+ <562791D4.3050105@osg.samsung.com>
+Message-ID: <CAGOxZ52=CgdVa4wDTowy+FCJNO0QJ0nTvPgOPEgkFMs_oFfB5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 21, 2015, at 1:04 AM, James Morse wrote:
-> On 20/10/15 16:05, Jungseok Lee wrote:
->> On Oct 20, 2015, at 7:05 PM, James Morse wrote:
->>> On 17/10/15 15:27, Jungseok Lee wrote:
->>>> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
->>>> index 9f17ec0..13fe8f4 100644
->>>> --- a/arch/arm64/kernel/irq.c
->>>> +++ b/arch/arm64/kernel/irq.c
->>>> @@ -30,6 +30,8 @@
->>>> 
->>>> unsigned long irq_err_count;
->>>> 
->>>> +DEFINE_PER_CPU(void *, irq_stacks);
->>>> +
->>>> int arch_show_interrupts(struct seq_file *p, int prec)
->>>> {
->>>> 	show_ipi_list(p, prec);
->>>> @@ -47,9 +49,31 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
->>>> 	handle_arch_irq = handle_irq;
->>>> }
->>>> 
->>>> +static char boot_irq_stack[IRQ_STACK_SIZE] __aligned(IRQ_STACK_SIZE);
->>> 
->>> Is kmalloc() not available this early? Regardless:
->>> As Catalin is happy with the Image size increase [0], this could become
->>> something like:
->>>> DEFINE_PER_CPU(union thread_union, irq_stack);
->>> Which will remove the need to __alloc_irq_stack()s.
->> 
->> We cannot rely on static allocation using percpu in case of 4KB page system.
->> Since ARM64 utilizes generic setup_per_cpu_areas(), tpidr_el1 is PAGE_SIZE
->> aligned. That is, IRQ stack is allocated with PAGE_SIZE alignment for secondary
->> cores. However, the top-bit method works well under the assumption that IRQ
->> stack is IRQ_STACK_SIZE aligned. It leads to IRQ re-entrance check failure.
-> 
-> Yikes! That is nasty... well caught!
-> 
-> Now I understand why you had the per-cpu version #ifdef'd in your example
-> hunk earlier!
-> 
-> Do we need the irq stack to be aligned like this? It was originally for the
-> old implementation of current_thread_info(), which this patch changes.
+Hi Javier,
 
-Not necessarily, but the alignment restriction helps us to simplify IRQ
-re-entrance check and linkage between a process stack and IRQ one.
+On Wed, Oct 21, 2015 at 6:53 PM, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> Hello Alim,
+>
+> On 10/21/2015 12:44 PM, Alim Akhtar wrote:
+>
+> [snip]
+>
+>>>
+>>> Can you please test following patch [0] on top of Alim's series? If that
+>>> works then it should either be part of Alim's series or the patches will
+>>> have to wait until that patch lands into mainline. I don't have an eMMC
+>>> to test it in XU4 but I'm pretty confident that it will solve the issue.
+>>>
+>> I am fine with including this with my series or lowering syscon_restart_handler priority to 128.
+>
+> Yes, I also considered changing the syscon-reboot handler priority to 128 but
+> then I noticed this commit:
+>
+> b81180b3fd48 ("power: reset: adjust priority of simple syscon reboot driver").
+>
+> So as you can see, it was 128 before but was bumped to 192 so it was called
+> before restart handlers registered by watchdogs. So, changing to 128 would
+> break other people use cases.
+>
+> Now, I don't know if that is the right fix since register_restart_handler()
+> explanation about the policy used for restart handler priority numbers is
+> scarce. It only mentions 0, 128 and 255 so probably the correct thing to do
+> is to change all watchdog restart handler to 0 but that is a separate issue.
+>
+>> It also make sense to increase eMMC priority as you suggested as before system reboot, devices should have reseted itself.
+>
+> That was my rationale as well and is why I think the handler for devices
+> should use the highest priority regardless if the syscon-reboot is later
+> changed to prio 128 and the watchdog handlers to 0.
+>
+I agree, in any case dumping up eMMC reset priority make sense.
+If all is good here, over to Krzysztof and Ulf to handle these patches.
+Thanks.
+> Best regards,
+>
+> [0]: http://lxr.free-electrons.com/source/kernel/reboot.c#L113
+>
+> Best regards,
+> --
+> Javier Martinez Canillas
+> Open Source Group
+> Samsung Research America
 
-> If its just the re-entrance check that needs the alignment, maybe the
-> irq_count approach is better (but count late not early), and drop the
-> alignment requirement on interrupt stacks. We know re-entrant irqs will
-> keep sp_el0, so the new current_thread_info() still works.
 
-Hmm.. I cannot image how simple this logic is without implementation detail.
-We should consider the number of memory access such as pointer read under
-count based approach. In this context, I guess a static allocation is better
-than dynamic one.
 
-Best Regards
-Jungseok Lee
-
-> I think Catalin's comment is to count like x86 (64 bit version) does in
-> arch/x86/entry/entry_64.S:do_softirq_own_stack, and treat this as a
-> re-entrance flag in entry.S.
-> 
-> task stacks still need to be aligned, as when user space is interrupted, we
-> have a kernel stack, and no idea where its struct task_struct is, unless we
-> know it was originally THREAD_SIZE aligned.
-> 
-> 
-> 
-> James
+-- 
+Regards,
+Alim
