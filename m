@@ -1,69 +1,56 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Wed, 21 Oct 2015 12:26:36 -0400
-Subject: Which is better to specify console, "console= " or "stdout-path" ?
-In-Reply-To: <CAK7LNAQ_+_9K-y7bmpdGwcH2u4uqJhJhON1Ew4OvzSSa-amyvw@mail.gmail.com>
-References: <CAK7LNAS9uBJ1cVmGBKae3W0tk8Siu1yeXOaeN6Kz11cksMqtsg@mail.gmail.com>
- <562753A6.3070107@arm.com> <56278911.9050704@hurleysoftware.com>
- <CAK7LNAQ_+_9K-y7bmpdGwcH2u4uqJhJhON1Ew4OvzSSa-amyvw@mail.gmail.com>
-Message-ID: <5627BCBC.5040701@hurleysoftware.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 21 Oct 2015 17:26:38 +0100
+Subject: pmu: armv7_a9_pmu_init() fails with -ENXIO
+In-Reply-To: <5627B2CA.4030005@free.fr>
+References: <56278C91.8050605@free.fr> <56279753.5000107@free.fr>
+ <5627A0DB.5030304@arm.com> <5627B2CA.4030005@free.fr>
+Message-ID: <5627BCBE.2060102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2015 11:38 AM, Masahiro Yamada wrote:
-> Hi Peter.
-> 
-> 2015-10-21 21:46 GMT+09:00 Peter Hurley <peter@hurleysoftware.com>:
->> On 10/21/2015 04:58 AM, Sudeep Holla wrote:
->>> On 21/10/15 06:09, Masahiro Yamada wrote:
->>>> I think there exist two ways to specify the console port and baudrate.
->>>>
->>>>
->>>> [1] Specify console in bootargs
->>>>
->>>>    chosen {
->>>>          bootargs = "console=ttyS0,115200";
->>>>    };
->>>>
->>>>
->>>> [2] Specify stdout-path
->>>>
->>>>     chosen {
->>>>           stdout-path = "serial0:115200n8";
->>>
->>> This will work for even early/boot console, so this is better than
->>> option [1]
+
+
+On 21/10/15 16:44, Mason wrote:
+> On 21/10/2015 16:27, Sudeep Holla wrote:
+>
+>> On 21/10/15 14:46, Mason wrote:
 >>
->> Be aware that options specified via /chosen/stdout-path are
->> currently ignored by earlycon. There were some hiccups getting the
->> initial support upstream; when 4.4 hits mainline, I'll resubmit
->> my series that implements the of_serial i/o properties and
->> options passthrough to earlycon setup.
-> 
-> 
-> As I said in another thread ("serial: earlycon: allow to specify
-> uartclk in earlycon kernel-parameter"),
-> stdout-path can pass dev->baud, but not port->uartclk.
+>>> I also looked more closely at of_pmu_irq_cfg()
+>>>
+>>> platform_get_irq(pdev, 0); returns -6
+>>
+>> Won't it return here ?
+>> Though you must first check why is that returning error.
+>>
+>>           irq = platform_get_irq(pdev, 0);
+>>           if (irq >= 0 && irq_is_percpu(irq))
+>>                   return 0;
+>
+> Thanks for prodding me in the right direction.
+> platform_get_irq() was failing because I hadn't properly defined
+> the node's interrupt-parent...
+>
 
-That's true but I'm not seeing in that thread where you wrote that?
-My replies there were specific to uartclk on the kernel command line,
-which isn't necessary if the bootloader has already initialized the
-uart.
+Yes that's what I guessed seeing of_irq_get.
 
-> It is usually specified "clocks" phandle, but
-> clk is not ready at the point of earlycon.
-> 
-> It seems impossible to set up the baudrate even if the options are passed.
+> I've added
+>    interrupt-parent = <&gic>;
+> at the root of my DT, and things now work as expected.
+> (Haven't tested actually using the counters yet.)
+>
+> [    0.090058] irq=212 irqs=e7603400 pdev->num_resources=2
+> [    0.090091] hw perfevents: Failed to parse /pmu/interrupt-affinity[0]
 
-It's difficult to understand what you're trying to do when I can't
-see the code you're referring to.  For example, I only recently
-understood that you're talking about a earlycon implementation
-that you're working on and not the 8250 earlycon itself.
+Better to add this property. It assigns the cpu affinity in logical
+order which might break if your logical and physical cpu ordering
+differs.(e.g. you boot on CPU#1 instead of CPU#0)
 
-If you look at other non-8250 earlycons, you'll see they all ignore
-the baud rate, on the assumption the bootloader already set it up.
+> [    0.090103] armv7_a9_pmu_init: ret=0
+> [    0.090145] hw perfevents: enabled with armv7_cortex_a9 PMU driver, 7 counters available
+>
 
-The 8250 earlycon is a little different because legacy platforms
-do not initialize the uart.
+Cool
 
+-- 
 Regards,
-Peter Hurley
+Sudeep
