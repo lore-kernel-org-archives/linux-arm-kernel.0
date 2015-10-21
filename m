@@ -1,58 +1,62 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Wed, 21 Oct 2015 22:41:38 +0200
-Subject: [PATCH 3/5] clk: imx27: add missing of_node_put
-In-Reply-To: <1445460100-26727-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1445460100-26727-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1445460100-26727-4-git-send-email-Julia.Lawall@lip6.fr>
+From: iain@mcfarlanes.me (Iain McFarlane)
+Date: Wed, 21 Oct 2015 22:22:50 +0100
+Subject: I/O issues with writing to mtdblock devices on kirkwood
+In-Reply-To: <1445461864.32735.21.camel@debian.org>
+References: <1444722697.16876.55.camel@debian.org>
+ <5626B4DC.8000407@mcfarlanes.me> <5627F4E8.3030907@mcfarlanes.me>
+ <1445461864.32735.21.camel@debian.org>
+Message-ID: <5628022A.9050707@mcfarlanes.me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for_each_compatible_node performs an of_node_get on each iteration, so a
-break out of the loop requires an of_node_put.
+On 21/10/15 22:11, Ian Campbell wrote:
+> On Wed, 2015-10-21 at 21:26 +0100, Iain McFarlane wrote:
+>> Summary of progress:
+> Thanks for the info. I've reinstated the CC list here.
+>
+>> I ended up connecting using a serial cable which was invaluable as my
+>> initrd was not working (see below)
+>>
+>> I tried going backwards:
+>> 4.2.0 - SATA errors when flashing initrd
+>> 4.1.0 - SATA errors when flashing initrd
+>> 4.0.0 - SATA errors when flashing initrd
+>> 3.16 - No SATA errors when updating initrd - the kernel is flashed using
+>> dtb but how do I tell if it is used?
+> /proc/device-tree will exist. Also the Hardware field in /proc/cpuinfo
+> would differ, IIRC with a board file it says "QNAP TS-119/TS-219" and
+> with DTB it says "QNAP TS219 family".
+>
+> Ian.
+>
+>> it didn't help that somewhere along the line udev/initramfs/systemd is
+>> broken so that I had to remove all the UUID values from my fstab and go
+>> back to device names.
+>>
+>>
+>> On 20/10/15 22:40, Iain McFarlane wrote:
+>>> Posting from archive as previously not subscribed.
+>>>
+>>> I have a qnap ts-219p (kirkwood) in pieces at the moment as it is
+>>> failing to boot the 4.2 kernel from a brand new install of stretch.
+>>>
+>>> I am also seeing problems with the sata controller interacting with the
+>>> mtdblock driver
+>>>
+>>> I am going to see if rolling back a version or 2 of the kernel will work
+>>> tomorrow and will feedback to the list.
+>>>
+>>> Regards
+>>>
+>>> Iain
+>>>
+>>
+In which case it is using the board file
 
-The semantic patch that fixes this problem is as follows
-(http://coccinelle.lip6.fr):
+How do I force it to use the dtb?
 
-// <smpl>
-@@
-local idexpression n;
-expression e;
-@@
+On a different note anyone know why udev would not be running modprobe? 
+Every time I reboot this box I have to the reload any of the modules not
+specified in the initrd even things like mvmdio to get the network working.
 
- for_each_compatible_node(n,...) {
-   ...
-(
-   of_node_put(n);
-|
-   e = n
-|
-+  of_node_put(n);
-?  break;
-)
-   ...
- }
-... when != n
-// </smpl>
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
- drivers/clk/imx/clk-imx27.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/imx/clk-imx27.c b/drivers/clk/imx/clk-imx27.c
-index 0d7b8df..cf5cf75 100644
---- a/drivers/clk/imx/clk-imx27.c
-+++ b/drivers/clk/imx/clk-imx27.c
-@@ -261,8 +261,10 @@ static void __init mx27_clocks_init_dt(struct device_node *np)
- 		if (!of_device_is_compatible(refnp, "fsl,imx-osc26m"))
- 			continue;
- 
--		if (!of_property_read_u32(refnp, "clock-frequency", &fref))
-+		if (!of_property_read_u32(refnp, "clock-frequency", &fref)) {
-+			of_node_put(refnp);
- 			break;
-+		}
- 	}
- 
- 	ccm = of_iomap(np, 0);
+Iain
