@@ -1,228 +1,110 @@
 From: jenskuske@gmail.com (Jens Kuske)
-Date: Wed, 21 Oct 2015 18:13:23 +0200
-Subject: [PATCH 2/6] clk: sunxi: Add H3 clocks support
+Date: Wed, 21 Oct 2015 18:13:22 +0200
+Subject: [PATCH 1/6] clk: sunxi: Let divs clocks read the base factor clock
+ name from devicetree
 In-Reply-To: <1445444007-4260-1-git-send-email-jenskuske@gmail.com>
 References: <1445444007-4260-1-git-send-email-jenskuske@gmail.com>
-Message-ID: <1445444007-4260-3-git-send-email-jenskuske@gmail.com>
+Message-ID: <1445444007-4260-2-git-send-email-jenskuske@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The H3 clock control unit is similar to the those of other sun8i family
-members like the A23.
+Currently, the sunxi clock driver gets the name for the base factor clock
+of divs clocks from the name field in factors_data. This prevents reusing
+of the factor clock for clocks with same properties, but different name.
 
-It adds a new bus gates clock similar to the simple gates, but with a
-different parent clock for each single gate.
-Some of the gates use the new AHB2 clock as parent, whose clock source
-is muxable between AHB1 and PLL6/2. The documentation isn't totally clear
-about which devices belong to AHB2 now, especially USB EHIC/OHIC, so it
-is mostly based on Allwinner kernel source code.
+This commit makes the divs setup function try to get a name from
+clock-output-names in the devicetree. It also removes the name field where
+possible and merges the sun4i PLL5 and PLL6 clocks.
 
 Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt |   2 +
- drivers/clk/sunxi/Makefile                        |   1 +
- drivers/clk/sunxi/clk-bus-gates.c                 | 105 ++++++++++++++++++++++
- drivers/clk/sunxi/clk-sunxi.c                     |  12 ++-
- 4 files changed, 117 insertions(+), 3 deletions(-)
- create mode 100644 drivers/clk/sunxi/clk-bus-gates.c
+ drivers/clk/sunxi/clk-sunxi.c | 39 ++++++++++++++++++++++++++++-----------
+ 1 file changed, 28 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 8a47b77..d303dec 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -28,6 +28,7 @@ Required properties:
- 	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
- 	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
- 	"allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
-+	"allwinner,sun8i-h3-ahb2-clk" - for the AHB2 clock on H3
- 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
- 	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
- 	"allwinner,sun9i-a80-ahb0-gates-clk" - for the AHB0 gates on A80
-@@ -55,6 +56,7 @@ Required properties:
- 	"allwinner,sun9i-a80-apb1-gates-clk" - for the APB1 gates on A80
- 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
- 	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
-+	"allwinner,sun8i-h3-bus-gates-clk" - for the bus gates on H3
- 	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
- 	"allwinner,sun4i-a10-mmc-clk" - for the MMC clock
- 	"allwinner,sun9i-a80-mmc-clk" - for mmc module clocks on A80
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index f5a35b8..ecaff7f 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -5,6 +5,7 @@
- obj-y += clk-sunxi.o clk-factors.o
- obj-y += clk-a10-hosc.o
- obj-y += clk-a20-gmac.o
-+obj-y += clk-bus-gates.o
- obj-y += clk-mod0.o
- obj-y += clk-simple-gates.o
- obj-y += clk-sun8i-mbus.o
-diff --git a/drivers/clk/sunxi/clk-bus-gates.c b/drivers/clk/sunxi/clk-bus-gates.c
-new file mode 100644
-index 0000000..5bba0b9
---- /dev/null
-+++ b/drivers/clk/sunxi/clk-bus-gates.c
-@@ -0,0 +1,105 @@
-+/*
-+ * Copyright (C) 2015 Jens Kuske <jenskuske@gmail.com>
-+ *
-+ * Based on clk-simple-gates.c, which is:
-+ * Copyright 2015 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+
-+static DEFINE_SPINLOCK(gates_lock);
-+
-+static void __init sunxi_bus_gates_setup(struct device_node *node,
-+					 const int protected[],
-+					 int nprotected)
-+{
-+	struct clk_onecell_data *clk_data;
-+	const char *clk_parent, *clk_name;
-+	struct property *prop;
-+	struct resource res;
-+	void __iomem *clk_reg;
-+	void __iomem *reg;
-+	const __be32 *p;
-+	int number, i = 0, j;
-+	u8 clk_bit;
-+	u32 index;
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (IS_ERR(reg))
-+		return;
-+
-+	clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
-+	if (!clk_data)
-+		goto err_unmap;
-+
-+	number = of_property_count_u32_elems(node, "clock-indices");
-+	of_property_read_u32_index(node, "clock-indices", number - 1, &number);
-+
-+	clk_data->clks = kcalloc(number + 1, sizeof(struct clk *), GFP_KERNEL);
-+	if (!clk_data->clks)
-+		goto err_free_data;
-+
-+	of_property_for_each_u32(node, "clock-indices", prop, p, index) {
-+		of_property_read_string_index(node, "clock-output-names",
-+					      i, &clk_name);
-+
-+		clk_parent = of_clk_get_parent_name(node, i);
-+
-+		clk_reg = reg + 4 * (index / 32);
-+		clk_bit = index % 32;
-+
-+		clk_data->clks[index] = clk_register_gate(NULL, clk_name,
-+							  clk_parent, 0,
-+							  clk_reg,
-+							  clk_bit,
-+							  0, &gates_lock);
-+		i++;
-+
-+		if (IS_ERR(clk_data->clks[index])) {
-+			WARN_ON(true);
-+			continue;
-+		}
-+
-+		for (j = 0; j < nprotected; j++)
-+			if (protected[j] == index)
-+				clk_prepare_enable(clk_data->clks[index]);
-+
-+	}
-+
-+	clk_data->clk_num = number + 1;
-+	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-+
-+	return;
-+
-+err_free_data:
-+	kfree(clk_data);
-+err_unmap:
-+	iounmap(reg);
-+	of_address_to_resource(node, 0, &res);
-+	release_mem_region(res.start, resource_size(&res));
-+}
-+
-+static void __init sunxi_bus_gates_init(struct device_node *node)
-+{
-+	sunxi_bus_gates_setup(node, NULL, 0);
-+}
-+
-+CLK_OF_DECLARE(sun8i_h3_bus_gates, "allwinner,sun8i-h3-bus-gates-clk",
-+	       sunxi_bus_gates_init);
 diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 7c4aee0..6293c65 100644
+index 9c79af0c..7c4aee0 100644
 --- a/drivers/clk/sunxi/clk-sunxi.c
 +++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -769,6 +769,10 @@ static const struct mux_data sun6i_a31_ahb1_mux_data __initconst = {
- 	.shift = 12,
+@@ -704,21 +704,12 @@ static const struct factors_data sun4i_pll5_data __initconst = {
+ 	.enable = 31,
+ 	.table = &sun4i_pll5_config,
+ 	.getter = sun4i_get_pll5_factors,
+-	.name = "pll5",
+-};
+-
+-static const struct factors_data sun4i_pll6_data __initconst = {
+-	.enable = 31,
+-	.table = &sun4i_pll5_config,
+-	.getter = sun4i_get_pll5_factors,
+-	.name = "pll6",
  };
  
-+static const struct mux_data sun8i_h3_ahb2_mux_data __initconst = {
-+	.shift = 0,
-+};
-+
- static void __init sunxi_mux_clk_setup(struct device_node *node,
- 				       struct mux_data *data)
- {
-@@ -945,10 +949,11 @@ static const struct divs_data pll6_divs_data __initconst = {
+ static const struct factors_data sun6i_a31_pll6_data __initconst = {
+ 	.enable = 31,
+ 	.table = &sun6i_a31_pll6_config,
+ 	.getter = sun6i_a31_get_pll6_factors,
+-	.name = "pll6x2",
+ };
  
- static const struct divs_data sun6i_a31_pll6_divs_data __initconst = {
- 	.factors = &sun6i_a31_pll6_data,
--	.ndivs = 2,
-+	.ndivs = 3,
+ static const struct factors_data sun5i_a13_ahb_data __initconst = {
+@@ -902,6 +893,7 @@ struct gates_data {
+ 
+ #define SUNXI_DIVS_MAX_QTY	4
+ #define SUNXI_DIVISOR_WIDTH	2
++#define SUNXI_DIVS_BASE_NAME_MAX_LEN	8
+ 
+ struct divs_data {
+ 	const struct factors_data *factors; /* data for the factor clock */
+@@ -941,7 +933,7 @@ static const struct divs_data pll5_divs_data __initconst = {
+ };
+ 
+ static const struct divs_data pll6_divs_data __initconst = {
+-	.factors = &sun4i_pll6_data,
++	.factors = &sun4i_pll5_data,
+ 	.ndivs = 4,
  	.div = {
- 		{ .fixed = 2 }, /* normal output */
- 		{ .self = 1 }, /* base factor clock, 2x */
-+		{ .fixed = 4 }, /* divided output, /2 */
- 	}
- };
+ 		{ .shift = 0, .table = pll6_sata_tbl, .gate = 14 }, /* M, SATA */
+@@ -983,6 +975,8 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+ 	struct clk_gate *gate = NULL;
+ 	struct clk_fixed_factor *fix_factor;
+ 	struct clk_divider *divider;
++	struct factors_data factors = *data->factors;
++	char base_name[SUNXI_DIVS_BASE_NAME_MAX_LEN];
+ 	void __iomem *reg;
+ 	int ndivs = SUNXI_DIVS_MAX_QTY, i = 0;
+ 	int flags, clkflags;
+@@ -991,8 +985,31 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+ 	if (data->ndivs)
+ 		ndivs = data->ndivs;
  
-@@ -1000,9 +1005,8 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
++	/* Try to find a name for base factor clock */
++	for (i = 0; i < ndivs; i++) {
++		if (data->div[i].self) {
++			of_property_read_string_index(node, "clock-output-names",
++						      i, &factors.name);
++			break;
++		}
++	}
++	/* If we don't have a .self clk use the first output-name up to '_' */
++	if (factors.name == NULL) {
++		of_property_read_string_index(node, "clock-output-names",
++						      0, &clk_name);
++
++		for (i = 0; i < SUNXI_DIVS_BASE_NAME_MAX_LEN - 1 &&
++						clk_name[i] != '_' &&
++						clk_name[i] != '\0'; i++) {
++			base_name[i] = clk_name[i];
++		}
++
++		base_name[i] = '\0';
++		factors.name = base_name;
++	}
++
+ 	/* Set up factor clock that we will be dividing */
+-	pclk = sunxi_factors_clk_setup(node, data->factors);
++	pclk = sunxi_factors_clk_setup(node, &factors);
+ 	parent = __clk_get_name(pclk);
  
- 		for (i = 0; i < SUNXI_DIVS_BASE_NAME_MAX_LEN - 1 &&
- 						clk_name[i] != '_' &&
--						clk_name[i] != '\0'; i++) {
-+						clk_name[i] != '\0'; i++)
- 			base_name[i] = clk_name[i];
--		}
- 
- 		base_name[i] = '\0';
- 		factors.name = base_name;
-@@ -1147,6 +1151,7 @@ static const struct of_device_id clk_divs_match[] __initconst = {
- static const struct of_device_id clk_mux_match[] __initconst = {
- 	{.compatible = "allwinner,sun4i-a10-cpu-clk", .data = &sun4i_cpu_mux_data,},
- 	{.compatible = "allwinner,sun6i-a31-ahb1-mux-clk", .data = &sun6i_a31_ahb1_mux_data,},
-+	{.compatible = "allwinner,sun8i-h3-ahb2-clk", .data = &sun8i_h3_ahb2_mux_data,},
- 	{}
- };
- 
-@@ -1229,6 +1234,7 @@ CLK_OF_DECLARE(sun6i_a31_clk_init, "allwinner,sun6i-a31", sun6i_init_clocks);
- CLK_OF_DECLARE(sun6i_a31s_clk_init, "allwinner,sun6i-a31s", sun6i_init_clocks);
- CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
- CLK_OF_DECLARE(sun8i_a33_clk_init, "allwinner,sun8i-a33", sun6i_init_clocks);
-+CLK_OF_DECLARE(sun8i_h3_clk_init, "allwinner,sun8i-h3", sun6i_init_clocks);
- 
- static void __init sun9i_init_clocks(struct device_node *node)
- {
+ 	reg = of_iomap(node, 0);
 -- 
 2.6.1
