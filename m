@@ -1,122 +1,54 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Wed, 21 Oct 2015 22:41:35 +0200
-Subject: [PATCH 0/5] add missing of_node_put
-Message-ID: <1445460100-26727-1-git-send-email-Julia.Lawall@lip6.fr>
+From: ijc@debian.org (Ian Campbell)
+Date: Wed, 21 Oct 2015 22:11:04 +0100
+Subject: I/O issues with writing to mtdblock devices on kirkwood
+In-Reply-To: <5627F4E8.3030907@mcfarlanes.me>
+References: <1444722697.16876.55.camel@debian.org>
+ <5626B4DC.8000407@mcfarlanes.me> <5627F4E8.3030907@mcfarlanes.me>
+Message-ID: <1445461864.32735.21.camel@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The various for_each device_node iterators performs an of_node_get on each
-iteration, so a break out of the loop requires an of_node_put.
+On Wed, 2015-10-21 at 21:26 +0100, Iain McFarlane wrote:
+> Summary of progress:
 
-The complete semantic patch that fixes this problem is
-(http://coccinelle.lip6.fr):
+Thanks for the info. I've reinstated the CC list here.
 
-// <smpl>
-@r@
-local idexpression n;
-expression e1,e2;
-iterator name for_each_node_by_name, for_each_node_by_type,
-for_each_compatible_node, for_each_matching_node,
-for_each_matching_node_and_match, for_each_child_of_node,
-for_each_available_child_of_node, for_each_node_with_property;
-iterator i;
-statement S;
-expression list [n1] es;
-@@
+> I ended up connecting using a serial cable which was invaluable as my
+> initrd was not working (see below)
+> 
+> I tried going backwards:
+> 4.2.0 - SATA errors when flashing initrd
+> 4.1.0 - SATA errors when flashing initrd
+> 4.0.0 - SATA errors when flashing initrd
+> 3.16 - No SATA errors when updating initrd - the kernel is flashed using
+> dtb but how do I tell if it is used?
 
-(
-(
-for_each_node_by_name(n,e1) S
-|
-for_each_node_by_type(n,e1) S
-|
-for_each_compatible_node(n,e1,e2) S
-|
-for_each_matching_node(n,e1) S
-|
-for_each_matching_node_and_match(n,e1,e2) S
-|
-for_each_child_of_node(e1,n) S
-|
-for_each_available_child_of_node(e1,n) S
-|
-for_each_node_with_property(n,e1) S
-)
-&
-i(es,n,...) S
-)
+/proc/device-tree will exist. Also the Hardware field in /proc/cpuinfo
+would differ, IIRC with a board file it says "QNAP TS-119/TS-219" and
+with DTB it says "QNAP TS219 family".
 
-@@
-local idexpression r.n;
-iterator r.i;
-expression e;
-expression list [r.n1] es;
-@@
+Ian.
 
- i(es,n,...) {
-   ...
-(
-   of_node_put(n);
-|
-   e = n
-|
-   return n;
-|
-+  of_node_put(n);
-?  return ...;
-)
-   ...
- }
-
-@@
-local idexpression r.n;
-iterator r.i;
-expression e;
-expression list [r.n1] es;
-@@
-
- i(es,n,...) {
-   ...
-(
-   of_node_put(n);
-|
-   e = n
-|
-+  of_node_put(n);
-?  break;
-)
-   ...
- }
-... when != n
-
-@@
-local idexpression r.n;
-iterator r.i;
-expression e;
-identifier l;
-expression list [r.n1] es;
-@@
-
- i(es,n,...) {
-   ...
-(
-   of_node_put(n);
-|
-   e = n
-|
-+  of_node_put(n);
-?  goto l;
-)
-   ...
- }
-...
-l: ... when != n// </smpl>
-
----
-
- drivers/clk/clk-scpi.c      |    1 +
- drivers/clk/clk-si5351.c    |   17 ++++++++++-------
- drivers/clk/clk.c           |    4 ++++
- drivers/clk/imx/clk-imx27.c |    4 +++-
- drivers/clk/imx/clk-imx31.c |    4 +++-
- 5 files changed, 21 insertions(+), 9 deletions(-)
+> it didn't help that somewhere along the line udev/initramfs/systemd is
+> broken so that I had to remove all the UUID values from my fstab and go
+> back to device names.
+> 
+> 
+> On 20/10/15 22:40, Iain McFarlane wrote:
+> > Posting from archive as previously not subscribed.
+> >
+> > I have a qnap ts-219p (kirkwood) in pieces at the moment as it is
+> > failing to boot the 4.2 kernel from a brand new install of stretch.
+> >
+> > I am also seeing problems with the sata controller interacting with the
+> > mtdblock driver
+> >
+> > I am going to see if rolling back a version or 2 of the kernel will work
+> > tomorrow and will feedback to the list.
+> >
+> > Regards
+> >
+> > Iain
+> >
+> 
+> 
