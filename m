@@ -1,143 +1,82 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 21 Oct 2015 17:15:24 -0500
-Subject: [PATCH v11 1/6] PCI: designware: move calculation of bus
- addresses to DRA7xx
-In-Reply-To: <1444991021-109306-2-git-send-email-wangzhou1@hisilicon.com>
-References: <1444991021-109306-1-git-send-email-wangzhou1@hisilicon.com>
- <1444991021-109306-2-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <20151021221524.GM1583@localhost>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 21 Oct 2015 17:41:39 -0500
+Subject: [PATCH v4 1/6] remoteproc: dt: Provide bindings for ST's Remote
+ Processor Controller driver
+In-Reply-To: <1445428027-26174-2-git-send-email-lee.jones@linaro.org>
+References: <1445428027-26174-1-git-send-email-lee.jones@linaro.org>
+ <1445428027-26174-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAL_JsqK6ZxgfO+_XWKzLG1e=Bd2CZP8Fc2ORnn9_LSH17uNJSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhou & Gabriele,
+On Wed, Oct 21, 2015 at 6:47 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-On Fri, Oct 16, 2015 at 06:23:36PM +0800, Zhou Wang wrote:
-> From: gabriele paoloni <gabriele.paoloni@huawei.com>
-> 
-> Commit f4c55c5a3f7f ("PCI: designware: Program ATU with untranslated
-> address") added the calculation of PCI BUS addresses in designware,
-> storing them in new fields added in "struct pcie_port". This
-> calculation is done for every designware user even if is only
-> applicable to DRA7xx.
-> This patch moves the calculation of the bus addresses to the DRA7xx
-> driver and is needed to allow the rework of designware to use
-> the new DT parsing API.
-> 
-> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
-> Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
+Are all the instances the same or are some fixed to audio processing
+for example? If the latter, I think the compatible strings should
+reflect the function. If the former, then:
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+Rob
+
 > ---
->  drivers/pci/host/pci-dra7xx.c      | 13 +++++++++++++
->  drivers/pci/host/pcie-designware.c | 15 ++++-----------
->  2 files changed, 17 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
-> index 199e29a..ebdffa0 100644
-> --- a/drivers/pci/host/pci-dra7xx.c
-> +++ b/drivers/pci/host/pci-dra7xx.c
-> @@ -62,6 +62,7 @@
->  
->  #define	PCIECTRL_DRA7XX_CONF_PHY_CS			0x010C
->  #define	LINK_UP						BIT(16)
-> +#define	CPU_TO_BUS_ADDR					0x0FFFFFFF
-
-"CPU_TO_BUS_ADDR" is a very generic name.  Since you do have DRA7XX in
-other #defines and static symbols in this file, maybe it could be DRA7XX to
-make it obvious that it only applies here?
-
->  
->  struct dra7xx_pcie {
->  	void __iomem		*base;
-> @@ -151,6 +152,18 @@ static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
->  static void dra7xx_pcie_host_init(struct pcie_port *pp)
->  {
->  	dw_pcie_setup_rc(pp);
+>  .../devicetree/bindings/remoteproc/st-rproc.txt    | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/remoteproc/st-rproc.txt b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+> new file mode 100644
+> index 0000000..1031bcd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+> @@ -0,0 +1,41 @@
+> +STMicroelectronics Co-Processor Bindings
+> +----------------------------------------
 > +
-> +	if (pp->io_mod_base)
-> +		pp->io_mod_base &= CPU_TO_BUS_ADDR;
-
-These are equivalent to
-
-  pp->io_mod_base &= CPU_TO_BUS_ADDR;
-
-(You don't need to test whether they're zero first.)
-
+> +This binding provides support for adjunct processors found on ST SoCs.
 > +
-> +	if (pp->mem_mod_base)
-> +		pp->mem_mod_base &= CPU_TO_BUS_ADDR;
+> +Co-processors can be controlled from the bootloader or the primary OS. If
+> +the bootloader starts a co-processor, the primary OS must detect its state
+> +and act accordingly.
 > +
-> +	if (pp->cfg0_mod_base) {
-> +		pp->cfg0_mod_base &= CPU_TO_BUS_ADDR;
-> +		pp->cfg1_mod_base &= CPU_TO_BUS_ADDR;
-> +	}
+> +Required properties:
+> +- compatible           Should be one of:
+> +                               "st,st231-rproc"
+> +                               "st,st40-rproc"
+> +- memory-region                Reserved memory (See: ../reserved-memory/reserved-memory.txt)
+> +- resets               Reset lines (See: ../reset/reset.txt)
+> +- reset-names          Must be "sw_reset" and "pwr_reset"
+> +- clocks               Clock for co-processor (See: ../clock/clock-bindings.txt)
+> +- clock-frequency      Clock frequency to set co-processor at if the bootloader
+> +                       hasn't already done so
+> +- st,syscfg            System configuration register which holds the boot vector
+> +                       for the co-processor
+> +                               1st cell: Phandle to syscon block
+> +                               2nd cell: Boot vector register offset
 > +
->  	dra7xx_pcie_establish_link(pp);
->  	if (IS_ENABLED(CONFIG_PCI_MSI))
->  		dw_pcie_msi_init(pp);
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 52aa6e3..75338a6 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -365,14 +365,10 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  	struct of_pci_range range;
->  	struct of_pci_range_parser parser;
->  	struct resource *cfg_res;
-> -	u32 val, na, ns;
-> +	u32 val, ns;
->  	const __be32 *addrp;
->  	int i, index, ret;
->  
-> -	/* Find the address cell size and the number of cells in order to get
-> -	 * the untranslated address.
-> -	 */
-> -	of_property_read_u32(np, "#address-cells", &na);
->  	ns = of_n_size_cells(np);
->  
->  	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
-> @@ -415,8 +411,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  			pp->io_base = range.cpu_addr;
->  
->  			/* Find the untranslated IO space address */
-> -			pp->io_mod_base = of_read_number(parser.range -
-> -							 parser.np + na, ns);
-> +			pp->io_mod_base = range.cpu_addr;
-
-So apparently 
-
-  "of_read_number() == range.cpu_addr & CPU_TO_BUS_ADDR" on DRA7xx
-  "of_read_number() == range.cpu_addr" everywhere else?
-
-Is that right?  Is that a valid assumption, i.e., are we assuming
-anything about DTs in the field that we shouldn't?
-
->  		}
->  		if (restype == IORESOURCE_MEM) {
->  			of_pci_range_to_resource(&range, np, &pp->mem);
-> @@ -425,8 +420,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  			pp->mem_bus_addr = range.pci_addr;
->  
->  			/* Find the untranslated MEM space address */
-> -			pp->mem_mod_base = of_read_number(parser.range -
-> -							  parser.np + na, ns);
-> +			pp->mem_mod_base = range.cpu_addr;
->  		}
->  		if (restype == 0) {
->  			of_pci_range_to_resource(&range, np, &pp->cfg);
-> @@ -436,8 +430,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  			pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
->  
->  			/* Find the untranslated configuration space address */
-> -			pp->cfg0_mod_base = of_read_number(parser.range -
-> -							   parser.np + na, ns);
-> +			pp->cfg0_mod_base = range.cpu_addr;
->  			pp->cfg1_mod_base = pp->cfg0_mod_base +
->  					    pp->cfg0_size;
->  		}
-> -- 
-> 1.9.1
-> 
+> +Example:
+> +
+> +       audio_reserved: rproc at 42000000 {
+> +               compatible = "shared-dma-pool";
+> +               reg = <0x42000000 0x01000000>;
+> +               no-map;
+> +       };
+> +
+> +       st231-audio {
+> +               compatible      = "st,st231-rproc";
+> +               memory-region   = <&audio_reserved>;
+> +               resets          = <&softreset STIH407_ST231_AUD_SOFTRESET>;
+> +               reset-names     = "sw_reset";
+> +               clocks          = <&clk_s_c0_flexgen CLK_ST231_AUD_0>;
+> +               clock-frequency = <600000000>;
+> +               st,syscfg       = <&syscfg_core 0x228>;
+> +       };
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
