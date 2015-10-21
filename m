@@ -1,200 +1,46 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 21 Oct 2015 09:57:11 +0530
-Subject: [PATCH v6 2/4] Documentation, dt, arm64/arm: dt bindings for numa.
-In-Reply-To: <20151020153526.GC3349@leverpostej>
-References: <1445337931-11344-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1445337931-11344-3-git-send-email-gkulkarni@caviumnetworks.com>
- <20151020153526.GC3349@leverpostej>
-Message-ID: <CAFpQJXUfpbNkvuLrOPs2nUV+HOJKXLfO07fqsA6TeS0e9+Ub4A@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 21 Oct 2015 10:14:37 +0530
+Subject: [PATCH v3 1/3] mailbox/omap: Add ti, mbox-send-noirq quirk to fix
+ AM33xx CPU Idle
+In-Reply-To: <1442967294-23837-2-git-send-email-d-gerlach@ti.com>
+References: <1442967294-23837-1-git-send-email-d-gerlach@ti.com>
+ <1442967294-23837-2-git-send-email-d-gerlach@ti.com>
+Message-ID: <CABb+yY0rCGCj=vkNXP1c9zonX+snBxdKFeQ4JCo2aKb-h6JhCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 9:05 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Oct 20, 2015 at 04:15:29PM +0530, Ganapatrao Kulkarni wrote:
->> DT bindings for numa mapping of memory, cores and IOs.
->>
->> Reviewed-by: Robert Richter <rrichter@cavium.com>
->> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
->> ---
->>  Documentation/devicetree/bindings/arm/numa.txt | 275 +++++++++++++++++++++++++
->>  1 file changed, 275 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/numa.txt b/Documentation/devicetree/bindings/arm/numa.txt
->> new file mode 100644
->> index 0000000..f3bc8e6
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/numa.txt
->> @@ -0,0 +1,275 @@
->> +==============================================================================
->> +NUMA binding description.
->> +==============================================================================
->> +
->> +==============================================================================
->> +1 - Introduction
->> +==============================================================================
->> +
->> +Systems employing a Non Uniform Memory Access (NUMA) architecture contain
->> +collections of hardware resources including processors, memory, and I/O buses,
->> +that comprise what is commonly known as a NUMA node.
->> +Processor accesses to memory within the local NUMA node is generally faster
->> +than processor accesses to memory outside of the local NUMA node.
->> +DT defines interfaces that allow the platform to convey NUMA node
->> +topology information to OS.
->> +
->> +==============================================================================
->> +2 - proximity
->> +==============================================================================
->> +The proximity device node property describes proximity domains within a
->> +machine. This property can be used in device nodes like cpu, memory, bus and
->> +devices to map to respective numa nodes.
->> +
->> +proximity property is a 32-bit integer which defines numa node id to which
->> +this device node has numa proximity association.
->> +
->> +Example:
->> +     /* numa node 0 */
->> +     proximity = <0>;
->> +
->> +     /* numa node 1 */
->> +     proximity = <1>;
+On Wed, Sep 23, 2015 at 5:44 AM, Dave Gerlach <d-gerlach@ti.com> wrote:
+> The mailbox framework controls the transmission queue and requires
+> either its controller implementations or clients to run the state
+> machine for the Tx queue. The OMAP mailbox controller uses a Tx-ready
+> interrupt as the equivalent of a Tx-done interrupt to run this Tx
+> queue state-machine.
 >
+> The WkupM3 processor on AM33xx and AM43xx SoCs is used to offload
+> certain PM tasks, like doing the necessary operations for Device
+> PM suspend/resume or for entering lower c-states during cpuidle.
 >
-> It would probably be better to call this something like "numa-domain-id"
-> or "numa-node-id". The "proximity" is a relationship (that's actually
-> described in the distance map), and it makes it obvious that this is
-> NUMA related.
-ok, numa-node-id makes more appropriate.
+> The CPUIdle on AM33xx requires the messages to be sent without
+> having to trigger the Tx-ready interrupts, as the interrupt
+> would immediately terminate the CPUIdle operation. Support for
+> this has been added by introducing a DT quirk, "ti,mbox-send-noirq"
+> and using it to modify the normal OMAP mailbox controller behavior
+> on the sub-mailboxes used to communicate with the WkupM3 remote
+> processor. This also requires the wkup_m3_ipc driver to adjust
+> its mailbox usage logic to run the Tx state machine.
 >
->> +
->> +==============================================================================
->> +3 - distance-map
->> +==============================================================================
->> +
->> +The device tree node distance-map describes the relative
->> +distance (memory latency) between all numa nodes.
->
-> Rather than making this another magic name, we should give it a
-> compatible string. That will also help if/when updating this in future.
-thanks, we can have compatible string, which helps in future expansions.
->
->> +
->> +- distance-matrix
->> +  This property defines a matrix to describe the relative distances
->> +  between all numa nodes.
->> +  It is represented as a list of node pairs and their relative distance.
->> +
->> +  Note:
->> +     1. If there is no distance-map, the system should setup:
->> +
->> +                   local/local:  10
->> +                   local/remote: 20
->> +     for all node distances.
->
-> I think that either you have both the IDs and a distance map, or we
-> assume !NUMA (as we currently do). If your system is so trivial that the
-> above defaults are good enough, it's trivial to write them explicitly.
-it might be trivial to mention this explicitly, however definitely
-2 node numa system is not trivial!!
->
-> So I think this should go.
-ok.
->
->> +
->> +     2. If both directions between 2 nodes have the same distance, only
->> +            one entry is required.
->
-> So there's a direction implied by each entry? That should be stated
-> explicitly.
-ok
->
-> That said, I'm having some difficulty comprehending an asymmetric
-> distance, and I worry that it's ill-defined.
->
-> What does the direction apply to specifically?
->
-> How is it to be interpreted?
->
-> Assuming I have two domains A and B, and I have:
->
->         distance-matrix = <A B 1>, <B A 255>;
->
-> What does that mean for those domains? What's fast and what is slow?
-lesser the distance value indicates less inter node access latency.
-for cpu present in node A to access memory of node B, the latency
-would be 1(less latency)
-for other-way scenario, it is 255(more latency)
+Probably Suman already updated you on what was discussed about this
+patch at Connect-SFO. My suggestion was to drive TX poll-based (I
+know, I know...) because the "interrupt-driven" is just an impression,
+it is not really. You get the interrupt as soon as you enable it
+because it is the "FIFO not-full" interrupt which is always because
+there is always space left after writing to the fifo. The cons are
+that it buffers messages hidden from the client while abusing the irq.
+If you guys could break away from the "interrupt-driven" illusion and
+use polling which it actually is, everything falls into place and you
+avoid the "ti,mbox-send-noirq" quirk.
 
-i am not sure how the system behaves with asymmetric distance, however
-function sched_init_numa tries to assess that the distance are symmetric or not
-and for asymmetric, it prints warning.
->
->> +     3. distance-matrix shold have entries in ascending order of nodes.
->
-> s/ascending/lexicographical ascending/, and s/nodes/domain ids/, just to
-> be explicit.
-ok
->
->> +     4. Device node distance-map must reside in the root node.
->
-> Presumably there should be no duplicate entries? We should state that
-> explicitly.
-ok
->
->> +
->> +Example:
->> +     4 nodes connected in mesh/ring topology as below,
->> +
->> +             0_______20______1
->> +             |               |
->> +             |               |
->> +          20 |               |20
->> +             |               |
->> +             |               |
->> +             |_______________|
->> +             3       20      2
->> +
->> +     if relative distance for each hop is 20,
->> +     then inter node distance would be for this topology will be,
->> +           0 -> 1 = 20
->> +           1 -> 2 = 20
->> +           2 -> 3 = 20
->> +           3 -> 0 = 20
->> +           0 -> 2 = 40
->> +           1 -> 3 = 40
->> +
->> +     and dt presentation for this distance matrix is,
->> +
->> +             distance-map {
->> +                      distance-matrix = <0 0  10>,
->> +                                        <0 1  20>,
->> +                                        <0 2  40>,
->> +                                        <0 3  20>,
->> +                                        <1 0  20>,
->> +                                        <1 1  10>,
->> +                                        <1 2  20>,
->> +                                        <1 3  40>,
->> +                                        <2 0  40>,
->> +                                        <2 1  20>,
->> +                                        <2 2  10>,
->> +                                        <2 3  20>,
->> +                                        <3 0  20>,
->> +                                        <3 1  40>,
->> +                                        <3 2  20>,
->> +                                        <3 3  10>;
->> +             };
->> +
->> +Note:
->> +      1. The entries like <0 0> <1 1>  <2 2> <3 3>
->> +         can be optional and system can put default value(local distance, i.e 10).
->
-> As mentioned above, I think this should go.
-ok
->
-> Other than the comments above, this is looking promising!
-thanks
->
-> Thanks,
-> Mark.
-thanks
-Ganapat
+  Anyways I am OK too, if you guys want to fix it with a platform
+specific quirk. Let me know I'll pick this patch.
+
+Cheers!
