@@ -1,73 +1,78 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 21 Oct 2015 08:46:21 +0200
-Subject: [PATCHv2] fpga: zynq-fpga: Change fw format to handle bin instead
- of bit.
-In-Reply-To: <1445361596-12024-2-git-send-email-moritz.fischer@ettus.com>
-References: <1445361596-12024-1-git-send-email-moritz.fischer@ettus.com>
- <1445361596-12024-2-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <562734BD.2000909@xilinx.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Wed, 21 Oct 2015 14:48:13 +0800
+Subject: [PATCH v3 10/20] KVM: ARM64: Add reset and access handlers for
+ PMCCNTR register
+In-Reply-To: <5621127B.8070704@redhat.com>
+References: <1443133885-3366-1-git-send-email-shannon.zhao@linaro.org>
+ <1443133885-3366-11-git-send-email-shannon.zhao@linaro.org>
+ <5621127B.8070704@redhat.com>
+Message-ID: <5627352D.7010607@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2015 07:19 PM, Moritz Fischer wrote:
-> This gets rid of the code to strip away the header and byteswap,
-> as well as the check for the sync word.
-> 
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> ---
-> v2:
->  - Removed early exit path in case synq seq is not found
-> ---
->  drivers/fpga/zynq-fpga.c | 24 ++----------------------
->  1 file changed, 2 insertions(+), 22 deletions(-)
-> 
-> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
-> index 617d382..31db550 100644
-> --- a/drivers/fpga/zynq-fpga.c
-> +++ b/drivers/fpga/zynq-fpga.c
-> @@ -287,9 +287,9 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
->  	struct zynq_fpga_priv *priv;
->  	int err;
->  	char *kbuf;
-> -	size_t i, in_count;
-> +	size_t in_count;
->  	dma_addr_t dma_addr;
-> -	u32 transfer_length = 0;
-> +	u32 transfer_length;
->  	u32 intr_status;
->  
->  	in_count = count;
-> @@ -301,26 +301,6 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
->  
->  	memcpy(kbuf, buf, count);
->  
-> -	/* look for the sync word */
-> -	for (i = 0; i < count - 4; i++) {
-> -		if (memcmp(kbuf + i, "\xAA\x99\x55\x66", 4) == 0) {
-> -			dev_dbg(priv->dev, "Found swapped sync word\n");
-> -			break;
-> -		}
-> -	}
-> -
-> -	/* remove the header, align the data on word boundary */
-> -	if (i != count - 4) {
-> -		count -= i;
-> -		memmove(kbuf, kbuf + i, count);
-> -	}
-> -
-> -	/* fixup endianness of the data */
-> -	for (i = 0; i < count; i += 4) {
-> -		u32 *p = (u32 *)&kbuf[i];
-> -		*p = swab32(*p);
-> -	}
-> -
->  	/* enable clock */
->  	err = clk_enable(priv->clk);
->  	if (err)
-> 
 
-Looks good.
-Acked-by: Michal Simek <michal.simek@xilinx.com>
 
-Thanks,
-Michal
+On 2015/10/16 23:06, Wei Huang wrote:
+> 
+> 
+> On 09/24/2015 05:31 PM, Shannon Zhao wrote:
+>> Since the reset value of PMCCNTR is UNKNOWN, use reset_unknown for its
+>> reset handler. Add a new case to emulate reading to PMCCNTR register.
+>>
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> ---
+>>  arch/arm64/kvm/sys_regs.c | 17 +++++++++++++++--
+>>  1 file changed, 15 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>> index e7f6058..c38c2de 100644
+>> --- a/arch/arm64/kvm/sys_regs.c
+>> +++ b/arch/arm64/kvm/sys_regs.c
+>> @@ -518,6 +518,12 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
+>>  		}
+>>  	} else {
+>>  		switch (r->reg) {
+>> +		case PMCCNTR_EL0: {
+>> +			val = kvm_pmu_get_counter_value(vcpu,
+>> +							ARMV8_MAX_COUNTERS - 1);
+>> +			*vcpu_reg(vcpu, p->Rt) = val;
+>> +			break;
+>> +		}
+>>  		case PMXEVCNTR_EL0: {
+>>  			val = kvm_pmu_get_counter_value(vcpu,
+>>  						vcpu_sys_reg(vcpu, PMSELR_EL0));
+>> @@ -748,7 +754,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>>  	  access_pmu_regs, reset_pmceid, PMCEID1_EL0 },
+>>  	/* PMCCNTR_EL0 */
+>>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
+>> -	  trap_raz_wi },
+>> +	  access_pmu_regs, reset_unknown, PMCCNTR_EL0 },
+>>  	/* PMXEVTYPER_EL0 */
+>>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b001),
+>>  	  access_pmu_regs, reset_unknown, PMXEVTYPER_EL0 },
+>> @@ -997,6 +1003,12 @@ static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
+>>  		}
+>>  	} else {
+>>  		switch (r->reg) {
+>> +		case c9_PMCCNTR: {
+>> +			val = kvm_pmu_get_counter_value(vcpu,
+>> +							ARMV8_MAX_COUNTERS - 1);
+> 
+> PMCCNTR is for cycle counter. There is a filter register, PMCCFILTR_EL0,
+> associated with it. When kvm_pmu_set_counter_event_type() is called, I
+> didn't see this filter config been used in perf_event_attr when
+> perf_event is created.
+
+According to the spec, to PMXEVTYPER_EL0 it says "When PMSELR_EL0.SEL
+selects the cycle counter, this accesses PMCCFILTR_EL0." So within
+kvm_pmu_set_counter_event_type, I configure the perf_event_attr based on
+the bits of PMXEVTYPER_EL0 and only handle bit P for EL0 and bit U for
+EL1 since KVM guest doesn't see EL2 and EL3.
+
+See patch 07/20 :
++	attr.exclude_user = data & ARMV8_EXCLUDE_EL0 ? 1 : 0;
++	attr.exclude_kernel = data & ARMV8_EXCLUDE_EL1 ? 1 : 0;
+
+
+-- 
+Shannon
