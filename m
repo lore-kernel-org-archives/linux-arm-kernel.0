@@ -1,94 +1,45 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 21 Oct 2015 15:44:04 +0200
-Subject: [PATCH v2 2/2] i2c: at91: manage unexpected RXRDY flag when starting
- a transfer
-In-Reply-To: <1445435048-25889-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1445435048-25889-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1445435048-25889-2-git-send-email-ludovic.desroches@atmel.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 21 Oct 2015 08:44:44 -0500
+Subject: [PATCH v6 22/22] of/platform: Defer probes of registered devices
+In-Reply-To: <1445406845.701.55.camel@freescale.com>
+References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1442844182-27787-23-git-send-email-tomeu.vizoso@collabora.com>
+ <1445406845.701.55.camel@freescale.com>
+Message-ID: <CAL_JsqLhZmc8cEC+tFJ25KLe0bQZsWmrRWGBMQake9VN6OjvdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases, we could start a new i2c transfer with the RXRDY flag
-set. It is not a clean state and it leads to print annoying error
-messages even if there no real issue. The cause is only having garbage
-data in the Receive Holding Register because of a weird behavior of the
-RXRDY flag.
+On Wed, Oct 21, 2015 at 12:54 AM, Scott Wood <scottwood@freescale.com> wrote:
+> On Mon, 2015-09-21 at 16:03 +0200, Tomeu Vizoso wrote:
+>> Instead of trying to match and probe platform and AMBA devices right
+>> after each is registered, delay their probes until device_initcall_sync.
+>>
+>> This means that devices will start probing once all built-in drivers
+>> have registered, and after all platform and AMBA devices from the DT
+>> have been registered already.
+>>
+>> This allows us to prevent deferred probes by probing dependencies on
+>> demand.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> ---
+>>
+>> Changes in v4:
+>> - Also defer probes of AMBA devices registered from the DT as they can
+>>   also request resources.
+>>
+>>  drivers/of/platform.c | 11 ++++++++---
+>>  1 file changed, 8 insertions(+), 3 deletions(-)
+>
+> This breaks arch/powerpc/sysdev/fsl_pci.c.  The PCI bus is an OF platform
+> device, and it must be probed before pcibios_init() which is a
+> subsys_initcall(), or else the PCI bus never gets scanned.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Fixes: 93563a6a71bb ("i2c: at91: fix a race condition when using the DMA
-controller")
-Reported-by: Peter Rosin <peda@lysator.liu.se>
-Tested-by: Peter Rosin <peda@lysator.liu.se>
-Cc: stable at vger.kernel.org #4.1
----
- drivers/i2c/busses/i2c-at91.c | 33 +++++++++++++++++++++++++--------
- 1 file changed, 25 insertions(+), 8 deletions(-)
+Thanks for the report. This is probably getting dropped, but it could
+be disabled for PPC.
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index 94c087b..bac0016 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -347,8 +347,14 @@ error:
- 
- static void at91_twi_read_next_byte(struct at91_twi_dev *dev)
- {
--	if (!dev->buf_len)
-+	/*
-+	 * If we are in this case, it means there is garbage data in RHR, so
-+	 * delete them.
-+	 */
-+	if (!dev->buf_len) {
-+		at91_twi_read(dev, AT91_TWI_RHR);
- 		return;
-+	}
- 
- 	/* 8bit read works with and without FIFO */
- 	*dev->buf = readb_relaxed(dev->base + AT91_TWI_RHR);
-@@ -465,6 +471,24 @@ static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
- 
- 	if (!irqstatus)
- 		return IRQ_NONE;
-+	/*
-+	 * In reception, the behavior of the twi device (before sama5d2) is
-+	 * weird. There is some magic about RXRDY flag! When a data has been
-+	 * almost received, the reception of a new one is anticipated if there
-+	 * is no stop command to send. That is the reason why ask for sending
-+	 * the stop command not on the last data but on the second last one.
-+	 *
-+	 * Unfortunately, we could still have the RXRDY flag set even if the
-+	 * transfer is done and we have read the last data. It might happen
-+	 * when the i2c slave device sends too quickly data after receiving the
-+	 * ack from the master. The data has been almost received before having
-+	 * the order to send stop. In this case, sending the stop command could
-+	 * cause a RXRDY interrupt with a TXCOMP one. It is better to manage
-+	 * the RXRDY interrupt first in order to not keep garbage data in the
-+	 * Receive Holding Register for the next transfer.
-+	 */
-+	if (irqstatus & AT91_TWI_RXRDY)
-+		at91_twi_read_next_byte(dev);
- 
- 	/*
- 	 * When a NACK condition is detected, the I2C controller sets the NACK,
-@@ -507,8 +531,6 @@ static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
- 	if (irqstatus & (AT91_TWI_TXCOMP | AT91_TWI_NACK)) {
- 		at91_disable_twi_interrupts(dev);
- 		complete(&dev->cmd_complete);
--	} else if (irqstatus & AT91_TWI_RXRDY) {
--		at91_twi_read_next_byte(dev);
- 	} else if (irqstatus & AT91_TWI_TXRDY) {
- 		at91_twi_write_next_byte(dev);
- 	}
-@@ -600,11 +622,6 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
- 	} else if (dev->msg->flags & I2C_M_RD) {
- 		unsigned start_flags = AT91_TWI_START;
- 
--		if (sr & AT91_TWI_RXRDY) {
--			dev_err(dev->dev, "RXRDY still set!");
--			at91_twi_read(dev, AT91_TWI_RHR);
--		}
--
- 		/* if only one byte is to be read, immediately stop transfer */
- 		if (!has_alt_cmd && dev->buf_len <= 1 &&
- 		    !(dev->msg->flags & I2C_M_RECV_LEN))
--- 
-2.5.0
+Any plans to fix this and make PCI hosts hotplugable? For the scanning
+part, generally the host controller drivers are responsible for
+scanning their bus now.
+
+Rob
