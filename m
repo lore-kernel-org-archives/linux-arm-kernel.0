@@ -1,47 +1,35 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 21 Oct 2015 17:11:05 +0800
-Subject: [PATCH] bus: sunxi-rsb: Allow building sunxi-rsb as a module
-Message-ID: <1445418665-14138-1-git-send-email-wens@csie.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Oct 2015 11:16:46 +0200
+Subject: [PATCH] i2c: designware: fix platform driver probe rename
+Message-ID: <4006973.dp9o3gm8C4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner Reduced Serial Bus support is only needed for sun[89]i
-platforms. Having it built-in for multi-platform kernels leads to
-a bigger kernel image, without any benefit for non sun[89]i systems.
+A function rename was incomplete and missed the !CONFIG_PM
+case:
 
-The driver already exports the needed symbols and supports module
-loading/unloading. Change the Kconfig symbol to tristate to allow
-the user to build it as a module.
+i2c-designware-platdrv.c:340:13: error: 'dw_i2c_plat_prepare' undeclared here (not in a function)
+i2c-designware-platdrv.c:341:14: error: 'dw_i2c_plat_complete' undeclared here (not in a function)
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+This renames the macros accordingly.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 6ad6fde3970c ("i2c: designware: Rename platform driver probe and PM functions")
 ---
+Found on ARM randconfig builds
 
-Hi Arnd,
-
-Maxime requested we make the RSB driver and subsequent PMIC drivers
-tristate. Please squash this patch into patch 2 of the RSB series
-when you apply them.
-
-
-Thanks
-ChenYu
-
----
- drivers/bus/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index e921b8c72f8c..78382de19ed9 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -122,7 +122,7 @@ config SIMPLE_PM_BUS
- 	  "External Bus Interface") as found on several Renesas ARM SoCs.
+diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+index f6b252a8ffd1..eb55760ccd9f 100644
+--- a/drivers/i2c/busses/i2c-designware-platdrv.c
++++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+@@ -307,8 +307,8 @@ static void dw_i2c_plat_complete(struct device *dev)
+ 		pm_request_resume(dev);
+ }
+ #else
+-#define dw_i2c_prepare	NULL
+-#define dw_i2c_complete	NULL
++#define dw_i2c_plat_prepare	NULL
++#define dw_i2c_plat_complete	NULL
+ #endif
  
- config SUNXI_RSB
--	bool "Allwinner sunXi Reduced Serial Bus Driver"
-+	tristate "Allwinner sunXi Reduced Serial Bus Driver"
- 	  default MACH_SUN8I || MACH_SUN9I
- 	  depends on ARCH_SUNXI
- 	  select REGMAP
--- 
-2.6.1
+ #ifdef CONFIG_PM
