@@ -1,36 +1,46 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 21 Oct 2015 22:53:05 +0200
-Subject: [PATCH 12/13] ARM: sun4i: Enable audio-codec on Mele A1000
+Date: Wed, 21 Oct 2015 22:52:57 +0200
+Subject: [PATCH 04/13] ARM: sun4i: Add audio codec clock
 In-Reply-To: <1445460786-18280-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1445460786-18280-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1445460786-18280-13-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1445460786-18280-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+The audio codec functional clock is a child of PLL2 and is used to control
+the audio rate, enable it in the DT.
 
-Enable the audio-codec on the Mele A1000 top-set box.
-
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun4i-a10-a1000.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/sun4i-a10.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-index 2630d78d9e04..97570cb7f2fc 100644
---- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-@@ -93,6 +93,10 @@
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index c8595926a721..8993dfadd18c 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -45,6 +45,7 @@
  
-+&codec {
-+	status = "okay";
-+};
+ #include <dt-bindings/thermal/thermal.h>
+ 
++#include <dt-bindings/clock/sun4i-a10-pll2.h>
+ #include <dt-bindings/dma/sun4i-a10.h>
+ #include <dt-bindings/pinctrl/sun4i-a10.h>
+ 
+@@ -490,6 +491,14 @@
+ 			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+ 			clock-output-names = "spi3";
+ 		};
 +
- &ehci0 {
- 	status = "okay";
- };
++		codec_clk: clk at 01c20140 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-codec-clk";
++			reg = <0x01c20140 0x4>;
++			clocks = <&pll2 SUN4I_A10_PLL2_1X>;
++			clock-output-names = "codec";
++		};
+ 	};
+ 
+ 	soc at 01c00000 {
 -- 
 2.6.2
