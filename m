@@ -1,57 +1,43 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 21 Oct 2015 10:28:59 +0200
-Subject: [PATCH v4 0/5] mtd: pxa3xx_nand: rework the timing setup
-Message-ID: <1445416144-9194-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Wed, 21 Oct 2015 10:29:00 +0200
+Subject: [PATCH v4 1/5] mtd: pxa3xx: prepare allowing compile test
+In-Reply-To: <1445416144-9194-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1445416144-9194-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1445416144-9194-2-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Using readsl() result in a build error on i386. Fix this
+by using ioread32_rep() instead, to allow compile test the
+pxa3xx nand driver later.
 
-Let's try one more time to get this merged.
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ drivers/mtd/nand/pxa3xx_nand.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-This series was part of a bigger one[1], which was split into smaller
-ones as asked by Ezequiel[2]. When we take this into account this is
-v9; with a v1 sent in January, 9 months ago.
-
-Another series, introducing the Berlin nand support, depends on this.
-
-The aim here is to use the nand framework to setup the timings,
-while keeping the old in-driver way of configuration timings for
-compatibility reasons.
-
-You can find the series at:
-https://github.com/atenart/linux.git berlin/4.3/nand-timings
-
-Antoine
-
-Since v3:
-        - Moved back a chunk into the right patch.
-        - Called pxa3xx_nand_config_flash() before KEEP_CONFIG.
-        - Rebased on top of l2-mtd.git master.
-
-Since v2:
-        - Added back the support for keep-config 16 bits devices
-        - Fixed wrong unit in a calculation
-        - Reworked the pxa3xx_nand_init_timings() logic
-        - Allowed compile test the pxa3xx driver
-
-Since v1:
-        - Rebased on top of v4.2-rc1
-
-Since the series was split up:
-        - Reworked the ndcr setup
-        - Removed the read_id_bytes update after device detection
-
-Antoine Tenart (5):
-  mtd: pxa3xx: prepare allowing compile test
-  mtd: nand: allow compile test of MTD_NAND_PXA3xx
-  mtd: pxa3xx_nand: add helpers to setup the timings
-  mtd: pxa3xx_nand: rework flash detection and timing setup
-  mtd: pxa3xx_nand: clean up the pxa3xx timings
-
- drivers/mtd/nand/Kconfig       |   2 +-
- drivers/mtd/nand/pxa3xx_nand.c | 274 +++++++++++++++++++++++++----------------
- 2 files changed, 168 insertions(+), 108 deletions(-)
-
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index 77b3206aef01..91605c1ee169 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -532,7 +532,7 @@ static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
+ 		 * the polling on the last read.
+ 		 */
+ 		while (len > 8) {
+-			readsl(info->mmio_base + NDDB, data, 8);
++			ioread32_rep(info->mmio_base + NDDB, data, 8);
+ 
+ 			ret = readl_relaxed_poll_timeout(info->mmio_base + NDSR, val,
+ 							 val & NDSR_RDDREQ, 1000, 5000);
+@@ -547,7 +547,7 @@ static void drain_fifo(struct pxa3xx_nand_info *info, void *data, int len)
+ 		}
+ 	}
+ 
+-	readsl(info->mmio_base + NDDB, data, len);
++	ioread32_rep(info->mmio_base + NDDB, data, len);
+ }
+ 
+ static void handle_data_pio(struct pxa3xx_nand_info *info)
 -- 
 2.6.2
