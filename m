@@ -1,393 +1,427 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 21 Oct 2015 11:10:07 +0100
-Subject: [PATCH 10/19] ARM: dts: at91: replace gpio-key,
- wakeup with wakeup-source property
+Date: Wed, 21 Oct 2015 11:10:09 +0100
+Subject: [PATCH 12/19] ARM: dts: exynos: replace legacy *,
+ wakeup property with wakeup-source
 In-Reply-To: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
 References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1445422216-29375-11-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1445422216-29375-13-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
-check for/support the legacy "gpio-key,wakeup" boolean property to
-enable gpio buttons as wakeup source, "wakeup-source" is the new
-standard binding.
+Though the keyboard and other driver will continue to support the legacy
+"gpio-key,wakeup", "linux-keypad,wakeup" boolean property to enable the
+wakeup source, "wakeup-source" is the new standard binding.
 
-This patch replaces the legacy "gpio-key,wakeup" with the unified
+This patch replaces all the legacy wakeup properties with the unified
 "wakeup-source" property in order to avoid any futher copy-paste
 duplication.
 
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: linux-samsung-soc at vger.kernel.org
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm/boot/dts/animeo_ip.dts             |  6 +++---
- arch/arm/boot/dts/at91-foxg20.dts           |  2 +-
- arch/arm/boot/dts/at91-kizbox.dts           |  4 ++--
- arch/arm/boot/dts/at91-kizbox2.dts          |  6 +++---
- arch/arm/boot/dts/at91-kizboxmini.dts       |  4 ++--
- arch/arm/boot/dts/at91-qil_a9260.dts        |  2 +-
- arch/arm/boot/dts/at91-sama5d3_xplained.dts |  2 +-
- arch/arm/boot/dts/at91-sama5d4_xplained.dts |  2 +-
- arch/arm/boot/dts/at91-sama5d4ek.dts        |  2 +-
- arch/arm/boot/dts/at91sam9261ek.dts         | 10 +++++-----
- arch/arm/boot/dts/at91sam9263ek.dts         |  4 ++--
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi |  4 ++--
- arch/arm/boot/dts/at91sam9m10g45ek.dts      |  4 ++--
- arch/arm/boot/dts/at91sam9n12ek.dts         |  2 +-
- arch/arm/boot/dts/at91sam9rlek.dts          |  4 ++--
- arch/arm/boot/dts/sama5d35ek.dts            |  2 +-
- arch/arm/boot/dts/usb_a9260_common.dtsi     |  2 +-
- arch/arm/boot/dts/usb_a9263.dts             |  2 +-
- 18 files changed, 32 insertions(+), 32 deletions(-)
+ arch/arm/boot/dts/exynos3250-monk.dts           |  6 +++---
+ arch/arm/boot/dts/exynos3250-rinato.dts         |  6 +++---
+ arch/arm/boot/dts/exynos4210-origen.dts         | 10 +++++-----
+ arch/arm/boot/dts/exynos4210-smdkv310.dts       |  2 +-
+ arch/arm/boot/dts/exynos4210-trats.dts          |  2 +-
+ arch/arm/boot/dts/exynos4210-universal_c210.dts |  4 ++--
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  2 +-
+ arch/arm/boot/dts/exynos4412-odroidx.dts        |  2 +-
+ arch/arm/boot/dts/exynos4412-origen.dts         |  2 +-
+ arch/arm/boot/dts/exynos4412-smdk4412.dts       |  2 +-
+ arch/arm/boot/dts/exynos4412-trats2.dts         |  4 ++--
+ arch/arm/boot/dts/exynos5250-arndale.dts        | 12 ++++++------
+ arch/arm/boot/dts/exynos5250-snow.dts           |  4 ++--
+ arch/arm/boot/dts/exynos5250-spring.dts         |  4 ++--
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts   |  2 +-
+ arch/arm/boot/dts/exynos5420-peach-pit.dts      |  4 ++--
+ arch/arm/boot/dts/exynos5800-peach-pi.dts       |  4 ++--
+ 17 files changed, 36 insertions(+), 36 deletions(-)
 
-diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
-index 4e0ad3b82796..0962f2fa3f6e 100644
---- a/arch/arm/boot/dts/animeo_ip.dts
-+++ b/arch/arm/boot/dts/animeo_ip.dts
-@@ -155,21 +155,21 @@
- 			label = "keyswitch_in";
- 			gpios = <&pioB 1 GPIO_ACTIVE_HIGH>;
- 			linux,code = <28>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		error_in {
- 			label = "error_in";
- 			gpios = <&pioB 2 GPIO_ACTIVE_HIGH>;
- 			linux,code = <29>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		btn {
- 			label = "btn";
- 			gpios = <&pioC 23 GPIO_ACTIVE_HIGH>;
- 			linux,code = <31>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/at91-foxg20.dts b/arch/arm/boot/dts/at91-foxg20.dts
-index f89598af4c2b..6bf873e7d96c 100644
---- a/arch/arm/boot/dts/at91-foxg20.dts
-+++ b/arch/arm/boot/dts/at91-foxg20.dts
-@@ -159,7 +159,7 @@
- 			label = "Button";
- 			gpios = <&pioC 4 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x103>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
-index bf18ece0c027..8afe35f64034 100644
---- a/arch/arm/boot/dts/at91-kizbox.dts
-+++ b/arch/arm/boot/dts/at91-kizbox.dts
-@@ -94,14 +94,14 @@
- 			label = "PB_RST";
- 			gpios = <&pioB 30 GPIO_ACTIVE_HIGH>;
- 			linux,code = <0x100>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		user {
- 			label = "PB_USER";
- 			gpios = <&pioB 31 GPIO_ACTIVE_HIGH>;
- 			linux,code = <0x101>;
+diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
+index 540a0adf2be6..b77ea2163a0a 100644
+--- a/arch/arm/boot/dts/exynos3250-monk.dts
++++ b/arch/arm/boot/dts/exynos3250-monk.dts
+@@ -43,7 +43,7 @@
+ 			linux,code = <KEY_POWER>;
+ 			label = "power key";
+ 			debounce-interval = <10>;
 -			gpio-key,wakeup;
 +			wakeup-source;
  		};
  	};
  
-diff --git a/arch/arm/boot/dts/at91-kizbox2.dts b/arch/arm/boot/dts/at91-kizbox2.dts
-index f0b1563cb3f1..50a14568f094 100644
---- a/arch/arm/boot/dts/at91-kizbox2.dts
-+++ b/arch/arm/boot/dts/at91-kizbox2.dts
-@@ -171,21 +171,21 @@
- 			label = "PB_PROG";
- 			gpios = <&pioE 27 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x102>;
--			gpio-key,wakeup;
+@@ -67,7 +67,7 @@
+ 			interrupt-parent = <&gpx1>;
+ 			interrupts = <5 0>;
+ 			reg = <0x25>;
+-			wakeup;
 +			wakeup-source;
- 		};
  
- 		reset {
- 			label = "PB_RST";
- 			gpios = <&pioE 29 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x100>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
+ 			muic: max77836-muic {
+ 				compatible = "maxim,max77836-muic";
+@@ -184,7 +184,7 @@
+ 		interrupt-parent = <&gpx0>;
+ 		interrupts = <7 0>;
+ 		reg = <0x66>;
+-		wakeup;
++		wakeup-source;
  
- 		user {
- 			label = "PB_USER";
- 			gpios = <&pioE 31 GPIO_ACTIVE_HIGH>;
- 			linux,code = <0x101>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/at91-kizboxmini.dts b/arch/arm/boot/dts/at91-kizboxmini.dts
-index 9f72b4932634..9682d105d4d8 100644
---- a/arch/arm/boot/dts/at91-kizboxmini.dts
-+++ b/arch/arm/boot/dts/at91-kizboxmini.dts
-@@ -98,14 +98,14 @@
- 			label = "PB_PROG";
- 			gpios = <&pioC 17 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x102>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		reset {
- 			label = "PB_RST";
- 			gpios = <&pioC 16 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x100>;
+ 		s2mps14_osc: clocks {
+ 			compatible = "samsung,s2mps14-clk";
+diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+index 41a5fafb9aa9..7acd11d2d957 100644
+--- a/arch/arm/boot/dts/exynos3250-rinato.dts
++++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+@@ -43,7 +43,7 @@
+ 			linux,code = <KEY_POWER>;
+ 			label = "power key";
+ 			debounce-interval = <10>;
 -			gpio-key,wakeup;
 +			wakeup-source;
  		};
  	};
  
-diff --git a/arch/arm/boot/dts/at91-qil_a9260.dts b/arch/arm/boot/dts/at91-qil_a9260.dts
-index a9aef53ab764..4f2eebf4a560 100644
---- a/arch/arm/boot/dts/at91-qil_a9260.dts
-+++ b/arch/arm/boot/dts/at91-qil_a9260.dts
-@@ -183,7 +183,7 @@
- 			label = "user_pb";
- 			gpios = <&pioB 10 GPIO_ACTIVE_LOW>;
- 			linux,code = <28>;
+@@ -58,7 +58,7 @@
+ 			interrupt-parent = <&gpx1>;
+ 			interrupts = <5 0>;
+ 			reg = <0x25>;
+-			wakeup;
++			wakeup-source;
+ 
+ 			muic: max77836-muic {
+ 				compatible = "maxim,max77836-muic";
+@@ -245,7 +245,7 @@
+ 		interrupt-parent = <&gpx0>;
+ 		interrupts = <7 0>;
+ 		reg = <0x66>;
+-		wakeup;
++		wakeup-source;
+ 
+ 		s2mps14_osc: clocks {
+ 			compatible = "samsung,s2mps14-clk";
+diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+index e050d85cdacd..9e97f6065493 100644
+--- a/arch/arm/boot/dts/exynos4210-origen.dts
++++ b/arch/arm/boot/dts/exynos4210-origen.dts
+@@ -59,35 +59,35 @@
+ 			label = "Up";
+ 			gpios = <&gpx2 0 1>;
+ 			linux,code = <KEY_UP>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		down {
+ 			label = "Down";
+ 			gpios = <&gpx2 1 1>;
+ 			linux,code = <KEY_DOWN>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		back {
+ 			label = "Back";
+ 			gpios = <&gpx1 7 1>;
+ 			linux,code = <KEY_BACK>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		home {
+ 			label = "Home";
+ 			gpios = <&gpx1 6 1>;
+ 			linux,code = <KEY_HOME>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		menu {
+ 			label = "Menu";
+ 			gpios = <&gpx1 5 1>;
+ 			linux,code = <KEY_MENU>;
 -			gpio-key,wakeup;
 +			wakeup-source;
  		};
  	};
  
-diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-index d81474e0bcd6..b0dd58f448fe 100644
---- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-@@ -315,7 +315,7 @@
- 			label = "PB_USER";
- 			gpios = <&pioE 29 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x104>;
+diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+index 043b03caff8f..82babe064576 100644
+--- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
++++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+@@ -69,7 +69,7 @@
+ 	samsung,keypad-num-rows = <2>;
+ 	samsung,keypad-num-columns = <8>;
+ 	linux,keypad-no-autorepeat;
+-	linux,keypad-wakeup;
++	wakeup-source;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&keypad_rows &keypad_cols>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
+index ba34886f8b65..1317c0fc7005 100644
+--- a/arch/arm/boot/dts/exynos4210-trats.dts
++++ b/arch/arm/boot/dts/exynos4210-trats.dts
+@@ -111,7 +111,7 @@
+ 			linux,code = <116>;
+ 			label = "power";
+ 			debounce-interval = <10>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		ok-key {
+diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+index eb379526e234..0eed67bef4b7 100644
+--- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
++++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+@@ -91,7 +91,7 @@
+ 			linux,code = <171>;
+ 			label = "config";
+ 			debounce-interval = <1>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		camera-key {
+@@ -106,7 +106,7 @@
+ 			linux,code = <116>;
+ 			label = "power";
+ 			debounce-interval = <1>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		ok-key {
+diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+index db52841297a5..079f2d373c4c 100644
+--- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
++++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+@@ -34,7 +34,7 @@
+ 			linux,code = <KEY_POWER>;
+ 			label = "power key";
+ 			debounce-interval = <10>;
 -			gpio-key,wakeup;
 +			wakeup-source;
  		};
  	};
  
-diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-index 07f46963335b..c34a23b82e1a 100644
---- a/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-@@ -235,7 +235,7 @@
- 			label = "pb_user1";
- 			gpios = <&pioE 8 GPIO_ACTIVE_HIGH>;
- 			linux,code = <0x100>;
+diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
+index 679ac103ebf6..9491449c01e8 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidx.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+@@ -48,7 +48,7 @@
+ 			linux,code = <KEY_HOME>;
+ 			label = "home key";
+ 			debounce-interval = <10>;
 -			gpio-key,wakeup;
 +			wakeup-source;
  		};
  	};
  
-diff --git a/arch/arm/boot/dts/at91-sama5d4ek.dts b/arch/arm/boot/dts/at91-sama5d4ek.dts
-index 49a59c7e4a5d..d4cf2cf119e4 100644
---- a/arch/arm/boot/dts/at91-sama5d4ek.dts
-+++ b/arch/arm/boot/dts/at91-sama5d4ek.dts
-@@ -277,7 +277,7 @@
- 			label = "pb_user1";
- 			gpios = <&pioE 13 GPIO_ACTIVE_HIGH>;
- 			linux,code = <0x100>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
-index 2e92ac020f23..facce0ef840b 100644
---- a/arch/arm/boot/dts/at91sam9261ek.dts
-+++ b/arch/arm/boot/dts/at91sam9261ek.dts
-@@ -149,7 +149,7 @@
- 					ti,debounce-tol = /bits/ 16 <65535>;
- 					ti,debounce-max = /bits/ 16 <1>;
- 
--					linux,wakeup;
-+					wakeup-source;
- 				};
- 			};
- 
-@@ -193,28 +193,28 @@
- 			label = "button_0";
- 			gpios = <&pioA 27 GPIO_ACTIVE_LOW>;
- 			linux,code = <256>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		button_1 {
- 			label = "button_1";
- 			gpios = <&pioA 26 GPIO_ACTIVE_LOW>;
- 			linux,code = <257>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		button_2 {
- 			label = "button_2";
- 			gpios = <&pioA 25 GPIO_ACTIVE_LOW>;
- 			linux,code = <258>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		button_3 {
- 			label = "button_3";
- 			gpios = <&pioA 24 GPIO_ACTIVE_LOW>;
- 			linux,code = <259>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
-index 23381276ffb8..241de040681f 100644
---- a/arch/arm/boot/dts/at91sam9263ek.dts
-+++ b/arch/arm/boot/dts/at91sam9263ek.dts
-@@ -213,14 +213,14 @@
- 			label = "left_click";
- 			gpios = <&pioC 5 GPIO_ACTIVE_LOW>;
- 			linux,code = <272>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		right_click {
- 			label = "right_click";
- 			gpios = <&pioC 4 GPIO_ACTIVE_LOW>;
- 			linux,code = <273>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-index 57548a2c5a1e..e45c744d3cc8 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-@@ -206,14 +206,14 @@
- 			label = "Button 3";
- 			gpios = <&pioA 30 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x103>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		btn4 {
- 			label = "Button 4";
- 			gpios = <&pioA 31 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x104>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index d1ae60a855d4..a251a193d208 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -321,14 +321,14 @@
- 			label = "left_click";
- 			gpios = <&pioB 6 GPIO_ACTIVE_LOW>;
- 			linux,code = <272>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		right_click {
- 			label = "right_click";
- 			gpios = <&pioB 7 GPIO_ACTIVE_LOW>;
- 			linux,code = <273>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		left {
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index efa75064d38a..a00cd1ded131 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -223,7 +223,7 @@
- 			label = "Enter";
- 			gpios = <&pioB 3 GPIO_ACTIVE_LOW>;
- 			linux,code = <28>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/at91sam9rlek.dts b/arch/arm/boot/dts/at91sam9rlek.dts
-index 558c9f220bed..8a847c2d8e42 100644
---- a/arch/arm/boot/dts/at91sam9rlek.dts
-+++ b/arch/arm/boot/dts/at91sam9rlek.dts
-@@ -225,14 +225,14 @@
- 			label = "right_click";
- 			gpios = <&pioB 0 GPIO_ACTIVE_LOW>;
- 			linux,code = <273>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		left_click {
- 			label = "left_click";
- 			gpios = <&pioB 1 GPIO_ACTIVE_LOW>;
- 			linux,code = <272>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/sama5d35ek.dts b/arch/arm/boot/dts/sama5d35ek.dts
-index d9a9aca1ccfd..e812f5c1bf70 100644
---- a/arch/arm/boot/dts/sama5d35ek.dts
-+++ b/arch/arm/boot/dts/sama5d35ek.dts
+diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
+index 9d528af68c1a..107e77dc8060 100644
+--- a/arch/arm/boot/dts/exynos4412-origen.dts
++++ b/arch/arm/boot/dts/exynos4412-origen.dts
+@@ -426,7 +426,7 @@
+ 	samsung,keypad-num-rows = <3>;
+ 	samsung,keypad-num-columns = <2>;
+ 	linux,keypad-no-autorepeat;
+-	linux,keypad-wakeup;
++	wakeup-source;
+ 	pinctrl-0 = <&keypad_rows &keypad_cols>;
+ 	pinctrl-names = "default";
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/exynos4412-smdk4412.dts b/arch/arm/boot/dts/exynos4412-smdk4412.dts
+index c2421df1fa43..210a6b2e51d4 100644
+--- a/arch/arm/boot/dts/exynos4412-smdk4412.dts
++++ b/arch/arm/boot/dts/exynos4412-smdk4412.dts
 @@ -49,7 +49,7 @@
- 			label = "pb_user1";
- 			gpios = <&pioE 27 GPIO_ACTIVE_HIGH>;
- 			linux,code = <0x100>;
+ 	samsung,keypad-num-rows = <3>;
+ 	samsung,keypad-num-columns = <8>;
+ 	linux,keypad-no-autorepeat;
+-	linux,keypad-wakeup;
++	wakeup-source;
+ 	pinctrl-0 = <&keypad_rows &keypad_cols>;
+ 	pinctrl-names = "default";
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 2a1ebb76ebe0..cdb2e81d9d04 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -119,7 +119,7 @@
+ 			linux,code = <116>;
+ 			label = "power";
+ 			debounce-interval = <10>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		key-ok {
+@@ -127,7 +127,7 @@
+ 			linux,code = <139>;
+ 			label = "ok";
+ 			debounce-inteval = <10>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+index db3f65f3eb45..866934e948fc 100644
+--- a/arch/arm/boot/dts/exynos5250-arndale.dts
++++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+@@ -34,42 +34,42 @@
+ 			label = "SW-TACT2";
+ 			gpios = <&gpx1 4 GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_MENU>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		home {
+ 			label = "SW-TACT3";
+ 			gpios = <&gpx1 5 GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_HOME>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		up {
+ 			label = "SW-TACT4";
+ 			gpios = <&gpx1 6 GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_UP>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		down {
+ 			label = "SW-TACT5";
+ 			gpios = <&gpx1 7 GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_DOWN>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		back {
+ 			label = "SW-TACT6";
+ 			gpios = <&gpx2 0 GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_BACK>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		wakeup {
+ 			label = "SW-TACT7";
+ 			gpios = <&gpx2 1 GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_WAKEUP>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index 0720caab5511..cb13c94e6089 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -41,7 +41,7 @@
+ 			label = "Power";
+ 			gpios = <&gpx1 3 GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		lid-switch {
+@@ -50,7 +50,7 @@
+ 			linux,input-type = <5>; /* EV_SW */
+ 			linux,code = <0>; /* SW_LID */
+ 			debounce-interval = <1>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
+index c1edd6d038a9..0f500cb1eb2d 100644
+--- a/arch/arm/boot/dts/exynos5250-spring.dts
++++ b/arch/arm/boot/dts/exynos5250-spring.dts
+@@ -37,7 +37,7 @@
+ 			label = "Power";
+ 			gpios = <&gpx1 3 GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		lid-switch {
+@@ -46,7 +46,7 @@
+ 			linux,input-type = <5>; /* EV_SW */
+ 			linux,code = <0>; /* SW_LID */
+ 			debounce-interval = <1>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+index eeb4ac22cfce..797c05dec637 100644
+--- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
++++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+@@ -46,7 +46,7 @@
+ 			label = "SW-TACT1";
+ 			gpios = <&gpx2 7 1>;
+ 			linux,code = <KEY_WAKEUP>;
 -			gpio-key,wakeup;
 +			wakeup-source;
  		};
  	};
  };
-diff --git a/arch/arm/boot/dts/usb_a9260_common.dtsi b/arch/arm/boot/dts/usb_a9260_common.dtsi
-index 12edafefd44a..9beea8976584 100644
---- a/arch/arm/boot/dts/usb_a9260_common.dtsi
-+++ b/arch/arm/boot/dts/usb_a9260_common.dtsi
-@@ -115,7 +115,7 @@
- 			label = "user_pb";
- 			gpios = <&pioB 10 GPIO_ACTIVE_LOW>;
- 			linux,code = <28>;
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index 8f4d76c5e11c..d8ab9b6f4999 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -64,7 +64,7 @@
+ 			label = "Power";
+ 			gpios = <&gpx1 2 GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 		lid-switch {
+@@ -73,7 +73,7 @@
+ 			linux,input-type = <5>; /* EV_SW */
+ 			linux,code = <0>; /* SW_LID */
+ 			debounce-interval = <1>;
 -			gpio-key,wakeup;
 +			wakeup-source;
  		};
  	};
  
-diff --git a/arch/arm/boot/dts/usb_a9263.dts b/arch/arm/boot/dts/usb_a9263.dts
-index 68c0de36c339..8cc6edb29694 100644
---- a/arch/arm/boot/dts/usb_a9263.dts
-+++ b/arch/arm/boot/dts/usb_a9263.dts
-@@ -143,7 +143,7 @@
- 			label = "user_pb";
- 			gpios = <&pioB 10 GPIO_ACTIVE_LOW>;
- 			linux,code = <28>;
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 7d5b386b5ae6..68b7e8bcc5bd 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -63,7 +63,7 @@
+ 			label = "Power";
+ 			gpios = <&gpx1 2 GPIO_ACTIVE_LOW>;
+ 			linux,code = <KEY_POWER>;
 -			gpio-key,wakeup;
 +			wakeup-source;
  		};
- 	};
  
+ 		lid-switch {
+@@ -72,7 +72,7 @@
+ 			linux,input-type = <5>; /* EV_SW */
+ 			linux,code = <0>; /* SW_LID */
+ 			debounce-interval = <1>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+ 
+ 	};
 -- 
 1.9.1
