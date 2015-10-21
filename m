@@ -1,123 +1,76 @@
-From: peda@lysator.liu.se (Peter Rosin)
-Date: Wed, 21 Oct 2015 09:21:42 +0200
-Subject: [PATCH] i2c: at91: fix write transfers by clearing pending
- interrupt first
-In-Reply-To: <20151020132702.GA25824@odux.rfo.atmel.com>
-References: <1444746104-20615-1-git-send-email-ludovic.desroches@atmel.com>
- <561D20E7.5070405@lysator.liu.se> <561D359D.8000500@atmel.com>
- <561D46FE.4090801@lysator.liu.se> <20151014054321.GA20049@odux.rfo.atmel.com>
- <56203B0E.1030104@lysator.liu.se> <5620BE9A.10302@lysator.liu.se>
- <20151019085136.GK26893@odux.rfo.atmel.com> <5624CA9F.5080309@lysator.liu.se>
- <20151020132702.GA25824@odux.rfo.atmel.com>
-Message-ID: <56273D06.4010600@lysator.liu.se>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Wed, 21 Oct 2015 15:26:46 +0800
+Subject: [PATCH v3 00/20] KVM: ARM64: Add guest PMU support
+In-Reply-To: <56212D5B.1050207@codeaurora.org>
+References: <1443133885-3366-1-git-send-email-shannon.zhao@linaro.org>
+ <5620833B.5050803@redhat.com> <56212D5B.1050207@codeaurora.org>
+Message-ID: <56273E36.6000704@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-10-20 15:27, Ludovic Desroches wrote:
-> On Mon, Oct 19, 2015 at 12:49:03PM +0200, Peter Rosin wrote:
->> On 2015-10-19 10:51, Ludovic Desroches wrote:
->>> Hi Peter,
->>>
->>> On Fri, Oct 16, 2015 at 11:08:42AM +0200, Peter Rosin wrote:
->>>> On 2015-10-16 01:47, Peter Rosin wrote:
->>>>> On 2015-10-14 07:43, Ludovic Desroches wrote:
->>>>>> On Tue, Oct 13, 2015 at 08:01:34PM +0200, Peter Rosin wrote:
->>>>>>> On 2015-10-13 18:47, Cyrille Pitchen wrote:
->>>>>>>> Le 13/10/2015 17:19, Peter Rosin a ?crit :
->>>>>>>>> On 2015-10-13 16:21, Ludovic Desroches wrote:
->>>
->>> [...]
->>>
->>>>> I have started to get this when I run with this patch:
->>>>>
->>>>> [   73.310000] at91_i2c f0014000.i2c: RXRDY still set!
->>>>> [  198.200000] at91_i2c f0014000.i2c: RXRDY still set!
->>>>> [  509.880000] at91_i2c f0014000.i2c: RXRDY still set!
->>>>> [  615.750000] at91_i2c f0014000.i2c: RXRDY still set!
->>>>> [  617.750000] at91_i2c f0014000.i2c: RXRDY still set!
->>>>> [ 1766.640000] at91_i2c f0014000.i2c: RXRDY still set!
->>>>> [ 2035.380000] at91_i2c f0014000.i2c: RXRDY still set!
->>>>> [ 2227.190000] at91_i2c f0014000.i2c: RXRDY still set!
->>>>> [ 2313.100000] at91_i2c f0014000.i2c: RXRDY still set!
->>>>>
->>>>> My USB serial dongle was hung which was why I didn't notice until just now.
->>>>>
->>>>> This is probably not when communication with the eeprom though, and certainly not
->>>>> writing to it, but perhpaps when polling the temperature (using the jc42 driver).
->>>>> I'll investigate further in the morning to see if I can pinpoint it.
->>>>
->>>> Yep, it's the jc42 accesses that triggers this (to the same chip as the
->>>> eeprom, but a different block of transistors I suppose).
->>>>
->>>> Looking at the i2c bus, the accesses normally go like this:
->>>>
->>>> [0.000000] S 0x18 W 0x05 S 0x18 R 0xc1 0xbe NACK P
->>>> [0.000521] S 0x18 W 0x04 S 0x18 R 0x00 0x00 NACK P
->>>> [0.001024] S 0x18 W 0x03 S 0x18 R 0x00 0x00 NACK P
->>>> [0.001524] S 0x18 W 0x02 S 0x18 R 0x00 0x00 NACK P
->>>> [0.196991] S 0x18 W 0x05 S 0x18 R 0xc1 0xbe NACK P
->>>> [0.197514] S 0x18 W 0x04 S 0x18 R 0x00 0x00 NACK P
->>>> [0.198019] S 0x18 W 0x03 S 0x18 R 0x00 0x00 NACK P
->>>> [0.198520] S 0x18 W 0x02 S 0x18 R 0x00 0x00 NACK P
->>>>
->>>> I.e. chunks of four transfers every ~200 ms (I removed the 1Hz rate
->>>> limiter in the jc42 driver to get more frequent incidents).
->>>>
->>>> But when the diagnostic (RXRDY still set!) is output it continues
->>>> with this:
->>>>
->>>> [0.399755] S 0x18 W 0x05 S 0x18 R 0xc1 0xbe NACK P
->>>> [0.404998] S 0x18 W 0x04 S 0x18 R 0x00 0x00 NACK P
->>>> [0.405508] S 0x18 W 0x03 S 0x18 R 0x00 0x00 NACK P
->>>> [0.406008] S 0x18 W 0x02 S 0x18 R 0x00 0x00 NACK P
->>>>
->>>> Notice the ~5 ms delay (about the time it should take to output
->>>> the diagnostic at 115200 baud) after the access to register 0x05
->>>> at 0.399755.
->>>>
->>>> This is the only thing that I can observe on the bus, so it appears
->>>> to be harmless.
->>>>
->>>> It appears that the i2c access at 0.399755 finds the TWI
->>>> registers in an odd state, but nothing from the access at
->>>> 0.198520 appears to have gone wrong. Is this a race? Anyway,
->>>> the diagnostic is pretty frequent and annoying. printk_once?
->>>
->>> I'll try to reproduce it on my side. The only issue you have is having
->>> the message about RXRDY? I mean no issue with i2c transfers?
->>
->> Exactly, the only issue is the message, the bus looks good and transfers
->> work as they should AFAICT.
->>> It is not the possible bug we had in mind, this bug will prevent the
->>> master device to release the i2c bus. It will stop the transfer but
->>> without sending a stop on the bus.
->>
->> Agreed, this is not about the extra frame caused by the spurious write
->> to the THR register. This is something else.
->>
->> One suspicion is that the driver gets an unexpected irq from its own
->> NACK (the one that it puts out to end the read) and races with the
->> expected interrupt at TXCOMP?
->>
+
+
+On 2015/10/17 1:01, Christopher Covington wrote:
+> On 10/16/2015 12:55 AM, Wei Huang wrote:
+>> > 
+>> > 
+>> > On 09/24/2015 05:31 PM, Shannon Zhao wrote:
+>>> >> This patchset adds guest PMU support for KVM on ARM64. It takes
+>>> >> trap-and-emulate approach. When guest wants to monitor one event, it
+>>> >> will be trapped by KVM and KVM will call perf_event API to create a perf
+>>> >> event and call relevant perf_event APIs to get the count value of event.
+>>> >>
+>>> >> Use perf to test this patchset in guest. When using "perf list", it
+>>> >> shows the list of the hardware events and hardware cache events perf
+>>> >> supports. Then use "perf stat -e EVENT" to monitor some event. For
+>>> >> example, use "perf stat -e cycles" to count cpu cycles and
+>>> >> "perf stat -e cache-misses" to count cache misses.
+>>> >>
+>>> >> Below are the outputs of "perf stat -r 5 sleep 5" when running in host
+>>> >> and guest.
+>>> >>
+>>> >> Host:
+>>> >>  Performance counter stats for 'sleep 5' (5 runs):
+>>> >>
+>>> >>           0.551428      task-clock (msec)         #    0.000 CPUs utilized            ( +-  0.91% )
+>>> >>                  1      context-switches          #    0.002 M/sec
+>>> >>                  0      cpu-migrations            #    0.000 K/sec
+>>> >>                 48      page-faults               #    0.088 M/sec                    ( +-  1.05% )
+>>> >>            1150265      cycles                    #    2.086 GHz                      ( +-  0.92% )
+>>> >>    <not supported>      stalled-cycles-frontend
+>>> >>    <not supported>      stalled-cycles-backend
+>>> >>             526398      instructions              #    0.46  insns per cycle          ( +-  0.89% )
+>>> >>    <not supported>      branches
+>>> >>               9485      branch-misses             #   17.201 M/sec                    ( +-  2.35% )
+>>> >>
+>>> >>        5.000831616 seconds time elapsed                                          ( +-  0.00% )
+>>> >>
+>>> >> Guest:
+>>> >>  Performance counter stats for 'sleep 5' (5 runs):
+>>> >>
+>>> >>           0.730868      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.13% )
+>>> >>                  1      context-switches          #    0.001 M/sec
+>>> >>                  0      cpu-migrations            #    0.000 K/sec
+>>> >>                 48      page-faults               #    0.065 M/sec                    ( +-  0.42% )
+>>> >>            1642982      cycles                    #    2.248 GHz                      ( +-  1.04% )
+>>> >>    <not supported>      stalled-cycles-frontend
+>>> >>    <not supported>      stalled-cycles-backend
+>>> >>             637964      instructions              #    0.39  insns per cycle          ( +-  0.65% )
+>>> >>    <not supported>      branches
+>>> >>              10377      branch-misses             #   14.198 M/sec                    ( +-  1.09% )
+>>> >>
+>>> >>        5.001289068 seconds time elapsed                                          ( +-  0.00% )
+>>> >>
+>> > 
+>> > Thanks for V3. One suggestion is to run more perf stress tests, such as
+>> > "perf test". So we know the corner cases are covered as much as possible.
+> I'd also recommend Vince Weaver's perf_event_tests. It tests things like
+> signal-on-counter-overflow that I've never seen anywhere else (other than some
+> of my own code).
 > 
-> I have discussed with the designer of this IP. So the NACK flag is only
-> used for 'real' nack not protocol ones.
-> 
-> Concerning the read issue, it have attached a patch (apply it on top of
-> Cyrille's patch). Could you have a try? I have reproduced your issue only one
-> time so it's hard for me to tell if it works well or not.
+> https://github.com/deater/perf_event_tests
 
-Since you removed the dev_err call, I don't really know if the underlying
-issue is solved or not (if there ever was any).
+Ok. Thanks for your suggestion.
 
-Reading RHR in the if at the top of at91_twi_read_next_byte() never happens
-for me (I added a witness and left it running overnight), so that
-seems like an unrelated change.
-
-Checking RXRDY before TXCOMP|NACK seems about equal, but what do I know?
-
-But the "problem" is gone of course, no flood of messages, but I can't tell
-if this is just papering over or a fix.
-
-Cheers,
-Peter
+-- 
+Shannon
