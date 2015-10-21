@@ -1,40 +1,43 @@
-From: info@lategoodbye.de (Stefan Wahren)
-Date: Wed, 21 Oct 2015 18:16:31 +0200
-Subject: [PATCH RFT] ARM: bcm2835: enable all bcm2835-relevant in defconfig
-In-Reply-To: <5626F934.6090706@wwwdotorg.org>
-References: <1444942061-23085-1-git-send-email-stefan.wahren@i2se.com>
- <5626F934.6090706@wwwdotorg.org>
-Message-ID: <5627BA5F.104@lategoodbye.de>
+From: jenskuske@gmail.com (Jens Kuske)
+Date: Wed, 21 Oct 2015 18:20:26 +0200
+Subject: [PATCH 4/6] reset: sunxi: Add compatible for Allwinner H3 bus resets
+Message-ID: <1445444428-4652-1-git-send-email-jenskuske@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 21.10.2015 um 04:32 schrieb Stephen Warren:
-> On 10/15/2015 02:47 PM, Stefan Wahren wrote:
->> Rebuild bcm2835_defconfig using "make bcm2835_defconfig;
->> make savedefconfig", and add the following features:
->>
->> * Enable all bcm2835-relevant drivers (MBOX, WDT, DMA,
->>    PWM, SND)
->> * Re-enable some features to keep the current settings
->>    (stackprotector, LED GPIO, LED triggers)
->
-> Can you explain that second bullet a bit more?
+Adding a new compatible allows us to define SoC specific behaviour
+if necessary, for example forcing a particular device out of reset
+even if no driver is actually using it.
 
-Yes, the last update to bcm2835_defconfig was on 25th September 2014.
-So a little bit changed in the configs like renaming of options.
-After saving the defconfig i noticed that we "lost" 2 features with
-the new defconfig:
+Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+---
+ Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt | 1 +
+ drivers/reset/reset-sunxi.c                                             | 1 +
+ 2 files changed, 2 insertions(+)
 
-* CONFIG_CC_STACKPROTECTOR because of renaming to 
-CONFIG_CC_STACKPROTECTOR_REGULAR
-
-* CONFIG_LEDS_TRIGGER_HEARTBEAT because of the following new dependencies
-   * CONFIG_NEW_LEDS
-   * CONFIG_LEDS_CLASS
-   * CONFIG_LEDS_TRIGGERS
-
-Do you want 2 separate patches (first update with re-enable and second 
-with new bcm2835 stuff)?
-
-Best regards
-Stefan
+diff --git a/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt b/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
+index c8f7757..e11f023 100644
+--- a/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
++++ b/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
+@@ -8,6 +8,7 @@ Required properties:
+ - compatible: Should be one of the following:
+   "allwinner,sun6i-a31-ahb1-reset"
+   "allwinner,sun6i-a31-clock-reset"
++  "allwinner,sun8i-h3-bus-reset"
+ - reg: should be register base and length as documented in the
+   datasheet
+ - #reset-cells: 1, see below
+diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
+index 3d95c87..6f12b5c 100644
+--- a/drivers/reset/reset-sunxi.c
++++ b/drivers/reset/reset-sunxi.c
+@@ -124,6 +124,7 @@ err_alloc:
+  */
+ static const struct of_device_id sunxi_early_reset_dt_ids[] __initdata = {
+ 	{ .compatible = "allwinner,sun6i-a31-ahb1-reset", },
++	{ .compatible = "allwinner,sun8i-h3-bus-reset", },
+ 	{ /* sentinel */ },
+ };
+ 
+-- 
+2.6.1
