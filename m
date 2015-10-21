@@ -1,50 +1,47 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 21 Oct 2015 15:27:39 +0100
-Subject: pmu: armv7_a9_pmu_init() fails with -ENXIO
-In-Reply-To: <56279753.5000107@free.fr>
-References: <56278C91.8050605@free.fr> <56279753.5000107@free.fr>
-Message-ID: <5627A0DB.5030304@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 21 Oct 2015 16:29:00 +0200
+Subject: [linux-sunxi] [PATCH v2 1/1] dts: sun6i: yones toptech bs1078
+ v2: Add AXP221 support to dts
+In-Reply-To: <CAGb2v65S9R=sLVRBdUKFUDXCbEFJWF9Sp8Yw__+Q6ncpgPp7kg@mail.gmail.com>
+References: <1445191673-8869-1-git-send-email-lyu@micile.com>
+ <CAGb2v65S9R=sLVRBdUKFUDXCbEFJWF9Sp8Yw__+Q6ncpgPp7kg@mail.gmail.com>
+Message-ID: <20151021142900.GD10947@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Chen-Yu,
 
+On Mon, Oct 19, 2015 at 05:59:20PM +0800, Chen-Yu Tsai wrote:
+> > +/* Voltage source for I2C pullup resistors for I2C Bus 0 */
+> > +&reg_dldo3 {
+> > +       regulator-always-on;
+> > +       regulator-min-microvolt = <2800000>;
+> > +       regulator-max-microvolt = <2800000>;
+> > +       regulator-name = "vcc-csi";
+> 
+> This should probably be named "vddio-csi".
+> 
+> I think Maxime and Hans were still debating whether the camera VDDIO
+> regulator should be defined independently as "always-on", instead of
+> having the I2C subsystem do some kind of power sequencing.
+> 
+> I wonder if the power domain stuff would work for this.
 
-On 21/10/15 14:46, Mason wrote:
+Probably not, power domains are more targeted for in-SoC supplies
+(like when you can gate the power controler by controler).
 
-[...]
+This is for external signals.
 
->
-> I also looked more closely at of_pmu_irq_cfg()
->
-> platform_get_irq(pdev, 0); returns -6
-
-Won't it return here ? Though you must first check why is that returning
-error.
-
-         irq = platform_get_irq(pdev, 0);
-         if (irq >= 0 && irq_is_percpu(irq))
-                 return 0;
-
-> pdev->num_resources is 0 therefore...
->
-> 	if (i == pdev->num_resources) {
-> 		pmu->irq_affinity = irqs;
-> 	} else {
-> 		kfree(irqs);
-> 		cpumask_setall(&pmu->supported_cpus);
-> 	}
->
-> pmu->irq_affinity gets set to an invalid pointer (0x00000010)
-> and cpumask_setall() is not called.
->
-> Something is not working as expected, right?
->
-
-So you won't execute this in that case.
-
-Sorry if I missed something, I briefly checked v4.2
-Code have been changed and even moved since then.
+Maxime
 
 -- 
-Regards,
-Sudeep
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151021/6a75fa3c/attachment.sig>
