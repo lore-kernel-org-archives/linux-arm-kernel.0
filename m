@@ -1,88 +1,50 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 21 Oct 2015 10:50:09 +0200
-Subject: [GIT PULL] at91: dt for 4.4 #2
-In-Reply-To: <20151019193158.GA20739@piout.net>
-References: <20151019193158.GA20739@piout.net>
-Message-ID: <20151021085009.GM3421@piout.net>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 21 Oct 2015 09:50:17 +0100
+Subject: [PATCHv4 23/24] arm64: Expose feature registers by emulating MRS
+In-Reply-To: <1445261101-22344-24-git-send-email-suzuki.poulose@arm.com>
+References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
+ <1445261101-22344-24-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151021085017.GF4801@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Oct 19, 2015 at 02:25:00PM +0100, Suzuki K. Poulose wrote:
+> This patch adds the hook for emulating MRS instruction to
+> export the 'user visible' value of supported system registers.
+> We emulate only the following id space for system registers:
+> 	Op0=0, Op1=0, CRn=0.
 
-Actually, this built on my machine because one of the headers was left
-unversionned in my tree. The last patch depends on the MFD tree, I'm not
-sure how you want to handle that. I can as well drop the last patch and
-resend a PR.
+[...]
 
-On 19/10/2015 at 21:31:58 +0200, Alexandre Belloni wrote :
-> Arnd, Olof, Kevin,
-> 
-> A few more DT changes for AT91.
-> Small fixes and huge addition to the sama5d2 and its evaluation board.
-> There may be a simple add/add conflict with Linus Walleij pinctrl tree
-> that should be an issue.
-> 
-> Thanks, best regards,
-> 
-> The following changes since commit a9b672a636a599cc052afcb6837e3177dc53c143:
-> 
->   ARM: at91/dt: sama5d2 Xplained: add device pin muxing (2015-09-23 16:26:47 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-dt2
-> 
-> for you to fetch changes up to 0bddbefb9e731a6090350508f139b9ac3590303c:
-> 
->   ARM: at91/dt: sama5d2 Xplained: add several devices (2015-10-19 21:22:32 +0200)
-> 
-> ----------------------------------------------------------------
-> Second batch of DT changes for 4.4:
-> - some DT fixes: pullups, disabled property
-> - the PMC is now a syscon
-> - great improvement of sama5d2 support
-> 
-> ----------------------------------------------------------------
-> Alexandre Belloni (1):
->       ARM: at91/dt: use syscon for PMC
-> 
-> Gregory CLEMENT (1):
->       ARM: at91/dt: sama5d4: add the macb1 node
-> 
-> Ludovic Desroches (2):
->       ARM: at91/dt: sama5d2: add missing devices
->       ARM: at91/dt: sama5d2 Xplained: add several devices
-> 
-> Michael Opdenacker (1):
->       ARM: at91/dt: fix "disabled" property on at91rm9200
-> 
-> Sylvain Rochet (1):
->       ARM: at91/dt: add pullup on mmc2 data signals
-> 
-> Wenyou Yang (1):
->       ARM: at91/dt: sama5d2_xplained: add regulator nodes
-> 
->  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 163 ++++++++++++++++++++++++++++
->  arch/arm/boot/dts/at91rm9200.dtsi           |   8 +-
->  arch/arm/boot/dts/at91sam9260.dtsi          |   2 +-
->  arch/arm/boot/dts/at91sam9261.dtsi          |   2 +-
->  arch/arm/boot/dts/at91sam9263.dtsi          |   2 +-
->  arch/arm/boot/dts/at91sam9g45.dtsi          |   2 +-
->  arch/arm/boot/dts/at91sam9n12.dtsi          |   2 +-
->  arch/arm/boot/dts/at91sam9rl.dtsi           |   2 +-
->  arch/arm/boot/dts/at91sam9x5.dtsi           |   2 +-
->  arch/arm/boot/dts/sama5d2.dtsi              | 154 +++++++++++++++++++++++++-
->  arch/arm/boot/dts/sama5d3.dtsi              |   2 +-
->  arch/arm/boot/dts/sama5d3_mci2.dtsi         |   6 +-
->  arch/arm/boot/dts/sama5d4.dtsi              |  32 +++++-
->  13 files changed, 360 insertions(+), 19 deletions(-)
-> 
-> -- 
-> Alexandre Belloni, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 896a821..c44da31 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+[...]
+
+> @@ -908,3 +910,106 @@ void __init setup_cpu_features(void)
+>  		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
+>  			L1_CACHE_BYTES, cls);
+>  }
+> +
+> +/*
+> + * We emulate only the following system register space.
+> + * 	Op0 = 0x3, CRn = 0x0, Op1 = 0x0, CRm = [0 - 7]
+
+nit: ^ whitespace, no need to fix unless respinning the series
+
+[...]
+
+> +/*
+> + * With CRm = 0, id should be one of :
+> + *	MIDR_EL1
+> + *	MPIDR_EL1
+> + *  	REVIDR_EL1
+
+nit: ^ whitespace
+
+[...]
+
+Cheers
+---Dave
