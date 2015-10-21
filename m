@@ -1,79 +1,96 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 21 Oct 2015 09:35:46 +0800
-Subject: [PATCH] EDAC: Add AMD Seattle SoC EDAC
-In-Reply-To: <5626B199.4050209@amd.com>
-References: <1445282597-18999-1-git-send-email-brijeshkumar.singh@amd.com>
- <5625A528.1040803@huawei.com> <5626B199.4050209@amd.com>
-Message-ID: <5626EBF2.50107@huawei.com>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Wed, 21 Oct 2015 09:41:09 +0800
+Subject: [PATCH 2/4] thermal: rockchip: ensure the otp state before
+ resetting the controller
+In-Reply-To: <CAD=FV=WHvwNGdRZ4Yjwk0zB00o2gFHXLfbAYHai1kM_oBAR4_g@mail.gmail.com>
+References: <1445332264-6054-1-git-send-email-wxt@rock-chips.com>
+ <1445332264-6054-3-git-send-email-wxt@rock-chips.com>
+ <CAD=FV=WHvwNGdRZ4Yjwk0zB00o2gFHXLfbAYHai1kM_oBAR4_g@mail.gmail.com>
+Message-ID: <5626ED35.3010403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/10/21 5:26, Brijesh Singh wrote:
-> Hi Hanjun,
+Doug,
+
+? 2015?10?20? 23:52, Doug Anderson ??:
+> Caesar,
 >
-> Thanks for review.
->
-> -Brijesh 
-> On 10/19/2015 09:21 PM, Hanjun Guo wrote:
->> Hi Brijesh,
+> On Tue, Oct 20, 2015 at 2:11 AM, Caesar Wang <wxt@rock-chips.com> wrote:
+>> We need the OTP pin is gpio state before resetting the TSADC controller,
+>> since the tshut polarity will generate a high signal.
 >>
->> On 2015/10/20 3:23, Brijesh Singh wrote:
-[...]
->> The codes above are common for all A57 architectures, other A57 SoCs will use the same
->> code for L1/L2 caches error report, can we put those codes in common place and reused
->> for all A57 architectures?
+>> Says:
+>> The TSHUT temperature is setting more than 80 degree, the default tshut
+>> polarity is high.
 >>
-> Code is generic to A57 and I will follow Mark Rutland suggestion to make it cortex_a57_edac. If you have something else in mind then please let me know.
-
-Sorry, I missed Mark's comments before I sent my email, I'm fine with
-the file name suggested.
-
->
->>> +
->>> +static void cpu_check_errors(void *args)
->>> +{
->>> +	struct edac_device_ctl_info *edev_ctl = args;
->>> +
->>> +	check_cpumerrsr_el1_error(edev_ctl);
->>> +	check_l2merrsr_el1_error(edev_ctl);
->>> +}
->>> +
->>> +static void edac_check_errors(struct edac_device_ctl_info *edev_ctl)
->>> +{
->>> +	int cpu;
->>> +
->>> +	/* read L1 and L2 memory error syndrome register on possible CPU's */
->>> +	for_each_possible_cpu(cpu)
->>> +		smp_call_function_single(cpu, cpu_check_errors, edev_ctl, 0);
->> Seems that error syndrome registers for L2 cache are cluster lever (each cluster share the
->> L2 cache, you can refer to ARM doc: DDI0488D, Cortex-A57 Technical Reference Manual),
->> so for L2 cache, we need to check the error at cluster lever not the cpu core lever.
+>> If T > 80C, the OTP output the High Signal.
+>> If T < 80C, the OTP output the Low Signal.
 >>
-> Yes L1 seems to be CPU specific and L2 is shared in a cluster. So I am thinking of making the following changes in this function.
+>> On the moment, the TSADC controller is reset, the tshut polarity will be
+>> low in a short period of time.
+>> So:
+>>
+>> If T < 80C, the OTP output the High Signal.
+>> If T > 80C, the OTP output the Low Signal.
+>>
+>> In some cases, the OTP pin is connected to the PMIC, maybe the PMIC can
+>> accept the reset response time to avoid this issue.
+>> In other words, the system will be always reboot if we make the OTP pin
+>> is connected the others IC to control the power.
+>>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>> ---
+>>
+>>   drivers/thermal/rockchip_thermal.c | 32 ++++++++++++++++++++++++++++++++
+>>   1 file changed, 32 insertions(+)
+> I think you could do this with no code changes to the thermal driver
+> if we simply convince Linus W. to apply a change that I posted up just
+> about a year ago.  See:
 >
-> static void edac_check_errors(struct edac_device_ctl_info *edev_ctl)
-> {
->         int cpu;
->         struct cpumask cluster_mask, old_mask;
+> https://patchwork.kernel.org/patch/5055741/
 >
->         cpumask_clear(&cluster_mask);
->         cpumask_clear(&old_mask);
+> In v1 of that patch at <https://patchwork.kernel.org/patch/5049041/>
+> Linus said he liked it "A lot" and was willing to merge it with Greg
+> KH's Ack and with a small comment fix.  I obtained the Ack and fixed
+> the comment, but then the patch didn't end up being needed for me and
+> so I never bumped it and it got lost...
 >
->         for_each_possible_cpu(cpu) {
->                 smp_call_function_single(cpu, check_cpumerrsr_el1_error, 
->                                          edev_ctl, 0); 
->                 cpumask_copy(&cluster_mask, topology_core_cpumask(cpu));
->                 if (cpumask_equal(&cluster_mask, &old_mask))
->                         continue;
->                 cpumask_copy(&old_mask, &cluster_mask);
->                 smp_call_function_any(&cluster_mask, check_l2merrsr_el1_error,
->                                       edev_ctl, 0); 
->         }   
-> }
+> Maybe you could re-test that patch?  It looks like it has a merge
+> conflict with current linuxnext but it looks trivial to resolve.  You
+> could re-post my patch or I could repost it and you could add your
+> Tested-by.
 >
-> Read L1 on each CPU and L2 once in a cluster. Does this address your feedback ?
+> You'd still want to have a bindings change to describe "init", but at
+> least you shouldn't need any code changes.
 
-Yes, at least it will work as expected :)
+Okay, https://patchwork.kernel.org/patch/5055741/ that's working for me.
+Fell free add my  test tag if you resend the patch. (Tested-by: Caesar 
+Wang <wxt@rock-chips.com>)
 
-Thanks
-Hanjun
+
+1634ed8 FROMLIST: drivers/pinctrl: Add the concept of an "init" state
+15158f8 FROMLIST: ARM: dts: rockchip: Add the OTP gpio pinctrl
+e7d3b88 FROMLIST: thermal: rockchip: change the TSHUT default state
+184b154 FROMLIST: thermal: rockchip: ensure the otp state before 
+resetting the controller
+9edbe15 FROMLIST: dt-bindings: Sync the dts to this document
+
+Meanwhile, I change the dts as follows.
+
+-               pinctrl-names = "default", "otp_out";
++               pinctrl-names = "init", "default";
+                 pinctrl-0 = <&otp_gpio>;
+                 pinctrl-1 = <&otp_out>;
+
+>
+> -Doug
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+
+
+-- 
+Thanks,
+Caesar
