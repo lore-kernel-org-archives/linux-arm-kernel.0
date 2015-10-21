@@ -1,93 +1,228 @@
 From: jenskuske@gmail.com (Jens Kuske)
-Date: Wed, 21 Oct 2015 18:13:21 +0200
-Subject: [PATCH 0/6] ARM: sunxi: Introduce Allwinner H3 support
-Message-ID: <1445444007-4260-1-git-send-email-jenskuske@gmail.com>
+Date: Wed, 21 Oct 2015 18:13:23 +0200
+Subject: [PATCH 2/6] clk: sunxi: Add H3 clocks support
+In-Reply-To: <1445444007-4260-1-git-send-email-jenskuske@gmail.com>
+References: <1445444007-4260-1-git-send-email-jenskuske@gmail.com>
+Message-ID: <1445444007-4260-3-git-send-email-jenskuske@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The H3 clock control unit is similar to the those of other sun8i family
+members like the A23.
 
-This is v3 of my patch series introducing basic kernel support for Allwinner's
-H3 SoC. It mainly adds basic clocks and pinctrl. It also adds interrupts,
-timers, watchdog, RTC, dmaengine, MMC and UARTs, which are mostly compatible
-to those in earlier SoCs like A23 and A31, and can simply be reused.
+It adds a new bus gates clock similar to the simple gates, but with a
+different parent clock for each single gate.
+Some of the gates use the new AHB2 clock as parent, whose clock source
+is muxable between AHB1 and PLL6/2. The documentation isn't totally clear
+about which devices belong to AHB2 now, especially USB EHIC/OHIC, so it
+is mostly based on Allwinner kernel source code.
 
-These patches are based on Maxime's sunxi/for-next branch from
-git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git
-
-
-Patch 1 improves the sunxi divs clock to read the name of the base factor clock
-from devicetree instead of hardcoding it, which allows us to reuse sun6i-pll6
-for our pll8.
-
-Patch 2 adds support for the basic clocks.
-
-Patch 3 adds the pin sets for the H3 main PIO.
-
-Patch 4 adds a new compatible for the H3 reset controller
-
-Patch 5 adds the DTSI for the H3.
-
-Patch 6 adds a DTS for the Orange Pi Plus SBC, which these patches
-were developed and tested with.
-
-
-Changes since v2:
-- add mbus clock
-- add Maxime's suggestion to take the substring up to the first "_" as name
-  for the divs base clock
-- use A31 pll6 for H3 pll6
-- use a clock similar to the new simple gates for H3 bus gates
-- drop the pinctrl-as-module patch since pinctrl and gpio don't seem to be
-  ready for removable drivers
-- documentation and machine support are merged already
-  
-Changes since v1:
-- Update sunxi README in Documentation
-- Add the multiple parents gates and use them for bus-gates instead of
-  ahb1, ahb2, apb1 and apb2 gates
-- Merge the pll8 clock with sun6i pll6
-- Merge the ahb12, apb1 and apb2 resets to bus-resets with own compatible
-- Add sun6i_timer_init to sun8i machine
-- Remove the single SoC names from machine definition, its sun8i family
-- Make the pinctrl driver tristate and put its Kconfig entry in the right order
-- Rename pinctrl "scr" to "sim" and clock "sim" to "scr" to match user manual
-- Remove the address paragraph from GPL in dts and dtsi
-- Some style cleanup and line wrapping in dtsi
-- Add ARM architected timers
-- dmaengine isn't included anymore, it is merged already
-
-Best Regards,
-Jens
-
-
-Jens Kuske (6):
-  clk: sunxi: Let divs clocks read the base factor clock name from
-    devicetree
-  clk: sunxi: Add H3 clocks support
-  pinctrl: sunxi: Add H3 PIO controller support
-  reset: sunxi: Add compatible for Allwinner H3 bus resets
-  ARM: dts: sunxi: Add Allwinner H3 DTSI
-  ARM: dts: sun8i: Add Orange Pi Plus support
-
- Documentation/devicetree/bindings/clock/sunxi.txt  |   2 +
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
- .../bindings/reset/allwinner,sunxi-clock-reset.txt |   1 +
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts       |  77 +++
- arch/arm/boot/dts/sun8i-h3.dtsi                    | 499 ++++++++++++++++++++
- drivers/clk/sunxi/Makefile                         |   1 +
- drivers/clk/sunxi/clk-bus-gates.c                  | 105 +++++
- drivers/clk/sunxi/clk-sunxi.c                      |  47 +-
- drivers/pinctrl/sunxi/Kconfig                      |   4 +
- drivers/pinctrl/sunxi/Makefile                     |   1 +
- drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c           | 516 +++++++++++++++++++++
- drivers/reset/reset-sunxi.c                        |   1 +
- 13 files changed, 1245 insertions(+), 13 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
- create mode 100644 arch/arm/boot/dts/sun8i-h3.dtsi
+Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+---
+ Documentation/devicetree/bindings/clock/sunxi.txt |   2 +
+ drivers/clk/sunxi/Makefile                        |   1 +
+ drivers/clk/sunxi/clk-bus-gates.c                 | 105 ++++++++++++++++++++++
+ drivers/clk/sunxi/clk-sunxi.c                     |  12 ++-
+ 4 files changed, 117 insertions(+), 3 deletions(-)
  create mode 100644 drivers/clk/sunxi/clk-bus-gates.c
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
 
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index 8a47b77..d303dec 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -28,6 +28,7 @@ Required properties:
+ 	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
+ 	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
+ 	"allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
++	"allwinner,sun8i-h3-ahb2-clk" - for the AHB2 clock on H3
+ 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+ 	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
+ 	"allwinner,sun9i-a80-ahb0-gates-clk" - for the AHB0 gates on A80
+@@ -55,6 +56,7 @@ Required properties:
+ 	"allwinner,sun9i-a80-apb1-gates-clk" - for the APB1 gates on A80
+ 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+ 	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
++	"allwinner,sun8i-h3-bus-gates-clk" - for the bus gates on H3
+ 	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
+ 	"allwinner,sun4i-a10-mmc-clk" - for the MMC clock
+ 	"allwinner,sun9i-a80-mmc-clk" - for mmc module clocks on A80
+diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+index f5a35b8..ecaff7f 100644
+--- a/drivers/clk/sunxi/Makefile
++++ b/drivers/clk/sunxi/Makefile
+@@ -5,6 +5,7 @@
+ obj-y += clk-sunxi.o clk-factors.o
+ obj-y += clk-a10-hosc.o
+ obj-y += clk-a20-gmac.o
++obj-y += clk-bus-gates.o
+ obj-y += clk-mod0.o
+ obj-y += clk-simple-gates.o
+ obj-y += clk-sun8i-mbus.o
+diff --git a/drivers/clk/sunxi/clk-bus-gates.c b/drivers/clk/sunxi/clk-bus-gates.c
+new file mode 100644
+index 0000000..5bba0b9
+--- /dev/null
++++ b/drivers/clk/sunxi/clk-bus-gates.c
+@@ -0,0 +1,105 @@
++/*
++ * Copyright (C) 2015 Jens Kuske <jenskuske@gmail.com>
++ *
++ * Based on clk-simple-gates.c, which is:
++ * Copyright 2015 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++
++static DEFINE_SPINLOCK(gates_lock);
++
++static void __init sunxi_bus_gates_setup(struct device_node *node,
++					 const int protected[],
++					 int nprotected)
++{
++	struct clk_onecell_data *clk_data;
++	const char *clk_parent, *clk_name;
++	struct property *prop;
++	struct resource res;
++	void __iomem *clk_reg;
++	void __iomem *reg;
++	const __be32 *p;
++	int number, i = 0, j;
++	u8 clk_bit;
++	u32 index;
++
++	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
++	if (IS_ERR(reg))
++		return;
++
++	clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
++	if (!clk_data)
++		goto err_unmap;
++
++	number = of_property_count_u32_elems(node, "clock-indices");
++	of_property_read_u32_index(node, "clock-indices", number - 1, &number);
++
++	clk_data->clks = kcalloc(number + 1, sizeof(struct clk *), GFP_KERNEL);
++	if (!clk_data->clks)
++		goto err_free_data;
++
++	of_property_for_each_u32(node, "clock-indices", prop, p, index) {
++		of_property_read_string_index(node, "clock-output-names",
++					      i, &clk_name);
++
++		clk_parent = of_clk_get_parent_name(node, i);
++
++		clk_reg = reg + 4 * (index / 32);
++		clk_bit = index % 32;
++
++		clk_data->clks[index] = clk_register_gate(NULL, clk_name,
++							  clk_parent, 0,
++							  clk_reg,
++							  clk_bit,
++							  0, &gates_lock);
++		i++;
++
++		if (IS_ERR(clk_data->clks[index])) {
++			WARN_ON(true);
++			continue;
++		}
++
++		for (j = 0; j < nprotected; j++)
++			if (protected[j] == index)
++				clk_prepare_enable(clk_data->clks[index]);
++
++	}
++
++	clk_data->clk_num = number + 1;
++	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
++
++	return;
++
++err_free_data:
++	kfree(clk_data);
++err_unmap:
++	iounmap(reg);
++	of_address_to_resource(node, 0, &res);
++	release_mem_region(res.start, resource_size(&res));
++}
++
++static void __init sunxi_bus_gates_init(struct device_node *node)
++{
++	sunxi_bus_gates_setup(node, NULL, 0);
++}
++
++CLK_OF_DECLARE(sun8i_h3_bus_gates, "allwinner,sun8i-h3-bus-gates-clk",
++	       sunxi_bus_gates_init);
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 7c4aee0..6293c65 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -769,6 +769,10 @@ static const struct mux_data sun6i_a31_ahb1_mux_data __initconst = {
+ 	.shift = 12,
+ };
+ 
++static const struct mux_data sun8i_h3_ahb2_mux_data __initconst = {
++	.shift = 0,
++};
++
+ static void __init sunxi_mux_clk_setup(struct device_node *node,
+ 				       struct mux_data *data)
+ {
+@@ -945,10 +949,11 @@ static const struct divs_data pll6_divs_data __initconst = {
+ 
+ static const struct divs_data sun6i_a31_pll6_divs_data __initconst = {
+ 	.factors = &sun6i_a31_pll6_data,
+-	.ndivs = 2,
++	.ndivs = 3,
+ 	.div = {
+ 		{ .fixed = 2 }, /* normal output */
+ 		{ .self = 1 }, /* base factor clock, 2x */
++		{ .fixed = 4 }, /* divided output, /2 */
+ 	}
+ };
+ 
+@@ -1000,9 +1005,8 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+ 
+ 		for (i = 0; i < SUNXI_DIVS_BASE_NAME_MAX_LEN - 1 &&
+ 						clk_name[i] != '_' &&
+-						clk_name[i] != '\0'; i++) {
++						clk_name[i] != '\0'; i++)
+ 			base_name[i] = clk_name[i];
+-		}
+ 
+ 		base_name[i] = '\0';
+ 		factors.name = base_name;
+@@ -1147,6 +1151,7 @@ static const struct of_device_id clk_divs_match[] __initconst = {
+ static const struct of_device_id clk_mux_match[] __initconst = {
+ 	{.compatible = "allwinner,sun4i-a10-cpu-clk", .data = &sun4i_cpu_mux_data,},
+ 	{.compatible = "allwinner,sun6i-a31-ahb1-mux-clk", .data = &sun6i_a31_ahb1_mux_data,},
++	{.compatible = "allwinner,sun8i-h3-ahb2-clk", .data = &sun8i_h3_ahb2_mux_data,},
+ 	{}
+ };
+ 
+@@ -1229,6 +1234,7 @@ CLK_OF_DECLARE(sun6i_a31_clk_init, "allwinner,sun6i-a31", sun6i_init_clocks);
+ CLK_OF_DECLARE(sun6i_a31s_clk_init, "allwinner,sun6i-a31s", sun6i_init_clocks);
+ CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
+ CLK_OF_DECLARE(sun8i_a33_clk_init, "allwinner,sun8i-a33", sun6i_init_clocks);
++CLK_OF_DECLARE(sun8i_h3_clk_init, "allwinner,sun8i-h3", sun6i_init_clocks);
+ 
+ static void __init sun9i_init_clocks(struct device_node *node)
+ {
 -- 
 2.6.1
