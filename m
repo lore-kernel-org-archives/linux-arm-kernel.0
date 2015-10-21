@@ -1,35 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Oct 2015 17:02:20 +0200
-Subject: [GIT PULL] two omap fixes for v4.3-rc cycle
-In-Reply-To: <20151020193401.GM3078@atomide.com>
-References: <20151020193401.GM3078@atomide.com>
-Message-ID: <4037170.1cl4xHYRla@wuerfel>
+Date: Wed, 21 Oct 2015 17:03:03 +0200
+Subject: [GIT PULL] Samsung 2nd fixes for v4.3
+In-Reply-To: <5621889A.3020301@kernel.org>
+References: <5621889A.3020301@kernel.org>
+Message-ID: <60074663.p8MLucPXG0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 October 2015 12:34:01 Tony Lindgren wrote:
-> The following changes since commit d8e1f5ed11a39a68da00f05000466c4f6db4456e:
+On Saturday 17 October 2015 08:30:34 Kukjin Kim wrote:
+> Hello Arnd, Olof, Kevin
 > 
->   Documentation: ARM: List new omap MMC requirements (2015-10-12 16:23:34 -0700)
+> Here is 2nd Samsung fixes for v4.3 and it is including fix of exynos
+> thermal driver with exynos thermal driver maintainer(Lukasz)'s ack.
+> 
+> Please pull.
+> 
+> Thanks,
+> Kukjin
+> 
+> 
+> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+> 
+>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/fixes-rc6
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-fixes-2
 > 
-> for you to fetch changes up to 57df5380853460bc66b59a46273ce113c923d39c:
-> 
->   ARM: OMAP2+: Fix imprecise external abort caused by bogus SRAM init (2015-10-19 08:55:46 -0700)
-> 
-> ----------------------------------------------------------------
-> Fixes for omaps for v4.3-rc cycle:
-> 
-> - Fix oops with LPAE and moew than 2GB of memory by enabling
->   ZONE_DMA for LPAE. Probably no need for stable on this one as we
->   only recently ran into this with the mainline kernel
-> 
-> - Fix imprecise external abort caused by bogus SRAM init. This affects
->   dm814x recently merged, so no need for stable on this one AFAIK
 
-Applied to fixes, thanks!
+Merged into fixes, thanks!
 
 	Arnd
