@@ -1,43 +1,43 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 21 Oct 2015 11:25:54 +0100
-Subject: [PATCH 10/19] ARM: dts: at91: replace gpio-key,wakeup with
- wakeup-source property
-In-Reply-To: <5627672D.60108@atmel.com>
-References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
- <1445422216-29375-11-git-send-email-sudeep.holla@arm.com>
- <5627672D.60108@atmel.com>
-Message-ID: <56276832.9040006@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 21 Oct 2015 11:28:06 +0100
+Subject: [UPDATED] [PATCHv4 00/24] arm64: Consolidate CPU feature handling
+In-Reply-To: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
+References: <1445261101-22344-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151021102806.GH4801@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Oct 19, 2015 at 02:24:37PM +0100, Suzuki K. Poulose wrote:
+> Resending the series with fixed mail ids.
+> 
+> ---
+> This series introduces a new infrastructure to keep track of the CPU
+> feature registers on ARMv8-A for arm64 kernel. It provides the safe value
+> of a CPU feature register across all the CPUs on (a heterogeneous) system.
+> The infrastructure checks the individual CPU feature registers as they are
+> brought online (during system boot up) and udpates the status of each of
+> the feature bits across the system. Once all the active CPUs are brought
+> online (i.e, smp_cpus_done() ), the system can compute a reliable set of
+> capabilities (arm64_features CPU capability and ELF HWCAP). This allows
+> system to operate safely on CPUs with differing capabilities. Any new CPU
+> brought up(hotplugged in) should have all the established capabilities,
+> failing which could be disastrous. (e.g, alternative code patched in for
+> a feature avaialble on the system). We add a hotplug notifier to check if
+> the new CPU is missing any of the advertised capabilities and prevents it
+> from turning online if it is.
 
+[...]
 
-On 21/10/15 11:21, Nicolas Ferre wrote:
-> Le 21/10/2015 12:10, Sudeep Holla a ?crit :
->> Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
->> check for/support the legacy "gpio-key,wakeup" boolean property to
->> enable gpio buttons as wakeup source, "wakeup-source" is the new
->> standard binding.
->>
->> This patch replaces the legacy "gpio-key,wakeup" with the unified
->> "wakeup-source" property in order to avoid any futher copy-paste
->> duplication.
->>
->> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->
-> I'm not against this if the whole series goes further.
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->
+For the series,
 
-Thanks !
+Tested-by: Dave Martin <Dave.Martin@arm.com>
 
-> I suspect that we would need to take this patch with us on the AT91
-> branches that would go to arm-soc. Is it the intentions?
->
+(i.e., the system boots and MRS from userspace seems to do the correct
+thing -- I haven't stressed the series.)
 
-Yes that was my intention for splitting the patches per SoC group.
-Many SoC maintainers prefer that.
+I don't propose to review the patch content in detail since other
+people have already looked at it, the the code looks reasonable and
+seems to work but I'll let you know if I spot anything.
 
--- 
-Regards,
-Sudeep
+Cheers
+---Dave
