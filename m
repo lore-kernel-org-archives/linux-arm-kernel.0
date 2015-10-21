@@ -1,151 +1,58 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 21 Oct 2015 14:00:52 +0100
-Subject: [PATCH v4 1/3] xen/arm: Enable cpu_hotplug.c
-In-Reply-To: <1445428430-21567-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1510211251370.27957@kaball.uk.xensource.com>
- <1445428430-21567-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <alpine.DEB.2.02.1510211358250.27957@kaball.uk.xensource.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Wed, 21 Oct 2015 09:02:43 -0400
+Subject: Which is better to specify console, "console= " or "stdout-path" ?
+In-Reply-To: <56278AFD.8000505@arm.com>
+References: <CAK7LNAS9uBJ1cVmGBKae3W0tk8Siu1yeXOaeN6Kz11cksMqtsg@mail.gmail.com>
+ <562753A6.3070107@arm.com> <56278911.9050704@hurleysoftware.com>
+ <56278AFD.8000505@arm.com>
+Message-ID: <56278CF3.9010400@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC'ing few more x86 people as it contains a few x86 changes.
+On 10/21/2015 08:54 AM, Sudeep Holla wrote:
+> 
+> 
+> On 21/10/15 13:46, Peter Hurley wrote:
+>> On 10/21/2015 04:58 AM, Sudeep Holla wrote:
+>>> On 21/10/15 06:09, Masahiro Yamada wrote:
+>>>> I think there exist two ways to specify the console port and baudrate.
+>>>>
+>>>>
+>>>> [1] Specify console in bootargs
+>>>>
+>>>>     chosen {
+>>>>           bootargs = "console=ttyS0,115200";
+>>>>     };
+>>>>
+>>>>
+>>>> [2] Specify stdout-path
+>>>>
+>>>>      chosen {
+>>>>            stdout-path = "serial0:115200n8";
+>>>
+>>> This will work for even early/boot console, so this is better than
+>>> option [1]
+>>
+>> Be aware that options specified via /chosen/stdout-path are
+>> currently ignored by earlycon. There were some hiccups getting the
+>> initial support upstream; when 4.4 hits mainline, I'll resubmit
+>> my series that implements the of_serial i/o properties and
+>> options passthrough to earlycon setup.
+>>
+> 
+> Yes I am aware of that.
 
-If you are OK with this, I'll go ahead and apply the series to
-xentip/for-linus-4.4.
+The others to which my email was addressed might not know that.
 
-On Wed, 21 Oct 2015, Stefano Stabellini wrote:
-> Build cpu_hotplug for ARM and ARM64 guests.
-> 
-> Rename arch_(un)register_cpu to xen_(un)register_cpu and provide an
-> empty implementation on ARM and ARM64. On x86 just call
-> arch_(un)register_cpu as we are already doing.
-> 
-> Initialize cpu_hotplug on ARM.
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Reviewed-by: Julien Grall <julien.grall@citrix.com>
-> 
-> ---
-> 
-> Changes in v2:
-> - don't initialize if not a xen_domain() on arm
-> - protect xen_arch_(un)register_cpu with ifdef CONFIG_HOTPLUG_CPU on arm
-> ---
->  arch/arm/include/asm/xen/hypervisor.h |   10 ++++++++++
->  arch/x86/include/asm/xen/hypervisor.h |    5 +++++
->  arch/x86/xen/enlighten.c              |   15 +++++++++++++++
->  drivers/xen/Makefile                  |    2 --
->  drivers/xen/cpu_hotplug.c             |    8 ++++++--
->  5 files changed, 36 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/xen/hypervisor.h b/arch/arm/include/asm/xen/hypervisor.h
-> index 04ff8e7..9525151 100644
-> --- a/arch/arm/include/asm/xen/hypervisor.h
-> +++ b/arch/arm/include/asm/xen/hypervisor.h
-> @@ -26,4 +26,14 @@ void __init xen_early_init(void);
->  static inline void xen_early_init(void) { return; }
->  #endif
->  
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +static inline void xen_arch_register_cpu(int num)
-> +{
-> +}
-> +
-> +static inline void xen_arch_unregister_cpu(int num)
-> +{
-> +}
-> +#endif
-> +
->  #endif /* _ASM_ARM_XEN_HYPERVISOR_H */
-> diff --git a/arch/x86/include/asm/xen/hypervisor.h b/arch/x86/include/asm/xen/hypervisor.h
-> index d866959..8b2d4be 100644
-> --- a/arch/x86/include/asm/xen/hypervisor.h
-> +++ b/arch/x86/include/asm/xen/hypervisor.h
-> @@ -57,4 +57,9 @@ static inline bool xen_x2apic_para_available(void)
->  }
->  #endif
->  
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +void xen_arch_register_cpu(int num);
-> +void xen_arch_unregister_cpu(int num);
-> +#endif
-> +
->  #endif /* _ASM_X86_XEN_HYPERVISOR_H */
-> diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
-> index 11d6fb4..ba62d8e 100644
-> --- a/arch/x86/xen/enlighten.c
-> +++ b/arch/x86/xen/enlighten.c
-> @@ -71,6 +71,7 @@
->  #include <asm/mwait.h>
->  #include <asm/pci_x86.h>
->  #include <asm/pat.h>
-> +#include <asm/cpu.h>
->  
->  #ifdef CONFIG_ACPI
->  #include <linux/acpi.h>
-> @@ -1868,3 +1869,17 @@ const struct hypervisor_x86 x86_hyper_xen = {
->  	.set_cpu_features       = xen_set_cpu_features,
->  };
->  EXPORT_SYMBOL(x86_hyper_xen);
-> +
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +void xen_arch_register_cpu(int num)
-> +{
-> +	arch_register_cpu(num);
-> +}
-> +EXPORT_SYMBOL(xen_arch_register_cpu);
-> +
-> +void xen_arch_unregister_cpu(int num)
-> +{
-> +	arch_unregister_cpu(num);
-> +}
-> +EXPORT_SYMBOL(xen_arch_unregister_cpu);
-> +#endif
-> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-> index e293bc5..aa8a7f7 100644
-> --- a/drivers/xen/Makefile
-> +++ b/drivers/xen/Makefile
-> @@ -1,6 +1,4 @@
-> -ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
->  obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
-> -endif
->  obj-$(CONFIG_X86)			+= fallback.o
->  obj-y	+= grant-table.o features.o balloon.o manage.o preempt.o
->  obj-y	+= events/
-> diff --git a/drivers/xen/cpu_hotplug.c b/drivers/xen/cpu_hotplug.c
-> index cc6513a..43de1f5 100644
-> --- a/drivers/xen/cpu_hotplug.c
-> +++ b/drivers/xen/cpu_hotplug.c
-> @@ -11,7 +11,7 @@
->  static void enable_hotplug_cpu(int cpu)
->  {
->  	if (!cpu_present(cpu))
-> -		arch_register_cpu(cpu);
-> +		xen_arch_register_cpu(cpu);
->  
->  	set_cpu_present(cpu, true);
->  }
-> @@ -19,7 +19,7 @@ static void enable_hotplug_cpu(int cpu)
->  static void disable_hotplug_cpu(int cpu)
->  {
->  	if (cpu_present(cpu))
-> -		arch_unregister_cpu(cpu);
-> +		xen_arch_unregister_cpu(cpu);
->  
->  	set_cpu_present(cpu, false);
->  }
-> @@ -102,7 +102,11 @@ static int __init setup_vcpu_hotplug_event(void)
->  	static struct notifier_block xsn_cpu = {
->  		.notifier_call = setup_cpu_watcher };
->  
-> +#ifdef CONFIG_X86
->  	if (!xen_pv_domain())
-> +#else
-> +	if (!xen_domain())
-> +#endif
->  		return -ENODEV;
->  
->  	register_xenstore_notifier(&xsn_cpu);
-> -- 
-> 1.7.10.4
-> 
+> IIUC it's in -next now and works fine for me.
+
+Well, the fix in -next doesn't actually do anything wrt earlycon baud
+rate; those changes were part of a larger series that depends on
+the fix in -next.
+
+Regards,
+Peter Hurley
+
+> But having stdout-path in the DTS won't hinder normal console in anyway.
+> So I prefer it even without the patch you are referring(to support early
+> console parsing stdout-path)
