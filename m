@@ -1,40 +1,39 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 20 Oct 2015 21:21:56 -0500
-Subject: [PATCH v3 1/2] dt-bindings: Add new SoCs to bcm4708 DT bindings
-In-Reply-To: <1444947856-26246-1-git-send-email-jonmason@broadcom.com>
-References: <1444947856-26246-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <CAL_Jsq+-0TZ-SOz+W2WxUvC+e7iYnBStFuJHR0icy9Gfiu7rzA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 20 Oct 2015 20:32:20 -0600
+Subject: [PATCH RFT] ARM: bcm2835: enable all bcm2835-relevant in defconfig
+In-Reply-To: <1444942061-23085-1-git-send-email-stefan.wahren@i2se.com>
+References: <1444942061-23085-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <5626F934.6090706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 5:24 PM, Jon Mason <jonmason@broadcom.com> wrote:
-> Add the 4708, 4709, and 53012 SoCs to the the documentation for the
-> Broadcom Northstar device tree bindings.
->
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+On 10/15/2015 02:47 PM, Stefan Wahren wrote:
+> Rebuild bcm2835_defconfig using "make bcm2835_defconfig;
+> make savedefconfig", and add the following features:
+> 
+> * Enable all bcm2835-relevant drivers (MBOX, WDT, DMA,
+>   PWM, SND)
+> * Re-enable some features to keep the current settings
+>   (stackprotector, LED GPIO, LED triggers)
 
-Acked-by: Rob Herring <robh@kernel.org>
+Can you explain that second bullet a bit more?
 
-> ---
->  Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
-> index 6b0f49f..8608a77 100644
-> --- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
-> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
-> @@ -5,4 +5,11 @@ Boards with the BCM4708 SoC shall have the following properties:
->
->  Required root node property:
->
-> +bcm4708
->  compatible = "brcm,bcm4708";
-> +
-> +bcm4709
-> +compatible = "brcm,bcm4709";
-> +
-> +bcm53012
-> +compatible = "brcm,bcm53012";
-> --
-> 1.9.1
->
+When regenerating defconfig files, it is quite common for entries not
+related to your changes to appear or disappear due to other changes in
+the kernel or some of the remove options being selected by some of the
+new options you enabled.
+
+To check what's going on, I usually do the following when editing defconfig:
+
+1) Rebuild bcm2835_defconfig without editing the .config file at all
+(make bcm2835_defconfig; make savedefconfig; mv defconfig
+arch/arm/configs/bcm2835_defconfig; git commit). This allows me to see
+all the unrelated changes that will happen simply due to rebuilding the
+defconfig. You should double-check these, but likely ignore them.
+
+2) Now edit the .config (e.g. make menuconfig) and re-generate the
+defconfig and commit. This change should now only include changes that
+are a direct result of your .config edits.
+
+To submit the patch, I often squash the two together after the separate
+validation.
