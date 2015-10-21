@@ -1,38 +1,45 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Wed, 21 Oct 2015 18:46:03 -0400
-Subject: [PATCH v4 1/2] dt-bindings: Add new SoCs to bcm4708 DT bindings
-In-Reply-To: <1445467564-30024-1-git-send-email-jonmason@broadcom.com>
-References: <1445467564-30024-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1445467564-30024-2-git-send-email-jonmason@broadcom.com>
+Date: Wed, 21 Oct 2015 18:46:02 -0400
+Subject: [PATCH v4 0/2] ARM: dts: bcm5301x: Add SVK DT files and docs
+Message-ID: <1445467564-30024-1-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the 4708, 4709, and 53012 SoCs to the the documentation for the
-Broadcom Northstar device tree bindings.
+Changes in v4:
+* Changed bootargs to stdout-path, per Sudeep Holla
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
-Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
-Acked-by: Scott Branden <sbranden@broadcom.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
+Changes in v3:
+* Updated the DT documentation compat strings
+* Modified the include files and compat strings for the SVK DT files,
+  per Hauke Mehrtens
 
-diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
-index 6b0f49f..8608a77 100644
---- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
-+++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
-@@ -5,4 +5,11 @@ Boards with the BCM4708 SoC shall have the following properties:
- 
- Required root node property:
- 
-+bcm4708
- compatible = "brcm,bcm4708";
-+
-+bcm4709
-+compatible = "brcm,bcm4709";
-+
-+bcm53012
-+compatible = "brcm,bcm53012";
+Changes in v2: 
+* Reorder the patches to add the DT binding documentation prior to the
+  new DT files 
+* Removed the DT documentation compat strings to only the SoCs, not the
+  individual boards 
+* Fixed the compat strings in the individual device tree files 
+* Added the memory node and removed the "mem=" from the bootargs 
+
+
+Add device tree files and update the documentation for Broadcom
+Northstar based SVKs.  Since the bcm5301x.dtsi already exists, all that
+is necessary is the dts files to enable the UARTs.  With these files,
+the SVKs are able to boot to shell
+
+Jon Mason (2):
+  dt-bindings: Add new SoCs to bcm4708 DT bindings
+  ARM: dts: bcm5301x: Add BCM SVK DT files
+
+ .../devicetree/bindings/arm/bcm/brcm,bcm4708.txt   |  7 +++
+ arch/arm/boot/dts/Makefile                         |  5 +-
+ arch/arm/boot/dts/bcm94708.dts                     | 56 +++++++++++++++++++
+ arch/arm/boot/dts/bcm94709.dts                     | 56 +++++++++++++++++++
+ arch/arm/boot/dts/bcm953012k.dts                   | 63 ++++++++++++++++++++++
+ 5 files changed, 186 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/bcm94708.dts
+ create mode 100644 arch/arm/boot/dts/bcm94709.dts
+ create mode 100644 arch/arm/boot/dts/bcm953012k.dts
+
 -- 
 1.9.1
