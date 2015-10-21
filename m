@@ -1,60 +1,124 @@
-From: ryan.harkin@linaro.org (Ryan Harkin)
-Date: Wed, 21 Oct 2015 12:18:09 +0100
-Subject: [PATCH] ARM64: juno: add NOR flash to device tree
-In-Reply-To: <20151019112033.GA10728@bivouac.eciton.net>
-References: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
- <561FC681.2040809@arm.com>
- <CACRpkdaSox9WKb5-dkD_zAwO9WxP6+b010p3bdxsm1LRy=WvKg@mail.gmail.com>
- <5624C31D.3070906@arm.com> <20151019102932.GB10678@leverpostej>
- <20151019112033.GA10728@bivouac.eciton.net>
-Message-ID: <CAD0U-h+cr0xpAAcCD1P8k2hUcJJL2Ga+-Grrb8WaZrgm08G2nA@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 21 Oct 2015 13:29:08 +0200
+Subject: [PATCH v4 04/22] of: add function to allow probing a device from
+ a OF node
+In-Reply-To: <1441628627-5143-5-git-send-email-tomeu.vizoso@collabora.com>
+References: <1441628627-5143-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1441628627-5143-5-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <CAMuHMdW+Uq+mu=iy852bzcvRs8E=w8-WV4oDUyTyLOaDnwrp1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 October 2015 at 12:20, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> On Mon, Oct 19, 2015 at 11:29:32AM +0100, Mark Rutland wrote:
->> > Correct, I just mentioned so that if you see/get any boot issue report
->> > with NOR flash and CPUIdle enabled, you will have the background instead
->> > of investigating the known issue again.
->>
->> Also, for non U-Boot systems I was under the impression that the flash
->> was effectively owned by EFI (for variable storage), so it doesn't seem
->> like a sensible idea to me to poke the flash behind its back in that
->> case.
->>
->> Given that, I'm not sure that the flash node should be enabled by
->> default in the DT.
->>
->> Leif?
+Hi Tomeu,
+
+On Mon, Sep 7, 2015 at 2:23 PM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+> Walks the OF tree up and finds the closest ancestor that has a struct
+> device associated with it, probing it if isn't bound to a driver yet.
 >
-> Well, given that it's a NOR device (or even two), it doesn't
-> necessarily have to be an all-or-nothing decision.
+> The above should ensure that the dependency represented by the passed OF
+> node is available, because probing a device should cause its descendants
+> to be probed as well (when they get registered).
 >
-> 0x0BFC0000-0x0BFFFFFF ("erase region 1", the last 256KB) is used for
-> the persistent storage. This is hard wired into the UEFI image.
+> Subsystems can use this when looking up resources for drivers, to reduce
+> the chances of deferred probes because of the probing order of devices.
 >
-> But the rest of the flash consists of whatever the contents of
-> images.txt in the magic configuration-via-USB-filesystem says it is.
-> I'm not convinced that is written to the device in AFS format.
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> ---
+>
+> Changes in v4:
+> - Rename of_platform_probe to of_device_probe
+> - Use device_node.device instead of device_node.platform_dev
+>
+> Changes in v3:
+> - Set and use device_node.platform_dev instead of reversing the logic to
+>   find the platform device that encloses a device node.
+> - Drop the fwnode API to probe firmware nodes and add OF-only API for
+>   now. I think this same scheme could be used for machines with ACPI,
+>   but I haven't been able to find one that had to defer its probes because
+>   of the device probe order.
+>
+> Changes in v2: None
+>
+>  drivers/of/device.c       | 58 +++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/of/platform.c     |  2 ++
+>  include/linux/of_device.h |  3 +++
+>  3 files changed, 63 insertions(+)
+>
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index 8b91ea241b10..c32ac7b6fbe2 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -286,3 +286,61 @@ int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env)
+>
+>         return 0;
+>  }
+> +
+> +/**
+> + * of_device_probe() - Probe device associated with OF node
+> + * @np: node to probe
+> + *
+> + * Probe the device associated with the passed device node.
+> + */
+> +void of_device_probe(struct device_node *np)
+> +{
+> +       struct device_node *target;
+> +       struct device *dev = NULL;
+> +
+> +       if (!of_root || !of_node_check_flag(of_root, OF_POPULATED_BUS))
+> +               return;
+> +
+> +       if (!np)
+> +               return;
+> +
+> +       of_node_get(np);
+> +
+> +       /* Find the closest ancestor that has a device associated */
+> +       for (target = np;
+> +            !of_node_is_root(target);
+> +            target = of_get_next_parent(target))
+> +               if (target->device) {
+> +                       dev = target->device;
+> +                       break;
+> +               }
+> +
+> +       of_node_put(target);
+> +
+> +       if (!dev) {
+> +               pr_warn("Couldn't find a device for node '%s'\n",
+> +                       of_node_full_name(np));
 
-After a discussion on IRC, Leif asked me to email the list to describe
-how AFS works.  I read Linus' code in u-boot [1] to work it out.
+This is triggered for all devices with clocks instantiated through
+CLK_OF_DECLARE().
+E.g. on r8a7791/koelsch ("... | sort | uniq -c"):
 
-There is no global TOC placed in NOR or elsewhere.
+      1 Couldn't find a device for node '/clocks/audio_clk_a'
+      1 Couldn't find a device for node '/clocks/audio_clk_b'
+      1 Couldn't find a device for node '/clocks/audio_clk_c'
+      2 Couldn't find a device for node '/clocks/cpg_clocks at e6150000'
+      1 Couldn't find a device for node '/clocks/m2_clk'
+      2 Couldn't find a device for node '/clocks/mstp0_clks at e6150130'
+     34 Couldn't find a device for node '/clocks/mstp10_clks at e6150998'
+      2 Couldn't find a device for node '/clocks/mstp1_clks at e6150134'
+      2 Couldn't find a device for node '/clocks/mstp2_clks at e6150138'
+     10 Couldn't find a device for node '/clocks/mstp3_clks at e615013c'
+      3 Couldn't find a device for node '/clocks/mstp5_clks at e6150144'
+      8 Couldn't find a device for node '/clocks/mstp7_clks at e615014c'
+      4 Couldn't find a device for node '/clocks/mstp8_clks at e6150990'
+     22 Couldn't find a device for node '/clocks/mstp9_clks at e6150994'
+      1 Couldn't find a device for node '/clocks/pcie_bus_clk'
 
-Each image stored in NOR flash contains a "footer" at the end of the
-last sector of the image.  This footer describes the image, including
-it's image "name".
+Corresponding DTS is arch/arm/boot/dts/r8a7791.dtsi.
 
-To find all of the images in NOR flash, the AFS code has to scan for
-the footer's signature at the end of every sector in flash.  The v1
-footer is the last 4 bytes of the sector, the v2 footer is the last 8
-bytes.  Juno uses v2 footers.
+> +               return;
+> +       }
 
-For example, the first file in Juno's NOR flash is "fip".  It lives at
-address 0x08000000 and occupies two 256k sectors (08000000 and
-08040000).  So the footer lives at the end of the last sector, from
-address 0807ff70 to 0807ffff.
+Gr{oetje,eeting}s,
 
-[1] common/cmd_armflash.c
-http://git.denx.de/?p=u-boot.git;a=blob;f=common/cmd_armflash.c;h=af453f7b3b84aba97704fd9ff2178d00876b6aad;hb=5ec0003b19cbdf06ccd6941237cbc0d1c3468e2d
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
