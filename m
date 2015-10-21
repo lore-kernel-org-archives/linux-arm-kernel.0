@@ -1,64 +1,31 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Wed, 21 Oct 2015 17:51:52 -0500
-Subject: [PATCH v6 22/22] of/platform: Defer probes of registered devices
-In-Reply-To: <CAL_JsqLhZmc8cEC+tFJ25KLe0bQZsWmrRWGBMQake9VN6OjvdQ@mail.gmail.com>
-References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
- <1442844182-27787-23-git-send-email-tomeu.vizoso@collabora.com>
- <1445406845.701.55.camel@freescale.com>
- <CAL_JsqLhZmc8cEC+tFJ25KLe0bQZsWmrRWGBMQake9VN6OjvdQ@mail.gmail.com>
-Message-ID: <1445467912.701.90.camel@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 22 Oct 2015 00:54:28 +0200
+Subject: console vs earlycon ?
+In-Reply-To: <5627E679.1050207@hurleysoftware.com>
+References: <CAK7LNARem16fTim8Ds_y8ezMusz_aRtv6c59KoxyC0rLV-RBWw@mail.gmail.com>
+ <3890353.0icCv0Zeuq@wuerfel> <5627E679.1050207@hurleysoftware.com>
+Message-ID: <4134303.BAT7dSJRN3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-10-21 at 08:44 -0500, Rob Herring wrote:
-> On Wed, Oct 21, 2015 at 12:54 AM, Scott Wood <scottwood@freescale.com> 
-> wrote:
-> > On Mon, 2015-09-21 at 16:03 +0200, Tomeu Vizoso wrote:
-> > > Instead of trying to match and probe platform and AMBA devices right
-> > > after each is registered, delay their probes until device_initcall_sync.
-> > > 
-> > > This means that devices will start probing once all built-in drivers
-> > > have registered, and after all platform and AMBA devices from the DT
-> > > have been registered already.
-> > > 
-> > > This allows us to prevent deferred probes by probing dependencies on
-> > > demand.
-> > > 
-> > > Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> > > ---
-> > > 
-> > > Changes in v4:
-> > > - Also defer probes of AMBA devices registered from the DT as they can
-> > >   also request resources.
-> > > 
-> > >  drivers/of/platform.c | 11 ++++++++---
-> > >  1 file changed, 8 insertions(+), 3 deletions(-)
-> > 
-> > This breaks arch/powerpc/sysdev/fsl_pci.c.  The PCI bus is an OF platform
-> > device, and it must be probed before pcibios_init() which is a
-> > subsys_initcall(), or else the PCI bus never gets scanned.
+On Wednesday 21 October 2015 15:24:41 Peter Hurley wrote:
+> On 10/21/2015 03:00 PM, Arnd Bergmann wrote:
+
+> > Yes, I see this as a tradeoff: we want the console to be as early as
+> > possible in order to report boot-time errors to the user, but not so early
+> > to require hacks that can cause problems themselves. earlycon has to
+> > do some scary stuff and is relatively recent, while the hacks
+> > necessary for console_init() are much older and better tested.
 > 
-> Thanks for the report. This is probably getting dropped, but it could
-> be disabled for PPC.
+> I assume you mean the hacks necessary to get _earlycon_ working at
+> console_init() time, because the hacks necessary to get non-8250
+> serial consoles working at console_init() would be extensive and
+> brand new.
+> 
 
-I don't think that adding another arbitrary arch difference would be the 
-right solution.
+No, I was just being slow and assumed that the 51 drivers that come with
+a console_initcall() do something in there to actually start the console,
+but you are right that most of them don't actually do that. They just
+call register_console() and wait for the device to show up later.
 
-> Any plans to fix this and make PCI hosts hotplugable? For the scanning
-> part, generally the host controller drivers are responsible for
-> scanning their bus now.
-
-Scanning from the host controller driver seems like a reasonable goal, though 
-
-it'd take a bit of digging to extract whatever other things fsl_pci may 
-depend on from the common PPC PCI code, in particular the various things that 
-
-pcibios_resource_survey() does after all PCI buses have been scanned.
-
-There's also check_swiotlb_enabled(), another subsys_initcall, which frees 
-the swiotlb memory if ppc_swiotlb_enable hasn't been set.  The PCI host 
-controller probe sets ppc_swiotlb_enable if it wasn't able to create an 
-inbound mapping for all RAM.  Even if we were to change that to a later 
-initcall, there's nothing later than late_initcall that we could use.
-
--Scott
+	Arnd
