@@ -1,83 +1,56 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Wed, 21 Oct 2015 09:20:38 -0400
-Subject: console vs earlycon ?
-In-Reply-To: <CAK7LNARem16fTim8Ds_y8ezMusz_aRtv6c59KoxyC0rLV-RBWw@mail.gmail.com>
-References: <CAK7LNARem16fTim8Ds_y8ezMusz_aRtv6c59KoxyC0rLV-RBWw@mail.gmail.com>
-Message-ID: <56279126.8080506@hurleysoftware.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 21 Oct 2015 15:23:32 +0200
+Subject: [PATCH v2 0/6] Switch to generic syscon regmap based drivers
+In-Reply-To: <56276C87.6040509@samsung.com>
+References: <1445333085-22837-1-git-send-email-alim.akhtar@samsung.com>
+ <CAGOxZ50G-ttivhVjbozUisA0HXcFz7bvRUuPR67xR88TTCa_wQ@mail.gmail.com>
+ <CAGOxZ51_JPy51htzD_M_=qaPVUexkVhoA2ANLS2-rpK3QDT=8A@mail.gmail.com>
+ <1606098.olLAyTIhB3@dell2.five-lan.de> <56272C1C.8040007@samsung.com>
+ <562765F3.9010306@osg.samsung.com> <56276C87.6040509@samsung.com>
+Message-ID: <562791D4.3050105@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2015 04:21 AM, Masahiro Yamada wrote:
-> Hi.
-> 
-> 
-> 
-> 
-> I think there are three places where console could be enabled.
-> 
-> [1] earlycon
-> 
-> Each driver entry is declared with
-> EARLYCON_DECLARE()  or OF_EARLYCON_DECLARE()
-> 
-> 
-> 
-> [2] console_init()
-> 
-> Each entry is declared with  console_initcall()
-> 
-> 
-> 
-> [3]  when driver is probed
-> The console is usually enabled at this point
-> unless some special treatment is done.
-> 
-> 
-> 
-> 
-> My question is about [2].
+Hello Alim,
 
-For 8250 sub-drivers, the console_initcall() is only for legacy
-platforms, and not for 8250 ports added via serial8250_register_8250_port().
+On 10/21/2015 12:44 PM, Alim Akhtar wrote:
 
-In this contexts, legacy platforms are:
-1. early_serial_setup()
-2. platforms that define SERIAL_PORT_DFNS (eg., ISA ports)
+[snip]
 
+>>
+>> Can you please test following patch [0] on top of Alim's series? If that
+>> works then it should either be part of Alim's series or the patches will
+>> have to wait until that patch lands into mainline. I don't have an eMMC
+>> to test it in XU4 but I'm pretty confident that it will solve the issue.
+>>
+> I am fine with including this with my series or lowering syscon_restart_handler priority to 128.
 
-At the point where console_initcall() occurs, the 8250 core has _not_
-been initialized (ie., serial8250_init() has _not_ run).
+Yes, I also considered changing the syscon-reboot handler priority to 128 but
+then I noticed this commit:
 
+b81180b3fd48 ("power: reset: adjust priority of simple syscon reboot driver").
 
+So as you can see, it was 128 before but was bumped to 192 so it was called
+before restart handlers registered by watchdogs. So, changing to 128 would
+break other people use cases.
 
-> I am using 8250-ish UART device.
-> 
-> 
-> I noticed univ8250_console_match() and univ8250_console_setup()
-> always fail at the point of [2] unless early_serial_setup() has been
-> called in advance;
-> however, it looks like early_serial_setup() is only used for old platforms.
-> 
-> So, console cannot be enabled at [2] for modern platforms.
+Now, I don't know if that is the right fix since register_restart_handler()
+explanation about the policy used for restart handler priority numbers is
+scarce. It only mentions 0, 128 and 255 so probably the correct thing to do
+is to change all watchdog restart handler to 0 but that is a separate issue.
 
-Since console_init() => console_initcall() occurs before almost everything,
-it's not practical to use for probed drivers.
+> It also make sense to increase eMMC priority as you suggested as before system reboot, devices should have reseted itself.
 
+That was my rationale as well and is why I think the handler for devices
+should use the highest priority regardless if the syscon-reboot is later
+changed to prio 128 and the watchdog handlers to 0.
 
-> My questions are:
-> 
->  -  Given that earlycon can be now available for major architectures such ARM,
->      [2] will be deprecated at some point in the future?
+Best regards,
 
-PPC and x86 platforms still rely on console_init() so it will be some time
-before this disappears.
+[0]: http://lxr.free-electrons.com/source/kernel/reboot.c#L113
 
->  - I am implementing  earlycon  for my own UART driver.
->    Is it meaningless to implement  console_initcall()  as well as earlycon?
-
-Probed drivers should only implement earlycon and console. 8250 sub-drivers
-should only implement earlycon and/or console if the base 8250 earlycon and/or
-console are not operational.
-
-Regards,
-Peter Hurley
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
