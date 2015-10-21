@@ -1,52 +1,43 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 21 Oct 2015 08:52:04 -0700
-Subject: [PATCH V4 1/8] acpi: Honor ACPI _CCA attribute setting
+Date: Wed, 21 Oct 2015 08:52:05 -0700
+Subject: [PATCH V4 2/8] device property: Introducing enum dev_dma_attr
 In-Reply-To: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1445442731-28819-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1445442731-28819-3-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Linton <jeremy.linton@arm.com>
+A device could have one of the following DMA attributes:
+    * DMA not supported
+    * DMA non-coherent
+    * DMA coherent
 
-ACPI configurations can now mark devices as noncoherent,
-support that choice.
+So, this patch introduces enum dev_dma_attribute. This will be used by
+new APIs introduced in later patches.
 
-NOTE: This is required to support USB on ARM Juno Development Board.
-
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-CC: Bjorn Helgaas <bhelgaas@google.com>
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Will Deacon <will.deacon@arm.com>
 CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+CC: Bjorn Helgaas <bhelgaas@google.com>
 ---
- include/acpi/acpi_bus.h | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ include/linux/property.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
-index 5ba8fb6..5a42204 100644
---- a/include/acpi/acpi_bus.h
-+++ b/include/acpi/acpi_bus.h
-@@ -395,7 +395,7 @@ static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
- 	 * case 1. Do not support and disable DMA.
- 	 * case 2. Support but rely on arch-specific cache maintenance for
- 	 *         non-coherence DMA operations.
--	 * Currently, we implement case 1 above.
-+	 * Currently, we implement case 2 above.
- 	 *
- 	 * For the case when _CCA is missing (i.e. cca_seen=0) and
- 	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
-@@ -403,7 +403,8 @@ static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
- 	 *
- 	 * See acpi_init_coherency() for more info.
- 	 */
--	if (adev->flags.coherent_dma) {
-+	if (adev->flags.coherent_dma ||
-+	    (adev->flags.cca_seen && IS_ENABLED(CONFIG_ARM64))) {
- 		ret = true;
- 		if (coherent)
- 			*coherent = adev->flags.coherent_dma;
+diff --git a/include/linux/property.h b/include/linux/property.h
+index a59c6ee..522c1bf 100644
+--- a/include/linux/property.h
++++ b/include/linux/property.h
+@@ -27,6 +27,12 @@ enum dev_prop_type {
+ 	DEV_PROP_MAX,
+ };
+ 
++enum dev_dma_attr {
++	DEV_DMA_NOT_SUPPORTED,
++	DEV_DMA_NON_COHERENT,
++	DEV_DMA_COHERENT,
++};
++
+ bool device_property_present(struct device *dev, const char *propname);
+ int device_property_read_u8_array(struct device *dev, const char *propname,
+ 				  u8 *val, size_t nval);
 -- 
 2.1.0
