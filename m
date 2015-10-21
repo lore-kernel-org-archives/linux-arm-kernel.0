@@ -1,121 +1,69 @@
-From: jenskuske@gmail.com (Jens Kuske)
-Date: Wed, 21 Oct 2015 18:20:28 +0200
-Subject: [PATCH 6/6] ARM: dts: sun8i: Add Orange Pi Plus support
-In-Reply-To: <1445444428-4652-1-git-send-email-jenskuske@gmail.com>
-References: <1445444428-4652-1-git-send-email-jenskuske@gmail.com>
-Message-ID: <1445444428-4652-3-git-send-email-jenskuske@gmail.com>
+From: brijeshkumar.singh@amd.com (Brijesh Singh)
+Date: Wed, 21 Oct 2015 11:22:24 -0500
+Subject: [PATCH] EDAC: Add AMD Seattle SoC EDAC
+In-Reply-To: <5627627A.9010906@arm.com>
+References: <1445282597-18999-1-git-send-email-brijeshkumar.singh@amd.com>
+ <20151019205236.GB453@leverpostej> <56266F7E.6030404@amd.com>
+ <20151020165744.GE31130@pd.tnic> <20151020172654.GC4943@leverpostej>
+ <20151020173639.GH31130@pd.tnic> <5626F09F.4050107@huawei.com>
+ <20151021093536.GA3575@pd.tnic> <5627627A.9010906@arm.com>
+Message-ID: <5627BBC0.2000008@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Orange Pi Plus is a SBC based on the Allwinner H3 SoC
-with 8GB eMMC, multiple USB ports through a USB hub chip, SATA through
-a USB-SATA bridge, one uSD slot, a 10/100/1000M ethernet port,
-WiFi, HDMI, headphone jack, IR receiver, a microphone, a CSI connector
-and a 40-pin GPIO header.
 
-Signed-off-by: Jens Kuske <jenskuske@gmail.com>
----
- arch/arm/boot/dts/Makefile                   |  3 +-
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 77 ++++++++++++++++++++++++++++
- 2 files changed, 79 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 35a3cf4..bedf51b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -643,7 +643,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a33-ga10h-v1.1.dtb \
- 	sun8i-a33-ippo-q8h-v1.2.dtb \
- 	sun8i-a33-q8-tablet.dtb \
--	sun8i-a33-sinlinx-sina33.dtb
-+	sun8i-a33-sinlinx-sina33.dtb \
-+	sun8i-h3-orangepi-plus.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
- 	sun9i-a80-cubieboard4.dtb
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-new file mode 100644
-index 0000000..e67df59
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-@@ -0,0 +1,77 @@
-+/*
-+ * Copyright (C) 2015 Jens Kuske <jenskuske@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-h3.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Xunlong Orange Pi Plus";
-+	compatible = "xunlong,orangepi-plus", "allwinner,sun8i-h3";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
--- 
-2.6.1
+On 10/21/2015 05:01 AM, Andre Przywara wrote:
+> Hi,
+> 
+> On 21/10/15 10:35, Borislav Petkov wrote:
+>> On Wed, Oct 21, 2015 at 09:55:43AM +0800, Hanjun Guo wrote:
+>>> So I think the meaning of those error register is the same, but the way
+>>> of handle it may different from SoCs, for single bit error:
+>>>
+>>>  - SoC may trigger a interrupt;
+>>>  - SoC may just keep silent so we need to scan the registers using poll
+>>>    mechanism.
+>>>
+>>> For Double bit error:
+>>>   - SoC may also keep silent
+>>>   - Trigger a interrupt
+>>>   - Trigger a SEI (system error)
+>>>
+>>> Any suggestion to cover those cases?
+>>
+>> Well, I guess we can implement all those and have them configurable
+>> in the sense that a single driver loads, it has all functionality and
+>> dependent on the vendor detection, it does only what the vendor wants
+>> like trigger an interrupt or remain silent or ...
+> 
+> I guess the firmware (running in EL3) will take precedence over this
+> driver anyway, so we could just optimistically implement all errors, as
+> the driver will just never see errors that are handled in firmware (?)
+> In case of a critical error for instance I expect the firmware to never
+> return to EL1.
+> 
+>>
+>> Btw, in talking about this with Andre last night, he had the suggestion
+>> that this functionality is also in other implementations besides A57 so
+>> maybe the driver should be called arm_cortex_edac...
+> 
+> Yeah, so looking at the A-72 and the A-53 TRM I see those registers to
+> be there as well. The A-72 and the A-57 versions look identical to me,
+> the A-53 version is only slightly different, but apparently still
+> compatible.
+> So I'd suggest to let this driver load on detecting all three MIDRs.
+> Should later revisions of any of those parts change the register
+> meaning, we could add a blacklist or specific MIDR detection.
+> 
+> But let's just not assume the worst in the first place ;-)
+> 
+Ok. Will make it generic cortex_arm64_edac. Will check MIDR and call appropriate CPUMERRSR_EL1 and L2MERRSR_EL1. Since I don't have A53 and A72 hence my testing will be limited to Cortex A57.
+> Cheers,
+> Andre.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
