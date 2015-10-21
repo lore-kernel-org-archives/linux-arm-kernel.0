@@ -1,49 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 21 Oct 2015 11:59:32 +0100
-Subject: [PATCH RFC RFT 2/3] clk: clk_put WARNs if user has not disabled
- clk
-In-Reply-To: <CAMuHMdWd9LxrSWO5snriW+fb_d8FtMeXUBjp3M-Oeahh+FzJcw@mail.gmail.com>
-References: <1438974570-20812-1-git-send-email-mturquette@baylibre.com>
- <1438974570-20812-3-git-send-email-mturquette@baylibre.com>
- <CAMuHMdX8Fq3AfxuZMLe4-CYFzrDiQcwnREQhX5fSGXzYNSkKsA@mail.gmail.com>
- <20151020124000.20687.60752@quantum>
- <CAMuHMdWd9LxrSWO5snriW+fb_d8FtMeXUBjp3M-Oeahh+FzJcw@mail.gmail.com>
-Message-ID: <20151021105932.GP32536@n2100.arm.linux.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 21 Oct 2015 13:01:17 +0200
+Subject: [PATCH 10/19] ARM: dts: at91: replace gpio-key,wakeup with
+ wakeup-source property
+In-Reply-To: <56276832.9040006@arm.com>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-11-git-send-email-sudeep.holla@arm.com>
+ <5627672D.60108@atmel.com> <56276832.9040006@arm.com>
+Message-ID: <CAPDyKFq8CfzVPPCz=1AxZM3wsw8pkOPG6Ua_5spDuYa=Gzshrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2015 at 11:50:07AM +0200, Geert Uytterhoeven wrote:
-> Hi Mike, Russell,
-> 
-> On Tue, Oct 20, 2015 at 2:40 PM, Michael Turquette
-> <mturquette@baylibre.com> wrote:
-> > Why not keep the reference to the struct clk after get'ing it the first
-> > time?
-> 
-> And store it where?
+On 21 October 2015 at 12:25, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>
+> On 21/10/15 11:21, Nicolas Ferre wrote:
+>>
+>> Le 21/10/2015 12:10, Sudeep Holla a ?crit :
+>>>
+>>> Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
+>>> check for/support the legacy "gpio-key,wakeup" boolean property to
+>>> enable gpio buttons as wakeup source, "wakeup-source" is the new
+>>> standard binding.
+>>>
+>>> This patch replaces the legacy "gpio-key,wakeup" with the unified
+>>> "wakeup-source" property in order to avoid any futher copy-paste
+>>> duplication.
+>>>
+>>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>
+>>
+>> I'm not against this if the whole series goes further.
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>
+>
+> Thanks !
+>
+>> I suspect that we would need to take this patch with us on the AT91
+>> branches that would go to arm-soc. Is it the intentions?
+>>
+>
+> Yes that was my intention for splitting the patches per SoC group.
+> Many SoC maintainers prefer that.
 
-Not my problem :)
+Hold on! All patches that changes the DT parsing to accept the
+"standardized wakeup-source" binding, need to be merged upstream
+before corresponding DTS changes.
 
-Users are supposed to hold on to the reference obtained via clk_get()
-while they're making use of the clock: in some implementations, this
-increments the module use count if the clock driver is a module, and
-may have other effects too.
+Therefore, I suggest we go for a two step approach, starting with
+changes affecting the DT parsing/documentation for various
+drivers/subsystem and perhaps we can reach 4.4 for these.
+Then the DTS changes can go in at any later point.
 
-Dropping that while you're still requiring the clock to be enabled is
-unsafe: if it is provided by a module, then removing and reinserting
-the module may very well change the enabled state of the clock, it
-most certainly will disrupt the enable count.
-
-It's always been this way, right from the outset, and when I've seen
-people doing this bollocks, I've always pointed out that it's wrong.
-Generally, people will fix it once they become aware of it, so it's
-really that people just don't like reading and conforming to published
-API requirements.
-
-I think the root cause is that people just don't like reading what
-other people write in terms of documentation, and they prefer to go
-off and do their own thing, provided it works for them.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Kind regards
+Uffe
