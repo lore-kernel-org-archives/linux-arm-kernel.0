@@ -1,51 +1,36 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 21 Oct 2015 02:54:54 -0700
-Subject: [PATCH v2 3/4] clk: berlin: bg2q: remove CLK_IGNORE_UNUSED flag
- for sdio clk
-In-Reply-To: <20151021093039.20687.88701@quantum>
-References: <1445339807-2351-1-git-send-email-jszhang@marvell.com>
- <1445339807-2351-4-git-send-email-jszhang@marvell.com>
- <20151021093039.20687.88701@quantum>
-Message-ID: <20151021095454.20687.98330@quantum>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Wed, 21 Oct 2015 11:59:07 +0200
+Subject: [PATCH v5] arm-soc: Add support for Sigma Designs Tango4 platforms
+In-Reply-To: <56266D46.5080809@sigmadesigns.com>
+References: <56250FAC.2010800@sigmadesigns.com>
+ <56266D46.5080809@sigmadesigns.com>
+Message-ID: <562761EB.3070009@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Michael Turquette (2015-10-21 02:30:39)
-> Quoting Jisheng Zhang (2015-10-20 04:16:46)
-> > Since we have added the necessary two clks' properties in dts, we can
-> > remove the "sdio" clk's CLK_IGNORE_UNUSED flag now.
-> > 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> 
-> Applied to clk-next.
+On 20/10/2015 18:35, Marc Gonzalez wrote:
+> Changes in v5
+> drop mac-address property from eth0 node
+> tentatively add pmu node (not looking good)
+> hw perfevents: failed to probe PMU!
+> hw perfevents: failed to register PMU devices!
 
-So the sdhci change was dropped from v2. Do you want me to Ack these
-instead so you can send them all together?
+<Taking a closer look>
 
-Regards,
-Mike
+armv7_a9_pmu_init() eventually calls generic_exec_single()
+which fails this test:
 
-> 
-> Regards,
-> Mike
-> 
-> > ---
-> >  drivers/clk/berlin/bg2q.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
-> > index 221f40c..243f421 100644
-> > --- a/drivers/clk/berlin/bg2q.c
-> > +++ b/drivers/clk/berlin/bg2q.c
-> > @@ -283,7 +283,7 @@ static const struct berlin2_gate_data bg2q_gates[] __initconst = {
-> >         { "usb2",       "perif",        13 },
-> >         { "usb3",       "perif",        14 },
-> >         { "pbridge",    "perif",        15, CLK_IGNORE_UNUSED },
-> > -       { "sdio",       "perif",        16, CLK_IGNORE_UNUSED },
-> > +       { "sdio",       "perif",        16 },
-> >         { "nfc",        "perif",        18 },
-> >         { "pcie",       "perif",        22 },
-> >  };
-> > -- 
-> > 2.6.1
-> > 
+	if ((unsigned)cpu >= nr_cpu_ids || !cpu_online(cpu))
+
+because cpu = 4 and nr_cpu_ids = 2
+
+  /* Any online will do: smp_call_function_single handles nr_cpu_ids. */
+  cpu = cpumask_any_and(mask, cpu_online_mask);
+
+nr_cpu_ids starts out as 4  (CONFIG_NR_CPUS=4) but setup_nr_cpu_ids()
+drops it to 2 (the actual number of cores).
+
+<confused> I thought NR_CPUS was just the maximum number of CPUs.
+Is it expected that armv7_a9_pmu_init() would fail as it does for me?
+
+Regards.
