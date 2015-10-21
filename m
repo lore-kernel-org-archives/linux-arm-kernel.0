@@ -1,110 +1,93 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 21 Oct 2015 08:53:12 -0700
-Subject: [PATCH v6 1/5] clk: Add a basic multiplier clock
-In-Reply-To: <20151021145335.GF10947@lukather>
-References: <1445326609-6314-1-git-send-email-maxime.ripard@free-electrons.com>
- <1445326609-6314-2-git-send-email-maxime.ripard@free-electrons.com>
- <20151020134343.20687.16333@quantum> <20151020144047.GA10947@lukather>
- <20151020162939.20687.32769@quantum> <20151021145335.GF10947@lukather>
-Message-ID: <20151021155312.20687.73917@quantum>
+From: jenskuske@gmail.com (Jens Kuske)
+Date: Wed, 21 Oct 2015 18:13:21 +0200
+Subject: [PATCH 0/6] ARM: sunxi: Introduce Allwinner H3 support
+Message-ID: <1445444007-4260-1-git-send-email-jenskuske@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2015-10-21 07:53:35)
-> On Tue, Oct 20, 2015 at 09:29:39AM -0700, Michael Turquette wrote:
-> > Quoting Maxime Ripard (2015-10-20 07:40:47)
-> > > Hi Mike,
-> > > 
-> > > On Tue, Oct 20, 2015 at 06:43:43AM -0700, Michael Turquette wrote:
-> > > > Hi Maxime,
-> > > > 
-> > > > Quoting Maxime Ripard (2015-10-20 00:36:45)
-> > > > > +struct clk *clk_register_multiplier(struct device *dev, const char *name,
-> > > > > +                                   const char *parent_name,
-> > > > > +                                   unsigned long flags,
-> > > > > +                                   void __iomem *reg, u8 shift, u8 width,
-> > > > > +                                   u8 clk_mult_flags, spinlock_t *lock)
-> > > > > +{
-> > > > 
-> > > > Patch looks good in general. However this is a good opportunity to stop
-> > > > the madness around the registration functions in these basic clock
-> > > > types.
-> > > > 
-> > > > clk_register is really all that we need since we've had struct
-> > > > clk_init_data for a while. Initializing a multiplier should be as simple
-> > > > as:
-> > > > 
-> > > >       struct clk_multiplier clk_foo = {
-> > > >               .hw.init = &(struct clk_init_data){
-> > > >                       .name = "foo",
-> > > >                       .parent_names = (const char *[]){
-> > > >                               "bar",
-> > > >                       },
-> > > >                       .num_parents = 1;
-> > > >                       .ops = &clk_multiplier_ops,
-> > > >               },
-> > > >               .reg = 0xd34db33f,
-> > > >               .shift = 1,
-> > > >               .width = 2,
-> > > >       };
-> > > > 
-> > > >       clk_register(dev, &clk_foo.hw);
-> > > > 
-> > > > This is nice since it turns these basic clocks into even more of a
-> > > > library and less of a poor mans driver.
-> > > > 
-> > > > (I really hope the above works. I did not test it)
-> > > > 
-> > > > Is it possible you can convert to using this method, and if it is
-> > > > correct for you then just remove clk_multiplier_register altogether? (In
-> > > > fact you might not use the registration function at all since you use
-> > > > the composite clock...)
-> > > 
-> > > This chunk of code has been here since v2, which has been first posted
-> > > in May, two and half kernel releases ago.
-> > > 
-> > > In the meantime, we had a full-blown DMA driver and a quite unusual
-> > > ASoC driver merged. For some reason, this is the only piece of the
-> > > audio support that is missing for us, while at the same time it's the
-> > > most trivial.
-> > > 
-> > > If that's the only issue you have with this patch, I'm fine with
-> > > sending a subsequent patch this week. But I'd be really unhappy with
-> > > sending yet another version for a single change, while you had 5
-> > > monthes to review it, and we discussed it several times on IRC and
-> > > face to face.
-> > 
-> > The change can go in later. It's not a prerequisite. I had a feeling
-> > you'd be grumpy about me asking but I thought I'd try anyways. I won't
-> > even ask if you got sign-off from Jim on whether this works for his
-> > platforms ;-)
-> 
-> I asked several times, he never replied... :/
-> 
-> > The copy/paste nature of these basic clock types really sucks and it is
-> > one of many reasons that I am hesitant to accept them and slow to merge
-> > them...
-> 
-> I guess we cover all cases now? So it shouldn't grow that much.
-> 
-> > Anyways it seems that you are not using the registration function at all
-> > so I might just follow up with a patch to remove it.
-> > 
-> > I can pick these 5 patches directly, or do you plan to send a PR?
-> 
-> I have a pull request coming for you with a single patch, I can apply
-> them on that branch and send you the PR later today if it's okay?
+Hi everyone,
 
-Sounds good to me.
+This is v3 of my patch series introducing basic kernel support for Allwinner's
+H3 SoC. It mainly adds basic clocks and pinctrl. It also adds interrupts,
+timers, watchdog, RTC, dmaengine, MMC and UARTs, which are mostly compatible
+to those in earlier SoCs like A23 and A31, and can simply be reused.
 
-Regards,
-Mike
+These patches are based on Maxime's sunxi/for-next branch from
+git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git
 
-> 
-> Thanks,
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+
+Patch 1 improves the sunxi divs clock to read the name of the base factor clock
+from devicetree instead of hardcoding it, which allows us to reuse sun6i-pll6
+for our pll8.
+
+Patch 2 adds support for the basic clocks.
+
+Patch 3 adds the pin sets for the H3 main PIO.
+
+Patch 4 adds a new compatible for the H3 reset controller
+
+Patch 5 adds the DTSI for the H3.
+
+Patch 6 adds a DTS for the Orange Pi Plus SBC, which these patches
+were developed and tested with.
+
+
+Changes since v2:
+- add mbus clock
+- add Maxime's suggestion to take the substring up to the first "_" as name
+  for the divs base clock
+- use A31 pll6 for H3 pll6
+- use a clock similar to the new simple gates for H3 bus gates
+- drop the pinctrl-as-module patch since pinctrl and gpio don't seem to be
+  ready for removable drivers
+- documentation and machine support are merged already
+  
+Changes since v1:
+- Update sunxi README in Documentation
+- Add the multiple parents gates and use them for bus-gates instead of
+  ahb1, ahb2, apb1 and apb2 gates
+- Merge the pll8 clock with sun6i pll6
+- Merge the ahb12, apb1 and apb2 resets to bus-resets with own compatible
+- Add sun6i_timer_init to sun8i machine
+- Remove the single SoC names from machine definition, its sun8i family
+- Make the pinctrl driver tristate and put its Kconfig entry in the right order
+- Rename pinctrl "scr" to "sim" and clock "sim" to "scr" to match user manual
+- Remove the address paragraph from GPL in dts and dtsi
+- Some style cleanup and line wrapping in dtsi
+- Add ARM architected timers
+- dmaengine isn't included anymore, it is merged already
+
+Best Regards,
+Jens
+
+
+Jens Kuske (6):
+  clk: sunxi: Let divs clocks read the base factor clock name from
+    devicetree
+  clk: sunxi: Add H3 clocks support
+  pinctrl: sunxi: Add H3 PIO controller support
+  reset: sunxi: Add compatible for Allwinner H3 bus resets
+  ARM: dts: sunxi: Add Allwinner H3 DTSI
+  ARM: dts: sun8i: Add Orange Pi Plus support
+
+ Documentation/devicetree/bindings/clock/sunxi.txt  |   2 +
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
+ .../bindings/reset/allwinner,sunxi-clock-reset.txt |   1 +
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts       |  77 +++
+ arch/arm/boot/dts/sun8i-h3.dtsi                    | 499 ++++++++++++++++++++
+ drivers/clk/sunxi/Makefile                         |   1 +
+ drivers/clk/sunxi/clk-bus-gates.c                  | 105 +++++
+ drivers/clk/sunxi/clk-sunxi.c                      |  47 +-
+ drivers/pinctrl/sunxi/Kconfig                      |   4 +
+ drivers/pinctrl/sunxi/Makefile                     |   1 +
+ drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c           | 516 +++++++++++++++++++++
+ drivers/reset/reset-sunxi.c                        |   1 +
+ 13 files changed, 1245 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+ create mode 100644 arch/arm/boot/dts/sun8i-h3.dtsi
+ create mode 100644 drivers/clk/sunxi/clk-bus-gates.c
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
+
+-- 
+2.6.1
