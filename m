@@ -1,52 +1,75 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Wed, 21 Oct 2015 22:41:40 +0200
-Subject: [PATCH 5/5] clk: scpi: add missing of_node_put
-In-Reply-To: <1445460100-26727-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1445460100-26727-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1445460100-26727-6-git-send-email-Julia.Lawall@lip6.fr>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 21 Oct 2015 22:59:38 +0200
+Subject: [GIT PULLv2] at91: dt for 4.4 #2
+Message-ID: <20151021205938.GA18600@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for_each_available_child_of_node performs an of_node_get on each iteration,
-so a break out of the loop requires an of_node_put.
+Arnd,
 
-The semantic patch that fixes this problem is as follows
-(http://coccinelle.lip6.fr):
+As discussed, version 2 of that pull request that removes the last patch
+to avoid the dependency on the MFD subsystem.
 
-// <smpl>
-@@
-expression root,e;
-local idexpression child;
-@@
+The following changes since commit a9b672a636a599cc052afcb6837e3177dc53c143:
 
- for_each_available_child_of_node(root, child) {
-   ... when != of_node_put(child)
-       when != e = child
-(
-   return child;
-|
-+  of_node_put(child);
-?  return ...;
-)
-   ...
- }
-// </smpl>
+  ARM: at91/dt: sama5d2 Xplained: add device pin muxing (2015-09-23 16:26:47 +0200)
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+are available in the git repository at:
 
----
- drivers/clk/clk-scpi.c |    1 +
- 1 file changed, 1 insertion(+)
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-dt2
 
-diff --git a/drivers/clk/clk-scpi.c b/drivers/clk/clk-scpi.c
-index 0b501a9..cd0f272 100644
---- a/drivers/clk/clk-scpi.c
-+++ b/drivers/clk/clk-scpi.c
-@@ -292,6 +292,7 @@ static int scpi_clocks_probe(struct platform_device *pdev)
- 		ret = scpi_clk_add(dev, child, match);
- 		if (ret) {
- 			scpi_clocks_remove(pdev);
-+			of_node_put(child);
- 			return ret;
- 		}
- 	}
+for you to fetch changes up to 512fc048e4fdc39f43e78af7e2fed5047d651979:
+
+  ARM: at91/dt: sama5d2: add missing devices (2015-10-19 21:22:21 +0200)
+
+----------------------------------------------------------------
+Second batch of DT changes for 4.4:
+- some DT fixes: pullups, disabled property
+- the PMC is now a syscon
+- great improvement of sama5d2 support
+
+----------------------------------------------------------------
+Alexandre Belloni (1):
+      ARM: at91/dt: use syscon for PMC
+
+Gregory CLEMENT (1):
+      ARM: at91/dt: sama5d4: add the macb1 node
+
+Ludovic Desroches (1):
+      ARM: at91/dt: sama5d2: add missing devices
+
+Michael Opdenacker (1):
+      ARM: at91/dt: fix "disabled" property on at91rm9200
+
+Sylvain Rochet (1):
+      ARM: at91/dt: add pullup on mmc2 data signals
+
+Wenyou Yang (1):
+      ARM: at91/dt: sama5d2_xplained: add regulator nodes
+
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts |  57 ++++++++++
+ arch/arm/boot/dts/at91rm9200.dtsi           |   8 +-
+ arch/arm/boot/dts/at91sam9260.dtsi          |   2 +-
+ arch/arm/boot/dts/at91sam9261.dtsi          |   2 +-
+ arch/arm/boot/dts/at91sam9263.dtsi          |   2 +-
+ arch/arm/boot/dts/at91sam9g45.dtsi          |   2 +-
+ arch/arm/boot/dts/at91sam9n12.dtsi          |   2 +-
+ arch/arm/boot/dts/at91sam9rl.dtsi           |   2 +-
+ arch/arm/boot/dts/at91sam9x5.dtsi           |   2 +-
+ arch/arm/boot/dts/sama5d2.dtsi              | 154 +++++++++++++++++++++++++++-
+ arch/arm/boot/dts/sama5d3.dtsi              |   2 +-
+ arch/arm/boot/dts/sama5d3_mci2.dtsi         |   6 +-
+ arch/arm/boot/dts/sama5d4.dtsi              |  32 +++++-
+ 13 files changed, 254 insertions(+), 19 deletions(-)
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151021/3b891fc5/attachment.sig>
