@@ -1,28 +1,53 @@
-From: amittomer25@gmail.com (Amit Tomer)
-Date: Wed, 21 Oct 2015 21:07:04 +0530
-Subject: [PATCH RFC] arm64/ftrace: Define a new arm64 trace clock source
- based on cntpct_el0 register.
-In-Reply-To: <20151021094404.0e3114f9@gandalf.local.home>
-References: <1445170639-13943-1-git-send-email-amittomer25@gmail.com>
- <20151021094404.0e3114f9@gandalf.local.home>
-Message-ID: <CABHD4K_DmujOCEF=2R4ecJ7uH4yZ6QZAqBFFXpbGTh6i_xFqvA@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 22 Oct 2015 00:38:15 +0900
+Subject: Which is better to specify console, "console= " or "stdout-path" ?
+In-Reply-To: <56278911.9050704@hurleysoftware.com>
+References: <CAK7LNAS9uBJ1cVmGBKae3W0tk8Siu1yeXOaeN6Kz11cksMqtsg@mail.gmail.com>
+ <562753A6.3070107@arm.com> <56278911.9050704@hurleysoftware.com>
+Message-ID: <CAK7LNAQ_+_9K-y7bmpdGwcH2u4uqJhJhON1Ew4OvzSSa-amyvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you for looking into it and providing your comments.
+Hi Peter.
 
-
->> +       [local] global counter x86-tsc arm64-pct
+2015-10-21 21:46 GMT+09:00 Peter Hurley <peter@hurleysoftware.com>:
+> On 10/21/2015 04:58 AM, Sudeep Holla wrote:
+>> On 21/10/15 06:09, Masahiro Yamada wrote:
+>>> I think there exist two ways to specify the console port and baudrate.
+>>>
+>>>
+>>> [1] Specify console in bootargs
+>>>
+>>>    chosen {
+>>>          bootargs = "console=ttyS0,115200";
+>>>    };
+>>>
+>>>
+>>> [2] Specify stdout-path
+>>>
+>>>     chosen {
+>>>           stdout-path = "serial0:115200n8";
+>>
+>> This will work for even early/boot console, so this is better than
+>> option [1]
 >
-> You don't need to update this line. You can't have both x86-tsc and
-> arm64-pct at the same time.
+> Be aware that options specified via /chosen/stdout-path are
+> currently ignored by earlycon. There were some hiccups getting the
+> initial support upstream; when 4.4 hits mainline, I'll resubmit
+> my series that implements the of_serial i/o properties and
+> options passthrough to earlycon setup.
 
-  Ok, I understand. But is there a nice way to put it, something like
-x86-tsc/arm64-pct/... ?
 
-> Why is this a define and not a static inline?
+As I said in another thread ("serial: earlycon: allow to specify
+uartclk in earlycon kernel-parameter"),
+stdout-path can pass dev->baud, but not port->uartclk.
 
-There is no specific reason to it . I would change it to static inline.
+It is usually specified "clocks" phandle, but
+clk is not ready at the point of earlycon.
 
-Thanks,
--Amit
+It seems impossible to set up the baudrate even if the options are passed.
+
+
+-- 
+Best Regards
+Masahiro Yamada
