@@ -1,610 +1,131 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 21 Oct 2015 11:10:12 +0100
-Subject: [PATCH 15/19] ARM: dts: omap: replace legacy *,
- wakeup property with wakeup-source
-In-Reply-To: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
-References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1445422216-29375-16-git-send-email-sudeep.holla@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 21 Oct 2015 12:16:19 +0200
+Subject: [PATCH v2 0/6] Switch to generic syscon regmap based drivers
+In-Reply-To: <56272C1C.8040007@samsung.com>
+References: <1445333085-22837-1-git-send-email-alim.akhtar@samsung.com>
+ <CAGOxZ50G-ttivhVjbozUisA0HXcFz7bvRUuPR67xR88TTCa_wQ@mail.gmail.com>
+ <CAGOxZ51_JPy51htzD_M_=qaPVUexkVhoA2ANLS2-rpK3QDT=8A@mail.gmail.com>
+ <1606098.olLAyTIhB3@dell2.five-lan.de> <56272C1C.8040007@samsung.com>
+Message-ID: <562765F3.9010306@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Though the keyboard and other driver will continue to support the legacy
-"gpio-key,wakeup", "linux,wakeup" boolean property to enable the wakeup
-source, "wakeup-source" is the new standard binding.
+Hello Alim,
 
-This patch replaces all the legacy wakeup properties with the unified
-"wakeup-source" property in order to avoid any futher copy-paste
-duplication.
+On 10/21/2015 08:09 AM, Alim Akhtar wrote:
 
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: linux-omap at vger.kernel.org
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts  |  8 ++---
- arch/arm/boot/dts/omap3-beagle-xm.dts              |  2 +-
- arch/arm/boot/dts/omap3-beagle.dts                 |  2 +-
- arch/arm/boot/dts/omap3-cm-t3x.dtsi                |  2 +-
- arch/arm/boot/dts/omap3-devkit8000-common.dtsi     |  2 +-
- arch/arm/boot/dts/omap3-devkit8000-lcd-common.dtsi |  2 +-
- arch/arm/boot/dts/omap3-gta04.dtsi                 |  2 +-
- arch/arm/boot/dts/omap3-ldp.dts                    | 18 ++++++------
- arch/arm/boot/dts/omap3-lilly-a83x.dtsi            |  2 +-
- arch/arm/boot/dts/omap3-n900.dts                   | 10 +++----
- arch/arm/boot/dts/omap3-overo-alto35-common.dtsi   |  2 +-
- .../boot/dts/omap3-overo-chestnut43-common.dtsi    |  4 +--
- arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi    |  2 +-
- arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi    |  2 +-
- arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi |  4 +--
- arch/arm/boot/dts/omap3-overo-palo35-common.dtsi   |  4 +--
- arch/arm/boot/dts/omap3-overo-palo43-common.dtsi   |  4 +--
- arch/arm/boot/dts/omap3-pandora-common.dtsi        | 34 +++++++++++-----------
- .../boot/dts/omap3-panel-sharp-ls037v7dw01.dtsi    |  2 +-
- arch/arm/boot/dts/omap4-duovero-parlor.dts         |  2 +-
- arch/arm/boot/dts/omap4-var-om44customboard.dtsi   |  2 +-
- arch/arm/boot/dts/omap5-cm-t54.dts                 |  2 +-
- 22 files changed, 57 insertions(+), 57 deletions(-)
+[snip]
 
-diff --git a/arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts b/arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts
-index 91146c318798..caeb3b076042 100644
---- a/arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts
-+++ b/arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts
-@@ -23,28 +23,28 @@
- 			label = "sysboot2";
- 			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;	/* gpio2 */
- 			linux,code = <BTN_0>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		sysboot5 {
- 			label = "sysboot5";
- 			gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;	/* gpio7 */
- 			linux,code = <BTN_1>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		gpio1 {
- 			label = "gpio1";
- 			gpios = <&gpio6 21 GPIO_ACTIVE_LOW>;	/* gpio181 */
- 			linux,code = <BTN_2>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		gpio2 {
- 			label = "gpio2";
- 			gpios = <&gpio6 18 GPIO_ACTIVE_LOW>;	/* gpio178 */
- 			linux,code = <BTN_3>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index 7c4dca122a91..f0e2cf3c9e89 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -69,7 +69,7 @@
- 			label = "user";
- 			gpios = <&gpio1 4 GPIO_ACTIVE_HIGH>;
- 			linux,code = <0x114>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 	};
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index 67659a0ed13e..de5138e61ddc 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -80,7 +80,7 @@
- 			label = "user";
- 			gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
- 			linux,code = <0x114>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 	};
-diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-index 4d091ca43e25..5ec6491d7933 100644
---- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-+++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-@@ -238,7 +238,7 @@
- 		ti,debounce-tol = /bits/ 16 <10>;
- 		ti,debounce-rep = /bits/ 16 <1>;
- 
--		linux,wakeup;
-+		wakeup-source;
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/omap3-devkit8000-common.dtsi b/arch/arm/boot/dts/omap3-devkit8000-common.dtsi
-index 9ca2865a83d6..86850bb311eb 100644
---- a/arch/arm/boot/dts/omap3-devkit8000-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-devkit8000-common.dtsi
-@@ -64,7 +64,7 @@
- 			label = "user";
- 			gpios = <&gpio1 26 GPIO_ACTIVE_HIGH>;
- 			linux,code = <BTN_EXTRA>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/omap3-devkit8000-lcd-common.dtsi b/arch/arm/boot/dts/omap3-devkit8000-lcd-common.dtsi
-index e84184de2a4a..2476d3accee0 100644
---- a/arch/arm/boot/dts/omap3-devkit8000-lcd-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-devkit8000-lcd-common.dtsi
-@@ -68,6 +68,6 @@
- 		ti,keep-vref-on = <1>;
- 		ti,settle-delay-usec = /bits/ 16 <150>;
- 
--		linux,wakeup;
-+		wakeup-source;
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
-index 7166d8876ea8..d780ea16a0a3 100644
---- a/arch/arm/boot/dts/omap3-gta04.dtsi
-+++ b/arch/arm/boot/dts/omap3-gta04.dtsi
-@@ -37,7 +37,7 @@
- 			label = "aux";
- 			linux,code = <169>;
- 			gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/omap3-ldp.dts b/arch/arm/boot/dts/omap3-ldp.dts
-index bd6e6769c7ce..3198dafffb7a 100644
---- a/arch/arm/boot/dts/omap3-ldp.dts
-+++ b/arch/arm/boot/dts/omap3-ldp.dts
-@@ -35,63 +35,63 @@
- 			label = "enter";
- 			gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* gpio101 */
- 			linux,code = <KEY_ENTER>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		key_f1 {
- 			label = "f1";
- 			gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* gpio102 */
- 			linux,code = <KEY_F1>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		key_f2 {
- 			label = "f2";
- 			gpios = <&gpio4 7 GPIO_ACTIVE_LOW>; /* gpio103 */
- 			linux,code = <KEY_F2>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		key_f3 {
- 			label = "f3";
- 			gpios = <&gpio4 8 GPIO_ACTIVE_LOW>; /* gpio104 */
- 			linux,code = <KEY_F3>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		key_f4 {
- 			label = "f4";
- 			gpios = <&gpio4 9 GPIO_ACTIVE_LOW>; /* gpio105 */
- 			linux,code = <KEY_F4>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		key_left {
- 			label = "left";
- 			gpios = <&gpio4 10 GPIO_ACTIVE_LOW>; /* gpio106 */
- 			linux,code = <KEY_LEFT>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		key_right {
- 			label = "right";
- 			gpios = <&gpio4 11 GPIO_ACTIVE_LOW>; /* gpio107 */
- 			linux,code = <KEY_RIGHT>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		key_up {
- 			label = "up";
- 			gpios = <&gpio4 12 GPIO_ACTIVE_LOW>; /* gpio108 */
- 			linux,code = <KEY_UP>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		key_down {
- 			label = "down";
- 			gpios = <&gpio4 13 GPIO_ACTIVE_LOW>; /* gpio109 */
- 			linux,code = <KEY_DOWN>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap3-lilly-a83x.dtsi b/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
-index d0dd0365bfda..f0484cedd0bc 100644
---- a/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
-+++ b/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
-@@ -327,7 +327,7 @@
- 		ti,pressure-max = /bits/ 16 <255>;
- 		ti,swap-xy;
- 
--		linux,wakeup;
-+		wakeup-source;
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index 5f5e0f3d5b64..c146f42313cb 100644
---- a/arch/arm/boot/dts/omap3-n900.dts
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -67,28 +67,28 @@
- 			gpios = <&gpio4 14 GPIO_ACTIVE_LOW>; /* 110 */
- 			linux,input-type = <5>; /* EV_SW */
- 			linux,code = <0x09>; /* SW_CAMERA_LENS_COVER */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		camera_focus {
- 			label = "Camera Focus";
- 			gpios = <&gpio3 4 GPIO_ACTIVE_LOW>; /* 68 */
- 			linux,code = <0x210>; /* KEY_CAMERA_FOCUS */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		camera_capture {
- 			label = "Camera Capture";
- 			gpios = <&gpio3 5 GPIO_ACTIVE_LOW>; /* 69 */
- 			linux,code = <0xd4>; /* KEY_CAMERA */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		lock_button {
- 			label = "Lock Button";
- 			gpios = <&gpio4 17 GPIO_ACTIVE_LOW>; /* 113 */
- 			linux,code = <0x98>; /* KEY_SCREENLOCK */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		keypad_slide {
-@@ -96,7 +96,7 @@
- 			gpios = <&gpio3 7 GPIO_ACTIVE_LOW>; /* 71 */
- 			linux,input-type = <5>; /* EV_SW */
- 			linux,code = <0x0a>; /* SW_KEYPAD_SLIDE */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		proximity_sensor {
-diff --git a/arch/arm/boot/dts/omap3-overo-alto35-common.dtsi b/arch/arm/boot/dts/omap3-overo-alto35-common.dtsi
-index 7aae8fb82c1f..3b3a75997f81 100644
---- a/arch/arm/boot/dts/omap3-overo-alto35-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-alto35-common.dtsi
-@@ -48,7 +48,7 @@
- 			label = "button0";
- 			linux,code = <BTN_0>;
- 			gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;		/* gpio_10 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi b/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
-index 17b82f82638a..7df27926ead2 100644
---- a/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
-@@ -41,13 +41,13 @@
- 			label = "button0";
- 			linux,code = <BTN_0>;
- 			gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;		/* gpio_23 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 		button1 at 14 {
- 			label = "button1";
- 			linux,code = <BTN_1>;
- 			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;		/* gpio_14 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi b/arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi
-index 80d236ac64a5..2bbc2bd30b81 100644
---- a/arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi
-@@ -161,6 +161,6 @@
- 		ti,x-plate-ohms = /bits/ 16 <180>;
- 		ti,pressure-max = /bits/ 16 <255>;
- 
--		linux,wakeup;
-+		wakeup-source;
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi b/arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi
-index 048fd216970a..d19a2f293c97 100644
---- a/arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi
-@@ -172,7 +172,7 @@
- 		ti,x-plate-ohms = /bits/ 16 <180>;
- 		ti,pressure-max = /bits/ 16 <255>;
- 
--		linux,wakeup;
-+		wakeup-source;
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi b/arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi
-index 49d2254a99b0..250cc7fe5d5e 100644
---- a/arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi
-@@ -41,13 +41,13 @@
- 			label = "button0";
- 			linux,code = <BTN_0>;
- 			gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;		/* gpio_23 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 		button1 at 14 {
- 			label = "button1";
- 			linux,code = <BTN_1>;
- 			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;		/* gpio_14 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap3-overo-palo35-common.dtsi b/arch/arm/boot/dts/omap3-overo-palo35-common.dtsi
-index 680d7262399c..8df7ec35d17d 100644
---- a/arch/arm/boot/dts/omap3-overo-palo35-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-palo35-common.dtsi
-@@ -41,13 +41,13 @@
- 			label = "button0";
- 			linux,code = <BTN_0>;
- 			gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;		/* gpio_23 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 		button1 at 14 {
- 			label = "button1";
- 			linux,code = <BTN_1>;
- 			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;		/* gpio_14 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap3-overo-palo43-common.dtsi b/arch/arm/boot/dts/omap3-overo-palo43-common.dtsi
-index 087aedf5b902..0ea2c451c809 100644
---- a/arch/arm/boot/dts/omap3-overo-palo43-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-palo43-common.dtsi
-@@ -41,13 +41,13 @@
- 			label = "button0";
- 			linux,code = <BTN_0>;
- 			gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;		/* gpio_23 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 		button1 at 14 {
- 			label = "button1";
- 			linux,code = <BTN_1>;
- 			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;		/* gpio_14 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap3-pandora-common.dtsi b/arch/arm/boot/dts/omap3-pandora-common.dtsi
-index f2084e6d01e7..a5827c7ba1af 100644
---- a/arch/arm/boot/dts/omap3-pandora-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-pandora-common.dtsi
-@@ -84,112 +84,112 @@
- 			label = "up";
- 			linux,code = <KEY_UP>;
- 			gpios = <&gpio4 14 GPIO_ACTIVE_LOW>;	/* GPIO_110 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		down-button {
- 			label = "down";
- 			linux,code = <KEY_DOWN>;
- 			gpios = <&gpio4 7 GPIO_ACTIVE_LOW>;	/* GPIO_103 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		left-button {
- 			label = "left";
- 			linux,code = <KEY_LEFT>;
- 			gpios = <&gpio4 0 GPIO_ACTIVE_LOW>;	/* GPIO_96 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		right-button {
- 			label = "right";
- 			linux,code = <KEY_RIGHT>;
- 			gpios = <&gpio4 2 GPIO_ACTIVE_LOW>;	/* GPIO_98 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		pageup-button {
- 			label = "game 1";
- 			linux,code = <KEY_PAGEUP>;
- 			gpios = <&gpio4 13 GPIO_ACTIVE_LOW>;	/* GPIO_109 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		pagedown-button {
- 			label = "game 3";
- 			linux,code = <KEY_PAGEDOWN>;
- 			gpios = <&gpio4 10 GPIO_ACTIVE_LOW>;	/* GPIO_106 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		home-button {
- 			label = "game 4";
- 			linux,code = <KEY_HOME>;
- 			gpios = <&gpio4 5 GPIO_ACTIVE_LOW>;	/* GPIO_101 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		end-button {
- 			label = "game 2";
- 			linux,code = <KEY_END>;
- 			gpios = <&gpio4 15 GPIO_ACTIVE_LOW>;	/* GPIO_111 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		right-shift {
- 			label = "l";
- 			linux,code = <KEY_RIGHTSHIFT>;
- 			gpios = <&gpio4 6 GPIO_ACTIVE_LOW>;	/* GPIO_102 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		kp-plus {
- 			label = "l2";
- 			linux,code = <KEY_KPPLUS>;
- 			gpios = <&gpio4 1 GPIO_ACTIVE_LOW>;	/* GPIO_97 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		right-ctrl {
- 			label = "r";
- 			linux,code = <KEY_RIGHTCTRL>;
- 			gpios = <&gpio4 9 GPIO_ACTIVE_LOW>;	/* GPIO_105 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		kp-minus {
- 			label = "r2";
- 			linux,code = <KEY_KPMINUS>;
- 			gpios = <&gpio4 11 GPIO_ACTIVE_LOW>;	/* GPIO_107 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		left-ctrl {
- 			label = "ctrl";
- 			linux,code = <KEY_LEFTCTRL>;
- 			gpios = <&gpio4 8 GPIO_ACTIVE_LOW>;	/* GPIO_104 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		menu {
- 			label = "menu";
- 			linux,code = <KEY_MENU>;
- 			gpios = <&gpio4 3 GPIO_ACTIVE_LOW>;	/* GPIO_99 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		hold {
- 			label = "hold";
- 			linux,code = <KEY_COFFEE>;
- 			gpios = <&gpio6 16 GPIO_ACTIVE_LOW>;	/* GPIO_176 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		left-alt {
- 			label = "alt";
- 			linux,code = <KEY_LEFTALT>;
- 			gpios = <&gpio4 4 GPIO_ACTIVE_HIGH>;	/* GPIO_100 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 
- 		lid {
-@@ -617,7 +617,7 @@
- 		ti,x-plate-ohms = /bits/ 16 <40>;
- 		ti,pressure-max = /bits/ 16 <255>;
- 
--		linux,wakeup;
-+		wakeup-source;
- 	};
- 
- 	lcd: lcd at 1 {
-diff --git a/arch/arm/boot/dts/omap3-panel-sharp-ls037v7dw01.dtsi b/arch/arm/boot/dts/omap3-panel-sharp-ls037v7dw01.dtsi
-index f4b1a61853e3..157345bb8e79 100644
---- a/arch/arm/boot/dts/omap3-panel-sharp-ls037v7dw01.dtsi
-+++ b/arch/arm/boot/dts/omap3-panel-sharp-ls037v7dw01.dtsi
-@@ -66,6 +66,6 @@
- 		ti,x-plate-ohms = /bits/ 16 <40>;
- 		ti,pressure-max = /bits/ 16 <255>;
- 		ti,swap-xy;
--		linux,wakeup;
-+		wakeup-source;
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap4-duovero-parlor.dts b/arch/arm/boot/dts/omap4-duovero-parlor.dts
-index 1a78f013f37a..ab17b9929250 100644
---- a/arch/arm/boot/dts/omap4-duovero-parlor.dts
-+++ b/arch/arm/boot/dts/omap4-duovero-parlor.dts
-@@ -36,7 +36,7 @@
- 			label = "button0";
- 			linux,code = <BTN_0>;
- 			gpios = <&gpio4 25 GPIO_ACTIVE_LOW>;	/* gpio_121 */
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/omap4-var-om44customboard.dtsi b/arch/arm/boot/dts/omap4-var-om44customboard.dtsi
-index f2d2fdb75628..6e278d7716a5 100644
---- a/arch/arm/boot/dts/omap4-var-om44customboard.dtsi
-+++ b/arch/arm/boot/dts/omap4-var-om44customboard.dtsi
-@@ -41,7 +41,7 @@
- 			label = "user";
- 			gpios = <&gpio6 24 GPIO_ACTIVE_HIGH>; /* gpio 184 */
- 			linux,code = <BTN_EXTRA>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/omap5-cm-t54.dts b/arch/arm/boot/dts/omap5-cm-t54.dts
-index 61ad2ea34720..95c5523c1230 100644
---- a/arch/arm/boot/dts/omap5-cm-t54.dts
-+++ b/arch/arm/boot/dts/omap5-cm-t54.dts
-@@ -359,7 +359,7 @@
- 		ti,debounce-tol = /bits/ 16 <10>;
- 		ti,debounce-rep = /bits/ 16 <1>;
- 
--		linux,wakeup;
-+		wakeup-source;
- 	};
- };
- 
+>>>>>
+>>>>> Hi Alim,
+>>>>>
+>>>>> I have installed your patch set above with git am on top of
+>>>>> 4.3.0-rc6-00108-gce1fad2 torvalds/linux of today
+>>>>> with make exynos_defconfig on Odroid U3.
+>>>>>
+>>>> which exynos soc Odroid U3 uses?
+>>>>
+>>> OK, I can see its uses exynos4412 and exynos4412-odroidu3.dts does
+>>> include exynos4.dtsi,
+>>> so these should have worked.
+>>>
+>>>>> "halt -p" worked (power 0.0W).
+>>>>> "reboot" got stuck at 0.5W.
+>>>>>
+>>>> reboot stuck mean system does not reboot any more?
+>>
+>> It freezes when going for reboot.
+>> Have to power off/on to boot again.
+>>
+>> Btw I use an mmc, not an sd-card.
+>> No other HW connected, just LAN-cable.
+>> Bootloader is u-boot v2015.10.
+>> o
+> Have checked on 4.3.0-rc6-00006-gd03c139e7e77, still works on peach boards.
+> Sorry I don't have Odroid U3 with me, may be Javier or Krzysztof might help here to check whats wrong. To me its looks more of a board specific issue for now.
+> 
+
+Krzysztof has an Odroid XU3 lite and I have an Odroid XU4, both uses an
+Exynos5422 so we can't check what's wrong with Odroid U3 (Exynos4412).
+
+Having said that I think I know what is the issue here. Markus said that
+he is using an eMMC instead of an uSD (which is what I used and my guess
+is that Krzysztof did too).
+
+Now, there is a subtle difference between the old PMU restart handler
+and the syscon-reboot one, and that is the restart handler priorities:
+
+notifier                    priority
+------------------------------------
+pmu_restart_notify          128
+mmc_pwrseq_emmc_reset_nb    129
+syscon_restart_handle       192
+
+So, without Alim's patches, first the eMMC reset handler will be called
+and then the PMU restart handler but after his series, the syscon reset
+handler has a higher priority so the eMMC reset will never be called.
+
+But the problem is that the eMMC card has to be properly reset on system
+restart to allow the SoC iROM to be able to read the bootloader from the
+eMMC since the iROM doesn't have restart logic and the card shouldn't be
+left in an unknown state.
+
+So the problem here is not that the system is not being reset (that I
+think that works) but that on reboot, the system is not able to boot
+again since the ROM is not able to read the second stage bootloader.
+
+Markus, 
+
+Can you please test following patch [0] on top of Alim's series? If that
+works then it should either be part of Alim's series or the patches will
+have to wait until that patch lands into mainline. I don't have an eMMC
+to test it in XU4 but I'm pretty confident that it will solve the issue.
+
+Best regards,
 -- 
-1.9.1
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
+
+[0]:
+>From c9b250ee03bae338339b70693e906145c719f783 Mon Sep 17 00:00:00 2001
+From: Javier Martinez Canillas <javier@osg.samsung.com>
+Date: Wed, 21 Oct 2015 11:59:44 +0200
+Subject: [RFT PATCH] mmc: pwrseq: Use highest priority for eMMC restart
+ handler
+
+The pwrseq_emmc driver does a eMMC card reset before a system reboot to
+allow broken or limited ROM boot-loaders, that don't have an eMMC reset
+logic, to be able to read the second stage from the eMMC.
+
+But this has to be called before a system reboot handler and while most
+of them use the priority 128, there are other restart handlers (such as
+the syscon-reboot one) that use a higher priority. So, use the highest
+priority to make sure that the eMMC hw is reset before a system reboot.
+
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
+ drivers/mmc/core/pwrseq_emmc.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mmc/core/pwrseq_emmc.c b/drivers/mmc/core/pwrseq_emmc.c
+index 137c97fb7aa8..ad4f94ec7e8d 100644
+--- a/drivers/mmc/core/pwrseq_emmc.c
++++ b/drivers/mmc/core/pwrseq_emmc.c
+@@ -84,11 +84,11 @@ struct mmc_pwrseq *mmc_pwrseq_emmc_alloc(struct mmc_host *host,
+ 
+ 	/*
+ 	 * register reset handler to ensure emmc reset also from
+-	 * emergency_reboot(), priority 129 schedules it just before
+-	 * system reboot
++	 * emergency_reboot(), priority 255 is the highest priority
++	 * so it will be executed before any system reboot handler.
+ 	 */
+ 	pwrseq->reset_nb.notifier_call = mmc_pwrseq_emmc_reset_nb;
+-	pwrseq->reset_nb.priority = 129;
++	pwrseq->reset_nb.priority = 255;
+ 	register_restart_handler(&pwrseq->reset_nb);
+ 
+ 	pwrseq->pwrseq.ops = &mmc_pwrseq_emmc_ops;
+-- 
+2.4.3
