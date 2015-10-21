@@ -1,25 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Oct 2015 16:41:34 -0700
-Subject: MUSB peripheral DMA regression caused by driver core runtime PM change
-Message-ID: <20151021234134.GQ3078@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 21 Oct 2015 16:44:14 -0700
+Subject: [PATCH v3 02/10] clk: cygnus: Convert all macros to all caps
+In-Reply-To: <1444938513-10758-3-git-send-email-jonmason@broadcom.com>
+References: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
+ <1444938513-10758-3-git-send-email-jonmason@broadcom.com>
+Message-ID: <20151021234414.GO19782@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 10/15, Jon Mason wrote:
+> The macros that are being used to initialize the values of the clk
+> structures should be all caps.  Find and replace all of them with their
+> relevant counterparts.
+> 
+> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> ---
 
-I noticed a regresssino in v4.3-rc series to day with MUSB gadgets
-and DMA. Doing a git bisect between v4.2..v4.3-rc1 on it pointed to:
+Applied to clk-next
 
-ddef08dd00f5 ("Driver core: wakeup the parent device before trying probe")
-
-With the commit above reverted things work fine with DMA and USB gadgets.
-
-This is on omap3 with CONFIG_USB_INVENTRA_DMA selected. Selecting
-CONFIG_MUSB_PIO_ONLY still works even without reverting ddef08dd00f5.
-
-Anybody got ideas what might be wrong? Some wrong runtime PM usage
-under drivers/usb/musb?
-
-Regards,
-
-Tony
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
