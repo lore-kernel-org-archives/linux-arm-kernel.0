@@ -1,50 +1,115 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 21 Oct 2015 12:36:29 +0100
-Subject: [GIT PULL] arm64: Juno: Add support for PCIe or R1 board
-Message-ID: <20151021113629.GF3394@e106497-lin.cambridge.arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 21 Oct 2015 20:36:30 +0900
+Subject: [PATCH 4/4] ARM: dts: uniphier: add ProXstream2 Vodka board support
+In-Reply-To: <1445427390-22750-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1445427390-22750-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1445427390-22750-5-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+Initial version of DTS for ProXstream2 Vodka board.
 
-Please consider pulling the following commits for v4.4.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Best regards,
-Liviu
+ arch/arm/boot/dts/Makefile                       |  3 +-
+ arch/arm/boot/dts/uniphier-proxstream2-vodka.dts | 74 ++++++++++++++++++++++++
+ 2 files changed, 76 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
 
-The following changes since commit 25cb62b76430a91cc6195f902e61c2cb84ade622:
-
-  Linux 4.3-rc5 (2015-10-11 11:09:45 -0700)
-
-are available in the git repository at:
-
-  git://linux-arm.org/linux-ld for-upstream/juno-pcie
-
-for you to fetch changes up to 5e7ab8c54ba0f9c9a6332201d00edc6965d44078:
-
-  arm64: defconfig: Enable PCI generic host bridge by default (2015-10-16 15:59:53 +0100)
-
-----------------------------------------------------------------
-Liviu Dudau (3):
-      Documentation: of: Document the bindings used by Juno R1 PCIe host bridge
-      arm64: Juno: Add support for the PCIe host bridge on Juno R1
-      arm64: defconfig: Enable PCI generic host bridge by default
-
- .../devicetree/bindings/pci/arm,juno-r1-pcie.txt     | 10 ++++++++++
- .../devicetree/bindings/pci/plda,xpressrich3-axi.txt | 12 ++++++++++++
- .../devicetree/bindings/vendor-prefixes.txt          |  1 +
- arch/arm64/boot/dts/arm/juno-r1.dts                  | 20 ++++++++++++++++++++
- arch/arm64/configs/defconfig                         |  1 +
- 5 files changed, 44 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/arm,juno-r1-pcie.txt
- create mode 100644 Documentation/devicetree/bindings/pci/plda,xpressrich3-axi.txt
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d7eefec..2e1bc82 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -673,7 +673,8 @@ dtb-$(CONFIG_ARCH_UNIPHIER) += \
+ 	uniphier-ph1-pro4-ref.dtb \
+ 	uniphier-ph1-sld3-ref.dtb \
+ 	uniphier-ph1-sld8-ref.dtb \
+-	uniphier-proxstream2-gentil.dtb
++	uniphier-proxstream2-gentil.dtb \
++	uniphier-proxstream2-vodka.dtb
+ dtb-$(CONFIG_ARCH_VERSATILE) += \
+ 	versatile-ab.dtb \
+ 	versatile-pb.dtb
+diff --git a/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts b/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
+new file mode 100644
+index 0000000..76040bb
+--- /dev/null
++++ b/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
+@@ -0,0 +1,74 @@
++/*
++ * Device Tree Source for UniPhier ProXstream2 Vodka Board
++ *
++ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++/include/ "uniphier-proxstream2.dtsi"
++
++/ {
++	model = "UniPhier ProXstream2 Vodka Board";
++	compatible = "socionext,proxstream2-vodka", "socionext,proxstream2";
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x80000000>;
++	};
++
++	chosen {
++		stdout-path = "serial2:115200n8";
++	};
++
++	aliases {
++		serial0 = &serial0;
++		serial1 = &serial1;
++		serial2 = &serial2;
++	};
++};
++
++&serial2 {
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++};
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+1.9.1
