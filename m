@@ -1,145 +1,111 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Wed, 21 Oct 2015 20:20:43 +0530
-Subject: [PATCH v2 0/6] Switch to generic syscon regmap based drivers
-In-Reply-To: <562765F3.9010306@osg.samsung.com>
-References: <1445333085-22837-1-git-send-email-alim.akhtar@samsung.com>
- <CAGOxZ50G-ttivhVjbozUisA0HXcFz7bvRUuPR67xR88TTCa_wQ@mail.gmail.com>
- <CAGOxZ51_JPy51htzD_M_=qaPVUexkVhoA2ANLS2-rpK3QDT=8A@mail.gmail.com>
- <1606098.olLAyTIhB3@dell2.five-lan.de> <56272C1C.8040007@samsung.com>
- <562765F3.9010306@osg.samsung.com>
-Message-ID: <CAGOxZ52-ia8uhgGg5CiU9TSYkfAsRD52zvLqq++Y-mr4uaFOpg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 21 Oct 2015 16:53:35 +0200
+Subject: [PATCH v6 1/5] clk: Add a basic multiplier clock
+In-Reply-To: <20151020162939.20687.32769@quantum>
+References: <1445326609-6314-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1445326609-6314-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20151020134343.20687.16333@quantum>
+ <20151020144047.GA10947@lukather>
+ <20151020162939.20687.32769@quantum>
+Message-ID: <20151021145335.GF10947@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On Tue, Oct 20, 2015 at 09:29:39AM -0700, Michael Turquette wrote:
+> Quoting Maxime Ripard (2015-10-20 07:40:47)
+> > Hi Mike,
+> > 
+> > On Tue, Oct 20, 2015 at 06:43:43AM -0700, Michael Turquette wrote:
+> > > Hi Maxime,
+> > > 
+> > > Quoting Maxime Ripard (2015-10-20 00:36:45)
+> > > > +struct clk *clk_register_multiplier(struct device *dev, const char *name,
+> > > > +                                   const char *parent_name,
+> > > > +                                   unsigned long flags,
+> > > > +                                   void __iomem *reg, u8 shift, u8 width,
+> > > > +                                   u8 clk_mult_flags, spinlock_t *lock)
+> > > > +{
+> > > 
+> > > Patch looks good in general. However this is a good opportunity to stop
+> > > the madness around the registration functions in these basic clock
+> > > types.
+> > > 
+> > > clk_register is really all that we need since we've had struct
+> > > clk_init_data for a while. Initializing a multiplier should be as simple
+> > > as:
+> > > 
+> > >       struct clk_multiplier clk_foo = {
+> > >               .hw.init = &(struct clk_init_data){
+> > >                       .name = "foo",
+> > >                       .parent_names = (const char *[]){
+> > >                               "bar",
+> > >                       },
+> > >                       .num_parents = 1;
+> > >                       .ops = &clk_multiplier_ops,
+> > >               },
+> > >               .reg = 0xd34db33f,
+> > >               .shift = 1,
+> > >               .width = 2,
+> > >       };
+> > > 
+> > >       clk_register(dev, &clk_foo.hw);
+> > > 
+> > > This is nice since it turns these basic clocks into even more of a
+> > > library and less of a poor mans driver.
+> > > 
+> > > (I really hope the above works. I did not test it)
+> > > 
+> > > Is it possible you can convert to using this method, and if it is
+> > > correct for you then just remove clk_multiplier_register altogether? (In
+> > > fact you might not use the registration function at all since you use
+> > > the composite clock...)
+> > 
+> > This chunk of code has been here since v2, which has been first posted
+> > in May, two and half kernel releases ago.
+> > 
+> > In the meantime, we had a full-blown DMA driver and a quite unusual
+> > ASoC driver merged. For some reason, this is the only piece of the
+> > audio support that is missing for us, while at the same time it's the
+> > most trivial.
+> > 
+> > If that's the only issue you have with this patch, I'm fine with
+> > sending a subsequent patch this week. But I'd be really unhappy with
+> > sending yet another version for a single change, while you had 5
+> > monthes to review it, and we discussed it several times on IRC and
+> > face to face.
+> 
+> The change can go in later. It's not a prerequisite. I had a feeling
+> you'd be grumpy about me asking but I thought I'd try anyways. I won't
+> even ask if you got sign-off from Jim on whether this works for his
+> platforms ;-)
 
-On Wed, Oct 21, 2015 at 3:46 PM, Javier Martinez Canillas
-<javier@osg.samsung.com> wrote:
-> Hello Alim,
->
-> On 10/21/2015 08:09 AM, Alim Akhtar wrote:
->
-> [snip]
->
->>>>>>
->>>>>> Hi Alim,
->>>>>>
->>>>>> I have installed your patch set above with git am on top of
->>>>>> 4.3.0-rc6-00108-gce1fad2 torvalds/linux of today
->>>>>> with make exynos_defconfig on Odroid U3.
->>>>>>
->>>>> which exynos soc Odroid U3 uses?
->>>>>
->>>> OK, I can see its uses exynos4412 and exynos4412-odroidu3.dts does
->>>> include exynos4.dtsi,
->>>> so these should have worked.
->>>>
->>>>>> "halt -p" worked (power 0.0W).
->>>>>> "reboot" got stuck at 0.5W.
->>>>>>
->>>>> reboot stuck mean system does not reboot any more?
->>>
->>> It freezes when going for reboot.
->>> Have to power off/on to boot again.
->>>
->>> Btw I use an mmc, not an sd-card.
->>> No other HW connected, just LAN-cable.
->>> Bootloader is u-boot v2015.10.
->>> o
->> Have checked on 4.3.0-rc6-00006-gd03c139e7e77, still works on peach boards.
->> Sorry I don't have Odroid U3 with me, may be Javier or Krzysztof might help here to check whats wrong. To me its looks more of a board specific issue for now.
->>
->
-> Krzysztof has an Odroid XU3 lite and I have an Odroid XU4, both uses an
-> Exynos5422 so we can't check what's wrong with Odroid U3 (Exynos4412).
->
-> Having said that I think I know what is the issue here. Markus said that
-> he is using an eMMC instead of an uSD (which is what I used and my guess
-> is that Krzysztof did too).
->
-> Now, there is a subtle difference between the old PMU restart handler
-> and the syscon-reboot one, and that is the restart handler priorities:
->
-> notifier                    priority
-> ------------------------------------
-> pmu_restart_notify          128
-> mmc_pwrseq_emmc_reset_nb    129
-> syscon_restart_handle       192
->
-> So, without Alim's patches, first the eMMC reset handler will be called
-> and then the PMU restart handler but after his series, the syscon reset
-> handler has a higher priority so the eMMC reset will never be called.
->
-> But the problem is that the eMMC card has to be properly reset on system
-> restart to allow the SoC iROM to be able to read the bootloader from the
-> eMMC since the iROM doesn't have restart logic and the card shouldn't be
-> left in an unknown state.
->
-> So the problem here is not that the system is not being reset (that I
-> think that works) but that on reboot, the system is not able to boot
-> again since the ROM is not able to read the second stage bootloader.
->
-> Markus,
->
-> Can you please test following patch [0] on top of Alim's series? If that
-> works then it should either be part of Alim's series or the patches will
-> have to wait until that patch lands into mainline. I don't have an eMMC
-> to test it in XU4 but I'm pretty confident that it will solve the issue.
->
-> Best regards,
-> --
-> Javier Martinez Canillas
-> Open Source Group
-> Samsung Research America
->
-> [0]:
-> From c9b250ee03bae338339b70693e906145c719f783 Mon Sep 17 00:00:00 2001
-> From: Javier Martinez Canillas <javier@osg.samsung.com>
-> Date: Wed, 21 Oct 2015 11:59:44 +0200
-> Subject: [RFT PATCH] mmc: pwrseq: Use highest priority for eMMC restart
->  handler
->
-> The pwrseq_emmc driver does a eMMC card reset before a system reboot to
-> allow broken or limited ROM boot-loaders, that don't have an eMMC reset
-> logic, to be able to read the second stage from the eMMC.
->
-> But this has to be called before a system reboot handler and while most
-> of them use the priority 128, there are other restart handlers (such as
-> the syscon-reboot one) that use a higher priority. So, use the highest
-> priority to make sure that the eMMC hw is reset before a system reboot.
->
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
-Looks good.
-Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+I asked several times, he never replied... :/
 
->  drivers/mmc/core/pwrseq_emmc.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/mmc/core/pwrseq_emmc.c b/drivers/mmc/core/pwrseq_emmc.c
-> index 137c97fb7aa8..ad4f94ec7e8d 100644
-> --- a/drivers/mmc/core/pwrseq_emmc.c
-> +++ b/drivers/mmc/core/pwrseq_emmc.c
-> @@ -84,11 +84,11 @@ struct mmc_pwrseq *mmc_pwrseq_emmc_alloc(struct mmc_host *host,
->
->         /*
->          * register reset handler to ensure emmc reset also from
-> -        * emergency_reboot(), priority 129 schedules it just before
-> -        * system reboot
-> +        * emergency_reboot(), priority 255 is the highest priority
-> +        * so it will be executed before any system reboot handler.
->          */
->         pwrseq->reset_nb.notifier_call = mmc_pwrseq_emmc_reset_nb;
-> -       pwrseq->reset_nb.priority = 129;
-> +       pwrseq->reset_nb.priority = 255;
->         register_restart_handler(&pwrseq->reset_nb);
->
->         pwrseq->pwrseq.ops = &mmc_pwrseq_emmc_ops;
-> --
-> 2.4.3
+> The copy/paste nature of these basic clock types really sucks and it is
+> one of many reasons that I am hesitant to accept them and slow to merge
+> them...
 
+I guess we cover all cases now? So it shouldn't grow that much.
 
+> Anyways it seems that you are not using the registration function at all
+> so I might just follow up with a patch to remove it.
+> 
+> I can pick these 5 patches directly, or do you plan to send a PR?
+
+I have a pull request coming for you with a single patch, I can apply
+them on that branch and send you the PR later today if it's okay?
+
+Thanks,
+Maxime
 
 -- 
-Regards,
-Alim
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151021/6d5be779/attachment.sig>
