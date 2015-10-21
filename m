@@ -1,47 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Oct 2015 21:00:24 +0200
-Subject: console vs earlycon ?
-In-Reply-To: <5627AFFF.6060900@hurleysoftware.com>
-References: <CAK7LNARem16fTim8Ds_y8ezMusz_aRtv6c59KoxyC0rLV-RBWw@mail.gmail.com>
- <4963882.HSXu6hF7zO@wuerfel> <5627AFFF.6060900@hurleysoftware.com>
-Message-ID: <3890353.0icCv0Zeuq@wuerfel>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 21 Oct 2015 21:12:54 +0200
+Subject: [PATCH] iommu-common: fix return type of iommu_tbl_range_alloc()
+In-Reply-To: <1442567375-6963-1-git-send-email-andre.przywara@arm.com>
+References: <55FBD36C.5070301@arm.com>
+ <1442567375-6963-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <CAMuHMdXGM0ynDSv-_MdZptXeqJ=sU7=LChmihSCoqanVTUpWXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 October 2015 11:32:15 Peter Hurley wrote:
-> On 10/21/2015 10:13 AM, Arnd Bergmann wrote:
-> > On Wednesday 21 October 2015 09:53:47 Peter Hurley wrote:
-> > 
-> > Ah, I had no idea we were moving in this direction.
-> 
-> I would not say this was a conscious design decision, but rather an
-> outcome of getting-something-working-without-breaking-existing-usage.
-> 
-> My main focus with earlycon/console has been to try to reduce and
-> generalize the existing code.
+Hi Andre, J?rg,
 
-Ok.
+On Fri, Sep 18, 2015 at 11:09 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Though iommu_tbl_range_alloc() is only used by Sparc code, the
+> function itself lives in lib/iommu-common.c and is thus included in
+> other architecture's code as well.
+> When compiled on a 32-bit architecture using 64-bit DMA addresses
+> (ARM with LPAE), there is a compiler warning about a type mismatch
+> between dma_addr_t and the return type of this function:
+>
+> In file included from /src/linux/include/linux/dma-mapping.h:86:0,
+>                  from /src/linux/lib/iommu-common.c:11:
+> /src/linux/lib/iommu-common.c: In function 'iommu_tbl_range_alloc':
+> /src/linux/arch/arm/include/asm/dma-mapping.h:16:24: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+>  #define DMA_ERROR_CODE (~(dma_addr_t)0x0)
+>                         ^
+> /src/linux/lib/iommu-common.c:127:10: note: in expansion of macro
+> 'DMA_ERROR_CODE'
+>    return DMA_ERROR_CODE;
 
-> >> I'm assuming the issue with trying to get console_init() working
-> >> is because the dummy color console causes the earlycon to be disabled?
-> > 
-> > I don't think so.
-> > 
-> > My line of thinking was more about usability: earlycon requires that
-> > you edit the kernel command line at the moment, while console_init()
-> > doesn't require any user interaction and just uses the stdout-path.
-> > 
-> > I guess we could enable earlycon using a Kconfig symbol if we want
-> > to, or make it a per-architecture decision whether it's enabled even
-> > in the absence of the command line flag.
-> 
-> Ah, I see. You want to start the stdout-path console at console_init()
-> time.
+While I welcome a fix for this annoying warning on arm...
 
-Yes, I see this as a tradeoff: we want the console to be as early as
-possible in order to report boot-time errors to the user, but not so early
-to require hacks that can cause problems themselves. earlycon has to
-do some scary stuff and is relatively recent, while the hacks
-necessary for console_init() are much older and better tested.
+> --- a/lib/iommu-common.c
+> +++ b/lib/iommu-common.c
+> @@ -99,15 +99,16 @@ void iommu_tbl_pool_init(struct iommu_map_table *iommu,
+>  }
+>  EXPORT_SYMBOL(iommu_tbl_pool_init);
+>
+> -unsigned long iommu_tbl_range_alloc(struct device *dev,
+> -                               struct iommu_map_table *iommu,
+> -                               unsigned long npages,
+> -                               unsigned long *handle,
+> -                               unsigned long mask,
+> -                               unsigned int align_order)
+> +dma_addr_t iommu_tbl_range_alloc(struct device *dev,
+> +                                struct iommu_map_table *iommu,
+> +                                unsigned long npages,
+> +                                unsigned long *handle,
+> +                                unsigned long mask,
+> +                                unsigned int align_order)
+>  {
+>         unsigned int pool_hash = __this_cpu_read(iommu_hash_common);
+> -       unsigned long n, end, start, limit, boundary_size;
+> +       dma_addr_t n;
+> +       unsigned long end, start, limit, boundary_size;
 
-	Arnd
+... this doesn't look like the right fix.
+
+Apparently 64-bit parisc doesn't set ARCH_DMA_ADDR_T_64BIT, hence assigning
+(64-bit) "unsigned long" to (32-bit) dma_addr_t will truncate the address.
+
+Does this function really need to return DMA_ERROR_CODE in case of
+failure?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
