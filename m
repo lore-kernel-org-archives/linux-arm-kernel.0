@@ -1,48 +1,62 @@
 From: dledford@redhat.com (Doug Ledford)
-Date: Wed, 21 Oct 2015 16:57:17 -0400
-Subject: [PATCH] RDMA/cxgb4: re-fix 32-bit build warning
-In-Reply-To: <13543971.LQ3Q8CCxhL@wuerfel>
-References: <13543971.LQ3Q8CCxhL@wuerfel>
-Message-ID: <5627FC2D.9000402@redhat.com>
+Date: Wed, 21 Oct 2015 16:58:01 -0400
+Subject: [PATCH] IB/core: avoid 32-bit warning
+In-Reply-To: <1444225608.3188.67.camel@opteya.com>
+References: <17269152.DqJfCm1LOx@wuerfel>
+ <56151BDF.8010504@dev.mellanox.co.il> <1444225608.3188.67.camel@opteya.com>
+Message-ID: <5627FC59.4070502@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2015 08:10 AM, Arnd Bergmann wrote:
-> Casting a pointer to __be64 produces a warning on 32-bit architectures:
+On 10/07/2015 09:46 AM, Yann Droneaud wrote:
+> Hi,
 > 
-> drivers/infiniband/hw/cxgb4/mem.c:147:20: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
->     req->wr.wr_lo = (__force __be64)&wr_wait;
+> Le mercredi 07 octobre 2015 ? 16:19 +0300, Sagi Grimberg a ?crit :
+>> On 10/7/2015 3:29 PM, Arnd Bergmann wrote:
+>>> The INIT_UDATA() macro requires a pointer or unsigned long argument
+>>> for
+>>> both input and output buffer, and all callers had a cast from when
+>>> the code was merged until a recent restructuring, so now we get
+>>>
+>>> core/uverbs_cmd.c: In function 'ib_uverbs_create_cq':
+>>> core/uverbs_cmd.c:1481:66: warning: cast to pointer from integer of
+>>> different size [-Wint-to-pointer-cast]
+>>>
+>>> This makes the code behave as before by adding back the cast to
+>>> unsigned long.
+>>>
+>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>> Fixes: 565197dd8fb1 ("IB/core: Extend ib_uverbs_create_cq")
+>>>
+>>> diff --git a/drivers/infiniband/core/uverbs_cmd.c
+>>> b/drivers/infiniband/core/uverbs_cmd.c
+>>> index be4cb9f04be3..88b3b78340f2 100644
+>>> --- a/drivers/infiniband/core/uverbs_cmd.c
+>>> +++ b/drivers/infiniband/core/uverbs_cmd.c
+>>> @@ -1478,7 +1478,7 @@ ssize_t ib_uverbs_create_cq(struct
+>>> ib_uverbs_file *file,
+>>>   	if (copy_from_user(&cmd, buf, sizeof(cmd)))
+>>>   		return -EFAULT;
+>>>
+>>> -	INIT_UDATA(&ucore, buf, cmd.response, sizeof(cmd),
+>>> sizeof(resp));
+>>> +	INIT_UDATA(&ucore, buf, (unsigned long)cmd.response,
+>>> sizeof(cmd), sizeof(resp));
+>>
+>> Would it make sense to cast inside INIT_UDATA() and not have callers
+>> worry about it?
 > 
-> This was fixed at least twice for this driver in different places,
-> and accidentally reverted once more. This puts the correct version
-> back in place.
+> It's ... complicated. See INIT_UDATA_BUF_OR_NULL().
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 6198dd8d7a6a7 ("iw_cxgb4: 32b platform fixes")
+> Awayway, I have patch to do the opposite, eg. explicitly cast u64 value
+> to (void __user *)(unsigned long) in the caller function instead, as it
+> allows some safer / new operations on the response buffer.
+> 
+> Regards.
+> 
 
-Thanks, applied.
-
-> 
-> diff --git a/drivers/infiniband/hw/cxgb4/mem.c b/drivers/infiniband/hw/cxgb4/mem.c
-> index 026b91ebd5e2..140415d31bcc 100644
-> --- a/drivers/infiniband/hw/cxgb4/mem.c
-> +++ b/drivers/infiniband/hw/cxgb4/mem.c
-> @@ -144,7 +144,7 @@ static int _c4iw_write_mem_inline(struct c4iw_rdev *rdev, u32 addr, u32 len,
->  		if (i == (num_wqe-1)) {
->  			req->wr.wr_hi = cpu_to_be32(FW_WR_OP_V(FW_ULPTX_WR) |
->  						    FW_WR_COMPL_F);
-> -			req->wr.wr_lo = (__force __be64)&wr_wait;
-> +			req->wr.wr_lo = (__force __be64)(unsigned long)&wr_wait;
->  		} else
->  			req->wr.wr_hi = cpu_to_be32(FW_WR_OP_V(FW_ULPTX_WR));
->  		req->wr.wr_mid = cpu_to_be32(
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-rdma" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
+I haven't seen this oether patch that Yann is talking about, so I've
+taken this one.
 
 -- 
 Doug Ledford <dledford@redhat.com>
@@ -55,4 +69,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 884 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151021/f618245f/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151021/71b41919/attachment-0001.sig>
