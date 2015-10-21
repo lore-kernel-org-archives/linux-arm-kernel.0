@@ -1,67 +1,35 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Wed, 21 Oct 2015 20:31:10 +0530
-Subject: [PATCH v2 0/6] Switch to generic syscon regmap based drivers
-In-Reply-To: <5627A75E.60509@osg.samsung.com>
-References: <1445333085-22837-1-git-send-email-alim.akhtar@samsung.com>
- <CAGOxZ50G-ttivhVjbozUisA0HXcFz7bvRUuPR67xR88TTCa_wQ@mail.gmail.com>
- <CAGOxZ51_JPy51htzD_M_=qaPVUexkVhoA2ANLS2-rpK3QDT=8A@mail.gmail.com>
- <1606098.olLAyTIhB3@dell2.five-lan.de> <56272C1C.8040007@samsung.com>
- <562765F3.9010306@osg.samsung.com>
- <CAGOxZ52-ia8uhgGg5CiU9TSYkfAsRD52zvLqq++Y-mr4uaFOpg@mail.gmail.com>
- <5627A75E.60509@osg.samsung.com>
-Message-ID: <CAGOxZ537QuzBP4tcG9qh-+iXK-Y=WwZGiJ1-cwtLqwRf0a+wVA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Oct 2015 17:02:20 +0200
+Subject: [GIT PULL] two omap fixes for v4.3-rc cycle
+In-Reply-To: <20151020193401.GM3078@atomide.com>
+References: <20151020193401.GM3078@atomide.com>
+Message-ID: <4037170.1cl4xHYRla@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2015 at 8:25 PM, Javier Martinez Canillas
-<javier@osg.samsung.com> wrote:
-> Hello Alim,
->
-> On 10/21/2015 04:50 PM, Alim Akhtar wrote:
->
-> [snip]
->
->>>
->>> [0]:
->>> From c9b250ee03bae338339b70693e906145c719f783 Mon Sep 17 00:00:00 2001
->>> From: Javier Martinez Canillas <javier@osg.samsung.com>
->>> Date: Wed, 21 Oct 2015 11:59:44 +0200
->>> Subject: [RFT PATCH] mmc: pwrseq: Use highest priority for eMMC restart
->>>  handler
->>>
->>> The pwrseq_emmc driver does a eMMC card reset before a system reboot to
->>> allow broken or limited ROM boot-loaders, that don't have an eMMC reset
->>> logic, to be able to read the second stage from the eMMC.
->>>
->>> But this has to be called before a system reboot handler and while most
->>> of them use the priority 128, there are other restart handlers (such as
->>> the syscon-reboot one) that use a higher priority. So, use the highest
->>> priority to make sure that the eMMC hw is reset before a system reboot.
->>>
->>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>> ---
->> Looks good.
->> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
->>
->
-> Thanks, should I post it as a proper patch or are adding it to your
-> series?
-Suggest you to post as a patch collecting {Tested, Reviewed}-by (easy
-for maintainers to pickup ) and probably CCing Ulf for his feedback.
+On Tuesday 20 October 2015 12:34:01 Tony Lindgren wrote:
+> The following changes since commit d8e1f5ed11a39a68da00f05000466c4f6db4456e:
+> 
+>   Documentation: ARM: List new omap MMC requirements (2015-10-12 16:23:34 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/fixes-rc6
+> 
+> for you to fetch changes up to 57df5380853460bc66b59a46273ce113c923d39c:
+> 
+>   ARM: OMAP2+: Fix imprecise external abort caused by bogus SRAM init (2015-10-19 08:55:46 -0700)
+> 
+> ----------------------------------------------------------------
+> Fixes for omaps for v4.3-rc cycle:
+> 
+> - Fix oops with LPAE and moew than 2GB of memory by enabling
+>   ZONE_DMA for LPAE. Probably no need for stable on this one as we
+>   only recently ran into this with the mainline kernel
+> 
+> - Fix imprecise external abort caused by bogus SRAM init. This affects
+>   dm814x recently merged, so no need for stable on this one AFAIK
 
-> I think the latter is more reasonable so with an ack from Ulf,
-> all patches can go through the linux-samsung tree.
->
-yes, that is reasonable, as I said, let Krzysztof and Ulf take a call here.
+Applied to fixes, thanks!
 
-> Best regards,
-> --
-> Javier Martinez Canillas
-> Open Source Group
-> Samsung Research America
-
-
-
--- 
-Regards,
-Alim
+	Arnd
