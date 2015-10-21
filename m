@@ -1,30 +1,68 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Wed, 21 Oct 2015 09:19:15 -0400
-Subject: [PATCH v4 1/3] xen/arm: Enable cpu_hotplug.c
-In-Reply-To: <alpine.DEB.2.02.1510211358250.27957@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1510211251370.27957@kaball.uk.xensource.com>
- <1445428430-21567-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1510211358250.27957@kaball.uk.xensource.com>
-Message-ID: <562790D3.2090002@oracle.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 21 Oct 2015 15:20:00 +0200
+Subject: [GIT PULL 3/6] KVM: arm: use GIC support unconditionally
+In-Reply-To: <672714208.55851501.1445370665940.JavaMail.zimbra@zmail13.collab.prod.int.phx2.redhat.com>
+References: <1445357947-6022-1-git-send-email-christoffer.dall@linaro.org>
+ <1445357947-6022-4-git-send-email-christoffer.dall@linaro.org>
+ <672714208.55851501.1445370665940.JavaMail.zimbra@zmail13.collab.prod.int.phx2.redhat.com>
+Message-ID: <20151021132000.GA13488@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2015 09:00 AM, Stefano Stabellini wrote:
->>
->> diff --git a/arch/x86/include/asm/xen/hypervisor.h b/arch/x86/include/asm/xen/hypervisor.h
->> index d866959..8b2d4be 100644
->> --- a/arch/x86/include/asm/xen/hypervisor.h
->> +++ b/arch/x86/include/asm/xen/hypervisor.h
->> @@ -57,4 +57,9 @@ static inline bool xen_x2apic_para_available(void)
->>   }
->>   #endif
->>   
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +void xen_arch_register_cpu(int num);
->> +void xen_arch_unregister_cpu(int num);
->> +#endif
+On Tue, Oct 20, 2015 at 03:51:05PM -0400, Paolo Bonzini wrote:
+> Should this be "select" or "depends on"? Not a blocker, can always be fixed in 4.4.
+> 
+Hmm, I don't know actually.  I trusted Arnd to make the right call and
+given Marc's ack as well, I didn't pay too much attention to that
+particular detail.
 
-Why not inline them here, just like you did for ARM?
+Arnd, any comments?
 
+Thanks,
+-Christoffer
 
--boris
+> 
+> 
+> -----Original Message-----
+> From: Christoffer Dall [christoffer.dall at linaro.org]
+> Received: marted?, 20 ott 2015, 18:18
+> To: Paolo Bonzini [pbonzini at redhat.com]; kvmarm at lists.cs.columbia.edu, kvm at vger.kernel.org, linux-arm-kernel at lists.infradead.org
+> CC: Marc Zyngier [marc.zyngier at arm.com]; Arnd Bergmann [arnd at arndb.de]; Christoffer Dall [christoffer.dall at linaro.org]
+> Subject: [GIT PULL 3/6] KVM: arm: use GIC support unconditionally
+> 
+> From: Arnd Bergmann <arnd@arndb.de>
+> 
+> The vgic code on ARM is built for all configurations that enable KVM,
+> but the parent_data field that it references is only present when
+> CONFIG_IRQ_DOMAIN_HIERARCHY is set:
+> 
+> virt/kvm/arm/vgic.c: In function 'kvm_vgic_map_phys_irq':
+> virt/kvm/arm/vgic.c:1781:13: error: 'struct irq_data' has no member named 'parent_data'
+> 
+> This flag is implied by the GIC driver, and indeed the VGIC code only
+> makes sense if a GIC is present. This changes the CONFIG_KVM symbol
+> to always select GIC, which avoids the issue.
+> 
+> Fixes: 662d9715840 ("arm/arm64: KVM: Kill CONFIG_KVM_ARM_{VGIC,TIMER}")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm/kvm/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+> index 210ecca..356970f 100644
+> --- a/arch/arm/kvm/Kconfig
+> +++ b/arch/arm/kvm/Kconfig
+> @@ -21,6 +21,7 @@ config KVM
+>  	depends on MMU && OF
+>  	select PREEMPT_NOTIFIERS
+>  	select ANON_INODES
+> +	select ARM_GIC
+>  	select HAVE_KVM_CPU_RELAX_INTERCEPT
+>  	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
+>  	select KVM_MMIO
+> -- 
+> 2.1.2.330.g565301e.dirty
+> 
