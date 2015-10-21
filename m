@@ -1,117 +1,143 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 21 Oct 2015 17:08:15 -0500
-Subject: [PATCH v3 1/7] drm/vc4: Add devicetree bindings for VC4.
-In-Reply-To: <87a8rcegz2.fsf@eliezer.anholt.net>
-References: <1444426068-15817-1-git-send-email-eric@anholt.net>
- <1444426068-15817-2-git-send-email-eric@anholt.net>
- <CAL_JsqKbAm1=70GaDRg1Z47A9d9FShwpWacMOjr+FE8bZuocVg@mail.gmail.com>
- <87lhb63a60.fsf@eliezer.anholt.net>
- <CAL_JsqJ3ErrFQxA9pLV7pvG3pCEkPFRfE6sGER5uBeFbmDEnxA@mail.gmail.com>
- <87a8rcegz2.fsf@eliezer.anholt.net>
-Message-ID: <CAL_JsqK+2k6e3QYFkr9JfeoRZ_EnQUhKcEpxTinwRNd4AAwUnQ@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 21 Oct 2015 17:15:24 -0500
+Subject: [PATCH v11 1/6] PCI: designware: move calculation of bus
+ addresses to DRA7xx
+In-Reply-To: <1444991021-109306-2-git-send-email-wangzhou1@hisilicon.com>
+References: <1444991021-109306-1-git-send-email-wangzhou1@hisilicon.com>
+ <1444991021-109306-2-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <20151021221524.GM1583@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2015 at 3:57 AM, Eric Anholt <eric@anholt.net> wrote:
-> Rob Herring <robh@kernel.org> writes:
->
->> On Tue, Oct 13, 2015 at 1:17 PM, Eric Anholt <eric@anholt.net> wrote:
->>> Rob Herring <robh@kernel.org> writes:
->>>
->>>> On Fri, Oct 9, 2015 at 4:27 PM, Eric Anholt <eric@anholt.net> wrote:
+Hi Zhou & Gabriele,
 
-[...]
+On Fri, Oct 16, 2015 at 06:23:36PM +0800, Zhou Wang wrote:
+> From: gabriele paoloni <gabriele.paoloni@huawei.com>
+> 
+> Commit f4c55c5a3f7f ("PCI: designware: Program ATU with untranslated
+> address") added the calculation of PCI BUS addresses in designware,
+> storing them in new fields added in "struct pcie_port". This
+> calculation is done for every designware user even if is only
+> applicable to DRA7xx.
+> This patch moves the calculation of the bus addresses to the DRA7xx
+> driver and is needed to allow the rework of designware to use
+> the new DT parsing API.
+> 
+> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+> Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
+> ---
+>  drivers/pci/host/pci-dra7xx.c      | 13 +++++++++++++
+>  drivers/pci/host/pcie-designware.c | 15 ++++-----------
+>  2 files changed, 17 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+> index 199e29a..ebdffa0 100644
+> --- a/drivers/pci/host/pci-dra7xx.c
+> +++ b/drivers/pci/host/pci-dra7xx.c
+> @@ -62,6 +62,7 @@
+>  
+>  #define	PCIECTRL_DRA7XX_CONF_PHY_CS			0x010C
+>  #define	LINK_UP						BIT(16)
+> +#define	CPU_TO_BUS_ADDR					0x0FFFFFFF
 
->>>>> +Required properties for Pixel Valve:
->>>>> +- compatible:  Should be one of "brcm,bcm2835-pixelvalve0",
->>>>> +               "brcm,bcm2835-pixelvalve1", or "brcm,bcm2835-pixelvalve2"
->>>>> +- reg:         Physical base address and length of the PV's registers
->>>>> +- interrupts:  The interrupt number
->>>>> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
->>>>> +
->>>>> +Required properties for HVS:
->>>>> +- compatible:  Should be "brcm,bcm2835-hvs"
->>>>> +- reg:         Physical base address and length of the HVS's registers
->>>>> +- interrupts:  The interrupt number
->>>>> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
->>>>> +
->>>>> +Required properties for HDMI
->>>>
->>>> Is HDMI the only output possibility? If not, then you should have OF
->>>> graph nodes describing the connection between HDMI block and HVS (or
->>>> PV?).
->>>
->>> I'm using compatible strings for the different instances of the module:
->>> brcm,bcm2835-pixelvalve0/1/2.  This lets the connections get wired up
->>> cleanly and understandably within the driver.  I spent a long time
->>> trying to come up with an OF graph-based implementation, and I
->>> eventually gave up.
->>
->> I missed that before, but sorry, that's not how you should be using
->> compatible strings. What was your issue with OF graph? It can be
->> difficult to parse. I'd like to improve that with more common parsing
->> code.
->
-> pv2 is definitely different hardware than pv0/1 (some different source
-> files, not just connections at hw module instantiation).  This seems to
-> be an obvious case for compatible strings.  I haven't looked enough into
-> pv0/1 to tell if they're different at a hardware level, since I haven't
-> added any support for the encoders using them yet.
+"CPU_TO_BUS_ADDR" is a very generic name.  Since you do have DRA7XX in
+other #defines and static symbols in this file, maybe it could be DRA7XX to
+make it obvious that it only applies here?
 
-If you can come up with something more descriptive that would be good.
-Certain features or capabilities for example. If not, I guess this is
-okay. I worry that the numbering could be different in a future part,
-but the IP otherwise unchanged. Then you would not be able to use
-these compatible strings.
+>  
+>  struct dra7xx_pcie {
+>  	void __iomem		*base;
+> @@ -151,6 +152,18 @@ static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
+>  static void dra7xx_pcie_host_init(struct pcie_port *pp)
+>  {
+>  	dw_pcie_setup_rc(pp);
+> +
+> +	if (pp->io_mod_base)
+> +		pp->io_mod_base &= CPU_TO_BUS_ADDR;
 
-> OF graph: Doesn't appear to solve any problems that the driver has.  The
-> pv needs to know what kind of encoder is downstream to make choices
-> about its programming.  The bits in its documentation refer to encoders
-> by name.  I could write up a ton of DT bindings trying to generate an
-> abstraction so that the driver could map back to what it has today, but
-> it would just make the driver more obfuscated and error prone.  It's
-> much cleaner to let the two driver submodules talk to each other and
-> sort it out.
+These are equivalent to
 
-Okay.
+  pp->io_mod_base &= CPU_TO_BUS_ADDR;
 
->>>>> +- compatible:  Should be "brcm,bcm2835-hdmi"
->>>>> +- reg:         Physical base address and length of the two register ranges
->>>>> +                 ("HDMI" and "HD", in that order)
->>>>> +- interrupts:  The interrupt numbers
->>>>> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
->>>>> +- ddc:         phandle of the I2C controller used for DDC EDID probing
->>>>> +- clocks:      a) hdmi: The HDMI state machine clock
->>>>> +               b) pixel: The pixel clock.
->>>>> +
->>>>> +Optional properties for HDMI:
->>>>> +- hpd-gpio:    The GPIO pin for HDMI hotplug detect (if it doesn't appear
->>>>
->>>> *-gpio is deprecated, so "hpd-gpios".
->>>>
->>>> Really, I think this and ddc should be in hdmi-connector binding node.
->>>> What has been done for bindings so far is all over the map though.
->>>
->>> You say hpd-gpios is deprectated, but that I should use the
->>> hdmi-connector binding that uses hpd-gpios.  Which one is it?  If
->>> hpd-gpios deprecated, what is supposed to be used instead?
->>
->> No, I said "hpd-gpio" with no "s" is deprecated. In other words,
->> always use -gpios whether it is 1 or more gpio.
->
-> Fixed.
->
->> The connector part is a separate issue of the location of these
->> properties. If you think about it, the gpio line and I2C bus have
->> nothing to do with the HDMI node. That's different than cases of HDMI
->> bridges which have a HPD signal and dedicated I2C controller. Most
->> examples in the kernel have not followed this and do as you have. I
->> only have a desire to have common binding and code to handle
->> connectors at this point, but that is the direction I want to go.
->
-> If you come up with common code that makes driver development easier
-> instead of harder, I'll be interested to see.
+(You don't need to test whether they're zero first.)
 
-The start is common bindings. :)
+> +
+> +	if (pp->mem_mod_base)
+> +		pp->mem_mod_base &= CPU_TO_BUS_ADDR;
+> +
+> +	if (pp->cfg0_mod_base) {
+> +		pp->cfg0_mod_base &= CPU_TO_BUS_ADDR;
+> +		pp->cfg1_mod_base &= CPU_TO_BUS_ADDR;
+> +	}
+> +
+>  	dra7xx_pcie_establish_link(pp);
+>  	if (IS_ENABLED(CONFIG_PCI_MSI))
+>  		dw_pcie_msi_init(pp);
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 52aa6e3..75338a6 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -365,14 +365,10 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  	struct of_pci_range range;
+>  	struct of_pci_range_parser parser;
+>  	struct resource *cfg_res;
+> -	u32 val, na, ns;
+> +	u32 val, ns;
+>  	const __be32 *addrp;
+>  	int i, index, ret;
+>  
+> -	/* Find the address cell size and the number of cells in order to get
+> -	 * the untranslated address.
+> -	 */
+> -	of_property_read_u32(np, "#address-cells", &na);
+>  	ns = of_n_size_cells(np);
+>  
+>  	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
+> @@ -415,8 +411,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  			pp->io_base = range.cpu_addr;
+>  
+>  			/* Find the untranslated IO space address */
+> -			pp->io_mod_base = of_read_number(parser.range -
+> -							 parser.np + na, ns);
+> +			pp->io_mod_base = range.cpu_addr;
 
-Rob
+So apparently 
+
+  "of_read_number() == range.cpu_addr & CPU_TO_BUS_ADDR" on DRA7xx
+  "of_read_number() == range.cpu_addr" everywhere else?
+
+Is that right?  Is that a valid assumption, i.e., are we assuming
+anything about DTs in the field that we shouldn't?
+
+>  		}
+>  		if (restype == IORESOURCE_MEM) {
+>  			of_pci_range_to_resource(&range, np, &pp->mem);
+> @@ -425,8 +420,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  			pp->mem_bus_addr = range.pci_addr;
+>  
+>  			/* Find the untranslated MEM space address */
+> -			pp->mem_mod_base = of_read_number(parser.range -
+> -							  parser.np + na, ns);
+> +			pp->mem_mod_base = range.cpu_addr;
+>  		}
+>  		if (restype == 0) {
+>  			of_pci_range_to_resource(&range, np, &pp->cfg);
+> @@ -436,8 +430,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  			pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
+>  
+>  			/* Find the untranslated configuration space address */
+> -			pp->cfg0_mod_base = of_read_number(parser.range -
+> -							   parser.np + na, ns);
+> +			pp->cfg0_mod_base = range.cpu_addr;
+>  			pp->cfg1_mod_base = pp->cfg0_mod_base +
+>  					    pp->cfg0_size;
+>  		}
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
