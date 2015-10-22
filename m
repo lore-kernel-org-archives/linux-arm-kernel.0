@@ -1,50 +1,34 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 22 Oct 2015 17:22:01 +0100
-Subject: [PATCH v4 1/3] xen/arm: Enable cpu_hotplug.c
-In-Reply-To: <56290B8A.8040501@oracle.com>
-References: <alpine.DEB.2.02.1510211251370.27957@kaball.uk.xensource.com>
- <1445428430-21567-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1510211358250.27957@kaball.uk.xensource.com>
- <562790D3.2090002@oracle.com>
- <alpine.DEB.2.02.1510211632580.15801@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1510221713160.15801@kaball.uk.xensource.com>
- <56290B8A.8040501@oracle.com>
-Message-ID: <alpine.DEB.2.02.1510221720500.15801@kaball.uk.xensource.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 22 Oct 2015 09:33:15 -0700
+Subject: [PATCH 2/2] can: xilinx: fix bug in bus error handling
+In-Reply-To: <1445489163-11045-2-git-send-email-appanad@xilinx.com>
+References: <1445489163-11045-1-git-send-email-appanad@xilinx.com>
+ <1445489163-11045-2-git-send-email-appanad@xilinx.com>
+Message-ID: <20151022163315.GI5257@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Oct 2015, Boris Ostrovsky wrote:
-> On 10/22/2015 12:13 PM, Stefano Stabellini wrote:
-> > On Wed, 21 Oct 2015, Stefano Stabellini wrote:
-> > > On Wed, 21 Oct 2015, Boris Ostrovsky wrote:
-> > > > On 10/21/2015 09:00 AM, Stefano Stabellini wrote:
-> > > > > > diff --git a/arch/x86/include/asm/xen/hypervisor.h
-> > > > > > b/arch/x86/include/asm/xen/hypervisor.h
-> > > > > > index d866959..8b2d4be 100644
-> > > > > > --- a/arch/x86/include/asm/xen/hypervisor.h
-> > > > > > +++ b/arch/x86/include/asm/xen/hypervisor.h
-> > > > > > @@ -57,4 +57,9 @@ static inline bool xen_x2apic_para_available(void)
-> > > > > >    }
-> > > > > >    #endif
-> > > > > >    +#ifdef CONFIG_HOTPLUG_CPU
-> > > > > > +void xen_arch_register_cpu(int num);
-> > > > > > +void xen_arch_unregister_cpu(int num);
-> > > > > > +#endif
-> > > > Why not inline them here, just like you did for ARM?
-> > > I don't think is good practice to define static inline functions under
-> > > arch/something, then use them under drivers/something_else. It is
-> > > tolerable if the static inline functions are empty and the driver in
-> > > question cannot be compiled as module, like in this case for the arm.
-> > > 
-> > > In addition the x86 implementation calls arch_(un)register_cpu, which
-> > > requires #include <asm/cpu.h>, which doesn't compile if added to
-> > > arch/x86/include/asm/xen/hypervisor.h.
-> > Boris, does this explanation satisfy you?
-> > Do you want me to change anything?
+On Thu, 2015-10-22 at 10:16AM +0530, Kedareswara rao Appana wrote:
+> Simply resetting the peripheral on bus off condition is not enough,
+> Because we also need to re-initialize the whole device.
+> This patch fixes this issue.
 > 
-> Sorry, I forgot to respond!
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+>  drivers/net/can/xilinx_can.c | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
 > 
-> Reviewed-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
+> index 055d6f3..9aeb85f 100644
+> --- a/drivers/net/can/xilinx_can.c
+> +++ b/drivers/net/can/xilinx_can.c
+> @@ -529,6 +529,8 @@ static int xcan_rx(struct net_device *ndev)
+>  	return 1;
+>  }
+>  
+> +static void xcan_chip_stop(struct net_device *ndev);
 
-Fantatic, thank you!
-I'll apply to for-linus-4.4.
+Isn't it possible to move the function and avoid the forward
+declaration?
+
+	S?ren
