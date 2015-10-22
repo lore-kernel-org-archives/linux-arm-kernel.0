@@ -1,47 +1,31 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 22 Oct 2015 11:18:42 +0200
-Subject: [PATCH 1/4] arm: omap2+: add missing HWMOD_NO_IDLEST in 81xx hwmod
- data
-Message-ID: <5628A9F2.3010801@baylibre.com>
+Date: Thu, 22 Oct 2015 11:18:47 +0200
+Subject: [PATCH 2/4] clk: ti816x: Add missing dmtimer clkdev entries
+Message-ID: <5628A9F7.9090105@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing HWMOD_NO_IDLEST hwmod flag for entries no
-having omap4 clkctrl values.
+Add missing clkdev dmtimer related entries for dm816x.
+32Khz and ext sources were missing.
 
 Cc: Brian Hutchinson <b.hutchman@gmail.com>
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/clk/ti/clk-816x.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-index b1288f5..6256052 100644
---- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-@@ -144,6 +144,7 @@ static struct omap_hwmod dm81xx_l4_ls_hwmod = {
- 	.name		= "l4_ls",
- 	.clkdm_name	= "alwon_l3s_clkdm",
- 	.class		= &l4_hwmod_class,
-+	.flags		= HWMOD_NO_IDLEST,
- };
-
- /*
-@@ -155,6 +156,7 @@ static struct omap_hwmod dm81xx_l4_hs_hwmod = {
- 	.name		= "l4_hs",
- 	.clkdm_name	= "alwon_l3_med_clkdm",
- 	.class		= &l4_hwmod_class,
-+	.flags		= HWMOD_NO_IDLEST,
- };
-
- /* L3 slow -> L4 ls peripheral interface running at 125MHz */
-@@ -850,6 +852,7 @@ static struct omap_hwmod dm816x_emac0_hwmod = {
- 	.name		= "emac0",
- 	.clkdm_name	= "alwon_ethernet_clkdm",
- 	.class		= &dm816x_emac_hwmod_class,
-+	.flags		= HWMOD_NO_IDLEST,
- };
-
- static struct omap_hwmod_ocp_if dm81xx_l4_hs__emac0 = {
+diff --git a/drivers/clk/ti/clk-816x.c b/drivers/clk/ti/clk-816x.c
+index 1dfad0c..2a5d84f 100644
+--- a/drivers/clk/ti/clk-816x.c
++++ b/drivers/clk/ti/clk-816x.c
+@@ -20,6 +20,8 @@ static struct ti_dt_clk dm816x_clks[] = {
+ 	DT_CLK(NULL, "sys_clkin", "sys_clkin_ck"),
+ 	DT_CLK(NULL, "timer_sys_ck", "sys_clkin_ck"),
+ 	DT_CLK(NULL, "sys_32k_ck", "sys_32k_ck"),
++	DT_CLK(NULL, "timer_32k_ck", "sysclk18_ck"),
++	DT_CLK(NULL, "timer_ext_ck", "tclkin_ck"),
+ 	DT_CLK(NULL, "mpu_ck", "mpu_ck"),
+ 	DT_CLK(NULL, "timer1_fck", "timer1_fck"),
+ 	DT_CLK(NULL, "timer2_fck", "timer2_fck"),
 -- 
 1.9.1
