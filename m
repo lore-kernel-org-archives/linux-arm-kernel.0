@@ -1,25 +1,34 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 22 Oct 2015 18:55:24 +0300
-Subject: [PATCH v3 08/16] KVM: arm64: handle ITS related GICv3
- redistributor registers
-In-Reply-To: <015d01d10ce0$cb7009a0$62501ce0$@samsung.com>
-References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
- <1444229726-31559-9-git-send-email-andre.przywara@arm.com>
- <015d01d10ce0$cb7009a0$62501ce0$@samsung.com>
-Message-ID: <015e01d10ce2$112c6780$33853680$@samsung.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 22 Oct 2015 11:00:20 -0500
+Subject: [PATCH v3 1/3] mailbox/omap: Add ti, mbox-send-noirq quirk to fix
+ AM33xx CPU Idle
+In-Reply-To: <CAJe_Zhd4RoVQJKjGN8QKYCeDMWVsuPQhCj4gUpQwkAX_Wqnxxg@mail.gmail.com>
+References: <1442967294-23837-1-git-send-email-d-gerlach@ti.com>
+ <1442967294-23837-2-git-send-email-d-gerlach@ti.com>
+ <CABb+yY0rCGCj=vkNXP1c9zonX+snBxdKFeQ4JCo2aKb-h6JhCw@mail.gmail.com>
+ <56282833.5010105@ti.com>
+ <CAJe_Zhd4RoVQJKjGN8QKYCeDMWVsuPQhCj4gUpQwkAX_Wqnxxg@mail.gmail.com>
+Message-ID: <56290814.5030805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+On 10/21/2015 11:42 PM, Jassi Brar wrote:
+> On 22 October 2015 at 05:35, Suman Anna <s-anna@ti.com> wrote:
+> 
+>>>   Anyways I am OK too, if you guys want to fix it with a platform
+>>> specific quirk. Let me know I'll pick this patch.
+>>
+>> I haven't gotten a chance to try #1, and I won't be able to look at it
+>> atleast for another month. I suggest that you go ahead and pick this
+>> patch up, as a quirk is needed in one form or the other for #2, and #1
+>> is anyways a bigger change that will affect all our IPC stacks across
+>> all pairs of MPU - remote processors on different SoCs.
+>>
+> Yeah that is the reason I offered to pick this patch as such.
+> OK I'll take this patch.
 
- One more idea...
+Thanks a lot. We will be a lot closer to get PM working on AM335/AM437x
+SoCs.
 
->  Here you store lpis_enabled globally, and this is plain wrong.
-
- By the way, may be we should move this flag, together with pendbaser array, into struct vgic_cpu? Then we would not have to
-allocate them manually.
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+regards
+Suman
