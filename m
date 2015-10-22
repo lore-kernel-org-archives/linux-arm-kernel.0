@@ -1,86 +1,75 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 21 Oct 2015 20:15:10 -0500
-Subject: [PATCH V2 1/3] Documentation for system mmu in hi6220 platform.
-In-Reply-To: <1445330724-129401-1-git-send-email-puck.chen@hisilicon.com>
-References: <1445330724-129401-1-git-send-email-puck.chen@hisilicon.com>
-Message-ID: <CAL_JsqLSh2tA6EB8JSZ95c13yRfiPhfyuVaGcfKR=JE3RDYy4Q@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 22 Oct 2015 10:17:48 +0900
+Subject: [PATCH] MAINTAINERS: ARM: EXYNOS: Add documentation and
+ dt-bindings
+In-Reply-To: <56278E5C.9040603@osg.samsung.com>
+References: <1445391203-3819-1-git-send-email-k.kozlowski@samsung.com>
+ <5627509E.6090503@osg.samsung.com>
+ <CAJKOXPdG9qd_bAPdpKQSWJ5bM_LnjQ=XcWH14sa1jo0T5b+8zQ@mail.gmail.com>
+ <56278E5C.9040603@osg.samsung.com>
+Message-ID: <5628393C.7050105@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 3:45 AM, Chen Feng <puck.chen@hisilicon.com> wrote:
-> docs: iommu: Documentation for smmu in hi6220 SoC.
->
-> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
-> Signed-off-by: Yu Dongbin <yudongbin@hisilicon.com>
-> ---
->  .../bindings/iommu/hisi,hi6220-iommu.txt           | 52 ++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iommu/hisi,hi6220-iommu.txt
->
-> diff --git a/Documentation/devicetree/bindings/iommu/hisi,hi6220-iommu.txt b/Documentation/devicetree/bindings/iommu/hisi,hi6220-iommu.txt
-> new file mode 100644
-> index 0000000..93e0701
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iommu/hisi,hi6220-iommu.txt
-> @@ -0,0 +1,52 @@
-> +Hi6220 SoC SMMU Device Driver devicetree document
-> +=======================================================================
-> +The Architecture of SMMU on Hi6220 SoC:
-> +
-> +   +------------------------------------------------------------------+
-> +   |                                                                  |
-> +   |         +---------+  +--------+  +-------------+   +-------+     |
-> +   |         |   ADE   |  |  ISP   |  |  V/J codec  |   |  G3D  |     |
-> +   |         +----|----+  +---|----+  +------|------+   +---|---|     |
-> +   |              |           |              |              |         |
-> +   |     ---------v-----------v--------------v--------------v-----    |
-> +   |                           Media Bus                              |
-> +   |     --------------------------------|---------------|--------    |
-> +   |                                     |               |            |
-> +   |                                 +---v---------------v--------+   |
-> +   |                                 |            SMMU            |   |
-> +   |                                 +----------|---------|-------+   |
-> +   |                                            |         |           |
-> +   +--------------------------------------------|---------|-----------+
-> +                                                |         |
-> +                                   +------------v---------v-----------+
-> +                                   |              DDRC                |
-> +                                   +----------------------------------+
+On 21.10.2015 22:08, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
+> 
+> On 10/21/2015 02:43 PM, Krzysztof Kozlowski wrote:
+>> 2015-10-21 17:45 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
+>>>
+>>> Hello Krzysztof,
+>>>
+>>> Patch looks good to me, I've only one comment.
+>>>
+>>> On 10/21/2015 03:33 AM, Krzysztof Kozlowski wrote:
+>>>> Extend the Samsung Exynos maintainer entry to match SoC documentation
+>>>> and SoC dt-bindings directories. Without that some files, like
+>>>> bindings/arm/samsung/pmu.txt, are not matched by existing patterns.
+>>>>
+>>>> This also may serve as a hint where new documentation and bindings (not
+>>>> matching specific subsystem) should be put.
+>>>>
+>>>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>> Cc: Kukjin Kim <kgene@kernel.org>
+>>>> ---
+>>>>  MAINTAINERS | 2 ++
+>>>>  1 file changed, 2 insertions(+)
+>>>>
+>>>> diff --git a/MAINTAINERS b/MAINTAINERS
+>>>> index b556aad90930..cad7b6b628b2 100644
+>>>> --- a/MAINTAINERS
+>>>> +++ b/MAINTAINERS
+>>>> @@ -1459,6 +1459,8 @@ F:      drivers/*/*s3c2410*
+>>>>  F:   drivers/*/*/*s3c2410*
+>>>>  F:   drivers/spi/spi-s3c*
+>>>>  F:   sound/soc/samsung/*
+>>>> +F:   Documentation/arm/Samsung/
+>>>
+>>> That there is also a Documentation/arm/Samsung-S3C24XX/ so
+>>> I think this should be Documentation/arm/Samsung*/ instead.
+>>
+>> I am not sure... I think this is documentation from the Ben Dooks'
+>> work and there is a entry for S3C241x machines:
+>> SIMTEC EB2410ITX )
+>>
+> 
+> I'm not familiar with S3C241x but the EB2410ITX entry only covers
+> a couple of files under arch/arm/mach-s3c24xx, basically all that
+> are related to the BAST machine (board file and platform data).
+> 
+> But arch/arm/mach-s3c24* and drivers/*/*s3c2410* are covered by
+> the ARM/SAMSUNG entry so that's why I thought the Samsung-S3C24XX
+> docs should be there too since are SoC and not board specific.
 
-Nice diagram.
+Right, but in the same time the documentation clearly is related to the
+boards from that time (pre-Exynos).
 
-> +
-> +Note:
-> +The media system shared the same smmu IP. to access DDR memory. And all
-> +media IP used the same page table.
-> +
-> +Below binding describes the system mmu for media system in hi6220 platform
-> +
-> +Required properties:
-> +- compatible: Should be "hisilicon,hi6220-smmu" example:
-> +               compatible = "hisilicon,hi6220-smmu";
-> +- reg: A tuple of base address and size of System MMU registers.
-> +- interrupts: An interrupt specifier for interrupt signal of System MMU.
-> +- clocks: The clock used for smmu IP.
-> +- clock-names: The name to enable clock with clock framework.
-> +- #iommu-cells: The iommu-cells should be 1 for muti-master to use.
-> +
-> +Examples:
-> +       smmu at f4210000 {
+> It's your call but I would put it in ARM/SAMSUNG and only the file
+> Documentation/arm/Samsung-S3C24XX/EB2410ITX.txt in the BAST entry.
 
-node name should be iommu.
+I would prefer to leave it as is... Anyway thanks for comments and if
+anyone feels like doing re-organization and cleanup on this old
+documents - please go ahead.
 
-> +               compatible = "hisilicon,hi6220-smmu";
-> +               reg = <0x0 0xf4210000 0x0 0x1000>;
-> +               interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
-> +               clocks = <&sys_ctrl HI6220_MMU_CLK>,
-> +                        <&media_ctrl HI6220_MED_MMU>,
-> +                        <&sys_ctrl HI6220_MEDIA_PLL_SRC>;
-> +               clock-names = "smmu_clk",
-> +                             "media_sc_clk",
-> +                             "smmu_peri_clk";
-> +               #iommu-cells = <1>;
-> +       };
-> --
-> 1.9.1
->
+Best regards,
+Krzysztof
