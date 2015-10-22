@@ -1,60 +1,60 @@
 From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 22 Oct 2015 13:43:46 -0500
-Subject: [PATCH 05/11] dt-binding: Add ngpios property to GPIO controller
- node
-In-Reply-To: <1445233398-27129-6-git-send-email-pramodku@broadcom.com>
+Date: Thu, 22 Oct 2015 13:45:03 -0500
+Subject: [PATCH 01/11] dt-bindings: pinctrl: Optional DT property to
+ support pin mappings
+In-Reply-To: <1445233398-27129-2-git-send-email-pramodku@broadcom.com>
 References: <1445233398-27129-1-git-send-email-pramodku@broadcom.com>
- <1445233398-27129-6-git-send-email-pramodku@broadcom.com>
-Message-ID: <CAL_Jsq+Xwf7==J1LLnUDtj-cgJWRizbKXcYtwfEe5iv8VS-Uwg@mail.gmail.com>
+ <1445233398-27129-2-git-send-email-pramodku@broadcom.com>
+Message-ID: <CAL_JsqJaJO+ytBrZvwHkPjM9-Wr8MHMK-uTV93QLium3JL_A3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Oct 19, 2015 at 12:43 AM, Pramod Kumar <pramodku@broadcom.com> wrote:
-> Add ngpios property to the gpio controller's DT node so that controller
-> driver extracts total number of gpio lines present in controller
-> from DT and removes dependency on driver.
+> If GPIO controller's pins are muxed, pin-controller subsystem
+> need to be intimated by defining mapping between gpio and
+> pinmux controller. This patch adds required properties to
+> define this mapping via DT.
 >
 > Signed-off-by: Pramod Kumar <pramodku@broadcom.com>
 > Reviewed-by: Ray Jui <rjui@broadcom.com>
 > Reviewed-by: Scott Branden <sbranden@broadcom.com>
+
+Acked-by: Rob Herring <robh@kernel.org>
+
 > ---
->  Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt | 5 +++++
->  1 file changed, 5 insertions(+)
+>  .../devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt         | 12 +++++++++---
+>  1 file changed, 9 insertions(+), 3 deletions(-)
 >
 > diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
-> index f92b833..655a8d7 100644
+> index 6540ca5..25a5002 100644
 > --- a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
 > +++ b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
-> @@ -10,6 +10,9 @@ Required properties:
->      Define the base and range of the I/O address space that contains the Cygnus
->  GPIO/PINCONF controller registers
+> @@ -26,9 +26,13 @@ Optional properties:
+>  - interrupt-controller:
+>      Specifies that the node is an interrupt controller
 >
-> +- ngpios:
-> +    Total number of GPIOs the controller provides
-
-This must be optional for compatibility and the driver needs to handle
-it not present.
-
-> +
->  - #gpio-cells:
->      Must be two. The first cell is the GPIO pin number (within the
->  controller's pin space) and the second cell is used for the following:
-> @@ -57,6 +60,7 @@ Example:
->                 compatible = "brcm,cygnus-ccm-gpio";
->                 reg = <0x1800a000 0x50>,
->                       <0x0301d164 0x20>;
-> +               ngpios = <24>;
->                 #gpio-cells = <2>;
->                 gpio-controller;
->                 interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> @@ -78,6 +82,7 @@ Example:
->         gpio_asiu: gpio at 180a5000 {
->                 compatible = "brcm,cygnus-asiu-gpio";
->                 reg = <0x180a5000 0x668>;
-> +               ngpios = <146>;
->                 #gpio-cells = <2>;
+> -- pinmux:
+> -    Specifies the phandle to the IOMUX device, where pins can be individually
+> -muxed to GPIO
+> +- gpio-ranges:
+> +    Specifies the mapping between gpio controller and pin-controllers pins.
+> +    This requires 4 fields in cells defined as -
+> +    1. Phandle of pin-controller.
+> +    2. GPIO base pin offset.
+> +    3  Pin-control base pin offset.
+> +    4. number of gpio pins which are linearly mapped from pin base.
+>
+>  Supported generic PINCONF properties in child nodes:
+>
+> @@ -78,6 +82,8 @@ Example:
 >                 gpio-controller;
 >                 interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
+>                 interrupt-controller;
+> +               gpio-ranges = <&pinctrl 0 42 1>,
+> +                               <&pinctrl 1 44 3>;
+>         };
+>
+>         /*
 > --
 > 1.9.1
 >
