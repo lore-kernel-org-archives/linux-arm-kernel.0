@@ -1,62 +1,73 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Thu, 22 Oct 2015 09:25:30 +0800
-Subject: [PATCH v2 2/2] ARM: dts: rockchip: Add the OTP gpio pinctrl
-In-Reply-To: <1445477130-17065-1-git-send-email-wxt@rock-chips.com>
-References: <1445477130-17065-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1445477130-17065-3-git-send-email-wxt@rock-chips.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 21 Oct 2015 20:26:59 -0500
+Subject: [PATCH RESEND net-next] net: updates HNS config and documents
+In-Reply-To: <1445308604-95860-1-git-send-email-yankejian@huawei.com>
+References: <1445308604-95860-1-git-send-email-yankejian@huawei.com>
+Message-ID: <CAL_JsqJ+4BK2KDX5+t6GGEYv3pPDc+crktiMqgu6QTZi7WDrxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the "init" pinctrl as the OTP gpio state.
-We need the OTP pin is gpio state before resetting the TSADC controller,
-since the tshut polarity will generate a high signal.
+On Mon, Oct 19, 2015 at 9:36 PM, yankejian <yankejian@huawei.com> wrote:
+> updates the bindings documents and dtsi file according to the review
+> comments from Rob Herring <robh@kernel.org>
+>
+> Signed-off-by: yankejian <yankejian@huawei.com>
+> Signed-off-by: huangdaode <huangdaode@hisilicon.com>
 
-"init" pinctrl property is defined by Doug's Patch[0].
+Acked-by: Rob Herring <robh@kernel.org>
 
-Patch[0]:
-https://patchwork.kernel.org/patch/7454311/
-
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
----
-
-Changes in v2:
-  - Add some commits for more obvious in PATCH[2/2]
-
-Changes in v1:
-  - As the Doug comments, drop the thermal driver patchs since
-    we can with pinctrl changing to work.
-  - As the Doug's patch to add the 'init' property.
-
- arch/arm/boot/dts/rk3288.dtsi | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 906e938..6ea89aa 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -447,8 +447,9 @@
- 		clock-names = "tsadc", "apb_pclk";
- 		resets = <&cru SRST_TSADC>;
- 		reset-names = "tsadc-apb";
--		pinctrl-names = "default";
--		pinctrl-0 = <&otp_out>;
-+		pinctrl-names = "init", "default";
-+		pinctrl-0 = <&otp_gpio>;
-+		pinctrl-1 = <&otp_out>;
- 		#thermal-sensor-cells = <1>;
- 		rockchip,hw-tshut-temp = <95000>;
- 		status = "disabled";
-@@ -1273,6 +1274,10 @@
- 		};
- 
- 		tsadc {
-+			otp_gpio: otp-gpio {
-+				rockchip,pins = <0 10 RK_FUNC_GPIO &pcfg_pull_none>;
-+			};
-+
- 			otp_out: otp-out {
- 				rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_none>;
- 			};
--- 
-1.9.1
+> ---
+>  Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt | 2 +-
+>  arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi                 | 8 +++-----
+>  2 files changed, 4 insertions(+), 6 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
+> index 9940aa0..9c23fdf 100644
+> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
+> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
+> @@ -12,7 +12,7 @@ Example:
+>           mdio at 803c0000 {
+>                     #address-cells = <1>;
+>                     #size-cells = <0>;
+> -                   compatible = "hisilicon,mdio","hisilicon,hns-mdio";
+> +                   compatible = "hisilicon,hns-mdio","hisilicon,mdio";
+>                     reg = <0x0 0x803c0000 0x0 0x10000>;
+>
+>                     ethernet-phy at 0 {
+> diff --git a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+> index 3500586..606dd5a 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+> @@ -13,14 +13,12 @@ soc0: soc at 000000000 {
+>                 reg = <0x0 0x803c0000 0x0 0x10000
+>                        0x0 0x80000000 0x0 0x10000>;
+>
+> -               soc0_phy4: ethernet-phy at 4 {
+> +               soc0_phy0: ethernet-phy at 0 {
+>                         reg = <0x0>;
+> -                       device_type = "ethernet-phy";
+>                         compatible = "ethernet-phy-ieee802.3-c22";
+>                 };
+> -               soc0_phy5: ethernet-phy at 5 {
+> +               soc0_phy1: ethernet-phy at 1 {
+>                         reg = <0x1>;
+> -                       device_type = "ethernet-phy";
+>                         compatible = "ethernet-phy-ieee802.3-c22";
+>                 };
+>         };
+> @@ -37,7 +35,7 @@ soc0: soc at 000000000 {
+>                        0x0 0xc7000000 0x0 0x60000
+>                        >;
+>
+> -               phy-handle = <0 0 0 0 &soc0_phy4 &soc0_phy5 0 0>;
+> +               phy-handle = <0 0 0 0 &soc0_phy0 &soc0_phy1 0 0>;
+>                 interrupts = <
+>                         /* [14] ge fifo err 8 / xge 6**/
+>                         149 0x4 150 0x4 151 0x4 152 0x4
+> --
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
