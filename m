@@ -1,38 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 22 Oct 2015 09:54:11 -0700
-Subject: [PATCH v2] ARM: dts: fix gpio-keys wakeup-source property
-In-Reply-To: <1445011296-29042-1-git-send-email-sudeep.holla@arm.com>
-References: <1445011296-29042-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20151022165411.GD19953@localhost>
+Date: Thu, 22 Oct 2015 10:05:44 -0700
+Subject: [GIT PULL] PSCI 1.0 implementation for v4.4
+In-Reply-To: <20151005145557.GA2705@red-moon>
+References: <20151005145557.GA2705@red-moon>
+Message-ID: <20151022170544.GG19953@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 05:01:36PM +0100, Sudeep Holla wrote:
-> The keyboard driver for GPIO buttons(gpio-keys) checks for one of the
-> two boolean properties to enable gpio buttons as wakeup source:
-> 1. "wakeup-source" or
-> 2. the legacy "gpio-key,wakeup"
+On Mon, Oct 05, 2015 at 03:55:57PM +0100, Lorenzo Pieralisi wrote:
+> Hi Arnd, Kevin, Olof,
 > 
-> However juno, ste-snowball and emev2-kzm9d dts file have a undetected
-> "wakeup" property to indictate the wakeup source.
+> please consider pulling the following commits for v4.4.
 > 
-> This patch fixes it by making use of "wakeup-source" property.
+> The commits update the PSCI kernel interface implementation
+> so that it becomes compliant with the PSCI v1.0 specification and
+> also provide code that enables PSCI based suspend-to-RAM
+> based on the newly introduced PSCI v1.0 System Suspend call.
 > 
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Acked-by: Simon Horman <horms@verge.net.au>
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  arch/arm/boot/dts/emev2-kzm9d.dts             |  8 ++++----
->  arch/arm/boot/dts/ste-snowball.dts            | 10 +++++-----
->  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 12 ++++++------
->  3 files changed, 15 insertions(+), 15 deletions(-)
+> Thanks,
+> Lorenzo
 > 
-> Hi ARM-SoC group,
+> The following changes since commit 9ffecb10283508260936b96022d4ee43a7798b4c:
 > 
-> Please consider this as a fix for v4.3 if possible.
+>   Linux 4.3-rc3 (2015-09-27 07:50:08 -0400)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/firmware/psci-1.0
+> 
+> for you to fetch changes up to faf7ec4a92c0231d1079177095077c162eb9b466:
+> 
+>   drivers: firmware: psci: add system suspend support (2015-10-02 14:35:17 +0100)
 
-Applied now, thanks.
+THanks, and apologies for the delayed merge of this branch. I've added it to
+our next/drivers now, and we're carrying it as drivers/psci on its own as well.
 
 
 -Olof
