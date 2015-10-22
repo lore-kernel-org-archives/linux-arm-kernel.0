@@ -1,64 +1,51 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Thu, 22 Oct 2015 08:39:46 +0000
-Subject: [PATCH 1/2] can: xilinx: use readl/writel instead of
- ioread/iowrite
-In-Reply-To: <56289CA6.1060809@pengutronix.de>
-References: <1445489163-11045-1-git-send-email-appanad@xilinx.com>
- <4061693.oBld7AKBIp@wuerfel> <56289CA6.1060809@pengutronix.de>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A4F2CEB@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 22 Oct 2015 10:47:35 +0200
+Subject: [PATCH 5/6] ARM: dts: sunxi: Add Allwinner H3 DTSI
+In-Reply-To: <20151022102959.09f0a1f4@OPI2>
+References: <1445444428-4652-1-git-send-email-jenskuske@gmail.com>
+ <1445444428-4652-2-git-send-email-jenskuske@gmail.com>
+ <20151022080508.GN10947@lukather> <20151022102959.09f0a1f4@OPI2>
+Message-ID: <20151022084735.GR10947@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-> -----Original Message-----
-> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
-> Sent: Thursday, October 22, 2015 1:52 PM
-> To: Arnd Bergmann; linux-arm-kernel at lists.infradead.org
-> Cc: Appana Durga Kedareswara Rao; Anirudha Sarangi; wg at grandegger.com;
-> Michal Simek; Soren Brinkmann; Appana Durga Kedareswara Rao;
-> netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
-> can at vger.kernel.org
-> Subject: Re: [PATCH 1/2] can: xilinx: use readl/writel instead of ioread/iowrite
+On Thu, Oct 22, 2015 at 10:29:59AM +0200, Jean-Francois Moine wrote:
+> On Thu, 22 Oct 2015 10:05:08 +0200
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 > 
-> On 10/22/2015 10:14 AM, Arnd Bergmann wrote:
-> > On Thursday 22 October 2015 10:16:02 Kedareswara rao Appana wrote:
-> >> The driver only supports memory-mapped I/O [by ioremap()], so
-> >> readl/writel is actually the right thing to do, IMO.
-> >> During the validation of this driver or IP on ARM 64-bit processor
-> >> while sending lot of packets observed that the tx packet drop with
-> >> iowrite Putting the barriers for each tx fifo register write fixes
-> >> this issue Instead of barriers using writel also fixed this issue.
-> >>
-> >> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> >
-> > The two should really do the same thing: iowrite32() is just a static
-> > inline calling writel() on both ARM32 and ARM64. On which kernel
-> > version did you observe the difference? It's possible that an older
-> > version used CONFIG_GENERIC_IOMAP, which made this slightly more
-> expensive.
-> >
-> > If there are barriers that you want to get rid of for performance
-> > reasons, you should use writel_relaxed(), but be careful to
-> > synchronize them correctly with regard to DMA. It should be fine in
-> > this driver, as it does not perform any DMA, but be aware that there
-> > is no big-endian version of
-> > writel_relaxed() at the moment.
+> > > +		uart0: serial at 01c28000 {
+> > > +			compatible = "snps,dw-apb-uart";
+> > > +			reg = <0x01c28000 0x400>;
+> > > +			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+> > > +			reg-shift = <2>;
+> > > +			reg-io-width = <4>;
+> > > +			clocks = <&bus_gates 112>;
+> > > +			resets = <&bus_rst 208>;  
+> > 
+> > It's a bit weird that the clocks and reset indices don't match,
+> > usually they do.
+> > 
+> > What's even weirder is that there's a 96 offset between the two (4 *
+> > 32), is this expected?
 > 
-> We don't have DMA in CAN drivers, but usually a certain write triggers sending.
-> Do we need a barrier before triggering the sending?
+> Yes, this is conform to the H3 documentation.
 
-Yes During validation of this IP on ARM 64 bit processor with using iowrite32() and sending a lot of packets it requires barriers before triggering the send.
-With using writel() barriers are not needed.
+Not really. The uart0 reset is the bit 16, in the reset register 4.
 
-Regards,
-Kedar.
+4 * 32 + 16 = 44.
 
-> 
-> Marc
-> 
-> --
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Not 112, but still not 208 either.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151022/c2923062/attachment.sig>
