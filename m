@@ -1,133 +1,198 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Oct 2015 17:40:56 +0200
-Subject: [GIT PULL] ARM: SoC fixes for 4.3-rc
-Message-ID: <6788509.osko4XNn1O@wuerfel>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 22 Oct 2015 18:46:18 +0300
+Subject: [PATCH v3 08/16] KVM: arm64: handle ITS related GICv3
+ redistributor registers
+In-Reply-To: <1444229726-31559-9-git-send-email-andre.przywara@arm.com>
+References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
+ <1444229726-31559-9-git-send-email-andre.przywara@arm.com>
+Message-ID: <015d01d10ce0$cb7009a0$62501ce0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 25cb62b76430a91cc6195f902e61c2cb84ade622:
+ Hello!
 
-  Linux 4.3-rc5 (2015-10-11 11:09:45 -0700)
+ During my work on live migration i found a big bug in your implementation.
 
-are available in the git repository at:
+> -----Original Message-----
+> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On Behalf Of Andre Przywara
+> Sent: Wednesday, October 07, 2015 5:55 PM
+> To: marc.zyngier at arm.com; christoffer.dall at linaro.org
+> Cc: eric.auger at linaro.org; p.fedin at samsung.com; kvmarm at lists.cs.columbia.edu; linux-arm-
+> kernel at lists.infradead.org; kvm at vger.kernel.org
+> Subject: [PATCH v3 08/16] KVM: arm64: handle ITS related GICv3 redistributor registers
+> 
+> In the GICv3 redistributor there are the PENDBASER and PROPBASER
+> registers which we did not emulate so far, as they only make sense
+> when having an ITS. In preparation for that emulate those MMIO
+> accesses by storing the 64-bit data written into it into a variable
+> which we later read in the ITS emulation.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Changelog v2..v3:
+> - rename vgic_handle_base_register to vgic_reg64_access()
+> 
+>  include/kvm/arm_vgic.h      |  8 ++++++++
+>  virt/kvm/arm/vgic-v3-emul.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic.c         | 31 +++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic.h         |  2 ++
+>  4 files changed, 85 insertions(+)
+> 
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 067ad09..06c33bc 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -272,6 +272,14 @@ struct vgic_dist {
+>  	/* Virtual irq to hwirq mapping */
+>  	spinlock_t		irq_phys_map_lock;
+>  	struct list_head	irq_phys_map_list;
+> +
+> +	/* Address of LPI configuration table shared by all redistributors */
+> +	u64			propbaser;
+> +
+> +	/* Addresses of LPI pending tables per redistributor */
+> +	u64			*pendbaser;
+> +
+> +	bool			lpis_enabled;
+>  };
+> 
+>  struct vgic_v2_cpu_if {
+> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+> index a8cf669..6939f7c 100644
+> --- a/virt/kvm/arm/vgic-v3-emul.c
+> +++ b/virt/kvm/arm/vgic-v3-emul.c
+> @@ -651,6 +651,38 @@ static bool handle_mmio_cfg_reg_redist(struct kvm_vcpu *vcpu,
+>  	return vgic_handle_cfg_reg(reg, mmio, offset);
+>  }
+> 
+> +/* We don't trigger any actions here, just store the register value */
+> +static bool handle_mmio_propbaser_redist(struct kvm_vcpu *vcpu,
+> +					 struct kvm_exit_mmio *mmio,
+> +					 phys_addr_t offset)
+> +{
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +	int mode = ACCESS_READ_VALUE;
+> +
+> +	/* Storing a value with LPIs already enabled is undefined */
+> +	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
+> +	vgic_reg64_access(mmio, offset, &dist->propbaser, mode);
+> +
+> +	return false;
+> +}
+> +
+> +/* We don't trigger any actions here, just store the register value */
+> +static bool handle_mmio_pendbaser_redist(struct kvm_vcpu *vcpu,
+> +					 struct kvm_exit_mmio *mmio,
+> +					 phys_addr_t offset)
+> +{
+> +	struct kvm_vcpu *rdvcpu = mmio->private;
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +	int mode = ACCESS_READ_VALUE;
+> +
+> +	/* Storing a value with LPIs already enabled is undefined */
+> +	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
 
-  git+ssh://gitolite at ra.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+ Here you store lpis_enabled globally, and this is plain wrong.
 
-for you to fetch changes up to 55f41297576ddb7868af2f13f3a8107178dee2d0:
+ Linux kernel separately programs PENDBASER and enables LPIs on every CPU. Therefore, after CPU #0 is initialized (this happens much
+earlier than everything else), dist->lpis_enabled is set to true, and subsequent PROPBASER writes, even for different
+redistributors, will be ignored. As a result, you'll get dist->pendbaser[n] == NULL forever, where n > 0. And your
+its_sync_lpi_pending_table() actually reads some garbage from physical address 0 of the guest.
 
-  Merge tag 'mvebu-fixes-4.3-2' of git://git.infradead.org/linux-mvebu into fixes (2015-10-21 17:03:37 +0200)
+ Attempts to write data to that region silently corrupts random qemu data during migration, that's how i discovered it.
 
-----------------------------------------------------------------
-ARM: SoC fixes for 4.3-rc
+> +	vgic_reg64_access(mmio, offset,
+> +			  &dist->pendbaser[rdvcpu->vcpu_id], mode);
+> +
+> +	return false;
+> +}
+> +
+>  #define SGI_base(x) ((x) + SZ_64K)
+> 
+>  static const struct vgic_io_range vgic_redist_ranges[] = {
+> @@ -679,6 +711,18 @@ static const struct vgic_io_range vgic_redist_ranges[] = {
+>  		.handle_mmio    = handle_mmio_raz_wi,
+>  	},
+>  	{
+> +		.base		= GICR_PENDBASER,
+> +		.len		= 0x08,
+> +		.bits_per_irq	= 0,
+> +		.handle_mmio	= handle_mmio_pendbaser_redist,
+> +	},
+> +	{
+> +		.base		= GICR_PROPBASER,
+> +		.len		= 0x08,
+> +		.bits_per_irq	= 0,
+> +		.handle_mmio	= handle_mmio_propbaser_redist,
+> +	},
+> +	{
+>  		.base           = GICR_IDREGS,
+>  		.len            = 0x30,
+>  		.bits_per_irq   = 0,
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 4219f22..11bf692 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -471,6 +471,37 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
+>  	}
+>  }
+> 
+> +/* handle a 64-bit register access */
+> +void vgic_reg64_access(struct kvm_exit_mmio *mmio, phys_addr_t offset,
+> +		       u64 *basereg, int mode)
+> +{
+> +	u32 reg;
+> +	u64 breg;
+> +
+> +	switch (offset & ~3) {
+> +	case 0x00:
+> +		breg = *basereg;
+> +		reg = lower_32_bits(breg);
+> +		vgic_reg_access(mmio, &reg, offset & 3, mode);
+> +		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
+> +			breg &= GENMASK_ULL(63, 32);
+> +			breg |= reg;
+> +			*basereg = breg;
+> +		}
+> +		break;
+> +	case 0x04:
+> +		breg = *basereg;
+> +		reg = upper_32_bits(breg);
+> +		vgic_reg_access(mmio, &reg, offset & 3, mode);
+> +		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
+> +			breg  = lower_32_bits(breg);
+> +			breg |= (u64)reg << 32;
+> +			*basereg = breg;
+> +		}
+> +		break;
+> +	}
+> +}
+> +
+>  bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
+>  			phys_addr_t offset)
+>  {
+> diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
+> index a093f5c..104f780 100644
+> --- a/virt/kvm/arm/vgic.h
+> +++ b/virt/kvm/arm/vgic.h
+> @@ -71,6 +71,8 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
+>  		     phys_addr_t offset, int mode);
+>  bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
+>  			phys_addr_t offset);
+> +void vgic_reg64_access(struct kvm_exit_mmio *mmio, phys_addr_t offset,
+> +		       u64 *basereg, int mode);
+> 
+>  static inline
+>  u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
+> --
+> 2.5.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Most of the changes this time are for incorrect device nodes in various
-ways, on on imx, berlin, exynos, ux500, uniphier, omap and meson.
-
-Chen-Yu Tsai now co-maintains mach-sunxi (Allwinner).
-
-Other bug fixes include
- * a partial revert of a broken tegra gpio patch
- * irq affinity for arm ccn
- * suspend on one Armada 385 machine
- * enable ZONE_DMA to avoid an OMAP crash for over 2GB RAM
- * turning on a regulator on beagleboard-x15 for HDMI
- * making the omap gpmc debug code visible
- * setup of orion network switch
- * a rare build regression for pxa
-
-----------------------------------------------------------------
-Alim Akhtar (1):
-      ARM: dts: Fix audio card detection on Peach boards
-
-Arnd Bergmann (8):
-      Merge tag 'mvebu-fixes-4.3-1' of git://git.infradead.org/linux-mvebu into fixes
-      Merge tag 'berlin-fixes-for-4.3-1' of git://git.infradead.org/users/hesselba/linux-berlin into fixes
-      Merge tag 'imx-fixes-4.3-2' of git://git.kernel.org/.../shawnguo/linux into fixes
-      ARM: pxa: fix pxa3xx DFI lockup hack
-      Merge tag 'omap-for-v4.3/fixes-rc5' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'omap-for-v4.3/fixes-rc6' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'samsung-fixes-2' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-      Merge tag 'mvebu-fixes-4.3-2' of git://git.infradead.org/linux-mvebu into fixes
-
-Carlo Caione (1):
-      ARM: meson6: DTS: Fix wrong reg mapping and IRQ numbers
-
-Fabio Estevam (1):
-      ARM: dts: imx7d: Fix UART2 base address
-
-Florian Fainelli (1):
-      ARM: orion: Fix DSA platform device after mvmdio conversion
-
-Krzysztof Kozlowski (1):
-      ARM: EXYNOS: Fix double of_node_put() when parsing child power domains
-
-Linus Walleij (1):
-      ARM: ux500: modify initial levelshifter status
-
-Marcin Wojtas (1):
-      ARM: mvebu: correct a385-db-ap compatible string
-
-Masahiro Yamada (1):
-      ARM: dts: uniphier: fix IRQ number for devices on PH1-LD6b ref board
-
-Maxime Ripard (1):
-      MAINTAINERS: Update Allwinner entry and add new maintainer
-
-Pawel Moll (2):
-      bus: arm-ccn: Handle correctly no-more-cpus case
-      bus: arm-ccn: Fix irq affinity setting on CPU migration
-
-Sudip Mukherjee (1):
-      thermal: exynos: Fix register read in TMU
-
-Thierry Reding (1):
-      ARM: tegra: Comment out gpio-ranges properties
-
-Thomas Hebb (1):
-      ARM: dts: berlin: change BG2Q's USB PHY compatible
-
-Tomi Valkeinen (1):
-      ARM: dts: am57xx-beagle-x15: set VDD_SD to always-on
-
-Tony Lindgren (4):
-      memory: omap-gpmc: Fix unselectable debug option for GPMC
-      Documentation: ARM: List new omap MMC requirements
-      ARM: OMAP2+: Fix oops with LPAE and more than 2GB of memory
-      ARM: OMAP2+: Fix imprecise external abort caused by bogus SRAM init
-
-Uwe Kleine-K?nig (1):
-      memory: omap-gpmc: dump "before" state before first modification
-
-Will Deacon (1):
-      drivers/perf: arm_pmu: avoid CPU device_node reference leak
-
- Documentation/arm/OMAP/README                     |  7 +++++++
- MAINTAINERS                                       |  5 +++--
- arch/arm/boot/dts/am57xx-beagle-x15.dts           |  3 ++-
- arch/arm/boot/dts/armada-385-db-ap.dts            |  2 +-
- arch/arm/boot/dts/berlin2q.dtsi                   |  6 +++---
- arch/arm/boot/dts/exynos5420-peach-pit.dts        |  5 +++++
- arch/arm/boot/dts/exynos5800-peach-pi.dts         |  5 +++++
- arch/arm/boot/dts/imx7d.dtsi                      |  4 ++--
- arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts |  2 +-
- arch/arm/boot/dts/meson.dtsi                      | 23 ++++++++++++-----------
- arch/arm/boot/dts/omap3-evm-37xx.dts              |  2 +-
- arch/arm/boot/dts/ste-hrefv60plus.dtsi            |  2 +-
- arch/arm/boot/dts/tegra114.dtsi                   |  2 ++
- arch/arm/boot/dts/tegra124.dtsi                   |  2 ++
- arch/arm/boot/dts/tegra20.dtsi                    |  2 ++
- arch/arm/boot/dts/tegra30.dtsi                    |  2 ++
- arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts       |  2 +-
- arch/arm/mach-exynos/pm_domains.c                 |  8 +++-----
- arch/arm/mach-omap2/Kconfig                       |  2 ++
- arch/arm/mach-omap2/board-generic.c               | 10 ++++++++++
- arch/arm/mach-omap2/pdata-quirks.c                |  9 ++++++++-
- arch/arm/mach-pxa/pxa3xx.c                        |  9 +++++----
- arch/arm/plat-orion/common.c                      |  2 +-
- drivers/bus/arm-ccn.c                             |  5 +++--
- drivers/memory/Kconfig                            | 12 +++++++++---
- drivers/memory/omap-gpmc.c                        |  2 +-
- drivers/perf/arm_pmu.c                            | 10 ++++++++--
- drivers/thermal/samsung/exynos_tmu.c              |  2 +-
- 28 files changed, 103 insertions(+), 44 deletions(-)
- create mode 100644 Documentation/arm/OMAP/README
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
