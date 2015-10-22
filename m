@@ -1,46 +1,120 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 22 Oct 2015 09:26:40 +0900
-Subject: [PATCH 1/2] dt-bindings: Consolidate Exynos SoC bindings under
- Samsung directory
-In-Reply-To: <CAL_JsqLhbqJOhQrGwg3CZ2Th+wgf3oMR6-2oNNZ98yHNjxsx_A@mail.gmail.com>
-References: <1445391051-3727-1-git-send-email-k.kozlowski@samsung.com>
- <CAL_JsqLhbqJOhQrGwg3CZ2Th+wgf3oMR6-2oNNZ98yHNjxsx_A@mail.gmail.com>
-Message-ID: <56282D40.2050504@samsung.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 22 Oct 2015 03:00:27 +0200
+Subject: [PATCH v6 01/22] driver core: handle -EPROBE_DEFER from
+ bus_type.match()
+In-Reply-To: <1442844182-27787-2-git-send-email-tomeu.vizoso@collabora.com>
+References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1442844182-27787-2-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1908332.fNIEkCOsjd@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.10.2015 09:22, Rob Herring wrote:
-> On Tue, Oct 20, 2015 at 8:30 PM, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
->> Exynos SoC Device Tree bindings are spread over arm/exynos/ and
->> arm/samsung/ directories. There is no need for that separation and it
->> actually confuses. Put everything under arm/samsung/.
+On Monday, September 21, 2015 04:02:41 PM Tomeu Vizoso wrote:
+> Lets implementations of the match() callback in struct bus_type to
+> return errors and if it's -EPROBE_DEFER then queue the device for
+> deferred probing.
 > 
-> Thanks for the clean-up.
+> This is useful to buses such as AMBA in which devices are registered
+> before their matching information can be retrieved from the HW
+> (typically because a clock driver hasn't probed yet).
 > 
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> ---
->>  .../devicetree/bindings/arm/{exynos => samsung}/power_domain.txt          | 0
->>  Documentation/devicetree/bindings/arm/{ => samsung}/samsung-boards.txt    | 0
->>  Documentation/devicetree/bindings/arm/{exynos => samsung}/smp-sysram.txt  | 0
->>  3 files changed, 0 insertions(+), 0 deletions(-)
->>  rename Documentation/devicetree/bindings/arm/{exynos => samsung}/power_domain.txt (100%)
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> ---
 > 
-> I'd rather see this with other power domain bindings. So
-> bindings/power/pd-samsung.txt I guess.
+> 
+>  drivers/base/dd.c      | 24 ++++++++++++++++++++++--
+>  include/linux/device.h |  2 +-
+>  2 files changed, 23 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index be0eb4639128..7dc04ee81c8b 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -488,6 +488,7 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
+>  	struct device_attach_data *data = _data;
+>  	struct device *dev = data->dev;
+>  	bool async_allowed;
+> +	int ret;
+>  
+>  	/*
+>  	 * Check if device has already been claimed. This may
+> @@ -498,8 +499,17 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
+>  	if (dev->driver)
+>  		return -EBUSY;
+>  
+> -	if (!driver_match_device(drv, dev))
+> +	ret = driver_match_device(drv, dev);
+> +	if (!ret)
+>  		return 0;
+> +	else if (ret < 0) {
+> +		if (ret == -EPROBE_DEFER) {
+> +			dev_dbg(dev, "Device match requests probe deferral\n");
+> +			driver_deferred_probe_add(dev);
+> +		} else
+> +			dev_warn(dev, "Bus failed to match device: %d", ret);
+> +		return ret;
+> +	}
 
-OK
+The code below was reachable if an error was returned from driver_match_device()
+before this patch.  What's the reason for changing that?
 
+Shouldn't the code here really be:
+
+	ret = driver_match_device(drv, dev);
+	if (!ret)
+		return 0;
+
+	if (ret == -EPROBE_DEFER) {
+		driver_deferred_probe_add(dev);
+		return ret;
+	}
+
+>  	async_allowed = driver_allows_async_probing(drv);
+>  
+> @@ -619,6 +629,7 @@ void device_initial_probe(struct device *dev)
+>  static int __driver_attach(struct device *dev, void *data)
+>  {
+>  	struct device_driver *drv = data;
+> +	int ret;
+>  
+>  	/*
+>  	 * Lock device and try to bind to it. We drop the error
+> @@ -630,8 +641,17 @@ static int __driver_attach(struct device *dev, void *data)
+>  	 * is an error.
+>  	 */
+>  
+> -	if (!driver_match_device(drv, dev))
+> +	ret = driver_match_device(drv, dev);
+> +	if (!ret)
+> +		return 0;
+> +	else if (ret < 0) {
+> +		if (ret == -EPROBE_DEFER) {
+> +			dev_dbg(dev, "Device match requests probe deferral\n");
+> +			driver_deferred_probe_add(dev);
+> +		} else
+> +			dev_warn(dev, "Bus failed to match device: %d", ret);
+>  		return 0;
+
+Same comment here, plus why do we return 0 at this point?
+
+> +	}
+>  
+>  	if (dev->parent)	/* Needed for USB */
+>  		device_lock(dev->parent);
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index 5d7bc6349930..8e7b806f0744 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -70,7 +70,7 @@ extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
+>   * @dev_groups:	Default attributes of the devices on the bus.
+>   * @drv_groups: Default attributes of the device drivers on the bus.
+>   * @match:	Called, perhaps multiple times, whenever a new device or driver
+> - *		is added for this bus. It should return a nonzero value if the
+> + *		is added for this bus. It should return a positive value if the
+>   *		given device can be handled by the given driver.
+>   * @uevent:	Called when a device is added, removed, or a few other things
+>   *		that generate uevents to add the environment variables.
 > 
->>  rename Documentation/devicetree/bindings/arm/{ => samsung}/samsung-boards.txt (100%)
->>  rename Documentation/devicetree/bindings/arm/{exynos => samsung}/smp-sysram.txt (100%)
-> 
-> Probably need to move misc/sram.txt to bindings/sram/ and put both there.
 
-Right, that make sense. I'll send v2 moving pd-samsung and smp-sysram to
-these locations.
-
-Best regards,
-Krzysztof
+Thanks,
+Rafael
