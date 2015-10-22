@@ -1,31 +1,32 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 22 Oct 2015 11:18:47 +0200
-Subject: [PATCH 2/4] clk: ti816x: Add missing dmtimer clkdev entries
-Message-ID: <5628A9F7.9090105@baylibre.com>
+Date: Thu, 22 Oct 2015 11:18:53 +0200
+Subject: [PATCH 3/4] arm: plat-omap: add DT support for ti,dm816-timer
+Message-ID: <5628A9FD.5030709@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing clkdev dmtimer related entries for dm816x.
-32Khz and ext sources were missing.
+Adds ti,dm816-timer to the dmtimer OF match table.
 
 Cc: Brian Hutchinson <b.hutchman@gmail.com>
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/clk/ti/clk-816x.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/plat-omap/dmtimer.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/clk/ti/clk-816x.c b/drivers/clk/ti/clk-816x.c
-index 1dfad0c..2a5d84f 100644
---- a/drivers/clk/ti/clk-816x.c
-+++ b/drivers/clk/ti/clk-816x.c
-@@ -20,6 +20,8 @@ static struct ti_dt_clk dm816x_clks[] = {
- 	DT_CLK(NULL, "sys_clkin", "sys_clkin_ck"),
- 	DT_CLK(NULL, "timer_sys_ck", "sys_clkin_ck"),
- 	DT_CLK(NULL, "sys_32k_ck", "sys_32k_ck"),
-+	DT_CLK(NULL, "timer_32k_ck", "sysclk18_ck"),
-+	DT_CLK(NULL, "timer_ext_ck", "tclkin_ck"),
- 	DT_CLK(NULL, "mpu_ck", "mpu_ck"),
- 	DT_CLK(NULL, "timer1_fck", "timer1_fck"),
- 	DT_CLK(NULL, "timer2_fck", "timer2_fck"),
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index 8ca94d3..28a6550 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -943,6 +943,10 @@ static const struct of_device_id omap_timer_match[] = {
+ 		.compatible = "ti,am335x-timer-1ms",
+ 		.data = &omap3plus_pdata,
+ 	},
++	{
++		.compatible = "ti,dm816-timer",
++		.data = &omap3plus_pdata,
++	},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, omap_timer_match);
 -- 
 1.9.1
