@@ -1,96 +1,48 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Thu, 22 Oct 2015 21:43:05 +0800
-Subject: Problem about CPU stalling in hrtimer_intterrupts()
-In-Reply-To: <alpine.DEB.2.11.1510221133590.4012@nanos>
-References: <56288585.40204@huawei.com>
- <alpine.DEB.2.11.1510220942010.4012@nanos> <5628AC58.2030509@huawei.com>
- <alpine.DEB.2.11.1510221133590.4012@nanos>
-Message-ID: <5628E7E9.409@huawei.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Thu, 22 Oct 2015 09:50:44 -0400
+Subject: [PATCH] serial: msm_serial: Make config tristate
+In-Reply-To: <1445468723-948-1-git-send-email-sboyd@codeaurora.org>
+References: <1445468723-948-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20151022135044.GD4588@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[[PATCH] serial: msm_serial: Make config tristate] On 21/10/2015 (Wed 16:05) Stephen Boyd wrote:
 
-On 2015/10/22 18:25, Thomas Gleixner wrote:
-> On Thu, 22 Oct 2015, Ding Tianhong wrote:
->> On 2015/10/22 15:43, Thomas Gleixner wrote:
->>>> Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830
->>>> hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0
->>>> timer:ffffffdffdec6138, timer->function:ffffffc000129b84
->>>> Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830
->>>> hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0
->
->> This problem could only occur on the system with 32 cores, when I
->> cut the cores to 16, this problem disappeared, so I think there is
->> some parallel problem when the 32 core set clock time together:
->
->> I try to reproduce the scene:
->>
->> 1.do_settimeofday64
->> 2.update tk time
->> 3.update base time offset
->> 4.update expires_next
->>
->> the 3 and 4 will be called in softirq, but the hrtimer_interrupt may
->> break the order and run before 3, I am not sure whether this could
->> make the problem, do we need to update base time and expires_next in
->> the hrtimer_interrupt?  maybe I miss something, thanks for any
->> suggestion.
->
-> Base offset is updated in hrtimer_interrupt as
-> well. hrtimer_update_base() does that. So that's not the problem.
->
-> Can you apply the patch below and enable the hrtimer tracepoints and
-> collect trace data across the point where the problem happens?
->
-> Thanks,
->
-> 	tglx
-> ----
->
-> diff --git a/kernel/time/timekeeping.c b/kernel/time/timekeeping.c
-> index 44d2cc0436f4..614f8d272cb0 100644
-> --- a/kernel/time/timekeeping.c
-> +++ b/kernel/time/timekeeping.c
-> @@ -575,8 +575,14 @@ static void timekeeping_update(struct timekeeper *tk, unsigned int action)
->   	update_fast_timekeeper(&tk->tkr_mono, &tk_fast_mono);
->   	update_fast_timekeeper(&tk->tkr_raw,  &tk_fast_raw);
->
-> -	if (action & TK_CLOCK_WAS_SET)
-> +	if (action & TK_CLOCK_WAS_SET) {
->   		tk->clock_was_set_seq++;
-> +		trace_printk("TK: Seq: %u R: %lld B: %lld T: %lld\n",
-> +			     tk->clock_was_set_seq,
-> +			     tk->offs_real,
-> +			     tk->offs_boot,
-> +			     tk->offs_tai);
-> +	}
->   	/*
->   	 * The mirroring of the data to the shadow-timekeeper needs
->   	 * to happen last here to ensure we don't over-write the
-> @@ -1954,6 +1960,11 @@ ktime_t ktime_get_update_offsets_now(unsigned int *cwsseq, ktime_t *offs_real,
->   		base = ktime_add_ns(base, nsecs);
->
->   		if (*cwsseq != tk->clock_was_set_seq) {
-> +			trace_printk("HR: Seq: %u R: %lld B: %lld T: %lld\n",
-> +				     tk->clock_was_set_seq,
-> +				     tk->offs_real,
-> +				     tk->offs_boot,
-> +				     tk->offs_tai);
->   			*cwsseq = tk->clock_was_set_seq;
->   			*offs_real = tk->offs_real;
->   			*offs_boot = tk->offs_boot;
->
-> .
->
+> This driver works as a module, so mark it as a tristate config
+> instead of a bool.
+> 
+> Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+> 
+> I tested this with a busybox ramdisk that modprobes msm_serial and
+> then runs a getty on ttyMSM0. This patch should supersede Paul's earlier
+> patch that removes the module code from this driver.
 
+Thanks, I'll drop my patch for this driver.
 
-I don't try this patch yet.
-But I found out when the cpu is stalling, basenow.tv64(7676664221321) is
-bigger than ktime_get().tv64(7336008904750) in hrtimer_interrupt() and
-the timer->_softexpires is 7336288000000. This makes it can not finish
-the while loop until ktime_get().tv64 arrives basenow.tv64.
+Paul.
+--
 
-Is it correct that basenow bigger than ktime_get() ?
-
-Thanks,
-Yang
+> 
+>  drivers/tty/serial/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 1aec4404062d..e4f35da3de27 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -1044,7 +1044,7 @@ config SERIAL_SGI_IOC3
+>  	  say Y or M.  Otherwise, say N.
+>  
+>  config SERIAL_MSM
+> -	bool "MSM on-chip serial port support"
+> +	tristate "MSM on-chip serial port support"
+>  	depends on ARCH_QCOM
+>  	select SERIAL_CORE
+>  
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
