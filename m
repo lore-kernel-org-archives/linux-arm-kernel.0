@@ -1,68 +1,44 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Thu, 22 Oct 2015 11:38:36 -0700
-Subject: [PATCHv2 3/3] fpga manager: Adding FPGA Manager support for
- Xilinx Zynq 7000
-In-Reply-To: <alpine.DEB.2.02.1510221247360.23148@linuxheads99>
-References: <1445035350-3569-1-git-send-email-moritz.fischer@ettus.com>
- <1445035350-3569-4-git-send-email-moritz.fischer@ettus.com>
- <alpine.DEB.2.02.1510221247360.23148@linuxheads99>
-Message-ID: <CAAtXAHfaMRniqwuiniL5WQz+39WJh+L09-5uTHKiewtRH2pjkA@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 22 Oct 2015 13:40:46 -0500
+Subject: [PATCH 04/11] dt-binding: Add new compatible string for gpio
+ controller driver
+In-Reply-To: <1445233398-27129-5-git-send-email-pramodku@broadcom.com>
+References: <1445233398-27129-1-git-send-email-pramodku@broadcom.com>
+ <1445233398-27129-5-git-send-email-pramodku@broadcom.com>
+Message-ID: <CAL_JsqJ-Y8qObp9SVGwfUs7An_XaY8J7fVCfiphaNTWtJa77jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+On Mon, Oct 19, 2015 at 12:43 AM, Pramod Kumar <pramodku@broadcom.com> wrote:
+> This new compatible string, "brcm,iproc-gpio", should be used for
+> all new iproc-based future SoCs.
 
-On Thu, Oct 22, 2015 at 10:56 AM, atull <atull@opensource.altera.com> wrote:
-> On Fri, 16 Oct 2015, Moritz Fischer wrote:
->
-> Hi Moritz,
->
-> I just noticed a problem regarding private data.  Fortunately
-> it is easy to fix.  See below...
->
->> +static int zynq_fpga_probe(struct platform_device *pdev)
->> +{
->> +     struct device *dev = &pdev->dev;
->> +     struct zynq_fpga_priv *priv;
->> +     struct resource *res;
->> +     int err;
->> +
->> +     priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
->> +     if (!priv)
->> +             return -ENOMEM;
->> +
->> +     platform_set_drvdata(pdev, priv);
->
-> fpga-mgr.c uses drvdata for its struct fpga_manager, so this will
-> get overwritten.  So remove this platform_set_drvdata().  priv
-> is saved in struct fpga_manager during fpga_mgr_register().
+Can't predict the future and crazy whims of hardware designers.
 
-Ouch, I missed that.
->
-> ...
->
->> +static int zynq_fpga_remove(struct platform_device *pdev)
->> +{
->
-> Here you can get a pointer to priv from the fpga_manager struct:
->         struct fpga_manager *mgr = platform_get_drvdata(pdev);
->         struct zynq_fpga_priv *priv = mgr->priv;
+This is fine for matching, but you should also have a SOC specific string.
 
-Thanks, will submit a follow up patch.
-
->> +     struct zynq_fpga_priv *priv;
->> +
->> +     fpga_mgr_unregister(&pdev->dev);
->> +
->> +     priv = platform_get_drvdata(pdev);
->> +
->> +     clk_disable_unprepare(priv->clk);
->> +
->> +     return 0;
->> +}>
-> Alan
+> Signed-off-by: Pramod Kumar <pramodku@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> ---
+>  Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 >
-
-Cheers,
-
-Moritz
+> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
+> index 25a5002..f92b833 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
+> @@ -3,8 +3,8 @@ Broadcom Cygnus GPIO/PINCONF Controller
+>  Required properties:
+>
+>  - compatible:
+> -    Must be "brcm,cygnus-ccm-gpio", "brcm,cygnus-asiu-gpio", or
+> -    "brcm,cygnus-crmu-gpio"
+> +    Must be "brcm,cygnus-ccm-gpio", "brcm,cygnus-asiu-gpio",
+> +"brcm,cygnus-crmu-gpio" or "brcm,iproc-gpio"
+>
+>  - reg:
+>      Define the base and range of the I/O address space that contains the Cygnus
+> --
+> 1.9.1
+>
