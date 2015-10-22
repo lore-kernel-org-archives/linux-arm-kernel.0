@@ -1,40 +1,37 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 22 Oct 2015 17:09:59 +0200
-Subject: [PATCH] mutex: make mutex_lock_nested an inline function
-In-Reply-To: <57854232.vMTrn4EgZx@wuerfel>
-References: <11282238.AHmyWliPRj@wuerfel>
- <20151013203812.GM17308@twins.programming.kicks-ass.net>
- <11817958.z9KtmeKzV7@wuerfel> <57854232.vMTrn4EgZx@wuerfel>
-Message-ID: <20151022150959.GU17308@twins.programming.kicks-ass.net>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Thu, 22 Oct 2015 23:12:30 +0800
+Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
+In-Reply-To: <1444988219.3541.3.camel@pengutronix.de>
+References: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
+ <1444988219.3541.3.camel@pengutronix.de>
+Message-ID: <1445526750.27586.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 22, 2015 at 05:02:45PM +0200, Arnd Bergmann wrote:
-> On Tuesday 13 October 2015 23:46:35 Arnd Bergmann wrote:
-> > On Tuesday 13 October 2015 22:38:12 Peter Zijlstra wrote:
-> > > A quick grep shows a large amount of trivial code that optimizers will
-> > > still happily throw away, but it should be verified that this does not
-> > > result in pointless code generation.
-> > 
-> > Indeed, I'm seeing a tiny code growth with ARM multi_v7_defconfig when
-> > my patch is applied, as the image (according to size -A) grows from
-> > 13740187 bytes to 13740283, all of it in .text of two drivers (i2c-core
-> > and three files of bluetooth.ko).
+On Fri, 2015-10-16 at 11:36 +0200, Philipp Zabel wrote:
+> Am Freitag, den 16.10.2015, 17:17 +0800 schrieb YH Huang:
+> > In order to match the panel power sequence, disable the enable_gpio
+> > in the probe function. Also, reorder the code in the power_on and
+> > power_off function to match the timing.
 > 
+> Could you also have a look at the "pwm-backlight: Avoid backlight
+> flicker when probed from DT" patch?
+> I think in case of a panel left enabled by the bootloader, your patch
+> will disable the backlight for a short time.
 > 
-> Did we actually reach any conclusion here? We still get the warnings
-> in the regulator code in linux-next, and I'd like to see either this
-> patch ("mutex: make mutex_lock_nested an inline function") or
-> "regulator: core: avoid unused variable warning" get merged.
+> best regards
+> Philipp
 > 
-> We could also remove the two functions again, as they are still
-> unused and we are getting closer to the merge window.
+In the case of the panel disabled by the bootloader,
+your patch still has the following code and always enables the backlight
+in the probe function.
+pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
+-						  GPIOD_OUT_HIGH);
 
-Hmm, I was sure I send a reply, but I cannot even find it in my own sent
-folder so who knows.
+What do you think if I remove these two lines in my patch?
+if (pb->enable_gpio)
+	gpiod_direction_output(pb->enable_gpio, 0);
 
-My current preference is to keep the thing a macro and work around it in
-the usage site because while these warns are annoying, they're at least
-visible. Whereas, with an inline, code bloat is entirely silent. Even if
-the sites you found are harmless, there's no saying what the future will
-bring etc..
+
+Regards,
+YH Huang
