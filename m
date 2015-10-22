@@ -1,101 +1,44 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Thu, 22 Oct 2015 15:38:02 +0200
-Subject: [PATCH v3 1/5] mmc: sdhci-pxav3: enable proper resuming on Armada
- 38x SoC
-In-Reply-To: <CAPDyKFqoNh+yThhMQHbJV4izcH=ZviQsoaY7YXfS3dCxdF8myQ@mail.gmail.com>
-References: <1444926346-29763-1-git-send-email-mw@semihalf.com>
- <1444926346-29763-2-git-send-email-mw@semihalf.com>
- <CAPDyKFqoNh+yThhMQHbJV4izcH=ZviQsoaY7YXfS3dCxdF8myQ@mail.gmail.com>
-Message-ID: <CAPv3WKcKe_UKX0-yPF=Mxi_FPvkXziRGKVCy+g4EbUq7V37xPw@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 22 Oct 2015 15:43:39 +0200
+Subject: [PATCH RFC] l2c: warn about misconfigured PL310 shared-override
+Message-ID: <1445521419-10104-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf
+If the shared override enable bit in the PL310 aux ctrl register is
+not set the L2 cache controller will render the system non-compliant
+to the rules regarding mismatched memory aliases as specified in the
+ARMv7 ARM.
 
-2015-10-22 15:29 GMT+02:00 Ulf Hansson <ulf.hansson@linaro.org>:
-> On 15 October 2015 at 18:25, Marcin Wojtas <mw@semihalf.com> wrote:
->> When resuming from suspend on Armada 38x SoC MBus windows have to be
->> re-configured and for that purpose mv_conf_mbus_windows function needed
->> rework. MBus windows register base address obtaining was moved to
->> armada_38x_quirks function in order to be kept in pxa global structure,
->> because it is used during a resume.
->>
->> This commit fixes resuming from suspend by calling MBus windows
->> configuration routine and therefore enabling proper DMA operation.
->>
->> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
->> ---
->>  drivers/mmc/host/sdhci-pxav3.c | 35 ++++++++++++++++-------------------
->>  1 file changed, 16 insertions(+), 19 deletions(-)
->>
->> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
->> index f5edf9d..54a253c0 100644
->> --- a/drivers/mmc/host/sdhci-pxav3.c
->> +++ b/drivers/mmc/host/sdhci-pxav3.c
->> @@ -63,6 +63,7 @@ struct sdhci_pxa {
->>         struct clk *clk_io;
->>         u8      power_mode;
->>         void __iomem *sdio3_conf_reg;
->> +       void __iomem *mbus_win_regs;
->>  };
->>
->>  /*
->> @@ -81,30 +82,16 @@ struct sdhci_pxa {
->>  #define SDIO3_CONF_CLK_INV     BIT(0)
->>  #define SDIO3_CONF_SD_FB_CLK   BIT(2)
->>
->> -static int mv_conf_mbus_windows(struct platform_device *pdev,
->> +static int mv_conf_mbus_windows(struct device *dev, void __iomem *regs,
->>                                 const struct mbus_dram_target_info *dram)
->>  {
->>         int i;
->> -       void __iomem *regs;
->> -       struct resource *res;
->>
->>         if (!dram) {
->> -               dev_err(&pdev->dev, "no mbus dram info\n");
->> -               return -EINVAL;
->> -       }
->> -
->> -       res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
->> -       if (!res) {
->> -               dev_err(&pdev->dev, "cannot get mbus registers\n");
->> +               dev_err(dev, "no mbus dram info\n");
->>                 return -EINVAL;
->>         }
->>
->> -       regs = ioremap(res->start, resource_size(res));
->> -       if (!regs) {
->> -               dev_err(&pdev->dev, "cannot map mbus registers\n");
->> -               return -ENOMEM;
->> -       }
->> -
->>         for (i = 0; i < SDHCI_MAX_WIN_NUM; i++) {
->>                 writel(0, regs + SDHCI_WINDOW_CTRL(i));
->>                 writel(0, regs + SDHCI_WINDOW_BASE(i));
->> @@ -122,8 +109,6 @@ static int mv_conf_mbus_windows(struct platform_device *pdev,
->>                 writel(cs->base, regs + SDHCI_WINDOW_BASE(i));
->>         }
->>
->> -       iounmap(regs);
->> -
->>         return 0;
->>  }
->>
->> @@ -135,6 +120,11 @@ static int armada_38x_quirks(struct platform_device *pdev,
->>         struct sdhci_pxa *pxa = pltfm_host->priv;
->>         struct resource *res;
->>
->> +       res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mbus");
->
-> You change from using platform_get_resource(pdev, IORESOURCE_MEM, 1)
-> to above name based lookup.
->
-> I guess it's intentional, but there's no information about it in the
-> change-log, perhaps add it?
->
+As this may lead to subtle corruptions when reading from a bufferable
+alias, make sure to warn about this in the kernel log.
 
-Sure, good point.
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+I'm open to suggestions on how to improve the warning or where to put
+documentation for this so users are advised to update their board
+firmware, or work around this by using the "arm,shared-override" DT
+property on a secure state booted kernel, without spamming the logs
+too much.
+---
+ arch/arm/mm/cache-l2x0.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Best regards,
-Marcin
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 493692d838c6..8c586894c58d 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -820,6 +820,11 @@ static int __init __l2c_init(const struct l2c_init_data *data,
+ 		pr_warn("L2C: DT/platform modifies aux control register: 0x%08x -> 0x%08x\n",
+ 		        old_aux, aux);
+ 
++	if (((cache_id & L2X0_CACHE_ID_PART_MASK) == L2X0_CACHE_ID_PART_L310) &&
++	    !(aux & L2C_AUX_CTRL_SHARED_OVERRIDE))
++		pr_warn("L2C-310 shared attribute override enable not set, "
++			"system is non-compliant to ARM specified memory aliasing rules\n");
++
+ 	/* Determine the number of ways */
+ 	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
+ 	case L2X0_CACHE_ID_PART_L310:
+-- 
+2.6.1
