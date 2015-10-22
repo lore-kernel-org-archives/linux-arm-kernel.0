@@ -1,126 +1,44 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 15 Oct 2015 23:57:30 +0200
-Subject: [PATCH V2 RFT] ARM: bcm2835: enable all bcm2835-relevant in defconfig
-Message-ID: <1444946250-23219-1-git-send-email-stefan.wahren@i2se.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 22 Oct 2015 13:08:13 -0500
+Subject: [PATCH v4 5/6] PCI: layerscape: add PCIe support for LS1043a and
+ LS2080a
+In-Reply-To: <CADRPPNSPP1m_7zNF6wEfw9+Bpe=Z_gUA81cSaV4SENVpR34YWQ@mail.gmail.com>
+References: <1444979960-24100-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1444979960-24100-5-git-send-email-Minghuan.Lian@freescale.com>
+ <20151021213612.GK1583@localhost>
+ <CADRPPNSPP1m_7zNF6wEfw9+Bpe=Z_gUA81cSaV4SENVpR34YWQ@mail.gmail.com>
+Message-ID: <20151022180813.GA25693@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rebuild bcm2835_defconfig using "make bcm2835_defconfig;
-make savedefconfig", and enable manually the following features:
+Hi Leo,
 
-* all bcm2835-relevant drivers (MBOX, WDT, DMA, PWM, SND)
-* enable regular stackprotector because CONFIG_CC_STACKPROTECTOR
-  disappear
-* enable some new dependencies in order to keep LED heartbeat
-  ( CONFIG_NEW_LEDS, CONFIG_LEDS_CLASS, CONFIG_LEDS_TRIGGERS )
+On Thu, Oct 22, 2015 at 12:38:48PM -0500, Li Yang wrote:
+> On Wed, Oct 21, 2015 at 4:36 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> > On Fri, Oct 16, 2015 at 03:19:19PM +0800, Minghuan Lian wrote:
+> >> Both LS1043a and LS2080a are based on ARMv8 64-bit architecture
+> >> and have similar PCIe implementation. LUT is added to controller.
+> >> The patch removes the necessary fields from struct ls_pcie.
+> >>
+> >> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> >> ---
+> >> This patch is based on v4.3-rc4 and [PATCH v10 3/6]
+> >> PCI: designware: Add ARM64 support.
+> 
+> Hi Bjorn,
+> 
+> Are you also applying this patch
+> https://patchwork.ozlabs.org/patch/531184/ in this merge windows?
+> Because the new hardware can only work with the generic ARM64 support
+> added in the designware pcie driver.
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/configs/bcm2835_defconfig |   28 +++++++++++++++++-----------
- 1 file changed, 17 insertions(+), 11 deletions(-)
+I'm reviewing that patch right now, and I do hope to apply it for
+v4.4.
 
-This patch is only compile-tested.
+There was no cover letter for this series (Minghuan's Layerscape v4
+series), and I didn't see any mention of dependencies, so I applied it
+on top of v4.3-rc1.  Is that the wrong thing to do?  If it depends on
+the Zhou's v11 series, I can hold the Layerscape branch until after
+that.
 
-Changes in V2: clarify patch description
-
-diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-index 31cb073..0fda844 100644
---- a/arch/arm/configs/bcm2835_defconfig
-+++ b/arch/arm/configs/bcm2835_defconfig
-@@ -10,7 +10,6 @@ CONFIG_CGROUP_FREEZER=y
- CONFIG_CGROUP_DEVICE=y
- CONFIG_CPUSETS=y
- CONFIG_CGROUP_CPUACCT=y
--CONFIG_RESOURCE_COUNTERS=y
- CONFIG_CGROUP_PERF=y
- CONFIG_CFS_BANDWIDTH=y
- CONFIG_RT_GROUP_SCHED=y
-@@ -18,10 +17,6 @@ CONFIG_NAMESPACES=y
- CONFIG_SCHED_AUTOGROUP=y
- CONFIG_RELAY=y
- CONFIG_BLK_DEV_INITRD=y
--CONFIG_RD_BZIP2=y
--CONFIG_RD_LZMA=y
--CONFIG_RD_XZ=y
--CONFIG_RD_LZO=y
- CONFIG_CC_OPTIMIZE_FOR_SIZE=y
- CONFIG_KALLSYMS_ALL=y
- CONFIG_EMBEDDED=y
-@@ -29,6 +24,7 @@ CONFIG_EMBEDDED=y
- CONFIG_PROFILING=y
- CONFIG_OPROFILE=y
- CONFIG_JUMP_LABEL=y
-+CONFIG_CC_STACKPROTECTOR_REGULAR=y
- CONFIG_ARCH_MULTI_V6=y
- # CONFIG_ARCH_MULTI_V7 is not set
- CONFIG_ARCH_BCM=y
-@@ -38,7 +34,6 @@ CONFIG_AEABI=y
- CONFIG_KSM=y
- CONFIG_CLEANCACHE=y
- CONFIG_SECCOMP=y
--CONFIG_CC_STACKPROTECTOR=y
- CONFIG_KEXEC=y
- CONFIG_CRASH_DUMP=y
- CONFIG_VFP=y
-@@ -57,7 +52,6 @@ CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
--CONFIG_SCSI_MULTI_LUN=y
- CONFIG_SCSI_CONSTANTS=y
- CONFIG_SCSI_SCAN_ASYNC=y
- CONFIG_NETDEVICES=y
-@@ -77,17 +71,27 @@ CONFIG_SPI=y
- CONFIG_SPI_BCM2835=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_BCM2835_WDT=y
- CONFIG_FB=y
- CONFIG_FB_SIMPLE=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_SOC=y
-+CONFIG_SND_BCM2835_SOC_I2S=y
- CONFIG_USB=y
- CONFIG_USB_STORAGE=y
-+CONFIG_USB_DWC2=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_BCM2835=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_TIMER=y
- CONFIG_LEDS_TRIGGER_ONESHOT=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-@@ -96,17 +100,19 @@ CONFIG_LEDS_TRIGGER_GPIO=y
- CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_LEDS_TRIGGER_TRANSIENT=y
- CONFIG_LEDS_TRIGGER_CAMERA=y
-+CONFIG_DMADEVICES=y
-+CONFIG_DMA_BCM2835=y
- CONFIG_STAGING=y
--CONFIG_USB_DWC2=y
--CONFIG_USB_DWC2_HOST=y
-+CONFIG_MAILBOX=y
-+CONFIG_BCM2835_MBOX=y
- # CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_PWM=y
-+CONFIG_PWM_BCM2835=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT3_FS_POSIX_ACL=y
--CONFIG_EXT4_FS=y
--CONFIG_EXT4_FS_POSIX_ACL=y
- CONFIG_FANOTIFY=y
- CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
--- 
-1.7.10.4
+Bjorn
