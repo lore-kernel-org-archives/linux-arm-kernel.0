@@ -1,42 +1,94 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Thu, 22 Oct 2015 12:22:24 -0300
-Subject: [PATCH v4 0/5] mtd: pxa3xx_nand: rework the timing setup
-In-Reply-To: <20151022171259.57581575@free-electrons.com>
-References: <1445416144-9194-1-git-send-email-antoine.tenart@free-electrons.com>
- <20151022171259.57581575@free-electrons.com>
-Message-ID: <CAAEAJfCmo5u6=5GN6+k8GsFhC0dg477gVYY+t77uODP-PgWLGw@mail.gmail.com>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Thu, 22 Oct 2015 23:29:02 +0800
+Subject: [RESEND PATCH] pwm-backlight: fix the panel power sequence
+In-Reply-To: <1444984313.3180.6.camel@pengutronix.de>
+References: <1444959454-1516-1-git-send-email-yh.huang@mediatek.com>
+ <1444984313.3180.6.camel@pengutronix.de>
+Message-ID: <1445527742.27586.18.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 October 2015 at 12:12, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Hello Antoine,
->
-> On Wed, 21 Oct 2015 10:28:59 +0200, Antoine Tenart wrote:
->
->> Antoine Tenart (5):
->>   mtd: pxa3xx: prepare allowing compile test
->>   mtd: nand: allow compile test of MTD_NAND_PXA3xx
->>   mtd: pxa3xx_nand: add helpers to setup the timings
->>   mtd: pxa3xx_nand: rework flash detection and timing setup
->>   mtd: pxa3xx_nand: clean up the pxa3xx timings
->
-> I tested your series on Armada 375 DB, which uses the same pxa3xx
-> driver, but with the Armada 370 variant.
->
-> With the current Device Tree which has nand,keep-config to keep the
-> timing configuration from the bootloader, I don't see any problem, so
-> there is no regression introduced by your series, at least on this
-> platform.
->
-> However, when I remove nand,keep-config to use the ONFI timings from
-> the NAND, then things work fine (I can mount a UBIFS root filesystem),
-> but there is a weird:
->
+On Fri, 2015-10-16 at 10:31 +0200, Lucas Stach wrote:
+> Am Freitag, den 16.10.2015, 09:37 +0800 schrieb YH Huang:
+> > In order to match the panel power sequence, disable the enable_gpio
+> > in the probe function. Also, reorder the code in the power_on and
+> > power_off function to match the timing.
+> > 
+> You aren't specifying which panels power sequence you are matching here.
+> Are you sure you aren't breaking other panels with this patch?
+> 
+> Regards,
+> Lucas
+The panel sequence is:
+When powering on the panel, generate pwm signals fist and then enable it
+to show the backlight.
+When powering off the panel, do it opposite.
+In probe function, we keep the panel status from bootloader and don't
+enable or disable it by default.
 
-Could you compare NAND throughput using keep-config (keeping
-the bootloader timings) and without keep-config (with ONFI timings) ?
+Do these changes break other panels?
 
--- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+Regards,
+YH Huang
+
+
+> 
+> > Signed-off-by: YH Huang <yh.huang@mediatek.com>
+> > ---
+> >  drivers/video/backlight/pwm_bl.c |   15 +++++++++------
+> >  1 file changed, 9 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+> > index eff379b..99eca1e 100644
+> > --- a/drivers/video/backlight/pwm_bl.c
+> > +++ b/drivers/video/backlight/pwm_bl.c
+> > @@ -54,10 +54,11 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
+> >  	if (err < 0)
+> >  		dev_err(pb->dev, "failed to enable power supply\n");
+> >  
+> > +	pwm_enable(pb->pwm);
+> > +
+> >  	if (pb->enable_gpio)
+> >  		gpiod_set_value(pb->enable_gpio, 1);
+> >  
+> > -	pwm_enable(pb->pwm);
+> >  	pb->enabled = true;
+> >  }
+> >  
+> > @@ -66,12 +67,12 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
+> >  	if (!pb->enabled)
+> >  		return;
+> >  
+> > -	pwm_config(pb->pwm, 0, pb->period);
+> > -	pwm_disable(pb->pwm);
+> > -
+> >  	if (pb->enable_gpio)
+> >  		gpiod_set_value(pb->enable_gpio, 0);
+> >  
+> > +	pwm_config(pb->pwm, 0, pb->period);
+> > +	pwm_disable(pb->pwm);
+> > +
+> >  	regulator_disable(pb->power_supply);
+> >  	pb->enabled = false;
+> >  }
+> > @@ -241,8 +242,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+> >  	pb->dev = &pdev->dev;
+> >  	pb->enabled = false;
+> >  
+> > -	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
+> > -						  GPIOD_OUT_HIGH);
+> > +	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable");
+> >  	if (IS_ERR(pb->enable_gpio)) {
+> >  		ret = PTR_ERR(pb->enable_gpio);
+> >  		goto err_alloc;
+> > @@ -264,6 +264,9 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+> >  		pb->enable_gpio = gpio_to_desc(data->enable_gpio);
+> >  	}
+> >  
+> > +	if (pb->enable_gpio)
+> > +		gpiod_direction_output(pb->enable_gpio, 0);
+> > +
+> >  	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
+> >  	if (IS_ERR(pb->power_supply)) {
+> >  		ret = PTR_ERR(pb->power_supply);
+> 
