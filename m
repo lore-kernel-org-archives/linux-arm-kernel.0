@@ -1,51 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 22 Oct 2015 10:41:37 -0700
-Subject: [GIT PULL] ARM: mvebu: soc for v4.4 (#2)
-In-Reply-To: <87vba6g11k.fsf@free-electrons.com>
-References: <87vba6g11k.fsf@free-electrons.com>
-Message-ID: <20151022174137.GB31793@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Oct 2015 18:44:00 +0100
+Subject: [PATCH] mutex: make mutex_lock_nested an inline function
+In-Reply-To: <20151022150959.GU17308@twins.programming.kicks-ass.net>
+References: <11282238.AHmyWliPRj@wuerfel>
+ <20151013203812.GM17308@twins.programming.kicks-ass.net>
+ <11817958.z9KtmeKzV7@wuerfel> <57854232.vMTrn4EgZx@wuerfel>
+ <20151022150959.GU17308@twins.programming.kicks-ass.net>
+Message-ID: <20151022174400.GW32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 07:45:27PM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Thu, Oct 22, 2015 at 05:09:59PM +0200, Peter Zijlstra wrote:
+> Hmm, I was sure I send a reply, but I cannot even find it in my own sent
+> folder so who knows.
 > 
-> Here is the second pull request for soc for mvebu for v4.4.
-> 
-> Gregory
-> 
-> The following changes since commit d492cccac28493f26bb70038385a9ef4df19bdee:
-> 
->   ARM: mvebu: add support to clear shared L2 bit on Armada XP (2015-09-29 15:31:51 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.4-2
-> 
-> for you to fetch changes up to 400b1b26b44f1c5de45bc01873f42c9e776e102e:
-> 
->   ARM: orion5x: use mac_pton() helper (2015-10-15 09:37:18 +0200)
-> 
-> ----------------------------------------------------------------
-> mvebu soc for 4.4 (part 2)
-> 
-> - Use mac_pton() helper in the oropn5x board instead of duplicating it
-> - Add the broken-idle option allowing to boot boards with a mistake in
->   the hardware design
-> 
-> ----------------------------------------------------------------
-> Andy Shevchenko (1):
->       ARM: orion5x: use mac_pton() helper
-> 
-> Vincent Donnefort (1):
->       ARM: mvebu: add broken-idle option
+> My current preference is to keep the thing a macro and work around it in
+> the usage site because while these warns are annoying, they're at least
+> visible. Whereas, with an inline, code bloat is entirely silent. Even if
+> the sites you found are harmless, there's no saying what the future will
+> bring etc..
 
-I just posted a comment on this patch, the code should be revisited.
+I agree - we've got way too many inline functions already.  My biggest
+annoyance in that respect is the asm-generic dma_map_single()
+implementation that we're now forced to use on ARM, which results in
+quite a large chunk of code at every callsite.
 
-A small incremental pull request like this is OK late, so there's still time to
-fix that for 4.4. Please send a new request when done!
+The problem there is that when you have drivers which do something like:
 
+	dma = dma_map_single(dev, page_address(page), size, dir);
 
-Thanks,
+you end up with code which converts the struct page to a virtual address,
+and then you end up with code in the dma_map_single() inline function
+which then converts it back to a struct page + offset - none of which,
+with modern ARM kernels, the compiler has a hope in hell of optimising.
 
--Olof
+So we end up with all that junk at every single dma_map_single() callsite.
+If dma_map_single() were a library function, it would be a lot smaller
+since we'd only have one copy of the complex virt->struct page conversion.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
