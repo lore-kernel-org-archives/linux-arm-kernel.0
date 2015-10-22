@@ -1,40 +1,47 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 22 Oct 2015 13:55:02 -0500
-Subject: [PATCH] PCI: iproc: Fix company name
-In-Reply-To: <1445022248-12203-1-git-send-email-f.fainelli@gmail.com>
-References: <1445022248-12203-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20151022185502.GE21237@localhost>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Thu, 22 Oct 2015 11:56:09 -0700
+Subject: [PATCH] fpga: zynq-fpga: Fix issue with drvdata being overwritten.
+Message-ID: <1445540169-20715-1-git-send-email-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 12:04:04PM -0700, Florian Fainelli wrote:
-> The header of pcie-iproc.c contains an obvious typo on Broadcom
-> Corporation, fix that.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Upon registering a FPGA Manager low level driver, FPGA Manager
+core overwrites the platform drvdata pointer. Prior to this commit
+zynq-fpga falsely relied on this pointer to still be valid at remove()
+time.
 
-Applied with Ray's ack to pci/host-iproc for v4.4, thanks, Florian!
+Reported-by: Alan Tull <atull@opensource.altera.com>
+Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+---
+ drivers/fpga/zynq-fpga.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-> ---
->  drivers/pci/host/pcie-iproc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-> index fe2efb141a9b..6c3d4b54858c 100644
-> --- a/drivers/pci/host/pcie-iproc.c
-> +++ b/drivers/pci/host/pcie-iproc.c
-> @@ -1,6 +1,6 @@
->  /*
->   * Copyright (C) 2014 Hauke Mehrtens <hauke@hauke-m.de>
-> - * Copyright (C) 2015 Broadcom Corporatcommon ion
-> + * Copyright (C) 2015 Broadcom Corporation
->   *
->   * This program is free software; you can redistribute it and/or
->   * modify it under the terms of the GNU General Public License as
-> -- 
-> 2.1.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+index 31db550..c2fb412 100644
+--- a/drivers/fpga/zynq-fpga.c
++++ b/drivers/fpga/zynq-fpga.c
+@@ -416,7 +416,6 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+ 	if (!priv)
+ 		return -ENOMEM;
+ 
+-	platform_set_drvdata(pdev, priv);
+ 	priv->dev = dev;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -477,10 +476,12 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+ static int zynq_fpga_remove(struct platform_device *pdev)
+ {
+ 	struct zynq_fpga_priv *priv;
++	struct fpga_manager *mgr;
+ 
+-	fpga_mgr_unregister(&pdev->dev);
++	mgr = platform_get_drvdata(pdev);
++	priv = mgr->priv;
+ 
+-	priv = platform_get_drvdata(pdev);
++	fpga_mgr_unregister(&pdev->dev);
+ 
+ 	clk_unprepare(priv->clk);
+ 
+-- 
+2.6.2
