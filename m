@@ -1,64 +1,68 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 22 Oct 2015 11:42:02 +0200
-Subject: [PATCH v2 6/6] vfio: platform: move get/put reset at open/release
+Date: Thu, 22 Oct 2015 11:42:00 +0200
+Subject: [PATCH v2 4/6] vfio: platform: add compat in vfio_platform_device
 In-Reply-To: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
 References: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1445506922-6005-7-git-send-email-eric.auger@linaro.org>
+Message-ID: <1445506922-6005-5-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently reset lookup is done on probe. This introduces a
-race with new registration mechanism in the case where the
-vfio-platform driver is bound to the device before its module
-is loaded: on the load, the probe happens which triggers the
-reset module load which itself attempts to get the symbol for
-the registration function (vfio_platform_register_reset). The
-symbol is not yet available hence the lookup fails. In case we
-do the lookup in the first open we are sure the vfio-platform
-module is loaded and vfio_platform_register_reset is available.
+Let's retrieve the compatibility string on probe and store it
+in the vfio_platform_device struct
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 ---
- drivers/vfio/platform/vfio_platform_common.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/vfio/platform/vfio_platform_common.c  | 15 ++++++++-------
+ drivers/vfio/platform/vfio_platform_private.h |  1 +
+ 2 files changed, 9 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index 95b8294..5ebae8c 100644
+index 52a4c7b..e7d615f 100644
 --- a/drivers/vfio/platform/vfio_platform_common.c
 +++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -155,6 +155,7 @@ static void vfio_platform_release(void *device_data)
- 			vdev->reset(vdev);
- 		vfio_platform_regions_cleanup(vdev);
- 		vfio_platform_irq_cleanup(vdev);
-+		vfio_platform_put_reset(vdev);
- 	}
- 
- 	mutex_unlock(&driver_lock);
-@@ -181,6 +182,8 @@ static int vfio_platform_open(void *device_data)
- 		if (ret)
- 			goto err_irq;
- 
-+		vfio_platform_get_reset(vdev);
-+
- 		if (vdev->reset)
- 			vdev->reset(vdev);
- 	}
-@@ -570,8 +573,6 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
- 		return ret;
- 	}
- 
--	vfio_platform_get_reset(vdev);
+@@ -45,16 +45,11 @@ static const struct vfio_platform_reset_combo reset_lookup_table[] = {
+ static void vfio_platform_get_reset(struct vfio_platform_device *vdev,
+ 				    struct device *dev)
+ {
+-	const char *compat;
+ 	int (*reset)(struct vfio_platform_device *);
+-	int ret, i;
 -
- 	mutex_init(&vdev->igate);
+-	ret = device_property_read_string(dev, "compatible", &compat);
+-	if (ret)
+-		return;
++	int i;
  
- 	return 0;
-@@ -585,7 +586,6 @@ struct vfio_platform_device *vfio_platform_remove_common(struct device *dev)
- 	vdev = vfio_del_group_dev(dev);
+ 	for (i = 0 ; i < ARRAY_SIZE(reset_lookup_table); i++) {
+-		if (!strcmp(reset_lookup_table[i].compat, compat)) {
++		if (!strcmp(reset_lookup_table[i].compat, vdev->compat)) {
+ 			request_module(reset_lookup_table[i].module_name);
+ 			reset = __symbol_get(
+ 				reset_lookup_table[i].reset_function_name);
+@@ -545,6 +540,12 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+ 	struct iommu_group *group;
+ 	int ret;
  
- 	if (vdev) {
--		vfio_platform_put_reset(vdev);
- 		iommu_group_put(dev->iommu_group);
- 	}
++	ret = device_property_read_string(dev, "compatible", &vdev->compat);
++	if (ret) {
++		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
++		return -EINVAL;
++	}
++
+ 	if (!vdev)
+ 		return -EINVAL;
  
+diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+index 1fb1410..620ee40 100644
+--- a/drivers/vfio/platform/vfio_platform_private.h
++++ b/drivers/vfio/platform/vfio_platform_private.h
+@@ -56,6 +56,7 @@ struct vfio_platform_device {
+ 	u32				num_irqs;
+ 	int				refcnt;
+ 	struct mutex			igate;
++	const char			*compat;
+ 
+ 	/*
+ 	 * These fields should be filled by the bus specific binder
 -- 
 1.9.1
