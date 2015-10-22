@@ -1,73 +1,41 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 21 Oct 2015 20:26:59 -0500
-Subject: [PATCH RESEND net-next] net: updates HNS config and documents
-In-Reply-To: <1445308604-95860-1-git-send-email-yankejian@huawei.com>
-References: <1445308604-95860-1-git-send-email-yankejian@huawei.com>
-Message-ID: <CAL_JsqJ+4BK2KDX5+t6GGEYv3pPDc+crktiMqgu6QTZi7WDrxw@mail.gmail.com>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Thu, 22 Oct 2015 09:27:55 +0800
+Subject: [PATCH v1 1/2] dt-bindings: Sync the dts to this document
+In-Reply-To: <CAL_JsqJFO8u0-3BSwBrBh4m7z4iEDPYLeEM9Ef8SLvuj1FYXmg@mail.gmail.com>
+References: <1445395380-5365-1-git-send-email-wxt@rock-chips.com>
+ <1445395380-5365-2-git-send-email-wxt@rock-chips.com>
+ <CAL_JsqJ6ZRjZbtc7dqo-g=CzO+H_FWcRqs2gBGH2HMBBM1xU3g@mail.gmail.com>
+ <5627B309.9080309@gmail.com>
+ <CAL_JsqJcwWkMXQzo6PbO2kfv3h7hkqtq6CJW0+W4Wc3eh6RTuQ@mail.gmail.com>
+ <CAL_JsqJFO8u0-3BSwBrBh4m7z4iEDPYLeEM9Ef8SLvuj1FYXmg@mail.gmail.com>
+Message-ID: <56283B9B.70809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 9:36 PM, yankejian <yankejian@huawei.com> wrote:
-> updates the bindings documents and dtsi file according to the review
-> comments from Rob Herring <robh@kernel.org>
->
-> Signed-off-by: yankejian <yankejian@huawei.com>
-> Signed-off-by: huangdaode <huangdaode@hisilicon.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
 
-> ---
->  Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt | 2 +-
->  arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi                 | 8 +++-----
->  2 files changed, 4 insertions(+), 6 deletions(-)
+? 2015?10?22? 09:18, Rob Herring ??:
+> On Wed, Oct 21, 2015 at 11:48 AM, Rob Herring <robh+dt@kernel.org> wrote:
+>> On Wed, Oct 21, 2015 at 10:45 AM, Caesar Wang <caesar.upstream@gmail.com> wrote:
+>>> Hi Rob,
+>>>
+>>> ? 2015?10?21? 23:18, Rob Herring ??:
+>>>> On Tue, Oct 20, 2015 at 9:42 PM, Caesar Wang <wxt@rock-chips.com> wrote:
+>>>>> Add the OTP gpio state, we need switch the pin to gpio state
+>>>>> before the TSADC controller is reset.
+> Also, please fix the subject to be specific what binding you are changing.
 >
-> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
-> index 9940aa0..9c23fdf 100644
-> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
-> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
-> @@ -12,7 +12,7 @@ Example:
->           mdio at 803c0000 {
->                     #address-cells = <1>;
->                     #size-cells = <0>;
-> -                   compatible = "hisilicon,mdio","hisilicon,hns-mdio";
-> +                   compatible = "hisilicon,hns-mdio","hisilicon,mdio";
->                     reg = <0x0 0x803c0000 0x0 0x10000>;
+> dt-bindings: rockchip-thermal: <what the change is>
+
+Sorry, Mr. Rob
+I just sent the patch.:-(
+
+
+> Rob
 >
->                     ethernet-phy at 0 {
-> diff --git a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
-> index 3500586..606dd5a 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
-> @@ -13,14 +13,12 @@ soc0: soc at 000000000 {
->                 reg = <0x0 0x803c0000 0x0 0x10000
->                        0x0 0x80000000 0x0 0x10000>;
 >
-> -               soc0_phy4: ethernet-phy at 4 {
-> +               soc0_phy0: ethernet-phy at 0 {
->                         reg = <0x0>;
-> -                       device_type = "ethernet-phy";
->                         compatible = "ethernet-phy-ieee802.3-c22";
->                 };
-> -               soc0_phy5: ethernet-phy at 5 {
-> +               soc0_phy1: ethernet-phy at 1 {
->                         reg = <0x1>;
-> -                       device_type = "ethernet-phy";
->                         compatible = "ethernet-phy-ieee802.3-c22";
->                 };
->         };
-> @@ -37,7 +35,7 @@ soc0: soc at 000000000 {
->                        0x0 0xc7000000 0x0 0x60000
->                        >;
 >
-> -               phy-handle = <0 0 0 0 &soc0_phy4 &soc0_phy5 0 0>;
-> +               phy-handle = <0 0 0 0 &soc0_phy0 &soc0_phy1 0 0>;
->                 interrupts = <
->                         /* [14] ge fifo err 8 / xge 6**/
->                         149 0x4 150 0x4 151 0x4 152 0x4
-> --
-> 1.9.1
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> -- 
+> Thanks,
+> Caesar
