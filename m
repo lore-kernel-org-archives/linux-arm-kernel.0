@@ -1,23 +1,96 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 22 Oct 2015 13:50:08 +0100
-Subject: [PATCH 4/6] regulator: axp20x: Support new AXP223 PMIC
-In-Reply-To: <1444840342-9233-5-git-send-email-wens@csie.org>
-References: <1444840342-9233-1-git-send-email-wens@csie.org>
- <1444840342-9233-5-git-send-email-wens@csie.org>
-Message-ID: <20151022125008.GJ8232@sirena.org.uk>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 22 Oct 2015 18:36:32 -0500
+Subject: [PATCH v13 2/5] uart: pl011: Introduce register accessor
+In-Reply-To: <55FBECCD.2080906@arm.com>
+References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
+ <1438328959-16177-3-git-send-email-jun.nie@linaro.org>
+ <55FBECCD.2080906@arm.com>
+Message-ID: <CAOZdJXUZDTzEn4f4FGhmKfq7HeEFKPKp4BAbR6_=wXGVw5_0GQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 12:32:20AM +0800, Chen-Yu Tsai wrote:
-> The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
-> It is functionally identical to AXP221; only the regulator default
-> voltage/status and the external host interface are different.
+On Fri, Sep 18, 2015 at 5:51 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+>
+>>  static void pl011_putc(struct uart_port *port, int c)
+>>  {
+>> -       while (readl(port->membase + REG_FR) & UART01x_FR_TXFF)
+>> +       struct uart_amba_port *uap =
+>> +           container_of(port, struct uart_amba_port, port);
+>> +
+>> +       while (pl011_readw(uap, REG_FR) & UART01x_FR_TXFF)
+>>                 ;
+>> -       writeb(c, port->membase + REG_DR);
+>> -       while (readl(port->membase + REG_FR) & UART01x_FR_BUSY)
+>> +       pl011_writeb(uap, c, REG_DR);
+>> +       while (pl011_readw(uap, REG_FR) & UART01x_FR_BUSY)
+>>                 ;
+>>  }
+>
+> Just for the records, as this has been discussed before: pl011_putc() is
+> called by the earlycon code, before the uart_port is actually
+> initialized. So we cannot rely on the accessors, but have to use the
+> old-fashioned director accessors for this.
+>
+> Which means you cannot use that approach to get earlycon support for the
+> ZTE UART, if I get this correctly. It shouldn't be to hard to introduce
+> another earlycon type specificly for that one, copying pl011_early_write
+> and pl011_early_console_setup and changing pl011_putc into
+> zte_uart_putc. But of course this belongs into the final patch (or a
+> separate one), not in this. So I guess you just leave that function
+> unchanged in this patch.
 
-Reviwed-by: Mark Brown <broonie@kernel.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151022/4177eab1/attachment.sig>
+How about something like this?  It adds the "sbsa32" option to the
+earlycon command-line parameter.
+
+static void pl011_putc(struct uart_port *port, int c)
+{
+    while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+        cpu_relax();
+    writeb(c, port->membase + UART01x_DR);
+    while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
+        cpu_relax();
+}
+
+static void pl011_early_write(struct console *con, const char *s, unsigned n)
+{
+    struct earlycon_device *dev = con->data;
+
+    uart_console_write(&dev->port, s, n, pl011_putc);
+}
+
+static void pl011_putc_sbsa32(struct uart_port *port, int c)
+{
+    while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+        cpu_relax();
+    writel(c, port->membase + UART01x_DR);
+    while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
+        cpu_relax();
+}
+
+static void pl011_early_write_sbsa32(struct console *con, const char
+*s, unsigned n)
+{
+    struct earlycon_device *dev = con->data;
+
+    uart_console_write(&dev->port, s, n, pl011_putc_sbsa32);
+}
+
+static int __init pl011_early_console_setup(struct earlycon_device *device,
+                        const char *opt)
+{
+    if (!device->port.membase)
+        return -ENODEV;
+
+    if (strcmp(device->options, "sbsa32"))
+        device->con->write = pl011_early_write_sbsa32;
+    else
+        device->con->write = pl011_early_write;
+
+    return 0;
+}
+
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
