@@ -1,141 +1,120 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 22 Oct 2015 11:41:57 +0200
-Subject: [PATCH v2 1/6] vfio: platform: add capability to register a reset
- function
+Date: Thu, 22 Oct 2015 11:41:58 +0200
+Subject: [PATCH v2 2/6] vfio: platform: reset: add
+ vfio_platform_reset_private.h
 In-Reply-To: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
 References: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1445506922-6005-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <1445506922-6005-3-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for subsequent changes in reset function lookup,
-lets introduce a dynamic list of reset combos (compat string,
-reset module, reset function). The list can be populated/voided with
-two new functions, vfio_platform_register/unregister_reset. Those are
-not yet used in this patch.
+This header is to be included in all vfio reset modules. It
+defines the module_vfio_reset_handler macro whose role is
+- to define a module alias
+- implement module init/exit function which respectively registers
+  and unregisters the reset function.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
 
-v1 -> v2:
-- reset_list becomes static
-- vfio_platform_register/unregister_reset take a const char * as compat
-- fix node leak
-- add reset_lock to protect the reset list manipulation
-- move vfio_platform_reset_node declaration in vfio_platform_common.c
----
- drivers/vfio/platform/vfio_platform_common.c  | 77 +++++++++++++++++++++++++++
- drivers/vfio/platform/vfio_platform_private.h |  7 +++
- 2 files changed, 84 insertions(+)
+v2: creation
+- this defines the module_vfio_reset_handler macro as suggested by Arnd
 
-diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index e43efb5..52a4c7b 100644
---- a/drivers/vfio/platform/vfio_platform_common.c
-+++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -23,6 +23,15 @@
+Although Arnd suggested me to remove the vfio_platform_register_reset
+symbol_get (since the module manager can handle the case where the
+vfio-platform driver is not loaded), I prefered to keep it while
+introducing the macro. The rationale is, when using symbol_get/put
+we are able to release the hold from the reset module on vfio-platform
+as soon as the registration is complete and I think this makes sense.
+---
+ drivers/vfio/platform/reset/Makefile               |  2 +-
+ .../platform/reset/vfio_platform_reset_private.h   | 66 ++++++++++++++++++++++
+ 2 files changed, 67 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/vfio/platform/reset/vfio_platform_reset_private.h
+
+diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
+index 2a486af..154a7d5 100644
+--- a/drivers/vfio/platform/reset/Makefile
++++ b/drivers/vfio/platform/reset/Makefile
+@@ -1,5 +1,5 @@
+ vfio-platform-calxedaxgmac-y := vfio_platform_calxedaxgmac.o
  
- #include "vfio_platform_private.h"
+-ccflags-y += -Idrivers/vfio/platform
++ccflags-y += -Idrivers/vfio/platform -Idrivers/vfio/platform/reset
  
-+struct vfio_platform_reset_node {
-+	struct list_head link;
-+	char *compat;
-+	struct module *owner;
-+	vfio_platform_reset_fn_t reset;
-+};
+ obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
+diff --git a/drivers/vfio/platform/reset/vfio_platform_reset_private.h b/drivers/vfio/platform/reset/vfio_platform_reset_private.h
+new file mode 100644
+index 0000000..f212a61
+--- /dev/null
++++ b/drivers/vfio/platform/reset/vfio_platform_reset_private.h
+@@ -0,0 +1,66 @@
++/*
++ * Interface used by VFIO platform reset modules to register/unregister
++ * their reset function
++ *
++ * Copyright (c) 2015 Linaro Ltd.
++ *              www.linaro.org
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+static LIST_HEAD(reset_list);
-+static DEFINE_MUTEX(reset_lock);
- static DEFINE_MUTEX(driver_lock);
- 
- static const struct vfio_platform_reset_combo reset_lookup_table[] = {
-@@ -573,3 +582,71 @@ struct vfio_platform_device *vfio_platform_remove_common(struct device *dev)
- 	return vdev;
- }
- EXPORT_SYMBOL_GPL(vfio_platform_remove_common);
++#ifndef VFIO_PLATFORM_RESET_PRIVATE_H
++#define VFIO_PLATFORM_RESET_PRIVATE_H
 +
-+int vfio_platform_register_reset(struct module *reset_owner,
-+				 const char *compat,
-+				 vfio_platform_reset_fn_t reset)
++#include <linux/module.h>
++#include "vfio_platform_private.h"
++
++static int reset_module_register(struct module *module,
++				    const char *compat,
++				    vfio_platform_reset_fn_t reset)
 +{
-+	struct vfio_platform_reset_node *node, *iter;
-+	bool found = false;
++	int (*register_reset)(struct module *, const char*,
++				vfio_platform_reset_fn_t);
++	int ret;
 +
-+	mutex_lock(&reset_lock);
-+	list_for_each_entry(iter, &reset_list, link) {
-+		if (!strcmp(iter->compat, compat)) {
-+			found = true;
-+			break;
-+		}
-+	}
-+	if (found) {
-+		mutex_unlock(&reset_lock);
++	register_reset = symbol_get(vfio_platform_register_reset);
++	if (!register_reset)
 +		return -EINVAL;
-+	}
-+
-+	node = kmalloc(sizeof(*node), GFP_KERNEL);
-+	if (!node) {
-+		mutex_unlock(&reset_lock);
-+		return -ENOMEM;
-+	}
-+
-+	node->compat = kstrdup(compat, GFP_KERNEL);
-+	if (!node->compat) {
-+		kfree(node);
-+		mutex_unlock(&reset_lock);
-+		return -ENOMEM;
-+	}
-+
-+	node->owner = reset_owner;
-+	node->reset = reset;
-+
-+	list_add(&node->link, &reset_list);
-+	mutex_unlock(&reset_lock);
-+	return 0;
++	ret = register_reset(module, compat, reset);
++	symbol_put(vfio_platform_register_reset);
++	return ret;
 +}
-+EXPORT_SYMBOL_GPL(vfio_platform_register_reset);
 +
-+int vfio_platform_unregister_reset(const char *compat)
++static void reset_module_unregister(const char *compat)
 +{
-+	struct vfio_platform_reset_node *iter;
-+	bool found = false;
++	int (*unregister_reset)(const char *);
 +
-+	mutex_lock(&reset_lock);
-+	list_for_each_entry(iter, &reset_list, link) {
-+		if (!strcmp(iter->compat, compat)) {
-+			found = true;
-+			break;
-+		}
-+	}
-+	if (!found) {
-+		mutex_unlock(&reset_lock);
-+		return -EINVAL;
-+	}
++	unregister_reset = symbol_get(vfio_platform_unregister_reset);
++	if (!unregister_reset)
++		return;
 +
-+	list_del(&iter->link);
-+	kfree(iter->compat);
-+	kfree(iter);
-+	mutex_unlock(&reset_lock);
++	unregister_reset(compat);
 +
-+	return 0;
++	symbol_put(vfio_platform_unregister_reset);
 +}
-+EXPORT_SYMBOL_GPL(vfio_platform_unregister_reset);
 +
-diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index 1c9b3d5..1fb1410 100644
---- a/drivers/vfio/platform/vfio_platform_private.h
-+++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -89,4 +89,11 @@ extern int vfio_platform_set_irqs_ioctl(struct vfio_platform_device *vdev,
- 					unsigned start, unsigned count,
- 					void *data);
- 
-+typedef int (*vfio_platform_reset_fn_t)(struct vfio_platform_device *vdev);
++#define module_vfio_reset_handler(compat, reset)			\
++MODULE_ALIAS("vfio-reset:" compat);					\
++static int __init reset ## _module_init(void)				\
++{									\
++	return reset_module_register(THIS_MODULE, compat, &reset);	\
++};									\
++static void __exit reset ## _module_exit(void)				\
++{                                                                       \
++	reset_module_unregister(compat);				\
++};									\
++module_init(reset ## _module_init);					\
++module_exit(reset ## _module_exit)
 +
-+extern int vfio_platform_register_reset(struct module *owner,
-+					const char *compat,
-+					vfio_platform_reset_fn_t reset);
-+extern int vfio_platform_unregister_reset(const char *compat);
-+
- #endif /* VFIO_PLATFORM_PRIVATE_H */
++#endif /* VFIO_PLATFORM_RESET_PRIVATE_H */
 -- 
 1.9.1
