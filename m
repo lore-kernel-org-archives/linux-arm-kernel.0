@@ -1,32 +1,91 @@
-From: leoli@freescale.com (Li Yang)
-Date: Thu, 22 Oct 2015 12:38:48 -0500
-Subject: [PATCH v4 5/6] PCI: layerscape: add PCIe support for LS1043a and
- LS2080a
-In-Reply-To: <20151021213612.GK1583@localhost>
-References: <1444979960-24100-1-git-send-email-Minghuan.Lian@freescale.com>
- <1444979960-24100-5-git-send-email-Minghuan.Lian@freescale.com>
- <20151021213612.GK1583@localhost>
-Message-ID: <CADRPPNSPP1m_7zNF6wEfw9+Bpe=Z_gUA81cSaV4SENVpR34YWQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 22 Oct 2015 10:40:57 -0700
+Subject: [PATCH v5 1/4] ARM: mvebu: add broken-idle option
+In-Reply-To: <1444140824-24132-2-git-send-email-simon.guinot@sequanux.org>
+References: <1444140824-24132-1-git-send-email-simon.guinot@sequanux.org>
+ <1444140824-24132-2-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <CAOesGMjUG0Ws7X7sw3H=8BNTNrwqmfPREpP0MK8RoJssAgiJ-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2015 at 4:36 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Fri, Oct 16, 2015 at 03:19:19PM +0800, Minghuan Lian wrote:
->> Both LS1043a and LS2080a are based on ARMv8 64-bit architecture
->> and have similar PCIe implementation. LUT is added to controller.
->> The patch removes the necessary fields from struct ls_pcie.
->>
->> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
->> ---
->> This patch is based on v4.3-rc4 and [PATCH v10 3/6]
->> PCI: designware: Add ARM64 support.
+On Tue, Oct 6, 2015 at 7:13 AM, Simon Guinot <simon.guinot@sequanux.org> wrote:
+> From: Vincent Donnefort <vdonnefort@gmail.com>
+>
+> The broken-idle option can be activated from the coherency-fabric DT
+> node. This property allows to disable the idle capability, when the
+> hardware doesn't support it, like the Seagate Personal Cloud boards.
+>
+> Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
+> ---
+>  .../devicetree/bindings/arm/coherency-fabric.txt   |  5 ++++
+>  arch/arm/mach-mvebu/pmsu.c                         | 29 +++++++++++++++++++---
+>  2 files changed, 31 insertions(+), 3 deletions(-)
+>
+> Changes for v5:
+> - Make the broken-idle property boolean.
+> - Don't use the broken-idle flag for Armada 38x.
+>
+> diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+> index 8dd46617c889..9b5c3f620e65 100644
+> --- a/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+> +++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+> @@ -27,6 +27,11 @@ Required properties:
+>   * For "marvell,armada-380-coherency-fabric", only one pair is needed
+>     for the per-CPU fabric registers.
+>
+> +Optional properties:
+> +
+> +- broken-idle: boolean to set when the Idle mode is not supported by the
+> +  hardware.
+> +
+>  Examples:
+>
+>  coherency-fabric at d0020200 {
+> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> index e8fdb9ceedf0..cba3fa985734 100644
+> --- a/arch/arm/mach-mvebu/pmsu.c
+> +++ b/arch/arm/mach-mvebu/pmsu.c
+> @@ -379,6 +379,16 @@ static struct notifier_block mvebu_v7_cpu_pm_notifier = {
+>
+>  static struct platform_device mvebu_v7_cpuidle_device;
+>
+> +static int broken_idle(struct device_node *np)
+> +{
+> +       if (of_property_read_bool(np, "broken-idle")) {
+> +               pr_warn("CPU idle is currently broken: disabling\n");
+> +               return 0;
+> +       }
+> +
+> +       return 1;
+> +}
 
-Hi Bjorn,
+This is confusing. The function is called broken_idle(), but it
+returns 0 if idle is broken and 1 if it isn't.
 
-Are you also applying this patch
-https://patchwork.ozlabs.org/patch/531184/ in this merge windows?
-Because the new hardware can only work with the generic ARM64 support
-added in the designware pcie driver.
+It means these tests look odd:
 
-Regards,
-Leo
+> +
+>  static __init int armada_370_cpuidle_init(void)
+>  {
+>         struct device_node *np;
+> @@ -387,7 +397,9 @@ static __init int armada_370_cpuidle_init(void)
+>         np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
+>         if (!np)
+>                 return -ENODEV;
+> -       of_node_put(np);
+> +
+> +       if (!broken_idle(np))
+> +               goto end;
+
+So, the way I read this when I read just this code is: "If idle is NOT
+broken, then don't bother set up any of the idle stuff".
+
+Please turn this the other way around so others don't make the same
+mistake when reading the code.
+
+I know it might come across as bikesheddy and nitpicky, but
+readability trumps most other things when it comes to new code. :-/
+
+
+
+-Olof
