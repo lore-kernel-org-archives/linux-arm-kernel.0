@@ -1,26 +1,43 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Thu, 22 Oct 2015 10:12:13 +0530
-Subject: [PATCH v3 1/3] mailbox/omap: Add ti, mbox-send-noirq quirk to fix
- AM33xx CPU Idle
-In-Reply-To: <56282833.5010105@ti.com>
-References: <1442967294-23837-1-git-send-email-d-gerlach@ti.com>
- <1442967294-23837-2-git-send-email-d-gerlach@ti.com>
- <CABb+yY0rCGCj=vkNXP1c9zonX+snBxdKFeQ4JCo2aKb-h6JhCw@mail.gmail.com>
- <56282833.5010105@ti.com>
-Message-ID: <CAJe_Zhd4RoVQJKjGN8QKYCeDMWVsuPQhCj4gUpQwkAX_Wqnxxg@mail.gmail.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Thu, 22 Oct 2015 10:16:02 +0530
+Subject: [PATCH 1/2] can: xilinx: use readl/writel instead of ioread/iowrite
+Message-ID: <1445489163-11045-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 October 2015 at 05:35, Suman Anna <s-anna@ti.com> wrote:
+The driver only supports memory-mapped I/O [by ioremap()],
+so readl/writel is actually the right thing to do, IMO.
+During the validation of this driver or IP on ARM 64-bit processor
+while sending lot of packets observed that the tx packet drop with iowrite
+Putting the barriers for each tx fifo register write fixes this issue
+Instead of barriers using writel also fixed this issue.
 
->>   Anyways I am OK too, if you guys want to fix it with a platform
->> specific quirk. Let me know I'll pick this patch.
->
-> I haven't gotten a chance to try #1, and I won't be able to look at it
-> atleast for another month. I suggest that you go ahead and pick this
-> patch up, as a quirk is needed in one form or the other for #2, and #1
-> is anyways a bigger change that will affect all our IPC stacks across
-> all pairs of MPU - remote processors on different SoCs.
->
-Yeah that is the reason I offered to pick this patch as such.
-OK I'll take this patch.
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+ drivers/net/can/xilinx_can.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
+index 6114214..055d6f3 100644
+--- a/drivers/net/can/xilinx_can.c
++++ b/drivers/net/can/xilinx_can.c
+@@ -170,7 +170,7 @@ static const struct can_bittiming_const xcan_bittiming_const = {
+ static void xcan_write_reg_le(const struct xcan_priv *priv, enum xcan_reg reg,
+ 			u32 val)
+ {
+-	iowrite32(val, priv->reg_base + reg);
++	writel(val, priv->reg_base + reg);
+ }
+ 
+ /**
+@@ -183,7 +183,7 @@ static void xcan_write_reg_le(const struct xcan_priv *priv, enum xcan_reg reg,
+  */
+ static u32 xcan_read_reg_le(const struct xcan_priv *priv, enum xcan_reg reg)
+ {
+-	return ioread32(priv->reg_base + reg);
++	return readl(priv->reg_base + reg);
+ }
+ 
+ /**
+-- 
+2.1.2
