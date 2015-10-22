@@ -1,79 +1,40 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 22 Oct 2015 11:05:26 -0400
-Subject: [PATCH v3 0/2] Common SerDes driver for TI's Keystone Platforms
-In-Reply-To: <1445432201-16007-1-git-send-email-w-kwok2@ti.com>
-References: <1445432201-16007-1-git-send-email-w-kwok2@ti.com>
-Message-ID: <5628FB36.4010303@ti.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 22 Oct 2015 17:09:59 +0200
+Subject: [PATCH] mutex: make mutex_lock_nested an inline function
+In-Reply-To: <57854232.vMTrn4EgZx@wuerfel>
+References: <11282238.AHmyWliPRj@wuerfel>
+ <20151013203812.GM17308@twins.programming.kicks-ass.net>
+ <11817958.z9KtmeKzV7@wuerfel> <57854232.vMTrn4EgZx@wuerfel>
+Message-ID: <20151022150959.GU17308@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2015 08:56 AM, WingMan Kwok wrote:
-> On TI's Keystone platforms, several peripherals such as the
-> gbe ethernet switch, 10gbe ethernet switch and PCIe controller
-> require the use of a SerDes for converting SoC parallel data into
-> serialized data that can be output over a high-speed electrical
-> interface, and also converting high-speed serial input data
-> into parallel data that can be processed by the SoC.  The
-> SerDeses used by those peripherals, though they may be different,
-> are largely similar in functionality and setup.
->
-> This patch series provides a SerDes phy driver implementation that can be
-> used by the above mentioned peripheral drivers to configure their
-> respective SerDeses.
->
-> As an example of the using the SerDes driver, this patch series also
-> updates the Keystone PCIe host driver to enable and use its SerDes block.
->
-> References:
-> [1] KeyStone II Architecture Serializer/Deserializer (SerDes) User's Guide
->      (http://www.ti.com/lit/ug/spruho3a/spruho3a.pdf)
->
-> v3:
-> 	- addresses the following review comments
-> 		1. https://lkml.org/lkml/2015/10/19/756
-> 			-- included sizes.h
-> 		2. https://lkml.org/lkml/2015/10/19/781
-> 			-- updated base on Fengguang Wu's suggestions.
-> 		3. https://lkml.org/lkml/2015/10/15/896
-> 			-- clarified here https://lkml.org/lkml/2015/10/20/512
-> 			-- nothing to do.
->
-> v2:
-> 	- addresses the following review comments on v1:
-> 		1. https://lkml.org/lkml/2015/10/15/896
-> 			-- this does not address the question:
-> 			   "The current code does not do this when compiled,
-> 			    which might be a problem for distributors.
-> 			    Can you clarify the license?"
-> 			-- the question is still under discussion here:
-> 			   https://lkml.org/lkml/2015/10/19/471
-> 		2. https://lkml.org/lkml/2015/10/15/895
->
-> v1:
-> 	- addresses the following review comments
-> 		1. https://lkml.org/lkml/2015/10/13/803
-> 		2. https://lkml.org/lkml/2015/10/14/613
-> 		3. https://lkml.org/lkml/2015/10/13/818
->
-> 	- An update to PCIe dts bindings to enable the PCIe SerDes is
-> 	  submitted in a separate patch.
->
-> WingMan Kwok (2):
->    phy: keystone: serdes driver for gbe 10gbe and pcie
->    PCI: keystone: update to use generic keystone serdes driver
->
->   Documentation/devicetree/bindings/phy/ti-phy.txt |  239 +++
->   drivers/pci/host/pci-keystone.c                  |   24 +-
->   drivers/pci/host/pci-keystone.h                  |    1 +
->   drivers/phy/Kconfig                              |    8 +
->   drivers/phy/Makefile                             |    1 +
->   drivers/phy/phy-keystone-serdes.c                | 2366 ++++++++++++++++++++++
->   6 files changed, 2629 insertions(+), 10 deletions(-)
->   create mode 100644 drivers/phy/phy-keystone-serdes.c
->
-Kishon, Bjorn
+On Thu, Oct 22, 2015 at 05:02:45PM +0200, Arnd Bergmann wrote:
+> On Tuesday 13 October 2015 23:46:35 Arnd Bergmann wrote:
+> > On Tuesday 13 October 2015 22:38:12 Peter Zijlstra wrote:
+> > > A quick grep shows a large amount of trivial code that optimizers will
+> > > still happily throw away, but it should be verified that this does not
+> > > result in pointless code generation.
+> > 
+> > Indeed, I'm seeing a tiny code growth with ARM multi_v7_defconfig when
+> > my patch is applied, as the image (according to size -A) grows from
+> > 13740187 bytes to 13740283, all of it in .text of two drivers (i2c-core
+> > and three files of bluetooth.ko).
+> 
+> 
+> Did we actually reach any conclusion here? We still get the warnings
+> in the regulator code in linux-next, and I'd like to see either this
+> patch ("mutex: make mutex_lock_nested an inline function") or
+> "regulator: core: avoid unused variable warning" get merged.
+> 
+> We could also remove the two functions again, as they are still
+> unused and we are getting closer to the merge window.
 
-Who will pick this up? Do we have time to get this in 4.4?
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+Hmm, I was sure I send a reply, but I cannot even find it in my own sent
+folder so who knows.
+
+My current preference is to keep the thing a macro and work around it in
+the usage site because while these warns are annoying, they're at least
+visible. Whereas, with an inline, code bloat is entirely silent. Even if
+the sites you found are harmless, there's no saying what the future will
+bring etc..
