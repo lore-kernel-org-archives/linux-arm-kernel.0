@@ -1,124 +1,183 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Thu, 22 Oct 2015 14:43:17 +0800
-Subject: Problem about CPU stalling in hrtimer_intterrupts()
-Message-ID: <56288585.40204@huawei.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 22 Oct 2015 07:21:41 +0000
+Subject: [PATCH v11 1/6] PCI: designware: move calculation of bus
+ addresses to DRA7xx
+In-Reply-To: <20151021221524.GM1583@localhost>
+References: <1444991021-109306-1-git-send-email-wangzhou1@hisilicon.com>
+ <1444991021-109306-2-git-send-email-wangzhou1@hisilicon.com>
+ <20151021221524.GM1583@localhost>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E16274DCC@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+> -----Original Message-----
+> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> Sent: 21 October 2015 23:15
+> To: Wangzhou (B)
+> Cc: Bjorn Helgaas; jingoohan1 at gmail.com; pratyush.anand at gmail.com; Arnd
+> Bergmann; linux at arm.linux.org.uk; thomas.petazzoni at free-electrons.com;
+> Gabriele Paoloni; lorenzo.pieralisi at arm.com; james.morse at arm.com;
+> Liviu.Dudau at arm.com; jason at lakedaemon.net; robh at kernel.org;
+> gabriel.fernandez at linaro.org; Minghuan.Lian at freescale.com; linux-
+> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; zhangjukuo;
+> qiuzhenfa; liudongdong (C); qiujiang; xuwei (O); Liguozhu (Kenneth)
+> Subject: Re: [PATCH v11 1/6] PCI: designware: move calculation of bus
+> addresses to DRA7xx
+> 
+> Hi Zhou & Gabriele,
 
-I got the following call trace when I called some set time syscalls in 
-userspace.
+Hi Bjorn, thanks for reviewing
 
----start---
-Jan 01 00:02:29 Linux kernel: INFO: rcu_sched detected stalls on CPUs/tasks:
-Jan 01 00:02:29 Linux kernel:         0: (2 GPs behind) idle=913/1/0 
-softirq=59289/59291 fqs=488
-Jan 01 00:02:29 Linux kernel:         (detected by 20, t=5252 jiffies, 
-g=35769, c=35768, q=567)
-Jan 01 00:02:29 Linux kernel: Task dump for CPU 0:
-Jan 01 00:02:29 Linux kernel: swapper/0       R  running task        0 
-   0      0 0x00000002
-Jan 01 00:02:29 Linux kernel: Call trace:
-Jan 01 00:02:29 Linux kernel: [<ffffffc000086c5c>] __switch_to+0x74/0x8c
-Jan 01 00:02:29 Linux kernel: rcu_sched kthread starved for 4764 jiffies!
-Jan 01 00:03:32 Linux kernel: NMI watchdog: BUG: soft lockup - CPU#0 
-stuck for 23s! [swapper/0:0]
-Jan 01 00:03:32 Linux kernel: CPU: 0 PID: 0 Comm: swapper/0 Not tainted 
-4.1.6+ #184
-Jan 01 00:03:32 Linux kernel: task: ffffffc00091cdf0 ti: 
-ffffffc000910000 task.ti: ffffffc000910000
-Jan 01 00:03:32 Linux kernel: PC is at arch_cpu_idle+0x10/0x18
-Jan 01 00:03:32 Linux kernel: LR is at arch_cpu_idle+0xc/0x18
-Jan 01 00:03:32 Linux kernel: pc : [<ffffffc00008686c>] lr : 
-[<ffffffc000086868>] pstate: 60000145
-Jan 01 00:03:32 Linux kernel: sp : ffffffc000913f20
-Jan 01 00:03:32 Linux kernel: x29: ffffffc000913f20 x28: 000000003f4bbab0
-Jan 01 00:03:32 Linux kernel: x27: ffffffc00091669c x26: ffffffc00096e000
-Jan 01 00:03:32 Linux kernel: x25: ffffffc000804000 x24: ffffffc000913f30
-Jan 01 00:03:32 Linux kernel: x23: 0000000000000001 x22: ffffffc0006817f8
-Jan 01 00:03:32 Linux kernel: x21: ffffffc0008fdb00 x20: ffffffc000916618
-Jan 01 00:03:32 Linux kernel: x19: ffffffc000910000 x18: 00000000ffffffff
-Jan 01 00:03:32 Linux kernel: x17: 0000007f9d6f682c x16: ffffffc0001e19d0
-Jan 01 00:03:32 Linux kernel: x15: 0000000000000061 x14: 0000000000000072
-Jan 01 00:03:32 Linux kernel: x13: 0000000000000067 x12: ffffffc000682528
-Jan 01 00:03:32 Linux kernel: x11: 0000000000000005 x10: 00000001000faf9a
-Jan 01 00:03:32 Linux kernel: x9 : ffffffc000913e60 x8 : ffffffc00091d350
-Jan 01 00:03:32 Linux kernel: x7 : 0000000000000000 x6 : 002b24c4f00026aa
-Jan 01 00:03:32 Linux kernel: x5 : 0000001ffd5c6000 x4 : ffffffc000913ea0
-Jan 01 00:03:32 Linux kernel: x3 : ffffffdffdec3b44 x2 : ffffffdffdec3b44
-Jan 01 00:03:32 Linux kernel: x1 : 0000000000000000 x0 : 0000000000000000
----end---
+> 
+> On Fri, Oct 16, 2015 at 06:23:36PM +0800, Zhou Wang wrote:
+> > From: gabriele paoloni <gabriele.paoloni@huawei.com>
+> >
+> > Commit f4c55c5a3f7f ("PCI: designware: Program ATU with untranslated
+> > address") added the calculation of PCI BUS addresses in designware,
+> > storing them in new fields added in "struct pcie_port". This
+> > calculation is done for every designware user even if is only
+> > applicable to DRA7xx.
+> > This patch moves the calculation of the bus addresses to the DRA7xx
+> > driver and is needed to allow the rework of designware to use
+> > the new DT parsing API.
+> >
+> > Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> > Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+> > Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
+> > ---
+> >  drivers/pci/host/pci-dra7xx.c      | 13 +++++++++++++
+> >  drivers/pci/host/pcie-designware.c | 15 ++++-----------
+> >  2 files changed, 17 insertions(+), 11 deletions(-)
+> >
+> > diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+> > index 199e29a..ebdffa0 100644
+> > --- a/drivers/pci/host/pci-dra7xx.c
+> > +++ b/drivers/pci/host/pci-dra7xx.c
+> > @@ -62,6 +62,7 @@
+> >
+> >  #define	PCIECTRL_DRA7XX_CONF_PHY_CS			0x010C
+> >  #define	LINK_UP						BIT(16)
+> > +#define	CPU_TO_BUS_ADDR					0x0FFFFFFF
+> 
+> "CPU_TO_BUS_ADDR" is a very generic name.  Since you do have DRA7XX in
+> other #defines and static symbols in this file, maybe it could be DRA7XX to
+> make it obvious that it only applies here?
 
+Ok will change to DRA7XX_CPU_TO_BUS_ADRR in v12
 
-I use the kernel-4.1.6 running on arm64.
-My testcase is that it calls clock_settime and clock_adjtime alternately 
-with random params on each core. My system has 32 cores.
+> 
+> >
+> >  struct dra7xx_pcie {
+> >  	void __iomem		*base;
+> > @@ -151,6 +152,18 @@ static void dra7xx_pcie_enable_interrupts(struct
+> pcie_port *pp)
+> >  static void dra7xx_pcie_host_init(struct pcie_port *pp)
+> >  {
+> >  	dw_pcie_setup_rc(pp);
+> > +
+> > +	if (pp->io_mod_base)
+> > +		pp->io_mod_base &= CPU_TO_BUS_ADDR;
+> 
+> These are equivalent to
+> 
+>   pp->io_mod_base &= CPU_TO_BUS_ADDR;
+> 
+> (You don't need to test whether they're zero first.)
+> 
 
-I found the cpu stalling in  hrtimer_intterrupts(). So I added some 
-debug info in hrtimer_intterrupts() and found that the while loop runs 
-1020437660 times and takes 98761 jiffies(HZ=250).
+Yes agreed, will change in v12
 
-Some debug log is here:
----start---
-Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0 
-timer:ffffffdffdec6138, timer->function:ffffffc000129b84
-Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0 
-timer:ffffffdffdec6138, timer->function:ffffffc000129b84
-Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0 
-timer:ffffffdffdec6138, timer->function:ffffffc000129b84
-Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0 
-timer:ffffffdffdec6138, timer->function:ffffffc000129b84
-Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0 
-timer:ffffffdffdec6138, timer->function:ffffffc000129b84
-Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0 
-timer:ffffffdffdec6138, timer->function:ffffffc000129b84
-Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0 
-timer:ffffffdffdec6138, timer->function:ffffffc000129b84
-Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0 
-timer:ffffffdffdec6138, timer->function:ffffffc000129b84
-Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0 
-timer:ffffffdffdec6138, timer->function:ffffffc000129b84
-Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0 
-timer:ffffffdffdec6138, timer->function:ffffffc000129b84
-Jan 01 00:03:32 Linux kernel: hrtimer_interrupt: 12827864 callbacks 
-suppressed
-[....]
-Jan 01 00:08:43 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4805395417269 ccpu0 
-timer:ffffffef90390a98, timer->function:ffffffc00052bcb8
-Jan 01 00:08:43 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4805395417269 ccpu0 
-timer:ffffffef90390a98, timer->function:ffffffc00052bcb8
-Jan 01 00:08:43 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4805395417269 ccpu0 
-timer:ffffffef90390a98, timer->function:ffffffc00052bcb8
-Jan 01 00:08:43 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4805395417269 ccpu0 
-timer:ffffffef90390a98, timer->function:ffffffc00052bcb8
-Jan 01 00:08:43 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4805395417269 ccpu0 
-timer:ffffffef90390a98, timer->function:ffffffc00052bcb8
-Jan 01 00:08:43 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4805395417269 ccpu0 
-timer:ffffffef90390a98, timer->function:ffffffc00052bcb8
-Jan 01 00:08:43 Linux kernel: i:0 basenow.tv64:4809284991830 
-hrtimer_get_softexpires_tv64(timer):4809295433162 ccpu0
-Jan 01 00:08:43 Linux kernel: i:0 while_cnt:1020437660, cost 
-jiffies:98761, ccpu0
----end---
+> > +
+> > +	if (pp->mem_mod_base)
+> > +		pp->mem_mod_base &= CPU_TO_BUS_ADDR;
+> > +
+> > +	if (pp->cfg0_mod_base) {
+> > +		pp->cfg0_mod_base &= CPU_TO_BUS_ADDR;
+> > +		pp->cfg1_mod_base &= CPU_TO_BUS_ADDR;
+> > +	}
+> > +
+> >  	dra7xx_pcie_establish_link(pp);
+> >  	if (IS_ENABLED(CONFIG_PCI_MSI))
+> >  		dw_pcie_msi_init(pp);
+> > diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-
+> designware.c
+> > index 52aa6e3..75338a6 100644
+> > --- a/drivers/pci/host/pcie-designware.c
+> > +++ b/drivers/pci/host/pcie-designware.c
+> > @@ -365,14 +365,10 @@ int dw_pcie_host_init(struct pcie_port *pp)
+> >  	struct of_pci_range range;
+> >  	struct of_pci_range_parser parser;
+> >  	struct resource *cfg_res;
+> > -	u32 val, na, ns;
+> > +	u32 val, ns;
+> >  	const __be32 *addrp;
+> >  	int i, index, ret;
+> >
+> > -	/* Find the address cell size and the number of cells in order to get
+> > -	 * the untranslated address.
+> > -	 */
+> > -	of_property_read_u32(np, "#address-cells", &na);
+> >  	ns = of_n_size_cells(np);
+> >
+> >  	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
+> > @@ -415,8 +411,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+> >  			pp->io_base = range.cpu_addr;
+> >
+> >  			/* Find the untranslated IO space address */
+> > -			pp->io_mod_base = of_read_number(parser.range -
+> > -							 parser.np + na, ns);
+> > +			pp->io_mod_base = range.cpu_addr;
+> 
+> So apparently
+> 
+>   "of_read_number() == range.cpu_addr & CPU_TO_BUS_ADDR" on DRA7xx
+>   "of_read_number() == range.cpu_addr" everywhere else?
 
-Is there maybe a bug or do you have any opinions ?
+Yes correct
 
-Thanks,
-Yang
+> 
+> Is that right?  Is that a valid assumption, i.e., are we assuming
+> anything about DTs in the field that we shouldn't?
+
+Before I wrote a patch that was generic to accommodate intermediate level
+of translation between PCI_addr -> BUS_addr -> CPU_addr
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/360922.html
+
+After discussion we agreed to solve it with a bitmask rather than adding
+a field to of_pci_range to make it generic.
+The bitmask only applies to DRA7xx
+
+> 
+> >  		}
+> >  		if (restype == IORESOURCE_MEM) {
+> >  			of_pci_range_to_resource(&range, np, &pp->mem);
+> > @@ -425,8 +420,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+> >  			pp->mem_bus_addr = range.pci_addr;
+> >
+> >  			/* Find the untranslated MEM space address */
+> > -			pp->mem_mod_base = of_read_number(parser.range -
+> > -							  parser.np + na, ns);
+> > +			pp->mem_mod_base = range.cpu_addr;
+> >  		}
+> >  		if (restype == 0) {
+> >  			of_pci_range_to_resource(&range, np, &pp->cfg);
+> > @@ -436,8 +430,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+> >  			pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
+> >
+> >  			/* Find the untranslated configuration space address */
+> > -			pp->cfg0_mod_base = of_read_number(parser.range -
+> > -							   parser.np + na, ns);
+> > +			pp->cfg0_mod_base = range.cpu_addr;
+> >  			pp->cfg1_mod_base = pp->cfg0_mod_base +
+> >  					    pp->cfg0_size;
+> >  		}
+> > --
+> > 1.9.1
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
