@@ -1,11 +1,11 @@
 From: ijc@debian.org (Ian Campbell)
-Date: Thu, 22 Oct 2015 07:40:25 +0100
+Date: Thu, 22 Oct 2015 07:40:44 +0100
 Subject: I/O issues with writing to mtdblock devices on kirkwood
 In-Reply-To: <5628022A.9050707@mcfarlanes.me>
 References: <1444722697.16876.55.camel@debian.org>
  <5626B4DC.8000407@mcfarlanes.me> <5627F4E8.3030907@mcfarlanes.me>
  <1445461864.32735.21.camel@debian.org> <5628022A.9050707@mcfarlanes.me>
-Message-ID: <1445496025.32735.25.camel@debian.org>
+Message-ID: <1445496044.32735.26.camel@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
