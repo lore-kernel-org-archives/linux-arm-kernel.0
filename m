@@ -1,82 +1,78 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 22 Oct 2015 12:23:15 +0200
-Subject: [PATCH 4/4] cpufreq: imx6q: check regulator_get_optional return
- value
-In-Reply-To: <1445503652-777-5-git-send-email-s.hauer@pengutronix.de>
-References: <1445503652-777-1-git-send-email-s.hauer@pengutronix.de>
- <1445503652-777-5-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1445509395.3173.31.camel@pengutronix.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 22 Oct 2015 12:25:17 +0200 (CEST)
+Subject: Problem about CPU stalling in hrtimer_intterrupts()
+In-Reply-To: <5628AC58.2030509@huawei.com>
+References: <56288585.40204@huawei.com>
+ <alpine.DEB.2.11.1510220942010.4012@nanos> <5628AC58.2030509@huawei.com>
+Message-ID: <alpine.DEB.2.11.1510221133590.4012@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 22.10.2015, 10:47 +0200 schrieb Sascha Hauer:
-> While pu_reg is an optional regulator we still have to check
-> the return value for -EPROBE_DEFER to properly detect the
-> case when we have a pu regulator but it is not yet present.
+On Thu, 22 Oct 2015, Ding Tianhong wrote:
+> On 2015/10/22 15:43, Thomas Gleixner wrote:
+> >> Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830
+> >> hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0
+> >> timer:ffffffdffdec6138, timer->function:ffffffc000129b84
+> >> Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830
+> >> hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0
+
+> This problem could only occur on the system with 32 cores, when I
+> cut the cores to 16, this problem disappeared, so I think there is
+> some parallel problem when the 32 core set clock time together:
+
+> I try to reproduce the scene:
 > 
-> While at it, set pu_reg to NULL for an erroneous regulator
-> so that we can check for the regulator with if (pu_reg)
-> instead of the slightly less readable IS_ERR().
+> 1.do_settimeofday64
+> 2.update tk time
+> 3.update base time offset
+> 4.update expires_next
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/cpufreq/imx6q-cpufreq.c | 11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> index ce0c6bd..b643614 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -71,7 +71,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->  
->  	/* scaling up?  scale voltage before frequency */
->  	if (new_freq > old_freq) {
-> -		if (!IS_ERR(pu_reg)) {
-> +		if (pu_reg) {
->  			ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
->  			if (ret) {
->  				dev_err(cpu_dev, "failed to scale vddpu up: %d\n", ret);
-> @@ -148,7 +148,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->  			dev_warn(cpu_dev, "failed to scale vddsoc down: %d\n", ret);
->  			ret = 0;
->  		}
-> -		if (!IS_ERR(pu_reg)) {
-> +		if (pu_reg) {
->  			ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
->  			if (ret) {
->  				dev_warn(cpu_dev, "failed to scale vddpu down: %d\n", ret);
-> @@ -217,6 +217,11 @@ static int imx6q_cpufreq_get_resources(struct platform_device *pdev)
->  		return PTR_ERR(arm_reg);
->  
->  	pu_reg = regulator_get_optional(cpu_dev, "pu");
-> +	if (IS_ERR(pu_reg)) {
-> +		if (PTR_ERR(pu_reg) == -EPROBE_DEFER)
-> +			return -EPROBE_DEFER;
-> +		pu_reg = NULL;
-> +	}
+> the 3 and 4 will be called in softirq, but the hrtimer_interrupt may
+> break the order and run before 3, I am not sure whether this could
+> make the problem, do we need to update base time and expires_next in
+> the hrtimer_interrupt?  maybe I miss something, thanks for any
+> suggestion.
 
-The PU regulator isn't really optional for MX6 Q/DL (where it is present
-in hardware) as the datasheet clearly specifies that it needs to be set
-to the same voltage as SOC. Could you change this to request this
-regulator as non-optional for those chip derivatives and skip the
-request otherwise?
+Base offset is updated in hrtimer_interrupt as
+well. hrtimer_update_base() does that. So that's not the problem.
 
-Regards,
-Lucas
+Can you apply the patch below and enable the hrtimer tracepoints and
+collect trace data across the point where the problem happens?
 
->  
->  	soc_reg = regulator_get(cpu_dev, "soc");
->  	if (IS_ERR(soc_reg))
-> @@ -377,7 +382,7 @@ soc_opp_out:
->  	ret = regulator_set_voltage_time(soc_reg, imx6_soc_volt[0], imx6_soc_volt[num - 1]);
->  	if (ret > 0)
->  		transition_latency += ret * 1000;
-> -	if (!IS_ERR(pu_reg)) {
-> +	if (pu_reg) {
->  		ret = regulator_set_voltage_time(pu_reg, imx6_soc_volt[0], imx6_soc_volt[num - 1]);
->  		if (ret > 0)
->  			transition_latency += ret * 1000;
+Thanks,
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+	tglx
+----
+
+diff --git a/kernel/time/timekeeping.c b/kernel/time/timekeeping.c
+index 44d2cc0436f4..614f8d272cb0 100644
+--- a/kernel/time/timekeeping.c
++++ b/kernel/time/timekeeping.c
+@@ -575,8 +575,14 @@ static void timekeeping_update(struct timekeeper *tk, unsigned int action)
+ 	update_fast_timekeeper(&tk->tkr_mono, &tk_fast_mono);
+ 	update_fast_timekeeper(&tk->tkr_raw,  &tk_fast_raw);
+ 
+-	if (action & TK_CLOCK_WAS_SET)
++	if (action & TK_CLOCK_WAS_SET) {
+ 		tk->clock_was_set_seq++;
++		trace_printk("TK: Seq: %u R: %lld B: %lld T: %lld\n",
++			     tk->clock_was_set_seq,
++			     tk->offs_real,
++			     tk->offs_boot,
++			     tk->offs_tai);
++	}
+ 	/*
+ 	 * The mirroring of the data to the shadow-timekeeper needs
+ 	 * to happen last here to ensure we don't over-write the
+@@ -1954,6 +1960,11 @@ ktime_t ktime_get_update_offsets_now(unsigned int *cwsseq, ktime_t *offs_real,
+ 		base = ktime_add_ns(base, nsecs);
+ 
+ 		if (*cwsseq != tk->clock_was_set_seq) {
++			trace_printk("HR: Seq: %u R: %lld B: %lld T: %lld\n",
++				     tk->clock_was_set_seq,
++				     tk->offs_real,
++				     tk->offs_boot,
++				     tk->offs_tai);
+ 			*cwsseq = tk->clock_was_set_seq;
+ 			*offs_real = tk->offs_real;
+ 			*offs_boot = tk->offs_boot;
