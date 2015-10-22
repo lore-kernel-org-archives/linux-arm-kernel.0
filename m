@@ -1,42 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 22 Oct 2015 10:58:24 +0200
-Subject: [PATCH v2] ARM: dts: sun4i: Add dts file for the pov
- protab2-ips9 tablet
-In-Reply-To: <1445378669-21622-1-git-send-email-hdegoede@redhat.com>
-References: <1445378669-21622-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151022085824.GU10947@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 22 Oct 2015 10:58:33 +0200
+Subject: [PATCH 1/2] can: xilinx: use readl/writel instead of
+ ioread/iowrite
+In-Reply-To: <56289CA6.1060809@pengutronix.de>
+References: <1445489163-11045-1-git-send-email-appanad@xilinx.com>
+ <4061693.oBld7AKBIp@wuerfel> <56289CA6.1060809@pengutronix.de>
+Message-ID: <8460953.p47oezaZnR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2015 at 12:04:29AM +0200, Hans de Goede wrote:
-> The Point of View protab2-ips9 is a tablet with a 9" ips 1024x768 lcd screen,
-> microsd slot, headphones, mini hdmi, mini usb b and power barrel connectors.
+On Thursday 22 October 2015 10:21:58 Marc Kleine-Budde wrote:
+> On 10/22/2015 10:14 AM, Arnd Bergmann wrote:
+> > On Thursday 22 October 2015 10:16:02 Kedareswara rao Appana wrote:
+> >> The driver only supports memory-mapped I/O [by ioremap()],
+> >> so readl/writel is actually the right thing to do, IMO.
+> >> During the validation of this driver or IP on ARM 64-bit processor
+> >> while sending lot of packets observed that the tx packet drop with iowrite
+> >> Putting the barriers for each tx fifo register write fixes this issue
+> >> Instead of barriers using writel also fixed this issue.
+> >>
+> >> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> > 
+> > The two should really do the same thing: iowrite32() is just a static inline
+> > calling writel() on both ARM32 and ARM64. On which kernel version did you
+> > observe the difference? It's possible that an older version used
+> > CONFIG_GENERIC_IOMAP, which made this slightly more expensive.
+> > 
+> > If there are barriers that you want to get rid of for performance reasons,
+> > you should use writel_relaxed(), but be careful to synchronize them correctly
+> > with regard to DMA. It should be fine in this driver, as it does not
+> > perform any DMA, but be aware that there is no big-endian version of
+> > writel_relaxed() at the moment.
 > 
-> It uses a rtl8188cus usb wifi chip and a RDA 5875Y bluetooth chip attached
-> to uart2. It has a bma250 accelerometer attached to i2c1 addr 0x18, this
-> only works when ldo3 is set to 2.8 volt, otherwise i2c1 gets stuck, so
-> for now we mark i2c1 as failed.
-> 
-> It has a pixcir,pixcir_tangoc compatible touchscreen attached to i2c2 addr
-> 0x5c. This is not enabled in this dts, because this variant of the
-> pixcir_tangoc has separate wakeup and enable pins both of which need
-> to be driven low before the touchscreen will work. Before we can enable
-> this the pixcir driver and devicetree-bindings need to be extended to
-> support these pins.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> We don't have DMA in CAN drivers, but usually a certain write triggers
+> sending. Do we need a barrier before triggering the sending?
 
-Applied, thanks!
-Maxime
+No, the relaxed writes are not well-defined across architectures. On
+ARM, the CPU guarantees that stores to an MMIO area are still in order
+with respect to one another, the barrier is only needed for actual DMA,
+so you are fine. I would expect the same to be true everywhere,
+otherwise a lot of other drivers would be broken too.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151022/f81af65f/attachment-0001.sig>
+To be on the safe side, that last write() could remain a writel() instead
+of writel_relaxed(), and that would be guaranteed to work on all
+architectures even if they end relax the ordering between MMIO writes.
+If there is a measurable performance difference, just use writel_relaxed()
+and add a comment.
+
+	Arnd
