@@ -1,53 +1,40 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Thu, 22 Oct 2015 11:52:02 -0700
-Subject: [PATCH 05/11] dt-binding: Add ngpios property to GPIO controller
- node
-In-Reply-To: <CAL_Jsq+Xwf7==J1LLnUDtj-cgJWRizbKXcYtwfEe5iv8VS-Uwg@mail.gmail.com>
-References: <1445233398-27129-1-git-send-email-pramodku@broadcom.com>
- <1445233398-27129-6-git-send-email-pramodku@broadcom.com>
- <CAL_Jsq+Xwf7==J1LLnUDtj-cgJWRizbKXcYtwfEe5iv8VS-Uwg@mail.gmail.com>
-Message-ID: <56293052.80402@broadcom.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 22 Oct 2015 13:55:02 -0500
+Subject: [PATCH] PCI: iproc: Fix company name
+In-Reply-To: <1445022248-12203-1-git-send-email-f.fainelli@gmail.com>
+References: <1445022248-12203-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20151022185502.GE21237@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 16, 2015 at 12:04:04PM -0700, Florian Fainelli wrote:
+> The header of pcie-iproc.c contains an obvious typo on Broadcom
+> Corporation, fix that.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
+Applied with Ray's ack to pci/host-iproc for v4.4, thanks, Florian!
 
-On 10/22/2015 11:43 AM, Rob Herring wrote:
-> On Mon, Oct 19, 2015 at 12:43 AM, Pramod Kumar <pramodku@broadcom.com> wrote:
->> Add ngpios property to the gpio controller's DT node so that controller
->> driver extracts total number of gpio lines present in controller
->> from DT and removes dependency on driver.
->>
->> Signed-off-by: Pramod Kumar <pramodku@broadcom.com>
->> Reviewed-by: Ray Jui <rjui@broadcom.com>
->> Reviewed-by: Scott Branden <sbranden@broadcom.com>
->> ---
->>   Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt | 5 +++++
->>   1 file changed, 5 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
->> index f92b833..655a8d7 100644
->> --- a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
->> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
->> @@ -10,6 +10,9 @@ Required properties:
->>       Define the base and range of the I/O address space that contains the Cygnus
->>   GPIO/PINCONF controller registers
->>
->> +- ngpios:
->> +    Total number of GPIOs the controller provides
->
-> This must be optional for compatibility and the driver needs to handle
-> it not present.
->
-
-You meant to be compatible with existing Cygnus devices, correct?
-
-Just to clarify, here you suggest we still leave the existing hard coded 
-ngpios in the driver, in order to be compatible with all existing Cygnus 
-devices (while the Cygnus device tree changes to use ngpio is still 
-being merged and through different maintainer), and have all new iProc 
-SoCs switch to use ngpios from device tree, right?
-
-Thanks,
-
-Ray
+> ---
+>  drivers/pci/host/pcie-iproc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+> index fe2efb141a9b..6c3d4b54858c 100644
+> --- a/drivers/pci/host/pcie-iproc.c
+> +++ b/drivers/pci/host/pcie-iproc.c
+> @@ -1,6 +1,6 @@
+>  /*
+>   * Copyright (C) 2014 Hauke Mehrtens <hauke@hauke-m.de>
+> - * Copyright (C) 2015 Broadcom Corporatcommon ion
+> + * Copyright (C) 2015 Broadcom Corporation
+>   *
+>   * This program is free software; you can redistribute it and/or
+>   * modify it under the terms of the GNU General Public License as
+> -- 
+> 2.1.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
