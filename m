@@ -1,60 +1,46 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 22 Oct 2015 13:45:03 -0500
-Subject: [PATCH 01/11] dt-bindings: pinctrl: Optional DT property to
- support pin mappings
-In-Reply-To: <1445233398-27129-2-git-send-email-pramodku@broadcom.com>
-References: <1445233398-27129-1-git-send-email-pramodku@broadcom.com>
- <1445233398-27129-2-git-send-email-pramodku@broadcom.com>
-Message-ID: <CAL_JsqJaJO+ytBrZvwHkPjM9-Wr8MHMK-uTV93QLium3JL_A3Q@mail.gmail.com>
+From: alex.aring@gmail.com (Alexander Aring)
+Date: Thu, 22 Oct 2015 20:46:05 +0200
+Subject: [PATCH soc/next] ARM: bcm2835: add mutual inclusion protection
+Message-ID: <1445539565-24955-1-git-send-email-alex.aring@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 12:43 AM, Pramod Kumar <pramodku@broadcom.com> wrote:
-> If GPIO controller's pins are muxed, pin-controller subsystem
-> need to be intimated by defining mapping between gpio and
-> pinmux controller. This patch adds required properties to
-> define this mapping via DT.
->
-> Signed-off-by: Pramod Kumar <pramodku@broadcom.com>
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+This patch adds mutual inclusion protection for the rpi firmware header.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+---
+This patch is for "soc/next" and depends on Eric Anholt's patch ("ARM: bcm2835:
+Add the Raspberry Pi firmware driver"), see:
 
-> ---
->  .../devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt         | 12 +++++++++---
->  1 file changed, 9 insertions(+), 3 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
-> index 6540ca5..25a5002 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
-> @@ -26,9 +26,13 @@ Optional properties:
->  - interrupt-controller:
->      Specifies that the node is an interrupt controller
->
-> -- pinmux:
-> -    Specifies the phandle to the IOMUX device, where pins can be individually
-> -muxed to GPIO
-> +- gpio-ranges:
-> +    Specifies the mapping between gpio controller and pin-controllers pins.
-> +    This requires 4 fields in cells defined as -
-> +    1. Phandle of pin-controller.
-> +    2. GPIO base pin offset.
-> +    3  Pin-control base pin offset.
-> +    4. number of gpio pins which are linearly mapped from pin base.
->
->  Supported generic PINCONF properties in child nodes:
->
-> @@ -78,6 +82,8 @@ Example:
->                 gpio-controller;
->                 interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
->                 interrupt-controller;
-> +               gpio-ranges = <&pinctrl 0 42 1>,
-> +                               <&pinctrl 1 44 3>;
->         };
->
->         /*
-> --
-> 1.9.1
->
+http://lists.infradead.org/pipermail/linux-rpi-kernel/2015-October/002434.html
+
+I think the patch is already applied but not pushed, so please fixup use this
+as fixup or simple apply this patch after the patch to add the firmware driver.
+
+ include/soc/bcm2835/raspberrypi-firmware.h | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/include/soc/bcm2835/raspberrypi-firmware.h b/include/soc/bcm2835/raspberrypi-firmware.h
+index 9d9efb7..c07d74a 100644
+--- a/include/soc/bcm2835/raspberrypi-firmware.h
++++ b/include/soc/bcm2835/raspberrypi-firmware.h
+@@ -6,6 +6,9 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#ifndef __SOC_RASPBERRY_FIRMWARE_H__
++#define __SOC_RASPBERRY_FIRMWARE_H__
++
+ #include <linux/types.h>
+ #include <linux/of_device.h>
+ 
+@@ -113,3 +116,5 @@ int rpi_firmware_property(struct rpi_firmware *fw,
+ int rpi_firmware_property_list(struct rpi_firmware *fw,
+ 			       void *data, size_t tag_size);
+ struct rpi_firmware *rpi_firmware_get(struct device_node *firmware_node);
++
++#endif /* __SOC_RASPBERRY_FIRMWARE_H__ */
+-- 
+2.6.1
