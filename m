@@ -1,34 +1,31 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 22 Oct 2015 11:00:20 -0500
-Subject: [PATCH v3 1/3] mailbox/omap: Add ti, mbox-send-noirq quirk to fix
- AM33xx CPU Idle
-In-Reply-To: <CAJe_Zhd4RoVQJKjGN8QKYCeDMWVsuPQhCj4gUpQwkAX_Wqnxxg@mail.gmail.com>
-References: <1442967294-23837-1-git-send-email-d-gerlach@ti.com>
- <1442967294-23837-2-git-send-email-d-gerlach@ti.com>
- <CABb+yY0rCGCj=vkNXP1c9zonX+snBxdKFeQ4JCo2aKb-h6JhCw@mail.gmail.com>
- <56282833.5010105@ti.com>
- <CAJe_Zhd4RoVQJKjGN8QKYCeDMWVsuPQhCj4gUpQwkAX_Wqnxxg@mail.gmail.com>
-Message-ID: <56290814.5030805@ti.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 22 Oct 2015 09:07:33 -0700
+Subject: [PATCH] pinctrl-zynq: Initialize early
+In-Reply-To: <1445513420-23527-1-git-send-email-mike.looijmans@topic.nl>
+References: <1445513420-23527-1-git-send-email-mike.looijmans@topic.nl>
+Message-ID: <20151022160733.GH5257@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2015 11:42 PM, Jassi Brar wrote:
-> On 22 October 2015 at 05:35, Suman Anna <s-anna@ti.com> wrote:
+Hi Mike,
+
+On Thu, 2015-10-22 at 01:30PM +0200, Mike Looijmans wrote:
+> Supplying pinmux configuration for e.g. gpio pins leads to deferred
+> probes because the pinctrl device is probed much later than gpio.
+> Move the init call to a much earlier stage so it probes before the
+> devices that may need it.
 > 
->>>   Anyways I am OK too, if you guys want to fix it with a platform
->>> specific quirk. Let me know I'll pick this patch.
->>
->> I haven't gotten a chance to try #1, and I won't be able to look at it
->> atleast for another month. I suggest that you go ahead and pick this
->> patch up, as a quirk is needed in one form or the other for #2, and #1
->> is anyways a bigger change that will affect all our IPC stacks across
->> all pairs of MPU - remote processors on different SoCs.
->>
-> Yeah that is the reason I offered to pick this patch as such.
-> OK I'll take this patch.
+> Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
 
-Thanks a lot. We will be a lot closer to get PM working on AM335/AM437x
-SoCs.
+in general, the change should be OK, but neither on zc702 nor zc706 do I
+see a difference in respect to deferred probes. With and without the
+patch I see:
+    root at zynq:~# dmesg | grep -i defer
+    [    0.097021] zynq-gpio e000a000.gpio: could not find pctldev for node /amba/slcr at f8000000/pinctrl at 700/gpio0-default, deferring probe
+    root at zynq:~# 
 
-regards
-Suman
+If you have a case this patch improves things though, feel free to add my
+Tested-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+
+	Thanks,
+	S?ren
