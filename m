@@ -1,50 +1,88 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 22 Oct 2015 10:21:29 +0100
-Subject: [PATCH 5/5] clk: scpi: add missing of_node_put
-In-Reply-To: <1445460100-26727-6-git-send-email-Julia.Lawall@lip6.fr>
-References: <1445460100-26727-1-git-send-email-Julia.Lawall@lip6.fr>
- <1445460100-26727-6-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <5628AA99.1000000@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Oct 2015 10:26:30 +0100
+Subject: [RFC PATCH v6 3/3] arm: fix a migrating irq bug when hotplug cpu
+In-Reply-To: <20151021202907.GN32532@n2100.arm.linux.org.uk>
+References: <1443087135-17044-1-git-send-email-yangyingliang@huawei.com>
+ <1443087135-17044-4-git-send-email-yangyingliang@huawei.com>
+ <CAMuHMdWyvaecQHOzFnxVZus_Pfkxjw1XfkGdcLK=D2ThaoJMzA@mail.gmail.com>
+ <20151021202907.GN32532@n2100.arm.linux.org.uk>
+Message-ID: <20151022092629.GQ32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Oct 21, 2015 at 09:29:08PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Oct 21, 2015 at 01:47:49PM +0200, Geert Uytterhoeven wrote:
+> > On Thu, Sep 24, 2015 at 11:32 AM, Yang Yingliang
+> > <yangyingliang@huawei.com> wrote:
+> > > When cpu is disabled, all irqs will be migratged to another cpu.
+> > > In some cases, a new affinity is different, the old affinity need
+> > > to be updated and if irq_set_affinity's return value is IRQ_SET_MASK_OK_DONE,
+> > > the old affinity can not be updated. Fix it by using irq_do_set_affinity.
+> > >
+> > > And migrating interrupts is a core code matter, so use the generic
+> > > function irq_migrate_all_off_this_cpu() to migrate interrupts in
+> > > kernel/irq/migration.c.
+> > >
+> > > Cc: Jiang Liu <jiang.liu@linux.intel.com>
+> > > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> > > Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> > > Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+> > > ---
+> > >  arch/arm/Kconfig           |  1 +
+> > >  arch/arm/include/asm/irq.h |  1 -
+> > >  arch/arm/kernel/irq.c      | 62 ----------------------------------------------
+> > >  arch/arm/kernel/smp.c      |  2 +-
+> > >  4 files changed, 2 insertions(+), 64 deletions(-)
+> > >
+> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > index 72ad724..bffba78 100644
+> > > --- a/arch/arm/Kconfig
+> > > +++ b/arch/arm/Kconfig
+> > > @@ -1492,6 +1492,7 @@ config NR_CPUS
+> > >  config HOTPLUG_CPU
+> > >         bool "Support for hot-pluggable CPUs"
+> > >         depends on SMP
+> > > +       select GENERIC_IRQ_MIGRATION
+> > 
+> > This causes the following warnings during s2ram on r8a7791/koelsch
+> > (dual-core CA15):
+> 
+> Thanks for the report.  I'll see what tonight's boot run says for my
+> platforms.  Hopefully, the author of these changes can help debug
+> this.
 
+What's happened is that:
 
-On 21/10/15 21:41, Julia Lawall wrote:
-> for_each_available_child_of_node performs an of_node_get on each iteration,
-> so a break out of the loop requires an of_node_put.
->
-> The semantic patch that fixes this problem is as follows
-> (http://coccinelle.lip6.fr):
->
-> // <smpl>
-> @@
-> expression root,e;
-> local idexpression child;
-> @@
->
->   for_each_available_child_of_node(root, child) {
->     ... when != of_node_put(child)
->         when != e = child
-> (
->     return child;
-> |
-> +  of_node_put(child);
-> ?  return ...;
-> )
->     ...
->   }
-> // </smpl>
->
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+-	c = irq_data_get_irq_chip(d);
+-	if (!c->irq_set_affinity)
+-		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
 
-Thanks for the fix.
+has become:
 
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
++	c = irq_data_get_irq_chip(d);
++	if (!c->irq_set_affinity) {
++		pr_warn_ratelimited("IRQ%u: unable to set affinity\n", d->irq);
 
-PS: Since this driver is queued via arm-soc, it needs to go via them or
-wait for v4.4-rc1 and then queue via clk tree.
+which makes things more noisy.
+
+This is a change that was not described in the commit message for the
+patch Thomas merged.
+
+So, I think the right thing to do is to drop the patch set and revert
+back to what we knew was sane, and get the submitter to do the job
+properly: cleanly move the code from one location to another with _no_
+changes what so ever, convert ARM and ARM64 to use it, and _then_ to
+modify the resulting code.
+
+>From what I can see, both ARM and ARM64 implementations here are
+identical.
+
+I'm certainly dropping this from the ARM tree.
 
 -- 
-Regards,
-Sudeep
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
