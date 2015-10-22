@@ -1,89 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 22 Oct 2015 15:44:53 +0200
-Subject: [PATCH 01/13 v2] ARM: add some L220 DT settings
-Message-ID: <1445521493-21509-1-git-send-email-linus.walleij@linaro.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 22 Oct 2015 15:47:20 +0200
+Subject: [PATCH v2 1/8] clk: rockchip: Allow more precision for some mmc
+ clock phases
+In-Reply-To: <20151022120326.20687.80247@quantum>
+References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
+ <1443622064-14362-2-git-send-email-heiko@sntech.de>
+ <20151022120326.20687.80247@quantum>
+Message-ID: <6921472.VNZp85YW8f@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RealView ARM11MPCore enables parity, eventmon and shared
-override in the cache controller through its current boardfile,
-but the code and DT bindings for the ARM L220 is currently
-lacking the ability to set this up from DT. Add the required
-bool parameters for parity and shared override, but keep
-eventmon out of it: this should be enabled by the event
-monitor code.
+Hi Mike,
 
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Drop event monitor setup.
-- Support both parity enable and disable: could be useful.
----
- Documentation/devicetree/bindings/arm/l2cc.txt | 10 ++++++----
- arch/arm/mm/cache-l2x0.c                       | 20 ++++++++++++++++++++
- 2 files changed, 26 insertions(+), 4 deletions(-)
+Am Donnerstag, 22. Oktober 2015, 05:03:26 schrieb Michael Turquette:
+> Quoting Heiko Stuebner (2015-09-30 07:07:37)
+> 
+> > From: Douglas Anderson <dianders@chromium.org>
+> > 
+> > Because of the inexact nature of the extra MMC delay elements (it's
+> > not possible to keep the phase monotonic and to also make phases (mod
+> > 90) > 70), we previously only allowed phases (mod 90) of 22.5, 45,
+> > and 67.5.
+> > 
+> > But it's not the end of the world if the MMC clock phase goes
+> > non-monotonic.  At most we'll be 25 degrees off.  It's way better to
+> > test more phases to look for bad ones than to be 25 degrees off, because
+> > in the case of MMC really the point is to find bad phases and get as far
+> > asway from the as possible.  If we get to test extra phases by going
+> > slightly non-monotonic then that might be fine.  Worst case we would
+> > end up at a phases that's slight differnt than the one we wanted, but
+> > at least we'd still be quite far away from the a bad phase.
+> > 
+> > Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> > 
+> > Fold in more precise variance-values of 44-77 instead of 40-80.
+> > Fold in the actual removal of the monotonic requirement and adapt
+> > patch message accordingly.
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> Looks good to me. What tree do you want this to go through?
 
-diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-index 06c88a4d28ac..d181b7c4c522 100644
---- a/Documentation/devicetree/bindings/arm/l2cc.txt
-+++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-@@ -67,12 +67,14 @@ Optional properties:
-   disable if zero.
- - arm,prefetch-offset : Override prefetch offset value. Valid values are
-   0-7, 15, 23, and 31.
--- arm,shared-override : The default behavior of the pl310 cache controller with
--  respect to the shareable attribute is to transform "normal memory
--  non-cacheable transactions" into "cacheable no allocate" (for reads) or
--  "write through no write allocate" (for writes).
-+- arm,shared-override : The default behavior of the L220 or PL310 cache
-+  controllers with respect to the shareable attribute is to transform "normal
-+  memory non-cacheable transactions" into "cacheable no allocate" (for reads)
-+  or "write through no write allocate" (for writes).
-   On systems where this may cause DMA buffer corruption, this property must be
-   specified to indicate that such transforms are precluded.
-+- arm,parity-enable : enable parity checking on the L2 cache (L220 or PL310).
-+- arm,parity-disable : disable parity checking on the L2 cache (L220 or PL310).
- - prefetch-data : Data prefetch. Value: <0> (forcibly disable), <1>
-   (forcibly enable), property absent (retain settings set by firmware)
- - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 493692d838c6..3f3008e5c662 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1060,6 +1060,18 @@ static void __init l2x0_of_parse(const struct device_node *np,
- 		val |= (dirty - 1) << L2X0_AUX_CTRL_DIRTY_LATENCY_SHIFT;
- 	}
- 
-+	if (of_property_read_bool(np, "arm,parity-enable")) {
-+		mask &= ~L2C_AUX_CTRL_PARITY_ENABLE;
-+		val |= L2C_AUX_CTRL_PARITY_ENABLE;
-+	} else if (of_property_read_bool(np, "arm,parity-disable")) {
-+		mask &= ~L2C_AUX_CTRL_PARITY_ENABLE;
-+	}
-+
-+	if (of_property_read_bool(np, "arm,shared-override")) {
-+		mask &= ~L2C_AUX_CTRL_SHARED_OVERRIDE;
-+		val |= L2C_AUX_CTRL_SHARED_OVERRIDE;
-+	}
-+
- 	ret = l2x0_cache_size_of_parse(np, aux_val, aux_mask, &assoc, SZ_256K);
- 	if (ret)
- 		return;
-@@ -1176,6 +1188,14 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 		*aux_mask &= ~L2C_AUX_CTRL_SHARED_OVERRIDE;
- 	}
- 
-+	if (of_property_read_bool(np, "arm,parity-enable")) {
-+		*aux_val |= L2C_AUX_CTRL_PARITY_ENABLE;
-+		*aux_mask &= ~L2C_AUX_CTRL_PARITY_ENABLE;
-+	} else if (of_property_read_bool(np, "arm,parity-disable")) {
-+		*aux_val &= ~L2C_AUX_CTRL_PARITY_ENABLE;
-+		*aux_mask &= ~L2C_AUX_CTRL_PARITY_ENABLE;
-+	}
-+
- 	prefetch = l2x0_saved_regs.prefetch_ctrl;
- 
- 	ret = of_property_read_u32(np, "arm,double-linefill", &val);
--- 
-2.4.3
+we got already an Ack from Stephen [in the thread of patch3] for the clock 
+patches and they are already in the mmc.tree [0].
+
+
+Heiko
+
+
+[0] 
+https://git.linaro.org/people/ulf.hansson/mmc.git/commit/6cf04362a13de8cdb59b85b8dec1d53f90307dd1
