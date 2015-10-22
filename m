@@ -1,31 +1,43 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 22 Oct 2015 09:07:33 -0700
-Subject: [PATCH] pinctrl-zynq: Initialize early
-In-Reply-To: <1445513420-23527-1-git-send-email-mike.looijmans@topic.nl>
-References: <1445513420-23527-1-git-send-email-mike.looijmans@topic.nl>
-Message-ID: <20151022160733.GH5257@xsjsorenbubuntu>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 22 Oct 2015 17:13:37 +0100
+Subject: [PATCH v4 1/3] xen/arm: Enable cpu_hotplug.c
+In-Reply-To: <alpine.DEB.2.02.1510211632580.15801@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1510211251370.27957@kaball.uk.xensource.com>
+ <1445428430-21567-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1510211358250.27957@kaball.uk.xensource.com>
+ <562790D3.2090002@oracle.com>
+ <alpine.DEB.2.02.1510211632580.15801@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1510221713160.15801@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On Thu, 2015-10-22 at 01:30PM +0200, Mike Looijmans wrote:
-> Supplying pinmux configuration for e.g. gpio pins leads to deferred
-> probes because the pinctrl device is probed much later than gpio.
-> Move the init call to a much earlier stage so it probes before the
-> devices that may need it.
+On Wed, 21 Oct 2015, Stefano Stabellini wrote:
+> On Wed, 21 Oct 2015, Boris Ostrovsky wrote:
+> > On 10/21/2015 09:00 AM, Stefano Stabellini wrote:
+> > > > 
+> > > > diff --git a/arch/x86/include/asm/xen/hypervisor.h
+> > > > b/arch/x86/include/asm/xen/hypervisor.h
+> > > > index d866959..8b2d4be 100644
+> > > > --- a/arch/x86/include/asm/xen/hypervisor.h
+> > > > +++ b/arch/x86/include/asm/xen/hypervisor.h
+> > > > @@ -57,4 +57,9 @@ static inline bool xen_x2apic_para_available(void)
+> > > >   }
+> > > >   #endif
+> > > >   +#ifdef CONFIG_HOTPLUG_CPU
+> > > > +void xen_arch_register_cpu(int num);
+> > > > +void xen_arch_unregister_cpu(int num);
+> > > > +#endif
+> > 
+> > Why not inline them here, just like you did for ARM?
 > 
-> Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
+> I don't think is good practice to define static inline functions under
+> arch/something, then use them under drivers/something_else. It is
+> tolerable if the static inline functions are empty and the driver in
+> question cannot be compiled as module, like in this case for the arm.
+> 
+> In addition the x86 implementation calls arch_(un)register_cpu, which
+> requires #include <asm/cpu.h>, which doesn't compile if added to
+> arch/x86/include/asm/xen/hypervisor.h.
 
-in general, the change should be OK, but neither on zc702 nor zc706 do I
-see a difference in respect to deferred probes. With and without the
-patch I see:
-    root at zynq:~# dmesg | grep -i defer
-    [    0.097021] zynq-gpio e000a000.gpio: could not find pctldev for node /amba/slcr at f8000000/pinctrl at 700/gpio0-default, deferring probe
-    root at zynq:~# 
-
-If you have a case this patch improves things though, feel free to add my
-Tested-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-
-	Thanks,
-	S?ren
+Boris, does this explanation satisfy you?
+Do you want me to change anything?
