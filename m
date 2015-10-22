@@ -1,37 +1,63 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Thu, 22 Oct 2015 23:12:30 +0800
-Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
-In-Reply-To: <1444988219.3541.3.camel@pengutronix.de>
-References: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
- <1444988219.3541.3.camel@pengutronix.de>
-Message-ID: <1445526750.27586.8.camel@mtksdaap41>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 22 Oct 2015 17:12:59 +0200
+Subject: [PATCH v4 0/5] mtd: pxa3xx_nand: rework the timing setup
+In-Reply-To: <1445416144-9194-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1445416144-9194-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20151022171259.57581575@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-10-16 at 11:36 +0200, Philipp Zabel wrote:
-> Am Freitag, den 16.10.2015, 17:17 +0800 schrieb YH Huang:
-> > In order to match the panel power sequence, disable the enable_gpio
-> > in the probe function. Also, reorder the code in the power_on and
-> > power_off function to match the timing.
-> 
-> Could you also have a look at the "pwm-backlight: Avoid backlight
-> flicker when probed from DT" patch?
-> I think in case of a panel left enabled by the bootloader, your patch
-> will disable the backlight for a short time.
-> 
-> best regards
-> Philipp
-> 
-In the case of the panel disabled by the bootloader,
-your patch still has the following code and always enables the backlight
-in the probe function.
-pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
--						  GPIOD_OUT_HIGH);
+Hello Antoine,
 
-What do you think if I remove these two lines in my patch?
-if (pb->enable_gpio)
-	gpiod_direction_output(pb->enable_gpio, 0);
+On Wed, 21 Oct 2015 10:28:59 +0200, Antoine Tenart wrote:
 
+> Antoine Tenart (5):
+>   mtd: pxa3xx: prepare allowing compile test
+>   mtd: nand: allow compile test of MTD_NAND_PXA3xx
+>   mtd: pxa3xx_nand: add helpers to setup the timings
+>   mtd: pxa3xx_nand: rework flash detection and timing setup
+>   mtd: pxa3xx_nand: clean up the pxa3xx timings
 
-Regards,
-YH Huang
+I tested your series on Armada 375 DB, which uses the same pxa3xx
+driver, but with the Armada 370 variant.
+
+With the current Device Tree which has nand,keep-config to keep the
+timing configuration from the bootloader, I don't see any problem, so
+there is no regression introduced by your series, at least on this
+platform.
+
+However, when I remove nand,keep-config to use the ONFI timings from
+the NAND, then things work fine (I can mount a UBIFS root filesystem),
+but there is a weird:
+
+pxa3xx-nand f10d0000.nand: Wait time out!!!
+
+After investigating a bit, the following steps occur:
+
+ * The timings are configured as ONFI mode 0
+ * Reset command is sent to the NAND (0xff), two times in a row.
+ * READID command is sent to the NAND (0x90), three times in a row.
+ * PARAM command is sent to the NAND (0xec) and it times out
+ * The NAND is properly identified, and the timings are reconfigured as
+   ONFI mode 5
+ * Everything seems to work fine
+
+In the current implementation of the driver, the nand_cmdfunc()
+function is used for all the identification phase, and only switched
+later to nand_cmdfunc_extended() if we are on an Armada 370/XP variant
+(which Armada 375 is) and the page size is higher than PAGE_CHUNK_SIZE.
+So the timeout occurs when nand_cmdfunc() is in-use. I've tried forcing
+to use nand_cmdfunc_extended() from the beginning, but it times out
+similarly in this function.
+
+Since the driver works fine, maybe the PARAM command has worked
+properly, but just times out for some reason. It would be good to
+understand why.
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
