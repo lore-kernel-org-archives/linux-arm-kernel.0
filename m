@@ -1,103 +1,139 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 22 Oct 2015 12:18:57 +0200
-Subject: [PATCH 3/4] cpufreq: imx6q: Fix regulator/clock error handling
-In-Reply-To: <1445503652-777-4-git-send-email-s.hauer@pengutronix.de>
-References: <1445503652-777-1-git-send-email-s.hauer@pengutronix.de>
- <1445503652-777-4-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1445509137.3173.27.camel@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 22 Oct 2015 12:18:51 +0200
+Subject: [PATCH v2 2/2] dmaengine: hdmac: Add scatter-gathered memset
+ support
+In-Reply-To: <1445506860-22619-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1445506860-22619-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1445506860-22619-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <5628B80B.8040105@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 22.10.2015, 10:47 +0200 schrieb Sascha Hauer:
-> When one of the regulator_get/clk_get calls fails the driver just
-> returns -ENOENT. To properly handle the -EPROBE_DEFER case we have
-> to forward the actual error value instead. This patch fixes that.
+Le 22/10/2015 11:41, Maxime Ripard a ?crit :
+> Just like memset support, the HDMAC might be used to do a memset over a
+> discontiguous memory area.
 > 
-> Since all clocks/regulators are global static variables the IS_ERR()
-> check in the error path in probe() may erroneously work on the values
-> assigned in the previous probe run. This means we have to reinitialize
-> the variables between two probe runs().
+> In such a case, we'll just build up a chain of memset descriptors over the
+> contiguous chunks of memory to set, in order to allow such a support.
 > 
-> The probe function already is quite overloaded, so this patch moves
-> the regulator and clock allocation into a separate function and the
-> dropping of these resourced into a corresponding cleanup function.
-> This is easier to review for correctness than the current mix of
-> reverse-cleanup and !IS_ERR checks at the end of probe().
-> 
-> While at it leave a comment that these resource allocations can't use
-> devm_* to prevent people from trying to convert it.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Nice cleanup overall, one nit below.
+Yep, seems good!
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks Maxime, bye.
+
 
 > ---
->  drivers/cpufreq/imx6q-cpufreq.c | 166 ++++++++++++++++++++++++----------------
->  1 file changed, 102 insertions(+), 64 deletions(-)
+>  drivers/dma/at_hdmac.c | 79 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 79 insertions(+)
 > 
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> index 7557d1e..ce0c6bd 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -176,6 +176,99 @@ static struct cpufreq_driver imx6q_cpufreq_driver = {
->  	.attr = cpufreq_generic_attr,
->  };
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index cad18f3660ae..4e55239c7a30 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -986,6 +986,83 @@ err_free_buffer:
+>  	return NULL;
+>  }
 >  
-> +static int imx6q_cpufreq_get_resources(struct platform_device *pdev)
-
-Given that all the resources are attached to the cpu_dev anyway, do you
-really see a use for this parameter?
-
+> +static struct dma_async_tx_descriptor *
+> +atc_prep_dma_memset_sg(struct dma_chan *chan,
+> +		       struct scatterlist *sgl,
+> +		       unsigned int sg_len, int value,
+> +		       unsigned long flags)
 > +{
-> +	/*
-> +	 * Do not use devm_* here. The resources are bound to the
-> +	 * cpu_dev and not to this drivers platform_device.
-> +	 */
-> +	arm_clk = clk_get(cpu_dev, "arm");
-> +	if (IS_ERR(arm_clk))
-> +		return PTR_ERR(arm_clk);
+> +	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+> +	struct at_dma		*atdma = to_at_dma(chan->device);
+> +	struct at_desc		*desc = NULL, *first = NULL, *prev = NULL;
+> +	struct scatterlist	*sg;
+> +	void __iomem		*vaddr;
+> +	dma_addr_t		paddr;
+> +	size_t			total_len = 0;
+> +	int			i;
 > +
-> +	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
-> +	if (IS_ERR(pll1_sys_clk))
-> +		return PTR_ERR(pll1_sys_clk);
+> +	dev_vdbg(chan2dev(chan), "%s: v0x%x l0x%zx f0x%lx\n", __func__,
+> +		 value, sg_len, flags);
 > +
-> +	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
-> +	if (IS_ERR(pll1_sw_clk))
-> +		return PTR_ERR(pll1_sw_clk);
-> +
-> +	step_clk = clk_get(cpu_dev, "step");
-> +	if (IS_ERR(step_clk))
-> +		return PTR_ERR(step_clk);
-> +
-> +	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
-> +	if (IS_ERR(pll2_pfd2_396m_clk))
-> +		return PTR_ERR(pll2_pfd2_396m_clk);
-> +
-> +	if (of_machine_is_compatible("fsl,imx6ul")) {
-> +		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
-> +		if (IS_ERR(pll2_bus_clk))
-> +			return PTR_ERR(pll2_bus_clk);
-> +
-> +		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
-> +		if (IS_ERR(secondary_sel_clk))
-> +			return PTR_ERR(secondary_sel_clk);
+> +	if (unlikely(!sgl || !sg_len)) {
+> +		dev_dbg(chan2dev(chan), "%s: scatterlist is empty!\n",
+> +			__func__);
+> +		return NULL;
 > +	}
 > +
-> +	arm_reg = regulator_get(cpu_dev, "arm");
-> +	if (IS_ERR(arm_reg))
-> +		return PTR_ERR(arm_reg);
+> +	vaddr = dma_pool_alloc(atdma->memset_pool, GFP_ATOMIC, &paddr);
+> +	if (!vaddr) {
+> +		dev_err(chan2dev(chan), "%s: couldn't allocate buffer\n",
+> +			__func__);
+> +		return NULL;
+> +	}
+> +	*(u32*)vaddr = value;
 > +
-> +	pu_reg = regulator_get_optional(cpu_dev, "pu");
+> +	for_each_sg(sgl, sg, sg_len, i) {
+> +		dma_addr_t dest = sg_dma_address(sg);
+> +		size_t len = sg_dma_len(sg);
 > +
-> +	soc_reg = regulator_get(cpu_dev, "soc");
-> +	if (IS_ERR(soc_reg))
-> +		return PTR_ERR(soc_reg);
+> +		dev_vdbg(chan2dev(chan), "%s: d0x%08x, l0x%zx\n",
+> +			 __func__, dest, len);
 > +
-> +	return 0;
+> +		if (!is_dma_fill_aligned(chan->device, dest, 0, len)) {
+> +			dev_err(chan2dev(chan), "%s: buffer is not aligned\n",
+> +				__func__);
+> +			goto err_put_desc;
+> +		}
+> +
+> +		desc = atc_create_memset_desc(chan, paddr, dest, len);
+> +		if (!desc)
+> +			goto err_put_desc;
+> +
+> +		atc_desc_chain(&first, &prev, desc);
+> +
+> +		total_len += len;
+> +	}
+> +
+> +	/*
+> +	 * Only set the buffer pointers on the last descriptor to
+> +	 * avoid free'ing while we have our transfer still going
+> +	 */
+> +	desc->memset_paddr = paddr;
+> +	desc->memset_vaddr = vaddr;
+> +	desc->memset_buffer = true;
+> +
+> +	first->txd.cookie = -EBUSY;
+> +	first->total_len = total_len;
+> +
+> +	/* set end-of-link on the descriptor */
+> +	set_desc_eol(desc);
+> +
+> +	first->txd.flags = flags;
+> +
+> +	return &first->txd;
+> +
+> +err_put_desc:
+> +	atc_desc_put(atchan, first);
+> +	return NULL;
 > +}
 > +
-[...]
+>  /**
+>   * atc_prep_slave_sg - prepare descriptors for a DMA_SLAVE transaction
+>   * @chan: DMA channel
+> @@ -1868,6 +1945,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
+>  	dma_cap_set(DMA_INTERLEAVE, at91sam9g45_config.cap_mask);
+>  	dma_cap_set(DMA_MEMCPY, at91sam9g45_config.cap_mask);
+>  	dma_cap_set(DMA_MEMSET, at91sam9g45_config.cap_mask);
+> +	dma_cap_set(DMA_MEMSET_SG, at91sam9g45_config.cap_mask);
+>  	dma_cap_set(DMA_PRIVATE, at91sam9g45_config.cap_mask);
+>  	dma_cap_set(DMA_SLAVE, at91sam9g45_config.cap_mask);
+>  	dma_cap_set(DMA_SG, at91sam9g45_config.cap_mask);
+> @@ -1989,6 +2067,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
+>  
+>  	if (dma_has_cap(DMA_MEMSET, atdma->dma_common.cap_mask)) {
+>  		atdma->dma_common.device_prep_dma_memset = atc_prep_dma_memset;
+> +		atdma->dma_common.device_prep_dma_memset_sg = atc_prep_dma_memset_sg;
+>  		atdma->dma_common.fill_align = DMAENGINE_ALIGN_4_BYTES;
+>  	}
+>  
+> 
+
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Nicolas Ferre
