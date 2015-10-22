@@ -1,24 +1,32 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 22 Oct 2015 16:44:23 +0000 (UTC)
-Subject: [PATCH 2/2] ARM: OMAP3: hwmod data: Remove legacy mailbox data
- and addrs
-In-Reply-To: <1442273833-25013-3-git-send-email-s-anna@ti.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 22 Oct 2015 12:11:51 -0500
+Subject: [PATCH 1/2] ARM: OMAP2+: Remove legacy mailbox device
+ instantiation
+In-Reply-To: <1442273833-25013-2-git-send-email-s-anna@ti.com>
 References: <1442273833-25013-1-git-send-email-s-anna@ti.com>
- <1442273833-25013-3-git-send-email-s-anna@ti.com>
-Message-ID: <alpine.DEB.2.02.1510221644130.15693@utopia.booyaka.com>
+ <1442273833-25013-2-git-send-email-s-anna@ti.com>
+Message-ID: <562918D7.6020202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Sep 2015, Suman Anna wrote:
+Hi Tony,
 
-> Remove the mailbox attribute data, irq info and hwmod addr space
-> data that are used for creating the legacy-style mailbox devices,
-> there is no need for these as the support for legacy-mode for this
-> IP is being dropped.
+On 09/14/2015 06:37 PM, Suman Anna wrote:
+> The legacy-style mailbox device creation is supported currently
+> only for OMAP3, as all other SoCs are DT-boot only. Even on this
+> SoC, there are no client drivers that utilize these mailbox devices.
+> So, clean up the legacy-style mailbox device instantiation logic.
+> The mailbox devices are already present and supported for the DT
+> boot on OMAP3.
 > 
 > Signed-off-by: Suman Anna <s-anna@ti.com>
+> ---
+>  arch/arm/mach-omap2/devices.c | 28 ----------------------------
+>  1 file changed, 28 deletions(-)
+> 
 
-Thanks, queued.
+Ping, can you pick up this patch for your cleanup branch? FYI, Paul is
+queueing Patch 2.
 
-
-- Paul
+regards
+Suman
