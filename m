@@ -1,34 +1,38 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 22 Oct 2015 09:33:15 -0700
-Subject: [PATCH 2/2] can: xilinx: fix bug in bus error handling
-In-Reply-To: <1445489163-11045-2-git-send-email-appanad@xilinx.com>
-References: <1445489163-11045-1-git-send-email-appanad@xilinx.com>
- <1445489163-11045-2-git-send-email-appanad@xilinx.com>
-Message-ID: <20151022163315.GI5257@xsjsorenbubuntu>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 22 Oct 2015 17:34:27 +0100
+Subject: [RFC PATCH v6 3/3] arm: fix a migrating irq bug when hotplug cpu
+In-Reply-To: <alpine.DEB.2.11.1510221429300.7380@nanos>
+References: <1443087135-17044-1-git-send-email-yangyingliang@huawei.com>
+ <1443087135-17044-4-git-send-email-yangyingliang@huawei.com>
+ <CAMuHMdWyvaecQHOzFnxVZus_Pfkxjw1XfkGdcLK=D2ThaoJMzA@mail.gmail.com>
+ <20151021202907.GN32532@n2100.arm.linux.org.uk>
+ <20151022092629.GQ32532@n2100.arm.linux.org.uk>
+ <5628C0DD.50900@huawei.com>
+ <20151022111307.GS32532@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.11.1510221429300.7380@nanos>
+Message-ID: <20151022163427.GG26603@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-10-22 at 10:16AM +0530, Kedareswara rao Appana wrote:
-> Simply resetting the peripheral on bus off condition is not enough,
-> Because we also need to re-initialize the whole device.
-> This patch fixes this issue.
+On Thu, Oct 22, 2015 at 02:43:34PM +0200, Thomas Gleixner wrote:
+> On Thu, 22 Oct 2015, Russell King - ARM Linux wrote:
+> > The solutions are:
+> > * A patch to restore the pr_debug() which Thomas applies, and Catalin
+> >   and myself then pull Thomas' tree again, which potentially creates
+> >   a messier history.
+> > 
+> > * Catalin drops the ARM64 change and Thomas' tree from the ARM64 tree,
+> >   Thomas drops the original commit, and we start again doing it
+> >   correctly.
+> > 
+> > Which is up to Catalin and Thomas.
 > 
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> ---
->  drivers/net/can/xilinx_can.c | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
+> I'd have to do a revert as it's in the middle of other changes. So I
+> prefer to do an incremental fix.
 > 
-> diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
-> index 055d6f3..9aeb85f 100644
-> --- a/drivers/net/can/xilinx_can.c
-> +++ b/drivers/net/can/xilinx_can.c
-> @@ -529,6 +529,8 @@ static int xcan_rx(struct net_device *ndev)
->  	return 1;
->  }
->  
-> +static void xcan_chip_stop(struct net_device *ndev);
+> I committed the change into the irq/for-arm branch and pushed it out.
 
-Isn't it possible to move the function and avoid the forward
-declaration?
+I pulled the branch again into arm64 for-next/core. Thanks.
 
-	S?ren
+-- 
+Catalin
