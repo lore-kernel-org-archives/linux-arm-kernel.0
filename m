@@ -1,62 +1,25 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Thu, 22 Oct 2015 10:30:48 +0800
-Subject: [RESEND PATCH v2 2/2] ARM: dts: rockchip: Add the OTP gpio pinctrl
-In-Reply-To: <1445481048-20789-1-git-send-email-wxt@rock-chips.com>
-References: <1445481048-20789-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1445481048-20789-3-git-send-email-wxt@rock-chips.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 21 Oct 2015 19:48:26 -0700 (PDT)
+Subject: [PATCH resend] net: sun4i-emac: Properly free resources on
+ probe failure and remove
+In-Reply-To: <1445330544-6968-2-git-send-email-hdegoede@redhat.com>
+References: <1445330544-6968-1-git-send-email-hdegoede@redhat.com>
+ <1445330544-6968-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151021.194826.782971305803462043.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the "init" pinctrl as the OTP gpio state.
-We need the OTP pin is gpio state before resetting the TSADC controller,
-since the tshut polarity will generate a high signal.
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Tue, 20 Oct 2015 10:42:24 +0200
 
-"init" pinctrl property is defined by Doug's Patch[0].
+> Fix sun4i-emac not releasing the following resources:
+> -iomapped memory not released on probe-failure nor on remove
+> -clock not getting disabled on probe-failure nor on remove
+> -sram not being released on remove
+> 
+> And while at it also add error checking to the clk_prepare_enable call
+> done on probe.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Patch[0]:
-https://patchwork.kernel.org/patch/7454311/
-
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
----
-
-Changes in v2:
-  - Add some commits for more obvious in PATCH[2/2]
-
-Changes in v1:
-  - As the Doug comments, drop the thermal driver patchs since
-    we can with pinctrl changing to work.
-  - As the Doug's patch to add the 'init' property.
-
- arch/arm/boot/dts/rk3288.dtsi | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 906e938..6ea89aa 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -447,8 +447,9 @@
- 		clock-names = "tsadc", "apb_pclk";
- 		resets = <&cru SRST_TSADC>;
- 		reset-names = "tsadc-apb";
--		pinctrl-names = "default";
--		pinctrl-0 = <&otp_out>;
-+		pinctrl-names = "init", "default";
-+		pinctrl-0 = <&otp_gpio>;
-+		pinctrl-1 = <&otp_out>;
- 		#thermal-sensor-cells = <1>;
- 		rockchip,hw-tshut-temp = <95000>;
- 		status = "disabled";
-@@ -1273,6 +1274,10 @@
- 		};
- 
- 		tsadc {
-+			otp_gpio: otp-gpio {
-+				rockchip,pins = <0 10 RK_FUNC_GPIO &pcfg_pull_none>;
-+			};
-+
- 			otp_out: otp-out {
- 				rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_none>;
- 			};
--- 
-1.9.1
+Applied.
