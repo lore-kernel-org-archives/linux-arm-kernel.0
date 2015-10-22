@@ -1,73 +1,46 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 22 Oct 2015 15:39:25 -0500
-Subject: [PATCH] serial: amba-pl011: use cpu_relax when polling registers
-Message-ID: <1445546365-7998-1-git-send-email-timur@codeaurora.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 22 Oct 2015 22:59:09 +0200
+Subject: [PATCH 1/3] i2c: uniphier: add UniPhier FIFO-less I2C driver
+In-Reply-To: <1438243942-26401-2-git-send-email-yamada.masahiro@socionext.com>
+References: <1438243942-26401-1-git-send-email-yamada.masahiro@socionext.com>
+ <1438243942-26401-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20151022205908.GA1516@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Busy loops that poll on a register should call cpu_relax().  On some
-architectures, it can lower CPU power consumption or yield to a
-hyperthreaded twin processor.  It also serves as a compiler barrier,
-so it can replace barrier() calls.
+On Thu, Jul 30, 2015 at 05:12:20PM +0900, Masahiro Yamada wrote:
+> Add support for on-chip I2C controller used on old UniPhier SoCs
+> such as PH1-LD4, PH1-sLD8, etc..  This adapter is so simple that
+> it has no FIFO in it.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- drivers/tty/serial/amba-pl011.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+Finally! Mostly looking good.
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index fd27e98..4b5014b 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1076,7 +1076,7 @@ static void pl011_dma_shutdown(struct uart_amba_port *uap)
- 
- 	/* Disable RX and TX DMA */
- 	while (readw(uap->port.membase + UART01x_FR) & UART01x_FR_BUSY)
--		barrier();
-+		cpu_relax();
- 
- 	spin_lock_irq(&uap->port.lock);
- 	uap->dmacr &= ~(UART011_DMAONERR | UART011_RXDMAE | UART011_TXDMAE);
-@@ -1520,7 +1520,7 @@ static void pl011_put_poll_char(struct uart_port *port,
- 	    container_of(port, struct uart_amba_port, port);
- 
- 	while (readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF)
--		barrier();
-+		cpu_relax();
- 
- 	writew(ch, uap->port.membase + UART01x_DR);
- }
-@@ -2053,7 +2053,7 @@ static void pl011_console_putchar(struct uart_port *port, int ch)
- 	    container_of(port, struct uart_amba_port, port);
- 
- 	while (readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF)
--		barrier();
-+		cpu_relax();
- 	writew(ch, uap->port.membase + UART01x_DR);
- }
- 
-@@ -2093,6 +2093,7 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
- 	 */
- 	do {
- 		status = readw(uap->port.membase + UART01x_FR);
-+		cpu_relax();
- 	} while (status & UART01x_FR_BUSY);
- 	if (!uap->vendor->always_enabled)
- 		writew(old_cr, uap->port.membase + UART011_CR);
-@@ -2205,10 +2206,10 @@ static struct console amba_console = {
- static void pl011_putc(struct uart_port *port, int c)
- {
- 	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
--		;
-+		cpu_relax();
- 	writeb(c, port->membase + UART01x_DR);
- 	while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
--		;
-+		cpu_relax();
- }
- 
- static void pl011_early_write(struct console *con, const char *s, unsigned n)
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+> +static u32 uniphier_i2c_functionality(struct i2c_adapter *adap)
+> +{
+> +	return I2C_FUNC_I2C;
+> +}
+
+No I2C_FUNC_SMBUS_EMUL? But check if SMBUS_QUICK is supported by your
+adapter.
+
+> +	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!regs) {
+> +		dev_err(dev, "failed to get memory resource");
+> +		return -EINVAL;
+> +	}
+
+This 'if'-block can go. devm_ioremap_resource will check it for you.
+
+Thanks,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151022/801d0c1a/attachment.sig>
