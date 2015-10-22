@@ -1,40 +1,159 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 22 Oct 2015 13:54:42 +0200
-Subject: [PATCH v2 3/6] vfio: platform: reset: calxedaxgmac: add reset
- function registration
-In-Reply-To: <4810974.apRDTjc3oB@wuerfel>
-References: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
- <1445506922-6005-4-git-send-email-eric.auger@linaro.org>
- <4810974.apRDTjc3oB@wuerfel>
-Message-ID: <5628CE82.7090105@linaro.org>
+From: dawei.chien@mediatek.com (Dawei Chien)
+Date: Thu, 22 Oct 2015 20:02:39 +0800
+Subject: [PATCH v3 2/2] arm64: dts: mt8173: Add thermal zone node for mt8173.
+In-Reply-To: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
+References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
+Message-ID: <1445515359-8587-3-git-send-email-dawei.chien@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2015 12:13 PM, Arnd Bergmann wrote:
-> On Thursday 22 October 2015 11:41:59 Eric Auger wrote:
->> This patch adds the reset function registration/unregistration.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> 
-> Looks good, except one thing:
->> @@ -70,6 +69,8 @@ int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
->>  			return -ENOMEM;
->>  	}
->>  
->> +	pr_info("VFIO reset of %s\n", vdev->name);
->> +
->>  	/* disable IRQ */
->>  	writel(0, reg.ioaddr + XGMAC_DMA_INTR_ENA);
->>  
-> 
-> This probably slipped in from debugging, please remove it.
-Well actually this is not an oversight but some unappropriate tracing
-attempt I am afraid. I wanted to add a trace useful for the end-user to
-make sure the VFIO reset function was called. Do you forbid that or do
-recommend to use another tracing mechanism/level? In the past I tried
-dynamic tracing but with module loading mechanism I found it not that handy.
+Add thermal zone node to mt8173.dtsi.
 
-Eric
-> 
-> 	Arnd
-> 
+Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+---
+This patch is base on
+https://patchwork.kernel.org/patch/7249821/
+https://patchwork.kernel.org/patch/7249861/
+https://patchwork.kernel.org/patch/7249891/
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |   90 ++++++++++++++++++++++++++++++
+ 1 file changed, 90 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 3b18f37..eaf12bf 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -16,6 +16,7 @@
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/power/mt8173-power.h>
+ #include <dt-bindings/reset-controller/mt8173-resets.h>
++#include <dt-bindings/thermal/mt8173.h>
+ #include "mt8173-pinfunc.h"
+ 
+ / {
+@@ -54,6 +55,18 @@
+ 			reg = <0x000>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
++			static-power-points = <
++				859000  43
++				908000  52
++				983000  86
++				1009000 123
++				1028000 138
++				1083000 172
++				1110900 180
++				1125000 192
++			>;
++			dynamic-power-coefficient = <263>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+@@ -62,6 +75,17 @@
+ 			reg = <0x001>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
++			static-power-points = <
++				859000  43
++				908000  52
++				983000  86
++				1009000 123
++				1028000 138
++				1083000 172
++				1110900 180
++				1125000 192
++			>;
++			dynamic-power-coefficient = <263>;
+ 		};
+ 
+ 		cpu2: cpu at 100 {
+@@ -70,6 +94,18 @@
+ 			reg = <0x100>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
++			static-power-points = <
++				828000  72
++				867000  90
++				927000  156
++				968000  181
++				1007000 298
++				1049000 435
++				1089900 533
++				1125000 533
++			>;
++			dynamic-power-coefficient = <530>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu3: cpu at 101 {
+@@ -78,6 +114,17 @@
+ 			reg = <0x101>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
++			static-power-points = <
++				828000  72
++				867000  90
++				927000  156
++				968000  181
++				1007000 298
++				1049000 435
++				1089900 533
++				1125000 533
++			>;
++			dynamic-power-coefficient = <530>;
+ 		};
+ 
+ 		idle-states {
+@@ -116,6 +163,49 @@
+ 		clock-output-names = "clk32k";
+ 	};
+ 
++	thermal-zones {
++		cpu_thermal: cpu_thermal {
++			polling-delay-passive = <1000>; /* milliseconds */
++			polling-delay = <1000>; /* milliseconds */
++
++			thermal-sensors = <&thermal MT8173_THERMAL_ZONE_CA57>;
++			sustainable-power = <1500>;
++
++			trips {
++				threshold: trip-point at 0 {
++					temperature = <68000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				target: trip-point at 1 {
++					temperature = <85000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				cpu_crit: cpu_crit at 0 {
++					temperature = <115000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++				map at 0 {
++					trip = <&target>;
++					cooling-device = <&cpu0 0 0>;
++					contribution = <1024>;
++				};
++				map at 1 {
++					trip = <&target>;
++					cooling-device = <&cpu2 0 0>;
++					contribution = <2048>;
++				};
++			};
++		};
++	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupt-parent = <&gic>;
+-- 
+1.7.9.5
