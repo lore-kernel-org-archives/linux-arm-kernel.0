@@ -1,44 +1,89 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 22 Oct 2015 15:43:39 +0200
-Subject: [PATCH RFC] l2c: warn about misconfigured PL310 shared-override
-Message-ID: <1445521419-10104-1-git-send-email-l.stach@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 22 Oct 2015 15:44:53 +0200
+Subject: [PATCH 01/13 v2] ARM: add some L220 DT settings
+Message-ID: <1445521493-21509-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the shared override enable bit in the PL310 aux ctrl register is
-not set the L2 cache controller will render the system non-compliant
-to the rules regarding mismatched memory aliases as specified in the
-ARMv7 ARM.
+The RealView ARM11MPCore enables parity, eventmon and shared
+override in the cache controller through its current boardfile,
+but the code and DT bindings for the ARM L220 is currently
+lacking the ability to set this up from DT. Add the required
+bool parameters for parity and shared override, but keep
+eventmon out of it: this should be enabled by the event
+monitor code.
 
-As this may lead to subtle corruptions when reading from a bufferable
-alias, make sure to warn about this in the kernel log.
-
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-I'm open to suggestions on how to improve the warning or where to put
-documentation for this so users are advised to update their board
-firmware, or work around this by using the "arm,shared-override" DT
-property on a secure state booted kernel, without spamming the logs
-too much.
+ChangeLog v1->v2:
+- Drop event monitor setup.
+- Support both parity enable and disable: could be useful.
 ---
- arch/arm/mm/cache-l2x0.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ Documentation/devicetree/bindings/arm/l2cc.txt | 10 ++++++----
+ arch/arm/mm/cache-l2x0.c                       | 20 ++++++++++++++++++++
+ 2 files changed, 26 insertions(+), 4 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+index 06c88a4d28ac..d181b7c4c522 100644
+--- a/Documentation/devicetree/bindings/arm/l2cc.txt
++++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+@@ -67,12 +67,14 @@ Optional properties:
+   disable if zero.
+ - arm,prefetch-offset : Override prefetch offset value. Valid values are
+   0-7, 15, 23, and 31.
+-- arm,shared-override : The default behavior of the pl310 cache controller with
+-  respect to the shareable attribute is to transform "normal memory
+-  non-cacheable transactions" into "cacheable no allocate" (for reads) or
+-  "write through no write allocate" (for writes).
++- arm,shared-override : The default behavior of the L220 or PL310 cache
++  controllers with respect to the shareable attribute is to transform "normal
++  memory non-cacheable transactions" into "cacheable no allocate" (for reads)
++  or "write through no write allocate" (for writes).
+   On systems where this may cause DMA buffer corruption, this property must be
+   specified to indicate that such transforms are precluded.
++- arm,parity-enable : enable parity checking on the L2 cache (L220 or PL310).
++- arm,parity-disable : disable parity checking on the L2 cache (L220 or PL310).
+ - prefetch-data : Data prefetch. Value: <0> (forcibly disable), <1>
+   (forcibly enable), property absent (retain settings set by firmware)
+ - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 493692d838c6..8c586894c58d 100644
+index 493692d838c6..3f3008e5c662 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -820,6 +820,11 @@ static int __init __l2c_init(const struct l2c_init_data *data,
- 		pr_warn("L2C: DT/platform modifies aux control register: 0x%08x -> 0x%08x\n",
- 		        old_aux, aux);
+@@ -1060,6 +1060,18 @@ static void __init l2x0_of_parse(const struct device_node *np,
+ 		val |= (dirty - 1) << L2X0_AUX_CTRL_DIRTY_LATENCY_SHIFT;
+ 	}
  
-+	if (((cache_id & L2X0_CACHE_ID_PART_MASK) == L2X0_CACHE_ID_PART_L310) &&
-+	    !(aux & L2C_AUX_CTRL_SHARED_OVERRIDE))
-+		pr_warn("L2C-310 shared attribute override enable not set, "
-+			"system is non-compliant to ARM specified memory aliasing rules\n");
++	if (of_property_read_bool(np, "arm,parity-enable")) {
++		mask &= ~L2C_AUX_CTRL_PARITY_ENABLE;
++		val |= L2C_AUX_CTRL_PARITY_ENABLE;
++	} else if (of_property_read_bool(np, "arm,parity-disable")) {
++		mask &= ~L2C_AUX_CTRL_PARITY_ENABLE;
++	}
 +
- 	/* Determine the number of ways */
- 	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
- 	case L2X0_CACHE_ID_PART_L310:
++	if (of_property_read_bool(np, "arm,shared-override")) {
++		mask &= ~L2C_AUX_CTRL_SHARED_OVERRIDE;
++		val |= L2C_AUX_CTRL_SHARED_OVERRIDE;
++	}
++
+ 	ret = l2x0_cache_size_of_parse(np, aux_val, aux_mask, &assoc, SZ_256K);
+ 	if (ret)
+ 		return;
+@@ -1176,6 +1188,14 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 		*aux_mask &= ~L2C_AUX_CTRL_SHARED_OVERRIDE;
+ 	}
+ 
++	if (of_property_read_bool(np, "arm,parity-enable")) {
++		*aux_val |= L2C_AUX_CTRL_PARITY_ENABLE;
++		*aux_mask &= ~L2C_AUX_CTRL_PARITY_ENABLE;
++	} else if (of_property_read_bool(np, "arm,parity-disable")) {
++		*aux_val &= ~L2C_AUX_CTRL_PARITY_ENABLE;
++		*aux_mask &= ~L2C_AUX_CTRL_PARITY_ENABLE;
++	}
++
+ 	prefetch = l2x0_saved_regs.prefetch_ctrl;
+ 
+ 	ret = of_property_read_u32(np, "arm,double-linefill", &val);
 -- 
-2.6.1
+2.4.3
