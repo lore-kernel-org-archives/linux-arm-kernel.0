@@ -1,152 +1,65 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 22 Oct 2015 14:14:28 +0900
-Subject: [PATCH 1/2] mmc: dw_mmc: exynos: Add the exynos3250 compatible
-In-Reply-To: <56285D29.7030502@samsung.com>
-References: <1445409555-1684-1-git-send-email-jh80.chung@samsung.com>
- <5628289C.90800@samsung.com> <56284FCE.3000108@samsung.com>
- <56285D29.7030502@samsung.com>
-Message-ID: <562870B4.2070109@samsung.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Thu, 22 Oct 2015 13:15:48 +0800
+Subject: [PATCH 13/16] arm64: kdump: add kdump support
+In-Reply-To: <5628662B.1020605@linaro.org>
+References: <cover.1445297709.git.geoff@infradead.org>
+ <ef50b13d545f37a9fa95c5e6856e35f324798d00.1445297709.git.geoff@infradead.org>
+ <20151022032534.GC11227@dhcp-129-115.nay.redhat.com>
+ <5628662B.1020605@linaro.org>
+Message-ID: <20151022051548.GD11227@dhcp-129-115.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2015 12:51 PM, Krzysztof Kozlowski wrote:
-> On 22.10.2015 11:54, Jaehoon Chung wrote:
->> Hi, Krzysztof.
->>
->> On 10/22/2015 09:06 AM, Krzysztof Kozlowski wrote:
->>> On 21.10.2015 15:39, Jaehoon Chung wrote:
->>>> To check more exactly, add the exynos3250 compatible.
->>>> Not use exynos5250 compatibility.
->>>
->>> Hi,
->>>
->>> I can't find any difference between old and new compatible. Maybe I am
->>> missing something? Maybe there is a difference for these devices?
->>
->> Sorry, I needs to add more explanation about changing compatible.
->> Exynos3250 has more registers than exynos5250 in dwmmc IP.
->> Now, we used dwmmc controller with exynos5250 compatible.
->> Then some codes can't run in dw-mmc.c, if SoC is exynos3250.
->> For example, there is the checking point in dw_mci_exynos_config_hs400().
->>
->> static void dw_mci_exynos_config_hs400(struct dw_mci *host, u32 timing)
->> {
->>         struct dw_mci_exynos_priv_data *priv = host->priv;
->>         u32 dqs, strobe;
->>
->>         /*
->>          * Not supported to configure register
->>          * related to HS400
->>          */
->>         if (priv->ctrl_type < DW_MCI_TYPE_EXYNOS5420)
->>                 return;
->>
->>         dqs = priv->saved_dqs_en;
->>         strobe = priv->saved_strobe_ctrl;
->>
->> It can't use this feature with exynos5250 compatible.
+On 10/22/15 at 01:29pm, AKASHI Takahiro wrote:
+> Hi Dave,
 > 
-> Ahh, I see it now. I missed that context and commit message wasn't
-> explaining this real reason. This real reason - supporting HS400 or
-> other features not present on Exynos5250 - was not mentioned.
-
-Right, it's not enough to explain why needs this patch.
-
+> Thank you for your comment.
 > 
-> The new compatible make sense now... but I am wondering if instead just
-> "samsung,exynos5420-dw-mshc" should be used? I think it would give the
-> same result as your change and if new compatible is not required then it
-> will be better not to add it.
-
-I need to check whether it can be used with "samsung,exynos5420-dw-mshc".
-If you don't want to add new compatible, then i will check Exynos5420 TRM.
-Maybe, i think it can be used with it.
-
-Is it good that use more exact compatible?
-
-Best Regards,
-Jaehoon Chung
-
+> On 10/22/2015 12:25 PM, Dave Young wrote:
+> >Hi, AKASHI,
+> >
+> >On 10/19/15 at 11:38pm, Geoff Levand wrote:
+> >>From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> >>
+> >>On crash dump kernel, all the information about primary kernel's core
+> >>image is available in elf core header specified by "elfcorehdr=" boot
+> >>parameter. reserve_elfcorehdr() will set aside the region to avoid any
+> >>corruption by crash dump kernel.
+> >>
+> >>Crash dump kernel will access the system memory of primary kernel via
+> >>copy_oldmem_page(), which reads one page by ioremap'ing it since it does
+> >>not reside in linear mapping on crash dump kernel.
+> >>Please note that we should add "mem=X[MG]" boot parameter to limit the
+> >>memory size and avoid the following assertion at ioremap():
+> >>	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
+> >>		return NULL;
+> >>when accessing any pages beyond the usable memories of crash dump kernel.
+> >
+> >How does kexec-tools pass usable memory ranges to kernel? using dtb?
+> >Passing an extra mem=X sounds odd in the design. Kdump kernel should get
+> >usable ranges and hanle the limit better than depending on an extern kernel
+> >param.
 > 
-> Best regards,
-> Krzysztof
+> Well, regarding "depending on an external kernel param,"
+> - this limitation ("mem=") is compatible with arm(32) implementation although
+>   it is not clearly described in kernel's Documentation/kdump/kdump.txt.
+> - "elfcorehdr" kernel parameter is mandatory on x86 as well as on arm/arm64.
+>   The parameter is explicitly generated and added by kexec-tools.
 > 
->>
->> Does it need to change the compatible from exynos5250 to exynos3250?
->>
->> Beset Regards,
->> Jaehoon Chung
->>
->>>
->>> Anyway if the code is the same then it should use exactly the same
->>> compatible.
->>>
->>> Best regards,
->>> Krzysztof
->>>
->>>>
->>>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->>>> ---
->>>>  Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt | 2 ++
->>>>  drivers/mmc/host/dw_mmc-exynos.c                         | 7 +++++++
->>>>  2 files changed, 9 insertions(+)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->>>> index aad9844..cd22ac9 100644
->>>> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->>>> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->>>> @@ -22,6 +22,8 @@ Required Properties:
->>>>  	  specific extensions.
->>>>  	- "samsung,exynos7-dw-mshc-smu": for controllers with Samsung Exynos7
->>>>  	  specific extensions having an SMU.
->>>> +	- "samsung,exynos3250-dw-mshc": for controllers with Samsung Exynos3250
->>>> +	  specific extensions.
->>>>  
->>>>  * samsung,dw-mshc-ciu-div: Specifies the divider value for the card interface
->>>>    unit (ciu) clock. This property is applicable only for Exynos5 SoC's and
->>>> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
->>>> index 1e75309..1c96218 100644
->>>> --- a/drivers/mmc/host/dw_mmc-exynos.c
->>>> +++ b/drivers/mmc/host/dw_mmc-exynos.c
->>>> @@ -32,6 +32,7 @@ enum dw_mci_exynos_type {
->>>>  	DW_MCI_TYPE_EXYNOS5420_SMU,
->>>>  	DW_MCI_TYPE_EXYNOS7,
->>>>  	DW_MCI_TYPE_EXYNOS7_SMU,
->>>> +	DW_MCI_TYPE_EXYNOS3250,
->>>>  };
->>>>  
->>>>  /* Exynos implementation specific driver private data */
->>>> @@ -73,6 +74,9 @@ static struct dw_mci_exynos_compatible {
->>>>  	}, {
->>>>  		.compatible	= "samsung,exynos7-dw-mshc-smu",
->>>>  		.ctrl_type	= DW_MCI_TYPE_EXYNOS7_SMU,
->>>> +	}, {
->>>> +		.compatible	= "samsung,exynos3250-dw-mshc",
->>>> +		.ctrl_type	= DW_MCI_TYPE_EXYNOS3250,
->>>>  	},
->>>>  };
->>>>  
->>>> @@ -467,6 +471,7 @@ static int dw_mci_exynos_execute_tuning(struct dw_mci_slot *slot)
->>>>  	} while (start_smpl != smpl);
->>>>  
->>>>  	found = dw_mci_exynos_get_best_clksmpl(candiates);
->>>> +
->>>>  	if (found >= 0) {
->>>>  		dw_mci_exynos_set_clksmpl(host, found);
->>>>  		priv->tuned_sample = found;
->>>> @@ -520,6 +525,8 @@ static const struct of_device_id dw_mci_exynos_match[] = {
->>>>  			.data = &exynos_drv_data, },
->>>>  	{ .compatible = "samsung,exynos7-dw-mshc-smu",
->>>>  			.data = &exynos_drv_data, },
->>>> +	{ .compatible = "samsung,exynos3250-dw-mshc",
->>>> +			.data = &exynos_drv_data, },
->>>>  	{},
->>>>  };
->>>>  MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
->>>>
->>>
->>>
->>
->>
-> 
-> 
+> Do I miss your point?
+
+Arm previously use atag_mem tag for memory kernel uses, with dtb, Booting.txt
+says: The boot loader must pass at a minimum the size and location of the
+system memory
+
+In arm64 booting.txt, it does mentions about dtb but without above sentence.
+
+So if you are using dtb to pass memory I think the extra mem= should be not
+necessary unless there's other limitations dtb can not been used.
+
+One thing I'm confused is mem= only pass the memory size, where does you pass
+the start addresses? What if there's multiple sections such as some reserved
+ranges 2nd kernel also need?
+
+Thanks
+Dave
