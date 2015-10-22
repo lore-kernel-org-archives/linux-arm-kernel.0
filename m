@@ -1,57 +1,65 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 22 Oct 2015 11:43:51 +0800
-Subject: [PATCH 00/13] ARM: sunxi: Enable the audio codec
-In-Reply-To: <1445460786-18280-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1445460786-18280-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v66yuX-CZ_85MfVA36PYTSkgxUXvD2Hyf0VZvLAdPArevQ@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 21 Oct 2015 20:45:47 -0700
+Subject: [RESEND PATCH v2 1/2] dt-bindings: rockchip-thermal: Add the
+ "init" pinctrl in this document
+In-Reply-To: <1445481048-20789-2-git-send-email-wxt@rock-chips.com>
+References: <1445481048-20789-1-git-send-email-wxt@rock-chips.com>
+ <1445481048-20789-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <CAD=FV=XdN_Lie9bjbr0M4-=neVGrLiahAAxyUEuE0kO2ZsusfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 22, 2015 at 4:52 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi everyone,
->
-> This serie enables the support for the audio codec in the DTSI and in
-> a bunch of boards it has been tested on so far.
+Caesar,
 
-Except for the minor issue for the Cubietruck commit message, whole
-series is
+On Wed, Oct 21, 2015 at 7:30 PM, Caesar Wang <wxt@rock-chips.com> wrote:
+> The "init" pinctrl is defined we'll set
+> pinctrl to this state before probe and then "default" after probe.
+>
+> Add the "init" pinctrl as the OTP gpio state, since we need switch
+> the pin to gpio state before the TSADC controller is reset.
+>
+> As I know, the TSADC controller is reset, the tshut polarity will be
+> a *low* signal in a short period of time for some devices.
+>
+> Says:
+> The TSADC get the temperature on rockchip thermal.
+>
+> If T(current temperature) < (setting temperature), the OTP output the
+> *high* signal.
+> If T(current temperature) > (setting temperature), the OTP output the
+> *low* Signal.
+>
+> In some cases, the OTP pin is connected to the PMIC, maybe the
+> PMIC can accept the reset response time to avoid this issue.
+>
+> In other words, the system will be always reboot if we make the
+> OTP pin is connected the others IC to control the power.
+>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> ---
+>
+> Changes in v2:
+>   - Add the 'init' pinctrl more decription in commit.
+>   - Fix the subject to make more obvious in PATCH[1/2]
+>   - Resend this patch v2 since fix the subject to be specific.
+>
+> Changes in v1:
+>   - As the Doug comments, add the 'init' property to sync document.
+>
+>  Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> index ef802de..28e84f7 100644
+> --- a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+I think Rob wanted something more in the "rockchip-thermal.txt"
+document itself.  Like:
 
-Also tested on my CubieTruck with both 44.1 kHz and 48 kHz audio.
-
-> Thanks!
-> Maxime
->
-> Emilio L?pez (2):
->   ARM: sun7i: Add sunxi codec device node
->   ARM: sun7i: dt: enable audio codec on Cubietruck
->
-> Marcus Cooper (2):
->   ARM: sun4i: Add sunxi codec device node
->   ARM: sun4i: Enable audio-codec on Mele A1000
->
-> Maxime Ripard (9):
->   ARM: sun4i: Add audio PLL
->   ARM: sun5i: Add audio PLL
->   ARM: sun7i: Add audio PLL
->   ARM: sun4i: Add audio codec clock
->   ARM: sun5i: Add audio codec clock
->   ARM: sun7i: Add audio codec clock
->   ARM: sun5i: Add the Audio codec DT node
->   ARM: sun7i: Enable cubieboard2 audio codec
->   ARM: sun5i: chip: Enable the audio codec
->
->  arch/arm/boot/dts/sun4i-a10-a1000.dts       |  4 ++++
->  arch/arm/boot/dts/sun4i-a10.dtsi            | 31 +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/sun5i-r8-chip.dts         |  4 ++++
->  arch/arm/boot/dts/sun5i.dtsi                | 31 +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts |  4 ++++
->  arch/arm/boot/dts/sun7i-a20-cubietruck.dts  |  4 ++++
->  arch/arm/boot/dts/sun7i-a20.dtsi            | 31 +++++++++++++++++++++++++++++
->  7 files changed, 109 insertions(+)
->
-> --
-> 2.6.2
->
+Pinctrl states:
+- During device probe a driver may glitch the output line.  If this is
+not acceptable for your board, you can use the standard "init" and
+"default" pinctrl states.  The "init" state will be set before device
+probe and "default" after.
