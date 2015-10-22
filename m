@@ -1,79 +1,86 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 22 Oct 2015 05:04:00 -0700
-Subject: [PATCH v2 2/8] clk: rockchip: Make calculations use rounding
-In-Reply-To: <1443622064-14362-3-git-send-email-heiko@sntech.de>
-References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
- <1443622064-14362-3-git-send-email-heiko@sntech.de>
-Message-ID: <20151022120400.20687.61566@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 22 Oct 2015 14:05 +0200
+Subject: [PATCH v2 6/6] vfio: platform: move get/put reset at open/release
+In-Reply-To: <5628CB20.7040301@linaro.org>
+References: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
+ <4304536.D7eNHjlsvD@wuerfel> <5628CB20.7040301@linaro.org>
+Message-ID: <4122253.nUc0E0jzBg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Heiko Stuebner (2015-09-30 07:07:38)
-> From: Douglas Anderson <dianders@chromium.org>
+On Thursday 22 October 2015 13:40:16 Eric Auger wrote:
+> On 10/22/2015 12:29 PM, Arnd Bergmann wrote:
+> > On Thursday 22 October 2015 11:42:02 Eric Auger wrote:
+> >> Currently reset lookup is done on probe. This introduces a
+> >> race with new registration mechanism in the case where the
+> >> vfio-platform driver is bound to the device before its module
+> >> is loaded: on the load, the probe happens which triggers the
+> >> reset module load which itself attempts to get the symbol for
+> >> the registration function (vfio_platform_register_reset). The
+> >> symbol is not yet available hence the lookup fails. In case we
+> >> do the lookup in the first open we are sure the vfio-platform
+> >> module is loaded and vfio_platform_register_reset is available.
+> >>
+> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> > 
+> > I don't understand the explanation. I would expect the request_module()
+> > call to block until the module is actually loaded. Is this not
+> > what happens?
 > 
-> Let's use DIV_ROUND_CLOSEST for rounding, not just truncating
-> division.  This lets us get closer to the right rate.
+> Again many thanks for this new review.
 > 
-> Before this:
->   set_phase(86) delay_nums=26 reg[0xf000420c]=0x468 actual_degrees=83
->   set_phase(89) delay_nums=27 reg[0xf000420c]=0x46c actual_degrees=86
+> My understanding is the following
+> 1) vfio-platform is attached to the device through the override mechanism
+> 2) vfio-platform get loaded through modprobe:
+> 2-1) the platform driver init function eventually calls the
+> vfio-platform probe function.
+> 2-2) request_module of vfio-platform-calxedaxgmac gets called.
+> 3) The init of  vfio-platform-calxedaxgmac looks for
+> vfio_platform_register_reset. Unfortunately at that stage the init of
+> vfio-platform is not completed so the symbol is not available
+> 3-1) in case symbol_get is used in vfio_platform_calxedaxgmac init, as
+> of today, this latter simply returns -EINVAL. Reset registration failed
+> but no stall.
+> 3-2) in case symbol_get is *not* used, I think the module loader
+> attempts to load vfio-platform, which is already under load and this
+> causes a stall.
 > 
-> After this:
->   set_phase(86) delay_nums=27 reg[0xf000420c]=0x46c actual_degrees=86
->   set_phase(89) delay_nums=28 reg[0xf000420c]=0x470 actual_degrees=90
-> 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Let me know if you think this understanding is not correct.
 
-Looks good to me. What tree do you want this to go through?
+I was expecting the vfio_platform_register_reset() function to be
+available by the time of step 2-2.
 
-Regards,
-Mike
+What I think is going on here is that we are still inside of the
+module_init() function of the vfio-platform driver at the time that
+we call the request_module(), and the symbols are not made visible
+to other modules until the module_init function returns with success.
+This is a side-effect of the probe function for the platform driver
+getting called from deep inside of the platform_driver_register()
+function for all devices that are already present.
 
-> ---
->  drivers/clk/rockchip/clk-mmc-phase.c | 13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/clk/rockchip/clk-mmc-phase.c b/drivers/clk/rockchip/clk-mmc-phase.c
-> index a797d86..bc24e5a 100644
-> --- a/drivers/clk/rockchip/clk-mmc-phase.c
-> +++ b/drivers/clk/rockchip/clk-mmc-phase.c
-> @@ -69,7 +69,7 @@ static int rockchip_mmc_get_phase(struct clk_hw *hw)
->  
->                 delay_num = (raw_value & ROCKCHIP_MMC_DELAYNUM_MASK);
->                 delay_num >>= ROCKCHIP_MMC_DELAYNUM_OFFSET;
-> -               degrees += delay_num * factor / 10000;
-> +               degrees += DIV_ROUND_CLOSEST(delay_num * factor, 10000);
->         }
->  
->         return degrees % 360;
-> @@ -82,7 +82,7 @@ static int rockchip_mmc_set_phase(struct clk_hw *hw, int degrees)
->         u8 nineties, remainder;
->         u8 delay_num;
->         u32 raw_value;
-> -       u64 delay;
-> +       u32 delay;
->  
->         nineties = degrees / 90;
->         remainder = (degrees % 90);
-> @@ -110,12 +110,13 @@ static int rockchip_mmc_set_phase(struct clk_hw *hw, int degrees)
->          * Convert to delay; do a little extra work to make sure we
->          * don't overflow 32-bit / 64-bit numbers.
->          */
-> -       delay = PSECS_PER_SEC;
-> +       delay = 10000000; /* PSECS_PER_SEC / 10000 / 10 */
->         delay *= remainder;
-> -       do_div(delay, 10000);
-> -       do_div(delay, (rate / 1000) * 36 * ROCKCHIP_MMC_DELAY_ELEMENT_PSEC);
-> +       delay = DIV_ROUND_CLOSEST(delay,
-> +                       (rate / 1000) * 36 *
-> +                               (ROCKCHIP_MMC_DELAY_ELEMENT_PSEC / 10));
->  
-> -       delay_num = (u8) min(delay, 255ULL);
-> +       delay_num = (u8) min_t(u32, delay, 255);
->  
->         raw_value = delay_num ? ROCKCHIP_MMC_DELAY_SEL : 0;
->         raw_value |= delay_num << ROCKCHIP_MMC_DELAYNUM_OFFSET;
-> -- 
-> 2.5.1
-> 
+I think it already works for the AMBA case, which uses separate modules,
+but we need to restructure the platform_device case slightly to do
+the same:
+
+diff --git a/drivers/vfio/platform/Makefile b/drivers/vfio/platform/Makefile
+index 9ce8afe28450..a00a44814255 100644
+--- a/drivers/vfio/platform/Makefile
++++ b/drivers/vfio/platform/Makefile
+@@ -1,10 +1,12 @@
+ 
+-vfio-platform-y := vfio_platform.o vfio_platform_common.o vfio_platform_irq.o
++vfio-platform-base-y := vfio_platform_common.o vfio_platform_irq.o
+ 
+-obj-$(CONFIG_VFIO_PLATFORM) += vfio-platform.o
++obj-$(CONFIG_VFIO_PLATFORM) += vfio_platform.o
++obj-$(CONFIG_VFIO_PLATFORM) += vfio-platform-base.o
+ obj-$(CONFIG_VFIO_PLATFORM) += reset/
+ 
+ vfio-amba-y := vfio_amba.o
+ 
+ obj-$(CONFIG_VFIO_AMBA) += vfio-amba.o
++obj-$(CONFIG_VFIO_AMBA) += vfio-platform-base.o
+ obj-$(CONFIG_VFIO_AMBA) += reset/
+
+
+	Arnd
