@@ -1,75 +1,84 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 21 Oct 2015 19:05:07 -0500
-Subject: [PATCH v3 1/3] mailbox/omap: Add ti, mbox-send-noirq quirk to fix
- AM33xx CPU Idle
-In-Reply-To: <CABb+yY0rCGCj=vkNXP1c9zonX+snBxdKFeQ4JCo2aKb-h6JhCw@mail.gmail.com>
-References: <1442967294-23837-1-git-send-email-d-gerlach@ti.com>
- <1442967294-23837-2-git-send-email-d-gerlach@ti.com>
- <CABb+yY0rCGCj=vkNXP1c9zonX+snBxdKFeQ4JCo2aKb-h6JhCw@mail.gmail.com>
-Message-ID: <56282833.5010105@ti.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 22 Oct 2015 09:06:52 +0900
+Subject: [PATCH 1/2] mmc: dw_mmc: exynos: Add the exynos3250 compatible
+In-Reply-To: <1445409555-1684-1-git-send-email-jh80.chung@samsung.com>
+References: <1445409555-1684-1-git-send-email-jh80.chung@samsung.com>
+Message-ID: <5628289C.90800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
+On 21.10.2015 15:39, Jaehoon Chung wrote:
+> To check more exactly, add the exynos3250 compatible.
+> Not use exynos5250 compatibility.
 
-On 10/20/2015 11:44 PM, Jassi Brar wrote:
-> On Wed, Sep 23, 2015 at 5:44 AM, Dave Gerlach <d-gerlach@ti.com> wrote:
->> The mailbox framework controls the transmission queue and requires
->> either its controller implementations or clients to run the state
->> machine for the Tx queue. The OMAP mailbox controller uses a Tx-ready
->> interrupt as the equivalent of a Tx-done interrupt to run this Tx
->> queue state-machine.
->>
->> The WkupM3 processor on AM33xx and AM43xx SoCs is used to offload
->> certain PM tasks, like doing the necessary operations for Device
->> PM suspend/resume or for entering lower c-states during cpuidle.
->>
->> The CPUIdle on AM33xx requires the messages to be sent without
->> having to trigger the Tx-ready interrupts, as the interrupt
->> would immediately terminate the CPUIdle operation. Support for
->> this has been added by introducing a DT quirk, "ti,mbox-send-noirq"
->> and using it to modify the normal OMAP mailbox controller behavior
->> on the sub-mailboxes used to communicate with the WkupM3 remote
->> processor. This also requires the wkup_m3_ipc driver to adjust
->> its mailbox usage logic to run the Tx state machine.
->>
-> Probably Suman already updated you on what was discussed about this
-> patch at Connect-SFO. My suggestion was to drive TX poll-based (I
-> know, I know...) because the "interrupt-driven" is just an impression,
-> it is not really. You get the interrupt as soon as you enable it
-> because it is the "FIFO not-full" interrupt which is always because
-> there is always space left after writing to the fifo. The cons are
-> that it buffers messages hidden from the client while abusing the irq.
-> If you guys could break away from the "interrupt-driven" illusion and
-> use polling which it actually is, everything falls into place and you
-> avoid the "ti,mbox-send-noirq" quirk.
+Hi,
 
-Looking at this closely, even with that approach, we would still need a
-quirk to deal with the weird behavior of our wakeup m3. Essentially we
-have two independent things:
-1. Tx state machine (currently interrupt driven) for ticking the mailbox
-core tx state machine.
-2. A quirk that we need for dealing with Wakeup M3 behavior, MPU needs
-to take out the message on behalf of WkupM3 processor after transmission
-and clearing the IP-level interrupt intended for WkupM3. This will be
-irrespective of the Tx state machine choice, and this needs to be
-different only on the specific mbox channel used to talk with WkupM3
-processor.
+I can't find any difference between old and new compatible. Maybe I am
+missing something? Maybe there is a difference for these devices?
 
-Previously, we were doing #2 in the OMAP mailbox regular interrupt
-handler (handles both Rx and Tx interrupts) as part of the Rx interrupt
-handler with the rx mbox variables reflecting those of the WkupM3
-processor. But when we remove the interrupt processing, we now actually
-need to add code to deal with this.
+Anyway if the code is the same then it should use exactly the same
+compatible.
 
->   Anyways I am OK too, if you guys want to fix it with a platform
-> specific quirk. Let me know I'll pick this patch.
+Best regards,
+Krzysztof
 
-I haven't gotten a chance to try #1, and I won't be able to look at it
-atleast for another month. I suggest that you go ahead and pick this
-patch up, as a quirk is needed in one form or the other for #2, and #1
-is anyways a bigger change that will affect all our IPC stacks across
-all pairs of MPU - remote processors on different SoCs.
-
-regards
-Suman
+> 
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> ---
+>  Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt | 2 ++
+>  drivers/mmc/host/dw_mmc-exynos.c                         | 7 +++++++
+>  2 files changed, 9 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+> index aad9844..cd22ac9 100644
+> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+> @@ -22,6 +22,8 @@ Required Properties:
+>  	  specific extensions.
+>  	- "samsung,exynos7-dw-mshc-smu": for controllers with Samsung Exynos7
+>  	  specific extensions having an SMU.
+> +	- "samsung,exynos3250-dw-mshc": for controllers with Samsung Exynos3250
+> +	  specific extensions.
+>  
+>  * samsung,dw-mshc-ciu-div: Specifies the divider value for the card interface
+>    unit (ciu) clock. This property is applicable only for Exynos5 SoC's and
+> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+> index 1e75309..1c96218 100644
+> --- a/drivers/mmc/host/dw_mmc-exynos.c
+> +++ b/drivers/mmc/host/dw_mmc-exynos.c
+> @@ -32,6 +32,7 @@ enum dw_mci_exynos_type {
+>  	DW_MCI_TYPE_EXYNOS5420_SMU,
+>  	DW_MCI_TYPE_EXYNOS7,
+>  	DW_MCI_TYPE_EXYNOS7_SMU,
+> +	DW_MCI_TYPE_EXYNOS3250,
+>  };
+>  
+>  /* Exynos implementation specific driver private data */
+> @@ -73,6 +74,9 @@ static struct dw_mci_exynos_compatible {
+>  	}, {
+>  		.compatible	= "samsung,exynos7-dw-mshc-smu",
+>  		.ctrl_type	= DW_MCI_TYPE_EXYNOS7_SMU,
+> +	}, {
+> +		.compatible	= "samsung,exynos3250-dw-mshc",
+> +		.ctrl_type	= DW_MCI_TYPE_EXYNOS3250,
+>  	},
+>  };
+>  
+> @@ -467,6 +471,7 @@ static int dw_mci_exynos_execute_tuning(struct dw_mci_slot *slot)
+>  	} while (start_smpl != smpl);
+>  
+>  	found = dw_mci_exynos_get_best_clksmpl(candiates);
+> +
+>  	if (found >= 0) {
+>  		dw_mci_exynos_set_clksmpl(host, found);
+>  		priv->tuned_sample = found;
+> @@ -520,6 +525,8 @@ static const struct of_device_id dw_mci_exynos_match[] = {
+>  			.data = &exynos_drv_data, },
+>  	{ .compatible = "samsung,exynos7-dw-mshc-smu",
+>  			.data = &exynos_drv_data, },
+> +	{ .compatible = "samsung,exynos3250-dw-mshc",
+> +			.data = &exynos_drv_data, },
+>  	{},
+>  };
+>  MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
+> 
