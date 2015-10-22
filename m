@@ -1,183 +1,32 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 22 Oct 2015 07:21:41 +0000
-Subject: [PATCH v11 1/6] PCI: designware: move calculation of bus
- addresses to DRA7xx
-In-Reply-To: <20151021221524.GM1583@localhost>
-References: <1444991021-109306-1-git-send-email-wangzhou1@hisilicon.com>
- <1444991021-109306-2-git-send-email-wangzhou1@hisilicon.com>
- <20151021221524.GM1583@localhost>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E16274DCC@lhreml503-mbs>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 22 Oct 2015 09:43:17 +0200 (CEST)
+Subject: Problem about CPU stalling in hrtimer_intterrupts()
+In-Reply-To: <56288585.40204@huawei.com>
+References: <56288585.40204@huawei.com>
+Message-ID: <alpine.DEB.2.11.1510220942010.4012@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> Sent: 21 October 2015 23:15
-> To: Wangzhou (B)
-> Cc: Bjorn Helgaas; jingoohan1 at gmail.com; pratyush.anand at gmail.com; Arnd
-> Bergmann; linux at arm.linux.org.uk; thomas.petazzoni at free-electrons.com;
-> Gabriele Paoloni; lorenzo.pieralisi at arm.com; james.morse at arm.com;
-> Liviu.Dudau at arm.com; jason at lakedaemon.net; robh at kernel.org;
-> gabriel.fernandez at linaro.org; Minghuan.Lian at freescale.com; linux-
-> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; zhangjukuo;
-> qiuzhenfa; liudongdong (C); qiujiang; xuwei (O); Liguozhu (Kenneth)
-> Subject: Re: [PATCH v11 1/6] PCI: designware: move calculation of bus
-> addresses to DRA7xx
+On Thu, 22 Oct 2015, Yang Yingliang wrote:
+> I use the kernel-4.1.6 running on arm64.
+> My testcase is that it calls clock_settime and clock_adjtime alternately with
+> random params on each core. My system has 32 cores.
 > 
-> Hi Zhou & Gabriele,
-
-Hi Bjorn, thanks for reviewing
-
+> I found the cpu stalling in  hrtimer_intterrupts(). So I added some debug info
+> in hrtimer_intterrupts() and found that the while loop runs 1020437660 times
+> and takes 98761 jiffies(HZ=250).
 > 
-> On Fri, Oct 16, 2015 at 06:23:36PM +0800, Zhou Wang wrote:
-> > From: gabriele paoloni <gabriele.paoloni@huawei.com>
-> >
-> > Commit f4c55c5a3f7f ("PCI: designware: Program ATU with untranslated
-> > address") added the calculation of PCI BUS addresses in designware,
-> > storing them in new fields added in "struct pcie_port". This
-> > calculation is done for every designware user even if is only
-> > applicable to DRA7xx.
-> > This patch moves the calculation of the bus addresses to the DRA7xx
-> > driver and is needed to allow the rework of designware to use
-> > the new DT parsing API.
-> >
-> > Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> > Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
-> > Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
-> > ---
-> >  drivers/pci/host/pci-dra7xx.c      | 13 +++++++++++++
-> >  drivers/pci/host/pcie-designware.c | 15 ++++-----------
-> >  2 files changed, 17 insertions(+), 11 deletions(-)
-> >
-> > diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
-> > index 199e29a..ebdffa0 100644
-> > --- a/drivers/pci/host/pci-dra7xx.c
-> > +++ b/drivers/pci/host/pci-dra7xx.c
-> > @@ -62,6 +62,7 @@
-> >
-> >  #define	PCIECTRL_DRA7XX_CONF_PHY_CS			0x010C
-> >  #define	LINK_UP						BIT(16)
-> > +#define	CPU_TO_BUS_ADDR					0x0FFFFFFF
-> 
-> "CPU_TO_BUS_ADDR" is a very generic name.  Since you do have DRA7XX in
-> other #defines and static symbols in this file, maybe it could be DRA7XX to
-> make it obvious that it only applies here?
+> Some debug log is here:
+> ---start---
+> Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830
+> hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0
+> timer:ffffffdffdec6138, timer->function:ffffffc000129b84
+> Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830
+> hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0
 
-Ok will change to DRA7XX_CPU_TO_BUS_ADRR in v12
+Something is rearming a timer over and over with expiry time in the
+past.
 
-> 
-> >
-> >  struct dra7xx_pcie {
-> >  	void __iomem		*base;
-> > @@ -151,6 +152,18 @@ static void dra7xx_pcie_enable_interrupts(struct
-> pcie_port *pp)
-> >  static void dra7xx_pcie_host_init(struct pcie_port *pp)
-> >  {
-> >  	dw_pcie_setup_rc(pp);
-> > +
-> > +	if (pp->io_mod_base)
-> > +		pp->io_mod_base &= CPU_TO_BUS_ADDR;
-> 
-> These are equivalent to
-> 
->   pp->io_mod_base &= CPU_TO_BUS_ADDR;
-> 
-> (You don't need to test whether they're zero first.)
-> 
+Thanks,
 
-Yes agreed, will change in v12
-
-> > +
-> > +	if (pp->mem_mod_base)
-> > +		pp->mem_mod_base &= CPU_TO_BUS_ADDR;
-> > +
-> > +	if (pp->cfg0_mod_base) {
-> > +		pp->cfg0_mod_base &= CPU_TO_BUS_ADDR;
-> > +		pp->cfg1_mod_base &= CPU_TO_BUS_ADDR;
-> > +	}
-> > +
-> >  	dra7xx_pcie_establish_link(pp);
-> >  	if (IS_ENABLED(CONFIG_PCI_MSI))
-> >  		dw_pcie_msi_init(pp);
-> > diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-
-> designware.c
-> > index 52aa6e3..75338a6 100644
-> > --- a/drivers/pci/host/pcie-designware.c
-> > +++ b/drivers/pci/host/pcie-designware.c
-> > @@ -365,14 +365,10 @@ int dw_pcie_host_init(struct pcie_port *pp)
-> >  	struct of_pci_range range;
-> >  	struct of_pci_range_parser parser;
-> >  	struct resource *cfg_res;
-> > -	u32 val, na, ns;
-> > +	u32 val, ns;
-> >  	const __be32 *addrp;
-> >  	int i, index, ret;
-> >
-> > -	/* Find the address cell size and the number of cells in order to get
-> > -	 * the untranslated address.
-> > -	 */
-> > -	of_property_read_u32(np, "#address-cells", &na);
-> >  	ns = of_n_size_cells(np);
-> >
-> >  	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
-> > @@ -415,8 +411,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
-> >  			pp->io_base = range.cpu_addr;
-> >
-> >  			/* Find the untranslated IO space address */
-> > -			pp->io_mod_base = of_read_number(parser.range -
-> > -							 parser.np + na, ns);
-> > +			pp->io_mod_base = range.cpu_addr;
-> 
-> So apparently
-> 
->   "of_read_number() == range.cpu_addr & CPU_TO_BUS_ADDR" on DRA7xx
->   "of_read_number() == range.cpu_addr" everywhere else?
-
-Yes correct
-
-> 
-> Is that right?  Is that a valid assumption, i.e., are we assuming
-> anything about DTs in the field that we shouldn't?
-
-Before I wrote a patch that was generic to accommodate intermediate level
-of translation between PCI_addr -> BUS_addr -> CPU_addr
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/360922.html
-
-After discussion we agreed to solve it with a bitmask rather than adding
-a field to of_pci_range to make it generic.
-The bitmask only applies to DRA7xx
-
-> 
-> >  		}
-> >  		if (restype == IORESOURCE_MEM) {
-> >  			of_pci_range_to_resource(&range, np, &pp->mem);
-> > @@ -425,8 +420,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
-> >  			pp->mem_bus_addr = range.pci_addr;
-> >
-> >  			/* Find the untranslated MEM space address */
-> > -			pp->mem_mod_base = of_read_number(parser.range -
-> > -							  parser.np + na, ns);
-> > +			pp->mem_mod_base = range.cpu_addr;
-> >  		}
-> >  		if (restype == 0) {
-> >  			of_pci_range_to_resource(&range, np, &pp->cfg);
-> > @@ -436,8 +430,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
-> >  			pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
-> >
-> >  			/* Find the untranslated configuration space address */
-> > -			pp->cfg0_mod_base = of_read_number(parser.range -
-> > -							   parser.np + na, ns);
-> > +			pp->cfg0_mod_base = range.cpu_addr;
-> >  			pp->cfg1_mod_base = pp->cfg0_mod_base +
-> >  					    pp->cfg0_size;
-> >  		}
-> > --
-> > 1.9.1
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
+	tglx
