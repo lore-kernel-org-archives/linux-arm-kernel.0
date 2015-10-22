@@ -1,51 +1,46 @@
-From: lftan@altera.com (Ley Foon Tan)
-Date: Thu, 22 Oct 2015 17:27:31 +0800
-Subject: [PATCH v11 6/6] MAINTAINERS: Add Altera PCIe and MSI drivers
- maintainer
-In-Reply-To: <1445506051-21688-1-git-send-email-lftan@altera.com>
-References: <1445506051-21688-1-git-send-email-lftan@altera.com>
-Message-ID: <1445506051-21688-7-git-send-email-lftan@altera.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 22 Oct 2015 11:28:55 +0200
+Subject: [PATCH 2/5] mmc: omap_hsmmc: Enable omap_hsmmc for Keystone 2
+In-Reply-To: <1445377809-12516-2-git-send-email-fcooper@ti.com>
+References: <1445377809-12516-1-git-send-email-fcooper@ti.com>
+ <1445377809-12516-2-git-send-email-fcooper@ti.com>
+Message-ID: <CAPDyKFr6qt60gECs5y=Qq6XbFhiqWGrOcMozB4vNwaR8PHnu4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ley Foon Tan <lftan@altera.com>
----
- MAINTAINERS | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+On 20 October 2015 at 23:50, Franklin S Cooper Jr <fcooper@ti.com> wrote:
+>
+> From: Lokesh Vutla <lokeshvutla@ti.com>
+>
+> Enable omap_hsmmc for Keystone 2 architecture which reuses the HSMMC
+> IP found on OMAP platforms.
+>
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> ---
+>  drivers/mmc/host/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index 8a1e349..2ccec71 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -366,7 +366,7 @@ config MMC_OMAP
+>  config MMC_OMAP_HS
+>         tristate "TI OMAP High Speed Multimedia Card Interface support"
+>         depends on HAS_DMA
+> -       depends on ARCH_OMAP2PLUS || COMPILE_TEST
+> +       depends on ARCH_OMAP2PLUS || ARCH_KEYSTONE || COMPILE_TEST
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index b8577ad9..96b9fac 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7958,6 +7958,14 @@ F:	include/linux/pci*
- F:	arch/x86/pci/
- F:	arch/x86/kernel/quirks.c
- 
-+PCI DRIVER FOR ALTERA PCIE IP
-+M:	Ley Foon Tan <lftan@altera.com>
-+L:	rfi at lists.rocketboards.org (moderated for non-subscribers)
-+L:	linux-pci at vger.kernel.org
-+S:	Supported
-+F:	Documentation/devicetree/bindings/pci/altera-pcie.txt
-+F:	drivers/pci/host/pcie-altera.c
-+
- PCI DRIVER FOR ARM VERSATILE PLATFORM
- M:	Rob Herring <robh@kernel.org>
- L:	linux-pci at vger.kernel.org
-@@ -8059,6 +8067,14 @@ L:	linux-pci at vger.kernel.org
- S:	Maintained
- F:	drivers/pci/host/*spear*
- 
-+PCI MSI DRIVER FOR ALTERA MSI IP
-+M:	Ley Foon Tan <lftan@altera.com>
-+L:	rfi at lists.rocketboards.org (moderated for non-subscribers)
-+L:	linux-pci at vger.kernel.org
-+S:	Supported
-+F:	Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
-+F:	drivers/pci/host/pcie-altera-msi.c
-+
- PCI MSI DRIVER FOR APPLIEDMICRO XGENE
- M:	Duc Dang <dhdang@apm.com>
- L:	linux-pci at vger.kernel.org
--- 
-1.8.2.1
+How about:
+"depends on ARM || COMPILE_TEST"
+
+>
+>         help
+>           This selects the TI OMAP High Speed Multimedia card Interface.
+>           If you have an omap2plus board with a Multimedia Card slot,
+> --
+> 2.6.1
+>
+
+Kind regards
+Uffe
