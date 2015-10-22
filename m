@@ -1,42 +1,28 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 22 Oct 2015 11:14:10 +0200
-Subject: [PATCH 5/6] ARM: dts: sunxi: Add Allwinner H3 DTSI
-In-Reply-To: <20151022105745.2cc158a3@OPI2>
-References: <1445444428-4652-1-git-send-email-jenskuske@gmail.com>
- <1445444428-4652-2-git-send-email-jenskuske@gmail.com>
- <20151022080508.GN10947@lukather> <20151022102959.09f0a1f4@OPI2>
- <20151022084735.GR10947@lukather> <20151022105745.2cc158a3@OPI2>
-Message-ID: <20151022091410.GW10947@lukather>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 22 Oct 2015 11:18:35 +0200
+Subject: [PATCH 0/4] arm: omap2+: complete dm816x hwmod and clkdev
+Message-ID: <5628A9EB.9010005@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 22, 2015 at 10:57:45AM +0200, Jean-Francois Moine wrote:
-> On Thu, 22 Oct 2015 10:47:35 +0200
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> > Not really. The uart0 reset is the bit 16, in the reset register 4.
-> > 
-> > 4 * 32 + 16 = 44.
-> > 
-> > Not 112, but still not 208 either.
-> 
-> The registers are numbered 1..5, then
-> 
-> (4 - 1) * 32 + 16 = 112
+In order to fix support for the dm816x platform, add missing bits in
+the 81xx hwmod data.
 
-Not on my version, and even then, UARTs are on the last reset
-register, which would still make 144.
+The clk related patch adds the missing clkdev entries to fix all source
+selection in the dmtimer driver.
 
-Maxime
+The last patch adds hwmod support of the spinbox module.
+
+Neil Armstrong (4):
+  arm: omap2+: add missing HWMOD_NO_IDLEST in 81xx hwmod data
+  clk: ti816x: Add missing dmtimer clkdev entries
+  arm: plat-omap: add DT support for ti,dm816-timer
+  arm: omap2+: Add hwmod spinbox support for dm816x
+
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 38 ++++++++++++++++++++++++++++++
+ arch/arm/plat-omap/dmtimer.c               |  4 ++++
+ drivers/clk/ti/clk-816x.c                  |  2 ++
+ 3 files changed, 44 insertions(+)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151022/f9321180/attachment.sig>
+1.9.1
