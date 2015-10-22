@@ -1,63 +1,131 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Thu, 22 Oct 2015 23:05:43 +0900
-Subject: [PATCH v3 0/7] arm64: ftrace: fix incorrect output from stack
- tracer
-In-Reply-To: <36B8D79C-E3BD-4937-94D1-B9725CA4FD68@gmail.com>
-References: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
- <36B8D79C-E3BD-4937-94D1-B9725CA4FD68@gmail.com>
-Message-ID: <6852455A-9805-4824-8C19-0EEC8E705B3E@gmail.com>
+From: drew.richardson@arm.com (Drew Richardson)
+Date: Thu, 22 Oct 2015 07:07:01 -0700
+Subject: [PATCH 1/2] arm64: perf: Convert event enums to #defines
+In-Reply-To: <20151022140557.GA2154@dreric01-gentoo.localdomain>
+References: <20151007182735.GA18706@dreric01-gentoo.localdomain>
+ <20151009101338.GH26278@arm.com>
+ <20151022140557.GA2154@dreric01-gentoo.localdomain>
+Message-ID: <20151022140700.GB2154@dreric01-gentoo.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 8, 2015, at 11:45 PM, Jungseok Lee wrote:
-> On Oct 8, 2015, at 7:01 PM, AKASHI Takahiro wrote:
-> 
-> Hi Akashi,
-> 
->> This is the third patch series for fixing stack tracer on arm64.
->> The original issue was reported by Jungseok[1], and then I found more
->> issues[2].
->> (Steven, Jungseok, sorry for not replying to your comments directly.)
->> 
->> I address here all the issues and implement fixes described in [2] except
->> for interrupt-triggered problems, ie. II-3). Recent discussions[3] about
->> introducing a dedicated interrupt stack suggests that we may avoid walking
->> through from an interrupt stack to a process stack.
->> (So interrupt-stack patch is a prerequisite.)
->> 
->> Basically,
->> patch1 corresponds to the original issue.
->> patch2 is a proactive improvement of function_graph tracer. 
->> patch3 corresponds to II-4(functions under function_graph tracer).
->> patch4 corresponds to II-5(leaf function).
->> patch5, 6 and 7 correspond to II-1(slurping stack) and II-2(differences
->> between x86 and arm64).
->> 
->> Each fix can be applied independently, but if patch5, 6 and 7 are
->> acceptable, patch1 is not necessary because patch7 replaces a default
->> stack tracer.
+The enums are not necessary and this allows the event values to be
+used to construct static strings at compile time.
 
-I've used this series *without Patch1* for over a week.
+Signed-off-by: Drew Richardson <drew.richardson@arm.com>
+---
+ arch/arm64/kernel/perf_event.c | 95 ++++++++++++++++++++----------------------
+ 1 file changed, 45 insertions(+), 50 deletions(-)
 
-It works well till now. I have not observed any issues, such as function graph
-thing, of which I'm aware. Please note that I have not reviewed internals of
-the analyzer and related logics carefully.
-
-Best Regards
-Jungseok Lee
-
->> I tested the code with v4.3-rc3 + Jungseok's patch v3[4].
->> 
->> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354126.html
->> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/355920.html 
->> [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/368003.html
->> [4] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/371451.html
-> 
-> The [4] is not a valid patch. I hope the test has been going with the following one.
-> 
-> 	http://www.kernelhub.org/?msg=841034&p=2
-> 
-> I will leave comments after playing with this series on top of my IRQ stack tree.
-> 
-> Best Regards
-> Jungseok Lee
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 5b1897e8ca24..7e4372ee4dfb 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -29,60 +29,55 @@
+  * ARMv8 PMUv3 Performance Events handling code.
+  * Common event types.
+  */
+-enum armv8_pmuv3_perf_types {
+-	/* Required events. */
+-	ARMV8_PMUV3_PERFCTR_PMNC_SW_INCR			= 0x00,
+-	ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL			= 0x03,
+-	ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS			= 0x04,
+-	ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED			= 0x10,
+-	ARMV8_PMUV3_PERFCTR_CLOCK_CYCLES			= 0x11,
+-	ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED			= 0x12,
+-
+-	/* At least one of the following is required. */
+-	ARMV8_PMUV3_PERFCTR_INSTR_EXECUTED			= 0x08,
+-	ARMV8_PMUV3_PERFCTR_OP_SPEC				= 0x1B,
+-
+-	/* Common architectural events. */
+-	ARMV8_PMUV3_PERFCTR_MEM_READ				= 0x06,
+-	ARMV8_PMUV3_PERFCTR_MEM_WRITE				= 0x07,
+-	ARMV8_PMUV3_PERFCTR_EXC_TAKEN				= 0x09,
+-	ARMV8_PMUV3_PERFCTR_EXC_EXECUTED			= 0x0A,
+-	ARMV8_PMUV3_PERFCTR_CID_WRITE				= 0x0B,
+-	ARMV8_PMUV3_PERFCTR_PC_WRITE				= 0x0C,
+-	ARMV8_PMUV3_PERFCTR_PC_IMM_BRANCH			= 0x0D,
+-	ARMV8_PMUV3_PERFCTR_PC_PROC_RETURN			= 0x0E,
+-	ARMV8_PMUV3_PERFCTR_MEM_UNALIGNED_ACCESS		= 0x0F,
+-	ARMV8_PMUV3_PERFCTR_TTBR_WRITE				= 0x1C,
+-
+-	/* Common microarchitectural events. */
+-	ARMV8_PMUV3_PERFCTR_L1_ICACHE_REFILL			= 0x01,
+-	ARMV8_PMUV3_PERFCTR_ITLB_REFILL				= 0x02,
+-	ARMV8_PMUV3_PERFCTR_DTLB_REFILL				= 0x05,
+-	ARMV8_PMUV3_PERFCTR_MEM_ACCESS				= 0x13,
+-	ARMV8_PMUV3_PERFCTR_L1_ICACHE_ACCESS			= 0x14,
+-	ARMV8_PMUV3_PERFCTR_L1_DCACHE_WB			= 0x15,
+-	ARMV8_PMUV3_PERFCTR_L2_CACHE_ACCESS			= 0x16,
+-	ARMV8_PMUV3_PERFCTR_L2_CACHE_REFILL			= 0x17,
+-	ARMV8_PMUV3_PERFCTR_L2_CACHE_WB				= 0x18,
+-	ARMV8_PMUV3_PERFCTR_BUS_ACCESS				= 0x19,
+-	ARMV8_PMUV3_PERFCTR_MEM_ERROR				= 0x1A,
+-	ARMV8_PMUV3_PERFCTR_BUS_CYCLES				= 0x1D,
+-};
++
++/* Required events. */
++#define ARMV8_PMUV3_PERFCTR_PMNC_SW_INCR			0x00
++#define ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL			0x03
++#define ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS			0x04
++#define ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED			0x10
++#define ARMV8_PMUV3_PERFCTR_CLOCK_CYCLES			0x11
++#define ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED			0x12
++
++/* At least one of the following is required. */
++#define ARMV8_PMUV3_PERFCTR_INSTR_EXECUTED			0x08
++#define ARMV8_PMUV3_PERFCTR_OP_SPEC				0x1B
++
++/* Common architectural events. */
++#define ARMV8_PMUV3_PERFCTR_MEM_READ				0x06
++#define ARMV8_PMUV3_PERFCTR_MEM_WRITE				0x07
++#define ARMV8_PMUV3_PERFCTR_EXC_TAKEN				0x09
++#define ARMV8_PMUV3_PERFCTR_EXC_EXECUTED			0x0A
++#define ARMV8_PMUV3_PERFCTR_CID_WRITE				0x0B
++#define ARMV8_PMUV3_PERFCTR_PC_WRITE				0x0C
++#define ARMV8_PMUV3_PERFCTR_PC_IMM_BRANCH			0x0D
++#define ARMV8_PMUV3_PERFCTR_PC_PROC_RETURN			0x0E
++#define ARMV8_PMUV3_PERFCTR_MEM_UNALIGNED_ACCESS		0x0F
++#define ARMV8_PMUV3_PERFCTR_TTBR_WRITE				0x1C
++
++/* Common microarchitectural events. */
++#define ARMV8_PMUV3_PERFCTR_L1_ICACHE_REFILL			0x01
++#define ARMV8_PMUV3_PERFCTR_ITLB_REFILL				0x02
++#define ARMV8_PMUV3_PERFCTR_DTLB_REFILL				0x05
++#define ARMV8_PMUV3_PERFCTR_MEM_ACCESS				0x13
++#define ARMV8_PMUV3_PERFCTR_L1_ICACHE_ACCESS			0x14
++#define ARMV8_PMUV3_PERFCTR_L1_DCACHE_WB			0x15
++#define ARMV8_PMUV3_PERFCTR_L2_CACHE_ACCESS			0x16
++#define ARMV8_PMUV3_PERFCTR_L2_CACHE_REFILL			0x17
++#define ARMV8_PMUV3_PERFCTR_L2_CACHE_WB				0x18
++#define ARMV8_PMUV3_PERFCTR_BUS_ACCESS				0x19
++#define ARMV8_PMUV3_PERFCTR_MEM_ERROR				0x1A
++#define ARMV8_PMUV3_PERFCTR_BUS_CYCLES				0x1D
+ 
+ /* ARMv8 Cortex-A53 specific event types. */
+-enum armv8_a53_pmu_perf_types {
+-	ARMV8_A53_PERFCTR_PREFETCH_LINEFILL			= 0xC2,
+-};
++#define ARMV8_A53_PERFCTR_PREFETCH_LINEFILL			0xC2
+ 
+ /* ARMv8 Cortex-A57 specific event types. */
+-enum armv8_a57_perf_types {
+-	ARMV8_A57_PERFCTR_L1_DCACHE_ACCESS_LD			= 0x40,
+-	ARMV8_A57_PERFCTR_L1_DCACHE_ACCESS_ST			= 0x41,
+-	ARMV8_A57_PERFCTR_L1_DCACHE_REFILL_LD			= 0x42,
+-	ARMV8_A57_PERFCTR_L1_DCACHE_REFILL_ST			= 0x43,
+-	ARMV8_A57_PERFCTR_DTLB_REFILL_LD			= 0x4c,
+-	ARMV8_A57_PERFCTR_DTLB_REFILL_ST			= 0x4d,
+-};
++#define ARMV8_A57_PERFCTR_L1_DCACHE_ACCESS_LD			0x40
++#define ARMV8_A57_PERFCTR_L1_DCACHE_ACCESS_ST			0x41
++#define ARMV8_A57_PERFCTR_L1_DCACHE_REFILL_LD			0x42
++#define ARMV8_A57_PERFCTR_L1_DCACHE_REFILL_ST			0x43
++#define ARMV8_A57_PERFCTR_DTLB_REFILL_LD			0x4c
++#define ARMV8_A57_PERFCTR_DTLB_REFILL_ST			0x4d
+ 
+ /* PMUv3 HW events mapping. */
+ static const unsigned armv8_pmuv3_perf_map[PERF_COUNT_HW_MAX] = {
+-- 
+2.1.4
