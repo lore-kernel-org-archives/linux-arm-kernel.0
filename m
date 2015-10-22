@@ -1,388 +1,101 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Thu, 22 Oct 2015 10:15:20 +0530
-Subject: [PATCH v6] can: xilinx: Convert to runtime_pm
-Message-ID: <1445489120-10933-1-git-send-email-appanad@xilinx.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 22 Oct 2015 13:47:21 +0900
+Subject: console vs earlycon ?
+In-Reply-To: <56279126.8080506@hurleysoftware.com>
+References: <CAK7LNARem16fTim8Ds_y8ezMusz_aRtv6c59KoxyC0rLV-RBWw@mail.gmail.com>
+ <56279126.8080506@hurleysoftware.com>
+Message-ID: <CAK7LNAQhjLAgeiUSXvFfBzmdSzmy=fuTp7BKiGOaQTjbAZbR9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of enabling/disabling clocks at several locations in the driver,
-Use the runtime_pm framework. This consolidates the actions for runtime PM
-In the appropriate callbacks and makes the driver more readable and mantainable.
+Hi Peter
 
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
-Sorry for the long delay for sending this next version of the patch.
-somehow couldn't manage to send this next version of the patch.
- 
-Changes for v6:
- - Updated the driver with review comments as suggested by Marc.
-Changes for v5:
- - Updated with the review comments.
-   Updated the remove fuction to use runtime_pm.
-Chnages for v4:
- - Updated with the review comments.
-Changes for v3:
-  - Converted the driver to use runtime_pm.
-Changes for v2:
-  - Removed the struct platform_device* from suspend/resume
-    as suggest by Lothar.
+2015-10-21 22:20 GMT+09:00 Peter Hurley <peter@hurleysoftware.com>:
+> On 10/21/2015 04:21 AM, Masahiro Yamada wrote:
+>> Hi.
+>>
+>>
+>>
+>>
+>> I think there are three places where console could be enabled.
+>>
+>> [1] earlycon
+>>
+>> Each driver entry is declared with
+>> EARLYCON_DECLARE()  or OF_EARLYCON_DECLARE()
+>>
+>>
+>>
+>> [2] console_init()
+>>
+>> Each entry is declared with  console_initcall()
+>>
+>>
+>>
+>> [3]  when driver is probed
+>> The console is usually enabled at this point
+>> unless some special treatment is done.
+>>
+>>
+>>
+>>
+>> My question is about [2].
+>
+> For 8250 sub-drivers, the console_initcall() is only for legacy
+> platforms, and not for 8250 ports added via serial8250_register_8250_port().
+>
+> In this contexts, legacy platforms are:
+> 1. early_serial_setup()
+> 2. platforms that define SERIAL_PORT_DFNS (eg., ISA ports)
+>
+>
+> At the point where console_initcall() occurs, the 8250 core has _not_
+> been initialized (ie., serial8250_init() has _not_ run).
+>
+>
+>
+>> I am using 8250-ish UART device.
+>>
+>>
+>> I noticed univ8250_console_match() and univ8250_console_setup()
+>> always fail at the point of [2] unless early_serial_setup() has been
+>> called in advance;
+>> however, it looks like early_serial_setup() is only used for old platforms.
+>>
+>> So, console cannot be enabled at [2] for modern platforms.
+>
+> Since console_init() => console_initcall() occurs before almost everything,
+> it's not practical to use for probed drivers.
+>
+>
+>> My questions are:
+>>
+>>  -  Given that earlycon can be now available for major architectures such ARM,
+>>      [2] will be deprecated at some point in the future?
+>
+> PPC and x86 platforms still rely on console_init() so it will be some time
+> before this disappears.
+>
+>>  - I am implementing  earlycon  for my own UART driver.
+>>    Is it meaningless to implement  console_initcall()  as well as earlycon?
+>
+> Probed drivers should only implement earlycon and console. 8250 sub-drivers
+> should only implement earlycon and/or console if the base 8250 earlycon and/or
+> console are not operational.
 
- drivers/net/can/xilinx_can.c | 176 +++++++++++++++++++++++++++----------------
- 1 file changed, 110 insertions(+), 66 deletions(-)
+Sorry, let me to be sure a bit.
 
-diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
-index fc55e8e..6114214 100644
---- a/drivers/net/can/xilinx_can.c
-+++ b/drivers/net/can/xilinx_can.c
-@@ -32,6 +32,7 @@
- #include <linux/can/dev.h>
- #include <linux/can/error.h>
- #include <linux/can/led.h>
-+#include <linux/pm_runtime.h>
- 
- #define DRIVER_NAME	"xilinx_can"
- 
-@@ -138,7 +139,7 @@ struct xcan_priv {
- 	u32 (*read_reg)(const struct xcan_priv *priv, enum xcan_reg reg);
- 	void (*write_reg)(const struct xcan_priv *priv, enum xcan_reg reg,
- 			u32 val);
--	struct net_device *dev;
-+	struct device *dev;
- 	void __iomem *reg_base;
- 	unsigned long irq_flags;
- 	struct clk *bus_clk;
-@@ -843,6 +844,13 @@ static int xcan_open(struct net_device *ndev)
- 	struct xcan_priv *priv = netdev_priv(ndev);
- 	int ret;
- 
-+	ret = pm_runtime_get_sync(priv->dev);
-+	if (ret < 0) {
-+		netdev_err(ndev, "%s: pm_runtime_get failed(%d)\n",
-+				__func__, ret);
-+		return ret;
-+	}
-+
- 	ret = request_irq(ndev->irq, xcan_interrupt, priv->irq_flags,
- 			ndev->name, ndev);
- 	if (ret < 0) {
-@@ -850,29 +858,17 @@ static int xcan_open(struct net_device *ndev)
- 		goto err;
- 	}
- 
--	ret = clk_prepare_enable(priv->can_clk);
--	if (ret) {
--		netdev_err(ndev, "unable to enable device clock\n");
--		goto err_irq;
--	}
--
--	ret = clk_prepare_enable(priv->bus_clk);
--	if (ret) {
--		netdev_err(ndev, "unable to enable bus clock\n");
--		goto err_can_clk;
--	}
--
- 	/* Set chip into reset mode */
- 	ret = set_reset_mode(ndev);
- 	if (ret < 0) {
- 		netdev_err(ndev, "mode resetting failed!\n");
--		goto err_bus_clk;
-+		goto err_irq;
- 	}
- 
- 	/* Common open */
- 	ret = open_candev(ndev);
- 	if (ret)
--		goto err_bus_clk;
-+		goto err_irq;
- 
- 	ret = xcan_chip_start(ndev);
- 	if (ret < 0) {
-@@ -888,13 +884,11 @@ static int xcan_open(struct net_device *ndev)
- 
- err_candev:
- 	close_candev(ndev);
--err_bus_clk:
--	clk_disable_unprepare(priv->bus_clk);
--err_can_clk:
--	clk_disable_unprepare(priv->can_clk);
- err_irq:
- 	free_irq(ndev->irq, ndev);
- err:
-+	pm_runtime_put(priv->dev);
-+
- 	return ret;
- }
- 
-@@ -911,12 +905,11 @@ static int xcan_close(struct net_device *ndev)
- 	netif_stop_queue(ndev);
- 	napi_disable(&priv->napi);
- 	xcan_chip_stop(ndev);
--	clk_disable_unprepare(priv->bus_clk);
--	clk_disable_unprepare(priv->can_clk);
- 	free_irq(ndev->irq, ndev);
- 	close_candev(ndev);
- 
- 	can_led_event(ndev, CAN_LED_EVENT_STOP);
-+	pm_runtime_put(priv->dev);
- 
- 	return 0;
- }
-@@ -935,27 +928,20 @@ static int xcan_get_berr_counter(const struct net_device *ndev,
- 	struct xcan_priv *priv = netdev_priv(ndev);
- 	int ret;
- 
--	ret = clk_prepare_enable(priv->can_clk);
--	if (ret)
--		goto err;
--
--	ret = clk_prepare_enable(priv->bus_clk);
--	if (ret)
--		goto err_clk;
-+	ret = pm_runtime_get_sync(priv->dev);
-+	if (ret < 0) {
-+		netdev_err(ndev, "%s: pm_runtime_get failed(%d)\n",
-+				__func__, ret);
-+		return ret;
-+	}
- 
- 	bec->txerr = priv->read_reg(priv, XCAN_ECR_OFFSET) & XCAN_ECR_TEC_MASK;
- 	bec->rxerr = ((priv->read_reg(priv, XCAN_ECR_OFFSET) &
- 			XCAN_ECR_REC_MASK) >> XCAN_ESR_REC_SHIFT);
- 
--	clk_disable_unprepare(priv->bus_clk);
--	clk_disable_unprepare(priv->can_clk);
-+	pm_runtime_put(priv->dev);
- 
- 	return 0;
--
--err_clk:
--	clk_disable_unprepare(priv->can_clk);
--err:
--	return ret;
- }
- 
- 
-@@ -968,15 +954,45 @@ static const struct net_device_ops xcan_netdev_ops = {
- 
- /**
-  * xcan_suspend - Suspend method for the driver
-- * @dev:	Address of the platform_device structure
-+ * @dev:	Address of the device structure
-  *
-  * Put the driver into low power mode.
-- * Return: 0 always
-+ * Return: 0 on success and failure value on error
-  */
- static int __maybe_unused xcan_suspend(struct device *dev)
- {
--	struct platform_device *pdev = dev_get_drvdata(dev);
--	struct net_device *ndev = platform_get_drvdata(pdev);
-+	if (!device_may_wakeup(dev))
-+		return pm_runtime_force_suspend(dev);
-+
-+	return 0;
-+}
-+
-+/**
-+ * xcan_resume - Resume from suspend
-+ * @dev:	Address of the device structure
-+ *
-+ * Resume operation after suspend.
-+ * Return: 0 on success and failure value on error
-+ */
-+static int __maybe_unused xcan_resume(struct device *dev)
-+{
-+	if (!device_may_wakeup(dev))
-+		return pm_runtime_force_resume(dev);
-+
-+	return 0;
-+
-+}
-+
-+/**
-+ * xcan_runtime_suspend - Runtime suspend method for the driver
-+ * @dev:	Address of the device structure
-+ *
-+ * Put the driver into low power mode.
-+ * Return: 0 always
-+ */
-+static int __maybe_unused xcan_runtime_suspend(struct device *dev)
-+{
-+	struct net_device *ndev = dev_get_drvdata(dev);
- 	struct xcan_priv *priv = netdev_priv(ndev);
- 
- 	if (netif_running(ndev)) {
-@@ -987,43 +1003,55 @@ static int __maybe_unused xcan_suspend(struct device *dev)
- 	priv->write_reg(priv, XCAN_MSR_OFFSET, XCAN_MSR_SLEEP_MASK);
- 	priv->can.state = CAN_STATE_SLEEPING;
- 
--	clk_disable(priv->bus_clk);
--	clk_disable(priv->can_clk);
-+	clk_disable_unprepare(priv->bus_clk);
-+	clk_disable_unprepare(priv->can_clk);
- 
- 	return 0;
- }
- 
- /**
-- * xcan_resume - Resume from suspend
-- * @dev:	Address of the platformdevice structure
-+ * xcan_runtime_resume - Runtime resume from suspend
-+ * @dev:	Address of the device structure
-  *
-  * Resume operation after suspend.
-  * Return: 0 on success and failure value on error
-  */
--static int __maybe_unused xcan_resume(struct device *dev)
-+static int __maybe_unused xcan_runtime_resume(struct device *dev)
- {
--	struct platform_device *pdev = dev_get_drvdata(dev);
--	struct net_device *ndev = platform_get_drvdata(pdev);
-+	struct net_device *ndev = dev_get_drvdata(dev);
- 	struct xcan_priv *priv = netdev_priv(ndev);
- 	int ret;
-+	u32 isr, status;
- 
--	ret = clk_enable(priv->bus_clk);
-+	ret = clk_prepare_enable(priv->bus_clk);
- 	if (ret) {
- 		dev_err(dev, "Cannot enable clock.\n");
- 		return ret;
- 	}
--	ret = clk_enable(priv->can_clk);
-+	ret = clk_prepare_enable(priv->can_clk);
- 	if (ret) {
- 		dev_err(dev, "Cannot enable clock.\n");
- 		clk_disable_unprepare(priv->bus_clk);
- 		return ret;
- 	}
- 
--	priv->write_reg(priv, XCAN_MSR_OFFSET, 0);
--	priv->write_reg(priv, XCAN_SRR_OFFSET, XCAN_SRR_CEN_MASK);
--	priv->can.state = CAN_STATE_ERROR_ACTIVE;
-+	priv->write_reg(priv, XCAN_SRR_OFFSET, XCAN_SRR_RESET_MASK);
-+	isr = priv->read_reg(priv, XCAN_ISR_OFFSET);
-+	status = priv->read_reg(priv, XCAN_SR_OFFSET);
- 
- 	if (netif_running(ndev)) {
-+		if (isr & XCAN_IXR_BSOFF_MASK) {
-+			priv->can.state = CAN_STATE_BUS_OFF;
-+			priv->write_reg(priv, XCAN_SRR_OFFSET,
-+					XCAN_SRR_RESET_MASK);
-+		} else if ((status & XCAN_SR_ESTAT_MASK) ==
-+					XCAN_SR_ESTAT_MASK) {
-+			priv->can.state = CAN_STATE_ERROR_PASSIVE;
-+		} else if (status & XCAN_SR_ERRWRN_MASK) {
-+			priv->can.state = CAN_STATE_ERROR_WARNING;
-+		} else {
-+			priv->can.state = CAN_STATE_ERROR_ACTIVE;
-+		}
- 		netif_device_attach(ndev);
- 		netif_start_queue(ndev);
- 	}
-@@ -1031,7 +1059,10 @@ static int __maybe_unused xcan_resume(struct device *dev)
- 	return 0;
- }
- 
--static SIMPLE_DEV_PM_OPS(xcan_dev_pm_ops, xcan_suspend, xcan_resume);
-+static const struct dev_pm_ops xcan_dev_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(xcan_suspend, xcan_resume)
-+	SET_RUNTIME_PM_OPS(xcan_runtime_suspend, xcan_runtime_resume, NULL)
-+};
- 
- /**
-  * xcan_probe - Platform registration call
-@@ -1072,7 +1103,7 @@ static int xcan_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	priv = netdev_priv(ndev);
--	priv->dev = ndev;
-+	priv->dev = &pdev->dev;
- 	priv->can.bittiming_const = &xcan_bittiming_const;
- 	priv->can.do_set_mode = xcan_do_set_mode;
- 	priv->can.do_get_berr_counter = xcan_get_berr_counter;
-@@ -1114,21 +1145,30 @@ static int xcan_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	ret = clk_prepare_enable(priv->can_clk);
-+	ret = clk_prepare(priv->can_clk);
- 	if (ret) {
- 		dev_err(&pdev->dev, "unable to enable device clock\n");
- 		goto err_free;
- 	}
- 
--	ret = clk_prepare_enable(priv->bus_clk);
-+	ret = clk_prepare(priv->bus_clk);
- 	if (ret) {
- 		dev_err(&pdev->dev, "unable to enable bus clock\n");
--		goto err_unprepare_disable_dev;
-+		goto err_unprepare_dev;
- 	}
- 
- 	priv->write_reg = xcan_write_reg_le;
- 	priv->read_reg = xcan_read_reg_le;
- 
-+	pm_runtime_irq_safe(&pdev->dev);
-+	pm_runtime_enable(&pdev->dev);
-+	ret = pm_runtime_get_sync(&pdev->dev);
-+	if (ret < 0) {
-+		netdev_err(ndev, "%s: pm_runtime_get failed(%d)\n",
-+			__func__, ret);
-+		goto err_unprepare_busclk;
-+	}
-+
- 	if (priv->read_reg(priv, XCAN_SR_OFFSET) != XCAN_SR_CONFIG_MASK) {
- 		priv->write_reg = xcan_write_reg_be;
- 		priv->read_reg = xcan_read_reg_be;
-@@ -1141,22 +1181,26 @@ static int xcan_probe(struct platform_device *pdev)
- 	ret = register_candev(ndev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "fail to register failed (err=%d)\n", ret);
--		goto err_unprepare_disable_busclk;
-+		goto err_disableclks;
- 	}
- 
- 	devm_can_led_init(ndev);
--	clk_disable_unprepare(priv->bus_clk);
--	clk_disable_unprepare(priv->can_clk);
-+
-+	pm_runtime_put(&pdev->dev);
-+
- 	netdev_dbg(ndev, "reg_base=0x%p irq=%d clock=%d, tx fifo depth:%d\n",
- 			priv->reg_base, ndev->irq, priv->can.clock.freq,
- 			priv->tx_max);
- 
- 	return 0;
- 
--err_unprepare_disable_busclk:
--	clk_disable_unprepare(priv->bus_clk);
--err_unprepare_disable_dev:
--	clk_disable_unprepare(priv->can_clk);
-+err_disableclks:
-+	pm_runtime_put(priv->dev);
-+err_unprepare_busclk:
-+	pm_runtime_disable(&pdev->dev);
-+	clk_unprepare(priv->bus_clk);
-+err_unprepare_dev:
-+	clk_unprepare(priv->can_clk);
- err_free:
- 	free_candev(ndev);
- err:
-@@ -1175,11 +1219,11 @@ static int xcan_remove(struct platform_device *pdev)
- 	struct net_device *ndev = platform_get_drvdata(pdev);
- 	struct xcan_priv *priv = netdev_priv(ndev);
- 
--	if (set_reset_mode(ndev) < 0)
--		netdev_err(ndev, "mode resetting failed!\n");
--
- 	unregister_candev(ndev);
-+	pm_runtime_disable(&pdev->dev);
- 	netif_napi_del(&priv->napi);
-+	clk_unprepare(priv->bus_clk);
-+	clk_unprepare(priv->can_clk);
- 	free_candev(ndev);
- 
- 	return 0;
+Which does "console" in this context mean
+  - console_initcall
+  - console enabled when the driver is probed
+
+I am assuming the latter.
+
+
+Thanks,
+
+
+
 -- 
-2.1.2
+Best Regards
+Masahiro Yamada
