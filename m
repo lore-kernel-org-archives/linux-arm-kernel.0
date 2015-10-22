@@ -1,48 +1,39 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 22 Oct 2015 03:11:16 -0700
-Subject: [RFC PATCH 0/8] clk: qoriq: Move chip-specific knowledge into
- driver
-In-Reply-To: <1444435064.5185.16.camel@freescale.com>
-References: <1434682158-7243-1-git-send-email-scottwood@freescale.com>
- <20150811182535.31346.52965@quantum>
- <1443745589.5336.185.camel@freescale.com>
- <1444435064.5185.16.camel@freescale.com>
-Message-ID: <20151022101116.20687.55089@quantum>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 22 Oct 2015 12:11:22 +0200
+Subject: [PATCH 1/4] cpufreq: imx6q: Fix goto wrong error label
+In-Reply-To: <1445503652-777-2-git-send-email-s.hauer@pengutronix.de>
+References: <1445503652-777-1-git-send-email-s.hauer@pengutronix.de>
+ <1445503652-777-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1445508682.3173.24.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Scott Wood (2015-10-09 16:57:44)
-> On Thu, 2015-10-01 at 19:26 -0500, Scott Wood wrote:
-> > [Resending to updated e-mail address]
-> > 
-> > On Tue, 2015-08-11 at 11:25 -0700, Michael Turquette wrote:
-> > > Hi Scott,
-> > > 
-> > > Quoting Scott Wood (2015-06-18 19:49:10)
-> > > > The existing device tree bindings are error-prone and inflexible. 
-> > > > Correct the mistake by moving the knowledge into the driver, which
-> > > > has more flexibility in describing the quirks of each chip.  This leaves
-> > > > the device tree to its proper role of identifying a programming 
-> > > > interface
-> > > > rather than describing its individual registers.
-> > > 
-> > > Sorry for not responding to this one sooner. Fell through the cracks.
-> > > 
-> > > All of the changes to drives/clk/clk-qoriq.c look great to me. I assume
-> > > you need to keep all of these patches together and want to the take
-> > > through the freescale tree? If so feel free to add,
-> > > 
-> > > Acked-by: Michael Turquette <mturquette@baylibre.com>
-> > 
-> > Is the ack still valid for the v3 patchset?
-
-Yes. Looks Stephen beat me to it though.
-
-Regards,
-Mike
-
+Am Donnerstag, den 22.10.2015, 10:47 +0200 schrieb Sascha Hauer:
+> After the call to dev_pm_opp_init_cpufreq_table() we have to go to
+> out_free_opp because we have already allocated the opp.
 > 
-> ping
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+
+> ---
+>  drivers/cpufreq/imx6q-cpufreq.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> -Scott
-> 
+> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> index ef1fa81..fabd144 100644
+> --- a/drivers/cpufreq/imx6q-cpufreq.c
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -256,7 +256,7 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+>  	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
+>  	if (ret) {
+>  		dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
+> -		goto put_reg;
+> +		goto out_free_opp;
+>  	}
+>  
+>  	/* Make imx6_soc_volt array's size same as arm opp number */
+
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
