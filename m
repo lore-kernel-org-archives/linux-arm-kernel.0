@@ -1,73 +1,85 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Thu, 22 Oct 2015 10:07:00 +0800
-Subject: [PATCH 1/3] dt-bindings: Add document of Rockchip mailbox
-In-Reply-To: <CABb+yY2Z9soGR0OcCRcfr2Ei7zX29qHPhYEKf3LPe+OhAuZMjA@mail.gmail.com>
-References: <1442228798-15191-1-git-send-email-wxt@rock-chips.com>
- <1442228798-15191-2-git-send-email-wxt@rock-chips.com>
- <CABb+yY2Z9soGR0OcCRcfr2Ei7zX29qHPhYEKf3LPe+OhAuZMjA@mail.gmail.com>
-Message-ID: <562844C4.5040304@gmail.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Thu, 22 Oct 2015 10:18:49 +0800
+Subject: [PATCH v2 0/9] Add tune support of Mediatek MMC driver
+In-Reply-To: <CAPDyKFrTrR5U7QoXpiWj29bUD5SEp4ccbx8qNs9HF0cYxuqdBw@mail.gmail.com>
+References: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFrTrR5U7QoXpiWj29bUD5SEp4ccbx8qNs9HF0cYxuqdBw@mail.gmail.com>
+Message-ID: <1445480329.1593.4.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jassi,
+On Tue, 2015-10-20 at 18:41 +0200, Ulf Hansson wrote:
+> On 20 October 2015 at 11:13, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> > Change in v2:
+> > Drop the 400mhz and use assigned-clock-parents to instead
+> > Split the original tune patch to several independent patches
+> > Re-write the mmc_send_tuning()
+> > Fix GPD checksum error
+> > Move the HS400 setting to ops->prepare_hs400_tuning()
+> > Modify SD driving settings
+> >
+> > Change in v1:
+> > Add DT bindings for eMMC hardware reset
+> > Add pinctrl of data strobe pin for HS400 mode
+> > Modify eMMC driving settings
+> > Add 400mhz source clock for HS400 mode
+> > Add eMMC HS200/HS400 mode support
+> > Add SD SDR50/SDR104 mode support
+> > Add implement of tune function with CMD19/CMD21
+> >
+> > Chaotian Jing (9):
+> >   mmc: core: Add DT bindings for eMMC hardware reset support
+> >   mmc: dt-bindings: update Mediatek MMC bindings
+> >   mmc: mediatek: make cmd_ints_mask to const
+> >   mmc: mediatek: change the argument "ddr" to "timing"
+> >   mmc: mediatek: fix got GPD checksum error interrupt when data transfer
+> >   mmc: mediatek: add implement of ops->hw_reset()
+> >   mmc: mmc: extend the mmc_send_tuning()
+> >   mmc: mediatek: add HS400 support
+> >   arm64: dts: mediatek: add HS200/HS400/SDR50/SDR104 support
+> >
+> >  Documentation/devicetree/bindings/mmc/mmc.txt    |   1 +
+> >  Documentation/devicetree/bindings/mmc/mtk-sd.txt |  11 +-
+> >  arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |  27 ++-
+> >  drivers/mmc/core/host.c                          |   2 +
+> >  drivers/mmc/core/mmc_ops.c                       |   8 +-
+> >  drivers/mmc/host/dw_mmc-exynos.c                 |   4 +-
+> >  drivers/mmc/host/dw_mmc.c                        |   2 +-
+> >  drivers/mmc/host/dw_mmc.h                        |   2 +-
+> >  drivers/mmc/host/mtk-sd.c                        | 296 ++++++++++++++++++++---
+> >  drivers/mmc/host/sdhci-esdhc-imx.c               |   6 +-
+> >  drivers/mmc/host/sdhci-msm.c                     |   2 +-
+> >  drivers/mmc/host/sdhci-sirf.c                    |   2 +-
+> >  include/linux/mmc/core.h                         |   2 +-
+> >  13 files changed, 314 insertions(+), 51 deletions(-)
+> >
+> > --
+> > 1.8.1.1.dirty
+> 
+> I have reviewed the patches, I think they overall looks good! Some
+> comments though.
+> 
+> You need to split patch 9, the DT parts enabling hw reset shall go in
+> separately.
+> 
+Ok, will separate it at next revision.
 
-Sorry for delay reply.
-? 2015?10?06? 18:34, Jassi Brar ??:
-> On Mon, Sep 14, 2015 at 4:36 PM, Caesar Wang <wxt@rock-chips.com> wrote:
->> This add the necessary binding documentation for mailbox
->> found on RK3368 SoC.
->>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> ---
->>
->>   .../bindings/mailbox/rockchip-mailbox.txt          | 33 ++++++++++++++++++++++
->>   1 file changed, 33 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/mailbox/rockchip-mailbox.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mailbox/rockchip-mailbox.txt b/Documentation/devicetree/bindings/mailbox/rockchip-mailbox.txt
->> new file mode 100644
->> index 0000000..b9b4768
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mailbox/rockchip-mailbox.txt
->> @@ -0,0 +1,33 @@
->> +Rockchip mailbox
->> +
->> +The Rockchip mailbox is used by the Rockchip CPU cores to communicate
->> +requests to MCU processor.
->> +
->> +Refer to ./mailbox.txt for generic information about mailbox device-tree
->> +bindings.
->> +
->> +Required properties:
->> +
->> + - compatible: should be one of the following.
->> +   - "rockchip,rk3368-mbox" for rk3368
->> + - reg: physical base address of the controller and length of memory mapped
->> +       region.
->> +       physical base address of the share buffer and length of memory mapped
->> +       region.
-> Please make shared-sram a property of user drivers.
+> Regarding the hw-reset changes in patch1, patch6 and patch9, I believe
+> I requested you to separate the HW reset changes from $subject
+> patchset as they are unrelated, please do this.
+> 
+As you know, the hw-reset is a part of mmc retune.
+so that I add it to this series.
 
-As Rob points out,
-maybe, don't we need also define it in user drivers.
-As the SRAM binding (misc/sram.txt) had defined.
+> Running checkpatch, it gave me warnings and errors for patch 8.
+> Patch7 didn't apply to my next branch.
+> 
 
-I just make the SCPI protocol client driver to work for mailbox.
->
-> Location and size of shared-memory is a platform property, mailbox
-> controller doesn't need sram to function.
->    For example, protocol on some platform, with this controller, may be
-> trivial enough to not need a shared sram... say only 32-bits wide
-> requests and responses which can be passed via mailbox registers
-> directly.   mbox_client.tx_prepare() is where the user driver sets up
-> the shared-memory.
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+I will fix the checkpatch warnings and errors at next revision.
+by the way, I tried to use "git am
+0007-mmc-mmc-extend-the-mmc_send_tuning.patch" in your branch,
+there was no conflict, so why couldn't apply it ?
+Thx!
 
-
--- 
-Thanks,
-Caesar
+> Kind regards
+> Uffe
