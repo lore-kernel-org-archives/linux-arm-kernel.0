@@ -1,88 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Oct 2015 10:26:30 +0100
-Subject: [RFC PATCH v6 3/3] arm: fix a migrating irq bug when hotplug cpu
-In-Reply-To: <20151021202907.GN32532@n2100.arm.linux.org.uk>
-References: <1443087135-17044-1-git-send-email-yangyingliang@huawei.com>
- <1443087135-17044-4-git-send-email-yangyingliang@huawei.com>
- <CAMuHMdWyvaecQHOzFnxVZus_Pfkxjw1XfkGdcLK=D2ThaoJMzA@mail.gmail.com>
- <20151021202907.GN32532@n2100.arm.linux.org.uk>
-Message-ID: <20151022092629.GQ32532@n2100.arm.linux.org.uk>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Thu, 22 Oct 2015 17:27:25 +0800
+Subject: [PATCH v11 0/6] Altera PCIe host controller driver with MSI support
+Message-ID: <1445506051-21688-1-git-send-email-lftan@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2015 at 09:29:08PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Oct 21, 2015 at 01:47:49PM +0200, Geert Uytterhoeven wrote:
-> > On Thu, Sep 24, 2015 at 11:32 AM, Yang Yingliang
-> > <yangyingliang@huawei.com> wrote:
-> > > When cpu is disabled, all irqs will be migratged to another cpu.
-> > > In some cases, a new affinity is different, the old affinity need
-> > > to be updated and if irq_set_affinity's return value is IRQ_SET_MASK_OK_DONE,
-> > > the old affinity can not be updated. Fix it by using irq_do_set_affinity.
-> > >
-> > > And migrating interrupts is a core code matter, so use the generic
-> > > function irq_migrate_all_off_this_cpu() to migrate interrupts in
-> > > kernel/irq/migration.c.
-> > >
-> > > Cc: Jiang Liu <jiang.liu@linux.intel.com>
-> > > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > Cc: Will Deacon <will.deacon@arm.com>
-> > > Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> > > Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> > > Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
-> > > ---
-> > >  arch/arm/Kconfig           |  1 +
-> > >  arch/arm/include/asm/irq.h |  1 -
-> > >  arch/arm/kernel/irq.c      | 62 ----------------------------------------------
-> > >  arch/arm/kernel/smp.c      |  2 +-
-> > >  4 files changed, 2 insertions(+), 64 deletions(-)
-> > >
-> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > index 72ad724..bffba78 100644
-> > > --- a/arch/arm/Kconfig
-> > > +++ b/arch/arm/Kconfig
-> > > @@ -1492,6 +1492,7 @@ config NR_CPUS
-> > >  config HOTPLUG_CPU
-> > >         bool "Support for hot-pluggable CPUs"
-> > >         depends on SMP
-> > > +       select GENERIC_IRQ_MIGRATION
-> > 
-> > This causes the following warnings during s2ram on r8a7791/koelsch
-> > (dual-core CA15):
-> 
-> Thanks for the report.  I'll see what tonight's boot run says for my
-> platforms.  Hopefully, the author of these changes can help debug
-> this.
+This is the 11th version of patch set to add support for Altera PCIe host
+controller with MSI feature on Altera FPGA device families. This patchset
+mainly resovle the warning/error caught by kbuild test.
 
-What's happened is that:
+Hi Bjorn,
+Do you have further comment on this patchset? Any chance this can go into 4.4?
+Thanks.
 
--	c = irq_data_get_irq_chip(d);
--	if (!c->irq_set_affinity)
--		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+This patchset is based on v4.3-rc6.
 
-has become:
+v10->v11 changes:
+- altera-pcie: change altera_pcie_fixups to static function
+- Kconfig: add depends on ARM || NIOS2 for PCIE_ALTERA
 
-+	c = irq_data_get_irq_chip(d);
-+	if (!c->irq_set_affinity) {
-+		pr_warn_ratelimited("IRQ%u: unable to set affinity\n", d->irq);
+History:
+-------
+[v1]: https://lkml.org/lkml/2015/7/28/395
+[v2]: https://lkml.org/lkml/2015/7/31/267
+[v3]: http://www.kernelhub.org/?msg=811940&p=2
+[v4]: https://lkml.org/lkml/2015/8/17/141
+[v5]: https://lkml.org/lkml/2015/8/25/238
+[v6]: https://lkml.org/lkml/2015/9/1/177
+[v7]: https://lkml.org/lkml/2015/9/20/193
+[v8]: http://www.kernelhub.org/?msg=853553&p=2
+[v9]: https://lkml.org/lkml/2015/10/13/998
+[v10]: https://lkml.org/lkml/2015/10/19/139
 
-which makes things more noisy.
+Ley Foon Tan (6):
+  arm: add msi.h to Kbuild
+  pci: add Altera PCI vendor ID
+  pci:host: Add Altera PCIe host controller driver
+  pci: altera: Add Altera PCIe MSI driver
+  Documentation: dt-bindings: pci: altera pcie device tree binding
+  MAINTAINERS: Add Altera PCIe and MSI drivers maintainer
 
-This is a change that was not described in the commit message for the
-patch Thomas merged.
-
-So, I think the right thing to do is to drop the patch set and revert
-back to what we knew was sane, and get the submitter to do the job
-properly: cleanly move the code from one location to another with _no_
-changes what so ever, convert ARM and ARM64 to use it, and _then_ to
-modify the resulting code.
-
->From what I can see, both ARM and ARM64 implementations here are
-identical.
-
-I'm certainly dropping this from the ARM tree.
+ .../devicetree/bindings/pci/altera-pcie-msi.txt    |  28 +
+ .../devicetree/bindings/pci/altera-pcie.txt        |  49 ++
+ MAINTAINERS                                        |  16 +
+ arch/arm/include/asm/Kbuild                        |   1 +
+ drivers/pci/host/Kconfig                           |  16 +
+ drivers/pci/host/Makefile                          |   2 +
+ drivers/pci/host/pcie-altera-msi.c                 | 314 +++++++++++
+ drivers/pci/host/pcie-altera.c                     | 579 +++++++++++++++++++++
+ include/linux/pci_ids.h                            |   2 +
+ 9 files changed, 1007 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
+ create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie.txt
+ create mode 100644 drivers/pci/host/pcie-altera-msi.c
+ create mode 100644 drivers/pci/host/pcie-altera.c
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.8.2.1
