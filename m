@@ -1,37 +1,48 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 22 Oct 2015 09:47:13 -0700
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Defconfig
- Updates for v4.4
-In-Reply-To: <cover.1444869086.git.horms+renesas@verge.net.au>
-References: <cover.1444869086.git.horms+renesas@verge.net.au>
-Message-ID: <20151022164713.GA19953@localhost>
+Date: Thu, 22 Oct 2015 09:55:56 -0700
+Subject: [PATCH/RESEND] ARM: Remove __ref on hotplug cpu die path
+In-Reply-To: <1445285133-11977-1-git-send-email-sboyd@codeaurora.org>
+References: <1445285133-11977-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20151022165556.GE19953@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 09:34:02AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Mon, Oct 19, 2015 at 01:05:33PM -0700, Stephen Boyd wrote:
+> Now that __cpuinit has been removed, the __ref markings on these
+> functions are useless. Remove them. This also reduces the size of
+> the multi_v7_defconfig image:
 > 
-> Please consider these second round of Renesas ARM based SoC defconfig
-> updates for v4.4.
+> $ size before after
+>    text    data     bss     dec     hex filename
+>    12683578        1470996  348904 14503478         dd4e36 before
+>    12683274        1470996  348904 14503174         dd4d06 after
 > 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-defconfig-for-v4.4,
-> which I have already sent a pull-request for.
+> presumably because now we don't have to jump to code in the
+> .ref.text section and/or the noinline marking is removed.
 > 
+> Cc: Tony Lindgren <tony@atomide.com>
+> Acked-by: Barry Song <baohua@kernel.org>
+> Acked-by: Andy Gross <agross@codeaurora.org>
+> Acked-by: Viresh Kumar <vireshk@kernel.org>
+> Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Acked-by: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: <linux-omap@vger.kernel.org>
+> Cc: <linux-arm-msm@vger.kernel.org>
+> Cc: <spear-devel@list.st.com>
+> Cc: <linux-tegra@vger.kernel.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 > 
-> The following changes since commit 0a8b0695f4c490c349ee12956d6946576c44a419:
-> 
->   ARM: multi_v7_defconfig: Remove Marzen (2015-09-14 10:12:59 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig2-for-v4.4
-> 
-> for you to fetch changes up to fec3fb4734b4d2c33975077c250ebd4a3a9f8e34:
-> 
->   ARM: multi_v7_defconfig: enable HDMI output for Renesas RCar (2015-10-13 10:42:17 +0900)
+> Collected the acks and resent.
 
-Merged, thanks.
+Applied to next/cleanup. Thanks!
 
 
 -Olof
