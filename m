@@ -1,125 +1,44 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 21 Oct 2015 20:25:20 -0500
-Subject: [PATCH v3 1/2] Document: DT: Add bindings for mediatek MT2701 SoC
- Platform
-In-Reply-To: <1445322871-14134-2-git-send-email-erin.lo@mediatek.com>
-References: <1445322871-14134-1-git-send-email-erin.lo@mediatek.com>
- <1445322871-14134-2-git-send-email-erin.lo@mediatek.com>
-Message-ID: <CAL_JsqKPPXfXipARUrUyfk04LaV02AJcP-JUQ2jrxoUz9YCVTQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 22 Oct 2015 10:25:29 +0900
+Subject: [PATCH v2 2/3] dt-bindings: Consolidate Exynos SoC bindings
+In-Reply-To: <1445477130-407-1-git-send-email-k.kozlowski@samsung.com>
+References: <1445477130-407-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1445477130-407-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 1:34 AM, Erin Lo <erin.lo@mediatek.com> wrote:
-> This adds a DT binding documentation for the MT2701 SoC from Mediatek.
->
-> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+Exynos SoC Device Tree bindings are spread over arm/exynos/ and
+arm/samsung/ directories. There is no need for that separation and it
+actually confuses. Put power domain bindings under power/ and
+remaining samsung-boards.txt under arm/samsung/.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-> ---
->  Documentation/devicetree/bindings/arm/mediatek.txt         |  4 ++++
->  .../devicetree/bindings/arm/mediatek/mediatek,sysirq.txt   |  1 +
->  Documentation/devicetree/bindings/serial/mtk-uart.txt      | 14 +++++++-------
->  .../devicetree/bindings/timer/mediatek,mtk-timer.txt       |  5 +++--
->  Documentation/devicetree/bindings/watchdog/mtk-wdt.txt     |  6 +++++-
->  5 files changed, 20 insertions(+), 10 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-> index 618a919..54f43bc 100644
-> --- a/Documentation/devicetree/bindings/arm/mediatek.txt
-> +++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-> @@ -6,6 +6,7 @@ following property:
->  Required root node property:
->
->  compatible: Must contain one of
-> +   "mediatek,mt2701"
->     "mediatek,mt6580"
->     "mediatek,mt6589"
->     "mediatek,mt6592"
-> @@ -17,6 +18,9 @@ compatible: Must contain one of
->
->  Supported boards:
->
-> +- Evaluation board for MT2701:
-> +    Required root node properties:
-> +      - compatible = "mediatek,mt2701-evb", "mediatek,mt2701";
->  - Evaluation board for MT6580:
->      Required root node properties:
->        - compatible = "mediatek,mt6580-evbp1", "mediatek,mt6580";
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
-> index afef6a8..b8e1674 100644
-> --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
-> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
-> @@ -14,6 +14,7 @@ Required properties:
->         "mediatek,mt6582-sysirq"
->         "mediatek,mt6580-sysirq"
->         "mediatek,mt6577-sysirq"
-> +       "mediatek,mt2701-sysirq"
->  - interrupt-controller : Identifies the node as an interrupt controller
->  - #interrupt-cells : Use the same format as specified by GIC in
->    Documentation/devicetree/bindings/arm/gic.txt
-> diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-> index 2d47add..a833a01 100644
-> --- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
-> +++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-> @@ -2,15 +2,15 @@
->
->  Required properties:
->  - compatible should contain:
-> -  * "mediatek,mt8135-uart" for MT8135 compatible UARTS
-> +  * "mediatek,mt2701-uart" for MT2701 compatible UARTS
-> +  * "mediatek,mt6580-uart" for MT6580 compatible UARTS
-> +  * "mediatek,mt6582-uart" for MT6582 compatible UARTS
-> +  * "mediatek,mt6589-uart" for MT6589 compatible UARTS
-> +  * "mediatek,mt6795-uart" for MT6795 compatible UARTS
->    * "mediatek,mt8127-uart" for MT8127 compatible UARTS
-> +  * "mediatek,mt8135-uart" for MT8135 compatible UARTS
->    * "mediatek,mt8173-uart" for MT8173 compatible UARTS
-> -  * "mediatek,mt6795-uart" for MT6795 compatible UARTS
-> -  * "mediatek,mt6589-uart" for MT6589 compatible UARTS
-> -  * "mediatek,mt6582-uart" for MT6582 compatible UARTS
-> -  * "mediatek,mt6580-uart" for MT6580 compatible UARTS
-> -  * "mediatek,mt6577-uart" for all compatible UARTS (MT8173, MT6795,
-> -        MT6589, MT6582, MT6580, MT6577)
-> +  * "mediatek,mt6577-uart" for MT6577 and all of the above
->
->  - reg: The base address of the UART register bank.
->
-> diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> index 53a3029..54f858c 100644
-> --- a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> +++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> @@ -3,10 +3,11 @@ Mediatek MT6577, MT6572 and MT6589 Timers
->
->  Required properties:
->  - compatible should contain:
-> +       * "mediatek,mt2701-timer" for MT2701 compatible timers
->         * "mediatek,mt6589-timer" for MT6589 compatible timers
->         * "mediatek,mt6580-timer" for MT6580 compatible timers
-> -       * "mediatek,mt6577-timer" for all compatible timers (MT6589, MT6580,
-> -               MT6577)
-> +       * "mediatek,mt6577-timer" for all compatible timers (MT2701, MT6589,
-> +               MT6580, MT6577)
->  - reg: Should contain location and length for timers register.
->  - clocks: Clocks driving the timer hardware. This list should include two
->         clocks. The order is system clock and as second clock the RTC clock.
-> diff --git a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
-> index af9eb5b..6a00939 100644
-> --- a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
-> +++ b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
-> @@ -2,7 +2,11 @@ Mediatek SoCs Watchdog timer
->
->  Required properties:
->
-> -- compatible : should be "mediatek,mt6589-wdt"
-> +- compatible should contain:
-> +       * "mediatek,mt2701-wdt" for MT2701 compatible watchdog timers
-> +       * "mediatek,mt6589-wdt" for all compatible watchdog timers (MT2701,
-> +               MT6589)
-> +
->  - reg : Specifies base physical address and size of the registers.
->
->  Example:
-> --
-> 1.9.1
->
+---
+
+Changes since v1:
+1. Move power_domain.txt to power/pd-samsung.txt.
+2. The smp-sysram.txt is moved in previous patch to sram/ directory
+   (Suggested by Rob Herring).
+3. Added Javier's reviewed-by. Although there are some differences since
+   v1 but this is merely re-organization. Please let me know if the
+   review tag is no longer valid.
+---
+ Documentation/devicetree/bindings/arm/{ => samsung}/samsung-boards.txt    | 0
+ .../bindings/{arm/exynos/power_domain.txt => power/pd-samsung.txt}        | 0
+ 2 files changed, 0 insertions(+), 0 deletions(-)
+ rename Documentation/devicetree/bindings/arm/{ => samsung}/samsung-boards.txt (100%)
+ rename Documentation/devicetree/bindings/{arm/exynos/power_domain.txt => power/pd-samsung.txt} (100%)
+
+diff --git a/Documentation/devicetree/bindings/arm/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/samsung-boards.txt
+rename to Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/power/pd-samsung.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+rename to Documentation/devicetree/bindings/power/pd-samsung.txt
+-- 
+1.9.1
