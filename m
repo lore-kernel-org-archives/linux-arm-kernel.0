@@ -1,49 +1,33 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 22 Oct 2015 09:50:51 +0900
-Subject: [PATCH 14/19] ARM: dts: shmobile/r8a7xxx: replace
- gpio-key,wakeup with wakeup-source property
-In-Reply-To: <56276787.6090900@arm.com>
-References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
- <1445422216-29375-15-git-send-email-sudeep.holla@arm.com>
- <CAMuHMdXpY7gSOPAGxh9Z_LurpL392y7Vx0pBe-FqfauXjVnMFQ@mail.gmail.com>
- <56276787.6090900@arm.com>
-Message-ID: <20151022005051.GD8879@verge.net.au>
+Date: Thu, 22 Oct 2015 09:54:42 +0900
+Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
+In-Reply-To: <5627D5AE.8010804@cogentembedded.com>
+References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
+ <2544073.SzFGJq3XZ1@wasted.cogentembedded.com>
+ <56237CD5.6010609@cogentembedded.com>
+ <20151019004627.GD20599@verge.net.au>
+ <562680BC.9070100@cogentembedded.com>
+ <20151021003145.GF31026@verge.net.au>
+ <5627D5AE.8010804@cogentembedded.com>
+Message-ID: <20151022005441.GE8879@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2015 at 11:23:03AM +0100, Sudeep Holla wrote:
+On Wed, Oct 21, 2015 at 09:13:02PM +0300, Sergei Shtylyov wrote:
+> On 10/21/2015 03:31 AM, Simon Horman wrote:
 > 
-> 
-> On 21/10/15 11:18, Geert Uytterhoeven wrote:
-> >On Wed, Oct 21, 2015 at 12:10 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> >>Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
-> >>check for/support the legacy "gpio-key,wakeup" boolean property to
-> >>enable gpio buttons as wakeup source, "wakeup-source" is the new
-> >>standard binding.
+> >>>>There should have been [PATCH v3] in the subject, of course.
+> >>>
+> >>>Thanks for following up.
+> >>>
+> >>>I have queued this up for v4.5.
 > >>
-> >>This patch replaces the legacy "gpio-key,wakeup" with the unified
-> >>"wakeup-source" property in order to avoid any futher copy-paste
-> >>duplication.
+> >>    Again, not seeing anything new today from renesas.git...
 > >
-> >Thanks!
-> >
-> >I made the same changes to my local tree a few weeks ago, but never found
-> >time to send them out...
-> >
+> >Thanks for noticing, it should be there now.
 > 
-> Ah OK, even I had these changes for long. I waited until I fixed all the
-> binding documents(which was boring ;))
->
-> >>Cc: Simon Horman <horms@verge.net.au>
-> >>Cc: Magnus Damm <magnus.damm@gmail.com>
-> >>Cc: linux-sh at vger.kernel.org
-> >>Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> >
-> >Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>    Hm, again nothing... :-(
 
-Can I clarify that you would like me to pick up this patch?
-If so I'm happy to do so.
+Sorry, third time lucky.
 
-Else:
-
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+https://git.kernel.org/cgit/linux/kernel/git/horms/renesas.git/tag/?id=renesas-devel-20151021-v4.3-rc6
