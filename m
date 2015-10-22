@@ -1,198 +1,75 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 22 Oct 2015 18:46:18 +0300
-Subject: [PATCH v3 08/16] KVM: arm64: handle ITS related GICv3
- redistributor registers
-In-Reply-To: <1444229726-31559-9-git-send-email-andre.przywara@arm.com>
-References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
- <1444229726-31559-9-git-send-email-andre.przywara@arm.com>
-Message-ID: <015d01d10ce0$cb7009a0$62501ce0$@samsung.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 22 Oct 2015 10:47:16 -0500
+Subject: [PATCH v4 5/6] PCI: layerscape: add PCIe support for LS1043a and
+ LS2080a
+In-Reply-To: <1444979960-24100-5-git-send-email-Minghuan.Lian@freescale.com>
+References: <1444979960-24100-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1444979960-24100-5-git-send-email-Minghuan.Lian@freescale.com>
+Message-ID: <20151022154715.GB16360@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+[+cc Fabio, Lucas]
 
- During my work on live migration i found a big bug in your implementation.
+Hi Minghuan,
 
-> -----Original Message-----
-> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On Behalf Of Andre Przywara
-> Sent: Wednesday, October 07, 2015 5:55 PM
-> To: marc.zyngier at arm.com; christoffer.dall at linaro.org
-> Cc: eric.auger at linaro.org; p.fedin at samsung.com; kvmarm at lists.cs.columbia.edu; linux-arm-
-> kernel at lists.infradead.org; kvm at vger.kernel.org
-> Subject: [PATCH v3 08/16] KVM: arm64: handle ITS related GICv3 redistributor registers
+On Fri, Oct 16, 2015 at 03:19:19PM +0800, Minghuan Lian wrote:
+> Both LS1043a and LS2080a are based on ARMv8 64-bit architecture
+> and have similar PCIe implementation. LUT is added to controller.
+> The patch removes the necessary fields from struct ls_pcie.
 > 
-> In the GICv3 redistributor there are the PENDBASER and PROPBASER
-> registers which we did not emulate so far, as they only make sense
-> when having an ITS. In preparation for that emulate those MMIO
-> accesses by storing the 64-bit data written into it into a variable
-> which we later read in the ITS emulation.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
 > ---
-> Changelog v2..v3:
-> - rename vgic_handle_base_register to vgic_reg64_access()
+> This patch is based on v4.3-rc4 and [PATCH v10 3/6]
+> PCI: designware: Add ARM64 support.
 > 
->  include/kvm/arm_vgic.h      |  8 ++++++++
->  virt/kvm/arm/vgic-v3-emul.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic.c         | 31 +++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic.h         |  2 ++
->  4 files changed, 85 insertions(+)
+> change log
+> v4: 
+> 1. split to 6 patches.
+> 2. use ARCH_LAYERSCAPE instead of ARM64
 > 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 067ad09..06c33bc 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -272,6 +272,14 @@ struct vgic_dist {
->  	/* Virtual irq to hwirq mapping */
->  	spinlock_t		irq_phys_map_lock;
->  	struct list_head	irq_phys_map_list;
-> +
-> +	/* Address of LPI configuration table shared by all redistributors */
-> +	u64			propbaser;
-> +
-> +	/* Addresses of LPI pending tables per redistributor */
-> +	u64			*pendbaser;
-> +
-> +	bool			lpis_enabled;
->  };
+> v3:
+> 1. Use 8 or 16 bit access function to simplify code
+> 2. Add ls_add_pcie_port in accordance with other DesignWare-based drivers
 > 
->  struct vgic_v2_cpu_if {
-> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-> index a8cf669..6939f7c 100644
-> --- a/virt/kvm/arm/vgic-v3-emul.c
-> +++ b/virt/kvm/arm/vgic-v3-emul.c
-> @@ -651,6 +651,38 @@ static bool handle_mmio_cfg_reg_redist(struct kvm_vcpu *vcpu,
->  	return vgic_handle_cfg_reg(reg, mmio, offset);
->  }
+> v2:
+> 1. Rename ls2085a to ls2080a
+> 2. Add ls_pcie_msi_host_init()
 > 
-> +/* We don't trigger any actions here, just store the register value */
-> +static bool handle_mmio_propbaser_redist(struct kvm_vcpu *vcpu,
-> +					 struct kvm_exit_mmio *mmio,
-> +					 phys_addr_t offset)
-> +{
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +	int mode = ACCESS_READ_VALUE;
-> +
-> +	/* Storing a value with LPIs already enabled is undefined */
-> +	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
-> +	vgic_reg64_access(mmio, offset, &dist->propbaser, mode);
-> +
-> +	return false;
-> +}
-> +
-> +/* We don't trigger any actions here, just store the register value */
-> +static bool handle_mmio_pendbaser_redist(struct kvm_vcpu *vcpu,
-> +					 struct kvm_exit_mmio *mmio,
-> +					 phys_addr_t offset)
-> +{
-> +	struct kvm_vcpu *rdvcpu = mmio->private;
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +	int mode = ACCESS_READ_VALUE;
-> +
-> +	/* Storing a value with LPIs already enabled is undefined */
-> +	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
+>  drivers/pci/host/Kconfig          |  2 +-
+>  drivers/pci/host/pci-layerscape.c | 72 +++++++++++++++++++++++++++++++++++----
+>  2 files changed, 67 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index ae873be..8eb09ea 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -105,7 +105,7 @@ config PCI_XGENE_MSI
+>  
+>  config PCI_LAYERSCAPE
+>  	bool "Freescale Layerscape PCIe controller"
+> -	depends on OF && ARM
+> +	depends on OF && (ARM || ARCH_LAYERSCAPE)
+>  	select PCIE_DW
+>  	select MFD_SYSCON
+>  	help
+> diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+> index 891e504..c53692a 100644
+> --- a/drivers/pci/host/pci-layerscape.c
+> +++ b/drivers/pci/host/pci-layerscape.c
+> @@ -31,23 +31,26 @@
+>  #define LTSSM_STATE_MASK	0x3f
 
- Here you store lpis_enabled globally, and this is plain wrong.
+BTW, not related to *this* patch, but does LTSSM_STATE_MASK really need to
+be 0x3f (6 bits), or could it be 0x1f (5 bits)?
 
- Linux kernel separately programs PENDBASER and enables LPIs on every CPU. Therefore, after CPU #0 is initialized (this happens much
-earlier than everything else), dist->lpis_enabled is set to true, and subsequent PROPBASER writes, even for different
-redistributors, will be ignored. As a result, you'll get dist->pendbaser[n] == NULL forever, where n > 0. And your
-its_sync_lpi_pending_table() actually reads some garbage from physical address 0 of the guest.
+I'd like to include Layerscape in the LTSSM_STATE_MASK cleanup done by
+Fabio:
 
- Attempts to write data to that region silently corrupts random qemu data during migration, that's how i discovered it.
+https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/host-designware&id=4788fe6ebf4594c9a95b620cbff05147c8504823
 
-> +	vgic_reg64_access(mmio, offset,
-> +			  &dist->pendbaser[rdvcpu->vcpu_id], mode);
-> +
-> +	return false;
-> +}
-> +
->  #define SGI_base(x) ((x) + SZ_64K)
-> 
->  static const struct vgic_io_range vgic_redist_ranges[] = {
-> @@ -679,6 +711,18 @@ static const struct vgic_io_range vgic_redist_ranges[] = {
->  		.handle_mmio    = handle_mmio_raz_wi,
->  	},
->  	{
-> +		.base		= GICR_PENDBASER,
-> +		.len		= 0x08,
-> +		.bits_per_irq	= 0,
-> +		.handle_mmio	= handle_mmio_pendbaser_redist,
-> +	},
-> +	{
-> +		.base		= GICR_PROPBASER,
-> +		.len		= 0x08,
-> +		.bits_per_irq	= 0,
-> +		.handle_mmio	= handle_mmio_propbaser_redist,
-> +	},
-> +	{
->  		.base           = GICR_IDREGS,
->  		.len            = 0x30,
->  		.bits_per_irq   = 0,
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 4219f22..11bf692 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -471,6 +471,37 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
->  	}
->  }
-> 
-> +/* handle a 64-bit register access */
-> +void vgic_reg64_access(struct kvm_exit_mmio *mmio, phys_addr_t offset,
-> +		       u64 *basereg, int mode)
-> +{
-> +	u32 reg;
-> +	u64 breg;
-> +
-> +	switch (offset & ~3) {
-> +	case 0x00:
-> +		breg = *basereg;
-> +		reg = lower_32_bits(breg);
-> +		vgic_reg_access(mmio, &reg, offset & 3, mode);
-> +		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
-> +			breg &= GENMASK_ULL(63, 32);
-> +			breg |= reg;
-> +			*basereg = breg;
-> +		}
-> +		break;
-> +	case 0x04:
-> +		breg = *basereg;
-> +		reg = upper_32_bits(breg);
-> +		vgic_reg_access(mmio, &reg, offset & 3, mode);
-> +		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
-> +			breg  = lower_32_bits(breg);
-> +			breg |= (u64)reg << 32;
-> +			*basereg = breg;
-> +		}
-> +		break;
-> +	}
-> +}
-> +
->  bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
->  			phys_addr_t offset)
->  {
-> diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
-> index a093f5c..104f780 100644
-> --- a/virt/kvm/arm/vgic.h
-> +++ b/virt/kvm/arm/vgic.h
-> @@ -71,6 +71,8 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
->  		     phys_addr_t offset, int mode);
->  bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
->  			phys_addr_t offset);
-> +void vgic_reg64_access(struct kvm_exit_mmio *mmio, phys_addr_t offset,
-> +		       u64 *basereg, int mode);
-> 
->  static inline
->  u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
-> --
-> 2.5.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I don't have specs for any of these devices, so I don't know if this is
+really something that can vary between the different DesignWare-based
+devices, or if they all should use a mask of 0x1f.
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Bjorn
