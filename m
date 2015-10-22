@@ -1,36 +1,47 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Thu, 22 Oct 2015 11:25:34 +0800
-Subject: [PATCH 13/16] arm64: kdump: add kdump support
-In-Reply-To: <ef50b13d545f37a9fa95c5e6856e35f324798d00.1445297709.git.geoff@infradead.org>
-References: <cover.1445297709.git.geoff@infradead.org>
- <ef50b13d545f37a9fa95c5e6856e35f324798d00.1445297709.git.geoff@infradead.org>
-Message-ID: <20151022032534.GC11227@dhcp-129-115.nay.redhat.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 22 Oct 2015 11:41:25 +0800
+Subject: [PATCH 10/13] ARM: sun7i: dt: enable audio codec on Cubietruck
+In-Reply-To: <1445460786-18280-11-git-send-email-maxime.ripard@free-electrons.com>
+References: <1445460786-18280-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1445460786-18280-11-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v678LqQVMidbVqe0-JozJO_8fPTeZsW14hvL+UL4ikVzpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, AKASHI,
+On Thu, Oct 22, 2015 at 4:53 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> From: Emilio L?pez <emilio@elopez.com.ar>
+>
+> This commit enables the on-chip audio codec present on the A20 SoC
+> and outlines the SoC to connector routes for the Cubietruck.
 
-On 10/19/15 at 11:38pm, Geoff Levand wrote:
-> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> 
-> On crash dump kernel, all the information about primary kernel's core
-> image is available in elf core header specified by "elfcorehdr=" boot
-> parameter. reserve_elfcorehdr() will set aside the region to avoid any
-> corruption by crash dump kernel.
-> 
-> Crash dump kernel will access the system memory of primary kernel via
-> copy_oldmem_page(), which reads one page by ioremap'ing it since it does
-> not reside in linear mapping on crash dump kernel.
-> Please note that we should add "mem=X[MG]" boot parameter to limit the
-> memory size and avoid the following assertion at ioremap():
-> 	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
-> 		return NULL;
-> when accessing any pages beyond the usable memories of crash dump kernel.
+The latter bit is no longer true since you removed the routes.
 
-How does kexec-tools pass usable memory ranges to kernel? using dtb?
-Passing an extra mem=X sounds odd in the design. Kdump kernel should get
-usable ranges and hanle the limit better than depending on an extern kernel
-param. 
+ChenYu
 
-Thanks
-Dave
+>
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> index e6b019232a9e..8da939ab8350 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> @@ -101,6 +101,10 @@
+>         status = "okay";
+>  };
+>
+> +&codec {
+> +       status = "okay";
+> +};
+> +
+>  &cpu0 {
+>         cpu-supply = <&reg_dcdc2>;
+>  };
+> --
+> 2.6.2
+>
