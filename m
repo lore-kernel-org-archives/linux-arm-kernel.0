@@ -1,68 +1,50 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 22 Oct 2015 18:19:31 +0900
-Subject: [PATCH v2 1/3] dt-bindings: Consolidate SRAM bindings from all
- vendors
-In-Reply-To: <20151022090529.GV10947@lukather>
-References: <1445477130-407-1-git-send-email-k.kozlowski@samsung.com>
- <20151022090529.GV10947@lukather>
-Message-ID: <5628AA23.5070608@samsung.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 22 Oct 2015 10:21:29 +0100
+Subject: [PATCH 5/5] clk: scpi: add missing of_node_put
+In-Reply-To: <1445460100-26727-6-git-send-email-Julia.Lawall@lip6.fr>
+References: <1445460100-26727-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1445460100-26727-6-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <5628AA99.1000000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.10.2015 18:05, Maxime Ripard wrote:
-> Hi,
-> 
-> On Thu, Oct 22, 2015 at 10:25:28AM +0900, Krzysztof Kozlowski wrote:
->> SRAM bindings for various SoCs, using the mmio-sram genalloc
->> API, are spread over different places - per SoC vendor. Since all of
->> these are quite similar (they depend on mmio-sram) move them to a common
->> place.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Cc: Heiko Stuebner <heiko@sntech.de>
->> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
->> Cc: Chen-Yu Tsai <wens@csie.org>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> Suggested-by: Rob Herring <robh+dt@kernel.org>
->>
->> ---
->>
->> Changes since v1:
->> 1. New patch. Extended suggestion from Rob.
->> ---
->>  .../bindings/{arm/rockchip/pmu-sram.txt => sram/rockchip-pmu-sram.txt}    | 0
->>  .../bindings/{arm/rockchip/smp-sram.txt => sram/rockchip-smp-sram.txt}    | 0
->>  .../bindings/{arm/exynos/smp-sysram.txt => sram/samsung-sram.txt}         | 0
->>  Documentation/devicetree/bindings/{misc => sram}/sram.txt                 | 0
->>  .../devicetree/bindings/{soc/sunxi/sram.txt => sram/sunxi-sram.txt}       | 0
->>  5 files changed, 0 insertions(+), 0 deletions(-)
->>  rename Documentation/devicetree/bindings/{arm/rockchip/pmu-sram.txt => sram/rockchip-pmu-sram.txt} (100%)
->>  rename Documentation/devicetree/bindings/{arm/rockchip/smp-sram.txt => sram/rockchip-smp-sram.txt} (100%)
->>  rename Documentation/devicetree/bindings/{arm/exynos/smp-sysram.txt => sram/samsung-sram.txt} (100%)
->>  rename Documentation/devicetree/bindings/{misc => sram}/sram.txt (100%)
->>  rename Documentation/devicetree/bindings/{soc/sunxi/sram.txt => sram/sunxi-sram.txt} (100%)
-> 
-> I'm not sure about that one. The SRAM bindins we have for sunxi is for
-> an SRAM controller, that maps the SRAM either to the CPU or to the
-> devices.
-> 
-> It's not really related to the other users, and wouldn't it be
-> confusing to have a driver in drivers/soc, and a Documentation in
-> another sub-directory?
 
-I guess the only relation to other users is the "mmio-sram". In the same
-time this is still similar to e.g. Samsung's sram bindings (where the
-memory is mapped to CPU only).
 
-Being located in drivers/soc is not an issue here - code for other
-vendors may be moved there as well in the future.
+On 21/10/15 21:41, Julia Lawall wrote:
+> for_each_available_child_of_node performs an of_node_get on each iteration,
+> so a break out of the loop requires an of_node_put.
+>
+> The semantic patch that fixes this problem is as follows
+> (http://coccinelle.lip6.fr):
+>
+> // <smpl>
+> @@
+> expression root,e;
+> local idexpression child;
+> @@
+>
+>   for_each_available_child_of_node(root, child) {
+>     ... when != of_node_put(child)
+>         when != e = child
+> (
+>     return child;
+> |
+> +  of_node_put(child);
+> ?  return ...;
+> )
+>     ...
+>   }
+> // </smpl>
+>
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Of course I do not insist. Actually Rob's comment was only about moving
-sram.txt and Samsung's sram to common place.
+Thanks for the fix.
 
-Anyway I will be sending v3 of these because while looking more
-carefully I found hard-coded paths to bindings/misc/sram.txt. I'll fix
-it in next version.
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Best regards,
-Krzysztof
+PS: Since this driver is queued via arm-soc, it needs to go via them or
+wait for v4.4-rc1 and then queue via clk tree.
+
+-- 
+Regards,
+Sudeep
