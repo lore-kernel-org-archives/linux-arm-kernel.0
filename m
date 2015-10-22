@@ -1,119 +1,108 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 22 Oct 2015 11:54:06 +0900
-Subject: [PATCH 1/2] mmc: dw_mmc: exynos: Add the exynos3250 compatible
-In-Reply-To: <5628289C.90800@samsung.com>
-References: <1445409555-1684-1-git-send-email-jh80.chung@samsung.com>
- <5628289C.90800@samsung.com>
-Message-ID: <56284FCE.3000108@samsung.com>
+From: Minghuan.Lian@freescale.com (Lian M.H.)
+Date: Thu, 22 Oct 2015 03:03:10 +0000
+Subject: [PATCH v4 6/6] PCI: layerscape: add ls_pcie_msi_host_init
+In-Reply-To: <20151021213416.GJ1583@localhost>
+References: <1444979960-24100-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1444979960-24100-6-git-send-email-Minghuan.Lian@freescale.com>
+ <20151021213416.GJ1583@localhost>
+Message-ID: <DM2PR0301MB0640E65E99EA384420642AA9E2270@DM2PR0301MB0640.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Krzysztof.
+Hi Bjorn,
 
-On 10/22/2015 09:06 AM, Krzysztof Kozlowski wrote:
-> On 21.10.2015 15:39, Jaehoon Chung wrote:
->> To check more exactly, add the exynos3250 compatible.
->> Not use exynos5250 compatibility.
+I thank you very much to help review and help revise my patches.
+
+Regarding MSI, both LS1021a and LS1043a use SCFG to implement it. I have submitted patch:
+https://patchwork.kernel.org/patch/7411131/
+https://patchwork.kernel.org/patch/7411141/
+
+While ls2085a use ITS for it, we just re-use the ITS driver.
+
+I notice some platform MSI driver files were placed in pci/host folder not irqchip.
+If it is ok, I would like to change driver folder and re-submitted the MSI patch.
+
+Thanks,
+Minghaun
+
+> -----Original Message-----
+> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> Sent: Thursday, October 22, 2015 5:34 AM
+> To: Lian Minghuan-B31939 <Minghuan.Lian@freescale.com>
+> Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Zang
+> Roy-R61911 <tie-fei.zang@freescale.com>; Hu Mingkai-B21284
+> <Mingkai.Hu@freescale.com>; Yoder Stuart-B08248
+> <stuart.yoder@freescale.com>; Li Yang-Leo-R58472 <LeoLi@freescale.com>;
+> Arnd Bergmann <arnd@arndb.de>; Bjorn Helgaas <bhelgaas@google.com>;
+> Jingoo Han <jg1.han@samsung.com>; Zhou Wang <wangzhou1@hisilicon.com>
+> Subject: Re: [PATCH v4 6/6] PCI: layerscape: add ls_pcie_msi_host_init
 > 
-> Hi,
+> Hi Minghuan,
 > 
-> I can't find any difference between old and new compatible. Maybe I am
-> missing something? Maybe there is a difference for these devices?
-
-Sorry, I needs to add more explanation about changing compatible.
-Exynos3250 has more registers than exynos5250 in dwmmc IP.
-Now, we used dwmmc controller with exynos5250 compatible.
-Then some codes can't run in dw-mmc.c, if SoC is exynos3250.
-For example, there is the checking point in dw_mci_exynos_config_hs400().
-
-static void dw_mci_exynos_config_hs400(struct dw_mci *host, u32 timing)
-{
-        struct dw_mci_exynos_priv_data *priv = host->priv;
-        u32 dqs, strobe;
-
-        /*
-         * Not supported to configure register
-         * related to HS400
-         */
-        if (priv->ctrl_type < DW_MCI_TYPE_EXYNOS5420)
-                return;
-
-        dqs = priv->saved_dqs_en;
-        strobe = priv->saved_strobe_ctrl;
-
-It can't use this feature with exynos5250 compatible.
-
-Does it need to change the compatible from exynos5250 to exynos3250?
-
-Beset Regards,
-Jaehoon Chung
-
+> On Fri, Oct 16, 2015 at 03:19:20PM +0800, Minghuan Lian wrote:
+> > Layerscape PCIe has its own MSI implementation. The patch registers
+> > ls_pcie_msi_host_init() to avoid using Designware's MSI.
+> >
+> > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> > ---
+> > Change log
+> > v4: split from [PATCH v3] PCI: layerscape: Add PCIe support for
+> > LS1043a and LS2080a
+> >
+> >  drivers/pci/host/pci-layerscape.c | 17 +++++++++++++++++
+> >  1 file changed, 17 insertions(+)
+> >
+> > diff --git a/drivers/pci/host/pci-layerscape.c
+> > b/drivers/pci/host/pci-layerscape.c
+> > index c53692a..8fac6c8 100644
+> > --- a/drivers/pci/host/pci-layerscape.c
+> > +++ b/drivers/pci/host/pci-layerscape.c
+> > @@ -150,14 +150,31 @@ static void ls_pcie_host_init(struct pcie_port *pp)
+> >  	iowrite32(0, pcie->dbi + PCIE_DBI_RO_WR_EN);  }
+> >
+> > +static int ls_pcie_msi_host_init(struct pcie_port *pp,
+> > +				 struct msi_controller *chip)
+> > +{
+> > +	struct device_node *msi_node;
+> > +	struct device_node *np = pp->dev->of_node;
+> > +
+> > +	msi_node = of_parse_phandle(np, "msi-parent", 0);
+> > +	if (!msi_node) {
+> > +		dev_err(pp->dev, "failed to find msi-parent\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	return 0;
 > 
-> Anyway if the code is the same then it should use exactly the same
-> compatible.
+> I don't see how this can be right.  I think it's OK if you want to enforce the
+> presence of "msi-parent", but the other implementations of .msi_host_init
+> (ks_dw_pcie_msi_host_init() and the default implementation in
+> dw_pcie_host_init()) both set pp->irq_domain and call irq_create_mapping().
 > 
-> Best regards,
-> Krzysztof
+> You don't do either of those, so I don't see how MSIs can work, because I
+> assume the generic DesignWare code will depend on pp->irq_domain.  If
+> you're planning to add more Layerscape-specific MSI support later, I think you
+> should wait and include this patch with that work.
 > 
->>
->> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->> ---
->>  Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt | 2 ++
->>  drivers/mmc/host/dw_mmc-exynos.c                         | 7 +++++++
->>  2 files changed, 9 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->> index aad9844..cd22ac9 100644
->> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->> @@ -22,6 +22,8 @@ Required Properties:
->>  	  specific extensions.
->>  	- "samsung,exynos7-dw-mshc-smu": for controllers with Samsung Exynos7
->>  	  specific extensions having an SMU.
->> +	- "samsung,exynos3250-dw-mshc": for controllers with Samsung Exynos3250
->> +	  specific extensions.
->>  
->>  * samsung,dw-mshc-ciu-div: Specifies the divider value for the card interface
->>    unit (ciu) clock. This property is applicable only for Exynos5 SoC's and
->> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
->> index 1e75309..1c96218 100644
->> --- a/drivers/mmc/host/dw_mmc-exynos.c
->> +++ b/drivers/mmc/host/dw_mmc-exynos.c
->> @@ -32,6 +32,7 @@ enum dw_mci_exynos_type {
->>  	DW_MCI_TYPE_EXYNOS5420_SMU,
->>  	DW_MCI_TYPE_EXYNOS7,
->>  	DW_MCI_TYPE_EXYNOS7_SMU,
->> +	DW_MCI_TYPE_EXYNOS3250,
->>  };
->>  
->>  /* Exynos implementation specific driver private data */
->> @@ -73,6 +74,9 @@ static struct dw_mci_exynos_compatible {
->>  	}, {
->>  		.compatible	= "samsung,exynos7-dw-mshc-smu",
->>  		.ctrl_type	= DW_MCI_TYPE_EXYNOS7_SMU,
->> +	}, {
->> +		.compatible	= "samsung,exynos3250-dw-mshc",
->> +		.ctrl_type	= DW_MCI_TYPE_EXYNOS3250,
->>  	},
->>  };
->>  
->> @@ -467,6 +471,7 @@ static int dw_mci_exynos_execute_tuning(struct dw_mci_slot *slot)
->>  	} while (start_smpl != smpl);
->>  
->>  	found = dw_mci_exynos_get_best_clksmpl(candiates);
->> +
->>  	if (found >= 0) {
->>  		dw_mci_exynos_set_clksmpl(host, found);
->>  		priv->tuned_sample = found;
->> @@ -520,6 +525,8 @@ static const struct of_device_id dw_mci_exynos_match[] = {
->>  			.data = &exynos_drv_data, },
->>  	{ .compatible = "samsung,exynos7-dw-mshc-smu",
->>  			.data = &exynos_drv_data, },
->> +	{ .compatible = "samsung,exynos3250-dw-mshc",
->> +			.data = &exynos_drv_data, },
->>  	{},
->>  };
->>  MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
->>
-> 
-> 
+> > +}
+> > +
+> >  static struct pcie_host_ops ls1021_pcie_host_ops = {
+> >  	.link_up = ls1021_pcie_link_up,
+> >  	.host_init = ls1021_pcie_host_init,
+> > +	.msi_host_init = ls_pcie_msi_host_init,
+> >  };
+> >
+> >  static struct pcie_host_ops ls_pcie_host_ops = {
+> >  	.link_up = ls_pcie_link_up,
+> >  	.host_init = ls_pcie_host_init,
+> > +	.msi_host_init = ls_pcie_msi_host_init,
+> >  };
+> >
+> >  static struct ls_pcie_drvdata ls1021_drvdata = {
+> > --
+> > 1.9.1
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pci"
+> > in the body of a message to majordomo at vger.kernel.org More majordomo
+> > info at  http://vger.kernel.org/majordomo-info.html
