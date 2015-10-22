@@ -1,25 +1,30 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 21 Oct 2015 19:48:26 -0700 (PDT)
-Subject: [PATCH resend] net: sun4i-emac: Properly free resources on
- probe failure and remove
-In-Reply-To: <1445330544-6968-2-git-send-email-hdegoede@redhat.com>
-References: <1445330544-6968-1-git-send-email-hdegoede@redhat.com>
- <1445330544-6968-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151021.194826.782971305803462043.davem@davemloft.net>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 21 Oct 2015 21:50:49 -0500
+Subject: [PATCH] serial: msm_serial: Make config tristate
+In-Reply-To: <1445468723-948-1-git-send-email-sboyd@codeaurora.org>
+References: <1445468723-948-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20151022025049.GA4968@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hans de Goede <hdegoede@redhat.com>
-Date: Tue, 20 Oct 2015 10:42:24 +0200
-
-> Fix sun4i-emac not releasing the following resources:
-> -iomapped memory not released on probe-failure nor on remove
-> -clock not getting disabled on probe-failure nor on remove
-> -sram not being released on remove
+On Wed, Oct 21, 2015 at 04:05:23PM -0700, Stephen Boyd wrote:
+> This driver works as a module, so mark it as a tristate config
+> instead of a bool.
 > 
-> And while at it also add error checking to the clk_prepare_enable call
-> done on probe.
+> Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> I tested this with a busybox ramdisk that modprobes msm_serial and
+> then runs a getty on ttyMSM0. This patch should supersede Paul's earlier
+> patch that removes the module code from this driver.
+> 
+>  drivers/tty/serial/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Applied.
+Reviewed-by: Andy Gross <agross@codeaurora.org>
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
