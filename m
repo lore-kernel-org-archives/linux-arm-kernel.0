@@ -1,65 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Oct 2015 12:19:33 +0200
-Subject: [PATCH v2 5/6] vfio: platform: use list of registered reset
- function
-In-Reply-To: <1445506922-6005-6-git-send-email-eric.auger@linaro.org>
-References: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
- <1445506922-6005-6-git-send-email-eric.auger@linaro.org>
-Message-ID: <20554656.kA5nRBgtaJ@wuerfel>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 22 Oct 2015 12:23:15 +0200
+Subject: [PATCH 4/4] cpufreq: imx6q: check regulator_get_optional return
+ value
+In-Reply-To: <1445503652-777-5-git-send-email-s.hauer@pengutronix.de>
+References: <1445503652-777-1-git-send-email-s.hauer@pengutronix.de>
+ <1445503652-777-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1445509395.3173.31.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 October 2015 11:42:01 Eric Auger wrote:
-> Remove the static lookup table and use the dynamic list of registered
-> reset functions instead. Also load the reset module through its alias.
-> The reset struct module pointer is stored in vfio_platform_device.
+Am Donnerstag, den 22.10.2015, 10:47 +0200 schrieb Sascha Hauer:
+> While pu_reg is an optional regulator we still have to check
+> the return value for -EPROBE_DEFER to properly detect the
+> case when we have a pu regulator but it is not yet present.
 > 
-> We also remove the useless struct device pointer parameter in
-> vfio_platform_get_reset.
+> While at it, set pu_reg to NULL for an erroneous regulator
+> so that we can check for the regulator with if (pu_reg)
+> instead of the slightly less readable IS_ERR().
 > 
-> This patch fixes the issue related to the usage of __symbol_get, which
-> besides from being moot, prevented compilation with CONFIG_MODULES
-> disabled.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/cpufreq/imx6q-cpufreq.c | 11 ++++++++---
+>  1 file changed, 8 insertions(+), 3 deletions(-)
 > 
-> Also usage of MODULE_ALIAS makes possible to add a new reset module
-> without needing to update the framework. This was suggested by Arnd.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-
-Looks good, just small style issues:
-
-> 
-> -			}
-> +	mutex_lock(&reset_lock);
-> +	list_for_each_entry(iter, &reset_list, link) {
-> +		if (!strcmp(iter->compat, compat) &&
-> +			try_module_get(iter->owner)) {
-> +			*module = iter->owner;
-> +			mutex_unlock(&reset_lock);
-> +			return iter->reset;
->  		}
->  	}
-> +
-> +	mutex_unlock(&reset_lock);
-> +	return NULL;
-
-Better use 'break' to have a single mutex_unlock and return  statement.
-
-> +
+> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> index ce0c6bd..b643614 100644
+> --- a/drivers/cpufreq/imx6q-cpufreq.c
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -71,7 +71,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
 >  
->  static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
->  {
-> -	if (vdev->reset)
-> -		symbol_put_addr(vdev->reset);
-> +	if (vdev->reset) {
-> +		module_put(vdev->reset_module);
-> +		vdev->reset_module = NULL;
-> +		vdev->reset = NULL;
+>  	/* scaling up?  scale voltage before frequency */
+>  	if (new_freq > old_freq) {
+> -		if (!IS_ERR(pu_reg)) {
+> +		if (pu_reg) {
+>  			ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
+>  			if (ret) {
+>  				dev_err(cpu_dev, "failed to scale vddpu up: %d\n", ret);
+> @@ -148,7 +148,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+>  			dev_warn(cpu_dev, "failed to scale vddsoc down: %d\n", ret);
+>  			ret = 0;
+>  		}
+> -		if (!IS_ERR(pu_reg)) {
+> +		if (pu_reg) {
+>  			ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
+>  			if (ret) {
+>  				dev_warn(cpu_dev, "failed to scale vddpu down: %d\n", ret);
+> @@ -217,6 +217,11 @@ static int imx6q_cpufreq_get_resources(struct platform_device *pdev)
+>  		return PTR_ERR(arm_reg);
+>  
+>  	pu_reg = regulator_get_optional(cpu_dev, "pu");
+> +	if (IS_ERR(pu_reg)) {
+> +		if (PTR_ERR(pu_reg) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +		pu_reg = NULL;
 > +	}
->  }
 
-This gets called from the remove callback. No need to clear those
-struct members immediately before the kfree().
+The PU regulator isn't really optional for MX6 Q/DL (where it is present
+in hardware) as the datasheet clearly specifies that it needs to be set
+to the same voltage as SOC. Could you change this to request this
+regulator as non-optional for those chip derivatives and skip the
+request otherwise?
 
-	Arnd
+Regards,
+Lucas
+
+>  
+>  	soc_reg = regulator_get(cpu_dev, "soc");
+>  	if (IS_ERR(soc_reg))
+> @@ -377,7 +382,7 @@ soc_opp_out:
+>  	ret = regulator_set_voltage_time(soc_reg, imx6_soc_volt[0], imx6_soc_volt[num - 1]);
+>  	if (ret > 0)
+>  		transition_latency += ret * 1000;
+> -	if (!IS_ERR(pu_reg)) {
+> +	if (pu_reg) {
+>  		ret = regulator_set_voltage_time(pu_reg, imx6_soc_volt[0], imx6_soc_volt[num - 1]);
+>  		if (ret > 0)
+>  			transition_latency += ret * 1000;
+
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
