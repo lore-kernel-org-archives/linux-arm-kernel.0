@@ -1,75 +1,110 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 22 Oct 2015 11:35:34 -0500
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 22 Oct 2015 16:37:17 +0000
 Subject: [PATCH v11 1/6] PCI: designware: move calculation of bus
  addresses to DRA7xx
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E16274DCC@lhreml503-mbs>
+In-Reply-To: <20151022163534.GB21237@localhost>
 References: <1444991021-109306-1-git-send-email-wangzhou1@hisilicon.com>
  <1444991021-109306-2-git-send-email-wangzhou1@hisilicon.com>
  <20151021221524.GM1583@localhost>
  <EE11001F9E5DDD47B7634E2F8A612F2E16274DCC@lhreml503-mbs>
-Message-ID: <20151022163534.GB21237@localhost>
+ <20151022163534.GB21237@localhost>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E162759DA@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriele,
-
-On Thu, Oct 22, 2015 at 07:21:41AM +0000, Gabriele Paoloni wrote:
-> > -----Original Message-----
-> > From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-
-> > >  #define	PCIECTRL_DRA7XX_CONF_PHY_CS			0x010C
-> > >  #define	LINK_UP						BIT(16)
-> > > +#define	CPU_TO_BUS_ADDR					0x0FFFFFFF
-> > 
-> > "CPU_TO_BUS_ADDR" is a very generic name.  Since you do have DRA7XX in
-> > other #defines and static symbols in this file, maybe it could be DRA7XX to
-> > make it obvious that it only applies here?
+> -----Original Message-----
+> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+> owner at vger.kernel.org] On Behalf Of Bjorn Helgaas
+> Sent: Thursday, October 22, 2015 5:36 PM
+> To: Gabriele Paoloni
+> Cc: Wangzhou (B); Bjorn Helgaas; jingoohan1 at gmail.com;
+> pratyush.anand at gmail.com; Arnd Bergmann; linux at arm.linux.org.uk;
+> thomas.petazzoni at free-electrons.com; lorenzo.pieralisi at arm.com;
+> james.morse at arm.com; Liviu.Dudau at arm.com; jason at lakedaemon.net;
+> robh at kernel.org; gabriel.fernandez at linaro.org;
+> Minghuan.Lian at freescale.com; linux-pci at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; devicetree at vger.kernel.org; linux-
+> kernel at vger.kernel.org; zhangjukuo; qiuzhenfa; liudongdong (C);
+> qiujiang; xuwei (O); Liguozhu (Kenneth)
+> Subject: Re: [PATCH v11 1/6] PCI: designware: move calculation of bus
+> addresses to DRA7xx
 > 
-> Ok will change to DRA7XX_CPU_TO_BUS_ADRR in v12
-> ..
-
-> > > +	if (pp->io_mod_base)
-> > > +		pp->io_mod_base &= CPU_TO_BUS_ADDR;
-> > 
-> > These are equivalent to
-> > 
-> >   pp->io_mod_base &= CPU_TO_BUS_ADDR;
-> > 
-> > (You don't need to test whether they're zero first.)
+> Hi Gabriele,
 > 
-> Yes agreed, will change in v12
-> ...
-
-> > >  	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
-> > > @@ -415,8 +411,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
-> > >  			pp->io_base = range.cpu_addr;
+> On Thu, Oct 22, 2015 at 07:21:41AM +0000, Gabriele Paoloni wrote:
+> > > -----Original Message-----
+> > > From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> 
+> > > >  #define	PCIECTRL_DRA7XX_CONF_PHY_CS			0x010C
+> > > >  #define	LINK_UP						BIT(16)
+> > > > +#define	CPU_TO_BUS_ADDR					0x0FFFFFFF
 > > >
-> > >  			/* Find the untranslated IO space address */
-> > > -			pp->io_mod_base = of_read_number(parser.range -
-> > > -							 parser.np + na, ns);
-> > > +			pp->io_mod_base = range.cpu_addr;
-> > 
-> > So apparently
-> > 
-> >   "of_read_number() == range.cpu_addr & CPU_TO_BUS_ADDR" on DRA7xx
-> >   "of_read_number() == range.cpu_addr" everywhere else?
+> > > "CPU_TO_BUS_ADDR" is a very generic name.  Since you do have DRA7XX
+> in
+> > > other #defines and static symbols in this file, maybe it could be
+> DRA7XX to
+> > > make it obvious that it only applies here?
+> >
+> > Ok will change to DRA7XX_CPU_TO_BUS_ADRR in v12
+> > ..
 > 
-> Yes correct
+> > > > +	if (pp->io_mod_base)
+> > > > +		pp->io_mod_base &= CPU_TO_BUS_ADDR;
+> > >
+> > > These are equivalent to
+> > >
+> > >   pp->io_mod_base &= CPU_TO_BUS_ADDR;
+> > >
+> > > (You don't need to test whether they're zero first.)
+> >
+> > Yes agreed, will change in v12
+> > ...
 > 
-> > Is that right?  Is that a valid assumption, i.e., are we assuming
-> > anything about DTs in the field that we shouldn't?
+> > > >  	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+> "config");
+> > > > @@ -415,8 +411,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+> > > >  			pp->io_base = range.cpu_addr;
+> > > >
+> > > >  			/* Find the untranslated IO space address */
+> > > > -			pp->io_mod_base = of_read_number(parser.range -
+> > > > -							 parser.np + na, ns);
+> > > > +			pp->io_mod_base = range.cpu_addr;
+> > >
+> > > So apparently
+> > >
+> > >   "of_read_number() == range.cpu_addr & CPU_TO_BUS_ADDR" on DRA7xx
+> > >   "of_read_number() == range.cpu_addr" everywhere else?
+> >
+> > Yes correct
+> >
+> > > Is that right?  Is that a valid assumption, i.e., are we assuming
+> > > anything about DTs in the field that we shouldn't?
+> >
+> > Before I wrote a patch that was generic to accommodate intermediate
+> level
+> > of translation between PCI_addr -> BUS_addr -> CPU_addr
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
+> July/360922.html
+> >
+> > After discussion we agreed to solve it with a bitmask rather than
+> adding
+> > a field to of_pci_range to make it generic.
+> > The bitmask only applies to DRA7xx
 > 
-> Before I wrote a patch that was generic to accommodate intermediate level
-> of translation between PCI_addr -> BUS_addr -> CPU_addr
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/360922.html
-> 
-> After discussion we agreed to solve it with a bitmask rather than adding
-> a field to of_pci_range to make it generic.
-> The bitmask only applies to DRA7xx
+> I haven't gotten all the way through this series yet, but don't bother
+> with
+> a v12 just for these minor changes.  I can easily fix them up when
+> applying
+> it.
 
-I haven't gotten all the way through this series yet, but don't bother with
-a v12 just for these minor changes.  I can easily fix them up when applying
-it.
+Great Many Thanks for this!
 
-Bjorn
+Gab
+
+> 
+> Bjorn
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
